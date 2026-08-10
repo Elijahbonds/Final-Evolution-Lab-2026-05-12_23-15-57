@@ -39,6 +39,7 @@ import {
 } from '../core/BasketballCore';
 import { DribbleStateMachine, DRIBBLE_CLIP, syncedShotSpeed } from '../core/BallHandling';
 import { ContactSystem } from '../core/ContactSystem';
+import { MomentumBus } from '../core/MomentumBus';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -68,6 +69,12 @@ export const OneVOneMode: ModeDefinition = (() => {
   let arc: ShotArc;
   let arcResultMade = false, arcPoints = 0, arcLabel = '';
   let myScore = 0, foeScore = 0, momentum = 0;
+  const mbus = new MomentumBus();               // Phase 6: shared Game-Breaker
+  /** Report a highlight and mirror the bus into the HUD momentum meter. */
+  function swing(kind: Parameters<MomentumBus['report']>[0]['kind']): void {
+    mbus.report({ kind });
+    momentum = Math.round(mbus.score01 * 100);
+  }
   let possession: Possession = 'mine';
   let carrying = true, shooting = false, dunking = false;
   let ended = false;
@@ -175,6 +182,12 @@ export const OneVOneMode: ModeDefinition = (() => {
       myScore = 0; foeScore = 0; momentum = 0; ended = false; foeStunSec = 0;
       ctx.heroRef.current = me.root;
       ctx.objectiveRef.current = RIM;
+      mbus.reset();
+      mbus.onTierChange((tier) => {
+        if (tier === 'on_fire') { bannerFlash(ctx, "YOU'RE ON FIRE!", 1100); SoundKit.play('crowdCheer', { volume: 0.7 }); }
+        else if (tier === 'hot') bannerFlash(ctx, 'HEATING UP…', 800);
+        else if (tier === 'cold') bannerFlash(ctx, 'GONE COLD', 700);
+      });
       ctx.camDirector.snapTo(me.root.position, RIM);
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 6, modeId: 'onevone' });
       resetPositions();
@@ -197,6 +210,7 @@ export const OneVOneMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
+      mbus.update(dt);
       meSlot.poll(dt);
       foeSlot.poll(dt);
       foeStunSec = Math.max(0, foeStunSec - dt);
@@ -210,7 +224,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           EffectsKit.burst(ctx.scene, RIM, 'net');
           if (possession === 'mine') {
             myScore += arcPoints;
-            momentum = Math.min(100, momentum + 16);
+            swing('big_make');
             ctx.setHud({ score: myScore, momentum, banner: `${arcLabel} — GOOD!` });
             carrying = true;
             if (checkGameOver(ctx)) return;
@@ -268,7 +282,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             ctx.feel?.impact?.(0.1);
             if (foeStunSec === 0 && checkAnkleBreak(true, me.root.position, foe.root.position)) {
               foeStunSec = ANKLE_BREAK_STUN_SEC;
-              momentum = Math.min(100, momentum + 10);
+              swing('ankle_break');
               SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
               SoundKit.play('crowdCheer', { volume: 0.5 });
               ctx.feel?.impact?.(0.35);
@@ -288,7 +302,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           foe.animator.play(foeVel.lengthSquared() > 0.3 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
           if (carrying && !shooting && !dunking && foeIntent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.2) {
             SoundKit.play('impact', { pitch: 1.2, volume: 0.3 });
-            momentum = Math.max(0, momentum - 20);
+            swing('turnover'); momentum = Math.round(mbus.score01*100);
             ctx.setHud({ momentum });
             startDefense(ctx, 'STRIPPED — DEFEND!');
             return;
@@ -334,13 +348,13 @@ export const OneVOneMode: ModeDefinition = (() => {
             const iAmVictim = c.b === 'me';
             if (onMe && (shooting || dunking) && iAmVictim) {
               SoundKit.play('whistle');
-              momentum = Math.min(100, momentum + 8);
+              mbus.report({ kind: 'big_make', weight: 8 }); momentum = Math.round(mbus.score01 * 100);
               ctx.setHud({ momentum });
               bannerFlash(ctx, 'FOUL! — BALL BACK', 1000);
               resetPositions();
             } else if (onMe && possession === 'defense' && !iAmVictim) {
               SoundKit.play('whistle');
-              momentum = Math.max(0, momentum - 10);
+              mbus.report({ kind: 'turnover', weight: -10 }); momentum = Math.round(mbus.score01 * 100);
               ctx.setHud({ momentum });
               bannerFlash(ctx, 'FOUL ON YOU', 900);
               setTimeout(() => { if (!ended) resetPositions(); }, 900);
@@ -391,7 +405,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           // STEAL poke: my steal edge in tight range
           if (intent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.2 && Math.random() < 0.5) {
             SoundKit.play('impact', { pitch: 1.3, volume: 0.4 });
-            momentum = Math.min(100, momentum + 12);
+            swing('steal');
             ctx.setHud({ momentum });
             bannerFlash(ctx, 'PICKED THEIR POCKET!');
             resetPositions();
@@ -412,7 +426,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               SoundKit.play('crowdCheer', { volume: 0.6 });
               ctx.feel?.impact?.(0.5);
               EffectsKit.burst(ctx.scene, ball.position.clone(), 'sparks');
-              momentum = Math.min(100, momentum + 15);
+              swing('block');
               ballSim.launch(ball.getAbsolutePosition(), new Vector3((Math.random() - 0.5) * 4, 2, 3));
               ctx.setHud({ momentum });
               bannerFlash(ctx, 'REJECTED!', 900);
@@ -479,7 +493,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (made) {
         myScore += 1;
         const posterized = kind === 'poster';
-        momentum = Math.min(100, momentum + (posterized ? 30 : 18));
+        swing(posterized ? 'posterize' : 'highlight_dunk');
         SoundKit.play('score', { pitch: 0.9 });
         SoundKit.play('crowdCheer', { volume: posterized ? 0.8 : 0.5 });
         ctx.feel?.impact?.(posterized ? 0.7 : 0.45);
@@ -507,7 +521,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   function releaseJumper(ctx: ModeContext, quality: ShotQuality): void {
     shooting = false;
     const pctMod = currentShot?.pctMod ?? 1;
-    const pct = SHOT_QUALITY_PCT[quality] * pctMod * (1 + momentum / 400);
+    const pct = SHOT_QUALITY_PCT[quality] * pctMod * mbus.multiplier();
     const dist = Vector3.Distance(me.root.position, RIM);
     arcPoints = dist > PAINT_RADIUS ? 2 : 1;
     arcLabel = currentShot?.label ?? 'SHOT';
@@ -528,7 +542,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       ctx.feel?.impact?.(0.2);
       bannerFlash(ctx, 'GREEN!', 600);
     }
-    if (!arcResultMade) momentum = Math.max(0, momentum - 12);
+    if (!arcResultMade) swing('miss');
     carrying = false;
     arc.start(ball.getAbsolutePosition(), RIM, arcResultMade, currentShot?.style ?? 'jumper');
   }

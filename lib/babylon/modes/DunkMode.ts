@@ -34,6 +34,8 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { EffectsKit } from '../visual/EffectsKit';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
+import { DunkFlight } from '../core/DunkSystem';
+import { MomentumBus } from '../core/MomentumBus';
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'contestOver';
 const STYLES = ['power', 'flashy', 'sig'] as const;
@@ -106,6 +108,9 @@ export const DunkMode: ModeDefinition = (() => {
   const rim = new Vector3(0, CFG.rimHeight, CFG.rimZ);
   const ebState = { inLeftHand: false };
   let stickX = 0, stickY = 0;
+  const flight = new DunkFlight();               // Phase 6: trick-input flight
+  const momentum = new MomentumBus();            // Phase 6: shared Game-Breaker
+  let trickLabels: string[] = [];                // this attempt's thrown tricks
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
   const obstacleClearHeight = 1.35;
@@ -171,7 +176,7 @@ export const DunkMode: ModeDefinition = (() => {
 
       round = 1; dunkInRound = 0; playerTotal = 0; rivalTotal = 0; hype = 0; chain = 0; finishing = false;
       style = 'power'; prop = 'none'; rimCamCut = false;
-      styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear();
+      styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       setPhase('approach');
       ctx.setHud({
         round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`,
@@ -188,6 +193,23 @@ export const DunkMode: ModeDefinition = (() => {
         style = STYLES[(STYLES.indexOf(style) + 1) % STYLES.length];
         ctx.setHud({ style: STYLE_LABEL[style] });
         SoundKit.play('uiTick');
+      }
+      // TRICK GESTURES (Phase 6) — right-stick snaps mid-air throw real
+      // dunk tricks (windmill ↓↑, 360 ←→, eastbay ↓←, tomahawk ↑↓,
+      // between-the-legs →←→). Each plays its own clip, pumps difficulty,
+      // and taxes the slam window. Two before the window = COMBO dunk.
+      if (phase === 'cinematic' && !qteWindowOpen) {
+        const trick = flight.feedInput(e);
+        if (trick) {
+          trickLabels.push(trick.label);
+          player.animator.play(trick.clip, { speedRatio: 1.05 });
+          hype = Math.min(100, hype + 6);
+          SoundKit.play('whoosh', { pitch: 1.1 + trick.difficulty * 0.08, volume: 0.45 });
+          SoundKit.play('crowdCheer', { volume: 0.3 + trick.difficulty * 0.05 });
+          EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'sparks');
+          ctx.setHud({ banner: trickLabels.length > 1 ? `COMBO: ${trickLabels.join(' → ')}!` : `${trick.label}!` });
+          setTimeout(() => ctx.setHud({ banner: '' }), 700);
+        }
       }
       // STYLE TAPS — mid-air showboating before the SLAM window opens:
       // +1.2 difficulty each, SLAM window shrinks 25% per tap (max 2)
@@ -224,7 +246,7 @@ export const DunkMode: ModeDefinition = (() => {
       if (e.t === 'button' && e.btn === 'A' && e.pressed && qteWindowOpen) {
         qteHit = true;
         const center = EASTBAY_TIMING.extend;
-        const window = CFG.qteWindowSec * (1 - styleTaps * 0.25);   // taps tightened it
+        const window = CFG.qteWindowSec * (1 - styleTaps * 0.25) * flight.slamWindowScale;
         qteAccuracy = Math.max(0, 1 - Math.abs(clipTime - center) / (window / 2));
       }
       // RIM HANG — hold SLAM through the flush to hang on the iron
@@ -283,7 +305,8 @@ export const DunkMode: ModeDefinition = (() => {
         }
 
         const wasOpen = qteWindowOpen;
-        const window = CFG.qteWindowSec * (1 - styleTaps * 0.25);   // style taps tighten the slam
+        flight.update(dt);
+        const window = CFG.qteWindowSec * (1 - styleTaps * 0.25) * flight.slamWindowScale;
         qteWindowOpen = clipTime >= EASTBAY_TIMING.extend - window / 2
           && clipTime <= EASTBAY_TIMING.extend + window / 2;
         if (qteWindowOpen && !wasOpen) ctx.setHud({ hint: 'SLAM!', slamPulse: true });
@@ -361,7 +384,8 @@ export const DunkMode: ModeDefinition = (() => {
     if (phase === 'cinematic') return;
     setPhase('cinematic');
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false;
-    rimCamCut = false; styleTaps = 0; hangSec = 0;
+    rimCamCut = false; styleTaps = 0; hangSec = 0; trickLabels = [];
+    flight.launch(Math.min(1, charge * 0.5 + Math.hypot(stickX, stickY) * 0.5), STYLE_TIER[style]);
     if (prop !== 'alleyoop') attachBallToHand(ball, player.skeleton, 'RightHand');
     else releaseBall(ball);   // ball waits at the teammate's hand until the toss beat
     SoundKit.play('whoosh', { pitch: 0.85 });
@@ -412,7 +436,7 @@ export const DunkMode: ModeDefinition = (() => {
     }
 
     // VARIETY MEMORY — the judges remember what they've seen this contest
-    const combo = `${style}_${prop}`;
+    const combo = `${style}_${prop}_${trickLabels.join('+') || 'plain'}`;
     const isRepeat = usedCombos.has(combo);
     usedCombos.add(combo);
     const varietyMod = isRepeat ? 0.8 : 1;
@@ -430,8 +454,11 @@ export const DunkMode: ModeDefinition = (() => {
       setTimeout(() => ctx.setHud({ banner: '' }), 700);
     }
 
+    // Phase 6: trick gestures carry the difficulty (style tier is the base
+    // inside flight.attempt.difficulty; combo chains get their 1.35x there).
+    const trickDifficulty = flight.attempt.difficulty - STYLE_TIER[style];
     const difficulty = Math.max(0, Math.min(10,
-      (STYLE_TIER[style] + PROP_BONUS[prop] * (clippedObstacle ? 0.4 : 1) + charge * 2
+      (STYLE_TIER[style] + trickDifficulty + PROP_BONUS[prop] * (clippedObstacle ? 0.4 : 1) + charge * 2
         + styleTaps * 1.2 + varietyBonus) * varietyMod));
     const execution = Math.max(0, Math.min(10, qteAccuracy * 10));
     const styleScore = Math.max(0, Math.min(10, STYLE_TIER[style] * 0.6 + Math.min(2, hype / 50) + styleTaps * 0.8 + hangBonus));
@@ -442,6 +469,19 @@ export const DunkMode: ModeDefinition = (() => {
 
     // CHAIN: consecutive 24+ dunks build the multiplier; each link pumps
     // extra hype (which feeds the NEXT dunk's style score — real teeth)
+    // Game-Breaker: a 27+ dunk is a highlight that shifts the building
+    if (dunkTotal >= 27) {
+      momentum.report({ kind: 'highlight_dunk', weight: dunkTotal >= 29 ? 30 : 18 });
+    } else if (dunkTotal <= 19) {
+      momentum.report({ kind: 'contest_low' });
+    }
+    momentum.update(0); // settle tier for this beat
+    const tier = momentum.tier;
+    if (tier === 'on_fire' || tier === 'hot') {
+      hype = Math.min(100, hype + (tier === 'on_fire' ? 14 : 7));
+      ctx.setHud({ banner: tier === 'on_fire' ? 'THE BUILDING IS ON FIRE' : 'HEATING UP…' });
+    }
+
     if (dunkTotal >= CHAIN_THRESHOLD) {
       chain++;
       if (chain >= 2) {
