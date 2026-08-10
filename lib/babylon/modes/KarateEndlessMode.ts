@@ -41,6 +41,10 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
+import {
+  waveSpec, spawnRing, buyPerk, PERKS, DownRevive, REVIVE_RANGE,
+  surroundedCount, crowdClear, CROWDCLEAR_RADIUS,
+} from '../core/OnslaughtCore';
 
 const STANCE = SPORT_CLIP.karateStance;
 const STRIKES = {
@@ -99,6 +103,29 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   let pool: MobPool;
   let enemies: Enemy[] = [];
   let wave = 0, kos = 0, totalKos = 0, playerHp = 100, partnerHp = 100, chi = 0;
+  // Phase 8: perks, down/revive, crowd-clear
+  const ownedPerks = new Set<string>();
+  const myDown = new DownRevive();
+  const partnerDown = new DownRevive();
+  let revivingPartner = false;
+  let coins = 0;                       // display mirror of server balance
+  let dmgMult = 1, speedMult = 1;
+  let shopOpen = false;
+  let clockSec = 0;
+  /** Server-authoritative spend: the client sends the perk id ONLY; the
+   *  server owns price/balance. Offline/dev falls back to a local denial. */
+  async function serverSpend(perkId: string, _cost: number): Promise<{ ok: boolean; reason?: string }> {
+    try {
+      const res = await fetch('/api/wallet/spend', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId: `onslaught_perk_${perkId}` }),
+      });
+      if (!res.ok) return { ok: false, reason: `server refused (${res.status})` };
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: 'offline — purchases disabled' };
+    }
+  }
   let striking = false, blocking = false, dodging = false, bursting = false;
   let xHoldSec = -1, iframeSec = 0, slowMoSec = 0;
   let stickX = 0, stickY = 0;
@@ -135,8 +162,15 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
 
   async function spawnWave(ctx: ModeContext): Promise<void> {
+    // between waves (not the first): the perk shop opens
+    if (wave >= 1) {
+      shopOpen = true;
+      ctx.setHud({ banner: 'PERKS — d-pad to browse, A to buy, B to fight', perks: PERKS.map((p, i) => `${i + 1}=${p.label} ${p.costCoins}c`).join(' · '), coins });
+    }
     wave++; kos = 0;
-    const count = Math.min(WAVE.base + Math.floor(wave / WAVE.growEvery), WAVE.max);
+    const spec = waveSpec(wave);
+    const count = spec.count;
+    void spawnRing(wave, count);
     const proms: Promise<void>[] = [];
     for (let i = 0; i < count; i++) proms.push(spawnEnemy(ctx, (i / count) * Math.PI * 2 + wave, i));
     await Promise.all(proms);
@@ -161,6 +195,17 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   // existing landHit/ko/wave-clear path, so a burst can clear a wave cleanly.
   function chiBurst(ctx: ModeContext): void {
     if (!CHI_BURST_ENABLED || chi < 100 || striking || dodging || bursting) return;
+    // Phase 8: surrounded 3+ makes this the CROWD-CLEAR finisher — bigger
+    // radius read, brief invulnerability feel (dodge window), huge payoff.
+    const surrounded = surroundedCount(player.root.position,
+      enemies.map((e) => ({ id: 'e', pos: e.mob.char.root.position, hp: e.hp, airborneSec: 0 })));
+    const isCrowdClear = surrounded >= 3;
+    if (isCrowdClear) {
+      ctx.setHud({ banner: 'CROWD CLEAR!' });
+      ctx.feel?.impact?.(1);
+      SoundKit.play('crowdCheer', { volume: 0.9 });
+      ctx.camDirector?.pulse?.(0.8, 0.6);
+    }
     bursting = true; chi = 0;
     ctx.setHud({ chi, banner: 'CHI BURST' });
     setTimeout(() => { ctx.setHud({ banner: '' }); }, 800);
@@ -211,7 +256,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
 
   function landHit(ctx: ModeContext, t: Enemy, dmg: number): void {
-    t.hp -= dmg;
+    t.hp -= Math.round(dmg * dmgMult);
     gainChi(ctx, 8);
     ctx.feel?.impact?.(0.35);
     EffectsKit.burst(ctx.scene, t.mob.char.root.position.add(new Vector3(0, 1.1, 0)), 'sparks');
@@ -317,6 +362,39 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     },
 
     update(ctx, dtReal) {
+      clockSec += dtReal;
+      // Phase 8: down/revive tick
+      if (myDown.downed) {
+        const near = Vector3.Distance(partner.root.position, player.root.position) <= REVIVE_RANGE;
+        if (myDown.channel(dtReal, near)) {
+          playerHp = Math.round(100 * myDown.revive());
+          SoundKit.play('powerUp', { pitch: 1.1 });
+          ctx.setHud({ hp: playerHp, banner: 'REVIVED — BACK IN THE FIGHT' });
+          player.animator.play(STANCE, { loop: true });
+          setTimeout(() => ctx.setHud({ banner: '' }), 900);
+        }
+        if (myDown.bledOut(clockSec)) {
+          return ctx.end(`WAVE_${wave}`, totalKos * 100 + wave * 50, { wave, kos: totalKos });
+        }
+      }
+      if (partnerDown.downed) {
+        if (revivingPartner && Vector3.Distance(player.root.position, partner.root.position) <= REVIVE_RANGE) {
+          if (partnerDown.channel(dtReal, true)) {
+            partnerHp = Math.round(100 * partnerDown.revive());
+            SoundKit.play('powerUp', { pitch: 1.1 });
+            ctx.setHud({ partnerHp, banner: 'PARTNER REVIVED!' });
+            setTimeout(() => ctx.setHud({ banner: '' }), 900);
+          } else {
+            ctx.setHud({ revive: Math.round(partnerDown.channelSec / 3 * 100) });
+          }
+        } else {
+          partnerDown.channel(dtReal, false);
+          ctx.setHud({ revive: 0 });
+        }
+        if (partnerDown.bledOut(clockSec)) {
+          ctx.setHud({ banner: 'PARTNER BLED OUT' });
+        }
+      }
       slowMoSec = Math.max(0, slowMoSec - dtReal);
       const dt = slowMoSec > 0 ? dtReal * SLOWMO_SCALE : dtReal;
 
@@ -379,9 +457,21 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         if (!blocking) { player.animator.play(SPORT_CLIP.karateHitReact, {}); ctx.feel?.impact?.(0.4); }
         ctx.setHud({ hp: Math.max(0, playerHp) });
         if (playerHp <= 0) {
-          SoundKit.play('crowdGroan');
-          player.animator.play(SPORT_CLIP.karateKnockdown, { onEnd: () => {} });
-          return ctx.end(`WAVE_${wave}`, totalKos * 100 + wave * 50, { wave, kos: totalKos });
+          // Phase 8 co-op rule: go DOWN (not out) while the partner stands;
+          // they can revive you. Both down (or no partner alive) = run over.
+          if (!partnerDown.downed && partnerHp > 0 && !myDown.downed) {
+            myDown.down(clockSec);
+            playerHp = 0;
+            SoundKit.play('crowdGroan');
+            player.animator.play(SPORT_CLIP.karateKnockdown, {});
+            ctx.setHud({ banner: 'YOU ARE DOWN — PARTNER CAN REVIVE YOU', hp: 0 });
+          } else if (myDown.downed) {
+            // already down and got hit again — nothing to do
+          } else {
+            SoundKit.play('crowdGroan');
+            player.animator.play(SPORT_CLIP.karateKnockdown, { onEnd: () => {} });
+            return ctx.end(`WAVE_${wave}`, totalKos * 100 + wave * 50, { wave, kos: totalKos });
+          }
         }
       }
 
