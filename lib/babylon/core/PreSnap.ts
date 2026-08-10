@@ -125,6 +125,40 @@ export function playBeatsShell(play: PlayCall, read: DefensiveRead): boolean {
 // ── Pre-snap state machine ─────────────────────────────────────────────────
 export type PreSnapPhase = 'formation' | 'playcall' | 'read' | 'snapReady' | 'snapped';
 
+// ── Audibles & motion ──────────────────────────────────────────────────────
+/** Audible: swap the called play post-read (low-friction — one tap cycles
+ *  to the concept that beats the read). Returns the new playcall. */
+export function audibleToCounter(read: DefensiveRead): PlayCall {
+  const target = read.blitzComing ? 'blitz' : read.shell;
+  const idx = PLAYBOOK.findIndex((p) => p.beatsCoverage === target);
+  return PLAYBOOK[idx >= 0 ? idx : 0];
+}
+
+/** Pre-snap motion: move an offensive spot across the formation; returns
+ *  how the DEFENSE responds — a man defender follows (MAN TELL), a zone
+ *  defender bumps over one zone (ZONE TELL). This is the motion read:
+ *  the defense's response reveals the coverage before the snap. */
+export interface MotionResult {
+  movedTo: Vector3;
+  defenseResponse: 'followed' | 'bumped' | 'held';
+  revealedShell: 'man' | 'zone' | null;
+}
+
+export function motionPlayer(def: Formation, fromX: number, toX: number): MotionResult {
+  const isMan = def.id === 'press-man';
+  // the corner nearest the moving receiver reacts
+  const cb = def.spots.find((s) => s.role === 'press' || s.role === 'flat');
+  if (!cb) return { movedTo: new Vector3(toX, 0, 0), defenseResponse: 'held', revealedShell: null };
+  if (isMan) {
+    const followed = Math.sign(toX) !== Math.sign(cb.pos.x);
+    cb.pos.x = toX + 0.2 * Math.sign(toX);               // he follows across
+    return { movedTo: new Vector3(toX, 0, 0), defenseResponse: followed ? 'followed' : 'followed', revealedShell: 'man' };
+  }
+  // zone: the flat defender bumps a step, stays on his side
+  cb.pos.x += Math.sign(toX - cb.pos.x) * 1.2;
+  return { movedTo: new Vector3(toX, 0, 0), defenseResponse: 'bumped', revealedShell: 'zone' };
+}
+
 export class PreSnapFlow {
   phase: PreSnapPhase = 'formation';
   playcallIdx = 0;
@@ -138,6 +172,31 @@ export class PreSnapFlow {
   }
 
   get playcall(): PlayCall { return PLAYBOOK[this.playcallIdx]; }
+
+  /** Audible to the concept that beats the current read (if read taken). */
+  audible(): boolean {
+    if (this.phase !== 'read' && this.phase !== 'snapReady') return false;
+    if (!this.read) return false;
+    const counter = audibleToCounter(this.read);
+    this.playcallIdx = PLAYBOOK.findIndex((p) => p.id === counter.id);
+    return true;
+  }
+
+  /** Motion a receiver across the formation; returns the defense tell. */
+  motion(spotId: string, toX: number): MotionResult | null {
+    if (this.phase === 'snapped') return null;
+    const spot = this.offense.spots.find((s) => s.id === spotId);
+    if (!spot) return null;
+    const res = motionPlayer(this.defense, spot.pos.x, toX);
+    spot.pos = res.movedTo;
+    // motion REVEALS: refresh the read with the new alignment
+    if (this.phase === 'read' || this.phase === 'snapReady') {
+      this.read = readDefense(this.defense);
+      if (res.revealedShell) this.read.shell = res.revealedShell;
+      this.read.confidence01 = Math.min(1, this.read.confidence01 + 0.2);
+    }
+    return res;
+  }
 
   advance(): void {
     if (this.phase === 'formation') this.phase = 'playcall';
