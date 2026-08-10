@@ -494,6 +494,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         myScore += 1;
         const posterized = kind === 'poster';
         swing(posterized ? 'posterize' : 'highlight_dunk');
+        ctx.camDirector.pulse(posterized ? 0.85 : 0.6, 0.5);
         SoundKit.play('score', { pitch: 0.9 });
         SoundKit.play('crowdCheer', { volume: posterized ? 0.8 : 0.5 });
         ctx.feel?.impact?.(posterized ? 0.7 : 0.45);
@@ -541,6 +542,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       SoundKit.play('crowdCheer', { volume: 0.35 });
       ctx.feel?.impact?.(0.2);
       bannerFlash(ctx, 'GREEN!', 600);
+      ctx.camDirector.pulse(0.3, 0.35);
     }
     if (!arcResultMade) swing('miss');
     carrying = false;

@@ -89,6 +89,10 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   // third-person over-the-shoulder — close, low, offset to the right
   // shoulder, follows facing (fitTwo off — see file header)
   overShoulder: { distance: 3.1, height: 1.65, minHeight: 1.2, pitchFloorDeg: 1, pitchCapDeg: 9, targetHeight: 1.45, lag: 0.16, lookAhead: 2.2, shoulderOffset: 0.55 },
+  // DUNK CONTEST cinematic — NOT the live-play camera: lower, closer,
+  // slower lag so the flight glides like a highlight reel; tighter pitch
+  // cap keeps the rim in frame at apex without a hard tilt.
+  contest: { distance: 5.6, height: 1.7, minHeight: 1.1, pitchFloorDeg: 4, pitchCapDeg: 12, targetHeight: 1.5, lag: 0.06, lookAhead: 0.6, fitTwo: true },
 };
 
 export const FIXED_PRESETS: Record<string, { offset: Vector3; targetHeight: number }> = {
@@ -121,6 +125,23 @@ export class CameraDirector {
   private bounds: CamBounds | null = null;
   private boundsExplicit = false;
   private boundsTried = false;
+  // ── Phase 8: reaction beats ──
+  private beatT = 0; private beatDur = 0; private beatStrength = 0;
+
+  /** Reaction beat: a quick ease-out push-in on the subject (dunk flush,
+   *  posterize, big judge total). strength 0..1, duration seconds. */
+  pulse(strength: number, durationSec = 0.45): void {
+    this.beatT = durationSec;
+    this.beatDur = durationSec;
+    this.beatStrength = Math.max(0, Math.min(1, strength));
+  }
+
+  /** Current beat scale on the follow distance (1 = no beat). */
+  get beatScale(): number {
+    if (this.beatT <= 0 || this.beatDur <= 0) return 1;
+    const k = this.beatT / this.beatDur;                 // 1→0 over the beat
+    return 1 - 0.32 * this.beatStrength * k * k;         // ease-out push-in
+  }
 
   constructor(
     private scene: Scene,
@@ -225,6 +246,7 @@ export class CameraDirector {
 
   update(subject: Vector3, velocity: Vector3, objective: Vector3 | null): void {
     if (this.suspended) return;
+    this.beatT = Math.max(0, this.beatT - this.scene.getEngine().getDeltaTime() / 1000);
 
     if (this.mode === 'fixed' && this.fixedPos) {
       this.camera.position = Vector3.Lerp(this.camera.position, this.fixedPos, 0.1);
@@ -253,7 +275,7 @@ export class CameraDirector {
     const separation = cfg.fitTwo && objective ? Vector3.Distance(subject, objective) : 0;
     // E26: cap the separation pull-back — uncapped, a full-court 3v3
     // possession pushed the 'team' preset clean through the back wall.
-    const dist = cfg.distance + Math.min(4.5, Math.max(0, separation - 3) * 0.55);
+    const dist = (cfg.distance + Math.min(4.5, Math.max(0, separation - 3) * 0.55)) * this.beatScale;
 
     let desired = subject.add(back.scale(dist)).add(new Vector3(0, cfg.height, 0));
     desired.y = Math.max(desired.y, subject.y + cfg.minHeight);

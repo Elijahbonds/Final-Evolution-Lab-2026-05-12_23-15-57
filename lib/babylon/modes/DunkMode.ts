@@ -120,7 +120,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
 
   const def: ModeDefinition = {
-    modeId: 'dunk', mood: 'goldenHour', camPreset: 'court',
+    modeId: 'dunk', mood: 'goldenHour', camPreset: 'contest',  // Phase 8: cinematic, not broadcast
 
     async load(ctx: ModeContext) {
       // M74: try Nexus venue first; fallback to VenueKit if no spec
@@ -192,6 +192,7 @@ export const DunkMode: ModeDefinition = (() => {
           SoundKit.play('crowdCheer', { volume: 0.3 + trick.difficulty * 0.05 });
           EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'sparks');
           ctx.setHud({ banner: trickLabels.length > 1 ? `COMBO: ${trickLabels.join(' → ')}!` : `${trick.label}!` });
+          ctx.camDirector.pulse(trickLabels.length > 1 ? 0.7 : 0.45, 0.5);
           setTimeout(() => ctx.setHud({ banner: '' }), 700);
         }
       }
@@ -326,6 +327,7 @@ export const DunkMode: ModeDefinition = (() => {
             SoundKit.play('uiTick', { pitch: 0.95, volume: 0.35 });
           } else if (beat.kind === 'total') {
             ctx.setHud({ hint: '', judgeReveal: revealed });
+            ctx.camDirector.pulse(beat.band === 'eruption' ? 1 : beat.band === 'hush' ? 0.15 : 0.4, 0.6);
             if (beat.band === 'eruption') {
               SoundKit.play('crowdCheer', { volume: 1 });
               SoundKit.play('score', { pitch: 1.3 });
