@@ -26,6 +26,7 @@ import { ComboChain } from '../core/ComboChain';
 import { BoardAnimTree } from '../anim/boardTree';
 import { MomentumBus } from '../core/MomentumBus';
 import { BoardSync } from '../core/BoardPhysics';
+import { GoalTracker, MovingRail, SKATE_GOALS } from '../core/ParkGoals';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { CoinField } from '../core/Pickups';
@@ -59,6 +60,8 @@ export const SkateRunMode: ModeDefinition = (() => {
   let pushing = false;
   let lastLanding: 'none' | 'clean' | 'sketchy' = 'none';
   let landingBeatT = 0;
+  let goals: GoalTracker;
+  let patrolRail: MovingRail;
   return {
     modeId: 'skateboard', mood: 'goldenHour', camPreset: 'board',
 
@@ -70,6 +73,13 @@ export const SkateRunMode: ModeDefinition = (() => {
       animTree = new BoardAnimTree(rig.char.animator);
       boardSync = new BoardSync(rig.board, rig.char.root);
       mbus.reset();
+      goals = new GoalTracker(SKATE_GOALS);
+      // the gimmick: a rail that patrols the plaza — grind it in motion
+      patrolRail = new MovingRail(
+        new Vector3(-2, 0.5, 0), new Vector3(2, 0.5, 0),
+        new Vector3(0, 0, -8), new Vector3(0, 0, 8), 0.18,
+      );
+      world.grindLines.push(patrolRail.line);
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 4, modeId: 'skateboard' });
       timeLeft = RUN_SEC; ended = false; stickX = 0; pump = 0;
       SoundKit.startAmbient('stadium');
@@ -148,7 +158,17 @@ export const SkateRunMode: ModeDefinition = (() => {
         return ctx.end('RUN_COMPLETE', finalScore, { runSec: RUN_SEC, coinsCollected: coins.collected, bestCombo: combo.bestCombo });
       }
       const gained = coins.update(dt, rig.char.root.position);
-      if (gained > 0) { SoundKit.play('uiTick', { pitch: 1.4 }); ctx.setHud({ coins: coins.collected }); }
+      if (gained > 0) {
+        SoundKit.play('uiTick', { pitch: 1.4 });
+        ctx.setHud({ coins: coins.collected });
+        for (const g of goals.report({ type: 'collect', collectibleId: `c${coins.collected}` })) {
+          bannerFlash(ctx, `GOAL: ${g.label}`, 1200);
+          SoundKit.play('powerUp', { pitch: 1.3 });
+        }
+      }
+      // gimmick: rail patrols; its grind line follows
+      patrolRail.update(dt);
+      world.grindLines[world.grindLines.length - 1] = patrolRail.line;
       // ── balance channels (grind/manual) feed the combo ──
       if (grindCh?.active) {
         const r = grindCh.update(dt, stickX, move.speed01);
@@ -237,6 +257,27 @@ export const SkateRunMode: ModeDefinition = (() => {
         landing: landingBeatT > 0 ? lastLanding : 'none', bailing: false,
       });
       if (landingBeatT > 0) { landingBeatT -= dt; if (landingBeatT <= 0) animTree.clearBeat('land_clean', 'land_sketchy'); }
+
+      // goals: combo completion + banking feed the tracker
+      if (!combo.active && combo.banked > 0) {
+        for (const g of goals.report({ type: 'bank', value: combo.banked })) {
+          bannerFlash(ctx, `GOAL: ${g.label}`, 1200);
+          SoundKit.play('powerUp', { pitch: 1.3 });
+          mbus.report({ kind: 'big_make' });
+        }
+      }
+      if (grindCh?.active && patrolRail && Vector3.Distance(Vector3.Center(patrolRail.line.a, patrolRail.line.b), rig.char.root.position) < 2.5) {
+        for (const g of goals.report({ type: 'gap', gapId: patrolRail.gapId })) {
+          bannerFlash(ctx, `GAP: ${g.label}`, 1200);
+          SoundKit.play('crowdCheer', { volume: 0.6 });
+        }
+      }
+      if (combo.multiplier > 0 && combo.pot >= 800) {
+        for (const g of goals.report({ type: 'comboLanded', value: combo.pot })) {
+          bannerFlash(ctx, `GOAL: ${g.label}`, 1200);
+        }
+      }
+      ctx.setHud({ goals: `${goals.doneCount}/${SKATE_GOALS.length}` });
 
       // combo HUD
       const hud = combo.hud;
