@@ -20,7 +20,7 @@ let pass = 0;
 const ok = (n: string, fn: () => void) => { fn(); pass++; console.log(`  ✓ ${n}`); };
 const DT = 1 / 60;
 
-function sceneWithRamp(): { scene: Scene; rampTop: Vector3; ground: ReturnType<MeshBuilder.CreateGround>[] } {
+function sceneWithRamp(): { scene: Scene; rampTop: Vector3; ground: import('@babylonjs/core').AbstractMesh[] } {
   const scene = new Scene(new NullEngine());
   new ArcRotateCamera('cam', 0, 0, 10, Vector3.Zero(), scene);
   // a simple ramp: a rotated box you can stand on
@@ -29,7 +29,7 @@ function sceneWithRamp(): { scene: Scene; rampTop: Vector3; ground: ReturnType<M
   ramp.rotation.x = -0.3;                    // tilts so +Z is downhill
   ramp.computeWorldMatrix(true);
   scene.render();                             // bake world matrices
-  return { scene, rampTop: new Vector3(0, 2.5, 0), ground: [ramp] as never };
+  return { scene, rampTop: new Vector3(0, 2.5, 0), ground: [ramp] };
 }
 
 console.log('\nA. slope response');
@@ -43,7 +43,7 @@ ok('facing downhill gains, facing uphill loses, flat is neutral', () => {
   new ArcRotateCamera('cam', 0, 0, 10, Vector3.Zero(), flat);
   const g = MeshBuilder.CreateGround('g', { width: 10, height: 10 }, flat);
   flat.render();
-  const f = sampleSlope(flat, new Vector3(0, 0.5, 0), 0, [g] as never);
+  const f = sampleSlope(flat, new Vector3(0, 0.5, 0), 0, [g]);
   assert.ok(Math.abs(f.gravityAlongSlope) < 0.01, 'flat neutral');
   assert.ok(down.steepness01 > 0.02 && f.steepness01 < 0.01, `steepness reads (${down.steepness01.toFixed(3)} vs ${f.steepness01.toFixed(3)})`);
 });
