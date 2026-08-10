@@ -258,6 +258,20 @@ async function main() {
     spawned.dispose();
   }
 
+  // ══ F. Mode 4 Gate 0: football clip chain on the same rig ══════════════
+  console.log('\nF. football clip chain (Mode 4 gate)');
+  {
+    const spawned = await CharacterLibrary.spawn(scene, urlForModel('/models/elijah-hero.glb'), { modeId: 'gate0-football' });
+    const arm = spawned.skeleton.bones.find((b) => b.name === 'RightArm')?.getTransformNode();
+    for (const clip of ['football_sprint_return', 'football_juke_left', 'football_spin_move', 'football_stiff_arm', 'football_tackled_fall', 'football_touchdown_spike']) {
+      spawned.animator.play(clip, { loop: true, fadeSec: 0.05, restart: true });
+      for (let i = 0; i < 4; i++) scene.render();
+      const moved = motionWhilePlaying(scene, arm!);
+      ok(`"${clip}" plays with real motion (distinct: ${moved})`, spawned.animator.isPlaying && moved > 1);
+    }
+    spawned.dispose();
+  }
+
   // silence unused-var lint for the direct container preloads (used for parity)
   void heroContainer; void elijahContainer;
 
