@@ -124,6 +124,16 @@ export class CharacterAnimator {
     });
   }
 
+  /** Wall-clock duration of a clip (seconds) at speedRatio 1 — used by
+   *  ShotReleaseSync to pace the jumpshot so its contact frame lands on
+   *  the meter's green center. */
+  durationOf(name: string): number | null {
+    const g = this.groups.get(resolveClip(name, this.clipNames).clip);
+    if (!g) return null;
+    const fps = g.targetedAnimations[0]?.animation.framePerSecond ?? 60;
+    return (g.to - g.from) / fps;
+  }
+
   setSpeed(name: string, speedRatio: number): void {
     const g = this.groups.get(resolveClip(name, this.clipNames).clip);
     if (g?.isPlaying) g.speedRatio = speedRatio;

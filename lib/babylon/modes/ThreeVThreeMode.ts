@@ -28,6 +28,7 @@ import {
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, DUNK_PCT,
   SHOT_QUALITY_PCT, type ShotQuality, type ShotContext,
 } from '../core/BasketballCore';
+import { lockTarget, choosePassType, PassFlight, type PassType } from '../core/BallHandling';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { assertSpawned } from '../core/FrameGuard';
@@ -58,6 +59,9 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let shooting = false, dunking = false, ended = false, lastPasserWasMe = false;
   let currentShot: ShotContext | null = null;
   let myJumpAge = Infinity;                      // block-jump timer (defense)
+  const passFlight = new PassFlight();
+  let passTargetId: 'mate0' | 'mate1' = 'mate0';
+  let passType: PassType = 'chest';
   let foeShotBlocked = false;
 
   const cfg = { heroUrl: SHARED_CFG.heroUrl };
@@ -249,16 +253,34 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         }
       }
 
-      // pass (kick it out to whichever teammate is more open)
-      if (iAmCarrier && !shooting && meIntent.pass) {
-        const open = mates
-          .map((m, i) => ({ i, d: Math.min(...foePositions().map((f) => Vector3.Distance(f, m.char.root.position))) }))
-          .sort((a, b) => b.d - a.d)[0];
-        if (open) {
-          giveBallTo(open.i === 0 ? 'mate0' : 'mate1');
+      // pass — target-lock assist (stick aim snaps to the best teammate in
+      // the cone, else most-open), defender-in-lane forces the bounce pass,
+      // and the ball FLIES (PassFlight) instead of teleporting possession.
+      if (iAmCarrier && !shooting && !dunking && meIntent.pass && !passFlight.active) {
+        const targets = mates.map((m, i) => ({ id: i === 0 ? 'mate0' : 'mate1', pos: m.char.root.position }));
+        const locked = lockTarget(me.char.root.position, meIntent.moveX, meIntent.moveY, targets, foePositions());
+        if (locked) {
+          const type = choosePassType(me.char.root.position, locked.pos, foePositions());
+          passType = type;
+          passTargetId = locked.id as 'mate0' | 'mate1';
+          releaseBall(ball);
+          passFlight.start(
+            ball.getAbsolutePosition(),
+            locked.pos.add(new Vector3(0, 1.2, 0)),
+            type,
+          );
           lastPasserWasMe = true;
-          SoundKit.play('uiTick', { pitch: 1.3 });
+          SoundKit.play('uiTick', { pitch: type === 'bounce' ? 1.0 : 1.3 });
           EffectsKit.burst(ctx.scene, me.char.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
+        }
+      }
+      if (passFlight.active) {
+        if (passFlight.step(dt, ball.position)) {
+          giveBallTo(passTargetId);
+          if (passType === 'bounce') {
+            ctx.setHud({ banner: 'BOUNCE PASS!' });
+            setTimeout(() => ctx.setHud({ banner: '' }), 600);
+          }
         }
       }
 

@@ -136,6 +136,10 @@ export class ShotMeter {
     this.t = Math.min(1, this.t + dt / this.duration);
     return this.t;
   }
+  /** Meter pacing, exposed for ShotReleaseSync (BallHandling.ts). */
+  get durationSec(): number { return this.duration; }
+  get greenCenter01(): number { return this.greenCenter; }
+
   /** Release NOW — call on the actionEdge; returns the quality band. */
   release(): ShotQuality {
     this.active = false;

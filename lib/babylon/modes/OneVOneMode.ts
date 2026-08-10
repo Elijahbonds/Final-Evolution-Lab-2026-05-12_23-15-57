@@ -37,6 +37,7 @@ import {
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, DUNK_PCT,
   SHOT_QUALITY_PCT, type ShotQuality, type ShotContext,
 } from '../core/BasketballCore';
+import { DribbleStateMachine, DRIBBLE_CLIP, syncedShotSpeed } from '../core/BallHandling';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { assertSpawned } from '../core/FrameGuard';
@@ -56,6 +57,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let onevoneVenue: VenueHandle | null = null;  // M74
   let meSlot: PlayerSlot, foeSlot: PlayerSlot, localSource: LocalInputSource;
   let meDribble: DribbleController;
+  let meDribbleSM: DribbleStateMachine;
   let shotMeter: ShotMeter;
   let turbo: TurboMeter;
   let arc: ShotArc;
@@ -126,6 +128,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       }, new DefenderBrain(0.7)), false);
 
       meDribble = new DribbleController();
+      meDribbleSM = new DribbleStateMachine();
       shotMeter = new ShotMeter();
       turbo = new TurboMeter();
       arc = new ShotArc();
@@ -207,7 +210,11 @@ export const OneVOneMode: ModeDefinition = (() => {
           me.root.position.addInPlace(meDribble.vel.scale(dt));
           clampToHalfCourt(me.root.position, 7.2, 14.5);
           me.root.rotation.y = drib.facingRad;
-          me.animator.play(drib.speed01 > 0.15 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
+          const dState = meDribbleSM.update(dt, {
+            speed01: drib.speed01, crossover: drib.crossover,
+            nearestDefender: foeStunSec > 0 ? Infinity : Vector3.Distance(me.root.position, foe.root.position),
+          });
+          me.animator.play(DRIBBLE_CLIP[dState], { loop: dState !== 'crossover' });
           if (drib.crossover) {
             SoundKit.play('whoosh', { pitch: 1.4, volume: 0.4 });
             ctx.feel?.impact?.(0.1);
@@ -255,7 +262,11 @@ export const OneVOneMode: ModeDefinition = (() => {
             const contest = contestLevel(me.root.position, defenderPos);
             currentShot = classifyShot(me.root.position, meDribble.vel, RIM, contest);
             shotMeter.start(contest, currentShot.style);
-            me.animator.play(SPORT_CLIP.dunkChargeGather, { loop: true });
+            // ShotReleaseSync: pace the jumpshot so its contact frame lands
+            // exactly on the meter's green center — what you see is what you time.
+            const clipSec = me.animator.durationOf('jumpshot') ?? 1.0;
+            const speed = syncedShotSpeed(clipSec, shotMeter.durationSec, shotMeter.greenCenter01);
+            me.animator.play('jumpshot', { loop: true, speedRatio: speed });
             ctx.setHud({ shotType: currentShot.label });
           }
         }
@@ -415,10 +426,21 @@ export const OneVOneMode: ModeDefinition = (() => {
     arcLabel = currentShot?.label ?? 'SHOT';
     arcResultMade = Math.random() < Math.min(0.98, pct);
     releaseBall(ball);
-    const releaseClip = currentShot?.style === 'layup' ? SPORT_CLIP.dunkLaunchPower : 'jumpshot';
-    me.animator.play(releaseClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    // The jumpshot clip is already playing (meter-paced from shot start) —
+    // do NOT restart it here or the release frame pops. Let it ride out the
+    // follow-through, then settle to idle. Layups keep their own finish clip.
+    if (currentShot?.style === 'layup') {
+      me.animator.play(SPORT_CLIP.dunkLaunchPower, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    } else {
+      setTimeout(() => { if (!ended) me.animator.play(SPORT_CLIP.idle, { loop: true }); }, 420);
+    }
     ctx.setHud({ shotType: '', shotMeterT: 0 });
-    if (quality === 'perfect') { SoundKit.play('uiTick', { pitch: 1.5, volume: 0.4 }); }
+    if (quality === 'perfect') {
+      SoundKit.play('uiTick', { pitch: 1.5, volume: 0.4 });
+      SoundKit.play('crowdCheer', { volume: 0.35 });
+      ctx.feel?.impact?.(0.2);
+      bannerFlash(ctx, 'GREEN!', 600);
+    }
     if (!arcResultMade) momentum = Math.max(0, momentum - 12);
     carrying = false;
     arc.start(ball.getAbsolutePosition(), RIM, arcResultMade, currentShot?.style ?? 'jumper');
