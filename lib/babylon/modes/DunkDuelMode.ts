@@ -30,6 +30,7 @@ import { EffectsKit } from '../visual/EffectsKit';
 import { VenueKit } from '../visual/VenueKit';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
+import { judgeDunk, type JudgeScore } from '../core/JudgePanel';  // Phase 7: shared judges
 
 type Phase = 'handoff' | 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'matchOver';
 const STYLES = ['power', 'flashy', 'sig'] as const;
@@ -42,21 +43,6 @@ const STYLE_TIER: Record<Style, number> = { power: 3, flashy: 5.5, sig: 8 };
 
 const DUNKS_EACH = 2;
 
-const JUDGES = [
-  { name: 'Silk', w: { difficulty: 0.2, execution: 0.3, style: 0.5 } },
-  { name: 'Doc', w: { difficulty: 0.3, execution: 0.5, style: 0.2 } },
-  { name: 'Prime', w: { difficulty: 0.5, execution: 0.3, style: 0.2 } },
-] as const;
-interface JudgeScore { name: string; score: number; line: string }
-function judgeDunk(difficulty: number, execution: number, style: number): JudgeScore[] {
-  return JUDGES.map((j) => {
-    const raw = difficulty * j.w.difficulty + execution * j.w.execution + style * j.w.style;
-    const score = Math.max(6, Math.min(10, Math.round(6 + raw * 0.4)));
-    const line = score >= 10 ? `${j.name}: THAT'S A TEN.` : score >= 9 ? `${j.name}: about as good as it gets.`
-      : score >= 7 ? `${j.name}: real difficulty, clean finish.` : `${j.name}: gets it done — I've seen bigger.`;
-    return { name: j.name, score, line };
-  });
-}
 
 const BUDGET_SEC: Record<Phase, number> = {
   handoff: 6, approach: 30, charge: 5, cinematic: 4, resolve: 3, judging: 6, matchOver: 999,

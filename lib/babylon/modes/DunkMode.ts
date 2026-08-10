@@ -35,6 +35,7 @@ import { EffectsKit } from '../visual/EffectsKit';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { DunkFlight } from '../core/DunkSystem';
+import { judgeDunk, ScoreReveal, CrowdEnergy, REVEAL_DURATION_SEC, type JudgeScore } from '../core/JudgePanel';
 import { MomentumBus } from '../core/MomentumBus';
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'contestOver';
@@ -59,28 +60,8 @@ const DUNKS_PER_ROUND = 2;
 const TOTAL_ROUNDS = 2;
 const CHAIN_THRESHOLD = 24;                  // judge total that keeps a chain alive
 
-// Three judges, three lenses — same persona trio the Cash Arena uses, tuned
-// here for a live single-player reveal (deterministic, no network/LLM dep).
-const JUDGES = [
-  { id: 'silk', name: 'Silk', w: { difficulty: 0.2, execution: 0.3, style: 0.5 } },
-  { id: 'doc', name: 'Doc', w: { difficulty: 0.3, execution: 0.5, style: 0.2 } },
-  { id: 'prime', name: 'Prime', w: { difficulty: 0.5, execution: 0.3, style: 0.2 } },
-] as const;
-
-interface JudgeScore { name: string; score: number; line: string }
-function cannedLine(name: string, score: number): string {
-  if (score >= 10) return `${name}: THAT'S A TEN. Hand me the mic.`;
-  if (score >= 9) return `${name}: about as good as it gets.`;
-  if (score >= 7) return `${name}: real difficulty, clean finish.`;
-  return `${name}: gets it done — I've seen bigger.`;
-}
-function judgeDunk(difficulty: number, execution: number, style: number): JudgeScore[] {
-  return JUDGES.map((j) => {
-    const raw = difficulty * j.w.difficulty + execution * j.w.execution + style * j.w.style; // 0..10
-    const score = Math.max(6, Math.min(10, Math.round(6 + raw * 0.4)));
-    return { name: j.name, score, line: cannedLine(j.name, score) };
-  });
-}
+// Judges + staged reveal + crowd energy now live in the SHARED JudgePanel
+// (lib/babylon/core/JudgePanel.ts) — DunkDuelMode drinks from the same well.
 
 const BUDGET_SEC: Record<Phase, number> = {
   approach: 30, charge: 5, cinematic: 4, resolve: 3, judging: 6, rivalTurn: 8, contestOver: 999,
@@ -109,6 +90,9 @@ export const DunkMode: ModeDefinition = (() => {
   const ebState = { inLeftHand: false };
   let stickX = 0, stickY = 0;
   const flight = new DunkFlight();               // Phase 6: trick-input flight
+  const reveal = new ScoreReveal();              // Phase 7: staged judge reveal
+  const crowd = new CrowdEnergy();               // Phase 7: building voice
+  let revealed: JudgeScore[] = [];               // cards shown so far
   const momentum = new MomentumBus();            // Phase 6: shared Game-Breaker
   let trickLabels: string[] = [];                // this attempt's thrown tricks
 
@@ -325,6 +309,37 @@ export const DunkMode: ModeDefinition = (() => {
         }
       }
 
+      if (phase === 'judging') {
+        crowd.update(dt, Math.min(1, hype / 100), chain, momentum.tier === 'on_fire');
+        for (const beat of reveal.update(dt)) {
+          if (beat.kind === 'confer') {
+            ctx.setHud({ hint: 'THE JUDGES CONFER…' });
+            SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
+          } else if (beat.kind === 'card' && beat.judge) {
+            revealed = [...revealed, beat.judge];
+            ctx.setHud({ judgeReveal: revealed });
+            SoundKit.play('uiTick', { pitch: 1 + beat.judge.score * 0.06, volume: 0.5 });
+            ctx.feel?.impact?.(0.12);
+          } else if (beat.kind === 'drum') {
+            ctx.setHud({ hint: "PRIME'S CARD…" });
+            SoundKit.play('uiTick', { pitch: 0.9, volume: 0.4 });
+            SoundKit.play('uiTick', { pitch: 0.95, volume: 0.35 });
+          } else if (beat.kind === 'total') {
+            ctx.setHud({ hint: '', judgeReveal: revealed });
+            if (beat.band === 'eruption') {
+              SoundKit.play('crowdCheer', { volume: 1 });
+              SoundKit.play('score', { pitch: 1.3 });
+              ctx.feel?.impact?.(0.5);
+              EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti');
+            } else if (beat.band === 'hush') {
+              SoundKit.play('crowdGroan', { volume: 0.6 * crowd.level + 0.2 });
+            } else {
+              SoundKit.play('crowdCheer', { volume: 0.4 * crowd.level + 0.2 });
+            }
+          }
+        }
+      }
+
       if (phase === 'rivalTurn') {
         ctx.camDirector.update(rival.root.position, Vector3.Zero(), rim);
       } else if (phase === 'cinematic' && rimCamCut) {
@@ -503,15 +518,20 @@ export const DunkMode: ModeDefinition = (() => {
     const landing = pickLanding(dunkTotal);
     if (clippedObstacle) ctx.setHud({ banner: 'CLIPPED THE PROP — flushed anyway' });
 
-    ctx.setHud({ score: playerTotal, hype: Math.round(hype), chain, judgeReveal: scores });
     player.animator.play(landing, { onEnd: () => player.animator.play(SPORT_CLIP.idle, { loop: true }) });
 
     ctx.camDirector.suspended = true;
     await Promise.race([replay.play(rim), new Promise((r) => setTimeout(r, 3500))]);
     ctx.camDirector.suspended = false;
 
+    // Phase 7: STAGED REVEAL — confer, Silk, Doc, the long Prime beat,
+    // then the total + eruption/hush. Not a number flash.
+    crowd.onScore(dunkTotal);
+    revealed = [];
+    reveal.start(scores);
+    ctx.setHud({ score: playerTotal, hype: Math.round(hype), chain, judgeReveal: [] });
     setPhase('judging');
-    setTimeout(() => void advanceAfterJudging(ctx), 2600);
+    setTimeout(() => void advanceAfterJudging(ctx), REVEAL_DURATION_SEC * 1000 + 400);
     finishing = false;
   }
 
@@ -532,7 +552,7 @@ export const DunkMode: ModeDefinition = (() => {
     player.root.rotation.y = Math.PI;
     player.animator.play(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false;
-    styleTaps = 0; hangSec = 0;
+    styleTaps = 0; hangSec = 0; revealed = [];
     void setupProp(ctx);
     ctx.camDirector.snapTo(player.root.position, rim);
     setPhase('approach');
