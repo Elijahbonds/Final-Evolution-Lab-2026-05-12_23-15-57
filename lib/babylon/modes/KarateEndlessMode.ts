@@ -168,6 +168,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       ctx.setHud({ banner: 'PERKS — d-pad to browse, A to buy, B to fight', perks: PERKS.map((p, i) => `${i + 1}=${p.label} ${p.costCoins}c`).join(' · '), coins });
     }
     wave++; kos = 0;
+    SoundKit.play('powerUp', { pitch: 0.9, volume: 0.5 });   // wave-start horn
+    SoundKit.play('crowdCheer', { volume: Math.min(0.3 + wave * 0.06, 0.9) });
     const spec = waveSpec(wave);
     const count = spec.count;
     void spawnRing(wave, count);

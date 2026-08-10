@@ -93,6 +93,12 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   // slower lag so the flight glides like a highlight reel; tighter pitch
   // cap keeps the rim in frame at apex without a hard tilt.
   contest: { distance: 5.6, height: 1.7, minHeight: 1.1, pitchFloorDeg: 4, pitchCapDeg: 12, targetHeight: 1.5, lag: 0.06, lookAhead: 0.6, fitTwo: true },
+  // DUEL — side-on weapon-duel framing: wider lateral read than 'fight',
+  // slightly raised so the 8-way disc spacing reads at a glance.
+  duel: { distance: 5.4, height: 2.2, minHeight: 1.5, pitchFloorDeg: 8, pitchCapDeg: 16, targetHeight: 1.2, lag: 0.13, lookAhead: 0.5, fitTwo: true },
+  // ONSLAUGHT — horde readability: high and wide so surrounding enemies
+  // stay in frame during crowd-control moments.
+  onslaught: { distance: 9.5, height: 4.6, minHeight: 2.8, pitchFloorDeg: 18, pitchCapDeg: 30, targetHeight: 1.1, lag: 0.1, lookAhead: 1.6, fitTwo: true },
 };
 
 export const FIXED_PRESETS: Record<string, { offset: Vector3; targetHeight: number }> = {

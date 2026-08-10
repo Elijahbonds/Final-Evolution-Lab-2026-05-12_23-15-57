@@ -180,7 +180,7 @@ export const DuelMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'duel', mood: 'dojoWarm', camPreset: 'fight',
+    modeId: 'duel', mood: 'dojoWarm', camPreset: 'duel',  // Phase 9: side-on disc framing
 
     async load(ctx: ModeContext) {
       // raised disc arena (ring-out platform)
@@ -244,9 +244,13 @@ export const DuelMode: ModeDefinition = (() => {
       if (phase !== 'fighting' || !meState.controllable) return;
 
       const moveIds = Object.keys(WEAPON_MOVESET[myWeapon]());
-      if (e.btn === 'A') meStrike.request(moveIds[0], now());
-      if (e.btn === 'B') meStrike.request(moveIds[1], now());
-      if (e.btn === 'Y') meStrike.request(moveIds[2], now());
+      const whooshPitch = { fists: 1.2, blade: 1.5, staff: 0.8 }[myWeapon];
+      const trySwing = (id: string) => {
+        if (meStrike.request(id, now())) SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 });
+      };
+      if (e.btn === 'A') trySwing(moveIds[0]);
+      if (e.btn === 'B') trySwing(moveIds[1]);
+      if (e.btn === 'Y') trySwing(moveIds[2]);
       if (e.btn === 'X') {
         const to = rival.root.position.subtract(player.root.position);
         const flick = (stickX * to.x + -stickY * to.z) > 0.3;
