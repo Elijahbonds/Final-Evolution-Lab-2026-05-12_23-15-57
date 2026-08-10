@@ -17,6 +17,7 @@ import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
 import { buildSkatepark, type RideWorld } from './rideWorlds';
 import { assertSpawned } from '../core/FrameGuard';
 import { SPORT_CLIP } from '../anim/clipRegistry';
+import { FlickStick, GESTURES } from '../core/FlickStick';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { CoinField } from '../core/Pickups';
@@ -32,6 +33,8 @@ export const SkateRunMode: ModeDefinition = (() => {
   let stickX = 0, pump = 0;
   let ended = false;
 
+  const flick = new FlickStick();
+  void GESTURES;
   return {
     modeId: 'skateboard', mood: 'goldenHour', camPreset: 'board',
 
@@ -58,6 +61,18 @@ export const SkateRunMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') stickX = e.x;
+      // Phase 4: flick-stick is THE trick input (Skate 3 vocabulary).
+      if (e.t === 'stick' && e.side === 'R') {
+        const g = flick.feed(e);
+        if (g) {
+          tricks.start(TRICKS[g.trickKey]);
+          ctx.setHud({ banner: g.label });
+          setTimeout(() => ctx.setHud({ banner: '' }), 500);
+          SoundKit.play('whoosh', { pitch: 1 + g.difficulty * 0.15, volume: 0.4 });
+        }
+        // grab release
+        if (!flick.heldGrab) tricks.endGrab();
+      }
       if (e.t === 'trigger' && e.side === 'R') pump = e.value;
       if (e.t === 'button' && e.pressed) {
         if (e.btn === 'A') {
@@ -74,6 +89,7 @@ export const SkateRunMode: ModeDefinition = (() => {
             ctx.feel?.impact?.(0.3);
           }
         }
+        // face buttons kept as accessibility fallbacks (same tricks)
         if (e.btn === 'B') tricks.start(TRICKS.flipA);
         if (e.btn === 'Y') tricks.start(TRICKS.flipB);
         if (e.btn === 'X') tricks.start(TRICKS.grab);
