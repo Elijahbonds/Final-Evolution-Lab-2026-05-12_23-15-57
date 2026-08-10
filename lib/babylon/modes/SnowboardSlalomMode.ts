@@ -22,6 +22,8 @@ import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
+import { BoardMovement, SNOW_TUNING } from '../core/BoardMovement';
+import { MomentumBus } from '../core/MomentumBus';
 import { assertSpawned } from '../core/FrameGuard';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -42,6 +44,10 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let stumbleIframe = 0;
   let yeti: Mob | null = null, yetiPool: MobPool | null = null;
   let yetiSec = 0, yetiDone = false;
+  const move = new BoardMovement(SNOW_TUNING);   // Phase 12: carve weight + slope energy
+  const mbus = new MomentumBus();
+  let boost = 0;                                  // SSX boost meter 0..100
+  let boosting = false;
 
   async function spawnYeti(ctx: ModeContext): Promise<void> {
     if (yetiDone || yeti) return;
@@ -123,7 +129,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             ctx.feel?.impact?.(isCable ? 0.45 : 0.3);
           }
         }
-        if (e.btn === 'B') tricks.start(TRICKS.spin);
+        if (e.btn === 'B') { tricks.start(TRICKS.spin); boost = Math.min(100, boost + 12); }
+        if (e.btn === 'R1') boosting = boost > 10;
         if (e.btn === 'X') tricks.start(TRICKS.grab);
         if (e.btn === 'Y') tricks.start(TRICKS.flipA);
       }
@@ -135,7 +142,18 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       elapsed += dt;
       stumbleIframe = Math.max(0, stumbleIframe - dt);
       if (rig.rider.grinding && Math.abs(stickX) > 0.7) rig.rider.dismount();
+      // Phase 12: slope energy via the shared board movement (descent builds
+      // speed for real); tuck adds, boost spends the meter on a burst.
+      const v = move.update(dt, stickX, 0, ctx.scene, rig.char.root.position, world.ground);
+      rig.rider.vel.x = v.x; rig.rider.vel.z = v.z;
       rig.rider.update(dt, stickX, tuck);
+      if (boosting) {
+        rig.rider.vel.scaleInPlace(1 + 0.9 * dt);
+        boost = Math.max(0, boost - 30 * dt);
+        if (boost === 0) boosting = false;
+        ctx.setHud({ boost: Math.round(boost) });
+      }
+      mbus.update(dt);
 
       // ROCKS — grounded contact is a stumble; airborne clears clean
       if (stumbleIframe === 0 && rig.rider.grounded && !rig.rider.grinding) {
