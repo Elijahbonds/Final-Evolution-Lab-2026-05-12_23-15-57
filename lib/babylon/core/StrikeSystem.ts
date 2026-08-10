@@ -186,6 +186,30 @@ export function staffMoveset(staff: Record<'jab' | 'kick' | 'heavy', AttackDef>)
   };
 }
 
+export function bladeMoveset(): Record<string, CombatMove> {
+  // The katana identity: fastest startup, shortest range, chip-poor but
+  // combo-rich — win by volume and angles, lose the range war to staff.
+  const a = (dmg: number, range: number, startupMs: number, stunSec: number, knockback: number, chiGain: number, guardDmg: number) =>
+    ({ id: '', label: '', clip: 'hook', dmg, range, startupMs, stunSec, knockback, chiGain, guardDmg });
+  return {
+    slash: {
+      atk: { ...a(7, 1.9, 130, 0.35, 0.5, 9, 5), id: 'slash', label: 'SLASH', clip: 'hook' },
+      startupSec: 0.13, activeSec: 0.08, recoverySec: 0.2,
+      cancelInto: ['crossslash', 'riser'], cancelWindowSec: 0.2, weight: 'light', tags: ['jab'],
+    },
+    crossslash: {
+      atk: { ...a(9, 1.9, 160, 0.4, 0.8, 10, 7), id: 'crossslash', label: 'CROSS', clip: 'roundhouse' },
+      startupSec: 0.16, activeSec: 0.09, recoverySec: 0.26,
+      cancelInto: ['riser'], cancelWindowSec: 0.18, weight: 'medium', tags: ['kick'],
+    },
+    riser: {
+      atk: { ...a(15, 2.0, 300, 0.8, 1.8, 16, 20), id: 'riser', label: 'RISER', clip: 'uppercut' },
+      startupSec: 0.3, activeSec: 0.12, recoverySec: 0.46,
+      cancelInto: [], cancelWindowSec: 0, weight: 'heavy', tags: ['heavy'],
+    },
+  };
+}
+
 export function staffWeapon(): WeaponDef {
   return {
     id: 'staff', label: 'STAFF', rangeMult: 1,

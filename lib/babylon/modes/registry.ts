@@ -20,6 +20,7 @@ import { KarateVSMode } from './KarateVSMode';
 import { MixedCombatMode } from './MixedCombatMode';
 import { DunkDuelMode } from './DunkDuelMode';
 import { ShowdownMode } from './ShowdownMode';
+import { DuelMode } from './DuelMode';
 import { DanceMode } from './DanceMode';        // M75 creative discipline
 
 export const MODES: Record<string, ModeDefinition> = {
@@ -50,6 +51,7 @@ export const MODES: Record<string, ModeDefinition> = {
   // Rollout wave 6 — combat/duel family (M53/M56)
   karate_vs: KarateVSMode,
   showdown: ShowdownMode,
+  duel: DuelMode,
   mixedcombat: MixedCombatMode,
   dunkduel: DunkDuelMode,
   // Rollout wave 8 — creative disciplines (M75): rhythm dance on the audio clock
