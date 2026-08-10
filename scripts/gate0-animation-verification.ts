@@ -217,6 +217,31 @@ async function main() {
     ok('gateContainerRig throws on unresolvable bone names', threw);
   }
 
+  // ══ D. Mode 2 Gate 0: karate state machine clips on the same rig ════════
+  // Karate/weapon work reuses elijah-hero.glb (guard/jab/hook/roundhouse/
+  // high_kick/uppercut are the baked combat set). Prove the whole chain —
+  // stance, light, heavy, kick, react, knockdown — plays with real motion.
+  console.log('\nD. karate combat clip chain (Mode 2 gate)');
+  {
+    const spawned = await CharacterLibrary.spawn(scene, urlForModel('/models/elijah-hero.glb'), { modeId: 'gate0-karate' });
+    const arm = spawned.skeleton.bones.find((b) => b.name === 'RightArm')?.getTransformNode();
+    const leg = spawned.skeleton.bones.find((b) => b.name === 'RightUpLeg')?.getTransformNode();
+    ok('combat probe bones present (RightArm, RightUpLeg)', !!arm && !!leg);
+    const karateClips = ['karate_idle_stance', 'karate_punch_light', 'karate_punch_heavy',
+      'karate_kick_roundhouse', 'karate_hit_react', 'karate_knockdown'];
+    for (const clip of karateClips) {
+      const before = missingClipCount();
+      spawned.animator.play(clip, { loop: true, fadeSec: 0.05, restart: true });
+      for (let i = 0; i < 4; i++) scene.render();
+      const armMoves = motionWhilePlaying(scene, arm!);
+      const legMoves = motionWhilePlaying(scene, leg!);
+      const moved = Math.max(armMoves, legMoves);
+      ok(`"${clip}" plays with real motion (distinct poses: ${moved})`,
+        spawned.animator.isPlaying && moved > 2 && missingClipCount() === before);
+    }
+    spawned.dispose();
+  }
+
   // silence unused-var lint for the direct container preloads (used for parity)
   void heroContainer; void elijahContainer;
 
