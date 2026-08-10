@@ -29,7 +29,7 @@ const ok = (n: string, fn: () => void) => { fn(); pass++; console.log(`  ✓ ${n
 console.log('\nA. registry');
 ok('duel mode registered', () => {
   assert.equal(MODES.duel?.modeId, 'duel');
-  assert.equal(MODES.duel?.camPreset, 'fight');
+  assert.equal(MODES.duel?.camPreset, 'duel');
 });
 
 console.log('\nB. three weapon identities, one controller');
