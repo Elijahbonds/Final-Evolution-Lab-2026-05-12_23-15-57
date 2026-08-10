@@ -181,7 +181,7 @@ class SoundKitImpl {
 
   /** Looping ambient crowd bed for outdoor/stadium venues. Call once per
    *  mode load; returns nothing — call stopAmbient() on mode dispose. */
-  startAmbient(kind: 'stadium' | 'dojo' | 'none'): void {
+  startAmbient(kind: 'stadium' | 'dojo' | 'ocean' | 'wind' | 'none'): void {
     this.stopAmbient();
     if (kind === 'none' || !this.musicEnabled) return;
     const ctx = this.ensure();
@@ -191,13 +191,13 @@ class SoundKitImpl {
     src.loop = true;
     const bp = ctx.createBiquadFilter();
     bp.type = 'bandpass';
-    bp.frequency.value = kind === 'stadium' ? 900 : 220;
+    bp.frequency.value = kind === 'stadium' ? 900 : kind === 'ocean' ? 500 : kind === 'wind' ? 1400 : 220;
     bp.Q.value = 0.4;
     const g = ctx.createGain();
-    g.gain.value = kind === 'stadium' ? 0.05 : 0.025;
+    g.gain.value = kind === 'stadium' ? 0.05 : kind === 'ocean' ? 0.07 : kind === 'wind' ? 0.04 : 0.025;
     // slow LFO on gain so the crowd bed breathes instead of droning
     const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.15;
+    lfo.frequency.value = kind === 'ocean' ? 0.45 : kind === 'wind' ? 0.3 : 0.15;  // waves breathe faster
     const lfoGain = ctx.createGain();
     lfoGain.gain.value = g.gain.value * 0.4;
     lfo.connect(lfoGain).connect(g.gain);

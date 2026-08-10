@@ -101,7 +101,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       nextGate = 0; gatesHit = 0; elapsed = 0; ended = false; stickX = 0; tuck = 0;
       stumbleIframe = 0; yeti = null; yetiPool = null; yetiSec = 0; yetiDone = false;
       ctx.objectiveRef.current = world.markers[nextGate] ?? null;
-      SoundKit.startAmbient('dojo');           // quiet wind-bed, not a crowd
+      SoundKit.startAmbient('wind');           // Phase 18: descent wind bed
       EffectsKit.ambient(ctx.scene, 'slope');  // snowfall
       ctx.setHud({ score: 0, gates: `0/${world.markers.length}`, hint: 'Gates for points · JUMP rocks · grind the rails · watch the treeline…' });
     },

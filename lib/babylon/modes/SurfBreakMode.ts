@@ -80,7 +80,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       t = 0; timeLeft = RUN_SEC; flow = 0; ended = false; wipedOut = false; lapsSeen = 0;
       barrelSec = 0; inBarrel = false; barrels = 0;
       ctx.objectiveRef.current = waveLipAt(t);
-      SoundKit.startAmbient('stadium');
+      SoundKit.startAmbient('ocean');
       EffectsKit.ambient(ctx.scene, 'venice');
       ctx.setHud({ score: 0, flow: 0, time: RUN_SEC, hint: 'Stay in the pocket · ride the open TUBE for barrels · miss the buoys' });
     },
