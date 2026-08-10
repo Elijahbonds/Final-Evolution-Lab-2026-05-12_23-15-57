@@ -102,6 +102,11 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   // SURF — wave-following: low and close behind the rider so the face fills
   // frame; barrel treatment = tightest (set via pulse when in the tube).
   surf: { distance: 5.2, height: 1.5, minHeight: 1.0, pitchFloorDeg: 3, pitchCapDeg: 10, targetHeight: 1.1, lag: 0.12, lookAhead: 2.8 },
+  // PRE-SNAP — high, wide, centered on the line of scrimmage: formations
+  // and the coverage shell must be readable at a glance (the clarity beat).
+  presnap: { distance: 10.5, height: 6.0, minHeight: 4.0, pitchFloorDeg: 22, pitchCapDeg: 34, targetHeight: 0.6, lag: 0.12, lookAhead: 0.4, fitTwo: true },
+  // FOOTBALL LIVE — broadcast: behind the carrier, opens with field depth.
+  gridiron: { distance: 8.4, height: 3.4, minHeight: 2.2, pitchFloorDeg: 10, pitchCapDeg: 22, targetHeight: 1.3, lag: 0.09, lookAhead: 3.2 },
   // ONSLAUGHT — horde readability: high and wide so surrounding enemies
   // stay in frame during crowd-control moments.
   onslaught: { distance: 9.5, height: 4.6, minHeight: 2.8, pitchFloorDeg: 18, pitchCapDeg: 30, targetHeight: 1.1, lag: 0.1, lookAhead: 1.6, fitTwo: true },
