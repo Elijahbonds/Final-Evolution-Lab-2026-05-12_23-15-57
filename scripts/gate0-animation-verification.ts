@@ -242,6 +242,22 @@ async function main() {
     spawned.dispose();
   }
 
+  // ══ E. Mode 3 Gate 0: board-sport clips on the same rig ════════════════
+  // The board is an attached prop on the rider's root (boardCore.buildRig)
+  // — the RIG is unchanged, so the gate is that the ride/trick clips play.
+  console.log('\nE. board-sport clip chain (Mode 3 gate)');
+  {
+    const spawned = await CharacterLibrary.spawn(scene, urlForModel('/models/elijah-hero.glb'), { modeId: 'gate0-board' });
+    const arm = spawned.skeleton.bones.find((b) => b.name === 'RightArm')?.getTransformNode();
+    for (const clip of ['board_ride_idle', 'board_air', 'board_tuck', 'board_grab', 'board_grind']) {
+      spawned.animator.play(clip, { loop: true, fadeSec: 0.05, restart: true });
+      for (let i = 0; i < 4; i++) scene.render();
+      const moved = motionWhilePlaying(scene, arm!);
+      ok(`"${clip}" plays with real motion (distinct: ${moved})`, spawned.animator.isPlaying && moved > 1);
+    }
+    spawned.dispose();
+  }
+
   // silence unused-var lint for the direct container preloads (used for parity)
   void heroContainer; void elijahContainer;
 
