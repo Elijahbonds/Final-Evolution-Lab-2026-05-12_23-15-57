@@ -90,8 +90,8 @@ export function contactEvent(
   let outcome: ContactOutcome;
   if (timing === 'perfect' && pci01 > 0.85) outcome = 'barrel';
   else if (timing === 'perfect' || pci01 > 0.7) outcome = 'solid';
-  else if (Math.abs(vertErr) > 0.2 || timing !== 'perfect') outcome = pci01 > 0.4 ? 'weak' : 'foul';
-  else outcome = 'weak';
+  else if (Math.abs(vertErr) > 0.2) outcome = pci01 > 0.4 ? 'weak' : 'foul';
+  else outcome = pci01 > 0.4 ? 'weak' : 'foul';
 
   const whyParts = [
     timing === 'perfect' ? 'Perfect timing' : timing === 'early' ? 'A tick early' : 'A tick late',
