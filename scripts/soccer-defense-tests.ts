@@ -37,10 +37,10 @@ ok('standing in range wins; slide reaches further; from-behind slide fouls', () 
 console.log('\nC. offside');
 ok('past the second-last defender in the attacking half = off', () => {
   const defs = [new Vector3(0, 0, 40), new Vector3(2, 0, 36), new Vector3(-2, 0, 34)];
-  assert.ok(isOffside(new Vector3(0, 0, 37), new Vector3(0, 0, 20), defs, 90), 'past second-last (z=36)');
-  assert.ok(!isOffside(new Vector3(0, 0, 35), new Vector3(0, 0, 20), defs, 90), 'level = on');
-  assert.ok(!isOffside(new Vector3(0, 0, 30), new Vector3(0, 0, 20), defs, 90), 'own half');
-  assert.ok(!isOffside(new Vector3(0, 0, 44), new Vector3(0, 0, 44.5), defs, 90), 'level with the ball');
+  assert.ok(isOffside(new Vector3(0, 0, 37), new Vector3(0, 0, 20), defs, 45), 'past second-last (z=36)');
+  assert.ok(!isOffside(new Vector3(0, 0, 35), new Vector3(0, 0, 20), defs, 45), 'level = on');
+  assert.ok(!isOffside(new Vector3(0, 0, 20), new Vector3(0, 0, 10), defs, 45), 'own half');
+  assert.ok(!isOffside(new Vector3(0, 0, 44), new Vector3(0, 0, 44.5), defs, 45), 'level with the ball');
 });
 
 console.log(`\n${pass} checks green`);
