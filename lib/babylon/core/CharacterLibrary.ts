@@ -15,6 +15,7 @@ import { CLIP_ALIASES } from '../anim/clipAliases';
 import { registerMirroredClips, DANCE_ALIASES, DANCE_MIRROR_BASES } from '../anim/mirrored-clips';
 import { installSafePlay } from '../anim/clipRegistry';
 import { SkinningGuard } from '../anim/SkinningGuard';
+import { gateContainerRig } from '../anim/rigNormalize';
 import { solveArmsDown } from '../anim/restPose';           // M69: E25 finish
 import { applyRestPoseToSkeleton } from '../anim/restPoseApply';
 import { snapToGround } from './groundSnap';                // M69: feet-on-court
@@ -67,6 +68,13 @@ async function loadContainer(scene: Scene, url: string): Promise<AssetContainer>
   if (!p) {
     const { rootUrl, filename } = splitUrl(url);
     p = SceneLoader.LoadAssetContainerAsync(rootUrl, filename, scene)
+      .then((container) => {
+        // GATE 0: normalize mixamorig-prefixed bones + reject non-conformant
+        // rigs AT LOAD, before any spawn can freeze at bind pose. Runs once
+        // per cached container; unprefixed rigs pass through untouched.
+        gateContainerRig(container, url);
+        return container;
+      })
       .catch((e) => {
         containers.delete(url);                          // allow retry after a failure
         throw new Error(`[FEL-CHAR] failed to load "${url}": ${e?.message ?? e}`);
