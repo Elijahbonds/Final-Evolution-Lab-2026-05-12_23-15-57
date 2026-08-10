@@ -39,9 +39,12 @@ export function sampleSlope(
   scene: Scene, pos: Vector3, facingYaw: number, ground: AbstractMesh[],
 ): SlopeInfo {
   const up = pos.add(new Vector3(0, 1.2, 0));
-  const ray = new Ray(up, new Vector3(0, -1, 0), 4);
+  const ray = new Ray(up, new Vector3(0, -1, 0), 12);
   const hit = scene.pickWithRay(ray, (m) => ground.includes(m as AbstractMesh));
-  const normal = hit?.getNormal(true, true) ?? Vector3.Up();
+  // face-normal selection: the top face of a ramp, not a side face
+  let normal = hit?.getNormal(true, true) ?? null;
+  if (normal && normal.y < 0) normal = normal.negate();
+  if (!normal) normal = Vector3.Up();
   const n = normal.normalize();
   const steep = 1 - Math.max(-1, Math.min(1, Vector3.Dot(n, Vector3.Up())));
   // project gravity onto the slope plane, take the component along facing
