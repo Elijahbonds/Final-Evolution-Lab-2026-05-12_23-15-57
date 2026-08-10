@@ -68,7 +68,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'surf', mood: 'goldenHour', camPreset: 'board',
+    modeId: 'surf', mood: 'goldenHour', camPreset: 'surf',
 
     async load(ctx: ModeContext) {
       const built = buildSurfBreak(ctx.scene);

@@ -91,7 +91,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'snowboard', mood: 'alpine', camPreset: 'board',
+    modeId: 'snowboard', mood: 'alpine', camPreset: 'descent',
 
     async load(ctx: ModeContext) {
       world = buildSlopeRun(ctx.scene);

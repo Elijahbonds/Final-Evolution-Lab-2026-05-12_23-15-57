@@ -96,6 +96,12 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   // DUEL — side-on weapon-duel framing: wider lateral read than 'fight',
   // slightly raised so the 8-way disc spacing reads at a glance.
   duel: { distance: 5.4, height: 2.2, minHeight: 1.5, pitchFloorDeg: 8, pitchCapDeg: 16, targetHeight: 1.2, lag: 0.13, lookAhead: 0.5, fitTwo: true },
+  // SNOW DESCENT — wider and higher than 'board', opens up for big airs;
+  // longer lookAhead reads the fall line.
+  descent: { distance: 9.0, height: 3.6, minHeight: 2.2, pitchFloorDeg: 12, pitchCapDeg: 26, targetHeight: 1.2, lag: 0.08, lookAhead: 4.5 },
+  // SURF — wave-following: low and close behind the rider so the face fills
+  // frame; barrel treatment = tightest (set via pulse when in the tube).
+  surf: { distance: 5.2, height: 1.5, minHeight: 1.0, pitchFloorDeg: 3, pitchCapDeg: 10, targetHeight: 1.1, lag: 0.12, lookAhead: 2.8 },
   // ONSLAUGHT — horde readability: high and wide so surrounding enemies
   // stay in frame during crowd-control moments.
   onslaught: { distance: 9.5, height: 4.6, minHeight: 2.8, pitchFloorDeg: 18, pitchCapDeg: 30, targetHeight: 1.1, lag: 0.1, lookAhead: 1.6, fitTwo: true },
