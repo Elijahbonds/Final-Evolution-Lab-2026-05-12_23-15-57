@@ -90,9 +90,11 @@ export class SoccerBall {
       if (this.pos.y - t.radius <= groundY && this.vel.y < 0) {
         this.pos.y = groundY + t.radius;
         this.vel.y = -this.vel.y * t.restitution;
-        // tangential skid: topspin grips forward, backspin checks
+        // tangential skid: topspin grips forward, backspin checks;
+        // and the spin BITES the bounce — topspin jumps up, slice stays low
         const skid = t.skidFactor + this.spin.x * 0.03;
         this.vel.x *= skid; this.vel.z *= skid;
+        this.vel.y += -this.spin.x * 0.05;      // spin -> bounce bite
         // convert forward spin to roll on contact
         if (Math.abs(this.vel.y) < 1.2) {
           this.rolling = true;
