@@ -204,12 +204,25 @@ class SoundKitImpl {
     lfo.start();
     src.connect(bp).connect(g).connect(this.master);
     src.start();
+    this.crowdGain = g;
+    this.crowdBaseGain = g.gain.value;
     this.crowdBed = { stop: () => { try { src.stop(); lfo.stop(); } catch { /* already stopped */ } } };
+  }
+
+  private crowdGain: GainNode | null = null;
+  private crowdBaseGain = 0.05;
+  /** Mode 1 Phase 9: scale the crowd bed with CrowdEnergy/momentum so the
+   *  building audibly rises and hushes with the game. level 0..1. */
+  setAmbientLevel(level01: number): void {
+    if (!this.crowdGain) return;
+    const k = Math.max(0, Math.min(1, level01));
+    this.crowdGain.gain.value = this.crowdBaseGain * (0.35 + k * 2.2);
   }
 
   stopAmbient(): void {
     this.crowdBed?.stop();
     this.crowdBed = null;
+    this.crowdGain = null;
   }
 }
 

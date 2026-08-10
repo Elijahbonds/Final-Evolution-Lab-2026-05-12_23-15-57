@@ -310,8 +310,11 @@ export const DunkMode: ModeDefinition = (() => {
         }
       }
 
+      // the building breathes with the contest every frame
+      crowd.update(dt, Math.min(1, hype / 100), chain, momentum.tier === 'on_fire');
+      SoundKit.setAmbientLevel(crowd.level);
+
       if (phase === 'judging') {
-        crowd.update(dt, Math.min(1, hype / 100), chain, momentum.tier === 'on_fire');
         for (const beat of reveal.update(dt)) {
           if (beat.kind === 'confer') {
             ctx.setHud({ hint: 'THE JUDGES CONFER…' });
@@ -434,6 +437,9 @@ export const DunkMode: ModeDefinition = (() => {
 
     if (!made) {
       SoundKit.play('miss');
+      SoundKit.play('crowdGroan', { volume: 0.5 });
+      crowd.level = 0.15;                                 // the building hushes
+      SoundKit.setAmbientLevel(crowd.level);
       hype = Math.max(0, hype - 15);
       chain = 0;                                          // a miss breaks the chain
       lastScores = [];

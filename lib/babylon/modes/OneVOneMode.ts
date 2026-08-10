@@ -211,6 +211,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
       mbus.update(dt);
+      SoundKit.setAmbientLevel(0.3 + mbus.score01 * 0.7);
       meSlot.poll(dt);
       foeSlot.poll(dt);
       foeStunSec = Math.max(0, foeStunSec - dt);
