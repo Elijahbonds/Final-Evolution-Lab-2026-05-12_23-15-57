@@ -110,6 +110,9 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   // ONSLAUGHT — horde readability: high and wide so surrounding enemies
   // stay in frame during crowd-control moments.
   onslaught: { distance: 9.5, height: 4.6, minHeight: 2.8, pitchFloorDeg: 18, pitchCapDeg: 30, targetHeight: 1.1, lag: 0.1, lookAhead: 1.6, fitTwo: true },
+  // SOCCER BROADCAST — elevated sideline read; wide enough for off-ball
+  // runs to register, tracks the ball with a long lookahead.
+  soccer: { distance: 13.0, height: 6.4, minHeight: 4.0, pitchFloorDeg: 18, pitchCapDeg: 30, targetHeight: 0.8, lag: 0.08, lookAhead: 3.4, fitTwo: true },
 };
 
 export const FIXED_PRESETS: Record<string, { offset: Vector3; targetHeight: number }> = {
