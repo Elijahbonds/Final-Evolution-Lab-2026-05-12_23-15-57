@@ -18,7 +18,7 @@
 //     window around their release to erase the shot. Your positioning
 //     drives their make% exactly like theirs drives yours.
 
-import { MeshBuilder, Vector3 } from '@babylonjs/core';
+import { MeshBuilder, TransformNode as BABYLON_TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, TransformNode } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -39,6 +39,7 @@ import {
 } from '../core/BasketballCore';
 import { DribbleStateMachine, DRIBBLE_CLIP, syncedShotSpeed } from '../core/BallHandling';
 import { ContactSystem } from '../core/ContactSystem';
+import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { assertSpawned } from '../core/FrameGuard';
@@ -59,6 +60,9 @@ export const OneVOneMode: ModeDefinition = (() => {
   let meSlot: PlayerSlot, foeSlot: PlayerSlot, localSource: LocalInputSource;
   let meDribble: DribbleController;
   let meDribbleSM: DribbleStateMachine;
+  let meAnimTree: BasketballAnimTree;
+  let meFootPlant: FootPlant;
+  let wasPlanting = false;
   let shotMeter: ShotMeter;
   let turbo: TurboMeter;
   let arc: ShotArc;
@@ -163,6 +167,8 @@ export const OneVOneMode: ModeDefinition = (() => {
 
       meDribble = new DribbleController();
       meDribbleSM = new DribbleStateMachine();
+      meAnimTree = new BasketballAnimTree(me.animator);
+      meFootPlant = new FootPlant(me.skeleton, me.meshes[0] as never);
       shotMeter = new ShotMeter();
       turbo = new TurboMeter();
       arc = new ShotArc();
@@ -243,11 +249,20 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (!shooting && !dunking) {
           driveBody('me', me.root, meDribble.vel, dt);
           me.root.rotation.y = drib.facingRad;
-          const dState = meDribbleSM.update(dt, {
-            speed01: drib.speed01, crossover: drib.crossover,
-            nearestDefender: foeStunSec > 0 ? Infinity : Vector3.Distance(me.root.position, foe.root.position),
+          const nearestDef = foeStunSec > 0 ? Infinity : Vector3.Distance(me.root.position, foe.root.position);
+          meAnimTree.update({
+            speed01: drib.speed01, crossover: drib.crossover, nearestDefender: nearestDef,
+            hasBall: carrying, shooting, dunking,
+            driving: sprintOk && drib.speed01 > 0.6
+              && Vector3.Dot(meDribble.vel, RIM.subtract(me.root.position)) > 0,
+            defending: false, bracing: false, staggered: false,
           });
-          me.animator.play(DRIBBLE_CLIP[dState], { loop: dState !== 'crossover' });
+          // plant-and-cut contact lock: pin the plant foot with IK
+          if (drib.planting && !wasPlanting) {
+            meFootPlant.plant((n) => new BABYLON_TransformNode(n, ctx.scene));
+          }
+          wasPlanting = drib.planting;
+          meFootPlant.update(dt);
           if (drib.crossover) {
             SoundKit.play('whoosh', { pitch: 1.4, volume: 0.4 });
             ctx.feel?.impact?.(0.1);
@@ -349,7 +364,13 @@ export const OneVOneMode: ModeDefinition = (() => {
         driveBody('me', me.root, meDribble.vel, dt);
         me.root.rotation.y = drib.facingRad;
         contact?.brace('me', intent.brace ?? false);
-        if (myJumpAge === Infinity) me.animator.play(drib.speed01 > 0.15 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
+        if (myJumpAge === Infinity) {
+          meAnimTree.update({
+            speed01: drib.speed01, crossover: drib.crossover, nearestDefender: Infinity,
+            hasBall: false, shooting: false, dunking: false, driving: false,
+            defending: true, bracing: intent.brace ?? false, staggered: false,
+          });
+        }
 
         // the rival drives the lane
         if (!defReleased) {
@@ -413,6 +434,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      meFootPlant?.dispose();
       contact?.dispose(); contact = null;
       me?.dispose(); foe?.dispose(); ball?.dispose();
       meSlot?.dispose(); foeSlot?.dispose();

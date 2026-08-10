@@ -23,7 +23,7 @@ import type { AIBehavior, Intent } from './PlayerSlot';
 import { CourtMovement, DEFAULT_MOVEMENT } from './CourtMovement';
 
 // ── Movement ─────────────────────────────────────────────────────────────
-export interface DribbleResult { crossover: boolean; speed01: number; facingRad: number }
+export interface DribbleResult { crossover: boolean; speed01: number; facingRad: number; planting: boolean }
 
 /** Planar movement now runs on CourtMovement (Phase 2 weight model):
  *  ramped accel, stronger decel, speed-scaled plant-and-cut, turn-rate cap.
@@ -65,7 +65,7 @@ export class DribbleController {
     }
 
     this.lastMoveX = moveX; this.lastMoveY = moveY;
-    return { crossover, speed01: state.speed01, facingRad: this.movement.facing };
+    return { crossover, speed01: state.speed01, facingRad: this.movement.facing, planting: state.planting };
   }
 }
 
