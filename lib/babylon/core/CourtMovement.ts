@@ -57,6 +57,9 @@ export interface MovementState {
 export class CourtMovement {
   readonly vel: Vector3 = Vector3.Zero();
   facing = 0;
+  /** Stance/loadout speed multiplier (combat modes) — scales top speed,
+   *  not the stick, so partial-stick control is unaffected. */
+  speedScale = 1;
   private plantTimer = 0;
   private plantFloor = 0;
   private cutActive = false;
@@ -73,7 +76,7 @@ export class CourtMovement {
 
     if (mag > 0.05) {
       const wantDir = new Vector3(moveX, 0, -moveY).normalize();
-      const topSpeed = t.maxSpeed * (sprint ? 1 : t.jogFactor) * mag;
+      const topSpeed = t.maxSpeed * this.speedScale * (sprint ? 1 : t.jogFactor) * mag;
       const speed = this.vel.length();
 
       // Plant-and-cut: hard direction reversal at pace bleeds speed first.
