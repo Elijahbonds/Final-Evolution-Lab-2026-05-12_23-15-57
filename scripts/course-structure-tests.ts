@@ -56,7 +56,7 @@ ok('pumping on the wall builds amplitude; launch spends it; value scales', () =>
   assert.ok(air > 2.5, `pumped launch is bigger (${air.toFixed(2)}m)`);
   const pumped = p.trickValue(100, 1);
   assert.ok(pumped > base, `amplitude pays (${pumped} vs ${base})`);
-  assert.ok(p.pumpCharge === 0 || p.amplitude > 0, 'charge spent on launch');
+  assert.ok(p.amplitude > 0, 'charge spent on launch (amplitude recorded)');
 });
 
 console.log('\nC. rockfall hazard');
