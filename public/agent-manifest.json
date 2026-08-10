@@ -1,0 +1,66 @@
+{
+  "$comment": "Served at /agent-manifest.json. STATIC discovery: an agent fetches this BEFORE loading the app, so it knows what exists without booting a 3D scene first. The live window.__NEXUS_AGENT__.describe() is authoritative at runtime; this file must be kept in step with the app's mode registry.",
+  "schemaVersion": "1.0.0",
+  "product": "Final Evolution Lab",
+  "hosts": [
+    "https://finalevolution.abacusai.app",
+    "https://nexusllm.abacusai.app"
+  ],
+  "hostNote": "Both hosts serve the SAME application and the same build. Verified 2026-07-26: identical title and landing markup on each. Session cookies are host-scoped, so a session captured on one host will NOT authenticate the other — capture per host.",
+  "auth": {
+    "required": true,
+    "note": "Every /play/* route is behind a sign-in wall. An unauthenticated agent lands on the marketing page, which renders a canvas and can be mistaken for a loaded game. Check #fel-ready, never the presence of a canvas."
+  },
+  "enable": {
+    "query": "?agent=1",
+    "note": "The control bridge is OFF by default. ?agent=1 enables it for the session; ?agent=0 disables it. It grants control, never privilege: every action is one the signed-in user could perform by tapping. It cannot reach the wallet or the server."
+  },
+  "lifecycle": {
+    "marker": "#fel-ready",
+    "attributes": ["data-mode", "data-state"],
+    "states": ["booting", "loaded", "playing", "ended", "error"],
+    "criticalNote": "'loaded' means the scene mounted and the START GATE is still up. It does NOT mean the game is running. Every mode opens on a 'TAP TO START' overlay that must be cleared before any gameplay, animation or camera behaviour can be observed. Treating 'loaded' as success is the single most common false pass against this app."
+  },
+  "startGate": {
+    "present": true,
+    "selectorHint": "text=/tap to start/i",
+    "clearedWhen": "#fel-ready[data-state='playing']",
+    "note": "Click by accessible text, not coordinates — the overlay is centred and its position moves with viewport size."
+  },
+  "modes": [
+    { "id": "dunk",        "route": "/play/dunk",        "label": "Dunk Contest", "venue": "Venice Beach Court", "actions": ["move", "sprint", "dunk", "shoot", "idle"] },
+    { "id": "onevone",     "route": "/play/onevone",     "label": "1v1 Hoops",    "venue": "Venice Beach Court", "actions": ["move", "sprint", "shoot", "steal", "idle"] },
+    { "id": "threevthree", "route": "/play/threevthree", "label": "3v3",          "venue": "Venice Beach Court", "actions": ["move", "sprint", "shoot", "pass", "steal", "idle"] },
+    { "id": "karate",      "route": "/play/karate",      "label": "Karate Endless", "venue": "Shimogamo Dojo",  "actions": ["move", "guard", "strike", "idle"] },
+    { "id": "carnival",    "route": "/play/carnival",    "label": "Carnival",     "venue": "Boardwalk",         "actions": ["move", "shoot", "idle"] }
+  ],
+  "actions": [
+    { "name": "move",   "args": { "x": "-1..1", "y": "-1..1", "ms": "number" }, "description": "Walk or run. Magnitude above 0.85 sprints." },
+    { "name": "sprint", "args": { "ms": "number" }, "description": "Full-speed forward." },
+    { "name": "shoot",  "args": { "charge": "0..1", "ms": "number" }, "description": "Hold the shot meter to `charge`, then release." },
+    { "name": "dunk",   "args": { "ms": "number" }, "description": "Drive and slam. Requires turbo and rim proximity or it degrades to a layup." },
+    { "name": "pass",   "args": {}, "description": "Pass to the open teammate. Edge-triggered." },
+    { "name": "steal",  "args": {}, "description": "Defensive poke. Edge-triggered." },
+    { "name": "guard",  "args": { "ms": "number" }, "description": "Hold the karate guard stance." },
+    { "name": "strike", "args": { "which": "jab|hook|uppercut|high_kick|roundhouse" }, "description": "Karate attack. Edge-triggered." },
+    { "name": "idle",   "args": { "ms": "number" }, "description": "Release every input." }
+  ],
+  "observability": {
+    "snapshot": "window.__NEXUS_AGENT__.state()",
+    "events": "window.__NEXUS_AGENT__.recentEvents(50)",
+    "consoleTags": {
+      "[FEL-SPAWN]": "character spawn results",
+      "[FEL-ANIM]": "clip registration, rest pose, skinning guard",
+      "[FEL-FRAME]": "camera watchdog — hero off-screen, auto-recenter",
+      "[FEL-PERF]": "frame budget and shader compiles during play",
+      "[FEL-AGENT]": "control bridge"
+    },
+    "fatalPatterns": ["MISSING CLIP", "SKINNING STALL", "WATCHDOG", "[FEL-FRAME]"]
+  },
+  "pipeline": {
+    "entryPoint": "node tools/nexus_agent.mjs",
+    "verbs": ["plan", "verify", "build", "deploy", "smoke", "run"],
+    "output": "--json emits NDJSON, one record per line, status in {ok, failed, skipped}",
+    "note": "`skipped` is never coerced to `ok`. A step that cannot run reports why."
+  }
+}

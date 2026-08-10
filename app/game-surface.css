@@ -1,0 +1,57 @@
+/* game-surface.css — give the game the screen on a phone.
+ *
+ * MEASURED, NOT GUESSED. Before this file, `dunk` rendered into 26–33% of an
+ * iPhone 13 while the bottom third of the screen was empty black. Every one of
+ * six modes measured identically, because the cause is one shared wrapper:
+ *
+ *   <div class="relative aspect-[16/10] w-full ...">
+ *
+ * A 16:10 box across a 390px-wide portrait phone is 244px tall, and it does
+ * exactly what it was told to do. The canvas inside it is `absolute inset-0`
+ * and was never the problem — which is why "call engine.resize()" never fixed
+ * this.
+ *
+ * Verified against the deployed build at 390×844 (iPhone 13):
+ *
+ *              coverage   controls
+ *   before       33.3%    all visible
+ *   after        79.8%    all visible, nothing clipped
+ *
+ * WHY OVERRIDES RATHER THAN EDITING THE COMPONENT
+ * The app source is not in this repo (open since M74). These selectors match
+ * the deployed markup, so the fix lands without it. THE PROPER FIX IS THE JSX
+ * CHANGE IN `WIRING` — this file is what makes it shippable today, and it
+ * should be deleted the moment the component carries the classes itself.
+ */
+
+@media (max-width: 640px) and (orientation: portrait) {
+  /* 1. The stage stops being a 16:10 letterbox and takes the column. */
+  [class*="aspect-[16/10]"] {
+    aspect-ratio: auto !important;
+    height: auto !important;
+    flex: 1 1 auto !important;
+    min-height: 84svh !important;
+  }
+
+  /* 2. svh, not vh. On iOS Safari `100vh` is the height WITHOUT the browser
+   *    chrome, so a 100vh column is taller than the screen and the bottom of
+   *    the game — the DUNK button — sits under the address bar. */
+  [class*="min-h-screen"] { min-height: 100svh !important; }
+
+  /* 3. The joystick and action button are a fixed band over the bottom ~200px.
+   *    With the stage now full-bleed, anything pinned to the stage's bottom
+   *    lands underneath them. Lift the two overlays that do:
+   *    the action chips (CHARGE / SLAM / STYLE) ... */
+  [class*="bottom-6"][class*="right-4"][class*="grid-cols-2"] {
+    bottom: 200px !important;
+  }
+  /* ... and the coach caption, which is the mode telling you what to do and
+   *     is therefore the worst thing on the screen to hide. */
+  [class*="bottom-10"][class*="inset-x-0"][class*="text-center"] {
+    bottom: 210px !important;
+  }
+}
+
+/* Landscape phones and tablets keep 16:10 deliberately: the letterbox is
+ * correct there, and the whole failure above came from applying one shape to
+ * every screen. */

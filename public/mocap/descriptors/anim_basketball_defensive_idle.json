@@ -1,0 +1,44 @@
+{
+  "id": "anim_basketball_defensive_idle",
+  "name": "Basketball Defensive Idle Loop",
+  "category": "animations",
+  "type": "loop_motion",
+  "file": "anim_basketball_defensive_idle.fbx",
+  "urls": [
+    "https://static.seeles.ai/data/asset/export/7bf15bd4-7357-4700-a460-80cf24d03787/484484/unityModel_fef999b9-8877-4b04-951e-8bd17a91188f.fbx"
+  ],
+  "description": "Looping basketball defensive ready stance with bent knees and hands up for guarding",
+  "tags": [
+    "basketball",
+    "idle",
+    "defensive",
+    "stance",
+    "loop"
+  ],
+  "keywords": [
+    "defensive stance",
+    "basketball idle",
+    "guard position",
+    "ready pose"
+  ],
+  "compat": [
+    "unity",
+    "unreal"
+  ],
+  "status": "ready",
+  "created_at": "2026-05-23T16:00:00Z",
+  "source_date": "2026-05-23",
+  "source_turn": 22,
+  "version": "1.0",
+  "property_id": "search_5e0bb7e42765_0",
+  "motion_asset_id": 484484,
+  "fel_abp": "ABP_Basketball",
+  "fel_modes": [
+    "basketball_h2h",
+    "basketball_3v3"
+  ],
+  "local_bundle_file": "anim_basketball_defensive_idle.nexusanim.json",
+  "local_bundle_path": "FinalEvolutionLab/Resources/Animations/anim_basketball_defensive_idle.nexusanim.json",
+  "runtime_loader": "NexusAnimationLoader",
+  "runtime_format": "nexusanim_json"
+}

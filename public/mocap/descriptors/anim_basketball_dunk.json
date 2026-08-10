@@ -1,0 +1,44 @@
+{
+  "id": "anim_basketball_dunk",
+  "name": "Basketball Slam Dunk",
+  "category": "animations",
+  "type": "non_loop_motion",
+  "file": "anim_basketball_dunk.fbx",
+  "urls": [
+    "https://static.seeles.ai/data/asset/export/47800f8f-abcb-4551-92c7-9be8f300ef59/498391/import.fbx"
+  ],
+  "description": "One-shot slam dunk animation driving ball overhead into hoop with both hands from full sprint",
+  "tags": [
+    "basketball",
+    "dunk",
+    "slam",
+    "non-loop",
+    "montage"
+  ],
+  "keywords": [
+    "slam dunk",
+    "dunk animation",
+    "alley oop",
+    "basket"
+  ],
+  "compat": [
+    "unity",
+    "unreal"
+  ],
+  "status": "ready",
+  "created_at": "2026-05-23T16:00:00Z",
+  "source_date": "2026-05-23",
+  "source_turn": 22,
+  "version": "1.0",
+  "property_id": "search_2b656c46076b_2",
+  "motion_asset_id": 498391,
+  "fel_abp": "ABP_Basketball",
+  "fel_montage": "AM_Basketball_Dunk",
+  "fel_modes": [
+    "basketball_dunk"
+  ],
+  "local_bundle_file": "anim_basketball_dunk.nexusanim.json",
+  "local_bundle_path": "FinalEvolutionLab/Resources/Animations/anim_basketball_dunk.nexusanim.json",
+  "runtime_loader": "NexusAnimationLoader",
+  "runtime_format": "nexusanim_json"
+}

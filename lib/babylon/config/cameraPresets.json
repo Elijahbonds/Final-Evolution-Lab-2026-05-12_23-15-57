@@ -1,0 +1,122 @@
+{
+  "_comment": "Measured on the deployed build 2026-07-28 by converging each camera on the character's on-screen height. Values are VERIFIED, not calculated: radius is measured from the camera's TARGET, not from the character, so arithmetic undershoots (one-step estimates landed six modes at 13-17% instead of 22%).",
+  "targetFraction": 0.22,
+  "hardRadiusFloor": 3,
+  "_hardRadiusFloor": "Every ArcRotateCamera in this build ships lowerRadiusLimit = 3. Setting radius below it is accepted and then silently clamped back to exactly 3. Two modes need to go below it and cannot until the limit moves.",
+  "modes": {
+    "dunk": {
+      "camera": "nexus_cam_basketball_dunk",
+      "type": "ArcRotateCamera",
+      "radiusBefore": 14,
+      "radius": 3.0,
+      "fractionBefore": 0.083,
+      "fractionAfter": 0.212,
+      "charPxBefore": 60,
+      "charPxAfter": 154,
+      "verified": true
+    },
+    "onevone": {
+      "camera": "nexus_cam_basketball_h2h",
+      "type": "ArcRotateCamera",
+      "radiusBefore": 17,
+      "radius": 4.52,
+      "fractionBefore": 0.085,
+      "fractionAfter": 0.215,
+      "charPxBefore": 62,
+      "charPxAfter": 156,
+      "verified": true
+    },
+    "threevthree": {
+      "camera": "nexus_cam_basketball_3v3",
+      "type": "ArcRotateCamera",
+      "radiusBefore": 24,
+      "radius": 3.41,
+      "fractionBefore": 0.057,
+      "fractionAfter": 0.21,
+      "charPxBefore": 42,
+      "charPxAfter": 153,
+      "verified": true
+    },
+    "karate": {
+      "camera": "nexus_cam_karate_endless",
+      "type": "ArcRotateCamera",
+      "radiusBefore": 13,
+      "radius": 3.71,
+      "fractionBefore": 0.083,
+      "fractionAfter": 0.211,
+      "charPxBefore": 61,
+      "charPxAfter": 154,
+      "verified": true
+    },
+    "tennis": {
+      "camera": "nexus_cam_tennis",
+      "type": "ArcRotateCamera",
+      "radiusBefore": 26,
+      "radius": 2.51,
+      "requiresLowerRadiusLimit": 2.5,
+      "fractionBefore": 0.05,
+      "fractionAfter": 0.184,
+      "charPxBefore": 36,
+      "charPxAfter": 134,
+      "verified": false,
+      "_blocked": "Reached only 18.4% because radius clamped at the lowerRadiusLimit of 3. The value above is extrapolated from that measurement and needs the limit lowered before it can be verified."
+    },
+    "volleyball": {
+      "camera": "nexus_cam_volleyball",
+      "type": "ArcRotateCamera",
+      "radiusBefore": 22,
+      "radius": 2.51,
+      "requiresLowerRadiusLimit": 2.5,
+      "fractionBefore": 0.058,
+      "fractionAfter": 0.184,
+      "charPxBefore": 42,
+      "charPxAfter": 134,
+      "verified": false,
+      "_blocked": "Same lowerRadiusLimit clamp as tennis."
+    },
+    "karate-vs": {
+      "camera": "cam",
+      "type": "TargetCamera",
+      "fractionBefore": 0.357,
+      "verified": false,
+      "leaveAlone": true,
+      "_note": "Already well framed at 35.7%. Do not include it in a fleet-wide change."
+    },
+    "football": {
+      "camera": "cam",
+      "type": "TargetCamera",
+      "fractionBefore": 0.075,
+      "verified": false,
+      "controllerChangeRequired": true
+    },
+    "baseball": {
+      "camera": "cam",
+      "type": "TargetCamera",
+      "fractionBefore": 0.848,
+      "verified": false,
+      "controllerChangeRequired": true,
+      "_note": "TOO CLOSE, not too far. The character is 85% of frame height."
+    },
+    "skateboard": {
+      "camera": "cam",
+      "type": "TargetCamera",
+      "fractionBefore": 0.066,
+      "verified": false,
+      "controllerChangeRequired": true
+    },
+    "snowboard": {
+      "camera": "cam",
+      "type": "TargetCamera",
+      "fractionBefore": 0.058,
+      "verified": false,
+      "controllerChangeRequired": true
+    },
+    "surf": {
+      "camera": "cam",
+      "type": "TargetCamera",
+      "fractionBefore": 0.067,
+      "verified": false,
+      "controllerChangeRequired": true
+    }
+  }
+}
