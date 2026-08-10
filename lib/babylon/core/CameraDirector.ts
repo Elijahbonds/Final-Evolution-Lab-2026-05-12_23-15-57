@@ -113,6 +113,11 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   // SOCCER BROADCAST — elevated sideline read; wide enough for off-ball
   // runs to register, tracks the ball with a long lookahead.
   soccer: { distance: 13.0, height: 6.4, minHeight: 4.0, pitchFloorDeg: 18, pitchCapDeg: 30, targetHeight: 0.8, lag: 0.08, lookAhead: 3.4, fitTwo: true },
+  // BASEBALL DUEL — the pitcher/batter at-bat: behind the plate, reads the
+  // pitch flight and the PCI.
+  baseballDuel: { distance: 6.8, height: 2.0, minHeight: 1.4, pitchFloorDeg: 4, pitchCapDeg: 14, targetHeight: 1.0, lag: 0.1, lookAhead: 0.8, fitTwo: true },
+  // BASEBALL FIELD — high + wide for a batted ball in play.
+  baseballField: { distance: 14.0, height: 8.0, minHeight: 5.0, pitchFloorDeg: 24, pitchCapDeg: 38, targetHeight: 0.4, lag: 0.1, lookAhead: 2.0, fitTwo: true },
 };
 
 export const FIXED_PRESETS: Record<string, { offset: Vector3; targetHeight: number }> = {
