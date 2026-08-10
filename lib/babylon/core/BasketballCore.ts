@@ -20,52 +20,52 @@
 
 import { Vector3 } from '@babylonjs/core';
 import type { AIBehavior, Intent } from './PlayerSlot';
+import { CourtMovement, DEFAULT_MOVEMENT } from './CourtMovement';
 
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; speed01: number; facingRad: number }
 
+/** Planar movement now runs on CourtMovement (Phase 2 weight model):
+ *  ramped accel, stronger decel, speed-scaled plant-and-cut, turn-rate cap.
+ *  This class keeps its API (and its crossover detection) so every mode's
+ *  call sites are unchanged — the FEEL underneath got heavier. A detected
+ *  crossover is a *skilled* cut: it bypasses the plant penalty and gets the
+ *  burst boost, exactly like 2K's explosive crossover. */
 export class DribbleController {
-  vel = Vector3.Zero();
-  facing = 0;
+  private movement: CourtMovement;
   private lastMoveX = 0; private lastMoveY = 0;
   private crossoverCooldown = 0;
 
-  constructor(private cfg = { maxSpeed: 5.4, accel: 16, decel: 10, turnRate: 9, crossoverBoost: 2.2 }) {}
+  constructor(cfg = { maxSpeed: 6.4, accel: 26, decel: 34, turnRate: 9, crossoverBoost: 2.2 }) {
+    this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed });
+    this.crossoverBoost = cfg.crossoverBoost;
+  }
+  private crossoverBoost: number;
+
+  get vel(): Vector3 { return this.movement.vel; }
+  get facing(): number { return this.movement.facing; }
 
   update(dt: number, moveX: number, moveY: number, sprint: boolean): DribbleResult {
     this.crossoverCooldown = Math.max(0, this.crossoverCooldown - dt);
-
     const mag = Math.hypot(moveX, moveY);
     let crossover = false;
 
     // crossover: stick reversed hard within the reaction window, and we
     // were already moving with some pace — reads as an intentional shake
     const dot = this.lastMoveX * moveX + this.lastMoveY * moveY;
-    if (mag > 0.6 && this.vel.lengthSquared() > 1 && dot < -0.4 && this.crossoverCooldown === 0) {
+    const state = this.movement.update(dt, moveX, moveY, sprint);
+    if (mag > 0.6 && this.movement.vel.lengthSquared() > 1 && dot < -0.4 && this.crossoverCooldown === 0) {
       crossover = true;
       this.crossoverCooldown = 0.5;
+      // Skilled cut: instant redirect + burst (bypasses plant penalty).
       const dir = new Vector3(moveX, 0, -moveY).normalize();
-      this.vel = dir.scale(Math.min(this.cfg.maxSpeed * 1.15, this.vel.length() + this.cfg.crossoverBoost));
-      this.facing = Math.atan2(dir.x, dir.z);
-    } else if (mag > 0.05) {
-      const target = new Vector3(moveX, 0, -moveY).normalize().scale(this.cfg.maxSpeed * (sprint ? 1 : 0.7) * mag);
-      const accel = this.cfg.accel * dt;
-      this.vel.x += Math.max(-accel, Math.min(accel, target.x - this.vel.x));
-      this.vel.z += Math.max(-accel, Math.min(accel, target.z - this.vel.z));
-      const wantFacing = Math.atan2(moveX, -moveY);
-      let dFace = wantFacing - this.facing;
-      while (dFace > Math.PI) dFace -= 2 * Math.PI;
-      while (dFace < -Math.PI) dFace += 2 * Math.PI;
-      const maxStep = this.cfg.turnRate * dt;
-      this.facing += Math.max(-maxStep, Math.min(maxStep, dFace));
-    } else {
-      const decel = this.cfg.decel * dt;
-      const speed = this.vel.length();
-      if (speed > 0) this.vel.scaleInPlace(Math.max(0, 1 - decel / Math.max(speed, 0.001)));
+      const top = DEFAULT_MOVEMENT.maxSpeed;
+      this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, this.movement.vel.length() + this.crossoverBoost)));
+      this.movement.facing = Math.atan2(dir.x, dir.z);
     }
 
     this.lastMoveX = moveX; this.lastMoveY = moveY;
-    return { crossover, speed01: Math.min(1, this.vel.length() / this.cfg.maxSpeed), facingRad: this.facing };
+    return { crossover, speed01: state.speed01, facingRad: this.movement.facing };
   }
 }
 
