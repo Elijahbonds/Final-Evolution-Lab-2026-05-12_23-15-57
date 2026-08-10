@@ -19,7 +19,7 @@
 //     drives their make% exactly like theirs drives yours.
 
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh } from '@babylonjs/core';
+import type { AbstractMesh, TransformNode } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
@@ -38,6 +38,7 @@ import {
   SHOT_QUALITY_PCT, type ShotQuality, type ShotContext,
 } from '../core/BasketballCore';
 import { DribbleStateMachine, DRIBBLE_CLIP, syncedShotSpeed } from '../core/BallHandling';
+import { ContactSystem } from '../core/ContactSystem';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { assertSpawned } from '../core/FrameGuard';
@@ -70,12 +71,33 @@ export const OneVOneMode: ModeDefinition = (() => {
   let currentShot: ShotContext | null = null;
   // defense phase state
   let defSec = 0, defReleased = false, defResolved = false, myJumpAge = Infinity;
+  let contact: ContactSystem | null = null;      // Phase 4: Havok bodies when ready
+
+  /** Move a physics-bound character, or fall back to kinematic writes. */
+  function driveBody(id: string, root: TransformNode, vel: Vector3, dt: number): void {
+    if (contact?.isReady) {
+      // soft court bounds: kill the outward velocity component at the edge
+      const p = root.position;
+      const v = vel.clone();
+      if ((p.x > 7.2 && v.x > 0) || (p.x < -7.2 && v.x < 0)) v.x = 0;
+      if ((p.z > 14.5 && v.z > 0) || (p.z < 0.5 && v.z < 0)) v.z = 0;
+      contact.drive(id, v, dt);
+    } else {
+      root.position.addInPlace(vel.scale(dt));
+      clampToHalfCourt(root.position, 7.2, 14.5);
+    }
+  }
 
   const cfg = { heroUrl: SHARED_CFG.heroUrl };
 
   function resetPositions(): void {
-    me.root.position.set(0, 0, 5);
-    foe.root.position.set(0, 0, 2);
+    if (contact?.isReady) {
+      contact.teleport('me', new Vector3(0, 0, 5));
+      contact.teleport('foe', new Vector3(0, 0, 2));
+    } else {
+      me.root.position.set(0, 0, 5);
+      foe.root.position.set(0, 0, 2);
+    }
     attachBallToHand(ball, me.skeleton, 'RightHand');
     possession = 'mine'; carrying = true; shooting = false; dunking = false;
     currentShot = null; myJumpAge = Infinity;
@@ -127,6 +149,18 @@ export const OneVOneMode: ModeDefinition = (() => {
         ball: () => ball.position, hoop: () => RIM, allies: () => [], foes: () => [me.root.position],
       }, new DefenderBrain(0.7)), false);
 
+      // Phase 4: Havok contact bodies. If the physics wasm is unavailable
+      // the mode falls back to the kinematic path unchanged.
+      try {
+        contact = new ContactSystem();
+        await contact.init(ctx.scene);
+        contact.addBody('me', me.root);
+        contact.addBody('foe', foe.root);
+      } catch (e) {
+        console.warn('[1v1] physics unavailable, kinematic fallback:', e);
+        contact = null;
+      }
+
       meDribble = new DribbleController();
       meDribbleSM = new DribbleStateMachine();
       shotMeter = new ShotMeter();
@@ -140,7 +174,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       resetPositions();
       ctx.setHud({
         score: myScore, foeScore, target: TARGET_SCORE, momentum: 0, turbo: 100,
-        hint: 'Drive fast at the rim to DUNK · snap the stick in their face for ankles · on D: STEAL in tight, jump to BLOCK',
+        hint: 'Drive fast at the rim to DUNK · snap the stick for ankles · on D: hold L1/LT to BOX OUT, X to STEAL, A to BLOCK',
       });
     },
 
@@ -207,8 +241,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
         const drib = meDribble.update(dt, intent.moveX, intent.moveY, sprintOk);
         if (!shooting && !dunking) {
-          me.root.position.addInPlace(meDribble.vel.scale(dt));
-          clampToHalfCourt(me.root.position, 7.2, 14.5);
+          driveBody('me', me.root, meDribble.vel, dt);
           me.root.rotation.y = drib.facingRad;
           const dState = meDribbleSM.update(dt, {
             speed01: drib.speed01, crossover: drib.crossover,
@@ -235,8 +268,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (foeStunSec === 0) {
           const foeIntent = foeSlot.intent;
           const foeVel = new Vector3(foeIntent.moveX, 0, -foeIntent.moveY).scale(3.6);
-          foe.root.position.addInPlace(foeVel.scale(dt));
-          clampToHalfCourt(foe.root.position, 7.2, 14.5);
+          driveBody('foe', foe.root, foeVel, dt);
           if (foeVel.lengthSquared() > 0.05) foe.root.rotation.y = Math.atan2(foeVel.x, foeVel.z);
           foe.animator.play(foeVel.lengthSquared() > 0.3 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
           if (carrying && !shooting && !dunking && foeIntent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.2) {
@@ -248,7 +280,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           }
         }
 
-        if (resolveBodyCollision(me.root.position, foe.root.position) && meDribble.vel.lengthSquared() > 9) {
+        if (!contact?.isReady && resolveBodyCollision(me.root.position, foe.root.position) && meDribble.vel.lengthSquared() > 9) {
           SoundKit.play('impact', { pitch: 1.1, volume: 0.15 });
         }
 
@@ -279,6 +311,32 @@ export const OneVOneMode: ModeDefinition = (() => {
         ctx.camDirector.update(me.root.position, meDribble.vel, RIM);
       }
 
+      // ── Phase 4: contact events (fouls/hard contact) from Havok ──
+      if (contact?.isReady) {
+        for (const c of contact.drainContacts()) {
+          if (c.severity === 'foul') {
+            const onMe = c.b === 'me' || c.a === 'me';
+            const iAmVictim = c.b === 'me';
+            if (onMe && (shooting || dunking) && iAmVictim) {
+              SoundKit.play('whistle');
+              momentum = Math.min(100, momentum + 8);
+              ctx.setHud({ momentum });
+              bannerFlash(ctx, 'FOUL! — BALL BACK', 1000);
+              resetPositions();
+            } else if (onMe && possession === 'defense' && !iAmVictim) {
+              SoundKit.play('whistle');
+              momentum = Math.max(0, momentum - 10);
+              ctx.setHud({ momentum });
+              bannerFlash(ctx, 'FOUL ON YOU', 900);
+              setTimeout(() => { if (!ended) resetPositions(); }, 900);
+            }
+          } else if (c.severity === 'hard') {
+            SoundKit.play('impact', { pitch: 1.0, volume: 0.3 });
+            ctx.feel?.impact?.(0.25);
+          }
+        }
+      }
+
       // ══ THEIR POSSESSION — you defend ══
       if (possession === 'defense') {
         defSec += dt;
@@ -288,17 +346,23 @@ export const OneVOneMode: ModeDefinition = (() => {
         const sprintOk = turbo.gate(dt, intent.sprint, moving);
         ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
         const drib = meDribble.update(dt, intent.moveX, intent.moveY, sprintOk);
-        me.root.position.addInPlace(meDribble.vel.scale(dt));
-        clampToHalfCourt(me.root.position, 7.2, 14.5);
+        driveBody('me', me.root, meDribble.vel, dt);
         me.root.rotation.y = drib.facingRad;
+        contact?.brace('me', intent.brace ?? false);
         if (myJumpAge === Infinity) me.animator.play(drib.speed01 > 0.15 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
 
         // the rival drives the lane
         if (!defReleased) {
           const k = Math.min(1, defSec / DEFENSE_DRIVE_SEC);
           const targetX = Math.sin(defSec * 2.1) * 2.2 * (1 - k);
-          foe.root.position.x += (targetX - foe.root.position.x) * 3 * dt;
-          foe.root.position.z += ((RIM.z + 2 - foe.root.position.z)) * (0.9 + k) * dt;
+          if (contact?.isReady) {
+            const vx = (targetX - foe.root.position.x) * 3;
+            const vz = (RIM.z + 2 - foe.root.position.z) * (0.9 + k);
+            contact.drive('foe', new Vector3(vx, 0, vz), dt);
+          } else {
+            foe.root.position.x += (targetX - foe.root.position.x) * 3 * dt;
+            foe.root.position.z += ((RIM.z + 2 - foe.root.position.z)) * (0.9 + k) * dt;
+          }
           foe.root.rotation.y = Math.PI;
           foe.animator.play(SPORT_CLIP.moveLoop, { loop: true });
           attachBallToHand(ball, foe.skeleton, 'RightHand');
@@ -313,7 +377,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             return;
           }
 
-          resolveBodyCollision(me.root.position, foe.root.position);
+          if (!contact?.isReady) resolveBodyCollision(me.root.position, foe.root.position);
 
           // release moment
           if (defSec >= DEFENSE_DRIVE_SEC && !defResolved) {
@@ -349,6 +413,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      contact?.dispose(); contact = null;
       me?.dispose(); foe?.dispose(); ball?.dispose();
       meSlot?.dispose(); foeSlot?.dispose();
       SoundKit.stopAmbient();

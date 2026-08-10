@@ -23,6 +23,7 @@ export interface Intent {
   actionHeld: number;                  // 0..1 — shot-meter charge while held
   pass: boolean;                       // edge-detected
   steal: boolean;                      // edge-detected (defensive slot)
+  brace?: boolean;                     // held — box-out/post-up (Phase 4 contact)
 }
 
 const NEUTRAL: Intent = { moveX: 0, moveY: 0, sprint: false, action: false, actionHeld: 0, pass: false, steal: false };
@@ -41,6 +42,7 @@ export class LocalInputSource implements ControlSource {
   private moveX = 0; private moveY = 0;
   private actionDown = false; private actionEdge = false; private held = 0;
   private passEdge = false; private stealEdge = false;
+  private braceHeld = false;
 
   /** Call from the mode's onInput(ctx, e) for every event. */
   feed(e: FelInput): void {
@@ -50,6 +52,8 @@ export class LocalInputSource implements ControlSource {
       if (e.value === 0 && this.actionDown) { this.actionEdge = true; this.actionDown = false; }
       if (e.value > 0.02) this.actionDown = true;
     }
+    if (e.t === 'trigger' && e.side === 'L') this.braceHeld = e.value > 0.4;
+    if (e.t === 'button' && e.btn === 'L1') this.braceHeld = e.pressed;
     if (e.t === 'button' && e.pressed && e.btn === 'B') this.passEdge = true;
     if (e.t === 'button' && e.pressed && e.btn === 'X') this.stealEdge = true;
   }
@@ -60,6 +64,7 @@ export class LocalInputSource implements ControlSource {
       sprint: Math.hypot(this.moveX, this.moveY) > 0.85,
       action: this.actionEdge, actionHeld: this.held,
       pass: this.passEdge, steal: this.stealEdge,
+      brace: this.braceHeld,
     };
     this.actionEdge = false; this.passEdge = false; this.stealEdge = false;
     return out;
