@@ -118,6 +118,10 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   baseballDuel: { distance: 6.8, height: 2.0, minHeight: 1.4, pitchFloorDeg: 4, pitchCapDeg: 14, targetHeight: 1.0, lag: 0.1, lookAhead: 0.8, fitTwo: true },
   // BASEBALL FIELD — high + wide for a batted ball in play.
   baseballField: { distance: 14.0, height: 8.0, minHeight: 5.0, pitchFloorDeg: 24, pitchCapDeg: 38, targetHeight: 0.4, lag: 0.1, lookAhead: 2.0, fitTwo: true },
+  // GOLF TEE — behind the golfer down the line: the hole must read.
+  golfTee: { distance: 6.5, height: 2.4, minHeight: 1.6, pitchFloorDeg: 8, pitchCapDeg: 18, targetHeight: 1.2, lag: 0.1, lookAhead: 5.0, fitTwo: true },
+  // GOLF GREEN — tight overhead-ish read for the putt.
+  golfGreen: { distance: 4.2, height: 2.8, minHeight: 1.8, pitchFloorDeg: 20, pitchCapDeg: 32, targetHeight: 0.2, lag: 0.14, lookAhead: 0.4, fitTwo: true },
 };
 
 export const FIXED_PRESETS: Record<string, { offset: Vector3; targetHeight: number }> = {
