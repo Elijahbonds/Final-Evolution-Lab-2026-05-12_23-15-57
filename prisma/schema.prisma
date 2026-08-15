@@ -1,7 +1,7 @@
 generator client {
     provider = "prisma-client-js"
     binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
-    output = "/home/ubuntu/final_evolution_lab/nextjs_space/node_modules/.prisma/client"
+    // output path removed: use the default (node_modules/.prisma/client) so the project is portable across machines
 }
 
 datasource db {
