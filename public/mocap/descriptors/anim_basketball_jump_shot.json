@@ -1,0 +1,46 @@
+{
+  "id": "anim_basketball_jump_shot",
+  "name": "Basketball Jump Shot",
+  "category": "animations",
+  "type": "non_loop_motion",
+  "file": "anim_basketball_jump_shot.fbx",
+  "urls": [
+    "https://static.seeles.ai/data/asset/export/c21fe53c-8c11-4119-bdb0-3c2e7727b4c1/505896/import.fbx"
+  ],
+  "description": "One-shot basketball jump shot animation from two-foot plant through ball release and follow-through",
+  "tags": [
+    "basketball",
+    "jump shot",
+    "shoot",
+    "non-loop",
+    "montage"
+  ],
+  "keywords": [
+    "jump shot",
+    "basket",
+    "shoot basketball",
+    "score",
+    "ABP montage"
+  ],
+  "compat": [
+    "unity",
+    "unreal"
+  ],
+  "status": "ready",
+  "created_at": "2026-05-23T16:00:00Z",
+  "source_date": "2026-05-23",
+  "source_turn": 22,
+  "version": "1.0",
+  "property_id": "search_53e216778b06_0",
+  "motion_asset_id": 505896,
+  "fel_abp": "ABP_Basketball",
+  "fel_montage": "AM_Basketball_JumpShot",
+  "fel_modes": [
+    "basketball_h2h",
+    "basketball_3v3"
+  ],
+  "local_bundle_file": "anim_basketball_jump_shot.nexusanim.json",
+  "local_bundle_path": "FinalEvolutionLab/Resources/Animations/anim_basketball_jump_shot.nexusanim.json",
+  "runtime_loader": "NexusAnimationLoader",
+  "runtime_format": "nexusanim_json"
+}
