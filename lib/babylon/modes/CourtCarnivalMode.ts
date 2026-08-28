@@ -12,6 +12,8 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { allCarnivalEvents, type CarnivalEvent } from './carnivalEvents';
+import { NetworkManager } from '../network/NetworkManager';
+import { NetworkInputSource } from '../network/NetworkInputSource';
 
 type Phase = 'reveal' | 'playing' | 'eventOver' | 'finale';
 const EVENTS_PER_NIGHT = 4;
@@ -35,6 +37,9 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
   let ended = false;
   let player: SpawnedCharacter | null = null;
   let rival: SpawnedCharacter | null = null;
+  let networkManager: NetworkManager | null = null;
+  let networkInputSource: NetworkInputSource | null = null;
+  let isMultiplayer = false;
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
 
@@ -102,6 +107,22 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       rival = await CharacterLibrary.spawn(ctx.scene, 'hero.glb', { position: new BABYLON.Vector3(2, 0, 0), tint: '#ff2d78' });
       rival.installSafePlay();
       
+      // NETWORKING: Initialize multiplayer (attempt connection; graceful fallback to single-player)
+      try {
+        networkManager = new NetworkManager('http://localhost:3000');
+        const sessionId = `carnival-${Date.now()}`;
+        await networkManager.connect(sessionId);
+        networkInputSource = new NetworkInputSource(networkManager, ctx.inputBus);
+        isMultiplayer = true;
+        console.log(`[CourtCarnival] Connected to session ${sessionId} (multiplayer)`);
+        ctx.setHud({ banner: 'MULTIPLAYER MODE' });
+        setTimeout(() => ctx.setHud({ banner: '' }), 1200);
+      } catch (err) {
+        console.warn('[CourtCarnival] Multiplayer connection failed; running single-player', err);
+        isMultiplayer = false;
+        networkManager = null;
+      }
+      
       ctx.setHud({ score: 0, rivalScore: 0, eventNum: `1/${events.length}` });
       await startEvent(ctx);
     },
@@ -136,6 +157,11 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       current?.teardown(); 
       player?.dispose?.();
       rival?.dispose?.();
+      if (networkManager?.getConnected()) {
+        networkManager.disconnect();
+        console.log('[CourtCarnival] Disconnected from multiplayer session');
+      }
+      networkInputSource = null;
       SoundKit.stopAmbient(); 
     },
   };
