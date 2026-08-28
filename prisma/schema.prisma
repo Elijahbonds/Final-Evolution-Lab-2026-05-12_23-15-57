@@ -1349,3 +1349,166 @@ model CrmNote {
   @@index([contactId])
   @@index([dealId])
 }
+
+// =========================================================================== 
+// COACH PROGRAMMING SYSTEM (FEL Train Tab)
+// Exercise library, program builder, client programming, session logging
+// ===========================================================================
+
+model Exercise {
+  id           String   @id @default(cuid())
+  coachId      String   // Coach who created this exercise
+  name         String   @unique
+  category     String   @default("general")  // lower-body, upper-push, upper-pull, core, mobility, etc.
+  
+  // Demo & cues
+  demoVideoUrl String?  // URL to demo video (phase 2: replaced with avatar animation)
+  primaryCues  String[] @default([])  // Max 3 NASM-style setup/execution cues
+  commonFaults Json?    // Array of { fault: string, correctionCue: string }
+  
+  // Progression
+  equipment    String[] @default([])
+  defaultTempo String   @default("3-1-1-0")  // e.g. "3-1-1-0" (eccentric-pause-concentric-pause)
+  progressionOfId String? // ID of exercise this is progression of
+  regressionOfId String? // ID of exercise this is regression of
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  sessionExercises SessionExercise[]
+  
+  @@index([coachId])
+  @@index([category])
+}
+
+model CoachingProgram {
+  id           String   @id @default(cuid())
+  coachId      String
+  clientId     String
+  
+  name         String
+  startDate    DateTime
+  durationWeeks Int      @default(4)
+  
+  // Blocks (e.g. "Week 1", "Accumulation Phase")
+  blocks       Block[]
+  
+  // Metadata
+  isActive     Boolean  @default(true)
+  completedAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  clientSessions ClientSession[]
+  
+  @@index([coachId])
+  @@index([clientId])
+  @@index([isActive])
+}
+
+model Block {
+  id           String   @id @default(cuid())
+  programId    String
+  program      CoachingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  
+  order        Int      // 1, 2, 3...
+  label        String   // "Week 1", "Accumulation", etc.
+  
+  sessions     Session[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@index([programId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  blockId      String
+  block        Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  
+  order        Int      // 1, 2, 3... within block
+  label        String   // "Day 1 — Lower Push", "Session A", etc.
+  
+  exercises    SessionExercise[]
+  clientSessions ClientSession[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@index([blockId])
+}
+
+model SessionExercise {
+  id           String   @id @default(cuid())
+  sessionId    String
+  session      Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  exerciseId   String
+  exercise     Exercise @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  
+  order        Int      // 1, 2, 3... within session
+  sets         Int      @default(3)
+  reps         String   @default("8-10")  // Can be "10", "8-10", "3x10", etc.
+  load         String   @default("RPE7")   // "225 lbs", "%85 1RM", "RPE7", etc.
+  tempo        String   @default("3-1-1-0")
+  restSeconds  Int      @default(90)
+  
+  coachNote    String?  // Coach's override cue for this client/session
+  
+  exerciseLogs ExerciseLog[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@index([sessionId])
+  @@index([exerciseId])
+}
+
+model ClientSession {
+  id           String   @id @default(cuid())
+  programId    String
+  program      CoachingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  
+  sessionId    String
+  session      Session  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  
+  clientId     String
+  
+  completedAt  DateTime?
+  exerciseLogs ExerciseLog[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@unique([programId, sessionId, clientId, createdAt])
+  @@index([programId])
+  @@index([sessionId])
+  @@index([clientId])
+  @@index([completedAt])
+}
+
+model ExerciseLog {
+  id           String   @id @default(cuid())
+  clientSessionId String
+  clientSession ClientSession @relation(fields: [clientSessionId], references: [id], onDelete: Cascade)
+  
+  sessionExerciseId String
+  sessionExercise SessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Restrict)
+  
+  actualSets   Int?
+  actualReps   String?  // "10", "8,9,10", etc.
+  actualLoad   String?  // What they actually lifted
+  rpe          Int?     // Rate of Perceived Exertion (1-10)
+  clientNote   String?  // Client's notes (felt weird, form breakdown, etc.)
+  
+  completedAt  DateTime?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@index([clientSessionId])
+  @@index([sessionExerciseId])
+}
