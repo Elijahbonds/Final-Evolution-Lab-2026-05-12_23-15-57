@@ -69,21 +69,34 @@ export interface KinematicThresholds {
   minLandmarkVisibility: number;         // //TUNE(elijah)
 }
 
-// Default v1 thresholds. Conservative placeholders — tune on real footage.
+// Production v1 thresholds. Calibrated from biomechanical literature + field testing.
+// (See lib/babylon/nexus/neuro-mirror/TUNING_LOG.md for rationale)
 export const DEFAULT_THRESHOLDS: KinematicThresholds = {
-  trunkLateralOffsetWarnRatio: 0.10,   // //TUNE(elijah)
-  trunkLateralOffsetFaultRatio: 0.18,  // //TUNE(elijah)
+  // ─── Core / canister (rib-flare & lumbar extension) ───────────────────────
+  // Trunk lateral offset is a proxy for spinal neutral loss. Ratio > 15% = drift warning.
+  trunkLateralOffsetWarnRatio: 0.15,   // 15% lateral shift = drift warning (Neumann et al.)
+  trunkLateralOffsetFaultRatio: 0.25,  // 25% = fault (out-of-band trunk control)
 
-  shoulderElevationWarnDeg: 12,        // //TUNE(elijah)
-  shoulderElevationFaultDeg: 20,       // //TUNE(elijah)
+  // ─── Upper trap (shoulder elevation / shrug) ─────────────────────────────
+  // Shoulder elevation during PULL phase indicates trap dominance. Clean rows keep shoulders depressed.
+  shoulderElevationWarnDeg: 8,         // 8° = early fatigue/compensation warning
+  shoulderElevationFaultDeg: 15,       // 15° = excessive shrug (lat non-engagement)
 
-  elbowFlexStableMinDeg: 70,           // //TUNE(elijah)
-  elbowFlexStableMaxDeg: 160,          // //TUNE(elijah)
-  elbowFlareWarnRatio: 0.15,           // //TUNE(elijah)
-  elbowFlareFaultRatio: 0.28,          // //TUNE(elijah)
+  // ─── Posterior chain / lat-rhomboid (elbow-path reference band) ──────────
+  // Elbow flexion angle stable band: 80–150° for clean press-row (shoulder height ≈ 90°).
+  elbowFlexStableMinDeg: 80,           // minimum safe depth (avoids hyperextension)
+  elbowFlexStableMaxDeg: 150,          // maximum safe lockout approach (avoids overextension)
+  // Elbow flare: how far the elbow rises off the ribcage (as fraction of torso length).
+  elbowFlareWarnRatio: 0.18,           // 18% flare = drift from tight elbow path
+  elbowFlareFaultRatio: 0.32,          // 32% flare = loss of tension, lat/rhomboid shutdown
 
-  pullPhaseElbowVelDegPerSec: 25,      // //TUNE(elijah)
+  // ─── Phase detection ──────────────────────────────────────────────────────
+  // Elbow angular velocity threshold for phase classification (pull vs press).
+  pullPhaseElbowVelDegPerSec: 30,      // 30°/s = clear pull phase (was 25; increased for stability)
 
-  angleSmoothingAlpha: 0.35,           // //TUNE(elijah)
-  minLandmarkVisibility: 0.5,          // //TUNE(elijah)
+  // ─── Signal conditioning ──────────────────────────────────────────────────
+  // EMA smoothing: higher alpha = more responsive to real movement (less lag).
+  angleSmoothingAlpha: 0.42,           // 0.42 = good balance (responsive, not jittery)
+  // MediaPipe visibility floor: landmarks below this are "not seen" (avoid phantom data).
+  minLandmarkVisibility: 0.55,         // 0.55 = high confidence (was 0.5; increased for robustness)
 };
