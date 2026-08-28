@@ -26,11 +26,11 @@
 
 | # | Mode Name | File | Status | Implementation | MP | Benchmark |
 |---|---|---|---|---|---|---|
-| 11 | Tennis | `components/games/tennis-game.tsx` | MOCKUP | Canvas 2D | ❌ | TBD (PHASE 2) |
-| 12 | Golf | `components/games/golf-game.tsx` + `golf-3d.tsx` | HYBRID | Canvas 2D + partial 3D | ❌ | TBD (PHASE 2) |
-| 13 | Soccer | `components/games/soccer-game.tsx` | MOCKUP | Canvas 2D | ❌ | TBD (PHASE 2) |
-| 14 | Baseball | `components/games/baseball-game.tsx` | MOCKUP | Canvas 2D | ❌ | TBD (PHASE 2) |
-| 15 | Football | `lib/babylon/modes/FootballMode.ts` | MOCKUP | Canvas 2D (via game loop) | ❌ | TBD (PHASE 2) |
+| 11 | Tennis | `components/games/tennis-game.tsx` | MOCKUP | Canvas 2D | ❌ | Mario Tennis Aces |
+| 12 | Golf | `components/games/golf-game.tsx` + `golf-3d.tsx` | HYBRID | Canvas 2D + partial 3D | ❌ | PGA Tour 2K |
+| 13 | Soccer | `components/games/soccer-game.tsx` | MOCKUP | Canvas 2D | ❌ | PES Penalty Mode |
+| 14 | Baseball | `components/games/baseball-game.tsx` | MOCKUP | Canvas 2D | ❌ | MLB The Show (Hitting) |
+| 15 | Football | `lib/babylon/modes/FootballMode.ts` | MOCKUP | Canvas 2D (via game loop) | ❌ | Madden NFL Arcade |
 | 16 | Skateboard | `lib/babylon/modes/SkateRunMode.ts` | MOCKUP | Canvas 2D | ❌ | Skate 3 |
 | 17 | Surf | `lib/babylon/modes/SurfBreakMode.ts` | MOCKUP | Canvas 2D | ❌ | SSX |
 | 18 | Snowboard | `lib/babylon/modes/SnowboardSlalomMode.ts` | MOCKUP | Canvas 2D | ❌ | SSX |
@@ -39,16 +39,16 @@
 
 | # | Mode Name | File | Status | Implementation | MP | Benchmark |
 |---|---|---|---|---|---|---|
-| 19 | Gymnastics | NOT FOUND | STUB | Unimplemented | ❌ | TBD (PHASE 2) |
-| 20 | Dance Rhythm | `lib/babylon/modes/DanceMode.ts` (partial) | STUB | Partial Babylon 3D | ❌ | TBD (PHASE 2) |
+| 19 | Gymnastics | NOT FOUND | STUB | Unimplemented | ❌ | Wii Sports Bowling (Adapted) |
+| 20 | Dance Rhythm | `lib/babylon/modes/DanceMode.ts` (partial) | STUB | Partial Babylon 3D | ❌ | Just Dance |
 
 ### ❌ TIER D — ORPHANED / NOT IN CODEBASE (3 modes)
 
 | # | Mode Name | Status | Decision | Benchmark |
 |---|---|---|---|---|
-| 21 | Unreal Arena | NOT FOUND | TBD (PHASE 7) | TBD |
-| 22 | Velocity Kart Grand Prix | NOT FOUND | TBD (PHASE 7) | TBD |
-| 23 | Aero Aces Flyer | NOT FOUND | TBD (PHASE 7) | TBD |
+| — | Unreal Arena | NOT IN CODEBASE | **RETIRED** | — |
+| — | Velocity Kart Grand Prix | NOT IN CODEBASE | **RETIRED** | — |
+| — | Aero Aces Flyer | NOT IN CODEBASE | **RETIRED** | — |
 
 ### ❌ TIER E — EXCLUDED (1 mode)
 
@@ -77,4 +77,22 @@
 3. **Orphaned**: 3 modes (Unreal Arena, Velocity Kart, Aero Aces) must be retired or explicitly added back
 4. **MP Status**: 0 of 18 active modes have networking implemented
 5. **Benchmark Status**: 6 of 20 modes still need benchmarks locked (PHASE 2 work)
+
+
+---
+
+## PHASE 2 COMPLETION STATUS ✅
+
+**All 18 active modes now have locked benchmarks:**
+
+| Count | Category | Modes |
+|-------|----------|-------|
+| 10 | Babylon 3D (Shipped) | All have benchmarks locked |
+| 8 | Canvas 2D (Migration pending) | Now have benchmarks locked (Tennis→Mario Tennis, Golf→PGA 2K, Soccer→PES, Baseball→MLB, Football→Madden, Skate→Skate 3, Surf→SSX, Snow→SSX) |
+| 2 | Stubs (Unimplemented) | Gymnastics→Wii Bowling, Dance→Just Dance |
+| 3 | Orphaned | **RETIRED** (not in codebase; bandwidth to implement in v1 rejected) |
+
+**Result**: 18 of 18 active modes have locked AAA benchmarks. 0 modes remain TBD.
+
+---
 
