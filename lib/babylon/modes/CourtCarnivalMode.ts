@@ -7,6 +7,8 @@
 
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+import * as BABYLON from 'babylonjs';
+import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { allCarnivalEvents, type CarnivalEvent } from './carnivalEvents';
@@ -31,6 +33,8 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
   let current: CarnivalEvent | null = null;
   let myPoints = 0, rivalPoints = 0;
   let ended = false;
+  let player: SpawnedCharacter | null = null;
+  let rival: SpawnedCharacter | null = null;
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
 
@@ -91,6 +95,13 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       events = drawEvents();                    // fresh random four every session
       idx = 0; myPoints = 0; rivalPoints = 0; ended = false; current = null;
       SoundKit.startAmbient('stadium');
+      
+      // GATE 0: Spawn Mixamo-rigged characters for visibility
+      player = await CharacterLibrary.spawn(ctx.scene, 'hero.glb', { position: new BABYLON.Vector3(-2, 0, 0) });
+      player.installSafePlay();
+      rival = await CharacterLibrary.spawn(ctx.scene, 'hero.glb', { position: new BABYLON.Vector3(2, 0, 0), tint: '#ff2d78' });
+      rival.installSafePlay();
+      
       ctx.setHud({ score: 0, rivalScore: 0, eventNum: `1/${events.length}` });
       await startEvent(ctx);
     },
@@ -121,7 +132,12 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       }
     },
 
-    dispose() { current?.teardown(); SoundKit.stopAmbient(); },
+    dispose() { 
+      current?.teardown(); 
+      player?.dispose?.();
+      rival?.dispose?.();
+      SoundKit.stopAmbient(); 
+    },
   };
 })();
 
