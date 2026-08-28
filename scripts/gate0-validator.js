@@ -12,7 +12,7 @@ const path = require("path");
 
 // Define all 18 active modes
 const allModes = [
-  // TIER A — Babylon 3D Modes (10)
+  // TIER A — Babylon 3D Modes (14)
   { name: "Dunk Contest", file: "lib/babylon/modes/DunkMode.ts", category: "babylon3d" },
   { name: "Basketball 3v3", file: "lib/babylon/modes/ThreeVThreeMode.ts", category: "babylon3d" },
   { name: "Streetball 1v1", file: "lib/babylon/modes/OneVOneMode.ts", category: "babylon3d" },
@@ -23,16 +23,16 @@ const allModes = [
   { name: "Showdown", file: "lib/babylon/modes/ShowdownMode.ts", category: "babylon3d" },
   { name: "Mixed Combat", file: "lib/babylon/modes/MixedCombatMode.ts", category: "babylon3d" },
   { name: "Court Carnival", file: "lib/babylon/modes/CourtCarnivalMode.ts", category: "babylon3d" },
+  { name: "Football", file: "lib/babylon/modes/FootballMode.ts", category: "babylon3d" },
+  { name: "Skateboard", file: "lib/babylon/modes/SkateRunMode.ts", category: "babylon3d" },
+  { name: "Surf", file: "lib/babylon/modes/SurfBreakMode.ts", category: "babylon3d" },
+  { name: "Snowboard", file: "lib/babylon/modes/SnowboardSlalomMode.ts", category: "babylon3d" },
 
-  // TIER B — Canvas 2D Modes (8)
+  // TIER B — Canvas 2D Modes (4 React components)
   { name: "Tennis", file: "components/games/tennis-game.tsx", category: "canvas2d" },
   { name: "Golf", file: "components/games/golf-game.tsx", category: "canvas2d" },
   { name: "Soccer", file: "components/games/soccer-game.tsx", category: "canvas2d" },
   { name: "Baseball", file: "components/games/baseball-game.tsx", category: "canvas2d" },
-  { name: "Football", file: "lib/babylon/modes/FootballMode.ts", category: "canvas2d" },
-  { name: "Skateboard", file: "lib/babylon/modes/SkateRunMode.ts", category: "canvas2d" },
-  { name: "Surf", file: "lib/babylon/modes/SurfBreakMode.ts", category: "canvas2d" },
-  { name: "Snowboard", file: "lib/babylon/modes/SnowboardSlalomMode.ts", category: "canvas2d" },
 ];
 
 /**

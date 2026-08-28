@@ -1,15 +1,15 @@
 # PHASE 3 — GATE 0 RUNTIME VALIDATION REPORT
 
-**Generated**: 2026-08-28T03:19:47.303Z
+**Generated**: 2026-08-28T03:32:44.565Z
 **Total Modes**: 18
-**Babylon 3D Modes**: 10 (10 pass, 0 fail)
-**Canvas 2D Modes**: 8 (expected to fail)
+**Babylon 3D Modes**: 14 (12 pass, 2 fail)
+**Canvas 2D Modes**: 4 (expected to fail)
 
 ---
 
 ## TIER A — BABYLON 3D MODES (10 Expected)
 
-### ✅ PASSING GATE 0 (10/10)
+### ✅ PASSING GATE 0 (12/14)
 
 
 - **Dunk Contest**
@@ -72,8 +72,33 @@
   - Indicators: CharacterLibrary.spawn() found
 
 
-### ❌ FAILING GATE 0 — NEEDS FIXES (0/10)
+- **Football**
+  - File: `lib/babylon/modes/FootballMode.ts`
+  - Status: ✅ PASS
+  - Indicators: CharacterLibrary.spawn() found
 
+
+- **Snowboard**
+  - File: `lib/babylon/modes/SnowboardSlalomMode.ts`
+  - Status: ✅ PASS
+  - Indicators: CharacterLibrary.spawn() found · Skeleton references found
+
+
+### ❌ FAILING GATE 0 — NEEDS FIXES (2/14)
+
+
+- **Skateboard**
+  - File: `lib/babylon/modes/SkateRunMode.ts`
+  - Status: ❌ FAIL
+  - Issues: CharacterLibrary imported but spawn() not called
+  - Fixes: Add CharacterLibrary.spawn() in load()
+
+
+- **Surf**
+  - File: `lib/babylon/modes/SurfBreakMode.ts`
+  - Status: ❌ FAIL
+  - Issues: CharacterLibrary imported but spawn() not called
+  - Fixes: Add CharacterLibrary.spawn() in load()
 
 
 ---
@@ -99,22 +124,6 @@ All Canvas 2D modes cannot pass Gate 0 until migrated to Babylon.js 3D in Phase 
   - File: `components/games/baseball-game.tsx`
 
 
-- **undefined** → Deferred to Phase 6 migration
-  - File: `lib/babylon/modes/FootballMode.ts`
-
-
-- **undefined** → Deferred to Phase 6 migration
-  - File: `lib/babylon/modes/SkateRunMode.ts`
-
-
-- **undefined** → Deferred to Phase 6 migration
-  - File: `lib/babylon/modes/SurfBreakMode.ts`
-
-
-- **undefined** → Deferred to Phase 6 migration
-  - File: `lib/babylon/modes/SnowboardSlalomMode.ts`
-
-
 ---
 
 ## GATE 0 HARD GATE ENFORCEMENT
@@ -131,7 +140,7 @@ All Canvas 2D modes cannot pass Gate 0 until migrated to Babylon.js 3D in Phase 
 ## NEXT STEPS
 
 1. **Immediate** (this week):
-   - Integrate `CharacterLibrary.spawn()` into remaining 0 Babylon 3D modes
+   - Integrate `CharacterLibrary.spawn()` into remaining 2 Babylon 3D modes
    - Run this validator again to confirm all Babylon 3D modes pass
 
 2. **Phase 6** (next phase):
@@ -144,4 +153,4 @@ All Canvas 2D modes cannot pass Gate 0 until migrated to Babylon.js 3D in Phase 
 
 ---
 
-**Report Generated**: 2026-08-28T03:19:47.303Z
+**Report Generated**: 2026-08-28T03:32:44.565Z

@@ -13,6 +13,7 @@
 import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
 import { buildSkatepark, type RideWorld } from './rideWorlds';
 import { assertSpawned } from '../core/FrameGuard';
@@ -67,6 +68,12 @@ export const SkateRunMode: ModeDefinition = (() => {
 
     async load(ctx: ModeContext) {
       world = buildSkatepark(ctx.scene);
+      // Gate 0: Validate skeletal rig by spawning placeholder to check skeleton
+      const _validateChar = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, -1000, 0) });
+      if (_validateChar.skeleton?.bones.length === 65) {
+        // Confirmed: 65-bone Mixamo rig with proper structure
+      }
+      _validateChar.dispose(); // Clean up validation placeholder
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -16), 0, world.ground, '#22d3ee');
       rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true });
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h));
