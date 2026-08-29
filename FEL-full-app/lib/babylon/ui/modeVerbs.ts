@@ -1,0 +1,147 @@
+// modeVerbs v7 — uniform controller. Every mode now maps onto the SAME
+// fixed A/B/X/Y diamond (position + color per slot never change), a d-pad,
+// and both sticks — TouchOverlay always draws the full rig regardless of
+// mode, exactly like an emulator showing the whole controller. Modes differ
+// only in what pressing a slot DOES (`emit`) and what it's called
+// (`label`); a slot a mode has no use for is `emit: null` ("inert") and
+// still renders, dimmed, doing nothing when pressed.
+
+import type { FelInput } from '../core/InputBus';
+
+export interface VerbButton {
+  label: string;                       // verb, not letter: "SLAM", "JAB" — '' for inert slots
+  color: string;
+  emit: FelInput | null;               // null = inert (rendered, but a no-op)
+  hold?: boolean;                      // analog hold → trigger stream (charge)
+}
+// Always exactly 4, in A, B, X, Y order — TouchOverlay places them itself.
+export type ModeVerbConfig = { buttons: [VerbButton, VerbButton, VerbButton, VerbButton] };
+
+const A = (btn: 'A' | 'B' | 'X' | 'Y'): FelInput => ({ t: 'button', btn, pressed: true });
+const RT = (value: number): FelInput => ({ t: 'trigger', side: 'R', value });
+
+// Fixed slot colors — the whole point of a uniform rig: A is always this
+// cyan, Y is always this gold, everywhere, the same way a real controller's
+// face buttons never change color between games.
+const SLOT_COLOR = { A: '#22d3ee', B: '#ff6b3d', X: '#a78bfa', Y: '#ffd75e' } as const;
+
+const inert = (): VerbButton => ({ label: '', color: '#4b5563', emit: null });
+/** Build a 4-slot config from up to 4 {slot, label, emit, hold} entries; any
+ *  slot not supplied comes back inert (still drawn, does nothing). */
+function verbs(defs: Partial<Record<'A' | 'B' | 'X' | 'Y', { label: string; emit: FelInput; hold?: boolean }>>): ModeVerbConfig {
+  const slot = (k: 'A' | 'B' | 'X' | 'Y'): VerbButton =>
+    defs[k] ? { label: defs[k]!.label, color: SLOT_COLOR[k], emit: defs[k]!.emit, hold: defs[k]!.hold } : inert();
+  return { buttons: [slot('A'), slot('B'), slot('X'), slot('Y')] };
+}
+
+export const MODE_VERBS: Record<string, ModeVerbConfig> = {
+  dunk: verbs({
+    A: { label: 'SLAM', emit: A('A') },
+    B: { label: 'STYLE', emit: A('B') },
+    Y: { label: 'CHARGE', emit: RT(1), hold: true },
+    // X left inert on purpose — mid-air tricks fire from the d-pad + A/B/Y
+    // combo (see DunkSystem.ts), not a dedicated button of their own.
+  }),
+  karate: verbs({
+    A: { label: 'JAB', emit: A('A') },
+    B: { label: 'KICK', emit: A('B') },
+    X: { label: 'BLOCK', emit: A('X') },
+    Y: { label: 'HEAVY', emit: A('Y') },
+  }),
+  football: verbs({
+    A: { label: 'HURDLE', emit: A('A') },
+    X: { label: 'JUKE L', emit: A('X') },
+    Y: { label: 'TRUCK', emit: RT(1), hold: true },
+    B: { label: 'JUKE R', emit: A('Y') },
+  }),
+  skateboard: verbs({
+    A: { label: 'POP', emit: A('A') },
+    B: { label: 'FLIP', emit: A('B') },
+    X: { label: 'GRAB', emit: A('X') },
+    Y: { label: 'PUMP', emit: RT(1), hold: true },
+  }),
+  snowboard_slalom: verbs({
+    A: { label: 'JUMP', emit: A('A') },
+    B: { label: 'GRAB', emit: A('B') },
+    Y: { label: 'TUCK', emit: RT(1), hold: true },
+  }),
+  surf: verbs({
+    A: { label: 'AIR', emit: A('A') },
+    Y: { label: 'CARVE', emit: RT(1), hold: true },
+  }),
+  tennis: verbs({ A: { label: 'SWING', emit: A('A') } }),
+  derby: verbs({ A: { label: 'SWING', emit: A('A') } }),
+  penalty: verbs({ A: { label: 'STRIKE', emit: A('A') } }),
+  golf: verbs({ A: { label: 'SWING', emit: A('A') } }),
+
+  // 1v1 Hoops: shooting is HOLD-then-release on the trigger stream (shot
+  // meter). Crossovers come from stick reversal, so no button needed there.
+  onevone: verbs({
+    Y: { label: 'SHOOT', emit: RT(1), hold: true },
+    A: { label: 'BLOCK', emit: A('A') },
+    X: { label: 'STEAL', emit: A('X') },
+  }),
+  // 3v3 Streetball: held-trigger shot, PASS (B), STEAL (X), BLOCK (A) —
+  // the exact bindings LocalInputSource + the modes' onInput already read.
+  threevthree: verbs({
+    Y: { label: 'SHOOT', emit: RT(1), hold: true },
+    B: { label: 'PASS', emit: A('B') },
+    X: { label: 'STEAL', emit: A('X') },
+    A: { label: 'BLOCK', emit: A('A') },
+  }),
+  // Court Carnival: four rotating events share one deck. CHARGE covers Slam
+  // Rush's held trigger + Trick Gauntlet's pump; GO is every event's A verb
+  // (slam/jab/jump/shoot); TRICK is B (kick/flip A); POWER is Y (heavy/flip
+  // B). The Gauntlet's X spin is the one verb that didn't fit the 4-button
+  // budget — B/Y still give two distinct tricks, so variety scoring works.
+  carnival: verbs({
+    A: { label: 'GO', emit: A('A') },
+    B: { label: 'TRICK', emit: A('B') },
+    Y: { label: 'POWER', emit: A('Y') },
+    X: { label: 'CHARGE', emit: RT(1), hold: true },
+  }),
+
+  // Pass-and-play head-to-head dunk contest — no mid-air tricks here (see
+  // DunkDuelMode.ts), so X stays inert rather than wired to nothing.
+  dunkduel: verbs({
+    A: { label: 'SLAM', emit: A('A') },
+    B: { label: 'STYLE', emit: A('B') },
+    Y: { label: 'CHARGE', emit: RT(1), hold: true },
+  }),
+
+  // Karate VS uses the exact same verb set as Karate Endless — BLOCK is
+  // press-AND-release aware in the mode (hold to guard, tap to parry).
+  // NOTE: key must be 'karate_vs' (underscore) — karate-vs-babylon.tsx renders
+  // <TouchOverlay modeId="karate_vs">, so a hyphenated key here silently fell
+  // through to MODE_VERBS.default (a single ACTION/A button), making KICK,
+  // HEAVY, and BLOCK completely unreachable from the touch UI.
+  karate_vs: verbs({
+    A: { label: 'JAB', emit: A('A') },
+    B: { label: 'KICK', emit: A('B') },
+    X: { label: 'BLOCK', emit: A('X') },
+    Y: { label: 'HEAVY', emit: A('Y') },
+  }),
+  mixedcombat: verbs({
+    A: { label: 'STRIKE', emit: A('A') },
+    B: { label: 'KICK', emit: A('B') },
+    X: { label: 'GUARD', emit: A('X') },
+    Y: { label: 'HEAVY', emit: A('Y') },
+  }),
+  // Soul-Calibur-lane weapon duel (DuelMode.ts). Same A/B/Y buttons do double
+  // duty: during weapon select they PICK fists/blade/staff (matching the
+  // mode's own on-screen hint), then in the fight they're that weapon's
+  // three moves in order. BLOCK on X — hold to guard, flick the left stick
+  // toward the opponent at the moment of impact for a GUARD IMPACT no-sell.
+  duel: verbs({
+    A: { label: 'FISTS', emit: A('A') },
+    B: { label: 'BLADE', emit: A('B') },
+    X: { label: 'BLOCK', emit: A('X') },
+    Y: { label: 'STAFF', emit: A('Y') },
+  }),
+
+  // Rhythm dance. No movement stick use — the body IS the game; one TAP verb
+  // judged against the beat. B also taps (mode reads A or B).
+  dance: verbs({ A: { label: 'TAP', emit: A('A') } }),
+
+  default: verbs({ A: { label: 'ACTION', emit: A('A') } }),
+};
