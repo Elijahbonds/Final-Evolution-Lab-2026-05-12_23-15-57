@@ -13,8 +13,8 @@
 // Skin tone uses the same path: one body mesh, a mask marking skin zones,
 // and a tint parameter — no per-tone texture variants.
 
-import { Color3, MaterialPluginBase, RegisterMaterialPlugin } from '@babylonjs/core';
-import type { AbstractMesh, Material, PBRBaseMaterial, Nullable, Texture, UniformBuffer, Scene, Engine, SubMesh } from '@babylonjs/core';
+import { Color3, MaterialPluginBase, RegisterMaterialPlugin, ShaderLanguage } from '@babylonjs/core';
+import type { AbstractMesh, Material, PBRBaseMaterial, Nullable, Texture, UniformBuffer, Scene, AbstractEngine, SubMesh } from '@babylonjs/core';
 
 const PLUGIN_NAME = 'FELZoneTint';
 
@@ -51,14 +51,18 @@ export class ZoneTintPlugin extends MaterialPluginBase {
     samplers.push('felZoneMask');
   }
 
-  getUniforms(): { ubo: { name: string; size: number; type: string }[]; fragment: string } {
+  getUniforms(shaderLanguage?: ShaderLanguage): { ubo: { name: string; size: number; type: string }[]; fragment: string } {
+    const ubo = [
+      { name: 'felTintPrimary', size: 3, type: 'vec3' },
+      { name: 'felTintSecondary', size: 3, type: 'vec3' },
+      { name: 'felTintAccent', size: 3, type: 'vec3' },
+      { name: 'felTintStrength', size: 1, type: 'float' },
+    ];
+    // WGSL builds its uniform struct from `ubo` itself and exposes the members
+    // as uniforms.*, so emitting declarations here too would define them twice.
+    if (shaderLanguage === ShaderLanguage.WGSL) return { ubo, fragment: '' };
     return {
-      ubo: [
-        { name: 'felTintPrimary', size: 3, type: 'vec3' },
-        { name: 'felTintSecondary', size: 3, type: 'vec3' },
-        { name: 'felTintAccent', size: 3, type: 'vec3' },
-        { name: 'felTintStrength', size: 1, type: 'float' },
-      ],
+      ubo,
       fragment: `
         #ifdef FEL_ZONE_TINT
           uniform vec3 felTintPrimary;
@@ -70,7 +74,7 @@ export class ZoneTintPlugin extends MaterialPluginBase {
     };
   }
 
-  bindForSubMesh(uniformBuffer: UniformBuffer, _scene: Scene, _engine: Engine, _subMesh: SubMesh): void {
+  bindForSubMesh(uniformBuffer: UniformBuffer, _scene: Scene, _engine: AbstractEngine, _subMesh: SubMesh): void {
     if (!this._enabled) return;
     uniformBuffer.updateColor3('felTintPrimary', this.primary);
     uniformBuffer.updateColor3('felTintSecondary', this.secondary);
@@ -79,8 +83,36 @@ export class ZoneTintPlugin extends MaterialPluginBase {
     if (this.maskTexture) uniformBuffer.setTexture('felZoneMask', this.maskTexture);
   }
 
-  getCustomCode(shaderType: string): Nullable<Record<string, string>> {
+  getCustomCode(shaderType: string, shaderLanguage?: ShaderLanguage): Nullable<Record<string, string>> {
     if (shaderType !== 'fragment') return null;
+
+    // WebGPU compiles WGSL, so a GLSL-only plugin silently fails to build the
+    // whole PBR shader the moment it is enabled under that backend. Emitting
+    // both keeps this plugin from being a trap for whoever turns WebGPU on.
+    if (shaderLanguage === ShaderLanguage.WGSL) {
+      return {
+        // Babylon's WGSL naming: a sampler registered as `felZoneMask` becomes
+        // the texture `felZoneMask` plus a companion sampler `felZoneMaskSampler`
+        // (same pattern as albedoSampler / albedoSamplerSampler in pbr.fragment).
+        CUSTOM_FRAGMENT_DEFINITIONS: `
+          #ifdef FEL_ZONE_TINT
+            var felZoneMask: texture_2d<f32>;
+            var felZoneMaskSampler: sampler;
+          #endif
+        `,
+        CUSTOM_FRAGMENT_UPDATE_ALBEDO: `
+          #ifdef FEL_ZONE_TINT
+            var felMask: vec3f = TEXRD(felZoneMask, felZoneMaskSampler, fragmentInputs.vAlbedoUV).rgb;
+            var felTinted: vec3f = surfaceAlbedo;
+            felTinted = mix(felTinted, surfaceAlbedo * uniforms.felTintPrimary   * 2.0, vec3f(felMask.r * uniforms.felTintStrength));
+            felTinted = mix(felTinted, surfaceAlbedo * uniforms.felTintSecondary * 2.0, vec3f(felMask.g * uniforms.felTintStrength));
+            felTinted = mix(felTinted, surfaceAlbedo * uniforms.felTintAccent    * 2.0, vec3f(felMask.b * uniforms.felTintStrength));
+            surfaceAlbedo = felTinted;
+          #endif
+        `,
+      };
+    }
+
     return {
       CUSTOM_FRAGMENT_DEFINITIONS: `
         #ifdef FEL_ZONE_TINT
