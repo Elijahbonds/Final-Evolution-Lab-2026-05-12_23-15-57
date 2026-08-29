@@ -7,6 +7,7 @@ import {
 } from '@babylonjs/core';
 import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/core';
 import { MOODS, type VenueMood } from './moods';
+import { mountEnvironmentIBL } from './EnvironmentIBL';
 
 export interface LightRigHandle {
   hemi: HemisphericLight; sun: DirectionalLight;
@@ -30,6 +31,12 @@ export function mountLightRig(scene: Scene, mood: VenueMood): LightRigHandle {
   hemi.intensity = M.hemiIntensity;
   hemi.diffuse = Color3.FromHexString(M.sky);
   hemi.groundColor = Color3.FromHexString(M.ground);
+
+  // Image-based lighting, built from this same mood palette. Without it every
+  // PBRMaterial reflects nothing and metals read as flat plastic — see
+  // EnvironmentIBL.ts. Mounted before the lights so materials compiled during
+  // venue load already see an environment.
+  const disposeEnv = mountEnvironmentIBL(scene, mood);
 
   const sun = new DirectionalLight('fel_sun', new Vector3(...M.sunDir).normalize(), scene);
   sun.intensity = M.sunIntensity;
@@ -93,6 +100,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood): LightRigHandle {
       if (autoObserver) scene.onNewMeshAddedObservable.remove(autoObserver);
       if (flashObs) scene.onBeforeRenderObservable.remove(flashObs);
       hemi.dispose(); sun.dispose(); shadows.dispose(); pipeline.dispose();
+      disposeEnv();
     },
   };
 }
@@ -108,8 +116,15 @@ export function liftBlackMaterials(scene: Scene): number {
     if (albedo && !hasTex && albedo.r < 0.04 && albedo.g < 0.04 && albedo.b < 0.04) {
       albedo.set(0.22, 0.22, 0.25); fixed++;
     }
+    // A fully-metallic PBR material with nothing to reflect renders near-black,
+    // so this used to clamp metalness down to fake a lit look. Now that the
+    // scene carries a real IBL environment (EnvironmentIBL.ts) that reflection
+    // exists, and clamping here would quietly cancel it out — leaving every
+    // metal in the game a dull 0.25 no matter how good the environment is.
+    // Keep the rescue only for scenes that genuinely have no environment.
+    const hasEnv = !!(scene.environmentTexture ?? (m as PBRMaterial).reflectionTexture);
     const metallic = (m as PBRMaterial).metallic;
-    if (typeof metallic === 'number' && metallic > 0.95 && !hasTex && !(m as PBRMaterial).reflectionTexture) {
+    if (typeof metallic === 'number' && metallic > 0.95 && !hasTex && !hasEnv) {
       (m as PBRMaterial).metallic = 0.25;
       (m as PBRMaterial).roughness = Math.max((m as PBRMaterial).roughness ?? 1, 0.6);
       fixed++;

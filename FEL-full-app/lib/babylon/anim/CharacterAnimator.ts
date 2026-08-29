@@ -33,6 +33,10 @@ export class CharacterAnimator {
   private currentName = '';
   private currentSpeed = 1;
   private fadeObs: Observer<Scene> | null = null;
+  /** The clip the in-flight crossfade is ramping DOWN. Tracked so a fade that
+   *  gets replaced before it finishes can still stop its outgoing clip — see
+   *  crossFade(). */
+  private fadingOut: AnimationGroup | null = null;
   private endObs = new Map<AnimationGroup, Observer<AnimationGroup>>();
 
   constructor(private scene: Scene, groups: AnimationGroup[]) {
@@ -104,12 +108,23 @@ export class CharacterAnimator {
 
   /** Frame-driven weight ramp: prev→0, next→1. */
   private crossFade(prev: AnimationGroup | null, next: AnimationGroup, fadeSec: number): void {
+    // A fade already in flight owns an outgoing clip that has NOT been stopped
+    // yet (it only stops when the ramp reaches 1). Dropping its observer below
+    // would strand that clip playing forever at whatever partial weight it had
+    // reached, quietly blending into every pose that follows. Any clip switch
+    // faster than fadeSec — combo strings, rapid input, a stalled frame loop —
+    // hits this. Retire the orphan before taking over the fade slot.
+    if (this.fadingOut && this.fadingOut !== next && this.fadingOut !== prev) {
+      this.fadingOut.stop();
+    }
     this.fadeObs?.remove();
     if (fadeSec <= 0) {
       prev?.stop();
+      this.fadingOut = null;
       next.setWeightForAllAnimatables(1);
       return;
     }
+    this.fadingOut = prev && prev !== next ? prev : null;
     let t = 0;
     this.fadeObs = this.scene.onBeforeRenderObservable.add(() => {
       t += this.scene.getEngine().getDeltaTime() / 1000;
@@ -118,6 +133,7 @@ export class CharacterAnimator {
       if (prev && prev !== next) prev.setWeightForAllAnimatables(1 - k);
       if (k >= 1) {
         if (prev && prev !== next) prev.stop();
+        this.fadingOut = null;
         this.fadeObs?.remove();
         this.fadeObs = null;
       }

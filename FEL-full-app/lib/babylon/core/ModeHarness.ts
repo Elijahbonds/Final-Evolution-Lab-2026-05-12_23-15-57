@@ -1,7 +1,8 @@
 // ModeHarness — every Babylon mode runs through this: scene boot, LightRig,
 // InputBus, READY gate + 3-2-1, pause, update loop, SessionResult emit.
 
-import { Engine, Scene, TargetCamera, Vector3 } from '@babylonjs/core';
+import { Scene, TargetCamera, Vector3 } from '@babylonjs/core';
+import { createEngine } from './createEngine';
 import type { TransformNode } from '@babylonjs/core';
 import { mountLightRig, liftBlackMaterials, type LightRigHandle } from '../scene/LightRig';
 import type { VenueMood } from '../scene/moods';
@@ -95,7 +96,7 @@ export interface HarnessOpts {
 const LOAD_WATCHDOG_MS = 20_000;
 
 export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<() => void> {
-  const engine = new Engine(opts.canvas, true, { adaptToDeviceRatio: true });
+  const engine = await createEngine(opts.canvas);
   // M95 (Pass 2): a phone reports devicePixelRatio 3, so the backing buffer is
   // 9 pixels per CSS pixel — fill rate is the dominant cost on mobile GPUs and
   // the extra 8 are invisible at arm's length. Cap the ratio at 2 and cap total

@@ -6,7 +6,7 @@
 //   3. Requires consecutive confirmed-black samples before rescue/error.
 
 import { Tools } from '@babylonjs/core';
-import type { Engine, Scene, Camera } from '@babylonjs/core';
+import type { AbstractEngine, Scene, Camera } from '@babylonjs/core';
 import { liftBlackMaterials } from '../scene/LightRig';
 
 const SAMPLE_EVERY_MS = 1000;
@@ -22,7 +22,7 @@ export class RenderWatchdog {
 
   constructor(
     private scene: Scene,
-    private engine: Engine,
+    private engine: AbstractEngine,
     private camera: Camera,
     private isPlaying: () => boolean,     // phase gate — v2 requirement
     private onFail: (message: string) => void,

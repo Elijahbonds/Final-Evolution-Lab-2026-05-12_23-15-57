@@ -16,7 +16,7 @@
 // Dev-only: `mount()` is a no-op unless explicitly enabled, so the overlay
 // and its per-frame bookkeeping cost nothing in production.
 
-import type { Engine, Scene } from '@babylonjs/core';
+import type { AbstractEngine, Scene } from '@babylonjs/core';
 
 export interface PerfBudget {
   frameMs: number;        // 16.7 = 60fps, 33.3 = 30fps
@@ -57,7 +57,7 @@ export class PerfMonitor {
 
   constructor(
     private scene: Scene,
-    private engine: Engine,
+    private engine: AbstractEngine,
     private budget: PerfBudget = DEFAULT_BUDGET,
   ) {}
 
