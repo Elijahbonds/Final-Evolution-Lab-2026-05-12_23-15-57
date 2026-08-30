@@ -92,16 +92,40 @@ const paintBoardwalk = (ctx: CanvasRenderingContext2D, W: number, H: number) => 
     ctx.fillStyle = '#ffd75e'; ctx.fillRect(i * 128 + 28, H * 0.5, 30, 24);  // lit window
   }
 };
+/** Mix a hex colour toward the wall so the tag keeps its hue but loses chroma. */
+const towardWall = (hex: string, wall: string, k: number): string => {
+  const p = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [r, g, b] = p(hex); const [wr, wg, wb] = p(wall);
+  const m = (a: number, w: number) => Math.round(a + (w - a) * k);
+  return `rgb(${m(r, wr)}, ${m(g, wg)}, ${m(b, wb)})`;
+};
+
+// World-Population Protocol L5: ambience must never compete with L1/L2 for the
+// player's attention. This wall sits directly behind the Venice hoop — exactly
+// where the eye goes during a shot — and was 14 fully-saturated neon beziers up
+// to 18px wide. The ball, the rim and the release bar all had to fight it, which
+// is the concern recorded in 3PT's sign-off.
+//
+// The tags stay (this is Venice Beach; graffiti is right) but they are mixed
+// toward the wall colour, thinned, and drawn under a partial alpha so they read
+// as a painted wall at gameplay distance rather than as competing shapes.
 const paintGraffiti = (ctx: CanvasRenderingContext2D, W: number, H: number) => {
-  ctx.fillStyle = '#2b2b31'; ctx.fillRect(0, 0, W, H);
+  const WALL = '#2b2b31';
+  ctx.fillStyle = WALL; ctx.fillRect(0, 0, W, H);
   const cols = ['#ff006e', '#3a86ff', '#ffbe0b', '#34e89e', '#fb5607'];
-  for (let i = 0; i < 14; i++) {
-    ctx.strokeStyle = cols[i % cols.length]; ctx.lineWidth = 8 + Math.random() * 10;
+  ctx.save();
+  ctx.globalAlpha = 0.5;                                        //TUNE(elijah)
+  for (let i = 0; i < 10; i++) {                                //TUNE(elijah) was 14
+    // 0.55 toward the wall keeps the hue readable while dropping the chroma
+    // that was pulling focus off the rim.
+    ctx.strokeStyle = towardWall(cols[i % cols.length], WALL, 0.55);   //TUNE(elijah)
+    ctx.lineWidth = 5 + Math.random() * 6;                      //TUNE(elijah) was 8+10
     ctx.beginPath();
     ctx.moveTo(Math.random() * W, Math.random() * H);
     ctx.bezierCurveTo(Math.random() * W, Math.random() * H, Math.random() * W, Math.random() * H, Math.random() * W, Math.random() * H);
     ctx.stroke();
   }
+  ctx.restore();
 };
 const paintTrees = (snow: boolean) => (ctx: CanvasRenderingContext2D, W: number, H: number) => {
   ctx.fillStyle = snow ? '#dfeaf5' : '#0e1a14'; ctx.fillRect(0, 0, W, H);

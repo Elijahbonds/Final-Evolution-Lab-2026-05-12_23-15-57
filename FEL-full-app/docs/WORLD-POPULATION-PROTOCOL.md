@@ -146,10 +146,11 @@ L3 boundary .............. PASS  venueBox + boardwalk + ocean
 L4 crowd and life ........ PASS  bleacher crowd; cheers money balls and 4+ streaks
 L5 ambience .............. PASS  backdrop, palms, stadium ambient bed
 budget ................... draws 56  meshes 56  (dev pane throttled; re-measure on device)
-legibility ............... CONCERN — graffiti wall sits directly behind the rim
+legibility ............... PASS  graffiti muted (see VenueKit.paintGraffiti)
 ```
 
-**One open concern, deliberately not hidden:** the graffiti backdrop is busy
-directly behind the hoop, which is exactly where the player looks during a shot.
-It passes L5 as built but violates the governing rule. Recommend desaturating or
-displacing it behind the backboard before device playtest.
+**This concern has been closed.** The graffiti was 14 fully-saturated neon
+beziers directly behind the hoop. It now mixes 55% toward the wall colour, thinner
+and fewer at half alpha — the wall still reads as Venice graffiti, but the rim and
+ball no longer compete with it. This is the governing rule doing its job on the
+very first mode it was applied to.

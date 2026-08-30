@@ -37,13 +37,15 @@ L3 boundary .............. PASS  venueBox + boardwalk + ocean
 L4 crowd and life ........ PASS  bleacher crowd; cheers money balls and 4+ streaks
 L5 ambience .............. PASS  backdrop, palms, stadium ambient bed
 budget ................... draws 56  meshes 56  (dev pane throttled; re-measure on device)
-legibility ............... CONCERN — graffiti wall sits directly behind the rim
+legibility ............... PASS  graffiti muted (see VenueKit.paintGraffiti)
 ```
 
-**One concern recorded rather than hidden:** the graffiti backdrop is busy
-directly behind the hoop — exactly where the player looks during a shot. It
-passes L5 as built but violates the protocol's governing rule (legibility before
-atmosphere). Recommend desaturating or displacing it before device playtest.
+**The one concern raised by this pass is now closed.** The graffiti backdrop sat
+directly behind the hoop — exactly where the player looks during a shot — as 14
+fully-saturated neon beziers up to 18px wide. It passed L5 as built but violated
+the protocol's governing rule. The tags now mix 55% toward the wall colour, are
+thinner, fewer, and drawn at half alpha: Venice keeps its character, the rim and
+ball stop competing with it.
 
 Also still true, though not a §7 item: **Phase 9 (device playtest) has not been
 run for this mode.** Postgres is now up and the guest route proves real
