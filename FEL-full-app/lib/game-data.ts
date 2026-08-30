@@ -8,7 +8,7 @@ export interface Venue {
 }
 
 export const VENUES: Venue[] = [
-  { key: 'dojo', name: 'Shimogamo Dojo', image: '/venues/dojo-card.jpg', modes: ['Karate Endless', 'Karate VS'], playable: true, href: '/play/karate' },
+  { key: 'dojo', name: 'Shimogamo Dojo', image: '/venues/dojo-card.jpg', modes: ['Karate Endless', 'Karate VS', 'Weapon Duel', 'Showdown'], playable: true, href: '/play/karate' },
   { key: 'venicebeach', name: 'Venice Beach Court', image: '/venues/venicebeach.jpg', modes: ['Dunk Contest', '1v1 Hoops', '3v3 Streetball'], playable: true, href: '/play/dunk' },
   { key: 'tenniscourt', name: 'Venice Tennis Court', image: '/venues/tenniscourt.jpg', modes: ['Match Play'], playable: true, href: '/play/tennis' },
   { key: 'skatepark', name: 'Venice Skatepark', image: '/venues/skatepark.jpg', modes: ['Skate Run'], playable: true, href: '/play/skateboard' },
@@ -176,6 +176,7 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   football: { name: 'Street Football', venue: 'The Gridiron', href: '/play/football' },
   mixedcombat: { name: 'Mixed Combat', venue: 'The Octagon', href: '/play/mixedcombat' },
   duel: { name: 'Weapon Duel', venue: 'Shimogamo Dojo', href: '/play/duel' },
+  showdown: { name: 'Showdown', venue: 'Shimogamo Dojo', href: '/play/showdown' },
   dunkduel: { name: 'Dunk Duel', venue: 'Venice Beach Court', href: '/play/dunkduel' },
   musicAcademy: { name: 'Music Academy', venue: 'Studio', href: '/play/music' },
   dance: { name: 'The Cypher', venue: 'The Cypher', href: '/play/dance' },

@@ -139,6 +139,17 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
     Y: { label: 'STAFF', emit: A('Y') },
   }),
 
+  // Showdown (Naruto-Storm lane). The mode's four face verbs; its L1 dash-cancel,
+  // R1 substitution and SELECT assist are shoulder/system inputs that the touch
+  // pad has no slot for — they remain gamepad/keyboard only, which the mode's
+  // own on-screen hint already states.
+  showdown: verbs({
+    A: { label: 'JAB', emit: A('A') },
+    B: { label: 'KICK', emit: A('B') },
+    X: { label: 'GUARD', emit: A('X') },
+    Y: { label: 'ULTIMATE', emit: A('Y') },
+  }),
+
   // Rhythm dance. No movement stick use — the body IS the game; one TAP verb
   // judged against the beat. B also taps (mode reads A or B).
   // 3PT Shootout: one verb, the release. Timing is the whole mechanic.
