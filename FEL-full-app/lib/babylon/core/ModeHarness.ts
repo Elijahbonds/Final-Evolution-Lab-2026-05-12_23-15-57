@@ -5,6 +5,7 @@ import { Scene, TargetCamera, Vector3 } from '@babylonjs/core';
 import { createEngine } from './createEngine';
 import type { TransformNode } from '@babylonjs/core';
 import { mountLightRig, liftBlackMaterials, type LightRigHandle } from '../scene/LightRig';
+import { mountIblShadows, type IblShadowsHandle } from '../scene/IblShadows';
 import type { VenueMood } from '../scene/moods';
 import { InputBus, type FelInput } from './InputBus';
 import { CameraDirector, type FOLLOW_PRESETS } from './CameraDirector';
@@ -126,6 +127,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   let ambientStarted = false;   // M43: crowd/dojo bed starts once, on first input
   let unsub: (() => void) | null = null;
   let frameGuard: FrameGuard | null = null;
+  let iblShadows: IblShadowsHandle | null = null;
   const setPhase = (p: ModePhase, detail?: number | string) => {
     phase = p;
     // M37: hero-off-screen watchdog runs only during live play.
@@ -188,6 +190,10 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       try { opts.applySkin?.(scene); } catch (e) { console.error('[FEL-ART] applySkin failed', e); }
       // M37: loud spawn assertion — empty world or missing hero never reaches play.
       assertSpawned(scene, { hero: heroRef.current, minWorldMeshes: 8, modeId: def.modeId });
+      // Opt-in IBL contact shadows. Must come AFTER load(): voxelization
+      // snapshots the geometry present when it runs, so mounting any earlier
+      // would build the grid from an empty scene and do nothing.
+      iblShadows = mountIblShadows(scene, camera);
       setPhase('ready');
       // M67: pre-warm every material now, on the loading→ready boundary, so a
       // first-visibility shader compile never hitches mid-play. Dev-only work.
@@ -290,6 +296,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     clearReady();         // M67
     unink();              // M59
     backdrop.dispose();   // M61
+    iblShadows?.dispose();
     lights.dispose();
     scene.dispose();
     engine.dispose();

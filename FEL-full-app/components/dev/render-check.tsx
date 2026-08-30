@@ -19,6 +19,7 @@ import { createEngine } from '@/lib/babylon/core/createEngine';
 import { mountLightRig } from '@/lib/babylon/scene/LightRig';
 import { MOODS, type VenueMood } from '@/lib/babylon/scene/moods';
 import { CharacterLibrary } from '@/lib/babylon/core/CharacterLibrary';
+import { mountIblShadows } from '@/lib/babylon/scene/IblShadows';
 
 const MOOD_KEYS = Object.keys(MOODS) as VenueMood[];
 const ROWS = 4;   // roughness steps
@@ -34,6 +35,8 @@ export default function RenderCheck() {
   const [ibl, setIbl] = useState(true);
   const [backend, setBackend] = useState('…');
   const [clip, setClip] = useState('idle_stand');
+  const [shadowsOn, setShadowsOn] = useState(false);
+  const [shadowState, setShadowState] = useState('off');
 
   // The engine is created ONCE and outlives every mood/IBL change. Recreating it
   // per toggle looked reasonable but tore the page down: both engines call
@@ -116,6 +119,12 @@ export default function RenderCheck() {
       const generated = scene.environmentTexture;
       if (!ibl) scene.environmentTexture = null;
 
+      // IBL contact shadows, mounted once the grid + athlete exist (voxelization
+      // reads the geometry present at mount time). Reported back to the HUD so a
+      // silent "unsupported, skipped" is visible rather than mysterious.
+      const shadows = shadowsOn ? mountIblShadows(scene, camera) : null;
+      setShadowState(shadowsOn ? (shadows ? 'active' : 'unavailable') : 'off');
+
       engine.runRenderLoop(() => scene.render());
       const onResize = () => engine.resize();
       window.addEventListener('resize', onResize);
@@ -124,6 +133,7 @@ export default function RenderCheck() {
         window.removeEventListener('resize', onResize);
         engine.stopRenderLoop();
         if (clipTimer) clearInterval(clipTimer);
+        shadows?.dispose();
         character?.dispose();
         scene.environmentTexture = generated;
         rig.dispose();
@@ -133,7 +143,7 @@ export default function RenderCheck() {
     }
 
     return () => { cleanup?.(); };
-  }, [mood, ibl, engineReady]);
+  }, [mood, ibl, shadowsOn, engineReady]);
 
   return (
     <div className="relative h-screen w-screen bg-black">
@@ -144,6 +154,10 @@ export default function RenderCheck() {
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={ibl} onChange={(e) => setIbl(e.target.checked)} />
           <span>IBL environment {ibl ? 'ON' : 'OFF'}</span>
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={shadowsOn} onChange={(e) => setShadowsOn(e.target.checked)} />
+          <span>IBL shadows: {shadowState}</span>
         </label>
         <select
           value={mood}
