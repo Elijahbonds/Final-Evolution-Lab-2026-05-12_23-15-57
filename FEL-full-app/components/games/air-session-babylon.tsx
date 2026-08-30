@@ -18,6 +18,13 @@ export function makeAirHost(modeKey: string, title: string) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const busRef = useRef<InputBus | null>(null);
     const endedRef = useRef(false);
+    // The harness effect must NOT depend on onEnd's identity. A parent that
+    // passes an inline arrow (very common) gives a new function every render,
+    // the effect re-runs, and a SECOND Babylon engine is created on the same
+    // canvas — they share one WebGL context and the frame goes black while the
+    // HUD keeps updating from the other instance.
+    const onEndRef = useRef(onEnd);
+    onEndRef.current = onEnd;
     const [phase, setPhase] = useState<ModePhase>('loading');
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -44,7 +51,7 @@ export function makeAirHost(modeKey: string, title: string) {
         resultSink: async (r: SessionResult) => {
           if (endedRef.current) return;
           endedRef.current = true;
-          onEnd({
+          onEndRef.current({
             score: r.score,
             opponentScore: 0,
             won: r.outcome === 'win',
@@ -56,7 +63,7 @@ export function makeAirHost(modeKey: string, title: string) {
         .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
 
       return () => { disposed = true; stop?.(); };
-    }, [onEnd]);
+    }, []);   // mount once — see onEndRef above
 
     const tapStart = useCallback(() => {
       busRef.current?.emit({ t: 'button', btn: 'START', pressed: true });

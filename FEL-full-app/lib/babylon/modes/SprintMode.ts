@@ -26,12 +26,24 @@ const WIN_TIME = 13.0;                            //TUNE(elijah) sub-13 is the b
 /** Rival pace, m/s — a credible club sprinter to race against. */
 const RIVAL_SPEED = RACE_DIST / 13.4;             //TUNE(elijah)
 
+/**
+ * Built as a factory so every harness instance closes over its OWN state.
+ *
+ * This mode previously kept runner/rival/finishLine/core at module scope with a
+ * load/dispose counter guarding teardown. That guard was not reliable: React
+ * mounts effects twice in dev, and depending on which async load resolved first,
+ * an outgoing instance could still null the objects out from under the live one.
+ * update() then early-returned forever — the harness reported "playing", the HUD
+ * kept rendering, and the canvas stayed black with update() never once called.
+ *
+ * A ModeDefinition is a module singleton, so closure state is the only way to
+ * make that structurally impossible. AirSessionMode is built the same way.
+ */
+export function makeSprintMode(): ModeDefinition {
 let runner: SpawnedCharacter | null = null;
 let rival: SpawnedCharacter | null = null;
 let finishLine: Mesh | null = null;
 let core: SprintCore | null = null;
-let loadCount = 0;
-let disposeCount = 0;
 
 const S = {
   done: false,
@@ -73,13 +85,12 @@ function finish(ctx: ModeContext, timeS: number): void {
   });
 }
 
-export const SprintMode: ModeDefinition = {
+return {
   modeId: 'sprint',
   mood: 'daylight',
   camPreset: 'runner',
 
   async load(ctx: ModeContext): Promise<void> {
-    loadCount += 1;
     reset();
 
     VenueKit.buildPark(ctx.scene);
@@ -198,12 +209,12 @@ export const SprintMode: ModeDefinition = {
   },
 
   dispose(): void {
-    disposeCount += 1;
-    // Stale dev teardown must not null the live instance (see ThreePointMode).
-    if (disposeCount < loadCount) return;
     runner?.dispose(); runner = null;
     rival?.dispose(); rival = null;
     finishLine?.dispose(); finishLine = null;
     core = null;
   },
 };
+}
+
+export const SprintMode: ModeDefinition = makeSprintMode();

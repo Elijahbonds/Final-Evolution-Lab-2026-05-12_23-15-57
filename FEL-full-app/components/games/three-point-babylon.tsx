@@ -68,7 +68,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
 
     return () => { disposed = true; stop?.(); };
-  }, [onEnd]);
+  }, []);   // mount once — see onEndRef above
 
   const emit = useCallback((i: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(i);
