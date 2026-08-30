@@ -16,11 +16,18 @@ export function DevModeRunner({ modeKey }: { modeKey: string }) {
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [hud, setHud] = useState<Record<string, HudValue>>({});
   const [err, setErr] = useState<string | null>(null);
+  // React mounts effects twice in dev. Two runMode() calls on ONE canvas means
+  // two Babylon Engines sharing a single WebGL context, and the second one
+  // clobbers the first — every mode rendered a black frame here, including the
+  // shipped Dunk. This latch keeps exactly one harness per canvas.
+  const mountedRef = useRef(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const def = MODES[modeKey];
     if (!canvas) return;
+    if (mountedRef.current) return;
+    mountedRef.current = true;
     if (!def) { setErr(`no registry mode "${modeKey}"`); return; }
     const bus = new InputBus();
     busRef.current = bus;
@@ -36,7 +43,7 @@ export function DevModeRunner({ modeKey }: { modeKey: string }) {
     }).then((s) => { if (disposed) s(); else stop = s; })
       .catch((e) => { if (!disposed) setErr(String(e?.message ?? e)); });
 
-    return () => { disposed = true; stop?.(); };
+    return () => { disposed = true; mountedRef.current = false; stop?.(); };
   }, [modeKey]);
 
   return (

@@ -162,6 +162,10 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
     B: { label: 'STOMP', emit: A('B') },
   }),
 
+  // Sprint: the race IS the d-pad cadence, so no face verb does anything. All
+  // four stay inert rather than pretending a button matters.
+  sprint: verbs({}),
+
   // Rhythm dance. No movement stick use — the body IS the game; one TAP verb
   // judged against the beat. B also taps (mode reads A or B).
   // 3PT Shootout: one verb, the release. Timing is the whole mechanic.

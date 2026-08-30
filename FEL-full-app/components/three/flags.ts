@@ -61,6 +61,12 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   // AirSessionCore (lib/babylon/modes/AirSessionMode.ts).
   gymnastics: true,
   bigAir: true,
+  // sprint: SprintMode.ts is written and its LOGIC is verified (READY/SET gate,
+  // real false starts, d-pad cadence into the core, live HUD, rival pacing) but
+  // its camera framing is still wrong -- the frame renders black. Left OFF so
+  // /play/sprint keeps serving the working 2D game rather than shipping a black
+  // screen. Flip to true once the framing is fixed.
+  // sprint: true,
   // Rollout wave 5 — Court Carnival hub (M49). New Babylon-only hub mode.
   carnival: true,
   // Rollout wave 6 — combat/duel modes (M53/M56)

@@ -24,6 +24,7 @@ import { DuelMode } from './DuelMode';
 import { DanceMode } from './DanceMode';        // M75 creative discipline
 import { ThreePointMode } from './ThreePointMode'; // Babylon port of the R3F shootout
 import { GymnasticsMode, BigAirMode } from './AirSessionMode'; // shared AirSessionCore, two skins
+import { SprintMode } from './SprintMode';
 
 export const MODES: Record<string, ModeDefinition> = {
   // P3–P4 proof mode — shipped and playtested FIRST
@@ -49,6 +50,7 @@ export const MODES: Record<string, ModeDefinition> = {
   // Gymnastics vault + snowboard big air on ONE shared AirSessionCore.
   gymnastics: GymnasticsMode,
   bigair: BigAirMode,
+  sprint: SprintMode,
   threevthree: ThreeVThreeMode,
   // Rollout wave 5 — Court Carnival (M49): a NEW hub mode that rotates through
   // four quick minigame bursts. Doesn't replace anything.
