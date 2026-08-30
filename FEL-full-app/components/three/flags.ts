@@ -57,6 +57,10 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   // 3PT ported from react-three-fiber to Babylon (ThreePointMode.ts) so the
   // basketball family shares one renderer.
   threePoint: true,
+  // Air-session family: gymnastics vault + snowboard big air, both on the shared
+  // AirSessionCore (lib/babylon/modes/AirSessionMode.ts).
+  gymnastics: true,
+  bigAir: true,
   // Rollout wave 5 — Court Carnival hub (M49). New Babylon-only hub mode.
   carnival: true,
   // Rollout wave 6 — combat/duel modes (M53/M56)

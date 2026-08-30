@@ -150,6 +150,18 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
     Y: { label: 'ULTIMATE', emit: A('Y') },
   }),
 
+  // Air-session family (gymnastics vault / snowboard big air). The RUN is the
+  // d-pad cadence — alternating left/right strides — so the face buttons only
+  // carry the two air verbs.
+  gymnastics: verbs({
+    A: { label: 'FLIP', emit: A('A') },
+    B: { label: 'STICK', emit: A('B') },
+  }),
+  bigair: verbs({
+    A: { label: 'SPIN', emit: A('A') },
+    B: { label: 'STOMP', emit: A('B') },
+  }),
+
   // Rhythm dance. No movement stick use — the body IS the game; one TAP verb
   // judged against the beat. B also taps (mode reads A or B).
   // 3PT Shootout: one verb, the release. Timing is the whole mechanic.
