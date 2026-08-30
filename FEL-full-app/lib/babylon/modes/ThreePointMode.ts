@@ -108,6 +108,9 @@ let player: SpawnedCharacter | null = null;
 let ball: Mesh | null = null;
 let arc: ShotArc | null = null;
 let ballMat: StandardMaterial | null = null;
+/** One ball-rack per station: the frame plus its five balls. */
+let rackBalls: Mesh[][] = [];
+let rackMeshes: Mesh[] = [];
 
 /** Regulation ball vs the money ball. In the real contest (and in 2K9) the money
  *  ball is a different colour — seeing it coming is part of the tension, and it
@@ -115,8 +118,21 @@ let ballMat: StandardMaterial | null = null;
 const BALL_COLOR = Color3.FromHexString('#c1571f');       // leather orange
 const MONEY_COLOR = Color3.FromHexString('#ffd75e');      // money-ball gold
 
+/** Hide the balls already taken, so a rack visibly empties as it is shot. */
+function syncRacks(): void {
+  for (let r = 0; r < rackBalls.length; r++) {
+    for (let b = 0; b < rackBalls[r].length; b++) {
+      // Racks ahead stay full; the current rack empties left-to-right; racks
+      // already finished stay empty.
+      const taken = r < S.rack || (r === S.rack && b < S.ballIdx);
+      rackBalls[r][b].isVisible = !taken;
+    }
+  }
+}
+
 /** Recolour the loaded ball for whichever shot is next up. */
 function dressBall(): void {
+  syncRacks();
   if (!ballMat) return;
   const money = isMoneyBall(S.ballIdx);
   ballMat.diffuseColor = money ? MONEY_COLOR : BALL_COLOR;
@@ -241,13 +257,24 @@ function fire(ctx: ModeContext, power?: number): void {
   arc.start(ball.position.clone(), RIM, made, 'jumper');
   S.phase = 'flight';
 
+  const money = isMoneyBall(S.ballIdx);
   if (made) {
     ctx.juice.scorePop(RIM.clone(), perfect ? `PERFECT +${worth}` : `+${worth}`,
       perfect ? '#22d3ee' : '#ffd75e');
     ctx.feel.impact(perfect ? 0.5 : 0.3);
     SoundKit.play('score');
+    // Phase 7/8 — a money ball IS the crowd moment in this event, and a hot
+    // streak is the other one. Landing them identically to a routine make is
+    // what made the run read flat. Camera punch + exposure flash + crowd.
+    if (money || S.streak >= 4) {
+      SoundKit.play('crowdCheer');
+      ctx.camDirector.pulse(money ? 0.7 : 0.45, 0.45);       //TUNE(elijah)
+      ctx.lights.flashBeat();
+    }
   } else {
     SoundKit.play('miss');
+    // Bricking the double-value ball deserves the groan.
+    if (money) SoundKit.play('crowdGroan');
   }
   S.charge = 0;
   pushHud(ctx, made ? (perfect ? 'PERFECT' : 'GOOD') : 'MISS');
@@ -377,6 +404,40 @@ export const ThreePointMode: ModeDefinition = {
     // degenerated to a view of the boardwalk with neither player nor hoop in it.
     ctx.objectiveRef.current = RIM;
 
+    // Phase 6 / Concept Lock D3 — the racks belong ON the court. 2K9 shows them,
+    // and without them nothing tells the player where the balls are, how many are
+    // left, or which one is the money ball until it is already in their hands.
+    rackBalls = [];
+    rackMeshes = [];
+    for (let r = 0; r < RACKS; r++) {
+      const at = RACK_POS[r];
+      const stand = MeshBuilder.CreateBox(`rack_${r}`, { width: 0.9, height: 0.12, depth: 0.34 }, ctx.scene);
+      // Sit the rack just outside the arc so the shooter is never inside it.
+      const outward = at.subtract(RIM).normalize();
+      stand.position.copyFrom(at).addInPlace(outward.scale(0.75));
+      stand.position.y = 0.62;
+      const standMat = new StandardMaterial(`rackMat_${r}`, ctx.scene);
+      standMat.diffuseColor = Color3.FromHexString('#2b3038');
+      stand.material = standMat;
+      rackMeshes.push(stand);
+
+      const balls: Mesh[] = [];
+      for (let b = 0; b < BALLS_PER_RACK; b++) {
+        const bm = MeshBuilder.CreateSphere(`rack_${r}_ball_${b}`, { diameter: 0.2, segments: 10 }, ctx.scene);
+        bm.position.copyFrom(stand.position);
+        bm.position.x += (b - (BALLS_PER_RACK - 1) / 2) * 0.21;
+        bm.position.y += 0.16;
+        const m = new StandardMaterial(`rack_${r}_ballMat_${b}`, ctx.scene);
+        const money = isMoneyBall(b);
+        m.diffuseColor = money ? MONEY_COLOR : BALL_COLOR;
+        if (money) m.emissiveColor = MONEY_COLOR.scale(0.3);
+        bm.material = m;
+        balls.push(bm);
+      }
+      rackBalls.push(balls);
+      rackMeshes.push(...balls);
+    }
+
     arc = new ShotArc();
 
     S.from.copyFrom(RACK_POS[0]);
@@ -466,6 +527,8 @@ export const ThreePointMode: ModeDefinition = {
     player?.dispose(); player = null;
     ball?.dispose(); ball = null;
     ballMat?.dispose(); ballMat = null;
+    for (const m of rackMeshes) m.dispose();
+    rackMeshes = []; rackBalls = [];
     arc = null;
   },
 };
