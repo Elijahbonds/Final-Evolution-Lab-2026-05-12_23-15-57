@@ -1,23 +1,43 @@
 # §7 Completion Checklist — Three-Point Shootout
 
 Phase 10 of the convergence pass. Benchmark: **NBA 2K9 Three-Point Contest**.
-This is the bible's own eight-item checklist, run honestly. One item does not pass.
+This is the bible's own eight-item checklist, run honestly. Seven pass outright; the eighth is applied but awaiting ratification of a protocol that had never been written.
 
 | § | Item | Result |
 |---|---|---|
 | 7.1 | Gate 0 verified for this mode's animation set | ✅ 58 checks — the rig is the Mixamo 65-bone standard with `mixamorig:` bones |
 | 7.2 | 10-Phase Convergence Protocol run in full | ✅ Protocol ratified as canonical v1 (`docs/10-PHASE-CONVERGENCE-PROTOCOL.md`) after confirming no such document existed; the pass was run against it |
 | 7.3 | Benchmark parity against the locked reference | ✅ 15/15 criteria; D1/D2/D3 fixed, D4/D5/D6 all ruled |
-| 7.4 | World-Population Protocol applied | ❌ **The document does not exist.** A search of this machine finds it referenced only by files written during this pass. The benchmark-driven part (ball racks on court, depleting as shot) is done. Needs the same treatment the 10-Phase Protocol got: write and ratify one, or drop the gate |
+| 7.4 | World-Population Protocol applied | ⚠️ Protocol drafted (`docs/WORLD-POPULATION-PROTOCOL.md`) and applied — L1–L5 all PASS. **Awaiting Elijah's ratification of the draft**, exactly as the 10-Phase Protocol was ratified before 7.2 could pass |
 | 7.5 | Five-tab shell conventions intact | ✅ Lab/Train/Arena/Status/Profile |
 | 7.6 | vitest suite still green | ✅ `npm test` — 4 files, 47 tests green (vitest installed and wired; the 31/31 figure belongs to the `/tmp/fel3` checkout, not this tree) |
 | 7.7 | No orphaned-mode work smuggled in | ✅ Nothing from §4.3 touched. Showdown was routed under an explicit mount instruction |
 | 7.8 | No scope bleed into §6 features | ✅ Controller Link (§6.5) was separately commissioned; nothing else pulled forward |
 
-## Verdict: 7 of 8 pass. One gate remains.
+## Verdict: 7 pass, 1 pending ratification.
 
-**§7.4 is the only failing gate**, and it fails because the World-Population
-Protocol has never been written. It cannot be "applied" until it exists.
+**§7.4 no longer FAILS** — the World-Population Protocol has been written and
+applied to this mode (L1–L5 all PASS, recorded below). It is marked pending
+rather than passing because the protocol is a draft: the same standard applied to
+§7.2, which only passed once the 10-Phase Protocol was ratified. Ratify the draft
+and 3PT is 8/8.
+
+### World-Population Protocol — applied
+
+```
+L1 ground plane .......... PASS  Venice court + real NBA arc (6.71–7.24m)
+L2 play-critical props ... PASS  5 racks deplete as shot; money ball gold
+L3 boundary .............. PASS  venueBox + boardwalk + ocean
+L4 crowd and life ........ PASS  bleacher crowd; cheers money balls and 4+ streaks
+L5 ambience .............. PASS  backdrop, palms, stadium ambient bed
+budget ................... draws 56  meshes 56  (dev pane throttled; re-measure on device)
+legibility ............... CONCERN — graffiti wall sits directly behind the rim
+```
+
+**One concern recorded rather than hidden:** the graffiti backdrop is busy
+directly behind the hoop — exactly where the player looks during a shot. It
+passes L5 as built but violates the protocol's governing rule (legibility before
+atmosphere). Recommend desaturating or displacing it before device playtest.
 
 Also still true, though not a §7 item: **Phase 9 (device playtest) has not been
 run for this mode.** Postgres is now up and the guest route proves real
