@@ -75,3 +75,55 @@ bought: the metallic column collapses to black.
   exists. Start the DB to verify Streetball directly.
 - Running `next build` clobbers a running dev server's `.next`. Restart the dev
   server afterwards or pages hang on a spinner.
+
+---
+
+# 20-Phase Babylon-coverage pass (2026-08-30)
+
+Branch `babylon9-aaa-rendering`. Babylon-backed `/play` routes: **20 → 24**.
+
+| Phase | Outcome |
+|---|---|
+| 1 | **Showdown routed** — the only genuinely unrouted Babylon mode |
+| 2–3 | **Gymnastics + Big Air ported** to Babylon 9 on one shared `AirSessionCore` |
+| 4 | **Sprint** written and logic-verified, but **ships OFF** (renders black) |
+| 5, 12–13 | tiebreak / training / brain-brawl / who-scene-it — **not renderer swaps**, reported |
+| 14 | **Collapsed on inspection** — the teardown bug is not codebase-wide |
+| 15–19 | Controller Link schemas, menu entries, green build |
+| 20 | This audit |
+
+## Still not Babylon (7 routes)
+
+| Route | Why |
+|---|---|
+| `acting`, `irl` | MediaPipe device modes — Babylon is the wrong tool |
+| `music` | DAW-lite tool, not a 3D sport |
+| `tiebreak`, `training` | bespoke 2D canvas, **no shared core** — a new build, not a port |
+| `brain-brawl`, `who-scene-it` | `QuizCore` text games; bible §4.2 wants a 3D *presentation* layer |
+
+None of the last four has a locked benchmark, and §7.3 says to flag rather than invent one.
+
+## Sprint: the one thing that does not work
+
+`SprintMode.ts` logic is verified (READY→SET gate, real false starts, d-pad
+cadence into the core, live HUD, rival pacing). The frame renders **black**.
+Three real camera causes were found and fixed and it still renders black, so
+`sprint` is commented out of `BABYLON_MODES` — `/play/sprint` serves the proven
+2D game. **Do not flip that flag without re-verifying the frame.**
+
+The last cause found is worth knowing generally: `FrameGuard`'s auto-recenter
+calls `camDirector.snapTo(hero, objectiveRef)`. Point `objectiveRef` at
+something far away and every recenter re-frames that whole span — the camera
+parks where the preset's pitch cap cannot tilt down to the hero, FrameGuard
+declares it off-screen, and it recentres to the identical wrong place forever.
+A byte-identical camera position in the `[FEL-FRAME]` log is the tell.
+
+## Verification note
+
+`/dev/mode/[key]` is unreliable: React mounts effects twice in dev, and two
+`runMode()` calls on one canvas means two Babylon engines sharing one WebGL
+context. **Verify through a mode's real host component** (BootSplash path) —
+that is how 3PT, gymnastics and big air were confirmed.
+
+Suite: **188 headless checks** (28 air-session, 21 3PT contest, 57 Gate 0,
+26 controller-link, 7 crossfade, 36 IBL, 13 dunk).
