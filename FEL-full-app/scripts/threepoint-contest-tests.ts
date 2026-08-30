@@ -9,7 +9,10 @@
 // throttles rAF to ~0 fps (3.4s frames measured), so a 25-ball interactive
 // playthrough there could not produce a trustworthy result.
 
-import { resolveRound, simulateRival, type Shooter } from '../lib/babylon/modes/ThreePointMode';
+import {
+  resolveRound, simulateRival, rackRadius, RACK_ANGLES, RACK_CORNER_R, RACK_TOP_R,
+  type Shooter,
+} from '../lib/babylon/modes/ThreePointMode';
 
 let checks = 0;
 const fail: string[] = [];
@@ -83,6 +86,22 @@ ok(fMean > qMean, `D1 finalists outscore the qualifying field (${fMean.toFixed(1
 const tie = resolveRound([mk('YOU', 19, true), mk('V. MARCH', 19), mk('D. OKAFOR', 12)], 'final');
 ok(tie.place >= 1 && tie.place <= 2, 'E1 a tie still resolves to a single place');
 ok(tie.board.filter((f) => f.score === 19).length === 2, 'E2 both tied scores are on the board');
+
+// ── F. the arc must be the REAL three-point line, not one radius ────────────
+// Phase 1 deviation D1: a constant radius made every rack the same distance and
+// flattened away the reason the top-of-key rack is the hard one.
+const radii = RACK_ANGLES.map(rackRadius);
+ok(radii.length === 5, 'F1 five racks');
+ok(Math.abs(radii[0] - RACK_CORNER_R) < 1e-9, `F2 the 30-degree rack is a corner three (${radii[0].toFixed(2)}m)`);
+ok(Math.abs(radii[4] - RACK_CORNER_R) < 1e-9, `F3 the 150-degree rack is a corner three (${radii[4].toFixed(2)}m)`);
+ok(Math.abs(radii[2] - RACK_TOP_R) < 1e-9, `F4 the 90-degree rack is a top-of-arc three (${radii[2].toFixed(2)}m)`);
+ok(radii[2] > radii[0], 'F5 the top rack is a LONGER shot than the corners');
+ok(radii[1] > radii[0] && radii[1] < radii[2], `F6 the wing rack sits between them (${radii[1].toFixed(2)}m)`);
+// Real NBA line: 6.71m corners, 7.24m top. Nothing may fall outside that.
+ok(radii.every((r) => r >= RACK_CORNER_R - 1e-9 && r <= RACK_TOP_R + 1e-9),
+  'F7 every rack sits on the real NBA line');
+ok(Math.abs(RACK_CORNER_R - 6.71) < 1e-9 && Math.abs(RACK_TOP_R - 7.24) < 1e-9,
+  'F8 the line constants are the real NBA distances');
 
 if (fail.length) {
   console.error(`threepoint-contest-tests: ${fail.length} FAILED of ${checks}`);

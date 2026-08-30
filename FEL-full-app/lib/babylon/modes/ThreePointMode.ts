@@ -24,7 +24,7 @@
 //              decides the make, so a button-only controller is not handicapped.
 //   'charge' — live 0..1 wind-up, streamed for the on-screen power ring.
 
-import { MeshBuilder, Vector3 } from '@babylonjs/core';
+import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Mesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -44,15 +44,26 @@ const GAME_LEN = 60;
 const FIELD_SIZE = 6;
 const FINALISTS = 3;
 const SHOT_TARGET = 0.72;          // release-bar sweet centre // TUNE(elijah)
-const RACK_R = 6.75;               // 3-point arc radius
-const RACK_ANGLES = [30, 60, 90, 120, 150].map((d) => (d * Math.PI) / 180);
+// The real NBA three-point line is NOT a constant radius: 6.71m in the corners,
+// 7.24m at the top of the arc. The racks sit ON that line, so a corner rack is a
+// genuinely shorter shot than the top-of-key rack — which is the reason the top
+// rack is the hard one in the real contest. A single radius flattened that away.
+export const RACK_CORNER_R = 6.71;        // NBA corner three
+export const RACK_TOP_R = 7.24;           // NBA top-of-arc three
+export const RACK_ANGLES = [30, 60, 90, 120, 150].map((d) => (d * Math.PI) / 180);
+/** Radius at a given arc angle: corner distance at the ends, top distance at 90 deg. */
+export function rackRadius(angleRad: number): number {
+  // sin peaks at 90 deg (top of the key) and falls to 0.5 at the 30/150 corners.
+  const t = (Math.sin(angleRad) - 0.5) / 0.5;      // 0 at corners, 1 at the top
+  return RACK_CORNER_R + (RACK_TOP_R - RACK_CORNER_R) * Math.max(0, Math.min(1, t));
+}
 
 /** Rim position matches VenueKit.buildCourt's hoop. */
 const RIM = new Vector3(0, 3.05, -0.6);
 
 /** Rack stations swept along the arc in FRONT of the rim (+z side). */
 const RACK_POS = RACK_ANGLES.map(
-  (a) => new Vector3(RIM.x + RACK_R * Math.cos(a), 0, RIM.z + RACK_R * Math.sin(a)),
+  (a) => new Vector3(RIM.x + rackRadius(a) * Math.cos(a), 0, RIM.z + rackRadius(a) * Math.sin(a)),
 );
 
 /** How wide the "perfect" window is around SHOT_TARGET. */
@@ -96,6 +107,22 @@ export function simulateRival(skill: number, round: Round): number {
 let player: SpawnedCharacter | null = null;
 let ball: Mesh | null = null;
 let arc: ShotArc | null = null;
+let ballMat: StandardMaterial | null = null;
+
+/** Regulation ball vs the money ball. In the real contest (and in 2K9) the money
+ *  ball is a different colour — seeing it coming is part of the tension, and it
+ *  is the only cue that the next shot is worth double. */
+const BALL_COLOR = Color3.FromHexString('#c1571f');       // leather orange
+const MONEY_COLOR = Color3.FromHexString('#ffd75e');      // money-ball gold
+
+/** Recolour the loaded ball for whichever shot is next up. */
+function dressBall(): void {
+  if (!ballMat) return;
+  const money = isMoneyBall(S.ballIdx);
+  ballMat.diffuseColor = money ? MONEY_COLOR : BALL_COLOR;
+  // A touch of emissive so the money ball reads at distance under the venue grade.
+  ballMat.emissiveColor = money ? MONEY_COLOR.scale(0.35) : Color3.Black();
+}
 
 // A ModeDefinition is a module singleton, so its state is shared by every
 // harness instance that mounts it. In dev, React mounts twice (StrictMode /
@@ -168,6 +195,7 @@ function pushHud(ctx: ModeContext, banner?: string): void {
     streak: S.streak,
     clock: Math.max(0, Math.ceil(S.clock)),
     meter: S.phase === 'shoot' ? Number(S.barT.toFixed(2)) : null,
+    money: isMoneyBall(S.ballIdx),
     charge: S.charge > 0.02 ? Number(S.charge.toFixed(2)) : null,
     round: S.round === 'final' ? 'FINAL' : 'QUALIFYING',
     // The bezel renders a scorecard from {name,score,line} triples, so the
@@ -239,6 +267,7 @@ function advanceBall(ctx: ModeContext): void {
   }
   S.barT = Math.random() * Math.PI;   // desync the bar so it can't be memorised
   S.phase = 'shoot';
+  dressBall();
 }
 
 /** The player's run for this round is over — post the score, run the field. */
@@ -338,6 +367,9 @@ export const ThreePointMode: ModeDefinition = {
     ctx.heroRef.current = player.root;
 
     ball = MeshBuilder.CreateSphere('tp_ball', { diameter: 0.24, segments: 16 }, ctx.scene);
+    ballMat = new StandardMaterial('tp_ballMat', ctx.scene);
+    ball.material = ballMat;
+    dressBall();
     ball.position.copyFrom(RACK_POS[0]).addInPlace(new Vector3(0, 1.9, 0));
     // The objective is the RIM, not the ball. The 'hoops' preset frames hero and
     // objective together (fitTwo), so pointing this at the ball — which sits in
@@ -399,6 +431,7 @@ export const ThreePointMode: ModeDefinition = {
         S.phase = 'shoot';
         S.fired = false;
         S.barT = Math.random() * Math.PI;
+        dressBall();
         pushHud(ctx, `RACK ${S.rack + 1}`);
       }
     } else if (S.phase === 'shoot') {
@@ -432,6 +465,7 @@ export const ThreePointMode: ModeDefinition = {
     if (disposeCount < loadCount) return;
     player?.dispose(); player = null;
     ball?.dispose(); ball = null;
+    ballMat?.dispose(); ballMat = null;
     arc = null;
   },
 };
