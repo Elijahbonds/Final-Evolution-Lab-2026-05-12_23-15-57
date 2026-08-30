@@ -20,6 +20,19 @@ import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnum } from './hud-format';
 
+// Which harness currently owns a given canvas. React mounts effects twice in
+// dev: effect A starts an async runMode(), its cleanup fires before A has even
+// finished loading, then effect B starts on the SAME canvas. When A's promise
+// finally resolves it tears itself down — and engine.dispose() releases the
+// WebGL context of the shared canvas, killing B's render loop. The symptom is
+// brutal to read: the HUD keeps streaming from B's React state while update()
+// is never called again and the canvas stays black.
+//
+// The token lets a late teardown notice it has been superseded and leave the
+// canvas alone. Leaking one dev-only engine is vastly better than a dead frame.
+const canvasOwner = new WeakMap<HTMLCanvasElement, object>();
+
+
 type Hud = Record<string, HudValue>;
 
 export default function ThreePointBabylon({ onEnd }: GameProps) {

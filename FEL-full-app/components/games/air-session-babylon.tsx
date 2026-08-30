@@ -11,6 +11,19 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 
+// Which harness currently owns a given canvas. React mounts effects twice in
+// dev: effect A starts an async runMode(), its cleanup fires before A has even
+// finished loading, then effect B starts on the SAME canvas. When A's promise
+// finally resolves it tears itself down — and engine.dispose() releases the
+// WebGL context of the shared canvas, killing B's render loop. The symptom is
+// brutal to read: the HUD keeps streaming from B's React state while update()
+// is never called again and the canvas stays black.
+//
+// The token lets a late teardown notice it has been superseded and leave the
+// canvas alone. Leaking one dev-only engine is vastly better than a dead frame.
+const canvasOwner = new WeakMap<HTMLCanvasElement, object>();
+
+
 type Hud = Record<string, HudValue>;
 
 export function makeAirHost(modeKey: string, title: string) {
@@ -33,6 +46,8 @@ export function makeAirHost(modeKey: string, title: string) {
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
+      const token = {};
+      canvasOwner.set(canvas, token);
       const bus = new InputBus();
       busRef.current = bus;
       let stop: (() => void) | null = null;
@@ -59,10 +74,18 @@ export function makeAirHost(modeKey: string, title: string) {
             headline: r.outcome === 'win' ? 'ROUTINE LANDED' : 'SESSION COMPLETE',
           } satisfies GameResult);
         },
-      }).then((s) => { if (disposed) s(); else stop = s; })
+      }).then((s) => {
+        // If a newer mount already claimed this canvas, do NOT run our teardown —
+        // it would dispose the engine holding the shared WebGL context.
+        if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
+        stop = s;
+      })
         .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
 
-      return () => { disposed = true; stop?.(); };
+      return () => {
+        disposed = true;
+        if (canvasOwner.get(canvas) === token) stop?.();
+      };
     }, []);   // mount once — see onEndRef above
 
     const tapStart = useCallback(() => {
