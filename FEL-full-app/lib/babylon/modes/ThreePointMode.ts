@@ -11,6 +11,13 @@
 // make. That is exactly why this mode is the Controller Link reference target —
 // if a phone can hit a timing window, the transport is fast enough for anything.
 //
+// BENCHMARK (locked): NBA 2K9 Three-Point Contest. That means a FIELD and
+// ROUNDS, not a solo time attack — the 2009 event ran six shooters through a
+// qualifying round, advanced the top three, and decided it on a final round.
+// The shot format was already right (5 racks x 5 balls, last ball of each rack
+// is the money ball worth 2, 30 max, 60s); what was missing was the contest
+// around it, so a score had nothing to be measured against but a fixed number.
+//
 // Controller Link contract (see lib/controller-link/schemas/registry.ts):
 //   'shoot'  — release. Optional payload {power} from a tilt charge; when the
 //              phone sends power we bias the arc, but the TIMING is still what
@@ -33,7 +40,9 @@ import type { FelInput } from '../core/InputBus';
 const RACKS = 5;
 const BALLS_PER_RACK = 5;
 const GAME_LEN = 60;
-const WIN_PTS = 18;
+/** 2009 field size. Top FINALISTS advance from qualifying to the final round. */
+const FIELD_SIZE = 6;
+const FINALISTS = 3;
 const SHOT_TARGET = 0.72;          // release-bar sweet centre // TUNE(elijah)
 const RACK_R = 6.75;               // 3-point arc radius
 const RACK_ANGLES = [30, 60, 90, 120, 150].map((d) => (d * Math.PI) / 180);
@@ -53,12 +62,49 @@ const GOOD_BAND = 0.16;            //TUNE(elijah)
 const BAR_PERIOD = 1.15;           //TUNE(elijah)
 /** Seconds to travel between rack stations. */
 const MOVE_SEC = 0.85;             //TUNE(elijah)
+/** How long the standings board holds between rounds. */
+const STANDINGS_SEC = 4.0;         //TUNE(elijah)
 
-type Phase = 'move' | 'shoot' | 'flight' | 'done';
+type Phase = 'move' | 'shoot' | 'flight' | 'standings' | 'done';
+type Round = 'qualifying' | 'final';
+
+export interface Shooter {
+  name: string;
+  score: number;
+  isPlayer: boolean;
+  shot: boolean;      // has posted a score this round
+}
+
+/** Fictional rivals — deliberately not real 2009 competitors, since shipping
+ *  real athletes' names is a licensing question, not an engineering one. */
+const RIVAL_NAMES = ['V. MARCH', 'D. OKAFOR', 'R. SOLIS', 'T. HALE', 'K. NDIAYE'];
+
+/**
+ * A rival's round score. Real 2009 scores ran ~9-19 in qualifying and ~12-19 in
+ * the final, so this centres there rather than spanning the full 0-30 — a field
+ * that can post 3 or 29 makes the player's own score feel arbitrary.
+ * `skill` biases the centre; the triangular draw keeps extremes rare.
+ */
+export function simulateRival(skill: number, round: Round): number {
+  const centre = (round === 'final' ? 14 : 12.5) + skill * 5;
+  const spread = round === 'final' ? 3.2 : 4.0;
+  const tri = (Math.random() + Math.random()) / 2;          // triangular, centred
+  const raw = centre + (tri * 2 - 1) * spread * 2;
+  return Math.max(3, Math.min(30, Math.round(raw)));
+}
 
 let player: SpawnedCharacter | null = null;
 let ball: Mesh | null = null;
 let arc: ShotArc | null = null;
+
+// A ModeDefinition is a module singleton, so its state is shared by every
+// harness instance that mounts it. In dev, React mounts twice (StrictMode /
+// Fast Refresh): instance A loads, instance B loads, then A's teardown runs and
+// nulls player/ball/arc out from under the LIVE instance B. update() then
+// early-returns forever — the scene renders, the camera tracks, and nothing
+// ever moves. Counting loads against disposals lets a stale teardown skip.
+let loadCount = 0;
+let disposeCount = 0;
 
 const S = {
   phase: 'move' as Phase,
@@ -74,13 +120,42 @@ const S = {
   /** Live wind-up charge streamed from a phone; 0 when playing on keys. */
   charge: 0,
   fired: false,
+  // ── contest layer ──
+  round: 'qualifying' as Round,
+  field: [] as Shooter[],
+  /** Per-rival skill 0..1, fixed for the whole contest so form is consistent. */
+  skills: [] as number[],
+  standingsT: 0,
+  eliminated: false,
+  /** Previous hero position, for the camera's velocity term. */
+  prevPos: new Vector3(),
+  vel: new Vector3(),
 };
 
 function resetState(): void {
   S.phase = 'move'; S.rack = 0; S.ballIdx = 0; S.pts = 0; S.streak = 0; S.best = 0;
   S.clock = GAME_LEN; S.barT = 0; S.moveT = 0; S.charge = 0; S.fired = false;
   S.from.copyFrom(RACK_POS[0]);
+  S.round = 'qualifying';
+  S.standingsT = 0;
+  S.eliminated = false;
+  S.skills = RIVAL_NAMES.map(() => 0.25 + Math.random() * 0.7);
+  S.field = [
+    { name: 'YOU', score: 0, isPlayer: true, shot: false },
+    ...RIVAL_NAMES.slice(0, FIELD_SIZE - 1).map((name) => ({
+      name, score: 0, isPlayer: false, shot: false,
+    })),
+  ];
 }
+
+/** Reset only the per-run shooting state, keeping contest standings. */
+function resetRun(): void {
+  S.phase = 'move'; S.rack = 0; S.ballIdx = 0; S.pts = 0; S.streak = 0;
+  S.clock = GAME_LEN; S.barT = 0; S.moveT = 0; S.charge = 0; S.fired = false;
+  S.from.copyFrom(RACK_POS[0]);
+}
+
+const standings = (): Shooter[] => [...S.field].sort((a, b) => b.score - a.score);
 
 /** A rack's last ball is the money ball — 2 points instead of 1. */
 const isMoneyBall = (i: number): boolean => i === BALLS_PER_RACK - 1;
@@ -94,6 +169,19 @@ function pushHud(ctx: ModeContext, banner?: string): void {
     clock: Math.max(0, Math.ceil(S.clock)),
     meter: S.phase === 'shoot' ? Number(S.barT.toFixed(2)) : null,
     charge: S.charge > 0.02 ? Number(S.charge.toFixed(2)) : null,
+    round: S.round === 'final' ? 'FINAL' : 'QUALIFYING',
+    // The bezel renders a scorecard from {name,score,line} triples, so the
+    // standings board reuses the judged-contest HUD channel rather than
+    // inventing a second one.
+    board: S.phase === 'standings' || S.phase === 'done'
+      ? standings().map((f, i) => ({
+          name: f.name,
+          score: f.score,
+          line: S.round === 'qualifying' && i < FINALISTS ? 'ADVANCES'
+            : S.round === 'final' && i === 0 ? 'CHAMPION'
+            : `${i + 1}${i === 0 ? 'st' : i === 1 ? 'nd' : i === 2 ? 'rd' : 'th'}`,
+        }))
+      : null,
     banner: banner ?? null,
   });
 }
@@ -143,7 +231,7 @@ function advanceBall(ctx: ModeContext): void {
   if (S.ballIdx >= BALLS_PER_RACK) {
     S.ballIdx = 0;
     S.rack += 1;
-    if (S.rack >= RACKS) { finish(ctx); return; }
+    if (S.rack >= RACKS) { endRun(ctx); return; }
     S.from.copyFrom(player?.root.position ?? RACK_POS[0]);
     S.moveT = 0;
     S.phase = 'move';
@@ -153,12 +241,78 @@ function advanceBall(ctx: ModeContext): void {
   S.phase = 'shoot';
 }
 
-function finish(ctx: ModeContext): void {
-  if (S.phase === 'done') return;
-  S.phase = 'done';
-  ctx.end(S.pts >= WIN_PTS ? 'win' : 'complete', S.pts, {
-    points: S.pts, bestStreak: S.best, racks: S.rack,
+/** The player's run for this round is over — post the score, run the field. */
+function endRun(ctx: ModeContext): void {
+  if (S.phase === 'done' || S.phase === 'standings') return;
+
+  const me = S.field.find((f) => f.isPlayer);
+  if (me) { me.score = S.pts; me.shot = true; }
+
+  // Rivals shoot "at the same time" as far as the player is concerned. Only
+  // those still in the contest post a score.
+  S.field.forEach((f, i) => {
+    if (f.isPlayer || f.shot) return;
+    f.score = simulateRival(S.skills[i - 1] ?? 0.5, S.round);
+    f.shot = true;
   });
+
+  S.phase = 'standings';
+  S.standingsT = 0;
+  pushHud(ctx, S.round === 'qualifying' ? 'QUALIFYING RESULTS' : 'FINAL RESULTS');
+}
+
+/** Called once the standings board has been shown long enough to read. */
+function afterStandings(ctx: ModeContext): void {
+  const board = standings();
+  const me = board.findIndex((f) => f.isPlayer);
+  const myScore = board[me]?.score ?? 0;
+
+  if (S.round === 'final') {
+    const won = me === 0;
+    S.phase = 'done';
+    ctx.end(won ? 'win' : 'complete', myScore, {
+      points: myScore, bestStreak: S.best, place: me + 1, round: 2,
+    });
+    return;
+  }
+
+  // Qualifying: top three advance, exactly as the 2009 event ran.
+  if (me >= FINALISTS) {
+    S.eliminated = true;
+    S.phase = 'done';
+    ctx.end('complete', myScore, {
+      points: myScore, bestStreak: S.best, place: me + 1, round: 1,
+    });
+    return;
+  }
+
+  // Advance: the field shrinks to the finalists and everyone shoots again.
+  S.round = 'final';
+  S.field = board.slice(0, FINALISTS).map((f) => ({ ...f, score: 0, shot: false }));
+  S.skills = S.field.map(() => 0.35 + Math.random() * 0.6);
+  resetRun();
+  pushHud(ctx, 'FINAL ROUND');
+}
+
+/**
+ * Pure round resolution — the 2K9 contest rule, isolated from scene state so it
+ * can be proved without a renderer. Qualifying advances the top FINALISTS; the
+ * final is won outright by the leader.
+ */
+export function resolveRound(field: Shooter[], round: Round): {
+  board: Shooter[];
+  place: number;
+  advances: boolean;
+  champion: boolean;
+} {
+  const board = [...field].sort((a, b) => b.score - a.score);
+  const place = board.findIndex((f) => f.isPlayer) + 1;
+  return {
+    board,
+    place,
+    advances: round === 'qualifying' && place >= 1 && place <= FINALISTS,
+    champion: round === 'final' && place === 1,
+  };
 }
 
 export const ThreePointMode: ModeDefinition = {
@@ -167,6 +321,7 @@ export const ThreePointMode: ModeDefinition = {
   camPreset: 'hoops',
 
   async load(ctx: ModeContext): Promise<void> {
+    loadCount += 1;
     resetState();
 
     VenueKit.buildCourt(ctx.scene, 'venice');
@@ -184,16 +339,27 @@ export const ThreePointMode: ModeDefinition = {
 
     ball = MeshBuilder.CreateSphere('tp_ball', { diameter: 0.24, segments: 16 }, ctx.scene);
     ball.position.copyFrom(RACK_POS[0]).addInPlace(new Vector3(0, 1.9, 0));
-    ctx.objectiveRef.current = ball.position;
+    // The objective is the RIM, not the ball. The 'hoops' preset frames hero and
+    // objective together (fitTwo), so pointing this at the ball — which sits in
+    // the shooter's own hands — gave it two coincident points and the framing
+    // degenerated to a view of the boardwalk with neither player nor hoop in it.
+    ctx.objectiveRef.current = RIM;
 
     arc = new ShotArc();
 
     S.from.copyFrom(RACK_POS[0]);
+    S.prevPos.copyFrom(player.root.position);
+
+    // ModeHarness constructs the CameraDirector but does NOT drive it — each
+    // mode owns its own framing. Without these calls the camera stays at its
+    // construction default (0, 3, -8), which sits behind the hoop looking out
+    // at the boardwalk: no shooter, no rim, no shot arc in frame.
+    ctx.camDirector.snapTo(player.root.position, RIM);
     pushHud(ctx, 'RACK 1');
   },
 
   onInput(ctx: ModeContext, e: FelInput): void {
-    if (S.phase === 'done') return;
+    if (S.phase === 'done' || S.phase === 'standings') return;
 
     // Phone tilt wind-up streams in as the right trigger (see modeBridge).
     if (e.t === 'trigger' && e.side === 'R') {
@@ -210,8 +376,16 @@ export const ThreePointMode: ModeDefinition = {
   update(ctx: ModeContext, dt: number): void {
     if (S.phase === 'done' || !player || !ball || !arc) return;
 
+    // Standings board holds for a beat so the result is readable before the
+    // final round starts (or the contest ends).
+    if (S.phase === 'standings') {
+      S.standingsT += dt;
+      if (S.standingsT >= STANDINGS_SEC) afterStandings(ctx);
+      return;
+    }
+
     S.clock -= dt;
-    if (S.clock <= 0) { finish(ctx); return; }
+    if (S.clock <= 0) { endRun(ctx); return; }
 
     if (S.phase === 'move') {
       S.moveT = Math.min(1, S.moveT + dt / MOVE_SEC);
@@ -239,10 +413,23 @@ export const ThreePointMode: ModeDefinition = {
       if (r !== 'flying') advanceBall(ctx);
     }
 
+    // Camera follows the shooter, framed against the rim (the 'hoops' preset
+    // fits both). Velocity is derived rather than tracked so the lookAhead term
+    // leads the jog between racks.
+    if (dt > 0) {
+      S.vel.copyFrom(player.root.position).subtractInPlace(S.prevPos).scaleInPlace(1 / dt);
+      S.prevPos.copyFrom(player.root.position);
+    }
+    ctx.camDirector.update(player.root.position, S.vel, RIM);
+
     pushHud(ctx);
   },
 
   dispose(): void {
+    disposeCount += 1;
+    // A newer instance has already loaded — this teardown belongs to an older
+    // one and must not touch the live objects.
+    if (disposeCount < loadCount) return;
     player?.dispose(); player = null;
     ball?.dispose(); ball = null;
     arc = null;
