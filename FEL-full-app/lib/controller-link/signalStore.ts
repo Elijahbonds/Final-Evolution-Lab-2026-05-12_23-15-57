@@ -110,7 +110,27 @@ const g = globalThis as unknown as { __felSignalStore?: SignalStore };
 let store: SignalStore = g.__felSignalStore ?? new MemorySignalStore();
 g.__felSignalStore = store;
 
+/** Set once, on first use: prefer a KV-backed store when env configures one. */
+let resolved = false;
+
 export function getSignalStore(): SignalStore {
+  if (!resolved) {
+    resolved = true;
+    // Late import breaks the cycle (kvSignalStore imports this module's types)
+    // and keeps the KV code out of any bundle that never calls the API routes.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+      const { kvSignalStoreFromEnv } = require('./kvSignalStore') as typeof import('./kvSignalStore');
+      const kv = kvSignalStoreFromEnv();
+      if (kv) {
+        store = kv;
+        g.__felSignalStore = kv;
+        console.info('[FEL] Controller Link signaling: KV store (multi-instance safe).');
+      }
+    } catch {
+      // Fall through to memory — a signaling store must never take the app down.
+    }
+  }
   return store;
 }
 
