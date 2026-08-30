@@ -27,6 +27,7 @@ import {
 import { registerZoneTint, applyTint } from './TintMaterialPlugin';
 import { auditRig } from './RigValidator';
 import type { AssetRegistry } from './AssetRegistry';
+import { boneNode } from '../anim/boneLookup';
 
 interface EquippedSlot {
   itemId: string;
@@ -158,7 +159,7 @@ export class AvatarBuilder {
     this.applyHeight(h);
   }
   private applyHeight(h: number): void {
-    const hips = this.skeleton?.bones.find((b) => b.name === 'Hips')?.getTransformNode();
+    const hips = (this.skeleton ? boneNode(this.skeleton, 'Hips') : null);
     if (hips) hips.scaling.setAll(h);
     else this.root.scaling.setAll(h);      // fallback: scale the whole avatar
   }
@@ -185,7 +186,7 @@ export class AvatarBuilder {
       size: new Vector3(...cfg.size),
       angle: cfg.rotation[2],
     });
-    const bone = this.skeleton?.bones.find((b) => b.name === cfg.boneTarget)?.getTransformNode();
+    const bone = (this.skeleton ? boneNode(this.skeleton, cfg.boneTarget) : null);
     decal.parent = bone ?? this.root;
     if (!bone) {
       console.warn(`[FEL-AVATAR] decal boneTarget "${cfg.boneTarget}" not on the rig — parented to root; it will not follow the skin.`);

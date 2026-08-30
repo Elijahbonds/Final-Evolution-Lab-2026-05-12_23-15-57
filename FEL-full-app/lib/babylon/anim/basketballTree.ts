@@ -16,6 +16,7 @@
 import { Vector3, BoneIKController } from '@babylonjs/core';
 import type { Mesh, Skeleton, TransformNode } from '@babylonjs/core';
 import type { CharacterAnimator } from './CharacterAnimator';
+import { boneNode, findBone } from './boneLookup';
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
 export type BasketballAnimState =
@@ -105,8 +106,8 @@ export class FootPlant {
    *  plant start so the cut rotates around a fixed contact point. */
   plant(sceneFootTarget: (name: string) => TransformNode): void {
     if (this.lock) return;
-    const lf = this.skeleton.bones.find((b) => b.name === 'LeftFoot');
-    const rf = this.skeleton.bones.find((b) => b.name === 'RightFoot');
+    const lf = findBone(this.skeleton, 'LeftFoot');
+    const rf = findBone(this.skeleton, 'RightFoot');
     if (!lf || !rf) return;
     const ly = lf.getTransformNode()?.getAbsolutePosition().y ?? 0;
     const ry = rf.getTransformNode()?.getAbsolutePosition().y ?? 0;

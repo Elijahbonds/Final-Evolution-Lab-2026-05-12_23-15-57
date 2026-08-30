@@ -4,11 +4,12 @@
 import { Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Skeleton, TransformNode } from '@babylonjs/core';
 import { EASTBAY_TIMING as T } from './authored/timing';
+import { boneNode, findBone } from './boneLookup';
 
 const PALM_OFFSET = new Vector3(0, -0.07, 0.1);
 
 function handNode(skeleton: Skeleton, hand: 'LeftHand' | 'RightHand'): TransformNode | null {
-  return skeleton.bones.find((b) => b.name === hand)?.getTransformNode() ?? null;
+  return boneNode(skeleton, hand);
 }
 
 /** Parent the ball to a hand. Call on possession change. */

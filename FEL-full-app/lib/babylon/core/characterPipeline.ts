@@ -17,6 +17,7 @@ import type { Scene, Material } from '@babylonjs/core';
 type TintMat = Material & { albedoColor?: Color3; diffuseColor?: Color3 };
 import { CharacterLibrary, type SpawnedCharacter, type SpawnOpts } from './CharacterLibrary';
 import type { AvatarSpec } from '../../workout/avatar-builder';
+import { boneNode } from '../anim/boneLookup';
 import {
   defaultFace, getWearable, type FaceConfig, type WearableSlot,
 } from '../../closet/wearable-catalog';
@@ -91,7 +92,7 @@ export function applyIdentity(spawn: SpawnedCharacter, id: PlayerIdentity): void
 function scaleBones(spawn: SpawnedCharacter, names: string[], s: number): void {
   if (s === 1) return;
   for (const n of names) {
-    spawn.skeleton.bones.find((b) => b.name === n)?.getTransformNode()?.scaling.setAll(s);
+    boneNode(spawn.skeleton, n)?.scaling.setAll(s);
   }
 }
 function matColor(m: TintMat): Color3 | undefined {

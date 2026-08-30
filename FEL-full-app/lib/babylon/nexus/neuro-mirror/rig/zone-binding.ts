@@ -16,6 +16,7 @@ import {
 } from '@babylonjs/core';
 import { ZONE_STATE_COLOR, type ZoneState } from '../rules/config';
 import { PATTERN_ZONES, type ZoneId } from '../patterns/split-stance-press-row';
+import { boneNode } from '../../../anim/boneLookup';
 
 /** Which unprefixed bone each highlight zone rides on, plus a local placement. */
 interface ZonePlacement {
@@ -54,7 +55,7 @@ export function bindHighlightZones(scene: Scene, skeleton: Skeleton, root: Trans
   const bound: BoundZone[] = [];
   for (const id of PATTERN_ZONES) {
     const place = ZONE_PLACEMENT[id];
-    const node = skeleton.bones.find((b) => b.name === place.bone)?.getTransformNode();
+    const node = boneNode(skeleton, place.bone);
     if (!node) {
       console.warn(`[FEL-MIRROR] zone "${id}" — bone "${place.bone}" not found on rig; skipped`);
       continue;

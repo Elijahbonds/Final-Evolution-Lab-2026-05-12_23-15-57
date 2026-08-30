@@ -19,6 +19,7 @@
 
 import { Animation, AnimationGroup, Quaternion, Vector3 } from '@babylonjs/core';
 import type { Scene, Skeleton, TransformNode } from '@babylonjs/core';
+import { boneNode, findBone } from './boneLookup';
 
 const D2R = Math.PI / 180;
 const FPS = 30;
@@ -27,7 +28,7 @@ const FPS = 30;
 export type RestPose = Map<string, Quaternion>;
 
 function nodeOf(skeleton: Skeleton, boneName: string): TransformNode | null {
-  return skeleton.bones.find((b) => b.name === boneName)?.getTransformNode() ?? null;
+  return boneNode(skeleton, boneName);
 }
 
 /** Measure a node's world position after forcing a matrix refresh. */

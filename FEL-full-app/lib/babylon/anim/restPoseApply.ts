@@ -24,9 +24,10 @@
 
 import type { Quaternion, Skeleton, TransformNode } from '@babylonjs/core';
 import type { RestPose } from './restPose';
+import { boneNode, findBone } from './boneLookup';
 
 function nodeOf(skeleton: Skeleton, boneName: string): TransformNode | null {
-  return skeleton.bones.find((b) => b.name === boneName)?.getTransformNode() ?? null;
+  return boneNode(skeleton, boneName);
 }
 
 export interface RestPoseHandle {

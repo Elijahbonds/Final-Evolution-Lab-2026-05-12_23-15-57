@@ -9,6 +9,7 @@
 import { Animation, AnimationGroup, Quaternion } from '@babylonjs/core';
 import type { Scene, Skeleton } from '@babylonjs/core';
 import type { CharacterAnimator } from './CharacterAnimator';
+import { boneNode, findBone } from './boneLookup';
 
 const MIRROR_PAIRS: [string, string][] = [
   ['LeftShoulder', 'RightShoulder'],
@@ -40,7 +41,7 @@ export function registerMirroredClips(
     for (const ta of source.targetedAnimations) {
       const targetName = (ta.target as { name?: string }).name ?? '';
       const swapped = mirrorName(targetName.replace(/_c\d+$/, ''));
-      const node = skeleton.bones.find((b) => b.name === swapped)?.getTransformNode();
+      const node = boneNode(skeleton, swapped);
       if (!node) continue;
       const anim = ta.animation.clone();
       if (anim.targetProperty === 'rotationQuaternion') {

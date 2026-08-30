@@ -17,6 +17,7 @@
 import { Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, Skeleton, ArcRotateCamera } from '@babylonjs/core';
 import { REQUIRED_BONES, type RigReport } from '../types/avatar';
+import { boneNode } from '../anim/boneLookup';
 
 /** Static conformance audit — cheap, deterministic, run on every rig. */
 export function auditRig(skeleton: Skeleton, meshes: AbstractMesh[]): RigReport {
@@ -40,9 +41,9 @@ export function auditRig(skeleton: Skeleton, meshes: AbstractMesh[]): RigReport 
   // bind-pose classification: in a T-pose the hands sit near shoulder height
   // and far out laterally; in an A-pose they hang well below.
   let bindPose: RigReport['bindPose'] = 'unknown';
-  const lh = skeleton.bones.find((b) => b.name === 'LeftHand')?.getTransformNode();
-  const ls = skeleton.bones.find((b) => b.name === 'LeftShoulder')?.getTransformNode();
-  const hips = skeleton.bones.find((b) => b.name === 'Hips')?.getTransformNode();
+  const lh = boneNode(skeleton, 'LeftHand');
+  const ls = boneNode(skeleton, 'LeftShoulder');
+  const hips = boneNode(skeleton, 'Hips');
   if (lh && ls && hips) {
     const hand = lh.getAbsolutePosition();
     const shoulder = ls.getAbsolutePosition();
@@ -128,7 +129,7 @@ export type InspectTarget = (typeof INSPECT_TARGETS)[number];
 export function inspectJoint(
   camera: ArcRotateCamera, skeleton: Skeleton, joint: InspectTarget, radius = 0.45,
 ): boolean {
-  const node = skeleton.bones.find((b) => b.name === joint)?.getTransformNode();
+  const node = boneNode(skeleton, joint);
   if (!node) return false;
   camera.setTarget(node.getAbsolutePosition().clone());
   camera.radius = radius;

@@ -9,6 +9,8 @@
 // so the test cannot drift from the gate it claims to satisfy.
 
 import { NullEngine, Scene, FreeCamera, Vector3 } from '@babylonjs/core';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { buildRig, JOINTS, MIXAMO_PREFIX } from '../lib/babylon/characters/proceduralRig';
 import { Gate0Validator } from '../lib/babylon/modes/Gate0Validator';
 import { CharacterAnimator } from '../lib/babylon/anim/CharacterAnimator';
@@ -91,6 +93,32 @@ ok(animator.durationOf('run') !== null, 'D3 run resolves');
 const runGroup = scene.animationGroups.find((g) => g.name === 'run');
 ok(!!runGroup && runGroup.targetedAnimations.length > 0,
   `D4 run actually targets joints (got ${runGroup?.targetedAnimations.length ?? 0})`);
+
+// ── E. no bone lookup may bypass the prefix-tolerant helper ────────────────
+// Gate 0 renamed every bone to mixamorig:*. Nine call sites were doing an EXACT
+// match on the unprefixed name and silently stopped resolving: the ball stopped
+// attaching to the hand, feet stopped planting, the skinning guard lost its
+// bones, rest pose no-opped, weapon props were skipped. None of them threw.
+// Everything must go through boneNode()/findBone() so this cannot regress.
+{
+  const roots = ['lib/babylon'];
+  const offenders: string[] = [];
+  const walk = (dir: string): void => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) { walk(p); continue; }
+      if (!p.endsWith('.ts') || p.endsWith('boneLookup.ts')) continue;
+      const src = readFileSync(p, 'utf8');
+      // An exact-match bone lookup by name is the banned pattern.
+      if (/bones\s*\.\s*find\(\s*\(\s*b\s*\)\s*=>\s*b\.name\s*===/.test(src)) {
+        offenders.push(p);
+      }
+    }
+  };
+  for (const r of roots) if (existsSync(r)) walk(r);
+  ok(offenders.length === 0,
+    `E1 no exact-match bone lookups remain (found: ${offenders.join(', ') || 'none'})`);
+}
 
 scene.dispose();
 engine.dispose();

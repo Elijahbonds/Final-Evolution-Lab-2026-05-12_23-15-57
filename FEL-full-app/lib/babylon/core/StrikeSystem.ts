@@ -17,6 +17,7 @@
 import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
 import type { Mesh, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import type { AttackDef } from './FightCore';
+import { boneNode, findBone } from '../anim/boneLookup';
 
 // ── Moves with frame data ──────────────────────────────────────────────────
 export interface CombatMove {
@@ -234,7 +235,7 @@ export class WeaponRig {
     this.unequip();
     this.controller.swapMoveset(moveset);
     if (!weapon || weapon.id === 'fists') return;
-    const hand = skeleton.bones.find((b) => b.name === 'RightHand')?.getTransformNode();
+    const hand = boneNode(skeleton, 'RightHand');
     if (!hand) { console.warn('[FEL-COMBAT] no RightHand bone — weapon prop skipped'); return; }
     this.prop = weapon.buildProp(scene);
     this.prop.parent = hand as TransformNode;

@@ -24,6 +24,7 @@
 // clip's playhead moved during the window. All three, or it says nothing.
 
 import type { AbstractMesh, Scene, Skeleton } from '@babylonjs/core';
+import { boneNode, findBone } from './boneLookup';
 
 const warnedIds = new Set<string>();
 const FRAMES_TO_WAIT = 45;
@@ -52,7 +53,7 @@ export const SkinningGuard = {
     clipFrame?: () => number,
   ): void {
     const bones = SAMPLE_BONES
-      .map((n) => skeleton.bones.find((b) => b.name === n))
+      .map((n) => findBone(skeleton, n))
       .filter((b): b is NonNullable<typeof b> => !!b);
 
     if (bones.length === 0) {

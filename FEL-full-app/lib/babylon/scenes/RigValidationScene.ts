@@ -19,6 +19,7 @@ import {
   INSPECT_TARGETS, type InspectTarget,
 } from '../avatar/RigValidator';
 import type { RigReport } from '../types/avatar';
+import { boneNode, findBone } from '../anim/boneLookup';
 
 export interface RigValidationHandle {
   scene: Scene;
@@ -85,7 +86,7 @@ export async function createRigValidationScene(
       // retarget by bone name onto our skeleton
       for (const ta of group.targetedAnimations) {
         const name = (ta.target as { name?: string }).name?.replace(/_c\d+$/, '') ?? '';
-        const node = skeleton.bones.find((b) => b.name === name)?.getTransformNode();
+        const node = boneNode(skeleton, name);
         if (node) (ta as unknown as { target: unknown }).target = node;
       }
     }

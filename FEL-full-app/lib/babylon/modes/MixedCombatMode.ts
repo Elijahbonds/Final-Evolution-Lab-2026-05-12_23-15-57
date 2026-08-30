@@ -35,6 +35,7 @@ import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
+import { boneNode } from '../anim/boneLookup';
 
 type Phase = 'loadout' | 'fighting' | 'roundOver' | 'matchOver';
 type Loadout = 'fists' | 'staff';
@@ -109,7 +110,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
   }
 
   function makeStaff(ctx: ModeContext, char: SpawnedCharacter, name: string): AbstractMesh | null {
-    const hand = char.skeleton.bones.find((b) => b.name === 'RightHand')?.getTransformNode();
+    const hand = boneNode(char.skeleton, 'RightHand');
     if (!hand) return null;
     const staff = MeshBuilder.CreateCylinder(name, { height: 1.9, diameter: 0.05 }, ctx.scene);
     const m = new StandardMaterial(`${name}_m`, ctx.scene);

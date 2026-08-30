@@ -10,6 +10,7 @@
 
 import type { AnimationGroup, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import type { CharacterAnimator, PlayOpts } from './CharacterAnimator';
+import { boneNode, findBone } from './boneLookup';
 
 /** Names of clips WE author (position tracks are trusted). */
 const AUTHORED = new Set([
@@ -71,7 +72,7 @@ export class GroundLock {
   }
 
   track(root: TransformNode, skeleton: Skeleton): void {
-    const hips = skeleton.bones.find((b) => b.name === 'Hips')?.getTransformNode() ?? null;
+    const hips = boneNode(skeleton, 'Hips');
     // 45% of bind-pose hip height = deepest legal crouch
     const minHipsY = hips ? hips.position.y * 0.45 : 0;
     this.entries.push({ root, hips, minHipsY });
