@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Trophy, Flame, ArrowRight } from 'lucide-react';
 import { prqGrade } from '@/lib/prq';
-import { is3D } from '@/components/three/flags';
+import { is3D, isBabylon } from '@/components/three/flags';
 import { track, flush } from '@/lib/analytics';
 import type { GameProps, GameResult } from '@/components/games/game-shell';
 
@@ -18,6 +18,8 @@ const spinner = () => (
 
 const DunkGame2D = dynamicImport(() => import('@/components/games/dunk-game'), { ssr: false, loading: spinner });
 const DunkGame3D = dynamicImport(() => import('@/components/games/dunk-game-3d'), { ssr: false, loading: spinner });
+// Babylon dunk stage — the SAME host /play/dunk mounts.
+const DunkBabylon = dynamicImport(() => import('@/components/games/dunk-babylon'), { ssr: false, loading: spinner });
 
 /**
  * M13 Step 1 — "60 seconds to a dunk". A fully GUEST-playable dunk contest: no
@@ -27,7 +29,17 @@ const DunkGame3D = dynamicImport(() => import('@/components/games/dunk-game-3d')
  * Server owns all grants/scores; nothing here mutates a real account.
  */
 export function GuestDunkShell({ challengeCode }: { challengeCode?: string | null }) {
-  const Game = (is3D('dunkContest') ? DunkGame3D : DunkGame2D) as React.ComponentType<GameProps>;
+  // Engine selection must match /play/dunk: isBabylon FIRST, then the 3D
+  // fallback. This shell checked only is3D, so the guest path — the PLAY NOW
+  // button, and therefore the first thing every new player ever sees — mounted
+  // the react-three-fiber dunk with the Meshy GLB avatar. That avatar is the
+  // known-broken one (it is the reason PROCEDURAL_CHARACTERS defaults true), and
+  // it T-POSES on screen. Gate 0 passing did not save this path, because this
+  // path never used the Gate-0-compliant procedural rig at all.
+  const babylon = isBabylon('dunkContest');
+  const Game = (babylon
+    ? DunkBabylon
+    : is3D('dunkContest') ? DunkGame3D : DunkGame2D) as React.ComponentType<GameProps>;
   const grade = prqGrade(50);
   const [gameKey, setGameKey] = useState(0);
   const [result, setResult] = useState<GameResult | null>(null);
