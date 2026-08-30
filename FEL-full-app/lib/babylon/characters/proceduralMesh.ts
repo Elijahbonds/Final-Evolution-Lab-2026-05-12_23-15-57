@@ -25,6 +25,7 @@ import {
 } from '@babylonjs/core';
 import type { AbstractMesh, Mesh, Scene, TransformNode } from '@babylonjs/core';
 import type { ProceduralRig } from './proceduralRig';
+import { SPINE_TO_SPINE2 } from './proceduralRig';
 
 const SKIN = '#C68A5E';
 const SHOE = '#141414';
@@ -177,7 +178,10 @@ export function buildBody(scene: Scene, rig: ProceduralRig, opts: BodyOpts = {})
 
   // ── Torso: V-tapered trunk (waist → chest) + pecs + shorts hem ──
   add(taperSeg(scene, `waist_${id}`, nodes.Hips, offsets.Spine, 0.135, 0.115), shorts);
-  add(taperSeg(scene, `trunk_${id}`, nodes.Spine, offsets.Spine2, 0.17, 0.135), jersey);
+  // Mixamo splits the spine into Spine/Spine1/Spine2, so offsets.Spine2 is now
+  // measured from Spine1, not Spine. This segment spans the WHOLE trunk, so it
+  // needs the summed rise or the jersey stops short of the chest.
+  add(taperSeg(scene, `trunk_${id}`, nodes.Spine, SPINE_TO_SPINE2, 0.17, 0.135), jersey);
   const chest = add(MeshBuilder.CreateSphere(`chest_${id}`, { diameterX: 0.34, diameterY: 0.24, diameterZ: 0.22, segments: 14 }, scene), jersey);
   chest.parent = nodes.Spine2; chest.position = new Vector3(0, 0.015, 0.01);
   // shorts block around the hips

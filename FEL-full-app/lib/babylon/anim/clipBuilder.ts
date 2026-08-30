@@ -15,8 +15,24 @@ export type BoneKeys = Record<string, [number, number, number, number][]>;
 /** Optional Hips Y offset keys: [timeSec, yMeters]. */
 export type HipsYKeys = [number, number][];
 
+/** Mixamo's own exports prefix every bone; hand-authored rigs usually don't. */
+const MIXAMO_PREFIX = 'mixamorig:';
+const bare = (n: string): string =>
+  (n.startsWith(MIXAMO_PREFIX) ? n.slice(MIXAMO_PREFIX.length) : n);
+
+/**
+ * Resolve a clip's bone name to its transform node, tolerating the
+ * 'mixamorig:' prefix on EITHER side.
+ *
+ * This used to be an exact string match against unprefixed names, which meant a
+ * genuine Mixamo rig — where every bone is 'mixamorig:LeftArm' — resolved
+ * nothing and every clip silently built zero targets. The procedural rig only
+ * exposed that because Gate 0 requires the same prefix; the bug was already
+ * there for the GLB path it was supposed to serve.
+ */
 function nodeOf(skeleton: Skeleton, boneName: string): TransformNode | null {
-  const bone = skeleton.bones.find((b) => b.name === boneName);
+  const want = bare(boneName);
+  const bone = skeleton.bones.find((b) => bare(b.name) === want);
   return bone?.getTransformNode() ?? null;
 }
 
