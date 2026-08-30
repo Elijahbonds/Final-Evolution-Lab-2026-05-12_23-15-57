@@ -21,7 +21,7 @@ These are the 2009 NBA Three-Point Shootout rules, which 2K9 simulates.
 | A3 | Last ball of each rack is the money ball, worth 2 | ✅ | `isMoneyBall()` |
 | A4 | Perfect score is 30 | ✅ | proved in tests |
 | A5 | 60-second clock | ✅ | `GAME_LEN = 60` |
-| A6 | Racks sit along the three-point arc | ⚠️ **deviation — see D1** | `RACK_R = 6.75` |
+| A6 | Racks sit along the three-point arc | ✅ D1 fixed — real NBA line | `rackRadius()` 6.71→7.24m |
 
 ## B. Contest structure — what makes it a *contest*
 
@@ -49,20 +49,20 @@ measured against, which is what the original `WIN_PTS >= 18` threshold got wrong
 
 ## D. Deviations found in this phase — fix in Phase 2, or rule out of scope
 
-**D1 — The arc is a constant radius, and the real one is not.**
+**D1 — The arc is a constant radius, and the real one is not. → FIXED (Phase 2).**
 `RACK_R = 6.75` puts every rack the same distance from the rim. The real NBA
 three-point line is **6.71m in the corners and 7.24m at the top of the arc**, and
 the racks sit *on that line* — so the corner racks are genuinely shorter shots
 than the top-of-key rack. A 2K-benchmark mode should reproduce that: it is the
 reason the top rack feels harder. **Recommend fixing in Phase 2.**
 
-**D2 — The money ball is not visually distinct.**
+**D2 — The money ball is not visually distinct. → FIXED (Phase 2).**
 `isMoneyBall()` affects scoring only. In the real event (and in 2K9) the money
 ball is a different-coloured ball, and seeing it coming is part of the tension.
 Currently every ball renders identically. **Recommend fixing in Phase 2 — cheap
 and high value.**
 
-**D3 — The ball racks are not on the court.**
+**D3 — The ball racks are not on the court. → FIXED (Phase 6).**
 The shooter moves between rack *positions*, but no rack geometry is built, so
 there is nothing on court showing where the balls are or how many remain.
 **Defer to Phase 6 (World Population).**
@@ -77,16 +77,18 @@ the standings board already gives the score its meaning.
 2K9 lets you pick a competitor. FEL has one player identity (§5.3 Shared Profile
 Object). **OUT OF SCOPE — conflicts with the platform's own identity model.**
 
-**D6 — Physics is kinematic, not Havok.**
-Scoring uses `ShotArc`, a kinematic parabola, not a Havok rigid body. This is
-believed correct for the benchmark — 2K9 decides the make from the meter and
-animates the result — but §1 states the stack is Havok. **Needs a ruling.**
+**D6 — Physics is kinematic, not Havok. → RULED: ACCEPTED (Elijah, 2026-08-30).**
+Scoring uses `ShotArc`, a kinematic parabola, not a Havok rigid body. Ruled
+correct for this benchmark: 2K9 decides the make from the shot meter and then
+animates the result, so simulating a rigid body through a rim would be modelling
+something the benchmark does not do. §1's "Havok" is the platform default, not a
+per-mode requirement. **No longer an open item.**
 
 ---
 
 ## E. Exit criteria for this mode
 
 The mode is "2K9 parity" when A1–A6, B1–B6, C1–C3 all hold, D1 and D2 are fixed,
-D3 is delivered in Phase 6, and D4/D5/D6 have an explicit ruling recorded here.
+D3 is delivered in Phase 6 (done), and D4/D5/D6 have an explicit ruling recorded here (all three ruled).
 
-**Currently: 15 of 15 A/B/C criteria hold; A6 is qualified by D1.**
+**Currently: 15 of 15 A/B/C criteria hold. D1/D2/D3 fixed; D4/D5/D6 ruled.**

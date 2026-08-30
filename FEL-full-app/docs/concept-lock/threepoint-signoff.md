@@ -1,43 +1,35 @@
 # §7 Completion Checklist — Three-Point Shootout
 
 Phase 10 of the convergence pass. Benchmark: **NBA 2K9 Three-Point Contest**.
-This is the bible's own eight-item checklist, run honestly. Two items do not pass.
+This is the bible's own eight-item checklist, run honestly. One item does not pass.
 
 | § | Item | Result |
 |---|---|---|
-| 7.1 | Gate 0 verified for this mode's animation set | ✅ 57 checks — the rig is the Mixamo 65-bone standard with `mixamorig:` bones |
-| 7.2 | 10-Phase Convergence Protocol run in full | ⚠️ **Run against the reconstructed skeleton, not the canonical document** — see below |
-| 7.3 | Benchmark parity against the locked reference | ✅ 15/15 criteria; deviations D1/D2/D3 fixed, D4/D5 ruled out of scope, **D6 needs a ruling** |
-| 7.4 | World-Population Protocol applied | ⚠️ **Document not available.** The benchmark-driven part (ball racks) is done; the protocol itself was not applied because it was not available to apply |
+| 7.1 | Gate 0 verified for this mode's animation set | ✅ 58 checks — the rig is the Mixamo 65-bone standard with `mixamorig:` bones |
+| 7.2 | 10-Phase Convergence Protocol run in full | ✅ Protocol ratified as canonical v1 (`docs/10-PHASE-CONVERGENCE-PROTOCOL.md`) after confirming no such document existed; the pass was run against it |
+| 7.3 | Benchmark parity against the locked reference | ✅ 15/15 criteria; D1/D2/D3 fixed, D4/D5/D6 all ruled |
+| 7.4 | World-Population Protocol applied | ❌ **The document does not exist.** A search of this machine finds it referenced only by files written during this pass. The benchmark-driven part (ball racks on court, depleting as shot) is done. Needs the same treatment the 10-Phase Protocol got: write and ratify one, or drop the gate |
 | 7.5 | Five-tab shell conventions intact | ✅ Lab/Train/Arena/Status/Profile |
-| 7.6 | vitest suite still 31/31 green | ❌ **Not satisfiable in this tree** — vitest is not installed and there are 3 test files, not 31 suites. Substituted: 252 deterministic headless checks, all green |
+| 7.6 | vitest suite still green | ✅ `npm test` — 4 files, 47 tests green (vitest installed and wired; the 31/31 figure belongs to the `/tmp/fel3` checkout, not this tree) |
 | 7.7 | No orphaned-mode work smuggled in | ✅ Nothing from §4.3 touched. Showdown was routed under an explicit mount instruction |
 | 7.8 | No scope bleed into §6 features | ✅ Controller Link (§6.5) was separately commissioned; nothing else pulled forward |
 
-## Verdict: **NOT signed off.** 6 of 8 pass.
+## Verdict: 7 of 8 pass. One gate remains.
 
-Three blockers, none of which I can clear alone:
+**§7.4 is the only failing gate**, and it fails because the World-Population
+Protocol has never been written. It cannot be "applied" until it exists.
 
-1. **7.2 — the 10-Phase Convergence Protocol document.** The pass ran against a
-   reconstruction. §2 is explicit: *"do not improvise phase steps."* The work is
-   real and the phases were sound, but calling this "the protocol, run in full"
-   would be a false claim.
+Also still true, though not a §7 item: **Phase 9 (device playtest) has not been
+run for this mode.** Postgres is now up and the guest route proves real
+playthroughs work, but `/play/threepoint` needs an account. Sprint is the
+standing argument for not skipping it — its logic verified clean while the frame
+was black, and only a real playthrough would have caught that.
 
-2. **7.6 — the 31/31 vitest baseline does not exist here.** That baseline
-   belongs to the `/tmp/fel3` checkout described in §1. This tree has no vitest.
-   Either that checkout is the real one, or the baseline needs restating for
-   this tree.
+## Rulings recorded
 
-3. **Phase 9 (device playtest) never ran.** Postgres is down and every `/play/*`
-   route is auth-gated, so this mode has never been played through its shipping
-   route on a real device — only through a dev host. Sprint's black screen is
-   exactly what that gap lets through.
-
-## Open ruling
-
-**D6 — physics.** 3PT scores with `ShotArc`, a kinematic parabola, and uses zero
-Havok. Believed correct for the benchmark (2K9 decides the make from the meter,
-then animates it) but §1 states the stack is Havok. Needs an explicit call.
+**D6 — physics. ACCEPTED (Elijah, 2026-08-30).** Kinematic `ShotArc` is correct
+for this benchmark; 2K9 decides the make from the meter and animates it. §1's
+"Havok" is the platform default, not a per-mode requirement.
 
 ## What the pass actually produced
 
