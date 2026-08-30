@@ -3,7 +3,7 @@
 import dynamicImport from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import { GameShell } from '@/components/games/game-shell';
-import { is3D } from '@/components/three/flags';
+import { is3D, isBabylon } from '@/components/three/flags';
 
 const spinner = () => (
   <div className="flex h-[60vh] items-center justify-center">
@@ -21,7 +21,22 @@ const ThreePoint3D = dynamicImport(() => import('@/components/games/three-point-
   loading: spinner,
 });
 
+// Babylon port (ThreePointMode.ts) — also the Controller Link reference host.
+const ThreePointBabylon = dynamicImport(() => import('@/components/games/three-point-babylon'), {
+  ssr: false,
+  loading: spinner,
+});
+
 export function ThreePointLoader() {
-  const Game = is3D('threePoint') ? ThreePoint3D : ThreePoint2D;
-  return <GameShell mode="threePoint" title="THREE-POINT SHOOTOUT" venue="Venice Beach Court" Game={Game} />;
+  const babylon = isBabylon('threePoint');
+  const Game = babylon ? ThreePointBabylon : is3D('threePoint') ? ThreePoint3D : ThreePoint2D;
+  return (
+    <GameShell
+      mode="threePoint"
+      title="THREE-POINT SHOOTOUT"
+      venue="Venice Beach Court"
+      Game={Game}
+      ownControls={babylon}
+    />
+  );
 }

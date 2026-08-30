@@ -54,6 +54,9 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   // hoops1v1→onevone, hoops3v3→threevthree.
   hoops1v1: true,
   hoops3v3: true,
+  // 3PT ported from react-three-fiber to Babylon (ThreePointMode.ts) so the
+  // basketball family shares one renderer.
+  threePoint: true,
   // Rollout wave 5 — Court Carnival hub (M49). New Babylon-only hub mode.
   carnival: true,
   // Rollout wave 6 — combat/duel modes (M53/M56)

@@ -22,6 +22,7 @@ import { DunkDuelMode } from './DunkDuelMode';
 import { ShowdownMode } from './ShowdownMode';
 import { DuelMode } from './DuelMode';
 import { DanceMode } from './DanceMode';        // M75 creative discipline
+import { ThreePointMode } from './ThreePointMode'; // Babylon port of the R3F shootout
 
 export const MODES: Record<string, ModeDefinition> = {
   // P3–P4 proof mode — shipped and playtested FIRST
@@ -42,6 +43,8 @@ export const MODES: Record<string, ModeDefinition> = {
   // Rollout wave 4 — basketball simulator family (M48) on PlayerSlot +
   // BasketballCore. 1V1 first-to-11, 3V3 first-to-21 on a 90s clock.
   onevone: OneVOneMode,
+  // Ported off react-three-fiber so the whole basketball family is Babylon.
+  threepoint: ThreePointMode,
   threevthree: ThreeVThreeMode,
   // Rollout wave 5 — Court Carnival (M49): a NEW hub mode that rotates through
   // four quick minigame bursts. Doesn't replace anything.

@@ -141,6 +141,9 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
 
   // Rhythm dance. No movement stick use — the body IS the game; one TAP verb
   // judged against the beat. B also taps (mode reads A or B).
+  // 3PT Shootout: one verb, the release. Timing is the whole mechanic.
+  threepoint: verbs({ A: { label: 'SHOOT', emit: A('A') } }),
+
   dance: verbs({ A: { label: 'TAP', emit: A('A') } }),
 
   default: verbs({ A: { label: 'ACTION', emit: A('A') } }),
