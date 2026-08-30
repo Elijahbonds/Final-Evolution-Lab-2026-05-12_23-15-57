@@ -25,7 +25,7 @@ import {
   overallPrq,
   PRQ_BASELINE,
   tierForPrq,
-} from '../prq-engine';
+} from './prq-engine';
 
 const DAY = 24 * 60 * 60 * 1000;
 

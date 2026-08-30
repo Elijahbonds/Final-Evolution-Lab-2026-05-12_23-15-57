@@ -33,10 +33,10 @@ describe("PHASE 3 — Gate 0 Full Runtime Validation (All 18 Modes)", () => {
     { name: "Golf", file: "components/games/golf-game.tsx", category: "canvas2d" },
     { name: "Soccer", file: "components/games/soccer-game.tsx", category: "canvas2d" },
     { name: "Baseball", file: "components/games/baseball-game.tsx", category: "canvas2d" },
-    { name: "Football", file: "lib/babylon/modes/FootballMode.ts", category: "canvas2d" },
-    { name: "Skateboard", file: "lib/babylon/modes/SkateRunMode.ts", category: "canvas2d" },
-    { name: "Surf", file: "lib/babylon/modes/SurfBreakMode.ts", category: "canvas2d" },
-    { name: "Snowboard", file: "lib/babylon/modes/SnowboardSlalomMode.ts", category: "canvas2d" },
+    { name: "Football", file: "lib/babylon/modes/FootballMode.ts", category: "babylon3d" },
+    { name: "Skateboard", file: "lib/babylon/modes/SkateRunMode.ts", category: "babylon3d" },
+    { name: "Surf", file: "lib/babylon/modes/SurfBreakMode.ts", category: "babylon3d" },
+    { name: "Snowboard", file: "lib/babylon/modes/SnowboardSlalomMode.ts", category: "babylon3d" },
   ];
 
   /**
@@ -211,18 +211,23 @@ ${
     console.log(`\n✅ BABYLON 3D MODES PASSING GATE 0: ${babylon3DPassed.length}/10`);
     babylon3DPassed.forEach((r) => console.log(`   ✓ ${r.mode}`));
 
-    console.log(`\n⚠️ BABYLON 3D MODES NEEDING FIXES: ${10 - babylon3DPassed.length}/10`);
+    const babylon3DTotal = allModes.filter((m) => m.category === "babylon3d").length;
+    const canvas2DTotal = allModes.filter((m) => m.category === "canvas2d").length;
+    console.log(`\n⚠️ BABYLON 3D MODES NEEDING FIXES: ${babylon3DTotal - babylon3DPassed.length}/${babylon3DTotal}`);
     results
       .filter((r) => r.category === "babylon3d" && !r.passed)
       .forEach((r) => console.log(`   ✗ ${r.mode}: ${r.fixes.join("; ")}`));
 
-    console.log(`\n📋 CANVAS 2D MODES (EXPECTED FAIL, PHASE 6 WORK): ${canvas2DFailed.length}/8`);
+    console.log(`\n📋 CANVAS 2D MODES (EXPECTED FAIL, PHASE 6 WORK): ${canvas2DFailed.length}/${canvas2DTotal}`);
     canvas2DFailed.forEach((r) => console.log(`   ✗ ${r.mode} (will pass after migration)`));
 
-    // Assert hard gate is being enforced
-    expect(results.length).toBe(18);
+    // Assert hard gate is being enforced. Counts are DERIVED from the mode list,
+    // not hardcoded: the previous 10/8/18 literals silently encoded a snapshot of
+    // the roster, so porting a mode to Babylon broke the suite for the wrong
+    // reason — it reported failure when the codebase had improved.
+    expect(results.length).toBe(allModes.length);
     expect(babylon3DPassed.length).toBeGreaterThan(0); // At least some pass
-    expect(canvas2DFailed.length).toBe(8); // All Canvas 2D expected to fail
+    expect(canvas2DFailed.length).toBe(canvas2DTotal); // every 2D mode still fails the hard gate
   });
 
   it("should identify which Babylon 3D modes have CharacterLibrary.spawn() integrated", () => {
@@ -252,7 +257,12 @@ ${
     console.log(`\n⚠️ Babylon 3D modes needing CharacterLibrary integration: ${needsIntegration.length}/${babylon3D.length}`);
     needsIntegration.forEach((m) => console.log(`   • ${m.name} → Add CharacterLibrary.spawn()`));
 
-    expect(needsIntegration.length).toBeGreaterThan(0);
+    // INVERTED (was toBeGreaterThan(0)). This was a remediation-backlog test: it
+    // asserted at least one Babylon mode still lacked CharacterLibrary.spawn().
+    // The backlog is now empty, so the old assertion failed BECAUSE the work got
+    // done. Asserting the backlog stays empty is the useful form — it turns a
+    // one-time to-do list into a regression guard.
+    expect(needsIntegration.length, 'a Babylon 3D mode regressed to spawning characters itself').toBe(0);
   });
 
   it("should enforce hard Gate 0: Canvas 2D modes cannot pass", () => {
