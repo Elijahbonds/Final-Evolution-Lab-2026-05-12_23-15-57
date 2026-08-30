@@ -36,6 +36,53 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
       { kind: 'button', buttons: [{ action: 'shoot', label: 'SHOOT' }] },
     ],
   },
+
+  // ── Air-session family ────────────────────────────────────────────────────
+  // The run-up IS a d-pad cadence, so these need the dpad schema as well as the
+  // two air verbs. Same shape for both because they are one shared core.
+  gymnastics: {
+    modeId: 'gymnastics',
+    title: 'Gymnastics Vault',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'FLIP' },
+        { action: 'B', label: 'STICK' },
+      ] },
+    ],
+  },
+  bigair: {
+    modeId: 'bigair',
+    title: 'Big Air',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'SPIN' },
+        { action: 'B', label: 'STOMP' },
+      ] },
+    ],
+  },
+
+  // Showdown: four face verbs. Its L1/R1/SELECT specials have no pad slot and
+  // stay gamepad-only, same as the touch overlay.
+  showdown: {
+    modeId: 'showdown',
+    title: 'Showdown',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'JAB' },
+        { action: 'B', label: 'KICK' },
+        { action: 'X', label: 'GUARD' },
+        { action: 'Y', label: 'ULTIMATE' },
+      ] },
+    ],
+  },
 };
 
 export function controllerConfigFor(modeId: string): ModeControllerConfig | null {
