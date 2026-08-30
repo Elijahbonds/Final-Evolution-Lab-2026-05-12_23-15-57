@@ -1,16 +1,17 @@
-# World-Population Protocol — v1 (draft for ratification)
+# World-Population Protocol — v1 (canonical)
 
-**Status: DRAFT.** Written 2026-08-30 to unblock §7.4.
+**Status: RATIFIED 2026-08-30 by Elijah.** This is the protocol the Master Design
+Bible §2 names and §7.4 requires.
 
 The Master Design Bible §2 names this protocol and §7.4 makes "World-Population
-Protocol applied" a condition for any mode to be signed off. **The document has
-never existed** — a search of this machine finds it referenced only by files
-written during the current pass. So §7.4 has been unsatisfiable by construction:
-no mode could ever reach 8/8, however good it was.
+Protocol applied" a condition for any mode to be signed off. **No such document
+existed** — a search of this machine found it referenced only by files written
+during the pass that produced this one. §7.4 was therefore unsatisfiable by
+construction: no mode could reach 8/8, however good it was.
 
-This is the same situation the 10-Phase Convergence Protocol was in, and it gets
-the same treatment: write it, ratify it, make the gate checkable. Ratify or
-amend — but a gate nobody can pass is worse than no gate.
+This was the same situation the 10-Phase Convergence Protocol was in, and it got
+the same treatment: written, then ratified, so the gate is checkable. §7.4 is now
+satisfiable.
 
 **Scope (from §2):** how worlds and arenas are populated — crowd, ambience,
 environmental detail. Applies on top of the 10-phase pass to any mode with an

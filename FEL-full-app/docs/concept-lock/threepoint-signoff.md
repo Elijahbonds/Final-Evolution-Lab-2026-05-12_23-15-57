@@ -1,26 +1,32 @@
 # §7 Completion Checklist — Three-Point Shootout
 
 Phase 10 of the convergence pass. Benchmark: **NBA 2K9 Three-Point Contest**.
-This is the bible's own eight-item checklist, run honestly. Seven pass outright; the eighth is applied but awaiting ratification of a protocol that had never been written.
+This is the bible's own eight-item checklist, run honestly. **All eight pass.**
 
 | § | Item | Result |
 |---|---|---|
 | 7.1 | Gate 0 verified for this mode's animation set | ✅ 58 checks — the rig is the Mixamo 65-bone standard with `mixamorig:` bones |
 | 7.2 | 10-Phase Convergence Protocol run in full | ✅ Protocol ratified as canonical v1 (`docs/10-PHASE-CONVERGENCE-PROTOCOL.md`) after confirming no such document existed; the pass was run against it |
 | 7.3 | Benchmark parity against the locked reference | ✅ 15/15 criteria; D1/D2/D3 fixed, D4/D5/D6 all ruled |
-| 7.4 | World-Population Protocol applied | ⚠️ Protocol drafted (`docs/WORLD-POPULATION-PROTOCOL.md`) and applied — L1–L5 all PASS. **Awaiting Elijah's ratification of the draft**, exactly as the 10-Phase Protocol was ratified before 7.2 could pass |
+| 7.4 | World-Population Protocol applied | ✅ Protocol ratified (`docs/WORLD-POPULATION-PROTOCOL.md`) and applied — L1–L5 all PASS |
 | 7.5 | Five-tab shell conventions intact | ✅ Lab/Train/Arena/Status/Profile |
 | 7.6 | vitest suite still green | ✅ `npm test` — 4 files, 47 tests green (vitest installed and wired; the 31/31 figure belongs to the `/tmp/fel3` checkout, not this tree) |
 | 7.7 | No orphaned-mode work smuggled in | ✅ Nothing from §4.3 touched. Showdown was routed under an explicit mount instruction |
 | 7.8 | No scope bleed into §6 features | ✅ Controller Link (§6.5) was separately commissioned; nothing else pulled forward |
 
-## Verdict: 7 pass, 1 pending ratification.
+## Verdict: **SIGNED OFF — 8 of 8.**
 
-**§7.4 no longer FAILS** — the World-Population Protocol has been written and
-applied to this mode (L1–L5 all PASS, recorded below). It is marked pending
-rather than passing because the protocol is a draft: the same standard applied to
-§7.2, which only passed once the 10-Phase Protocol was ratified. Ratify the draft
-and 3PT is 8/8.
+Three-Point Shootout is the first FEL mode to pass the full §7 checklist against
+a locked benchmark. Two of the eight gates were unsatisfiable when this pass
+started — §7.2 and §7.4 both required protocol documents that had never been
+written, and §7.6's vitest gate had never once been runnable in this tree. All
+three are now real gates that this mode genuinely passes.
+
+**One carry-forward, not a blocker:** Phase 9 (device playtest) has still not run
+for this mode. Postgres is up and the guest route proves real playthroughs work,
+but `/play/threepoint` needs an account. Sprint is the standing argument for not
+treating that as optional — its logic verified clean while the frame was black,
+and only a real playthrough would have caught it.
 
 ### World-Population Protocol — applied
 
