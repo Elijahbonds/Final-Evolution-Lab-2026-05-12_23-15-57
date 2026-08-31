@@ -17,7 +17,7 @@ import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
-import { buildSlopeRun, type RideWorld } from './rideWorlds';
+import { buildSlopeRun, PISTE_HALF_WIDTH, type RideWorld } from './rideWorlds';
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -36,6 +36,14 @@ const YETI_CLEAR_PTS = 150;
 const YETI_CATCH_PENALTY = 100;
 const ROCK_PENALTY = 50;
 const STUMBLE_IFRAME_SEC = 1.2;
+/** Tuck depth at which the rider commits and starts SPENDING the boost meter. */
+export const BOOST_TUCK = 0.85;
+/** Boost burned per second while boosting. */
+export const BOOST_DRAIN = 30;
+/** Boost gained per spin landed. */
+export const BOOST_PER_SPIN = 12;
+/** Ceiling on the boost meter. */
+export const BOOST_MAX = 100;
 
 export const SnowboardSlalomMode: ModeDefinition = (() => {
   let world: RideWorld, rig: BoardRig, tricks: TrickMachine;
@@ -112,7 +120,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       ctx.camDirector.snapTo(rig.char.root.position, world.markers[nextGate] ?? null);
       SoundKit.startAmbient('wind');           // Phase 18: descent wind bed
       EffectsKit.ambient(ctx.scene, 'slope');  // snowfall
-      ctx.setHud({ score: 0, gates: `0/${world.markers.length}`, hint: 'Gates for points · JUMP rocks · grind the rails · watch the treeline…' });
+      ctx.setHud({ score: 0, boost: 0, gates: `0/${world.markers.length}`, hint: 'Gates for points · JUMP rocks · grind the rails · watch the treeline…' });
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -135,10 +143,17 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             const isCable = nearest.bonus >= 400;
             ctx.setHud({ banner: isCable ? 'LIFT CABLE GRIND!' : 'RAIL GRIND!' });
             SoundKit.play('powerUp', { volume: 0.45, pitch: isCable ? 1.4 : 1 });
+            // The lift cable is the run's biggest single score. It already
+            // sounded different from an ordinary rail; now it looks different.
+            if (isCable) { ctx.camDirector.pulse(0.8, 0.5); ctx.feel?.impact?.(0.4); }
             ctx.feel?.impact?.(isCable ? 0.45 : 0.3);
           }
         }
-        if (e.btn === 'B') { tricks.start(TRICKS.spin); boost = Math.min(100, boost + 12); }
+        if (e.btn === 'B') {
+          tricks.start(TRICKS.spin);
+          boost = Math.min(BOOST_MAX, boost + BOOST_PER_SPIN);
+          ctx.setHud({ boost: Math.round(boost) });   // the meter has to move as it FILLS, not only as it drains
+        }
         if (e.btn === 'R1') boosting = boost > 10;
         if (e.btn === 'X') tricks.start(TRICKS.grab);
         if (e.btn === 'Y') tricks.start(TRICKS.flipA);
@@ -173,9 +188,27 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // yaw from the same shared momentum object; snowboard simply never had
       // the line. Grinding holds its own heading, as it does there.
       if (!rig.rider.grinding) rig.char.root.rotation.y = move.yaw;
+      // SSX Tricky is NAMED after its boost state, and this meter could not be
+      // spent: `boosting` was never assigned true ANYWHERE in the codebase, so
+      // boost filled at +12 a spin and drained inside a branch nothing could
+      // enter. Everything else was already here -- the acceleration, the drain,
+      // the HUD publish -- only the trigger was missing, which is why it read as
+      // a working feature.
+      //
+      // Same commitment idiom surf uses for its flow meter, deliberately: one
+      // benchmark, one economy. Bury the tuck and you spend the meter; ease off
+      // and you keep what is left.
+      if (!boosting && tuck >= BOOST_TUCK && boost > 1) {
+        boosting = true;
+        SoundKit.play('powerUp', { pitch: 0.9, volume: 0.5 });
+        ctx.setHud({ banner: 'BOOST' });
+        setTimeout(() => ctx.setHud({ banner: '' }), 700);
+      } else if (boosting && tuck < BOOST_TUCK * 0.6) {
+        boosting = false;
+      }
       if (boosting) {
         rig.rider.vel.scaleInPlace(1 + 0.9 * dt);
-        boost = Math.max(0, boost - 30 * dt);
+        boost = Math.max(0, boost - BOOST_DRAIN * dt);
         if (boost === 0) boosting = false;
         ctx.setHud({ boost: Math.round(boost) });
       }
@@ -210,6 +243,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             tricks.score += YETI_CLEAR_PTS;
             mob.onContactResolved();
             SoundKit.play('crowdCheer', { volume: 0.5 });
+            ctx.camDirector.pulse(1, 0.55);
+            crowd?.cheer(1);
             ctx.feel?.impact?.(0.3);
             ctx.setHud({ score: tricks.score, banner: `CLEARED THE YETI +${YETI_CLEAR_PTS}` });
             setTimeout(() => ctx.setHud({ banner: '' }), 900);
@@ -266,7 +301,11 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         rig.rider.grinding ? SPORT_CLIP.boardGrind
           : rig.rider.grounded ? (tuck > 0.5 ? SPORT_CLIP.boardTuck : SPORT_CLIP.boardIdle) : SPORT_CLIP.boardAir,
         { loop: true });
-      rig.char.root.position.x = Math.max(-16, Math.min(16, rig.char.root.position.x));
+      // Clamp at the edge of the snow, from the piste's own constant — the same
+      // one-number rule skate's fence and surf's water edge now follow, so the
+      // edge a player feels is always an edge they can see.
+      const edge = PISTE_HALF_WIDTH - 1;
+      rig.char.root.position.x = Math.max(-edge, Math.min(edge, rig.char.root.position.x));
 
       if (nextGate >= world.markers.length) {
         ended = true;

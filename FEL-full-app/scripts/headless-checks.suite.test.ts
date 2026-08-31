@@ -40,6 +40,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'board-stance-tests.ts', guards: 'the board rider stands across the deck, looking down the line' },
   { script: 'skate-run-tests.ts', guards: 'Skate 3 rules — switch on a 180, bank or lose the pot' },
   { script: 'surf-run-tests.ts', guards: 'SSX economy — the flow meter is spendable, not a readout' },
+  { script: 'snowboard-run-tests.ts', guards: 'SSX boost is spendable and every slalom gate is reachable' },
 ];
 
 const ROOT = process.cwd();

@@ -163,8 +163,8 @@ export function buildSkatepark(scene: Scene): RideWorld {
 export function buildSlopeRun(scene: Scene): RideWorld {
   const all: AbstractMesh[] = [];
   const rideable: AbstractMesh[] = [];
-  const PITCH = 0.22;
-  const piste = MeshBuilder.CreateGround('piste', { width: 34, height: 220 }, scene);
+  const PITCH = SLOPE_PITCH;
+  const piste = MeshBuilder.CreateGround('piste', { width: PISTE_HALF_WIDTH * 2, height: 220 }, scene);
   piste.rotation.x = PITCH;
   piste.position.set(0, 0, 0);
   piste.checkCollisions = true;
@@ -193,9 +193,9 @@ export function buildSlopeRun(scene: Scene): RideWorld {
   // 3.2m -> 5.0m a side (6.4m -> 10m gate to gate): comfortable at the top of
   // the course, genuinely demanding at the bottom. Gate 0 sits dead ahead so
   // the run starts fair rather than with an immediate cut across the hill.
-  for (let i = 0; i < 12; i++) {
-    const dist = 18 + i * 20;
-    const cx = i === 0 ? 0 : (i % 2 === 0 ? -1 : 1) * (3.2 + (i / 11) * 1.8);
+  for (let i = 0; i < SLALOM_GATES; i++) {
+    const dist = slalomGateDist(i);
+    const cx = slalomGateX(i);
     markers.push(onPiste(cx, dist));
     for (const side of [-1, 1]) {
       const pole = MeshBuilder.CreateCylinder('gate', { diameter: 0.12, height: 1.6 }, scene);
@@ -301,6 +301,46 @@ export function buildSlopeRun(scene: Scene): RideWorld {
 /** Half-width of the surfable water. The rider clamps here and the water ends
  *  here, so the edge the player feels is the edge they can see. */
 export const SURF_HALF_WIDTH = 45;
+
+// ── The slalom course, as data ──────────────────────────────────────────────
+// These were literals inside buildSlopeRun, and scripts/slalom-drive.mts had to
+// MIRROR the formula to steer at the gates -- its own header warns that the two
+// would drift. One definition instead: the world builds from it, the driver
+// aims with it, and the tests check it.
+/** Half-width of the piste. The rider clamps here and the snow ends here. */
+export const PISTE_HALF_WIDTH = 17;
+export const SLALOM_GATES = 12;
+/** Metres down the fall line between gates. */
+export const SLALOM_SPACING = 20;
+/** Distance to the first gate. */
+export const SLALOM_START = 18;
+/** Slope pitch, radians. */
+export const SLOPE_PITCH = 0.22;
+/**
+ * Lateral offset of gate `i`, in metres.
+ *
+ * Alternating, opening up as the course goes on, and gate 0 dead ahead so the
+ * run starts fair. Sized against measured numbers rather than taste: a rider
+ * descends at ~12 m/s once the tuck feeds the momentum model and holds about
+ * 5.5 m/s across the fall line in a committed carve, so 20m of spacing is ~1.7s
+ * and ~9.2m of reachable lateral movement per gate.
+ *
+ * The ramp was 3.2 -> 5.0m a side when it was set by eye, which asks 9.8m of
+ * the last three gates -- past what a rider can cover, i.e. the same
+ * unreachable-tail defect the rebuild was meant to remove, reintroduced at a
+ * smaller scale. snowboard-run-tests C1 checks every gate against the measured
+ * figure and caught it. 3.1 -> 4.1 keeps the hardest gate at ~8.2m, about 90%
+ * of what is available, so the course is demanding at the bottom without
+ * asking for more than the rider has -- and boost, which shortens the window
+ * by making the descent faster, still fits inside the remainder.
+ */
+export function slalomGateX(i: number): number {
+  return i === 0 ? 0 : (i % 2 === 0 ? -1 : 1) * (3.1 + (i / 11) * 1.0);
+}
+/** Distance down the fall line to gate `i`. */
+export function slalomGateDist(i: number): number {
+  return SLALOM_START + i * SLALOM_SPACING;
+}
 
 /**
  * @param pocket The scored pocket band, in metres ahead of the lip. The VENUE

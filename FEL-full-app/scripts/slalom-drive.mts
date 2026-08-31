@@ -8,17 +8,24 @@
 //
 // This drives the real mode through the real route, reads the rider's position
 // from the agent bridge, and steers toward the next gate the way a player would.
-// It mirrors the course formula in rideWorlds.ts -- if that changes, this needs
-// to change with it, and the mismatch will show up as a low gate count.
+// It imports the course definition from rideWorlds.ts rather than restating it,
+// so the driver and the world cannot disagree about where the gates are.
 //
 //   npx tsx scripts/slalom-drive.mts
 
 import { chromium } from 'playwright-core';
+// DYNAMIC import, not a static one: this file is .mts (ESM, for top-level
+// await) while tsx transpiles the imported .ts as CJS, so a static named import
+// fails to resolve at load time even though the exports exist. Awaiting the
+// module gets the same names at runtime.
+const course = await import('../lib/babylon/modes/rideWorlds');
+const { SLALOM_GATES, SLOPE_PITCH, slalomGateDist, slalomGateX } = course;
 
-const PITCH = 0.22;
-const GATES = Array.from({ length: 12 }, (_, i) => ({
-  x: i === 0 ? 0 : (i % 2 === 0 ? -1 : 1) * (3.2 + (i / 11) * 1.8),
-  z: Math.cos(PITCH) * (18 + i * 20),
+// Aim with the course's OWN definition. This file used to mirror the formula,
+// and its header warned the two would drift; now there is nothing to drift from.
+const GATES = Array.from({ length: SLALOM_GATES }, (_, i) => ({
+  x: slalomGateX(i),
+  z: Math.cos(SLOPE_PITCH) * slalomGateDist(i),
 }));
 
 const b = await chromium.launch({
@@ -60,6 +67,10 @@ const hold = async (want: 'a' | 'd' | null) => {
 for (let step = 0; step < 700; step++) {
   const h = await hero();
   if (!h) break;
+  // Land a spin every so often: it is the only thing that FILLS the boost
+  // meter, and the tuck held below is what spends it. Without this the run
+  // never exercises the mode's boost economy at all.
+  if (step % 45 === 20) await p.keyboard.press('k');
   const gate = GATES.find((g) => g.z > h.z - 1);
   if (!gate) break;
   const dx = gate.x - h.x;
@@ -74,7 +85,11 @@ await p.waitForTimeout(500);
 
 const h = await hero();
 const gates = await hudGates();
-console.log(`slalom-drive: gates ${gates}   final z ${h ? h.z.toFixed(1) : '?'}m of ${GATES[11].z.toFixed(0)}m`);
+const hudOf = async (k: string): Promise<string> => {
+  const t = await p.evaluate<string>('document.body.innerText');
+  return new RegExp(`"${k}"\\s*:\\s*"?([^,"}]+)`).exec(t)?.[1] ?? '?';
+};
+console.log(`slalom-drive: gates ${gates}   score ${await hudOf('score')}   boost ${await hudOf('boost')}   final z ${h ? h.z.toFixed(1) : '?'}m of ${GATES[GATES.length - 1].z.toFixed(0)}m`);
 const frame = errs.filter((e) => /FEL-FRAME/.test(e)).length;
 const miss = errs.filter((e) => /MISSING CLIP/.test(e)).length;
 console.log(`slalom-drive: FEL-FRAME ${frame} | MISSING CLIP ${miss} | errors ${errs.length - frame - miss}`);
