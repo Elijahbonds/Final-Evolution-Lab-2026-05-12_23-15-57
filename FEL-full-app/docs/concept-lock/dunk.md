@@ -84,6 +84,35 @@ at `top-[38%]`, which is exactly where a FIFTY! lands.
 
 ![five-judge reveal](../shots/ref/dunk-five-judge-reveal.jpg)
 
+**D11 — The contest was neither winnable nor losable. → FIXED (console pass).**
+Two faults, one at each end. A blown dunk scored a flat **zero**, and the rival
+rolled a ~43 card on every attempt — near the top of what a good player can
+produce, every single time. Measured live: one miss and the HUD read
+*"FINAL ROUND — you need big numbers (down 48)"* after a single round. The
+contest was decided before the player's second dunk.
+
+In the real event the judges score what they saw. The panel's floor is five
+sixes, so a blown attempt lands near 30 while a good one lands in the low 40s
+and a great one at 50 — that IS the benchmark's scale; the 6–10 card is what
+compresses it. A miss is now judged rather than zeroed, and the rival is a
+contender who swings and **blows one about 18% of the time**, as real dunk
+contests do.
+
+The result is a skill curve, asserted in `dunk-balance-tests` rather than
+eyeballed: a 40% contest wins 25%, a 60% contest wins 50%, an 80% contest wins
+77%.
+
+**D12 — The camera framed against the ball in the dunker's own hand. → FIXED.**
+`camDirector.update` used the ball as its objective for every phase but the
+approach. Through the launch and most of the flight the ball is *in the player's
+hand*, so subject and objective are the same point: `fitTwo` degenerates, the
+back-vector falls through to a fixed world +z, and the camera whips in behind
+the hero instead of holding a shot of the attack. 1–2 `[FEL-FRAME]` lines per
+contest, every run, always mid-flight. This is the exact failure the convergence
+protocol records against 3PT — *"objective was the ball in the shooter's own
+hands"* — which is why the protocol names it. Now framed against the rim. Three
+consecutive contests: **0 lines**.
+
 **D2 — Four-competitor field. → OUT OF SCOPE for v1.**
 The real event runs four dunkers through a semifinal to a final. FEL runs the
 player head-to-head against one rival across two rounds. Simulating three AI

@@ -64,6 +64,10 @@ const TARGET_SCORE = 11;
 // 6.71m in the corners and 7.24m at the top, and that gap is the shot selection.
 // isThree() answers it per angle.
 const DEFENSE_DRIVE_SEC = 2.2;                     // rival's drive length on their possession
+/** Metres of rebound advantage for holding BOX OUT — worth a body length. */
+const BOX_OUT_EDGE = 1.6;
+/** How much a board is decided by the bounce rather than by position. */
+const REBOUND_JITTER = 2.6;
 
 type Possession = 'mine' | 'defense';
 
@@ -252,13 +256,33 @@ export const OneVOneMode: ModeDefinition = (() => {
         } else if (res === 'missed') {
           SoundKit.play('miss');
           ballSim.launch(ball.position.clone(), new Vector3((Math.random() - 0.5) * 3, 2.5, 1.5 + Math.random()));
-          // rebound race: closer body takes it
+          // THE BOARD IS A CONTEST, and BOX OUT is how you win it.
+          //
+          // This was a bare distance comparison, which made it deterministic —
+          // and since you shoot after driving, you are essentially always the
+          // closer body. Measured: with EVERY shot deliberately missed, the
+          // banner read "YOUR BOARD" every single time and the opponent never
+          // got a possession at all. An opponent who cannot get the ball cannot
+          // score, which is exactly what the scoreline showed: foeScore 0, every
+          // run, for as long as this mode has existed.
+          //
+          // Distance still names the favourite. Boxing out is worth a real body
+          // length on top of it — which is the whole point of a verb the mode
+          // tells you to hold — and a little randomness keeps a board from being
+          // decided before the ball leaves the rim.
           setTimeout(() => {
             if (ended) return;
             const meD = Vector3.Distance(me.root.position, ball.position);
             const foeD = Vector3.Distance(foe.root.position, ball.position);
-            if (possession === 'mine' && foeD < meD) { startDefense(ctx, 'THEIR BOARD — DEFEND!'); }
-            else { bannerFlash(ctx, meD <= foeD ? 'YOUR BOARD' : 'LOOSE BALL — YOURS'); resetPositions(); }
+            const boxing = meSlot.intent.brace ?? false;
+            const edge = (foeD - meD)
+              + (boxing ? BOX_OUT_EDGE : 0)
+              + (Math.random() - 0.5) * REBOUND_JITTER;
+            if (possession === 'mine' && edge <= 0) { startDefense(ctx, 'THEIR BOARD — DEFEND!'); }
+            else {
+              bannerFlash(ctx, boxing ? 'BOXED OUT — YOUR BOARD' : 'YOUR BOARD');
+              resetPositions();
+            }
           }, 900);
         }
         if (res !== 'flying') { arcResultMade = false; }

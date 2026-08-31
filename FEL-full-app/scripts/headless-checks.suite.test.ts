@@ -27,6 +27,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'crossfade-orphan-tests.ts', guards: 'animation crossfade does not strand clips' },
   { script: 'environment-ibl-tests.ts', guards: 'procedural IBL environment maths' },
   { script: 'dunk-system-tests.ts', guards: 'dunk trick recognition' },
+  { script: 'dunk-balance-tests.ts', guards: 'the dunk contest is winnable and losable' },
   { script: 'judge-panel-tests.ts', guards: 'five judges, ceiling 50, staged reveal' },
   { script: 'procedural-skin-tests.ts', guards: 'the athlete is a skinned mesh that deforms' },
   { script: 'threevthree-core-tests.ts', guards: '3v3 spacing, matchups and the real arc' },

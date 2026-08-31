@@ -94,8 +94,26 @@ output is dropped under load and had been quietly lying about frame counts.
 
 ---
 
+**D9 — The opponent could not get the ball. → FIXED (console pass).**
+The rebound was a bare distance comparison, which made it deterministic — and
+since you shoot after driving, you are essentially always the closer body.
+Measured with **every** shot deliberately missed, the banner read "YOUR BOARD"
+every single time and the opponent never got a possession at all. `foeScore` was
+**0 in every run this mode has ever been played**, because an opponent who
+cannot get the ball cannot score.
+
+Distance still names the favourite, but BOX OUT is now worth a real body length
+on top of it — which is the point of a verb the mode tells you to hold, and which
+did nothing for rebounds until now — and a bounce of randomness keeps a board
+from being decided before the ball leaves the rim.
+
+Verified: missing every shot now loses **0–2**; releasing in the green wins
+**6–2**. Both, from the same script, on the same build.
+
+---
+
 ## E. Exit criteria
 
 Parity when A1–A6 and B1–B8 hold, with D6 ruled.
 
-**Currently: 14 of 14 criteria hold.**
+**Currently: 15 of 15 criteria hold.**

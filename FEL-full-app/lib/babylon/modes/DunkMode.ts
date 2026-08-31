@@ -71,7 +71,9 @@ const MONSTER_AVG = 9.6;                       // per-judge avg for the heaviest
 const FLAT_AVG = 6.35;                         // per-judge avg that reads as a dud to the panel
 // Rival pace per dunk, measured from the simulated rival's score distribution
 // (~8.5 a card). The player's NEED is quoted against it in the final round.
-const RIVAL_PACE = Math.round(8.5 * JUDGE_COUNT);
+const RIVAL_PACE = Math.round(7.6 * JUDGE_COUNT);
+/** How often the rival blows a dunk. Real contests are full of missed attempts. */
+const RIVAL_BLOWN_CHANCE = 0.18;
 
 // Judges + staged reveal + crowd energy now live in the SHARED JudgePanel
 // (lib/babylon/core/JudgePanel.ts) — DunkDuelMode drinks from the same well.
@@ -414,7 +416,22 @@ export const DunkMode: ModeDefinition = (() => {
         // is wherever it bounced) drags the composition somewhere arbitrary.
         ctx.camDirector.update(player.root.position, Vector3.Zero(), null);
       } else if (phase !== 'contestOver') {
-        ctx.camDirector.update(player.root.position, vel, phase === 'approach' ? rim : ball.position);
+        // ALWAYS frame against the RIM, never the ball.
+        //
+        // This used the ball as the objective for every phase except the
+        // approach — but through the launch and most of the flight the ball is
+        // IN THE DUNKER'S OWN HAND, so subject and objective are the same point.
+        // fitTwo then degenerates: the separation is ~0, the back-vector falls
+        // through to a fixed world +z, and the camera whips in behind the hero
+        // instead of holding a shot of the attack. Measured as 1-2
+        // [FEL-FRAME] hero-off-screen lines per contest, every run, always
+        // mid-flight.
+        //
+        // This is the same failure the convergence protocol records against 3PT
+        // — "objective was the ball in the shooter's own hands" — which is
+        // exactly why the protocol names it. The rim is what the player is
+        // attacking and what the shot should be composed against.
+        ctx.camDirector.update(player.root.position, vel, rim);
       }
     },
 
@@ -507,10 +524,34 @@ export const DunkMode: ModeDefinition = (() => {
       hype = Math.max(0, hype - 15);
       chain = 0;                                          // a miss breaks the chain
       lastScores = [];
-      ctx.setHud({ banner: 'MISSED — 0 pts this attempt', judgeReveal: null, chain });
+      // A BLOWN DUNK IS STILL JUDGED. This awarded a flat ZERO, which is not
+      // how the event works and is not survivable: the rival paces ~40 a dunk,
+      // so one miss put the player unrecoverably behind — measured at "FINAL
+      // ROUND — you need big numbers (down 48)" after a single round.
+      //
+      // In the real contest the judges score what they saw. The panel's floor is
+      // five sixes, so a blown attempt lands around 30 while a good one lands in
+      // the low 40s and a great one at 50. That IS the benchmark's scale — the
+      // 6-10 card is what compresses it — and it keeps a miss expensive without
+      // ending the contest.
+      const missScores = judgeDunk(
+        Math.max(0, (STYLE_TIER[style] + PROP_BONUS[prop]) * 0.30),   // they saw the attempt
+        0,                                                            // and they saw it fail
+        Math.max(0, STYLE_TIER[style] * 0.22 + styleTaps * 0.4),
+      );
+      const missTotal = missScores.reduce((a, j) => a + j.score, 0);
+      playerTotal += missTotal;
+      lastScores = missScores;
+      crowd.onScore(missTotal);
+      revealed = [];
+      reveal.start(missScores);
+      ctx.setHud({
+        banner: 'MISSED — the judges saw it', judgeReveal: [],
+        score: playerTotal, chain, hype: Math.round(hype),
+      });
       player.animator.play(SPORT_CLIP.dunkLandCrouch, { onEnd: () => player.animator.play(SPORT_CLIP.idle, { loop: true }) });
       setPhase('judging');
-      setTimeout(() => { ctx.setHud({ banner: '' }); void advanceAfterJudging(ctx); }, 1400);
+      setTimeout(() => { ctx.setHud({ banner: '' }); void advanceAfterJudging(ctx); }, REVEAL_DURATION_SEC * 1000 + 400);
       finishing = false;
       return;
     }
@@ -670,14 +711,23 @@ export const DunkMode: ModeDefinition = (() => {
           if (k >= 1) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); }
         });
       });
-      // simulated judged score — comparable range to a real player attempt
-      const rDiff = 4 + Math.random() * 5, rExec = 5 + Math.random() * 5, rStyle = 3 + Math.random() * 4;
+      // The rival is a CONTENDER, not a wall. These inputs used to average a
+      // ~43 card, which is near the top of what a good player can produce, on
+      // every single attempt — so the contest was effectively decided before the
+      // player took their second dunk. A real field is beatable and streaky:
+      // this averages high-30s, swings, and BLOWS one now and then, which is
+      // also what real dunk contests look like.
+      const rivalBlew = Math.random() < RIVAL_BLOWN_CHANCE;
+      const rDiff = rivalBlew ? 0.4 : 2.6 + Math.random() * 3.4;
+      const rExec = rivalBlew ? 0 : 3.4 + Math.random() * 3.4;
+      const rStyle = rivalBlew ? 0.5 : 2.2 + Math.random() * 3.2;
       const rScores = judgeDunk(rDiff, rExec, rStyle);
       const rTotal = rScores.reduce((s, j) => s + j.score, 0);
       rivalTotal += rTotal;
-      SoundKit.play('crowdGroan', { volume: 0.35 });
-      rival.animator.play(SPORT_CLIP.scoreCelebrate, { onEnd: () => rival.animator.play(SPORT_CLIP.idle, { loop: true }) });
-      ctx.setHud({ rivalScore: rivalTotal, banner: `RIVAL SCORES ${rTotal}` });
+      SoundKit.play(rivalBlew ? 'miss' : 'crowdGroan', { volume: 0.35 });
+      rival.animator.play(rivalBlew ? SPORT_CLIP.dunkLandCrouch : SPORT_CLIP.scoreCelebrate,
+        { onEnd: () => rival.animator.play(SPORT_CLIP.idle, { loop: true }) });
+      ctx.setHud({ rivalScore: rivalTotal, banner: rivalBlew ? `RIVAL BLOWS IT — ${rTotal}` : `RIVAL SCORES ${rTotal}` });
       rival.root.position.set(3.2, 0, CFG.rimZ + 3);
       await new Promise((r) => setTimeout(r, 1200));
     }
