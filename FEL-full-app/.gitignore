@@ -1,3 +1,6 @@
 # Playwright capture output — large, reproducible via scripts/capture-dunk-reveal.mts
 docs/shots/*/
 !docs/shots/ref/
+
+# Verification builds (npm run build:check) — kept out of the dev server's .next
+.next-verify/
