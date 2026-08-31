@@ -117,6 +117,21 @@ The `team` preset retune (11/5.2 → 9.5/3.4) is kept, but for the honest reason
 it was written for "full-court flow" and 3v3 is half-court, and 9.5 keeps the
 camera comfortably inside the now-correct box where 11 would graze it.
 
+## Phase 9 — now on the shipping route
+
+Originally run through `/dev/mode/threevthree` because `/play/threevthree` needs an account,
+which is a **different host component** from the one that ships — exactly the gap
+the protocol's Phase 9 exists to close ("through the shipping route, not a dev
+harness").
+
+Closed. The playtest now logs in through the real `/login` form as an ordinary
+player and drives `/play/threevthree` with its real `GameShell` chrome and
+`BootSplash` gate. `scripts/ensure-playtest-user.ts` creates one normal account;
+nothing bypasses `getServerSession`.
+
+Result on the shipping route: **8–8 and 8–4**, with 0 `[FEL-FRAME]`, 0 missing clips
+and 0 console errors across repeated loads.
+
 ## Carry-forwards — recorded, not hidden
 
 1. **`CourtMovement`'s stick convention disagrees with every input source in the

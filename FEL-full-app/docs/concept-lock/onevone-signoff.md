@@ -77,6 +77,21 @@ legibility ............... PASS  stand 9m behind the basket, muted crowd texture
 front of nobody. **L5** was a flat two-stop gradient, because no venue in the
 game had ever set `backdrop` — found during the Dunk pass and applied here.
 
+## Phase 9 — now on the shipping route
+
+Originally run through `/dev/mode/onevone` because `/play/onevone` needs an account,
+which is a **different host component** from the one that ships — exactly the gap
+the protocol's Phase 9 exists to close ("through the shipping route, not a dev
+harness").
+
+Closed. The playtest now logs in through the real `/login` form as an ordinary
+player and drives `/play/onevone` with its real `GameShell` chrome and
+`BootSplash` gate. `scripts/ensure-playtest-user.ts` creates one normal account;
+nothing bypasses `getServerSession`.
+
+Result on the shipping route: **2–2 / 6–0 / 12–0 (a win past the target of 11)**, with 0 `[FEL-FRAME]`, 0 missing clips
+and 0 console errors across repeated loads.
+
 ## Carry-forwards
 
 0. **RESOLVED since this was written.** Both of the top two carry-forwards below

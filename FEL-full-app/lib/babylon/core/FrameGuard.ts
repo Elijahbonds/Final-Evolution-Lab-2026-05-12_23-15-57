@@ -7,10 +7,17 @@ import { Matrix, Vector3 } from '@babylonjs/core';
 import type { Scene, TargetCamera, TransformNode } from '@babylonjs/core';
 import type { CameraDirector } from './CameraDirector';
 
+/** How long after a mode starts playing before the first framing check. */
+const SPAWN_GRACE_MS = 3200;
+/** Steady-state sampling rate once the world has settled. */
+const CHECK_INTERVAL_MS = 2000;
+
 /** Watches the hero's screen projection; recenters after persistent loss. */
 export class FrameGuard {
   private missStreak = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
+  /** Has the hero ever been somewhere other than the world origin? */
+  private everPlaced = false;
 
   constructor(
     private scene: Scene,
@@ -22,13 +29,45 @@ export class FrameGuard {
 
   start(): void {
     this.stop();
-    this.timer = setInterval(() => this.check(), 2000);
+    // SPAWN GRACE. This guard exists to catch framing that is PERSISTENTLY
+    // wrong, and it acts only on a second consecutive miss for exactly that
+    // reason — but it still LOGGED on the first. Starting the interval
+    // immediately meant its first sample could land in the window between a
+    // character being spawned (at the world origin) and the mode positioning it,
+    // reporting a hero that had not been placed yet as a hero that was lost.
+    //
+    // Seen intermittently on /play/onevone — about one load in four, always with
+    // the hero at (0, ~0, ~0), which is a tell that it was never placed rather
+    // than that the camera failed. A short grace before the first check removes
+    // the race without weakening the guard: persistent loss still trips it, and
+    // trips it just as fast, because the interval is unchanged after the first.
+    this.timer = setTimeout(() => {
+      this.check();
+      this.timer = setInterval(() => this.check(), CHECK_INTERVAL_MS);
+    }, SPAWN_GRACE_MS);
   }
 
   private check(): void {
     const hero = this.hero();
     const engine = this.scene.getEngine();
     if (!hero) return;
+
+    // A HERO THAT HAS NEVER BEEN PLACED IS NOT A HERO THAT IS LOST.
+    // Characters spawn at the world origin and the mode positions them a moment
+    // later. If a check lands in that window the hero really is off-screen — the
+    // camera is sitting on top of it, both still at (0,0,0) — but nothing is
+    // wrong, and reporting it sends whoever reads the log after a camera bug
+    // that does not exist. Seen intermittently on /play/onevone, about one load
+    // in four, always with the hero within a millimetre of the origin.
+    //
+    // This cannot mask a real failure: one sighting away from the origin arms
+    // the guard permanently, so anything that goes wrong after the world is
+    // built is reported exactly as before.
+    if (!this.everPlaced) {
+      if (hero.position.lengthSquared() > 1e-4) this.everPlaced = true;
+      else return;
+    }
+
     // A SUSPENDED director means the mode has deliberately taken the camera —
     // a replay, a rim cut, a cinematic. The hero being out of frame is then the
     // authored shot, not a fault, and "recentering" it would be the guard
@@ -60,9 +99,10 @@ export class FrameGuard {
   }
 
   stop(): void {
-    if (this.timer) clearInterval(this.timer);
+    if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); }
     this.timer = null;
     this.missStreak = 0;
+    this.everPlaced = false;
   }
 }
 

@@ -8,7 +8,8 @@
 import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
 
-const URL = process.env.URL ?? 'http://localhost:3000/dev/mode/onevone';
+// NB: not named URL — that would shadow the global URL constructor.
+const MODE_URL = process.env.URL ?? 'http://localhost:3000/dev/mode/onevone';
 const HOLD = Number(process.env.HOLD ?? 390);
 const REPS = Number(process.env.REPS ?? 10);
 const OUT = process.env.OUT_DIR ?? 'docs/shots/play';
@@ -24,20 +25,56 @@ const logs: string[] = [];
 p.on('console', (m) => { if (m.type() === 'error' || /FEL-FRAME|MISSING CLIP/.test(m.text())) logs.push(`[${m.type()}] ${m.text().slice(0, 170)}`); });
 p.on('pageerror', (e) => logs.push(`[pageerror] ${e.message.slice(0, 170)}`));
 
-await p.goto(URL, { waitUntil: 'networkidle' });
-await p.waitForSelector('canvas');
+// PHASE 9 WANTS THE SHIPPING ROUTE. /play/* calls getServerSession and
+// redirects to /login without one, which is why 1v1 and 3v3 had only ever been
+// playtested through /dev/mode/[key] — a DIFFERENT host component from the one
+// that ships. Log in as an ordinary player through the real form instead of
+// routing around the gate. scripts/ensure-playtest-user.ts creates the account.
+await p.goto(MODE_URL, { waitUntil: 'networkidle' });
+if (/\/login/.test(p.url())) {
+  await p.locator('input[type="email"]').fill(process.env.PLAYTEST_EMAIL ?? 'playtest@fel.local');
+  await p.locator('input[type="password"]').fill(process.env.PLAYTEST_PASSWORD ?? 'playtest-local-only');
+  await p.locator('input[type="password"]').press('Enter');   // submit; the button can be overlay-blocked
+  await p.waitForURL((u) => !/\/login/.test(u.toString()), { timeout: 30_000 }).catch(() => {});
+  await p.goto(MODE_URL, { waitUntil: 'networkidle' });
+}
+console.log(`${NAME} route :`, new URL(p.url()).pathname);
+await p.waitForSelector('canvas', { timeout: 30_000 });
 await p.waitForTimeout(2500);
 const head = async () => (await p.evaluate<string>('document.body.innerText')).split('\n')[0];
-// Clear a real READY gate only. START is a TOGGLE — pressing it while playing
-// PAUSES the mode, which silently ruined an entire investigation once.
-if (/·\s*(ready|loading)/i.test(await head())) {
+// Clear the ready gate on EITHER route. The dev runner shows a bare START; the
+// shipping page shows BootSplash's "TAP TO START". START is a TOGGLE — pressing
+// it while already playing PAUSES the mode, which silently ruined an entire
+// investigation once, so only press it at an actual gate.
+const bodyNow = await p.evaluate<string>('document.body.innerText');
+if (/TAP TO START/i.test(bodyNow)) {
+  await p.getByText(/TAP TO START/i).first().click({ force: true }).catch(() => {});
+} else if (/·\s*(ready|loading)/i.test(await head())) {
   await p.getByText(/^START$/).first().click({ force: true }).catch(() => {});
 }
+// Blur: space activates a focused button, and space is the shoot key.
+await p.evaluate('document.activeElement && document.activeElement.blur()');
 await p.waitForTimeout(2500);
-const hud = async () => {
+/**
+ * The two routes report state differently: /dev/mode dumps the raw HUD object as
+ * JSON, the shipping page renders a real scoreboard. Read whichever is there, so
+ * one harness can prove a mode on the route that actually ships.
+ */
+const hud = async (): Promise<Record<string, unknown>> => {
   const t = await p.evaluate<string>('document.body.innerText');
   const i = t.indexOf('{'), j = t.lastIndexOf('}');
-  try { return JSON.parse(t.slice(i, j + 1)); } catch { return {}; }
+  if (i >= 0 && j > i) {
+    try { return JSON.parse(t.slice(i, j + 1)) as Record<string, unknown>; } catch { /* fall through */ }
+  }
+  // Shipping scoreboard: "0 – 0" (en dash) with a "TO 11" / "RD 1/2" beside it.
+  const score = /(\d+)\s*[–-]\s*(\d+)/.exec(t.replace(/\n/g, ' '));
+  const target = /TO\s+(\d+)/i.exec(t);
+  const out: Record<string, unknown> = {};
+  if (score) { out.score = Number(score[1]); out.foeScore = Number(score[2]); }
+  if (target) out.target = Number(target[1]);
+  const banner = /(GOOD!|SPLASH!|RIMS OUT|YOUR BOARD|THEIR BOARD|REJECTED!|BOXED OUT[^|]*)/i.exec(t);
+  if (banner) out.banner = banner[1].trim();
+  return out;
 };
 console.log(`${NAME} start :`, JSON.stringify(await hud()));
 

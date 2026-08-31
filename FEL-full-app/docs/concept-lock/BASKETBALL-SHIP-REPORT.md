@@ -16,7 +16,7 @@ Every number below was measured, not asserted.
 | | 1v1 | 3v3 | Dunk |
 |---|---|---|---|
 | Route | `/play/onevone` | `/play/threevthree` | `/play/dunk` + **`/try` (guest)** |
-| Plays to a result | 12–0 win past target 11 | 6–2 / 6–4 in 6 possessions | full 2-round contest |
+| **Phase 9 on the SHIPPING route** | ✅ logged in, 2–2 / 6–0 / **12–0** | ✅ logged in, **8–8 / 8–4** | ✅ `/try`, full contest |
 | `[FEL-FRAME]` | **0** | **0** | **0** (3 consecutive runs) |
 | MISSING CLIP | **0** | **0** | **0** |
 | Console errors | **0** | **0** | **0** (guest 401s reported separately) |
@@ -64,9 +64,11 @@ Both non-dunk modes were technically clean and still not games:
 
 ## Not finished — stated plainly
 
-1. **Phase 9 for 1v1 and 3v3 ran through `/dev/mode/*`**, not `/play/*`, which
-   needs an account. Dunk is the only one of the three with a genuine guest
-   route, and it is the only one truly playtested through what ships.
+1. ~~Phase 9 for 1v1 and 3v3 ran through `/dev/mode/*`~~ — **CLOSED.** All three
+   are now playtested through `/play/*`, logged in as an ordinary player via the
+   real `/login` form. `scripts/ensure-playtest-user.ts` creates the account;
+   nothing bypasses the gate. 1v1 finished 12–0 past its target of 11 and 3v3
+   finished 8–8, both on the shipping host with its own `GameShell` chrome.
 2. **No test on real hardware.** Everything here is desktop Chromium plus one
    emulated mobile viewport. Thermals, GPU behaviour and true touch latency are
    unverified for all three.
