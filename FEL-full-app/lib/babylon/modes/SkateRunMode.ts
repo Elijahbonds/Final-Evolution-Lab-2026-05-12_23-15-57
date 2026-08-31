@@ -14,7 +14,7 @@ import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary } from '../core/CharacterLibrary';
-import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
+import { buildRig, TRICKS, type BoardRig } from './boardCore';
 import { buildSkatepark, type RideWorld } from './rideWorlds';
 import { assertSpawned } from '../core/FrameGuard';
 import { SPORT_CLIP } from '../anim/clipRegistry';
@@ -34,10 +34,14 @@ import { CoinField } from '../core/Pickups';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
 
 const RUN_SEC = 90;
+/** Skate 3 banks the moment you roll away clean; the delay is the revert window. */
+const BANK_SETTLE_SEC = 0.45;
 const PARK_BOUND = 33;
 
 export const SkateRunMode: ModeDefinition = (() => {
-  let world: RideWorld, rig: BoardRig, tricks: TrickMachine;
+  let world: RideWorld, rig: BoardRig;
+  /** Seconds rolling clean on the ground before the pot banks (revert window). */
+  let settleT = 0;
   let coins: CoinField;
   let timeLeft = RUN_SEC;
   let stickX = 0, pump = 0;
@@ -63,6 +67,17 @@ export const SkateRunMode: ModeDefinition = (() => {
   let landingBeatT = 0;
   let goals: GoalTracker;
   let patrolRail: MovingRail;
+  /** Apply a trick to the air chain and flash it -- shared by flick and buttons. */
+  const airTrick = (
+    ctx: ModeContext, id: string, label: string,
+    family: 'flip' | 'grab' | 'spin', basePts: number, difficulty: number,
+  ): void => {
+    air.applyTrick({ id, label, family, basePts, difficulty });
+    ctx.setHud({ banner: label });
+    setTimeout(() => ctx.setHud({ banner: '' }), 500);
+    SoundKit.play('whoosh', { pitch: 1 + difficulty * 0.15, volume: 0.4 });
+  };
+
   return {
     modeId: 'skateboard', mood: 'goldenHour', camPreset: 'board',
 
@@ -76,7 +91,6 @@ export const SkateRunMode: ModeDefinition = (() => {
       _validateChar.dispose(); // Clean up validation placeholder
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -16), 0, world.ground, '#22d3ee');
       rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true });
-      tricks = new TrickMachine(rig, (h) => ctx.setHud(h));
       animTree = new BoardAnimTree(rig.char.animator);
       boardSync = new BoardSync(rig.board, rig.char.root);
       mbus.reset();
@@ -94,7 +108,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // off-screen the whole way. That is where this mode's [FEL-FRAME] lines
       // came from — a fast board sport outruns a camera that begins behind.
       ctx.camDirector.snapTo(rig.char.root.position, null);
-      timeLeft = RUN_SEC; ended = false; stickX = 0; pump = 0;
+      timeLeft = RUN_SEC; ended = false; stickX = 0; pump = 0; settleT = 0;
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'park');
       coins = new CoinField(ctx.scene);
@@ -147,18 +161,35 @@ export const SkateRunMode: ModeDefinition = (() => {
             const nearest = world.grindLines.reduce((best, l) =>
               Vector3.Distance(Vector3.Center(l.a, l.b), p) < Vector3.Distance(Vector3.Center(best.a, best.b), p) ? l : best,
             world.grindLines[0]);
-            tricks.bankGrind(nearest);
+            // Bank the rail's bonus into the LIVE combo. TrickMachine.bankGrind
+            // adds to a comboPts that nothing in this mode ever reads, so every
+            // transfer and rail bonus was being thrown away.
+            combo.add(nearest.bonus >= 260 ? 'TRANSFER GRIND' : 'GRIND', nearest.bonus, 'grind');
             ctx.setHud({ banner: nearest.bonus >= 260 ? `TRANSFER GRIND +${nearest.bonus}` : 'GRIND!' });
             SoundKit.play('powerUp', { volume: 0.4, pitch: nearest.bonus >= 260 ? 1.3 : 1 });
             ctx.feel?.impact?.(0.3);
           }
         }
-        // face buttons kept as accessibility fallbacks (same tricks)
-        if (e.btn === 'B') tricks.start(TRICKS.flipA);
-        if (e.btn === 'Y') tricks.start(TRICKS.flipB);
-        if (e.btn === 'X') tricks.start(TRICKS.grab);
+        // The face buttons are not a SECOND trick system -- they are the same
+        // one. These called TrickMachine, whose points accumulate in a score
+        // this mode never reads (finalScore is combo.banked + combo.pot +
+        // coins) and whose update() is never even called here, so its state
+        // machine never advanced. A right-stick flick was therefore the only
+        // way to score anything, and neither the keyboard nor the touch
+        // overlay has a right stick -- skate was unscoreable for every player
+        // not holding a gamepad. Route them through the same air chain the
+        // flick path uses, so the landing grades and banks them.
+        if (!rig.rider.grounded) {
+          if (e.btn === 'B') airTrick(ctx, 'kickflip', 'KICKFLIP', 'flip', TRICKS.flipA.pts, 2);
+          if (e.btn === 'Y') airTrick(ctx, 'heelflip', 'HEELFLIP', 'flip', TRICKS.flipB.pts, 2);
+          if (e.btn === 'X') airTrick(ctx, 'indy', 'INDY', 'grab', TRICKS.grab.pts, 1);
+        }
       }
-      if (e.t === 'button' && !e.pressed && e.btn === 'X') tricks.endGrab();
+      // releasing GRAB banks the hold, exactly as the flick path does
+      if (e.t === 'button' && !e.pressed && e.btn === 'X' && air.state.grabHeld) {
+        const pts = air.releaseGrab();
+        if (pts > 0) combo.add('GRAB', pts, 'air');
+      }
     },
 
     update(ctx: ModeContext, dt: number) {
@@ -291,6 +322,33 @@ export const SkateRunMode: ModeDefinition = (() => {
         }
       }
       ctx.setHud({ goals: `${goals.doneCount}/${SKATE_GOALS.length}` });
+
+      // ── banking: the rule this mode never had ──
+      // combo.bank() was called NOWHERE in this file -- only bail(). The pot
+      // therefore grew for the entire run and nothing but a bail could clear
+      // it, so `score` (which publishes combo.banked) sat at 0 from start to
+      // finish, and the goal tracker, which waits on
+      // (!combo.active && combo.banked > 0), could never fire either. That is
+      // the whole reason a 90-second run ended 0 / 0 goals / 0 momentum.
+      // Skate 3's rule: you bank by landing and rolling away clean. The short
+      // settle window first gives the revert a chance to link the combo into a
+      // manual, which is the entire point of having a revert.
+      if (combo.active && rig.rider.grounded && !grindCh && !manualCh && !air.state.airborne) {
+        settleT += dt;
+        if (settleT >= BANK_SETTLE_SEC) {
+          const banked = combo.bank();
+          if (banked > 0) {
+            bannerFlash(ctx, `BANKED +${banked}`, 700);
+            SoundKit.play('powerUp', { volume: 0.5, pitch: banked >= 500 ? 1.3 : 1 });
+            // Every bank feeds the momentum bus, weighted by what it was
+            // worth. Reporting only the 500+ banks left the meter reading a
+            // flat 0 through a whole scoring run, which tells the player
+            // nothing about how their line is going.
+            mbus.report({ kind: 'big_make', weight: Math.max(3, Math.min(25, banked / 40)) });
+          }
+          settleT = 0;
+        }
+      } else settleT = 0;
 
       // combo HUD
       const hud = combo.hud;

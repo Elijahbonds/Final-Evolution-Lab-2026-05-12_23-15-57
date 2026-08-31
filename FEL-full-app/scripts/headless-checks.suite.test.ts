@@ -37,6 +37,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'basketball-rules-tests.ts', guards: 'rims, arcs and scoring agree across every basketball mode' },
   { script: 'spawn-path-tests.ts', guards: "converted modes keep the player's identity" },
   { script: 'dunk-animation-tests.ts', guards: 'dunk clips resolve AND move the rig' },
+  { script: 'board-stance-tests.ts', guards: 'the board rider stands across the deck, looking down the line' },
 ];
 
 const ROOT = process.cwd();

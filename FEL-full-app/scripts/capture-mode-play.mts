@@ -22,6 +22,11 @@ const REPS = Number(process.env.REPS ?? 10);
 /** ms to hold forward before acting — how long the mode needs to close range. */
 const APPROACH = Number(process.env.APPROACH ?? 900);
 const KEYS = (process.env.KEYS ?? '').split(',').map((k) => k.trim()).filter(Boolean);
+/** Hold the analog pump/charge before the trick keys (board sports). */
+const PUMP = process.env.PUMP === '1';
+/** ms between trick keys. Air windows are short -- a board trick must be
+ *  pressed while the rider is still off the ground. */
+const GAP = Number(process.env.GAP ?? 260);
 const OUT = process.env.OUT_DIR ?? 'docs/shots/play';
 const NAME = process.env.NAME ?? 'play';
 mkdirSync(OUT, { recursive: true });
@@ -90,8 +95,16 @@ console.log(`${NAME} start :`, JSON.stringify(await hud()));
 
 for (let i = 0; i < REPS; i++) {
   await p.keyboard.down('w'); await p.waitForTimeout(APPROACH); await p.keyboard.up('w');
+  // A board sport needs BOTH: space is the analog pump/charge (and its release
+  // is the ollie), while the face keys are the tricks. Driving skate with KEYS
+  // alone never held space, so it never pumped -- the run ended at momentum 0
+  // and score 0, which looked exactly like a broken mode and was not.
+  if (KEYS.length && PUMP) {
+    await p.keyboard.down(' '); await p.waitForTimeout(HOLD); await p.keyboard.up(' ');
+    await p.waitForTimeout(GAP);
+  }
   if (KEYS.length) {
-    for (const k of KEYS) { await p.keyboard.press(k); await p.waitForTimeout(260); }
+    for (const k of KEYS) { await p.keyboard.press(k); await p.waitForTimeout(GAP); }
   } else {
     await p.keyboard.down(' '); await p.waitForTimeout(HOLD); await p.keyboard.up(' ');
   }
