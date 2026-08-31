@@ -153,6 +153,14 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       const v = move.update(dt, stickX, 0, ctx.scene, rig.char.root.position, world.ground);
       rig.rider.vel.x = v.x; rig.rider.vel.z = v.z;
       rig.rider.update(dt, stickX, tuck);
+      // The rider has to FACE where they are going. This mode never set the
+      // root rotation at ALL, so the board kept whatever yaw it spawned with
+      // and the rider came down the mountain broadside -- steering with the
+      // slalom while permanently pointed across the fall line. The board mesh
+      // is parented to this root, so it was sideways too. Skate takes the same
+      // yaw from the same shared momentum object; snowboard simply never had
+      // the line. Grinding holds its own heading, as it does there.
+      if (!rig.rider.grinding) rig.char.root.rotation.y = move.yaw;
       if (boosting) {
         rig.rider.vel.scaleInPlace(1 + 0.9 * dt);
         boost = Math.max(0, boost - 30 * dt);

@@ -23,6 +23,8 @@ import { EffectsKit } from '../visual/EffectsKit';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
 
 const RUN_SEC = 90;
+/** How fast a cutback comes around. ~0.4s to complete the turn. */
+const CUTBACK_RATE = 6;
 const POCKET = { min: 2, max: 9 };
 const MAX_FORWARD_SPEED = 9;
 const WAVE_LAP = 140;
@@ -34,6 +36,8 @@ export const SurfBreakMode: ModeDefinition = (() => {
   let rig: BoardRig, tricks: TrickMachine;
   let t = 0, timeLeft = RUN_SEC, flow = 0;
   let stickX = 0, carve = 0;
+  /** Where the board is turning TO. A cutback is a carve, not a pivot. */
+  let yawTarget = 0;
   let ended = false, wipedOut = false;
   let lapsSeen = 0;
   let barrelSec = 0, inBarrel = false, barrels = 0;
@@ -88,6 +92,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       ctx.camDirector.setPreset('board');
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 4, modeId: 'surf' });
       t = 0; timeLeft = RUN_SEC; flow = 0; ended = false; wipedOut = false; lapsSeen = 0;
+      yawTarget = rig.char.root.rotation.y;
       barrelSec = 0; inBarrel = false; barrels = 0;
       ctx.objectiveRef.current = waveLipAt(t);
       // Phase 3 requires snapTo() at load and update() every frame. All three
@@ -110,7 +115,13 @@ export const SurfBreakMode: ModeDefinition = (() => {
           if (rig.rider.grounded) { rig.rider.jump(0.5 + flow / 200); rig.char.animator.play(SPORT_CLIP.boardAir, {}); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); }
         }
         if (e.btn === 'B') {
-          rig.char.root.rotation.y += Math.PI * 0.5 * (stickX >= 0 ? 1 : -1);
+          // This snapped the board through 90 degrees in a single frame. A
+          // cutback is the most drawn-out turn in surfing -- you bury the rail
+          // and come back around -- and an instant pivot both looks wrong and
+          // whips the chase camera hard enough to lose the rider, which is
+          // where surf's remaining [FEL-FRAME] lines came from. Aim the turn
+          // and let update() carve into it.
+          yawTarget += Math.PI * 0.5 * (stickX >= 0 ? 1 : -1);
           tricks.score += 40 + Math.round(flow / 4);
           ctx.feel?.impact?.(0.12);
           SoundKit.play('whoosh', { pitch: 1.5, volume: 0.35 });
@@ -193,6 +204,10 @@ export const SurfBreakMode: ModeDefinition = (() => {
         rig.char.animator.play(rig.rider.grounded ? (carve > 0.5 ? SPORT_CLIP.boardTuck : SPORT_CLIP.boardIdle) : SPORT_CLIP.boardAir, { loop: true });
         rig.char.root.position.x = Math.max(-40, Math.min(40, rig.char.root.position.x));
       }
+
+      // carve toward the aimed heading (~0.4s to come around)
+      const yawErr = yawTarget - rig.char.root.rotation.y;
+      if (Math.abs(yawErr) > 0.001) rig.char.root.rotation.y += yawErr * Math.min(1, dt * CUTBACK_RATE);
 
       ctx.setHud({ time: Math.ceil(timeLeft) });
       const vel = rig.rider.vel;

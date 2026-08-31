@@ -107,16 +107,25 @@ export const SPORT_CLIP = {
   footballHurdle: 'jump_up',
   footballTackled: 'football_tackled_fall',
 
-  // board sports (skate / snowboard / surf) — fighter-rig clips give real,
-  // readable motion instead of a static T-pose while riding.
-  boardIdle: 'guard',
-  boardCarve: 'walk',
-  boardAir: 'jump_up',
-  boardGrab: 'hook',
-  boardFlipTrick: 'roundhouse',
-  boardGrind: 'guard',
-  boardTuck: 'guard',
-  boardBail: 'football_tackled_fall',
+  // Board sports (skate / snowboard / surf). These were fighter-rig stand-ins --
+  // a real, readable motion beats a T-pose while riding, and that is what they
+  // bought. But 'guard' is a KARATE GUARD: upright, square to the front, fists
+  // up. Three of the eight resolved to it, so the idle, the tuck and the grind
+  // were all the same martial-arts pose on a moving board.
+  //
+  // boardSuite.ts authors these for real now. Repointing the TABLE matters as
+  // much as authoring them: skate drives its animation through BoardAnimTree,
+  // but surf and snowboard call SPORT_CLIP.board* directly, so pointing only
+  // the tree at the new clips left two of the three modes still riding in a
+  // karate stance -- which is exactly what the first snowboard capture showed.
+  boardIdle: 'board_ride_idle',
+  boardCarve: 'board_carve_right',
+  boardAir: 'board_air',
+  boardGrab: 'board_grab',
+  boardFlipTrick: 'skate_kickflip',
+  boardGrind: 'board_grind',
+  boardTuck: 'board_tuck',
+  boardBail: 'skate_bail',
 
   // precision sports
   golfAddress: 'guard',
