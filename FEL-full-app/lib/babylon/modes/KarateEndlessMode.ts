@@ -46,6 +46,15 @@ import {
   surroundedCount, crowdClear, CROWDCLEAR_RADIUS,
 } from '../core/OnslaughtCore';
 
+/**
+ * Half-extent of the playable floor, INSET from the 24x24 mat.
+ *
+ * The camera's bounds come from the ground mesh, so a play area the same size as
+ * the mat leaves it nowhere to stand: at the old ±8 on a 16x16 mat the camera was
+ * clamped to ±6.8 and ended up 1.2m behind a player at the edge, putting them out
+ * of frame. 7.5 on a 24x24 mat keeps 3.3m clear behind the overShoulder rig.
+ */
+const ARENA_HALF = 7.5;
 const STANCE = SPORT_CLIP.karateStance;
 const STRIKES = {
   A: { clip: SPORT_CLIP.karateJab, dmg: 12, range: 1.4 },
@@ -415,8 +424,10 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       const vel = new Vector3(stickX * 3, 0, -stickY * 3);
       if (!striking && !blocking && !dodging && vel.lengthSquared() > 0.05) {
         player.root.position.addInPlace(vel.scale(dt));
-        player.root.position.x = Math.max(-8, Math.min(8, player.root.position.x));
-        player.root.position.z = Math.max(-8, Math.min(8, player.root.position.z));
+        // Inset from the mat so the camera always has somewhere to stand behind
+        // the player — see ARENA_HALF.
+        player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x));
+        player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z));
         player.root.rotation.y = Math.atan2(vel.x, vel.z);
         player.animator.play(SPORT_CLIP.moveLoop, { loop: true });
       } else if (!striking && !blocking && !dodging && vel.lengthSquared() <= 0.05) {

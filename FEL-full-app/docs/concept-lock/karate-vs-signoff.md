@@ -84,8 +84,12 @@ legibility ............... PASS  nothing competes with the two fighters
 2. **D5 — ring-out ruled out of scope.** Soul Calibur's signature loss condition.
    Naruto Storm has no such rule and the benchmark names both, so `ARENA_HALF`
    clamps rather than eliminates.
-3. **Karate Endless still has a pre-existing `[FEL-FRAME]` issue** and its forward
-   direction is **unverified** — it is a different mode and was not part of this
-   pass, but it shares `FightCore`, so it inherits the reactive-guard fix and
-   should be re-measured when its own pass runs.
+3. ~~Karate Endless ... shares `FightCore`, so it inherits the reactive-guard
+   fix~~ — **CORRECTION: that was wrong.** `KarateEndlessMode` imports nothing
+   from `FightCore`; it has its own combat, so it inherited nothing from the
+   reactive-guard fix. Its separate defect pass (see
+   `karate-endless-defects.md`) found and fixed a different cause for its
+   `[FEL-FRAME]` lines, and confirmed its forward direction is **correct** —
+   its camera is facing-derived, so `-stickY` is self-consistent there rather
+   than inverted as it was here.
 4. **Phase 9 has not run on real hardware** — same limitation as every other mode.

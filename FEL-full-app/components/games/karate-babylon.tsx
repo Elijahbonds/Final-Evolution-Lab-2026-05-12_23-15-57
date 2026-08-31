@@ -46,8 +46,12 @@ export default function KarateBabylon({ onEnd }: GameProps) {
       };
       onEnd(result);
     };
-
-    runMode(MODES.karate, {
+    // StrictMode runs effect -> cleanup -> effect. Starting immediately lets the
+    // PHANTOM mount build a Babylon engine its own cleanup cannot cancel, and two
+    // engines fight over one WebGL context — 3v3 rendered an empty void this way.
+    const startTimer = setTimeout(() => {
+      if (disposed) return;
+      runMode(MODES.karate, {
       canvas,
       input: bus,
       onPhase: (p, cd) => {
@@ -62,10 +66,12 @@ export default function KarateBabylon({ onEnd }: GameProps) {
         if (disposed) { s(); return; }
         stop = s;
       })
-      .catch((e) => console.error('[FEL-KARATE] boot failed', e));
+        .catch((e) => console.error('[FEL-KARATE] boot failed', e));
+    }, 0);
 
     return () => {
       disposed = true;
+      clearTimeout(startTimer);
       stop?.();
       busRef.current = null;
     };

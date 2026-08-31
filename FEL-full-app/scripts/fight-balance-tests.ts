@@ -77,13 +77,23 @@ ok(neverGuards === 0, 'C2 a zero-difficulty rival never guards');
 // Every [FEL-FRAME] line this mode produced was a fighter at exactly the arena
 // boundary with the camera crushed 0.3m behind them against the dojo wall.
 import { readFileSync } from 'node:fs';
-const src = readFileSync('lib/babylon/modes/KarateVSMode.ts', 'utf8');
-const half = Number(/const ARENA_HALF = ([0-9.]+)/.exec(src)?.[1] ?? '99');
-const DOJO_HALF = 9;                      // VenueKit.buildDojo paints an 18x18 floor
-const CAMERA_PULLBACK = 4.2;              // FOLLOW_PRESETS.fight distance
-ok(half + CAMERA_PULLBACK <= DOJO_HALF + 0.5,
-  `D1 a fighter at the arena edge (${half}) leaves room for the camera's ${CAMERA_PULLBACK}m ` +
-  `pullback inside the ${DOJO_HALF * 2}x${DOJO_HALF * 2} dojo — it did not, and the hero fell out of frame`);
+// Both karate modes hit this, and so did both half-court basketball venues: a
+// play area exactly as big as its room leaves the camera nowhere to stand, and
+// the hero drops out of frame at the boundary. One check, both modes.
+const arenas: { file: string; roomHalf: number; pullback: number; label: string }[] = [
+  // KarateVS fights in VenueKit.buildDojo's 18x18 floor with the 'fight' preset.
+  { file: 'lib/babylon/modes/KarateVSMode.ts', roomHalf: 9, pullback: 4.2, label: 'Karate VS / dojo' },
+  // KarateEndless fights on the karate_endless mat with the 'overShoulder' preset.
+  { file: 'lib/babylon/modes/KarateEndlessMode.ts', roomHalf: 12, pullback: 3.1, label: 'Karate Endless / mat' },
+];
+for (const a of arenas) {
+  const src = readFileSync(a.file, 'utf8');
+  const half = Number(/const ARENA_HALF = ([0-9.]+)/.exec(src)?.[1] ?? '99');
+  ok(half + a.pullback <= a.roomHalf + 0.5,
+    `D-${a.label}: a fighter at the arena edge (${half}) leaves room for the camera's ` +
+    `${a.pullback}m pullback inside a room of half-extent ${a.roomHalf} — it did not, ` +
+    'and the hero fell out of frame at the boundary');
+}
 
 if (fail.length) {
   console.error(`fight-balance-tests: ${fail.length} FAILED of ${checks}`);

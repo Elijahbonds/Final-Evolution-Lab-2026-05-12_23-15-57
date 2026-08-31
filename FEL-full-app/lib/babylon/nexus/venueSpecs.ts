@@ -190,7 +190,13 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   karate_endless: {
     modeId: 'karate_endless', name: 'Karate Endless', venue: 'Shadow Gauntlet',
     environment: dusk('#2A0E3A', '#07070E', '#140A1E', '#C77DFF', 0.38),
-    ground: { kind: 'mat', size: [16, 16], color: '#2A1A3A', lineColor: '#BF5AF2', markings: 'none' },
+    // 24x24, not 16x16. The camera's box is derived from the ground, so a mat
+    // exactly as big as the play area leaves the camera nowhere to stand: the
+    // player clamps to ±8, the bounds clamp the camera to ±6.8, and a player at
+    // the edge ends up with the camera 1.2m behind them and themselves out of
+    // frame. Every [FEL-FRAME] line this mode produced was a hero at ±8.
+    // A wave brawler with five enemies wants the space anyway.
+    ground: { kind: 'mat', size: [24, 24], color: '#2A1A3A', lineColor: '#BF5AF2', markings: 'none' },
     props: [
       { kind: 'wall', position: [0, 0, -14], color: '#0D0714' },
       { kind: 'lamp', position: [7, 0, -5], color: '#BF5AF2' },
