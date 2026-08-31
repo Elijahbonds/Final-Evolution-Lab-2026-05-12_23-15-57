@@ -337,7 +337,18 @@ export class CameraDirector {
     // M69: enforceStandoff is the FINAL link in the chain — nothing can undo the
     // safe distance after it (fixes the karate dojo camera collapsing onto the hero).
     const finalPos = enforceStandoff(subject, this.clampToBounds(this.resolveOcclusion(subject, desired, back))).pos;
-    this.camera.position = Vector3.Lerp(this.camera.position, finalPos, cfg.lag);
+    // The standoff was enforced on the TARGET and then thrown away by the lerp.
+    // At lag 0.08-0.12 the camera only ever travels a fraction of the way there,
+    // so a subject accelerating hard away from a standing start leaves the
+    // ACTUAL camera far closer than MIN_SAFE_DISTANCE even though the target it
+    // is chasing is not. Measured on a phone viewport during a skate launch:
+    // camera 0.74m behind the rider and 1.67m up, against a 1.8m minimum. A
+    // wide desktop FOV still holds the rider at that range and a portrait one
+    // does not, which is why this only ever showed up in the mobile playtest.
+    // Re-enforce on the RESULT, so the guarantee is about where the camera IS.
+    this.camera.position = enforceStandoff(
+      subject, Vector3.Lerp(this.camera.position, finalPos, cfg.lag),
+    ).pos;
     this.aim(subject, objective, velocity);
   }
 

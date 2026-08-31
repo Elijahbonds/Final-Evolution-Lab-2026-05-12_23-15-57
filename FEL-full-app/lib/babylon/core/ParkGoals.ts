@@ -11,7 +11,8 @@
 //     grinding it pays a fat bonus and counts as its own gap. The park is
 //     a puzzle, not a sandbox.
 
-import { Vector3 } from '@babylonjs/core';
+import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import type { AbstractMesh, Scene } from '@babylonjs/core';
 
 export type GoalKind = 'score' | 'combo' | 'gap' | 'collect';
 
@@ -73,11 +74,50 @@ export class MovingRail {
     public speed = 0.25,                        // patrol cycle speed
   ) {}
 
+  /** The rail the player can actually see. Built by mount(). */
+  private mesh: AbstractMesh | null = null;
+
+  /**
+   * Give the patrol rail a body.
+   *
+   * It did not have one. This class was pure maths -- a grind line that slides
+   * back and forth and pays a bonus -- while one of the four run goals is
+   * "GRIND THE PATROL RAIL". The player was being asked to find, approach and
+   * grind an object that was not drawn. That is the World-Population
+   * Protocol's L2 failure exactly, and worse than the ball-rack case it cites:
+   * there the state was at least visible in the HUD.
+   *
+   * Deliberately gold rather than the plaza's white: it is the goal object, so
+   * it should read as different from the five ordinary rails at a glance.
+   */
+  mount(scene: Scene): AbstractMesh {
+    const len = Vector3.Distance(this.a, this.b);
+    const rail = MeshBuilder.CreateCylinder('rail_patrol', { diameter: 0.13, height: len }, scene);
+    const d = this.b.subtract(this.a);
+    rail.rotation.x = Math.PI / 2 - Math.atan2(d.y, Math.hypot(d.x, d.z));
+    rail.rotation.y = Math.atan2(d.x, d.z);
+    const m = new StandardMaterial('railPatrolM', scene);
+    m.diffuseColor = Color3.FromHexString('#f2b73d');
+    m.emissiveColor = Color3.FromHexString('#3a2a08');   // catches the eye while it slides
+    rail.material = m;
+    this.mesh = rail;
+    this.syncMesh();
+    return rail;
+  }
+
+  private syncMesh(): void {
+    if (!this.mesh) return;
+    this.mesh.position = Vector3.Center(this.a, this.b).add(this.offset);
+  }
+
   update(dt: number): void {
     this.t += this.dir * this.speed * dt;
     if (this.t > 1) { this.t = 1; this.dir = -1; }
     if (this.t < 0) { this.t = 0; this.dir = 1; }
+    this.syncMesh();
   }
+
+  dispose(): void { this.mesh?.dispose(); this.mesh = null; }
 
   get offset(): Vector3 { return Vector3.Lerp(this.from, this.to, this.t); }
   /** Current world-space grind line (feed the Rider's line list per frame). */

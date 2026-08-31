@@ -11,10 +11,28 @@
 // played. Nothing threw. A test that only asked "does ComboChain work" would
 // have passed the whole time -- ComboChain was fine, the mode never called it.
 
+import { NullEngine, Scene, Vector3 } from '@babylonjs/core';
 import { ComboChain } from '../lib/babylon/core/ComboChain';
 import { BoardMovement, SKATE_TUNING } from '../lib/babylon/core/BoardMovement';
 import { landsSwitch } from '../lib/babylon/modes/boardCore';
-import { SKATE_GOALS } from '../lib/babylon/core/ParkGoals';
+import { MovingRail, SKATE_GOALS } from '../lib/babylon/core/ParkGoals';
+import { buildSkatepark, PARK_BOUND } from '../lib/babylon/modes/rideWorlds';
+
+// buildSkatepark paints its ground into a DynamicTexture, which reaches for
+// OffscreenCanvas -- absent under Node. Section E only inspects mesh names and
+// positions, so a no-op 2D surface is enough to let the park build. Same shim
+// dunk-animation-tests.ts uses, for the same reason.
+if (typeof (globalThis as { OffscreenCanvas?: unknown }).OffscreenCanvas === 'undefined') {
+  const ctx2d = new Proxy({}, {
+    get: (_t, k) => (k === 'measureText' ? () => ({ width: 0 }) : () => undefined),
+    set: () => true,
+  });
+  (globalThis as unknown as { OffscreenCanvas: unknown }).OffscreenCanvas = class {
+    width: number; height: number;
+    constructor(w: number, h: number) { this.width = w; this.height = h; }
+    getContext(): unknown { return ctx2d; }
+  };
+}
 
 let checks = 0;
 const fail: string[] = [];
@@ -83,6 +101,50 @@ ok(byId.has('coins10'), 'D5 a collection goal exists');
 // failure this mode shipped with, so tie the goal to the mechanic that feeds it.
 ok((byId.get('score5k')?.target ?? 0) > 0, 'D6 the score goal has a real target');
 ok((byId.get('combo800')?.target ?? 0) > 0, 'D7 the combo goal has a real target');
+
+// ── E. Phase 6: the world shows the rules ───────────────────────────────────
+// World-Population Protocol L2: "if the HUD is the only place a rule is
+// visible, L2 is incomplete". The patrol rail was worse than that -- it is a
+// named RUN GOAL ("GRIND THE PATROL RAIL") and it had no mesh at all, so the
+// player was asked to find an object that was never drawn.
+const engine = new NullEngine();
+const scene = new Scene(engine);
+
+const rail = new MovingRail(
+  new Vector3(-2, 0.5, 0), new Vector3(2, 0.5, 0),
+  new Vector3(0, 0, -8), new Vector3(0, 0, 8), 0.18,
+);
+const railMesh = rail.mount(scene);
+ok(!!railMesh, 'E1 the patrol rail has a body');
+ok(scene.meshes.some((m) => m.name === 'rail_patrol'), 'E2 it is in the scene');
+const before = railMesh.position.clone();
+for (let i = 0; i < 60; i++) rail.update(1 / 30);
+ok(!railMesh.position.equals(before),
+  `E3 the body PATROLS with the line (${before.z.toFixed(2)} -> ${railMesh.position.z.toFixed(2)})`);
+// the drawn rail must sit where the grind line actually is, or the player
+// grinds thin air next to a visible rail
+const mid = Vector3.Center(rail.line.a, rail.line.b);
+ok(Vector3.Distance(mid, railMesh.position) < 0.01,
+  `E4 the body is exactly ON the grind line (off by ${Vector3.Distance(mid, railMesh.position).toFixed(4)}m)`);
+rail.dispose();
+ok(!scene.meshes.some((m) => m.name === 'rail_patrol'), 'E5 dispose() takes it away');
+
+// L3: the invisible clamp and the visible fence must be the same number.
+const park = buildSkatepark(scene);
+const fences = scene.meshes.filter((m) => m.name === 'wall_fence');
+ok(fences.length === 4, `E6 the park is fenced on four sides (got ${fences.length})`);
+for (const f of fences) {
+  const onBound = Math.abs(Math.abs(f.position.x) - PARK_BOUND) < 0.01
+                || Math.abs(Math.abs(f.position.z) - PARK_BOUND) < 0.01;
+  ok(onBound, `E7 fence at (${f.position.x}, ${f.position.z}) stands on PARK_BOUND ${PARK_BOUND}`);
+}
+// The camera probes occlusion against anything matching wall_*; a fence that
+// caught that ray would yank the camera in every time the rider neared an edge.
+ok(fences.every((f) => !f.isPickable), 'E8 the fence never catches the camera occlusion ray');
+ok(park.grindLines.length >= 5, `E9 the park still has its rails (${park.grindLines.length})`);
+park.dispose();
+scene.dispose();
+engine.dispose();
 
 if (fail.length) {
   console.error(`skate-run-tests: ${fail.length} FAILED of ${checks}`);

@@ -15,6 +15,11 @@ import { mkdirSync } from 'node:fs';
 
 const OUT = process.env.OUT_DIR ?? 'docs/shots/mobile';
 const URL = process.env.URL ?? 'http://localhost:3000/try';
+// The verbs are per-mode. This was hard-coded to dunk's CHARGE/SLAM, so pointing
+// it at any other mode died on a locator for a button that mode does not have.
+// HOLD_VERB is the analog one held with a real touch; TAP_VERB is tapped.
+const HOLD_VERB = process.env.HOLD_VERB ?? 'CHARGE';
+const TAP_VERB = process.env.TAP_VERB ?? 'SLAM';
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({
@@ -33,7 +38,22 @@ const logs: string[] = [];
 page.on('console', (m) => { if (m.type() === 'error' || /FEL-/.test(m.text())) logs.push(`[${m.type()}] ${m.text()}`); });
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 
+// Phase 9 wants the SHIPPING route, and /play/* calls getServerSession and
+// redirects to /login without one -- this script previously only ever pointed at
+// /try, which is unauthenticated, so aiming it at a real mode page just timed
+// out waiting for a canvas that was never going to appear. Same login the
+// desktop capture does: through the real form, as an ordinary player.
 await page.goto(URL, { waitUntil: 'networkidle' });
+if (/\/login/.test(page.url())) {
+  await page.locator('input[type="email"]').fill(process.env.PLAYTEST_EMAIL ?? 'playtest@fel.local');
+  await page.locator('input[type="password"]').fill(process.env.PLAYTEST_PASSWORD ?? 'playtest-local-only');
+  await page.locator('input[type="password"]').press('Enter');
+  await page.waitForURL((u) => !/\/login/.test(u.toString()), { timeout: 30_000 }).catch(() => {});
+  await page.goto(URL, { waitUntil: 'networkidle' });
+}
+// NB: this module's own `const URL = process.env.URL` shadows the global URL
+// constructor, so `new URL(...)` throws here. Print the href instead.
+console.log('route :', page.url());
 await page.waitForSelector('canvas', { timeout: 30_000 });
 const text = async () => (await page.evaluate<string>('document.body.innerText')).replace(/\n+/g, ' | ');
 
@@ -43,7 +63,7 @@ await page.getByText(/TAP TO START/i).first().tap().catch(async () => {
 await page.waitForTimeout(4500);
 await page.screenshot({ path: `${OUT}/01-mobile-approach.png` });
 
-// TOUCH ONLY from here. Hold CHARGE with a real touch, then tap SLAM.
+// TOUCH ONLY from here. Hold the analog verb with a real touch, then tap.
 const tapVerb = async (label: string) => {
   const el = page.locator(`text=/^${label}$/`).first();
   const box = await el.boundingBox();
@@ -51,9 +71,9 @@ const tapVerb = async (label: string) => {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 };
 
-const charge = await tapVerb('CHARGE');
-const slam = await tapVerb('SLAM');
-console.log(`touch targets: CHARGE ${JSON.stringify(charge)}  SLAM ${JSON.stringify(slam)}`);
+const charge = await tapVerb(HOLD_VERB);
+const slam = await tapVerb(TAP_VERB);
+console.log(`touch targets: ${HOLD_VERB} ${JSON.stringify(charge)}  ${TAP_VERB} ${JSON.stringify(slam)}`);
 
 // Hold CHARGE with REAL touch input via CDP. TouchOverlay binds React
 // onPointerDown/onPointerUp, and the browser only synthesizes pointer events

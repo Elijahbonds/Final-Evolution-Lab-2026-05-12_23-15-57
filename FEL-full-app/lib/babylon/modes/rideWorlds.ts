@@ -58,6 +58,10 @@ function makeRail(scene: Scene, all: AbstractMesh[], lines: GrindLine[], a: Vect
   lines.push({ a, b, bonus });
 }
 
+/** Half-width of the skatepark's playable area. The rider clamps here AND the
+ *  fence is built here — one constant so a player never hits an invisible wall. */
+export const PARK_BOUND = 33;
+
 // ── SKATEPARK v2 — bowl, downhill straight, five rails ─────────────────────
 export function buildSkatepark(scene: Scene): RideWorld {
   const all: AbstractMesh[] = [];
@@ -113,6 +117,24 @@ export function buildSkatepark(scene: Scene): RideWorld {
     box.position.set(x, 0.55, z);
     box.material = boxM;
     all.push(box);
+  }
+
+  // L3 BOUNDARY — the rider was clamped at PARK_BOUND with nothing there to see,
+  // so the park ended at an invisible wall two metres inside a ground plane that
+  // visibly continued. A chain-link run on all four sides makes the edge a place
+  // rather than a stop, and it reads from the gameplay camera because it stands
+  // above the deck line.
+  const fenceM = mat(scene, 'fenceM', '#3c3947');
+  for (const [dx, dz] of [[0, 1], [0, -1], [1, 0], [-1, 0]] as const) {
+    const span = MeshBuilder.CreateBox('wall_fence', {
+      width: dx === 0 ? PARK_BOUND * 2 : 0.25,
+      height: 1.9,
+      depth: dz === 0 ? PARK_BOUND * 2 : 0.25,
+    }, scene);
+    span.position.set(dx * PARK_BOUND, 0.95, dz * PARK_BOUND);
+    span.material = fenceM;
+    span.isPickable = false;      // never let the fence catch the camera's occlusion ray
+    all.push(span);
   }
 
   const grindLines: GrindLine[] = [];

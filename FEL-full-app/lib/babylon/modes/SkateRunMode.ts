@@ -15,7 +15,7 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, landsSwitch, TRICKS, type BoardRig } from './boardCore';
-import { buildSkatepark, type RideWorld } from './rideWorlds';
+import { buildSkatepark, PARK_BOUND, type RideWorld } from './rideWorlds';
 import { assertSpawned } from '../core/FrameGuard';
 import { SPORT_CLIP } from '../anim/clipRegistry';
 import { FlickStick } from '../core/FlickStick';
@@ -36,7 +36,12 @@ import { RIDE_CONFIG as CFG } from './modeConfigs';
 const RUN_SEC = 90;
 /** Skate 3 banks the moment you roll away clean; the delay is the revert window. */
 const BANK_SETTLE_SEC = 0.45;
-const PARK_BOUND = 33;
+/** A bank at or above this is the run's big moment and is cued as one. */
+const BIG_BANK_PTS = 500;
+// Imported from the world builder so the invisible clamp and the visible fence
+// are the SAME number by construction -- they were 33 and 35 (the ground's own
+// half-width), so the rider stopped two metres short of a fence that was not
+// there anyway.
 
 export const SkateRunMode: ModeDefinition = (() => {
   let world: RideWorld, rig: BoardRig;
@@ -44,6 +49,8 @@ export const SkateRunMode: ModeDefinition = (() => {
   let settleT = 0;
   /** Heading when the wheels left the ground — decides switch stance on landing. */
   let airEntryYaw = 0;
+  /** Has the camera been snapped since play actually began? */
+  let snappedForPlay = false;
   let coins: CoinField;
   let timeLeft = RUN_SEC;
   let stickX = 0, pump = 0;
@@ -102,6 +109,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         new Vector3(-2, 0.5, 0), new Vector3(2, 0.5, 0),
         new Vector3(0, 0, -8), new Vector3(0, 0, 8), 0.18,
       );
+      patrolRail.mount(ctx.scene);      // L2: the goal object has to be visible
       world.grindLines.push(patrolRail.line);
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 4, modeId: 'skateboard' });
       // Phase 3 requires snapTo() at load and update() every frame. All three
@@ -110,8 +118,10 @@ export const SkateRunMode: ModeDefinition = (() => {
       // off-screen the whole way. That is where this mode's [FEL-FRAME] lines
       // came from — a fast board sport outruns a camera that begins behind.
       ctx.camDirector.snapTo(rig.char.root.position, null);
-      timeLeft = RUN_SEC; ended = false; stickX = 0; pump = 0; settleT = 0; airEntryYaw = 0;
-      SoundKit.startAmbient('stadium');
+      timeLeft = RUN_SEC; ended = false; stickX = 0; pump = 0; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
+      // 'stadium' is a crowd bed with a breathing LFO -- wrong for a solo run
+      // in an outdoor plaza. 'wind' is the open-air option in SoundKit's set.
+      SoundKit.startAmbient('wind');
       EffectsKit.ambient(ctx.scene, 'park');
       coins = new CoinField(ctx.scene);
       coins.line(new Vector3(-16, 0.4, -16), new Vector3(16, 0.4, 16), 10);
@@ -354,8 +364,19 @@ export const SkateRunMode: ModeDefinition = (() => {
         if (settleT >= BANK_SETTLE_SEC) {
           const banked = combo.bank();
           if (banked > 0) {
-            bannerFlash(ctx, `BANKED +${banked}`, 700);
-            SoundKit.play('powerUp', { volume: 0.5, pitch: banked >= 500 ? 1.3 : 1 });
+            // Phase 7: the big moment has to SOUND different from a routine one.
+            // A pitch-shifted copy of the routine cue is still the routine cue,
+            // so the big line gets its own sample, its own banner, a camera
+            // pulse and a heavier haptic -- landing a run-defining combo should
+            // not be a slightly higher beep than landing a kickflip.
+            const big = banked >= BIG_BANK_PTS;
+            bannerFlash(ctx, big ? `HUGE! +${banked}` : `BANKED +${banked}`, big ? 1000 : 700);
+            SoundKit.play('powerUp', { volume: 0.5, pitch: big ? 1.3 : 1 });
+            if (big) {
+              SoundKit.play('score', { volume: 0.55, pitch: 1.1 });
+              ctx.camDirector.pulse(0.5, 0.5);
+              ctx.feel?.impact?.(0.5);
+            }
             // Every bank feeds the momentum bus, weighted by what it was
             // worth. Reporting only the 500+ banks left the meter reading a
             // flat 0 through a whole scoring run, which tells the player
@@ -372,9 +393,17 @@ export const SkateRunMode: ModeDefinition = (() => {
       rig.char.root.position.x = Math.max(-PARK_BOUND, Math.min(PARK_BOUND, rig.char.root.position.x));
       rig.char.root.position.z = Math.max(-PARK_BOUND, Math.min(PARK_BOUND, rig.char.root.position.z));
       ctx.setHud({ time: Math.ceil(timeLeft) });
+      // Snap once more on the first PLAYED frame. The load-time snapTo is
+      // correct when it runs and stale by the time it matters: between load and
+      // play the rider drops onto the park and starts rolling down it, so the
+      // camera resumes several metres out of position and spends ~half a second
+      // lerping in. A desktop FOV is wide enough to hold the rider through that;
+      // a phone in portrait is not, which is why this only ever appeared in the
+      // mobile playtest and never in any desktop capture.
+      if (!snappedForPlay) { ctx.camDirector.snapTo(rig.char.root.position, null); snappedForPlay = true; }
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, null);
     },
 
-    dispose() { rig?.dispose(); world?.dispose(); coins?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
