@@ -38,6 +38,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'spawn-path-tests.ts', guards: "converted modes keep the player's identity" },
   { script: 'dunk-animation-tests.ts', guards: 'dunk clips resolve AND move the rig' },
   { script: 'board-stance-tests.ts', guards: 'the board rider stands across the deck, looking down the line' },
+  { script: 'skate-run-tests.ts', guards: 'Skate 3 rules — switch on a 180, bank or lose the pot' },
 ];
 
 const ROOT = process.cwd();

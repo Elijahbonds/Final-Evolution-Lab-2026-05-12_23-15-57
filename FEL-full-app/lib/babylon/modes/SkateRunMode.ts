@@ -14,7 +14,7 @@ import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary } from '../core/CharacterLibrary';
-import { buildRig, TRICKS, type BoardRig } from './boardCore';
+import { buildRig, landsSwitch, TRICKS, type BoardRig } from './boardCore';
 import { buildSkatepark, type RideWorld } from './rideWorlds';
 import { assertSpawned } from '../core/FrameGuard';
 import { SPORT_CLIP } from '../anim/clipRegistry';
@@ -42,6 +42,8 @@ export const SkateRunMode: ModeDefinition = (() => {
   let world: RideWorld, rig: BoardRig;
   /** Seconds rolling clean on the ground before the pot banks (revert window). */
   let settleT = 0;
+  /** Heading when the wheels left the ground — decides switch stance on landing. */
+  let airEntryYaw = 0;
   let coins: CoinField;
   let timeLeft = RUN_SEC;
   let stickX = 0, pump = 0;
@@ -108,7 +110,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // off-screen the whole way. That is where this mode's [FEL-FRAME] lines
       // came from — a fast board sport outruns a camera that begins behind.
       ctx.camDirector.snapTo(rig.char.root.position, null);
-      timeLeft = RUN_SEC; ended = false; stickX = 0; pump = 0; settleT = 0;
+      timeLeft = RUN_SEC; ended = false; stickX = 0; pump = 0; settleT = 0; airEntryYaw = 0;
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'park');
       coins = new CoinField(ctx.scene);
@@ -119,7 +121,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       coins.line(new Vector3(20, 2.6, -19), new Vector3(20, 0.6, 8), 8);
       // ...and an air arc over the bowl rim
       coins.arc(new Vector3(-22, 1.6, 14), new Vector3(-10, 1.6, 14), 2.6, 6);
-      ctx.setHud({ score: 0, combo: '', time: RUN_SEC, hint: 'PUMP for speed · bomb the downhill · carve the bowl · grind everything' });
+      ctx.setHud({ score: 0, combo: '', coins: 0, time: RUN_SEC, goals: `0/${SKATE_GOALS.length}`, hint: 'PUMP for speed · bomb the downhill · carve the bowl · grind everything' });
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -136,6 +138,7 @@ export const SkateRunMode: ModeDefinition = (() => {
           SoundKit.play('whoosh', { pitch: 1 + g.difficulty * 0.15, volume: 0.4 });
         } else if (g && rig.rider.grounded && g.id === 'ollie') {
           rig.rider.jump(0.55 + pump * 0.45);
+          airEntryYaw = rig.char.root.rotation.y;
           air.launch();
           SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
         }
@@ -152,7 +155,8 @@ export const SkateRunMode: ModeDefinition = (() => {
         if (e.btn === 'A') {
           if (rig.rider.grounded) {
             rig.rider.jump(0.55 + pump * 0.45);
-            air.launch();
+            airEntryYaw = rig.char.root.rotation.y;
+          air.launch();
             SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 });
           }
           else if (rig.rider.tryGrind(world.grindLines)) {
@@ -264,6 +268,18 @@ export const SkateRunMode: ModeDefinition = (() => {
           rig.char.animator.play('skate_bail', {});
           ctx.feel?.impact?.(0.7);
         }
+        // SWITCH STANCE. BoardMovement.switchStance() existed, applied its 0.92
+        // carve tax and its 180-degree flip at the bottom of this update -- and
+        // NOTHING in the game ever called it, so switch riding was built and
+        // unreachable. The concept lock filed that as a Phase 5 control-schema
+        // slot; it does not need one. In Skate 3 you do not press a button to
+        // ride switch, you land a half-rotation and find yourself in it. Count
+        // the half-turns taken in the air: an odd number puts you switch, an
+        // even one (a clean 360) returns you to the stance you left with.
+        if (landsSwitch(airEntryYaw, rig.char.root.rotation.y)) {
+          move.switchStance();
+          bannerFlash(ctx, move.stance === 'switch' ? 'SWITCH' : 'REGULAR', 700);
+        }
         air.land();
         rig.char.root.rotation.y = Math.atan2(move.vel.x, move.vel.z) || rig.char.root.rotation.y;
       }
@@ -276,7 +292,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       }
 
       // grind catch: airborne near a rail
-      if (!rig.rider.grounded && !air.state.airborne) { /* falling without air state (rolled off an edge) */ air.launch(); }
+      if (!rig.rider.grounded && !air.state.airborne) { /* falling without air state (rolled off an edge) */ airEntryYaw = rig.char.root.rotation.y; air.launch(); }
       if (rig.rider.grinding && !grindCh) {
         grindCh = new BalanceChannel('grind', move.balance);
         grindCh.start(move.speed01);

@@ -53,6 +53,22 @@ export const TRICKS: Record<string, TrickDef> = {
   grab:  { name: 'GRAB',      pts: 90,  spinAxis: 'x', turns: 0, clip: 'board_grab' },
 };
 
+/**
+ * Did this air land the rider SWITCH?
+ *
+ * Counts half-turns between leaving the ground and touching down: an odd count
+ * means the board is pointed the other way, which is what riding switch IS. A
+ * clean 360 is even and returns you to the stance you left with. This is the
+ * real rule from the benchmark -- in Skate 3 nobody presses a "ride switch"
+ * button, you land a 180 and discover you are in it.
+ *
+ * Rounding puts the boundary at 90 degrees, so an undercooked 180 still counts.
+ * That is deliberate arcade generosity, not an accident of Math.round.
+ */
+export function landsSwitch(entryYaw: number, exitYaw: number): boolean {
+  return Math.abs(Math.round((exitYaw - entryYaw) / Math.PI)) % 2 === 1;
+}
+
 export class TrickMachine {
   score = 0; combo = 0; comboPts = 0;
   private active: TrickDef | null = null;

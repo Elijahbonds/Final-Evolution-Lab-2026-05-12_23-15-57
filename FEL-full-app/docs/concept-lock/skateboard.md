@@ -27,7 +27,7 @@ button that names them. The vocabulary and the risk both live in the flick.
 | A3 | Harder gestures are worth more (difficulty feeds scoring) | ✅ `difficulty` 1–5 | `AirControl.applyTrick` |
 | A4 | Grabs are HELD, and the hold accrues value | ✅ | `releaseGrab()` |
 | A5 | The same tricks are reachable without a right stick (keyboard/touch) | ✅ **D2 fixed this pass** | face buttons → `airTrick()` |
-| A6 | Switch stance riding | ❌ **D6** | `switchStance()` never called |
+| A6 | Switch stance riding | ✅ **D6 fixed** | `landsSwitch()` on an odd half-turn |
 
 ## B. Combo economy — the part that was missing entirely
 
@@ -77,22 +77,34 @@ overlay has a right stick.
 `tricks.bankGrind()` fed the same dead pot, so every rail and transfer bonus was
 thrown away.
 
-**D4 — The HUD shows almost none of the mode. → PHASE 8.**
+**D4 — The HUD showed almost none of the mode. → FIXED (Phase 8).**
 The mode publishes `combo`, `pot`, `momentum`, `goals`, `score`, `coins`,
 `time`, `banner`. The shared host (`board-babylon.tsx`) renders **time, coins,
 score, banner** and nothing else. The live combo string and the pot at risk are
 *the* Skate/THPS HUD — the whole tension is watching a pot you have not banked
 yet. Currently a player cannot see their multiplier, their pot, or their goals.
-This is the single largest remaining gap against the benchmark.
+The host bezel is now driven by what the mode *publishes* rather than by
+`modeKey`: a combo ticker showing the pot at risk above the multiplier, chips for
+goals and gates, and meters for flow / boost / momentum, each appearing only when
+its key is present. The coins counter is now conditional too, so surf and
+snowboard stop carrying a permanent `◈ 0`. One fix, all three modes.
 
-**D5 — The four goals are never shown. → PHASE 8.**
-`GoalTracker` banners on completion, but the objective list is never displayed,
-so the player is chasing targets they were never told about. Fold into D4.
+**D5 — The goals were never shown. → PARTIALLY FIXED (Phase 8).**
+A `GOALS n/4` chip is now on the bezel, so progress is visible. The four
+objectives themselves are still not *named* anywhere in-game — a player sees
+`0/4` without being told what the four are. Naming them needs a pre-run card or
+a pause panel, which is a UI surface this host does not have yet. **Deferred to
+Phase 8 of a later pass**, recorded rather than closed.
 
-**D6 — Switch riding is built but unreachable. → PHASE 5.**
-`BoardMovement.switchStance()` exists, applies a 0.97 speed tax, and flips the
-rider 180° at `SkateRunMode.ts:291` — and **no mode ever calls it**. Switch is a
-Skate 3 staple. Cheap to bind; needs a control-schema slot, hence Phase 5.
+**D6 — Switch riding was built but unreachable. → FIXED, and not the way this
+lock proposed.** `BoardMovement.switchStance()` existed, applied its 0.97 speed
+tax and flipped the rider 180° at `SkateRunMode.ts:291`, and **nothing in the
+game ever called it**. This document filed it as a Phase 5 control-schema slot.
+That was wrong: in Skate 3 nobody presses a "ride switch" button — you land a
+half-rotation and find yourself in it. It now follows the rotation, via
+`landsSwitch(entryYaw, exitYaw)` in `boardCore.ts`: an odd count of half-turns
+lands you switch, a clean 360 returns you to the stance you left with. No new
+button, and the mechanic is the benchmark's rather than a menu of ours.
 
 **D7 — `X` is overloaded: push when grounded, grab when airborne. → ACCEPTED.**
 Documented rather than fixed. The two are context-disjoint (you cannot push in

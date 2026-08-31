@@ -131,6 +131,70 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
+  // ── Board family (skate / surf / snowboard) ───────────────────────────────
+  // All three were missing entirely, so Controller Link simply did not offer
+  // them -- isControllerEnabled() is a plain `modeId in MODE_CONTROLLERS`, so an
+  // absent mode is not an error, it is a phone that never gets to join.
+  //
+  // Two shared idioms make these work:
+  //  - The d-pad action is named 'move', which is what opts a schema into being
+  //    forwarded as a LEFT STICK event. Board modes steer from stickX and read
+  //    nothing else for movement, so a d-pad named anything else would give a
+  //    phone every verb except the ability to turn.
+  //  - Speed is the analog R-trigger in all three (PUMP / CARVE / TUCK), and
+  //    'charge' is the vocabulary word that maps to it. Held, not tapped.
+  skateboard: {
+    modeId: 'skateboard',
+    title: 'Skate Run',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'charge', label: 'PUMP', hold: true },
+        { action: 'A', label: 'POP' },
+        { action: 'B', label: 'FLIP' },
+        { action: 'X', label: 'GRAB' },
+      ] },
+    ],
+  },
+  surf: {
+    modeId: 'surf',
+    title: 'Surf Break',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      // CUTBACK and GRAB are on here deliberately: the touch overlay gives surf
+      // only AIR and CARVE (surf D1), so on the phone path these are the mode's
+      // two missing scoring verbs. The overlay gap is still a separate fix.
+      { kind: 'button', buttons: [
+        { action: 'charge', label: 'CARVE', hold: true },
+        { action: 'A', label: 'AIR' },
+        { action: 'B', label: 'CUTBACK' },
+        { action: 'X', label: 'GRAB' },
+      ] },
+    ],
+  },
+  // Keyed 'snowboard_slalom' -- the registry key, NOT the route word. /play/snowboard
+  // maps to it in that route's loader; getting this wrong yields a phone that
+  // joins nothing, silently.
+  snowboard_slalom: {
+    modeId: 'snowboard_slalom',
+    title: 'Slalom Descent',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'charge', label: 'TUCK', hold: true },
+        { action: 'A', label: 'JUMP' },
+        { action: 'B', label: 'SPIN' },
+        { action: 'X', label: 'GRAB' },
+      ] },
+    ],
+  },
+
   // Showdown: four face verbs. Its L1/R1/SELECT specials have no pad slot and
   // stay gamepad-only, same as the touch overlay.
   showdown: {
