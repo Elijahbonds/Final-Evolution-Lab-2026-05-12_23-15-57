@@ -352,8 +352,17 @@ export const DunkMode: ModeDefinition = (() => {
             ctx.setHud({ hint: '', judgeReveal: revealed, banner: perfect ? 'FIFTY!' : '' });
             ctx.camDirector.pulse(perfect ? 1.4 : beat.band === 'eruption' ? 1 : beat.band === 'hush' ? 0.15 : 0.4, 0.6);
             if (perfect) {
+              // A 50 has to SOUND like a 50. An eruption already plays a cheer
+              // at full volume, so pitch alone would not separate the rarest
+              // call in the event from a merely great dunk. Layer it: the cheer
+              // stacks, the building keeps going, and the whistle cuts through.
               SoundKit.play('crowdCheer', { volume: 1 });
+              SoundKit.play('crowdCheer', { volume: 0.9, pitch: 1.15 });
               SoundKit.play('score', { pitch: 1.5 });
+              SoundKit.play('whistle', { volume: 0.5 });
+              setTimeout(() => SoundKit.play('crowdCheer', { volume: 0.85, pitch: 0.95 }), 420);
+              crowd.level = 1;
+              SoundKit.setAmbientLevel(1);
               ctx.feel?.impact?.(0.8);
               for (const dy of [1.6, 2.2, 2.8]) {
                 EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, dy, 0)), 'confetti');
@@ -377,7 +386,16 @@ export const DunkMode: ModeDefinition = (() => {
         ctx.camDirector.update(rival.root.position, Vector3.Zero(), rim);
       } else if (phase === 'cinematic' && rimCamCut) {
         // hold the rim-cam angle through the flush — no per-frame follow
-      } else if (phase !== 'judging' && phase !== 'contestOver') {
+      } else if (phase === 'judging') {
+        // THE VERDICT. The camera used to be left entirely undriven here, so it
+        // froze on whatever angle the replay cam happened to end on — for the
+        // full 5.1s of the reveal, which is the mode's dramatic peak. A NULL
+        // objective gives a clean hero framing with nothing else pulling on it:
+        // the dunker, waiting on his card, which is the shot the broadcast cuts
+        // to. Anything else in frame (the ball is the obvious candidate, and it
+        // is wherever it bounced) drags the composition somewhere arbitrary.
+        ctx.camDirector.update(player.root.position, Vector3.Zero(), null);
+      } else if (phase !== 'contestOver') {
         ctx.camDirector.update(player.root.position, vel, phase === 'approach' ? rim : ball.position);
       }
     },
@@ -613,6 +631,12 @@ export const DunkMode: ModeDefinition = (() => {
 
   async function rivalRound(ctx: ModeContext): Promise<void> {
     setPhase('rivalTurn');
+    // The camera follows the rival for this stretch, so the rival IS the hero
+    // on screen. FrameGuard watches heroRef and would otherwise spend the whole
+    // rival round reporting the player — who is standing off-camera by design —
+    // as lost, and after two strikes would recenter the camera off the rival
+    // mid-dunk. Point the guard at whoever the camera is actually following.
+    ctx.heroRef.current = rival.root;
     ctx.setHud({ hint: 'RIVAL ROUND', judgeReveal: null });
     for (let i = 0; i < DUNKS_PER_ROUND; i++) {
       ctx.camDirector.snapTo(rival.root.position, rim);
@@ -640,6 +664,7 @@ export const DunkMode: ModeDefinition = (() => {
       await new Promise((r) => setTimeout(r, 1200));
     }
     ctx.setHud({ banner: '' });
+    ctx.heroRef.current = player.root;          // the player is the hero again
     await advanceAfterRivalTurn(ctx);
   }
 

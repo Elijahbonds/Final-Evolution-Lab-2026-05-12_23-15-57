@@ -154,3 +154,33 @@ beziers directly behind the hoop. It now mixes 55% toward the wall colour, thinn
 and fewer at half alpha — the wall still reads as Venice graffiti, but the rim and
 ball no longer compete with it. This is the governing rule doing its job on the
 very first mode it was applied to.
+
+---
+
+## Applied: Dunk Contest
+
+```
+L1 ground plane .......... PASS  16x28 court, halfcourt markings, regulation hoop
+L2 play-critical props ... PASS  hoop/backboard/net, ball, selectable prop (alley-oop, obstacle)
+L3 boundary .............. PASS  venue box + backdrop wall + banner; no void at the edges
+L4 crowd and life ........ PASS  two crowd tiers; CrowdEnergy drives ambient level and cheer/groan
+L5 ambience .............. PASS  dusk sky, palms, lamps, arena banner, stadium bed
+budget ................... draws 53-90  meshes 53-90  frame 16.7ms @ 60fps
+legibility ............... PASS  crowd texture rebuilt — see below
+```
+
+**The governing rule caught the same failure twice, in a different asset.**
+`paintCrowd` scattered 900 fully-saturated neon dots at uniform random and used
+the result as albedo *and* emissive. It read as confetti static rather than a
+crowd, and on the dunk court a tier of it sits directly behind the hoop — where
+the player looks on every attempt.
+
+This is 3PT's graffiti wearing different clothes, and it took the same remedy:
+spectators sit in **rows** (random scatter was the single biggest reason it read
+as noise), each is a torso plus a head so the silhouette is a person, most are
+mixed heavily toward the background with only ~1 in 8 wearing the venue accent
+at strength, back rows recede for depth, and the emissive is halved.
+
+> Worth recording as a pattern: both failures were *added detail* that reduced
+> readability, and both sat directly behind the thing the player aims at. When
+> this protocol is applied to a new mode, look behind the target first.

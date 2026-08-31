@@ -240,20 +240,81 @@ function seeded(seed: number): () => number {
 /** A stand full of people: thousands of tiny coloured dabs on a dark tier so a
  *  crowd reads as a CROWD from the field instead of a flat grey block. One
  *  texture is shared by all three rows of a tier. */
+/** Mix a hex colour toward another by t (0..1). The crowd's legibility fix. */
+function mixHex(a: string, b: string, t: number): string {
+  const p = (h: string): [number, number, number] => {
+    const v = h.replace('#', '');
+    return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)];
+  };
+  const [r1, g1, b1] = p(a), [r2, g2, b2] = p(b);
+  const m = (x: number, y: number): string =>
+    Math.round(x + (y - x) * t).toString(16).padStart(2, '0');
+  return `#${m(r1, r2)}${m(g1, g2)}${m(b1, b2)}`;
+}
+
+/**
+ * A crowd in a stand — SEATED IN ROWS, mostly dark, with occasional colour.
+ *
+ * This was 900 fully-saturated neon dots scattered at uniform random from an
+ * 8-colour palette, applied as albedo AND emissive. It did not read as a crowd;
+ * it read as confetti static, and on the dunk court a tier of it sits directly
+ * behind the hoop — precisely where the player looks on every attempt.
+ *
+ * That is the same failure the World-Population Protocol was written for after
+ * 3PT's graffiti backdrop, and it gets the same remedy: keep the character,
+ * stop competing with the thing the player is trying to see.
+ *
+ *   - people sit in ROWS, because random scatter is the single biggest reason
+ *     the old texture read as noise rather than as a stand full of people
+ *   - each person is a torso plus a smaller head, so the silhouette is a person
+ *   - most of the crowd is mixed heavily toward the background: real stands are
+ *     mostly dark clothing, and it is the MINORITY of bright tops that reads as
+ *     colour. Everyone being bright is what destroys the read.
+ *   - only ~1 in 8 wears the venue accent at strength — those are the pops
+ *   - emissive is halved; every spectator glowing like an LED was why the tier
+ *     drew the eye harder than the rim did
+ */
 function paintCrowd(scene: Scene, accent: string): DynamicTexture {
   const W = 512, H = 128;
+  const BG = '#0C1020';
   const tex = new DynamicTexture('crowdTex', { width: W, height: H }, scene, false);
   const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
-  ctx.fillStyle = '#0C1020';
+  ctx.fillStyle = BG;
   ctx.fillRect(0, 0, W, H);
-  const palette = ['#FF6B00', '#00E5FF', '#FFD700', '#FF3366', '#00FF9D', '#A855F7', '#F2F6FF', accent];
+
+  const tops = ['#FF6B00', '#00E5FF', '#FFD700', '#FF3366', '#00FF9D', '#A855F7', '#F2F6FF', accent];
+  const skins = ['#8D5524', '#C68642', '#E0AC69', '#F1C27D', '#5C3317'];
   const rnd = seeded(0x5eed01);
-  for (let i = 0; i < 900; i++) {
-    const x = rnd() * W, y = rnd() * H;
-    ctx.fillStyle = palette[Math.floor(rnd() * palette.length)];
-    ctx.beginPath();
-    ctx.arc(x, y, 1.8 + rnd() * 2.4, 0, Math.PI * 2);
-    ctx.fill();
+
+  const ROWS = 7;
+  const rowGap = H / ROWS;
+  for (let row = 0; row < ROWS; row++) {
+    // Back rows sit higher in the texture and read darker — cheap depth.
+    const depth = 1 - row / (ROWS - 1);            // 1 = back, 0 = front
+    const y = rowGap * (row + 0.5);
+    const pitch = 9 + rnd() * 2;
+    for (let x = pitch * 0.5; x < W; x += pitch) {
+      const jx = x + (rnd() - 0.5) * 3;
+      const jy = y + (rnd() - 0.5) * 2;
+      if (rnd() < 0.06) continue;                  // empty seats — stands are never full
+
+      // The pop: a minority wear the venue accent at real saturation.
+      const bright = rnd() < 0.12;
+      const base = tops[Math.floor(rnd() * tops.length)];
+      // Everyone else is mixed most of the way to the background. Back rows
+      // recede further, which is what gives the tier depth instead of flatness.
+      const t = bright ? 0.35 : 0.72 + depth * 0.12;
+      ctx.fillStyle = mixHex(base, BG, Math.min(0.9, t));
+      ctx.beginPath();
+      ctx.ellipse(jx, jy + 1.6, 2.6, 3.0, 0, 0, Math.PI * 2);   // torso
+      ctx.fill();
+
+      const skin = skins[Math.floor(rnd() * skins.length)];
+      ctx.fillStyle = mixHex(skin, BG, 0.45 + depth * 0.15);
+      ctx.beginPath();
+      ctx.arc(jx, jy - 2.0, 1.7, 0, Math.PI * 2);               // head
+      ctx.fill();
+    }
   }
   tex.update(false);
   return tex;
@@ -444,7 +505,8 @@ function buildProp(scene: Scene, p: PropSpec, root: TransformNode, shadows: Shad
           // M108: a living crowd texture instead of a flat grey block.
           rmat.albedoTexture = crowdTex;
           rmat.emissiveTexture = crowdTex;
-          rmat.emissiveColor = c3('#FFFFFF').scale(0.18);
+          // Halved: every spectator glowing pulled the eye off the rim.
+          rmat.emissiveColor = c3('#FFFFFF').scale(0.09);
         }
         row.material = rmat;
         add(row, false);

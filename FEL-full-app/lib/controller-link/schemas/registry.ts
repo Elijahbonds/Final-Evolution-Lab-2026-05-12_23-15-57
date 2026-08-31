@@ -37,6 +37,39 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
+  // ── Dunk Contest ──────────────────────────────────────────────────────────
+  // The charge is analog, so the phone idiom is the same one 3PT uses: tilt
+  // back to load the jump, release to launch. The d-pad is genuinely dual-role
+  // in this mode — it picks the prop during the approach and arms mid-air
+  // tricks during the flight — so it is forwarded verbatim and the mode decides
+  // which job it is doing from its own phase.
+  dunk: {
+    modeId: 'dunk',
+    title: 'Dunk Contest',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      {
+        kind: 'motion',
+        motion: {
+          action: 'charge',
+          hint: 'Tilt back to load your jump — release to launch',
+          axis: 'pitch',
+          fullChargeDeg: 40,           //TUNE(elijah)
+        },
+      },
+      { kind: 'dpad', dpad: { action: 'dpad' } },
+      // Buttons are the fallback when motion is denied. CHARGE is `hold`, which
+      // the Babylon adapter ramps into an analog trigger — a plain tap would
+      // arrive as a face button and be read as SLAM.
+      { kind: 'button', buttons: [
+        { action: 'charge', label: 'CHARGE', hold: true },
+        { action: 'A', label: 'SLAM' },
+        { action: 'B', label: 'STYLE' },
+      ] },
+    ],
+  },
+
   // ── Air-session family ────────────────────────────────────────────────────
   // The run-up IS a d-pad cadence, so these need the dpad schema as well as the
   // two air verbs. Same shape for both because they are one shared core.

@@ -100,6 +100,29 @@ async function main(): Promise<void> {
     'E6 hold down maps to a held button');
   ok(seen[1].t === 'button' && seen[1].btn === 'X' && !seen[1].pressed, 'E7 hold up releases it');
 
+  // A HELD CHARGE must stay analog. This is the fallback a phone lands on when
+  // it denies motion permission, and 'charge' is not a face button — it fell
+  // through to normalizeBtn(), which maps every unknown action to 'A', so
+  // holding CHARGE on such a phone fired SLAM instead. No error, just the wrong
+  // verb: the same silent-degradation shape as the Karate VS verb-key bug, so
+  // it gets the same treatment — a permanent guard rather than only a fix.
+  seen.length = 0;
+  feed({ a: 'charge:down', t: 0 });
+  ok(seen.length >= 1 && seen[0].t === 'trigger',
+    'E8 a HELD charge stays a trigger — never a face button');
+  ok(!seen.some((i) => i.t === 'button'),
+    'E9 a held charge emits no button press (SLAM must not fire from CHARGE)');
+  await new Promise((r) => setTimeout(r, 260));
+  const ramped = seen.filter((i) => i.t === 'trigger') as Extract<FelInput, { t: 'trigger' }>[];
+  ok(ramped.length >= 3 && ramped[ramped.length - 1].value > ramped[0].value,
+    `E10 a held charge RAMPS like the keyboard does (${ramped.length} samples)`);
+  seen.length = 0;
+  feed({ a: 'charge:up', t: 0 });
+  ok(seen.length === 1 && seen[0].t === 'trigger' && seen[0].value === 0,
+    'E11 releasing charge emits trigger 0 — the launch edge every mode watches');
+  await new Promise((r) => setTimeout(r, 200));
+  ok(seen.length === 1, 'E12 the ramp stops on release — no leaked timer');
+
   // ── report ───────────────────────────────────────────────────────────────
   if (fail.length) {
     console.error(`controller-link-tests: ${fail.length} FAILED of ${checks}`);

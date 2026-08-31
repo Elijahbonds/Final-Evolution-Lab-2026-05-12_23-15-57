@@ -28,7 +28,19 @@ import type { Dir } from './schemas/dpad';
  *   anything else              -> passed through as a button of that name,
  *                                 which modes can pattern-match on.
  */
+/** Matches InputBus's space-key analog ramp so a phone feels like a keyboard. */
+const CHARGE_RAMP_MS = 1100;
+
 export function toInputBus(bus: InputBus): (ev: ControlEvent) => void {
+  // A held CHARGE button has to be ramped by SOMEBODY. On keyboard InputBus
+  // does it (space depth over 1.1s); on the motion path the phone does it from
+  // tilt. A held button has neither, so the bridge ramps it here — otherwise
+  // the fallback is a single instant value and charge stops being analog.
+  let chargeTimer: ReturnType<typeof setInterval> | null = null;
+  const stopCharge = (): void => {
+    if (chargeTimer) { clearInterval(chargeTimer); chargeTimer = null; }
+  };
+
   return (ev: ControlEvent) => {
     const emit = (i: FelInput): void => bus.emit(i);
 
@@ -48,6 +60,24 @@ export function toInputBus(bus: InputBus): (ev: ControlEvent) => void {
     const holdMatch = /^([A-Za-z0-9_]+):(down|up)$/.exec(ev.a);
     if (holdMatch) {
       const [, name, edge] = holdMatch;
+      // 'charge' is ANALOG everywhere else in this vocabulary, and a held button
+      // is its fallback when a phone denies motion or is not in a secure
+      // context. Without this branch it fell through to normalizeBtn(), which
+      // maps every unknown action to 'A' — so on a phone with motion denied,
+      // holding CHARGE fired SLAM instead. That is the silent-degradation shape
+      // this project keeps getting bitten by: no error, just the wrong verb.
+      if (name === 'charge') {
+        stopCharge();
+        if (edge === 'up') { emit({ t: 'trigger', side: 'R', value: 0 }); return; }
+        const t0 = Date.now();
+        emit({ t: 'trigger', side: 'R', value: 0.01 });
+        chargeTimer = setInterval(() => {
+          const v = Math.min(1, (Date.now() - t0) / CHARGE_RAMP_MS);
+          emit({ t: 'trigger', side: 'R', value: v });
+          if (v >= 1) stopCharge();
+        }, 50);
+        return;
+      }
       emit({ t: 'button', btn: normalizeBtn(name), pressed: edge === 'down' });
       return;
     }

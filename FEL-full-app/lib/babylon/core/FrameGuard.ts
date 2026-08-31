@@ -29,6 +29,11 @@ export class FrameGuard {
     const hero = this.hero();
     const engine = this.scene.getEngine();
     if (!hero) return;
+    // A SUSPENDED director means the mode has deliberately taken the camera —
+    // a replay, a rim cut, a cinematic. The hero being out of frame is then the
+    // authored shot, not a fault, and "recentering" it would be the guard
+    // fighting the direction. Only judge framing the director is responsible for.
+    if (this.director?.suspended) { this.missStreak = 0; return; }
     const p = Vector3.Project(
       hero.position.add(new Vector3(0, 1.2, 0)),
       Matrix.Identity(),
