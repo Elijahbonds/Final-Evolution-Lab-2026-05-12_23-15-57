@@ -72,8 +72,27 @@ waves 1 -> 2 reached, 5-6 KOs per run, perk shop and chi burst live
 
 ## Still open
 
-1. **No locked benchmark** — the blocker on a real pass. §4.3 also still lists
-   `UnrealArenaMode`, `VelocityKartGrandPrixMode` and `AeroAcesFlyerMode` as
-   undecided.
+1. **No locked benchmark** — the blocker on a real pass.
+
+## §4.3 resolved: three of the four never existed
+
+Elijah asked what `UnrealArenaMode` was, saying he never wrote it. He is right.
+
+`UnrealArenaMode`, `VelocityKartGrandPrixMode` and `AeroAcesFlyerMode` appear
+**only in markdown audit paperwork** — never in a `.ts` or `.tsx` file anywhere in
+the repository. There is no route, no host, no registry entry and no reference of
+any kind in source. A previous audit had already reached the same conclusion and
+said so plainly:
+
+> `Unreal Arena ❌ NOT FOUND in codebase`
+> `UnrealArenaMode: FORMALLY RETIRED (not in codebase)`
+
+The bible's §4.3 inherited those three entries from that paperwork and still
+lists them as awaiting a retire-or-mount decision. **They cannot be mounted;
+there is nothing to mount.** They should be struck from §4.3 rather than carried
+as backlog — carrying phantom entries is itself the scope-drift §0 warns about.
+
+That leaves `KarateEndlessMode` as the only real §4.3 mode, and it is now
+mounted (this document). **§4.3 is closed.**
 2. **No World-Population pass, no §7 checklist** — deliberately, per the above.
 3. **Not tested on real hardware**, same as every other mode.
