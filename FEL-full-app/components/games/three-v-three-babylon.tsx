@@ -46,25 +46,38 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       onEnd(result);
     };
 
-    runMode(MODES.threevthree, {
-      canvas,
-      input: bus,
-      onPhase: (p, cd) => {
-        setPhase(p);
-        setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
-        setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
-      },
-      onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
-      resultSink,
-    })
-      .then((s) => {
-        if (disposed) { s(); return; }
-        stop = s;
+    // StrictMode runs effect -> cleanup -> effect. Starting the harness
+    // immediately means the PHANTOM mount also builds a Babylon engine, and its
+    // cleanup cannot cancel it — `stop` is not assigned until the async load
+    // resolves. Two engines then sit on the SAME canvas sharing one WebGL
+    // context and fight, and the loser renders nothing: the HUD streams happily
+    // from one instance while the canvas shows an empty void. Measured on this
+    // mode: mountVenue ran TWICE and the scene came out at 5 meshes.
+    // Deferring by a tick lets the phantom mount be cancelled before it builds.
+    // Identical fix to the one the Dunk host needed.
+    const startTimer = setTimeout(() => {
+      if (disposed) return;
+      runMode(MODES.threevthree, {
+        canvas,
+        input: bus,
+        onPhase: (p, cd) => {
+          setPhase(p);
+          setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
+          setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
+        },
+        onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
+        resultSink,
       })
-      .catch((e) => console.error('[FEL-HOOPS3] boot failed', e));
+        .then((s) => {
+          if (disposed) { s(); return; }
+          stop = s;
+        })
+        .catch((e) => console.error('[FEL-HOOPS3] boot failed', e));
+    }, 0);
 
     return () => {
       disposed = true;
+      clearTimeout(startTimer);
       stop?.();
       busRef.current = null;
     };

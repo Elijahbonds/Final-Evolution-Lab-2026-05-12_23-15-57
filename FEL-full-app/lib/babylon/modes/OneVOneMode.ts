@@ -48,7 +48,8 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 
-const RIM = new Vector3(0, 3.05, -0.6);
+/** Exported so hoop-alignment-tests can check it against the venue's hoop. */
+export const RIM = new Vector3(0, 3.05, -0.6);
 const TARGET_SCORE = 11;
 // FORMAT FIX: scoring used to be "1pt inside a 4.2-unit paint radius, 2pts
 // anywhere past it, no matter how far" — a made shot was never worth 3, and

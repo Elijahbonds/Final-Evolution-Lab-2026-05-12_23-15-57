@@ -34,16 +34,25 @@ export function DevModeRunner({ modeKey }: { modeKey: string }) {
     let stop: (() => void) | null = null;
     let disposed = false;
 
-    runMode(def, {
-      canvas,
-      input: bus,
-      onPhase: (p, d) => { if (!disposed) { setPhase(p); if (p === 'error') setErr(String(d)); } },
-      onHud: (h) => { if (!disposed) setHud((prev) => ({ ...prev, ...h })); },
-      resultSink: async (r) => console.log('[dev] result', r),
-    }).then((s) => { if (disposed) s(); else stop = s; })
-      .catch((e) => { if (!disposed) setErr(String(e?.message ?? e)); });
+    // Deferred for the same reason every host defers: the phantom StrictMode
+    // mount would otherwise build a second engine on this canvas that its own
+    // cleanup cannot cancel, and the two fight over one WebGL context. The
+    // mountedRef guard above does NOT prevent it — the phantom mount is the one
+    // that sets the ref. Measured on threevthree through this runner: mountVenue
+    // ran twice and the canvas came out empty at 5 meshes while the HUD streamed.
+    const startTimer = setTimeout(() => {
+      if (disposed) return;
+      runMode(def, {
+        canvas,
+        input: bus,
+        onPhase: (p, d) => { if (!disposed) { setPhase(p); if (p === 'error') setErr(String(d)); } },
+        onHud: (h) => { if (!disposed) setHud((prev) => ({ ...prev, ...h })); },
+        resultSink: async (r) => console.log('[dev] result', r),
+      }).then((s) => { if (disposed) s(); else stop = s; })
+        .catch((e) => { if (!disposed) setErr(String(e?.message ?? e)); });
+    }, 0);
 
-    return () => { disposed = true; mountedRef.current = false; stop?.(); };
+    return () => { disposed = true; mountedRef.current = false; stop?.(); clearTimeout(startTimer); };
   }, [modeKey]);
 
   return (

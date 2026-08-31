@@ -50,8 +50,11 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     environment: dusk('#F0637A', '#1B2A6B', '#2A3C7A', '#FFB36B'),
     ground: { kind: 'court', size: [16, 28], color: '#1B7FB5', lineColor: '#F2F6FF', markings: 'basketball' },
     props: [
-      { kind: 'hoop', position: [0, 0, -12.5], color: '#FF6B00' },
-      { kind: 'hoop', position: [0, 0, 12.5], rotationY: Math.PI, color: '#FF6B00' },
+      // Same half-court correction as 3v3: OneVOneMode clamps play to
+      // z 0.5..14.5 and shoots at RIM (0, 3.05, -0.6), but this venue put
+      // baskets at both ends of a full court, so the nearest hoop stood behind
+      // the players at z +13.22. -1.32 puts the rim on the mode's RIM.
+      { kind: 'hoop', position: [0, 0, -1.32], color: '#FF6B00' },
       ...beachDressing,
     ],
     actors: [
@@ -89,8 +92,15 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     environment: dusk('#C24BE0', '#150E3D', '#2B1D5E', '#FFB0E0', 0.5),
     ground: { kind: 'court', size: [18, 30], color: '#2B4A8F', lineColor: '#FFFFFF', markings: 'basketball' },
     props: [
-      { kind: 'hoop', position: [0, 0, -13.5], color: '#BF5AF2' },
-      { kind: 'hoop', position: [0, 0, 13.5], rotationY: Math.PI, color: '#BF5AF2' },
+      // ONE basket, at the end the mode actually plays to.
+      // 3v3 streetball is a HALF-COURT game — first to 21, one hoop — and
+      // ThreeVThreeMode enforces that: clampToHalfCourt keeps every player in
+      // z 0.5..15 and RIM is (0, 3.05, -0.6). This venue gave it a FULL court
+      // with baskets at both ends, z -13.5 and +13.5, so the nearest real hoop
+      // stood at z +14.22 — BEHIND the players — while they shot at empty air
+      // just past their own baseline. A hoop prop sits 0.72 behind its rim, so
+      // -1.32 puts the rim exactly on the mode's RIM.
+      { kind: 'hoop', position: [0, 0, -1.32], color: '#BF5AF2' },
       { kind: 'crowdTier', position: [0, 0, -24] },
       { kind: 'crowdTier', position: [0, 0, 24], rotationY: Math.PI },
       { kind: 'lamp', position: [12, 0, -8], color: '#E0B0FF' },

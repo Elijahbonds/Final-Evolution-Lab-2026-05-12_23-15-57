@@ -29,6 +29,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'dunk-system-tests.ts', guards: 'dunk trick recognition' },
   { script: 'judge-panel-tests.ts', guards: 'five judges, ceiling 50, staged reveal' },
   { script: 'procedural-skin-tests.ts', guards: 'the athlete is a skinned mesh that deforms' },
+  { script: 'hoop-alignment-tests.ts', guards: 'every rim is on a real, regulation hoop' },
   { script: 'spawn-path-tests.ts', guards: "converted modes keep the player's identity" },
   { script: 'dunk-animation-tests.ts', guards: 'dunk clips resolve AND move the rig' },
 ];

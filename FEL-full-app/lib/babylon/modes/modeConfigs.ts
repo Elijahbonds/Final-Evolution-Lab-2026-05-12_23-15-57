@@ -17,13 +17,13 @@ export const DUNK_CONFIG = {
   heroUrl: HERO_URL,
   // Aligned to the hoop the player can actually SEE. venueSpecs puts
   // basketball_dunk's hoop prop at z = -11 and NexusWebScene's HOOP_RIM_OFFSET
-  // puts the rim 0.72 in front of it at y 2.70, so the real rim is
-  // (0, 2.70, -10.28). This config used to say (0, 3.05, -0.6): the dunker flew
+  // puts the rim 0.72 in front of it at regulation 3.05, so the real
+  // rim is (0, 3.05, -10.28). This config used to say (0, 3.05, -0.6): the dunker flew
   // to mid-court and dunked into thin air while the backboard sat ten metres
   // further downcourt. The approach distances below are UNCHANGED — gather is
   // still 2.78 out from the rim and the start is still 6.3 behind the gather —
   // the whole run-up is simply relocated to where the basket is.
-  startZ: -1.2, gatherZ: -7.5, rimZ: -10.28, rimHeight: 2.70,
+  startZ: -1.2, gatherZ: -7.5, rimZ: -10.28, rimHeight: 3.05,
   qteWindowSec: 0.28,
   target: 21,
   rivalMakeChance: 0.55,

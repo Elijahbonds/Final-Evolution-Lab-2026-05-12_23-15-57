@@ -53,11 +53,18 @@ export interface Grade {
  *
  * Exported because a mode has to fly the ball to the same place the player can
  * see the hoop, and those were two independent numbers. DUNK_CONFIG put its rim
- * at z = -0.6 while this venue puts the hoop at z = -11 — the dunker flew to
+ * at z = -0.6 while its venue puts the hoop at z = -11 — the dunker flew to
  * mid-court and slammed into empty air ten metres short of the basket that was
  * on screen. Nothing errored, because both halves were internally consistent.
+ *
+ * The height is REGULATION: a basketball rim is 10 feet, 3.05m. This hoop was
+ * built at 2.70 — about 8'10" — so every basketball mode in the game was
+ * shooting at a rim nearly a foot low. The World-Population Protocol's L1 is
+ * explicit that markings and dimensions are checked against the real sport
+ * rather than eyeballed, and rim height is the single most-known number in
+ * basketball.
  */
-export const HOOP_RIM_OFFSET = { y: 2.70, z: 0.72 } as const;
+export const HOOP_RIM_OFFSET = { y: 3.05, z: 0.72 } as const;
 
 /** M110 — the procedural horizon backdrops. Each paints a recognisable place
  *  into the sky-dome texture (buildings, stands, peaks, sea, dojo interior…)
@@ -431,12 +438,14 @@ function buildProp(scene: Scene, p: PropSpec, root: TransformNode, shadows: Shad
     case 'hoop': {
       // Rim placement comes from HOOP_RIM_OFFSET so a mode can compute where the
       // ball actually has to go. See the constant for why that matters.
-      const pole = MeshBuilder.CreateCylinder('pole', { height: 3.05 * s, diameter: 0.16 * s }, scene);
-      pole.position.y = (3.05 * s) / 2;
+      const pole = MeshBuilder.CreateCylinder('pole', { height: 3.30 * s, diameter: 0.16 * s }, scene);
+      pole.position.y = (3.30 * s) / 2;
       pole.material = surface(scene, 'poleMat', '#2A2E37', 0.5, 0.4);
       add(pole);
+      // Regulation backboard is 1.8m wide x 1.05m tall with its lower edge
+      // level with the rim, so its centre sits half a board above rim height.
       const board = MeshBuilder.CreateBox('board', { width: 1.8 * s, height: 1.05 * s, depth: 0.06 * s }, scene);
-      board.position.set(0, 3.0 * s, 0.3 * s);
+      board.position.set(0, (HOOP_RIM_OFFSET.y + 0.45) * s, 0.3 * s);
       board.material = surface(scene, 'boardMat', '#F4F1E8', 0.4);
       add(board);
       const rim = MeshBuilder.CreateTorus('rim', { diameter: 0.90 * s, thickness: 0.055 * s, tessellation: 24 }, scene);
