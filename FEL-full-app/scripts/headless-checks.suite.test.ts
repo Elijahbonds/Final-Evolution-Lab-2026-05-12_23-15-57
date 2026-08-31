@@ -30,6 +30,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'judge-panel-tests.ts', guards: 'five judges, ceiling 50, staged reveal' },
   { script: 'procedural-skin-tests.ts', guards: 'the athlete is a skinned mesh that deforms' },
   { script: 'threevthree-core-tests.ts', guards: '3v3 spacing, matchups and the real arc' },
+  { script: 'venue-bounds-tests.ts', guards: 'the camera box matches the court it clamps to' },
   { script: 'stick-convention-tests.ts', guards: 'hardware and movement agree on which way is forward' },
   { script: 'basketball-rules-tests.ts', guards: 'rims, arcs and scoring agree across every basketball mode' },
   { script: 'spawn-path-tests.ts', guards: "converted modes keep the player's identity" },

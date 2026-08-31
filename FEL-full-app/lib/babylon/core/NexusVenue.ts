@@ -70,6 +70,21 @@ export interface MountVenueOptions {
  * venue should still be playable on whatever VenueKit already builds; losing
  * the scenery is a downgrade, losing the mode is an outage.
  */
+/**
+ * The venue footprint the camera is allowed to sit inside.
+ *
+ * Exported so it can be asserted against the ground it claims to describe —
+ * these were two independent calculations of the same rectangle, and they
+ * disagreed the moment a ground gained an offset.
+ */
+export function venueBounds(spec: { ground: { size: [number, number]; offset?: [number, number] } }): {
+  minX: number; maxX: number; minZ: number; maxZ: number; minY: number;
+} {
+  const [w, d] = spec.ground.size;
+  const [ox, oz] = spec.ground.offset ?? [0, 0];
+  return { minX: ox - w / 2, maxX: ox + w / 2, minZ: oz - d / 2, maxZ: oz + d / 2, minY: 0 };
+}
+
 export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOptions = {}): VenueHandle | null {
   const spec = specFor(modeId);
   if (!spec) {
@@ -98,12 +113,19 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   // Hand the camera the venue footprint. Without this the M64 bounds clamp has
   // nothing to clamp against and the camera can leave the venue entirely — the
   // full-court 3v3 case that produced E26.
-  const [w, d] = spec.ground.size;
-  ctx.camDirector?.setBounds?.({
-    minX: -w / 2, maxX: w / 2,
-    minZ: -d / 2, maxZ: d / 2,
-    minY: 0,
-  });
+  // The footprint must include the ground's OFFSET, not just its size. Grounds
+  // are centred on the origin by default, so `size` alone was the whole story
+  // until half-court venues started offsetting theirs to sit around the half
+  // actually played (1v1 and 3v3, so the painted key lands under the basket).
+  //
+  // Without the offset the camera is clamped to a box the court no longer
+  // occupies. 3v3's ground is 18x20 offset +7.8 — spanning z -2.2..17.8 — but
+  // the bounds said z -10..10, so the camera was pinned at z 8.8 (10 minus the
+  // 1.2 margin) while asking to sit at 17.8. Pinned 2.8m behind the hero while
+  // still holding the preset's full height, that is a ~60 degree pitch against a
+  // preset declaring 28, and the hero drops out of the bottom of frame: the
+  // [FEL-FRAME] lines that survived the 3v3 pass.
+  ctx.camDirector?.setBounds?.(venueBounds(spec));
 
   const placeholders = built.actors;
 

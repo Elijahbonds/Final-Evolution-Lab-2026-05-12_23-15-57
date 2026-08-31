@@ -27,7 +27,7 @@ Third mode through the full checklist, after Three-Point Shootout and Dunk.
 | 0 Platform preconditions | `gate0-rig-tests` 58 green |
 | 1 Concept Lock | `docs/concept-lock/threevthree.md` — 19 criteria, 10 deviations resolved |
 | 2 Core mechanics + tests | `threevthree-core-tests` 18 green — spacing, matchups, the real arc, the scoring scale |
-| 3 Camera & framing | **CORRECTED — see below.** 19 lines with auto-recentres at the start of the pass; 1–2 transients remain at spawn |
+| 3 Camera & framing | ✅ **0 `[FEL-FRAME]` lines**, reproducibly (19 with auto-recentres before the pass). Root-caused — see below |
 | 4 Reachability | registry · `ENABLED_BABYLON_MODES` · `/play/threevthree` · `three-v-three-babylon.tsx` · `MODE_VERBS` · venue map · `game-data` |
 | 5 Input & control schema | `verb-key-alignment-tests` 39 · `controller-link-tests` 35 · forward direction fixed (D9) |
 | 6 World population | L1–L5 below; half court, one basket, stands repositioned |
@@ -81,29 +81,41 @@ height, wrong markings — on a mode listed as shipped-standard. L1 is the layer
 the protocol says to check against the real sport rather than eyeball, and this
 is the clearest case yet of why.
 
-## Correction to this sign-off's Phase 3
+## Correction history for Phase 3 — and the real cause
 
-This document originally recorded **0 `[FEL-FRAME]` lines**. That measurement was
-taken with a hand-written script whose timing happened to miss the transient.
-Re-measured later with the standard `capture-mode-play` harness, 3v3 reproducibly
-logs **1–2 hero-off-screen lines at spawn** (single strikes, no auto-recentre —
-the 19 lines and the auto-recentres from before the pass are genuinely gone).
+This section has been wrong twice, so here is the whole of it.
 
-The cause is now understood and is a **platform** issue, not a 3v3 one:
-`CameraDirector` adds a flat `cfg.height` regardless of how far back the camera
-actually ends up, so a `fitTwo` preset framing a nearby objective can sit 2.8m
-behind the hero while still holding 3.4–5.2m of height — a 55–67 degree pitch
-against presets that declare a 28 degree cap. The hero drops below frame.
+**First version:** recorded **0 `[FEL-FRAME]` lines**. That was measured with a
+hand-written script whose timing happened to miss the transient.
 
-Mitigated by re-tuning the `team` preset, which was written for "full-court
-flow" (distance 11, height 5.2) and applied to a half-court game: now 9.5 / 3.4.
-That reduced the count but did **not** eliminate it, and something downstream —
-`resolveOcclusion` or `clampToBounds` — is still pulling the camera to ~2.8m
-when it asks for 9.5. That is not root-caused, and it is written here rather
-than left as a green tick.
+**Second version:** re-measured with the standard `capture-mode-play` harness,
+found **1–2 lines at spawn**, and attributed them to `CameraDirector` adding a
+flat `cfg.height` regardless of distance — a pitch-cap violation. That
+attribution was **wrong**. It was the symptom, not the cause.
 
-Strictly, Phase 3's exit criterion is "no `[FEL-FRAME] hero off-screen`", so this
-phase is **not** cleanly passed. The rest of the pass stands.
+**The actual cause was mine, introduced by this very pass.** `mountVenue` hands
+the camera a footprint to clamp against, computed from `spec.ground.size`
+**alone**. That was the whole story while every ground was centred on the
+origin — and became wrong the moment this pass gave 3v3 a `ground.offset` so the
+painted key would land under the basket.
+
+3v3's ground is 18×20 offset +7.8, spanning z −2.2..17.8. The bounds still said
+z −10..10, so the camera was pinned at **z 8.8** (10 minus the 1.2 margin) while
+asking to sit at 17.8. Pinned 2.8m behind the hero while still holding the
+preset's full height *is* a ~60° pitch against a preset declaring 28 — which is
+why the pitch looked like the problem. The hero dropped out of the bottom of
+frame.
+
+Two numbers describing one rectangle, never compared. `venueBounds()` is now
+exported and `venue-bounds-tests` asserts the camera's box **is** the court's
+box for every venue — 67 checks, 8 of which fail if the offset is dropped again.
+
+With that fixed, Phase 3 measures **0 lines across repeated runs**, and 1v1
+(which carries the same kind of offset) measures 0 as well.
+
+The `team` preset retune (11/5.2 → 9.5/3.4) is kept, but for the honest reason:
+it was written for "full-court flow" and 3v3 is half-court, and 9.5 keeps the
+camera comfortably inside the now-correct box where 11 would graze it.
 
 ## Carry-forwards — recorded, not hidden
 

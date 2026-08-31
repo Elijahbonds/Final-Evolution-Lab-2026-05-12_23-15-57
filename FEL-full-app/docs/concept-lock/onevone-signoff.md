@@ -79,6 +79,14 @@ game had ever set `backdrop` — found during the Dunk pass and applied here.
 
 ## Carry-forwards
 
+0. **RESOLVED since this was written.** Both of the top two carry-forwards below
+   have been closed by a platform pass: the stick convention is now normalised
+   once in `LocalInputSource` (guarded by `stick-convention-tests`), and the
+   per-mode negation this document describes has been removed from 1v1. The
+   camera-bounds bug that pinned the camera on offset grounds is fixed and
+   guarded by `venue-bounds-tests`. Re-measured after both: 1v1 plays to an 8–0
+   with **0 `[FEL-FRAME]` lines**.
+
 1. **`CourtMovement`'s stick convention still disagrees with every input source.**
    Now negated at the boundary in BOTH 1v1 and 3v3 — which is two patches around
    one platform bug, and the point at which it should stop being patched
