@@ -43,7 +43,16 @@ import { KARATE_CONFIG as CFG } from './modeConfigs';
 type Phase = 'intro' | 'fighting' | 'roundOver' | 'matchOver';
 const ROUNDS_TO_WIN = 2;
 const MOVE_SPEED = 3.4;
-const ARENA_HALF = 7.5;
+// THE FIGHT AREA MUST BE INSET FROM THE ROOM. The dojo floor is 18x18, so its
+// half-extent is 9 — and this was 7.5, leaving 1.5m between a fighter at the
+// edge and the wall. The fight camera pulls back about 5m, so a fighter backed
+// into the boundary left it nowhere to go: it ended up 0.3m behind the hero,
+// pinned against the wall, and the hero fell out of frame. Every [FEL-FRAME]
+// line this mode produced was at exactly z = -7.5.
+//
+// 4.5 gives a 9m square to fight in — about the size of a Soul Calibur ring —
+// and keeps a clear 4.5m of room behind either fighter for the camera.
+const ARENA_HALF = 4.5;
 const SLOWMO_SEC = 0.5;
 const SLOWMO_SCALE = 0.3;
 
@@ -280,7 +289,17 @@ export const KarateVSMode: ModeDefinition = (() => {
 
       // player movement — lock-on: always face the rival, stick strafes/closes
       if (meState.controllable && !striking && !meState.blockHeld) {
-        const vel = new Vector3(stickX, 0, -stickY).scale(MOVE_SPEED);
+        // FORWARD IS TOWARD THE OPPONENT. Every input source reports up-stick
+        // as NEGATIVE y, and the camera sits behind the player looking down -z,
+        // so "up" on screen is -z. `-stickY` yielded +z and walked you away from
+        // the fight.
+        //
+        // Note this is a THIRD site of the same platform disagreement, and the
+        // LocalInputSource normalisation that fixed 1v1 and 3v3 does NOT reach
+        // it: this mode reads stickX/stickY raw in onInput and never goes
+        // through the adapter. Fixing a seam only fixes the consumers that use
+        // the seam.
+        const vel = new Vector3(stickX, 0, stickY).scale(MOVE_SPEED);
         player.root.position.addInPlace(vel.scale(sdt));
         player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x));
         player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z));

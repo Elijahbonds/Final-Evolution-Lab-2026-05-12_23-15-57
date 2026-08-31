@@ -12,6 +12,16 @@ import { mkdirSync } from 'node:fs';
 const MODE_URL = process.env.URL ?? 'http://localhost:3000/dev/mode/onevone';
 const HOLD = Number(process.env.HOLD ?? 390);
 const REPS = Number(process.env.REPS ?? 10);
+/**
+ * Keys to tap each rep, comma separated. Defaults to the basketball pattern
+ * (hold space = charge/shoot). A mode whose verbs are face buttons needs its
+ * own: Karate VS is JAB(j) KICK(k) BLOCK(l) HEAVY(i), and driving it with the
+ * basketball pattern just stands there being hit — which is exactly what the
+ * first run showed, at hp 22 to 100.
+ */
+/** ms to hold forward before acting — how long the mode needs to close range. */
+const APPROACH = Number(process.env.APPROACH ?? 900);
+const KEYS = (process.env.KEYS ?? '').split(',').map((k) => k.trim()).filter(Boolean);
 const OUT = process.env.OUT_DIR ?? 'docs/shots/play';
 const NAME = process.env.NAME ?? 'play';
 mkdirSync(OUT, { recursive: true });
@@ -79,8 +89,12 @@ const hud = async (): Promise<Record<string, unknown>> => {
 console.log(`${NAME} start :`, JSON.stringify(await hud()));
 
 for (let i = 0; i < REPS; i++) {
-  await p.keyboard.down('w'); await p.waitForTimeout(900); await p.keyboard.up('w');
-  await p.keyboard.down(' '); await p.waitForTimeout(HOLD); await p.keyboard.up(' ');
+  await p.keyboard.down('w'); await p.waitForTimeout(APPROACH); await p.keyboard.up('w');
+  if (KEYS.length) {
+    for (const k of KEYS) { await p.keyboard.press(k); await p.waitForTimeout(260); }
+  } else {
+    await p.keyboard.down(' '); await p.waitForTimeout(HOLD); await p.keyboard.up(' ');
+  }
   await p.waitForTimeout(1400);
   if (i === Math.floor(REPS / 3)) await p.screenshot({ path: `${OUT}/${NAME}.png` });
 }

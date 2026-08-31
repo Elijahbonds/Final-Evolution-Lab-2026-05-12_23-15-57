@@ -79,7 +79,19 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   board:  { distance: 6.5, height: 2.4, minHeight: 1.6, pitchFloorDeg: 10, pitchCapDeg: 24, targetHeight: 1.1,  lag: 0.12, lookAhead: 4.0 },
   // fight distance pulled in (5.2 → 4.2): the dojo's walled room is narrower
   // than a 5.2-unit pullback can safely clear from every player position.
-  fight:  { distance: 4.2, height: 1.9, minHeight: 1.4, pitchFloorDeg: 4,  pitchCapDeg: 12, targetHeight: 1.15, lag: 0.15, lookAhead: 0.3, fitTwo: true },
+  // VS fighter — a THREE-QUARTER view, not an over-the-back one.
+  //
+  // fitTwo puts the camera on the line BETWEEN the two fighters, which for a
+  // chase cam is right and for a fighting game is exactly wrong: the near
+  // fighter stands directly in front of the far one and hides them. The
+  // baseline capture of Karate VS shows the red opponent almost entirely
+  // occluded by the blue player.
+  //
+  // Soul Calibur and Naruto Storm — both named benchmarks — hold an off-axis
+  // three-quarter view so both fighters AND the space between them stay
+  // readable, because that space is the whole game. shoulderOffset swings the
+  // camera off the axis while aim() keeps it pointed at the midpoint.
+  fight:  { distance: 4.2, height: 1.9, minHeight: 1.4, pitchFloorDeg: 4,  pitchCapDeg: 12, targetHeight: 1.15, lag: 0.15, lookAhead: 0.3, fitTwo: true, shoulderOffset: 3.0 },
   // 1v1 isolation — tight and low, broadcast iso-cam framing on the
   // ball-handler vs the defender/hoop
   hoops:  { distance: 6.2, height: 2.4, minHeight: 1.6, pitchFloorDeg: 6,  pitchCapDeg: 18, targetHeight: 1.3,  lag: 0.11, lookAhead: 1.2, fitTwo: true },

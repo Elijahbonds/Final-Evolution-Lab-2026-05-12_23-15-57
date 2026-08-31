@@ -148,6 +148,8 @@ export class RivalFightBrain {
   private circleDir = 1;
   private circleTimer = 2;
   private blockHoldSec = 0;
+  /** Have we already reacted to the wind-up currently on screen? */
+  private reactedToStrike = false;
 
   constructor(private difficulty = 0.6, private attacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS) {}
 
@@ -167,10 +169,25 @@ export class RivalFightBrain {
     const dir = to.normalize();
     const idealRange = this.attacks.jab.range * 0.9;
 
-    // reactive guard: see the wind-up, hold block for a beat
-    if (foeStriking && dist < this.attacks.heavy.range + 0.4 && this.blockHoldSec === 0
-        && Math.random() < this.difficulty * 0.5) {
-      this.blockHoldSec = 0.45;
+    // REACTIVE GUARD — once per wind-up, not once per frame.
+    //
+    // This rolled `difficulty * 0.5` on EVERY FRAME the player was mid-swing.
+    // A jab's startup is 120ms and a kick's 180ms, so at 60fps that is 7-11
+    // rolls per attack: at difficulty 0.6 the rival blocked about 98% of
+    // everything thrown at it. Measured outcomes over a run of kicks were
+    // blocked / blocked / blocked / parried / whiff — and not one HIT. The
+    // player could not damage the rival at all, which is not a hard opponent,
+    // it is an unbeatable one.
+    //
+    // Rolling once on the rising edge of the wind-up makes the number mean what
+    // it reads as: a 30% chance to read the attack and guard it.
+    if (!foeStriking) this.reactedToStrike = false;
+    if (foeStriking && !this.reactedToStrike) {
+      this.reactedToStrike = true;
+      if (dist < this.attacks.heavy.range + 0.4 && this.blockHoldSec === 0
+          && Math.random() < this.difficulty * 0.5) {
+        this.blockHoldSec = 0.45;
+      }
     }
     if (this.blockHoldSec > 0) return { moveX: 0, moveY: 0, attack: null, block: true };
 
