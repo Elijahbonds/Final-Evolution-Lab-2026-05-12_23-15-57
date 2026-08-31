@@ -49,6 +49,9 @@ export const SurfBreakMode: ModeDefinition = (() => {
     flow = 0; barrelSec = 0; inBarrel = false;
     setTimeout(() => {
       rig.char.root.position.set(rig.char.root.position.x, 0, lipZ + 6);
+      // A reposition is a teleport, not motion — the camera must follow it in one
+      // step rather than lerping across the gap with the rider out of frame.
+      ctx.camDirector.snapTo(rig.char.root.position, waveLipAt(t));
       rig.rider.vel.set(0, 0, 0);
       wipedOut = false;
       ctx.setHud({ banner: '' });
@@ -87,6 +90,12 @@ export const SurfBreakMode: ModeDefinition = (() => {
       t = 0; timeLeft = RUN_SEC; flow = 0; ended = false; wipedOut = false; lapsSeen = 0;
       barrelSec = 0; inBarrel = false; barrels = 0;
       ctx.objectiveRef.current = waveLipAt(t);
+      // Phase 3 requires snapTo() at load and update() every frame. All three
+      // board modes had only the update: the camera therefore STARTED at its
+      // default position and had to lerp in at lag 0.08-0.12, with the rider
+      // off-screen the whole way. That is where this mode's [FEL-FRAME] lines
+      // came from — a fast board sport outruns a camera that begins behind.
+      ctx.camDirector.snapTo(rig.char.root.position, waveLipAt(t));
       SoundKit.startAmbient('ocean');
       EffectsKit.ambient(ctx.scene, 'venice');
       ctx.setHud({ score: 0, flow: 0, time: RUN_SEC, hint: 'Stay in the pocket · ride the open TUBE for barrels · miss the buoys' });

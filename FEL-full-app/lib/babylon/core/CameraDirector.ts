@@ -150,6 +150,11 @@ export const FIXED_PRESETS: Record<string, { offset: Vector3; targetHeight: numb
 
 /** Camera may never end up closer to the subject than this, in ANY venue —
  *  below this range a wall/prop fills the frame illegibly. */
+/** Share of lookAhead a vertical velocity component may claim (see aim()). */
+const VERTICAL_LEAD_SHARE = 0.25;
+/** How much of the frustum half-height an objective may pull the target by. */
+const OBJECTIVE_BIAS_SHARE = 0.6;
+
 const MIN_SAFE_DISTANCE = 1.8;
 /** Clearance kept between the camera and whatever occludes it. */
 const OCCLUSION_MARGIN = 0.6;
@@ -389,11 +394,39 @@ export class CameraDirector {
   private aim(subject: Vector3, objective: Vector3 | null, velocity?: Vector3): void {
     const cfg = this.cfg;
     const chest = subject.add(new Vector3(0, cfg.targetHeight, 0));
-    const ahead = velocity && velocity.lengthSquared() > 0.01
-      ? chest.add(velocity.normalizeToNew().scale(cfg.lookAhead)) : chest;
-    const target = objective
-      ? Vector3.Lerp(ahead, objective.add(new Vector3(0, cfg.targetHeight * 0.5, 0)), cfg.fitTwo ? 0.5 : 0.35)
-      : ahead;
+
+    // Lead the subject along the GROUND direction of travel. This used the raw
+    // velocity, which puts the ENTIRE vertical component into the lead: on a
+    // downhill the look-target is dragged below the rider and the camera
+    // pitches clean past them. That is where every [FEL-FRAME] line in the
+    // skate run came from -- the warnings tracked the drop precisely (hero Y
+    // 1.89 -> 1.32 -> 0.13 as the camera aimed further and further under him).
+    // A little vertical lead is still wanted, so you can see what you are
+    // dropping into; it is just not worth a full metre-for-metre share.
+    let ahead = chest;
+    if (velocity && velocity.lengthSquared() > 0.01) {
+      const dir = velocity.normalizeToNew();
+      const flat = new Vector3(dir.x, 0, dir.z);
+      if (flat.lengthSquared() > 1e-4) flat.normalize();
+      ahead = chest
+        .add(flat.scale(cfg.lookAhead))
+        .add(new Vector3(0, dir.y * cfg.lookAhead * VERTICAL_LEAD_SHARE, 0));
+    }
+
+    let target = ahead;
+    if (objective) {
+      target = Vector3.Lerp(ahead, objective.add(new Vector3(0, cfg.targetHeight * 0.5, 0)), cfg.fitTwo ? 0.5 : 0.35);
+      // An objective BIASES the framing; it must never replace the subject.
+      // Unleashed, this lerp is fine for a rim 5m away and ruinous for surf's
+      // wave lip tens of metres down the line -- 35% of that distance walks the
+      // look-target off the surfer, which is what the surf capture kept
+      // reporting. Cap the displacement to what provably stays in frame: the
+      // frustum half-height at the subject's own distance, times a margin.
+      const reach = Vector3.Distance(this.camera.position, chest);
+      const maxOff = Math.max(1.2, reach * Math.tan(this.camera.fov / 2) * OBJECTIVE_BIAS_SHARE);
+      const off = target.subtract(ahead);
+      if (off.length() > maxOff) target = ahead.add(off.normalize().scale(maxOff));
+    }
     this.camera.setTarget(target);
 
     const flat = Vector3.Distance(

@@ -88,6 +88,12 @@ export const SkateRunMode: ModeDefinition = (() => {
       );
       world.grindLines.push(patrolRail.line);
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 4, modeId: 'skateboard' });
+      // Phase 3 requires snapTo() at load and update() every frame. All three
+      // board modes had only the update: the camera therefore STARTED at its
+      // default position and had to lerp in at lag 0.08-0.12, with the rider
+      // off-screen the whole way. That is where this mode's [FEL-FRAME] lines
+      // came from — a fast board sport outruns a camera that begins behind.
+      ctx.camDirector.snapTo(rig.char.root.position, null);
       timeLeft = RUN_SEC; ended = false; stickX = 0; pump = 0;
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'park');

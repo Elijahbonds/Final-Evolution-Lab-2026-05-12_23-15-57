@@ -101,6 +101,12 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       nextGate = 0; gatesHit = 0; elapsed = 0; ended = false; stickX = 0; tuck = 0;
       stumbleIframe = 0; yeti = null; yetiPool = null; yetiSec = 0; yetiDone = false;
       ctx.objectiveRef.current = world.markers[nextGate] ?? null;
+      // Phase 3 requires snapTo() at load and update() every frame. All three
+      // board modes had only the update: the camera therefore STARTED at its
+      // default position and had to lerp in at lag 0.08-0.12, with the rider
+      // off-screen the whole way. That is where this mode's [FEL-FRAME] lines
+      // came from — a fast board sport outruns a camera that begins behind.
+      ctx.camDirector.snapTo(rig.char.root.position, world.markers[nextGate] ?? null);
       SoundKit.startAmbient('wind');           // Phase 18: descent wind bed
       EffectsKit.ambient(ctx.scene, 'slope');  // snowfall
       ctx.setHud({ score: 0, gates: `0/${world.markers.length}`, hint: 'Gates for points · JUMP rocks · grind the rails · watch the treeline…' });

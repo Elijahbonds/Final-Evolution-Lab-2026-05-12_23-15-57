@@ -67,7 +67,16 @@ export function makeBoardHost(opts: BoardHostOpts) {
       };
 
       const def = MODES[modeKey];
-      runMode(def, {
+      // StrictMode runs effect -> cleanup -> effect. Starting immediately lets the
+      // PHANTOM mount build a Babylon engine its own cleanup cannot cancel —
+      // `stop` is not assigned until the async load resolves — so two engines end
+      // up on one canvas fighting over a single WebGL context and the loser draws
+      // nothing. 3v3 rendered an empty void this way and the Dunk guest path
+      // rendered black. This host is SHARED by skateboard, surf and snowboard, so
+      // all three carried it.
+      const startTimer = setTimeout(() => {
+        if (disposed) return;
+        runMode(def, {
         canvas,
         input: bus,
         // M28 art round-trip: paint the venue with the player's saved art card.
@@ -92,10 +101,12 @@ export function makeBoardHost(opts: BoardHostOpts) {
           if (disposed) { s(); return; }
           stop = s;
         })
-        .catch((e) => console.error(`[${tag}] boot failed`, e));
+          .catch((e) => console.error(`[${tag}] boot failed`, e));
+      }, 0);
 
       return () => {
         disposed = true;
+        clearTimeout(startTimer);
         stop?.();
         busRef.current = null;
       };

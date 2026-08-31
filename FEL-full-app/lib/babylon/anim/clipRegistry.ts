@@ -37,7 +37,19 @@ export const REAL_CLIPS = new Set<string>([
   'dunk_finish_windmill', 'dunk_finish_tomahawk', 'dunk_finish_blown', 'dunk_celebrate_big',
   'football_juke_left', 'football_juke_right', 'football_spin_move', 'football_tackled_fall',
   'karate_hit_react', 'karate_knockdown',
+  // board suite — skate / surf / snowboard share these (anim/authored/boardSuite)
+  'board_ride_idle', 'board_carve_left', 'board_carve_right', 'board_tuck',
+  'board_grab', 'board_air', 'board_grind', 'board_land',
+  'skate_kickflip', 'skate_bail',
 ]);
+
+// NOTE ON THIS LIST. isResolvable() — and therefore installSafePlay's gate —
+// consults this STATIC table, not the animator's live groups. So an authored
+// clip that is registered, playing, and moving the rig is still rejected here if
+// its name is absent, and the mode silently falls back to a safe pose. That is
+// what happened the moment the board suite introduced names with no alias entry:
+// `board_land` was built and registered, and still logged MISSING CLIP eight
+// times a run. Anything added to anim/authored MUST be added here too.
 
 /** The universal fallback when nothing better applies. Always real. */
 const SAFE_DEFAULT = 'guard';

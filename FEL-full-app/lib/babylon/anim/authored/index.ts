@@ -10,6 +10,11 @@ import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebr
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildJuke, buildSpinMove, buildTackledFall } from './football';
 import { buildHitReact, buildKnockdown } from './karate';
+import {
+  buildBoardRideIdle, buildBoardCarveLeft, buildBoardCarveRight, buildBoardTuck,
+  buildBoardGrab, buildBoardAir, buildBoardGrind, buildBoardLand,
+  buildSkateKickflip, buildSkateBail,
+} from './boardSuite';
 
 export function registerAuthoredClips(
   animator: CharacterAnimator, scene: Scene, skeleton: Skeleton,
@@ -36,6 +41,18 @@ export function registerAuthoredClips(
     () => buildTackledFall(scene, skeleton),
     () => buildHitReact(scene, skeleton),
     () => buildKnockdown(scene, skeleton),
+    // Board suite — skate / surf / snowboard all ride on these. Without them
+    // every board clip fell through the alias table onto a karate stance.
+    () => buildBoardRideIdle(scene, skeleton),
+    () => buildBoardCarveLeft(scene, skeleton),
+    () => buildBoardCarveRight(scene, skeleton),
+    () => buildBoardTuck(scene, skeleton),
+    () => buildBoardGrab(scene, skeleton),
+    () => buildBoardAir(scene, skeleton),
+    () => buildBoardGrind(scene, skeleton),
+    () => buildBoardLand(scene, skeleton),
+    () => buildSkateKickflip(scene, skeleton),
+    () => buildSkateBail(scene, skeleton),
   ];
   const registered: string[] = [];
   for (const b of builders) {
