@@ -83,9 +83,16 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   // 1v1 isolation — tight and low, broadcast iso-cam framing on the
   // ball-handler vs the defender/hoop
   hoops:  { distance: 6.2, height: 2.4, minHeight: 1.6, pitchFloorDeg: 6,  pitchCapDeg: 18, targetHeight: 1.3,  lag: 0.11, lookAhead: 1.2, fitTwo: true },
-  // 3v3 full-court flow — wider and higher so all six bodies stay legible;
-  // lookAhead is generous since possessions move fast end to end
-  team:   { distance: 11.0, height: 5.2, minHeight: 3.0, pitchFloorDeg: 14, pitchCapDeg: 30, targetHeight: 1.3,  lag: 0.09, lookAhead: 2.5, fitTwo: true },
+  // 3v3 — wide enough that all six bodies stay legible, but NOT the old
+  // full-court height. This was distance 11 / height 5.2, written for "full-court
+  // flow"; 3v3 is a HALF-COURT game (clampToHalfCourt, one basket), so fitTwo
+  // frames the ball-handler against a rim only a few metres away and pulls the
+  // camera in to ~2.8 behind — while still holding 5.2 of height. That is a ~62
+  // degree pitch, double this preset's own 30 degree cap, and it put the hero
+  // below the bottom of frame: two [FEL-FRAME] hero-off-screen lines, reproducibly,
+  // at every spawn. Lower and slightly closer keeps six bodies readable at an
+  // angle the cap can actually honour.
+  team:   { distance: 9.5,  height: 3.4, minHeight: 2.2, pitchFloorDeg: 12, pitchCapDeg: 28, targetHeight: 1.3,  lag: 0.09, lookAhead: 2.5, fitTwo: true },
   // third-person over-the-shoulder — close, low, offset to the right
   // shoulder, follows facing (fitTwo off — see file header)
   overShoulder: { distance: 3.1, height: 1.65, minHeight: 1.2, pitchFloorDeg: 1, pitchCapDeg: 9, targetHeight: 1.45, lag: 0.16, lookAhead: 2.2, shoulderOffset: 0.55 },

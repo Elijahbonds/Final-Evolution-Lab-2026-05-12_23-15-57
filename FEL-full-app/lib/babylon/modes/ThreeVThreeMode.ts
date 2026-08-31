@@ -231,21 +231,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       const moving = Math.hypot(meIntent.moveX, meIntent.moveY) > 0.1;
       const sprintOk = turbo.gate(dt, meIntent.sprint, moving);
       ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
-      // FORWARD WAS BACKWARDS. Every input source in this game reports up-stick
-      // as NEGATIVE y — the Gamepad API's axes[1] is -1 pushed up, InputBus maps
-      // W to -1 to match, and the touch stick uses screen deltas so up is also
-      // negative. CourtMovement documents the opposite ("+Y = up-stick") and maps
-      // wantDir = (moveX, 0, -moveY), so pressing forward walked the player AWAY
-      // from the basket. Measured: holding W drove the hero from z 6 to z 8.6
-      // with the rim at z -0.6, and dragged him out of frame — which is where
-      // this mode's [FEL-FRAME] errors were coming from.
-      //
-      // Negated HERE rather than in CourtMovement because that file is shared by
-      // a dozen others (tennis, combat, story hub, carrier control) that this
-      // pass has not verified, and silently reversing all of them to fix one is
-      // exactly the blast radius §0 exists to prevent. The platform-level
-      // disagreement is recorded in the sign-off as a carry-forward.
-      const drib = me.drib.update(dt, meIntent.moveX, -meIntent.moveY, sprintOk);
+        // Stick-space is normalised in LocalInputSource — see PlayerSlot.
+      const drib = me.drib.update(dt, meIntent.moveX, meIntent.moveY, sprintOk);
       if (!shooting && !dunking) {
         me.char.root.position.addInPlace(me.drib.vel.scale(dt));
         clampToHalfCourt(me.char.root.position, 8, 15);

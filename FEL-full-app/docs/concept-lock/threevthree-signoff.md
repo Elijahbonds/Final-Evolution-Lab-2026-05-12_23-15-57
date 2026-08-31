@@ -27,7 +27,7 @@ Third mode through the full checklist, after Three-Point Shootout and Dunk.
 | 0 Platform preconditions | `gate0-rig-tests` 58 green |
 | 1 Concept Lock | `docs/concept-lock/threevthree.md` — 19 criteria, 10 deviations resolved |
 | 2 Core mechanics + tests | `threevthree-core-tests` 18 green — spacing, matchups, the real arc, the scoring scale |
-| 3 Camera & framing | full playthrough: **0 `[FEL-FRAME]` lines** (was 19, with auto-recentres firing) |
+| 3 Camera & framing | **CORRECTED — see below.** 19 lines with auto-recentres at the start of the pass; 1–2 transients remain at spawn |
 | 4 Reachability | registry · `ENABLED_BABYLON_MODES` · `/play/threevthree` · `three-v-three-babylon.tsx` · `MODE_VERBS` · venue map · `game-data` |
 | 5 Input & control schema | `verb-key-alignment-tests` 39 · `controller-link-tests` 35 · forward direction fixed (D9) |
 | 6 World population | L1–L5 below; half court, one basket, stands repositioned |
@@ -80,6 +80,30 @@ legibility ............... PASS  stands moved from 6m to 10m behind the basket,
 height, wrong markings — on a mode listed as shipped-standard. L1 is the layer
 the protocol says to check against the real sport rather than eyeball, and this
 is the clearest case yet of why.
+
+## Correction to this sign-off's Phase 3
+
+This document originally recorded **0 `[FEL-FRAME]` lines**. That measurement was
+taken with a hand-written script whose timing happened to miss the transient.
+Re-measured later with the standard `capture-mode-play` harness, 3v3 reproducibly
+logs **1–2 hero-off-screen lines at spawn** (single strikes, no auto-recentre —
+the 19 lines and the auto-recentres from before the pass are genuinely gone).
+
+The cause is now understood and is a **platform** issue, not a 3v3 one:
+`CameraDirector` adds a flat `cfg.height` regardless of how far back the camera
+actually ends up, so a `fitTwo` preset framing a nearby objective can sit 2.8m
+behind the hero while still holding 3.4–5.2m of height — a 55–67 degree pitch
+against presets that declare a 28 degree cap. The hero drops below frame.
+
+Mitigated by re-tuning the `team` preset, which was written for "full-court
+flow" (distance 11, height 5.2) and applied to a half-court game: now 9.5 / 3.4.
+That reduced the count but did **not** eliminate it, and something downstream —
+`resolveOcclusion` or `clampToBounds` — is still pulling the camera to ~2.8m
+when it asks for 9.5. That is not root-caused, and it is written here rather
+than left as a green tick.
+
+Strictly, Phase 3's exit criterion is "no `[FEL-FRAME] hero off-screen`", so this
+phase is **not** cleanly passed. The rest of the pass stands.
 
 ## Carry-forwards — recorded, not hidden
 

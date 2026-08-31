@@ -46,7 +46,30 @@ export class LocalInputSource implements ControlSource {
 
   /** Call from the mode's onInput(ctx, e) for every event. */
   feed(e: FelInput): void {
-    if (e.t === 'stick' && e.side === 'L') { this.moveX = e.x; this.moveY = e.y; }
+    if (e.t === 'stick' && e.side === 'L') {
+      this.moveX = e.x;
+      // STICK-SPACE -> INTENT-SPACE. This is the one place hardware meets the
+      // movement layer, and the two use OPPOSITE signs for Y.
+      //
+      // Hardware reports up as NEGATIVE: the Gamepad API's axes[1] is -1 pushed
+      // up, InputBus maps W to -1 to match it, and the touch stick derives y
+      // from a screen delta so up is negative there too. All three agree.
+      //
+      // The movement layer means the opposite. CourtMovement documents
+      // "+Y = up-stick = forward/away from camera = -Z on court" and implements
+      // it as wantDir = (moveX, 0, -moveY); every world-direction caller feeds
+      // it that way (CombatMovement passes -wish.z, the basketball AI brains
+      // return -dir.z, lockTarget aims with -aimY). That convention is coherent
+      // and widely used — it was simply never bridged to the hardware sign.
+      //
+      // Nothing converted between them, so a HUMAN pressing forward walked
+      // backwards while every AI on the same court moved correctly. It was
+      // patched per-mode in 1v1 and 3v3; those patches are now removed, because
+      // this is the seam where it belongs and one negation here fixes every mode
+      // at once — including the pass-aim stick and Karate Endless, which were
+      // inverted the same way and nobody had noticed.
+      this.moveY = -e.y;
+    }
     if (e.t === 'trigger' && e.side === 'R') {
       this.held = e.value;
       if (e.value === 0 && this.actionDown) { this.actionEdge = true; this.actionDown = false; }

@@ -272,13 +272,8 @@ export const OneVOneMode: ModeDefinition = (() => {
         const moving = Math.hypot(intent.moveX, intent.moveY) > 0.1;
         const sprintOk = turbo.gate(dt, intent.sprint, moving);
         ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
-        // FORWARD WAS BACKWARDS — see ThreeVThreeMode for the full account.
-        // Every input source reports up-stick as NEGATIVE y (Gamepad axes[1],
-        // InputBus's W, the touch stick's screen delta); CourtMovement documents
-        // the opposite and maps -moveY, so pressing forward walked the player
-        // away from the basket. Negated here rather than in CourtMovement, which
-        // a dozen unverified files share.
-        const drib = meDribble.update(dt, intent.moveX, -intent.moveY, sprintOk);
+        // Stick-space is normalised in LocalInputSource — see PlayerSlot.
+        const drib = meDribble.update(dt, intent.moveX, intent.moveY, sprintOk);
         if (!shooting && !dunking) {
           driveBody('me', me.root, meDribble.vel, dt);
           me.root.rotation.y = drib.facingRad;
@@ -393,13 +388,8 @@ export const OneVOneMode: ModeDefinition = (() => {
         const moving = Math.hypot(intent.moveX, intent.moveY) > 0.1;
         const sprintOk = turbo.gate(dt, intent.sprint, moving);
         ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
-        // FORWARD WAS BACKWARDS — see ThreeVThreeMode for the full account.
-        // Every input source reports up-stick as NEGATIVE y (Gamepad axes[1],
-        // InputBus's W, the touch stick's screen delta); CourtMovement documents
-        // the opposite and maps -moveY, so pressing forward walked the player
-        // away from the basket. Negated here rather than in CourtMovement, which
-        // a dozen unverified files share.
-        const drib = meDribble.update(dt, intent.moveX, -intent.moveY, sprintOk);
+        // Stick-space is normalised in LocalInputSource — see PlayerSlot.
+        const drib = meDribble.update(dt, intent.moveX, intent.moveY, sprintOk);
         driveBody('me', me.root, meDribble.vel, dt);
         me.root.rotation.y = drib.facingRad;
         contact?.brace('me', intent.brace ?? false);
