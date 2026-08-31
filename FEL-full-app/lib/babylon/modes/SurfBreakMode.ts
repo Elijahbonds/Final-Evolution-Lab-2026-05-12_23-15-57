@@ -20,6 +20,7 @@ import { assertSpawned } from '../core/FrameGuard';
 import { SPORT_CLIP } from '../anim/clipRegistry';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
+import { Onlookers } from '../visual/Onlookers';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
 
 const RUN_SEC = 90;
@@ -34,6 +35,7 @@ const BARREL_BONUS = 250;
 export const SurfBreakMode: ModeDefinition = (() => {
   let world: RideWorld, waveLipAt: (t: number) => Vector3, barrelActive: (t: number) => boolean;
   let rig: BoardRig, tricks: TrickMachine;
+  let crowd: Onlookers;
   let t = 0, timeLeft = RUN_SEC, flow = 0;
   let stickX = 0, carve = 0;
   /** Where the board is turning TO. A cutback is a carve, not a pivot. */
@@ -95,6 +97,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       yawTarget = rig.char.root.rotation.y;
       barrelSec = 0; inBarrel = false; barrels = 0;
       ctx.objectiveRef.current = waveLipAt(t);
+      crowd = new Onlookers(ctx.scene, world.crowdSpots, '#3a4a63');   // L4: the beach
       // Phase 3 requires snapTo() at load and update() every frame. All three
       // board modes had only the update: the camera therefore STARTED at its
       // default position and had to lerp in at lag 0.08-0.12, with the rider
@@ -209,13 +212,14 @@ export const SurfBreakMode: ModeDefinition = (() => {
       const yawErr = yawTarget - rig.char.root.rotation.y;
       if (Math.abs(yawErr) > 0.001) rig.char.root.rotation.y += yawErr * Math.min(1, dt * CUTBACK_RATE);
 
+      crowd.update(dt);
       ctx.setHud({ time: Math.ceil(timeLeft) });
       const vel = rig.rider.vel;
       const leadVel = vel.lengthSquared() > 0.01 ? vel.scale(1.6) : vel;
       ctx.camDirector.update(rig.char.root.position, leadVel, lip);
     },
 
-    dispose() { rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 

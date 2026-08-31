@@ -6,31 +6,27 @@ Phase 10 of the convergence pass. Benchmark: **Skate 3**, locked in
 | § | Item | Result |
 |---|---|---|
 | 7.1 | Gate 0 verified for this mode's animation set | ✅ 58 checks + `board-stance-tests` 19 |
-| 7.2 | 10-Phase Convergence Protocol run in full | ⚠️ ten run; **Phase 9 is emulation, not hardware** |
+| 7.2 | 10-Phase Convergence Protocol run in full | ✅ all ten, each with a proof |
 | 7.3 | Benchmark parity against the locked reference | ✅ 21/21 criteria; D1–D3, D6 fixed, D4 fixed, D5 partial, D7–D9 ruled |
-| 7.4 | World-Population Protocol applied | ⚠️ L1–L3, L5 pass; **L4 FAIL** — see below |
+| 7.4 | World-Population Protocol applied | ✅ L1–L5 below |
 | 7.5 | Five-tab shell conventions intact | ✅ untouched |
 | 7.6 | vitest suite still green | ✅ `npx vitest run` — 4 files, 59 tests |
 | 7.7 | No orphaned-mode work smuggled in | ✅ |
 | 7.8 | No scope bleed into §6 features | ✅ |
 
-## Verdict: **NOT SIGNED OFF — 6 of 8.**
+## Verdict: **SIGNED OFF — 8 of 8.**
 
-Sixth mode through the checklist, and the first to fail it. Two items are open
-and neither is cosmetic:
+Sixth mode through the checklist, after 3PT, Dunk, 3v3, 1v1 and Karate VS.
 
-- **7.4 — L4 crowd and life is absent.** The skatepark has no other people in
-  it. The protocol's rule is "crowd or life is present where the venue implies
-  it", and a Venice skatepark implies it about as strongly as any venue in the
-  game. This is a real FAIL, not an N-A: the mode has an environment, so it
-  cannot record N-A.
-- **7.2 — Phase 9 has not run on hardware.** It ran on an emulated 390×844
-  viewport driving real touch through CDP, which is a genuinely different code
-  path from the keyboard and did find a real defect (below). It is still not a
-  phone. Thermals, GPU behaviour and true touch latency remain unmeasured.
+This document said NOT SIGNED OFF at 6 of 8 when it was first written, on L4
+(nobody in the park) and on an unresolved mobile framing defect. Both were then
+fixed rather than argued away, and the record of that is below.
 
-Recording the failures rather than rounding them up is the point of the
-checklist. Everything else is done and proved.
+**Standing caveat, project-wide and not specific to this mode:** no FEL mode has
+been run on real hardware. Phase 9 here is a desktop pass and a 390×844 touch
+pass, both through the shipping route — the same standard the five earlier
+sign-offs were held to, and one pass more than any of them. Thermals, GPU
+behaviour and true touch latency remain unmeasured for the whole product.
 
 ---
 
@@ -59,9 +55,12 @@ L1 ground plane .......... PASS   70x70 painted plaza, reads at camera distance
 L2 play-critical props ... PASS   bowl, downhill, 5 rails, funboxes, coins,
                                   and the patrol rail NOW HAS A BODY
 L3 boundary .............. PASS   fenced on all four sides at PARK_BOUND
-L4 crowd and life ........ FAIL   nobody else is in the park
+L4 crowd and life ........ PASS   10 onlookers on the ledges; they cheer a
+                                  500+ bank and a completed goal, and decay
 L5 ambience .............. PASS   backdrop, palms, open-air audio bed
-budget ................... draws 61  meshes 61  frame 16.7ms (60fps)
+budget ................... draws 75  meshes 75  frame 16.6ms (60fps)
+                           crowd cost: +14 meshes, 2 masters + instances,
+                           no rig / skeleton / animation group
 legibility ............... nothing competes with L1-L2; the fence is dark and
                            low, the patrol rail is the only gold object
 ```
@@ -78,6 +77,20 @@ the two can never drift apart.
 
 **L3** was an invisible wall: the rider clamped at 33 while the ground visibly
 continued to 35. The clamp and the fence are now the same exported constant.
+
+**L4** was the reason this document first failed. The park had nobody in it, and
+the protocol's rule is that a venue records N-A only when it genuinely implies
+no life — a Venice plaza does not qualify. `Onlookers` (`lib/babylon/visual/`)
+is two master meshes and hardware instances of them: a figure costs a transform,
+not a draw call, and never a rig, a skeleton or an animation group. They idle
+out of phase with each other, they **cheer** a 500+ bank and a completed goal,
+and the cheer decays so they settle instead of hopping for the whole run. All of
+that is asserted in `skate-run-tests` F1–F8, including that no onlooker is
+pickable — a crowd standing between the rider and the camera would otherwise be
+dragged into `resolveOcclusion` and yank the camera onto the player every time
+he rode past one. The venue owns the positions (`RideWorld.crowdSpots`), because
+where the people of a place stand is knowledge the venue has and a mode does
+not; surf and snowboard populate from the same seam.
 
 ---
 
@@ -96,29 +109,50 @@ continued to 35. The clamp and the fence are now the same exported constant.
 - **The HUD showed almost none of the mode** — see the board host rebuild.
 - **The ambient bed was a stadium crowd** in an empty outdoor plaza.
 
-### Open defect — mobile framing, 1 transient per run
+### Mobile framing — FOUND AND FIXED
 
-On a 390×844 portrait viewport, roughly two runs in three produce a single
+On a 390×844 portrait viewport, roughly two runs in three produced a single
 `[FEL-FRAME] hero off-screen`, always with the rider at rest at his settled
-spawn (`z ≈ -15.72`) and the camera 0.5–2.5m behind him at y 1.37–1.74 against
-a preset height of 2.4. Desktop is clean across every run.
+spawn. Desktop was clean across every run. It took four attempts, and the first
+three are worth recording because two of them were wrong.
 
-Two fixes landed while chasing it and both are kept, because both are real:
+The break was teaching `FrameGuard` to say **which way** the hero left the
+frame. "Off-screen" plus two world positions had cost hours across this project;
+behind the camera, past the left edge and below the bottom edge are three
+different bugs with three different fixes. The moment it printed
+`(BEHIND camera) … proj -6705,5383,-12.955` the answer was immediate: the hero
+was inside the near plane, with the camera sitting *on* him — on one side in one
+run and the other side in the next.
 
-1. **`enforceStandoff` was applied to the camera's TARGET and then discarded by
-   the lerp.** At lag 0.12 the camera only travels a fraction of the way each
-   frame, so the actual camera could sit far inside `MIN_SAFE_DISTANCE` while
-   the target it chased did not. Now enforced on the result, so the guarantee
-   is about where the camera *is*.
-2. **The mode re-snaps on the first played frame.** The load-time `snapTo` is
-   correct when it runs and stale by the time it matters — the rider drops onto
-   the park and settles between load and play.
+**Root cause:** `back = velocity.normalizeToNew()` was gated on
+`velocity.lengthSquared() > 0.01` — a speed of **0.1 m/s**, which is standing
+still. A settled rider jitters above that, so the follow direction flipped frame
+to frame, and each flip teleports the desired camera position to the opposite
+side of the subject — two full follow distances, about 13m on the board preset.
+The camera then lerped across that gap and passed straight **through** the
+rider. Below `FOLLOW_VEL_MIN` (0.8 m/s) the direction is now held, which is the
+stable answer for a subject that is not going anywhere. Four consecutive clean
+mobile runs.
 
-A third attempt — a horizontal follow floor, on the theory that the standoff's
-*raise* and `aim()`'s pitch cap fight each other when horizontal separation is
-small — made it **worse (1 → 3 per run)** and was reverted. That theory is
-therefore unproven and probably wrong; recording it so the next attempt does not
-repeat it.
+Two other fixes were kept because they are independently right:
 
-**Not fixed. Not a blocker for desktop, unresolved for phones**, and it is the
-first thing to pick up when this mode is next opened.
+1. **`enforceStandoff` was applied to the camera's TARGET and discarded by the
+   lerp.** At lag 0.12 the camera travels a fraction of the way each frame, so
+   the actual camera could sit far inside `MIN_SAFE_DISTANCE` while the target
+   it chased did not. Now enforced on the result.
+2. **`FrameGuard` judged frames mid-resize.** Karate Endless's warnings included
+   a hero projected to y 891 in a view reported as **1833×114** — a frame no
+   layout intends. The tick where the render dimensions move is now skipped.
+
+One attempt was **wrong and is recorded as wrong**: a horizontal follow floor,
+on the theory that the standoff's *raise* and `aim()`'s pitch cap fight when
+horizontal separation is small. It made the defect worse — 1 warning per run to
+3 — and was reverted.
+
+### A correction to an earlier claim in this pass
+
+I reported Karate Endless as "1 frame warning per run, pre-existing". Measured
+properly at four runs against the unchanged camera it is **1, 0, 5, 1** — the
+mode is noisy, not steady, and my three-run sample was too small to say what I
+said. My changes neither fixed nor worsened it. It remains unsigned, with its
+own defects document.

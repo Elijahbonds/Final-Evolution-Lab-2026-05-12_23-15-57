@@ -27,6 +27,7 @@ import { MomentumBus } from '../core/MomentumBus';
 import { assertSpawned } from '../core/FrameGuard';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
+import { Onlookers } from '../visual/Onlookers';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
 
 const YETI_SPAWN_GATE = 5;                 // bursts out after this gate clears
@@ -38,6 +39,7 @@ const STUMBLE_IFRAME_SEC = 1.2;
 
 export const SnowboardSlalomMode: ModeDefinition = (() => {
   let world: RideWorld, rig: BoardRig, tricks: TrickMachine;
+  let crowd: Onlookers;
   let nextGate = 0, gatesHit = 0, elapsed = 0;
   let stickX = 0, tuck = 0;
   let ended = false;
@@ -101,6 +103,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       nextGate = 0; gatesHit = 0; elapsed = 0; ended = false; stickX = 0; tuck = 0;
       stumbleIframe = 0; yeti = null; yetiPool = null; yetiSec = 0; yetiDone = false;
       ctx.objectiveRef.current = world.markers[nextGate] ?? null;
+      crowd = new Onlookers(ctx.scene, world.crowdSpots, '#2f3f57');   // L4: spectators on the slope
       // Phase 3 requires snapTo() at load and update() every frame. All three
       // board modes had only the update: the camera therefore STARTED at its
       // default position and had to lerp in at lag 0.08-0.12, with the rider
@@ -161,6 +164,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       const v = move.update(dt, stickX, tuck, ctx.scene, rig.char.root.position, world.ground);
       rig.rider.vel.x = v.x; rig.rider.vel.z = v.z;
       rig.rider.update(dt, stickX, tuck);
+      crowd.update(dt);
       // The rider has to FACE where they are going. This mode never set the
       // root rotation at ALL, so the board kept whatever yaw it spawned with
       // and the rider came down the mountain broadside -- steering with the
@@ -242,6 +246,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             SoundKit.play('score', { pitch: 1.4, volume: 0.35 });
             EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'sparks');
             ctx.setHud({ banner: 'GATE ✓', score: tricks.score });
+            crowd?.cheer(0.5);
           } else {
             SoundKit.play('miss', { volume: 0.3 });
             ctx.setHud({ banner: 'MISSED GATE' });
@@ -274,6 +279,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
 
     dispose() {
       yeti?.char.dispose(); yeti = null; yetiPool = null;
+      crowd?.dispose();
       rig?.dispose(); world?.dispose(); SoundKit.stopAmbient();
     },
   };

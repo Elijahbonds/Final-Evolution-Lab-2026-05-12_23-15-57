@@ -156,6 +156,28 @@ const VERTICAL_LEAD_SHARE = 0.25;
 const OBJECTIVE_BIAS_SHARE = 0.6;
 
 const MIN_SAFE_DISTANCE = 1.8;
+/**
+ * Speed below which the follow direction is HELD rather than re-derived from
+ * velocity (m/s).
+ *
+ * This was `lengthSquared() > 0.01` -- a speed of 0.1 m/s, which is standing
+ * still. A settled character still jitters above that, so the direction flipped
+ * frame to frame, and each flip teleports the desired camera position to the
+ * opposite side of the subject (two full follow distances, ~13m on the board
+ * preset). The camera then lerps across the gap and passes straight THROUGH the
+ * character, who lands inside the near plane on the way past. That is what the
+ * mobile skate playtest kept catching: rider parked at his spawn, camera 0.7-1.3m
+ * away, sometimes in front and sometimes behind, projected depth outside [0,1].
+ * Below this threshold the else-branch keeps the camera where it already is,
+ * which is the stable answer for a subject that is not going anywhere.
+ *
+ * CONTRACT FOR FACING-FOLLOWERS: the 'overShoulder' preset follows FACING, and
+ * its callers pass a facing direction through this same `velocity` argument
+ * (KarateEndlessMode passes facingVec(), a sin/cos UNIT vector). Length 1.0
+ * clears this floor by design. A caller that scales its facing vector below
+ * this would silently stop being followed -- pass it normalised.
+ */
+const FOLLOW_VEL_MIN = 0.8;
 /** Clearance kept between the camera and whatever occludes it. */
 const OCCLUSION_MARGIN = 0.6;
 /** Meshes that form the venue shell. These block the camera even when they
@@ -316,7 +338,7 @@ export class CameraDirector {
       back = subject.subtract(objective);
       back.y = 0;
       if (back.lengthSquared() < 0.01) back.set(0, 0, 1); else back.normalize();
-    } else if (velocity.lengthSquared() > 0.01) {
+    } else if (velocity.lengthSquared() > FOLLOW_VEL_MIN * FOLLOW_VEL_MIN) {
       back = velocity.normalizeToNew().scaleInPlace(-1);
       back.y = 0; back.normalize();
     } else {

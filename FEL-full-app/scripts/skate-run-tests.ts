@@ -16,6 +16,7 @@ import { ComboChain } from '../lib/babylon/core/ComboChain';
 import { BoardMovement, SKATE_TUNING } from '../lib/babylon/core/BoardMovement';
 import { landsSwitch } from '../lib/babylon/modes/boardCore';
 import { MovingRail, SKATE_GOALS } from '../lib/babylon/core/ParkGoals';
+import { Onlookers } from '../lib/babylon/visual/Onlookers';
 import { buildSkatepark, PARK_BOUND } from '../lib/babylon/modes/rideWorlds';
 
 // buildSkatepark paints its ground into a DynamicTexture, which reaches for
@@ -145,6 +146,49 @@ ok(park.grindLines.length >= 5, `E9 the park still has its rails (${park.grindLi
 park.dispose();
 scene.dispose();
 engine.dispose();
+
+// ── F. Phase 6 L4: the crowd is alive, reacts, and stays cheap ──────────────
+// "Crowd REACTS to the big moment -- a static crowd is set dressing", and
+// "crowd cost is bounded; it must never compete with characters for frame
+// budget". Both halves are asserted, because a crowd that fails either one is
+// worse than no crowd: it costs budget and buys nothing.
+const spots = [new Vector3(-24, 0, -4), new Vector3(12, 0, 22), new Vector3(26, 0, -14)];
+const crowd = new Onlookers(scene, spots);
+ok(crowd.count === spots.length, `F1 one figure per spot (${crowd.count})`);
+
+const fig = () => scene.meshes.find((m) => m.name === 'onlooker_b0');
+ok(!!fig(), 'F2 the figures are in the scene');
+// Never pickable: resolveOcclusion casts subject->camera and yanks the camera
+// in on whatever it hits. A crowd standing between the two would drag the
+// camera onto the player every time they rode past one.
+ok(scene.meshes.filter((m) => m.name.startsWith('onlooker')).every((m) => !m.isPickable),
+  'F3 no onlooker can catch the camera occlusion ray');
+// The master meshes must be parked out of sight, not merely hidden -- hiding a
+// master hides every instance of it.
+for (const n of ['onlooker_body', 'onlooker_head']) {
+  const master = scene.meshes.find((m) => m.name === n);
+  ok(!!master && master.position.y < -100, `F4 master "${n}" is parked out of frame`);
+}
+
+const y0 = fig()!.position.y;
+for (let i = 0; i < 12; i++) crowd.update(1 / 30);
+const idleY = fig()!.position.y;
+ok(Math.abs(idleY - y0) > 1e-4, 'F5 they are alive when nothing is happening');
+const idleSwing = Math.abs(idleY - y0);
+
+crowd.cheer(1);
+let peak = 0;
+for (let i = 0; i < 20; i++) { crowd.update(1 / 30); peak = Math.max(peak, Math.abs(fig()!.position.y - y0)); }
+ok(peak > idleSwing * 3, `F6 a cheer is visibly bigger than the idle (${peak.toFixed(3)} vs ${idleSwing.toFixed(3)})`);
+
+// ...and it decays, so the crowd settles instead of hopping for the whole run.
+for (let i = 0; i < 90; i++) crowd.update(1 / 30);
+let settled = 0;
+for (let i = 0; i < 20; i++) { crowd.update(1 / 30); settled = Math.max(settled, Math.abs(fig()!.position.y - y0)); }
+ok(settled < peak * 0.6, `F7 the cheer decays (${settled.toFixed(3)} < ${(peak * 0.6).toFixed(3)})`);
+
+crowd.dispose();
+ok(!scene.meshes.some((m) => m.name.startsWith('onlooker')), 'F8 dispose() clears every figure and master');
 
 if (fail.length) {
   console.error(`skate-run-tests: ${fail.length} FAILED of ${checks}`);

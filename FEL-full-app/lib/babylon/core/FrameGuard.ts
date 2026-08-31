@@ -15,6 +15,9 @@ const CHECK_INTERVAL_MS = 2000;
 /** Watches the hero's screen projection; recenters after persistent loss. */
 export class FrameGuard {
   private missStreak = 0;
+  /** Render size at the previous tick; a change means a resize is in flight. */
+  private lastW = 0;
+  private lastH = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
   /** Has the hero ever been somewhere other than the world origin? */
   private everPlaced = false;
@@ -87,10 +90,37 @@ export class FrameGuard {
     // on-screen instead of panicking.
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) return;
     const w = engine.getRenderWidth(), h = engine.getRenderHeight();
+
+    // A RESIZING canvas is not a framing failure. Mid-resize the engine reports
+    // a render target that the projection matrix does not match yet -- Karate
+    // Endless's one warning per run was the hero projected to y 891 in a view
+    // reported as 1833x114, a 114-pixel-tall frame that no layout ever intends.
+    // Judging a frame the projection does not describe produces exactly the
+    // false positive this guard exists to be trusted about, so skip the tick
+    // where the dimensions moved and judge the next one.
+    if (w !== this.lastW || h !== this.lastH) {
+      this.lastW = w; this.lastH = h;
+      this.missStreak = 0;
+      return;
+    }
     const onScreen = p.z > 0 && p.z < 1 && p.x > -w * 0.05 && p.x < w * 1.05 && p.y > -h * 0.05 && p.y < h * 1.1;
     if (onScreen) { this.missStreak = 0; return; }
     this.missStreak++;
-    console.error(`[FEL-FRAME] hero off-screen ${this.missStreak}x at ${hero.position.toString()} cam ${this.camera.position.toString()}`);
+    // Say WHICH WAY it left the frame. "off-screen" plus two world positions
+    // has repeatedly cost hours: behind the camera, below the bottom edge and
+    // past the left edge are three different bugs with three different fixes,
+    // and the world coordinates alone do not distinguish them. p is the
+    // projected pixel; z outside [0,1] means it is outside the depth range,
+    // and z < 0 specifically means the hero is BEHIND the camera.
+    const edge = p.z <= 0 ? 'BEHIND camera'
+      : p.z >= 1 ? 'beyond far plane'
+      : p.x < 0 ? 'off LEFT' : p.x > w ? 'off RIGHT'
+      : p.y < 0 ? 'off TOP' : p.y > h ? 'off BOTTOM' : 'edge margin';
+    console.error(
+      `[FEL-FRAME] hero off-screen ${this.missStreak}x (${edge}) at ${hero.position.toString()} `
+      + `cam ${this.camera.position.toString()} proj ${p.x.toFixed(0)},${p.y.toFixed(0)},${p.z.toFixed(3)} `
+      + `view ${w}x${h}`,
+    );
     if (this.missStreak >= 2 && this.director) {
       console.error('[FEL-FRAME] auto-recentering camera on hero');
       this.director.snapTo(hero.position, this.objective?.() ?? null);

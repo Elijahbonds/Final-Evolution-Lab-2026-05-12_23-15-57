@@ -28,6 +28,7 @@ import { BoardAnimTree } from '../anim/boardTree';
 import { MomentumBus } from '../core/MomentumBus';
 import { BoardSync } from '../core/BoardPhysics';
 import { GoalTracker, MovingRail, SKATE_GOALS } from '../core/ParkGoals';
+import { Onlookers } from '../visual/Onlookers';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { CoinField } from '../core/Pickups';
@@ -76,6 +77,7 @@ export const SkateRunMode: ModeDefinition = (() => {
   let landingBeatT = 0;
   let goals: GoalTracker;
   let patrolRail: MovingRail;
+  let crowd: Onlookers;
   /** Apply a trick to the air chain and flash it -- shared by flick and buttons. */
   const airTrick = (
     ctx: ModeContext, id: string, label: string,
@@ -110,6 +112,8 @@ export const SkateRunMode: ModeDefinition = (() => {
         new Vector3(0, 0, -8), new Vector3(0, 0, 8), 0.18,
       );
       patrolRail.mount(ctx.scene);      // L2: the goal object has to be visible
+      // L4: a Venice plaza is not empty. The venue owns where people stand.
+      crowd = new Onlookers(ctx.scene, world.crowdSpots);
       world.grindLines.push(patrolRail.line);
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 4, modeId: 'skateboard' });
       // Phase 3 requires snapTo() at load and update() every frame. All three
@@ -226,6 +230,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       }
       // gimmick: rail patrols; its grind line follows
       patrolRail.update(dt);
+      crowd.update(dt);
       world.grindLines[world.grindLines.length - 1] = patrolRail.line;
       // ── balance channels (grind/manual) feed the combo ──
       if (grindCh?.active) {
@@ -333,6 +338,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         for (const g of goals.report({ type: 'bank', value: combo.banked })) {
           bannerFlash(ctx, `GOAL: ${g.label}`, 1200);
           SoundKit.play('powerUp', { pitch: 1.3 });
+          crowd.cheer(1);
           mbus.report({ kind: 'big_make' });
         }
       }
@@ -374,6 +380,7 @@ export const SkateRunMode: ModeDefinition = (() => {
             SoundKit.play('powerUp', { volume: 0.5, pitch: big ? 1.3 : 1 });
             if (big) {
               SoundKit.play('score', { volume: 0.55, pitch: 1.1 });
+              crowd.cheer(Math.min(1, banked / 1200));   // L4: they REACT, or they are set dressing
               ctx.camDirector.pulse(0.5, 0.5);
               ctx.feel?.impact?.(0.5);
             }
@@ -404,6 +411,6 @@ export const SkateRunMode: ModeDefinition = (() => {
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, null);
     },
 
-    dispose() { rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },
   };
 })();

@@ -109,3 +109,16 @@ Through `/dev/mode/surf`, driven by `scripts/capture-mode-play.mts`
 score 200 · no unearned wipeouts
 FEL-FRAME 0 | MISSING CLIP 0 | errors 0
 ```
+
+
+---
+
+## World population — L4
+
+The venue was empty. `Onlookers` (`lib/babylon/visual/`) now places beachgoers on the sand,
+positioned by the venue itself via `RideWorld.crowdSpots` rather than by the
+mode. They react to a banked barrel, and the cheer decays. Two master meshes plus
+hardware instances — no rig, no skeleton, no animation group — and nothing in
+the crowd is pickable, so it can never be dragged into the camera's occlusion
+probe. Behaviour is asserted in `skate-run-tests` F1–F8 against the shared
+class.

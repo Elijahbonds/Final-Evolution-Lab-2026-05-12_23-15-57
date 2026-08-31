@@ -26,6 +26,10 @@ export interface RideWorld {
   grindLines: GrindLine[];
   markers: Vector3[];
   obstacles: RideObstacle[];
+  /** L4 — where onlookers stand in THIS venue. Where the people of a place
+   *  belong is knowledge the venue has and a mode does not, so the builder
+   *  hands them over rather than each mode guessing coordinates. */
+  crowdSpots: Vector3[];
   dispose(): void;
 }
 
@@ -144,7 +148,15 @@ export function buildSkatepark(scene: Scene): RideWorld {
   makeRail(scene, all, grindLines, new Vector3(-2, 0.8, 20), new Vector3(6, 0.8, 24), 260);    // kinked pair, part 1
   makeRail(scene, all, grindLines, new Vector3(6, 0.8, 24), new Vector3(14, 0.8, 20), 300);    // part 2 — transfer pays most
 
-  return { ground: rideable, grindLines, markers: [], obstacles: [], dispose: () => all.forEach((m) => m.dispose()) };
+  // Where people actually watch a plaza from: the ledges and the bowl rim,
+  // clear of every line the player rides.
+  const crowdSpots = [
+    new Vector3(-24, 0, -4), new Vector3(-24, 0, -1.4), new Vector3(-22.4, 0, 1),
+    new Vector3(12, 0, 22), new Vector3(14.2, 0, 22.6), new Vector3(16, 0, 21.4),
+    new Vector3(-9.5, 0, 18), new Vector3(-7.2, 0, 19.2),
+    new Vector3(26, 0, -14), new Vector3(27.4, 0, -11.6),
+  ];
+  return { ground: rideable, grindLines, markers: [], obstacles: [], crowdSpots, dispose: () => all.forEach((m) => m.dispose()) };
 }
 
 // ── SLOPE v2 — rocks, rails, kickers, the ski-lift grind, the yeti den ─────
@@ -274,7 +286,15 @@ export function buildSlopeRun(scene: Scene): RideWorld {
   // right past the second kicker's launch arc)
   grindLines.push({ a: pylonTops[2], b: pylonTops[3], bonus: 400 });
 
-  return { ground: rideable, grindLines, markers, obstacles, dispose: () => all.forEach((m) => m.dispose()) };
+  // Spectators beside the piste, well outside the gate corridor (gates run to
+  // +-5m; these stand at +-13m) so they never read as an obstacle on the line.
+  // Clustered at three points down the course, because a slope's spectators
+  // gather at the interesting corners rather than lining the whole run.
+  const crowdSpots: Vector3[] = [];
+  for (const [side, dist] of [[-1, 55], [-1, 58], [1, 60], [1, 120], [-1, 124], [1, 127], [-1, 190], [1, 193]] as const) {
+    crowdSpots.push(onPiste(side * 13 + side * Math.random() * 1.5, dist));
+  }
+  return { ground: rideable, grindLines, markers, obstacles, crowdSpots, dispose: () => all.forEach((m) => m.dispose()) };
 }
 
 // ── SURF v3 — the curling funnel wave + buoys ──────────────────────────────
@@ -358,8 +378,19 @@ export function buildSurfBreak(scene: Scene): {
     obstacles.push({ pos: buoy.position, radius: 0.9 });
   }
 
+  // Beachgoers on the sand, watching the break. The shore sits at z 96 (90 wide,
+  // 18 deep) and the rider runs the wave toward it before the lap wraps, so
+  // these are on the horizon for most of a ride and close at the end of one.
+  // Kept off the water entirely: nothing in the lineup to read as an obstacle
+  // next to the buoys, which ARE one.
+  const crowdSpots: Vector3[] = [];
+  for (const [x, z] of [[-14, 92], [-11.5, 93.4], [-9, 92.2], [4, 93], [6.5, 94.2],
+                        [9, 92.6], [11.5, 93.8], [22, 94], [-24, 93.2]] as const) {
+    crowdSpots.push(new Vector3(x, 0.02, z));
+  }
+
   const world: RideWorld = {
-    ground: [water], grindLines: [], markers: [], obstacles,
+    ground: [water], grindLines: [], markers: [], obstacles, crowdSpots,
     dispose: () => all.forEach((m) => m.dispose()),
   };
   const BARREL_ON = 8, BARREL_CYCLE = 18;
