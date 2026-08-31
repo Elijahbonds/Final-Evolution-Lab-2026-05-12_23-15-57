@@ -1,0 +1,3 @@
+# Playwright capture output — large, reproducible via scripts/capture-dunk-reveal.mts
+docs/shots/*/
+!docs/shots/ref/

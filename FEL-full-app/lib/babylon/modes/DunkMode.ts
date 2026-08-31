@@ -35,7 +35,10 @@ import { EffectsKit } from '../visual/EffectsKit';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { DunkFlight } from '../core/DunkSystem';
-import { judgeDunk, ScoreReveal, CrowdEnergy, REVEAL_DURATION_SEC, type JudgeScore } from '../core/JudgePanel';
+import {
+  judgeDunk, ScoreReveal, CrowdEnergy, REVEAL_DURATION_SEC, BAND_TOTAL, JUDGE_COUNT,
+  PERFECT_TOTAL, perJudgeAvg, type JudgeScore,
+} from '../core/JudgePanel';
 import { MomentumBus } from '../core/MomentumBus';
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'contestOver';
@@ -58,7 +61,16 @@ const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, obstacle: 2 };
 
 const DUNKS_PER_ROUND = 2;
 const TOTAL_ROUNDS = 2;
-const CHAIN_THRESHOLD = 24;                  // judge total that keeps a chain alive
+// Every threshold below is derived from the panel, never a bare number. The D1
+// bug was exactly this: the judge total was written as a literal tuned to a
+// 3-judge ceiling, so moving to five judges would have silently made an
+// eruption routine. Derived, they follow the panel wherever it goes.
+const CHAIN_THRESHOLD = BAND_TOTAL.approval;   // 40/50 — an "approval" dunk keeps a chain alive
+const MONSTER_AVG = 9.6;                       // per-judge avg for the heaviest momentum weight
+const FLAT_AVG = 6.35;                         // per-judge avg that reads as a dud to the panel
+// Rival pace per dunk, measured from the simulated rival's score distribution
+// (~8.5 a card). The player's NEED is quoted against it in the final round.
+const RIVAL_PACE = Math.round(8.5 * JUDGE_COUNT);
 
 // Judges + staged reveal + crowd energy now live in the SHARED JudgePanel
 // (lib/babylon/core/JudgePanel.ts) — DunkDuelMode drinks from the same well.
@@ -332,9 +344,22 @@ export const DunkMode: ModeDefinition = (() => {
             SoundKit.play('uiTick', { pitch: 0.9, volume: 0.4 });
             SoundKit.play('uiTick', { pitch: 0.95, volume: 0.35 });
           } else if (beat.kind === 'total') {
-            ctx.setHud({ hint: '', judgeReveal: revealed });
-            ctx.camDirector.pulse(beat.band === 'eruption' ? 1 : beat.band === 'hush' ? 0.15 : 0.4, 0.6);
-            if (beat.band === 'eruption') {
+            // THE 50. Raising the ceiling to 50 only means something if the game
+            // KNOWS what a 50 is — it is the most recognisable call in the whole
+            // event, and a perfect card sweep that scrolled by as an ordinary
+            // eruption would waste the entire point of this change.
+            const perfect = beat.total === PERFECT_TOTAL;
+            ctx.setHud({ hint: '', judgeReveal: revealed, banner: perfect ? 'FIFTY!' : '' });
+            ctx.camDirector.pulse(perfect ? 1.4 : beat.band === 'eruption' ? 1 : beat.band === 'hush' ? 0.15 : 0.4, 0.6);
+            if (perfect) {
+              SoundKit.play('crowdCheer', { volume: 1 });
+              SoundKit.play('score', { pitch: 1.5 });
+              ctx.feel?.impact?.(0.8);
+              for (const dy of [1.6, 2.2, 2.8]) {
+                EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, dy, 0)), 'confetti');
+              }
+              setTimeout(() => ctx.setHud({ banner: '' }), 2000);
+            } else if (beat.band === 'eruption') {
               SoundKit.play('crowdCheer', { volume: 1 });
               SoundKit.play('score', { pitch: 1.3 });
               ctx.feel?.impact?.(0.5);
@@ -400,7 +425,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
   function pickLanding(total: number): string {
     if (!DUNK_FINISH_VARIETY) return SPORT_CLIP.dunkLandCrouch;
-    return total >= 27 ? SPORT_CLIP.dunkCelebrateBig : SPORT_CLIP.dunkLandCrouch;
+    return total >= BAND_TOTAL.eruption ? SPORT_CLIP.dunkCelebrateBig : SPORT_CLIP.dunkLandCrouch;
   }
 
   function launchDunk(ctx: ModeContext): void {
@@ -491,14 +516,14 @@ export const DunkMode: ModeDefinition = (() => {
 
     const scores = judgeDunk(difficulty, execution, styleScore);
     lastScores = scores;
-    const dunkTotal = scores.reduce((s, j) => s + j.score, 0);   // 18..30
+    const dunkTotal = scores.reduce((s, j) => s + j.score, 0);   // MIN_TOTAL..PERFECT_TOTAL (30..50)
 
-    // CHAIN: consecutive 24+ dunks build the multiplier; each link pumps
-    // extra hype (which feeds the NEXT dunk's style score — real teeth)
-    // Game-Breaker: a 27+ dunk is a highlight that shifts the building
-    if (dunkTotal >= 27) {
-      momentum.report({ kind: 'highlight_dunk', weight: dunkTotal >= 29 ? 30 : 18 });
-    } else if (dunkTotal <= 19) {
+    // CHAIN: consecutive approval-band dunks build the multiplier; each link
+    // pumps extra hype (which feeds the NEXT dunk's style score — real teeth)
+    // Game-Breaker: an eruption-band dunk is a highlight that shifts the building
+    if (dunkTotal >= BAND_TOTAL.eruption) {
+      momentum.report({ kind: 'highlight_dunk', weight: perJudgeAvg(dunkTotal) >= MONSTER_AVG ? 30 : 18 });
+    } else if (perJudgeAvg(dunkTotal) <= FLAT_AVG) {
       momentum.report({ kind: 'contest_low' });
     }
     momentum.update(0); // settle tier for this beat
@@ -520,12 +545,16 @@ export const DunkMode: ModeDefinition = (() => {
     }
 
     playerTotal += dunkTotal;
-    hype = Math.min(100, hype + dunkTotal * 2);
+    // Hype is fed by the QUALITY of the dunk, not the raw total — the total's
+    // range moved with the ceiling and `dunkTotal * 2` would now fill the meter
+    // almost instantly, quietly wrecking the momentum curve. Per-judge average
+    // is scale-free: this yields the same 36..60 it always did.
+    hype = Math.min(100, hype + perJudgeAvg(dunkTotal) * 6);
 
     ctx.feel?.impact?.(0.2 + execution / 15);
     SoundKit.play('score', { pitch: 1 + Math.min(1, hype / 100) });
     EffectsKit.burst(ctx.scene, rim, 'net');
-    if (dunkTotal >= 27) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'confetti'); }
+    if (dunkTotal >= BAND_TOTAL.eruption) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'confetti'); }
     const landing = pickLanding(dunkTotal);
     if (clippedObstacle) ctx.setHud({ banner: 'CLIPPED THE PROP — flushed anyway' });
 
@@ -571,7 +600,7 @@ export const DunkMode: ModeDefinition = (() => {
     // to stay ahead of the rival's pace (they dunk after you)
     const isFinalRound = round === TOTAL_ROUNDS;
     const deficit = rivalTotal - playerTotal;
-    const need = isFinalRound ? Math.max(0, deficit + 25) : 0;   // 25/dunk ≈ rival pace
+    const need = isFinalRound ? Math.max(0, deficit + RIVAL_PACE) : 0;
     ctx.setHud({
       dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`,
       need: need > 0 ? need : 0,

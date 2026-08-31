@@ -27,6 +27,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'crossfade-orphan-tests.ts', guards: 'animation crossfade does not strand clips' },
   { script: 'environment-ibl-tests.ts', guards: 'procedural IBL environment maths' },
   { script: 'dunk-system-tests.ts', guards: 'dunk trick recognition' },
+  { script: 'judge-panel-tests.ts', guards: 'five judges, ceiling 50, staged reveal' },
   { script: 'dunk-animation-tests.ts', guards: 'dunk clips resolve AND move the rig' },
 ];
 

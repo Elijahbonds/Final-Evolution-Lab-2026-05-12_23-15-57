@@ -146,16 +146,32 @@ export default function DunkBabylon({ onEnd }: GameProps) {
         </div>
       )}
 
-      {/* Judge scorecard reveal */}
-      {Array.isArray(hud.judgeReveal) && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/4 flex flex-col items-center gap-1">
-          {(hud.judgeReveal as HudScoreCard[]).map((j) => (
-            <div key={j.name} className="fel-panel flex items-center gap-3 px-3 py-1 font-mono text-xs">
-              <span className="text-[var(--fel-cyan)]">{j.name}</span>
-              <span className="text-lg font-bold text-[var(--fel-gold)]">{j.score}</span>
-              <span className="max-w-[220px] truncate text-white/60">{j.line}</span>
+      {/* Judge scorecard reveal — five cards held up in a row, as the panel
+          actually does it. This was a vertical stack of name+score+voice-line
+          rows, which worked for three judges and does not for five: the column
+          grew straight down through the banner at top-[38%], which is exactly
+          where a FIFTY! lands. Cards across, one voice line at a time, and a
+          running total that climbs as they flip — the number everyone watches. */}
+      {Array.isArray(hud.judgeReveal) && (hud.judgeReveal as HudScoreCard[]).length > 0 && (
+        <div className="pointer-events-none absolute inset-x-0 top-[20%] flex flex-col items-center gap-2">
+          <div className="flex items-end justify-center gap-1.5">
+            {(hud.judgeReveal as HudScoreCard[]).map((j) => (
+              <div key={j.name} className="fel-panel flex flex-col items-center px-2.5 py-1">
+                <span className="font-mono text-[9px] uppercase tracking-wider text-[var(--fel-cyan)]">{j.name}</span>
+                <span className="text-2xl font-black leading-none text-[var(--fel-gold)]">{j.score}</span>
+              </div>
+            ))}
+            <div className="fel-panel ml-1 flex flex-col items-center border-[var(--fel-gold)]/40 px-3 py-1">
+              <span className="font-mono text-[9px] uppercase tracking-wider text-white/50">total</span>
+              <span className="text-2xl font-black leading-none text-white">
+                {(hud.judgeReveal as HudScoreCard[]).reduce((s, j) => s + j.score, 0)}
+              </span>
             </div>
-          ))}
+          </div>
+          {/* the card that just flipped gets to speak */}
+          <span className="fel-panel max-w-[85%] truncate px-3 py-1 font-mono text-[11px] text-white/70">
+            {(hud.judgeReveal as HudScoreCard[])[(hud.judgeReveal as HudScoreCard[]).length - 1].line}
+          </span>
         </div>
       )}
 
