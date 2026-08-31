@@ -1,5 +1,9 @@
 #!/usr/bin/env -S npx tsx
-// Hoop alignment — the ball must fly to the basket the player can SEE.
+// Basketball rules, checked across EVERY basketball mode at once.
+//
+// Three modes independently made the same three mistakes. That is the signature
+// of knowledge living in one mode instead of in the shared core, so the checks
+// live here, across all of them, rather than in any single mode's suite.
 //
 // Every basketball mode carried its own rim constant, and every venue placed
 // its own hoop prop, and nothing ever compared the two. All three modes were
@@ -21,6 +25,7 @@ import { RIM as RIM_3V3 } from '../lib/babylon/modes/ThreeVThreeMode';
 import { RIM as RIM_1V1 } from '../lib/babylon/modes/OneVOneMode';
 import { VENUE_SPECS } from '../lib/babylon/nexus/venueSpecs';
 import { HOOP_RIM_OFFSET } from '../lib/babylon/nexus/NexusWebScene';
+import { readFileSync } from 'node:fs';
 
 let checks = 0;
 const fail: string[] = [];
@@ -82,9 +87,40 @@ for (const v of ['basketball_h2h', 'basketball_3v3']) {
   ok(rimsOf(v).length === 1, `C-${v}: a half-court game has exactly one basket (got ${rimsOf(v).length})`);
 }
 
+// ── D. no mode carries its own flat three-point radius ─────────────────────
+// The real arc is 6.71m in the corners and 7.24m at the top. 3PT shipped a flat
+// radius as its D1 and fixed it; 3v3 then wrote `THREE_POINT_RADIUS = 6.75` and
+// 1v1 wrote `= 6.7`, independently, because the correct arc lived inside
+// ThreePointMode instead of the shared core. It lives in BasketballCore now.
+const MODE_FILES = [
+  'lib/babylon/modes/ThreeVThreeMode.ts',
+  'lib/babylon/modes/OneVOneMode.ts',
+  'lib/babylon/modes/DunkMode.ts',
+];
+for (const f of MODE_FILES) {
+  const code = readFileSync(f, 'utf8')
+    .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+  ok(!/THREE_POINT_RADIUS\s*=/.test(code),
+    `D-${f.split('/').pop()} defines no private three-point radius — the arc is ` +
+    'angle-dependent and belongs to BasketballCore');
+}
+
+// ── E. no scoring path awards a single point ───────────────────────────────
+// Both 1v1 and 3v3 carry a comment recording the scale being fixed from
+// "1 inside the paint, 2 outside" to real 2s and 3s — and in BOTH, only the
+// jump-shot branch was updated. The dunk kept awarding 1, so the best shot in
+// basketball was worth half a jumper: the exact bug those fixes were written to
+// remove, still live, in the same file as its own post-mortem.
+for (const f of ['lib/babylon/modes/ThreeVThreeMode.ts', 'lib/babylon/modes/OneVOneMode.ts']) {
+  const code = readFileSync(f, 'utf8')
+    .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+  ok(!/(my|foe)Score \+= 1;/.test(code),
+    `E-${f.split('/').pop()} has no single-point scoring path — a dunk is a two`);
+}
+
 if (fail.length) {
-  console.error(`hoop-alignment-tests: ${fail.length} FAILED of ${checks}`);
+  console.error(`basketball-rules-tests: ${fail.length} FAILED of ${checks}`);
   for (const f of fail) console.error('  ✗ ' + f);
   process.exit(1);
 }
-console.log(`hoop-alignment-tests: ${checks} checks green — every rim is on a real, regulation hoop`);
+console.log(`basketball-rules-tests: ${checks} checks green — rims, arcs and scoring agree across every mode`);

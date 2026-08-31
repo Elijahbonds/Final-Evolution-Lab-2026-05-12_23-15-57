@@ -19,6 +19,8 @@ export type ModeVerbConfig = { buttons: [VerbButton, VerbButton, VerbButton, Ver
 
 const A = (btn: 'A' | 'B' | 'X' | 'Y'): FelInput => ({ t: 'button', btn, pressed: true });
 const RT = (value: number): FelInput => ({ t: 'trigger', side: 'R', value });
+/** Shoulder button. Held verbs like BOX OUT live here, not on the face diamond. */
+const L1 = (): FelInput => ({ t: 'button', btn: 'L1', pressed: true });
 
 // Fixed slot colors — the whole point of a uniform rig: A is always this
 // cyan, Y is always this gold, everywhere, the same way a real controller's
@@ -80,6 +82,13 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
     Y: { label: 'SHOOT', emit: RT(1), hold: true },
     A: { label: 'BLOCK', emit: A('A') },
     X: { label: 'STEAL', emit: A('X') },
+    // BOX OUT was gamepad-only. The mode's own on-screen hint tells you to
+    // "hold L1/LT to BOX OUT" while the touch overlay drew no such button — so
+    // on a phone the instruction named a control that did not exist, and the B
+    // slot sat there inert rendering the bare letter "B". A press/release on a
+    // button slot emits pressed true/false, which is exactly what braceHeld
+    // wants, so the shoulder verb fits the diamond without a new control type.
+    B: { label: 'BOX OUT', emit: L1() },
   }),
   // 3v3 Streetball: held-trigger shot, PASS (B), STEAL (X), BLOCK (A) —
   // the exact bindings LocalInputSource + the modes' onInput already read.

@@ -69,7 +69,14 @@ export function BootSplash(props: {
         )}
 
         {props.phase === 'ready' && (
-          <button onClick={props.onStart}
+          <button
+            // Blur after starting. A clicked <button> KEEPS FOCUS, and the
+            // browser activates a focused button on SPACE — which is the shoot
+            // and charge key in every mode here. So a player who started with a
+            // mouse and then pressed space to shoot re-fired START, and
+            // ModeHarness reads "playing + START" as PAUSE: the game froze
+            // mid-shot, on their very first input, with no way to tell why.
+            onClick={(e) => { e.currentTarget.blur(); props.onStart(); }}
             className="fel-cta mt-2 rounded-2xl px-10 py-4 text-lg font-black text-black"
             style={{ background: v.tint, boxShadow: `0 0 34px ${v.tint}66` }}>
             TAP TO START
@@ -87,7 +94,7 @@ export function BootSplash(props: {
             <p className="text-sm text-rose-300">
               {typeof props.detail === 'string' ? props.detail : 'The arena failed to load.'}
             </p>
-            <button onClick={props.onRetry}
+            <button onClick={(e) => { e.currentTarget.blur(); props.onRetry(); }}
               className="rounded-2xl bg-white px-8 py-3 font-black text-black">RETRY</button>
           </div>
         )}

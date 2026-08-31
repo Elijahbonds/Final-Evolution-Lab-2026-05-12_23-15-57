@@ -11,7 +11,9 @@
 
 import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
-mkdirSync('docs/shots/3v3', { recursive: true });
+const OUT = process.env.OUT_DIR ?? 'docs/shots/mode';
+const NAME = process.env.NAME ?? 'load';
+mkdirSync(OUT, { recursive: true });
 const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', args:['--use-gl=angle','--use-angle=metal'] });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
 const logs: string[] = [];
@@ -19,9 +21,16 @@ p.on('console', m => { const t=m.text(); logs.push(`[${m.type()}] ${t.slice(0,18
 const url = process.env.URL ?? 'http://localhost:3000/dev/mode/threevthree';
 await p.goto(url, { waitUntil: 'networkidle' });
 console.log('landed on:', new URL(p.url()).pathname, ' canvas:', await p.locator('canvas').count());
-await p.getByText(/TAP TO START|START/i).first().click({ force: true }).catch(()=>{});
-await p.waitForTimeout(6000);
-await p.screenshot({ path: 'docs/shots/3v3/3v3-load.png' });
+// The dev runner can sit at a ready gate; clear it before judging anything.
+{
+  const head = await p.evaluate<string>('document.body.innerText');
+  if (/·\s*(ready|loading)/i.test(head) || /TAP TO START/i.test(head)) {
+    await p.getByText(/TAP TO START|^START$/i).first().click({ force: true }).catch(() => {});
+    await p.evaluate('document.activeElement && document.activeElement.blur()');
+  }
+}
+await p.waitForTimeout(7000);
+await p.screenshot({ path: `${OUT}/${NAME}.png` });
 console.log('body:', (await p.evaluate<string>('document.body.innerText')).replace(/\n+/g,' | ').slice(0,240));
 console.log('--- console ---');
 for (const l of logs.filter(l=>/FEL-SPAWN|FEL-FRAME|error|warn|black|watchdog|venue|VENUE/i.test(l)).slice(0,20)) console.log(' ', l);

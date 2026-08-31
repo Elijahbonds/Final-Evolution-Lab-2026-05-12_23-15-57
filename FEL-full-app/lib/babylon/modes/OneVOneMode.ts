@@ -32,7 +32,7 @@ import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
 import { AgentControlSource } from '../core/AgentControlSource';  // M69: intent play under ?agent=1
 import { agentBridge } from '../core/AgentBridge';
 import {
-  DribbleController, ShotMeter, DefenderBrain, contestLevel, clampToHalfCourt,
+  DribbleController, ShotMeter, DefenderBrain, contestLevel, clampToHalfCourt, isThree,
   resolveBodyCollision, checkAnkleBreak, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, DUNK_PCT,
   SHOT_QUALITY_PCT, type ShotQuality, type ShotContext,
@@ -58,7 +58,11 @@ const TARGET_SCORE = 11;
 // mid-range shots are both a normal 2, and only shots beyond a real
 // 3-point arc distance score 3 — reachable inside the mode's half-court
 // movement bounds (clampToHalfCourt goes out to depth 14.5, width 7.2).
-const THREE_POINT_RADIUS = 6.7;
+// The arc is NOT a circle. This was a flat 6.7m radius — the same mistake 3PT
+// shipped as its D1 and 3v3 repeated, all three independently, because the real
+// line lived inside ThreePointMode instead of the shared basketball core. It is
+// 6.71m in the corners and 7.24m at the top, and that gap is the shot selection.
+// isThree() answers it per angle.
 const DEFENSE_DRIVE_SEC = 2.2;                     // rival's drive length on their possession
 
 type Possession = 'mine' | 'defense';
@@ -268,7 +272,13 @@ export const OneVOneMode: ModeDefinition = (() => {
         const moving = Math.hypot(intent.moveX, intent.moveY) > 0.1;
         const sprintOk = turbo.gate(dt, intent.sprint, moving);
         ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
-        const drib = meDribble.update(dt, intent.moveX, intent.moveY, sprintOk);
+        // FORWARD WAS BACKWARDS — see ThreeVThreeMode for the full account.
+        // Every input source reports up-stick as NEGATIVE y (Gamepad axes[1],
+        // InputBus's W, the touch stick's screen delta); CourtMovement documents
+        // the opposite and maps -moveY, so pressing forward walked the player
+        // away from the basket. Negated here rather than in CourtMovement, which
+        // a dozen unverified files share.
+        const drib = meDribble.update(dt, intent.moveX, -intent.moveY, sprintOk);
         if (!shooting && !dunking) {
           driveBody('me', me.root, meDribble.vel, dt);
           me.root.rotation.y = drib.facingRad;
@@ -383,7 +393,13 @@ export const OneVOneMode: ModeDefinition = (() => {
         const moving = Math.hypot(intent.moveX, intent.moveY) > 0.1;
         const sprintOk = turbo.gate(dt, intent.sprint, moving);
         ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
-        const drib = meDribble.update(dt, intent.moveX, intent.moveY, sprintOk);
+        // FORWARD WAS BACKWARDS — see ThreeVThreeMode for the full account.
+        // Every input source reports up-stick as NEGATIVE y (Gamepad axes[1],
+        // InputBus's W, the touch stick's screen delta); CourtMovement documents
+        // the opposite and maps -moveY, so pressing forward walked the player
+        // away from the basket. Negated here rather than in CourtMovement, which
+        // a dozen unverified files share.
+        const drib = meDribble.update(dt, intent.moveX, -intent.moveY, sprintOk);
         driveBody('me', me.root, meDribble.vel, dt);
         me.root.rotation.y = drib.facingRad;
         contact?.brace('me', intent.brace ?? false);
@@ -445,7 +461,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             // no block — contest distance sets their make%
             const contest = contestLevel(foe.root.position, me.root.position);
             const made = Math.random() < 0.62 - contest * 0.35;
-            arcPoints = Vector3.Distance(foe.root.position, RIM) > THREE_POINT_RADIUS ? 3 : 2;
+            arcPoints = isThree(foe.root.position, RIM) ? 3 : 2;
             arcResultMade = made;
             arc.start(ball.getAbsolutePosition(), RIM, made, 'jumper');
             defResolved = true;
@@ -500,7 +516,12 @@ export const OneVOneMode: ModeDefinition = (() => {
       dunking = false;
       releaseBall(ball);
       if (made) {
-        myScore += 1;
+        // A DUNK IS WORTH TWO. The comment above TARGET_SCORE records the
+        // scoring scale being fixed from "1 inside the paint, 2 outside" to real
+        // 2s and 3s — but only the JUMP SHOT path was updated. The dunk kept
+        // awarding 1, so the best shot in basketball stayed worth half a jumper,
+        // the exact bug that fix was written to remove. 3v3 had it too.
+        myScore += 2;
         const posterized = kind === 'poster';
         swing(posterized ? 'posterize' : 'highlight_dunk');
         ctx.camDirector.pulse(posterized ? 0.85 : 0.6, 0.5);
@@ -533,7 +554,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     const pctMod = currentShot?.pctMod ?? 1;
     const pct = SHOT_QUALITY_PCT[quality] * pctMod * mbus.multiplier();
     const dist = Vector3.Distance(me.root.position, RIM);
-    arcPoints = dist > THREE_POINT_RADIUS ? 3 : 2;
+    arcPoints = isThree(me.root.position, RIM) ? 3 : 2;
     arcLabel = currentShot?.label ?? 'SHOT';
     arcResultMade = Math.random() < Math.min(0.98, pct);
     releaseBall(ball);

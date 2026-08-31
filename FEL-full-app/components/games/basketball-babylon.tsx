@@ -46,7 +46,15 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
       onEnd(result);
     };
 
-    runMode(MODES.onevone, {
+    // StrictMode runs effect -> cleanup -> effect. Starting immediately means the
+    // PHANTOM mount also builds a Babylon engine its cleanup cannot cancel —
+    // `stop` is not assigned until the async load resolves — so two engines end
+    // up on one canvas fighting over a single WebGL context and the loser draws
+    // nothing. Measured on 3v3: mountVenue ran twice and the scene came out at
+    // 5 meshes while the HUD streamed happily. Same fix as Dunk and 3v3.
+    const startTimer = setTimeout(() => {
+      if (disposed) return;
+      runMode(MODES.onevone, {
       canvas,
       input: bus,
       onPhase: (p, cd) => {
@@ -61,10 +69,12 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
         if (disposed) { s(); return; }
         stop = s;
       })
-      .catch((e) => console.error('[FEL-HOOPS] boot failed', e));
+        .catch((e) => console.error('[FEL-HOOPS] boot failed', e));
+    }, 0);
 
     return () => {
       disposed = true;
+      clearTimeout(startTimer);
       stop?.();
       busRef.current = null;
     };

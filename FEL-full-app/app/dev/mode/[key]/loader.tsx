@@ -71,7 +71,12 @@ export function DevModeRunner({ modeKey }: { modeKey: string }) {
       </div>
 
       <button
-        onClick={() => busRef.current?.emit({ t: 'button', btn: 'START', pressed: true })}
+        // Blur: space activates a focused button, and space is the shoot key,
+        // so leaving it focused turns the next shot into a pause.
+        onClick={(e) => {
+          e.currentTarget.blur();
+          busRef.current?.emit({ t: 'button', btn: 'START', pressed: true });
+        }}
         className="absolute left-3 bottom-3 z-20 rounded bg-[#00E5FF] px-4 py-2 font-bold text-black"
       >START</button>
 

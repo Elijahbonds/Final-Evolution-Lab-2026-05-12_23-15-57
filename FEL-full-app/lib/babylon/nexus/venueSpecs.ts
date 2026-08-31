@@ -48,13 +48,26 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   basketball_h2h: {
     modeId: 'basketball_h2h', name: '1v1 Hoops', venue: 'Venice Beach Court',
     environment: dusk('#F0637A', '#1B2A6B', '#2A3C7A', '#FFB36B'),
-    ground: { kind: 'court', size: [16, 28], color: '#1B7FB5', lineColor: '#F2F6FF', markings: 'basketball' },
+    // A HALF court, like the game played on it. It was a full 16x28 centred on
+    // the origin with FULL-court markings — two keys, a halfway line, a centre
+    // circle — for a one-basket game that never crosses z 0, so the painted key
+    // sat at the opposite end from the hoop. Offset 7.6 puts the baseline 1.575m
+    // behind the rim; 19m of depth covers the play area (z 0.5..14.5).
+    ground: {
+      kind: 'court', size: [16, 19], offset: [0, 7.6],
+      color: '#1B7FB5', lineColor: '#F2F6FF', markings: 'halfcourt',
+    },
     props: [
       // Same half-court correction as 3v3: OneVOneMode clamps play to
       // z 0.5..14.5 and shoots at RIM (0, 3.05, -0.6), but this venue put
       // baskets at both ends of a full court, so the nearest hoop stood behind
       // the players at z +13.22. -1.32 puts the rim on the mode's RIM.
       { kind: 'hoop', position: [0, 0, -1.32], color: '#FF6B00' },
+      // L4 was EMPTY — this venue had no crowd at all, so a 1v1 on the most
+      // famous blacktop in the world was played in front of nobody. One stand
+      // behind the basket, one behind the play, matching 3v3's placement.
+      { kind: 'crowdTier', position: [0, 0, -9] },
+      { kind: 'crowdTier', position: [0, 0, 20], rotationY: Math.PI },
       ...beachDressing,
     ],
     actors: [

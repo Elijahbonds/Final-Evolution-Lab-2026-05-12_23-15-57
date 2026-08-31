@@ -212,3 +212,27 @@ with full-court markings so the key sat at the opposite end from the hoop.
 > mode's rim against the venue's hoop, the built rim height against ten feet,
 > the painted markings against the geometry actually being played. None threw.
 > `hoop-alignment-tests` now performs that comparison for every basketball mode.
+
+---
+
+## Applied: Streetball 1v1
+
+```
+L1 ground plane .......... PASS  16x19 half court, offset so the baseline sits
+                                 1.575m behind the rim; regulation rim; real arc
+L2 play-critical props ... PASS  one basket with backboard and net, live ball
+L3 boundary .............. PASS  court edges, stands, palms, beach horizon
+L4 crowd and life ........ PASS  ADDED — the venue had NO crowd at all
+L5 ambience .............. PASS  'beach' backdrop, lamps, stadium bed
+budget ................... draws 33  meshes 33  frame 16.7ms @ 60fps
+legibility ............... PASS  stand 9m back, muted crowd texture
+```
+
+**L4 was entirely empty** on the mode the Master Design Bible calls the
+validated reference: a 1v1 on Venice Beach played in front of nobody. L1 failed
+the same three ways 3v3's did — wrong basket position, wrong rim height,
+full-court markings on a half-court game.
+
+> Four modes in, the pattern is consistent enough to state plainly: **L1 and L4
+> fail most often, and they fail silently.** Nothing errors when a rim is in the
+> wrong place or a stand is missing. Check them first.
