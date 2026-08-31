@@ -62,13 +62,26 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
     X: { label: 'GRAB', emit: A('X') },
     Y: { label: 'PUMP', emit: RT(1), hold: true },
   }),
+  // B is TRICKS.spin + boost fill in SnowboardSlalomMode, not a grab. It was
+  // labelled GRAB, so a touch player pressing GRAB spun -- and the real grab,
+  // which the mode reads on X, was not on the overlay at all. Both fixed: the
+  // label now says what the button does, and X exists.
   snowboard_slalom: verbs({
     A: { label: 'JUMP', emit: A('A') },
-    B: { label: 'GRAB', emit: A('B') },
+    B: { label: 'SPIN', emit: A('B') },
+    X: { label: 'GRAB', emit: A('X') },
     Y: { label: 'TUCK', emit: RT(1), hold: true },
   }),
+  // Surf had TWO of its four verbs. SurfBreakMode reads B (cutback) and X
+  // (grab) as well, and the cutback is one of only two scoring actions a player
+  // can actively take -- so on a phone, half the mode was missing and nothing
+  // reported it, because an absent slot renders as an inert button rather than
+  // failing. This is the same silent-degradation shape as the Karate VS verb-key
+  // bug that gave this phase its own permanent guard.
   surf: verbs({
     A: { label: 'AIR', emit: A('A') },
+    B: { label: 'CUTBACK', emit: A('B') },
+    X: { label: 'GRAB', emit: A('X') },
     Y: { label: 'CARVE', emit: RT(1), hold: true },
   }),
   tennis: verbs({ A: { label: 'SWING', emit: A('A') } }),

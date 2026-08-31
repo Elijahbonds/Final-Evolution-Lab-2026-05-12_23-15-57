@@ -13,6 +13,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { MODE_VERBS } from '../lib/babylon/ui/modeVerbs';
+import { MODES } from '../lib/babylon/modes/registry';
 
 let checks = 0;
 const fail: string[] = [];
@@ -57,6 +58,71 @@ ok(MODE_VERBS.default.buttons.filter((b) => b.emit !== null).length === 1,
 // and a short array would leave a hole in the diamond.
 for (const [key, cfg] of Object.entries(MODE_VERBS)) {
   ok(cfg.buttons.length === 4, `C-${key} declares exactly 4 slots (got ${cfg.buttons.length})`);
+}
+
+// ── Every verb a mode READS must exist on its overlay ───────────────────────
+//
+// Key alignment was only half the guard. Surf shipped with a correctly-keyed
+// entry that offered TWO of its four verbs: SurfBreakMode reads B (cutback) and
+// X (grab) and neither was on the overlay, so on a phone the cutback -- one of
+// only two scoring actions a player can actively take -- simply did not exist.
+// An absent slot renders as an inert button rather than failing, which is the
+// same silent-degradation shape as the original karate_vs bug.
+//
+// So: read each mode's own source for the face buttons it acts on, and assert
+// the overlay offers them. A mode that deliberately leaves a verb to gamepad
+// only records it in EXEMPT with a reason, which makes that a decision instead
+// of an oversight.
+const MODE_SRC = join(process.cwd(), 'lib', 'babylon', 'modes');
+const EXEMPT: Record<string, { btn: string; why: string }[]> = {
+  // Showdown's L1/R1/SELECT specials already have no pad slot by design; the
+  // face buttons it reads are all present.
+};
+
+const registryFile = readFileSync(join(MODE_SRC, 'registry.ts'), 'utf8');
+/** registry key -> implementation file, read from the registry's own imports. */
+function modeSources(): { key: string; file: string }[] {
+  const out: { key: string; file: string }[] = [];
+  for (const [, key, symbol] of registryFile.matchAll(/^\s{2}([a-z_0-9]+):\s*([A-Za-z0-9_]+),/gm)) {
+    const imp = new RegExp(`import \\{[^}]*\\b${symbol}\\b[^}]*\\} from '\\.\\/([^']+)'`).exec(registryFile);
+    if (imp) out.push({ key, file: `${imp[1]}.ts` });
+  }
+  return out;
+}
+
+for (const { key, file } of modeSources()) {
+  const cfg = MODE_VERBS[key];
+  if (!cfg) continue;                       // key coverage is asserted above
+  let src: string;
+  try { src = readFileSync(join(MODE_SRC, file), 'utf8'); } catch { continue; }
+
+  // Buttons the mode acts on, grouped BY CONDITION. A mode that writes
+  //   if (e.btn === 'A' || e.btn === 'B') fire()
+  // is offering B as an alias for A, not as a second verb -- 3PT and Dance both
+  // do exactly that, and demanding a B slot for them would be this guard
+  // inventing work. So the unit is the disjunction: the action is reachable if
+  // ANY button that triggers it is on the overlay. A standalone
+  //   if (e.btn === 'X')
+  // is a group of one and must be offered on its own.
+  const groups: string[][] = [];
+  for (const line of src.split('\n')) {
+    const btns = [...line.matchAll(/e\.btn === '([ABXY])'/g)].map((m) => m[1]);
+    if (btns.length) groups.push([...new Set(btns)]);
+  }
+  if (groups.length === 0) continue;
+
+  const offered = new Set(
+    cfg.buttons.map((b, i) => (b.label && b.label !== '—' ? ['A', 'B', 'X', 'Y'][i] : null)).filter(Boolean) as string[],
+  );
+  const seen = new Set<string>();
+  for (const group of groups) {
+    const id = group.join('|');
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const exempt = group.every((b) => EXEMPT[key]?.some((e) => e.btn === b));
+    ok(group.some((b) => offered.has(b)) || exempt,
+      `${key}: acts on ${group.join(' or ')} in ${file} — the touch overlay offers none of them`);
+  }
 }
 
 if (fail.length) {

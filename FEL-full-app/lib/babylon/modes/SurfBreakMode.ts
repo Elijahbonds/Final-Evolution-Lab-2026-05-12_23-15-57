@@ -26,12 +26,22 @@ import { RIDE_CONFIG as CFG } from './modeConfigs';
 const RUN_SEC = 90;
 /** How fast a cutback comes around. ~0.4s to complete the turn. */
 const CUTBACK_RATE = 6;
-const POCKET = { min: 2, max: 9 };
-const MAX_FORWARD_SPEED = 9;
+export const POCKET = { min: 2, max: 9 };
+export const MAX_FORWARD_SPEED = 9;
 const WAVE_LAP = 140;
-const BARREL_HOLD_SEC = 1.5;
-const BARREL_BONUS = 250;
+export const BARREL_HOLD_SEC = 1.5;
+export const BARREL_BONUS = 250;
+/** Carve depth at which the rider commits and starts SPENDING flow. */
+export const SURGE_CARVE = 0.85;
+/** Flow burned per second while surging. */
+export const SURGE_DRAIN = 45;
+/** Extra m/s the surge buys above the normal ceiling. */
+export const SURGE_SPEED_BONUS = 4;
 
+/** Ceiling on the flow meter. */
+export const FLOW_MAX = 200;
+/** Flow gained per second riding the pocket (doubled inside the tube). */
+export const FLOW_FILL_PER_SEC = 22;
 export const SurfBreakMode: ModeDefinition = (() => {
   let world: RideWorld, waveLipAt: (t: number) => Vector3, barrelActive: (t: number) => boolean;
   let rig: BoardRig, tricks: TrickMachine;
@@ -43,6 +53,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
   let ended = false, wipedOut = false;
   let lapsSeen = 0;
   let barrelSec = 0, inBarrel = false, barrels = 0;
+  let surging = false;
 
   function wipeout(ctx: ModeContext, why: string, lipZ: number): void {
     if (wipedOut) return;
@@ -93,7 +104,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h));
       ctx.camDirector.setPreset('board');
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 4, modeId: 'surf' });
-      t = 0; timeLeft = RUN_SEC; flow = 0; ended = false; wipedOut = false; lapsSeen = 0;
+      t = 0; timeLeft = RUN_SEC; flow = 0; ended = false; wipedOut = false; lapsSeen = 0; surging = false;
       yawTarget = rig.char.root.rotation.y;
       barrelSec = 0; inBarrel = false; barrels = 0;
       ctx.objectiveRef.current = waveLipAt(t);
@@ -154,9 +165,30 @@ export const SurfBreakMode: ModeDefinition = (() => {
       }
 
       if (!wipedOut) {
-        if (rig.rider.vel.z < MAX_FORWARD_SPEED) {
-          rig.rider.vel.z += (2.2 + carve * 1.6) * dt;
-          rig.rider.vel.z = Math.min(MAX_FORWARD_SPEED, rig.rider.vel.z);
+        // SURGE — the flow meter is a resource you SPEND, which is the half of
+        // SSX's boost economy this mode did not have. Flow filled by riding the
+        // pocket and then only ever gated a passive score trickle: there was no
+        // action anywhere that consumed it, so it was a readout, not a
+        // decision. Now burying the rail past SURGE_CARVE burns the meter for
+        // drive above the normal ceiling — speed you cannot otherwise get, and
+        // the only way to outrun a section closing ahead of you. Bank it for
+        // the score trickle or spend it to make the wave; that trade is the
+        // decision the meter was missing.
+        const wantSurge = carve >= SURGE_CARVE && flow > 1;
+        if (wantSurge && !surging) {
+          surging = true;
+          SoundKit.play('whoosh', { pitch: 0.75, volume: 0.5 });
+          ctx.setHud({ banner: 'SURGE' });
+          setTimeout(() => ctx.setHud({ banner: '' }), 600);
+        } else if (!wantSurge) {
+          surging = false;
+        }
+        if (surging) flow = Math.max(0, flow - SURGE_DRAIN * dt);
+
+        const ceiling = MAX_FORWARD_SPEED + (surging ? SURGE_SPEED_BONUS : 0);
+        if (rig.rider.vel.z < ceiling) {
+          rig.rider.vel.z += (2.2 + carve * 1.6 + (surging ? 2.5 : 0)) * dt;
+          rig.rider.vel.z = Math.min(ceiling, rig.rider.vel.z);
         }
         rig.rider.update(dt, stickX, carve);
 
@@ -179,7 +211,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
         } else if (ahead >= POCKET.min && ahead <= POCKET.max) {
           // pocket riding — doubled while the tube is open over you
           const mult = hollow ? 2 : 1;
-          flow = Math.min(200, flow + dt * 22 * mult);
+          flow = Math.min(FLOW_MAX, flow + dt * FLOW_FILL_PER_SEC * mult);
           tricks.score += Math.round(dt * (10 + flow / 10) * mult);
           if (hollow) {
             barrelSec += dt;
