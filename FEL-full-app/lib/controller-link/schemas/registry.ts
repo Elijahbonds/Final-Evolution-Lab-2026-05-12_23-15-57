@@ -70,6 +70,37 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
+  // ── Basketball 3v3 ────────────────────────────────────────────────────────
+  // The first mode here that needs WALKING, which is why the bridge grew a
+  // 'move' action: modes read movement from a left-stick event, so a plain
+  // d-pad schema would have delivered every verb except the ability to move.
+  // SHOOT is the analog hold-and-release meter, so it takes the same tilt idiom
+  // as 3PT's shot and Dunk's charge.
+  threevthree: {
+    modeId: 'threevthree',
+    title: '3v3 Streetball',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      {
+        kind: 'motion',
+        motion: {
+          action: 'charge',
+          hint: 'Tilt back to load your shot — release in the green',
+          axis: 'pitch',
+          fullChargeDeg: 40,           //TUNE(elijah)
+        },
+      },
+      { kind: 'button', buttons: [
+        { action: 'charge', label: 'SHOOT', hold: true },
+        { action: 'B', label: 'PASS' },
+        { action: 'X', label: 'STEAL' },
+        { action: 'A', label: 'BLOCK' },
+      ] },
+    ],
+  },
+
   // ── Air-session family ────────────────────────────────────────────────────
   // The run-up IS a d-pad cadence, so these need the dpad schema as well as the
   // two air verbs. Same shape for both because they are one shared core.

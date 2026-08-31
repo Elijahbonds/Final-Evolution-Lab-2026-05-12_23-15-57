@@ -184,3 +184,31 @@ at strength, back rows recede for depth, and the emissive is halved.
 > Worth recording as a pattern: both failures were *added detail* that reduced
 > readability, and both sat directly behind the thing the player aims at. When
 > this protocol is applied to a new mode, look behind the target first.
+
+---
+
+## Applied: Basketball 3v3
+
+```
+L1 ground plane .......... PASS  18x20 half court, offset so the baseline sits
+                                 1.575m behind the rim; halfcourt markings;
+                                 regulation 3.05m rim; real 6.71-7.24m arc
+L2 play-critical props ... PASS  one basket with backboard and net, live ball
+L3 boundary .............. PASS  court edges + stands + skyline; no void
+L4 crowd and life ........ PASS  two stands, behind the basket and behind play
+L5 ambience .............. PASS  night skyline, lamps, stadium bed
+budget ................... draws 49  meshes 49  frame 16.7ms @ 60fps
+legibility ............... PASS  stands moved 6m -> 10m behind the basket
+```
+
+**L1 failed on three separate counts** on a mode the bible lists as
+shipped-standard: the basket was ~12m from where the mode shot, the rim was
+built at 2.70m against a regulation 3.05m, and a half-court game was painted
+with full-court markings so the key sat at the opposite end from the hoop.
+
+> This is the strongest evidence yet for L1's rule that dimensions are checked
+> against the REAL SPORT rather than eyeballed. Every one of the three was a
+> pair of numbers that were each internally consistent and never compared: the
+> mode's rim against the venue's hoop, the built rim height against ten feet,
+> the painted markings against the geometry actually being played. None threw.
+> `hoop-alignment-tests` now performs that comparison for every basketball mode.

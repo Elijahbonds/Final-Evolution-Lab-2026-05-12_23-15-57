@@ -32,6 +32,7 @@ import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { ShotArc } from '../core/BasketballCore';
+import { THREE_CORNER_R, THREE_TOP_R, threePointRadius } from '../core/BasketballCore';
 import { SoundKit } from '../audio/SoundKit';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -48,15 +49,13 @@ const SHOT_TARGET = 0.72;          // release-bar sweet centre // TUNE(elijah)
 // 7.24m at the top of the arc. The racks sit ON that line, so a corner rack is a
 // genuinely shorter shot than the top-of-key rack — which is the reason the top
 // rack is the hard one in the real contest. A single radius flattened that away.
-export const RACK_CORNER_R = 6.71;        // NBA corner three
-export const RACK_TOP_R = 7.24;           // NBA top-of-arc three
+// Re-exported from the shared basketball core so 3PT and the 5-on-court modes
+// cannot drift to different three-point lines. Names kept for 3PT's own tests.
+export const RACK_CORNER_R = THREE_CORNER_R;   // NBA corner three
+export const RACK_TOP_R = THREE_TOP_R;         // NBA top-of-arc three
 export const RACK_ANGLES = [30, 60, 90, 120, 150].map((d) => (d * Math.PI) / 180);
 /** Radius at a given arc angle: corner distance at the ends, top distance at 90 deg. */
-export function rackRadius(angleRad: number): number {
-  // sin peaks at 90 deg (top of the key) and falls to 0.5 at the 30/150 corners.
-  const t = (Math.sin(angleRad) - 0.5) / 0.5;      // 0 at corners, 1 at the top
-  return RACK_CORNER_R + (RACK_TOP_R - RACK_CORNER_R) * Math.max(0, Math.min(1, t));
-}
+export const rackRadius = threePointRadius;
 
 /** Rim position matches VenueKit.buildCourt's hoop. */
 const RIM = new Vector3(0, 3.05, -0.6);

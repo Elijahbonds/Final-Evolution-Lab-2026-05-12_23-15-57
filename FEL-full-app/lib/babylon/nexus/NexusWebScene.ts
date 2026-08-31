@@ -95,6 +95,14 @@ export interface GroundSpec {
   lineColor?: string;
   /** Painted into a DynamicTexture — no image files. */
   markings?: 'basketball' | 'halfcourt' | 'tennis' | 'soccer' | 'volleyball' | 'none';
+  /**
+   * [x, z] offset for the playing surface. Grounds are centred on the origin,
+   * which assumes a mode plays symmetrically around it — and a HALF-court game
+   * does not. 3v3 plays z 0.5..15 with its basket behind z 0, so a centred court
+   * put the painted key and arc at the wrong end entirely and left fourteen
+   * metres of unused court behind the basket. Omitted, behaviour is unchanged.
+   */
+  offset?: [number, number];
 }
 
 export interface PropSpec {
@@ -394,6 +402,7 @@ function buildGround(scene: Scene, g: GroundSpec, root: TransformNode): Mesh {
   const mesh = MeshBuilder.CreateGround(
     'venue_ground', { width: g.size[0], height: g.size[1], subdivisions: 2 }, scene);
   mesh.parent = root;
+  if (g.offset) mesh.position.set(g.offset[0], 0, g.offset[1]);
   mesh.receiveShadows = true;
   // Named so the M64 CameraDirector occlusion probe recognises it as venue
   // shell even though it carries no collision flag.

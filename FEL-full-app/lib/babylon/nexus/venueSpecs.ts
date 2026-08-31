@@ -90,7 +90,16 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   basketball_3v3: {
     modeId: 'basketball_3v3', name: '3v3', venue: 'Streetball Arena',
     environment: dusk('#C24BE0', '#150E3D', '#2B1D5E', '#FFB0E0', 0.5),
-    ground: { kind: 'court', size: [18, 30], color: '#2B4A8F', lineColor: '#FFFFFF', markings: 'basketball' },
+    // A HALF court, positioned around the half the mode actually plays.
+    // It was a full 18x30 centred on the origin with FULL-court markings — two
+    // keys, a halfway line and a centre circle — on a game that uses one basket
+    // and never crosses z 0. The painted key sat at the far end from the hoop.
+    // Offset 7.8 puts the baseline 1.575m behind the rim, where a baseline goes,
+    // and the 20m depth covers the play area (z 0.5..15) with room behind it.
+    ground: {
+      kind: 'court', size: [18, 20], offset: [0, 7.8],
+      color: '#2B4A8F', lineColor: '#FFFFFF', markings: 'halfcourt',
+    },
     props: [
       // ONE basket, at the end the mode actually plays to.
       // 3v3 streetball is a HALF-COURT game — first to 21, one hoop — and
@@ -101,10 +110,12 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
       // just past their own baseline. A hoop prop sits 0.72 behind its rim, so
       // -1.32 puts the rim exactly on the mode's RIM.
       { kind: 'hoop', position: [0, 0, -1.32], color: '#BF5AF2' },
-      { kind: 'crowdTier', position: [0, 0, -24] },
-      { kind: 'crowdTier', position: [0, 0, 24], rotationY: Math.PI },
-      { kind: 'lamp', position: [12, 0, -8], color: '#E0B0FF' },
-      { kind: 'lamp', position: [-12, 0, 8], color: '#E0B0FF' },
+      // Stands behind the basket and behind the play, not 24m out past the
+      // ends of a court that no longer extends that far.
+      { kind: 'crowdTier', position: [0, 0, -10] },
+      { kind: 'crowdTier', position: [0, 0, 21], rotationY: Math.PI },
+      { kind: 'lamp', position: [11, 0, 2], color: '#E0B0FF' },
+      { kind: 'lamp', position: [-11, 0, 12], color: '#E0B0FF' },
     ],
     actors: threeVthree(),
     camera: { alpha: -Math.PI / 2, beta: 1.0, radius: 24, target: [0, 1.6, 2], fov: 0.88 },

@@ -123,6 +123,29 @@ async function main(): Promise<void> {
   await new Promise((r) => setTimeout(r, 200));
   ok(seen.length === 1, 'E12 the ramp stops on release — no leaked timer');
 
+  // MOVEMENT. Modes read movement from a LEFT STICK event and nothing else, so
+  // a d-pad event moves nobody. A mode that needs walking would have delivered
+  // every verb except the ability to walk — silently, like everything else in
+  // this codebase that goes wrong. 'move' is the opt-in that becomes a stick.
+  seen.length = 0;
+  feed({ a: 'move', p: { dir: 'right', pressed: true }, t: 0 });
+  ok(seen.length === 1 && seen[0].t === 'stick' && seen[0].side === 'L' && seen[0].x === 1,
+    'E13 a move d-pad press becomes a LEFT STICK event, not a dpad event');
+  feed({ a: 'move', p: { dir: 'up', pressed: true }, t: 0 });
+  const diag = seen[seen.length - 1];
+  ok(diag.t === 'stick' && diag.x === 1 && diag.y === 1,
+    'E14 two held directions combine into a diagonal rather than replacing each other');
+  feed({ a: 'move', p: { dir: 'right', pressed: false }, t: 0 });
+  const rel = seen[seen.length - 1];
+  ok(rel.t === 'stick' && rel.x === 0 && rel.y === 1, 'E15 releasing one direction keeps the other');
+
+  // Dunk's d-pad means PROP and mid-air TRICK, not movement. It must stay a dpad
+  // event or picking a prop would walk the dunker instead.
+  seen.length = 0;
+  feed({ a: 'dpad', p: { dir: 'down', pressed: true }, t: 0 });
+  ok(seen.length === 1 && seen[0].t === 'dpad',
+    'E16 a plain dpad action stays a dpad event — Dunk selects props with it');
+
   // ── report ───────────────────────────────────────────────────────────────
   if (fail.length) {
     console.error(`controller-link-tests: ${fail.length} FAILED of ${checks}`);

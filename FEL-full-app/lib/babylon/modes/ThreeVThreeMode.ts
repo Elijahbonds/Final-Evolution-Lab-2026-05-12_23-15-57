@@ -23,7 +23,7 @@ import { BallSim } from '../core/BallPhysics';
 import { attachBallToHand, releaseBall } from '../anim/ballRig';
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
 import {
-  DribbleController, ShotMeter, DefenderBrain, TeammateBrain, contestLevel, clampToHalfCourt,
+  DribbleController, ShotMeter, DefenderBrain, TeammateBrain, contestLevel, clampToHalfCourt, isThree,
   resolveBodyCollision, checkAnkleBreak, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, DUNK_PCT,
   SHOT_QUALITY_PCT, type ShotQuality, type ShotContext,
@@ -44,7 +44,13 @@ const TARGET_SCORE = 21;
 // the real streetball 2s-and-3s format (matching NBA 2K's stated
 // benchmark); this radius sits inside the court's clampToHalfCourt bounds
 // (width 8, depth 15) so a real 3 is reachable but not trivial.
-const THREE_POINT_RADIUS = 6.75;
+//
+// The arc is NOT a circle. This was `THREE_POINT_RADIUS = 6.75`, a single flat
+// radius — the exact mistake 3PT shipped as its D1 and then fixed, made again
+// here because the knowledge lived in ThreePointMode rather than in the shared
+// basketball core. The real line is 6.71m in the corners and 7.24m at the top,
+// and that difference IS the shot selection: a corner three is the bargain and
+// the top of the key is the hard one. isThree() now answers it per angle.
 const POSSESSION_SEC = 90;
 
 interface Body { char: SpawnedCharacter; slot: PlayerSlot; drib: DribbleController; stunSec: number }
@@ -103,15 +109,25 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     async load(ctx: ModeContext) {
       threeVenue = mountVenue(ctx, 'basketball_3v3', { keepGameplayCamera: true });
       if (!threeVenue) { VenueKit.buildCourt(ctx.scene, 'venice'); applyOceanCourt(ctx.scene, 'venice'); }
-      const spawnBody = async (pos: Vector3, tint: string | undefined, ai: boolean, aiKind: 'teammate' | 'defender', slotAngle = 0): Promise<Body> => {
+      const spawnBody = async (
+        pos: Vector3, tint: string | undefined, ai: boolean,
+        aiKind: 'teammate' | 'defender', slotAngle = 0, markIndex: number | null = null,
+      ): Promise<Body> => {
         const char = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: pos, tint, startClip: SPORT_CLIP.idle });
         neverBindPose(char.animator, SPORT_CLIP.idle);
         installSafePlay(char.animator, 'threevthree');
         ctx.groundLock?.track(char.root, char.skeleton);
+        // PERSPECTIVE. `allies` and `foes` used to be the same two functions for
+        // everyone, so a DEFENDER was handed the player's team as its allies and
+        // its own team as its foes — exactly backwards. It did not matter while
+        // DefenderBrain ignored both, and would have silently produced a defence
+        // that marked its own teammates the moment it stopped ignoring them.
+        const world = aiKind === 'teammate'
+          ? { ball: () => ball.position, hoop: () => RIM, allies: allyPositions, foes: foePositions }
+          : { ball: () => ball.position, hoop: () => RIM, allies: foePositions, foes: allyPositions };
         const slot = ai
-          ? new PlayerSlot('ai', new AISource(char.root.position, {
-              ball: () => ball.position, hoop: () => RIM, allies: allyPositions, foes: foePositions,
-            }, aiKind === 'teammate' ? new TeammateBrain(slotAngle) : new DefenderBrain(0.55)), false)
+          ? new PlayerSlot('ai', new AISource(char.root.position, world,
+            aiKind === 'teammate' ? new TeammateBrain(slotAngle) : new DefenderBrain(0.55, markIndex)), false)
           : new PlayerSlot('me', localSource, true);
         return { char, slot, drib: new DribbleController(), stunSec: 0 };
       };
@@ -122,10 +138,14 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         await spawnBody(new Vector3(-3.5, 0, 4), '#22d3ee', true, 'teammate', Math.PI * 0.25),
         await spawnBody(new Vector3(3.5, 0, 4), '#22d3ee', true, 'teammate', -Math.PI * 0.25),
       ];
+      // Each defender MARKS A MAN: allyPositions() is [me, mate0, mate1], so
+      // 0/1/2 is a real matchup. Three defenders with no assignment all solved
+      // for the same point between the ball and the rim and arrived in a heap,
+      // which is what the first 3v3 screenshot showed.
       foes = [
-        await spawnBody(new Vector3(-2, 0, 2), '#ff2d78', true, 'defender'),
-        await spawnBody(new Vector3(0, 0, 1.5), '#ff2d78', true, 'defender'),
-        await spawnBody(new Vector3(2, 0, 2), '#ff2d78', true, 'defender'),
+        await spawnBody(new Vector3(-2, 0, 2), '#ff2d78', true, 'defender', 0, 0),
+        await spawnBody(new Vector3(0, 0, 1.5), '#ff2d78', true, 'defender', 0, 1),
+        await spawnBody(new Vector3(2, 0, 2), '#ff2d78', true, 'defender', 0, 2),
       ];
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
@@ -179,9 +199,20 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         const res = arc.step(dt, ball.position);
         if (res === 'made') {
           myScore += arcPoints;
+          // A THREE is not a routine bucket and must not land like one. The mode
+          // had no camera pulse anywhere, so a deep splash and a two-foot layup
+          // produced identical feedback — Phase 7's bar is that the big moment
+          // is distinguishable, and Phase 8's is that the moments which earn it
+          // get the juice.
+          const bigShot = arcPoints === 3;
           SoundKit.play('score', { pitch: arcQuality === 'perfect' ? 1.2 : 1 });
           EffectsKit.burst(ctx.scene, RIM, 'net');
-          if (arcQuality === 'perfect') SoundKit.play('crowdCheer');
+          if (bigShot || arcQuality === 'perfect') {
+            SoundKit.play('crowdCheer', { volume: bigShot ? 1 : 0.7 });
+            ctx.camDirector.pulse(bigShot ? 0.85 : 0.5, 0.5);
+            ctx.feel?.impact?.(bigShot ? 0.45 : 0.3);
+          }
+          if (bigShot) EffectsKit.burst(ctx.scene, me.char.root.position.add(new Vector3(0, 1.8, 0)), 'sparks');
           ctx.setHud({ score: myScore, banner: arcQuality === 'perfect' ? `${arcLabel} — SPLASH!` : `${arcLabel} — GOOD!` });
           setTimeout(() => ctx.setHud({ banner: '' }), 800);
           if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
@@ -200,7 +231,21 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       const moving = Math.hypot(meIntent.moveX, meIntent.moveY) > 0.1;
       const sprintOk = turbo.gate(dt, meIntent.sprint, moving);
       ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
-      const drib = me.drib.update(dt, meIntent.moveX, meIntent.moveY, sprintOk);
+      // FORWARD WAS BACKWARDS. Every input source in this game reports up-stick
+      // as NEGATIVE y — the Gamepad API's axes[1] is -1 pushed up, InputBus maps
+      // W to -1 to match, and the touch stick uses screen deltas so up is also
+      // negative. CourtMovement documents the opposite ("+Y = up-stick") and maps
+      // wantDir = (moveX, 0, -moveY), so pressing forward walked the player AWAY
+      // from the basket. Measured: holding W drove the hero from z 6 to z 8.6
+      // with the rim at z -0.6, and dragged him out of frame — which is where
+      // this mode's [FEL-FRAME] errors were coming from.
+      //
+      // Negated HERE rather than in CourtMovement because that file is shared by
+      // a dozen others (tennis, combat, story hub, carrier control) that this
+      // pass has not verified, and silently reversing all of them to fix one is
+      // exactly the blast radius §0 exists to prevent. The platform-level
+      // disagreement is recorded in the sign-off as a carry-forward.
+      const drib = me.drib.update(dt, meIntent.moveX, -meIntent.moveY, sprintOk);
       if (!shooting && !dunking) {
         me.char.root.position.addInPlace(me.drib.vel.scale(dt));
         clampToHalfCourt(me.char.root.position, 8, 15);
@@ -344,7 +389,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     if (shooting) return;
     shooting = true;
     const dist = Vector3.Distance(body.char.root.position, RIM);
-    const points = dist > THREE_POINT_RADIUS ? 3 : 2;
+    const points = isThree(body.char.root.position, RIM) ? 3 : 2;
     const made = Math.random() < 0.55;
     releaseBall(ball);
     body.char.animator.play(SPORT_CLIP.dunkLaunchPower, { onEnd: () => body.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
@@ -368,7 +413,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     const pctMod = currentShot?.pctMod ?? 1;
     const pct = SHOT_QUALITY_PCT[quality] * pctMod;
     const dist = Vector3.Distance(me.char.root.position, RIM);
-    arcPoints = dist > THREE_POINT_RADIUS ? 3 : 2;
+    arcPoints = isThree(me.char.root.position, RIM) ? 3 : 2;
     arcLabel = currentShot?.label ?? 'SHOT';
     arcQuality = quality;
     arcMade = Math.random() < Math.min(0.98, pct);
@@ -398,11 +443,18 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       dunking = false;
       releaseBall(ball);
       if (made) {
-        myScore += 1;
+        // A DUNK IS WORTH TWO. This awarded 1, left over from the old "1 inside
+        // the paint, 2 outside" scale that this file's own header says was
+        // already fixed once — "a layup scored LESS than a jumper". The jumper
+        // path was corrected to 2s and 3s and the dunk path was not, so the
+        // highest-percentage and most spectacular shot in the game stayed worth
+        // half a jump shot. A dunk is always inside the arc, so it is a two.
+        myScore += 2;
         const posterized = kind === 'poster' && defenderPos !== null;
         SoundKit.play('score', { pitch: 0.9 });
         SoundKit.play('crowdCheer', { volume: posterized ? 0.8 : 0.5 });
         ctx.feel?.impact?.(posterized ? 0.7 : 0.45);
+        ctx.camDirector.pulse(posterized ? 1 : 0.6, 0.55);
         EffectsKit.burst(ctx.scene, RIM, 'net');
         if (posterized) {
           const victim = foes.reduce<Body | null>((best, f) =>

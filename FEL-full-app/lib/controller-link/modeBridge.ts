@@ -37,12 +37,38 @@ export function toInputBus(bus: InputBus): (ev: ControlEvent) => void {
   // tilt. A held button has neither, so the bridge ramps it here — otherwise
   // the fallback is a single instant value and charge stops being analog.
   let chargeTimer: ReturnType<typeof setInterval> | null = null;
+  // Held d-pad directions for the 'move' action, so up+right is a diagonal
+  // rather than whichever arrow arrived last.
+  const heldDirs = new Set<Dir>();
   const stopCharge = (): void => {
     if (chargeTimer) { clearInterval(chargeTimer); chargeTimer = null; }
   };
 
   return (ev: ControlEvent) => {
     const emit = (i: FelInput): void => bus.emit(i);
+
+    // MOVEMENT. Modes read movement from a LEFT STICK event and nothing else —
+    // LocalInputSource only looks at { t: 'stick', side: 'L' }. A d-pad event
+    // moves no one. That is fine for a stationary mode like 3PT, and it makes a
+    // mode like 3v3 unplayable from a phone: every verb would work except
+    // walking. A schema opts in by naming its d-pad action 'move', which keeps
+    // this away from modes where the d-pad means something else entirely — in
+    // Dunk it picks the prop and arms mid-air tricks, and turning that into
+    // movement would break it.
+    if (ev.a === 'move') {
+      const p = ev.p as { dir?: Dir; pressed?: boolean; x?: number; y?: number } | undefined;
+      if (!p) return;
+      if (typeof p.x === 'number' || typeof p.y === 'number') {
+        emit({ t: 'stick', side: 'L', x: p.x ?? 0, y: p.y ?? 0 });
+        return;
+      }
+      if (!p.dir) return;
+      if (p.pressed) heldDirs.add(p.dir); else heldDirs.delete(p.dir);
+      const x = (heldDirs.has('right') ? 1 : 0) - (heldDirs.has('left') ? 1 : 0);
+      const y = (heldDirs.has('up') ? 1 : 0) - (heldDirs.has('down') ? 1 : 0);
+      emit({ t: 'stick', side: 'L', x, y });
+      return;
+    }
 
     if (ev.a === 'dpad') {
       const p = ev.p as { dir: Dir; pressed: boolean } | undefined;

@@ -156,23 +156,63 @@ export const SHOT_QUALITY_PCT: Record<ShotQuality, number> = {
 };
 
 // ── AI: defender ─────────────────────────────────────────────────────────
+/**
+ * Push away from anyone standing on top of you.
+ *
+ * Both brains steered toward a single ideal point and nothing else, so every AI
+ * that shared a goal converged on the same square metre and body collision then
+ * jammed them into a heap. Real spacing is a repulsion term, not a nicer target.
+ */
+function separation(self: Vector3, others: Vector3[], minDist: number): Vector3 {
+  const push = new Vector3(0, 0, 0);
+  for (const o of others) {
+    if (o === self) continue;
+    const away = self.subtract(o);
+    away.y = 0;
+    const d = away.length();
+    if (d > 1e-3 && d < minDist) push.addInPlace(away.normalize().scale((minDist - d) / minDist));
+  }
+  return push;
+}
+
+/** Turn a desired world-space direction into an Intent, with a dead zone. */
+function steer(to: Vector3, sprint: boolean, deadZone: number, steal = false): Intent {
+  to.y = 0;
+  const dist = to.length();
+  if (dist < deadZone) {
+    return { moveX: 0, moveY: 0, sprint: false, action: false, actionHeld: 0, pass: false, steal };
+  }
+  const dir = to.normalize();
+  return { moveX: dir.x, moveY: -dir.z, sprint, action: false, actionHeld: 0, pass: false, steal };
+}
+
 export class DefenderBrain implements AIBehavior {
-  constructor(private aggression = 0.6) {}
-  decide(_dt: number, self: Vector3, ball: Vector3, hoop: Vector3): Intent {
-    // stay between the ball-handler and the hoop, biased toward the ball
-    const denyPoint = Vector3.Lerp(ball, hoop, 0.35);
-    const toDeny = denyPoint.subtract(self);
-    toDeny.y = 0;
-    const dist = toDeny.length();
-    const closeEnough = dist < 1.4;
-    return {
-      moveX: closeEnough ? 0 : Math.max(-1, Math.min(1, toDeny.normalize().x)),
-      moveY: closeEnough ? 0 : Math.max(-1, Math.min(1, -toDeny.normalize().z)),
-      sprint: dist > 3,
-      action: false, actionHeld: 0,
-      pass: false,
-      steal: dist < 1.1 && Math.random() < this.aggression * 0.02,   // occasional steal poke, cheap per-frame odds
-    };
+  /**
+   * @param markIndex which opponent this defender is assigned to. Null keeps the
+   *   old ball-chasing behaviour, which is correct for a 1v1 mode with a single
+   *   defender and disastrous with three: all three computed the SAME deny point
+   *   between the ball and the rim and piled onto it, leaving every other
+   *   attacker completely unguarded. Basketball defenders match up.
+   */
+  constructor(private aggression = 0.6, private markIndex: number | null = null) {}
+
+  decide(_dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
+    const mark = this.markIndex !== null ? foes[this.markIndex] ?? null : null;
+    const markHasBall = mark ? Vector3.Distance(mark, ball) < 1.8 : false;
+
+    // On the ball: stay between the handler and the rim. Off the ball: stay
+    // between YOUR man and the rim, shaded toward the ball — help-side defence,
+    // which is what stops three defenders being in the same place.
+    const onBall = !mark || markHasBall;
+    const anchor = onBall ? ball : mark!;
+    let denyPoint = Vector3.Lerp(anchor, hoop, onBall ? 0.35 : 0.30);
+    if (!onBall) denyPoint = Vector3.Lerp(denyPoint, ball, 0.22);
+
+    const to = denyPoint.subtract(self);
+    to.addInPlace(separation(self, allies, 2.0).scale(1.4));
+    const dist = Vector3.Distance(denyPoint, self);
+    return steer(to, dist > 3, 1.4,
+      onBall && dist < 1.1 && Math.random() < this.aggression * 0.02);
   }
 }
 
@@ -189,19 +229,50 @@ export function contestLevel(ballHandler: Vector3, defender: Vector3 | null): nu
  *  ball" without needing a full playbook system. */
 export class TeammateBrain implements AIBehavior {
   constructor(private slotAngle: number, private holdRadius = 5.5) {}
-  decide(_dt: number, self: Vector3, ball: Vector3, hoop: Vector3, _allies: Vector3[], foes: Vector3[]): Intent {
-    const spot = hoop.add(new Vector3(Math.sin(this.slotAngle) * this.holdRadius, 0, Math.cos(this.slotAngle) * this.holdRadius));
-    // if the passing lane to the hoop is clear (no defender within 2u of
-    // the cut line), cut hard to the rim instead of holding the spot
+
+  decide(_dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
+    const lane = new Vector3(Math.sin(this.slotAngle), 0, Math.cos(this.slotAngle));
+    const spot = hoop.add(lane.scale(this.holdRadius));
+
+    // if the lane to the hoop is clear, cut hard
     const nearestFoe = foes.reduce<number>((m, f) => Math.min(m, Vector3.Distance(f, self)), 99);
     const cutting = nearestFoe > 3.2 && Vector3.Distance(self, ball) < 8;
-    const target = cutting ? hoop : spot;
-    const to = target.subtract(self); to.y = 0;
-    const dist = to.length();
-    if (dist < 0.6) return { moveX: 0, moveY: 0, sprint: false, action: false, actionHeld: 0, pass: false, steal: false };
-    const dir = to.normalize();
-    return { moveX: dir.x, moveY: -dir.z, sprint: cutting, action: false, actionHeld: 0, pass: false, steal: false };
+
+    // A cut used to target the hoop EXACTLY, so both teammates cut to the same
+    // point and arrived stacked on each other. Each cuts to its own side of the
+    // rim instead, along the lane it was already holding.
+    const target = cutting ? hoop.add(lane.scale(1.7)) : spot;
+
+    const to = target.subtract(self);
+    // ...and hold the floor open regardless: allies never share a square metre.
+    to.addInPlace(separation(self, allies, 3.0).scale(1.8));
+    return steer(to, cutting, 0.6);
   }
+}
+
+// ── The three-point line ─────────────────────────────────────────────────
+// The real NBA arc is NOT a constant radius: 6.71m in the corners, 7.24m at the
+// top. That difference is the whole reason a corner three is the shot everyone
+// wants and the top of the key is the hard one. 3PT learned this the hard way —
+// a single flat radius was its D1 — and 3v3 then made the identical mistake with
+// its own `THREE_POINT_RADIUS = 6.75`, because the knowledge lived in
+// ThreePointMode instead of in the shared basketball core. It lives here now.
+export const THREE_CORNER_R = 6.71;
+export const THREE_TOP_R = 7.24;
+
+/** Radius of the arc at a given angle: corner distance at the ends, top at 90 deg. */
+export function threePointRadius(angleRad: number): number {
+  // sin peaks at 90 deg (top of the key) and falls to 0.5 at the 30/150 corners.
+  const t = (Math.sin(angleRad) - 0.5) / 0.5;
+  return THREE_CORNER_R + (THREE_TOP_R - THREE_CORNER_R) * Math.max(0, Math.min(1, t));
+}
+
+/** Is a shot from `pos` behind the arc around `rim`? Angle-aware, not a circle. */
+export function isThree(pos: Vector3, rim: Vector3): boolean {
+  const dx = pos.x - rim.x;
+  const dz = pos.z - rim.z;
+  const dist = Math.hypot(dx, dz);
+  return dist > threePointRadius(Math.atan2(dz, dx));
 }
 
 // ── Court helpers ────────────────────────────────────────────────────────
