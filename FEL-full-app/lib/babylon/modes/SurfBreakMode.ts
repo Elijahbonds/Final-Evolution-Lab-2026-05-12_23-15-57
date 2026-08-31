@@ -15,7 +15,7 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
-import { buildSurfBreak, type RideWorld } from './rideWorlds';
+import { buildSurfBreak, SURF_HALF_WIDTH, type RideWorld } from './rideWorlds';
 import { assertSpawned } from '../core/FrameGuard';
 import { SPORT_CLIP } from '../anim/clipRegistry';
 import { SoundKit } from '../audio/SoundKit';
@@ -81,6 +81,13 @@ export const SurfBreakMode: ModeDefinition = (() => {
     tricks.score += BARREL_BONUS;
     SoundKit.play('score', { pitch: 1.3 });
     SoundKit.play('crowdCheer', { volume: 0.5 });
+    // The 'surf' preset's own note reads "barrel treatment = tightest (set via
+    // pulse when in the tube)" -- an intent that was written down and never
+    // wired. pulse() is a push-in of up to 32% on the follow distance, which is
+    // exactly that treatment. The run's biggest moment now looks different as
+    // well as sounding different.
+    ctx.camDirector.pulse(1, 0.6);
+    ctx.feel?.impact?.(0.45);
     ctx.feel?.impact?.(0.4);
     EffectsKit.burst(ctx.scene, rig.char.root.position.add(new Vector3(0, 1.2, 0)), 'net');
     ctx.setHud({ score: tricks.score, banner: `BARRELED! +${BARREL_BONUS}` });
@@ -92,7 +99,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
     modeId: 'surf', mood: 'goldenHour', camPreset: 'surf',
 
     async load(ctx: ModeContext) {
-      const built = buildSurfBreak(ctx.scene);
+      const built = buildSurfBreak(ctx.scene, POCKET);
       world = built.world; waveLipAt = built.waveLipAt; barrelActive = built.barrelActive;
       // Gate 0: Validate skeletal rig by spawning placeholder to check skeleton
       const _validateChar = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, -1000, 0) });
@@ -218,6 +225,8 @@ export const SurfBreakMode: ModeDefinition = (() => {
             if (!inBarrel && barrelSec > 0.3) {
               inBarrel = true;
               SoundKit.play('powerUp', { pitch: 1.2, volume: 0.35 });
+              // hood in as the tube closes over you, and hold it while you are inside
+              ctx.camDirector.pulse(0.7, 1.2);
               ctx.setHud({ banner: 'IN THE BARREL' });
               setTimeout(() => ctx.setHud({ banner: '' }), 800);
             }
@@ -237,7 +246,10 @@ export const SurfBreakMode: ModeDefinition = (() => {
           setTimeout(() => ctx.setHud({ banner: '' }), 900);
         }
         rig.char.animator.play(rig.rider.grounded ? (carve > 0.5 ? SPORT_CLIP.boardTuck : SPORT_CLIP.boardIdle) : SPORT_CLIP.boardAir, { loop: true });
-        rig.char.root.position.x = Math.max(-40, Math.min(40, rig.char.root.position.x));
+        // Clamp AT the water's edge, not 5m inside it. The rider used to stop
+        // against nothing while the ocean visibly continued past him.
+        const edge = SURF_HALF_WIDTH - 1;
+        rig.char.root.position.x = Math.max(-edge, Math.min(edge, rig.char.root.position.x));
       }
 
       // carve toward the aimed heading (~0.4s to come around)

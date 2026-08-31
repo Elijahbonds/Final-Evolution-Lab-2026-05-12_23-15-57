@@ -298,7 +298,18 @@ export function buildSlopeRun(scene: Scene): RideWorld {
 }
 
 // ── SURF v3 — the curling funnel wave + buoys ──────────────────────────────
-export function buildSurfBreak(scene: Scene): {
+/** Half-width of the surfable water. The rider clamps here and the water ends
+ *  here, so the edge the player feels is the edge they can see. */
+export const SURF_HALF_WIDTH = 45;
+
+/**
+ * @param pocket The scored pocket band, in metres ahead of the lip. The VENUE
+ *   draws exactly the band the MODE scores -- passing it in rather than
+ *   duplicating the numbers here is what stops the drawn pocket and the scored
+ *   pocket drifting apart, the same reason the patrol rail's mesh is asserted
+ *   to sit on its grind line.
+ */
+export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number }): {
   world: RideWorld;
   waveLipAt(tSec: number): Vector3;
   barrelActive(tSec: number): boolean;
@@ -354,6 +365,24 @@ export function buildSurfBreak(scene: Scene): {
   tube.material = tubeM;
   all.push(tube);
 
+  // THE POCKET, drawn. This is the one piece of state the whole mode turns on --
+  // ride 2-9m ahead of the lip and you gain flow and score, drift out and you
+  // bleed both -- and it was visible ONLY as a number climbing in the HUD. The
+  // protocol's rule is that state the player needs must be readable from the
+  // object, not just the readout; this is the same defect as 3PT shipping
+  // without ball racks. A soft band on the water, travelling with the lip.
+  // Deliberately low-contrast: it has to be findable without competing with the
+  // lip and the tube, which are what the player is really reading.
+  const pocketBand = MeshBuilder.CreateGround('wavePocket', {
+    width: SURF_HALF_WIDTH * 2 - 6, height: pocket.max - pocket.min,
+  }, scene);
+  const pocketM = mat(scene, 'pocketM', '#7fe3ff');
+  pocketM.alpha = 0.16;
+  pocketM.backFaceCulling = false;
+  pocketBand.material = pocketM;
+  pocketBand.isPickable = false;
+  all.push(pocketBand);
+
   // a second, distant swell line purely for depth/scale cues
   const farSwell = MeshBuilder.CreateCylinder('farSwell', { diameter: 1.6, height: 70, tessellation: 8 }, scene);
   farSwell.rotation.z = Math.PI / 2;
@@ -399,6 +428,8 @@ export function buildSurfBreak(scene: Scene): {
     const z = -50 + ((tSec * 4.5) % 140);
     lip.position.z = z;
     lip.position.y = 0.9 + Math.sin(tSec * 2.2) * 0.15;
+    // the drawn band rides with the lip, centred on the scored band
+    pocketBand.position.set(0, 0.06, z + (pocket.min + pocket.max) / 2);
     // the funnel breathes with the barrel cycle
     const active = barrelActive(tSec);
     tubeM.alpha += ((active ? 0.55 : 0.08) - tubeM.alpha) * 0.06;
