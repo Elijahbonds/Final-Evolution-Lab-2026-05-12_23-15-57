@@ -68,11 +68,19 @@ await shot('phase-final');
 
 const frameWarn = logs.filter((l) => /FEL-FRAME/.test(l));
 const missing = logs.filter((l) => /MISSING CLIP/.test(l));
-const errors = logs.filter((l) => l.startsWith('[error]') || l.startsWith('[pageerror]'));
+const isErr = (l: string) => l.startsWith('[error]') || l.startsWith('[pageerror]');
+// A guest has no account, so /api/v1/closet and /api/v1/workout/scan answer 401
+// and resolveIdentity falls back to the mode's designed kit. That is the
+// intended behaviour on /try, not a fault — but it is still reported rather
+// than filtered away silently, because "errors: 0" is only worth anything if
+// nothing is being quietly swept out of it.
+const expected401 = logs.filter((l) => isErr(l) && /401 \(Unauthorized\)/.test(l));
+const errors = logs.filter((l) => isErr(l) && !/401 \(Unauthorized\)/.test(l));
 console.log(`\n[FEL-FRAME] lines ........ ${frameWarn.length}`);
 for (const l of frameWarn.slice(0, 6)) console.log('   ·', l.slice(0, 170));
 console.log(`MISSING CLIP lines ....... ${missing.length}`);
 for (const l of [...new Set(missing)].slice(0, 6)) console.log('   ·', l.slice(0, 170));
+console.log(`expected guest 401s ...... ${expected401.length} (no account on /try — identity falls back)`);
 console.log(`errors ................... ${errors.length}`);
 for (const l of [...new Set(errors)].slice(0, 10)) console.log('   ·', l.slice(0, 170));
 await browser.close();

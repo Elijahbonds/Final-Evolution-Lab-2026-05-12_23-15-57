@@ -104,7 +104,14 @@ function applySkinTone(spawn: SpawnedCharacter, hex: string): void {
     const m = mesh.material as TintMat | null;
     const c = m && matColor(m);
     if (!c) continue;
-    const isSkin = c.r > 0.45 && c.g > 0.25 && c.b > 0.15 && c.r > c.b && c.g > c.b * 0.9;
+    // Name first, colour heuristic second. The heuristic guesses "is this
+    // flesh-coloured?", which quietly depends on the DEFAULT skin tone being
+    // flesh-coloured — pick a very dark or very pale tone and it stops matching
+    // its own mesh, so changing skin tone twice would fail the second time. The
+    // procedural body names its material `skin_<id>`, so just ask.
+    const named = `${mesh.name} ${m!.name}`.toLowerCase().includes('skin');
+    const isSkin = named
+      || (c.r > 0.45 && c.g > 0.25 && c.b > 0.15 && c.r > c.b && c.g > c.b * 0.9);
     if (!isSkin) continue;
     const clone = m!.clone(`${m!.name}_skin`) as TintMat | null;
     if (clone) { matColor(clone)?.copyFrom(tone); mesh.material = clone; }

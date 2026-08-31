@@ -18,7 +18,8 @@
 
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
-import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { type SpawnedCharacter } from '../core/CharacterLibrary';
+import { CharacterPipeline } from '../core/characterPipeline';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { BallSim } from '../core/BallPhysics';
@@ -123,7 +124,7 @@ export const DunkMode: ModeDefinition = (() => {
       obstacle.position.set(0, obstacleClearHeight / 2, CFG.rimZ + 1.4);
     }
     if (prop === 'alleyoop') {
-      teammate = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
+      teammate = await CharacterPipeline.spawnNpc(ctx.scene, CFG.heroUrl, {
         position: new Vector3(-3.4, 0, CFG.rimZ + 1.6), tint: '#22d3ee', startClip: SPORT_CLIP.teammateIdle,
       });
       neverBindPose(teammate.animator, SPORT_CLIP.teammateIdle);
@@ -138,7 +139,16 @@ export const DunkMode: ModeDefinition = (() => {
       // M74: try Nexus venue first; fallback to VenueKit if no spec
       dunkVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true });
       if (!dunkVenue) { VenueKit.buildCourt(ctx.scene); applyOceanCourt(ctx.scene, 'venice'); }
-      player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
+      // spawnPlayer, not CharacterLibrary.spawn — this is the route that applies
+      // the player's own identity: closet wardrobe colours, skin tone, and body
+      // proportions from a body scan. Football, BoardRun and TimingSport all used
+      // it; the dunk contest did not, so nothing a player picked in the Closet
+      // ever showed up in the mode that IS the guest onboarding path. The kit
+      // colours below stay as the designed fallback for anyone with no identity
+      // saved (every guest on /try), and identity overrides them when there is
+      // one. Now that the body is skinned, the scan's buildScale/reachScale
+      // actually reshape the mesh instead of scaling rigid parts.
+      player = await CharacterPipeline.spawnPlayer(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, CFG.startZ), yawRad: Math.PI, startClip: SPORT_CLIP.idle,
         // M110 skins — the hero: gold-trimmed royal kit, deep skin tone, black hair,
         // white sneakers. A designed look rather than the default flat jersey.
@@ -147,7 +157,9 @@ export const DunkMode: ModeDefinition = (() => {
       neverBindPose(player.animator, SPORT_CLIP.idle);
       installSafePlay(player.animator, 'dunk-player');
       ctx.groundLock?.track(player.root, player.skeleton);
-      rival = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
+      // spawnNpc is explicit: the rival must NEVER wear the player's identity,
+      // or you end up dunking against yourself.
+      rival = await CharacterPipeline.spawnNpc(ctx.scene, CFG.heroUrl, {
         position: new Vector3(3.2, 0, CFG.rimZ + 3), startClip: SPORT_CLIP.idle,
         // M110 skins — the rival: hot-pink kit with cyan accent, lighter skin,
         // sandy hair, black sneakers, so the two never read as the same person.
