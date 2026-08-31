@@ -1,0 +1,11 @@
+import { chromium } from 'playwright-core';
+const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', args:['--use-gl=angle','--use-angle=metal'] });
+const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+const all: string[] = [];
+p.on('console', m => { if (/DIAG/.test(m.text())) all.push(m.text()); });
+await p.goto('http://localhost:3000/try', { waitUntil: 'networkidle' });
+await p.waitForSelector('canvas');
+await p.getByText(/TAP TO START/i).first().click({ force: true }).catch(()=>{});
+await p.waitForTimeout(9000);
+all.slice(0,3).forEach(l=>console.log(l));
+await b.close();

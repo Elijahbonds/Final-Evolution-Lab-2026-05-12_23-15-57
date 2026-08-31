@@ -6,6 +6,7 @@ import {
   Animation, AnimationGroup, Quaternion, Vector3,
 } from '@babylonjs/core';
 import type { Scene, Skeleton, TransformNode } from '@babylonjs/core';
+import { boneNode } from './boneLookup';
 
 const FPS = 30;
 const D2R = Math.PI / 180;
@@ -15,25 +16,26 @@ export type BoneKeys = Record<string, [number, number, number, number][]>;
 /** Optional Hips Y offset keys: [timeSec, yMeters]. */
 export type HipsYKeys = [number, number][];
 
-/** Mixamo's own exports prefix every bone; hand-authored rigs usually don't. */
-const MIXAMO_PREFIX = 'mixamorig:';
-const bare = (n: string): string =>
-  (n.startsWith(MIXAMO_PREFIX) ? n.slice(MIXAMO_PREFIX.length) : n);
-
 /**
- * Resolve a clip's bone name to its transform node, tolerating the
- * 'mixamorig:' prefix on EITHER side.
+ * Resolve a clip's bone name to its transform node.
  *
- * This used to be an exact string match against unprefixed names, which meant a
- * genuine Mixamo rig — where every bone is 'mixamorig:LeftArm' — resolved
- * nothing and every clip silently built zero targets. The procedural rig only
- * exposed that because Gate 0 requires the same prefix; the bug was already
- * there for the GLB path it was supposed to serve.
+ * This file used to carry its OWN copy of the name normalisation, and that copy
+ * is the whole reason boneLookup exists — which makes it the one place that
+ * most needed to use it. boneLookup's header says "everything that resolves a
+ * bone goes through here now... it cannot drift back". A private duplicate here
+ * is exactly how it drifted back.
+ *
+ * The cost was the GLB character path. Babylon's instantiation uniquifies every
+ * cloned node, so an imported skeleton's bones arrive as `LeftArm_c21`. The
+ * local copy stripped the `mixamorig:` prefix but knew nothing about that
+ * suffix, so every authored clip built ZERO targets against a GLB rig. It never
+ * threw: the group registered, played, and moved nothing, leaving the character
+ * in its bind pose. That T-pose is what "the Meshy GLB is visually broken" has
+ * meant all along — not broken geometry, a name mismatch — and it is why the
+ * whole game fell back to primitive procedural characters.
  */
 function nodeOf(skeleton: Skeleton, boneName: string): TransformNode | null {
-  const want = bare(boneName);
-  const bone = skeleton.bones.find((b) => bare(b.name) === want);
-  return bone?.getTransformNode() ?? null;
+  return boneNode(skeleton, boneName);
 }
 
 export function buildClip(

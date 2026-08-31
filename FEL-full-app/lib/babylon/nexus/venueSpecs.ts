@@ -14,10 +14,14 @@
 
 import type { NexusWebSpec, BackdropKind } from './NexusWebScene';
 
-const dusk = (top: string, bottom: string, fog: string, sun: string, ambient = 0.55) => ({
+const dusk = (
+  top: string, bottom: string, fog: string, sun: string, ambient = 0.55,
+  backdrop?: NexusWebSpec['environment']['backdrop'],
+) => ({
   skyTop: top, skyBottom: bottom, fogColor: fog, fogDensity: 0.008,
   ambient, sunDirection: [-0.4, -0.85, 0.35] as [number, number, number], sunColor: sun,
   grade: { exposure: 1.15, contrast: 1.35, vignette: 0.35 },
+  backdrop,
 });
 
 /** Five bodies for a 3v3 court, arranged as an actual possession rather than
@@ -59,7 +63,13 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
 
   basketball_dunk: {
     modeId: 'basketball_dunk', name: 'Dunk Contest', venue: 'Venice Beach Court',
-    environment: dusk('#FF7A5C', '#1A2560', '#33408A', '#FFC98A', 0.6),
+    // M110's procedural horizon backdrops were built and then wired to NOTHING —
+    // not one venue in this file set `backdrop`, so every sky in the game was the
+    // cheap 4px two-stop gradient the system exists to replace. That flat wall
+    // behind the hoop is the whole reason this venue read as a colour field
+    // rather than as Venice at dusk. 'beach' paints a sun, its glow, an ocean
+    // with light on the water, and a palm line along the horizon.
+    environment: dusk('#FF7A5C', '#1A2560', '#33408A', '#FFC98A', 0.6, 'beach'),
     ground: { kind: 'court', size: [16, 28], color: '#1B7FB5', lineColor: '#F2F6FF', markings: 'halfcourt' },
     props: [
       { kind: 'hoop', position: [0, 0, -11], color: '#FF3B30' },

@@ -24,9 +24,28 @@ import type { Nullable, Skeleton, TransformNode } from '@babylonjs/core';
 
 export const MIXAMO_PREFIX = 'mixamorig:';
 
-/** Strip the Mixamo prefix if present. `mixamorig:Hips` -> `Hips`. */
+/**
+ * Babylon's instantiation suffix. `AssetContainer.instantiateModelsToScene`
+ * uniquifies every cloned node, so a GLB skeleton's bones arrive as
+ * `LeftArm_c21`, `RightArm_c22`, `__root___c1` — one counter per spawned copy.
+ *
+ * This is the SECOND legitimate spelling this file exists to absorb, and it
+ * caused the same silent failure the prefix did, on the GLB path: a lookup for
+ * `mixamorig:LeftArm` compared `LeftArm` against `LeftArm_c21`, missed, and
+ * returned undefined. Every authored clip then built with ZERO bone targets. It
+ * did not throw and it did not warn — the clip registered, played, and moved
+ * nothing, so the character stood in its bind pose. That is what "the Meshy GLB
+ * is visually broken" actually was: not broken geometry, a name mismatch.
+ */
+const CLONE_SUFFIX = /_c\d+$/;
+
+/**
+ * Reduce any spelling of a bone name to its canonical bare form.
+ * `mixamorig:Hips` -> `Hips`, `LeftArm_c21` -> `LeftArm`.
+ */
 export function bareBoneName(name: string): string {
-  return name.startsWith(MIXAMO_PREFIX) ? name.slice(MIXAMO_PREFIX.length) : name;
+  const unprefixed = name.startsWith(MIXAMO_PREFIX) ? name.slice(MIXAMO_PREFIX.length) : name;
+  return unprefixed.replace(CLONE_SUFFIX, '');
 }
 
 /** Resolve a bone by name, tolerating the `mixamorig:` prefix on either side. */

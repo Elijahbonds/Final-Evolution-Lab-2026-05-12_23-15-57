@@ -48,6 +48,17 @@ export interface Grade {
   vignette: number;
 }
 
+/**
+ * Where a 'hoop' prop's RIM sits relative to the prop's own position.
+ *
+ * Exported because a mode has to fly the ball to the same place the player can
+ * see the hoop, and those were two independent numbers. DUNK_CONFIG put its rim
+ * at z = -0.6 while this venue puts the hoop at z = -11 — the dunker flew to
+ * mid-court and slammed into empty air ten metres short of the basket that was
+ * on screen. Nothing errored, because both halves were internally consistent.
+ */
+export const HOOP_RIM_OFFSET = { y: 2.70, z: 0.72 } as const;
+
 /** M110 — the procedural horizon backdrops. Each paints a recognisable place
  *  into the sky-dome texture (buildings, stands, peaks, sea, dojo interior…)
  *  so a venue reads as WHERE it is, not just a colour gradient. */
@@ -418,6 +429,8 @@ function buildProp(scene: Scene, p: PropSpec, root: TransformNode, shadows: Shad
 
   switch (p.kind) {
     case 'hoop': {
+      // Rim placement comes from HOOP_RIM_OFFSET so a mode can compute where the
+      // ball actually has to go. See the constant for why that matters.
       const pole = MeshBuilder.CreateCylinder('pole', { height: 3.05 * s, diameter: 0.16 * s }, scene);
       pole.position.y = (3.05 * s) / 2;
       pole.material = surface(scene, 'poleMat', '#2A2E37', 0.5, 0.4);
@@ -427,7 +440,7 @@ function buildProp(scene: Scene, p: PropSpec, root: TransformNode, shadows: Shad
       board.material = surface(scene, 'boardMat', '#F4F1E8', 0.4);
       add(board);
       const rim = MeshBuilder.CreateTorus('rim', { diameter: 0.90 * s, thickness: 0.055 * s, tessellation: 24 }, scene);
-      rim.position.set(0, 2.70 * s, 0.72 * s);
+      rim.position.set(0, HOOP_RIM_OFFSET.y * s, HOOP_RIM_OFFSET.z * s);
       rim.material = emissive(scene, 'rimMat', p.color ?? '#FF6B00', 0.5);
       add(rim);
       if (PREMIUM_DRESSING) {
@@ -435,7 +448,7 @@ function buildProp(scene: Scene, p: PropSpec, root: TransformNode, shadows: Shad
         // separates a real hoop from a bare ring. Wireframe tube = net cords.
         const net = MeshBuilder.CreateCylinder('hoopnet',
           { height: 0.42 * s, diameterTop: 0.82 * s, diameterBottom: 0.44 * s, tessellation: 12, cap: Mesh.NO_CAP }, scene);
-        net.position.set(0, 2.70 * s - 0.21 * s, 0.72 * s);
+        net.position.set(0, HOOP_RIM_OFFSET.y * s - 0.21 * s, HOOP_RIM_OFFSET.z * s);
         const nmat = new StandardMaterial('hoopNetMat', scene);
         nmat.emissiveColor = c3('#FFFFFF'); nmat.disableLighting = true;
         nmat.wireframe = true; nmat.alpha = 0.85;
@@ -675,21 +688,50 @@ function seedOf(s: string): number {
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
 }
-function paintPalm(ctx: CanvasRenderingContext2D, x: number, baseY: number, h: number): void {
-  ctx.strokeStyle = 'rgba(14,18,24,0.9)';
-  ctx.lineWidth = Math.max(2, h * 0.03);
-  ctx.beginPath(); ctx.moveTo(x, baseY);
-  ctx.quadraticCurveTo(x + h * 0.12, baseY - h * 0.55, x + h * 0.18, baseY - h);
+/**
+ * A palm on the horizon, as a SILHOUETTE rather than a diagram.
+ *
+ * This drew six stroked curves in near-black at up to 18% of the sky texture's
+ * height. Painted into a 1024x512 texture and then wrapped around a 400-unit
+ * sky dome, that is enormous: the "palms" came out as huge dark spider shapes
+ * hanging over the court, reading as bare winter branches rather than as
+ * anything tropical, and they sat in exactly the part of frame the player looks
+ * through on a dunk.
+ *
+ * The World-Population Protocol's rule applies to the sky as much as the
+ * ground: atmosphere must not compete with the thing the player is trying to
+ * see. So the palms are now small, drawn in the FOG colour rather than black so
+ * they sit back in the haze like real distant trees, and their fronds are
+ * tapered fills instead of uniform strokes.
+ */
+function paintPalm(
+  ctx: CanvasRenderingContext2D, x: number, baseY: number, h: number, tint: string,
+): void {
+  ctx.save();
+  ctx.fillStyle = tint;
+  ctx.strokeStyle = tint;
+
+  // trunk: a tapering curve, thicker at the base
+  ctx.lineWidth = Math.max(1, h * 0.035);
+  ctx.beginPath();
+  ctx.moveTo(x, baseY);
+  ctx.quadraticCurveTo(x + h * 0.10, baseY - h * 0.55, x + h * 0.15, baseY - h);
   ctx.stroke();
-  const tx = x + h * 0.18, ty = baseY - h;
-  for (let f = 0; f < 6; f++) {
-    const ang = -Math.PI * 0.5 + (f - 2.5) * 0.52;
-    ctx.beginPath(); ctx.moveTo(tx, ty);
-    ctx.quadraticCurveTo(
-      tx + Math.cos(ang) * h * 0.28, ty + Math.sin(ang) * h * 0.28 - h * 0.05,
-      tx + Math.cos(ang) * h * 0.5, ty + Math.sin(ang) * h * 0.5);
-    ctx.lineWidth = Math.max(1.5, h * 0.02); ctx.stroke();
+
+  const tx = x + h * 0.15, ty = baseY - h;
+  for (let f = 0; f < 7; f++) {
+    const ang = -Math.PI * 0.5 + (f - 3) * 0.44;
+    const len = h * (0.30 + (f % 2) * 0.06);
+    // a frond is a thin leaf shape: out along the angle, drooping, and back
+    const ex = tx + Math.cos(ang) * len;
+    const ey = ty + Math.sin(ang) * len + len * 0.34;      // gravity droop
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.quadraticCurveTo(tx + Math.cos(ang) * len * 0.6, ty + Math.sin(ang) * len * 0.5 - len * 0.10, ex, ey);
+    ctx.quadraticCurveTo(tx + Math.cos(ang) * len * 0.55, ty + Math.sin(ang) * len * 0.5 + len * 0.10, tx, ty);
+    ctx.fill();
   }
+  ctx.restore();
 }
 
 function paintBackdrop(ctx: CanvasRenderingContext2D, W: number, H: number, kind: BackdropKind): void {
@@ -716,7 +758,12 @@ function paintBackdrop(ctx: CanvasRenderingContext2D, W: number, H: number, kind
       }
       ctx.fillStyle = 'rgba(255,236,200,0.5)';
       ctx.fillRect(sx - 12, horizon, 24, H - horizon);
-      if (kind === 'beach') for (let i = 0; i < 5; i++) paintPalm(ctx, rng() * W, horizon + 4, H * (0.12 + rng() * 0.06));
+      if (kind === 'beach') {
+        // A LINE of small palms reads as a beach; five giants read as a problem.
+        for (let i = 0; i < 11; i++) {
+          paintPalm(ctx, rng() * W, horizon + 3, H * (0.045 + rng() * 0.028), 'rgba(26,32,44,0.62)');
+        }
+      }
       break;
     }
     case 'city': {

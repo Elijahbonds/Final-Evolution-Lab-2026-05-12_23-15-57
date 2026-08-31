@@ -207,7 +207,13 @@ export const DunkMode: ModeDefinition = (() => {
       // press that ISN'T a recognized combo (no direction held, or a
       // direction that has no B trick) falls through to the plain STYLE TAP
       // showboat below instead — one press always does exactly one thing.
-      if (phase === 'cinematic' && !qteWindowOpen) {
+      // A trick needs AIR under it. The gate used to be "in the cinematic
+      // phase and the slam window isn't open", which includes frame zero — so a
+      // trick armed the instant the jump released played out while the dunker
+      // was still leaving the floor, nowhere near the rim. An eastbay is a
+      // thing you do at the basket; thrown at ankle height it reads as a
+      // glitch. EASTBAY_TIMING.rise is when the rig is actually off the ground.
+      if (phase === 'cinematic' && !qteWindowOpen && clipTime >= EASTBAY_TIMING.rise) {
         const trick = flight.feedInput(e);
         if (trick) {
           trickLabels.push(trick.label);
