@@ -28,6 +28,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'environment-ibl-tests.ts', guards: 'procedural IBL environment maths' },
   { script: 'dunk-system-tests.ts', guards: 'dunk trick recognition' },
   { script: 'judge-panel-tests.ts', guards: 'five judges, ceiling 50, staged reveal' },
+  { script: 'procedural-skin-tests.ts', guards: 'the athlete is a skinned mesh that deforms' },
   { script: 'dunk-animation-tests.ts', guards: 'dunk clips resolve AND move the rig' },
 ];
 

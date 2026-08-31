@@ -11,6 +11,7 @@ import { installSafePlay } from '../anim/clipRegistry';
 import { registerMirroredClips, DANCE_MIRROR_BASES } from '../anim/mirrored-clips';
 import { buildRig } from './proceduralRig';
 import { buildBody } from './proceduralMesh';
+import { buildSkinnedBody } from './proceduralSkin';
 import { registerProceduralClips } from './proceduralClips';
 import { registerAuthoredClips } from '../anim/authored';
 import type { SpawnedCharacter, SpawnOpts } from '../core/CharacterLibrary';
@@ -20,10 +21,21 @@ let procCounter = 0;
 export function spawnProceduralAthlete(scene: Scene, opts: SpawnOpts = {}): SpawnedCharacter {
   const id = `p${++procCounter}`;
   const rig = buildRig(scene, id);
-  const meshes = buildBody(scene, rig, {
+  // SKINNED body by default. buildBody parents ~30 rigid primitives to bone
+  // nodes, which is not skinning: the pieces pivot about a shared point and
+  // visibly separate at the joints under a fast clip — a dunk caught mid-air
+  // shows the character coming apart. buildSkinnedBody emits a handful of
+  // genuinely skinned meshes bound to the SAME rig, so every authored clip
+  // keeps working untouched and the surface deforms through a joint instead of
+  // tearing. Set NEXT_PUBLIC_SKINNED_BODY=false to fall back.
+  const skinned = process.env.NEXT_PUBLIC_SKINNED_BODY !== 'false';
+  const bodyOpts = {
     tint: opts.tint, accent: opts.accent, skinTone: opts.skinTone,
     hairColor: opts.hairColor, shoeColor: opts.shoeColor,
-  });
+  };
+  const meshes = skinned
+    ? buildSkinnedBody(scene, rig, bodyOpts)
+    : buildBody(scene, rig, bodyOpts);
 
   // Place / orient / scale on the root (identical semantics to the GLB path).
   rig.root.position = opts.position ?? Vector3.Zero();
