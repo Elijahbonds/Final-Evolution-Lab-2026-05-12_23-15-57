@@ -24,6 +24,8 @@ const APPROACH = Number(process.env.APPROACH ?? 900);
 const KEYS = (process.env.KEYS ?? '').split(',').map((k) => k.trim()).filter(Boolean);
 /** Hold the analog pump/charge before the trick keys (board sports). */
 const PUMP = process.env.PUMP === '1';
+/** Alternate left/right carve each rep (slalom / carving modes). */
+const STEER = process.env.STEER === '1';
 /** ms between trick keys. Air windows are short -- a board trick must be
  *  pressed while the rider is still off the ground. */
 const GAP = Number(process.env.GAP ?? 260);
@@ -94,7 +96,17 @@ const hud = async (): Promise<Record<string, unknown>> => {
 console.log(`${NAME} start :`, JSON.stringify(await hud()));
 
 for (let i = 0; i < REPS; i++) {
-  await p.keyboard.down('w'); await p.waitForTimeout(APPROACH); await p.keyboard.up('w');
+  await p.keyboard.down('w');
+  if (STEER) {
+    // A slalom needs LATERAL input. Holding only forward, the bot rides the
+    // fall line straight past every gate, which reads as "the gates are
+    // unreachable" when it only means nobody steered. Alternate the carve.
+    const lean = i % 2 === 0 ? 'a' : 'd';
+    await p.keyboard.down(lean); await p.waitForTimeout(APPROACH); await p.keyboard.up(lean);
+  } else {
+    await p.waitForTimeout(APPROACH);
+  }
+  await p.keyboard.up('w');
   // A board sport needs BOTH: space is the analog pump/charge (and its release
   // is the ollie), while the face keys are the tricks. Driving skate with KEYS
   // alone never held space, so it never pumped -- the run ended at momentum 0

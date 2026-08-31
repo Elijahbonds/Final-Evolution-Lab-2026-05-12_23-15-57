@@ -150,7 +150,15 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       if (rig.rider.grinding && Math.abs(stickX) > 0.7) rig.rider.dismount();
       // Phase 12: slope energy via the shared board movement (descent builds
       // speed for real); tuck adds, boost spends the meter on a burst.
-      const v = move.update(dt, stickX, 0, ctx.scene, rig.char.root.position, world.ground);
+      // TUCK, not 0. The comment above says "tuck adds" and the HUD verb is
+      // literally TUCK, but the momentum model was handed a hard-coded 0, so
+      // tucking drove the animation and nothing else. With pushAccel 0 on snow,
+      // that left slope gravity as the ONLY propulsion in the mode: measured
+      // over six seconds of held tuck the rider covered 1.5m down the hill
+      // against 7.2m across it, roughly 0.75 m/s of descent on a course 205m
+      // long. That is the whole reason a 90-second run scored 1 gate out of 12
+      // -- the rider only ever physically reached the first one.
+      const v = move.update(dt, stickX, tuck, ctx.scene, rig.char.root.position, world.ground);
       rig.rider.vel.x = v.x; rig.rider.vel.z = v.z;
       rig.rider.update(dt, stickX, tuck);
       // The rider has to FACE where they are going. This mode never set the

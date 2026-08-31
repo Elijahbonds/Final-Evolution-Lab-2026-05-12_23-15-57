@@ -147,9 +147,21 @@ export function buildSlopeRun(scene: Scene): RideWorld {
 
   const markers: Vector3[] = [];
   const gateMatL = mat(scene, 'gateL', '#e23c50'), gateMatR = mat(scene, 'gateR', '#2c6fe2');
+  // A slalom is a RHYTHM: left, right, left, at a spacing you can carve. This
+  // was sin(i * 1.7) * 9, which is neither -- stepping a sine by 1.7 radians
+  // aliases into a near-random sequence (0, +8.9, -2.3, -8.4, +4.4, +7.3 ...),
+  // so consecutive gates could sit 12.8m apart across only 15m of slope.
+  //
+  // Sized against measurements rather than taste. A rider descends at ~12 m/s
+  // once the tuck is feeding the momentum model, and can hold about 5.5 m/s
+  // across the fall line in a committed carve. At 20m spacing that is ~1.7s of
+  // travel and ~9m of reachable lateral movement per gate, so the offsets ramp
+  // 3.2m -> 5.0m a side (6.4m -> 10m gate to gate): comfortable at the top of
+  // the course, genuinely demanding at the bottom. Gate 0 sits dead ahead so
+  // the run starts fair rather than with an immediate cut across the hill.
   for (let i = 0; i < 12; i++) {
-    const dist = 18 + i * 15;
-    const cx = Math.sin(i * 1.7) * 9;
+    const dist = 18 + i * 20;
+    const cx = i === 0 ? 0 : (i % 2 === 0 ? -1 : 1) * (3.2 + (i / 11) * 1.8);
     markers.push(onPiste(cx, dist));
     for (const side of [-1, 1]) {
       const pole = MeshBuilder.CreateCylinder('gate', { diameter: 0.12, height: 1.6 }, scene);
