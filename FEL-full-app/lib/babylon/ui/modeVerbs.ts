@@ -193,6 +193,16 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
   // 3PT Shootout: one verb, the release. Timing is the whole mechanic.
   threepoint: verbs({ A: { label: 'SHOOT', emit: A('A') } }),
 
+  // Volleyball had NO entry at all, so touch fell through to MODE_VERBS.default
+  // — one generic ACTION button — which is the original karate_vs bug in a mode
+  // that shipped. NetSportMode reads exactly one verb (A, or the R trigger as
+  // an analog alias), so one labelled button is the correct entry TODAY. The
+  // benchmark wants three: bump / set / spike is the whole loop of Nintendo
+  // Switch Sports volleyball, and this mode currently treats all three touches
+  // as the same generic hit. That is a Phase 2 change recorded in the concept
+  // lock, not something to fake here by adding buttons the mode cannot read.
+  volleyball: verbs({ A: { label: 'HIT', emit: A('A') } }),
+
   dance: verbs({ A: { label: 'TAP', emit: A('A') } }),
 
   default: verbs({ A: { label: 'ACTION', emit: A('A') } }),

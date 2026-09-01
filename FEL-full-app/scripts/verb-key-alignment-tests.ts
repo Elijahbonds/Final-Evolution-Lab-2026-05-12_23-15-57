@@ -13,7 +13,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { MODE_VERBS } from '../lib/babylon/ui/modeVerbs';
-import { MODES } from '../lib/babylon/modes/registry';
+import { ENABLED_BABYLON_MODES, MODES } from '../lib/babylon/modes/registry';
 
 let checks = 0;
 const fail: string[] = [];
@@ -90,9 +90,26 @@ function modeSources(): { key: string; file: string }[] {
   return out;
 }
 
+// EVERY ENABLED MODE NEEDS AN ENTRY, however its host passes the id.
+//
+// The check above scans host components for a STATIC modeId literal, which
+// misses any mode served by a shared factory that passes a variable --
+// makeTimingHost, makeBoardHost. Volleyball fell straight through that hole: it
+// has no MODE_VERBS entry at all, so on touch it falls to MODE_VERBS.default, a
+// single generic ACTION button. That is the original karate_vs bug, in a mode
+// that shipped, surviving the guard written to prevent it.
+//
+// Asking the REGISTRY instead of the hosts closes it: if a mode is enabled to
+// be served on Babylon, a player can reach it, and a player who reaches it
+// needs its verbs.
+for (const key of ENABLED_BABYLON_MODES) {
+  ok(MODE_VERBS[key] !== undefined,
+    `${key} is in ENABLED_BABYLON_MODES but has no MODE_VERBS entry — touch falls through to a single generic ACTION button`);
+}
+
 for (const { key, file } of modeSources()) {
   const cfg = MODE_VERBS[key];
-  if (!cfg) continue;                       // key coverage is asserted above
+  if (!cfg) continue;                       // reported by the enabled-mode check above
   let src: string;
   try { src = readFileSync(join(MODE_SRC, file), 'utf8'); } catch { continue; }
 
