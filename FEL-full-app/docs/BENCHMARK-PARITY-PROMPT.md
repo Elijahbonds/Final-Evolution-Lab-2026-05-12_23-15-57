@@ -42,6 +42,29 @@ like 2K has been attempted. Work these first and hardest:
 - **Momentum and crowd.** There is a `MomentumBus` already; 2K's runs, timeouts
   and crowd swings are a system, not a meter.
 
+**The dunk contest is held to the same bar, and it is its own discipline.** Its
+benchmark is NBA Live 08's contest, and a contest is judged on things this mode
+does not yet model:
+
+- **Variety is scored.** Repeating a dunk you already threw should cost you.
+  Judges reward a package they have not seen; `DUNK_TRICKS` exists but nothing
+  penalises repetition.
+- **The approach is part of the dunk.** Speed, angle, one-foot versus two-foot
+  takeoff, and how late you gather all change what is available in the air and
+  what the judges see.
+- **Difficulty must be earned, not selected.** An eastbay off the bounce, a
+  between-the-legs, a 360 windmill — these should be *harder to execute*, not
+  just worth more. If the hardest dunk is the same input as the easiest, the
+  score is a menu.
+- **Props and contact.** Dunking over a person or a chair is the contest's
+  signature image. There are props in the HUD; make them change the dunk, the
+  risk and the reaction.
+- **The landing counts.** Hanging on the rim, a clean two-foot land, a stumble —
+  contests are lost on the finish.
+- **The crowd and the judges must react in the moment**, not only in a final
+  tally. The five-judge panel and staged reveal exist; the arena around them does
+  not respond yet.
+
 Do not add all of these. **Pick the ones whose absence a 2K player would notice
 in the first minute**, build those properly, and record the rest as deferred with
 reasons.
@@ -104,7 +127,10 @@ with:
 
 1. `onevone` — the purest 1-on-1 test of dribble, defence and finishing.
 2. `threevthree` — adds help defence, spacing and passing reads.
-3. `dunk` — the animation and judging showpiece.
+3. `dunk` — the animation and judging showpiece, and held to the bar above:
+   variety penalties, an approach that matters, difficulty that is executed
+   rather than chosen, props that change the dunk, a landing that can cost you,
+   and a crowd that reacts as it happens.
 4. `threepoint` — smallest gap; finish the rival presentation.
 5. Then `derby` (baseball: 4 open frame warnings, no Phase 6) and `penalty`
    (soccer: needs Phases 6–10).
