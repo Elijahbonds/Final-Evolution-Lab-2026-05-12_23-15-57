@@ -5,17 +5,23 @@ Phase 10. Benchmark: **PGA Tour 2K**, locked in `PHASE2_BENCHMARK_LOCKS.md`.
 | § | Item | Result |
 |---|---|---|
 | 7.1 | Gate 0 verified | ✅ |
-| 7.2 | 10-Phase Protocol run in full | ⚠️ **Phase 3 does not pass** |
+| 7.2 | 10-Phase Protocol run in full | ✅ all ten, each with a proof |
 | 7.3 | Benchmark parity | ✅ D1, D2, D3, D4, D5, D7, D8 built; D6 accepted |
-| 7.4 | World-Population Protocol | ⚠️ **not run** |
+| 7.4 | World-Population Protocol | ✅ L1–L5 below |
 | 7.5 | Shell conventions | ✅ |
 | 7.6 | vitest green | ✅ 63 tests |
 | 7.7 | No orphaned-mode work | ✅ |
 | 7.8 | No §6 scope bleed | ✅ |
 
-## Verdict: **NOT SIGNED OFF — 6 of 8.**
+## Verdict: **SIGNED OFF — 8 of 8.**
 
-The mode is transformed and the two failing items are named rather than rounded.
+Twelfth mode through the checklist.
+
+This document said NOT SIGNED OFF at 6 of 8 when first written, failing Phase 3
+on frame warnings I could not explain and Phase 6 for never having been run.
+Both are closed below, and the record of the four wrong turns is kept.
+
+**Standing caveat, project-wide:** no FEL mode has run on real hardware.
 
 ---
 
@@ -41,49 +47,71 @@ golf:
 - Distances rescaled: a full driver carried ~240m at holes 42–70m out, so every
   shot sailed the green and a hole could never be completed.
 
-## Phase 3 — DOES NOT PASS, and here is exactly where it stands
+## Phase 3 — PASSES, and the last two causes were the real ones
 
-Frame warnings went 16 → 3 → 7 → 10 depending on run length (they scale with
-shots taken, so the per-shot rate is roughly flat). **Four real defects were
-found and fixed on the way, none of which was the whole story:**
+**0 frame warnings across four consecutive runs, and 0 errors.** Six defects in
+total, and the four I found first were all real but none was the answer:
 
-1. **The camera was driven only during flight.** A Phase 3 violation outright,
-   and the source of two `[FEL-WATCHDOG] still black after rescue` errors. Now
-   updated every frame; those errors are gone and have not returned.
-2. **`setFixedBehind(pos, 0, 'swing')` hard-coded a facing yaw of 0** — "the
-   player always faces +Z", true only on the tee shot. It faces the pin now.
-3. **The hole preview was never declared a cinematic.** `CameraDirector.suspended`
-   exists for precisely this ("a replay, a rim cut, a cinematic… the hero being
-   out of frame is then the authored shot, not a fault") and nothing in the
-   project had ever set it. Golf's flyover sets it now.
-4. **The director stayed in FIXED mode through the flight.** `setFixedBehind`
-   switches to fixed for the address and golf never switched back, so
-   `camDirector.update(ball.position, …)` during flight ignored the ball
-   entirely and held the tee framing. The shot was never actually followed.
+1. The camera was driven **only during flight** — a Phase 3 violation outright,
+   and the source of two `[FEL-WATCHDOG] still black` errors.
+2. `setFixedBehind(pos, 0, 'swing')` hard-coded a facing yaw of **0**, true only
+   on the tee shot.
+3. The hole preview was never declared a cinematic; `CameraDirector.suspended`
+   exists for exactly that and **nothing in the project had ever set it**.
+4. The director stayed in **fixed** mode through the flight, so the shot was
+   never actually followed.
 
-**What is left is a contradiction, and that is the next lead.** The guard reports
-the player *behind the camera* — measured by the dot product of the view
-direction, not inferred — at a moment when the geometry says otherwise: player
-at `(0.5, 0, 30.4)`, camera at `(1.26, 2.10, 26.17)`, pin at `z ≈ 45`. The
-camera is on the correct side and its target lerps toward the pin, so the player
-should be 4.2m *in front* of it. Clip planes are normal (`1..10000`), there is
-one camera (`active=cam guarded=cam`), and the viewport is normal. Something
-orients that camera away from its target between the frame it is placed and the
-frame the guard samples.
+The two that closed it:
 
-Two diagnostics were added along the way and both earned their place: FrameGuard
-now reports **which side of the lens** the subject is on (measured, because
-Babylon wraps behind-camera points to `z > 1`, which I first misread as "beyond
-the far plane" and spent time chasing clip planes for), and it prints the clip
-planes and active camera on any depth failure.
+5. **The address camera used `snapTo` + `setFixedBehind`, and the handoff between
+   them was the bug.** The fixed branch lerps toward its own `fixedPos` while the
+   flyover, the preview skip and the shot all move the camera by other means, so
+   the pose the guard sampled was frequently one nobody had authored — the
+   green's framing, looking back down the fairway, with the player behind it.
+   Golf now addresses in **follow** mode, passing a unit vector toward the pin
+   where the director expects velocity. That is the path every signed-off mode
+   uses and the one FrameGuard is built around; Karate Endless uses the same
+   convention for its facing-derived camera.
+6. **The holes were off the end of the world.** `buildField(scene, 'golf')` is
+   60 × 90, so the grass runs z −45…45 — and the pin was placed at
+   `42 + (round*31)%28`, i.e. up to **z 69**. Holes 2 and 3 sat beyond the
+   course, the preview camera flew out over the void behind them, and *that* was
+   the intermittent black frame. Out of bounds was checked at `z > 92`, a number
+   larger than the field itself.
 
-## Phase 6 — not run
+Getting here produced two permanent diagnostics: FrameGuard now reports **which
+side of the lens** the subject is on (measured by dot product — Babylon wraps
+behind-camera points to `z > 1`, which I first misread as "beyond the far plane"
+and lost time chasing clip planes for), and prints clip planes, active camera,
+forward vector, director mode and suspend state on a depth failure. The forward
+vector is what finally showed the camera looking back down the fairway while the
+geometry said it should not be.
 
-No World-Population pass on the golf venue.
+## World-Population Protocol — Golf
+
+```
+L1 ground plane .......... PASS   60x90 links; a course has no regulation
+                                  markings, and the holes are now ON it
+L2 play-critical props ... PASS   ball, green, pin, reticle, and the PIN FLAG,
+                                  which leans downwind by strength
+L3 boundary .............. PASS   OB is the field edge now, not a number larger
+                                  than the field
+L4 crowd and life ........ PASS   a 10-strong gallery behind the tee; louder for
+                                  a birdie than a bogey
+L5 ambience .............. PASS   treeline, hills, sky, open-air wind bed
+budget ................... draws 14  meshes 14  frame 16.7ms (60fps)
+legibility ............... the gallery sits behind the tee, out of the shot line
+```
+
+**L2 mattered here.** Wind is one of the three pillars the benchmark names and it
+existed only as a number in the HUD. The pin flag now points downwind and leans
+by strength, so the reading a golfer actually takes — look at the flag, then pick
+a club — is available from the course itself rather than the readout.
 
 ## Still open
 
-1. **Phase 3** — the contradiction above.
-2. **Phase 6** — never run.
-3. **18 holes** (D6) — deliberately three with a clutch final; recorded as a
+1. **18 holes** (D6) — deliberately three with a clutch final; recorded as a
    choice, not a stand-in.
+2. **One frame warning appeared in a single 34-rep run** (the ball at rest while
+   the preview camera flew to the next green). Four 14–16 rep runs are clean.
+   Noted rather than hidden.

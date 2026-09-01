@@ -135,7 +135,9 @@ export class FrameGuard {
       // different camera than the one being moved.
       + (p.z <= 0 || p.z >= 1
         ? ` clip ${this.camera.minZ}..${this.camera.maxZ} active=${this.scene.activeCamera?.name ?? 'none'} guarded=${this.camera.name}`
-        : ''),
+        : '')
+      + ` fwd ${fwd ? `${fwd.x.toFixed(2)},${fwd.y.toFixed(2)},${fwd.z.toFixed(2)}` : 'n/a'}`
+      + ` mode=${this.director?.mode ?? '?'} susp=${this.director?.suspended ?? '?'} tgt=${(this.camera as unknown as { target?: { x: number; y: number; z: number } }).target ? `${(this.camera as unknown as { target: { x: number; z: number } }).target.x.toFixed(1)},${(this.camera as unknown as { target: { x: number; z: number } }).target.z.toFixed(1)}` : 'n/a'}`,
     );
     if (this.missStreak >= 2 && this.director) {
       console.error('[FEL-FRAME] auto-recentering camera on hero');

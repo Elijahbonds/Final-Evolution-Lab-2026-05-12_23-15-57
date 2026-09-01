@@ -33,6 +33,7 @@ import { SPORT_CLIP } from '../anim/clipRegistry';
 import { SoundKit } from '../audio/SoundKit';
 import { VenueKit } from '../visual/VenueKit';
 import { EffectsKit } from '../visual/EffectsKit';
+import { Onlookers } from '../visual/Onlookers';
 import { PRECISION_CONFIG as CFG } from './modeConfigs';
 
 const CLUTCH_MULT = 1.5;
@@ -233,6 +234,22 @@ export const GolfMode: ModeDefinition = (() => {
    *  a stick swing does not express on a touch overlay and 3-click is the
    *  better mobile input, so the mode offers both. */
   let backswing = 0, pulling = false;
+  /**
+   * The beat between a ball coming to rest and the player walking to it.
+   *
+   * The landing handler set `phase = 'aim'` immediately and scheduled
+   * backToTee() on a 1.1s timer. For that whole window the mode ran the AIM
+   * camera against `me.root`, still standing at the PREVIOUS lie, while
+   * heroRef still pointed at the ball where it had just landed — so the camera
+   * framed one place and the guard measured another, metres apart, and reported
+   * the hero behind the camera. It was right: the camera was looking at the old
+   * lie. Staying in 'flight' across the beat keeps the camera on the ball, which
+   * is the thing worth looking at anyway.
+   */
+  let settling = false;
+  /** L4 — a gallery at the green, and the pin flag that shows the wind. */
+  let gallery: Onlookers | null = null;
+  let flag: AbstractMesh | null = null;
   let ended = false;
   const TOTAL = 3;
   const PREVIEW_SEC = 1.8;
@@ -241,20 +258,40 @@ export const GolfMode: ModeDefinition = (() => {
 
   function nextShot(ctx: ModeContext): void {
     round++;
-    holePos = new Vector3(((round * 53) % 21) - 10, 0, 42 + ((round * 31) % 28));
+    // ON THE COURSE. VenueKit.buildField(scene, 'golf') builds 60 x 90, so the
+    // grass runs z -45..45 — and this put the pin at 42 + (round*31)%28, i.e.
+    // up to z 69. Holes 2 and 3 sat off the end of the world, the preview camera
+    // flew out over the void behind them, and the watchdog reported a black
+    // frame. Kept well inside the field now.
+    holePos = new Vector3(((round * 53) % 21) - 10, 0, 26 + ((round * 31) % 13));
     furniture.forEach((f) => f.dispose());
     furniture = buildGolfGreen(ctx.scene, holePos);
+    // L2 — THE WIND, READABLE FROM THE COURSE. It was a number in the HUD only,
+    // and "course reading" is one of the three pillars the benchmark names: a
+    // player should be able to look at the hole and see which way it blows.
+    // The flag leans with it, harder in a stronger wind.
+    flag?.dispose();
+    flag = MeshBuilder.CreateBox('pinFlag', { width: 0.7, height: 0.34, depth: 0.03 }, ctx.scene);
+    flag.position = holePos.add(new Vector3(0.35, 1.85, 0));
+    flag.material = furniture[0]?.material ?? null;
     ball.position.set(0, 0.05, 0.6);
     me.animator.play(SPORT_CLIP.golfAddress, { loop: true });
     // HOLE PREVIEW — fly the camera to the green, look back at the tee.
     // Pure camDirector.snapTo, timer-bounded, cannot stall.
     strokes = 0;
+    settling = false;
     // COURSE READING — the third pillar, and none of its inputs existed. Wind
     // is the cheapest honest one: it is visible in the HUD before you commit,
     // it pushes the ball for the whole flight, and it makes the reticle a
     // starting point rather than an answer.
     const wa = (round * 2.399) % (Math.PI * 2);
     wind = new Vector3(Math.sin(wa) * (1.2 + (round % 3) * 0.9), 0, Math.cos(wa) * 0.6);
+    if (flag) {
+      // Point the flag downwind and lean it by strength — the reading a golfer
+      // actually takes before choosing a club.
+      flag.rotation.y = Math.atan2(wind.x, wind.z);
+      flag.rotation.z = -Math.min(0.9, wind.length() * 0.35);
+    }
     phase = 'preview'; previewSec = 0;
     // The hole preview is an AUTHORED SHOT: the camera flies to the green and
     // looks back, and the player is deliberately not in it. CameraDirector has
@@ -335,6 +372,7 @@ export const GolfMode: ModeDefinition = (() => {
 
   function backToTee(ctx: ModeContext): void {
     phase = 'aim';
+    settling = false;
     ctx.camDirector.suspended = false;      // the cinematic is over
     pulling = false; backswing = 0;
     ctx.heroRef.current = me.root;      // addressing the ball: frame the player
@@ -349,11 +387,27 @@ export const GolfMode: ModeDefinition = (() => {
     // setting up as though they faced away: it ended up in front of them,
     // looking the wrong way, with the player projecting outside the frustum.
     // That is where golf's [FEL-FRAME] lines came from.
+    // FOLLOW, not FIXED.
+    //
+    // The address camera was `snapTo` + `setFixedBehind`, and the handoff
+    // between them is where golf's remaining framing failures lived: the fixed
+    // branch lerps position toward its own fixedPos while the flyover, the
+    // A-press preview skip and the shot itself all move the camera by other
+    // means, so the pose the guard sampled was frequently one nobody had
+    // authored — camera at the green's framing, looking back down the fairway,
+    // with the player behind it.
+    //
+    // Follow mode is the path every signed-off mode uses and the one FrameGuard
+    // is built around, and it expresses this shot exactly: pass a unit vector
+    // toward the pin as the "velocity" and the director puts the camera behind
+    // the player looking down the line. Karate Endless uses the same convention
+    // for its facing-derived camera.
     const pinVec = holePos.subtract(me.root.position);
-    const faceYaw = Math.atan2(pinVec.x, pinVec.z);
-    me.root.rotation.y = faceYaw;
+    pinVec.y = 0;
+    if (pinVec.lengthSquared() > 1e-4) pinVec.normalize(); else pinVec.set(0, 0, 1);
+    me.root.rotation.y = Math.atan2(pinVec.x, pinVec.z);
+    ctx.camDirector.mode = 'follow';
     ctx.camDirector.snapTo(me.root.position, holePos);
-    ctx.camDirector.setFixedBehind(me.root.position, faceYaw, 'swing');
     const toPin = Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos);
     ctx.setHud({
       club: onGreen() ? PUTTER.id : GOLF_CLUBS[club].id,
@@ -382,6 +436,13 @@ export const GolfMode: ModeDefinition = (() => {
       // 'wind', not 'dojo' — a martial-arts room tone on an alpine golf course.
       // Same class of mistake as the skatepark's stadium crowd bed.
       SoundKit.startAmbient('wind');
+      // L4 — a gallery behind the tee. A links hole is watched; and they are
+      // instanced silhouettes, so the whole gallery costs two draws.
+      gallery = new Onlookers(ctx.scene, Array.from({ length: 10 }, (_, i) => new Vector3(
+        -7 + (i % 5) * 3.4 + (i > 4 ? 1.6 : 0),
+        0,
+        -4 - (i > 4 ? 2.2 : 0),
+      )), '#3d4a3a');
       ctx.setHud({ score: 0 });
       nextShot(ctx);
     },
@@ -444,24 +505,34 @@ export const GolfMode: ModeDefinition = (() => {
       // framing — it sat wherever the last snap left it, which after a long
       // drive was far enough away to project past the far plane and, twice in a
       // capture, to render black.
-      if (phase !== 'flight') ctx.camDirector.update(me.root.position, Vector3.Zero(), holePos);
+      gallery?.update(dt);
+      if (phase !== 'flight') {
+        // A unit vector toward the pin stands in for velocity, which is how the
+        // director is told which way "behind" is for a stationary subject.
+        const aimDir = holePos.subtract(me.root.position);
+        aimDir.y = 0;
+        if (aimDir.lengthSquared() > 1e-4) aimDir.normalize(); else aimDir.set(0, 0, 1);
+        ctx.camDirector.update(me.root.position, aimDir, holePos);
+      }
       if (phase === 'flight') {
         // Wind acts for the whole flight, so a long club spends longer in it.
         if (flight.active) flight.vel.addInPlace(wind.scale(dt));
         const flying = flight.step(dt);
         ctx.camDirector.update(ball.position, flight.vel, holePos);
-        if (!flying) {
+        if (!flying && !settling) {
           const flat = new Vector3(ball.position.x, 0, ball.position.z);
           // OUT OF BOUNDS — a stroke penalty and a drop, which is the real
           // rule and also stops a shanked drive leaving the course entirely.
-          if (Math.abs(ball.position.x) > 34 || ball.position.z > 92 || ball.position.z < -6) {
+          // Out of bounds is the EDGE OF THE FIELD (60 x 90 → ±30, ±45), not an
+          // arbitrary number larger than it.
+          if (Math.abs(ball.position.x) > 28 || ball.position.z > 43 || ball.position.z < -6) {
             strokes++;
             const back = holePos.subtract(new Vector3(0, 0, 14));
             ball.position.set(back.x, 0.05, Math.max(1, back.z));
             SoundKit.play('miss');
             ctx.setHud({ banner: `OUT OF BOUNDS — penalty stroke (${strokes})`, strokes });
+            settling = true;
             setTimeout(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1300);
-            phase = 'aim';
             return;
           }
           const dist = Vector3.Distance(flat, holePos);
@@ -476,8 +547,8 @@ export const GolfMode: ModeDefinition = (() => {
                 ? `ON THE GREEN — ${dist.toFixed(1)}m · stroke ${strokes}`
                 : `${dist.toFixed(1)}m from the pin · stroke ${strokes}`,
             });
+            settling = true;
             setTimeout(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1100);
-            phase = 'aim';
             return;
           }
 
@@ -491,10 +562,12 @@ export const GolfMode: ModeDefinition = (() => {
           const gained = Math.round(Math.max(20, 120 - rel * 40) * (clutch ? CLUTCH_MULT : 1));
           pts += gained;
           SoundKit.play('score', { pitch: rel < 0 ? 1.35 : 1 });
+          gallery?.cheer(rel <= 0 ? 1 : 0.4);      // louder for a birdie than a bogey
           ctx.setHud({
             score: pts, strokes, card: card(),
             banner: `${name} — ${strokes} on a par ${par}${clutch ? ' · CLUTCH' : ''}`,
           });
+          settling = true;
           setTimeout(() => {
             ctx.setHud({ banner: '' });
             if (round >= TOTAL) {
@@ -502,14 +575,13 @@ export const GolfMode: ModeDefinition = (() => {
               ctx.end('CARD_IN', pts, { holes: TOTAL, overPar });
             } else nextShot(ctx);
           }, 1600);
-          phase = 'aim';
         }
         return;
       }
       ctx.camDirector.update(me.root.position, Vector3.Zero(), reticle.pos);
     },
 
-    dispose() { me?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { gallery?.dispose(); gallery = null; flag?.dispose(); flag = null; me?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 
