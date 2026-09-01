@@ -39,8 +39,8 @@ const b = await chromium.launch({
 });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
 const logs: string[] = [];
-p.on('console', (m) => { if (m.type() === 'error' || /FEL-FRAME|MISSING CLIP/.test(m.text())) logs.push(`[${m.type()}] ${m.text().slice(0, 170)}`); });
-p.on('pageerror', (e) => logs.push(`[pageerror] ${e.message.slice(0, 170)}`));
+p.on('console', (m) => { if (m.type() === 'error' || /FEL-FRAME|MISSING CLIP/.test(m.text())) logs.push(`[${m.type()}] ${m.text().slice(0, Number(process.env.LOG_CHARS ?? 170))}`); });
+p.on('pageerror', (e) => logs.push(`[pageerror] ${e.message.slice(0, Number(process.env.LOG_CHARS ?? 170))}`));
 
 // PHASE 9 WANTS THE SHIPPING ROUTE. /play/* calls getServerSession and
 // redirects to /login without one, which is why 1v1 and 3v3 had only ever been

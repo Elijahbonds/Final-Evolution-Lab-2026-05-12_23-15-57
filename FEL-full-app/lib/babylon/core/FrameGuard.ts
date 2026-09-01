@@ -112,14 +112,30 @@ export class FrameGuard {
     // and the world coordinates alone do not distinguish them. p is the
     // projected pixel; z outside [0,1] means it is outside the depth range,
     // and z < 0 specifically means the hero is BEHIND the camera.
-    const edge = p.z <= 0 ? 'BEHIND camera'
+    // WHICH SIDE OF THE LENS, measured rather than inferred from p.z. Babylon
+    // wraps a point BEHIND the camera to z > 1, so reading z >= 1 as "beyond the
+    // far plane" is wrong exactly when it matters — it reported a hero 4m away
+    // as beyond a 10,000m far plane, which sent me looking at clip planes for a
+    // camera that was simply pointing the other way. The dot product cannot lie
+    // about it.
+    const toHero = hero.position.add(new Vector3(0, 1.2, 0)).subtract(this.camera.position);
+    const fwd = this.camera.getForwardRay ? this.camera.getForwardRay().direction : null;
+    const facing = fwd ? Vector3.Dot(toHero.normalize(), fwd) : 1;
+    const edge = facing < 0 ? 'BEHIND camera'
       : p.z >= 1 ? 'beyond far plane'
       : p.x < 0 ? 'off LEFT' : p.x > w ? 'off RIGHT'
       : p.y < 0 ? 'off TOP' : p.y > h ? 'off BOTTOM' : 'edge margin';
     console.error(
       `[FEL-FRAME] hero off-screen ${this.missStreak}x (${edge}) at ${hero.position.toString()} `
       + `cam ${this.camera.position.toString()} proj ${p.x.toFixed(0)},${p.y.toFixed(0)},${p.z.toFixed(3)} `
-      + `view ${w}x${h}`,
+      + `view ${w}x${h}`
+      // A DEPTH failure is only meaningful next to the clip planes and the
+      // camera that actually rendered the frame: "beyond far plane" at four
+      // metres is impossible unless maxZ is wrong or the transform came from a
+      // different camera than the one being moved.
+      + (p.z <= 0 || p.z >= 1
+        ? ` clip ${this.camera.minZ}..${this.camera.maxZ} active=${this.scene.activeCamera?.name ?? 'none'} guarded=${this.camera.name}`
+        : ''),
     );
     if (this.missStreak >= 2 && this.director) {
       console.error('[FEL-FRAME] auto-recentering camera on hero');

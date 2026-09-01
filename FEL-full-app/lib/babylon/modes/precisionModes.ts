@@ -49,6 +49,11 @@ export const GOLF_CLUBS = [
   { id: 'WEDGE', reach: 0.38, launch: 1.75, forgive: 1.25 },
 ] as const;
 
+/** Inside this, you are on the green and putting — a different act entirely. */
+export const PUTT_RANGE_M = 9;
+/** The putter: along the ground, short, and unforgiving of a bad line. */
+export const PUTTER = { id: 'PUTTER', reach: 0.16, launch: 0.06, forgive: 0.55 } as const;
+
 /** Strokes each hole is expected to take. Golf is scored against this. */
 export const GOLF_PAR = [3, 4, 3] as const;
 /** Within this many metres the ball is holed. */
@@ -239,6 +244,14 @@ export const GolfMode: ModeDefinition = (() => {
     const wa = (round * 2.399) % (Math.PI * 2);
     wind = new Vector3(Math.sin(wa) * (1.2 + (round % 3) * 0.9), 0, Math.cos(wa) * 0.6);
     phase = 'preview'; previewSec = 0;
+    // The hole preview is an AUTHORED SHOT: the camera flies to the green and
+    // looks back, and the player is deliberately not in it. CameraDirector has
+    // `suspended` for exactly this — its own comment reads "a replay, a rim
+    // cut, a cinematic... the hero being out of frame is then the authored shot,
+    // not a fault" — and nothing in the project had ever set it. FrameGuard
+    // honours the flag, so the preview stops being reported as a framing
+    // failure, which is what it was.
+    ctx.camDirector.suspended = true;
     ctx.camDirector.snapTo(holePos.add(new Vector3(0, 0, 3)), ball.position.add(new Vector3(0, 0.6, 0)));
     const clutch = round === TOTAL;
     ctx.setHud({
@@ -255,8 +268,19 @@ export const GolfMode: ModeDefinition = (() => {
   /** Strike the ball. BOTH swings end here, so the 3-click and the stick
    *  produce the same shot from the same two inputs — power and side error —
    *  instead of two implementations that drift apart. */
+  /** On the green the club is taken out of your hands — you putt. */
+  function onGreen(): boolean {
+    return Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos) <= PUTT_RANGE_M;
+  }
+
   function strike(ctx: ModeContext, pwr: number, sideErr: number): void {
-    const c = GOLF_CLUBS[club];
+    // PUTTING. Half of golf, and the mode had none of it: every shot was a full
+    // swing, so a ball 2m from the pin was struck with a driver. Inside
+    // PUTT_RANGE the putter is automatic — you do not choose a club on the
+    // green — and it rolls the ball along the ground rather than flying it,
+    // which is why its launch is near zero and its forgiveness is the lowest in
+    // the bag: on the green the LINE is the whole shot.
+    const c = onGreen() ? PUTTER : GOLF_CLUBS[club];
     phase = 'flight';
     // FrameGuard checks that you can see the thing the mode is about, and once
     // the ball is struck that thing is the BALL — the camera follows it down
@@ -264,6 +288,13 @@ export const GolfMode: ModeDefinition = (() => {
     // at all, so it inherited the player from spawnAthlete and the guard spent
     // every shot reporting a hero it was never meant to be framing.
     ctx.heroRef.current = ball;
+    // BACK TO FOLLOW for the flight. setFixedBehind puts the director in FIXED
+    // mode for the address, and golf never took it out again — so
+    // camDirector.update(ball.position, …) during the flight ignored the ball
+    // completely and held the tee framing while the ball flew away. The shot
+    // was never actually followed; the camera only looked like it was because
+    // the target lerps toward the pin.
+    ctx.camDirector.mode = 'follow';
     strokes++;
     SoundKit.play('whoosh', { pitch: 0.9 });
     me.animator.play(SPORT_CLIP.golfSwing, {});
@@ -292,6 +323,7 @@ export const GolfMode: ModeDefinition = (() => {
 
   function backToTee(ctx: ModeContext): void {
     phase = 'aim';
+    ctx.camDirector.suspended = false;      // the cinematic is over
     pulling = false; backswing = 0;
     ctx.heroRef.current = me.root;      // addressing the ball: frame the player
     // Behind the BALL, not the tee. Golf is played from where it lies; this
@@ -312,7 +344,7 @@ export const GolfMode: ModeDefinition = (() => {
     ctx.camDirector.setFixedBehind(me.root.position, faceYaw, 'swing');
     const toPin = Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos);
     ctx.setHud({
-      club: GOLF_CLUBS[club].id,
+      club: onGreen() ? PUTTER.id : GOLF_CLUBS[club].id,
       wind: `${wind.length().toFixed(0)} m/s`,
       pin: `${toPin.toFixed(0)}m`,
       strokes, card: card(),
@@ -377,7 +409,7 @@ export const GolfMode: ModeDefinition = (() => {
         }
       }
       // CLUB SELECTION — the first pillar the lock names, and it did not exist.
-      if (e.t === 'button' && e.btn === 'B' && e.pressed && phase === 'aim') {
+      if (e.t === 'button' && e.btn === 'B' && e.pressed && phase === 'aim' && !onGreen()) {
         club = (club + 1) % GOLF_CLUBS.length;
         SoundKit.play('uiTick', { pitch: 1.1 });
         const toPin = Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos);
@@ -427,7 +459,11 @@ export const GolfMode: ModeDefinition = (() => {
           // to score against par and no reason to own a wedge.
           if (dist > HOLED_M) {
             SoundKit.play('uiTick');
-            ctx.setHud({ banner: `${dist.toFixed(1)}m from the pin · stroke ${strokes}` });
+            ctx.setHud({
+              banner: dist <= PUTT_RANGE_M
+                ? `ON THE GREEN — ${dist.toFixed(1)}m · stroke ${strokes}`
+                : `${dist.toFixed(1)}m from the pin · stroke ${strokes}`,
+            });
             setTimeout(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1100);
             phase = 'aim';
             return;
