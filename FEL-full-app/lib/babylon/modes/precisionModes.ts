@@ -38,6 +38,16 @@ import { PRECISION_CONFIG as CFG } from './modeConfigs';
 const CLUTCH_MULT = 1.5;
 
 // ════════════════════════════════════════════════════════════════ TENNIS ══
+// ⚠️ DEAD CODE — NOT THE TENNIS THE GAME RUNS.
+//
+// The registry imports Tennis from `./TennisMode` (the M74 net-sport core) and
+// takes only Golf, Derby and Penalty from this file; its own import line says
+// "M74 net-sport replaces precision tennis". This implementation is unreachable.
+//
+// Unlike the dead `GolfMode.ts`, it is NOT excluded in tsconfig, so it
+// type-checks and reads as live code. Editing it changes nothing in the game.
+// Kept rather than deleted because it is a working reference for the rally feel
+// described at the top of this file; git has it either way if it should go.
 export const TennisMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, opponent: SpawnedCharacter;
   let furniture: AbstractMesh[] = [];
@@ -225,7 +235,9 @@ export const GolfMode: ModeDefinition = (() => {
       ctx.camDirector.setFixedBehind(me.root.position, 0, 'swing');
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 6, modeId: 'golf' });
       round = 0; pts = 0; ended = false;
-      SoundKit.startAmbient('dojo');
+      // 'wind', not 'dojo' — a martial-arts room tone on an alpine golf course.
+      // Same class of mistake as the skatepark's stadium crowd bed.
+      SoundKit.startAmbient('wind');
       ctx.setHud({ score: 0 });
       nextShot(ctx);
     },
