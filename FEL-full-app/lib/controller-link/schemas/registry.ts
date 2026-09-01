@@ -131,6 +131,33 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
+  // Baseball (Home Run Derby). The d-pad is 'move' so it forwards as a LEFT
+  // STICK event, which is what drives the PCI — a phone that could swing but not
+  // COVER the pitch would be playing a different, easier game.
+  derby: {
+    modeId: 'derby',
+    title: 'Home Run Derby',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [{ action: 'A', label: 'SWING' }] },
+    ],
+  },
+
+  // Soccer (penalties). The feint is a stick SNAP, so the pad's movement axis
+  // has to reach the mode for the mechanic to exist at all on a phone.
+  penalty: {
+    modeId: 'penalty',
+    title: 'Penalty Shootout',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [{ action: 'A', label: 'KICK' }] },
+    ],
+  },
+
   // Golf: the 3-click swing plus club selection. The stick swing needs an
   // analog axis a phone pad does not have, so a Controller Link player uses the
   // 3-click — which is exactly why it was kept alongside rather than replaced.

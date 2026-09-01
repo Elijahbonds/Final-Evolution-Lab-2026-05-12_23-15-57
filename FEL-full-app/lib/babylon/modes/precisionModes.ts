@@ -51,6 +51,18 @@ export const GOLF_CLUBS = [
 
 /** Inside this, you are on the green and putting — a different act entirely. */
 export const PUTT_RANGE_M = 9;
+
+// ── BASEBALL: the PCI ───────────────────────────────────────────────────────
+// The benchmark's own locked justification reads "contact-based bat mechanics
+// with dynamic PCI". The PCI — Plate Coverage Indicator — is the reticle you
+// move to where you think the pitch will be, and contact quality is how well it
+// overlaps the ball. Derby had no PCI and every pitch arrived at the same spot,
+// so the only skill was timing and the stick merely set launch angle.
+/** Half-extents of the strike zone the PCI moves inside, in metres. */
+export const ZONE_HALF = { x: 0.62, y: 0.42 } as const;
+/** Perfect overlap within this; degrades to nothing by ZONE_MISS. */
+export const PCI_PURE_M = 0.16;
+export const PCI_MISS_M = 0.78;
 /** The putter: along the ground, short, and unforgiving of a bad line. */
 export const PUTTER = { id: 'PUTTER', reach: 0.16, launch: 0.06, forgive: 0.55 } as const;
 
@@ -506,7 +518,10 @@ export const DerbyMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, pitcher: SpawnedCharacter;
   let furniture: AbstractMesh[] = [];
   let ball: AbstractMesh, flight: Flight;
-  let round = 0, pts = 0, stickY = 0;
+  let round = 0, pts = 0, stickX = 0, stickY = 0;
+  /** The PCI, and where THIS pitch will cross the plate. */
+  let pci: Reticle;
+  let pitchAt = new Vector3(0, 1.1, 0);
   let incoming = false, swung = false, ended = false;
   const TOTAL = 10;
 
@@ -514,8 +529,18 @@ export const DerbyMode: ModeDefinition = (() => {
     round++;
     swung = false; incoming = true;
     pitcher.animator.play(SPORT_CLIP.derbyPitch, { onEnd: () => pitcher.animator.play(SPORT_CLIP.idle, { loop: true }) });
-    ball.position.set(0.2, 1.4, 17.5);
-    flight.launch(ball.position, new Vector3(-0.1, 1.1, -14 - round * 0.5));
+    // EVERY PITCH USED TO ARRIVE AT THE SAME SPOT — same origin, same velocity —
+    // so there was nothing to read and nothing for a PCI to cover. Location now
+    // varies across the zone, and the pitch is aimed AT that location so the
+    // ball genuinely arrives where the hitter has to have guessed.
+    const px = (Math.sin(round * 2.7) * 0.8) * ZONE_HALF.x;
+    const py = 1.05 + Math.cos(round * 1.9) * ZONE_HALF.y;
+    pitchAt = new Vector3(px, py, 0);
+    ball.position.set(px * 0.4, 1.5, 17.5);
+    const speed = 14 + round * 0.5;
+    const travel = pitchAt.subtract(ball.position);
+    const t = 17.5 / speed;
+    flight.launch(ball.position, new Vector3(travel.x / t, travel.y / t + 3.0, -speed));
     const clutch = round === TOTAL;
     ctx.setHud({ round: `${round}/${TOTAL}`, hint: clutch ? 'FINAL PITCH — STRIKE as it crosses the plate' : 'STRIKE as it crosses the plate' });
   }
@@ -529,6 +554,7 @@ export const DerbyMode: ModeDefinition = (() => {
       furniture = buildPlateAndMound(ctx.scene);
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.7, 0, 0), Math.PI / 2, SPORT_CLIP.derbyStance);
       pitcher = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(0, 0.35, 18), Math.PI, SPORT_CLIP.idle);
+      pci = new Reticle(ctx.scene, new Vector3(0, 1.1, 0.2), { x: ZONE_HALF.x, y: ZONE_HALF.y });
       ctx.heroRef.current = me.root;
       ball = MeshBuilder.CreateSphere('bball', { diameter: 0.12 }, ctx.scene);
       flight = new Flight(ball, -6);
@@ -543,28 +569,44 @@ export const DerbyMode: ModeDefinition = (() => {
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
-      if (e.t === 'stick' && e.side === 'L') stickY = e.y;
+      if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       if (e.t === 'button' && e.btn === 'A' && e.pressed && incoming && !swung) {
         swung = true;
         SoundKit.play('whoosh');
         me.animator.play(SPORT_CLIP.derbySwing, { onEnd: () => me.animator.play(SPORT_CLIP.derbyStance, { loop: true }) });
-        const q = swingQuality(ball.position.z, 0.3, 14, 0.3);
-        if (q <= 0) return;
+        const timing = swingQuality(ball.position.z, 0.3, 14, 0.3);
+        if (timing <= 0) return;
         incoming = false;
+        // CONTACT = TIMING x COVERAGE. Timing alone was the whole game; now
+        // where you put the PCI matters as much as when you swing, which is the
+        // mechanic the benchmark is named for.
+        const off = Math.hypot(pci.pos.x - ball.position.x, pci.pos.y - ball.position.y);
+        const cover = off <= PCI_PURE_M ? 1
+          : Math.max(0, 1 - (off - PCI_PURE_M) / (PCI_MISS_M - PCI_PURE_M));
+        const q = timing * (0.25 + 0.75 * cover);
         ctx.feel?.impact?.(0.3 + q * 0.5);
         const clutch = round === TOTAL;
-        const launch = 0.45 - stickY * 0.3;
+        // Where you met the ball decides the launch: under it lifts, on top of
+        // it drives the ball into the dirt. That is the PCI doing the job the
+        // stick used to do by fiat.
+        const meet = pci.pos.y - ball.position.y;
+        const launch = Math.max(0.1, Math.min(0.9, 0.45 - meet * 1.1));
         flight.launch(ball.position, new Vector3((Math.random() - 0.5) * 4, 18 * launch * q + 4, 16 + q * 18));
         const distPts = Math.round(q * (80 + launch * 60) * (clutch ? CLUTCH_MULT : 1));
         pts += distPts;
         SoundKit.play('score', { pitch: q > 0.85 ? 1.2 : 1 });
-        ctx.setHud({ score: pts, banner: clutch ? `CLUTCH DINGER! +${distPts}` : q > 0.85 ? `DINGER! +${distPts}` : `+${distPts}` });
+        ctx.setHud({
+          score: pts, contact: cover >= 0.9 ? 'PURE' : cover >= 0.5 ? 'OFF-CENTRE' : 'EDGE OF THE BAT',
+          banner: clutch ? `CLUTCH DINGER! +${distPts}` : q > 0.85 ? `DINGER! +${distPts}` : `+${distPts}`,
+        });
         setTimeout(() => ctx.setHud({ banner: '' }), 900);
       }
     },
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
+      // The PCI is only yours to move while a pitch is on the way.
+      if (incoming) pci.update(dt, stickX, stickY);
       const flying = flight.step(dt);
       if (incoming && ball.position.z <= -1.2) {
         incoming = false;

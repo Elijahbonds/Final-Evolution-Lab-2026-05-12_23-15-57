@@ -43,6 +43,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'snowboard-run-tests.ts', guards: 'SSX boost is spendable and every slalom gate is reachable' },
   { script: 'volleyball-rally-tests.ts', guards: 'bump / set / spike are three different shots, and tennis is untouched' },
   { script: 'tennis-rally-tests.ts', guards: 'Mario Tennis Aces vocabulary — four shots, four real trades' },
+  { script: 'precision-modes-tests.ts', guards: "baseball's PCI is a real decision and golf's bag is a real bag" },
 ];
 
 const ROOT = process.cwd();

@@ -17,7 +17,7 @@ const Baseball3D = dynamicImport(() => import('@/components/games/baseball-3d'),
 // Registry maps the home-run derby to the 'derby' timing mode.
 const BaseballBabylon = dynamicImport(
   () => import('@/components/games/timing-babylon').then((m) => ({
-    default: m.makeTimingHost({ modeKey: 'derby', tag: 'FEL-DERBY', swingLabel: 'STRIKE', hint: 'Time the swing · stick up/down shapes launch' }),
+    default: m.makeTimingHost({ modeKey: 'derby', tag: 'FEL-DERBY', swingLabel: 'STRIKE', hint: 'Move the PCI onto the pitch with the stick · STRIKE as it crosses the plate' }),
   })),
   { ssr: false, loading: spinner },
 );
