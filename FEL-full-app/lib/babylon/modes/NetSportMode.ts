@@ -22,7 +22,8 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import {
   gradeSwing, planShot, shotAt, judgeShot, TennisScore, VolleyScore, RallyState,
-  type RallyConfig, type Shot, type SwingQuality, type RallyFault,
+  volleyTouchFor, volleyCrosses,
+  type RallyConfig, type Shot, type SwingQuality, type RallyFault, type VolleyTouch,
 } from '../core/RallyCore';
 
 export interface NetSportOptions {
@@ -123,8 +124,11 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   }
 
   /** Begin a flight from `from` toward `toSide`, with a quality already graded. */
-  function launch(_ctx: ModeContext, from: Vector3, toSide: -1 | 1, aim: number, q: SwingQuality): boolean {
-    const planned = planShot(o.cfg, { x: from.x, y: from.y, z: from.z }, toSide, aim, q);
+  function launch(
+    _ctx: ModeContext, from: Vector3, toSide: -1 | 1, aim: number, q: SwingQuality,
+    touch?: VolleyTouch,
+  ): boolean {
+    const planned = planShot(o.cfg, { x: from.x, y: from.y, z: from.z }, toSide, aim, q, touch);
     if (!planned) return false;
 
     const fault: RallyFault | null = judgeShot(o.cfg, planned);
@@ -161,18 +165,39 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   /** The opponent's return. Skill decides how often they find a good one. */
   function aiReturn(ctx: ModeContext): void {
     const roll = Math.random();
-    const q: SwingQuality = roll > o.aiSkill ? 'miss'
+    let q: SwingQuality = roll > o.aiSkill ? 'miss'
       : roll > o.aiSkill * 0.75 ? 'late'
       : roll > o.aiSkill * 0.45 ? 'good' : 'perfect';
 
+    // A bump and a set are routine CONTROL touches. Errors in volleyball happen
+    // on the attack and the serve-receive, not on the second ball -- and the
+    // miss roll is per touch, so making the opponent play three of them
+    // multiplied their error rate per rally by three. Measured: a competitive
+    // 4-5 became 5-0 and 4-0 with the player barely touching the ball. The
+    // attack keeps the full roll, because that is where the risk belongs.
+    const aiTouchPeek = volleyTouchFor(rally.touches + 1, o.cfg.touchesPerSide);
+    if (q === 'miss' && aiTouchPeek !== 'spike') q = 'good';
+
     if (q === 'miss') { awardPoint(ctx, 0, 'THEY MISSED'); return; }
+
+    // The opponent plays the same sequence the player does. Leaving them on a
+    // one-touch return while the player has to build three would not be a
+    // difficulty setting, it would be a different sport on each side of the net
+    // -- and the three-touch limit would still never fire over there.
+    const aiIsVolley = o.cfg.touchesPerSide > 1;
+    const aiTouchNo = rally.touches + 1;
+    const aiTouch = volleyTouchFor(aiTouchNo, o.cfg.touchesPerSide);
+    const aiCrosses = volleyCrosses(aiTouch);
+
     if (rally.touch() === 'fault') { awardPoint(ctx, 0, 'FOUR TOUCHES'); return; }
-    rally.cross();
+    if (aiCrosses) rally.cross();
 
     foe.animator.play(o.swingClip, { onEnd: () => foe.animator.play(SPORT_CLIP.idle, { loop: true }) });
     SoundKit.play('uiTick', { pitch: 0.9, volume: 0.35 });
     EffectsKit.burst(ctx.scene, ball.getAbsolutePosition(), 'sparks');
-    launch(ctx, ball.getAbsolutePosition(), 1, (Math.random() - 0.5) * 1.6, q);
+    // A self-pass on their side must NOT hand the human a swing window, which
+    // is what toSide decides (awaitingHuman = toSide > 0).
+    launch(ctx, ball.getAbsolutePosition(), aiCrosses ? 1 : -1, (Math.random() - 0.5) * 1.6, q, aiIsVolley ? aiTouch : undefined);
   }
 
   /** The human's swing. Called on the action edge. */
@@ -183,8 +208,24 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     const q = gradeSwing(dt);
 
     if (q === 'miss') return;                       // early flail; not a fault yet
+
+    // WHICH touch this is decides what the swing DOES. Previously every human
+    // swing called rally.cross(), and cross() zeroes the touch counter, so the
+    // three-touch limit could never fire and all three touches were the same
+    // shot sent over the net. Bump and set now stay on your own side and hand
+    // you the next contact; only the spike crosses.
+    // Only a MULTI-touch sport gets the bump/set/spike shaping. volleyTouchFor
+    // returns 'spike' for touchesPerSide 1, which is correct for "this touch
+    // crosses" and would be quietly wrong if it also reshaped the shot: tennis
+    // would start every ball above the net on a flat arc. Tennis keeps the
+    // original planShot behaviour by passing no touch at all.
+    const isVolley = o.cfg.touchesPerSide > 1;
+    const touchNo = rally.touches + 1;
+    const touchKind = volleyTouchFor(touchNo, o.cfg.touchesPerSide);
+    const crosses = volleyCrosses(touchKind);
+
     if (rally.touch() === 'fault') { awardPoint(ctx, 1, 'TOO MANY TOUCHES'); return; }
-    rally.cross();
+    if (crosses) rally.cross();
 
     me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
     SoundKit.play('uiTick', { pitch: q === 'perfect' ? 1.6 : 1.1, volume: 0.5 });
@@ -199,9 +240,17 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     } else if (q === 'good') {
       ctx.juice.scorePop(swingPos, 'NICE', '#00FF9D');
     }
-    ctx.setHud({ shotType: q.toUpperCase() });
+    // Name the touch. In a three-touch sport the player has to know which one
+    // they are about to play, and the difference between a set and a spike is
+    // the difference between building the point and winning it.
+    const label = o.cfg.touchesPerSide > 1 ? `${touchKind.toUpperCase()} · ${q.toUpperCase()}` : q.toUpperCase();
+    ctx.setHud({ shotType: label, touch: o.cfg.touchesPerSide > 1 ? `${touchNo}/${o.cfg.touchesPerSide}` : '' });
     setTimeout(() => ctx.setHud({ shotType: '' }), 500);
-    launch(ctx, swingPos, -1, aimX, q);
+    if (touchKind === 'spike' && q === 'perfect') {
+      SoundKit.play('impact', { pitch: 1.2, volume: 0.6 });
+      ctx.juice.shake(0.14, 130);
+    }
+    launch(ctx, swingPos, crosses ? -1 : 1, aimX, q, isVolley ? touchKind : undefined);
   }
 
   return {
@@ -271,9 +320,18 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ball.position.set(p.x, p.y, p.z);
 
       // Arm the swing window once the ball is on its way in.
-      if (!contactArmed && flightT > 0.55) {
-        contactArmed = true;
-        if (awaitingHuman) ctx.setHud({ shotMeterT: 1 });
+      if (!contactArmed && flightT > 0.55) contactArmed = true;
+
+      // A REAL METER. This published `shotMeterT: 1` the moment the window
+      // armed and 0 on landing -- a boolean wearing a meter's name. Nothing
+      // rendered it (the basketball hosts publish a genuine ramp and draw a
+      // bar; the timing host draws nothing), so a mode graded on contact
+      // timing offered the player no timing cue at all, and no automated
+      // driver could time a swing either: flights differ per touch, so a fixed
+      // delay is wrong for all of them (bump 1.56s, set 1.88s, spike 0.88s).
+      // Ramp it across the window, contact at 1.
+      if (contactArmed && awaitingHuman) {
+        ctx.setHud({ shotMeterT: Math.max(0, Math.min(1, (flightT - 0.55) / 0.45)) });
       }
 
       if (flightT < 1) return;

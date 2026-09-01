@@ -62,9 +62,37 @@ export const TENNIS: RallyConfig = {
 };
 
 export const VOLLEYBALL: RallyConfig = {
-  halfLength: 9, halfWidth: 4.5, netHeight: 2.24,
+  // 2.43m — the men's indoor net (women's is 2.24). Elijah's call, 2026-08-31.
+  // planShot derives its apex from netHeight, so raising the net raises every
+  // arc with it rather than making shots clip the tape.
+  halfLength: 9, halfWidth: 4.5, netHeight: 2.43,
   baseFlightTime: 1.25, touchesPerSide: 3, gravity: 9.8,
 };
+
+/**
+ * Which of a side's touches this is.
+ *
+ * The three-touch limit was enforced as a COUNT and nothing else -- and even
+ * that never fired, because every human swing called cross(), and cross() zeroes
+ * the counter. So a mode with touchesPerSide 3 played exactly like one with 1.
+ *
+ * In the locked benchmark (Nintendo Switch Sports volleyball) the SEQUENCE is
+ * the game: you bump to control the ball, set to place it, and spike to win the
+ * point. Three touches that behave identically have the rule and not the sport.
+ */
+export type VolleyTouch = 'bump' | 'set' | 'spike';
+
+/** What the Nth touch of a rally is. The last allowed touch is the attack. */
+export function volleyTouchFor(touchNo: number, touchesPerSide: number): VolleyTouch {
+  if (touchesPerSide <= 1) return 'spike';          // tennis: every touch crosses
+  if (touchNo >= touchesPerSide) return 'spike';
+  return touchNo === 1 ? 'bump' : 'set';
+}
+
+/** Does this touch send the ball over the net, or keep it on your own side? */
+export function volleyCrosses(touch: VolleyTouch): boolean {
+  return touch === 'spike';
+}
 
 export interface Shot {
   from: Vec3;
@@ -84,12 +112,24 @@ export interface Shot {
  */
 export function planShot(
   cfg: RallyConfig, from: Vec3, toSide: -1 | 1, aimX: number, quality: SwingQuality,
+  touch?: VolleyTouch,
 ): Shot | null {
   if (quality === 'miss') return null;
   const power = QUALITY_POWER[quality];
 
   // depth: 0.45 (short, mid-court) … 0.95 (deep, near baseline)
-  const depth = 0.45 + 0.5 * power;
+  let depth = 0.45 + 0.5 * power;
+
+  // The three touches are three different SHOTS, which is the whole point of
+  // the sequence. Omitting `touch` leaves the original behaviour exactly as it
+  // was, so tennis (touchesPerSide 1) is untouched by any of this.
+  if (touch === 'bump') {
+    depth = 0.5;                       // dig it up into your own mid-court
+  } else if (touch === 'set') {
+    depth = 0.18;                      // float it to the net for the attack
+  } else if (touch === 'spike') {
+    depth = 0.55 + 0.35 * power;       // driven down into their court
+  }
   const targetZ = toSide * cfg.halfLength * depth;
 
   // lateral intent degrades with poor contact
@@ -99,13 +139,67 @@ export function planShot(
   // Apex must clear the net with margin, and a shorter shot needs a HIGHER
   // arc to get over — otherwise weak contact would fire a flat rocket into
   // the tape every time, which reads as a bug rather than a mistake.
-  const apex = cfg.netHeight + 0.6 + (1 - power) * 1.1;
+  let apex = cfg.netHeight + 0.6 + (1 - power) * 1.1;
+  let flight = cfg.baseFlightTime * (1.25 - 0.35 * power);
+
+  if (touch === 'bump') {
+    // A dig is a controlled loop: enough hang time to get under it for the set.
+    apex = 3.0; flight = cfg.baseFlightTime * 1.25;
+  } else if (touch === 'set') {
+    // A set is the highest ball in volleyball and the slowest — it exists to
+    // buy the spiker time to arrive under it.
+    apex = 4.4; flight = cfg.baseFlightTime * 1.5;
+  } else if (touch === 'spike') {
+    // A spike is the opposite: flat and fast, over the tape rather than lofted.
+    //
+    // The margin has to be honest about what `apex` means, though. It is the
+    // peak of the ARC, and judgeShot measures the height AT THE NET, which is
+    // lower whenever contact happens deep in court and the ball is still
+    // climbing as it reaches the tape. A first cut used netHeight + 0.18 and
+    // every attack from the back court hit the net -- the opponent conceded
+    // 4-0 on nothing but "INTO THE NET". This margin clears a 2.43m men's net
+    // from realistic contact positions while staying far flatter than the
+    // lofted arc above, which is what makes it read as an attack.
+    // Small, because the ball now STARTS above the net and apex is measured
+    // from the higher endpoint: the arc peaks just past the attacker and drops.
+    //
+    // ...but it grows with distance from the net, because the tape falls
+    // EARLIER in a longer flight and a flat attack from the baseline evaluates
+    // below the net however high the contact is. That is also what a real
+    // player does: you spike flat from the net and drive with more arc from the
+    // back court. Close attacks are unchanged and stay flat.
+    const backCourt = Math.max(0, Math.abs(from.z) - 2);
+    apex = 0.35 + (1 - power) * 0.5 + backCourt * 0.24;
+    flight = cfg.baseFlightTime * (0.62 + 0.18 * (1 - power));
+  }
+
+  // A SPIKE IS HIT FROM ABOVE THE NET, travelling down. That is not a detail:
+  // a set lands the ball AT the net (depth 0.18), so a ground-launched spike
+  // has covered only about a quarter of its arc by the time it reaches the
+  // tape and is still climbing — height there works out near 2.25m against a
+  // 2.43m net, so every attack from a good set hit the net. Raising the apex
+  // did not fix it and could not, because the problem is the launch height,
+  // not the peak.
+  //
+  // Starting the shot above the tape models the jumping attacker and makes the
+  // ball descend into the opponent's court, which is what a spike is.
+  const origin = touch === 'spike'
+    // netHeight + 0.85. Solved, not guessed: the flight is
+    // y = from.y + (to.y - from.y)u + apex*4u(1-u), and the net sits at
+    // u = -from.z / (to.z - from.z). From the back court that lands near
+    // u = 0.31-0.39, where +0.35 of clearance evaluates to about 2.34m against
+    // a 2.43m net -- which is why deep attacks kept hitting the tape even after
+    // the launch was raised once. +0.85 clears it from anywhere on the court,
+    // and 3.28m of contact height is what a real attacker reaches for a men's
+    // net anyway.
+    ? { x: from.x, y: Math.max(from.y, cfg.netHeight + 0.85), z: from.z }
+    : { ...from };
 
   return {
-    from: { ...from },
+    from: origin,
     to: { x: targetX, y: 0, z: targetZ },
     apex,
-    duration: cfg.baseFlightTime * (1.25 - 0.35 * power),
+    duration: flight,
   };
 }
 

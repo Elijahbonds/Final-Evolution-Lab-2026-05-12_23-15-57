@@ -131,6 +131,23 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
+  // Volleyball. One verb — NetSportMode reads A (with the R trigger as an
+  // analog alias) and nothing else; the three touches are the same button doing
+  // a different job depending on where you are in the rally, which is how the
+  // benchmark plays it too. The d-pad is named 'move' so it forwards as a LEFT
+  // STICK event: aim is a real player intent here, and a phone without it could
+  // hit the ball but never place it.
+  volleyball: {
+    modeId: 'volleyball',
+    title: 'Volleyball',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [{ action: 'A', label: 'HIT' }] },
+    ],
+  },
+
   // ── Board family (skate / surf / snowboard) ───────────────────────────────
   // All three were missing entirely, so Controller Link simply did not offer
   // them -- isControllerEnabled() is a plain `modeId in MODE_CONTROLLERS`, so an

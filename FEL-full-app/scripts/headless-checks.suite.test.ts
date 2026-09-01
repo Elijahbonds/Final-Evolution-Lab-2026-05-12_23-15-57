@@ -41,6 +41,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'skate-run-tests.ts', guards: 'Skate 3 rules — switch on a 180, bank or lose the pot' },
   { script: 'surf-run-tests.ts', guards: 'SSX economy — the flow meter is spendable, not a readout' },
   { script: 'snowboard-run-tests.ts', guards: 'SSX boost is spendable and every slalom gate is reachable' },
+  { script: 'volleyball-rally-tests.ts', guards: 'bump / set / spike are three different shots, and tennis is untouched' },
 ];
 
 const ROOT = process.cwd();
