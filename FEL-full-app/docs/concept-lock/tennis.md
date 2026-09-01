@@ -80,8 +80,16 @@ The mode says so itself: an overhead racquet motion and a jumper share an arm
 arc closely enough to read, and it beats shipping with no swing. A real
 `tennis_swing` clip is an animation-authoring task, not a convergence-pass one.
 
-**D6 — No energy economy: no Zone Shot, Zone Speed, trick shot or racket break.
-→ OUT OF SCOPE (v1), deliberately.**
+**D6 — The energy economy. → BUILT (Phase 2, second pass).**
+Gauge, Zone Shot and racket break are in. **Zone Speed and the trick-shot dash
+are NOT**, and that exclusion is structural rather than a shortcut: both exist in
+Aces to help you *reach* a ball, and this mode has no player positioning to reach
+with — contact is pure timing. Faking them would be a button that slows time for
+no reason. The same limit is why volleyball's block needed a cooldown instead of
+a court position.
+
+**(original entry, kept for the record)** No energy economy: no Zone Shot, Zone
+Speed, trick shot or racket break. → OUT OF SCOPE (v1), deliberately.
 This is a large interlocking system — a gauge, two spend modes, a dash that
 earns it, and a durability model that ends matches. Aces is *also* a normal
 tennis game underneath, and that underneath is what this pass is for. Building

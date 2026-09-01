@@ -28,7 +28,7 @@ Eleventh mode through the checklist.
 |---|---|
 | 0 Platform preconditions | `gate0-rig-tests` 58 green |
 | 1 Concept Lock | `docs/concept-lock/tennis.md` — 19 criteria, 7 deviations |
-| 2 Core mechanics | `tennis-rally-tests` 19 green — four shots, four real trades |
+| 2 Core mechanics | `tennis-rally-tests` 27 green — four shots, four real trades, and an energy economy with stakes |
 | 3 Camera & framing | **0 `[FEL-FRAME]`** desktop and mobile |
 | 4 Reachability | registry `tennis` · `ENABLED_BABYLON_MODES` · `/play/tennis` · `makeTimingHost` · `MODE_VERBS` · Controller Link |
 | 5 Input & control schema | four shots on four slots (it used one), phone schema added |
@@ -79,10 +79,34 @@ dimensions — 23.77m × 11m with 6.4m service boxes here.
   `let shot: Shot | null` — the ball in flight. TypeScript caught it.
 - **No Controller Link entry** — a phone could not join.
 
+## The energy layer (built in a second pass)
+
+The gauge fills on well-timed contact — the same skill the mode already grades,
+so it rewards what it teaches — and a **Zone Shot** spends *the whole gauge*.
+Binding it to the DRIVE rather than firing it automatically is what keeps it a
+decision: play a slice, drop or lob at a full gauge and you are choosing to bank
+it.
+
+Its stake is the **racket break**. Anything short of a perfect read on an
+incoming Zone Shot costs a racket, and the third one ends the match on the spot
+rather than on the scoreboard. Verified end to end through the driver:
+
+```
+ZONE SHOT → RACKET DAMAGE → THEIR ZONE SHOT → THEY HELD IT
+→ STREAK ×3 — RACKET DAMAGE → RACKET BROKEN — YOU WIN
+```
+
+The opponent plays the same economy; a gauge only one side can spend is a
+handicap, not a mechanic.
+
+**Zone Speed and the trick-shot dash are deliberately absent, and the reason is
+structural.** Both exist in Aces to help you *reach* a ball. This mode has no
+player positioning — contact is pure timing — so there is nothing for them to
+do, and a button that slows time for no reason is worse than its absence. It is
+the same architectural limit that made volleyball's block need a cooldown rather
+than a court position, and it is the honest boundary of this core.
+
 ## Still open
 
-**The energy layer is deliberately absent** (D6): no Zone Shot, Zone Speed,
-trick-shot dash or racket break. That is a large interlocking system, and Aces
-is *also* a normal tennis game underneath — which is what this pass built.
-Building it in the other order would have attached a special move to a
-metronome. It is the next pass for this mode, recorded rather than smuggled in.
+**Zone Speed and the trick shot**, if this core ever grows player movement.
+Until then they have nothing to act on.

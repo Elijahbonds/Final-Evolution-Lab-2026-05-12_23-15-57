@@ -122,6 +122,41 @@ export function makeTimingHost(opts: TimingHostOpts) {
           <span className="rounded-md bg-black/50 px-3 py-1 text-white">{typeof hud.score === 'number' ? `${hud.score} PTS` : hnode(hud.score, '0 PTS')}</span>
         </div>
 
+        {/* THE ENERGY LAYER. A gauge you cannot see is not a gauge, and rackets
+            you cannot count are not a threat — this is the second time in this
+            family that a mode published state the bezel dropped on the floor.
+            Rendered only when the mode publishes it, so the modes without an
+            energy economy are unchanged. */}
+        {hud.energy != null && (
+          <div className="pointer-events-none absolute left-4 top-14 flex flex-col gap-1">
+            <span className="font-mono text-[10px] tracking-wider text-[var(--fel-gold)]">ENERGY</span>
+            <div className="h-2 w-28 overflow-hidden rounded-full bg-black/50">
+              <div
+                className="h-full rounded-full transition-[width] duration-200"
+                style={{
+                  width: `${Math.max(0, Math.min(100, Number(hud.energy)))}%`,
+                  background: Number(hud.energy) >= 100 ? 'var(--fel-gold)' : 'var(--fel-cyan)',
+                }}
+              />
+            </div>
+            {typeof hud.rackets === 'string' && (
+              <span className="font-mono text-[10px] text-white/70">
+                RACKETS {hud.rackets}
+                {typeof hud.foeRackets === 'string' && (
+                  <span className="text-white/40"> · THEM {hud.foeRackets}</span>
+                )}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* The shot the mode graded, and the incoming-attack warning. */}
+        {typeof hud.shotType === 'string' && hud.shotType && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-24 text-center">
+            <span className="fel-panel px-3 py-1 font-mono text-[11px] text-white/85">{hud.shotType}</span>
+          </div>
+        )}
+
         {typeof hud.banner === 'string' && hud.banner && (
           <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
             <span className="fel-heading fel-panel px-4 py-2 text-2xl font-bold text-[var(--fel-emerald)]">{hud.banner}</span>

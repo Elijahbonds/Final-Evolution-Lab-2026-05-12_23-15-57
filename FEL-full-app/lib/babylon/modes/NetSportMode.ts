@@ -21,6 +21,20 @@ import { Onlookers } from '../visual/Onlookers';
 
 /** Seconds before the blocker can commit to the net again. */
 const BLOCK_COOLDOWN_SEC = 7;
+
+// ── The energy layer (Mario Tennis Aces) ────────────────────────────────────
+// A gauge you fill by hitting the ball WELL and spend on a shot that can break
+// the other player's racket. Aces also has Zone Speed and a trick-shot dash;
+// both exist to help you REACH a ball, and this mode has no player positioning
+// to reach with, so they are recorded as out of scope rather than faked.
+export const ENERGY_MAX = 100;
+export const ENERGY_PERFECT = 20;
+export const ENERGY_GOOD = 9;
+export const ENERGY_RALLY_WON = 10;
+/** A Zone Shot costs the whole gauge — it is the payoff, not a rotation. */
+export const ZONE_COST = 100;
+/** Rackets each side can lose before the match is over. */
+export const RACKETS = 3;
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -44,6 +58,8 @@ export interface NetSportOptions {
   /** L4 — line the court with spectators. Opt-in per mode so a mode that has
    *  not had a World-Population pass does not silently gain one. */
   crowd?: boolean;
+  /** Aces' energy gauge, Zone Shot and racket break. Tennis only. */
+  energy?: boolean;
   swingClip: string;
   /** 0–1. How reliably the AI returns; higher misses less. */
   aiSkill: number;
@@ -86,6 +102,12 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
    * stand-in: the block is a resource you spend, not a default you hold.
    */
   let blockCooldown = 0;
+  /** Aces' energy gauge, per side. [hero, opponent]. */
+  let energy: [number, number] = [0, 0];
+  /** Rackets left. Lose them all and the match ends there, mid-set. */
+  let rackets: [number, number] = [RACKETS, RACKETS];
+  /** Is the ball in flight a Zone Shot? It answers differently to everything. */
+  let incomingZone = false;
   let aimX = 0;
   let ended = false;
   let restSec = 0;                 // pause between points
@@ -100,6 +122,13 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   }
 
   function pushHud(ctx: ModeContext): void {
+    if (o.energy) {
+      ctx.setHud({
+        energy: Math.round(energy[0]),
+        rackets: `${rackets[0]}/${RACKETS}`,
+        foeRackets: `${rackets[1]}/${RACKETS}`,
+      });
+    }
     ctx.setHud({
       score: tennisScore ? tennisScore.games[0] : volleyScore!.points[0],
       foeScore: tennisScore ? tennisScore.games[1] : volleyScore!.points[1],
@@ -117,6 +146,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     rally.end();
     shot = null;
     contactArmed = false;
+    if (o.energy) {
+      energy[side] = Math.min(ENERGY_MAX, energy[side] + ENERGY_RALLY_WON);
+    }
     const result = tennisScore ? tennisScore.award(side) : volleyScore!.award(side);
     pushHud(ctx);
     SoundKit.play(side === 0 ? 'score' : 'miss');
@@ -162,7 +194,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // NOT named `shot`: the module already has `let shot: Shot | null` for the
     // ball in flight, and shadowing it here made `shot = planned` assign to the
     // parameter instead of the flight state.
-    touch?: VolleyTouch, tennisShot?: TennisShot,
+    touch?: VolleyTouch, tennisShot?: TennisShot, zone = false,
   ): boolean {
     const planned = planShot(o.cfg, { x: from.x, y: from.y, z: from.z }, toSide, aim, q, touch, tennisShot);
     if (!planned) return false;
@@ -172,6 +204,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     flightT = 0;
     contactArmed = false;
     incomingTouch = touch;
+    incomingZone = zone;
     blockSpent = false;
     // Who is receiving decides whether WE get a swing window this flight.
     awaitingHuman = toSide > 0;
@@ -216,6 +249,27 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     const aiTouchPeek = volleyTouchFor(rally.touches + 1, o.cfg.touchesPerSide);
     if (q === 'miss' && aiTouchPeek !== 'spike') q = 'good';
 
+    // A ZONE SHOT is the hardest ball in the mode to answer, and failing to
+    // answer it costs a RACKET rather than only a point. That is the stake the
+    // gauge buys, and it is what makes banking energy meaningful.
+    if (o.energy && incomingZone) {
+      if (q !== 'perfect') {
+        rackets[1] = Math.max(0, rackets[1] - 1);
+        pushHud(ctx);
+        ctx.juice.flash('#FFD700', 220);
+        SoundKit.play('impact', { pitch: 0.8, volume: 0.7 });
+        if (rackets[1] === 0) {
+          ended = true;
+          flash(ctx, 'RACKET BROKEN — YOU WIN', 2500);
+          ctx.end('WIN', tennisScore ? tennisScore.games[0] : 0, { rackets: rackets[0] });
+          return;
+        }
+        awardPoint(ctx, 0, 'RACKET DAMAGE');
+        return;
+      }
+      flash(ctx, 'THEY HELD IT', 700);
+    }
+
     // An ATTACK is harder to dig than a floated ball. Without this the spike is
     // only cosmetically the payoff shot: it would look different and win points
     // at exactly the same rate as a lob, which is not what the benchmark's
@@ -244,9 +298,23 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     foe.animator.play(o.swingClip, { onEnd: () => foe.animator.play(SPORT_CLIP.idle, { loop: true }) });
     SoundKit.play('uiTick', { pitch: 0.9, volume: 0.35 });
     EffectsKit.burst(ctx.scene, ball.getAbsolutePosition(), 'sparks');
+
+    // The opponent plays the same economy. A gauge only one side can spend is a
+    // handicap, not a mechanic.
+    let aiZone = false;
+    if (o.energy) {
+      energy[1] = Math.min(ENERGY_MAX, energy[1] + (q === 'perfect' ? ENERGY_PERFECT : q === 'good' ? ENERGY_GOOD : 0));
+      if (energy[1] >= ZONE_COST && (q === 'perfect' || q === 'good')) {
+        aiZone = true;
+        energy[1] = 0;
+        flash(ctx, 'THEIR ZONE SHOT', 900);
+        SoundKit.play('powerUp', { pitch: 1.2, volume: 0.6 });
+        ctx.juice.flash('#FF3366', 200);
+      }
+    }
     // A self-pass on their side must NOT hand the human a swing window, which
     // is what toSide decides (awaitingHuman = toSide > 0).
-    launch(ctx, ball.getAbsolutePosition(), aiCrosses ? 1 : -1, (Math.random() - 0.5) * 1.6, q, aiIsVolley ? aiTouch : undefined);
+    launch(ctx, ball.getAbsolutePosition(), aiCrosses ? 1 : -1, (Math.random() - 0.5) * 1.6, q, aiIsVolley ? aiTouch : undefined, undefined, aiZone);
   }
 
   /**
@@ -387,9 +455,46 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       SoundKit.play('impact', { pitch: 1.2, volume: 0.6 });
       ctx.juice.shake(0.14, 130);
     }
+    // Holding THEIR Zone Shot is the same test in reverse: anything short of a
+    // perfect read costs you a racket, and the third one ends the match on the
+    // spot rather than on the scoreboard.
+    if (o.energy && incomingZone && q !== 'perfect') {
+      rackets[0] = Math.max(0, rackets[0] - 1);
+      pushHud(ctx);
+      ctx.juice.flash('#FF3366', 240);
+      SoundKit.play('impact', { pitch: 0.7, volume: 0.7 });
+      if (rackets[0] === 0) {
+        ended = true;
+        flash(ctx, 'YOUR RACKET IS GONE', 2500);
+        ctx.end('LOSS', tennisScore ? tennisScore.games[0] : 0, { rackets: 0 });
+        return;
+      }
+      awardPoint(ctx, 1, 'RACKET DAMAGE');
+      return;
+    }
+
+    // ENERGY. Earned by hitting the ball well — which is the same skill the
+    // mode already grades, so the gauge rewards what it is teaching.
+    let zone = false;
+    if (o.energy) {
+      energy[0] = Math.min(ENERGY_MAX, energy[0] + (q === 'perfect' ? ENERGY_PERFECT : q === 'good' ? ENERGY_GOOD : 0));
+      // A ZONE SHOT is the DRIVE at a full gauge. Binding it to one shot rather
+      // than firing automatically is what keeps it a decision: play a slice, a
+      // drop or a lob at full energy and you are choosing to bank it.
+      if (pendingShot === 'drive' && energy[0] >= ZONE_COST && (q === 'perfect' || q === 'good')) {
+        zone = true;
+        energy[0] = 0;
+        flash(ctx, 'ZONE SHOT', 900);
+        SoundKit.play('powerUp', { pitch: 1.5, volume: 0.6 });
+        ctx.juice.shake(0.2, 160);
+        ctx.feel.impact(0.6);
+      }
+      ctx.setHud({ energy: Math.round(energy[0]) });
+    }
+
     launch(ctx, swingPos, crosses ? -1 : 1, aimX, q,
       isVolley ? touchKind : undefined,
-      isVolley ? undefined : pendingShot);
+      isVolley ? undefined : pendingShot, zone);
   }
 
   return {

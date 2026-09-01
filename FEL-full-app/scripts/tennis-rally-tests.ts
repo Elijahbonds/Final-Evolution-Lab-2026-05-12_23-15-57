@@ -11,6 +11,9 @@
 // shot would have arced like a drop shot and landed as deep as a drive.
 
 import { TENNIS, VOLLEYBALL, planShot, judgeShot } from '../lib/babylon/core/RallyCore';
+import {
+  ENERGY_MAX, ENERGY_PERFECT, ENERGY_GOOD, ENERGY_RALLY_WON, ZONE_COST, RACKETS,
+} from '../lib/babylon/modes/NetSportMode';
 
 let checks = 0;
 const fail: string[] = [];
@@ -62,6 +65,27 @@ const spikePlusUndefined = planShot(VOLLEYBALL, { x: 0, y: 1.1, z: 1.6 }, -1, 0,
 ok(spikeOnly.apex === spikePlusUndefined.apex && spikeOnly.to.z === spikePlusUndefined.to.z,
   'E1 a volley touch with no tennis shot is unchanged');
 ok(spikeOnly.from.y > VOLLEYBALL.netHeight, 'E2 the volleyball spike still launches from above the net');
+
+// ── F. the energy layer ─────────────────────────────────────────────────────
+// Aces' gauge is not a score multiplier, it is a threat: you fill it by hitting
+// well and spend it on a shot that can END the match by breaking a racket. The
+// checks are on the SHAPE of that economy, the way the surf and snowboard meters
+// are checked — a gauge that fills too fast is a rotation, not a payoff.
+ok(ZONE_COST === ENERGY_MAX, 'F1 a Zone Shot costs the WHOLE gauge — it is the payoff, not a rotation');
+ok(ENERGY_PERFECT > ENERGY_GOOD, 'F2 the gauge rewards the timing the mode already grades');
+const perfectsToFill = ENERGY_MAX / ENERGY_PERFECT;
+ok(perfectsToFill >= 4 && perfectsToFill <= 8,
+  `F3 filling it is a real investment (${perfectsToFill} perfect contacts)`);
+ok(ENERGY_MAX / ENERGY_GOOD > perfectsToFill,
+  'F4 ...and merely good contact takes longer, so precision is the faster route');
+ok(ENERGY_RALLY_WON > 0 && ENERGY_RALLY_WON < ENERGY_MAX / 3,
+  `F5 winning a rally helps but does not hand you a Zone Shot (${ENERGY_RALLY_WON})`);
+ok(RACKETS >= 2, `F6 a single mistake cannot end the match (${RACKETS} rackets)`);
+ok(RACKETS <= 4, 'F7 ...but the threat is real enough to change how you play');
+// The stake has to be worth the gauge: breaking every racket must be reachable
+// inside a match, or the Zone Shot is just a point with a cutscene.
+ok(RACKETS * ZONE_COST <= ENERGY_MAX * 4,
+  'F8 breaking a full set of rackets is reachable within one match');
 
 if (fail.length) {
   console.error(`tennis-rally-tests: ${fail.length} FAILED of ${checks}`);
