@@ -37,6 +37,25 @@ import { PRECISION_CONFIG as CFG } from './modeConfigs';
 
 const CLUTCH_MULT = 1.5;
 
+// ── GOLF: the three pillars the benchmark's own lock names ──────────────────
+// "Club selection + shot timing + course reading". Shot timing was here and
+// good; the other two did not exist, so every shot was the same shot at a
+// different power percentage and there was nothing on the course to read.
+
+/** Clubs set the DISTANCE BAND and the trajectory — the primary decision. */
+export const GOLF_CLUBS = [
+  { id: 'DRIVER', reach: 1.0, launch: 0.85, forgive: 0.8 },
+  { id: 'IRON', reach: 0.68, launch: 1.15, forgive: 1.0 },
+  { id: 'WEDGE', reach: 0.38, launch: 1.75, forgive: 1.25 },
+] as const;
+
+/** Strokes each hole is expected to take. Golf is scored against this. */
+export const GOLF_PAR = [3, 4, 3] as const;
+/** Within this many metres the ball is holed. */
+export const HOLED_M = 1.6;
+/** Stick pulled past this is a backswing; pushed past it is the strike. */
+export const SWING_STICK = 0.6;
+
 // ════════════════════════════════════════════════════════════════ TENNIS ══
 // ⚠️ DEAD CODE — NOT THE TENNIS THE GAME RUNS.
 //
@@ -190,6 +209,13 @@ export const GolfMode: ModeDefinition = (() => {
   let round = 0, pts = 0, stickX = 0, stickY = 0;
   let phase: 'preview' | 'aim' | 'power' | 'accuracy' | 'flight' = 'aim';
   let previewSec = 0, power = 0;
+  let club = 0;                       // which club is in hand
+  let wind = new Vector3();           // per-hole wind, applied in flight
+  let strokes = 0, overPar = 0;       // golf is scored in strokes against par
+  /** Stick-swing state. Runs ALONGSIDE the 3-click swing, never replacing it:
+   *  a stick swing does not express on a touch overlay and 3-click is the
+   *  better mobile input, so the mode offers both. */
+  let backswing = 0, pulling = false;
   let ended = false;
   const TOTAL = 3;
   const PREVIEW_SEC = 1.8;
@@ -205,6 +231,13 @@ export const GolfMode: ModeDefinition = (() => {
     me.animator.play(SPORT_CLIP.golfAddress, { loop: true });
     // HOLE PREVIEW — fly the camera to the green, look back at the tee.
     // Pure camDirector.snapTo, timer-bounded, cannot stall.
+    strokes = 0;
+    // COURSE READING — the third pillar, and none of its inputs existed. Wind
+    // is the cheapest honest one: it is visible in the HUD before you commit,
+    // it pushes the ball for the whole flight, and it makes the reticle a
+    // starting point rather than an answer.
+    const wa = (round * 2.399) % (Math.PI * 2);
+    wind = new Vector3(Math.sin(wa) * (1.2 + (round % 3) * 0.9), 0, Math.cos(wa) * 0.6);
     phase = 'preview'; previewSec = 0;
     ctx.camDirector.snapTo(holePos.add(new Vector3(0, 0, 3)), ball.position.add(new Vector3(0, 0.6, 0)));
     const clutch = round === TOTAL;
@@ -214,10 +247,77 @@ export const GolfMode: ModeDefinition = (() => {
     });
   }
 
+  /** The golf frame: strokes against par, which is how the sport is scored. */
+  function card(): string {
+    return overPar === 0 ? 'E' : overPar > 0 ? `+${overPar}` : `${overPar}`;
+  }
+
+  /** Strike the ball. BOTH swings end here, so the 3-click and the stick
+   *  produce the same shot from the same two inputs — power and side error —
+   *  instead of two implementations that drift apart. */
+  function strike(ctx: ModeContext, pwr: number, sideErr: number): void {
+    const c = GOLF_CLUBS[club];
+    phase = 'flight';
+    // FrameGuard checks that you can see the thing the mode is about, and once
+    // the ball is struck that thing is the BALL — the camera follows it down
+    // the fairway by design, leaving the player behind. Golf never set heroRef
+    // at all, so it inherited the player from spawnAthlete and the guard spent
+    // every shot reporting a hero it was never meant to be framing.
+    ctx.heroRef.current = ball;
+    strokes++;
+    SoundKit.play('whoosh', { pitch: 0.9 });
+    me.animator.play(SPORT_CLIP.golfSwing, {});
+    ctx.feel?.impact?.(0.25 + pwr * 0.35);
+    const dir = reticle.pos.subtract(new Vector3(0, 0.4, 0)).normalize();
+    // A forgiving club punishes a bad strike less. That is the trade for its
+    // shorter reach, and it is the reason not to simply always take the driver.
+    const spread = (sideErr * 6) / c.forgive;
+    const hookSlice = new Vector3(spread * (Math.random() < 0.5 ? -1 : 1), 0, 0);
+    flight.launch(
+      ball.position,
+      // Scaled to THIS course. The holes sit 42-70m out and a full driver was
+      // carrying ~240m, so every shot sailed the green, the hole could never be
+      // completed, and the ball ended up somewhere the camera could not hold.
+      // A driver now reaches the far pin and a wedge does not — which is what
+      // makes the club a decision instead of a label.
+      dir.scale((10 + pwr * 15) * c.reach)
+        .add(new Vector3(0, (5 + pwr * 5) * c.launch, 0))
+        .add(hookSlice),
+    );
+    ctx.setHud({
+      accuracy: sideErr === 0 ? 'PURE' : sideErr > 0.5 ? 'SHANKED' : 'DRIFTED',
+      hint: '', strokes,
+    });
+  }
+
   function backToTee(ctx: ModeContext): void {
     phase = 'aim';
-    ctx.camDirector.setFixedBehind(me.root.position, 0, 'swing');
-    ctx.setHud({ hint: 'Aim with the stick · SWING starts the meter · set POWER up top · nail ACCURACY on the way down' });
+    pulling = false; backswing = 0;
+    ctx.heroRef.current = me.root;      // addressing the ball: frame the player
+    // Behind the BALL, not the tee. Golf is played from where it lies; this
+    // mode gave every shot from the tee because a hole WAS one shot.
+    me.root.position.set(ball.position.x - 0.5, 0, ball.position.z - 0.6);
+    // The player TELEPORTS to the lie, which is a cut, not motion. Snap the
+    // camera with them or it lerps across the fairway with nobody in frame.
+    // FACE THE PIN. This passed a hard-coded yaw of 0, i.e. "the player always
+    // faces +Z" — true only on the tee shot. The moment a drive overshoots the
+    // hole the player is beyond it and must play BACK, and the camera was still
+    // setting up as though they faced away: it ended up in front of them,
+    // looking the wrong way, with the player projecting outside the frustum.
+    // That is where golf's [FEL-FRAME] lines came from.
+    const pinVec = holePos.subtract(me.root.position);
+    const faceYaw = Math.atan2(pinVec.x, pinVec.z);
+    me.root.rotation.y = faceYaw;
+    ctx.camDirector.snapTo(me.root.position, holePos);
+    ctx.camDirector.setFixedBehind(me.root.position, faceYaw, 'swing');
+    const toPin = Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos);
+    ctx.setHud({
+      club: GOLF_CLUBS[club].id,
+      wind: `${wind.length().toFixed(0)} m/s`,
+      pin: `${toPin.toFixed(0)}m`,
+      strokes, card: card(),
+      hint: 'B cycles CLUB · SWING for the meter, or pull the stick back and drive through',
+    });
   }
 
   return {
@@ -244,7 +344,24 @@ export const GolfMode: ModeDefinition = (() => {
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
-      if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      if (e.t === 'stick' && e.side === 'L') {
+        stickX = e.x; stickY = e.y;
+        // THE ANALOG STICK SWING — PGA Tour 2K's signature, added ALONGSIDE the
+        // 3-click rather than replacing it. Pull back to load, drive through to
+        // strike: how far you pulled is the power, and where the stick sits
+        // laterally as you come through is the path, so a swing that drifts off
+        // line hooks or slices exactly as a real one does.
+        if (phase === 'aim') {
+          if (e.y <= -SWING_STICK) {
+            pulling = true;
+            backswing = Math.max(backswing, Math.min(1, -e.y));
+          } else if (pulling && e.y >= SWING_STICK) {
+            pulling = false;
+            strike(ctx, backswing, Math.min(1, Math.abs(e.x)));
+            backswing = 0;
+          }
+        }
+      }
       if (e.t === 'button' && e.btn === 'A' && e.pressed) {
         if (phase === 'preview') { backToTee(ctx); return; }   // skip the flyover
         if (phase === 'aim') { phase = 'power'; meter.start(); ctx.setHud({ hint: 'SWING at the top for POWER' }); }
@@ -256,17 +373,15 @@ export const GolfMode: ModeDefinition = (() => {
         } else if (phase === 'accuracy') {
           const err = Math.abs(meter.stop() - ACCURACY_CENTER);
           const clean = err <= ACCURACY_HALF;
-          const sideErr = clean ? 0 : Math.min(1, (err - ACCURACY_HALF) * 3);
-          phase = 'flight';
-          SoundKit.play('whoosh', { pitch: 0.9 });
-          me.animator.play(SPORT_CLIP.golfSwing, {});
-          ctx.feel?.impact?.(0.25 + power * 0.35);
-          const dir = reticle.pos.subtract(new Vector3(0, 0.4, 0)).normalize();
-          // a missed accuracy click hooks (early) or slices (late) the ball
-          const hookSlice = new Vector3(sideErr * 6 * (Math.random() < 0.5 ? -1 : 1), 0, 0);
-          flight.launch(ball.position, dir.scale(14 + power * 21).add(new Vector3(0, 6 + power * 6, 0)).add(hookSlice));
-          ctx.setHud({ accuracy: clean ? 'PURE' : sideErr > 0.5 ? 'SHANKED' : 'DRIFTED', hint: '' });
+          strike(ctx, power, clean ? 0 : Math.min(1, (err - ACCURACY_HALF) * 3));
         }
+      }
+      // CLUB SELECTION — the first pillar the lock names, and it did not exist.
+      if (e.t === 'button' && e.btn === 'B' && e.pressed && phase === 'aim') {
+        club = (club + 1) % GOLF_CLUBS.length;
+        SoundKit.play('uiTick', { pitch: 1.1 });
+        const toPin = Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos);
+        ctx.setHud({ club: GOLF_CLUBS[club].id, pin: `${toPin.toFixed(0)}m` });
       }
     },
 
@@ -280,21 +395,65 @@ export const GolfMode: ModeDefinition = (() => {
       }
       if (phase === 'power' || phase === 'accuracy') ctx.setHud({ power: Math.round(meter.value * 100) });
       if (phase === 'aim') reticle.update(dt, stickX, stickY);
+      // Phase 3 wants update() EVERY frame; this mode drove its camera only
+      // during flight, so between shots the camera never converged on its fixed
+      // framing — it sat wherever the last snap left it, which after a long
+      // drive was far enough away to project past the far plane and, twice in a
+      // capture, to render black.
+      if (phase !== 'flight') ctx.camDirector.update(me.root.position, Vector3.Zero(), holePos);
       if (phase === 'flight') {
+        // Wind acts for the whole flight, so a long club spends longer in it.
+        if (flight.active) flight.vel.addInPlace(wind.scale(dt));
         const flying = flight.step(dt);
         ctx.camDirector.update(ball.position, flight.vel, holePos);
         if (!flying) {
-          const dist = Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos);
+          const flat = new Vector3(ball.position.x, 0, ball.position.z);
+          // OUT OF BOUNDS — a stroke penalty and a drop, which is the real
+          // rule and also stops a shanked drive leaving the course entirely.
+          if (Math.abs(ball.position.x) > 34 || ball.position.z > 92 || ball.position.z < -6) {
+            strokes++;
+            const back = holePos.subtract(new Vector3(0, 0, 14));
+            ball.position.set(back.x, 0.05, Math.max(1, back.z));
+            SoundKit.play('miss');
+            ctx.setHud({ banner: `OUT OF BOUNDS — penalty stroke (${strokes})`, strokes });
+            setTimeout(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1300);
+            phase = 'aim';
+            return;
+          }
+          const dist = Vector3.Distance(flat, holePos);
+
+          // NOT HOLED — play it from where it lies. A hole used to be exactly
+          // one shot, scored by proximity, which is why there were no strokes
+          // to score against par and no reason to own a wedge.
+          if (dist > HOLED_M) {
+            SoundKit.play('uiTick');
+            ctx.setHud({ banner: `${dist.toFixed(1)}m from the pin · stroke ${strokes}` });
+            setTimeout(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1100);
+            phase = 'aim';
+            return;
+          }
+
+          // HOLED. Golf is scored in strokes against par.
+          const par = GOLF_PAR[Math.min(round, GOLF_PAR.length) - 1] ?? 3;
+          const rel = strokes - par;
+          overPar += rel;
           const clutch = round === TOTAL;
-          const gained = Math.round((dist < 0.5 ? 100 : Math.max(0, Math.round(60 - dist * 3))) * (clutch ? CLUTCH_MULT : 1));
+          const name = rel <= -2 ? 'EAGLE' : rel === -1 ? 'BIRDIE' : rel === 0 ? 'PAR'
+            : rel === 1 ? 'BOGEY' : `+${rel}`;
+          const gained = Math.round(Math.max(20, 120 - rel * 40) * (clutch ? CLUTCH_MULT : 1));
           pts += gained;
-          SoundKit.play(dist < 0.5 ? 'score' : 'uiTick');
-          ctx.setHud({ score: pts, banner: dist < 0.5 ? (clutch ? `CLUTCH HOLE OUT! +${gained}` : `HOLED OUT! +${gained}`) : `${dist.toFixed(1)}m out · +${gained}` });
+          SoundKit.play('score', { pitch: rel < 0 ? 1.35 : 1 });
+          ctx.setHud({
+            score: pts, strokes, card: card(),
+            banner: `${name} — ${strokes} on a par ${par}${clutch ? ' · CLUTCH' : ''}`,
+          });
           setTimeout(() => {
             ctx.setHud({ banner: '' });
-            if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); ctx.end('CARD_IN', pts, { shots: TOTAL }); }
-            else nextShot(ctx);
-          }, 1400);
+            if (round >= TOTAL) {
+              ended = true; SoundKit.play('whistle');
+              ctx.end('CARD_IN', pts, { holes: TOTAL, overPar });
+            } else nextShot(ctx);
+          }, 1600);
           phase = 'aim';
         }
         return;

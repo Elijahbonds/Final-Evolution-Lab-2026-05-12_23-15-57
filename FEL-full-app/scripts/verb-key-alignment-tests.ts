@@ -81,13 +81,29 @@ const EXEMPT: Record<string, { btn: string; why: string }[]> = {
 
 const registryFile = readFileSync(join(MODE_SRC, 'registry.ts'), 'utf8');
 /** registry key -> implementation file, read from the registry's own imports. */
-function modeSources(): { key: string; file: string }[] {
-  const out: { key: string; file: string }[] = [];
+function modeSources(): { key: string; file: string; symbol: string }[] {
+  const out: { key: string; file: string; symbol: string }[] = [];
   for (const [, key, symbol] of registryFile.matchAll(/^\s{2}([a-z_0-9]+):\s*([A-Za-z0-9_]+),/gm)) {
     const imp = new RegExp(`import \\{[^}]*\\b${symbol}\\b[^}]*\\} from '\\.\\/([^']+)'`).exec(registryFile);
-    if (imp) out.push({ key, file: `${imp[1]}.ts` });
+    if (imp) out.push({ key, file: `${imp[1]}.ts` , symbol });
   }
   return out;
+}
+
+/**
+ * Just THIS mode's section of its file.
+ *
+ * Golf, Derby and Penalty share precisionModes.ts, and scanning the whole file
+ * gave every one of them the union of its buttons: adding a club-cycle B to
+ * golf immediately accused derby and penalty of missing a verb they never read.
+ * A guard that cries wolf is one people learn to ignore, which is worse than no
+ * guard. Bound the scan by the mode's own `export const <Symbol>`.
+ */
+function sectionFor(src: string, symbol: string): string {
+  const start = src.indexOf(`export const ${symbol}`);
+  if (start < 0) return src;
+  const next = src.indexOf('\nexport const ', start + 10);
+  return next < 0 ? src.slice(start) : src.slice(start, next);
 }
 
 // EVERY ENABLED MODE NEEDS AN ENTRY, however its host passes the id.
@@ -107,11 +123,11 @@ for (const key of ENABLED_BABYLON_MODES) {
     `${key} is in ENABLED_BABYLON_MODES but has no MODE_VERBS entry — touch falls through to a single generic ACTION button`);
 }
 
-for (const { key, file } of modeSources()) {
+for (const { key, file, symbol } of modeSources()) {
   const cfg = MODE_VERBS[key];
   if (!cfg) continue;                       // reported by the enabled-mode check above
   let src: string;
-  try { src = readFileSync(join(MODE_SRC, file), 'utf8'); } catch { continue; }
+  try { src = sectionFor(readFileSync(join(MODE_SRC, file), 'utf8'), symbol); } catch { continue; }
 
   // Buttons the mode acts on, grouped BY CONDITION. A mode that writes
   //   if (e.btn === 'A' || e.btn === 'B') fire()

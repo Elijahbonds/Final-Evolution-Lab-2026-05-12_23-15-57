@@ -131,6 +131,23 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
+  // Golf: the 3-click swing plus club selection. The stick swing needs an
+  // analog axis a phone pad does not have, so a Controller Link player uses the
+  // 3-click — which is exactly why it was kept alongside rather than replaced.
+  golf: {
+    modeId: 'golf',
+    title: 'Golf',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'SWING' },
+        { action: 'B', label: 'CLUB' },
+      ] },
+    ],
+  },
+
   // Tennis: the four shots. A phone could not join this mode at all before --
   // isControllerEnabled() is a plain `modeId in MODE_CONTROLLERS`, so an absent
   // entry is silence, not an error.

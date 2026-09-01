@@ -94,7 +94,10 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
   }),
   derby: verbs({ A: { label: 'SWING', emit: A('A') } }),
   penalty: verbs({ A: { label: 'STRIKE', emit: A('A') } }),
-  golf: verbs({ A: { label: 'SWING', emit: A('A') } }),
+  golf: verbs({
+    A: { label: 'SWING', emit: A('A') },
+    B: { label: 'CLUB', emit: A('B') },
+  }),
 
   // 1v1 Hoops: shooting is HOLD-then-release on the trigger stream (shot
   // meter). Crossovers come from stick reversal, so no button needed there.

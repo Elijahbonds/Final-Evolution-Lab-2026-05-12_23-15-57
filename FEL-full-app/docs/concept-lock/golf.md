@@ -91,3 +91,38 @@ what the venue wants.
 A phone cannot join at all (`isControllerEnabled` is `modeId in
 MODE_CONTROLLERS`), and the overlay offers only SWING — which is *correct* for a
 3-click swing, and becomes a gap the moment D1 adds club selection.
+
+
+---
+
+## Phase 2 — built
+
+| Deviation | Outcome |
+|---|---|
+| D1 club selection | ✅ DRIVER / IRON / WEDGE on `B`. Reach, launch and **forgiveness** differ, so a short club punishes a bad strike less — that is the trade that stops the driver being the always-answer. |
+| D2 course reading | ✅ per-hole **wind**, shown before you commit and applied for the whole flight, so a long club spends longer in it |
+| D3 the 2K stick swing | ✅ **added alongside** 3-click, not replacing it. Pull back to load, drive through to strike; the pull is the power and the lateral position at contact is the path. Both swings end in one `strike()`, so they cannot drift apart. |
+| D5 strokes against par | ✅ EAGLE / BIRDIE / PAR / BOGEY, a running card, and holes that take as many strokes as they take |
+| D7 ambient bed | ✅ `dojo` → `wind` |
+| D8 overlay + Controller Link | ✅ SWING + CLUB on both |
+| — | ✅ **play it from where it lies**: a hole was one shot scored by proximity, which is why there were no strokes to count |
+| — | ✅ **out of bounds** — penalty stroke and a drop |
+
+**D4 putting is still absent.** It needs a green surface, a putt swing with its own
+scale, and a read; it is the next pass.
+
+## Phase 3 — DOES NOT PASS
+
+Three `[FEL-FRAME]` per run, down from sixteen. Two real causes were found and
+fixed on the way:
+
+- The mode drove its camera **only during flight**, so between shots it never
+  converged on its framing — a Phase 3 violation that also produced two
+  `[FEL-WATCHDOG] still black` errors. It updates every frame now, and the
+  errors are gone.
+- `setFixedBehind(me.root.position, 0, 'swing')` hard-coded a facing yaw of
+  **0** — "the player always faces +Z", true only on the tee shot. The moment a
+  drive overshoots the pin the player must play *back*, and the camera set up in
+  front of them looking the wrong way. It faces the pin now.
+
+What remains is not diagnosed. Golf is **not signed off**.
