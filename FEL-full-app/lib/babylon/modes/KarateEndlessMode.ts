@@ -36,6 +36,7 @@ import type { ControlSource, Intent } from '../core/PlayerSlot';
 import { PlayerSlot, LocalInputSource } from '../core/PlayerSlot';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
+import { Onlookers } from '../visual/Onlookers';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -54,7 +55,15 @@ import {
  * clamped to ±6.8 and ended up 1.2m behind a player at the edge, putting them out
  * of frame. 7.5 on a 24x24 mat keeps 3.3m clear behind the overShoulder rig.
  */
-const ARENA_HALF = 7.5;
+/**
+ * The fighter is held inside a DISC of this radius, not a square of this half-
+ * width. A square clamp has corners, and a corner is the one place a
+ * facing-derived camera at a 3.1m radius cannot swing behind its subject:
+ * every [FEL-FRAME] this mode had left was a fighter pinned at (+-7.5, +-7.5).
+ * Karate VS is fought on a disc for the same reason, and the venue now paints
+ * this ring on the mat so the edge is seen rather than only felt.
+ */
+const ARENA_RADIUS = 7.5;
 const STANCE = SPORT_CLIP.karateStance;
 const STRIKES = {
   A: { clip: SPORT_CLIP.karateJab, dmg: 12, range: 1.4 },
@@ -107,6 +116,7 @@ class PartnerAISource implements ControlSource {
 
 export const KarateEndlessMode: ModeDefinition = (() => {
   let karateVenue: VenueHandle | null = null;  // M74
+  let crowd: Onlookers | null = null;   // L4 — the gauntlet's audience
   let player: SpawnedCharacter, partner: SpawnedCharacter;
   let playerSlot: PlayerSlot, partnerSlot: PlayerSlot, localSource: LocalInputSource;
   let pool: MobPool;
@@ -325,6 +335,16 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // Build the arena FIRST so the M37 spawn guard sees a populated world
       // (>=8 meshes) and the dojoWarm ambient bed has somewhere to live.
       karateVenue = mountVenue(ctx, 'karate_endless', { keepGameplayCamera: true });
+      // L4 — the Shadow Gauntlet is a gauntlet, and a gauntlet has an audience.
+      // Ringed OUTSIDE the fighting disc (radius 7.5) and inside the mat (12),
+      // so nobody stands anywhere the fight can reach. Instanced silhouettes,
+      // never rigs: this mode already carries up to twelve pursuers plus an
+      // ally, and L4's own rule is that a crowd must not compete with
+      // characters for frame budget.
+      crowd = new Onlookers(ctx.scene, Array.from({ length: 14 }, (_, i) => {
+        const a = (i / 14) * Math.PI * 2 + 0.22;
+        return new Vector3(Math.sin(a) * 10.2, 0, Math.cos(a) * 10.2);
+      }), '#3B2A52');
       if (!karateVenue) VenueKit.buildDojo(ctx.scene);
       EffectsKit.ambient(ctx.scene, 'dojo');
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, 0, 1.5), startClip: STANCE });
@@ -425,9 +445,13 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       if (!striking && !blocking && !dodging && vel.lengthSquared() > 0.05) {
         player.root.position.addInPlace(vel.scale(dt));
         // Inset from the mat so the camera always has somewhere to stand behind
-        // the player — see ARENA_HALF.
-        player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x));
-        player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z));
+        // the player — see ARENA_RADIUS.
+        const pr = Math.hypot(player.root.position.x, player.root.position.z);
+        if (pr > ARENA_RADIUS) {
+          const k = ARENA_RADIUS / pr;
+          player.root.position.x *= k;
+          player.root.position.z *= k;
+        }
         player.root.rotation.y = Math.atan2(vel.x, vel.z);
         player.animator.play(SPORT_CLIP.moveLoop, { loop: true });
       } else if (!striking && !blocking && !dodging && vel.lengthSquared() <= 0.05) {
@@ -495,10 +519,11 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // gates on lengthSquared() > 0.01, and the same vector also drives the
       // look-ahead target, which is exactly the desired effect here — the
       // camera looks slightly down the direction you're facing.
+      crowd?.update(dt);
       ctx.camDirector.update(player.root.position, facingVec(), nearest(player.root.position)?.mob.char.root.position ?? null);
     },
 
-    dispose() { karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { crowd?.dispose(); crowd = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 

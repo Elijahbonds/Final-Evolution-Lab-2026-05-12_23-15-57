@@ -88,7 +88,17 @@ const arenas: { file: string; roomHalf: number; pullback: number; label: string 
 ];
 for (const a of arenas) {
   const src = readFileSync(a.file, 'utf8');
-  const half = Number(/const ARENA_HALF = ([0-9.]+)/.exec(src)?.[1] ?? '99');
+  // Accept either spelling. Karate Endless's square clamp became a RADIAL one
+  // (ARENA_HALF -> ARENA_RADIUS) because a square has corners, and a corner is
+  // the one place a facing-derived camera cannot swing behind its subject. The
+  // clearance arithmetic is the same either way -- it is the worst-case
+  // distance from the origin to where a fighter can stand -- but the fallback
+  // of '99' meant a rename silently turned this check into a guaranteed
+  // failure rather than a skipped one, which is at least loud. Reading both
+  // names keeps it honest through the next rename too.
+  const decl = /const ARENA_(?:HALF|RADIUS) = ([0-9.]+)/.exec(src);
+  ok(decl !== null, `D-${a.label}: found an arena extent to check in ${a.file}`);
+  const half = Number(decl?.[1] ?? '99');
   ok(half + a.pullback <= a.roomHalf + 0.5,
     `D-${a.label}: a fighter at the arena edge (${half}) leaves room for the camera's ` +
     `${a.pullback}m pullback inside a room of half-extent ${a.roomHalf} — it did not, ` +

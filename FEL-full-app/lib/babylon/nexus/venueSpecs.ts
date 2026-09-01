@@ -196,7 +196,13 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     // the edge ends up with the camera 1.2m behind them and themselves out of
     // frame. Every [FEL-FRAME] line this mode produced was a hero at ±8.
     // A wave brawler with five enemies wants the space anyway.
-    ground: { kind: 'mat', size: [24, 24], color: '#2A1A3A', lineColor: '#BF5AF2', markings: 'none' },
+    // markings 'ring', not 'none': the mode clamps the fighter to a radius and
+    // that boundary has to be visible. It is also now a DISC rather than a
+    // square, because a square clamp has CORNERS, and every remaining
+    // [FEL-FRAME] this mode produced was a fighter pinned at (+-7.5, +-7.5) --
+    // the one place a facing-derived camera at a 3.1m radius has no room to
+    // swing. Karate VS uses a disc for the same reason.
+    ground: { kind: 'mat', size: [24, 24], color: '#2A1A3A', lineColor: '#BF5AF2', markings: 'ring' },
     props: [
       { kind: 'wall', position: [0, 0, -14], color: '#0D0714' },
       { kind: 'lamp', position: [7, 0, -5], color: '#BF5AF2' },

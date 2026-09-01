@@ -94,7 +94,7 @@ export interface GroundSpec {
   color: string;
   lineColor?: string;
   /** Painted into a DynamicTexture — no image files. */
-  markings?: 'basketball' | 'halfcourt' | 'tennis' | 'soccer' | 'volleyball' | 'none';
+  markings?: 'basketball' | 'halfcourt' | 'tennis' | 'soccer' | 'volleyball' | 'ring' | 'none';
   /**
    * [x, z] offset for the playing surface. Grounds are centred on the origin,
    * which assumes a mode plays symmetrically around it — and a HALF-court game
@@ -217,6 +217,20 @@ function paintMarkings(
       box(S / 2 - 200, 40, 400, 130);
       box(S / 2 - 200, S - 170, 400, 130);
       break;
+    // A DOJO RING. The arena modes clamp the fighter to a play area that the
+    // mat does not draw, so the boundary is felt and never seen -- the same
+    // invisible-wall defect the skatepark and the surf break both carried. The
+    // ring is drawn at the fraction of the mat the mode actually clamps to
+    // (ARENA_RADIUS / half the mat), with a fading outer band so the edge reads
+    // as a place rather than a hard stop.
+    case 'ring': {
+      const cx = S / 2, cy = S / 2;
+      arc(cx, cy, S * 0.3125);              // the clamp itself: 7.5 of a 24m mat
+      ctx.globalAlpha = 0.45; arc(cx, cy, S * 0.3125 - 26); ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.25; arc(cx, cy, S * 0.3125 + 34); ctx.globalAlpha = 1;
+      arc(cx, cy, 60);                      // centre mark, for spawn orientation
+      break;
+    }
     case 'volleyball':
       box(60, 60, S - 120, S - 120);
       line2(60, S / 2, S - 60, S / 2);
