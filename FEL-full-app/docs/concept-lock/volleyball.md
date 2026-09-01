@@ -77,7 +77,13 @@ and spike to win the point, and the spike is the moment the whole rally exists
 to reach. A mode that models the three-touch **limit** without the three-touch
 **vocabulary** has the rule but not the sport.
 
-**D2 — No block. → PHASE 2 of a later pass, now that there IS a spike.**
+**D2 — No block. → FIXED (Phase 2), and re-balanced after a bug corrupted the
+first reading.** See the sign-off's correction section: the stuff was awarding
+the point to the opponent, so the balance figure it was tuned against was
+meaningless. Its cost is now a cooldown, because a block's real cost is
+positional and this mode has no player positioning.
+
+**(original note) No block. → PHASE 2 of a later pass, now that there IS a spike.**
 The defensive answer to an attack. It was meaningless while every touch was the
 same hit; now that the attack exists and is the point-winning shot, a block is
 the missing counter-play. Deferred rather than closed, and it needs an overlay

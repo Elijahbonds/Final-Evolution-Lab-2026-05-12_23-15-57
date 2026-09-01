@@ -17,6 +17,17 @@ export type SwingQuality = 'perfect' | 'good' | 'early' | 'late' | 'miss';
 
 /** Half-width of each timing band, in seconds around the ideal contact time. */
 export const SWING_BANDS = { perfect: 0.09, good: 0.20, ok: 0.34 } as const;
+/**
+ * A STUFF block needs a tighter read than a perfect swing — a third of the
+ * window.
+ *
+ * Without this the block strictly dominates the dig: a player who can time a
+ * swing can time a block, so blocking every incoming attack beat digging 9-1
+ * against 3-0 and there was never a reason to dig. A choice where one option is
+ * better in every case is not a choice. The block is meant to be the read you
+ * can be punished for, so it asks for more than the shot it answers.
+ */
+export const BLOCK_STUFF_WINDOW = 0.03;
 
 /**
  * Grade a swing. `dt` is (swingTime − idealContactTime): negative is early.

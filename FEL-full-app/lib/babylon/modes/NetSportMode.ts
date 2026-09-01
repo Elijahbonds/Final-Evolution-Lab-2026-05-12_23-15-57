@@ -18,12 +18,15 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
+
+/** Seconds before the blocker can commit to the net again. */
+const BLOCK_COOLDOWN_SEC = 7;
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import {
   gradeSwing, planShot, shotAt, judgeShot, TennisScore, VolleyScore, RallyState,
-  volleyTouchFor, volleyCrosses,
+  volleyTouchFor, volleyCrosses, BLOCK_STUFF_WINDOW,
   type TennisShot,
   type RallyConfig, type Shot, type SwingQuality, type RallyFault, type VolleyTouch,
 } from '../core/RallyCore';
@@ -71,6 +74,18 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
    *  Chosen by which button they swing with, so it is a decision made under the
    *  same time pressure as the timing itself. */
   let pendingShot: TennisShot = 'drive';
+  /**
+   * Seconds until the player can commit to the net again.
+   *
+   * A real block's cost is POSITIONAL: you commit to the net and leave the
+   * court open behind you, so you cannot block every attack. This mode has no
+   * player positioning at all — contact is pure timing — so that cost cannot be
+   * expressed geometrically, and without it a well-timed block strictly
+   * dominates the dig (measured: blocking every attack won 10-0 against 3-0 for
+   * digging, at every timing window I tried). A cooldown is the honest
+   * stand-in: the block is a resource you spend, not a default you hold.
+   */
+  let blockCooldown = 0;
   let aimX = 0;
   let ended = false;
   let restSec = 0;                 // pause between points
@@ -247,12 +262,21 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   function humanBlock(ctx: ModeContext): void {
     if (o.cfg.touchesPerSide <= 1) return;          // tennis has no such thing
     if (!shot || !awaitingHuman || blockSpent) return;
+    if (blockCooldown > 0) {
+      ctx.setHud({ shotType: 'NOT SET AT THE NET' });
+      setTimeout(() => ctx.setHud({ shotType: '' }), 450);
+      return;
+    }
     if (incomingTouch !== 'spike') return;          // you cannot block a dig
     blockSpent = true;
+    blockCooldown = BLOCK_COOLDOWN_SEC;
 
     const dt = (flightT - 1) * shot.duration;
     const q = gradeSwing(dt);
     const at = ball.getAbsolutePosition();
+    // A stuff demands a tighter read than a perfect swing does — see
+    // BLOCK_STUFF_WINDOW. Anything less good touches the ball back into play.
+    const stuffed = Math.abs(dt) <= BLOCK_STUFF_WINDOW;
 
     if (q === 'miss' || q === 'late') {
       // Jumped early or arrived under it — the attack goes through, and it goes
@@ -272,15 +296,43 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       return;
     }
 
+    // A GOOD block is not a stuff. It touches the ball and puts it back over
+    // as a free ball, so the rally continues from a position you have earned
+    // rather than ending. Only a PERFECT read stuffs it for the point.
+    //
+    // Both halves are needed. With every successful block ending the rally the
+    // play was dominant -- blocking every incoming attack won 10-0 -- and with
+    // none of them ending it (the earlier inverted-award version) it looked
+    // punishing for the wrong reason. This is the shape the benchmark has: a
+    // read that is worth making and hard to make.
+    if (!stuffed && (q === 'good' || q === 'perfect')) {
+      me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
+      EffectsKit.burst(ctx.scene, at, 'sparks');
+      ctx.setHud({ shotType: 'BLOCK · TOUCH' });
+      setTimeout(() => ctx.setHud({ shotType: '' }), 500);
+      SoundKit.play('uiTick', { pitch: 1.2, volume: 0.45 });
+      rally.cross();
+      // A FREE BALL, not an attack. This launched a 'spike', which is the
+      // hardest shot in the mode to dig -- so merely touching a block was
+      // nearly as good as stuffing one, and blocking still beat digging 10-0.
+      // A deflection off a block is a soft ball they get to build on.
+      launch(ctx, at, -1, 0, 'late');
+      return;
+    }
+
     // A stuff: straight back down on their side, and the point.
     me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
     EffectsKit.burst(ctx.scene, at, 'sparks');
-    ctx.juice.scorePop(at, q === 'perfect' ? 'STUFF!' : 'BLOCK', '#00E5FF');
+    ctx.juice.scorePop(at, 'STUFF!', '#00E5FF');
     ctx.feel.impact(0.5);
     ctx.juice.shake(0.16, 140);
     SoundKit.play('impact', { pitch: 1.35, volume: 0.6 });
     shot = null;
-    awardPoint(ctx, 1, q === 'perfect' ? 'STUFF BLOCK' : 'BLOCKED');
+    // SIDE 0 IS THE HERO. This read `1` — so every successful stuff handed the
+    // point to the opponent, which is the reverse of what a block is for. It
+    // also corrupted the balance reading it was measured with: "blocking
+    // everything loses 2-8" was partly this bug, not the risk model.
+    awardPoint(ctx, 0, 'STUFF BLOCK');
   }
 
   /** The human's swing. Called on the action edge. */
@@ -427,6 +479,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         return;
       }
       crowd?.update(dt);
+      if (blockCooldown > 0) blockCooldown = Math.max(0, blockCooldown - dt);
       if (!shot) return;
 
       flightT += dt / shot.duration;

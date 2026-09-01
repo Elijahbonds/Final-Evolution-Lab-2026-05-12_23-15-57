@@ -104,10 +104,39 @@ It was **pre-existing** — verified by reproducing it with the venue reverted �
 and it took down all five timing modes: volleyball, tennis, golf, derby, penalty.
 Desktop never showed it. This is the phase's whole argument.
 
+## Correction — the block's balance was measured against a bug
+
+The sign-off originally reported that "blocking everything loses 2–8, digging
+and building goes 2–1", and read that as the block being appropriately risky.
+**That measurement was invalid.** `awardPoint(ctx, side, …)` takes the side that
+*wins* the point and side 0 is the hero — the stuff was awarding side **1**, so
+every successful block scored for the opponent. The number was produced by a bug,
+not by a risk model, and the conclusion drawn from it was wrong.
+
+Fixed, and then re-balanced honestly, which took three more passes:
+
+1. With the award corrected, blocking every attack won **10–0**. Dominant.
+2. Requiring a tighter read than a perfect swing (`BLOCK_STUFF_WINDOW`, a third
+   of the perfect band) did not move it, because the driver times to that
+   window anyway.
+3. A block that merely *touched* the ball was launching a **spike** back — the
+   hardest shot in the mode to dig — so a touch was nearly as good as a stuff.
+   It sends a free ball now.
+4. Still 10–0. The real reason is structural: **a block's cost is positional.**
+   You commit to the net and leave the court open behind you, and this mode has
+   no player positioning at all — contact is pure timing. That cost cannot be
+   expressed geometrically here, so it is a **cooldown** instead: you cannot be
+   at the net for every attack.
+
+Final: blocking when available **7–4**, digging and building **6–0**. Digging is
+the safer line for a well-timed player and the block is a high-risk read that
+cannot be spammed, which is the shape the benchmark has.
+
 ## Still open
 
-1. **The block is single-hand.** It is a read on an announced attack and a
-   missed one costs your contact; there is no double block or net-touch fault.
-   Enough for the benchmark, short of the sport.
+1. **The block is single-hand**, with no double block or net-touch fault, and
+   its positional cost is a cooldown rather than real court position — see the
+   correction above. Enough for the benchmark, short of the sport, and honest
+   about which.
 2. **Tennis, golf, derby and penalty** now boot on mobile but have not had
    convergence passes. They are not claimed here.
