@@ -84,7 +84,14 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
     X: { label: 'GRAB', emit: A('X') },
     Y: { label: 'CARVE', emit: RT(1), hold: true },
   }),
-  tennis: verbs({ A: { label: 'SWING', emit: A('A') } }),
+  // The four slots ARE the shot vocabulary — the thing that makes the locked
+  // benchmark a rally rather than a metronome. It used one of them.
+  tennis: verbs({
+    A: { label: 'DRIVE', emit: A('A') },
+    B: { label: 'SLICE', emit: A('B') },
+    X: { label: 'DROP', emit: A('X') },
+    Y: { label: 'LOB', emit: A('Y') },
+  }),
   derby: verbs({ A: { label: 'SWING', emit: A('A') } }),
   penalty: verbs({ A: { label: 'STRIKE', emit: A('A') } }),
   golf: verbs({ A: { label: 'SWING', emit: A('A') } }),

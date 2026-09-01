@@ -131,6 +131,25 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
+  // Tennis: the four shots. A phone could not join this mode at all before --
+  // isControllerEnabled() is a plain `modeId in MODE_CONTROLLERS`, so an absent
+  // entry is silence, not an error.
+  tennis: {
+    modeId: 'tennis',
+    title: 'Tennis',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'DRIVE' },
+        { action: 'B', label: 'SLICE' },
+        { action: 'X', label: 'DROP' },
+        { action: 'Y', label: 'LOB' },
+      ] },
+    ],
+  },
+
   // Volleyball. One verb — NetSportMode reads A (with the R trigger as an
   // analog alias) and nothing else; the three touches are the same button doing
   // a different job depending on where you are in the rally, which is how the

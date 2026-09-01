@@ -56,6 +56,10 @@ const seen = new Set<string>();
 let swings = 0, blocks = 0, armed = true;
 /** Answer an incoming attack with the block instead of a dig. */
 const BLOCK = process.env.BLOCK !== '0';
+/** Keys to rotate through for the swing. A one-touch sport puts its whole shot
+ *  vocabulary on the face buttons, so a driver that only presses A proves only
+ *  that one shot works. */
+const SHOTS = (process.env.SHOTS ?? 'j').split(',').map((k) => k.trim()).filter(Boolean);
 const deadline = Date.now() + SECONDS * 1000;
 while (Date.now() < deadline) {
   const h = await hud();
@@ -66,7 +70,7 @@ while (Date.now() < deadline) {
     // Block an incoming attack, hit anything else — which is the read the mode
     // is asking the player to make.
     const attack = h.incoming === 'SPIKE';
-    await p.keyboard.press(attack && BLOCK ? 'k' : 'j');   // B = BLOCK, A = HIT
+    await p.keyboard.press(attack && BLOCK ? 'k' : SHOTS[swings % SHOTS.length]);
     if (attack && BLOCK) blocks++;
     swings++; armed = false;
   }

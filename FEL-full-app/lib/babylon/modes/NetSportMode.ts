@@ -24,6 +24,7 @@ import type { FelInput } from '../core/InputBus';
 import {
   gradeSwing, planShot, shotAt, judgeShot, TennisScore, VolleyScore, RallyState,
   volleyTouchFor, volleyCrosses,
+  type TennisShot,
   type RallyConfig, type Shot, type SwingQuality, type RallyFault, type VolleyTouch,
 } from '../core/RallyCore';
 
@@ -66,6 +67,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let incomingTouch: VolleyTouch | undefined;
   /** One block attempt per incoming attack. */
   let blockSpent = false;
+  /** The shot the player has selected for their NEXT contact (one-touch sports).
+   *  Chosen by which button they swing with, so it is a decision made under the
+   *  same time pressure as the timing itself. */
+  let pendingShot: TennisShot = 'drive';
   let aimX = 0;
   let ended = false;
   let restSec = 0;                 // pause between points
@@ -139,9 +144,12 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   /** Begin a flight from `from` toward `toSide`, with a quality already graded. */
   function launch(
     _ctx: ModeContext, from: Vector3, toSide: -1 | 1, aim: number, q: SwingQuality,
-    touch?: VolleyTouch,
+    // NOT named `shot`: the module already has `let shot: Shot | null` for the
+    // ball in flight, and shadowing it here made `shot = planned` assign to the
+    // parameter instead of the flight state.
+    touch?: VolleyTouch, tennisShot?: TennisShot,
   ): boolean {
-    const planned = planShot(o.cfg, { x: from.x, y: from.y, z: from.z }, toSide, aim, q, touch);
+    const planned = planShot(o.cfg, { x: from.x, y: from.y, z: from.z }, toSide, aim, q, touch, tennisShot);
     if (!planned) return false;
 
     const fault: RallyFault | null = judgeShot(o.cfg, planned);
@@ -318,14 +326,18 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // Name the touch. In a three-touch sport the player has to know which one
     // they are about to play, and the difference between a set and a spike is
     // the difference between building the point and winning it.
-    const label = o.cfg.touchesPerSide > 1 ? `${touchKind.toUpperCase()} · ${q.toUpperCase()}` : q.toUpperCase();
+    const label = o.cfg.touchesPerSide > 1
+      ? `${touchKind.toUpperCase()} · ${q.toUpperCase()}`
+      : `${pendingShot.toUpperCase()} · ${q.toUpperCase()}`;
     ctx.setHud({ shotType: label, touch: o.cfg.touchesPerSide > 1 ? `${touchNo}/${o.cfg.touchesPerSide}` : '' });
     setTimeout(() => ctx.setHud({ shotType: '' }), 500);
     if (touchKind === 'spike' && q === 'perfect') {
       SoundKit.play('impact', { pitch: 1.2, volume: 0.6 });
       ctx.juice.shake(0.14, 130);
     }
-    launch(ctx, swingPos, crosses ? -1 : 1, aimX, q, isVolley ? touchKind : undefined);
+    launch(ctx, swingPos, crosses ? -1 : 1, aimX, q,
+      isVolley ? touchKind : undefined,
+      isVolley ? undefined : pendingShot);
   }
 
   return {
@@ -354,12 +366,16 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       EffectsKit.ballTrail(ctx.scene, ball);
       SoundKit.startAmbient(o.ambient);
       if (o.crowd) {
-        // Down both sidelines, OUTSIDE the free zone (court ±4.5, sand ±7.5),
-        // so nobody stands anywhere a ball can legally land.
+        // Down both sidelines, derived from THIS court rather than hardcoded:
+        // volleyball and tennis are very different sizes, and a fixed offset
+        // that clears one sits inside the other. Always outside halfWidth, so
+        // nobody stands anywhere a ball can legally land.
+        const sideX = o.cfg.halfWidth + 3;
+        const spread = o.cfg.halfLength * 0.62;
         const spots: Vector3[] = [];
         for (let i = 0; i < 12; i++) {
-          const z = -7.5 + (i % 6) * 3;
-          spots.push(new Vector3(i < 6 ? -8.6 : 8.6, 0, z + (i % 2) * 0.6));
+          const t = (i % 6) / 5;                       // 0..1 along the sideline
+          spots.push(new Vector3(i < 6 ? -sideX : sideX, 0, -spread + t * spread * 2 + (i % 2) * 0.6));
         }
         crowd = new Onlookers(ctx.scene, spots, '#3E5A70');
       }
@@ -387,8 +403,19 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         }
       }
       if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5) humanSwing(_ctx);
-      if (e.t === 'button' && e.pressed && e.btn === 'A') humanSwing(_ctx);
-      if (e.t === 'button' && e.pressed && e.btn === 'B') humanBlock(_ctx);
+      // In a ONE-touch sport the four face buttons are the four SHOTS: which
+      // button you swing with is the shot you play, decided under the same time
+      // pressure as the timing. In a multi-touch sport (volleyball) B is the
+      // block instead, because there the vocabulary lives in the touch order.
+      if (e.t === 'button' && e.pressed && o.cfg.touchesPerSide <= 1) {
+        if (e.btn === 'A') { pendingShot = 'drive'; humanSwing(_ctx); }
+        if (e.btn === 'B') { pendingShot = 'slice'; humanSwing(_ctx); }
+        if (e.btn === 'X') { pendingShot = 'drop'; humanSwing(_ctx); }
+        if (e.btn === 'Y') { pendingShot = 'lob'; humanSwing(_ctx); }
+      } else if (e.t === 'button' && e.pressed) {
+        if (e.btn === 'A') humanSwing(_ctx);
+        if (e.btn === 'B') humanBlock(_ctx);
+      }
     },
 
     update(ctx: ModeContext, dt: number) {

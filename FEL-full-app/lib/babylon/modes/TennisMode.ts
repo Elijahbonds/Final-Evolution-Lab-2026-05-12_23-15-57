@@ -17,6 +17,7 @@ export const TennisMode = createNetSportMode({
   ballDiameter: 0.14,
   ballTint: '#D4FF00',
   ambient: 'stadium',
+  crowd: true,          // L4 — Center Court has crowd tiers; give them people
   // Reuses the authored jumpshot swing: an overhead racquet motion and a
   // jumper share the same arm arc closely enough to read correctly, and it
   // beats shipping a mode with no swing animation at all. Replace with an

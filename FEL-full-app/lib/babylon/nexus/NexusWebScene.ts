@@ -207,12 +207,24 @@ function paintMarkings(
       arc(S / 2, 230, 150, 0, Math.PI);
       arc(S / 2, 40, 380, 0.35, Math.PI - 0.35);
       break;
-    case 'tennis':
-      box(60, 40, S - 120, S - 80);
-      line2(60, S / 2, S - 60, S / 2);
-      box(150, 250, S - 300, S - 500);
-      line2(S / 2, 250, S / 2, S - 250);
+    // Same defect volleyball had, in the same painter: fixed pixel insets from
+    // the TEXTURE edge, while the texture spans the whole ground. On a 16x34
+    // court that painted the sideline near x = +-7.0 while RallyCore judges
+    // anything past +-5.5 wide, so the player was shown a court that was not
+    // the court. Derived from the real dimensions now.
+    case 'tennis': {
+      const [gw, gd] = size ?? [16, 34];
+      const COURT_W = 11, COURT_L = 23.77, SERVICE = 6.4;   // doubles width, FIVB/ITF
+      const ix = ((1 - COURT_W / gw) / 2) * S;
+      const iy = ((1 - COURT_L / gd) / 2) * S;
+      const w = S - ix * 2, h = S - iy * 2;
+      box(ix, iy, w, h);                                    // the court
+      line2(ix, S / 2, ix + w, S / 2);                      // the net line
+      const svc = (SERVICE / COURT_L) * h;                  // service boxes
+      box(ix, S / 2 - svc, w, svc * 2);
+      line2(S / 2, S / 2 - svc, S / 2, S / 2 + svc);        // centre service line
       break;
+    }
     case 'soccer':
       box(40, 40, S - 80, S - 80);
       line2(40, S / 2, S - 40, S / 2);

@@ -42,6 +42,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'surf-run-tests.ts', guards: 'SSX economy — the flow meter is spendable, not a readout' },
   { script: 'snowboard-run-tests.ts', guards: 'SSX boost is spendable and every slalom gate is reachable' },
   { script: 'volleyball-rally-tests.ts', guards: 'bump / set / spike are three different shots, and tennis is untouched' },
+  { script: 'tennis-rally-tests.ts', guards: 'Mario Tennis Aces vocabulary — four shots, four real trades' },
 ];
 
 const ROOT = process.cwd();

@@ -89,6 +89,16 @@ export function volleyTouchFor(touchNo: number, touchesPerSide: number): VolleyT
   return touchNo === 1 ? 'bump' : 'set';
 }
 
+/**
+ * A tennis shot. This is the Mario Tennis Aces vocabulary, minus the energy
+ * layer: the rally is a conversation because you are choosing between these
+ * under time pressure, not because the ball is hard to reach.
+ *
+ * 'drive' is the default and reproduces the original single swing exactly, so a
+ * mode that never picks a shot behaves as it always did.
+ */
+export type TennisShot = 'drive' | 'slice' | 'lob' | 'drop';
+
 /** Does this touch send the ball over the net, or keep it on your own side? */
 export function volleyCrosses(touch: VolleyTouch): boolean {
   return touch === 'spike';
@@ -112,7 +122,7 @@ export interface Shot {
  */
 export function planShot(
   cfg: RallyConfig, from: Vec3, toSide: -1 | 1, aimX: number, quality: SwingQuality,
-  touch?: VolleyTouch,
+  touch?: VolleyTouch, shot?: TennisShot,
 ): Shot | null {
   if (quality === 'miss') return null;
   const power = QUALITY_POWER[quality];
@@ -130,6 +140,15 @@ export function planShot(
   } else if (touch === 'spike') {
     depth = 0.55 + 0.35 * power;       // driven down into their court
   }
+
+  // Tennis DEPTH belongs here, with the other depths, because targetZ is
+  // computed immediately below. Setting it further down (next to the shot's
+  // apex, where it reads more naturally) silently does nothing: a drop shot
+  // would arc like a drop shot and land as deep as a drive, which is most of
+  // what makes it a drop shot.
+  if (shot === 'slice') depth = 0.42 + 0.34 * power;
+  else if (shot === 'lob') depth = 0.86 + 0.1 * power;
+  else if (shot === 'drop') depth = 0.2 + 0.08 * power;
   const targetZ = toSide * cfg.halfLength * depth;
 
   // lateral intent degrades with poor contact
@@ -141,6 +160,22 @@ export function planShot(
   // the tape every time, which reads as a bug rather than a mistake.
   let apex = cfg.netHeight + 0.6 + (1 - power) * 1.1;
   let flight = cfg.baseFlightTime * (1.25 - 0.35 * power);
+
+  // THE TENNIS VOCABULARY. Each of these is a real trade, which is the point:
+  // a shot menu where one option dominates is a menu with one option.
+  if (shot === 'slice') {
+    // Low and skidding: hard to attack off, but it sits up if you are late.
+    apex = cfg.netHeight + 0.22 + (1 - power) * 0.55;
+    flight = cfg.baseFlightTime * (1.32 - 0.3 * power);
+  } else if (shot === 'lob') {
+    // Over a player at the net. Slow, so it is a gift if they are not there.
+    apex = cfg.netHeight + 3.4 + (1 - power) * 0.8;
+    flight = cfg.baseFlightTime * 1.62;
+  } else if (shot === 'drop') {
+    // Dies just past the tape. Punishes a deep opponent, feeds a close one.
+    apex = cfg.netHeight + 0.5 + (1 - power) * 0.4;
+    flight = cfg.baseFlightTime * 0.92;
+  }
 
   if (touch === 'bump') {
     // A dig is a controlled loop: enough hang time to get under it for the set.
