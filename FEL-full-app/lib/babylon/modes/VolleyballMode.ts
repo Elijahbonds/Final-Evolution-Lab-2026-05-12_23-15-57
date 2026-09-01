@@ -18,7 +18,12 @@ export const VolleyballMode = createNetSportMode({
   scoring: 'volley',
   ballDiameter: 0.21,
   ballTint: '#FFD60A',
-  ambient: 'stadium',     // mapped from 'beach' — SoundKit only accepts 'stadium'|'dojo'|'none'
+  // 'ocean', not 'stadium'. The comment here said SoundKit only accepts
+  // 'stadium' | 'dojo' | 'none' and that has not been true for some time — it
+  // takes 'ocean' and 'wind' as well, and surf already uses the ocean bed. A
+  // crowd loop on an empty beach court was the wrong room entirely.
+  ambient: 'ocean',
+  crowd: true,          // L4 — a Beach Pro court is not empty
   swingClip: 'jumpshot',
   aiSkill: 0.78,  //TUNE(elijah)
   hudLabels: { you: 'POINT', them: 'POINT THEM' },

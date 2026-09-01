@@ -170,6 +170,9 @@ function emissive(scene: Scene, name: string, hex: string, strength = 0.6): PBRM
  *  sweet spot: lines stay crisp at grazing angles without a 4 MB upload. */
 function paintMarkings(
   scene: Scene, kind: NonNullable<GroundSpec['markings']>, base: string, line: string,
+  /** Ground size in metres [width, depth] — needed to place lines where the
+   *  RULES are rather than where the texture edge happens to be. */
+  size?: readonly [number, number],
 ): DynamicTexture {
   const S = 1024;
   const tex = new DynamicTexture('groundTex', { width: S, height: S }, scene, false);
@@ -231,12 +234,28 @@ function paintMarkings(
       arc(cx, cy, 60);                      // centre mark, for spawn orientation
       break;
     }
-    case 'volleyball':
-      box(60, 60, S - 120, S - 120);
-      line2(60, S / 2, S - 60, S / 2);
-      line2(60, S / 2 - 160, S - 60, S / 2 - 160);
-      line2(60, S / 2 + 160, S - 60, S / 2 + 160);
+    // The court lines have to sit where in/out is actually JUDGED. This drew a
+    // box inset a fixed 60px from the texture edge, and the texture spans the
+    // whole sand — so on an 18x30 beach the sideline was painted at x = +-8.5
+    // while RallyCore calls anything past x = +-4.5 wide. The player was shown
+    // a court that was not the court. That is 3PT's ball-rack lesson in its
+    // other form: a wrong marking is a wrong game.
+    //
+    // Derived from the real dimensions instead: an 18m x 9m court inside the
+    // sand the venue actually specifies.
+    case 'volleyball': {
+      const [gw, gd] = size ?? [18, 18];
+      const COURT_W = 9, COURT_L = 18, ATTACK_LINE = 3;   // metres, FIVB
+      const ix = ((1 - COURT_W / gw) / 2) * S;
+      const iy = ((1 - COURT_L / gd) / 2) * S;
+      const w = S - ix * 2, h = S - iy * 2;
+      box(ix, iy, w, h);                                   // the court
+      line2(ix, S / 2, ix + w, S / 2);                     // centre line, under the net
+      const atk = (ATTACK_LINE / COURT_L) * h;             // 3m attack lines
+      line2(ix, S / 2 - atk, ix + w, S / 2 - atk);
+      line2(ix, S / 2 + atk, ix + w, S / 2 + atk);
       break;
+    }
     default:
       break;
   }
@@ -424,7 +443,7 @@ function buildGround(scene: Scene, g: GroundSpec, root: TransformNode): Mesh {
 
   const mat = surface(scene, 'nexus_groundMat', g.color, g.kind === 'water' ? 0.25 : 0.85);
   if (g.markings && g.markings !== 'none') {
-    mat.albedoTexture = paintMarkings(scene, g.markings, g.color, g.lineColor ?? '#FFFFFF');
+    mat.albedoTexture = paintMarkings(scene, g.markings, g.color, g.lineColor ?? '#FFFFFF', g.size);
   } else if (g.kind === 'water' || g.kind === 'snow' || g.kind === 'sand') {
     mat.albedoTexture = paintOrganic(scene, g.kind, g.color);
   } else if (PREMIUM_DRESSING && (g.kind === 'mat' || g.kind === 'stage')) {

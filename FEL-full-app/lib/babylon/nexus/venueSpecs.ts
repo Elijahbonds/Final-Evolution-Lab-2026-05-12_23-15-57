@@ -289,7 +289,12 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   volleyball: {
     modeId: 'volleyball', name: 'Volleyball', venue: 'Beach Pro',
     environment: dusk('#FFC48A', '#12406B', '#1E5C8C', '#FFF0CC', 0.85),
-    ground: { kind: 'sand', size: [18, 30], color: '#E0C08A', lineColor: '#FFFFFF', markings: 'volleyball' },
+    // 15 x 24: an 18m x 9m court with a 3m free zone on every side, which is
+    // the regulation surround. It was 18 x 30 — wider than the court is long in
+    // one axis and 12m of dead sand in the other — and the painted lines were
+    // placed off the texture edge rather than off the court, so the sideline a
+    // player could see sat at x = ±8.5 while the rules called ±4.5 out.
+    ground: { kind: 'sand', size: [15, 24], color: '#E0C08A', lineColor: '#FFFFFF', markings: 'volleyball' },
     props: [
       { kind: 'net', position: [0, 0, 0], scale: 1.1, color: '#FFFFFF' },
       { kind: 'palm', position: [-11, 0, -8] },

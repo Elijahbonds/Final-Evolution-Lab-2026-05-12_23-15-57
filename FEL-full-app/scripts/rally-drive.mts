@@ -53,7 +53,9 @@ const hud = async (): Promise<Record<string, unknown>> => {
 };
 
 const seen = new Set<string>();
-let swings = 0, armed = true;
+let swings = 0, blocks = 0, armed = true;
+/** Answer an incoming attack with the block instead of a dig. */
+const BLOCK = process.env.BLOCK !== '0';
 const deadline = Date.now() + SECONDS * 1000;
 while (Date.now() < deadline) {
   const h = await hud();
@@ -61,7 +63,11 @@ while (Date.now() < deadline) {
   // Rearm once the meter resets for the next flight, so one swing per contact.
   if (t < 0.15) armed = true;
   if (armed && t >= SWING_AT) {
-    await p.keyboard.press('j');       // A — the HIT verb
+    // Block an incoming attack, hit anything else — which is the read the mode
+    // is asking the player to make.
+    const attack = h.incoming === 'SPIKE';
+    await p.keyboard.press(attack && BLOCK ? 'k' : 'j');   // B = BLOCK, A = HIT
+    if (attack && BLOCK) blocks++;
     swings++; armed = false;
   }
   if (typeof h.banner === 'string' && h.banner && !seen.has('B' + h.banner)) {
@@ -81,7 +87,7 @@ while (Date.now() < deadline) {
 }
 
 const h = await hud();
-console.log(`rally-drive: ${h.score ?? '?'} – ${h.foeScore ?? '?'}   swings ${swings}   touches seen: ${[...seen].sort().join(', ') || '(none)'}`);
+console.log(`rally-drive: ${h.score ?? '?'} – ${h.foeScore ?? '?'}   swings ${swings}   blocks ${blocks}   touches seen: ${[...seen].filter((k) => !k.startsWith('B')).sort().join(', ') || '(none)'}`);
 const frame = logs.filter((l) => /FEL-FRAME/.test(l)).length;
 const miss = logs.filter((l) => /MISSING CLIP/.test(l)).length;
 console.log(`rally-drive: FEL-FRAME ${frame} | MISSING CLIP ${miss} | errors ${logs.length - frame - miss}`);

@@ -65,25 +65,38 @@ export function makeTimingHost(opts: TimingHostOpts) {
       };
 
       const def = MODES[modeKey];
-      runMode(def, {
-        canvas,
-        input: bus,
-        onPhase: (p, cd) => {
-          setPhase(p);
-          setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
-          setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
-        },
-        onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
-        resultSink,
-      })
-        .then((s) => {
-          if (disposed) { s(); return; }
-          stop = s;
+      // DEFER THE START. React StrictMode runs effect -> cleanup -> effect, and
+      // calling runMode synchronously means the PHANTOM mount also builds a
+      // Babylon engine that its own cleanup cannot cancel: `stop` is not
+      // assigned until the async load resolves. Two engines then sit on the SAME
+      // canvas sharing one WebGL context and fight, and the watchdog reports
+      // "still black after rescue" — which is exactly what /play/volleyball,
+      // /play/tennis and /play/golf all did on a phone viewport. Every other
+      // host in this project already defers by a tick; this one never got the
+      // fix, so it took all five timing modes down with it.
+      const startTimer = setTimeout(() => {
+        if (disposed) return;
+        runMode(def, {
+          canvas,
+          input: bus,
+          onPhase: (p, cd) => {
+            setPhase(p);
+            setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
+            setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
+          },
+          onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
+          resultSink,
         })
-        .catch((e) => console.error(`[${tag}] boot failed`, e));
+          .then((s) => {
+            if (disposed) { s(); return; }
+            stop = s;
+          })
+          .catch((e) => console.error(`[${tag}] boot failed`, e));
+      }, 0);
 
       return () => {
         disposed = true;
+        clearTimeout(startTimer);
         stop?.();
         busRef.current = null;
       };

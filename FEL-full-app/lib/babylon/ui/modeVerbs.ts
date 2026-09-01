@@ -201,7 +201,10 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
   // Switch Sports volleyball, and this mode currently treats all three touches
   // as the same generic hit. That is a Phase 2 change recorded in the concept
   // lock, not something to fake here by adding buttons the mode cannot read.
-  volleyball: verbs({ A: { label: 'HIT', emit: A('A') } }),
+  volleyball: verbs({
+    A: { label: 'HIT', emit: A('A') },
+    B: { label: 'BLOCK', emit: A('B') },
+  }),
 
   dance: verbs({ A: { label: 'TAP', emit: A('A') } }),
 

@@ -17,6 +17,7 @@ import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
+import { Onlookers } from '../visual/Onlookers';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -36,6 +37,9 @@ export interface NetSportOptions {
   ballDiameter: number;
   ballTint: string;
   ambient: Parameters<typeof SoundKit.startAmbient>[0];
+  /** L4 — line the court with spectators. Opt-in per mode so a mode that has
+   *  not had a World-Population pass does not silently gain one. */
+  crowd?: boolean;
   swingClip: string;
   /** 0–1. How reliably the AI returns; higher misses less. */
   aiSkill: number;
@@ -53,9 +57,15 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
   // flight state
   let shot: Shot | null = null;
+  let crowd: Onlookers | null = null;
   let flightT = 0;                 // 0..1 across the current flight
   let contactArmed = false;        // the receiving side may swing
   let awaitingHuman = false;       // is the ball coming to us?
+  /** What KIND of shot is in the air. A block only answers an attack, and an
+   *  attack is harder to return than a dig — both need this. */
+  let incomingTouch: VolleyTouch | undefined;
+  /** One block attempt per incoming attack. */
+  let blockSpent = false;
   let aimX = 0;
   let ended = false;
   let restSec = 0;                 // pause between points
@@ -90,6 +100,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     const result = tennisScore ? tennisScore.award(side) : volleyScore!.award(side);
     pushHud(ctx);
     SoundKit.play(side === 0 ? 'score' : 'miss');
+    // L4: they react to the point, or they are set dressing. Louder for the
+    // home side, which is what a crowd at a beach court actually does.
+    crowd?.cheer(side === 1 ? 1 : 0.35);
 
     // M107 point feedback: a world-space pop at the net so a won/lost point
     // reads instantly, plus a streak that builds tension across a game.
@@ -135,6 +148,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     shot = planned;
     flightT = 0;
     contactArmed = false;
+    incomingTouch = touch;
+    blockSpent = false;
     // Who is receiving decides whether WE get a swing window this flight.
     awaitingHuman = toSide > 0;
 
@@ -178,6 +193,17 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     const aiTouchPeek = volleyTouchFor(rally.touches + 1, o.cfg.touchesPerSide);
     if (q === 'miss' && aiTouchPeek !== 'spike') q = 'good';
 
+    // An ATTACK is harder to dig than a floated ball. Without this the spike is
+    // only cosmetically the payoff shot: it would look different and win points
+    // at exactly the same rate as a lob, which is not what the benchmark's
+    // sequence is for. Receiving one degrades the return by a step.
+    if (incomingTouch === 'spike') {
+      if (q === 'perfect') q = 'good';
+      else if (q === 'good') q = 'late';
+      else if (q === 'late' && Math.random() < 0.45) q = 'miss';
+      if (q === 'miss') { awardPoint(ctx, 0, 'KILL — THEY COULD NOT DIG IT'); return; }
+    }
+
     if (q === 'miss') { awardPoint(ctx, 0, 'THEY MISSED'); return; }
 
     // The opponent plays the same sequence the player does. Leaving them on a
@@ -198,6 +224,55 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // A self-pass on their side must NOT hand the human a swing window, which
     // is what toSide decides (awaitingHuman = toSide > 0).
     launch(ctx, ball.getAbsolutePosition(), aiCrosses ? 1 : -1, (Math.random() - 0.5) * 1.6, q, aiIsVolley ? aiTouch : undefined);
+  }
+
+  /**
+   * THE BLOCK — the defensive answer to an attack, and the last piece of the
+   * benchmark's rally loop. It was meaningless while every touch was the same
+   * hit; now that the attack exists and wins points, this is its counter-play.
+   *
+   * Real volleyball's rule is what makes it worth having: a block is NOT one of
+   * your three touches, so stuffing an attack leaves your side a full rally
+   * afterwards. Timing is graded the same way a swing is, so it is a read on
+   * the attack rather than a button you hold.
+   */
+  function humanBlock(ctx: ModeContext): void {
+    if (o.cfg.touchesPerSide <= 1) return;          // tennis has no such thing
+    if (!shot || !awaitingHuman || blockSpent) return;
+    if (incomingTouch !== 'spike') return;          // you cannot block a dig
+    blockSpent = true;
+
+    const dt = (flightT - 1) * shot.duration;
+    const q = gradeSwing(dt);
+    const at = ball.getAbsolutePosition();
+
+    if (q === 'miss' || q === 'late') {
+      // Jumped early or arrived under it — the attack goes through, and it goes
+      // through BEHIND you. Committing to the block spends your contact: you do
+      // not get to dig the same ball you just jumped at.
+      //
+      // Without that cost the block is free, and free is not a decision — the
+      // driver simply blocked every incoming ball, because every ball that
+      // crosses is the opponent's third touch and therefore an attack. The
+      // choice the mode wants is dig (safe, builds your own attack) against
+      // block (reads the spike, wins the point outright, loses it if you are
+      // wrong).
+      awaitingHuman = false;
+      ctx.setHud({ shotType: 'BLOCK MISSED' });
+      setTimeout(() => ctx.setHud({ shotType: '' }), 500);
+      SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
+      return;
+    }
+
+    // A stuff: straight back down on their side, and the point.
+    me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    EffectsKit.burst(ctx.scene, at, 'sparks');
+    ctx.juice.scorePop(at, q === 'perfect' ? 'STUFF!' : 'BLOCK', '#00E5FF');
+    ctx.feel.impact(0.5);
+    ctx.juice.shake(0.16, 140);
+    SoundKit.play('impact', { pitch: 1.35, volume: 0.6 });
+    shot = null;
+    awardPoint(ctx, 1, q === 'perfect' ? 'STUFF BLOCK' : 'BLOCKED');
   }
 
   /** The human's swing. Called on the action edge. */
@@ -278,6 +353,16 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ball = MeshBuilder.CreateSphere('ball', { diameter: o.ballDiameter }, ctx.scene);
       EffectsKit.ballTrail(ctx.scene, ball);
       SoundKit.startAmbient(o.ambient);
+      if (o.crowd) {
+        // Down both sidelines, OUTSIDE the free zone (court ±4.5, sand ±7.5),
+        // so nobody stands anywhere a ball can legally land.
+        const spots: Vector3[] = [];
+        for (let i = 0; i < 12; i++) {
+          const z = -7.5 + (i % 6) * 3;
+          spots.push(new Vector3(i < 6 ? -8.6 : 8.6, 0, z + (i % 2) * 0.6));
+        }
+        crowd = new Onlookers(ctx.scene, spots, '#3E5A70');
+      }
 
       rally = new RallyState(o.cfg);
       tennisScore = o.scoring === 'tennis' ? new TennisScore(4) : null;
@@ -303,6 +388,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       }
       if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5) humanSwing(_ctx);
       if (e.t === 'button' && e.pressed && e.btn === 'A') humanSwing(_ctx);
+      if (e.t === 'button' && e.pressed && e.btn === 'B') humanBlock(_ctx);
     },
 
     update(ctx: ModeContext, dt: number) {
@@ -313,6 +399,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         if (restSec <= 0) serve(ctx);
         return;
       }
+      crowd?.update(dt);
       if (!shot) return;
 
       flightT += dt / shot.duration;
@@ -331,13 +418,19 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       // delay is wrong for all of them (bump 1.56s, set 1.88s, spike 0.88s).
       // Ramp it across the window, contact at 1.
       if (contactArmed && awaitingHuman) {
-        ctx.setHud({ shotMeterT: Math.max(0, Math.min(1, (flightT - 0.55) / 0.45)) });
+        ctx.setHud({
+          shotMeterT: Math.max(0, Math.min(1, (flightT - 0.55) / 0.45)),
+          // Tell the receiver an ATTACK is coming. You cannot decide to block
+          // something you were not shown, and the block is a read on the spike
+          // rather than a button you can hold down.
+          incoming: o.cfg.touchesPerSide > 1 && incomingTouch === 'spike' ? 'SPIKE' : '',
+        });
       }
 
       if (flightT < 1) return;
 
       // The flight has landed.
-      ctx.setHud({ shotMeterT: 0 });
+      ctx.setHud({ shotMeterT: 0, incoming: '' });
       if (pendingFault) {
         // Whoever last hit it committed the fault.
         const offender: 0 | 1 = awaitingHuman ? 1 : 0;
@@ -357,6 +450,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     },
 
     dispose() {
+      crowd?.dispose(); crowd = null;
       venue?.dispose(); venue = null;
       me?.dispose(); foe?.dispose();
       SoundKit.stopAmbient();

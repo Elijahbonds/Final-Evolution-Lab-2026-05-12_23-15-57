@@ -144,7 +144,10 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     askName: true,
     schemas: [
       { kind: 'dpad', dpad: { action: 'move' } },
-      { kind: 'button', buttons: [{ action: 'A', label: 'HIT' }] },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'HIT' },
+        { action: 'B', label: 'BLOCK' },
+      ] },
     ],
   },
 
