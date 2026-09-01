@@ -595,6 +595,10 @@ export const DerbyMode: ModeDefinition = (() => {
   let pci: Reticle;
   let pitchAt = new Vector3(0, 1.1, 0);
   let incoming = false, swung = false, ended = false;
+  /** A pitch is on the way from the timer but has not been thrown yet. This is
+   *  the re-entry guard; using `incoming` for it meant the whiff test — which
+   *  now fires on a ball at rest — retriggered during the gap between pitches. */
+  let pending = false;
   const TOTAL = 10;
 
   function pitch(ctx: ModeContext): void {
@@ -680,16 +684,29 @@ export const DerbyMode: ModeDefinition = (() => {
       // The PCI is only yours to move while a pitch is on the way.
       if (incoming) pci.update(dt, stickX, stickY);
       const flying = flight.step(dt);
-      if (incoming && ball.position.z <= -1.2) {
+      // A PITCH IS OVER WHEN IT IS OVER — past the plate OR come to rest.
+      //
+      // This waited for the ball to reach z <= -1.2, and the ball never gets
+      // there: Flight stops it the moment it touches the ground, and with the
+      // derby's gravity it lands at roughly z -0.6, just past the plate. So a
+      // mistimed swing (or none at all) left `incoming` true forever with the
+      // ball at rest, `flying` false, and the "next pitch" branch — which needs
+      // !flying && !incoming — unreachable. THE MODE SOFT-LOCKED on the first
+      // pitch you did not connect with.
+      //
+      // It survived play-testing because the generic capture bot swings on a
+      // cadence and its first swing happened to connect. A driver that aims the
+      // PCI and swings ONCE per pitch found it immediately.
+      if (incoming && (ball.position.z <= -1.2 || !flight.active)) {
         incoming = false;
         SoundKit.play('miss');
         ctx.setHud({ banner: 'WHIFF' });
         setTimeout(() => ctx.setHud({ banner: '' }), 700);
       }
-      if (!flying && !incoming) {
+      if (!flying && !incoming && !pending) {
         if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); return ctx.end('DERBY_END', pts, { pitches: TOTAL }); }
-        incoming = true;
-        setTimeout(() => { if (!ended) pitch(ctx); }, 800);
+        pending = true;
+        setTimeout(() => { pending = false; if (!ended) pitch(ctx); }, 800);
       }
       ctx.camDirector.update(me.root.position, Vector3.Zero(), ball.position);
     },
