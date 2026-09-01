@@ -186,6 +186,21 @@ export function makeBoardHost(opts: BoardHostOpts) {
           {hud.momentum != null && <Meter label="MOMENTUM" value={Number(hud.momentum)} max={100} color="var(--fel-red)" />}
         </div>
 
+        {/* The objectives, NAMED. The bezel showed "GOALS 0/4" and nothing else,
+            so the player was chasing four targets they had never been told. */}
+        {typeof hud.goalList === 'string' && hud.goalList && (
+          <div className="pointer-events-none absolute bottom-4 left-4 flex flex-col items-start gap-0.5">
+            {hud.goalList.split(' · ').map((g) => (
+              <span
+                key={g}
+                className={`font-mono text-[10px] ${g.startsWith('✓') ? 'text-[var(--fel-gold)]' : 'text-white/55'}`}
+              >
+                {g}
+              </span>
+            ))}
+          </div>
+        )}
+
         {typeof hud.banner === 'string' && hud.banner && (
           <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
             <span className="fel-heading fel-panel px-4 py-2 text-2xl font-bold text-[var(--fel-emerald)]">{hud.banner}</span>

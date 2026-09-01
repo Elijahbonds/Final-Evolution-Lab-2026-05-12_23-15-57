@@ -353,7 +353,14 @@ export const SkateRunMode: ModeDefinition = (() => {
           bannerFlash(ctx, `GOAL: ${g.label}`, 1200);
         }
       }
-      ctx.setHud({ goals: `${goals.doneCount}/${SKATE_GOALS.length}` });
+      // Name the goals, do not just count them. The tracker banners a goal as
+      // it falls and the bezel showed "GOALS 0/4", so a player was chasing four
+      // objectives nobody had told them about. THPS puts the list on screen;
+      // this publishes it with each one's done state so the host can too.
+      ctx.setHud({
+        goals: `${goals.doneCount}/${SKATE_GOALS.length}`,
+        goalList: goals.goals.map((g) => `${g.done ? '✓' : '○'} ${g.label}`).join(' · '),
+      });
 
       // ── banking: the rule this mode never had ──
       // combo.bank() was called NOWHERE in this file -- only bail(). The pot

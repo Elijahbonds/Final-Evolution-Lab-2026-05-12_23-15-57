@@ -104,8 +104,49 @@ export default function KarateBabylon({ onEnd }: GameProps) {
         </div>
         <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">
           WAVE {hnode(hud.wave, 1)} · {hnode(hud.kos, 0)} KO
+          {hud.coins != null && <> · <span className="text-white">{hnode(hud.coins, 0)}c</span></>}
         </span>
       </div>
+
+      {/* ALLY. The mode publishes partnerHp every frame and this bezel rendered
+          hp, chi, wave, kos and banner only — so in a down-and-revive co-op mode
+          you could not see your partner failing. */}
+      {hud.partnerHp != null && (
+        <div className="pointer-events-none absolute left-4 top-14 min-w-[5rem]">
+          <span className="font-mono text-[10px] text-white/60">ALLY</span>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/50">
+            <div
+              className="h-full rounded-full bg-[#7CFFB2] transition-all"
+              style={{ width: `${Math.max(0, Math.min(100, Number(hud.partnerHp)))}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* REVIVE prompt — also published and never shown. */}
+      {typeof hud.revive === 'string' && hud.revive && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-24 text-center">
+          <span className="fel-panel px-4 py-2 font-mono text-sm font-bold text-[#7CFFB2]">{hud.revive}</span>
+        </div>
+      )}
+
+      {/* THE PERK SHOP. This is the Zombies half of the benchmark and it was
+          unusable: the mode publishes `coins` and a formatted `perks` list, the
+          shop opened with the banner "PERKS — d-pad to browse, A to buy, B to
+          fight", and the screen showed neither the perks nor the money. A points
+          economy whose points are invisible is not an economy. */}
+      {typeof hud.perks === 'string' && hud.perks && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-10 flex flex-col items-center gap-1 px-4">
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {hud.perks.split(' · ').map((p) => (
+              <span key={p} className="fel-panel px-2.5 py-1 font-mono text-[11px] text-white/85">{p}</span>
+            ))}
+          </div>
+          <span className="font-mono text-[11px] text-[var(--fel-gold)]">
+            BALANCE {hnode(hud.coins, 0)}c
+          </span>
+        </div>
+      )}
 
       {typeof hud.banner === 'string' && hud.banner && (
         <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">

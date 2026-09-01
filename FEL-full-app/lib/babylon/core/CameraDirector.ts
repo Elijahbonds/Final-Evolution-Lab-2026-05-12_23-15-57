@@ -107,7 +107,14 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   team:   { distance: 9.5,  height: 3.4, minHeight: 2.2, pitchFloorDeg: 12, pitchCapDeg: 28, targetHeight: 1.3,  lag: 0.09, lookAhead: 2.5, fitTwo: true },
   // third-person over-the-shoulder — close, low, offset to the right
   // shoulder, follows facing (fitTwo off — see file header)
-  overShoulder: { distance: 3.1, height: 1.65, minHeight: 1.2, pitchFloorDeg: 1, pitchCapDeg: 9, targetHeight: 1.45, lag: 0.16, lookAhead: 2.2, shoulderOffset: 0.55 },
+  // lag 0.16 -> 0.3: this is the one preset that follows FACING rather than
+  // velocity, and facing can swing 180 degrees in a moment. At 0.16 the camera
+  // needed roughly a quarter-second to come round, and at a 3.1m radius with a
+  // 9-degree pitch cap that is long enough to leave the fighter outside a
+  // narrow frame -- which is what Karate Endless's intermittent [FEL-FRAME]
+  // lines were. Third-person action cameras are near-rigid in yaw for this
+  // exact reason; the softness belongs in position, not heading.
+  overShoulder: { distance: 3.1, height: 1.65, minHeight: 1.2, pitchFloorDeg: 1, pitchCapDeg: 9, targetHeight: 1.45, lag: 0.3, lookAhead: 2.2, shoulderOffset: 0.55 },
   // DUNK CONTEST cinematic — NOT the live-play camera: lower, closer,
   // slower lag so the flight glides like a highlight reel; tighter pitch
   // cap keeps the rim in frame at apex without a hard tilt.
@@ -156,6 +163,20 @@ const VERTICAL_LEAD_SHARE = 0.25;
 const OBJECTIVE_BIAS_SHARE = 0.6;
 
 const MIN_SAFE_DISTANCE = 1.8;
+/**
+ * Distance below which a shot is not worth taking, even though it is "safe".
+ *
+ * MIN_SAFE_DISTANCE is the absolute floor -- the camera is never nearer than
+ * this. But safe and legible are different numbers: at 1.9m from a subject the
+ * near plane and the subject's own body between them leave nothing framed, and
+ * a narrow (portrait) FOV loses them entirely. Karate Endless produced this
+ * every time the player backed into an arena CORNER: the probe hit the wall
+ * behind them, pulled in to ~1.94m, cleared the safety floor, and framed a
+ * hero the guard reported as behind the camera. The elevated fallback below is
+ * the better shot in that situation and was only being reached when the
+ * absolute floor failed.
+ */
+const FRAMING_MIN_DISTANCE = 2.6;
 /**
  * Speed below which the follow direction is HELD rather than re-derived from
  * velocity (m/s).
@@ -368,9 +389,50 @@ export class CameraDirector {
     // wide desktop FOV still holds the rider at that range and a portrait one
     // does not, which is why this only ever showed up in the mobile playtest.
     // Re-enforce on the RESULT, so the guarantee is about where the camera IS.
-    this.camera.position = enforceStandoff(
-      subject, Vector3.Lerp(this.camera.position, finalPos, cfg.lag),
-    ).pos;
+    // ORBIT toward the target, do not lerp at it.
+    //
+    // A follow camera moving to a new side of its subject describes an ARC.
+    // Lerping the position walks the CHORD instead, and a chord passes closer
+    // to the subject than either endpoint -- at the 'overShoulder' preset's
+    // 2.5m radius it passes through the player. Karate Endless produced this
+    // whenever the fighter turned on the spot in an arena corner: the camera is
+    // facing-derived, so a turn swings the target right around them, and the
+    // straight-line catch-up cut the corner across the fighter's own body.
+    // Measured there: desired 2.57m, occlusion 2.57m, bounds 2.57m, final
+    // 2.57m -- nothing in the pipeline was pulling the camera in, the
+    // interpolation was steering it through the subject.
+    //
+    // Interpolating the DIRECTION and the RADIUS separately holds the camera
+    // out at its follow distance for the whole swing.
+    // HORIZONTALLY. The arc problem is a yaw problem: preserving the full 3D
+    // radius fights vertical convergence, because a subject who is rising (a
+    // ramp, an ollie) needs the camera to climb to its preset height while the
+    // radius wants to hold it where it was. Skate caught that immediately --
+    // the camera sat at y 2.23 against a minHeight floor of 2.86 and the rider
+    // went off the TOP of the frame. Orbit the ground plane, lerp the height.
+    const curX = this.camera.position.x - subject.x, curZ = this.camera.position.z - subject.z;
+    const tgtX = finalPos.x - subject.x, tgtZ = finalPos.z - subject.z;
+    const curR = Math.hypot(curX, curZ), tgtR = Math.hypot(tgtX, tgtZ);
+    let next: Vector3;
+    if (curR > 0.01 && tgtR > 0.01) {
+      let dx = (curX / curR) + ((tgtX / tgtR) - (curX / curR)) * cfg.lag;
+      let dz = (curZ / curR) + ((tgtZ / tgtR) - (curZ / curR)) * cfg.lag;
+      const dLen = Math.hypot(dx, dz);
+      if (dLen > 1e-3) {
+        dx /= dLen; dz /= dLen;
+        const r = curR + (tgtR - curR) * cfg.lag;
+        next = new Vector3(
+          subject.x + dx * r,
+          this.camera.position.y + (finalPos.y - this.camera.position.y) * cfg.lag,
+          subject.z + dz * r,
+        );
+      } else {
+        next = Vector3.Lerp(this.camera.position, finalPos, cfg.lag);
+      }
+    } else {
+      next = Vector3.Lerp(this.camera.position, finalPos, cfg.lag);
+    }
+    this.camera.position = enforceStandoff(subject, next).pos;
     this.aim(subject, objective, velocity);
   }
 
@@ -416,8 +478,10 @@ export class CameraDirector {
       if (best.clearance >= MIN_SAFE_DISTANCE + 0.4) return best.pos;
     }
 
-    // still boxed in — guaranteed-clear overhead fallback (never a wall)
-    if (best.clearance < MIN_SAFE_DISTANCE) {
+    // Still boxed in — guaranteed-clear overhead fallback (never a wall). Tested
+    // against the FRAMING minimum, not the safety floor: a shot that clears the
+    // floor but frames nothing is the failure this is here to avoid.
+    if (best.clearance < FRAMING_MIN_DISTANCE) {
       console.warn('[FEL-FRAME] camera boxed in on all probed angles — using overhead fallback');
       return subject.add(new Vector3(0.001, MIN_SAFE_DISTANCE + 1.6, 0.001));
     }

@@ -2,7 +2,7 @@
 
 **Objective**: Specify locked AAA reference titles for all 20+ modes. One sentence justification each.
 
-**Status**: IN PROGRESS
+**Status**: COMPLETE for the 18 modes below; later additions recorded in their own section.
 
 ## Modes with TBD Benchmarks (from MASTER_MODE_LIST)
 
@@ -20,6 +20,23 @@ From audit findings + MASTER_MODE_LIST:
 | Unreal Arena (orphaned) | TBD | RETIRE | Not in codebase; no bandwidth to implement in this pass |
 | Velocity Kart (orphaned) | TBD | RETIRE | Not in codebase; racing doesn't fit FEL's action-sports focus |
 | Aero Aces Flyer (orphaned) | TBD | RETIRE | Not in codebase; 3D flight sim too niche for v1 |
+
+## Later Additions
+
+Modes that shipped after this document was first written, locked since.
+
+| Mode | Decision | Locked by | Justification |
+|------|----------|-----------|---------------|
+| Volleyball | **Nintendo Switch Sports — Volleyball** | Elijah, 2026-08-31 | Bump / set / spike is a three-touch sequence, which is exactly what `RallyCore`'s VOLLEYBALL config already models (`touchesPerSide: 3`); party-accessible timing depth over simulation |
+
+> **Correction recorded.** `SESSION_STATUS_DASHBOARD.md` listed Volleyball's
+> benchmark as *Wii Sports Resort*. That is wrong on its face — Wii Sports
+> Resort has no volleyball mode (swordplay, archery, bowling, table tennis,
+> basketball, golf, air sports, cycling, canoeing, wakeboarding, frisbee, power
+> cruising). The claim also appeared nowhere in this file and nowhere in
+> `VolleyballMode.ts`, unlike the board benchmarks, which are corroborated in
+> code ("Skate 3 vocabulary", "SSX boost meter"). Treat the dashboard as
+> unreliable for benchmark claims as well as status ones.
 
 ## Already-Locked Benchmarks (from audit)
 
