@@ -15,7 +15,7 @@ concept-lock docs.
 | **2 Character fidelity** 🔶 skin/cloth/secondary/planting done |  Forge `skin` gets PBR subsurface; normal + roughness maps authored in the forge; secondary animation layer (head look-at, breathing, idle weight shift); two-foot IK planting everywhere + hand IK for ball grip in basketball. No root-motion rewrite. | Pose gate + pipeline tests green; side-by-side captures before/after per mode family. |
 | **3 Avatar builder** 🔶 face, morphs, sliders, likeness, hair styles, 8-body roster done |  Morph targets in the forge (brow, jaw, mouth, blink + body proportions) exposed as Closet sliders; expanded skin tones, hair styles, kits; photo-to-avatar likeness fit; more authored hero clips per sport. Material name contract untouched. | Closet round-trip: a saved look renders identically in the preview and in a mode. |
 | **4 Basketball to benchmark** 🔶 packages, free-approach dunk, alley-oop |  dunk, threepoint, onevone, threevthree, dunkduel brought to their locked inspirators (NBA Live 08 contest, NBA 2K feel). Depth of control, AI, presentation. | §7 sign-off per mode against `PHASE2_BENCHMARK_LOCKS.md`. |
-| **5 Combat, board, air** 🔶 mixed combat sidestep, big air direction |  karate, karate_vs (the Storm mode), mixedcombat (Soul Calibur style), skateboard, surf, snowboard_slalom, bigair (SSX), gymnastics. | §7 sign-off per mode. |
+| **5 Combat, board, air** 🔶 sidestep, spin direction; horde pass staged |  karate, karate_vs (the Storm mode), mixedcombat (Soul Calibur style), skateboard, surf, snowboard_slalom, bigair (SSX), gymnastics. | §7 sign-off per mode. |
 | **6 Net, precision, field, party** 🔶 net touch, baseball clips + bat, keeper round |  volleyball (Switch Sports), tennis, golf, derby, penalty, football, carnival (Mario Party / Pac-Man Fever), dance (Class of 3000). | §7 sign-off per mode. |
 | **7 Camp Blueprint — model + content** 🔶 model, curriculum draft, API live |  Curriculum bodies + assessments authored into the Educational Track; `CurriculumAssessment` + credential (80% pass, owner revoke); `CreatorCard.kind='facilitator'`; `FacilitatorProfile`, `GoalPlan` (on `CoachingProgram`), `CampSession` (on `ClientSession`), `CampTemplate`; guardian consent gate; resiliency = retry rate after failed attempts. | Prisma migration applied; unit tests on the read-model and the metric. |
 | **8 Camp Blueprint — flows** 🔶 four screens live |  Facilitator onboarding, intake with AI-coach follow-ups, session runner (curriculum beside a game mode, subscribed to `resultSink`), template export/fork with curriculum versioning; coaching-program backend persisted. | Each flow walked end to end on the dev server with screenshots. |
@@ -138,3 +138,10 @@ concept-lock docs.
   defender, where a chest pass cannot) and finishes as a dunk at 82%.
   Derby: a bat in the batter's hands. Karate endless: the lock already existed
   (Zombies + Soul Calibur); the owner's SoR4 answer awaits confirmation.
+- **2026-09-03, karate endless lock (owner, final).** A horde brawler in the
+  Matrix Revolutions / Pirate Warriors grammar, solo or co-op. Three combat
+  modes, three mechanics (VS = Storm, mixed combat = Soul Calibur). The lock
+  doc's horde criteria H1–H8 are measured against the code: the crowd-control
+  core existed but every strike hit the nearest enemy only; the patch (arc
+  strikes, launcher + juggle, a hit counter, tier-capped hordes of 20/12, the
+  surrounded camera) is staged behind the running sweep.
