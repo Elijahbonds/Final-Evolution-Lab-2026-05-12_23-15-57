@@ -110,3 +110,20 @@ POST-LOCK RE-LOCKS (owner decisions, 2026-09-01):
     Just Dance lock. Locked by asking, 2026-09-01.
 ```
 
+
+## 2026-09-02 owner decisions — ship pass (from the two gap reports)
+
+Asked as multiple choice, answered by the owner. These gate the 10-phase ship pass.
+
+- **Character path:** forge GLB everywhere. Flip `PROCEDURAL_CHARACTERS` off, re-verify every mode on the real avatar, then skin/PBR/IK work lands on it.
+- **Workstream order:** fidelity → modes to benchmark → Camp Blueprint.
+- **Ship target:** desktop web 60 fps + mobile web 30 fps. Fidelity features carry a quality tier; mobile drops SSAO/shadows.
+- **Movement:** code-driven movement + two-foot IK planting + hand IK for ball grip. No root-motion rewrite.
+- **Lighting:** procedural IBL stays as v1; mount the post-pipeline; convert venues to PBR; cascaded shadows outdoors.
+- **Curriculum:** Claude authors real lesson bodies + assessments from the story spine and PRQ pillars; owner reviews/replaces text later.
+- **Facilitator Card:** a `CreatorCard` with `kind='facilitator'`.
+- **Mentees may be minors:** guardian consent gate at intake; sessions blocked until consent.
+- **Certification:** auto-graded assessment, 80% pass, owner revoke switch.
+- **Resiliency metric:** retry rate after failed attempts (in-session retries after a fail + return sessions after a losing one).
+- **Avatar builder scope (all four):** face + body morph-target sliders; more skin tones/hair/kits; photo-to-avatar likeness; better forge animation set.
+- **Ship roster:** all 21 Babylon modes; Sprint/Showdown/Duel stay retired.
