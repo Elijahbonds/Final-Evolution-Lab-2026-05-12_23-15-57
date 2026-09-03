@@ -147,6 +147,14 @@ for (let i = 0; i < REPS; i++) {
 }
 console.log(`${NAME} end   :`, JSON.stringify(await hud()));
 console.log(`${NAME} phase :`, await head());
+// The dev page's PerfMonitor overlay is in the body text: "60 fps avg 16.7ms ... draws 61 meshes 61".
+// Surface it so a sweep doubles as a frame-budget survey.
+{
+  const body = await p.evaluate<string>('document.body.innerText');
+  const fps = /(\d+)\s*fps\s*avg\s*([\d.]+)ms/.exec(body);
+  const dm = /draws\s*(\d+)\s*meshes\s*(\d+)/.exec(body);
+  console.log(`${NAME} perf  : ${fps ? `${fps[1]}fps ${fps[2]}ms` : 'n/a'} ${dm ? `draws ${dm[1]} meshes ${dm[2]}` : ''}`);
+}
 const frame = logs.filter((l) => /FEL-FRAME/.test(l));
 const miss = logs.filter((l) => /MISSING CLIP/.test(l));
 const errs = logs.filter((l) => (l.startsWith('[error]') || l.startsWith('[pageerror]'))
