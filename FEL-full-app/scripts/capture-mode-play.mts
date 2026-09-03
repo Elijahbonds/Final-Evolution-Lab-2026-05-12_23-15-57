@@ -37,7 +37,13 @@ const b = await chromium.launch({
   executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
   args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'],
 });
-const p = await b.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
+// TIER=mobile: a phone-shaped, touch-capable context so detectQualityTier picks
+// the mobile tier (touch points + coarse pointer + viewport) while the same
+// keyboard drive runs. Phase 1's gate wants every mode measured on both tiers.
+const MOBILE_TIER = process.env.TIER === 'mobile';
+const p = MOBILE_TIER
+  ? await (await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Mobile Safari/537.36' })).newPage()
+  : await b.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
 // LOGIN=1: carry a real session INTO /dev/mode/<key>, which never shows the
 // login form. Only a logged-in hero runs applyIdentity (tint clones, morphs,
 // hair style, jersey plate) on top of the spawn layers — the Closet caught a
@@ -174,7 +180,7 @@ const cam = logs.filter((l) => /FEL-CAM/.test(l));
 if (cam.length) console.log(`${NAME} cam   : overhead fallback x${cam.length} (designed degradation, not counted)`);
 const errs = logs.filter((l) => ((l.startsWith('[error]') || l.startsWith('[pageerror]'))
   && !/401 \(Unauthorized\)/.test(l) && !/FEL-FRAME/.test(l)) || /FEL-IDENT.*never ready/.test(l));
-console.log(`${NAME} FEL-FRAME ${frame.length} | MISSING CLIP ${miss.length} | errors ${errs.length}`);
+console.log(`${NAME} FEL-FRAME ${frame.length} | MISSING CLIP ${miss.length} | errors ${errs.length}${MOBILE_TIER ? ' | tier mobile' : ''}`);
 if (process.env.LOGIN === '1') console.log(`${NAME} ident : ${ident.length ? ident.map((l) => l.replace(/^\[\w+\] /, '')).join(' | ') : 'no FEL-IDENT line (identity did not run?)'}`);
 for (const l of [...new Set([...frame, ...miss, ...errs])].slice(0, 4)) console.log('   ·', l);
 await b.close();
