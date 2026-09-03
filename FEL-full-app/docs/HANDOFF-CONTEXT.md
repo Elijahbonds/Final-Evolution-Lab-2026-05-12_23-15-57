@@ -259,3 +259,12 @@ stand:
   free-approach dunk flight; 3v3 alley-oops and switching; PBR venues; a bat
   prop in the derby; Phase 9 hardening (`npm run build:check`, mobile on
   hardware).
+- **Later 2026-09-03:** karate endless is the horde brawler (owner lock; arc
+  strikes, launcher, hit counter, tier-capped hordes, crowd camera); penalty
+  has the keeper round (`KeeperCore`); dunk judges the approach
+  (`DunkApproach`); 3v3 has the alley-oop (`BallHandling` lob) and, staged,
+  defensive switching (`Matchups`) and the ball in the AI driver's hand;
+  three-point has a tie playoff; football shows a blitz pre-snap; venue kit
+  props are PBR. Every staged batch is a `scripts`-free Python patch in the
+  session scratchpad — if you find `MISMATCH` output, the anchor text moved;
+  re-read the file rather than forcing it.

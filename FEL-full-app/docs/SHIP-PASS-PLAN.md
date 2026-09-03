@@ -154,3 +154,8 @@ concept-lock docs.
   points and drill with a link into the mode. Carnival's event cameras cut
   instead of lerping (the lerp from the previous event left the hero behind the
   camera for three frames).
+- **2026-09-03, Phase 9 items.** Retired routes verified dark for a logged-in
+  player (`scripts/_retired-routes-check.mts`: sprint/showdown/duel → 307 to
+  /modes, a live mode → 200). Staged behind the running sweep: the ball rides
+  the AI driver's hand in 3v3; defenders switch marks when beaten (pure
+  `scramSwitch`, hysteretic); ride worlds and the ocean court go PBR.
