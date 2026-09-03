@@ -86,7 +86,10 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       if (wantActive !== active) {
         active = wantActive;
         if (active) { opts.ball.setParent(null); phase = 0; }
-        else attachBallToHand(opts.ball, opts.skeleton, `${side}Hand`);
+        // Hand the ball back ONLY if it is still ours to hand back: a steal
+        // re-parents it to another hand and a release sets it flying, and
+        // either may land in the same frame as our deactivation.
+        else if (opts.ball.parent === null && !opts.ball.metadata?.felReleased) attachBallToHand(opts.ball, opts.skeleton, `${side}Hand`);
       }
       if (!active) return;
       phase = advancePhase(phase, dt, speed01, p);

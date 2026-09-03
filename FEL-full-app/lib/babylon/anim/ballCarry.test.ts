@@ -73,4 +73,14 @@ describe('ballCarry', () => {
     r.ball.computeWorldMatrix(true);
     expect(r.ball.getAbsolutePosition().x).toBeGreaterThan(0.2);   // now on the body's left
   });
+  it('leaves the ball alone on deactivate when the mode already took it (a steal)', () => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk });
+    carry.update(0.016, 0.5, true);
+    const thief = new TransformNode('LeftHand_thief', scene);
+    r.ball.setParent(thief);                                  // the mode re-parents on a steal
+    carry.update(0.016, 0, false);
+    expect(r.ball.parent).toBe(thief);
+  });
 });
