@@ -261,6 +261,14 @@ concept-lock docs.
   registers 4/4 bones on both rigs and refuses nothing. Also fixed on the way:
   the arm-solver tool's `torso:` option, and a test-harness rule (build every
   clip from bind — a module's lazy rest solve measures the skeleton as it stands).
+- **2026-09-03, rounds seven and eight: no regressions.** Seven (dribble
+  wiring): 21 modes 0/0/0, carnival back to 0, 199 tests. Eight (sport clips,
+  rest-solve fix, safe-play, headers): 211 tests; dunk and onevone each logged
+  ONE "hero off-screen (off RIGHT)" frame — the first two captures after the
+  dev-server restart, the camera's pre-snap frame on a cold compile; both
+  0/0/0 alone. The gauntlet now also runs seven modes on the MOBILE quality
+  tier (`TIER=mobile`: phone-shaped touch context, `detectQualityTier` picks
+  mobile); the dunk smoke held 60 fps.
 - **2026-09-03, Phase 9 item: production build check clean.** `npm run
   build:check` (a separate dist dir, the dev server untouched) exited 0 on the
   planting-on state with no type or lint failures.

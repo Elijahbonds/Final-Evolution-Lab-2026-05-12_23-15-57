@@ -26,6 +26,15 @@ OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
     ident=$(echo "$r" | grep -oE "ident : .*" | sed 's/ident : //' | head -1)
     printf "%-16s: %-46s %s\n" "login/$m" "${line:-NO RESULT}" "${ident:-}"
   done
+  # mobile QUALITY TIER, one mode per family: a phone-shaped touch context makes
+  # detectQualityTier pick the mobile tier (Phase 1 gate: both tiers measured).
+  for m in dunk karate skateboard volleyball golf football dance; do
+    r=$(TIER=mobile URL=http://localhost:3000/dev/mode/$m PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=mtier_$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=4 npx tsx scripts/capture-mode-play.mts 2>&1)
+    echo "$r" > "$G/logs/mtier-$m.txt"
+    line=$(echo "$r" | grep -oE "FEL-FRAME [0-9]+ \| MISSING CLIP [0-9]+ \| errors [0-9]+" | head -1)
+    perf=$(echo "$r" | grep -oE "perf  : .*" | sed 's/perf  : //' | head -1)
+    printf "%-16s: %-46s %s\n" "mtier/$m" "${line:-NO RESULT}" "${perf:-}"
+  done
   for r in "skateboard PUMP POP" "volleyball HIT BLOCK" "tennis DRIVE SLICE"; do
     set -- ${=r}   # zsh does not word-split an unquoted variable; ${=r} forces it
     mr=$(URL=http://localhost:3000/play/$1 HOLD_VERB=$2 TAP_VERB=$3 OUT_DIR="$G/shots" npx tsx scripts/capture-mobile-touch.mts 2>&1)
