@@ -294,3 +294,14 @@ stand:
   The gauntlet plays onevone/skateboard/karate logged in and `[FEL-IDENT]`
   names any material that never compiles. Carnival occasionally logs five
   "camera boxed in" warnings in a shuffled venue (re-runs clean) — Phase 9.
+- **Later 2026-09-03, Phase 3 closed; two more measured rules.** Eleven sport
+  clips (golf, tennis, volleyball, soccer) are authored and registered.
+  (1) `installSafePlay` now admits any clip the animator has registered — the
+  static alias table is no longer a gate, so new authored clips need no alias
+  entry. (2) `solveArmsDown` measures in the ROOT's frame: it used world x, so
+  any rig spawned off-centre or facing +z lost every rest-based clip while the
+  alias fallback quietly played karate. If a clip "plays" but looks wrong,
+  check the registration line (`[FEL-ANIM] authored clips registered`) for
+  that rig before anything else. Authoring rule: solve hands UNDER the clip's
+  torso keys (`_arm-solve.mts … torso:hipsX,hipsY,hipsZ,spineX,spineY,spineZ`),
+  key `Hips` in every clip, and test builders from bind.
