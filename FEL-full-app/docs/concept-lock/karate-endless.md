@@ -1,5 +1,7 @@
 # Concept Lock — Karate Endless (the horde brawler)
 
+> **Status (2026-09-03):** the criteria table below is the PRE-FIX snapshot from the concept lock. Every ❌ it lists was worked in the convergence pass; `karate-endless-signoff.md` records which were fixed, which were accepted and why. Read the two together.
+
 **Benchmark (LOCKED by the owner, 2026-09-03): the Matrix Revolutions burly brawl /
 One Piece Pirate Warriors (Musou) horde grammar.** You face hordes and waves of
 enemies, solo or co-op. Recorded in `PHASE2_BENCHMARK_LOCKS.md` (repo root).

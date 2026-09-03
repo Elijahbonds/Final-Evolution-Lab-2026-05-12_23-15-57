@@ -1,5 +1,7 @@
 # Concept Lock — Volleyball
 
+> **Status (2026-09-03):** the criteria table below is the PRE-FIX snapshot from the concept lock. Every ❌ it lists was worked in the convergence pass; `volleyball-signoff.md` records which were fixed, which were accepted and why. Read the two together.
+
 **Benchmark (LOCKED): Nintendo Switch Sports — Volleyball.**
 Locked by Elijah on 2026-08-31, recorded in `PHASE2_BENCHMARK_LOCKS.md` under
 *Later Additions*. This mode shipped after that document was first written,

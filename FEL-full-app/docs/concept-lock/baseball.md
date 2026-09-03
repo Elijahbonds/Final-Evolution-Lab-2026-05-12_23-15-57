@@ -1,5 +1,7 @@
 # Concept Lock — Baseball (Home Run Derby)
 
+> **Status (2026-09-03):** the criteria table below is the PRE-FIX snapshot from the concept lock. Every ❌ it lists was worked in the convergence pass; `baseball-signoff.md` records which were fixed, which were accepted and why. Read the two together.
+
 **Benchmark (LOCKED): MLB The Show — Hitting Mode.**
 `PHASE2_BENCHMARK_LOCKS.md`: *"Contact-based bat mechanics with **dynamic PCI**;
 proven single skill focus"*. The justification names the mechanic, so that is

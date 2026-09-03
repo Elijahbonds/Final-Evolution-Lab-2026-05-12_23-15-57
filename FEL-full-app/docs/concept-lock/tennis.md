@@ -1,5 +1,7 @@
 # Concept Lock — Tennis
 
+> **Status (2026-09-03):** the criteria table below is the PRE-FIX snapshot from the concept lock. Every ❌ it lists was worked in the convergence pass; `tennis-signoff.md` records which were fixed, which were accepted and why. Read the two together.
+
 **Benchmark (LOCKED): Mario Tennis Aces.**
 Locked in `PHASE2_BENCHMARK_LOCKS.md` (repo root, commit `d441f29`), in the
 TBD→decide table: *"Accessible arcade tennis with motion controls; matches FEL's
