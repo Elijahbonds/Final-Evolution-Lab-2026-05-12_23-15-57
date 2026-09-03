@@ -214,3 +214,6 @@ concept-lock docs.
   turning in place is not fought. Round five (first with logged-in captures):
   21 modes 0/0/0, three logged-in modes 0/0/0 with every material ready, mobile
   trio clean, 182 tests.
+- **2026-09-03, Phase 9 item: production build check clean.** `npm run
+  build:check` (a separate dist dir, the dev server untouched) exited 0 on the
+  planting-on state with no type or lint failures.
