@@ -93,3 +93,17 @@ concept-lock docs.
   three-quarter slot for the slider. Gymnastics and big air hold the end
   screen until the last landing's banner has shown. The 21-mode sweep is
   green on all of it.
+- **2026-09-03, Phase 9 (mobile) — open.** The 21-mode sweep's mobile
+  skateboard capture shows a start-of-run frame-guard hit one run in two on
+  the portrait viewport (camera ~4–6 m beside the spawn for the first frames,
+  then auto-recentered). Desktop is clean. Not chased yet; the board modes'
+  load-time snap on a portrait aspect is the suspect.
+- **2026-09-03, Phase 7 begins.** Additive Camp models pushed to the local
+  database: `FacilitatorProfile`, `Credential`, `GuardianConsent`, `GoalPlan`
+  (milestones on a `CoachingProgram`), `CampSession` (outcomes on a
+  `ClientSession`), `CampTemplate`; `CreatorCard.kind` and `Block.targetDate`
+  added as defaulted/nullable columns. The Neuro-Mechanic's Blueprint is
+  authored as content (`lib/curriculum/blueprint.ts`, version 2026.09-draft1):
+  three required modules (Engine, Governor, Facilitating) over the eight PRQ
+  pillars and the four Camp flows, with graded assessments at the 80% mark,
+  plus bodies for the twelve existing mode-track lessons. Owner review pending.

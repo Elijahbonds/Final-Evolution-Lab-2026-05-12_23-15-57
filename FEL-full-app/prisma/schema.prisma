@@ -74,6 +74,13 @@ model User {
   ownedWearables  OwnedWearable[]
   sessionBookings SessionBooking[]
 
+  // Camp Blueprint (Education pillar: Mentorship), 2026-09-03
+  facilitatorProfile FacilitatorProfile?
+  goalPlansAsMentee  GoalPlan[]        @relation("GoalPlanMentee")
+  goalPlansAsFacilitator GoalPlan[]    @relation("GoalPlanFacilitator")
+  credentials        Credential[]
+  guardianConsents   GuardianConsent[] @relation("ConsentMentee")
+
   // M4 compliance stubs
   dobYear         Int?        // Year of birth for 18+ attestation
   kycStatus       String      @default("NONE") // NONE | PENDING | VERIFIED | REJECTED
@@ -1112,6 +1119,8 @@ model CreatorCard {
   topScore    Int               @default(0)
   wins        Int               @default(0)
   signatureMove String?
+  /// 'athlete' (default) | 'facilitator' — Camp Blueprint (2026-09-03): the Facilitator Card is a Creator Card with a kind.
+  kind          String            @default("athlete")
 
   published   Boolean           @default(false)
   views       Int               @default(0)
@@ -1120,6 +1129,7 @@ model CreatorCard {
 
   @@index([ownerId])
   @@index([published])
+  @@index([kind])
 }
 
 // ===========================================================================
@@ -1416,6 +1426,7 @@ model Block {
   
   order        Int      // 1, 2, 3...
   label        String   // "Week 1", "Accumulation", etc.
+  targetDate   DateTime? // Camp Blueprint: a milestone's target date
   
   sessions     Session[]
   
@@ -1512,4 +1523,160 @@ model ExerciseLog {
   
   @@index([clientSessionId])
   @@index([sessionExerciseId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAMP BLUEPRINT — Education pillar: Mentorship (2026-09-03, ship pass Phase 7)
+// Layered on what exists: a GoalPlan's milestones are a CoachingProgram's
+// Blocks, a CampSession's outcomes live in a ClientSession, the Facilitator
+// Card is a CreatorCard with kind='facilitator'. Nothing existing changes
+// shape (two nullable/defaulted columns added above). Owner decisions in
+// PHASE2_BENCHMARK_LOCKS.md "ship pass".
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum CertificationStatus {
+  none
+  in_progress
+  certified
+  revoked
+}
+
+model FacilitatorProfile {
+  id                  String              @id @default(cuid())
+  userId              String              @unique
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  certificationStatus CertificationStatus @default(none)
+  curriculumVersion   String?             // the curriculum the credential was earned on
+  certifiedAt         DateTime?
+  revokedAt           DateTime?
+  revokedReason       String?
+  facilitatorCardId   String?             // CreatorCard.id with kind='facilitator'
+  bio                 String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  goalPlans           GoalPlan[]
+  campSessions        CampSession[]
+  templates           CampTemplate[]
+
+  @@index([certificationStatus])
+}
+
+/// One graded attempt at a curriculum module's assessment. Certification is
+/// auto-graded: every required module ≥ passMark (80) → certified; the owner
+/// keeps a revoke switch on FacilitatorProfile.
+model Credential {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackKey          String
+  moduleKey         String
+  curriculumVersion String
+  score             Int      // 0..100
+  passMark          Int      @default(80)
+  passed            Boolean
+  answers           Json     // [{ questionKey, chosen, correct }]
+  earnedAt          DateTime @default(now())
+
+  @@index([userId, trackKey, moduleKey])
+  @@index([userId, passed])
+}
+
+/// Mentees may be minors (owner decision): intake records a birth year and
+/// guardian consent; a GoalPlan cannot go active without an accepted consent
+/// when the mentee is under 18.
+model GuardianConsent {
+  id            String    @id @default(cuid())
+  menteeId      String
+  mentee        User      @relation("ConsentMentee", fields: [menteeId], references: [id], onDelete: Cascade)
+  guardianName  String
+  guardianEmail String
+  menteeBirthYear Int
+  token         String    @unique          // emailed acceptance token
+  requestedAt   DateTime  @default(now())
+  acceptedAt    DateTime?
+  revokedAt     DateTime?
+
+  @@index([menteeId])
+}
+
+enum GoalPlanStatus {
+  draft
+  locked
+  active
+  done
+  abandoned
+}
+
+/// "What do you want to be when you grow up" → a locked goal, a milestone
+/// timeline (Blocks on a CoachingProgram), and the curriculum modules it draws on.
+model GoalPlan {
+  id                String          @id @default(cuid())
+  menteeId          String
+  mentee            User            @relation("GoalPlanMentee", fields: [menteeId], references: [id], onDelete: Cascade)
+  facilitatorUserId String
+  facilitator       User            @relation("GoalPlanFacilitator", fields: [facilitatorUserId], references: [id], onDelete: Restrict)
+  facilitatorId     String
+  facilitatorProfile FacilitatorProfile @relation(fields: [facilitatorId], references: [id], onDelete: Restrict)
+  goalText          String
+  tags              String[]        @default([])
+  status            GoalPlanStatus  @default(draft)
+  programId         String?         // CoachingProgram.id — the milestone timeline
+  linkedModuleKeys  String[]        @default([])   // "trackKey/moduleKey"
+  curriculumVersion String
+  templateId        String?         // CampTemplate this plan was instantiated from
+  lockedAt          DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  sessions          CampSession[]
+
+  @@index([menteeId])
+  @@index([facilitatorId])
+  @@index([status])
+}
+
+/// One facilitated session. Outcomes: modules covered, game sessions played,
+/// PRQ + movement deltas (cached from PrqEntry / WorkoutScan), the resiliency
+/// log (owner decision: retry rate after failed attempts).
+model CampSession {
+  id               String   @id @default(cuid())
+  goalPlanId       String
+  goalPlan         GoalPlan @relation(fields: [goalPlanId], references: [id], onDelete: Cascade)
+  facilitatorId    String
+  facilitatorProfile FacilitatorProfile @relation(fields: [facilitatorId], references: [id], onDelete: Restrict)
+  menteeId         String
+  date             DateTime @default(now())
+  clientSessionId  String?  // ClientSession.id — exercise outcomes
+  moduleKeys       String[] @default([])
+  gameSessionIds   String[] @default([])
+  prqDelta         Json?    // { attribute: delta } since the previous camp session
+  movementDelta    Json?    // pillar deltas between the two nearest WorkoutScans
+  resiliency       Json?    // { attempts, failures, retriesAfterFail, retryRate, returnedAfterLoss }
+  notes            String?
+  createdAt        DateTime @default(now())
+
+  @@index([goalPlanId])
+  @@index([facilitatorId])
+  @@index([menteeId, date])
+}
+
+/// A facilitator's replicable program: blocks of sessions, each naming the
+/// curriculum modules and the game mode. Versioned against the curriculum so a
+/// template built on one curriculum never silently imports into another.
+model CampTemplate {
+  id                String   @id @default(cuid())
+  authorId          String
+  author            FacilitatorProfile @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  version           Int      @default(1)
+  curriculumVersion String
+  forkedFromId      String?
+  structure         Json     // { blocks: [{ label, pacingDays, sessions: [{ label, moduleKeys, modeKey }] }] }
+  published         Boolean  @default(false)
+  uses              Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([authorId])
+  @@index([published])
 }
