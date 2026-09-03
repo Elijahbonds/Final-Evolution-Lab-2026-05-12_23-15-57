@@ -195,6 +195,11 @@ concept-lock docs.
   bones carried non-uniform scale (0.94/0.85/0.91) under `BoneIKController` on
   this linked-node rig, so foot planting mounts at intensity 0 until a
   node-space solver replaces it; the pore-map cache rejects a disposed texture.
-- **Gauntlet gap (open):** the 21-mode captures spawn the hero WITHOUT a login,
-  so `applyIdentity` and the new spawn layers only meet in the Closet. A
-  logged-in capture of one mode per family belongs in the gauntlet before ship.
+- **Gauntlet gap (closed same day):** the 21-mode captures spawn the hero
+  WITHOUT a login, so `applyIdentity` and the new spawn layers only met in the
+  Closet. Now: `LOGIN=1` carries a real session into `/dev/mode/<key>`, the
+  gauntlet runs it for onevone / skateboard / karate, and `applyIdentity` names
+  any visible mesh whose material is still not ready three seconds after it
+  lands (`[FEL-IDENT]`, counted as an error). First logged-in 1v1: ready, 0/0/0.
+  The round-four sweep itself was clean (threepoint's two errors were network
+  suspension in the capture browser; a lone re-run was 0/0/0).

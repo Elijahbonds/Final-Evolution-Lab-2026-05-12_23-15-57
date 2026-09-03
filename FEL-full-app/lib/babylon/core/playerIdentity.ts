@@ -114,6 +114,7 @@ export function applyIdentity(
   // iris material. No-ops on a body without morphs or an iris.
   applyFaceMorphs(spawn.meshes, resolveFaceWeights({ faceShape: id.face.faceShape, brows: id.face.brows, sliders: id.face.sliders as never }));
   tintSlot(spawn, ['iris'], id.face.eyeColor);
+  watchReadiness(spawn);
   if (parts === 'body') return;
   // 3) Wardrobe palette — jersey/shorts/shoes tints by mesh/material slot name.
   tintSlot(spawn, ['jersey', 'top', 'shirt', 'tee'], id.palette.jersey);
@@ -122,6 +123,24 @@ export function applyIdentity(
   // 4) Jersey ID plate on the back — applied for 'body' too: a team-tinted
   //    hero still wears the player's own number.
   if (id.jersey && (id.jersey.name || id.jersey.number > 0)) attachJerseyPlate(spawn, id.jersey, id.palette.accent);
+}
+
+/** Ship watchdog. A material that never compiles renders NOTHING and throws
+ *  nothing — the Closet's skin vanished that way for a whole pass. Three
+ *  seconds after identity lands, name every visible mesh whose material is
+ *  still not ready; the gauntlet's logged-in captures count that line as an
+ *  error (`[FEL-IDENT]`, scripts/capture-mode-play.mts). */
+function watchReadiness(spawn: SpawnedCharacter): void {
+  const scene = spawn.root.getScene();
+  if (typeof setTimeout !== 'function') return;
+  setTimeout(() => {
+    if (scene.isDisposed) return;
+    const bad = spawn.meshes
+      .filter((m) => !m.isDisposed() && m.isEnabled() && m.isVisible && m.material && !m.material.isReady(m, true))
+      .map((m) => `${m.name}/${m.material!.name}`);
+    if (bad.length) console.error(`[FEL-IDENT] material never ready: ${bad.join(', ')}`);
+    else console.info(`[FEL-IDENT] ready: ${spawn.meshes.filter((m) => m.isVisible && m.isEnabled()).length} visible meshes`);
+  }, 3000);
 }
 
 /** Number + name plate, parented to the Spine2 bone so it rides every

@@ -38,8 +38,20 @@ const b = await chromium.launch({
   args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'],
 });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
+// LOGIN=1: carry a real session INTO /dev/mode/<key>, which never shows the
+// login form. Only a logged-in hero runs applyIdentity (tint clones, morphs,
+// hair style, jersey plate) on top of the spawn layers — the Closet caught a
+// never-ready skin material that 21 anonymous captures could not see.
+if (process.env.LOGIN === '1') {
+  const { request } = await import('playwright-core');
+  const rc = await request.newContext({ baseURL: new URL(MODE_URL).origin });
+  const csrf = (await (await rc.get('/api/auth/csrf')).json()).csrfToken as string;
+  await rc.post('/api/auth/callback/credentials', { form: { csrfToken: csrf, email: process.env.PLAYTEST_EMAIL ?? 'playtest@fel.local', password: process.env.PLAYTEST_PASSWORD ?? 'playtest-local-only', json: 'true' } });
+  await p.context().addCookies((await rc.storageState()).cookies);
+  await rc.dispose();
+}
 const logs: string[] = [];
-p.on('console', (m) => { if (m.type() === 'error' || /FEL-FRAME|MISSING CLIP/.test(m.text())) logs.push(`[${m.type()}] ${m.text().slice(0, Number(process.env.LOG_CHARS ?? 170))}`); });
+p.on('console', (m) => { if (m.type() === 'error' || /FEL-FRAME|MISSING CLIP|FEL-IDENT/.test(m.text())) logs.push(`[${m.type()}] ${m.text().slice(0, Number(process.env.LOG_CHARS ?? 170))}`); });
 p.on('pageerror', (e) => logs.push(`[pageerror] ${e.message.slice(0, Number(process.env.LOG_CHARS ?? 170))}`));
 
 // PHASE 9 WANTS THE SHIPPING ROUTE. /play/* calls getServerSession and
@@ -157,8 +169,10 @@ console.log(`${NAME} phase :`, await head());
 }
 const frame = logs.filter((l) => /FEL-FRAME/.test(l));
 const miss = logs.filter((l) => /MISSING CLIP/.test(l));
-const errs = logs.filter((l) => (l.startsWith('[error]') || l.startsWith('[pageerror]'))
-  && !/401 \(Unauthorized\)/.test(l) && !/FEL-FRAME/.test(l));
+const ident = logs.filter((l) => /FEL-IDENT/.test(l));
+const errs = logs.filter((l) => ((l.startsWith('[error]') || l.startsWith('[pageerror]'))
+  && !/401 \(Unauthorized\)/.test(l) && !/FEL-FRAME/.test(l)) || /FEL-IDENT.*never ready/.test(l));
 console.log(`${NAME} FEL-FRAME ${frame.length} | MISSING CLIP ${miss.length} | errors ${errs.length}`);
+if (process.env.LOGIN === '1') console.log(`${NAME} ident : ${ident.length ? ident.map((l) => l.replace(/^\[\w+\] /, '')).join(' | ') : 'no FEL-IDENT line (identity did not run?)'}`);
 for (const l of [...new Set([...frame, ...miss, ...errs])].slice(0, 4)) console.log('   ·', l);
 await b.close();
