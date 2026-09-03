@@ -283,6 +283,15 @@ concept-lock docs.
   a transient in the same window). Server restarted, the round-nine baseline
   restored, the sweep re-run. Rule: a sweep whose every line is NO RESULT is
   the server, not the code — check `curl localhost:3000` before reading it.
+- **2026-09-03, rounds eleven and twelve; the one-sample frame line fixed at
+  the guard.** Eleven: no change. Twelve: dunk logged one "hero off-screen 1x
+  (off RIGHT)" — and reproduced it alone on a warm server with identical
+  numbers every load, a hero dead ahead of the camera. That is the sample on a
+  hard cut's frame, projected by the camera from before the cut. The
+  FrameGuard acted only on a second consecutive miss but logged the first; it
+  now logs from the second too (persistent loss still logs and recenters on
+  the next sample). Dunk 0/0/0 twice after. The dev server died between wakes
+  three times today; each wake restarts and warms it before sweeping.
 - **2026-09-03, Phase 9 item: production build check clean.** `npm run
   build:check` (a separate dist dir, the dev server untouched) exited 0 on the
   planting-on state with no type or lint failures.
