@@ -90,8 +90,18 @@ export function solveTwoBone(input: TwoBoneInput): TwoBoneSolution {
     const knee = rotate(upper, qRoot);
     const kneePerp = knee.subtract(ax.scale(Vector3.Dot(knee, ax)));
     const polePerp = pole.subtract(ax.scale(Vector3.Dot(pole, ax)));
-    if (kneePerp.lengthSquared() > EPS && polePerp.lengthSquared() > EPS) {
-      const twist = qFromTo(kneePerp, polePerp);
+    // A straight leg has no knee direction: the perpendicular is noise, and a
+    // twist about the leg's own axis moves nothing but the foot's toes. Fade
+    // the pole in with the bend (measured: an unfaded twist picked a random
+    // angle every solve on a leg pulled straight by an out-of-reach target).
+    const bend = kneePerp.length() / L1;          // 0 straight … ~1 right angle
+    const fade = Math.min(1, Math.max(0, (bend - 0.03) / 0.12));
+    if (fade > 0 && polePerp.lengthSquared() > EPS) {
+      // signed angle ABOUT THE AIM AXIS — never a from-to rotation, whose
+      // opposite-vector branch picks an unrelated axis when the knee points
+      // straight away from the pole (measured: a 1 m miss on the test chain)
+      const angle = Math.atan2(Vector3.Dot(Vector3.Cross(kneePerp, polePerp), ax), Vector3.Dot(kneePerp, polePerp));
+      const twist = Quaternion.RotationAxis(ax, angle * fade);
       qRoot = twist.multiply(qRoot);   // aim first, then the twist
     }
   }
