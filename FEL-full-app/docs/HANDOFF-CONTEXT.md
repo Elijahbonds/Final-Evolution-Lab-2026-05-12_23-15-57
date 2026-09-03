@@ -282,3 +282,15 @@ stand:
   node-space replacement is `lib/babylon/anim/TwoBoneIK.ts` (pure, tested),
   not yet wired into `mountFootPlanting`. Never edit code the dev server
   imports while a gauntlet sweep runs — HMR mid-capture perturbs the results.
+- **Later 2026-09-03, Phase 2 closed:** planting is node-space
+  (`TwoBoneIK.ts` → `FootPlanting.ts`, and the 1v1's plant-and-cut helper in
+  `basketballTree.ts`); nothing uses `BoneIKController` any more — it leaves
+  non-uniform scale on this rig. The ball leaves the hand: `ballCarry.ts`
+  (`Dribble.ts` cycle + `HandIK.ts`) is wired into the 1v1 and 3v3. Two
+  measured rules: (1) Babylon's `a.multiply(b)` applies b FIRST; (2) the
+  harness runs `def.update` BEFORE `scene.render()`, so a bone rotation
+  written from a mode's update is overwritten when the clips evaluate — any
+  IK or procedural bone write belongs in `scene.onAfterAnimationsObservable`.
+  The gauntlet plays onevone/skateboard/karate logged in and `[FEL-IDENT]`
+  names any material that never compiles. Carnival occasionally logs five
+  "camera boxed in" warnings in a shuffled venue (re-runs clean) — Phase 9.
