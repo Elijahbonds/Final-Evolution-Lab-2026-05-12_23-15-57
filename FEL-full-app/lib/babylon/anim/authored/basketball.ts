@@ -10,7 +10,7 @@
 // hip world positions at the clip's key frame), not eyeballed.
 //
 // Local-offset vocabulary on a dropped arm (withOffset(rest, x, y, z)):
-//   y  swings the arm forward (+) / back (−)
+//   y  swings the arm forward: +y on the RIGHT arm, −y on the LEFT (mirrored)
 //   z  raises it sideways toward the T (+ left / − right) — ±162 is overhead
 //   x  twists about the limb (invisible on a capsule; used sparingly)
 
@@ -40,7 +40,7 @@ export function buildDribbleIdle(scene: Scene, sk: Skeleton): AnimationGroup | n
     RightUpLeg: [[0, eulerQ(-22, 0, -8)], [0.8, eulerQ(-22, 0, -8)]],
     LeftLeg: [[0, eulerQ(34, 0, 0)], [0.8, eulerQ(34, 0, 0)]],
     RightLeg: [[0, eulerQ(34, 0, 0)], [0.8, eulerQ(34, 0, 0)]],
-    LeftArm: [[0, withOffset(la, 0, 18, 6)], [0.8, withOffset(la, 0, 18, 6)]],
+    LeftArm: [[0, withOffset(la, 0, -18, 6)], [0.8, withOffset(la, 0, -18, 6)]],
     RightArm: [[0, withOffset(ra, 0, 38, -8)], [0.4, withOffset(ra, 0, 58, -6)], [0.8, withOffset(ra, 0, 38, -8)]],
   };
   if (rf) tracks.RightForeArm = [[0, withOffset(rf, 0, 30, 0)], [0.4, withOffset(rf, 0, 10, 0)], [0.8, withOffset(rf, 0, 30, 0)]];
@@ -57,7 +57,7 @@ export function buildCrossover(scene: Scene, sk: Skeleton, dir: 'left' | 'right'
     Spine: [[0, eulerQ(14, 0, 0)], [0.2, eulerQ(20, -14 * s, 0)], [0.45, eulerQ(14, 0, 0)]],
     LeftUpLeg: [[0, eulerQ(-22, 0, 8)], [0.2, eulerQ(-34, 0, 18)], [0.45, eulerQ(-22, 0, 8)]],
     RightUpLeg: [[0, eulerQ(-22, 0, -8)], [0.2, eulerQ(-34, 0, -18)], [0.45, eulerQ(-22, 0, -8)]],
-    LeftArm: [[0, withOffset(la, 0, 20, 6)], [0.2, withOffset(la, 0, 55, -30 * s)], [0.45, withOffset(la, 0, 20, 6)]],
+    LeftArm: [[0, withOffset(la, 0, -20, 6)], [0.2, withOffset(la, 0, -55, -30 * s)], [0.45, withOffset(la, 0, -20, 6)]],
     RightArm: [[0, withOffset(ra, 0, 45, -8)], [0.2, withOffset(ra, 0, 60, 30 * s)], [0.45, withOffset(ra, 0, 45, -8)]],
   }, [[0, -0.05], [0.2, -0.09], [0.45, -0.05]]);
 }
@@ -71,7 +71,7 @@ export function buildHesi(scene: Scene, sk: Skeleton): AnimationGroup | null {
     Neck: [[0, eulerQ(0, 0, 0)], [0.2, eulerQ(-8, 0, 0)], [0.55, eulerQ(0, 0, 0)]],
     LeftUpLeg: [[0, eulerQ(-22, 0, 8)], [0.2, eulerQ(-10, 0, 8)], [0.55, eulerQ(-28, 0, 8)]],
     RightUpLeg: [[0, eulerQ(-22, 0, -8)], [0.2, eulerQ(-10, 0, -8)], [0.55, eulerQ(-28, 0, -8)]],
-    LeftArm: [[0, withOffset(la, 0, 18, 6)], [0.55, withOffset(la, 0, 18, 6)]],
+    LeftArm: [[0, withOffset(la, 0, -18, 6)], [0.55, withOffset(la, 0, -18, 6)]],
     RightArm: [[0, withOffset(ra, 0, 40, -8)], [0.2, withOffset(ra, 0, 44, -8)], [0.55, withOffset(ra, 0, 40, -8)]],
   }, [[0, -0.05], [0.2, -0.02], [0.55, -0.08]]);
 }
@@ -85,7 +85,7 @@ export function buildLayupGather(scene: Scene, sk: Skeleton): AnimationGroup | n
     RightUpLeg: [[0, eulerQ(-20, 0, -6)], [0.3, eulerQ(-82, 0, -4)], [0.5, eulerQ(-70, 0, -4)]],
     RightLeg: [[0, eulerQ(30, 0, 0)], [0.3, eulerQ(78, 0, 0)], [0.5, eulerQ(60, 0, 0)]],
     LeftUpLeg: [[0, eulerQ(-20, 0, 6)], [0.3, eulerQ(4, 0, 4)], [0.5, eulerQ(8, 0, 4)]],
-    LeftArm: [[0, withOffset(la, 0, 20, 6)], [0.3, withOffset(la, 0, 40, 30)], [0.5, withOffset(la, 0, 35, 30)]],
+    LeftArm: [[0, withOffset(la, 0, -20, 6)], [0.3, withOffset(la, 0, -40, 30)], [0.5, withOffset(la, 0, -35, 30)]],
     RightArm: [[0, withOffset(ra, 0, 45, -8)], [0.3, withOffset(ra, 0, 40, -150)], [0.5, withOffset(ra, 0, 30, -162)]],
   }, [[0, -0.05], [0.3, 0.02], [0.5, 0.05]]);
 }
@@ -103,7 +103,7 @@ export function buildDefendSlide(scene: Scene, sk: Skeleton, dir: 'left' | 'righ
     LeftLeg: [[0, eulerQ(40, 0, 0)], [0.5, eulerQ(40, 0, 0)]],
     RightLeg: [[0, eulerQ(40, 0, 0)], [0.5, eulerQ(40, 0, 0)]],
     // arms low and in front (measured 2026-09-03: +34 raise read as a T-pose)
-    LeftArm: [[0, withOffset(la, 0, 36, 14)], [0.5, withOffset(la, 0, 36, 14)]],
+    LeftArm: [[0, withOffset(la, 0, -36, 14)], [0.5, withOffset(la, 0, -36, 14)]],
     RightArm: [[0, withOffset(ra, 0, 36, -14)], [0.5, withOffset(ra, 0, 36, -14)]],
   }, [[0, -0.10], [0.25, -0.12], [0.5, -0.10]]);
 }
@@ -114,7 +114,7 @@ export function buildBlockReach(scene: Scene, sk: Skeleton): AnimationGroup | nu
   if (!la || !ra) return null;
   return buildQuatClip(scene, sk, 'bball_block_reach', 0.5, {
     Spine: [[0, eulerQ(8, 0, 0)], [0.25, eulerQ(-8, 0, 0)], [0.5, eulerQ(-6, 0, 0)]],
-    LeftArm: [[0, withOffset(la, 0, 20, 6)], [0.25, withOffset(la, 0, 6, 164)], [0.5, withOffset(la, 0, 6, 160)]],
+    LeftArm: [[0, withOffset(la, 0, -20, 6)], [0.25, withOffset(la, 0, -6, 164)], [0.5, withOffset(la, 0, -6, 160)]],
     RightArm: [[0, withOffset(ra, 0, 20, -6)], [0.25, withOffset(ra, 0, 6, -164)], [0.5, withOffset(ra, 0, 6, -160)]],
   });
 }
@@ -127,7 +127,7 @@ export function buildStealReach(scene: Scene, sk: Skeleton): AnimationGroup | nu
     Spine: [[0, eulerQ(16, 0, 0)], [0.15, eulerQ(26, -12, 0)], [0.35, eulerQ(16, 0, 0)]],
     LeftUpLeg: [[0, eulerQ(-22, 0, 8)], [0.15, eulerQ(-30, 0, 10)], [0.35, eulerQ(-22, 0, 8)]],
     RightUpLeg: [[0, eulerQ(-22, 0, -8)], [0.15, eulerQ(-14, 0, -8)], [0.35, eulerQ(-22, 0, -8)]],
-    LeftArm: [[0, withOffset(la, 0, 20, 6)], [0.35, withOffset(la, 0, 20, 6)]],
+    LeftArm: [[0, withOffset(la, 0, -20, 6)], [0.35, withOffset(la, 0, -20, 6)]],
     RightArm: [[0, withOffset(ra, 0, 30, -8)], [0.15, withOffset(ra, 0, 92, -18)], [0.35, withOffset(ra, 0, 30, -8)]],
   };
   if (rf) tracks.RightForeArm = [[0, withOffset(rf, 0, 20, 0)], [0.15, withOffset(rf, 0, 4, 0)], [0.35, withOffset(rf, 0, 20, 0)]];
