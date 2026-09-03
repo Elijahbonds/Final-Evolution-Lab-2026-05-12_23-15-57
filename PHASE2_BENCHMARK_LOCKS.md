@@ -140,3 +140,13 @@ Asked as multiple choice, answered by the owner. These gate the 10-phase ship pa
 - **Order**: Camp Blueprint (Phase 7) starts now; remaining mode polish
   (alley-oops, defensive switching, throws, football disguise, bat prop, PBR
   venues) continues in the background between sweeps.
+- **Correction on Karate Endless (2026-09-03, same day):** the question above
+  was asked on a false premise. `docs/concept-lock/karate-endless.md` records
+  that this mode WAS already locked — Soul Calibur melee + COD Zombies wave
+  structure (this file's "Already-Locked (from audit)" list) — and that the
+  defects document's "no benchmark" line was wrong. Two of that lock's deviations
+  (perk balance/prices and ally HP/revive on the bezel) have since been fixed in
+  the host. The Streets of Rage 4 answer therefore either SUPERSEDES the
+  Zombies+SC lock or was answered without knowing it existed. **Owner to
+  confirm at the next decision round; until then the existing lock stands and no
+  benchmark work starts on this mode.**
