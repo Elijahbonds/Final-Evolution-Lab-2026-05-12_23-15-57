@@ -76,7 +76,10 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
   const src = full.slice(full.indexOf('export const PenaltyMode'));
   ok(src.includes('keeperReadProb'), 'the keeper reads history');
   ok(src.includes('shotHistory.push'), 'kicks are remembered');
-  ok(src.includes('rivalConverts'), 'the rival answers');
+  // The rival's kick is PLAYED now, not rolled (owner decision 2026-09-03):
+  // you keep it. The read/dive/save rules live in KeeperCore.
+  ok(src.includes('planRivalKick') && src.includes('resolveSave'), 'the rival answers — and you are the keeper');
+  ok(src.includes("phase === 'keep'"), 'the keeper round is a real phase');
   ok(src.includes('shootoutState'), 'the format decides the contest');
   ok(src.includes("'SUDDEN DEATH'"), 'sudden death is labelled');
   ok(src.includes('SCORE OR YOU ARE OUT'), 'a must-score kick says so');

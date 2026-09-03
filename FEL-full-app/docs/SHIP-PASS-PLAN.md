@@ -14,9 +14,9 @@ concept-lock docs.
 | **1 Shared rendering** 🔶 tiers done |  Quality tiers on the light rig's existing pipeline (already mounts ACES tone-map, bloom, FXAA, sharpen, vignette, 1024 soft shadows in every mode). Desktop 60 fps adds SSAO and cascaded shadows outdoors; mobile 30 fps keeps bloom + tone-map only. The unused duplicate `RenderPipeline.ts` is retired. `VenueKit` / ride worlds / `CourtSurface` converted to PBR. Procedural IBL stays v1. | Per-mode frame budget re-measured on both tiers; no mode below its floor. |
 | **2 Character fidelity** 🔶 skin/cloth/secondary/planting done |  Forge `skin` gets PBR subsurface; normal + roughness maps authored in the forge; secondary animation layer (head look-at, breathing, idle weight shift); two-foot IK planting everywhere + hand IK for ball grip in basketball. No root-motion rewrite. | Pose gate + pipeline tests green; side-by-side captures before/after per mode family. |
 | **3 Avatar builder** 🔶 face, morphs, sliders, likeness, hair styles, 8-body roster done |  Morph targets in the forge (brow, jaw, mouth, blink + body proportions) exposed as Closet sliders; expanded skin tones, hair styles, kits; photo-to-avatar likeness fit; more authored hero clips per sport. Material name contract untouched. | Closet round-trip: a saved look renders identically in the preview and in a mode. |
-| **4 Basketball to benchmark** 🔶 animation packages live |  dunk, threepoint, onevone, threevthree, dunkduel brought to their locked inspirators (NBA Live 08 contest, NBA 2K feel). Depth of control, AI, presentation. | §7 sign-off per mode against `PHASE2_BENCHMARK_LOCKS.md`. |
+| **4 Basketball to benchmark** 🔶 packages, free-approach dunk, alley-oop |  dunk, threepoint, onevone, threevthree, dunkduel brought to their locked inspirators (NBA Live 08 contest, NBA 2K feel). Depth of control, AI, presentation. | §7 sign-off per mode against `PHASE2_BENCHMARK_LOCKS.md`. |
 | **5 Combat, board, air** 🔶 mixed combat sidestep, big air direction |  karate, karate_vs (the Storm mode), mixedcombat (Soul Calibur style), skateboard, surf, snowboard_slalom, bigair (SSX), gymnastics. | §7 sign-off per mode. |
-| **6 Net, precision, field, party** 🔶 volleyball net touch, baseball clips |  volleyball (Switch Sports), tennis, golf, derby, penalty, football, carnival (Mario Party / Pac-Man Fever), dance (Class of 3000). | §7 sign-off per mode. |
+| **6 Net, precision, field, party** 🔶 net touch, baseball clips + bat, keeper round |  volleyball (Switch Sports), tennis, golf, derby, penalty, football, carnival (Mario Party / Pac-Man Fever), dance (Class of 3000). | §7 sign-off per mode. |
 | **7 Camp Blueprint — model + content** 🔶 model, curriculum draft, API live |  Curriculum bodies + assessments authored into the Educational Track; `CurriculumAssessment` + credential (80% pass, owner revoke); `CreatorCard.kind='facilitator'`; `FacilitatorProfile`, `GoalPlan` (on `CoachingProgram`), `CampSession` (on `ClientSession`), `CampTemplate`; guardian consent gate; resiliency = retry rate after failed attempts. | Prisma migration applied; unit tests on the read-model and the metric. |
 | **8 Camp Blueprint — flows** 🔶 four screens live |  Facilitator onboarding, intake with AI-coach follow-ups, session runner (curriculum beside a game mode, subscribed to `resultSink`), template export/fork with curriculum versioning; coaching-program backend persisted. | Each flow walked end to end on the dev server with screenshots. |
 | **9 Ship hardening** | Mobile tier verified on the mobile capture for every mode; `build:check` clean; auth/prod config reviewed; retired routes confirmed dark; docs and handoff current; final gauntlet green on all 21 modes. | Ship sign-off. |
@@ -126,3 +126,15 @@ concept-lock docs.
   Session (record with modules and a note; deltas and the resiliency log read
   back), Templates (export & publish, fork, import with the version prompt).
   Walked as both accounts with `scripts/camp-ui-walk.mts`: zero console errors.
+- **2026-09-03, owner round two lands.** Penalty: on the rival's kick you are
+  the KEEPER — the rival's body runs up with a tell (honest 70% in regulation,
+  58% in sudden death), you dive ◀/▶ or with a stick flick, and `KeeperCore`
+  grades the dive against the strike and resolves the save; the camera sits
+  behind the goal and re-aims every frame (measured: it had faced away).
+  Dunk: the free approach — the angle read from where you are and one-foot
+  (running) vs two-foot (gather) feed the judges' difficulty; the flight now
+  curves to the rim on both axes. 3v3: the alley-oop — an unaimed pass to a
+  teammate cutting hard inside the circle goes up as a lob (over a corridor
+  defender, where a chest pass cannot) and finishes as a dunk at 82%.
+  Derby: a bat in the batter's hands. Karate endless: the lock already existed
+  (Zombies + Soul Calibur); the owner's SoR4 answer awaits confirmation.

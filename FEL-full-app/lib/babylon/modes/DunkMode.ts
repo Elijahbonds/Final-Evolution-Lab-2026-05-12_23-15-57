@@ -36,6 +36,7 @@ import { EffectsKit } from '../visual/EffectsKit';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { DunkFlight } from '../core/DunkSystem';
+import { approachAngle, approachBonus, takeoffFor } from '../core/DunkApproach';
 import {
   judgeDunk, ScoreReveal, CrowdEnergy, REVEAL_DURATION_SEC, BAND_TOTAL, JUDGE_COUNT,
   PERFECT_TOTAL, perJudgeAvg, type JudgeScore,
@@ -316,7 +317,10 @@ export const DunkMode: ModeDefinition = (() => {
         if (style === 'sig') runEastbayPath(ball, player.skeleton, clipTime, ebState);
         const k = Math.min(1, clipTime / EASTBAY_TIMING.duration);
         player.root.position.y = Math.sin(k * Math.PI) * (1.05 + charge * 0.55);
+        // the flight curves in to the rim on BOTH axes: an angled approach
+        // used to fly straight and flush a metre wide of the iron
         player.root.position.z += (rim.z + 0.6 - player.root.position.z) * 1.6 * dt;
+        player.root.position.x += (rim.x - player.root.position.x) * 1.6 * dt;
 
         // THE PROP IS PHYSICAL. Crossing the obstacle with your feet below
         // its top is not a scoring penalty — the dunk DIES at the chair,
@@ -538,9 +542,16 @@ export const DunkMode: ModeDefinition = (() => {
     // EVERY dunk launched as a walk-up. Peak measured approach speed is the
     // approach. (Max run is ~7 m/s; the mode auto-drifts at 2.)
     launchSpeed01 = Math.min(1, runUpPeak / 7);
-    flight.launch(Math.min(1, charge * 0.5 + launchSpeed01 * 0.5), STYLE_TIER[style]);
+    // FREE APPROACH (owner decision 2026-09-03): where you came from and how
+    // you left the floor are judged, as in the real contest. The angle is read
+    // from where you actually are; one-foot needs a real run.
+    const approach = approachBonus(approachAngle(player.root.position.x, player.root.position.z, rim.x, rim.z), takeoffFor(runUpPeak));
+    flight.launch(Math.min(1, charge * 0.5 + launchSpeed01 * 0.5), STYLE_TIER[style], approach.difficulty);
     if (launchSpeed01 < 0.3 && charge > 0.4) {
       ctx.setHud({ banner: 'WALK-UP — short air' });
+      setTimeout(() => ctx.setHud({ banner: '' }), 900);
+    } else if (approach.difficulty > 0) {
+      ctx.setHud({ banner: `${approach.label}${approach.angleDeg >= 10 ? ` · ${approach.angleDeg}°` : ''}` });
       setTimeout(() => ctx.setHud({ banner: '' }), 900);
     }
     if (prop !== 'alleyoop') attachBallToHand(ball, player.skeleton, 'RightHand');

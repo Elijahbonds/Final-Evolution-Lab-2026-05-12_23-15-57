@@ -78,6 +78,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   const passFlight = new PassFlight();
   let passTargetId: 'mate0' | 'mate1' = 'mate0';
   let passType: PassType = 'chest';
+  /** Each teammate's velocity this frame — the lob needs to know who is CUTTING (D7). */
+  const mateVel: Vector3[] = [new Vector3(), new Vector3()];
   let foeShotBlocked = false;
 
   const cfg = { heroUrl: SHARED_CFG.heroUrl };
@@ -300,6 +302,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         const body = mates[i];
         const intent = body.slot.intent;
         const vel = new Vector3(intent.moveX, 0, -intent.moveY).scale(4.2);
+        mateVel[i]?.copyFrom(vel);
         body.char.root.position.addInPlace(vel.scale(dt));
         clampToHalfCourt(body.char.root.position, 8, 15);
         if (vel.lengthSquared() > 0.1) body.char.root.rotation.y = Math.atan2(vel.x, vel.z);
@@ -349,7 +352,9 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         const locked = lockTarget(me.char.root.position, meIntent.moveX, meIntent.moveY, targets, foePositions());
         if (locked) {
           const aimed = Math.hypot(meIntent.moveX, meIntent.moveY) > 0.3;
-          const type = aimed ? 'chest' : choosePassType(me.char.root.position, locked.pos, foePositions());
+          // THE ALLEY-OOP (D7, 2026-09-03): an unaimed pass to a teammate cutting
+          // hard at the rim goes up as a lob and comes down as a dunk.
+          const type = aimed ? 'chest' : choosePassType(me.char.root.position, locked.pos, foePositions(), { rim: RIM, targetVel: mateVel[locked.id === 'mate0' ? 0 : 1] });
           passType = type;
           passTargetId = locked.id as 'mate0' | 'mate1';
           releaseBall(ball);
@@ -359,7 +364,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
             type,
           );
           lastPasserWasMe = true;
-          SoundKit.play('uiTick', { pitch: type === 'bounce' ? 1.0 : 1.3 });
+          SoundKit.play('uiTick', { pitch: type === 'bounce' ? 1.0 : type === 'lob' ? 0.8 : 1.3 });
+          if (type === 'lob') { ctx.setHud({ banner: 'LOB!' }); setTimeout(() => ctx.setHud({ banner: '' }), 500); }
           EffectsKit.burst(ctx.scene, me.char.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
         }
       }
@@ -384,6 +390,13 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         }
         if (!passFlight.active) { /* picked */ }
         else if (passFlight.step(dt, ball.position)) {
+          if (passType === 'lob') {
+            // caught above the rim: the cutter finishes it, no dribble in between
+            const idx = passTargetId === 'mate0' ? 0 : 1;
+            giveBallTo(passTargetId);
+            void teammateShoots(ctx, mates[idx], idx, 'alleyoop');
+            return;
+          }
           giveBallTo(passTargetId);
           if (passType === 'bounce') {
             ctx.setHud({ banner: 'BOUNCE PASS!' });
@@ -445,19 +458,21 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     },
   };
 
-  async function teammateShoots(ctx: ModeContext, body: Body, _i: number): Promise<void> {
+  async function teammateShoots(ctx: ModeContext, body: Body, _i: number, finish: 'shot' | 'alleyoop' = 'shot'): Promise<void> {
     if (shooting) return;
     shooting = true;
     const dist = Vector3.Distance(body.char.root.position, RIM);
-    const points = isThree(body.char.root.position, RIM) ? 3 : 2;
-    const made = Math.random() < 0.55;
+    const points = finish === 'alleyoop' ? 2 : isThree(body.char.root.position, RIM) ? 3 : 2;
+    // a lob caught at the rim is a high-percentage finish — the read was made on the pass
+    const made = Math.random() < (finish === 'alleyoop' ? 0.82 : 0.55);
     releaseBall(ball);
-    body.char.animator.play(SPORT_CLIP.dunkLaunchPower, { onEnd: () => body.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    body.char.animator.play(finish === 'alleyoop' ? SPORT_CLIP.dunkFinishTomahawk : SPORT_CLIP.dunkLaunchPower, { onEnd: () => body.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    if (finish === 'alleyoop') { ctx.juice.shake(0.12, 120); ctx.feel?.impact?.(0.5); }
     if (made) {
       myScore += points;
       if (lastPasserWasMe) { assists++; ctx.setHud({ ast: assists }); }
       SoundKit.play('score'); EffectsKit.burst(ctx.scene, RIM, 'net');
-      ctx.setHud({ score: myScore, banner: 'ASSISTED BUCKET' });
+      ctx.setHud({ score: myScore, banner: finish === 'alleyoop' ? 'ALLEY-OOP!' : 'ASSISTED BUCKET' });
     } else {
       SoundKit.play('miss');
       ctx.setHud({ banner: 'MISS' });

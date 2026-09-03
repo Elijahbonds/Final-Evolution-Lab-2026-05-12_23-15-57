@@ -60,7 +60,13 @@ export const DRIBBLE_CLIP: Record<DribbleState, string> = {
 };
 
 // ── Passing ────────────────────────────────────────────────────────────────
-export type PassType = 'chest' | 'bounce';
+export type PassType = 'chest' | 'bounce' | 'lob';
+
+/** A lob is only on when the target is cutting to the rim: this close, moving toward it. */
+export const LOB_RIM_RADIUS = 3.4;
+export const LOB_MIN_CUT_SPEED = 1.2;
+
+export interface PassContext { rim?: Vector3; targetVel?: Vector3 }
 
 /** Assist cone half-angle for stick-aimed target lock. */
 export const PASS_LOCK_CONE_RAD = (40 * Math.PI) / 180;
@@ -109,19 +115,29 @@ export function lockTarget(
 }
 
 /** A defender standing in the pass lane corridor forces the bounce pass. */
-export function choosePassType(passer: Vector3, target: Vector3, defenders: Vector3[]): PassType {
+export function choosePassType(passer: Vector3, target: Vector3, defenders: Vector3[], ctx: PassContext = {}): PassType {
   const lane = target.subtract(passer); lane.y = 0;
   const len = lane.length();
   if (len < 0.001) return 'chest';
   const dir = lane.normalize();
+  let corridorBlocked = false;
   for (const d of defenders) {
     const rel = d.subtract(passer); rel.y = 0;
     const along = Vector3.Dot(rel, dir);
     if (along < 0.3 || along > len - 0.3) continue;      // behind passer / past target
     const lateral = rel.subtract(dir.scale(along)).length();
-    if (lateral < 0.7) return 'bounce';                   // in the corridor
+    if (lateral < 0.7) { corridorBlocked = true; break; }  // in the corridor
   }
-  return 'chest';
+  // THE ALLEY-OOP (3v3 D7, 2026-09-03): a teammate cutting hard to the rim,
+  // inside the restricted circle's reach, gets the ball above the iron — a lob
+  // goes over a corridor defender, which is exactly when a chest pass cannot.
+  if (ctx.rim && ctx.targetVel) {
+    const toRim = ctx.rim.subtract(target); toRim.y = 0;
+    const near = toRim.length() <= LOB_RIM_RADIUS;
+    const cutting = toRim.length() > 0.01 && Vector3.Dot(ctx.targetVel, toRim.normalize()) >= LOB_MIN_CUT_SPEED;
+    if (near && cutting) return 'lob';
+  }
+  return corridorBlocked ? 'bounce' : 'chest';
 }
 
 /** Real pass flight — chest is flat and fast, bounce dips to the floor at
@@ -135,7 +151,7 @@ export class PassFlight {
     this.from.copyFrom(from); this.to.copyFrom(to);
     this.type = type;
     const dist = Vector3.Distance(from, to);
-    this.duration = Math.max(0.18, dist / (type === 'chest' ? 14 : 10));
+    this.duration = Math.max(0.18, dist / (type === 'chest' ? 14 : type === 'lob' ? 9 : 10));
     this.t = 0;
     this.active = true;
   }
@@ -148,6 +164,9 @@ export class PassFlight {
     ball.z = this.from.z + (this.to.z - this.from.z) * k;
     if (this.type === 'chest') {
       ball.y = this.from.y + (this.to.y - this.from.y) * k + Math.sin(k * Math.PI) * 0.15;
+    } else if (this.type === 'lob') {
+      // up and over: arrives ABOVE the catcher's reach so the finish is a dunk
+      ball.y = this.from.y + (this.to.y + 1.3 - this.from.y) * k + Math.sin(k * Math.PI) * 1.4;
     } else {
       // down to the floor by k=0.5, skip back up to chest height by k=1
       if (k < 0.5) {

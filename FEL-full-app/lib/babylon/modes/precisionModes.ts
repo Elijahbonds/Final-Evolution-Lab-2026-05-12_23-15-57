@@ -20,6 +20,8 @@
 // Derby is unchanged from M43 apart from riding the same file.
 
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { boneNode } from '../anim/boneLookup';
+import { planRivalKick, gradeDive, resolveSave, type DiveSign, type RivalKickPlan } from '../core/KeeperCore';
 import type { AbstractMesh } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -637,6 +639,7 @@ export function pitchSpec(round: number): PitchSpec {
 
 export const DerbyMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, pitcher: SpawnedCharacter;
+  let bat: AbstractMesh | null = null;
   let furniture: AbstractMesh[] = [];
   let ball: AbstractMesh, flight: Flight;
   let round = 0, pts = 0, stickX = 0, stickY = 0;
@@ -720,6 +723,19 @@ export const DerbyMode: ModeDefinition = (() => {
         ...[0, 1, 2, 3, 4, 5].map((i) => new Vector3(-6.5 - i * 0.9, 0, 3 + i * 1.4)),
       ]);
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.7, 0, 0), Math.PI / 2, SPORT_CLIP.derbyStance);
+      // The bat (Phase 6, 2026-09-03): the stance and swing are real now; the
+      // hands were empty. A hand-parented prop, the way mixed combat's staff is.
+      {
+        const hand = boneNode(me.skeleton, 'RightHand');
+        if (hand) {
+          bat = MeshBuilder.CreateCylinder('derby_bat', { height: 0.86, diameterTop: 0.065, diameterBottom: 0.03, tessellation: 12 }, ctx.scene);
+          const bm = new StandardMaterial('derby_bat_m', ctx.scene);
+          bm.diffuseColor = Color3.FromHexString('#c9a06a'); bm.specularColor = Color3.Black();
+          bat.material = bm; bat.parent = hand;
+          bat.position.set(0, 0.36, 0.02);      // knob in the fist, barrel up along the forearm line
+          bat.rotation.set(0.35, 0, 0);
+        }
+      }
       pitcher = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(0, 0.35, 18), Math.PI, SPORT_CLIP.idle);
       pci = new Reticle(ctx.scene, new Vector3(0, 1.1, 0.2), { x: ZONE_HALF.x, y: ZONE_HALF.y });
       ctx.heroRef.current = me.root;
@@ -836,7 +852,7 @@ export const DerbyMode: ModeDefinition = (() => {
       ctx.camDirector.update(me.root.position, Vector3.Zero(), incoming ? pitchAt : ball.position);
     },
 
-    dispose() { gallery?.dispose(); gallery = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { gallery?.dispose(); gallery = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 
@@ -846,8 +862,15 @@ export const PenaltyMode: ModeDefinition = (() => {
   let furniture: AbstractMesh[] = [];
   let ball: AbstractMesh, flight: Flight, reticle: Reticle, meter: PowerMeter;
   let round = 0, goals = 0, stylePts = 0, stickX = 0, stickY = 0;
-  let phase: 'aim' | 'power' | 'flight' = 'aim';
+  let phase: 'aim' | 'power' | 'flight' | 'keep' = 'aim';
   let keeperTargetX = 0, ended = false;
+  // THE KEEPER ROUND (owner decision 2026-09-03): on their kick you are the
+  // keeper. The rival's body runs up with a tell, you dive, KeeperCore judges.
+  let keepPlan: RivalKickPlan | null = null;
+  let keepT = 0;                               // seconds into the rival's run-up
+  let keepStruck = false, keepStrikeAt = 0, keepDive: DiveSign = 0, keepDiveAt: number | null = null;
+  const KEEP_RUNUP_SEC = 1.15;
+  const SPOT = new Vector3(0, 0, 0), GOAL_LINE = new Vector3(0, 0, 10.4);
   let feints = 0, lastFlickSign = 0, lastFlickMs = 0;
   /** L4 — the bank behind the goal. A shootout is watched. */
   let gallery: Onlookers | null = null;
@@ -895,6 +918,40 @@ export const PenaltyMode: ModeDefinition = (() => {
   }
 
   /** Street-style feint: a hard left↔right stick snap during aim. */
+  /** THEIR kick, kept by you. The AI keeper's body becomes the kicker at the
+   *  spot; you stand on the line; the camera sits behind the goal. */
+  function startKeeperRound(ctx: ModeContext): void {
+    const sd = round > REGULATION_KICKS;
+    keepPlan = planRivalKick(Math.random, sd);
+    keepT = 0; keepStruck = false; keepDive = 0; keepDiveAt = null;
+    phase = 'keep';
+    keeper.root.position.set(SPOT.x, 0, SPOT.z - 2.2); keeper.root.rotation.set(0, 0, 0);
+    keeper.animator.play(SPORT_CLIP.moveLoop, { loop: true });
+    me.root.position.copyFrom(GOAL_LINE); me.root.rotation.set(0, Math.PI, 0);
+    me.animator.play(SPORT_CLIP.keeperIdle, { loop: true });
+    ball.position.set(SPOT.x, 0.11, SPOT.z + 0.3);
+    ctx.camDirector.setFixedBehind(me.root.position, Math.PI, 'flight', true);
+    ctx.setHud({ hint: `THEIR KICK — read the run-up · dive ◀ / ▶ as he strikes${sd ? ' · sudden death: he lies more' : ''}`, banner: '' });
+  }
+  function afterTheirKick(ctx: ModeContext): void {
+    if (ended) return;
+    ctx.setHud({ banner: '' });
+    const s = shootoutState(goals, themGoals, round, themKicks);
+    if (s.phase === 'decided' && s.winner) {
+      ended = true;
+      SoundKit.play('whistle');
+      const won = s.winner === 'you';
+      if (won) SoundKit.play('crowdCheer');
+      ctx.end(won ? 'SHOOTOUT_WIN' : 'SHOOTOUT_LOSS', goals * 20 + stylePts,
+        { goals, stylePts, themGoals, sdRounds: Math.max(0, round - REGULATION_KICKS) });
+      return;
+    }
+    me.root.position.set(-0.4, 0, -1.6); me.root.rotation.set(0, 0, 0);
+    me.animator.play(SPORT_CLIP.penaltyIdle, { loop: true });
+    nextKick(ctx);
+    ctx.camDirector.setFixedBehind(me.root.position, 0, 'flight', true);
+  }
+
   function detectFeint(ctx: ModeContext, x: number): void {
     if (phase !== 'aim' || feints >= MAX_FEINTS) return;
     const sign = x > 0.6 ? 1 : x < -0.6 ? -1 : 0;
@@ -951,6 +1008,17 @@ export const PenaltyMode: ModeDefinition = (() => {
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
+      if (phase === 'keep') {
+        // one dive per kick: d-pad or a decisive stick flick picks the side
+        const side: DiveSign = e.t === 'dpad' && e.pressed ? (e.dir === 'left' ? -1 : e.dir === 'right' ? 1 : 0)
+          : e.t === 'stick' && e.side === 'L' && Math.abs(e.x) > 0.6 ? (e.x < 0 ? -1 : 1) : 0;
+        if (side !== 0 && keepDiveAt == null) {
+          keepDive = side; keepDiveAt = performance.now();
+          me.animator.play(SPORT_CLIP.keeperDive, {});
+          ctx.setHud({ hint: '' });
+        }
+        return;
+      }
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; detectFeint(ctx, e.x); }
       if (e.t === 'button' && e.btn === 'A' && e.pressed) {
         if (phase === 'aim') { phase = 'power'; meter.start(); ctx.setHud({ hint: 'KICK at the top of the wave' }); }
@@ -1038,34 +1106,58 @@ export const PenaltyMode: ModeDefinition = (() => {
           });
           // YOUR kick, then THEIR answer — the shootout breathes in
           // alternating beats, and a tied fifth round goes to SUDDEN DEATH.
-          setTimeout(() => {
-            if (ended) return;
-            const sd = round > REGULATION_KICKS;
-            const theyScore = rivalConverts(Math.random, sd);
-            if (theyScore) themGoals++;
-            themKicks++;
-            SoundKit.play(theyScore ? 'crowdGroan' : 'crowdCheer', { volume: 0.35 });
-            ctx.setHud({
-              score: `${goals}–${themGoals}`,
-              banner: theyScore ? 'THEM: BURIES IT' : 'THEM: SAVED!',
-            });
-            setTimeout(() => {
-              ctx.setHud({ banner: '' });
-              const s = shootoutState(goals, themGoals, round, themKicks);
-              if (s.phase === 'decided' && s.winner) {
-                ended = true;
-                SoundKit.play('whistle');
-                const won = s.winner === 'you';
-                if (won) SoundKit.play('crowdCheer');
-                return ctx.end(won ? 'SHOOTOUT_WIN' : 'SHOOTOUT_LOSS', goals * 20 + stylePts,
-                  { goals, stylePts, themGoals, sdRounds: Math.max(0, round - REGULATION_KICKS) });
-              }
-              nextKick(ctx);
-              ctx.camDirector.setFixedBehind(me.root.position, 0, 'flight', true);
-            }, 1100);
-          }, 1200);
+          // YOUR kick, then THEIR kick — and their kick is yours to keep.
+          setTimeout(() => { if (!ended) startKeeperRound(ctx); }, 1200);
           phase = 'aim';
         }
+        return;
+      }
+      if (phase === 'keep' && keepPlan) {
+        keepT += dt;
+        // the run-up: the kicker's body drifts toward the tell side and leans
+        if (!keepStruck) {
+          const lean = Math.min(1, keepT / KEEP_RUNUP_SEC);
+          keeper.root.position.x = SPOT.x + keepPlan.tellSign * 0.55 * lean;
+          keeper.root.position.z = SPOT.z - 2.2 * (1 - lean);
+          keeper.root.rotation.y = keepPlan.tellSign * 0.18 * lean;
+          if (keepT >= KEEP_RUNUP_SEC) {
+            keepStruck = true; keepStrikeAt = performance.now();
+            keeper.animator.play(SPORT_CLIP.penaltyStrike, { onEnd: () => keeper.animator.play(SPORT_CLIP.penaltyIdle, { loop: true }) });
+            SoundKit.play('whoosh');
+            ball.position.set(SPOT.x, 0.11, SPOT.z + 0.3);
+            const to = new Vector3(keepPlan.aimX, keepPlan.aimY + 1.0, 10.9).subtract(ball.position).normalize();
+            flight.launch(ball.position, to.scale(25));
+          }
+        } else {
+          flight.step(dt);
+          // your dive carries you toward the side you chose
+          if (keepDive !== 0) me.root.position.x += (keepDive * 2.4 - me.root.position.x) * 6 * dt;
+          const diedShort = !flight.active && ball.position.z < 10.9;
+          if (ball.position.z >= 10.9 || diedShort) {
+            flight.active = false;
+            const timing = gradeDive(keepDiveAt == null ? null : (keepDiveAt - keepStrikeAt) / 1000);
+            const r = diedShort ? { saved: false, why: 'off_target' as const } : resolveSave(keepDive, timing, ball.position.x, ball.position.y);
+            const theyScore = !r.saved && r.why !== 'off_target';
+            if (theyScore) themGoals++;
+            themKicks++;
+            if (r.saved) { ctx.juice.scorePop(ball.position, 'SAVED!', '#7CFFB2'); ctx.feel?.impact?.(0.5); }
+            SoundKit.play(theyScore ? 'crowdGroan' : 'crowdCheer', { volume: 0.4 });
+            ctx.setHud({
+              score: `${goals}–${themGoals}`,
+              banner: r.saved ? (timing === 'perfect' ? 'SAVED! — read it perfectly' : 'SAVED!')
+                : r.why === 'wrong_way' ? (keepPlan.feint ? 'THEM: SOLD YOU — the run-up was a feint' : 'THEM: WRONG WAY')
+                : r.why === 'too_slow' ? 'THEM: BURIES IT — dive as he strikes'
+                : r.why === 'stayed' ? 'THEM: BURIES IT — you stayed home'
+                : 'THEM: OFF TARGET',
+            });
+            keepPlan = null;
+            setTimeout(() => afterTheirKick(ctx), 1300);
+          }
+        }
+        // the fixed camera only re-aims inside update(): without this it sat
+        // behind the goal still facing the way it had been (measured: hero
+        // BEHIND camera on every keeper round)
+        ctx.camDirector.update(me.root.position, Vector3.Zero(), ball.position);
         return;
       }
       ctx.camDirector.update(me.root.position, Vector3.Zero(), reticle.pos);

@@ -93,11 +93,12 @@ export class DunkFlight {
   private slamWindow = 0.32;             // seconds of finish timing at full window
 
   /** Launch: approach speed (0..1) and style tier buy airtime. */
-  launch(approachSpeed01: number, styleTier: number): void {
+  launch(approachSpeed01: number, styleTier: number, approachDifficulty = 0): void {
     this.phase = 'airborne';
     this.tricks = [];
     this.rejectedForAir = false;
-    this.baseDifficulty = styleTier;
+    // Free approach (2026-09-03): the angle and the takeoff foot are judged too.
+    this.baseDifficulty = styleTier + approachDifficulty;
     this.airTotal = 0.85 + approachSpeed01 * 0.55 + styleTier * 0.05; // 0.85–1.8s
     this.airLeft = this.airTotal;
     this.recognizer.reset();
