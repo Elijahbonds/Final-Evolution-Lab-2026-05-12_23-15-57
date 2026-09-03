@@ -104,6 +104,7 @@ export default function KarateBabylon({ onEnd }: GameProps) {
         </div>
         <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">
           WAVE {hnode(hud.wave, 1)} · {hnode(hud.kos, 0)} KO
+          {Number(hud.hits) > 1 && <> · <span className="text-[#00E5FF]">{hnode(hud.hits, 0)} HITS</span></>}
           {hud.coins != null && <> · <span className="text-white">{hnode(hud.coins, 0)}c</span></>}
         </span>
       </div>

@@ -172,6 +172,8 @@ const S = {
   /** Rival field indices awaiting a staged reveal, weakest first — the
    *  favourite's number lands last, which is the drama a results board is FOR. */
   revealQueue: [] as number[],
+  /** Tiebreak playoffs run so far (a tied final is shot again by the tied shooters). */
+  playoff: 0,
   revealT: 0,
   /** True while the finalists' FINAL scores post before the player's run. */
   finalistsPosting: false,
@@ -347,6 +349,22 @@ function afterStandings(ctx: ModeContext): void {
   const myScore = board[me]?.score ?? 0;
 
   if (S.round === 'final') {
+    // THE PLAYOFF (lock D-tiebreak, 2026-09-03): a tie at the top is shot
+    // again by the tied shooters, as the real event does — it no longer goes
+    // to the earlier poster.
+    const tied = board.filter((f) => f.score === board[0].score);
+    if (tied.length > 1 && S.playoff < 3) {
+      S.playoff += 1;
+      S.field = tied.map((f) => ({ ...f, score: 0, shot: false }));
+      S.skills = S.field.map(() => 0.35 + Math.random() * 0.6);
+      S.finalistsPosting = true;
+      S.revealQueue = S.field.map((f, i) => ({ f, i })).filter(({ f }) => !f.isPlayer).map(({ i }) => i);
+      S.revealT = 0;
+      S.phase = 'standings';
+      S.standingsT = 0;
+      pushHud(ctx, `PLAYOFF ${S.playoff} — TIED AT ${board[0].score}`);
+      return;
+    }
     const won = me === 0;
     S.phase = 'done';
     ctx.end(won ? 'win' : 'complete', myScore, {

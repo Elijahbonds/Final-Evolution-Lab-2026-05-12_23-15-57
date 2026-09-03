@@ -28,6 +28,16 @@ export const CROWDCLEAR_MIN_SURROUNDED = 3;
 export const CROWDCLEAR_RADIUS = 2.6;
 export const CROWDCLEAR_DMG = 30;
 
+/** Is `target` inside a strike's reach: within `range` of `origin` and inside
+ *  the forward arc of `arcDeg` about the facing yaw (yaw 0 faces +z). Pure. */
+export function inArc(origin: Vector3, facingYaw: number, target: Vector3, range: number, arcDeg: number): boolean {
+  const dx = target.x - origin.x, dz = target.z - origin.z;
+  const len = Math.hypot(dx, dz);
+  if (len > range || len < 1e-3) return false;
+  const fx = Math.sin(facingYaw), fz = Math.cos(facingYaw);
+  return (dx * fx + dz * fz) / len >= Math.cos((arcDeg / 2) * Math.PI / 180);
+}
+
 /** Enemies hit by an AOE strike: inside radius AND (for arcs) within the
  *  forward 120° arc. */
 export function aoeTargets(self: Vector3, facingRad: number, enemies: EnemyLike[], radius: number, arc: boolean): EnemyLike[] {
@@ -76,10 +86,10 @@ export function crowdClear(self: Vector3, enemies: EnemyLike[]): { hit: number; 
 // ── Wave director ──────────────────────────────────────────────────────────
 export interface WaveSpec { wave: number; count: number; hp: number; speedMult: number }
 
-export function waveSpec(wave: number): WaveSpec {
+export function waveSpec(wave: number, maxCount = 14): WaveSpec {
   return {
     wave,
-    count: Math.min(4 + Math.floor(wave * 0.9), 14),
+    count: Math.min(6 + Math.floor(wave * 1.2), maxCount),    // a horde from wave one (H1)
     hp: 22 + wave * 4,
     speedMult: Math.min(1.6, 1 + wave * 0.04),
   };

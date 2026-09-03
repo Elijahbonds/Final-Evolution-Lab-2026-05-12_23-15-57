@@ -44,7 +44,7 @@ import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
 import {
   waveSpec, spawnRing, buyPerk, PERKS, DownRevive, REVIVE_RANGE,
-  surroundedCount, crowdClear, CROWDCLEAR_RADIUS,
+  surroundedCount, crowdClear, CROWDCLEAR_RADIUS, JUGGLE_DAMAGE_MULT, JUGGLE_LAUNCH_SEC, inArc,
 } from '../core/OnslaughtCore';
 
 /**
@@ -65,11 +65,17 @@ import {
  */
 const ARENA_RADIUS = 7.5;
 const STANCE = SPORT_CLIP.karateStance;
+// THE HORDE GRAMMAR (owner lock 2026-09-03: Matrix Revolutions / Pirate
+// Warriors). Every strike hits EVERYONE in its arc; the heavy LAUNCHES, and an
+// airborne enemy is helpless and takes JUGGLE_DAMAGE_MULT. Before this each
+// strike resolved against the single nearest enemy — a queue of duels.
 const STRIKES = {
-  A: { clip: SPORT_CLIP.karateJab, dmg: 12, range: 1.4 },
-  B: { clip: SPORT_CLIP.karateKick, dmg: 18, range: 1.8 },
-  Y: { clip: SPORT_CLIP.karateHeavy, dmg: 24, range: 1.5 },
+  A: { clip: SPORT_CLIP.karateJab, dmg: 12, range: 1.5, arcDeg: 100, launch: false },
+  B: { clip: SPORT_CLIP.karateKick, dmg: 18, range: 1.9, arcDeg: 150, launch: false },
+  Y: { clip: SPORT_CLIP.karateHeavy, dmg: 24, range: 1.6, arcDeg: 90, launch: true },
 } as const;
+/** The running hit count decays after this long without a hit (the Musou number). */
+const HIT_CHAIN_MS = 1400;
 
 // horde sizing — deliberately bigger/faster than the old wave-survival pace
 const WAVE = { base: 4, max: 12, growEvery: 1, hpBase: 22, hpPerWave: 4 };
@@ -88,7 +94,7 @@ const CHI_BURST_RADIUS = 4.6;
 const CHI_BURST_DAMAGE = 60;
 const CHI_BURST_KNOCKBACK = 3.4;
 
-interface Enemy { mob: Mob; hp: number; maxHp: number }
+interface Enemy { mob: Mob; hp: number; maxHp: number; /** launched: helpless and takes more until this timestamp */ airUntil: number }
 
 // ── Ally: a self-contained AI ControlSource. Doesn't reuse PlayerSlot's
 //    basketball-flavored AIBehavior (ball/hoop shape doesn't fit melee) —
@@ -146,6 +152,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     }
   }
   let striking = false, blocking = false, dodging = false, bursting = false;
+  let hitCount = 0, lastHitAt = 0;                 // the Musou number
+  let camCrowd = false;                             // H8: surrounded → the crowd preset
   let xHoldSec = -1, iframeSec = 0, slowMoSec = 0;
   let stickX = 0, stickY = 0;
 
@@ -177,7 +185,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const mob = new Mob(char, STEERING_PRESETS[archetype]);
     mob.startPursuit();
     pool.add(mob);
-    enemies.push({ mob, hp: WAVE.hpBase + wave * WAVE.hpPerWave, maxHp: WAVE.hpBase + wave * WAVE.hpPerWave });
+    enemies.push({ mob, hp: WAVE.hpBase + wave * WAVE.hpPerWave, maxHp: WAVE.hpBase + wave * WAVE.hpPerWave, airUntil: 0 });
   }
 
   async function spawnWave(ctx: ModeContext): Promise<void> {
@@ -189,7 +197,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     wave++; kos = 0;
     SoundKit.play('powerUp', { pitch: 0.9, volume: 0.5 });   // wave-start horn
     SoundKit.play('crowdCheer', { volume: Math.min(0.3 + wave * 0.06, 0.9) });
-    const spec = waveSpec(wave);
+    // horde size by tier: the desktop budget takes 20 bodies, a phone 12
+    const spec = waveSpec(wave, ctx.scene.metadata?.felTier === 'mobile' ? 12 : 20);
     const count = spec.count;
     void spawnRing(wave, count);
     const proms: Promise<void>[] = [];
@@ -270,9 +279,20 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     SoundKit.play('whoosh');
     player.animator.play(s.clip, { onEnd: () => { striking = false; player.animator.play(STANCE, { loop: true, fadeSec: 0.12 }); } });
     setTimeout(() => {
-      const t = nearest(player.root.position);
-      if (!t || Vector3.Distance(t.mob.char.root.position, player.root.position) > s.range) return;
-      landHit(ctx, t, s.dmg);
+      // everyone in the arc, not the nearest one
+      const origin = player.root.position;
+      const hit = enemies.filter((e) => inArc(origin, player.root.rotation.y, e.mob.char.root.position, s.range, s.arcDeg));
+      if (!hit.length) { if (performance.now() - lastHitAt > HIT_CHAIN_MS) { hitCount = 0; ctx.setHud({ hits: 0 }); } return; }
+      const now = performance.now();
+      if (now - lastHitAt > HIT_CHAIN_MS) hitCount = 0;
+      for (const t of [...hit]) {
+        const airborne = t.airUntil > now;
+        landHit(ctx, t, s.dmg * (airborne ? JUGGLE_DAMAGE_MULT : 1));
+        if (s.launch && t.hp > 0) t.airUntil = now + JUGGLE_LAUNCH_SEC * 1000;
+      }
+      hitCount += hit.length; lastHitAt = now;
+      ctx.setHud({ hits: hitCount });
+      if (hit.length >= 3) ctx.feel?.impact?.(0.55);
     }, 150);
   }
 
@@ -394,6 +414,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
     update(ctx, dtReal) {
       clockSec += dtReal;
+      if (hitCount > 0 && performance.now() - lastHitAt > HIT_CHAIN_MS) { hitCount = 0; ctx.setHud({ hits: 0 }); }
       // Phase 8: down/revive tick
       if (myDown.downed) {
         const near = Vector3.Distance(partner.root.position, player.root.position) <= REVIVE_RANGE;
@@ -520,6 +541,12 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // look-ahead target, which is exactly the desired effect here — the
       // camera looks slightly down the direction you're facing.
       crowd?.update(dt);
+      // surrounded by three or more inside the crowd-clear radius: the camera
+      // pulls back and up so the horde is the shot (preset change on the
+      // transition only — setPreset re-derives the venue bounds)
+      const surroundedNow = surroundedCount(player.root.position,
+        enemies.map((e) => ({ id: 'e', pos: e.mob.char.root.position, hp: e.hp, airborneSec: 0 }))) >= 3;
+      if (surroundedNow !== camCrowd) { camCrowd = surroundedNow; ctx.camDirector.setPreset(camCrowd ? 'crowd' : 'overShoulder'); }
       ctx.camDirector.update(player.root.position, facingVec(), nearest(player.root.position)?.mob.char.root.position ?? null);
     },
 

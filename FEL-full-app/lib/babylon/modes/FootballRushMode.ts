@@ -73,11 +73,30 @@ export const FootballRushMode: ModeDefinition = (() => {
   // before you could see it. The read is the snap's timing choice.
   let preSnap = true, preSnapT = 0;
   const PRESNAP_AUTOSNAP_SEC = 3;
+  // PRE-SNAP DISGUISE (sign-off carry-forward, 2026-09-03): one defender SHOWS
+  // blitz — creeping toward the line while the defense is set — and at the
+  // snap either comes (a real blitz, fast) or drops back into coverage. The
+  // alignment you read is no longer always the coverage you get; the read is
+  // whether to snap into the show or wait it out.
+  let showBlitz: Mob | null = null, showBlitzComes = false;
+  const SHOW_BLITZ_CHANCE = 0.55, SHOW_BLITZ_CREEP = 0.9, SHOW_BLITZ_DROP_SEC = 0.8;
 
   function snap(ctx: ModeContext): void {
     if (!preSnap) return;
     preSnap = false;
-    for (const m of defenders) m.startPursuit();
+    for (const m of defenders) {
+      if (m === showBlitz && !showBlitzComes) {
+        // the show was a bluff: he drops, and starts late
+        m.char.root.position.z += 3.5;
+        setTimeout(() => { if (!ended) m.startPursuit(); }, SHOW_BLITZ_DROP_SEC * 1000);
+        continue;
+      }
+      m.startPursuit();
+    }
+    if (showBlitz) {
+      ctx.setHud({ banner: showBlitzComes ? 'BLITZ!' : 'HE DROPPED — coverage' });
+      setTimeout(() => ctx.setHud({ banner: '' }), 700);
+    }
     SoundKit.play('uiTick', { pitch: 1.3, volume: 0.4 });
     ctx.setHud({ hint: 'Juke, spin, hurdle — or HOLD TRUCK and run THROUGH them', banner: 'BALL!' });
     setTimeout(() => ctx.setHud({ banner: '' }), 500);
@@ -134,6 +153,9 @@ export const FootballRushMode: ModeDefinition = (() => {
       pool.add(mob);
       defenders.push(mob);
     }
+    // one shown blitz per alignment, once the defense has more than a pair
+    showBlitz = defenders.length >= 3 && Math.random() < 0.6 ? defenders[0] : null;
+    showBlitzComes = Math.random() < SHOW_BLITZ_CHANCE;
   }
 
   function newDrive(ctx: ModeContext, banner: string): void {
@@ -226,6 +248,11 @@ export const FootballRushMode: ModeDefinition = (() => {
       // or the auto-snap so an idle phone never stalls)
       if (preSnap) {
         preSnapT += dt;
+        if (showBlitz) {
+          // the show: he creeps toward the line while everyone else is set
+          showBlitz.char.root.position.z -= SHOW_BLITZ_CREEP * dt;
+          if (preSnapT < 0.1) ctx.setHud({ hint: 'SHOWING BLITZ — snap into it, or wait him out' });
+        }
         if (preSnapT >= PRESNAP_AUTOSNAP_SEC) snap(ctx);
         ctx.camDirector.update(runner.root.position, Vector3.Zero(), null);
         return;

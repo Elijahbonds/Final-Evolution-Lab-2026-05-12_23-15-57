@@ -115,6 +115,9 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   // lines were. Third-person action cameras are near-rigid in yaw for this
   // exact reason; the softness belongs in position, not heading.
   overShoulder: { distance: 3.1, height: 1.65, minHeight: 1.2, pitchFloorDeg: 1, pitchCapDeg: 9, targetHeight: 1.45, lag: 0.3, lookAhead: 2.2, shoulderOffset: 0.55 },
+  // the horde brawler when SURROUNDED (karate endless H8): pull back and up so
+  // the crowd around you is the shot, then drop back over the shoulder
+  crowd: { distance: 5.6, height: 3.0, minHeight: 2.0, pitchFloorDeg: 12, pitchCapDeg: 26, targetHeight: 1.2, lag: 0.16, lookAhead: 0.6 },
   // DUNK CONTEST cinematic — NOT the live-play camera: lower, closer,
   // slower lag so the flight glides like a highlight reel; tighter pitch
   // cap keeps the rim in frame at apex without a hard tilt.

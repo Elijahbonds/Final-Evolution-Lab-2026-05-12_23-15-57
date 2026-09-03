@@ -145,3 +145,12 @@ concept-lock docs.
   core existed but every strike hit the nearest enemy only; the patch (arc
   strikes, launcher + juggle, a hit counter, tier-capped hordes of 20/12, the
   surrounded camera) is staged behind the running sweep.
+- **2026-09-03, round three lands.** Karate endless horde pass: arc strikes hit
+  everyone in reach (`inArc`), the heavy launches and juggled enemies take
+  1.5×, a hit counter climbs and decays on the bezel, hordes of 6→20 on desktop
+  (12 on a phone), the camera pulls back when surrounded. Three-point: a tie at
+  the top is shot again as a playoff. Football: a shown blitz that may drop.
+  Venue kit props are PBR. Camp: the session runner shows each lesson's key
+  points and drill with a link into the mode. Carnival's event cameras cut
+  instead of lerping (the lerp from the previous event left the hero behind the
+  camera for three frames).

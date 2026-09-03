@@ -175,7 +175,7 @@ export function hotShot(): CarnivalEvent {
       meter = new PowerMeter();
       goals = 0; phase = 'aim';
       ctx.heroRef.current = player.root;
-      ctx.camDirector.setFixedBehind(player.root.position, 0, 'flight');
+      ctx.camDirector.setFixedBehind(player.root.position, 0, 'flight', true)   // hard cut between events: a lerp from the last event's camera left the hero behind it (measured, 3 frame-guard hits);
       ctx.setHud({ hint: 'Aim, KICK to power, KICK to shoot — as many as you can' });
     },
     onInput(ctx, e) {

@@ -6,6 +6,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { GraduationCap, Target, ClipboardList, Copy, Loader2, Check, Lock, Play, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import { allLessons } from '@/lib/curriculum/blueprint';
 
 type Tab = 'certify' | 'plans' | 'session' | 'templates';
 interface ModuleQ { key: string; prompt: string; options: string[] }
@@ -232,7 +234,9 @@ function Plans({ plans, me, certified, onChange }: { plans: Plan[]; me: string |
 // ── Session ────────────────────────────────────────────────────────────────
 function SessionTab({ plans, onChange }: { plans: Plan[]; onChange: () => Promise<void> }) {
   const [planId, setPlanId] = useState(plans[0]?.id ?? '');
+  const lessons = useMemo(() => allLessons(), []);
   const [modules, setModules] = useState('blueprint/m1/strength'); const [notes, setNotes] = useState(''); const [busy, setBusy] = useState(false);
+  const lesson = useMemo(() => lessons.find((l) => l.ref === modules.split(',')[0]?.trim()) ?? null, [lessons, modules]);
   const [rows, setRows] = useState<CampSessionRow[]>([]);
   const load = useCallback(async (id: string) => { if (!id) return; const r = await api<{ sessions: CampSessionRow[] }>(`/api/v1/camp/sessions?goalPlanId=${id}`); if (!r.error) setRows(r.sessions ?? []); }, []);
   useEffect(() => { if (!planId && plans[0]) setPlanId(plans[0].id); }, [plans, planId]);
@@ -249,7 +253,18 @@ function SessionTab({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
     <section className="space-y-4">
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
         <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white" aria-label="Plan">{plans.map((p) => <option key={p.id} value={p.id}>{p.goalText}</option>)}</select>
-        <input value={modules} onChange={(e) => setModules(e.target.value)} className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white" aria-label="Modules covered" placeholder="blueprint/m1/strength, blueprint/m2/recovery" />
+        <select value={modules} onChange={(e) => setModules(e.target.value)} className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white" aria-label="Lesson covered">
+          {lessons.map((l) => <option key={l.ref} value={l.ref}>{l.ref} — {l.title}</option>)}
+        </select>
+        {lesson && (
+          <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-3 text-xs">
+            <p className="font-semibold text-white/90">{lesson.title}</p>
+            <ul className="mt-1 list-disc pl-4 text-white/60">{lesson.keyPoints.map((k, i) => <li key={i}>{k}</li>)}</ul>
+            <p className="mt-2 text-white/70"><span className="text-cyan-300">Drill:</span> {lesson.drill.text}</p>
+            <Link href={`/play/${lesson.drill.modeKey}`} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 font-bold text-cyan-300"><Play className="h-3.5 w-3.5" /> Play the drill · {lesson.drill.modeKey}</Link>
+            <p className="mt-1 text-[11px] text-white/40">The game attaches itself to this plan when you record the session.</p>
+          </div>
+        )}
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white" placeholder="One honest note: the one thing that changed or did not" />
         <button onClick={record} disabled={busy} className="flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-2 text-xs font-black text-black disabled:opacity-40">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardList className="h-3.5 w-3.5" />} Record session</button>
         <p className="text-[11px] text-white/40">The mentee&apos;s games since the last record attach automatically; PRQ and movement deltas and the resiliency log are computed on the server.</p>

@@ -31,7 +31,12 @@ const link = readFileSync(new URL('../lib/controller-link/schemas/registry.ts', 
   ok(mode.includes('preSnap') && mode.includes('function snap('), 'a pre-snap state and a snap() exist');
   ok(mode.includes('if (preSnap) {') && /preSnapT \+= dt/.test(mode), 'the update loop is gated on the snap');
   ok(mode.includes('PRESNAP_AUTOSNAP_SEC'), 'the auto-snap exists (an idle phone never stalls)');
-  ok(mode.includes('m.startPursuit()') && /for \(const m of defenders\) m\.startPursuit\(\)/.test(mode),
+  // pursuit starts inside snap() — since the pre-snap disguise (2026-09-03) the
+  // snap loop is a block (a shown blitz may drop and start late), so look for
+  // startPursuit inside snap()'s body and NOT in the alignment loop.
+  const snapBody = mode.slice(mode.indexOf('function snap('), mode.indexOf('function ', mode.indexOf('function snap(') + 10));
+  const spawnBody = mode.slice(mode.indexOf('function spawnDefense('), mode.indexOf('function newDrive('));
+  ok(/m\.startPursuit\(\)/.test(snapBody) && !/startPursuit\(\)/.test(spawnBody.replace(/\/\/.*$/gm, '')),
     'pursuit starts AT the snap, not at the spawn');
   ok(!/const mob = new Mob[^;]*;\s*\n\s*mob\.startPursuit\(\)/.test(mode), 'no spawn-time pursuit left');
   ok(mode.includes('READ THE FRONT'), 'the read is presented to the player');

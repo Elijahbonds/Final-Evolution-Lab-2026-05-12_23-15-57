@@ -3,16 +3,19 @@
 // textures, so scenes are FULL today; GLB venue pieces can replace parts later.
 
 import {
-  Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, TransformNode, Vector3,
+  Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, TransformNode, Vector3,
 } from '@babylonjs/core';
 import type { Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
 
-const mat = (scene: Scene, name: string, hex: string, emissive = 0.06): StandardMaterial => {
-  const m = new StandardMaterial(name, scene);
-  m.diffuseColor = Color3.FromHexString(hex);
+/** Venue props are PBR now (Phase 1, 2026-09-03): they take the procedural IBL
+ *  and the tier's shadows like the hero does. Matte by default; the emissive
+ *  floor rule stays so nothing goes black under a dim mood. */
+const mat = (scene: Scene, name: string, hex: string, emissive = 0.06, roughness = 0.85): PBRMaterial => {
+  const m = new PBRMaterial(name, scene);
+  m.albedoColor = Color3.FromHexString(hex);
   m.emissiveColor = Color3.FromHexString(hex).scale(emissive);   // ambient floor rule
-  m.specularColor = new Color3(0.05, 0.05, 0.05);
+  m.metallic = 0; m.roughness = roughness;
   return m;
 };
 
@@ -34,11 +37,10 @@ function paintedGround(
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, 1024, 1024);
   tex.update();
-  const m = new StandardMaterial('venue_ground_mat', scene);
-  m.diffuseTexture = tex;
+  const m = new PBRMaterial('venue_ground_mat', scene);
+  m.albedoTexture = tex;
   m.emissiveColor = Color3.FromHexString(base).scale(0.08);
-  m.specularColor = new Color3(0.14, 0.14, 0.16);   // a floor that catches light
-  m.specularPower = 48;
+  m.metallic = 0; m.roughness = 0.72;                 // a floor that catches light
   ground.material = m;
   ground.receiveShadows = true;
   ground.checkCollisions = false;
@@ -90,8 +92,9 @@ function venueBox(
     (painters[i % painters.length])(ctx, 1024, 256);
     wallJuice(ctx, 1024, 256);          // every venue gets the finish
     tex.update();
-    const m = new StandardMaterial(`wall_mat_${d.name}`, scene);
-    m.diffuseTexture = tex; m.emissiveTexture = tex; m.emissiveColor = new Color3(0.35, 0.35, 0.35);
+    const m = new PBRMaterial(`wall_mat_${d.name}`, scene);
+    m.albedoTexture = tex; m.emissiveTexture = tex; m.emissiveColor = new Color3(0.35, 0.35, 0.35);
+    m.metallic = 0; m.roughness = 0.9;
     m.backFaceCulling = false;
     wall.material = m; wall.isPickable = false;
   });
