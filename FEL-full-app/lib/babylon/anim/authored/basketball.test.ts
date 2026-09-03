@@ -3,7 +3,7 @@
 // key frame and measure where hands, knees and hips actually are.
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { FreeCamera, NullEngine, Scene, SceneLoader, Vector3 } from '@babylonjs/core';
+import { FreeCamera, NullEngine, Quaternion, Scene, SceneLoader, Vector3 } from '@babylonjs/core';
 import type { AnimationGroup, Skeleton, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { boneNode } from '../boneLookup';
@@ -11,7 +11,8 @@ import {
   buildBlockReach, buildCrossover, buildDefendSlide, buildDribbleIdle, buildHesi, buildLayupGather, buildStealReach,
 } from './basketball';
 
-let scene: Scene; let sk: Skeleton; let root: TransformNode;
+let scene: Scene; let sk: Skeleton;
+const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>(); let root: TransformNode;
 
 beforeAll(async () => {
   scene = new Scene(new NullEngine());
@@ -19,10 +20,14 @@ beforeAll(async () => {
   const b64 = readFileSync('public/models/fel-hero.glb').toString('base64');
   const r = await SceneLoader.ImportMeshAsync('', '', 'data:model/gltf-binary;base64,' + b64, scene, undefined, '.glb');
   for (const g of r.animationGroups) g.stop();
-  sk = r.skeletons[0]; root = r.meshes[0] as TransformNode;
+  sk = r.skeletons[0];
+  for (const b of sk.bones) { const n = b.getTransformNode(); if (n) bind.set(n, { p: n.position.clone(), q: (n.rotationQuaternion ?? Quaternion.Identity()).clone() }); } root = r.meshes[0] as TransformNode;
 });
 
 function at(g: AnimationGroup, sec: number): void {
+  // one clip at a time, from bind: a stopped group leaves the bones it keyed where they were
+  for (const x of scene.animationGroups) x.stop();
+  for (const [n, t] of bind) { n.position.copyFrom(t.p); n.rotationQuaternion = t.q.clone(); }
   g.start(false, 1, g.from, g.to, false); g.goToFrame(sec * 30); scene.render();
 }
 function pos(name: string): Vector3 {

@@ -47,9 +47,17 @@ function stepsOneWindUp(difficulty: number): boolean {
   }
   return false;
 }
-/** A read of the wind-up is either answer. */
+/** A read of the wind-up is either answer — judged on ONE brain's one roll. */
 function readsOneWindUp(difficulty: number): boolean {
-  return blocksOneWindUp(difficulty) || stepsOneWindUp(difficulty);
+  const brain = new RivalFightBrain(difficulty);
+  const self = new Vector3(0, 0, 0);
+  const foe = new Vector3(0, 0, 1.5);
+  const state = new FighterState();
+  for (let f = 0; f < STARTUP_FRAMES; f++) {
+    const a = brain.decide(DT, self, foe, state, true);
+    if (a.block || (Math.abs(a.moveX) > 0.8 && Math.abs(a.moveY) < 0.2)) return true;
+  }
+  return false;
 }
 
 // ── A. the guard is a read, not a wall ─────────────────────────────────────

@@ -13,6 +13,7 @@ import { buildHitReact, buildKnockdown } from './karate';
 import {
   buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildDefendSlide, buildBlockReach, buildStealReach,
 } from './basketball';
+import { buildBatStance, buildBatSwing, buildPitchOver, buildPitchSide } from './baseball';
 import {
   buildBoardRideIdle, buildBoardCarveLeft, buildBoardCarveRight, buildBoardTuck,
   buildBoardGrab, buildBoardAir, buildBoardGrind, buildBoardLand,
@@ -67,6 +68,11 @@ export function registerAuthoredClips(
     () => buildDefendSlide(scene, skeleton, 'right'),
     () => buildBlockReach(scene, skeleton),
     () => buildStealReach(scene, skeleton),
+    // Baseball packages (Phase 6, 2026-09-03) — the derby borrowed karate clips.
+    () => buildBatStance(scene, skeleton),
+    () => buildBatSwing(scene, skeleton),
+    () => buildPitchOver(scene, skeleton),
+    () => buildPitchSide(scene, skeleton),
   ];
   const registered: string[] = [];
   for (const b of builders) {

@@ -16,7 +16,7 @@ concept-lock docs.
 | **3 Avatar builder** 🔶 face, morphs, sliders, likeness, hair styles, 8-body roster done |  Morph targets in the forge (brow, jaw, mouth, blink + body proportions) exposed as Closet sliders; expanded skin tones, hair styles, kits; photo-to-avatar likeness fit; more authored hero clips per sport. Material name contract untouched. | Closet round-trip: a saved look renders identically in the preview and in a mode. |
 | **4 Basketball to benchmark** 🔶 animation packages live |  dunk, threepoint, onevone, threevthree, dunkduel brought to their locked inspirators (NBA Live 08 contest, NBA 2K feel). Depth of control, AI, presentation. | §7 sign-off per mode against `PHASE2_BENCHMARK_LOCKS.md`. |
 | **5 Combat, board, air** 🔶 mixed combat sidestep, big air direction |  karate, karate_vs (the Storm mode), mixedcombat (Soul Calibur style), skateboard, surf, snowboard_slalom, bigair (SSX), gymnastics. | §7 sign-off per mode. |
-| **6 Net, precision, field, party** 🔶 volleyball net touch |  volleyball (Switch Sports), tennis, golf, derby, penalty, football, carnival (Mario Party / Pac-Man Fever), dance (Class of 3000). | §7 sign-off per mode. |
+| **6 Net, precision, field, party** 🔶 volleyball net touch, baseball clips |  volleyball (Switch Sports), tennis, golf, derby, penalty, football, carnival (Mario Party / Pac-Man Fever), dance (Class of 3000). | §7 sign-off per mode. |
 | **7 Camp Blueprint — model + content** | Curriculum bodies + assessments authored into the Educational Track; `CurriculumAssessment` + credential (80% pass, owner revoke); `CreatorCard.kind='facilitator'`; `FacilitatorProfile`, `GoalPlan` (on `CoachingProgram`), `CampSession` (on `ClientSession`), `CampTemplate`; guardian consent gate; resiliency = retry rate after failed attempts. | Prisma migration applied; unit tests on the read-model and the metric. |
 | **8 Camp Blueprint — flows** | Facilitator onboarding, intake with AI-coach follow-ups, session runner (curriculum beside a game mode, subscribed to `resultSink`), template export/fork with curriculum versioning; coaching-program backend persisted. | Each flow walked end to end on the dev server with screenshots. |
 | **9 Ship hardening** | Mobile tier verified on the mobile capture for every mode; `build:check` clean; auth/prod config reviewed; retired routes confirmed dark; docs and handoff current; final gauntlet green on all 21 modes. | Ship sign-off. |
@@ -85,3 +85,11 @@ concept-lock docs.
   Volleyball: an early block jump is a NET TOUCH fault (it was falling into
   the stuff branch and being rewarded). The gauntlet now sweeps all 21
   roster modes, not 14.
+- **2026-09-03, Phase 6 (baseball) + Phase 5 (air).** The derby's stance,
+  swing and pitch were the karate guard, uppercut and jab. A rig-measured
+  baseball suite replaces them (`authored/baseball.ts`, solved with
+  `_arm-solve.mts` under each clip's torso keys): a real bat stance and swing,
+  an over-the-top delivery for the fastball and the same-look changeup, and a
+  three-quarter slot for the slider. Gymnastics and big air hold the end
+  screen until the last landing's banner has shown. The 21-mode sweep is
+  green on all of it.

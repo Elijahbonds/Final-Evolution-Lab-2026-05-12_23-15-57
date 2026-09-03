@@ -41,6 +41,8 @@ export const REAL_CLIPS = new Set<string>([
   'bball_dribble_idle', 'bball_crossover_left', 'bball_crossover_right', 'bball_hesi',
   'bball_layup_gather', 'bball_defend_slide_left', 'bball_defend_slide_right',
   'bball_block_reach', 'bball_steal_reach',
+  // baseball packages (anim/authored/baseball) — Phase 6, 2026-09-03
+  'baseball_stance', 'baseball_swing', 'baseball_pitch_over', 'baseball_pitch_side',
   // board suite — skate / surf / snowboard share these (anim/authored/boardSuite)
   'board_ride_idle', 'board_carve_left', 'board_carve_right', 'board_tuck',
   'board_grab', 'board_air', 'board_grind', 'board_land',
@@ -136,9 +138,10 @@ export const SPORT_CLIP = {
   golfSwing: 'roundhouse',
   tennisIdle: 'guard',
   tennisForehand: 'jab',
-  derbyStance: 'guard',
-  derbySwing: 'uppercut',
-  derbyPitch: 'jab',
+  derbyStance: 'baseball_stance',        // Phase 6: real bat stance (was the karate guard)
+  derbySwing: 'baseball_swing',          // (was the uppercut)
+  derbyPitch: 'baseball_pitch_over',     // fastball + changeup: the same look, by design
+  derbyPitchSide: 'baseball_pitch_side', // the slider's three-quarter arm slot
   penaltyIdle: 'guard',
   penaltyStrike: 'high_kick',
   keeperIdle: 'guard',

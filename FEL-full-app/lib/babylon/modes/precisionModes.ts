@@ -665,7 +665,6 @@ export const DerbyMode: ModeDefinition = (() => {
     // FEL-FRAME). snap=true is a hard cut to the swing camera's fixed spot;
     // snapTo() can't reproduce it (it computes its own behind-vector).
     ctx.camDirector.setFixedBehind(me.root.position, Math.PI, 'swing', true);
-    pitcher.animator.play(SPORT_CLIP.derbyPitch, { onEnd: () => pitcher.animator.play(SPORT_CLIP.idle, { loop: true }) });
     // EVERY PITCH USED TO ARRIVE AT THE SAME SPOT — same origin, same velocity —
     // so there was nothing to read and nothing for a PCI to cover. Location now
     // varies across the zone, and the pitch is aimed AT that location so the
@@ -674,6 +673,9 @@ export const DerbyMode: ModeDefinition = (() => {
     // changeups take speed off. The pitch aims at the PRE-break spot; the
     // break lands it at `arrive`, which is where the PCI must actually be.)
     const spec = pitchSpec(round);
+    // The slider comes from a three-quarter slot; the changeup deliberately
+    // shares the fastball's look (the ball flight is the tell, not the arm).
+    pitcher.animator.play(spec.type === 'slider' ? SPORT_CLIP.derbyPitchSide : SPORT_CLIP.derbyPitch, { onEnd: () => pitcher.animator.play(SPORT_CLIP.idle, { loop: true }) });
     pitchAt = spec.arrive.clone();
     pitchBreakA = spec.breakShift === 0 ? 0
       : (2 * spec.breakShift) / Math.pow(0.45 * (17.5 / spec.speed), 2);

@@ -211,7 +211,13 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       // re-deriving them keeps the HUD honest and the end condition single-sourced.
       S.score = st.score;
       S.attempt = st.attempt;
-      if (st.finished || st.phase === 'Done') { finish(ctx); return; }
+      if (st.finished || st.phase === 'Done') {
+        // The final attempt's grade gets its own beat (gymnastics carry-forward
+        // #1): the last landing's banner used to be cut off by the end screen
+        // on the same frame it appeared. Hold the finish until it has shown.
+        if (S.bannerT > 0) { S.bannerT -= dt; pushHud(ctx); return; }
+        finish(ctx); return;
+      }
 
       if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
 
