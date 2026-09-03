@@ -16,6 +16,14 @@ app; nothing is inferred from documentation.
   or proposed for change.
 - **One mode at a time** — this report ranks, it does not start.
 
+> **Status 2026-09-03:** of the ranking in §4, items 0–4 and 6–7 have landed
+> (character path, tiers with SSAO + cascades, secondary motion, skin
+> subsurface + generated pore normals, two-foot planting, SSAO, PBR venue kit /
+> ride worlds / ocean court), item 5 in part (pore normals; no authored
+> roughness maps), item 11 in part (seven head morphs, hair-style geometry).
+> Still open: cloth/hair spring motion (10), LOD/streaming (12), real HDR IBL
+> (9), the venue scene's duplicate shadow pass. See `docs/SHIP-PASS-PLAN.md`.
+
 ## 1. THE FINDING THAT REORDERS EVERYTHING
 
 > **Status 2026-09-02 (later the same day):** owner chose the forge GLB. `PROCEDURAL_CHARACTERS` now defaults off; every mode and the mobile trio re-verified green on the GLB path (see `docs/SHIP-PASS-PLAN.md`).
