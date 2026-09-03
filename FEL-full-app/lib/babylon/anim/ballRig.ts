@@ -19,6 +19,7 @@ export function attachBallToHand(
   const node = handNode(skeleton, hand);
   if (!node) { console.warn(`[FEL-BALL] no ${hand} bone`); return false; }
   ball.setParent(node);
+  (ball.metadata ??= {}).felReleased = false;
   ball.position.copyFrom(PALM_OFFSET);
   ball.rotationQuaternion = null;
   return true;
@@ -26,6 +27,7 @@ export function attachBallToHand(
 
 /** Detach into world space keeping the world transform (flight/physics). */
 export function releaseBall(ball: AbstractMesh): void {
+  (ball.metadata ??= {}).felReleased = true;   // ballCarry: not ours to hand back
   ball.setParent(null);   // Babylon setParent(null) preserves world transform
 }
 

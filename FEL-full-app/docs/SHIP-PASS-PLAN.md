@@ -12,7 +12,7 @@ concept-lock docs.
 |---|---|---|
 | **0 Character path** ✅ 2026-09-02 | Forge GLB is the default spawn in every mode (`PROCEDURAL_CHARACTERS` now opt-in). Gauntlet green on the GLB path: 14 desktop modes 0/0/0 at 60 fps, mobile trio 0 errors; four empty-URL spawns fixed; 1v1 corner camera fixed. | Gauntlet diff vs the procedural baseline shows no new frame-guard hits, no missing clips, no errors. |
 | **1 Shared rendering** 🔶 tiers, PBR kit/worlds/court done |  Quality tiers on the light rig's existing pipeline (already mounts ACES tone-map, bloom, FXAA, sharpen, vignette, 1024 soft shadows in every mode). Desktop 60 fps adds SSAO and cascaded shadows outdoors; mobile 30 fps keeps bloom + tone-map only. The unused duplicate `RenderPipeline.ts` is retired. `VenueKit` / ride worlds / `CourtSurface` converted to PBR. Procedural IBL stays v1. | Per-mode frame budget re-measured on both tiers; no mode below its floor. |
-| **2 Character fidelity** 🔶 skin/cloth/secondary done; planting node-space |  Forge `skin` gets PBR subsurface; normal + roughness maps authored in the forge; secondary animation layer (head look-at, breathing, idle weight shift); two-foot IK planting everywhere + hand IK for ball grip in basketball. No root-motion rewrite. | Pose gate + pipeline tests green; side-by-side captures before/after per mode family. |
+| **2 Character fidelity** ✅ skin/cloth/secondary/planting/hand-IK dribble |  Forge `skin` gets PBR subsurface; normal + roughness maps authored in the forge; secondary animation layer (head look-at, breathing, idle weight shift); two-foot IK planting everywhere + hand IK for ball grip in basketball. No root-motion rewrite. | Pose gate + pipeline tests green; side-by-side captures before/after per mode family. |
 | **3 Avatar builder** 🔶 face, morphs, sliders, likeness, hair styles, 8-body roster done |  Morph targets in the forge (brow, jaw, mouth, blink + body proportions) exposed as Closet sliders; expanded skin tones, hair styles, kits; photo-to-avatar likeness fit; more authored hero clips per sport. Material name contract untouched. | Closet round-trip: a saved look renders identically in the preview and in a mode. |
 | **4 Basketball to benchmark** 🔶 packages, free-approach dunk, alley-oop |  dunk, threepoint, onevone, threevthree, dunkduel brought to their locked inspirators (NBA Live 08 contest, NBA 2K feel). Depth of control, AI, presentation. | §7 sign-off per mode against `PHASE2_BENCHMARK_LOCKS.md`. |
 | **5 Combat, board, air** 🔶 sidestep, spin direction; horde pass staged |  karate, karate_vs (the Storm mode), mixedcombat (Soul Calibur style), skateboard, surf, snowboard_slalom, bigair (SSX), gymnastics. | §7 sign-off per mode. |
@@ -214,6 +214,25 @@ concept-lock docs.
   turning in place is not fought. Round five (first with logged-in captures):
   21 modes 0/0/0, three logged-in modes 0/0/0 with every material ready, mobile
   trio clean, 182 tests.
+- **2026-09-03, round six (planting on, node-space): no regressions.** 21 modes
+  0/0/0 except carnival at 5 frame-guard lines, all the camera director's
+  "boxed in on all probed angles — overhead fallback" warning; a lone re-run was
+  0/0/0. Residual camera flake in a randomly shuffled party venue, not
+  planting. Left on the Phase 9 list: make the box-in probe tolerate a venue
+  that occludes every angle without warning five times.
+- **2026-09-03, the ball leaves the hand (Phase 2's last item, hand IK on the
+  ball).** Every basketball mode had the ball parented to the palm, so a drive
+  read as carrying. Now `ballCarry` (pure `Dribble` cycle + `HandIK` on the
+  node-space solver) bounces the ball beside the root at a cadence set by
+  speed and reaches the carrying arm for it; a crossover swaps hands. Shots,
+  dunks, passes and steals put the ball back in the palm through the existing
+  paths (a released ball is marked so the carry never re-grabs it). Wired in
+  the 1v1 (me and the rival's drive) and the 3v3 (my team's carrier). The
+  1v1's plant-and-cut helper moved off `BoneIKController` too (the last user).
+  Applied in `onAfterAnimationsObservable`: the harness updates modes before
+  the clips evaluate, so a bone written from update is overwritten a frame
+  later — measured, and now a standing rule. 199 tests; logged-in 1v1 and 3v3
+  captures 0/0/0 with the ball on the floor mid-bounce in both frames.
 - **2026-09-03, Phase 9 item: production build check clean.** `npm run
   build:check` (a separate dist dir, the dev server untouched) exited 0 on the
   planting-on state with no type or lint failures.

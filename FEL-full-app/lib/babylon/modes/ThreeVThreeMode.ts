@@ -21,6 +21,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
 import { attachBallToHand, releaseBall } from '../anim/ballRig';
+import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
 import {
   DribbleController, ShotMeter, DefenderBrain, TeammateBrain, contestLevel, clampToHalfCourt, isThree,
@@ -77,6 +78,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let foeCloseMem: number[] = [];
   let myJumpAge = Infinity;                      // block-jump timer (defense)
   const passFlight = new PassFlight();
+  const carries = new Map<Body, BallCarry>();   // live dribble per body on my team
+  let meSpeed01 = 0;
   let passTargetId: 'mate0' | 'mate1' = 'mate0';
   let passType: PassType = 'chest';
   /** Each teammate's velocity this frame — the lob needs to know who is CUTTING (D7). */
@@ -170,6 +173,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       ];
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
+      carries.forEach((c) => c.dispose()); carries.clear();
+      for (const b of [me, ...mates]) carries.set(b, mountBallCarry({ scene: ctx.scene, ball, root: b.char.root, skeleton: b.char.skeleton }));
       ballSim = new BallSim(ball, 0.12);
       shotMeter = new ShotMeter();
       turbo = new TurboMeter();
@@ -211,6 +216,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         return ctx.end(myScore >= foeScore ? 'WIN' : 'LOSS', myScore, { foeScore, assists });
       }
       ctx.setHud({ time: Math.ceil(timeLeft) });
+      // the carrier dribbles (ball off the palm, arm reaches); everyone else's
+      // carry is idle. Shots, dunks and passes put the ball back in the palm.
+      const cbNow = carrierBody();
+      for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : 0.5, cbNow === b && !shooting && !dunking && !passFlight.active);
 
       // poll every body; tick stagger timers
       for (const b of everyBody()) { b.slot.poll(dt); b.stunSec = Math.max(0, b.stunSec - dt); }
@@ -255,6 +264,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
       const drib = me.drib.update(dt, meIntent.moveX, meIntent.moveY, sprintOk);
+      meSpeed01 = drib.speed01;
+      if (drib.crossover) carries.get(me)?.switchHand();
       if (!shooting && !dunking) {
         me.char.root.position.addInPlace(me.drib.vel.scale(dt));
         clampToHalfCourt(me.char.root.position, 8, 15);
@@ -472,6 +483,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      carries.forEach((c) => c.dispose()); carries.clear();
       threeVenue?.dispose(); threeVenue = null;  // M74
       me?.char.dispose(); mates.forEach((m) => m.char.dispose()); foes.forEach((f) => f.char.dispose());
       ball?.dispose(); SoundKit.stopAmbient();

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Bone, Matrix, MeshBuilder, NullEngine, Quaternion, Scene, Skeleton, TransformNode, Vector3 } from '@babylonjs/core';
 import { DEFAULT_DRIBBLE as P } from './Dribble';
 import { mountBallCarry } from './ballCarry';
-import { attachBallToHand } from './ballRig';
+import { attachBallToHand, releaseBall } from './ballRig';
 
 /** A root with a right arm whose bones are linked to TransformNodes, like the glTF hero. */
 function rig(scene: Scene) {
@@ -82,5 +82,17 @@ describe('ballCarry', () => {
     r.ball.setParent(thief);                                  // the mode re-parents on a steal
     carry.update(0.016, 0, false);
     expect(r.ball.parent).toBe(thief);
+  });
+  it('leaves a released ball flying when it deactivates in the same frame', () => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk });
+    carry.update(0.016, 0.5, true);
+    releaseBall(r.ball);                                      // the shot leaves the hand
+    carry.update(0.016, 0, false);
+    expect(r.ball.parent).toBeNull();
+    // and the next possession clears the mark
+    attachBallToHand(r.ball, r.sk, 'RightHand');
+    expect(r.ball.metadata?.felReleased).toBe(false);
   });
 });

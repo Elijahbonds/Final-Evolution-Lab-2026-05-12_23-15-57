@@ -13,8 +13,9 @@
 // rotates around it — no foot-skate through the cut. Court is flat, so
 // this is the whole IK scope for Mode 1 (deliberate).
 
-import { Vector3, BoneIKController } from '@babylonjs/core';
-import type { Mesh, Skeleton, TransformNode } from '@babylonjs/core';
+import { Vector3 } from '@babylonjs/core';
+import type { Mesh, Observer, Scene, Skeleton, TransformNode } from '@babylonjs/core';
+import { plantLeg } from './FootPlanting';
 import type { CharacterAnimator } from './CharacterAnimator';
 import { boneNode, findBone } from './boneLookup';
 
@@ -98,13 +99,19 @@ export class BasketballAnimTree {
 export const PLANT_LOCK_SEC = 0.18;
 
 export class FootPlant {
-  private lock: { foot: 'Left' | 'Right'; target: TransformNode; left: number; ik: BoneIKController } | null = null;
+  // 2026-09-03: BoneIKController wrote bone matrices that this linked-node rig
+  // decomposed into non-uniform scale (measured 0.94/0.85/0.91 — the Closet
+  // "explosion"). The pin is now the node-space two-bone solver, applied in
+  // onAfterAnimationsObservable so the clip's own leg pose is what gets pinned
+  // (the harness updates modes BEFORE the clips evaluate).
+  private lock: { foot: 'Left' | 'Right'; pin: Vector3; left: number; obs: Observer<Scene> } | null = null;
 
   constructor(private skeleton: Skeleton, private mesh: Mesh) {}
 
   /** Which foot is planted (the one currently lower/forward) — captured at
-   *  plant start so the cut rotates around a fixed contact point. */
-  plant(sceneFootTarget: (name: string) => TransformNode): void {
+   *  plant start so the cut rotates around a fixed contact point. The factory
+   *  argument is kept for callers; no scene node is needed any more. */
+  plant(_sceneFootTarget?: (name: string) => TransformNode): void {
     if (this.lock) return;
     const lf = findBone(this.skeleton, 'LeftFoot');
     const rf = findBone(this.skeleton, 'RightFoot');
@@ -112,29 +119,32 @@ export class FootPlant {
     const ly = lf.getTransformNode()?.getAbsolutePosition().y ?? 0;
     const ry = rf.getTransformNode()?.getAbsolutePosition().y ?? 0;
     const side = ly <= ry ? 'Left' : 'Right';
-    const footBone = side === 'Left' ? lf : rf;
-    const footNode = footBone.getTransformNode();
-    if (!footNode) return;
-    const target = sceneFootTarget(`plantTarget_${side}`);
-    target.position.copyFrom(footNode.getAbsolutePosition());
-    // BoneIKController has no enabled flag — it applies on update() only.
-    // We call update() each frame while the lock is held; on release the
-    // animator's per-frame bone writes take back over (no snap-back needed).
-    const ik = new BoneIKController(this.mesh, footBone, { targetMesh: target as never, poleTargetMesh: undefined });
-    this.lock = { foot: side, target, left: PLANT_LOCK_SEC, ik };
+    const hip = findBone(this.skeleton, `${side}UpLeg`)?.getTransformNode();
+    const knee = findBone(this.skeleton, `${side}Leg`)?.getTransformNode();
+    const ankle = (side === 'Left' ? lf : rf).getTransformNode();
+    if (!hip || !knee || !ankle) return;
+    ankle.computeWorldMatrix(true);
+    const pin = ankle.getAbsolutePosition().clone();
+    const scene = this.mesh.getScene();
+    const target = new Vector3();
+    const obs = scene.onAfterAnimationsObservable.add(() => {
+      ankle.computeWorldMatrix(true);
+      target.set(pin.x, ankle.getAbsolutePosition().y, pin.z);   // the clip keeps its height
+      plantLeg(hip, knee, ankle, target, this.mesh.forward);
+    });
+    this.lock = { foot: side, pin, left: PLANT_LOCK_SEC, obs };
   }
 
-  /** Advance; applies the IK pin and releases when the plant window ends. */
+  /** Advance the lock window; the pin itself runs after animations. */
   update(dt: number): void {
     if (!this.lock) return;
-    this.lock.ik.update();
     this.lock.left -= dt;
     if (this.lock.left <= 0) this.release();
   }
 
   release(): void {
     if (!this.lock) return;
-    this.lock.target.dispose();
+    this.mesh.getScene().onAfterAnimationsObservable.remove(this.lock.obs);
     this.lock = null;
   }
 

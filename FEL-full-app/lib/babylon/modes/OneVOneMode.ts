@@ -42,6 +42,7 @@ import { DribbleStateMachine, DRIBBLE_CLIP, syncedShotSpeed } from '../core/Ball
 import { ContactSystem } from '../core/ContactSystem';
 import { MomentumBus } from '../core/MomentumBus';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
+import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { assertSpawned } from '../core/FrameGuard';
@@ -80,6 +81,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let meDribbleSM: DribbleStateMachine;
   let meAnimTree: BasketballAnimTree;
   let meFootPlant: FootPlant;
+  let meCarry: BallCarry | null = null, foeCarry: BallCarry | null = null;   // live dribble (ball off the palm)
   let wasPlanting = false;
   let shotMeter: ShotMeter;
   let turbo: TurboMeter;
@@ -231,6 +233,9 @@ export const OneVOneMode: ModeDefinition = (() => {
       meDribbleSM = new DribbleStateMachine();
       meAnimTree = new BasketballAnimTree(me.animator);
       meFootPlant = new FootPlant(me.skeleton, me.meshes[0] as never);
+      meCarry?.dispose(); foeCarry?.dispose();
+      meCarry = mountBallCarry({ scene: ctx.scene, ball, root: me.root, skeleton: me.skeleton });
+      foeCarry = mountBallCarry({ scene: ctx.scene, ball, root: foe.root, skeleton: foe.skeleton });
       shotMeter = new ShotMeter();
       turbo = new TurboMeter();
       arc = new ShotArc();
@@ -362,6 +367,9 @@ export const OneVOneMode: ModeDefinition = (() => {
           }
           wasPlanting = drib.planting;
           meFootPlant.update(dt);
+          // the ball leaves the palm while I carry; a crossover swaps hands
+          meCarry?.update(dt, drib.speed01, carrying && !shooting && !dunking);
+          if (drib.crossover) meCarry?.switchHand();
           if (drib.crossover) {
             SoundKit.play('whoosh', { pitch: 1.4, volume: 0.4 });
             ctx.feel?.impact?.(0.1);
@@ -482,6 +490,8 @@ export const OneVOneMode: ModeDefinition = (() => {
       }
 
       // ══ THEIR POSSESSION — you defend ══
+      if (possession !== 'mine') meCarry?.update(dt, 0, false);
+      if (possession !== 'defense' || defReleased) foeCarry?.update(dt, 0, false);
       if (possession === 'defense') {
         defSec += dt;
         meStunSec = Math.max(0, meStunSec - dt);
@@ -524,7 +534,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           }
           foe.root.rotation.y = Math.PI;
           foe.animator.play(SPORT_CLIP.moveLoop, { loop: true });
-          attachBallToHand(ball, foe.skeleton, 'RightHand');
+          foeCarry?.update(dt, 0.75, true);   // the rival dribbles the lane
 
           // STEAL poke: a read, not a dice roll. The rival's weave EXPOSES
           // the ball — poke while they're mid-crossover and it's yours; reach
@@ -556,6 +566,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           // release moment
           if (defSec >= DEFENSE_DRIVE_SEC && !defResolved) {
             defReleased = true;
+            foeCarry?.update(0, 0, false);   // gather: back in the palm, then the release
             releaseBall(ball);
             foe.animator.play('jumpshot', { onEnd: () => foe.animator.play(SPORT_CLIP.idle, { loop: true }) });
             // BLOCK check — a timed jump in range erases it
@@ -589,6 +600,7 @@ export const OneVOneMode: ModeDefinition = (() => {
 
     dispose() {
       meFootPlant?.dispose();
+      meCarry?.dispose(); foeCarry?.dispose(); meCarry = null; foeCarry = null;
       contact?.dispose(); contact = null;
       me?.dispose(); foe?.dispose(); ball?.dispose();
       meSlot?.dispose(); foeSlot?.dispose();
