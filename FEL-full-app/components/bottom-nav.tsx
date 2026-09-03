@@ -38,6 +38,7 @@ const SECONDARY = [
   { href: '/create', label: 'Create' },
   { href: '/live', label: 'Live' },
   { href: '/coach', label: 'Coach' },
+  { href: '/camp', label: 'Camp' },
   { href: '/support', label: 'Support' },
   { href: '/terms', label: 'Terms' },
   { href: '/privacy', label: 'Privacy' },

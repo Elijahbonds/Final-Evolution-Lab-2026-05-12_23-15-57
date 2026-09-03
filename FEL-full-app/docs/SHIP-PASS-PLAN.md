@@ -18,7 +18,7 @@ concept-lock docs.
 | **5 Combat, board, air** 🔶 mixed combat sidestep, big air direction |  karate, karate_vs (the Storm mode), mixedcombat (Soul Calibur style), skateboard, surf, snowboard_slalom, bigair (SSX), gymnastics. | §7 sign-off per mode. |
 | **6 Net, precision, field, party** 🔶 volleyball net touch, baseball clips |  volleyball (Switch Sports), tennis, golf, derby, penalty, football, carnival (Mario Party / Pac-Man Fever), dance (Class of 3000). | §7 sign-off per mode. |
 | **7 Camp Blueprint — model + content** 🔶 model, curriculum draft, API live |  Curriculum bodies + assessments authored into the Educational Track; `CurriculumAssessment` + credential (80% pass, owner revoke); `CreatorCard.kind='facilitator'`; `FacilitatorProfile`, `GoalPlan` (on `CoachingProgram`), `CampSession` (on `ClientSession`), `CampTemplate`; guardian consent gate; resiliency = retry rate after failed attempts. | Prisma migration applied; unit tests on the read-model and the metric. |
-| **8 Camp Blueprint — flows** | Facilitator onboarding, intake with AI-coach follow-ups, session runner (curriculum beside a game mode, subscribed to `resultSink`), template export/fork with curriculum versioning; coaching-program backend persisted. | Each flow walked end to end on the dev server with screenshots. |
+| **8 Camp Blueprint — flows** 🔶 four screens live |  Facilitator onboarding, intake with AI-coach follow-ups, session runner (curriculum beside a game mode, subscribed to `resultSink`), template export/fork with curriculum versioning; coaching-program backend persisted. | Each flow walked end to end on the dev server with screenshots. |
 | **9 Ship hardening** | Mobile tier verified on the mobile capture for every mode; `build:check` clean; auth/prod config reviewed; retired routes confirmed dark; docs and handoff current; final gauntlet green on all 21 modes. | Ship sign-off. |
 
 ## Standing rules
@@ -119,3 +119,10 @@ concept-lock docs.
   uncertified user cannot draft (403) and a mentee cannot read another's
   profile (403). The dev server had to be restarted to load the regenerated
   Prisma client — every new route 500'd until then.
+- **2026-09-03, Phase 8 screens live.** `/camp` (auth-gated, in the nav) carries
+  the four flows as tabs over the API: Certify (module assessments, pass
+  states), Plans (intake with mentee lookup by email, coach follow-ups,
+  say-it-back, milestones, lock / activate, guardian-consent request),
+  Session (record with modules and a note; deltas and the resiliency log read
+  back), Templates (export & publish, fork, import with the version prompt).
+  Walked as both accounts with `scripts/camp-ui-walk.mts`: zero console errors.
