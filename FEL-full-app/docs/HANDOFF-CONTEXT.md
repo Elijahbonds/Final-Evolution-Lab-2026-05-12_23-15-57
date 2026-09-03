@@ -305,3 +305,10 @@ stand:
   that rig before anything else. Authoring rule: solve hands UNDER the clip's
   torso keys (`_arm-solve.mts … torso:hipsX,hipsY,hipsZ,spineX,spineY,spineZ`),
   key `Hips` in every clip, and test builders from bind.
+- **Later 2026-09-03, the dev server between sweeps.** The preview-managed
+  `fel-dev` server (:3000) has died twice while the session idled between
+  loop wakes (gone from `preview_list`, no logs). A sweep whose every line is
+  NO RESULT with `ERR_CONNECTION_REFUSED` is that, not the code. Each wake now
+  does `preview_start fel-dev` (reuses a live server), warms `/dev/mode/dunk`,
+  `/dev/mode/onevone` and `/play/skateboard`, then runs the gauntlet — the
+  warm-up avoids the cold-compile first-frame "hero off-screen" line.
