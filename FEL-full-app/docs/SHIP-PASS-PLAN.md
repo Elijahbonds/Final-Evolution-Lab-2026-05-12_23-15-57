@@ -276,6 +276,13 @@ concept-lock docs.
   football, dance at 60 fps with the lighter rig engaged (karate 89 meshes on
   the mobile tier against 106 on desktop; skateboard 82 against 74 — the tier
   drops post-passes, not meshes, so parity there is expected). 211 tests.
+- **2026-09-03, round ten (first attempt) was an outage, not a regression.**
+  Every capture reported NO RESULT with `ERR_CONNECTION_REFUSED`: the
+  preview-managed dev server had gone away between rounds (its process was no
+  longer listed). The suite passed 211 on a re-run (the sweep's "1 failed" was
+  a transient in the same window). Server restarted, the round-nine baseline
+  restored, the sweep re-run. Rule: a sweep whose every line is NO RESULT is
+  the server, not the code — check `curl localhost:3000` before reading it.
 - **2026-09-03, Phase 9 item: production build check clean.** `npm run
   build:check` (a separate dist dir, the dev server untouched) exited 0 on the
   planting-on state with no type or lint failures.
