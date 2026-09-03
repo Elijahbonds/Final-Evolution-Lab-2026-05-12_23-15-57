@@ -106,6 +106,13 @@ export class FrameGuard {
     const onScreen = p.z > 0 && p.z < 1 && p.x > -w * 0.05 && p.x < w * 1.05 && p.y > -h * 0.05 && p.y < h * 1.1;
     if (onScreen) { this.missStreak = 0; return; }
     this.missStreak++;
+    // A SINGLE sample is not a framing failure. The guard acts on the second
+    // consecutive miss for a reason, and logging the first put "1x (off RIGHT)"
+    // lines in the gauntlet for a hero dead ahead of the camera — the one
+    // sample that lands on a hard cut's frame, whose projection came from the
+    // camera before the cut (dunk, 2026-09-03, identical numbers every load).
+    // Persistent loss still logs and recenters on the very next sample.
+    if (this.missStreak < 2) return;
     // Say WHICH WAY it left the frame. "off-screen" plus two world positions
     // has repeatedly cost hours: behind the camera, below the bottom edge and
     // past the left edge are three different bugs with three different fixes,
