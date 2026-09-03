@@ -11,7 +11,7 @@ concept-lock docs.
 | Phase | Deliverable | Gate |
 |---|---|---|
 | **0 Character path** ✅ 2026-09-02 | Forge GLB is the default spawn in every mode (`PROCEDURAL_CHARACTERS` now opt-in). Gauntlet green on the GLB path: 14 desktop modes 0/0/0 at 60 fps, mobile trio 0 errors; four empty-URL spawns fixed; 1v1 corner camera fixed. | Gauntlet diff vs the procedural baseline shows no new frame-guard hits, no missing clips, no errors. |
-| **1 Shared rendering** 🔶 tiers done |  Quality tiers on the light rig's existing pipeline (already mounts ACES tone-map, bloom, FXAA, sharpen, vignette, 1024 soft shadows in every mode). Desktop 60 fps adds SSAO and cascaded shadows outdoors; mobile 30 fps keeps bloom + tone-map only. The unused duplicate `RenderPipeline.ts` is retired. `VenueKit` / ride worlds / `CourtSurface` converted to PBR. Procedural IBL stays v1. | Per-mode frame budget re-measured on both tiers; no mode below its floor. |
+| **1 Shared rendering** 🔶 tiers, PBR kit/worlds/court done |  Quality tiers on the light rig's existing pipeline (already mounts ACES tone-map, bloom, FXAA, sharpen, vignette, 1024 soft shadows in every mode). Desktop 60 fps adds SSAO and cascaded shadows outdoors; mobile 30 fps keeps bloom + tone-map only. The unused duplicate `RenderPipeline.ts` is retired. `VenueKit` / ride worlds / `CourtSurface` converted to PBR. Procedural IBL stays v1. | Per-mode frame budget re-measured on both tiers; no mode below its floor. |
 | **2 Character fidelity** 🔶 skin/cloth/secondary/planting done |  Forge `skin` gets PBR subsurface; normal + roughness maps authored in the forge; secondary animation layer (head look-at, breathing, idle weight shift); two-foot IK planting everywhere + hand IK for ball grip in basketball. No root-motion rewrite. | Pose gate + pipeline tests green; side-by-side captures before/after per mode family. |
 | **3 Avatar builder** 🔶 face, morphs, sliders, likeness, hair styles, 8-body roster done |  Morph targets in the forge (brow, jaw, mouth, blink + body proportions) exposed as Closet sliders; expanded skin tones, hair styles, kits; photo-to-avatar likeness fit; more authored hero clips per sport. Material name contract untouched. | Closet round-trip: a saved look renders identically in the preview and in a mode. |
 | **4 Basketball to benchmark** 🔶 packages, free-approach dunk, alley-oop |  dunk, threepoint, onevone, threevthree, dunkduel brought to their locked inspirators (NBA Live 08 contest, NBA 2K feel). Depth of control, AI, presentation. | §7 sign-off per mode against `PHASE2_BENCHMARK_LOCKS.md`. |
@@ -174,3 +174,10 @@ concept-lock docs.
   before-shot). Modes were spared because their clips key those bones. Fix:
   `AdditiveTrack` — the delta is applied on the last base unless the animation
   wrote a fresh value (tested); staged with the round-four batch.
+- **2026-09-03, round four lands.** 3v3: the ball rides the AI driver's hand;
+  defenders switch marks when beaten (`scramSwitch`, announced once). Ride
+  worlds and the ocean court are PBR. The skate start snaps behind the rider's
+  facing (the mobile start flake: two clean phone runs after). The Closet
+  preview regression is fixed (`AdditiveTrack`). Fixed cameras re-aim on a
+  snap, which closes carnival's Hot Shot hits for good (two clean runs). The
+  Camp's delta helpers are pure and tested.

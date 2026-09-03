@@ -29,6 +29,7 @@ import {
   SHOT_QUALITY_PCT, type ShotQuality, type ShotContext,
 } from '../core/BasketballCore';
 import { lockTarget, choosePassType, PassFlight, type PassType } from '../core/BallHandling';
+import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { assertSpawned } from '../core/FrameGuard';
@@ -80,6 +81,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let passType: PassType = 'chest';
   /** Each teammate's velocity this frame — the lob needs to know who is CUTTING (D7). */
   const mateVel: Vector3[] = [new Vector3(), new Vector3()];
+  /** The defenders' brains and their current marks — the scram switch re-marks them (lock: defensive switching). */
+  const defenderBrains: DefenderBrain[] = [];
+  let marks: number[] = [];
+  let switchBannerAt = 0;
   let foeShotBlocked = false;
 
   const cfg = { heroUrl: SHARED_CFG.heroUrl };
@@ -137,9 +142,13 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         const world = aiKind === 'teammate'
           ? { ball: () => ball.getAbsolutePosition(), hoop: () => RIM, allies: allyPositions, foes: foePositions }
           : { ball: () => ball.getAbsolutePosition(), hoop: () => RIM, allies: foePositions, foes: allyPositions };
-        const slot = ai
-          ? new PlayerSlot('ai', new AISource(char.root.position, world,
-            aiKind === 'teammate' ? new TeammateBrain(slotAngle) : new DefenderBrain(0.55, markIndex)), false)
+        let brain: TeammateBrain | DefenderBrain | null = null;
+        if (ai) {
+          if (aiKind === 'teammate') brain = new TeammateBrain(slotAngle);
+          else { const db = new DefenderBrain(0.55, markIndex); defenderBrains.push(db); marks.push(markIndex ?? 0); brain = db; }
+        }
+        const slot = ai && brain
+          ? new PlayerSlot('ai', new AISource(char.root.position, world, brain), false)
           : new PlayerSlot('me', localSource, true);
         return { char, slot, drib: new DribbleController(), stunSec: 0 };
       };
@@ -312,6 +321,17 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         }
       }
 
+      // THE SWITCH (lock deferred item, 2026-09-03): a beaten defender whose man
+      // a teammate is clearly closer to swaps marks with that teammate — the
+      // X-out after a help rotation, so beating your man no longer leaves him
+      // open forever. Pure and hysteretic in Matchups.ts; announced once.
+      if (defenderBrains.length === foes.length && marks.length === foes.length) {
+        const next = scramSwitch(marks, foes.map((f) => f.char.root.position), allyPositions());
+        if (next !== marks) {
+          marks = next; defenderBrains.forEach((b, i) => b.setMark(marks[i]));
+          if (performance.now() - switchBannerAt > 4000) { switchBannerAt = performance.now(); ctx.setHud({ banner: 'THEY SWITCHED' }); setTimeout(() => ctx.setHud({ banner: '' }), 700); }
+        }
+      }
       // defenders (staggered defenders don't move) — and track each one's
       // closing speed on the carrier, decaying, for the hesi bite read
       for (let fi = 0; fi < foes.length; fi++) {
@@ -574,6 +594,9 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     const shooter = foes[Math.floor(Math.random() * foes.length)];
     const t0 = performance.now();
     const from = shooter.char.root.position.clone();
+    // the ball rides the driver's hand (lock carry-forward: AI drives were
+    // bodies without a ball — visible if you looked for it)
+    attachBallToHand(ball, shooter.char.skeleton, 'RightHand');
     shooter.char.animator.play(SPORT_CLIP.moveLoop, { loop: true });
     await new Promise<void>((res) => {
       const obs = ctx.scene.onBeforeRenderObservable.add(() => {
@@ -602,6 +625,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     const nearestD = Math.min(...allyPositions().map((p) => Vector3.Distance(p, shooter.char.root.position)));
     const defenseFactor = Math.max(0, Math.min(1, 1 - nearestD / 3));
     const made = Math.random() < 0.5 - defenseFactor * 0.3;
+    releaseBall(ball);                                          // the shot leaves the hand
     shooter.char.animator.play(SPORT_CLIP.dunkLaunchPower, { onEnd: () => shooter.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
     if (made) {
       foeScore += 2;

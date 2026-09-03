@@ -15,7 +15,7 @@
 // New in the RideWorld contract: `obstacles` (position+radius list — empty
 // where a world has none). Modes shipped alongside consume it.
 
-import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
 
@@ -33,21 +33,22 @@ export interface RideWorld {
   dispose(): void;
 }
 
-function mat(scene: Scene, name: string, hex: string): StandardMaterial {
-  const m = new StandardMaterial(name, scene);
-  m.diffuseColor = Color3.FromHexString(hex);
-  m.specularColor = Color3.Black();
+/** Ride-world props are PBR (Phase 1, 2026-09-03): matte, lit by the IBL and the tier's shadows. */
+function mat(scene: Scene, name: string, hex: string): PBRMaterial {
+  const m = new PBRMaterial(name, scene);
+  m.albedoColor = Color3.FromHexString(hex);
+  m.metallic = 0; m.roughness = 0.9;
   return m;
 }
 
-function paintGround(scene: Scene, w: number, h: number, painter: (g: CanvasRenderingContext2D, W: number, H: number) => void): StandardMaterial {
+function paintGround(scene: Scene, w: number, h: number, painter: (g: CanvasRenderingContext2D, W: number, H: number) => void): PBRMaterial {
   const tex = new DynamicTexture('groundTex', { width: 1024, height: 1024 }, scene, false);
   const g = tex.getContext() as unknown as CanvasRenderingContext2D;
   painter(g, 1024, 1024);
   tex.update();
-  const m = new StandardMaterial('groundMat', scene);
-  m.diffuseTexture = tex;
-  m.specularColor = Color3.Black();
+  const m = new PBRMaterial('groundMat', scene);
+  m.albedoTexture = tex;
+  m.metallic = 0; m.roughness = 0.95;                 // snow, sand, asphalt: all matte
   return m;
 }
 

@@ -309,6 +309,9 @@ export class DefenderBrain implements AIBehavior {
    *   attacker completely unguarded. Basketball defenders match up.
    */
   constructor(private aggression = 0.6, private markIndex: number | null = null) {}
+  /** Re-mark this defender (the scram switch, lib/babylon/core/Matchups.ts). */
+  setMark(index: number | null): void { this.markIndex = index; }
+  get mark(): number | null { return this.markIndex; }
 
   decide(dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
     const mark = this.markIndex !== null ? foes[this.markIndex] ?? null : null;

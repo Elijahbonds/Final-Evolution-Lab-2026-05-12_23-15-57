@@ -20,6 +20,7 @@
 import { Quaternion, Vector3 } from '@babylonjs/core';
 import type { Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { findBone } from './boneLookup';
+import { AdditiveQuat, AdditiveScalar } from './AdditiveTrack';
 
 export interface SecondaryMotionOpts {
   /** World-space point the head should track; null = none this frame. */
@@ -90,6 +91,18 @@ export function mountSecondaryMotion(scene: Scene, skeleton: Skeleton, opts: Sec
   let t = Math.random() * 10;   // desync crowd members / opponents from the hero
   const tmpQ = new Quaternion();
   const tmpV = new Vector3();
+  // Additive on top of the clip WITHOUT compounding on bones the clip leaves
+  // alone (measured 2026-09-03: the Closet idle keys neither Spine2 nor Hips and
+  // the body drifted apart into blocks). See AdditiveTrack.
+  const chestRot = new AdditiveQuat(), chestScaleX = new AdditiveScalar(), chestScaleY = new AdditiveScalar();
+  const hipsRot = new AdditiveQuat(), hipsX = new AdditiveScalar();
+  const headRot = new AdditiveQuat();
+  const applyQuat = (node: TransformNode, track: AdditiveQuat, delta: Quaternion): void => {
+    const q = node.rotationQuaternion!;
+    const b = track.baseFor(q.x, q.y, q.z, q.w);
+    const out = new Quaternion(b[0], b[1], b[2], b[3]).multiplyInPlace(delta);
+    q.copyFrom(out); track.wrote(out.x, out.y, out.z, out.w);
+  };
   const obs = scene.onAfterAnimationsObservable.add(() => {
     const dt = scene.getEngine().getDeltaTime() / 1000;
     t += dt;
@@ -100,20 +113,22 @@ export function mountSecondaryMotion(scene: Scene, skeleton: Skeleton, opts: Sec
     if (chest) {
       const b = breathCurve(t / 4.0);
       debug.breath = b;
-      const s = 1 + 0.025 * b * calm;
-      chest.scaling.set(s, 1 + 0.015 * b * calm, s);
+      const sx = chestScaleX.baseFor(chest.scaling.x) * (1 + 0.025 * b * calm);
+      const sy = chestScaleY.baseFor(chest.scaling.y) * (1 + 0.015 * b * calm);
+      chest.scaling.set(sx, sy, sx); chestScaleX.wrote(sx); chestScaleY.wrote(sy);
       if (chest.rotationQuaternion) {
         Quaternion.RotationAxisToRef(Vector3.Right(), -0.02 * b * calm, tmpQ);
-        chest.rotationQuaternion.multiplyInPlace(tmpQ);
+        applyQuat(chest, chestRot, tmpQ);
       }
     }
     // weight shift: hips sway laterally on a slow cycle, idle only
     if (hips) {
       const w = Math.sin(t / 7.0 * Math.PI * 2);
-      hips.position.x += 0.012 * w * calm;
+      const hx = hipsX.baseFor(hips.position.x) + 0.012 * w * calm;
+      hips.position.x = hx; hipsX.wrote(hx);
       if (hips.rotationQuaternion) {
         Quaternion.RotationAxisToRef(Vector3.Forward(), 0.015 * w * calm, tmpQ);
-        hips.rotationQuaternion.multiplyInPlace(tmpQ);
+        applyQuat(hips, hipsRot, tmpQ);
       }
     }
     // look-at: blend a clamped yaw/pitch delta onto the clip's head pose
@@ -137,7 +152,7 @@ export function mountSecondaryMotion(scene: Scene, skeleton: Skeleton, opts: Sec
       debug.lookYaw = smoothTo(debug.lookYaw, wantYaw * intensity, dt, 0.12);
       debug.lookPitch = smoothTo(debug.lookPitch, wantPitch * intensity, dt, 0.12);
       Quaternion.RotationYawPitchRollToRef(debug.lookYaw, debug.lookPitch, 0, tmpQ);
-      head.rotationQuaternion.multiplyInPlace(tmpQ);
+      applyQuat(head, headRot, tmpQ);
     }
   });
   return {

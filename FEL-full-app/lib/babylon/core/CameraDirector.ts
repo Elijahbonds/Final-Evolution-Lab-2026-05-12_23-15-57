@@ -328,6 +328,11 @@ export class CameraDirector {
       -p.offset.x * sin + p.offset.z * cos,
     );
     this.setFixed(subject.add(off), p.targetHeight, snap);
+    // A snapped fixed camera must also AIM now: the target is otherwise only
+    // refreshed inside update(), and a mode that never calls update on a fixed
+    // shot (carnival's Hot Shot, the keeper round before its fix) kept the
+    // previous shot's aim for several frames — hero off-screen, measured 3x.
+    if (snap) this.camera.setTarget(subject.add(new Vector3(0, p.targetHeight, 0)));
   }
 
   snapTo(subject: Vector3, objective: Vector3 | null): void {

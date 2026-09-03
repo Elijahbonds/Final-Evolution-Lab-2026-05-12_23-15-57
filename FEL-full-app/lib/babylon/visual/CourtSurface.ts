@@ -15,7 +15,7 @@
 // and swaps its material, so it works with every basketball mode as a
 // one-line call and can't desync from the venue's geometry.
 
-import { Color3, DynamicTexture, StandardMaterial, Vector2 } from '@babylonjs/core';
+import { Color3, DynamicTexture, StandardMaterial, PBRMaterial, Vector2 } from '@babylonjs/core';
 import type { Scene } from '@babylonjs/core';
 
 const TEX = 2048;                       // court lines need the resolution
@@ -175,12 +175,11 @@ export function applyOceanCourt(scene: Scene, style: CourtWaterStyle = 'venice')
   paintOcean(g, TEX, TEX, style);
   tex.update();
 
-  const mat = new StandardMaterial('court_ocean_mat', scene);
-  mat.diffuseTexture = tex;
-  // water is glossy: a real specular lobe is what separates "ocean" from
-  // "blue floor", and it plays into M59's rim light + bloom
-  mat.specularColor = new Color3(0.55, 0.72, 0.8);
-  mat.specularPower = 96;
+  const mat = new PBRMaterial('court_ocean_mat', scene);
+  mat.albedoTexture = tex;
+  // water is glossy: a low roughness gives the ocean a real reflection lobe
+  // from the IBL — what separates "ocean" from "blue floor" (PBR since 2026-09-03)
+  mat.metallic = 0; mat.roughness = 0.22;
   mat.emissiveColor = Color3.FromHexString(PALETTE[style].deep).scale(0.22);
   ground.material = mat;
   ground.receiveShadows = true;

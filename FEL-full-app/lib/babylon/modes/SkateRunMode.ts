@@ -52,6 +52,8 @@ export const SkateRunMode: ModeDefinition = (() => {
   let airEntryYaw = 0;
   /** Has the camera been snapped since play actually began? */
   let snappedForPlay = false;
+  /** A point 8 m ahead along the rider's facing — the snap's objective, so "behind" means behind the rider. */
+  const aheadOfRider = (): Vector3 => rig.char.root.position.add(new Vector3(Math.sin(rig.char.root.rotation.y), 0, Math.cos(rig.char.root.rotation.y)).scale(8));
   let coins: CoinField;
   let timeLeft = RUN_SEC;
   let stickX = 0, pump = 0;
@@ -121,7 +123,11 @@ export const SkateRunMode: ModeDefinition = (() => {
       // default position and had to lerp in at lag 0.08-0.12, with the rider
       // off-screen the whole way. That is where this mode's [FEL-FRAME] lines
       // came from — a fast board sport outruns a camera that begins behind.
-      ctx.camDirector.snapTo(rig.char.root.position, null);
+      // snap BEHIND THE RIDER'S FACING, not behind a fixed +z: with no objective
+      // the director assumes +z, which on this run put the camera ahead and to
+      // the side for the first frames and, on a portrait phone (aspect 0.46),
+      // lost the rider until the follow swung round (mobile capture, ~1 run in 2)
+      ctx.camDirector.snapTo(rig.char.root.position, aheadOfRider());
       timeLeft = RUN_SEC; ended = false; stickX = 0; pump = 0; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
       // 'stadium' is a crowd bed with a breathing LFO -- wrong for a solo run
       // in an outdoor plaza. 'wind' is the open-air option in SoundKit's set.
@@ -414,7 +420,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // lerping in. A desktop FOV is wide enough to hold the rider through that;
       // a phone in portrait is not, which is why this only ever appeared in the
       // mobile playtest and never in any desktop capture.
-      if (!snappedForPlay) { ctx.camDirector.snapTo(rig.char.root.position, null); snappedForPlay = true; }
+      if (!snappedForPlay) { ctx.camDirector.snapTo(rig.char.root.position, aheadOfRider()); snappedForPlay = true; }
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, null);
     },
 

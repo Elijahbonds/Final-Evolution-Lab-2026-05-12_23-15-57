@@ -23,6 +23,7 @@ await page.waitForTimeout(900);
 const slider = page.getByLabel('Roundness');
 if (await slider.count()) { await slider.first().fill('90').catch(async () => { await slider.first().evaluate((el: HTMLInputElement) => { el.value = '90'; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }); }); }
 await page.waitForTimeout(1200);
+await page.evaluate('window.scrollTo(0, 0)'); await page.waitForTimeout(400);
 await page.screenshot({ path: `${OUT}/closet-after.png` });
 const text = (await page.innerText('body')).replace(/\s+/g, ' ');
 console.log('closet text has Fine-tune:', /Fine-tune/.test(text), '| Afro chip present:', /Afro/.test(text));
