@@ -16,20 +16,20 @@ to Karate VS. Three modes, three mechanics.
 
 | # | Criterion | Status | Where |
 |---|---|---|---|
-| H1 | Many enemies on screen at once, not a queue of duels | ⚠ 4→12 per wave | `WAVE.base/max`; the horde fantasy wants ~8→20 on desktop, capped by tier on mobile |
-| H2 | Every strike hits EVERYONE in its arc, not the nearest one | ❌ **D-H1** | `strike()` → `nearest()` single target; `OnslaughtCore.aoeTargets` exists and is unused |
-| H3 | A launcher and a juggle: airborne enemies are helpless and take more | ❌ **D-H1** | `applyCCHit` / `JUGGLE_*` exist in the core, never called by the mode |
+| H1 | Many enemies on screen at once, not a queue of duels | ✅ 6→20 (mobile 12) | `WAVE.base/max`; the horde fantasy wants ~8→20 on desktop, capped by tier on mobile |
+| H2 | Every strike hits EVERYONE in its arc, not the nearest one | ✅ `inArc` per strike (2026-09-03) | `strike()` → `nearest()` single target; `OnslaughtCore.aoeTargets` exists and is unused |
+| H3 | A launcher and a juggle: airborne enemies are helpless and take more | ✅ `launch` strikes set `airUntil` | `applyCCHit` / `JUGGLE_*` exist in the core, never called by the mode |
 | H4 | A crowd-clear special when surrounded | ✅ | `surroundedCount` / `crowdClear` — the one core piece that is wired |
-| H5 | A hit counter that climbs across the horde (the Musou number) | ❌ **D-H2** | `kos` only; no running hit count on the bezel |
+| H5 | A hit counter that climbs across the horde (the Musou number) | ✅ HITS badge, 1.4 s chain | `kos` only; no running hit count on the bezel |
 | H6 | Waves escalate in count and toughness | ✅ | `waveSpec` |
 | H7 | Co-op: a partner fights beside you, down-and-revive | ✅ | `PartnerAISource`, `DownRevive` |
-| H8 | The camera frames a crowd, not a duel | ⚠ | facing-derived `overShoulder`; needs a pull-back when surrounded |
+| H8 | The camera frames a crowd, not a duel | ✅ `crowd` preset when surrounded | facing-derived `overShoulder`; needs a pull-back when surrounded |
 
-**D-H1 — Strikes are single-target. → FIX (Phase 5).** Every strike resolves
+**D-H1 — Strikes are single-target. → FIXED 2026-09-03 (horde pass).** Every strike resolves
 through `aoeTargets` with a per-strike arc: jab a 100° arc at 1.5 m (light,
 launches a staggered enemy), kick a 150° arc at 1.9 m with knockback, heavy a
 launcher on the front arc. Airborne enemies take `JUGGLE_DAMAGE_MULT`.
-**D-H2 — No hit counter. → FIX (Phase 5).** A running `hits` count that decays
+**D-H2 — No hit counter. → FIXED 2026-09-03 (horde pass).** A running `hits` count that decays
 after 1.4 s without a hit; the bezel shows it; the chi gain scales gently with it.
 **D-H3 — Horde size. → FIX (Phase 5), tier-capped.** `WAVE.base 6 / max 20`
 on desktop, `max 12` on mobile — measured against the frame budget.
