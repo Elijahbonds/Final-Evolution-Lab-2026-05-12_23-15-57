@@ -3,6 +3,7 @@
 // cycle. Modes spawning a BARE hero (no tint/skinTone chosen) get the player's
 // saved look applied automatically; explicit colors always win (rivals/NPCs).
 
+import { applyHairStyle } from './hairStyles';
 import { applyFaceMorphs, resolveFaceWeights } from './faceMorphs';
 import { Color3, DynamicTexture, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Material } from '@babylonjs/core';
@@ -92,6 +93,7 @@ export function applyIdentity(
   //    the flat FaceConfig preset variety is handled by the Closet preview rig).
   applySkinTone(spawn, id.face.skinTone);
   applyHair(spawn, id.face.hairColor, id.face.hairStyle === 'Bald');
+  applyHairStyle(spawn.meshes, id.face.hairStyle);   // Phase 3: real hair geometry per style
   // Phase 3 (2026-09-02): the forge now has a face. Shape presets and the
   // fine-tune sliders resolve through one table; eye color lands on the
   // iris material. No-ops on a body without morphs or an iris.
@@ -198,8 +200,9 @@ function applyHair(spawn: SpawnedCharacter, hex: string, bald: boolean): void {
   for (const mesh of spawn.meshes) {
     const m = mesh.material as TintMat | null;
     if (!m || !m.name.toLowerCase().startsWith('hair')) continue;
-    mesh.setEnabled(!bald);
-    if (bald) continue;
+    // Phase 3: visibility is applyHairStyle's job (Bald = no hair node shown);
+    // the brows share this material and must keep their color either way.
+    void bald;
     const tone = Color3.FromHexString(hex);
     const clone = m.clone(`${m.name}_style`) as TintMat | null;
     if (clone) { matColor(clone)?.copyFrom(tone); mesh.material = clone; }

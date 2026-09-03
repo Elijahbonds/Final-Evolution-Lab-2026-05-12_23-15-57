@@ -50,3 +50,17 @@ concept-lock docs.
   on both character paths (predates the tier work) — a venue item, not SSAO.
 - **2026-09-02, for Phase 2.** Shoes were a near-white albedo under the IBL
   and read as glowing blocks; the skin-shading pass darkens and glosses them.
+- **2026-09-03, Phase 3/5 (forge clips).** `chain(a, b)` in the forge applies
+  `b` first, and a rotation about a limb's own bind axis is an invisible twist —
+  so the guard, jab, hook and uppercut had never actually moved the way their
+  comments said. Rewritten with `aimBone` (point a bone at a world direction
+  under the pose's own parent chain) and measured with `_pose-dump.mts`: guard
+  fists at chin height, jab reaches 0.6 m, hook crosses the midline, uppercut
+  ends high. Pose gate green.
+- **2026-09-03, Phase 4 (basketball packages).** Every basketball state used to
+  alias onto run / guard / jumpshot. A new authored suite (dribble idle,
+  crossover L/R, hesi, layup gather, defend slide L/R, block reach, steal
+  reach) is proven on the real forge rig by `authored/basketball.test.ts`
+  (hand / knee / hip world positions at the key frame). Remaining from the
+  locks: teammate alley-oops, defensive switching, ball-in-hand on AI drives,
+  3PT tiebreak playoff, free-approach dunk flight.

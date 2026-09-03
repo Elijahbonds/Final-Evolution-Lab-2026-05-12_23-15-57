@@ -80,6 +80,7 @@ export function applySkinShading(meshes: AbstractMesh[], scene: Scene, tier: Qua
     const mat = m.material;
     if (!(mat instanceof PBRMaterial) || seen.has(mat)) continue;
     seen.add(mat);
+    (mat.metadata ??= {}).felShaded = true;   // AnimeInk leaves tuned materials alone
     const name = mat.name.toLowerCase();
     if (name.startsWith('skin')) {
       mat.metallic = 0;

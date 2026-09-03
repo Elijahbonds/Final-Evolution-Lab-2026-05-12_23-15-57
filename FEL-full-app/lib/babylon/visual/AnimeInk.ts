@@ -28,6 +28,11 @@ export function inkCharacter(meshes: AbstractMesh[]): void {
     if (!mat) continue;
     // cel flattening — no glossy hotspots; the rim light supplies the glint
     if ((mat as StandardMaterial).specularColor) (mat as StandardMaterial).specularColor = Color3.Black();
+    // Phase 2 (2026-09-02): the skin-shading pass tunes roughness, sheen and
+    // subsurface per material and flags them; flattening those again here
+    // undid the whole pass (measured roughness 0.95 on skin). The contour
+    // line stays on every character; only untuned materials get cel-flattened.
+    if ((m.material as { metadata?: { felShaded?: boolean } } | null)?.metadata?.felShaded) continue;
     if ((mat as PBRMaterial).metallic !== undefined) {
       (mat as PBRMaterial).metallic = 0;
       (mat as PBRMaterial).roughness = 0.95;

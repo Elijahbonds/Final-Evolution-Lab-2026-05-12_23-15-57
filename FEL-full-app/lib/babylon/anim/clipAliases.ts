@@ -41,8 +41,7 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   bball_dribble_run: ['run', 0.9],
   bball_shoot_jumper: ['jumpshot', 1.0],
   bball_score_celebrate: ['uppercut', 0.8],
-  bball_defend_stance: ['guard', 0.7],
-  bball_block_reach: ['jumpshot', 1.2],
+  bball_defend_stance: ['bball_defend_slide_left', 0.45],   // low, wide, slow sway
   // football
   football_sprint_return: ['run', 1.35],
   football_juke_left: ['walk', 1.8],

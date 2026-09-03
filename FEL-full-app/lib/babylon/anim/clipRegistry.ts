@@ -37,6 +37,10 @@ export const REAL_CLIPS = new Set<string>([
   'dunk_finish_windmill', 'dunk_finish_tomahawk', 'dunk_finish_blown', 'dunk_celebrate_big',
   'football_juke_left', 'football_juke_right', 'football_spin_move', 'football_tackled_fall',
   'karate_hit_react', 'karate_knockdown',
+  // basketball packages (anim/authored/basketball) — Phase 4, 2026-09-03
+  'bball_dribble_idle', 'bball_crossover_left', 'bball_crossover_right', 'bball_hesi',
+  'bball_layup_gather', 'bball_defend_slide_left', 'bball_defend_slide_right',
+  'bball_block_reach', 'bball_steal_reach',
   // board suite — skate / surf / snowboard share these (anim/authored/boardSuite)
   'board_ride_idle', 'board_carve_left', 'board_carve_right', 'board_tuck',
   'board_grab', 'board_air', 'board_grind', 'board_land',

@@ -19,6 +19,11 @@ export const ATHLETE_ROSTER: RosterAthlete[] = [
   { key: 'blitz', url: '/models/athletes/blitz.glb' },
   { key: 'nova', url: '/models/athletes/nova.glb' },
   { key: 'titan', url: '/models/athletes/titan.glb' },
+  // Phase 3 (2026-09-02): four more bodies so a 3v3 never repeats a look.
+  { key: 'ember', url: '/models/athletes/ember.glb' },
+  { key: 'frost', url: '/models/athletes/frost.glb' },
+  { key: 'sage', url: '/models/athletes/sage.glb' },
+  { key: 'vex', url: '/models/athletes/vex.glb' },
 ];
 
 /** The forge hero — the one body every mode spawns unless it asks for a

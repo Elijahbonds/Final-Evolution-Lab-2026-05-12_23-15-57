@@ -43,17 +43,17 @@ export interface AnimTreeInput {
 export interface AnimChoice { state: BasketballAnimState; clip: string; loop: boolean; fadeSec: number }
 
 const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeSec: number }> = {
-  idle_dribble:    { clip: 'idle_stand', loop: true, fadeSec: 0.18 },
+  idle_dribble:    { clip: 'bball_dribble_idle', loop: true, fadeSec: 0.18 },
   speed_dribble:   { clip: 'bball_dribble_run', loop: true, fadeSec: 0.14 },
-  crossover:       { clip: 'football_juke_left', loop: false, fadeSec: 0.08 },
+  crossover:       { clip: 'bball_crossover_left', loop: false, fadeSec: 0.08 },
   protect:         { clip: 'bball_defend_stance', loop: true, fadeSec: 0.2 },
   drive:           { clip: 'run_forward', loop: true, fadeSec: 0.1 },
   gather:          { clip: 'dunk_charge_gather', loop: true, fadeSec: 0.08 },
   shot_release:    { clip: 'bball_shoot_jumper', loop: true, fadeSec: 0.06 },
-  layup:           { clip: 'dunk_launch', loop: false, fadeSec: 0.08 },
+  layup:           { clip: 'bball_layup_gather', loop: false, fadeSec: 0.08 },
   dunk:            { clip: 'dunk_launch', loop: false, fadeSec: 0.06 },
   contact_stagger: { clip: 'karate_hit_react', loop: false, fadeSec: 0.06 },
-  defend_slide:    { clip: 'strafe_left', loop: true, fadeSec: 0.16 },
+  defend_slide:    { clip: 'bball_defend_slide_left', loop: true, fadeSec: 0.16 },
   defend_idle:     { clip: 'bball_defend_stance', loop: true, fadeSec: 0.2 },
   box_out:         { clip: 'bball_defend_stance', loop: true, fadeSec: 0.12 },
   celebrate:       { clip: 'bball_score_celebrate', loop: false, fadeSec: 0.15 },

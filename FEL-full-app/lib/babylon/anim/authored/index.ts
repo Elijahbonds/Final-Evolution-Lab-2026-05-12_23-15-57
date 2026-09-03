@@ -11,6 +11,9 @@ import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locom
 import { buildJuke, buildSpinMove, buildTackledFall } from './football';
 import { buildHitReact, buildKnockdown } from './karate';
 import {
+  buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildDefendSlide, buildBlockReach, buildStealReach,
+} from './basketball';
+import {
   buildBoardRideIdle, buildBoardCarveLeft, buildBoardCarveRight, buildBoardTuck,
   buildBoardGrab, buildBoardAir, buildBoardGrind, buildBoardLand,
   buildSkateKickflip, buildSkateBail,
@@ -53,6 +56,17 @@ export function registerAuthoredClips(
     () => buildBoardLand(scene, skeleton),
     () => buildSkateKickflip(scene, skeleton),
     () => buildSkateBail(scene, skeleton),
+    // Basketball packages (Phase 4, 2026-09-03) — size-ups, gather, slide,
+    // block and steal used to alias onto run/guard/jumpshot.
+    () => buildDribbleIdle(scene, skeleton),
+    () => buildCrossover(scene, skeleton, 'left'),
+    () => buildCrossover(scene, skeleton, 'right'),
+    () => buildHesi(scene, skeleton),
+    () => buildLayupGather(scene, skeleton),
+    () => buildDefendSlide(scene, skeleton, 'left'),
+    () => buildDefendSlide(scene, skeleton, 'right'),
+    () => buildBlockReach(scene, skeleton),
+    () => buildStealReach(scene, skeleton),
   ];
   const registered: string[] = [];
   for (const b of builders) {

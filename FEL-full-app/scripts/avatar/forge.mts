@@ -129,6 +129,23 @@ const qFromTo = (a: [number, number, number], b: [number, number, number]): Quat
 const aimLimb = (parentWorld: Quat, bindAxis: [number, number, number], dir: [number, number, number]): Quat =>
   qNorm(qMul(qInv(parentWorld), qFromTo(bindAxis, dir)));
 
+/** World rotation of a bone under a pose (parents composed, same rule as poseToLocals). */
+const worldOf = (pose: Pose, name: string): Quat => {
+  const parent = boneParent.get(name);
+  const parentWorld = parent ? worldOf(pose, parent) : ([0, 0, 0, 1] as Quat);
+  return qNorm(qMul(parentWorld, pose[name] ?? ([0, 0, 0, 1] as Quat)));
+};
+
+/** Point `bone` (bind axis `axis`) at WORLD direction `dir` under the pose's
+ *  upstream deltas, writing the delta into the pose. Order matters: set the
+ *  torso, then the upper arm, then the forearm. */
+const aimBone = (pose: Pose, bone: string, axis: [number, number, number], dir: [number, number, number]): Pose => {
+  const parent = boneParent.get(bone);
+  pose[bone] = aimLimb(parent ? worldOf(pose, parent) : ([0, 0, 0, 1] as Quat), axis, dir);
+  return pose;
+};
+const LX: [number, number, number] = [1, 0, 0], RX: [number, number, number] = [-1, 0, 0];
+
 // ── clip authoring ──────────────────────────────────────────────────────────
 interface ClipKey { t: number; pose: Pose }
 interface ClipDef { name: string; duration: number; loop: boolean; keys: ClipKey[] }
@@ -222,12 +239,13 @@ const CLIPS: ClipDef[] = [
     keys: [
       { t: 0, pose: guardPose },
       {
-        t: 0.15, pose: {
-          ...guardPose,
-          LeftArm: chain(qAxis('z', -82), qAxis('x', -88)),
-          LeftForeArm: qAxis('z', -4),
-          Hips: qAxis('y', -12), Spine2: qAxis('y', -8),
-        },
+        // impact: the lead arm snaps straight out to the front at chin height
+        t: 0.15, pose: (() => {
+          const P: Pose = { ...guardPose, Hips: qAxis('y', -12), Spine2: qAxis('y', -8) };
+          aimBone(P, 'LeftArm', LX, [-0.12, 0.12, 0.98]);
+          aimBone(P, 'LeftForeArm', LX, [-0.06, 0.06, 1.0]);
+          return P;
+        })(),
       },
       { t: 0.5, pose: guardPose },
     ],
@@ -237,20 +255,22 @@ const CLIPS: ClipDef[] = [
     keys: [
       { t: 0, pose: guardPose },
       {
-        t: 0.2, pose: {
-          ...guardPose,
-          RightArm: chain(qAxis('z', 12), qAxis('y', 55)),
-          RightForeArm: chain(qAxis('z', 8), qAxis('x', -85)),
-          Hips: qAxis('y', 10),
-        },
+        // wind-up: rear elbow comes up and back, forearm cocked
+        t: 0.2, pose: (() => {
+          const P: Pose = { ...guardPose, Hips: qAxis('y', 10) };
+          aimBone(P, 'RightArm', RX, [-0.85, 0.15, -0.5]);
+          aimBone(P, 'RightForeArm', RX, [-0.3, 0.2, 0.93]);
+          return P;
+        })(),
       },
       {
-        t: 0.35, pose: {
-          ...guardPose,
-          RightArm: chain(qAxis('z', 12), qAxis('y', -45)),
-          RightForeArm: chain(qAxis('z', 8), qAxis('x', -85)),
-          Hips: qAxis('y', -16), Spine2: qAxis('y', -10),
-        },
+        // impact: upper arm horizontal to the front, forearm whips across the body
+        t: 0.35, pose: (() => {
+          const P: Pose = { ...guardPose, Hips: qAxis('y', -16), Spine2: qAxis('y', -10) };
+          aimBone(P, 'RightArm', RX, [-0.35, 0.1, 0.93]);
+          aimBone(P, 'RightForeArm', RX, [0.9, 0.05, 0.43]);
+          return P;
+        })(),
       },
       { t: 0.6, pose: guardPose },
     ],
@@ -265,17 +285,19 @@ const CLIPS: ClipDef[] = [
           LeftUpLeg: qAxis('x', -18), RightUpLeg: qAxis('x', -18),
           LeftLeg: qAxis('x', 42), RightLeg: qAxis('x', 42),
           Spine: qAxis('x', 12),
-          RightArm: chain(qAxis('z', 60), qAxis('x', 25)),
+          // dip: rear arm drops back, fist low
+          ...(() => { const P: Pose = { ...guardPose, Hips: qAxis('y', 12), Spine: qAxis('x', 12) }; aimBone(P, 'RightArm', RX, [-0.3, -0.85, -0.45]); aimBone(P, 'RightForeArm', RX, [-0.1, -0.2, 0.97]); return { RightArm: P.RightArm, RightForeArm: P.RightForeArm }; })(),
           Hips: qAxis('y', 12),
         },
       },
       {
-        t: 0.42, pose: {
-          ...guardPose,
-          RightArm: chain(qAxis('z', 55), qAxis('x', -70)),
-          RightForeArm: chain(qAxis('z', 10), qAxis('x', -95)),
-          Spine: qAxis('x', -4), Hips: qAxis('y', -14), Spine2: qAxis('y', -8),
-        },
+        // impact: the fist drives up in front of the face
+        t: 0.42, pose: (() => {
+          const P: Pose = { ...guardPose, Spine: qAxis('x', -4), Hips: qAxis('y', -14), Spine2: qAxis('y', -8) };
+          aimBone(P, 'RightArm', RX, [-0.15, 0.35, 0.92]);
+          aimBone(P, 'RightForeArm', RX, [0.0, 0.8, 0.6]);
+          return P;
+        })(),
       },
       { t: 0.7, pose: guardPose },
     ],
@@ -363,6 +385,8 @@ const CLIPS: ClipDef[] = [
 // ── geometry ────────────────────────────────────────────────────────────────
 interface Part {
   material: string;
+  /** When set, this part becomes its own node/mesh with this name (hair styles). */
+  node?: string;
   positions: number[]; normals: number[]; uvs: number[];
   indices: number[]; joints: number[]; weights: number[];
 }
@@ -541,12 +565,28 @@ function buildParts(): Part[] {
   const lipsP = add('lips');
   box(lipsP, -0.026, 0.026, 1.652, 1.661, 0.100, 0.109, [['Head', 1]]);
 
-  // hair — cap over the back/top of the skull, face left open
-  const hairP = add('hair');
-  sphere(hairP, 0, 1.715, -0.012, 0.122, [['Head', 1]], {
-    scaleY: 0.98,
-    keep: (x, y, z) => z < 0.045 || y > 1.76,
-  });
+  // hair STYLES (Phase 3, ship pass 2026-09-02): each style is its own node
+  // (Hair_<key>) sharing the skin, so it rides the Head bone. The runtime
+  // shows exactly one (lib/babylon/core/hairStyles.ts); `cap` is the default.
+  // The brows stay in the body as the only 'hair'-material primitive, so
+  // swapping or removing hair never removes the brows.
+  const H = [['Head', 1]] as Influence;
+  const style = (key: string) => { const part = add('hair'); part.node = `Hair_${key}`; return part; };
+  // cap — the default: over the back/top of the skull, face left open
+  sphere(style('cap'), 0, 1.715, -0.012, 0.122, H, { scaleY: 0.98, keep: (x, y, z) => z < 0.045 || y > 1.76 });
+  // afro — a big soft sphere around the whole skull, face open
+  sphere(style('afro'), 0, 1.73, -0.02, 0.165, H, { lat: 12, lon: 14, keep: (x, y, z) => z < 0.07 || y > 1.79 });
+  // buzz — a tight cap hugging the skull (fade / buzz / cropped / waves)
+  sphere(style('buzz'), 0, 1.71, -0.01, 0.119, H, { scaleY: 0.99, keep: (x, y, z) => z < 0.03 || y > 1.775 });
+  // bun — the cap plus a knot high on the back of the head
+  { const p = style('bun'); sphere(p, 0, 1.715, -0.012, 0.122, H, { scaleY: 0.98, keep: (x, y, z) => z < 0.045 || y > 1.76 }); sphere(p, 0, 1.79, -0.10, 0.045, H, { lat: 6, lon: 8 }); }
+  // ponytail — the cap plus a tail hanging down the back
+  { const p = style('ponytail'); sphere(p, 0, 1.715, -0.012, 0.122, H, { scaleY: 0.98, keep: (x, y, z) => z < 0.045 || y > 1.76 }); tube(p, 'y', [0, -0.12], 1.72, 1.42, 0.03, 0.02, 8, 2, () => H); }
+  // braids — the cap plus six strands down the back and sides (box braids / locs / cornrows)
+  { const p = style('braids'); sphere(p, 0, 1.715, -0.012, 0.122, H, { scaleY: 0.98, keep: (x, y, z) => z < 0.045 || y > 1.76 });
+    for (const [x, z] of [[-0.09, -0.07], [-0.05, -0.11], [0, -0.12], [0.05, -0.11], [0.09, -0.07], [-0.11, 0.0], [0.11, 0.0]] as [number, number][]) tube(p, 'y', [x, z], 1.70, 1.38, 0.014, 0.011, 6, 2, () => H); }
+  // hijab — a full wrap covering hair and neck, face open
+  { const p = style('hijab'); sphere(p, 0, 1.70, -0.01, 0.135, H, { lat: 12, lon: 14, keep: (x, y, z) => z < 0.06 || y > 1.79 }); tube(p, 'y', [0, -0.01], 1.44, 1.62, 0.135, 0.12, 12, 2, () => H); }
 
   // torso (jersey) — height-banded spine weights
   const jerseyP = add('jersey');
@@ -697,6 +737,7 @@ const materials = new Map(Object.entries(MAT_COLORS).map(([name, rgb]) => [
 // mesh — one primitive per part
 const mesh = doc.createMesh('AthleteBody');
 const targetNames: string[] = [];
+const styleNodes: { name: string; prim: ReturnType<typeof doc.createPrimitive> }[] = [];
 for (const part of buildParts()) {
   const prim = doc.createPrimitive()
     .setAttribute('POSITION', acc('VEC3', new Float32Array(part.positions)))
@@ -714,6 +755,7 @@ for (const part of buildParts()) {
       targetNames.push(t.name);
     }
   }
+  if (part.node) { styleNodes.push({ name: part.node, prim }); continue; }
   mesh.addPrimitive(prim);
 }
 if (targetNames.length) {
@@ -722,6 +764,10 @@ if (targetNames.length) {
 }
 const body = doc.createNode('Body').setMesh(mesh).setSkin(skin);
 armature.addChild(body);
+for (const sn of styleNodes) {
+  const m = doc.createMesh(sn.name); m.addPrimitive(sn.prim);
+  armature.addChild(doc.createNode(sn.name).setMesh(m).setSkin(skin));
+}
 
 // animations — sample each bone's local quat at the union of its key times
 const FPS = 30;

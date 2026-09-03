@@ -24,6 +24,7 @@ import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
 import { rosterUrlFor, normalizeHeroUrl } from './athleteRoster';
 import { applySkinShading } from './skinShading';
+import { applyHairStyle, DEFAULT_HAIR_STYLE, HAIR_KEY_TO_STYLE } from './hairStyles';
 import { mountSecondaryMotion, type SecondaryMotionHandle } from '../anim/SecondaryMotion';
 import { mountFootPlanting } from '../anim/FootPlanting';
 import type { QualityTier } from '../scene/QualityTier';
@@ -203,6 +204,14 @@ export const CharacterLibrary = {
     // lacks them, and mobile gets the cheaper variants.
     const tier: QualityTier = (scene.metadata?.felTier as QualityTier | undefined) ?? 'desktop';
     applySkinShading(meshes, scene, tier);
+    // Phase 3: the forge ships every hair style; show the default, hide the
+    // rest. The identity pipe re-applies the player's own choice below.
+    // The loader's root is a synthetic __root__; the forge's Armature (which
+    // carries the roster's baked extras) is a descendant — search for it.
+    const bakedHair = [root, ...root.getChildTransformNodes(false)]
+      .map((n) => n.metadata?.gltf?.extras?.hairStyle as string | undefined)
+      .find((v) => typeof v === 'string');
+    applyHairStyle(meshes, bakedHair ? HAIR_KEY_TO_STYLE[bakedHair] ?? DEFAULT_HAIR_STYLE : DEFAULT_HAIR_STYLE);
     const skinned = meshes.find((m) => m.skeleton === skeleton) ?? meshes[0];
     const secondary = mountSecondaryMotion(scene, skeleton, { intensity: tier === 'mobile' ? 0.6 : 1 });
     const planting = skinned

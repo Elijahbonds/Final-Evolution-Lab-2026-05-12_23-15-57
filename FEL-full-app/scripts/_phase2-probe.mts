@@ -3,6 +3,8 @@ import { chromium } from 'playwright-core';
 const URL_ = process.env.URL ?? 'http://localhost:3000/dev/mode/onevone?agent=1';
 const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', args: ['--use-gl=angle','--use-angle=metal','--enable-webgl','--ignore-gpu-blocklist'] });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+const anim: string[] = [];
+p.on('console', (m) => { const t = m.text(); if (t.includes('[FEL-ANIM] authored clips registered')) anim.push(t); });
 await p.goto(URL_, { waitUntil: 'networkidle' }); await p.waitForSelector('canvas', { timeout: 30000 }); await p.waitForTimeout(3500);
 const js = [
   "(() => {",
@@ -13,7 +15,8 @@ const js = [
   "  const jersey = s.materials.find(m => m.name === 'jersey' && m.getClassName() === 'PBRMaterial');",
   "  const sheen = jersey && jersey.sheen ? jersey.sheen.isEnabled : null;",
   "  const skinnedWithMorphs = s.meshes.filter(m => m.morphTargetManager && m.morphTargetManager.numTargets > 0).length;",
-  "  return JSON.stringify({ afterAnimObservers: s.onAfterAnimationsObservable.observers.length, plants, skin: ss, jerseySheen: sheen, meshesWithMorphs: skinnedWithMorphs, tier: s.metadata && s.metadata.felTier });",
+  "  const hair = s.meshes.filter(m => /^Hair_/.test(m.name)).map(m => m.name.replace(/_c\\d+$/, '') + (m.isVisible ? ':on' : ':off'));",
+  "  return JSON.stringify({ hair, afterAnimObservers: s.onAfterAnimationsObservable.observers.length, plants, skin: ss, jerseySheen: sheen, meshesWithMorphs: skinnedWithMorphs, tier: s.metadata && s.metadata.felTier });",
   "})()",
 ].join(String.fromCharCode(10));
-console.log(await p.evaluate(js)); await b.close();
+console.log(await p.evaluate(js)); console.log('bball clips registered:', anim.some((t) => t.includes('bball_dribble_idle')), '| registrations logged:', anim.length); await b.close();
