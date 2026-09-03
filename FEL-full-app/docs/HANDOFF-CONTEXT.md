@@ -214,3 +214,48 @@ strings** — tsx injects a `__name` helper that does not exist in the page.
 - Fix the root cause; if a fix is wrong, revert it and **record that it was
   wrong** (see golf's sign-off — four wrong turns are kept in the document).
 - Never delete a failing criterion from a lock to make a sign-off pass.
+
+## 2026-09-03 — ship pass state (read this before anything else)
+
+The owner's twelve decisions (2026-09-02) and four more (2026-09-03) are
+recorded in the repo-root `PHASE2_BENCHMARK_LOCKS.md` under "ship pass". The
+plan and its running findings log are `docs/SHIP-PASS-PLAN.md`. Where things
+stand:
+
+- **Characters:** the forge GLB (`public/models/fel-hero.glb`, eight roster
+  athletes under `public/models/athletes/`) is the DEFAULT in every mode;
+  `PROCEDURAL_CHARACTERS` is opt-in. Rebuild the hero with
+  `npx tsx scripts/avatar/forge.mts --out public/models/fel-hero.glb`, then
+  `npx tsx scripts/avatar/roster.mts`, then `npx tsx scripts/avatar/validate-pose.mts`.
+  The forge now has a face (eyes/iris/brows/lips/nose materials), seven head
+  morph targets, seven hair-style nodes (`Hair_<key>`, one shown at runtime),
+  and measured strike clips. Clip authoring: `chain(a, b)` applies `b` first; a
+  rotation about a limb's own bind axis is an invisible twist — use `aimBone`.
+- **Rendering:** the light rig's pipeline runs everywhere; quality tiers in
+  `lib/babylon/scene/QualityTier.ts` (desktop: SSAO on its own geometry buffer
+  + 3-cascade shadows outdoors; mobile: cheaper). Probe with
+  `scripts/_tier-probe.mts`.
+- **Character layers on every GLB spawn:** `skinShading` (subsurface, pore
+  normals, sheen), `SecondaryMotion` (breath, weight shift, head look-at —
+  modes call `spawn.secondary?.setLookTarget`), `FootPlanting` (two-foot IK).
+  The ink pass skips materials flagged `felShaded`.
+- **Authored sport suites** (`lib/babylon/anim/authored/basketball.ts`,
+  `baseball.ts`) are proven by rig-measured tests; solve new arm keys with
+  `scripts/avatar/_arm-solve.mts` (target hand position → offsets, with a
+  torso pose), never by eye. Reset bones to bind between samples in tests.
+- **Camp Blueprint:** models in `prisma/schema.prisma` (Camp section), the
+  curriculum in `lib/curriculum/blueprint.ts` (owner review pending), API under
+  `app/api/v1/camp/*`, screens at `/camp`. Walk it with
+  `scripts/camp-walk.mts` (API) and `scripts/camp-ui-walk.mts` (screens);
+  both log in as real accounts (`scripts/ensure-playtest-user.ts`, and
+  `PLAYTEST_EMAIL=mentee@fel.local` for the mentee). After `prisma generate`
+  the dev server MUST be restarted or every new route 500s with an empty body.
+- **Gauntlet:** `GAUNTLET_DIR=<dir> zsh scripts/gauntlet.sh` sweeps all 21
+  modes + the mobile trio and diffs against the previous run; per-mode logs
+  under `<dir>/logs`. Green as of this note. Known flake: the mobile skateboard
+  capture shows a start-of-run frame-guard hit about one run in two.
+- **Open, in order:** owner review of the curriculum text; karate endless
+  benchmark pass (Streets of Rage 4 lock); a keeper round in penalty; the
+  free-approach dunk flight; 3v3 alley-oops and switching; PBR venues; a bat
+  prop in the derby; Phase 9 hardening (`npm run build:check`, mobile on
+  hardware).
