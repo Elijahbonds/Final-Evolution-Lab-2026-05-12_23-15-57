@@ -118,6 +118,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         aiKind: 'teammate' | 'defender', slotAngle = 0, markIndex: number | null = null,
       ): Promise<Body> => {
         const char = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: pos, tint, startClip: SPORT_CLIP.idle });
+        char.secondary?.setLookTarget(() => ball?.position ?? null);   // Phase 2: all six watch the ball
         neverBindPose(char.animator, SPORT_CLIP.idle);
         installSafePlay(char.animator, 'threevthree');
         ctx.groundLock?.track(char.root, char.skeleton);

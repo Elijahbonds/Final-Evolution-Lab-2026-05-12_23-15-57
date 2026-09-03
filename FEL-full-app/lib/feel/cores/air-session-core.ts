@@ -222,6 +222,12 @@ export class AirSessionCore {
     this._emit('trickTap', { vy: this.state.vy });
   }
 
+  /** Spin direction for this air (d-pad left = backside, right = frontside). */
+  setSpinDir(dir: 1 | -1): void {
+    if (this.fsm.current !== 'Air') return;
+    this.airTrick.setDir(dir);
+  }
+
   /** Stick-the-landing tap (press just before touchdown). Air phase only. */
   stick(): void {
     if (this.fsm.current !== 'Air') return;

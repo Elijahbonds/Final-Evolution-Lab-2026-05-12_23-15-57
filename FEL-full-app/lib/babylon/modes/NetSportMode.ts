@@ -363,6 +363,18 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
       return;
     }
+    if (q === 'early') {
+      // NET TOUCH (Phase 6, 2026-09-03, the sign-off's carry-forward). An
+      // early jump into the net is the real game's fault, and it was also a
+      // bug: 'early' fell past the miss/late branch and landed in the STUFF
+      // branch, so jumping too soon was rewarded with the point.
+      awaitingHuman = false;
+      shot = null;
+      ctx.setHud({ shotType: 'NET TOUCH' });
+      SoundKit.play('uiTick', { pitch: 0.6, volume: 0.35 });
+      awardPoint(ctx, 1, 'NET TOUCH');
+      return;
+    }
 
     // A GOOD block is not a stuff. It touches the ball and puts it back over
     // as a free ball, so the rally continues from a position you have earned

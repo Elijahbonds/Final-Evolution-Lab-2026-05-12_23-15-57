@@ -93,7 +93,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       best: S.best ? GRADE_LABEL[S.best] : null,
       nextFoot: S.nextFoot,
       banner: S.banner || null,
-      hint: 'D-PAD ←/→ alternate strides · A flip · B stick the landing',
+      hint: 'D-PAD ←/→ alternate strides · in the air ←/→ picks backside/frontside · A spin · B stick the landing',
     });
   };
 
@@ -139,7 +139,8 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       core = opts.makeSession((grade, rotations) => {
         if (grade === 'stuck' || grade === 'clean') S.combo += 1; else S.combo = 0;
         if (S.best === null || GRADE_RANK[grade] > GRADE_RANK[S.best]) S.best = grade;
-        say(`${GRADE_LABEL[grade]}${rotations >= 1 ? `  ${rotations.toFixed(1)} ROT` : ''}`, 1.6);
+        const turns = Math.abs(rotations);
+        say(`${GRADE_LABEL[grade]}${turns >= 1 ? `  ${turns.toFixed(1)} ROT ${rotations < 0 ? 'BS' : 'FS'}` : ''}`, 1.6);
         gallery?.cheer(grade === 'stuck' ? 1 : grade === 'clean' ? 0.6 : grade === 'sketchy' ? 0.3 : 0.15);
         SoundKit.play(grade === 'crash' ? 'miss' : 'score');
         ctx.juice.scorePop(
@@ -167,6 +168,9 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
 
       // Alternating strides build run speed — the cadence IS the mechanic.
       if (e.t === 'dpad' && e.pressed && (e.dir === 'left' || e.dir === 'right')) {
+        // In the air the same keys pick the spin direction (big air D4):
+        // left = backside, right = frontside. Before the first trick tap only.
+        if (phase === 'Air') { core.setSpinDir(e.dir === 'left' ? -1 : 1); return; }
         if (phase !== 'Run') return;
         const side: CadenceSide = e.dir === 'left' ? 'L' : 'R';
         const q = core.runTap(side);

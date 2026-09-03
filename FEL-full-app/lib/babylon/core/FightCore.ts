@@ -184,6 +184,11 @@ export class RivalFightBrain {
   private circleDir = 1;
   private circleTimer = 2;
   private blockHoldSec = 0;
+  /** Phase 5 (2026-09-03, mixed combat D2): a deliberate sidestep burst —
+   *  the brain reads the wind-up and moves off the attack line instead of
+   *  guarding. Seconds left in the burst, and its direction. */
+  private stepHoldSec = 0;
+  private stepDir = 1;
   /** Have we already reacted to the wind-up currently on screen? */
   private reactedToStrike = false;
 
@@ -198,6 +203,7 @@ export class RivalFightBrain {
     this.cooldown -= dt;
     this.circleTimer -= dt;
     this.blockHoldSec = Math.max(0, this.blockHoldSec - dt);
+    this.stepHoldSec = Math.max(0, this.stepHoldSec - dt);
     if (this.circleTimer <= 0) { this.circleTimer = 1.4 + Math.random() * 1.6; this.circleDir *= -1; }
 
     const to = foe.subtract(self); to.y = 0;
@@ -220,10 +226,22 @@ export class RivalFightBrain {
     if (!foeStriking) this.reactedToStrike = false;
     if (foeStriking && !this.reactedToStrike) {
       this.reactedToStrike = true;
-      if (dist < this.attacks.heavy.range + 0.4 && this.blockHoldSec === 0
-          && Math.random() < this.difficulty * 0.5) {
-        this.blockHoldSec = 0.45;
+      if (dist < this.attacks.heavy.range + 0.4 && this.blockHoldSec === 0 && this.stepHoldSec === 0) {
+        const roll = Math.random();
+        // One read per wind-up, split between the two honest answers to a
+        // vertical: step off the line (the sidestep grammar pays chi and
+        // opens a punish) or guard it. Difficulty scales both.
+        if (roll < this.difficulty * 0.35) {
+          this.stepHoldSec = 0.22;
+          this.stepDir = Math.random() < 0.5 ? -1 : 1;
+        } else if (roll < this.difficulty * 0.85) {
+          this.blockHoldSec = 0.45;
+        }
       }
+    }
+    if (this.stepHoldSec > 0) {
+      const perp = new Vector3(-dir.z, 0, dir.x).scale(this.stepDir);
+      return { moveX: perp.x, moveY: -perp.z, attack: null, block: false };
     }
     if (this.blockHoldSec > 0) return { moveX: 0, moveY: 0, attack: null, block: true };
 

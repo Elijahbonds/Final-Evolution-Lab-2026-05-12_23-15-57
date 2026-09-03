@@ -8,7 +8,7 @@ OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
 {
   printf "tsc        : "; if npx tsc --noEmit 2>&1 | grep -vE "\.next/types|node_modules" | grep -q .; then echo FAIL; else echo PASS; fi
   printf "vitest     : "; npx vitest run 2>&1 | grep -oE "Tests +[0-9]+ passed \([0-9]+\)|[0-9]+ failed" | head -1
-  for m in dunk threepoint threevthree onevone karate_vs karate skateboard surf snowboard_slalom volleyball tennis golf derby penalty; do
+  for m in dunk threepoint threevthree onevone dunkduel karate_vs karate mixedcombat skateboard surf snowboard_slalom bigair gymnastics volleyball tennis golf derby penalty football carnival dance; do
     # full output kept per mode so a frame-guard hit is inspectable after the fact
     r=$(URL=http://localhost:3000/dev/mode/$m PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=8 npx tsx scripts/capture-mode-play.mts 2>&1)
     echo "$r" > "$G/logs/$m.txt"

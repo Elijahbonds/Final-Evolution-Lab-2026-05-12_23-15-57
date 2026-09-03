@@ -39,6 +39,9 @@ export class AirTrick {
 
   rotation = 0;
   taps = 0;
+  /** Spin direction (big air D4, 2026-09-03): +1 frontside, −1 backside.
+   *  Chosen in the air with the d-pad; `rotation` is signed by it. */
+  dir: 1 | -1 = 1;
   private _stickAt = -1e9;
 
   constructor({ perTapRotation = 0.5, cleanTolerance = 0.13, stickWindowMs = 160, now }: AirTrickOpts = {}) {
@@ -52,13 +55,19 @@ export class AirTrick {
   reset(): void {
     this.rotation = 0;
     this.taps = 0;
+    this.dir = 1;
     this._stickAt = -1e9;
   }
 
   /** Mid-air trick tap — adds half a rotation. */
   trick(): void {
     this.taps += 1;
-    this.rotation += this.perTapRotation;
+    this.rotation += this.perTapRotation * this.dir;
+  }
+  /** Pick the spin direction; only meaningful before the first tap of an air
+   *  (changing it mid-spin would reverse a rotation already in the air). */
+  setDir(dir: 1 | -1): void {
+    if (this.taps === 0) this.dir = dir;
   }
 
   /** Stick-the-landing tap (press just before touchdown). */

@@ -35,11 +35,35 @@ function blocksOneWindUp(difficulty: number): boolean {
   return blocked;
 }
 
+/** Phase 5 (mixed combat D2): did the brain STEP off the line during the wind-up? */
+function stepsOneWindUp(difficulty: number): boolean {
+  const brain = new RivalFightBrain(difficulty);
+  const self = new Vector3(0, 0, 0);
+  const foe = new Vector3(0, 0, 1.5);
+  const state = new FighterState();
+  for (let f = 0; f < STARTUP_FRAMES; f++) {
+    const a = brain.decide(DT, self, foe, state, true);
+    if (!a.block && Math.abs(a.moveX) > 0.8 && Math.abs(a.moveY) < 0.2) return true;   // a full-speed lateral burst — circling moves at 0.6
+  }
+  return false;
+}
+/** A read of the wind-up is either answer. */
+function readsOneWindUp(difficulty: number): boolean {
+  return blocksOneWindUp(difficulty) || stepsOneWindUp(difficulty);
+}
+
 // ── A. the guard is a read, not a wall ─────────────────────────────────────
 const N = 4000;
 let guarded = 0;
 for (let i = 0; i < N; i++) if (blocksOneWindUp(0.6)) guarded++;
 const rate = guarded / N;
+
+let stepped = 0;
+for (let i = 0; i < N; i++) if (stepsOneWindUp(0.6)) stepped++;
+const stepRate = stepped / N;
+ok(stepRate > 0.1 && stepRate < 0.35,
+  `A2 at difficulty 0.6 the rival deliberately STEPS ${(stepRate * 100).toFixed(0)}% of wind-ups — ` +
+  'mixed combat D2: verticals are read with feet as well as with the guard');
 
 ok(rate > 0.15 && rate < 0.5,
   `A1 at difficulty 0.6 the rival guards ${(rate * 100).toFixed(0)}% of wind-ups — a real ` +
@@ -68,7 +92,7 @@ ok(Math.abs(short - long) < 0.08,
   `${(long * 100).toFixed(0)}%) — startup length must not multiply the rival's odds`);
 
 // ── C. the rival still guards, and still fights ────────────────────────────
-ok(blocksOneWindUp(2.0), 'C1 a maxed-difficulty rival always reads the wind-up');
+ok(readsOneWindUp(2.0), 'C1 a maxed-difficulty rival always reads the wind-up (guard or step)');
 let neverGuards = 0;
 for (let i = 0; i < 200; i++) if (blocksOneWindUp(0)) neverGuards++;
 ok(neverGuards === 0, 'C2 a zero-difficulty rival never guards');

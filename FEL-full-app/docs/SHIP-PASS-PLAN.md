@@ -15,8 +15,8 @@ concept-lock docs.
 | **2 Character fidelity** 🔶 skin/cloth/secondary/planting done |  Forge `skin` gets PBR subsurface; normal + roughness maps authored in the forge; secondary animation layer (head look-at, breathing, idle weight shift); two-foot IK planting everywhere + hand IK for ball grip in basketball. No root-motion rewrite. | Pose gate + pipeline tests green; side-by-side captures before/after per mode family. |
 | **3 Avatar builder** 🔶 face, morphs, sliders, likeness, hair styles, 8-body roster done |  Morph targets in the forge (brow, jaw, mouth, blink + body proportions) exposed as Closet sliders; expanded skin tones, hair styles, kits; photo-to-avatar likeness fit; more authored hero clips per sport. Material name contract untouched. | Closet round-trip: a saved look renders identically in the preview and in a mode. |
 | **4 Basketball to benchmark** 🔶 animation packages live |  dunk, threepoint, onevone, threevthree, dunkduel brought to their locked inspirators (NBA Live 08 contest, NBA 2K feel). Depth of control, AI, presentation. | §7 sign-off per mode against `PHASE2_BENCHMARK_LOCKS.md`. |
-| **5 Combat, board, air** | karate, karate_vs (the Storm mode), mixedcombat (Soul Calibur style), skateboard, surf, snowboard_slalom, bigair (SSX), gymnastics. | §7 sign-off per mode. |
-| **6 Net, precision, field, party** | volleyball (Switch Sports), tennis, golf, derby, penalty, football, carnival (Mario Party / Pac-Man Fever), dance (Class of 3000). | §7 sign-off per mode. |
+| **5 Combat, board, air** 🔶 mixed combat sidestep, big air direction |  karate, karate_vs (the Storm mode), mixedcombat (Soul Calibur style), skateboard, surf, snowboard_slalom, bigair (SSX), gymnastics. | §7 sign-off per mode. |
+| **6 Net, precision, field, party** 🔶 volleyball net touch |  volleyball (Switch Sports), tennis, golf, derby, penalty, football, carnival (Mario Party / Pac-Man Fever), dance (Class of 3000). | §7 sign-off per mode. |
 | **7 Camp Blueprint — model + content** | Curriculum bodies + assessments authored into the Educational Track; `CurriculumAssessment` + credential (80% pass, owner revoke); `CreatorCard.kind='facilitator'`; `FacilitatorProfile`, `GoalPlan` (on `CoachingProgram`), `CampSession` (on `ClientSession`), `CampTemplate`; guardian consent gate; resiliency = retry rate after failed attempts. | Prisma migration applied; unit tests on the read-model and the metric. |
 | **8 Camp Blueprint — flows** | Facilitator onboarding, intake with AI-coach follow-ups, session runner (curriculum beside a game mode, subscribed to `resultSink`), template export/fork with curriculum versioning; coaching-program backend persisted. | Each flow walked end to end on the dev server with screenshots. |
 | **9 Ship hardening** | Mobile tier verified on the mobile capture for every mode; `build:check` clean; auth/prod config reviewed; retired routes confirmed dark; docs and handoff current; final gauntlet green on all 21 modes. | Ship sign-off. |
@@ -64,3 +64,24 @@ concept-lock docs.
   (hand / knee / hip world positions at the key frame). Remaining from the
   locks: teammate alley-oops, defensive switching, ball-in-hand on AI drives,
   3PT tiebreak playoff, free-approach dunk flight.
+- **2026-09-03, Phase 5/6 inventory (from the sign-offs' carry-forwards).**
+  Mixed combat: throws (D1) and a deliberate AI sidestep (D2) deferred. Karate
+  VS: D1–D3 fixed, D4 venue mapping to assess, ring-out ruled. **Karate
+  endless has NO locked benchmark** (§4.3 orphan mounted by request; a defect
+  pass only) — §7.3 forbids inventing one, so it needs an owner lock before a
+  benchmark pass. Big air: spin has no direction vocabulary. Gymnastics: final
+  attempt lacks its own banner beat. Volleyball: single-hand block, no double
+  block / net-touch fault. Soccer: no keeper-only mode. Baseball: covering
+  driver coarse, foul poles scenery, one pitcher arm action for all pitches.
+  Football: no pre-snap disguise. Skate/surf/snowboard/tennis: no open items
+  recorded. Carnival and dance: their fix lists are closed; no carry-forwards
+  beyond tuning.
+- **2026-09-03, Phases 4–6 items landed.** 3v3: all six heads track the ball.
+  Mixed combat D2: the rival brain now reads a wind-up with its feet as well
+  as its guard (a deliberate sidestep burst, ~21% at the default difficulty,
+  asserted by `fight-balance-tests` A2; throws stay deferred with the lock's
+  reason). Big air D4: spin has a direction — d-pad in the air picks
+  backside/frontside, the landing banner names it, `air-trick.test.ts`.
+  Volleyball: an early block jump is a NET TOUCH fault (it was falling into
+  the stuff branch and being rewarded). The gauntlet now sweeps all 21
+  roster modes, not 14.
