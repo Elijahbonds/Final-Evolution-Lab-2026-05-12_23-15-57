@@ -3,13 +3,20 @@
 // arm reaches for it (HandIK.ts). When the mode shoots, dunks, passes or loses
 // the ball it calls setActive(false) and the ball is back in the palm exactly
 // as before (ballRig.attachBallToHand), so every existing release path holds.
+//
+// Timing: the harness runs a mode's update BEFORE scene.render(), and the
+// clips are evaluated inside render — so a bone rotation written from update
+// is overwritten a moment later. update() only records the frame; the ball
+// placement and the arm reach happen in onAfterAnimationsObservable, on top
+// of the final pose (same slot foot planting uses).
 import { Quaternion, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, Skeleton, TransformNode } from '@babylonjs/core';
+import type { AbstractMesh, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { attachBallToHand } from './ballRig';
 import { DEFAULT_DRIBBLE, advancePhase, dribbleAt, type DribbleParams } from './Dribble';
 import { armChain, reachArm, type ArmChain } from './HandIK';
 
 export interface BallCarryOpts {
+  scene: Scene;
   ball: AbstractMesh;
   root: TransformNode;
   skeleton: Skeleton;
@@ -25,6 +32,7 @@ export interface BallCarry {
   update(dtSec: number, speed01: number, active: boolean): void;
   /** Swap the dribbling hand (crossover). */
   switchHand(): void;
+  dispose(): void;
   readonly active: boolean;
   readonly phase: number;
   readonly side: 'Left' | 'Right';
@@ -37,6 +45,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   let arm: ArmChain | null = armChain(opts.skeleton, side);
   let active = false;
   let phase = 0;
+  let pending = false;   // a frame was recorded since the last after-animations pass
   const local = new Vector3(), world = new Vector3(), handT = new Vector3(), pole = new Vector3();
 
   const toWorld = (x: number, y: number, z: number, out: Vector3): Vector3 => {
@@ -46,6 +55,22 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     local.applyRotationQuaternionToRef(rot, out);
     return out.addInPlace(opts.root.getAbsolutePosition());
   };
+
+  const apply = () => {
+    if (!active || !pending) return;
+    pending = false;
+    const s = dribbleAt(phase, p);
+    const sx = side === 'Right' ? 1 : -1;
+    toWorld(s.ball.x * sx, s.ball.y, s.ball.z, world);
+    opts.ball.position.copyFrom(world);
+    if (arm && armW > 0) {
+      toWorld(s.hand.x * sx, s.hand.y, s.hand.z, handT);
+      // elbow out to the side and back, never into the ribs
+      toWorld(sx * 0.7, s.hand.y - 0.2, -0.5, pole).subtractInPlace(opts.root.getAbsolutePosition());
+      reachArm(arm, handT, pole, s.handWeight * armW);
+    }
+  };
+  const obs = opts.scene.onAfterAnimationsObservable.add(apply);
 
   return {
     get active() { return active; },
@@ -65,16 +90,8 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       }
       if (!active) return;
       phase = advancePhase(phase, dt, speed01, p);
-      const s = dribbleAt(phase, p);
-      const sx = side === 'Right' ? 1 : -1;
-      toWorld(s.ball.x * sx, s.ball.y, s.ball.z, world);
-      opts.ball.position.copyFrom(world);
-      if (arm && armW > 0) {
-        toWorld(s.hand.x * sx, s.hand.y, s.hand.z, handT);
-        // elbow out to the side and back, never into the ribs
-        toWorld(sx * 0.7, s.hand.y - 0.2, -0.5, pole).subtractInPlace(opts.root.getAbsolutePosition());
-        reachArm(arm, handT, pole, s.handWeight * armW);
-      }
+      pending = true;
     },
+    dispose() { opts.scene.onAfterAnimationsObservable.remove(obs); },
   };
 }

@@ -33,16 +33,18 @@ describe('ballCarry', () => {
     const scene = new Scene(new NullEngine());
     const r = rig(scene);
     attachBallToHand(r.ball, r.sk, 'RightHand');             // the mode owns possession
-    const carry = mountBallCarry({ ball: r.ball, root: r.root, skeleton: r.sk });
-    carry.update(0, 0, false);
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk });
+    // a frame = the mode's update, then Babylon's after-animations pass
+    const frame = (dt: number, speed: number, active: boolean) => { carry.update(dt, speed, active); scene.onAfterAnimationsObservable.notifyObservers(scene); };
+    frame(0, 0, false);
     expect(r.ball.parent).toBe(r.hand);                      // inactive: left alone in the palm
     r.hand.computeWorldMatrix(true);
     const restHand = r.hand.getAbsolutePosition().clone();
-    carry.update(0.016, 0.5, true);
+    frame(0.016, 0.5, true);
     expect(r.ball.parent).toBeNull();
     // step to phase 0.5 — the floor
     let steps = 0;
-    while (Math.abs(carry.phase - 0.5) > 0.01 && steps++ < 400) carry.update(1 / 240, 0, true);
+    while (Math.abs(carry.phase - 0.5) > 0.01 && steps++ < 400) frame(1 / 240, 0, true);
     r.ball.computeWorldMatrix(true);
     expect(r.ball.getAbsolutePosition().y).toBeCloseTo(P.ballR, 2);
     // the ball dribbles on the right of a body facing -z: world x is negative
@@ -55,17 +57,19 @@ describe('ballCarry', () => {
     const hand = r.hand.getAbsolutePosition();
     const ballPos = r.ball.getAbsolutePosition();
     expect(Math.hypot(hand.x - ballPos.x, hand.z - ballPos.z)).toBeLessThan(Math.hypot(restHand.x - ballPos.x, restHand.z - ballPos.z));
-    carry.update(0.016, 0, false);
+    frame(0.016, 0, false);
     expect(r.ball.parent).toBe(r.hand);                      // shot starts: back in the palm
+    carry.dispose();
   });
   it('switches hands on a crossover', () => {
     const scene = new Scene(new NullEngine());
     const r = rig(scene);
-    const carry = mountBallCarry({ ball: r.ball, root: r.root, skeleton: r.sk });
-    carry.update(0.016, 0.5, true);
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk });
+    const frame = (dt: number, speed: number, active: boolean) => { carry.update(dt, speed, active); scene.onAfterAnimationsObservable.notifyObservers(scene); };
+    frame(0.016, 0.5, true);
     carry.switchHand();
     expect(carry.side).toBe('Left');
-    while (Math.abs(carry.phase - 0.5) > 0.01) carry.update(1 / 240, 0, true);
+    while (Math.abs(carry.phase - 0.5) > 0.01) frame(1 / 240, 0, true);
     r.ball.computeWorldMatrix(true);
     expect(r.ball.getAbsolutePosition().x).toBeGreaterThan(0.2);   // now on the body's left
   });
