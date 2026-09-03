@@ -1,27 +1,38 @@
-# Concept Lock — Karate Endless (Agent Waves)
+# Concept Lock — Karate Endless (the horde brawler)
 
-**Benchmark (LOCKED): Soul Calibur + Wave Survival (COD Zombies).**
-Locked in `PHASE2_BENCHMARK_LOCKS.md` (repo root, commit `d441f29`), in the
-*Already-Locked (from audit)* list.
-
-**This unblocks the mode.** `karate-endless-defects.md` states plainly that the
-mode could not have a real pass because "§4.3 carries no benchmark", and that a
-benchmark "still needs locking". That was true of the Master Design Bible's §4.3
-and false of this repository — the lock existed the whole time, at the tracked
-repo root, one level above `FEL-full-app`, which is why every search inside the
-app missed it. The same file also settles Unreal Arena, and the same oversight
-cost the board sports a phase each. That defect document stands as an accurate
-record of its own pass; it is superseded on this one point only.
+**Benchmark (LOCKED by the owner, 2026-09-03): the Matrix Revolutions burly brawl /
+One Piece Pirate Warriors (Musou) horde grammar.** You face hordes and waves of
+enemies, solo or co-op. Recorded in `PHASE2_BENCHMARK_LOCKS.md` (repo root).
+This supersedes the earlier Soul Calibur + COD Zombies reading below, which is
+kept as the record of the prior pass: its wave structure (A) and co-op (C)
+criteria still hold under the new lock; its melee section (D) is retired — the
+one-on-one Soul Calibur grammar belongs to Mixed Combat, and the Storm grammar
+to Karate VS. Three modes, three mechanics.
 
 **Mode id:** `karate` · **Implementation:** `lib/babylon/modes/KarateEndlessMode.ts`
 **Route:** `/play/karate` · **Host:** `components/games/karate-babylon.tsx`
 
-**Reading a two-part benchmark.** COD Zombies supplies the *structure* — escalating
-waves, a points economy, perk purchases, down-and-revive co-op, a run that ends
-when you are overwhelmed. Soul Calibur supplies the *melee* — 3D arena combat with
-strikes, guard, and movement that matters. Where the two disagree, the structure
-criteria come from Zombies and the fight criteria from Soul Calibur, and this
-document says which is which rather than blending them.
+## H. The horde grammar (this pass — measured against the code, 2026-09-03)
+
+| # | Criterion | Status | Where |
+|---|---|---|---|
+| H1 | Many enemies on screen at once, not a queue of duels | ⚠ 4→12 per wave | `WAVE.base/max`; the horde fantasy wants ~8→20 on desktop, capped by tier on mobile |
+| H2 | Every strike hits EVERYONE in its arc, not the nearest one | ❌ **D-H1** | `strike()` → `nearest()` single target; `OnslaughtCore.aoeTargets` exists and is unused |
+| H3 | A launcher and a juggle: airborne enemies are helpless and take more | ❌ **D-H1** | `applyCCHit` / `JUGGLE_*` exist in the core, never called by the mode |
+| H4 | A crowd-clear special when surrounded | ✅ | `surroundedCount` / `crowdClear` — the one core piece that is wired |
+| H5 | A hit counter that climbs across the horde (the Musou number) | ❌ **D-H2** | `kos` only; no running hit count on the bezel |
+| H6 | Waves escalate in count and toughness | ✅ | `waveSpec` |
+| H7 | Co-op: a partner fights beside you, down-and-revive | ✅ | `PartnerAISource`, `DownRevive` |
+| H8 | The camera frames a crowd, not a duel | ⚠ | facing-derived `overShoulder`; needs a pull-back when surrounded |
+
+**D-H1 — Strikes are single-target. → FIX (Phase 5).** Every strike resolves
+through `aoeTargets` with a per-strike arc: jab a 100° arc at 1.5 m (light,
+launches a staggered enemy), kick a 150° arc at 1.9 m with knockback, heavy a
+launcher on the front arc. Airborne enemies take `JUGGLE_DAMAGE_MULT`.
+**D-H2 — No hit counter. → FIX (Phase 5).** A running `hits` count that decays
+after 1.4 s without a hit; the bezel shows it; the chi gain scales gently with it.
+**D-H3 — Horde size. → FIX (Phase 5), tier-capped.** `WAVE.base 6 / max 20`
+on desktop, `max 12` on mobile — measured against the frame budget.
 
 ---
 
