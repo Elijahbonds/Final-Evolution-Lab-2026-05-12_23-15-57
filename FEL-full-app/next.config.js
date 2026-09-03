@@ -16,6 +16,21 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   images: { unoptimized: true },
+  // Ship pass, Phase 9 (2026-09-03): baseline security headers. The Closet's
+  // face scan uses the camera, so the permissions policy keeps camera=(self);
+  // frame-ancestors 'self' — the game is not embedded anywhere else.
+  async headers() {
+    return [{
+      source: '/(.*)',
+      headers: [
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+        { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+        { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=()' },
+      ],
+    }];
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.output.filename = 'static/chunks/[name]-[contenthash:8].js';

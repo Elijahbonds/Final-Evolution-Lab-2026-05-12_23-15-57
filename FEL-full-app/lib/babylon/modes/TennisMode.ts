@@ -19,11 +19,9 @@ export const TennisMode = createNetSportMode({
   ambient: 'stadium',
   crowd: true,          // L4 — Center Court has crowd tiers; give them people
   energy: true,         // Aces' gauge, Zone Shot and racket break
-  // Reuses the authored jumpshot swing: an overhead racquet motion and a
-  // jumper share the same arm arc closely enough to read correctly, and it
-  // beats shipping a mode with no swing animation at all. Replace with an
-  // authored `tennis_swing` clip when one exists.
-  swingClip: 'jumpshot',
+  // Phase 3 (2026-09-03): the authored forehand (lib/babylon/anim/authored/tennis.ts),
+  // proven on the forge rig. It replaced the jumpshot stand-in.
+  swingClip: 'tennis_swing',
   aiSkill: 0.82,  //TUNE(elijah)
   hudLabels: { you: 'YOUR POINT', them: 'THEIR POINT' },
 });

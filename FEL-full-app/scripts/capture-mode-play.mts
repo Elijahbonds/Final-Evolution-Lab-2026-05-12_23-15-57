@@ -51,7 +51,7 @@ if (process.env.LOGIN === '1') {
   await rc.dispose();
 }
 const logs: string[] = [];
-p.on('console', (m) => { if (m.type() === 'error' || /FEL-FRAME|MISSING CLIP|FEL-IDENT/.test(m.text())) logs.push(`[${m.type()}] ${m.text().slice(0, Number(process.env.LOG_CHARS ?? 170))}`); });
+p.on('console', (m) => { if (m.type() === 'error' || /FEL-FRAME|MISSING CLIP|FEL-IDENT|FEL-CAM/.test(m.text())) logs.push(`[${m.type()}] ${m.text().slice(0, Number(process.env.LOG_CHARS ?? 170))}`); });
 p.on('pageerror', (e) => logs.push(`[pageerror] ${e.message.slice(0, Number(process.env.LOG_CHARS ?? 170))}`));
 
 // PHASE 9 WANTS THE SHIPPING ROUTE. /play/* calls getServerSession and
@@ -170,6 +170,8 @@ console.log(`${NAME} phase :`, await head());
 const frame = logs.filter((l) => /FEL-FRAME/.test(l));
 const miss = logs.filter((l) => /MISSING CLIP/.test(l));
 const ident = logs.filter((l) => /FEL-IDENT/.test(l));
+const cam = logs.filter((l) => /FEL-CAM/.test(l));
+if (cam.length) console.log(`${NAME} cam   : overhead fallback x${cam.length} (designed degradation, not counted)`);
 const errs = logs.filter((l) => ((l.startsWith('[error]') || l.startsWith('[pageerror]'))
   && !/401 \(Unauthorized\)/.test(l) && !/FEL-FRAME/.test(l)) || /FEL-IDENT.*never ready/.test(l));
 console.log(`${NAME} FEL-FRAME ${frame.length} | MISSING CLIP ${miss.length} | errors ${errs.length}`);

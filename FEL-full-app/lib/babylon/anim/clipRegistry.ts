@@ -134,18 +134,18 @@ export const SPORT_CLIP = {
   boardBail: 'skate_bail',
 
   // precision sports
-  golfAddress: 'guard',
-  golfSwing: 'roundhouse',
-  tennisIdle: 'guard',
-  tennisForehand: 'jab',
+  golfAddress: 'golf_address_idle',   // Phase 3: authored (was the karate guard)
+  golfSwing: 'golf_swing_full',       // (was the roundhouse)
+  tennisIdle: 'tennis_ready',
+  tennisForehand: 'tennis_swing',
   derbyStance: 'baseball_stance',        // Phase 6: real bat stance (was the karate guard)
   derbySwing: 'baseball_swing',          // (was the uppercut)
   derbyPitch: 'baseball_pitch_over',     // fastball + changeup: the same look, by design
   derbyPitchSide: 'baseball_pitch_side', // the slider's three-quarter arm slot
-  penaltyIdle: 'guard',
-  penaltyStrike: 'high_kick',
-  keeperIdle: 'guard',
-  keeperDive: 'jumpshot',
+  penaltyIdle: 'idle_stand',
+  penaltyStrike: 'soccer_kick_shoot',  // (was the karate high kick)
+  keeperIdle: 'keeper_set',
+  keeperDive: 'keeper_dive',           // (was the jumpshot)
 } as const;
 
 export type SportGesture = keyof typeof SPORT_CLIP;
@@ -163,7 +163,11 @@ export function installSafePlay(animator: CharacterAnimator, modeId: string): vo
   a.__safePlayInstalled = true;
   const rawPlay = animator.play.bind(animator);
   animator.play = (name: string, opts: PlayOpts = {}) => {
-    if (!isResolvable(name)) {
+    // A registered authored clip is resolvable too. isResolvable() knows the
+    // GLB's clips and the static alias table only, so an authored clip with no
+    // alias entry (tennis_swing, keeper_dive…) was refused here and never
+    // reached the resolver that would have found it — measured 2026-09-03.
+    if (!isResolvable(name) && !animator.clipNames.has(name)) {
       console.error(`[FEL-ANIM] MISSING CLIP "${name}" requested in "${modeId}" — no real clip or alias; falling back to "${SAFE_DEFAULT}" (bind pose avoided)`);
       return rawPlay(SAFE_DEFAULT, opts);
     }

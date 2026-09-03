@@ -14,6 +14,10 @@ import {
   buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildDefendSlide, buildBlockReach, buildStealReach,
 } from './basketball';
 import { buildBatStance, buildBatSwing, buildPitchOver, buildPitchSide } from './baseball';
+import { buildGolfAddress, buildGolfSwing } from './golf';
+import { buildTennisReady, buildTennisServe, buildTennisSwing } from './tennis';
+import { buildVolleyBlock, buildVolleyReady, buildVolleySpike } from './volleyball';
+import { buildKeeperDive, buildKeeperSet, buildSoccerKick } from './soccer';
 import {
   buildBoardRideIdle, buildBoardCarveLeft, buildBoardCarveRight, buildBoardTuck,
   buildBoardGrab, buildBoardAir, buildBoardGrind, buildBoardLand,
@@ -47,6 +51,18 @@ export function registerAuthoredClips(
     () => buildKnockdown(scene, skeleton),
     // Board suite — skate / surf / snowboard all ride on these. Without them
     // every board clip fell through the alias table onto a karate stance.
+    // Phase 3 (2026-09-03): the racket, club, net and keeper sports stop borrowing karate
+    () => buildGolfAddress(scene, skeleton),
+    () => buildGolfSwing(scene, skeleton),
+    () => buildTennisReady(scene, skeleton),
+    () => buildTennisSwing(scene, skeleton),
+    () => buildTennisServe(scene, skeleton),
+    () => buildVolleyReady(scene, skeleton),
+    () => buildVolleySpike(scene, skeleton),
+    () => buildVolleyBlock(scene, skeleton),
+    () => buildSoccerKick(scene, skeleton),
+    () => buildKeeperSet(scene, skeleton),
+    () => buildKeeperDive(scene, skeleton),
     () => buildBoardRideIdle(scene, skeleton),
     () => buildBoardCarveLeft(scene, skeleton),
     () => buildBoardCarveRight(scene, skeleton),
