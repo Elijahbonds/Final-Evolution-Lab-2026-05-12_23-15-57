@@ -30,7 +30,10 @@ while (i + 1 < args.length) {
   const hips = boneNode(sk, 'Hips')!, spine = boneNode(sk, 'Spine')!;
   hips.rotationQuaternion = torso ? eulerQ(torso[0], torso[1], torso[2]) : eulerQ(0, 0, 0);
   spine.rotationQuaternion = torso ? eulerQ(torso[3], torso[4], torso[5]) : eulerQ(0, 0, 0);
-  hips.computeWorldMatrix(true); spine.computeWorldMatrix(true);
+  // A forced compute on a node uses its PARENT'S CACHED matrix; the chest and
+  // shoulder between the spine and the arm stay stale without a render, so
+  // every torso: solve before 2026-09-03 was really solved upright. Render once.
+  hips.computeWorldMatrix(true); spine.computeWorldMatrix(true); scene.render();
   const arm = boneNode(sk, `${side}Arm`)!, fore = boneNode(sk, `${side}ForeArm`)!, hand = boneNode(sk, `${side}Hand`)!;
   const ra = rest.get(`${side}Arm`)!, rf = rest.get(`${side}ForeArm`)!;
   let best = { d: 1e9, y: 0, z: 0, fy: 0, p: Vector3.Zero() };
