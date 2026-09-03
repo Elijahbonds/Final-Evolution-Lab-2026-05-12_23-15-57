@@ -17,7 +17,7 @@ concept-lock docs.
 | **4 Basketball to benchmark** 🔶 animation packages live |  dunk, threepoint, onevone, threevthree, dunkduel brought to their locked inspirators (NBA Live 08 contest, NBA 2K feel). Depth of control, AI, presentation. | §7 sign-off per mode against `PHASE2_BENCHMARK_LOCKS.md`. |
 | **5 Combat, board, air** 🔶 mixed combat sidestep, big air direction |  karate, karate_vs (the Storm mode), mixedcombat (Soul Calibur style), skateboard, surf, snowboard_slalom, bigair (SSX), gymnastics. | §7 sign-off per mode. |
 | **6 Net, precision, field, party** 🔶 volleyball net touch, baseball clips |  volleyball (Switch Sports), tennis, golf, derby, penalty, football, carnival (Mario Party / Pac-Man Fever), dance (Class of 3000). | §7 sign-off per mode. |
-| **7 Camp Blueprint — model + content** | Curriculum bodies + assessments authored into the Educational Track; `CurriculumAssessment` + credential (80% pass, owner revoke); `CreatorCard.kind='facilitator'`; `FacilitatorProfile`, `GoalPlan` (on `CoachingProgram`), `CampSession` (on `ClientSession`), `CampTemplate`; guardian consent gate; resiliency = retry rate after failed attempts. | Prisma migration applied; unit tests on the read-model and the metric. |
+| **7 Camp Blueprint — model + content** 🔶 model, curriculum draft, API live |  Curriculum bodies + assessments authored into the Educational Track; `CurriculumAssessment` + credential (80% pass, owner revoke); `CreatorCard.kind='facilitator'`; `FacilitatorProfile`, `GoalPlan` (on `CoachingProgram`), `CampSession` (on `ClientSession`), `CampTemplate`; guardian consent gate; resiliency = retry rate after failed attempts. | Prisma migration applied; unit tests on the read-model and the metric. |
 | **8 Camp Blueprint — flows** | Facilitator onboarding, intake with AI-coach follow-ups, session runner (curriculum beside a game mode, subscribed to `resultSink`), template export/fork with curriculum versioning; coaching-program backend persisted. | Each flow walked end to end on the dev server with screenshots. |
 | **9 Ship hardening** | Mobile tier verified on the mobile capture for every mode; `build:check` clean; auth/prod config reviewed; retired routes confirmed dark; docs and handoff current; final gauntlet green on all 21 modes. | Ship sign-off. |
 
@@ -107,3 +107,15 @@ concept-lock docs.
   three required modules (Engine, Governor, Facilitating) over the eight PRQ
   pillars and the four Camp flows, with graded assessments at the 80% mark,
   plus bodies for the twelve existing mode-track lessons. Owner review pending.
+- **2026-09-03, Phase 7 backend live.** `/api/v1/camp/{assess,plans,consent,
+  sessions,profile,templates,revoke}` walked end to end on the dev server as
+  two real accounts (`scripts/camp-walk.mts`, NextAuth credentials flow, no
+  bypass): three assessments certify the facilitator and flip their Creator
+  Card to kind=facilitator; a plan drafts a CoachingProgram of milestones,
+  locks, is refused activation for a minor (412) until the guardian accepts by
+  token, then activates; a session record attaches games and computes PRQ /
+  movement deltas and the resiliency log; the composed profile reads; a
+  template exports, forks and imports with the curriculum-version check; an
+  uncertified user cannot draft (403) and a mentee cannot read another's
+  profile (403). The dev server had to be restarted to load the regenerated
+  Prisma client — every new route 500'd until then.
