@@ -127,3 +127,16 @@ Asked as multiple choice, answered by the owner. These gate the 10-phase ship pa
 - **Resiliency metric:** retry rate after failed attempts (in-session retries after a fail + return sessions after a losing one).
 - **Avatar builder scope (all four):** face + body morph-target sliders; more skin tones/hair/kits; photo-to-avatar likeness; better forge animation set.
 - **Ship roster:** all 21 Babylon modes; Sprint/Showdown/Duel stay retired.
+
+## 2026-09-03 owner decisions — ship pass, round two
+
+- **Karate Endless → Streets of Rage 4** (wave brawler: endless waves, crowd
+  control, juggles, specials on the chi meter). This closes the §4.3 gap; the
+  mode may now enter a benchmark pass.
+- **Penalty gains a keeper round**: alternate kicker/keeper rounds inside the
+  existing penalty mode, dive-on-command with a timing read. Not a new mode.
+- **Dunk Contest gets the free-approach flight**: approach angle and one/two-foot
+  takeoff feed style and difficulty, as the real event judges them.
+- **Order**: Camp Blueprint (Phase 7) starts now; remaining mode polish
+  (alley-oops, defensive switching, throws, football disguise, bat prop, PBR
+  venues) continues in the background between sweeps.
