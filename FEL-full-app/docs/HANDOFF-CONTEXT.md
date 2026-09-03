@@ -268,3 +268,17 @@ stand:
   props are PBR. Every staged batch is a `scripts`-free Python patch in the
   session scratchpad — if you find `MISMATCH` output, the anchor text moved;
   re-read the file rather than forcing it.
+- **Later 2026-09-03, the Closet "explosion" and what it taught:** the body
+  never exploded; the SKIN material never compiled. Tinting clones materials,
+  `Material.clone` deep-clones textures, and `DynamicTexture.clone()` is a blank
+  canvas — the pore map's copy never became ready, so the skin (the only mesh
+  carrying it) rendered nothing. `cloneForTint` (playerIdentity.ts) shares the
+  map; a test pins it. Rules that fell out of it: (1) a never-ready material
+  throws nothing and logs nothing — `applyIdentity` now names such meshes with
+  `[FEL-IDENT]` 3 s after landing; (2) the gauntlet plays onevone / skateboard
+  / karate LOGGED IN (`LOGIN=1` in capture-mode-play.mts) because only a
+  session runs the identity pass; (3) foot planting is mounted at intensity 0 —
+  `BoneIKController` leaves non-uniform scale on this rig's leg bones; the
+  node-space replacement is `lib/babylon/anim/TwoBoneIK.ts` (pure, tested),
+  not yet wired into `mountFootPlanting`. Never edit code the dev server
+  imports while a gauntlet sweep runs — HMR mid-capture perturbs the results.
