@@ -8,7 +8,7 @@ describe('dribble cycle', () => {
     expect(dribbleAt(1).ballY).toBeCloseTo(P.palmY, 6);
   });
   it('keeps the hand on the ball through the push, then waits above the floor', () => {
-    const push = dribbleAt(0.1);
+    const push = dribbleAt(0.03);   // inside the push: the ball is still near the palm
     expect(push.hand.y).toBeCloseTo(push.ballY + P.ballR, 6);
     expect(push.handWeight).toBe(1);
     const low = dribbleAt(0.5);

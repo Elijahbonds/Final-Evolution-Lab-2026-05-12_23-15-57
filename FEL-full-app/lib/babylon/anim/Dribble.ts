@@ -18,8 +18,12 @@ export interface DribbleParams {
   followDepth: number;
 }
 
+// The forged hero's arm (Arm→ForeArm→Hand) is 0.55 m from a 1.47 m shoulder,
+// so a standing hand hangs at ~0.92 m. The palm height is the hanging hand;
+// the follow depth asks a little more and the solver clamps to full reach,
+// which reads as reaching for the ball (measured on the node test rig).
 export const DEFAULT_DRIBBLE: DribbleParams = {
-  palmY: 0.92, ballR: 0.12, hzIdle: 1.7, hzFast: 2.6, side: 0.28, forward: 0.22, followDepth: 0.22,
+  palmY: 0.98, ballR: 0.12, hzIdle: 1.7, hzFast: 2.6, side: 0.26, forward: 0.16, followDepth: 0.12,
 };
 
 export interface DribbleState {
