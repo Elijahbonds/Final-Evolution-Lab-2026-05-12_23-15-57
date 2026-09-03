@@ -87,10 +87,24 @@ Metal. These are the baseline any fidelity change is measured against.
 <!-- GAUNTLET-TABLE -->
 | Mode | fps | avg frame | draws | meshes |
 |---|---|---|---|---|
-| (populated from the gauntlet run when it completes) | | | | |
+| `dunk` | 60 | 16.7 ms | 26 | 26 |
+| `threepoint` | 60 | 16.7 ms | 46 | 46 |
+| `threevthree` | 60 | 16.7 ms | 54 | 54 |
+| `onevone` | 60 | 16.7 ms | 29 | 29 |
+| `karate_vs` | 60 | 16.7 ms | 19 | 19 |
+| `karate` | 60 | 16.7 ms | 31 | 31 |
+| `skateboard` | 60 | 16.7 ms | 69 | 69 |
+| `surf` | 60 | 16.7 ms | 23 | 23 |
+| `snowboard_slalom` | 60 | 16.7 ms | 45 | 45 |
+| `volleyball` | 61 | 16.4 ms | 46 | 46 |
+| `tennis` | 59 | 17.0 ms | 46 | 46 |
+| `golf` | 60 | 16.7 ms | 18 | 18 |
+| `derby` | 60 | 16.7 ms | 21 | 21 |
+| `penalty` | 60 | 16.6 ms | 53 | 53 |
 <!-- /GAUNTLET-TABLE -->
 
-Every mode measured this session sits at 60 fps / ~16.7 ms with 14–75 draws.
+Baseline run 2026-09-02 22:29. Every mode sits at 59–61 fps / ~16.7 ms with 18–69 draws
+(draws == meshes everywhere: nothing is instanced or merged, which is itself a D-section note).
 There is substantial headroom, **but it is headroom on a `StandardMaterial`
 capsule body**. The budget must be re-measured the moment the GLB path is
 enabled, before any material work.
