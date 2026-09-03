@@ -327,7 +327,7 @@ export default function KarateGame({ grade, prq, onEnd, gamepad }: GameProps) {
       ctx.fillStyle = '#fff'; ctx.font = 'bold 28px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
       ctx.fillText(String(st.score), W / 2, 44);
       ctx.font = '600 14px "Barlow Condensed", sans-serif'; ctx.fillStyle = '#00E5FF';
-      ctx.fillText(`KARATE ENDLESS · WAVE ${st.wave}`, W / 2, 20);
+      ctx.fillText(`THE HUNDRED · WAVE ${st.wave}`, W / 2, 20);
       // health bar
       const hpw = 240, hpx = W * 0.2 + 12, hpy = 66;
       ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(hpx, hpy, hpw, 10);
@@ -405,7 +405,7 @@ export default function KarateGame({ grade, prq, onEnd, gamepad }: GameProps) {
         <canvas ref={canvasRef} className="w-full rounded-lg border border-white/10 bg-[#0F0F13]" style={{ aspectRatio: '16/9' }} />
         {!started && (
           <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg bg-black/70 backdrop-blur-sm">
-            <h2 className="fel-heading text-4xl font-bold text-white">KARATE ENDLESS</h2>
+            <h2 className="fel-heading text-4xl font-bold text-white">THE HUNDRED</h2>
             <p className="mt-2 max-w-md text-center text-sm text-white/60">
               Survive escalating waves. Chain strikes inside the 0.5s window to build your multiplier.
             </p>

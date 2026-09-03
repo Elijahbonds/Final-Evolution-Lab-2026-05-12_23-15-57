@@ -16,15 +16,15 @@
 import { chromium } from 'playwright-core';
 
 const mode = await import('../lib/babylon/modes/precisionModes');
-const { ZONE_HALF } = mode;
+const { pitchSpec } = mode;
 
-/** Where pitch `round` crosses the plate — mirrors DerbyMode.pitch(). */
-const pitchAt = (round: number) => ({
-  x: Math.sin(round * 2.7) * 0.8 * ZONE_HALF.x,
-  y: 1.05 + Math.cos(round * 1.9) * ZONE_HALF.y,
-});
-/** Pitch speed rises with the round, so the flight shortens. */
-const flightSec = (round: number) => 17.5 / (14 + round * 0.5);
+/** Where pitch `round` crosses the plate — the mode's OWN pitchSpec,
+ *  including the slider's late break (cover the ARRIVAL, not the aim), so
+ *  driver and mode cannot drift. This used to mirror the location formula
+ *  and miss the break entirely. */
+const pitchAt = (round: number) => ({ x: pitchSpec(round).arrive.x, y: pitchSpec(round).arrive.y });
+/** Pitch speed varies by type now (changeups take off ~22%), not just round. */
+const flightSec = (round: number) => 17.5 / pitchSpec(round).speed;
 
 const COVER = process.env.COVER !== '0';
 /** Milliseconds shaved off the computed flight before swinging. Detecting the
@@ -39,7 +39,10 @@ const logs: string[] = [];
 p.on('console', (m) => { if (m.type() === 'error' || /FEL-FRAME|MISSING CLIP/.test(m.text())) logs.push(m.text().slice(0, 150)); });
 p.on('pageerror', (e) => logs.push(`[pageerror] ${e.message.slice(0, 150)}`));
 
-await p.goto('http://localhost:3000/dev/mode/derby', { waitUntil: 'networkidle' });
+// NB: not named URL — that would shadow the global URL constructor (§7.8).
+// And honour the URL env like every other driver: a hardcoded port once
+// aimed this at ANOTHER worktree's dev server and measured their derby.
+await p.goto(process.env.URL ?? 'http://localhost:3000/dev/mode/derby', { waitUntil: 'networkidle' });
 await p.waitForSelector('canvas', { timeout: 30_000 });
 await p.waitForTimeout(2500);
 const head = async () => (await p.evaluate<string>('document.body.innerText')).split('\n')[0];
@@ -54,8 +57,10 @@ const hud = async (): Promise<Record<string, unknown>> => {
   return {};
 };
 
-/** PCI starts centred; the Reticle moves 3.2 u/s in x, 2.6 u/s in y. */
-let pci = { x: 0, y: 1.1 };
+/** PCI starts centred; the Reticle moves 3.2 u/s in x, 2.6 u/s in y.
+ *  The position comes from the HUD's own `pci` field each poll — the driver
+ *  used to integrate its own model, and the drift accumulated enough that
+ *  the covering bot once lost to the blind control. Close the loop. */
 const contacts: string[] = [];
 let seenRound = 0;
 
@@ -72,18 +77,28 @@ for (let guard = 0; guard < 4000 && Date.now() < deadline; guard++) {
   if (COVER) {
     // Walk the PCI onto the pitch, then hold. Hold times come from the
     // reticle's own speeds so this stays honest about what a player can do.
-    const dx = want.x - pci.x, dy = want.y - pci.y;
+    const pciNow = typeof h.pci === 'string' ? (h.pci as string).split(',').map(Number) : [0, 1.1];
+    const dx = want.x - pciNow[0], dy = want.y - pciNow[1];
     const holdX = Math.min(0.55, Math.abs(dx) / 3.2);
     const holdY = Math.min(0.55, Math.abs(dy) / 2.6);
     if (holdX > 0.02) {
       const k = dx > 0 ? 'd' : 'a';
       await p.keyboard.down(k); await p.waitForTimeout(holdX * 1000); await p.keyboard.up(k);
-      pci.x += Math.sign(dx) * holdX * 3.2;
     }
     if (holdY > 0.02) {
       const k = dy > 0 ? 's' : 'w';
       await p.keyboard.down(k); await p.waitForTimeout(holdY * 1000); await p.keyboard.up(k);
-      pci.y += Math.sign(dy) * holdY * 2.6;
+    }
+    // re-read after the walk: the reticle's own position, not our estimate
+    const walked = await hud();
+    const walkedPci = typeof walked.pci === 'string' ? (walked.pci as string).split(',').map(Number) : [0, 1.1];
+    const residual = Math.hypot(want.x - walkedPci[0], want.y - walkedPci[1]);
+    // one correction step if the capped holds under-walked (reticle caps exist)
+    if (residual > 0.12) {
+      const dx2 = want.x - walkedPci[0], dy2 = want.y - walkedPci[1];
+      const hx = Math.min(0.3, Math.abs(dx2) / 3.2), hy = Math.min(0.3, Math.abs(dy2) / 2.6);
+      if (hx > 0.02) { const k = dx2 > 0 ? 'd' : 'a'; await p.keyboard.down(k); await p.waitForTimeout(hx * 1000); await p.keyboard.up(k); }
+      if (hy > 0.02) { const k = dy2 > 0 ? 's' : 'w'; await p.keyboard.down(k); await p.waitForTimeout(hy * 1000); await p.keyboard.up(k); }
     }
     await p.waitForTimeout(Math.max(0, flight * 1000 - holdX * 1000 - holdY * 1000 - LEAD_MS));
   } else {

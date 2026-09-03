@@ -20,6 +20,28 @@ Third mode through the full checklist, after Three-Point Shootout and Dunk.
 
 ---
 
+## Depth re-verification (2026-09-01, after the F-pass)
+
+The depth pass added help defence, lane pick-offs, the hesi vocabulary and
+shot-feedback legibility, and fixed the palm-local ball feed that had left
+every defender marking nobody. Re-measured, nothing grandfathered:
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | ✅ clean |
+| `npx vitest run` | ✅ 66 tests (`threevthree-depth-tests` added, 14 checks) |
+| `/dev/mode/threevthree` | ✅ 6–2 in 8 reps, FEL-FRAME 0 · MISSING CLIP 0 · errors 0 |
+| `/play/threevthree` (logged in) | ✅ 6–4, FEL-FRAME 0 · 0 · 0 — the AI scores more now that defenders genuinely mark and possessions turn over |
+| Mobile touch (`/play/threevthree`, 390×844) | ✅ all four verbs (SHOOT/STEAL/PASS/BLOCK) on the overlay, 60 fps, 0 errors |
+| Help rotation / pick geometry | ✅ headless, against the real rules of the read (low man, planar lane) |
+| Shared-code note | DefenderBrain/DribbleController changed in the 1v1 pass; this mode was re-measured after both passes |
+| World-Population L1–L5 | unchanged — no venue edits |
+
+New surface for the touch overlay: none — hesi is a stick gesture, picks are
+thrown by the existing PASS verb. The overlay contract is unchanged.
+
+---
+
 ## Phase-by-phase, with the proof for each
 
 | Phase | Proof |

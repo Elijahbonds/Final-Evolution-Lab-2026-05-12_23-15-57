@@ -324,7 +324,7 @@ export default function KarateVersusGame({ grade, prq, onEnd, gamepad }: GamePro
         <canvas ref={canvasRef} width={W} height={H} className="h-full w-full" />
         {!started && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
-            <h2 className="fel-heading text-4xl text-white">KARATE VS</h2>
+            <h2 className="fel-heading text-4xl text-white">STORM DUEL</h2>
             <p className="max-w-md text-sm text-gray-300">
               Best of 3 vs the Rival Sensei. <span className="text-[#00FF9D]">SPACE</span> strikes — punish gold wind-ups. Hold <span className="text-[#00E5FF]">↓</span> to block incoming red attacks and build chi. Full chi? <span className="text-[#FFD700]">↑</span> unleashes the Dragon Palm.
             </p>

@@ -22,6 +22,27 @@ started — §7.2 and §7.4 both required protocol documents that had never been
 written, and §7.6's vitest gate had never once been runnable in this tree. All
 three are now real gates that this mode genuinely passes.
 
+---
+
+## Depth re-verification (2026-09-01, after the F-pass)
+
+The depth pass finished the rival presentation — and found the contest was
+never rendered on the shipping host at all (trap #4, fifth occurrence).
+Re-measured:
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | ✅ clean (HudScoreCard.score widened to `number \| string` for unrevealed cards; dunk's total coerces) |
+| `npx vitest run` | ✅ 68 tests (`threepoint-depth-tests` added, 31 checks) |
+| `/dev/mode/threepoint` full contest (`threepoint-depth-drive.mts`) | ✅ 24 in qualifying (meter-timed), staged reveal walked 5→0, finalists posted FIRST, **NEED 22 live during the final run**, champion crowned. FEL-FRAME 0 · MISSING CLIP 0 · errors 0 |
+| `/play/threepoint` (logged in) | ✅ the standings board RENDERS on the shipping host (dark "— SHOOTING…" cards walking, ADVANCES lines), 0 errors |
+| Mobile touch (`/play/threepoint`, 390×844) | ✅ touch SHOOT actuates, score/clock/money/round all render on the phone bezel, 60 fps, 0 errors |
+| Shared-driver repair | ✅ `capture-mobile-touch.mts` login/navigation flakes fixed with measured causes (see lock §F) |
+| World-Population L1–L5 | unchanged — no venue edits |
+
+Deferred in the lock: visible rival runs (D4 stands), shooter selection (D5
+stands), tiebreak playoff.
+
 **One carry-forward, not a blocker:** Phase 9 (device playtest) has still not run
 for this mode. Postgres is up and the guest route proves real playthroughs work,
 but `/play/threepoint` needs an account. Sprint is the standing argument for not

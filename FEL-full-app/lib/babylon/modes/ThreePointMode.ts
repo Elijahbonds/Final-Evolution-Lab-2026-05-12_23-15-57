@@ -168,6 +168,12 @@ const S = {
   /** Per-rival skill 0..1, fixed for the whole contest so form is consistent. */
   skills: [] as number[],
   standingsT: 0,
+  /** Rival field indices awaiting a staged reveal, weakest first — the
+   *  favourite's number lands last, which is the drama a results board is FOR. */
+  revealQueue: [] as number[],
+  revealT: 0,
+  /** True while the finalists' FINAL scores post before the player's run. */
+  finalistsPosting: false,
   eliminated: false,
   /** Previous hero position, for the camera's velocity term. */
   prevPos: new Vector3(),
@@ -180,6 +186,9 @@ function resetState(): void {
   S.from.copyFrom(RACK_POS[0]);
   S.round = 'qualifying';
   S.standingsT = 0;
+  S.revealQueue = [];
+  S.revealT = 0;
+  S.finalistsPosting = false;
   S.eliminated = false;
   S.skills = RIVAL_NAMES.map(() => 0.25 + Math.random() * 0.7);
   S.field = [
@@ -197,7 +206,10 @@ function resetRun(): void {
   S.from.copyFrom(RACK_POS[0]);
 }
 
-const standings = (): Shooter[] => [...S.field].sort((a, b) => b.score - a.score);
+/** Posted shooters by score; anyone still to post sinks to the bottom (their
+ *  card reads "—" until their number lands). */
+const standings = (): Shooter[] =>
+  [...S.field].sort((a, b) => (b.shot ? b.score : -1) - (a.shot ? a.score : -1));
 
 /** A rack's last ball is the money ball — 2 points instead of 1. */
 const isMoneyBall = (i: number): boolean => i === BALLS_PER_RACK - 1;
@@ -215,15 +227,23 @@ function pushHud(ctx: ModeContext, banner?: string): void {
     round: S.round === 'final' ? 'FINAL' : 'QUALIFYING',
     // The bezel renders a scorecard from {name,score,line} triples, so the
     // standings board reuses the judged-contest HUD channel rather than
-    // inventing a second one.
+    // inventing a second one. An unposted rival's card reads "—" until their
+    // number lands in the staged reveal.
     board: S.phase === 'standings' || S.phase === 'done'
       ? standings().map((f, i) => ({
           name: f.name,
-          score: f.score,
-          line: S.round === 'qualifying' && i < FINALISTS ? 'ADVANCES'
+          score: f.shot ? f.score : '—',
+          line: !f.shot ? 'SHOOTING…'
+            : S.round === 'qualifying' && i < FINALISTS ? 'ADVANCES'
             : S.round === 'final' && i === 0 ? 'CHAMPION'
             : `${i + 1}${i === 0 ? 'st' : i === 1 ? 'nd' : i === 2 ? 'rd' : 'th'}`,
         }))
+      : null,
+    // THE NEED — the final round's pressure number, live during the run.
+    // The finalists post first; the player shoots last, at a known target,
+    // exactly as the top qualifier does in the real event.
+    need: S.round === 'final' && !S.finalistsPosting && S.phase !== 'standings' && S.phase !== 'done'
+      ? Math.max(0, ...S.field.filter((f) => !f.isPlayer).map((f) => f.score)) + 1
       : null,
     banner: banner ?? null,
   });
@@ -303,13 +323,16 @@ function endRun(ctx: ModeContext): void {
   const me = S.field.find((f) => f.isPlayer);
   if (me) { me.score = S.pts; me.shot = true; }
 
-  // Rivals shoot "at the same time" as far as the player is concerned. Only
-  // those still in the contest post a score.
-  S.field.forEach((f, i) => {
-    if (f.isPlayer || f.shot) return;
-    f.score = simulateRival(S.skills[i - 1] ?? 0.5, S.round);
-    f.shot = true;
-  });
+  // The field's numbers land ONE AT A TIME, weakest first — a results board
+  // that appears fully formed has no drama, and the dunk contest's staged
+  // reveal already proved the idiom. In the final, the rivals posted before
+  // the player's run (see afterStandings), so the queue is empty there.
+  S.revealQueue = S.field
+    .map((f, i) => ({ f, i }))
+    .filter(({ f }) => !f.isPlayer && !f.shot)
+    .sort((a, b) => (S.skills[a.i - 1] ?? 0.5) - (S.skills[b.i - 1] ?? 0.5))
+    .map(({ i }) => i);
+  S.revealT = 0;
 
   S.phase = 'standings';
   S.standingsT = 0;
@@ -341,12 +364,25 @@ function afterStandings(ctx: ModeContext): void {
     return;
   }
 
-  // Advance: the field shrinks to the finalists and everyone shoots again.
+  // Advance: the field shrinks to the finalists — and the finalists post
+  // FIRST, staged, so the player runs the final at a known number. The real
+  // event shoots the final in reverse qualifying order; with one human in
+  // the field the dramatic choice is the same one the broadcast makes: the
+  // player shoots last. Recorded in the lock (this is board order only —
+  // D4's ruling against visible rival shooting stands).
   S.round = 'final';
   S.field = board.slice(0, FINALISTS).map((f) => ({ ...f, score: 0, shot: false }));
   S.skills = S.field.map(() => 0.35 + Math.random() * 0.6);
-  resetRun();
-  pushHud(ctx, 'FINAL ROUND');
+  S.finalistsPosting = true;
+  S.revealQueue = S.field
+    .map((f, i) => ({ f, i }))
+    .filter(({ f }) => !f.isPlayer)
+    .sort((a, b) => (S.skills[a.i - 1] ?? 0.5) - (S.skills[b.i - 1] ?? 0.5))
+    .map(({ i }) => i);
+  S.revealT = 0;
+  S.phase = 'standings';
+  S.standingsT = 0;
+  pushHud(ctx, 'THE FIELD POSTS…');
 }
 
 /**
@@ -468,11 +504,33 @@ export const ThreePointMode: ModeDefinition = {
   update(ctx: ModeContext, dt: number): void {
     if (S.phase === 'done' || !player || !ball || !arc) return;
 
-    // Standings board holds for a beat so the result is readable before the
-    // final round starts (or the contest ends).
+    // Standings: the staged reveal runs first (one card every 0.75s); the
+    // readable hold starts only when the last number has landed.
     if (S.phase === 'standings') {
+      if (S.revealQueue.length) {
+        S.revealT += dt;
+        if (S.revealT >= 0.75) {
+          S.revealT = 0;
+          const idx = S.revealQueue.shift()!;
+          const f = S.field[idx];
+          f.score = simulateRival(S.skills[idx - 1] ?? 0.5, S.round);
+          f.shot = true;
+          SoundKit.play('uiTick', { pitch: 0.8 + f.score * 0.02, volume: 0.4 });
+          pushHud(ctx);
+        }
+        return;
+      }
       S.standingsT += dt;
-      if (S.standingsT >= STANDINGS_SEC) afterStandings(ctx);
+      if (S.standingsT >= STANDINGS_SEC) {
+        if (S.finalistsPosting) {
+          // the field has posted; the player runs the final at the number
+          S.finalistsPosting = false;
+          resetRun();
+          pushHud(ctx, 'FINAL ROUND — YOUR RUN');
+        } else {
+          afterStandings(ctx);
+        }
+      }
       return;
     }
 

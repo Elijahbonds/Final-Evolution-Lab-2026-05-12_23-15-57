@@ -156,7 +156,7 @@ export default function KarateBabylon({ onEnd }: GameProps) {
 
       <BootSplash
         modeId="karate"
-        title="KARATE"
+        title="THE HUNDRED"
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}

@@ -25,5 +25,5 @@ const SoccerBabylon = dynamicImport(
 export function SoccerLoader() {
   const babylon = isBabylon('soccer');
   const Game = babylon ? SoccerBabylon : is3D('soccer') ? Soccer3D : SoccerGame;
-  return <GameShell mode="soccer" title="PENALTY SHOOTOUT" venue="Coastal FC Stadium" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="soccer" title="TWELVE YARDS" venue="Coastal FC Stadium" Game={Game} ownControls={babylon} />;
 }

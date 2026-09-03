@@ -47,15 +47,37 @@ p.on('pageerror', (e) => logs.push(`[pageerror] ${e.message.slice(0, Number(proc
 // playtested through /dev/mode/[key] — a DIFFERENT host component from the one
 // that ships. Log in as an ordinary player through the real form instead of
 // routing around the gate. scripts/ensure-playtest-user.ts creates the account.
-await p.goto(MODE_URL, { waitUntil: 'networkidle' });
-if (/\/login/.test(p.url())) {
-  await p.locator('input[type="email"]').fill(process.env.PLAYTEST_EMAIL ?? 'playtest@fel.local');
+// networkidle never settles on hosts that long-poll (the Controller Link /
+// carnival hub lobby heartbeats) — /play/carnival timed out on exactly that.
+// domcontentloaded + the canvas wait below is the real requirement. The login
+// FORM (not the URL) decides: the /play→/login redirect is client-side and
+// lands after hydration, so a URL check races it; and the SSR'd form needs
+// networkidle before Enter does anything. Both measured, same day.
+await p.goto(MODE_URL, { waitUntil: 'domcontentloaded' });
+const emailInput = p.locator('input[type="email"]');
+const onLogin = await emailInput.waitFor({ timeout: 8_000 }).then(() => true).catch(() => false);
+if (onLogin) {
+  await p.waitForLoadState('networkidle').catch(() => {});   // hydrate the SSR'd form first
+  await emailInput.fill(process.env.PLAYTEST_EMAIL ?? 'playtest@fel.local');
   await p.locator('input[type="password"]').fill(process.env.PLAYTEST_PASSWORD ?? 'playtest-local-only');
   await p.locator('input[type="password"]').press('Enter');   // submit; the button can be overlay-blocked
   await p.waitForURL((u) => !/\/login/.test(u.toString()), { timeout: 30_000 }).catch(() => {});
-  await p.goto(MODE_URL, { waitUntil: 'networkidle' });
+  await p.waitForLoadState('networkidle').catch(() => {});   // let the session cookie commit
+  await p.goto(MODE_URL, { waitUntil: 'domcontentloaded' });
 }
 console.log(`${NAME} route :`, new URL(p.url()).pathname);
+// Party-night hubs (carnival) gate the canvas behind a START THE NIGHT
+// briefing that renders AFTER a client-side shuffle — a single isVisible
+// check races it (measured). Loop: canvas wins, hub button starts the night.
+const startNight = p.getByText(/START THE NIGHT/i).first();
+for (let i = 0; i < 12; i++) {
+  if (await p.$('canvas')) break;
+  if (await startNight.isVisible().catch(() => false)) {
+    await startNight.click().catch(() => {});
+    console.log(`${NAME} hub   : started the night`);
+  }
+  await p.waitForTimeout(1500);
+}
 await p.waitForSelector('canvas', { timeout: 30_000 });
 await p.waitForTimeout(2500);
 const head = async () => (await p.evaluate<string>('document.body.innerText')).split('\n')[0];

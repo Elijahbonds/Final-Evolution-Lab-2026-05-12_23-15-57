@@ -25,7 +25,7 @@ export const ALL_ACCESS_PASS: AllAccessPass = {
 export const PASS_BENEFITS = [
   'ALL premium mode content unlocked (every mode, every variant)',
   'Monthly Shard stipend: 1200 ◈ auto-granted on each renewal',
-  'All Music Academy kits unlocked (NEON, DUST, and future kits)',
+  'All Groove Academy kits unlocked (NEON, DUST, and future kits)',
   'Marketplace seller fee drops from 10% to 5%',
   'Story Mode chapters unlock early (full season from day one)',
   'All-Access badge on Creator Cards and marketplace listings',

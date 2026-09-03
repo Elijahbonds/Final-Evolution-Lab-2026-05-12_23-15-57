@@ -105,7 +105,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
 
       <BootSplash
         modeId="threepoint"
-        title="THREE-POINT SHOOTOUT"
+        title="DOWNTOWN"
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}
@@ -127,10 +127,37 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           <div className="text-2xl font-bold text-[#ffd75e]">{hnum(hud.score)}</div>
           <div className="text-white/60">RACK {String(hud.rack ?? '—')} · BALL {String(hud.ball ?? '—')}</div>
           <div className="text-white/60">{hnum(hud.clock)}s · streak {hnum(hud.streak)}</div>
+          {/* The contest layer publishes round/money/need/board — all four
+              used to be computed every frame and rendered NOWHERE (the classic
+              "HUD state is not a bezel" trap; only the dev route's JSON dump
+              ever showed them). This is the contest the player is in. */}
+          <div className="mt-0.5 text-[10px] tracking-widest text-white/50">
+            {String(hud.round ?? 'QUALIFYING')}
+            {hud.money ? ' · MONEY BALL' : ''}
+          </div>
           {typeof hud.meter === 'number' && <ReleaseBar t={hud.meter} />}
+          {typeof hud.need === 'number' && (
+            <div className="mt-1 inline-block rounded bg-[#ff2d78]/20 px-2 py-0.5 text-[#ff2d78]">
+              NEED {hnum(hud.need)} TO WIN
+            </div>
+          )}
           {typeof hud.banner === 'string' && hud.banner && (
             <div className="mt-2 text-[#00E5FF]">{hud.banner}</div>
           )}
+        </div>
+      )}
+
+      {phase === 'playing' && Array.isArray(hud.board) && (
+        <div className="pointer-events-none absolute right-4 top-4 z-20 rounded-lg border border-white/15 bg-black/60 px-3 py-2 font-mono text-xs text-white backdrop-blur-sm">
+          {(hud.board as { name: string; score: number | string; line: string }[]).map((r) => (
+            <div key={r.name} className={`flex items-baseline gap-3 py-0.5 ${r.name === 'YOU' ? 'text-[#ffd75e]' : ''}`}>
+              <span className="w-16 truncate">{r.name}</span>
+              <span className="w-8 text-right text-base font-bold">{r.score}</span>
+              <span className={`text-[10px] tracking-wider ${
+                r.line === 'CHAMPION' ? 'text-[#ffd75e]' : r.line === 'ADVANCES' ? 'text-[#22d3ee]' : 'text-white/40'
+              }`}>{r.line}</span>
+            </div>
+          ))}
         </div>
       )}
 

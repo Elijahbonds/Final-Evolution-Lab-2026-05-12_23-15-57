@@ -40,12 +40,22 @@ export const MIXAMO_PREFIX = 'mixamorig:';
 const CLONE_SUFFIX = /_c\d+$/;
 
 /**
+ * The procedural rig's per-instance node uniquifier (proceduralRig.ts: nodes
+ * are 'LeftArm_p3'). Animation targets read NODE names, bones read
+ * 'mixamorig:LeftArm' — a lookup that doesn't strip this spelling can never
+ * meet its bone. Measured: registerMirroredClips resolved ZERO targets
+ * ('Hips_p1' ≠ 'mixamorig:Hips'), so every '.M' mirrored group was disposed
+ * at spawn and mirrored dance steps have never played.
+ */
+const INSTANCE_SUFFIX = /_p\d+$/;
+
+/**
  * Reduce any spelling of a bone name to its canonical bare form.
- * `mixamorig:Hips` -> `Hips`, `LeftArm_c21` -> `LeftArm`.
+ * `mixamorig:Hips` -> `Hips`, `LeftArm_c21` -> `LeftArm`, `Hips_p1` -> `Hips`.
  */
 export function bareBoneName(name: string): string {
   const unprefixed = name.startsWith(MIXAMO_PREFIX) ? name.slice(MIXAMO_PREFIX.length) : name;
-  return unprefixed.replace(CLONE_SUFFIX, '');
+  return unprefixed.replace(CLONE_SUFFIX, '').replace(INSTANCE_SUFFIX, '');
 }
 
 /** Resolve a bone by name, tolerating the `mixamorig:` prefix on either side. */

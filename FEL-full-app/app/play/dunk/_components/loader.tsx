@@ -30,5 +30,5 @@ const DunkBabylon = dynamicImport(() => import('@/components/games/dunk-babylon'
 export function DunkLoader() {
   const babylon = isBabylon('dunkContest');
   const Game = babylon ? DunkBabylon : is3D('dunkContest') ? DunkGame3D : DunkGame2D;
-  return <GameShell mode="dunkContest" title="DUNK CONTEST" venue="Venice Beach Court" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="dunkContest" title="FLIGHT NIGHT" venue="Venice Beach Court" Game={Game} ownControls={babylon} />;
 }

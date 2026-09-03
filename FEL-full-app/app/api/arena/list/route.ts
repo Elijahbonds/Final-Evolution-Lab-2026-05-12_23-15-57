@@ -78,6 +78,9 @@ export async function GET() {
       status: m.status,
       role: isP1 ? 'p1' : 'p2',
       opponent: label(oppId, nameMap),
+      // Quick Match duels seat a House Rival — the lobby labels them so a
+      // simulated opponent is never dressed up as a human with stakes on.
+      ghost: m.matchType === 'GHOST_DUEL',
       myScore: myScore ?? null,
       oppScore: oppScore ?? null,
       mySubmitted: myScore !== null && myScore !== undefined,

@@ -14,9 +14,9 @@ export const SIGNATURE_MODES = ['dunkContest', 'threePoint', 'hoops1v1'] as cons
 export type SignatureMode = (typeof SIGNATURE_MODES)[number];
 
 export const MODE_LABEL: Record<SignatureMode, string> = {
-  dunkContest: 'Dunk Contest',
-  threePoint: '3-Point Contest',
-  hoops1v1: '1v1 Hoops',
+  dunkContest: 'Flight Night',
+  threePoint: 'Downtown',
+  hoops1v1: 'Ones',
 };
 
 const MODIFIERS = [

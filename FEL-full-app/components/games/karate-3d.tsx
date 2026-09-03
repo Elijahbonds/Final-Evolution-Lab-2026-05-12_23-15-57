@@ -647,7 +647,7 @@ export default function Karate3D(props: GameProps) {
   if (!started) {
     return (
       <div className="relative w-full h-full flex flex-col items-center justify-center gap-4 p-6 text-center" style={{ background: '#080604', minHeight: '60vh' }}>
-        <h2 className="fel-heading text-4xl text-white">KARATE ENDLESS</h2>
+        <h2 className="fel-heading text-4xl text-white">THE HUNDRED</h2>
         <p className="max-w-md text-sm text-gray-300">
           Survive escalating waves in the dojo. Chain strikes inside the 0.5s window to build your multiplier and charge Neural Burst.
         </p>

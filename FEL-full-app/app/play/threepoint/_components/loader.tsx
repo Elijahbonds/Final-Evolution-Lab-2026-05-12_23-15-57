@@ -33,7 +33,7 @@ export function ThreePointLoader() {
   return (
     <GameShell
       mode="threePoint"
-      title="THREE-POINT SHOOTOUT"
+      title="DOWNTOWN"
       venue="Venice Beach Court"
       Game={Game}
       ownControls={babylon}

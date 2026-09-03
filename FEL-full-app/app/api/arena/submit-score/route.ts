@@ -11,6 +11,7 @@ import {
   appendMatchEvent,
   ArenaError,
 } from '@/lib/arena';
+import { drawRivalScore, median } from '@/lib/arena-rivals';
 import { recordServerEvent } from '@/lib/analytics-server';
 
 /**
@@ -61,6 +62,48 @@ export async function POST(req: NextRequest) {
       if (Object.keys(data).length) {
         await tx.competitionMatch.update({ where: { id: matchId }, data });
         await appendMatchEvent(tx, matchId, 'SCORE_SUBMITTED', userId, { player: isP1 ? 'p1' : 'p2', score });
+      }
+
+      // GHOST_DUEL (Quick Match): the house rival's score is drawn NOW, from
+      // the match seed + skill history that strictly PREDATES this match —
+      // the submitted score is never an input, so the draw can't be pulled
+      // toward it. Deterministic: re-submitting draws the same number.
+      const ghostSide: 'p1' | 'p2' | null =
+        match.matchType === 'GHOST_DUEL' ? (isP1 ? 'p2' : 'p1') : null;
+      const ghostScoreMissing =
+        ghostSide === 'p1' ? match.player1Score === null : match.player2Score === null;
+      if (ghostSide && ghostScoreMissing && match.seed) {
+        const [recent, population] = await Promise.all([
+          tx.gameSession.findMany({
+            where: { userId, mode: match.mode, createdAt: { lt: match.createdAt } },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+            select: { score: true },
+          }),
+          tx.gameSession.findMany({
+            where: { mode: match.mode, createdAt: { lt: match.createdAt } },
+            orderBy: { createdAt: 'desc' },
+            take: 200,
+            select: { score: true },
+          }),
+        ]);
+        const draw = drawRivalScore({
+          seed: match.seed,
+          mode: match.mode,
+          playerHistory: recent.map((r: { score: number }) => r.score),
+          populationMedian: population.length ? median(population.map((r: { score: number }) => r.score)) : null,
+        });
+        const ghostData =
+          ghostSide === 'p1' ? { player1Score: draw.score, player1SubmittedAt: new Date() } : { player2Score: draw.score, player2SubmittedAt: new Date() };
+        await tx.competitionMatch.update({ where: { id: matchId }, data: ghostData });
+        await appendMatchEvent(tx, matchId, 'GHOST_SCORED', null, {
+          player: ghostSide,
+          score: draw.score,
+          bandCenter: draw.center,
+          bandSource: draw.source,
+        });
+        if (ghostSide === 'p1') match.player1Score = draw.score;
+        else match.player2Score = draw.score;
       }
 
       const p1Score = isP1 && !alreadySubmitted ? score : match.player1Score;

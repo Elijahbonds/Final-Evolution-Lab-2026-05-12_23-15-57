@@ -13,5 +13,5 @@ const spinner = () => (
 const MixedCombatBabylon = dynamicImport(() => import('@/components/games/mixedcombat-babylon'), { ssr: false, loading: spinner });
 
 export function MixedCombatLoader() {
-  return <GameShell mode="mixedcombat" title="MIXED COMBAT" venue="The Octagon" Game={MixedCombatBabylon} ownControls />;
+  return <GameShell mode="mixedcombat" title="RING'S EDGE" venue="The Octagon" Game={MixedCombatBabylon} ownControls />;
 }

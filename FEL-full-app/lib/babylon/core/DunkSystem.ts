@@ -96,21 +96,37 @@ export class DunkFlight {
   launch(approachSpeed01: number, styleTier: number): void {
     this.phase = 'airborne';
     this.tricks = [];
+    this.rejectedForAir = false;
     this.baseDifficulty = styleTier;
     this.airTotal = 0.85 + approachSpeed01 * 0.55 + styleTier * 0.05; // 0.85–1.8s
     this.airLeft = this.airTotal;
     this.recognizer.reset();
   }
 
-  /** Mid-air: feed input; each recognized trick spends window. */
+  /** Set (once, consumable) when a recognized trick was refused because the
+   *  air budget couldn't pay for it. Modes surface this — a silent refusal
+   *  reads as a dropped input. */
+  rejectedForAir = false;
+
+  /** Mid-air: feed input; each recognized trick spends window. The air
+   *  budget is now ENFORCED: a trick needs 30% of the air left, a combo
+   *  trick 42% — so the run-up genuinely decides what exists in the air.
+   *  Before this, `airTotal` was computed and never consulted: a walk-up and
+   *  a full-speed runway attack had the same trick menu. */
   feedInput(e: FelInput): DunkTrick | null {
-    if (this.phase !== 'airborne') return null;
+    this.rejectedForAir = false;
     const trick = this.recognizer.feed(e);
-    if (trick && this.tricks.length < 2) {
-      this.tricks.push(trick);
-      this.airLeft *= 1 - trick.windowCost;    // showboating costs air
-      this.slamWindow *= 1 - trick.windowCost * 0.5;
-    }
+    if (!trick) return null;
+    // A recognized trick in a spent budget is a REFUSAL, not a non-input —
+    // whether the air ran out early (threshold) or entirely (slamWindow).
+    if (this.phase === 'slamWindow') { this.rejectedForAir = true; return null; }
+    if (this.phase !== 'airborne') return null;
+    if (this.tricks.length >= 2) return null;
+    const need = this.tricks.length === 0 ? 0.30 : 0.42;
+    if (this.airRemaining01 < need) { this.rejectedForAir = true; return null; }
+    this.tricks.push(trick);
+    this.airLeft *= 1 - trick.windowCost;    // showboating costs air
+    this.slamWindow *= 1 - trick.windowCost * 0.5;
     return trick;
   }
 
@@ -152,6 +168,7 @@ export class DunkFlight {
   reset(): void {
     this.phase = 'idle';
     this.tricks = [];
+    this.rejectedForAir = false;
     this.recognizer.reset();
   }
 }

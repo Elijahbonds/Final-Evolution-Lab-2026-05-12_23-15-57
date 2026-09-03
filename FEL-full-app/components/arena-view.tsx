@@ -15,6 +15,8 @@ import {
   Plus,
   RefreshCw,
   ShieldCheck,
+  Zap,
+  Bot,
 } from 'lucide-react';
 import { WALLET_REFRESH_EVENT } from '@/components/wallet-chip';
 
@@ -54,6 +56,8 @@ interface MyDuel {
   status: string;
   role: 'p1' | 'p2';
   opponent: string | null;
+  /** True when the opponent is a House Rival (Quick Match) — labelled, never disguised. */
+  ghost?: boolean;
   myScore: number | null;
   oppScore: number | null;
   mySubmitted: boolean;
@@ -90,6 +94,7 @@ export function ArenaView() {
   const [pickMode, setPickMode] = useState<string>('');
   const [pickFee, setPickFee] = useState<number>(0);
   const [creating, setCreating] = useState(false);
+  const [quickMatching, setQuickMatching] = useState(false);
 
   const flash = useCallback((kind: 'err' | 'ok', text: string) => {
     setNotice({ kind, text });
@@ -172,6 +177,39 @@ export function ArenaView() {
       flash('err', 'Network error opening the duel.');
     } finally {
       setCreating(false);
+    }
+  }
+
+  // Quick Match: stake + instantly seat a House Rival, then go straight into
+  // the venue — Triumph's "fire immediately" loop. The rival's score is
+  // drawn server-side from the match seed when you submit, banded to your
+  // own measured level in the mode.
+  async function quickMatch() {
+    if (!pickMode || pickFee <= 0) return;
+    if (!canAfford) {
+      flash('err', 'Not enough Lab Credits for that stake.');
+      return;
+    }
+    setQuickMatching(true);
+    try {
+      const r = await fetch('/api/arena/quick-match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: pickMode, feeLc: pickFee }),
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        flash('err', j?.detail || j?.error || 'Could not start a quick match.');
+        setQuickMatching(false);
+      } else {
+        flash('ok', `${j.rival?.name ?? 'A House Rival'} accepts — ${pickFee} LC on the line.`);
+        window.dispatchEvent(new Event(WALLET_REFRESH_EVENT));
+        // Straight into the venue — the duel is already live.
+        window.location.href = `${j.href}?arena=${j.matchId}`;
+      }
+    } catch {
+      flash('err', 'Network error starting the quick match.');
+      setQuickMatching(false);
     }
   }
 
@@ -331,14 +369,29 @@ export function ArenaView() {
           </div>
         )}
 
-        <button
-          onClick={createDuel}
-          disabled={creating || !pickMode || pickFee <= 0 || !canAfford}
-          className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#FF3366] px-5 py-2.5 font-mono text-sm font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Swords className="h-4 w-4" />}
-          {canAfford || pickFee <= 0 ? 'STAKE & POST DUEL' : 'INSUFFICIENT LC'}
-        </button>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <button
+            onClick={quickMatch}
+            disabled={quickMatching || creating || !pickMode || pickFee <= 0 || !canAfford}
+            className="inline-flex items-center gap-2 rounded-lg bg-[#00FF9D] px-5 py-2.5 font-mono text-sm font-bold text-black transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {quickMatching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+            {canAfford || pickFee <= 0 ? 'QUICK MATCH — PLAY NOW' : 'INSUFFICIENT LC'}
+          </button>
+          <button
+            onClick={createDuel}
+            disabled={creating || quickMatching || !pickMode || pickFee <= 0 || !canAfford}
+            className="inline-flex items-center gap-2 rounded-lg bg-[#FF3366] px-5 py-2.5 font-mono text-sm font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Swords className="h-4 w-4" />}
+            {canAfford || pickFee <= 0 ? 'STAKE & POST DUEL' : 'INSUFFICIENT LC'}
+          </button>
+        </div>
+        <p className="mt-2 max-w-xl font-mono text-[10px] leading-relaxed text-white/35">
+          QUICK MATCH seats a House Rival instantly — a simulated athlete whose
+          score is drawn from the match seed, banded to your own recent form in
+          the mode. STAKE &amp; POST waits for a human challenger.
+        </p>
       </section>
 
       {/* Open duels */}
@@ -434,7 +487,13 @@ export function ArenaView() {
                         </span>
                       </div>
                       <div className="mt-0.5 truncate font-mono text-[11px] text-white/40">
-                        vs {d.opponent ?? 'awaiting challenger'} &middot; {d.feeLc} LC stake
+                        vs {d.opponent ?? 'awaiting challenger'}
+                        {d.ghost && (
+                          <span className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-[#00E5FF]/10 px-1 py-px align-middle text-[9px] text-[#00E5FF]">
+                            <Bot className="h-2.5 w-2.5" /> HOUSE
+                          </span>
+                        )}
+                        {' '}&middot; {d.feeLc} LC stake
                         {settled && (
                           <>
                             {' '}
@@ -498,7 +557,10 @@ export function ArenaView() {
         <span>
           Lab Credits are an in-app skill currency with no cash value and cannot be
           purchased. The Arena is a game of skill &mdash; both athletes play the
-          identical seeded challenge and the higher score wins.
+          identical seeded challenge and the higher score wins. Duels labelled
+          HOUSE are played against simulated athletes whose scores are drawn from
+          the match seed, banded to your own recent form &mdash; never from your
+          submitted score.
         </span>
       </div>
     </div>

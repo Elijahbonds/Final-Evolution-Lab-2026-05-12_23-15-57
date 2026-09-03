@@ -72,3 +72,24 @@ export function wearablesForSlot(slot: WearableSlot): Wearable[] {
 export function defaultEquipped(): Record<WearableSlot, string | null> {
   return { headwear: null, tops: 'top_lab', shorts: 'shorts_court', shoes: 'shoes_flight', accessory: null };
 }
+
+/** Jersey ID — the number + name plate rendered on the hero's back in-game. */
+export interface JerseyConfig { number: number; name: string }
+
+export function defaultJersey(): JerseyConfig {
+  return { number: 0, name: '' };
+}
+
+/** Server + client share this: clamp the number to 0–99, name to 12
+ *  A–Z/0–9/space/hyphen characters, uppercased. Never throws. */
+export function sanitizeJersey(input: unknown): JerseyConfig {
+  const raw = (input ?? {}) as Partial<Record<keyof JerseyConfig, unknown>>;
+  const n = Number(raw.number);
+  const number = Number.isFinite(n) ? Math.min(99, Math.max(0, Math.round(n))) : 0;
+  const name = String(raw.name ?? '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9 \-]/g, '')
+    .slice(0, 12)
+    .trim();
+  return { number, name };
+}

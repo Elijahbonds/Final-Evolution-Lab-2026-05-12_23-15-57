@@ -18,7 +18,7 @@ const BigAir3D = dynamicImport(() => import('@/components/games/big-air-game'), 
 // Babylon big air on the same shared AirSessionCore as the gymnastics vault.
 const BigAirBabylon = dynamicImport(
   () => import('@/components/games/air-session-babylon').then((m) => ({
-    default: m.makeAirHost('bigair', 'BIG AIR'),
+    default: m.makeAirHost('bigair', 'STOMP'),
   })),
   { ssr: false, loading: spinner },
 );
@@ -26,5 +26,5 @@ const BigAirBabylon = dynamicImport(
 export function BigAirLoader() {
   const babylon = isBabylon('bigAir');
   const Game = babylon ? BigAirBabylon : BigAir3D;
-  return <GameShell mode="bigAir" title="BIG AIR" venue="Alpine Ridge" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="bigAir" title="STOMP" venue="Alpine Ridge" Game={Game} ownControls={babylon} />;
 }

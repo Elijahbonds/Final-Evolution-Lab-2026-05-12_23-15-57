@@ -25,5 +25,5 @@ const BaseballBabylon = dynamicImport(
 export function BaseballLoader() {
   const babylon = isBabylon('baseball');
   const Game = babylon ? BaseballBabylon : is3D('baseball') ? Baseball3D : BaseballGame2D;
-  return <GameShell mode="baseball" title="HOME RUN DERBY" venue="Catalina Ballpark" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="baseball" title="MOONSHOT DERBY" venue="Catalina Ballpark" Game={Game} ownControls={babylon} />;
 }

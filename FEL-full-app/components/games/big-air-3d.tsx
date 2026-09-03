@@ -242,7 +242,7 @@ export default function BigAir3D(props: GameProps) {
 
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-1/2 top-3 -translate-x-1/2 rounded-lg border border-white/8 bg-black/70 px-5 py-2 text-center backdrop-blur-md">
-            <div className="fel-heading text-[10px] tracking-[0.2em] text-white/50">BIG AIR · JUMP {hud.jump}/{JUMPS}</div>
+            <div className="fel-heading text-[10px] tracking-[0.2em] text-white/50">STOMP · JUMP {hud.jump}/{JUMPS}</div>
             <div className="font-mono text-2xl font-bold text-[#00E5FF]">{hud.score}</div>
           </div>
 

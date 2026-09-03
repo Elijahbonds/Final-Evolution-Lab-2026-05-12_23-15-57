@@ -47,27 +47,50 @@ export const ARENA_MAX_FEE_LC = 500;  // TUNE(elijah)
 export const ARENA_EXPIRY_HOURS = 48; // TUNE(elijah)
 
 /**
- * Modes that support Arena duels. Every entry is a pure high-score skill mode
- * whose single score is directly comparable head-to-head. Keys are the same
- * camelCase mode keys GameShell posts (and MODE_INFO keys), so score
- * submission and the lobby "Play" links line up.
+ * Modes that support Arena duels. Every entry is a high-score skill mode
+ * whose single score is directly comparable head-to-head — with Quick Match
+ * (GHOST_DUEL) the arena is the stakes layer over the WHOLE roster, so this
+ * list is every playable scored mode. Keys are the same camelCase mode keys
+ * GameShell posts (and MODE_INFO keys), so score submission and the lobby
+ * "Play" links line up.
+ *
+ * 'sprint' was removed when the mode was retired from the v1 roster (owner
+ * decision, 2026-09-01 — PHASE2_BENCHMARK_LOCKS.md): a stake on a route that
+ * redirects away is a trap. 'storyMode' is excluded by design (narrative,
+ * not a score duel).
  */
 export const ARENA_MODES: readonly string[] = [
   'dunkContest',
+  // 'dunkduel' left the Arena with its re-lock (owner, 2026-09-01): Prove It
+  // is an IRL camera-judged contest, not a GameShell score-duel — an arena
+  // stake on it would sit unsubmitted till expiry. An async measured-ghost
+  // arena for IRL results is a future build.
   'threePoint',
   'hoops1v1',
+  'hoops3v3',
   'skateboarding',
   'bigAir',
-  'sprint',
   'golf',
   'baseball',
   'soccer',
+  'tennis',
   'tiebreak',
   'gymnastics',
   'brainBrawl',
   'whoSceneIt',
   'surfing',
   'snowboarding',
+  'karateEndless',
+  'karateVersus',
+  'carnival',
+  'football',
+  'mixedcombat',
+  // 'duel' + 'showdown' retired from the v1 roster with the combat-family
+  // trim (owner, 2026-09-01 — karate-vs is the Storm mode; combat is three
+  // modes). A stake on a redirecting route is a trap, same as sprint.
+  'musicAcademy',
+  'dance',
+  'training',
 ];
 
 export function isArenaMode(mode: string): boolean {

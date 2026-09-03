@@ -14,8 +14,10 @@ import {
   ArcRotateCamera, Color3, Color4, Engine, HemisphericLight, Scene, Vector3,
 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../../../core/CharacterLibrary';
-import { MediaPipePoseAdapter } from '../pose/mediapipe-adapter';
+import { MediaPipePoseAdapter, type PoseFrame } from '../pose/mediapipe-adapter';
 import { KinematicEngine } from '../rules/kinematic-engine';
+import { RepCounter, type RepState } from '../rules/rep-counter';
+import { SquatAudit, type SquatFrameResult } from '../rules/squat-audit';
 import { applyZoneState, bindHighlightZones, disposeZones, type BoundZone } from '../rig/zone-binding';
 import { SPLIT_STANCE_PRESS_ROW, PATTERN_ZONES, type PatternConfig, type ZoneId } from '../patterns/split-stance-press-row';
 import type { ZoneState } from '../rules/config';
@@ -30,6 +32,10 @@ export interface SessionSummary {
   faultCounts: Record<ZoneId, number>;
   /** Rolling average per-frame engine+pose processing time (ms). */
   avgFrameMs: number;
+  /** Completed pull→press cycles (estimated from joint kinematics). */
+  reps: number;
+  /** Average tempo across completed reps (null before the first). */
+  avgTempo: { pullSec: number; pressSec: number } | null;
 }
 
 export interface MirrorRuntime {
@@ -44,10 +50,25 @@ export interface MirrorMountOpts {
   video: HTMLVideoElement;
   overlayCanvas: HTMLCanvasElement;
   pattern?: PatternConfig;
+  /** Which analysis runs. 'zones' = the pattern's engagement zones (v1);
+   *  'squat' = the corrective squat audit (the Playbook's movement check).
+   *  The rig + video layers are identical either way. */
+  analysis?: 'zones' | 'squat';
   /** Called when the pose model is ready (to flip UI out of "loading"). */
   onReady?: () => void;
-  /** Optional per-frame callback for a live HUD (phase, latency, zone states). */
-  onFrame?: (info: { phase: string; frameMs: number; zones: Record<ZoneId, ZoneState> }) => void;
+  /** Optional per-frame callback for a live HUD (phase, latency, zone states,
+   *  rep state, and the RAW POSE FRAME — pattern-specific trackers (vertical
+   *  jump) and the skeleton painter consume it without the compositor knowing
+   *  any pattern but its own). */
+  onFrame?: (info: {
+    phase: string;
+    frameMs: number;
+    zones: Record<ZoneId, ZoneState>;
+    reps: RepState;
+    pose: PoseFrame;
+    /** Present when analysis==='squat'. */
+    squat?: SquatFrameResult;
+  }) => void;
 }
 
 const emptyPerZone = (): Record<ZoneId, number> => ({
@@ -87,9 +108,11 @@ export async function mountMirrorOverlay(opts: MirrorMountOpts): Promise<MirrorR
     ? bindHighlightZones(scene, character.skeleton, character.root)
     : [];
 
-  // Pose + rules.
+  // Pose + rules + the rep book (phase stream → counted reps with tempo).
   const adapter = new MediaPipePoseAdapter({ numPoses: 1 });
   const kin = new KinematicEngine(pattern.thresholds);
+  const reps = new RepCounter();
+  const squatAudit = opts.analysis === 'squat' ? new SquatAudit() : null;
 
   // Session accounting (all real).
   const startedAtMs = performance.now();
@@ -124,9 +147,11 @@ export async function mountMirrorOverlay(opts: MirrorMountOpts): Promise<MirrorR
       }
       // ensure zones that had no mesh still report for the HUD
       for (const id of PATTERN_ZONES) if (!(id in zoneStates)) zoneStates[id] = result.zones[id].state;
+      reps.feed(result.phase, frame.timestampMs);
+      const squat = squatAudit?.evaluate(frame);
       const frameMs = performance.now() - t0;
       frameMsAccum += frameMs; frameMsCount += 1;
-      opts.onFrame?.({ phase: result.phase, frameMs, zones: zoneStates });
+      opts.onFrame?.({ phase: result.phase, frameMs, zones: zoneStates, reps: reps.state, pose: frame, squat });
     }
     scene.render();
   });
@@ -136,14 +161,19 @@ export async function mountMirrorOverlay(opts: MirrorMountOpts): Promise<MirrorR
 
   return {
     ready: () => ready,
-    summary: (): SessionSummary => ({
-      patternId: pattern.id,
-      startedAtMs,
-      durationMs: performance.now() - startedAtMs,
-      timeInStableMs: { ...timeInStableMs },
-      faultCounts: { ...faultCounts },
-      avgFrameMs: frameMsCount ? frameMsAccum / frameMsCount : 0,
-    }),
+    summary: (): SessionSummary => {
+      const repState = reps.state;
+      return {
+        patternId: pattern.id,
+        startedAtMs,
+        durationMs: performance.now() - startedAtMs,
+        timeInStableMs: { ...timeInStableMs },
+        faultCounts: { ...faultCounts },
+        avgFrameMs: frameMsCount ? frameMsAccum / frameMsCount : 0,
+        reps: repState.reps,
+        avgTempo: repState.avg,
+      };
+    },
     dispose() {
       window.removeEventListener('resize', onResize);
       engine.stopRenderLoop();

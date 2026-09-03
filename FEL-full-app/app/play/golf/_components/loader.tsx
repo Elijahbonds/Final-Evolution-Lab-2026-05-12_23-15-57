@@ -24,5 +24,5 @@ const GolfBabylon = dynamicImport(
 export function GolfLoader() {
   const babylon = isBabylon('golf');
   const Game = babylon ? GolfBabylon : is3D('golf') ? Golf3D : GolfGame2D;
-  return <GameShell mode="golf" title="LINKS CHALLENGE" venue="Coastal Links" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="golf" title="THE LOOP" venue="Coastal Links" Game={Game} ownControls={babylon} />;
 }

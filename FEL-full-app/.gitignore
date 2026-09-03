@@ -4,3 +4,4 @@ docs/shots/*/
 
 # Verification builds (npm run build:check) — kept out of the dev server's .next
 .next-verify/
+scripts/avatar/out/

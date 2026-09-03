@@ -217,7 +217,7 @@ export default function ThreeVThreeGame({ grade, prq, onEnd, gamepad }: GameProp
         <canvas ref={canvasRef} width={W} height={H} className="h-full w-full" />
         {!started && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
-            <h2 className="fel-heading text-4xl text-white">3V3 STREETBALL</h2>
+            <h2 className="fel-heading text-4xl text-white">THREES</h2>
             <p className="max-w-md text-sm text-gray-300">
               Find the open man with <span className="text-[#00FF9D]">1 / 2 / 3</span> before the shot clock, then catch-and-shoot with <span className="text-[#00E5FF]">SPACE</span> on the gold line. Wrong pass = turnover. First to {TARGET} or best score in 90s.
             </p>

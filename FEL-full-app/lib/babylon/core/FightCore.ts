@@ -33,28 +33,43 @@ export interface AttackDef {
   knockback: number;         // meters of backward slide on hit
   chiGain: number;           // attacker chi on clean hit
   guardDmg: number;          // guard-gauge chip when blocked
+  /**
+   * The attack's line (Soul Calibur's vertical/horizontal grammar).
+   *   vertical   — powerful, but STEPPABLE: if the defender is more than
+   *                STEP_EVADE_M off the attacker's facing line at impact,
+   *                the swing whiffs past them ('stepped').
+   *   horizontal — sweeps wide: catches steppers. The answer to circling.
+   * Optional: modes that don't pass a lateral offset to resolveStrike never
+   * trigger the check, so the karate modes' behavior is unchanged whether or
+   * not their attack sets declare a line.
+   */
+  line?: 'vertical' | 'horizontal';
 }
 
 /** Unarmed karate set (Karate VS, and the FISTS loadout in Mixed Combat):
- *  fast and short — win by getting inside and chaining stuns. */
+ *  fast and short — win by getting inside and chaining stuns.
+ *  Line grammar (only enforced where the mode passes lateral offsets —
+ *  Mixed Combat): jab/heavy are vertical (steppable), the roundhouse kick
+ *  is horizontal (catches steppers). */
 export const KARATE_ATTACKS: Record<'jab' | 'kick' | 'heavy', AttackDef> = {
-  jab:   { id: 'jab',   label: 'JAB',   clip: 'jab',       dmg: 6,  range: 1.6, startupMs: 120, stunSec: 0.35, knockback: 0.4, chiGain: 8,  guardDmg: 6 },
-  kick:  { id: 'kick',  label: 'KICK',  clip: 'high_kick', dmg: 9,  range: 1.9, startupMs: 180, stunSec: 0.45, knockback: 0.9, chiGain: 10, guardDmg: 10 },
-  heavy: { id: 'heavy', label: 'HEAVY', clip: 'uppercut',  dmg: 14, range: 1.8, startupMs: 260, stunSec: 0.7,  knockback: 1.6, chiGain: 14, guardDmg: 22 },
+  jab:   { id: 'jab',   label: 'JAB',   clip: 'jab',       dmg: 6,  range: 1.6, startupMs: 120, stunSec: 0.35, knockback: 0.4, chiGain: 8,  guardDmg: 6,  line: 'vertical' },
+  kick:  { id: 'kick',  label: 'KICK',  clip: 'high_kick', dmg: 9,  range: 1.9, startupMs: 180, stunSec: 0.45, knockback: 0.9, chiGain: 10, guardDmg: 10, line: 'horizontal' },
+  heavy: { id: 'heavy', label: 'HEAVY', clip: 'uppercut',  dmg: 14, range: 1.8, startupMs: 260, stunSec: 0.7,  knockback: 1.6, chiGain: 14, guardDmg: 22, line: 'vertical' },
 };
 
 /** STAFF loadout (Mixed Combat): long and slow — win by keeping distance
  *  and punishing approaches. The reach-vs-speed tradeoff IS the matchup. */
 export const STAFF_ATTACKS: Record<'jab' | 'kick' | 'heavy', AttackDef> = {
-  jab:   { id: 'poke',     label: 'POKE',     clip: 'jab',        dmg: 8,  range: 2.6, startupMs: 200, stunSec: 0.4,  knockback: 0.8, chiGain: 8,  guardDmg: 8 },
-  kick:  { id: 'sweep',    label: 'SWEEP',    clip: 'roundhouse', dmg: 11, range: 2.8, startupMs: 260, stunSec: 0.5,  knockback: 1.4, chiGain: 10, guardDmg: 12 },
-  heavy: { id: 'overhead', label: 'OVERHEAD', clip: 'hook',       dmg: 16, range: 2.6, startupMs: 340, stunSec: 0.8,  knockback: 2.2, chiGain: 14, guardDmg: 26 },
+  jab:   { id: 'poke',     label: 'POKE',     clip: 'jab',        dmg: 8,  range: 2.6, startupMs: 200, stunSec: 0.4,  knockback: 0.8, chiGain: 8,  guardDmg: 8,  line: 'vertical' },
+  kick:  { id: 'sweep',    label: 'SWEEP',    clip: 'roundhouse', dmg: 11, range: 2.8, startupMs: 260, stunSec: 0.5,  knockback: 1.4, chiGain: 10, guardDmg: 12, line: 'horizontal' },
+  heavy: { id: 'overhead', label: 'OVERHEAD', clip: 'hook',       dmg: 16, range: 2.6, startupMs: 340, stunSec: 0.8,  knockback: 2.2, chiGain: 14, guardDmg: 26, line: 'vertical' },
 };
 
 /** Full-chi special — replaces HEAVY while chi is maxed. Huge knockback:
- *  in Mixed Combat this is the ring-out tool. */
+ *  in Mixed Combat this is the ring-out tool. Horizontal: the finisher is
+ *  not steppable — you beat it with range, guard or a parry, not a sidestep. */
 export const SPECIAL_ATTACK: AttackDef =
-  { id: 'special', label: 'DRAGON', clip: 'roundhouse', dmg: 26, range: 2.2, startupMs: 320, stunSec: 1.0, knockback: 3.4, chiGain: 0, guardDmg: 100 };
+  { id: 'special', label: 'DRAGON', clip: 'roundhouse', dmg: 26, range: 2.2, startupMs: 320, stunSec: 1.0, knockback: 3.4, chiGain: 0, guardDmg: 100, line: 'horizontal' };
 
 // ── Fighter state ────────────────────────────────────────────────────────
 export const GUARD_MAX = 100;
@@ -99,13 +114,31 @@ export class FighterState {
 }
 
 // ── Strike resolution ────────────────────────────────────────────────────
-export type StrikeOutcome = 'whiff' | 'parried' | 'blocked' | 'guardBreak' | 'hit';
+export type StrikeOutcome = 'whiff' | 'parried' | 'blocked' | 'guardBreak' | 'hit' | 'stepped';
+
+/** How far off the attack line a defender must be for a vertical to whiff
+ *  past them. TUNE(elijah), MEASURED: fighters move 3.3 m/s, so a committed
+ *  orbit covers 0.40m inside a jab's 120ms startup and 0.86m inside a
+ *  heavy's 260ms. 0.5 made the step invisible (0 steps in a 150s driven
+ *  match — only heavies qualified, and heavies are 20% of the brain's mix).
+ *  0.32 makes deliberate lateral movement beat even jabs — the Soul Calibur
+ *  answer to which is the horizontal, which is what B is FOR. Slight drift
+ *  (~0.2m from re-aiming) still connects. */
+export const STEP_EVADE_M = 0.32;
+
+/** Chi the stepper earns for making a vertical miss — the read IS the
+ *  reward (Soul Calibur pays initiative for a good step). */
+export const STEP_CHI_GAIN = 8;
 
 /** One authoritative answer for a swing landing at `dist` right now.
  *  Mutates the DEFENDER's guard/stagger state for blocked/broken/parried
  *  outcomes; 'hit' damage is applied by the caller via applyHit (so the
- *  attacker's combo scaling stays with the attacker). */
-export function resolveStrike(atk: AttackDef, dist: number, defender: FighterState, nowMs: number): StrikeOutcome {
+ *  attacker's combo scaling stays with the attacker).
+ *
+ *  `lateralOffsetM` = the defender's sideways distance from the attacker's
+ *  facing line at impact. Only vertical attacks check it (a stepped
+ *  vertical whiffs past); horizontals ignore it — that's their job. */
+export function resolveStrike(atk: AttackDef, dist: number, defender: FighterState, nowMs: number, lateralOffsetM?: number): StrikeOutcome {
   if (dist > atk.range) return 'whiff';
   if (!defender.controllable) return 'hit';                 // stunned/staggered = defenseless
   if (nowMs - defender.lastBlockPressMs <= PARRY_WINDOW_MS) return 'parried';
@@ -118,6 +151,9 @@ export function resolveStrike(atk: AttackDef, dist: number, defender: FighterSta
       return 'guardBreak';
     }
     return 'blocked';
+  }
+  if (atk.line === 'vertical' && lateralOffsetM != null && Math.abs(lateralOffsetM) > STEP_EVADE_M) {
+    return 'stepped';
   }
   return 'hit';
 }

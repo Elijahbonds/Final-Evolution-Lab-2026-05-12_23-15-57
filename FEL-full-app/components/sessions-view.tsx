@@ -87,7 +87,7 @@ export function SessionsView() {
             const isBooked = bookedKeys.has(s.sessionKey);
             return (
               <motion.div key={s.sessionKey} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="flex items-center gap-2 text-sm font-bold text-white"><Dumbbell className="h-4 w-4 text-red-400" /> {s.label} PT</div>
+                <div className="flex items-center gap-2 text-sm font-bold text-white"><Dumbbell className="h-4 w-4 text-red-400" /> {s.label}</div>
                 <div className="text-xs text-white/40">Hosted by {s.host} · up to {s.capacity} athletes</div>
                 <button onClick={() => book('group_workout', s.sessionKey)} disabled={isBooked || booking === s.sessionKey} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2 text-sm font-bold transition disabled:opacity-70" style={{ backgroundColor: isBooked ? 'rgba(0,255,157,0.15)' : '#00E5FF', color: isBooked ? '#00FF9D' : '#050505' }}>
                   {booking === s.sessionKey ? <Loader2 className="h-4 w-4 animate-spin" /> : isBooked ? <><Check className="h-4 w-4" /> Booked</> : <><Sparkles className="h-4 w-4" /> Book · {s.shards} shards</>}
@@ -107,7 +107,7 @@ export function SessionsView() {
               const isBooked = bookedKeys.has(s.sessionKey);
               return (
                 <motion.div key={s.sessionKey} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-purple-400/20 bg-purple-400/[0.05] p-4">
-                  <div className="text-sm font-bold text-white">{s.label} PT</div>
+                  <div className="text-sm font-bold text-white">{s.label}</div>
                   <div className="text-xs text-white/40">Direct session with Elijah Bonds</div>
                   <button onClick={() => book('private_1on1', s.sessionKey)} disabled={isBooked || booking === s.sessionKey} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2 text-sm font-bold transition disabled:opacity-70" style={{ backgroundColor: isBooked ? 'rgba(0,255,157,0.15)' : '#A855F7', color: isBooked ? '#00FF9D' : '#fff' }}>
                     {booking === s.sessionKey ? <Loader2 className="h-4 w-4 animate-spin" /> : isBooked ? <><Check className="h-4 w-4" /> Booked</> : <><Sparkles className="h-4 w-4" /> Book · {s.shards} shards</>}

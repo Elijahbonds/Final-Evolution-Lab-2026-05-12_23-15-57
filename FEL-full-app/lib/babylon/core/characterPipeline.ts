@@ -22,112 +22,13 @@ import {
   defaultFace, getWearable, type FaceConfig, type WearableSlot,
 } from '../../closet/wearable-catalog';
 
-export interface PlayerIdentity {
-  proportions: AvatarSpec | null;                 // null until a body scan exists
-  face: FaceConfig;
-  /** jersey/shorts/shoes/accent hex derived from equipped wearables + card skin. */
-  palette: { jersey: string; shorts: string; shoes: string; accent: string };
-}
-
-const FALLBACK_PALETTE = { jersey: '#00E5FF', shorts: '#0b1220', shoes: '#A855F7', accent: '#FFD700' };
-
-let cached: PlayerIdentity | null = null;
-
-/** Fetch + merge the user's identity once per session. Fail soft to defaults. */
-export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
-  if (cached && !force) return cached;
-  const [closet, scan] = await Promise.all([
-    fetch('/api/v1/closet').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    fetch('/api/v1/workout/scan').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-  ]);
-
-  const face: FaceConfig = { ...defaultFace(), ...(closet?.look?.face ?? {}) };
-  const equipped: Partial<Record<WearableSlot, string | null>> = closet?.look?.equipped ?? {};
-  const cardAccent: string | undefined = closet?.skins?.find(
-    (s: { id: string; accent?: string }) => s.id === closet?.look?.skinCardId,
-  )?.accent;
-
-  const accentOf = (slot: WearableSlot, fallback: string): string => {
-    const id = equipped[slot];
-    return (id && getWearable(id)?.accent) || fallback;
-  };
-  const palette = {
-    jersey: accentOf('tops', FALLBACK_PALETTE.jersey),
-    shorts: accentOf('shorts', FALLBACK_PALETTE.shorts),
-    shoes: accentOf('shoes', FALLBACK_PALETTE.shoes),
-    accent: cardAccent || accentOf('accessory', FALLBACK_PALETTE.accent),
-  };
-
-  const proportions: AvatarSpec | null = scan?.scans?.[0]?.avatarSpec ?? null;
-
-  cached = { proportions, face, palette };
-  return cached;
-}
-
-/** Call on Closet save / new scan so the next spawn picks up changes. */
-export function invalidateIdentity(): void { cached = null; }
-
-// ── Application layers ──────────────────────────────────────────────────
-
-const TORSO_BONES = ['Spine', 'Spine1', 'Spine2', 'Chest'];
-const ARM_BONES = ['LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm'];
-
-export function applyIdentity(spawn: SpawnedCharacter, id: PlayerIdentity): void {
-  // 1) Proportions (scan AvatarSpec) — height on root, build on torso, reach on arms.
-  if (id.proportions) {
-    const p = id.proportions;
-    spawn.root.scaling.scaleInPlace(p.heightScale || 1);
-    scaleBones(spawn, TORSO_BONES, p.buildScale || 1);
-    scaleBones(spawn, ARM_BONES, p.reachScale || 1);
-  }
-  // 2) Face — skin tone on skin materials (the model has no blendshapes today;
-  //    the flat FaceConfig preset variety is handled by the Closet preview rig).
-  applySkinTone(spawn, id.face.skinTone);
-  // 3) Wardrobe palette — jersey/shorts/shoes tints by mesh/material slot name.
-  tintSlot(spawn, ['jersey', 'top', 'shirt', 'tee'], id.palette.jersey);
-  tintSlot(spawn, ['shorts', 'pants', 'bottom'], id.palette.shorts);
-  tintSlot(spawn, ['shoe', 'sneaker', 'boot'], id.palette.shoes);
-}
-
-function scaleBones(spawn: SpawnedCharacter, names: string[], s: number): void {
-  if (s === 1) return;
-  for (const n of names) {
-    boneNode(spawn.skeleton, n)?.scaling.setAll(s);
-  }
-}
-function matColor(m: TintMat): Color3 | undefined {
-  return m.albedoColor ?? m.diffuseColor;
-}
-function applySkinTone(spawn: SpawnedCharacter, hex: string): void {
-  const tone = Color3.FromHexString(hex);
-  for (const mesh of spawn.meshes) {
-    const m = mesh.material as TintMat | null;
-    const c = m && matColor(m);
-    if (!c) continue;
-    // Name first, colour heuristic second. The heuristic guesses "is this
-    // flesh-coloured?", which quietly depends on the DEFAULT skin tone being
-    // flesh-coloured — pick a very dark or very pale tone and it stops matching
-    // its own mesh, so changing skin tone twice would fail the second time. The
-    // procedural body names its material `skin_<id>`, so just ask.
-    const named = `${mesh.name} ${m!.name}`.toLowerCase().includes('skin');
-    const isSkin = named
-      || (c.r > 0.45 && c.g > 0.25 && c.b > 0.15 && c.r > c.b && c.g > c.b * 0.9);
-    if (!isSkin) continue;
-    const clone = m!.clone(`${m!.name}_skin`) as TintMat | null;
-    if (clone) { matColor(clone)?.copyFrom(tone); mesh.material = clone; }
-  }
-}
-function tintSlot(spawn: SpawnedCharacter, keys: string[], hex: string): void {
-  const tint = Color3.FromHexString(hex);
-  for (const mesh of spawn.meshes) {
-    const m = mesh.material as TintMat | null;
-    if (!m) continue;
-    const name = `${mesh.name} ${m.name}`.toLowerCase();
-    if (!keys.some((k) => name.includes(k))) continue;
-    const clone = m.clone(`${m.name}_wear`) as TintMat | null;
-    if (clone) { matColor(clone)?.copyFrom(tint); mesh.material = clone; }
-  }
-}
+// The identity machinery lives in ./playerIdentity (extracted so the shared
+// spawn layer can apply it without an import cycle). Re-exported here so the
+// sanctioned spawn paths keep their stable public API.
+export {
+  resolveIdentity, invalidateIdentity, applyIdentity, type PlayerIdentity,
+} from './playerIdentity';
+import { resolveIdentity, applyIdentity } from './playerIdentity';
 
 // ── The only sanctioned spawn paths ──────────────────────────────────────
 
@@ -135,7 +36,9 @@ export const CharacterPipeline = {
   /** Player-controlled character: identity ALWAYS applied. */
   async spawnPlayer(scene: Scene, url: string, opts: SpawnOpts = {}): Promise<SpawnedCharacter> {
     const [spawn, id] = await Promise.all([
-      CharacterLibrary.spawn(scene, url, opts),
+      // identity: false — the pipeline applies it below; the library layer
+      // would apply it a second time (measured: two jersey plates on Spine2).
+      CharacterLibrary.spawn(scene, url, { ...opts, identity: false }),
       resolveIdentity(),
     ]);
     try { applyIdentity(spawn, id); } catch (e) { console.error('[FEL-IDENTITY] applyIdentity failed', e); }

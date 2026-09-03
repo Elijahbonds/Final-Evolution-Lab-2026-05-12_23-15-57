@@ -83,15 +83,37 @@ export default function FootballBabylon({ onEnd }: GameProps) {
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
-      {/* HUD bezel */}
+      {/* HUD bezel. It used to render a field the mode has never published
+          (the mode's is `evades`), and nothing else: no score, no toGo, no
+          breakaway, no truck state. Same family trap as the 3PT board and the
+          energy gauge — published state is not a bezel. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-4 py-3">
         <span className="rounded-md bg-black/50 px-3 py-1 font-mono text-sm font-bold text-white">
-          {hnode(hud.down, '1 & 10')}
+          {hnode(hud.down, '1')} & {hnode(hud.toGo, 10)}
+        </span>
+        <span className="rounded-md bg-black/50 px-3 py-1 font-mono text-sm font-bold text-[var(--fel-gold)]">
+          {hnode(hud.score, 0)} PTS
         </span>
         <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-emerald)]">
-          {hnode(hud.yards, 0)} YD · {hnode(hud.evaded, 0)} EVA
+          {hnode(hud.yards, 0)} YD · {hnode(hud.evades, 0)} EVA
         </span>
       </div>
+
+      {/* drive state chips: breakaway gear + truck cooldown */}
+      <div className="pointer-events-none absolute left-4 top-14 flex flex-col gap-1 font-mono text-[10px] tracking-wider">
+        {hud.breakaway === true && (
+          <span className="rounded bg-[#ff2d78]/25 px-2 py-0.5 text-[#ff2d78]">BREAKAWAY</span>
+        )}
+        <span className={`rounded px-2 py-0.5 ${hud.truckReady === false ? 'bg-white/10 text-white/30' : 'bg-[#00E5FF]/15 text-[#00E5FF]'}`}>
+          TRUCK {hud.truckReady === false ? '…' : 'READY'}
+        </span>
+      </div>
+
+      {typeof hud.hint === 'string' && hud.hint && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-16 text-center">
+          <span className="fel-panel px-3 py-1 font-mono text-[10px] text-white/70">{hud.hint}</span>
+        </div>
+      )}
 
       {typeof hud.banner === 'string' && hud.banner && (
         <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
@@ -101,7 +123,7 @@ export default function FootballBabylon({ onEnd }: GameProps) {
 
       <BootSplash
         modeId="football"
-        title="GRIDIRON"
+        title="BREAKAWAY"
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}

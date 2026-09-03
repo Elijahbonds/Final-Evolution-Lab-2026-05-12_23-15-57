@@ -17,7 +17,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   // as much as the tilt.
   threepoint: {
     modeId: 'threepoint',
-    title: 'Three-Point Shootout',
+    title: 'Downtown',
     maxPlayers: 1,
     askName: true,
     schemas: [
@@ -45,7 +45,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   // which job it is doing from its own phase.
   dunk: {
     modeId: 'dunk',
-    title: 'Dunk Contest',
+    title: 'Flight Night',
     maxPlayers: 1,
     askName: true,
     schemas: [
@@ -78,7 +78,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   // as 3PT's shot and Dunk's charge.
   threevthree: {
     modeId: 'threevthree',
-    title: '3v3 Streetball',
+    title: 'Threes',
     maxPlayers: 1,
     askName: true,
     schemas: [
@@ -106,7 +106,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   // two air verbs. Same shape for both because they are one shared core.
   gymnastics: {
     modeId: 'gymnastics',
-    title: 'Gymnastics Vault',
+    title: 'Stick It',
     maxPlayers: 1,
     askName: true,
     schemas: [
@@ -119,7 +119,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   },
   bigair: {
     modeId: 'bigair',
-    title: 'Big Air',
+    title: 'Stomp',
     maxPlayers: 1,
     askName: true,
     schemas: [
@@ -136,7 +136,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   // COVER the pitch would be playing a different, easier game.
   derby: {
     modeId: 'derby',
-    title: 'Home Run Derby',
+    title: 'Moonshot Derby',
     maxPlayers: 1,
     askName: true,
     schemas: [
@@ -149,7 +149,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   // has to reach the mode for the mechanic to exist at all on a phone.
   penalty: {
     modeId: 'penalty',
-    title: 'Penalty Shootout',
+    title: 'Twelve Yards',
     maxPlayers: 1,
     askName: true,
     schemas: [
@@ -158,12 +158,33 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
+  // Football (rush). Steering is the left stick, so the d-pad is 'move' and
+  // forwards as one (same trap as derby: a phone that can evade but not
+  // STEER is playing a different game). TRUCK is the R-trigger hold, which
+  // the 'charge' hold idiom maps to; the four face buttons carry the evades.
+  // SPIN stays keyboard-only — the touch budget ruling is in the concept lock.
+  football: {
+    modeId: 'football',
+    title: 'Breakaway',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'HURDLE' },
+        { action: 'X', label: 'JUKE L' },
+        { action: 'Y', label: 'JUKE R' },
+        { action: 'charge', label: 'TRUCK', hold: true },
+      ] },
+    ],
+  },
+
   // Golf: the 3-click swing plus club selection. The stick swing needs an
   // analog axis a phone pad does not have, so a Controller Link player uses the
   // 3-click — which is exactly why it was kept alongside rather than replaced.
   golf: {
     modeId: 'golf',
-    title: 'Golf',
+    title: 'The Loop',
     maxPlayers: 1,
     askName: true,
     schemas: [
@@ -180,7 +201,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   // entry is silence, not an error.
   tennis: {
     modeId: 'tennis',
-    title: 'Tennis',
+    title: 'Match Point',
     maxPlayers: 1,
     askName: true,
     schemas: [
@@ -228,7 +249,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   //    'charge' is the vocabulary word that maps to it. Held, not tapped.
   skateboard: {
     modeId: 'skateboard',
-    title: 'Skate Run',
+    title: 'Venice Lines',
     maxPlayers: 1,
     askName: true,
     schemas: [
@@ -243,7 +264,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   },
   surf: {
     modeId: 'surf',
-    title: 'Surf Break',
+    title: 'The Break',
     maxPlayers: 1,
     askName: true,
     schemas: [
@@ -264,7 +285,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   // joins nothing, silently.
   snowboard_slalom: {
     modeId: 'snowboard_slalom',
-    title: 'Slalom Descent',
+    title: 'Gate Crasher',
     maxPlayers: 1,
     askName: true,
     schemas: [
@@ -278,19 +299,57 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
-  // Showdown: four face verbs. Its L1/R1/SELECT specials have no pad slot and
-  // stay gamepad-only, same as the touch overlay.
-  showdown: {
-    modeId: 'showdown',
-    title: 'Showdown',
+  // Showdown: RETIRED from the v1 roster with the combat-family trim (owner,
+  // 2026-09-01 — karate-vs is the Storm mode). Schema removed so phones don't
+  // join a mode the roster no longer offers; the mode file stays registered.
+
+  // The Cypher: tap on the beat — one verb, no movement. (The touch overlay
+  // already covers playing ON the phone; this is the second-screen path.)
+  dance: {
+    modeId: 'dance',
+    title: 'The Cypher',
     maxPlayers: 1,
     askName: true,
     schemas: [
+      { kind: 'button', buttons: [{ action: 'A', label: 'TAP' }] },
+    ],
+  },
+
+  // Dunk Duel: pass-and-play contest. The d-pad drives the approach ('move');
+  // the chair prop lives on X because the d-pad is spoken for. CHARGE is a
+  // hold (the mode reads the trigger ramp; modeBridge turns a held button
+  // into that analog ramp).
+  dunkduel: {
+    modeId: 'dunkduel',
+    title: 'Prove It',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
       { kind: 'button', buttons: [
-        { action: 'A', label: 'JAB' },
+        { action: 'A', label: 'SLAM' },
+        { action: 'B', label: 'STYLE' },
+        { action: 'X', label: 'CHAIR' },
+        { action: 'charge', label: 'CHARGE', hold: true },
+      ] },
+    ],
+  },
+
+  // Mixed Combat: 8-way spacing + the three attacks + guard. The d-pad is
+  // 'move' (a fighter that can't walk is a training dummy); the mode also
+  // reads a stick flick for the loadout pick, so phones lose nothing.
+  mixedcombat: {
+    modeId: 'mixedcombat',
+    title: "Ring's Edge",
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'STRIKE' },
         { action: 'B', label: 'KICK' },
         { action: 'X', label: 'GUARD' },
-        { action: 'Y', label: 'ULTIMATE' },
+        { action: 'Y', label: 'HEAVY' },
       ] },
     ],
   },

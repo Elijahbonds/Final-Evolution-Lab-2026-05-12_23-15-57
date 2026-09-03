@@ -92,3 +92,55 @@ The mode is "2K9 parity" when A1–A6, B1–B6, C1–C3 all hold, D1 and D2 are 
 D3 is delivered in Phase 6 (done), and D4/D5/D6 have an explicit ruling recorded here (all three ruled).
 
 **Currently: 15 of 15 A/B/C criteria hold. D1/D2/D3 fixed; D4/D5/D6 ruled.**
+
+---
+
+## F. Depth pass (2026-09-01) — the rival presentation, finished
+
+**F0 — The contest was invisible on the shipping route.** The mode published
+`board`, `round`, `money` and the reveal state every frame; the shipping host
+(`three-point-babylon.tsx`) rendered `score / rack / ball / clock / streak /
+meter / banner` and NOTHING else. The standings board — the entire contest —
+existed only in the dev route's JSON dump. This is the handoff's trap #4
+("HUD state is not a bezel"), fifth recorded occurrence. The host now renders
+the board, the round, the money ball, and THE NEED. Guarded source-level by
+`threepoint-depth-tests` (every published field must have a renderer).
+
+**F1 — The reveal is staged.** Rival scores used to land all at once the
+instant your run ended. Now the board walks one card every 0.75s, weakest
+first, the favourite's number last, with unposted cards reading "— SHOOTING…".
+The dunk contest's staged-reveal idiom, applied to the shootout.
+
+**F2 — The final is played at a known number.** The finalists post their
+final-round scores FIRST (staged), then the player runs with a live
+"NEED N TO WIN" chip. This is board ORDER, not visible rival shooting — D4's
+ruling stands. In the real event finalists shoot in reverse qualifying order
+and the top qualifier goes last knowing the target; a one-player field makes
+the same dramatic choice by construction. Ties don't qualify as wins: NEED is
+the outright number (max rival + 1).
+
+### Driver fixes found by this pass (shared, measured)
+
+`capture-mobile-touch.mts`: (a) `networkidle` never settles on hosts that
+long-poll (the Controller Link lobby heartbeats) — now `domcontentloaded` +
+canvas wait; (b) the /play→/login redirect is client-side and lands after
+hydration, so the URL check raced it — now detects the login FORM; (c) the
+login inputs are SSR'd and a pre-hydration Enter is a no-op — now waits for
+networkidle on /login specifically before filling; (d) the session cookie
+needs a settle before the target page's `getServerSession` runs.
+
+`threepoint-depth-drive.mts` (new): a blind shooter scores 0 and is
+eliminated in qualifying, "proving" the final round didn't exist. It shoots
+the exposed meter like a person (24 in qualifying), and a real elimination is
+reported as a result, not a pass.
+
+### Deferred, with reasons
+
+- **Visible rival shot runs** — D4 stands (ruled out of scope: a large lift,
+  and the staged board now carries the drama it was meant to provide).
+- **Shooter selection** — D5 stands (conflicts with the platform identity
+  model).
+- **Tiebreak playoff** — a tied final currently goes to the earlier poster;
+  the NEED chip tells the player the outright number, so no tie sneaks up on
+  anyone. A playoff round is real-event-faithful and deferred as format
+  polish.

@@ -10,6 +10,8 @@
 
 import { RARITY_META, safeAccent, rarityLabel, type CardRarity } from '@/lib/creator/card-core';
 import { mpModeLabel } from '@/lib/mp/match-core';
+import { AvatarFigure } from '@/components/avatar-figure';
+import { ROSTER } from '@/lib/game-data';
 import { Trophy, Zap, Star } from 'lucide-react';
 
 export interface CreatorCardData {
@@ -25,6 +27,8 @@ export interface CreatorCardData {
   wins: number;
   signatureMove?: string | null;
   views?: number;
+  /** The owner's athlete — card face when no photo is set. */
+  ownerLook?: { avatarKey: string | null; cosmeticAssetId: string | null } | null;
 }
 
 export function CreatorCard({ card }: { card: CreatorCardData }) {
@@ -59,13 +63,26 @@ export function CreatorCard({ card }: { card: CreatorCardData }) {
           {card.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={card.avatarUrl} alt={`${card.displayName} avatar`} className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <span className="fel-heading text-6xl font-black" style={{ color: accent }}>
-                {(card.displayName || 'A').slice(0, 1).toUpperCase()}
-              </span>
-            </div>
-          )}
+          ) : (() => {
+            // the owner's athlete IS the card face (their build, their kit
+            // accent, their cosmetic) — not an initial on a gradient
+            const rosterAvatar = ROSTER.find((r) => r.key === card.ownerLook?.avatarKey) ?? null;
+            return rosterAvatar ? (
+              <div className="flex h-full w-full items-end justify-center pb-10">
+                <AvatarFigure
+                  avatar={{ ...rosterAvatar, accent }}
+                  size={200}
+                  cosmeticAssetId={card.ownerLook?.cosmeticAssetId}
+                />
+              </div>
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <span className="fel-heading text-6xl font-black" style={{ color: accent }}>
+                  {(card.displayName || 'A').slice(0, 1).toUpperCase()}
+                </span>
+              </div>
+            );
+          })()}
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3">
             <h3 className="fel-heading text-xl font-bold leading-tight text-white">{card.displayName}</h3>
             {card.tagline ? <p className="text-xs text-white/60">{card.tagline}</p> : null}

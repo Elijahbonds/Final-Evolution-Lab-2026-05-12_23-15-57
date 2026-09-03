@@ -25,6 +25,7 @@ import { assertSpawned } from '../core/FrameGuard';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { VenueKit } from '../visual/VenueKit';
+import { Onlookers } from '../visual/Onlookers';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { FOOTBALL_CONFIG as CFG } from './modeConfigs';
@@ -63,6 +64,24 @@ export const FootballRushMode: ModeDefinition = (() => {
   let styleTypes = new Set<string>();          // evade types used this drive
   let lastDodgeType = '';                      // which move earned the current iframes
   let stickX = 0, stickY = 0;
+  /** L4 — sideline banks. A drive is watched; 2 draws, instanced. */
+  let gallery: Onlookers | null = null;
+  // PRE-SNAP — every play begins SET: the defense holds its alignment and
+  // the ball snaps on the PLAYER's call (first forward push), auto-snapping
+  // at 3s so an idle phone never stalls. The benchmark's lock justification
+  // opens with "pre-snap reads" and the mode had none: the defense was live
+  // before you could see it. The read is the snap's timing choice.
+  let preSnap = true, preSnapT = 0;
+  const PRESNAP_AUTOSNAP_SEC = 3;
+
+  function snap(ctx: ModeContext): void {
+    if (!preSnap) return;
+    preSnap = false;
+    for (const m of defenders) m.startPursuit();
+    SoundKit.play('uiTick', { pitch: 1.3, volume: 0.4 });
+    ctx.setHud({ hint: 'Juke, spin, hurdle — or HOLD TRUCK and run THROUGH them', banner: 'BALL!' });
+    setTimeout(() => ctx.setHud({ banner: '' }), 500);
+  }
 
   function layCoins(ctx: ModeContext, fromZ: number): void {
     coins?.dispose();
@@ -110,7 +129,8 @@ export const FootballRushMode: ModeDefinition = (() => {
       ctx.groundLock?.track(char.root, char.skeleton);
       const archetype = i % 3 === 2 ? 'flanker' : 'defender';
       const mob = new Mob(char, STEERING_PRESETS[archetype]);
-      mob.startPursuit();
+      // NO pursuit yet — defenders stand in their alignment until the snap
+      // (D1: the pre-snap read). startPursuit moves to snap().
       pool.add(mob);
       defenders.push(mob);
     }
@@ -121,13 +141,16 @@ export const FootballRushMode: ModeDefinition = (() => {
     lineOfScrimmage = 0; yards = 0; driveEvades = 0; breakawaySec = 0;
     styleTypes = new Set();
     truckSec = 0; truckCooldown = 0;
+    preSnap = true; preSnapT = 0;
     runner.root.position.set(0, 0, 0);
     runner.root.rotation.y = 0;
     runner.animator.play(SPORT_CLIP.idle, { loop: true });
     ctx.camDirector.snapTo(runner.root.position, runner.root.position.add(new Vector3(0, 0, 12)));
     ctx.setHud({ down, toGo, banner, breakaway: false, truckReady: true });
     setTimeout(() => ctx.setHud({ banner: '' }), 1400);
-    void spawnDefense(ctx);
+    void spawnDefense(ctx).then(() => {
+      ctx.setHud({ hint: 'READ THE FRONT — push ▲/W to SNAP' });
+    });
     layCoins(ctx, 0);
   }
 
@@ -150,6 +173,12 @@ export const FootballRushMode: ModeDefinition = (() => {
       assertSpawned(ctx.scene, { hero: runner.root, minWorldMeshes: 6, modeId: 'football' });
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'gridiron');
+      // L4 — a drive is watched. Two sideline banks outside the playing
+      // width (FIELD_HALF_X 20), in the runner-cam's frame edges.
+      gallery = new Onlookers(ctx.scene, [
+        ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => new Vector3(-21.5, 0, 4 + i * 4)),
+        ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => new Vector3(21.5, 0, 6 + i * 4)),
+      ]);
       newDrive(ctx, 'TAKE THE FIELD');
       ctx.setHud({ score: 0, yards: 0, evades: 0, hint: 'Juke, spin, hurdle — or HOLD TRUCK and run THROUGH them' });
     },
@@ -157,6 +186,15 @@ export const FootballRushMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+
+      // THE SNAP — the player snaps on their call: forward push (or any
+      // evade button) with the defense set. Everything before it is the read.
+      if (preSnap && !ended) {
+        const snapCall = (e.t === 'stick' && e.side === 'L' && e.y < -0.4)
+          || (e.t === 'button' && e.pressed && ['A', 'B', 'X', 'Y'].includes(e.btn ?? ''))
+          || (e.t === 'trigger' && e.side === 'R' && e.value > 0.5);
+        if (snapCall) snap(ctx);
+      }
 
       // TRUCK — trigger hold, windowed + cooldown
       if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5 && !ended
@@ -184,6 +222,14 @@ export const FootballRushMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
+      // SET AT THE LINE — nobody moves until the snap (the player calls it,
+      // or the auto-snap so an idle phone never stalls)
+      if (preSnap) {
+        preSnapT += dt;
+        if (preSnapT >= PRESNAP_AUTOSNAP_SEC) snap(ctx);
+        ctx.camDirector.update(runner.root.position, Vector3.Zero(), null);
+        return;
+      }
       iframeSec = Math.max(0, iframeSec - dt);
       breakawaySec = Math.max(0, breakawaySec - dt);
       truckSec = Math.max(0, truckSec - dt);
@@ -226,6 +272,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           SoundKit.play('impact', { pitch: 0.6, volume: 0.6 });
           EffectsKit.burst(ctx.scene, mob.char.root.position.add(new Vector3(0, 0.8, 0)), 'dust');
           ctx.setHud({ score, banner: 'TRUCKED!' });
+          gallery?.cheer(0.6);
           setTimeout(() => ctx.setHud({ banner: '' }), 600);
           styleCredit(ctx, 'truck');
           if (driveEvades >= BREAKAWAY_THRESHOLD && breakawaySec <= 0) {
@@ -279,7 +326,12 @@ export const FootballRushMode: ModeDefinition = (() => {
         setTimeout(() => {
           ctx.setHud({ banner: '' });
           runner.root.position.x = 0;
-          void spawnDefense(ctx);
+          // a stopped play is a new SET: the front respawns in its alignment
+          // and the next snap is the player's call again
+          preSnap = true; preSnapT = 0;
+          void spawnDefense(ctx).then(() => {
+            if (!ended && preSnap) ctx.setHud({ hint: 'READ THE FRONT — push ▲/W to SNAP' });
+          });
         }, 1000);
         yards = 0;
         lineOfScrimmage = runner.root.position.z;
@@ -296,13 +348,16 @@ export const FootballRushMode: ModeDefinition = (() => {
         SoundKit.play('crowdCheer');
         EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, 1.8, 0)), 'confetti');
         ctx.setHud({ score, banner: 'TOUCHDOWN!' });
+        gallery?.cheer(1);
         newDrive(ctx, 'NEXT DRIVE');
       }
 
+      gallery?.update(dt);
       ctx.camDirector.update(runner.root.position, vel, null);
     },
 
     dispose() {
+      gallery?.dispose(); gallery = null;
       runner?.dispose();
       for (const mob of defenders) mob.char.dispose();
       defenders = [];

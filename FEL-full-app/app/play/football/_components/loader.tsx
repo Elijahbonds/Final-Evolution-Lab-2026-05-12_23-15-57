@@ -20,5 +20,5 @@ export function FootballLoader() {
   // there is no 2D fallback — Babylon when enabled, else the three.js 3D scene.
   const babylon = isBabylon('football');
   const Game = babylon ? FootballBabylon : Football3D;
-  return <GameShell mode="football" title="STREET FOOTBALL" venue="The Gridiron" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="football" title="BREAKAWAY" venue="The Gridiron" Game={Game} ownControls={babylon} />;
 }

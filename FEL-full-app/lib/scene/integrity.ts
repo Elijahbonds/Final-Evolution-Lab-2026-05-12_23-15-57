@@ -95,25 +95,25 @@ export const VENUE_DOJO: VenueIdentity = {
 export const SCENE_MANIFESTS: Record<string, SceneManifest> = {
   basketball_dunk: {
     modeId: 'basketball_dunk',
-    sceneLabel: 'Dunk Contest',
+    sceneLabel: 'Flight Night',
     requiredNodes: courtNodes,
     venue: VENUE_VENICE_SUNSET,
   },
   basketball_h2h: {
     modeId: 'basketball_h2h',
-    sceneLabel: 'Three-Point Shootout',
+    sceneLabel: 'Downtown',
     requiredNodes: courtNodes,
     venue: VENUE_VENICE_DAY,
   },
   basketball_3v3: {
     modeId: 'basketball_3v3',
-    sceneLabel: '3v3 Streetball',
+    sceneLabel: 'Threes',
     requiredNodes: courtNodes,
     venue: VENUE_VENICE_DAY,
   },
   karate_versus: {
     modeId: 'karate_versus',
-    sceneLabel: 'Karate Versus',
+    sceneLabel: 'Storm Duel',
     requiredNodes: dojoNodes,
     venue: VENUE_DOJO,
   },

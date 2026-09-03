@@ -136,6 +136,44 @@ Parity when A1–A6, B1–B4, C1–C4 all hold and D1 is fixed, with D2/D3 ruled
 
 ---
 
+## G. Depth pass (2026-09-01) — the contest-craft layer
+
+Audited against the six things a dunk contest is judged on. Already real:
+variety memory (−20% for a seen combo), mid-air tricks that tax the slam
+window (difficulty earned through execution), the five-judge staged reveal,
+crowd energy per frame, THE NEED. The gaps were the approach and the props.
+
+**G1 — The run-up buys the air.** Peak approach speed is now measured and
+fed to the flight budget (`DunkFlight.launch`) — before, the launch read
+`hypot(stickX, stickY)` at the release instant, which is ~0 during a charge,
+so EVERY dunk launched as a walk-up and `airTotal` was never consulted by
+anything. And the budget is now enforced: a trick needs 30% of the air left,
+a combo 42%. A refused trick is surfaced (`NOT ENOUGH AIR — come in faster`)
+instead of reading as a dropped input. The judges see the run-up too
+(+speed·1.0 difficulty). Guarded by `dunk-depth-tests`.
+
+**G2 — The prop is physical.** Crossing the obstacle with your feet below
+1.30m blows the dunk ON CONTACT — clank, stumble, the chair goes over, the
+judges score the attempt (the judged-miss path), the crowd drops. The jump
+peaks at `1.05 + 0.55·charge` and the crossing happens near apex, so the
+chair demands a real charge (~55%+). The old check sampled `y + 1.0` at the
+FLUSH — past the prop, near apex, with a 1.0m fudge — so "CLIPPED THE PROP"
+had literally never displayed. Verified live on both routes: weak charge →
+`CAUGHT THE PROP — BLOWN`; loaded runway → cleared and judged.
+
+### Deferred, with reasons
+
+- **The landing as an input** (stumble vs clean finish affecting the card) —
+  the honest design is a balance beat on landing, but the rim-hang already
+  owns the post-flush hold and a second simultaneous input collides with it.
+  Needs its own input design; recorded, not smuggled.
+- **One-foot vs two-foot takeoff and approach angle** — the venue's runway
+  is head-on and the flight homes to the rim; meaningful angle wants a
+  free-approach flight model, which is a bigger build than this pass.
+- **Four-competitor field** — D2 stands.
+
+---
+
 ## F. Found during Phase 2 verification — the dunk was never animating
 
 Capturing the reveal required driving the mode in a real browser, and that

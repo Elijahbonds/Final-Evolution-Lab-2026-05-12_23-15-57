@@ -40,5 +40,5 @@ const SnowboardBabylon = dynamicImport(
 export function SnowboardLoader() {
   const babylon = isBabylon('snowboard_slalom');
   const Game = babylon ? SnowboardBabylon : is3D('snowboarding') ? Snowboard3D : SnowboardGame2D;
-  return <GameShell mode="snowboarding" title="SLALOM DESCENT" venue="Mountain Slope" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="snowboarding" title="GATE CRASHER" venue="Mountain Slope" Game={Game} ownControls={babylon} />;
 }

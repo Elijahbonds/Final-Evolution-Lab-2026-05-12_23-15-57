@@ -164,7 +164,7 @@ export default function DunkBabylon({ onEnd }: GameProps) {
             <div className="fel-panel ml-1 flex flex-col items-center border-[var(--fel-gold)]/40 px-3 py-1">
               <span className="font-mono text-[9px] uppercase tracking-wider text-white/50">total</span>
               <span className="text-2xl font-black leading-none text-white">
-                {(hud.judgeReveal as HudScoreCard[]).reduce((s, j) => s + j.score, 0)}
+                {(hud.judgeReveal as HudScoreCard[]).reduce((s, j) => s + Number(j.score), 0)}
               </span>
             </div>
           </div>
@@ -191,7 +191,7 @@ export default function DunkBabylon({ onEnd }: GameProps) {
       {/* BootSplash: cartridge boot / venue art / progress / READY / 3-2-1 / error+retry */}
       <BootSplash
         modeId="dunk"
-        title="DUNK"
+        title="FLIGHT NIGHT"
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}

@@ -17,5 +17,5 @@ const KarateVsBabylon = dynamicImport(() => import('@/components/games/karate-vs
 export function KarateVsLoader() {
   const babylon = isBabylon('karateVersus');
   const Game = babylon ? KarateVsBabylon : KarateVs2D;
-  return <GameShell mode="karateVersus" title="KARATE VS" venue="Shimogamo Dojo" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="karateVersus" title="STORM DUEL" venue="Shimogamo Dojo" Game={Game} ownControls={babylon} />;
 }

@@ -4,47 +4,47 @@
     {
       "name": "guard",
       "loop": true,
-      "seconds": 1.1
-    },
-    {
-      "name": "jab",
-      "loop": false,
-      "seconds": 1.4
-    },
-    {
-      "name": "hook",
-      "loop": false,
-      "seconds": 0.767
+      "seconds": 1.367
     },
     {
       "name": "high_kick",
       "loop": false,
-      "seconds": 1.633
+      "seconds": 2.033
     },
     {
-      "name": "roundhouse",
+      "name": "hook",
       "loop": false,
-      "seconds": 2.133
+      "seconds": 0.967
     },
     {
-      "name": "uppercut",
+      "name": "jab",
       "loop": false,
-      "seconds": 1.4
+      "seconds": 1.733
     },
     {
       "name": "jumpshot",
       "loop": false,
-      "seconds": 2.067
+      "seconds": 2.567
+    },
+    {
+      "name": "roundhouse",
+      "loop": false,
+      "seconds": 2.667
     },
     {
       "name": "run",
       "loop": true,
-      "seconds": 0.5
+      "seconds": 0.633
+    },
+    {
+      "name": "uppercut",
+      "loop": false,
+      "seconds": 1.733
     },
     {
       "name": "walk",
       "loop": true,
-      "seconds": 0.833
+      "seconds": 1.033
     }
   ]
 }

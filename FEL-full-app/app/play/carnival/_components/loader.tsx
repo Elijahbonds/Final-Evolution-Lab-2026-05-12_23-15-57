@@ -18,5 +18,5 @@ const CarnivalBabylon = dynamicImport(() => import('@/components/games/carnival-
 });
 
 export function CarnivalLoader() {
-  return <GameShell mode="carnival" title="COURT CARNIVAL" venue="Venice Beach Carnival" Game={CarnivalBabylon} ownControls />;
+  return <GameShell mode="carnival" title="GAME NIGHT" venue="Venice Beach Carnival" Game={CarnivalBabylon} ownControls />;
 }

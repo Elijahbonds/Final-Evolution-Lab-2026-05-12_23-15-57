@@ -103,8 +103,21 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
         </div>
       </motion.div>
 
-      <h2 className="fel-heading mt-8 text-2xl font-bold text-white">SELECT YOUR ATHLETE</h2>
-      <p className="text-xs text-white/45">Pick the body type you're building toward. Your athlete shows up across the Lab.</p>
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="fel-heading text-2xl font-bold text-white">SELECT YOUR ATHLETE</h2>
+          <p className="text-xs text-white/45">Pick the body type you're building toward. Your athlete shows up across the Lab.</p>
+        </div>
+        <a
+          href="/closet"
+          className="inline-flex items-center gap-1.5 rounded-md border border-[#C79BFF]/40 bg-[#C79BFF]/10 px-3 py-1.5 text-xs font-bold text-[#C79BFF] transition-colors hover:bg-[#C79BFF]/20"
+        >
+          <Sparkles className="h-3.5 w-3.5" /> CUSTOMIZE YOUR LOOK
+        </a>
+      </div>
+      <p className="mt-1 text-[11px] text-white/35">
+        Face, gear, and card skin live in the <a href="/closet" className="text-[#C79BFF]/80 underline underline-offset-2 hover:text-[#C79BFF]">Closet</a> — or scan your face there and let it build you.
+      </p>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {ROSTER.map((r, i) => {
           const selected = p?.avatarKey === r.key;

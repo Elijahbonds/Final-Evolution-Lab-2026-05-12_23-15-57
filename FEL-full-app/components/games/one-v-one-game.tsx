@@ -235,7 +235,7 @@ export default function OneVOneGame({ grade, prq, onEnd, gamepad }: GameProps) {
         <canvas ref={canvasRef} width={W} height={H} className="h-full w-full" />
         {!started && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
-            <h2 className="fel-heading text-4xl text-white">1V1 HOOPS</h2>
+            <h2 className="fel-heading text-4xl text-white">ONES</h2>
             <p className="max-w-md text-sm text-gray-300">
               First to {TARGET}. On offense: tap <span className="text-[#00E5FF]">SPACE</span> to lock aim, tap again on the gold line — dead-center swishes count 2. On defense: read the flash and guard with <span className="text-[#FF3366]">← ↑ →</span>.
             </p>

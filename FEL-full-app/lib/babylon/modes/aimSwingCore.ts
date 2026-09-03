@@ -8,7 +8,7 @@
 // plus the missing furniture (net, flag+hole, plate+mound, goal+keeper) and a
 // ballistic flight solver. Athletes are real characters with swing clips.
 
-import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, DynamicTexture, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -144,6 +144,46 @@ export function buildPlateAndMound(scene: Scene): AbstractMesh[] {
   mound.position.set(0, 0.17, 18);
   mound.material = mat(scene, '#b08968');
   return [plate, mound];
+}
+
+/** The outfield wall, as a 5-segment arc a constant 38m from home plate —
+ *  plus the two foul poles at its ends and a distance band. A home-run derby
+ *  without a wall has no "gone": the ball flew into a void and the only
+ *  evidence was the points ticker. The wall is what a dinger CLEARS.
+ *  (Legibility first: one texture draw for the distance band, the rest are
+ *  five matte boxes and two cylinders.) */
+export function buildBallparkOutfield(scene: Scene): AbstractMesh[] {
+  const parts: AbstractMesh[] = [];
+  const wallMat = mat(scene, '#24503a');
+  const poleMat = mat(scene, '#f7d038');
+  const R = 38;                                   // metres from the plate, constant along the arc
+  const SEGS = [-40, -20, 0, 20, 40];             // degrees off dead-centre
+  for (const deg of SEGS) {
+    const rad = (deg * Math.PI) / 180;
+    const seg = MeshBuilder.CreateBox(`ofwall_${deg}`, { width: 13.4, height: 3, depth: 0.5 }, scene);
+    seg.position.set(Math.sin(rad) * R, 1.5, Math.cos(rad) * R);
+    seg.rotation.y = rad;                          // face the plate
+    seg.material = wallMat;
+    parts.push(seg);
+  }
+  for (const side of [-1, 1]) {
+    const rad = (side * 46 * Math.PI) / 180;      // just past the wall ends
+    const pole = MeshBuilder.CreateCylinder(`foulpole_${side}`, { diameter: 0.22, height: 9 }, scene);
+    pole.position.set(Math.sin(rad) * R, 4.5, Math.cos(rad) * R);
+    pole.material = poleMat;
+    parts.push(pole);
+  }
+  // distance band across dead centre — the number every broadcast quotes
+  const band = MeshBuilder.CreatePlane('ofwall_band', { width: 12, height: 1.1 }, scene);
+  band.position.set(0, 2.1, R - 0.3);
+  const dt = new DynamicTexture('ofwall_bandTex', { width: 512, height: 64 }, scene, false);
+  dt.drawText('124 FT  ·  124 FT  ·  124 FT', 10, 44, 'bold 34px monospace', '#f4f1de', 'transparent', true, true);
+  const bandMat = new StandardMaterial('ofwall_bandMat', scene);
+  bandMat.diffuseTexture = dt;
+  bandMat.specularColor = Color3.Black();
+  band.material = bandMat;
+  parts.push(band);
+  return parts;
 }
 
 export function buildGoal(scene: Scene): AbstractMesh[] {

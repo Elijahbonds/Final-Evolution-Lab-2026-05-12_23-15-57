@@ -307,7 +307,7 @@ export default function DunkGame({ grade, prq, onEnd, gamepad }: GameProps) {
       ctx.fillStyle = '#00E5FF'; ctx.fillText(st.pScore.toFixed(1), W / 2 - 90, 46);
       ctx.fillStyle = '#FF3366'; ctx.fillText(st.aiScore.toFixed(1), W / 2 + 90, 46);
       ctx.fillStyle = '#fff'; ctx.font = '600 14px "Barlow Condensed", sans-serif';
-      ctx.fillText('DUNK CONTEST · FIRST TO 21', W / 2, 22);
+      ctx.fillText('FLIGHT NIGHT · FIRST TO 21', W / 2, 22);
       if (moFrames) {
         ctx.font = '10px "JetBrains Mono", monospace'; ctx.fillStyle = '#00E5FF';
         ctx.fillText('DEEPMOTION MOCAP · LIVE CAPTURE', W / 2, H - 12);
@@ -367,7 +367,7 @@ export default function DunkGame({ grade, prq, onEnd, gamepad }: GameProps) {
         <canvas ref={canvasRef} className="w-full rounded-lg border border-white/10 bg-[#0F0F13]" style={{ aspectRatio: '16/9' }} />
         {!started && (
           <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg bg-black/70 backdrop-blur-sm">
-            <h2 className="fel-heading text-4xl font-bold text-white">DUNK CONTEST</h2>
+            <h2 className="fel-heading text-4xl font-bold text-white">FLIGHT NIGHT</h2>
             <p className="mt-2 max-w-md text-center text-sm text-white/60">Charge the jump, tap the apex QTE, pick your style. First to 21 style points beats the rival.</p>
             <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-xs text-white/55">
               <span>HOLD SPACE — Charge</span><span>RELEASE — Jump</span>

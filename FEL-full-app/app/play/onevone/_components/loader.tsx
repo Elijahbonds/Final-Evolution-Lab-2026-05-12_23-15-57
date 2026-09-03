@@ -30,5 +30,5 @@ const OneVOneBabylon = dynamicImport(() => import('@/components/games/basketball
 export function OneVOneLoader() {
   const babylon = isBabylon('hoops1v1');
   const Game = babylon ? OneVOneBabylon : is3D('hoops1v1') ? OneVOne3D : OneVOne2D;
-  return <GameShell mode="hoops1v1" title="1V1 HOOPS" venue="Venice Beach Court" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="hoops1v1" title="ONES" venue="Venice Beach Court" Game={Game} ownControls={babylon} />;
 }

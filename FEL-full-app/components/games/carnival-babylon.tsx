@@ -16,6 +16,16 @@ import { hnode } from './hud-format';
 
 type Hud = Record<string, HudValue>;
 
+// Which mount currently owns a given canvas. The in-run hub (?carnival=1)
+// double-mounts this component (StrictMode + the hub's Suspense boundary):
+// effect A starts an async runMode(), its cleanup fires before A has even
+// finished loading, then effect B starts on the SAME canvas — and A's late
+// teardown disposed the engine holding B's WebGL context. Measured on the
+// mobile leg: "carnival → loading" twice, then a black frame forever and the
+// RenderWatchdog's rescue could not fix a dead context. The token pattern is
+// ported from air-session-babylon, which has the guard and never goes black.
+const canvasOwner = new WeakMap<HTMLCanvasElement, object>();
+
 export default function CarnivalBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
@@ -28,10 +38,12 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const bus = new InputBus();
-    busRef.current = bus;
-    let stop: (() => void) | null = null;
-    let disposed = false;
+  const token = {};
+  canvasOwner.set(canvas, token);
+  const bus = new InputBus();
+  busRef.current = bus;
+  let stop: (() => void) | null = null;
+  let disposed = false;
 
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
@@ -59,14 +71,16 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
       resultSink,
     })
       .then((s) => {
-        if (disposed) { s(); return; }
+        // A newer mount owns the canvas: do NOT run our teardown — it would
+        // dispose the engine holding the shared WebGL context.
+        if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
         stop = s;
       })
       .catch((e) => console.error('[FEL-CARNIVAL] boot failed', e));
 
     return () => {
       disposed = true;
-      stop?.();
+      if (canvasOwner.get(canvas) === token) stop?.();
       busRef.current = null;
     };
   }, [onEnd]);
@@ -118,7 +132,7 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
 
       <BootSplash
         modeId="carnival"
-        title="COURT CARNIVAL"
+        title="GAME NIGHT"
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}

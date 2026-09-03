@@ -207,7 +207,7 @@ export default function ThreePointGame({ grade, prq, onEnd, gamepad }: GameProps
         <canvas ref={canvasRef} width={W} height={H} className="h-full w-full" />
         {!started && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
-            <h2 className="fel-heading text-4xl text-white">THREE-POINT SHOOTOUT</h2>
+            <h2 className="fel-heading text-4xl text-white">DOWNTOWN</h2>
             <p className="max-w-md text-sm text-gray-300">
               5 racks, 5 balls each, 60 seconds. Tap <span className="text-[#00E5FF]">SPACE</span> to release at the gold line. The last ball of every rack is a <span className="text-[#FFD700]">MONEY BALL</span> worth 2. Hit {WIN_PTS}+ points to win.
             </p>

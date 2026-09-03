@@ -9,7 +9,7 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import * as BABYLON from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
-import { installSafePlay } from '../anim/clipRegistry';
+import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { allCarnivalEvents, type CarnivalEvent } from './carnivalEvents';
@@ -63,6 +63,16 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     current.teardown();
     SoundKit.play('score');
     if (points > rivalPts) EffectsKit.burst(ctx.scene, ctx.camera.position, 'confetti');
+    // The rival is a PERSON at the party, not a number: they celebrate
+    // taking an event and slump losing one. Before this they stood at
+    // (2,0,0) as a statue from load to finale — a points race against
+    // wallpaper. (Mario Party's rivals react; ours now does.)
+    const rivalTookIt = rivalPts > points;
+    const winnerChar = rivalTookIt ? rival : player;
+    const loserChar = rivalTookIt ? player : rival;
+    winnerChar?.animator.play(SPORT_CLIP.scoreCelebrate, { onEnd: () => winnerChar?.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    loserChar?.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => loserChar?.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    SoundKit.play(rivalTookIt ? 'crowdGroan' : 'crowdCheer', { volume: 0.4 });
     ctx.setHud({
       banner: `${current.title}: YOU ${points} · RIVAL ${rivalPts}`,
       score: myPoints, rivalScore: rivalPoints,
@@ -82,6 +92,11 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       SoundKit.play('whistle');
       const won = myPoints >= rivalPoints;
       if (won) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, ctx.camera.position, 'confetti'); }
+      // the champion celebrates; the runner-up takes it on the chin
+      const champ = won ? player : rival;
+      const runnerUp = won ? rival : player;
+      champ?.animator.play(SPORT_CLIP.scoreCelebrate, {});
+      runnerUp?.animator.play(SPORT_CLIP.karateHitReact, {});
       ctx.setHud({ banner: won ? 'CARNIVAL CHAMPION!' : 'RIVAL TAKES THE CARNIVAL' });
       ctx.end(won ? 'CHAMPION' : 'RUNNER_UP', myPoints, { rivalPoints, events: events.length });
       return;

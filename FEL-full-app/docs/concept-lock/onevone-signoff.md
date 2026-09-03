@@ -22,6 +22,28 @@ Fourth mode through the checklist, after 3PT, Dunk and 3v3.
 
 ---
 
+## Depth re-verification (2026-09-01, after the F-pass)
+
+The depth pass touched the shared basketball core (DribbleController,
+DefenderBrain) and this mode. Everything re-measured, nothing grandfathered:
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | ✅ clean |
+| `npx vitest run` | ✅ 65 tests (was 64; `onevone-depth-tests` added, 23 checks) |
+| `/dev/mode/onevone` | ✅ FEL-FRAME 0 · MISSING CLIP 0 · errors 0 |
+| `/play/onevone` (logged in, real shell) | ✅ played to 6–0, FEL-FRAME 0 · 0 · 0 |
+| Mobile touch (`capture-mobile-touch`, 390×844, /play/onevone) | ✅ all four verbs on the overlay, 0 errors, 56 fps — and the foe scored (0–2), which the old rebound/steal bugs made impossible |
+| Depth driver (`onevone-depth-drive.mts`, agent bridge) | ✅ hesi fired · **bite** observed · explode-out covered ground · release feedback named · steal resolved as a timed read |
+| Shared-code re-measure: `/dev/mode/threevthree` | ✅ 6–2 in 8 reps, FEL-FRAME 0 · 0 · 0 — with defenders that now actually mark the ball |
+| World-Population L1–L5 | unchanged — no venue edits this pass |
+
+Still true and still open: the four carry-forwards below (minus the two the
+platform pass closed). New mechanics all live behind the existing four touch
+verbs plus stick gestures — the overlay contract is unchanged.
+
+---
+
 ## Phase-by-phase, with the proof
 
 | Phase | Proof |

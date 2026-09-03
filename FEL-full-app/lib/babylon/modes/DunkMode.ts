@@ -95,6 +95,10 @@ export const DunkMode: ModeDefinition = (() => {
   let sinceRelease = 0, releasePos = new Vector3();
   let styleTaps = 0;                          // mid-air showboat taps (max 2)
   let aHeld = false, hangSec = 0;             // rim-hang tracking
+  let runUpPeak = 0;                          // fastest approach speed (m/s) this attempt
+  let launchSpeed01 = 0;                      // run-up speed as a 0..1 budget input
+  let obstacleClipped = false;                // caught the prop mid-flight — the dunk is dead
+  let toppling = false;                       // the prop goes over with you
   const usedCombos = new Set<string>();       // variety memory: "style_prop" combos thrown
   let round = 1, dunkInRound = 0;
   let playerTotal = 0, rivalTotal = 0, hype = 0, chain = 0;
@@ -152,9 +156,9 @@ export const DunkMode: ModeDefinition = (() => {
       // actually reshape the mesh instead of scaling rigid parts.
       player = await CharacterPipeline.spawnPlayer(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, CFG.startZ), yawRad: Math.PI, startClip: SPORT_CLIP.idle,
-        // M110 skins — the hero: gold-trimmed royal kit, deep skin tone, black hair,
-        // white sneakers. A designed look rather than the default flat jersey.
-        tint: '#2F6BFF', accent: '#FFD700', skinTone: '#8D5524', hairColor: '#141414', shoeColor: '#F5F5F5',
+        // The hero wears the player's SAVED look (appearanceBridge via the
+        // shared spawn layer) — the hardcoded M110 kit is gone: 'use my skin'
+        // means the Closet's skin plays.
       });
       neverBindPose(player.animator, SPORT_CLIP.idle);
       installSafePlay(player.animator, 'dunk-player');
@@ -187,11 +191,12 @@ export const DunkMode: ModeDefinition = (() => {
       round = 1; dunkInRound = 0; playerTotal = 0; rivalTotal = 0; hype = 0; chain = 0; finishing = false;
       style = 'power'; prop = 'none'; rimCamCut = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
+      runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
       setPhase('approach');
       ctx.setHud({
         round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`,
         score: playerTotal, rivalScore: rivalTotal, style: STYLE_LABEL[style], prop: PROP_LABEL[prop], hype: 0, chain: 0,
-        hint: 'Pick your PROP (d-pad) · STYLE to cycle · HOLD CHARGE to load your jump',
+        hint: 'Pick your PROP (d-pad) · STYLE to cycle · RUN-UP SPEED buys your air · HOLD CHARGE to load your jump',
       });
     },
 
@@ -229,6 +234,14 @@ export const DunkMode: ModeDefinition = (() => {
       // glitch. EASTBAY_TIMING.rise is when the rig is actually off the ground.
       if (phase === 'cinematic' && !qteWindowOpen && clipTime >= EASTBAY_TIMING.rise) {
         const trick = flight.feedInput(e);
+        if (!trick && flight.rejectedForAir) {
+          // the run-up didn't buy the air that trick needs — SAY so, or it
+          // reads as a dropped input
+          flight.rejectedForAir = false;
+          SoundKit.play('uiTick', { pitch: 0.6, volume: 0.35 });
+          ctx.setHud({ banner: 'NOT ENOUGH AIR — come in faster' });
+          setTimeout(() => ctx.setHud({ banner: '' }), 900);
+        }
         if (trick) {
           trickLabels.push(trick.label);
           player.animator.play(trick.clip, { speedRatio: 1.05 });
@@ -283,10 +296,18 @@ export const DunkMode: ModeDefinition = (() => {
         player.root.position.addInPlace(vel.scale(dt));
         player.root.position.z = Math.max(player.root.position.z, CFG.gatherZ);
         player.root.position.x = Math.max(-6, Math.min(6, player.root.position.x));
+        // THE RUN-UP IS PART OF THE DUNK. Peak approach speed feeds the air
+        // budget at launch — a walk-up has less air, and less air means fewer
+        // tricks fit before the slam window. Live 08's whole ramp, in one number.
+        runUpPeak = Math.max(runUpPeak, Math.hypot(vel.x, vel.z));
         const moving = Math.hypot(vel.x, vel.z) > 2.5;
         player.animator.play(moving ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
         if (player.root.position.z <= CFG.gatherZ + 0.2) {
-          ctx.setHud({ hint: 'HOLD CHARGE — load your jump' });
+          ctx.setHud({
+            hint: runUpPeak < 3.5
+              ? 'HOLD CHARGE — and come in FASTER: the run-up buys your air'
+              : 'HOLD CHARGE — load your jump',
+          });
         }
       }
 
@@ -296,6 +317,23 @@ export const DunkMode: ModeDefinition = (() => {
         const k = Math.min(1, clipTime / EASTBAY_TIMING.duration);
         player.root.position.y = Math.sin(k * Math.PI) * (1.05 + charge * 0.55);
         player.root.position.z += (rim.z + 0.6 - player.root.position.z) * 1.6 * dt;
+
+        // THE PROP IS PHYSICAL. Crossing the obstacle with your feet below
+        // its top is not a scoring penalty — the dunk DIES at the chair,
+        // mid-flight, whatever the slam timing was going to be. The jump
+        // peaks at 1.05 + charge*0.55, so the chair (1.35m) demands a real
+        // charge; the old check (y + 1.0 at the flush, deep past the prop)
+        // could never clip anything — measured: "CLIPPED THE PROP" had never
+        // displayed, the prop was wallpaper.
+        if (prop === 'obstacle' && obstacle && !obstacleClipped) {
+          const overProp = Math.abs(player.root.position.z - obstacle.position.z) < 0.45;
+          // feet must genuinely clear the chair: 1.30m demands ~55% charge
+          // (crossing happens near apex, y ≈ 0.975 × (1.05 + 0.55·charge))
+          if (overProp && player.root.position.y < obstacleClearHeight - 0.05) {
+            obstacleClipped = true;
+            clipBlown(ctx);
+          }
+        }
 
         // BROADCAST RIM-CAM CUT: one hard cut to a baseline angle as the
         // rise crests, exactly like the wide→under-basket cut on TV. One
@@ -336,6 +374,15 @@ export const DunkMode: ModeDefinition = (() => {
 
       if (phase === 'resolve') {
         sinceRelease += dt;
+        // a clipped dunk drops the dunker where the prop caught him, and the
+        // prop goes over — the failure has to READ as contact, not a teleport
+        if (obstacleClipped) {
+          player.root.position.y = Math.max(0, player.root.position.y - 6 * dt);
+          if (toppling && obstacle) {
+            obstacle.rotation.x = Math.min(1.45, obstacle.rotation.x + dt * 4);
+            if (obstacle.rotation.x >= 1.45) toppling = false;
+          }
+        }
         if (qteHit) {
           if (aHeld) hangSec += dt;               // rim hang builds while SLAM stays held
           if (flushThroughRim(ball, rim, releasePos, sinceRelease)) void finishAttempt(ctx, true);
@@ -485,12 +532,34 @@ export const DunkMode: ModeDefinition = (() => {
     if (phase === 'cinematic') return;
     setPhase('cinematic');
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false;
-    rimCamCut = false; styleTaps = 0; hangSec = 0; trickLabels = [];
-    flight.launch(Math.min(1, charge * 0.5 + Math.hypot(stickX, stickY) * 0.5), STYLE_TIER[style]);
+    rimCamCut = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
+    // The run-up, not the stick at the release instant: during the charge the
+    // stick is usually neutral, so the old `hypot(stickX, stickY)` read ~0 and
+    // EVERY dunk launched as a walk-up. Peak measured approach speed is the
+    // approach. (Max run is ~7 m/s; the mode auto-drifts at 2.)
+    launchSpeed01 = Math.min(1, runUpPeak / 7);
+    flight.launch(Math.min(1, charge * 0.5 + launchSpeed01 * 0.5), STYLE_TIER[style]);
+    if (launchSpeed01 < 0.3 && charge > 0.4) {
+      ctx.setHud({ banner: 'WALK-UP — short air' });
+      setTimeout(() => ctx.setHud({ banner: '' }), 900);
+    }
     if (prop !== 'alleyoop') attachBallToHand(ball, player.skeleton, 'RightHand');
     else releaseBall(ball);   // ball waits at the teammate's hand until the toss beat
     SoundKit.play('whoosh', { pitch: 0.85 });
     player.animator.play(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => {} });
+  }
+
+  /** The dunk dies at the prop: clip it mid-flight and the attempt is blown
+   *  on contact — clank, stumble, the chair goes over, judges score what they
+   *  saw (the miss path), crowd drops. This is the contest's signature risk. */
+  function clipBlown(ctx: ModeContext): void {
+    toppling = true;
+    SoundKit.play('impact', { pitch: 0.6, volume: 0.6 });
+    SoundKit.play('crowdGroan', { volume: 0.7 });
+    ctx.feel?.impact?.(0.6);
+    ctx.setHud({ banner: 'CAUGHT THE PROP — BLOWN' });
+    setTimeout(() => ctx.setHud({ banner: '' }), 1200);
+    resolveDunk(ctx);   // qteHit is false → the clank path; judging follows
   }
 
   function resolveDunk(ctx: ModeContext): void {
@@ -556,13 +625,6 @@ export const DunkMode: ModeDefinition = (() => {
       return;
     }
 
-    // clear the obstacle? (checked once, at the flush moment — apex already happened)
-    let clippedObstacle = false;
-    if (prop === 'obstacle' && obstacle) {
-      const clearedIt = player.root.position.y + 1.0 >= obstacleClearHeight;
-      clippedObstacle = !clearedIt;
-    }
-
     // VARIETY MEMORY — the judges remember what they've seen this contest
     const combo = `${style}_${prop}_${trickLabels.join('+') || 'plain'}`;
     const isRepeat = usedCombos.has(combo);
@@ -584,9 +646,11 @@ export const DunkMode: ModeDefinition = (() => {
 
     // Phase 6: trick gestures carry the difficulty (style tier is the base
     // inside flight.attempt.difficulty; combo chains get their 1.35x there).
+    // The run-up is judged too: a full-speed runway attack reads harder than
+    // a walk-up, exactly as the real panel reads it.
     const trickDifficulty = flight.attempt.difficulty - STYLE_TIER[style];
     const difficulty = Math.max(0, Math.min(10,
-      (STYLE_TIER[style] + trickDifficulty + PROP_BONUS[prop] * (clippedObstacle ? 0.4 : 1) + charge * 2
+      (STYLE_TIER[style] + trickDifficulty + PROP_BONUS[prop] + charge * 2 + launchSpeed01 * 1.0
         + styleTaps * 1.2 + varietyBonus) * varietyMod));
     const execution = Math.max(0, Math.min(10, qteAccuracy * 10));
     const styleScore = Math.max(0, Math.min(10, STYLE_TIER[style] * 0.6 + Math.min(2, hype / 50) + styleTaps * 0.8 + hangBonus));
@@ -633,7 +697,6 @@ export const DunkMode: ModeDefinition = (() => {
     EffectsKit.burst(ctx.scene, rim, 'net');
     if (dunkTotal >= BAND_TOTAL.eruption) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'confetti'); }
     const landing = pickLanding(dunkTotal);
-    if (clippedObstacle) ctx.setHud({ banner: 'CLIPPED THE PROP — flushed anyway' });
 
     player.animator.play(landing, { onEnd: () => player.animator.play(SPORT_CLIP.idle, { loop: true }) });
 
@@ -670,6 +733,7 @@ export const DunkMode: ModeDefinition = (() => {
     player.animator.play(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false;
     styleTaps = 0; hangSec = 0; revealed = [];
+    runUpPeak = 0; obstacleClipped = false; toppling = false;
     void setupProp(ctx);
     ctx.camDirector.snapTo(player.root.position, rim);
     setPhase('approach');

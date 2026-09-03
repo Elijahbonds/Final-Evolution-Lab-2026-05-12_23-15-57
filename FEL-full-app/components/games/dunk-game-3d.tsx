@@ -1041,7 +1041,7 @@ export default function Dunk3D(props: GameProps) {
       {showControls && (
         <div className="absolute inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(5,5,8,0.82)', backdropFilter: 'blur(6px)' }}>
           <div className="rounded-xl px-6 py-5 text-center" style={{ background: 'rgba(10,10,20,0.95)', border: '1px solid rgba(168,85,247,0.25)' }}>
-            <div className="text-sm font-bold text-[#A855F7] mb-3">CONTROLS — DUNK CONTEST</div>
+            <div className="text-sm font-bold text-[#A855F7] mb-3">CONTROLS — FLIGHT NIGHT</div>
             <div className="text-xs text-white/70 space-y-1 font-mono">
               {(device === 'touch' ? MODE_BINDINGS['basketball_dunk'].touch : MODE_BINDINGS['basketball_dunk'].desktop).map((b, i) => (
                 <div key={i}><span className="text-white">{b.key}</span> — {b.label}</div>

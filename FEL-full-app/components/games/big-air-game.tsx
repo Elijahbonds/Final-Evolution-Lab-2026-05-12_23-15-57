@@ -104,7 +104,7 @@ export default function BigAirGame({ grade, prq, onEnd, gamepad }: GameProps) {
         score,
         won,
         duration: Math.round((Date.now() - startTime) / 1000),
-        headline: won ? 'BIG AIR CHAMPION — SEND IT FOREVER' : 'MORE AMPLITUDE NEXT TIME',
+        headline: won ? 'STOMP CHAMPION — SEND IT FOREVER' : 'MORE AMPLITUDE NEXT TIME',
         tallies: rec.tallies(), maxCombo: rec.bestChain,
       });
     }
@@ -248,7 +248,7 @@ export default function BigAirGame({ grade, prq, onEnd, gamepad }: GameProps) {
         <canvas ref={canvasRef} width={W} height={H} className="h-full w-full" />
         {!started && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
-            <h2 className="fel-heading text-4xl text-white">BIG AIR</h2>
+            <h2 className="fel-heading text-4xl text-white">STOMP</h2>
             <p className="max-w-md text-sm text-gray-300">
               5 jumps off the mega kicker. <span className="text-[#00E5FF]">HOLD SPACE</span> to charge, release to launch. Tap when a trick flashes gold, then tap again just before touchdown to stomp the landing. Score {WIN_SCORE}+ to win.
             </p>

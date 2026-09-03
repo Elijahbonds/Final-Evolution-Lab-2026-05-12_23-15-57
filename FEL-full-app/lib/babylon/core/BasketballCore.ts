@@ -23,18 +23,48 @@ import type { AIBehavior, Intent } from './PlayerSlot';
 import { CourtMovement, DEFAULT_MOVEMENT } from './CourtMovement';
 
 // ── Movement ─────────────────────────────────────────────────────────────
-export interface DribbleResult { crossover: boolean; speed01: number; facingRad: number; planting: boolean }
+export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean }
 
 /** Planar movement now runs on CourtMovement (Phase 2 weight model):
  *  ramped accel, stronger decel, speed-scaled plant-and-cut, turn-rate cap.
  *  This class keeps its API (and its crossover detection) so every mode's
  *  call sites are unchanged — the FEEL underneath got heavier. A detected
  *  crossover is a *skilled* cut: it bypasses the plant penalty and gets the
- *  burst boost, exactly like 2K's explosive crossover. */
+ *  burst boost, exactly like 2K's explosive crossover.
+ *
+ *  Depth pass: a hard stick reversal is no longer one move. A reversal
+ *  BACKWARD against your facing is a HESITATION (the 2K right-stick
+ *  pullback): you plant dead — your momentum is the cost — and get a short
+ *  explode-out window on the next push. A reversal LATERAL to your facing
+ *  stays the crossover. Before this split, pulling back to set up a drive
+ *  fired the crossover burst and (worse) could trigger ankle-breakers while
+ *  retreating. */
 export class DribbleController {
   private movement: CourtMovement;
-  private lastMoveX = 0; private lastMoveY = 0;
+  // The last COMMITTED stick direction (normalised) and how long ago. The
+  // reversal detection used to compare CONSECUTIVE frames — which meant the
+  // move only existed for an analog flick fast enough to skip the deadzone
+  // between two frames. A keyboard can never do that (key-up reports neutral
+  // before the next key-down), and a human thumb passes through neutral too.
+  // On keyboard the entire crossover/hesi vocabulary was simply absent.
+  private lastDirX = 0; private lastDirY = 0; private lastDirAge = Infinity;
   private crossoverCooldown = 0;
+  private hesiCooldown = 0;
+  private hesiBoostLeft = 0;
+  /** Seconds the stick has been held BACK (pullback gather); -1 = not
+   *  pulling, Infinity = held too long — that's a retreat, not a hesi. */
+  private pullbackSec = -1;
+
+  /** Max seconds between the last committed direction and its reversal —
+   *  a flick, not a meander. */
+  static readonly REVERSAL_WINDOW_SEC = 0.25;
+  /** A pullback becomes a retreat if held longer than this. */
+  static readonly PULLBACK_TAP_SEC = 0.35;
+
+  /** Seconds the explode-out window stays open after a hesitation plant. */
+  static readonly HESI_BOOST_SEC = 0.6;
+  /** Seconds before another hesitation can be thrown. */
+  static readonly HESI_COOLDOWN_SEC = 1.0;
 
   constructor(cfg = { maxSpeed: 6.4, accel: 26, decel: 34, turnRate: 9, crossoverBoost: 2.2 }) {
     this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed });
@@ -44,28 +74,99 @@ export class DribbleController {
 
   get vel(): Vector3 { return this.movement.vel; }
   get facing(): number { return this.movement.facing; }
+  /** The movement layer's facing starts at 0 no matter which way the model
+   *  spawned — and "pull BACK" is judged against facing, so a triple-threat
+   *  hesi before your first step read backwards as a push. Modes that spawn
+   *  a character facing somewhere (all of them) must say so. */
+  setFacing(rad: number): void { this.movement.facing = rad; }
 
   update(dt: number, moveX: number, moveY: number, sprint: boolean): DribbleResult {
     this.crossoverCooldown = Math.max(0, this.crossoverCooldown - dt);
+    this.hesiCooldown = Math.max(0, this.hesiCooldown - dt);
+    this.hesiBoostLeft = Math.max(0, this.hesiBoostLeft - dt);
     const mag = Math.hypot(moveX, moveY);
     let crossover = false;
+    let hesitation = false;
 
-    // crossover: stick reversed hard within the reaction window, and we
-    // were already moving with some pace — reads as an intentional shake
-    const dot = this.lastMoveX * moveX + this.lastMoveY * moveY;
+    this.lastDirAge += dt;
+    const committed = mag > 0.6;
+    const dot = this.lastDirX * (committed ? moveX / mag : 0) + this.lastDirY * (committed ? moveY / mag : 0);
+    // Classify the gesture against the facing you HAD, not the facing after
+    // this frame's movement: at low speed CourtMovement snaps facing to the
+    // stick, which re-labelled a pull-back as a push mid-gesture (measured:
+    // three frames of held pull-back wrapped facing π → 0 and the tap
+    // exploded you toward your own basket).
+    const facingX = Math.sin(this.movement.facing), facingZ = Math.cos(this.movement.facing);
     const state = this.movement.update(dt, moveX, moveY, sprint);
-    if (mag > 0.6 && this.movement.vel.lengthSquared() > 1 && dot < -0.4 && this.crossoverCooldown === 0) {
+    const dir = committed ? new Vector3(moveX / mag, 0, -moveY / mag) : null;
+    const back = dir ? dir.x * facingX + dir.z * facingZ : 0;
+    const fwd = back !== 0 ? -back : 0;
+    // Backpedalling keeps your chest to the rim: a pull-back/retreat must not
+    // turn the model (or the gesture layer's idea of "back") around — after
+    // one retreat the next pull-back read as a push and the vocabulary died.
+    if (dir && back < -0.5) this.movement.facing = Math.atan2(facingX, facingZ);
+
+    // HESITATION — the pull-back TAP. Hold the stick away from your facing
+    // for a beat and let go (or snap forward): you plant dead — your momentum
+    // is the price — and the explode-out window arms. Held longer than
+    // PULLBACK_TAP_SEC it's just a retreat dribble and nothing fires. A tap
+    // from a TRIPLE-THREAT standstill is the canonical throw (no run-up
+    // needed), which a reversal-only detector could never see.
+    if (dir && back < -0.92) {
+      if (this.pullbackSec < 0) this.pullbackSec = 0;
+      else this.pullbackSec += dt;
+      if (this.pullbackSec > DribbleController.PULLBACK_TAP_SEC) this.pullbackSec = Infinity;
+    } else {
+      if (this.pullbackSec >= 0 && this.pullbackSec <= DribbleController.PULLBACK_TAP_SEC && this.hesiCooldown === 0) {
+        hesitation = true;
+        this.hesiCooldown = DribbleController.HESI_COOLDOWN_SEC;
+        this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC;
+        this.movement.vel.scaleInPlace(0.12);
+        // A flick straight back OUT (pull then push in one motion) explodes
+        // on the same frame instead of waiting for the next push.
+        if (dir && fwd > 0.3) {
+          const top = DEFAULT_MOVEMENT.maxSpeed;
+          this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, this.crossoverBoost * 1.5)));
+          this.movement.facing = Math.atan2(dir.x, dir.z);
+          this.hesiBoostLeft = 0;
+        }
+      }
+      this.pullbackSec = -1;
+    }
+
+    // CROSSOVER — a hard reversal of the committed direction that is NOT a
+    // pullback (keeps a rim-ward component), with a head of steam. The speed
+    // gate is real: an explosive cut from a standstill is a hesi's job.
+    if (!hesitation && committed && dot < -0.4 && this.lastDirAge <= DribbleController.REVERSAL_WINDOW_SEC
+        && back >= -0.92 && this.crossoverCooldown === 0 && this.movement.vel.lengthSquared() > 1) {
       crossover = true;
       this.crossoverCooldown = 0.5;
       // Skilled cut: instant redirect + burst (bypasses plant penalty).
-      const dir = new Vector3(moveX, 0, -moveY).normalize();
       const top = DEFAULT_MOVEMENT.maxSpeed;
-      this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, this.movement.vel.length() + this.crossoverBoost)));
-      this.movement.facing = Math.atan2(dir.x, dir.z);
+      this.movement.vel.copyFrom(dir!.scale(Math.min(top * 1.15, this.movement.vel.length() + this.crossoverBoost)));
+      this.movement.facing = Math.atan2(dir!.x, dir!.z);
     }
 
-    this.lastMoveX = moveX; this.lastMoveY = moveY;
-    return { crossover, speed01: state.speed01, facingRad: this.movement.facing, planting: state.planting };
+    // EXPLODE-OUT — the first FORWARD push inside the hesi window gets the
+    // burst (dot > 0.3 against facing — a held pullback stick must not
+    // explode you toward your own half). That's the separation the move
+    // exists to create.
+    if (!hesitation && this.hesiBoostLeft > 0 && mag > 0.5) {
+      const dir = new Vector3(moveX, 0, -moveY).normalize();
+      const fwd = dir.x * Math.sin(this.movement.facing) + dir.z * Math.cos(this.movement.facing);
+      if (fwd > 0.3) {
+        const top = DEFAULT_MOVEMENT.maxSpeed;
+        this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, this.movement.vel.length() + this.crossoverBoost)));
+        this.movement.facing = Math.atan2(dir.x, dir.z);
+        this.hesiBoostLeft = 0;
+      }
+    }
+
+    if (committed) {
+      this.lastDirX = moveX / mag; this.lastDirY = moveY / mag;
+      this.lastDirAge = 0;
+    }
+    return { crossover, hesitation, speed01: state.speed01, facingRad: this.movement.facing, planting: state.planting };
   }
 }
 
@@ -187,6 +288,19 @@ function steer(to: Vector3, sprint: boolean, deadZone: number, steal = false): I
 }
 
 export class DefenderBrain implements AIBehavior {
+  /** Ball position last frame — the brain slides with the HANDLER's speed,
+   *  and the ball is the only handler telemetry an AIBehavior gets. */
+  private prevBall: Vector3 | null = null;
+  /** How long the ball has been stationary — a standing handler is an
+   *  invitation to pressure. */
+  private stillSec = 0;
+  /** Handler body position last frame (press clock + slide lever). */
+  private prevHandler: Vector3 | null = null;
+
+  /** Ball still this long → the on-ball defender steps UP into the handler
+   *  instead of holding the cushion. */
+  static readonly PRESS_AFTER_SEC = 0.6;
+
   /**
    * @param markIndex which opponent this defender is assigned to. Null keeps the
    *   old ball-chasing behaviour, which is correct for a 1v1 mode with a single
@@ -196,22 +310,89 @@ export class DefenderBrain implements AIBehavior {
    */
   constructor(private aggression = 0.6, private markIndex: number | null = null) {}
 
-  decide(_dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
+  decide(dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
     const mark = this.markIndex !== null ? foes[this.markIndex] ?? null : null;
-    const markHasBall = mark ? Vector3.Distance(mark, ball) < 1.8 : false;
+    const markHasBall = mark ? distXZ(mark, ball) < 1.8 : false;
 
-    // On the ball: stay between the handler and the rim. Off the ball: stay
-    // between YOUR man and the rim, shaded toward the ball — help-side defence,
-    // which is what stops three defenders being in the same place.
+    // Two different speeds, two different jobs:
+    //   ballDelta — the BALL's motion. Off-ball defenders need this too:
+    //     a drive IS the ball moving fast at the rim, and help rotation
+    //     dies without it (measured: the low man read ballSpeed 0 and held
+    //     his mark through every drive). Hand sway rides along but stays
+    //     well under the drive threshold.
+    //   handlerSpeed — the handler's BODY. Used for the press clock and the
+    //     slide lever, where idle hand sway would read as perpetual motion.
     const onBall = !mark || markHasBall;
+    const ballDelta = this.prevBall && dt > 1e-4 ? Vector3.Distance(ball, this.prevBall) / dt : 0;
+    this.prevBall = ball.clone();
+    const handlerPos = onBall ? (mark ?? foes[0] ?? null) : null;
+    const handlerSpeed = handlerPos && this.prevHandler && dt > 1e-4
+      ? Vector3.Distance(handlerPos, this.prevHandler) / dt : 0;
+    if (handlerPos) this.prevHandler = handlerPos.clone();
+
+    this.stillSec = onBall && handlerSpeed < 0.5 ? this.stillSec + dt : 0;
+
+    // PRESSURE — a handler standing still gets stepped into. Without this the
+    // on-ball defender parked at its deny point forever (measured: ~2m off,
+    // never closing, never in poke range), so fakes had nothing to beat and
+    // standing with the ball was free. The press also puts the steal roll in
+    // range — holding the ball should be dangerous.
+    const press = onBall && this.stillSec > DefenderBrain.PRESS_AFTER_SEC;
+
+    // HELP DEFENCE — the low man rotates to a drive. When the ball is inside
+    // ~4m of the rim and moving fast (a drive, not a pass — pass flight is
+    // faster), the off-ball defender CLOSEST to the rim steps into the lane
+    // and the others stay home. This is the rotation that makes the kick-out
+    // the right read: beat your man and the rim is NOT empty; the open man
+    // is the helper's man. Without it (measured): beat your mark and the
+    // drive was a layup line, every time, because all three defenders held
+    // their own matchup no matter how beaten it was.
+    let helping = false;
+    if (!onBall && mark) {
+      const driving = distXZ(ball, hoop) < 4.2 && ballDelta > 3;
+      if (driving) {
+        // "Low man" = the off-ball defender closest to the rim. The beaten
+        // on-ball defender is excluded from that comparison — he's behind the
+        // drive, and counting him means nobody ever rotates (he is, by
+        // definition, the closest defender to the rim on a drive).
+        const beatenMan = allies.reduce<number>((m, a) => Math.min(m, distXZ(a, ball)), Infinity);
+        const myDist = distXZ(self, hoop);
+        const nearestHelper = allies.reduce<number>((m, a) =>
+          distXZ(a, ball) <= beatenMan + 1e-6 ? m : Math.min(m, distXZ(a, hoop)), Infinity);
+        helping = myDist < 4 && myDist <= nearestHelper;
+      }
+    }
+
+    // On the ball: stay between the handler and the rim, DROPPING DEEPER as
+    // the attack speeds up (contain first, contest second) — or STEPPING IN
+    // when the handler stands on the ball. Off the ball: stay between YOUR
+    // man and the rim, shaded toward the ball — help-side defence, which is
+    // what stops three defenders being in the same place.
+    //
+    // The on-ball dead zone also used to be 1.4m — so wide that the defender
+    // never adjusted at all: measured live, the 1v1 defender moved < 1m in
+    // an entire possession and could never be caught closing (which the hesi
+    // bite needs). A statue can't bite on a fake; a sliding defender can.
     const anchor = onBall ? ball : mark!;
-    let denyPoint = Vector3.Lerp(anchor, hoop, onBall ? 0.35 : 0.30);
+    const lever = press ? 0.12 : onBall ? 0.35 + Math.min(1, handlerSpeed / 6) * 0.25 : 0.30;
+    let denyPoint = Vector3.Lerp(anchor, hoop, lever);
     if (!onBall) denyPoint = Vector3.Lerp(denyPoint, ball, 0.22);
+    if (helping) denyPoint = Vector3.Lerp(hoop, ball, 0.2);   // the low man steps INTO the drive
 
     const to = denyPoint.subtract(self);
     to.addInPlace(separation(self, allies, 2.0).scale(1.4));
-    const dist = Vector3.Distance(denyPoint, self);
-    return steer(to, dist > 3, 1.4,
+    // PLANAR distance. Vector3.Distance includes Y, and the deny point's Y
+    // is lerped toward the rim (y=3.05) while the defender's feet are at 0 —
+    // so `dist` carried ~1.3m of phantom altitude and the steal gate
+    // (dist < 1.1) could never open. Measured live: press active, defender
+    // parked 0.9m off the handler, zero steal rolls in 12 seconds. The poke
+    // had never fired in any game this mode has played.
+    const dist = distXZ(denyPoint, self);
+    // The press needs its own dead zone: the normal 0.6m settle stopped the
+    // approach 0.6m short of the press point, which parked the defender at
+    // ~1.4m — just OUTSIDE poke range (1.1m). Pressure without arrival is a
+    // statue with intent. Measured live: never stripped, never stole.
+    return steer(to, dist > 3, press ? 0.2 : onBall ? 0.6 : 1.4,
       onBall && dist < 1.1 && Math.random() < this.aggression * 0.02);
   }
 }
@@ -279,6 +460,16 @@ export function isThree(pos: Vector3, rim: Vector3): boolean {
 export function clampToHalfCourt(pos: Vector3, halfWidth: number, depth: number): void {
   pos.x = Math.max(-halfWidth, Math.min(halfWidth, pos.x));
   pos.z = Math.max(0.5, Math.min(depth, pos.z));
+}
+
+/** Planar (XZ) distance. Basketball spacing is a floor game: the rim floats
+ *  at 3.05m and the ball rides a hand at ~1.2m, so 3D distance to either
+ *  carries phantom altitude. Every "how far apart are these players / how
+ *  far from the rim" question on defence wants THIS, not Vector3.Distance —
+ *  two separate gates (the steal roll, the help rotation) were silently
+ *  dead until their distance math went planar. */
+export function distXZ(a: Vector3, b: Vector3): number {
+  return Math.hypot(a.x - b.x, a.z - b.z);
 }
 
 // ── NEW (v3): turbo ──────────────────────────────────────────────────────
@@ -370,3 +561,18 @@ export const BLOCK_WINDOW_SEC = 0.4;
 export function checkBlock(blocker: Vector3, shooter: Vector3, jumpAgeSec: number): boolean {
   return jumpAgeSec <= BLOCK_WINDOW_SEC && Vector3.Distance(blocker, shooter) <= BLOCK_RANGE;
 }
+
+// ── Depth pass: the steal is a read, not a dice roll ─────────────────────
+/** The 1v1 rival's scripted drive weaves — `targetX = sin(t * 2.1) * 2.2
+ *  * (1 - k)` — and a ball carrier mid-weave is EXPOSED; gathering for the
+ *  shot (k → 1) they're protected. This returns 0..1 exposure so a steal
+ *  pressed at the right moment of the drive lands and a reach into a
+ *  protected ball whiffs. Pure so the window is headless-testable.
+ *  Replaces `Math.random() < 0.5`: defence is a skill, not a coin flip. */
+export function driveBallExposure(driveSec: number, driveDurationSec: number): number {
+  const k = Math.min(1, Math.max(0, driveSec / driveDurationSec));
+  const weaveSpeed = Math.abs(Math.cos(driveSec * 2.1)) * 2.1 * (1 - k);
+  return Math.max(0, Math.min(1, weaveSpeed / 1.6));
+}
+/** Exposure above which a poke connects. ~half the weave is live. */
+export const STEAL_EXPOSURE_MIN = 0.5;

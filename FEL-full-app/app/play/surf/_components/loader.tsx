@@ -40,5 +40,5 @@ const SurfBabylon = dynamicImport(
 export function SurfLoader() {
   const babylon = isBabylon('surf');
   const Game = babylon ? SurfBabylon : is3D('surfing') ? Surf3D : SurfGame2D;
-  return <GameShell mode="surfing" title="SURF BREAK" venue="Surf Break" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="surfing" title="THE BREAK" venue="Surf Break" Game={Game} ownControls={babylon} />;
 }

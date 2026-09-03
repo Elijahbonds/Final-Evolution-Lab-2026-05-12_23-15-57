@@ -46,7 +46,7 @@ const beachDressing: NexusWebSpec['props'] = [
 export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   // ── basketball family ───────────────────────────────────────────────────
   basketball_h2h: {
-    modeId: 'basketball_h2h', name: '1v1 Hoops', venue: 'Venice Beach Court',
+    modeId: 'basketball_h2h', name: 'Ones', venue: 'Venice Beach Court',
     environment: dusk('#F0637A', '#1B2A6B', '#2A3C7A', '#FFB36B'),
     // A HALF court, like the game played on it. It was a full 16x28 centred on
     // the origin with FULL-court markings — two keys, a halfway line, a centre
@@ -78,7 +78,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   },
 
   basketball_dunk: {
-    modeId: 'basketball_dunk', name: 'Dunk Contest', venue: 'Venice Beach Court',
+    modeId: 'basketball_dunk', name: 'Flight Night', venue: 'Venice Beach Court',
     // M110's procedural horizon backdrops were built and then wired to NOTHING —
     // not one venue in this file set `backdrop`, so every sky in the game was the
     // cheap 4px two-stop gradient the system exists to replace. That flat wall
@@ -144,7 +144,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   },
 
   court_carnival: {
-    modeId: 'court_carnival', name: 'Court Carnival', venue: 'Carnival Court',
+    modeId: 'court_carnival', name: 'Game Night', venue: 'Carnival Court',
     environment: dusk('#FF9F45', '#3A1150', '#5E2170', '#FFE0A0', 0.65),
     ground: { kind: 'court', size: [18, 26], color: '#8E3BB5', lineColor: '#FFE66D', markings: 'halfcourt' },
     props: [
@@ -188,7 +188,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   },
 
   karate_endless: {
-    modeId: 'karate_endless', name: 'Karate Endless', venue: 'Shadow Gauntlet',
+    modeId: 'karate_endless', name: 'The Hundred', venue: 'Shadow Gauntlet',
     environment: dusk('#2A0E3A', '#07070E', '#140A1E', '#C77DFF', 0.38),
     // 24x24, not 16x16. The camera's box is derived from the ground, so a mat
     // exactly as big as the play area leaves the camera nowhere to stand: the
@@ -439,7 +439,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
 // AVATAR is the content, so it needs a stage, a key light on the performer and
 // a crowd to perform to. Appended so the rest of VENUE_SPECS is byte-identical.
 VENUE_SPECS.dance = {
-  modeId: 'dance', name: 'Dance', venue: 'The Cypher',
+  modeId: 'dance', name: 'The Cypher', venue: 'The Cypher',
   environment: {
     skyTop: '#FF2D95', skyBottom: '#0A0018', fogColor: '#1A0033', fogDensity: 0.02,
     ambient: 0.40, sunDirection: [-0.25, -0.9, 0.3], sunColor: '#FFD1F0',
@@ -485,6 +485,30 @@ const BACKDROPS: Record<string, BackdropKind> = {
 for (const [id, bk] of Object.entries(BACKDROPS)) {
   const spec = VENUE_SPECS[id];
   if (spec) spec.environment.backdrop = bk;
+}
+
+// Venue maps — the baked Meshy environment GLBs (scripts/map/pipeline.mts)
+// mounted as the actual court/world around the play (visual/VenueMaps.ts).
+// Only maps that SURVIVED the pipeline are listed: gridiron, neuro-arena and
+// sand-court have no textures at all (single grey material, no vertex color)
+// and stay procedural until the art exists.
+const VENUE_MAP_KEYS: Record<string, string> = {
+  // venice-blacktop is intentionally NOT mounted: the scan's painted court
+  // sits off the play area with no clean offset candidate (see map-data.ts).
+  basketball_3v3: 'venice-blue-court',
+  skateboarding: 'venice-skatepark',
+  tennis: 'tennis-court',
+  soccer: 'soccer-stadium',
+  baseball: 'baseball-park',
+  golf: 'coastal-links',
+  karate_h2h: 'dojo', karate_endless: 'dojo', gymnastics: 'dojo',
+  snowboarding: 'mountain-slope',
+  surfing: 'surf-break',
+  market_browse: 'shop',
+};
+for (const [id, key] of Object.entries(VENUE_MAP_KEYS)) {
+  const spec = VENUE_SPECS[id];
+  if (spec) spec.mapKey = key;
 }
 
 export const ALL_MODE_IDS = Object.keys(VENUE_SPECS);

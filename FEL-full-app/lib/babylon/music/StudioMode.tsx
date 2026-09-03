@@ -295,7 +295,7 @@ export default function StudioMode({
   return (
     <div style={S.root}>
       <div style={S.header}>
-        <div style={S.h1}>FEL MUSIC ACADEMY</div>
+        <div style={S.h1}>FEL GROOVE ACADEMY</div>
         <div style={{ fontSize: 12, opacity: 0.75 }}>the studio floor is yours</div>
       </div>
 

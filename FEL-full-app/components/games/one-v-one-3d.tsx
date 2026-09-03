@@ -312,7 +312,7 @@ export default function OneVOne3D(props: GameProps) {
   if (!started) {
     return (
       <div className="relative w-full h-full flex flex-col items-center justify-center gap-4 p-6 text-center" style={{ background: '#050508', minHeight: '60vh' }}>
-        <h2 className="fel-heading text-4xl text-white">1V1 HOOPS</h2>
+        <h2 className="fel-heading text-4xl text-white">ONES</h2>
         <p className="max-w-md text-sm text-gray-300">
           First to {TARGET}. On offense: tap <span className="text-[#00E5FF]">SPACE</span> to lock aim, tap again on the gold line — dead-center swishes count 2. On defense: read the flash and guard with <span className="text-[#FF3366]">← ↑ →</span>.
         </p>

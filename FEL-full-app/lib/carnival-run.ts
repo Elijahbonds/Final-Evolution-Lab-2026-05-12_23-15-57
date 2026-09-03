@@ -21,7 +21,9 @@ export const CARNIVAL_EXTERNAL_POOL = [
   'threePoint',
   'whoSceneIt',
   'tiebreak',
-  'sprint',
+  // 'sprint' was a stop — RETIRED from the v1 roster (owner, 2026-09-01, see
+  // PHASE2_BENCHMARK_LOCKS.md). A retired stop in the pool deals tonight's
+  // lineup a route that redirects away mid-night.
 ] as const;
 
 export type CarnivalExternalMode = (typeof CARNIVAL_EXTERNAL_POOL)[number];

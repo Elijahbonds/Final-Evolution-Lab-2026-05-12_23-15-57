@@ -56,6 +56,7 @@ async function main(): Promise<void> {
       data: { password: await bcrypt.hash(PASSWORD, 10) },
     });
     if (!existing.profile) await createProfile(existing.id);
+    else await reconcileLedger(existing.id);
     console.log(`playtest user ready (existing): ${PLAYTEST_EMAIL}`);
     return;
   }
@@ -72,14 +73,48 @@ async function main(): Promise<void> {
 }
 
 /** Mid-range attributes — a profile the modes can read without special-casing. */
-function createProfile(userId: string) {
-  return prisma.playerProfile.create({
+async function createProfile(userId: string) {
+  const profile = await prisma.playerProfile.create({
     data: {
       userId,
       strength: 60, speed: 60, endurance: 60, agility: 60,
       power: 60, flexibility: 60, recovery: 60, mental: 60,
     },
   });
+  await reconcileLedger(userId);
+  return profile;
+}
+
+/**
+ * The profile's labCredits default (500) lands at creation WITHOUT a ledger
+ * row (the signup route posts its own welcome grant; this script doesn't go
+ * through signup). /api/wallet sums the CreditLedger while the header chip
+ * reads the profile — so a fresh playtest account shows 500 in the header
+ * and 0 in the shop. Post one deduped reconciliation entry so the two books
+ * agree (measured on the cards page: header 555 LC vs storefront 55 LC).
+ */
+async function reconcileLedger(userId: string) {
+  const [profile, agg] = await Promise.all([
+    prisma.playerProfile.findUnique({ where: { userId }, select: { labCredits: true } }),
+    prisma.creditLedger.aggregate({ where: { userId }, _sum: { amount: true } }),
+  ]);
+  const ledger = agg._sum.amount ?? 0;
+  const balance = profile?.labCredits ?? 0;
+  const diff = balance - ledger;
+  if (diff === 0) return;
+  const dedupeKey = `seed-reconcile:${userId}:${diff}`;
+  const existing = await prisma.creditLedger.findFirst({ where: { userId, dedupeKey } });
+  if (existing) return;
+  await prisma.creditLedger.create({
+    data: {
+      userId,
+      amount: diff,
+      reason: 'Playtest seed reconciliation',
+      dedupeKey,
+      balanceAfter: balance,
+    },
+  });
+  console.log(`ledger reconciled: ${ledger} → ${balance} (${diff > 0 ? '+' : ''}${diff})`);
 }
 
 main()

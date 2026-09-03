@@ -4,7 +4,7 @@ import { Vector3 } from '@babylonjs/core';
 import type { VenueMood } from '../scene/moods';
 import type { GrindLine } from '../core/GroundRide';
 
-const HERO_URL = '/models/elijah-hero.glb';
+const HERO_URL = '/models/fel-hero.glb'; // forged (scripts/avatar/forge.mts) — the Meshy hero is retired
 
 // ── M39 Board rides (procedural worlds via rideWorlds.ts) ────────────────────
 export const RIDE_CONFIG = { heroUrl: HERO_URL };

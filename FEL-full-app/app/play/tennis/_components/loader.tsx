@@ -24,5 +24,5 @@ const TennisBabylon = dynamicImport(
 export function TennisLoader() {
   const babylon = isBabylon('tennis');
   const Game = babylon ? TennisBabylon : TennisGame2D;
-  return <GameShell mode="tennis" title="MATCH PLAY" venue="Nexus Tennis Court" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="tennis" title="MATCH POINT" venue="Nexus Tennis Court" Game={Game} ownControls={babylon} />;
 }

@@ -133,7 +133,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
 
       <BootSplash
         modeId="threevthree"
-        title="3V3 STREETBALL"
+        title="THREES"
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}

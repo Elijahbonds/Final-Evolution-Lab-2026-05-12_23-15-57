@@ -31,14 +31,16 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { registerDanceClips, resolveDanceClip } from '../anim/danceClips';
+import { registerMirroredClips } from '../anim/mirrored-clips';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import {
-  DancePerformance, generateRoutine, beatDuration, type Judgement, type DanceStep,
+  DancePerformance, generateRoutine, beatDuration, DANCE_LIBRARY, type Judgement, type DanceStep,
 } from '../core/DanceCore';
+import { StemBand, CATEGORY_STEM } from '../audio/StemBand';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 
 const BPM = 96;                 // //TUNE(elijah): routine tempo
@@ -55,6 +57,9 @@ export const DanceMode: ModeDefinition = (() => {
   let started = false;
   /** Local AudioContext used ONLY as the song clock (see header). */
   let audioCtx: AudioContext | null = null;
+  /** The Class of 3000 layer: the band your dancing builds. */
+  let band: StemBand | null = null;
+  let bandJoined = new Set<string>();
 
   /** The song clock. Falls back to performance.now() only if no audio context
    *  exists — and says so, because silent fallback to the frame clock is the
@@ -75,15 +80,43 @@ export const DanceMode: ModeDefinition = (() => {
     });
   }
 
-  function onJudged(ctx: ModeContext, label: Judgement, _pts: number, combo: number): void {
-    ctx.setHud({ banner: combo >= 4 ? `${label}  \u00d7${combo}` : label, score: perf.score, combo });
+  function onJudged(ctx: ModeContext, label: Judgement, _pts: number, combo: number, step?: DanceStep, deltaMs?: number): void {
+    // THE BAND ANSWERS THE DANCING. The judged step's family turns its
+    // instrument up (or down) — and when an instrument first joins, the
+    // banner says WHO walked in. The Class of 3000 fantasy: you are not
+    // dancing TO a track, you are ASSEMBLING one.
+    let joinBanner: string | null = null;
+    if (band && step) {
+      const cat = DANCE_LIBRARY.find((c) => c.id === step.clipId)?.category;
+      if (cat) {
+        const before = band.level(cat);
+        band.judge(cat, label);
+        const instrument = CATEGORY_STEM[cat];
+        if (before === 0 && band.level(cat) > 0 && !bandJoined.has(instrument)) {
+          bandJoined.add(instrument);
+          joinBanner = `${instrument} JOINS THE MIX`;
+        }
+      }
+    }
+    // Shot-feedback legibility, rhythm edition: a miss says WHICH side of
+    // the beat you were on.
+    const dirTag = label === 'MISS' && typeof deltaMs === 'number'
+      ? (deltaMs < 0 ? ' — EARLY' : ' — LATE')
+      : '';
+    ctx.setHud({
+      banner: joinBanner ?? (combo >= 4 ? `${label}  \u00d7${combo}` : `${label}${dirTag}`),
+      score: perf.score,
+      combo,
+      energy: band ? Math.round(band.mixLevel() * 100) : 0,
+      energyLabel: 'MIX',
+    });
     if (label === 'PERFECT') {
       EffectsKit.burst(ctx.scene, me.root.position.add(new Vector3(0, 1.4, 0)), 'sparks');
       SoundKit.play('uiTick', { pitch: 1.6, volume: 0.35 });
     } else if (label === 'MISS') {
       SoundKit.play('miss', { volume: 0.25 });
     }
-    setTimeout(() => ctx.setHud({ banner: '' }), 380);
+    setTimeout(() => ctx.setHud({ banner: '' }), joinBanner ? 1000 : 380);
   }
 
   function finish(ctx: ModeContext): void {
@@ -93,8 +126,9 @@ export const DanceMode: ModeDefinition = (() => {
     const r = perf.result();
     const cleanHits = r.counts.PERFECT + r.counts.GREAT + r.counts.GOOD;
     const rounds = cleanHits + r.counts.MISS;
+    const mixPct = band ? Math.round(band.mixLevel() * 100) : 0;
     ctx.setHud({
-      banner: `${'\u2605'.repeat(r.stars)}${'\u2606'.repeat(5 - r.stars)}  ${Math.round(r.accuracy * 100)}%`,
+      banner: `${'\u2605'.repeat(r.stars)}${'\u2606'.repeat(5 - r.stars)}  ${Math.round(r.accuracy * 100)}%  \u00b7  MIX ${mixPct}%`,
     });
     // Results screen: the timing host reads outcome ('GREAT' => won),
     // stats.hits/stats.rounds for its headline, and score.
@@ -133,11 +167,18 @@ export const DanceMode: ModeDefinition = (() => {
         me.animator.register(group);
         registered.add(id);
       });
+      // Mirrored steps deserve mirrored DANCE motion, not a sport stand-in:
+      // build '<danceId>.M' from the procedural groups themselves. (This also
+      // no longer depends on the alias chain — which silently shipped zero
+      // mirrored groups until the _pN bone-suffix fix in boneLookup.ts.)
+      registerMirroredClips(me.animator, ctx.scene, me.skeleton, [...registered]);
 
       perf = new DancePerformance(BPM);
       perf.setRoutine(generateRoutine({ bars: BARS, difficulty: DIFFICULTY, seed: Date.now() & 0xffff }));
       perf.onStepFired = playStep;
-      perf.onJudged = (l, p, c) => onJudged(ctx, l, p, c);
+      // pass ALL of onJudged's args through — a 3-arg arrow here silently
+      // dropped the step (no band motion ever) and the delta (no EARLY/LATE)
+      perf.onJudged = (l, p, c, step, deltaMs) => onJudged(ctx, l, p, c, step, deltaMs);
 
       ended = false; started = false;
       countInSec = beatDuration(BPM) * 4;          // one bar of count-in
@@ -150,6 +191,10 @@ export const DanceMode: ModeDefinition = (() => {
         audioCtx = AC ? new AC() : null;
       } catch { audioCtx = null; }
       if (!audioCtx) console.warn('[FEL-DANCE] no AudioContext — judging on the frame clock (drift possible).');
+
+      // The band plays through the SAME context that keeps the song clock.
+      band = audioCtx ? new StemBand(audioCtx, audioCtx.destination, BPM) : null;
+      bandJoined = new Set();
 
       ctx.heroRef.current = me.root;
       ctx.objectiveRef.current = me.root.position;
@@ -176,7 +221,8 @@ export const DanceMode: ModeDefinition = (() => {
           started = true;
           void audioCtx?.resume?.();
           perf.start(audioNow());
-          ctx.setHud({ banner: 'GO' });
+          band?.start(audioNow());
+          ctx.setHud({ banner: 'GO', hint: 'Every move family is an instrument — hit on the beat and the band builds' });
           setTimeout(() => ctx.setHud({ banner: '' }), 500);
         } else {
           ctx.setHud({ banner: `${Math.ceil(countInSec / beatDuration(BPM))}` });
@@ -186,6 +232,25 @@ export const DanceMode: ModeDefinition = (() => {
 
       const now = audioNow();
       perf.update(now);
+      band?.update(now);
+
+      // The beat pulse — rhythm games show the beat, and it is the honest
+      // way to publish timing (published = rendered): a dot that pops on
+      // every beat, decaying through it.
+      const songBeat = (now - (perf as unknown as { started: number }).started) / beatDuration(BPM);
+      if (songBeat >= 0) ctx.setHud({ beatPulse: 1 - (songBeat % 1) });
+
+      // THE CUE — the next move and when it lands. Without it the judging
+      // is unfair by design (a perfect-cadence beat bot hit 28%: it tapped
+      // beats with no step on them). Now the cypher shows its cards.
+      const next = perf.peekNext(now);
+      if (next) {
+        const clip = DANCE_LIBRARY.find((c) => c.id === next.step.clipId);
+        ctx.setHud({
+          nextStep: clip?.name?.toUpperCase() ?? 'MOVE',
+          nextStepIn: Math.max(0, Math.round((next.time - now) * 100) / 100),
+        });
+      }
 
       // The routine is over one full beat after the last step's window closes,
       // so a final PERFECT is never cut off by the results screen.
@@ -195,6 +260,7 @@ export const DanceMode: ModeDefinition = (() => {
 
     dispose() {
       perf?.stop();
+      band?.dispose(); band = null;
       SoundKit.stopAmbient();
       if (audioCtx) { void audioCtx.close(); audioCtx = null; }
       venue?.dispose(); venue = null;

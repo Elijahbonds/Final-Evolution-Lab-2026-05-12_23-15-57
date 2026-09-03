@@ -40,5 +40,5 @@ const SkateboardBabylon = dynamicImport(
 export function SkateboardLoader() {
   const babylon = isBabylon('skateboard');
   const Game = babylon ? SkateboardBabylon : is3D('skateboard') ? Skateboard3D : SkateboardGame2D;
-  return <GameShell mode="skateboarding" title="SKATE RUN" venue="Venice Skatepark" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="skateboarding" title="VENICE LINES" venue="Venice Skatepark" Game={Game} ownControls={babylon} />;
 }

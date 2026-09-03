@@ -218,7 +218,7 @@ export default function BaseballGame({ grade, prq, onEnd, gamepad }: GameProps) 
       ctx.fillStyle = '#FFD700'; ctx.font = 'bold 20px "JetBrains Mono", monospace';
       ctx.fillText(`${st.best}m`, W / 2, 44);
       ctx.fillStyle = '#fff'; ctx.font = '600 14px "Barlow Condensed", sans-serif';
-      ctx.fillText('HOME RUN DERBY · 6 HRs TO WIN', W / 2, 22);
+      ctx.fillText('MOONSHOT DERBY · 6 HRs TO WIN', W / 2, 22);
       ctx.font = '11px "JetBrains Mono", monospace'; ctx.fillStyle = 'rgba(255,255,255,0.5)';
       ctx.fillText('HOMERS', W / 2 - 110, 57); ctx.fillText('BEST', W / 2, 57); ctx.fillText('OUTS', W / 2 + 100, 57);
       ctx.textAlign = 'right'; ctx.font = '12px "JetBrains Mono", monospace';
@@ -248,7 +248,7 @@ export default function BaseballGame({ grade, prq, onEnd, gamepad }: GameProps) 
         <canvas ref={canvasRef} className="w-full rounded-lg border border-white/10 bg-[#0F0F13]" style={{ aspectRatio: '16/9' }} />
         {!started && (
           <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg bg-black/70 backdrop-blur-sm">
-            <h2 className="fel-heading text-4xl font-bold text-white">HOME RUN DERBY</h2>
+            <h2 className="fel-heading text-4xl font-bold text-white">MOONSHOT DERBY</h2>
             <p className="mt-2 max-w-md text-center text-sm text-white/60">Read the pitch — fastball, curveball or changeup — and swing as it crosses the green zone. Perfect timing clears the 120m fence. 10 outs, 6 homers wins it.</p>
             <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-xs text-white/55">
               <span>SPACE / SWING — swing</span><span>Perfect contact = HOME RUN</span>

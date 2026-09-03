@@ -300,16 +300,23 @@ export class CameraDirector {
     return pos;
   }
 
-  setFixed(position: Vector3, targetHeight = 1.2): void {
+  /** snap: place the camera AT the fixed spot now. The default eases
+   *  (Lerp 0.1/frame), which is right for a framing change mid-play but wrong
+   *  for a broadcast CUT — derby's return from the ball-flight follow cam
+   *  spent ~2s easing home with the batter off-frame (its last FEL-FRAME
+   *  warnings). snapTo() can't reproduce a fixed preset's offset — it
+   *  computes its own behind-vector — so the cut has to happen here. */
+  setFixed(position: Vector3, targetHeight = 1.2, snap = false): void {
     this.mode = 'fixed';
     this.fixedPos = position.clone();
     this.fixedTargetHeight = targetHeight;
+    if (snap) this.camera.position.copyFrom(position);
   }
 
   /** SELECT-button debug toggle between follow and fixed framing (ModeHarness). */
   toggle(): void { this.mode = this.mode === 'follow' ? 'fixed' : 'follow'; }
 
-  setFixedBehind(subject: Vector3, facingYaw: number, preset: keyof typeof FIXED_PRESETS = 'swing'): void {
+  setFixedBehind(subject: Vector3, facingYaw: number, preset: keyof typeof FIXED_PRESETS = 'swing', snap = false): void {
     const p = FIXED_PRESETS[preset];
     const sin = Math.sin(facingYaw), cos = Math.cos(facingYaw);
     const off = new Vector3(
@@ -317,7 +324,7 @@ export class CameraDirector {
       p.offset.y,
       -p.offset.x * sin + p.offset.z * cos,
     );
-    this.setFixed(subject.add(off), p.targetHeight);
+    this.setFixed(subject.add(off), p.targetHeight, snap);
   }
 
   snapTo(subject: Vector3, objective: Vector3 | null): void {

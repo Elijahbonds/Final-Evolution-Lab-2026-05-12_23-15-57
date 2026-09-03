@@ -244,7 +244,7 @@ export default function SoccerGame({ grade, prq, onEnd, gamepad }: GameProps) {
       ctx.fillStyle = '#00E5FF'; ctx.fillText(String(st.pGoals), W / 2 - 90, 46);
       ctx.fillStyle = '#FF3366'; ctx.fillText(String(st.aiGoals), W / 2 + 90, 46);
       ctx.fillStyle = '#fff'; ctx.font = '600 14px "Barlow Condensed", sans-serif';
-      ctx.fillText(st.sudden ? 'PENALTY SHOOTOUT · SUDDEN DEATH' : 'PENALTY SHOOTOUT · BEST OF 5', W / 2, 22);
+      ctx.fillText(st.sudden ? 'TWELVE YARDS · SUDDEN DEATH' : 'TWELVE YARDS · BEST OF 5', W / 2, 22);
       ctx.font = '11px "JetBrains Mono", monospace'; ctx.fillStyle = 'rgba(255,255,255,0.5)';
       ctx.fillText(`YOU ${st.shotsP}/5`, W / 2 - 90, 57); ctx.fillText(`RIVAL ${st.shotsAI}/5`, W / 2 + 90, 57);
       ctx.textAlign = 'right'; ctx.font = '12px "JetBrains Mono", monospace';
@@ -274,7 +274,7 @@ export default function SoccerGame({ grade, prq, onEnd, gamepad }: GameProps) {
         <canvas ref={canvasRef} className="w-full rounded-lg border border-white/10 bg-[#0F0F13]" style={{ aspectRatio: '16/9' }} />
         {!started && (
           <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg bg-black/70 backdrop-blur-sm">
-            <h2 className="fel-heading text-4xl font-bold text-white">PENALTY SHOOTOUT</h2>
+            <h2 className="fel-heading text-4xl font-bold text-white">TWELVE YARDS</h2>
             <p className="mt-2 max-w-md text-center text-sm text-white/60">Five shots each. As shooter: lock the moving aim, then nail the power zone. As keeper: read the shot and pick your dive.</p>
             <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-xs text-white/55">
               <span>SPACE — lock aim / power</span><span>← ↓ → — dive as keeper</span>

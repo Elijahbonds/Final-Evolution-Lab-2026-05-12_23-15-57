@@ -120,6 +120,18 @@ export function makeTimingHost(opts: TimingHostOpts) {
           <span className="fel-panel px-3 py-1 text-[var(--fel-cyan)]">{hnode(hud.round, '—')}</span>
           {/* M42 E20: numeric score gets " PTS"; string scores (e.g. "2 GOALS") render as-is */}
           <span className="rounded-md bg-black/50 px-3 py-1 text-white">{typeof hud.score === 'number' ? `${hud.score} PTS` : hnode(hud.score, '0 PTS')}</span>
+          {/* combo — the rhythm family's core readout (The Cypher publishes it
+              every judgement; the bezel never drew it) */}
+          {typeof hud.combo === 'number' && hud.combo >= 2 && (
+            <span className="fel-panel px-3 py-1 font-bold text-[var(--fel-gold)]">×{hud.combo}</span>
+          )}
+          {/* the beat, visible: pops at each step, fades through the bar */}
+          {typeof hud.beatPulse === 'number' && (
+            <span
+              className="mt-1.5 inline-block h-3 w-3 rounded-full bg-[var(--fel-gold)]"
+              style={{ opacity: 0.25 + hud.beatPulse * 0.75, transform: `scale(${0.7 + hud.beatPulse * 0.45})` }}
+            />
+          )}
         </div>
 
         {/* THE ENERGY LAYER. A gauge you cannot see is not a gauge, and rackets
@@ -129,7 +141,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
             energy economy are unchanged. */}
         {hud.energy != null && (
           <div className="pointer-events-none absolute left-4 top-14 flex flex-col gap-1">
-            <span className="font-mono text-[10px] tracking-wider text-[var(--fel-gold)]">ENERGY</span>
+            <span className="font-mono text-[10px] tracking-wider text-[var(--fel-gold)]">{typeof hud.energyLabel === 'string' ? hud.energyLabel : 'ENERGY'}</span>
             <div className="h-2 w-28 overflow-hidden rounded-full bg-black/50">
               <div
                 className="h-full rounded-full transition-[width] duration-200"
@@ -154,6 +166,37 @@ export function makeTimingHost(opts: TimingHostOpts) {
         {typeof hud.shotType === 'string' && hud.shotType && (
           <div className="pointer-events-none absolute inset-x-0 bottom-24 text-center">
             <span className="fel-panel px-3 py-1 font-mono text-[11px] text-white/85">{hud.shotType}</span>
+          </div>
+        )}
+
+        {/* the cue — rhythm modes publish the incoming move; it goes gold
+            inside the last 0.35s so the tap is about reading, not guessing */}
+        {typeof hud.nextStep === 'string' && hud.nextStep && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-24 text-center">
+            <span
+              className={`fel-panel px-4 py-1.5 font-mono text-sm font-bold transition-colors ${
+                typeof hud.nextStepIn === 'number' && hud.nextStepIn <= 0.35
+                  ? 'border-[var(--fel-gold)]/60 text-[var(--fel-gold)]'
+                  : 'text-white/85'
+              }`}
+            >
+              {typeof hud.nextStepIn === 'number' && hud.nextStepIn <= 0.35 ? 'NOW — ' : ''}
+              {hud.nextStep}
+              {typeof hud.nextStepIn === 'number' && hud.nextStepIn > 0.35 && (
+                <span className="text-white/40"> · {hud.nextStepIn.toFixed(1)}</span>
+              )}
+            </span>
+          </div>
+        )}
+
+        {/* The contact grade — PURE / OFF-CENTRE / EDGE OF THE BAT, plus the
+            pitch that threw it. Derby publishes it on every swing and the
+            bezel dropped it (same family trap as the energy gauge above,
+            whose comment names this exact failure). This is the benchmark's
+            named mechanic; it cannot be invisible. */}
+        {typeof hud.contact === 'string' && hud.contact && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-36 text-center">
+            <span className="fel-panel px-3 py-1 font-mono text-[11px] font-bold text-[var(--fel-gold)]">{hud.contact}</span>
           </div>
         )}
 

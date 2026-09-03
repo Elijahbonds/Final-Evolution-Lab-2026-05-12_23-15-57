@@ -43,8 +43,10 @@ interface RingSpec {
 
 const SKIES: Record<BackdropFamily, SkySpec> = {
   venice: {
-    stops: [[0, '#2c2a6e'], [0.45, '#b34a8c'], [0.75, '#ff8a5c'], [1, '#ffd98a']],
-    sun: { x: 0.5, y: 0.78, r: 0.055, color: '#fff3c4', glow: '#ff9d5c' }, stars: 0, clouds: 7, cloudColor: '#ffb9d0',
+    // Matches /backdrops/dunk.jpg: orange-dominant golden hour, hot pink band
+    // above, indigo crown; sun sits ON the ocean horizon with a big warm glow.
+    stops: [[0, '#241a4e'], [0.34, '#7a2e7a'], [0.55, '#e85a71'], [0.78, '#ff9440'], [1, '#ffdd96']],
+    sun: { x: 0.5, y: 0.86, r: 0.042, color: '#fff6d8', glow: '#ff8a3c' }, stars: 0, clouds: 0, cloudColor: '#ffb9d0',
   },
   ocean: {
     stops: [[0, '#1d3a6e'], [0.5, '#3a7cb0'], [0.8, '#7fc4d9'], [1, '#ffe9b0']],
@@ -104,21 +106,93 @@ function skyline(g: CanvasRenderingContext2D, W: number, H: number, baseY: numbe
 
 const RINGS: Record<BackdropFamily, RingSpec> = {
   venice: {
-    base: '#3a1f4a', windows: '#ffca7a',
+    base: '#4a2440', windows: '#ffd98a',
     paint: (g, W, H) => {
-      skyline(g, W, H, H * 0.45, '#3a1f4a', '#ffca7a');
-      // palm silhouettes in front
-      g.fillStyle = '#241030';
-      for (let i = 0; i < 26; i++) {
-        const x = Math.random() * W, h = 60 + Math.random() * 50;
-        g.fillRect(x, H - h, 5, h);
-        for (let f = 0; f < 6; f++) {
-          const a = (f / 6) * Math.PI - Math.PI * 0.1;
-          g.beginPath();
-          g.ellipse(x + 2, H - h, 30, 7, a, 0, Math.PI);
-          g.fill();
+      // 1. OCEAN — the reference's horizon is open sea CATCHING the sun:
+      //    warm mauve-gold, not a dark band. Sun-glitter path wide and hot.
+      const seaTop = H * 0.30;
+      const sea = g.createLinearGradient(0, seaTop, 0, H * 0.62);
+      sea.addColorStop(0, '#c65f6e');
+      sea.addColorStop(0.35, '#8a4160');
+      sea.addColorStop(0.75, '#5a2c50');
+      sea.addColorStop(1, '#3c2044');
+      g.fillStyle = sea;
+      g.fillRect(0, seaTop, W, H * 0.32);
+      // sun glitter: bright vertical shimmer under the sun azimuth (x=0.5)
+      const sunX = W * 0.5;
+      const gl2 = g.createLinearGradient(sunX - W * 0.08, 0, sunX + W * 0.08, 0);
+      gl2.addColorStop(0, 'rgba(255,180,90,0)');
+      gl2.addColorStop(0.5, 'rgba(255,220,150,0.85)');
+      gl2.addColorStop(1, 'rgba(255,180,90,0)');
+      g.fillStyle = gl2;
+      g.fillRect(sunX - W * 0.08, seaTop, W * 0.16, H * 0.3);
+      // horizontal wave sparkles — denser + brighter near the glitter path
+      for (let i = 0; i < 160; i++) {
+        const y = seaTop + Math.random() * H * 0.28;
+        const d = Math.abs(Math.random() * W - sunX) / W;
+        const wdt = (1 - d) * (22 + Math.random() * 40);
+        g.fillStyle = `rgba(255,205,145,${0.35 + (1 - d) * 0.45})`;
+        g.fillRect(Math.random() * W, y, wdt, 1.8);
+      }
+      // 2. SAND strip — sunset-lit sand is warm, not maroon
+      const sand = g.createLinearGradient(0, H * 0.62, 0, H * 0.72);
+      sand.addColorStop(0, '#b06a52');
+      sand.addColorStop(1, '#7a4440');
+      g.fillStyle = sand;
+      g.fillRect(0, H * 0.62, W, H * 0.1);
+      // 3. BOARDWALK — LOW storefronts (Venice is 1–3 stories, not a skyline),
+      //    dusk-lit walls, warm windows, neon signs, string lights
+      let bx = 0;
+      const shopTops: number[] = [];
+      while (bx < W) {
+        const w = 90 + Math.random() * 130;
+        const h = H * (0.14 + Math.random() * 0.08);
+        const top = H * 0.86 - h;
+        g.fillStyle = '#583050';                    // wall lit by the sky
+        g.fillRect(bx, top, w, h + H * 0.14);
+        g.fillStyle = '#6e3a5c';                    // awning line
+        g.fillRect(bx - 4, top + 10, w + 8, 7);
+        g.fillStyle = '#ffca7a';                    // windows
+        for (let wx = bx + 8; wx < bx + w - 10; wx += 22) {
+          if (Math.random() < 0.75) g.fillRect(wx, top + 24, 14, 18);
+        }
+        if (Math.random() < 0.5) {                  // neon sign
+          g.fillStyle = Math.random() < 0.5 ? '#ff5a8a' : '#4ae0d8';
+          g.fillRect(bx + 10, top + 2, 30 + Math.random() * 30, 6);
+        }
+        shopTops.push(top);
+        bx += w + 8 + Math.random() * 24;
+      }
+      // string lights between poles
+      g.fillStyle = 'rgba(255,224,170,0.95)';
+      for (let sx = 0; sx < W; sx += 130) {
+        const baseY = H * 0.66;
+        for (let t = 0; t <= 10; t++) {
+          const lx = sx + t * 13;
+          const ly = baseY + Math.sin((t / 10) * Math.PI) * 10;
+          g.fillRect(lx, ly, 3, 3);
         }
       }
+      // 4. PALMS — two depth layers, tall curved trunks + drooping fronds.
+      //    Far layer is sky-lit mauve; near layer is deep purple (not black).
+      const palm = (x: number, h: number, col: string, lean: number) => {
+        g.strokeStyle = col;
+        g.lineWidth = 6;
+        g.beginPath();
+        g.moveTo(x, H);
+        g.quadraticCurveTo(x + lean * 0.4, H - h * 0.6, x + lean, H - h);
+        g.stroke();
+        const cx = x + lean, cy = H - h;
+        g.fillStyle = col;
+        for (let f = 0; f < 8; f++) {
+          const a = (f / 8) * Math.PI * 1.35 - Math.PI * 0.2;
+          g.beginPath();
+          g.ellipse(cx + Math.cos(a) * 26, cy + Math.sin(a) * 10, 30, 5.5, a * 0.5, 0, Math.PI * 2);
+          g.fill();
+        }
+      };
+      for (let i = 0; i < 14; i++) palm(Math.random() * W, 70 + Math.random() * 40, '#5c2c50', (Math.random() - 0.5) * 40);
+      for (let i = 0; i < 10; i++) palm(Math.random() * W, 100 + Math.random() * 55, '#38183c', (Math.random() - 0.5) * 55);
     },
   },
   ocean: {
@@ -263,11 +337,16 @@ export interface Backdrop { dispose(): void }
  *  it never steals a venue mesh name) and keep the returned handle for
  *  dispose. Radius outside every venue (venues max ~110 units). */
 export function mountBackdrop(scene: Scene, family: BackdropFamily): Backdrop {
+  // A venue built by NexusWebScene already owns a painted sky ('nexus_sky',
+  // radius 200) that fully occludes this dome (280) and ring (235) — mounting
+  // both pays for two skies and shows one. The venue sky wins; stand down.
+  if (scene.getMeshByName('nexus_sky')) return { dispose() {} };
   const meshes: AbstractMesh[] = [];
 
   const dome = MeshBuilder.CreateSphere('bk_dome', { diameter: 560, segments: 16, sideOrientation: Mesh.BACKSIDE }, scene);
   const domeMat = new StandardMaterial('bk_dome_m', scene);
   domeMat.emissiveTexture = paintSky(scene, SKIES[family]);
+  domeMat.emissiveColor = Color3.White();           // emissive = texture × color — never let it multiply down
   domeMat.diffuseColor = Color3.Black();
   domeMat.specularColor = Color3.Black();
   domeMat.disableLighting = true;
@@ -283,6 +362,7 @@ export function mountBackdrop(scene: Scene, family: BackdropFamily): Backdrop {
   const ringMat = new StandardMaterial('bk_ring_m', scene);
   const ringTex = paintRing(scene, RINGS[family]);
   ringMat.emissiveTexture = ringTex;
+  ringMat.emissiveColor = Color3.White();           // emissive = texture × color — never let it multiply down
   ringMat.opacityTexture = ringTex;
   ringMat.diffuseColor = Color3.Black();
   ringMat.specularColor = Color3.Black();

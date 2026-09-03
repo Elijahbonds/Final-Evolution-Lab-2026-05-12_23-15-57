@@ -70,6 +70,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let carrierId: 'me' | 'mate0' | 'mate1' | 'foeTeam' = 'me';
   let shooting = false, dunking = false, ended = false, lastPasserWasMe = false;
   let currentShot: ShotContext | null = null;
+  /** Contest at shot start — so the release banner can say why. */
+  let shotContest = 0;
+  /** Per-foe closing-speed memory for the hesi bite (same read as 1v1). */
+  let foeCloseMem: number[] = [];
   let myJumpAge = Infinity;                      // block-jump timer (defense)
   const passFlight = new PassFlight();
   let passTargetId: 'mate0' | 'mate1' = 'mate0';
@@ -122,9 +126,14 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         // its own team as its foes — exactly backwards. It did not matter while
         // DefenderBrain ignored both, and would have silently produced a defence
         // that marked its own teammates the moment it stopped ignoring them.
+        // getAbsolutePosition, NOT .position — while carried, the ball is
+        // parented to the carrier's hand and .position is palm-local (~origin).
+        // Brains anchored on it read the ball as permanently at the rim:
+        // defenders never saw a carrier (markHasBall could not be true) and
+        // never played on-ball defence at all. Same bug as 1v1, same seam.
         const world = aiKind === 'teammate'
-          ? { ball: () => ball.position, hoop: () => RIM, allies: allyPositions, foes: foePositions }
-          : { ball: () => ball.position, hoop: () => RIM, allies: foePositions, foes: allyPositions };
+          ? { ball: () => ball.getAbsolutePosition(), hoop: () => RIM, allies: allyPositions, foes: foePositions }
+          : { ball: () => ball.getAbsolutePosition(), hoop: () => RIM, allies: foePositions, foes: allyPositions };
         const slot = ai
           ? new PlayerSlot('ai', new AISource(char.root.position, world,
             aiKind === 'teammate' ? new TeammateBrain(slotAngle) : new DefenderBrain(0.55, markIndex)), false)
@@ -158,6 +167,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       SoundKit.startAmbient('stadium');
 
       myScore = 0; foeScore = 0; assists = 0; timeLeft = POSSESSION_SEC; ended = false;
+      shotContest = 0; foeCloseMem = foes.map(() => 0);
       ctx.heroRef.current = me.char.root;
       ctx.objectiveRef.current = RIM;
       ctx.camDirector.snapTo(me.char.root.position, RIM);
@@ -256,6 +266,32 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
             setTimeout(() => ctx.setHud({ banner: '' }), 800);
           }
         }
+
+        // HESITATION — same vocabulary as 1v1: the pull-back tap plants you,
+        // and a defender who has been CLOSING (not one standing set) bites.
+        if (iAmCarrier && drib.hesitation) {
+          turbo.t01 = Math.max(0, turbo.t01 - 0.05);
+          SoundKit.play('whoosh', { pitch: 0.8, volume: 0.3 });
+          let bit = false;
+          for (let fi = 0; fi < foes.length; fi++) {
+            const f = foes[fi];
+            if (f.stunSec > 0) continue;
+            if (Vector3.Distance(f.char.root.position, me.char.root.position) < 2.4 && (foeCloseMem[fi] ?? 0) > 0.8) {
+              f.stunSec = 0.45;
+              bit = true;
+              f.char.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => f.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
+              break;                                   // only the man you shook
+            }
+          }
+          if (bit) {
+            SoundKit.play('impact', { pitch: 1.1, volume: 0.35 });
+            ctx.feel?.impact?.(0.2);
+            ctx.setHud({ banner: 'BIT ON THE HESI!' });
+          } else {
+            ctx.setHud({ banner: 'HESI…' });
+          }
+          setTimeout(() => ctx.setHud({ banner: '' }), 700);
+        }
       }
 
       // teammates: move via their brain; if they're carrying, chase the hoop a little
@@ -272,11 +308,19 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         }
       }
 
-      // defenders (staggered defenders don't move)
-      for (const f of foes) {
-        if (f.stunSec > 0) continue;
+      // defenders (staggered defenders don't move) — and track each one's
+      // closing speed on the carrier, decaying, for the hesi bite read
+      for (let fi = 0; fi < foes.length; fi++) {
+        const f = foes[fi];
+        if (f.stunSec > 0) { foeCloseMem[fi] = Math.max(0, (foeCloseMem[fi] ?? 0) - dt * 2.5); continue; }
         const intent = f.slot.intent;
         const vel = new Vector3(intent.moveX, 0, -intent.moveY).scale(3.8);
+        const cb = carrierBody();
+        if (cb) {
+          const toBall = cb.char.root.position.subtract(f.char.root.position); toBall.y = 0;
+          const closing = toBall.lengthSquared() > 1e-4 ? Math.max(0, Vector3.Dot(vel, toBall.normalize())) : 0;
+          foeCloseMem[fi] = Math.max(closing, (foeCloseMem[fi] ?? 0) - dt * 2.5);
+        }
         f.char.root.position.addInPlace(vel.scale(dt));
         clampToHalfCourt(f.char.root.position, 8, 15);
         if (vel.lengthSquared() > 0.1) f.char.root.rotation.y = Math.atan2(vel.x, vel.z);
@@ -294,11 +338,17 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       // pass — target-lock assist (stick aim snaps to the best teammate in
       // the cone, else most-open), defender-in-lane forces the bounce pass,
       // and the ball FLIES (PassFlight) instead of teleporting possession.
+      //
+      // PASSING IS A READ: an AIMED pass (stick held) into an occupied lane
+      // stays a chest pass — the assist no longer saves you from a read you
+      // made yourself — and a defender standing in that lane PICKS IT. The
+      // unaimed open-man pass keeps the auto-bounce (the assist's job).
       if (iAmCarrier && !shooting && !dunking && meIntent.pass && !passFlight.active) {
         const targets = mates.map((m, i) => ({ id: i === 0 ? 'mate0' : 'mate1', pos: m.char.root.position }));
         const locked = lockTarget(me.char.root.position, meIntent.moveX, meIntent.moveY, targets, foePositions());
         if (locked) {
-          const type = choosePassType(me.char.root.position, locked.pos, foePositions());
+          const aimed = Math.hypot(meIntent.moveX, meIntent.moveY) > 0.3;
+          const type = aimed ? 'chest' : choosePassType(me.char.root.position, locked.pos, foePositions());
           passType = type;
           passTargetId = locked.id as 'mate0' | 'mate1';
           releaseBall(ball);
@@ -313,7 +363,26 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         }
       }
       if (passFlight.active) {
-        if (passFlight.step(dt, ball.position)) {
+        // a chest pass through a defender's reach is THEIRS, not a dice roll:
+        // they were standing in the lane when you threw it. PLANAR distance —
+        // the ball flies at chest height (~1.2m) and a 3D check would measure
+        // the defender's feet as forever 1.2m away (the same Y-trap that
+        // silenced the AI poke in the shared brain).
+        if (passType === 'chest') {
+          const picker = foes.find((f) => f.stunSec === 0
+            && Math.hypot(f.char.root.position.x - ball.position.x, f.char.root.position.z - ball.position.z) < 0.8);
+          if (picker) {
+            passFlight.active = false;
+            attachBallToHand(ball, picker.char.skeleton, 'RightHand');   // the pick reads
+            SoundKit.play('impact', { pitch: 1.3, volume: 0.4 });
+            SoundKit.play('crowdGroan', { volume: 0.35 });
+            ctx.setHud({ banner: 'PICKED OFF! — you threw into coverage' });
+            setTimeout(() => ctx.setHud({ banner: '' }), 1100);
+            void opponentPossession(ctx);
+          }
+        }
+        if (!passFlight.active) { /* picked */ }
+        else if (passFlight.step(dt, ball.position)) {
           giveBallTo(passTargetId);
           if (passType === 'bounce') {
             ctx.setHud({ banner: 'BOUNCE PASS!' });
@@ -333,6 +402,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         } else {
           shooting = true;
           const contest = contestLevel(me.char.root.position, nearestFoePos);
+          shotContest = contest;
           currentShot = classifyShot(me.char.root.position, me.drib.vel, RIM, contest);
           shotMeter.start(contest, currentShot.style);
           me.char.animator.play(SPORT_CLIP.dunkChargeGather, { loop: true });
@@ -348,11 +418,13 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         }
       }
 
-      // steal (defenders occasionally poke the carrier)
+      // steal (defenders occasionally poke the carrier) — 1.6m, not 1.2:
+      // body collision holds two players ~1.1m apart, so a 1.2m application
+      // range flickered across the standoff (same trap as 1v1, measured there)
       const carrier = carrierBody();
       if (carrier && carrierId !== 'foeTeam' && !shooting) {
         for (const f of foes) {
-          if (f.stunSec === 0 && f.slot.intent.steal && Vector3.Distance(f.char.root.position, carrier.char.root.position) < 1.2) {
+          if (f.stunSec === 0 && f.slot.intent.steal && Vector3.Distance(f.char.root.position, carrier.char.root.position) < 1.6) {
             SoundKit.play('impact', { pitch: 1.2, volume: 0.3 });
             ctx.setHud({ banner: 'STOLEN!' });
             setTimeout(() => ctx.setHud({ banner: '' }), 700);
@@ -408,6 +480,14 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     const releaseClip = currentShot?.style === 'layup' ? SPORT_CLIP.dunkLaunchPower : 'jumpshot';
     me.char.animator.play(releaseClip, { onEnd: () => me.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
     ctx.setHud({ shotType: '' });
+    // SHOT FEEDBACK (same contract as 1v1): the release names the quality and
+    // the contest at the moment you let go — before the arc decides anything.
+    const tag = shotContest >= 0.5 ? ' — CONTESTED' : shotContest <= 0.15 ? ' — WIDE OPEN' : '';
+    if (quality === 'perfect') ctx.setHud({ banner: `GREEN!${tag}` });
+    else if (quality === 'early') ctx.setHud({ banner: `EARLY${tag}` });
+    else if (quality === 'late') ctx.setHud({ banner: `LATE${tag}` });
+    else if (quality === 'brick') ctx.setHud({ banner: `WAY LATE${tag}` });
+    // no clear here: the arc's make/miss banner replaces it and owns the timeout
     // the ball flies — score/possession resolve when it lands (update loop)
     arc.start(ball.getAbsolutePosition(), RIM, arcMade, currentShot?.style ?? 'jumper');
   }
@@ -482,8 +562,11 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     await new Promise<void>((res) => {
       const obs = ctx.scene.onBeforeRenderObservable.add(() => {
         const k = Math.min(1, (performance.now() - t0) / 1100);
-        shooter.char.root.position.x = from.x + (RIM.x - from.x) * k * 0.6;
-        shooter.char.root.position.z = from.z + (RIM.z + 2.2 - from.z) * k;
+        // drive AT the rim, not 5m short of it (was x*0.6, z to RIM.z+2.2 —
+        // the same short drive 1v1 shipped; a drive that never arrives makes
+        // your positioning irrelevant and the block dance unreachable)
+        shooter.char.root.position.x = from.x + (RIM.x - from.x) * k;
+        shooter.char.root.position.z = from.z + (RIM.z + 0.9 - from.z) * k;
         if (k >= 1) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); }
       });
     });
@@ -507,7 +590,12 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     if (made) {
       foeScore += 2;
       SoundKit.play('crowdGroan', { volume: 0.4 });
-      ctx.setHud({ foeScore, banner: 'THEY SCORE' });
+      // your defence is graded on their makes (same contract as 1v1)
+      ctx.setHud({
+        foeScore,
+        banner: defenseFactor >= 0.5 ? 'THEY SCORE — THROUGH THE CONTEST'
+          : defenseFactor <= 0.15 ? 'THEY SCORE — LEFT WIDE OPEN' : 'THEY SCORE',
+      });
     } else {
       SoundKit.play('impact', { pitch: 0.9, volume: 0.3 });
       ctx.setHud({ banner: 'STOP!' });

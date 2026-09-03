@@ -30,5 +30,5 @@ const ThreeVThreeBabylon = dynamicImport(() => import('@/components/games/three-
 export function ThreeVThreeLoader() {
   const babylon = isBabylon('hoops3v3');
   const Game = babylon ? ThreeVThreeBabylon : is3D('hoops3v3') ? ThreeVThree3D : ThreeVThree2D;
-  return <GameShell mode="hoops3v3" title="3V3 STREETBALL" venue="Venice Beach Court" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="hoops3v3" title="THREES" venue="Venice Beach Court" Game={Game} ownControls={babylon} />;
 }

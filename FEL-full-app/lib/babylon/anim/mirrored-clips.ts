@@ -55,7 +55,14 @@ export function registerMirroredClips(
       mirrored.addTargetedAnimation(anim, node);
     }
     if (mirrored.targetedAnimations.length > 0) animator.register(mirrored);
-    else mirrored.dispose();
+    else {
+      // Loud, not silent: a mirrored group with zero resolved targets means
+      // a bone-name spelling drifted (the _pN instance suffix did exactly
+      // that — see boneLookup.ts). Silent disposal made every mirrored dance
+      // step a MISSING CLIP at play time.
+      console.warn(`[FEL-ANIM] mirrored clip "${name}.M" resolved ZERO bone targets — not registering`);
+      mirrored.dispose();
+    }
   }
 }
 

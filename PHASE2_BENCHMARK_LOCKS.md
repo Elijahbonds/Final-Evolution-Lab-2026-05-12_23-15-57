@@ -72,5 +72,41 @@ TIER B (ORPHANED → RETIRE):
   Unreal Arena → DELETE (not in codebase)
   Velocity Kart → DELETE (not in codebase)
   Aero Aces → DELETE (not in codebase)
+
+POST-LOCK RETIREMENTS (owner decisions, 2026-09-01):
+  Sprint → RETIRED from the v1 roster (no locked benchmark; offered options
+    incl. Konami Track & Field cadence racing were declined). Route redirects
+    to /play; the mode file stays in the registry for a future revival.
+  Showdown → RETIRED from the v1 roster. Owner: "There's only supposed to be
+    Karate VS, Karate Endless, Mixed Combat (Soul Calibur-like)" — and
+    "karate vs is the storm mode". Showdown's Naruto-Storm identity therefore
+    has no slot; Karate VS already carries the Storm reference. Route
+    redirects to /play; mode file stays registered; Arena + Controller Link
+    entries removed (a stake on a redirecting route is a trap).
+  Duel (Weapon Duel) → RETIRED, same decision, same mechanics. The dojo
+    venue card now lists Karate Endless / Karate VS only.
+  (same day, locked by asking): Big Air → SSX (Big Air discipline) — was
+    missing from every governing doc; locked, not invented.
+
+POST-LOCK RE-LOCKS (owner decisions, 2026-09-01):
+  Court Carnival → Mario Party / Pac-Man Fever (minigame-night gauntlet with
+    a points race) — replaces the earlier Wii Sports Resort lock.
+  Mixed Combat → Soul Calibur style (arena fighter) — replaces the earlier
+    MMA lock; joins karate/karate-vs under the same reference family.
+  Dunk Duel → the REAL-LIFE dunk contest platform. Owner, verbatim: "the
+    head to head dunk contest is a real life actual footage dunk contest
+    judged and scored by our AI's tracking PRQ, Flight Time, Dunk
+    Difficulty." NOT a video-game duel — real footage, on-device AI tracking
+    (the repo's MediaPipe pose pipeline + IRLCore flight physics), judged
+    and scored from measured PRQ / flight time / dunk difficulty. The `dunk`
+    mode stays "a normal video game" (the NBA Live 08 contest). The
+    Babylon pass-and-play duel (signed off 8/8 same day) is the TRANSITIONAL
+    occupant of /play/dunkduel until the IRL contest ships; DunkDuelMode.ts
+    then stays in the tree like other superseded modes.
+  Karate VS → confirmed as THE Storm mode ("karate vs is the storm mode") —
+    its Soul Calibur / Naruto Storm lock stands as the family's Storm lane.
+  Dance Rhythm → Class of 3000 music games (André 3000's Cartoon Network
+    show — playful, instrument-stem mixing) — replaces the earlier
+    Just Dance lock. Locked by asking, 2026-09-01.
 ```
 

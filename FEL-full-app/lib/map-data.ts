@@ -1,5 +1,7 @@
 // Authoritative registry of all 3D maps in FEL.
-// Each entry maps to a Meshy-derived GLB in public/models/maps/.
+// Each entry maps to a Meshy-derived GLB, BAKED by scripts/map/pipeline.mts
+// (WebP→PNG/JPEG, Draco decoded) into public/models/maps/baked/. The raw
+// Meshy exports stay one directory up; nothing loads them directly.
 // Scale converts the normalized [-1,1] GLB bounds to real-world metres.
 
 export interface MapConfig {
@@ -22,13 +24,14 @@ export interface MapConfig {
   mapOffset?: [number, number, number]; // world translation applied to the loaded map mesh (after scale+rotation)
   mapRotationY?: number;  // Y-axis rotation (radians) applied to the loaded map mesh, e.g. to align a painted hoop under the functional rim
   matteFloor?: boolean;   // M12.2: treat the surface as matte painted blacktop (kills specular/reflection sheen that made the blue court read as water) and brightens albedo
+  surfaceY?: number;      // MEASURED walking-surface height in world units under the full transform (scripts/map/measure-surface.mts). Consumers drop the map by this so the real court/floor lands on the gameplay invariant floorY=0. Never guess it — re-run the probe after changing scale/offset/rotation.
 }
 
 export const MAPS: Record<string, MapConfig> = {
   'venice-blacktop': {
     key: 'venice-blacktop',
     label: 'Venice Blacktop Court',
-    glb: '/models/maps/venice-blacktop.glb',
+    glb: '/models/maps/baked/venice-blacktop.glb',
     scale: 14,
     spawnPos: [0, 0, 6],
     spawnYaw: Math.PI,
@@ -42,11 +45,15 @@ export const MAPS: Record<string, MapConfig> = {
     boundsMin: [-13, 0, -13],
     boundsMax: [13, 8, 13],
     backdrop: '/backdrops/venice-sky-day.jpg',
+    // NOTE: not mounted in Nexus venues (VENUE_MAP_KEYS) — the scan keeps its
+    // painted court off the play area and no offset candidate measured clean;
+    // the procedural court is the verified baseline. Revisit with a court-
+    // segmentation pass in measure-surface.mts before re-enabling.
   },
   'shop': {
     key: 'shop',
     label: 'Venice Ball Shop',
-    glb: '/models/maps/shop.glb',
+    glb: '/models/maps/baked/shop.glb',
     scale: 6,
     spawnPos: [0, 0, 2],
     spawnYaw: 0,
@@ -59,11 +66,12 @@ export const MAPS: Record<string, MapConfig> = {
     ceilingY: 6,
     boundsMin: [-5, 0, -5],
     boundsMax: [5, 6, 5],
+    surfaceY: 0.243, // measured: interior floor (band analysis skips the roof at ~4-5m)
   },
   'venice-blue-court': {
     key: 'venice-blue-court',
     label: 'Venice Blue Court',
-    glb: '/models/maps/venice-blue-court.glb',
+    glb: '/models/maps/baked/venice-blue-court.glb',
     scale: 14,
     spawnPos: [0, 0, 6],
     spawnYaw: Math.PI,
@@ -85,11 +93,12 @@ export const MAPS: Record<string, MapConfig> = {
     // M12.2(b): the scanned surface is a glossy blue that read as rippling water under
     // the neon rig. Force a matte, brightened blacktop look so it reads as a painted court.
     matteFloor: true,
+    surfaceY: -2.34, // measured: scan dips below y=0 — characters floated before this
   },
   'venice-skatepark': {
     key: 'venice-skatepark',
     label: 'Venice Beach Skatepark',
-    glb: '/models/maps/venice-skatepark.glb',
+    glb: '/models/maps/baked/venice-skatepark.glb',
     scale: 14,
     spawnPos: [0, 0, 10],
     spawnYaw: Math.PI,
@@ -103,11 +112,12 @@ export const MAPS: Record<string, MapConfig> = {
     boundsMin: [-13, 0, -13],
     boundsMax: [13, 9, 13],
     backdrop: '/backdrops/venice-sky-day.jpg',
+    surfaceY: 0.76, // measured: park deck at the play centre (ramps vary ±2m — it is a skatepark)
   },
   'dojo': {
     key: 'dojo',
     label: 'Shimogamo Dojo',
-    glb: '/models/maps/dojo.glb',
+    glb: '/models/maps/baked/dojo.glb',
     scale: 8,
     spawnPos: [0, 0, 3],
     spawnYaw: Math.PI,
@@ -121,11 +131,12 @@ export const MAPS: Record<string, MapConfig> = {
     boundsMin: [-7, 0, -6],
     boundsMax: [7, 10, 6],
     backdrop: '/backdrops/karate.jpg',
+    surfaceY: 1.4, // measured: interior tatami platform bands at 1.3-1.5m (band 0.0 is the terrain UNDER the building; roof at ~8-10m)
   },
   'tennis-court': {
     key: 'tennis-court',
     label: 'Venice Tennis Court',
-    glb: '/models/maps/tennis-court.glb',
+    glb: '/models/maps/baked/tennis-court.glb',
     scale: 10,
     spawnPos: [0, 0, 4],
     spawnYaw: Math.PI,
@@ -139,11 +150,12 @@ export const MAPS: Record<string, MapConfig> = {
     boundsMin: [-12, 0, -12],
     boundsMax: [12, 8, 12],
     backdrop: '/backdrops/venice-sky-day.jpg',
+    surfaceY: -1.025, // measured
   },
   'coastal-links': {
     key: 'coastal-links',
     label: 'Coastal Links',
-    glb: '/models/maps/coastal-links.glb',
+    glb: '/models/maps/baked/coastal-links.glb',
     scale: 12,
     spawnPos: [0, 0, 6],
     spawnYaw: Math.PI,
@@ -157,11 +169,12 @@ export const MAPS: Record<string, MapConfig> = {
     boundsMin: [-15, 0, -15],
     boundsMax: [15, 10, 15],
     backdrop: '/backdrops/venice-sky-day.jpg',
+    surfaceY: -1.385, // measured
   },
   'baseball-park': {
     key: 'baseball-park',
     label: 'Catalina Ballpark',
-    glb: '/models/maps/baseball-park.glb',
+    glb: '/models/maps/baked/baseball-park.glb',
     scale: 12,
     spawnPos: [0, 0, 6],
     spawnYaw: Math.PI,
@@ -175,11 +188,12 @@ export const MAPS: Record<string, MapConfig> = {
     boundsMin: [-15, 0, -15],
     boundsMax: [15, 10, 15],
     backdrop: '/backdrops/venice-sky-day.jpg',
+    surfaceY: -1.83, // measured
   },
   'gridiron': {
     key: 'gridiron',
     label: 'Gridiron Stadium',
-    glb: '/models/maps/gridiron.glb',
+    glb: '/models/maps/baked/gridiron.glb',
     scale: 14,
     spawnPos: [0, 0, 6],
     spawnYaw: Math.PI,
@@ -197,7 +211,7 @@ export const MAPS: Record<string, MapConfig> = {
   'soccer-stadium': {
     key: 'soccer-stadium',
     label: 'Coastal FC Stadium',
-    glb: '/models/maps/soccer-stadium.glb',
+    glb: '/models/maps/baked/soccer-stadium.glb',
     scale: 14,
     spawnPos: [0, 0, 6],
     spawnYaw: Math.PI,
@@ -211,11 +225,12 @@ export const MAPS: Record<string, MapConfig> = {
     boundsMin: [-16, 0, -16],
     boundsMax: [16, 10, 16],
     backdrop: '/backdrops/venice-sky-day.jpg',
+    surfaceY: -2.887, // measured
   },
   'sand-court': {
     key: 'sand-court',
     label: 'Venice Sand Court',
-    glb: '/models/maps/sand-court.glb',
+    glb: '/models/maps/baked/sand-court.glb',
     scale: 10,
     spawnPos: [0, 0, 4],
     spawnYaw: Math.PI,
@@ -233,7 +248,7 @@ export const MAPS: Record<string, MapConfig> = {
   'surf-break': {
     key: 'surf-break',
     label: 'Surf Break',
-    glb: '/models/maps/surf-break.glb',
+    glb: '/models/maps/baked/surf-break.glb',
     scale: 12,
     spawnPos: [0, 0, 4],
     spawnYaw: Math.PI,
@@ -247,11 +262,12 @@ export const MAPS: Record<string, MapConfig> = {
     boundsMin: [-12, 0, -12],
     boundsMax: [12, 8, 12],
     backdrop: '/backdrops/venice-sky-sunset.jpg',
+    surfaceY: -2.653, // measured: water/launch line at the play centre
   },
   'mountain-slope': {
     key: 'mountain-slope',
     label: 'Mountain Slope',
-    glb: '/models/maps/mountain-slope.glb',
+    glb: '/models/maps/baked/mountain-slope.glb',
     scale: 14,
     spawnPos: [0, 0, 4],
     spawnYaw: Math.PI,
@@ -265,11 +281,13 @@ export const MAPS: Record<string, MapConfig> = {
     boundsMin: [-14, 0, -14],
     boundsMax: [14, 12, 14],
     backdrop: '/backdrops/venice-sky-day.jpg',
+    // No surfaceY: the play surface is a continuous slope (no band dense
+    // enough to calibrate against; the valley floor at -6m is NOT the slope).
   },
   'gymnastics-gym': {
     key: 'gymnastics-gym',
     label: 'Pacifica Gymnastics',
-    glb: '/models/maps/gymnastics-gym.glb',
+    glb: '/models/maps/baked/gymnastics-gym.glb',
     scale: 8,
     spawnPos: [0, 0, 3],
     spawnYaw: Math.PI,
@@ -283,11 +301,12 @@ export const MAPS: Record<string, MapConfig> = {
     boundsMin: [-8, 0, -8],
     boundsMax: [8, 8, 8],
     backdrop: '/backdrops/venice-sky-day.jpg',
+    surfaceY: -1.398, // measured
   },
   'neuro-arena': {
     key: 'neuro-arena',
     label: 'NeuroArena',
-    glb: '/models/maps/neuro-arena.glb',
+    glb: '/models/maps/baked/neuro-arena.glb',
     scale: 8,
     spawnPos: [0, 0, 3],
     spawnYaw: Math.PI,

@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { prisma } from '@/lib/db';
 import { getPublicCard } from '@/lib/creator/card-service';
 import { CreatorCard } from '@/components/creator/creator-card';
+import { CardShare } from '@/components/creator/card-share';
 import { Sparkles } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   return {
     title: `${card.displayName} — FEL Creator Card`,
     description: card.tagline ?? `${card.displayName}'s athlete card on Final Evolution Lab.`,
+    // link-in-bio shares render the card's own face on social platforms
+    openGraph: {
+      title: `${card.displayName} — FEL Creator Card`,
+      description: card.tagline ?? `${card.displayName}'s athlete card on Final Evolution Lab.`,
+      type: 'profile',
+    },
   };
 }
 
@@ -31,8 +38,18 @@ export default async function CardPage({ params }: { params: { slug: string } })
         <p className="mt-2 font-mono text-[11px] uppercase tracking-widest text-white/40">Creator Card</p>
 
         <div className="mt-8">
-          <CreatorCard card={card} />
+          <CreatorCard
+            card={{
+              ...card,
+              ownerLook: card.owner?.profile
+                ? { avatarKey: card.owner.profile.avatarKey, cosmeticAssetId: card.owner.profile.cosmeticAssetId }
+                : null,
+            }}
+          />
         </div>
+
+        {/* the share surface: bio link + QR (stickers/flyers) */}
+        <CardShare slug={card.slug} accent={card.accent} />
 
         <Link
           href="/signup"

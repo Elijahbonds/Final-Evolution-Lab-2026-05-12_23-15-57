@@ -221,10 +221,14 @@ function GameShellInner({
             // the server auto-settles and returns the result for the recap.
             if (arenaMatchId) {
               try {
+                // Arena scores must be whole numbers (submit-score validates
+                // integers); some modes accrue fractional points internally
+                // (e.g. the carnival gauntlet at 0.4/unit).
+                const arenaScore = Math.max(0, Math.round(res?.score ?? 0));
                 const ar = await fetch('/api/arena/submit-score', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ matchId: arenaMatchId, score: res?.score ?? 0 }),
+                  body: JSON.stringify({ matchId: arenaMatchId, score: arenaScore }),
                 }).then((r2) => (r2.ok ? r2.json() : null));
                 if (ar?.ok) {
                   setArenaResult({

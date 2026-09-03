@@ -22,6 +22,27 @@ unlike 3PT it needs no account and a real playthrough was actually possible.
 
 ---
 
+## Depth re-verification (2026-09-01, after the G-pass)
+
+The depth pass made the run-up buy the airtime (and enforced the budget),
+and made the obstacle physical. Re-measured:
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | ✅ clean |
+| `npx vitest run` | ✅ 67 tests (`dunk-depth-tests` added, 19 checks; `dunk-system-tests` and `dunk-balance-tests` still green after the feedInput contract change) |
+| `/dev/mode/dunk` depth drive | ✅ weak charge at the chair → **BLOWN on contact**; loaded runway → cleared and judged; walk-up → honestly told. FEL-FRAME 0 · MISSING CLIP 0 · errors 0 |
+| `/play/dunk` (logged in) | ✅ same three proofs on the shipping route, same zeroes |
+| Mobile touch (`/try`, 390×844, real CDP touch) | ✅ full loop to a judged 32 with voice lines, 0 console errors (2× 401 guest-asset noise, as every guest session) |
+| World-Population L1–L5 | unchanged — no venue edits |
+
+Deferred and recorded in the lock §G: landing as a scored input (collides
+with the rim-hang hold — needs its own design), one/two-foot takeoff and
+approach angle (wants a free-approach flight model), four-competitor field
+(D2 stands).
+
+---
+
 ## Phase-by-phase, with the proof for each
 
 | Phase | Proof |

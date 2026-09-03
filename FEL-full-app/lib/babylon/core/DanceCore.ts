@@ -159,7 +159,11 @@ export class DancePerformance {
 
   /** Fired when a step's animation should play. */
   onStepFired: ((s: DanceStep) => void) | null = null;
-  onJudged: ((label: Judgement, points: number, combo: number) => void) | null = null;
+  /** `step` is the step this judgement belongs to (undefined for a wild tap
+   *  with nothing pending). `deltaMs` is SIGNED: negative = the tap was
+   *  early, positive = late (undefined on wild taps). Both optional —
+   *  existing 3-arg callbacks are unaffected. */
+  onJudged: ((label: Judgement, points: number, combo: number, step?: DanceStep, deltaMs?: number) => void) | null = null;
 
   constructor(bpm: number) { this.bpm = bpm; }
 
@@ -199,35 +203,69 @@ export class DancePerformance {
     }
 
     while (this.pending.length && this.pending[0].time < now - MISS_AFTER) {
-      this.pending.shift();
-      this.registerMiss();
+      const expired = this.pending.shift()!;
+      this.registerMiss(expired.step);
     }
   }
 
-  private registerMiss(): void {
+  private registerMiss(step?: DanceStep, deltaMs?: number): void {
     this.combo = 0;
     this.counts.MISS++;
-    this.onJudged?.('MISS', 0, 0);
+    this.onJudged?.('MISS', 0, 0, step, deltaMs);
+  }
+
+  /** The next step to be judged and WHEN (audio-clock seconds) — pending
+   *  first, then the next unfired step. A rhythm game that never shows the
+   *  incoming move is unplayable-by-design (measured: a beat-grid bot with
+   *  perfect cadence hit 28% — it was tapping beats with no step on them);
+   *  the cue is what makes the judging fair. */
+  peekNext(now: number): { time: number; step: DanceStep } | null {
+    if (this.pending.length) return this.pending[0];
+    if (!this.started) return null;
+    const s = this.steps[this.nextIdx];
+    if (!s) return null;
+    return { step: s, time: this.started + s.beat * beatDuration(this.bpm) };
   }
 
   /** Player input on the audio clock. */
   hit(now: number): Judgement {
-    let bestIdx = -1, best = Infinity;
+    let bestIdx = -1, best = Infinity, bestSigned = 0;
     for (let i = 0; i < this.pending.length; i++) {
-      const d = Math.abs(this.pending[i].time - now);
-      if (d < best) { best = d; bestIdx = i; }
+      const signed = now - this.pending[i].time;   // + = late, − = early
+      const d = Math.abs(signed);
+      if (d < best) { best = d; bestIdx = i; bestSigned = signed; }
     }
     if (bestIdx === -1 || best > MISS_AFTER) {
-      this.registerMiss();
+      // Rhythm games judge SYMMETRICALLY: an early tap inside the window
+      // hits the UPCOMING step. Without this, taps before the step fires are
+      // "wild" misses — a tap 100ms early on purpose is a play, not an error
+      // (measured: every slightly-early tap scored a wild MISS).
+      if (this.nextIdx < this.steps.length) {
+        const s = this.steps[this.nextIdx];
+        const t = this.started + s.beat * beatDuration(this.bpm);
+        const earlyBy = t - now;                        // + = the step is ahead
+        if (earlyBy > 0 && earlyBy <= MISS_AFTER) {
+          this.nextIdx++;                               // consumed early — never fires
+          const { label, points } = judgeDelta(earlyBy);
+          this.combo++;
+          if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+          this.score += points + this.combo * 5;
+          this.counts[label]++;
+          this.onStepFired?.(s);
+          this.onJudged?.(label, points, this.combo, s, -earlyBy * 1000);
+          return label;
+        }
+      }
+      this.registerMiss(undefined, bestIdx === -1 ? undefined : bestSigned * 1000);
       return 'MISS';
     }
-    this.pending.splice(bestIdx, 1);
+    const [hitStep] = this.pending.splice(bestIdx, 1);
     const { label, points } = judgeDelta(best);
     this.combo++;
     if (this.combo > this.maxCombo) this.maxCombo = this.combo;
     this.score += points + this.combo * 5;
     this.counts[label]++;
-    this.onJudged?.(label, points, this.combo);
+    this.onJudged?.(label, points, this.combo, hitStep.step, bestSigned * 1000);
     return label;
   }
 

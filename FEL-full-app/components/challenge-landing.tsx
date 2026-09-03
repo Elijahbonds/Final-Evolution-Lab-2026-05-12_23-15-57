@@ -4,12 +4,12 @@ import { useEffect, useRef } from 'react';
 import { Trophy, Swords, Flame } from 'lucide-react';
 
 const MODE_LABEL: Record<string, string> = {
-  dunkContest: 'Dunk Contest',
-  threePoint: '3-Point Contest',
-  hoops1v1: '1v1 Hoops',
-  hoops3v3: '3v3 Hoops',
+  dunkContest: 'Flight Night',
+  threePoint: 'Downtown',
+  hoops1v1: 'Ones',
+  hoops3v3: 'Threes',
   tiebreak: 'Tiebreak',
-  bigAir: 'Big Air',
+  bigAir: 'Stomp',
 };
 
 function modeLabel(key: string): string {

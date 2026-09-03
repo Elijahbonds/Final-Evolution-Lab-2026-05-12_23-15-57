@@ -71,12 +71,18 @@ function GLBMap({ config }: { config: MapConfig }) {
     return s;
   }, [gltf]);
 
+  const oy = config.mapOffset?.[1] ?? 0;
   return (
     <primitive
       object={scene}
       scale={[config.scale, config.scale, config.scale]}
       rotation={[0, config.mapRotationY ?? 0, 0]}
-      position={config.mapOffset ?? [0, 0, 0]}
+      position={[
+        config.mapOffset?.[0] ?? 0,
+        // surfaceY: measured walking-surface height (scripts/map/measure-surface.mts)
+        oy - (config.surfaceY ?? 0),
+        config.mapOffset?.[2] ?? 0,
+      ]}
     />
   );
 }

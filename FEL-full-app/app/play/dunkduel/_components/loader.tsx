@@ -13,5 +13,5 @@ const spinner = () => (
 const DunkDuelBabylon = dynamicImport(() => import('@/components/games/dunkduel-babylon'), { ssr: false, loading: spinner });
 
 export function DunkDuelLoader() {
-  return <GameShell mode="dunkduel" title="DUNK DUEL" venue="Venice Beach Court" Game={DunkDuelBabylon} ownControls />;
+  return <GameShell mode="dunkduel" title="PROVE IT" venue="Venice Beach Court" Game={DunkDuelBabylon} ownControls />;
 }

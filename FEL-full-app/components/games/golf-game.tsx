@@ -311,7 +311,7 @@ export default function GolfGame({ grade, prq, onEnd, gamepad }: GameProps) {
         <canvas ref={canvasRef} width={W} height={H} className="h-full w-full" />
         {!started && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
-            <h2 className="fel-heading text-4xl text-white">LINKS CHALLENGE</h2>
+            <h2 className="fel-heading text-4xl text-white">THE LOOP</h2>
             <p className="max-w-md text-sm text-gray-300">
               9 shots at the coastal links. Tap <span className="text-[#00E5FF]">SPACE</span> to lock your aim on the gold marker (watch the wind!), then tap again to stop the power bar at the gold line. Land inside 3m for BIRDIE points. Score {WIN_SCORE}+ to win.
             </p>

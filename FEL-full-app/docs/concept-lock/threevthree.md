@@ -145,3 +145,58 @@ support one. Not format-critical; it is polish.
 Parity when A1–A7, B1–B8 and C1–C4 hold, with D6 ruled and D7 recorded.
 
 **Currently: 19 of 19 criteria hold.** D6 ruled, D7 deferred to a later polish pass.
+
+---
+
+## F. Depth pass (2026-09-01) — what makes it 3v3 and not 1v1 with extras
+
+The structure pass fixed the matchups (C2); the depth pass found that the
+matchups were the ONLY thing the defence did. First-minute 2K gaps closed:
+
+**F1 — Help defence (the signature 3v3 read).** When the ball is driven at
+the rim, the LOW MAN — the off-ball defender closest to the hoop, with the
+beaten on-ball defender excluded from that comparison — leaves his mark and
+steps into the lane. Beat your man and the rim is no longer empty; the open
+man is the helper's man, which is what the kick-out pass is FOR. Guarded by
+`threevthree-depth-tests` (rotation fires on a drive, holds without one, and
+only the low man comes).
+
+**F2 — Passing is a read.** An AIMED pass (stick held) into an occupied lane
+stays a chest pass and a defender standing in it PICKS IT — deterministic,
+planar (a 3D check measures the ball at chest height against feet and never
+fires; the same Y-trap as the brain's steal gate). The unaimed open-man pass
+keeps the auto-bounce. `PICKED OFF! — you threw into coverage`.
+
+**F3 — The hesi vocabulary carries over.** Pull-back tap plants you; the
+on-ball defender bites only if he has been closing (per-defender decaying
+closing-speed memory, same rule as 1v1). Plant + explode-out come from the
+shared controller.
+
+**F4 — Shot feedback says why.** Same contract as 1v1: release banners name
+quality + contest (`GREEN! — CONTESTED`, `EARLY — WIDE OPEN`); their makes
+grade your defence (`THROUGH THE CONTEST` / `LEFT WIDE OPEN`).
+
+### Root causes found and fixed underneath
+
+- **D11 — The AI never saw the carrier at all.** Both modes fed the brains
+  palm-LOCAL `ball.position` (parented to the hand bone, ≈ origin) — so
+  `markHasBall` could never be true and NO defender played on-ball defence,
+  in any 3v3 game ever played. Now `getAbsolutePosition()`. (Fixed in the
+  1v1 pass; recorded here because this mode's D4 matchup fix was real but
+  dead on arrival without it.)
+- **D12 — The steal application range flickered across the body standoff.**
+  1.2m where bodies rest ~1.1m apart. Now 1.6m.
+- **D13 — The AI's drive stopped 5m short of the rim** (`x*0.6`, z to
+  `RIM.z + 2.2`). It drives to the basket now, which is also what makes the
+  block dance reachable.
+
+### Deferred, with reasons
+
+- **Alley-oops between teammates** — D7 stands; the pieces exist, it is
+  polish, and it wants an animation beat the suite doesn't have.
+- **Defensive switching / scram recovery** — after a kick-out the helper
+  recovers to his own mark rather than a full X-out rotation; a real switch
+  system wants matchup state the brains don't carry yet.
+- **Ball in hand during AI drives** — the foe possession drives a shooter
+  without visually attaching the ball to him (pre-existing; cosmetic next
+  to the flight work, but visible if you look for it).

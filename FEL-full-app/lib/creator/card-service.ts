@@ -105,7 +105,12 @@ export async function setPublished(db: Db, userId: string, published: boolean) {
 
 /** Public read by slug. Only published cards are visible; bumps the view count. */
 export async function getPublicCard(db: Db, slug: string) {
-  const card = await db.creatorCard.findUnique({ where: { slug } });
+  const card = await db.creatorCard.findUnique({
+    where: { slug },
+    // the card's face is the owner's athlete — the same build + skin that
+    // plays in-game. "Use my skin" applies to the card too.
+    include: { owner: { select: { profile: { select: { avatarKey: true, cosmeticAssetId: true } } } } },
+  });
   if (!card || !card.published) return null;
   // Best-effort view increment — never block the render on it.
   db.creatorCard.update({ where: { id: card.id }, data: { views: { increment: 1 } } }).catch(() => {});

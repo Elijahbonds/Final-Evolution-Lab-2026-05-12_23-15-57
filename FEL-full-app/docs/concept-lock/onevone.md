@@ -117,3 +117,73 @@ Verified: missing every shot now loses **0–2**; releasing in the green wins
 Parity when A1–A6 and B1–B8 hold, with D6 ruled.
 
 **Currently: 15 of 15 criteria hold.**
+
+---
+
+## F. Depth pass (2026-09-01) — from "rules are right" to "feels like 2K"
+
+The structure pass made the mode *correct*; a 2K player would still not
+recognise it in the first minute. This pass attacked the three absences such
+a player notices first, and found that two of them were not missing features
+but *existing features that could not fire*.
+
+**F1 — Dribbling is a vocabulary.** Added the HESITATION: a pull-back tap of
+the stick (held ≤0.35s, then released or snapped forward) plants you dead —
+your momentum is the price — and arms a 0.6s explode-out window. Works from a
+run *and* from a triple-threat standstill. A hard diagonal snap stays the
+explosive crossover. A defender who is **closing** (or closed within the last
+~1s — the on-their-heels window) and within 2.4m **bites**: 0.45s frozen. A
+set defender does not. All deterministic reads, no dice.
+`DribbleController` in the shared core, guarded by `onevone-depth-tests`.
+
+**F2 — Defence is a skill, on both sides.** The steal was
+`Math.random() < 0.5`. Now the rival's drive weaves (`driveBallExposure`):
+the ball is exposed mid-weave and protected at the gather, so a poke has a
+real window (measured: the first ~0.6s of the 2.2s drive is live). A reach
+into a protected ball costs you 0.45s off your feet. Block timing (A) is
+unchanged. The AI defender now *slides* (speed-matched deny depth), *presses*
+a stationary handler into poke range, and *bites* on the hesi.
+
+**F3 — Shot feedback says why.** Release banners name the quality and the
+context: `GREEN! — CONTESTED`, `EARLY — WIDE OPEN`, `WAY LATE`. Their makes
+grade your defence (`THROUGH YOUR CONTEST` / `LEFT WIDE OPEN`).
+
+### What the depth pass found underneath (root causes, all fixed)
+
+- **D10 — The dribble vocabulary was unplayable on keyboard.** Reversal
+  detection compared *consecutive frames*; a keyboard always reports neutral
+  between key-up and key-down, so no crossover or hesi could ever fire from
+  WASD. Reversals now measure against the last *committed* direction within
+  a 0.25s flick window. (Found by the depth driver; headless tests had
+  asserted atomic reversals only — the classic "the driver is the test"
+  trap.)
+- **D11 — The AI defended a palm-local ball.** `attachBallToHand` parents the
+  ball to the hand bone, so `ball.position` is ~origin while carried — and
+  both 1v1 and 3v3 fed `ball.position` to the AI brains. The 1v1 defender's
+  deny point collapsed onto the rim: measured live, it parked at (0, 0.3) and
+  never marked anyone. In 3v3 `markHasBall` could never be true, so no
+  defender ever played on-ball defence. Both modes now feed
+  `getAbsolutePosition()`.
+- **D12 — The defender's steal gate was 3D.** `dist < 1.1` compared against a
+  deny point whose Y is lerped toward the rim (3.05m) — ~1.3m of phantom
+  altitude meant the AI's poke roll **never fired in any game this mode has
+  played**. Distance is planar now.
+- **D13 — The rival's drive stopped 5m short of the rim.** It targeted
+  `RIM.z + 2` and released from there every time. Now drives to the basket,
+  which is also what makes the block/steal dance reachable in the flow of
+  play.
+- **D14 — Poke ranges sat on the body standoff.** Bodies rest ~1.1m apart;
+  steal application ranges of 1.2m flickered across the boundary. Now 1.6m.
+
+### Deferred, with reasons
+
+- **Size-up packages, behind-the-back, step-back as distinct animations** —
+  the controller vocabulary (hesi/crossover/explode) now exists; visual
+  packages are an animation-suite task, not a mechanics one.
+- **Layup packages / and-ones** — the foul system (`ContactSystem`) already
+  pays fouls on shot contact ("FOUL! — BALL BACK"); distinct gather
+  animations deferred with the packages.
+- **Timeouts / crowd as a system** — `MomentumBus` tiers already swing make%,
+  ambient level and banners; a timeout verb is a format decision (1v1 to 11
+  is five buckets; a timeout would be dead weight).
+- **Pick-and-roll / off-ball screens** — 3v3's department.

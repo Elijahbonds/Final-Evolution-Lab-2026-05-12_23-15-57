@@ -1,0 +1,34 @@
+{
+  "beach": {
+    "file": "beach.jpg",
+    "source": "dunk.jpg"
+  },
+  "ocean": {
+    "file": "ocean.jpg",
+    "source": "surf.jpg"
+  },
+  "city": {
+    "file": "city.jpg",
+    "source": "venice-sky-sunset.jpg"
+  },
+  "stadium": {
+    "file": "stadium.jpg",
+    "source": "soccer.jpg"
+  },
+  "mountains": {
+    "file": "mountains.jpg",
+    "source": "snowboard.jpg"
+  },
+  "dojo": {
+    "file": "dojo.jpg",
+    "source": "karate.jpg"
+  },
+  "neon": {
+    "file": "neon.jpg",
+    "source": "skateboarding.jpg"
+  },
+  "links": {
+    "file": "links.jpg",
+    "source": "golf.jpg"
+  }
+}

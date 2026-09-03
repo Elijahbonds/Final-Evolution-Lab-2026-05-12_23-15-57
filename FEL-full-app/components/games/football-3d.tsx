@@ -437,7 +437,7 @@ export default function Football3D(props: GameProps) {
         <div className="pointer-events-none absolute inset-0">
           {/* Top HUD */}
           <div className="absolute left-1/2 top-3 -translate-x-1/2 rounded-lg border border-white/8 bg-black/70 px-5 py-2 text-center backdrop-blur-md">
-            <div className="fel-heading text-[10px] tracking-[0.2em] text-white/50">STREET FOOTBALL</div>
+            <div className="fel-heading text-[10px] tracking-[0.2em] text-white/50">BREAKAWAY</div>
             <div className="font-mono text-2xl font-bold text-[#00E5FF]">{hud.score}</div>
           </div>
 

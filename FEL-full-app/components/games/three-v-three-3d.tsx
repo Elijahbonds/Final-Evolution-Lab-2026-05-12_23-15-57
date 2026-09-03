@@ -760,7 +760,7 @@ export default function ThreeVThree3D(props: GameProps) {
       {showControls && (
         <div className="absolute inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(5,5,8,0.82)', backdropFilter: 'blur(6px)' }}>
           <div className="rounded-xl px-6 py-5 text-center" style={{ background: 'rgba(10,10,20,0.95)', border: '1px solid rgba(0,229,255,0.25)' }}>
-            <div className="text-sm font-bold text-[#00E5FF] mb-3">CONTROLS — 3V3 STREETBALL</div>
+            <div className="text-sm font-bold text-[#00E5FF] mb-3">CONTROLS — THREES</div>
             <div className="text-xs text-white/70 space-y-1 font-mono">
               {(device === 'touch' ? MODE_BINDINGS['basketball_3v3'].touch : MODE_BINDINGS['basketball_3v3'].desktop).map((b, i) => (
                 <div key={i}><span className="text-white">{b.key}</span> — {b.label}</div>

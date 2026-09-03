@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Loader2, Shirt, Palette, Check, Coins, Sparkles } from 'lucide-react';
@@ -9,9 +10,12 @@ import { FaceScanCapture } from '@/components/facescan/face-scan-capture';
 import { invalidateIdentity } from '@/lib/babylon/core/characterPipeline';
 import {
   SKIN_TONES, FACE_SHAPES, HAIR_STYLES, HAIR_COLORS, EYE_SHAPES, EYE_COLORS,
-  BROWS, MOUTHS, NOSES, defaultFace, defaultEquipped, WEARABLES, SLOTS,
-  wearablesForSlot, getWearable, type FaceConfig, type WearableSlot,
+  BROWS, MOUTHS, NOSES, defaultFace, defaultEquipped, defaultJersey, sanitizeJersey, SLOTS,
+  wearablesForSlot, getWearable, type FaceConfig, type WearableSlot, type JerseyConfig,
 } from '@/lib/closet/wearable-catalog';
+
+// The 3D preview is client-only (Babylon engine on a canvas) — never SSR it.
+const AvatarPreview = dynamic(() => import('@/components/closet/avatar-preview'), { ssr: false });
 
 type Equipped = Record<WearableSlot, string | null>;
 type CardSkin = { id: string; displayName: string; accent: string; rarity: string };
@@ -81,6 +85,7 @@ function FacePreview({ face, accent }: { face: FaceConfig; accent: string }) {
 export function ClosetView() {
   const [face, setFace] = useState<FaceConfig>(defaultFace());
   const [equipped, setEquipped] = useState<Equipped>(defaultEquipped());
+  const [jersey, setJersey] = useState<JerseyConfig>(defaultJersey());
   const [owned, setOwned] = useState<Set<string>>(new Set());
   const [skins, setSkins] = useState<CardSkin[]>([]);
   const [skinCardId, setSkinCardId] = useState<string | null>(null);
@@ -101,6 +106,7 @@ export function ClosetView() {
           setOwned(new Set<string>(j.owned ?? []));
           setSkins(j.skins ?? []);
           setSkinCardId(j.look?.skinCardId ?? null);
+          setJersey(sanitizeJersey(j.look?.jersey ?? defaultJersey()));
         }
       } catch { /* ignore */ }
       finally { setLoading(false); }
@@ -108,6 +114,14 @@ export function ClosetView() {
   }, []);
 
   const accent = useMemo(() => skins.find((s) => s.id === skinCardId)?.accent || '#00E5FF', [skins, skinCardId]);
+  // Draft palette — the same mapping resolveIdentity() applies at spawn time,
+  // so the preview and the game can never disagree about what a wearable does.
+  const previewPalette = useMemo(() => ({
+    jersey: (equipped.tops && getWearable(equipped.tops)?.accent) || '#00E5FF',
+    shorts: (equipped.shorts && getWearable(equipped.shorts)?.accent) || '#0b1220',
+    shoes: (equipped.shoes && getWearable(equipped.shoes)?.accent) || '#A855F7',
+    accent,
+  }), [equipped, accent]);
   const setF = (k: keyof FaceConfig, v: string) => setFace((p) => ({ ...p, [k]: v }));
 
   const canEquip = (itemId: string) => owned.has(itemId) || FREE_ITEMS.has(itemId);
@@ -135,7 +149,7 @@ export function ClosetView() {
     try {
       const res = await fetch('/api/v1/closet', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ face, equipped, skinCardId }),
+        body: JSON.stringify({ face, equipped, skinCardId, jersey }),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j?.error || 'save failed');
@@ -159,7 +173,12 @@ export function ClosetView() {
       <div className="grid gap-6 md:grid-cols-[260px_1fr]">
         {/* preview column */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          <FacePreview face={face} accent={accent} />
+          {/* The actual game model (forged fel-hero) wearing the draft look —
+              what you design here is what spawns in every mode. */}
+          <AvatarPreview face={face} palette={previewPalette} jersey={jersey} />
+          <div className="mt-3">
+            <FacePreview face={face} accent={accent} />
+          </div>
           <div className="mt-5 space-y-1.5 text-xs text-white/60">
             {SLOTS.map((slot) => {
               const it = equipped[slot] ? getWearable(equipped[slot]!) : null;
@@ -171,6 +190,13 @@ export function ClosetView() {
               );
             })}
           </div>
+          {(jersey.name || jersey.number > 0) && (
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-center">
+              <div className="font-mono text-lg font-black tracking-widest text-white">{jersey.number}</div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60">{jersey.name || '—'}</div>
+              <div className="mt-0.5 text-[9px] uppercase tracking-wider text-white/30">jersey back</div>
+            </div>
+          )}
           <button onClick={save} disabled={saving} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-400 py-2.5 text-sm font-bold text-black transition hover:bg-cyan-300 disabled:opacity-60">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save Look
           </button>
@@ -216,6 +242,28 @@ export function ClosetView() {
 
           {tab === 'wear' && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                <h3 className="mb-1 text-sm font-semibold text-white/80">Jersey ID</h3>
+                <p className="mb-3 text-[11px] text-white/40">Your number and name plate, rendered on your hero&apos;s back in every mode.</p>
+                <div className="flex items-center gap-3">
+                  <div>
+                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-white/50">Number</label>
+                    <input
+                      type="number" min={0} max={99} value={jersey.number}
+                      onChange={(e) => setJersey((j) => sanitizeJersey({ ...j, number: e.target.value }))}
+                      className="w-20 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-center font-mono text-lg font-bold text-white"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="mb-1 block text-[10px] uppercase tracking-wider text-white/50">Name plate</label>
+                    <input
+                      type="text" maxLength={12} value={jersey.name} placeholder="YOUR NAME"
+                      onChange={(e) => setJersey((j) => sanitizeJersey({ ...j, name: e.target.value }))}
+                      className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 font-mono text-sm font-bold uppercase tracking-wider text-white placeholder:text-white/25"
+                    />
+                  </div>
+                </div>
+              </div>
               {SLOTS.map((slot) => (
                 <div key={slot}>
                   <h3 className="mb-2 text-sm font-semibold capitalize text-white/80">{slot}</h3>

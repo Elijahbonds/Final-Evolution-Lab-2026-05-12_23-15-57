@@ -47,19 +47,19 @@ export function winnerIdFor(outcome: MpOutcome, hostId: string, guestId: string 
  * Quiz/co-op modes are intentionally excluded. Labels drive the lobby UI.
  */
 export const MP_MODES: { key: string; label: string }[] = [
-  { key: 'dunk', label: 'Dunk Contest' },
-  { key: 'threepoint', label: '3-Point Shootout' },
+  { key: 'dunk', label: 'Flight Night' },
+  { key: 'threepoint', label: 'Downtown' },
   { key: 'sprint', label: 'Beach Sprint' },
-  { key: 'big-air', label: 'Big Air' },
-  { key: 'snowboard', label: 'Slalom Descent' },
-  { key: 'skateboard', label: 'Skate Run' },
-  { key: 'surf', label: 'Surf Break' },
-  { key: 'golf', label: 'Links Challenge' },
-  { key: 'baseball', label: 'Home Run Derby' },
-  { key: 'soccer', label: 'Penalty Shootout' },
-  { key: 'football', label: 'Street Football' },
-  { key: 'gymnastics', label: 'Vault' },
-  { key: 'tennis', label: 'Match Play' },
+  { key: 'big-air', label: 'Stomp' },
+  { key: 'snowboard', label: 'Gate Crasher' },
+  { key: 'skateboard', label: 'Venice Lines' },
+  { key: 'surf', label: 'The Break' },
+  { key: 'golf', label: 'The Loop' },
+  { key: 'baseball', label: 'Moonshot Derby' },
+  { key: 'soccer', label: 'Twelve Yards' },
+  { key: 'football', label: 'Breakaway' },
+  { key: 'gymnastics', label: 'Stick It' },
+  { key: 'tennis', label: 'Match Point' },
   { key: 'tiebreak', label: 'Tiebreak Blitz' },
 ];
 

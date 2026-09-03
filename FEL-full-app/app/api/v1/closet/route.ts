@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { defaultFace, defaultEquipped, type FaceConfig } from '@/lib/closet/wearable-catalog';
+import { defaultFace, defaultEquipped, sanitizeJersey, type FaceConfig } from '@/lib/closet/wearable-catalog';
 
 /** GET /api/v1/closet — current look + owned wearables + applied card skin. */
 export async function GET() {
@@ -46,10 +46,13 @@ export async function POST(req: NextRequest) {
     if (owns) skinCardId = owns.id;
   }
 
+  // Jersey ID is optional — absent means "keep whatever is stored".
+  const jersey = body?.jersey === undefined ? undefined : sanitizeJersey(body.jersey);
+
   const look = await prisma.avatarLook.upsert({
     where: { userId },
-    update: { face: face as any, equipped: cleanEquipped as any, skinCardId },
-    create: { userId, face: face as any, equipped: cleanEquipped as any, skinCardId },
+    update: { face: face as any, equipped: cleanEquipped as any, skinCardId, ...(jersey ? { jersey: jersey as any } : {}) },
+    create: { userId, face: face as any, equipped: cleanEquipped as any, skinCardId, ...(jersey ? { jersey: jersey as any } : {}) },
   });
   return NextResponse.json({ look });
 }

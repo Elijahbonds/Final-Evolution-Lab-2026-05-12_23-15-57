@@ -118,7 +118,7 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
 
       <BootSplash
         modeId="karate_vs"
-        title="KARATE VS"
+        title="STORM DUEL"
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}

@@ -35,6 +35,7 @@ import {
   DribbleController, ShotMeter, DefenderBrain, contestLevel, clampToHalfCourt, isThree,
   resolveBodyCollision, checkAnkleBreak, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, DUNK_PCT,
+  driveBallExposure, STEAL_EXPOSURE_MIN,
   SHOT_QUALITY_PCT, type ShotQuality, type ShotContext,
 } from '../core/BasketballCore';
 import { DribbleStateMachine, DRIBBLE_CLIP, syncedShotSpeed } from '../core/BallHandling';
@@ -96,8 +97,22 @@ export const OneVOneMode: ModeDefinition = (() => {
   let ended = false;
   let foeStunSec = 0;
   let currentShot: ShotContext | null = null;
+  /** Contest level at shot start — kept so the RESULT banner can say why. */
+  let shotContest = 0;
+  /** Contest level on the RIVAL's release — so their makes grade your D. */
+  let defContest = 0;
+  /** Defender's closing speed toward the handler (m/s) — a SET defender
+   *  doesn't bite on a hesi; only one running at you does. */
+  let foeClosingSpeed = 0;
+  /** Decaying memory of that closing speed — a defender who JUST sprinted at
+   *  you is on their heels for about a second after they arrive. That's the
+   *  real 2K bite window: measured live, a press closes in ~0.35s and a pure
+   *  "currently closing" test expired before a human (or driver) could pull
+   *  the stick. */
+  let foeCloseMemory = 0;
   // defense phase state
   let defSec = 0, defReleased = false, defResolved = false, myJumpAge = Infinity;
+  let meStunSec = 0;                        // whiffed reach costs you your feet
   let contact: ContactSystem | null = null;      // Phase 4: Havok bodies when ready
 
   /** Move a physics-bound character, or fall back to kinematic writes. */
@@ -127,7 +142,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     }
     attachBallToHand(ball, me.skeleton, 'RightHand');
     possession = 'mine'; carrying = true; shooting = false; dunking = false;
-    currentShot = null; myJumpAge = Infinity;
+    currentShot = null; myJumpAge = Infinity; meStunSec = 0;
+    meDribble.setFacing(Math.PI);           // reset means facing the rim again
     arc.active = false;
   }
 
@@ -173,7 +189,12 @@ export const OneVOneMode: ModeDefinition = (() => {
       }
       meSlot = new PlayerSlot('me', agentCtl ?? localSource, true);
       foeSlot = new PlayerSlot('foe', new AISource(foe.root.position, {
-        ball: () => ball.position, hoop: () => RIM, allies: () => [], foes: () => [me.root.position],
+        // getAbsolutePosition, NOT .position: while the ball rides a hand it
+        // is PARENTED to the hand bone and .position is a palm-local offset
+        // (~origin). Fed that, the defender's deny point collapsed onto the
+        // rim — measured live: the "defender" parked at (0, 0.3) and never
+        // marked anyone, in every game this mode has ever played.
+        ball: () => ball.getAbsolutePosition(), hoop: () => RIM, allies: () => [], foes: () => [me.root.position],
       }, new DefenderBrain(0.7)), false);
 
       // Phase 4: Havok contact bodies. If the physics wasm is unavailable
@@ -189,6 +210,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       }
 
       meDribble = new DribbleController();
+      meDribble.setFacing(Math.PI);           // spawned facing the rim (yaw π)
       meDribbleSM = new DribbleStateMachine();
       meAnimTree = new BasketballAnimTree(me.animator);
       meFootPlant = new FootPlant(me.skeleton, me.meshes[0] as never);
@@ -209,7 +231,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       resetPositions();
       ctx.setHud({
         score: myScore, foeScore, target: TARGET_SCORE, momentum: 0, turbo: 100,
-        hint: 'Drive fast at the rim to DUNK · snap the stick for ankles · on D: hold L1/LT to BOX OUT, X to STEAL, A to BLOCK',
+        hint: 'Drive fast at the rim to DUNK · snap the stick for ankles · pull BACK for a HESI · on D: hold L1/LT to BOX OUT, X to STEAL (mid-weave!), A to BLOCK',
       });
     },
 
@@ -242,14 +264,22 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (possession === 'mine') {
             myScore += arcPoints;
             swing('big_make');
-            ctx.setHud({ score: myScore, momentum, banner: `${arcLabel} — GOOD!` });
+            // the WHY was named at release (GREEN/EARLY/LATE + contest); the
+            // resolution just confirms the result and the points
+            ctx.setHud({ score: myScore, momentum, banner: `${arcLabel} +${arcPoints}` });
             carrying = true;
             if (checkGameOver(ctx)) return;
             setTimeout(() => { ctx.setHud({ banner: '' }); resetPositions(); }, 700);
           } else {
             foeScore += arcPoints;
             SoundKit.play('crowdGroan', { volume: 0.4 });
-            ctx.setHud({ foeScore, banner: 'THEY SCORE' });
+            // your defence is graded on their makes too — a wide-open look
+            // you gave them should READ as your mistake
+            ctx.setHud({
+              foeScore,
+              banner: defContest >= 0.5 ? 'THEY SCORE — THROUGH YOUR CONTEST'
+                : defContest <= 0.15 ? 'THEY SCORE — LEFT WIDE OPEN' : 'THEY SCORE',
+            });
             if (checkGameOver(ctx)) return;
             setTimeout(() => { ctx.setHud({ banner: '' }); resetPositions(); }, 800);
           }
@@ -330,15 +360,44 @@ export const OneVOneMode: ModeDefinition = (() => {
               bannerFlash(ctx, 'ANKLES!');
             }
           }
+          // HESITATION — the pullback plant. You spent your momentum; if the
+          // defender was CLOSING on you, they bite and you own the next beat
+          // (the controller's explode-out window is already armed). A set
+          // defender standing off does NOT bite — that's the read.
+          if (drib.hesitation) {
+            turbo.t01 = Math.max(0, turbo.t01 - 0.05);
+            SoundKit.play('whoosh', { pitch: 0.8, volume: 0.3 });
+            ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
+            // 2.4m: the defender's settle point on a stationary handler is
+            // ~2m out (deny lever 0.35), so 1.9m put the bite permanently
+            // one step out of reach — measured live, it could never trigger.
+            const inRange = Vector3.Distance(me.root.position, foe.root.position) < 2.4;
+            if (foeStunSec === 0 && inRange && foeCloseMemory > 0.8) {
+              foeStunSec = 0.45;
+              SoundKit.play('impact', { pitch: 1.1, volume: 0.35 });
+              ctx.feel?.impact?.(0.2);
+              foe.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => foe.animator.play(SPORT_CLIP.idle, { loop: true }) });
+              bannerFlash(ctx, 'BIT ON THE HESI!');
+            } else {
+              bannerFlash(ctx, 'HESI…', 500);
+            }
+          }
         }
 
         if (foeStunSec === 0) {
           const foeIntent = foeSlot.intent;
           const foeVel = new Vector3(foeIntent.moveX, 0, -foeIntent.moveY).scale(3.6);
+          // closing speed toward the handler feeds the hesi bite read
+          const toMe = me.root.position.subtract(foe.root.position); toMe.y = 0;
+          foeClosingSpeed = toMe.lengthSquared() > 1e-4
+            ? Math.max(0, Vector3.Dot(foeVel, toMe.normalize()))
+            : 0;
+          foeCloseMemory = Math.max(foeClosingSpeed, foeCloseMemory - dt * 2.5);
           driveBody('foe', foe.root, foeVel, dt);
           if (foeVel.lengthSquared() > 0.05) foe.root.rotation.y = Math.atan2(foeVel.x, foeVel.z);
           foe.animator.play(foeVel.lengthSquared() > 0.3 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
-          if (carrying && !shooting && !dunking && foeIntent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.2) {
+          // same standoff fix as the defensive poke: bodies rest ~1.1m apart
+          if (carrying && !shooting && !dunking && foeIntent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.6) {
             SoundKit.play('impact', { pitch: 1.2, volume: 0.3 });
             swing('turnover'); momentum = Math.round(mbus.score01*100);
             ctx.setHud({ momentum });
@@ -359,6 +418,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           else {
             shooting = true;
             const contest = contestLevel(me.root.position, defenderPos);
+            shotContest = contest;
             currentShot = classifyShot(me.root.position, meDribble.vel, RIM, contest);
             shotMeter.start(contest, currentShot.style);
             // ShotReleaseSync: pace the jumpshot so its contact frame lands
@@ -407,13 +467,17 @@ export const OneVOneMode: ModeDefinition = (() => {
       // ══ THEIR POSSESSION — you defend ══
       if (possession === 'defense') {
         defSec += dt;
-        // I move freely on D (turbo still gates sprint)
+        meStunSec = Math.max(0, meStunSec - dt);
+        // I move freely on D (turbo still gates sprint) — unless a whiffed
+        // reach took my feet. That's the price of a bad gamble.
         const intent = meSlot.intent;
         const moving = Math.hypot(intent.moveX, intent.moveY) > 0.1;
         const sprintOk = turbo.gate(dt, intent.sprint, moving);
         ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
-        const drib = meDribble.update(dt, intent.moveX, intent.moveY, sprintOk);
+        const drib = meStunSec > 0
+          ? meDribble.update(dt, 0, 0, false)
+          : meDribble.update(dt, intent.moveX, intent.moveY, sprintOk);
         driveBody('me', me.root, meDribble.vel, dt);
         me.root.rotation.y = drib.facingRad;
         contact?.brace('me', intent.brace ?? false);
@@ -425,30 +489,49 @@ export const OneVOneMode: ModeDefinition = (() => {
           });
         }
 
-        // the rival drives the lane
+        // the rival drives the lane — AT the rim, not five metres short of
+        // it. This targeted z = RIM.z + 2 (y ≈ 1.4): their jumpshot released
+        // from the same spot every time, and the steal/block dance the mode
+        // teaches ("in tight", BLOCK_RANGE 1.5) was a walk into their path.
+        // A driver who gets to the basket is also just recognisably 2K.
         if (!defReleased) {
           const k = Math.min(1, defSec / DEFENSE_DRIVE_SEC);
           const targetX = Math.sin(defSec * 2.1) * 2.2 * (1 - k);
           if (contact?.isReady) {
             const vx = (targetX - foe.root.position.x) * 3;
-            const vz = (RIM.z + 2 - foe.root.position.z) * (0.9 + k);
+            const vz = (RIM.z + 0.8 - foe.root.position.z) * (0.9 + k);
             contact.drive('foe', new Vector3(vx, 0, vz), dt);
           } else {
             foe.root.position.x += (targetX - foe.root.position.x) * 3 * dt;
-            foe.root.position.z += ((RIM.z + 2 - foe.root.position.z)) * (0.9 + k) * dt;
+            foe.root.position.z += ((RIM.z + 0.8 - foe.root.position.z)) * (0.9 + k) * dt;
           }
           foe.root.rotation.y = Math.PI;
           foe.animator.play(SPORT_CLIP.moveLoop, { loop: true });
           attachBallToHand(ball, foe.skeleton, 'RightHand');
 
-          // STEAL poke: my steal edge in tight range
-          if (intent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.2 && Math.random() < 0.5) {
-            SoundKit.play('impact', { pitch: 1.3, volume: 0.4 });
-            swing('steal');
-            ctx.setHud({ momentum });
-            bannerFlash(ctx, 'PICKED THEIR POCKET!');
-            resetPositions();
-            return;
+          // STEAL poke: a read, not a dice roll. The rival's weave EXPOSES
+          // the ball — poke while they're mid-crossover and it's yours; reach
+          // while they're protecting it (or gathering) and you're off your
+          // feet while they go by. Was `Math.random() < 0.5` — 2K's defenders
+          // are beaten by timing, not entropy.
+          // 1.6m, not an arm's-length 1.2: body collision holds two players
+          // ~1.1m apart, so a 1.2m poke range sat exactly ON the standoff
+          // distance and flickered across it — the press arrived, the poke
+          // roll fired, and the mode measured "not in range" (seen live:
+          // 15s of standing in the press, zero strips).
+          if (intent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.6 && meStunSec === 0) {
+            const exposure = driveBallExposure(defSec, DEFENSE_DRIVE_SEC);
+            if (exposure >= STEAL_EXPOSURE_MIN) {
+              SoundKit.play('impact', { pitch: 1.3, volume: 0.4 });
+              swing('steal');
+              ctx.setHud({ momentum });
+              bannerFlash(ctx, 'PICKED THEIR POCKET!');
+              resetPositions();
+              return;
+            }
+            meStunSec = 0.45;
+            SoundKit.play('whoosh', { pitch: 0.7, volume: 0.3 });
+            bannerFlash(ctx, 'REACH — THEY GO BY', 700);
           }
 
           if (!contact?.isReady) resolveBodyCollision(me.root.position, foe.root.position);
@@ -474,6 +557,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             }
             // no block — contest distance sets their make%
             const contest = contestLevel(foe.root.position, me.root.position);
+            defContest = contest;
             const made = Math.random() < 0.62 - contest * 0.35;
             arcPoints = isThree(foe.root.position, RIM) ? 3 : 2;
             arcResultMade = made;
@@ -498,7 +582,7 @@ export const OneVOneMode: ModeDefinition = (() => {
 
   function startDefense(ctx: ModeContext, banner: string): void {
     possession = 'defense'; carrying = false; shooting = false; dunking = false;
-    defSec = 0; defReleased = false; defResolved = false; myJumpAge = Infinity;
+    defSec = 0; defReleased = false; defResolved = false; myJumpAge = Infinity; meStunSec = 0;
     arc.active = false;
     attachBallToHand(ball, foe.skeleton, 'RightHand');
     bannerFlash(ctx, banner, 900);
@@ -567,7 +651,6 @@ export const OneVOneMode: ModeDefinition = (() => {
     shooting = false;
     const pctMod = currentShot?.pctMod ?? 1;
     const pct = SHOT_QUALITY_PCT[quality] * pctMod * mbus.multiplier();
-    const dist = Vector3.Distance(me.root.position, RIM);
     arcPoints = isThree(me.root.position, RIM) ? 3 : 2;
     arcLabel = currentShot?.label ?? 'SHOT';
     arcResultMade = Math.random() < Math.min(0.98, pct);
@@ -581,12 +664,23 @@ export const OneVOneMode: ModeDefinition = (() => {
       setTimeout(() => { if (!ended) me.animator.play(SPORT_CLIP.idle, { loop: true }); }, 420);
     }
     ctx.setHud({ shotType: '', shotMeterT: 0 });
+    // SHOT FEEDBACK — 2K tells you WHY at the moment of release, not after
+    // the arc resolves. Quality word + contest tag: an early contested
+    // fadeaway that rims out was legible as a bad shot before it landed.
+    // Before this, only a perfect release said anything at all.
+    const tag = shotContest >= 0.5 ? ' — CONTESTED' : shotContest <= 0.15 ? ' — WIDE OPEN' : '';
     if (quality === 'perfect') {
       SoundKit.play('uiTick', { pitch: 1.5, volume: 0.4 });
       SoundKit.play('crowdCheer', { volume: 0.35 });
       ctx.feel?.impact?.(0.2);
-      bannerFlash(ctx, 'GREEN!', 600);
+      bannerFlash(ctx, `GREEN!${tag}`, 700);
       ctx.camDirector.pulse(0.3, 0.35);
+    } else if (quality === 'early') {
+      bannerFlash(ctx, `EARLY${tag}`, 700);
+    } else if (quality === 'late') {
+      bannerFlash(ctx, `LATE${tag}`, 700);
+    } else if (quality === 'brick') {
+      bannerFlash(ctx, `WAY LATE${tag}`, 800);
     }
     if (!arcResultMade) swing('miss');
     carrying = false;

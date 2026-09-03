@@ -29,6 +29,7 @@ import {
   StandardMaterial, Texture, TransformNode, Vector3,
 } from '@babylonjs/core';
 import { PREMIUM_DRESSING } from './dressingFlags';   // M108 broadcast dressing (rollback flag)
+import { mountVenueMap } from '../visual/VenueMaps';
 
 // ── spec ──────────────────────────────────────────────────────────────────
 
@@ -136,6 +137,9 @@ export interface NexusWebSpec {
   venue: string;
   environment: Environment;
   ground: GroundSpec;
+  /** Baked Meshy venue map key (lib/map-data.ts) mounted as the environment;
+   *  the procedural ground stays as fallback when no bake exists. */
+  mapKey?: string;
   props: PropSpec[];
   actors: ActorSpec[];
   camera: CameraSpec;
@@ -347,7 +351,9 @@ function mixHex(a: string, b: string, t: number): string {
  */
 function paintCrowd(scene: Scene, accent: string): DynamicTexture {
   const W = 512, H = 128;
-  const BG = '#0C1020';
+  // Dusk-lit stand, not a void: at '#0C1020' the tiers rendered as a black
+  // wall that hid the painted ocean horizon behind them.
+  const BG = '#453252';
   const tex = new DynamicTexture('crowdTex', { width: W, height: H }, scene, false);
   const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
   ctx.fillStyle = BG;
@@ -374,7 +380,7 @@ function paintCrowd(scene: Scene, accent: string): DynamicTexture {
       const base = tops[Math.floor(rnd() * tops.length)];
       // Everyone else is mixed most of the way to the background. Back rows
       // recede further, which is what gives the tier depth instead of flatness.
-      const t = bright ? 0.35 : 0.72 + depth * 0.12;
+      const t = bright ? 0.3 : 0.55 + depth * 0.1;
       ctx.fillStyle = mixHex(base, BG, Math.min(0.9, t));
       ctx.beginPath();
       ctx.ellipse(jx, jy + 1.6, 2.6, 3.0, 0, 0, Math.PI * 2);   // torso
@@ -576,13 +582,15 @@ function buildProp(scene: Scene, p: PropSpec, root: TransformNode, shadows: Shad
       for (let r = 0; r < 3; r++) {
         const row = MeshBuilder.CreateBox('tier', { width: 22 * s, height: 0.9 * s, depth: 1.6 * s }, scene);
         row.position.set(0, 0.45 * s + r * 0.85 * s, r * 1.5 * s);
-        const rmat = surface(scene, `tierMat${r}`, r % 2 ? '#1B2030' : '#232A3D', 0.95);
+        const rmat = surface(scene, `tierMat${r}`, r % 2 ? '#2A3048' : '#343C58', 0.95);
         if (crowdTex) {
           // M108: a living crowd texture instead of a flat grey block.
           rmat.albedoTexture = crowdTex;
           rmat.emissiveTexture = crowdTex;
           // Halved: every spectator glowing pulled the eye off the rim.
-          rmat.emissiveColor = c3('#FFFFFF').scale(0.09);
+          // (Raised 0.09→0.16: at dusk-light levels 0.09 read as a black wall
+          // that hid the painted ocean horizon behind the stand.)
+          rmat.emissiveColor = c3('#FFFFFF').scale(0.5);
         }
         row.material = rmat;
         add(row, false);
@@ -797,6 +805,22 @@ function paintPalm(
   ctx.restore();
 }
 
+/** Multi-stop sky per backdrop kind — the Meshy reference (public/backdrops/
+ *  dunk.jpg) is orange-DOMINANT at the horizon with a hot-pink band and an
+ *  indigo crown; a two-stop gradient blends that into a flat mauve at the
+ *  exact band the camera looks at. Stops run v=0 (zenith) → the painted
+ *  horizon at v=0.6. */
+const BACKDROP_SKY_STOPS: Partial<Record<BackdropKind, [number, string][]>> = {
+  beach: [[0, '#241a4e'], [0.34, '#7a2e7a'], [0.55, '#e85a71'], [0.78, '#ff9440'], [1, '#ffdd96']],
+  ocean: [[0, '#1d3a6e'], [0.4, '#3a7cb0'], [0.75, '#7fc4d9'], [1, '#ffe9b0']],
+  city: [[0, '#1c1445'], [0.5, '#6e2a6e'], [0.8, '#d85a6e'], [1, '#ff9d5c']],
+  stadium: [[0, '#05061c'], [0.5, '#141a4a'], [0.85, '#3a2a6e'], [1, '#6e2a8a']],
+  mountains: [[0, '#2a6ed9'], [0.5, '#6ea8e8'], [0.85, '#c4ddf4'], [1, '#f0f6fc']],
+  dojo: [[0, '#0c1030'], [0.55, '#232a5c'], [0.85, '#4a3a6e'], [1, '#6e4a6e']],
+  neon: [[0, '#060414'], [0.6, '#141031'], [1, '#2a1650']],
+  links: [[0, '#3a7bd9'], [0.55, '#8ab8e8'], [1, '#e8f2fc']],
+};
+
 function paintBackdrop(ctx: CanvasRenderingContext2D, W: number, H: number, kind: BackdropKind): void {
   const rng = mulberry32(seedOf(kind));
   const horizon = Math.round(H * 0.6);
@@ -812,19 +836,33 @@ function paintBackdrop(ctx: CanvasRenderingContext2D, W: number, H: number, kind
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, horizon);
       ctx.fillStyle = 'rgba(255,246,222,0.98)';
       ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = 'rgba(18,74,122,0.55)';
+      // Sunset water: warm at the horizon line, cooling as it comes forward —
+      // the old flat dark-blue wash is why the venue read as night, not dusk.
+      const sea = ctx.createLinearGradient(0, horizon, 0, H);
+      sea.addColorStop(0, 'rgba(198,95,110,0.85)');
+      sea.addColorStop(0.35, 'rgba(120,60,100,0.75)');
+      sea.addColorStop(1, 'rgba(40,38,84,0.8)');
+      ctx.fillStyle = sea;
       ctx.fillRect(0, horizon, W, H - horizon);
-      for (let i = 0; i < 28; i++) {
-        const y = horizon + (i / 28) * (H - horizon);
-        ctx.fillStyle = `rgba(200,230,255,${0.05 + rng() * 0.06})`;
-        ctx.fillRect(0, y, W, 1.5);
+      // sun glitter: a hot path on the water under the sun, wide at the horizon
+      const gl = ctx.createLinearGradient(sx - W * 0.06, 0, sx + W * 0.06, 0);
+      gl.addColorStop(0, 'rgba(255,190,100,0)');
+      gl.addColorStop(0.5, 'rgba(255,224,160,0.85)');
+      gl.addColorStop(1, 'rgba(255,190,100,0)');
+      ctx.fillStyle = gl;
+      ctx.fillRect(sx - W * 0.06, horizon, W * 0.12, H - horizon);
+      // wave sparkles, denser + brighter near the glitter path
+      for (let i = 0; i < 120; i++) {
+        const y = horizon + rng() * (H - horizon);
+        const x = rng() * W;
+        const d = Math.abs(x - sx) / W;
+        ctx.fillStyle = `rgba(255,205,145,${0.15 + (1 - d) * 0.5})`;
+        ctx.fillRect(x, y, (1 - d) * (14 + rng() * 30) + 4, 1.5);
       }
-      ctx.fillStyle = 'rgba(255,236,200,0.5)';
-      ctx.fillRect(sx - 12, horizon, 24, H - horizon);
       if (kind === 'beach') {
         // A LINE of small palms reads as a beach; five giants read as a problem.
         for (let i = 0; i < 11; i++) {
-          paintPalm(ctx, rng() * W, horizon + 3, H * (0.045 + rng() * 0.028), 'rgba(26,32,44,0.62)');
+          paintPalm(ctx, rng() * W, horizon + 3, H * (0.045 + rng() * 0.028), 'rgba(46,22,52,0.75)');
         }
       }
       break;
@@ -967,8 +1005,16 @@ export function buildNexusScene(scene: Scene, spec: NexusWebSpec, canvas?: HTMLC
     const tex = new DynamicTexture('skyTex', { width: W, height: S }, scene, false);
     const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
     const grad = ctx.createLinearGradient(0, 0, 0, S);
-    grad.addColorStop(0, env.skyTop);
-    grad.addColorStop(1, env.skyBottom);
+    const stops = useBackdrop ? BACKDROP_SKY_STOPS[env.backdrop!] : undefined;
+    if (stops) {
+      // The painted horizon sits at v=0.6 — the sky stops span 0..0.6 so the
+      // LAST stop lands exactly on the horizon line instead of the nadir.
+      for (const [p, c] of stops) grad.addColorStop(p * 0.6, c);
+      grad.addColorStop(1, stops[stops.length - 1][1]);
+    } else {
+      grad.addColorStop(0, env.skyTop);
+      grad.addColorStop(1, env.skyBottom);
+    }
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, S);
     if (useBackdrop) paintBackdrop(ctx, W, S, env.backdrop!);
@@ -978,6 +1024,19 @@ export function buildNexusScene(scene: Scene, spec: NexusWebSpec, canvas?: HTMLC
     m.disableLighting = true;
     m.backFaceCulling = false;
     sky.material = m;
+
+    // Backdrop pipeline (scripts/backdrop/pipeline.mts): when a baked dome
+    // exists for this venue's backdrop kind, it IS the sky — the painted
+    // texture above stays as the instant placeholder + offline fallback.
+    // The painted version still paints first so there is no pop-in of empty
+    // sky while the jpg streams in.
+    if (useBackdrop) {
+      const baked = new Texture(
+        `/backdrops/baked/${env.backdrop}.jpg`, scene, false, false, Texture.BILINEAR_SAMPLINGMODE,
+        () => { m.emissiveTexture = baked; },
+        () => { /* no baked dome for this kind — painted sky stays */ },
+      );
+    }
   }
 
   // lighting: hemispheric fill + directional key with shadows
@@ -996,6 +1055,14 @@ export function buildNexusScene(scene: Scene, spec: NexusWebSpec, canvas?: HTMLC
   shadows.darkness = 0.45;
 
   const ground = buildGround(scene, spec.ground, root);
+  // Baked Meshy venue map (scripts/map/pipeline.mts → visual/VenueMaps.ts):
+  // when this venue has one, it becomes the court and the world around it;
+  // the procedural ground hides but stays live for bounds/camera logic.
+  if (spec.mapKey) {
+    void mountVenueMap(scene, root, spec.mapKey).then((ok) => {
+      if (ok) ground.visibility = 0;
+    });
+  }
   for (const p of spec.props) buildProp(scene, p, root, shadows);
   const actors = spec.actors.map((a) => buildActor(scene, a, root, shadows));
 

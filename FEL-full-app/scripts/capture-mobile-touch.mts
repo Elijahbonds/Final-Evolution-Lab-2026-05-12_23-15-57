@@ -43,17 +43,53 @@ page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 // /try, which is unauthenticated, so aiming it at a real mode page just timed
 // out waiting for a canvas that was never going to appear. Same login the
 // desktop capture does: through the real form, as an ordinary player.
-await page.goto(URL, { waitUntil: 'networkidle' });
-if (/\/login/.test(page.url())) {
-  await page.locator('input[type="email"]').fill(process.env.PLAYTEST_EMAIL ?? 'playtest@fel.local');
+// networkidle never settles on hosts that long-poll (the Controller Link
+// lobby streams KV heartbeats), and /play/threepoint died on exactly that —
+// twice. domcontentloaded + the canvas wait below is the real requirement.
+await page.goto(URL, { waitUntil: 'domcontentloaded' });
+// The /play → /login redirect is CLIENT-side and lands after hydration, so
+// page.url() can still read the target here. Detect the login FORM, not the
+// URL — the URL check raced and lost twice on the same route.
+const email = page.locator('input[type="email"]');
+const onLogin = await email.waitFor({ timeout: 8_000 }).then(() => true).catch(() => false);
+if (onLogin) {
+  // The login inputs are SSR'd — visible before React hydrates them, and a
+  // pre-hydration Enter is a no-op (measured: form filled, still /login).
+  // /login does not long-poll, so networkidle is safe HERE specifically.
+  await page.waitForLoadState('networkidle').catch(() => {});
+  await email.fill(process.env.PLAYTEST_EMAIL ?? 'playtest@fel.local');
   await page.locator('input[type="password"]').fill(process.env.PLAYTEST_PASSWORD ?? 'playtest-local-only');
   await page.locator('input[type="password"]').press('Enter');
   await page.waitForURL((u) => !/\/login/.test(u.toString()), { timeout: 30_000 }).catch(() => {});
-  await page.goto(URL, { waitUntil: 'networkidle' });
+  // let the session cookie commit before the target page's getServerSession
+  // runs — navigating the instant the URL flips can land pre-cookie and come
+  // straight back to /login (measured: canvas never appears)
+  await page.waitForLoadState('networkidle').catch(() => {});
+  await page.goto(URL, { waitUntil: 'load' });
 }
 // NB: this module's own `const URL = process.env.URL` shadows the global URL
 // constructor, so `new URL(...)` throws here. Print the href instead.
 console.log('route :', page.url());
+// Party-night hubs (carnival) gate the canvas behind a START THE NIGHT
+// briefing that renders after a client-side shuffle — loop: canvas wins,
+// the hub button starts the night. Same beat as capture-mode-play.
+const startNight = page.getByText(/START THE NIGHT/i).first();
+for (let i = 0; i < 12; i++) {
+  // START THE NIGHT router-pushes to the in-run URL — any probe can land
+  // mid-navigation and throw "execution context destroyed". Treat that as
+  // progress, not failure.
+  try {
+    if (await page.$('canvas')) break;
+  } catch { /* navigating */ }
+  try {
+    if (await startNight.isVisible()) {
+      await startNight.tap().catch(async () => { await startNight.click({ force: true }).catch(() => {}); });
+      console.log('hub   : started the night');
+      await page.waitForLoadState('load').catch(() => {});
+    }
+  } catch { /* navigating */ }
+  await page.waitForTimeout(1500);
+}
 await page.waitForSelector('canvas', { timeout: 30_000 });
 const text = async () => (await page.evaluate<string>('document.body.innerText')).replace(/\n+/g, ' | ');
 

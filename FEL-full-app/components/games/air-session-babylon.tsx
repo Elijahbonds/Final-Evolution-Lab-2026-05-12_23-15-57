@@ -103,6 +103,23 @@ export function makeAirHost(modeKey: string, title: string) {
             <div className="text-white/60">
               speed {String(hud.speed ?? 0)} · height {String(hud.height ?? 0)} · spin {String(hud.spin ?? 0)}
             </div>
+            {/* nextFoot is the cadence mechanic's core readout — which stride
+                comes next — and the bezel dropped it (same trap as the 3PT
+                board and football's drive state: published is not rendered).
+                combo/best are the scoring accelerators. */}
+            <div className="mt-1 flex items-center gap-2">
+              {typeof hud.nextFoot === 'string' && hud.nextFoot && String(hud.phase) === 'Run' && (
+                <span className="rounded bg-[#22d3ee]/15 px-2 py-0.5 text-[#22d3ee]">
+                  NEXT {hud.nextFoot === 'L' ? '◀ LEFT' : 'RIGHT ▶'}
+                </span>
+              )}
+              {typeof hud.combo === 'number' && hud.combo >= 2 && (
+                <span className="rounded bg-[#ffd75e]/15 px-2 py-0.5 text-[#ffd75e]">COMBO x{hud.combo}</span>
+              )}
+              {typeof hud.best === 'string' && hud.best && (
+                <span className="rounded bg-white/10 px-2 py-0.5 text-white/60">BEST {hud.best}</span>
+              )}
+            </div>
             {typeof hud.banner === 'string' && hud.banner && (
               <div className="mt-2 text-[#00E5FF]">{hud.banner}</div>
             )}

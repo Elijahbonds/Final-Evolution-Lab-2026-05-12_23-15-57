@@ -18,7 +18,7 @@ const Gymnastics2D = dynamicImport(() => import('@/components/games/gymnastics-g
 // Babylon vault on the shared AirSessionCore (lib/babylon/modes/AirSessionMode).
 const GymnasticsBabylon = dynamicImport(
   () => import('@/components/games/air-session-babylon').then((m) => ({
-    default: m.makeAirHost('gymnastics', 'GYMNASTICS VAULT'),
+    default: m.makeAirHost('gymnastics', 'STICK IT'),
   })),
   { ssr: false, loading: spinner },
 );
@@ -27,6 +27,6 @@ export function GymnasticsLoader() {
   const babylon = isBabylon('gymnastics');
   const Game = babylon ? GymnasticsBabylon : Gymnastics2D;
   return (
-    <GameShell mode="gymnastics" title="GYMNASTICS" venue="Evolution Arena" Game={Game} ownControls={babylon} />
+    <GameShell mode="gymnastics" title="STICK IT" venue="Evolution Arena" Game={Game} ownControls={babylon} />
   );
 }

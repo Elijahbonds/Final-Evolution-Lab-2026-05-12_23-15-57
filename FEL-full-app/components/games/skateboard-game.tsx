@@ -234,7 +234,7 @@ export default function SkateboardGame({ grade, prq, onEnd, gamepad }: GameProps
       ctx.fillStyle = '#FF3366'; ctx.font = 'bold 22px "JetBrains Mono", monospace';
       ctx.fillText(`${Math.max(Math.ceil(st.time), 0)}s`, W / 2 + 170, 44);
       ctx.fillStyle = '#fff'; ctx.font = '600 14px "Barlow Condensed", sans-serif';
-      ctx.fillText('SKATE RUN · SCORE 2000 TO WIN', W / 2, 22);
+      ctx.fillText('VENICE LINES · SCORE 2000 TO WIN', W / 2, 22);
       ctx.font = '11px "JetBrains Mono", monospace'; ctx.fillStyle = 'rgba(255,255,255,0.5)';
       ctx.fillText('SCORE', W / 2 - 110, 57); ctx.fillText('COMBO', W / 2 + 60, 57);
       ctx.textAlign = 'right'; ctx.font = '12px "JetBrains Mono", monospace';
@@ -270,7 +270,7 @@ export default function SkateboardGame({ grade, prq, onEnd, gamepad }: GameProps
         <canvas ref={canvasRef} className="w-full rounded-lg border border-white/10 bg-[#0F0F13]" style={{ aspectRatio: '16/9' }} />
         {!started && (
           <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg bg-black/70 backdrop-blur-sm">
-            <h2 className="fel-heading text-4xl font-bold text-white">SKATE RUN</h2>
+            <h2 className="fel-heading text-4xl font-bold text-white">VENICE LINES</h2>
             <p className="mt-2 max-w-md text-center text-sm text-white/60">Hit trick prompts as they cross the zone, hold grinds on gold rails, keep the combo alive. Three straight misses and you bail.</p>
             <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-xs text-white/55">
               <span>← KICKFLIP · ↑ HEELFLIP</span><span>→ 360 FLIP · ↓ GRAB</span>

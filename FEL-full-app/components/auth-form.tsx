@@ -17,7 +17,7 @@ const SPORT_PICKS: { label: string; sub: string; img: string; href: string }[] =
   { label: 'Karate', sub: 'Endless · Versus', img: '/venues/dojo-card.jpg', href: '/play/karate' },
   { label: 'Skate', sub: 'Venice Skatepark', img: '/venues/skatepark.jpg', href: '/play/skateboard' },
   { label: 'Surf', sub: 'Surf Break', img: '/venues/surfbreak.jpg', href: '/play/surf' },
-  { label: 'Snowboard', sub: 'Slalom · Big Air', img: '/venues/mountainslope.jpg', href: '/play/snowboard' },
+  { label: 'Snowboard', sub: 'Gate Crasher · Stomp', img: '/venues/mountainslope.jpg', href: '/play/snowboard' },
   { label: 'Tennis', sub: 'Match · Tiebreak', img: '/venues/tenniscourt.jpg', href: '/play/tennis' },
 ];
 

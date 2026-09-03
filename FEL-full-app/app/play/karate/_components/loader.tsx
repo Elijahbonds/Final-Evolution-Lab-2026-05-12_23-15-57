@@ -19,5 +19,5 @@ const KarateBabylon = dynamicImport(() => import('@/components/games/karate-baby
 export function KarateLoader() {
   const babylon = isBabylon('karateEndless');
   const Game = babylon ? KarateBabylon : is3D('karateEndless') ? Karate3D : Karate2D;
-  return <GameShell mode="karateEndless" title="KARATE ENDLESS" venue="Shimogamo Dojo" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="karateEndless" title="THE HUNDRED" venue="Shimogamo Dojo" Game={Game} ownControls={babylon} />;
 }

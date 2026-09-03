@@ -38,7 +38,10 @@ export interface ModeFeel {
 export type ModePhase = 'loading' | 'ready' | 'countdown' | 'playing' | 'paused' | 'ended' | 'error';
 
 /** One judge line in a live scorecard reveal (M47 dunk contest). */
-export interface HudScoreCard { name: string; score: number; line: string }
+/** score is a string only for an UNREVEALED card ('—' while the staged
+ *  reveal is still walking — 3PT's results board). Revealed cards are always
+ *  numeric; numeric consumers coerce with Number(). */
+export interface HudScoreCard { name: string; score: number | string; line: string }
 /** Values a mode may push to the bezel HUD. Widened at M47 so a judged
  * contest can surface booleans (pulse flags), a cleared field (null) and a
  * 3-judge scorecard array — the bezel decorates them; modes stay declarative. */

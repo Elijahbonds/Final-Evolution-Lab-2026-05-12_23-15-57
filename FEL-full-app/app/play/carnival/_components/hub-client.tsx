@@ -59,7 +59,7 @@ function CarnivalHubInner() {
       <main className="mx-auto max-w-[560px] px-4 py-8 text-center">
         <div className="fel-panel rounded-2xl p-8">
           <PartyPopper className="mx-auto h-12 w-12 text-[#FFD700]" />
-          <h1 className="fel-heading mt-3 text-3xl font-bold text-white">COURT CARNIVAL</h1>
+          <h1 className="fel-heading mt-3 text-3xl font-bold text-white">GAME NIGHT</h1>
           <p className="mt-1 text-sm text-white/50">Venice Beach Carnival — a party night of quick bursts, back to back.</p>
 
           <div className="mt-6 space-y-2 text-left">

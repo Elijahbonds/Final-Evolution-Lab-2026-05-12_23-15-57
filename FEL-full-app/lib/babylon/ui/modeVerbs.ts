@@ -134,10 +134,12 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
   }),
 
   // Pass-and-play head-to-head dunk contest — no mid-air tricks here (see
-  // DunkDuelMode.ts), so X stays inert rather than wired to nothing.
+  // DunkDuelMode.ts). X arms THE CHAIR: the prop needs a face button because
+  // a Controller Link phone's d-pad IS its movement stick.
   dunkduel: verbs({
     A: { label: 'SLAM', emit: A('A') },
     B: { label: 'STYLE', emit: A('B') },
+    X: { label: 'CHAIR', emit: A('X') },
     Y: { label: 'CHARGE', emit: RT(1), hold: true },
   }),
 

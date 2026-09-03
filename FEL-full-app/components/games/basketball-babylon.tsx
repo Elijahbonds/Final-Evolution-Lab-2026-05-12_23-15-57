@@ -119,7 +119,7 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
 
       <BootSplash
         modeId="onevone"
-        title="1V1 HOOPS"
+        title="ONES"
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}

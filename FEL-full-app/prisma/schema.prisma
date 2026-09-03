@@ -1165,6 +1165,7 @@ model AvatarLook {
   face        Json     // FaceConfig: skinTone, faceShape, hairStyle, hairColor, eyeShape, eyeColor, brows, mouth, nose
   equipped    Json     // { headwear, tops, shorts, shoes, accessory } -> itemId|null
   skinCardId  String?  // applied creator-card skin (ownership verified server-side)
+  jersey      Json?    // JerseyConfig: { number 0-99, name <=12 } rendered on the hero's back
   updatedAt   DateTime @updatedAt
   createdAt   DateTime @default(now())
 }

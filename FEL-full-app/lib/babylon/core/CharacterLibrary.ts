@@ -14,6 +14,7 @@ import { registerAuthoredClips } from '../anim/authored';
 import { CLIP_ALIASES } from '../anim/clipAliases';
 import { registerMirroredClips, DANCE_ALIASES, DANCE_MIRROR_BASES } from '../anim/mirrored-clips';
 import { installSafePlay } from '../anim/clipRegistry';
+import { resolveIdentity, applyIdentity } from './playerIdentity';
 import { SkinningGuard } from '../anim/SkinningGuard';
 import { gateContainerRig } from '../anim/rigNormalize';
 import { solveArmsDown } from '../anim/restPose';           // M69: E25 finish
@@ -21,6 +22,7 @@ import { applyRestPoseToSkeleton } from '../anim/restPoseApply';
 import { snapToGround } from './groundSnap';                // M69: feet-on-court
 import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
+import { rosterUrlFor } from './athleteRoster';
 
 // M28 dance: make dance clip ids resolvable and pre-build mirrored variants once.
 Object.assign(CLIP_ALIASES, DANCE_ALIASES);
@@ -45,6 +47,7 @@ export interface SpawnOpts {
   scale?: number;           // 0.92–1.08 for mob variance
   startClip?: string;       // default 'idle_stand'
   modeId?: string;          // M42: tags [FEL-ANIM] MISSING CLIP warnings with the calling mode
+  identity?: boolean;       // default true — set false when the CALLER applies identity (CharacterPipeline.spawnPlayer), or everything skins twice
 }
 
 // M30 fix: instantiateModelsToScene's rename suffixes AnimationGroup names too
@@ -97,8 +100,45 @@ export const CharacterLibrary = {
     // M105 (Path A): the Meshy hero GLB is visually broken. When
     // PROCEDURAL_CHARACTERS is on, bypass the GLB entirely and spawn a clean,
     // assetless, cel-shaded procedural athlete satisfying the same contract.
-    if (PROCEDURAL_CHARACTERS) return spawnProceduralAthlete(scene, opts);
-    const container = await loadContainer(scene, url);
+    if (PROCEDURAL_CHARACTERS) {
+      const spawned = await spawnProceduralAthlete(scene, opts);
+      // THE SAVED LOOK, ONE PIPE: a spawn that chose NO colors of its own
+      // wears the player's Closet identity (proportions + skin + wardrobe) —
+      // the same applyIdentity CharacterPipeline.spawnPlayer uses, now at the
+      // layer every mode actually calls. Explicit tint/skinTone always wins
+      // (rivals and NPCs keep their authored look). Identity applies only
+      // when a logged-in player's closet answered (custom) — guests and dev
+      // drivers get the unchanged default. Measured gap this closes: the
+      // Closet saved, the rig accepted, and bare-spawned heroes played
+      // anonymous.
+      if (opts.tint == null && opts.skinTone == null && opts.identity !== false) {
+        try {
+          const id = await resolveIdentity();
+          if (id.custom) applyIdentity(spawned, id);
+        } catch (e) { console.error('[FEL-IDENTITY] hero identity failed', e); }
+      }
+      return spawned;
+    }
+    // ROSTER (anti-clone): a tinted spawn on the shared hero URL is a
+    // rival/NPC by convention in every mode — give it a distinct baked body
+    // from the athlete roster. Kit color is baked into the roster GLB, so the
+    // runtime tint is skipped when a swap happens. Any roster load failure
+    // falls back to the requested URL; the roster can never brick a spawn.
+    const rosterUrl = rosterUrlFor(url, opts.tint);
+    let effectiveUrl = url;
+    let rosterPicked = false;
+    let container: AssetContainer;
+    if (rosterUrl) {
+      try {
+        container = await loadContainer(scene, rosterUrl);
+        effectiveUrl = rosterUrl;
+        rosterPicked = true;
+      } catch {
+        container = await loadContainer(scene, url);
+      }
+    } else {
+      container = await loadContainer(scene, url);
+    }
     const inst = container.instantiateModelsToScene(
       (n) => `${n}_c${++spawnCounter}`, false, { doNotInstantiate: true },
     );
@@ -106,7 +146,7 @@ export const CharacterLibrary = {
     const skeleton = inst.skeletons[0];
     const meshes = root.getChildMeshes();
 
-    if (!skeleton) throw new Error(`[FEL-CHAR] no skeleton in ${url}`);
+    if (!skeleton) throw new Error(`[FEL-CHAR] no skeleton in ${effectiveUrl}`);
 
     // ── THE M30 FIX: restore original clip names on this spawn's animation
     // groups. 'guard_c58' -> 'guard' so aliases (run_forward->run, jab, hook…)
@@ -126,7 +166,7 @@ export const CharacterLibrary = {
     root.rotation = new Vector3(0, opts.yawRad ?? 0, 0);
     root.scaling.setAll(opts.scale ?? 1);
 
-    if (opts.tint) applyTint(meshes, opts.tint);
+    if (opts.tint && !rosterPicked) applyTint(meshes, opts.tint);
 
     const animator = new CharacterAnimator(scene, inst.animationGroups);
     registerAuthoredClips(animator, scene, skeleton);
@@ -140,7 +180,7 @@ export const CharacterLibrary = {
     // M42: cooperative safe-play guard — logs loudly + avoids bind pose if a
     // truly-unknown clip name is ever requested (delegates to resolver-backed
     // play so the CLIP_ALIASES table still works for known sport names).
-    installSafePlay(animator, opts.modeId ?? url);
+    installSafePlay(animator, opts.modeId ?? effectiveUrl);
 
     // M69 (E25 complete): write a measured arms-down pose onto the SKELETON so
     // it is the resting state for EVERY character in EVERY state — not only the
@@ -148,6 +188,27 @@ export const CharacterLibrary = {
     // run BEFORE the first clip starts so there is no one-frame bind-pose flash.
     const restPose = solveArmsDown(skeleton);
     applyRestPoseToSkeleton(skeleton, restPose);
+
+    const spawned: SpawnedCharacter = {
+      id: `char_${spawnCounter}`,
+      root, meshes, skeleton, animator,
+      dispose() {
+        animator.dispose();
+        inst.dispose();
+      },
+    };
+
+    // THE SAVED LOOK, GLB PATH: same one identity pipe as the procedural
+    // branch above. The forged hero (scripts/avatar/forge.mts) names its
+    // materials skin/jersey/shorts/shoes/hair precisely so applyIdentity's
+    // name-matched slots find them. Roster athletes carry their own baked
+    // colorway and are never over-painted.
+    if (!rosterPicked && opts.tint == null && opts.skinTone == null && opts.identity !== false) {
+      try {
+        const id = await resolveIdentity();
+        if (id.custom) applyIdentity(spawned, id);
+      } catch (e) { console.error('[FEL-IDENTITY] GLB hero identity failed', e); }
+    }
 
     animator.play(baseLoop, { loop: true });
 
@@ -164,14 +225,7 @@ export const CharacterLibrary = {
     // LAST step: the rest pose above affects the measured bounds. courtY = 0.
     snapToGround(root, meshes, 0);
 
-    return {
-      id: `char_${spawnCounter}`,
-      root, meshes, skeleton, animator,
-      dispose() {
-        animator.dispose();
-        inst.dispose();
-      },
-    };
+    return spawned;
   },
 };
 

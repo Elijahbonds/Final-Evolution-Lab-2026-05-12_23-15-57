@@ -259,7 +259,7 @@ export default function TennisGame({ grade, prq, onEnd, gamepad }: GameProps) {
       ctx.fillStyle = '#FF3366'; ctx.fillText(String(st.oScore), W / 2 + 80, 46);
       ctx.fillStyle = '#fff'; ctx.font = '600 14px "Barlow Condensed", sans-serif';
       const clock = Math.max(0, 120 - Math.floor(elapsed));
-      ctx.fillText(`MATCH PLAY · FIRST TO 5 · ${String(Math.floor(clock / 60))}:${String(clock % 60).padStart(2, '0')}`, W / 2, 22);
+      ctx.fillText(`MATCH POINT · FIRST TO 5 · ${String(Math.floor(clock / 60))}:${String(clock % 60).padStart(2, '0')}`, W / 2, 22);
       ctx.textAlign = 'right'; ctx.font = '12px "JetBrains Mono", monospace';
       ctx.fillStyle = gradeRef.current?.color ?? '#00FF9D';
       ctx.fillText(`PRQ ${Math.round(prq)} · ${gradeRef.current?.label ?? ''}`, W - 60, 24);
@@ -289,7 +289,7 @@ export default function TennisGame({ grade, prq, onEnd, gamepad }: GameProps) {
         <canvas ref={canvasRef} className="w-full rounded-lg border border-white/10 bg-[#0F0F13]" style={{ aspectRatio: '16/9' }} />
         {!started && (
           <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg bg-black/70 backdrop-blur-sm">
-            <h2 className="fel-heading text-4xl font-bold text-white">MATCH PLAY</h2>
+            <h2 className="fel-heading text-4xl font-bold text-white">MATCH POINT</h2>
             <p className="mt-2 max-w-md text-center text-sm text-white/60">Rally against an adaptive AI. Watch the ghost ring — it shows where the incoming ball lands. Rush to the spot and <span className="text-[#00E5FF]">time your swing</span>: too early dumps into the net, too late floats an easy smash. First to 5 — 120s tiebreak clock.</p>
             <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-xs text-white/55">
               <span>MOUSE / A D — Move</span><span>SPACE / TAP — Serve</span>

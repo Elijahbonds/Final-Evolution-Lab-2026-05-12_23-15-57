@@ -19,6 +19,7 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
+import { Onlookers } from '../visual/Onlookers';
 import { SoundKit } from '../audio/SoundKit';
 import type { AirSessionCore } from '../../feel/cores/air-session-core';
 import type { TrickGrade, CadenceSide } from '../../feel';
@@ -58,6 +59,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   let athlete: SpawnedCharacter | null = null;
   let core: AirSessionCore | null = null;
   let launchPad: Mesh | null = null;
+  let gallery: Onlookers | null = null;          // L4 — a judged event is watched
   let loadCount = 0;
   let disposeCount = 0;
 
@@ -137,6 +139,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         if (grade === 'stuck' || grade === 'clean') S.combo += 1; else S.combo = 0;
         if (S.best === null || GRADE_RANK[grade] > GRADE_RANK[S.best]) S.best = grade;
         say(`${GRADE_LABEL[grade]}${rotations >= 1 ? `  ${rotations.toFixed(1)} ROT` : ''}`, 1.6);
+        gallery?.cheer(grade === 'stuck' ? 1 : grade === 'clean' ? 0.6 : grade === 'sketchy' ? 0.3 : 0.15);
         SoundKit.play(grade === 'crash' ? 'miss' : 'score');
         ctx.juice.scorePop(
           athlete ? athlete.root.position.add(new Vector3(0, 2.2, 0)) : Vector3.Zero(),
@@ -146,6 +149,14 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       });
 
       ctx.camDirector.snapTo(athlete.root.position, launchPad.position);
+      // L4 — a judged performance is watched. The gallery flanks the runway
+      // (the athlete runs -z into the launch at z=-12): two banks at |x|=4,
+      // outside the run line, in the runner cam's frame edges. Instanced,
+      // 2 draws, shared by both skins — one factory, never forked.
+      gallery = new Onlookers(ctx.scene, [
+        ...[0, 1, 2, 3, 4, 5].map((i) => new Vector3(-4, 0, -3 - i * 2.2)),
+        ...[0, 1, 2, 3, 4, 5].map((i) => new Vector3(4, 0, -4.5 - i * 2.2)),
+      ]);
       pushHud(ctx);
     },
 
@@ -199,6 +210,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
 
       if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
 
+      gallery?.update(dt);
       ctx.camDirector.update(athlete.root.position, new Vector3(0, 0, -st.speed), launchPad.position);
       pushHud(ctx);
     },
@@ -211,6 +223,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       if (disposeCount < loadCount) return;
       athlete?.dispose(); athlete = null;
       launchPad?.dispose(); launchPad = null;
+      gallery?.dispose(); gallery = null;
       core = null;
     },
   };

@@ -13,6 +13,14 @@ import { hnode, hnum } from './hud-format';
 
 type Hud = Record<string, HudValue>;
 
+// Which mount currently owns a given canvas. StrictMode double-mounts this
+// host: effect A starts an async runMode(), its cleanup fires before A has
+// finished loading, then effect B starts on the SAME canvas — and A's late
+// teardown disposed the engine holding B's WebGL context. Measured on the
+// /play route: black frame, RenderWatchdog rescue fails on a dead context.
+// Same guard as carnival-babylon / air-session-babylon.
+const canvasOwner = new WeakMap<HTMLCanvasElement, object>();
+
 export default function MixedCombatBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
@@ -21,10 +29,16 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  // A parent passing an inline arrow gives a new onEnd every render — the
+  // effect must NOT depend on its identity (see air-session-babylon).
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const token = {};
+    canvasOwner.set(canvas, token);
     const bus = new InputBus();
     busRef.current = bus;
     let stop: (() => void) | null = null;
@@ -33,15 +47,18 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      const won = r.outcome === 'WIN';
+      // The mode ends 'MATCH_WON'/'MATCH_LOST' — the old 'WIN' check here
+      // made every recap read DEFEATED, and stats.wins never existed, so the
+      // score was always 0 (the mode's score rides r.score).
+      const won = r.outcome === 'MATCH_WON';
       const result: GameResult = {
-        score: Number(r.stats?.wins ?? 0),
+        score: Math.max(0, Math.round(r.score ?? 0)),
         opponentScore: Number(r.stats?.foeWins ?? 0),
         won,
         duration: r.durationSec,
         headline: won ? 'CHAMPION' : 'DEFEATED',
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
 
     runMode(MODES.mixedcombat, {
@@ -56,17 +73,20 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
       resultSink,
     })
       .then((s) => {
-        if (disposed) { s(); return; }
+        // A newer mount owns the canvas: do NOT run our teardown — it would
+        // dispose the engine holding the shared WebGL context.
+        if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
         stop = s;
       })
       .catch((e) => console.error('[FEL-COMBAT] boot failed', e));
 
     return () => {
       disposed = true;
-      stop?.();
+      if (canvasOwner.get(canvas) === token) stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps — onEnd via ref, mount once
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
@@ -108,9 +128,32 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
         </div>
       )}
 
+      {/* Edge danger — the ring-out is the signature, so the warning must be
+          on the bezel, pulsing, the moment a back nears the rim. */}
+      {typeof hud.edge === 'string' && hud.edge && phase === 'playing' && (
+        <div className="pointer-events-none absolute inset-x-0 top-[22%] text-center">
+          <span
+            className={`fel-heading animate-pulse text-xl font-black drop-shadow ${
+              hud.edge === 'EDGE BEHIND YOU' ? 'text-[#FF3366]' : 'text-[#00FF9D]'
+            }`}
+          >
+            {hud.edge === 'EDGE BEHIND YOU' ? '⚠ EDGE BEHIND YOU ⚠' : 'RIVAL ON THE EDGE — PRESS!'}
+          </span>
+        </div>
+      )}
+
+      {/* The mode's own instructions (loadout pick, fight grammar). The mode
+          published these every phase and no bezel ever drew them — trap:
+          "published is not rendered". */}
+      {typeof hud.hint === 'string' && hud.hint && (phase === 'playing' || phase === 'countdown') && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[13%] flex justify-center">
+          <span className="fel-panel max-w-lg px-3 py-1 text-center text-[11px] text-white/80">{hud.hint}</span>
+        </div>
+      )}
+
       <BootSplash
         modeId="mixedcombat"
-        title="MIXED COMBAT"
+        title="RING'S EDGE"
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}

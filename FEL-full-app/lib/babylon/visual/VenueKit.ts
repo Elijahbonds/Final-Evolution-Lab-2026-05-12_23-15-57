@@ -27,15 +27,47 @@ function paintedGround(
   ctx.fillStyle = base; ctx.fillRect(0, 0, 1024, 1024);
   paint(ctx, 1024, 1024);
   tex.update();
+  // the finish: a soft center glow painted INTO the texture (no lights added)
+  const glow = ctx.createRadialGradient(512, 512, 60, 512, 512, 640);
+  glow.addColorStop(0, 'rgba(255,255,255,0.10)');
+  glow.addColorStop(1, 'rgba(0,0,0,0.12)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, 1024, 1024);
+  tex.update();
   const m = new StandardMaterial('venue_ground_mat', scene);
   m.diffuseTexture = tex;
   m.emissiveColor = Color3.FromHexString(base).scale(0.08);
-  m.specularColor = new Color3(0.04, 0.04, 0.04);
+  m.specularColor = new Color3(0.14, 0.14, 0.16);   // a floor that catches light
+  m.specularPower = 48;
   ground.material = m;
   ground.receiveShadows = true;
   ground.checkCollisions = false;
   ground.isPickable = true;                 // camera occlusion probe needs it
   return ground;
+}
+
+// ── Wall juice (one place → every venue) ────────────────────────────────────
+// Applied AFTER each wall's painter: a night-sky gradient cap above the art,
+// a neon trim strip at the top edge, and a soft floor-glow at the base — the
+// difference between "flat plywood box" and "arena at night". Zero draws added.
+function wallJuice(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+  // sky cap: deep to lifted over the top third of the wall
+  const sky = ctx.createLinearGradient(0, 0, 0, H * 0.34);
+  sky.addColorStop(0, 'rgba(6,8,18,0.95)');
+  sky.addColorStop(1, 'rgba(6,8,18,0)');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H * 0.34);
+  // neon trim strip along the top edge — the venue's light line
+  ctx.fillStyle = 'rgba(0,229,255,0.9)';
+  ctx.fillRect(0, 0, W, 5);
+  ctx.fillStyle = 'rgba(0,229,255,0.22)';
+  ctx.fillRect(0, 5, W, 14);
+  // base glow: the floor light bleeding up the wall bottom
+  const base = ctx.createLinearGradient(0, H * 0.82, 0, H);
+  base.addColorStop(0, 'rgba(255,255,255,0)');
+  base.addColorStop(1, 'rgba(255,255,255,0.08)');
+  ctx.fillStyle = base;
+  ctx.fillRect(0, H * 0.82, W, H * 0.18);
 }
 
 /** 4-wall venue box with per-wall art painter (M22 §6). */
@@ -56,6 +88,7 @@ function venueBox(
     const tex = new DynamicTexture(`wall_tex_${d.name}`, { width: 1024, height: 256 }, scene, false);
     const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
     (painters[i % painters.length])(ctx, 1024, 256);
+    wallJuice(ctx, 1024, 256);          // every venue gets the finish
     tex.update();
     const m = new StandardMaterial(`wall_mat_${d.name}`, scene);
     m.diffuseTexture = tex; m.emissiveTexture = tex; m.emissiveColor = new Color3(0.35, 0.35, 0.35);
