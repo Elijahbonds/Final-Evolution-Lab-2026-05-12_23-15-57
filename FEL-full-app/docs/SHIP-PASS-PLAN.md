@@ -178,6 +178,23 @@ concept-lock docs.
   defenders switch marks when beaten (`scramSwitch`, announced once). Ride
   worlds and the ocean court are PBR. The skate start snaps behind the rider's
   facing (the mobile start flake: two clean phone runs after). The Closet
-  preview regression is fixed (`AdditiveTrack`). Fixed cameras re-aim on a
+  preview regression looked fixed (`AdditiveTrack`) — see the next entry. Fixed cameras re-aim on a
   snap, which closes carnival's Hot Shot hits for good (two clean runs). The
   Camp's delta helpers are pure and tested.
+- **2026-09-03, the Closet regression's REAL cause (the entry above was a
+  partial).** `AdditiveTrack` fixed a genuine compounding bug, but the preview
+  stayed "exploded". A per-mesh readiness probe (`scripts/_closet-scene-probe.mts`,
+  dev-only `window.__FEL_PREVIEW__` hook) showed every mesh in place and ONE
+  material never ready: the skin. Cause: the identity pass tints by cloning the
+  material, `Material.clone` deep-clones textures, and `DynamicTexture.clone()`
+  is a blank canvas nobody draws into — the cloned pore map never became ready,
+  the skin never compiled, and the body rendered as floating clothes. Every
+  logged-in hero in every mode took the same path; the gauntlet never saw it
+  because dev captures do not log in (gap recorded below). Fix: `cloneForTint`
+  shares the source bump map (tested). Also found on the way and kept: leg
+  bones carried non-uniform scale (0.94/0.85/0.91) under `BoneIKController` on
+  this linked-node rig, so foot planting mounts at intensity 0 until a
+  node-space solver replaces it; the pore-map cache rejects a disposed texture.
+- **Gauntlet gap (open):** the 21-mode captures spawn the hero WITHOUT a login,
+  so `applyIdentity` and the new spawn layers only meet in the Closet. A
+  logged-in capture of one mode per family belongs in the gauntlet before ship.

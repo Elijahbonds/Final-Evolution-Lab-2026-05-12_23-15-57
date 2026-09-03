@@ -8,7 +8,22 @@ import { applyFaceMorphs, resolveFaceWeights } from './faceMorphs';
 import { Color3, DynamicTexture, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Material } from '@babylonjs/core';
 
-type TintMat = Material & { albedoColor?: Color3; diffuseColor?: Color3 };
+type TintMat = Material & { albedoColor?: Color3; diffuseColor?: Color3; bumpTexture?: { dispose(): void } | null };
+
+/** Clone a material for tinting while SHARING its bump map. Material.clone
+ *  deep-clones textures, and DynamicTexture.clone() is a blank canvas that
+ *  nobody ever draws into: the copy never becomes ready, so the material never
+ *  compiles and the mesh vanishes. That was the Closet's "exploded" body — the
+ *  skin (the only mesh whose material carries the procedural pore map) simply
+ *  never rendered. Every logged-in hero in every mode took the same path. */
+export function cloneForTint(m: TintMat, name: string): TintMat | null {
+  const clone = m.clone(name) as TintMat | null;
+  if (clone && m.bumpTexture) {
+    clone.bumpTexture?.dispose();
+    clone.bumpTexture = m.bumpTexture;
+  }
+  return clone;
+}
 import type { SpawnedCharacter } from './CharacterLibrary';
 import type { AvatarSpec } from '../../workout/avatar-builder';
 import { boneNode } from '../anim/boneLookup';
@@ -190,7 +205,7 @@ function applySkinTone(spawn: SpawnedCharacter, hex: string): void {
     const isSkin = named
       || (c.r > 0.45 && c.g > 0.25 && c.b > 0.15 && c.r > c.b && c.g > c.b * 0.9);
     if (!isSkin) continue;
-    const clone = m!.clone(`${m!.name}_skin`) as TintMat | null;
+    const clone = cloneForTint(m!, `${m!.name}_skin`);
     if (clone) { matColor(clone)?.copyFrom(tone); mesh.material = clone; }
   }
 }
@@ -204,7 +219,7 @@ function applyHair(spawn: SpawnedCharacter, hex: string, bald: boolean): void {
     // the brows share this material and must keep their color either way.
     void bald;
     const tone = Color3.FromHexString(hex);
-    const clone = m.clone(`${m.name}_style`) as TintMat | null;
+    const clone = cloneForTint(m, `${m.name}_style`);
     if (clone) { matColor(clone)?.copyFrom(tone); mesh.material = clone; }
   }
 }
@@ -215,7 +230,7 @@ function tintSlot(spawn: SpawnedCharacter, keys: string[], hex: string): void {
     if (!m) continue;
     const name = `${mesh.name} ${m.name}`.toLowerCase();
     if (!keys.some((k) => name.includes(k))) continue;
-    const clone = m.clone(`${m.name}_wear`) as TintMat | null;
+    const clone = cloneForTint(m, `${m.name}_wear`);
     if (clone) { matColor(clone)?.copyFrom(tint); mesh.material = clone; }
   }
 }

@@ -45,6 +45,9 @@ export default function AvatarPreview({ face, palette, jersey }: AvatarPreviewPr
       // identity:false — the DRAFT look is applied below, not the saved one.
       const spawned = await CharacterLibrary.spawn(scene, '/models/fel-hero.glb', { identity: false });
       if (disposed) { spawned.dispose(); engine.dispose(); return; }
+      // dev-only probe hook (scripts/_closet-scene-probe.mts): the preview is the
+      // one place the identity pipe and the spawn layers meet without a login
+      if (process.env.NODE_ENV === 'development') (window as unknown as { __FEL_PREVIEW__?: unknown }).__FEL_PREVIEW__ = { scene, spawned };
 
       applyRef.current = (p: AvatarPreviewProps) => {
         applyIdentity(spawned, {

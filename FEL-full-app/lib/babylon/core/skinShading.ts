@@ -22,7 +22,11 @@ const PORE_SIZE = 256;
  *  micro-highlights, not to sculpt features. */
 function poreNormalMap(scene: Scene): DynamicTexture {
   const cached = (scene.metadata ??= {})[PORE_TEX_KEY] as DynamicTexture | undefined;
-  if (cached) return cached;
+  // A spawn disposed with its textures (the Closet re-spawns on every look
+  // change; React's dev double-effect spawns twice) takes the shared map
+  // with it. Handing the dead texture to the next spawn leaves the skin
+  // material never-ready and the body invisible, so rebuild in that case.
+  if (cached && cached.getInternalTexture()) return cached;
   const tex = new DynamicTexture('fel_skin_pore_normal', { width: PORE_SIZE, height: PORE_SIZE }, scene, false);
   const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
   const img = ctx.createImageData(PORE_SIZE, PORE_SIZE);

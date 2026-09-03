@@ -214,8 +214,15 @@ export const CharacterLibrary = {
     applyHairStyle(meshes, bakedHair ? HAIR_KEY_TO_STYLE[bakedHair] ?? DEFAULT_HAIR_STYLE : DEFAULT_HAIR_STYLE);
     const skinned = meshes.find((m) => m.skeleton === skeleton) ?? meshes[0];
     const secondary = mountSecondaryMotion(scene, skeleton, { intensity: tier === 'mobile' ? 0.6 : 1 });
+    // FOOT PLANTING IS OFF (2026-09-03, measured in the Closet preview): Babylon's
+    // BoneIKController writes matrices that this glTF rig — bones driven by
+    // linked TransformNodes — decomposes into non-uniform SCALE on the thigh and
+    // shin (0.94/0.85/0.91) and the body flies apart. Modes were spared only
+    // because a standing ankle sits 1 cm above the plant threshold. The pure
+    // contact state machine stays (tested); a node-space two-bone solver is the
+    // follow-up before this returns. intensity 0 mounts nothing.
     const planting = skinned
-      ? mountFootPlanting(scene, skinned, skeleton, { root, intensity: tier === 'mobile' ? 0 : 1 })
+      ? mountFootPlanting(scene, skinned, skeleton, { root, intensity: 0 })
       : null;
 
     const spawned: SpawnedCharacter = {
