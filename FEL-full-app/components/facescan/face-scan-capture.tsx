@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { faceFromLandmarks, type Landmark } from '@/lib/facescan/faceFromLandmarks';
+import { slidersFromLandmarks } from '@/lib/facescan/slidersFromLandmarks';
 import type { FaceConfig } from '@/lib/closet/wearable-catalog';
 
 type Status = 'idle' | 'loading-model' | 'camera' | 'analyzing' | 'error';
@@ -102,6 +103,11 @@ export function FaceScanCapture({
         ? sampleColor(cctx, w, h, pts[IRIS_L].x, pts[IRIS_L].y)
         : (pts[IRIS_R] ? sampleColor(cctx, w, h, pts[IRIS_R].x, pts[IRIS_R].y) : undefined);
       const partial = faceFromLandmarks(pts, skinHex, eyeHex);
+      // Phase 3 likeness: the same landmarks also drive the forge's morph
+      // sliders, so the avatar keeps the person's proportions, not just the
+      // nearest named preset. Pure, in-browser, nothing leaves the page.
+      const sliders = slidersFromLandmarks(pts);
+      if (Object.keys(sliders).length) partial.sliders = sliders;
       stopCamera();
       onResult(partial);
     } catch (e) {

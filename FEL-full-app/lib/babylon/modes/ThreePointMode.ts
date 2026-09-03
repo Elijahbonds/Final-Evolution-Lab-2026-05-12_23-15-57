@@ -27,6 +27,7 @@
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Mesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
@@ -418,7 +419,7 @@ export const ThreePointMode: ModeDefinition = {
     VenueKit.buildCourt(ctx.scene, 'venice');
     applyOceanCourt(ctx.scene, 'venice');
 
-    player = await CharacterLibrary.spawn(ctx.scene, '', {
+    player = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
       position: RACK_POS[0].clone(),
       startClip: 'idle_stand',
       modeId: 'threepoint',

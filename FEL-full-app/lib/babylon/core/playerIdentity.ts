@@ -3,6 +3,7 @@
 // cycle. Modes spawning a BARE hero (no tint/skinTone chosen) get the player's
 // saved look applied automatically; explicit colors always win (rivals/NPCs).
 
+import { applyFaceMorphs, resolveFaceWeights } from './faceMorphs';
 import { Color3, DynamicTexture, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Material } from '@babylonjs/core';
 
@@ -91,6 +92,11 @@ export function applyIdentity(
   //    the flat FaceConfig preset variety is handled by the Closet preview rig).
   applySkinTone(spawn, id.face.skinTone);
   applyHair(spawn, id.face.hairColor, id.face.hairStyle === 'Bald');
+  // Phase 3 (2026-09-02): the forge now has a face. Shape presets and the
+  // fine-tune sliders resolve through one table; eye color lands on the
+  // iris material. No-ops on a body without morphs or an iris.
+  applyFaceMorphs(spawn.meshes, resolveFaceWeights({ faceShape: id.face.faceShape, brows: id.face.brows, sliders: id.face.sliders as never }));
+  tintSlot(spawn, ['iris'], id.face.eyeColor);
   if (parts === 'body') return;
   // 3) Wardrobe palette — jersey/shorts/shoes tints by mesh/material slot name.
   tintSlot(spawn, ['jersey', 'top', 'shirt', 'tee'], id.palette.jersey);

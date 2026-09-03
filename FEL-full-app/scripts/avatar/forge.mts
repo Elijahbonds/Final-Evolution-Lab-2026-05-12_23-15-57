@@ -106,8 +106,28 @@ function poseToLocals(pose: Pose): Map<string, Quat> {
   return locals;
 }
 
-/** Compose world deltas: q('x', a) THEN q('y', b) etc. in listed order. */
+/** Compose world deltas. NOTE (measured 2026-09-02 with _pose-dump.mts): the
+ *  product a·b applies b FIRST, so `chain(a, b)` = "b, then a". A rotation
+ *  about a limb's own bind axis (x for arms) is an invisible twist — drop the
+ *  arm about z first, THEN swing it about x: `chain(qAxis('x', -30), qAxis('z', -62))`. */
 const chain = (...qs: Quat[]): Quat => qs.reduce((acc, q) => qNorm(qMul(acc, q)), [0, 0, 0, 1] as Quat);
+
+/** Rotation taking unit vector a onto unit vector b (no twist). */
+const qFromTo = (a: [number, number, number], b: [number, number, number]): Quat => {
+  const n = (v: [number, number, number]): [number, number, number] => { const l = Math.hypot(...v) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  const u = n(a), v = n(b);
+  const d = u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+  if (d < -0.9999) return [0, 0, 1, 0];                               // 180°: flip about z
+  const c: [number, number, number] = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+  return qNorm([c[0], c[1], c[2], 1 + d]);
+};
+
+/** Aim a limb whose bind axis is `bindAxis` (arms: +x left, −x right) at a
+ *  WORLD direction, given its parent's composed world delta. Returns the
+ *  bone's own world delta for a Pose. Anatomical authoring: "forearm points
+ *  up-and-forward" instead of guessing Euler angles. */
+const aimLimb = (parentWorld: Quat, bindAxis: [number, number, number], dir: [number, number, number]): Quat =>
+  qNorm(qMul(qInv(parentWorld), qFromTo(bindAxis, dir)));
 
 // ── clip authoring ──────────────────────────────────────────────────────────
 interface ClipKey { t: number; pose: Pose }
@@ -151,12 +171,19 @@ function locomotion(duration: number, thighDeg: number, kneeBase: number, kneeAm
   return keys;
 }
 
+// A fighting guard (Phase 5 prep, 2026-09-02): the old pose left the upper
+// arms 35° below horizontal and read as a splay on screen. Upper arms hang
+// near the torso and swing a little forward; forearms come up so the fists sit
+// at chin height in front of the face. Measured with scripts/avatar/_pose-dump.mts.
+const guardArmL = chain(qAxis('x', -32), qAxis('z', -64));   // drop, then swing forward
+const guardArmR = chain(qAxis('x', -32), qAxis('z', 64));
 const guardPose: Pose = {
   ...armsDown,
-  LeftArm: chain(qAxis('z', -35), qAxis('x', -50)),
-  RightArm: chain(qAxis('z', 35), qAxis('x', -50)),
-  LeftForeArm: chain(qAxis('z', -10), qAxis('x', -75)),
-  RightForeArm: chain(qAxis('z', 10), qAxis('x', -75)),
+  LeftArm: guardArmL,
+  RightArm: guardArmR,
+  // forearms aimed up-and-forward, slightly inward: fists in front of the chin
+  LeftForeArm: aimLimb(guardArmL, [1, 0, 0], [-0.25, 0.62, 0.74]),
+  RightForeArm: aimLimb(guardArmR, [-1, 0, 0], [0.25, 0.62, 0.74]),
   LeftUpLeg: qAxis('y', 10), RightUpLeg: qAxis('y', -10),
   Spine: qAxis('x', 4),
 };
@@ -441,14 +468,78 @@ function sphere(p: Part, cx: number, cy: number, cz: number, r: number, inf: Inf
 }
 
 // ── assemble parts ──────────────────────────────────────────────────────────
+/** Head sphere placement — shared by the face features and the morph targets. */
+const HEAD = { cx: 0, cy: 1.705, cz: 0.01, r: 0.115, from: 0, to: 0 };
+
+/**
+ * Morph targets (Phase 3): POSITION deltas over the skin primitive, non-zero
+ * only on the head sphere. Named so the Closet's face presets map onto them
+ * (lib/babylon/core/faceMorphs.ts). Babylon reads the names from
+ * extras.targetNames.
+ */
+function headMorphs(skin: Part): { name: string; deltas: Float32Array }[] {
+  const n = skin.positions.length / 3;
+  const mk = (name: string, f: (x: number, y: number, z: number) => [number, number, number]) => {
+    const d = new Float32Array(n * 3);
+    for (let i = HEAD.from; i < HEAD.to; i++) {
+      const x = skin.positions[i * 3] - HEAD.cx, y = skin.positions[i * 3 + 1] - HEAD.cy, z = skin.positions[i * 3 + 2] - HEAD.cz;
+      const [dx, dy, dz] = f(x, y, z);
+      d[i * 3] = dx; d[i * 3 + 1] = dy; d[i * 3 + 2] = dz;
+    }
+    return { name, deltas: d };
+  };
+  const R = HEAD.r;
+  const lower = (y: number) => Math.max(0, Math.min(1, (-y) / R));          // 0 at centre, 1 at chin
+  const upper = (y: number) => Math.max(0, Math.min(1, y / R));             // 0 at centre, 1 at crown
+  const front = (z: number) => Math.max(0, Math.min(1, z / R));             // 0 at centre, 1 at the face
+  return [
+    // longer skull: stretch along y, more at the chin
+    mk('faceLong',   (x, y, z) => [0, y * 0.18 + (y < 0 ? -0.012 * lower(y) : 0), 0]),
+    // rounder: fuller cheeks, softer chin
+    mk('faceRound',  (x, y, z) => [x * 0.12 * (1 - upper(y)), y < 0 ? 0.006 * lower(y) : 0, z * 0.05]),
+    // squarer: jaw pushed out and flattened at the sides
+    mk('faceSquare', (x, y, z) => [Math.sign(x) * 0.016 * lower(y), -0.004 * lower(y), 0]),
+    // heart: wide brow, narrow chin
+    mk('faceHeart',  (x, y, z) => [x * (0.10 * upper(y) - 0.14 * lower(y)), 0, 0]),
+    // diamond: wide at the cheekbones, narrow above and below
+    mk('faceDiamond',(x, y, z) => { const c = 1 - Math.min(1, Math.abs(y) / (R * 0.6)); return [x * 0.16 * c - x * 0.06 * (1 - c), 0, 0]; }),
+    // jaw open: lower front of the skull drops
+    mk('jawOpen',    (x, y, z) => [0, -0.03 * lower(y) * front(z), 0.004 * lower(y) * front(z)]),
+    // brow raise: the band above the eyes lifts
+    mk('browRaise',  (x, y, z) => { const band = y > 0.02 * R && y < 0.55 * R ? 1 : 0; return [0, 0.012 * band * front(z), 0]; }),
+  ];
+}
+
 function buildParts(): Part[] {
   const parts: Part[] = [];
   const add = (m: string) => { const p = newPart(m); parts.push(p); return p; };
 
   // head + neck (skin)
   const skinP = add('skin');
-  sphere(skinP, 0, 1.705, 0.01, 0.115, [['Head', 1]]);
+  HEAD.from = skinP.positions.length / 3;
+  sphere(skinP, HEAD.cx, HEAD.cy, HEAD.cz, HEAD.r, [['Head', 1]]);
+  HEAD.to = skinP.positions.length / 3;
   tube(skinP, 'y', [0, 0], 1.46, 1.62, 0.052, 0.048, 8, 1, () => [['Neck', 1]]);
+  // nose — a small wedge on the front of the skull (skin)
+  box(skinP, -0.011, 0.011, 1.685, 1.712, 0.108, 0.128, [['Head', 1]]);
+
+  // face features (Phase 3, ship pass 2026-09-02): eyes, brows, mouth.
+  // Real geometry, so the face reads at gameplay distance and so the
+  // morph targets below have something to move. All ride the Head bone.
+  const eyesP = add('eyes');
+  for (const sx of [-1, 1]) {
+    sphere(eyesP, sx * 0.038, 1.722, 0.098, 0.017, [['Head', 1]], { lat: 6, lon: 8 });
+  }
+  const irisP = add('iris');                                   // eye color lives here, never the hair tint
+  for (const sx of [-1, 1]) {
+    sphere(irisP, sx * 0.038, 1.722, 0.1125, 0.0075, [['Head', 1]], { lat: 5, lon: 8 });
+  }
+  const browP = add('hair');
+  for (const sx of [-1, 1]) {
+    box(browP, sx * 0.058 - 0.026, sx * 0.058 + 0.026, 1.748, 1.756, 0.096, 0.106, [['Head', 1]]);
+  }
+  const lipsP = add('lips');
+  box(lipsP, -0.026, 0.026, 1.652, 1.661, 0.100, 0.109, [['Head', 1]]);
 
   // hair — cap over the back/top of the skull, face left open
   const hairP = add('hair');
@@ -590,6 +681,9 @@ const MAT_COLORS: Record<string, [number, number, number]> = {
   shorts: [0.10, 0.13, 0.34],
   shoes: [0.88, 0.88, 0.86],
   hair: [0.10, 0.07, 0.05],
+  eyes: [0.96, 0.96, 0.95],
+  iris: [0.23, 0.16, 0.10],
+  lips: [0.55, 0.28, 0.26],
 };
 const materials = new Map(Object.entries(MAT_COLORS).map(([name, rgb]) => [
   name,
@@ -602,6 +696,7 @@ const materials = new Map(Object.entries(MAT_COLORS).map(([name, rgb]) => [
 
 // mesh — one primitive per part
 const mesh = doc.createMesh('AthleteBody');
+const targetNames: string[] = [];
 for (const part of buildParts()) {
   const prim = doc.createPrimitive()
     .setAttribute('POSITION', acc('VEC3', new Float32Array(part.positions)))
@@ -611,7 +706,19 @@ for (const part of buildParts()) {
     .setAttribute('WEIGHTS_0', acc('VEC4', new Float32Array(part.weights)))
     .setIndices(acc('SCALAR', new Uint16Array(part.indices)))
     .setMaterial(materials.get(part.material)!);
+  if (part.material === 'skin' && targetNames.length === 0) {
+    // Phase 3: the head morphs live on the skin primitive (the only one with
+    // head vertices). Order == weight order == extras.targetNames.
+    for (const t of headMorphs(part)) {
+      prim.addTarget(doc.createPrimitiveTarget(t.name).setAttribute('POSITION', acc('VEC3', t.deltas)));
+      targetNames.push(t.name);
+    }
+  }
   mesh.addPrimitive(prim);
+}
+if (targetNames.length) {
+  mesh.setWeights(targetNames.map(() => 0));
+  mesh.setExtras({ ...(mesh.getExtras() ?? {}), targetNames });
 }
 const body = doc.createNode('Body').setMesh(mesh).setSkin(skin);
 armature.addChild(body);

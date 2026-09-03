@@ -124,6 +124,21 @@ export const OneVOneMode: ModeDefinition = (() => {
       if ((p.x > 7.2 && v.x > 0) || (p.x < -7.2 && v.x < 0)) v.x = 0;
       if ((p.z > 14.5 && v.z > 0) || (p.z < 0.5 && v.z < 0)) v.z = 0;
       contact.drive(id, v, dt);
+      // The velocity kill is soft on purpose, but an impulse (dunk flight,
+      // steal knock-back, body contact) can still carry a body past the
+      // baseline — measured 2026-09-02: hero at z −1.4 behind the rim, camera
+      // clamped into the corner on top of him. Beyond a hand's width out,
+      // put the body back on the line. Inside the box physics is untouched.
+      // The dunk flight lands at RIM.z + 0.5 (z −0.1), legitimately behind the
+      // z 0.5 line, and the flight itself writes the root directly — so the
+      // near line is the RIM PLANE, not the play line, and nothing fires
+      // mid-dunk.
+      const OUT = 0.15, BEHIND_RIM = 0.5 - RIM.z;   // fires only past z −0.6
+      if (!dunking && (p.x > 7.2 + OUT || p.x < -7.2 - OUT || p.z > 14.5 + OUT || p.z < 0.5 - BEHIND_RIM)) {
+        const back = p.clone();
+        clampToHalfCourt(back, 7.2, 14.5);
+        contact.teleport(id, back);
+      }
     } else {
       root.position.addInPlace(vel.scale(dt));
       clampToHalfCourt(root.position, 7.2, 14.5);

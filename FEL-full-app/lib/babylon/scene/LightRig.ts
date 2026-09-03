@@ -2,16 +2,20 @@
 // Fixes: black skatepark, dark football field, mid-dunk sky collapse.
 
 import {
-  Color3, Color4, DefaultRenderingPipeline, DirectionalLight,
+  CascadedShadowGenerator, Color3, Color4, DefaultRenderingPipeline, DirectionalLight,
   HemisphericLight, ImageProcessingConfiguration, Scene, ShadowGenerator, Vector3,
 } from '@babylonjs/core';
 import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/core';
 import { MOODS, type VenueMood } from './moods';
+import { tierRigSettings, type QualityTier } from './QualityTier';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
 
 export interface LightRigHandle {
   hemi: HemisphericLight; sun: DirectionalLight;
   shadows: ShadowGenerator;
+  /** The mounted post pipeline (ACES, bloom, FXAA, sharpen, vignette). */
+  pipeline: DefaultRenderingPipeline;
+  tier: QualityTier;
   /** M44: brief exposure pulse for a highlight beat (dunk flush, TD, KO,
    *  goal) — reads as a camera-flash without a hard cut. Self-reverts. */
   flashBeat(): void;
@@ -21,8 +25,11 @@ export interface LightRigHandle {
 /** Names that read as ground/floor — auto-receivers, never auto-casters (M44). */
 const RECEIVER_HINTS = /floor|ground|piste|water|court|pitch|green|plate|mound|shore|park_floor|tatami|snow|sky|horizon|swell/i;
 
-export function mountLightRig(scene: Scene, mood: VenueMood): LightRigHandle {
+export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier = 'desktop'): LightRigHandle {
   const M = MOODS[mood];
+  // Ship pass (2026-09-02): desktop 60 fps / mobile 30 fps. The tier decides
+  // shadow map size, cascades on outdoor moods, sharpen and bloom weight.
+  const T = tierRigSettings(tier, mood);
 
   scene.clearColor = Color4.FromHexString(M.clearColor + 'ff');
   scene.fogMode = Scene.FOGMODE_NONE;          // fog was blacking out high cameras
@@ -43,10 +50,27 @@ export function mountLightRig(scene: Scene, mood: VenueMood): LightRigHandle {
   sun.diffuse = Color3.FromHexString(M.sun);
   sun.position = new Vector3(-M.sunDir[0], -M.sunDir[1], -M.sunDir[2]).scale(30);
 
-  const shadows = new ShadowGenerator(1024, sun);
-  shadows.useBlurExponentialShadowMap = true;   // M44: soft, cheap shadows
-  shadows.blurKernel = 24;                       //TUNE(elijah)
-  shadows.darkness = 0.35;                        //TUNE(elijah) shadows read, never pitch black
+  let shadows: ShadowGenerator;
+  if (T.cascaded) {
+    // Desktop, outdoor: three cascades keep the near shadow crisp on a
+    // 60-90 m field without a 4k map. Stabilized so the edge does not swim
+    // as the follow camera moves; PCF for the soft edge the blur gave us.
+    const csm = new CascadedShadowGenerator(T.shadowMapSize, sun);
+    csm.numCascades = 3;
+    csm.lambda = 0.85;
+    csm.shadowMaxZ = 90;
+    csm.stabilizeCascades = true;
+    csm.cascadeBlendPercentage = 0.1;
+    csm.usePercentageCloserFiltering = true;
+    csm.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+    csm.darkness = 0.35;
+    shadows = csm;
+  } else {
+    shadows = new ShadowGenerator(T.shadowMapSize, sun);
+    shadows.useBlurExponentialShadowMap = true;   // M44: soft, cheap shadows
+    shadows.blurKernel = tier === 'mobile' ? 12 : 24;   //TUNE(elijah)
+    shadows.darkness = 0.35;                        //TUNE(elijah) shadows read, never pitch black
+  }
 
   // M44: auto-classify casters/receivers by mesh name so shadows appear in
   // every mode WITHOUT any mode file calling addShadowCasters (which nothing
@@ -68,10 +92,10 @@ export function mountLightRig(scene: Scene, mood: VenueMood): LightRigHandle {
   pipeline.bloomEnabled = true;
   pipeline.bloomThreshold = M.bloomThreshold;
   pipeline.bloomWeight = M.bloomWeight;
-  pipeline.bloomScale = M.bloomScale;
+  pipeline.bloomScale = M.bloomScale * T.bloomScaleMul;
   // M44: free anti-aliasing + a light sharpen pass (edges were raw/jagged)
   pipeline.fxaaEnabled = true;
-  pipeline.sharpenEnabled = true;
+  pipeline.sharpenEnabled = T.sharpen;               // mobile skips the full-screen pass
   pipeline.sharpen.edgeAmount = 0.25;                             //TUNE(elijah)
   // M44: mood-tinted vignette so the grade reads on the whole frame
   pipeline.imageProcessing.vignetteEnabled = true;
@@ -82,7 +106,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood): LightRigHandle {
 
   let flashObs: ReturnType<Scene['onBeforeRenderObservable']['add']> | null = null;
   return {
-    hemi, sun, shadows,
+    hemi, sun, shadows, pipeline, tier,
     flashBeat() {
       const base = M.exposure;
       pipeline.imageProcessing.exposure = base * 1.35;            //TUNE(elijah)

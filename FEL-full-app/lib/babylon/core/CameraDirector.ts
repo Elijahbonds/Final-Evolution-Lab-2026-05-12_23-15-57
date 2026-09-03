@@ -512,9 +512,17 @@ export class CameraDirector {
       const dir = velocity.normalizeToNew();
       const flat = new Vector3(dir.x, 0, dir.z);
       if (flat.lengthSquared() > 1e-4) flat.normalize();
+      // Boxed-in guard (measured 2026-09-02, 1v1 corner): when the venue
+      // clamp leaves the camera almost on top of the hero, a full lead puts
+      // the look-target a metre past him and the frame loses him off the
+      // bottom. Fade the lead to zero as horizontal separation collapses
+      // below the framing minimum — up close, look AT him.
+      const sep = Math.hypot(this.camera.position.x - subject.x, this.camera.position.z - subject.z);
+      const leadScale = Math.max(0, Math.min(1, (sep - 1.0) / (FRAMING_MIN_DISTANCE - 1.0)));
+      const lead = cfg.lookAhead * leadScale;
       ahead = chest
-        .add(flat.scale(cfg.lookAhead))
-        .add(new Vector3(0, dir.y * cfg.lookAhead * VERTICAL_LEAD_SHARE, 0));
+        .add(flat.scale(lead))
+        .add(new Vector3(0, dir.y * lead * VERTICAL_LEAD_SHARE, 0));
     }
 
     let target = ahead;

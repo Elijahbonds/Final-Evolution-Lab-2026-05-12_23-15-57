@@ -9,6 +9,7 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import * as BABYLON from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -113,9 +114,9 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       SoundKit.startAmbient('stadium');
       
       // GATE 0: Spawn Mixamo-rigged characters for visibility
-      player = await CharacterLibrary.spawn(ctx.scene, 'hero.glb', { position: new BABYLON.Vector3(-2, 0, 0) });
+      player = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: new BABYLON.Vector3(-2, 0, 0) });
       installSafePlay(player.animator, 'carnival-player');
-      rival = await CharacterLibrary.spawn(ctx.scene, 'hero.glb', { position: new BABYLON.Vector3(2, 0, 0), tint: '#ff2d78' });
+      rival = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: new BABYLON.Vector3(2, 0, 0), tint: '#ff2d78' });
       installSafePlay(rival.animator, 'carnival-rival');
 
       ctx.setHud({ score: 0, rivalScore: 0, eventNum: `1/${events.length}` });

@@ -22,7 +22,11 @@ import { applyRestPoseToSkeleton } from '../anim/restPoseApply';
 import { snapToGround } from './groundSnap';                // M69: feet-on-court
 import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
-import { rosterUrlFor } from './athleteRoster';
+import { rosterUrlFor, normalizeHeroUrl } from './athleteRoster';
+import { applySkinShading } from './skinShading';
+import { mountSecondaryMotion, type SecondaryMotionHandle } from '../anim/SecondaryMotion';
+import { mountFootPlanting } from '../anim/FootPlanting';
+import type { QualityTier } from '../scene/QualityTier';
 
 // M28 dance: make dance clip ids resolvable and pre-build mirrored variants once.
 Object.assign(CLIP_ALIASES, DANCE_ALIASES);
@@ -33,6 +37,9 @@ export interface SpawnedCharacter {
   meshes: AbstractMesh[];
   skeleton: Skeleton;
   animator: CharacterAnimator;
+  /** Phase 2 "alive" layer (breathing, weight shift, head look-at). GLB path
+   *  only; modes call `secondary?.setLookTarget(() => ball.position)`. */
+  secondary?: SecondaryMotionHandle;
   dispose(): void;
 }
 
@@ -92,11 +99,12 @@ export const CharacterLibrary = {
   async load(scene: Scene, url: string): Promise<void> {
     // M105: procedural path needs no GLB fetch — preloading is a no-op.
     if (PROCEDURAL_CHARACTERS) return;
-    await loadContainer(scene, url);
+    await loadContainer(scene, normalizeHeroUrl(url));
   },
 
   /** Instantiate a character with its own animator + authored clips. */
   async spawn(scene: Scene, url: string, opts: SpawnOpts = {}): Promise<SpawnedCharacter> {
+    url = normalizeHeroUrl(url);
     // M105 (Path A): the Meshy hero GLB is visually broken. When
     // PROCEDURAL_CHARACTERS is on, bypass the GLB entirely and spawn a clean,
     // assetless, cel-shaded procedural athlete satisfying the same contract.
@@ -189,10 +197,24 @@ export const CharacterLibrary = {
     const restPose = solveArmsDown(skeleton);
     applyRestPoseToSkeleton(skeleton, restPose);
 
+    // ── Phase 2 (ship pass, 2026-09-02): the material set and the two
+    // motion layers that make the forge hero read as a person. All three key
+    // on the LOCKED bone/material names; all three are no-ops on a rig that
+    // lacks them, and mobile gets the cheaper variants.
+    const tier: QualityTier = (scene.metadata?.felTier as QualityTier | undefined) ?? 'desktop';
+    applySkinShading(meshes, scene, tier);
+    const skinned = meshes.find((m) => m.skeleton === skeleton) ?? meshes[0];
+    const secondary = mountSecondaryMotion(scene, skeleton, { intensity: tier === 'mobile' ? 0.6 : 1 });
+    const planting = skinned
+      ? mountFootPlanting(scene, skinned, skeleton, { root, intensity: tier === 'mobile' ? 0 : 1 })
+      : null;
+
     const spawned: SpawnedCharacter = {
       id: `char_${spawnCounter}`,
-      root, meshes, skeleton, animator,
+      root, meshes, skeleton, animator, secondary,
       dispose() {
+        planting?.dispose();
+        secondary.dispose();
         animator.dispose();
         inst.dispose();
       },

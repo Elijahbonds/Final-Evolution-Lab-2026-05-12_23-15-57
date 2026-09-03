@@ -16,6 +16,10 @@ export interface FaceConfig {
   brows: string;
   mouth: string;
   nose: string;
+  /** Phase 3 fine-tune: forge morph weights 0..1 keyed by morph name
+   *  (faceLong, faceRound, faceSquare, faceHeart, faceDiamond, jawOpen,
+   *  browRaise). Optional — a preset-only face is still a full face. */
+  sliders?: Partial<Record<string, number>>;
 }
 
 // 12+ skin swatches spanning the full inclusive range (hard acceptance item).
@@ -36,6 +40,23 @@ export const EYE_COLORS = ['#3B2A1A', '#5A3B1A', '#7A5230', '#4A6B4A', '#3A5A7A'
 export const BROWS = ['Natural', 'Arched', 'Straight', 'Thick', 'Thin', 'Bold'];
 export const MOUTHS = ['Neutral', 'Full', 'Wide', 'Soft', 'Defined'];
 export const NOSES = ['Straight', 'Rounded', 'Wide', 'Narrow', 'Button', 'Aquiline'];
+
+/** Forge morph names the sliders may carry — anything else is dropped. */
+export const FACE_SLIDER_KEYS = ['faceLong', 'faceRound', 'faceSquare', 'faceHeart', 'faceDiamond', 'jawOpen', 'browRaise'] as const;
+
+/** Clamp every slider to 0..1 and drop unknown keys / non-numbers. Returns
+ *  undefined when nothing survives so a preset-only face stays compact. */
+export function sanitizeFaceSliders(input: unknown): Partial<Record<string, number>> | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  const out: Partial<Record<string, number>> = {};
+  for (const k of FACE_SLIDER_KEYS) {
+    const v = (input as Record<string, unknown>)[k];
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    const c = Math.max(0, Math.min(1, v));
+    if (c > 0) out[k] = Math.round(c * 1000) / 1000;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 
 export function defaultFace(): FaceConfig {
   return {

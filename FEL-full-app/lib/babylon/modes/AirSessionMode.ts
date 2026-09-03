@@ -16,6 +16,7 @@
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Mesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
@@ -125,7 +126,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       launchPad.material = padMat;
       launchPad.position.set(0, 0.25, -12);
 
-      athlete = await CharacterLibrary.spawn(ctx.scene, '', {
+      athlete = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
         position: new Vector3(0, 0, 0), startClip: 'idle_stand', modeId: opts.modeId,
       });
       neverBindPose(athlete.animator, 'idle_stand');

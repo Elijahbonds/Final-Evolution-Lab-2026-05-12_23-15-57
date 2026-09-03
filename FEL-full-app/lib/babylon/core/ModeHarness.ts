@@ -6,6 +6,7 @@ import { createEngine } from './createEngine';
 import type { TransformNode } from '@babylonjs/core';
 import { mountLightRig, liftBlackMaterials, type LightRigHandle } from '../scene/LightRig';
 import { mountIblShadows, type IblShadowsHandle } from '../scene/IblShadows';
+import { detectQualityTier, mountSsao, tierRigSettings, type SsaoHandle } from '../scene/QualityTier';
 import type { VenueMood } from '../scene/moods';
 import { InputBus, type FelInput } from './InputBus';
 import { CameraDirector, type FOLLOW_PRESETS } from './CameraDirector';
@@ -105,13 +106,20 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   // 9 pixels per CSS pixel — fill rate is the dominant cost on mobile GPUs and
   // the extra 8 are invisible at arm's length. Cap the ratio at 2 and cap total
   // backing pixels; no-op on a 1x desktop.
-  applyCanvasFit(engine, opts.canvas);
+  const fit = applyCanvasFit(engine, opts.canvas);
+  // Ship pass (2026-09-02): desktop 60 fps / mobile 30 fps. Decided once, here,
+  // from the same fill-rate signal the canvas fit used.
+  const tier = detectQualityTier(opts.canvas, fit);
   const scene = new Scene(engine);
+  (scene.metadata ??= {}).felTier = tier;   // read by CharacterLibrary for per-spawn quality
   // M69: publish the agent control bridge (no-op unless ?agent=1). Idempotent —
   // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
   installAgentBridge(AGENT_MODES);
   const camera = new TargetCamera('cam', new Vector3(0, 3, -8), scene);
-  const lights = mountLightRig(scene, def.mood);
+  const lights = mountLightRig(scene, def.mood, tier);
+  // Desktop tier only: SSAO grounds feet and darkens the crease between close
+  // bodies. Attached to the one gameplay camera; disposed with the mode.
+  const ssao: SsaoHandle | null = tierRigSettings(tier, def.mood).ssao ? mountSsao(scene, camera) : null;
   // M61: painted sky + horizon backdrop (2 meshes, unlit, auto-rotating)
   const backdrop = mountBackdrop(scene, MOOD_TO_FAMILY[def.mood] ?? 'park');
   // M59: anime ink outlines on every skinned character (auto-hooks spawns)
@@ -300,6 +308,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     unink();              // M59
     backdrop.dispose();   // M61
     iblShadows?.dispose();
+    ssao?.dispose();
     lights.dispose();
     scene.dispose();
     engine.dispose();

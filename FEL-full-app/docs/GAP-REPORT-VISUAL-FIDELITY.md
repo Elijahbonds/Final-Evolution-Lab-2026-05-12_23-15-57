@@ -18,6 +18,8 @@ app; nothing is inferred from documentation.
 
 ## 1. THE FINDING THAT REORDERS EVERYTHING
 
+> **Status 2026-09-02 (later the same day):** owner chose the forge GLB. `PROCEDURAL_CHARACTERS` now defaults off; every mode and the mobile trio re-verified green on the GLB path (see `docs/SHIP-PASS-PLAN.md`).
+
 **The modes do not render the forge avatar. They render the procedural capsule
 body.** Measured live on `/dev/mode/onevone?agent=1`: every skinned mesh is
 `*_procAthlete_*` with a `StandardMaterial` (`jersey_procAthlete_p1`,

@@ -82,6 +82,12 @@ function FacePreview({ face, accent }: { face: FaceConfig; accent: string }) {
   );
 }
 
+/** Phase 3 fine-tune sliders — names are the forge's morph targets. */
+const FACE_SLIDERS: [string, string][] = [
+  ['faceLong', 'Length'], ['faceRound', 'Roundness'], ['faceSquare', 'Jaw'],
+  ['faceHeart', 'Heart'], ['faceDiamond', 'Cheekbones'], ['jawOpen', 'Jaw open'], ['browRaise', 'Brow'],
+];
+
 export function ClosetView() {
   const [face, setFace] = useState<FaceConfig>(defaultFace());
   const [equipped, setEquipped] = useState<Equipped>(defaultEquipped());
@@ -123,6 +129,7 @@ export function ClosetView() {
     accent,
   }), [equipped, accent]);
   const setF = (k: keyof FaceConfig, v: string) => setFace((p) => ({ ...p, [k]: v }));
+  const setSlider = (k: string, v: number) => setFace((p) => ({ ...p, sliders: { ...(p.sliders ?? {}), [k]: v } }));
 
   const canEquip = (itemId: string) => owned.has(itemId) || FREE_ITEMS.has(itemId);
 
@@ -237,6 +244,20 @@ export function ClosetView() {
               <Group title="Brows"><div className="flex flex-wrap gap-2">{BROWS.map((s) => <Chip key={s} label={s} active={face.brows === s} onClick={() => setF('brows', s)} />)}</div></Group>
               <Group title="Mouth"><div className="flex flex-wrap gap-2">{MOUTHS.map((s) => <Chip key={s} label={s} active={face.mouth === s} onClick={() => setF('mouth', s)} />)}</div></Group>
               <Group title="Nose"><div className="flex flex-wrap gap-2">{NOSES.map((s) => <Chip key={s} label={s} active={face.nose === s} onClick={() => setF('nose', s)} />)}</div></Group>
+              <Group title="Fine-tune">
+                <p className="mb-2 text-[11px] text-white/40">Sculpt on top of the shape preset. These are the same morphs the game renders.</p>
+                <div className="space-y-2">
+                  {FACE_SLIDERS.map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-3 text-xs text-white/70">
+                      <span className="w-24 shrink-0">{label}</span>
+                      <input type="range" min={0} max={100} value={Math.round(((face.sliders?.[key] ?? 0) as number) * 100)}
+                        onChange={(e) => setSlider(key, Number(e.target.value) / 100)} className="w-full accent-cyan-400" aria-label={label} />
+                      <span className="w-8 text-right tabular-nums text-white/40">{Math.round(((face.sliders?.[key] ?? 0) as number) * 100)}</span>
+                    </label>
+                  ))}
+                  <button type="button" onClick={() => setFace((p) => ({ ...p, sliders: {} }))} className="text-[11px] text-cyan-300/80 hover:text-cyan-200">Reset sculpt</button>
+                </div>
+              </Group>
             </motion.div>
           )}
 
