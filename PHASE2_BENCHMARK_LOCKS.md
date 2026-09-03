@@ -150,3 +150,11 @@ Asked as multiple choice, answered by the owner. These gate the 10-phase ship pa
   Zombies+SC lock or was answered without knowing it existed. **Owner to
   confirm at the next decision round; until then the existing lock stands and no
   benchmark work starts on this mode.**
+- **Karate Endless — LOCKED by the owner, 2026-09-03 (supersedes both the
+  Zombies+SC lock and the SoR4 answer):** a HORDE BRAWLER in the Matrix
+  Revolutions burly-brawl / One Piece Pirate Warriors (Musou) grammar — you
+  face hordes and waves of enemies, solo or co-op. Crowds on screen at once,
+  strikes that hit several at a time, launchers and juggles, specials that
+  clear a radius, escalating waves. Distinct from Karate VS (= Storm, the
+  one-on-one arena fighter) and Mixed Combat (= Soul Calibur, the weapon
+  fighter). Three modes, three mechanics.
