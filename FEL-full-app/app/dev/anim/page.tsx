@@ -6,6 +6,7 @@
  * route for visual verification of clip playback, cross-fade, and bone binding.
  */
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import AnimHarnessClient from './_components/anim-harness-client';
 
 export const dynamic = 'force-dynamic';
@@ -16,5 +17,6 @@ export const metadata: Metadata = {
 };
 
 export default function DevAnimPage() {
+  if (process.env.NODE_ENV !== 'development') notFound();   // dev-only harness: hard 404 in production
   return <AnimHarnessClient />;
 }

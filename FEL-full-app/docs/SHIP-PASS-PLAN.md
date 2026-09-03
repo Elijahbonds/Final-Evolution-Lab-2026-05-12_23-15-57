@@ -233,6 +233,17 @@ concept-lock docs.
   the clips evaluate, so a bone written from update is overwritten a frame
   later — measured, and now a standing rule. 199 tests; logged-in 1v1 and 3v3
   captures 0/0/0 with the ball on the floor mid-bounce in both frames.
+- **2026-09-03, Phase 9 review (auth, prod config, retired routes, dev gates).**
+  Auth: one credentials provider, bcrypt compare, JWT sessions (30-day absolute,
+  daily rolling refresh), secret from the environment, no debug flag, no
+  hard-coded fallback — sound. Retired routes: logged in, `/play/sprint`,
+  `/play/showdown`, `/play/duel` 307 → `/modes` (dark), measured with
+  `scripts/_retired-routes-probe.mts`. Dev harnesses: five of seven `/dev/*`
+  pages already 404 outside `next dev`; `/dev/anim` and `/dev/rig` did not and
+  now do. Prod config: `poweredByHeader` off, source maps off, TS errors fail the
+  build; no security headers yet — `headers()` with nosniff, referrer policy
+  and frame-ancestors is queued for the next dev-server restart (a config edit
+  restarts it, so never mid-sweep).
 - **2026-09-03, Phase 9 item: production build check clean.** `npm run
   build:check` (a separate dist dir, the dev server untouched) exited 0 on the
   planting-on state with no type or lint failures.
