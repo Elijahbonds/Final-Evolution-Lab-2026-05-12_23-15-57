@@ -1,5 +1,7 @@
 # Concept Lock — Golf
 
+> **Status (2026-09-03):** the criteria table below is the PRE-FIX snapshot from the concept lock. Every ❌ it lists was worked in the convergence pass; `golf-signoff.md` records which were fixed, which were accepted and why. Read the two together.
+
 **Benchmark (LOCKED): PGA Tour 2K.**
 Locked in `PHASE2_BENCHMARK_LOCKS.md`: *"Club selection + shot timing + course
 reading; proven 1v1 competitive golf formula"* — the justification names the
