@@ -13,7 +13,7 @@ concept-lock docs.
 | **0 Character path** ✅ 2026-09-02 | Forge GLB is the default spawn in every mode (`PROCEDURAL_CHARACTERS` now opt-in). Gauntlet green on the GLB path: 14 desktop modes 0/0/0 at 60 fps, mobile trio 0 errors; four empty-URL spawns fixed; 1v1 corner camera fixed. | Gauntlet diff vs the procedural baseline shows no new frame-guard hits, no missing clips, no errors. |
 | **1 Shared rendering** 🔶 tiers, PBR kit/worlds/court done |  Quality tiers on the light rig's existing pipeline (already mounts ACES tone-map, bloom, FXAA, sharpen, vignette, 1024 soft shadows in every mode). Desktop 60 fps adds SSAO and cascaded shadows outdoors; mobile 30 fps keeps bloom + tone-map only. The unused duplicate `RenderPipeline.ts` is retired. `VenueKit` / ride worlds / `CourtSurface` converted to PBR. Procedural IBL stays v1. | Per-mode frame budget re-measured on both tiers; no mode below its floor. |
 | **2 Character fidelity** ✅ skin/cloth/secondary/planting/hand-IK dribble |  Forge `skin` gets PBR subsurface; normal + roughness maps authored in the forge; secondary animation layer (head look-at, breathing, idle weight shift); two-foot IK planting everywhere + hand IK for ball grip in basketball. No root-motion rewrite. | Pose gate + pipeline tests green; side-by-side captures before/after per mode family. |
-| **3 Avatar builder** 🔶 face, morphs, sliders, likeness, hair styles, 8-body roster done |  Morph targets in the forge (brow, jaw, mouth, blink + body proportions) exposed as Closet sliders; expanded skin tones, hair styles, kits; photo-to-avatar likeness fit; more authored hero clips per sport. Material name contract untouched. | Closet round-trip: a saved look renders identically in the preview and in a mode. |
+| **3 Avatar builder** ✅ face, morphs, sliders, likeness, hair styles, roster, sport clips |  Morph targets in the forge (brow, jaw, mouth, blink + body proportions) exposed as Closet sliders; expanded skin tones, hair styles, kits; photo-to-avatar likeness fit; more authored hero clips per sport. Material name contract untouched. | Closet round-trip: a saved look renders identically in the preview and in a mode. |
 | **4 Basketball to benchmark** 🔶 packages, free-approach dunk, alley-oop |  dunk, threepoint, onevone, threevthree, dunkduel brought to their locked inspirators (NBA Live 08 contest, NBA 2K feel). Depth of control, AI, presentation. | §7 sign-off per mode against `PHASE2_BENCHMARK_LOCKS.md`. |
 | **5 Combat, board, air** 🔶 sidestep, spin direction; horde pass staged |  karate, karate_vs (the Storm mode), mixedcombat (Soul Calibur style), skateboard, surf, snowboard_slalom, bigair (SSX), gymnastics. | §7 sign-off per mode. |
 | **6 Net, precision, field, party** 🔶 net touch, baseball clips + bat, keeper round |  volleyball (Switch Sports), tennis, golf, derby, penalty, football, carnival (Mario Party / Pac-Man Fever), dance (Class of 3000). | §7 sign-off per mode. |
@@ -244,6 +244,23 @@ concept-lock docs.
   build; no security headers yet — `headers()` with nosniff, referrer policy
   and frame-ancestors is queued for the next dev-server restart (a config edit
   restarts it, so never mid-sweep).
+- **2026-09-03, Phase 3's last item: eleven authored sport clips — and a
+  latent ship bug they exposed.** Golf (address, swing), tennis (ready,
+  forehand, serve), volleyball (ready, spike, block) and soccer (kick, keeper
+  set, keeper dive) are authored on the measured rest and proven on the rig
+  (`sportClips.test.ts`); the aliases and the net-sport swings point at them.
+  Wiring them surfaced two faults that had been hiding behind alias fallbacks:
+  (1) `installSafePlay` refused any authored clip with no static alias entry
+  before the resolver could find it (the board suite had hit this and added
+  aliases; now the gate consults the animator's registered clips, tested);
+  (2) the arms-down rest solve measured hands in WORLD coordinates, so a rig
+  spawned off the world centre or facing +z (the penalty kicker, every net
+  rival) failed the left-arm solve and every rest-based clip on that rig —
+  baseball's included — silently never registered, the alias fallback playing
+  a karate move instead. The solve is root-relative now; a penalty page
+  registers 4/4 bones on both rigs and refuses nothing. Also fixed on the way:
+  the arm-solver tool's `torso:` option, and a test-harness rule (build every
+  clip from bind — a module's lazy rest solve measures the skeleton as it stands).
 - **2026-09-03, Phase 9 item: production build check clean.** `npm run
   build:check` (a separate dist dir, the dev server untouched) exited 0 on the
   planting-on state with no type or lint failures.

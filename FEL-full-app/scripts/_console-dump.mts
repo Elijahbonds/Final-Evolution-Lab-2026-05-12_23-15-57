@@ -8,5 +8,9 @@ p.on('console', (m) => { if (FILTER.test(m.text())) console.log(`[${m.type()}] $
 p.on('pageerror', (e) => console.log(`[pageerror] ${e.message.slice(0, 600)}\n${(e.stack ?? '').split('\n').slice(0, 4).join('\n')}`));
 await p.goto(URL, { waitUntil: 'domcontentloaded' });
 await p.waitForSelector('canvas', { timeout: 30_000 }).catch(() => {});
-await p.waitForTimeout(9000);
+// KEYS=j,k,l DRIVE_MS=25000: press the keys in turn so play advances (the keeper round in penalty)
+const keys = (process.env.KEYS ?? '').split(',').filter(Boolean);
+const until = Date.now() + Number(process.env.DRIVE_MS ?? 9000);
+let k = 0;
+while (Date.now() < until) { if (keys.length) { await p.keyboard.down(keys[k % keys.length]); await p.waitForTimeout(400); await p.keyboard.up(keys[k % keys.length]); k++; } await p.waitForTimeout(300); }
 await b.close();

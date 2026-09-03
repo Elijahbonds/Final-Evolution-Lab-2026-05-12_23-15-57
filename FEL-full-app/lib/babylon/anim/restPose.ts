@@ -31,11 +31,18 @@ function nodeOf(skeleton: Skeleton, boneName: string): TransformNode | null {
   return boneNode(skeleton, boneName);
 }
 
-/** Measure a node's world position after forcing a matrix refresh. */
+/** Measure a node's position IN THE ROOT'S FRAME after forcing a matrix refresh.
+ *  Measured 2026-09-03: this used world coordinates, so the inward-overshoot
+ *  test below compared the hand's absolute world x — a rig spawned off the
+ *  world centre or facing +z (the penalty kicker at x −0.4, yaw 0; every net
+ *  rival) failed the left-arm solve, and every rest-based clip on that rig
+ *  (baseball, golf, tennis, keeper…) silently never registered. Every rig
+ *  that "worked" happened to spawn near the origin facing −z. */
 function worldPosAfterRefresh(node: TransformNode, root: TransformNode): Vector3 {
   root.computeWorldMatrix(true);
   node.computeWorldMatrix(true);
-  return node.getAbsolutePosition().clone();
+  const inv = root.getWorldMatrix().clone().invert();
+  return Vector3.TransformCoordinates(node.getAbsolutePosition(), inv);
 }
 
 /**
