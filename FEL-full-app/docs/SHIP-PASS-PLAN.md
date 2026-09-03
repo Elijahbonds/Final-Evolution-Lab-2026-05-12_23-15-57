@@ -12,7 +12,7 @@ concept-lock docs.
 |---|---|---|
 | **0 Character path** ✅ 2026-09-02 | Forge GLB is the default spawn in every mode (`PROCEDURAL_CHARACTERS` now opt-in). Gauntlet green on the GLB path: 14 desktop modes 0/0/0 at 60 fps, mobile trio 0 errors; four empty-URL spawns fixed; 1v1 corner camera fixed. | Gauntlet diff vs the procedural baseline shows no new frame-guard hits, no missing clips, no errors. |
 | **1 Shared rendering** 🔶 tiers, PBR kit/worlds/court done |  Quality tiers on the light rig's existing pipeline (already mounts ACES tone-map, bloom, FXAA, sharpen, vignette, 1024 soft shadows in every mode). Desktop 60 fps adds SSAO and cascaded shadows outdoors; mobile 30 fps keeps bloom + tone-map only. The unused duplicate `RenderPipeline.ts` is retired. `VenueKit` / ride worlds / `CourtSurface` converted to PBR. Procedural IBL stays v1. | Per-mode frame budget re-measured on both tiers; no mode below its floor. |
-| **2 Character fidelity** 🔶 skin/cloth/secondary/planting done |  Forge `skin` gets PBR subsurface; normal + roughness maps authored in the forge; secondary animation layer (head look-at, breathing, idle weight shift); two-foot IK planting everywhere + hand IK for ball grip in basketball. No root-motion rewrite. | Pose gate + pipeline tests green; side-by-side captures before/after per mode family. |
+| **2 Character fidelity** 🔶 skin/cloth/secondary done; planting node-space |  Forge `skin` gets PBR subsurface; normal + roughness maps authored in the forge; secondary animation layer (head look-at, breathing, idle weight shift); two-foot IK planting everywhere + hand IK for ball grip in basketball. No root-motion rewrite. | Pose gate + pipeline tests green; side-by-side captures before/after per mode family. |
 | **3 Avatar builder** 🔶 face, morphs, sliders, likeness, hair styles, 8-body roster done |  Morph targets in the forge (brow, jaw, mouth, blink + body proportions) exposed as Closet sliders; expanded skin tones, hair styles, kits; photo-to-avatar likeness fit; more authored hero clips per sport. Material name contract untouched. | Closet round-trip: a saved look renders identically in the preview and in a mode. |
 | **4 Basketball to benchmark** 🔶 packages, free-approach dunk, alley-oop |  dunk, threepoint, onevone, threevthree, dunkduel brought to their locked inspirators (NBA Live 08 contest, NBA 2K feel). Depth of control, AI, presentation. | §7 sign-off per mode against `PHASE2_BENCHMARK_LOCKS.md`. |
 | **5 Combat, board, air** 🔶 sidestep, spin direction; horde pass staged |  karate, karate_vs (the Storm mode), mixedcombat (Soul Calibur style), skateboard, surf, snowboard_slalom, bigair (SSX), gymnastics. | §7 sign-off per mode. |
@@ -203,3 +203,14 @@ concept-lock docs.
   lands (`[FEL-IDENT]`, counted as an error). First logged-in 1v1: ready, 0/0/0.
   The round-four sweep itself was clean (threepoint's two errors were network
   suspension in the capture browser; a lone re-run was 0/0/0).
+- **2026-09-03, planting returns (node-space).** `TwoBoneIK.ts` is a pure
+  two-bone solver returning world rotation deltas for hip and knee;
+  `mountFootPlanting` lands them as local rotationQuaternions, so scale is never
+  touched (Closet probe: every bone 1.00, foot at 0.10 m). Two things measured
+  on the way: Babylon's `a.multiply(b)` applies b FIRST; and a from-to rotation
+  between near-opposite vectors picks an unrelated axis, so the pole twist is a
+  signed angle about the aim axis, faded by knee bend (a straight leg has no
+  knee direction). The pin lives in the root's frame: translation is resisted,
+  turning in place is not fought. Round five (first with logged-in captures):
+  21 modes 0/0/0, three logged-in modes 0/0/0 with every material ready, mobile
+  trio clean, 182 tests.
