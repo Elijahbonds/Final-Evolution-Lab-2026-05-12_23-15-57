@@ -165,3 +165,12 @@ concept-lock docs.
   swung round on the first frames; a portrait phone's 0.46 aspect lost the
   rider during the swing while desktop did not. Fix staged: snap toward a point
   8 m ahead along the rider's facing at both snap sites.
+- **2026-09-03, REGRESSION found and fixed (staged): the Closet preview.** The
+  secondary-motion layer multiplied its breath / sway deltas onto a bone's
+  current transform every frame — correct only when the running clip rewrites
+  that bone each frame. The Closet's idle leaves Spine2, Hips and Head alone, so
+  the chest scale compounded, the hips walked sideways and the torso spun: the
+  preview rendered as scattered blocks (`scripts/_closet-preview-probe.mts`,
+  before-shot). Modes were spared because their clips key those bones. Fix:
+  `AdditiveTrack` — the delta is applied on the last base unless the animation
+  wrote a fresh value (tested); staged with the round-four batch.
