@@ -159,3 +159,9 @@ concept-lock docs.
   /modes, a live mode → 200). Staged behind the running sweep: the ball rides
   the AI driver's hand in 3v3; defenders switch marks when beaten (pure
   `scramSwitch`, hysteretic); ride worlds and the ocean court go PBR.
+- **2026-09-03, Phase 9 (mobile) — root cause staged.** The mobile skateboard
+  start flake: the mode's start snaps pass no objective, so the director's
+  "behind" is a fixed +z — the camera began ahead of and beside the rider and
+  swung round on the first frames; a portrait phone's 0.46 aspect lost the
+  rider during the swing while desktop did not. Fix staged: snap toward a point
+  8 m ahead along the rider's facing at both snap sites.
