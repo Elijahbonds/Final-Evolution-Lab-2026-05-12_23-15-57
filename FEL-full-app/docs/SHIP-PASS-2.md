@@ -69,3 +69,12 @@ Plan page: https://claude.ai/code/artifact/06ac4116-487a-472f-9378-07e2834ccebb
 - **Phase 9 read (3 Sep).** Tennis already has its Controller Link entry
   (`schemas/registry.ts`), so the concept lock's ❌ D4 is stale. Four modes have
   no entry and are silent to a phone: onevone, karate, karate_vs, carnival.
+- **Phase 8, quarantine done (3 Sep).** The repo-root twin (855 tracked files:
+  `app/`, `lib/`, `components/`, `public/`, configs; older than ThreePoint,
+  Sprint and Air Session; no deploy configuration ever pointed at it) moved
+  unchanged to `_archive/root-twin/` with a README. Root `scripts/` and `docs/`
+  stay: other sessions write there. CI workflow at `.github/workflows/ci.yml`.
+- **Phase 3, all maps measured (3 Sep).** Twelve baked maps, no glTF extensions,
+  one to four textures each: 36 MB → 26 MB under dedup/prune/weld/quantize
+  (17–37% per map). Quantize adds `KHR_mesh_quantization`, which the writer
+  must have registered or the file omits the declaration — fixed in the probe.
