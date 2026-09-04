@@ -58,8 +58,7 @@ inertia, jump impulse, landing load) and readable in the Camp's lessons.
 2. Realism target: **stylised-real** (true proportions, real skin response,
    readable at game scale) · or photoreal (SSS everywhere, 4K skins; mobile
    suffers).
-3. Photo likeness: **keep the in-house scan → sliders path** · or add
-   MetaPerson/Avaturn (commercial licence, per-avatar cost).
+3. Photo likeness — **DECIDED 2026-09-03 (owner): fit the photo onto the body by default (face + full-body proportions, on the device, free at runtime); an AI image-to-3D generator may be a premium option later, never the default.** Generic image-to-3D (Meshy, Tripo) makes a new topology per player, which cannot share the rig, the clothes, the anatomy layer or the physics numbers — that is why it is not the base path.
 4. Cloth: **skinned garments + additive motion** · or simulated cloth on
    desktop for select pieces.
 

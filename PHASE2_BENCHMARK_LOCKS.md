@@ -158,3 +158,24 @@ Asked as multiple choice, answered by the owner. These gate the 10-phase ship pa
   clear a radius, escalating waves. Distinct from Karate VS (= Storm, the
   one-on-one arena fighter) and Mixed Combat (= Soul Calibur, the weapon
   fighter). Three modes, three mechanics.
+
+## 2026-09-03 owner decisions — ship pass 3 (human body, likeness)
+
+Asked as multiple choice, answered by the owner:
+
+- **Likeness path: BOTH.** The photo is fitted onto the anatomically correct
+  body by default (face landmarks, skin tone, proportions → the body's sliders;
+  face texture projected from the picture). An AI image-to-3D service (Meshy,
+  Tripo) may be offered later as a PREMIUM option for stylised looks that do
+  not need anatomy — it never replaces the fitted body.
+- **Capture: face plus body proportions** — a selfie and a standing full-body
+  shot; the proportions also feed the physics layer.
+- **Privacy: on the device only.** Nothing uploaded, as the scan promises
+  today; required with minors in the Camp.
+- **Budget: free at runtime.** No per-avatar API spend in the shipped path;
+  a premium generator, if it comes, is a paid tier.
+- Directives that set the pass, verbatim intent: human-like anatomically
+  sensible models with real skin and cloth, because the app will teach anatomy
+  and physics ("like the hardware you own IRL"); upgrade boundaries, map,
+  movement, camera; improve the animations from the owner's own motion capture
+  and identify the movements in it.
