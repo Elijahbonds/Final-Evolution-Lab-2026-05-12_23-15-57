@@ -8,7 +8,7 @@ await rc.post(`${BASE}/api/auth/callback/credentials`, { form: { csrfToken: csrf
 const p = await ctx.newPage(); const errs: string[] = []; p.on('pageerror', (e) => errs.push(e.message)); p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 120)); });
 await p.goto(`${BASE}/closet${HERO ? `?hero=${HERO}` : ''}`, { waitUntil: 'networkidle', timeout: 120000 });
 await p.waitForSelector('canvas', { timeout: 60000 }); await p.waitForTimeout(4000);
-console.log(TAG, await p.evaluate(`(() => { const s = window.__FEL_PREVIEW__?.spawned; s.root.rotation.y = 0.6; return JSON.stringify({ visible: s.meshes.filter((m) => m.isVisible).map((m) => m.name.replace(/_c\\d+$/, '')), playing: [...s.animator.groups.values()].filter((g) => g.isPlaying).map((g) => g.name) }); })()`));
+console.log(TAG, await p.evaluate(`(() => { const s = window.__FEL_PREVIEW__?.spawned; s.root.rotation.y = ${process.env.YAW ?? 0.6}; return JSON.stringify({ visible: s.meshes.filter((m) => m.isVisible).map((m) => m.name.replace(/_c\\d+$/, '')), playing: [...s.animator.groups.values()].filter((g) => g.isPlaying).map((g) => g.name) }); })()`));
 await p.waitForTimeout(300); const canvas = await p.$('canvas'); await canvas!.screenshot({ path: `${OUT}/${TAG}.png` });
 console.log('errors:', errs.length, errs.slice(0, 2));
 await b.close();

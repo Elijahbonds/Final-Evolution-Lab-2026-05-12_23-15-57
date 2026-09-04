@@ -24,6 +24,8 @@ All notable changes to Final Evolution Lab. Dates are 2026.
 - Clothing-only tint skips skin, hair and eyes by name (a photographed skin is a white albedo the colour heuristic read as clothing).
 - The MPFB2 candidate's textures ship as WebP (13 MB → 2.2 MB); its skin material is flagged `felSkinUV: makehuman`.
 - Development only: `?tone=<hex>` on the Closet previews a skin tone.
+- Two kit bodies (male, female) carry the Closet's tops, shorts and shoes as fitted CC0 garments; the equipped one per slot shows (`lib/babylon/core/kit.ts`). Candidates only, behind the dev flag until the swap.
+- The candidate import bakes the A-pose mesh into the rig's rest pose and the avatar scripts gain a mesh-versus-bind joint check.
 
 ## 0.9.0-rc.1 — 2026-09-03 · release candidate
 

@@ -41,7 +41,7 @@ def add(kind, path, label, material=None):
 KIT = {
     'tops':   [('top_lab', 'toigo_basic_tucked_t-shirt' if SEX == 'female' else 'elvs_crude_t-shirt_male'), ('top_bonds', 'toigo_keyhole_tank_top')],
     'shorts': [('shorts_court', 'cortu_jeans_shorts'), ('shorts_glitch', 'cortu_jeans_shorts')],
-    'shoes':  [('shoes_evo', 'culturalibre_hero_boots_1' if SEX == 'male' else 'culturalibre_heroine_boots_1'), ('shoes_flight', 'shoes01')],
+    'shoes':  [('shoes_evo', 'culturalibre_hero_boots_1' if SEX == 'male' else 'toigo_ankle_boots_female'), ('shoes_flight', 'shoes01')],
 }
 MAT = {'tops': 'jersey', 'shorts': 'shorts', 'shoes': 'shoes'}
 kit_objects = []
