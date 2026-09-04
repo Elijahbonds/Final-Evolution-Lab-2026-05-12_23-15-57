@@ -63,6 +63,28 @@ inertia, jump impulse, landing load) and readable in the Camp's lessons.
 4. Cloth: **skinned garments + additive motion** · or simulated cloth on
    desktop for select pieces.
 
+## The owner's motion capture (third directive: *improve the animations, recreate
+my mo cap or use that data, identify the movements*)
+
+What is in the tree: `public/mocap/dunk.json` (DeepMotion, 92 frames at 15 fps,
+16 world-space joints) — already processed into `dunk_mocap`; and
+`public/models/clips/*.glb`: nineteen DeepMotion **Animate 3D** exports
+("My Movie 198/199_customModel…", Blender glTF I/O) on a 25-node Mixamo-style
+rig. Several are whole recording sessions, not single moves: golf_swing 100.8 s,
+tennis_serve 72.4 s, football_catch 44.1 s, baseball_pitch 7.8 s; the npc_*
+run/walk are short loops. Only the retired three.js components load them; no
+Babylon mode does. The pipeline, then: **inventory → segment → retarget →
+register**. Segment each take by motion energy (hand/foot speed peaks with rest
+between) into named actions; retarget by bone-name map (the FEL 22-bone spec
+descends from the same Mixamo names, so most bones map 1:1; toes drop; root
+motion is removed the way `mocapDunk` did it, since movement is code-driven);
+write the segments as clips on the hero's skeleton and register them under the
+names the modes already ask for (`golf_swing_full`, `tennis_serve`,
+`baseball_pitch_over`, `football_catch`, `volleyball_spike`, …), replacing the
+hand-authored stand-ins wherever a capture exists. The owner's own body then
+moves the athletes, which is also the honest reference for the anatomy and
+physics lessons.
+
 ## Pass 3 — "A real body in a real place" (proposed ladder)
 
 | Phase | Deliverable | Gate |
@@ -70,7 +92,7 @@ inertia, jump impulse, landing load) and readable in the Camp's lessons.
 | 1 Body spike | One MPFB2 human exported and forged into `fel-hero.glb`: FEL bones, material contract, seven head morphs + proportion morphs, skins. Gauntlet unchanged. | 21/21 green on the new hero; Closet round-trips. |
 | 2 Skin | UV-mapped CC0 skins across the tone range, pore/detail normals, SSS on desktop, translucency on mobile. | Side-by-side captures per tone; mobile ≥ 30 fps. |
 | 3 Clothes | Kit library on the new mesh from MPFB2 garments with PBR fabrics; the Closet's wearables map to them. | Every wearable renders; no skin poke-through in the clip suite. |
-| 4 Hair, eyes, face | Hair library, eye shader, facial morph set widened; the scan maps to the new targets. | Closet likeness gate. |
+| 4 Mocap → clips | Inventory and segment the owner's captures by motion energy; retarget onto the FEL rig; register segments under the modes' clip names, replacing stand-ins. Hair, eyes and the wider face set ride along in the forge. | Every sport that has a capture plays it; the rig test suite proves each segment. |
 | 5 Anatomy layer | Skeleton + muscles under the skin, rig-shared, labelled; a lesson can toggle systems and highlight a structure. | A Camp module walks through one movement's anatomy. |
 | 6 Body physics | de Leva segments on the rig; movement model derives acceleration, turning inertia, jump impulse and landing load from them. | Physics lesson reads live numbers; modes feel weightier but pass their gauntlets. |
 | 7 Boundaries | Offline navmesh per baked venue; players and AI constrained to it; court clamps removed. | No out-of-bounds in a 21-mode sweep. |
