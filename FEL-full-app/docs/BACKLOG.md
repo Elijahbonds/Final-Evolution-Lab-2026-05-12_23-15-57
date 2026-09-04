@@ -55,4 +55,13 @@ orchestrator.
 
 ## From the run (lanes' "did NOT do", appended live)
 
-- _none yet (15:03 — no lane commits beyond the freeze)_
+- **15:07** (working trees, uncommitted) — nothing reported as "did NOT do" yet. Observed drift candidates:
+  - **rc** `docs/CHANGELOG.md` says of phase 9 "the tier-aware `applySkinMap`, `textureBudget.json` and the budget test
+    land through the perf and verify lanes" — a forward reference written before those land; if either lane stops short,
+    the changelog line becomes untrue and must be edited at integration. Belongs to `docs/CHANGELOG.md` (rc).
+  - **perf** `_vram-diag.mts` sweep defaults to `BASE=http://localhost:3005` (the perf lane's port per contract §6) — the
+    single-mode form still defaults to `:3000`, the orchestrator's server. Two defaults in one probe; note for whoever
+    runs it after the lanes close. Belongs to `scripts/probes/_vram-diag.mts` (perf).
+  - **verify** `playerIdentity.test.ts` imports `skinMapUrl` from `./playerIdentity`, which does not exist on any branch
+    yet — vitest on `lane/verify` alone fails to compile until `lane/perf` exports it; the integration order is
+    perf before verify (or the two land together). Belongs to the orchestrator's integration step.

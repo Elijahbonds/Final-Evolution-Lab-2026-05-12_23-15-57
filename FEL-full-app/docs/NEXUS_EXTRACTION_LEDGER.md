@@ -245,3 +245,21 @@ Entry shape: **pattern** · files · why it generalises beyond FEL · what must 
 Appended every ~10 minutes while the run is live; see also `docs/BACKLOG.md` for what a lane reports it did NOT do.
 
 - **15:03** — lanes `verify`, `perf`, `rc` all at `476cfc2` (the contract freeze); no lane commits yet.
+- **15:07** — still no lane commits; working trees read (uncommitted, so provisional). Every file touched is inside its
+  lane's owned set. Reusable already:
+  - **verify** — `scripts/perf-budget-tests.ts`: the gate computes the median FROM THE ROWS and requires the recorded
+    `median` to agree within 0.1 MB, so a stale field cannot hide a heavy mode; `measuredAt` must be a date ("an
+    unmeasured table is not a pass"); the mobile column must list at least as many modes as desktop. Pattern for any
+    budget table: **re-derive the summary, never trust it.** `lib/babylon/core/playerIdentity.test.ts` is a pure-function
+    contract test (`skinMapUrl(url, tier)`) written BEFORE the perf lane exports the function — the test fails to compile
+    until the implementation lands. Pattern: **the test is the contract, the compile error is the hand-off.**
+  - **perf** — `scripts/probes/_vram-diag.mts` grows a sweep mode (`MODES=all TIERS=desktop,mobile OUT=…`) that writes the
+    frozen `textureBudget.json` schema, reads the enabled-mode list off `registry.ts` SOURCE so the sweep cannot drift from
+    `ENABLED_BABYLON_MODES`, warns when the page reports a different tier than requested, and preserves fields other
+    steps wrote to the same file (`existingExtras`). Pattern: **probe → frozen-schema table → test**, with the schema
+    frozen in the contract doc first. Also reads `scene.metadata.felTier` directly (contract §1 honoured).
+  - **rc** — `scripts/rc-checklist.mts`: a read-only gate table (tsc, vitest, texture budget, latest gauntlet run's
+    non-clean rows, git HEAD + rc tag) where "every number printed is measured here and now — nothing is read from a
+    doc"; `scripts/prod-serve.sh` takes a port argument with LOG/PID following the port (contract §6 ports). Pattern:
+    **the RC gate is a script, not a checklist page.** `docs/CHANGELOG.md` is being rewritten per phase with commit shas
+    and measured numbers, and states which phases are OPEN (4, 5) — the changelog as a ledger of measurements.
