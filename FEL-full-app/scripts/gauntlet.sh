@@ -35,7 +35,8 @@ OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
     perf=$(echo "$r" | grep -oE "perf  : .*" | sed 's/perf  : //' | head -1)
     printf "%-16s: %-46s %s\n" "mtier/$m" "${line:-NO RESULT}" "${perf:-}"
   done
-  for r in "skateboard PUMP POP" "volleyball HIT BLOCK" "tennis DRIVE SLICE"; do
+  # phone captures on the shipping routes, one mode per family (ship pass 2, Phase 7)
+  for r in "skateboard PUMP POP" "volleyball HIT BLOCK" "tennis DRIVE SLICE" "dunk CHARGE SLAM" "karate BLOCK JAB" "football TRUCK HURDLE" "golf SWING CLUB"; do
     set -- ${=r}   # zsh does not word-split an unquoted variable; ${=r} forces it
     mr=$(URL=http://localhost:3000/play/$1 HOLD_VERB=$2 TAP_VERB=$3 OUT_DIR="$G/shots" npx tsx scripts/capture-mobile-touch.mts 2>&1)
     echo "$mr" > "$G/logs/mobile-$1.txt"
