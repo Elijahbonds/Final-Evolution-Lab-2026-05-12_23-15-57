@@ -151,3 +151,12 @@ Plan page: https://claude.ai/code/artifact/06ac4116-487a-472f-9378-07e2834ccebb
   33 suites / 213 tests green. Tagged `v0.9.0-rc.1` locally (not pushed — an
   outward action for the owner). `docs/SHIP-READINESS.md` signed pending the
   owner's curriculum review and hardware session; `docs/CHANGELOG.md` current.
+- **Round eighteen (3 Sep, dev harness).** No capture regressions; the "1
+  failed" in the vitest line was a temporary probe test deleted mid-run
+  (34 suites / 215 green on the re-run). The four new phone captures (dunk,
+  karate, football, golf) clean. **Phase 3 budget set:** time-to-LOADED on the
+  warm dev server is 1.7–1.9 s for every mode that reported it; the budget is
+  **≤ 3 s warm desktop, ≤ 6 s warm mobile tier**, to be confirmed on the
+  production build and cold caches in the next sweeps. Time-to-playing
+  (13 s flat) measures the capture script's own start delay and is not a
+  load number.
