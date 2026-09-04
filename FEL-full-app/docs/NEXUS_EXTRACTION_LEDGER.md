@@ -282,3 +282,22 @@ Appended every ~10 minutes while the run is live; see also `docs/BACKLOG.md` for
   - **A ratio gate needs a minimum row count** — with two rows the 2×-median rule cannot flag the 168 MB mode
     (median 104, ceiling 208); a third row near 40 MB drops the median to 40 and trips it. Freeze a minimum mode count
     into `perf-budget-tests.ts` (or the contract) before the table is trusted.
+- **15:18** — ten-minute check. Branches: verify 2 commits (above); perf and rc none yet. Working trees (uncommitted,
+  provisional), all inside owned sets: perf `CharacterLibrary.ts`, `PerfMonitor.ts`, `playerIdentity.ts`,
+  `scripts/avatar/import-mpfb.mts`, `_vram-diag.mts`, new `public/models/fel-hero.mobile.glb`; rc `CHANGELOG.md`,
+  `prod-serve.sh`, new `docs/RC-2026-09-04.md`, `scripts/rc-checklist.mts`. `textureBudget.json` is still the null
+  stub on `lane/perf`. Reusable from the perf lane's diff:
+  - **Count GPU memory from the engine's cache, not `scene.textures`** — `PerfMonitor.textureMb()` now walks
+    `engine._internalTexturesCache`, skipping render-target sources (5, 6, 12, 14: shadow maps and post-process
+    targets belong to the tier, not the mode). Measured reason: an `AssetContainer`'s maps are uploaded at load but
+    never appear in `scene.textures` (the hero GLB's 96 MB read as 0 in every mode), and `Material.clone()` pushes a
+    Texture sharing one GPU texture (a logged-in dunk read the hero twice). Falls back to `scene.textures` on
+    NullEngine. Contract to freeze: the vram number's definition — the probe and the HUD must count the same list.
+  - **Tier variant of the default body with a never-brick fallback** — `heroUrlForTier()` swaps ONLY the default hero
+    URL for `/models/fel-hero.mobile.glb` on the mobile tier (a `?hero=` override or an explicit body loads as asked);
+    `loadHero()` falls back to the requested file if the variant fails ("a texture variant can never brick a spawn —
+    the roster's rule"). The variant is made by `import-mpfb.mts <in> <out> --textures-only` (skin 1024², every other
+    map 512²): same nodes, joints, weights, morphs, clips. Contract: variant files are textures-only derivatives;
+    the `.mobile.glb` suffix; the tier read from `scene.metadata.felTier` (contract §1).
+  - `skinMapUrl(url, tier)` exported exactly as the verify lane's red test specified (idempotent on `-1024.jpg`,
+    non-`.jpg` passes through) — the red-first hand-off closing from the other side.

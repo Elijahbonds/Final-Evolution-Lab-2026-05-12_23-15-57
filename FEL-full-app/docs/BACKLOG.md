@@ -82,3 +82,9 @@ orchestrator.
 - **15:12** `lane/verify` `62e9777` — the 2×-median budget rule cannot trip on a two-row table (median 104 MB,
   ceiling 208 MB > dunk's 168 MB). Gate only as strong as the perf lane's row count; the contract names no minimum.
   Belongs to `scripts/perf-budget-tests.ts` (verify) / `docs/CONTRACTS-PASS4-RUN.md` §3 (orchestrator).
+- **15:18** working trees — **perf**: `textureBudget.json` still the null stub (the sweep has not been run or written
+  yet); `fel-hero.mobile.glb` is untracked and unmeasured in the tree (its 24 MB figure is from the code comment).
+  The perf lane's new engine-cache basis means the 15:03 numbers in `docs/SHIP-PASS-4.md` (dunk 168 MB mobile) were
+  measured on the OLD `scene.textures` basis and are not comparable to the table the sweep will write — the changelog
+  and the RC doc must say which basis each number is on. Belongs to `scripts/probes/_vram-diag.mts` (perf),
+  `docs/CHANGELOG.md` (rc), `docs/SHIP-PASS-4.md` (orchestrator).
