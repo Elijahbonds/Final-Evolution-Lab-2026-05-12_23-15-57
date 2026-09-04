@@ -22,6 +22,36 @@ const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
 const doc = await io.readBinary(new Uint8Array(readFileSync(inFile)));
 const root = doc.getRoot();
 
+// ── Phase 9 (2026-09-04): the mobile-tier hero. `--textures-only` skips the rig work entirely and only re-encodes
+// the textures of an ALREADY-FORGED hero (public/models/fel-hero.glb → public/models/fel-hero.mobile.glb): skin at
+// 1024², everything else (six hair styles, two jerseys, two shoes, shorts, eyes) at 512², the same split
+// roster-from-kit gives a rival. Measured before this: the hero's fifteen maps were 96 MB of GPU memory in every
+// mode that spawns the untinted hero, on both tiers; the mobile file is ~24 MB. Nodes, skin, joints, weights, morphs
+// and clips are byte-for-byte the same data (Gate 0 is untouched — this is a texture pass, not a rig pass).
+//   npx tsx scripts/avatar/import-mpfb.mts public/models/fel-hero.glb public/models/fel-hero.mobile.glb --textures-only
+// CharacterLibrary picks the mobile file when scene.metadata.felTier === 'mobile'; desktop keeps fel-hero.glb.
+if (process.argv.includes('--textures-only')) {
+  const skinTextures = new Set<import('@gltf-transform/core').Texture>();
+  for (const m of root.listMaterials()) if (m.getName() === 'skin') for (const t of [m.getBaseColorTexture(), m.getNormalTexture(), m.getMetallicRoughnessTexture()]) if (t) skinTextures.add(t);
+  const pxFlag = (name: string, dflt: number): number => { const i = process.argv.indexOf(name); const v = i > 0 ? Number(process.argv[i + 1]) : NaN; return Number.isFinite(v) && v > 0 ? v : dflt; };
+  const SKIN_PX = pxFlag('--skin-px', 1024), OTHER_PX = pxFlag('--other-px', 512);
+  let gpuMB = 0;
+  for (const t of root.listTextures()) {
+    const img = t.getImage(); if (!img) continue;
+    const px = skinTextures.has(t) ? SKIN_PX : OTHER_PX;
+    const meta = await sharp(img).metadata();
+    const size = Math.min(px, meta.width || px);   // never upscale
+    const out = await sharp(img).resize(size, size, { fit: 'fill' }).webp({ quality: skinTextures.has(t) ? 82 : 78 }).toBuffer();
+    t.setImage(new Uint8Array(out)).setMimeType('image/webp');
+    gpuMB += size * size * 4 * 1.33 / 1048576;
+    console.log(`  ${(t.getName() || '?').padEnd(40)} ${meta.width}² → ${size}²  ${(out.byteLength / 1024).toFixed(0)} KB`);
+  }
+  const bin = await io.writeBinary(doc);
+  writeFileSync(outFile, bin);
+  console.log(`wrote ${outFile}: ${(bin.byteLength / 1048576).toFixed(2)} MB file, ~${gpuMB.toFixed(1)} MB of GPU textures (skin ${SKIN_PX}², others ${OTHER_PX}²); joints ${root.listSkins()[0]?.listJoints().length ?? 0}, meshes ${root.listMeshes().length}, materials ${root.listMaterials().length}`);
+  process.exit(0);
+}
+
 // 1) rename bones to the FEL names
 for (const n of root.listNodes()) n.setName(strip(n.getName()));
 

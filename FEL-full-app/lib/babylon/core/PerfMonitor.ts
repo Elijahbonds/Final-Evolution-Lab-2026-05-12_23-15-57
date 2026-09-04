@@ -16,7 +16,12 @@
 // Dev-only: `mount()` is a no-op unless explicitly enabled, so the overlay
 // and its per-frame bookkeeping cost nothing in production.
 
-import type { AbstractEngine, Scene } from '@babylonjs/core';
+import type { AbstractEngine, InternalTexture, Scene } from '@babylonjs/core';
+
+// InternalTextureSource: RenderTarget 5, MultiRenderTarget 6, DepthStencil 12, Depth 14 — the pipeline's textures
+// (shadow maps, post-process targets), sized by the quality tier, not by the mode. Literal so this file stays
+// type-only on @babylonjs/core (the overlay is dev-only and must not pull the engine into its own chunk).
+const RENDER_TARGET_SOURCES = new Set<number>([5, 6, 12, 14]);
 
 export interface PerfBudget {
   frameMs: number;        // 16.7 = 60fps, 33.3 = 30fps
@@ -101,12 +106,25 @@ export class PerfMonitor {
     this.obs = this.scene.onAfterRenderObservable.add(() => this.tick());
   }
 
+  /** GPU texture memory, counted the way scripts/probes/_vram-diag.mts counts it (pass 4 phase 9, 2026-09-04):
+   *  every texture in the ENGINE's cache once. scene.textures was the wrong list — an AssetContainer's maps are
+   *  uploaded at load but never appear in it (the hero GLB's 96 MB read as 0 here in every mode), and a
+   *  Material.clone() pushes a Texture that SHARES one GPU texture into it (a logged-in dunk read the hero twice).
+   *  Render targets and shadow/depth maps are left out: they belong to the quality tier, not the mode. */
   private textureMb(): number {
+    const cache = (this.engine as unknown as { _internalTexturesCache?: InternalTexture[] })._internalTexturesCache;
     let bytes = 0;
-    for (const t of this.scene.textures) {
+    if (cache) {
+      for (const t of cache) {
+        if (RENDER_TARGET_SOURCES.has(t.source)) continue;
+        // 4 bytes/px, ~33% for the mip chain, six faces for a cube, every slice of a 3D texture
+        bytes += t.width * t.height * 4 * (t.generateMipMaps ? 1.33 : 1) * (t.isCube ? 6 : 1) * (t.is3D ? Math.max(1, t.depth) : 1);
+      }
+      return bytes / (1024 * 1024);
+    }
+    for (const t of this.scene.textures) {                 // an engine without the cache (NullEngine in tests)
       const size = t.getSize?.();
       if (!size?.width) continue;
-      // 4 bytes/px + ~33% for the mip chain
       bytes += size.width * size.height * 4 * 1.33;
     }
     return bytes / (1024 * 1024);
