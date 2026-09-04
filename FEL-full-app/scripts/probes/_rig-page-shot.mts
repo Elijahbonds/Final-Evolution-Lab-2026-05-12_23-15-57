@@ -10,9 +10,9 @@ await rc.post('/api/auth/callback/credentials', { form: { csrfToken: csrf, email
 const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } }); await ctx.addCookies((await rc.storageState()).cookies); await rc.dispose();
 const p = await ctx.newPage();
 const errs: string[] = []; p.on('console', (m) => { if (m.type() === 'error' || /FEL-/.test(m.text())) errs.push(m.text().slice(0, 200)); });
-await p.goto(`http://localhost:3000/dev/rig?avatar=${encodeURIComponent(AVATAR)}`, { waitUntil: 'domcontentloaded' });
+await p.goto(`http://localhost:3000/dev/rig?avatar=${encodeURIComponent(AVATAR)}&anim=${encodeURIComponent(process.env.ANIM ?? '/models/clips/npc_ericnash_run.glb')}`, { waitUntil: 'domcontentloaded' });
 await p.waitForSelector('canvas', { timeout: 30_000 }).catch(() => {});
-await p.waitForTimeout(8000);
+await p.waitForTimeout(Number(process.env.WAIT_MS ?? 8000));
 await p.screenshot({ path: OUT });
 console.log('text:', (await p.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ').slice(0, 500));
 for (const e of errs.slice(0, 6)) console.log('  ·', e);
