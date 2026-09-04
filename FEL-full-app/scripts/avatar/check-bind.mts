@@ -7,6 +7,7 @@
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { mat4 } from 'gl-matrix';
+import { dequantize } from '@gltf-transform/functions';
 import { readFileSync } from 'node:fs';
 
 const file = process.argv[2]; if (!file) { console.error('usage: check-bind <glb> [--tol m]'); process.exit(2); }
@@ -15,6 +16,7 @@ const file = process.argv[2]; if (!file) { console.error('usage: check-bind <glb
 // mismatch, which measured 30–40 cm.
 const ti = process.argv.indexOf('--tol'); const TOL = ti > 0 ? Number(process.argv[ti + 1]) : 0.10;
 const doc = await new NodeIO().registerExtensions(ALL_EXTENSIONS).readBinary(new Uint8Array(readFileSync(file)));
+await doc.transform(dequantize());   // quantized files (the rivals) measure in metres again
 const skin = doc.getRoot().listSkins()[0]; if (!skin) { console.error('no skin'); process.exit(2); }
 const joints = skin.listJoints().map((j) => j.getName().replace(/^mixamorig:?/, '')); const ibm = skin.getInverseBindMatrices()!;
 const bind = (i: number) => { const inv = mat4.invert(mat4.create(), ibm.getElement(i, new Array(16).fill(0)) as unknown as mat4)!; return [inv[12], inv[13], inv[14]]; };
