@@ -55,3 +55,14 @@ Plan page: https://claude.ai/code/artifact/88460d0b-8775-4206-a872-81951f4ddeb0
   old body's rest and land elsewhere on this T-posed body (re-solve per clip,
   the rig tests will flag each); no face morphs yet (the Closet's seven must be
   authored as MPFB targets → shape keys); texture size/KTX2 for the load budget.
+- **3 Sep, rung 1 spike, second cut.** The Closet's seven morphs (faceLong,
+  faceRound, faceSquare, faceHeart, faceDiamond, jawOpen, browRaise) are MPFB
+  targets loaded as shape keys under the FEL names and survive export: Blender's
+  glTF exporter drops all shape keys when it applies modifiers, so the clothes'
+  decimation is baked, the body's helper geometry is deleted by vertex after the
+  targets load (indices stay valid), MPFB's eight macro keys are removed, and
+  the export applies nothing. `fel-hero-mpfb.glb` carries exactly the seven, in
+  the Closet's order. Cost: the body alone is 26,756 tris (13,380 verts), so the
+  dressed candidate is 29,647 against the 25k advisory budget — accepted for
+  the desktop tier for now; the way down is MPFB's low-poly **proxy** body
+  (system assets `proxymeshes/`) as the render mesh, rung 2's decision.
