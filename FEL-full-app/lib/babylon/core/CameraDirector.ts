@@ -54,6 +54,7 @@
 import { Ray, TargetCamera, Vector3 } from '@babylonjs/core';
 import type { Scene, AbstractMesh } from '@babylonjs/core';
 import { enforceStandoff } from './CameraStandoff';   // M69: last-guard standoff
+import { reportDiag } from './diag';
 
 export type CamMode = 'follow' | 'fixed';
 
@@ -504,6 +505,7 @@ export class CameraDirector {
       const now = performance.now();
       if (now - this.lastBoxedInLogAt > 3000) {
         this.lastBoxedInLogAt = now;
+        reportDiag('cam', 'boxed in on all probed angles — overhead fallback');
         console.info('[FEL-CAM] boxed in on all probed angles — overhead fallback');
       }
       return subject.add(new Vector3(0.001, MIN_SAFE_DISTANCE + 1.6, 0.001));

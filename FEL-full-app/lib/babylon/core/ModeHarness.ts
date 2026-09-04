@@ -25,6 +25,7 @@ import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readin
 import { installAgentBridge, agentBridge } from './AgentBridge';  // M69: agent control plane
 import { AGENT_MODES } from './agentModes';
 import type { AgentControlSource } from './AgentControlSource';  // M69: per-mode intent play
+import { reportDiag, setDiagMode } from './diag';
 
 /** M37 mutable slot a mode fills right after spawn (hero root / live objective). */
 export interface MutableRef<T> { current: T | null; }
@@ -180,6 +181,10 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
 
   // M37: hero-framing watchdog — recenters the camera if the hero leaves frame.
   frameGuard = new FrameGuard(scene, camera, () => heroRef.current, camDirector, () => objectiveRef.current);
+  setDiagMode(def.modeId);
+  // a lost WebGL context is the one failure the player cannot recover from by playing on
+  engine.onContextLostObservable.add(() => reportDiag('context', 'WebGL context lost'));
+  engine.onContextRestoredObservable.add(() => reportDiag('context', 'WebGL context restored'));
 
   // ── Load with watchdog + error phase (the anti-infinite-spinner guarantee) ──
   // load() either resolves (READY), throws (error screen), or the 20s watchdog
@@ -212,7 +217,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       // Runtime black-screen guard: after READY, watch the framebuffer; rescue
       // lighting if it goes black, and surface the error phase if unrecoverable.
       renderWatchdog?.disarm();
-      renderWatchdog = new RenderWatchdog(scene, engine, camera, () => phase === 'playing', (m) => setPhase('error', m));
+      renderWatchdog = new RenderWatchdog(scene, engine, camera, () => phase === 'playing', (m) => { reportDiag('load', `render watchdog: ${m}`); setPhase('error', m); });
       renderWatchdog.arm();
       return true;
     } catch (e) {

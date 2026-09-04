@@ -6,6 +6,7 @@
 import { Matrix, Vector3 } from '@babylonjs/core';
 import type { Scene, TargetCamera, TransformNode } from '@babylonjs/core';
 import type { CameraDirector } from './CameraDirector';
+import { reportDiag } from './diag';
 
 /** How long after a mode starts playing before the first framing check. */
 const SPAWN_GRACE_MS = 3200;
@@ -132,6 +133,7 @@ export class FrameGuard {
       : p.z >= 1 ? 'beyond far plane'
       : p.x < 0 ? 'off LEFT' : p.x > w ? 'off RIGHT'
       : p.y < 0 ? 'off TOP' : p.y > h ? 'off BOTTOM' : 'edge margin';
+    reportDiag('frame', `hero off-screen ${this.missStreak}x (${edge}) mode=${this.director?.mode ?? '?'}`);
     console.error(
       `[FEL-FRAME] hero off-screen ${this.missStreak}x (${edge}) at ${hero.position.toString()} `
       + `cam ${this.camera.position.toString()} proj ${p.x.toFixed(0)},${p.y.toFixed(0)},${p.z.toFixed(3)} `

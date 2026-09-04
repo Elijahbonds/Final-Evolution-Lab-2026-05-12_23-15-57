@@ -353,6 +353,71 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
       ] },
     ],
   },
+
+  // ── Ship pass 2, Phase 9: the four modes a phone could not join ───────────
+  // isControllerEnabled() is `modeId in MODE_CONTROLLERS`; an absent entry is
+  // silence. Labels mirror lib/babylon/ui/modeVerbs.ts so the phone reads like
+  // the on-screen rig.
+  onevone: {
+    modeId: 'onevone',
+    title: 'Ones',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'charge', label: 'SHOOT', hold: true },
+        { action: 'B', label: 'BOX OUT' },
+        { action: 'X', label: 'STEAL' },
+        { action: 'A', label: 'BLOCK' },
+      ] },
+    ],
+  },
+  karate: {
+    modeId: 'karate',
+    title: 'Endless',
+    maxPlayers: 2,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'JAB' },
+        { action: 'B', label: 'KICK' },
+        { action: 'X', label: 'BLOCK' },
+        { action: 'Y', label: 'HEAVY' },
+      ] },
+    ],
+  },
+  karate_vs: {
+    modeId: 'karate_vs',
+    title: 'Versus',
+    maxPlayers: 2,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'JAB' },
+        { action: 'B', label: 'KICK' },
+        { action: 'X', label: 'BLOCK' },
+        { action: 'Y', label: 'HEAVY' },
+      ] },
+    ],
+  },
+  carnival: {
+    modeId: 'carnival',
+    title: 'Court Carnival',
+    maxPlayers: 4,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'GO' },
+        { action: 'B', label: 'TRICK' },
+        { action: 'X', label: 'CHARGE' },
+        { action: 'Y', label: 'POWER' },
+      ] },
+    ],
+  },
 };
 
 export function controllerConfigFor(modeId: string): ModeControllerConfig | null {

@@ -4,6 +4,7 @@
 // saved look applied automatically; explicit colors always win (rivals/NPCs).
 
 import { applyHairStyle } from './hairStyles';
+import { reportDiag } from './diag';
 import { applyFaceMorphs, resolveFaceWeights } from './faceMorphs';
 import { Color3, DynamicTexture, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Material } from '@babylonjs/core';
@@ -150,7 +151,7 @@ function watchReadiness(spawn: SpawnedCharacter): void {
       catch (e) { return `${m.name}/${m.material!.name}: ${String((e as Error)?.message ?? e).slice(0, 80)}`; }
     })).then((results) => {
       const bad = results.filter((r): r is string => !!r);
-      if (bad.length) console.error(`[FEL-IDENT] material never ready: ${bad.join(', ')}`);
+      if (bad.length) { reportDiag('ident', `material never ready: ${bad.join(', ')}`); console.error(`[FEL-IDENT] material never ready: ${bad.join(', ')}`); }
       else console.info(`[FEL-IDENT] ready: ${spawn.meshes.filter((m) => m.isVisible && m.isEnabled()).length} visible meshes${pending.length ? ` (${pending.length} compiled on demand)` : ''}`);
     });
   });

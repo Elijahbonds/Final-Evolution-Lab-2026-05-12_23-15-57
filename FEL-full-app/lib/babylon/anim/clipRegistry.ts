@@ -25,6 +25,7 @@
 
 import type { CharacterAnimator, PlayOpts } from './CharacterAnimator';
 import { CLIP_ALIASES } from './clipAliases';
+import { reportDiag } from '../core/diag';
 
 /** Names that actually exist on the live rig today (imported GLB + authored
  *  procedural clips). Single source of truth for "is this a real clip". */
@@ -168,6 +169,7 @@ export function installSafePlay(animator: CharacterAnimator, modeId: string): vo
     // alias entry (tennis_swing, keeper_dive…) was refused here and never
     // reached the resolver that would have found it — measured 2026-09-03.
     if (!isResolvable(name) && !animator.clipNames.has(name)) {
+      reportDiag('clip', `MISSING CLIP ${name} in ${modeId}`);
       console.error(`[FEL-ANIM] MISSING CLIP "${name}" requested in "${modeId}" — no real clip or alias; falling back to "${SAFE_DEFAULT}" (bind pose avoided)`);
       return rawPlay(SAFE_DEFAULT, opts);
     }
