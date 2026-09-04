@@ -50,8 +50,17 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   // snapshot bind so every key is solved from the same start and the rig is left untouched
   const nodes = new Map<string, TransformNode>();
   for (const b of sk.bones) { const n = b.getTransformNode(); if (n) nodes.set(b.name.replace(/^mixamorig:?/, ''), n); }
+  // Bind comes from the skeleton's REST matrices, not from where the bones
+  // happen to be: a clip built while the rig is still posed by a previous clip
+  // would otherwise bake that pose in as its zero (measured 2026-09-03: the
+  // over-the-top pitch built after a follow-through reached 1.43 m, not 1.83).
   const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>();
-  for (const n of nodes.values()) bind.set(n, { p: n.position.clone(), q: (n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation)).clone() });
+  for (const b of sk.bones) {
+    const n = b.getTransformNode(); if (!n) continue;
+    const p = new Vector3(), q = new Quaternion(), sc = new Vector3();
+    if (b.getRestMatrix().decompose(sc, q, p)) bind.set(n, { p, q });
+    else bind.set(n, { p: n.position.clone(), q: (n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation)).clone() });
+  }
   // World matrices refresh PARENT-FIRST. A forced compute on a node reads its
   // parent's CACHED matrix (the arm-solver lesson, 2026-09-03), so refreshing
   // in arbitrary order leaves the chest and shoulders stale under a new torso

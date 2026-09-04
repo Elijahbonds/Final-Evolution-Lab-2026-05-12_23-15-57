@@ -1,135 +1,91 @@
-// Basketball packages (Phase 4, ship pass 2026-09-03) — the moves the 2K
-// benchmark expects to SEE, not just resolve: a live dribble, size-ups
-// (crossover / hesi), the layup gather, a defensive slide, a block reach and
-// a steal reach. Before this file every one of them aliased onto run, guard
-// or jumpshot (clipAliases.ts), so a crossover looked like jogging.
+// Basketball packages (Phase 4, 2026-09-03) — the moves the 2K benchmark
+// expects to SEE: a live dribble, size-ups (crossover / hesi), the layup
+// gather, a defensive slide, a block reach and a steal reach.
 //
-// Built the way locomotion.ts builds: arms ride the MEASURED arms-down rest
-// (solveArmsDown) so the pose never drifts toward the T-pose bind, and every
-// offset is proven on the real forge rig by basketball.test.ts (hand / knee /
-// hip world positions at the clip's key frame), not eyeballed.
-//
-// Local-offset vocabulary on a dropped arm (withOffset(rest, x, y, z)):
-//   y  swings the arm forward: +y on the RIGHT arm, −y on the LEFT (mirrored)
-//   z  raises it sideways toward the T (+ left / − right) — ±162 is overhead
-//   x  twists about the limb (invisible on a capsule; used sparingly)
-
+// RE-AUTHORED as pose targets (ship pass 3, rung 1): torso and legs in degrees
+// about the parent's bind axes, hands as world-axis metres from the root
+// (+x = the hero's right at bind), fitted at build time by the two-bone solver
+// so one authoring plays on any body that passes Gate 0. Every clip is proven
+// by basketball.test.ts on the shipped hero and the candidate body.
+// Yaw convention (measured 2026-09-03): +yaw turns the RIGHT shoulder FORWARD (+z).
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
-import { solveArmsDown, buildQuatClip, withOffset, eulerQ, type RestPose } from '../restPose';
-
-const restCache = new WeakMap<Skeleton, RestPose>();
-function restFor(sk: Skeleton): RestPose {
-  let r = restCache.get(sk);
-  if (!r) { r = solveArmsDown(sk, 72); restCache.set(sk, r); }
-  return r;
-}
+import { buildPoseClip, type Deg3 } from '../poseClip';
 
 export const BASKETBALL_CLIPS = [
   'bball_dribble_idle', 'bball_crossover_left', 'bball_crossover_right', 'bball_hesi',
   'bball_layup_gather', 'bball_defend_slide_left', 'bball_defend_slide_right',
   'bball_block_reach', 'bball_steal_reach',
 ] as const;
+type V3 = [number, number, number];
+
+const STANCE: Record<string, Deg3> = { LeftUpLeg: [-22, 0, 8], RightUpLeg: [-22, 0, -8], LeftLeg: [34, 0, 0], RightLeg: [34, 0, 0] };
+const BALL_HAND: V3 = [0.25, 0.95, 0.30];       // the live dribble, waist height, out front
+const OFF_HAND: V3 = [-0.25, 1.00, 0.12];       // relaxed, slightly forward
+const UP_R: V3 = [0.9, 0.1, -0.3], UP_L: V3 = [-0.9, 0.1, -0.3];
+const mirror = (v: V3): V3 => [-v[0], v[1], v[2]];
 
 /** Ball-hand pump on a bent-knee stance. Loops. */
 export function buildDribbleIdle(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const r = restFor(sk); const la = r.get('LeftArm'), ra = r.get('RightArm'), rf = r.get('RightForeArm');
-  if (!la || !ra) return null;
-  const tracks: Record<string, [number, ReturnType<typeof eulerQ>][]> = {
-    Spine: [[0, eulerQ(14, 0, 0)], [0.4, eulerQ(17, 0, 0)], [0.8, eulerQ(14, 0, 0)]],
-    LeftUpLeg: [[0, eulerQ(-22, 0, 8)], [0.8, eulerQ(-22, 0, 8)]],
-    RightUpLeg: [[0, eulerQ(-22, 0, -8)], [0.8, eulerQ(-22, 0, -8)]],
-    LeftLeg: [[0, eulerQ(34, 0, 0)], [0.8, eulerQ(34, 0, 0)]],
-    RightLeg: [[0, eulerQ(34, 0, 0)], [0.8, eulerQ(34, 0, 0)]],
-    LeftArm: [[0, withOffset(la, 0, -18, 6)], [0.8, withOffset(la, 0, -18, 6)]],
-    RightArm: [[0, withOffset(ra, 0, 38, -8)], [0.4, withOffset(ra, 0, 58, -6)], [0.8, withOffset(ra, 0, 38, -8)]],
-  };
-  if (rf) tracks.RightForeArm = [[0, withOffset(rf, 0, 30, 0)], [0.4, withOffset(rf, 0, 10, 0)], [0.8, withOffset(rf, 0, 30, 0)]];
-  return buildQuatClip(scene, sk, 'bball_dribble_idle', 0.8, tracks, [[0, -0.05], [0.4, -0.07], [0.8, -0.05]]);
+  const key = (t: number, spine: number, hand: V3, hipsY: number) => ({ t, bones: { Hips: [0, 0, 0] as Deg3, Spine: [spine, 0, 0] as Deg3, ...STANCE }, hands: { Right: hand, Left: OFF_HAND }, hipsY });
+  return buildPoseClip(scene, sk, 'bball_dribble_idle', 0.8, [key(0, 14, BALL_HAND, -0.05), key(0.4, 17, [0.22, 0.82, 0.32], -0.07), key(0.8, 14, BALL_HAND, -0.05)]);
 }
 
 /** Crossover: hips and shoulders snap to the new side, the ball hand sweeps across. */
 export function buildCrossover(scene: Scene, sk: Skeleton, dir: 'left' | 'right'): AnimationGroup | null {
   const s = dir === 'left' ? 1 : -1;
-  const r = restFor(sk); const la = r.get('LeftArm'), ra = r.get('RightArm');
-  if (!la || !ra) return null;
-  return buildQuatClip(scene, sk, `bball_crossover_${dir}`, 0.45, {
-    Hips: [[0, eulerQ(0, 0, 0)], [0.2, eulerQ(0, 28 * s, 0)], [0.45, eulerQ(0, 6 * s, 0)]],
-    Spine: [[0, eulerQ(14, 0, 0)], [0.2, eulerQ(20, -14 * s, 0)], [0.45, eulerQ(14, 0, 0)]],
-    LeftUpLeg: [[0, eulerQ(-22, 0, 8)], [0.2, eulerQ(-34, 0, 18)], [0.45, eulerQ(-22, 0, 8)]],
-    RightUpLeg: [[0, eulerQ(-22, 0, -8)], [0.2, eulerQ(-34, 0, -18)], [0.45, eulerQ(-22, 0, -8)]],
-    LeftArm: [[0, withOffset(la, 0, -20, 6)], [0.2, withOffset(la, 0, -55, -30 * s)], [0.45, withOffset(la, 0, -20, 6)]],
-    RightArm: [[0, withOffset(ra, 0, 45, -8)], [0.2, withOffset(ra, 0, 60, 30 * s)], [0.45, withOffset(ra, 0, 45, -8)]],
-  }, [[0, -0.05], [0.2, -0.09], [0.45, -0.05]]);
+  // going left: the right hand carries the ball across to the left hip; going right: the left hand comes across
+  const across = { Right: (dir === 'left' ? [-0.12, 0.88, 0.34] : [0.48, 0.95, 0.26]) as V3, Left: (dir === 'left' ? [-0.48, 0.95, 0.26] : [0.12, 0.88, 0.34]) as V3 };
+  return buildPoseClip(scene, sk, `bball_crossover_${dir}`, 0.45, [
+    { t: 0,    bones: { Hips: [0, 0, 0],      Spine: [14, 0, 0],       ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+    { t: 0.2,  bones: { Hips: [0, 28 * s, 0], Spine: [20, -14 * s, 0], LeftUpLeg: [-34, 0, 18], RightUpLeg: [-34, 0, -18], LeftLeg: [40, 0, 0], RightLeg: [40, 0, 0] }, hands: across, hipsY: -0.09 },
+    { t: 0.45, bones: { Hips: [0, 6 * s, 0],  Spine: [14, 0, 0],       ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+  ]);
 }
 
 /** Hesitation: a stutter — the body checks, the ball hand holds, the knees load. */
 export function buildHesi(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const r = restFor(sk); const la = r.get('LeftArm'), ra = r.get('RightArm');
-  if (!la || !ra) return null;
-  return buildQuatClip(scene, sk, 'bball_hesi', 0.55, {
-    Spine: [[0, eulerQ(14, 0, 0)], [0.2, eulerQ(4, 0, 0)], [0.35, eulerQ(6, 0, 0)], [0.55, eulerQ(16, 0, 0)]],
-    Neck: [[0, eulerQ(0, 0, 0)], [0.2, eulerQ(-8, 0, 0)], [0.55, eulerQ(0, 0, 0)]],
-    LeftUpLeg: [[0, eulerQ(-22, 0, 8)], [0.2, eulerQ(-10, 0, 8)], [0.55, eulerQ(-28, 0, 8)]],
-    RightUpLeg: [[0, eulerQ(-22, 0, -8)], [0.2, eulerQ(-10, 0, -8)], [0.55, eulerQ(-28, 0, -8)]],
-    LeftArm: [[0, withOffset(la, 0, -18, 6)], [0.55, withOffset(la, 0, -18, 6)]],
-    RightArm: [[0, withOffset(ra, 0, 40, -8)], [0.2, withOffset(ra, 0, 44, -8)], [0.55, withOffset(ra, 0, 40, -8)]],
-  }, [[0, -0.05], [0.2, -0.02], [0.55, -0.08]]);
+  return buildPoseClip(scene, sk, 'bball_hesi', 0.55, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [14, 0, 0], Neck: [0, 0, 0],  ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+    { t: 0.2,  bones: { Hips: [0, 0, 0], Spine: [4, 0, 0],  Neck: [-8, 0, 0], LeftUpLeg: [-10, 0, 8], RightUpLeg: [-10, 0, -8], LeftLeg: [16, 0, 0], RightLeg: [16, 0, 0] }, hands: { Right: [0.26, 0.98, 0.31], Left: OFF_HAND }, hipsY: -0.02 },
+    { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],  Neck: [-4, 0, 0], LeftUpLeg: [-14, 0, 8], RightUpLeg: [-14, 0, -8], LeftLeg: [22, 0, 0], RightLeg: [22, 0, 0] }, hands: { Right: [0.26, 0.96, 0.31], Left: OFF_HAND }, hipsY: -0.04 },
+    { t: 0.55, bones: { Hips: [0, 0, 0], Spine: [16, 0, 0], Neck: [0, 0, 0],  LeftUpLeg: [-28, 0, 8], RightUpLeg: [-28, 0, -8], LeftLeg: [42, 0, 0], RightLeg: [42, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.08 },
+  ]);
 }
 
 /** Layup gather: the inside knee drives up as the ball hand rises. */
 export function buildLayupGather(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const r = restFor(sk); const la = r.get('LeftArm'), ra = r.get('RightArm');
-  if (!la || !ra) return null;
-  return buildQuatClip(scene, sk, 'bball_layup_gather', 0.5, {
-    Spine: [[0, eulerQ(12, 0, 0)], [0.3, eulerQ(-6, 0, 0)], [0.5, eulerQ(-4, 0, 0)]],
-    RightUpLeg: [[0, eulerQ(-20, 0, -6)], [0.3, eulerQ(-82, 0, -4)], [0.5, eulerQ(-70, 0, -4)]],
-    RightLeg: [[0, eulerQ(30, 0, 0)], [0.3, eulerQ(78, 0, 0)], [0.5, eulerQ(60, 0, 0)]],
-    LeftUpLeg: [[0, eulerQ(-20, 0, 6)], [0.3, eulerQ(4, 0, 4)], [0.5, eulerQ(8, 0, 4)]],
-    LeftArm: [[0, withOffset(la, 0, -20, 6)], [0.3, withOffset(la, 0, -40, 30)], [0.5, withOffset(la, 0, -35, 30)]],
-    RightArm: [[0, withOffset(ra, 0, 45, -8)], [0.3, withOffset(ra, 0, 40, -150)], [0.5, withOffset(ra, 0, 30, -162)]],
-  }, [[0, -0.05], [0.3, 0.02], [0.5, 0.05]]);
+  return buildPoseClip(scene, sk, 'bball_layup_gather', 0.5, [
+    { t: 0,   bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], LeftUpLeg: [-20, 0, 6], RightUpLeg: [-20, 0, -6], LeftLeg: [30, 0, 0], RightLeg: [30, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+    { t: 0.3, bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], LeftUpLeg: [4, 0, 4],   RightUpLeg: [-82, 0, -4], LeftLeg: [6, 0, 0],  RightLeg: [78, 0, 0] }, hands: { Right: [0.20, 1.95, 0.15], Left: [-0.30, 1.25, 0.20] }, poles: { Right: UP_R }, hipsY: 0.02 },
+    { t: 0.5, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], LeftUpLeg: [8, 0, 4],   RightUpLeg: [-70, 0, -4], LeftLeg: [4, 0, 0],  RightLeg: [60, 0, 0] }, hands: { Right: [0.18, 1.98, 0.10], Left: [-0.30, 1.20, 0.20] }, poles: { Right: UP_R }, hipsY: 0.05 },
+  ]);
 }
 
-/** Defensive slide: wide, low, arms out and low. Loops. */
+/** Defensive slide: wide, low, arms out and low in front. Loops. */
 export function buildDefendSlide(scene: Scene, sk: Skeleton, dir: 'left' | 'right'): AnimationGroup | null {
   const s = dir === 'left' ? 1 : -1;
-  const r = restFor(sk); const la = r.get('LeftArm'), ra = r.get('RightArm');
-  if (!la || !ra) return null;
-  return buildQuatClip(scene, sk, `bball_defend_slide_${dir}`, 0.5, {
-    Hips: [[0, eulerQ(0, 0, 4 * s)], [0.25, eulerQ(0, 0, 8 * s)], [0.5, eulerQ(0, 0, 4 * s)]],
-    Spine: [[0, eulerQ(22, 0, -4 * s)], [0.5, eulerQ(22, 0, -4 * s)]],
-    LeftUpLeg: [[0, eulerQ(-28, 0, 22)], [0.25, eulerQ(-34, 0, 30)], [0.5, eulerQ(-28, 0, 22)]],
-    RightUpLeg: [[0, eulerQ(-28, 0, -22)], [0.25, eulerQ(-22, 0, -14)], [0.5, eulerQ(-28, 0, -22)]],
-    LeftLeg: [[0, eulerQ(40, 0, 0)], [0.5, eulerQ(40, 0, 0)]],
-    RightLeg: [[0, eulerQ(40, 0, 0)], [0.5, eulerQ(40, 0, 0)]],
-    // arms low and in front (measured 2026-09-03: +34 raise read as a T-pose)
-    LeftArm: [[0, withOffset(la, 0, -36, 14)], [0.5, withOffset(la, 0, -36, 14)]],
-    RightArm: [[0, withOffset(ra, 0, 36, -14)], [0.5, withOffset(ra, 0, 36, -14)]],
-  }, [[0, -0.10], [0.25, -0.12], [0.5, -0.10]]);
+  const hands = { Left: [-0.36, 1.05, 0.30] as V3, Right: [0.36, 1.05, 0.30] as V3 };
+  const key = (t: number, roll: number, lead: Deg3, trail: Deg3, hipsY: number) => ({ t, bones: { Hips: [0, 0, roll * s] as Deg3, Spine: [22, 0, -4 * s] as Deg3, LeftUpLeg: lead, RightUpLeg: trail, LeftLeg: [40, 0, 0] as Deg3, RightLeg: [40, 0, 0] as Deg3 }, hands, hipsY });
+  return buildPoseClip(scene, sk, `bball_defend_slide_${dir}`, 0.5, [
+    key(0, 4, [-28, 0, 22], [-28, 0, -22], -0.10), key(0.25, 8, [-34, 0, 30], [-22, 0, -14], -0.12), key(0.5, 4, [-28, 0, 22], [-28, 0, -22], -0.10),
+  ]);
 }
 
 /** Block reach: both arms straight overhead. One-shot; the mode owns the jump. */
 export function buildBlockReach(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const r = restFor(sk); const la = r.get('LeftArm'), ra = r.get('RightArm');
-  if (!la || !ra) return null;
-  return buildQuatClip(scene, sk, 'bball_block_reach', 0.5, {
-    Spine: [[0, eulerQ(8, 0, 0)], [0.25, eulerQ(-8, 0, 0)], [0.5, eulerQ(-6, 0, 0)]],
-    LeftArm: [[0, withOffset(la, 0, -20, 6)], [0.25, withOffset(la, 0, -6, 164)], [0.5, withOffset(la, 0, -6, 160)]],
-    RightArm: [[0, withOffset(ra, 0, 20, -6)], [0.25, withOffset(ra, 0, 6, -164)], [0.5, withOffset(ra, 0, 6, -160)]],
-  });
+  const up = { Right: [0.20, 2.00, 0.05] as V3, Left: [-0.20, 2.00, 0.05] as V3 };
+  return buildPoseClip(scene, sk, 'bball_block_reach', 0.5, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [8, 0, 0] },  hands: { Right: [0.25, 1.00, 0.25], Left: mirror([0.25, 1.00, 0.25]) } },
+    { t: 0.25, bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0] }, hands: up, poles: { Right: UP_R, Left: UP_L } },
+    { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0] }, hands: { Right: [0.22, 1.98, 0.08], Left: [-0.22, 1.98, 0.08] }, poles: { Right: UP_R, Left: UP_L } },
+  ]);
 }
 
 /** Steal reach: the lead hand flashes forward and low, the torso follows. */
 export function buildStealReach(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const r = restFor(sk); const la = r.get('LeftArm'), ra = r.get('RightArm'), rf = r.get('RightForeArm');
-  if (!la || !ra) return null;
-  const tracks: Record<string, [number, ReturnType<typeof eulerQ>][]> = {
-    Spine: [[0, eulerQ(16, 0, 0)], [0.15, eulerQ(26, -12, 0)], [0.35, eulerQ(16, 0, 0)]],
-    LeftUpLeg: [[0, eulerQ(-22, 0, 8)], [0.15, eulerQ(-30, 0, 10)], [0.35, eulerQ(-22, 0, 8)]],
-    RightUpLeg: [[0, eulerQ(-22, 0, -8)], [0.15, eulerQ(-14, 0, -8)], [0.35, eulerQ(-22, 0, -8)]],
-    LeftArm: [[0, withOffset(la, 0, -20, 6)], [0.35, withOffset(la, 0, -20, 6)]],
-    RightArm: [[0, withOffset(ra, 0, 30, -8)], [0.15, withOffset(ra, 0, 92, -18)], [0.35, withOffset(ra, 0, 30, -8)]],
-  };
-  if (rf) tracks.RightForeArm = [[0, withOffset(rf, 0, 20, 0)], [0.15, withOffset(rf, 0, 4, 0)], [0.35, withOffset(rf, 0, 20, 0)]];
-  return buildQuatClip(scene, sk, 'bball_steal_reach', 0.35, tracks, [[0, -0.05], [0.15, -0.08], [0.35, -0.05]]);
+  return buildPoseClip(scene, sk, 'bball_steal_reach', 0.35, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [16, 0, 0],   ...STANCE }, hands: { Right: [0.25, 1.00, 0.25], Left: OFF_HAND }, hipsY: -0.05 },
+    { t: 0.15, bones: { Hips: [0, 0, 0], Spine: [26, 12, 0],  LeftUpLeg: [-30, 0, 10], RightUpLeg: [-14, 0, -8], LeftLeg: [38, 0, 0], RightLeg: [26, 0, 0] }, hands: { Right: [0.28, 0.92, 0.62], Left: OFF_HAND }, poles: { Right: [0.8, -0.6, 0.0] }, hipsY: -0.08 },
+    { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [16, 0, 0],   ...STANCE }, hands: { Right: [0.25, 1.00, 0.25], Left: OFF_HAND }, hipsY: -0.05 },
+  ]);
 }

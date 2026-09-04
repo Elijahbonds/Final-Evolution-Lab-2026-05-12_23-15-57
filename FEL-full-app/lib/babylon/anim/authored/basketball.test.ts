@@ -40,7 +40,7 @@ describe('basketball packages on the forge rig', () => {
     const h = pos('RightHand'), head = pos('Head');
     expect(h.y).toBeLessThan(1.1);
     expect(h.z).toBeGreaterThan(0.15);
-    expect(head.y).toBeGreaterThan(1.45);
+    expect(head.y).toBeGreaterThan(pos('Hips').y + 0.45);   // upright enough — relative, so a shorter body passes too
   });
   it('block reach puts both hands above the head', () => {
     at(buildBlockReach(scene, sk)!, 0.25);
