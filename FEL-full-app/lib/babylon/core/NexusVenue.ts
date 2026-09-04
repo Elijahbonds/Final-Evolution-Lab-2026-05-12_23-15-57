@@ -20,6 +20,7 @@ import type { Scene, TransformNode } from '@babylonjs/core';
 import { buildNexusScene, type BuiltScene } from '../nexus/NexusWebScene';
 import { mountVenueProps, propSetFor, type VenuePropsHandle } from '../visual/VenueProps';
 import { NavBounds } from './NavBounds';
+import { MAPS } from '../../map-data';
 import type { Vector3 } from '@babylonjs/core';
 import { specFor } from '../nexus/venueSpecs';
 
@@ -142,7 +143,18 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   // still holding the preset's full height, that is a ~60 degree pitch against a
   // preset declaring 28, and the hero drops out of the bottom of frame: the
   // [FEL-FRAME] lines that survived the 3v3 pass.
-  ctx.camDirector?.setBounds?.(venueBounds(spec));
+  // Phase 6: the camera may use the whole map, not just the painted ground. Union the ground box
+  // with the map's measured walkabout bounds (map-data boundsMin/Max, world frame after mapOffset):
+  // three-point's corner racks wanted the camera at x ±11 on a 16 m half-court box and were pinned
+  // 4.0 m from the shooter. Occlusion still handles the fence; the box only stops escapes.
+  const camBox = venueBounds(spec);
+  const mapCfg = spec.mapKey ? MAPS[spec.mapKey] : undefined;
+  if (mapCfg?.boundsMin && mapCfg.boundsMax) {
+    const ox = mapCfg.mapOffset?.[0] ?? 0, oz = mapCfg.mapOffset?.[2] ?? 0;
+    camBox.minX = Math.min(camBox.minX, mapCfg.boundsMin[0] + ox); camBox.maxX = Math.max(camBox.maxX, mapCfg.boundsMax[0] + ox);
+    camBox.minZ = Math.min(camBox.minZ, mapCfg.boundsMin[2] + oz); camBox.maxZ = Math.max(camBox.maxZ, mapCfg.boundsMax[2] + oz);
+  }
+  ctx.camDirector?.setBounds?.(camBox);
 
   const placeholders = built.actors;
 

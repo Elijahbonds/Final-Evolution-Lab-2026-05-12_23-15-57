@@ -23,7 +23,8 @@ for (let i = 0; i < 6; i++) {
     const tf = s.getTransformMatrix();
     let minY = Infinity, maxY = -Infinity, minX = Infinity, maxX = -Infinity;
     for (const m of best) { m.refreshBoundingInfo(true); const bb = m.getBoundingInfo().boundingBox; const M = tf.m; for (const v of bb.vectorsWorld) { const cx = M[0] * v.x + M[4] * v.y + M[8] * v.z + M[12], cy = M[1] * v.x + M[5] * v.y + M[9] * v.z + M[13], cw = M[3] * v.x + M[7] * v.y + M[11] * v.z + M[15]; if (cw <= 0) continue; const sx = (cx / cw * 0.5 + 0.5) * W, sy = (1 - (cy / cw * 0.5 + 0.5)) * H; minY = Math.min(minY, sy); maxY = Math.max(maxY, sy); minX = Math.min(minX, sx); maxX = Math.max(maxX, sx); } }
-    return { mode: d.modeId, viaHero: !!(heroRoot && bestD === 0), cam: cam.name, type: cam.getClassName(), H, px: Math.round(maxY - minY), fraction: +((maxY - minY) / H).toFixed(3), cx: Math.round((minX + maxX) / 2 / W * 100) / 100, roots: roots.size, radius: cam.radius ?? null };
+    const hp = heroRoot ? (heroRoot.getAbsolutePosition ? heroRoot.getAbsolutePosition() : heroRoot.position) : null; const camDist = hp ? +Math.hypot(cam.position.x - hp.x, cam.position.y - hp.y, cam.position.z - hp.z).toFixed(2) : null;
+    return { mode: d.modeId, viaHero: !!(heroRoot && bestD === 0), camDist, camY: +cam.position.y.toFixed(2), cam: cam.name, type: cam.getClassName(), H, px: Math.round(maxY - minY), fraction: +((maxY - minY) / H).toFixed(3), cx: Math.round((minX + maxX) / 2 / W * 100) / 100, roots: roots.size, radius: cam.radius ?? null };
   })()`);
   if (r && !(r as { err?: string }).err) samples.push((r as { fraction: number }).fraction);
   if (i === 0) console.log(JSON.stringify(r));

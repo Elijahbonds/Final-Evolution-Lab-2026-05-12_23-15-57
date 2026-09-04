@@ -16,11 +16,13 @@
       "viaHero": true
     },
     "threepoint": {
-      "fraction": 0.66,
-      "min": 0.658,
-      "max": 0.662,
+      "fraction": 0.353,
+      "min": 0.353,
+      "max": 0.353,
       "samples": 6,
-      "viaHero": true
+      "viaHero": true,
+      "camDist": 6.74,
+      "note": "after the camera box took the map's measured bounds (was 0.66 at 4.04 m, pinned by the 16 m half-court box on the corner racks)"
     },
     "threevthree": {
       "fraction": 0.205,

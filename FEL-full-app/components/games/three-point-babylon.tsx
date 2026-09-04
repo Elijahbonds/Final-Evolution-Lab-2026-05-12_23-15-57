@@ -111,6 +111,11 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
         onStart={tapStart}
         onRetry={tapStart}
       />
+      {phase === 'paused' && (
+        <button onClick={tapStart} className="absolute inset-0 flex items-center justify-center bg-black/60">
+          <span className="fel-heading text-3xl font-bold text-white">PAUSED — TAP TO RESUME</span>
+        </button>
+      )}
 
       {/* Lobby is expanded until the whistle, then collapses to a status badge
           so it never sits on top of live play. */}
