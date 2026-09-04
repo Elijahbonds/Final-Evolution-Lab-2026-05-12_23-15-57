@@ -10,7 +10,7 @@ OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
   printf "vitest     : "; npx vitest run 2>&1 | grep -oE "Tests +[0-9]+ passed \([0-9]+\)|[0-9]+ failed" | head -1
   for m in dunk threepoint threevthree onevone dunkduel karate_vs karate mixedcombat skateboard surf snowboard_slalom bigair gymnastics volleyball tennis golf derby penalty football carnival dance; do
     # full output kept per mode so a frame-guard hit is inspectable after the fact
-    r=$(URL=http://localhost:3000/dev/mode/$m PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=8 npx tsx scripts/capture-mode-play.mts 2>&1)
+    r=$(URL=$BASE/dev/mode/$m PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=8 npx tsx scripts/capture-mode-play.mts 2>&1)
     echo "$r" > "$G/logs/$m.txt"
     line=$(echo "$r" | grep -oE "FEL-FRAME [0-9]+ \| MISSING CLIP [0-9]+ \| errors [0-9]+" | head -1)
     perf=$(echo "$r" | grep -oE "perf  : .*" | sed 's/perf  : //' | head -1)
@@ -20,7 +20,7 @@ OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
   # (tint clones, morphs, hair style, jersey plate) on top of the spawn layers.
   # The Closet caught a never-ready skin material 21 anonymous runs could not.
   for m in onevone skateboard karate; do
-    r=$(LOGIN=1 URL=http://localhost:3000/dev/mode/$m PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=login_$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=4 npx tsx scripts/capture-mode-play.mts 2>&1)
+    r=$(LOGIN=1 URL=$BASE/dev/mode/$m PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=login_$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=4 npx tsx scripts/capture-mode-play.mts 2>&1)
     echo "$r" > "$G/logs/login-$m.txt"
     line=$(echo "$r" | grep -oE "FEL-FRAME [0-9]+ \| MISSING CLIP [0-9]+ \| errors [0-9]+" | head -1)
     ident=$(echo "$r" | grep -oE "ident : .*" | sed 's/ident : //' | head -1)
@@ -29,7 +29,7 @@ OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
   # mobile QUALITY TIER, one mode per family: a phone-shaped touch context makes
   # detectQualityTier pick the mobile tier (Phase 1 gate: both tiers measured).
   for m in dunk karate skateboard volleyball golf football dance; do
-    r=$(TIER=mobile URL=http://localhost:3000/dev/mode/$m PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=mtier_$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=4 npx tsx scripts/capture-mode-play.mts 2>&1)
+    r=$(TIER=mobile URL=$BASE/dev/mode/$m PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=mtier_$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=4 npx tsx scripts/capture-mode-play.mts 2>&1)
     echo "$r" > "$G/logs/mtier-$m.txt"
     line=$(echo "$r" | grep -oE "FEL-FRAME [0-9]+ \| MISSING CLIP [0-9]+ \| errors [0-9]+" | head -1)
     perf=$(echo "$r" | grep -oE "perf  : .*" | sed 's/perf  : //' | head -1)
@@ -38,7 +38,7 @@ OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
   # phone captures on the shipping routes, one mode per family (ship pass 2, Phase 7)
   for r in "skateboard PUMP POP" "volleyball HIT BLOCK" "tennis DRIVE SLICE" "dunk CHARGE SLAM" "karate BLOCK JAB" "football TRUCK HURDLE" "golf SWING CLUB"; do
     set -- ${=r}   # zsh does not word-split an unquoted variable; ${=r} forces it
-    mr=$(URL=http://localhost:3000/play/$1 HOLD_VERB=$2 TAP_VERB=$3 OUT_DIR="$G/shots" npx tsx scripts/capture-mobile-touch.mts 2>&1)
+    mr=$(URL=$BASE/play/$1 HOLD_VERB=$2 TAP_VERB=$3 OUT_DIR="$G/shots" npx tsx scripts/capture-mobile-touch.mts 2>&1)
     echo "$mr" > "$G/logs/mobile-$1.txt"
     e=$(echo "$mr" | grep -oE "^errors: [0-9]+" | head -1)
     printf "%-16s: %s\n" "mobile/$1" "${e:-NO RESULT}"
