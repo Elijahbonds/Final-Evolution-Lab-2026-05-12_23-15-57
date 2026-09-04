@@ -58,10 +58,18 @@ for (const j of joints) if (!keep.has(j.getName())) skin.removeJoint(j);
 // detach the dropped nodes so the hierarchy is the 22-bone tree
 for (const j of joints) if (!keep.has(j.getName())) { for (const c of j.listChildren()) keptAncestor(j).addChild(c); j.dispose(); }
 
-// 3) materials: the body primitive is `skin`; keep it PBR-ready
+// 3) the material name contract (skin / jersey / shorts / shoes / eyes / hair):
+//    the body primitive is `skin`; dressed meshes carry the label given at
+//    dressing time (Blender object name) or fall back on their asset name.
+const contract: [RegExp, string][] = [[/eye|low-poly|high-poly/i, 'eyes'], [/shirt|tee|jersey|polo|top/i, 'jersey'], [/short|pant|jean|trouser/i, 'shorts'], [/boot|shoe|sneaker/i, 'shoes'], [/hair|afro|braid|bun|ponytail/i, 'hair'], [/brow/i, 'brows'], [/lash/i, 'lashes'], [/teeth|tongue/i, 'mouth']];
+const nameFor = (meshName: string, matName: string): string | null => { for (const [re, n] of contract) if (re.test(meshName) || re.test(matName)) return n; return null; };
 for (const mesh of root.listMeshes()) for (const prim of mesh.listPrimitives()) {
-  if (!prim.getMaterial()) prim.setMaterial(doc.createMaterial('skin').setBaseColorFactor([0.78, 0.55, 0.42, 1]).setRoughnessFactor(0.6).setMetallicFactor(0));
+  const mat = prim.getMaterial();
+  if (!mat) { prim.setMaterial(doc.createMaterial('skin').setBaseColorFactor([0.78, 0.55, 0.42, 1]).setRoughnessFactor(0.6).setMetallicFactor(0)); continue; }
+  if (mat.getName() === 'skin' || /^skin/i.test(mat.getName())) { mat.setName('skin'); continue; }
+  const n = nameFor(mesh.getName(), mat.getName()); if (n) mat.setName(n);
 }
+for (const n of root.listNodes()) { const m = n.getMesh(); if (m) { const mats = m.listPrimitives().map((p) => p.getMaterial()?.getName()).filter(Boolean); if (mats.length === 1 && mats[0] !== 'skin') n.setName(mats[0]!); else if (mats[0] === 'skin') n.setName('Body'); } }
 await doc.transform(dedup(), prune());
 writeFileSync(outFile, await io.writeBinary(doc));
 const outJoints = root.listSkins()[0].listJoints().map((j) => j.getName());
