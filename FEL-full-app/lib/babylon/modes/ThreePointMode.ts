@@ -31,12 +31,15 @@ import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
+import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { ShotArc } from '../core/BasketballCore';
 import { THREE_CORNER_R, THREE_TOP_R, threePointRadius } from '../core/BasketballCore';
 import { SoundKit } from '../audio/SoundKit';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+
+let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 
 // ── EXACT tuned constants (verbatim from the proven 2D/R3F shootout) ──
 const RACKS = 5;
@@ -434,7 +437,11 @@ export const ThreePointMode: ModeDefinition = {
     loadCount += 1;
     resetState();
 
-    VenueKit.buildCourt(ctx.scene, 'venice');
+    // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
+
+    modeVenue = mountVenue(ctx, 'basketball_h2h', { keepGameplayCamera: true });
+
+    if (!modeVenue) VenueKit.buildCourt(ctx.scene, 'venice');
     applyOceanCourt(ctx.scene, 'venice');
 
     player = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
@@ -596,6 +603,8 @@ export const ThreePointMode: ModeDefinition = {
   },
 
   dispose(): void {
+
+    modeVenue?.dispose?.(); modeVenue = null;
     disposeCount += 1;
     // A newer instance has already loaded — this teardown belongs to an older
     // one and must not touch the live objects.

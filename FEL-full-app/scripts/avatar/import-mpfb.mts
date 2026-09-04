@@ -173,7 +173,9 @@ for (const mesh of root.listMeshes()) for (const prim of mesh.listPrimitives()) 
     if (mat.getName().startsWith('hair.')) { mat.setAlphaMode('MASK').setAlphaCutoff(0.5).setDoubleSided(true); }
     // garments too: Blender exported them BLEND, and Babylon's transparency pass sorted the
     // shorts behind the body in the modes (measured 2026-09-04: the hero played bare-legged)
-    else { mat.setAlphaMode('MASK').setAlphaCutoff(0.5); }
+    // garments: OPAQUE. Their maps carry a low alpha (measured 2026-09-04: the jean shorts' mean alpha
+    // is well under 0.5), which BLEND rendered as near-transparent cloth and a MASK discarded outright
+    else { mat.setAlphaMode('OPAQUE'); }
     continue;
   }
   const n = nameFor(mesh.getName(), mat.getName()); if (n) mat.setName(n);

@@ -29,6 +29,7 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
+import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import {
   FighterState, RivalFightBrain, resolveStrike, applyHit,
   KARATE_ATTACKS, SPECIAL_ATTACK, CHI_MAX, PARRY_STAGGER_SEC, type AttackDef,
@@ -39,6 +40,8 @@ import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
+
+let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 
 type Phase = 'intro' | 'fighting' | 'roundOver' | 'matchOver';
 const ROUNDS_TO_WIN = 2;
@@ -222,7 +225,9 @@ export const KarateVSMode: ModeDefinition = (() => {
     modeId: 'karate-vs', mood: 'dojoWarm', camPreset: 'fight',
 
     async load(ctx: ModeContext) {
-      VenueKit.buildDojo(ctx.scene);
+      // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
+      modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true });
+      if (!modeVenue) VenueKit.buildDojo(ctx.scene);
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 2.2), startClip: SPORT_CLIP.karateStance,
       });
@@ -330,6 +335,8 @@ export const KarateVSMode: ModeDefinition = (() => {
     },
 
     dispose() {
+
+      modeVenue?.dispose?.(); modeVenue = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
     },
   };

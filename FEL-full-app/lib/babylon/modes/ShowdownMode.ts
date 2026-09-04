@@ -25,6 +25,7 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
+import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { FighterState, KARATE_ATTACKS, CHI_MAX } from '../core/FightCore';
 import { StrikeController, karateMoveset, type CombatMove } from '../core/StrikeSystem';
 import { DefenseController, applyDefenseOutcome, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';
@@ -38,6 +39,8 @@ import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
+
+let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 
 const ARENA_HALF = 12;
 const DASH_CHI_COST = 12;
@@ -269,7 +272,9 @@ export const ShowdownMode: ModeDefinition = (() => {
     modeId: 'showdown', mood: 'dojoWarm', camPreset: 'fight',
 
     async load(ctx: ModeContext) {
-      VenueKit.buildDojo(ctx.scene);
+      // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
+      modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true });
+      if (!modeVenue) VenueKit.buildDojo(ctx.scene);
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 4), startClip: 'karate_idle_stance', modeId: 'showdown-me',
       });
@@ -465,6 +470,8 @@ export const ShowdownMode: ModeDefinition = (() => {
     },
 
     dispose() {
+
+      modeVenue?.dispose?.(); modeVenue = null;
       support?.dispose(); wallMesh?.dispose();
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
     },

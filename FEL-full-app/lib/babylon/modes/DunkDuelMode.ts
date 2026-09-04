@@ -39,8 +39,11 @@ import { EASTBAY_TIMING } from '../anim/authored/timing';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { VenueKit } from '../visual/VenueKit';
+import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
+
+let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 import { judgeDunk, type JudgeScore } from '../core/JudgePanel';  // Phase 7: shared judges
 
 type Phase = 'handoff' | 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'matchOver';
@@ -251,7 +254,9 @@ export const DunkDuelMode: ModeDefinition = (() => {
     modeId: 'dunkduel', mood: 'goldenHour', camPreset: 'court',
 
     async load(ctx: ModeContext) {
-      VenueKit.buildCourt(ctx.scene);
+      // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
+      modeVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true });
+      if (!modeVenue) VenueKit.buildCourt(ctx.scene);
       applyOceanCourt(ctx.scene, 'venice');
       p1 = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, CFG.startZ), yawRad: Math.PI, startClip: SPORT_CLIP.idle,
@@ -406,6 +411,8 @@ export const DunkDuelMode: ModeDefinition = (() => {
     },
 
     dispose() {
+
+      modeVenue?.dispose?.(); modeVenue = null;
       p1?.dispose(); p2?.dispose(); ball?.dispose();
       obstacle?.dispose(); obstacle = null;
       SoundKit.stopAmbient();
