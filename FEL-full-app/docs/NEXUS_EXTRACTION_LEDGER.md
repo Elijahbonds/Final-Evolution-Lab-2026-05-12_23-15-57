@@ -321,3 +321,9 @@ Appended every ~10 minutes while the run is live; see also `docs/BACKLOG.md` for
     rig pass** — Gate 0 is unaffected by construction, and the script says so in its output.
   - `textureBudget.json` is NOT in this commit — still the null stub — so the verify gate is still red on the shipped
     table and the acceptance row ("mobile-tier table with no mode above 2× median") is not yet met.
+- **15:23** — `lane/rc` `17654af` "RC changelog for passes 3–4, the RC checklist script, prod-serve takes a port": three
+  files (`docs/CHANGELOG.md` +184/−35, `scripts/prod-serve.sh`, `scripts/rc-checklist.mts` new), all owned; Risk LOW,
+  tsc clean, vitest 39/253, production build exit 0 / 62.8 s stated. `docs/RC-2026-09-04.md` (owned) is NOT in this
+  commit — still in the working tree with §3–6 pending. Reusable: the changelog is **grouped by pass and phase from
+  the git history, each line carrying the measured proof its commit recorded**, and marks phases OPEN / IN THIS RUN
+  instead of omitting them — a Nexus changelog convention worth freezing (a line with no number says so).

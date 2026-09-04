@@ -92,3 +92,11 @@ orchestrator.
   null`, no modes); the sweep mode exists in the probe but has not been run against `MODES=all`. The throttle rows
   ("≥ 30 fps under 4× throttle", acceptance) and the gauntlet 0/0/0 are also not in the commit. The commit's
   before/after (dunk 197 → 94, karate 189 → 117) is two modes, not the tier. Belongs to `lane/perf` (next commit).
+- **15:23** `lane/rc` `17654af` — did NOT (yet) commit `docs/RC-2026-09-04.md`; §3a gauntlet on :3006, §3b 20-route
+  play sweep, §3c mobile tier on shipping routes, §4 checklist output, §5 findings and §6 "not done" are all PENDING in
+  the working tree. The acceptance row "production sweep on :3006 clean" is therefore unproven at this commit.
+  Belongs to `lane/rc` (next commit).
+- **15:23** `lane/rc` `17654af` — `rc-checklist.mts` gates on `textureBudget.json` (`measuredAt`, mobile median, 2×
+  rule); on every branch today that table is the null stub, so the checklist's texture-budget row is FAIL until the
+  perf lane's sweep writes it — the RC gate table is red by design until integration orders perf → verify → rc.
+  Belongs to the orchestrator's integration step.
