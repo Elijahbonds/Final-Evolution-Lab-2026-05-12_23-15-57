@@ -1,0 +1,15 @@
+{
+  "measuredAt": null,
+  "probe": "scripts/probes/_vram-diag.mts",
+  "budgetRule": "mobile: no mode above 2x tierMedian",
+  "tiers": {
+    "desktop": {
+      "median": null,
+      "modes": {}
+    },
+    "mobile": {
+      "median": null,
+      "modes": {}
+    }
+  }
+}

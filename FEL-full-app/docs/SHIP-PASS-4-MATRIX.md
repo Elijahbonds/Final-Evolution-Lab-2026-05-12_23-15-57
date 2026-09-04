@@ -8,54 +8,52 @@ Generated 2026-09-04. ✓ present · — missing. Clamps = typed bounds constant
 | karate | ✓ | /play/karate | ✓ | karate_endless → dojo | buildDojo | ✓ | OnslaughtCore | ✓ | 3 | ✓ | ✓ | ✓ | ✓ | 3 | 561 |
 | football | ✓ | /play/football | ✓ | football_rush → — | buildGridiron | — | — | ✓ | 4 | ✓ | ✓ | ✓ | ✓ | 4 | 407 |
 | skateboard | ✓ | /play/skateboard | ✓ | — → — | — | — | BoardMovement, AirControl | ✓ | 3 | ✓ | ✓ | ✓ | ✓ | 0 | 433 |
-| snowboard_slalom | ✓ | /play/snowboard | ✓ | — → — | — | — | BoardMovement | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 2 | 330 |
-| surf | ✓ | /play/surf | ✓ | — → — | — | — | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 3 | 275 |
+| snowboard_slalom | ✓ | /play/snowboard | ✓ | — → — | — | — | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 2 | 282 |
+| surf | ✓ | /play/surf | ✓ | — → — | — | — | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 3 | 230 |
 | tennis | ✓ | /play/tennis | ✓ | tennis → tennis-court | — | ✓ | RallyCore | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 4 | 28 |
-| derby | ✓ | /play/baseball | ✓ | golf_loop → — | buildField | — | KeeperCore | ✓ | 3 | ✓ | ✓ | ✓ | ✓ | 2 | 1177 |
-| penalty | ✓ | /play/soccer | ✓ | golf_loop → — | buildField | — | KeeperCore | ✓ | 3 | ✓ | ✓ | ✓ | ✓ | 2 | 1177 |
-| golf | ✓ | /play/golf | ✓ | golf_loop → — | buildField | — | KeeperCore | ✓ | 3 | ✓ | ✓ | ✓ | ✓ | 5 | 1177 |
-| onevone | ✓ | /play/onevone | ✓ | basketball_h2h → venice-blue-court | buildCourt | ✓ | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 1 | 723 |
-| threepoint | — | /play/threepoint | ✓ | basketball_h2h → venice-blue-court | buildCourt | ✓ | — | ✓ | 2 | ✓ | ✓ | ✓ | ✓ | 2 | 620 |
-| gymnastics | — | /play/gymnastics | ✓ | — → — | buildPark+buildSlope | — | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 1 | 272 |
-| bigair | — | /play/big-air | ✓ | — → — | buildPark+buildSlope | — | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 0 | 272 |
+| derby | ✓ | /play/baseball | ✓ | derby → baseball-park | buildField | ✓ | — | ✓ | 1 | ✓ | ✓ | ✓ | ✓ | 2 | 221 |
+| penalty | ✓ | /play/soccer | ✓ | penalty → soccer-stadium | buildField | ✓ | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 2 | 311 |
+| golf | ✓ | /play/golf | ✓ | golf_loop → — | buildField | — | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 5 | 417 |
+| onevone | ✓ | /play/onevone | ✓ | basketball_h2h → venice-blue-court | buildCourt | ✓ | — | ✓ | 0 (nav-first) | ✓ | ✓ | ✓ | ✓ | 1 | 648 |
+| threepoint | — | /play/threepoint | ✓ | basketball_h2h → venice-blue-court | buildCourt | ✓ | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 2 | 190 |
+| gymnastics | — | /play/gymnastics | ✓ | — → — | buildPark | — | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 1 | 12 |
+| bigair | — | /play/big-air | ✓ | — → — | buildSlope | — | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 0 | 11 |
 | sprint | — | /play/sprint | ✓ | — → — | buildPark | — | — | — | 0 | — | — | — | — | 2 | 221 |
-| threevthree | ✓ | /play/threevthree | ✓ | basketball_3v3 → venice-blue-court | buildCourt | ✓ | — | ✓ | 1 | ✓ | ✓ | ✓ | ✓ | 2 | 664 |
+| threevthree | ✓ | /play/threevthree | ✓ | basketball_3v3 → venice-blue-court | buildCourt | ✓ | — | ✓ | 1 (nav-first) | ✓ | ✓ | ✓ | ✓ | 2 | 605 |
 | carnival | ✓ | /play/carnival | ✓ | court_carnival → venice-blue-court | — | ✓ | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 1 | 166 |
 | volleyball | ✓ | /play/volleyball | ✓ | volleyball → — | — | — | RallyCore | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 2 | 31 |
-| karate_vs | ✓ | /play/karate-vs | ✓ | karate_h2h → dojo | buildDojo | ✓ | — | ✓ | 7 | ✓ | ✓ | ✓ | ✓ | 3 | 346 |
-| showdown | — | /play/showdown | ✓ | karate_h2h → dojo | buildDojo | ✓ | CombatMovement | ✓ | 7 | — | — | — | — | 1 | 477 |
+| karate_vs | ✓ | /play/karate-vs | ✓ | karate_h2h → dojo | buildDojo | ✓ | — | ✓ | 7 (nav-first) | ✓ | ✓ | ✓ | ✓ | 3 | 346 |
+| showdown | — | /play/showdown | ✓ | karate_h2h → dojo | buildDojo | ✓ | CombatMovement | ✓ | 7 (nav-first) | — | — | — | — | 1 | 477 |
 | duel | — | /play/duel | ✓ | — → — | — | — | CombatMovement | — | 0 | — | — | ✓ | — | 2 | 340 |
 | mixedcombat | ✓ | /play/mixedcombat | ✓ | — → — | — | — | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 1 | 527 |
 | dunkduel | ✓ | /play/dunkduel | ✓ | basketball_dunk → venice-blue-court | buildCourt | ✓ | — | ✓ | 5 | ✓ | ✓ | ✓ | ✓ | 1 | 426 |
 | dance | ✓ | /play/dance | ✓ | dance → — | — | — | DanceCore | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 2 | 277 |
 
-## Gaps (28)
+## Gaps (26)
 
-- dunk: 4 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
-- karate: 3 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
+- dunk: 4 typed bound(s)/clamp(s), no navmesh (kit venue or unmapped spec) — box is the bound
+- karate: 3 typed bound(s)/clamp(s), no navmesh (kit venue or unmapped spec) — box is the bound
 - football: no baked map (spec football_rush)
-- football: 4 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
+- football: 4 typed bound(s)/clamp(s), no navmesh (kit venue or unmapped spec) — box is the bound
 - football: no shared movement core (mode-local movement)
 - skateboard: no baked map (no venue)
-- skateboard: 3 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
+- skateboard: 3 typed bound(s)/clamp(s), no navmesh (kit venue or unmapped spec) — box is the bound
 - snowboard_slalom: no baked map (no venue)
+- snowboard_slalom: no shared movement core (mode-local movement)
 - surf: no baked map (no venue)
 - surf: no shared movement core (mode-local movement)
-- derby: no baked map (spec golf_loop)
-- derby: 3 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
-- penalty: no baked map (spec golf_loop)
-- penalty: 3 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
+- derby: 1 typed bound(s)/clamp(s), no navmesh (kit venue or unmapped spec) — box is the bound
+- derby: no shared movement core (mode-local movement)
+- penalty: no shared movement core (mode-local movement)
 - golf: no baked map (spec golf_loop)
-- golf: 3 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
+- golf: no shared movement core (mode-local movement)
 - onevone: no shared movement core (mode-local movement)
-- threevthree: 1 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
 - threevthree: no shared movement core (mode-local movement)
 - carnival: no shared movement core (mode-local movement)
 - volleyball: no baked map (spec volleyball)
-- karate_vs: 7 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
 - karate_vs: no shared movement core (mode-local movement)
 - mixedcombat: no baked map (no venue)
 - mixedcombat: no shared movement core (mode-local movement)
-- dunkduel: 5 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
+- dunkduel: 5 typed bound(s)/clamp(s), no navmesh (kit venue or unmapped spec) — box is the bound
 - dunkduel: no shared movement core (mode-local movement)
 - dance: no baked map (spec dance)
