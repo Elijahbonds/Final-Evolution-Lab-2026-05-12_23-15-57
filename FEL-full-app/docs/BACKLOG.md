@@ -88,3 +88,7 @@ orchestrator.
   measured on the OLD `scene.textures` basis and are not comparable to the table the sweep will write — the changelog
   and the RC doc must say which basis each number is on. Belongs to `scripts/probes/_vram-diag.mts` (perf),
   `docs/CHANGELOG.md` (rc), `docs/SHIP-PASS-4.md` (orchestrator).
+- **15:19** `lane/perf` `98a4696` — did NOT (yet) write `lib/babylon/config/textureBudget.json` (still `measuredAt:
+  null`, no modes); the sweep mode exists in the probe but has not been run against `MODES=all`. The throttle rows
+  ("≥ 30 fps under 4× throttle", acceptance) and the gauntlet 0/0/0 are also not in the commit. The commit's
+  before/after (dunk 197 → 94, karate 189 → 117) is two modes, not the tier. Belongs to `lane/perf` (next commit).

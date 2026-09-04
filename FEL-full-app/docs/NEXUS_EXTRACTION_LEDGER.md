@@ -310,3 +310,14 @@ Appended every ~10 minutes while the run is live; see also `docs/BACKLOG.md` for
   :3000 and :3005 for the whole sweep, so every fps figure is under contention; frame-guard, missing-clip and error
   counts do not depend on that." Nexus rule: an fps number without its contention note is not a measurement.
   Also: `fel-hero.mobile.glb` on disk is 2.37 MB against the 3.73 MB hero (textures-only derivative, same geometry).
+- **15:19** — `lane/perf` `98a4696` "skin maps and the hero follow the quality tier; the probe counts the GPU": six files
+  (`CharacterLibrary.ts`, `PerfMonitor.ts`, `playerIdentity.ts`, `public/models/fel-hero.mobile.glb` new 2.37 MB,
+  `scripts/avatar/import-mpfb.mts` +30, `_vram-diag.mts` +136/−25), every one in the lane's owned set (the mobile GLB was
+  the contract's "if chosen" — chosen). Risk: LOW, tsc clean, vitest 39/253 stated. Measured on the harness, mobile
+  tier, ENGINE basis: dunk 197 → 94 MB, karate 189 → 117 MB. Reusable, beyond the 15:18 notes:
+  - **`--textures-only` derivative pass** — re-encodes an already-forged GLB's textures (skin `--skin-px 1024`, others
+    `--other-px 512`, never upscale, WebP q82/q78) and touches nothing else, printing the estimated GPU MB per map and
+    the joint/mesh/material counts as proof the rig is untouched. Pattern: **a tier variant is a texture pass, not a
+    rig pass** — Gate 0 is unaffected by construction, and the script says so in its output.
+  - `textureBudget.json` is NOT in this commit — still the null stub — so the verify gate is still red on the shipped
+    table and the acceptance row ("mobile-tier table with no mode above 2× median") is not yet met.
