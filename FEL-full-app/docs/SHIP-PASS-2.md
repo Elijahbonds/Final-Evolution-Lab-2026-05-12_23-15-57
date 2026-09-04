@@ -45,3 +45,19 @@ never bare `build` with the dev server up, sweeps at phase boundaries.
 Plan page: https://claude.ai/code/artifact/06ac4116-487a-472f-9378-07e2834ccebb
 
 ## Findings log
+- **Phase 1 groundwork (3 Sep).** `scripts/gauntlet-play.sh` carries the
+  route↔registry map (`karate_vs→karate-vs`, `penalty→soccer`,
+  `derby→baseball`, `snowboard_slalom→snowboard`, `bigair→big-air`). Every
+  shipping loader mounts the Babylon game: twenty through `isBabylon()` flags
+  (all set), volleyball and dance unconditionally through `timing-babylon`.
+- **Phase 3 probe (3 Sep).** Lossless-ish gltf-transform passes (dedup, prune,
+  weld, quantize 14/10/12) shrink the baked maps ~27% (venice-skatepark 4.30→3.12
+  MB, dojo 3.30→2.37 MB) with no runtime decoder. Meshopt would go further but
+  needs the decoder wired into Babylon's loader; decide after the load-time
+  measurement says whether 27% is enough.
+- **Phase 4 groundwork (3 Sep).** `scripts/capture-fault.mts`: glb404 / slow /
+  offline / contextloss on any mode page; reports canvas, body text, a recovery
+  cue, crash posts, and whether the screen went white.
+- **Phase 8 groundwork (3 Sep).** `.github/workflows/ci.yml` at the repo root:
+  tsc, vitest, production build on every push (the browser gauntlet stays
+  local — it needs a GPU).
