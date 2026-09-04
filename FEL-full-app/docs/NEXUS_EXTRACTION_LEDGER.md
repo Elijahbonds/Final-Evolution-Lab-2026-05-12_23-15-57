@@ -301,3 +301,12 @@ Appended every ~10 minutes while the run is live; see also `docs/BACKLOG.md` for
     the `.mobile.glb` suffix; the tier read from `scene.metadata.felTier` (contract §1).
   - `skinMapUrl(url, tier)` exported exactly as the verify lane's red test specified (idempotent on `-1024.jpg`,
     non-`.jpg` passes through) — the red-first hand-off closing from the other side.
+- **15:20** — `lane/rc` working tree, `docs/RC-2026-09-04.md` (uncommitted): §1 production build measured (exit 0,
+  62.8 s wall, 80/80 static pages, one pre-existing MediaPipe "critical dependency" warning, 209 routes, shared JS
+  89.8 kB; `/dev/mode/[key]` 2.08 MB and `/closet` 2.02 MB are the heavy chunks); §2 :3006 up on the first poll, every
+  `/dev/*` route 404 in production, security headers listed, anonymous `/play/dunk` → 307 `/login`; §3–6 PENDING
+  (gauntlet on :3006, 20-route play sweep, mobile tier on shipping routes, checklist output, findings, not-done).
+  Reusable: **the RC doc records the environment it measured in** — "the other lanes' captures were running against
+  :3000 and :3005 for the whole sweep, so every fps figure is under contention; frame-guard, missing-clip and error
+  counts do not depend on that." Nexus rule: an fps number without its contention note is not a measurement.
+  Also: `fel-hero.mobile.glb` on disk is 2.37 MB against the 3.73 MB hero (textures-only derivative, same geometry).
