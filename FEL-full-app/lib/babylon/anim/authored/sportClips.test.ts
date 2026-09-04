@@ -14,7 +14,7 @@ let scene: Scene; let sk: Skeleton;
 const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>();
 beforeAll(async () => {
   scene = new Scene(new NullEngine()); new FreeCamera('c', new Vector3(0, 1, -3), scene);
-  const b64 = readFileSync('public/models/fel-hero.glb').toString('base64');
+  const b64 = readFileSync(process.env.FEL_HERO_GLB ?? 'public/models/fel-hero.glb').toString('base64');
   const r = await SceneLoader.ImportMeshAsync('', '', 'data:model/gltf-binary;base64,' + b64, scene, undefined, '.glb');
   for (const g of r.animationGroups) g.stop();
   sk = r.skeletons[0];

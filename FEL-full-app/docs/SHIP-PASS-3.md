@@ -66,3 +66,19 @@ Plan page: https://claude.ai/code/artifact/88460d0b-8775-4206-a872-81951f4ddeb0
   dressed candidate is 29,647 against the 25k advisory budget — accepted for
   the desktop tier for now; the way down is MPFB's low-poly **proxy** body
   (system assets `proxymeshes/`) as the render mesh, rung 2's decision.
+- **3 Sep, rung 1 measurement: 18 of 24 rig-measured clip tests fail on the
+  candidate body** (`FEL_HERO_GLB=public/models/candidates/fel-hero-mpfb.glb
+  npx vitest run …`). Every authored clip stores upper-arm/forearm offsets
+  solved on the OLD body's bone axes and proportions (`withOffset(rest, 0, y,
+  z)` via `_arm-solve.mts`), so a new body invalidates them wholesale — and the
+  same coupling is why the mocap golf swing opens the hands (D-M1). Two ways
+  forward, put to the owner (RIG-ADJACENT):
+  **A.** re-solve every clip's offsets on the new body with the existing tool
+  (mechanical, ~40 clips; body-specific, so any future body or a proportion
+  slider repeats it);
+  **B.** author clips as world-space END-EFFECTOR targets (hand/foot positions
+  per key, plus torso keys) fitted at build time with the two-bone solver we
+  already ship (`TwoBoneIK`, `HandIK`, `plantLeg`) — body-independent, the
+  Closet's proportion sliders stop breaking poses, and the mocap retarget
+  becomes "match the owner's hand and foot paths", which closes D-M1.
+  Recommendation: B.
