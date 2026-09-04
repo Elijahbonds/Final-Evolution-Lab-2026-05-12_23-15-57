@@ -515,7 +515,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     camPreset: 'hoops',
 
     async load(ctx: ModeContext) {
-      venue = mountVenue(ctx, o.venueId);
+      venue = mountVenue(ctx, o.venueId, { keepGameplayCamera: true });   // M104 gap: tennis and volleyball rendered through the venue orbit camera — the hero sat at 44 px, cut off at the frame's bottom
 
       me = await CharacterLibrary.spawn(ctx.scene, o.heroUrl, {
         position: new Vector3(0, 0, o.cfg.halfLength * 0.85), yawRad: Math.PI, startClip: SPORT_CLIP.idle });

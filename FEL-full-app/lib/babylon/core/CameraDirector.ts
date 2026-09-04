@@ -429,24 +429,28 @@ export class CameraDirector {
     const curX = this.camera.position.x - subject.x, curZ = this.camera.position.z - subject.z;
     const tgtX = finalPos.x - subject.x, tgtZ = finalPos.z - subject.z;
     const curR = Math.hypot(curX, curZ), tgtR = Math.hypot(tgtX, tgtZ);
+    // Phase 6: cfg.lag was a per-frame fraction, so a 30 fps phone lagged twice as far as a 60 fps
+    // desktop. Normalise to frame time, then bias it — catching up (the subject pulling away, a cut
+    // still settling) runs faster than settling in, which is what a broadcast operator does.
+    const lag = this.followLag(cfg.lag, Vector3.Distance(finalPos, this.camera.position), tgtR > curR + 0.3);
     let next: Vector3;
     if (curR > 0.01 && tgtR > 0.01) {
-      let dx = (curX / curR) + ((tgtX / tgtR) - (curX / curR)) * cfg.lag;
-      let dz = (curZ / curR) + ((tgtZ / tgtR) - (curZ / curR)) * cfg.lag;
+      let dx = (curX / curR) + ((tgtX / tgtR) - (curX / curR)) * lag;
+      let dz = (curZ / curR) + ((tgtZ / tgtR) - (curZ / curR)) * lag;
       const dLen = Math.hypot(dx, dz);
       if (dLen > 1e-3) {
         dx /= dLen; dz /= dLen;
-        const r = curR + (tgtR - curR) * cfg.lag;
+        const r = curR + (tgtR - curR) * lag;
         next = new Vector3(
           subject.x + dx * r,
-          this.camera.position.y + (finalPos.y - this.camera.position.y) * cfg.lag,
+          this.camera.position.y + (finalPos.y - this.camera.position.y) * lag,
           subject.z + dz * r,
         );
       } else {
-        next = Vector3.Lerp(this.camera.position, finalPos, cfg.lag);
+        next = Vector3.Lerp(this.camera.position, finalPos, lag);
       }
     } else {
-      next = Vector3.Lerp(this.camera.position, finalPos, cfg.lag);
+      next = Vector3.Lerp(this.camera.position, finalPos, lag);
     }
     this.camera.position = enforceStandoff(subject, next).pos;
     this.aim(subject, objective, velocity);
@@ -458,6 +462,15 @@ export class CameraDirector {
    * overhead shot. The camera NEVER returns a position that presents a wall
    * at point-blank range — worst case is an elevated but legible framing.
    */
+  /** Frame-time-normalised follow lag with an asymmetric bias (phase 6). `perFrame` is the preset's
+   *  60 fps fraction; `gap` the metres between the camera and where it wants to be. */
+  private followLag(perFrame: number, gap: number, retreating: boolean): number {
+    const dt = Math.min(0.1, this.scene.getEngine().getDeltaTime() / 1000);
+    const base = 1 - Math.pow(1 - perFrame, dt * 60);
+    const catchUp = retreating || gap > 1.5;
+    return Math.min(1, base * (catchUp ? 1.6 : 0.8));
+  }
+
   private resolveOcclusion(subject: Vector3, desired: Vector3, back?: Vector3): Vector3 {
     const eye = subject.add(new Vector3(0, 1.2, 0));
     const probe = (candidate: Vector3): { pos: Vector3; clearance: number } => {
@@ -478,7 +491,16 @@ export class CameraDirector {
     };
 
     let best = probe(desired);
-    if (best.clearance >= MIN_SAFE_DISTANCE + 0.4) return best.pos;
+    if (best.clearance >= MIN_SAFE_DISTANCE + 0.4) {
+      // Phase 6 whiskers: two short side probes. If one side is closing in and the other is open,
+      // lean 8° toward the open side now, so the hard ±50° swing below is rarely needed.
+      const d0 = back ?? desired.subtract(subject).normalizeToNew(); const len = desired.subtract(subject).length();
+      const whisker = (deg: number) => { const r = (deg * Math.PI) / 180; const v = new Vector3(d0.x * Math.cos(r) - d0.z * Math.sin(r), 0, d0.x * Math.sin(r) + d0.z * Math.cos(r)); return probe(subject.add(v.scale(len)).add(new Vector3(0, desired.y - subject.y, 0))); };
+      const wl = whisker(18), wr = whisker(-18);
+      const blockedL = wl.clearance < len * 0.7, blockedR = wr.clearance < len * 0.7;
+      if (blockedL !== blockedR) { const lean = whisker(blockedL ? -8 : 8); if (lean.clearance >= best.clearance - 0.01) return lean.pos; }
+      return best.pos;
+    }
 
     // occluded close — try two alternate azimuths around the subject
     const dir0 = back ?? desired.subtract(subject).normalizeToNew();

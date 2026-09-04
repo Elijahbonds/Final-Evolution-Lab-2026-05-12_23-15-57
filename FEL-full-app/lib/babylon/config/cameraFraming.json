@@ -1,0 +1,170 @@
+{
+  "_comment": "Hero on-screen height as a fraction of viewport height under the GAMEPLAY camera (the one the player sees; venue cameras are scenery since M104). Measured 2026-09-04 on /dev/mode/<key> at 1280x800 with scripts/probes/_cam-frame.mts: the harness's own hero (window.__FEL_DEV__.hero; viaHero=true), else the skinned character nearest the camera target, world bounding box projected through the scene transform, six samples over three seconds. Values are MEASURED, never typed. lib/babylon/config/cameraPresets.json predates M104 and describes the retired venue cameras.",
+  "measuredAt": "2026-09-04",
+  "viewport": [
+    1280,
+    800
+  ],
+  "probe": "scripts/probes/_cam-frame.mts",
+  "medianAcrossModes": 0.352,
+  "modes": {
+    "dunk": {
+      "fraction": 0.371,
+      "min": 0.37,
+      "max": 0.371,
+      "samples": 6,
+      "viaHero": true
+    },
+    "threepoint": {
+      "fraction": 0.66,
+      "min": 0.658,
+      "max": 0.662,
+      "samples": 6,
+      "viaHero": true
+    },
+    "threevthree": {
+      "fraction": 0.205,
+      "min": 0.205,
+      "max": 0.206,
+      "samples": 6,
+      "viaHero": true,
+      "note": "hero handle; the first survey had picked an ally"
+    },
+    "onevone": {
+      "fraction": 0.331,
+      "min": 0.331,
+      "max": 0.332,
+      "samples": 6,
+      "viaHero": true
+    },
+    "dunkduel": {
+      "fraction": 0.258,
+      "min": 0.258,
+      "max": 0.258,
+      "samples": 6,
+      "viaHero": true
+    },
+    "karate_vs": {
+      "fraction": 0.473,
+      "min": 0.473,
+      "max": 0.474,
+      "samples": 6,
+      "viaHero": true
+    },
+    "karate": {
+      "fraction": 0.697,
+      "min": 0.697,
+      "max": 0.698,
+      "samples": 6,
+      "viaHero": true
+    },
+    "showdown": {
+      "fraction": 0.676,
+      "min": 0.673,
+      "max": 0.68,
+      "samples": 6,
+      "viaHero": true
+    },
+    "mixedcombat": {
+      "fraction": 0.445,
+      "min": 0.443,
+      "max": 0.446,
+      "samples": 6,
+      "viaHero": true
+    },
+    "skateboard": {
+      "fraction": 0.328,
+      "min": 0.325,
+      "max": 0.33,
+      "samples": 6,
+      "viaHero": true
+    },
+    "surf": {
+      "fraction": 0.352,
+      "min": 0.35,
+      "max": 0.355,
+      "samples": 6,
+      "viaHero": true
+    },
+    "snowboard_slalom": {
+      "fraction": 0.324,
+      "min": 0.321,
+      "max": 0.326,
+      "samples": 6,
+      "viaHero": true
+    },
+    "bigair": {
+      "fraction": 0.267,
+      "min": 0.266,
+      "max": 0.267,
+      "samples": 6,
+      "viaHero": true
+    },
+    "gymnastics": {
+      "fraction": 0.266,
+      "min": 0.265,
+      "max": 0.268,
+      "samples": 6,
+      "viaHero": true
+    },
+    "volleyball": {
+      "fraction": 0.599,
+      "min": 0.598,
+      "max": 0.6,
+      "samples": 6,
+      "viaHero": true,
+      "note": "after keepGameplayCamera (the venue orbit camera had been the active one)"
+    },
+    "tennis": {
+      "fraction": 0.363,
+      "min": 0.363,
+      "max": 0.364,
+      "samples": 6,
+      "viaHero": true,
+      "note": "after keepGameplayCamera (the venue orbit camera had been the active one)"
+    },
+    "golf": {
+      "fraction": 0.048,
+      "min": 0.047,
+      "max": 0.048,
+      "samples": 6,
+      "viaHero": true
+    },
+    "derby": {
+      "fraction": 0.471,
+      "min": 0.469,
+      "max": 0.473,
+      "samples": 6,
+      "viaHero": true
+    },
+    "penalty": {
+      "fraction": 0.338,
+      "min": 0.337,
+      "max": 0.339,
+      "samples": 6,
+      "viaHero": true
+    },
+    "football": {
+      "fraction": 0.264,
+      "min": 0.264,
+      "max": 0.265,
+      "samples": 6,
+      "viaHero": true
+    },
+    "carnival": {
+      "fraction": 0.326,
+      "min": 0.323,
+      "max": 0.327,
+      "samples": 6,
+      "viaHero": true
+    },
+    "dance": {
+      "fraction": 0.688,
+      "min": 0.685,
+      "max": 0.692,
+      "samples": 6,
+      "viaHero": true,
+      "note": "after keepGameplayCamera (the venue orbit camera had been the active one)"
+    }
+  }
+}

@@ -184,6 +184,10 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   // mode). Routes redirect to /play; mode files stay registered for a future
   // revival. See PHASE2_BENCHMARK_LOCKS.md post-lock retirements.
   dunkduel: { name: 'Prove It', venue: 'Venice Beach Court', href: '/play/dunkduel' },
+  volleyball: { name: 'Beach Rally', venue: 'Nexus Volleyball Court', href: '/play/volleyball' },
+  showdown: { name: 'Showdown', venue: 'Shimogamo Dojo', href: '/play/showdown' },
+  duel: { name: 'Duel', venue: 'Shimogamo Dojo', href: '/play/duel' },
+  sprint: { name: 'Beach Sprint', venue: 'Muscle Beach Gym', href: '/play/sprint' },
   musicAcademy: { name: 'Groove Academy', venue: 'Studio', href: '/play/music' },
   dance: { name: 'The Cypher', venue: 'The Cypher', href: '/play/dance' },
   acting: { name: 'The Read', venue: 'Acting Stage', href: '/play/acting' },

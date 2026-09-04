@@ -12,24 +12,24 @@ Generated 2026-09-04. ✓ present · — missing. Clamps = typed bounds constant
 | surf | ✓ | /play/surf | ✓ | — → — | — | — | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 3 | 275 |
 | tennis | ✓ | /play/tennis | ✓ | tennis → tennis-court | — | ✓ | RallyCore | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 4 | 28 |
 | derby | ✓ | /play/baseball | ✓ | golf_loop → — | buildField | — | KeeperCore | ✓ | 3 | ✓ | ✓ | ✓ | ✓ | 2 | 1177 |
-| penalty | ✓ | /play/soccer | ✓ | golf_loop → — | buildField | — | KeeperCore | — | 3 | ✓ | ✓ | ✓ | ✓ | 2 | 1177 |
-| golf | ✓ | /play/golf | ✓ | golf_loop → — | buildField | — | KeeperCore | — | 3 | ✓ | ✓ | ✓ | ✓ | 5 | 1177 |
+| penalty | ✓ | /play/soccer | ✓ | golf_loop → — | buildField | — | KeeperCore | ✓ | 3 | ✓ | ✓ | ✓ | ✓ | 2 | 1177 |
+| golf | ✓ | /play/golf | ✓ | golf_loop → — | buildField | — | KeeperCore | ✓ | 3 | ✓ | ✓ | ✓ | ✓ | 5 | 1177 |
 | onevone | ✓ | /play/onevone | ✓ | basketball_h2h → venice-blue-court | buildCourt | ✓ | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 1 | 723 |
-| threepoint | — | /play/threepoint | ✓ | basketball_h2h → venice-blue-court | buildCourt | ✓ | — | — | 2 | ✓ | ✓ | ✓ | ✓ | 2 | 620 |
-| gymnastics | — | /play/gymnastics | ✓ | — → — | buildPark+buildSlope | — | — | — | 0 | ✓ | ✓ | ✓ | ✓ | 1 | 272 |
-| bigair | — | /play/big-air | ✓ | — → — | buildPark+buildSlope | — | — | — | 0 | ✓ | ✓ | ✓ | ✓ | 0 | 272 |
-| sprint | — | /play/sprint | — | — → — | buildPark | — | — | — | 0 | — | — | — | — | 2 | 221 |
+| threepoint | — | /play/threepoint | ✓ | basketball_h2h → venice-blue-court | buildCourt | ✓ | — | ✓ | 2 | ✓ | ✓ | ✓ | ✓ | 2 | 620 |
+| gymnastics | — | /play/gymnastics | ✓ | — → — | buildPark+buildSlope | — | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 1 | 272 |
+| bigair | — | /play/big-air | ✓ | — → — | buildPark+buildSlope | — | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 0 | 272 |
+| sprint | — | /play/sprint | ✓ | — → — | buildPark | — | — | — | 0 | — | — | — | — | 2 | 221 |
 | threevthree | ✓ | /play/threevthree | ✓ | basketball_3v3 → venice-blue-court | buildCourt | ✓ | — | ✓ | 1 | ✓ | ✓ | ✓ | ✓ | 2 | 664 |
-| carnival | ✓ | /play/carnival | ✓ | court_carnival → venice-blue-court | — | ✓ | — | — | 0 | ✓ | ✓ | ✓ | ✓ | 1 | 166 |
-| volleyball | ✓ | /play/volleyball | — | volleyball → — | — | — | RallyCore | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 2 | 31 |
+| carnival | ✓ | /play/carnival | ✓ | court_carnival → venice-blue-court | — | ✓ | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 1 | 166 |
+| volleyball | ✓ | /play/volleyball | ✓ | volleyball → — | — | — | RallyCore | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 2 | 31 |
 | karate_vs | ✓ | /play/karate-vs | ✓ | karate_h2h → dojo | buildDojo | ✓ | — | ✓ | 7 | ✓ | ✓ | ✓ | ✓ | 3 | 346 |
-| showdown | — | /play/showdown | — | karate_h2h → dojo | buildDojo | ✓ | CombatMovement | — | 7 | — | — | — | — | 1 | 477 |
-| duel | — | /play/duel | — | — → — | — | — | CombatMovement | — | 0 | — | — | ✓ | — | 2 | 340 |
-| mixedcombat | ✓ | /play/mixedcombat | ✓ | — → — | — | — | — | — | 0 | ✓ | ✓ | ✓ | ✓ | 1 | 527 |
-| dunkduel | ✓ | /play/dunkduel | ✓ | basketball_dunk → venice-blue-court | buildCourt | ✓ | — | — | 5 | ✓ | ✓ | ✓ | ✓ | 1 | 426 |
-| dance | ✓ | /play/dance | ✓ | dance → — | — | — | DanceCore | — | 0 | ✓ | ✓ | ✓ | ✓ | 2 | 277 |
+| showdown | — | /play/showdown | ✓ | karate_h2h → dojo | buildDojo | ✓ | CombatMovement | ✓ | 7 | — | — | — | — | 1 | 477 |
+| duel | — | /play/duel | ✓ | — → — | — | — | CombatMovement | — | 0 | — | — | ✓ | — | 2 | 340 |
+| mixedcombat | ✓ | /play/mixedcombat | ✓ | — → — | — | — | — | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 1 | 527 |
+| dunkduel | ✓ | /play/dunkduel | ✓ | basketball_dunk → venice-blue-court | buildCourt | ✓ | — | ✓ | 5 | ✓ | ✓ | ✓ | ✓ | 1 | 426 |
+| dance | ✓ | /play/dance | ✓ | dance → — | — | — | DanceCore | ✓ | 0 | ✓ | ✓ | ✓ | ✓ | 2 | 277 |
 
-## Gaps (35)
+## Gaps (28)
 
 - dunk: 4 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
 - karate: 3 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
@@ -44,25 +44,18 @@ Generated 2026-09-04. ✓ present · — missing. Clamps = typed bounds constant
 - derby: no baked map (spec golf_loop)
 - derby: 3 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
 - penalty: no baked map (spec golf_loop)
-- penalty: no camera preset
 - penalty: 3 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
 - golf: no baked map (spec golf_loop)
-- golf: no camera preset
 - golf: 3 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
 - onevone: no shared movement core (mode-local movement)
 - threevthree: 1 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
 - threevthree: no shared movement core (mode-local movement)
-- carnival: no camera preset
 - carnival: no shared movement core (mode-local movement)
 - volleyball: no baked map (spec volleyball)
-- volleyball: no Modes-screen entry for /play/volleyball
 - karate_vs: 7 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
 - karate_vs: no shared movement core (mode-local movement)
 - mixedcombat: no baked map (no venue)
-- mixedcombat: no camera preset
 - mixedcombat: no shared movement core (mode-local movement)
-- dunkduel: no camera preset
 - dunkduel: 5 typed bound(s)/clamp(s) — navmesh replaces them (phase 3)
 - dunkduel: no shared movement core (mode-local movement)
 - dance: no baked map (spec dance)
-- dance: no camera preset

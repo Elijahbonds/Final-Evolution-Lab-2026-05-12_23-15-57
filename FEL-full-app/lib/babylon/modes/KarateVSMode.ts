@@ -87,7 +87,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     dir.normalize();
     const from = char.root.position.clone();
     const to = from.add(dir.scale(meters));
-    if (!modeVenue?.constrain(to)) { to.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, to.x)); to.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, to.z)); }   // phase 3: navmesh first
+    modeVenue?.constrain(to); to.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, to.x)); to.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, to.z));   // phase 3: the floor (navmesh) AND the arena box — the alcoves past ±4.5 box the fight camera in
     const t0 = now();
     const obs = ctx.scene.onBeforeRenderObservable.add(() => {
       const k = Math.min(1, (now() - t0) / 160);
@@ -305,7 +305,7 @@ export const KarateVSMode: ModeDefinition = (() => {
         // the seam.
         const vel = new Vector3(stickX, 0, stickY).scale(MOVE_SPEED);
         player.root.position.addInPlace(vel.scale(sdt));
-        if (!modeVenue?.constrain(player.root.position)) { player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z)); }
+        modeVenue?.constrain(player.root.position); player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z));
         if (vel.lengthSquared() > 0.4 && !striking) {
           player.animator.play(SPORT_CLIP.moveLoop, { loop: true });
         } else if (!striking) {

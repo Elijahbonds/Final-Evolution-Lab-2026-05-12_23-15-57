@@ -33,8 +33,10 @@ const venueOfMode = (key: string, src: string): { venue: string | null; map: str
 };
 
 const CORES = ['CourtMovement', 'BoardMovement', 'CombatMovement', 'FieldRun', 'CarrierControl', 'GroundRide', 'AirControl', 'RallyCore', 'TennisCore', 'GolfCore', 'DanceCore', 'DunkApproach', 'OnslaughtCore', 'KeeperCore', 'Batting', 'Pitching'];
-const camPresets = JSON.parse(read('lib/babylon/config/cameraPresets.json'));
-const camKeys = new Set(Object.keys(camPresets.modes ?? camPresets.presets ?? camPresets));
+// Camera column = a MEASURED gameplay framing exists for the mode (lib/babylon/config/cameraFraming.json,
+// scripts/probes/_cam-frame.mts). cameraPresets.json describes the retired venue cameras (pre-M104).
+const camFraming = JSON.parse(read('lib/babylon/config/cameraFraming.json'));
+const camKeys = new Set(Object.keys(camFraming.modes));
 const bridge = read('lib/controller-link/schemas/registry.ts');
 const gauntlet = read('scripts/gauntlet.sh');
 const gauntletPlay = read('scripts/gauntlet-play.sh');
@@ -56,7 +58,7 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
     menu: gameData.includes(`href: '${route}'`),
     venue, map, kit, baked: !!map && bakedKeys.has(map),
     cores: cores.filter((c) => src.includes(`/${c}'`)),
-    camera: camKeys.has(camName[key] ?? key),
+    camera: camKeys.has(key),   // cameraFraming.json is keyed by registry key
     clamps: (src.match(/Math\.max\(-?[A-Z_0-9.]+, *Math\.min\(/g) ?? []).length + (src.match(/^const (COURT|FIELD|ARENA|BOUNDS|HALF)[A-Z_]* *=/gm) ?? []).length,
     bridge: bridge.includes(`'${key}'`),
     gauntlet: new RegExp(`\\b${key}\\b`).test(gauntlet.split('for m in')[1] ?? ''),
@@ -74,7 +76,7 @@ for (const r of rows) lines.push(`| ${r.key} | ${mark(r.enabled)} | ${r.route} |
 const gaps: string[] = [];
 for (const r of rows.filter((x) => x.enabled)) {
   if (!r.baked) gaps.push(`${r.key}: no baked map (${r.venue ? 'spec ' + r.venue : r.kit ? 'kit ' + r.kit : 'no venue'})`);
-  if (!r.camera) gaps.push(`${r.key}: no camera preset`);
+  if (!r.camera) gaps.push(`${r.key}: no measured camera framing`);
   if (r.clamps > 0) gaps.push(`${r.key}: ${r.clamps} typed bound(s)/clamp(s) — navmesh replaces them (phase 3)`);
   if (!r.bridge) gaps.push(`${r.key}: not on the phone bridge`);
   if (!r.menu) gaps.push(`${r.key}: no Modes-screen entry for ${r.route}`);

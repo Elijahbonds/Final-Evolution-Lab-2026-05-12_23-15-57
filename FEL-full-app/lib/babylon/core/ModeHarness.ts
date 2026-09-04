@@ -184,7 +184,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
 
   // M37: hero-framing watchdog — recenters the camera if the hero leaves frame.
   frameGuard = new FrameGuard(scene, camera, () => heroRef.current, camDirector, () => objectiveRef.current);
-  if (process.env.NODE_ENV === 'development') (window as unknown as { __FEL_DEV__?: unknown }).__FEL_DEV__ = { scene, modeId: def.modeId };   // dev probes (ship pass 4)
+  if (process.env.NODE_ENV === 'development') (window as unknown as { __FEL_DEV__?: unknown }).__FEL_DEV__ = { scene, modeId: def.modeId, hero: () => heroRef.current };   // hero for the framing probe (phase 6)   // dev probes (ship pass 4)
   setDiagMode(def.modeId);
   // a lost WebGL context is the one failure the player cannot recover from by playing on
   engine.onContextLostObservable.add(() => {

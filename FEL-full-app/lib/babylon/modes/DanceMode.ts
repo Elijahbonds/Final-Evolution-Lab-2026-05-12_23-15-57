@@ -150,7 +150,7 @@ export const DanceMode: ModeDefinition = (() => {
     camPreset: 'overShoulder',
 
     async load(ctx: ModeContext) {
-      venue = mountVenue(ctx, 'dance');
+      venue = mountVenue(ctx, 'dance', { keepGameplayCamera: true });   // M104 gap: keep the over-shoulder follow camera, not the venue orbit
 
       me = await CharacterLibrary.spawn(ctx.scene, SHARED_CFG.heroUrl, {
         // Stand on the stage deck, not in it — podium scale 1.4 -> surface y 0.7.
