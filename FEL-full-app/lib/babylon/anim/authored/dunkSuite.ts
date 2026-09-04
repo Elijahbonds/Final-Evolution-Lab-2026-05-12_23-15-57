@@ -1,56 +1,47 @@
 // Dunk suite: charge gather, launch, score hang, land crouch.
-
+// RE-AUTHORED as pose targets (ship pass 3, rung 1): torso and legs in degrees
+// about the parent's bind axes, hands as world-axis metres from the root,
+// fitted by the two-bone solver so the suite plays on any body that passes
+// Gate 0. The old Euler arm keys rotated about X — the arm's own axis on this
+// rig — so the launch never raised the hands (coreClips.test.ts, 2026-09-03).
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
-import { buildClip } from '../clipBuilder';
+import { buildPoseClip, type Deg3 } from '../poseClip';
 import { DUNK_TIMING as D } from './timing';
+type V3 = [number, number, number];
+
+const UP = { Left: [-0.9, 0.1, -0.3] as V3, Right: [0.9, 0.1, -0.3] as V3 };
+const legs = (thigh: number, knee: number, flare = 4): Record<string, Deg3> => ({ LeftUpLeg: [thigh, 0, flare], RightUpLeg: [thigh, 0, -flare], LeftLeg: [knee, 0, 0], RightLeg: [knee, 0, 0] });
 
 export function buildChargeGather(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = D.chargeSec;
-  return buildClip(scene, sk, 'dunk_charge_gather', T, {
-    Spine: [[0, 6, 0, 0], [T, 30, 0, 0]],
-    LeftUpLeg: [[0, -12, 0, 4], [T, -55, 0, 8]],
-    LeftLeg: [[0, 16, 0, 0], [T, 80, 0, 0]],
-    RightUpLeg: [[0, -12, 0, -4], [T, -55, 0, -8]],
-    RightLeg: [[0, 16, 0, 0], [T, 80, 0, 0]],
-    LeftArm: [[0, 20, 0, 10], [T, 45, 0, 14]],
-    RightArm: [[0, 20, 0, -10], [T, 45, 0, -14]],
-  }, [[0, 0], [T, -0.22]]);
+  return buildPoseClip(scene, sk, 'dunk_charge_gather', T, [
+    { t: 0, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],  ...legs(-12, 16) }, hands: { Left: [-0.24, 0.90, 0.18], Right: [0.24, 0.90, 0.18] }, hipsY: 0 },
+    { t: T, bones: { Hips: [0, 0, 0], Spine: [30, 0, 0], ...legs(-55, 80, 8) }, hands: { Left: [-0.28, 0.85, -0.30], Right: [0.28, 0.85, -0.30] }, poles: { Left: [-0.6, 0.4, -0.6], Right: [0.6, 0.4, -0.6] }, hipsY: -0.22 },   // arms swung back, loaded
+  ]);
 }
 
 export function buildLaunch(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = D.launchSec;
-  return buildClip(scene, sk, 'dunk_launch', T, {
-    Spine: [[0, 30, 0, 0], [T, -10, 0, 0]],
-    LeftUpLeg: [[0, -55, 0, 8], [T, -20, 0, 4]],
-    LeftLeg: [[0, 80, 0, 0], [T, 20, 0, 0]],
-    RightUpLeg: [[0, -55, 0, -8], [T, -20, 0, -4]],
-    RightLeg: [[0, 80, 0, 0], [T, 20, 0, 0]],
-    LeftArm: [[0, 45, 0, 14], [T, -140, 0, 10]],
-    RightArm: [[0, 45, 0, -14], [T, -140, 0, -10]],
-  }, [[0, -0.22], [T, 0.05]]);
+  return buildPoseClip(scene, sk, 'dunk_launch', T, [
+    { t: 0, bones: { Hips: [0, 0, 0], Spine: [30, 0, 0],  ...legs(-55, 80, 8) }, hands: { Left: [-0.28, 0.85, -0.30], Right: [0.28, 0.85, -0.30] }, poles: { Left: [-0.6, 0.4, -0.6], Right: [0.6, 0.4, -0.6] }, hipsY: -0.22 },
+    { t: T, bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], ...legs(-20, 20) },    hands: { Left: [-0.18, 1.98, 0.12], Right: [0.18, 1.98, 0.12] }, poles: UP, hipsY: 0.05 },   // both hands thrown overhead
+  ]);
 }
 
 export function buildScoreHang(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = D.hangSec;
-  return buildClip(scene, sk, 'dunk_score_hang', T, {
-    LeftArm: [[0, -160, 0, 10], [T / 2, -150, 0, 12], [T, -100, 0, 10]],
-    LeftForeArm: [[0, 8, 0, 0], [T / 2, 25, 0, 0], [T, 40, 0, 0]],
-    RightArm: [[0, -30, 0, -10], [T, 10, 0, -12]],
-    Spine: [[0, -12, 0, 0], [T, 2, 0, 0]],
-    LeftUpLeg: [[0, -25, 0, 4], [T, -10, 0, 2]],
-    RightUpLeg: [[0, -25, 0, -4], [T, -10, 0, -2]],
-  });
+  return buildPoseClip(scene, sk, 'dunk_score_hang', T, [
+    { t: 0,     bones: { Hips: [0, 0, 0], Spine: [-12, 0, 0], LeftUpLeg: [-25, 0, 4], RightUpLeg: [-25, 0, -4] }, hands: { Left: [-0.12, 2.02, 0.25], Right: [0.30, 1.25, 0.10] }, poles: { Left: UP.Left } },   // left hand on the rim
+    { t: T / 2, bones: { Hips: [0, 0, 0], Spine: [-5, 0, 0],  LeftUpLeg: [-18, 0, 3], RightUpLeg: [-18, 0, -3] }, hands: { Left: [-0.10, 1.95, 0.28], Right: [0.34, 1.35, 0.05] }, poles: { Left: UP.Left } },
+    { t: T,     bones: { Hips: [0, 0, 0], Spine: [2, 0, 0],   LeftUpLeg: [-10, 0, 2], RightUpLeg: [-10, 0, -2] }, hands: { Left: [-0.20, 1.55, 0.30], Right: [0.30, 1.10, 0.15] } },   // letting go
+  ]);
 }
 
 export function buildLandCrouch(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = D.landSec, M = T * 0.4;
-  return buildClip(scene, sk, 'dunk_land_crouch', T, {
-    Spine: [[0, 0, 0, 0], [M, 26, 0, 0], [T, 6, 0, 0]],
-    LeftUpLeg: [[0, -10, 0, 4], [M, -60, 0, 8], [T, -14, 0, 4]],
-    LeftLeg: [[0, 12, 0, 0], [M, 85, 0, 0], [T, 18, 0, 0]],
-    RightUpLeg: [[0, -10, 0, -4], [M, -60, 0, -8], [T, -14, 0, -4]],
-    RightLeg: [[0, 12, 0, 0], [M, 85, 0, 0], [T, 18, 0, 0]],
-    LeftArm: [[0, 10, 0, 12], [M, 40, 0, 30], [T, 15, 0, 12]],
-    RightArm: [[0, 10, 0, -12], [M, 40, 0, -30], [T, 15, 0, -12]],
-  }, [[0, 0.05], [M, -0.26], [T, 0]]);
+  return buildPoseClip(scene, sk, 'dunk_land_crouch', T, [
+    { t: 0, bones: { Hips: [0, 0, 0], Spine: [0, 0, 0],  ...legs(-10, 12) },    hands: { Left: [-0.26, 1.00, 0.20], Right: [0.26, 1.00, 0.20] }, hipsY: 0.05 },
+    { t: M, bones: { Hips: [0, 0, 0], Spine: [26, 0, 0], ...legs(-60, 85, 8) }, hands: { Left: [-0.34, 0.85, 0.34], Right: [0.34, 0.85, 0.34] }, hipsY: -0.26 },   // absorb, arms forward for balance
+    { t: T, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],  ...legs(-14, 18) },    hands: { Left: [-0.26, 0.86, 0.12], Right: [0.26, 0.86, 0.12] }, hipsY: 0 },
+  ]);
 }

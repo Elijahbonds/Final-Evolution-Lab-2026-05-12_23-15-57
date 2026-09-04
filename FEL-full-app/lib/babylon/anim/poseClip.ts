@@ -16,7 +16,8 @@ import type { AnimationGroup, Scene, Skeleton, TransformNode } from '@babylonjs/
 import { boneNode } from './boneLookup';
 import { buildQuatClip, eulerQ, type QuatKeys } from './restPose';
 import { armChain, reachArm } from './HandIK';
-import { chainRotation, frameAbove } from './TwoBoneIK';
+import { frameAbove } from './TwoBoneIK';
+import { bindFrame } from './bindFrame';
 import { plantLeg } from './FootPlanting';
 
 export type Deg3 = [number, number, number];
@@ -50,17 +51,9 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   // snapshot bind so every key is solved from the same start and the rig is left untouched
   const nodes = new Map<string, TransformNode>();
   for (const b of sk.bones) { const n = b.getTransformNode(); if (n) nodes.set(b.name.replace(/^mixamorig:?/, ''), n); }
-  // Bind comes from the skeleton's REST matrices, not from where the bones
-  // happen to be: a clip built while the rig is still posed by a previous clip
-  // would otherwise bake that pose in as its zero (measured 2026-09-03: the
-  // over-the-top pitch built after a follow-through reached 1.43 m, not 1.83).
-  const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>();
-  for (const b of sk.bones) {
-    const n = b.getTransformNode(); if (!n) continue;
-    const p = new Vector3(), q = new Quaternion(), sc = new Vector3();
-    if (b.getRestMatrix().decompose(sc, q, p)) bind.set(n, { p, q });
-    else bind.set(n, { p: n.position.clone(), q: (n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation)).clone() });
-  }
+  // Bind (rest matrices) and the meaning of a degree key come from the shared bind frame — see bindFrame.ts.
+  const bf = bindFrame(sk);
+  const bind = bf.bind;
   // World matrices refresh PARENT-FIRST. A forced compute on a node reads its
   // parent's CACHED matrix (the arm-solver lesson, 2026-09-03), so refreshing
   // in arbitrary order leaves the chest and shoulders stale under a new torso
@@ -71,22 +64,8 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   const restore = () => { for (const [n, t] of bind) { n.position.copyFrom(t.p); n.rotationQuaternion = t.q.clone(); } refresh(); };
   const root = hips.parent as TransformNode | null;
   refresh();
-  // Degrees are portable only if they mean the same thing on every rig. On the
-  // forge hero every bone's bind rotation is identity, so writing eulerQ(deg)
-  // into the local rotation rotated the bone about its parent's world-aligned
-  // axes. The MPFB2 rig's bones carry bind orientations (measured 2026-09-03:
-  // the same thigh degrees swung the kicking leg FORWARD), so a key is applied
-  // as that same rotation — about the parent's bind axes, from bind — via the
-  // bind chain rotations captured here, before any key moves anything.
   const frame = frameAbove(hips);
-  const bindParentRot = new Map<TransformNode, Quaternion>();
-  for (const n of nodes.values()) { const par = n.parent as TransformNode | null; bindParentRot.set(n, par && par !== frame ? chainRotation(par, frame) : Quaternion.Identity()); }
-  const keyed = (n: TransformNode, deg: Deg3): Quaternion => {
-    const b = bind.get(n)!.q; const Rp = bindParentRot.get(n)!;
-    // Babylon: a.multiply(b) applies b first. Conjugate the delta into the parent's frame, then apply it after the bind rotation.
-    const inParent = Rp.clone().invert().multiply(eulerQ(...deg)).multiply(Rp);
-    return inParent.multiply(b);
-  };
+  const keyed = (n: TransformNode, deg: Deg3): Quaternion => bf.keyed(n, deg);
   const scale = hips.getAbsolutePosition().y / REF_HIPS_Y || 1;          // body height ratio
   // Targets are WORLD-AXIS offsets from the root's position — the same frame the
   // rig tests and the arm-solver tool always measured in (+x = the hero's right

@@ -7,9 +7,9 @@ import {
 } from '@babylonjs/core';
 import type { Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { boneNode } from './boneLookup';
+import { bindFrame } from './bindFrame';
 
 const FPS = 30;
-const D2R = Math.PI / 180;
 
 /** [timeSec, xDeg, yDeg, zDeg] rotation keys per bone name. */
 export type BoneKeys = Record<string, [number, number, number, number][]>;
@@ -47,6 +47,7 @@ export function buildClip(
   hipsY?: HipsYKeys,
 ): AnimationGroup | null {
   const group = new AnimationGroup(name, scene);
+  const bf = bindFrame(skeleton);
   let added = 0;
 
   for (const [boneName, keys] of Object.entries(bones)) {
@@ -59,9 +60,13 @@ export function buildClip(
       `${name}.${boneName}.rotq`, 'rotationQuaternion', FPS,
       Animation.ANIMATIONTYPE_QUATERNION, Animation.ANIMATIONLOOPMODE_CYCLE,
     );
+    // A key rotates the bone by these degrees about its parent's BIND axes, from
+    // bind (bindFrame.ts). Identical to the raw Euler write on the shipped hero,
+    // whose bind is identity; the same movement on a rig whose bones carry bind
+    // rotations (the MPFB2 candidate: up to 180°, measured 2026-09-03).
     anim.setKeys(keys.map(([t, x, y, z]) => ({
       frame: t * FPS,
-      value: Quaternion.FromEulerAngles(x * D2R, y * D2R, z * D2R),
+      value: bf.keyed(node, [x, y, z]),
     })));
     group.addTargetedAnimation(anim, node);
     added++;

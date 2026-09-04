@@ -1,107 +1,54 @@
-// Locomotion v2 — REPLACES the M24 file. Fixes the real cause of the
-// "everything looks T-posed" complaint (see restPose.ts for the full
-// finding): the M24 idle keyed the arms only ~8-10° off this rig's arms-out
-// bind pose, so a standing character was visually indistinguishable from
-// bind. Animation was never broken — the idle was.
+// Locomotion — idle, strafes, jump. RE-AUTHORED as pose targets (ship pass 3,
+// rung 1): the hands hang where hands hang, in world-axis metres from the root,
+// fitted by the two-bone solver; torso and legs in degrees about the parent's
+// bind axes. One authoring plays on any body that passes Gate 0.
 //
-// idle_stand and both strafes are now built on a MEASURED arms-down rest
-// pose (solveArmsDown() empirically finds which axis/sign lowers the arm on
-// the live rig — no sign guessing), with the same subtle breathing motion
-// layered on top. jump_up / jump_land are unchanged from M24: their arm
-// rotations are already large enough to read clearly.
-//
-// This one file makes every mode's default standing pose look right, since
-// `idle_stand` is the base loop `neverBindPose()` falls back to everywhere.
+// History: the M24 idle keyed the arms ~8-10° off the T-pose bind, so a standing
+// character looked bind-posed; v2 fixed idle and strafe on a measured arms-down
+// rest but left jump_up / jump_land on Euler X keys — which on this rig rotate
+// the arm about its own axis (a twist), so the arms never swung on a jump
+// (measured 2026-09-03 by coreClips.test.ts). Now every clip is a pose.
+import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
+import { buildPoseClip, type Deg3 } from '../poseClip';
+type V3 = [number, number, number];
 
-import type { Scene, Skeleton, AnimationGroup, Quaternion } from '@babylonjs/core';
-import { buildClip } from '../clipBuilder';
-import { solveArmsDown, buildQuatClip, withOffset, eulerQ, type RestPose, type QuatKeys } from '../restPose';
-
-/** Solved once per skeleton and reused by every clip in this module. */
-const restCache = new WeakMap<Skeleton, RestPose>();
-function restFor(sk: Skeleton): RestPose {
-  let r = restCache.get(sk);
-  if (!r) { r = solveArmsDown(sk, 72); restCache.set(sk, r); }
-  return r;
-}
+/** Hands hanging at the sides, slightly forward of the hip, palms in. */
+const HANG = { Left: [-0.24, 0.84, 0.06] as V3, Right: [0.24, 0.84, 0.06] as V3 };
+const HANG_POLES = { Left: [-0.2, -0.3, -0.9] as V3, Right: [0.2, -0.3, -0.9] as V3 };   // elbows slightly back
 
 export function buildIdleStand(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const rest = restFor(sk);
-  const la = rest.get('LeftArm'), ra = rest.get('RightArm');
-  const lf = rest.get('LeftForeArm'), rf = rest.get('RightForeArm');
-
-  // Fallback: if the rig didn't yield a solution, keep M24's behavior rather
-  // than shipping a broken pose.
-  if (!la || !ra) {
-    return buildClip(scene, sk, 'idle_stand', 3.0, {
-      Spine: [[0, 2, 0, 0], [1.5, 4.5, 0, 0], [3, 2, 0, 0]],
-      Neck: [[0, 0, 0, 0], [1.5, 2, 3, 0], [3, 0, 0, 0]],
-      LeftArm: [[0, 8, 0, 6], [1.5, 10, 0, 7], [3, 8, 0, 6]],
-      RightArm: [[0, 8, 0, -6], [1.5, 10, 0, -7], [3, 8, 0, -6]],
-    }, [[0, 0], [1.5, -0.012], [3, 0]]);
-  }
-
-  // breathing: a few degrees of arm sway + spine rise, around the rest pose
-  const tracks: QuatKeys = {
-    Spine: [[0, eulerQ(2, 0, 0)], [1.5, eulerQ(4.5, 0, 0)], [3, eulerQ(2, 0, 0)]],
-    Neck: [[0, eulerQ(0, 0, 0)], [1.5, eulerQ(2, 3, 0)], [3, eulerQ(0, 0, 0)]],
-    LeftArm: [[0, la], [1.5, withOffset(la, 0, 0, 3)], [3, la]],
-    RightArm: [[0, ra], [1.5, withOffset(ra, 0, 0, -3)], [3, ra]],
-  };
-  const breathe = (q: Quaternion): [number, Quaternion][] => [[0, q], [1.5, withOffset(q, 4, 0, 0)], [3, q]];
-  if (lf) tracks.LeftForeArm = breathe(lf);
-  if (rf) tracks.RightForeArm = breathe(rf);
-  return buildQuatClip(scene, sk, 'idle_stand', 3.0, tracks, [[0, 0], [1.5, -0.012], [3, 0]]);
+  const key = (t: number, spine: number, neck: Deg3, lift: number, hipsY: number) => ({
+    t, bones: { Hips: [0, 0, 0] as Deg3, Spine: [spine, 0, 0] as Deg3, Neck: neck },
+    hands: { Left: [HANG.Left[0] - lift * 0.3, HANG.Left[1] + lift, HANG.Left[2]] as V3, Right: [HANG.Right[0] + lift * 0.3, HANG.Right[1] + lift, HANG.Right[2]] as V3 },
+    poles: HANG_POLES, hipsY,
+  });
+  return buildPoseClip(scene, sk, 'idle_stand', 3.0, [key(0, 2, [0, 0, 0], 0, 0), key(1.5, 4.5, [2, 3, 0], 0.02, -0.012), key(3, 2, [0, 0, 0], 0, 0)]);
 }
 
 export function buildStrafe(scene: Scene, sk: Skeleton, dir: 'left' | 'right'): AnimationGroup | null {
   const s = dir === 'left' ? 1 : -1;
-  const rest = restFor(sk);
-  const la = rest.get('LeftArm'), ra = rest.get('RightArm');
-
-  if (!la || !ra) {
-    return buildClip(scene, sk, `strafe_${dir}`, 0.6, {
-      Hips: [[0, 0, 0, 6 * s], [0.3, 0, 0, 10 * s], [0.6, 0, 0, 6 * s]],
-      Spine: [[0, 4, 0, -4 * s], [0.3, 6, 0, -6 * s], [0.6, 4, 0, -4 * s]],
-      LeftUpLeg: [[0, -12, 0, 8 * s], [0.3, -22, 0, 14 * s], [0.6, -12, 0, 8 * s]],
-      RightUpLeg: [[0, -12, 0, 8 * s], [0.3, -4, 0, 2 * s], [0.6, -12, 0, 8 * s]],
-      LeftArm: [[0, 12, 0, 8], [0.3, 18, 0, 12], [0.6, 12, 0, 8]],
-      RightArm: [[0, 12, 0, -8], [0.3, 18, 0, -12], [0.6, 12, 0, -8]],
-    });
-  }
-
-  // legs/hips keep M24's tuned Euler motion; arms ride the measured rest
-  return buildQuatClip(scene, sk, `strafe_${dir}`, 0.6, {
-    Hips: [[0, eulerQ(0, 0, 6 * s)], [0.3, eulerQ(0, 0, 10 * s)], [0.6, eulerQ(0, 0, 6 * s)]],
-    Spine: [[0, eulerQ(4, 0, -4 * s)], [0.3, eulerQ(6, 0, -6 * s)], [0.6, eulerQ(4, 0, -4 * s)]],
-    LeftUpLeg: [[0, eulerQ(-12, 0, 8 * s)], [0.3, eulerQ(-22, 0, 14 * s)], [0.6, eulerQ(-12, 0, 8 * s)]],
-    RightUpLeg: [[0, eulerQ(-12, 0, 8 * s)], [0.3, eulerQ(-4, 0, 2 * s)], [0.6, eulerQ(-12, 0, 8 * s)]],
-    LeftArm: [[0, withOffset(la, 8, 0, 0)], [0.3, withOffset(la, 14, 0, 0)], [0.6, withOffset(la, 8, 0, 0)]],
-    RightArm: [[0, withOffset(ra, 8, 0, 0)], [0.3, withOffset(ra, 14, 0, 0)], [0.6, withOffset(ra, 8, 0, 0)]],
+  const key = (t: number, roll: number, lead: number, trail: number, swing: number) => ({
+    t, bones: { Hips: [0, 0, roll * s] as Deg3, Spine: [4 + roll * 0.4, 0, -roll * 0.7 * s] as Deg3, LeftUpLeg: [-12 - lead, 0, 8 * s] as Deg3, RightUpLeg: [-12 + trail, 0, 8 * s] as Deg3 },
+    hands: { Left: [HANG.Left[0], HANG.Left[1] + swing, HANG.Left[2] + swing * 2] as V3, Right: [HANG.Right[0], HANG.Right[1] + swing, HANG.Right[2] + swing * 2] as V3 }, poles: HANG_POLES,
   });
+  return buildPoseClip(scene, sk, `strafe_${dir}`, 0.6, [key(0, 6, 0, 0, 0.02), key(0.3, 10, 10, 8, 0.05), key(0.6, 6, 0, 0, 0.02)]);
 }
 
-// ── unchanged from M24 (arm swings here are already large and readable) ──
 export function buildJumpUp(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  return buildClip(scene, sk, 'jump_up', 0.45, {
-    Spine: [[0, 18, 0, 0], [0.2, -8, 0, 0], [0.45, -4, 0, 0]],
-    LeftUpLeg: [[0, -45, 0, 6], [0.2, -18, 0, 3], [0.45, -25, 0, 4]],
-    LeftLeg: [[0, 65, 0, 0], [0.2, 18, 0, 0], [0.45, 30, 0, 0]],
-    RightUpLeg: [[0, -45, 0, -6], [0.2, -18, 0, -3], [0.45, -25, 0, -4]],
-    RightLeg: [[0, 65, 0, 0], [0.2, 18, 0, 0], [0.45, 30, 0, 0]],
-    LeftArm: [[0, 40, 0, 12], [0.2, -120, 0, 8], [0.45, -100, 0, 8]],
-    RightArm: [[0, 40, 0, -12], [0.2, -120, 0, -8], [0.45, -100, 0, -8]],
-  }, [[0, -0.18], [0.2, 0.02], [0.45, 0]]);
+  return buildPoseClip(scene, sk, 'jump_up', 0.45, [
+    // gather: deep, arms swung back
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [18, 0, 0], LeftUpLeg: [-45, 0, 6], LeftLeg: [65, 0, 0], RightUpLeg: [-45, 0, -6], RightLeg: [65, 0, 0] }, hands: { Left: [-0.30, 0.95, -0.32], Right: [0.30, 0.95, -0.32] }, poles: { Left: [-0.6, 0.4, -0.6], Right: [0.6, 0.4, -0.6] }, hipsY: -0.18 },
+    // take-off: arms thrown overhead
+    { t: 0.2,  bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], LeftUpLeg: [-18, 0, 3], LeftLeg: [18, 0, 0], RightUpLeg: [-18, 0, -3], RightLeg: [18, 0, 0] }, hands: { Left: [-0.18, 1.98, 0.10], Right: [0.18, 1.98, 0.10] }, poles: { Left: [-0.9, 0.1, -0.3], Right: [0.9, 0.1, -0.3] }, hipsY: 0.02 },
+    { t: 0.45, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], LeftUpLeg: [-25, 0, 4], LeftLeg: [30, 0, 0], RightUpLeg: [-25, 0, -4], RightLeg: [30, 0, 0] }, hands: { Left: [-0.22, 1.90, 0.15], Right: [0.22, 1.90, 0.15] }, poles: { Left: [-0.9, 0.1, -0.3], Right: [0.9, 0.1, -0.3] }, hipsY: 0 },
+  ]);
 }
 
 export function buildJumpLand(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  return buildClip(scene, sk, 'jump_land', 0.35, {
-    Spine: [[0, -4, 0, 0], [0.15, 24, 0, 0], [0.35, 6, 0, 0]],
-    LeftUpLeg: [[0, -25, 0, 4], [0.15, -55, 0, 8], [0.35, -14, 0, 4]],
-    LeftLeg: [[0, 30, 0, 0], [0.15, 80, 0, 0], [0.35, 18, 0, 0]],
-    RightUpLeg: [[0, -25, 0, -4], [0.15, -55, 0, -8], [0.35, -14, 0, -4]],
-    RightLeg: [[0, 30, 0, 0], [0.15, 80, 0, 0], [0.35, 18, 0, 0]],
-    LeftArm: [[0, -100, 0, 8], [0.15, 30, 0, 22], [0.35, 12, 0, 10]],
-    RightArm: [[0, -100, 0, -8], [0.15, 30, 0, -22], [0.35, 12, 0, -10]],
-  }, [[0, 0.02], [0.15, -0.24], [0.35, 0]]);
+  return buildPoseClip(scene, sk, 'jump_land', 0.35, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], LeftUpLeg: [-25, 0, 4], LeftLeg: [30, 0, 0], RightUpLeg: [-25, 0, -4], RightLeg: [30, 0, 0] }, hands: { Left: [-0.22, 1.90, 0.15], Right: [0.22, 1.90, 0.15] }, poles: { Left: [-0.9, 0.1, -0.3], Right: [0.9, 0.1, -0.3] }, hipsY: 0.02 },
+    // absorb: deep crouch, arms come down and forward for balance
+    { t: 0.15, bones: { Hips: [0, 0, 0], Spine: [24, 0, 0], LeftUpLeg: [-55, 0, 8], LeftLeg: [80, 0, 0], RightUpLeg: [-55, 0, -8], RightLeg: [80, 0, 0] }, hands: { Left: [-0.30, 0.95, 0.35], Right: [0.30, 0.95, 0.35] }, hipsY: -0.24 },
+    { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],  LeftUpLeg: [-14, 0, 4], LeftLeg: [18, 0, 0], RightUpLeg: [-14, 0, -4], RightLeg: [18, 0, 0] }, hands: { Left: [-0.26, 0.86, 0.12], Right: [0.26, 0.86, 0.12] }, poles: HANG_POLES, hipsY: 0 },
+  ]);
 }

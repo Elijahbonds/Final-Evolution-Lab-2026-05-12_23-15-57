@@ -1,97 +1,65 @@
-// dunkFinishes — M111 performance/timing-driven dunk finishes.
-//
-// WHY: DunkMode's contest LOGIC (3-judge scoring, chain, variety memory, QTE
-// timing) is rich, but every attempt finished with the SAME two poses —
-// dunk_score_hang on a made slam, jump_land on a whiffed one, then always
-// dunk_land_crouch. The finish never reflected HOW WELL you timed the slam or
-// HOW BIG the judges scored it. These authored clips give the finish real
-// variety so the visual pays off the result:
+// dunkFinishes — M111 performance/timing-driven dunk finishes: the finish
+// reflects HOW WELL you timed the slam and HOW BIG the judges scored it.
 //   dunk_finish_windmill — perfect-timing aerial: a full one-arm windmill.
 //   dunk_finish_tomahawk — good-timing aerial: two-hand cock-back tomahawk.
 //   dunk_finish_blown    — mistimed/whiffed aerial: arms flail off-balance.
 //   dunk_celebrate_big   — landing after a huge score: crouch into a flex.
-// (Clean/ok timing reuses dunk_score_hang; modest scores reuse
-//  dunk_land_crouch — both already authored, so we only add the extremes.)
 //
-// Sign conventions (same as dunkSuite.ts / proceduralClips.ts):
-//   Arm  +X = swing back/behind, -X = raise toward front/overhead.
-//   Arm  Z: Left +Z abducts outward, Right -Z abducts outward.
-//   ForeArm +X = flex (bend elbow).
-//   UpLeg -X = raise knee to front; Leg +X = flex knee (heel back).
-//   Spine +X = lean forward, -X = lean back; Spine Y = twist.
-// All values are anatomically reasonable; the mesh is rigid-parented primitives
-// so nothing skins — these are pure orientation keys, deterministic and assetless.
-
+// RE-AUTHORED as pose targets (ship pass 3, rung 1): hands as world-axis metres
+// from the root, fitted by the two-bone solver; torso and legs in degrees about
+// the parent's bind axes. The old Euler arm keys rotated about X — the arm's own
+// axis on this rig — so the tomahawk's hands never rose above the head
+// (coreClips.test.ts, 2026-09-03). The mode owns the jump; these are aerial shapes.
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
-import { buildClip } from '../clipBuilder';
+import { buildPoseClip, type Deg3 } from '../poseClip';
+type V3 = [number, number, number];
+
+const UP = { Left: [-0.9, 0.1, -0.3] as V3, Right: [0.9, 0.1, -0.3] as V3 };
+const AIR_LEGS: Record<string, Deg3> = { LeftUpLeg: [-30, 0, 6], LeftLeg: [45, 0, 0], RightUpLeg: [-30, 0, -6], RightLeg: [45, 0, 0] };
+const SETTLE_LEGS: Record<string, Deg3> = { LeftUpLeg: [-12, 0, 4], LeftLeg: [16, 0, 0], RightUpLeg: [-12, 0, -4], RightLeg: [16, 0, 0] };
 
 // PERFECT timing → the crowd-popper. Right arm sweeps a full circle: cocked
-// back-and-down, up and over the top, then down to slam. Left arm rides high
-// for balance and the spine adds a small windmill twist.
+// back-and-down, out and up over the top, then down to slam. Left arm rides high.
 export function buildFinishWindmill(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 0.85;
-  return buildClip(scene, sk, 'dunk_finish_windmill', T, {
-    Spine:        [[0, -6, -8, 0], [0.4, -12, 6, 0], [T, 6, 0, 0]],
-    Spine2:       [[0, -3, -4, 0], [0.4, -6, 3, 0], [T, 3, 0, 0]],
-    RightArm:     [[0, 55, 0, -8], [0.3, -30, 0, -8], [0.55, -178, 0, -8], [T, -95, 0, -8]],
-    RightForeArm: [[0, 10, 0, 0], [0.55, 5, 0, 0], [T, 15, 0, 0]],
-    LeftArm:      [[0, -125, 0, 12], [T, -85, 0, 12]],
-    LeftForeArm:  [[0, 20, 0, 0], [T, 30, 0, 0]],
-    LeftUpLeg:    [[0, -35, 0, 6], [T, -14, 0, 4]],
-    LeftLeg:      [[0, 55, 0, 0], [T, 18, 0, 0]],
-    RightUpLeg:   [[0, -22, 0, -6], [T, -12, 0, -4]],
-    RightLeg:     [[0, 40, 0, 0], [T, 14, 0, 0]],
-  });
+  return buildPoseClip(scene, sk, 'dunk_finish_windmill', T, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, -8, 0],  LeftUpLeg: [-35, 0, 6], LeftLeg: [55, 0, 0], RightUpLeg: [-22, 0, -6], RightLeg: [40, 0, 0] }, hands: { Right: [0.30, 0.80, -0.30], Left: [-0.20, 1.85, 0.15] }, poles: { Right: [0.8, 0.2, -0.5], Left: UP.Left } },
+    { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0],  ...AIR_LEGS }, hands: { Right: [0.62, 1.40, -0.15], Left: [-0.20, 1.90, 0.15] }, poles: { Right: [0.4, -0.3, -0.9], Left: UP.Left } },   // out to the side
+    { t: 0.55, bones: { Hips: [0, 0, 0], Spine: [-12, 6, 0],  ...AIR_LEGS }, hands: { Right: [0.15, 2.02, 0.05], Left: [-0.22, 1.85, 0.18] }, poles: { Right: UP.Right, Left: UP.Left } },   // over the top
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],    ...SETTLE_LEGS }, hands: { Right: [0.12, 1.90, 0.35], Left: [-0.22, 1.60, 0.25] }, poles: { Right: UP.Right } },   // slam, forward and down
+  ]);
 }
 
-// GOOD timing → both arms cock straight overhead, then crunch down together in
-// a two-hand tomahawk. Spine loads back then snaps forward for the slam.
+// GOOD timing → both arms cock straight overhead, then crunch down together.
 export function buildFinishTomahawk(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 0.75;
-  return buildClip(scene, sk, 'dunk_finish_tomahawk', T, {
-    Spine:        [[0, -14, 0, 0], [0.35, -20, 0, 0], [T, 10, 0, 0]],
-    LeftArm:      [[0, -150, 0, 10], [0.35, -178, 0, 10], [T, -70, 0, 10]],
-    RightArm:     [[0, -150, 0, -10], [0.35, -178, 0, -10], [T, -70, 0, -10]],
-    LeftForeArm:  [[0, 30, 0, 0], [0.35, 50, 0, 0], [T, 10, 0, 0]],
-    RightForeArm: [[0, 30, 0, 0], [0.35, 50, 0, 0], [T, 10, 0, 0]],
-    LeftUpLeg:    [[0, -30, 0, 6], [T, -12, 0, 4]],
-    LeftLeg:      [[0, 45, 0, 0], [T, 16, 0, 0]],
-    RightUpLeg:   [[0, -30, 0, -6], [T, -12, 0, -4]],
-    RightLeg:     [[0, 45, 0, 0], [T, 16, 0, 0]],
-  });
+  return buildPoseClip(scene, sk, 'dunk_finish_tomahawk', T, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-14, 0, 0], LeftUpLeg: [-30, 0, 6], LeftLeg: [45, 0, 0], RightUpLeg: [-30, 0, -6], RightLeg: [45, 0, 0] }, hands: { Left: [-0.20, 1.92, -0.05], Right: [0.20, 1.92, -0.05] }, poles: UP },
+    { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [-20, 0, 0], ...AIR_LEGS }, hands: { Left: [-0.18, 1.98, -0.22], Right: [0.18, 1.98, -0.22] }, poles: UP },   // cocked back overhead
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [10, 0, 0],  ...SETTLE_LEGS }, hands: { Left: [-0.16, 1.75, 0.40], Right: [0.16, 1.75, 0.40] }, poles: UP },   // crunched down and through
+  ]);
 }
 
-// MISTIMED / whiffed → arms flail out wide, torso twists off-balance, legs
-// splay asymmetrically. Reads clearly as a blown attempt (no clean finish).
+// MISTIMED / whiffed → arms flail wide, torso twists off-balance, legs splay.
 export function buildFinishBlown(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 0.7;
-  return buildClip(scene, sk, 'dunk_finish_blown', T, {
-    Spine:        [[0, 0, 0, 0], [0.35, -8, 14, 16], [T, 6, 6, 8]],
-    Spine2:       [[0, 0, 0, 0], [0.35, -4, 8, 8], [T, 3, 4, 4]],
-    LeftArm:      [[0, 10, 0, 40], [0.35, -35, 0, 72], [T, 18, 0, 55]],
-    RightArm:     [[0, 10, 0, -40], [0.35, -52, 0, -78], [T, 18, 0, -52]],
-    LeftForeArm:  [[0, 15, 0, 0], [0.35, 35, 0, 0], [T, 20, 0, 0]],
-    RightForeArm: [[0, 15, 0, 0], [0.35, 45, 0, 0], [T, 25, 0, 0]],
-    LeftUpLeg:    [[0, -40, 0, 10], [T, -18, 0, 6]],
-    LeftLeg:      [[0, 30, 0, 0], [T, 22, 0, 0]],
-    RightUpLeg:   [[0, -10, 0, -10], [T, -8, 0, -6]],
-    RightLeg:     [[0, 60, 0, 0], [T, 26, 0, 0]],
-  });
+  return buildPoseClip(scene, sk, 'dunk_finish_blown', T, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [0, 0, 0],      LeftUpLeg: [-40, 0, 10], LeftLeg: [30, 0, 0], RightUpLeg: [-10, 0, -10], RightLeg: [60, 0, 0] }, hands: { Left: [-0.45, 1.25, 0.15], Right: [0.45, 1.25, 0.15] } },
+    { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [-8, 14, 16],   LeftUpLeg: [-35, 0, 10], LeftLeg: [28, 0, 0], RightUpLeg: [-8, 0, -10],  RightLeg: [50, 0, 0] }, hands: { Left: [-0.60, 1.55, -0.10], Right: [0.62, 1.62, 0.05] }, poles: { Left: [-0.3, -0.6, -0.7], Right: [0.3, -0.6, -0.7] } },   // flail
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [6, 6, 8],      LeftUpLeg: [-18, 0, 6],  LeftLeg: [22, 0, 0], RightUpLeg: [-8, 0, -6],   RightLeg: [26, 0, 0] }, hands: { Left: [-0.52, 1.30, 0.10], Right: [0.50, 1.32, 0.15] } },
+  ]);
 }
 
 // BIG score landing → absorb into a deep crouch, then rise into a proud
-// two-arm bicep flex (chest out, spine leaned back). The Hips dip and recover.
+// two-arm bicep flex (chest out, spine leaned back). The hips dip and recover.
 export function buildCelebrateBig(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 0.9, M = 0.3;
-  return buildClip(scene, sk, 'dunk_celebrate_big', T, {
-    Spine:        [[0, 20, 0, 0], [M, 26, 0, 0], [0.6, -8, 0, 0], [T, -2, 0, 0]],
-    LeftUpLeg:    [[0, -55, 0, 8], [M, -60, 0, 8], [T, -10, 0, 4]],
-    LeftLeg:      [[0, 80, 0, 0], [M, 85, 0, 0], [T, 14, 0, 0]],
-    RightUpLeg:   [[0, -55, 0, -8], [M, -60, 0, -8], [T, -10, 0, -4]],
-    RightLeg:     [[0, 80, 0, 0], [M, 85, 0, 0], [T, 14, 0, 0]],
-    LeftArm:      [[0, 15, 0, 14], [M, 30, 0, 24], [0.6, -35, 0, 55], [T, -55, 0, 42]],
-    RightArm:     [[0, 15, 0, -14], [M, 30, 0, -24], [0.6, -35, 0, -55], [T, -55, 0, -42]],
-    LeftForeArm:  [[0, 20, 0, 0], [0.6, 95, 0, 0], [T, 85, 0, 0]],
-    RightForeArm: [[0, 20, 0, 0], [0.6, 95, 0, 0], [T, 85, 0, 0]],
-  }, [[0, 0.02], [M, -0.26], [0.6, -0.02], [T, 0]]);
+  const FLEX = { Left: [-0.34, 1.52, 0.12] as V3, Right: [0.34, 1.52, 0.12] as V3 };   // fists up beside the head, elbows out at shoulder height
+  const FLEX_POLES = { Left: [-0.9, -0.2, -0.3] as V3, Right: [0.9, -0.2, -0.3] as V3 };
+  return buildPoseClip(scene, sk, 'dunk_celebrate_big', T, [
+    { t: 0,   bones: { Hips: [0, 0, 0], Spine: [20, 0, 0], LeftUpLeg: [-55, 0, 8], LeftLeg: [80, 0, 0], RightUpLeg: [-55, 0, -8], RightLeg: [80, 0, 0] }, hands: { Left: [-0.30, 0.85, 0.30], Right: [0.30, 0.85, 0.30] }, hipsY: 0.02 },
+    { t: M,   bones: { Hips: [0, 0, 0], Spine: [26, 0, 0], LeftUpLeg: [-60, 0, 8], LeftLeg: [85, 0, 0], RightUpLeg: [-60, 0, -8], RightLeg: [85, 0, 0] }, hands: { Left: [-0.34, 0.80, 0.34], Right: [0.34, 0.80, 0.34] }, hipsY: -0.26 },
+    { t: 0.6, bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], LeftUpLeg: [-10, 0, 4], LeftLeg: [14, 0, 0], RightUpLeg: [-10, 0, -4], RightLeg: [14, 0, 0] }, hands: FLEX, poles: FLEX_POLES, hipsY: -0.02 },
+    { t: T,   bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], LeftUpLeg: [-10, 0, 4], LeftLeg: [14, 0, 0], RightUpLeg: [-10, 0, -4], RightLeg: [14, 0, 0] }, hands: FLEX, poles: FLEX_POLES, hipsY: 0 },
+  ]);
 }
