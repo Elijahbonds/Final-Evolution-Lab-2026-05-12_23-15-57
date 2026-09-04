@@ -39,8 +39,6 @@ import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
-import { NetworkManager } from '../network/NetworkManager';
-import { NetworkInputSource } from '../network/NetworkInputSource';
 
 type Phase = 'intro' | 'fighting' | 'roundOver' | 'matchOver';
 const ROUNDS_TO_WIN = 2;
@@ -61,10 +59,7 @@ export const KarateVSMode: ModeDefinition = (() => {
   let striking = false, foeStriking = false;
   let slowmoSec = 0;
   let stickX = 0, stickY = 0;
-  let networkManager: NetworkManager | null = null;
-  let networkInputSource: NetworkInputSource | null = null;
   let isMultiplayer = false;
-  let remotePlayerId: string | null = null;
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
   function now(): number { return performance.now(); }
@@ -124,15 +119,6 @@ export const KarateVSMode: ModeDefinition = (() => {
       const outcome = resolveStrike(atk, dist, defState, now());
       
       // In multiplayer, send hit attempt to server for validation
-      if (isMultiplayer && mine && networkManager) {
-        networkManager.sendMessage('hitAttempt', {
-          attackKey: key,
-          distance: dist,
-          outcome,
-          timestamp: Date.now(),
-        });
-      }
-      
       switch (outcome) {
         case 'whiff': break;
         case 'parried': {
@@ -249,28 +235,11 @@ export const KarateVSMode: ModeDefinition = (() => {
       brain = new RivalFightBrain(0.65, KARATE_ATTACKS);
       round = 1; myWins = 0; foeWins = 0;
 
-      // NETWORKING: Initialize multiplayer with server-authoritative hit detection
-      try {
-        networkManager = new NetworkManager('http://localhost:3000');
-        const sessionId = `karate-vs-${Date.now()}`;
-        await networkManager.connect(sessionId);
-        networkInputSource = new NetworkInputSource(networkManager, ctx.inputBus);
-        isMultiplayer = true;
-        
-        // Register server-side hit detection validation
-        networkManager.onMessage('hitValidation', (data: any) => {
-          console.log('[KarateVS] Server validated hit:', data);
-          // Server response format: { valid: boolean, comboDamage: number, message: string }
-        });
-        
-        console.log(`[KarateVS] Connected to session ${sessionId} (multiplayer)`);
-        ctx.setHud({ banner: 'MULTIPLAYER MODE — BEST OF 3' });
-        setTimeout(() => ctx.setHud({ banner: '' }), 1500);
-      } catch (err) {
-        console.warn('[KarateVS] Multiplayer connection failed; running vs AI', err);
-        isMultiplayer = false;
-        networkManager = null;
-      }
+      // Honest multiplayer contract: the shipped mode runs locally against the AI
+      // rival until a real transport is passed in via the documented NetworkInputSource seam.
+      isMultiplayer = false;
+      ctx.setHud({ banner: 'BEST OF 3 — LOCAL RIVAL SENSEI' });
+      setTimeout(() => ctx.setHud({ banner: '' }), 1200);
 
       SoundKit.startAmbient('dojo');
       EffectsKit.ambient(ctx.scene, 'dojo');
@@ -351,11 +320,8 @@ export const KarateVSMode: ModeDefinition = (() => {
 
     dispose() {
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
-      if (networkManager?.getConnected()) {
-        networkManager.disconnect();
-        console.log('[KarateVS] Disconnected from multiplayer session');
-      }
-      networkInputSource = null;
+      // Multiplayer transport is intentionally out-of-band until a real session
+      // layer is provided; local AI fallback requires no cleanup.
     },
   };
 })();
