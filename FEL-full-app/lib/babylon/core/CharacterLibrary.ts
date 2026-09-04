@@ -22,7 +22,7 @@ import { applyRestPoseToSkeleton } from '../anim/restPoseApply';
 import { snapToGround } from './groundSnap';                // M69: feet-on-court
 import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
-import { rosterUrlFor, normalizeHeroUrl } from './athleteRoster';
+import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL } from './athleteRoster';
 import { applySkinShading } from './skinShading';
 import { applyKit } from './kit';
 import { applyHairStyle, DEFAULT_HAIR_STYLE, HAIR_KEY_TO_STYLE } from './hairStyles';
@@ -110,12 +110,33 @@ async function loadContainer(scene: Scene, url: string): Promise<AssetContainer>
   return p;
 }
 
+/** Pass 4 phase 9 (2026-09-04): the mobile tier's hero file. Same nodes, skin, joints, weights, morphs and clips as
+ *  fel-hero.glb — only the textures differ: skin at 1024², every other map (six hair styles, two jerseys, two shoes,
+ *  shorts, eyes) at 512² (`scripts/avatar/import-mpfb.mts <in> <out> --textures-only`). Measured before this: the
+ *  desktop file's fifteen maps were 96 MB of GPU memory in EVERY mode that spawns the untinted hero, on both tiers
+ *  (the probe's old scene.textures basis could not see them); the mobile file is 24 MB. Only the DEFAULT hero is
+ *  swapped — a dev override (?hero=) or an explicitly requested body always loads as asked, and the desktop tier's
+ *  look is untouched. */
+const MOBILE_HERO_URL = '/models/fel-hero.mobile.glb';
+function tierOf(scene: Scene): QualityTier { return (scene.metadata?.felTier as QualityTier | undefined) ?? 'desktop'; }
+function heroUrlForTier(url: string, scene: Scene): string { return url === DEFAULT_HERO_URL && tierOf(scene) === 'mobile' ? MOBILE_HERO_URL : url; }
+/** The hero for this scene's tier, falling back to the requested file if the tier's variant will not load — a
+ *  texture variant can never brick a spawn (the roster's rule). */
+async function loadHero(scene: Scene, url: string): Promise<{ container: AssetContainer; url: string }> {
+  const tiered = heroUrlForTier(url, scene);
+  if (tiered !== url) {
+    try { return { container: await loadContainer(scene, tiered), url: tiered }; }
+    catch (e) { console.warn(`[FEL-CHAR] tier hero "${tiered}" unavailable, using "${url}": ${(e as Error)?.message ?? e}`); }
+  }
+  return { container: await loadContainer(scene, url), url };
+}
+
 export const CharacterLibrary = {
   /** Preload an asset (hero, enemy, defender…) into the cache. */
   async load(scene: Scene, url: string): Promise<void> {
     // M105: procedural path needs no GLB fetch — preloading is a no-op.
     if (PROCEDURAL_CHARACTERS) return;
-    await loadContainer(scene, normalizeHeroUrl(url));
+    await loadHero(scene, normalizeHeroUrl(url));
   },
 
   /** Instantiate a character with its own animator + authored clips. */
@@ -161,10 +182,10 @@ export const CharacterLibrary = {
         effectiveUrl = rosterUrl;
         rosterPicked = true;
       } catch {
-        container = await loadContainer(scene, url);
+        ({ container, url: effectiveUrl } = await loadHero(scene, url));
       }
     } else {
-      container = await loadContainer(scene, url);
+      ({ container, url: effectiveUrl } = await loadHero(scene, url));
     }
     const inst = container.instantiateModelsToScene(
       (n) => `${n}_c${++spawnCounter}`, false, { doNotInstantiate: true },
@@ -220,7 +241,7 @@ export const CharacterLibrary = {
     // motion layers that make the forge hero read as a person. All three key
     // on the LOCKED bone/material names; all three are no-ops on a rig that
     // lacks them, and mobile gets the cheaper variants.
-    const tier: QualityTier = (scene.metadata?.felTier as QualityTier | undefined) ?? 'desktop';
+    const tier = tierOf(scene);
     applySkinShading(meshes, scene, tier);
     // ship pass 4: a kit body carries every garment; show one per slot even with no identity
     // (anonymous dev captures, guests, rivals) — the identity pipe re-applies the player's own choice below

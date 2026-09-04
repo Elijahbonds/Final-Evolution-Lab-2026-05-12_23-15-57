@@ -10,6 +10,7 @@ import { applyFaceMorphs, resolveFaceWeights } from './faceMorphs';
 import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, StandardMaterial, Texture, Vector3 } from '@babylonjs/core';
 import { SKIN_DETAIL_NORMAL, SKIN_LIBRARY, type SkinEntry } from './skinLibrary';
 import type { Material } from '@babylonjs/core';
+import type { QualityTier } from '../scene/QualityTier';
 
 type TintMat = Material & { albedoColor?: Color3; diffuseColor?: Color3; bumpTexture?: { dispose(): void } | null };
 
@@ -266,6 +267,16 @@ function skinFor(tone: Color3): SkinEntry | null {
   const family = lum < 0.28 ? 'dark' : lum < 0.5 ? 'medium' : 'light';
   return SKIN_LIBRARY.find((e) => e.family === family && e.sex === 'male') ?? SKIN_LIBRARY[0];   // sex arrives with the body roster (rung 3)
 }
+/** Contract addendum (pass 4 phase 9, docs/CONTRACTS-PASS4-RUN.md contracts 1 + 2): the skin maps follow the
+ *  quality tier. Desktop takes the shipped 2048² set (`public/models/skins/<key>.jpg`); mobile takes the 1024² set
+ *  export-skins writes beside it (`--suffix -1024`: `<key>-1024.jpg`, `detail-normal-1024.jpg`). Pure. Idempotent
+ *  on a url already on the mobile set; a url that is not a `.jpg` has no 1024 twin and passes through unchanged.
+ *  Measured 2026-09-04 before this: the three 2048² maps a logged-in hero loads were 64 MB of dunk's mobile total. */
+export function skinMapUrl(url: string, tier: QualityTier): string {
+  if (tier !== 'mobile') return url;
+  if (/-1024\.jpg$/.test(url) || !/\.jpg$/.test(url)) return url;
+  return url.replace(/\.jpg$/, '-1024.jpg');
+}
 const skinTexCache = new WeakMap<object, Map<string, Texture>>();
 function applySkinMap(mat: PBRMaterial, tone: Color3, scene: ReturnType<PBRMaterial['getScene']>): void {
   const entry = skinFor(tone);
@@ -273,7 +284,9 @@ function applySkinMap(mat: PBRMaterial, tone: Color3, scene: ReturnType<PBRMater
   let cache = skinTexCache.get(scene); if (!cache) { cache = new Map(); skinTexCache.set(scene, cache); }
   // orientation follows the file's own map (the glTF loader's flag), so the swap lands on the same UV layout
   const invertY = (mat.albedoTexture as Texture | null)?.invertY ?? false;
-  const tex = (url: string) => { let t = cache!.get(url); if (!t) { t = new Texture(url, scene, false, invertY, Texture.TRILINEAR_SAMPLINGMODE); cache!.set(url, t); } return t; };
+  // the tier the harness stored on the scene (ModeHarness.ts); a scene without one (Closet preview, tests) is desktop
+  const tier: QualityTier = (scene.metadata as { felTier?: QualityTier } | undefined)?.felTier ?? 'desktop';
+  const tex = (rawUrl: string) => { const url = skinMapUrl(rawUrl, tier); let t = cache!.get(url); if (!t) { t = new Texture(url, scene, false, invertY, Texture.TRILINEAR_SAMPLINGMODE); cache!.set(url, t); } return t; };
   mat.albedoTexture = tex(entry.albedo);
   const [mr, mg, mb] = entry.meanRGB.map((v) => Math.max(8, v) / 255);
   const clamp = (v: number) => Math.min(1.25, Math.max(0.35, v));   // past 1.25 the map washes out; the light family already sits near the swatch
