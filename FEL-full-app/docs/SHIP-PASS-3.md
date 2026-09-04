@@ -36,3 +36,22 @@ Plan page: https://claude.ai/code/artifact/88460d0b-8775-4206-a872-81951f4ddeb0
   hero's). Fix planned: grip IK to a shared club target. Gate 0 held: the hero
   is the 22-bone unprefixed rig; the takes' Mixamo names map 1:1 after the
   prefix strip, toes dropped, root motion dropped.
+- **3 Sep, rung 1 spike: the pipeline runs end to end, offline.** MPFB2 v2.0.17
+  installed into Blender 5.1 headless (clone at `~/Developer/FEL-swarm/tools/
+  mpfb2`, extension zip built from source); CC0 packs unpacked into its user
+  data: system assets (eyes, teeth, proxies), skins 01–02, shirts 01, pants 01,
+  shoes 01, hair 01, clothes and hair materials (~955 MB, owner-approved).
+  `scratchpad/mpfb-spike/dress.py` creates the human at metres, adds the
+  **mixamo** rig (52 bones; covers the FEL 22 exactly), a CC0 skin
+  (`middleage_caucasian_male`), a t-shirt, jean shorts, hero boots and
+  low-poly eyes, and exports a GLB with textures. `scripts/avatar/import-mpfb.mts`
+  strips the prefix, folds fingers/toes/extras into their kept parents with
+  weights re-summed, and names the materials to the contract (skin, jersey,
+  shorts, shoes, eyes). Result `public/models/candidates/fel-hero-mpfb.glb`
+  (12.3 MB, 5 meshes, 6 textures): **Phase 0 rig audit PASS** (22 bones,
+  T-pose), rest solve finds four arm bones, authored idle and golf clips build.
+  Open before it can replace the hero: 25,678 tris vs the 25k budget (decimate
+  the boots/eyes or drop helper faces); authored clip offsets were solved on the
+  old body's rest and land elsewhere on this T-posed body (re-solve per clip,
+  the rig tests will flag each); no face morphs yet (the Closet's seven must be
+  authored as MPFB targets → shape keys); texture size/KTX2 for the load budget.
