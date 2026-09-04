@@ -3,6 +3,7 @@
 # against the previous run; the /loop reports only what changed.
 set -u
 cd "$(dirname "$0")/.."
+BASE=${BASE:-http://localhost:3000}   # ship pass 2: BASE=http://localhost:3004 points at the production server
 G="${GAUNTLET_DIR:?set GAUNTLET_DIR}"; mkdir -p "$G" "$G/logs"
 OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
 {
