@@ -176,8 +176,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     meSubstituted = now() + 400;
     const spot = DefenseController.substitutionSpot(rival.root.position, rival.root.rotation.y);
     player.root.position.copyFrom(spot);
-    player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x));
-    player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z));
+    if (!modeVenue?.constrain(player.root.position)) { player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z)); }   // phase 3: the dojo floor, not a 24 m box
     mbus.report({ kind: 'steal', weight: 14 });
     SoundKit.play('whoosh', { pitch: 1.8, volume: 0.6 });
     EffectsKit.burst(ctx.scene, spot.add(new Vector3(0, 1.2, 0)), 'glitch');
@@ -397,8 +396,7 @@ export const ShowdownMode: ModeDefinition = (() => {
         meMove.update(dt, 0, 0, false);
       }
       player.root.position.addInPlace(meMove.vel.scale(dt));
-      player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x));
-      player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z));
+      if (!modeVenue?.constrain(player.root.position)) { player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z)); }
 
       // ── strikes: advance, resolve at active-frame open ──
       const opened = meStrike.update(dt, now());
@@ -430,8 +428,7 @@ export const ShowdownMode: ModeDefinition = (() => {
           else if (foeState.blockHeld && Math.random() < 0.02) { foeDef.releaseBlock(); foeState.releaseBlock(); }
         }
         rival.root.position.addInPlace(foeMove.vel.scale(dt));
-        rival.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.x));
-        rival.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.z));
+        if (!modeVenue?.constrain(rival.root.position)) { rival.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.x)); rival.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.z)); }
       }
 
       // ── support assist lifecycle ──

@@ -19,9 +19,15 @@
 import type { Scene, TransformNode } from '@babylonjs/core';
 import { buildNexusScene, type BuiltScene } from '../nexus/NexusWebScene';
 import { mountVenueProps, propSetFor, type VenuePropsHandle } from '../visual/VenueProps';
+import { NavBounds } from './NavBounds';
+import type { Vector3 } from '@babylonjs/core';
 import { specFor } from '../nexus/venueSpecs';
 
 export interface VenueHandle {
+  /** Ship pass 4, phase 3: the walkable-area navmesh baked from this venue's map (null until loaded, or when the venue has no map). */
+  readonly nav: NavBounds | null;
+  /** Keep `pos` on the walkable surface. Returns false when no navmesh is loaded yet — callers fall back to their box clamp. */
+  constrain(pos: Vector3): boolean;
   built: BuiltScene;
   /** Placeholder bodies, kept so a mode can drop them the moment real
    *  characters are ready. */
@@ -103,6 +109,9 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   // Ship pass 4, phase 2: the CC0 prop dressing for this venue (visual/VenueProps.ts),
   // loaded async under the venue root and disposed with it. Placements live in
   // venuePropSets.ts and stay outside every play area.
+  // Phase 3: the navmesh for this venue's map (scripts/venue/navmesh-gen.mts → public/models/navmesh).
+  let nav: NavBounds | null = null;
+  if (spec.mapKey) void NavBounds.load(spec.mapKey).then((n) => { nav = n; if (n) console.info(`[NEXUS] navmesh "${spec.mapKey}": ${n.data.polys.length} polys`); });
   const propSet = propSetFor(modeId);
   let props: VenuePropsHandle | null = null; let propsGone = false;
   if (propSet) void mountVenueProps(ctx.scene, propSet, built.root).then((h) => { if (propsGone) h?.dispose(); else props = h; });
@@ -140,6 +149,8 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   return {
     built,
     placeholders,
+    get nav() { return nav; },
+    constrain(pos: Vector3) { if (!nav) return false; const [x, z] = nav.constrain(pos.x, pos.z); pos.x = x; pos.z = z; return true; },
     hidePlaceholders() {
       for (const a of placeholders) {
         a.getChildMeshes().forEach((m) => { m.isVisible = false; });

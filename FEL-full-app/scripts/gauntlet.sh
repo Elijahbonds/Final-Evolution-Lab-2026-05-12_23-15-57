@@ -40,7 +40,7 @@ OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
   done
   # phone captures on the shipping routes, one mode per family (ship pass 2, Phase 7)
   for r in "skateboard PUMP POP" "volleyball HIT BLOCK" "tennis DRIVE SLICE" "dunk CHARGE SLAM" "karate BLOCK JAB" "football TRUCK HURDLE" "golf SWING CLUB"; do
-    set -- ${=r}   # zsh does not word-split an unquoted variable; ${=r} forces it
+    set -- $(printf "%s\n" "$r")   # command substitution word-splits in BOTH bash and zsh (a bare $r does not in zsh; ${=r} is zsh-only)
     mr=$(URL=$BASE/play/$1 HOLD_VERB=$2 TAP_VERB=$3 OUT_DIR="$G/shots" npx tsx scripts/capture-mobile-touch.mts 2>&1)
     echo "$mr" > "$G/logs/mobile-$1.txt"
     e=$(echo "$mr" | grep -oE "^errors: [0-9]+" | head -1)
@@ -48,6 +48,10 @@ OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
   done
 } > "$OUT" 2>&1
 echo "=== RESULT ($OUT) ==="; cat "$OUT"
+# Tripwire (2026-09-04): the baked venue maps and their manifest were rewritten twice today by
+# a writer no script or test names; flag any drift so the next sweep catches a recurrence.
+drift=$(git status --short public/models/maps/baked 2>/dev/null | wc -l | tr -d " ")
+[ "$drift" != "0" ] && echo "WARNING: $drift baked map file(s) modified during this sweep — see docs/SHIP-PASS-4.md findings" | tee -a "$OUT"
 if [ -f "$G/latest.txt" ]; then
   echo "=== DIFF vs previous (regressions) ==="
   # only lines whose status changed; perf numbers are stripped for the compare

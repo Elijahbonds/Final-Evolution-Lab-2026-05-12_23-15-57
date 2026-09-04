@@ -1970,6 +1970,26 @@
     suspend-react "^0.1.3"
     zustand "^3.7.1"
 
+"@recast-navigation/core@0.43.1":
+  version "0.43.1"
+  resolved "https://registry.npmjs.org/@recast-navigation/core/-/core-0.43.1.tgz"
+  integrity sha512-4igfPgnoV90O92sDSIA0xHa6tanh3z/udlgGmD0SqGQ6PKV4JS2l9jWO8YnxfZuXP/NV52H4c5FU6pSdZc9WDA==
+  dependencies:
+    "@recast-navigation/wasm" "0.43.1"
+
+"@recast-navigation/generators@0.43.1":
+  version "0.43.1"
+  resolved "https://registry.npmjs.org/@recast-navigation/generators/-/generators-0.43.1.tgz"
+  integrity sha512-w7r6k/A93wWxuSN+Lg+PmlsUVXq06r5bqXmBglolxqDt2O/Y776BIhYtb6P2P6pbYqDWORu9NCZZJzfY4FNpaA==
+  dependencies:
+    "@recast-navigation/core" "0.43.1"
+    "@recast-navigation/wasm" "0.43.1"
+
+"@recast-navigation/wasm@0.43.1":
+  version "0.43.1"
+  resolved "https://registry.npmjs.org/@recast-navigation/wasm/-/wasm-0.43.1.tgz"
+  integrity sha512-XFL6PhO8JodwXUHBSAkfaLUdUEweIkJsdP3HTmtJvMs5fkqEWxWJmBskZlACHJepv55NAriqWxOtuLlG3t7+Hg==
+
 "@rollup/rollup-darwin-arm64@4.63.1":
   version "4.63.1"
   resolved "https://registry.npmjs.org/@rollup/rollup-darwin-arm64/-/rollup-darwin-arm64-4.63.1.tgz"
@@ -7348,6 +7368,14 @@ readdirp@~3.6.0:
   integrity sha512-hOS089on8RduqdbhvQ5Z37A0ESjsqz6qnRcffsMU3495FuTdqSm+7bhJ29JvIOsBDEEnan5DPu9t3To9VRlMzA==
   dependencies:
     picomatch "^2.2.1"
+
+recast-navigation@^0.43.1:
+  version "0.43.1"
+  resolved "https://registry.npmjs.org/recast-navigation/-/recast-navigation-0.43.1.tgz"
+  integrity sha512-BVBQEHE6uqD36opJomVkI5TxMVZ8bBLdDn90mYtBUYJnNlqEuNFOL8DH8lLOksfVVaC+kjykYuS57P6MrxVB7A==
+  dependencies:
+    "@recast-navigation/core" "0.43.1"
+    "@recast-navigation/generators" "0.43.1"
 
 recharts-scale@^0.4.4:
   version "0.4.5"

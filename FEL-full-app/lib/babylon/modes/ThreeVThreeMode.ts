@@ -268,7 +268,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       if (drib.crossover) carries.get(me)?.switchHand();
       if (!shooting && !dunking) {
         me.char.root.position.addInPlace(me.drib.vel.scale(dt));
-        clampToHalfCourt(me.char.root.position, 8, 15);
+        if (!threeVenue?.constrain(me.char.root.position)) clampToHalfCourt(me.char.root.position, 8, 15);   // phase 3: navmesh first
         me.char.root.rotation.y = drib.facingRad;
         me.char.animator.play(drib.speed01 > 0.15 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
 
@@ -324,7 +324,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         const vel = new Vector3(intent.moveX, 0, -intent.moveY).scale(4.2);
         mateVel[i]?.copyFrom(vel);
         body.char.root.position.addInPlace(vel.scale(dt));
-        clampToHalfCourt(body.char.root.position, 8, 15);
+        if (!threeVenue?.constrain(body.char.root.position)) clampToHalfCourt(body.char.root.position, 8, 15);
         if (vel.lengthSquared() > 0.1) body.char.root.rotation.y = Math.atan2(vel.x, vel.z);
         body.char.animator.play(vel.lengthSquared() > 0.3 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
         if (carrierId === (i === 0 ? 'mate0' : 'mate1') && Vector3.Distance(body.char.root.position, RIM) < 3.5 && Math.random() < 0.01) {
@@ -357,7 +357,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           foeCloseMem[fi] = Math.max(closing, (foeCloseMem[fi] ?? 0) - dt * 2.5);
         }
         f.char.root.position.addInPlace(vel.scale(dt));
-        clampToHalfCourt(f.char.root.position, 8, 15);
+        if (!threeVenue?.constrain(f.char.root.position)) clampToHalfCourt(f.char.root.position, 8, 15);
         if (vel.lengthSquared() > 0.1) f.char.root.rotation.y = Math.atan2(vel.x, vel.z);
         f.char.animator.play(vel.lengthSquared() > 0.3 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
       }

@@ -138,12 +138,12 @@ export const OneVOneMode: ModeDefinition = (() => {
       const OUT = 0.15, BEHIND_RIM = 0.5 - RIM.z;   // fires only past z −0.6
       if (!dunking && (p.x > 7.2 + OUT || p.x < -7.2 - OUT || p.z > 14.5 + OUT || p.z < 0.5 - BEHIND_RIM)) {
         const back = p.clone();
-        clampToHalfCourt(back, 7.2, 14.5);
+        if (!onevoneVenue?.constrain(back)) clampToHalfCourt(back, 7.2, 14.5);   // phase 3: navmesh first, box when no map
         contact.teleport(id, back);
       }
     } else {
       root.position.addInPlace(vel.scale(dt));
-      clampToHalfCourt(root.position, 7.2, 14.5);
+      if (!onevoneVenue?.constrain(root.position)) clampToHalfCourt(root.position, 7.2, 14.5);
     }
   }
 
