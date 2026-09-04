@@ -98,6 +98,12 @@ function GameShellInner({
   const arenaMatchId = searchParams.get('arena');
   const carnivalFlag = searchParams.get('carnival');
   const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade } | null>(null);
+  // Ship pass 2, Phase 4: the profile request failing (offline, server down)
+  // used to leave the shell empty and silent — no game, no message. Measured
+  // with a blocked /api/** on /play/onevone: "HUB ONES Venice Beach Court" and
+  // nothing else. Say so, and offer a retry.
+  const [unreachable, setUnreachable] = useState(false);
+  const [profileTry, setProfileTry] = useState(0);
   const [result, setResult] = useState<GameResult | null>(null);
   const [recap, setRecap] = useState<RecapData | null>(null);
   const [carnivalRun, setCarnivalRun] = useState<CarnivalRunState | null>(null);
@@ -127,6 +133,7 @@ function GameShellInner({
 
   useEffect(() => {
     let live = true;
+    setUnreachable(false);
     fetch('/api/profile')
       .then((r) => (r?.ok ? r.json() : null))
       .then((j) => {
@@ -137,11 +144,11 @@ function GameShellInner({
           router.replace('/login');
         }
       })
-      .catch(() => {});
+      .catch(() => { if (live) setUnreachable(true); });
     return () => {
       live = false;
     };
-  }, [router, gameKey]);
+  }, [router, gameKey, profileTry]);
 
   const handleEnd = useCallback(
     (res: GameResult) => {
@@ -345,6 +352,12 @@ function GameShellInner({
       </header>
 
       <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4">
+        {!profile && unreachable && (
+          <div className="flex h-[60vh] flex-col items-center justify-center gap-3 text-center">
+            <p className="font-mono text-sm text-white/80">Can&apos;t reach the server. Check your connection, then try again.</p>
+            <button type="button" onClick={() => setProfileTry((n) => n + 1)} className="rounded-md border border-[#00E5FF]/60 px-4 py-2 font-mono text-sm text-[#00E5FF]">RETRY</button>
+          </div>
+        )}
         {profile ? (
           <Game key={gameKey} grade={profile.grade} prq={profile.prq} onEnd={handleEnd} />
         ) : (

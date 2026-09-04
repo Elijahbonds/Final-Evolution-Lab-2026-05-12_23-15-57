@@ -183,7 +183,13 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   frameGuard = new FrameGuard(scene, camera, () => heroRef.current, camDirector, () => objectiveRef.current);
   setDiagMode(def.modeId);
   // a lost WebGL context is the one failure the player cannot recover from by playing on
-  engine.onContextLostObservable.add(() => reportDiag('context', 'WebGL context lost'));
+  engine.onContextLostObservable.add(() => {
+    reportDiag('context', 'WebGL context lost');
+    // Measured (fault capture, 2026-09-03): the canvas went black and the HUD
+    // kept streaming with no word to the player. Name it; the host's error UI
+    // offers the reload.
+    setPhase('error', 'Graphics were reset by the device. Reload to keep playing.');
+  });
   engine.onContextRestoredObservable.add(() => reportDiag('context', 'WebGL context restored'));
 
   // ── Load with watchdog + error phase (the anti-infinite-spinner guarantee) ──
