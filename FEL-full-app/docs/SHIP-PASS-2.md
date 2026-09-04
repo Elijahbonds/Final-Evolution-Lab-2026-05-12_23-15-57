@@ -146,3 +146,8 @@ Plan page: https://claude.ai/code/artifact/06ac4116-487a-472f-9378-07e2834ccebb
   `lib/auth.ts`, with a five-minute refresh so a promotion takes); and the
   analytics route swallowed rejected batches and exceptions behind a silent
   204 (it logs them now).
+- **Phase 10, release candidate (3 Sep).** Release build on the pass-2 tree,
+  served and swept: 20/20 shipping routes clean, seven phone captures clean,
+  33 suites / 213 tests green. Tagged `v0.9.0-rc.1` locally (not pushed — an
+  outward action for the owner). `docs/SHIP-READINESS.md` signed pending the
+  owner's curriculum review and hardware session; `docs/CHANGELOG.md` current.
