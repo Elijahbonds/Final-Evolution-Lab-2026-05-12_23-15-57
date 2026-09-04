@@ -38,7 +38,8 @@ describe('mocap takes on the forge rig (Gate 0: 22 unprefixed bones)', () => {
       maxGap = Math.max(maxGap, Vector3.Distance(r, l));
     }
     console.log(`MOCAP golf hand y ${minY.toFixed(2)}..${maxY.toFixed(2)} x ${minX.toFixed(2)}..${maxX.toFixed(2)} max hand gap ${maxGap.toFixed(2)}`);
-    expect(maxY - minY).toBeGreaterThan(0.5);      // a swing goes low to high
+    const stature = pos('Hips').y / 0.96;          // judge the arc against this body's size, not the forge hero's
+    expect(maxY - minY).toBeGreaterThan(0.5 * stature);   // a swing goes low to high
     expect(maxX - minX).toBeGreaterThan(0.4);      // and across the body
     // D-M1 (measured 2026-09-03): direct local-rotation transfer opens the hands
     // to 0.71 m at full extension — the owner's limb lengths against the hero's.
@@ -50,7 +51,8 @@ describe('mocap takes on the forge rig (Gate 0: 22 unprefixed bones)', () => {
     for (const f of ['tennis_serve', 'baseball_pitch_over', 'volleyball_spike', 'football_catch']) {
       const j = load(f); const g = buildMocapClip(scene, sk, j)!;
       expect(g, f).not.toBeNull();
-      expect(g.targetedAnimations.length, f).toBe(Object.keys(j.tracks).length);
+      // pose keys (ship pass 3): Hips + Spine + both arms + both legs + the hips position = 11 targets; raw rotations: one per tracked bone
+      expect(g.targetedAnimations.length, f).toBe(j.poseKeys?.length ? 11 : Object.keys(j.tracks).length);
     }
   });
 });
