@@ -61,3 +61,11 @@ Plan page: https://claude.ai/code/artifact/06ac4116-487a-472f-9378-07e2834ccebb
 - **Phase 8 groundwork (3 Sep).** `.github/workflows/ci.yml` at the repo root:
   tsc, vitest, production build on every push (the browser gauntlet stays
   local — it needs a GPU).
+- **Phase 7 read (3 Sep).** `lib/babylon/ui/modeVerbs.ts` carries a verb set
+  for every one of the 21 modes (plus the retired three); the touch overlay is
+  the uniform console rig with per-mode labels. Parity is therefore a WIRING
+  audit — does each labelled button reach a real action in its mode — not a
+  gap fill.
+- **Phase 9 read (3 Sep).** Tennis already has its Controller Link entry
+  (`schemas/registry.ts`), so the concept lock's ❌ D4 is stale. Four modes have
+  no entry and are silent to a phone: onevone, karate, karate_vs, carnival.
