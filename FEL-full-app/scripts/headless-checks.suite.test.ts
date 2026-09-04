@@ -62,6 +62,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'mirror-coach-tests.ts', guards: "mirror coach — the squat audit measures the book's four faults; the cue engine holds down, escalates, confirms once; the guided flow wires it" },
   { script: 'closet-jersey-tests.ts', guards: 'jersey id — number clamps 0–99, name plate is charset-safe and length-capped, garbage never throws' },
   { script: 'avatar-pipeline-tests.ts', guards: 'shipped avatar GLBs — spec bones, float32 skins, no draco, meter-scale tracks, manifest coverage' },
+  { script: 'perf-budget-tests.ts', guards: 'mobile-tier texture memory stays within 2x the median (textureBudget.json, measured)' },
   { script: 'avatar-pose-tests.ts', guards: 'forged avatar POSE gate — clips are anatomically sane, bind is a T-pose, load state is arms-down' },
 ];
 
