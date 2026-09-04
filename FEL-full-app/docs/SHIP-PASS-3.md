@@ -25,6 +25,7 @@ Plan page: https://claude.ai/code/artifact/88460d0b-8775-4206-a872-81951f4ddeb0
 | 10 Maps | Venue upgrade on the optimized maps: props, lighting per mood, navmesh-authored bounds. | Load budget met; every venue re-shot. |
 
 ## Findings log
+- **3 Sep, rung 1 landed.** The two-bone solver was turning large reaches the wrong way under the glTF root's handedness mirror; it now solves in the rig's own frame. Pose-target clips author on world axes from the root; golf passes on both bodies (shipped and MPFB2 candidate). The candidate plays golf on the dev harness through `?hero=` with no frame-guard hits, no missing clips, no errors at 60 fps; its cold first load was 8.0 s against the shipped hero's 2.1 s and is the next number to bring inside the 3 s warm budget. Remaining candidate-body failures: 12, all in suites not yet migrated (baseball, basketball, tennis, one mocap grip). Also landed today, outside this pass: the owner's Camp Blueprint curriculum into `/camp`.
 - **3 Sep, opened.** Blender 5.1.2 is installed on this machine; MPFB2 is not.
   The spike starts with a headless install and an API probe.
 - **3 Sep, rung 4 first measure.** Five takes segmented by motion energy

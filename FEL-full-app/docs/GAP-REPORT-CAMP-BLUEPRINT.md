@@ -1,6 +1,12 @@
 # Gap Report — Workstream 1: Camp Blueprint (Education Pillar: Mentorship)
 
 Audit only. No implementation code was written for this workstream.
+
+> **Update 2026-09-03.** The owner delivered the facilitator curriculum (the
+> eight-week arc, Pathway Map Protocol, Bridge prompts, standards). It is filed
+> at `docs/CAMP-BLUEPRINT.md`, typed in `lib/camp/curriculum.ts`, and rendered
+> on `/camp` (Curriculum tab; week-aware Session tab). G1 below is now about
+> lesson bodies and assessments only; the program curriculum exists.
 Audited 2026-09-02 against the repository at commit `5322d8a` (the imported
 handoff state). Scope respected: FEL side only — nothing under the CELL × NEXUS
 Studio models (`CellProject`, `CellApiKey`, `CellSettings`, `CellUsage`,

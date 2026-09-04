@@ -5,15 +5,16 @@
 // facilitated session and read the deltas), Templates (export / import / fork).
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { GraduationCap, Target, ClipboardList, Copy, Loader2, Check, Lock, Play, Sparkles } from 'lucide-react';
+import { GraduationCap, Target, ClipboardList, Copy, Loader2, Check, Lock, Play, Sparkles, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { allLessons } from '@/lib/curriculum/blueprint';
+import { ARC, BRIDGE_PROMPTS, CAMP_BLUEPRINT_VERSION, MEASURES, PATHWAY_FIELDS, PROGRAM, REPLICATION, STANDARDS, THESIS, TRACKS, arcMilestones, arcWeek, bridgePromptFor, weekOf } from '@/lib/camp/curriculum';
 
-type Tab = 'certify' | 'plans' | 'session' | 'templates';
+type Tab = 'certify' | 'plans' | 'session' | 'templates' | 'curriculum';
 interface ModuleQ { key: string; prompt: string; options: string[] }
 interface ModuleInfo { ref: string; title: string; summary: string; required: boolean; questions: ModuleQ[] }
 interface AssessState { status: string; missingModules: string[]; passedModules: string[]; modules: ModuleInfo[]; credentials: { trackKey: string; moduleKey: string; score: number; passed: boolean }[]; curriculumVersion: string }
-interface Plan { id: string; goalText: string; status: string; menteeId: string; facilitatorUserId: string; linkedModuleKeys: string[]; tags: string[]; createdAt: string; sessions?: CampSessionRow[] }
+interface Plan { id: string; goalText: string; status: string; menteeId: string; facilitatorUserId: string; linkedModuleKeys: string[]; tags: string[]; createdAt: string; lockedAt?: string | null; sessions?: CampSessionRow[] }
 interface CampSessionRow { id: string; date: string; moduleKeys: string[]; gameSessionIds: string[]; prqDelta: Record<string, number> | null; resiliency: { attempts: number; failures: number; retryRate: number; returnedAfterLoss: boolean | null } | null; notes: string | null }
 interface Template { id: string; name: string; description: string | null; version: number; curriculumVersion: string; published: boolean; uses: number; forkedFromId: string | null; structure: { blocks: { label: string; sessions: { label: string }[] }[] } }
 
@@ -48,6 +49,7 @@ export function CampView() {
   const tabs: { key: Tab; label: string; icon: typeof Target }[] = [
     { key: 'certify', label: 'Certify', icon: GraduationCap }, { key: 'plans', label: 'Plans', icon: Target },
     { key: 'session', label: 'Session', icon: ClipboardList }, { key: 'templates', label: 'Templates', icon: Copy },
+    { key: 'curriculum', label: 'Curriculum', icon: BookOpen },
   ];
 
   return (
@@ -56,7 +58,7 @@ export function CampView() {
         <h1 className="text-2xl font-black tracking-tight">Camp Blueprint</h1>
         <p className="text-sm text-white/50">Mentorship, on the Neuro-Mechanic&apos;s Blueprint. {assess ? <span className={certified ? 'text-emerald-300' : 'text-white/70'}>{STATUS_LABEL[assess.status] ?? assess.status}</span> : null}</p>
       </div>
-      <div className="mb-6 grid grid-cols-4 gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
+      <div className="mb-6 grid grid-cols-5 gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
         {tabs.map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setTab(key)} className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition ${tab === key ? 'bg-cyan-400/15 text-cyan-300' : 'text-white/60 hover:text-white'}`}>
             <Icon className="h-3.5 w-3.5" /> {label}
@@ -67,6 +69,7 @@ export function CampView() {
       {tab === 'plans' && <Plans plans={plans} me={me} certified={certified} onChange={refresh} />}
       {tab === 'session' && <SessionTab plans={plans.filter((p) => p.status === 'active' && p.facilitatorUserId === me)} onChange={refresh} />}
       {tab === 'templates' && <Templates templates={templates} plans={plans.filter((p) => p.facilitatorUserId === me)} certified={certified} onChange={refresh} />}
+      {tab === 'curriculum' && <Curriculum />}
     </main>
   );
 }
@@ -193,7 +196,7 @@ function Plans({ plans, me, certified, onChange }: { plans: Plan[]; me: string |
             {milestones.map((m, i) => (
               <div key={i} className="mb-1.5 flex gap-2"><input value={m.label} onChange={(e) => setMilestones((ms) => ms.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} className="flex-1 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white" aria-label={`Milestone ${i + 1}`} /><span className="self-center text-[11px] text-white/40">{m.sessions.length} session{m.sessions.length > 1 ? 's' : ''}</span></div>
             ))}
-            <button onClick={() => setMilestones((ms) => [...ms, { label: `Milestone ${ms.length + 1}`, sessions: [{ label: 'Session 1' }] }])} className="text-[11px] text-cyan-300">+ milestone</button>
+            <div className="flex gap-3"><button onClick={() => setMilestones((ms) => [...ms, { label: `Milestone ${ms.length + 1}`, sessions: [{ label: 'Session 1' }] }])} className="text-[11px] text-cyan-300">+ milestone</button><button onClick={() => setMilestones(arcMilestones())} className="text-[11px] text-cyan-300">Use the eight-week arc</button></div>
           </div>
           <button onClick={draft} disabled={!mentee || !goal.trim() || busy === 'draft'} className="flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-2 text-xs font-black text-black disabled:opacity-40">{busy === 'draft' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Target className="h-3.5 w-3.5" />} Draft plan</button>
         </div>
@@ -249,10 +252,21 @@ function SessionTab({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
     toast.success(`Session recorded · ${r.gamesAttached} game${r.gamesAttached === 1 ? '' : 's'} attached`); setNotes(''); await load(planId); await onChange();
   };
   if (!plans.length) return <p className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-xs text-white/60">No active plan you facilitate. Activate one on the Plans tab.</p>;
+  const plan = plans.find((p) => p.id === planId) ?? plans[0];
+  const week = weekOf(plan.lockedAt ?? plan.createdAt);
+  const arc = arcWeek(week);
+  const bridge = bridgePromptFor(week);
   return (
     <section className="space-y-4">
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
         <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white" aria-label="Plan">{plans.map((p) => <option key={p.id} value={p.id}>{p.goalText}</option>)}</select>
+        <div className={`rounded-lg border p-3 text-xs ${arc.plateau ? 'border-amber-400/40 bg-amber-400/10' : 'border-white/10 bg-white/[0.03]'}`} data-testid="camp-week">
+          <p className="font-semibold text-white/90">Week {week} of {ARC.length} — {arc.name}{arc.plateau ? ' · scheduled, not accidental' : ''}</p>
+          {arc.output && <p className="mt-1 text-white/60"><span className="text-cyan-300">Output:</span> {arc.output}</p>}
+          {arc.script.length > 0 && <ul className="mt-1.5 list-disc pl-4 text-white/70">{arc.script.map((l, i) => <li key={i}>“{l}”</li>)}</ul>}
+          <p className="mt-2 text-white/80"><span className="text-cyan-300">The Bridge, this week:</span> “{bridge}”</p>
+          <button type="button" onClick={() => setNotes((n) => n.startsWith('Bridge') ? n : `Bridge, week ${week}: ${n}`)} className="mt-1.5 rounded-lg border border-white/15 px-2.5 py-1 text-[11px]">Note the mentee&apos;s answer</button>
+        </div>
         <select value={modules} onChange={(e) => setModules(e.target.value)} className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white" aria-label="Lesson covered">
           {lessons.map((l) => <option key={l.ref} value={l.ref}>{l.ref} — {l.title}</option>)}
         </select>
@@ -329,6 +343,74 @@ function Templates({ templates, plans, certified, onChange }: { templates: Templ
         </div>
       ))}
       {!templates.length && <p className="text-xs text-white/50">No templates yet.</p>}
+    </section>
+  );
+}
+
+// ── Curriculum ─────────────────────────────────────────────────────────────
+// The owner's Camp Blueprint (docs/CAMP-BLUEPRINT.md), rendered from lib/camp/curriculum.
+function Curriculum() {
+  const [worksheet, setWorksheet] = useState<Record<string, string>>({});
+  const copyWorksheet = async () => {
+    const text = PATHWAY_FIELDS.map((f, i) => `${i + 1}. ${f.label}\n${worksheet[f.key]?.trim() || '—'}`).join('\n\n');
+    await navigator.clipboard?.writeText(`Pathway map\n\n${text}`).catch(() => undefined);
+    toast.success('Worksheet copied');
+  };
+  return (
+    <section className="space-y-5 text-sm">
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+        <p className="text-[11px] uppercase tracking-wider text-white/40">{PROGRAM.type}</p>
+        <h3 className="mt-1 text-base font-semibold">The thesis — say it out loud in week 1</h3>
+        {THESIS.map((t, i) => <p key={i} className="mt-2 text-white/75">{t}</p>)}
+        <p className="mt-3 text-xs text-white/50">Deliverable: {PROGRAM.deliverable}. Designed for replication: {PROGRAM.replication}.</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {TRACKS.map((t) => (
+          <div key={t.key} className={`rounded-xl border p-4 ${t.key === 'bridge' ? 'border-cyan-400/30 bg-cyan-400/5' : 'border-white/10 bg-white/[0.02]'}`}>
+            <p className="text-[11px] uppercase tracking-wider text-white/40">{t.loop} · {t.cadence}</p>
+            <h4 className="mt-1 font-semibold">{t.name}</h4>
+            <p className="mt-1 text-xs text-white/65">{t.body}</p>
+          </div>
+        ))}
+      </div>
+      <div>
+        <h3 className="mb-2 text-base font-semibold">Eight-week arc</h3>
+        <div className="space-y-2">
+          {ARC.map((w) => (
+            <details key={w.week} className={`rounded-xl border p-4 ${w.plateau ? 'border-amber-400/40 bg-amber-400/5' : 'border-white/10 bg-white/[0.02]'}`}>
+              <summary className="cursor-pointer font-semibold">Week {w.week} — {w.name}{w.plateau ? <span className="ml-2 rounded bg-amber-400/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-amber-300">the most important session</span> : null}</summary>
+              {w.output && <p className="mt-2 text-xs text-white/70"><span className="text-cyan-300">Output:</span> {w.output}</p>}
+              {w.body.map((b, i) => <p key={i} className="mt-2 text-xs text-white/65">{b}</p>)}
+              {w.script.length > 0 && <div className="mt-2 text-xs"><p className="text-white/50">Facilitator script</p><ul className="mt-1 list-disc pl-4 text-white/75">{w.script.map((l, i) => <li key={i}>“{l}”</li>)}</ul></div>}
+              {w.trap && <p className="mt-2 text-xs text-amber-200/90"><span className="font-semibold">Trap to avoid:</span> {w.trap}</p>}
+            </details>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+        <h3 className="text-base font-semibold">Pathway Map Protocol</h3>
+        <p className="mt-1 text-xs text-white/60">A facilitator cannot improvise the path to every career. Run this with the mentee — them learning to map a path is better content than you already knowing it. Your job is to make sure all six get filled, not to fill them.</p>
+        <div className="mt-3 space-y-3">
+          {PATHWAY_FIELDS.map((f, i) => (
+            <label key={f.key} className="block text-xs text-white/70">{i + 1}. <span className="font-semibold text-white/90">{f.label}</span> — {f.prompt}
+              <textarea value={worksheet[f.key] ?? ''} onChange={(e) => setWorksheet((w) => ({ ...w, [f.key]: e.target.value }))} rows={2} className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white" aria-label={f.label} />
+            </label>
+          ))}
+        </div>
+        <button type="button" onClick={copyWorksheet} className="mt-3 flex items-center gap-2 rounded-lg border border-white/15 px-3 py-1.5 text-xs"><Copy className="h-3.5 w-3.5" /> Copy worksheet</button>
+      </div>
+      <div className="rounded-xl border border-cyan-400/30 bg-cyan-400/5 p-4">
+        <h3 className="text-base font-semibold">The Bridge — weekly transfer prompts</h3>
+        <p className="mt-1 text-xs text-white/60">Rotate these. The mentee answers, not the facilitator. The Session tab shows the week&apos;s prompt.</p>
+        <ul className="mt-2 list-disc pl-4 text-xs text-white/75">{BRIDGE_PROMPTS.map((p, i) => <li key={i} className="mt-1">“{p}”</li>)}</ul>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4"><h4 className="font-semibold">Honest and reportable</h4><ul className="mt-2 list-disc pl-4 text-xs text-white/70">{MEASURES.report.map((m, i) => <li key={i}>{m}</li>)}</ul></div>
+        <div className="rounded-xl border border-rose-400/30 bg-rose-400/5 p-4"><h4 className="font-semibold">Do not claim</h4><ul className="mt-2 list-disc pl-4 text-xs text-white/70">{MEASURES.neverClaim.map((m, i) => <li key={i}>{m}</li>)}</ul></div>
+      </div>
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4"><h4 className="font-semibold">Facilitator standards</h4><ul className="mt-2 list-disc pl-4 text-xs text-white/70">{STANDARDS.map((m, i) => <li key={i} className="mt-1">{m}</li>)}</ul></div>
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4"><h4 className="font-semibold">Replication package</h4><ol className="mt-2 list-decimal pl-4 text-xs text-white/70">{REPLICATION.map((m, i) => <li key={i} className="mt-1">{m}</li>)}</ol><p className="mt-2 text-xs text-white/50">The lookup table of pre-built pathway maps is a growing asset, not a prerequisite. Every cycle run adds maps to it.</p></div>
+      <p className="text-[11px] text-white/40">Camp Blueprint {CAMP_BLUEPRINT_VERSION} · source: docs/CAMP-BLUEPRINT.md</p>
     </section>
   );
 }
