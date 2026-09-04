@@ -495,7 +495,9 @@ for (const [id, bk] of Object.entries(BACKDROPS)) {
 const VENUE_MAP_KEYS: Record<string, string> = {
   // venice-blacktop is intentionally NOT mounted: the scan's painted court
   // sits off the play area with no clean offset candidate (see map-data.ts).
-  basketball_3v3: 'venice-blue-court',
+  // ship pass 4 (2026-09-04): every basketball venue stands on the scanned Venice court —
+  // the rim sits at world origin in all four specs, where the map's painted baseline hoop was tuned to land
+  basketball_3v3: 'venice-blue-court', basketball_dunk: 'venice-blue-court', basketball_h2h: 'venice-blue-court', court_carnival: 'venice-blue-court',
   skateboarding: 'venice-skatepark',
   tennis: 'tennis-court',
   soccer: 'soccer-stadium',

@@ -171,6 +171,9 @@ for (const mesh of root.listMeshes()) for (const prim of mesh.listPrimitives()) 
     mat.setName(mat.getName().replace(/\.\d+$/, ''));
     // MakeHuman hair is an alpha-masked card mesh: a cutout sorts and lights like geometry, a blend does not
     if (mat.getName().startsWith('hair.')) { mat.setAlphaMode('MASK').setAlphaCutoff(0.5).setDoubleSided(true); }
+    // garments too: Blender exported them BLEND, and Babylon's transparency pass sorted the
+    // shorts behind the body in the modes (measured 2026-09-04: the hero played bare-legged)
+    else { mat.setAlphaMode('MASK').setAlphaCutoff(0.5); }
     continue;
   }
   const n = nameFor(mesh.getName(), mat.getName()); if (n) mat.setName(n);

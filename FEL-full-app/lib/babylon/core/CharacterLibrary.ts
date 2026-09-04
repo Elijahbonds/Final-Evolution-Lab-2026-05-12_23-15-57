@@ -24,6 +24,7 @@ import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
 import { rosterUrlFor, normalizeHeroUrl } from './athleteRoster';
 import { applySkinShading } from './skinShading';
+import { applyKit } from './kit';
 import { applyHairStyle, DEFAULT_HAIR_STYLE, HAIR_KEY_TO_STYLE } from './hairStyles';
 import { mountSecondaryMotion, type SecondaryMotionHandle } from '../anim/SecondaryMotion';
 import { mountFootPlanting } from '../anim/FootPlanting';
@@ -221,6 +222,9 @@ export const CharacterLibrary = {
     // lacks them, and mobile gets the cheaper variants.
     const tier: QualityTier = (scene.metadata?.felTier as QualityTier | undefined) ?? 'desktop';
     applySkinShading(meshes, scene, tier);
+    // ship pass 4: a kit body carries every garment; show one per slot even with no identity
+    // (anonymous dev captures, guests, rivals) — the identity pipe re-applies the player's own choice below
+    applyKit(meshes, null);
     // Phase 3: the forge ships every hair style; show the default, hide the
     // rest. The identity pipe re-applies the player's own choice below.
     // The loader's root is a synthetic __root__; the forge's Armature (which
