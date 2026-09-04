@@ -49,7 +49,7 @@ than assumed in.
 |---|---|---|
 | C1 | Registry, enabled, routed, hosted | ✅ |
 | C2 | Touch overlay names the mode's verbs | ⚠️ **D3** — one slot of four |
-| C3 | Controller Link schema | ❌ **D4** — no entry; a phone cannot join |
+| C3 | Controller Link schema | ✅ entry present in `lib/controller-link/schemas/registry.ts` (the ❌ D4 here was stale; verified 2026-09-03) |
 | C4 | Boots on a phone | ✅ **fixed** — see the volleyball sign-off |
 | C5 | Camera holds the rally | ✅ 0 `[FEL-FRAME]` |
 

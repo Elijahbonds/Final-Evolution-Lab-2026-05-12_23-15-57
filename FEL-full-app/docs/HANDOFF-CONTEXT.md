@@ -312,3 +312,17 @@ stand:
   does `preview_start fel-dev` (reuses a live server), warms `/dev/mode/dunk`,
   `/dev/mode/onevone` and `/play/skateboard`, then runs the gauntlet — the
   warm-up avoids the cold-compile first-frame "hero off-screen" line.
+
+- **Ship pass 2 (2026-09-03, `docs/SHIP-PASS-2.md`).** Launch readiness. The
+  gauntlet now has a SHIPPING-ROUTE form (`scripts/gauntlet-play.sh`, 20
+  Babylon `/play` routes, logged in; `/play/dunkduel` is PROVE IT, the owner's
+  real-footage contest) and a PRODUCTION form (`scripts/prod-serve.sh build|
+  start|stop` → :3004, then `BASE=http://localhost:3004`). Fixed on the way:
+  character containers cached per SCENE (a disposed scene's container crashed
+  the next spawn); the identity watchdog judges compilability after 60 rendered
+  frames; the game shell names an unreachable server; a lost WebGL context
+  becomes an error state; the session carries `role` (every `/api/admin/*` had
+  answered 401 to everyone). Diagnostics leave the browser as `game_diag`
+  analytics events; owners read `/api/admin/diag`. Owner directives for pass 3
+  (human models, mocap, world/camera) are researched in
+  `docs/HUMAN-MODEL-RESEARCH.md`.
