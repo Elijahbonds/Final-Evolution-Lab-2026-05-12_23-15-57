@@ -63,6 +63,10 @@ if (THROTTLE > 1) {
   const cdp = await p.context().newCDPSession(p);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
 }
+// time-to-playing (ship pass 2, Phase 3): from navigation to the harness's
+// "→ playing" line, cold or warm depending on the server's state.
+const t0 = Date.now(); let ttp = -1;
+p.on('console', (m) => { if (ttp < 0 && /FEL-READY\] \w+ → playing/.test(m.text())) ttp = Date.now() - t0; });
 const logs: string[] = [];
 p.on('console', (m) => { if (m.type() === 'error' || /FEL-FRAME|MISSING CLIP|FEL-IDENT|FEL-CAM/.test(m.text())) logs.push(`[${m.type()}] ${m.text().slice(0, Number(process.env.LOG_CHARS ?? 170))}`); });
 p.on('pageerror', (e) => logs.push(`[pageerror] ${e.message.slice(0, Number(process.env.LOG_CHARS ?? 170))}`));
@@ -187,6 +191,7 @@ const cam = logs.filter((l) => /FEL-CAM/.test(l));
 if (cam.length) console.log(`${NAME} cam   : overhead fallback x${cam.length} (designed degradation, not counted)`);
 const errs = logs.filter((l) => ((l.startsWith('[error]') || l.startsWith('[pageerror]'))
   && !/401 \(Unauthorized\)/.test(l) && !/FEL-FRAME/.test(l)) || /FEL-IDENT.*never ready/.test(l));
+console.log(`${NAME} ttp   : ${ttp >= 0 ? (ttp / 1000).toFixed(1) + ' s' : 'n/a'}`);
 console.log(`${NAME} FEL-FRAME ${frame.length} | MISSING CLIP ${miss.length} | errors ${errs.length}${MOBILE_TIER ? ' | tier mobile' : ''}${THROTTLE > 1 ? ` | cpu x${THROTTLE}` : ''}`);
 if (process.env.LOGIN === '1') console.log(`${NAME} ident : ${ident.length ? ident.map((l) => l.replace(/^\[\w+\] /, '')).join(' | ') : 'no FEL-IDENT line (identity did not run?)'}`);
 for (const l of [...new Set([...frame, ...miss, ...errs])].slice(0, 4)) console.log('   ·', l);
