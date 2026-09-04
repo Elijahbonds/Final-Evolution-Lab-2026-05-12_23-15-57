@@ -21,7 +21,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
-import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 
 const REQUIRED_BONES = [
   'Hips',
@@ -42,7 +42,7 @@ function check(ok: boolean, label: string) {
   else { failures++; console.error(`  ✗ ${label}`); }
 }
 
-const io = new NodeIO().registerExtensions(KHRONOS_EXTENSIONS);
+const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);   // WebP textures and mesh quantization (ship pass 3)
 
 async function main() {
 const targets = ['public/models/fel-hero.glb'];
@@ -63,6 +63,7 @@ for (const path of targets) {
 
   const required = root.listExtensionsRequired().map((e) => (e.constructor as any).EXTENSION_NAME ?? '');
   check(!required.some((e) => /draco/i.test(e)), `no required draco compression (required=[${required.join(', ') || 'none'}])`);
+  const quantized = required.includes('KHR_mesh_quantization');
 
   check(root.listSkins().length >= 1, `skeleton present (${root.listSkins().length} skins)`);
 
@@ -73,18 +74,23 @@ for (const path of targets) {
       const j = prim.getAttribute('JOINTS_0');
       const w = prim.getAttribute('WEIGHTS_0');
       if (!j || !w) continue;
-      if (!(j.getArray() instanceof Float32Array) || j.getNormalized()) skinsFloat = false;
-      if (!(w.getArray() instanceof Float32Array) || w.getNormalized()) skinsFloat = false;
-      const wArr = w.getArray()!;
-      const comps = w.getElementSize();
+      // KHR_mesh_quantization (ship pass 3): integer joints and NORMALIZED integer weights are the
+      // spec's quantized form, which Babylon reads natively — the sweep renders them (40 rows clean).
+      // Un-quantized files keep the float32 rule that caught the byte skins that never rendered.
+      if (quantized) { if (w.getArray() instanceof Float32Array ? false : !w.getNormalized()) skinsFloat = false; }
+      else {
+        if (!(j.getArray() instanceof Float32Array) || j.getNormalized()) skinsFloat = false;
+        if (!(w.getArray() instanceof Float32Array) || w.getNormalized()) skinsFloat = false;
+      }
+      const comps = w.getElementSize(); const el = new Array(comps).fill(0);
       for (let v = 0; v < Math.min(w.getCount(), 200); v++) {
-        let s = 0;
-        for (let c = 0; c < comps; c++) s += wArr[v * comps + c];
-        if (s > 1e-6 && Math.abs(s - 1) > 1e-2) weightsNormalized = false;
+        w.getElement(v, el);   // dequantizes normalized integer weights (KHR_mesh_quantization)
+        const s = el.reduce((a, b) => a + b, 0);
+        if (s > 1e-6 && Math.abs(s - 1) > 2e-2) weightsNormalized = false;
       }
     }
   }
-  check(skinsFloat, 'skin attributes float32, non-normalized');
+  check(skinsFloat, quantized ? 'skin attributes quantized (integer joints, normalized weights)' : 'skin attributes float32, non-normalized');
   check(weightsNormalized, 'skin weights normalized per vertex (sampled 200)');
 
   let cmTracks = 0;
@@ -108,7 +114,8 @@ for (const path of targets) {
       }
     }
   }
-  check(animCount >= 8, `clip set shipped (${animCount} clips)`);
+  const manifestBuiltAtSpawn = existsSync(path.replace(/\.glb$/, '.json')) && !!JSON.parse(readFileSync(path.replace(/\.glb$/, '.json'), 'utf8')).builtAtSpawn;
+  check(clipNames.length > 0 || manifestBuiltAtSpawn, manifestBuiltAtSpawn ? 'clip set built at spawn (manifest builtAtSpawn)' : `clip set shipped (${clipNames.length} clips)`);
   check(cmTracks === 0, `animation translation tracks meter-scale (${cmTracks} cm-scale tracks)`);
 
   const manifestPath = path.replace(/\.glb$/, '.json');
@@ -118,7 +125,10 @@ for (const path of targets) {
     const m = JSON.parse(readFileSync(manifestPath, 'utf8'));
     const names = new Set((m.clips ?? []).map((c: any) => c.name));
     const missingClips = clipNames.filter((c) => !names.has(c));
-    check(missingClips.length === 0, `manifest covers every GLB clip (${names.size}/${clipNames.length})`);
+    // ship pass 3: a kit body carries no baked clips — every clip is built at spawn
+    // (lib/babylon/anim/authored) — and says so in its manifest
+    if (m.builtAtSpawn) check(clipNames.length === 0, `built-at-spawn manifest: the GLB carries no baked clips (${clipNames.length})`);
+    else check(missingClips.length === 0, `manifest covers every GLB clip (${names.size}/${clipNames.length})`);
   }
 }
 

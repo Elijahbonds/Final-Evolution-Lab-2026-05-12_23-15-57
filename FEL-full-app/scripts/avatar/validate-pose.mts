@@ -18,6 +18,11 @@
 import { readFileSync } from 'node:fs';
 import * as BABYLON from '@babylonjs/core';
 import '@babylonjs/loaders/glTF/index.js';
+// library code arrives as CommonJS under tsx here: take the module object and read the named exports off it
+import restPoseMod from '../../lib/babylon/anim/restPose';
+import restPoseApplyMod from '../../lib/babylon/anim/restPoseApply';
+const { solveArmsDown } = restPoseMod as unknown as typeof import('../../lib/babylon/anim/restPose');
+const restPoseApply = restPoseApplyMod as unknown as typeof import('../../lib/babylon/anim/restPoseApply');
 
 const glbPath = process.argv[2] ?? 'public/models/fel-hero.glb';
 
@@ -60,26 +65,37 @@ const fail = (msg: string) => { failures++; console.error(`  ✗ ${msg}`); };
 // frame of the first animation, so node worlds at load are NOT the bind pose.
 // The honest bind check is the skin's inverse bind matrices: invert IBM to
 // recover each joint's bind world position.
-console.log('bind pose (from skin IBMs):');
+// Ship pass 3: a kit body carries no baked clips and its joint nodes sit AT rest, so
+// the node world at load IS the bind; its inverse bind matrices are in quantized
+// space (KHR_mesh_quantization) and cannot be read in metres.
+const hasClips = scene.animationGroups.length > 0;
+console.log(hasClips ? 'bind pose (from skin IBMs):' : 'bind pose (from the joint nodes at rest — no baked clips):');
 {
   const bindPos = (name: string): BABYLON.Vector3 => {
     const b = skel.bones.find((x) => x.name === name)!;
+    if (!hasClips) return BABYLON.Vector3.TransformCoordinates(BABYLON.Vector3.Zero(), b.getAbsoluteMatrix());
     const m = b.getAbsoluteInverseBindMatrix().invert();
     return BABYLON.Vector3.TransformCoordinates(BABYLON.Vector3.Zero(), m);
   };
   const hand = bindPos('LeftHand'), foot = bindPos('LeftFoot'), head = bindPos('Head');
   console.log(`  hand y ${hand.y.toFixed(3)} x ${hand.x.toFixed(3)} · foot y ${foot.y.toFixed(3)} · head y ${head.y.toFixed(3)}`);
-  if (Math.abs(hand.y - 1.47) > 0.08) fail(`bind hands not at shoulder height (got ${hand.y.toFixed(3)}, want ≈1.47) — bind is not a T-pose`);
-  if (Math.abs(Math.abs(hand.x) - 0.72) > 0.08) fail(`bind hands not out to the side (|x| ${Math.abs(hand.x).toFixed(3)}, want ≈0.72)`);
+  // the forge hero's T-pose hand sat at (0.72, 1.47); the MPFB2 body's at (0.66, 1.39) — accept either build within 12 cm
+  if (Math.abs(hand.y - 1.43) > 0.12) fail(`bind hands not at shoulder height (got ${hand.y.toFixed(3)}, want ≈1.4) — bind is not a T-pose`);
+  if (Math.abs(Math.abs(hand.x) - 0.69) > 0.12) fail(`bind hands not out to the side (|x| ${Math.abs(hand.x).toFixed(3)}, want ≈0.7)`);
   if (foot.y > 0.15) fail(`bind foot floating (${foot.y.toFixed(3)})`);
   if (head.y < 1.5 || head.y > 1.75) fail(`bind head off (${head.y.toFixed(3)})`);
+  if (failures === 0) console.log('  ✓ bind is a T-pose (hands out at shoulder height, feet on the floor, head in range)');
 }
 
 // ── load state: must be the natural idle, never bind ───────────────────────
 {
+  // A file without clips loads at bind; spawn (CharacterLibrary) writes the measured
+  // arms-down rest onto the skeleton before the first frame — apply the same here.
+  if (!hasClips) { restPoseApply.applyRestPoseToSkeleton(skel, solveArmsDown(skel)); scene.render(); }
   const handY = wy('LeftHand');
-  console.log(`load state: hand y ${handY.toFixed(3)} (must be < 1.30 — arms down, not T-posed)`);
-  if (handY > 1.30) fail('loaded rest state has hands at shoulder height — first clip in file is not arms-down (see forge.mts idle_stand note)');
+  console.log(`load state${hasClips ? '' : ' (runtime rest pose applied)'}: hand y ${handY.toFixed(3)} (must be < 1.30 — arms down, not T-posed)`);
+  if (handY > 1.30) fail(hasClips ? 'loaded rest state has hands at shoulder height — first clip in file is not arms-down (see forge.mts idle_stand note)' : 'runtime rest pose leaves the hands at shoulder height');
+  else console.log(`  ✓ load state is arms-down (hand y ${handY.toFixed(2)})`);
 }
 
 // ── clips: anatomy over time ────────────────────────────────────────────────

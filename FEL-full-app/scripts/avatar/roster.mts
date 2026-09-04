@@ -1,4 +1,8 @@
 /**
+ * ARCHIVED 2026-09-04 (ship pass 3): the roster now comes from the kit bodies —
+ * scripts/avatar/roster-from-kit.mts. This script bakes variants of the FORGE
+ * hero, which lives on under public/models/_forge/ for A/B and rollback.
+ *
  * FEL ATHLETE ROSTER — turns the pipeline-cleaned template into N distinct
  * athletes so modes stop fielding clones.
  *

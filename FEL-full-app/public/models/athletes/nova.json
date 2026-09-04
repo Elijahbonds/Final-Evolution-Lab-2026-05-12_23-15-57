@@ -1,57 +1,9 @@
 {
   "fps": 30,
-  "clips": [
-    {
-      "name": "idle_stand",
-      "loop": true,
-      "seconds": 3
-    },
-    {
-      "name": "run",
-      "loop": true,
-      "seconds": 0.6
-    },
-    {
-      "name": "walk",
-      "loop": true,
-      "seconds": 1
-    },
-    {
-      "name": "guard",
-      "loop": true,
-      "seconds": 1.2
-    },
-    {
-      "name": "jab",
-      "loop": false,
-      "seconds": 0.5
-    },
-    {
-      "name": "hook",
-      "loop": false,
-      "seconds": 0.6
-    },
-    {
-      "name": "uppercut",
-      "loop": false,
-      "seconds": 0.7
-    },
-    {
-      "name": "roundhouse",
-      "loop": false,
-      "seconds": 0.8
-    },
-    {
-      "name": "high_kick",
-      "loop": false,
-      "seconds": 0.7
-    },
-    {
-      "name": "jumpshot",
-      "loop": false,
-      "seconds": 0.9
-    }
-  ],
+  "clips": [],
+  "builtAtSpawn": true,
   "athlete": "nova",
-  "note": "violet kit"
+  "sex": "female",
+  "note": "violet kit",
+  "source": "public/models/candidates/fel-kit-female.glb"
 }
