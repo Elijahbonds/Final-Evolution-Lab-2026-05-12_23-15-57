@@ -269,3 +269,16 @@ Appended every ~10 minutes while the run is live; see also `docs/BACKLOG.md` for
   budget test 2 FAILED of 4 on today's stub (`measuredAt` null, no modes); full suite 39 files / 253 tests intact plus
   the 6 new `skinMapUrl` cases red until `lane/perf` exports the function. Reusable: **red-first hand-off** — a lane
   commits a failing test against a frozen contract and names in the message which other lane turns it green.
+- **15:12** — `lane/verify` `62e9777` "Gate 0 report for 2026-09-04": one file, `docs/GATE0-REPORT-2026-09-04.md`
+  (+156), owned. Verdict PASS on contract 5 as `scripts/gate0-rig-tests.ts` enforces it (58 checks on the procedural
+  default rig), with every number next to the command that printed it. Reusable:
+  - **A gate report is a command table** — `| # | command | exit | printed result |`, ten rows, nothing estimated; the
+    rig-test inventory is found by `grep -rl 'mixamorig'`, not remembered. Pattern for any Nexus gate report.
+  - **Measure the gate's blind spots, not just its verdict** — the report shows `Gate0Validator.validateSkeleton` is
+    never run against a GLB skeleton anywhere in the suite (every shipped body is 22 joints, 0 prefixed), and that
+    `hasTPose` is a root-XZ check while the pose gate measures bind vs load state. A contract can PASS on the rig the
+    test builds and say nothing about the rigs the app renders — the extraction should make the Gate 0 validator run
+    on the LOADED skeleton (the `gateContainerRig` path) so the two Gate 0s become one.
+  - **A ratio gate needs a minimum row count** — with two rows the 2×-median rule cannot flag the 168 MB mode
+    (median 104, ceiling 208); a third row near 40 MB drops the median to 40 and trips it. Freeze a minimum mode count
+    into `perf-budget-tests.ts` (or the contract) before the table is trusted.

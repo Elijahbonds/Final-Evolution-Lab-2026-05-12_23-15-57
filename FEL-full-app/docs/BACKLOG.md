@@ -68,3 +68,17 @@ orchestrator.
 - **15:09** `lane/verify` `bd3284e` — did NOT (yet) write `docs/GATE0-REPORT-2026-09-04.md` (owned, in the acceptance row
   "Gate 0 PASS/FAIL reported"). Vitest on the lane is deliberately red (6 `skinMapUrl` cases) until perf lands — the
   integration must not read that red as a regression. Belongs to the orchestrator's integration step.
+- **15:12** `lane/verify` `62e9777` — **Two Gate 0s.** Contract 5 (Mixamo 65-bone, `mixamorig` prefix) and
+  `docs/AGENT-OPERATING-RULES.md` line 9/17 (22-bone unprefixed FEL spec; Mixamo is an import format normalised at
+  load) describe different gates; `Gate0Validator.validateSkeleton` never runs against a GLB skeleton, so every shipped
+  body (five GLBs, 22 joints, 0 prefixed) would FAIL it if it did. Verify lane changed nothing per "no rig migration
+  this run". Decision belongs to the orchestrator/owner: which Gate 0 is the contract. Files:
+  `docs/CONTRACTS-PASS4-RUN.md` §5, `docs/AGENT-OPERATING-RULES.md`, `lib/babylon/modes/Gate0Validator.ts`,
+  `scripts/gate0-rig-tests.ts`.
+- **15:12** `lane/verify` `62e9777` — `check-bind.mts` skips ALL three shipped/candidate GLBs as quantized, so the
+  mesh-vs-bind joint check (added to the Phase 1 gate in pass 3) currently runs on nothing that ships; the rig suites
+  on both kit bodies are the substitute. Belongs to `scripts/avatar/check-bind.mts` (an un-quantized source check in
+  `roster-from-kit.mts` / `import-mpfb.mts` before quantize) — extends B23/B26 area.
+- **15:12** `lane/verify` `62e9777` — the 2×-median budget rule cannot trip on a two-row table (median 104 MB,
+  ceiling 208 MB > dunk's 168 MB). Gate only as strong as the perf lane's row count; the contract names no minimum.
+  Belongs to `scripts/perf-budget-tests.ts` (verify) / `docs/CONTRACTS-PASS4-RUN.md` §3 (orchestrator).
