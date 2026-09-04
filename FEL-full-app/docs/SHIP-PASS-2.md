@@ -42,4 +42,6 @@ Standing rules carry over: no Nexus/Cell work (SHIP firewall), material name
 contract untouched, never edit imported code while a sweep runs, `build:check`
 never bare `build` with the dev server up, sweeps at phase boundaries.
 
+Plan page: https://claude.ai/code/artifact/06ac4116-487a-472f-9378-07e2834ccebb
+
 ## Findings log
