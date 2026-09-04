@@ -100,3 +100,17 @@ orchestrator.
   rule); on every branch today that table is the null stub, so the checklist's texture-budget row is FAIL until the
   perf lane's sweep writes it — the RC gate table is red by design until integration orders perf → verify → rc.
   Belongs to the orchestrator's integration step.
+- **15:26** `lane/rc` `488d5aa` — did NOT run the remaining 10 `/play/*` routes of `gauntlet-play.sh` (threepoint,
+  karate-vs, mixedcombat, surf, snowboard, big-air, gymnastics, baseball, soccer, carnival) against :3006; did NOT
+  measure the mobile quality tier against production (the `TIER=mobile` rows are `/dev/mode` only); did NOT measure fps
+  on any shipping route (no HUD on the shipped page); did NOT update `docs/SHIP-READINESS.md` (not in its file set).
+  Belongs to `scripts/gauntlet-play.sh` (a production-mode run at integration), `docs/SHIP-READINESS.md` (orchestrator).
+- **15:26** `lane/rc` `488d5aa` — `scripts/gauntlet.sh` cannot serve as a production sweep (31 of its rows target the dev
+  harness); it needs either a `BASE`-aware mode that switches to the play routes or a documented "dev server only" line
+  at its head. Belongs to `scripts/gauntlet.sh` (shared file — orchestrator).
+- **15:26** `lane/rc` `488d5aa` — skateboard printed two `[FEL-IDENT] ready` lines on the production route ("recorded, not
+  explained"): identity applied twice, or two spawns. Belongs to `lib/babylon/core/playerIdentity.ts` /
+  `lib/babylon/modes/SkateRunMode.ts`.
+- **15:26** `lane/rc` `488d5aa` — production build carries the pre-existing MediaPipe "critical dependency" warning via
+  `components/facescan/face-scan-capture.tsx` → `components/closet-view.tsx`; `/closet` and `/dev/mode/[key]` are 2 MB
+  first-load chunks. Belongs to `components/closet-view.tsx` (a dynamic import of the face-scan capture).

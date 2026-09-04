@@ -327,3 +327,17 @@ Appended every ~10 minutes while the run is live; see also `docs/BACKLOG.md` for
   commit — still in the working tree with §3–6 pending. Reusable: the changelog is **grouped by pass and phase from
   the git history, each line carrying the measured proof its commit recorded**, and marks phases OPEN / IN THIS RUN
   instead of omitting them — a Nexus changelog convention worth freezing (a line with no number says so).
+- **15:26** — `lane/rc` `488d5aa` "the release-candidate record": one file, `docs/RC-2026-09-04.md` (+152), owned;
+  Risk LOW. Measured: 10/10 logged-in `/play/*` rows `FEL-FRAME 0 | MISSING CLIP 0 | errors 0` with identity ready and
+  time-to-loaded 1.1–2.0 s (under the 3 s warm budget); 7/7 phone touch rows `errors: 0`; no baked-map drift; the
+  rc-checklist output pasted verbatim (2 gates failing, both expected: the null budget table and the mid-edit tree).
+  Reusable:
+  - **The dev harness is dark in production, so the production sweep is the play-route set** — `scripts/gauntlet.sh`'s
+    21 harness + 3 login + 7 mobile-tier rows all target `/dev/mode/*`, which 404s when `NODE_ENV !== 'development'`;
+    against :3006 each row burned ~60 s to `NO RESULT` before the run was stopped (four rows recorded, file kept as
+    `harness-aborted-run-…`). Pass 2 had reached the same conclusion (`scripts/gauntlet-play.sh`). Nexus rule: a sweep
+    script declares which server class it can run against; the RC gate uses the shipping-route sweep.
+  - **An RC record has a "Not done in this lane" section** with the reason for each omission (impossible by design /
+    not in the file set / orchestrator's step) — the honest complement to the gate table.
+  - `perf` reads `n/a` on shipping routes because the fps/draw readout is the dev HUD — fps on the shipped page is
+    unmeasured. For the extraction: the perf sample must have a production-safe channel (`__FEL_DEV__` is dev-only).
