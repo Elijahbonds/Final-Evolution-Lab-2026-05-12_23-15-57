@@ -47,7 +47,7 @@ describe('golf', () => {
   });
   it('swing: hands over the right shoulder at the top, high left at the finish', () => {
     const g = fresh(() => buildGolfSwing(scene, sk)!);
-    at(g, 0.35); const top = pos('RightHand');
+    at(g, 0.35); const top = pos('RightHand'); expect(pos('RightArm').z).toBeLessThan(pos('LeftArm').z);   // chest turned away from the ball
     expect(top.y).toBeGreaterThan(1.5); expect(top.x).toBeGreaterThan(0.1);
     at(g, 0.55); expect(pos('RightHand').y).toBeLessThan(1.05);   // back down through the ball
     at(g, 0.88); const fin = pos('RightHand');
@@ -61,7 +61,7 @@ describe('tennis', () => {
   });
   it('forehand: taken back, contact out front, wrapped left', () => {
     const g = fresh(() => buildTennisSwing(scene, sk)!);
-    at(g, 0.02); expect(pos('RightHand').z).toBeLessThan(-0.1);
+    at(g, 0.02); expect(pos('RightHand').z).toBeLessThan(-0.1); expect(pos('RightArm').z).toBeLessThan(-0.05);   // the racket shoulder turns BACK
     at(g, 0.3); const c = pos('RightHand'); expect(c.z).toBeGreaterThan(0.25); expect(c.x).toBeGreaterThan(0.2);
     at(g, 0.58); expect(pos('RightHand').x).toBeLessThan(-0.1);
   });

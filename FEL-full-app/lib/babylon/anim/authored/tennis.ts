@@ -1,75 +1,53 @@
-// Tennis (Phase 3 clips, ship pass 2026-09-03). The net sport reused the
-// jumpshot as its swing. Rig-solved hands, arms on the measured rest.
+// Tennis (Phase 3 clips, 2026-09-03) — RE-AUTHORED as pose targets (ship pass 3,
+// rung 1): torso keys in degrees, hands as world-axis metres from the root,
+// fitted at build time by the two-bone solver so one authoring plays on any
+// body that passes Gate 0. The targets are the positions the previous
+// offset-authored form was solved to, so the shapes are unchanged.
 //
 //   tennis_ready — split-step bounce, racket hand front-right (loop)
 //   tennis_swing — forehand: take-back, contact out front, wrap over the left shoulder
 //   tennis_serve — trophy, contact overhead, follow through low left
+// Yaw convention (measured 2026-09-03): +yaw turns the RIGHT shoulder FORWARD (+z).
+// A right-hander's backswing/take-back therefore keys NEGATIVE yaw so the racket
+// shoulder goes back and the target stays inside the arm's reach.
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
-import { solveArmsDown, buildQuatClip, withOffset, eulerQ, type RestPose } from '../restPose';
+import { buildPoseClip, type Deg3 } from '../poseClip';
 
-const restCache = new WeakMap<Skeleton, RestPose>();
-function restFor(sk: Skeleton): RestPose {
-  let r = restCache.get(sk);
-  if (!r) { r = solveArmsDown(sk, 72); restCache.set(sk, r); }
-  return r;
-}
 export const TENNIS_CLIPS = ['tennis_ready', 'tennis_swing', 'tennis_serve'] as const;
+type V3 = [number, number, number];
+
+const RACKET_READY: V3 = [0.32, 1.03, 0.27];
+const FREE_READY: V3 = [0.06, 1.09, 0.29];
 
 export function buildTennisReady(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const r = restFor(sk); const la = r.get('LeftArm'), ra = r.get('RightArm'), lf = r.get('LeftForeArm'), rf = r.get('RightForeArm');
-  if (!la || !ra || !lf || !rf) return null;
   const D = 0.8;
-  return buildQuatClip(scene, sk, 'tennis_ready', D, {
-    Hips: [[0, eulerQ(0, 0, 0)], [D, eulerQ(0, 0, 0)]],
-    Spine: [[0, eulerQ(14, 0, 0)], [D / 2, eulerQ(16, 0, 0)], [D, eulerQ(14, 0, 0)]],
-    LeftUpLeg: [[0, eulerQ(-22, 0, 14)], [D / 2, eulerQ(-26, 0, 14)], [D, eulerQ(-22, 0, 14)]],
-    RightUpLeg: [[0, eulerQ(-22, 0, -14)], [D / 2, eulerQ(-26, 0, -14)], [D, eulerQ(-22, 0, -14)]],
-    LeftLeg: [[0, eulerQ(34, 0, 0)], [D / 2, eulerQ(40, 0, 0)], [D, eulerQ(34, 0, 0)]],
-    RightLeg: [[0, eulerQ(34, 0, 0)], [D / 2, eulerQ(40, 0, 0)], [D, eulerQ(34, 0, 0)]],
-    // racket hand (0.32, 1.03, 0.27); free hand on the throat (0.06, 1.09, 0.29)
-    // solved under spine 14: racket hand (0.31, 0.99, 0.30), free hand (0.05, 1.04, 0.31)
-    RightArm: [[0, withOffset(ra, 0, 30, 0)], [D, withOffset(ra, 0, 30, 0)]],
-    RightForeArm: [[0, withOffset(rf, 0, 40, 0)], [D, withOffset(rf, 0, 40, 0)]],
-    LeftArm: [[0, withOffset(la, 0, -70, -40)], [D, withOffset(la, 0, -70, -40)]],
-    LeftForeArm: [[0, withOffset(lf, 0, 0, 0)], [D, withOffset(lf, 0, 0, 0)]],
-  }, [[0, -0.06], [D / 2, -0.09], [D, -0.06]]);
+  const legs = (knee: number): Record<string, Deg3> => ({ LeftUpLeg: [-22 - (knee - 34) * 0.6, 0, 14], RightUpLeg: [-22 - (knee - 34) * 0.6, 0, -14], LeftLeg: [knee, 0, 0], RightLeg: [knee, 0, 0] });
+  const key = (t: number, spine: number, knee: number, hipsY: number) => ({ t, bones: { Hips: [0, 0, 0] as Deg3, Spine: [spine, 0, 0] as Deg3, ...legs(knee) }, hands: { Right: RACKET_READY, Left: FREE_READY }, hipsY });
+  return buildPoseClip(scene, sk, 'tennis_ready', D, [key(0, 14, 34, -0.06), key(D / 2, 16, 40, -0.09), key(D, 14, 34, -0.06)]);
 }
 
 /** Forehand. */
 export function buildTennisSwing(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const r = restFor(sk); const la = r.get('LeftArm'), ra = r.get('RightArm'), rf = r.get('RightForeArm');
-  if (!la || !ra || !rf) return null;
-  return buildQuatClip(scene, sk, 'tennis_swing', 0.6, {
-    Hips: [[0, eulerQ(0, 35, 0)], [0.3, eulerQ(0, -10, 0)], [0.6, eulerQ(0, -45, 0)]],
-    Spine: [[0, eulerQ(12, 25, 0)], [0.3, eulerQ(14, -10, 0)], [0.6, eulerQ(10, -35, 0)]],
-    LeftUpLeg: [[0, eulerQ(-18, 0, 12)], [0.6, eulerQ(-12, 0, 8)]],
-    RightUpLeg: [[0, eulerQ(-24, 0, -12)], [0.6, eulerQ(-20, 0, -6)]],
-    // take-back (0.40, 1.08, −0.29) → contact (0.39, 1.12, 0.35) → wrap (−0.27, 1.56, 0.14)
-    // solved under the torso keys (hips 35 / spine 12,25 → −10 / 14,−10 → −45 / 10,−35)
-    RightArm: [[0, withOffset(ra, 0, -40, 30)], [0.3, withOffset(ra, 0, -120, -180)], [0.6, withOffset(ra, 0, -150, 50)]],
-    RightForeArm: [[0, withOffset(rf, 0, 0, 0)], [0.3, withOffset(rf, 0, 0, 0)], [0.6, withOffset(rf, 0, 70, 0)]],
-    // the free arm points at the ball then tucks
-    LeftArm: [[0, withOffset(la, 0, 170, -100)], [0.3, withOffset(la, 0, -70, -40)], [0.6, withOffset(la, 0, -30, -20)]],
-  }, [[0, -0.06], [0.3, -0.07], [0.6, -0.03]]);
+  return buildPoseClip(scene, sk, 'tennis_swing', 0.6, [
+    // take-back: racket behind the right hip, free arm pointing at the ball
+    { t: 0,   bones: { Hips: [0, -35, 0],  Spine: [12, -25, 0],  LeftUpLeg: [-18, 0, 12], RightUpLeg: [-24, 0, -12] }, hands: { Right: [0.40, 1.08, -0.29], Left: [0.10, 1.22, 0.42] }, poles: { Right: [0.8, -0.4, -0.4] }, hipsY: -0.06 },
+    // contact out front
+    { t: 0.3, bones: { Hips: [0, 10, 0], Spine: [14, 10, 0], LeftUpLeg: [-15, 0, 10], RightUpLeg: [-22, 0, -9] },  hands: { Right: [0.39, 1.12, 0.35], Left: [0.05, 1.05, 0.30] }, poles: { Right: [0.8, -0.5, 0.2] }, hipsY: -0.07 },
+    // wrap over the left shoulder, free hand tucked
+    { t: 0.6, bones: { Hips: [0, 45, 0], Spine: [10, 35, 0], LeftUpLeg: [-12, 0, 8],  RightUpLeg: [-20, 0, -6] },  hands: { Right: [-0.27, 1.56, 0.14], Left: [-0.05, 1.05, 0.25] }, poles: { Right: [-0.5, -0.6, -0.6] }, hipsY: -0.03 },
+  ]);
 }
 
 /** Serve. */
 export function buildTennisServe(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const r = restFor(sk); const la = r.get('LeftArm'), ra = r.get('RightArm'), lf = r.get('LeftForeArm'), rf = r.get('RightForeArm');
-  if (!la || !ra || !lf || !rf) return null;
-  return buildQuatClip(scene, sk, 'tennis_serve', 0.9, {
-    Hips: [[0, eulerQ(0, 20, 0)], [0.4, eulerQ(0, 30, 0)], [0.6, eulerQ(0, -10, 0)], [0.9, eulerQ(0, -25, 0)]],
-    Spine: [[0, eulerQ(0, 10, 0)], [0.4, eulerQ(-12, 20, 0)], [0.6, eulerQ(12, -10, 0)], [0.9, eulerQ(26, -20, 0)]],
-    LeftUpLeg: [[0, eulerQ(-8, 0, 8)], [0.4, eulerQ(-20, 0, 8)], [0.9, eulerQ(-10, 0, 8)]],
-    RightUpLeg: [[0, eulerQ(-8, 0, -8)], [0.4, eulerQ(-20, 0, -8)], [0.9, eulerQ(-30, 0, -6)]],
-    LeftLeg: [[0, eulerQ(10, 0, 0)], [0.4, eulerQ(34, 0, 0)], [0.9, eulerQ(10, 0, 0)]],
-    RightLeg: [[0, eulerQ(10, 0, 0)], [0.4, eulerQ(34, 0, 0)], [0.9, eulerQ(20, 0, 0)]],
-    // racket: trophy (0.30, 1.93, −0.22) → contact overhead (0.20, 1.99, 0.11) → down and left
-    // solved under the torso keys (hips 30 / spine −12,20 → −10 / 12,−10 → −25 / 26,−20)
-    RightArm: [[0, withOffset(ra, 0, -30, -20)], [0.4, withOffset(ra, 0, 20, -180)], [0.6, withOffset(ra, 0, 0, -170)], [0.9, withOffset(ra, 0, -160, 110)]],
-    RightForeArm: [[0, withOffset(rf, 0, 0, 0)], [0.9, withOffset(rf, 0, 0, 0)]],
-    // toss arm up (0.08, 1.72, 0.26), then down out of the way
-    LeftArm: [[0, withOffset(la, 0, -60, -20)], [0.4, withOffset(la, 0, -160, -40)], [0.6, withOffset(la, 0, -40, -60)], [0.9, withOffset(la, 0, -20, -10)]],
-    LeftForeArm: [[0, withOffset(lf, 0, 0, 0)], [0.9, withOffset(lf, 0, 0, 0)]],
-  }, [[0, -0.02], [0.4, -0.08], [0.6, 0.02], [0.9, -0.04]]);
+  return buildPoseClip(scene, sk, 'tennis_serve', 0.9, [
+    // set: both hands low in front
+    { t: 0,   bones: { Hips: [0, -20, 0],  Spine: [0, -10, 0],    LeftUpLeg: [-8, 0, 8],   RightUpLeg: [-8, 0, -8],   LeftLeg: [10, 0, 0], RightLeg: [10, 0, 0] }, hands: { Right: [0.25, 1.05, 0.25], Left: [0.05, 1.05, 0.30] }, hipsY: -0.02 },
+    // trophy: toss arm straight up, racket cocked behind the head
+    { t: 0.4, bones: { Hips: [0, -30, 0],  Spine: [-12, -20, 0],  LeftUpLeg: [-20, 0, 8],  RightUpLeg: [-20, 0, -8],  LeftLeg: [34, 0, 0], RightLeg: [34, 0, 0] }, hands: { Left: [0.08, 1.72, 0.26], Right: [0.30, 1.72, -0.22] }, poles: { Left: [-0.6, 0.2, -0.6], Right: [0.9, 0.0, -0.4] }, hipsY: -0.08 },
+    // contact overhead
+    { t: 0.6, bones: { Hips: [0, 10, 0], Spine: [12, 10, 0],  LeftUpLeg: [-14, 0, 8],  RightUpLeg: [-24, 0, -7],  LeftLeg: [20, 0, 0], RightLeg: [26, 0, 0] }, hands: { Right: [0.15, 1.92, 0.10], Left: [0.02, 1.25, 0.32] }, poles: { Right: [0.9, 0.1, -0.3] }, hipsY: 0.02 },
+    // follow through low left
+    { t: 0.9, bones: { Hips: [0, 25, 0], Spine: [26, 20, 0],  LeftUpLeg: [-10, 0, 8],  RightUpLeg: [-30, 0, -6],  LeftLeg: [10, 0, 0], RightLeg: [20, 0, 0] }, hands: { Right: [-0.25, 1.00, 0.30], Left: [-0.12, 1.00, 0.10] }, poles: { Right: [-0.3, -0.7, 0.4] }, hipsY: -0.04 },
+  ]);
 }

@@ -34,6 +34,13 @@ export interface PoseKey {
 }
 /** Hips height the targets were authored against (the forge hero). */
 export const REF_HIPS_Y = 0.96;
+/** Limb lengths the targets were authored against (the forge hero, measured 2026-09-03):
+ *  shoulder→elbow→wrist 0.54 m, hip→knee→ankle 0.82 m. A body with shorter arms
+ *  gets every hand target pulled toward its shoulder by the ratio, so the arm
+ *  ends up in the same configuration instead of stretching short (the MPFB2
+ *  candidate's arm is 0.486 m at 0.914 m hips: height alone under-shrinks). */
+export const REF_ARM_LEN = 0.54;
+export const REF_LEG_LEN = 0.82;
 
 const ARM_BONES = ['LeftArm', 'LeftForeArm', 'RightArm', 'RightForeArm'];
 const LEG_BONES = ['LeftUpLeg', 'LeftLeg', 'RightUpLeg', 'RightLeg'];
@@ -64,6 +71,20 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   const toWorld = (v: [number, number, number]) => rootPos.add(new Vector3(v[0] * scale, v[1] * scale, v[2] * scale));
   const arms = { Left: armChain(sk, 'Left'), Right: armChain(sk, 'Right') };
   const legs = { Left: ['LeftUpLeg', 'LeftLeg', 'LeftFoot'], Right: ['RightUpLeg', 'RightLeg', 'RightFoot'] } as const;
+  const dist = (a: TransformNode, b: TransformNode) => Vector3.Distance(a.getAbsolutePosition(), b.getAbsolutePosition());
+  const armRatio = (side: 'Left' | 'Right') => { const a = arms[side]; return a ? (dist(a.shoulder, a.elbow) + dist(a.elbow, a.hand)) / REF_ARM_LEN : 1; };
+  const legRatio = (side: 'Left' | 'Right') => { const [h, k, a] = legs[side].map((b) => nodes.get(b)); return h && k && a ? (dist(h, k) + dist(k, a)) / REF_LEG_LEN : 1; };
+  const ratios = { arm: { Left: armRatio('Left'), Right: armRatio('Right') }, leg: { Left: legRatio('Left'), Right: legRatio('Right') } };
+  // A limb target in reference proportions, re-expressed for this body: the
+  // offset from the joint root (as the reference body would have had it, i.e.
+  // this body's posed joint un-scaled by height) times the limb-length ratio.
+  const forLimb = (tgt: [number, number, number], joint: TransformNode, ratio: number) => {
+    joint.computeWorldMatrix(true);
+    const j = joint.getAbsolutePosition();
+    const jRef = rootPos.add(j.subtract(rootPos).scale(1 / scale));
+    const authored = rootPos.add(new Vector3(...tgt));
+    return j.add(authored.subtract(jRef).scale(ratio));
+  };
 
   const out: QuatKeys = {}; const hipsY: [number, number][] = [];
   const push = (bone: string, t: number, q: Quaternion) => { (out[bone] ??= []).push([t, q.clone()]); };
@@ -76,14 +97,14 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
     for (const side of ['Left', 'Right'] as const) {
       const tgt = key.hands?.[side]; const arm = arms[side]; if (!tgt || !arm) continue;
       const pole = key.poles?.[side] ?? [side === 'Left' ? -0.7 : 0.7, -0.2, -0.5];
-      reachArm(arm, toWorld(tgt), new Vector3(...pole), 1);   // pole is a world direction too
+      reachArm(arm, forLimb(tgt, arm.shoulder, ratios.arm[side]), new Vector3(...pole), 1);   // pole is a world direction too
       refresh();
     }
     // 3) feet
     for (const side of ['Left', 'Right'] as const) {
       const tgt = key.feet?.[side]; if (!tgt) continue;
       const [h, k, a] = legs[side].map((b) => nodes.get(b)); if (!h || !k || !a) continue;
-      plantLeg(h, k, a, toWorld(tgt), Vector3.Forward());
+      plantLeg(h, k, a, forLimb(tgt, h, ratios.leg[side]), Vector3.Forward());
       refresh();
     }
     // 4) read back local rotations for every bone the key touched
