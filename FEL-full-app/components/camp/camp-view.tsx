@@ -14,7 +14,7 @@ type Tab = 'certify' | 'plans' | 'session' | 'templates' | 'curriculum';
 interface ModuleQ { key: string; prompt: string; options: string[] }
 interface ModuleInfo { ref: string; title: string; summary: string; required: boolean; questions: ModuleQ[] }
 interface AssessState { status: string; missingModules: string[]; passedModules: string[]; modules: ModuleInfo[]; credentials: { trackKey: string; moduleKey: string; score: number; passed: boolean }[]; curriculumVersion: string }
-interface Plan { id: string; goalText: string; status: string; menteeId: string; facilitatorUserId: string; linkedModuleKeys: string[]; tags: string[]; createdAt: string; lockedAt?: string | null; sessions?: CampSessionRow[] }
+interface Plan { id: string; goalText: string; status: string; menteeId: string; facilitatorUserId: string; linkedModuleKeys: string[]; tags: string[]; createdAt: string; lockedAt?: string | null; pathwayMap?: Record<string, string> | null; sessions?: CampSessionRow[] }
 interface CampSessionRow { id: string; date: string; moduleKeys: string[]; gameSessionIds: string[]; prqDelta: Record<string, number> | null; resiliency: { attempts: number; failures: number; retryRate: number; returnedAfterLoss: boolean | null } | null; notes: string | null }
 interface Template { id: string; name: string; description: string | null; version: number; curriculumVersion: string; published: boolean; uses: number; forkedFromId: string | null; structure: { blocks: { label: string; sessions: { label: string }[] }[] } }
 
@@ -69,7 +69,7 @@ export function CampView() {
       {tab === 'plans' && <Plans plans={plans} me={me} certified={certified} onChange={refresh} />}
       {tab === 'session' && <SessionTab plans={plans.filter((p) => p.status === 'active' && p.facilitatorUserId === me)} onChange={refresh} />}
       {tab === 'templates' && <Templates templates={templates} plans={plans.filter((p) => p.facilitatorUserId === me)} certified={certified} onChange={refresh} />}
-      {tab === 'curriculum' && <Curriculum />}
+      {tab === 'curriculum' && <Curriculum plans={plans} onChange={refresh} />}
     </main>
   );
 }
@@ -349,8 +349,21 @@ function Templates({ templates, plans, certified, onChange }: { templates: Templ
 
 // ── Curriculum ─────────────────────────────────────────────────────────────
 // The owner's Camp Blueprint (docs/CAMP-BLUEPRINT.md), rendered from lib/camp/curriculum.
-function Curriculum() {
+function Curriculum({ plans, onChange }: { plans: Plan[]; onChange: () => Promise<void> }) {
+  const [planId, setPlanId] = useState(plans[0]?.id ?? '');
+  const plan = plans.find((p) => p.id === planId) ?? plans[0] ?? null;
   const [worksheet, setWorksheet] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (!planId && plans[0]) setPlanId(plans[0].id); }, [plans, planId]);
+  useEffect(() => { setWorksheet(Object.fromEntries(PATHWAY_FIELDS.map((f) => [f.key, plan?.pathwayMap?.[f.key] ?? '']))); }, [plan?.id, plan?.pathwayMap]);
+  const saveWorksheet = async () => {
+    if (!plan) return;
+    setBusy(true);
+    const r = await api<{ plan: Plan }>('/api/v1/camp/plans', { method: 'POST', body: JSON.stringify({ action: 'pathway', planId: plan.id, fields: worksheet }) });
+    setBusy(false);
+    if (r.error) { toast.error(r.error); return; }
+    toast.success('Pathway map saved to the plan'); await onChange();
+  };
   const copyWorksheet = async () => {
     const text = PATHWAY_FIELDS.map((f, i) => `${i + 1}. ${f.label}\n${worksheet[f.key]?.trim() || '—'}`).join('\n\n');
     await navigator.clipboard?.writeText(`Pathway map\n\n${text}`).catch(() => undefined);
@@ -397,7 +410,16 @@ function Curriculum() {
             </label>
           ))}
         </div>
-        <button type="button" onClick={copyWorksheet} className="mt-3 flex items-center gap-2 rounded-lg border border-white/15 px-3 py-1.5 text-xs"><Copy className="h-3.5 w-3.5" /> Copy worksheet</button>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {plans.length > 0 ? (
+            <>
+              <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white" aria-label="Plan for this worksheet">{plans.map((p) => <option key={p.id} value={p.id}>{p.goalText}</option>)}</select>
+              <button type="button" onClick={saveWorksheet} disabled={busy} className="flex items-center gap-2 rounded-lg bg-cyan-400 px-3 py-1.5 text-xs font-black text-black disabled:opacity-40">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Save to the plan</button>
+            </>
+          ) : <span className="text-[11px] text-white/40">No plan yet — draft one on the Plans tab to save the worksheet with it.</span>}
+          <button type="button" onClick={copyWorksheet} className="flex items-center gap-2 rounded-lg border border-white/15 px-3 py-1.5 text-xs"><Copy className="h-3.5 w-3.5" /> Copy</button>
+        </div>
+        {plan?.pathwayMap?.updatedAt && <p className="mt-2 text-[11px] text-white/40">Saved {new Date(plan.pathwayMap.updatedAt).toLocaleString()}</p>}
       </div>
       <div className="rounded-xl border border-cyan-400/30 bg-cyan-400/5 p-4">
         <h3 className="text-base font-semibold">The Bridge — weekly transfer prompts</h3>

@@ -1624,6 +1624,7 @@ model GoalPlan {
   linkedModuleKeys  String[]        @default([])   // "trackKey/moduleKey"
   curriculumVersion String
   templateId        String?         // CampTemplate this plan was instantiated from
+  pathwayMap        Json?           // the six-field Pathway Map Protocol worksheet, filled with the mentee (Camp Blueprint)
   lockedAt          DateTime?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt

@@ -31,6 +31,18 @@ export async function POST(req: NextRequest) {
   let body: any;
   try { body = await req.json(); } catch { return bad('invalid_json'); }
 
+  // { action: 'pathway', planId, fields: { entry, credential, firstStep, who, numbers, second } } — the
+  // Pathway Map worksheet, saved on the plan. Facilitator or mentee may write it (the mentee writes; the facilitator edits).
+  if (body.action === 'pathway') {
+    const plan = await prisma.goalPlan.findUnique({ where: { id: String(body.planId ?? '') } });
+    if (!plan) return bad('not_found', 404);
+    if (plan.facilitatorUserId !== userId && plan.menteeId !== userId) return bad('forbidden', 403);
+    const allowed = ['entry', 'credential', 'firstStep', 'who', 'numbers', 'second'];
+    const src = typeof body.fields === 'object' && body.fields ? body.fields as Record<string, unknown> : {};
+    const fields = Object.fromEntries(allowed.map((k) => [k, String(src[k] ?? '').slice(0, 2000)]));
+    const updated = await prisma.goalPlan.update({ where: { id: plan.id }, data: { pathwayMap: { ...fields, updatedAt: new Date().toISOString(), updatedBy: userId } } });
+    return NextResponse.json({ plan: updated });
+  }
   if (body.action === 'lock' || body.action === 'activate') {
     const plan = await prisma.goalPlan.findUnique({ where: { id: String(body.planId ?? '') } });
     if (!plan) return bad('not_found', 404);

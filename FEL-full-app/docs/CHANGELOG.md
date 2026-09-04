@@ -8,11 +8,14 @@ All notable changes to Final Evolution Lab. Dates are 2026.
 - The owner's Camp Blueprint (eight-week facilitator curriculum, 2026-09-03) is filed at `docs/CAMP-BLUEPRINT.md` and mirrored as `lib/camp/curriculum.ts`.
 - `/camp` gains a Curriculum tab: thesis, the two tracks and the Bridge, the eight-week arc with scripts and traps, the Pathway Map Protocol as a fillable worksheet, the Bridge prompts, what is measured and never claimed, facilitator standards, replication package.
 - The Session tab shows which week of the arc the plan is in (from its lock date), that week's output and script, and the rotating Bridge prompt; the intake can seed its milestones with the eight-week arc.
+- The Pathway Map worksheet saves to the mentee's plan (`GoalPlan.pathwayMap`), per plan, by facilitator or mentee; copy to clipboard stays.
 
 ### Animation
 - Pose-target clips: authored clips are hand and foot targets fitted by the two-bone solver at build time, so one authoring works on any body. Golf is migrated and proven on the shipped hero and the MPFB2 candidate.
 - The shared two-bone solver solves in the rig's own frame; under the glTF root's handedness mirror it used to turn large reaches the wrong way.
 - Development only: `?hero=<glb>` on the dev harness and the Closet swaps the hero body behind a flag.
+- Every authored clip is portable: a degree key rotates the bone about its parent's bind axes from bind (`bindFrame.ts`), in both builders. Locomotion, karate, football, the dunk suite, finishes and eastbay are pose targets; the jump, launch, tomahawk and eastbay now actually raise the hands (their arm keys were twists).
+- The dunk's live clip is rebuilt from the owner's capture as pose keys (`scripts/mocap/dunk-pose.mts`).
 
 ## 0.9.0-rc.1 — 2026-09-03 · release candidate
 
