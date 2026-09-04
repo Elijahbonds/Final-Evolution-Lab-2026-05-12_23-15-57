@@ -263,3 +263,9 @@ Appended every ~10 minutes while the run is live; see also `docs/BACKLOG.md` for
     doc"; `scripts/prod-serve.sh` takes a port argument with LOG/PID following the port (contract §6 ports). Pattern:
     **the RC gate is a script, not a checklist page.** `docs/CHANGELOG.md` is being rewritten per phase with commit shas
     and measured numbers, and states which phases are OPEN (4, 5) — the changelog as a ledger of measurements.
+- **15:09** — `lane/verify` `bd3284e` "failing tests first — texture budget gate and skinMapUrl": exactly the two files
+  read at 15:07 (`scripts/perf-budget-tests.ts` +118, `lib/babylon/core/playerIdentity.test.ts` +55); both inside the
+  lane's owned set; `docs/GATE0-REPORT-2026-09-04.md` not yet written. Commit records the count as the rules require:
+  budget test 2 FAILED of 4 on today's stub (`measuredAt` null, no modes); full suite 39 files / 253 tests intact plus
+  the 6 new `skinMapUrl` cases red until `lane/perf` exports the function. Reusable: **red-first hand-off** — a lane
+  commits a failing test against a frozen contract and names in the message which other lane turns it green.

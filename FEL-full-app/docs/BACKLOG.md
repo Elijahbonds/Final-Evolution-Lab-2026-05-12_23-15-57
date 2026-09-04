@@ -65,3 +65,6 @@ orchestrator.
   - **verify** `playerIdentity.test.ts` imports `skinMapUrl` from `./playerIdentity`, which does not exist on any branch
     yet — vitest on `lane/verify` alone fails to compile until `lane/perf` exports it; the integration order is
     perf before verify (or the two land together). Belongs to the orchestrator's integration step.
+- **15:09** `lane/verify` `bd3284e` — did NOT (yet) write `docs/GATE0-REPORT-2026-09-04.md` (owned, in the acceptance row
+  "Gate 0 PASS/FAIL reported"). Vitest on the lane is deliberately red (6 `skinMapUrl` cases) until perf lands — the
+  integration must not read that red as a regression. Belongs to the orchestrator's integration step.
