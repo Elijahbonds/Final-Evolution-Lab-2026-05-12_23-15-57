@@ -82,3 +82,11 @@ Plan page: https://claude.ai/code/artifact/88460d0b-8775-4206-a872-81951f4ddeb0
   Closet's proportion sliders stop breaking poses, and the mocap retarget
   becomes "match the owner's hand and foot paths", which closes D-M1.
   Recommendation: B.
+- **3 Sep, owner sign-off (RIG-ADJACENT): option B.** Clips become pose
+  targets (`lib/babylon/anim/poseClip.ts`): torso keys in degrees, hands and
+  feet in body-local metres scaled by Hips height, fitted at build time with
+  the node-space two-bone solver. The new body enters **behind a flag on the
+  dev harness first**; the shipped hero stays until the 21-mode gauntlet is
+  green on the candidate. Migration order: golf first (smallest), then tennis,
+  volleyball, soccer, baseball, basketball, locomotion, combat, board, dunk —
+  each proven by its rig test on BOTH bodies (`FEL_HERO_GLB=…`).
