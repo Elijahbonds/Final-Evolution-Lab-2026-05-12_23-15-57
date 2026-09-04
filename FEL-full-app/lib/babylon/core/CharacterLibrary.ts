@@ -62,7 +62,20 @@ export interface SpawnOpts {
 // (guard -> guard_c58), which broke EVERY alias lookup in EVERY mode. We strip
 // this suffix off the groups post-instantiation so aliases resolve again.
 const SUFFIX = /_c\d+$/;
-const containers = new Map<string, Promise<AssetContainer>>();
+// Keyed by SCENE, then URL. An AssetContainer belongs to the scene that loaded
+// it; a cache keyed by URL alone handed a container from a DISPOSED scene to
+// the next one — the shipping hosts mount twice under React's dev double-mount
+// and any player who leaves a mode and comes back does the same — and the
+// second spawn died on a disposed root ("Cannot read properties of undefined
+// (reading 'getChildMeshes')", threepoint on /play, retried five times) or
+// produced a rig whose bones never moved (the "char_120" skinning stall).
+// A WeakMap lets a disposed scene's containers go with it.
+const containers = new WeakMap<Scene, Map<string, Promise<AssetContainer>>>();
+function containersFor(scene: Scene): Map<string, Promise<AssetContainer>> {
+  let m = containers.get(scene);
+  if (!m) { m = new Map(); containers.set(scene, m); }
+  return m;
+}
 let spawnCounter = 0;
 
 /** '/models/elijah-hero.glb' → { rootUrl: '/models/', filename: 'elijah-hero.glb' }.
@@ -75,7 +88,8 @@ function splitUrl(url: string): { rootUrl: string; filename: string } {
 }
 
 async function loadContainer(scene: Scene, url: string): Promise<AssetContainer> {
-  let p = containers.get(url);
+  const cache = containersFor(scene);
+  let p = cache.get(url);
   if (!p) {
     const { rootUrl, filename } = splitUrl(url);
     p = SceneLoader.LoadAssetContainerAsync(rootUrl, filename, scene)
@@ -87,10 +101,10 @@ async function loadContainer(scene: Scene, url: string): Promise<AssetContainer>
         return container;
       })
       .catch((e) => {
-        containers.delete(url);                          // allow retry after a failure
+        cache.delete(url);                               // allow retry after a failure
         throw new Error(`[FEL-CHAR] failed to load "${url}": ${e?.message ?? e}`);
       });
-    containers.set(url, p);
+    cache.set(url, p);
   }
   return p;
 }

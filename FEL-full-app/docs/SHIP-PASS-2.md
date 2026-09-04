@@ -85,3 +85,28 @@ Plan page: https://claude.ai/code/artifact/06ac4116-487a-472f-9378-07e2834ccebb
   `e.t === 'trigger' && side === 'R'`); football accepts any of the four for
   the juke read; volleyball's BLOCK is `humanBlock`. No gap to fill — the gate
   is now the phone captures, one per family.
+- **Phase 1, shipping-route baseline (3 Sep).** 13/21 clean on the first
+  pass; the rest resolved to three causes and one design fact:
+  1. *Container cache keyed by URL alone.* The shipping hosts mount twice under
+     React's dev double-mount, and the second harness took an `AssetContainer`
+     from the first, disposed scene: threepoint's load crashed on a disposed
+     root (`getChildMeshes` of undefined, retried five times) and the same rig
+     produced the "char_120" skinning stall in threepoint, football and
+     carnival. Any player who leaves a mode and returns hits the same path, so
+     this is a ship bug, not a dev artifact. Cache is now `WeakMap<Scene,
+     Map<url,…>>`. Threepoint, football: 0/0/0 after.
+  2. *Identity watchdog judged on a clock.* A material compiles when its mesh
+     is first drawn; the shell holds a scene behind a profile load, and the
+     penalty kicker's shoes sit below the frame — both read "never ready" at
+     3 s. Now: sixty rendered frames after identity, anything not ready is
+     asked to compile and only a FAILED compile is reported. Bigair,
+     gymnastics: "ready, 10 compiled on demand".
+  3. *Dev double-mount.* Every shipping host still starts two harnesses on one
+     canvas in development (guards vary: token, none); the dev runner has a
+     latch. Production mounts once, so Phase 2's production sweep decides
+     whether this is worth unifying; the black bigair frame is the leaked
+     first engine.
+  4. *`/play/dunkduel` is PROVE IT by owner re-lock (2026-09-01):* the
+     real-footage head-to-head contest, camera-tracked, no canvas. The Babylon
+     DunkDuelMode stays registry-only at `/dev/mode/dunkduel`. The
+     shipping-route gauntlet covers the twenty Babylon routes.

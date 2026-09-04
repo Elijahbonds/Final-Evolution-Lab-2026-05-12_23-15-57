@@ -132,15 +132,28 @@ export function applyIdentity(
  *  error (`[FEL-IDENT]`, scripts/capture-mode-play.mts). */
 function watchReadiness(spawn: SpawnedCharacter): void {
   const scene = spawn.root.getScene();
-  if (typeof setTimeout !== 'function') return;
-  setTimeout(() => {
+  // "Ready" means COMPILABLE, not "already drawn". A material compiles when its
+  // mesh is first rendered, so a rig held behind a shell's countdown, or shoes
+  // culled below the frame, read as "never ready" on a clock (bigair,
+  // gymnastics, derby, penalty on /play, 2026-09-03) while the dev harness,
+  // which draws at once, was clean. Sixty rendered frames after identity, any
+  // material still not ready is asked to compile; only a FAILED compile is the
+  // fault this watchdog exists for (the Closet's blank pore-map clone).
+  let frames = 0;
+  const obs = scene.onAfterRenderObservable.add(() => {
+    if (++frames < 60) return;
+    scene.onAfterRenderObservable.remove(obs);
     if (scene.isDisposed) return;
-    const bad = spawn.meshes
-      .filter((m) => !m.isDisposed() && m.isEnabled() && m.isVisible && m.material && !m.material.isReady(m, true))
-      .map((m) => `${m.name}/${m.material!.name}`);
-    if (bad.length) console.error(`[FEL-IDENT] material never ready: ${bad.join(', ')}`);
-    else console.info(`[FEL-IDENT] ready: ${spawn.meshes.filter((m) => m.isVisible && m.isEnabled()).length} visible meshes`);
-  }, 3000);
+    const pending = spawn.meshes.filter((m) => !m.isDisposed() && m.isEnabled() && m.isVisible && m.material && !m.material.isReady(m, true));
+    void Promise.all(pending.map(async (m) => {
+      try { await m.material!.forceCompilationAsync(m); return null; }
+      catch (e) { return `${m.name}/${m.material!.name}: ${String((e as Error)?.message ?? e).slice(0, 80)}`; }
+    })).then((results) => {
+      const bad = results.filter((r): r is string => !!r);
+      if (bad.length) console.error(`[FEL-IDENT] material never ready: ${bad.join(', ')}`);
+      else console.info(`[FEL-IDENT] ready: ${spawn.meshes.filter((m) => m.isVisible && m.isEnabled()).length} visible meshes${pending.length ? ` (${pending.length} compiled on demand)` : ''}`);
+    });
+  });
 }
 
 /** Number + name plate, parented to the Spine2 bone so it rides every
