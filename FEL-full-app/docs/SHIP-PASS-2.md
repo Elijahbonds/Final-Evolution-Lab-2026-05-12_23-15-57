@@ -78,3 +78,10 @@ Plan page: https://claude.ai/code/artifact/06ac4116-487a-472f-9378-07e2834ccebb
   one to four textures each: 36 MB → 26 MB under dedup/prune/weld/quantize
   (17–37% per map). Quantize adds `KHR_mesh_quantization`, which the writer
   must have registered or the file omits the declaration — fixed in the probe.
+- **Phase 7, static audit done (3 Sep).** Every labelled touch button reaches a
+  handler: A/B/X/Y by name in the combat, board and net modes; B→pass, X→steal,
+  L1→box out through `PlayerSlot` intents in the basketball modes; the CHARGE
+  and CARVE holds stream the right trigger (dunk, dunkduel, surf read
+  `e.t === 'trigger' && side === 'R'`); football accepts any of the four for
+  the juke read; volleyball's BLOCK is `humanBlock`. No gap to fill — the gate
+  is now the phone captures, one per family.
