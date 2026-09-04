@@ -11,7 +11,7 @@ import { prune, dedup } from '@gltf-transform/functions';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { mat3, mat4, quat, vec3 } from 'gl-matrix';
 import sharp from 'sharp';
-import { dedup, resample, textureCompress } from '@gltf-transform/functions';
+import { dedup, quantize, resample, textureCompress } from '@gltf-transform/functions';
 
 const FEL = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand',
   'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'LeftToeBase', 'RightUpLeg', 'RightLeg', 'RightFoot', 'RightToeBase'];
@@ -188,6 +188,10 @@ await doc.transform(dedup(), resample(),
   textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 82, resize: [2048, 2048], pattern: undefined, slots: undefined, formats: undefined, ...({} as object) }),
 );
 for (const t of root.listTextures()) if (!skinTex.has(t)) { const img = t.getImage(); if (img) { const out = await sharp(img).resize(1024, 1024, { fit: 'fill' }).webp({ quality: 80 }).toBuffer(); t.setImage(new Uint8Array(out)).setMimeType('image/webp'); } }
+// KHR_mesh_quantization (Babylon reads it natively): 14-bit positions, 8-bit normals and
+// weights, 12-bit UVs — the 4 MB haired kit body drops to about half. --no-quantize keeps
+// floats (check-bind.mts needs the unquantized file, so run it on that first).
+if (!process.argv.includes('--no-quantize')) await doc.transform(quantize({ quantizePosition: 14, quantizeNormal: 8, quantizeTexcoord: 12, quantizeColor: 8, quantizeWeight: 8, quantizeGeneric: 8 }));
 writeFileSync(outFile, await io.writeBinary(doc));
 const outJoints = root.listSkins()[0].listJoints().map((j) => j.getName());
 console.log(`wrote ${outFile}: joints ${outJoints.length} (${outJoints.filter((n) => keep.has(n)).length} in spec), meshes ${root.listMeshes().length}, materials ${root.listMaterials().map((m) => m.getName()).join(',')}`);

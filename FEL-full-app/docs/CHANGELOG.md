@@ -26,6 +26,8 @@ All notable changes to Final Evolution Lab. Dates are 2026.
 - Development only: `?tone=<hex>` on the Closet previews a skin tone.
 - Two kit bodies (male, female) carry the Closet's tops, shorts and shoes as fitted CC0 garments; the equipped one per slot shows (`lib/babylon/core/kit.ts`). Candidates only, behind the dev flag until the swap.
 - The candidate import bakes the A-pose mesh into the rig's rest pose and the avatar scripts gain a mesh-versus-bind joint check.
+- Both kit bodies carry six hair styles as cutout meshes; the macro shape (sex, build) is baked so each sex exports its own body; hero files ship quantized (KHR_mesh_quantization).
+- Eight rivals can be derived from the kit bodies (`scripts/avatar/roster-from-kit.mts`); the hero swap itself is an owner-run step (see SHIP-PASS-3 §Swap).
 
 ## 0.9.0-rc.1 — 2026-09-03 · release candidate
 

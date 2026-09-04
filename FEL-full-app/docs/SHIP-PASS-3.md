@@ -25,6 +25,7 @@ Plan page: https://claude.ai/code/artifact/88460d0b-8775-4206-a872-81951f4ddeb0
 | 10 Maps | Venue upgrade on the optimized maps: props, lighting per mood, navmesh-authored bounds. | Load budget met; every venue re-shot. |
 
 ## Findings log
+- **4 Sep, the swap is ready and waits for the owner's hands.** The male kit body (garments, hair, real skin, 3.7 MB quantized) swept clean through all 40 gauntlet rows; every rig suite passes on it. Eight rivals derived from the two kit bodies (`scripts/avatar/roster-from-kit.mts`, 0.8–1.0 MB each) sit staged in the session scratchpad. The file moves themselves — archiving `public/models/fel-hero.glb` and `public/models/athletes/*` under `public/models/_forge/` and copying the kit files into place — were refused by the session's permission classifier twice, so they are handed to the owner as commands in `docs/SHIP-PASS-3.md` §Swap. After the moves: the full gauntlet on the shipping path, then commit. Residuals unchanged: hijab asset, sport-length shorts, headwear and accessories.
 - **4 Sep, both sexes for real.** Both kit bodies had exported the same androgynous geometry: the exporter writes the base mesh and the macro shape keys (sex, build, age) were dropped before export, while the eyes, hair and garments were fitted to the evaluated shape, so on the female the hair sat across her eyes and the shorts and boots floated. `dress-kit.py` now bakes the macro mix into the basis before the face morphs load; the female body is 1.61 m to the male's 1.67, her hair sits above her eyes, and the bind check passes on both (the neck row is informational: its mixed-weight region sits at the shoulders). Male rig suites pass on the rebuilt file.
 - **4 Sep, rung 4 hair on the kit bodies.** Six CC0 MakeHuman hair assets ride each kit body as `Hair_<key>` meshes (cap, afro, buzz, bun, ponytail, braids) under `hair.<key>` cutout materials, so the existing hair-style switch and hair tint work unchanged; no hijab asset exists in the packs (residual: a custom mesh). Both bodies import at 3.9 / 4.3 MB with 13 meshes, pass the bind check, and show the equipped style and kit in the Closet with no errors. Sweep on the shipped hero after the kit runtime landed: 40 rows clean.
 - **4 Sep, rung 3 first cut: the garment library on two bodies.** `dress-kit.py` builds a male and a female MPFB2 body (gender 0.9 / 0.1; the first candidate was the androgynous 0.5 default) carrying every Closet wearable for tops, shorts and shoes as its own fitted garment (`Kit_<slot>_<itemId>`, material `<slot>.<itemId>`); `kit.ts` shows the equipped one per slot. Both import at ~2 MB, pass the bind check, and the male passes every rig suite; in the Closet the equipped garment shows and the others hide. Residuals: the CC0 packs hold no basketball-length shorts (both shorts slots wear the jean shorts, told apart by tint) and no sporting headwear or accessories, so those two slots stay procedural; the female heroine boot rendered on one leg and was swapped for the ankle boot. Tri count with one garment per slot drawn ≈ 20k body+kit against the 25k advisory.
@@ -101,3 +102,14 @@ Plan page: https://claude.ai/code/artifact/88460d0b-8775-4206-a872-81951f4ddeb0
   green on the candidate. Migration order: golf first (smallest), then tennis,
   volleyball, soccer, baseball, basketball, locomotion, combat, board, dunk —
   each proven by its rig test on BOTH bodies (`FEL_HERO_GLB=…`).
+
+## Swap — owner-run commands (2026-09-04)
+
+The kit files are in `public/models/candidates/` and the staged rivals in the session scratchpad
+(`…/scratchpad/athletes-kit-staged/`, or regenerate them with `npx tsx scripts/avatar/roster-from-kit.mts --out public/models/athletes-kit`). From `FEL-full-app/`:
+
+```bash
+mkdir -p public/models/_forge/athletes && git mv public/models/fel-hero.glb public/models/_forge/fel-hero.glb && for f in public/models/athletes/*; do git mv "$f" public/models/_forge/athletes/; done && cp public/models/candidates/fel-kit-male.glb public/models/fel-hero.glb && npx tsx scripts/avatar/roster-from-kit.mts --out public/models/athletes && npx vitest run && GAUNTLET_DIR=/tmp/fel-gauntlet BASE=http://localhost:3000 zsh scripts/gauntlet.sh
+```
+
+Then commit with the sweep's row count. Reverting is `git checkout -- public/models` plus removing the copied files.
