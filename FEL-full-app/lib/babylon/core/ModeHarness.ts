@@ -222,6 +222,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       return true;
     } catch (e) {
       clearTimeout(watchdog);
+      reportDiag('load', `${def.modeId} load failed: ${String((e as Error)?.message ?? e).slice(0, 160)}`);
       console.error(`[FEL-MODE] ${def.modeId} load failed:`, e);
       setPhase('error', e instanceof Error ? e.message : 'Failed to load the arena.');
       return false;

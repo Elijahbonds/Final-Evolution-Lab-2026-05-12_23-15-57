@@ -9,6 +9,13 @@ const OUT = process.env.OUT_DIR ?? 'docs/shots/fault'; mkdirSync(OUT, { recursiv
 const NAME = process.env.NAME ?? `${FAULT}`;
 const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'] });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+if (process.env.LOGIN === '1') {   // the shipping routes are auth-gated
+  const { request } = await import('playwright-core');
+  const rc = await request.newContext({ baseURL: new globalThis.URL(URL).origin });
+  const csrf = (await (await rc.get('/api/auth/csrf')).json()).csrfToken as string;
+  await rc.post('/api/auth/callback/credentials', { form: { csrfToken: csrf, email: 'playtest@fel.local', password: 'playtest-local-only', json: 'true' } });
+  await p.context().addCookies((await rc.storageState()).cookies); await rc.dispose();
+}
 const logs: string[] = []; const crashPosts: string[] = [];
 p.on('console', (m) => { if (m.type() === 'error' || /FEL-|ASSET-LOADER/.test(m.text())) logs.push(`[${m.type()}] ${m.text().slice(0, 240)}`); });
 p.on('pageerror', (e) => logs.push(`[pageerror] ${e.message.slice(0, 240)}`));
