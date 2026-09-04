@@ -174,7 +174,14 @@ await doc.transform(dedup(), prune());
 // Textures: the MakeHuman packs ship 2048² PNGs (a skin 3.5 MB, a denim normal 5.4 MB).
 // WebP at 2048 keeps the detail the skin pass needs and brings the file inside the
 // hero load budget (measured 2026-09-04: 13.2 MB → see the log line).
-await doc.transform(dedup(), resample(), textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 82, resize: [2048, 2048] }));
+// Skin keeps 2048 (the skin pass reads its detail); clothes, eyes and normals go to 1024 —
+// three heroes on the candidate reached 466 MB of VRAM in karate against a 256 MB budget (2026-09-04).
+const skinTex = new Set<import('@gltf-transform/core').Texture>();
+for (const m of root.listMaterials()) if (m.getName() === 'skin') for (const t of [m.getBaseColorTexture(), m.getNormalTexture(), m.getMetallicRoughnessTexture()]) if (t) skinTex.add(t);
+await doc.transform(dedup(), resample(),
+  textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 82, resize: [2048, 2048], pattern: undefined, slots: undefined, formats: undefined, ...({} as object) }),
+);
+for (const t of root.listTextures()) if (!skinTex.has(t)) { const img = t.getImage(); if (img) { const out = await sharp(img).resize(1024, 1024, { fit: 'fill' }).webp({ quality: 80 }).toBuffer(); t.setImage(new Uint8Array(out)).setMimeType('image/webp'); } }
 writeFileSync(outFile, await io.writeBinary(doc));
 const outJoints = root.listSkins()[0].listJoints().map((j) => j.getName());
 console.log(`wrote ${outFile}: joints ${outJoints.length} (${outJoints.filter((n) => keep.has(n)).length} in spec), meshes ${root.listMeshes().length}, materials ${root.listMaterials().map((m) => m.getName()).join(',')}`);
