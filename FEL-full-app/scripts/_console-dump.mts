@@ -7,7 +7,7 @@ const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
 // LOGIN=1: carry a real session (the /play routes are auth-gated)
 if (process.env.LOGIN === '1') {
   const { request } = await import('playwright-core');
-  const rc = await request.newContext({ baseURL: new URL(URL).origin });
+  const rc = await request.newContext({ baseURL: new globalThis.URL(URL).origin });
   const csrf = (await (await rc.get('/api/auth/csrf')).json()).csrfToken as string;
   await rc.post('/api/auth/callback/credentials', { form: { csrfToken: csrf, email: 'playtest@fel.local', password: 'playtest-local-only', json: 'true' } });
   await p.context().addCookies((await rc.storageState()).cookies); await rc.dispose();
