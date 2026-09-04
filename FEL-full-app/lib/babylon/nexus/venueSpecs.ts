@@ -309,7 +309,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
 
   golf: {
     modeId: 'golf', name: 'Golf', venue: 'Sovereign Links',
-    environment: dusk('#9FE0FF', '#0F3A22', '#1C5636', '#FFFAD8', 0.9),
+    environment: { ...dusk('#5FA3E0', '#C9DDF0', '#BFD3C6', '#FFF4D6', 0.45), fogDensity: 0.003 },   // links daylight: a blue sky feeds the IBL; thin haze so the green stays green
     ground: { kind: 'green', size: [50, 60], color: '#3B8A4E', lineColor: '#FFFFFF', markings: 'none' },
     props: [
       { kind: 'tee', position: [0, 0, 20], color: '#4FA45B' },
@@ -433,6 +433,59 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     actors: [],
     camera: { alpha: -Math.PI / 2, beta: 1.05, radius: 17, target: [0, 1.6, -1], fov: 0.9 },
   },
+
+  // ── ship pass 4 (2026-09-04): specs sized to the modes' real play, with the baked maps ──
+  // The kit fields these replace were 60×90 (golf), 70×90 (ballpark), 50×70 (pitch) and a
+  // 44 m gridiron; the holes, mound, penalty spot and field lines below match the modes' code.
+  golf_loop: {
+    modeId: 'golf_loop', name: 'The Loop', venue: 'Coastal Links',
+    environment: dusk('#9FE0FF', '#0F3A22', '#1C5636', '#FFFAD8', 0.9),
+    ground: { kind: 'green', size: [60, 90], color: '#3B8A4E', lineColor: '#FFFFFF', markings: 'none' },
+    props: [
+      // the mode places its own tee, ball and flag (holes at z 26–39, x −10..10); scenery only here
+      { kind: 'palm', position: [-24, 0, 12], scale: 1.2 }, { kind: 'palm', position: [26, 0, 30] }, { kind: 'palm', position: [-22, 0, 40], scale: 1.1 },
+      { kind: 'lamp', position: [-20, 0, -8] }, { kind: 'lamp', position: [20, 0, -8] },
+      { kind: 'crowdTier', position: [0, 0, -44] },
+    ],
+    actors: [],
+    camera: { alpha: -Math.PI / 2, beta: 1.05, radius: 24, target: [0, 1.4, 10], fov: 0.9 },
+  },
+  derby: {
+    modeId: 'derby', name: 'Derby', venue: 'Pro Diamond',
+    environment: dusk('#8ED0F0', '#123A1E', '#1E5230', '#FFF0B8', 0.85),
+    ground: { kind: 'diamond', size: [70, 90], color: '#2F7A42', lineColor: '#E8D5A8', markings: 'none' },
+    props: [
+      { kind: 'crowdTier', position: [0, 0, 44], rotationY: Math.PI }, { kind: 'crowdTier', position: [-30, 0, 30], rotationY: Math.PI * 0.75 }, { kind: 'crowdTier', position: [30, 0, 30], rotationY: -Math.PI * 0.75 },
+      { kind: 'lamp', position: [-28, 0, -20] }, { kind: 'lamp', position: [28, 0, -20] },
+      { kind: 'banner', position: [0, 0, -42], color: '#E8D5A8' },
+    ],
+    actors: [],
+    camera: { alpha: -Math.PI / 2, beta: 1.05, radius: 26, target: [0, 1.5, 2], fov: 0.9 },
+  },
+  penalty: {
+    modeId: 'penalty', name: 'Penalty', venue: 'Global Pitch',
+    environment: dusk('#5BC0EB', '#0B3D2E', '#12513C', '#FFF6C8', 0.8),
+    // the spot is the origin and the goal line sits at z 10.4 (the mode builds the goal)
+    ground: { kind: 'pitch', size: [50, 70], color: '#2E7D46', lineColor: '#FFFFFF', markings: 'none' },
+    props: [
+      { kind: 'crowdTier', position: [0, 0, 24] }, { kind: 'crowdTier', position: [-26, 0, 6], rotationY: Math.PI / 2 }, { kind: 'crowdTier', position: [26, 0, 6], rotationY: -Math.PI / 2 },
+      { kind: 'lamp', position: [-22, 0, 16] }, { kind: 'lamp', position: [22, 0, 16] },
+    ],
+    actors: [],
+    camera: { alpha: -Math.PI / 2, beta: 1.0, radius: 34, target: [0, 1.5, 0], fov: 0.9 },
+  },
+  football_rush: {
+    modeId: 'football_rush', name: 'Football Rush', venue: 'Gridiron Sovereign',
+    environment: dusk('#FF8C42', '#0D2818', '#173D26', '#FFE0A8', 0.7),
+    // the mode plays x −20..20 over 40 m of length; the kit gridiron was widened to 44 m
+    ground: { kind: 'pitch', size: [44, 52], color: '#256B38', lineColor: '#FFFFFF', markings: 'none' },
+    props: [
+      { kind: 'crowdTier', position: [-30, 0, 20], rotationY: Math.PI / 2 }, { kind: 'crowdTier', position: [30, 0, 20], rotationY: -Math.PI / 2 },
+      { kind: 'lamp', position: [-26, 0, 0] }, { kind: 'lamp', position: [26, 0, 0] }, { kind: 'lamp', position: [-26, 0, 40] }, { kind: 'lamp', position: [26, 0, 40] },
+    ],
+    actors: [],
+    camera: { alpha: -Math.PI / 2, beta: 1.02, radius: 32, target: [0, 1.5, 20], fov: 0.9 },
+  },
 };
 
 // M75 — Dance venue ("The Cypher"). The one creative discipline where the
@@ -478,6 +531,8 @@ const BACKDROPS: Record<string, BackdropKind> = {
   soccer: 'stadium',         football: 'stadium',        baseball: 'stadium',
   tennis: 'stadium',
   snowboarding: 'mountains', surfing: 'ocean',           golf: 'links',
+  golf_loop: 'links',        derby: 'stadium',           penalty: 'stadium',
+  football_rush: 'stadium',
   karate_h2h: 'dojo',        karate_endless: 'dojo',     gymnastics: 'dojo',
   brain_brawl: 'neon',       who_scene_it: 'neon',       court_carnival: 'neon',
   dance: 'neon',
@@ -502,7 +557,7 @@ const VENUE_MAP_KEYS: Record<string, string> = {
   tennis: 'tennis-court',
   soccer: 'soccer-stadium',
   baseball: 'baseball-park',
-  golf: 'coastal-links',
+  golf: 'coastal-links', derby: 'baseball-park', penalty: 'soccer-stadium',   // golf_loop: no map — coastal-links is a ±15 m island, the course runs to z 39
   karate_h2h: 'dojo', karate_endless: 'dojo', gymnastics: 'dojo',
   snowboarding: 'mountain-slope',
   surfing: 'surf-break',

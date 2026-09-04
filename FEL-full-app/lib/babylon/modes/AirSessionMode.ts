@@ -20,6 +20,7 @@ import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
+import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 import { Onlookers } from '../visual/Onlookers';
 import { SoundKit } from '../audio/SoundKit';
 import type { AirSessionCore } from '../../feel/cores/air-session-core';
@@ -35,6 +36,7 @@ export interface AirSessionModeOpts {
   mood: VenueMood;
   /** Builds the venue. Called once in load(). */
   buildVenue: (scene: Scene) => void;
+  propSet?: string;   // ship pass 4: key into visual/venuePropSets.ts
   /** Constructs the skinned core; onLanding is supplied by the factory. */
   makeSession: (onLanding: (g: TrickGrade, rot: number, pts: number) => void) => AirSessionCore;
   /** Attempts before the session ends. */
@@ -58,6 +60,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   // modes exist, and module state would let gymnastics and big-air overwrite
   // each other's athlete the moment both had been mounted in one session.
   let athlete: SpawnedCharacter | null = null;
+  let props: VenuePropsHandle | null = null; let propsGone = false;
   let core: AirSessionCore | null = null;
   let launchPad: Mesh | null = null;
   let gallery: Onlookers | null = null;          // L4 — a judged event is watched
@@ -117,6 +120,8 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       reset();
 
       opts.buildVenue(ctx.scene);
+      propsGone = false;
+      if (opts.propSet) void mountVenueProps(ctx.scene, opts.propSet).then((h) => { if (propsGone) h?.dispose(); else props = h; });   // ship pass 4
 
       // The launch object: vault table or kicker lip. Placed at the core's own
       // launchZ so the visual and the physics agree by construction.
@@ -233,6 +238,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       // this prevents: the scene renders, and nothing ever moves).
       if (disposeCount < loadCount) return;
       athlete?.dispose(); athlete = null;
+      propsGone = true; props?.dispose(); props = null;
       launchPad?.dispose(); launchPad = null;
       gallery?.dispose(); gallery = null;
       core = null;
@@ -245,6 +251,7 @@ export const GymnasticsMode: ModeDefinition = makeAirSessionMode({
     modeId: 'gymnastics',
     mood: 'daylight',
     buildVenue: (scene) => VenueKit.buildPark(scene),
+    propSet: 'gym',
     makeSession: (onLanding) => makeVaultSession(undefined, { onLanding }),
     attempts: VAULT_TUNING.attemptsPerRound,
     winScore: 800,                                    //TUNE(elijah)
@@ -256,6 +263,7 @@ export const BigAirMode: ModeDefinition = makeAirSessionMode({
     modeId: 'bigair',
     mood: 'alpine',
     buildVenue: (scene) => VenueKit.buildSlope(scene),
+    propSet: 'slope',
     makeSession: (onLanding) => makeBigAirSession(undefined, { onLanding }),
     attempts: BIG_AIR_TUNING.attemptsPerRound ?? 3,
     winScore: 900,                                    //TUNE(elijah)

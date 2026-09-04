@@ -33,6 +33,7 @@ import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { CoinField } from '../core/Pickups';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
+import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 
 const RUN_SEC = 90;
 /** Skate 3 banks the moment you roll away clean; the delay is the revert window. */
@@ -46,6 +47,7 @@ const BIG_BANK_PTS = 500;
 
 export const SkateRunMode: ModeDefinition = (() => {
   let world: RideWorld, rig: BoardRig;
+  let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
   /** Seconds rolling clean on the ground before the pot banks (revert window). */
   let settleT = 0;
   /** Heading when the wheels left the ground — decides switch stance on landing. */
@@ -96,6 +98,7 @@ export const SkateRunMode: ModeDefinition = (() => {
 
     async load(ctx: ModeContext) {
       world = buildSkatepark(ctx.scene);
+      propsGone = false; void mountVenueProps(ctx.scene, 'skatepark').then((h) => { if (propsGone) h?.dispose(); else props = h; });
       // Gate 0: Validate skeletal rig by spawning placeholder to check skeleton
       const _validateChar = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, -1000, 0) });
       if (_validateChar.skeleton?.bones.length === 65) {
@@ -424,6 +427,6 @@ export const SkateRunMode: ModeDefinition = (() => {
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, null);
     },
 
-    dispose() { rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { propsGone = true; props?.dispose(); props = null; rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },
   };
 })();

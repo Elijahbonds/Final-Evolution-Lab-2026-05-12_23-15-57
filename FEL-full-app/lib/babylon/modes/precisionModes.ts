@@ -34,10 +34,14 @@ import {
 import { SPORT_CLIP } from '../anim/clipRegistry';
 import { SoundKit } from '../audio/SoundKit';
 import { VenueKit } from '../visual/VenueKit';
+import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
 import { keeperReadProb, rivalConverts, shootoutState, REGULATION_KICKS } from '../core/ShootoutCore';
 import { PRECISION_CONFIG as CFG } from './modeConfigs';
+
+// ship pass 4: the mounted venue specs (golf_loop / derby / penalty), disposed with their modes
+let golfVenue: VenueHandle | null = null, derbyVenue: VenueHandle | null = null, penaltyVenue: VenueHandle | null = null;
 
 const CLUTCH_MULT = 1.5;
 
@@ -425,7 +429,9 @@ export const GolfMode: ModeDefinition = (() => {
     modeId: 'golf', mood: 'alpine', camPreset: 'court',
 
     async load(ctx: ModeContext) {
-      VenueKit.buildField(ctx.scene, 'golf');
+      golfVenue = mountVenue(ctx, 'golf_loop', { keepGameplayCamera: true });
+      VenueKit.buildField(ctx.scene, 'golf');   // the kit green and pines stay under the spec's sky and props; the spec's pale ground hides
+      if (golfVenue) for (const m of golfVenue.built.root.getChildMeshes()) if (m.name === 'venue_ground') m.visibility = 0;
       EffectsKit.ambient(ctx.scene, 'park');
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.5, 0, 0), 0, SPORT_CLIP.golfAddress);
       ball = MeshBuilder.CreateSphere('gball', { diameter: 0.1 }, ctx.scene);
@@ -584,7 +590,7 @@ export const GolfMode: ModeDefinition = (() => {
       ctx.camDirector.update(me.root.position, Vector3.Zero(), reticle.pos);
     },
 
-    dispose() { gallery?.dispose(); gallery = null; flag?.dispose(); flag = null; me?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { golfVenue?.dispose?.(); golfVenue = null; gallery?.dispose(); gallery = null; flag?.dispose(); flag = null; me?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 
@@ -708,7 +714,8 @@ export const DerbyMode: ModeDefinition = (() => {
     modeId: 'baseball', mood: 'goldenHour', camPreset: 'court',
 
     async load(ctx: ModeContext) {
-      VenueKit.buildField(ctx.scene, 'ballpark');
+      derbyVenue = mountVenue(ctx, 'derby', { keepGameplayCamera: true });
+      if (!derbyVenue) VenueKit.buildField(ctx.scene, 'ballpark');   // spec first, kit fallback
       EffectsKit.ambient(ctx.scene, 'park');
       furniture = buildPlateAndMound(ctx.scene);
       // Phase 6 — the ballpark was a green plain with a mound: nothing for a
@@ -852,7 +859,7 @@ export const DerbyMode: ModeDefinition = (() => {
       ctx.camDirector.update(me.root.position, Vector3.Zero(), incoming ? pitchAt : ball.position);
     },
 
-    dispose() { gallery?.dispose(); gallery = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 
@@ -971,7 +978,8 @@ export const PenaltyMode: ModeDefinition = (() => {
     modeId: 'soccer', mood: 'nightGame', camPreset: 'court',
 
     async load(ctx: ModeContext) {
-      VenueKit.buildField(ctx.scene, 'pitch');
+      penaltyVenue = mountVenue(ctx, 'penalty', { keepGameplayCamera: true });
+      if (!penaltyVenue) VenueKit.buildField(ctx.scene, 'pitch');   // spec first, kit fallback
       EffectsKit.ambient(ctx.scene, 'park');
       furniture = buildGoal(ctx.scene);
       // Phase 6: the penalty spot is a real mark under the ball, and the
@@ -1163,6 +1171,6 @@ export const PenaltyMode: ModeDefinition = (() => {
       ctx.camDirector.update(me.root.position, Vector3.Zero(), reticle.pos);
     },
 
-    dispose() { gallery?.dispose(); gallery = null; me?.dispose(); keeper?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { penaltyVenue?.dispose?.(); penaltyVenue = null; gallery?.dispose(); gallery = null; me?.dispose(); keeper?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
   };
 })();

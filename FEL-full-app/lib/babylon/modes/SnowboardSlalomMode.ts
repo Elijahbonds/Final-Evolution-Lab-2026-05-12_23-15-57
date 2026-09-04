@@ -29,6 +29,7 @@ import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
+import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 
 const YETI_SPAWN_GATE = 5;                 // bursts out after this gate clears
 const YETI_CHASE_SEC = 8;
@@ -47,6 +48,7 @@ export const BOOST_MAX = 100;
 
 export const SnowboardSlalomMode: ModeDefinition = (() => {
   let world: RideWorld, rig: BoardRig, tricks: TrickMachine;
+  let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
   let crowd: Onlookers;
   let nextGate = 0, gatesHit = 0, elapsed = 0;
   let stickX = 0, tuck = 0;
@@ -105,6 +107,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
 
     async load(ctx: ModeContext) {
       world = buildSlopeRun(ctx.scene);
+      propsGone = false; void mountVenueProps(ctx.scene, 'slope').then((h) => { if (propsGone) h?.dispose(); else props = h; });
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0.2, 4), 0, world.ground, '#ff6b3d');
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h));
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 20, modeId: 'snowboard' });
@@ -319,6 +322,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     dispose() {
       yeti?.char.dispose(); yeti = null; yetiPool = null;
       crowd?.dispose();
+      propsGone = true; props?.dispose(); props = null;
       rig?.dispose(); world?.dispose(); SoundKit.stopAmbient();
     },
   };

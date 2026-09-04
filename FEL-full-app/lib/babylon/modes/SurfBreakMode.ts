@@ -22,6 +22,7 @@ import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
+import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 
 const RUN_SEC = 90;
 /** How fast a cutback comes around. ~0.4s to complete the turn. */
@@ -44,6 +45,7 @@ export const FLOW_MAX = 200;
 export const FLOW_FILL_PER_SEC = 22;
 export const SurfBreakMode: ModeDefinition = (() => {
   let world: RideWorld, waveLipAt: (t: number) => Vector3, barrelActive: (t: number) => boolean;
+  let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
   let rig: BoardRig, tricks: TrickMachine;
   let crowd: Onlookers;
   let t = 0, timeLeft = RUN_SEC, flow = 0;
@@ -101,6 +103,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
     async load(ctx: ModeContext) {
       const built = buildSurfBreak(ctx.scene, POCKET);
       world = built.world; waveLipAt = built.waveLipAt; barrelActive = built.barrelActive;
+      propsGone = false; void mountVenueProps(ctx.scene, 'surf-break').then((h) => { if (propsGone) h?.dispose(); else props = h; });
       // Gate 0: Validate skeletal rig by spawning placeholder to check skeleton
       const _validateChar = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, -1000, 0) });
       if (_validateChar.skeleton?.bones.length === 65) {
@@ -263,7 +266,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       ctx.camDirector.update(rig.char.root.position, leadVel, lip);
     },
 
-    dispose() { crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { propsGone = true; props?.dispose(); props = null; crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 

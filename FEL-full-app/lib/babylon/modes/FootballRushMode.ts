@@ -25,10 +25,13 @@ import { assertSpawned } from '../core/FrameGuard';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { VenueKit } from '../visual/VenueKit';
+import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { Onlookers } from '../visual/Onlookers';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { FOOTBALL_CONFIG as CFG } from './modeConfigs';
+
+let rushVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 
 // MAP-SIZE FIX: VenueKit.buildGridiron widened from 22m to 44m to match a
 // real field's sideline-to-sideline width — this clamp has to widen with it
@@ -180,7 +183,9 @@ export const FootballRushMode: ModeDefinition = (() => {
     modeId: 'football', mood: 'nightGame', camPreset: 'runner',
 
     async load(ctx: ModeContext) {
-      VenueKit.buildGridiron(ctx.scene);
+      rushVenue = mountVenue(ctx, 'football_rush', { keepGameplayCamera: true });
+      VenueKit.buildGridiron(ctx.scene);   // the kit field keeps its yard lines and posts under the spec's sky
+      if (rushVenue) for (const m of rushVenue.built.root.getChildMeshes()) if (m.name === 'venue_ground') m.visibility = 0;
       runner = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 0), yawRad: 0, startClip: SPORT_CLIP.idle,
       });
@@ -384,6 +389,8 @@ export const FootballRushMode: ModeDefinition = (() => {
     },
 
     dispose() {
+
+      rushVenue?.dispose?.(); rushVenue = null;
       gallery?.dispose(); gallery = null;
       runner?.dispose();
       for (const mob of defenders) mob.char.dispose();

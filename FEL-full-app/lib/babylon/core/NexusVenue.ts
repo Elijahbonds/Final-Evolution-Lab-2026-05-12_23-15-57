@@ -18,6 +18,7 @@
 
 import type { Scene, TransformNode } from '@babylonjs/core';
 import { buildNexusScene, type BuiltScene } from '../nexus/NexusWebScene';
+import { mountVenueProps, propSetFor, type VenuePropsHandle } from '../visual/VenueProps';
 import { specFor } from '../nexus/venueSpecs';
 
 export interface VenueHandle {
@@ -99,6 +100,13 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
 
   const built = buildNexusScene(ctx.scene, spec, ctx.canvas);
 
+  // Ship pass 4, phase 2: the CC0 prop dressing for this venue (visual/VenueProps.ts),
+  // loaded async under the venue root and disposed with it. Placements live in
+  // venuePropSets.ts and stay outside every play area.
+  const propSet = propSetFor(modeId);
+  let props: VenuePropsHandle | null = null; let propsGone = false;
+  if (propSet) void mountVenueProps(ctx.scene, propSet, built.root).then((h) => { if (propsGone) h?.dispose(); else props = h; });
+
   // M104: hand the shot back to the mode's follow-cam. The venue's ArcRotate
   // camera stays in the scene (its scenery is unaffected by which camera
   // renders) but is detached from input and no longer active, so the
@@ -139,6 +147,7 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
     },
     dispose() {
       ctx.camDirector?.invalidateBounds?.();
+      propsGone = true; props?.dispose(); props = null;
       built.dispose();
     },
   };

@@ -116,6 +116,11 @@ for (const key of srcKeys) {
     console.error(`  ✗ ${key}: ${(err as Error).message}`);
   }
 }
-writeFileSync(join(OUT_DIR, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+// Merge into the shipped manifest: a partial run (one key, or a run where every input
+// was refused) must not erase the entries of maps it never touched — that happened on
+// 2026-09-04 and emptied the file.
+const manifestPath = join(OUT_DIR, 'manifest.json');
+const previous = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown> : {};
+writeFileSync(manifestPath, JSON.stringify({ ...previous, ...manifest }, null, 2) + '\n');
 console.log(`\n${failures ? '✗' : '✔'} MAP PIPELINE — ${Object.keys(manifest).length} baked, ${failures} failed → ${OUT_DIR}/`);
 if (failures) process.exit(1);
