@@ -128,3 +128,10 @@ Plan page: https://claude.ai/code/artifact/06ac4116-487a-472f-9378-07e2834ccebb
   → used to be a black canvas with the HUD still streaming, now "Graphics were
   reset by the device. Reload to keep playing." Every path also reports a
   diagnostic (Phase 5) — the load failure path was added.
+- **Phase 6, weak-hardware proxy: gate met (3 Sep).** Seven modes on the
+  mobile tier under a 4× CPU throttle (CDP `Emulation.setCPUThrottlingRate`):
+  dunk 60, karate 60, skateboard 60, volleyball 59, golf 60, football 60,
+  dance 61 fps, all 0/0/0. Time-to-playing under throttle sat at 13–14 s for
+  every mode alike, which says the number is dominated by the capture's own
+  flow and the dev server's compile, not by the mode; the unthrottled and
+  production numbers come with the next sweeps and set the Phase 3 budget.

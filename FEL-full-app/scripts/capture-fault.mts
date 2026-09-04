@@ -24,7 +24,7 @@ if (FAULT === 'glb404') await p.route('**/models/**/*.glb', (r) => r.fulfill({ s
 if (FAULT === 'slow') await p.route('**/models/**/*.glb', async (r) => { await new Promise((res) => setTimeout(res, 12_000)); await r.continue(); });
 if (FAULT === 'offline') await p.route('**/api/**', (r) => r.abort('connectionfailed'));
 await p.goto(URL, { waitUntil: 'domcontentloaded' });
-await p.waitForTimeout(FAULT === 'slow' ? 16_000 : 9_000);
+await p.waitForTimeout(Number(process.env.WAIT_MS ?? (FAULT === 'slow' ? 16_000 : 9_000)));
 if (FAULT === 'contextloss') {
   await p.evaluate(() => { const c = document.querySelector('canvas'); const gl = c?.getContext('webgl2') ?? c?.getContext('webgl'); const ext = gl?.getExtension('WEBGL_lose_context'); ext?.loseContext(); (window as unknown as { __felLost?: boolean }).__felLost = !!ext; });
   await p.waitForTimeout(6_000);
@@ -37,4 +37,5 @@ console.log(`${NAME} canvas ${canvas} | body text ${text.length} chars${blank ? 
 const cue = /retry|reload|try again|couldn.t load|failed to load|something went wrong|offline|reconnect/i.exec(text);
 console.log(`${NAME} recovery cue: ${cue ? `"${cue[0]}"` : 'NONE'} | text: ${text.slice(0, 200)}`);
 for (const l of logs.slice(0, 4)) console.log('   ·', l);
+for (const b of crashPosts.slice(0, 3)) console.log('   post:', b.slice(0, 300));
 await b.close();
