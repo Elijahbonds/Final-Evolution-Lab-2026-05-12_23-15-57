@@ -27,3 +27,12 @@ Plan page: https://claude.ai/code/artifact/88460d0b-8775-4206-a872-81951f4ddeb0
 ## Findings log
 - **3 Sep, opened.** Blender 5.1.2 is installed on this machine; MPFB2 is not.
   The spike starts with a headless install and an API probe.
+- **3 Sep, rung 4 first measure.** Five takes segmented by motion energy
+  (golf 5.4 s, tennis serve 3.5 s, baseball pitch 2.6 s, volleyball spike
+  3.3 s, football catch 8.2 s; each take is one movement after a static
+  lead-in). `buildMocapClip` plays a take on the hero from the JSON. Golf on
+  the rig: hand rises 0.98→1.62 m and crosses 1.0 m — a swing — but the hands
+  open to 0.71 m at extension (**D-M1**: the owner's limb lengths vs the
+  hero's). Fix planned: grip IK to a shared club target. Gate 0 held: the hero
+  is the 22-bone unprefixed rig; the takes' Mixamo names map 1:1 after the
+  prefix strip, toes dropped, root motion dropped.
