@@ -167,9 +167,10 @@ for (const mesh of root.listMeshes()) for (const prim of mesh.listPrimitives()) 
   if (!mat) { prim.setMaterial(doc.createMaterial('skin').setBaseColorFactor([0.78, 0.55, 0.42, 1]).setRoughnessFactor(0.6).setMetallicFactor(0)); continue; }
   // the skin follows the MakeHuman UV layout: the runtime may swap in any MakeHuman skin map (playerIdentity.applySkinMap)
   if (mat.getName() === 'skin' || /^skin/i.test(mat.getName())) { mat.setName('skin'); mat.setExtras({ ...(mat.getExtras() ?? {}), felSkinUV: 'makehuman' }); continue; }
+  if (/^(jersey|shorts|shoes)\.[A-Za-z0-9_-]+/.test(mat.getName())) { mat.setName(mat.getName().replace(/\.\d+$/, '')); continue; }   // kit garment: <slot>.<itemId> stays (Blender's .001 suffix dropped)
   const n = nameFor(mesh.getName(), mat.getName()); if (n) mat.setName(n);
 }
-for (const n of root.listNodes()) { const m = n.getMesh(); if (m) { const mats = m.listPrimitives().map((p) => p.getMaterial()?.getName()).filter(Boolean); if (mats.length === 1 && mats[0] !== 'skin') n.setName(mats[0]!); else if (mats[0] === 'skin') n.setName('Body'); } }
+for (const n of root.listNodes()) { if (/^Kit_/.test(n.getName())) continue; const m = n.getMesh(); if (m) { const mats = m.listPrimitives().map((p) => p.getMaterial()?.getName()).filter(Boolean); if (mats.length === 1 && mats[0] !== 'skin') n.setName(mats[0]!); else if (mats[0] === 'skin') n.setName('Body'); } }
 await doc.transform(dedup(), prune());
 // Textures: the MakeHuman packs ship 2048² PNGs (a skin 3.5 MB, a denim normal 5.4 MB).
 // WebP at 2048 keeps the detail the skin pass needs and brings the file inside the

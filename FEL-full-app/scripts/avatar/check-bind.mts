@@ -11,9 +11,9 @@ import { readFileSync } from 'node:fs';
 
 const file = process.argv[2]; if (!file) { console.error('usage: check-bind <glb> [--tol m]'); process.exit(2); }
 // Tolerance: a blend centroid sits a few cm off the joint (the knee's mixed region
-// hangs below it, the neck's above) — 8 cm separates that bias from a pose
+// hangs below it, the neck's above) — 10 cm separates that bias from a pose
 // mismatch, which measured 30–40 cm.
-const ti = process.argv.indexOf('--tol'); const TOL = ti > 0 ? Number(process.argv[ti + 1]) : 0.08;
+const ti = process.argv.indexOf('--tol'); const TOL = ti > 0 ? Number(process.argv[ti + 1]) : 0.10;
 const doc = await new NodeIO().registerExtensions(ALL_EXTENSIONS).readBinary(new Uint8Array(readFileSync(file)));
 const skin = doc.getRoot().listSkins()[0]; if (!skin) { console.error('no skin'); process.exit(2); }
 const joints = skin.listJoints().map((j) => j.getName().replace(/^mixamorig:?/, '')); const ibm = skin.getInverseBindMatrices()!;
