@@ -135,3 +135,14 @@ Plan page: https://claude.ai/code/artifact/06ac4116-487a-472f-9378-07e2834ccebb
   every mode alike, which says the number is dominated by the capture's own
   flow and the dev server's compile, not by the mode; the unthrottled and
   production numbers come with the next sweeps and set the Phase 3 budget.
+- **Phase 5, game telemetry: gate met (3 Sep).** `reportDiag()` rides the
+  analytics pipe as `game_diag` (rate-limited per kind, 10 s), wired at the
+  frame guard's second miss, safe-play's unknown clip, the identity watchdog's
+  failed compile, the camera's boxed-in fallback, the render watchdog, a mode
+  load failure and WebGL context loss/restore. Proof: a blocked hero model on
+  `/play/onevone` posted `{kind: load, mode: onevone, detail: …}` and
+  `/api/admin/diag` listed it. Found on the way: every `/api/admin/*` route
+  answered 401 to everyone because the session never carried `role` (fixed in
+  `lib/auth.ts`, with a five-minute refresh so a promotion takes); and the
+  analytics route swallowed rejected batches and exceptions behind a silent
+  204 (it logs them now).

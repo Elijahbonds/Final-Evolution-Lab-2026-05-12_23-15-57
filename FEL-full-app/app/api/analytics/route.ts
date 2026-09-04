@@ -32,7 +32,12 @@ export async function POST(req: Request) {
   try {
     const raw = await req.json().catch(() => ({}));
     const parsed = bodySchema.safeParse(raw);
-    if (!parsed.success) return new NextResponse(null, { status: 204 });
+    if (!parsed.success) {
+      // Ship pass 2: a 204 on a bad batch is right for the client and wrong for
+      // us — say what was rejected, once per request, so a shape drift shows.
+      console.warn('[analytics] batch rejected:', parsed.error.issues.slice(0, 3).map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
+      return new NextResponse(null, { status: 204 });
+    }
 
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id ?? null;
@@ -49,8 +54,11 @@ export async function POST(req: Request) {
       })),
     );
     return new NextResponse(null, { status: 204 });
-  } catch {
-    // Telemetry must never surface an error to the client.
+  } catch (err) {
+    // Telemetry must never surface an error to the client — but it must
+    // surface to US. Measured 2026-09-03: a valid batch vanished behind this
+    // 204 with nothing in the log.
+    console.error('[analytics] POST failed:', (err as Error)?.message ?? err);
     return new NextResponse(null, { status: 204 });
   }
 }
