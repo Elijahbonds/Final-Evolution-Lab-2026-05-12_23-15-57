@@ -49,6 +49,14 @@ for slot, items in KIT.items():
     for item_id, garment in items:
         obj = add('Clothes', U + f'/clothes/{garment}/{garment}.mhclo', f'Kit_{slot}_{item_id}', f'{MAT[slot]}.{item_id}')
         if obj: kit_objects.append(obj.name)
+# hair: one asset per Closet hair node key (lib/babylon/core/hairStyles.ts), each its own
+# object Hair_<key> under material hair.<key> — the runtime shows one, hides the rest and
+# tints anything named hair*. No hijab asset in the packs (residual).
+HAIR = [('cap', 'short01'), ('afro', 'afro01'), ('buzz', 'short03'), ('bun', 'rehmanpolanski_hair_bun_brown'), ('ponytail', 'ponytail01'), ('braids', 'braid01')]
+hair_objects = []
+for key, asset in HAIR:
+    obj = add('Hair', U + f'/hair/{asset}/{asset}.mhclo', f'Hair_{key}', f'hair.{key}')
+    if obj: hair_objects.append(obj.name)
 eyes = sorted(glob.glob(U + '/eyes/low-poly/*.mhclo'))
 if eyes: add('Eyes', eyes[0], 'eyes')
 FACE = [('faceLong', 'head-rectangular'), ('faceRound', 'head-round'), ('faceSquare', 'head-square'), ('faceHeart', 'head-invertedtriangular'),
@@ -64,6 +72,7 @@ def decimate(name, ratio):
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.modifier_apply(modifier='fel_decimate')
 for name in kit_objects: decimate(name, 0.35 if name.startswith('Kit_shoes') else 0.6)
+for name in hair_objects: decimate(name, 0.5)
 decimate('eyes', 0.5)
 import bmesh
 helper_groups = [vg.index for vg in basemesh.vertex_groups if vg.name.lower().startswith(('helper', 'joint', 'hair', 'tights', 'skirt', 'fur'))]
