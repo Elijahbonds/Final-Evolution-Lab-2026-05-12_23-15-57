@@ -59,6 +59,20 @@ for key, asset in HAIR:
     if obj: hair_objects.append(obj.name)
 eyes = sorted(glob.glob(U + '/eyes/low-poly/*.mhclo'))
 if eyes: add('Eyes', eyes[0], 'eyes')
+# Bake the macro shape (sex, build, age) into the mesh BEFORE the face morphs
+# load: the exporter writes the base mesh and the macro keys are dropped below,
+# so without this both sexes export the same androgynous geometry while the
+# eyes, hair and garments are fitted to the evaluated shape (measured
+# 2026-09-04: the female's hair sat across her eyes).
+if basemesh.data.shape_keys:
+    mix = basemesh.shape_key_add(name='felBakedMix', from_mix=True)
+    basis = basemesh.data.shape_keys.reference_key
+    for i, v in enumerate(mix.data):
+        basis.data[i].co = v.co
+        basemesh.data.vertices[i].co = v.co
+    for kb in list(basemesh.data.shape_keys.key_blocks):
+        if kb != basis: basemesh.shape_key_remove(kb)
+    print('KIT macro shape baked into the basis; keys left', [k.name for k in basemesh.data.shape_keys.key_blocks])
 FACE = [('faceLong', 'head-rectangular'), ('faceRound', 'head-round'), ('faceSquare', 'head-square'), ('faceHeart', 'head-invertedtriangular'),
         ('faceDiamond', 'head-diamond'), ('jawOpen', 'chin-jaw-drop-incr'), ('browRaise', 'eyebrows-trans-up')]
 for fel, target in FACE:
