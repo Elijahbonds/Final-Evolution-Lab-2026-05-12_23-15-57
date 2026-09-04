@@ -1,7 +1,24 @@
 # Changelog
 
-## Unreleased — ship passes 1 and 2 (2026-09-02 → 2026-09-03)
+All notable changes to Final Evolution Lab. Dates are 2026.
 
+## 0.9.0-rc.1 — 2026-09-03 · release candidate
+
+### Ship pass 2 — launch readiness
+- Shipping-route gauntlet (`scripts/gauntlet-play.sh`): all twenty Babylon `/play` routes, logged in.
+- Production-mode gauntlet (`scripts/prod-serve.sh`): the built bundle served on :3004 and swept.
+- Character containers cached per scene; a disposed scene's container no longer reaches the next spawn.
+- Identity watchdog judges compilability after sixty rendered frames; force-compiles before reporting.
+- Game shell: an unreachable-server state with Retry. Harness: WebGL context loss becomes a named error state.
+- Game diagnostics leave the browser as `game_diag` analytics events; owners read `/api/admin/diag`.
+- Session carries the user's role (every `/api/admin/*` had answered 401). Analytics route logs rejected batches and failures.
+- Baked venue maps optimized 36 → 26 MB (dedup, prune, weld, quantize).
+- Controller Link entries for ones, karate, karate versus, carnival.
+- Capture tooling: mobile quality tier, CPU throttle, time-to-playing, fault injection (missing model, slow asset, offline, context loss).
+- Security headers; dev harness routes 404 outside development; CI workflow (type-check, tests, production build).
+- Repo: the stale root twin archived under `_archive/root-twin/`; probes under `scripts/probes/`.
+
+### Ship pass 1 — every mode to its benchmark (2026-09-02 → 03)
 - Import the fel-app-handoff state: avatar/map/backdrop pipelines and nine more sign-offs
 - Gap reports for both directive workstreams, before any implementation
 - Gauntlet baseline: fill the frame-budget table, fix the mobile sweep
@@ -41,9 +58,4 @@
 - Capture: TIER=mobile runs a mode in a phone-shaped touch context (mobile quality tier)
 - Gauntlet: seven modes on the mobile quality tier; rounds seven and eight recorded
 - FrameGuard: log from the second consecutive miss, as it already acts
-- Ship Pass 2: launch-readiness plan (ten phases)
-- Ship Pass 2: plan page link
-- Ship Pass 2 groundwork: shipping-route gauntlet, map optimizer probe, fault captures, CI workflow
-- Capture: THROTTLE=n applies CDP CPU throttling (weak-hardware proxy)
-- Ship Pass 2: phase 7 and 9 reads
 
