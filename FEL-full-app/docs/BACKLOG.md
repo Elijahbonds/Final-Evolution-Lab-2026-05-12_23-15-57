@@ -114,3 +114,14 @@ orchestrator.
 - **15:26** `lane/rc` `488d5aa` — production build carries the pre-existing MediaPipe "critical dependency" warning via
   `components/facescan/face-scan-capture.tsx` → `components/closet-view.tsx`; `/closet` and `/dev/mode/[key]` are 2 MB
   first-load chunks. Belongs to `components/closet-view.tsx` (a dynamic import of the face-scan capture).
+- **15:44** window closed — `lane/perf` did NOT commit the written `textureBudget.json` (21 modes × 2 tiers, mobile
+  no mode over 2×, `throttle4` rows present) within the window; until it lands, verify's gate and rc's checklist row
+  stay red on every branch. Its two extra fields (`basis`, `throttle4`) are outside contract §3's schema — ratify or
+  strip at integration. Belongs to `lane/perf` (commit) and `docs/CONTRACTS-PASS4-RUN.md` §3 (orchestrator).
+- **15:44** — no lane produced a commit whose message says "final"; the window rule ("stop after 40 minutes or when all
+  three lanes say final") closed on time. Integration order still perf → verify → rc (skinMapUrl, budget table,
+  checklist). Belongs to the orchestrator.
+
+## Count
+
+28 seeded items (B1–B28) + 15 items appended from the run = 43.

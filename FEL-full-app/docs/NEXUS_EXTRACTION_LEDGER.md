@@ -341,3 +341,18 @@ Appended every ~10 minutes while the run is live; see also `docs/BACKLOG.md` for
     not in the file set / orchestrator's step) — the honest complement to the gate table.
   - `perf` reads `n/a` on shipping routes because the fps/draw readout is the dev HUD — fps on the shipped page is
     unmeasured. For the extraction: the perf sample must have a production-safe channel (`__FEL_DEV__` is dev-only).
+- **15:44 — watch window closed** (opened 15:03). Final branch state: `lane/verify` 2 commits (`bd3284e`, `62e9777`),
+  `lane/perf` 1 (`98a4696`), `lane/rc` 2 (`17654af`, `488d5aa`); none carries "final" in its message. Every lane
+  commit touched only files in its own owned set; no lane edited a shared file. Last working-tree read: `lane/perf`
+  has `lib/babylon/config/textureBudget.json` WRITTEN but uncommitted — `measuredAt 2026-09-04`, 21 enabled modes on
+  both tiers, engine basis; desktop median 132.4 MB (dunk 197.6 heaviest); **mobile median 60.9 MB, ceiling 121.8,
+  heaviest karate 117.0 — no mode over 2×** (dunk 93.6, down from 168 on the old basis / 197 on the new). The table
+  adds two fields beyond the frozen schema: a `basis` string and a `throttle4` block (the ≥ 30 fps rows), which the
+  verify test ignores and `existingExtras` preserves — a contract addendum for the orchestrator to ratify, since
+  contract §3 lists neither. Reusable: **record the measurement basis IN the table** (`basis: …`) so a future
+  re-measure on a different list is not mistaken for a regression.
+- **Ledger close-out.** Twelve numbered patterns (§1–12) plus the run-log patterns: red-first hand-off, re-derive the
+  summary, probe → frozen-schema table → test, gate report as a command table, measure the gate's blind spots,
+  ratio gates need a minimum row count, count GPU memory from the engine cache, tier variant = texture pass with a
+  never-brick fallback, changelog by phase with measured proof, RC record with a "not done" section, dev harness
+  dark in production → the sweep is the play routes, and the contention note on every fps figure.
