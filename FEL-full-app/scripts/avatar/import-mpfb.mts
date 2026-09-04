@@ -9,6 +9,8 @@ import { NodeIO, type Node } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { prune, dedup } from '@gltf-transform/functions';
 import { readFileSync, writeFileSync } from 'node:fs';
+import sharp from 'sharp';
+import { dedup, resample, textureCompress } from '@gltf-transform/functions';
 
 const FEL = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand',
   'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'LeftToeBase', 'RightUpLeg', 'RightLeg', 'RightFoot', 'RightToeBase'];
@@ -66,11 +68,16 @@ const nameFor = (meshName: string, matName: string): string | null => { for (con
 for (const mesh of root.listMeshes()) for (const prim of mesh.listPrimitives()) {
   const mat = prim.getMaterial();
   if (!mat) { prim.setMaterial(doc.createMaterial('skin').setBaseColorFactor([0.78, 0.55, 0.42, 1]).setRoughnessFactor(0.6).setMetallicFactor(0)); continue; }
-  if (mat.getName() === 'skin' || /^skin/i.test(mat.getName())) { mat.setName('skin'); continue; }
+  // the skin follows the MakeHuman UV layout: the runtime may swap in any MakeHuman skin map (playerIdentity.applySkinMap)
+  if (mat.getName() === 'skin' || /^skin/i.test(mat.getName())) { mat.setName('skin'); mat.setExtras({ ...(mat.getExtras() ?? {}), felSkinUV: 'makehuman' }); continue; }
   const n = nameFor(mesh.getName(), mat.getName()); if (n) mat.setName(n);
 }
 for (const n of root.listNodes()) { const m = n.getMesh(); if (m) { const mats = m.listPrimitives().map((p) => p.getMaterial()?.getName()).filter(Boolean); if (mats.length === 1 && mats[0] !== 'skin') n.setName(mats[0]!); else if (mats[0] === 'skin') n.setName('Body'); } }
 await doc.transform(dedup(), prune());
+// Textures: the MakeHuman packs ship 2048² PNGs (a skin 3.5 MB, a denim normal 5.4 MB).
+// WebP at 2048 keeps the detail the skin pass needs and brings the file inside the
+// hero load budget (measured 2026-09-04: 13.2 MB → see the log line).
+await doc.transform(dedup(), resample(), textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 82, resize: [2048, 2048] }));
 writeFileSync(outFile, await io.writeBinary(doc));
 const outJoints = root.listSkins()[0].listJoints().map((j) => j.getName());
 console.log(`wrote ${outFile}: joints ${outJoints.length} (${outJoints.filter((n) => keep.has(n)).length} in spec), meshes ${root.listMeshes().length}, materials ${root.listMaterials().map((m) => m.getName()).join(',')}`);

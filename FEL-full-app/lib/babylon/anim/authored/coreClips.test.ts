@@ -15,6 +15,7 @@ import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildCelebrateBig } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
 import { buildJuke, buildSpinMove, buildTackledFall } from './football';
+import { buildBaseClips } from './baseClips';
 
 let scene: Scene; let sk: Skeleton;
 const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>();
@@ -136,5 +137,33 @@ describe('football fills', () => {
     const g = fresh(() => buildTackledFall(scene, sk)!);
     at(g, 0); const h0 = hipsY();
     at(g, 0.6); expect(hipsY()).toBeLessThan(h0 - 0.6);
+  });
+});
+
+describe('base clips (the forge\'s nine, built at runtime)', () => {
+  it('guard: fists up in front of the chin, arms not out in a T', () => {
+    const g = fresh(() => buildBaseClips(scene, sk).find((c) => c.name === 'guard')!);
+    at(g, 0.1);
+    for (const s of ['Left', 'Right']) { const h = pos(`${s}Hand`); expect(h.z).toBeGreaterThan(0.2); expect(h.y).toBeGreaterThan(pos('Head').y - 0.4); expect(Math.abs(h.x)).toBeLessThan(0.3); }
+  });
+  it('jab: the lead hand snaps out front', () => {
+    const g = fresh(() => buildBaseClips(scene, sk).find((c) => c.name === 'jab')!);
+    at(g, 0); const z0 = pos('LeftHand').z;
+    at(g, 0.15); expect(pos('LeftHand').z).toBeGreaterThan(z0 + 0.25);
+  });
+  it('run: the legs alternate and the arms hang, swinging', () => {
+    const g = fresh(() => buildBaseClips(scene, sk).find((c) => c.name === 'run')!);
+    at(g, 0.15); const a = pos('LeftFoot').z - pos('RightFoot').z;
+    at(g, 0.45); const b = pos('LeftFoot').z - pos('RightFoot').z;
+    expect(Math.sign(a)).not.toBe(Math.sign(b)); expect(Math.abs(a)).toBeGreaterThan(0.25);
+    expect(pos('RightHand').y).toBeLessThan(pos('RightArm').y - 0.3);
+  });
+  it('jumpshot: both hands above the head at the release', () => {
+    const g = fresh(() => buildBaseClips(scene, sk).find((c) => c.name === 'jumpshot')!);
+    at(g, 0.5); expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);
+  });
+  it('high kick: the right foot rises above the hips', () => {
+    const g = fresh(() => buildBaseClips(scene, sk).find((c) => c.name === 'high_kick')!);
+    at(g, 0.28); expect(pos('RightFoot').y).toBeGreaterThan(hipsY() - 0.1);
   });
 });

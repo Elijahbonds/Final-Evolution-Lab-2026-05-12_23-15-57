@@ -52,10 +52,12 @@ export default function AvatarPreview({ face, palette, jersey }: AvatarPreviewPr
       // one place the identity pipe and the spawn layers meet without a login
       if (process.env.NODE_ENV === 'development') (window as unknown as { __FEL_PREVIEW__?: unknown }).__FEL_PREVIEW__ = { scene, spawned };
 
+      // dev only: ?tone=8d5524 previews a skin tone without touching the draft (per-tone captures, ship pass 3 rung 2)
+      const toneParam = process.env.NODE_ENV === 'development' ? new URLSearchParams(window.location.search).get('tone') : null;
       applyRef.current = (p: AvatarPreviewProps) => {
         applyIdentity(spawned, {
           proportions: null,
-          face: p.face,
+          face: toneParam ? { ...p.face, skinTone: `#${toneParam.replace(/^#/, '')}` } : p.face,
           palette: p.palette,
           jersey: p.jersey,
           custom: true,

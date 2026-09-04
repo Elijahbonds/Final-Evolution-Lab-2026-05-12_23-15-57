@@ -4,6 +4,8 @@
 set -u
 cd "$(dirname "$0")/.."
 BASE=${BASE:-http://localhost:3000}   # ship pass 2: BASE=http://localhost:3004 points at the production server
+# ship pass 3: HERO=/models/candidates/<file>.glb sweeps the dev-mode captures on a candidate body (dev-only ?hero= flag)
+Q=${HERO:+?hero=$HERO}
 G="${GAUNTLET_DIR:?set GAUNTLET_DIR}"; mkdir -p "$G" "$G/logs"
 OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
 {
@@ -11,7 +13,7 @@ OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
   printf "vitest     : "; npx vitest run 2>&1 | grep -oE "Tests +[0-9]+ passed \([0-9]+\)|[0-9]+ failed" | head -1
   for m in dunk threepoint threevthree onevone dunkduel karate_vs karate mixedcombat skateboard surf snowboard_slalom bigair gymnastics volleyball tennis golf derby penalty football carnival dance; do
     # full output kept per mode so a frame-guard hit is inspectable after the fact
-    r=$(URL=$BASE/dev/mode/$m PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=8 npx tsx scripts/capture-mode-play.mts 2>&1)
+    r=$(URL="$BASE/dev/mode/$m$Q" PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=8 npx tsx scripts/capture-mode-play.mts 2>&1)
     echo "$r" > "$G/logs/$m.txt"
     line=$(echo "$r" | grep -oE "FEL-FRAME [0-9]+ \| MISSING CLIP [0-9]+ \| errors [0-9]+" | head -1)
     perf=$(echo "$r" | grep -oE "perf  : .*" | sed 's/perf  : //' | head -1)

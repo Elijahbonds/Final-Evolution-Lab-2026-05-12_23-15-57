@@ -26,6 +26,8 @@ export interface BindFrame {
   parentRot: Map<TransformNode, Quaternion>;
   /** degrees → local quaternion, about the parent's bind axes, from bind */
   keyed(n: TransformNode, deg: Deg3): Quaternion;
+  /** a world-space delta from rest (the forge's pose vocabulary) → the same local quaternion */
+  keyedQ(n: TransformNode, delta: Quaternion): Quaternion;
 }
 
 const cache = new WeakMap<Skeleton, BindFrame>();
@@ -49,10 +51,11 @@ export function bindFrame(sk: Skeleton): BindFrame {
   for (const [n, q] of saved) n.rotationQuaternion = q;
   const bf: BindFrame = {
     bind, parentRot,
-    keyed(n, deg) {
+    keyed(n, deg) { return bf.keyedQ(n, eulerQ(...deg)); },
+    keyedQ(n, delta) {
       const b = bind.get(n)?.q ?? Quaternion.Identity(); const Rp = parentRot.get(n) ?? Quaternion.Identity();
       // Babylon: a.multiply(b) applies b first. Conjugate the delta into the parent's frame, then apply it after the bind rotation.
-      return Rp.clone().invert().multiply(eulerQ(...deg)).multiply(Rp).multiply(b);
+      return Rp.clone().invert().multiply(delta).multiply(Rp).multiply(b);
     },
   };
   cache.set(sk, bf);

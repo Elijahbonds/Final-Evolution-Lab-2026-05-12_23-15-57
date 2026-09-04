@@ -6,7 +6,8 @@
 import { applyHairStyle } from './hairStyles';
 import { reportDiag } from './diag';
 import { applyFaceMorphs, resolveFaceWeights } from './faceMorphs';
-import { Color3, DynamicTexture, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, StandardMaterial, Texture, Vector3 } from '@babylonjs/core';
+import { SKIN_DETAIL_NORMAL, SKIN_LIBRARY, type SkinEntry } from './skinLibrary';
 import type { Material } from '@babylonjs/core';
 
 type TintMat = Material & { albedoColor?: Color3; diffuseColor?: Color3; bumpTexture?: { dispose(): void } | null };
@@ -239,8 +240,43 @@ function applySkinTone(spawn: SpawnedCharacter, hex: string): void {
       || (c.r > 0.45 && c.g > 0.25 && c.b > 0.15 && c.r > c.b && c.g > c.b * 0.9);
     if (!isSkin) continue;
     const clone = cloneForTint(m!, `${m!.name}_skin`);
-    if (clone) { matColor(clone)?.copyFrom(tone); mesh.material = clone; }
+    if (!clone) continue;
+    mesh.material = clone;
+    // Real skin (ship pass 3, rung 2): a GLB hero's PBR `skin` material gets a
+    // photographed CC0 skin map from the family nearest the chosen tone, and
+    // the albedo colour becomes the RATIO tone / map-mean so the mean skin
+    // colour lands on the swatch while the map keeps its detail. Procedural
+    // bodies (StandardMaterial, no texture slot) keep the flat tint.
+    // Only a body whose skin is laid out on the MakeHuman UVs can wear the
+    // photographed maps (the import marks its skin material; the forge hero's
+    // own UVs would scramble them). Everything else keeps the flat tint.
+    const extras = (clone.metadata as { gltf?: { extras?: { felSkinUV?: string } } } | undefined)?.gltf?.extras;
+    if (clone instanceof PBRMaterial && named && extras?.felSkinUV === 'makehuman') applySkinMap(clone, tone, mesh.getScene());
+    else matColor(clone)?.copyFrom(tone);
   }
+}
+function skinFor(tone: Color3): SkinEntry | null {
+  if (!SKIN_LIBRARY.length) return null;
+  const lum = 0.2126 * tone.r + 0.7152 * tone.g + 0.0722 * tone.b;
+  const family = lum < 0.28 ? 'dark' : lum < 0.5 ? 'medium' : 'light';
+  return SKIN_LIBRARY.find((e) => e.family === family && e.sex === 'male') ?? SKIN_LIBRARY[0];   // sex arrives with the body roster (rung 3)
+}
+const skinTexCache = new WeakMap<object, Map<string, Texture>>();
+function applySkinMap(mat: PBRMaterial, tone: Color3, scene: ReturnType<PBRMaterial['getScene']>): void {
+  const entry = skinFor(tone);
+  if (!entry) { mat.albedoColor.copyFrom(tone); return; }
+  let cache = skinTexCache.get(scene); if (!cache) { cache = new Map(); skinTexCache.set(scene, cache); }
+  // orientation follows the file's own map (the glTF loader's flag), so the swap lands on the same UV layout
+  const invertY = (mat.albedoTexture as Texture | null)?.invertY ?? false;
+  const tex = (url: string) => { let t = cache!.get(url); if (!t) { t = new Texture(url, scene, false, invertY, Texture.TRILINEAR_SAMPLINGMODE); cache!.set(url, t); } return t; };
+  mat.albedoTexture = tex(entry.albedo);
+  const [mr, mg, mb] = entry.meanRGB.map((v) => Math.max(8, v) / 255);
+  const clamp = (v: number) => Math.min(1.25, Math.max(0.35, v));   // past 1.25 the map washes out; the light family already sits near the swatch
+  mat.albedoColor = new Color3(clamp(tone.r / mr), clamp(tone.g / mg), clamp(tone.b / mb));
+  // photographed detail normal in place of the procedural pores (same UV layout on every MakeHuman skin)
+  const n = tex(SKIN_DETAIL_NORMAL);
+  mat.bumpTexture = n; n.level = 0.45;
+  mat.metadata = { ...(mat.metadata ?? {}), felSkin: entry.key };
 }
 /** Hair color + bald toggle, matched on the forged rig's `hair` material name
  *  (scripts/avatar/forge.mts). Rigs without one skip cleanly. */

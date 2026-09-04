@@ -8,6 +8,7 @@ import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from 
 import { buildMocapDunk } from './mocapDunk';
 import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig } from './dunkFinishes';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
+import { buildBaseClips } from './baseClips';
 import { buildJuke, buildSpinMove, buildTackledFall } from './football';
 import { buildHitReact, buildKnockdown } from './karate';
 import {
@@ -95,6 +96,10 @@ export function registerAuthoredClips(
     const g = b();
     if (g) { animator.register(g); registered.push(g.name); }
   }
+  // The nine base clips (run, walk, guard, strikes, jumpshot) the forge bakes into
+  // fel-hero.glb, built here on the live skeleton too so a body without baked
+  // animations (the MPFB2 candidate) plays them — one source of truth.
+  for (const g of buildBaseClips(scene, skeleton)) { animator.register(g); registered.push(g.name); }
   console.info(`[FEL-ANIM] authored clips registered: ${registered.join(', ')}`);
   return registered;
 }

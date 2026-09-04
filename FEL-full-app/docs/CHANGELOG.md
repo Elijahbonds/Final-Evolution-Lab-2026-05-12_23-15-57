@@ -16,6 +16,14 @@ All notable changes to Final Evolution Lab. Dates are 2026.
 - Development only: `?hero=<glb>` on the dev harness and the Closet swaps the hero body behind a flag.
 - Every authored clip is portable: a degree key rotates the bone about its parent's bind axes from bind (`bindFrame.ts`), in both builders. Locomotion, karate, football, the dunk suite, finishes and eastbay are pose targets; the jump, launch, tomahawk and eastbay now actually raise the hands (their arm keys were twists).
 - The dunk's live clip is rebuilt from the owner's capture as pose keys (`scripts/mocap/dunk-pose.mts`).
+- The nine base clips (run, walk, guard, strikes, jumpshot) are built at runtime on the bind frame, so a body without baked animations plays them; the jumpshot's release now goes overhead (the baked keys crossed the arms low).
+- Mocap takes play as pose targets from the take's forward kinematics, with a two-hand grip option.
+
+### Body and skin (ship pass 3)
+- Six CC0 MakeHuman skins across the tone range (`public/models/skins`, `scripts/avatar/skins/export-skins.mts`); a body whose skin sits on the MakeHuman UV layout wears the family nearest the chosen tone, with the map's mean pulled onto the swatch and a photographed detail normal.
+- Clothing-only tint skips skin, hair and eyes by name (a photographed skin is a white albedo the colour heuristic read as clothing).
+- The MPFB2 candidate's textures ship as WebP (13 MB → 2.2 MB); its skin material is flagged `felSkinUV: makehuman`.
+- Development only: `?tone=<hex>` on the Closet previews a skin tone.
 
 ## 0.9.0-rc.1 — 2026-09-03 · release candidate
 

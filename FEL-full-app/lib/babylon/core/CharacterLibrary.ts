@@ -289,6 +289,12 @@ function applyTint(meshes: AbstractMesh[], hex: string): void {
     if (!m) continue;
     const albedo = (m as PBRMaterial).albedoColor ?? (m as StandardMaterial).diffuseColor;
     if (!albedo) continue;
+    // Name first (the material contract: skin / hair / eyes are never clothing),
+    // colour heuristic second. A photographed skin is a WHITE albedo with the
+    // colour in the texture, which the heuristic reads as "not flesh" — the
+    // MPFB2 candidate's rival went red head to toe (measured 2026-09-04).
+    const mname = String(m.name ?? '').toLowerCase();
+    if (/^(skin|hair|eyes|iris|lips)/.test(mname)) continue;
     const isSkinTone = albedo.r > 0.45 && albedo.g > 0.25 && albedo.b > 0.15
       && albedo.r > albedo.b && albedo.g > albedo.b * 0.9;
     if (isSkinTone) continue;
