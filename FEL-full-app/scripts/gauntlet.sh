@@ -23,7 +23,7 @@ OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
   # (tint clones, morphs, hair style, jersey plate) on top of the spawn layers.
   # The Closet caught a never-ready skin material 21 anonymous runs could not.
   for m in onevone skateboard karate; do
-    r=$(LOGIN=1 URL=$BASE/dev/mode/$m PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=login_$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=4 npx tsx scripts/capture-mode-play.mts 2>&1)
+    r=$(LOGIN=1 URL="$BASE/dev/mode/$m$Q" PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=login_$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=4 npx tsx scripts/capture-mode-play.mts 2>&1)
     echo "$r" > "$G/logs/login-$m.txt"
     line=$(echo "$r" | grep -oE "FEL-FRAME [0-9]+ \| MISSING CLIP [0-9]+ \| errors [0-9]+" | head -1)
     ident=$(echo "$r" | grep -oE "ident : .*" | sed 's/ident : //' | head -1)
@@ -32,7 +32,7 @@ OUT="$G/run-$(date +%Y%m%d-%H%M%S).txt"
   # mobile QUALITY TIER, one mode per family: a phone-shaped touch context makes
   # detectQualityTier pick the mobile tier (Phase 1 gate: both tiers measured).
   for m in dunk karate skateboard volleyball golf football dance; do
-    r=$(TIER=mobile URL=$BASE/dev/mode/$m PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=mtier_$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=4 npx tsx scripts/capture-mode-play.mts 2>&1)
+    r=$(TIER=mobile URL="$BASE/dev/mode/$m$Q" PUMP=1 STEER=1 HOLD=700 GAP=70 KEYS=j,k,l NAME=mtier_$m LOG_CHARS=400 OUT_DIR="$G/shots" REPS=4 npx tsx scripts/capture-mode-play.mts 2>&1)
     echo "$r" > "$G/logs/mtier-$m.txt"
     line=$(echo "$r" | grep -oE "FEL-FRAME [0-9]+ \| MISSING CLIP [0-9]+ \| errors [0-9]+" | head -1)
     perf=$(echo "$r" | grep -oE "perf  : .*" | sed 's/perf  : //' | head -1)
