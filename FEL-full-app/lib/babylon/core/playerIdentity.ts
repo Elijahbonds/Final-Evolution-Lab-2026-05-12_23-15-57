@@ -4,6 +4,7 @@
 // saved look applied automatically; explicit colors always win (rivals/NPCs).
 
 import { applyHairStyle } from './hairStyles';
+import { applyKit, type Wardrobe } from './kit';
 import { reportDiag } from './diag';
 import { applyFaceMorphs, resolveFaceWeights } from './faceMorphs';
 import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, StandardMaterial, Texture, Vector3 } from '@babylonjs/core';
@@ -41,6 +42,8 @@ export interface PlayerIdentity {
   palette: { jersey: string; shorts: string; shoes: string; accent: string };
   /** Number + name plate for the hero's back. null until the player sets one. */
   jersey: JerseyConfig | null;
+  /** Equipped wearable ids per kit slot — the fitted garment library (kit.ts) shows these. */
+  wardrobe: Wardrobe;
   /** True when a logged-in player's closet answered — guests/dev get defaults
    *  visually UNCHANGED (identity only applies when this is true). */
   custom: boolean;
@@ -79,7 +82,8 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
   const jerseyRaw = closet?.look?.jersey;
   const jersey = jerseyRaw ? sanitizeJersey(jerseyRaw) : null;
 
-  cached = { proportions, face, palette, jersey, custom: Boolean(closet?.look) };
+  const wardrobe: Wardrobe = { tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null };
+  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) };
   return cached;
 }
 
@@ -111,6 +115,7 @@ export function applyIdentity(
   applySkinTone(spawn, id.face.skinTone);
   applyHair(spawn, id.face.hairColor, id.face.hairStyle === 'Bald');
   applyHairStyle(spawn.meshes, id.face.hairStyle);   // Phase 3: real hair geometry per style
+  applyKit(spawn.meshes, id.wardrobe);              // ship pass 3: fitted garments per equipped wearable (no-op without a kit)
   // Phase 3 (2026-09-02): the forge now has a face. Shape presets and the
   // fine-tune sliders resolve through one table; eye color lands on the
   // iris material. No-ops on a body without morphs or an iris.

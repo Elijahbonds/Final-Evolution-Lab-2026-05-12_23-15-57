@@ -182,7 +182,7 @@ export function ClosetView() {
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
           {/* The actual game model (forged fel-hero) wearing the draft look —
               what you design here is what spawns in every mode. */}
-          <AvatarPreview face={face} palette={previewPalette} jersey={jersey} />
+          <AvatarPreview face={face} palette={previewPalette} jersey={jersey} wardrobe={{ tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null }} />
           <div className="mt-3">
             <FacePreview face={face} accent={accent} />
           </div>

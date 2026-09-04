@@ -1,4 +1,5 @@
 'use client';
+import type { Wardrobe } from '@/lib/babylon/core/kit';
 
 // AvatarPreview — the Closet's live 3D preview: the FORGED hero
 // (public/models/fel-hero.glb, scripts/avatar/forge.mts) wearing the draft
@@ -14,9 +15,11 @@ export interface AvatarPreviewProps {
   face: FaceConfig;
   palette: { jersey: string; shorts: string; shoes: string; accent: string };
   jersey: JerseyConfig;
+  /** equipped wearable ids per kit slot (ship pass 3: the fitted garment library) */
+  wardrobe?: Wardrobe;
 }
 
-export default function AvatarPreview({ face, palette, jersey }: AvatarPreviewProps) {
+export default function AvatarPreview({ face, palette, jersey, wardrobe }: AvatarPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const applyRef = useRef<((p: AvatarPreviewProps) => void) | null>(null);
 
@@ -60,10 +63,11 @@ export default function AvatarPreview({ face, palette, jersey }: AvatarPreviewPr
           face: toneParam ? { ...p.face, skinTone: `#${toneParam.replace(/^#/, '')}` } : p.face,
           palette: p.palette,
           jersey: p.jersey,
+          wardrobe: p.wardrobe ?? {},
           custom: true,
         });
       };
-      applyRef.current({ face, palette, jersey });
+      applyRef.current({ face, palette, jersey, wardrobe });
 
       // slow turntable so the back (jersey plate) is reachable
       scene.registerBeforeRender(() => {
@@ -83,8 +87,8 @@ export default function AvatarPreview({ face, palette, jersey }: AvatarPreviewPr
 
   // re-apply the draft on every edit — same pipe, new values
   useEffect(() => {
-    applyRef.current?.({ face, palette, jersey });
-  }, [face, palette, jersey]);
+    applyRef.current?.({ face, palette, jersey, wardrobe });
+  }, [face, palette, jersey, wardrobe]);
 
   return (
     <canvas
