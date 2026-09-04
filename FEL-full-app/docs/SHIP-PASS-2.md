@@ -110,3 +110,21 @@ Plan page: https://claude.ai/code/artifact/06ac4116-487a-472f-9378-07e2834ccebb
      real-footage head-to-head contest, camera-tracked, no canvas. The Babylon
      DunkDuelMode stays registry-only at `/dev/mode/dunkduel`. The
      shipping-route gauntlet covers the twenty Babylon routes.
+- **Phase 2, production-mode gauntlet: gate met (3 Sep).** `.next-verify`
+  built, served on :3004 by `scripts/prod-serve.sh`, the shipping-route
+  gauntlet and the phone trio run against it: 20/20 routes 0/0/0, trio 0
+  errors, security headers present, `/dev/mode/*` 404. The dev-only double
+  mount does not exist in production, so the black bigair frame and the two
+  engines per canvas are dev artifacts — recorded, not unified.
+- **Phase 3, maps swapped (3 Sep).** The twelve optimized baked maps replaced
+  the originals (36 → 26 MB; originals kept beside the scratchpad); golf and
+  karate re-captured with identical draw and mesh counts and clean frames.
+  Time-to-playing is now a capture metric (`ttp`), so the budget is measurable
+  in the next sweep.
+- **Phase 4, failure UX proven (3 Sep).** Fault captures on `/play/onevone`:
+  a missing hero model → the error state with RETRY (already there); the API
+  unreachable → used to be an empty, silent shell, now "Can't reach the
+  server. Check your connection, then try again. RETRY"; a lost WebGL context
+  → used to be a black canvas with the HUD still streaming, now "Graphics were
+  reset by the device. Reload to keep playing." Every path also reports a
+  diagnostic (Phase 5) — the load failure path was added.
