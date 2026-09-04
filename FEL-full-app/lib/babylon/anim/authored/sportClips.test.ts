@@ -80,7 +80,7 @@ describe('volleyball', () => {
   });
   it('spike: hitting hand above the head and in front at contact', () => {
     const g = fresh(() => buildVolleySpike(scene, sk)!);
-    at(g, 0.02); expect(pos('RightHand').z).toBeLessThan(0);   // loaded back
+    at(g, 0.02); expect(pos('RightHand').z).toBeLessThan(0); expect(pos('RightArm').z).toBeLessThan(pos('LeftArm').z);   // loaded back, hitting shoulder behind
     at(g, 0.3); const c = pos('RightHand'); expect(c.y).toBeGreaterThan(pos('Head').y); expect(c.z).toBeGreaterThan(0.05);
   });
   it('block: both hands straight up', () => {
@@ -104,5 +104,6 @@ describe('soccer', () => {
   it('keeper dive: both hands stretched out to the right', () => {
     at(fresh(() => buildKeeperDive(scene, sk)!), 0.58);
     expect(pos('RightHand').x).toBeGreaterThan(0.45); expect(pos('LeftHand').x).toBeGreaterThan(0.2);
+    expect(pos('Head').x).toBeGreaterThan(pos('Hips').x + 0.1);   // the body tips to the right, not just the arms
   });
 });

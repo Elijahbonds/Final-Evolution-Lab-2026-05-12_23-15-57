@@ -16,6 +16,7 @@ import type { AnimationGroup, Scene, Skeleton, TransformNode } from '@babylonjs/
 import { boneNode } from './boneLookup';
 import { buildQuatClip, eulerQ, type QuatKeys } from './restPose';
 import { armChain, reachArm } from './HandIK';
+import { chainRotation, frameAbove } from './TwoBoneIK';
 import { plantLeg } from './FootPlanting';
 
 export type Deg3 = [number, number, number];
@@ -61,6 +62,22 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   const restore = () => { for (const [n, t] of bind) { n.position.copyFrom(t.p); n.rotationQuaternion = t.q.clone(); } refresh(); };
   const root = hips.parent as TransformNode | null;
   refresh();
+  // Degrees are portable only if they mean the same thing on every rig. On the
+  // forge hero every bone's bind rotation is identity, so writing eulerQ(deg)
+  // into the local rotation rotated the bone about its parent's world-aligned
+  // axes. The MPFB2 rig's bones carry bind orientations (measured 2026-09-03:
+  // the same thigh degrees swung the kicking leg FORWARD), so a key is applied
+  // as that same rotation — about the parent's bind axes, from bind — via the
+  // bind chain rotations captured here, before any key moves anything.
+  const frame = frameAbove(hips);
+  const bindParentRot = new Map<TransformNode, Quaternion>();
+  for (const n of nodes.values()) { const par = n.parent as TransformNode | null; bindParentRot.set(n, par && par !== frame ? chainRotation(par, frame) : Quaternion.Identity()); }
+  const keyed = (n: TransformNode, deg: Deg3): Quaternion => {
+    const b = bind.get(n)!.q; const Rp = bindParentRot.get(n)!;
+    // Babylon: a.multiply(b) applies b first. Conjugate the delta into the parent's frame, then apply it after the bind rotation.
+    const inParent = Rp.clone().invert().multiply(eulerQ(...deg)).multiply(Rp);
+    return inParent.multiply(b);
+  };
   const scale = hips.getAbsolutePosition().y / REF_HIPS_Y || 1;          // body height ratio
   // Targets are WORLD-AXIS offsets from the root's position — the same frame the
   // rig tests and the arm-solver tool always measured in (+x = the hero's right
@@ -91,7 +108,7 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   for (const key of keys) {
     restore();
     // 1) torso and any explicit bone keys
-    for (const [bone, deg] of Object.entries(key.bones ?? {})) { const n = nodes.get(bone); if (n) n.rotationQuaternion = eulerQ(...deg); }
+    for (const [bone, deg] of Object.entries(key.bones ?? {})) { const n = nodes.get(bone); if (n) n.rotationQuaternion = keyed(n, deg); }
     refresh();
     // 2) hands
     for (const side of ['Left', 'Right'] as const) {
