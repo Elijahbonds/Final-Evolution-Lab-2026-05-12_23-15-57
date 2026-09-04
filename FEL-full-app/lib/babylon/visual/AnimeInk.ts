@@ -44,6 +44,15 @@ export function inkCharacter(meshes: AbstractMesh[]): void {
  *  skinned mesh that ever spawns — hero, rivals, mobs, the Yeti — gets
  *  inked automatically, existing and future. Returns a disposer. */
 export function autoInk(scene: Scene): () => void {
+  // The outline is an inverted hull drawn with depth: on a body wearing FITTED
+  // garments the body's hull buried anything tighter than the ink width — the
+  // kit hero played bare-legged (measured 2026-09-04; the Closet, which has no
+  // ink, showed the shorts). A NEGATIVE polygon offset pushes every hull behind
+  // the surfaces it wraps, so tight cloth wins the depth test while the contour
+  // still shows at the silhouette. Trials: +8 speckled, −6 near-clean, −12 clean.
+  const outline = scene.getOutlineRenderer();
+  outline.zOffset = -12;
+  outline.zOffsetUnits = -48;
   const seen = new WeakSet<AbstractMesh>();
   const tryInk = (m: AbstractMesh): void => {
     if (seen.has(m) || !m.skeleton) return;
