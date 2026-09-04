@@ -89,6 +89,8 @@ export interface HarnessOpts {
   // detail is the countdown number during 'countdown', or an error message string during 'error'
   onPhase?: (p: ModePhase, detail?: number | string) => void;   // drives READY/3-2-1/ERROR UI
   onHud?: (hud: Record<string, HudValue>) => void;
+  /** Dev only (ship pass 3 rollout flag): every spawn of the default hero uses this GLB instead. */
+  heroOverride?: string;
   resultSink?: ResultSink;
   /** Optional host-owned bus so a touch overlay can emit() the same events. */
   input?: InputBus;
@@ -113,6 +115,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   const tier = detectQualityTier(opts.canvas, fit);
   const scene = new Scene(engine);
   (scene.metadata ??= {}).felTier = tier;   // read by CharacterLibrary for per-spawn quality
+  if (opts.heroOverride) scene.metadata.felHeroOverride = opts.heroOverride;   // dev rollout flag (?hero=)
   // M69: publish the agent control bridge (no-op unless ?agent=1). Idempotent —
   // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
   installAgentBridge(AGENT_MODES);

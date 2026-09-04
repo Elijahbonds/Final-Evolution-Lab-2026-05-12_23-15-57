@@ -22,7 +22,7 @@
 import { Quaternion, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Bone, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { findBone } from './boneLookup';
-import { localAfterWorldDelta, solveTwoBone } from './TwoBoneIK';
+import { localAfterWorldDelta, solveChainInFrame } from './TwoBoneIK';
 
 export type Side = 'Left' | 'Right';
 
@@ -114,18 +114,8 @@ export function applyWorldDelta(n: TransformNode, delta: Quaternion, w = 1): voi
  *  the pre-aim pose — then the hip, which the knee inherits. Returns the
  *  ankle's remaining miss in metres. */
 export function plantLeg(hip: TransformNode, knee: TransformNode, ankle: TransformNode, target: Vector3, pole: Vector3): number {
-  hip.computeWorldMatrix(true); knee.computeWorldMatrix(true); ankle.computeWorldMatrix(true);
-  const s = solveTwoBone({
-    root: hip.getAbsolutePosition().clone(),
-    mid: knee.getAbsolutePosition().clone(),
-    end: ankle.getAbsolutePosition().clone(),
-    target: target.clone(),
-    pole: pole.clone(),
-  });
-  applyWorldDelta(knee, s.mid, 1);
-  applyWorldDelta(hip, s.root, 1);
-  ankle.computeWorldMatrix(true);
-  return Vector3.Distance(ankle.getAbsolutePosition(), target);
+  // solved in the rig's own frame — see TwoBoneIK.solveChainInFrame (handedness)
+  return solveChainInFrame(hip, knee, ankle, target, pole, 1).miss;
 }
 
 export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton: Skeleton, opts: FootPlantingOpts): FootPlantingHandle {

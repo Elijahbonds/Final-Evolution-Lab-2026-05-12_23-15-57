@@ -43,6 +43,7 @@ export function DevModeRunner({ modeKey }: { modeKey: string }) {
     const startTimer = setTimeout(() => {
       if (disposed) return;
       runMode(def, {
+        heroOverride: process.env.NODE_ENV === 'development' ? new URLSearchParams(window.location.search).get('hero') ?? undefined : undefined,   // ship pass 3 rollout flag
         canvas,
         input: bus,
         onPhase: (p, d) => { if (!disposed) { setPhase(p); if (p === 'error') setErr(String(d)); } },

@@ -120,6 +120,9 @@ export const CharacterLibrary = {
   /** Instantiate a character with its own animator + authored clips. */
   async spawn(scene: Scene, url: string, opts: SpawnOpts = {}): Promise<SpawnedCharacter> {
     url = normalizeHeroUrl(url);
+    // Ship pass 3 rollout flag: the dev harness and the Closet can point the DEFAULT hero at a candidate body.
+    const override = (scene.metadata as { felHeroOverride?: string } | undefined)?.felHeroOverride;
+    if (override && url === '/models/fel-hero.glb') url = override;
     // M105 (Path A): the Meshy hero GLB is visually broken. When
     // PROCEDURAL_CHARACTERS is on, bypass the GLB entirely and spawn a clean,
     // assetless, cel-shaded procedural athlete satisfying the same contract.

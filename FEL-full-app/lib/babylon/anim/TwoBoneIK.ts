@@ -6,7 +6,8 @@
 // forged hero, 2026-09-03) — the "exploded" feet. This solver never touches a
 // matrix: it returns world-space rotation DELTAS for the hip and knee nodes,
 // which the mount converts to local rotations. Geometry only; no scene.
-import { Quaternion, Vector3 } from '@babylonjs/core';
+import { Matrix, Quaternion, Vector3 } from '@babylonjs/core';
+import type { TransformNode } from '@babylonjs/core';
 
 export interface TwoBoneInput {
   /** Hip (root joint) world position. */
@@ -124,4 +125,49 @@ export function applySolution(input: TwoBoneInput, s: TwoBoneSolution): { mid: V
 export function localAfterWorldDelta(parentWorld: Quaternion, nodeWorld: Quaternion, delta: Quaternion): Quaternion {
   const worldNew = delta.multiply(nodeWorld);
   return Quaternion.Inverse(parentWorld).multiply(worldNew);
+}
+
+// ── Solving on a real rig ─────────────────────────────────────────────────
+// glTF heroes arrive under a root that flips handedness (Babylon's importer
+// puts a (1,1,-1) scale on `__root__`). A rotation delta derived from WORLD
+// rotations decomposed under that reflection turns the wrong way (measured
+// 2026-09-03: a reach for the grip sent the hand up and forward, 0.81 m off).
+// So: pick a FRAME node above the chain, express positions in its frame
+// (M⁻¹ removes the reflection for every descendant), accumulate rotations as
+// the product of LOCAL quaternions from the frame down (never decomposed from
+// a reflected matrix), solve there, and write locals back.
+export function frameAbove(n: TransformNode): TransformNode {
+  let f: TransformNode = n;
+  while (f.parent && (f.parent as TransformNode).getWorldMatrix) f = f.parent as TransformNode;
+  return f;   // the topmost node: __root__ (its own reflection is inside the frame matrix and removed with it)
+}
+function localRot(n: TransformNode): Quaternion { return n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation); }
+/** Rotation of `n` relative to `frame`: product of locals frame→…→n (frame's own rotation excluded). */
+export function chainRotation(n: TransformNode, frame: TransformNode): Quaternion {
+  const chain: TransformNode[] = [];
+  for (let c: TransformNode | null = n; c && c !== frame; c = c.parent as TransformNode | null) chain.unshift(c);
+  let q = Quaternion.Identity();
+  for (const c of chain) q = q.multiply(localRot(c));   // Babylon: a.multiply(b) applies b first → outer ∘ inner
+  return q;
+}
+export interface ChainSolveResult { miss: number }
+/** Reach `end` toward `target` (WORLD) with `root`/`mid` rotating; writes local rotationQuaternions. */
+export function solveChainInFrame(rootN: TransformNode, midN: TransformNode, endN: TransformNode, targetWorld: Vector3, poleWorldDir: Vector3, weight = 1, frame: TransformNode = frameAbove(rootN)): ChainSolveResult {
+  const inv = frame.getWorldMatrix().clone().invert();
+  const P = (n: TransformNode) => { n.computeWorldMatrix(true); return Vector3.TransformCoordinates(n.getAbsolutePosition(), inv); };
+  const s = solveTwoBone({ root: P(rootN), mid: P(midN), end: P(endN), target: Vector3.TransformCoordinates(targetWorld, inv), pole: Vector3.TransformNormal(poleWorldDir, inv) });
+  const apply = (n: TransformNode, delta: Quaternion) => {
+    const parent = n.parent as TransformNode;
+    const pRot = parent && parent !== frame ? chainRotation(parent, frame) : Quaternion.Identity();
+    const nRot = chainRotation(n, frame);
+    const local = localAfterWorldDelta(pRot, nRot, delta);
+    const cur = localRot(n);
+    n.rotationQuaternion = weight >= 1 ? local : Quaternion.Slerp(cur, local, weight);
+    n.computeWorldMatrix(true);
+  };
+  apply(midN, s.mid);   // knee/elbow first: its delta is defined on the pre-aim pose
+  apply(rootN, s.root);
+  endN.computeWorldMatrix(true);
+  const endF = Vector3.TransformCoordinates(endN.getAbsolutePosition(), inv);
+  return { miss: Vector3.Distance(endF, Vector3.TransformCoordinates(targetWorld, inv)) };
 }

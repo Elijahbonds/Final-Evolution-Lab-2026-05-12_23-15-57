@@ -43,6 +43,9 @@ export default function AvatarPreview({ face, palette, jersey }: AvatarPreviewPr
       key.diffuse = new Color3(1, 0.92, 0.82);
 
       // identity:false — the DRAFT look is applied below, not the saved one.
+      // ship pass 3 rollout flag (dev only): ?hero=/models/candidates/<file>.glb previews a candidate body
+      const heroParam = process.env.NODE_ENV === 'development' ? new URLSearchParams(window.location.search).get('hero') : null;
+      if (heroParam) (scene.metadata ??= {}).felHeroOverride = heroParam;
       const spawned = await CharacterLibrary.spawn(scene, '/models/fel-hero.glb', { identity: false });
       if (disposed) { spawned.dispose(); engine.dispose(); return; }
       // dev-only probe hook (scripts/_closet-scene-probe.mts): the preview is the
