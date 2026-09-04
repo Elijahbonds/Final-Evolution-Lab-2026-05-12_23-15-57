@@ -51,6 +51,8 @@ export interface AnalyticsEventMap {
   challenge_attempted: { code: string; mode: string; score: number };
   challenge_beat: { code: string; mode: string; margin: number };
   signup_complete: { fromChallenge?: string; fromGuest?: boolean };
+  /** Ship pass 2: a game diagnostic that used to live only in the console. */
+  game_diag: { kind: string; mode: string; detail: string };
 }
 
 export type AnalyticsEventName = keyof AnalyticsEventMap;
