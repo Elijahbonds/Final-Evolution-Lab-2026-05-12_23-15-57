@@ -34,6 +34,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name ?? undefined,
           profileId: (user as any).profile?.id ?? null,
+          role: (user as any).role ?? 'player',
         };
       },
     }),
@@ -43,6 +44,15 @@ export const authOptions: NextAuthOptions = {
       if (user?.id) {
         token.sub = user.id;
         token.profileId = (user as any).profileId ?? null;
+        token.role = (user as any).role ?? 'player';
+      }
+      // Ship pass 2 (2026-09-03): the admin routes read session.user.role, but the
+      // session never carried it — every /api/admin/* answered 401 to everyone.
+      // Backfill for tokens minted before, and refresh so a promotion takes.
+      if (token.sub && (!token.role || !token.roleAt || Date.now() - (token.roleAt as number) > 5 * 60_000)) {
+        const u = await prisma.user.findUnique({ where: { id: token.sub as string }, select: { role: true } });
+        token.role = u?.role ?? 'player';
+        token.roleAt = Date.now();
       }
       // Self-heal: backfill profileId for tokens minted before this upgrade
       if (token.sub && !token.profileId) {
@@ -58,6 +68,7 @@ export const authOptions: NextAuthOptions = {
       if (session?.user && token?.sub) {
         (session.user as any).id = token.sub;
         (session.user as any).profileId = token.profileId ?? null;
+        (session.user as any).role = token.role ?? 'player';
       }
       return session;
     },
