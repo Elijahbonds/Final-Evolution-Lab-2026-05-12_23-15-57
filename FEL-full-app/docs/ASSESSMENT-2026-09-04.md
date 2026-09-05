@@ -43,7 +43,7 @@ Ranked by how much value sits behind how little work. "Source" is where the ask 
 
 ## 3. Economy inventory — what exists, what is dark, what is missing
 
-**Three balances exist and they are not one system.** This is the first thing to protect.
+**Three balances exist and they are not one system.** This is the first thing to protect. *Update, later the same day: lab credits are folded into the wallet (`docs/LC-FOLD-2026-09-04.md`); the profile column is now a written mirror.*
 
 | Balance | Lives in | Earned / spent by | State |
 |---|---|---|---|
@@ -96,7 +96,7 @@ Hook text Growth can build on (claims that are true on this tree): "your Closet 
 
 ## 6. Decisions the owner is asked for next (multiple choice when we meet)
 
-1. Currency: fold LC into the wallet, show LC in the chip, or reprice the shop in coins (§3).
+1. Currency: fold LC into the wallet, show LC in the chip, or reprice the shop in coins (§3). **Taken 2026-09-04: folded into the wallet — `docs/LC-FOLD-2026-09-04.md`.**
 2. Gate 0 wording: 22-bone unprefixed as the shipping spec (the operating rules), with the 65-bone tests kept for the import path — or the reverse (G12).
 3. Story spine: confirm, revise, or park (G8).
 4. Multiplayer: recover the karate versus / carnival networking from the other worktree, or ship tennis-only for friends (G5).

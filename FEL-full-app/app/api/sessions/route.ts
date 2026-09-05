@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
+import { applyLc } from '@/lib/wallet/wallet-service';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getOrCreateProfile } from '@/lib/profile-service';
 import { computePrqDelta, MODE_ATTRS, prqScore, prqGrade } from '@/lib/prq';
-import { postLc } from '@/lib/ledger';
 import { sanitizeTallies } from '@/lib/game-systems';
 import { createPrqEntry } from '@/lib/prq-entries';
 import { addSeasonXp } from '@/lib/season/season-service';
@@ -71,23 +71,19 @@ export async function POST(req: Request) {
           ...attrData,
           xp: { increment: xp },
           shards: { increment: shards },
-          labCredits: { increment: credits },
           streakDays,
           lastStreakAt: daysSince >= 1 ? new Date() : profile?.lastStreakAt,
           lastActiveAt: new Date(),
         },
       });
-      const newBalance = updated.labCredits;
       const createdSession = await tx.gameSession.create({
         data: { userId, mode, score, opponentScore, won, xp, shards, prqDelta, credits, duration, hits, misses, dodges, combos, maxCombo },
       });
+      // LC lives in the wallet (2026-09-04): the session's credits move through the one mover, keyed by the session row.
+      let newBalance = Number(updated.labCredits ?? 0);
       if (credits > 0) {
-        await postLc(tx, {
-          userId,
-          amount: credits,
-          reason: won ? `Session win (${mode})${streakBonus ? ' + streak' : ''}` : `Daily streak day ${streakDays}`,
-          balanceAfter: newBalance,
-        });
+        const r = await applyLc(tx, { playerId: userId, delta: credits, reasonCode: 'SESSION_CREDITS', source: 'gameplay', idempotencyKey: `session-lc:${(createdSession as any).id}`, metadata: { mode, won, streakDays, streakBonus: !!streakBonus } });
+        newBalance = r.balanceAfter;
       }
       // Task 3: emit drillResult PrqEntries for mode-relevant attributes.
       // prqDelta is the per-attribute gain; source = drillResult, linked to this session.

@@ -22,6 +22,7 @@
  */
 
 import 'dotenv/config';
+import { applyLc, readWallet } from '../lib/wallet/wallet-service';
 import assert from 'node:assert';
 import { PrismaClient } from '@prisma/client';
 
@@ -195,12 +196,13 @@ async function makeAthlete(tag: string, lc: number): Promise<string> {
     },
     select: { id: true },
   });
+  // LC lives in the wallet (2026-09-04): the profile column above is only the mirror — fund the wallet.
+  if (lc > 0) await applyLc(prisma, { playerId: user.id, delta: lc, reasonCode: 'WELCOME_GRANT', source: 'milestone', idempotencyKey: `arenatest-fund:${user.id}` });
   return user.id;
 }
 
 async function balanceOf(userId: string): Promise<number> {
-  const p = await prisma.playerProfile.findUnique({ where: { userId }, select: { labCredits: true } });
-  return p?.labCredits ?? 0;
+  return (await readWallet(prisma, userId)).lc;
 }
 
 async function dbTests() {

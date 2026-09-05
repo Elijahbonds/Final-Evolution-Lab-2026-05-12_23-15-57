@@ -26,7 +26,7 @@ import {
 } from '../lib/wallet/validation';
 import { CATALOG, COIN_PACKS, coinPackForPrice, getSku, COIN_STORE_PACKS, getCoinStorePack, coinStorePackTotal } from '../lib/wallet/catalog';
 import {
-  earn, spend, grantCoinPurchase, grantShardPurchase, refundCoins, readWallet, derivedBalances, resolveRule, WalletError,
+  earn, spend, grantCoinPurchase, grantShardPurchase, refundCoins, readWallet, derivedBalances, resolveRule, WalletError, applyLc,
 } from '../lib/wallet/wallet-service';
 import { FREE_USE_QUESTIONS, freeUseIsClean } from '../lib/wallet/sceneit-freeuse';
 import { REASON_LABELS, reasonLabel } from '../lib/wallet/reason-labels';
@@ -275,6 +275,33 @@ async function dbTests() {
   const playerId = user.id;
 
   try {
+    // LAB CREDITS (folded into the wallet 2026-09-04): one mover — balance, wallet ledger, profile mirror, house book.
+    await checkAsync('lc: a grant lands in Wallet.lc, writes an lc ledger row, mirrors PlayerProfile.labCredits and posts to the house book', async () => {
+      await prisma.playerProfile.upsert({ where: { userId: playerId }, update: {}, create: { userId: playerId, labCredits: 0, strength: 50, speed: 50, endurance: 50, agility: 50, power: 50, flexibility: 50, recovery: 50, mental: 50 } });
+      const before = await readWallet(prisma, playerId);
+      const r = await applyLc(prisma, { playerId, delta: 250, reasonCode: 'WELCOME_GRANT', source: 'milestone', idempotencyKey: `lc_grant_${stamp}` });
+      assert.equal(r.replayed, false); assert.equal(r.balanceAfter, before.lc + 250);
+      const after = await readWallet(prisma, playerId); assert.equal(after.lc, before.lc + 250, 'wallet lc moved');
+      const row = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey: `lc_grant_${stamp}` } });
+      assert.ok(row && String(row.currency) === 'lc' && Number(row.delta) === 250, 'lc ledger row');
+      const prof = await prisma.playerProfile.findUnique({ where: { userId: playerId }, select: { labCredits: true } });
+      assert.equal(prof?.labCredits, after.lc, 'profile column mirrors the wallet');
+      const audit = await prisma.creditLedger.findFirst({ where: { userId: playerId, dedupeKey: `lc_grant_${stamp}` } });
+      assert.ok(audit && audit.amount === 250, 'house book (CreditLedger) has the movement');
+    });
+    await checkAsync('lc: a spend past the balance is rejected atomically with INSUFFICIENT_FUNDS and moves nothing', async () => {
+      const before = await readWallet(prisma, playerId);
+      await assert.rejects(applyLc(prisma, { playerId, delta: -(before.lc + 1), reasonCode: 'SHOP_PURCHASE', source: 'spend', idempotencyKey: `lc_over_${stamp}` }), (e: unknown) => e instanceof WalletError && e.code === 'INSUFFICIENT_FUNDS');
+      const after = await readWallet(prisma, playerId); assert.equal(after.lc, before.lc, 'balance untouched');
+      assert.equal(await prisma.walletLedgerEntry.count({ where: { idempotencyKey: `lc_over_${stamp}` } }), 0, 'no ledger row');
+    });
+    await checkAsync('lc: a replayed idempotency key returns the original entry and moves nothing', async () => {
+      const key = `lc_spend_${stamp}`;
+      const first = await applyLc(prisma, { playerId, delta: -100, reasonCode: 'ARENA_ENTRY', source: 'spend', idempotencyKey: key });
+      const second = await applyLc(prisma, { playerId, delta: -100, reasonCode: 'ARENA_ENTRY', source: 'spend', idempotencyKey: key });
+      assert.equal(second.replayed, true); assert.equal(second.entryId, first.entryId); assert.equal(second.balanceAfter, first.balanceAfter);
+      const after = await readWallet(prisma, playerId); assert.equal(after.lc, first.balanceAfter, 'spent exactly once');
+    });
     // CASE 1 — replayed idempotency_key grants exactly once.
     await checkAsync('replayed idempotency_key grants EXACTLY once', async () => {
       const key = `earn_once_${stamp}`;

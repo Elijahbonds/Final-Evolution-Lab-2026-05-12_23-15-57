@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { readWallet } from '@/lib/wallet/wallet-service';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
@@ -22,7 +23,8 @@ export async function GET() {
       where: { userId },
       select: { labCredits: true },
     });
-    balance = profile?.labCredits ?? 0;
+    // LC lives in the wallet (2026-09-04); the profile column is the mirror
+    balance = (await readWallet(prisma, userId)).lc ?? (profile?.labCredits ?? 0);
   }
 
   const modes = ARENA_MODES.map((key) => ({

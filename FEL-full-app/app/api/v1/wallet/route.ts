@@ -20,6 +20,7 @@ export async function GET() {
   return NextResponse.json({
     coins: view.coins,
     shards: view.shards,
+    lc: view.lc,
     version: view.version,
     updated_at: view.updated_at,
   });

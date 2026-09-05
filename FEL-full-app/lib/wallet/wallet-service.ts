@@ -31,28 +31,29 @@ import {
   type WalletCurrency,
 } from './reward-rules';
 import { getSku } from './catalog';
+import { postLc } from '../ledger';
 import { payloadHash, validateDunkAttempt } from './validation';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
 export class WalletError extends Error {
-  constructor(public code: 'INSUFFICIENT_FUNDS' | 'UNKNOWN_SKU' | 'SHARD_PURCHASE_FORBIDDEN' | 'RULE_INACTIVE' | 'RULE_NOT_FOUND' | 'INVALID_AMOUNT', message?: string) {
+  constructor(public code: 'INSUFFICIENT_FUNDS' | 'UNKNOWN_SKU' | 'SHARD_PURCHASE_FORBIDDEN' | 'RULE_INACTIVE' | 'RULE_NOT_FOUND' | 'INVALID_AMOUNT' | 'REPLAYED_KEY', message?: string) {
     super(message ?? code);
     this.name = 'WalletError';
   }
 }
 
-export interface WalletView { coins: number; shards: number; version: number; updated_at: string }
+export interface WalletView { coins: number; shards: number; lc: number; version: number; updated_at: string }
 export interface EarnResult {
   granted: { coins: number; shards: number };
-  balances: { coins: number; shards: number };
+  balances: { coins: number; shards: number; lc: number };
   entry_id: string | null;
   capped: boolean;
   rejected?: string;
 }
 export interface SpendResult {
   spent: { currency: WalletCurrency; amount: number };
-  balances: { coins: number; shards: number };
+  balances: { coins: number; shards: number; lc: number };
   entry_id: string;
 }
 
@@ -76,7 +77,7 @@ export async function getOrCreateWallet(db: Db, playerId: string) {
 
 export async function readWallet(db: Db, playerId: string): Promise<WalletView> {
   const w = await getOrCreateWallet(db, playerId);
-  return { coins: n(w.coins), shards: n(w.shards), version: n(w.version), updated_at: w.updatedAt.toISOString() };
+  return { coins: n(w.coins), shards: n(w.shards), lc: n(w.lc ?? 0), version: n(w.version), updated_at: w.updatedAt.toISOString() };
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +120,7 @@ export async function earn(
         coins: priorByKey.currency === 'coins' ? amt : 0,
         shards: priorByKey.currency === 'shards' ? amt : 0,
       },
-      balances: { coins: bal.coins, shards: bal.shards },
+      balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc },
       entry_id: priorByKey.id,
       capped: false,
     };
@@ -134,7 +135,7 @@ export async function earn(
     await prisma.perfEarnEvent.update({ where: { id: evt.id }, data: { rejectedReason: reason } });
     console.warn(`[wallet/earn] rejected event ${eventType} for ${playerId}: ${reason}`);
     const bal = await readWallet(prisma, playerId);
-    return { granted: { coins: 0, shards: 0 }, balances: { coins: bal.coins, shards: bal.shards }, entry_id: null, capped: false, rejected: reason };
+    return { granted: { coins: 0, shards: 0 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: null, capped: false, rejected: reason };
   };
 
   // 2. Resolve reason from event type.
@@ -188,7 +189,7 @@ export async function earn(
   if (grant <= 0) {
     await prisma.perfEarnEvent.update({ where: { id: evt.id }, data: { rejectedReason: capped ? 'rate_capped' : 'zero_grant' } });
     const bal = await readWallet(prisma, playerId);
-    return { granted: { coins: 0, shards: 0 }, balances: { coins: bal.coins, shards: bal.shards }, entry_id: null, capped };
+    return { granted: { coins: 0, shards: 0 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: null, capped };
   }
 
   // 10. Apply grant idempotently.
@@ -224,7 +225,7 @@ export async function spend(
   const prior = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey } });
   if (prior) {
     const bal = await readWallet(prisma, playerId);
-    return { spent: { currency: prior.currency as WalletCurrency, amount: n(prior.delta) * -1 }, balances: { coins: bal.coins, shards: bal.shards }, entry_id: prior.id };
+    return { spent: { currency: prior.currency as WalletCurrency, amount: n(prior.delta) * -1 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: prior.id };
   }
 
   try {
@@ -238,7 +239,7 @@ export async function spend(
       });
       if (res.count !== 1) throw new WalletError('INSUFFICIENT_FUNDS');
       const after = await (tx as any).wallet.findUnique({ where: { id: wallet.id } });
-      const balanceAfter = field === 'coins' ? after.coins : after.shards;
+      const balanceAfter = (after as Record<string, unknown>)[field] as bigint;
       const entry = await (tx as any).walletLedgerEntry.create({
         data: {
           walletId: wallet.id, currency: sku.currency, delta: BigInt(-price),
@@ -252,13 +253,13 @@ export async function spend(
         update: sku.consumable ? { quantity: { increment: quantity } } : {},
         create: { playerId, skuId, quantity },
       });
-      return { spent: { currency: sku.currency, amount: price }, balances: { coins: n(after.coins), shards: n(after.shards) }, entry_id: entry.id };
+      return { spent: { currency: sku.currency, amount: price }, balances: { coins: n(after.coins), shards: n(after.shards), lc: n(after.lc) }, entry_id: entry.id };
     });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
       const original = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey } });
       const bal = await readWallet(prisma, playerId);
-      if (original) return { spent: { currency: original.currency as WalletCurrency, amount: n(original.delta) * -1 }, balances: { coins: bal.coins, shards: bal.shards }, entry_id: original.id };
+      if (original) return { spent: { currency: original.currency as WalletCurrency, amount: n(original.delta) * -1 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: original.id };
     }
     throw e;
   }
@@ -270,7 +271,7 @@ export async function spend(
 export async function grantCoinPurchase(
   prisma: PrismaClient,
   args: { playerId: string; coins: number; idempotencyKey: string; metadata?: Record<string, unknown> }
-): Promise<{ entry_id: string; balances: { coins: number; shards: number } }> {
+): Promise<{ entry_id: string; balances: { coins: number; shards: number; lc: number } }> {
   if (args.coins <= 0) throw new WalletError('SHARD_PURCHASE_FORBIDDEN', 'non-positive coin grant');
   const applied = await applyDelta(prisma, {
     playerId: args.playerId, currency: 'coins', delta: args.coins,
@@ -286,7 +287,7 @@ export async function grantCoinPurchase(
 export async function grantShardPurchase(
   prisma: PrismaClient,
   args: { playerId: string; shards: number; idempotencyKey: string; metadata?: Record<string, unknown> }
-): Promise<{ entry_id: string; balances: { coins: number; shards: number } }> {
+): Promise<{ entry_id: string; balances: { coins: number; shards: number; lc: number } }> {
   if (!Number.isFinite(args.shards) || args.shards <= 0) throw new WalletError('INVALID_AMOUNT', 'non-positive shard grant');
   const applied = await applyDelta(prisma, {
     playerId: args.playerId, currency: 'shards', delta: args.shards,
@@ -299,7 +300,7 @@ export async function grantShardPurchase(
 export async function refundCoins(
   prisma: PrismaClient,
   args: { playerId: string; coins: number; idempotencyKey: string; metadata?: Record<string, unknown> }
-): Promise<{ entry_id: string; balances: { coins: number; shards: number } }> {
+): Promise<{ entry_id: string; balances: { coins: number; shards: number; lc: number } }> {
   // Refund clamps so the balance floors at 0 (never negative).
   const applied = await applyDelta(prisma, {
     playerId: args.playerId, currency: 'coins', delta: -Math.abs(args.coins),
@@ -314,7 +315,7 @@ export async function refundCoins(
 export async function refundShards(
   prisma: PrismaClient,
   args: { playerId: string; shards: number; idempotencyKey: string; metadata?: Record<string, unknown> }
-): Promise<{ entry_id: string; balances: { coins: number; shards: number } }> {
+): Promise<{ entry_id: string; balances: { coins: number; shards: number; lc: number } }> {
   const applied = await applyDelta(prisma, {
     playerId: args.playerId, currency: 'shards', delta: -Math.abs(args.shards),
     reasonCode: REASON.PURCHASE_REFUND, source: 'refund',
@@ -337,7 +338,7 @@ export async function refundShards(
 export async function grantServerReward(
   prisma: PrismaClient,
   args: { playerId: string; reasonCode: string; idempotencyKey: string; payload?: Record<string, unknown>; metadata?: Record<string, unknown> }
-): Promise<{ entry_id: string; granted: { coins: number; shards: number }; balances: { coins: number; shards: number } }> {
+): Promise<{ entry_id: string; granted: { coins: number; shards: number }; balances: { coins: number; shards: number; lc: number } }> {
   const rule = (await resolveRule(prisma, args.reasonCode)) ?? DEFAULT_REWARD_RULES[args.reasonCode];
   if (!rule || !rule.active) throw new WalletError('RULE_NOT_FOUND', `no active rule for ${args.reasonCode}`);
   const amount = computeGrant(rule, args.payload ?? {});
@@ -364,12 +365,12 @@ interface ApplyArgs {
 }
 async function applyDelta(
   prisma: PrismaClient, a: ApplyArgs
-): Promise<{ entryId: string; delta: number; balances: { coins: number; shards: number }; replayed: boolean }> {
+): Promise<{ entryId: string; delta: number; balances: { coins: number; shards: number; lc: number }; replayed: boolean }> {
   // Fast idempotency short-circuit.
   const prior = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey: a.idempotencyKey } });
   if (prior) {
     const bal = await readWallet(prisma, a.playerId);
-    return { entryId: prior.id, delta: n(prior.delta), balances: { coins: bal.coins, shards: bal.shards }, replayed: true };
+    return { entryId: prior.id, delta: n(prior.delta), balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, replayed: true };
   }
   try {
     return await prisma.$transaction(async (tx) => {
@@ -377,14 +378,14 @@ async function applyDelta(
       const field = a.currency;
       let effectiveDelta = a.delta;
       if (a.clampToZero && a.delta < 0) {
-        const cur = n(field === 'coins' ? wallet.coins : wallet.shards);
+        const cur = n((wallet as Record<string, unknown>)[field] as bigint);
         effectiveDelta = -Math.min(cur, Math.abs(a.delta)); // floor at 0
       }
       const after = await (tx as any).wallet.update({
         where: { id: wallet.id },
         data: { [field]: { increment: BigInt(effectiveDelta) }, version: { increment: BigInt(1) } },
       });
-      const balanceAfter = field === 'coins' ? after.coins : after.shards;
+      const balanceAfter = (after as Record<string, unknown>)[field] as bigint;
       const entry = await (tx as any).walletLedgerEntry.create({
         data: {
           walletId: wallet.id, currency: a.currency, delta: BigInt(effectiveDelta),
@@ -392,13 +393,13 @@ async function applyDelta(
           idempotencyKey: a.idempotencyKey, metadata: a.metadata as any,
         },
       });
-      return { entryId: entry.id, delta: effectiveDelta, balances: { coins: n(after.coins), shards: n(after.shards) }, replayed: false };
+      return { entryId: entry.id, delta: effectiveDelta, balances: { coins: n(after.coins), shards: n(after.shards), lc: n(after.lc) }, replayed: false };
     });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
       const original = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey: a.idempotencyKey } });
       const bal = await readWallet(prisma, a.playerId);
-      if (original) return { entryId: original.id, delta: n(original.delta), balances: { coins: bal.coins, shards: bal.shards }, replayed: true };
+      if (original) return { entryId: original.id, delta: n(original.delta), balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, replayed: true };
     }
     throw e;
   }
@@ -415,4 +416,67 @@ export async function derivedBalances(prisma: PrismaClient, playerId: string): P
     if (r.currency === 'coins') coins = s; else if (r.currency === 'shards') shards = s;
   }
   return { coins, shards };
+}
+
+// ---------------------------------------------------------------------------
+// LAB CREDITS (folded into the wallet, owner decision 2026-09-04)
+// ---------------------------------------------------------------------------
+// Before this, LC lived in PlayerProfile.labCredits and every route moved it with
+// its own conditional update plus a postLc() audit row — five copies of the same
+// dance (arena lock/pay/refund, shop, lessons, ladder, sessions). Now ONE mover:
+// the wallet's `lc` column is the balance, the WalletLedgerEntry is the record,
+// postLc keeps the double-entry house book intact, and the profile column is
+// written as a MIRROR so older readers stay right until they are retired.
+// Works inside a caller's transaction: pass the tx as `db`.
+export interface ApplyLcArgs {
+  playerId: string; delta: number; reasonCode: string;
+  source: 'gameplay' | 'milestone' | 'purchase' | 'spend' | 'admin_adjust' | 'refund';
+  idempotencyKey: string; metadata?: Record<string, unknown>;
+  /** Reject (INSUFFICIENT_FUNDS) instead of going negative on a spend. Default true. */
+  requireFunds?: boolean;
+  /** Throw REPLAYED_KEY when the idempotency key already exists instead of returning the original entry. The arena
+   *  lock uses this so a replayed stake aborts the WHOLE transaction it rides in (match row included) — the house-book
+   *  rule its tests pin. Grants and refunds keep the idempotent return. Default false. */
+  rejectReplay?: boolean;
+}
+export interface ApplyLcResult { entryId: string; delta: number; balanceAfter: number; replayed: boolean }
+
+export async function applyLc(db: Db, a: ApplyLcArgs): Promise<ApplyLcResult> {
+  if (!Number.isFinite(a.delta) || a.delta === 0 || Math.round(a.delta) !== a.delta) throw new WalletError('INVALID_AMOUNT', `lc delta must be a non-zero integer, got ${a.delta}`);
+  const prior = await (db as any).walletLedgerEntry.findUnique({ where: { idempotencyKey: a.idempotencyKey } });
+  if (prior) {
+    if (a.rejectReplay) throw new WalletError('REPLAYED_KEY', `lc movement already recorded: ${a.idempotencyKey}`);
+    return { entryId: prior.id, delta: n(prior.delta), balanceAfter: n(prior.balanceAfter), replayed: true };
+  }
+  const wallet = await getOrCreateWallet(db, a.playerId);
+  if (a.delta < 0 && a.requireFunds !== false) {
+    const res = await (db as any).wallet.updateMany({
+      where: { id: wallet.id, lc: { gte: BigInt(-a.delta) } },
+      data: { lc: { increment: BigInt(a.delta) }, version: { increment: BigInt(1) } },
+    });
+    if (res.count === 0) throw new WalletError('INSUFFICIENT_FUNDS', 'Not enough Lab Credits.');
+  } else {
+    await (db as any).wallet.update({ where: { id: wallet.id }, data: { lc: { increment: BigInt(a.delta) }, version: { increment: BigInt(1) } } });
+  }
+  const after = await (db as any).wallet.findUnique({ where: { id: wallet.id }, select: { lc: true } });
+  const balanceAfter = n(after?.lc ?? 0);
+  let entry;
+  try {
+    entry = await (db as any).walletLedgerEntry.create({
+      data: { walletId: wallet.id, currency: 'lc', delta: BigInt(a.delta), balanceAfter: BigInt(balanceAfter), reasonCode: a.reasonCode, source: a.source, idempotencyKey: a.idempotencyKey, metadata: (a.metadata ?? {}) as any },
+    });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      // lost a race on the key: the other writer's row is the truth — undo our balance move is not possible outside a tx,
+      // so callers that need strict atomicity pass a transaction client.
+      const original = await (db as any).walletLedgerEntry.findUnique({ where: { idempotencyKey: a.idempotencyKey } });
+      if (original) return { entryId: original.id, delta: n(original.delta), balanceAfter: n(original.balanceAfter), replayed: true };
+    }
+    throw e;
+  }
+  // mirror for legacy readers (profile view, hub, shop storefront) — the wallet is the truth
+  await (db as any).playerProfile.updateMany({ where: { userId: a.playerId }, data: { labCredits: balanceAfter } });
+  // the double-entry house book (CreditLedger + LedgerAccount postings) stays the audit trail
+  await postLc(db as any, { userId: a.playerId, amount: a.delta, reason: a.reasonCode, balanceAfter, dedupeKey: a.idempotencyKey, metadata: (a.metadata ?? {}) as any });
+  return { entryId: entry.id, delta: a.delta, balanceAfter, replayed: false };
 }

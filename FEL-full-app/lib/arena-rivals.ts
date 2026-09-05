@@ -25,6 +25,7 @@
  */
 
 import type { DbClient } from '@/lib/ledger';
+import { applyLc, getOrCreateWallet } from '@/lib/wallet/wallet-service';
 
 // ---------------------------------------------------------------------------
 // House rival roster
@@ -95,11 +96,13 @@ export async function ensureHouseRivals(db: DbClient): Promise<Map<string, strin
         select: { id: true },
       });
     } else {
-      // Keep the treasury able to cover a max-tier lock.
-      await (db as any).playerProfile.updateMany({
-        where: { userId: user.id, labCredits: { lt: HOUSE_MIN_COVER_LC } },
-        data: { labCredits: HOUSE_TREASURY_LC },
-      });
+    }
+    // The treasury is a wallet balance now (2026-09-04): top it up to HOUSE_TREASURY_LC whenever it cannot cover a
+    // max-tier lock. A fresh house user's profile default (500) is overwritten by the same move.
+    const w = await getOrCreateWallet(db as any, user.id);
+    const have = Number(w.lc ?? 0);
+    if (have < HOUSE_MIN_COVER_LC) {
+      await applyLc(db as any, { playerId: user.id, delta: HOUSE_TREASURY_LC - have, reasonCode: 'HOUSE_TREASURY', source: 'admin_adjust', idempotencyKey: `house-topup:${user.id}:${Date.now()}`, metadata: { rival: rival.key } });
     }
     ids.set(rival.key, user.id);
   }

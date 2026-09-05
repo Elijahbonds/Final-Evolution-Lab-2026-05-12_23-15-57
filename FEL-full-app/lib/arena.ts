@@ -16,7 +16,7 @@
  */
 
 import type { DbClient } from '@/lib/ledger';
-import { postLc } from '@/lib/ledger';
+import { applyLc, WalletError } from '@/lib/wallet/wallet-service';
 import {
   rakeAmount,
   winnerPayout,
@@ -157,27 +157,14 @@ export async function arenaLockEntry(
   // evaluated together by the database, so two concurrent lock attempts can't
   // both read the same stale balance and both pass the funds check (the race
   // a plain findUnique-then-update would allow).
-  const result = await (db as any).playerProfile.updateMany({
-    where: { userId: opts.userId, labCredits: { gte: opts.feeLc } },
-    data: { labCredits: { decrement: opts.feeLc } },
-  });
-  if (result.count === 0) {
-    throw new ArenaError('INSUFFICIENT_FUNDS', 'Not enough Lab Credits to cover the entry fee.', 402);
+  // LC lives in the wallet (2026-09-04): one mover writes the balance, the wallet ledger, the profile mirror and the house book.
+  try {
+    const r = await applyLc(db, { playerId: opts.userId, delta: -opts.feeLc, reasonCode: 'ARENA_ENTRY', source: 'spend', idempotencyKey: `arena-entry:${opts.matchId}:${opts.userId}`, metadata: { matchId: opts.matchId, kind: 'arena_entry' }, rejectReplay: true });
+    return r.balanceAfter;
+  } catch (e) {
+    if (e instanceof WalletError && e.code === 'INSUFFICIENT_FUNDS') throw new ArenaError('INSUFFICIENT_FUNDS', 'Not enough Lab Credits to cover the entry fee.', 402);
+    throw e;
   }
-  const profile = await (db as any).playerProfile.findUnique({
-    where: { userId: opts.userId },
-    select: { labCredits: true },
-  });
-  const newBalance = profile?.labCredits ?? 0;
-  await postLc(db, {
-    userId: opts.userId,
-    amount: -opts.feeLc,
-    reason: 'Arena entry',
-    balanceAfter: newBalance,
-    dedupeKey: `arena-entry:${opts.matchId}:${opts.userId}`,
-    metadata: { matchId: opts.matchId, kind: 'arena_entry' },
-  });
-  return newBalance;
 }
 
 /**
@@ -191,20 +178,7 @@ export async function arenaPayWinner(
 ): Promise<{ payout: number; rake: number }> {
   const payout = winnerPayout(opts.feeLc, opts.rakePercent);
   const rake = rakeAmount(opts.feeLc, opts.rakePercent);
-  const updated = await (db as any).playerProfile.update({
-    where: { userId: opts.winnerId },
-    data: { labCredits: { increment: payout } },
-    select: { labCredits: true },
-  });
-  const newBalance = updated.labCredits;
-  await postLc(db, {
-    userId: opts.winnerId,
-    amount: payout,
-    reason: 'Arena winnings',
-    balanceAfter: newBalance,
-    dedupeKey: `arena-settle:${opts.matchId}`,
-    metadata: { matchId: opts.matchId, kind: 'arena_winnings', rake },
-  });
+  await applyLc(db, { playerId: opts.winnerId, delta: payout, reasonCode: 'ARENA_WINNINGS', source: 'gameplay', idempotencyKey: `arena-settle:${opts.matchId}`, metadata: { matchId: opts.matchId, kind: 'arena_winnings', rake } });
   return { payout, rake };
 }
 
@@ -216,19 +190,7 @@ export async function arenaRefund(
   db: DbClient,
   opts: { userId: string; matchId: string; feeLc: number }
 ): Promise<number> {
-  const updated = await (db as any).playerProfile.update({
-    where: { userId: opts.userId },
-    data: { labCredits: { increment: opts.feeLc } },
-    select: { labCredits: true },
-  });
-  const newBalance = updated.labCredits;
-  await postLc(db, {
-    userId: opts.userId,
-    amount: opts.feeLc,
-    reason: 'Arena refund',
-    balanceAfter: newBalance,
-    dedupeKey: `arena-refund:${opts.matchId}:${opts.userId}`,
-    metadata: { matchId: opts.matchId, kind: 'arena_refund' },
-  });
+  const r = await applyLc(db, { playerId: opts.userId, delta: opts.feeLc, reasonCode: 'ARENA_REFUND', source: 'refund', idempotencyKey: `arena-refund:${opts.matchId}:${opts.userId}`, metadata: { matchId: opts.matchId, kind: 'arena_refund' } });
+  const newBalance = r.balanceAfter;
   return newBalance;
 }

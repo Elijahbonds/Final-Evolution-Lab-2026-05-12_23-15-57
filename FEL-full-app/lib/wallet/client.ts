@@ -53,8 +53,8 @@ export interface EarnReport {
 export const WALLET_EARN_EVENT = 'fel:wallet-earn';
 
 export interface WalletEarnDetail {
-  granted: { coins: number; shards: number };
-  balances: { coins: number; shards: number };
+  granted: { coins: number; shards: number; lc?: number };
+  balances: { coins: number; shards: number; lc?: number };
   capped?: boolean;
 }
 
@@ -66,7 +66,7 @@ export interface WalletEarnDetail {
 export const WALLET_SYNC_EVENT = 'fel:wallet-sync';
 
 export interface WalletSyncDetail {
-  balances: { coins: number; shards: number };
+  balances: { coins: number; shards: number; lc?: number };
 }
 
 /** Broadcast fresh server balances to any mounted HUD (no toast). */
@@ -95,6 +95,7 @@ export async function reportEarn(report: EarnReport): Promise<boolean> {
       const balances = {
         coins: Number(data?.balances?.coins ?? 0),
         shards: Number(data?.balances?.shards ?? 0),
+        lc: Number(data?.balances?.lc ?? 0),
       };
       if (typeof window !== 'undefined') {
         window.dispatchEvent(

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { migrateLcToWallet } from './migrate-lc-to-wallet';
 import bcrypt from 'bcryptjs';
 import { postLc } from '../lib/ledger';
 import { GOLDEN_HOUR_REWARDS } from '../lib/season/golden-hour';
@@ -157,6 +158,8 @@ async function main() {
   });
   console.log(`Seeded Season: ${season.name} (${season.key}), active=${season.active}`);
 
+  // LC lives in the wallet (2026-09-04): seeded profiles' labCredits are carried into their wallets
+  await migrateLcToWallet(prisma);
   console.log('Seed complete');
 }
 

@@ -869,6 +869,7 @@ model MetricRollup {
 enum WalletCurrency {
   coins
   shards
+  lc // lab credits — folded into the wallet 2026-09-04 (owner decision); PlayerProfile.labCredits is a read-only mirror
 }
 
 enum WalletLedgerSource {
@@ -886,6 +887,7 @@ model Wallet {
   player    User     @relation(fields: [playerId], references: [id], onDelete: Cascade)
   coins     BigInt   @default(0) // CHECK >= 0 (applied via wallet-constraints.sql)
   shards    BigInt   @default(0) // CHECK >= 0
+  lc        BigInt   @default(0) // lab credits (CHECK >= 0) — the arena house book and the shop spend this; the profile column mirrors it
   version   BigInt   @default(0) // optimistic-concurrency counter
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

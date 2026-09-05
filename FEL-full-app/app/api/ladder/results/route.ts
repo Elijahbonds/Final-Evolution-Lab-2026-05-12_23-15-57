@@ -1,11 +1,11 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { applyLc } from '@/lib/wallet/wallet-service';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { ledgerLadderPrize } from '@/lib/stripe-helpers';
-import { postLc } from '@/lib/ledger';
 
 // Prize distribution: 1st 50%, 2nd 30%, 3rd 20%  // TUNE(elijah)
 const PRIZE_SPLITS = [0.5, 0.3, 0.2];
@@ -53,19 +53,8 @@ export async function POST() {
 
       const idempotencyKey = `ladder-prize:${season.id}:${entry.userId}:${i}`;
 
-      // Award LC via the unified funnel (CreditLedger compat + double-entry)
-      // First update PlayerProfile.labCredits
-      await tx.playerProfile.update({
-        where: { userId: entry.userId },
-        data: { labCredits: { increment: prize } },
-      });
-      await postLc(tx, {
-        userId: entry.userId,
-        amount: prize,
-        reason: 'LADDER_PRIZE',
-        dedupeKey: idempotencyKey,
-        metadata: { seasonId: season.id, rank: i + 1, mode: season.mode },
-      });
+      // LC lives in the wallet (2026-09-04): one mover — balance, wallet ledger, profile mirror, house book.
+      await applyLc(tx, { playerId: entry.userId, delta: prize, reasonCode: 'LADDER_PRIZE', source: 'gameplay', idempotencyKey, metadata: { seasonId: season.id, rank: i + 1, mode: season.mode } });
 
       winners.push({ rank: i + 1, userId: entry.userId, prize });
     }

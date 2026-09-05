@@ -9,4 +9,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'wallet_shards_nonneg') THEN
     ALTER TABLE "Wallet" ADD CONSTRAINT wallet_shards_nonneg CHECK (shards >= 0);
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'wallet_lc_nonneg') THEN
+    ALTER TABLE "Wallet" ADD CONSTRAINT wallet_lc_nonneg CHECK (lc >= 0);
+  END IF;
 END $$;

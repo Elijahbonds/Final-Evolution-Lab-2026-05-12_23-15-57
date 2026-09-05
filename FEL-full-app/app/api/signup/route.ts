@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
+import { applyLc } from '@/lib/wallet/wallet-service';
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { rateLimit, clientKeyFromHeaders } from '@/lib/rate-limit';
-import { postLc } from '@/lib/ledger';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { GUEST_COOKIE } from '@/lib/guest';
 import { convertReferralOnSignup } from '@/lib/marketing/referral';
@@ -79,7 +79,8 @@ export async function POST(req: Request) {
         labCredits: 500,
       },
     });
-    await postLc(prisma, { userId: user.id, amount: 500, reason: 'Welcome grant', balanceAfter: 500, dedupeKey: `welcome:${user.id}` });
+    // LC lives in the wallet (2026-09-04): the welcome grant lands in Wallet.lc; the profile's 500 default is the mirror.
+    await applyLc(prisma, { playerId: user.id, delta: 500, reasonCode: 'WELCOME_GRANT', source: 'milestone', idempotencyKey: `welcome:${user.id}` });
 
     // M13 Step 1 — migrate any anonymous guest state into the new account and
     // close out the growth funnel (guest_claim + signup_complete). Best-effort:

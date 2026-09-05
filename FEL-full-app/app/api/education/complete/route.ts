@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
+import { applyLc } from '@/lib/wallet/wallet-service';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getOrCreateProfile } from '@/lib/profile-service';
 import { TRACKS } from '@/lib/game-data';
-import { postLc } from '@/lib/ledger';
 import { ECONOMY_CONFIG } from '@/lib/economy';
 
 export const dynamic = 'force-dynamic';
@@ -42,18 +42,10 @@ export async function POST(req: Request) {
 
     await getOrCreateProfile(userId);
     const newBalance = await prisma.$transaction(async (tx) => {
-      const updated = await tx.playerProfile.update({
-        where: { userId },
-        data: { labCredits: { increment: credits }, xp: { increment: 20 }, lastActiveAt: new Date() },
-        select: { labCredits: true },
-      });
-      await postLc(tx, {
-        userId,
-        amount: credits,
-        reason: moduleComplete ? `Lesson + module checkpoint (${track.title})` : `Lesson complete (${track.title})`,
-        balanceAfter: updated.labCredits,
-      });
-      return updated.labCredits;
+      await tx.playerProfile.update({ where: { userId }, data: { xp: { increment: 20 }, lastActiveAt: new Date() } });
+      // LC lives in the wallet (2026-09-04)
+      const r = await applyLc(tx, { playerId: userId, delta: credits, reasonCode: 'LESSON_COMPLETE', source: 'milestone', idempotencyKey: `lesson:${userId}:${trackKey}:${lessonKey}`, metadata: { trackKey, lessonKey, moduleComplete, track: track.title } });
+      return r.balanceAfter;
     });
 
     return NextResponse.json({ ok: true, credits, moduleComplete, labCredits: newBalance });

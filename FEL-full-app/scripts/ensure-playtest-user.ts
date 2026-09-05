@@ -19,7 +19,8 @@
 import { readFileSync, existsSync } from 'node:fs';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
-import { seedRewardRules } from './seed-reward-rules';   // PACK #5: the playtest path seeds the reward rules so earn never no-ops
+import { seedRewardRules } from './seed-reward-rules';
+import { migrateLcToWallet } from './migrate-lc-to-wallet';   // LC lives in the wallet (2026-09-04)   // PACK #5: the playtest path seeds the reward rules so earn never no-ops
 
 // Next.js loads .env for the app; a bare tsx script does not, and Prisma then
 // fails with "Environment variable not found: DATABASE_URL".
@@ -58,7 +59,7 @@ async function main(): Promise<void> {
       data: { password: await bcrypt.hash(PASSWORD, 10) },
     });
     if (!existing.profile) await createProfile(existing.id);
-    else await reconcileLedger(existing.id);
+    else await migrateLcToWallet(prisma);
     console.log(`playtest user ready (existing): ${PLAYTEST_EMAIL}`);
     return;
   }
@@ -83,7 +84,7 @@ async function createProfile(userId: string) {
       power: 60, flexibility: 60, recovery: 60, mental: 60,
     },
   });
-  await reconcileLedger(userId);
+  await migrateLcToWallet(prisma);
   return profile;
 }
 

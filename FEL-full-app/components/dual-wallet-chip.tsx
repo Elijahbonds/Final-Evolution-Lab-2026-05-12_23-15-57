@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { animate, motion, useMotionValue, useTransform } from 'framer-motion';
-import { Coins, Gem } from 'lucide-react';
+import { Coins, Gem, Landmark } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { WALLET_EARN_EVENT, WALLET_SYNC_EVENT, reportEarn, type WalletEarnDetail, type WalletSyncDetail } from '@/lib/wallet/client';
@@ -45,9 +45,10 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
   const [state, setState] = useState<FetchState>('loading');
   const coins = useCountUp();
   const shards = useCountUp();
+  const lc = useCountUp();   // lab credits — the arena's and the shop's currency, folded into the wallet 2026-09-04
   const seq = useRef(0);
   const firedRef = useRef(false);
-  const lastRef = useRef<{ coins: number; shards: number } | null>(null);   // last balances we showed — a replayed earn returns the same ones
+  const lastRef = useRef<{ coins: number; shards: number; lc: number } | null>(null);   // last balances we showed — a replayed earn returns the same ones
 
   // PACK THE FIVE #2 (2026-09-04): the first-session faucet. DAILY_FIRST_SESSION existed as a rule with no client
   // fire. The chip is auth-aware (its wallet fetch is 401 when logged out), so once the wallet reads it fires
@@ -74,12 +75,13 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
     try {
       const res = await fetch('/api/v1/wallet', { cache: 'no-store' });
       if (!res.ok) throw new Error(`wallet ${res.status}`);
-      const data: { coins: number; shards: number } = await res.json();
+      const data: { coins: number; shards: number; lc?: number } = await res.json();
       if (mine !== seq.current) return; // a newer fetch already won
-      lastRef.current = { coins: data.coins, shards: data.shards };
+      lastRef.current = { coins: data.coins, shards: data.shards, lc: data.lc ?? 0 };
       if (!firedRef.current) { firedRef.current = true; void fireDailyFirstSession(); }
       coins.set(Number.isFinite(data.coins) ? data.coins : 0);
       shards.set(Number.isFinite(data.shards) ? data.shards : 0);
+      lc.set(Number.isFinite(data.lc ?? NaN) ? (data.lc as number) : 0);
       setState('ready');
     } catch {
       if (mine === seq.current) setState('error');
@@ -95,17 +97,19 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
       if (detail?.balances) {
         coins.set(detail.balances.coins);
         shards.set(detail.balances.shards);
+        if (typeof detail.balances.lc === 'number') lc.set(detail.balances.lc);
         setState('ready');
       }
       const g = detail?.granted;
       // PACK #2: a replayed idempotency key (second device, reload) returns the ORIGINAL grant with unchanged
       // balances — nothing was earned now, so nothing to toast.
       const replay = !!detail?.balances && !!lastRef.current && detail.balances.coins === lastRef.current.coins && detail.balances.shards === lastRef.current.shards;
-      if (detail?.balances) lastRef.current = { coins: detail.balances.coins, shards: detail.balances.shards };
-      if (g && !replay && (g.coins > 0 || g.shards > 0)) {
+      if (detail?.balances) lastRef.current = { coins: detail.balances.coins, shards: detail.balances.shards, lc: detail.balances.lc ?? lastRef.current?.lc ?? 0 };
+      if (g && !replay && (g.coins > 0 || g.shards > 0 || (g.lc ?? 0) > 0)) {
         const parts: string[] = [];
         if (g.coins > 0) parts.push(`+${g.coins.toLocaleString('en-US')} coins`);
         if (g.shards > 0) parts.push(`+${g.shards} shards`);
+        if ((g.lc ?? 0) > 0) parts.push(`+${(g.lc as number).toLocaleString('en-US')} LC`);
         toast.success(parts.join('  ·  '), {
           description: detail?.capped ? 'Daily cap reached — reduced reward' : undefined,
           duration: 2600,
@@ -134,12 +138,12 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
       window.removeEventListener(WALLET_SYNC_EVENT, onSync as EventListener);
       window.removeEventListener('focus', onFocus);
     };
-  }, [refresh, coins, shards]);
+  }, [refresh, coins, shards, lc]);
 
   return (
     <div
       className={cn('inline-flex items-center gap-1.5', className)}
-      aria-label="Coins and shards balance"
+      aria-label="Coins, shards and lab credits balance"
     >
       {/* Coins */}
       <span
@@ -166,6 +170,20 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
         ) : (
           <motion.span className={cn('tabular-nums', state === 'loading' && 'animate-pulse opacity-60')}>
             {shards.display}
+          </motion.span>
+        )}
+      </span>
+      {/* Lab credits — the arena's and the shop's currency, folded into the wallet 2026-09-04 */}
+      <span
+        className="inline-flex items-center gap-1.5 rounded-md border border-[#00E5FF]/40 bg-[#00E5FF]/5 px-2.5 py-1 font-mono text-xs text-[#7FEFFF]"
+        title="Lab credits — the arena's stake and the shop's price"
+      >
+        <Landmark className="h-3.5 w-3.5" aria-hidden="true" />
+        {state === 'error' ? (
+          <span className="tabular-nums">—</span>
+        ) : (
+          <motion.span className={cn('tabular-nums', state === 'loading' && 'animate-pulse opacity-60')}>
+            {lc.display}
           </motion.span>
         )}
       </span>

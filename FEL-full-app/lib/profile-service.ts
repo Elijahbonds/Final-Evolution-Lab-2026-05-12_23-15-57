@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { PRQ_ATTRS } from '@/lib/prq';
-import { postLc } from '@/lib/ledger';
+import { applyLc } from '@/lib/wallet/wallet-service';
 
 function randAttr() {
   return Math.round((40 + Math.random() * 30) * 10) / 10;
@@ -25,7 +25,7 @@ export async function getOrCreateProfile(userId: string) {
         labCredits: 500,
       },
     });
-    await postLc(prisma, { userId, amount: 500, reason: 'Welcome grant', balanceAfter: 500, dedupeKey: `welcome:${userId}` });
+    await applyLc(prisma, { playerId: userId, delta: 500, reasonCode: 'WELCOME_GRANT', source: 'milestone', idempotencyKey: `welcome:${userId}` });   // LC lives in the wallet (2026-09-04)
   }
 
   // Apply inactivity decay: -0.5 per attribute per full day since lastActiveAt (beyond 1 day)

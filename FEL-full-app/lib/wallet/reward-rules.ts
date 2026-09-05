@@ -9,7 +9,7 @@
  * No THREE / DOM / React / network imports here — unit-testable in isolation.
  */
 
-export type WalletCurrency = 'coins' | 'shards';
+export type WalletCurrency = 'coins' | 'shards' | 'lc';   // lc = lab credits, folded into the wallet 2026-09-04
 export type RewardFormula = 'flat' | 'scoreLinear';
 
 export interface RewardRuleConfig {
