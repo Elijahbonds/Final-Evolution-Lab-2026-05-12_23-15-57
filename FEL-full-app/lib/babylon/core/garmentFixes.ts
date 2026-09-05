@@ -55,6 +55,7 @@ export function syncGarmentVisibility(mesh: AbstractMesh): void {
 
 /** Apply the read fixes for a garment that applyKit just chose to show. Idempotent per mesh instance. */
 export function fixGarment(mesh: AbstractMesh, slot: KitSlot, itemId: string): void {
+  if (slot === 'tops' || slot === 'shorts') { liftOffBody(mesh, slot); return; }
   if (slot !== 'shoes') return;
   if (!(mesh instanceof Mesh) || fixed.has(mesh)) { syncGarmentVisibility(mesh); return; }
   fixed.add(mesh);
@@ -250,4 +251,36 @@ function foldShaft(mesh: Mesh, skeleton: Skeleton, positions: FloatArray, world:
     out[v * 3] = p.x; out[v * 3 + 1] = p.y; out[v * 3 + 2] = p.z;
   }
   return out;
+}
+
+/**
+ * Tops and shorts sit a few millimetres over the skin, and where the two surfaces coincide the body wins the depth
+ * test in patches — the "torn / stained" read on the tee and the court short (karate and tennis frames, 2026-09-05).
+ * A polygon offset on the garment's material pulls it in front of the skin at the same depth; the geometry is untouched.
+ */
+export const GARMENT_Z_OFFSET = -4;
+/** metres each garment surface moves out along its bind normals: the hips protrude furthest through the 188-vertex short;
+ * the tee's hem and shoulder blades were still pierced at 8 mm (karate strip test, 2026-09-05) */
+export const GARMENT_INFLATE: Record<'tops' | 'shorts', number> = { tops: 0.013, shorts: 0.02 };
+const inflated = new WeakSet<AbstractMesh>();
+export function liftOffBody(mesh: AbstractMesh, slot: 'tops' | 'shorts'): void {
+  const mat = mesh.material;
+  if (mat && mat.zOffset !== GARMENT_Z_OFFSET) mat.zOffset = GARMENT_Z_OFFSET;
+  if (!(mesh instanceof Mesh) || inflated.has(mesh)) return;
+  inflated.add(mesh);
+  // the patches that survive the offset are the body protruding through the coarse garment (188-vertex short): the
+  // garment moves out along its bind normals, and the skin transform carries the offset into every pose
+  const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+  const normals = mesh.getVerticesData(VertexBuffer.NormalKind);
+  if (!positions || !normals || positions.length !== normals.length) return;
+  try {
+    mesh.makeGeometryUnique();
+    const out = new Float32Array(positions.length);
+    const d = GARMENT_INFLATE[slot];
+    for (let i = 0; i < positions.length; i++) out[i] = positions[i] + normals[i] * d;
+    mesh.setVerticesData(VertexBuffer.PositionKind, out, false);   // updateVerticesData is a silent no-op on the loader's non-updatable buffer
+    mesh.refreshBoundingInfo();
+  } catch (e) {
+    console.warn(`[FEL-KIT] garment inflate skipped on ${mesh.name}: ${String((e as Error)?.message ?? e).slice(0, 120)}`);
+  }
 }

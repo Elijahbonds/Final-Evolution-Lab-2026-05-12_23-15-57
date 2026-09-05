@@ -62,6 +62,16 @@ Fixes by lane:
   work in the owner's MPFB / Meshy pipeline; the wiring exists (`kit.ts` slots, `resolveIdentity`). Recommended order:
   fix the shoe, then a plain short, then per-sport tops.
 
+**Correction (kits agent, 16:20) and landing (8cb40bf + follow-up):** measured, the knee boot is `shoes_evo` (0.51 m), not
+`shoes_flight` (0.22 m, already ankle-height); the leopard tank is `top_bonds` and `top_lab` is the plain tee; `shorts_glitch`
+shares `shorts_court`'s material. Landed: per-sport default kits (`sportKitDefaults.ts`, Closet pick always wins), the boot
+folded to a hi-top with a matte sneaker material and a split light sole (`garmentFixes.ts`). The "torn / stained" read on
+the tee and the court short was NOT the print: the body's finer surface pokes through the coarse garments (188-vertex
+short). Fixed at runtime on the shown garment — a depth offset on its material plus an inflate along the bind normals
+(tops 13 mm, shorts 20 mm; the first attempt used `updateVerticesData`, a silent no-op on the loader's buffer). Karate and
+tennis frames: clean tee and shorts, sneakers with soles. Rival capsule shooters in the three-point contest remain
+placeholder bodies — a look note for the roster lane.
+
 ## 3. Venice court and background (owner: "still needs work")
 
 - The dark crowd tier is gone from every basketball court (this pass). The red hoop banner remains — remove or replace
