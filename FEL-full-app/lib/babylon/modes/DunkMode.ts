@@ -203,7 +203,7 @@ export const DunkMode: ModeDefinition = (() => {
       ctx.setHud({
         round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`,
         score: playerTotal, rivalScore: rivalTotal, style: STYLE_LABEL[style], prop: PROP_LABEL[prop], hype: 0, chain: 0,
-        hint: 'Pick your PROP (d-pad) · STYLE to cycle · RUN-UP SPEED buys your air · HOLD CHARGE to load your jump',
+        hint: 'Pick your PROP (d-pad) · STYLE to cycle · RUN-UP SPEED buys your air · HOLD to run — then tap jump',
       });
     },
 
@@ -323,8 +323,8 @@ export const DunkMode: ModeDefinition = (() => {
         if (player.root.position.z <= CFG.gatherZ + 0.2) {
           ctx.setHud({
             hint: runUpPeak < 3.5
-              ? 'HOLD CHARGE — and come in FASTER: the run-up buys your air'
-              : 'HOLD CHARGE — load your jump',
+              ? 'HOLD to run — come in FASTER: the run-up buys your air'
+              : 'HOLD to run — then tap jump',
           });
         }
       }
@@ -532,7 +532,7 @@ export const DunkMode: ModeDefinition = (() => {
     switch (phase) {
       case 'approach':
         player.root.position.set(0, 0, CFG.gatherZ);
-        ctx.setHud({ hint: 'HOLD CHARGE — load your jump' });
+        ctx.setHud({ hint: 'HOLD to run — then tap jump' });
         phaseSec = 0;
         break;
       case 'charge': launchDunk(ctx); break;

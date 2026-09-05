@@ -128,7 +128,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     });
     setTimeout(() => {
       if (phase !== 'handoff' || ended) return;
-      ctx.setHud({ banner: '', hint: 'STYLE to cycle · D-PAD down arms THE CHAIR · run in FAST — the run-up buys your air · HOLD CHARGE' });
+      ctx.setHud({ banner: '', hint: 'STYLE to cycle · D-PAD down arms THE CHAIR · run in FAST — the run-up buys your air · HOLD to run' });
       setPhase('approach');
     }, 2200);
   }
@@ -288,7 +288,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       if (phase === 'handoff' && e.t === 'button' && e.pressed) {
         // any button skips the handoff card
-        ctx.setHud({ banner: '', hint: 'STYLE to cycle · HOLD CHARGE to load your jump' });
+        ctx.setHud({ banner: '', hint: 'STYLE to cycle · HOLD to run — then tap jump' });
         setPhase('approach');
         return;
       }
@@ -345,8 +345,8 @@ export const DunkDuelMode: ModeDefinition = (() => {
         if (c.root.position.z <= CFG.gatherZ + 0.2) {
           ctx.setHud({
             hint: runUpPeak < 3.5
-              ? 'HOLD CHARGE — and come in FASTER: the run-up buys your air'
-              : 'HOLD CHARGE — load your jump',
+              ? 'HOLD to run — come in FASTER: the run-up buys your air'
+              : 'HOLD to run — then tap jump',
           });
         }
       }
