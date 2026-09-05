@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { readWallet } from '@/lib/wallet/wallet-service';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
@@ -20,15 +21,12 @@ export async function POST() {
     await prisma.prqEntry.deleteMany({ where: { userId } });
 
     // Ledger the deletion as an event (wallet untouched)
-    const profile = await prisma.playerProfile.findUnique({
-      where: { userId },
-      select: { labCredits: true },
-    });
+    const walletView = await readWallet(prisma, userId);   // pass 5 phase 1
     await postLc(prisma, {
       userId,
       amount: 0,
       reason: `PRQ data erasure: ${count} entries deleted`,
-      balanceAfter: profile?.labCredits ?? 0,
+      balanceAfter: walletView.lc,
       dedupeKey: `prq-erase:${userId}:${Date.now()}`,
     });
   }

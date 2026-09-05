@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { proofLineFor } from '@/lib/proofLine';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,6 +27,9 @@ export interface GameResult {
   tallies?: SessionTallies;
   /** Longest combo chain reached during the session. */
   maxCombo?: number;
+  /** Pass 5 phase 3: the mode's own end-of-session stats and outcome, for the proof line (lib/proofLine.ts). */
+  stats?: Record<string, number | string | boolean>;
+  outcome?: string;
 }
 
 export interface GameProps {
@@ -96,6 +100,7 @@ function GameShellInner({
   const storyNodeId = searchParams.get('story');
   const signatureFlag = searchParams.get('signature');
   const arenaMatchId = searchParams.get('arena');
+  const mpCode = searchParams.get('mp');   // pass 5 phase 5: an async challenge code — accept it with this run's session
   const carnivalFlag = searchParams.get('carnival');
   const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade } | null>(null);
   // Ship pass 2, Phase 4: the profile request failing (offline, server down)
@@ -108,6 +113,7 @@ function GameShellInner({
   const [recap, setRecap] = useState<RecapData | null>(null);
   const [carnivalRun, setCarnivalRun] = useState<CarnivalRunState | null>(null);
   const [storyReward, setStoryReward] = useState<{ rewardLC: number; badge?: { name: string } | null } | null>(null);
+  const [mpResult, setMpResult] = useState<{ status: string; hostScore: number; guestScore: number; hostName?: string; iWon: boolean; tie: boolean } | null>(null);
   const [arenaResult, setArenaResult] = useState<
     | { settled: boolean; status: string; result?: string; iWon?: boolean; payout?: number; feeLc?: number; myScore?: number; oppScore?: number }
     | null
@@ -250,6 +256,16 @@ function GameShellInner({
               } catch {}
             }
 
+            // Pass 5 phase 5: accepting a friend's async challenge from the results card. The session above is what
+            // bestScoreFor reads; the join settles best score vs best score and says who won.
+            if (mpCode) {
+              try {
+                const mj = await fetch('/api/v1/mp/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: mpCode }) }).then((r2) => (r2.ok ? r2.json() : null));
+                const m = mj?.match ?? mj;
+                if (m && m.status) setMpResult({ status: m.status, hostScore: Number(m.hostScore ?? 0), guestScore: Number(m.guestScore ?? 0), hostName: m.hostName, iWon: !!m.winnerId && m.winnerId === m.guestId, tie: m.status === 'settled' && !m.winnerId });
+              } catch {}
+            }
+
             // Court Carnival relay: this stop's reward already posted above
             // through the normal pipeline — this only advances the run so
             // the recap can offer "next stop" instead of Replay/Hub.
@@ -282,13 +298,14 @@ function GameShellInner({
         })
         .catch(() => setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 }));
     },
-    [mode, storyNodeId, signatureFlag, arenaMatchId, carnivalFlag]
+    [mode, storyNodeId, signatureFlag, arenaMatchId, carnivalFlag, mpCode]
   );
 
   const replay = () => {
     setResult(null);
     setRecap(null);
     setArenaResult(null);
+    setMpResult(null);
     setShareUrl(null);
     setShareState('idle');
     setGameKey((k) => k + 1);
@@ -327,10 +344,9 @@ function GameShellInner({
     }
   }, [result, mode, title]);
 
-  // PACK THE FIVE #3: dunk proof — the card says what happened at the rim, not just the score.
-  const isDunk = mode === 'dunkContest' || mode === 'dunkduel';
-  const dunkProofLine = isDunk && result ? `${result.tallies?.hits ?? 0}/${(result.tallies?.hits ?? 0) + (result.tallies?.misses ?? 0)} DUNKS · ${result.score} PTS${result.opponentScore ? ` vs ${result.opponentScore}` : ''} · ${result.won ? 'WON' : 'LOST'}` : null;
-  const shareDunkProof = useCallback(() => { if (dunkProofLine) void shareChallenge(`DUNK PROOF · ${dunkProofLine}`); }, [dunkProofLine, shareChallenge]);
+  // Pass 5 phase 3 (was PACK THE FIVE #3, dunk only): one proof line per mode from its own stats — lib/proofLine.ts.
+  const proofLine = result ? proofLineFor(mode, { score: result.score, opponentScore: result.opponentScore, won: result.won, outcome: result.outcome, stats: result.stats }) : null;
+  const shareProof = useCallback(() => { if (proofLine) void shareChallenge(`PROOF · ${proofLine}`); }, [proofLine, shareChallenge]);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#050505]">
@@ -448,6 +464,12 @@ function GameShellInner({
                   )}
 
                   {/* M14 Triumph Arena — duel result */}
+                  {mpResult && (
+                    <div className={`mt-3 rounded-lg border p-3 text-center ${mpResult.tie ? 'border-white/25 bg-white/[0.05]' : mpResult.iWon ? 'border-[#00FF9D]/40 bg-[#00FF9D]/10' : 'border-[#FF3366]/40 bg-[#FF3366]/10'}`}>
+                      <p className="text-xs font-bold tracking-wide text-white/80">FRIEND CHALLENGE</p>
+                      <p className="mt-1 text-sm text-white/80">{mpResult.tie ? 'Dead heat' : mpResult.iWon ? 'You took it' : `${mpResult.hostName ?? 'They'} held it`} — your best {mpResult.guestScore.toLocaleString('en-US')} vs their {mpResult.hostScore.toLocaleString('en-US')}</p>
+                    </div>
+                  )}
                   {arenaResult && (
                     <div
                       className={`mt-3 rounded-lg border p-3 text-center ${
@@ -526,13 +548,13 @@ function GameShellInner({
                       <><Share2 className="h-4 w-4" /> CHALLENGE A FRIEND</>
                     )}
                   </button>
-                  {dunkProofLine && (
+                  {proofLine && (
                     <button
-                      onClick={shareDunkProof}
+                      onClick={shareProof}
                       disabled={shareState === 'minting'}
                       className="fel-heading mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-[#00E5FF]/50 bg-[#00E5FF]/10 py-2.5 text-sm font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20 disabled:opacity-60"
                     >
-                      <Share2 className="h-4 w-4" /> SHARE DUNK PROOF · {dunkProofLine}
+                      <Share2 className="h-4 w-4" /> SHARE PROOF · {proofLine}
                     </button>
                   )}
                   {shareUrl && (

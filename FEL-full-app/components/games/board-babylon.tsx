@@ -70,6 +70,7 @@ export function makeBoardHost(opts: BoardHostOpts) {
         const combo = Number(r.stats?.combo ?? 1);
         const result: GameResult = {
           score: r.score,
+          stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
           opponentScore: 0,
           won: false, // score run — the clock always runs out, no win/lose gate
           duration: r.durationSec,

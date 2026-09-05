@@ -37,6 +37,7 @@ export default function DuelBabylon({ onEnd }: GameProps) {
       const won = r.outcome === 'WIN';
       const result: GameResult = {
         score: Number(r.stats?.wins ?? 0),
+        stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
         opponentScore: Number(r.stats?.foeWins ?? 0),
         won,
         duration: r.durationSec,

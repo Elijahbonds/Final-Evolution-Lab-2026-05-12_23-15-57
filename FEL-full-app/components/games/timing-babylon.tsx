@@ -55,6 +55,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
         const rounds = Number(r.stats?.rounds ?? 0);
         const result: GameResult = {
           score: r.score,
+          stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
           opponentScore: 0,
           won: r.outcome === 'GREAT', // GREAT = hit ≥60% of rounds cleanly
           duration: r.durationSec,

@@ -39,6 +39,7 @@ export default function DunkBabylon({ onEnd }: GameProps) {
       const won = r.outcome === 'WIN' || r.outcome === 'CONTEST_WON';   // PACK #3: the mode emits CONTEST_WON, not WIN — dunk sessions had always posted as losses
       const result: GameResult = {
         score: r.score,
+        stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
         opponentScore: r.stats?.rivalScore ?? r.stats?.rivalTotal ?? 0,   // the mode reports `rivalTotal`; the session had posted the rival as 0
         won,
         duration: r.durationSec,

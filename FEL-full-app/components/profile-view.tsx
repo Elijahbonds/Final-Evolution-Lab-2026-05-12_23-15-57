@@ -83,7 +83,7 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
           </div>
           <div className="ml-auto grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
             {[
-              { icon: Coins, label: 'Credits', value: p?.labCredits, color: '#FFD700' },
+              { icon: Coins, label: 'Credits', value: data?.wallet?.lc ?? p?.labCredits, color: '#FFD700' },
               { icon: Sparkles, label: 'XP', value: p?.xp, color: '#00FF9D' },
               { icon: Gem, label: 'Shards', value: p?.shards, color: '#A855F7' },
               { icon: Flame, label: 'Streak', value: p?.streakDays, color: '#FF3366' },

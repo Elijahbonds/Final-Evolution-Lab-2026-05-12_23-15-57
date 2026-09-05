@@ -53,6 +53,7 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
       const won = r.outcome === 'MATCH_WON';
       const result: GameResult = {
         score: Math.max(0, Math.round(r.score ?? 0)),
+        stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
         opponentScore: Number(r.stats?.foeWins ?? 0),
         won,
         duration: r.durationSec,

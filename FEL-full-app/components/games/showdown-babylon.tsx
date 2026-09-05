@@ -43,6 +43,7 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
       const won = r.outcome === 'SHOWDOWN_WON';
       const result: GameResult = {
         score: r.score,
+        stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
         opponentScore: Number(r.stats?.foeRounds ?? 0),
         won,
         duration: r.durationSec,

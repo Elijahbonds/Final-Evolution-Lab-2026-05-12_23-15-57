@@ -27,7 +27,7 @@ export function AppHeader() {
           prq: j?.prq ?? 0,
           gradeLabel: j?.grade?.label ?? 'READY',
           gradeColor: j?.grade?.color ?? '#00FF9D',
-          credits: j?.profile?.labCredits ?? 0,
+          credits: j?.wallet?.lc ?? j?.profile?.labCredits ?? 0,   // wallet first (pass 5 phase 1)
           isAdmin: j?.role === 'admin',
         });
       })

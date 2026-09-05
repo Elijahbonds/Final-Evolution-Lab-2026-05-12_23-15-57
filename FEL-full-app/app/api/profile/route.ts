@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { readWallet } from '@/lib/wallet/wallet-service';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getOrCreateProfile } from '@/lib/profile-service';
@@ -17,7 +18,8 @@ export async function GET() {
     const profile = await getOrCreateProfile(userId);
     const score = prqScore(profile as any);
     const role = (session?.user as any)?.role ?? 'user';
-    return NextResponse.json({ profile, prq: score, grade: prqGrade(score), role });
+    const wallet = await readWallet(prisma, userId);   // pass 5 phase 1: the wallet is the balance readers use
+    return NextResponse.json({ profile, wallet: { coins: wallet.coins, shards: wallet.shards, lc: wallet.lc }, prq: score, grade: prqGrade(score), role });
   } catch (e) {
     console.error('profile error', e);
     return NextResponse.json({ error: 'Failed to load profile' }, { status: 500 });

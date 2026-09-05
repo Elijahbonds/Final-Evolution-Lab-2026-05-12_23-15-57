@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { readWallet } from '@/lib/wallet/wallet-service';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
@@ -20,7 +21,7 @@ export async function GET() {
       take: 10,
     });
     return NextResponse.json({
-      labCredits: profile?.labCredits ?? 0,
+      labCredits: (await readWallet(prisma, userId)).lc,   // pass 5 phase 1: the wallet is the balance
       owned: owned?.map((o: any) => o?.cardKey) ?? [],
       ledger: ledger ?? [],
     });

@@ -13,6 +13,7 @@
  * settle never double-pays.
  */
 import 'server-only';
+import { sessionModeFor } from './match-core';
 import type { PrismaClient } from '@prisma/client';
 import { grantServerReward } from '@/lib/wallet/wallet-service';
 import { REASON } from '@/lib/wallet/reward-rules';
@@ -21,7 +22,7 @@ import { generateMatchCode, resolveOutcome, winnerIdFor } from '@/lib/mp/match-c
 /** Best recorded score for a user in a mode (server-authoritative). 0 if none. */
 export async function bestScoreFor(prisma: PrismaClient, userId: string, mode: string): Promise<number> {
   const row = await prisma.gameSession.findFirst({
-    where: { userId, mode },
+    where: { userId, mode: sessionModeFor(mode) },   // pass 5: the challenge key is not the session mode
     orderBy: { score: 'desc' },
     select: { score: true },
   });

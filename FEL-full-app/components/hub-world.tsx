@@ -12,6 +12,7 @@ import { HubQuickActions } from '@/components/hub-quick-actions';
 
 interface ProfileData {
   profile: any;
+  wallet?: { coins: number; shards: number; lc: number };   // pass 5 phase 1: the balance readers use
   prq: number;
   grade: { label: string; color: string };
 }
@@ -107,7 +108,7 @@ export function HubWorld({ userName }: { userName: string }) {
             <div className="text-center">
               <div className="flex items-center gap-1 font-mono text-[28px] font-bold leading-none text-[#FFD700]">
                 <Coins className="h-5 w-5" />
-                {p?.labCredits ?? '–'}
+                {data?.wallet?.lc ?? p?.labCredits ?? '–'}
               </div>
               <div className="mt-1 text-[11px] uppercase tracking-wider text-white/40">Lab Credits</div>
             </div>
@@ -163,6 +164,21 @@ export function HubWorld({ userName }: { userName: string }) {
           </div>
         </div>
         <span className="font-mono text-xs text-[#FF3366]">ENTER →</span>
+      </Link>
+
+      {/* Pass 5 phase 4 — the mastery ladder */}
+      <Link
+        href="/ladder"
+        className="mt-3 flex items-center justify-between rounded-xl border border-[#00E5FF]/30 bg-gradient-to-r from-[#00E5FF]/10 to-transparent px-5 py-4"
+      >
+        <div className="flex items-center gap-3">
+          <Trophy className="h-6 w-6 text-[#00E5FF]" />
+          <div>
+            <div className="fel-heading text-base font-bold text-white">Mastery Ladder</div>
+            <div className="font-mono text-[11px] text-white/50">This week's standing, recent seasons, your PRQ grade</div>
+          </div>
+        </div>
+        <span className="font-mono text-xs text-[#00E5FF]">CLIMB →</span>
       </Link>
 
       {/* Venue grid */}

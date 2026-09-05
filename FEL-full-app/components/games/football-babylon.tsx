@@ -39,6 +39,7 @@ export default function FootballBabylon({ onEnd }: GameProps) {
       const yards = Number(r.stats?.yards ?? 0);
       const result: GameResult = {
         score: r.score,
+        stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
         opponentScore: 0,
         won,
         duration: r.durationSec,

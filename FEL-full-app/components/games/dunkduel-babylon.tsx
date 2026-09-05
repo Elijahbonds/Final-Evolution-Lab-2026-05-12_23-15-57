@@ -48,6 +48,7 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
       const won = r.outcome === 'P1_WINS';
       const result: GameResult = {
         score: Number(r.stats?.p1 ?? r.score ?? 0),
+        stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
         opponentScore: Number(r.stats?.p2 ?? 0),
         won,
         duration: r.durationSec,

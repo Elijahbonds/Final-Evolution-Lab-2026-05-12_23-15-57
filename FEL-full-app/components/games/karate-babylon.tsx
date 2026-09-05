@@ -39,6 +39,7 @@ export default function KarateBabylon({ onEnd }: GameProps) {
       const wave = Number(r.stats?.wave ?? 0);
       const result: GameResult = {
         score: r.score,
+        stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
         opponentScore: 0,
         won: false, // endless survival — the run always ends on defeat
         duration: r.durationSec,

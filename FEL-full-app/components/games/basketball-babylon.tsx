@@ -38,6 +38,7 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
       const won = r.outcome === 'WIN';
       const result: GameResult = {
         score: r.score,
+        stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
         opponentScore: r.stats?.foeScore ?? 0,
         won,
         duration: r.durationSec,

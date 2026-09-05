@@ -59,6 +59,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       endedRef.current = true;
       onEnd({
         score: Number(r.stats?.points ?? r.score ?? 0),
+        stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
         opponentScore: 0,
         won: r.outcome === 'win',
         duration: r.durationSec,

@@ -68,6 +68,7 @@ export function makeAirHost(modeKey: string, title: string) {
           endedRef.current = true;
           onEndRef.current({
             score: r.score,
+            stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
             opponentScore: 0,
             won: r.outcome === 'win',
             duration: r.durationSec,

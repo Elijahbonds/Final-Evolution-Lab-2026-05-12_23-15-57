@@ -61,8 +61,24 @@ export const MP_MODES: { key: string; label: string }[] = [
   { key: 'gymnastics', label: 'Stick It' },
   { key: 'tennis', label: 'Match Point' },
   { key: 'tiebreak', label: 'Tiebreak Blitz' },
+  // pass 5: head-to-head modes join with their session score (rounds × 100 − rival rounds × 40 for fights; points for ball games)
+  { key: 'karate-vs', label: 'Storm Duel' },
+  { key: 'onevone', label: 'Ones' },
+  { key: 'threevthree', label: 'Threes' },
+  { key: 'carnival', label: 'Game Night' },
+  { key: 'volleyball', label: 'Beach Rally' },
+  { key: 'dance', label: 'The Cypher' },
 ];
 
+// Challenge key → the `mode` a GameSession is stored under (the GameShell prop). Measured 2026-09-04: twelve of the
+// fourteen keys never matched a session mode, so best scores read 0 and those challenges settled as ties.
+export const MP_SESSION_MODE: Record<string, string> = {
+  dunk: 'dunkContest', threepoint: 'threePoint', sprint: 'sprint', 'big-air': 'bigAir', snowboard: 'snowboarding',
+  skateboard: 'skateboarding', surf: 'surfing', golf: 'golf', baseball: 'baseball', soccer: 'soccer', football: 'football',
+  gymnastics: 'gymnastics', tennis: 'tennis', tiebreak: 'tiebreak',
+  'karate-vs': 'karateVersus', onevone: 'hoops1v1', threevthree: 'hoops3v3', carnival: 'carnival', volleyball: 'volleyball', dance: 'dance',
+};
+export function sessionModeFor(mpKey: string): string { return MP_SESSION_MODE[mpKey] ?? mpKey; }
 const MP_MODE_KEYS = new Set(MP_MODES.map((m) => m.key));
 
 /** Is a mode key eligible for an async challenge? */
