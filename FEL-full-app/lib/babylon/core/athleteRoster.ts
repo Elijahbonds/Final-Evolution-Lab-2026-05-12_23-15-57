@@ -39,7 +39,7 @@ const HERO_URLS = new Set([DEFAULT_HERO_URL, 'fel-hero.glb', '/models/elijah-her
 export function normalizeHeroUrl(url: string | undefined | null): string {
   if (!url) return DEFAULT_HERO_URL;
   if (HERO_URLS.has(url) && !url.startsWith('/')) return DEFAULT_HERO_URL;
-  if (url === '/models/elijah-hero.glb') return DEFAULT_HERO_URL;   // retired asset
+  // /models/elijah-hero.glb is the live dunk/Venice player body — keep as-is.
   return url;
 }
 

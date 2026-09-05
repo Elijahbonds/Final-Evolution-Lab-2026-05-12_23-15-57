@@ -266,8 +266,8 @@ export const DunkDuelMode: ModeDefinition = (() => {
       neverBindPose(p1.animator, SPORT_CLIP.idle);
       installSafePlay(p1.animator, 'dunkduel-p1');
       ctx.groundLock?.track(p1.root, p1.skeleton);
-      p2 = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
-        position: new Vector3(4.2, 0, CFG.rimZ + 4), tint: '#22d3ee', startClip: SPORT_CLIP.idle,
+      p2 = await CharacterLibrary.spawn(ctx.scene, CFG.rivalUrl, {
+        position: new Vector3(4.2, 0, CFG.rimZ + 4), startClip: SPORT_CLIP.idle,
       });
       neverBindPose(p2.animator, SPORT_CLIP.idle);
       installSafePlay(p2.animator, 'dunkduel-p2');
