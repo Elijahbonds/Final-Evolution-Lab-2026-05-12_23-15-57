@@ -356,7 +356,7 @@ function GameShellInner({
             href="/"
             className="flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-xs font-medium text-white/60 transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> HUB
+            <ArrowLeft className="h-3.5 w-3.5" /> Home
           </Link>
           <div>
             <h1 className="fel-heading text-xl font-bold leading-none text-white">{title}</h1>
@@ -597,7 +597,7 @@ function GameShellInner({
                       href={storyNodeId ? '/story' : '/'}
                       className="fel-heading flex flex-1 items-center justify-center gap-2 rounded-md border border-white/15 py-3 text-base font-bold text-white/80 transition-colors hover:border-[#00E5FF]/60 hover:text-[#00E5FF]"
                     >
-                      <Home className="h-4 w-4" /> {storyNodeId ? 'MAP' : 'HUB'}
+                      <Home className="h-4 w-4" /> {storyNodeId ? 'Map' : 'Home'}
                     </Link>
                   </div>
                 )}
