@@ -554,7 +554,7 @@ function GameShellInner({
                       disabled={shareState === 'minting'}
                       className="fel-heading mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-[#00E5FF]/50 bg-[#00E5FF]/10 py-2.5 text-sm font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20 disabled:opacity-60"
                     >
-                      <Share2 className="h-4 w-4" /> SHARE PROOF · {proofLine}
+                      <Share2 className="h-4 w-4" /> Share proof · {proofLine}
                     </button>
                   )}
                   {shareUrl && (

@@ -1,13 +1,20 @@
 // proofLine — pass 5 phase 3: one line that says what happened, per mode, from the mode's own session stats. Rendered on
-// the results card ("SHARE PROOF · …") and minted onto the challenge card as `display`. Dunk keeps its make/miss line.
+// the results card ("Share proof · …") and minted onto the challenge card as `display`. Dunk keeps its make/miss line.
 export interface ProofInput { score: number; opponentScore?: number; won: boolean; outcome?: string; stats?: Record<string, number | string | boolean> }
 const n = (s: ProofInput['stats'], k: string): number | null => { const v = s?.[k]; return typeof v === 'number' && Number.isFinite(v) ? v : null; };
 const wl = (r: ProofInput) => (r.won ? 'WON' : 'LOST');
 export function proofLineFor(mode: string, r: ProofInput): string | null {
   const s = r.stats ?? {};
   switch (mode) {
-    case 'dunkContest': { const m = n(s, 'makes') ?? 0, x = n(s, 'misses') ?? 0; return `${m}/${m + x} DUNKS · ${r.score} PTS${r.opponentScore ? ` VS ${r.opponentScore}` : ''} · ${wl(r)}`; }
-    case 'dunkduel': { const p1 = n(s, 'p1'), p2 = n(s, 'p2'); return p1 !== null && p2 !== null ? `DUEL ${p1} VS ${p2} · ${r.outcome?.replace(/_/g, ' ') ?? ''}`.trim() : null; }
+    case 'dunkContest': {
+      const m = n(s, 'makes') ?? 0, x = n(s, 'misses') ?? 0, tot = m + x;
+      const rival = r.opponentScore != null ? ` vs ${r.opponentScore}` : '';
+      const outcome = r.won ? 'You won' : 'You lost';
+      if (m > 0) return `You slammed ${m}/${tot} · ${r.score} pts${rival} · ${outcome}`;
+      if (tot > 0) return `You missed every dunk · ${r.score} pts${rival} · ${outcome}`;
+      return `You missed · ${r.score} pts${rival} · ${outcome}`;
+    }
+    case 'dunkduel': { const p1 = n(s, 'p1'), p2 = n(s, 'p2'); return p1 !== null && p2 !== null ? `Duel ${p1} vs ${p2} · ${(r.outcome?.replace(/_/g, ' ') ?? '').toLowerCase()}`.trim() : null; }
     case 'karateVersus': case 'mixedcombat': { const rounds = n(s, 'rounds'), foe = n(s, 'foeWins'); return rounds !== null ? `${wl(r)} IN ${rounds} ROUNDS${foe !== null ? ` · RIVAL TOOK ${foe}` : ''}` : null; }
     case 'showdown': { const foe = n(s, 'foeRounds'); return `${wl(r)}${foe !== null ? ` · RIVAL TOOK ${foe} ROUND${foe === 1 ? '' : 'S'}` : ''}`; }
     case 'duel': { const foe = n(s, 'foeWins'); return `${wl(r)}${foe !== null ? ` · RIVAL TOOK ${foe}` : ''}${s.weapon ? ` · ${String(s.weapon).toUpperCase()}` : ''}`; }

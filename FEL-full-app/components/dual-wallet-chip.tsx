@@ -109,7 +109,7 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
         const parts: string[] = [];
         if (g.coins > 0) parts.push(`+${g.coins.toLocaleString('en-US')} coins`);
         if (g.shards > 0) parts.push(`+${g.shards} shards`);
-        if ((g.lc ?? 0) > 0) parts.push(`+${(g.lc as number).toLocaleString('en-US')} LC`);
+        if ((g.lc ?? 0) > 0) parts.push(`+${(g.lc as number).toLocaleString('en-US')} credits`);
         toast.success(parts.join('  ·  '), {
           description: detail?.capped ? 'Daily cap reached — reduced reward' : undefined,
           duration: 2600,
@@ -176,7 +176,7 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
       {/* Lab credits — the arena's and the shop's currency, folded into the wallet 2026-09-04 */}
       <span
         className="inline-flex items-center gap-1.5 rounded-md border border-[#00E5FF]/40 bg-[#00E5FF]/5 px-2.5 py-1 font-mono text-xs text-[#7FEFFF]"
-        title="Lab credits — the arena's stake and the shop's price"
+        title="Credits — arena stake & shop"
       >
         <Landmark className="h-3.5 w-3.5" aria-hidden="true" />
         {state === 'error' ? (
