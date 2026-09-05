@@ -40,7 +40,7 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
   dunk: verbs({
     A: { label: 'SLAM', emit: A('A') },
     B: { label: 'STYLE', emit: A('B') },
-    Y: { label: 'CHARGE', emit: RT(1), hold: true },
+    Y: { label: 'RUN', emit: RT(1), hold: true },
     // Venice DualShock pad (2026-09-05): no dead binds — X cycles the PROP (none → alley-oop → obstacle) during the
     // approach, the same job the d-pad does. Mid-air tricks still fire from d-pad + A/B/Y combos (DunkSystem.ts).
     X: { label: 'PROP', emit: A('X') },
@@ -54,8 +54,8 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
   football: verbs({
     A: { label: 'HURDLE', emit: A('A') },
     X: { label: 'JUKE L', emit: A('X') },
-    Y: { label: 'TRUCK', emit: RT(1), hold: true },
-    B: { label: 'JUKE R', emit: A('Y') },
+    Y: { label: 'JUKE R', emit: A('Y') },
+    B: { label: 'TRUCK', emit: RT(1), hold: true },
   }),
   skateboard: verbs({
     A: { label: 'POP', emit: A('A') },
@@ -141,7 +141,7 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
     A: { label: 'SLAM', emit: A('A') },
     B: { label: 'STYLE', emit: A('B') },
     X: { label: 'CHAIR', emit: A('X') },
-    Y: { label: 'CHARGE', emit: RT(1), hold: true },
+    Y: { label: 'RUN', emit: RT(1), hold: true },
   }),
 
   // Karate VS uses the exact same verb set as Karate Endless — BLOCK is

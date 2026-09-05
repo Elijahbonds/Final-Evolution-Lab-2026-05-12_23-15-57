@@ -79,7 +79,7 @@ for (const field of ['p1Score', 'p2Score', 'activePlayer', 'dunkNum', 'style', '
   // phones
   const verbs = readFileSync(new URL('../lib/babylon/ui/modeVerbs.ts', import.meta.url), 'utf8');
   const vblock = verbs.slice(verbs.indexOf('dunkduel:'), verbs.indexOf('})', verbs.indexOf('dunkduel:')));
-  for (const label of ['SLAM', 'STYLE', 'CHAIR', 'CHARGE']) ok(vblock.includes(label), `touch verb ${label}`);
+  for (const label of ['SLAM', 'STYLE', 'CHAIR', 'RUN']) ok(vblock.includes(label), `touch verb ${label}`);
   const cl = readFileSync(new URL('../lib/controller-link/schemas/registry.ts', import.meta.url), 'utf8');
   ok(/modeId: 'dunkduel'/.test(cl), 'Controller Link has a dunkduel schema');
   // the camera follows whose turn it is

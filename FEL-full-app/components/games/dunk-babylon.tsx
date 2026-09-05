@@ -135,7 +135,7 @@ export default function DunkBabylon({ onEnd }: GameProps) {
       )}
 
       {/* Venice DualShock pad (2026-09-05): the charge METER is gone — the Benchmark feel bar calls a meter a hard
-          fail ("meter slideshow"), and HOLD = RUN carries its own cue: the hold ring fills on the pad's CHARGE button. */}
+          fail ("meter slideshow"), and HOLD = RUN carries its own cue: the hold ring fills on the pad's RUN button. */}
 
       {/* SLAM! cue */}
       {hud.slamPulse === true && phase === 'playing' && (
