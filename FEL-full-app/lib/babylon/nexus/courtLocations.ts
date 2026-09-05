@@ -4,7 +4,7 @@
 // pick is byte-identical to the spec as authored. Decoration that needs meshes (blossom trees, a starfield) is added
 // AFTER the scene builds through the venue mount hook — NexusWebScene.ts stays fenced.
 
-import { Color3, Color4, DynamicTexture, Mesh, MeshBuilder, ParticleSystem, PBRMaterial, StandardMaterial, Texture, TransformNode, Vector3 } from '@babylonjs/core';
+import { Color3, Color4, DynamicTexture, Mesh, MeshBuilder, ParticleSystem, PBRMaterial, SpotLight, StandardMaterial, Texture, TransformNode, Vector3 } from '@babylonjs/core';
 import type { Scene } from '@babylonjs/core';
 import type { Environment, NexusWebSpec, PropKind } from './NexusWebScene';
 
@@ -64,14 +64,16 @@ export const COURT_LOCATIONS: Record<CourtLocationId, CourtLocation> = {
     decorate: decorateOrbit,
   },
   canopy: {
-    id: 'canopy', name: 'Canopy Court', sub: 'CANOPY COURT', tint: '#9be37a', thumb: 'canopy-court', ready: false,
-    environment: { skyTop: '#7BA35A', skyBottom: '#2E4A2B', fogColor: '#4E6B3F', fogDensity: 0.012, ambient: 0.5, sunDirection: [-0.2, -0.9, 0.3], sunColor: '#FFE9B0', grade },
-    surround: [], propSet: '',
+    id: 'canopy', name: 'Canopy Court', sub: 'CANOPY COURT', tint: '#9be37a', thumb: 'canopy-court', ready: true,
+    environment: { skyTop: '#6E8F4A', skyBottom: '#2C4426', fogColor: '#4A6438', fogDensity: 0.0035, ambient: 0.5, sunDirection: [-0.2, -0.9, 0.3], sunColor: '#FFE9B0', grade },
+    surround: [], propSet: 'canopy-court',
+    decorate: decorateCanopy,
   },
   rooftop: {
-    id: 'rooftop', name: 'Night Rooftop', sub: 'NIGHT ROOFTOP', tint: '#ffd166', thumb: 'night-rooftop', ready: false,
-    environment: { skyTop: '#0B1230', skyBottom: '#3A2A5E', fogColor: '#241A3F', fogDensity: 0.008, ambient: 0.45, sunDirection: [-0.4, -0.85, 0.35], sunColor: '#FFD9A0', grade, backdrop: 'neon' },
-    surround: [{ kind: 'lamp', position: [-13, 0, 2] }, { kind: 'lamp', position: [13, 0, 2] }], propSet: '',
+    id: 'rooftop', name: 'Night Rooftop', sub: 'NIGHT ROOFTOP', tint: '#ffd166', thumb: 'night-rooftop', ready: true,
+    environment: { skyTop: '#0B1230', skyBottom: '#3A2A5E', fogColor: '#241A3F', fogDensity: 0.004, ambient: 0.45, sunDirection: [-0.4, -0.85, 0.35], sunColor: '#FFD9A0', grade },   // no baked backdrop: the skyline is geometry (below)
+    surround: [{ kind: 'lamp', position: [-13, 0, 2] }, { kind: 'lamp', position: [13, 0, 2] }], propSet: 'night-rooftop',
+    decorate: decorateRooftop,
   },
 };
 
@@ -121,40 +123,46 @@ export function writeCourtLocation(id: CourtLocationId): void {
 // Stylised cherry trees (a trunk and a cluster of blossom heads) ring the court outside the play area, and petals fall
 // the way the dojo's do, over the whole court. Everything is procedural — no assets.
 
-function decorateBlossom(scene: Scene, root: TransformNode): void {
-  const holder = new TransformNode('loc_blossom', scene); holder.parent = root;
-  const trunkMat = new PBRMaterial('loc_blossom_trunk', scene);
-  trunkMat.albedoColor = Color3.FromHexString('#5A3D2E'); trunkMat.metallic = 0; trunkMat.roughness = 0.95;
-  // Deeper pinks than the pastel first pass: under the venue grade (exposure 1.15, contrast 1.35) pale pink read as white cloud.
-  const bloomMats = ['#E8577F', '#F06292', '#F48FB1'].map((hex, i) => {
-    const m = new PBRMaterial(`loc_blossom_bloom_${i}`, scene);
+/** Stylised trees: a trunk and a cluster of canopy heads. Shared by Blossom Park (pinks) and Canopy Court (greens). */
+function plantTrees(scene: Scene, holder: TransformNode, tag: string, spots: Array<[number, number, number]>, heads: string[], trunkHex: string, seed0: number): void {
+  const trunkMat = new PBRMaterial(`loc_${tag}_trunk`, scene);
+  trunkMat.albedoColor = Color3.FromHexString(trunkHex); trunkMat.metallic = 0; trunkMat.roughness = 0.95;
+  const headMats = heads.map((hex, i) => {
+    const m = new PBRMaterial(`loc_${tag}_head_${i}`, scene);
     m.albedoColor = Color3.FromHexString(hex); m.metallic = 0; m.roughness = 0.9;
-    m.emissiveColor = Color3.FromHexString(hex).scale(0.04);   // a hint of held light, not a glow
+    m.emissiveColor = Color3.FromHexString(hex).scale(0.04);
     return m;
   });
-  // Placement is for the DUNK camera (behind the player, 0.9 rad, looking down −z at the hoop): the court is x ±8,
-  // z ±14, the player is clamped to x ±6. Trees line both sides just outside the court (x ±11) inside the cone, and
-  // taller ones stand behind the far crowd tier (z −20…−25) so their canopies rise above it under the hoop.
-  const spots: Array<[number, number, number]> = [
-    [-11, -3, 0.9], [11, -2, 1.0], [-11.5, -8, 1.0], [11.5, -7.5, 0.9], [-11, -13, 0.95], [11, -12.5, 1.05],
-    [-12, -21, 1.25], [-4.5, -23, 1.15], [4, -22, 1.3], [12, -21, 1.2], [-8, -25, 1.1], [8.5, -25, 1.15],
-    [-11, 4, 0.85], [11, 5, 0.9],
-  ];
-  let seed = 7;
+  let seed = seed0;
   const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
   spots.forEach(([x, z, s], i) => {
     const h = 3.0 * s;
-    const trunk = MeshBuilder.CreateCylinder(`loc_blossom_trunk_${i}`, { height: h, diameterTop: 0.22 * s, diameterBottom: 0.36 * s, tessellation: 7 }, scene);
+    const trunk = MeshBuilder.CreateCylinder(`loc_${tag}_trunk_${i}`, { height: h, diameterTop: 0.22 * s, diameterBottom: 0.36 * s, tessellation: 7 }, scene);
     trunk.position.set(x, h / 2, z); trunk.material = trunkMat; trunk.parent = holder; trunk.isPickable = false;
-    const heads = 6 + Math.floor(rnd() * 3);   // more, smaller heads: a canopy, not a cloud
-    for (let k = 0; k < heads; k++) {
+    const n = 6 + Math.floor(rnd() * 3);
+    for (let k = 0; k < n; k++) {
       const r = (0.6 + rnd() * 0.5) * s;
-      const head = MeshBuilder.CreateSphere(`loc_blossom_head_${i}_${k}`, { diameter: r * 2, segments: 6 }, scene);
+      const head = MeshBuilder.CreateSphere(`loc_${tag}_head_${i}_${k}`, { diameter: r * 2, segments: 6 }, scene);
       head.position.set(x + (rnd() - 0.5) * 2.0 * s, h + (rnd() - 0.15) * 1.1 * s, z + (rnd() - 0.5) * 2.0 * s);
       head.scaling.y = 0.8;
-      head.material = bloomMats[(i + k) % bloomMats.length]; head.parent = holder; head.isPickable = false;
+      head.material = headMats[(i + k) % headMats.length]; head.parent = holder; head.isPickable = false;
     }
   });
+  holder.onDisposeObservable.add(() => { trunkMat.dispose(); headMats.forEach((m) => m.dispose()); });
+}
+
+/** Ring positions for the DUNK camera (behind the player, 0.9 rad, looking down −z): both sides just outside the court
+ *  (x ±11) and a taller row behind the far crowd tier (z −20…−25). */
+const COURT_TREE_SPOTS: Array<[number, number, number]> = [
+  [-11, -3, 0.9], [11, -2, 1.0], [-11.5, -8, 1.0], [11.5, -7.5, 0.9], [-11, -13, 0.95], [11, -12.5, 1.05],
+  [-12, -21, 1.25], [-4.5, -23, 1.15], [4, -22, 1.3], [12, -21, 1.2], [-8, -25, 1.1], [8.5, -25, 1.15],
+  [-11, 4, 0.85], [11, 5, 0.9],
+];
+
+function decorateBlossom(scene: Scene, root: TransformNode): void {
+  const holder = new TransformNode('loc_blossom', scene); holder.parent = root;
+  // Deeper pinks than the pastel first pass: under the venue grade (exposure 1.15, contrast 1.35) pale pink read as white cloud.
+  plantTrees(scene, holder, 'blossom', COURT_TREE_SPOTS, ['#E8577F', '#F06292', '#F48FB1'], '#5A3D2E', 7);
   // petals over the court
   const tex = new DynamicTexture('loc_blossom_petal', 16, scene, false);
   const g = tex.getContext() as CanvasRenderingContext2D; g.clearRect(0, 0, 16, 16);
@@ -167,7 +175,7 @@ function decorateBlossom(scene: Scene, root: TransformNode): void {
   ps.minSize = 0.07; ps.maxSize = 0.16; ps.minLifeTime = 7; ps.maxLifeTime = 11; ps.emitRate = 18;
   ps.gravity = new Vector3(0.25, -0.5, 0.1); ps.minAngularSpeed = -1.5; ps.maxAngularSpeed = 1.5;
   ps.start();
-  holder.onDisposeObservable.add(() => { ps.dispose(); tex.dispose(); trunkMat.dispose(); bloomMats.forEach((m) => m.dispose()); });
+  holder.onDisposeObservable.add(() => { ps.dispose(); tex.dispose(); });
 }
 
 // ── Orbit ────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -222,4 +230,105 @@ function decorateOrbit(scene: Scene, root: TransformNode): void {
   // slow drift of the stars
   const obs = scene.onBeforeRenderObservable.add(() => { dome.rotation.y += 0.00004 * scene.getEngine().getDeltaTime(); });
   holder.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(obs); starTex.dispose(); planetTex.dispose(); starMat.dispose(); planetMat.dispose(); shadeMat.dispose(); });
+}
+
+// ── Canopy Court ─────────────────────────────────────────────────────────────────────────────────────────────────────
+// The forest is the Kenney nature kit (prop set 'canopy-court'). Here: a painted mural wall behind the far crowd tier
+// (a Meshy mural can replace the texture later) and dappled light — a leaf-pattern projection on a spotlight over the
+// court — plus warm motes drifting in the air.
+
+function decorateCanopy(scene: Scene, root: TransformNode): void {
+  const holder = new TransformNode('loc_canopy', scene); holder.parent = root;
+  // the forest: the same stylised trees as Blossom Park in greens, one size up, plus a few giants behind the wall
+  plantTrees(scene, holder, 'canopy', [...COURT_TREE_SPOTS.map(([x, z, s]) => [x, z, s * 1.25] as [number, number, number]), [-16, -30, 1.9], [0, -32, 2.1], [16, -30, 1.8]], ['#1B5E20', '#2E7D32', '#33691E', '#245C2A'], '#4E342E', 31);   // deep greens: the grade lifts them toward lime
+  let seed = 23;
+  const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  // mural wall
+  const tex = new DynamicTexture('loc_canopy_mural', { width: 1024, height: 256 }, scene, false);
+  const g = tex.getContext() as CanvasRenderingContext2D;
+  g.fillStyle = '#B25C8E'; g.fillRect(0, 0, 1024, 256);
+  const palette = ['#F2C14E', '#3BB4C1', '#F26B5B', '#8FD16C', '#F7F7F2', '#6B4CE6'];
+  for (let i = 0; i < 26; i++) {                       // leaf shapes and tag strokes
+    g.fillStyle = palette[i % palette.length];
+    g.globalAlpha = 0.85;
+    g.beginPath(); g.ellipse(rnd() * 1024, 40 + rnd() * 180, 30 + rnd() * 90, 14 + rnd() * 40, rnd() * Math.PI, 0, Math.PI * 2); g.fill();
+  }
+  g.globalAlpha = 1; g.lineWidth = 9; g.strokeStyle = '#1B1B1F';
+  for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(rnd() * 1024, rnd() * 256); g.bezierCurveTo(rnd() * 1024, rnd() * 256, rnd() * 1024, rnd() * 256, rnd() * 1024, rnd() * 256); g.stroke(); }
+  tex.update();
+  const wallMat = new PBRMaterial('loc_canopy_wallmat', scene); wallMat.albedoTexture = tex; wallMat.metallic = 0; wallMat.roughness = 0.95;
+  const wall = MeshBuilder.CreateBox('loc_canopy_wall', { width: 30, height: 5.5, depth: 0.5 }, scene);
+  wall.position.set(0, 2.75, -19.6); wall.material = wallMat; wall.parent = holder; wall.isPickable = false;
+  // dappled light: a leaf-hole pattern projected from above
+  const cookie = new DynamicTexture('loc_canopy_cookie', 512, scene, false);
+  const c = cookie.getContext() as CanvasRenderingContext2D;
+  c.fillStyle = '#5a5a5a'; c.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 160; i++) { c.fillStyle = `rgba(255,255,255,${0.5 + rnd() * 0.5})`; c.beginPath(); c.ellipse(rnd() * 512, rnd() * 512, 6 + rnd() * 22, 4 + rnd() * 12, rnd() * Math.PI, 0, Math.PI * 2); c.fill(); }
+  cookie.update();
+  const dapple = new SpotLight('loc_canopy_dapple', new Vector3(0, 26, -2), new Vector3(0, -1, 0), Math.PI / 2.4, 1, scene);
+  dapple.projectionTexture = cookie; dapple.intensity = 900; dapple.diffuse = Color3.FromHexString('#FFF1C2'); dapple.specular = Color3.Black(); dapple.parent = holder;
+  // motes
+  const dot = new DynamicTexture('loc_canopy_dot', 16, scene, false);
+  const d = dot.getContext() as CanvasRenderingContext2D; d.clearRect(0, 0, 16, 16); d.fillStyle = '#fff'; d.beginPath(); d.arc(8, 8, 5, 0, Math.PI * 2); d.fill(); dot.update(); dot.hasAlpha = true;
+  const motes = new ParticleSystem('loc_canopy_motes', 140, scene);
+  motes.particleTexture = dot as unknown as Texture; motes.blendMode = ParticleSystem.BLENDMODE_ADD;
+  motes.emitter = new Vector3(0, 3, -2); motes.minEmitBox = new Vector3(-12, -2, -14); motes.maxEmitBox = new Vector3(12, 5, 12);
+  motes.color1 = new Color4(1, 0.93, 0.7, 0.35); motes.color2 = new Color4(1, 0.85, 0.55, 0.2); motes.colorDead = new Color4(1, 0.9, 0.6, 0);
+  motes.minSize = 0.03; motes.maxSize = 0.08; motes.minLifeTime = 6; motes.maxLifeTime = 12; motes.emitRate = 12;
+  motes.gravity = new Vector3(0.05, 0.02, 0); motes.direction1 = new Vector3(-0.2, 0.05, -0.2); motes.direction2 = new Vector3(0.2, 0.1, 0.2);
+  motes.start();
+  holder.onDisposeObservable.add(() => { motes.dispose(); dot.dispose(); dapple.dispose(); cookie.dispose(); tex.dispose(); wallMat.dispose(); });
+}
+
+// ── Night Rooftop ────────────────────────────────────────────────────────────────────────────────────────────────────
+// The parapet and planters are the suburban kit (prop set 'night-rooftop'). Here: the roof slab the court sits on, so
+// beyond the parapet the city drops away; string lights on posts down both sides; the 'neon' backdrop is the skyline.
+
+function decorateRooftop(scene: Scene, root: TransformNode): void {
+  const holder = new TransformNode('loc_rooftop', scene); holder.parent = root;
+  const slabMat = new PBRMaterial('loc_rooftop_slab', scene); slabMat.albedoColor = Color3.FromHexString('#2A2731'); slabMat.metallic = 0; slabMat.roughness = 0.9;
+  const slab = MeshBuilder.CreateBox('loc_rooftop_slabmesh', { width: 26, height: 1.2, depth: 38 }, scene);
+  slab.position.set(0, -0.62, 0); slab.material = slabMat; slab.parent = holder; slab.isPickable = false;
+  const postMat = new PBRMaterial('loc_rooftop_post', scene); postMat.albedoColor = Color3.FromHexString('#1B1B22'); postMat.metallic = 0.2; postMat.roughness = 0.6;
+  const bulbMat = new StandardMaterial('loc_rooftop_bulb', scene); bulbMat.emissiveColor = Color3.FromHexString('#FFD27A'); bulbMat.disableLighting = true;
+  const wireMat = new StandardMaterial('loc_rooftop_wire', scene); wireMat.emissiveColor = Color3.FromHexString('#2A2A2A'); wireMat.disableLighting = true;
+  const zs = [-15, -7.5, 0, 7.5, 15];
+  for (const x of [-11.5, 11.5]) {
+    for (const z of zs) {
+      const post = MeshBuilder.CreateCylinder(`loc_rooftop_postmesh_${x}_${z}`, { height: 4.2, diameter: 0.12, tessellation: 6 }, scene);
+      post.position.set(x, 2.1, z); post.material = postMat; post.parent = holder; post.isPickable = false;
+    }
+    for (let i = 0; i < zs.length - 1; i++) {          // a sagging string with bulbs between posts
+      const z0 = zs[i], z1 = zs[i + 1];
+      for (let k = 0; k <= 8; k++) {
+        const tt = k / 8; const z = z0 + (z1 - z0) * tt; const sag = Math.sin(tt * Math.PI) * 0.45;
+        const bulb = MeshBuilder.CreateSphere(`loc_rooftop_bulb_${x}_${i}_${k}`, { diameter: 0.24, segments: 4 }, scene);
+        bulb.position.set(x, 4.1 - sag, z); bulb.material = bulbMat; bulb.parent = holder; bulb.isPickable = false;
+      }
+      const wire = MeshBuilder.CreateCylinder(`loc_rooftop_wire_${x}_${i}`, { height: z1 - z0, diameter: 0.02, tessellation: 3 }, scene);
+      wire.position.set(x, 3.95, (z0 + z1) / 2); wire.rotation.x = Math.PI / 2; wire.material = wireMat; wire.parent = holder; wire.isPickable = false;
+    }
+  }
+  // the city: dark towers with lit windows ringing the roof at 55–115 m, taller behind the hoop
+  const winTex = new DynamicTexture('loc_rooftop_windows', 128, scene, false);
+  const w = winTex.getContext() as CanvasRenderingContext2D; w.fillStyle = '#0B0C14'; w.fillRect(0, 0, 128, 128);
+  let seed = 41; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  for (let yy = 4; yy < 128; yy += 10) for (let xx = 4; xx < 128; xx += 8) { if (rnd() < 0.55) { w.fillStyle = rnd() < 0.3 ? '#FFE3A8' : '#B9D4FF'; w.globalAlpha = 0.6 + rnd() * 0.4; w.fillRect(xx, yy, 4, 6); } }
+  winTex.update(); winTex.wrapU = Texture.WRAP_ADDRESSMODE; winTex.wrapV = Texture.WRAP_ADDRESSMODE;
+  const towerMat = new StandardMaterial('loc_rooftop_tower', scene); towerMat.emissiveTexture = winTex; towerMat.diffuseColor = new Color3(0.03, 0.03, 0.05); towerMat.specularColor = Color3.Black();
+  for (let i = 0; i < 44; i++) {
+    const a = (i / 44) * Math.PI * 2 + rnd() * 0.1; const r = 55 + rnd() * 60;
+    const behind = Math.cos(a) < -0.3;                 // the far side (−z) gets the tall ones
+    const hgt = (behind ? 22 : 12) + rnd() * (behind ? 30 : 16); const wid = 6 + rnd() * 10;
+    const tower = MeshBuilder.CreateBox(`loc_rooftop_tower_${i}`, { width: wid, height: hgt, depth: 6 + rnd() * 8 }, scene);
+    tower.position.set(Math.sin(a) * r, hgt / 2 - 6, Math.cos(a) * r); tower.rotation.y = -a;
+    tower.material = towerMat; tower.parent = holder; tower.isPickable = false;
+    const scaleU = Math.max(1, Math.round(wid / 4)), scaleV = Math.max(1, Math.round(hgt / 4));
+    void scaleU; void scaleV;
+  }
+  // warm pools under the strings so the light reads on the court
+  const glowL = new SpotLight('loc_rooftop_glow_l', new Vector3(-11.5, 4.2, 0), new Vector3(0.35, -1, 0), Math.PI / 1.6, 1.2, scene);
+  const glowR = new SpotLight('loc_rooftop_glow_r', new Vector3(11.5, 4.2, 0), new Vector3(-0.35, -1, 0), Math.PI / 1.6, 1.2, scene);
+  for (const l of [glowL, glowR]) { l.diffuse = Color3.FromHexString('#FFC978'); l.specular = Color3.Black(); l.intensity = 260; l.parent = holder; }
+  holder.onDisposeObservable.add(() => { glowL.dispose(); glowR.dispose(); slabMat.dispose(); postMat.dispose(); bulbMat.dispose(); wireMat.dispose(); towerMat.dispose(); winTex.dispose(); });
 }

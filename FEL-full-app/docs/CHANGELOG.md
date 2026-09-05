@@ -15,7 +15,10 @@ Full logs: `docs/SHIP-PASS-3.md`, `docs/SHIP-PASS-4.md`; the gate table: `docs/R
   Picker on the boot splash of every basketball mode; the pick is remembered and honoured by `?location=`; free for all.
   Texture footprint equal to Venice on both tiers.
 - Orbit: the court in space — a procedural starfield inside the venue sky, a planet rising behind the hoop; footprint below
-  Venice. Canopy Court and Night Rooftop are authored, hidden until ready.
+  Venice.
+- Canopy Court: a forest of the same stylised trees in deep greens, Kenney undergrowth, a painted mural wall, dappled light
+  and motes. Night Rooftop: a roof slab with parapet and planters, string lights, and a geometry skyline of lit towers.
+  All four locations are on the picker.
 
 ### Session endings (2026-09-05, early; owner decisions, MEDIUM risk — game rules)
 - Football (Breakaway): a session is THREE drives, each ending on a touchdown or a turnover on downs; before, a runner who

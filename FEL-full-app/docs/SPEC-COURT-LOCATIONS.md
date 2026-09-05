@@ -73,3 +73,13 @@ Physics, rim position, court size, camera presets, the crowd, the Meshy mural (u
   which is opaque — a 900 m dome was hidden behind it), a planet of 80 m rising over the horizon behind the hoop with a
   procedural blue-white marble and a dark terminator, slow star drift; no backdrop, no fog. dunk 60 fps / 30 draws, ones
   60 fps / 31 draws, 0 errors; texture footprint BELOW Venice (176.7 MB desktop, 72.6 MB mobile — no baked sky image).
+- **Canopy Court landed (2026-09-05)**: deep green-gold dusk; the same stylised trees as Blossom Park in deep greens, one
+  size up, with three giants behind the wall; Kenney undergrowth (bushes, grass) from prop set `canopy-court`; a painted
+  mural wall behind the far crowd tier (a Meshy mural can replace its texture); a leaf-pattern spotlight projection over
+  the court and warm motes. dunk 60 fps / ~99 draws, 0 errors. The Kenney trees themselves read as green gems at court
+  scale and were dropped in favour of the procedural ones.
+- **Night Rooftop landed (2026-09-05)**: the baked `neon` backdrop turned out to be a daytime beach scene, so the skyline is
+  geometry — 44 dark towers with lit-window textures ringing the roof at 55–115 m, taller behind the hoop; a roof slab the
+  court sits on; the suburban kit's parapet and planters (prop set `night-rooftop`); string lights on posts down both
+  sides with warm pools under them. dunk 60 fps / 41–60 draws, 0 errors.
+- All four locations are `ready` and on the picker. Venice stays the default.

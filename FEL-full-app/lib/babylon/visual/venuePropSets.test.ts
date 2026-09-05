@@ -6,6 +6,8 @@ import { VENUE_PROP_SETS } from './venuePropSets';
 // play areas (x half-width, z range) the props must clear — from the modes' own venues
 const PLAY: Record<string, { hx: number; z: [number, number] }> = {
   'venice-court': { hx: 8, z: [-14, 14] },       // 16×28 court
+  'canopy-court': { hx: 8, z: [-14, 14] },       // court locations (docs/SPEC-COURT-LOCATIONS.md): the same court
+  'night-rooftop': { hx: 8, z: [-14, 14] },
   'dojo':         { hx: 7, z: [-7, 7] },         // 14×14 mat
   'links':        { hx: 12, z: [-42, 42] },      // fairway strip inside the 60×90 green
   'ballpark':     { hx: 28, z: [-40, 40] },      // diamond + outfield
