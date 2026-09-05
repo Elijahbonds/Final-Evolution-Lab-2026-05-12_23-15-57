@@ -34,6 +34,7 @@ import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { EffectsKit } from '../visual/EffectsKit';
 import { applyOceanCourt } from '../visual/CourtSurface';
+import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { DunkFlight } from '../core/DunkSystem';
 import { approachAngle, approachBonus, takeoffFor } from '../core/DunkApproach';
@@ -111,6 +112,7 @@ export const DunkMode: ModeDefinition = (() => {
   let lastScores: JudgeScore[] = [];
   let finishing = false;
   let rimCamCut = false;                     // broadcast cut latch (per attempt)
+  let hangSlowMoLatch = false;               // JuiceKit.slowMo once per attempt (hang only)
   const rim = new Vector3(0, CFG.rimHeight, CFG.rimZ);
   const ebState = { inLeftHand: false };
   let stickX = 0, stickY = 0;
@@ -194,9 +196,11 @@ export const DunkMode: ModeDefinition = (() => {
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'venice');
       EffectsKit.ballTrail(ctx.scene, ball);
+      // Venice LOOK: KEEP/HIDE, palm tip ~10m, golden-haze (no GLB edits).
+      await applyVeniceDunkLookPass(ctx.scene);
 
       round = 1; dunkInRound = 0; playerTotal = 0; rivalTotal = 0; hype = 0; chain = 0; finishing = false; makes = 0; misses = 0; bestChain = 0;
-      style = 'power'; prop = 'none'; rimCamCut = false;
+      style = 'power'; prop = 'none'; rimCamCut = false; hangSlowMoLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
       setPhase('approach');
@@ -340,7 +344,15 @@ export const DunkMode: ModeDefinition = (() => {
         if (player.root.position.z <= CFG.gatherZ) { player.root.position.z = CFG.gatherZ; launchDunk(ctx); }
       }
       if (phase === 'cinematic') {
-        clipTime += dt;
+        // Hang mid-flight slow-mo: JuiceKit owns animationTimeScale; gate clip advance to it.
+        const animScale = ctx.scene.animationTimeScale ?? 1;
+        const prevClip = clipTime;
+        clipTime += dt * (Number.isFinite(animScale) && animScale > 0 ? animScale : 1);
+        if (!hangSlowMoLatch && prevClip < EASTBAY_TIMING.rise && clipTime >= EASTBAY_TIMING.rise) {
+          hangSlowMoLatch = true;
+          ctx.juice.slowMo(0.4, 400);
+          ctx.camDirector.pulse(0.4, 0.45); // ~13% soft push-in; rimCamCut stays the one hard cut
+        }
         if (style === 'sig') runEastbayPath(ball, player.skeleton, clipTime, ebState);
         const k = Math.min(1, clipTime / EASTBAY_TIMING.duration);
         player.root.position.y = Math.sin(k * Math.PI) * (1.05 + charge * 0.55);
@@ -569,7 +581,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (phase === 'cinematic') return;
     setPhase('cinematic');
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false;
-    rimCamCut = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
+    rimCamCut = false; hangSlowMoLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
     // The run-up, not the stick at the release instant: during the charge the
     // stick is usually neutral, so the old `hypot(stickX, stickY)` read ~0 and
     // EVERY dunk launched as a walk-up. Peak measured approach speed is the
@@ -778,7 +790,7 @@ export const DunkMode: ModeDefinition = (() => {
     player.root.rotation.y = Math.PI;
     player.root.rotation.z = 0; airLean = 0; holdRunSpeed = 0;
     player.animator.play(SPORT_CLIP.idle, { loop: true });
-    charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false;
+    charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false;
     styleTaps = 0; hangSec = 0; revealed = [];
     runUpPeak = 0; obstacleClipped = false; toppling = false;
     void setupProp(ctx);

@@ -38,6 +38,7 @@ import { attachBallToHand, releaseBall, runEastbayPath, flushThroughRim, clankOf
 import { EASTBAY_TIMING } from '../anim/authored/timing';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
+import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { applyOceanCourt } from '../visual/CourtSurface';
@@ -79,6 +80,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   let charge = 0, clipTime = 0, qteHit = false, qteWindowOpen = false, qteAccuracy = 0;
   let sinceRelease = 0, releasePos = new Vector3();
   let finishing = false, rimCamCut = false, ended = false;
+  let hangSlowMoLatch = false;
   // the contest systems (owner re-lock: the real dunk-contest bar)
   let prop: Prop = 'none';
   let obstacle: AbstractMesh | null = null;
@@ -106,7 +108,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
 
   function enterHandoff(ctx: ModeContext): void {
     setPhase('handoff');
-    style = 'power'; charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false;
+    style = 'power'; charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false;
     runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
     setProp(ctx, 'none');
     active().root.position.set(0, 0, CFG.startZ);
@@ -136,7 +138,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   function launchDunk(ctx: ModeContext): void {
     if (phase === 'cinematic') return;
     setPhase('cinematic');
-    clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false; rimCamCut = false;
+    clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false; rimCamCut = false; hangSlowMoLatch = false;
     SoundKit.play('whoosh', { pitch: 0.85 });
     active().animator.play(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => {} });
   }
@@ -278,6 +280,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'venice');
       EffectsKit.ballTrail(ctx.scene, ball);
+      await applyVeniceDunkLookPass(ctx.scene);
 
       activeIdx = 0; attemptNum = [0, 0]; totals = [0, 0]; ended = false; finishing = false;
       enterHandoff(ctx);
@@ -352,7 +355,14 @@ export const DunkDuelMode: ModeDefinition = (() => {
       }
 
       if (phase === 'cinematic') {
-        clipTime += dt;
+        const animScale = ctx.scene.animationTimeScale ?? 1;
+        const prevClip = clipTime;
+        clipTime += dt * (Number.isFinite(animScale) && animScale > 0 ? animScale : 1);
+        if (!hangSlowMoLatch && prevClip < EASTBAY_TIMING.rise && clipTime >= EASTBAY_TIMING.rise) {
+          hangSlowMoLatch = true;
+          ctx.juice.slowMo(0.4, 400);
+          ctx.camDirector.pulse(0.4, 0.45);
+        }
         const c = active();
         if (style === 'sig') runEastbayPath(ball, c.skeleton, clipTime, ebState);
         const k = Math.min(1, clipTime / EASTBAY_TIMING.duration);
