@@ -7,6 +7,8 @@
 // hair styles: show the equipped one per slot, hide the rest. A body without
 // kit meshes (the forge hero, roster athletes) is a harmless no-op.
 import type { AbstractMesh } from '@babylonjs/core';
+import { sportKitDefault } from './sportKitDefaults';
+import { fixGarment, syncGarmentVisibility } from './garmentFixes';
 
 export type KitSlot = 'tops' | 'shorts' | 'shoes';
 export const KIT_SLOTS: readonly KitSlot[] = ['tops', 'shorts', 'shoes'];
@@ -23,20 +25,33 @@ export function kitOf(meshName: string): { slot: KitSlot; itemId: string } | nul
   const m = KIT_RE.exec(meshName.replace(CLONE_SUFFIX, '')); return m ? { slot: m[1] as KitSlot, itemId: m[2] } : null;
 }
 
+/** The mode the harness stamped on the scene these meshes live in (ModeHarness: `scene.metadata.felModeId`). */
+function sceneModeId(meshes: AbstractMesh[]): string | undefined {
+  for (const m of meshes) {
+    const scene = typeof m.getScene === 'function' ? m.getScene() : null;
+    if (scene) return (scene.metadata as { felModeId?: string } | undefined)?.felModeId;
+  }
+  return undefined;
+}
+
 /**
- * Show the equipped garment per slot and hide the others. A slot with no
- * equipped item (or an item the body does not carry) shows the slot's first
- * garment so nobody plays naked. Returns kit meshes found (0 = no kit).
+ * Show the equipped garment per slot and hide the others. Owner decision 2026-09-05 ("Per-sport defaults"): a Closet
+ * pick always wins; a slot the Closet left empty (or every slot when no Closet answered — guests, the dev harness,
+ * rivals on the kit body) takes the SPORT's default (sportKitDefaults.ts, by the scene's mode); an item the body does
+ * not carry falls to the sport default too, then to the slot's first garment so nobody plays naked. The shown garment
+ * gets its runtime read fixes (garmentFixes.ts). Returns kit meshes found (0 = no kit).
  */
-export function applyKit(meshes: AbstractMesh[], wardrobe: Wardrobe | null | undefined): number {
+export function applyKit(meshes: AbstractMesh[], wardrobe: Wardrobe | null | undefined, modeId: string | null = null): number {
   const bySlot = new Map<KitSlot, AbstractMesh[]>();
   for (const m of meshes) { const k = kitOf(m.name); if (!k) continue; (bySlot.get(k.slot) ?? bySlot.set(k.slot, []).get(k.slot)!).push(m); }
+  if (!bySlot.size) return 0;
+  const sport = sportKitDefault(modeId ?? sceneModeId(meshes));
   let found = 0;
   for (const [slot, list] of bySlot) {
-    const want = wardrobe?.[slot] ?? null;
-    const has = want ? list.find((m) => kitOf(m.name)!.itemId === want) : undefined;
-    const show = has ?? list[0];
-    for (const m of list) { m.isVisible = m === show; found++; }
+    const byId = (id: string | null | undefined) => (id ? list.find((m) => kitOf(m.name)!.itemId === id) : undefined);
+    const show = byId(wardrobe?.[slot]) ?? byId(sport[slot]) ?? list[0];
+    for (const m of list) { m.isVisible = m === show; found++; syncGarmentVisibility(m); }
+    fixGarment(show, slot, kitOf(show.name)!.itemId);
   }
   return found;
 }

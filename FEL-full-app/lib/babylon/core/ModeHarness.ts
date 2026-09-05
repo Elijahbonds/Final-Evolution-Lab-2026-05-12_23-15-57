@@ -119,6 +119,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   const tier = detectQualityTier(opts.canvas, fit);
   const scene = new Scene(engine);
   (scene.metadata ??= {}).felTier = tier;   // read by CharacterLibrary for per-spawn quality
+  scene.metadata.felModeId = def.modeId;   // read by kit.applyKit for the sport's default kit (owner decision 2026-09-05)
   if (opts.heroOverride) scene.metadata.felHeroOverride = opts.heroOverride;   // dev rollout flag (?hero=)
   // M69: publish the agent control bridge (no-op unless ?agent=1). Idempotent —
   // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
