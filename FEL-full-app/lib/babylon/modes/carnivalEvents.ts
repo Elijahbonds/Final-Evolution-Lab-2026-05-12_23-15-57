@@ -99,7 +99,7 @@ export function strikeStorm(): CarnivalEvent {
       ctx.heroRef.current = player.root;
       ctx.camDirector.setPreset('fight');
       ctx.camDirector.snapTo(player.root.position, bag.root.position);
-      ctx.setHud({ hint: 'Mash JAB / KICK / HEAVY on the bag' });
+      ctx.setHud({ hint: 'Mash GO / TRICK / POWER on the bag' });
     },
     onInput(ctx, e) {
       if (e.t === 'button' && e.pressed && !striking && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y')) {
@@ -176,7 +176,7 @@ export function hotShot(): CarnivalEvent {
       goals = 0; phase = 'aim';
       ctx.heroRef.current = player.root;
       ctx.camDirector.setFixedBehind(player.root.position, 0, 'flight', true)   // hard cut between events: a lerp from the last event's camera left the hero behind it (measured, 3 frame-guard hits);
-      ctx.setHud({ hint: 'Aim, KICK to power, KICK to shoot — as many as you can' });
+      ctx.setHud({ hint: 'Aim, GO to power, GO to shoot — as many as you can' });
     },
     onInput(ctx, e) {
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }

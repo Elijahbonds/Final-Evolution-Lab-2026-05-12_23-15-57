@@ -42,12 +42,12 @@ export const MODE_BINDINGS: Record<string, ModeControls> = {
   basketball_dunk: {
     desktop: [
       { key: 'W/A/S/D', label: 'Move' },
-      { key: 'SPACE', label: 'Charge / Jump' },
+      { key: 'SPACE', label: 'Hold run / tap jump' },
       { key: 'E', label: 'Signature Dunk' },
     ],
     touch: [
       { key: 'Joystick', label: 'Move' },
-      { key: 'TAP', label: 'Charge / Jump' },
+      { key: 'TAP', label: 'Hold run / tap jump' },
     ],
   },
   basketball_h2h: {

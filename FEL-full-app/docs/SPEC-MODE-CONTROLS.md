@@ -36,9 +36,9 @@ Legend: **PASS** = UI copy matches actual input · **FAIL** = wrong/leftover lan
 | **threevthree** | SHOOT[hold], PASS, STEAL, BLOCK; HOLD SHOOT green | Matches | **PASS** | |
 | **carnival** (deck) | GO / TRICK / POWER / CHARGE[hold] | Shared 4-button deck across events | **PASS** deck | Per-event copy below |
 | carnival · slam_rush | `HOLD CHARGE, release near the top for a make` | RT hold = power meter, release near ~0.85 | **PASS** | Real charge meter (not run-up) — keep CHARGE |
-| carnival · strike_storm | `Mash JAB / KICK / HEAVY` | A/B/Y attacks; pad labels GO/TRICK/POWER | **SOFT** | Hint uses karate names; pad says GO/TRICK/POWER — rename hint to pad verbs when convenient |
+| carnival · strike_storm | `Mash GO / TRICK / POWER` | A/B/Y attacks; pad labels GO/TRICK/POWER | **PASS** (post-fix) | Hint aligned to pad verbs |
 | carnival · trick_gauntlet | `POP, flip…` | A jump, B/Y flips, RT pump; X spin unused on deck | **SOFT** | X spin missing from 4-btn budget (documented) |
-| carnival · hot_shot | `Aim, KICK to power, KICK to shoot` | A twice (aim→power→shoot); pad GO | **FAIL** | Say **GO** (or tap GO twice), not KICK |
+| carnival · hot_shot | `Aim, GO to power, GO to shoot` | A twice (aim→power→shoot); pad GO | **PASS** (post-fix) | Hint uses GO |
 | carnival · coin_storm | Sprint the pattern | Stick move + pickups | **PASS** | |
 | carnival · counter_strike | `tap GO at the last instant` | A in window | **PASS** | |
 | **skateboard** | POP/FLIP/GRAB/PUMP; PUMP for speed | Matches | **PASS** | |
@@ -65,7 +65,7 @@ Used by dunk-game-3d / three-v-three-3d / karate-versus-3d / three-point-3d boot
 
 | Binding key | Copy | Actual (legacy scene) | Result | Fix note |
 |-------------|------|----------------------|--------|----------|
-| basketball_dunk | SPACE / TAP: **Charge / Jump** | Hold-to-charge jump in dunk-game-3d | **FAIL** vs Babylon | Babylon is hold-to-run; legacy still meter-charge. If Babylon is ship path, retire or retitle overlay. Do not put CHARGE back on Babylon pad. |
+| basketball_dunk | SPACE / TAP: **Hold run / tap jump** | Plain-language overlay (Babylon path is hold-to-run) | **PASS** (copy) | Display only; do not put CHARGE back on Babylon pad. |
 | basketball_3v3 | Pass lanes + Shoot | Scene-local | **SOFT** | Separate from threevthree Babylon |
 | basketball_h2h | Shoot / Release | 3PT-ish | **SOFT** | |
 | karate_versus | Slash/Heavy/Kick/Guard | Scene-local | **SOFT** | Labels differ from Babylon JAB/KICK/BLOCK/HEAVY |
@@ -76,7 +76,7 @@ Used by dunk-game-3d / three-v-three-3d / karate-versus-3d / three-point-3d boot
 
 | mode | Label still CHARGE? | Note |
 |------|---------------------|------|
-| dunk / dunkduel | **Yes** (`action: 'charge', label: 'CHARGE'`) | Action id can stay `charge` (adapter→RT). **Display label** should become **RUN** in a follow-up to match pad — not done this commit (scope = modeVerbs). |
+| dunk / dunkduel | **No** (`action: 'charge', label: 'RUN'`) | Action id stays `charge` (adapter→RT). Display label **RUN** matches pad. |
 | football | JUKE R on Y + TRUCK hold | Already matched; modeVerbs now aligned |
 | carnival | CHARGE hold | Correct for slam_rush meter |
 
@@ -84,10 +84,10 @@ Used by dunk-game-3d / three-v-three-3d / karate-versus-3d / three-point-3d boot
 
 ## Remaining FAIL backlog (Gameplay)
 
-1. **carnival hot_shot** hint: `KICK` → `GO` (one-line).  
-2. **carnival strike_storm** hint: JAB/KICK/HEAVY → GO/TRICK/POWER (plain language).  
-3. **Controller Link** dunk/dunkduel button label CHARGE → RUN (display only).  
-4. **Legacy MODE_BINDINGS basketball_dunk** "Charge / Jump" if those shells still ship.  
+1. ~~carnival hot_shot hint KICK→GO~~ **done**  
+2. ~~carnival strike_storm hint → GO/TRICK/POWER~~ **done**  
+3. ~~Controller Link dunk/dunkduel CHARGE→RUN~~ **done** (display only; action id `charge`)  
+4. ~~Legacy MODE_BINDINGS basketball_dunk "Charge / Jump"~~ **done** → Hold run / tap jump  
 5. Optional: dunk-game.tsx canvas string `HOLD … TO CHARGE` (pre-Babylon canvas).
 
 ---

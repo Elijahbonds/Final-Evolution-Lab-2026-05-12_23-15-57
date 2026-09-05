@@ -59,11 +59,11 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
         },
       },
       { kind: 'dpad', dpad: { action: 'dpad' } },
-      // Buttons are the fallback when motion is denied. CHARGE is `hold`, which
-      // the Babylon adapter ramps into an analog trigger — a plain tap would
-      // arrive as a face button and be read as SLAM.
+      // Buttons are the fallback when motion is denied. RUN is `hold` (action
+      // id stays `charge` → RT ramp) — a plain tap would arrive as a face
+      // button and be read as SLAM.
       { kind: 'button', buttons: [
-        { action: 'charge', label: 'CHARGE', hold: true },
+        { action: 'charge', label: 'RUN', hold: true },
         { action: 'A', label: 'SLAM' },
         { action: 'B', label: 'STYLE' },
       ] },
@@ -316,8 +316,8 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   },
 
   // Dunk Duel: pass-and-play contest. The d-pad drives the approach ('move');
-  // the chair prop lives on X because the d-pad is spoken for. CHARGE is a
-  // hold (the mode reads the trigger ramp; modeBridge turns a held button
+  // the chair prop lives on X because the d-pad is spoken for. RUN is a
+  // hold (action id `charge` → RT ramp; modeBridge turns a held button
   // into that analog ramp).
   dunkduel: {
     modeId: 'dunkduel',
@@ -330,7 +330,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
         { action: 'A', label: 'SLAM' },
         { action: 'B', label: 'STYLE' },
         { action: 'X', label: 'CHAIR' },
-        { action: 'charge', label: 'CHARGE', hold: true },
+        { action: 'charge', label: 'RUN', hold: true },
       ] },
     ],
   },
