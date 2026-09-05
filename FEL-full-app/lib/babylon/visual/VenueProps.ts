@@ -6,7 +6,7 @@
 // Each unique model loads once per scene and repeats as instances; props are
 // scenery only — not pickable, no collisions, outside every playing area.
 // Assets: public/models/props/<kit>/<model>.glb (Kenney, CC0; see manifest.json).
-import { PBRMaterial, SceneLoader, TransformNode } from '@babylonjs/core';
+import { Color3, PBRMaterial, SceneLoader, TransformNode } from '@babylonjs/core';
 import type { AbstractMesh, Mesh, Scene } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { VENUE_PROP_SETS, type PropPlacement } from './venuePropSets';
@@ -51,11 +51,12 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
     holder.rotation.y = p.yaw ?? 0;
     const s = p.scale ?? 1; holder.scaling.set(s, s, s);
     for (const src of meshes) {
-      const inst = src.createInstance(`${src.name}_i${i}`);
+      // a tinted placement gets a clone with its own material (instances share the source's); untinted ones instance
+      const inst: AbstractMesh = p.tint ? tintedClone(scene, src, `${src.name}_t${i}`, p.tint) : src.createInstance(`${src.name}_i${i}`);
       inst.parent = holder;
       // the source mesh keeps its own transform inside the kit file; the instance repeats it under the holder
       inst.position.copyFrom(src.position); inst.rotationQuaternion = src.rotationQuaternion?.clone() ?? null; inst.rotation.copyFrom(src.rotation); inst.scaling.copyFrom(src.scaling);
-      inst.isPickable = false; inst.receiveShadows = true;
+      inst.isPickable = false; inst.receiveShadows = true; inst.setEnabled(true);
       instances.push(inst);
     }
     count++;
@@ -73,3 +74,16 @@ export function propSetFor(specVenueId: string): string | null {
   return map[specVenueId] ?? null;
 }
 
+/** Clone a kit mesh with a tinted copy of its material: the palette texture stays, multiplied by `hex`. Cached per (material, tint). */
+const tintCache = new Map<string, PBRMaterial>();
+function tintedClone(scene: Scene, src: Mesh, name: string, hex: string): Mesh {
+  const c = src.clone(name, null, true) as Mesh;
+  const base = src.material;
+  if (base instanceof PBRMaterial) {
+    const key = `${base.uniqueId}|${hex}`;
+    let m = tintCache.get(key);
+    if (!m || m.getScene() !== scene) { m = base.clone(`${base.name}_tint_${hex}`); m.albedoColor = Color3.FromHexString(hex); tintCache.set(key, m); }
+    c.material = m;
+  }
+  return c;
+}

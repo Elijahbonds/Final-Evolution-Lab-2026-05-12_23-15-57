@@ -18,6 +18,9 @@ export interface HostLobbyProps {
 }
 
 export function HostLobby({ config, onInput, collapsed }: HostLobbyProps) {
+  // Owner call 2026-09-05: on desktop the pairing panel is a badge until a phone joins or the player taps it — the
+  // panel used to sit open beside play on every three-point load. A connected peer opens it on its own.
+  const [open, setOpen] = useState(false);
   const [code, setCode] = useState('');
   const [peers, setPeers] = useState<LobbyPeer[]>([]);
   const [state, setState] = useState<LinkState>('idle');
@@ -69,6 +72,13 @@ export function HostLobby({ config, onInput, collapsed }: HostLobbyProps) {
       </Badge>
     );
   }
+  if (!open && connected.length === 0) {
+    return (
+      <Badge tone="#6b7280" onClick={() => setOpen(true)}>
+        CONTROLLER LINK · {code || '····'} · tap to pair a phone
+      </Badge>
+    );
+  }
 
   return (
     <div className="pointer-events-auto absolute right-4 top-4 z-30 w-[300px] rounded-xl border border-white/10 bg-black/80 p-4 font-mono text-xs text-white backdrop-blur">
@@ -112,10 +122,12 @@ export function HostLobby({ config, onInput, collapsed }: HostLobbyProps) {
   );
 }
 
-function Badge({ children, tone }: { children: React.ReactNode; tone: string }) {
+function Badge({ children, tone, onClick }: { children: React.ReactNode; tone: string; onClick?: () => void }) {
   return (
     <div
-      className="pointer-events-none absolute right-4 top-4 z-30 rounded-full border px-3 py-1 font-mono text-[10px]"
+      role={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={`${onClick ? 'pointer-events-auto cursor-pointer hover:bg-white/10' : 'pointer-events-none'} absolute right-4 top-4 z-30 rounded-full border px-3 py-1 font-mono text-[10px]`}
       style={{ borderColor: `${tone}55`, color: tone, background: '#000000aa' }}
     >
       {children}

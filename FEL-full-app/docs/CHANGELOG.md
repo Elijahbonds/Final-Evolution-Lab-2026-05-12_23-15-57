@@ -4,6 +4,7 @@ All notable changes to Final Evolution Lab. Dates are 2026.
 
 ## Unreleased — release candidate, 2026-09-04 (ship passes 3 and 4)
 
+- 2026-09-05 round two: dunk hoop banner removed, controller lobby collapses to a badge on desktop, prop tint (slope trees green), friend-test pack, pad hollow sockets, kitchens depth.
 The tag is assigned by the orchestrator at integration (the previous candidate was `v0.9.0-rc.1`). Every number below is
 the one the commit or the findings log recorded; a line with no number had no measurement in its commit.
 Full logs: `docs/SHIP-PASS-3.md`, `docs/SHIP-PASS-4.md`; the gate table: `docs/RC-2026-09-04.md`.

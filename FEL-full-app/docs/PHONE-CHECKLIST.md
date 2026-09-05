@@ -10,7 +10,7 @@ LAN address, port 3000). Log in as yourself. Rotate to landscape for play routes
 |---|---|---|---|
 | 1 | Open `/modes` | The header chip shows coins · shards · credits; the list has every mode with its venue | chip numbers, load time |
 | 2 | Open `/play/dunk` | Loads under 3 s on Wi-Fi; READY gate; no white screen | seconds to READY |
-| 3 | Play one dunk with the touch deck (CHARGE hold, SLAM) | The jump reads the hold; the slam lands or misses with the judges' reveal | did the hold register |
+| 3 | Play one dunk with the touch deck (RUN hold (the hold-to-run verb; it was CHARGE before 2026-09-05), SLAM) | The jump reads the hold; the slam lands or misses with the judges' reveal | did the hold register |
 | 4 | Finish the contest | Results card with XP / shards / credits and **SHARE PROOF**; the toast "+N coins" if first session today | the proof line text |
 | 5 | Tap SHARE PROOF, open the link in the phone's browser | The card page renders the proof line | yes / no |
 | 6 | `/play/karate-vs`, one round | Buttons respond within a beat; the camera keeps both fighters in frame | frame hits felt |

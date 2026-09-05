@@ -26,6 +26,12 @@ in four kit-wearing modes (pre-rebuild hero, 13:20 sweep). Read-only; fixes list
 | carnival | GO | TRICK | CHARGE (hold) | POWER | delegated to the current mini-game | ? each mini-game must handle B and Y — verify per game |
 | sprint | HIT | BLOCK | · | · | (mode disabled) | out of rollout |
 
+**Correction (agent pass, 15:50):** the dead-bind rows above were mostly wrong. Ones and threes route the pad through
+`LocalInputSource` (`lib/babylon/core/PlayerSlot.ts`): L1 → brace (BOX OUT), X → steal, B → pass, and the modes read those
+intents; tennis lives in `NetSportMode.onInput` and sets a `pendingShot` of drive / slice / drop / lob from A/B/X/Y. The
+only true dead bind was threes' STEAL for the hero's own press (the steal loop reads only the foes' intents) — now a hollow
+socket, as are volleyball's two unbound slots. Golf and ones gained one hint line each. Landed as e7494e1.
+
 **Rule from the pad spec (Benchmark feel bar):** "every face/trigger/stick the loop uses is readable — no dead binds
 (shown but inert), no missing buttons." Ones, threes, tennis and volleyball fail it today.
 

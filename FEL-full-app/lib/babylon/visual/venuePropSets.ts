@@ -3,11 +3,14 @@
 // area the mode defines (court 16×28 centred; dojo mat 14×14; pitch 50×70 with the
 // goal line at z 10.4; gridiron x ±20 over z 0..40; links green 60×90, holes at
 // z 26–39; skatepark ±33; piste half-width 17; surf half-width 45).
-export interface PropPlacement { kit: string; model: string; at: [number, number, number]; yaw?: number; scale?: number }
+export interface PropPlacement { kit: string; model: string; at: [number, number, number]; yaw?: number; scale?: number; /** multiply the kit palette (e.g. a green over the nature kit's teal canopy) */ tint?: string }
 const ring = (kit: string, model: string, r: number, n: number, y = 0, scale = 1, phase = 0): PropPlacement[] =>
   Array.from({ length: n }, (_, i) => { const a = phase + (i / n) * Math.PI * 2; return { kit, model, at: [Math.sin(a) * r, y, Math.cos(a) * r], yaw: -a, scale }; });
-const line = (kit: string, model: string, from: [number, number], to: [number, number], n: number, yaw = 0, scale = 1): PropPlacement[] =>
-  Array.from({ length: n }, (_, i) => { const t = n === 1 ? 0 : i / (n - 1); return { kit, model, at: [from[0] + (to[0] - from[0]) * t, 0, from[1] + (to[1] - from[1]) * t], yaw, scale }; });
+const line = (kit: string, model: string, from: [number, number], to: [number, number], n: number, yaw = 0, scale = 1, tint?: string): PropPlacement[] =>
+  Array.from({ length: n }, (_, i) => { const t = n === 1 ? 0 : i / (n - 1); return { kit, model, at: [from[0] + (to[0] - from[0]) * t, 0, from[1] + (to[1] - from[1]) * t], yaw, scale, ...(tint ? { tint } : {}) }; });
+
+/** owner call 2026-09-05: the nature kit's canopy is teal by palette; the slope's trees take a green multiply. */
+const GREEN = '#63D452';
 
 export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
   // Court locations (docs/SPEC-COURT-LOCATIONS.md) — placed for the dunk camera: sides at x ±11–13, a back row behind the
@@ -61,9 +64,9 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     { kit: 'nature', model: 'tree_palm', at: [-38, 0, 20], scale: 4.4 }, { kit: 'nature', model: 'tree_palmTall', at: [38, 0, -18], scale: 4.4 }, { kit: 'nature', model: 'tree_palm', at: [38, 0, 24], scale: 4.4 },
     { kit: 'racing', model: 'lightPostModern', at: [-37, 0, -30], scale: 2.6 }, { kit: 'racing', model: 'lightPostModern', at: [37, 0, 30], scale: 2.6 },
   ],
-  'slope': [
-    ...line('nature', 'tree_pineTallA', [-22, -20], [-24, 240], 12, 0, 5.2), ...line('nature', 'tree_pineTallB', [22, 0], [24, 250], 12, 0, 5.2),
-    ...line('nature', 'tree_pineSmallA', [-19, 30], [-20, 230], 8, 0, 3.6), ...line('nature', 'tree_pineSmallB', [19, 40], [20, 240], 8, 0, 3.6),
+  'slope': [   // owner call 2026-09-05: green trees (the kit's pines are teal by palette)
+    ...line('nature', 'tree_tall', [-22, -20], [-24, 240], 12, 0, 5.2, GREEN), ...line('nature', 'tree_default', [22, 0], [24, 250], 12, 0, 5.2, GREEN),
+    ...line('nature', 'tree_default', [-19, 30], [-20, 230], 8, 0, 3.6, GREEN), ...line('nature', 'tree_oak', [19, 40], [20, 240], 8, 0, 3.6, GREEN),
     { kit: 'nature', model: 'rock_tallA', at: [-21, 0, 120], scale: 2.8 }, { kit: 'nature', model: 'rock_largeD', at: [21, 0, 180], scale: 2.8 },
     { kit: 'racing', model: 'tent', at: [-20, 0, 8], scale: 2.4 }, { kit: 'racing', model: 'flagRed', at: [20, 0, 8], scale: 2.4 },
   ],

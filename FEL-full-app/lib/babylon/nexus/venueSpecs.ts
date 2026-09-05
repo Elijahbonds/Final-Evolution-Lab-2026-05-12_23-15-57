@@ -86,8 +86,8 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     environment: dusk('#FF7A5C', '#1A2560', '#33408A', '#FFC98A', 0.6, 'beach'),
     ground: { kind: 'court', size: [16, 28], color: '#1B7FB5', lineColor: '#F2F6FF', markings: 'halfcourt' },
     props: [
+      // Owner call 2026-09-05: the red hoop banner is gone from every basketball court — the backboard and rim stand alone.
       { kind: 'hoop', position: [0, 0, -11], color: '#FF3B30' },
-      { kind: 'banner', position: [0, 0, -14.5], color: '#FF2D55' },
       // Owner call 2026-09-05: the baseline crowd tiers are gone from every basketball court — the dark stepped
       // stand read as a black bar behind the hoop in every frame. The horizon (backdrop, trees, skyline) carries the depth.
       ...beachDressing,

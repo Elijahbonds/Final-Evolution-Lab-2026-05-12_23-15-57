@@ -98,3 +98,11 @@ Physics, rim position, court size, camera presets, the crowd, the Meshy mural (u
   court-only mount. The clip-plane experiment is removed.
 - Athletes: the rebuilt `elijah-hero.glb` and new `elijah-rival.glb` (other writer, 14:11–14:14) rendered headless and
   distorted; the previous hero bytes are restored from 44e2646 and mirrored to the rival until the rebuild is right.
+
+## Round two (2026-09-05, owner multiple choice)
+- The red hoop banner is gone from the dunk court (Venice and every location); the backboard stands alone.
+- Desktop skips the controller lobby: on the play routes the lobby is a tappable badge until a phone connects.
+- The slalom's Kenney trees were teal by palette; `PropPlacement.tint` multiplies a kit material (tinted clone, cached per
+  material and tint) and the slope's trees take a green. The Kenney tree is one material, so its trunk takes the tint too.
+- Still open under a location: the scanned court. The rebuilt raw scan was never baked (`scripts/map/pipeline.mts`), and
+  `Mesh_0` in the baked `venice-blue-court.glb` is the whole map; the live test showed it invisible under a location.
