@@ -11,8 +11,10 @@
 // stick + d-pad on the left, right stick + A/B/X/Y diamond on the right.
 // Modes differ only in what each control DOES (modeVerbs.ts), never in
 // which controls are on screen — the console-emulator feel the whole point
-// of this file is to guarantee. A slot a given mode has no use for is still
-// drawn and still pressable; it just has nothing listening on the other end.
+// of this file is to guarantee. A slot a given mode has no use for keeps its
+// place in the diamond but renders HOLLOW: a thin dashed ring, no letter, no
+// label, not pressable — an empty socket, never a control (owner decision
+// 2026-09-05, "hide now, build later").
 
 import React, { useEffect, useRef, useState } from 'react';
 import type { InputBus } from '../core/InputBus';
@@ -120,8 +122,8 @@ function DPad({ bus }: { bus: InputBus }) {
 
 // Fixed Xbox-style diamond: Y top, X left, B right, A bottom. Position and
 // per-slot color are ALWAYS the same across every mode — only the label and
-// what pressing it does change. A slot a mode leaves unassigned still shows
-// its bare letter, muted, and simply does nothing when pressed.
+// what pressing it does change. A slot a mode leaves unassigned keeps its
+// position (so bound slots never move) and renders as a hollow socket.
 const SLOT_POS: Record<'A' | 'B' | 'X' | 'Y', string> = {
   Y: 'left-1/2 top-0 -translate-x-1/2',
   X: 'left-0 top-1/2 -translate-y-1/2',
@@ -148,6 +150,19 @@ function Verb({ bus, def, slot }: { bus: InputBus; def: VerbButton; slot: 'A' | 
   const downAt = useRef(0);
   const inert = def.emit === null;
   const [holdV, setHoldV] = useState(0);   // pad acceptance #1: the HOLD cue — the ring fills while the hold is down
+
+  // HOLLOW SOCKET. An inert slot is not a button: no letter (a bare "X" reads
+  // as a control), no label, no glow, nothing to press. A thin dashed ring at
+  // 30% keeps the diamond's shape so the bound slots stay where the thumb
+  // expects them. Same 64 px footprint as a live verb.
+  if (inert) {
+    return (
+      <div className="relative">
+        <div aria-hidden="true"
+          className="pointer-events-none h-[64px] w-[64px] rounded-full border border-dashed border-white opacity-30" />
+      </div>
+    );
+  }
 
   const press = (e: React.PointerEvent) => {
     if (inert) return;
@@ -178,16 +193,16 @@ function Verb({ bus, def, slot }: { bus: InputBus; def: VerbButton; slot: 'A' | 
     }
   };
 
-  const color = inert ? '#4b5563' : def.color;
+  const color = def.color;
   return (
     <div className="relative">
-      {def.hold && !inert && (
+      {def.hold && (
         <span className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 text-[7px] font-black tracking-[0.2em] text-white/60">HOLD</span>
       )}
     <button
       onPointerDown={press} onPointerUp={release} onPointerCancel={release}
-      className={`h-[64px] w-[64px] touch-none select-none rounded-full border-2 text-[10px] font-black tracking-wide text-white transition-transform duration-75 ${inert ? 'opacity-45' : 'active:scale-90 active:brightness-150'}`}
-      style={{ borderColor: color, background: def.hold && holdV > 0 ? `conic-gradient(${color}cc ${Math.round(holdV * 360)}deg, ${color}22 0)` : `${color}22`, boxShadow: inert ? 'none' : `0 0 18px ${color}44` }}>
+      className="h-[64px] w-[64px] touch-none select-none rounded-full border-2 text-[10px] font-black tracking-wide text-white transition-transform duration-75 active:scale-90 active:brightness-150"
+      style={{ borderColor: color, background: def.hold && holdV > 0 ? `conic-gradient(${color}cc ${Math.round(holdV * 360)}deg, ${color}22 0)` : `${color}22`, boxShadow: `0 0 18px ${color}44` }}>
       {def.label || slot}
     </button>
     </div>

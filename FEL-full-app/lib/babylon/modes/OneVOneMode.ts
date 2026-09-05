@@ -615,7 +615,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     arc.active = false;
     attachBallToHand(ball, foe.skeleton, 'RightHand');
     bannerFlash(ctx, banner, 900);
-    ctx.setHud({ hint: 'STEAL in tight · time a jump (A) at their release to BLOCK' });
+    ctx.setHud({ hint: 'BLOCK: jump (A) as they release · STEAL (X) in tight · hold BOX OUT (B) for the board' });
     // watchdog: a defense phase can never hang
     setTimeout(() => {
       if (!ended && possession === 'defense' && !defReleased && defSec < DEFENSE_DRIVE_SEC * 0.5) {

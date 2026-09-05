@@ -422,7 +422,7 @@ export const GolfMode: ModeDefinition = (() => {
       wind: `${wind.length().toFixed(0)} m/s`,
       pin: `${toPin.toFixed(0)}m`,
       strokes, card: card(),
-      hint: 'B cycles CLUB · SWING for the meter, or pull the stick back and drive through',
+      hint: 'A to start the swing · A at the top for POWER · A in the accuracy band · B cycles CLUB · or pull the stick back and drive through',
     });
   }
 

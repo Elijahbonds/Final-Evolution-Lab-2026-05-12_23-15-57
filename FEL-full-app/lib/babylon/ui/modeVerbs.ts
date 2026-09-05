@@ -4,7 +4,12 @@
 // mode, exactly like an emulator showing the whole controller. Modes differ
 // only in what pressing a slot DOES (`emit`) and what it's called
 // (`label`); a slot a mode has no use for is `emit: null` ("inert") and
-// still renders, dimmed, doing nothing when pressed.
+// renders HOLLOW — a dashed empty socket with no letter and no label that
+// cannot be pressed — so it never reads as a control. Owner decision
+// 2026-09-05 ("hide now, build later"): the pad never shows a verb the mode
+// does not handle, and never shows a bare letter that looks like a button.
+// A label earns its slot only when the mode's onInput (or the
+// LocalInputSource it feeds) acts on that button.
 
 import type { FelInput } from '../core/InputBus';
 
@@ -29,7 +34,7 @@ const SLOT_COLOR = { A: '#22d3ee', B: '#ff6b3d', X: '#a78bfa', Y: '#ffd75e' } as
 
 const inert = (): VerbButton => ({ label: '', color: '#4b5563', emit: null });
 /** Build a 4-slot config from up to 4 {slot, label, emit, hold} entries; any
- *  slot not supplied comes back inert (still drawn, does nothing). */
+ *  slot not supplied comes back inert (drawn hollow, not pressable). */
 function verbs(defs: Partial<Record<'A' | 'B' | 'X' | 'Y', { label: string; emit: FelInput; hold?: boolean }>>): ModeVerbConfig {
   const slot = (k: 'A' | 'B' | 'X' | 'Y'): VerbButton =>
     defs[k] ? { label: defs[k]!.label, color: SLOT_COLOR[k], emit: defs[k]!.emit, hold: defs[k]!.hold } : inert();
@@ -87,6 +92,11 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
   }),
   // The four slots ARE the shot vocabulary — the thing that makes the locked
   // benchmark a rally rather than a metronome. It used one of them.
+  // Verified 2026-09-05 against NetSportMode.onInput: in a one-touch sport
+  // (TENNIS.touchesPerSide === 1) A/B/X/Y each set `pendingShot` to
+  // drive/slice/drop/lob and swing, and the type changes the flight — all four
+  // are live. (The controls audit of the same day listed B/X/Y as dead; it
+  // read the mode's config file, not the engine's onInput.)
   tennis: verbs({
     A: { label: 'DRIVE', emit: A('A') },
     B: { label: 'SLICE', emit: A('B') },
@@ -102,6 +112,9 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
 
   // 1v1 Hoops: shooting is HOLD-then-release on the trigger stream (shot
   // meter). Crossovers come from stick reversal, so no button needed there.
+  // Verified 2026-09-05: onInput feeds LocalInputSource, which turns X into
+  // intent.steal (read on defense, 1.6 m) and L1 into intent.brace (read for
+  // the rebound edge and body contact). Both verbs are live; they stay.
   onevone: verbs({
     Y: { label: 'SHOOT', emit: RT(1), hold: true },
     A: { label: 'BLOCK', emit: A('A') },
@@ -114,12 +127,17 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
     // wants, so the shoulder verb fits the diamond without a new control type.
     B: { label: 'BOX OUT', emit: L1() },
   }),
-  // 3v3 Streetball: held-trigger shot, PASS (B), STEAL (X), BLOCK (A) —
-  // the exact bindings LocalInputSource + the modes' onInput already read.
+  // 3v3 Streetball: held-trigger shot, PASS (B), BLOCK (A). PASS is live —
+  // LocalInputSource turns B into intent.pass, which the carrier branch reads.
+  // STEAL is NOT: the mode's steal loop reads only the AI defenders'
+  // `slot.intent.steal`, and the human never gets a live-ball defensive
+  // possession (the opponent drive is scripted), so a hero X press is
+  // consumed by LocalInputSource and dropped. Owner decision 2026-09-05
+  // ("hide now, build later"): X renders hollow until a steal window on the
+  // carrier exists in ThreeVThreeMode.
   threevthree: verbs({
     Y: { label: 'SHOOT', emit: RT(1), hold: true },
     B: { label: 'PASS', emit: A('B') },
-    X: { label: 'STEAL', emit: A('X') },
     A: { label: 'BLOCK', emit: A('A') },
   }),
   // Court Carnival: four rotating events share one deck. CHARGE covers Slam
