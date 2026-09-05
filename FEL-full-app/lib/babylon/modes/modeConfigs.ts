@@ -14,8 +14,7 @@ export const PRECISION_CONFIG = { heroUrl: HERO_URL };
 
 // ── Dunk Contest ────────────────────────────────────────────────────────────
 export const DUNK_CONFIG = {
-  heroUrl: '/models/elijah-hero.glb',
-  rivalUrl: '/models/elijah-rival.glb',
+  heroUrl: HERO_URL,
   // Aligned to the hoop the player can actually SEE. venueSpecs puts
   // basketball_dunk's hoop prop at z = -11 and NexusWebScene's HOOP_RIM_OFFSET
   // puts the rim 0.72 in front of it at regulation 3.05, so the real

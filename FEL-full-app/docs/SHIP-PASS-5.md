@@ -92,3 +92,4 @@ tests green with the count before every commit, a risk level on every change, no
   guarded under non-Venice locations; headless/distorted athletes traced to their rebuilt hero + rival models — previous
   hero bytes restored (asset only). Their `lib/proofLine.test.ts` expectation aligned to their plain-language copy so the
   suite is green again.
+- **Athlete revert (owner, 15:10: "take my model out, he's T-posing, revert")**: the other writer's athlete wire (CharacterLibrary, athleteRoster, modeConfigs, rebuilt `elijah-hero.glb`, new `elijah-rival.glb`) is reverted to 44e2646; the dunk modes spawn the rival from the hero body as before. Their hang slow-mo and Venice look pass stay. Frame: hero and rival stand and animate with heads, kit intact; suite 45 / 293.

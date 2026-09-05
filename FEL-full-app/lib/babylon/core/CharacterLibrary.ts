@@ -214,10 +214,7 @@ export const CharacterLibrary = {
     root.rotation = new Vector3(0, opts.yawRad ?? 0, 0);
     root.scaling.setAll(opts.scale ?? 1);
 
-    // W2/W3: tint + skin/hair/shoe (were dead on GLB path). Body atlas soft-only; Proxy HOLD.
-    if (opts.tint || opts.skinTone || opts.hairColor || opts.shoeColor) {
-      applySlotColors(meshes, opts);
-    }
+    if (opts.tint && !rosterPicked) applyTint(meshes, opts.tint);
 
     const animator = new CharacterAnimator(scene, inst.animationGroups);
     registerAuthoredClips(animator, scene, skeleton);
@@ -309,69 +306,26 @@ export const CharacterLibrary = {
   },
 };
 
-/** Soft slot colors for GLB heroes — never overwrite atlas Body with one jersey hex. */
-function applySlotColors(meshes: AbstractMesh[], opts: {
-  tint?: string; skinTone?: string; hairColor?: string; shoeColor?: string;
-}): void {
-  const skin = opts.skinTone ? Color3.FromHexString(opts.skinTone) : null;
-  const hair = opts.hairColor ? Color3.FromHexString(opts.hairColor) : null;
-  const shoe = opts.shoeColor ? Color3.FromHexString(opts.shoeColor) : null;
-  const kit = opts.tint ? Color3.FromHexString(opts.tint) : null;
-  for (const mesh of meshes) {
-    const mat = mesh.material as PBRMaterial | StandardMaterial | null;
-    if (!mat) continue;
-    const n = `${mesh.name} ${mat.name || ''}`.toLowerCase();
-    // Closet Proxy HOLD — flat untextured proxies stay off the premium path.
-    if (/proxy|closet.?proxy|wardrobe.?proxy/.test(n)) {
-      mesh.isVisible = false;
-      mesh.setEnabled(false);
-      continue;
-    }
-    const matName = (mat.name || '').toLowerCase();
-    const meshName = mesh.name.toLowerCase();
-    const isBodyAtlas = meshName === 'body' || meshName === 'material.001' || matName === 'body' || matName === 'material.001';
-    const isSkin = /skin|face|head|hand|arm|leg|neck|ear/.test(n) && !/hair|shoe|jersey|short|kit/.test(n);
-    const isHair = /hair/.test(n);
-    const isShoe = /shoe|sneaker|sole|boot/.test(n);
-    const isKit = /jersey|kit|top|shirt|short|trunk|sleeve|accent/.test(n) || /^kit_/i.test(mesh.name);
-    let color: Color3 | null = null;
-    if (isHair && hair) color = hair;
-    else if (isShoe && shoe) color = shoe;
-    else if (isSkin && skin) color = skin;
-    else if (isKit && kit) color = kit;
-    else if (isBodyAtlas) {
-      // Soft multiply only — keep skin readable; never wash whole Body to jersey hex.
-      if (skin && (mat as PBRMaterial).albedoColor) {
-        const a = (mat as PBRMaterial).albedoColor!;
-        a.r = a.r * 0.55 + skin.r * 0.45;
-        a.g = a.g * 0.55 + skin.g * 0.45;
-        a.b = a.b * 0.55 + skin.b * 0.45;
-      } else if (skin && (mat as StandardMaterial).diffuseColor) {
-        const a = (mat as StandardMaterial).diffuseColor!;
-        a.r = a.r * 0.55 + skin.r * 0.45;
-        a.g = a.g * 0.55 + skin.g * 0.45;
-        a.b = a.b * 0.55 + skin.b * 0.45;
-      }
-      continue;
-    } else if (kit && !isSkin) {
-      const albedo = (mat as PBRMaterial).albedoColor ?? (mat as StandardMaterial).diffuseColor;
-      if (albedo) {
-        const isSkinTone = albedo.r > 0.45 && albedo.g > 0.25 && albedo.b > 0.15
-          && albedo.r > albedo.b && albedo.g > albedo.b * 0.9;
-        if (isSkinTone) continue;
-        color = kit;
-      }
-    }
-    if (!color) continue;
-    const cloned = mat.clone(`${mat.name || mesh.name}_slot`);
-    if ((cloned as PBRMaterial).albedoColor) (cloned as PBRMaterial).albedoColor = color.clone();
-    else if ((cloned as StandardMaterial).diffuseColor) (cloned as StandardMaterial).diffuseColor = color.clone();
-    mesh.material = cloned;
-  }
-}
-
 /** Clothing-only tint: skips skin-toned materials so faces stay natural. */
 function applyTint(meshes: AbstractMesh[], hex: string): void {
-  // Legacy — prefer applySlotColors. Never wash Body/Material.001 into one jersey hex.
-  applySlotColors(meshes, { tint: hex });
+  const tint = Color3.FromHexString(hex);
+  for (const mesh of meshes) {
+    const m = mesh.material as any;
+    if (!m) continue;
+    const albedo = (m as PBRMaterial).albedoColor ?? (m as StandardMaterial).diffuseColor;
+    if (!albedo) continue;
+    // Name first (the material contract: skin / hair / eyes are never clothing),
+    // colour heuristic second. A photographed skin is a WHITE albedo with the
+    // colour in the texture, which the heuristic reads as "not flesh" — the
+    // MPFB2 candidate's rival went red head to toe (measured 2026-09-04).
+    const mname = String(m.name ?? '').toLowerCase();
+    if (/^(skin|hair|eyes|iris|lips)/.test(mname)) continue;
+    const isSkinTone = albedo.r > 0.45 && albedo.g > 0.25 && albedo.b > 0.15
+      && albedo.r > albedo.b && albedo.g > albedo.b * 0.9;
+    if (isSkinTone) continue;
+    const cloned = m.clone(`${m.name}_tint`);
+    if ((cloned as PBRMaterial).albedoColor) (cloned as PBRMaterial).albedoColor = tint;
+    else (cloned as StandardMaterial).diffuseColor = tint;
+    mesh.material = cloned;
+  }
 }

@@ -174,7 +174,7 @@ export const DunkMode: ModeDefinition = (() => {
       ctx.groundLock?.track(player.root, player.skeleton);
       // spawnNpc is explicit: the rival must NEVER wear the player's identity,
       // or you end up dunking against yourself.
-      rival = await CharacterPipeline.spawnNpc(ctx.scene, CFG.rivalUrl, {
+      rival = await CharacterPipeline.spawnNpc(ctx.scene, CFG.heroUrl, {
         position: new Vector3(3.2, 0, CFG.rimZ + 3), startClip: SPORT_CLIP.idle,
         // Distinct baked body (elijah-rival.glb) — kit/skin/hair/shoes are in
         // the GLB. No jersey tint wash; that used to clone the hero as a twin.
