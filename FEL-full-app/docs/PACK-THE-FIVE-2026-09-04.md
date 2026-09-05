@@ -32,7 +32,13 @@ list in the GO message (tint #1, faucet + toast, dunk proof card, free starter o
   dunk session posted as a loss. Fixed (both accepted).
 - `GameShell`: a second mint button **SHARE DUNK PROOF · <makes>/<attempts> DUNKS · <pts> vs <rival> · WON/LOST** for
   `dunkContest` / `dunkduel`, minting the existing challenge link with that line as `display`; the `/c/<code>` page renders it.
-- Proof run: `PROOF=1 ACTIVE=1 ROUTE=dunk scripts/probes/_session-e2e.mts` (result recorded below when the run lands).
+- **Proof** (`scripts/probes/_dunk-proof-drive.mts`: login, `/play/dunk`, a timing-based run-up / charge / slam loop):
+  the contest ended after four attempts in 60 s (124 vs 157, lost), `POST /api/sessions` 200 (xp 196, shards 6), the
+  results card showed **SHARE DUNK PROOF · 0/4 DUNKS · 124 PTS · LOST** (every timing-driven slam missed, so 0 makes is
+  the true count), the click minted `/c/VXff8bdfMJ0exh2R`, and that page renders the DUNK PROOF line. Follow-up in the
+  same pack: the mode reports the rival as `rivalTotal` while the component read `rivalScore`, so the rival's points
+  were missing from the line and posted as 0 — fixed; re-proof: **SHARE DUNK PROOF · 0/4 DUNKS · 124 PTS VS 138 · LOST**,
+  minted `/c/3dI_v3H-cQY10Ogb`, page renders the line.
 
 ### 4 · Free starter on Venice
 - `defaultEquipped()` already equips `top_lab / shorts_court / shoes_flight` for every user; item 1's fix is what makes
@@ -45,8 +51,7 @@ list in the GO message (tint #1, faucet + toast, dunk proof card, free starter o
 - **Proof**: `reward rules present: 14`; `_pack-db.mts` → RewardRule rows 14 (active 14).
 
 ## Residual risks
-- Item 3's proof needs a completed dunk contest; the passive session probe never reached an end on dunk, the active-input
-  run is the evidence (below).
+- Item 3's proof used a timing-based driver; a human run will make dunks and the line will read `n/4 DUNKS` accordingly.
 - Load: a full `vitest run` loses one headless child to its 120 s budget when a production server or a second browser
   shares the host; it is 40 files / 260 tests in isolation.
 
