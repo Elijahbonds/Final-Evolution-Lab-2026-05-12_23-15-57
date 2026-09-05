@@ -8,6 +8,40 @@ The tag is assigned by the orchestrator at integration (the previous candidate w
 the one the commit or the findings log recorded; a line with no number had no measurement in its commit.
 Full logs: `docs/SHIP-PASS-3.md`, `docs/SHIP-PASS-4.md`; the gate table: `docs/RC-2026-09-04.md`.
 
+### Ship pass 5 — the nuggets pass (2026-09-04, evening)
+
+Owner decisions taken up front: Gate 0's shipping spec is the 22-bone unprefixed FEL rig (the 65-bone Mixamo tests stay for
+the import path); multiplayer is recovered and re-scoped to the async best-score challenge; the Creator Card economy opens
+now; every mode carries a proof line. Full log: `docs/SHIP-PASS-5.md`.
+
+**Phase 0 — close-out** (`4869bf6`, tag `v0.9.0-rc.4`)
+- Lab credits folded into the wallet (`docs/LC-FOLD-2026-09-04.md`): `Wallet.lc` is the balance, `applyLc` the only mover,
+  the profile column dead. Wallet tests 33/33, arena tests 13/13.
+- Active driver on the eight contest routes: karate posts and mints a proof card (WAVE 3 · 19 KOS); threepoint, snowboard,
+  gymnastics, golf, soccer, football and dunk do not reach their end calls under mashed input — each end condition logged.
+
+**Phases 1–6** (`a49ac13`)
+- One balance, one reader: `/api/profile` returns the wallet; header, hub, profile view, storefront and PRQ-erase read it.
+  Probe: wallet 560 = arena config 560 = shop 560.
+- Proof lines for every mode: `GameResult` carries `stats` + `outcome`, sixteen game components pass them, `lib/proofLine.ts`
+  renders one line per mode (5 tests); SHARE PROOF on every results card; minted `/c` page renders the line.
+- Mastery ladder surface at `/ladder`, linked from the hub.
+- Multiplayer: `MP_SESSION_MODE` maps every challenge key to its session mode (twelve of fourteen keys had settled as ties
+  because `GameSession.mode` never matched); six head-to-head modes join; the results card settles a `?mp=<code>` run.
+  Proofs: dunk challenge hostScore 124 (was 0), settled host 124 vs guest 0; karate-versus run joins and renders FRIEND CHALLENGE.
+- Gate 0 on loaded bodies: `loadedBodies.test.ts` loads hero, mobile hero, both kit bodies and the eight-athlete roster
+  through Babylon and asserts 22 unprefixed joints with a conforming rig audit (13 tests).
+
+**Phases 2, 7, 8** (`09b471e`)
+- Creator Card economy proven on the dev DB: publish +50 coins (740 → 790), remix royalty +25 to the parent's owner (790 → 815).
+- The alpine whiteout: the mood (sun 2.8, hemisphere 0.9, exposure 1.05, bloom from 0.78) on near-white snow. Retuned; both
+  pistes paint cooler with groom lines and drifts. Slalom mean luminance at the same four moments 221/218/214/211 →
+  198/196/194/193, piste band 236 → 213. Teal pines are the Kenney palette, not lighting (two experiments reverted).
+- Court ocean texture at 1024² on the mobile tier: threepoint 80.0 → 64.1 MB, dunk duel 102.9 → 86.9 MB; desktop unchanged.
+
+**Phases 9–10** — production bundle of `09b471e` built clean in the release lane; the twenty-route production play sweep
+and the tag are recorded in `docs/SHIP-PASS-5.md` when they land.
+
 ### Ship pass 4 — stages, movement, menus, wiring (2026-09-04)
 
 Owner decisions taken up front: procedural props and CC0 packs on every venue; a navmesh per venue from an offline recast
