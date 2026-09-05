@@ -5,6 +5,11 @@
 
 const PALETTES: Record<string, [string, string, string]> = {
   'venice-court':   ['#ff9a3d', '#1c4d8f', '#0b2036'],
+  // court locations (docs/SPEC-COURT-LOCATIONS.md)
+  'blossom-park':   ['#ffc1da', '#b08bb5', '#3a2846'],
+  'orbit':          ['#9ecbff', '#101a3a', '#02030a'],
+  'canopy-court':   ['#9be37a', '#2e4a2b', '#0e1a0c'],
+  'night-rooftop':  ['#ffd166', '#3a2a5e', '#0b1230'],
   'shimogamo-dojo': ['#caa06a', '#5a3b22', '#1c120a'],
   'gridiron':       ['#0b3d1f', '#0f5c2e', '#04160c'],
   'skatepark':      ['#6d5a8c', '#3a2f52', '#171126'],
@@ -19,6 +24,7 @@ const PALETTES: Record<string, [string, string, string]> = {
 
 const GLYPHS: Record<string, string> = {
   'venice-court': '🏀', 'shimogamo-dojo': '🥋', 'gridiron': '🏈',
+  'blossom-park': '🌸', 'orbit': '🪐', 'canopy-court': '🌳', 'night-rooftop': '🌃',
   'skatepark': '🛹', 'mountain-slope': '🏂', 'surf-break': '🏄',
   'tennis-court': '🎾', 'coastal-links': '⛳', 'ballpark': '⚾', 'fc-stadium': '⚽',
 };

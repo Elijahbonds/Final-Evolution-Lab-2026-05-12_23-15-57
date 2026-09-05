@@ -49,3 +49,23 @@ Physics, rim position, court size, camera presets, the crowd, the Meshy mural (u
 - Venice with no pick renders byte-for-byte as before (capture diff on the dev harness).
 - Each location: a gauntlet-style capture on dunk, ones, threes; 0 errors; both tiers under the texture budget.
 - The pick survives reload and is honoured by `?location=`; the splash shows the current pick.
+
+## Landed (2026-09-05)
+
+- `lib/babylon/nexus/courtLocations.ts`: the location table, `applyLocation` (identity for Venice / unknown / non-basketball
+  specs; strips the dressing kinds and keeps hoop, backboard pole, net, banner, crowd tiers), the pick (`?location=` →
+  `fel-court-location` → Venice), and Blossom Park's decoration (procedural cherry trees, petal fall). 4 tests.
+- `mountVenue(ctx, key, { location })` applies the overlay before the build, swaps the Kenney prop set, and runs the
+  location's decoration under the venue root after the build. `HarnessOpts.location` → `ModeContext.location`; the five
+  basketball modes pass it; the four basketball game components and the dev harness read the pick.
+- Boot splash: a LOCATION row (ready locations only) on the ready and loading states of basketball splashes; a pick is
+  remembered and reloads the route with `?location=`; the splash's eyebrow, tint and art follow the pick.
+- Under a location the scanned Venice court map is NOT mounted (its palms and walls are baked into the GLB); the spec's
+  own court, markings and hoop stand, at the same rim position. Venice with no pick keeps the map.
+- Measured: Venice with no pick renders as before (dunk 60 fps, 31 draws, 0 errors). Blossom Park: dunk 60 fps, 81 draws;
+  ones 60 fps, 63 draws; threes 60 fps; 0 errors everywhere. Texture footprint equal to Venice on both tiers (197.6 MB
+  desktop, 93.6 MB mobile — the backdrop swaps one baked sky for another, the petal sprite is 16 px, the trees are meshes).
+- Two passes on the trees: the first ring stood outside the dunk camera's 0.9 rad cone (invisible); the second read as
+  white cloud under the grade and the location's fog — now deeper pinks, smaller and more heads, fog 0.0022.
+- Orbit, Canopy Court and Night Rooftop are authored as environments but `ready: false` (hidden from the picker) until
+  their decoration passes land.

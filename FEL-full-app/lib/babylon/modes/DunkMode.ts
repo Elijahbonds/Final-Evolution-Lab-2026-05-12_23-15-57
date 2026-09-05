@@ -150,7 +150,7 @@ export const DunkMode: ModeDefinition = (() => {
 
     async load(ctx: ModeContext) {
       // M74: try Nexus venue first; fallback to VenueKit if no spec
-      dunkVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true });
+      dunkVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true, location: ctx.location });
       if (!dunkVenue) { VenueKit.buildCourt(ctx.scene); applyOceanCourt(ctx.scene, 'venice'); }
       // spawnPlayer, not CharacterLibrary.spawn — this is the route that applies
       // the player's own identity: closet wardrobe colours, skin tone, and body

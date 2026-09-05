@@ -6,6 +6,7 @@
 // GameShell pipeline (GameProps.onEnd → /api/sessions recap). All gameplay
 // lives in lib/babylon/* cores; nothing game-specific is duplicated here.
 
+import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
@@ -61,6 +62,7 @@ export default function DunkBabylon({ onEnd }: GameProps) {
       if (disposed) return;
       runMode(MODES.dunk, {
         canvas,
+        location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
         input: bus,
         onPhase: (p, cd) => {
           setPhase(p);

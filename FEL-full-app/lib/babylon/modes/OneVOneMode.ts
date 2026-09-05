@@ -179,7 +179,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     modeId: 'onevone', mood: 'goldenHour', camPreset: 'hoops',
 
     async load(ctx: ModeContext) {
-      onevoneVenue = mountVenue(ctx, 'basketball_h2h', { keepGameplayCamera: true });
+      onevoneVenue = mountVenue(ctx, 'basketball_h2h', { keepGameplayCamera: true, location: ctx.location });
       if (!onevoneVenue) { VenueKit.buildCourt(ctx.scene, 'venice'); applyOceanCourt(ctx.scene, 'venice'); }
       me = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 5), yawRad: Math.PI, startClip: SPORT_CLIP.idle });
       me.secondary?.setLookTarget(() => ball?.position ?? null);    // Phase 2: eyes on the ball

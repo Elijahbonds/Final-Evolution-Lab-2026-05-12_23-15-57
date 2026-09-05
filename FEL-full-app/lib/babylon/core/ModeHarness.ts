@@ -51,6 +51,8 @@ export type HudValue = string | number | boolean | null | HudScoreCard[];
 
 export interface ModeContext {
   scene: Scene;
+  /** Court location pick (docs/SPEC-COURT-LOCATIONS.md), passed through to mountVenue by the basketball modes. */
+  location?: string;
   camera: TargetCamera;
   camDirector: CameraDirector;
   input: InputBus;
@@ -94,6 +96,8 @@ export interface HarnessOpts {
   resultSink?: ResultSink;
   /** Optional host-owned bus so a touch overlay can emit() the same events. */
   input?: InputBus;
+  /** Court location pick (docs/SPEC-COURT-LOCATIONS.md) — basketball venues swap their environment half. */
+  location?: string;
   /** M28 art round-trip: called once after the venue loads so a published art
    * card can reskin the court/board/kit mesh. Runs post-liftBlackMaterials. */
   applySkin?: (scene: Scene) => void;
@@ -170,6 +174,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
 
   const agentHooks: ModeContext['agent'] = {};   // M69: filled by a mode's load() if it opts in
   const ctx: ModeContext = {
+    location: opts.location,
     scene, camera, camDirector, input, lights, juice,
     feel, heroRef, objectiveRef, groundLock, agent: agentHooks,
     phase: () => phase,

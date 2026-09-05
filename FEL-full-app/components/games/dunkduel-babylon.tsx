@@ -3,6 +3,7 @@
 // FEL Babylon Dunk Duel host (M56 Phase 6). Pass-and-play head-to-head
 // judged dunk contest for 2 local players.
 
+import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
@@ -59,6 +60,7 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
 
     runMode(MODES.dunkduel, {
       canvas,
+      location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
       input: bus,
       onPhase: (p, cd) => {
         setPhase(p);

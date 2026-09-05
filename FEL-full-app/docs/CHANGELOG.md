@@ -8,6 +8,13 @@ The tag is assigned by the orchestrator at integration (the previous candidate w
 the one the commit or the findings log recorded; a line with no number had no measurement in its commit.
 Full logs: `docs/SHIP-PASS-3.md`, `docs/SHIP-PASS-4.md`; the gate table: `docs/RC-2026-09-04.md`.
 
+### Court locations — Blossom Park (2026-09-05; owner ask, `docs/SPEC-COURT-LOCATIONS.md`)
+- A location swaps the environment half of a basketball venue spec (sky, backdrop, mood, dressing, particles) under the
+  unchanged court half (court, hoop, crowd, actors, camera). Venice is the default and byte-identical with no pick.
+- Blossom Park ships first: pink-grey dusk over the city skyline, procedural cherry trees around the court, petal fall.
+  Picker on the boot splash of every basketball mode; the pick is remembered and honoured by `?location=`; free for all.
+  Texture footprint equal to Venice on both tiers. Orbit, Canopy Court and Night Rooftop are authored, hidden until ready.
+
 ### Session endings (2026-09-05, early; owner decisions, MEDIUM risk — game rules)
 - Football (Breakaway): a session is THREE drives, each ending on a touchdown or a turnover on downs; before, a runner who
   kept gaining reset to first down forever and never posted. `drive` in the HUD; `DRIVES_DONE` / `TURNOVER_ON_DOWNS`.

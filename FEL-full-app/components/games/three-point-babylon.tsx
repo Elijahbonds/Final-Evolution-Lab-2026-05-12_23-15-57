@@ -9,6 +9,7 @@
 // never learns that a phone exists. That is the property that makes the next
 // mode cheap.
 
+import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
@@ -69,6 +70,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
 
     runMode(MODES.threepoint, {
       canvas,
+      location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
       input: bus,
       onPhase: (p, detail) => {
         if (disposed) return;

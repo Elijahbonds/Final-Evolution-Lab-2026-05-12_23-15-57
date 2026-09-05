@@ -5,6 +5,7 @@
 // can actually be run and looked at — every /play route is auth-gated and the
 // local database is down, so the shipped routes cannot be opened here.
 
+import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
 import { useEffect, useRef, useState } from 'react';
 import { runMode, InputBus, type ModePhase, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
@@ -45,6 +46,7 @@ export function DevModeRunner({ modeKey }: { modeKey: string }) {
       runMode(def, {
         heroOverride: process.env.NODE_ENV === 'development' ? new URLSearchParams(window.location.search).get('hero') ?? undefined : undefined,   // ship pass 3 rollout flag
         canvas,
+        location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
         input: bus,
         onPhase: (p, d) => { if (!disposed) { setPhase(p); if (p === 'error') setErr(String(d)); } },
         onHud: (h) => { if (!disposed) setHud((prev) => ({ ...prev, ...h })); },

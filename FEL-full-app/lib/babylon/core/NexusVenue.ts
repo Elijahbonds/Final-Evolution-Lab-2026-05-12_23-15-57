@@ -23,6 +23,7 @@ import { NavBounds } from './NavBounds';
 import { MAPS } from '../../map-data';
 import type { Vector3 } from '@babylonjs/core';
 import { specFor } from '../nexus/venueSpecs';
+import { applyLocation, COURT_LOCATIONS, isCourtLocationId } from '../nexus/courtLocations';
 
 export interface VenueHandle {
   /** Ship pass 4, phase 3: the walkable-area navmesh baked from this venue's map (null until loaded, or when the venue has no map). */
@@ -51,6 +52,8 @@ interface VenueCtx {
 }
 
 export interface MountVenueOptions {
+  /** Court location (docs/SPEC-COURT-LOCATIONS.md): swaps the environment half of a basketball spec; ignored elsewhere. */
+  location?: string;
   /**
    * M104 (framing fix): keep the mode's own gameplay camera active instead of
    * letting the venue's static ArcRotateCamera take over `scene.activeCamera`.
@@ -94,7 +97,9 @@ export function venueBounds(spec: { ground: { size: [number, number]; offset?: [
 }
 
 export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOptions = {}): VenueHandle | null {
-  const spec = specFor(modeId);
+  const authored = specFor(modeId);
+  const spec = authored ? applyLocation(authored, options.location) : authored;
+  const location = isCourtLocationId(options.location) && spec !== authored ? COURT_LOCATIONS[options.location] : null;
   if (!spec) {
     console.warn(`[NEXUS] no venue spec for "${modeId}" — falling back to VenueKit. `
       + 'Add one to venueSpecs.ts to give this mode its own venue.');
@@ -113,7 +118,8 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   // Phase 3: the navmesh for this venue's map (scripts/venue/navmesh-gen.mts → public/models/navmesh).
   let nav: NavBounds | null = null;
   if (spec.mapKey) void NavBounds.load(spec.mapKey).then((n) => { nav = n; if (n) console.info(`[NEXUS] navmesh "${spec.mapKey}": ${n.data.polys.length} polys`); });
-  const propSet = propSetFor(modeId);
+  const propSet = location && location.propSet !== undefined && location.propSet !== null ? (location.propSet || null) : propSetFor(modeId);
+  if (location?.decorate) location.decorate(ctx.scene, built.root);   // blossom trees, starfields: meshes after the build, under the venue root
   let props: VenuePropsHandle | null = null; let propsGone = false;
   if (propSet) void mountVenueProps(ctx.scene, propSet, built.root).then((h) => { if (propsGone) h?.dispose(); else props = h; });
 

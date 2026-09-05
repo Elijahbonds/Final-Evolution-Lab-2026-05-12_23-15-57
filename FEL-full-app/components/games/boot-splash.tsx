@@ -5,6 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import type { ModePhase } from '@/lib/babylon';
 import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
+import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 
 // M37 E12 FIX: venue slugs resolve to PROCEDURAL canvas thumbnails (venueThumbs)
 // instead of /img/venues/*.jpg files that 404 on every mode route.
@@ -31,7 +32,18 @@ export function BootSplash(props: {
   onStart: () => void;              // READY tap
   onRetry: () => void;              // error retry
 }) {
-  const v = VENUE_ART[props.modeId] ?? VENUE_ART.default;
+  // Court locations (docs/SPEC-COURT-LOCATIONS.md): basketball splashes take their art from the player's pick.
+  const isCourt = BASKETBALL_MODE_IDS.has(props.modeId);
+  const [loc, setLoc] = useState<CourtLocationId>('venice');
+  useEffect(() => { if (isCourt) setLoc(readCourtLocation()); }, [isCourt]);
+  const art0 = VENUE_ART[props.modeId] ?? VENUE_ART.default;
+  const v = isCourt && loc !== 'venice' ? { venue: COURT_LOCATIONS[loc].thumb, sub: COURT_LOCATIONS[loc].sub, tint: COURT_LOCATIONS[loc].tint } : art0;
+  const pickLocation = (id: CourtLocationId) => {
+    if (id === loc) return;
+    writeCourtLocation(id);
+    // the venue mounts when the mode loads, so a new pick reloads the route with the pick in the URL
+    const u = new URL(window.location.href); u.searchParams.set('location', id); window.location.assign(u.toString());
+  };
   const [inserted, setInserted] = useState(false);
   // Procedural venue art generated client-side (no network request, no 404).
   const [art, setArt] = useState<string | null>(null);
@@ -81,6 +93,21 @@ export function BootSplash(props: {
             style={{ background: v.tint, boxShadow: `0 0 34px ${v.tint}66` }}>
             TAP TO START
           </button>
+        )}
+
+        {isCourt && (props.phase === 'ready' || props.phase === 'loading') && readyCourtLocations().length > 1 && (
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">LOCATION</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {readyCourtLocations().map((l) => (
+                <button key={l.id} type="button" onClick={() => pickLocation(l.id)}
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${l.id === loc ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={l.id === loc ? { background: l.tint, borderColor: l.tint } : { borderColor: `${l.tint}88` }}>
+                  {l.name.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {props.phase === 'countdown' && (

@@ -121,7 +121,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     modeId: 'threevthree', mood: 'goldenHour', camPreset: 'team',
 
     async load(ctx: ModeContext) {
-      threeVenue = mountVenue(ctx, 'basketball_3v3', { keepGameplayCamera: true });
+      threeVenue = mountVenue(ctx, 'basketball_3v3', { keepGameplayCamera: true, location: ctx.location });
       if (!threeVenue) { VenueKit.buildCourt(ctx.scene, 'venice'); applyOceanCourt(ctx.scene, 'venice'); }
       const spawnBody = async (
         pos: Vector3, tint: string | undefined, ai: boolean,

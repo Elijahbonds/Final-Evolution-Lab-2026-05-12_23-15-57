@@ -5,6 +5,7 @@
 // phase/HUD/result into the existing GameShell pipeline. All gameplay lives in
 // lib/babylon/* cores (BasketballCore + PlayerSlot + OneVOneMode).
 
+import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
@@ -57,6 +58,7 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
       if (disposed) return;
       runMode(MODES.onevone, {
       canvas,
+      location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
       input: bus,
       onPhase: (p, cd) => {
         setPhase(p);

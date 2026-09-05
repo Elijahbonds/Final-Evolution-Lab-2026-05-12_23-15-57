@@ -255,7 +255,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
 
     async load(ctx: ModeContext) {
       // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
-      modeVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true });
+      modeVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true, location: ctx.location });
       if (!modeVenue) VenueKit.buildCourt(ctx.scene);
       applyOceanCourt(ctx.scene, 'venice');
       p1 = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {

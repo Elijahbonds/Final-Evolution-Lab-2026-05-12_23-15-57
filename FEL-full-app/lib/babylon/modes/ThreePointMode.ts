@@ -439,7 +439,7 @@ export const ThreePointMode: ModeDefinition = {
 
     // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
 
-    modeVenue = mountVenue(ctx, 'basketball_h2h', { keepGameplayCamera: true });
+    modeVenue = mountVenue(ctx, 'basketball_h2h', { keepGameplayCamera: true, location: ctx.location });
 
     if (!modeVenue) VenueKit.buildCourt(ctx.scene, 'venice');
     applyOceanCourt(ctx.scene, 'venice');
