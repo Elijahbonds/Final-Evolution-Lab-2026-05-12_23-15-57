@@ -97,6 +97,10 @@ export default function KitchenHub({
 
   return (
     <div style={S.root}>
+      {/* FEL Kitchens lane (2026-09-05): the Fuel floor — today's MealRx from Your Build + grocery list. */}
+      <a href="/kitchens/fuel" className="mb-3 flex items-center justify-between rounded-xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.06] px-4 py-3 text-sm font-bold text-[#00E5FF] hover:bg-[#00E5FF]/[0.12]">
+        <span>Today&apos;s fuel — your Build, as a plate</span><span aria-hidden>→</span>
+      </a>
       <div style={S.h1}>FEL KITCHENS</div>
       <div style={{ fontSize: 12, opacity: 0.75 }}>idle kitchens working · chefs cooking · meal prep on subscription</div>
 

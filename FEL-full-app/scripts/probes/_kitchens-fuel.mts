@@ -1,0 +1,27 @@
+// FEL Kitchens — the Fuel floor renders logged in: leak chip, load band, day plan, grocery list, fulfilment paths.
+import { chromium, request } from 'playwright-core';
+const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing' });
+const rc = await request.newContext({ baseURL: 'http://localhost:3000' });
+const csrf = (await (await rc.get('/api/auth/csrf')).json()).csrfToken as string;
+await rc.post('/api/auth/callback/credentials', { form: { csrfToken: csrf, email: 'playtest@fel.local', password: 'playtest-local-only', json: 'true' } });
+const p = await b.newPage({ viewport: { width: 1280, height: 900 } }); await p.context().addCookies((await rc.storageState()).cookies); await rc.dispose();
+const errors: string[] = []; p.on('pageerror', (e) => errors.push(e.message)); p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 120)); });
+await p.goto('http://localhost:3000/kitchens/fuel', { waitUntil: 'networkidle' });
+await p.waitForTimeout(2500);
+const text = (await p.evaluate('document.body.innerText')) as string;
+const has = (s: string) => text.toLowerCase().includes(s.toLowerCase());
+console.log(`url ${p.url()}`);
+console.log(`leak chip: ${has('LEAK ·')} · load band: ${/EASY DAY|TRAIN DAY|HARD DAY/.test(text)} · day plan: ${has('Day plan')} · grocery: ${has('Grocery list')} · get it: ${has('Instacart list') && has('DoorDash Drive')} · disclaimer: ${has('not medical advice')}`);
+const items = await p.evaluate(`Array.from(document.querySelectorAll('section ul li button')).length`);
+console.log(`grocery rows: ${items}`);
+await p.locator('section ul li button').first().click().catch(() => {});
+await p.waitForTimeout(300);
+console.log(`basket after one tap: ${((await p.evaluate('document.body.innerText')) as string).match(/(\d+) \/ (\d+) in the basket/)?.[0] ?? '?'}`);
+const stored = await p.evaluate(`localStorage.getItem('fel-kitchen-store-v1')?.slice(0, 160)`);
+console.log(`store: ${stored}`);
+await p.screenshot({ path: process.env.OUT ?? 'docs/shots/kitchens-fuel.png', fullPage: true });
+console.log(`errors: ${errors.length}${errors.length ? ' · ' + errors.slice(0, 3).join(' | ') : ''}`);
+await p.goto('http://localhost:3000/kitchens', { waitUntil: 'networkidle' }); await p.waitForTimeout(1500);
+const hub = (await p.evaluate('document.body.innerText')) as string;
+console.log(`hub link to fuel: ${hub.toLowerCase().includes("today's fuel")} · hub floors: ${/EAT/.test(hub) && /COOK/.test(hub)}`);
+await b.close();

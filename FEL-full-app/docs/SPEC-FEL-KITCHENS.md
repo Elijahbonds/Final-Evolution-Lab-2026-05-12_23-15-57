@@ -1,0 +1,96 @@
+# FEL Kitchens — spec (v0, 2026-09-05)
+
+Folded from the PM's soft prep (`docs/_soft-prep-kitchens/SPEC-MEAL-RX-v0.md`, `ONEPAGER-FULFILLMENT-v0.md`) and the
+lane brief (`docs/CLAUDE-KITCHENS-BRIEF.md`). The soft prep is the source of truth for the MealRx schema and the
+fulfillment hybrid; this file adapts it to the Mac tree and records what the tree already holds. Studio HOLD. No Publish.
+
+## Audience and job
+
+The athlete. Your Build's current leak and load turn into a **meal Rx**: performance fuel for the body object, one day
+plan and one grocery list, surfaced on Build / Kitchens only — never on the Venice court. Non-clinical, food tags only,
+no medical claims; the disclaimer rides every meal and fulfilment surface.
+
+## What the tree already has (survey, step 2 of the brief)
+
+| Hit | What it is | Kitchens' relation |
+|---|---|---|
+| `app/kitchens/page.tsx` → `lib/babylon/kitchens/KitchenHub.tsx` + `KitchenMarket.ts` (M62) | the ghost-kitchen **marketplace**: kitchens list shifts, chefs subscribe and publish meal-prep plans, eaters subscribe; Stripe seam; compliance notice | the hub stays; Kitchens adds a **Fuel** floor at `/kitchens/fuel` and a link from the hub — no second app root, no route collision (`app/(lab)/kitchens` would resolve to the same `/kitchens` path as the hub) |
+| `lib/babylon/nutrition/NutritionScore.ts` + `FoodScan.tsx` (M60) | scan-your-plate: plate tags → goal-relative score | untouched; a later fold could tag MealRx recipes with `PlateTag`s |
+| `lib/game-data.ts:199` | the hub card `kitchens: FEL Kitchens · The Kitchen · /kitchens` | untouched |
+| `lib/prq.ts` | PRQ = mean of the eight profile attributes, **0–100**; grades RECOVERING < 40 · READY · PRIMED ≥ 60 · ELITE ≥ 80 | the snapshot adapter divides by 100 to meet the soft prep's 0–1 thresholds |
+| `lib/workout/movement-screen.ts` | `MovementMetrics` → `ScreenResult { pillars (power, mobility, symmetry, stability, cadence, posture), weakest, overall, flags }` | the leak guess reads `weakest` and the valgus / asymmetry metrics |
+| `lib/babylon/nexus/neuro-mirror/*` | the Mirror runtime (zones, squat audit faults: kneeValgus, heelRise, armFall, lateralShift, shallow) | read-only; not wired into Kitchens in v0 |
+| `BuildStore`, `MovementSignature`, `BuildRx`, `detectLeak`, `radarFromSignature` | **absent** — they live in the Vite twin (`src/core/BuildStore.ts`, `src/types/university.ts`), which is not on this disk | Kitchens owns a small **read-only `BuildSnapshot`** with the same field meanings and a local `LeakId`; when BuildStore lands here, `types.ts` re-exports its `LeakId` and `buildSnapshot.ts` reads its snapshot — nothing else changes |
+| DoorDash / Instacart | no hits | documented only (below) |
+
+## Locked decisions (PM, 2026-09-05)
+
+- Grocery list v0 ships first: in-app checklist + share from `MealRx.groceryList`. Zero partner dependency.
+- Instacart IDP optional (v0.5): a shopping-list link from the same `GroceryItem[]`; affiliate later; **not** Instacart
+  Connect. Apply HOLD until pad-grade + AM paste + Elijah GO.
+- No live DoorDash Drive until a real pickup / pack node exists. Drive is typed and documented; its adapter is a no-op.
+- `KitchenStore` is separate from the Build store and keyed by `sourceScanDate`. Mirror types are never mutated.
+- Build is READ-ONLY upstream. Modes never call MealRx or KitchenStore.
+
+## Modules (this tree)
+
+| File | Role |
+|---|---|
+| `lib/kitchens/types.ts` | the LOCKED shapes from the soft prep: `MealRx`, `LoadBand`, `MealTheme`, `MealSlot`, `Macros`, `GroceryItem`, `Recipe`, `FulfillmentPath`, `KitchenSnapshot`, `KITCHEN_STORAGE_KEY`, `LeakId` (local until BuildStore lands), `NON_CLINICAL_DISCLAIMER` |
+| `lib/kitchens/buildSnapshot.ts` | read-only upstream adapter: `BuildSnapshot { scanDate, prqScore (0–1), leak, leakLabel, pillars? }`; `snapshotFromTree({ prq0to100, screen?, metrics?, scanDate })` — the leak guess is **draft, pending Elijah** |
+| `lib/kitchens/mealRxBuilder.ts` | pure `buildMealRx({ signature, recipes, preferredFulfillment })` — the soft prep's algorithm, `LEAK_THEMES`, `LEAK_ONE_LINER`, `loadBandFor` |
+| `lib/kitchens/recipes.seed.ts` | eight seed recipes (`source: 'seed'`), tags and ingredients only; the first real 7–14 recipes are Elijah's |
+| `lib/kitchens/fulfillment.ts` | `fulfill(path, list)` → list text · Instacart link (null until the key and GO exist) · DoorDash `unavailable`; `groceryText`, `mergeGrocery` |
+| `lib/kitchens/KitchenStore.ts` | localStorage store (`fel-kitchen-store-v1`, the same pattern as `KitchenMarket`): `snapshot`, `ingest(build)` (archives on a new `sourceScanDate`, cap 14), `setPreferredFulfillment`, `reset` |
+| `components/kitchens/fuel-view.tsx`, `grocery-list.tsx` | the Fuel floor: leak chip, load band, themes, day plan, grocery checklist with copy / share, fulfilment path picker (list live; Instacart and Drive shown locked) |
+| `app/kitchens/fuel/page.tsx` | `/kitchens/fuel`, logged in; builds the snapshot from `/api/profile`'s `prq` + the default movement screen |
+
+## Flow
+
+```
+/api/profile.prq (0–100) + movement screen (default metrics until a scan lands)
+  → snapshotFromTree → BuildSnapshot (read-only)
+  → buildMealRx (pure) → KitchenStore.current (keyed by sourceScanDate; prior → history)
+  → Fuel floor: day plan · grocery checklist · share text
+  → fulfill('list') now · 'instacart' when unlocked · 'doordash' documented only
+```
+
+## Leak → theme map (draft, pending Elijah) and load band
+
+| LeakId | Themes (primary first) | One-liner (fuel, not PT) |
+|---|---|---|
+| `mid-back` | recovery, hydration-electrolyte, anti-inflammatory | Fuel that keeps you soft and ready for the next lock. |
+| `knee-valgus` | protein-rebuild, joint-support, anti-inflammatory | Rebuild day. Protein first, keep the joints quiet. |
+| `hip-drop` | protein-rebuild, carb-timing | Stance-side fuel. Steady protein + timed carbs. |
+| `ankle` | hydration-electrolyte, anti-inflammatory, joint-support | Soft tissue day. Fluids + quiet joints. |
+
+`loadBand` from `prqScore` (0–1): `< 0.75` easy · `0.75–0.88` train · `> 0.88` hard. With this tree's PRQ ÷ 100 a PRIMED
+athlete (60) lands on `easy`; the thresholds are the soft prep's stub and are the first thing to tune with Elijah.
+
+Leak guess from the movement screen (draft): valgus above 0.45 on either knee → `knee-valgus`; asymmetry above 12 % →
+`hip-drop`; otherwise the weakest pillar — mobility → `mid-back`, stability → `knee-valgus`, symmetry → `hip-drop`,
+posture / power / cadence → `ankle`.
+
+## Fulfilment (LOCKED hybrid)
+
+| Phase | Ships | Gate |
+|---|---|---|
+| v0 | in-app grocery checklist + copy / share text | schema only — **this commit** |
+| v0.5 | Instacart IDP shopping-list link from the same list | pad-grade + AM paste + Elijah GO; env `INSTACART_IDP_KEY` (server) — no secrets in git; adapter returns `null` until then |
+| v1+ | DoorDash Drive from a pickup / pack node | a real partner kitchen; adapter stays `unavailable` |
+
+## Auth and surfaces
+
+`/kitchens/fuel` requires a session like every lab route. The hub at `/kitchens` links to it. The disclaimer renders on
+the Fuel floor and in the share text.
+
+## Out of scope
+
+Studio Preview / Publish · Venice dunk, pad, Pack 5 wallet · Mirror or Build type changes · medical claims, supplements,
+calorie-deficit coaching · live Instacart or DoorDash checkout · Stripe meal packs · marketplace scraping.
+
+## Open for Elijah / PM
+
+1. Leak → theme map and load-band thresholds (draft above).
+2. Cookbook source for the first 7–14 recipes (seed recipes are placeholders with honest macros, no voice).
+3. Whether the Fuel floor also reads the Mirror's squat faults once a scan exists (v0 uses the default screen metrics).

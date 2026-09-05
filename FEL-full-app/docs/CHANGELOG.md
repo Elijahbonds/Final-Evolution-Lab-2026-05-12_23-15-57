@@ -8,6 +8,16 @@ The tag is assigned by the orchestrator at integration (the previous candidate w
 the one the commit or the findings log recorded; a line with no number had no measurement in its commit.
 Full logs: `docs/SHIP-PASS-3.md`, `docs/SHIP-PASS-4.md`; the gate table: `docs/RC-2026-09-04.md`.
 
+### FEL Kitchens — spec + scaffold (2026-09-05, overnight; PM lane brief `docs/CLAUDE-KITCHENS-BRIEF.md`)
+- `docs/SPEC-FEL-KITCHENS.md` folds the soft prep (MealRx schema, LOCKED hybrid fulfilment) onto this tree: the existing
+  `/kitchens` marketplace hub stays; the Build store lives in the Vite twin, so Kitchens reads a small read-only snapshot
+  from this tree's PRQ (0–100 ÷ 100) and movement screen.
+- `lib/kitchens/`: types (LOCKED shapes), `snapshotFromTree`, pure `buildMealRx`, eight seed recipes, fulfilment adapter
+  (list live; Instacart link null until the key + GO; Drive unavailable), `KitchenStore` (localStorage, keyed by scan date,
+  history cap 14); 7 tests.
+- `/kitchens/fuel` (Fuel floor): leak chip, load band, day plan, grocery checklist with copy / share, locked paths shown,
+  disclaimer; linked from the hub. Probe: renders logged in, 12 grocery rows, checklist persists, 0 console errors.
+
 ### Venice DualShock pad (2026-09-05, overnight; Gameplay acceptance `docs/SPEC-VENICE-DUALSHOCK-PAD.md`)
 - Dunk: HOLD = RUN — the held charge drives the athlete to the rim (stick steers, launch at the gather line or on release);
   the left stick leans and drifts the hang before contact; a miss is one beat (1.4 s) then the next run-up, no card.
