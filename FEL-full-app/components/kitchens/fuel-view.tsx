@@ -24,6 +24,7 @@ export function FuelView() {
   const [prq, setPrq] = useState<number | null>(null);
   const [path, setPath] = useState<FulfillmentPath>('list');
   const [error, setError] = useState('');
+  const [instacart, setInstacart] = useState<{ available: boolean; url?: string; note?: string }>({ available: false });
 
   const rebuild = async () => {
     setError('');
@@ -42,12 +43,23 @@ export function FuelView() {
     const s = KitchenStore.snapshot();
     setPath(s.preferredFulfillment);
     if (s.current) setRx(s.current); else void rebuild();
+    void fetch('/api/kitchens/instacart-list', { cache: 'no-store' }).then((r) => r.json()).then((j: { available?: boolean }) => setInstacart({ available: Boolean(j.available) })).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const choose = (p: FulfillmentPath, available: boolean) => {
+  const choose = async (p: FulfillmentPath, available: boolean) => {
     if (!available) return;
     KitchenStore.setPreferredFulfillment(p); setPath(p);
+    if (p === 'instacart' && rx) {
+      // Same GroceryItem[] as the list path; the server mints the shoppable page only when the key exists.
+      setInstacart((v) => ({ ...v, url: undefined, note: 'Building your list…' }));
+      try {
+        const r = await fetch('/api/kitchens/instacart-list', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: rx.groceryList, linkbackUrl: window.location.href }) });
+        const j = (await r.json()) as { url?: string; locked?: boolean; error?: string };
+        if (r.ok && j.url) { setInstacart({ available: true, url: j.url, note: 'Your list is ready' }); window.open(j.url, '_blank', 'noopener'); }
+        else setInstacart((v) => ({ ...v, note: j.locked ? 'Locked on this server — the grocery list has the same items' : (j.error ?? 'Instacart did not answer — use the grocery list') }));
+      } catch { setInstacart((v) => ({ ...v, note: 'Instacart unreachable — use the grocery list' })); }
+    }
   };
 
   return (
@@ -103,14 +115,15 @@ export function FuelView() {
           <section className="mt-4">
             <p className="px-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">Get it</p>
             <div className="mt-2 grid gap-2 sm:grid-cols-3">
-              {availablePaths().map((o) => (
+              {availablePaths({ instacart: instacart.available }).map((o) => (
                 <button key={o.path} type="button" onClick={() => choose(o.path, o.available)} disabled={!o.available}
                   className={`fel-panel rounded-xl p-3 text-left ${path === o.path && o.available ? 'border border-[#00E5FF]/50' : 'border border-transparent'} ${o.available ? 'hover:bg-white/[0.06]' : 'opacity-60'}`}>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold text-white">{o.label}</span>
                     {!o.available && <Lock className="h-3.5 w-3.5 text-white/40" />}
                   </div>
-                  <p className="mt-1 text-[11px] text-white/55">{o.available ? 'Live now — copy or share the list' : o.note}</p>
+                  <p className="mt-1 text-[11px] text-white/55">{o.path === 'instacart' && instacart.note ? instacart.note : o.available ? (o.note ?? 'Live now — copy or share the list') : o.note}</p>
+                  {o.path === 'instacart' && instacart.url && <a href={instacart.url} target="_blank" rel="noopener noreferrer" className="mt-1 block truncate text-[11px] text-[#00E5FF] underline">{instacart.url}</a>}
                 </button>
               ))}
             </div>

@@ -20,10 +20,12 @@ export function groceryText(items: GroceryItem[], title = 'FEL Kitchens · groce
 }
 
 /** Which paths a viewer may pick right now. Instacart and Drive render locked until their gates open. */
-export function availablePaths(): Array<{ path: FulfillmentPath; label: string; available: boolean; note?: string }> {
+export function availablePaths(unlocked: { instacart?: boolean } = {}): Array<{ path: FulfillmentPath; label: string; available: boolean; note?: string }> {
   return [
     { path: 'list', label: 'Grocery list', available: true },
-    { path: 'instacart', label: 'Instacart list', available: false, note: 'v0.5 — after the pad grade, the AM paste and Elijah\'s GO' },
+    // Wired behind the key (owner decision 2026-09-05): the server says whether INSTACART_IDP_KEY exists; the
+    // application itself stays on HOLD until the pad grade, the AM paste and Elijah's GO.
+    { path: 'instacart', label: 'Instacart list', available: Boolean(unlocked.instacart), note: unlocked.instacart ? 'Live — opens a shoppable list with the same items' : 'Unlocks when the Instacart key lands (apply HOLD)' },
     { path: 'doordash', label: 'DoorDash Drive', available: false, note: 'Needs a partner kitchen with pickup' },
   ];
 }
@@ -31,7 +33,7 @@ export function availablePaths(): Array<{ path: FulfillmentPath; label: string; 
 export function fulfill(path: FulfillmentPath, items: GroceryItem[]): FulfillmentResult {
   switch (path) {
     case 'list': return { path, text: groceryText(items), items };
-    case 'instacart': return { path, url: null, reason: 'Instacart IDP not applied for (HOLD) — the list path carries the same items', items };
+    case 'instacart': return { path, url: null, reason: 'The link is minted server-side by /api/kitchens/instacart-list (409 while the key is absent) — the list path carries the same items', items };
     case 'doordash': return { path, unavailable: true, reason: 'No pickup / pack node yet — documented only' };
     default: return { path: 'none' };
   }

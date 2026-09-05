@@ -26,7 +26,7 @@ export const LEAK_LABEL: Record<LeakId, string> = {
 };
 
 /**
- * DRAFT (pending Elijah): the leak guess from this tree's screen. Valgus above 0.45 on either knee → knee-valgus;
+ * Owner decision (2026-09-05): the movement screen is the leak source until a Mirror scan is wired. Valgus above 0.45 on either knee → knee-valgus;
  * asymmetry above 12 % → hip-drop; otherwise the weakest pillar decides.
  */
 export function leakFromScreen(metrics: MovementMetrics, screen: ScreenResult): LeakId {

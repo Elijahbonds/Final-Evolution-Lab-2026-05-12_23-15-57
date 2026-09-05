@@ -7,11 +7,12 @@ import { SEED_RECIPES } from './recipes.seed';
 import { NON_CLINICAL_DISCLAIMER } from './types';
 
 describe('FEL Kitchens — MealRx builder (pure)', () => {
-  it('maps the soft prep load bands on a 0–1 PRQ', () => {
-    expect(loadBandFor(0.5)).toBe('easy');
-    expect(loadBandFor(0.75)).toBe('train');
-    expect(loadBandFor(0.88)).toBe('train');
-    expect(loadBandFor(0.9)).toBe('hard');
+  it('maps the load band to this tree\'s PRQ grades (owner decision): < 60 easy, 60–79 train, 80+ hard', () => {
+    expect(loadBandFor(0.39)).toBe('easy');   // RECOVERING
+    expect(loadBandFor(0.59)).toBe('easy');   // READY
+    expect(loadBandFor(0.6)).toBe('train');   // PRIMED
+    expect(loadBandFor(0.79)).toBe('train');
+    expect(loadBandFor(0.8)).toBe('hard');    // ELITE
   });
 
   it('divides this tree\'s 0–100 PRQ by 100 and keys the snapshot by scan date', () => {

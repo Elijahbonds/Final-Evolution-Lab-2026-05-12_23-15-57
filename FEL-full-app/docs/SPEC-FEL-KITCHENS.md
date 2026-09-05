@@ -40,7 +40,8 @@ no medical claims; the disclaimer rides every meal and fulfilment surface.
 | `lib/kitchens/buildSnapshot.ts` | read-only upstream adapter: `BuildSnapshot { scanDate, prqScore (0–1), leak, leakLabel, pillars? }`; `snapshotFromTree({ prq0to100, screen?, metrics?, scanDate })` — the leak guess is **draft, pending Elijah** |
 | `lib/kitchens/mealRxBuilder.ts` | pure `buildMealRx({ signature, recipes, preferredFulfillment })` — the soft prep's algorithm, `LEAK_THEMES`, `LEAK_ONE_LINER`, `loadBandFor` |
 | `lib/kitchens/recipes.seed.ts` | eight seed recipes (`source: 'seed'`), tags and ingredients only; the first real 7–14 recipes are Elijah's |
-| `lib/kitchens/fulfillment.ts` | `fulfill(path, list)` → list text · Instacart link (null until the key and GO exist) · DoorDash `unavailable`; `groceryText`, `mergeGrocery` |
+| `lib/kitchens/fulfillment.ts` | `fulfill(path, list)` → list text · Instacart (minted server-side, see below) · DoorDash `unavailable`; `availablePaths({ instacart })`, `groceryText` |
+| `lib/kitchens/instacart.ts` + `app/api/kitchens/instacart-list/route.ts` | IDP payload builder (pure, tested) and the keyed server route (GET availability · POST mint) |
 | `lib/kitchens/KitchenStore.ts` | localStorage store (`fel-kitchen-store-v1`, the same pattern as `KitchenMarket`): `snapshot`, `ingest(build)` (archives on a new `sourceScanDate`, cap 14), `setPreferredFulfillment`, `reset` |
 | `components/kitchens/fuel-view.tsx`, `grocery-list.tsx` | the Fuel floor: leak chip, load band, themes, day plan, grocery checklist with copy / share, fulfilment path picker (list live; Instacart and Drive shown locked) |
 | `app/kitchens/fuel/page.tsx` | `/kitchens/fuel`, logged in; builds the snapshot from `/api/profile`'s `prq` + the default movement screen |
@@ -64,10 +65,10 @@ no medical claims; the disclaimer rides every meal and fulfilment surface.
 | `hip-drop` | protein-rebuild, carb-timing | Stance-side fuel. Steady protein + timed carbs. |
 | `ankle` | hydration-electrolyte, anti-inflammatory, joint-support | Soft tissue day. Fluids + quiet joints. |
 
-`loadBand` from `prqScore` (0–1): `< 0.75` easy · `0.75–0.88` train · `> 0.88` hard. With this tree's PRQ ÷ 100 a PRIMED
-athlete (60) lands on `easy`; the thresholds are the soft prep's stub and are the first thing to tune with Elijah.
+`loadBand` — **owner decision 2026-09-05, grade-aligned**: RECOVERING and READY (PRQ < 60) → easy · PRIMED (60–79) → train ·
+ELITE (80+) → hard. (The soft prep's 0.75 / 0.88 cuts on a 0–1 scale put every current athlete on an easy day.)
 
-Leak guess from the movement screen (draft): valgus above 0.45 on either knee → `knee-valgus`; asymmetry above 12 % →
+Leak source — **owner decision 2026-09-05: the movement screen** until a Mirror scan is wired: valgus above 0.45 on either knee → `knee-valgus`; asymmetry above 12 % →
 `hip-drop`; otherwise the weakest pillar — mobility → `mid-back`, stability → `knee-valgus`, symmetry → `hip-drop`,
 posture / power / cadence → `ankle`.
 
@@ -76,7 +77,7 @@ posture / power / cadence → `ankle`.
 | Phase | Ships | Gate |
 |---|---|---|
 | v0 | in-app grocery checklist + copy / share text | schema only — **this commit** |
-| v0.5 | Instacart IDP shopping-list link from the same list | pad-grade + AM paste + Elijah GO; env `INSTACART_IDP_KEY` (server) — no secrets in git; adapter returns `null` until then |
+| v0.5 | Instacart IDP shopping-list link from the same list — **wired behind the key (owner decision 2026-09-05)**: `lib/kitchens/instacart.ts` builds the IDP `products_link` payload (units mapped, optional items labelled, disclaimer as instructions); `POST /api/kitchens/instacart-list` mints the page when `INSTACART_IDP_KEY` exists (dev host by default, `INSTACART_IDP_HOST` for production) and answers 409 `locked` until then; `GET` reports availability so the Fuel floor's button unlocks by itself | the application stays on HOLD (pad-grade + AM paste + Elijah GO); no key in git; verify the endpoint against the IDP docs on the first key |
 | v1+ | DoorDash Drive from a pickup / pack node | a real partner kitchen; adapter stays `unavailable` |
 
 ## Auth and surfaces
@@ -91,6 +92,6 @@ calorie-deficit coaching · live Instacart or DoorDash checkout · Stripe meal p
 
 ## Open for Elijah / PM
 
-1. Leak → theme map and load-band thresholds (draft above).
+1. Leak → theme map (draft above; the load band and the leak source are decided).
 2. Cookbook source for the first 7–14 recipes (seed recipes are placeholders with honest macros, no voice).
 3. Whether the Fuel floor also reads the Mirror's squat faults once a scan exists (v0 uses the default screen metrics).

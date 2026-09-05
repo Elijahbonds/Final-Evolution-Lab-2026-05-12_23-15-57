@@ -15,6 +15,9 @@ Full logs: `docs/SHIP-PASS-3.md`, `docs/SHIP-PASS-4.md`; the gate table: `docs/R
 - `lib/kitchens/`: types (LOCKED shapes), `snapshotFromTree`, pure `buildMealRx`, eight seed recipes, fulfilment adapter
   (list live; Instacart link null until the key + GO; Drive unavailable), `KitchenStore` (localStorage, keyed by scan date,
   history cap 14); 7 tests.
+- Owner decisions (same night): load band grade-aligned to this tree's PRQ (< 60 easy · 60–79 train · 80+ hard); the
+  movement screen is the leak source until a Mirror scan lands; Instacart wired behind `INSTACART_IDP_KEY` (payload builder +
+  keyed route, button unlocks by itself; application still on HOLD); the two pad commits squashed into one.
 - `/kitchens/fuel` (Fuel floor): leak chip, load band, day plan, grocery checklist with copy / share, locked paths shown,
   disclaimer; linked from the hub. Probe: renders logged in, 12 grocery rows, checklist persists, 0 console errors.
 

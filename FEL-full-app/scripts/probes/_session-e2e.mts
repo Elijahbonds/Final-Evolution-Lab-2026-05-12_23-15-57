@@ -22,12 +22,15 @@ const ACTIVE = process.env.ACTIVE === '1'; const keys = ['j', 'k', 'l', 'j', 'Ar
 const DRIVER = process.env.DRIVER ?? (ACTIVE ? 'masher' : 'passive');
 const HOLD_MS = Number(process.env.HOLD_MS ?? 600), GAP_MS = Number(process.env.GAP_MS ?? 3000), STRIDE_MS = Number(process.env.STRIDE_MS ?? 4000);
 let tick = 0;
+let lastGate = 0;
 while (sessionStatus === null && Date.now() - t0 < maxMs) {
+  // Some routes boot slowly (football's splash outlived the first tap): re-tap through TAP TO START / READY every 4 s.
+  if (Date.now() - lastGate > 4000) { lastGate = Date.now(); const gate = (await p.evaluate(`/TAP TO START|PRESS START|TAP TO BEGIN/i.test(document.body.innerText.slice(0, 800))`)) as boolean; if (gate) { await p.keyboard.press('j'); const btn = p.getByRole('button', { name: /start|ready|tap to/i }).first(); if (await btn.count().catch(() => 0)) await btn.click({ timeout: 1500 }).catch(() => {}); } }   // three-point's BootSplash starts on a click, not a key
   if (DRIVER === 'masher') { await p.waitForTimeout(1500); await p.keyboard.down('ArrowUp'); await p.keyboard.press(keys[tick++ % keys.length]); await p.waitForTimeout(120); await p.keyboard.up('ArrowUp'); }
   else if (DRIVER === 'holds') { await p.keyboard.down('j'); await p.waitForTimeout(HOLD_MS); await p.keyboard.up('j'); await p.waitForTimeout(GAP_MS); if (tick++ % 4 === 3) await p.keyboard.press('j'); }
   else if (DRIVER === 'strides') { const tEnd = Date.now() + STRIDE_MS; let side = 0; while (Date.now() < tEnd) { await p.keyboard.press(side++ % 2 ? 'ArrowLeft' : 'ArrowRight'); await p.waitForTimeout(110); } await p.waitForTimeout(500); await p.keyboard.press('j'); await p.waitForTimeout(700); await p.keyboard.press('k'); await p.waitForTimeout(3500); await p.keyboard.press('j'); }
-  else if (DRIVER === 'run') { await p.keyboard.down('ArrowUp'); await p.waitForTimeout(2500); await p.keyboard.up('ArrowUp'); await p.waitForTimeout(200); if (tick++ % 6 === 5) await p.keyboard.press('j'); }
-  else if (DRIVER === 'ride') { await p.keyboard.down('ArrowUp'); await p.keyboard.press(tick++ % 2 ? 'ArrowLeft' : 'ArrowRight'); await p.waitForTimeout(1200); await p.keyboard.up('ArrowUp'); await p.waitForTimeout(100); }
+  else if (DRIVER === 'run') { await p.keyboard.down('w'); await p.waitForTimeout(2500); await p.keyboard.up('w'); await p.waitForTimeout(200); if (tick++ % 6 === 5) await p.keyboard.press('j'); }   // w = left stick up (arrows are the d-pad)
+  else if (DRIVER === 'ride') { const side = tick++ % 2 ? 'a' : 'd'; await p.keyboard.down(' '); await p.keyboard.down(side); await p.waitForTimeout(1100); await p.keyboard.up(side); await p.waitForTimeout(300); await p.keyboard.up(' '); await p.waitForTimeout(100); }   // space = held trigger (tuck / pump), a/d = stick steer
   else { await p.waitForTimeout(2000); if ((Date.now() - t0) % 20000 < 2000) await p.keyboard.press('j'); }   // passive: a tap now and then keeps the READY/results gates moving
 }
 // the route may redirect when the mode is disabled in the rollout: say so instead of throwing

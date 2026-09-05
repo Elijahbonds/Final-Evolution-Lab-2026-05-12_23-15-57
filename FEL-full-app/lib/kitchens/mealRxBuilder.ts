@@ -19,10 +19,13 @@ export const LEAK_ONE_LINER: Record<LeakId, string> = {
   ankle: 'Soft tissue day. Fluids + quiet joints.',
 };
 
-/** The soft prep's stub thresholds on a 0–1 PRQ — the first knob to tune with Elijah. */
+/**
+ * Owner decision (2026-09-05): grade-aligned to this tree's PRQ grades — RECOVERING and READY (< 60) → easy day,
+ * PRIMED (60–79) → train day, ELITE (80+) → hard day. `prqScore` is 0–1 (this tree's 0–100 ÷ 100).
+ */
 export function loadBandFor(prqScore: number): LoadBand {
-  if (prqScore > 0.88) return 'hard';
-  if (prqScore >= 0.75) return 'train';
+  if (prqScore >= 0.8) return 'hard';
+  if (prqScore >= 0.6) return 'train';
   return 'easy';
 }
 
