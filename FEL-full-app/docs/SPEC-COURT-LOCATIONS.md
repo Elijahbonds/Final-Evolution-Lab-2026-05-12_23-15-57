@@ -83,3 +83,6 @@ Physics, rim position, court size, camera presets, the crowd, the Meshy mural (u
   court sits on; the suburban kit's parapet and planters (prop set `night-rooftop`); string lights on posts down both
   sides with warm pools under them. dunk 60 fps / 41–60 draws, 0 errors.
 - All four locations are `ready` and on the picker. Venice stays the default.
+- **Acceptance sweep (2026-09-05)**: dunk, ones and threes captured at every location — 0 errors, 60 fps everywhere.
+  Mobile-tier texture footprint on dunk: Venice 93.6 MB · Blossom Park 93.6 · Orbit 72.6 · Canopy Court 69.6 · Night
+  Rooftop 69.0 (the three without a baked sky image sit below Venice). The pick probe passes on the play route.
