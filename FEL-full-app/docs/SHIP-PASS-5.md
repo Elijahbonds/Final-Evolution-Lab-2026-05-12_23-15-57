@@ -56,3 +56,8 @@ tests green with the count before every commit, a risk level on every change, no
 - **Phase 9 (build)**: production bundle of 09b471e built clean in the release lane (`.next-verify`); the twenty-route production play sweep runs against :3006.
 - **Phase 9 (production sweep)**: bundle of 09b471e served on :3006; twenty `/play` routes with the real login — 19 clean (FEL-FRAME 0 · MISSING CLIP 0 · errors 0); carnival NO RESULT because `/play/carnival` shows no canvas within 30 s, exactly as in the pass 4 production sweep (a lobby page, not a regression). Server stopped after the sweep.
 - **Phase 10**: changelog section written; assessment G1 corrected; tag `v0.9.0-rc.5` (local) on this commit. Open for the owner: the seven contest routes' drivers (phase 0 gate), the pines' colour as a curation call, the two test accounts' names (mentee now "Mentee" in the dev DB), the story spine decision from the assessment.
+
+## After the tag (the open gate, worked while the boundary gauntlet ran)
+- **Drivers**: `_session-e2e.mts` gains `DRIVER=` variants — `holds` (hold A, release, wait: shots, swings, kicks), `strides` (alternate ← → then A, B: air routines), `run` (hold ↑ only: a runner who never evades is downed), `ride` (hold ↑ with a steer tap: a slalom to its line), `masher` (the old ACTIVE loop), `passive`.
+- **gymnastics closes**: `DRIVER=strides` — two attempts, session 200 in 57 s, proof "240 PTS · COMPLETE" minted to `/c/XPscgWxWjzO9WjsK`. Six routes left.
+- **Phase 7 leftover closed as moot**: coastal-links and venice-blacktop have no navmesh bake because no live venue spec mounts either map (golf runs its kit field under the spec sky since pass 4; venice-blacktop is unreferenced outside `map-data.ts`). Nothing to bake.

@@ -41,8 +41,9 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
     A: { label: 'SLAM', emit: A('A') },
     B: { label: 'STYLE', emit: A('B') },
     Y: { label: 'CHARGE', emit: RT(1), hold: true },
-    // X left inert on purpose — mid-air tricks fire from the d-pad + A/B/Y
-    // combo (see DunkSystem.ts), not a dedicated button of their own.
+    // Venice DualShock pad (2026-09-05): no dead binds — X cycles the PROP (none → alley-oop → obstacle) during the
+    // approach, the same job the d-pad does. Mid-air tricks still fire from d-pad + A/B/Y combos (DunkSystem.ts).
+    X: { label: 'PROP', emit: A('X') },
   }),
   karate: verbs({
     A: { label: 'JAB', emit: A('A') },

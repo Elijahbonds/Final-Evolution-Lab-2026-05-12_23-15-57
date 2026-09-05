@@ -1,6 +1,6 @@
 // _dunk-proof-drive — PACK THE FIVE #3: play a whole dunk contest on the shipping route (login, /play/dunk) with a
 // timing-based attempt loop (run-up W, hold SPACE to charge, release, slam A on the flight), wait for the session
-// post, then press SHARE DUNK PROOF and fetch the minted /c page. Misses still end an attempt, so the contest ends.
+// post, then press SHARE PROOF and fetch the minted /c page. Misses still end an attempt, so the contest ends.
 //   npx tsx scripts/probes/_dunk-proof-drive.mts        (ATTEMPTS=10 MAX_S=360)
 import { chromium, request } from 'playwright-core';
 const ATTEMPTS = Number(process.env.ATTEMPTS ?? 10), maxMs = Number(process.env.MAX_S ?? 360) * 1000;
@@ -29,8 +29,8 @@ while (sessionStatus === null && n < ATTEMPTS && Date.now() - t0 < maxMs) {
 console.log(`dunk: /api/sessions → ${sessionStatus ?? 'never posted'} · ${sessionBody}`);
 if (sessionStatus !== null) {
   await p.waitForTimeout(1500);
-  const btn = p.getByText('SHARE DUNK PROOF', { exact: false }).first();
-  if (!(await btn.count())) console.log('proof: no SHARE DUNK PROOF button on the results card');
+  const btn = p.getByText('SHARE PROOF', { exact: false }).first();
+  if (!(await btn.count())) console.log('proof: no SHARE PROOF button on the results card');
   else {
     const label = (await btn.innerText()).replace(/\s+/g, ' '); await btn.click();
     let url = ''; for (let i = 0; i < 20 && !url; i++) { await p.waitForTimeout(500); url = await p.evaluate(`(document.body.innerText.match(/https?:\\/\\/[^\\s]+\\/c\\/[A-Za-z0-9_-]+/) || [''])[0]`); }

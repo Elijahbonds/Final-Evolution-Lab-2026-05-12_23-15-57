@@ -8,6 +8,12 @@ The tag is assigned by the orchestrator at integration (the previous candidate w
 the one the commit or the findings log recorded; a line with no number had no measurement in its commit.
 Full logs: `docs/SHIP-PASS-3.md`, `docs/SHIP-PASS-4.md`; the gate table: `docs/RC-2026-09-04.md`.
 
+### Venice DualShock pad (2026-09-05, overnight; Gameplay acceptance `docs/SPEC-VENICE-DUALSHOCK-PAD.md`)
+- Dunk: HOLD = RUN — the held charge drives the athlete to the rim (stick steers, launch at the gather line or on release);
+  the left stick leans and drifts the hang before contact; a miss is one beat (1.4 s) then the next run-up, no card.
+- Pad chrome: HOLD caption and ring fill on hold verbs; pressed highlight; X bound to PROP (no dead binds); the charge
+  meter removed; the hint plate clears the pad on phones (12 px above CHARGE, measured). Notes: `docs/VENICE-PAD-LAND-2026-09-05.md`.
+
 ### Ship pass 5 — the nuggets pass (2026-09-04, evening)
 
 Owner decisions taken up front: Gate 0's shipping spec is the 22-bone unprefixed FEL rig (the 65-bone Mixamo tests stay for

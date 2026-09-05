@@ -132,14 +132,8 @@ export default function DunkBabylon({ onEnd }: GameProps) {
         </div>
       )}
 
-      {/* CHARGE bar while loading the jump */}
-      {phase === 'playing' && hnum(hud.charge) > 0 && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-28 flex justify-center">
-          <div className="h-2 w-40 overflow-hidden rounded-full bg-white/15">
-            <div className={`h-full ${hud.slamPulse ? 'bg-[var(--fel-gold)]' : 'bg-[var(--fel-cyan)]'}`} style={{ width: `${Math.max(0, Math.min(100, hnum(hud.charge)))}%` }} />
-          </div>
-        </div>
-      )}
+      {/* Venice DualShock pad (2026-09-05): the charge METER is gone — the Benchmark feel bar calls a meter a hard
+          fail ("meter slideshow"), and HOLD = RUN carries its own cue: the hold ring fills on the pad's CHARGE button. */}
 
       {/* SLAM! cue */}
       {hud.slamPulse === true && phase === 'playing' && (
@@ -184,8 +178,10 @@ export default function DunkBabylon({ onEnd }: GameProps) {
         </div>
       )}
 
+      {/* Venice DualShock pad: on phones (< 640 px) the hint plate sits above the pad column (the diamond stacks over the
+          LOOK stick, ≈ 264 px); the clamp is a media switch in pure CSS — this project's Tailwind emits no max-* variants. */}
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-10 text-center">
+        <div className="pointer-events-none absolute inset-x-0 px-3 text-center" style={{ bottom: 'clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem)' }}>
           <span className="fel-panel px-3 py-1.5 font-mono text-[11px] text-white/80">{hud.hint}</span>
         </div>
       )}

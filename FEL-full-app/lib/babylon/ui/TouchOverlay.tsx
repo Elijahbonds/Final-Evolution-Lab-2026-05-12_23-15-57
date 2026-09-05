@@ -147,6 +147,7 @@ function Verb({ bus, def, slot }: { bus: InputBus; def: VerbButton; slot: 'A' | 
   const holdRaf = useRef(0);
   const downAt = useRef(0);
   const inert = def.emit === null;
+  const [holdV, setHoldV] = useState(0);   // pad acceptance #1: the HOLD cue — the ring fills while the hold is down
 
   const press = (e: React.PointerEvent) => {
     if (inert) return;
@@ -157,6 +158,7 @@ function Verb({ bus, def, slot }: { bus: InputBus; def: VerbButton; slot: 'A' | 
       const stream = () => {
         const v = Math.min(1, (performance.now() - downAt.current) / 1100);
         bus.emit({ t: 'trigger', side: 'R', value: Math.max(0.01, v) });
+        setHoldV(v);
         holdRaf.current = requestAnimationFrame(stream);
       };
       stream();
@@ -169,20 +171,26 @@ function Verb({ bus, def, slot }: { bus: InputBus; def: VerbButton; slot: 'A' | 
     if (inert) return;
     if (def.hold) {
       cancelAnimationFrame(holdRaf.current);
+      setHoldV(0);
       bus.emit({ t: 'trigger', side: 'R', value: 0 });   // release = launch
-    } else if (def.emit!.t === 'button') {
+    } else if (def.emit!.t === 'button' || def.emit!.t === 'dpad') {
       bus.emit({ ...def.emit!, pressed: false });
     }
   };
 
   const color = inert ? '#4b5563' : def.color;
   return (
+    <div className="relative">
+      {def.hold && !inert && (
+        <span className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 text-[7px] font-black tracking-[0.2em] text-white/60">HOLD</span>
+      )}
     <button
       onPointerDown={press} onPointerUp={release} onPointerCancel={release}
-      className={`h-[64px] w-[64px] touch-none select-none rounded-full border-2 text-[10px] font-black tracking-wide text-white transition-transform duration-75 ${inert ? 'opacity-45' : 'active:scale-90'}`}
-      style={{ borderColor: color, background: `${color}22`, boxShadow: inert ? 'none' : `0 0 18px ${color}44` }}>
+      className={`h-[64px] w-[64px] touch-none select-none rounded-full border-2 text-[10px] font-black tracking-wide text-white transition-transform duration-75 ${inert ? 'opacity-45' : 'active:scale-90 active:brightness-150'}`}
+      style={{ borderColor: color, background: def.hold && holdV > 0 ? `conic-gradient(${color}cc ${Math.round(holdV * 360)}deg, ${color}22 0)` : `${color}22`, boxShadow: inert ? 'none' : `0 0 18px ${color}44` }}>
       {def.label || slot}
     </button>
+    </div>
   );
 }
 

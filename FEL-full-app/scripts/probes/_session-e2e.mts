@@ -15,11 +15,20 @@ try { await p.waitForSelector('canvas', { timeout: 60000 }); } catch { console.l
 await p.waitForTimeout(9000);
 await p.keyboard.press('j'); const t0 = Date.now();
 const ACTIVE = process.env.ACTIVE === '1'; const keys = ['j', 'k', 'l', 'j', 'ArrowUp', 'j'];   // ACTIVE=1: pump the face keys like the gauntlet does, so contests and runs reach an end
+// Pass 5 phase 0: DRIVER picks how the run is played, because seven contest routes never end under mashed keys.
+//   masher (ACTIVE=1 default) · holds: hold A for HOLD_MS then release every GAP_MS (shots, swings, kicks) ·
+//   strides: alternate ← → for STRIDE_MS then A, B (air routines) · run: hold ↑ only (a runner who never evades is downed) ·
+//   ride: hold ↑ with a steer tap either side (a slalom to its line) · passive: a tap every 20 s.
+const DRIVER = process.env.DRIVER ?? (ACTIVE ? 'masher' : 'passive');
+const HOLD_MS = Number(process.env.HOLD_MS ?? 600), GAP_MS = Number(process.env.GAP_MS ?? 3000), STRIDE_MS = Number(process.env.STRIDE_MS ?? 4000);
 let tick = 0;
 while (sessionStatus === null && Date.now() - t0 < maxMs) {
-  await p.waitForTimeout(ACTIVE ? 1500 : 2000);
-  if (ACTIVE) { await p.keyboard.down('ArrowUp'); await p.keyboard.press(keys[tick++ % keys.length]); await p.waitForTimeout(120); await p.keyboard.up('ArrowUp'); }
-  else if ((Date.now() - t0) % 20000 < 2000) await p.keyboard.press('j');   // a tap now and then keeps the READY/results gates moving
+  if (DRIVER === 'masher') { await p.waitForTimeout(1500); await p.keyboard.down('ArrowUp'); await p.keyboard.press(keys[tick++ % keys.length]); await p.waitForTimeout(120); await p.keyboard.up('ArrowUp'); }
+  else if (DRIVER === 'holds') { await p.keyboard.down('j'); await p.waitForTimeout(HOLD_MS); await p.keyboard.up('j'); await p.waitForTimeout(GAP_MS); if (tick++ % 4 === 3) await p.keyboard.press('j'); }
+  else if (DRIVER === 'strides') { const tEnd = Date.now() + STRIDE_MS; let side = 0; while (Date.now() < tEnd) { await p.keyboard.press(side++ % 2 ? 'ArrowLeft' : 'ArrowRight'); await p.waitForTimeout(110); } await p.waitForTimeout(500); await p.keyboard.press('j'); await p.waitForTimeout(700); await p.keyboard.press('k'); await p.waitForTimeout(3500); await p.keyboard.press('j'); }
+  else if (DRIVER === 'run') { await p.keyboard.down('ArrowUp'); await p.waitForTimeout(2500); await p.keyboard.up('ArrowUp'); await p.waitForTimeout(200); if (tick++ % 6 === 5) await p.keyboard.press('j'); }
+  else if (DRIVER === 'ride') { await p.keyboard.down('ArrowUp'); await p.keyboard.press(tick++ % 2 ? 'ArrowLeft' : 'ArrowRight'); await p.waitForTimeout(1200); await p.keyboard.up('ArrowUp'); await p.waitForTimeout(100); }
+  else { await p.waitForTimeout(2000); if ((Date.now() - t0) % 20000 < 2000) await p.keyboard.press('j'); }   // passive: a tap now and then keeps the READY/results gates moving
 }
 // the route may redirect when the mode is disabled in the rollout: say so instead of throwing
 

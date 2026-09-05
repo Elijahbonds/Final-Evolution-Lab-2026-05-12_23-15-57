@@ -44,6 +44,10 @@ import {
 import { MomentumBus } from '../core/MomentumBus';
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'contestOver';
+/** Venice DualShock pad (2026-09-05): a miss is one beat, not the full judged reveal — the next run-up follows at once. */
+const MISS_BEAT_MS = 1400;
+/** HOLD = RUN: the hold ramps the athlete toward the rim at up to the max run (7 m/s) and launches at the gather line. */
+const HOLD_RUN_MAX = 7, HOLD_RUN_RAMP = 6, AIR_LEAN_RAD = 0.32, AIR_DRIFT = 0.8;
 const STYLES = ['power', 'flashy', 'sig'] as const;
 type Style = (typeof STYLES)[number];
 const PROPS = ['none', 'alleyoop', 'obstacle'] as const;
@@ -110,6 +114,7 @@ export const DunkMode: ModeDefinition = (() => {
   const rim = new Vector3(0, CFG.rimHeight, CFG.rimZ);
   const ebState = { inLeftHand: false };
   let stickX = 0, stickY = 0;
+  let holdRunSpeed = 0, airLean = 0;          // pad: hold-run speed this attempt; smoothed air lean from the stick
   const flight = new DunkFlight();               // Phase 6: trick-input flight
   const reveal = new ScoreReveal();              // Phase 7: staged judge reveal
   const crowd = new CrowdEnergy();               // Phase 7: building voice
@@ -215,6 +220,13 @@ export const DunkMode: ModeDefinition = (() => {
       // down=obstacle); the SAME d-pad, held during the mid-air cinematic
       // phase, arms a TRICK COMBO instead — two different jobs on two
       // different phases, never both at once.
+      // Pad: X cycles the prop the way the d-pad picks it — one button, no dead bind on the diamond.
+      if (e.t === 'button' && e.btn === 'X' && e.pressed && phase === 'approach') {
+        prop = prop === 'none' ? 'alleyoop' : prop === 'alleyoop' ? 'obstacle' : 'none';
+        ctx.setHud({ prop: PROP_LABEL[prop] });
+        SoundKit.play('uiTick', { pitch: 1.3 });
+        void setupProp(ctx);
+      }
       if (e.t === 'dpad' && e.pressed && phase === 'approach') {
         prop = e.dir === 'up' ? 'none' : e.dir === 'right' ? 'alleyoop' : 'obstacle';
         ctx.setHud({ prop: PROP_LABEL[prop] });
@@ -268,8 +280,12 @@ export const DunkMode: ModeDefinition = (() => {
 
       if (e.t === 'trigger' && e.side === 'R') {
         if (phase === 'approach' && e.value > 0.02) {
+          // Venice DualShock pad: HOLD = RUN. The hold drives the runway toward the rim (stick steers), the jump
+          // loads while you run, and the launch fires at the gather line — or on release, from wherever you are.
           setPhase('charge');
-          player.animator.play(SPORT_CLIP.dunkChargeGather, { loop: true });
+          holdRunSpeed = Math.max(2, runUpPeak);
+          player.animator.play(SPORT_CLIP.moveLoop, { loop: true });
+          ctx.setHud({ hint: 'HOLD — running to the rim · steer with the stick · release early to jump from here' });
         }
         if (phase === 'charge') {
           charge = Math.max(charge, e.value);
@@ -313,6 +329,16 @@ export const DunkMode: ModeDefinition = (() => {
         }
       }
 
+      if (phase === 'charge') {
+        // HOLD = RUN (pad acceptance #2): ramp to the max run, curve toward the rim's x, let the stick steer,
+        // and launch the moment the gather line is reached. runUpPeak keeps feeding the air budget.
+        holdRunSpeed = Math.min(HOLD_RUN_MAX, holdRunSpeed + dt * HOLD_RUN_RAMP);
+        const steer = stickX * 3 + Math.max(-2, Math.min(2, (rim.x - player.root.position.x) * 0.8));
+        player.root.position.x = Math.max(-6, Math.min(6, player.root.position.x + steer * dt));
+        player.root.position.z -= holdRunSpeed * dt;
+        runUpPeak = Math.max(runUpPeak, Math.hypot(steer, holdRunSpeed));
+        if (player.root.position.z <= CFG.gatherZ) { player.root.position.z = CFG.gatherZ; launchDunk(ctx); }
+      }
       if (phase === 'cinematic') {
         clipTime += dt;
         if (style === 'sig') runEastbayPath(ball, player.skeleton, clipTime, ebState);
@@ -322,6 +348,11 @@ export const DunkMode: ModeDefinition = (() => {
         // used to fly straight and flush a metre wide of the iron
         player.root.position.z += (rim.z + 0.6 - player.root.position.z) * 1.6 * dt;
         player.root.position.x += (rim.x - player.root.position.x) * 1.6 * dt;
+        // Pad acceptance #2: the stick is alive in the hang — a body lean and a small drift before contact;
+        // the pull to rim.x above (1.6/s) still wins by the flush, so the contact math is untouched.
+        airLean += (stickX - airLean) * Math.min(1, dt * 8);
+        player.root.rotation.z = -airLean * AIR_LEAN_RAD;
+        player.root.position.x += airLean * AIR_DRIFT * dt;
 
         // THE PROP IS PHYSICAL. Crossing the obstacle with your feet below
         // its top is not a scoring penalty — the dunk DIES at the chair,
@@ -378,6 +409,7 @@ export const DunkMode: ModeDefinition = (() => {
       }
 
       if (phase === 'resolve') {
+        player.root.rotation.z *= Math.max(0, 1 - dt * 6);   // the air lean settles on the landing
         sinceRelease += dt;
         // a clipped dunk drops the dunker where the prop caught him, and the
         // prop goes over — the failure has to READ as contact, not a teleport
@@ -632,7 +664,9 @@ export const DunkMode: ModeDefinition = (() => {
       });
       player.animator.play(SPORT_CLIP.dunkLandCrouch, { onEnd: () => player.animator.play(SPORT_CLIP.idle, { loop: true }) });
       setPhase('judging');
-      setTimeout(() => { ctx.setHud({ banner: '' }); void advanceAfterJudging(ctx); }, REVEAL_DURATION_SEC * 1000 + 400);
+      // Pad acceptance #4: a miss is one beat, then the next run-up — no reveal wait, no card, no re-press
+      // (a hold still down streams the trigger and starts the next run the frame the approach resets).
+      setTimeout(() => { ctx.setHud({ banner: '' }); void advanceAfterJudging(ctx); }, MISS_BEAT_MS);
       finishing = false;
       return;
     }
@@ -742,6 +776,7 @@ export const DunkMode: ModeDefinition = (() => {
   function resetForNextAttempt(ctx: ModeContext): void {
     player.root.position.set(0, 0, CFG.startZ);
     player.root.rotation.y = Math.PI;
+    player.root.rotation.z = 0; airLean = 0; holdRunSpeed = 0;
     player.animator.play(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false;
     styleTaps = 0; hangSec = 0; revealed = [];
