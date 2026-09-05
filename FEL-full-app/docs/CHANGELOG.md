@@ -13,7 +13,9 @@ Full logs: `docs/SHIP-PASS-3.md`, `docs/SHIP-PASS-4.md`; the gate table: `docs/R
   unchanged court half (court, hoop, crowd, actors, camera). Venice is the default and byte-identical with no pick.
 - Blossom Park ships first: pink-grey dusk over the city skyline, procedural cherry trees around the court, petal fall.
   Picker on the boot splash of every basketball mode; the pick is remembered and honoured by `?location=`; free for all.
-  Texture footprint equal to Venice on both tiers. Orbit, Canopy Court and Night Rooftop are authored, hidden until ready.
+  Texture footprint equal to Venice on both tiers.
+- Orbit: the court in space — a procedural starfield inside the venue sky, a planet rising behind the hoop; footprint below
+  Venice. Canopy Court and Night Rooftop are authored, hidden until ready.
 
 ### Session endings (2026-09-05, early; owner decisions, MEDIUM risk — game rules)
 - Football (Breakaway): a session is THREE drives, each ending on a touchdown or a turnover on downs; before, a runner who

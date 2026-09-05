@@ -69,3 +69,7 @@ Physics, rim position, court size, camera presets, the crowd, the Meshy mural (u
   white cloud under the grade and the location's fog — now deeper pinks, smaller and more heads, fog 0.0022.
 - Orbit, Canopy Court and Night Rooftop are authored as environments but `ready: false` (hidden from the picker) until
   their decoration passes land.
+- **Orbit landed (2026-09-05)**: a starfield painted on the inside of a 380 m sphere (inside the venue's own 400 m sky,
+  which is opaque — a 900 m dome was hidden behind it), a planet of 80 m rising over the horizon behind the hoop with a
+  procedural blue-white marble and a dark terminator, slow star drift; no backdrop, no fog. dunk 60 fps / 30 draws, ones
+  60 fps / 31 draws, 0 errors; texture footprint BELOW Venice (176.7 MB desktop, 72.6 MB mobile — no baked sky image).

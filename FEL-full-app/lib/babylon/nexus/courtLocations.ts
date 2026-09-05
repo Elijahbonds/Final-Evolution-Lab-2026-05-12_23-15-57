@@ -4,7 +4,7 @@
 // pick is byte-identical to the spec as authored. Decoration that needs meshes (blossom trees, a starfield) is added
 // AFTER the scene builds through the venue mount hook — NexusWebScene.ts stays fenced.
 
-import { Color3, Color4, DynamicTexture, MeshBuilder, ParticleSystem, PBRMaterial, Texture, TransformNode, Vector3 } from '@babylonjs/core';
+import { Color3, Color4, DynamicTexture, Mesh, MeshBuilder, ParticleSystem, PBRMaterial, StandardMaterial, Texture, TransformNode, Vector3 } from '@babylonjs/core';
 import type { Scene } from '@babylonjs/core';
 import type { Environment, NexusWebSpec, PropKind } from './NexusWebScene';
 
@@ -57,9 +57,11 @@ export const COURT_LOCATIONS: Record<CourtLocationId, CourtLocation> = {
     decorate: decorateBlossom,
   },
   orbit: {
-    id: 'orbit', name: 'Orbit', sub: 'ORBIT', tint: '#9ecbff', thumb: 'orbit', ready: false,
-    environment: { skyTop: '#02030a', skyBottom: '#050816', fogColor: '#050816', fogDensity: 0.0, ambient: 0.5, sunDirection: [-0.3, -0.9, 0.2], sunColor: '#DDE8FF', grade },
+    id: 'orbit', name: 'Orbit', sub: 'ORBIT', tint: '#9ecbff', thumb: 'orbit', ready: true,
+    // no backdrop: the sky dome stays a near-black gradient and the starfield + planet are meshes added after the build
+    environment: { skyTop: '#03040c', skyBottom: '#070a1a', fogColor: '#070a1a', fogDensity: 0.0, ambient: 0.55, sunDirection: [-0.3, -0.9, 0.2], sunColor: '#E4ECFF', grade },
     surround: [], propSet: '',
+    decorate: decorateOrbit,
   },
   canopy: {
     id: 'canopy', name: 'Canopy Court', sub: 'CANOPY COURT', tint: '#9be37a', thumb: 'canopy-court', ready: false,
@@ -166,4 +168,58 @@ function decorateBlossom(scene: Scene, root: TransformNode): void {
   ps.gravity = new Vector3(0.25, -0.5, 0.1); ps.minAngularSpeed = -1.5; ps.maxAngularSpeed = 1.5;
   ps.start();
   holder.onDisposeObservable.add(() => { ps.dispose(); tex.dispose(); trunkMat.dispose(); bloomMats.forEach((m) => m.dispose()); });
+}
+
+// ── Orbit ────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// A court floating in space: a starfield painted on the inside of a far sphere and a planet rising on the horizon behind
+// the hoop, its surface a procedural blue-white marble. Both unlit (emissive) so the venue's lights do not touch them.
+
+function decorateOrbit(scene: Scene, root: TransformNode): void {
+  const holder = new TransformNode('loc_orbit', scene); holder.parent = root;
+  // starfield
+  const starTex = new DynamicTexture('loc_orbit_stars', 1024, scene, false);
+  const g = starTex.getContext() as CanvasRenderingContext2D;
+  g.fillStyle = '#03040c'; g.fillRect(0, 0, 1024, 1024);
+  let seed = 11;
+  const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  for (let i = 0; i < 2600; i++) {                     // finer and denser: at 190 m the texture minifies and each dot spreads
+    const r = rnd() < 0.06 ? 1.3 + rnd() * 0.8 : 0.45 + rnd() * 0.6;
+    const a = 0.45 + rnd() * 0.55;
+    g.fillStyle = rnd() < 0.15 ? `rgba(180,205,255,${a})` : `rgba(255,255,255,${a})`;
+    g.beginPath(); g.arc(rnd() * 1024, rnd() * 1024, r, 0, Math.PI * 2); g.fill();
+  }
+  // a faint milky band
+  const band = g.createLinearGradient(0, 380, 0, 640);
+  band.addColorStop(0, 'rgba(120,140,200,0)'); band.addColorStop(0.5, 'rgba(120,140,200,0.14)'); band.addColorStop(1, 'rgba(120,140,200,0)');
+  g.fillStyle = band; g.fillRect(0, 380, 1024, 260);
+  starTex.update();
+  const starMat = new StandardMaterial('loc_orbit_starmat', scene);
+  starMat.emissiveTexture = starTex; starMat.disableLighting = true; starMat.backFaceCulling = false;
+  starMat.diffuseColor = Color3.Black(); starMat.specularColor = Color3.Black();
+  // INSIDE the venue's own sky (an opaque 400 m sphere) — outside it the stars were hidden.
+  const dome = MeshBuilder.CreateSphere('loc_orbit_dome', { diameter: 380, segments: 24, sideOrientation: Mesh.BACKSIDE }, scene);
+  dome.material = starMat; dome.parent = holder; dome.isPickable = false; dome.infiniteDistance = true; dome.applyFog = false;
+  // planet
+  const planetTex = new DynamicTexture('loc_orbit_planet', 512, scene, false);
+  const pg = planetTex.getContext() as CanvasRenderingContext2D;
+  pg.fillStyle = '#1c4f9c'; pg.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 90; i++) {                       // continents and cloud
+    const land = rnd() < 0.55;
+    pg.fillStyle = land ? `rgba(${60 + rnd() * 40 | 0},${110 + rnd() * 50 | 0},${70 + rnd() * 30 | 0},0.9)` : 'rgba(255,255,255,0.55)';
+    pg.beginPath(); pg.ellipse(rnd() * 512, rnd() * 512, 20 + rnd() * 70, 10 + rnd() * 40, rnd() * Math.PI, 0, Math.PI * 2); pg.fill();
+  }
+  planetTex.update();
+  const planetMat = new StandardMaterial('loc_orbit_planetmat', scene);
+  planetMat.emissiveTexture = planetTex; planetMat.disableLighting = true; planetMat.specularColor = Color3.Black();
+  const planet = MeshBuilder.CreateSphere('loc_orbit_planet', { diameter: 80, segments: 32 }, scene);
+  planet.position.set(-42, -10, -134);                 // a world rising over the left horizon behind the hoop, inside the star dome (|p| + r < 190)
+  planet.material = planetMat; planet.parent = holder; planet.isPickable = false; planet.applyFog = false;
+  // terminator: a dark half so the planet reads lit from the sun side
+  const shade = MeshBuilder.CreateSphere('loc_orbit_shade', { diameter: 80.6, segments: 32, slice: 0.5 }, scene);
+  const shadeMat = new StandardMaterial('loc_orbit_shademat', scene);
+  shadeMat.diffuseColor = Color3.Black(); shadeMat.emissiveColor = new Color3(0.01, 0.01, 0.03); shadeMat.disableLighting = true; shadeMat.alpha = 0.85;
+  shade.material = shadeMat; shade.position.copyFrom(planet.position); shade.rotation.z = Math.PI / 2; shade.rotation.y = -0.6; shade.parent = holder; shade.isPickable = false; shade.applyFog = false;
+  // slow drift of the stars
+  const obs = scene.onBeforeRenderObservable.add(() => { dome.rotation.y += 0.00004 * scene.getEngine().getDeltaTime(); });
+  holder.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(obs); starTex.dispose(); planetTex.dispose(); starMat.dispose(); planetMat.dispose(); shadeMat.dispose(); });
 }
