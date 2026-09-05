@@ -15,6 +15,8 @@ Full logs: `docs/SHIP-PASS-3.md`, `docs/SHIP-PASS-4.md`; the gate table: `docs/R
   nerve. Verified: 10–10 → "LEVEL AFTER 5 — YOURS ON NERVE", session posted, proof minted (before: level for 421 s).
 - Golf (The Loop): triple-par pick-up — at three times par the hole is scored as triple par and the round moves on
   (`pickUps` on the card); before, an unholed hole never ended. Out-of-bounds strokes count toward the cap.
+- Pass 5 phase 0 gate closed: all eight contest routes post a session end to end (football and three-point proven on the
+  production bundle; the dev server's double-mount race, not the modes, had stalled them).
 - Drivers: arrows are the d-pad in the input bus — the session probe's run/ride variants use the stick keys and a held
   trigger; the splash is clicked by text. Snowboard now posts (proof "0 GATES · 58S · 25 PTS").
 
