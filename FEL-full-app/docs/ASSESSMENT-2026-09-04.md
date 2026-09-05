@@ -26,7 +26,7 @@ Ranked by how much value sits behind how little work. "Source" is where the ask 
 
 | # | Request | Source | Status today | Where it belongs |
 |---|---|---|---|---|
-| G1 | **Creator Card economy** (Story P6) — deferred "pending live server-authoritative wallet" | `VISION_AUDIT.md` §Story/Garden | The wallet exists now (dual currency, 14 rules, tests). Reason codes `CREATIVE_CARD_PUBLISH` / `CREATIVE_CARD_REMIX_ROYALTY` are defined; the publish/royalty *fires* are not wired | Economy — unblocked, not started |
+| G1 | **Creator Card economy** (Story P6) — deferred "pending live server-authoritative wallet" | `VISION_AUDIT.md` §Story/Garden | The wallet exists now (dual currency, 14 rules, tests). Reason codes `CREATIVE_CARD_PUBLISH` / `CREATIVE_CARD_REMIX_ROYALTY` are defined; the publish/royalty *fires* are not wired | Economy — unblocked, not started **Corrected in pass 5 (2026-09-04, phase 2): both fires exist in `creative-card-service.ts` and are proven on the dev DB — publish +50, remix royalty +25 to the parent's owner, as wallet ledger entries.** |
 | G2 | **Mastery ladder surface** — "I can feel myself getting better" (the vision's #1 quote) | `VISION_AUDIT.md` recommended move 2 | PRQ engine, mastery recap (`MASTERY UP` on the results card) and weekly `LadderSeason`/`LadderEntry` exist; no player-facing ladder screen | Progression — partial |
 | G3 | **Shareable highlights beyond dunk** — "replay recorder exists for dunks; generalize" | `VISION_AUDIT.md` move 3 | `DunkReplayRecorder` only; the pack's proof card shares a LINE, not a clip | Social — dunk only |
 | G4 | **Full-game loops for the precision modes** (fielding, match play, 18 holes, open play) | `VISION_AUDIT.md` move 1 | Derby/penalty/golf/tennis/football ship as single-skill loops by benchmark lock (PES penalty, MLB hitting, PGA 2K); not built | Modes — deferred by benchmark decision |
@@ -60,7 +60,7 @@ Call-outs vs older briefs:
 - **Studio Creator monetisation** (subscription gating, build metering, cartridge publishing, partner API): behind `STUDIO_CREATOR_ENABLED` (default off). Not for friends.
 - **Marketplace**: `/api/marketplace/purchase` is 21 lines and `MarketplacePurchase` has 3 references — thin; the vision's "Market Browse UX pass" never happened.
 - **Carnival**: the run lineup, `NEXT:` stop navigation and `/play/carnival/recap` exist; carnival has **no earn reason of its own** (it pays through `MODE_SESSION_*` like every mode). If the carnival was meant to pay a pot, that rule is missing.
-- **Creator Card**: mint (`/api/challenge/mint` → `/c/<code>`), `CreatorCard`/`CardOwnership`/`CreativeCard` routes and the pack's dunk proof line exist; the royalty/publish fires (G1) do not.
+- **Creator Card**: mint (`/api/challenge/mint` → `/c/<code>`), `CreatorCard`/`CardOwnership`/`CreativeCard` routes and the pack's dunk proof line exist; the royalty/publish fires (G1) exist and are proven (pass 5 phase 2, `_creative-card-economy.mts`).
 - **Missing from every brief I can find**: a payout/withdraw path for shards (`/api/wallet/withdraw` exists as a route; its economics are not documented), and any admin screen for the reward rules beyond editing rows.
 
 ## 4. Friend-test readiness — what the AM and PM deploy, and what to tell friends
@@ -100,4 +100,4 @@ Hook text Growth can build on (claims that are true on this tree): "your Closet 
 2. Gate 0 wording: 22-bone unprefixed as the shipping spec (the operating rules), with the 65-bone tests kept for the import path — or the reverse (G12).
 3. Story spine: confirm, revise, or park (G8).
 4. Multiplayer: recover the karate versus / carnival networking from the other worktree, or ship tennis-only for friends (G5).
-5. The Creator Card economy (G1): open it now that the wallet exists, or hold until after friend testing.
+5. The Creator Card economy (G1): open it now that the wallet exists, or hold until after friend testing. **Taken 2026-09-04: opened in pass 5; proven.**

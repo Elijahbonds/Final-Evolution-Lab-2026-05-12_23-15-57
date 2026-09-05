@@ -18,7 +18,9 @@ export const MOODS: Record<VenueMood, MoodDef> = {
   daylight:   { sky: '#cfe8ff', ground: '#5a5a52', hemiIntensity: 0.85, sun: '#ffffff', sunIntensity: 2.6, sunDir: [-0.5, -1, -0.3], exposure: 1.05, clearColor: '#87b7dd', bloomThreshold: 0.78, bloomWeight: 0.28, bloomScale: 0.5, contrast: 1.08, vignetteColor: [0.05, 0.08, 0.12, 0], vignetteWeight: 1.1 },
   dojoWarm:   { sky: '#ffcf9e', ground: '#3a2a22', hemiIntensity: 0.65, sun: '#ff9d5c', sunIntensity: 1.9, sunDir: [-0.3, -1, -0.5], exposure: 1.1,  clearColor: '#1d1210', bloomThreshold: 0.7, bloomWeight: 0.25, bloomScale: 0.4, contrast: 1.18, vignetteColor: [0.1, 0.04, 0.02, 0], vignetteWeight: 1.8 },
   nightGame:  { sky: '#9fb7ff', ground: '#22262e', hemiIntensity: 0.55, sun: '#e8f0ff', sunIntensity: 2.2, sunDir: [-0.35, -1, -0.2], exposure: 1.15, clearColor: '#0b0e16', bloomThreshold: 0.55, bloomWeight: 0.5, bloomScale: 0.6, contrast: 1.22, vignetteColor: [0, 0.02, 0.06, 0], vignetteWeight: 2.2 },
-  alpine:     { sky: '#eaf4ff', ground: '#8fa0b5', hemiIntensity: 0.9,  sun: '#fff4e0', sunIntensity: 2.8, sunDir: [-0.45, -1, -0.25], exposure: 1.05, clearColor: '#b9d4ee', bloomThreshold: 0.78, bloomWeight: 0.3, bloomScale: 0.5, contrast: 1.08, vignetteColor: [0.05, 0.08, 0.12, 0], vignetteWeight: 1.1 },
+  // Pass 5 phase 7: sun 2.8 + hemi 0.9 + exposure 1.05 + bloom from 0.78 on near-white snow read as a 211–221 mean-
+  // luminance whiteout in slalom frames (piste band 236). Cooler sky, a real sun/shade ratio, bloom only on true highlights.
+  alpine:     { sky: '#cfe0f4', ground: '#7d90a8', hemiIntensity: 0.55, sun: '#fff1dc', sunIntensity: 1.6, sunDir: [-0.45, -1, -0.25], exposure: 0.92, clearColor: '#a9c7e8', bloomThreshold: 0.92, bloomWeight: 0.22, bloomScale: 0.5, contrast: 1.14, vignetteColor: [0.05, 0.08, 0.12, 0], vignetteWeight: 1.1 },
 };
 
 /** Mode → mood mapping (README wiring step 4). */

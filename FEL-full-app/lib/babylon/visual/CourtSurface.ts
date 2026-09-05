@@ -170,9 +170,12 @@ export function applyOceanCourt(scene: Scene, style: CourtWaterStyle = 'venice')
     console.warn('[FEL-COURT] applyOceanCourt: no "venue_ground" mesh — call after VenueKit.buildCourt()');
     return false;
   }
-  const tex = new DynamicTexture('court_ocean_tex', { width: TEX, height: TEX }, scene, true);
+  // Pass 5 phase 8: the mobile tier paints the court at half resolution — measured 21 MB at 2048² on three-point and dunk duel,
+  // the largest single texture on the phone tier after the hero variant landed.
+  const size = (scene.metadata as { felTier?: string } | undefined)?.felTier === 'mobile' ? TEX / 2 : TEX;
+  const tex = new DynamicTexture('court_ocean_tex', { width: size, height: size }, scene, true);
   const g = tex.getContext() as unknown as CanvasRenderingContext2D;
-  paintOcean(g, TEX, TEX, style);
+  paintOcean(g, size, size, style);
   tex.update();
 
   const mat = new PBRMaterial('court_ocean_mat', scene);

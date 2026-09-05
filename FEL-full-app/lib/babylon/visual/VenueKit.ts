@@ -277,9 +277,15 @@ export const VenueKit = {
   },
 
   buildSlope(scene: Scene, liftCable?: GrindLine): void {
-    paintedGround(scene, 60, 400, '#eef4fa', (ctx, W, H) => {
-      ctx.fillStyle = 'rgba(160,190,220,0.35)';
-      for (let i = 0; i < 200; i++) ctx.fillRect(Math.random() * W, Math.random() * H, 3, 12);  // groom lines
+    // Pass 5 phase 7: big air's piste was near-white (#eef4fa) with faint groom lines under the alpine sky and read as a
+    // flat white sheet. Cooler snow, denser darker groom lines and shadowed drifts give the run edges to read speed against.
+    paintedGround(scene, 60, 400, '#cbd9e7', (ctx, W, H) => {
+      ctx.fillStyle = 'rgba(96,130,176,0.55)';
+      for (let i = 0; i < 420; i++) ctx.fillRect(Math.random() * W, Math.random() * H, 3, 14);  // groom lines
+      ctx.fillStyle = 'rgba(70,100,150,0.30)';
+      for (let i = 0; i < 60; i++) {                                                          // drifts
+        ctx.beginPath(); ctx.ellipse(Math.random() * W, Math.random() * H, 10 + Math.random() * 24, 3 + Math.random() * 5, 0, 0, Math.PI * 2); ctx.fill();
+      }
     });
     venueBox(scene, 64, 404, 12, [paintTrees(true)]);
     for (let z = -40; z > -360; z -= 60) for (const x of [-24, 24]) {   // gate flags

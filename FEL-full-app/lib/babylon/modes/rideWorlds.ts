@@ -171,7 +171,13 @@ export function buildSlopeRun(scene: Scene): RideWorld {
   piste.checkCollisions = true;
   piste.isPickable = true;
   piste.material = paintGround(scene, 34, 220, (g, W, H) => {
-    g.fillStyle = '#eef3f7'; g.fillRect(0, 0, W, H);
+    // Pass 5 phase 7: near-white snow (#eef3f7) under a white sky read as a 211–221 mean-luminance whiteout in the
+    // slalom frames. Cooler snow, denser darker groom lines and shadowed drifts give the run edges to read speed against.
+    g.fillStyle = '#c6d5e4'; g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgba(92,126,172,0.55)';
+    for (let i = 0; i < 700; i++) g.fillRect(Math.random() * W, Math.random() * H, 2, 16);
+    g.fillStyle = 'rgba(70,100,150,0.32)';
+    for (let i = 0; i < 160; i++) { g.beginPath(); g.ellipse(Math.random() * W, Math.random() * H, 8 + Math.random() * 20, 2 + Math.random() * 5, 0, 0, Math.PI * 2); g.fill(); }
     g.strokeStyle = 'rgba(120,150,175,0.25)'; g.lineWidth = 5;
     for (let i = 0; i < 14; i++) { g.beginPath(); g.moveTo((i / 14) * W, 0); g.lineTo((i / 14) * W + 30, H); g.stroke(); }
   });

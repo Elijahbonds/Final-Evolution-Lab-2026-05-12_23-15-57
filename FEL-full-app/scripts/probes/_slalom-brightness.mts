@@ -11,7 +11,11 @@ for (const at of [2000, 4000, 8000, 12000]) {
   const png = await p.screenshot({ clip: { x: 300, y: 100, width: 700, height: 600 } });   // centre of the canvas, away from HUD panels
   const { data, info } = await sharp(png).greyscale().raw().toBuffer({ resolveWithObject: true });
   let sum = 0; for (let i = 0; i < data.length; i++) sum += data[i]; const mean = sum / data.length;
+  // Pass 5 phase 7: top / bottom thirds (sky vs piste) so a fix lands on the band that carries the brightness.
+  const ch = data.length / (info.width * info.height); const rowLen = info.width * ch; const third = Math.floor(info.height / 3) * rowLen;
+  let top = 0, bot = 0; for (let i = 0; i < third; i++) top += data[i]; for (let i = data.length - third; i < data.length; i++) bot += data[i];
+  const bands = `top ${(top / third).toFixed(0)} · bottom ${(bot / third).toFixed(0)}`;
   const cam = await p.evaluate(`(() => { const d = window.__FEL_DEV__; const c = d?.scene?.activeCamera; const h = d?.hero?.(); return c && h ? 'cam y ' + c.position.y.toFixed(1) + ' hero y ' + h.position.y.toFixed(1) + ' z ' + h.position.z.toFixed(0) + ' dist ' + Math.hypot(c.position.x - h.position.x, c.position.y - h.position.y, c.position.z - h.position.z).toFixed(1) : 'no cam/hero'; })()`);
-  console.log(`t+${at / 1000}s: mean luminance ${mean.toFixed(0)} (${info.width}x${info.height}) · ${cam}`);
+  console.log(`t+${at / 1000}s: mean luminance ${mean.toFixed(0)} (${bands}; ${info.width}x${info.height}) · ${cam}`);
 }
 await b.close();
