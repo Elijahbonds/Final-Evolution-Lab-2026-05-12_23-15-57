@@ -39,12 +39,14 @@ no medical claims; the disclaimer rides every meal and fulfilment surface.
 | `lib/kitchens/types.ts` | the LOCKED shapes from the soft prep: `MealRx`, `LoadBand`, `MealTheme`, `MealSlot`, `Macros`, `GroceryItem`, `Recipe`, `FulfillmentPath`, `KitchenSnapshot`, `KITCHEN_STORAGE_KEY`, `LeakId` (local until BuildStore lands), `NON_CLINICAL_DISCLAIMER` |
 | `lib/kitchens/buildSnapshot.ts` | read-only upstream adapter: `BuildSnapshot { scanDate, prqScore (0–1), leak, leakLabel, pillars? }`; `snapshotFromTree({ prq0to100, screen?, metrics?, scanDate })` — the leak guess is **draft, pending Elijah** |
 | `lib/kitchens/mealRxBuilder.ts` | pure `buildMealRx({ signature, recipes, preferredFulfillment })` — the soft prep's algorithm, `LEAK_THEMES`, `LEAK_ONE_LINER`, `loadBandFor` |
-| `lib/kitchens/recipes.seed.ts` | eight seed recipes (`source: 'seed'`), tags and ingredients only; the first real 7–14 recipes are Elijah's |
+| `lib/kitchens/recipes.seed.ts` | the catalogue: `ELIJAH_RECIPES` (`source: 'elijah'`, empty — the marked slot where Elijah's recipes go, they win ties) + `SEED_RECIPES` (fourteen placeholders, honest ordinary macros, food tags only, every theme ≥ 3 options); `KITCHEN_RECIPES` is what the store reads |
+| `lib/kitchens/metrics.ts` | the Your Build scan input: `METRIC_FIELDS` (ranges / steps for the seven `MovementMetrics`), `sanitizeMetrics`, `clampMetric`, `loadMetrics` / `saveMetrics` / `clearMetrics` under `fel-kitchen-metrics` (per viewer, localStorage) |
+| `lib/kitchens/instacartMint.ts` | the Instacart mint lifted out of the route: `mintInstacartList({ items, linkbackUrl, env, fetchImpl })` → `{ status, body }`; `parseItems` (well-formed lines only, cap 60). The fetch is injected, so the key path is proven without the network |
 | `lib/kitchens/fulfillment.ts` | `fulfill(path, list)` → list text · Instacart (minted server-side, see below) · DoorDash `unavailable`; `availablePaths({ instacart })`, `groceryText` |
-| `lib/kitchens/instacart.ts` + `app/api/kitchens/instacart-list/route.ts` | IDP payload builder (pure, tested) and the keyed server route (GET availability · POST mint) |
+| `lib/kitchens/instacart.ts` + `app/api/kitchens/instacart-list/route.ts` | IDP payload builder (pure, tested) and the keyed server route (GET availability · POST auth → `mintInstacartList` with the real `fetch`) |
 | `lib/kitchens/KitchenStore.ts` | localStorage store (`fel-kitchen-store-v1`, the same pattern as `KitchenMarket`): `snapshot`, `ingest(build)` (archives on a new `sourceScanDate`, cap 14), `setPreferredFulfillment`, `reset` |
-| `components/kitchens/fuel-view.tsx`, `grocery-list.tsx` | the Fuel floor: leak chip, load band, themes, day plan, grocery checklist with copy / share, fulfilment path picker (list live; Instacart and Drive shown locked) |
-| `app/kitchens/fuel/page.tsx` | `/kitchens/fuel`, logged in; builds the snapshot from `/api/profile`'s `prq` + the default movement screen |
+| `components/kitchens/fuel-view.tsx`, `your-build-panel.tsx`, `grocery-list.tsx` | the Fuel floor: the Your Build panel (seven sliders, defaults pre-filled, derived leak + load band live, Defaults button), leak chip, load band, themes, day plan, grocery checklist with copy / share, fulfilment path picker (list live; Instacart behind the key; Drive locked) |
+| `app/kitchens/fuel/page.tsx` | `/kitchens/fuel`, logged in; builds the snapshot from `/api/profile`'s `prq` + the movement screen the athlete entered (defaults until touched) |
 
 ## Flow
 
@@ -93,5 +95,35 @@ calorie-deficit coaching · live Instacart or DoorDash checkout · Stripe meal p
 ## Open for Elijah / PM
 
 1. Leak → theme map (draft above; the load band and the leak source are decided).
-2. Cookbook source for the first 7–14 recipes (seed recipes are placeholders with honest macros, no voice).
-3. Whether the Fuel floor also reads the Mirror's squat faults once a scan exists (v0 uses the default screen metrics).
+2. Cookbook source for the first 7–14 recipes (seed recipes are placeholders with honest macros, no voice). The slot is
+   `ELIJAH_RECIPES` in `lib/kitchens/recipes.seed.ts`.
+3. Whether the Fuel floor also reads the Mirror's squat faults once a scan exists (today the athlete enters the screen
+   metrics in the Your Build panel; a Mirror scan would pre-fill the same seven fields).
+
+## Landed
+
+**2026-09-05 (v0 fold):** types · read-only snapshot adapter · pure builder · eight seeds · KitchenStore · Fuel floor
+with grocery checklist, copy / share, path picker · Instacart payload builder + keyed route (409 without the key) · hub
+link · probe `scripts/probes/_kitchens-fuel.mts`.
+
+**2026-09-05 (kitchens depth):**
+
+1. *Scan input.* The Your Build panel on the Fuel floor (`components/kitchens/your-build-panel.tsx`): the seven
+   `MovementMetrics` as sliders with sensible ranges (jump 10–90 cm · depth 60–130° · asymmetry 0–30 % · valgus L/R
+   0–1 · cadence 140–200 spm · trunk lean 0–45°), defaults pre-filled, the derived leak and load band updating live, a
+   Defaults button. The last metrics persist per viewer under `fel-kitchen-metrics`; `snapshotFromTree` gets them, so
+   the MealRx is built from the athlete's screen, not the default one. An unchanged plan keeps its MealRx id on
+   rebuild, so the basket ticks survive. The disclaimer stays.
+2. *Recipes.* `ELIJAH_RECIPES` (`source: 'elijah'`, empty, marked) + six more seeds (tuna quinoa · ginger chicken
+   broth · coconut water + orange · sardines on rye · beef and potatoes · rice cakes + honey) → fourteen seeds, every
+   theme with at least three options. `buildMealRx` fills a per-band slot plan (`LOAD_SLOTS`: easy = breakfast, lunch,
+   dinner, snack · train adds pre + post · hard adds pre, post + snack) by theme overlap + slot fit (light and quick
+   around the session, a full plate at meals); no recipe twice in a day plan; deterministic.
+3. *Instacart key path.* `mintInstacartList` with an injectable fetch; the route only does auth and hands it the real
+   `fetch`. `lib/kitchens/instacartRoute.test.ts` proves, with a FAKE in-process key and a recording fetch, the exact
+   POST (dev host + `/idp/v1/products/products_link`, Bearer header, `shopping_list` payload with mapped units and the
+   linkback), the 409 `locked` without the key (fetch never called), 400 / 401 / 502 paths, and the route itself with
+   auth mocked and `fetch` stubbed. `.env.example` documents `INSTACART_IDP_HOST`. No real key anywhere.
+
+Tests: `lib/kitchens/*.test.ts` — 4 files, 29 tests (`metrics`, `instacart`, `mealRxBuilder`, `instacartRoute`).
+Probe: `BASE=http://localhost:3005 npx tsx scripts/probes/_kitchens-fuel.mts` (BASE defaults to 3000).

@@ -1,17 +1,21 @@
 'use client';
 
 // FEL Kitchens — the Fuel floor (/kitchens/fuel). Reads the Build snapshot (read-only: this tree's PRQ + the movement
-// screen), builds today's MealRx through KitchenStore, and shows the day plan, the grocery checklist and the fulfilment
-// paths (list live; Instacart and Drive locked). Never on the Venice court; modes never call this.
+// screen, whose metrics the athlete enters in the Your Build panel until a Mirror scan lands), builds today's MealRx
+// through KitchenStore, and shows the day plan, the grocery checklist and the fulfilment paths (list live; Instacart
+// behind the key; Drive locked). Never on the Venice court; modes never call this.
 
 import { useEffect, useState } from 'react';
 import { Lock, RefreshCw } from 'lucide-react';
+import { defaultMetrics, type MovementMetrics } from '@/lib/workout/movement-screen';
 import { KitchenStore } from '@/lib/kitchens/KitchenStore';
 import { snapshotFromTree } from '@/lib/kitchens/buildSnapshot';
 import { LEAK_ONE_LINER } from '@/lib/kitchens/mealRxBuilder';
+import { clearMetrics, loadMetrics, saveMetrics } from '@/lib/kitchens/metrics';
 import { availablePaths } from '@/lib/kitchens/fulfillment';
 import type { FulfillmentPath, MealRx } from '@/lib/kitchens/types';
 import { GroceryList } from './grocery-list';
+import { YourBuildPanel } from './your-build-panel';
 
 const THEME_LABEL: Record<string, string> = {
   recovery: 'Recovery', 'protein-rebuild': 'Protein rebuild', 'anti-inflammatory': 'Anti-inflammatory',
@@ -25,24 +29,38 @@ export function FuelView() {
   const [path, setPath] = useState<FulfillmentPath>('list');
   const [error, setError] = useState('');
   const [instacart, setInstacart] = useState<{ available: boolean; url?: string; note?: string }>({ available: false });
+  const [metrics, setMetrics] = useState<MovementMetrics>(() => defaultMetrics());
 
-  const rebuild = async () => {
+  const rebuild = async (m: MovementMetrics = metrics) => {
     setError('');
     try {
       const r = await fetch('/api/profile', { cache: 'no-store' });
       const j = r.ok ? ((await r.json()) as { prq?: number }) : {};
       const score = typeof j.prq === 'number' ? j.prq : 0;
       setPrq(score);
-      // The Build store is read-only upstream; the snapshot is built from the profile's PRQ and the default movement
-      // screen until a scan lands. Keyed by today's date, so a rebuild in the same day is idempotent.
-      setRx(KitchenStore.ingest(snapshotFromTree({ prq0to100: score })));
+      // The Build store is read-only upstream; the snapshot is built from the profile's PRQ and the movement screen the
+      // athlete entered (Your Build) until a Mirror scan lands. Keyed by today's date, so a rebuild in the same day is
+      // idempotent — and an unchanged plan keeps its id, so the basket ticks stay.
+      setRx(KitchenStore.ingest(snapshotFromTree({ prq0to100: score, metrics: m })));
     } catch { setError('Could not read your Build right now.'); }
   };
+
+  /** Your Build changed: persist the metrics and rebuild live (the PRQ is already known after the first read). */
+  const applyMetrics = (m: MovementMetrics) => {
+    setMetrics(m);
+    saveMetrics(m);
+    if (prq == null) { void rebuild(m); return; }
+    setRx(KitchenStore.ingest(snapshotFromTree({ prq0to100: prq, metrics: m })));
+  };
+  const resetMetrics = () => { clearMetrics(); applyMetrics(defaultMetrics()); };
 
   useEffect(() => {
     const s = KitchenStore.snapshot();
     setPath(s.preferredFulfillment);
-    if (s.current) setRx(s.current); else void rebuild();
+    if (s.current) setRx(s.current); // paint the last plan at once; the rebuild below keeps its id when nothing changed
+    const m = loadMetrics();
+    setMetrics(m);
+    void rebuild(m);
     void fetch('/api/kitchens/instacart-list', { cache: 'no-store' }).then((r) => r.json()).then((j: { available?: boolean }) => setInstacart({ available: Boolean(j.available) })).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -70,19 +88,21 @@ export function FuelView() {
           <h1 className="fel-heading mt-1 text-2xl font-bold text-white">Today&apos;s fuel</h1>
           <p className="mt-1 text-sm text-white/60">Your Build&apos;s current leak and load, as a plate. Food tags only.</p>
         </div>
-        <button type="button" onClick={rebuild} className="flex items-center gap-1 rounded-md border border-white/15 px-2.5 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">
+        <button type="button" onClick={() => void rebuild()} className="flex items-center gap-1 rounded-md border border-white/15 px-2.5 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">
           <RefreshCw className="h-3.5 w-3.5" /> Rebuild
         </button>
       </div>
 
       {error && <p className="mt-3 text-sm text-[#FF3D5E]">{error}</p>}
 
+      <YourBuildPanel metrics={metrics} prq0to100={prq} onChange={applyMetrics} onReset={resetMetrics} />
+
       {rx && (
         <>
           <section className="fel-panel mt-4 rounded-2xl p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-[#A855F7]/40 bg-[#A855F7]/10 px-2.5 py-1 text-xs font-bold text-[#A855F7]">LEAK · {rx.leakLabel.toUpperCase()}</span>
-              <span className="rounded-full border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-2.5 py-1 text-xs font-bold text-[#00E5FF]">{BAND_LABEL[rx.loadBand]}</span>
+              <span className="rounded-full border border-[#A855F7]/40 bg-[#A855F7]/10 px-2.5 py-1 text-xs font-bold text-[#A855F7]" data-testid="rx-leak">LEAK · {rx.leakLabel.toUpperCase()}</span>
+              <span className="rounded-full border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-2.5 py-1 text-xs font-bold text-[#00E5FF]" data-testid="rx-band">{BAND_LABEL[rx.loadBand]}</span>
               {prq != null && <span className="rounded-full border border-white/15 px-2.5 py-1 font-mono text-xs text-white/70">PRQ {prq}</span>}
               <span className="font-mono text-[11px] text-white/40">scan {rx.sourceScanDate}</span>
             </div>
@@ -94,9 +114,9 @@ export function FuelView() {
 
           <section className="mt-4">
             <p className="px-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">Day plan</p>
-            <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+            <ul className="mt-2 grid gap-2 sm:grid-cols-2" data-testid="day-plan">
               {rx.dayPlan.map((s) => (
-                <li key={`${s.slot}-${s.recipeId}`} className="fel-panel rounded-xl p-3">
+                <li key={`${s.slot}-${s.recipeId}`} className="fel-panel rounded-xl p-3" data-slot={s.slot} data-recipe={s.recipeId}>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">{s.slot}</span>
                     <span className="font-mono text-[11px] text-white/50">{s.minutes} min</span>
