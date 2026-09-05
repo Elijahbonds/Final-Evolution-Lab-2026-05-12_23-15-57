@@ -4,7 +4,7 @@ import { proofLineFor } from './proofLine';
 
 describe('proofLineFor', () => {
   it('dunk keeps the make/miss line with the rival', () => {
-    expect(proofLineFor('dunkContest', { score: 124, opponentScore: 138, won: false, stats: { makes: 0, misses: 4 } })).toBe('0/4 DUNKS · 124 PTS VS 138 · LOST');
+    expect(proofLineFor('dunkContest', { score: 124, opponentScore: 138, won: false, stats: { makes: 0, misses: 4 } })).toBe('You missed every dunk · 124 pts vs 138 · You lost')   // plain-language copy (fd3517c);
   });
   it('fights say rounds and what the rival took', () => {
     expect(proofLineFor('karateVersus', { score: 260, won: true, stats: { rounds: 3, foeWins: 1 } })).toBe('WON IN 3 ROUNDS · RIVAL TOOK 1');

@@ -66,8 +66,6 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
       // L4 was EMPTY — this venue had no crowd at all, so a 1v1 on the most
       // famous blacktop in the world was played in front of nobody. One stand
       // behind the basket, one behind the play, matching 3v3's placement.
-      { kind: 'crowdTier', position: [0, 0, -9] },
-      { kind: 'crowdTier', position: [0, 0, 20], rotationY: Math.PI },
       ...beachDressing,
     ],
     actors: [
@@ -90,10 +88,8 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     props: [
       { kind: 'hoop', position: [0, 0, -11], color: '#FF3B30' },
       { kind: 'banner', position: [0, 0, -14.5], color: '#FF2D55' },
-      // Contest crowd on both baselines (same proven placement as 3v3) so the
-      // dunk reads as a broadcast event with a stand, not an empty court.
-      { kind: 'crowdTier', position: [0, 0, -17] },
-      { kind: 'crowdTier', position: [0, 0, 17], rotationY: Math.PI },
+      // Owner call 2026-09-05: the baseline crowd tiers are gone from every basketball court — the dark stepped
+      // stand read as a black bar behind the hoop in every frame. The horizon (backdrop, trees, skyline) carries the depth.
       ...beachDressing,
     ],
     actors: [{ id: 'you', role: 'player', position: [0, 0, 6.5], facing: Math.PI, color: '#FF6B00' }],
@@ -125,8 +121,6 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
       { kind: 'hoop', position: [0, 0, -1.32], color: '#BF5AF2' },
       // Stands behind the basket and behind the play, not 24m out past the
       // ends of a court that no longer extends that far.
-      { kind: 'crowdTier', position: [0, 0, -10] },
-      { kind: 'crowdTier', position: [0, 0, 21], rotationY: Math.PI },
       { kind: 'lamp', position: [11, 0, 2], color: '#E0B0FF' },
       { kind: 'lamp', position: [-11, 0, 12], color: '#E0B0FF' },
     ],

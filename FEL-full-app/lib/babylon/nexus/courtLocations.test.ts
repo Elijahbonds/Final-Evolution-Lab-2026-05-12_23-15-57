@@ -24,19 +24,19 @@ describe('court locations — the environment half swaps, the court half never m
     expect(out.ground).toEqual(spec.ground);
     expect(out.actors).toEqual(spec.actors);
     expect(out.camera).toEqual(spec.camera);
-    const courtKinds = ['hoop', 'backboardPole', 'net', 'banner', 'crowdTier'];
+    const courtKinds = ['hoop', 'backboardPole', 'net', 'banner'];
     const court = spec.props.filter((p) => courtKinds.includes(p.kind));
     expect(court.length).toBeGreaterThan(0);
     for (const p of court) expect(out.props).toContainEqual(p);
     expect(out.props.some((p) => p.kind === 'palm')).toBe(false);      // the beach dressing is gone
     expect(out.environment).toEqual(COURT_LOCATIONS.blossom.environment);
     expect(out.environment.backdrop).toBe('city');
-    expect(out.mapKey).toBeUndefined();                              // the scanned Venice map (its palms, its walls) is not mounted under a location
+    expect(out.mapKey).toBeUndefined();                              // the rebuilt scan renders no court on its own; the spec's court stands under a location
     // the authored spec is untouched (no mutation)
     expect(spec.props.some((p) => p.kind === 'palm')).toBe(true);
   });
 
-  it('ones and threes drop the scanned court map under a location and keep their own court', () => {
+  it('ones and threes stand on their own court and hoop under a location', () => {
     for (const id of ['basketball_h2h', 'basketball_3v3']) {
       const spec = specFor(id)!;
       const out = applyLocation(spec, 'blossom');

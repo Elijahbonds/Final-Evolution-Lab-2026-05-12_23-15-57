@@ -72,3 +72,23 @@ tests green with the count before every commit, a risk level on every change, no
 - **threepoint (open)**: 600 s under `holds` with the splash clicked — the screen stays "DOWNTOWN 3 · CONTROLLER LINK signaling · PLAYERS 0/1": the boot countdown sits at 3 and never reaches play. The lobby is a 300 px panel top-right and covers nothing; the stall matches the dev-mode double-mount race the component's header describes (effect A's dispose kills effect B's render loop). Not reproduced on the production bundle yet (the production sweep only checks the route paints). Next: run the session probe against the production bundle on :3006, and a solo desktop start by hand.
 - **football watchdog card**: `RenderWatchdog` fires on FIVE consecutive black composited frames, not on a stalled loop — the arena went black for 5 s mid-drive under three concurrent probes at 26 fps. Solo run in progress with page/console errors captured.
 - **Phase 0 gate CLOSED on the production bundle (d6e5bc4 on :3006)**: football `DRIVER=run` → three drives, session 200 in 21 s, proof "43 YDS · 0 EVADES · 0 TRUCKS"; threepoint `DRIVER=holds` → session 200 in 74 s, proof "6 PTS DOWNTOWN · LOST" (the Controller Link lobby sits beside play; the dev-mode stall was the double-mount race, which the production bundle does not have). With dunk (timing driver), karate, gymnastics, snowboard, soccer and golf, all eight contest routes now post a session end to end.
+
+## Two writers, one tree (2026-09-05, 13:00–14:15)
+- A second writer commits in this worktree under the repo user: copy passes (13:04–13:06, `fd3517c`), then `f57576b`…`f34b1ec`
+  (14:10–14:14): hang slow-mo in DunkMode (`ctx.juice.slowMo(0.4, 400)` at the rise), a Venice LOOK pass
+  (`veniceSurroundVisibility.ts`: golden-haze clearColor, a Meshy surround GLB with bleachers/bodies hidden, palm scaling),
+  a rebuilt `venice-blue-court.glb` (0.9 → 3.1 MB), rebuilt `elijah-hero.glb`, new `elijah-rival.glb`.
+- Their `f57576b` broke the dev build (a `*/` inside a doc comment closed it early; every route 500). Fixed here with one
+  comment line. Their copy commit also left `lib/proofLine.test.ts` failing (the dunk line changed to plain language, the
+  test still expects the tally) — theirs to update.
+- Owner split (14:15): **court locations are mine; the dunk's feel, camera and Venice look are theirs.** Their look pass
+  must step aside under a non-Venice location (it forces a golden sky and Venice palms on every dunk load). The
+  "elijah-hero.glb retired" rule is lifted by the owner.
+- Owner asks on the courts: the crowd tier ("black bar") is removed from all three basketball specs; the canopy mural is
+  removed; under a location the scanned court is kept and clipped to its footprint (verification pending against the
+  rebuilt court model).
+- **Court pass (owner asks, 14:00–15:00)**: crowd tiers off all basketball courts; canopy mural off; scanned court under a
+  location attempted and proven non-rendering on the rebuilt scan (see SPEC-COURT-LOCATIONS); other writer's look pass
+  guarded under non-Venice locations; headless/distorted athletes traced to their rebuilt hero + rival models — previous
+  hero bytes restored (asset only). Their `lib/proofLine.test.ts` expectation aligned to their plain-language copy so the
+  suite is green again.

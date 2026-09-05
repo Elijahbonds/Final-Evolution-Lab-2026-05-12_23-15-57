@@ -280,7 +280,9 @@ export const DunkDuelMode: ModeDefinition = (() => {
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'venice');
       EffectsKit.ballTrail(ctx.scene, ball);
-      await applyVeniceDunkLookPass(ctx.scene);
+      // Court locations (docs/SPEC-COURT-LOCATIONS.md): the Venice look (golden sky, surround palms) is Venice's own —
+      // under any other location the location's environment stands, so the pass steps aside.
+      if (!ctx.location || ctx.location === 'venice') await applyVeniceDunkLookPass(ctx.scene);
 
       activeIdx = 0; attemptNum = [0, 0]; totals = [0, 0]; ended = false; finishing = false;
       enterHandoff(ctx);

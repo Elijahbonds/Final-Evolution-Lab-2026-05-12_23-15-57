@@ -17,7 +17,7 @@ export const BASKETBALL_SPEC_IDS = new Set(['basketball_dunk', 'basketball_h2h',
 export const BASKETBALL_MODE_IDS = new Set(['dunk', 'dunkduel', 'threepoint', 'onevone', 'threevthree', 'basketball', 'hoops1v1', 'hoops3v3']);
 
 /** Court props that survive a location swap; everything else in a spec's props is dressing and is replaced. */
-const COURT_PROP_KINDS = new Set<PropKind>(['hoop', 'backboardPole', 'net', 'banner', 'crowdTier']);
+const COURT_PROP_KINDS = new Set<PropKind>(['hoop', 'backboardPole', 'net', 'banner']);
 
 export interface CourtLocation {
   id: CourtLocationId;
@@ -47,8 +47,10 @@ export const COURT_LOCATIONS: Record<CourtLocationId, CourtLocation> = {
   blossom: {
     id: 'blossom', name: 'Blossom Park', sub: 'BLOSSOM PARK', tint: '#ffb7d5', thumb: 'blossom-park', ready: true,
     environment: {
-      skyTop: '#F7C7D9', skyBottom: '#B08BB5', fogColor: '#E8C3D2', fogDensity: 0.0022,   // thin: the far trees must stay pink, not fog-white
-      ambient: 0.62, sunDirection: [-0.35, -0.8, 0.45], sunColor: '#FFE6C7', grade, backdrop: 'city',
+      // skyTop is ALSO the hemisphere fill colour: a pastel pink fill at 0.62 washed the scanned court to white. Deeper
+      // dusk pink, lower ambient, thin fog — the trees stay pink and the court keeps its paint.
+      skyTop: '#D98FAF', skyBottom: '#7E5C8E', fogColor: '#D9A6BC', fogDensity: 0.0015,
+      ambient: 0.42, sunDirection: [-0.35, -0.8, 0.45], sunColor: '#FFE0BF', grade, backdrop: 'city',
     },
     surround: [
       { kind: 'lamp', position: [-13, 0, 2] }, { kind: 'lamp', position: [13, 0, 2] },
@@ -95,8 +97,10 @@ export function applyLocation<T extends NexusWebSpec>(spec: T, id: string | unde
   const loc = COURT_LOCATIONS[id];
   if (!loc.environment) return spec;
   const court = spec.props.filter((p) => COURT_PROP_KINDS.has(p.kind));
-  // The scanned Venice court map carries Venice's own palms and walls inside the GLB, so under a location the spec's
-  // procedural court and hoop stand instead of the map (the modes' play clamps do not depend on the map).
+  // The owner wants the scanned Venice court under every location. The rebuilt scan (venice-blue-court.glb, 2026-09-05)
+  // renders no visible court on its own — under Venice the court seen now is the other writer's Meshy court, mounted by
+  // their look pass, which forces Venice's sky and palms. Until that pass exposes a court-only mount, a location stands on
+  // the spec's procedural court at the same rim (mapKey dropped), so nothing half-mounted shows.
   return { ...spec, environment: loc.environment, props: [...court, ...(loc.surround ?? [])], mapKey: undefined };
 }
 
@@ -233,9 +237,8 @@ function decorateOrbit(scene: Scene, root: TransformNode): void {
 }
 
 // ── Canopy Court ─────────────────────────────────────────────────────────────────────────────────────────────────────
-// The forest is the Kenney nature kit (prop set 'canopy-court'). Here: a painted mural wall behind the far crowd tier
-// (a Meshy mural can replace the texture later) and dappled light — a leaf-pattern projection on a spotlight over the
-// court — plus warm motes drifting in the air.
+// The forest is procedural (plantTrees) over Kenney undergrowth (prop set 'canopy-court'); dappled light — a leaf-pattern
+// projection on a spotlight over the court — and warm motes drifting in the air.
 
 function decorateCanopy(scene: Scene, root: TransformNode): void {
   const holder = new TransformNode('loc_canopy', scene); holder.parent = root;
@@ -243,22 +246,7 @@ function decorateCanopy(scene: Scene, root: TransformNode): void {
   plantTrees(scene, holder, 'canopy', [...COURT_TREE_SPOTS.map(([x, z, s]) => [x, z, s * 1.25] as [number, number, number]), [-16, -30, 1.9], [0, -32, 2.1], [16, -30, 1.8]], ['#1B5E20', '#2E7D32', '#33691E', '#245C2A'], '#4E342E', 31);   // deep greens: the grade lifts them toward lime
   let seed = 23;
   const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-  // mural wall
-  const tex = new DynamicTexture('loc_canopy_mural', { width: 1024, height: 256 }, scene, false);
-  const g = tex.getContext() as CanvasRenderingContext2D;
-  g.fillStyle = '#B25C8E'; g.fillRect(0, 0, 1024, 256);
-  const palette = ['#F2C14E', '#3BB4C1', '#F26B5B', '#8FD16C', '#F7F7F2', '#6B4CE6'];
-  for (let i = 0; i < 26; i++) {                       // leaf shapes and tag strokes
-    g.fillStyle = palette[i % palette.length];
-    g.globalAlpha = 0.85;
-    g.beginPath(); g.ellipse(rnd() * 1024, 40 + rnd() * 180, 30 + rnd() * 90, 14 + rnd() * 40, rnd() * Math.PI, 0, Math.PI * 2); g.fill();
-  }
-  g.globalAlpha = 1; g.lineWidth = 9; g.strokeStyle = '#1B1B1F';
-  for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(rnd() * 1024, rnd() * 256); g.bezierCurveTo(rnd() * 1024, rnd() * 256, rnd() * 1024, rnd() * 256, rnd() * 1024, rnd() * 256); g.stroke(); }
-  tex.update();
-  const wallMat = new PBRMaterial('loc_canopy_wallmat', scene); wallMat.albedoTexture = tex; wallMat.metallic = 0; wallMat.roughness = 0.95;
-  const wall = MeshBuilder.CreateBox('loc_canopy_wall', { width: 30, height: 5.5, depth: 0.5 }, scene);
-  wall.position.set(0, 2.75, -19.6); wall.material = wallMat; wall.parent = holder; wall.isPickable = false;
+  // (the painted mural wall of the first pass is gone — owner, 2026-09-05: cluttered; the trees carry the back line)
   // dappled light: a leaf-hole pattern projected from above
   const cookie = new DynamicTexture('loc_canopy_cookie', 512, scene, false);
   const c = cookie.getContext() as CanvasRenderingContext2D;
@@ -277,7 +265,7 @@ function decorateCanopy(scene: Scene, root: TransformNode): void {
   motes.minSize = 0.03; motes.maxSize = 0.08; motes.minLifeTime = 6; motes.maxLifeTime = 12; motes.emitRate = 12;
   motes.gravity = new Vector3(0.05, 0.02, 0); motes.direction1 = new Vector3(-0.2, 0.05, -0.2); motes.direction2 = new Vector3(0.2, 0.1, 0.2);
   motes.start();
-  holder.onDisposeObservable.add(() => { motes.dispose(); dot.dispose(); dapple.dispose(); cookie.dispose(); tex.dispose(); wallMat.dispose(); });
+  holder.onDisposeObservable.add(() => { motes.dispose(); dot.dispose(); dapple.dispose(); cookie.dispose(); });
 }
 
 // ── Night Rooftop ────────────────────────────────────────────────────────────────────────────────────────────────────

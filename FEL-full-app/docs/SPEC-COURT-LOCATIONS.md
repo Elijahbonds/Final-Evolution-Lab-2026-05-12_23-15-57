@@ -86,3 +86,15 @@ Physics, rim position, court size, camera presets, the crowd, the Meshy mural (u
 - **Acceptance sweep (2026-09-05)**: dunk, ones and threes captured at every location — 0 errors, 60 fps everywhere.
   Mobile-tier texture footprint on dunk: Venice 93.6 MB · Blossom Park 93.6 · Orbit 72.6 · Canopy Court 69.6 · Night
   Rooftop 69.0 (the three without a baked sky image sit below Venice). The pick probe passes on the play route.
+
+## Owner pass on the courts (2026-09-05, 14:00–15:00)
+- "That black bar needs to go": the `crowdTier` props are removed from all three basketball specs (Venice included).
+- "That mural needs to go": Canopy Court's painted wall is removed; its trees carry the back line.
+- "The court should look like the Luma scan": attempted — the rebuilt `venice-blue-court.glb` (other writer, 14:11)
+  renders no visible court on its own under any lighting (proved by mutating fog, sun, image light and unlit on the live
+  scene); under Venice the court now seen is the other writer's Meshy court, mounted by their look pass, which also forces
+  Venice's golden sky and palms. So: their look pass steps aside under a non-Venice location (a two-line guard at its two
+  call sites), and a location stands on the spec's procedural court at the same rim until their pipeline exposes a
+  court-only mount. The clip-plane experiment is removed.
+- Athletes: the rebuilt `elijah-hero.glb` and new `elijah-rival.glb` (other writer, 14:11–14:14) rendered headless and
+  distorted; the previous hero bytes are restored from 44e2646 and mirrored to the rival until the rebuild is right.

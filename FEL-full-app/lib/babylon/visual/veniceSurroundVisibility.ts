@@ -55,7 +55,7 @@ function walkNodes(scene: Scene): Array<AbstractMesh | TransformNode> {
 }
 
 /**
- * KEEP Ocean*/trunk*/frond*; HIDE Bleach*/body*/head*/kiosk*/kroof*/GroundApron/SandRing/BoardwalkBand.
+ * KEEP Ocean*, trunk*, frond*; HIDE Bleach*, body*, head*, kiosk*, kroof*, GroundApron, SandRing, BoardwalkBand.
  * Court: Mesh_0 only as painted playable court (sibling court paint meshes under Meshy court stay off).
  */
 export function applyVeniceSurroundVisibility(scene: Scene): void {
