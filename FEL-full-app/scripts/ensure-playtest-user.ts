@@ -19,6 +19,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
+import { seedRewardRules } from './seed-reward-rules';   // PACK #5: the playtest path seeds the reward rules so earn never no-ops
 
 // Next.js loads .env for the app; a bare tsx script does not, and Prisma then
 // fails with "Environment variable not found: DATABASE_URL".
@@ -44,6 +45,7 @@ const PASSWORD = process.env.PLAYTEST_PASSWORD ?? 'playtest-local-only';
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
+  const rules = await seedRewardRules(prisma); console.log(`reward rules present: ${rules}`);
   const existing = await prisma.user.findUnique({
     where: { email: PLAYTEST_EMAIL },
     include: { profile: { select: { id: true } } },

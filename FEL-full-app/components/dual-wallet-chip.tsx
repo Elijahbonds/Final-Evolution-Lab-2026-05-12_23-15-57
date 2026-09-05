@@ -20,7 +20,7 @@ import { animate, motion, useMotionValue, useTransform } from 'framer-motion';
 import { Coins, Gem } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { WALLET_EARN_EVENT, WALLET_SYNC_EVENT, type WalletEarnDetail, type WalletSyncDetail } from '@/lib/wallet/client';
+import { WALLET_EARN_EVENT, WALLET_SYNC_EVENT, reportEarn, type WalletEarnDetail, type WalletSyncDetail } from '@/lib/wallet/client';
 
 type FetchState = 'loading' | 'ready' | 'error';
 
@@ -46,6 +46,28 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
   const coins = useCountUp();
   const shards = useCountUp();
   const seq = useRef(0);
+  const firedRef = useRef(false);
+  const lastRef = useRef<{ coins: number; shards: number } | null>(null);   // last balances we showed — a replayed earn returns the same ones
+
+  // PACK THE FIVE #2 (2026-09-04): the first-session faucet. DAILY_FIRST_SESSION existed as a rule with no client
+  // fire. The chip is auth-aware (its wallet fetch is 401 when logged out), so once the wallet reads it fires
+  // ONE earn per calendar day: the idempotency key is the day plus the player's wallet identity, so the ledger
+  // returns the original grant on any replay (a second tab, a reload) and a per-day localStorage mark keeps the
+  // toast to the first fire. Wallet chip only — PlayerProfile.shards is not touched.
+  const fireDailyFirstSession = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    // the PLAYER's calendar day, not UTC — a 6 pm Pacific login is still today
+    const d = new Date(); const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const mark = `fel:daily_first_session:${day}`;
+    try { if (window.localStorage.getItem(mark)) return; } catch { /* storage unavailable: the server key still dedupes */ }
+    // the ledger's idempotency key is unique across ALL players, so it must carry this player's id — the wallet
+    // response has none; the session does (id, else email)
+    let who = '';
+    try { const s = await fetch('/api/auth/session', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)); who = String((s?.user as { id?: string; email?: string } | undefined)?.id ?? (s?.user as { email?: string } | undefined)?.email ?? ''); } catch { /* no session → no faucet */ }
+    if (!who) return;
+    const ok = await reportEarn({ idempotency_key: `daily_first_session:${day}:${who}`, event_type: 'daily_first_session', payload: { day, source: 'wallet-chip' } });
+    if (ok) { try { window.localStorage.setItem(mark, '1'); } catch { /* fine */ } }
+  }, []);
 
   const refresh = useCallback(async () => {
     const mine = ++seq.current;
@@ -54,6 +76,8 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
       if (!res.ok) throw new Error(`wallet ${res.status}`);
       const data: { coins: number; shards: number } = await res.json();
       if (mine !== seq.current) return; // a newer fetch already won
+      lastRef.current = { coins: data.coins, shards: data.shards };
+      if (!firedRef.current) { firedRef.current = true; void fireDailyFirstSession(); }
       coins.set(Number.isFinite(data.coins) ? data.coins : 0);
       shards.set(Number.isFinite(data.shards) ? data.shards : 0);
       setState('ready');
@@ -74,7 +98,11 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
         setState('ready');
       }
       const g = detail?.granted;
-      if (g && (g.coins > 0 || g.shards > 0)) {
+      // PACK #2: a replayed idempotency key (second device, reload) returns the ORIGINAL grant with unchanged
+      // balances — nothing was earned now, so nothing to toast.
+      const replay = !!detail?.balances && !!lastRef.current && detail.balances.coins === lastRef.current.coins && detail.balances.shards === lastRef.current.shards;
+      if (detail?.balances) lastRef.current = { coins: detail.balances.coins, shards: detail.balances.shards };
+      if (g && !replay && (g.coins > 0 || g.shards > 0)) {
         const parts: string[] = [];
         if (g.coins > 0) parts.push(`+${g.coins.toLocaleString('en-US')} coins`);
         if (g.shards > 0) parts.push(`+${g.shards} shards`);

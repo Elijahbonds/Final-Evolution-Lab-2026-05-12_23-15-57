@@ -24,6 +24,16 @@ while (sessionStatus === null && Date.now() - t0 < maxMs) {
 // the route may redirect when the mode is disabled in the rollout: say so instead of throwing
 
 const ended = await p.evaluate(`document.body.innerText.slice(0, 400).replace(/\\n/g, ' ')`);
+// PROOF=1 (PACK THE FIVE #3): on the results card, press SHARE DUNK PROOF, read the minted link, fetch the /c page.
+if (process.env.PROOF === '1' && sessionStatus !== null) {
+  await p.waitForTimeout(1500);
+  const btn = p.getByText('SHARE DUNK PROOF', { exact: false }).first();
+  const has = await btn.count();
+  if (!has) console.log('proof: no SHARE DUNK PROOF button on the results card');
+  else { const label = (await btn.innerText()).replace(/\s+/g, ' '); await btn.click(); let url = ''; for (let i = 0; i < 20 && !url; i++) { await p.waitForTimeout(500); url = await p.evaluate(`(document.body.innerText.match(/https?:\\/\\/[^\\s]+\\/c\\/[A-Za-z0-9_-]+/) || [''])[0]`); }
+    let pageHas = 'n/a'; if (url) { const html = await (await p.request.get(url)).text(); pageHas = html.includes('DUNK PROOF') ? 'yes' : 'NO'; }
+    console.log(`proof: button "${label}" → link ${url || 'none'} · /c page shows DUNK PROOF: ${pageHas}`); }
+}
 console.log(`${route}: /api/sessions → ${sessionStatus ?? 'never posted'} in ${((Date.now() - t0) / 1000).toFixed(0)} s · ${sessionBody}`);
 console.log('posts:', [...new Set(posts)].join(' | ') || 'none'); console.log('screen:', ended.slice(0, 200));
 await b.close();

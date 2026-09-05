@@ -36,13 +36,14 @@ export default function DunkBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      const won = r.outcome === 'WIN';
+      const won = r.outcome === 'WIN' || r.outcome === 'CONTEST_WON';   // PACK #3: the mode emits CONTEST_WON, not WIN — dunk sessions had always posted as losses
       const result: GameResult = {
         score: r.score,
         opponentScore: r.stats?.rivalScore ?? 0,
         won,
         duration: r.durationSec,
         headline: won ? 'CONTEST WON' : 'CONTEST OVER',
+        tallies: { hits: r.stats?.makes ?? 0, misses: r.stats?.misses ?? 0, dodges: 0, combos: r.stats?.bestChain ?? 0 },   // PACK #3: make/miss proof
       };
       onEnd(result);
     };

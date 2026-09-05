@@ -12,11 +12,15 @@ export type KitSlot = 'tops' | 'shorts' | 'shoes';
 export const KIT_SLOTS: readonly KitSlot[] = ['tops', 'shorts', 'shoes'];
 export type Wardrobe = Partial<Record<KitSlot, string | null>>;
 
+// A garment mesh is `Kit_<slot>_<itemId>`; the identity layer's per-mesh clones append `_c<n>` (PACK THE FIVE #1/#4,
+// 2026-09-04: with the suffix unparsed every slot fell back to its FIRST garment — top_bonds and shoes_evo showed,
+// tinted in the starters' colours, while top_lab and shoes_flight stayed hidden). The suffix is optional here.
 const KIT_RE = /^Kit_(tops|shorts|shoes)_([A-Za-z0-9_-]+)/;
+const CLONE_SUFFIX = /_c\d+(?![A-Za-z0-9])/;   // `Kit_tops_top_lab_c31` → `Kit_tops_top_lab`
 
 /** Parse a kit mesh name; null for anything else. */
 export function kitOf(meshName: string): { slot: KitSlot; itemId: string } | null {
-  const m = KIT_RE.exec(meshName); return m ? { slot: m[1] as KitSlot, itemId: m[2] } : null;
+  const m = KIT_RE.exec(meshName.replace(CLONE_SUFFIX, '')); return m ? { slot: m[1] as KitSlot, itemId: m[2] } : null;
 }
 
 /**

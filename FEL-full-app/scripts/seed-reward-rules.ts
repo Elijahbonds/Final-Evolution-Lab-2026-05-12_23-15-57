@@ -12,10 +12,10 @@ import { DEFAULT_REWARD_RULES } from '../lib/wallet/reward-rules';
 
 const prisma = new PrismaClient();
 
-async function main() {
+export async function seedRewardRules(db: PrismaClient = prisma): Promise<number> {
   let n = 0;
   for (const [reasonCode, r] of Object.entries(DEFAULT_REWARD_RULES)) {
-    await prisma.rewardRule.upsert({
+    await db.rewardRule.upsert({
       where: { reasonCode },
       // Do NOT clobber a hand-tuned live row's amounts on re-seed; only ensure
       // the row exists and stays active. Operators edit values in the DB.
@@ -36,9 +36,11 @@ async function main() {
     n++;
   }
   console.log(`Seeded/verified ${n} reward rules.`);
+  return n;
 }
 
-main()
+// CLI entry only when run directly (ensure-playtest-user.ts imports this module and calls seedRewardRules itself)
+if (process.argv[1]?.endsWith('seed-reward-rules.ts')) seedRewardRules()
   .catch((e) => {
     console.error('seed-reward-rules FAILED:', e);
     process.exitCode = 1;

@@ -295,7 +295,8 @@ function GameShellInner({
   };
 
   // Mint a shareable challenge link from this finished run (M13.4 K-factor loop).
-  const shareChallenge = useCallback(async () => {
+  // PACK THE FIVE #3: `display` may be overridden — the dunk proof card mints the same link with the make/miss line.
+  const shareChallenge = useCallback(async (displayOverride?: string) => {
     if (!result) return;
     setShareState('minting');
     try {
@@ -305,7 +306,7 @@ function GameShellInner({
         body: JSON.stringify({
           modeKey: mode,
           score: result.score ?? 0,
-          display: result.headline ?? `${title} run`,
+          display: displayOverride ?? result.headline ?? `${title} run`,
         }),
       }).then((r) => (r.ok ? r.json() : null));
       if (j?.path) {
@@ -325,6 +326,11 @@ function GameShellInner({
       setShareState('idle');
     }
   }, [result, mode, title]);
+
+  // PACK THE FIVE #3: dunk proof — the card says what happened at the rim, not just the score.
+  const isDunk = mode === 'dunkContest' || mode === 'dunkduel';
+  const dunkProofLine = isDunk && result ? `${result.tallies?.hits ?? 0}/${(result.tallies?.hits ?? 0) + (result.tallies?.misses ?? 0)} DUNKS · ${result.score} PTS${result.opponentScore ? ` vs ${result.opponentScore}` : ''} · ${result.won ? 'WON' : 'LOST'}` : null;
+  const shareDunkProof = useCallback(() => { if (dunkProofLine) void shareChallenge(`DUNK PROOF · ${dunkProofLine}`); }, [dunkProofLine, shareChallenge]);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#050505]">
@@ -508,7 +514,7 @@ function GameShellInner({
 
                   {/* M13.4 share challenge (K-factor loop) */}
                   <button
-                    onClick={shareChallenge}
+                    onClick={() => void shareChallenge()}
                     disabled={shareState === 'minting'}
                     className="fel-heading mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-[#A855F7]/50 bg-[#A855F7]/10 py-2.5 text-sm font-bold text-[#A855F7] transition-colors hover:bg-[#A855F7]/20 disabled:opacity-60"
                   >
@@ -520,6 +526,15 @@ function GameShellInner({
                       <><Share2 className="h-4 w-4" /> CHALLENGE A FRIEND</>
                     )}
                   </button>
+                  {dunkProofLine && (
+                    <button
+                      onClick={shareDunkProof}
+                      disabled={shareState === 'minting'}
+                      className="fel-heading mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-[#00E5FF]/50 bg-[#00E5FF]/10 py-2.5 text-sm font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20 disabled:opacity-60"
+                    >
+                      <Share2 className="h-4 w-4" /> SHARE DUNK PROOF · {dunkProofLine}
+                    </button>
+                  )}
                   {shareUrl && (
                     <p className="mt-1 break-all font-mono text-[10px] text-white/40">{shareUrl}</p>
                   )}

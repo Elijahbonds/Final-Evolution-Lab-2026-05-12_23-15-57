@@ -103,6 +103,7 @@ export const DunkMode: ModeDefinition = (() => {
   const usedCombos = new Set<string>();       // variety memory: "style_prop" combos thrown
   let round = 1, dunkInRound = 0;
   let playerTotal = 0, rivalTotal = 0, hype = 0, chain = 0;
+  let makes = 0, misses = 0, bestChain = 0;   // PACK #3: the proof card's make/miss line
   let lastScores: JudgeScore[] = [];
   let finishing = false;
   let rimCamCut = false;                     // broadcast cut latch (per attempt)
@@ -189,7 +190,7 @@ export const DunkMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'venice');
       EffectsKit.ballTrail(ctx.scene, ball);
 
-      round = 1; dunkInRound = 0; playerTotal = 0; rivalTotal = 0; hype = 0; chain = 0; finishing = false;
+      round = 1; dunkInRound = 0; playerTotal = 0; rivalTotal = 0; hype = 0; chain = 0; finishing = false; makes = 0; misses = 0; bestChain = 0;
       style = 'power'; prop = 'none'; rimCamCut = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
@@ -620,7 +621,7 @@ export const DunkMode: ModeDefinition = (() => {
         Math.max(0, STYLE_TIER[style] * 0.22 + styleTaps * 0.4),
       );
       const missTotal = missScores.reduce((a, j) => a + j.score, 0);
-      playerTotal += missTotal;
+      playerTotal += missTotal; misses++;
       lastScores = missScores;
       crowd.onScore(missTotal);
       revealed = [];
@@ -696,7 +697,7 @@ export const DunkMode: ModeDefinition = (() => {
       chain = 0;
     }
 
-    playerTotal += dunkTotal;
+    playerTotal += dunkTotal; makes++; bestChain = Math.max(bestChain, chain);
     // Hype is fed by the QUALITY of the dunk, not the raw total — the total's
     // range moved with the ceiling and `dunkTotal * 2` would now fill the meter
     // almost instantly, quietly wrecking the momentum curve. Per-judge average
@@ -823,7 +824,7 @@ export const DunkMode: ModeDefinition = (() => {
     SoundKit.play('whistle');
     const won = playerTotal >= rivalTotal;
     if (won) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
-    ctx.end(won ? 'CONTEST_WON' : 'CONTEST_LOST', playerTotal, { rivalTotal, rounds: TOTAL_ROUNDS });
+    ctx.end(won ? 'CONTEST_WON' : 'CONTEST_LOST', playerTotal, { rivalTotal, rounds: TOTAL_ROUNDS, makes, misses, bestChain });
   }
 
   return def;

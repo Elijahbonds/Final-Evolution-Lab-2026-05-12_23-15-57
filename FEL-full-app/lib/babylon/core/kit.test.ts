@@ -6,7 +6,10 @@ const mesh = (name: string) => ({ name, isVisible: true }) as unknown as import(
 describe('kit', () => {
   it('parses kit mesh names and ignores the rest', () => {
     expect(kitOf('Kit_tops_top_lab')).toEqual({ slot: 'tops', itemId: 'top_lab' });
-    expect(kitOf('Kit_shoes_shoes_evo_c12')).toEqual({ slot: 'shoes', itemId: 'shoes_evo_c12' });
+    expect(kitOf('Kit_shoes_shoes_flight_c27')).toEqual({ slot: 'shoes', itemId: 'shoes_flight' });   // identity clone suffix
+    expect(kitOf('Kit_tops_top_lab_c31')).toEqual({ slot: 'tops', itemId: 'top_lab' });
+    // `_c<n>` is the identity layer's clone suffix, never part of an item id (wearable-catalog ids end in a word)
+    expect(kitOf('Kit_shoes_shoes_evo_c12')).toEqual({ slot: 'shoes', itemId: 'shoes_evo' });
     expect(kitOf('Body_c10')).toBeNull(); expect(kitOf('Hair_afro')).toBeNull();
   });
   it('shows the equipped garment per slot and hides the others', () => {
