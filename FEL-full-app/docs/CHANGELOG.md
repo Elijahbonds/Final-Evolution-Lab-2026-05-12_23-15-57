@@ -8,6 +8,16 @@ The tag is assigned by the orchestrator at integration (the previous candidate w
 the one the commit or the findings log recorded; a line with no number had no measurement in its commit.
 Full logs: `docs/SHIP-PASS-3.md`, `docs/SHIP-PASS-4.md`; the gate table: `docs/RC-2026-09-04.md`.
 
+### Session endings (2026-09-05, early; owner decisions, MEDIUM risk — game rules)
+- Football (Breakaway): a session is THREE drives, each ending on a touchdown or a turnover on downs; before, a runner who
+  kept gaining reset to first down forever and never posted. `drive` in the HUD; `DRIVES_DONE` / `TURNOVER_ON_DOWNS`.
+- Soccer (Twelve Yards): sudden death caps at five rounds — still level, style decides; no style, the later save; no saves,
+  nerve. Verified: 10–10 → "LEVEL AFTER 5 — YOURS ON NERVE", session posted, proof minted (before: level for 421 s).
+- Golf (The Loop): triple-par pick-up — at three times par the hole is scored as triple par and the round moves on
+  (`pickUps` on the card); before, an unholed hole never ended. Out-of-bounds strokes count toward the cap.
+- Drivers: arrows are the d-pad in the input bus — the session probe's run/ride variants use the stick keys and a held
+  trigger; the splash is clicked by text. Snowboard now posts (proof "0 GATES · 58S · 25 PTS").
+
 ### FEL Kitchens — spec + scaffold (2026-09-05, overnight; PM lane brief `docs/CLAUDE-KITCHENS-BRIEF.md`)
 - `docs/SPEC-FEL-KITCHENS.md` folds the soft prep (MealRx schema, LOCKED hybrid fulfilment) onto this tree: the existing
   `/kitchens` marketplace hub stays; the Build store lives in the Vite twin, so Kitchens reads a small read-only snapshot

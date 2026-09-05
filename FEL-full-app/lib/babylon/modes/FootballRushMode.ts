@@ -61,6 +61,9 @@ export const FootballRushMode: ModeDefinition = (() => {
   let defenders: Mob[] = [];
   let coins: CoinField | null = null;
   let down = 1, toGo = 10, lineOfScrimmage = 0, yards = 0, score = 0, evades = 0;
+  // Owner decision (2026-09-05): a session is THREE drives. Each ends on a touchdown or a turnover on downs; the
+  // session ends after the third. Before this, a runner who kept gaining reset to first down forever and never posted.
+  const DRIVES = 3; let drive = 1;
   let driveEvades = 0, breakawaySec = 0;
   let iframeSec = 0, dodging = false, ended = false;
   let truckSec = 0, truckCooldown = 0, trucks = 0;
@@ -171,7 +174,7 @@ export const FootballRushMode: ModeDefinition = (() => {
     runner.root.rotation.y = 0;
     runner.animator.play(SPORT_CLIP.idle, { loop: true });
     ctx.camDirector.snapTo(runner.root.position, runner.root.position.add(new Vector3(0, 0, 12)));
-    ctx.setHud({ down, toGo, banner, breakaway: false, truckReady: true });
+    ctx.setHud({ down, toGo, banner, breakaway: false, truckReady: true, drive: `${drive}/${DRIVES}` });
     setTimeout(() => ctx.setHud({ banner: '' }), 1400);
     void spawnDefense(ctx).then(() => {
       ctx.setHud({ hint: 'READ THE FRONT — push ▲/W to SNAP' });
@@ -194,7 +197,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       ctx.groundLock?.track(runner.root, runner.skeleton);
       ctx.heroRef.current = runner.root;
       defenders = []; pool = new MobPool();
-      score = 0; evades = 0; trucks = 0; ended = false; iframeSec = 0; dodging = false;
+      score = 0; evades = 0; trucks = 0; ended = false; iframeSec = 0; dodging = false; drive = 1;
       driveEvades = 0; breakawaySec = 0; truckSec = 0; truckCooldown = 0;
       ctx.camDirector.snapTo(runner.root.position, runner.root.position.add(new Vector3(0, 0, 12)));
       assertSpawned(ctx.scene, { hero: runner.root, minWorldMeshes: 6, modeId: 'football' });
@@ -348,9 +351,15 @@ export const FootballRushMode: ModeDefinition = (() => {
           down++;
           toGo -= gainedY;
           if (down > 4) {
-            ended = true;
+            if (drive >= DRIVES) {
+              ended = true;
+              SoundKit.play('whistle');
+              return ctx.end('TURNOVER_ON_DOWNS', score, { yards, evades, trucks, coinsCollected: coins?.collected ?? 0, drives: DRIVES });
+            }
+            drive++;
             SoundKit.play('whistle');
-            return ctx.end('TURNOVER_ON_DOWNS', score, { yards, evades, trucks, coinsCollected: coins?.collected ?? 0 });
+            newDrive(ctx, `TURNOVER ON DOWNS · DRIVE ${drive}/${DRIVES}`);
+            return;
           }
           ctx.setHud({ down, toGo, banner: `TACKLED — DOWN ${down}` });
         }
@@ -381,7 +390,13 @@ export const FootballRushMode: ModeDefinition = (() => {
         EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, 1.8, 0)), 'confetti');
         ctx.setHud({ score, banner: 'TOUCHDOWN!' });
         gallery?.cheer(1);
-        newDrive(ctx, 'NEXT DRIVE');
+        if (drive >= DRIVES) {
+          ended = true;
+          SoundKit.play('whistle');
+          return ctx.end('DRIVES_DONE', score, { yards, evades, trucks, coinsCollected: coins?.collected ?? 0, drives: DRIVES });
+        }
+        drive++;
+        newDrive(ctx, `TOUCHDOWN! · DRIVE ${drive}/${DRIVES}`);
       }
 
       gallery?.update(dt);

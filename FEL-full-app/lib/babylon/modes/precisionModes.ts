@@ -237,6 +237,7 @@ export const GolfMode: ModeDefinition = (() => {
   let club = 0;                       // which club is in hand
   let wind = new Vector3();           // per-hole wind, applied in flight
   let strokes = 0, overPar = 0;       // golf is scored in strokes against par
+  let pickUps = 0;   // triple-par pick-ups this round (owner decision 2026-09-05)
   /** Stick-swing state. Runs ALONGSIDE the 3-click swing, never replacing it:
    *  a stick swing does not express on a touch overlay and 3-click is the
    *  better mobile input, so the mode offers both. */
@@ -442,6 +443,7 @@ export const GolfMode: ModeDefinition = (() => {
       ctx.camDirector.setFixedBehind(me.root.position, 0, 'swing');
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 6, modeId: 'golf' });
       round = 0; pts = 0; ended = false;
+      overPar = 0; pickUps = 0;   // the round's tallies start clean (overPar used to carry across plays on one page)
       // 'wind', not 'dojo' — a martial-arts room tone on an alpine golf course.
       // Same class of mistake as the skatepark's stadium crowd bed.
       SoundKit.startAmbient('wind');
@@ -530,12 +532,30 @@ export const GolfMode: ModeDefinition = (() => {
         ctx.camDirector.update(ball.position, flight.vel, holePos);
         if (!flying && !settling) {
           const flat = new Vector3(ball.position.x, 0, ball.position.z);
+          // Owner decision (2026-09-05): TRIPLE-PAR PICK-UP. At three times par the hole is scored as triple par and the
+          // round moves on — a hole that is never holed used to never end (traced: the ball wandered and re-dropped for
+          // 330 s on hole 1). A real player rarely reaches it; a stuck one always finishes the card.
+          const parNow = GOLF_PAR[Math.min(round, GOLF_PAR.length) - 1] ?? 3;
+          const pickUp = (why: string) => {
+            const rel = strokes - parNow;
+            overPar += rel; pickUps++;
+            pts += Math.round(Math.max(20, 120 - rel * 40));
+            SoundKit.play('miss'); gallery?.cheer(0.2);
+            ctx.setHud({ score: pts, strokes, card: card(), banner: `PICKED UP — ${why} · ${strokes} on a par ${parNow}` });
+            settling = true;
+            setTimeout(() => {
+              ctx.setHud({ banner: '' });
+              if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); ctx.end('CARD_IN', pts, { holes: TOTAL, overPar, pickUps }); }
+              else nextShot(ctx);
+            }, 1600);
+          };
           // OUT OF BOUNDS — a stroke penalty and a drop, which is the real
           // rule and also stops a shanked drive leaving the course entirely.
           // Out of bounds is the EDGE OF THE FIELD (60 x 90 → ±30, ±45), not an
           // arbitrary number larger than it.
           if (Math.abs(ball.position.x) > 28 || ball.position.z > 43 || ball.position.z < -6) {
             strokes++;
+            if (strokes >= parNow * 3) { pickUp('triple par, out of bounds'); return; }
             const back = holePos.subtract(new Vector3(0, 0, 14));
             ball.position.set(back.x, 0.05, Math.max(1, back.z));
             SoundKit.play('miss');
@@ -550,6 +570,7 @@ export const GolfMode: ModeDefinition = (() => {
           // one shot, scored by proximity, which is why there were no strokes
           // to score against par and no reason to own a wedge.
           if (dist > HOLED_M) {
+            if (strokes >= parNow * 3) { pickUp('triple par'); return; }
             SoundKit.play('uiTick');
             ctx.setHud({
               banner: dist <= PUTT_RANGE_M
@@ -581,7 +602,7 @@ export const GolfMode: ModeDefinition = (() => {
             ctx.setHud({ banner: '' });
             if (round >= TOTAL) {
               ended = true; SoundKit.play('whistle');
-              ctx.end('CARD_IN', pts, { holes: TOTAL, overPar });
+              ctx.end('CARD_IN', pts, { holes: TOTAL, overPar, pickUps });
             } else nextShot(ctx);
           }, 1600);
         }
@@ -886,6 +907,10 @@ export const PenaltyMode: ModeDefinition = (() => {
    *  simulated and revealed between yours (the numbers-only rival
    *  presentation 3PT's lock ruled acceptable — and here it is the format). */
   let themGoals = 0, themKicks = 0;
+  // Owner decision (2026-09-05): sudden death caps at SD_CAP rounds. Still level after that, STYLE decides (the rival has
+  // no style mechanic, so any banked style wins it); no style → the side with the LATER save; no saves at all → nerve:
+  // the kicker who kept converting under the cap. Before this, two sides that kept converting never finished (52–52).
+  const SD_CAP = 5; let lastSaveBy: 'you' | 'them' | null = null;
   /** Your placement history (sign of reticle x per kick) — the keeper READS it. */
   let shotHistory: number[] = [];
   const hintFlags = { read: false };           // don't re-fire the warning every frame
@@ -944,6 +969,19 @@ export const PenaltyMode: ModeDefinition = (() => {
     if (ended) return;
     ctx.setHud({ banner: '' });
     const s = shootoutState(goals, themGoals, round, themKicks);
+    const sdRounds = Math.max(0, Math.min(round, themKicks) - REGULATION_KICKS);
+    if (s.phase === 'suddenDeath' && round === themKicks && sdRounds >= SD_CAP) {
+      const decidedBy = stylePts > 0 ? 'style' : lastSaveBy ? 'later-save' : 'nerve';
+      const winner: 'you' | 'them' = stylePts > 0 ? 'you' : lastSaveBy ?? 'you';
+      ended = true;
+      SoundKit.play('whistle');
+      const won = winner === 'you';
+      if (won) SoundKit.play('crowdCheer');
+      ctx.setHud({ banner: won ? `LEVEL AFTER ${SD_CAP} — YOURS ON ${decidedBy === 'style' ? 'STYLE' : decidedBy === 'later-save' ? 'THE LATER SAVE' : 'NERVE'}` : `LEVEL AFTER ${SD_CAP} — THEIRS ON THE LATER SAVE` });
+      // stats are numbers: decidedBy 1 = style, 2 = the later save, 3 = nerve
+      ctx.end(won ? 'SHOOTOUT_WIN' : 'SHOOTOUT_LOSS', goals * 20 + stylePts, { goals, stylePts, themGoals, sdRounds, decidedBy: decidedBy === 'style' ? 1 : decidedBy === 'later-save' ? 2 : 3 });
+      return;
+    }
     if (s.phase === 'decided' && s.winner) {
       ended = true;
       SoundKit.play('whistle');
@@ -1093,6 +1131,7 @@ export const PenaltyMode: ModeDefinition = (() => {
           flight.active = false;
           const inFrame = !diedShort && Math.abs(ball.position.x) < 3.6 && ball.position.y < 2.4 && ball.position.y > 0;
           const saved = !diedShort && Math.abs(ball.position.x - keeper.root.position.x) < 0.9 && ball.position.y < 1.9;
+          if (saved) lastSaveBy = 'them';
           const scored = inFrame && !saved;
           shotHistory.push(Math.sign(reticle.pos.x || 0.01));   // the keeper remembers
           if (scored) {
@@ -1148,7 +1187,7 @@ export const PenaltyMode: ModeDefinition = (() => {
             const theyScore = !r.saved && r.why !== 'off_target';
             if (theyScore) themGoals++;
             themKicks++;
-            if (r.saved) { ctx.juice.scorePop(ball.position, 'SAVED!', '#7CFFB2'); ctx.feel?.impact?.(0.5); }
+            if (r.saved) { lastSaveBy = 'you'; ctx.juice.scorePop(ball.position, 'SAVED!', '#7CFFB2'); ctx.feel?.impact?.(0.5); }
             SoundKit.play(theyScore ? 'crowdGroan' : 'crowdCheer', { volume: 0.4 });
             ctx.setHud({
               score: `${goals}–${themGoals}`,
