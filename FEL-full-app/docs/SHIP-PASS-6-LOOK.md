@@ -59,3 +59,25 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   parents — the live absolute matrices read mid-pose and failed the clip test). Roster rival now hangs its arms.
   Onlookers (skate rail, slope, surf, pit) are roster bodies now (`visual/Onlookers.ts`, cap 8, same API + `count`).
   Alias `idle → idle_stand`: karate enemies asked for a clip only the old hero file baked (7 MISSING CLIP → 0).
+- **Batch A (basketball)**: three-point's five rivals wait along the sideline as roster bodies; the procedural court plane
+  hides under a mounted map (it never did — a blue PBR plane z-fought the scan and mirrored the dome); the ones camera frames
+  the rim when the foe is inside 2.2 m (the two-point fit had put the camera inside a body); the 3D sun disc is gone (a navy
+  coin from threes/ones — the dome's painted sun carries it). The orange far half of the threes court is the scan's own
+  painted surround (Luma look, second writer's lane). Committed 1916ccb.
+- **Batch B (board + air), 21:00–21:40**: the white walls behind skate, slope, surf and big air were the harness-level
+  painted backdrop (`visual/Backdrops.ts` — `mountBackdrop` by mood: dome 280 m + silhouette ring 235 m). A second dome
+  inside it (a SkyDome module, three attempts) was drawn but never showed; the fix went into the existing mount instead:
+  a family with a baked photo dome uses it as the dome texture (park→neon, alpine→mountains, ocean→ocean, stadium,
+  dojo, venice→beach), painted sky as fallback, ring skipped when baked. Golf's spec gained its links dome. Alias
+  `cheer → jump_up` (the roster crowd's cheer asked for a clip no body bakes; big air logged 6 MISSING CLIP).
+  Capture hangs during this stretch were the dev server recompiling after many edits, not the modes — a shell watchdog
+  now wraps every capture.
+  **Root cause of the white walls (21:50)**: not clipping, not the grade alone. The backdrop dome (radius 284, centre at
+  the origin) has its equator at the camera's eye line; the bakes paint their horizon at v = 0.6, so from the court the
+  camera only ever saw the bright gold horizon band, which exposure + bloom pushed to cream. A red emissive proved the
+  dome was on screen; detaching the grade showed the band as flat orange. Fix: `vOffset = 0.1` on the baked texture so
+  the painted horizon meets the real one, and the dome dimmed to 0.82 under the grade.
+  **Still open (22:05)**: with the horizon aligned and the dome at 0.55 the skate sky still measures near white under the
+  grade; the venue skies read pale pastel from the same deep bakes. Suspect: the emissive sky path is gamma-lifted twice
+  (StandardMaterial output + the pipeline's tone map). Parked for a measured fix (pixel samples in the log); the props +
+  depth brief (inbox, 20:03) runs next on top of this work.

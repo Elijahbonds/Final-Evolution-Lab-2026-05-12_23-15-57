@@ -6,7 +6,8 @@
 export const CLIP_ALIASES: Record<string, [string, number]> = {
   // locomotion
   idle_stand: ['guard', 0.45],
-  idle: ['idle_stand', 1.0],   // Ship Pass 6: roster bodies never baked an 'idle'; the authored idle_stand stands in (karate enemies asked for it)
+  idle: ['idle_stand', 1.0],
+  cheer: ['jump_up', 0.9],     // Ship Pass 6: the roster crowd's cheer — arms overhead on the big moment (no baked cheer on any body)   // Ship Pass 6: roster bodies never baked an 'idle'; the authored idle_stand stands in (karate enemies asked for it)
   walk_forward: ['walk', 1.0],
   run_forward: ['run', 1.0],
   run_backward: ['run', -1.0],

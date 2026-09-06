@@ -336,6 +336,14 @@ export interface Backdrop { dispose(): void }
 /** Mount the full three-layer backdrop. Call AFTER the venue is built (so
  *  it never steals a venue mesh name) and keep the returned handle for
  *  dispose. Radius outside every venue (venues max ~110 units). */
+/**
+ * Ship Pass 6 batch B (owner: "it needs to look good"): the painted skies read as flat walls (park = pale overcast behind the
+ * skate bowl, alpine = white). The venue specs already ship photo-derived 1024×512 domes (public/backdrops/baked, horizon at
+ * v=0.6); a family that has one uses it as the dome texture — the painted sky stays as the fallback when the file is
+ * missing, and the silhouette ring is skipped because the bake carries its own horizon.
+ */
+const BAKED: Partial<Record<BackdropFamily, string>> = { park: 'neon', alpine: 'mountains', ocean: 'ocean', stadium: 'stadium', dojo: 'dojo', venice: 'beach' };
+
 export function mountBackdrop(scene: Scene, family: BackdropFamily): Backdrop {
   // A venue built by NexusWebScene already owns a painted sky ('nexus_sky',
   // radius 200) that fully occludes this dome (280) and ring (235) — mounting
@@ -345,8 +353,21 @@ export function mountBackdrop(scene: Scene, family: BackdropFamily): Backdrop {
 
   const dome = MeshBuilder.CreateSphere('bk_dome', { diameter: 560, segments: 16, sideOrientation: Mesh.BACKSIDE }, scene);
   const domeMat = new StandardMaterial('bk_dome_m', scene);
-  domeMat.emissiveTexture = paintSky(scene, SKIES[family]);
-  domeMat.emissiveColor = Color3.White();           // emissive = texture × color — never let it multiply down
+  const baked = BAKED[family];
+  let usedBake = false;
+  if (baked) {
+    const tex = new Texture(`/backdrops/baked/${baked}.jpg`, scene, false, false, Texture.BILINEAR_SAMPLINGMODE, undefined,
+      () => { domeMat.emissiveTexture = paintSky(scene, SKIES[family]); console.warn(`[FEL-SKY] baked dome "${baked}" missing — painted ${family} sky`); });
+    tex.wrapU = Texture.WRAP_ADDRESSMODE; tex.wrapV = Texture.CLAMP_ADDRESSMODE;
+    domeMat.emissiveTexture = tex; usedBake = true;
+  } else {
+    domeMat.emissiveTexture = paintSky(scene, SKIES[family]);
+  }
+  // StandardMaterial ADDS the emissive texture to emissiveColor (default.fragment: emissiveColor += texture); a white
+  // emissiveColor therefore clipped every sky to white — the "white wall" behind skate, slope, surf and big air since the
+  // painted domes shipped (measured 2026-09-05: sky pixels 221/221/220 regardless of texture, 255 with the grade off).
+  // Black lets the texture through unchanged; the venue sky (nexus_sky) always did this by leaving the default.
+  domeMat.emissiveColor = Color3.Black();
   domeMat.diffuseColor = Color3.Black();
   domeMat.specularColor = Color3.Black();
   domeMat.disableLighting = true;
@@ -355,6 +376,7 @@ export function mountBackdrop(scene: Scene, family: BackdropFamily): Backdrop {
   dome.applyFog = false;
   meshes.push(dome);
 
+  if (!usedBake) {
   const ring = MeshBuilder.CreateCylinder('bk_ring', {
     diameter: 470, height: 90, tessellation: 48, sideOrientation: Mesh.BACKSIDE, cap: Mesh.NO_CAP,
   }, scene);
@@ -362,7 +384,7 @@ export function mountBackdrop(scene: Scene, family: BackdropFamily): Backdrop {
   const ringMat = new StandardMaterial('bk_ring_m', scene);
   const ringTex = paintRing(scene, RINGS[family]);
   ringMat.emissiveTexture = ringTex;
-  ringMat.emissiveColor = Color3.White();           // emissive = texture × color — never let it multiply down
+  ringMat.emissiveColor = Color3.Black();           // the texture adds to this — black shows the paint as painted
   ringMat.opacityTexture = ringTex;
   ringMat.diffuseColor = Color3.Black();
   ringMat.specularColor = Color3.Black();
@@ -370,6 +392,7 @@ export function mountBackdrop(scene: Scene, family: BackdropFamily): Backdrop {
   ring.material = ringMat;
   ring.isPickable = false;
   meshes.push(ring);
+  }
 
   // DRIFT — clouds/stars slowly live
   const obs = scene.onBeforeRenderObservable.add(() => {

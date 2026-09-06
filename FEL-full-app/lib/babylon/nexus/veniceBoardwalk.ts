@@ -52,11 +52,8 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode): Tran
   seaMat.emissiveColor = new Color3(0.10, 0.06, 0.12);
   const seaW = MeshBuilder.CreateGround('vb_sea_w', { width: L, height: L * 2 }, scene); seaW.position.set(westSea - L / 2, 0, 0); seaW.parent = holder; seaW.material = seaMat; seaW.isPickable = false;
   const seaN = MeshBuilder.CreateGround('vb_sea_n', { width: L * 2, height: L }, scene); seaN.position.set(0, 0, northSea - L / 2); seaN.parent = holder; seaN.material = seaMat; seaN.isPickable = false;
-  // the sun low over the northern water, where the hoop camera looks: a warm disc and a soft glow, just under the dome
-  const sun = MeshBuilder.CreateDisc('vb_sun', { radius: 6, tessellation: 48 }, scene);
-  sun.position.set(-48, 11, -186); sun.billboardMode = Mesh.BILLBOARDMODE_ALL; sun.parent = holder; sun.isPickable = false;
-  const sm = new StandardMaterial('vb_sun_mat', scene); sm.emissiveColor = new Color3(1, 0.93, 0.78); sm.disableLighting = true; sun.material = sm;
-  // (an additive glow plane read as a cone against the dome — the disc alone carries the sun; the bake carries the sky)
+  // The sun is PAINTED into the beach dome (scripts/backdrop/paint-beach-dome.py, u≈0.33): a 3D disc at the dome wall rendered as a
+  // navy coin from the threes and ones cameras (depth against the dome at 190 m) while it read white from dunk's. No disc.
   void zSpanN;
   // a slow shimmer on the water: the specular highlight drifts
   let t = 0;
