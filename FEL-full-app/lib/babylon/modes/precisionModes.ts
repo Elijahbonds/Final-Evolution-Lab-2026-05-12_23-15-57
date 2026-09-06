@@ -450,10 +450,12 @@ export const GolfMode: ModeDefinition = (() => {
       SoundKit.startAmbient('wind');
       // L4 — a gallery behind the tee. A links hole is watched; and they are
       // instanced silhouettes, so the whole gallery costs two draws.
+      // two rows flanking the tee box (x ±8.5, z −1…+5): the old rows behind the tee at z −4 / −6 sat on the swing camera's
+      // plane (offset z −4.2) and two bodies stood beside the lens, over the phone pad (measured 2026-09-06)
       gallery = new Onlookers(ctx.scene, Array.from({ length: 10 }, (_, i) => new Vector3(
-        -7 + (i % 5) * 3.4 + (i > 4 ? 1.6 : 0),
+        (i < 5 ? -8.5 : 8.5) + (i % 2) * (i < 5 ? -0.8 : 0.8),
         0,
-        -4 - (i > 4 ? 2.2 : 0),
+        -1 + (i % 5) * 1.5,
       )), '#3d4a3a');
       ctx.setHud({ score: 0 });
       nextShot(ctx);

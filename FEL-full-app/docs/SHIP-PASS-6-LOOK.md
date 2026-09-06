@@ -175,3 +175,7 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   fades as the body rises (jump, dunk hang) and re-anchors after 1.6 s at a new height (a rider descending). No texture: a
   textured plane drew nothing through the alpha-tested path (measured live, red-solid showed, red-textured did not), so the
   soft edge is vertex alpha on a 24-slice disc. golf 60 fps / 58 draws, dunk 60 fps / 121; 0/0/0.
+- **Pass 7 phase 9 (pad and HUD), 06:40**: the phone frames (mobile-touch capture, /play/golf) showed two gallery bodies
+  standing beside the lens, over the action buttons and the d-pad — the golf gallery's rows sat at z −4 / −6, on the swing
+  camera's plane. The gallery flanks the tee box now (x ±8.5, z −1…+5). Phone: errors 0; desktop golf 60 fps / 72 draws.
+  The pad's hollow sockets for unbound verbs (e7494e1) read as intended; the perf panel over the title is the dev overlay.
