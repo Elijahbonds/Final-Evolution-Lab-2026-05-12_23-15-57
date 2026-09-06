@@ -74,6 +74,7 @@ export const KIT_PACKS: Record<string, string> = {
 };
 const packContainers = new WeakMap<Scene, Map<string, Promise<AssetContainer | null>>>();
 const attached = new WeakMap<AbstractMesh, Set<string>>();   // per body kit mesh: pack items already attached
+const templates = new WeakMap<Scene, Map<string, { mesh: Mesh; skeleton: Skeleton }>>();
 
 function loadPack(scene: Scene, itemId: string): Promise<AssetContainer | null> {
   let map = packContainers.get(scene); if (!map) { map = new Map(); packContainers.set(scene, map); }
@@ -108,13 +109,25 @@ async function attachKitPack(sibling: AbstractMesh, slot: KitSlot, itemId: strin
   const scene = sibling.getScene();
   const c = await loadPack(scene, itemId);
   if (!c || sibling.isDisposed() || !sibling.skeleton) return;
-  const src = c.meshes.find((m) => m.name.startsWith(`Kit_${slot}_${itemId}`) && (m as Mesh).getTotalVertices() > 0) as Mesh | undefined;
-  if (!src) { console.warn(`[FEL-KIT] pack ${itemId}: no Kit_${slot}_${itemId} mesh inside`); return; }
-  const inst = c.instantiateModelsToScene((n) => `${n}_pk${sibling.uniqueId}`, false, { doNotInstantiate: true });
-  const prefix = `Kit_${slot}_${itemId}`;
-  const mesh = inst.rootNodes.flatMap((r) => [r, ...r.getChildMeshes()]).find((n) => n.name.startsWith(prefix) && ((n as Mesh).getTotalVertices?.() ?? 0) > 0) as Mesh | undefined;
-  const packSkeleton = inst.skeletons[0] ?? mesh?.skeleton ?? null;
-  if (!mesh || !packSkeleton) { console.warn(`[FEL-KIT] pack ${itemId}: instantiate produced no skinned mesh`); return; }
+  // One TEMPLATE per pack per scene (the first body pays the container instantiate); every later body takes a mesh clone
+  // that shares the template's geometry plus a 22-bone skeleton clone — football pools a dozen defenders and paid a full
+  // instantiate for each (measured 44–50 fps, 2026-09-05).
+  let tpl = templates.get(scene)?.get(itemId);
+  if (!tpl) {
+    const inst = c.instantiateModelsToScene((n) => `${n}_pk`, false, { doNotInstantiate: true });
+    const prefix = `Kit_${slot}_${itemId}`;
+    const m0 = inst.rootNodes.flatMap((r) => [r, ...r.getChildMeshes()]).find((n) => n.name.startsWith(prefix) && ((n as Mesh).getTotalVertices?.() ?? 0) > 0) as Mesh | undefined;
+    const s0 = inst.skeletons[0] ?? m0?.skeleton ?? null;
+    if (!m0 || !s0) { console.warn(`[FEL-KIT] pack ${itemId}: instantiate produced no skinned mesh`); return; }
+    m0.setEnabled(false); m0.isVisible = false; m0.parent = null;
+    for (const r of inst.rootNodes) if (r !== m0 && r.getChildMeshes().length === 0) r.dispose();
+    tpl = { mesh: m0, skeleton: s0 };
+    let map = templates.get(scene); if (!map) { map = new Map(); templates.set(scene, map); }
+    map.set(itemId, tpl);
+  }
+  const mesh = tpl.mesh.clone(`Kit_${slot}_${itemId}_pk${sibling.uniqueId}`, null, true) as Mesh;
+  mesh.setEnabled(true);
+  const packSkeleton = tpl.skeleton.clone(`${tpl.skeleton.name}_pk${sibling.uniqueId}`);
   // The pack mesh's vertices live in the PACK's bind space (Blender's export of the same rig); a straight skeleton swap
   // deformed it into a blob (measured 2026-09-05). So the pack keeps its own Skeleton and inverse binds, and each of its
   // bones reads the BODY's matching transform node — the body's animation drives it through the pack's own binds.
@@ -129,11 +142,12 @@ async function attachKitPack(sibling: AbstractMesh, slot: KitSlot, itemId: strin
   mesh.parent = sibling.parent;
   mesh.position.copyFrom(sibling.position); mesh.rotationQuaternion = sibling.rotationQuaternion?.clone() ?? null; mesh.rotation.copyFrom(sibling.rotation); mesh.scaling.copyFrom(sibling.scaling);
   mesh.isPickable = false;
-  for (const r of inst.rootNodes) if (r !== mesh && r.getChildMeshes().length === 0) r.dispose();
   mesh.onDisposeObservable.add(() => packSkeleton.dispose());
   // swap in: the fallback the slot showed goes invisible, the pack garment takes the slot's fixes
   for (const m of list) { m.isVisible = false; syncGarmentVisibility(m); }
   list.push(mesh); mesh.isVisible = true;
-  fixGarment(mesh, slot, itemId);
+  // pack garments are fitted with ease in Blender (fit-garment.py) — the runtime inflate is a 15k-vertex CPU rewrite per spawn,
+  // and football spawns defenders all game (measured 44–50 fps with it, 2026-09-05); shoes still take their fold
+  if (slot === 'shoes') fixGarment(mesh, slot, itemId);
   console.info(`[FEL-KIT] pack ${itemId} attached to ${sibling.parent?.name ?? 'body'}`);
 }

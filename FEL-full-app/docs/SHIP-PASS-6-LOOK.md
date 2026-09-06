@@ -110,3 +110,8 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
 - **Phase 3 (dressing density)**: `scripts/meshy/extract-prop.py` lifts one object out of a Meshy pack's fragment cloud
   (cluster.py's box) as a real-metre prop: football helmets ×2 (the 'football' cluster was a second helmet), a bat and a
   glove → `public/models/meshy/{helmet,helmet2,bat,glove}.glb`, placed at the gridiron bench and the ballpark dugout.
+- **Football frame rate (23:10)**: read 44–50 fps at the end of every capture after the cache wipe. Probed: ~1M real
+  triangles (the scan a third of it) — decimated the scan to 97k tris, the jersey packs to ~15k vertices, the helmets to
+  a fifth; attach rebuilt around one template per pack (mesh clone sharing geometry + skeleton clone) and the runtime
+  inflate skipped for packs. Still 46–50 — and 50 WITHOUT the pack. So the cost is the dev server recompiling every route
+  after `.next` was cleared, not the scene; the warm gauntlet decides. The lighter assets stay (they cost nothing).
