@@ -49,7 +49,12 @@ interface BakeSpec {
 }
 
 const BAKES: BakeSpec[] = [
-  { kind: 'beach',     src: 'dunk.jpg',              srcHorizon: 0.52, ground: [62, 48, 44],  warm: 0.10 },
+  // owner 2026-09-05: with the horizon at 0.52 the photo's COURT and hoops were baked into the sky behind the real
+  // court. 0.34 is the shop line: sky, ocean, palms and the boardwalk stay above the horizon; the court falls below it
+  // owner 2026-09-05: dunk.jpg is the CONCEPT for Venice, rebuilt as 3D scenery (nexus/veniceBoardwalk.ts + prop set
+  // venice-court-meshy) — baking it put a court in the sky. The beach dome is now the pure sunset SKY photo, no ground in it.
+  // 'beach' is PAINTED, not baked from a photo (owner 2026-09-05: the sunset photo read as a red wall — "not hell"):
+  // scripts/backdrop/paint-beach-dome.py writes public/backdrops/baked/beach.jpg; this pipeline leaves it alone.
   { kind: 'ocean',     src: 'surf.jpg',              srcHorizon: 0.50, ground: [28, 52, 66],  warm: 0.06 },
   { kind: 'city',      src: 'venice-sky-sunset.jpg', srcHorizon: 0.55, ground: [40, 32, 40],  warm: 0.08 },
   { kind: 'stadium',   src: 'soccer.jpg',            srcHorizon: 0.50, ground: [24, 40, 26] },

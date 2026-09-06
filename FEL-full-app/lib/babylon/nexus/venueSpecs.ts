@@ -83,7 +83,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     // behind the hoop is the whole reason this venue read as a colour field
     // rather than as Venice at dusk. 'beach' paints a sun, its glow, an ocean
     // with light on the water, and a palm line along the horizon.
-    environment: dusk('#FF7A5C', '#1A2560', '#C9A184', '#FFC98A', 0.6, 'beach', 0.0006),   // golden-hour haze, thin: the boardwalk scenery reads to the horizon
+    environment: dusk('#F2B48C', '#2B3A78', '#C9A184', '#FFD2A0', 0.6, 'beach', 0.0006),   // soft peach fill, deep-blue ground bounce: the red cast is gone   // golden-hour haze, thin: the boardwalk scenery reads to the horizon
     ground: { kind: 'court', size: [16, 28], color: '#1B7FB5', lineColor: '#F2F6FF', markings: 'halfcourt' },
     props: [
       // Owner call 2026-09-05: the red hoop banner is gone from every basketball court — the backboard and rim stand alone.
