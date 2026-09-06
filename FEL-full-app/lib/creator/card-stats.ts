@@ -61,18 +61,20 @@ export function normalizeHighlights(input: unknown, candidates: HighlightCandida
 
 export interface PublicStats {
   prq: Record<string, number> | null;                                  // eight attributes, measured over card
+  prqSource: 'measured' | 'profile' | null;                            // measured = from PrqEntry rows; profile = the stored self-reported profile
   mastery: { mode: string; tier: number; label: string; best: number | null }[];
   records: { mode: string; best: number; sessions: number; wins: number }[];
   resiliency: { attempts: number; retryRate: number; returnedAfterLoss: boolean | null } | null;
   movement: { latestAt: string | null; delta: Record<string, number> | null } | null;
   ladder: { mode: string; bestScore: number; weekStart: string } | null;
-  verified: boolean;                                                   // every number above came from recorded sessions
+  verified: boolean;                                                   // the PRQ block came from measured entries (records/mastery are always from played sessions)
 }
 
 /** Apply the owner's mask: hidden blocks come back null/empty so the wire shape stays stable. */
 export function maskStats(stats: PublicStats, vis: Visibility): PublicStats {
   return {
     prq: vis.prq ? stats.prq : null,
+    prqSource: vis.prq ? stats.prqSource : null,
     mastery: vis.mastery ? stats.mastery : [],
     records: vis.records ? stats.records : [],
     resiliency: vis.resiliency ? stats.resiliency : null,

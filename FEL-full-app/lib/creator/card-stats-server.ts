@@ -11,15 +11,17 @@ export async function computePublicStats(userId: string): Promise<PublicStats> {
     prisma.ladderEntry.findMany({ where: { userId }, orderBy: { bestScore: 'desc' }, take: 1, include: { season: { select: { mode: true, weekStart: true } } } }),
     prisma.gameSession.findMany({ where: { userId }, select: { mode: true, score: true, won: true }, take: 500, orderBy: { createdAt: 'desc' } }),
   ]);
-  const prq = profile.prq.measured && Object.keys(profile.prq.measured).length ? profile.prq.measured : profile.prq.card;
+  const measured = !!(profile.prq.measured && Object.keys(profile.prq.measured).length);
+  const prq = measured ? profile.prq.measured : profile.prq.card;
   return {
     prq: prq ? Object.fromEntries(Object.entries(prq).map(([k, v]) => [k, Math.round(Number(v))])) : null,
+    prqSource: prq ? (measured ? 'measured' : 'profile') : null,
     mastery: mastery.map((m) => ({ mode: m.mode, tier: m.tier, label: masteryLabel(m.tier), best: bestSample(m.samples) })),
     records: recordsByMode(sessions),
     resiliency: profile.history.sessions ? { attempts: profile.resiliency.attempts, retryRate: profile.resiliency.retryRate, returnedAfterLoss: profile.resiliency.returnedAfterLoss } : null,
     movement: profile.movement.latestAt ? { latestAt: new Date(profile.movement.latestAt).toISOString(), delta: profile.movement.delta } : null,
     ladder: ladder[0] ? { mode: ladder[0].season.mode, bestScore: ladder[0].bestScore, weekStart: ladder[0].season.weekStart.toISOString() } : null,
-    verified: true,
+    verified: measured,   // honest: the shield only when the eight numbers came from measured entries
   };
 }
 
