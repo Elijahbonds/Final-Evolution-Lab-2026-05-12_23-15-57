@@ -43,10 +43,7 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     ...line('nature', 'tree_palmShort', [-12, -42], [12, -42], 4, 0, 3.6),
     ...line('racing', 'lightPostModern', [19, -36], [19, 36], 7, Math.PI, 2.4), ...line('racing', 'lightPostModern', [-15, -30], [-15, 30], 4, 0, 2.4),
     ...line('city-suburban', 'planter', [21, -33], [21, 33], 6, 0, 2.2),
-    { kit: 'meshy', model: 'store', at: [36, 0, -30], yaw: -Math.PI / 2 }, { kit: 'meshy', model: 'store', at: [36, 0, -12], yaw: -Math.PI / 2, scale: 0.92 },
-    { kit: 'meshy', model: 'store', at: [36, 0, 8], yaw: -Math.PI / 2 }, { kit: 'meshy', model: 'store', at: [36, 0, 28], yaw: -Math.PI / 2, scale: 0.95 },
     { kit: 'racing', model: 'tent', at: [33, 0, -21], yaw: -Math.PI / 2, scale: 2.6 }, { kit: 'racing', model: 'tent', at: [33, 0, 18], yaw: -Math.PI / 2, scale: 2.6 },
-    { kit: 'meshy', model: 'store', at: [-6, 0, -50], yaw: 0 }, { kit: 'meshy', model: 'store', at: [10, 0, -50], yaw: 0, scale: 0.9 },
     { kit: 'racing', model: 'tent', at: [22, 0, -48], yaw: 0, scale: 2.6 },
     { kit: 'meshy', model: 'hoopbus', at: [30, 0, -46], yaw: Math.PI / 2 }, { kit: 'meshy', model: 'sedan', at: [29, 0, 44], yaw: Math.PI / 2 },
     ...line('nature', 'plant_bushLarge', [-13, -18], [-13, 18], 5, 0, 3.0), ...line('nature', 'plant_bush', [13, -20], [13, 20], 6, 0, 2.6),
@@ -54,11 +51,15 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     ...line('city-suburban', 'fence-low', [-12.5, -12], [-12.5, 12], 7, Math.PI / 2, 2.0), ...line('nature', 'grass_large', [-11, -15.5], [11, -15.5], 6, 0, 2.4),
     ...line('nature', 'grass_large', [-11, 15.5], [11, 15.5], 6, 0, 2.4), { kit: 'nature', model: 'rock_smallFlatA', at: [-14, 0, 16], scale: 2.2 }, { kit: 'nature', model: 'rock_smallG', at: [14, 0, -16.5], scale: 2.0 },
     // MID: the boardwalk gains life — a third tent, two more shop fronts on the far line, lamps down the west grass
-    { kit: 'racing', model: 'tent', at: [33, 0, 40], yaw: -Math.PI / 2, scale: 2.6 }, { kit: 'meshy', model: 'store', at: [26, 0, -50], yaw: 0, scale: 0.9 }, { kit: 'racing', model: 'tent', at: [-22, 0, -48], yaw: 0, scale: 2.6 },
+    { kit: 'racing', model: 'tent', at: [33, 0, 40], yaw: -Math.PI / 2, scale: 2.6 }, { kit: 'racing', model: 'tent', at: [-22, 0, -48], yaw: 0, scale: 2.6 },
     ...line('racing', 'lightPostModern', [-15, -36], [-15, 36], 4, 0, 2.4), { kit: 'racing', model: 'flagRed', at: [21, 0, -40], scale: 2.4 }, { kit: 'racing', model: 'flagGreen', at: [21, 0, 40], scale: 2.4 },
     // FAR: silhouettes for depth — a palm line down the sand and across the north shore, rocks at the water's edge
     ...line('nature', 'tree_palmTall', [-30, -60], [-30, 60], 7, 0.3, 5.2), ...line('nature', 'tree_palmDetailedTall', [-40, -62], [40, -62], 6, 0, 5.0),
     ...line('nature', 'rock_largeB', [-34, -30], [-34, 30], 4, 0, 3.0), { kit: 'nature', model: 'rock_largeD', at: [-36, 0, -50], scale: 3.4 },
+    // PM brief 2026-09-05 (VENICE-BASKET): the Meshy stores leave the court set; the second writer's venice kit stands in —
+    // the far pier on the northern water and three sail billboards along the boardwalk, all MID/FAR (≥ 15 m from the court)
+    { kit: 'venice', model: 'pier_far', at: [-30, 0, -110], yaw: 0.2 },
+    { kit: 'venice', model: 'sail_billboard_0', at: [34, 0, -22], yaw: -Math.PI / 2 }, { kit: 'venice', model: 'sail_billboard_1', at: [34, 0, 6], yaw: -Math.PI / 2 }, { kit: 'venice', model: 'sail_billboard_2', at: [34, 0, 32], yaw: -Math.PI / 2 },
   ],
   'dojo': [
     ...ring('mini-arena', 'column', 9.5, 8, 0, 2.6, Math.PI / 8),

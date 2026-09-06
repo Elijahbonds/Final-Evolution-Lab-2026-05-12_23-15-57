@@ -121,3 +121,11 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   posts at the south end, a FLIGHT NIGHT scoreboard plate beside the far hoop, FEL flags on four boardwalk lamp posts.
   Unlit boards (emissive black under the paint). Canvas text painted top-down onto a plane's bottom-up v read upside down
   on the first frame — `vScale = -1` on every sign texture.
+- **Venice basket (owner 23:35–00:20, PM brief VENICE-BASKET)**: the "structure in front of the rim" was the Luma scan's own
+  two hoop stands baked into `venice-blue-court.glb`. Finding them took a while: the map is mounted with `mapRotationY = π/2`
+  (lib/map-data.ts), so the court's length runs along the file's x axis — every cut box laid along z hit mid-court side
+  clutter instead. Deleting the stands opened a hole (their base shares the floor's vertices); `scripts/map/cut-scan-stands.py`
+  now FLATTENS them onto the local floor (248 + 190 vertices, mesh closed, textures untouched). A texture repaint of the
+  ghost paint was attempted and parked: the repainted image never reached the screen. The Meshy hoop stands on the play
+  rim (dressHoop) and mirrored on the south baseline; the stores left the Venice set for the second writer's venice kit
+  (far pier, three sail billboards, all ≥ 15 m).
