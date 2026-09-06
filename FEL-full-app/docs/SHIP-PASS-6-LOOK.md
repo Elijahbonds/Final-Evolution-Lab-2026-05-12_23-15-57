@@ -160,3 +160,7 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   hero's scan and reassigned the hero ref). A rail of onlookers stands on the Venice court's east apron inside the scan's
   fence, facing the court (`veniceBoardwalk.ts`, roster bodies, cap 8) — on the walk behind the baked wall they were unseen.
   dunk 60 fps / 117–119 draws, threes 177, tennis 66, derby 45, penalty 116–118; 0/0/0 everywhere.
+- **Pass 7 phase 6 (life) cont., 05:00**: karate versus gets the endless gauntlet's ring of onlookers (14 spots on the
+  gravel, cap 8). Seen in the frames and fixed: the dojo set's two Kenney corner blocks read as black cubes under the dusk
+  (gone) and its column ring at 2.6× read as Greek temple pillars in a shrine courtyard (1.5×, lantern-post height).
+  karate_vs 60 fps / 46 draws, karate 60 fps / 136; 0/0/0.

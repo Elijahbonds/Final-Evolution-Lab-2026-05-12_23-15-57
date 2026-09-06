@@ -62,11 +62,11 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     { kit: 'venice', model: 'sail_billboard_0', at: [34, 0, -22], yaw: -Math.PI / 2 }, { kit: 'venice', model: 'sail_billboard_1', at: [34, 0, 6], yaw: -Math.PI / 2 }, { kit: 'venice', model: 'sail_billboard_2', at: [34, 0, 32], yaw: -Math.PI / 2 },
   ],
   'dojo': [
-    ...ring('mini-arena', 'column', 9.5, 8, 0, 2.6, Math.PI / 8),
+    ...ring('mini-arena', 'column', 9.5, 8, 0, 1.5, Math.PI / 8),   // Pass 7: lantern-post height — at 2.6 they read as Greek temple pillars in a shrine courtyard
     { kit: 'mini-arena', model: 'statue', at: [0, 0, 11], yaw: Math.PI, scale: 2.4 }, { kit: 'mini-arena', model: 'banner', at: [-4, 0, 11], scale: 2.4 }, { kit: 'mini-arena', model: 'banner', at: [4, 0, 11], scale: 2.4 },
     { kit: 'mini-arena', model: 'tree', at: [-11, 0, -8], scale: 2.6 }, { kit: 'nature', model: 'tree_pineRoundA', at: [11, 0, -9], scale: 4.8 },
-    // props+depth pass 2026-09-05 — NEAR: stones and a block at each corner of the mat's apron
-    { kit: 'nature', model: 'rock_smallFlatA', at: [-8.5, 0, 8.5], scale: 2.0 }, { kit: 'nature', model: 'rock_smallG', at: [8.5, 0, -8.5], scale: 1.8 }, { kit: 'mini-arena', model: 'block', at: [-8.5, 0, -8.5], scale: 2.2 }, { kit: 'mini-arena', model: 'block', at: [8.5, 0, 8.5], scale: 2.2 },
+    // props+depth pass 2026-09-05 — NEAR: stones at the mat's apron corners (the Kenney blocks read as black cubes under the dusk — gone, Pass 7)
+    { kit: 'nature', model: 'rock_smallFlatA', at: [-8.5, 0, 8.5], scale: 2.0 }, { kit: 'nature', model: 'rock_smallG', at: [8.5, 0, -8.5], scale: 1.8 },
     // MID: a second ring of pines outside the columns, banners between them
     ...ring('nature', 'tree_pineRoundB', 16, 6, Math.PI / 6, 4.4, 0), { kit: 'mini-arena', model: 'banner', at: [-13, 0, 0], yaw: Math.PI / 2, scale: 2.4 }, { kit: 'mini-arena', model: 'banner', at: [13, 0, 0], yaw: -Math.PI / 2, scale: 2.4 },
     // FAR: the owner's Meshy dojo stands off the side where the fighting camera can see it; a wall line closes the back
