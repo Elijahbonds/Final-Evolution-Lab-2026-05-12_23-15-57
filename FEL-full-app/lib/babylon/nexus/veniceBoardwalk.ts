@@ -8,7 +8,7 @@
 // 'venice-court-meshy' (venuePropSets.ts). Runs for the basketball venues under Venice only — a picked location brings
 // its own environment. Everything hangs under the venue root and dies with it.
 import { Color3, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, TransformNode } from '@babylonjs/core';
-import { courtLogoTexture, groundTextureFor, TILE_M, type GroundKind } from '../visual/groundTextures';
+import { courtLogoTexture, groundTextureFor, signTexture, TILE_M, type GroundKind } from '../visual/groundTextures';
 import { HOOP_SCAN, spawnMeshyProp } from '../visual/meshyProps';
 import type { Scene } from '@babylonjs/core';
 
@@ -73,6 +73,20 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode): Tran
     const s = 3.05 / HOOP_SCAN.rimY; root.scaling.setAll(s); root.rotation.y = Math.PI;
     root.position.set(0, 0, COURT.hz - 0.6 + HOOP_SCAN.rimZ * s);   // pole just inside the baseline, ring 0.6 m in front of it
   });
+  // Pass 7 phase 4 — signage with real names: an entrance sign at the south gate, a scoreboard plate behind the far hoop,
+  // flags on the boardwalk lamp posts (unlit boards so the paint reads under the grade; ~10 draws)
+  const sign = (name: string, w: number, h: number, pos: [number, number, number], yaw: number, tex: ReturnType<typeof signTexture>) => {
+    const plane = MeshBuilder.CreatePlane(name, { width: w, height: h }, scene);
+    plane.position.set(pos[0], pos[1], pos[2]); plane.rotation.y = yaw; plane.parent = holder; plane.isPickable = false;
+    const m = new StandardMaterial(`${name}_mat`, scene); m.emissiveTexture = tex; m.emissiveColor = Color3.Black(); m.disableLighting = true; m.backFaceCulling = false;
+    plane.material = m; return plane;
+  };
+  const post = (name: string, x: number, z: number, hgt: number) => { const c = MeshBuilder.CreateCylinder(name, { height: hgt, diameter: 0.14 }, scene); c.position.set(x, hgt / 2, z); c.parent = holder; c.isPickable = false; const pm = new PBRMaterial(`${name}_mat`, scene); pm.albedoColor = Color3.FromHexString('#2A2E37'); pm.roughness = 0.6; pm.metallic = 0.4; c.material = pm; return c; };
+  post('vb_gate_post_l', -1.9, 19.5, 3.4); post('vb_gate_post_r', 1.9, 19.5, 3.4);
+  sign('vb_gate_sign', 4.2, 1.0, [0, 3.0, 19.5], Math.PI, signTexture(scene, ['VENICE BEACH COURTS', 'FINAL EVOLUTION LAB · EST. 2026'], { bg: '#1E2A44', accent: '#F2B84B' }));
+  sign('vb_scoreboard', 4.8, 1.3, [7.5, 3.0, -19.5], 0, signTexture(scene, ['FLIGHT NIGHT', 'VENICE · OPEN RUN · ALL LEVELS'], { bg: '#141826', fg: '#FFE9B0', accent: '#FF6B3D' }));
+  const flagTex = signTexture(scene, ['FEL'], { bg: '#B03A2E', fg: '#FFF4E0', accent: '#F2B84B', w: 256, h: 640 });
+  for (let i = 0; i < 4; i++) { const z = -36 + i * 24; sign(`vb_flag_${i}`, 0.5, 1.25, [19.55, 4.0, z + 0.5], Math.PI / 2, flagTex); }
   // Pass 7 phase 1: a half-court logo decal on the scan (centre circle, 3.6 m), matte, alpha-blended
   const logo = MeshBuilder.CreateGround('vb_court_logo', { width: 3.6, height: 3.6 }, scene);
   logo.position.set(0, 0.03, 0); logo.parent = holder; logo.isPickable = false;

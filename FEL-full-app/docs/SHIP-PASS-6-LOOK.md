@@ -115,3 +115,9 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   a fifth; attach rebuilt around one template per pack (mesh clone sharing geometry + skeleton clone) and the runtime
   inflate skipped for packs. Still 46–50 — and 50 WITHOUT the pack. So the cost is the dev server recompiling every route
   after `.next` was cleared, not the scene; the warm gauntlet decides. The lighter assets stay (they cost nothing).
+- **Warm gauntlet 22:37–23:00 (b2bc6d1)**: tsc PASS, 320 tests, every dev / login / mtier / mobile row 0/0/0 at 60 fps —
+  football included, confirming the cold-server read. Diff vs previous: no change.
+- **Phase 4 (signage), 23:05–23:20**: `signTexture` paints boards with real names — the VENICE BEACH COURTS gate sign on two
+  posts at the south end, a FLIGHT NIGHT scoreboard plate beside the far hoop, FEL flags on four boardwalk lamp posts.
+  Unlit boards (emissive black under the paint). Canvas text painted top-down onto a plane's bottom-up v read upside down
+  on the first frame — `vScale = -1` on every sign texture.

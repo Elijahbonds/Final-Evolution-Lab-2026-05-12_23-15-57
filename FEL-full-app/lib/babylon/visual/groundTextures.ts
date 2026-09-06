@@ -72,3 +72,23 @@ export function courtLogoTexture(scene: Scene, size = 512): DynamicTexture {
   tex.update(false); tex.hasAlpha = true;
   return tex;
 }
+
+/** Painted signage (Pass 7 phase 4): lines of text on a coloured board, ratio w:h, for entrance signs, plates and flags. */
+export function signTexture(scene: Scene, lines: string[], opts: { bg?: string; fg?: string; accent?: string; w?: number; h?: number; stripes?: boolean } = {}): DynamicTexture {
+  const w = opts.w ?? 1024, h = opts.h ?? 256;
+  const tex = new DynamicTexture(`fel_sign_${lines[0]?.slice(0, 12) ?? 'sign'}`, { width: w, height: h }, scene, true);
+  const ctx = tex.getContext() as CanvasRenderingContext2D;
+  ctx.fillStyle = opts.bg ?? '#1E2A44'; ctx.fillRect(0, 0, w, h);
+  if (opts.stripes) { ctx.fillStyle = opts.accent ?? '#F2B84B'; for (let x = 0; x < w; x += 80) ctx.fillRect(x, 0, 40, h * 0.12); }
+  ctx.strokeStyle = opts.accent ?? '#F2B84B'; ctx.lineWidth = h * 0.05; ctx.strokeRect(h * 0.05, h * 0.05, w - h * 0.1, h - h * 0.1);
+  ctx.fillStyle = opts.fg ?? '#F7F3EA'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const n = lines.length; lines.forEach((line, i) => {
+    const size = Math.round(i === 0 ? h * (n > 1 ? 0.42 : 0.5) : h * 0.2);
+    ctx.font = `${i === 0 ? 'bold ' : ''}${size}px Helvetica, Arial, sans-serif`;
+    ctx.fillText(line, w / 2, n > 1 ? (i === 0 ? h * 0.42 : h * 0.76) : h / 2);
+  });
+  tex.update(false);
+  tex.vScale = -1;   // the canvas paints top-down, a plane's v runs bottom-up: without this every sign read upside down
+  tex.wrapV = Texture.WRAP_ADDRESSMODE;
+  return tex;
+}
