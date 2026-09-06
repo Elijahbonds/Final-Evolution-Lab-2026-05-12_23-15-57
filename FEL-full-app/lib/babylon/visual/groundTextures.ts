@@ -2,8 +2,8 @@
 // floor and surround"). No files, no downloads: a 512² DynamicTexture per kind, cached per scene, wrapped and tiled by the
 // caller (uScale/vScale = metres / TILE_M). Kinds read at play distance: grass (blade speckle, two greens), sand (fine grain,
 // damp streaks), concrete (slab seams, aggregate), asphalt (dark grain, faint patch lines).
-import { Color3, DynamicTexture, Texture } from '@babylonjs/core';
-import type { Scene } from '@babylonjs/core';
+import { Color3, DynamicTexture, PBRMaterial, Texture } from '@babylonjs/core';
+import type { AbstractMesh, Scene, TransformNode } from '@babylonjs/core';
 
 export type GroundKind = 'grass' | 'sand' | 'concrete' | 'asphalt';
 /** metres one tile of the texture covers */
@@ -91,4 +91,91 @@ export function signTexture(scene: Scene, lines: string[], opts: { bg?: string; 
   tex.vScale = -1;   // the canvas paints top-down, a plane's v runs bottom-up: without this every sign read upside down
   tex.wrapV = Texture.WRAP_ADDRESSMODE;
   return tex;
+}
+
+// ── Pass 7 phase 2 spread: a tiled grain over every procedural venue floor ───────────────────────────────────────────
+// The fenced builder paints each floor's albedo (markings, organic water/snow/sand, studio rings). Instead of repainting,
+// a PBR detail map multiplies a tiled grain over it: the red channel carries luminance (128 = no change), green/blue a
+// flat normal, alpha a neutral roughness. Markings stay crisp; a flat green pitch stops reading as a vector fill.
+
+export type FloorDetail = { kind: GroundKind; blend: number };
+
+/** Which grain a builder floor kind takes (albedo multiply only). Court, mat, stage, snow and water keep their paint. */
+export function floorDetailFor(floorKind: string): FloorDetail | null {
+  switch (floorKind) {
+    case 'pitch': case 'diamond': case 'green': return { kind: 'grass', blend: 0.55 };
+    case 'sand': return { kind: 'sand', blend: 0.45 };
+    case 'street': return { kind: 'asphalt', blend: 0.6 };
+    case 'hardcourt': return { kind: 'concrete', blend: 0.22 };
+    default: return null;
+  }
+}
+
+/** metres one DETAIL tile covers — grass wider than its albedo tile so the mottle reads as patches, not a grid */
+export const DETAIL_TILE_M: Record<GroundKind, number> = { grass: 9, sand: 4, concrete: 6, asphalt: 6 };
+
+const detailCache = new WeakMap<Scene, Map<GroundKind, DynamicTexture>>();
+
+/** Neutral-luminance grain of one kind for a PBR detail map (cached per scene; tile with uScale/vScale on a copy). */
+export function groundDetailTexture(scene: Scene, kind: GroundKind, size = 512): DynamicTexture {
+  let map = detailCache.get(scene); if (!map) { map = new Map(); detailCache.set(scene, map); }
+  const hit = map.get(kind); if (hit) return hit;
+  const src = groundTexture(scene, kind, size);
+  const tex = new DynamicTexture(`fel_ground_detail_${kind}`, size, scene, true);
+  const ctx = tex.getContext() as CanvasRenderingContext2D;
+  ctx.drawImage((src.getContext() as CanvasRenderingContext2D).canvas as unknown as CanvasImageSource, 0, 0);
+  if (kind === 'grass') {
+    // blades are one or two pixels and mipmap away at play distance; a low-frequency mottle (mown bands, damp patches)
+    // is what reads from the camera
+    const r = rng(77);
+    for (let i = 0; i < 70; i++) {
+      const x = r() * size, y = r() * size, rad = 30 + r() * 110;
+      const g = ctx.createRadialGradient(x, y, 1, x, y, rad);
+      const dark = r() < 0.5;
+      g.addColorStop(0, dark ? 'rgba(0,0,0,0.13)' : 'rgba(255,255,255,0.11)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    }
+    // (mower stripes were tried: one stripe per 3 m tile read as a checkerboard across the fairway — measured 2026-09-06)
+  }
+  const img = ctx.getImageData(0, 0, size, size); const d = img.data;
+  let sum = 0;
+  for (let i = 0; i < d.length; i += 4) sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+  const mean = sum / (d.length / 4) || 128;
+  for (let i = 0; i < d.length; i += 4) {
+    const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    d[i] = Math.max(0, Math.min(255, Math.round(128 + (l - mean) * 1.6)));   // luminance around neutral, contrast up
+    d[i + 1] = 128; d[i + 2] = 128; d[i + 3] = 128;                          // flat normal, neutral roughness
+  }
+  ctx.putImageData(img, 0, 0);
+  tex.update(false);
+  tex.wrapU = Texture.WRAP_ADDRESSMODE; tex.wrapV = Texture.WRAP_ADDRESSMODE; tex.anisotropicFilteringLevel = 8;
+  map.set(kind, tex);
+  return tex;
+}
+
+/** Layer the grain over a built venue floor (`venue_ground` under `root`, PBR material). No-op for kinds without a grain. */
+export function applyFloorDetail(scene: Scene, root: TransformNode, floorKind: string, size: [number, number]): boolean {
+  const detail = floorDetailFor(floorKind); if (!detail) return false;
+  const ground = root.getChildMeshes(false).find((m) => m.name === 'venue_ground');
+  return ground ? applyFloorDetailToMesh(scene, ground, detail, size) : false;
+}
+
+/** Layer a grain over one floor mesh (a mode's own slab, e.g. the skatepark). Needs a PBR material; the tile follows `size`. */
+export function applyFloorDetailToMesh(scene: Scene, ground: AbstractMesh, detail: FloorDetail, size: [number, number]): boolean {
+  const mat = ground.material as PBRMaterial | null;
+  if (!mat || !(mat instanceof PBRMaterial)) return false;
+  const src = groundDetailTexture(scene, detail.kind);
+  const tex = new DynamicTexture(`fel_ground_detail_${detail.kind}_i`, src.getSize().width, scene, true);
+  const ctx = tex.getContext() as CanvasRenderingContext2D;
+  ctx.drawImage((src.getContext() as CanvasRenderingContext2D).canvas as unknown as CanvasImageSource, 0, 0);
+  tex.update(false);
+  tex.wrapU = Texture.WRAP_ADDRESSMODE; tex.wrapV = Texture.WRAP_ADDRESSMODE; tex.anisotropicFilteringLevel = 8;
+  tex.uScale = Math.max(1, size[0] / DETAIL_TILE_M[detail.kind]); tex.vScale = Math.max(1, size[1] / DETAIL_TILE_M[detail.kind]);
+  mat.detailMap.isEnabled = true;
+  mat.detailMap.texture = tex;
+  mat.detailMap.diffuseBlendLevel = detail.blend;
+  mat.detailMap.bumpLevel = 0;
+  mat.detailMap.roughnessBlendLevel = 0;
+  ground.onDisposeObservable.add(() => tex.dispose());
+  return true;
 }

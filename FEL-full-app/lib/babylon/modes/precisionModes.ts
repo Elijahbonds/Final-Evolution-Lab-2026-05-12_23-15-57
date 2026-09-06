@@ -964,7 +964,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     me.root.position.copyFrom(GOAL_LINE); me.root.rotation.set(0, Math.PI, 0);
     me.animator.play(SPORT_CLIP.keeperIdle, { loop: true });
     ball.position.set(SPOT.x, 0.11, SPOT.z + 0.3);
-    ctx.camDirector.setFixedBehind(me.root.position, Math.PI, 'flight', true);
+    ctx.camDirector.setFixedBehind(SPOT, 0, 'keeper', true);   // high behind the spot, the keeper faces the camera at the goal
     ctx.setHud({ hint: `THEIR KICK — read the run-up · dive ◀ / ▶ as he strikes${sd ? ' · sudden death: he lies more' : ''}`, banner: '' });
   }
   function afterTheirKick(ctx: ModeContext): void {
@@ -1035,7 +1035,9 @@ export const PenaltyMode: ModeDefinition = (() => {
       furniture.push(spot);
       gallery = new Onlookers(ctx.scene, Array.from({ length: 14 }, (_, i) => {
         const k = i - 6.5;
-        return new Vector3(k * 1.5, 0, 13.2 + Math.abs(k) * 0.22);   // a shallow bank behind the goal
+        // a shallow bank behind the goal — 2 m behind the keeper camera (fixed at z 13.4 on THEIR kick): at 13.2 the camera
+        // stood inside a spectator and the whole frame was the inside of a body (measured 2026-09-06)
+        return new Vector3(k * 1.5, 0, 15.4 + Math.abs(k) * 0.22);
       }));
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.4, 0, -1.6), 0, SPORT_CLIP.penaltyIdle);
       keeper = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(0, 0, 10.4), Math.PI, SPORT_CLIP.keeperIdle);

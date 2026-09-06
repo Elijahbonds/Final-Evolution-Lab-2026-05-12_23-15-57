@@ -25,6 +25,8 @@ import { NavBounds } from './NavBounds';
 import { MAPS } from '../../map-data';
 import type { Vector3 } from '@babylonjs/core';
 import { specFor } from '../nexus/venueSpecs';
+import { applyFloorDetail } from '../visual/groundTextures';
+import { flattenMapBoxes, type FlattenBox } from '../visual/mapSurgery';
 import { applyLocation, COURT_LOCATIONS, isCourtLocationId } from '../nexus/courtLocations';
 
 export interface VenueHandle {
@@ -115,7 +117,10 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   const built = buildNexusScene(ctx.scene, spec, ctx.canvas);
   // Ship Pass 6 phase 5: under a scanned map the procedural court plane must not render — it z-fought the scan and mirrored the
   // dusk dome as an orange slab (threes, three-point). It stays in the scene for bounds and camera logic.
-  if (spec.mapKey) for (const m of built.root.getChildMeshes()) if (m.name === 'venue_ground') m.isVisible = false;
+  if (spec.mapKey) { for (const m of built.root.getChildMeshes()) if (m.name === 'venue_ground') m.isVisible = false; }
+  // Pass 7 phase 2 spread: a tiled grain (detail map) over the procedural floor — grass on pitches, diamonds and greens,
+  // sand on the beach court, asphalt on the street, a faint concrete grain on hardcourt. Markings are the albedo and stay.
+  else applyFloorDetail(ctx.scene, built.root, spec.ground.kind, spec.ground.size);
 
   // Ship pass 4, phase 2: the CC0 prop dressing for this venue (visual/VenueProps.ts),
   // loaded async under the venue root and disposed with it. Placements live in
@@ -127,15 +132,30 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   if (location?.decorate) location.decorate(ctx.scene, built.root);   // blossom trees, starfields: meshes after the build, under the venue root
   // The scanned court is mounted for the half-court rim (z −1.32). Dunk's rim is at z −11, so under dunk the scan slides −9 so
   // its north baseline meets the rim (owner's Luma reference, 2026-09-06: the hoop stands on the apron right behind the paint).
-  const scanShiftZ = !location && modeId === 'basketball_dunk' && spec.mapKey ? -9 : 0;
-  if (scanShiftZ && spec.mapKey) {
+  // Per-mode slide of the mounted map along z (metres), applied once the async mount lands:
+  //  · dunk: −9 puts the scan's baseline rim where the spec's rim stands (owner's Luma reference)
+  const MAP_SLIDE_Z: Record<string, number> = { basketball_dunk: -9 };
+  // Per-mode flatten boxes (world metres, before the slide): baked junk pushed under the floor once the mount lands.
+  //  · penalty: the stadium's two "goals" are SOLID low-poly blocks ~2 m deep on each goal line — the keeper stood inside one
+  //    (feet showing) and sliding the map only moved the other under the camera (measured 2026-09-06). Both go; the spec's
+  //    white goal frame stands alone.
+  const MAP_FLATTEN: Record<string, FlattenBox[]> = {
+    penalty: [{ x: [-4.6, 4.6], z: [6.8, 12.0] }, { x: [-4.6, 4.6], z: [-12.0, -6.8] }],
+  };
+  const scanShiftZ = !location && spec.mapKey ? (MAP_SLIDE_Z[modeId] ?? 0) : 0;
+  const flatten = !location && spec.mapKey ? MAP_FLATTEN[modeId] : undefined;
+  if ((scanShiftZ || flatten) && spec.mapKey) {
     const key = `nexus_venue_map_${spec.mapKey}`; let tries = 0;
-    const slide = (): void => {
+    const settle = (): void => {
       const node = ctx.scene.getTransformNodeByName(key);
-      if (node) { node.position.z += scanShiftZ; return; }
-      if (tries++ < 80) setTimeout(slide, 250);
+      if (node) {
+        if (flatten) { const n = flattenMapBoxes(node, flatten); console.info(`[NEXUS] map "${spec.mapKey}": flattened ${n} vertices in ${flatten.length} boxes`); }
+        if (scanShiftZ) node.position.z += scanShiftZ;
+        return;
+      }
+      if (tries++ < 80) setTimeout(settle, 250);
     };
-    slide();
+    settle();
   }
   if (!location && /^basketball_/.test(modeId)) decorateVeniceBoardwalk(ctx.scene, built.root, scanShiftZ);   // owner 2026-09-05: the concept photo rebuilt as scenery
   void dressHoop(ctx.scene, built.root);   // owner 2026-09-05: the scanned Venice hoop stands in for the procedural one, every court, every location

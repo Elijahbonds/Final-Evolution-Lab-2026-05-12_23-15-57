@@ -143,3 +143,15 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   tried and dropped: they read as hard white blobs against the dome (the painted dome carries the clouds).
 - Sweep on 4cbe55d: every row clean; "vitest: 1 failed" was the headless timeout (fixed in 883d4cd — test timeout 180 s
   now outlasts the script's 120 s); penalty's 44 fps row was my concurrent suite run, 60 fps on recapture.
+- **Pass 7 phase 2 spread (floor grain), 03:40**: a PBR detail map multiplies a tiled grain over every procedural floor the
+  fenced builder paints — grass on pitches, diamonds and greens (a 9 m mottle; blades mipmap away, and mower stripes read as
+  a checkerboard), sand on the beach court, asphalt on the skatepark slab, a faint concrete on hardcourt; markings stay the
+  albedo. Also on the older kit's fields (golf keeps the kit green on top of the spec floor). Court, mat, stage, snow and
+  water keep their paint. Found on the way: my hook's `else` bound to the loop's inner `if`, so the grain first ran only under
+  scanned maps. Frames: golf mottled turf, skate crack lines and grit, volleyball and tennis unchanged in read.
+- **Penalty keeper round (found by the frames)**: THEIR kick was framed from inside a spectator, then inside the stadium's
+  stand, then behind the map's baked goal — a SOLID block on the goal line with the keeper inside it. Now: the gallery bank
+  stands 2 m further back, both baked goal blocks are flattened under the floor at mount (`visual/mapSurgery.ts`, a per-mode
+  flatten table beside the dunk slide in `NexusVenue.ts`), and the round is shot high from behind the spot (CameraDirector
+  preset `keeper`) with the keeper facing the camera in the goal mouth. 60 fps, 0/0/0. Open: the penalty rival wears the
+  hero scan (should be a roster body).

@@ -18,6 +18,7 @@
 import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
+import { applyFloorDetailToMesh } from '../visual/groundTextures';
 
 export interface RideObstacle { pos: Vector3; radius: number }
 
@@ -81,6 +82,7 @@ export function buildSkatepark(scene: Scene): RideWorld {
     g.fillStyle = 'rgba(34,211,238,0.5)'; g.font = 'bold 90px sans-serif';
     g.fillText('FEL', W * 0.42, H * 0.52);
   });
+  applyFloorDetailToMesh(scene, ground, { kind: 'asphalt', blend: 0.6 }, [70, 70]);   // Pass 7 phase 2 spread: asphalt grain over the slab paint
   all.push(ground); rideable.push(ground);
 
   const rampM = mat(scene, 'rampM', '#6f6680');

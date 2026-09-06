@@ -157,6 +157,10 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
 export const FIXED_PRESETS: Record<string, { offset: Vector3; targetHeight: number }> = {
   swing: { offset: new Vector3(0.9, 2.1, -4.2), targetHeight: 1.2 },
   flight: { offset: new Vector3(0, 1.6, -3.0), targetHeight: 0.6 },
+  /** penalty's keeper round: high behind the SPOT, the keeper (you) facing the camera at the goal so the dive is in frame.
+   *  Behind the goal the shot sat inside the stand, then on the baked goal's net, then above the stand with the keeper hidden
+   *  under the baked goal box (measured 2026-09-06). */
+  keeper: { offset: new Vector3(0, 3.4, -7.5), targetHeight: 1.0 },
 };
 
 /** Camera may never end up closer to the subject than this, in ANY venue —

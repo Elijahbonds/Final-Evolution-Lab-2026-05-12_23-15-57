@@ -7,6 +7,7 @@ import {
 } from '@babylonjs/core';
 import type { Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
+import { applyFloorDetailToMesh, floorDetailFor } from './groundTextures';
 
 /** Venue props are PBR now (Phase 1, 2026-09-03): they take the procedural IBL
  *  and the tier's shadows like the hero does. Matte by default; the emissive
@@ -351,7 +352,7 @@ export const VenueKit = {
     const BOX = { tennis: [28, 46], golf: [66, 96], ballpark: [76, 96], pitch: [56, 76] } as const;
     const [w, l] = FIELD[preset];
     const [bw, bl] = BOX[preset];
-    paintedGround(scene, w, l, bases[preset], (ctx, W, H) => {
+    const field = paintedGround(scene, w, l, bases[preset], (ctx, W, H) => {
       ctx.strokeStyle = '#f4f1de'; ctx.lineWidth = 5;
       if (preset === 'tennis') {
         ctx.strokeRect(W * 0.18, H * 0.1, W * 0.64, H * 0.8);
@@ -363,6 +364,9 @@ export const VenueKit = {
         ctx.strokeRect(W * 0.3, H * 0.02, W * 0.4, H * 0.16);            // box
       }
     });
+    // Pass 7 phase 2 spread: the same tiled grain the spec floors carry (grass on golf / ballpark / pitch, a faint concrete on tennis)
+    const grain = floorDetailFor({ tennis: 'hardcourt', golf: 'green', ballpark: 'diamond', pitch: 'pitch' }[preset]);
+    if (grain) applyFloorDetailToMesh(scene, field, grain, [w, l]);
     venueBox(scene, bw, bl, 7, [paintBleachers(CROWD), paintTrees(false)]);
   },
 };
