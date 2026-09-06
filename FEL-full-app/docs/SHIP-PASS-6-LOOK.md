@@ -179,3 +179,22 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   standing beside the lens, over the action buttons and the d-pad — the golf gallery's rows sat at z −4 / −6, on the swing
   camera's plane. The gallery flanks the tee box now (x ±8.5, z −1…+5). Phone: errors 0; desktop golf 60 fps / 72 draws.
   The pad's hollow sockets for unbound verbs (e7494e1) read as intended; the perf panel over the title is the dev overlay.
+
+### Pass 7 close (2026-09-06, 05:30)
+
+| Phase | Landed | Commit |
+|---|---|---|
+| 1–4 | props and depth, ground textures on Venice, signage, logo decal | earlier (see log above) |
+| 5 sky and air | gulls over the water (clouds tried, dropped) | 613c08a |
+| 2 spread | floor grain (PBR detail map) on every procedural floor, kit fields, skatepark slab | 8243812, abbae7e |
+| — | penalty keeper round reframed: flattened baked goal blocks, gallery back, `keeper` preset | 8243812 |
+| 6 life | roster foes in the precision modes; Venice apron rail; karate versus ring; dojo props trimmed | dee3d8d, 82b4f2b, 2cffa7e |
+| 7 materials | Kenney kits normalised (metallic 0, plant greens); `_mat-diag` | f1a3d43 |
+| 8 contact shadows | vertex-alpha disc under every body | f87e1da |
+| 9 pad and HUD | golf gallery off the swing camera's plane (phone frames) | c908cf0 |
+| 10 close | sweep on c908cf0: tsc PASS, vitest 323/323, every mode 0/0/0, mobile skateboard/volleyball/tennis/karate/football/golf errors 0; `mobile/dunk` NO RESULT is the known CHARGE-verb locator | — |
+
+Open after the pass: wide cameras exceed the 150-draw budget (dunk wide 139, slalom 266 at the tree line); the flattened
+stands' ghost paint on the Venice scan (texture repaint parked); the karate shrine roof sits above the frame.
+Sweep fps dips (volleyball 48, tennis 50) recaptured warm at 60 fps each (a 3 fps volleyball row in between was the
+loading screen — the perf sample landed before the mode had built). Tagged `v0.9.0-rc.7` locally on the close commit.
