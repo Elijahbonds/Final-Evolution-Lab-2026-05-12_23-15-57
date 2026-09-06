@@ -159,8 +159,8 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   // ── combat ──────────────────────────────────────────────────────────────
   karate_h2h: {
     modeId: 'karate_h2h', name: 'Karate', venue: 'Sovereign Dojo',
-    environment: dusk('#3A1220', '#0A0A12', '#1A0E18', '#FF8A6B', 0.45),
-    ground: { kind: 'mat', size: [14, 14], color: '#8C2F3A', lineColor: '#F0D9A0', markings: 'none' },
+    environment: dusk('#C9D3DC', '#8E9AA6', '#B9C2CA', '#FFF4E6', 0.7, undefined, 0.002),   // owner's Luma reference 2026-09-06 (Shimogamo Jinja): soft overcast daylight over gravel
+    ground: { kind: 'mat', size: [14, 14], color: '#C6BFB2', lineColor: '#6B5B4A', markings: 'none' },   // shrine gravel (same reference)
     props: [
       // Walls at ±8 put the dojo shell INSIDE the camera's resting position
       // (radius 11, beta 1.15 resolves to z ≈ -8.6) and the frame filled with
@@ -183,7 +183,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
 
   karate_endless: {
     modeId: 'karate_endless', name: 'The Hundred', venue: 'Shadow Gauntlet',
-    environment: dusk('#2A0E3A', '#07070E', '#140A1E', '#C77DFF', 0.38),
+    environment: dusk('#C9D3DC', '#8E9AA6', '#B9C2CA', '#FFF4E6', 0.7, undefined, 0.002),   // shrine daylight (same reference)
     // 24x24, not 16x16. The camera's box is derived from the ground, so a mat
     // exactly as big as the play area leaves the camera nowhere to stand: the
     // player clamps to ±8, the bounds clamp the camera to ±6.8, and a player at
@@ -196,9 +196,9 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     // [FEL-FRAME] this mode produced was a fighter pinned at (+-7.5, +-7.5) --
     // the one place a facing-derived camera at a 3.1m radius has no room to
     // swing. Karate VS uses a disc for the same reason.
-    ground: { kind: 'mat', size: [24, 24], color: '#2A1A3A', lineColor: '#BF5AF2', markings: 'ring' },
+    ground: { kind: 'mat', size: [24, 24], color: '#C6BFB2', lineColor: '#6B5B4A', markings: 'ring' },   // owner's Luma reference 2026-09-06 (Shimogamo Jinja): pale raked gravel, dark lines
     props: [
-      { kind: 'wall', position: [0, 0, -14], color: '#0D0714' },
+      { kind: 'wall', position: [0, 0, -14], color: '#B9AFA0' },   // shrine courtyard: a low stone wall, not a black void
       { kind: 'lamp', position: [7, 0, -5], color: '#FFD79A' },
       { kind: 'lamp', position: [-7, 0, -5], color: '#FFD79A' },
       { kind: 'banner', position: [0, 0, -13.6], color: '#BF5AF2' },
@@ -552,7 +552,9 @@ const VENUE_MAP_KEYS: Record<string, string> = {
   soccer: 'soccer-stadium',
   baseball: 'baseball-park',
   golf: 'coastal-links', derby: 'baseball-park', penalty: 'soccer-stadium',   // golf_loop: no map — coastal-links is a ±15 m island, the course runs to z 39
-  karate_h2h: 'dojo', karate_endless: 'dojo', gymnastics: 'dojo',
+  // karate: NO map (owner's Luma reference 2026-09-06, Shimogamo Jinja) — the baked dojo pavilion sat over the mat and roofed the
+  // fight; the mat is open gravel now with the Meshy shrine standing behind it (prop set 'dojo').
+  gymnastics: 'dojo',
   snowboarding: 'mountain-slope',
   surfing: 'surf-break',
   market_browse: 'shop',

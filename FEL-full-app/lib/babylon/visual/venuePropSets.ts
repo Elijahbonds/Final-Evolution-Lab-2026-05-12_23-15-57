@@ -70,7 +70,8 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     // MID: a second ring of pines outside the columns, banners between them
     ...ring('nature', 'tree_pineRoundB', 16, 6, Math.PI / 6, 4.4, 0), { kit: 'mini-arena', model: 'banner', at: [-13, 0, 0], yaw: Math.PI / 2, scale: 2.4 }, { kit: 'mini-arena', model: 'banner', at: [13, 0, 0], yaw: -Math.PI / 2, scale: 2.4 },
     // FAR: the owner's Meshy dojo stands off the side where the fighting camera can see it; a wall line closes the back
-    { kit: 'meshy', model: 'dojo', at: [26, 0, -26], yaw: -Math.PI / 4 }, ...line('mini-arena', 'wall', [-24, -30], [24, -30], 7, 0, 2.6),
+    { kit: 'meshy', model: 'dojo', at: [0, 0, -18], yaw: 0, scale: 0.9 },   // just behind the courtyard wall the camera faces, roof showing over it   // owner's Luma reference 2026-09-06 (Shimogamo Jinja): the pavilion centred behind the mat
+    ...line('mini-arena', 'wall', [-30, -34], [30, -34], 9, 0, 2.6), ...line('nature', 'tree_default', [-26, -30], [26, -30], 6, 0, 5.2),
   ],
   'links': [
     { kit: 'nature', model: 'tree_oak', at: [-24, 0, 12], scale: 4.8 }, { kit: 'nature', model: 'tree_default', at: [26, 0, 30], scale: 4.8 }, { kit: 'nature', model: 'tree_detailed', at: [-22, 0, 40], scale: 4.8 }, { kit: 'nature', model: 'tree_oak', at: [24, 0, -20], scale: 4.8 }, { kit: 'nature', model: 'tree_default', at: [-26, 0, -30], scale: 4.8 },

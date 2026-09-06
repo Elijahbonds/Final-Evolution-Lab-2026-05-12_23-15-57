@@ -125,7 +125,19 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   if (spec.mapKey) void NavBounds.load(spec.mapKey).then((n) => { nav = n; if (n) console.info(`[NEXUS] navmesh "${spec.mapKey}": ${n.data.polys.length} polys`); });
   const propSet = location && location.propSet !== undefined && location.propSet !== null ? (location.propSet || null) : propSetFor(modeId);
   if (location?.decorate) location.decorate(ctx.scene, built.root);   // blossom trees, starfields: meshes after the build, under the venue root
-  if (!location && /^basketball_/.test(modeId)) decorateVeniceBoardwalk(ctx.scene, built.root);   // owner 2026-09-05: the concept photo rebuilt as scenery
+  // The scanned court is mounted for the half-court rim (z −1.32). Dunk's rim is at z −11, so under dunk the scan slides −9 so
+  // its north baseline meets the rim (owner's Luma reference, 2026-09-06: the hoop stands on the apron right behind the paint).
+  const scanShiftZ = !location && modeId === 'basketball_dunk' && spec.mapKey ? -9 : 0;
+  if (scanShiftZ && spec.mapKey) {
+    const key = `nexus_venue_map_${spec.mapKey}`; let tries = 0;
+    const slide = (): void => {
+      const node = ctx.scene.getTransformNodeByName(key);
+      if (node) { node.position.z += scanShiftZ; return; }
+      if (tries++ < 80) setTimeout(slide, 250);
+    };
+    slide();
+  }
+  if (!location && /^basketball_/.test(modeId)) decorateVeniceBoardwalk(ctx.scene, built.root, scanShiftZ);   // owner 2026-09-05: the concept photo rebuilt as scenery
   void dressHoop(ctx.scene, built.root);   // owner 2026-09-05: the scanned Venice hoop stands in for the procedural one, every court, every location
   let props: VenuePropsHandle | null = null; let propsGone = false;
   if (propSet) void mountVenueProps(ctx.scene, propSet, built.root).then((h) => { if (propsGone) h?.dispose(); else props = h; });

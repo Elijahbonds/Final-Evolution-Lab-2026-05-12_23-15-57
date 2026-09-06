@@ -29,7 +29,13 @@ function flat(scene: Scene, name: string, w: number, d: number, x: number, z: nu
   return g;
 }
 
-export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode): TransformNode {
+/**
+ * `scanShiftZ`: how far the venue map is slid along z for this mode (NexusVenue). The scan is mounted for the half-court modes
+ * (its north baseline meets the ones/threes rim at z −1.32); dunk's rim sits at z −11, so dunk slides the scan −9 and the
+ * aprons, far hoop, centre logo and gate sign slide with it — the owner's Luma reference (2026-09-06) shows both hoops on
+ * the concrete right behind each baseline.
+ */
+export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanShiftZ = 0): TransformNode {
   const holder = new TransformNode('venice_boardwalk', scene); holder.parent = root;
   const { apron, grass, walkW, sandW } = BOARDWALK;
   // concrete apron around the slab (a hair above the scan's painted ground), then the boardwalk strip to the east
@@ -39,7 +45,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode): Tran
   // the scan is 26 m long under a 28 m court: the baseline aprons start where the scan's paint ends (owner: "the court is cut off")
   // measured 2026-09-05: the scan's mesh is centred at z ≈ 10.9 and spans 26 m — its paint runs from z −2 (the dunk hoop's
   // baseline) to z +24, ten metres past the gameplay court. The south apron starts where the paint ends.
-  const SCAN_N = -2.1, SCAN_S = 23.9;
+  const SCAN_N = -2.1 + scanShiftZ, SCAN_S = 23.9 + scanShiftZ, SCAN_MID = 10.9 + scanShiftZ;
   flat(scene, 'vb_apron_n', ax * 2, apron, 0, SCAN_N - apron / 2, 0.012, '#B9AFA0', holder, 1, 'concrete');
   flat(scene, 'vb_apron_s', ax * 2, apron, 0, SCAN_S + apron / 2, 0.012, '#B9AFA0', holder, 1, 'concrete');
   // one continuous surround out to the dome wall (190 m): grass east of the apron, the boardwalk, more grass to the shop line;
@@ -84,14 +90,14 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode): Tran
     plane.material = m; return plane;
   };
   const post = (name: string, x: number, z: number, hgt: number) => { const c = MeshBuilder.CreateCylinder(name, { height: hgt, diameter: 0.14 }, scene); c.position.set(x, hgt / 2, z); c.parent = holder; c.isPickable = false; const pm = new PBRMaterial(`${name}_mat`, scene); pm.albedoColor = Color3.FromHexString('#2A2E37'); pm.roughness = 0.6; pm.metallic = 0.4; c.material = pm; return c; };
-  post('vb_gate_post_l', 7.1, 27.5, 3.4); post('vb_gate_post_r', 10.9, 27.5, 3.4);   // owner: back off the paint, to the right
-  sign('vb_gate_sign', 4.2, 1.0, [9, 3.0, 27.5], Math.PI, signTexture(scene, ['VENICE BEACH COURTS', 'FINAL EVOLUTION LAB · EST. 2026'], { bg: '#1E2A44', accent: '#F2B84B' }));
-  sign('vb_scoreboard', 4.8, 1.3, [7.5, 3.0, -19.5], Math.PI, signTexture(scene, ['FLIGHT NIGHT', 'VENICE · OPEN RUN · ALL LEVELS'], { bg: '#141826', fg: '#FFE9B0', accent: '#FF6B3D' }));
+  post('vb_gate_post_l', 7.1, SCAN_S + 3.6, 3.4); post('vb_gate_post_r', 10.9, SCAN_S + 3.6, 3.4);   // owner: back off the paint, to the right
+  sign('vb_gate_sign', 4.2, 1.0, [9, 3.0, SCAN_S + 3.6], Math.PI, signTexture(scene, ['VENICE BEACH COURTS', 'FINAL EVOLUTION LAB · EST. 2026'], { bg: '#1E2A44', accent: '#F2B84B' }));
+  sign('vb_scoreboard', 4.8, 1.3, [7.5, 3.0, SCAN_N - 17.4], Math.PI, signTexture(scene, ['FLIGHT NIGHT', 'VENICE · OPEN RUN · ALL LEVELS'], { bg: '#141826', fg: '#FFE9B0', accent: '#FF6B3D' }));
   const flagTex = signTexture(scene, ['FEL'], { bg: '#B03A2E', fg: '#FFF4E0', accent: '#F2B84B', w: 256, h: 640 });
   for (let i = 0; i < 4; i++) { const z = -36 + i * 24; sign(`vb_flag_${i}`, 0.5, 1.25, [19.55, 4.0, z + 0.5], Math.PI / 2, flagTex); }
   // Pass 7 phase 1: a half-court logo decal on the scan (centre circle, 3.6 m), matte, alpha-blended
   const logo = MeshBuilder.CreateGround('vb_court_logo', { width: 3.6, height: 3.6 }, scene);
-  logo.position.set(0, 0.03, 10.9); logo.parent = holder; logo.isPickable = false;  // the scan's centre circle
+  logo.position.set(0, 0.03, SCAN_MID); logo.parent = holder; logo.isPickable = false;  // the scan's centre circle
   const lm = new PBRMaterial('vb_court_logo_mat', scene); lm.albedoTexture = courtLogoTexture(scene); lm.useAlphaFromAlbedoTexture = true; lm.transparencyMode = 2; lm.roughness = 0.9; lm.metallic = 0; lm.albedoColor = Color3.White(); lm.environmentIntensity = 0.3;
   logo.material = lm;
   console.info('[FEL-VENICE] boardwalk scenery built (apron, grass, boardwalk, sand, ocean, sun) — props from venice-court-meshy');

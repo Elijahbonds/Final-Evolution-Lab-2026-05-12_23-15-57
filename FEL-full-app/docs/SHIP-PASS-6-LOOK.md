@@ -129,3 +129,12 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   ghost paint was attempted and parked: the repainted image never reached the screen. The Meshy hoop stands on the play
   rim (dressHoop) and mirrored on the south baseline; the stores left the Venice set for the second writer's venice kit
   (far pier, three sail billboards, all ≥ 15 m).
+- **Owner references (2026-09-06, 00:30–01:40)**: four Luma views of the real Venice court — both hoops on the concrete apron
+  right behind each baseline. Dunk's rim sits at z −11 while the scan is mounted for the half-court rim (north baseline at
+  z −2), so under dunk the venue slides the scan −9 once it mounts (`NexusVenue`, `scanShiftZ`); aprons, far hoop, centre
+  decal and gate sign follow. Five Luma views of Shimogamo Jinja (the Meshy dojo's subject) — the karate mat had the baked
+  `dojo` map (a pavilion at 8×) roofed over it, which is what the fighting camera always showed. Karate specs: no map,
+  mats to pale raked gravel with dark lines, soft overcast daylight (`dusk` 0.7, thin fog), the back wall to stone, the
+  Meshy shrine placed behind the wall the camera faces.
+- **PM brief VENICE-JUICE-P0 (838ca82)**: hit-stop 70 / shake 0.12,140 / flash / rim thud on the make's flush frame, once per
+  attempt, in dunk and duel; no second slow-mo. Outbox VENICE-JUICE-P0.md.
