@@ -15,8 +15,8 @@ export default defineConfig({
     ],
     // Babylon's NullEngine work and the 3000-sample statistical checks are not
     // fast; the default 5s timeout fails them for no good reason.
-    testTimeout: 60_000,
-    hookTimeout: 60_000,
+    testTimeout: 180_000,   // the headless check suites spawn a script with its own 120 s limit; under a sweep load a 60 s test timeout fired first (three false alarms 2026-09-05 and 06)
+    hookTimeout: 120_000,
   },
   resolve: {
     alias: { '@': path.resolve(__dirname, '.') },
