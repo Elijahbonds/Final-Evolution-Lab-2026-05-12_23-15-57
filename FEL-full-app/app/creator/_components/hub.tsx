@@ -19,7 +19,7 @@ type Discipline = {
 const DISCIPLINES: Discipline[] = [
   { id: 'dance', name: 'Dance', tagline: 'Nail the count-in, then chain the combo. Tap on the beat.', href: '/play/dance', color: '#FF2D95', icon: Zap },
   { id: 'acting', name: 'Acting', tagline: 'Hit the cue, match the intensity. Delivery, scored locally.', href: '/play/acting', color: '#FF3366', icon: Mic },
-  { id: 'music', name: 'Music', tagline: 'The FEL Academy — sequence, master and publish your own tracks.', href: '/studio', color: '#00E5FF', icon: Music },
+  { id: 'music', name: 'Music', tagline: 'The FEL Academy — sequence, flip a sample, master and publish your own tracks.', href: '/play/music', color: '#00E5FF', icon: Music },   // the Academy mounts at /play/music (/studio is the code studio, on hold)
   { id: 'sport', name: 'Sport', tagline: 'Time the rise, throw it down. The dunk arena.', href: '/play/dunk', color: '#FFD700', icon: Dumbbell },
   { id: 'art', name: 'Art', tagline: 'The paint studio is in the workshop — arriving in a future drop.', href: null, color: '#A855F7', icon: Palette },
   // lane 4 (2026-09-06): the new disciplines author in /create and publish as Creator Cards

@@ -105,6 +105,18 @@ Acceptance: chop a public-domain source into 8 pads on the phone, record a 2-bar
 take, export stems + master, publish (pending review), a friend remixes it and the royalty posts. Latency under the
 lookahead scheduler's 100 ms window; no new dependency (Web Audio only).
 
+### Landed (2026-09-06, lane 2 M1 — the Flip)
+- `lib/babylon/music/Flip.ts` (pure, 7 tests): transient slicing on an RMS envelope with a slow floor, a minimum gap and
+  a grid fallback; grid slices; 16 pads with pitch/reverse/gate; the `1234 / qwer / asdf / zxcv` key map; tap quantization;
+  the source rule as code — `SourceKind = 'fel' | 'own' | 'public-domain'` with a written note per source, and `FEL_SOURCES`
+  = the eight 808 kit stems in `public/audio/kits/808`. Third-party audio has no path in.
+- `FlipPad.tsx`: FEL stems, your own file, or an 8 s mic take → slices onto the pads; touch or keyboard plays; pitch
+  ±12, reverse, gate per pad; SEND TO TRACK puts a pad on a groovebox track (`flip_<n>`); ARM REC writes live taps into
+  the running pattern at the step under the playhead. The Academy (`/play/music`) gains a FLIP tab; flip tracks show in the
+  STUDIO grid as `FLIP n`. The Creator hub's Music tile now points at `/play/music` (it pointed at the code studio).
+- Probe `scripts/probes/_flip-diag.mts`: stem → 8 slices, key `1` → pad 1 played, touch → pad 2 played, GRID reslices, no
+  page errors. Phone-pad face buttons over the key bridge: next (M1b).
+
 ## Lane 3 — Who Scene It as a mode + Scene Packs
 
 Today: a 2D deck. The live-venue pack already exists in content. The mode:

@@ -27,6 +27,7 @@ import { synthesizeKit, KIT_SLOTS, KIT_META, type KitId } from './SynthKit';
 import { StudioLibrary, blobToDataUrl, type TrackRecord } from './StudioLibrary';
 import { parseStreamingUrl, PROVIDER_META } from './StreamingBridge';
 import StreamingDeck from './StreamingDeck';
+import FlipPad from './FlipPad';   // lane 2 M1 — the chop pad
 
 const STEPS = 16;
 const EXPIRE_S = 0.25;
@@ -71,7 +72,7 @@ function cellFoundation(seed = Date.now()): Record<string, boolean[]> {
   return { kick, snare, hat, open, clap, bass, lead, fx };
 }
 
-type View = 'studio' | 'library' | 'creator' | 'listen';
+type View = 'studio' | 'flip' | 'library' | 'creator' | 'listen';
 type Mode = 'build' | 'perform';
 
 export default function StudioMode({
@@ -300,10 +301,10 @@ export default function StudioMode({
       </div>
 
       <div style={S.tabs}>
-        {(['studio', 'library', 'listen'] as View[]).map((v) => (
+        {(['studio', 'flip', 'library', 'listen'] as View[]).map((v) => (
           <button key={v} style={{ ...S.tab, ...(view === v ? S.tabOn : {}) }}
             onClick={() => { setView(v); setCreatorId(null); }}>
-            {v === 'studio' ? 'STUDIO' : v === 'library' ? 'LIBRARY' : 'LISTEN'}
+            {v === 'studio' ? 'STUDIO' : v === 'flip' ? 'FLIP' : v === 'library' ? 'LIBRARY' : 'LISTEN'}
           </button>
         ))}
         {view === 'creator' && creatorId && (
@@ -312,6 +313,29 @@ export default function StudioMode({
       </div>
 
       {view === 'listen' && <StreamingDeck />}
+
+      {view === 'flip' && (
+        <>
+          <FlipPad engine={engineRef.current} playing={playing} playhead={playhead} steps={STEPS} say={say}
+            onAssign={(pad, buffer, label) => {
+              const id = `flip_${pad}`;
+              engineRef.current?.loadBuffer(id, label, buffer, 'melody');
+              setTracks((prev) => prev.some((t) => t.sampleId === id) ? prev : [...prev, { sampleId: id, pattern: Array(STEPS).fill(false), volume: 0.9, muted: false, pan: 0 }]);
+            }}
+            onRecordHit={(pad, step) => {
+              const id = `flip_${pad}`;
+              setTracks((prev) => {
+                const has = prev.some((t) => t.sampleId === id);
+                const next = has ? prev : [...prev, { sampleId: id, pattern: Array(STEPS).fill(false), volume: 0.9, muted: false, pan: 0 }];
+                return next.map((t) => (t.sampleId === id ? { ...t, pattern: t.pattern.map((v, j) => (j === step ? true : v)) } : t));
+              });
+            }} />
+          <div style={S.row}>
+            <button style={S.btn} onClick={togglePlay}>{playing ? 'STOP' : 'PLAY'}</button>
+            <span style={{ fontSize: 12, opacity: 0.75 }}>the groovebox runs under the pads — arm REC and your taps land in the STUDIO grid</span>
+          </div>
+        </>
+      )}
 
       {view === 'studio' && (
         <>
@@ -323,7 +347,7 @@ export default function StudioMode({
           <div style={S.grid}>
             {tracks.map((t, ti) => (
               <React.Fragment key={t.sampleId}>
-                <div style={S.label}>{KIT_SLOTS[ti]?.name ?? t.sampleId}</div>
+                <div style={S.label}>{KIT_SLOTS.find((k) => k.id === t.sampleId)?.name ?? (t.sampleId.startsWith('flip_') ? `FLIP ${Number(t.sampleId.slice(5)) + 1}` : t.sampleId)}</div>
                 {t.pattern.map((on, si) => (
                   <div key={si}
                     style={{ ...S.cell, ...(on ? S.cellOn : {}), ...(playhead === si ? S.cellHead : {}) }}
