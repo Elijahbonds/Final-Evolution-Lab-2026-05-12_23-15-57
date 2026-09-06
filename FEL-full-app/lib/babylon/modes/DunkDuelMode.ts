@@ -81,6 +81,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   let sinceRelease = 0, releasePos = new Vector3();
   let finishing = false, rimCamCut = false, ended = false;
   let hangSlowMoLatch = false;
+  let contactLatch = false;                  // contactPunch once per attempt (the make's flush frame)
   // the contest systems (owner re-lock: the real dunk-contest bar)
   let prop: Prop = 'none';
   let obstacle: AbstractMesh | null = null;
@@ -108,7 +109,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
 
   function enterHandoff(ctx: ModeContext): void {
     setPhase('handoff');
-    style = 'power'; charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false;
+    style = 'power'; charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
     setProp(ctx, 'none');
     active().root.position.set(0, 0, CFG.startZ);
@@ -138,7 +139,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   function launchDunk(ctx: ModeContext): void {
     if (phase === 'cinematic') return;
     setPhase('cinematic');
-    clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false; rimCamCut = false; hangSlowMoLatch = false;
+    clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     SoundKit.play('whoosh', { pitch: 0.85 });
     active().animator.play(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => {} });
   }
@@ -167,6 +168,19 @@ export const DunkDuelMode: ModeDefinition = (() => {
     ctx.setHud({ banner: `${label()} CAUGHT THE CHAIR — BLOWN` });
     setTimeout(() => ctx.setHud({ banner: '' }), 1200);
     resolveDunk(ctx); // qteHit false → the clank path; a blown dunk judges at 0
+  }
+
+
+  /** CONTACT (PM brief VENICE-JUICE-P0, 2026-09-06): console juice on the make's flush frame — one hit-stop, one shake,
+   *  one white-gold flash, one rim thud — latched once per attempt so judge cards and FIFTY bursts never re-fire it.
+   *  Never a second slow-mo: the hang already spent it at rise. Miss path: nothing here (the clank stays honest). */
+  function contactPunch(ctx: ModeContext): void {
+    if (contactLatch) return;
+    contactLatch = true;
+    ctx.juice.hitStop(70);
+    ctx.juice.shake(0.12, 140);
+    ctx.juice.flash('#fff6dd', 120);
+    SoundKit.play('impact', { pitch: 0.7, volume: 0.8 });
   }
 
   function finishAttempt(ctx: ModeContext, made: boolean): void {
@@ -408,7 +422,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
           }
         }
         if (qteHit) {
-          if (flushThroughRim(ball, rim, releasePos, sinceRelease)) finishAttempt(ctx, true);
+          if (flushThroughRim(ball, rim, releasePos, sinceRelease)) { contactPunch(ctx); finishAttempt(ctx, true); }
         } else {
           ballSim.step(dt);
           if (sinceRelease > 1.2) finishAttempt(ctx, false);

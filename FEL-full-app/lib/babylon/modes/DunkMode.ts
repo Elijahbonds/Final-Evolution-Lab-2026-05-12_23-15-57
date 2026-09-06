@@ -114,6 +114,7 @@ export const DunkMode: ModeDefinition = (() => {
   let finishing = false;
   let rimCamCut = false;                     // broadcast cut latch (per attempt)
   let hangSlowMoLatch = false;               // JuiceKit.slowMo once per attempt (hang only)
+  let contactLatch = false;                  // contactPunch once per attempt (the make's flush frame)
   const rim = new Vector3(0, CFG.rimHeight, CFG.rimZ);
   const ebState = { inLeftHand: false };
   let stickX = 0, stickY = 0;
@@ -203,7 +204,7 @@ export const DunkMode: ModeDefinition = (() => {
       if (!ctx.location || ctx.location === 'venice') await applyVeniceDunkLookPass(ctx.scene);
 
       round = 1; dunkInRound = 0; playerTotal = 0; rivalTotal = 0; hype = 0; chain = 0; finishing = false; makes = 0; misses = 0; bestChain = 0;
-      style = 'power'; prop = 'none'; rimCamCut = false; hangSlowMoLatch = false;
+      style = 'power'; prop = 'none'; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
       setPhase('approach');
@@ -437,7 +438,7 @@ export const DunkMode: ModeDefinition = (() => {
         }
         if (qteHit) {
           if (aHeld) hangSec += dt;               // rim hang builds while SLAM stays held
-          if (flushThroughRim(ball, rim, releasePos, sinceRelease)) void finishAttempt(ctx, true);
+          if (flushThroughRim(ball, rim, releasePos, sinceRelease)) { contactPunch(ctx); void finishAttempt(ctx, true); }
         } else {
           ballSim.step(dt);
           if (sinceRelease > 1.2) void finishAttempt(ctx, false);
@@ -584,7 +585,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (phase === 'cinematic') return;
     setPhase('cinematic');
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false;
-    rimCamCut = false; hangSlowMoLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
+    rimCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
     // The run-up, not the stick at the release instant: during the charge the
     // stick is usually neutral, so the old `hypot(stickX, stickY)` read ~0 and
     // EVERY dunk launched as a walk-up. Peak measured approach speed is the
@@ -638,6 +639,19 @@ export const DunkMode: ModeDefinition = (() => {
     player.animator.play(aerial, {
       onEnd: () => player.animator.play(SPORT_CLIP.idle, { loop: true }),
     });
+  }
+
+
+  /** CONTACT (PM brief VENICE-JUICE-P0, 2026-09-06): console juice on the make's flush frame — one hit-stop, one shake,
+   *  one white-gold flash, one rim thud — latched once per attempt so judge cards and FIFTY bursts never re-fire it.
+   *  Never a second slow-mo: the hang already spent it at rise. Miss path: nothing here (the clank stays honest). */
+  function contactPunch(ctx: ModeContext): void {
+    if (contactLatch) return;
+    contactLatch = true;
+    ctx.juice.hitStop(70);
+    ctx.juice.shake(0.12, 140);
+    ctx.juice.flash('#fff6dd', 120);
+    SoundKit.play('impact', { pitch: 0.7, volume: 0.8 });
   }
 
   async function finishAttempt(ctx: ModeContext, made: boolean): Promise<void> {
@@ -793,7 +807,7 @@ export const DunkMode: ModeDefinition = (() => {
     player.root.rotation.y = Math.PI;
     player.root.rotation.z = 0; airLean = 0; holdRunSpeed = 0;
     player.animator.play(SPORT_CLIP.idle, { loop: true });
-    charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false;
+    charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     styleTaps = 0; hangSec = 0; revealed = [];
     runUpPeak = 0; obstacleClipped = false; toppling = false;
     void setupProp(ctx);
