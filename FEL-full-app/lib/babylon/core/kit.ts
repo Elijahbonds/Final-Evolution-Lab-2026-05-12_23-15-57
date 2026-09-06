@@ -70,6 +70,7 @@ export function applyKit(meshes: AbstractMesh[], wardrobe: Wardrobe | null | und
  */
 export const KIT_PACKS: Record<string, string> = {
   top_baseball: '/models/kits/top_baseball.glb',
+  top_football: '/models/kits/top_football.glb',
 };
 const packContainers = new WeakMap<Scene, Map<string, Promise<AssetContainer | null>>>();
 const attached = new WeakMap<AbstractMesh, Set<string>>();   // per body kit mesh: pack items already attached

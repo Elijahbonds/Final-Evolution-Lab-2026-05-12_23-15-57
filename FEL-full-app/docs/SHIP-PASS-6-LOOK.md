@@ -87,3 +87,10 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   note `/Users/elijahbonds/Claude/outbox/PROPS-DEPTH.md`. Batch C's field and court venues took their dressing here.
 - Remaining: Phase 8 kits (more Meshy garments as packs), Phase 9 mobile parity (gauntlet mtier rows), Phase 10 close
   (gauntlet, tag `v0.9.0-rc.6`); then Pass 7 details.
+- **Phase 8 (kits)**: the Meshy football jersey is the second kit pack (`public/models/kits/top_football.glb`, football's
+  sport default, Closet "Gridiron Jersey"). The scan keeps its own outfit; packs dress the roster bodies and the forge hero.
+- **Phase 9 (mobile parity)**: gauntlet mtier rows — dunk 93 draws, karate 104, skate 102, volleyball 88, golf 27, football
+  51, dance 34, all 60 fps (football was 45 fps this morning). No fix needed.
+- **Phase 10 (close)**: full gauntlet on the pass — tsc PASS, 320 tests, every dev-mode / login / mtier / mobile row 0/0/0
+  (mobile dunk "NO RESULT" predates the pass); the only diffs vs the previous run are the test count and the identity
+  layer reporting one mesh (the scan). Tag `v0.9.0-rc.6` (local).
