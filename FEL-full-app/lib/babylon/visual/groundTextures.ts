@@ -137,7 +137,9 @@ export function groundDetailTexture(scene: Scene, kind: GroundKind, size = 512):
     }
     // (mower stripes were tried: one stripe per 3 m tile read as a checkerboard across the fairway — measured 2026-09-06)
   }
-  const img = ctx.getImageData(0, 0, size, size); const d = img.data;
+  // headless (NullEngine) canvases hand back no pixels — keep the untouched grain rather than dying (skate headless suite, 2026-09-06)
+  const img = ctx.getImageData?.(0, 0, size, size); const d = img?.data;
+  if (!d) { tex.update(false); tex.wrapU = Texture.WRAP_ADDRESSMODE; tex.wrapV = Texture.WRAP_ADDRESSMODE; map.set(kind, tex); return tex; }
   let sum = 0;
   for (let i = 0; i < d.length; i += 4) sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
   const mean = sum / (d.length / 4) || 128;
@@ -164,6 +166,10 @@ export function applyFloorDetail(scene: Scene, root: TransformNode, floorKind: s
 export function applyFloorDetailToMesh(scene: Scene, ground: AbstractMesh, detail: FloorDetail, size: [number, number]): boolean {
   const mat = ground.material as PBRMaterial | null;
   if (!mat || !(mat instanceof PBRMaterial)) return false;
+  try { return applyDetail(scene, ground, mat, detail, size); } catch (e) { console.warn('[FEL-GROUND] floor grain skipped:', (e as Error).message); return false; }
+}
+
+function applyDetail(scene: Scene, ground: AbstractMesh, mat: PBRMaterial, detail: FloorDetail, size: [number, number]): boolean {
   const src = groundDetailTexture(scene, detail.kind);
   const tex = new DynamicTexture(`fel_ground_detail_${detail.kind}_i`, src.getSize().width, scene, true);
   const ctx = tex.getContext() as CanvasRenderingContext2D;
