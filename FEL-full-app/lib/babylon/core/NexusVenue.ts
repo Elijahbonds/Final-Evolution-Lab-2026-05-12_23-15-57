@@ -113,6 +113,9 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   const gameplayCam = ctx.scene.activeCamera;
 
   const built = buildNexusScene(ctx.scene, spec, ctx.canvas);
+  // Ship Pass 6 phase 5: under a scanned map the procedural court plane must not render — it z-fought the scan and mirrored the
+  // dusk dome as an orange slab (threes, three-point). It stays in the scene for bounds and camera logic.
+  if (spec.mapKey) for (const m of built.root.getChildMeshes()) if (m.name === 'venue_ground') m.isVisible = false;
 
   // Ship pass 4, phase 2: the CC0 prop dressing for this venue (visual/VenueProps.ts),
   // loaded async under the venue root and disposed with it. Placements live in
@@ -167,6 +170,11 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   ctx.camDirector?.setBounds?.(camBox);
 
   const placeholders = built.actors;
+  // Ship Pass 6 phase 3 (owner: "fix the arms of the NPCs"): the spec's placeholder actors are armless capsules. Modes that
+  // spawn real bodies are meant to call hidePlaceholders() and several never did (karate rails, skate rail, three-point
+  // lanes). They now go on their own two and a half seconds after the mount — long enough for every mode's spawns to land.
+  let disposed = false;
+  const autoHide = setTimeout(() => { if (!disposed) for (const a of placeholders) a.getChildMeshes().forEach((m) => { m.isVisible = false; }); }, 2500);
 
   return {
     built,
@@ -179,6 +187,7 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
       }
     },
     dispose() {
+      disposed = true; clearTimeout(autoHide);
       ctx.camDirector?.invalidateBounds?.();
       propsGone = true; props?.dispose(); props = null;
       built.dispose();

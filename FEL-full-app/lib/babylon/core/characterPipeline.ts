@@ -16,6 +16,11 @@ import type { Scene, Material } from '@babylonjs/core';
 // clashes, so we use a structural type instead.)
 type TintMat = Material & { albedoColor?: Color3; diffuseColor?: Color3 };
 import { CharacterLibrary, type SpawnedCharacter, type SpawnOpts } from './CharacterLibrary';
+import { DEFAULT_HERO_URL, normalizeHeroUrl } from './athleteRoster';
+
+/** Rival colours that double as roster seeds: a different roster body per NPC in a scene, the same bodies every session. */
+const NPC_SEEDS = ['#F25F5C', '#2EC4B6', '#FFBF47', '#5B8DEF', '#B07CF5', '#7BD389'];
+let npcSeq = 0;
 import type { AvatarSpec } from '../../workout/avatar-builder';
 import { boneNode } from '../anim/boneLookup';
 import {
@@ -44,8 +49,12 @@ export const CharacterPipeline = {
     try { applyIdentity(spawn, id); } catch (e) { console.error('[FEL-IDENTITY] applyIdentity failed', e); }
     return spawn;
   },
-  /** NPCs/mobs: variety (tint/scale), never the player's identity. */
+  /** NPCs/mobs: variety (tint/scale), never the player's identity. Owner decision 2026-09-05 (Ship Pass 6): the hero is
+   *  the owner's scan, so an NPC asked to wear the hero slot without a tint would be a clone of the owner — it takes a
+   *  roster body instead (the tint seeds CharacterLibrary's deterministic roster pick; the roster's baked kit ignores it). */
   spawnNpc(scene: Scene, url: string, opts: SpawnOpts = {}): Promise<SpawnedCharacter> {
-    return CharacterLibrary.spawn(scene, url, opts);
+    const wantsHero = normalizeHeroUrl(url) === DEFAULT_HERO_URL;
+    const tint = opts.tint ?? (wantsHero ? NPC_SEEDS[npcSeq++ % NPC_SEEDS.length] : undefined);
+    return CharacterLibrary.spawn(scene, url, tint ? { ...opts, tint } : opts);
   },
 };

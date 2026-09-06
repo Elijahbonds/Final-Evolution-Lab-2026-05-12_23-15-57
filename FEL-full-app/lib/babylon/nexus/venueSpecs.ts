@@ -169,8 +169,8 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
       { kind: 'wall', position: [0, 0, -12], color: '#1A1220' },
       { kind: 'wall', position: [0, 0, 12], rotationY: Math.PI, color: '#1A1220' },
       { kind: 'banner', position: [0, 0, -11.6], color: '#FF2D55' },
-      { kind: 'lamp', position: [6, 0, -6], color: '#FFCF9A' },
-      { kind: 'lamp', position: [-6, 0, -6], color: '#FFCF9A' },
+      { kind: 'lamp', position: [6, 0, -6], color: '#FFD79A' },
+      { kind: 'lamp', position: [-6, 0, -6], color: '#FFD79A' },
     ],
     actors: [
       { id: 'you', role: 'player', position: [-2, 0, 1.5], facing: Math.PI / 2, color: '#FFFFFF' },
@@ -199,8 +199,8 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     ground: { kind: 'mat', size: [24, 24], color: '#2A1A3A', lineColor: '#BF5AF2', markings: 'ring' },
     props: [
       { kind: 'wall', position: [0, 0, -14], color: '#0D0714' },
-      { kind: 'lamp', position: [7, 0, -5], color: '#BF5AF2' },
-      { kind: 'lamp', position: [-7, 0, -5], color: '#5E5CE6' },
+      { kind: 'lamp', position: [7, 0, -5], color: '#FFD79A' },
+      { kind: 'lamp', position: [-7, 0, -5], color: '#FFD79A' },
       { kind: 'banner', position: [0, 0, -13.6], color: '#BF5AF2' },
     ],
     actors: [

@@ -117,7 +117,7 @@ async function loadContainer(scene: Scene, url: string): Promise<AssetContainer>
  *  (the probe's old scene.textures basis could not see them); the mobile file is 24 MB. Only the DEFAULT hero is
  *  swapped — a dev override (?hero=) or an explicitly requested body always loads as asked, and the desktop tier's
  *  look is untouched. */
-const MOBILE_HERO_URL = '/models/fel-hero.mobile.glb';
+const MOBILE_HERO_URL = '/models/elijah-meshy.mobile.glb';   // Ship Pass 6: the scan's decimated bake (54k verts, 1K textures)
 function tierOf(scene: Scene): QualityTier { return (scene.metadata?.felTier as QualityTier | undefined) ?? 'desktop'; }
 function heroUrlForTier(url: string, scene: Scene): string { return url === DEFAULT_HERO_URL && tierOf(scene) === 'mobile' ? MOBILE_HERO_URL : url; }
 /** The hero for this scene's tier, falling back to the requested file if the tier's variant will not load — a
@@ -144,7 +144,7 @@ export const CharacterLibrary = {
     url = normalizeHeroUrl(url);
     // Ship pass 3 rollout flag: the dev harness and the Closet can point the DEFAULT hero at a candidate body.
     const override = (scene.metadata as { felHeroOverride?: string } | undefined)?.felHeroOverride;
-    if (override && url === '/models/fel-hero.glb') url = override;
+    if (override && url === DEFAULT_HERO_URL) url = override;
     // M105 (Path A): the Meshy hero GLB is visually broken. When
     // PROCEDURAL_CHARACTERS is on, bypass the GLB entirely and spawn a clean,
     // assetless, cel-shaded procedural athlete satisfying the same contract.

@@ -8,15 +8,41 @@
 // rest but left jump_up / jump_land on Euler X keys — which on this rig rotate
 // the arm about its own axis (a twist), so the arms never swung on a jump
 // (measured 2026-09-03 by coreClips.test.ts). Now every clip is a pose.
-import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
+import type { Scene, Skeleton, AnimationGroup, Bone, Matrix } from '@babylonjs/core';
 import { buildPoseClip, type Deg3 } from '../poseClip';
 type V3 = [number, number, number];
 
-/** Hands hanging at the sides, slightly forward of the hip, palms in. */
-const HANG = { Left: [-0.24, 0.84, 0.06] as V3, Right: [0.24, 0.84, 0.06] as V3 };
+/** Hands hanging at the sides, slightly forward of the hip, palms in — the HERO's measure (shoulder 0.17 out, arm 0.58). */
+const HANG_DEFAULT = { Left: [-0.24, 0.84, 0.06] as V3, Right: [0.24, 0.84, 0.06] as V3 };
 const HANG_POLES = { Left: [-0.2, -0.3, -0.9] as V3, Right: [0.2, -0.3, -0.9] as V3 };   // elbows slightly back
 
+/**
+ * Ship Pass 6 (owner: "fix the arms of the NPCs"): the hang was fixed metres from the root, so a body with shorter arms
+ * than the hero (the roster) had to BEND its elbows to reach the same point — arms held out, hands splayed. Now the hang
+ * is derived from THIS skeleton: shoulder position from the bind pose, hand a hair under a straight arm's reach.
+ */
+export function hangFor(sk: Skeleton): { Left: V3; Right: V3 } {
+  // REST positions: the bind matrices chained through the parents. (The live absolute matrices carry whatever pose
+  // the skeleton is in right now — mid-clip that read the arm short and hung the hands high.)
+  const rest = (b: Bone): Matrix => { const p = b.getParent(); return p ? b.getBaseMatrix().multiply(rest(p)) : b.getBaseMatrix().clone(); };
+  const pos = (name: string): V3 | null => {
+    const b = sk.bones.find((x) => x.name === name); if (!b) return null;
+    const t = rest(b).getTranslation(); return [t.x, t.y, t.z];
+  };
+  const out = { ...HANG_DEFAULT };
+  for (const side of ['Left', 'Right'] as const) {
+    const sh = pos(`${side}Arm`), el = pos(`${side}ForeArm`), ha = pos(`${side}Hand`);
+    if (!sh || !el || !ha) continue;
+    const len = Math.hypot(el[0] - sh[0], el[1] - sh[1], el[2] - sh[2]) + Math.hypot(ha[0] - el[0], ha[1] - el[1], ha[2] - el[2]);
+    if (!(len > 0.3 && len < 1.2)) continue;
+    const dir = side === 'Left' ? -1 : 1;
+    out[side] = [sh[0] + dir * 0.05, sh[1] - len * 0.965, sh[2] + 0.06] as V3;   // hands 3.5 % short of straight: a soft elbow
+  }
+  return out;
+}
+
 export function buildIdleStand(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const HANG = hangFor(sk);
   const key = (t: number, spine: number, neck: Deg3, lift: number, hipsY: number) => ({
     t, bones: { Hips: [0, 0, 0] as Deg3, Spine: [spine, 0, 0] as Deg3, Neck: neck },
     hands: { Left: [HANG.Left[0] - lift * 0.3, HANG.Left[1] + lift, HANG.Left[2]] as V3, Right: [HANG.Right[0] + lift * 0.3, HANG.Right[1] + lift, HANG.Right[2]] as V3 },
@@ -26,6 +52,7 @@ export function buildIdleStand(scene: Scene, sk: Skeleton): AnimationGroup | nul
 }
 
 export function buildStrafe(scene: Scene, sk: Skeleton, dir: 'left' | 'right'): AnimationGroup | null {
+  const HANG = hangFor(sk);
   const s = dir === 'left' ? 1 : -1;
   const key = (t: number, roll: number, lead: number, trail: number, swing: number) => ({
     t, bones: { Hips: [0, 0, roll * s] as Deg3, Spine: [4 + roll * 0.4, 0, -roll * 0.7 * s] as Deg3, LeftUpLeg: [-12 - lead, 0, 8 * s] as Deg3, RightUpLeg: [-12 + trail, 0, 8 * s] as Deg3 },

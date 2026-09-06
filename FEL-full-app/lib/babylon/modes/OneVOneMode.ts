@@ -596,7 +596,8 @@ export const OneVOneMode: ModeDefinition = (() => {
           }
         }
 
-        ctx.camDirector.update(me.root.position, meDribble.vel, foe.root.position);
+        // Ship Pass 6: a two-point fit on a foe within arm's reach put the camera inside a body (sweep frame 2026-09-05); frame the rim instead
+        ctx.camDirector.update(me.root.position, meDribble.vel, Vector3.Distance(me.root.position, foe.root.position) < 2.2 ? RIM : foe.root.position);
       }
     },
 

@@ -1,6 +1,6 @@
 """Rig a Meshy body scan onto the FEL 22-bone rig WITHOUT the T-pose problem (owner ask 2026-09-05: "see if the loader can build me").
 
-blender -b --python scripts/meshy/rig-scan.py -- <scan.glb> <hero.glb> <out.glb> [height_m] [arm_deg]
+blender -b --python scripts/meshy/rig-scan.py -- <scan.glb> <hero.glb> <out.glb> [height_m] [arm_deg] [decimate_ratio] [tex_px]
 
 Meshy scans have no skeleton and stand in a T-pose. Binding a T-posed mesh to the A-pose rig is what made the earlier hero
 T-pose in game. So: (1) scale the scan to the body's height, feet on the floor, facing the body's way; (2) pose the rig's
@@ -14,6 +14,8 @@ argv = sys.argv[sys.argv.index('--') + 1:]
 scan_path, hero_path, out = argv[0], argv[1], argv[2]
 height = float(argv[3]) if len(argv) > 3 else 1.71
 arm_deg = float(argv[4]) if len(argv) > 4 else 90.0
+decimate = float(argv[5]) if len(argv) > 5 else 1.0
+tex_px = int(argv[6]) if len(argv) > 6 else 2048
 
 def wverts(o): return [o.matrix_world @ v.co for v in o.data.vertices]
 def bbox(o):
@@ -49,6 +51,11 @@ scan.location = (-(lo.x + hi.x) / 2 + (blo.x + bhi.x) / 2, -(lo.y + hi.y) / 2 + 
 bpy.ops.object.transform_apply(location=True)
 lo, hi = bbox(scan)
 print(f"FELRIG scan verts={len(scan.data.vertices)} height={hi.z-lo.z:.2f} width={hi.x-lo.x:.2f} depth={hi.y-lo.y:.2f} body width={bhi.x-blo.x:.2f}")
+# 1b. mobile bake: collapse the scan before weights (the 160k-vertex desktop scan is 12 MB)
+if decimate < 1:
+    bpy.ops.object.select_all(action='DESELECT'); scan.select_set(True); bpy.context.view_layer.objects.active = scan
+    md = scan.modifiers.new('dec', 'DECIMATE'); md.ratio = decimate; bpy.ops.object.modifier_apply(modifier='dec')
+    print(f"FELRIG decimated to {len(scan.data.vertices)} verts")
 # 2. pose the rig's upper arms out to the scan's arm angle (about the body's forward axis)
 bpy.context.view_layer.objects.active = rig; bpy.ops.object.mode_set(mode='POSE')
 for name, side in (('LeftArm', 1), ('RightArm', -1)):
@@ -82,7 +89,7 @@ for m in scan.data.materials:
     if m: m.name = 'scan'
 for o in [o for o in bpy.data.objects if o.type == 'MESH' and o is not scan]: bpy.data.objects.remove(o, do_unlink=True)
 for img in bpy.data.images:
-    if img.size[0] > 2048: img.scale(2048, 2048)
+    if img.size[0] > tex_px: img.scale(tex_px, tex_px)
 bpy.ops.object.select_all(action='DESELECT'); scan.select_set(True); rig.select_set(True)
 bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_yup=True, use_selection=True, export_skins=True, export_animations=False, export_image_format='JPEG', export_jpeg_quality=85)
 print(f"FELRIG wrote {out} bytes={os.path.getsize(out)} bones={len(rig.data.bones)}")

@@ -108,6 +108,10 @@ export function simulateRival(skill: number, round: Round): number {
 }
 
 let player: SpawnedCharacter | null = null;
+/** Owner decision 2026-09-05: the contest's other shooters are ROSTER BODIES waiting behind the arc (idle, never seen
+ *  shooting — D4's ruling stands); they replace the venue's capsule placeholders. */
+let rivalBodies: SpawnedCharacter[] = [];
+const RIVAL_SEEDS = ['#F25F5C', '#2EC4B6', '#FFBF47', '#5B8DEF', '#B07CF5'];
 let ball: Mesh | null = null;
 let arc: ShotArc | null = null;
 let ballMat: StandardMaterial | null = null;
@@ -453,6 +457,11 @@ export const ThreePointMode: ModeDefinition = {
     installSafePlay(player.animator, 'threepoint');
     ctx.groundLock.track(player.root, player.skeleton);
     ctx.heroRef.current = player.root;
+    // the field waits along the left sideline, facing the rim, one body per rival card
+    void Promise.all(RIVAL_NAMES.map((_, i) => CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
+      position: new Vector3(-9.2, 0, 4 - i * 1.9), yawRad: Math.atan2(RIM.x - -9.2, RIM.z - (4 - i * 1.9)), tint: RIVAL_SEEDS[i % RIVAL_SEEDS.length], startClip: 'idle_stand', identity: false, modeId: 'threepoint',
+    }))).then((bodies) => { if (!player) { bodies.forEach((b) => b.dispose()); return; } rivalBodies = bodies; for (const b of bodies) neverBindPose(b.animator, 'idle_stand'); })
+      .catch((e) => console.warn('[FEL-3PT] rival bodies did not spawn', (e as Error)?.message ?? e));
 
     ball = MeshBuilder.CreateSphere('tp_ball', { diameter: 0.24, segments: 16 }, ctx.scene);
     ballMat = new StandardMaterial('tp_ballMat', ctx.scene);
@@ -610,6 +619,7 @@ export const ThreePointMode: ModeDefinition = {
     // one and must not touch the live objects.
     if (disposeCount < loadCount) return;
     player?.dispose(); player = null;
+    for (const b of rivalBodies) b.dispose(); rivalBodies = [];
     ball?.dispose(); ball = null;
     ballMat?.dispose(); ballMat = null;
     for (const m of rackMeshes) m.dispose();

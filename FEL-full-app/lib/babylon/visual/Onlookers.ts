@@ -1,99 +1,75 @@
 // Onlookers — World-Population Protocol L4 for the solo score-run venues.
 //
-// The three board sports all failed L4 with the same shape: nobody else was in
-// the world. A Venice skatepark, a lift-served slope and a surf break in sight
-// of a boardwalk all imply people, and the protocol's rule is that a venue
-// records N-A only when it genuinely implies none ("a dawn beach may not").
-//
-// Two constraints shape this file:
-//
-//  - "Crowd REACTS to the big moment — a static crowd is set dressing." So this
-//    is not scenery with a bob on it; cheer() exists and the modes call it on
-//    the moment that matters (a banked run, a cleared threat, a barrel).
-//  - "Crowd cost is bounded; it must never compete with characters for frame
-//    budget." So it is two master meshes and hardware instances of them — a
-//    figure costs a transform, not a draw call — and it never spawns a rig, a
-//    skeleton or an animation group. Twelve onlookers add 2 draws.
-//
-// Deliberately silhouettes, not characters. At gameplay camera distance in a
-// score-run mode these read as people at the edge of the park; modelling them
-// any further would spend budget on something the player never looks at, and
-// L5's rule is that nothing may compete with L1-L2 for attention.
+// A Venice skatepark, a lift-served slope, a surf break in sight of a boardwalk, a pit fight: all imply people. The first
+// version was capsule silhouettes (two instanced masters, 2 draws) — the owner's read on 2026-09-05 was "fix the arms of
+// the NPCs": armless pills on the rail. Ship Pass 6 phase 3: onlookers are now ROSTER BODIES (athleteRoster, tinted seeds
+// so the same spots get the same people every session), idling on the spot, capped so a crowd never competes with the
+// athletes for frame budget (MAX_BODIES × ~6 draws). The constructor keeps its shape — modes construct it synchronously
+// and call update(dt) and cheer(strength); the bodies land a moment later.
+import { Vector3 } from '@babylonjs/core';
+import type { Scene, TransformNode } from '@babylonjs/core';
+import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 
-import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, InstancedMesh, Scene } from '@babylonjs/core';
+interface Figure { char: SpawnedCharacter; root: TransformNode; baseY: number; phase: number }
 
-interface Figure {
-  body: InstancedMesh;
-  head: InstancedMesh;
-  /** Ground height, so the bob and the cheer hop are relative to it. */
-  baseY: number;
-  /** Phase offset so a crowd does not breathe in unison. */
-  phase: number;
-}
-
-const BOB_HEIGHT = 0.035;
+const BOB_HEIGHT = 0.02;
 const CHEER_SEC = 1.6;
-const CHEER_HOP = 0.42;
+const CHEER_HOP = 0.3;
+export const MAX_BODIES = 8;
+/** Seed colours → deterministic roster picks; the roster's baked kit ignores the tint itself. */
+const SEEDS = ['#3E5A70', '#F25F5C', '#2EC4B6', '#FFBF47', '#5B8DEF', '#B07CF5', '#7BD389', '#E27D60'];
 
 export class Onlookers {
   private figures: Figure[] = [];
-  private masters: AbstractMesh[] = [];
   private t = 0;
   private cheerT = 0;
+  private disposed = false;
+  private requested = 0;
+  /** Bodies this crowd asked for (the headless checks count the crowd before the spawns land). */
+  get count(): number { return Math.max(this.requested, this.figures.length); }
 
-  constructor(scene: Scene, spots: Vector3[], tint = '#2b3550') {
+  constructor(scene: Scene, spots: Vector3[], tint = '#2b3550', lookAt: Vector3 = Vector3.Zero()) {
     if (spots.length === 0) return;
-
-    const bodyM = new StandardMaterial('onlookerM', scene);
-    bodyM.diffuseColor = Color3.FromHexString(tint);
-    bodyM.specularColor = Color3.Black();          // matte: never draws the eye
-
-    const body = MeshBuilder.CreateCapsule('onlooker_body', { radius: 0.19, height: 1.25 }, scene);
-    const head = MeshBuilder.CreateSphere('onlooker_head', { diameter: 0.34, segments: 6 }, scene);
-    body.material = bodyM; head.material = bodyM;
-    body.isPickable = false; head.isPickable = false;
-    // The masters themselves are parked out of sight; only instances are placed.
-    // Hiding them instead would hide every instance with them.
-    body.position.set(0, -500, 0); head.position.set(0, -500, 0);
-    this.masters = [body, head];
-
-    spots.forEach((p, i) => {
-      const b = body.createInstance(`onlooker_b${i}`);
-      const h = head.createInstance(`onlooker_h${i}`);
-      b.isPickable = false; h.isPickable = false;
-      b.position.set(p.x, p.y + 0.72, p.z);
-      h.position.set(p.x, p.y + 1.52, p.z);
-      this.figures.push({ body: b, head: h, baseY: p.y, phase: (i * 2.399) % (Math.PI * 2) });
+    // spread the cap over the spots so a long rail still reads populated end to end
+    const step = Math.max(1, Math.ceil(spots.length / MAX_BODIES));
+    const chosen = spots.filter((_, i) => i % step === 0).slice(0, MAX_BODIES);
+    this.requested = chosen.length;
+    chosen.forEach((p, i) => {
+      const seed = SEEDS[(i + tint.length) % SEEDS.length];
+      const yaw = Math.atan2(lookAt.x - p.x, lookAt.z - p.z);   // face the action
+      void CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { position: p.clone(), yawRad: yaw, tint: seed, startClip: 'idle', identity: false })
+        .then((char) => {
+          if (this.disposed) { char.dispose(); return; }
+          for (const m of char.root.getChildMeshes()) m.isPickable = false;
+          this.figures.push({ char, root: char.root, baseY: p.y, phase: (i * 2.399) % (Math.PI * 2) });
+        })
+        .catch((e) => console.warn('[FEL-ONLOOKERS] body did not spawn', (e as Error)?.message ?? e));
     });
   }
 
-  /** Call once a frame. Idle sway, plus the tail of any cheer in progress. */
+  /** Call once a frame. A slow breathe, plus the tail of any cheer in progress. */
   update(dt: number): void {
     if (this.figures.length === 0) return;
     this.t += dt;
     if (this.cheerT > 0) this.cheerT = Math.max(0, this.cheerT - dt);
-    const excite = this.cheerT / CHEER_SEC;             // 1 -> 0 over the cheer
-
+    const excite = this.cheerT / CHEER_SEC;
     for (const f of this.figures) {
       const sway = Math.sin(this.t * (1.4 + excite * 6) + f.phase);
-      // A cheer is a hop that decays, on top of the idle bob.
       const lift = BOB_HEIGHT * sway + (excite > 0 ? Math.abs(Math.sin(this.t * 9 + f.phase)) * CHEER_HOP * excite : 0);
-      f.body.position.y = f.baseY + 0.72 + lift;
-      f.head.position.y = f.baseY + 1.52 + lift;
+      f.root.position.y = f.baseY + lift;
     }
   }
 
   /** The big moment happened. 0..1 — a bigger moment cheers longer. */
   cheer(strength = 1): void {
     this.cheerT = Math.max(this.cheerT, CHEER_SEC * Math.max(0.2, Math.min(1, strength)));
+    for (const f of this.figures) { try { f.char.animator?.play?.('cheer', { loop: false }); } catch { /* no cheer clip on this body — the hop carries it */ } }
   }
 
-  get count(): number { return this.figures.length; }
-
   dispose(): void {
-    for (const f of this.figures) { f.body.dispose(); f.head.dispose(); }
-    for (const m of this.masters) m.dispose();
-    this.figures = []; this.masters = [];
+    this.disposed = true;
+    for (const f of this.figures) f.char.dispose();
+    this.figures = [];
   }
 }
