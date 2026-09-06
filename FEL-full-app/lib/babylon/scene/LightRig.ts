@@ -75,10 +75,19 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // M44: auto-classify casters/receivers by mesh name so shadows appear in
   // every mode WITHOUT any mode file calling addShadowCasters (which nothing
   // ever did — so shadows were silently absent everywhere).
+  // Pass 7 follow-up (2026-09-06): the engine's real draw counter showed ~8 draws per active mesh — every caster is drawn
+  // again into each cascade. Scenery that can never throw a useful shadow stays out of the map: the scanned venue maps and
+  // seas (bounding radius > 25 m), the sky and backdrop domes, the boardwalk flats, the gulls, the contact-shadow discs.
+  const NEVER_CAST = /^(vb_|bk_|nexus_sky|sky|fel_ground|venue_props_)|_contact$|_gull_|nexus_venue_map/i;
   const classify = (mesh: AbstractMesh): void => {
     if (!mesh.name || mesh.name.startsWith('__')) return;
-    if (RECEIVER_HINTS.test(mesh.name)) mesh.receiveShadows = true;
-    else { try { shadows.addShadowCaster(mesh, true); } catch { /* non-renderable */ } }
+    if (RECEIVER_HINTS.test(mesh.name)) { mesh.receiveShadows = true; return; }
+    if (NEVER_CAST.test(mesh.name)) return;
+    try {
+      const r = mesh.getBoundingInfo().boundingSphere.radiusWorld;
+      if (r > 25) return;                       // a scan, a sea, a dome: receives at most, never casts
+      shadows.addShadowCaster(mesh, true);
+    } catch { /* non-renderable */ }
   };
   for (const m of scene.meshes as AbstractMesh[]) classify(m);
   const autoObserver = scene.onNewMeshAddedObservable.add((m) => classify(m as AbstractMesh));

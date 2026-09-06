@@ -166,8 +166,10 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
       // (radius 11, beta 1.15 resolves to z ≈ -8.6) and the frame filled with
       // flat paint. Moved out to ±12; the framing guard in the loader now
       // catches this class at build time.
-      { kind: 'wall', position: [0, 0, -12], color: '#1A1220' },
-      { kind: 'wall', position: [0, 0, 12], rotationY: Math.PI, color: '#1A1220' },
+      // shrine courtyard (owner's Luma reference): low pale stone walls, not 6 m of near-black — the black slab hid the Meshy
+      // shrine behind it in every versus frame (measured 2026-09-06); at 0.6× the roof shows over the wall
+      { kind: 'wall', position: [0, 0, -12], color: '#B9AFA0', scale: 0.6 },
+      { kind: 'wall', position: [0, 0, 12], rotationY: Math.PI, color: '#B9AFA0', scale: 0.6 },
       { kind: 'banner', position: [0, 0, -11.6], color: '#FF2D55' },
       { kind: 'lamp', position: [6, 0, -6], color: '#FFD79A' },
       { kind: 'lamp', position: [-6, 0, -6], color: '#FFD79A' },
@@ -198,7 +200,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     // swing. Karate VS uses a disc for the same reason.
     ground: { kind: 'mat', size: [24, 24], color: '#C6BFB2', lineColor: '#6B5B4A', markings: 'ring' },   // owner's Luma reference 2026-09-06 (Shimogamo Jinja): pale raked gravel, dark lines
     props: [
-      { kind: 'wall', position: [0, 0, -14], color: '#B9AFA0' },   // shrine courtyard: a low stone wall, not a black void
+      { kind: 'wall', position: [0, 0, -14], color: '#B9AFA0', scale: 0.6 },   // shrine courtyard: a LOW stone wall (3.6 m) so the shrine shows over it
       { kind: 'lamp', position: [7, 0, -5], color: '#FFD79A' },
       { kind: 'lamp', position: [-7, 0, -5], color: '#FFD79A' },
       { kind: 'banner', position: [0, 0, -13.6], color: '#BF5AF2' },

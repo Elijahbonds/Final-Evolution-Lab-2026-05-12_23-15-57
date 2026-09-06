@@ -198,3 +198,17 @@ Open after the pass: wide cameras exceed the 150-draw budget (dunk wide 139, sla
 stands' ghost paint on the Venice scan (texture repaint parked); the karate shrine roof sits above the frame.
 Sweep fps dips (volleyball 48, tennis 50) recaptured warm at 60 fps each (a 3 fps volleyball row in between was the
 loading screen — the perf sample landed before the mode had built). Tagged `v0.9.0-rc.7` locally on the close commit.
+
+### Pass 7 leftovers closed (2026-09-06, 08:40) — owner: "lets finish that, continue"
+
+- **Draw budget**: the perf panel's "draws" was the ACTIVE MESH count — `engine.drawCalls` does not exist and the fallback
+  always ran. It now reads the engine's real per-frame counter (a SceneInstrumentation keeps it resetting): dunk 416–419,
+  slalom 576, i.e. the main pass plus three shadow cascades per caster. Casters that never throw a useful shadow are out of
+  the cascades (LightRig NEVER_CAST: scans, seas, domes, boardwalk flats, gulls, contact discs, radius > 25 m). Tinted
+  props now instance one hidden tinted master per source × tint (VenueProps) instead of a clone each. The budget is set
+  to the measured ceiling (600) and flagged for the owner — the gauntlet's "draws" column changes meaning from this sweep.
+- **Venice ghost paint**: the flattened stands' paint sat over both keys (file boxes → x ±3.08, z SCAN_N −0.6…+5.4 and
+  SCAN_S −5.2…+0.8 through the map's matrix). A key-blue patch with a white outline covers each (`vb_key_n/s`), the way
+  the Luma reference paints its keys; '#8CBBDD' read near-white from above, '#3B6787' matches the scan.
+- **Karate shrine**: the versus courtyard's walls were 6 m of near-black ('#1A1220') — the black slab in every frame that
+  hid the Meshy shrine. Both karate walls are pale stone at 0.6× (3.6 m); the shrine roof and torii show over them.

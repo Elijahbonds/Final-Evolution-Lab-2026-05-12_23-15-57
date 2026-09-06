@@ -113,6 +113,19 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   const logo = MeshBuilder.CreateGround('vb_court_logo', { width: 3.6, height: 3.6 }, scene);
   logo.position.set(0, 0.03, SCAN_MID); logo.parent = holder; logo.isPickable = false;  // the scan's centre circle
 
+  // The scan's two baked hoop stands were flattened onto the floor (scripts/map/cut-scan-stands.py) and left their paint
+  // as ghost rectangles over both keys — file boxes (±0.55…0.98, |z| < 0.22) land at x ±3.08, z SCAN_N −0.6…+5.4 and
+  // SCAN_S −5.2…+0.8 (measured through the map's matrix, 2026-09-06). A key-blue patch with a white outline covers each,
+  // the way the Luma reference paints its keys.
+  const keyTex = new DynamicTexture('vb_key_tex', { width: 256, height: 256 }, scene, false);
+  { const g = keyTex.getContext() as CanvasRenderingContext2D; g.fillStyle = '#3B6787'; g.fillRect(0, 0, 256, 256);   // the scan's key tone under the dusk grade — '#8CBBDD' read near-white from above
+    g.strokeStyle = '#D9E4EE'; g.lineWidth = 6; g.strokeRect(5, 5, 246, 246); keyTex.update(false); }
+  const keyMat = new PBRMaterial('vb_key_mat', scene); keyMat.albedoTexture = keyTex; keyMat.metallic = 0; keyMat.roughness = 0.95;
+  for (const [name, z0, z1] of [['vb_key_n', SCAN_N - 0.62, SCAN_N + 5.4], ['vb_key_s', SCAN_S - 5.2, SCAN_S + 0.82]] as const) {
+    const k = MeshBuilder.CreateGround(name, { width: 6.16, height: z1 - z0 }, scene);
+    k.position.set(0, 0.016, (z0 + z1) / 2); k.parent = holder; k.material = keyMat; k.isPickable = false; k.receiveShadows = true;
+  }
+
   // Pass 7 phase 6 — life: a rail of onlookers on the boardwalk's inner edge, facing the court (roster bodies, cap 8, the
   // same people every session). They idle and bob; the modes' cheer hooks are not wired here — this is scenery.
   const railX = COURT.hx + apron - 0.7;   // on the east apron, inside the scan's baked fence — on the walk they stood behind it, unseen from the court

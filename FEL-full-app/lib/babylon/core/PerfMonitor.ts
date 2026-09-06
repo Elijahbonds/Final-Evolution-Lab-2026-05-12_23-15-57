@@ -17,6 +17,7 @@
 // and its per-frame bookkeeping cost nothing in production.
 
 import type { AbstractEngine, InternalTexture, Scene } from '@babylonjs/core';
+import { SceneInstrumentation } from '@babylonjs/core';
 
 // InternalTextureSource: RenderTarget 5, MultiRenderTarget 6, DepthStencil 12, Depth 14 — the pipeline's textures
 // (shadow maps, post-process targets), sized by the quality tier, not by the mode. Literal so this file stays
@@ -30,8 +31,11 @@ export interface PerfBudget {
   textureMb: number;
 }
 
+// drawCalls: the panel now reports the engine's REAL per-frame draw calls (main pass + every shadow cascade per caster).
+// Measured 2026-09-06 on the play cameras after the caster trim: dunk 416, slalom 576, karate 250-ish; the old 150 was an
+// active-mesh count in disguise. 600 is that measured ceiling, not a target — owner to confirm or re-baseline.
 export const DEFAULT_BUDGET: PerfBudget = {
-  frameMs: 16.7, drawCalls: 150, activeMeshes: 400, textureMb: 256,
+  frameMs: 16.7, drawCalls: 600, activeMeshes: 400, textureMb: 256,
 };
 
 export interface PerfSample {
@@ -59,6 +63,7 @@ export class PerfMonitor {
   private el: HTMLDivElement | null = null;
   private sample: PerfSample | null = null;
   private uiTick = 0;
+  private instr: SceneInstrumentation | null = null;
 
   constructor(
     private scene: Scene,
@@ -144,8 +149,12 @@ export class PerfMonitor {
     const avgMs = sum / this.times.length;
     const worstMs = Math.max(...this.times);
     const longFrames = this.times.filter((t) => t > this.budget.frameMs).length;
-    const drawCalls = (this.engine as unknown as { drawCalls?: { current?: number } }).drawCalls?.current
-      ?? this.scene.getActiveMeshes().length;
+    // Babylon keeps the real per-frame draw-call counter on the engine as `_drawCalls` (what SceneInstrumentation reads);
+    // `engine.drawCalls` does not exist, so this always fell back to the ACTIVE MESH count — the slalom's 60 instanced pines
+    // read as 60 "draws" when they are one (measured 2026-09-06). Active meshes stay their own field.
+    if (!this.instr) this.instr = new SceneInstrumentation(this.scene);   // resets the engine's counter every frame
+    const dc = (this.engine as unknown as { _drawCalls?: { current?: number } })._drawCalls?.current;
+    const drawCalls = dc && dc > 0 ? dc : this.scene.getActiveMeshes().length;   // sampled after render: this frame's real draw calls (shadow passes included)
     const activeMeshes = this.scene.getActiveMeshes().length;
     const textureMb = this.textureMb();
 
@@ -200,6 +209,7 @@ export class PerfMonitor {
   snapshot(): PerfSample | null { return this.sample ? { ...this.sample } : null; }
 
   dispose(): void {
+    this.instr?.dispose(); this.instr = null;
     if (this.obs) this.scene.onAfterRenderObservable.remove(this.obs);
     this.obs = null;
     this.el?.remove();

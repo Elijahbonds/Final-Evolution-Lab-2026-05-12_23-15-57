@@ -65,7 +65,10 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
     const s = p.scale ?? 1; holder.scaling.set(s, s, s);
     for (const src of meshes) {
       // a tinted placement gets a clone with its own material (instances share the source's); untinted ones instance
-      const inst: AbstractMesh = p.tint ? tintedClone(scene, src, `${src.name}_t${i}`, p.tint) : src.createInstance(`${src.name}_i${i}`);
+      // a tinted placement instances a TINTED MASTER (one hidden clone per source × tint, shared by every placement with that
+      // tint — the slope's 60 green pines were 60 clones = 60 draws, measured 2026-09-06); untinted ones instance the source
+      const master = p.tint ? tintedMaster(scene, src, p.tint) : src;
+      const inst: AbstractMesh = master.createInstance(`${src.name}_i${i}`);
       inst.parent = holder;
       // the source mesh keeps its own transform inside the kit file; the instance repeats it under the holder
       inst.position.copyFrom(src.position); inst.rotationQuaternion = src.rotationQuaternion?.clone() ?? null; inst.rotation.copyFrom(src.rotation); inst.scaling.copyFrom(src.scaling);
@@ -89,6 +92,16 @@ export function propSetFor(specVenueId: string): string | null {
 
 /** Clone a kit mesh with a tinted copy of its material: the palette texture stays, multiplied by `hex`. Cached per (material, tint). */
 const tintCache = new Map<string, PBRMaterial>();
+const masterCache = new WeakMap<Scene, Map<string, Mesh>>();
+/** One hidden tinted clone per (source mesh, tint) per scene; placements instance it so a tinted line stays one draw. */
+function tintedMaster(scene: Scene, src: Mesh, hex: string): Mesh {
+  let map = masterCache.get(scene); if (!map) { map = new Map(); masterCache.set(scene, map); }
+  const key = `${src.uniqueId}|${hex}`;
+  let m = map.get(key);
+  if (!m || m.isDisposed()) { m = tintedClone(scene, src, `${src.name}_tm_${hex.replace('#', '')}`, hex); m.setEnabled(false); m.isPickable = false; map.set(key, m); }
+  return m;
+}
+
 function tintedClone(scene: Scene, src: Mesh, name: string, hex: string): Mesh {
   const c = src.clone(name, null, true) as Mesh;
   const base = src.material;
