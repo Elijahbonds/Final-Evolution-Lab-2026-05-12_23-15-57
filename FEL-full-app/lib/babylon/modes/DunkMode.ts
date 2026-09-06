@@ -98,6 +98,7 @@ export const DunkMode: ModeDefinition = (() => {
   let trail: ParticleSystem | null = null;   // juice soft #5
   let fovCam: Camera | null = null, fovBase = 0, fovT = 0, fovOn = false;   // juice soft #4
   let settleLatch = false;                    // juice soft #3
+  let settleArmed = false, settleArmAt = 0;   // A+ P4: the settle waits for feet-down, not the flush frame
   let hoopJuice: HoopJuice | null = null;     // juice LOOK: rim spring, net squash, hoop flash on the make
   let phase: Phase = 'approach';
   let phaseSec = 0;
@@ -320,7 +321,9 @@ export const DunkMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
-      fovTick(dt);
+      fovTick(dt); settleTick(ctx);
+      // A+ P5: the fov pinch starts on the APPROACH — inside 3.6 m (horizontal) of the rim during the run, not at takeoff
+      if ((phase === 'approach' || phase === 'charge') && !fovOn && Math.hypot(player.root.position.x - rim.x, player.root.position.z - rim.z) <= 3.6) fovGather(ctx);
       phaseSec += dt;
       watchdog(ctx);
       hype = Math.max(0, hype - dt * 1.5);       // slow decay between dunks
@@ -364,6 +367,7 @@ export const DunkMode: ModeDefinition = (() => {
           hangSlowMoLatch = true;
           ctx.juice.slowMo(0.4, 400);
           ctx.camDirector.pulse(0.4, 0.45); // ~13% soft push-in; rimCamCut stays the one hard cut
+          setTrail('hang');   // A+ P6: the trail brightens at the hang rise, not at takeoff
         }
         if (style === 'sig') runEastbayPath(ball, player.skeleton, clipTime, ebState);
         const k = Math.min(1, clipTime / EASTBAY_TIMING.duration);
@@ -595,7 +599,8 @@ export const DunkMode: ModeDefinition = (() => {
     setPhase('cinematic');
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false;
     rimCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
-    settleLatch = false; fovGather(ctx); setTrail('hang');   // juice soft #3–#5
+    settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
+    console.info('[JUICE-SOFT] launch');
     // The run-up, not the stick at the release instant: during the charge the
     // stick is usually neutral, so the old `hypot(stickX, stickY)` read ~0 and
     // EVERY dunk launched as a walk-up. Peak measured approach speed is the
@@ -624,7 +629,7 @@ export const DunkMode: ModeDefinition = (() => {
    *  saw (the miss path), crowd drops. This is the contest's signature risk. */
   function clipBlown(ctx: ModeContext): void {
     toppling = true;
-    SoundKit.play('impact', { pitch: 0.6, volume: 0.6 });
+    SoundKit.play('impact', { pitch: 0.6, volume: 0.6 }); console.info('[JUICE-SFX] impact chair');   // the chair is the miss's one hit (missClank skips)
     SoundKit.play('crowdGroan', { volume: 0.7 });
     ctx.feel?.impact?.(0.6);
     ctx.setHud({ banner: 'CAUGHT THE PROP — BLOWN' });
@@ -642,7 +647,7 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.setHud({ slamPulse: false });
     releasePos.copyFrom(ball.getAbsolutePosition());
     releaseBall(ball);
-    if (!qteHit) { ballSim.launch(releasePos, clankOffRim(ball, rim)); missClank(ctx); setTrail('off'); }   // juice soft #2, #5
+    if (!qteHit) { ballSim.launch(releasePos, clankOffRim(ball, rim)); missClank(ctx); setTrail('off'); armSettle(); }   // juice soft #2, #5; A+ P4
     const aerial = pickAerialFinish(qteHit, qteAccuracy);
     const banner = finishBanner(qteHit, qteAccuracy);
     if (banner) ctx.setHud({ banner });
@@ -658,14 +663,25 @@ export const DunkMode: ModeDefinition = (() => {
   // ── Venice juice soft #2–#5 (PM brief VENICE-JUICE-SOFT, 2026-09-06) ─────────────────────────────────────────────
   /** #2 miss clank weight: a light metallic hit and a small feel impact on the clank — never the make's contactPunch. */
   function missClank(ctx: ModeContext): void {
+    if (obstacleClipped) { console.info('[JUICE-SFX] clank skipped — the chair thud was the one hit'); return; }   // A+ P2: one hit per miss
     ctx.feel.impact(0.4);
     SoundKit.play('impact', { pitch: 1.35, volume: 0.45 });
-    console.info('[JUICE-SOFT] miss clank');
+    console.info('[JUICE-SOFT] miss clank'); console.info('[JUICE-SFX] impact clank');
   }
   /** #3 land settle: a micro shake (amp 0.05) and dust at the feet, once per attempt; the miss keeps its one-breath retry. */
+  /** A+ P4: armed at CONTACT (make) or at the clank (miss); fires from update() once the body is back on the floor. */
+  function armSettle(): void { settleArmed = true; settleArmAt = performance.now(); }
+  function settleTick(ctx: ModeContext): void {
+    if (!settleArmed) return;
+    const since = performance.now() - settleArmAt;
+    // feet-down (root back on the floor) or, failing that, the land clip's plant beat ~0.45 s after the hit — never the hit frame
+    if (since < 220 || (player.root.position.y > 0.05 && since < 450)) return;
+    settleArmed = false; landSettle(ctx);
+  }
   function landSettle(ctx: ModeContext): void {
     if (settleLatch) return;
     settleLatch = true;
+    fovRelease();   // A+ P5: a miss restores the fov at the land
     ctx.juice.shake(0.05, 110);
     EffectsKit.burst(ctx.scene, player.root.position.clone(), 'dust');
     console.info('[JUICE-SOFT] land settle');
@@ -709,19 +725,19 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.juice.hitStop(70);
     ctx.juice.shake(0.12, 140);
     ctx.juice.flash('#fff6dd', 120);
-    SoundKit.play('impact', { pitch: 0.7, volume: 0.8 });
+    SoundKit.play('impact', { pitch: 0.7, volume: 0.8 }); console.info('[JUICE-SFX] impact slam');   // A+ P2: the ONE slam thud of the attempt
     fovRelease(); trailFlash();   // juice soft #4, #5: CONTACT restores the fov and cuts the trail with a flash
+    armSettle();                  // A+ P4: the settle fires at feet-down, not on this frame
     hoopJuice?.punch();           // juice LOOK #1–#3: the hoop answers the make (never on a miss — this is the flush frame)
   }
 
   async function finishAttempt(ctx: ModeContext, made: boolean): Promise<void> {
     if (finishing) return;
     finishing = true;
-    landSettle(ctx); fovRelease();   // juice soft #3, #4: the landing settles, the fov is back by land
 
     if (!made) {
-      SoundKit.play('miss');
-      SoundKit.play('crowdGroan', { volume: 0.5 });
+      // A+ P2: the clank is the miss's one hit — no buzzer on the same beat; the crowd groans a breath later, quietly
+      setTimeout(() => SoundKit.play('crowdGroan', { volume: 0.35 }), 260);
       crowd.level = 0.15;                                 // the building hushes
       SoundKit.setAmbientLevel(crowd.level);
       hype = Math.max(0, hype - 15);
@@ -871,7 +887,7 @@ export const DunkMode: ModeDefinition = (() => {
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     styleTaps = 0; hangSec = 0; revealed = [];
     runUpPeak = 0; obstacleClipped = false; toppling = false;
-    settleLatch = false; fovRelease(); setTrail('soft');   // juice soft: back to the runway
+    settleLatch = false; settleArmed = false; fovRelease(); setTrail('soft');   // juice soft: back to the runway
     void setupProp(ctx);
     ctx.camDirector.snapTo(player.root.position, rim);
     setPhase('approach');

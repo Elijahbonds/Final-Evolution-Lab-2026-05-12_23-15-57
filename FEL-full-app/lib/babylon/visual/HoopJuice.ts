@@ -10,7 +10,7 @@
 import { Color3, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Observer, Scene } from '@babylonjs/core';
 
-const SPRING_S = 0.14, NET_S = 0.30, FLASH_S = 0.09;
+const SPRING_S = 0.14, NET_S = 0.30, FLASH_S = 0.06;   // flash: peak at ~30 ms (1–2 frames), exact restore after
 const FLASH_COLOR = Color3.FromHexString('#FFD79A');
 
 export class HoopJuice {
@@ -19,6 +19,8 @@ export class HoopJuice {
   private readonly net: Mesh;
   private t = -1;
   private flashMats: { mat: PBRMaterial; base: Color3 }[] | null = null;
+  /** A+ P3: every hoop mesh the punch re-materialised, with its ORIGINAL material — restored at beat end and on dispose */
+  private swapped: { mesh: AbstractMesh; original: import('@babylonjs/core').Material | null }[] = [];
   private obs: Observer<Scene> | null = null;
   /** for the probe / outbox: which meshes and materials the last punch touched */
   readonly used = { rim: 'juice_rim', net: 'juice_net', flash: [] as string[] };
@@ -45,7 +47,7 @@ export class HoopJuice {
     this.t = 0;
     this.rimRing.isVisible = true; this.net.isVisible = true;
     this.rimRing.scaling.set(1, 1, 1); this.netPivot.scaling.set(1, 1, 1); this.netPivot.rotation.set(0, 0, 0);
-    if (!this.flashMats) this.flashMats = this.cloneHoopMaterials();
+    this.flashMats = this.cloneHoopMaterials();   // fresh clones per beat; restoreMaterials() puts the originals back
     console.info(`[JUICE-LOOK] punch: rim spring + net squash + hoop flash on ${this.used.flash.length} material(s)`);
     if (!this.obs) this.obs = this.scene.onBeforeRenderObservable.add(() => this.tick(this.scene.getEngine().getDeltaTime() / 1000));
   }
@@ -60,7 +62,8 @@ export class HoopJuice {
       const near = Vector3.Distance(bb.centerWorld, this.rim) < 3 || (bb.minimumWorld.z - 1 < this.rim.z && bb.maximumWorld.z + 1 > this.rim.z && Math.abs(bb.centerWorld.x - this.rim.x) < 1.5);
       if (!near) continue;
       let clone = seen.get(m.material.uniqueId);
-      if (!clone) { clone = m.material.clone(`${m.material.name}_juice`); seen.set(m.material.uniqueId, clone); out.push({ mat: clone, base: clone.emissiveColor.clone() }); this.used.flash.push(`${m.name}:${clone.name}`); }
+      if (!clone) { clone = m.material.clone(`${m.material.name}_juice`); seen.set(m.material.uniqueId, clone); out.push({ mat: clone, base: clone.emissiveColor.clone() }); if (!this.used.flash.includes(`${m.name}:${clone.name}`)) this.used.flash.push(`${m.name}:${clone.name}`); }
+      this.swapped.push({ mesh: m, original: m.material });
       m.material = clone;
     }
     return out;
@@ -81,10 +84,19 @@ export class HoopJuice {
       if (t < FLASH_S) { const a = Math.sin((t / FLASH_S) * Math.PI) * 0.9; for (const f of this.flashMats) f.mat.emissiveColor = Color3.Lerp(f.base, FLASH_COLOR, a); }
       else for (const f of this.flashMats) f.mat.emissiveColor.copyFrom(f.base);
     }
-    if (t >= Math.max(SPRING_S, NET_S, FLASH_S)) this.t = -1;
+    if (t >= Math.max(SPRING_S, NET_S, FLASH_S)) { this.t = -1; this.restoreMaterials(); }
+  }
+
+  /** A+ P3: the hoop meshes get their ORIGINAL material back and the juice clones are disposed — nothing sticky. */
+  private restoreMaterials(): void {
+    for (const s of this.swapped) if (!s.mesh.isDisposed()) s.mesh.material = s.original;
+    this.swapped = [];
+    if (this.flashMats) { for (const f of this.flashMats) f.mat.dispose(); this.flashMats = null; }
+    console.info('[JUICE-LOOK] hoop materials restored');
   }
 
   dispose(): void {
+    this.restoreMaterials();
     if (this.obs) this.scene.onBeforeRenderObservable.remove(this.obs);
     this.rimRing.material?.dispose(); this.rimRing.dispose(); this.net.material?.dispose(); this.net.dispose(); this.netPivot.dispose();
   }
