@@ -101,3 +101,12 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   DynamicTextures, one per kind per scene, copied per surface for its own uScale/vScale (a DynamicTexture `clone()` hands
   back an empty canvas — the first attempt turned every flat white). The Venice boardwalk flats wear them; a 3.6 m FEL
   half-court logo decal sits on the scan's centre circle. Dunk frame: 99 draws, 60 fps.
+- **Owner asks 22:35 (b314d5b)**: the scanned hoop stands on the far baseline too (mirrored); the baseline aprons start
+  where the scan's paint ends (26 m scan under a 28 m court — the "cut off" strip was the orthophoto showing through);
+  Venice dressing thinned so the six-athlete threes mode returns under the 150-draw budget.
+- **Disk full, 22:45**: the scratchpad's converted Meshy copies (~2 GB) and capture frames filled the volume; the shell
+  could not open its own output file. Cleared (converted copies, frames, sweep shots) → 41 GB free. The dev server's
+  build cache was written during the outage and served 404s; `.next` cleared and the server restarted clean.
+- **Phase 3 (dressing density)**: `scripts/meshy/extract-prop.py` lifts one object out of a Meshy pack's fragment cloud
+  (cluster.py's box) as a real-metre prop: football helmets ×2 (the 'football' cluster was a second helmet), a bat and a
+  glove → `public/models/meshy/{helmet,helmet2,bat,glove}.glb`, placed at the gridiron bench and the ballpark dugout.

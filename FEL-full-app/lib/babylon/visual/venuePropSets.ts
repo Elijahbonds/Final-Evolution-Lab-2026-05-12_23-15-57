@@ -89,6 +89,8 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     ...line('nature', 'plant_bush', [-30, -10], [-38, 20], 5, 0, 2.6), ...line('nature', 'plant_bush', [30, -10], [38, 20], 5, 0, 2.6),
     { kit: 'racing', model: 'lightPostLarge', at: [0, 0, -46], scale: 3 },
     ...line('nature', 'tree_tall', [-44, -54], [44, -54], 9, 0, 6.2), ...line('nature', 'tree_detailed', [-46, -20], [-46, 40], 5, 0, 5.0),
+    // Pass 7 phase 3 (dressing density): bats and a glove by the dugout — Meshy props from the baseball pack, real size
+    { kit: 'meshy', model: 'bat', at: [-29.5, 0.05, 26], yaw: 0.3 }, { kit: 'meshy', model: 'bat', at: [-29.2, 0.05, 26.6], yaw: 0.8 }, { kit: 'meshy', model: 'glove', at: [-30.4, 0, 27.4], yaw: 1.4 }, { kit: 'meshy', model: 'glove', at: [29.6, 0, 26.2], yaw: -1.1 },
   ],
   'stadium': [
     { kit: 'racing', model: 'grandStandCoveredRound', at: [0, 0, 26], scale: 3 }, { kit: 'racing', model: 'grandStandRound', at: [-28, 0, 6], yaw: Math.PI / 2, scale: 3 }, { kit: 'racing', model: 'grandStandRound', at: [28, 0, 6], yaw: -Math.PI / 2, scale: 3 },
@@ -107,6 +109,8 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     { kit: 'racing', model: 'tent', at: [-28, 0, 10], yaw: Math.PI / 2, scale: 2.4 }, { kit: 'racing', model: 'tent', at: [28, 0, 10], yaw: -Math.PI / 2, scale: 2.4 }, ...line('racing', 'flagRed', [-29, -2], [-29, 30], 4, 0, 2.2),
     { kit: 'racing', model: 'lightPostLarge', at: [-27, 0, 36], scale: 3 }, { kit: 'racing', model: 'lightPostLarge', at: [27, 0, 36], scale: 3 },
     ...line('nature', 'tree_tall', [-34, 54], [34, 54], 7, 0, 6.0), ...line('nature', 'tree_default', [-40, -12], [-40, 44], 5, 0, 5.2),
+    // Pass 7 phase 3 (dressing density): the team's gear at the bench — Meshy helmets from the football pack, real size
+    { kit: 'meshy', model: 'helmet', at: [-27.2, 0, 7.6], yaw: 0.6 }, { kit: 'meshy', model: 'helmet2', at: [-26.6, 0, 8.4], yaw: -0.4 }, { kit: 'meshy', model: 'helmet', at: [27.3, 0, 12.2], yaw: 2.2 },
   ],
   'skatepark': [
     ...line('city-suburban', 'fence-1x4', [-36, -36], [36, -36], 9, 0, 2), ...line('city-suburban', 'fence-1x4', [-36, 36], [36, 36], 9, 0, 2),
