@@ -17,6 +17,7 @@
 // All additions are animation-independent on purpose (E25/M51-safe).
 
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
+import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh } from '@babylonjs/core';
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';
@@ -185,6 +186,7 @@ export const DunkMode: ModeDefinition = (() => {
       dunkVenue?.hidePlaceholders();  // M74: drop stand-ins now that real chars are in
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
+      void dressBall(ball, 'basketball');   // Meshy ball skin rides the physics sphere (visual only)
       ballSim = new BallSim(ball, 0.12);
       attachBallToHand(ball, player.skeleton, 'RightHand');
       replay = new DunkReplayRecorder(ctx.scene, player.root, ball, ctx.camera as never);

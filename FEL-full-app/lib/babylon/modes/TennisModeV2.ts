@@ -13,6 +13,7 @@
  */
 
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
+import { dressBall } from '../visual/meshyProps';
 import type { FelInput } from '../core/InputBus';
 import * as BABYLON from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -112,6 +113,7 @@ export const TennisModeV2: ModeDefinition = (() => {
   async function spawnBall(ctx: ModeContext): Promise<void> {
     // Ball mesh
     ball = BABYLON.MeshBuilder.CreateSphere('ball', { diameter: 0.067 }, ctx.scene); // Standard tennis ball
+    void dressBall(ball, 'tennis');   // Meshy ball skin rides the physics sphere (visual only)
     ball.position = new BABYLON.Vector3(-2, 2, -8); // Serve position
     const ballMat = new BABYLON.StandardMaterial('ballMat', ctx.scene);
     ballMat.diffuse = new BABYLON.Color3(1, 1, 0); // Yellow

@@ -67,7 +67,7 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
 /** For a spec venue: the root is the built scene's root; the venue key comes from the spec's venue name map. */
 export function propSetFor(specVenueId: string): string | null {
   const map: Record<string, string> = {
-    basketball_dunk: 'venice-court', basketball_h2h: 'venice-court', basketball_3v3: 'venice-court', court_carnival: 'venice-court',
+    basketball_dunk: 'venice-court-meshy', basketball_h2h: 'venice-court-meshy', basketball_3v3: 'venice-court-meshy', court_carnival: 'venice-court',
     karate_h2h: 'dojo', karate_endless: 'dojo', golf_loop: 'links', derby: 'ballpark', penalty: 'stadium', football_rush: 'gridiron',
     tennis: 'venice-court', volleyball: 'surf-break', gymnastics: 'gym', dance: 'dojo',
   };

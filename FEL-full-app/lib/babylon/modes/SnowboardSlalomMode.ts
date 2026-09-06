@@ -108,7 +108,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     async load(ctx: ModeContext) {
       world = buildSlopeRun(ctx.scene);
       propsGone = false; void mountVenueProps(ctx.scene, 'slope').then((h) => { if (propsGone) h?.dispose(); else props = h; });
-      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0.2, 4), 0, world.ground, '#ff6b3d');
+      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0.2, 4), 0, world.ground, '#ff6b3d', 'snowboard');
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h));
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 20, modeId: 'snowboard' });
       nextGate = 0; gatesHit = 0; elapsed = 0; ended = false; stickX = 0; tuck = 0;

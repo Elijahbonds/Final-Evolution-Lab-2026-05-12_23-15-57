@@ -110,7 +110,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
         // Confirmed: 65-bone Mixamo rig with proper structure
       }
       _validateChar.dispose(); // Clean up validation placeholder
-      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -22), 0, world.ground, '#ffd75e');
+      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -22), 0, world.ground, '#ffd75e', 'surfboard');
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h));
       ctx.camDirector.setPreset('board');
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 4, modeId: 'surf' });

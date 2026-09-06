@@ -19,6 +19,7 @@
 import type { Scene, TransformNode } from '@babylonjs/core';
 import { buildNexusScene, type BuiltScene } from '../nexus/NexusWebScene';
 import { mountVenueProps, propSetFor, type VenuePropsHandle } from '../visual/VenueProps';
+import { dressHoop } from '../visual/meshyProps';
 import { NavBounds } from './NavBounds';
 import { MAPS } from '../../map-data';
 import type { Vector3 } from '@babylonjs/core';
@@ -120,6 +121,7 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   if (spec.mapKey) void NavBounds.load(spec.mapKey).then((n) => { nav = n; if (n) console.info(`[NEXUS] navmesh "${spec.mapKey}": ${n.data.polys.length} polys`); });
   const propSet = location && location.propSet !== undefined && location.propSet !== null ? (location.propSet || null) : propSetFor(modeId);
   if (location?.decorate) location.decorate(ctx.scene, built.root);   // blossom trees, starfields: meshes after the build, under the venue root
+  void dressHoop(ctx.scene, built.root);   // owner 2026-09-05: the scanned Venice hoop stands in for the procedural one, every court, every location
   let props: VenuePropsHandle | null = null; let propsGone = false;
   if (propSet) void mountVenueProps(ctx.scene, propSet, built.root).then((h) => { if (propsGone) h?.dispose(); else props = h; });
 

@@ -3,6 +3,7 @@
 // incoming/setup → swing window → contact via sweptHit → ball flight → score.
 
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
+import { ballKindFor, dressBall } from '../visual/meshyProps';
 import type { AbstractMesh } from '@babylonjs/core';
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';
@@ -51,6 +52,7 @@ export function makeTimingSportMode(cfg: TimingSportConfig): ModeDefinition {
         position: cfg.athletePos, yawRad: cfg.athleteYaw, startClip: cfg.idleClip,
       });
       ball = MeshBuilder.CreateSphere('ball', { diameter: cfg.ballDiameter }, ctx.scene);
+      void dressBall(ball, ballKindFor(cfg.ballDiameter));   // Meshy soccer ball on penalty; golf and baseball keep their spheres
       EffectsKit.ballTrail(ctx.scene, ball);
       sim = new BallSim(ball, cfg.ballDiameter / 2);
       round = 0; hits = 0; scoreVal = 0;

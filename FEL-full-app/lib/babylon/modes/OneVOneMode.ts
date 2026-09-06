@@ -19,6 +19,7 @@
 //     drives their make% exactly like theirs drives yours.
 
 import { MeshBuilder, TransformNode as BABYLON_TransformNode, Vector3 } from '@babylonjs/core';
+import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, TransformNode } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -192,6 +193,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       onevoneVenue?.hidePlaceholders();  // M74
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
+      void dressBall(ball, 'basketball');   // Meshy ball skin rides the physics sphere (visual only)
       ballSim = new BallSim(ball, 0.12);
       attachBallToHand(ball, me.skeleton, 'RightHand');
       EffectsKit.ambient(ctx.scene, 'venice');

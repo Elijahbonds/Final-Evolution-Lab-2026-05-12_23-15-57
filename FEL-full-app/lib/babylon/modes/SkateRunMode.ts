@@ -105,7 +105,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         // Confirmed: 65-bone Mixamo rig with proper structure
       }
       _validateChar.dispose(); // Clean up validation placeholder
-      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -16), 0, world.ground, '#22d3ee');
+      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -16), 0, world.ground, '#22d3ee', 'skateboard');
       rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true });
       animTree = new BoardAnimTree(rig.char.animator);
       boardSync = new BoardSync(rig.board, rig.char.root);

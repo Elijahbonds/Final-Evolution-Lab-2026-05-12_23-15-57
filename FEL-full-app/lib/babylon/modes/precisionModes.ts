@@ -20,6 +20,7 @@
 // Derby is unchanged from M43 apart from riding the same file.
 
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { dressBall } from '../visual/meshyProps';
 import { boneNode } from '../anim/boneLookup';
 import { planRivalKick, gradeDive, resolveSave, type DiveSign, type RivalKickPlan } from '../core/KeeperCore';
 import type { AbstractMesh } from '@babylonjs/core';
@@ -161,6 +162,7 @@ export const TennisMode: ModeDefinition = (() => {
       opponent = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(0, 0, 11), Math.PI, SPORT_CLIP.tennisIdle);
       ctx.heroRef.current = me.root;                 // spawnAthlete sets heroRef on each call — reassert the player
       ball = MeshBuilder.CreateSphere('tball', { diameter: 0.14 }, ctx.scene);
+      void dressBall(ball, 'tennis');   // Meshy ball skin rides the sphere (visual only)
       flight = new Flight(ball, -8.5);
       ctx.objectiveRef.current = ball.position;
       ctx.camDirector.setFixedBehind(me.root.position, 0, 'swing');
@@ -1039,6 +1041,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       keeper = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(0, 0, 10.4), Math.PI, SPORT_CLIP.keeperIdle);
       ctx.heroRef.current = me.root;
       ball = MeshBuilder.CreateSphere('sball', { diameter: 0.22 }, ctx.scene);
+      void dressBall(ball, 'soccer');   // Meshy ball skin rides the sphere (visual only)
       flight = new Flight(ball, -9.8);
       reticle = new Reticle(ctx.scene, new Vector3(0, 1.2, 11), { x: 3.3, y: 1.05 });
       meter = new PowerMeter();

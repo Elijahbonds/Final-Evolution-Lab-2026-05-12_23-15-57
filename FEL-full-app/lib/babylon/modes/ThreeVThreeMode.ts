@@ -12,6 +12,7 @@
 //     your D already sets. Time it in range and the shot is REJECTED.
 
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
+import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -173,6 +174,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       ];
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
+      void dressBall(ball, 'basketball');   // Meshy ball skin rides the physics sphere (visual only)
       carries.forEach((c) => c.dispose()); carries.clear();
       for (const b of [me, ...mates]) carries.set(b, mountBallCarry({ scene: ctx.scene, ball, root: b.char.root, skeleton: b.char.skeleton }));
       ballSim = new BallSim(ball, 0.12);

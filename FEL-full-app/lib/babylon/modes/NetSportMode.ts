@@ -10,6 +10,7 @@
 // This file owns meshes, input, animation and HUD, and nothing else.
 
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
+import { ballKindFor, dressBall } from '../visual/meshyProps';
 import type { AbstractMesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -532,6 +533,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       venue?.hidePlaceholders();
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: o.ballDiameter }, ctx.scene);
+      void dressBall(ball, ballKindFor(o.ballDiameter));   // Meshy ball skin (visual only; volleyball keeps its sphere)
       EffectsKit.ballTrail(ctx.scene, ball);
       SoundKit.startAmbient(o.ambient);
       if (o.crowd) {
