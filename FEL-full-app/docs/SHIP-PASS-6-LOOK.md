@@ -170,3 +170,8 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   colour under image lighting is the "green gem" tree. The kit loader (`VenueProps.ts` normaliseKitMaterial) makes
   untextured metals matte dielectrics and remaps the kit's teal leaf/grass and orange bark to plant colours (placement
   tints still multiply). Venice palms and slalom pines read as matte greens. dunk 60 fps / 117 draws; 0/0/0.
+- **Pass 7 phase 8 (contact shadows), 06:10**: a soft dark disc under every body (`visual/contactShadow.ts`, attached in
+  CharacterLibrary.spawn — loader lane, three lines, logged). The disc rides the body's x/z on the floor it spawned on,
+  fades as the body rises (jump, dunk hang) and re-anchors after 1.6 s at a new height (a rider descending). No texture: a
+  textured plane drew nothing through the alpha-tested path (measured live, red-solid showed, red-textured did not), so the
+  soft edge is vertex alpha on a 24-slice disc. golf 60 fps / 58 draws, dunk 60 fps / 121; 0/0/0.

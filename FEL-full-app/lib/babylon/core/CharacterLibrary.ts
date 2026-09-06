@@ -25,6 +25,7 @@ import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
 import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL } from './athleteRoster';
 import { applySkinShading } from './skinShading';
 import { applyKit } from './kit';
+import { attachContactShadow } from '../visual/contactShadow';
 import { applyHairStyle, DEFAULT_HAIR_STYLE, HAIR_KEY_TO_STYLE } from './hairStyles';
 import { mountSecondaryMotion, type SecondaryMotionHandle } from '../anim/SecondaryMotion';
 import { mountFootPlanting } from '../anim/FootPlanting';
@@ -302,6 +303,7 @@ export const CharacterLibrary = {
     // LAST step: the rest pose above affects the measured bounds. courtY = 0.
     snapToGround(root, meshes, 0);
 
+    attachContactShadow(scene, root);   // Pass 7 phase 8: a soft disc grounds the feet where the shadow map does not reach
     return spawned;
   },
 };
