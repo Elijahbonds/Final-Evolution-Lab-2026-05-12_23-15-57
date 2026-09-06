@@ -4,15 +4,9 @@
 // sport designation when sport is involved, license gate (also server-enforced).
 
 import React, { useState } from 'react';
-import type { Discipline, SportDesignation } from '@/lib/creator/creative-card-types';
+import { DISCIPLINE_META, DISCIPLINES as DISCIPLINE_ORDER, type Discipline, type SportDesignation } from '@/lib/creator/creative-card-types';
 
-const DISCIPLINES: { id: Discipline; label: string; blurb: string; color: string }[] = [
-  { id: 'sport', label: 'Sport', blurb: 'Routines, signature moves, highlight reels', color: 'bg-orange-500' },
-  { id: 'music', label: 'Music', blurb: 'Build a beat, perform it live', color: 'bg-emerald-500' },
-  { id: 'art', label: 'Art', blurb: 'Paint courts, boards, kits, UI', color: 'bg-sky-500' },
-  { id: 'dance', label: 'Dance', blurb: 'Choreograph routines and celebrations', color: 'bg-fuchsia-500' },
-  { id: 'acting', label: 'Acting', blurb: 'Record commentary and callouts', color: 'bg-amber-500' },
-];
+const DISCIPLINES: { id: Discipline; label: string; blurb: string; color: string }[] = DISCIPLINE_ORDER.map((id) => ({ id, ...DISCIPLINE_META[id] }));
 
 const SPORTS: SportDesignation[] = [
   'basketball', 'football', 'soccer', 'baseball', 'tennis', 'golf', 'skate', 'snowboard', 'karate',

@@ -128,6 +128,17 @@ Today: a 2D deck. The live-venue pack already exists in content. The mode:
 Mechanics shared by all: `NEEDS_REVIEW` extended per discipline; `FREE_CARD_SLOTS` unchanged; remix royalty unchanged;
 `Discipline` union extended and every `switch` over it made exhaustive (tests).
 
+### Landed (2026-09-06, lane 4)
+- `Discipline` = nine (`scene`, `cooking`, `fashion`, `writing` added); `DISCIPLINE_META` drives the create hub; `NEEDS_REVIEW`
+  adds `scene` (original-content screen) and `writing` (text screen); `validateArtPayload` (pure, 6 tests) checks every
+  payload's fields, URL schemes and list bounds — the service calls it after the kind check and refuses unknown disciplines;
+  a fashion card may only carry wearables the owner holds (server re-check against `OwnedWearable`).
+- Authoring modes in `/create`: Scene (FEL venue + camera sweep + 1–8 four-option questions), Cooking (ingredients, steps,
+  fuel tags, photo link), Fashion (owned pieces from the closet, palette, photo link), Writing (20–4000 chars, cover link).
+  `/creator` hub shows nine tiles; My Creations summarises the new kinds. No schema change (`primary` is a string).
+- Smoke `scripts/probes/_disciplines-smoke.mts`: 6/6 PASS on the dev DB (cooking approved+public, scene → review, bad
+  fashion palette 422, unknown discipline 422, browse by cooking, mine lists both).
+
 ## Lane 5 — The Creator Card as a scouting profile (owner, 2026-09-06 evening)
 
 "Put your stats and your highlights on your creator card, so people can share theirs — coaches their clients', friend to

@@ -11,7 +11,7 @@ import { REASON } from '@/lib/wallet/reward-rules';
 import {
   NEEDS_REVIEW, FREE_CARD_SLOTS,
   defaultStats, defaultRarity,
-  type CreativeCard, type Discipline, type ArtPayload,
+  type CreativeCard, type Discipline, type ArtPayload, isDiscipline, validateArtPayload,
   type CardStats, type CardRarity, type ReviewState, type SportDesignation,
 } from './creative-card-types';
 
@@ -87,6 +87,14 @@ export async function createCard(
   const needsSport = input.primary === 'sport' || input.secondary.includes('sport');
   if (needsSport && !input.sportDesignation) throw new CardError(422, 'sport designation required');
   if (input.art.kind !== input.primary) throw new CardError(422, 'art payload must match primary discipline');
+  if (!isDiscipline(input.primary) || !input.secondary.every(isDiscipline)) throw new CardError(422, 'unknown discipline');
+  const shape = validateArtPayload(input.art);   // lane 4: every payload's fields, urls and list bounds
+  if (!shape.ok) throw new CardError(422, shape.error);
+  if (input.art.kind === 'fashion') {   // a look may only carry wearables the owner actually holds
+    const owned = new Set((await prisma.ownedWearable.findMany({ where: { userId }, select: { itemId: true } })).map((o) => o.itemId));
+    const missing = input.art.wearableIds.filter((id) => !owned.has(id));
+    if (missing.length) throw new CardError(422, `fashion: not owned — ${missing.slice(0, 3).join(', ')}`);
+  }
 
   // Slot check: 3 free, extras purchased with shards.
   const [mineCount, slotDoc] = await Promise.all([
@@ -152,7 +160,7 @@ export async function browse(
   prisma: PrismaClient, discipline?: Discipline,
 ): Promise<CreativeCard[]> {
   const where: Record<string, unknown> = { isPublic: true, reviewState: 'approved' };
-  if (discipline) where.primary = discipline;
+  if (discipline && isDiscipline(discipline)) where.primary = discipline;
   const rows = await prisma.creativeCard.findMany({
     where, orderBy: { createdAt: 'desc' }, take: 100,
   });

@@ -1071,7 +1071,7 @@ model CreativeCard {
   id               String   @id
   ownerId          String
   title            String
-  primary          String   // Discipline: sport|music|art|dance|acting
+  primary          String   // Discipline: sport|music|art|dance|acting|scene|cooking|fashion|writing (lane 4)
   secondary        String[] // up to 2 secondary disciplines
   sportDesignation String?  // required when sport is primary/secondary
   art              Json     // ArtPayload (discriminated union keyed by discipline)

@@ -58,6 +58,10 @@ export default function MyCreations({ refreshKey }: { refreshKey?: number }) {
             )}
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-bold text-neutral-100">{c.title}</div>
+              {c.art.kind === 'scene' && <div className="truncate text-[11px] text-neutral-400">{c.art.questions.length} question{c.art.questions.length === 1 ? '' : 's'} · {c.art.venueId}</div>}
+              {c.art.kind === 'cooking' && <div className="truncate text-[11px] text-neutral-400">{c.art.ingredients.length} ingredients · {c.art.steps.length} steps{c.art.fuelTags.length ? ` · ${c.art.fuelTags.join(', ')}` : ''}</div>}
+              {c.art.kind === 'fashion' && <div className="truncate text-[11px] text-neutral-400">{c.art.wearableIds.length} pieces{c.art.palette.length ? ` · ${c.art.palette.join(' ')}` : ''}</div>}
+              {c.art.kind === 'writing' && <div className="truncate text-[11px] text-neutral-400">{c.art.text.slice(0, 80)}{c.art.text.length > 80 ? '…' : ''}</div>}
               <div className="mt-1 flex items-center gap-2">
                 <span className="text-[11px] uppercase text-neutral-500">{c.primary}</span>
                 <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${BADGE[c.reviewState] ?? ''}`}>

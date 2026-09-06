@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Music, Mic, Zap, Palette, Dumbbell, ArrowRight, Lock } from 'lucide-react';
+import { Music, Mic, Zap, Palette, Dumbbell, ArrowRight, Lock, Clapperboard, ChefHat, Shirt, PenLine } from 'lucide-react';
 
 // Creator Hub — the five disciplines. Each tile routes to a real, playable
 // surface. Art has no painter yet (the M76 card/paint editor is deferred), so
@@ -22,6 +22,11 @@ const DISCIPLINES: Discipline[] = [
   { id: 'music', name: 'Music', tagline: 'The FEL Academy — sequence, master and publish your own tracks.', href: '/studio', color: '#00E5FF', icon: Music },
   { id: 'sport', name: 'Sport', tagline: 'Time the rise, throw it down. The dunk arena.', href: '/play/dunk', color: '#FFD700', icon: Dumbbell },
   { id: 'art', name: 'Art', tagline: 'The paint studio is in the workshop — arriving in a future drop.', href: null, color: '#A855F7', icon: Palette },
+  // lane 4 (2026-09-06): the new disciplines author in /create and publish as Creator Cards
+  { id: 'scene', name: 'Scene', tagline: 'Author a Who Scene It pack from FEL\'s own venues — friends play it as a round.', href: '/create', color: '#8B5CF6', icon: Clapperboard },
+  { id: 'cooking', name: 'Cooking', tagline: 'A recipe card the Fuel floor can serve and a coach can assign.', href: '/create', color: '#F43F5E', icon: ChefHat },
+  { id: 'fashion', name: 'Fashion', tagline: 'A look from your closet — equippable, shareable, sellable.', href: '/create', color: '#EC4899', icon: Shirt },
+  { id: 'writing', name: 'Writing', tagline: 'A story beat, a caption, a verse — reviewed, then read in Story.', href: '/create', color: '#84CC16', icon: PenLine },
 ];
 
 export function CreatorHub() {
@@ -31,7 +36,7 @@ export function CreatorHub() {
         <div className="mb-2 text-xs font-semibold tracking-[0.4em] text-white/40">FEL · CREATOR</div>
         <h1 className="text-4xl font-black tracking-tight sm:text-5xl">Creator Hub</h1>
         <p className="mt-3 max-w-2xl text-sm text-white/55">
-          Five disciplines, one arena. Pick a craft and perform — each one scores what you actually do,
+          Nine disciplines, one arena. Pick a craft and perform — each one scores what you actually do,
           not a menu you tap through.
         </p>
 

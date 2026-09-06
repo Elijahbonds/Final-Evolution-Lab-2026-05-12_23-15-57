@@ -24,11 +24,19 @@ import type { ArtPublishPayload } from '@/components/creator/modes/art-mode';
 import type { MusicPublishPayload } from '@/components/creator/modes/music-mode';
 import type { DancePublishPayload } from '@/components/creator/modes/dance-mode';
 import type { ActingPublishPayload } from '@/components/creator/modes/acting-mode';
+import type { ScenePublishPayload } from '@/components/creator/modes/scene-mode';
+import type { CookingPublishPayload } from '@/components/creator/modes/cooking-mode';
+import type { WritingPublishPayload } from '@/components/creator/modes/writing-mode';
+import type { FashionPublishPayload } from '@/components/creator/modes/fashion-mode';
 
 const ArtMode = dynamic(() => import('@/components/creator/modes/art-mode'), { ssr: false });
 const MusicMode = dynamic(() => import('@/components/creator/modes/music-mode'), { ssr: false });
 const DanceMode = dynamic(() => import('@/components/creator/modes/dance-mode'), { ssr: false });
 const ActingMode = dynamic(() => import('@/components/creator/modes/acting-mode'), { ssr: false });
+const SceneMode = dynamic(() => import('@/components/creator/modes/scene-mode'), { ssr: false });
+const CookingMode = dynamic(() => import('@/components/creator/modes/cooking-mode'), { ssr: false });
+const WritingMode = dynamic(() => import('@/components/creator/modes/writing-mode'), { ssr: false });
+const FashionMode = dynamic(() => import('@/components/creator/modes/fashion-mode'), { ssr: false });
 
 type Stage = 'hub' | 'mode';
 
@@ -134,6 +142,12 @@ export default function CreatePage() {
     }
   };
 
+  // lane 4: the new disciplines publish straight from their forms (no uploads — links and text)
+  const onScene = (p: ScenePublishPayload) => submit({ kind: 'scene', venueId: p.venueId, cameraPath: p.cameraPath, questions: p.questions }, p.title);
+  const onCooking = (p: CookingPublishPayload) => submit({ kind: 'cooking', steps: p.steps, ingredients: p.ingredients, fuelTags: p.fuelTags, photoUrl: p.photoUrl }, p.title);
+  const onWriting = (p: WritingPublishPayload) => submit({ kind: 'writing', text: p.text, coverUrl: p.coverUrl }, p.title);
+  const onFashion = (p: FashionPublishPayload) => submit({ kind: 'fashion', lookId: p.lookId, wearableIds: p.wearableIds, palette: p.palette, photoUrl: p.photoUrl }, p.title);
+
   if (stage === 'hub' || !sel) return (
     // Standard chrome on the hub stage (the authoring modes stay immersive).
     <div className="min-h-screen bg-neutral-950 pb-20">
@@ -159,6 +173,10 @@ export default function CreatePage() {
       {sel.primary === 'music' && <MusicMode onPublish={onMusic} />}
       {sel.primary === 'dance' && <DanceMode onPublish={onDance} />}
       {sel.primary === 'acting' && <ActingMode onPublish={onActing} />}
+      {sel.primary === 'scene' && <SceneMode onPublish={onScene} />}
+      {sel.primary === 'cooking' && <CookingMode onPublish={onCooking} />}
+      {sel.primary === 'writing' && <WritingMode onPublish={onWriting} />}
+      {sel.primary === 'fashion' && <FashionMode onPublish={onFashion} />}
       {sel.primary === 'sport' && (
         <div className="min-h-screen bg-neutral-950 p-6 text-neutral-100">
           <h2 className="mb-2 text-2xl font-black">Sport Cards</h2>
