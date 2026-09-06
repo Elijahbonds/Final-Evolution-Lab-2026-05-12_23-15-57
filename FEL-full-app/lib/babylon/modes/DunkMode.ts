@@ -34,6 +34,7 @@ import { SoundKit } from '../audio/SoundKit';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { EffectsKit } from '../visual/EffectsKit';
+import { HoopJuice } from '../visual/HoopJuice';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
@@ -97,6 +98,7 @@ export const DunkMode: ModeDefinition = (() => {
   let trail: ParticleSystem | null = null;   // juice soft #5
   let fovCam: Camera | null = null, fovBase = 0, fovT = 0, fovOn = false;   // juice soft #4
   let settleLatch = false;                    // juice soft #3
+  let hoopJuice: HoopJuice | null = null;     // juice LOOK: rim spring, net squash, hoop flash on the make
   let phase: Phase = 'approach';
   let phaseSec = 0;
   let style: Style = 'power';
@@ -201,6 +203,8 @@ export const DunkMode: ModeDefinition = (() => {
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'venice');
       trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
+      hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
+      if (process.env.NODE_ENV === 'development') (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__!.hoopJuiceUsed = hoopJuice.used;
       // Venice LOOK: KEEP/HIDE, palm tip ~10m, golden-haze (no GLB edits).
       // Court locations (docs/SPEC-COURT-LOCATIONS.md): the Venice look (golden sky, surround palms) is Venice's own —
       // under any other location the location's environment stands, so the pass steps aside.
@@ -540,6 +544,7 @@ export const DunkMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      hoopJuice?.dispose(); hoopJuice = null;
       player?.dispose(); rival?.dispose(); replay?.dispose(); ball?.dispose();
       clearProps(); SoundKit.stopAmbient();
       dunkVenue?.dispose(); dunkVenue = null;  // M74
@@ -706,6 +711,7 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.juice.flash('#fff6dd', 120);
     SoundKit.play('impact', { pitch: 0.7, volume: 0.8 });
     fovRelease(); trailFlash();   // juice soft #4, #5: CONTACT restores the fov and cuts the trail with a flash
+    hoopJuice?.punch();           // juice LOOK #1–#3: the hoop answers the make (never on a miss — this is the flush frame)
   }
 
   async function finishAttempt(ctx: ModeContext, made: boolean): Promise<void> {

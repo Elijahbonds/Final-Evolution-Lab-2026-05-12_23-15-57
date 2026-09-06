@@ -38,6 +38,7 @@ import { attachBallToHand, releaseBall, runEastbayPath, flushThroughRim, clankOf
 import { EASTBAY_TIMING } from '../anim/authored/timing';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
+import { HoopJuice } from '../visual/HoopJuice';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
@@ -74,6 +75,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   let trail: ParticleSystem | null = null;   // juice soft #5
   let fovCam: Camera | null = null, fovBase = 0, fovT = 0, fovOn = false;   // juice soft #4
   let settleLatch = false;                    // juice soft #3
+  let hoopJuice: HoopJuice | null = null;     // juice LOOK: rim spring, net squash, hoop flash on the make
   let phase: Phase = 'handoff';
   let phaseSec = 0;
   let activeIdx: 0 | 1 = 0;                       // whose turn
@@ -235,6 +237,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     ctx.juice.flash('#fff6dd', 120);
     SoundKit.play('impact', { pitch: 0.7, volume: 0.8 });
     fovRelease(); trailFlash();   // juice soft #4, #5
+    hoopJuice?.punch();           // juice LOOK #1–#3 (make only)
   }
 
   function finishAttempt(ctx: ModeContext, made: boolean): void {
@@ -349,6 +352,8 @@ export const DunkDuelMode: ModeDefinition = (() => {
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'venice');
       trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
+      hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
+      if (process.env.NODE_ENV === 'development') (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__!.hoopJuiceUsed = hoopJuice.used;
       // Court locations (docs/SPEC-COURT-LOCATIONS.md): the Venice look (golden sky, surround palms) is Venice's own —
       // under any other location the location's environment stands, so the pass steps aside.
       if (!ctx.location || ctx.location === 'venice') await applyVeniceDunkLookPass(ctx.scene);
@@ -493,7 +498,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     },
 
     dispose() {
-
+      hoopJuice?.dispose(); hoopJuice = null;
       modeVenue?.dispose?.(); modeVenue = null;
       p1?.dispose(); p2?.dispose(); ball?.dispose();
       obstacle?.dispose(); obstacle = null;
