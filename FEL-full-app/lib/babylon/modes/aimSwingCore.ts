@@ -11,6 +11,7 @@
 import { Color3, DynamicTexture, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { CharacterPipeline } from '../core/characterPipeline';
 import { neverBindPose } from '../anim/importSanitizer';
 import type { ModeContext } from '../core/ModeHarness';
 
@@ -32,6 +33,17 @@ export async function spawnAthlete(
   neverBindPose(char.animator, idleClip);
   ctx.groundLock?.track(char.root, char.skeleton);
   ctx.heroRef.current = char.root;
+  return char;
+}
+
+/** An AI athlete (the tennis opponent, the pitcher, the kicker/keeper): a ROSTER body via the pipeline's NPC path — the
+ *  hero's scan is the player's alone (owner, 2026-09-05: "me everywhere, rivals on the roster"). Never touches heroRef. */
+export async function spawnFoe(
+  ctx: ModeContext, heroUrl: string, pos: Vector3, yaw: number, idleClip: string,
+): Promise<SpawnedCharacter> {
+  const char = await CharacterPipeline.spawnNpc(ctx.scene, heroUrl, { position: pos, yawRad: yaw, startClip: idleClip });
+  neverBindPose(char.animator, idleClip);
+  ctx.groundLock?.track(char.root, char.skeleton);
   return char;
 }
 

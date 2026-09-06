@@ -155,3 +155,8 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   flatten table beside the dunk slide in `NexusVenue.ts`), and the round is shot high from behind the spot (CameraDirector
   preset `keeper`) with the keeper facing the camera in the goal mouth. 60 fps, 0/0/0. Open: the penalty rival wears the
   hero scan (should be a roster body).
+- **Pass 7 phase 6 (life), 04:40**: the AI athletes of the precision modes — tennis opponent, pitcher, penalty kicker/keeper —
+  are roster bodies now (`spawnFoe` in aimSwingCore, the pipeline's NPC path; the shared spawner had every body on the
+  hero's scan and reassigned the hero ref). A rail of onlookers stands on the Venice court's east apron inside the scan's
+  fence, facing the court (`veniceBoardwalk.ts`, roster bodies, cap 8) — on the walk behind the baked wall they were unseen.
+  dunk 60 fps / 117–119 draws, threes 177, tennis 66, derby 45, penalty 116–118; 0/0/0 everywhere.

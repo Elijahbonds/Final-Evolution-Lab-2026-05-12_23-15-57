@@ -30,8 +30,7 @@ import type { SpawnedCharacter } from '../core/CharacterLibrary';
 import { assertSpawned } from '../core/FrameGuard';
 import {
   spawnAthlete, Reticle, PowerMeter, Flight, swingQuality,
-  buildTennisNet, buildGolfGreen, buildPlateAndMound, buildGoal, buildBallparkOutfield,
-} from './aimSwingCore';
+  buildTennisNet, buildGolfGreen, buildPlateAndMound, buildGoal, buildBallparkOutfield, spawnFoe } from './aimSwingCore';
 import { SPORT_CLIP } from '../anim/clipRegistry';
 import { SoundKit } from '../audio/SoundKit';
 import { VenueKit } from '../visual/VenueKit';
@@ -159,7 +158,7 @@ export const TennisMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'park');
       furniture = buildTennisNet(ctx.scene);
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(0, 0, -10.5), 0, SPORT_CLIP.tennisIdle);
-      opponent = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(0, 0, 11), Math.PI, SPORT_CLIP.tennisIdle);
+      opponent = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0, 11), Math.PI, SPORT_CLIP.tennisIdle);
       ctx.heroRef.current = me.root;                 // spawnAthlete sets heroRef on each call — reassert the player
       ball = MeshBuilder.CreateSphere('tball', { diameter: 0.14 }, ctx.scene);
       void dressBall(ball, 'tennis');   // Meshy ball skin rides the sphere (visual only)
@@ -766,7 +765,7 @@ export const DerbyMode: ModeDefinition = (() => {
           bat.rotation.set(0.35, 0, 0);
         }
       }
-      pitcher = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(0, 0.35, 18), Math.PI, SPORT_CLIP.idle);
+      pitcher = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0.35, 18), Math.PI, SPORT_CLIP.idle);
       pci = new Reticle(ctx.scene, new Vector3(0, 1.1, 0.2), { x: ZONE_HALF.x, y: ZONE_HALF.y });
       ctx.heroRef.current = me.root;
       ball = MeshBuilder.CreateSphere('bball', { diameter: 0.12 }, ctx.scene);
@@ -1040,7 +1039,7 @@ export const PenaltyMode: ModeDefinition = (() => {
         return new Vector3(k * 1.5, 0, 15.4 + Math.abs(k) * 0.22);
       }));
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.4, 0, -1.6), 0, SPORT_CLIP.penaltyIdle);
-      keeper = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(0, 0, 10.4), Math.PI, SPORT_CLIP.keeperIdle);
+      keeper = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0, 10.4), Math.PI, SPORT_CLIP.keeperIdle);
       ctx.heroRef.current = me.root;
       ball = MeshBuilder.CreateSphere('sball', { diameter: 0.22 }, ctx.scene);
       void dressBall(ball, 'soccer');   // Meshy ball skin rides the sphere (visual only)
