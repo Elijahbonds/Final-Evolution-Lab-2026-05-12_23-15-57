@@ -9,6 +9,7 @@
 // its own environment. Everything hangs under the venue root and dies with it.
 import { Color3, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, TransformNode } from '@babylonjs/core';
 import { courtLogoTexture, groundTextureFor, TILE_M, type GroundKind } from '../visual/groundTextures';
+import { HOOP_SCAN, spawnMeshyProp } from '../visual/meshyProps';
 import type { Scene } from '@babylonjs/core';
 
 const COURT = { hx: 8, hz: 14 };                 // 16 × 28 court slab (venueSpecs basketball_*)
@@ -35,8 +36,10 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode): Tran
   const ax = COURT.hx + apron, az = COURT.hz + apron;
   flat(scene, 'vb_apron_w', apron, az * 2, -(COURT.hx + apron / 2), 0, 0.012, '#B9AFA0', holder, 1, 'concrete');
   flat(scene, 'vb_apron_e', apron, az * 2, COURT.hx + apron / 2, 0, 0.012, '#B9AFA0', holder, 1, 'concrete');
-  flat(scene, 'vb_apron_n', ax * 2, apron, 0, -(COURT.hz + apron / 2), 0.012, '#B9AFA0', holder, 1, 'concrete');
-  flat(scene, 'vb_apron_s', ax * 2, apron, 0, COURT.hz + apron / 2, 0.012, '#B9AFA0', holder, 1, 'concrete');
+  // the scan is 26 m long under a 28 m court: the baseline aprons start where the scan's paint ends (owner: "the court is cut off")
+  const SCAN_HZ = 13;
+  flat(scene, 'vb_apron_n', ax * 2, COURT.hz + apron - SCAN_HZ, 0, -(SCAN_HZ + (COURT.hz + apron - SCAN_HZ) / 2), 0.012, '#B9AFA0', holder, 1, 'concrete');
+  flat(scene, 'vb_apron_s', ax * 2, COURT.hz + apron - SCAN_HZ, 0, SCAN_HZ + (COURT.hz + apron - SCAN_HZ) / 2, 0.012, '#B9AFA0', holder, 1, 'concrete');
   // one continuous surround out to the dome wall (190 m): grass east of the apron, the boardwalk, more grass to the shop line;
   // the coast wraps the NORTH (behind the hoop, where the dunk camera looks) and the WEST — sand, then water to the horizon
   const L = 190, GRASS = '#3A5233', GRASS2 = '#3E5838';   // inside the 400 m sky sphere (radius 200); greyed greens — the grade pushes greens toward lime
@@ -64,6 +67,12 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode): Tran
   let t = 0;
   const obs = scene.onBeforeRenderObservable.add(() => { t += scene.getEngine().getDeltaTime() / 1000; seaMat.roughness = 0.35 + Math.sin(t * 0.7) * 0.06; });
   holder.onDisposeObservable.add(() => scene.onBeforeRenderObservable.remove(obs));
+  // Owner 2026-09-05: the far baseline carries the scanned hoop as well, mirrored — the court reads as a full court
+  void spawnMeshyProp(scene, 'hoop', holder, 'vb_far_hoop').then((root) => {
+    if (!root) return;
+    const s = 3.05 / HOOP_SCAN.rimY; root.scaling.setAll(s); root.rotation.y = Math.PI;
+    root.position.set(0, 0, COURT.hz - 0.6 + HOOP_SCAN.rimZ * s);   // pole just inside the baseline, ring 0.6 m in front of it
+  });
   // Pass 7 phase 1: a half-court logo decal on the scan (centre circle, 3.6 m), matte, alpha-blended
   const logo = MeshBuilder.CreateGround('vb_court_logo', { width: 3.6, height: 3.6 }, scene);
   logo.position.set(0, 0.03, 0); logo.parent = holder; logo.isPickable = false;
