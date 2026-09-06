@@ -1,12 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import { MessageSquare, BookOpen, Video } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { MessageSquare, BookOpen, Video, CalendarCheck, Users } from 'lucide-react';
 import { CoachChat } from './coach-chat';
 import { ExerciseCatalogue } from './exercise-catalogue';
 import { FormFeedback } from './form-feedback';
+import { TodayView } from './today-view';
+import { ClientsView } from './clients-view';
 
+// lane 1 (SPEC-PASSION-PIPELINES): Today = the client's session loop; Clients = the certified coach's builder + inbox.
 const TABS = [
+  { key: 'today', label: 'Today', icon: CalendarCheck },
+  { key: 'clients', label: 'Clients', icon: Users },
   { key: 'chat', label: 'Coach', icon: MessageSquare },
   { key: 'catalogue', label: 'Exercises', icon: BookOpen },
   { key: 'form', label: 'Form Check', icon: Video },
@@ -15,13 +20,16 @@ const TABS = [
 type Tab = typeof TABS[number]['key'];
 
 export function CoachView() {
-  const [tab, setTab] = useState<Tab>('chat');
+  const [tab, setTab] = useState<Tab>('today');
+  const [coach, setCoach] = useState(false);   // the Clients tab shows only for a certified coach or an existing coach of programs
+  useEffect(() => { fetch('/api/coach/programs').then((r) => r.json()).then((j) => setCoach(!!j.coachCertified || (j.programs ?? []).some((p: { role: string }) => p.role === 'coach'))).catch(() => {}); }, []);
+  const tabs = TABS.filter((t) => t.key !== 'clients' || coach);
 
   return (
     <main className="mx-auto max-w-[900px] px-4 py-4">
       {/* Tab switcher */}
       <div className="flex gap-1 rounded-xl bg-[#0f0f13] p-1 mb-4 border border-white/6">
-        {TABS.map((t) => {
+        {tabs.map((t) => {
           const Icon = t.icon;
           const active = tab === t.key;
           return (
@@ -42,6 +50,8 @@ export function CoachView() {
       </div>
 
       {/* Tab content */}
+      {tab === 'today' && <TodayView />}
+      {tab === 'clients' && <ClientsView />}
       {tab === 'chat' && <CoachChat />}
       {tab === 'catalogue' && <ExerciseCatalogue />}
       {tab === 'form' && <FormFeedback />}

@@ -1415,6 +1415,7 @@ model CoachingProgram {
   
   // Relations
   clientSessions ClientSession[]
+  messages     ProgramMessage[]   // coach ↔ client thread (SPEC-PASSION-PIPELINES lane 1, C3)
   
   @@index([coachId])
   @@index([clientId])
@@ -1517,6 +1518,9 @@ model ExerciseLog {
   actualLoad   String?  // What they actually lifted
   rpe          Int?     // Rate of Perceived Exertion (1-10)
   clientNote   String?  // Client's notes (felt weird, form breakdown, etc.)
+  videoUrl     String?  // lane 1 C2: a form video the client attached to this log (http(s) only, validated in lib/coach/loop.ts)
+  coachComment String?  // lane 1 C3: the coach's review of this log
+  coachCommentAt DateTime?
   
   completedAt  DateTime?
   
@@ -1525,6 +1529,17 @@ model ExerciseLog {
   
   @@index([clientSessionId])
   @@index([sessionExerciseId])
+}
+
+/// lane 1 C3 — the coach ↔ client thread on a program (both sides write; read by both).
+model ProgramMessage {
+  id         String   @id @default(cuid())
+  programId  String
+  program    CoachingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  authorId   String
+  body       String
+  createdAt  DateTime @default(now())
+  @@index([programId, createdAt])
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

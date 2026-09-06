@@ -66,6 +66,21 @@ tracks write to the mentee's Shared Profile and cards.
 | C7 Templates and marketplace | Coaches publish program templates (fork/uses exist); a template can be listed on the Marketplace for coins. Payouts via the existing Stripe `PayoutRequest` — **later**, after the friend test. | `CampTemplate`, `MarketplaceListing` |
 | C8 Cards | Completing a program mints a **mentee Creator Card update** (rarity from PRQ/wins) and credits the coach's Facilitator Card (clients coached, deltas). | `deriveRarity`, `CreatorCard` |
 
+### Landed (2026-09-06, lane 1 C1–C3)
+- `lib/coach/loop.ts` (pure: ordered sessions, today, roles, log/prescription/message validation, progress series,
+  needs-review) + 9 tests; `lib/coach/server.ts` (tree read, certified-coach gate).
+- Routes: `GET /api/coach/programs` (my programs as trees, roles, completion, plan), `POST /api/coach/programs/:id/exercises`
+  (builder add/update/remove — coach + certified), `GET /api/coach/me/today`, `POST /api/coach/me/log` (upsert logs, video
+  link, complete), `GET /api/coach/inbox`, `POST /api/coach/review`, `GET|POST /api/coach/messages`.
+- Schema: `ProgramMessage` (coach ↔ client thread per program); `ExerciseLog.videoUrl / coachComment / coachCommentAt`.
+  Applied with `prisma db push` + `generate` + server restart on the dev DB.
+- UI: `/coach` gains **Today** (client: session card, tap-through logging, video link, Done, coach comments, thread) and
+  **Clients** (certified coach: inbox with logs/videos and per-rep comments, programs with the builder, thread).
+- Dev seed `scripts/coach/seed-loop.ts` (certified coach@fel.local, client@fel.local, 2 blocks × 2 sessions × 2
+  prescriptions, active plan) and the end-to-end smoke `scripts/probes/_coach-loop-smoke.mts`: 9/9 PASS — Today → log +
+  complete (video on the first log) → inbox (needsReview 1) → comment → thread both ways → Today advances with the
+  coach's comment surfaced → client refused at the builder (403) → coach add/remove a prescription.
+
 ### Acceptance (lane 1)
 - A certified coach builds a 4-week program from a template, assigns it, the client logs 3 sessions on the phone with one
   video, the coach comments, the progress chart shows the delta, the Bridge prompt appeared each week. All on the dev DB.
@@ -113,10 +128,26 @@ Today: a 2D deck. The live-venue pack already exists in content. The mode:
 Mechanics shared by all: `NEEDS_REVIEW` extended per discipline; `FREE_CARD_SLOTS` unchanged; remix royalty unchanged;
 `Discipline` union extended and every `switch` over it made exhaustive (tests).
 
+## Lane 5 — The Creator Card as a scouting profile (owner, 2026-09-06 evening)
+
+"Put your stats and your highlights on your creator card, so people can share theirs — coaches their clients', friend to
+friend. It could be used as a scouting platform."
+
+| Phase | Deliverable | Builds on |
+|---|---|---|
+| S1 Stats on the card | The public card (`/c/<code>`, `CreatorCard`) shows the athlete's **PRQ** (the eight stats), mode mastery, best scores per mode, season/ladder rank, resiliency, and the Movement Signature delta — read from `PrqEntry`, `ModeMastery`, `LadderEntry`, `WorkoutScan`. The owner picks which blocks are public (a per-card visibility mask). | card page exists, models exist |
+| S2 Highlights | A **highlight reel** on the card: pinned replays (the dunk `DunkReplayRecorder` clips, contest results with score cards, `SignatureAttempt`s), up to 6, ordered by the owner; a mode's "pin this" after a PB. Video/GIF export of a replay for off-platform sharing later. | `highlightReelUrl` already on the sport payload |
+| S3 Share | The existing mint/share link (`/c/<code>`, `card-share.tsx`) gains: a coach's **client roster** (every mentee's card in one view, with deltas), friend-to-friend sending (inbox), and an OG image so the link previews as a card. | `ChallengeLink`, share components |
+| S4 Scouting | Search/filter public cards by sport, PRQ range, age band (with consent rules for minors), location tag; a **scout view** for a certified coach (side-by-side cards, notes). Minors: only with guardian consent and never searchable by default. | `GuardianConsent`, `FacilitatorProfile` |
+| S5 Verification | Stats are **verified** when they come from played sessions (server-authoritative scores); self-entered numbers are marked. A coach can attest a client's stat (the Facilitator Card signs it). | `GameSession`, `PrqEntry` |
+
+Order: S1 → S2 → S3 right after lane 1 C1–C3 (it is what makes the coach's roster meaningful); S4–S5 after the friend test.
+
 ## Order and first slice
 
 1. **Lane 1 C1–C3** (program builder, client Today, coach review + messaging) — the coaching loop closes end to end.
-2. Lane 4 schema extension (`Discipline` + payloads + review rule) — small, mechanical, unblocks lanes 2–3's publish.
+2. **Lane 5 S1–S3** — stats and highlights on the card, coach roster, share (the scouting profile).
+3. Lane 4 schema extension (`Discipline` + payloads + review rule) — small, mechanical, unblocks lanes 2–3's publish.
 3. **Lane 2 M1** the Flip on the pad (the reel), then M2–M5.
 4. **Lane 3 W1–W2**.
 5. C4–C8, M6–M7, W3–W4.
