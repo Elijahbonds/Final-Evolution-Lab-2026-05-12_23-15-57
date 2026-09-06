@@ -81,3 +81,9 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   grade; the venue skies read pale pastel from the same deep bakes. Suspect: the emissive sky path is gamma-lifted twice
   (StandardMaterial output + the pipeline's tone map). Parked for a measured fix (pixel samples in the log); the props +
   depth brief (inbox, 20:03) runs next on top of this work.
+- **Batch B committed 1815afe (22:20)** — the emissive fix restores a sky to every non-venue mode: skate under a magenta
+  dusk, surf under a sunset gradient, slope and big air under the alpine bake.
+- **Props + depth (PM brief 20:03) committed ad5d7a0 (22:40)** — near / mid / far layers in every venue prop set; outbox
+  note `/Users/elijahbonds/Claude/outbox/PROPS-DEPTH.md`. Batch C's field and court venues took their dressing here.
+- Remaining: Phase 8 kits (more Meshy garments as packs), Phase 9 mobile parity (gauntlet mtier rows), Phase 10 close
+  (gauntlet, tag `v0.9.0-rc.6`); then Pass 7 details.
