@@ -30,6 +30,7 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
+import { Onlookers } from '../visual/Onlookers';
 import {
   FighterState, RivalFightBrain, resolveStrike, applyHit,
   KARATE_ATTACKS, SPECIAL_ATTACK, CHI_MAX, PARRY_STAGGER_SEC, type AttackDef,
@@ -42,6 +43,7 @@ import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
 
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
+let crowd: Onlookers | null = null;         // Pass 7 phase 6: a ring of onlookers on the gravel, as the endless gauntlet has
 
 type Phase = 'intro' | 'fighting' | 'roundOver' | 'matchOver';
 const ROUNDS_TO_WIN = 2;
@@ -227,6 +229,10 @@ export const KarateVSMode: ModeDefinition = (() => {
       // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
       modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true });
       if (!modeVenue) VenueKit.buildDojo(ctx.scene);
+      crowd = new Onlookers(ctx.scene, Array.from({ length: 14 }, (_, i) => {
+        const a = (i / 14) * Math.PI * 2 + 0.22;
+        return new Vector3(Math.sin(a) * 8.8, 0, Math.cos(a) * 8.8);   // off the 14 m mat, on the courtyard gravel
+      }), '#3B2A52');
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 2.2), startClip: SPORT_CLIP.karateStance,
       });
@@ -277,6 +283,7 @@ export const KarateVSMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       phaseSec += dt;
+      crowd?.update(dt);
       if (phaseSec > BUDGET_SEC[phase]) {
         console.warn(`[FEL-WATCHDOG] karate-vs stuck in "${phase}" — auto-advancing`);
         if (phase === 'fighting') endRound(ctx, meState.hp >= foeState.hp);
@@ -334,6 +341,7 @@ export const KarateVSMode: ModeDefinition = (() => {
 
     dispose() {
 
+      crowd?.dispose(); crowd = null;
       modeVenue?.dispose?.(); modeVenue = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
     },
