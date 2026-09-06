@@ -164,3 +164,9 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   gravel, cap 8). Seen in the frames and fixed: the dojo set's two Kenney corner blocks read as black cubes under the dusk
   (gone) and its column ring at 2.6× read as Greek temple pillars in a shrine courtyard (1.5×, lantern-post height).
   karate_vs 60 fps / 46 draws, karate 60 fps / 136; 0/0/0.
+- **Pass 7 phase 7 (materials), 05:30**: `_mat-diag` probe (scripts/probes) lists every used material's PBR numbers. The
+  athletes' five named materials are sane (skin 0.58 rough, jersey/shorts 0.88, shoes 0.85, hair 0.5, all dielectric). The
+  Kenney kits were not: every kit material ships metallic 1 / roughness 1 with no metallic texture — a fully metallic flat
+  colour under image lighting is the "green gem" tree. The kit loader (`VenueProps.ts` normaliseKitMaterial) makes
+  untextured metals matte dielectrics and remaps the kit's teal leaf/grass and orange bark to plant colours (placement
+  tints still multiply). Venice palms and slalom pines read as matte greens. dunk 60 fps / 117 draws; 0/0/0.

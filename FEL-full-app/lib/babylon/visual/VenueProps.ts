@@ -15,6 +15,19 @@ export interface VenuePropsHandle { root: TransformNode; count: number; dispose(
 
 const modelCache = new WeakMap<Scene, Map<string, Promise<Mesh[]>>>();
 
+// Pass 7 phase 7 (materials): the Kenney kits export every material with metallicFactor 1 and roughness 1 and NO metallic
+// texture (measured 2026-09-06, _mat-diag: leafsGreen / woodBark / grass / dirt all met=1) — under image lighting a fully
+// metallic flat colour reads as a dark gem. Untextured metals become matte dielectrics; the kit's teal greens and orange
+// bark take real plant colours (a placement `tint` still multiplies on top).
+const KIT_PALETTE: Record<string, string> = { leafsGreen: '#3F9A55', grass: '#4C9E58', woodBark: '#8B5E3C', dirt: '#8A6A4A' };
+const kitFixed = new WeakSet<PBRMaterial>();
+function normaliseKitMaterial(mat: PBRMaterial): void {
+  if (kitFixed.has(mat)) return; kitFixed.add(mat);
+  if (mat.unlit) mat.unlit = false;
+  if (!mat.metallicTexture && (mat.metallic ?? 0) > 0.5) { mat.metallic = 0; mat.roughness = 0.9; }
+  const hex = KIT_PALETTE[mat.name]; if (hex && !mat.albedoTexture) mat.albedoColor = Color3.FromHexString(hex);
+}
+
 async function loadModel(scene: Scene, kit: string, model: string): Promise<Mesh[]> {
   let cache = modelCache.get(scene); if (!cache) { cache = new Map(); modelCache.set(scene, cache); }
   const key = `${kit}/${model}`;
@@ -25,7 +38,7 @@ async function loadModel(scene: Scene, kit: string, model: string): Promise<Mesh
       for (const m of r.meshes) {
         m.isPickable = false; m.setEnabled(false);   // the source stays hidden; instances show
         // Kenney's nature/racing kits export KHR_materials_unlit; lit PBR keeps them in the IBL like everything else.
-        const mat = m.material; if (mat instanceof PBRMaterial && mat.unlit) { mat.unlit = false; mat.metallic = 0; mat.roughness = 0.85; }
+        const mat = m.material; if (mat instanceof PBRMaterial) normaliseKitMaterial(mat);
       }
       return meshes;
     });
