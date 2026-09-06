@@ -94,3 +94,10 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
 - **Phase 10 (close)**: full gauntlet on the pass — tsc PASS, 320 tests, every dev-mode / login / mtier / mobile row 0/0/0
   (mobile dunk "NO RESULT" predates the pass); the only diffs vs the previous run are the test count and the identity
   layer reporting one mesh (the scan). Tag `v0.9.0-rc.6` (local).
+
+## Pass 7 log
+- **Phases 1–2 (court surface, ground textures), 21:55–22:20**: `visual/groundTextures.ts` — seeded, tiling procedural
+  albedos (grass blade speckle, sand grain + damp streaks, concrete slab seams + aggregate, asphalt grain) as 512²
+  DynamicTextures, one per kind per scene, copied per surface for its own uScale/vScale (a DynamicTexture `clone()` hands
+  back an empty canvas — the first attempt turned every flat white). The Venice boardwalk flats wear them; a 3.6 m FEL
+  half-court logo decal sits on the scan's centre circle. Dunk frame: 99 draws, 60 fps.
