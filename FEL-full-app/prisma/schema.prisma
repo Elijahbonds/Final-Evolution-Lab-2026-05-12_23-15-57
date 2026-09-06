@@ -1124,6 +1124,11 @@ model CreatorCard {
   /// 'athlete' (default) | 'facilitator' — Camp Blueprint (2026-09-03): the Facilitator Card is a Creator Card with a kind.
   kind          String            @default("athlete")
 
+  /// lane 5 (SPEC-PASSION-PIPELINES, owner 2026-09-06): which stat blocks the owner shows on the public card —
+  /// { prq, mastery, records, resiliency, movement, highlights } booleans; null = all shown (lib/creator/card-stats.ts)
+  showStats   Json?
+  /// lane 5: up to 6 pinned highlights [{ id, kind: 'session'|'signature', mode, score, won, at, label? }] — ids must be the owner's
+  highlights  Json?
   published   Boolean           @default(false)
   views       Int               @default(0)
   createdAt   DateTime          @default(now())

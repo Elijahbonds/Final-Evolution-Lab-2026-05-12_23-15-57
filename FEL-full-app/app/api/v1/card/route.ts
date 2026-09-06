@@ -6,6 +6,8 @@ import { rateLimit, clientKeyFromHeaders } from '@/lib/rate-limit';
 import { getMyCard, upsertMyCard } from '@/lib/creator/card-service';
 import { isValidMpMode } from '@/lib/mp/match-core';
 import { isValidAccent } from '@/lib/creator/card-core';
+import { normalizeHighlights, normalizeVisibility } from '@/lib/creator/card-stats';
+import { highlightCandidatesFor } from '@/lib/creator/card-stats-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +40,9 @@ export async function POST(req: Request) {
   }
 
   const userName = (session?.user as any)?.name ?? null;
+  // lane 5: the mask is normalized; pins may only reference the caller's own sessions / signature attempts
+  const showStats = body?.showStats !== undefined ? normalizeVisibility(body.showStats) : undefined;
+  const highlights = body?.highlights !== undefined ? normalizeHighlights(body.highlights, await highlightCandidatesFor(userId)) : undefined;
   const card = await upsertMyCard(prisma, userId, userName, {
     displayName: body?.displayName,
     tagline: body?.tagline,
@@ -45,6 +50,7 @@ export async function POST(req: Request) {
     accent: body?.accent,
     avatarUrl: body?.avatarUrl,
     signatureMove: body?.signatureMove,
+    showStats, highlights,
   });
   return NextResponse.json({ ok: true, card });
 }

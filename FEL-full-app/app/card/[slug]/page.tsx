@@ -3,6 +3,8 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { prisma } from '@/lib/db';
 import { getPublicCard } from '@/lib/creator/card-service';
+import { publicStatsFor } from '@/lib/creator/card-stats-server';
+import type { Highlight } from '@/lib/creator/card-stats';
 import { CreatorCard } from '@/components/creator/creator-card';
 import { CardShare } from '@/components/creator/card-share';
 import { Sparkles } from 'lucide-react';
@@ -28,6 +30,9 @@ export default async function CardPage({ params }: { params: { slug: string } })
   const slug = String(params?.slug ?? '').toLowerCase();
   const card = await getPublicCard(prisma, slug);
   if (!card) notFound();
+  // lane 5: the scouting blocks, masked by the owner
+  const { stats, visibility } = await publicStatsFor(card.ownerId, card.showStats);
+  const highlights = visibility.highlights ? ((card.highlights ?? []) as unknown as Highlight[]) : [];
 
   return (
     <div className="min-h-screen bg-[#050505]">
@@ -45,6 +50,8 @@ export default async function CardPage({ params }: { params: { slug: string } })
                 ? { avatarKey: card.owner.profile.avatarKey, cosmeticAssetId: card.owner.profile.cosmeticAssetId }
                 : null,
             }}
+            stats={stats}
+            highlights={highlights}
           />
         </div>
 

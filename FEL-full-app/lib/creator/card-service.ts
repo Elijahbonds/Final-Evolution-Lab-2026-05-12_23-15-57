@@ -52,6 +52,9 @@ export interface CardInput {
   accent?: string;
   avatarUrl?: string | null;
   signatureMove?: string;
+  /** lane 5: visibility mask + pinned highlights — already normalized by the route (lib/creator/card-stats.ts) */
+  showStats?: unknown;
+  highlights?: unknown;
 }
 
 /**
@@ -69,13 +72,17 @@ export async function upsertMyCard(db: Db, userId: string, userName: string | nu
   const mode = clampCardText(input.mode ?? existing?.mode ?? 'dunk', 32) || 'dunk';
   const accent = safeAccent(input.accent ?? existing?.accent);
   const avatarUrl = input.avatarUrl !== undefined ? input.avatarUrl : existing?.avatarUrl ?? null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const extra: any = {};
+  if (input.showStats !== undefined) extra.showStats = input.showStats;
+  if (input.highlights !== undefined) extra.highlights = input.highlights;
 
   if (existing) {
     return db.creatorCard.update({
       where: { id: existing.id },
       data: {
         displayName, tagline: tagline || null, signatureMove: signatureMove || null,
-        mode, accent, avatarUrl,
+        mode, accent, avatarUrl, ...extra,
         prq: stats.prq, topScore: stats.topScore, wins: stats.wins, rarity,
       },
     });
@@ -86,7 +93,7 @@ export async function upsertMyCard(db: Db, userId: string, userName: string | nu
     data: {
       ownerId: userId, slug,
       displayName, tagline: tagline || null, signatureMove: signatureMove || null,
-      mode, accent, avatarUrl,
+      mode, accent, avatarUrl, ...extra,
       prq: stats.prq, topScore: stats.topScore, wins: stats.wins, rarity,
       published: false,
     },

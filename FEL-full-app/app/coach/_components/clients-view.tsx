@@ -3,7 +3,7 @@
 // session), the inbox of completed sessions with logs and videos to comment, and the thread per program.
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Plus, Trash2, Video, MessageSquare } from 'lucide-react';
+import { Loader2, Plus, Trash2, Video, MessageSquare, IdCard } from 'lucide-react';
 
 interface Ex { id: string; name: string; sets: number; reps: string; load: string; tempo: string; restSeconds: number; coachNote: string | null }
 interface Tree { id: string; name: string; blocks: { id: string; label: string; sessions: { id: string; label: string; exercises: Ex[] }[] }[] }
@@ -12,6 +12,7 @@ interface Catalogue { id: string; name: string; category: string }
 interface InboxLog { id: string; exercise: string; prescribed: string; actualSets: number | null; actualReps: string | null; actualLoad: string | null; rpe: number | null; clientNote: string | null; videoUrl: string | null; coachComment: string | null }
 interface InboxItem { id: string; completedAt: string; program: { id: string; name: string }; session: string; clientName: string; logs: InboxLog[] }
 interface Msg { id: string; body: string; mine: boolean; fromCoach: boolean }
+interface RosterRow { clientId: string; name: string; programs: { id: string; name: string; isActive: boolean }[]; card: { slug: string; published: boolean; rarity: string; prq: number; topScore: number; wins: number } | null; prq: Record<string, number> | null; prqDelta: Record<string, number> | null; sessions: number; wins: number; resiliency: { attempts: number; retryRate: number } }
 
 export function ClientsView() {
   const [programs, setPrograms] = useState<Program[] | null>(null);
@@ -22,9 +23,11 @@ export function ClientsView() {
   const [comments, setComments] = useState<Record<string, string>>({});
   const [thread, setThread] = useState<Msg[]>([]);
   const [msg, setMsg] = useState('');
+  const [roster, setRoster] = useState<RosterRow[]>([]);
 
   const load = useCallback(async () => {
-    const [p, c, i] = await Promise.all([fetch('/api/coach/programs').then((r) => r.json()), fetch('/api/coach/programs/exercises').then((r) => r.json()), fetch('/api/coach/inbox').then((r) => r.json())]);
+    const [p, c, i, ro] = await Promise.all([fetch('/api/coach/programs').then((r) => r.json()), fetch('/api/coach/programs/exercises').then((r) => r.json()), fetch('/api/coach/inbox').then((r) => r.json()), fetch('/api/coach/roster').then((r) => r.json())]);
+    setRoster(ro.roster ?? []);
     const mine = (p.programs ?? []).filter((x: Program) => x.role === 'coach');
     setPrograms(mine); setCatalogue(Array.isArray(c) ? c : []); setInbox(i);
     if (!selected && mine[0]) setSelected(mine[0].tree.id);
@@ -52,6 +55,20 @@ export function ClientsView() {
   const prog = programs.find((p) => p.tree.id === selected) ?? null;
   return (
     <div className="space-y-4">
+      {/* roster — lane 5 S3: every client with their card, PRQ and deltas since the program began */}
+      <div className="fel-card rounded-xl p-4 space-y-2">
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><IdCard className="h-3.5 w-3.5" /> Roster</div>
+        {roster.length === 0 && <div className="text-sm text-white/50">No clients yet.</div>}
+        {roster.map((r) => (
+          <div key={r.clientId} className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] border border-white/6 px-3 py-2 text-xs">
+            <div className="min-w-0">
+              <div className="text-white text-sm truncate">{r.name} <span className="text-white/40">· {r.sessions} sessions · {r.wins}W</span></div>
+              <div className="text-white/50 truncate">{r.prq ? Object.entries(r.prq).slice(0, 4).map(([k, v]) => `${k.slice(0, 3)} ${Math.round(v)}${r.prqDelta?.[k] ? ` (${r.prqDelta[k] > 0 ? '+' : ''}${Math.round(r.prqDelta[k])})` : ''}`).join(' · ') : 'no PRQ yet'}</div>
+            </div>
+            {r.card?.published ? <a href={`/card/${r.card.slug}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-md border border-[#00E5FF]/40 px-2 py-1 text-[#00E5FF]">card · {r.card.rarity}</a> : <span className="shrink-0 text-white/30">no public card</span>}
+          </div>
+        ))}
+      </div>
       {/* inbox */}
       <div className="fel-card rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between"><div className="text-[11px] uppercase tracking-wider text-white/40">Inbox</div><div className="text-xs text-[#FFD700]">{inbox.needsReview} to review</div></div>

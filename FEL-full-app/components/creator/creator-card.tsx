@@ -12,7 +12,8 @@ import { RARITY_META, safeAccent, rarityLabel, type CardRarity } from '@/lib/cre
 import { mpModeLabel } from '@/lib/mp/match-core';
 import { AvatarFigure } from '@/components/avatar-figure';
 import { ROSTER } from '@/lib/game-data';
-import { Trophy, Zap, Star } from 'lucide-react';
+import { Trophy, Zap, Star, ShieldCheck } from 'lucide-react';
+import type { PublicStats, Highlight } from '@/lib/creator/card-stats';
 
 export interface CreatorCardData {
   slug: string;
@@ -31,7 +32,8 @@ export interface CreatorCardData {
   ownerLook?: { avatarKey: string | null; cosmeticAssetId: string | null } | null;
 }
 
-export function CreatorCard({ card }: { card: CreatorCardData }) {
+/** lane 5 (scouting profile): the masked stat blocks and the owner's pinned highlights, rendered under the card. */
+export function CreatorCard({ card, stats, highlights }: { card: CreatorCardData; stats?: PublicStats | null; highlights?: Highlight[] | null }) {
   const accent = safeAccent(card.accent);
   const rarity = (['common', 'rare', 'epic', 'legendary'].includes(card.rarity) ? card.rarity : 'common') as CardRarity;
   const meta = RARITY_META[rarity];
@@ -106,7 +108,70 @@ export function CreatorCard({ card }: { card: CreatorCardData }) {
           <Stat icon={<Trophy className="h-4 w-4" />} label="Top" value={card.topScore} accent={accent} />
           <Stat icon={<Zap className="h-4 w-4" />} label="Wins" value={card.wins} accent={accent} />
         </div>
+
+        {stats && <StatBlocks stats={stats} accent={accent} />}
+        {highlights && highlights.length > 0 && (
+          <div className="mt-4">
+            <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-white/40">Highlights</div>
+            <div className="space-y-1.5">
+              {highlights.map((h) => (
+                <div key={`${h.kind}:${h.id}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm">
+                  <span className="text-white/85">{h.label ?? (h.kind === 'signature' ? `Signature · ${mpModeLabel(h.mode)}` : `${mpModeLabel(h.mode)}${h.won ? ' · W' : ''}`)}</span>
+                  <span className="font-mono text-xs" style={{ color: accent }}>{h.score}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+const PRQ_ORDER = ['strength', 'speed', 'endurance', 'agility', 'power', 'flexibility', 'recovery', 'mental'];
+
+function StatBlocks({ stats, accent }: { stats: PublicStats; accent: string }) {
+  return (
+    <div className="mt-4 space-y-4">
+      {stats.prq && (
+        <div>
+          <div className="mb-2 flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-white/40">PRQ profile {stats.verified && <ShieldCheck className="h-3 w-3" style={{ color: accent }} />}</div>
+          <div className="space-y-1">
+            {PRQ_ORDER.filter((k) => stats.prq && k in stats.prq).map((k) => {
+              const v = Math.max(0, Math.min(100, stats.prq![k]));
+              return (
+                <div key={k} className="flex items-center gap-2 text-[11px]">
+                  <span className="w-16 capitalize text-white/50">{k}</span>
+                  <div className="h-1.5 flex-1 rounded-full bg-white/10"><div className="h-1.5 rounded-full" style={{ width: `${v}%`, backgroundColor: accent }} /></div>
+                  <span className="w-6 text-right font-mono text-white/70">{Math.round(stats.prq![k])}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {stats.mastery.length > 0 && (
+        <div>
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-white/40">Mastery</div>
+          <div className="flex flex-wrap gap-1.5">{stats.mastery.map((m) => <span key={m.mode} className="rounded-md border border-white/10 px-2 py-1 text-[11px] text-white/80">{mpModeLabel(m.mode)} · <span style={{ color: accent }}>{m.label}</span>{m.best != null ? ` · ${m.best}` : ''}</span>)}</div>
+        </div>
+      )}
+      {stats.records.length > 0 && (
+        <div>
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-white/40">Records</div>
+          <div className="grid grid-cols-2 gap-1.5">{stats.records.slice(0, 6).map((r) => <div key={r.mode} className="rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px]"><div className="text-white/80">{mpModeLabel(r.mode)}</div><div className="font-mono text-white/50">best <span className="text-white">{r.best}</span> · {r.wins}W / {r.sessions}</div></div>)}</div>
+          {stats.ladder && <div className="mt-1.5 text-[11px] text-white/50">Ladder best: <span className="text-white/80">{stats.ladder.bestScore}</span> in {mpModeLabel(stats.ladder.mode)}</div>}
+        </div>
+      )}
+      {stats.resiliency && (
+        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/70">
+          <span>Resiliency · {stats.resiliency.attempts} attempts</span>
+          <span>retry rate <span className="text-white">{Math.round(stats.resiliency.retryRate * 100)}%</span>{stats.resiliency.returnedAfterLoss === true ? ' · came back after the last loss' : ''}</span>
+        </div>
+      )}
+      {stats.movement?.delta && (
+        <div className="text-[11px] text-white/60">Movement signature delta since last scan: {Object.entries(stats.movement.delta).slice(0, 4).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${Math.round(v * 10) / 10}`).join(' · ')}</div>
+      )}
     </div>
   );
 }

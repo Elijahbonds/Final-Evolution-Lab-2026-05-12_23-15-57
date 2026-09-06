@@ -143,6 +143,21 @@ friend. It could be used as a scouting platform."
 
 Order: S1 → S2 → S3 right after lane 1 C1–C3 (it is what makes the coach's roster meaningful); S4–S5 after the friend test.
 
+### Landed (2026-09-06, lane 5 S1–S3)
+- `lib/creator/card-stats.ts` (pure: visibility mask, mastery labels, highlight candidates = one PB per mode → wins →
+  signature attempts, own-only pins ≤ 6 with clamped labels, records per mode, masked wire shape) + 6 tests;
+  `card-stats-server.ts` composes the blocks from the Shared Profile read-model + `ModeMastery` + `LadderEntry`.
+- Schema: `CreatorCard.showStats Json?` (mask) and `highlights Json?` (pins), `prisma db push`.
+- Routes: `POST /api/v1/card` accepts `showStats` + `highlights` (pins validated against the caller's own candidates);
+  `GET /api/v1/card/highlights` (candidates); `GET /api/v1/card/:slug` returns `stats` (masked) + `highlights`;
+  `GET /api/coach/roster` (every client with card link, PRQ, deltas since the program began, sessions, resiliency).
+- UI: the card renders PRQ bars (verified shield), mastery chips, records, ladder best, resiliency, movement delta and
+  pinned highlights; the editor gets "What your card shows" toggles and a pin picker; the coach's Clients tab gets a
+  Roster block; `/card/[slug]/opengraph-image` renders the card as the link preview (next/og — Satori needs single text
+  children per node, measured).
+- Smoke `scripts/probes/_card-stats-smoke.mts`: 7/7 PASS on the dev DB (mask saved with unknown keys dropped, stolen pin
+  dropped, public stats masked, OG 200 image/png, card page renders the PRQ block, roster links the card).
+
 ## Order and first slice
 
 1. **Lane 1 C1–C3** (program builder, client Today, coach review + messaging) — the coaching loop closes end to end.
