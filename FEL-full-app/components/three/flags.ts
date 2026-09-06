@@ -33,6 +33,8 @@ const THREE_D_MODES: Partial<Record<string, boolean>> = {
 // after they pass device playtest — the mode code already exists in the registry.
 const BABYLON_MODES: Partial<Record<string, boolean>> = {
   dunkContest: true,
+  // lane 3 W1 (2026-09-06) — Who Scene It as a live venue quiz on Babylon
+  whoSceneIt: true,
   // Rollout wave 1 — KO-gated karate + skinned-pursuit football on the shared
   // Babylon cores. Kill-switch NEXT_PUBLIC_DISABLE_3D=1 forces all back to 2D/3D.
   karateEndless: true,

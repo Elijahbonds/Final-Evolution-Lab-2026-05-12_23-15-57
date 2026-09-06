@@ -128,6 +128,19 @@ Today: a 2D deck. The live-venue pack already exists in content. The mode:
 | W3 Free-Use Legends | Keep the public-domain identification bank as the shard-earning bonus round; packs may include free-use entries with the documented rationale field. |
 | W4 Ladder | Pack leaderboards; a pack's plays feed its creator's card rarity. |
 
+### Landed (2026-09-06, lane 3 W1 + W2)
+- `lib/babylon/modes/WhoSceneItMode.ts` — a factory mode on QuizCore: each question mounts its venue live (`mountVenue`
+  by `sceneVenueId`, disposed on the next), a slow orbit sweeps it, the four answers ride A/B/X/Y, speed-scaled points and
+  streaks, a reveal card, `ctx.end` with correct/total/bestStreak. Registered as `who_scene_it` (+ pad verbs A B C D), the
+  play route flag `whoSceneIt` flips the loader to `components/games/who-scene-it-babylon.tsx` (question card + answer
+  buttons over the canvas); the 2D deck stays as the fallback behind the flag. An anchor node satisfies the frame guard.
+- W2: `lib/babylon/content/scenePacks.ts` (3 tests) turns approved `scene` cards into QuizPacks; `GET /api/v1/scene-packs
+  [?venue=]` serves them; the mode plays a friend's pack with `?pack=<cardId>` and falls back to FEL's own pack.
+- Measured: dev capture 60 fps / 115 draws, 0/0/0, full round of 8 (score 983); mid-round probe shows the venue roots
+  swapping per question (gym+dojo map → Venice boardwalk); play route renders the courtyard behind the card at 60 fps.
+- Open: the built-in pack's names/explanations predate the shrine and Venice looks (content refresh); the wide sweep runs
+  above the 600-draw ceiling on Venice (933) and swapping venues leaves texture memory near the 256 MB soft budget.
+
 ## Lane 4 — New disciplines (the other passion pipelines)
 
 | Discipline | Room that makes it | Payload | Review | Equip / use in play |

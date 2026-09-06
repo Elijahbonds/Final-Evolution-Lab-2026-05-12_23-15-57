@@ -25,6 +25,7 @@ import { DanceMode } from './DanceMode';        // M75 creative discipline
 import { ThreePointMode } from './ThreePointMode'; // Babylon port of the R3F shootout
 import { GymnasticsMode, BigAirMode } from './AirSessionMode'; // shared AirSessionCore, two skins
 import { SprintMode } from './SprintMode';
+import { WhoSceneItMode } from './WhoSceneItMode';   // lane 3 W1 — the live venue quiz
 
 export const MODES: Record<string, ModeDefinition> = {
   // P3–P4 proof mode — shipped and playtested FIRST
@@ -65,6 +66,8 @@ export const MODES: Record<string, ModeDefinition> = {
   dunkduel: DunkDuelMode,
   // Rollout wave 8 — creative disciplines (M75): rhythm dance on the audio clock
   dance: DanceMode,
+  // Lane 3 W1 (2026-09-06): Who Scene It as a live mode — the question's venue mounts behind the card
+  who_scene_it: WhoSceneItMode,
 };
 
 /** Modes proven safe to serve on Babylon right now (dunk = the gate; karate +
@@ -85,4 +88,6 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   'volleyball',
   // Rollout wave 8 — creative disciplines (M75)
   'dance',
+  // lane 3 W1 — live venue quiz
+  'who_scene_it',
 ]);

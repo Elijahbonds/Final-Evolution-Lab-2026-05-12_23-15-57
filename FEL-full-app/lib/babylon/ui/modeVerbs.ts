@@ -238,6 +238,8 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
   }),
 
   dance: verbs({ A: { label: 'TAP', emit: A('A') } }),
+  // lane 3 W1 — the four answers ride the four face buttons
+  who_scene_it: verbs({ A: { label: 'A', emit: A('A') }, B: { label: 'B', emit: A('B') }, X: { label: 'C', emit: A('X') }, Y: { label: 'D', emit: A('Y') } }),
 
   default: verbs({ A: { label: 'ACTION', emit: A('A') } }),
 };
