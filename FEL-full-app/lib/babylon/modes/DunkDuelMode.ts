@@ -26,8 +26,8 @@
 // (The bench-toss alley-oop — P2 throwing P1's lob — is the duel-native
 // prop and is DEFERRED: it needs a second input surface mid-attempt.)
 
-import { MeshBuilder, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh } from '@babylonjs/core';
+import { Color3, Color4, MeshBuilder, Vector3 } from '@babylonjs/core';
+import type { AbstractMesh, Camera, ParticleSystem } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -71,6 +71,9 @@ const BUDGET_SEC: Record<Phase, number> = {
 export const DunkDuelMode: ModeDefinition = (() => {
   let p1: SpawnedCharacter, p2: SpawnedCharacter;
   let ball: AbstractMesh, ballSim: BallSim;
+  let trail: ParticleSystem | null = null;   // juice soft #5
+  let fovCam: Camera | null = null, fovBase = 0, fovT = 0, fovOn = false;   // juice soft #4
+  let settleLatch = false;                    // juice soft #3
   let phase: Phase = 'handoff';
   let phaseSec = 0;
   let activeIdx: 0 | 1 = 0;                       // whose turn
@@ -111,6 +114,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     setPhase('handoff');
     style = 'power'; charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
+    settleLatch = false; fovRelease(); setTrail('soft');   // juice soft: back to the runway
     setProp(ctx, 'none');
     active().root.position.set(0, 0, CFG.startZ);
     active().root.rotation.y = Math.PI;
@@ -140,6 +144,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     if (phase === 'cinematic') return;
     setPhase('cinematic');
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
+    settleLatch = false; fovGather(ctx); setTrail('hang');   // juice soft #3–#5
     SoundKit.play('whoosh', { pitch: 0.85 });
     active().animator.play(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => {} });
   }
@@ -152,7 +157,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     ctx.setHud({ slamPulse: false });
     releasePos.copyFrom(ball.getAbsolutePosition());
     releaseBall(ball);
-    if (!qteHit) ballSim.launch(releasePos, clankOffRim(ball, rim));
+    if (!qteHit) { ballSim.launch(releasePos, clankOffRim(ball, rim)); missClank(ctx); setTrail('off'); }   // juice soft #2, #5
     active().animator.play(qteHit ? SPORT_CLIP.dunkScoreHang : SPORT_CLIP.jumpLand, {
       onEnd: () => active().animator.play(SPORT_CLIP.idle, { loop: true }),
     });
@@ -174,6 +179,54 @@ export const DunkDuelMode: ModeDefinition = (() => {
   /** CONTACT (PM brief VENICE-JUICE-P0, 2026-09-06): console juice on the make's flush frame — one hit-stop, one shake,
    *  one white-gold flash, one rim thud — latched once per attempt so judge cards and FIFTY bursts never re-fire it.
    *  Never a second slow-mo: the hang already spent it at rise. Miss path: nothing here (the clank stays honest). */
+  // ── Venice juice soft #2–#5 (PM brief VENICE-JUICE-SOFT, 2026-09-06) ─────────────────────────────────────────────
+  /** #2 miss clank weight: a light metallic hit and a small feel impact on the clank — never the make's contactPunch. */
+  function missClank(ctx: ModeContext): void {
+    ctx.feel.impact(0.4);
+    SoundKit.play('impact', { pitch: 1.35, volume: 0.45 });
+    console.info('[JUICE-SOFT] miss clank');
+  }
+  /** #3 land settle: a micro shake (amp 0.05) and dust at the feet, once per attempt; the miss keeps its one-breath retry. */
+  function landSettle(ctx: ModeContext): void {
+    if (settleLatch) return;
+    settleLatch = true;
+    ctx.juice.shake(0.05, 110);
+    EffectsKit.burst(ctx.scene, active().root.position.clone(), 'dust');
+    console.info('[JUICE-SOFT] land settle');
+  }
+  /** #4 FOV gather: the active camera's fov eases −10% over the gather into the hang and back on CONTACT or land. Only
+   *  the fov moves — rimCamCut, the hang target locks and the follow distance beat are untouched. */
+  function fovGather(ctx: ModeContext): void {
+    const cam = ctx.scene.activeCamera; if (!cam) return;
+    if (fovCam !== cam) { fovCam = cam; fovBase = cam.fov; fovT = 0; }
+    fovOn = true;
+    console.info('[JUICE-SOFT] fov gather');
+  }
+  function fovRelease(): void { if (fovOn) console.info('[JUICE-SOFT] fov release'); fovOn = false; }
+  function fovTick(dt: number): void {
+    if (!fovCam) return;
+    const target = fovOn ? 1 : 0; const rate = dt / (fovOn ? 0.35 : 0.25);
+    fovT = fovT < target ? Math.min(target, fovT + rate) : Math.max(target, fovT - rate);
+    const k = fovT * fovT * (3 - 2 * fovT);
+    fovCam.fov = fovBase * (1 - 0.10 * k);
+    if (!fovOn && fovT === 0) { fovCam.fov = fovBase; fovCam = null; }
+  }
+  /** #5 trail ramp: soft on the runway, bright in the hang, a white flash cut on the make, dead on a miss or a clipped air. */
+  function setTrail(level: 'soft' | 'hang' | 'off'): void {
+    if (!trail) return;
+    console.info(`[JUICE-SOFT] trail ${level}`);
+    if (level === 'off') { trail.emitRate = 0; return; }
+    const hang = level === 'hang'; const c = Color3.FromHexString('#ffb36b');
+    trail.emitRate = hang ? 170 : 45; trail.maxSize = hang ? 0.2 : 0.1; trail.minSize = hang ? 0.07 : 0.04;
+    trail.color1 = new Color4(c.r, c.g, c.b, hang ? 0.95 : 0.5);
+  }
+  function trailFlash(): void {
+    if (!trail) return;
+    console.info('[JUICE-SOFT] trail flash');
+    trail.color1 = new Color4(1, 1, 1, 1); trail.emitRate = 260; trail.maxSize = 0.3;
+    setTimeout(() => { if (trail) trail.emitRate = 0; }, 130);
+  }
+
   function contactPunch(ctx: ModeContext): void {
     if (contactLatch) return;
     contactLatch = true;
@@ -181,11 +234,13 @@ export const DunkDuelMode: ModeDefinition = (() => {
     ctx.juice.shake(0.12, 140);
     ctx.juice.flash('#fff6dd', 120);
     SoundKit.play('impact', { pitch: 0.7, volume: 0.8 });
+    fovRelease(); trailFlash();   // juice soft #4, #5
   }
 
   function finishAttempt(ctx: ModeContext, made: boolean): void {
     if (finishing) return;
     finishing = true;
+    landSettle(ctx); fovRelease();   // juice soft #3, #4
     let dunkTotal = 0;
     let scores: JudgeScore[] = [];
     let isRepeat = false;
@@ -293,7 +348,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       ctx.objectiveRef.current = rim;
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'venice');
-      EffectsKit.ballTrail(ctx.scene, ball);
+      trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
       // Court locations (docs/SPEC-COURT-LOCATIONS.md): the Venice look (golden sky, surround palms) is Venice's own —
       // under any other location the location's environment stands, so the pass steps aside.
       if (!ctx.location || ctx.location === 'venice') await applyVeniceDunkLookPass(ctx.scene);
@@ -346,6 +401,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
+      fovTick(dt);
       phaseSec += dt;
       watchdog(ctx);
       if (ended) return;
@@ -392,7 +448,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
         if (prop === 'obstacle' && obstacle && !obstacleClipped) {
           const overProp = Math.abs(c.root.position.z - obstacle.position.z) < 0.45;
           if (overProp && c.root.position.y < OBSTACLE_CLEAR_HEIGHT - 0.05) {
-            obstacleClipped = true;
+            obstacleClipped = true; setTrail('off');   // juice soft #5: a clipped air kills the trail
             clipBlown(ctx);
           }
         }

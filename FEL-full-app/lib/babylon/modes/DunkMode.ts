@@ -16,9 +16,9 @@
 //     enough it pays +1 style ("HANG TIME!") before the judges reveal.
 // All additions are animation-independent on purpose (E25/M51-safe).
 
-import { MeshBuilder, Vector3 } from '@babylonjs/core';
+import { Color3, Color4, MeshBuilder, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
-import type { AbstractMesh } from '@babylonjs/core';
+import type { AbstractMesh, Camera, ParticleSystem } from '@babylonjs/core';
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -94,6 +94,9 @@ export const DunkMode: ModeDefinition = (() => {
   let dunkVenue: VenueHandle | null = null;  // M74
   let obstacle: AbstractMesh | null = null;
   let ball: AbstractMesh, ballSim: BallSim, replay: DunkReplayRecorder;
+  let trail: ParticleSystem | null = null;   // juice soft #5
+  let fovCam: Camera | null = null, fovBase = 0, fovT = 0, fovOn = false;   // juice soft #4
+  let settleLatch = false;                    // juice soft #3
   let phase: Phase = 'approach';
   let phaseSec = 0;
   let style: Style = 'power';
@@ -197,7 +200,7 @@ export const DunkMode: ModeDefinition = (() => {
       ctx.objectiveRef.current = rim;
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'venice');
-      EffectsKit.ballTrail(ctx.scene, ball);
+      trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
       // Venice LOOK: KEEP/HIDE, palm tip ~10m, golden-haze (no GLB edits).
       // Court locations (docs/SPEC-COURT-LOCATIONS.md): the Venice look (golden sky, surround palms) is Venice's own —
       // under any other location the location's environment stands, so the pass steps aside.
@@ -313,6 +316,7 @@ export const DunkMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
+      fovTick(dt);
       phaseSec += dt;
       watchdog(ctx);
       hype = Math.max(0, hype - dt * 1.5);       // slow decay between dunks
@@ -382,7 +386,7 @@ export const DunkMode: ModeDefinition = (() => {
           // feet must genuinely clear the chair: 1.30m demands ~55% charge
           // (crossing happens near apex, y ≈ 0.975 × (1.05 + 0.55·charge))
           if (overProp && player.root.position.y < obstacleClearHeight - 0.05) {
-            obstacleClipped = true;
+            obstacleClipped = true; setTrail('off');   // juice soft #5: a clipped air kills the trail
             clipBlown(ctx);
           }
         }
@@ -586,6 +590,7 @@ export const DunkMode: ModeDefinition = (() => {
     setPhase('cinematic');
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false;
     rimCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
+    settleLatch = false; fovGather(ctx); setTrail('hang');   // juice soft #3–#5
     // The run-up, not the stick at the release instant: during the charge the
     // stick is usually neutral, so the old `hypot(stickX, stickY)` read ~0 and
     // EVERY dunk launched as a walk-up. Peak measured approach speed is the
@@ -632,7 +637,7 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.setHud({ slamPulse: false });
     releasePos.copyFrom(ball.getAbsolutePosition());
     releaseBall(ball);
-    if (!qteHit) ballSim.launch(releasePos, clankOffRim(ball, rim));
+    if (!qteHit) { ballSim.launch(releasePos, clankOffRim(ball, rim)); missClank(ctx); setTrail('off'); }   // juice soft #2, #5
     const aerial = pickAerialFinish(qteHit, qteAccuracy);
     const banner = finishBanner(qteHit, qteAccuracy);
     if (banner) ctx.setHud({ banner });
@@ -645,6 +650,54 @@ export const DunkMode: ModeDefinition = (() => {
   /** CONTACT (PM brief VENICE-JUICE-P0, 2026-09-06): console juice on the make's flush frame — one hit-stop, one shake,
    *  one white-gold flash, one rim thud — latched once per attempt so judge cards and FIFTY bursts never re-fire it.
    *  Never a second slow-mo: the hang already spent it at rise. Miss path: nothing here (the clank stays honest). */
+  // ── Venice juice soft #2–#5 (PM brief VENICE-JUICE-SOFT, 2026-09-06) ─────────────────────────────────────────────
+  /** #2 miss clank weight: a light metallic hit and a small feel impact on the clank — never the make's contactPunch. */
+  function missClank(ctx: ModeContext): void {
+    ctx.feel.impact(0.4);
+    SoundKit.play('impact', { pitch: 1.35, volume: 0.45 });
+    console.info('[JUICE-SOFT] miss clank');
+  }
+  /** #3 land settle: a micro shake (amp 0.05) and dust at the feet, once per attempt; the miss keeps its one-breath retry. */
+  function landSettle(ctx: ModeContext): void {
+    if (settleLatch) return;
+    settleLatch = true;
+    ctx.juice.shake(0.05, 110);
+    EffectsKit.burst(ctx.scene, player.root.position.clone(), 'dust');
+    console.info('[JUICE-SOFT] land settle');
+  }
+  /** #4 FOV gather: the active camera's fov eases −10% over the gather into the hang and back on CONTACT or land. Only
+   *  the fov moves — rimCamCut, the hang target locks and the follow distance beat are untouched. */
+  function fovGather(ctx: ModeContext): void {
+    const cam = ctx.scene.activeCamera; if (!cam) return;
+    if (fovCam !== cam) { fovCam = cam; fovBase = cam.fov; fovT = 0; }
+    fovOn = true;
+    console.info('[JUICE-SOFT] fov gather');
+  }
+  function fovRelease(): void { if (fovOn) console.info('[JUICE-SOFT] fov release'); fovOn = false; }
+  function fovTick(dt: number): void {
+    if (!fovCam) return;
+    const target = fovOn ? 1 : 0; const rate = dt / (fovOn ? 0.35 : 0.25);
+    fovT = fovT < target ? Math.min(target, fovT + rate) : Math.max(target, fovT - rate);
+    const k = fovT * fovT * (3 - 2 * fovT);
+    fovCam.fov = fovBase * (1 - 0.10 * k);
+    if (!fovOn && fovT === 0) { fovCam.fov = fovBase; fovCam = null; }
+  }
+  /** #5 trail ramp: soft on the runway, bright in the hang, a white flash cut on the make, dead on a miss or a clipped air. */
+  function setTrail(level: 'soft' | 'hang' | 'off'): void {
+    if (!trail) return;
+    console.info(`[JUICE-SOFT] trail ${level}`);
+    if (level === 'off') { trail.emitRate = 0; return; }
+    const hang = level === 'hang'; const c = Color3.FromHexString('#ffb36b');
+    trail.emitRate = hang ? 170 : 45; trail.maxSize = hang ? 0.2 : 0.1; trail.minSize = hang ? 0.07 : 0.04;
+    trail.color1 = new Color4(c.r, c.g, c.b, hang ? 0.95 : 0.5);
+  }
+  function trailFlash(): void {
+    if (!trail) return;
+    console.info('[JUICE-SOFT] trail flash');
+    trail.color1 = new Color4(1, 1, 1, 1); trail.emitRate = 260; trail.maxSize = 0.3;
+    setTimeout(() => { if (trail) trail.emitRate = 0; }, 130);
+  }
+
   function contactPunch(ctx: ModeContext): void {
     if (contactLatch) return;
     contactLatch = true;
@@ -652,11 +705,13 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.juice.shake(0.12, 140);
     ctx.juice.flash('#fff6dd', 120);
     SoundKit.play('impact', { pitch: 0.7, volume: 0.8 });
+    fovRelease(); trailFlash();   // juice soft #4, #5: CONTACT restores the fov and cuts the trail with a flash
   }
 
   async function finishAttempt(ctx: ModeContext, made: boolean): Promise<void> {
     if (finishing) return;
     finishing = true;
+    landSettle(ctx); fovRelease();   // juice soft #3, #4: the landing settles, the fov is back by land
 
     if (!made) {
       SoundKit.play('miss');
@@ -810,6 +865,7 @@ export const DunkMode: ModeDefinition = (() => {
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     styleTaps = 0; hangSec = 0; revealed = [];
     runUpPeak = 0; obstacleClipped = false; toppling = false;
+    settleLatch = false; fovRelease(); setTrail('soft');   // juice soft: back to the runway
     void setupProp(ctx);
     ctx.camDirector.snapTo(player.root.position, rim);
     setPhase('approach');
