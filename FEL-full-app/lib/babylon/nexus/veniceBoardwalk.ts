@@ -7,7 +7,7 @@
 // (apron, grass, sand, ocean, sun); the props (shops, tents, palms, lamps, bus, sedan) are placements in prop set
 // 'venice-court-meshy' (venuePropSets.ts). Runs for the basketball venues under Venice only — a picked location brings
 // its own environment. Everything hangs under the venue root and dies with it.
-import { Color3, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, TransformNode } from '@babylonjs/core';
+import { Color3, DynamicTexture, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, TransformNode } from '@babylonjs/core';
 import { courtLogoTexture, groundTextureFor, signTexture, TILE_M, type GroundKind } from '../visual/groundTextures';
 import { HOOP_SCAN, spawnMeshyProp } from '../visual/meshyProps';
 import type { Scene } from '@babylonjs/core';
@@ -95,6 +95,19 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   sign('vb_scoreboard', 4.8, 1.3, [7.5, 3.0, SCAN_N - 17.4], Math.PI, signTexture(scene, ['FLIGHT NIGHT', 'VENICE · OPEN RUN · ALL LEVELS'], { bg: '#141826', fg: '#FFE9B0', accent: '#FF6B3D' }));
   const flagTex = signTexture(scene, ['FEL'], { bg: '#B03A2E', fg: '#FFF4E0', accent: '#F2B84B', w: 256, h: 640 });
   for (let i = 0; i < 4; i++) { const z = -36 + i * 24; sign(`vb_flag_${i}`, 0.5, 1.25, [19.55, 4.0, z + 0.5], Math.PI / 2, flagTex); }
+  // Pass 7 phase 5 — air: six gulls wheel over the northern water on slow ellipses (billboards on a painted chevron).
+  // Cheap: six unlit planes and one observer.
+  const gullTex = new DynamicTexture('vb_gull_tex', 64, scene, false);
+  { const c = gullTex.getContext() as CanvasRenderingContext2D; c.clearRect(0, 0, 64, 64); c.strokeStyle = '#2A2630'; c.lineWidth = 5; c.lineCap = 'round'; c.beginPath(); c.moveTo(6, 40); c.quadraticCurveTo(20, 22, 32, 34); c.quadraticCurveTo(44, 22, 58, 40); c.stroke(); gullTex.update(false); gullTex.hasAlpha = true; }
+  const gullMat = new StandardMaterial('vb_gull_mat', scene); gullMat.emissiveTexture = gullTex; gullMat.opacityTexture = gullTex; gullMat.emissiveColor = Color3.Black(); gullMat.diffuseColor = Color3.Black(); gullMat.disableLighting = true; gullMat.backFaceCulling = false;
+  const gulls = Array.from({ length: 6 }, (_, i) => { const g = MeshBuilder.CreatePlane(`vb_gull_${i}`, { size: 1.6 }, scene); g.material = gullMat; g.billboardMode = Mesh.BILLBOARDMODE_ALL; g.parent = holder; g.isPickable = false; return g; });
+  // (drifting cloud planes read as hard white blobs against the dome — the painted dome carries the clouds; the gulls stay)
+  let ta = 0;
+  const air = scene.onBeforeRenderObservable.add(() => {
+    ta += scene.getEngine().getDeltaTime() / 1000;
+    gulls.forEach((g, i) => { const ph = ta * (0.22 + i * 0.03) + i * 1.1; g.position.set(-30 + Math.cos(ph) * (22 + i * 4), 14 + i * 1.6 + Math.sin(ta * 1.3 + i) * 0.8, -95 + Math.sin(ph) * (14 + i * 3)); g.scaling.y = 0.75 + 0.25 * Math.sin(ta * 9 + i * 2); });
+  });
+  holder.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(air); gullTex.dispose(); });
   // Pass 7 phase 1: a half-court logo decal on the scan (centre circle, 3.6 m), matte, alpha-blended
   const logo = MeshBuilder.CreateGround('vb_court_logo', { width: 3.6, height: 3.6 }, scene);
   logo.position.set(0, 0.03, SCAN_MID); logo.parent = holder; logo.isPickable = false;  // the scan's centre circle

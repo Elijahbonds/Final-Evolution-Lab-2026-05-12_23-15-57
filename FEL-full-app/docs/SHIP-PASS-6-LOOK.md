@@ -138,3 +138,8 @@ Runs after Pass 6, same rules. Detail means the small things a camera catches at
   Meshy shrine placed behind the wall the camera faces.
 - **PM brief VENICE-JUICE-P0 (838ca82)**: hit-stop 70 / shake 0.12,140 / flash / rim thud on the make's flush frame, once per
   attempt, in dunk and duel; no second slow-mo. Outbox VENICE-JUICE-P0.md.
+- **Pass 7 phase 5 (sky and air), 02:30**: six gulls wheel over the northern water on slow ellipses — billboards on a
+  painted chevron, one observer, ~6 draws — visible as small dark chevrons from the dunk camera. Drifting cloud planes were
+  tried and dropped: they read as hard white blobs against the dome (the painted dome carries the clouds).
+- Sweep on 4cbe55d: every row clean; "vitest: 1 failed" was the headless timeout (fixed in 883d4cd — test timeout 180 s
+  now outlasts the script's 120 s); penalty's 44 fps row was my concurrent suite run, 60 fps on recapture.
