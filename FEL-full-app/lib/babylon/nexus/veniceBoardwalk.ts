@@ -91,7 +91,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode): Tran
   for (let i = 0; i < 4; i++) { const z = -36 + i * 24; sign(`vb_flag_${i}`, 0.5, 1.25, [19.55, 4.0, z + 0.5], Math.PI / 2, flagTex); }
   // Pass 7 phase 1: a half-court logo decal on the scan (centre circle, 3.6 m), matte, alpha-blended
   const logo = MeshBuilder.CreateGround('vb_court_logo', { width: 3.6, height: 3.6 }, scene);
-  logo.position.set(0, 0.03, 10.9); logo.parent = holder;   // the scan's centre circle logo.isPickable = false;
+  logo.position.set(0, 0.03, 10.9); logo.parent = holder; logo.isPickable = false;  // the scan's centre circle
   const lm = new PBRMaterial('vb_court_logo_mat', scene); lm.albedoTexture = courtLogoTexture(scene); lm.useAlphaFromAlbedoTexture = true; lm.transparencyMode = 2; lm.roughness = 0.9; lm.metallic = 0; lm.albedoColor = Color3.White(); lm.environmentIntensity = 0.3;
   logo.material = lm;
   console.info('[FEL-VENICE] boardwalk scenery built (apron, grass, boardwalk, sand, ocean, sun) — props from venice-court-meshy');
