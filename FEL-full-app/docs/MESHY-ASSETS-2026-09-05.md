@@ -37,3 +37,29 @@ physics, rim constants, the ball spheres and the board box are untouched; a miss
 - Frames: dunk (hoop aligned, ball skinned), ones, threes, three-point, skateboard, snowboard slalom, surf, tennis,
   penalty — `FEL-FRAME 0 | MISSING CLIP 0 | errors 0`, 60 fps. VRAM: dunk 139 → ~219 MB with the bus and sedan at 2K,
   re-baked at 1K.
+
+## Round two (2026-09-05, evening) — store, skinned garments, the owner's scan, the boardwalk
+
+Owner: "put the store next to the court · I approve skinning of the rigs · be proactive in troubleshooting · see if the
+loader we built can accurately build me · that picture shouldn't be used as a background — recreate it as the environment".
+
+- **Store**: `store.glb` (7 m, 1K textures) — now four shop fronts along the boardwalk plus two behind the hoop (prop set
+  `venice-court-meshy`).
+- **Garments skinned to the rig (kit packs)**: the sport packs split into loose fragments (700–2600 per pack), regrouped
+  into objects by bbox proximity (`scratchpad cluster.py` → the jersey, helmets, bat, glove…). `scripts/meshy/fit-garment.py`
+  joins a cluster, scales it per axis onto the body's slot band with ease (tops 1.16× width, 1.22× depth), copies skin
+  weights from the Body (nearest face, interpolated), binds to the 22-bone rig and exports `public/models/kits/<item>.glb`.
+  Runtime `kit.ts` KIT_PACKS: a sport default or Closet pick the body does not carry is fetched, its bones LINKED to the
+  body's transform nodes (a straight skeleton swap collapsed the mesh — the pack's vertices live in the pack's bind space),
+  and swapped into the slot. First item: `top_baseball` on derby/baseball. Verified on the batter.
+- **The owner's scan** (`Elijah_Bonds` Meshy export, a T-pose statue, no skeleton): `scripts/meshy/rig-scan.py` scales it
+  to height, floors and faces it like the body, copies weights from the body and binds. The FEL rig's REST pose is a T
+  (arms horizontal, measured), so the T-pose scan needed no re-posing — the earlier "he's T-posing" was clips not driving
+  a body, not a pose mismatch. Result `public/models/candidates/elijah-meshy.glb` plays karate and dunk through the
+  `?hero=` flag: guard stance, dunk charge, jacket/shorts/slides intact, no T-pose. Frames sent to the owner.
+- **Boardwalk** (`lib/babylon/nexus/veniceBoardwalk.ts`): the concept photo rebuilt in 3D for the basketball venues under
+  Venice — concrete apron, park grass, a boardwalk strip with shops, tents, lamp posts and planters, palm rows, sand and
+  water wrapping the north and west inside the 400 m sky sphere, a sun disc low over the northern water where the hoop
+  camera looks. The baked `beach` dome is now the pure sunset-sky photo (no court in it), toned down; Venice fog is thin
+  golden haze. Ground pieces are PBR (standard materials blew out under the venue sun and grade); the scan court is matte
+  so it stops mirroring the dome. The second writer's Venice surround miniature still mounts under it (their lane).

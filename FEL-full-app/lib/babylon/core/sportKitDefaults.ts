@@ -25,6 +25,8 @@ const COMBAT: SportKit = { tops: 'top_lab', shorts: 'shorts_court', shoes: 'shoe
 const BOARD: SportKit = { tops: 'top_lab', shorts: 'shorts_court', shoes: 'shoes_flight' };
 const COURT: SportKit = { tops: 'top_bonds', shorts: 'shorts_court', shoes: 'shoes_evo' };
 const FIELD: SportKit = { tops: 'top_bonds', shorts: 'shorts_court', shoes: 'shoes_flight' };
+// owner approval 2026-09-05 ("skinning of the rigs"): the Meshy baseball jersey, fitted and skinned in Blender, ships as a kit pack
+const BASEBALL: SportKit = { tops: 'top_baseball', shorts: 'shorts_court', shoes: 'shoes_flight' };
 
 /** Every mode without its own row wears this — the court fit, the body's most complete read. */
 export const FALLBACK_KIT: SportKit = COURT;
@@ -38,7 +40,7 @@ export const SPORT_KIT_DEFAULTS: Readonly<Record<string, SportKit>> = {
   tennis: COURT, volleyball: COURT, onevone: COURT, threevthree: COURT, dunk: COURT, dunkduel: COURT, threepoint: COURT,
   carnival: COURT,
   // field / track / studio — a jersey and the low trainer
-  football: FIELD, sprint: FIELD, soccer: FIELD, penalty: FIELD, baseball: FIELD, derby: FIELD, golf: FIELD,
+  football: FIELD, sprint: FIELD, soccer: FIELD, penalty: FIELD, baseball: BASEBALL, derby: BASEBALL, golf: FIELD,
   gymnastics: FIELD, dance: FIELD,
 };
 

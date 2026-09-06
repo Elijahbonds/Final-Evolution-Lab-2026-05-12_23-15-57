@@ -16,9 +16,9 @@ import type { NexusWebSpec, BackdropKind } from './NexusWebScene';
 
 const dusk = (
   top: string, bottom: string, fog: string, sun: string, ambient = 0.55,
-  backdrop?: NexusWebSpec['environment']['backdrop'],
+  backdrop?: NexusWebSpec['environment']['backdrop'], fogDensity = 0.008,
 ) => ({
-  skyTop: top, skyBottom: bottom, fogColor: fog, fogDensity: 0.008,
+  skyTop: top, skyBottom: bottom, fogColor: fog, fogDensity,
   ambient, sunDirection: [-0.4, -0.85, 0.35] as [number, number, number], sunColor: sun,
   grade: { exposure: 1.15, contrast: 1.35, vignette: 0.35 },
   backdrop,
@@ -83,7 +83,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     // behind the hoop is the whole reason this venue read as a colour field
     // rather than as Venice at dusk. 'beach' paints a sun, its glow, an ocean
     // with light on the water, and a palm line along the horizon.
-    environment: dusk('#FF7A5C', '#1A2560', '#33408A', '#FFC98A', 0.6, 'beach'),
+    environment: dusk('#FF7A5C', '#1A2560', '#C9A184', '#FFC98A', 0.6, 'beach', 0.0006),   // golden-hour haze, thin: the boardwalk scenery reads to the horizon
     ground: { kind: 'court', size: [16, 28], color: '#1B7FB5', lineColor: '#F2F6FF', markings: 'halfcourt' },
     props: [
       // Owner call 2026-09-05: the red hoop banner is gone from every basketball court — the backboard and rim stand alone.

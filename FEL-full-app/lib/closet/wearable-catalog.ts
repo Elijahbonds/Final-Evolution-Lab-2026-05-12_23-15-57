@@ -74,6 +74,8 @@ export const WEARABLES: Wearable[] = [
   { itemId: 'band_flow', slot: 'headwear', name: 'Flow Headband', coinPrice: 150, accent: '#00FF9D' },
   { itemId: 'top_lab', slot: 'tops', name: 'Lab Compression Tee', coinPrice: 400, accent: '#A855F7' },
   { itemId: 'top_bonds', slot: 'tops', name: 'Bonds Signature Jersey', coinPrice: 700, accent: '#FFD700' },
+  // owner 2026-09-05: the first Meshy garment skinned to the rig (kit pack public/models/kits/top_baseball.glb) — the baseball default
+  { itemId: 'top_baseball', slot: 'tops', name: 'Diamond Club Jersey', coinPrice: 650, accent: '#1E3A8A' },
   { itemId: 'shorts_court', slot: 'shorts', name: 'Court Shorts', coinPrice: 350, accent: '#00E5FF' },
   { itemId: 'shorts_glitch', slot: 'shorts', name: 'Glitch Shorts', coinPrice: 500, accent: '#FF3366' },
   { itemId: 'shoes_evo', slot: 'shoes', name: 'Evolution Hi-Tops', coinPrice: 800, accent: '#00E5FF' },

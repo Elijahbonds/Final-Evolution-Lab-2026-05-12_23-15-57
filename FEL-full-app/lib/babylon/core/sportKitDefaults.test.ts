@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_KIT, SPORT_KIT_DEFAULTS, catalogueKitIds, sportKitDefault } from './sportKitDefaults';
+import { KIT_PACKS } from './kit';
 import { WEARABLES, wearablesForSlot } from '../../closet/wearable-catalog';
 import { KIT_SLOTS } from './kit';
 
@@ -41,7 +42,12 @@ describe('sportKitDefaults (owner decision 2026-09-05: per-sport defaults)', () 
     expect(sportKitDefault('penalty')).toBe(sportKitDefault('soccer'));
   });
 
-  it('the catalogue still carries exactly the garments dress-kit fits (two per slot)', () => {
-    for (const slot of KIT_SLOTS) expect(wearablesForSlot(slot).length).toBe(2);
+  it('the catalogue carries the garments dress-kit fits (two per slot) plus the kit-pack items', () => {
+    // kit packs (kit.ts KIT_PACKS): garments skinned to the rig outside the body file, one glb each
+    for (const slot of KIT_SLOTS) {
+      const packed = wearablesForSlot(slot).filter((w) => w.itemId in KIT_PACKS).length;
+      expect(wearablesForSlot(slot).length - packed).toBe(2);
+    }
+    for (const id of Object.keys(KIT_PACKS)) expect(WEARABLES.some((w) => w.itemId === id), `${id} is a pack without a catalogue entry`).toBe(true);
   });
 });
