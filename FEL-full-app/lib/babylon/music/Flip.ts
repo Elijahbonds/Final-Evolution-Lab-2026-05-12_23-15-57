@@ -84,3 +84,11 @@ export function quantizeTap(playhead: number, steps: number): number {
   if (playhead < 0) return 0;
   return ((Math.round(playhead) % steps) + steps) % steps;
 }
+
+/** A phone pad action (`pad_<n>`, from the controller link) → pad index, or -1. */
+export function padFromAction(action: string): number {
+  const m = /^pad_(\d{1,2})$/.exec(action);
+  if (!m) return -1;
+  const i = Number(m[1]);
+  return i >= 0 && i < PAD_COUNT ? i : -1;
+}

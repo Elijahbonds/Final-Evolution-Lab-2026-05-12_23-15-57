@@ -11,6 +11,19 @@
 import type { ModeControllerConfig } from '../types';
 
 export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
+  // ── The Flip (Music Academy, lane 2 M1b) ─────────────────────────────────
+  // The phone IS the pad controller: sixteen pads in a 4×4 grid, actions pad_0…pad_15 (row-major, same order as the
+  // keyboard map 1234 / qwer / asdf / zxcv). Colours rotate per row so a bank reads at a glance.
+  music_flip: {
+    modeId: 'music_flip',
+    title: 'The Flip',
+    maxPlayers: 1,
+    askName: false,
+    schemas: [
+      { kind: 'button', columns: 4, buttons: Array.from({ length: 16 }, (_, i) => ({ action: `pad_${i}`, label: String(i + 1), color: ['#22d3ee', '#ff6b3d', '#a78bfa', '#ffd75e'][Math.floor(i / 4)] })) },
+    ],
+  },
+
   // ── Reference implementation ──────────────────────────────────────────────
   // 3PT Shootout: tilt the phone back to wind up, release to shoot. The release
   // is what gets timed against the mode's oscillating bar, so the tap matters

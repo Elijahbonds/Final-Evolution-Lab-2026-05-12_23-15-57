@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FEL_SOURCES, PAD_COUNT, PAD_KEYS, energyEnvelope, gridSlices, isAllowedSource, onsetSlices, padForKey, padsFromSlices, quantizeTap, rateForPitch, sliceSamples } from './Flip';
+import { FEL_SOURCES, PAD_COUNT, PAD_KEYS, energyEnvelope, gridSlices, isAllowedSource, onsetSlices, padForKey, padFromAction, padsFromSlices, quantizeTap, rateForPitch, sliceSamples } from './Flip';
 
 function burstSignal(sr: number, hits: number[], seconds: number): Float32Array {
   const out = new Float32Array(Math.floor(sr * seconds));
@@ -43,6 +43,7 @@ describe('pads', () => {
     const pads = padsFromSlices(gridSlices(160, 3));
     expect(pads.length).toBe(PAD_COUNT); expect(pads[2].slice).toEqual({ start: 106, end: 160 }); expect(pads[3].slice).toBeNull();
     expect(PAD_KEYS.length).toBe(16); expect(padForKey('Q')).toBe(4); expect(padForKey('v')).toBe(15); expect(padForKey('p')).toBe(-1);
+    expect(padFromAction('pad_0')).toBe(0); expect(padFromAction('pad_15')).toBe(15); expect(padFromAction('pad_16')).toBe(-1); expect(padFromAction('shoot')).toBe(-1);
   });
   it('pitch rates and slice samples (reversed) and tap quantization', () => {
     expect(rateForPitch(12)).toBeCloseTo(2); expect(rateForPitch(-12)).toBeCloseTo(0.5); expect(rateForPitch(40)).toBeCloseTo(2);

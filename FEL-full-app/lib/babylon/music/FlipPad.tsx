@@ -16,11 +16,13 @@ export interface FlipPadProps {
   /** a live tap while playing: toggle the step under the playhead on that pad's track */
   onRecordHit: (pad: number, step: number) => void;
   say: (msg: string) => void;
+  /** filled with `play(pad)` so a paired phone (controller link) can hit the pads */
+  triggerRef?: React.MutableRefObject<((pad: number) => void) | null>;
 }
 
 declare global { interface Window { __FEL_FLIP__?: { source: string | null; slices: number; pads: number; lastPlayed: number | null; mode: string } } }
 
-export default function FlipPad({ engine, playing, playhead, steps, onAssign, onRecordHit, say }: FlipPadProps) {
+export default function FlipPad({ engine, playing, playhead, steps, onAssign, onRecordHit, say, triggerRef }: FlipPadProps) {
   const [source, setSource] = useState<FlipSource | null>(null);
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const [mono, setMono] = useState<Float32Array | null>(null);
@@ -93,6 +95,7 @@ export default function FlipPad({ engine, playing, playhead, steps, onAssign, on
     window.__FEL_FLIP__ = { source: source?.id ?? null, slices: pads.filter((p) => p.slice).length, pads: PAD_COUNT, lastPlayed: i, mode };
   }, [engine, padBuffer, pads, onRecordHit, steps, source, mode]);
 
+  useEffect(() => { if (triggerRef) triggerRef.current = play; return () => { if (triggerRef) triggerRef.current = null; }; }, [play, triggerRef]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if ((e.target as HTMLElement)?.tagName === 'INPUT') return; const i = padForKey(e.key); if (i >= 0 && !e.repeat) { e.preventDefault(); play(i); } };
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);

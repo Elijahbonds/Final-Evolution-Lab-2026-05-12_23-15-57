@@ -45,7 +45,7 @@ export interface DpadSpec {
 }
 
 export type SchemaSpec =
-  | { kind: 'button'; buttons: ButtonSpec[] }
+  | { kind: 'button'; buttons: ButtonSpec[]; /** grid columns on the phone (default 2) — a pad bank asks for 4 */ columns?: number }
   | { kind: 'motion'; motion: MotionSpec }
   | { kind: 'dpad'; dpad: DpadSpec };
 

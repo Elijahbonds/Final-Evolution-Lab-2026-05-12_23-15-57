@@ -70,7 +70,7 @@ export default function ControllerPage({ code }: { code: string }) {
           }
           if (s.kind === 'button') {
             return (
-              <div key={i} className="grid grid-cols-2 gap-3">
+              <div key={i} className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(6, s.columns ?? 2))}, minmax(0, 1fr))` }}>
                 {s.buttons.map((b, bi) => (
                   <ActionButton key={b.action} spec={b} color={colorFor(b, bi)} client={clientRef.current} />
                 ))}

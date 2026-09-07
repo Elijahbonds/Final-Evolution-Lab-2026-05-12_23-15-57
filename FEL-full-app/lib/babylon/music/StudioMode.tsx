@@ -28,6 +28,9 @@ import { StudioLibrary, blobToDataUrl, type TrackRecord } from './StudioLibrary'
 import { parseStreamingUrl, PROVIDER_META } from './StreamingBridge';
 import StreamingDeck from './StreamingDeck';
 import FlipPad from './FlipPad';   // lane 2 M1 — the chop pad
+import { padFromAction } from './Flip';
+import { HostLobby } from '@/components/controller-link/host-lobby';   // M1b — the phone is the pad controller
+import { MODE_CONTROLLERS } from '@/lib/controller-link/schemas/registry';
 
 const STEPS = 16;
 const EXPIRE_S = 0.25;
@@ -115,6 +118,7 @@ export default function StudioMode({
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [judgement, setJudgement] = useState('');
+  const flipTrigger = useRef<((pad: number) => void) | null>(null);   // filled by FlipPad; hit by paired phones
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
   useEffect(() => {
@@ -316,7 +320,9 @@ export default function StudioMode({
 
       {view === 'flip' && (
         <>
-          <FlipPad engine={engineRef.current} playing={playing} playhead={playhead} steps={STEPS} say={say}
+          {/* M1b: pair a phone — its 4×4 pad bank hits these pads (controller link, room code + QR in the badge) */}
+          <HostLobby config={MODE_CONTROLLERS.music_flip} collapsed onInput={(ev) => { const i = padFromAction(ev.a); if (i >= 0) flipTrigger.current?.(i); }} />
+          <FlipPad engine={engineRef.current} playing={playing} playhead={playhead} steps={STEPS} say={say} triggerRef={flipTrigger}
             onAssign={(pad, buffer, label) => {
               const id = `flip_${pad}`;
               engineRef.current?.loadBuffer(id, label, buffer, 'melody');
