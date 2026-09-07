@@ -477,3 +477,42 @@ rules lane; every host block key-gated):**
   `.next`; a production build under it would corrupt their server, so the bundle check and the production route frames
   for #7–#9 wait for a dev-server-free window. In dev, the baseball / soccer / football routes sit on their arena splash
   past 40–60 s (the same strict-mode double-mount load as 3PT); production mounts once.
+
+---
+
+## Mission #10 — FreeRun (replaces Gymnastics) — PHASE 0 AUDIT (no code changes)
+
+**Benchmark (owner):** Skate 3 trick-scoring model + Mirror's Edge traversal feel. Owner framing: a Skate reskin at the
+systems level — REUSE Skate's scoring by import; the movement tech feeds later Party Survival concepts.
+
+1. **Current GymnasticsMode.** `lib/babylon/modes/AirSessionMode.ts` (271 lines) `makeAirSessionMode({...})` — a shared
+   air-session skin: gymnastics = `VenueKit.buildPark`, propSet `gym`, `makeVaultSession` (core `AirSessionCore`, attempts
+   per round, grades crash / sketchy / clean / stuck, win 800). Two verbs (FLIP / SPIN, STICK / STOMP). BigAir is the same
+   core with the alpine skin — it STAYS. Salvageable for FreeRun: the grade vocabulary and the host pattern
+   (`air-session-babylon.tsx` `makeAirHost(modeKey, title)`), the flag `gymnastics`, verbs, the proof line case, the
+   gauntlet row (`gymnastics` is in the sweep list). Route `app/play/gymnastics`.
+2. **Registration pattern (Streetball = the validated reference).** `lib/babylon/modes/registry.ts`: import the mode, add a
+   key to `MODES`, add the key to `ENABLED_BABYLON_MODES`; `components/three/flags.ts` flag; `lib/babylon/ui/modeVerbs.ts`
+   verbs; a route folder `app/play/<name>/_components/loader.tsx` with `next/dynamic` (`ssr: false`) into `GameShell`
+   (`mode`, `title`, `venue`, `Game`, `ownControls`); a host component under `components/games/`; optional Controller
+   Link schema. Ones / threes (`OneVOneMode`, `ThreeVThreeMode`) follow exactly this, with `ContactSystem` Havok bodies.
+3. **SkateMode's trick scoring — what is reused.** Directly reusable, by import: `core/ComboChain.ts` (links → the
+   multiplier = number of links, the pot pays N× per link, `bank()` on a clean stop, `bail()` burns the pot, `bestCombo`,
+   momentum hooks) and `core/LandingSystem.ts` (`gradeLanding` / `resolveLanding` → clean / sketchy / crash,
+   `SKETCHY_SCORE_MULT 0.6`, the `BalanceSave` window). Traversal-specific variants needed: the TRICK TABLE (`boardCore`'s
+   `TRICKS` is board tricks — FreeRun needs flips / twists / spins with air-time costs), the AIR CONTROLLER (`TrickMachine`
+   spins a board rig; FreeRun spins a body off vaults, wall-kicks and drops), and the LANDING INPUT (a body's feet, not a
+   rig's wheels). Difficulty × execution × combo = `TrickDef.pts` × landing grade (1 / 0.6 / bail) × ComboChain multiplier.
+4. **Gate 0.** The 22-bone unprefixed rig loads and the gymnastics row is 0 / 0 / 0 in every sweep; `rigNormalize` strips
+   every `mixamorig` variant. PASS.
+5. **Vitest / bundle.** 397 / 397; baseline `/play/gymnastics` First Load JS 158 kB (shared 89.9 kB).
+
+**Physics available:** `core/Physics.ts` `initPhysics` (Havok), `core/ContactSystem.ts` (dynamic capsules driven by wish
+velocity, collision events, `addBody` / `drive` / `brace` / `teleport`), `core/CourtMovement.ts` (movement tuning +
+`PhysicsBodyBinding`). Course geometry gets static Havok aggregates; the runner a capsule.
+
+**Plan (Phases 1–7 per the owner's prompt):** P1 nothing (Gate 0 PASS). P2 traversal core: momentum run (speed gates the
+verbs), vault / slide / wall-run / wall-kick / cat leap / precision jump / landing roll, Havok on every course piece, a
+camera that leads and pulls back with speed. P3 tricks + scoring on ComboChain + LandingSystem. P4 one authored course
+with two routes (the harder one pays more), three tiers. P5 rename gymnastics → freerun everywhere (registry, flag, verbs,
+route, host, proof line, gauntlet row). P6 tests. P7 local build + verify (no deploy).
