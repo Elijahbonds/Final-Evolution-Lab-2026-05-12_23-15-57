@@ -80,6 +80,7 @@ const STYLE_TIER: Record<Style, number> = { power: 3, flashy: 5.5, sig: 8 };
 const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, obstacle: 2 };
 
 const DUNKS_PER_ROUND = 2;
+const RIVAL_HOP_MS = 1300;                 // the rival's scripted hop bench → rim
 const TOTAL_ROUNDS = 2;
 // Every threshold below is derived from the panel, never a bare number. The D1
 // bug was exactly this: the judge total was written as a literal tuned to a
@@ -136,6 +137,8 @@ export const DunkMode: ModeDefinition = (() => {
   let makes = 0, misses = 0, bestChain = 0;   // PACK #3: the proof card's make/miss line
   let lastScores: JudgeScore[] = [];
   let finishing = false;
+  let ended = false;                          // soft-OPEN #3: ctx.end / resultSink once — the watchdog and rivalRound's own end can both reach advanceAfterRivalTurn
+  let rivalClipToken = 0;                     // soft-OPEN #3: the rival's clip chains carry the same token guard as the player's
   let rimCamCut = false;                     // broadcast cut latch (per attempt)
   let hangSlowMoLatch = false;               // JuiceKit.slowMo once per attempt (hang only)
   let contactLatch = false;                  // contactPunch once per attempt (the make's flush frame)
@@ -275,7 +278,7 @@ export const DunkMode: ModeDefinition = (() => {
       // under any other location the location's environment stands, so the pass steps aside.
       if (!ctx.location || ctx.location === 'venice') await applyVeniceDunkLookPass(ctx.scene);
 
-      round = 1; dunkInRound = 0; playerTotal = 0; rivalTotal = 0; hype = 0; chain = 0; finishing = false; makes = 0; misses = 0; bestChain = 0;
+      round = 1; dunkInRound = 0; playerTotal = 0; rivalTotal = 0; hype = 0; chain = 0; finishing = false; ended = false; rivalClipToken = 0; makes = 0; misses = 0; bestChain = 0;
       style = 'power'; prop = 'none'; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
@@ -687,7 +690,7 @@ export const DunkMode: ModeDefinition = (() => {
       case 'cinematic': resolveDunk(ctx); break;
       case 'resolve': void finishAttempt(ctx, qteHit); break;
       case 'judging': void advanceAfterJudging(ctx); break;
-      case 'rivalTurn': void advanceAfterRivalTurn(ctx); break;
+      case 'rivalTurn': rival.root.position.set(3.2, 0, CFG.rimZ + 3); rival.root.rotation.y = 0; void advanceAfterRivalTurn(ctx); break;   // soft-OPEN #3: the rival is parked + idled by the advance
     }
   }
 
@@ -742,7 +745,11 @@ export const DunkMode: ModeDefinition = (() => {
     if (prop !== 'alleyoop') attachBallToHand(ball, player.skeleton, 'RightHand');
     else releaseBall(ball);   // ball waits at the teammate's hand until the toss beat
     SoundKit.play('whoosh', { pitch: 0.85 });
-    playClip(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => {} });   // the no-op chain holds the last frame if the clip ends in the air
+    // Soft-OPEN #2 (2026-09-07, measured by fel-full-app-50 + this probe): the launch clip (dunk_mocap 1.3 s) ran out ~3 frames
+    // BEFORE the resolve, so for 34–50 ms NO clip played on the athlete — a held pose (pose Δ 0.000) that the finish then
+    // crossfaded out of. A launch clip that ends while the flight is still in the air now flows into the held hang; the
+    // resolve's finish supersedes it (the token guard kills this chain once superseded). Ends at the flush → nothing here.
+    playClip(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => { if (phase === 'cinematic') { console.info('[HANDS] launch → hang'); playAir(SPORT_CLIP.dunkScoreHang); } } });
   }
 
   /** The dunk dies at the prop: clip it mid-flight and the attempt is blown
@@ -815,6 +822,19 @@ export const DunkMode: ModeDefinition = (() => {
     airHeld = false;
     console.info(`[HANDS] land ${landingClip}`);
     playClip(landingClip, { onEnd: () => playClip(SPORT_CLIP.idle, { loop: true }) });
+  }
+  /** Soft-OPEN #3 (2026-09-07): the rival's clips get the player's token guard. Its hop launch and verdict clips were raw
+   *  `play(clip, { onEnd: idle })` chains — Babylon raises a group's end observable on stop() too, so whenever a verdict clip
+   *  superseded a still-playing launch (a longer launch clip, a stalled frame loop) the launch's chain cut the celebrate /
+   *  crouch to idle on its first frame. A superseded rival chain is dead; the idle loop follows only a clip that ends on
+   *  its own. A loop bumps the token so any pending chain dies with it (the turn-end idle). */
+  function rivalClip(name: string, opts: PlayOpts = {}): void {
+    const token = ++rivalClipToken;
+    if (opts.loop) { rival.animator.play(name, opts); return; }
+    rival.animator.play(name, { ...opts, onEnd: () => {
+      if (token !== rivalClipToken) return;
+      if (opts.onEnd) opts.onEnd(); else rival.animator.play(SPORT_CLIP.idle, { loop: true });
+    } });
   }
 
 
@@ -1082,18 +1102,27 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.setHud({ hint: 'RIVAL ROUND', judgeReveal: null });
     for (let i = 0; i < DUNKS_PER_ROUND; i++) {
       ctx.camDirector.snapTo(rival.root.position, rim);
-      rival.animator.play(SPORT_CLIP.dunkLaunchPower, { onEnd: () => rival.animator.play(SPORT_CLIP.idle, { loop: true }) });
       const t0 = performance.now();
       const from = rival.root.position.clone();
+      // Soft-OPEN #3 (fel-full-app-50's measurement): the rival spawns at yaw 0 — facing the CAMERA — and flew its whole
+      // hop backwards (the rim sits at −139° from the bench spot); its 0.35 s launch clip then chained to idle IN THE AIR
+      // (219 of 288 airborne frames in idle_stand). Face the rim for the hop; launch → held hang until the verdict clip.
+      rival.root.rotation.y = Math.atan2(rim.x - from.x, rim.z - from.z);
+      // The hang is paced to span the rest of the hop (+150 ms so the verdict clip supersedes it, never a held pose): measured
+      // at speed 1 it ran out ~130 ms before the landing and the rival flew those frames with no clip at all.
+      const hopLeft = RIVAL_HOP_MS / 1000 - (rival.animator.durationOf(SPORT_CLIP.dunkLaunchPower) ?? 0.35) + 0.15;
+      const hangRate = Math.max(0.25, Math.min(1.5, (rival.animator.durationOf(SPORT_CLIP.dunkScoreHang) ?? hopLeft) / hopLeft));
+      rivalClip(SPORT_CLIP.dunkLaunchPower, { onEnd: () => rivalClip(SPORT_CLIP.dunkScoreHang, { speedRatio: hangRate, onEnd: () => {} }) });
       await new Promise<void>((res) => {
         const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-          const k = Math.min(1, (performance.now() - t0) / 1300);
+          const k = Math.min(1, (performance.now() - t0) / RIVAL_HOP_MS);
           rival.root.position.x = from.x + (rim.x - from.x) * k;
           rival.root.position.z = from.z + (rim.z + 0.7 - from.z) * k;
           rival.root.position.y = Math.sin(k * Math.PI) * 1.2;
           if (k >= 1) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); }
         });
       });
+      if (phase !== 'rivalTurn') return;   // soft-OPEN #3: the watchdog advanced the contest under this hop — its end owns the rest
       // The rival is a CONTENDER, not a wall. These inputs used to average a
       // ~43 card, which is near the top of what a good player can produce, on
       // every single attempt — so the contest was effectively decided before the
@@ -1108,18 +1137,24 @@ export const DunkMode: ModeDefinition = (() => {
       const rTotal = rScores.reduce((s, j) => s + j.score, 0);
       rivalTotal += rTotal;
       SoundKit.play(rivalBlew ? 'miss' : 'crowdGroan', { volume: 0.35 });
-      rival.animator.play(rivalBlew ? SPORT_CLIP.dunkLandCrouch : SPORT_CLIP.scoreCelebrate,
-        { onEnd: () => rival.animator.play(SPORT_CLIP.idle, { loop: true }) });
+      rivalClip(rivalBlew ? SPORT_CLIP.dunkLandCrouch : SPORT_CLIP.scoreCelebrate);   // soft-OPEN #3: the verdict clip plays out, then idle
       ctx.setHud({ rivalScore: rivalTotal, banner: rivalBlew ? `RIVAL BLOWS IT — ${rTotal}` : `RIVAL SCORES ${rTotal}` });
       rival.root.position.set(3.2, 0, CFG.rimZ + 3);
+      rival.root.rotation.y = 0;   // back at the bench spot, facing the court as it spawned
       await new Promise((r) => setTimeout(r, 1200));
+      if (phase !== 'rivalTurn') return;   // soft-OPEN #3: same — never a second advance from this loop
     }
     ctx.setHud({ banner: '' });
-    ctx.heroRef.current = player.root;          // the player is the hero again
     await advanceAfterRivalTurn(ctx);
   }
 
+  /** Round hand-off / contest end. Soft-OPEN #3: reached by rivalRound's own end AND by the rivalTurn watchdog (8 s) — the
+   *  phase gate makes it run once, so round++ never double-fires and ctx.end (the guest claim modal, the resultSink) fires
+   *  once per contest. The rival is left in the idle loop with any pending chain dead, whichever path got here. */
   async function advanceAfterRivalTurn(ctx: ModeContext): Promise<void> {
+    if (phase !== 'rivalTurn' || ended) return;
+    ctx.heroRef.current = player.root;          // the player is the hero again (on the watchdog path too)
+    rivalClip(SPORT_CLIP.idle, { loop: true });
     if (round < TOTAL_ROUNDS) {
       round++;
       ctx.setHud({ round: `${round}/${TOTAL_ROUNDS}`, banner: `ROUND ${round}` });
@@ -1128,6 +1163,7 @@ export const DunkMode: ModeDefinition = (() => {
       return;
     }
     setPhase('contestOver');
+    ended = true;
     SoundKit.play('whistle');
     const won = playerTotal >= rivalTotal;
     if (won) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }

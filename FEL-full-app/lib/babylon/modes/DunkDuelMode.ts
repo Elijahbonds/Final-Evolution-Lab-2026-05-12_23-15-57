@@ -193,7 +193,8 @@ export const DunkDuelMode: ModeDefinition = (() => {
     console.info('[JUICE-SOFT] launch');
     ctx.camDirector.resetLook();   // the takeoff → rimCamCut framing never inherits a look orbit
     SoundKit.play('whoosh', { pitch: 0.85 });   // the ONE whoosh — never re-triggered on CONTACT
-    playClip(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => {} });   // the no-op chain holds the last frame if the clip ends in the air
+    // Soft-OPEN #2 mirror (see DunkMode.launchDunk): a launch clip that runs out in the air flows into the held hang, not into nothing
+    playClip(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => { if (phase === 'cinematic') { console.info('[HANDS] launch → hang'); playAir(SPORT_CLIP.dunkScoreHang); } } });
   }
 
   function resolveDunk(ctx: ModeContext): void {
