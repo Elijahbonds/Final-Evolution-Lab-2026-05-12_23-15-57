@@ -20,7 +20,12 @@ export interface VerbButton {
   hold?: boolean;                      // analog hold → trigger stream (charge)
 }
 // Always exactly 4, in A, B, X, Y order — TouchOverlay places them itself.
-export type ModeVerbConfig = { buttons: [VerbButton, VerbButton, VerbButton, VerbButton] };
+export type ModeVerbConfig = {
+  buttons: [VerbButton, VerbButton, VerbButton, VerbButton];
+  /** The R stick's label on the touch rig — 'LOOK' where the mode feeds CameraDirector.look(), 'FLICK' where the
+   *  stick is the trick input (skate), null where nothing reads it (drawn as a hollow socket, same as an inert verb). */
+  rStick: string | null;
+};
 
 const A = (btn: 'A' | 'B' | 'X' | 'Y'): FelInput => ({ t: 'button', btn, pressed: true });
 const RT = (value: number): FelInput => ({ t: 'trigger', side: 'R', value });
@@ -35,13 +40,13 @@ const SLOT_COLOR = { A: '#22d3ee', B: '#ff6b3d', X: '#a78bfa', Y: '#ffd75e' } as
 const inert = (): VerbButton => ({ label: '', color: '#4b5563', emit: null });
 /** Build a 4-slot config from up to 4 {slot, label, emit, hold} entries; any
  *  slot not supplied comes back inert (drawn hollow, not pressable). */
-function verbs(defs: Partial<Record<'A' | 'B' | 'X' | 'Y', { label: string; emit: FelInput; hold?: boolean }>>): ModeVerbConfig {
+function verbs(defs: Partial<Record<'A' | 'B' | 'X' | 'Y', { label: string; emit: FelInput; hold?: boolean }>>): Omit<ModeVerbConfig, 'rStick'> {
   const slot = (k: 'A' | 'B' | 'X' | 'Y'): VerbButton =>
     defs[k] ? { label: defs[k]!.label, color: SLOT_COLOR[k], emit: defs[k]!.emit, hold: defs[k]!.hold } : inert();
   return { buttons: [slot('A'), slot('B'), slot('X'), slot('Y')] };
 }
 
-export const MODE_VERBS: Record<string, ModeVerbConfig> = {
+const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick'>> = {
   dunk: verbs({
     A: { label: 'SLAM', emit: A('A') },
     B: { label: 'STYLE', emit: A('B') },
@@ -245,3 +250,20 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
 
   default: verbs({ A: { label: 'ACTION', emit: A('A') } }),
 };
+
+// MODE-STICK-FACE family (2026-09-07): the R stick. TouchOverlay drew a LOOK stick on every mode while nothing read it;
+// now every mode with a follow camera feeds CameraDirector.look() (an orbit that springs back), skate keeps its flick
+// stick and says so, and the modes with a fixed / cut camera or no camera of their own show an empty socket instead of
+// a control that does nothing. Unlisted = 'LOOK'.
+const R_STICK: Record<string, string | null> = {
+  skateboard: 'FLICK',                                   // the trick input — never stolen for the camera
+  tennis: null, volleyball: null,                        // the rally camera is a cut behind the baseline
+  golf: null, derby: null, penalty: null,                // fixed shots (setFixedBehind) — no orbit to give
+  carnival: null,                                        // the hub's bursts cut between fixed and follow shots
+  dance: null, who_scene_it: null,                       // no follow camera
+  freerun: null,                                         // the run's camera is the FrameGuard recentre, not a follow
+  brainbrawl: null,
+};
+export const MODE_VERBS: Record<string, ModeVerbConfig> = Object.fromEntries(
+  Object.entries(VERBS).map(([k, v]) => [k, { ...v, rStick: R_STICK[k] === undefined ? 'LOOK' : R_STICK[k] }]),
+);

@@ -87,6 +87,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   const passFlight = new PassFlight();
   const carries = new Map<Body, BallCarry>();   // live dribble per body on my team
   let meSpeed01 = 0;
+  let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   let passTargetId: 'mate0' | 'mate1' = 'mate0';
   let passType: PassType = 'chest';
   /** Each teammate's velocity this frame — the lob needs to know who is CUTTING (D7). */
@@ -119,6 +120,11 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
 
   function resetPossession(toMe = true): void {
     me.char.root.position.set(0, 0, 6);
+    // MODE-STICK-FACE (2026-09-07): face the rim AND tell the dribble so. The movement layer's facing starts at 0 no
+    // matter which way the model spawned, and a push AGAINST the facing is a back-pedal that keeps the chest where it
+    // is (DribbleController) — so with the hero spawned facing +z and the rim at −z, push-forward ran him BACKWARDS
+    // to the rim for the whole drive (measured: facing·travel −1 for 4.4 m/s). 1v1 has always called setFacing(π).
+    me.char.root.rotation.y = Math.PI; me.drib.setFacing(Math.PI);
     mates[0].char.root.position.set(-3.5, 0, 4);
     mates[1].char.root.position.set(3.5, 0, 4);
     foes.forEach((f, i) => f.char.root.position.set((i - 1) * 3, 0, 2));
@@ -216,6 +222,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       localSource.feed(e);
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       // BLOCK jump while defending an opponent possession
       if (carrierId === 'foeTeam' && e.t === 'button' && e.btn === 'A' && e.pressed && myJumpAge === Infinity) {
         myJumpAge = 0;
@@ -284,7 +291,11 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       const sprintOk = turbo.gate(dt, meIntent.sprint, moving);
       ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
-      const drib = me.drib.update(dt, meIntent.moveX, meIntent.moveY, sprintOk);
+      // MODE-STICK-FACE (2026-09-07): CAMERA-relative — the team camera looks at the rim (−z) from behind me, and in a
+      // left-handed world a raw +x intent is SCREEN-LEFT (measured: stick-right Δscreen −5.6 m). Up = the camera's flat
+      // forward, right = screen right, handed to the dribble in its stick space (+Y = −Z).
+      const wish = ctx.camDirector.forwardFlat().scale(meIntent.moveY).addInPlace(ctx.camDirector.rightFlat().scale(meIntent.moveX));
+      const drib = me.drib.update(dt, wish.x, -wish.z, sprintOk);
       meSpeed01 = drib.speed01;
       if (drib.crossover) carries.get(me)?.switchHand();
       if (!shooting && !dunking) {
@@ -503,6 +514,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         }
       }
 
+      ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(me.char.root.position, me.drib.vel, RIM);
     },
 

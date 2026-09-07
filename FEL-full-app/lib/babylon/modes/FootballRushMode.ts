@@ -46,6 +46,8 @@ const BREAKAWAY_SPEED_MULT = 1.25;
 const BREAKAWAY_SEC = 4;
 const TRUCK_WINDOW_SEC = 0.5;
 const TRUCK_COOLDOWN_SEC = 2.5;
+/** MODE-STICK-FACE: the runner's yaw slews onto his line at this rate (rad/s) — a cut turns the body, not a snap. */
+const TURN_RATE = 10;
 const TRUCK_PTS = 30;
 const STYLE_CHAIN_PTS = 25;                    // per NEW evade type in a drive
 const DODGES = {
@@ -80,6 +82,7 @@ export const FootballRushMode: ModeDefinition = (() => {
   let styleTypes = new Set<string>();          // evade types used this drive
   let lastDodgeType = '';                      // which move earned the current iframes
   let stickX = 0, stickY = 0;
+  let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   /** L4 — sideline banks. A drive is watched; 2 draws, instanced. */
   let gallery: Onlookers | null = null;
   // PRE-SNAP — every play begins SET: the defense holds its alignment and
@@ -262,6 +265,7 @@ export const FootballRushMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
 
       // THE SNAP — the player snaps on their call: forward push (or any
       // evade button) with the defense set. Everything before it is the read.
@@ -279,7 +283,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         truckCooldown = TRUCK_COOLDOWN_SEC;
         truckLatch = false;                       // A+ P0: a fresh window gets one break punch
         SoundKit.play('powerUp', { pitch: 0.8, volume: 0.4 });
-        runner.animator.play(SPORT_CLIP.moveLoop, { loop: true });
+        runner.animator.play(SPORT_CLIP.footballCarryRun, { loop: true });
         ctx.setHud({ truckReady: false, banner: 'TRUCK!' });
         setTimeout(() => ctx.setHud({ banner: '' }), 400);
       }
@@ -309,6 +313,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           if (preSnapT < 0.1) ctx.setHud({ hint: 'SHOWING BLITZ — snap into it, or wait him out' });
         }
         if (preSnapT >= PRESNAP_AUTOSNAP_SEC) snap(ctx);
+        ctx.camDirector.look(lookX, lookY, dt);   // read the front from the R stick
         ctx.camDirector.update(runner.root.position, Vector3.Zero(), null);
         return;
       }
@@ -328,8 +333,13 @@ export const FootballRushMode: ModeDefinition = (() => {
       runner.root.position.addInPlace(vel.scale(dt));
       runner.root.position.x = Math.max(-FIELD_HALF_X, Math.min(FIELD_HALF_X, runner.root.position.x));
       if (!dodging) {
-        runner.root.rotation.y = Math.atan2(vel.x, vel.z) * 0.5;
-        runner.animator.play(SPORT_CLIP.moveLoop, { loop: true });
+        // MODE-STICK-FACE (2026-09-07): the runner FACES his line — yaw from the ground velocity, slewed. It was HALF
+        // the angle: a 42° cut ran at 21°, the body sliding sideways across the field. (The stick itself was never
+        // mirrored here: the runner camera looks up the field, +z, where screen-right IS world +x.)
+        const want = Math.atan2(vel.x, vel.z);
+        const d = Math.atan2(Math.sin(want - runner.root.rotation.y), Math.cos(want - runner.root.rotation.y));
+        runner.root.rotation.y += Math.sign(d) * Math.min(Math.abs(d), TURN_RATE * dt);
+        runner.animator.play(SPORT_CLIP.footballCarryRun, { loop: true });
       }
 
       yards = Math.max(yards, Math.floor((runner.root.position.z - lineOfScrimmage) / 0.9144));
@@ -454,6 +464,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       }
 
       gallery?.update(dt);
+      ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(runner.root.position, vel, null);
     },
 

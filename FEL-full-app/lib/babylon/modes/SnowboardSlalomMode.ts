@@ -52,6 +52,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let crowd: Onlookers;
   let nextGate = 0, gatesHit = 0, elapsed = 0;
   let stickX = 0, tuck = 0;
+  let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   let ended = false;
   let stumbleIframe = 0;
   let yeti: Mob | null = null, yetiPool: MobPool | null = null;
@@ -154,6 +155,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') stickX = e.x;
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (e.t === 'trigger' && e.side === 'R') tuck = e.value;
       if (e.t === 'button' && e.pressed) {
         if (e.btn === 'A') {
@@ -340,6 +342,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         const timeBonus = Math.max(0, Math.round((60 - elapsed) * 10));
         return ctx.end('FINISHED', tricks.score + timeBonus, { gatesHit, elapsed: Math.round(elapsed) });
       }
+      ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, gate ?? null);
     },
 

@@ -9,8 +9,8 @@ import { buildMocapDunk } from './mocapDunk';
 import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig } from './dunkFinishes';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
-import { buildJuke, buildSpinMove, buildTackledFall } from './football';
-import { buildHitReact, buildKnockdown } from './karate';
+import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
+import { buildHitReact, buildKnockdown, buildGuardStep } from './karate';
 import {
   buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildDefendSlide, buildBlockReach, buildStealReach,
 } from './basketball';
@@ -50,6 +50,9 @@ export function registerAuthoredClips(
     () => buildTackledFall(scene, skeleton),
     () => buildHitReact(scene, skeleton),
     () => buildKnockdown(scene, skeleton),
+    // MODE-STICK-FACE family (2026-09-07): sport-correct loco — the carrier's tucked-ball run, the fighter's guard step
+    () => buildCarryRun(scene, skeleton),
+    () => buildGuardStep(scene, skeleton),
     // Board suite — skate / surf / snowboard all ride on these. Without them
     // every board clip fell through the alias table onto a karate stance.
     // Phase 3 (2026-09-03): the racket, club, net and keeper sports stop borrowing karate

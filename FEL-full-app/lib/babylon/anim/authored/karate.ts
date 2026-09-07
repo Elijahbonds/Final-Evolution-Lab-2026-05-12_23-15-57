@@ -26,3 +26,26 @@ export function buildKnockdown(scene: Scene, sk: Skeleton): AnimationGroup | nul
     { t: 0.7, bones: { Hips: [0, 0, 0], Spine: [-85, 12, 10], Neck: [-10, 0, 0], LeftUpLeg: [-35, 0, 12], RightUpLeg: [-25, 0, -10] }, hands: { Left: [-0.55, 0.30, -0.35], Right: [0.55, 0.30, -0.40] }, poles: { Left: [-0.3, 0.8, -0.4], Right: [0.3, 0.8, -0.4] }, hipsY: -0.9 },   // on the floor, arms out
   ]);
 }
+
+/** The GUARD STEP — a fighter's loco (MODE-STICK-FACE family, 2026-09-07). Every combat mode moved the fighter on the
+ *  shared 'run' (arms pumping at the hips: a jogger, not a fighter). This keeps the fists at the chin (GUARD — the same
+ *  targets the hit react returns to) over a short stepping cadence, so closing, circling and retreating all read as a
+ *  fighter who is READY. Thigh ±26°, knee 12 + 14: a step, not a sprint. */
+export function buildGuardStep(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.6, N = 8; const keys = [];
+  for (let k = 0; k <= N; k++) {
+    const phi = (2 * Math.PI * k) / N, s = Math.sin(phi);
+    const kneeL = 12 + 14 * (1 - Math.cos(phi)), kneeR = 12 + 14 * (1 - Math.cos(phi + Math.PI));
+    keys.push({
+      t: (T * k) / N,
+      bones: {
+        Hips: [0, 4 * s, 0] as [number, number, number], Spine: [4, 0, 0] as [number, number, number],
+        LeftUpLeg: [-26 * s, 0, 4] as [number, number, number], RightUpLeg: [26 * s, 0, -4] as [number, number, number],
+        LeftLeg: [kneeL, 0, 0] as [number, number, number], RightLeg: [kneeR, 0, 0] as [number, number, number],
+        LeftFoot: [-kneeL * 0.4 + 8 * s, 0, 0] as [number, number, number], RightFoot: [-kneeR * 0.4 - 8 * s, 0, 0] as [number, number, number],
+      },
+      hands: { Left: [GUARD.Left[0], GUARD.Left[1] + 0.02 * Math.abs(s), GUARD.Left[2]] as V3, Right: [GUARD.Right[0], GUARD.Right[1] + 0.02 * Math.abs(s), GUARD.Right[2]] as V3 },
+    });
+  }
+  return buildPoseClip(scene, sk, 'karate_guard_step', T, keys);
+}

@@ -62,6 +62,11 @@ export const DuelMode: ModeDefinition = (() => {
   let phase: Phase = 'intro';
   let phaseSec = 0;
   let stickX = 0, stickY = 0;
+  let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
+  /** MODE-STICK-FACE (2026-09-07): the L stick as a WORLD wish, camera-relative — up = the camera's flat forward (the
+   *  rival on the disc), right = screen right. The 8-way basis read raw up-stick as RETREAT (−moveY·radial points away
+   *  from the foe; measured Δscreen −3.4 m on push-forward). */
+  const wish = (ctx: ModeContext): Vector3 => ctx.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx.camDirector.rightFlat().scale(stickX));
   let round = 1, myWins = 0, foeWins = 0;
   // ── A+ P0 juice (PM brief COMBAT-A-PLUS-P0, 2026-09-06): ONE thud per connect (feel.impact plays its own — the SoundKit
   // impact that stacked on it is gone), a latched hit-stop + shake on heavy / special, a soft round-win beat and a latched
@@ -249,6 +254,7 @@ export const DuelMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (e.t !== 'button' || !e.pressed) return;
 
       if (phase === 'weaponSelect') {
@@ -274,7 +280,8 @@ export const DuelMode: ModeDefinition = (() => {
       if (e.btn === 'Y') trySwing(moveIds[2]);
       if (e.btn === 'X') {
         const to = rival.root.position.subtract(player.root.position);
-        const flick = (stickX * to.x + -stickY * to.z) > 0.3;
+        const w = wish(ctx);
+        const flick = (w.x * to.x + w.z * to.z) > 0.3;
         meDef.pressBlock(now(), flick);
         meState.pressBlock(now());
       }
@@ -297,7 +304,7 @@ export const DuelMode: ModeDefinition = (() => {
 
       // 8-way movement (both fighters orbit the disc)
       if (meState.controllable && !meStrike.busy && !meDef.blocking) {
-        meMove.updateWithSelf(dt, stickX, stickY, false, player.root.position);
+        meMove.updateWithSelf(dt, stickX, stickY, false, player.root.position, wish(ctx));
       } else {
         meMove.updateWithSelf(dt, 0, 0, false, player.root.position);
       }
@@ -346,6 +353,7 @@ export const DuelMode: ModeDefinition = (() => {
       });
 
       ctx.setHud({ hp: meState.hp, foeHp: foeState.hp, guard: Math.round(meState.guard), foeGuard: Math.round(foeState.guard) });
+      ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(player.root.position, meMove.vel, rival.root.position);
     },
 

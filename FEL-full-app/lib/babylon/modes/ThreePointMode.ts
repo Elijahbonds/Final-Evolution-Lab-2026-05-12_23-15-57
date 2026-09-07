@@ -168,6 +168,7 @@ let landing: { perfect: boolean; money: boolean } = { perfect: false, money: fal
 
 const S = {
   phase: 'move' as Phase,
+  lookX: 0, lookY: 0,   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   rack: 0,
   ballIdx: 0,
   pts: 0,
@@ -557,6 +558,7 @@ export const ThreePointMode: ModeDefinition = {
   },
 
   onInput(ctx: ModeContext, e: FelInput): void {
+    if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }   // MODE-STICK-FACE: R stick → the director's look orbit
     if (S.phase === 'done' || S.phase === 'standings') return;
 
     // Phone tilt wind-up streams in as the right trigger (see modeBridge).
@@ -647,6 +649,7 @@ export const ThreePointMode: ModeDefinition = {
       S.vel.copyFrom(player.root.position).subtractInPlace(S.prevPos).scaleInPlace(1 / dt);
       S.prevPos.copyFrom(player.root.position);
     }
+    ctx.camDirector.look(S.lookX, S.lookY, dt);
     ctx.camDirector.update(player.root.position, S.vel, RIM);
 
     pushHud(ctx);

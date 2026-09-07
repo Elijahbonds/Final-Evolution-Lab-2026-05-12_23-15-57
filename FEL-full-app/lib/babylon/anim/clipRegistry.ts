@@ -76,6 +76,10 @@ export const SPORT_CLIP = {
   // locomotion (shared)
   idle: 'idle_stand',
   moveLoop: 'run',
+  // MODE-STICK-FACE family (2026-09-07): sport-correct loco. A fighter moves with the guard UP, a carrier with the
+  // ball TUCKED — the shared run (arms pumping at the hips) is for athletes with empty hands.
+  combatStep: 'karate_guard_step',
+  footballCarryRun: 'football_carry_run',
   walkLoop: 'walk',
   jumpUp: 'jump_up',
   jumpLand: 'jump_land',

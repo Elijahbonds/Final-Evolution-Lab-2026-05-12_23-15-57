@@ -38,3 +38,28 @@ export function buildTackledFall(scene: Scene, sk: Skeleton): AnimationGroup | n
     { t: 0.6,  bones: { Hips: [0, 0, 0], Spine: [-70, 0, 18],  Neck: [-20, 0, 0], LeftUpLeg: [-40, 0, 10], RightUpLeg: [-30, 0, -8] }, hands: { Right: [0.55, 0.35, -0.40], Left: [-0.55, 0.35, -0.35] }, poles: { Left: [-0.3, 0.8, -0.4], Right: [0.3, 0.8, -0.4] }, hipsY: -0.85 },
   ]);
 }
+
+/** The CARRY run — the loco the rush plays between its jukes (MODE-STICK-FACE family, 2026-09-07). The shared 'run'
+ *  pumped both arms with no ball; a carrier keeps the ball tucked high on the right (CARRY.Right — the same target the
+ *  jukes and the spin hold, so a move flows out of the run and back) and pumps the OFF arm against its own leg. The
+ *  legs are the base run's cadence (thigh ±42°, knee 18 + 22). */
+export function buildCarryRun(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.6, N = 8; const keys = [];
+  for (let k = 0; k <= N; k++) {
+    const phi = (2 * Math.PI * k) / N, s = Math.sin(phi);
+    const kneeL = 18 + 22 * (1 - Math.cos(phi)), kneeR = 18 + 22 * (1 - Math.cos(phi + Math.PI));
+    keys.push({
+      t: (T * k) / N,
+      bones: {
+        Hips: [0, 5 * s, 0] as Deg3, Spine: [8, 0, 3 * s] as Deg3, Neck: [-4, 0, 0] as Deg3,
+        LeftUpLeg: [-42 * s, 0, 0] as Deg3, RightUpLeg: [42 * s, 0, 0] as Deg3,
+        LeftLeg: [kneeL, 0, 0] as Deg3, RightLeg: [kneeR, 0, 0] as Deg3,
+        LeftFoot: [-kneeL * 0.4 + 12.6 * s, 0, 0] as Deg3, RightFoot: [-kneeR * 0.4 - 12.6 * s, 0, 0] as Deg3,
+      },
+      // the left thigh leads when s > 0, so the left hand goes BACK (each arm against its own leg)
+      hands: { Right: CARRY.Right, Left: [-0.30, 0.92 + 0.08 * Math.abs(s), 0.12 - 0.34 * s] as V3 },
+      poles: { Right: [0.6, -0.1, -0.5] as V3, Left: [-0.7, -0.2, -0.5] as V3 },
+    });
+  }
+  return buildPoseClip(scene, sk, 'football_carry_run', T, keys);
+}

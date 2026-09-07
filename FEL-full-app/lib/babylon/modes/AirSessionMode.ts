@@ -94,6 +94,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     banner: '',
     bannerT: 0,
     done: false,
+    lookX: 0, lookY: 0,   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   };
 
   const reset = (): void => {
@@ -191,6 +192,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     },
 
     onInput(ctx: ModeContext, e: FelInput): void {
+      if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (S.done || !core) return;
       const phase = core.state.phase;
 
@@ -250,6 +252,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
 
       gallery?.update(dt);
+      ctx.camDirector.look(S.lookX, S.lookY, dt);
       ctx.camDirector.update(athlete.root.position, new Vector3(0, 0, -st.speed), launchPad.position);
       pushHud(ctx);
     },

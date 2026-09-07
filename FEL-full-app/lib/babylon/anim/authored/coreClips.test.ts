@@ -9,12 +9,12 @@ import type { AnimationGroup, Skeleton, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { boneNode } from '../boneLookup';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
-import { buildHitReact, buildKnockdown } from './karate';
+import { buildHitReact, buildKnockdown, buildGuardStep } from './karate';
 import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail } from './boardSuite';
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildCelebrateBig } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
-import { buildJuke, buildSpinMove, buildTackledFall } from './football';
+import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
 import { buildBaseClips } from './baseClips';
 
 let scene: Scene; let sk: Skeleton;
@@ -137,6 +137,29 @@ describe('football fills', () => {
     const g = fresh(() => buildTackledFall(scene, sk)!);
     at(g, 0); const h0 = hipsY();
     at(g, 0.6); expect(hipsY()).toBeLessThan(h0 - 0.6);
+  });
+});
+
+// MODE-STICK-FACE family (2026-09-07): sport-correct loco — the fighter keeps the guard up, the carrier keeps the ball.
+describe('sport loco', () => {
+  it('guard step: the legs alternate while both fists stay up at the chin, out front', () => {
+    const g = fresh(() => buildGuardStep(scene, sk)!);
+    at(g, 0.15); const a = pos('LeftFoot').z - pos('RightFoot').z;
+    at(g, 0.45); const b = pos('LeftFoot').z - pos('RightFoot').z;
+    expect(Math.sign(a)).not.toBe(Math.sign(b)); expect(Math.abs(a)).toBeGreaterThan(0.15);
+    for (const t of [0.15, 0.45]) {
+      at(g, t);
+      for (const s of ['Left', 'Right']) { const h = pos(`${s}Hand`); expect(h.y).toBeGreaterThan(pos('Head').y - 0.4); expect(h.z).toBeGreaterThan(0.15); expect(Math.abs(h.x)).toBeLessThan(0.3); }
+    }
+  });
+  it('carry run: the legs alternate, the ball hand stays tucked high on the chest, the off arm pumps', () => {
+    const g = fresh(() => buildCarryRun(scene, sk)!);
+    at(g, 0.15); const a = pos('LeftFoot').z - pos('RightFoot').z; const r1 = pos('RightHand').clone(); const l1 = pos('LeftHand').z;
+    at(g, 0.45); const b = pos('LeftFoot').z - pos('RightFoot').z; const r2 = pos('RightHand').clone(); const l2 = pos('LeftHand').z;
+    expect(Math.sign(a)).not.toBe(Math.sign(b)); expect(Math.abs(a)).toBeGreaterThan(0.25);
+    for (const r of [r1, r2]) { expect(r.y).toBeGreaterThan(hipsY() + 0.05); expect(r.z).toBeGreaterThan(0.1); expect(Math.abs(r.x)).toBeLessThan(0.35); }   // tucked: high, in front, on the chest
+    expect(Math.abs(r2.z - r1.z)).toBeLessThan(0.1);                                   // the ball hand does not pump
+    expect(Math.abs(l2 - l1)).toBeGreaterThan(0.12);                                   // the off arm does
   });
 });
 

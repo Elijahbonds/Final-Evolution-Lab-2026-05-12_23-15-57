@@ -158,6 +158,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   let camCrowd = false;                             // H8: surrounded → the crowd preset
   let xHoldSec = -1, iframeSec = 0, slowMoSec = 0;
   let stickX = 0, stickY = 0;
+  let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
 
   const facingVec = () => new Vector3(Math.sin(player.root.rotation.y), 0, Math.cos(player.root.rotation.y));
 
@@ -399,6 +400,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       SoundKit.unlock();
       localSource.feed(e);
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (e.t === 'button' && e.pressed) {
         if (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y') strike(ctx, e.btn);
         if (e.btn === 'X') xHoldSec = 0;
@@ -463,7 +465,12 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       playerSlot.poll(dt);
       partnerSlot.poll(dt);
 
-      const vel = new Vector3(stickX * 3, 0, -stickY * 3);
+      // MODE-STICK-FACE (2026-09-07): the stick is CAMERA-relative. The over-shoulder camera follows the FACING, so a
+      // world-axis stick turned the fighter and the camera together until "right" meant "forward" (measured: stick-right
+      // ran screen-LEFT once the camera had swung). Up = the camera's flat forward, right = screen right; no axis flipped.
+      // The basis LATCHES while the stick is held (the over-shoulder camera swings behind every turn — a live basis
+      // spun the fighter on the spot on a held stick-right: 0.26 m/s net, measured); a push runs straight.
+      const vel = ctx.camDirector.stickWorldLatched(stickX, stickY).scaleInPlace(3);
       if (!striking && !blocking && !dodging && vel.lengthSquared() > 0.05) {
         player.root.position.addInPlace(vel.scale(dt));
         // Inset from the mat so the camera always has somewhere to stand behind
@@ -475,7 +482,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
           player.root.position.z *= k;
         }
         player.root.rotation.y = Math.atan2(vel.x, vel.z);
-        player.animator.play(SPORT_CLIP.moveLoop, { loop: true });
+        player.animator.play(SPORT_CLIP.combatStep, { loop: true });   // guard up on the move (was the shared run)
       } else if (!striking && !blocking && !dodging && vel.lengthSquared() <= 0.05) {
         player.animator.play(STANCE, { loop: true });
       }
@@ -487,7 +494,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       partner.root.position.x = Math.max(-8, Math.min(8, partner.root.position.x));
       partner.root.position.z = Math.max(-8, Math.min(8, partner.root.position.z));
       if (pVel.lengthSquared() > 0.05) partner.root.rotation.y = Math.atan2(pVel.x, pVel.z);
-      partner.animator.play(pVel.lengthSquared() > 0.1 ? SPORT_CLIP.moveLoop : STANCE, { loop: true });
+      partner.animator.play(pVel.lengthSquared() > 0.1 ? SPORT_CLIP.combatStep : STANCE, { loop: true });
       if (pIntent.action) {
         const t = nearest(partner.root.position);
         partner.animator.play(SPORT_CLIP.karateJab, { onEnd: () => partner.animator.play(STANCE, { loop: true }) });
@@ -548,6 +555,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       const surroundedNow = surroundedCount(player.root.position,
         enemies.map((e) => ({ id: 'e', pos: e.mob.char.root.position, hp: e.hp, airborneSec: 0 }))) >= 3;
       if (surroundedNow !== camCrowd) { camCrowd = surroundedNow; ctx.camDirector.setPreset(camCrowd ? 'crowd' : 'overShoulder'); }
+      ctx.camDirector.look(lookX, lookY, dtReal);
       ctx.camDirector.update(player.root.position, facingVec(), nearest(player.root.position)?.mob.char.root.position ?? null);
     },
 

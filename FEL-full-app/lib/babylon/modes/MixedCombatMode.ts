@@ -78,6 +78,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let fallVictim: 'me' | 'foe' | null = null;
   let myStaff: AbstractMesh | null = null, foeStaff: AbstractMesh | null = null;
   let stickX = 0, stickY = 0;
+  let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   let gallery: Onlookers | null = null;
 
   const foeLoadout = (): Loadout => (myLoadout === 'fists' ? 'staff' : 'fists');
@@ -425,6 +426,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
 
       if (phase === 'loadout') {
         if (e.t === 'dpad' && e.pressed) {
@@ -492,11 +494,15 @@ export const MixedCombatMode: ModeDefinition = (() => {
       meState.tick(sdt); foeState.tick(sdt);
 
       // player 8-way movement — NO clamp: walking off the edge is a real
-      // (terrible) option, which is what makes edge pressure meaningful
+      // (terrible) option, which is what makes edge pressure meaningful.
+      // MODE-STICK-FACE (2026-09-07): CAMERA-relative — up = the camera's flat forward (the rival, whom the fight camera
+      // looks at from behind the player), right = screen right. The world-axis read walked up-stick AWAY from the rival
+      // (Δscreen −3.4 m toward the camera) and mirrored X whenever the camera had swung. No axis is flipped.
+      const moveVel = ctx.camDirector.forwardFlat().scale(-stickY * MOVE_SPEED).addInPlace(ctx.camDirector.rightFlat().scale(stickX * MOVE_SPEED));
       if (meState.controllable && !striking && !meState.blockHeld) {
-        const vel = new Vector3(stickX, 0, -stickY).scale(MOVE_SPEED);
+        const vel = moveVel;
         player.root.position.addInPlace(vel.scale(sdt));
-        player.animator.play(vel.lengthSquared() > 0.4 ? SPORT_CLIP.moveLoop : SPORT_CLIP.karateStance, { loop: true });
+        player.animator.play(vel.lengthSquared() > 0.4 ? SPORT_CLIP.combatStep : SPORT_CLIP.karateStance, { loop: true });   // guard up on the move
         if (offRing(player.root.position)) { ringOut(ctx, true); return; }
       }
 
@@ -515,7 +521,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
           const s = (RING_RADIUS - 0.3) / r;
           rival.root.position.x *= s; rival.root.position.z *= s;
         }
-        if (vel.lengthSquared() > 0.4) rival.animator.play(SPORT_CLIP.moveLoop, { loop: true });
+        if (vel.lengthSquared() > 0.4) rival.animator.play(SPORT_CLIP.combatStep, { loop: true });
       }
 
       faceEachOther();
@@ -527,7 +533,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
       const foeR = Math.hypot(rival.root.position.x, rival.root.position.z);
       const edge = myR > RING_RADIUS - 1.6 ? 'EDGE BEHIND YOU' : foeR > RING_RADIUS - 1.6 ? 'RIVAL ON THE EDGE' : null;
       ctx.setHud({ guard: Math.round(meState.guard), foeGuard: Math.round(foeState.guard), edge });
-      ctx.camDirector.update(player.root.position, new Vector3(stickX, 0, -stickY).scale(MOVE_SPEED), rival.root.position);
+      ctx.camDirector.look(lookX, lookY, dt);
+      ctx.camDirector.update(player.root.position, moveVel, rival.root.position);
     },
 
     dispose() {

@@ -36,7 +36,7 @@ export interface CombatAnimInput {
 const CLIP_FOR: Record<CombatAnimState, { clip: string; loop: boolean; fadeSec: number }> = {
   idle:            { clip: 'karate_idle_stance', loop: true, fadeSec: 0.2 },
   idle_weapon:     { clip: 'karate_idle_stance', loop: true, fadeSec: 0.2 },
-  walk:            { clip: 'walk_forward', loop: true, fadeSec: 0.16 },
+  walk:            { clip: 'karate_guard_step', loop: true, fadeSec: 0.16 },   // MODE-STICK-FACE: the guard stays up on the walk (was the shared walk, arms at the hips)
   dash:            { clip: 'run_forward', loop: true, fadeSec: 0.06 },
   strike_light:    { clip: 'karate_punch_light', loop: false, fadeSec: 0.05 },
   strike_medium:   { clip: 'karate_kick_roundhouse', loop: false, fadeSec: 0.05 },

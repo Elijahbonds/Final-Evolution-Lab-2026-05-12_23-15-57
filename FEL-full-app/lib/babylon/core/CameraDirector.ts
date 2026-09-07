@@ -276,6 +276,21 @@ export class CameraDirector {
   get lookYawRad(): number { return this.lookYaw; }
   /** Drop the look at once — a mode's hard cut (the dunk's takeoff → rimCamCut) must not inherit a half-decayed orbit. */
   resetLook(): void { this.lookYaw = 0; this.lookPitch = 0; }
+  // ── MODE-STICK-FACE family (2026-09-07): a camera-relative stick whose basis LATCHES while the stick is held ──
+  // A camera that follows the subject's FACING or VELOCITY (overShoulder, runner) swings behind a turn within a few
+  // frames; re-deriving "right" from the live camera every frame then turns a held stick-right into a pirouette on the
+  // spot (measured on Karate Endless with the live basis: 0.26 m of net travel per second of stick-right, the yaw
+  // wrapping through ±180°). The basis is taken the frame the stick leaves the deadzone and kept until it centres, so a
+  // push runs STRAIGHT in the direction that was screen-right at the push while the camera swings in behind. Cameras
+  // anchored on an objective (the fight and hoops presets: fitTwo on the rival / rim) should keep the live basis —
+  // there "right" orbiting the rival IS the wanted feel.
+  private latchF: Vector3 | null = null; private latchR: Vector3 | null = null;
+  /** The L stick (x right, y down as the bus emits it) as a unit-scaled WORLD wish on the ground plane. */
+  stickWorldLatched(x: number, y: number, deadzone = 0.15): Vector3 {
+    if (Math.hypot(x, y) < deadzone) { this.latchF = null; this.latchR = null; return Vector3.Zero(); }
+    if (!this.latchF || !this.latchR) { this.latchF = this.forwardFlat(); this.latchR = this.rightFlat(); }
+    return this.latchF.scale(-y).addInPlace(this.latchR.scale(x));
+  }
   /** The camera's forward on the ground plane (unit; falls back to −Z when the camera looks straight down). */
   forwardFlat(): Vector3 {
     const d = this.camera.getDirection(Axis.Z); d.y = 0;

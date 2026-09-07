@@ -18,7 +18,7 @@
 //     window around their release to erase the shot. Your positioning
 //     drives their make% exactly like theirs drives yours.
 
-import { MeshBuilder, TransformNode as BABYLON_TransformNode, Vector3 } from '@babylonjs/core';
+import { MeshBuilder, Quaternion, TransformNode as BABYLON_TransformNode, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, TransformNode } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -102,6 +102,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let carrying = true, shooting = false, dunking = false;
   let ended = false;
   let foeStunSec = 0;
+  let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   let currentShot: ShotContext | null = null;
   /** Contest level at shot start — kept so the RESULT banner can say why. */
   let shotContest = 0;
@@ -124,6 +125,21 @@ export const OneVOneMode: ModeDefinition = (() => {
   let contactLatch = false;                      // A+ P0: the dunk's ONE punch per attempt — never re-fired by the banner or the stun
 
   /** Move a physics-bound character, or fall back to kinematic writes. */
+  /** MODE-STICK-FACE (2026-09-07): the stick is CAMERA-relative. The hoops camera sits behind the offence looking at the
+   *  rim (−z) and Babylon is left-handed, so a raw +x intent ran to SCREEN-LEFT (the dunk runway's bug, measured here
+   *  too: stick-right Δscreen −2.4 m). Up = the camera's flat forward, right = screen right, handed back to the
+   *  dribble in its own stick space (+Y = −Z). AI intents never pass through here. */
+  function camRel(ctx: ModeContext, mx: number, my: number): [number, number] {
+    const w = ctx.camDirector.forwardFlat().scale(my).addInPlace(ctx.camDirector.rightFlat().scale(mx));
+    return [w.x, -w.z];
+  }
+  /** Face a root by yaw. The Havok contact body writes root.rotationQuaternion every step, so an Euler yaw alone was
+   *  IGNORED — the hero faced his spawn direction for the whole game (measured: facing·travel 0.2 on a strafe). With
+   *  the body's pre-step enabled (ContactSystem), the quaternion written here is what the body — and the eye — keeps. */
+  function face(root: TransformNode, yaw: number): void {
+    root.rotation.y = yaw;
+    if (root.rotationQuaternion) Quaternion.RotationYawPitchRollToRef(yaw, 0, 0, root.rotationQuaternion);
+  }
   function driveBody(id: string, root: TransformNode, vel: Vector3, dt: number): void {
     if (contact?.isReady) {
       // soft court bounds: kill the outward velocity component at the edge
@@ -269,6 +285,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       localSource.feed(e);
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       // BLOCK jump on defense: A press starts a contest jump
       if (possession === 'defense' && e.t === 'button' && e.btn === 'A' && e.pressed && myJumpAge === Infinity) {
         myJumpAge = 0;
@@ -364,10 +381,11 @@ export const OneVOneMode: ModeDefinition = (() => {
         const sprintOk = turbo.gate(dt, intent.sprint, moving);
         ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
-        const drib = meDribble.update(dt, intent.moveX, intent.moveY, sprintOk);
+        const [mx, my] = camRel(ctx, intent.moveX, intent.moveY);
+        const drib = meDribble.update(dt, mx, my, sprintOk);
         if (!shooting && !dunking) {
           driveBody('me', me.root, meDribble.vel, dt);
-          me.root.rotation.y = drib.facingRad;
+          face(me.root, drib.facingRad);
           const nearestDef = foeStunSec > 0 ? Infinity : Vector3.Distance(me.root.position, foe.root.position);
           meAnimTree.update({
             speed01: drib.speed01, crossover: drib.crossover, nearestDefender: nearestDef,
@@ -434,7 +452,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             : 0;
           foeCloseMemory = Math.max(foeClosingSpeed, foeCloseMemory - dt * 2.5);
           driveBody('foe', foe.root, foeVel, dt);
-          if (foeVel.lengthSquared() > 0.05) foe.root.rotation.y = Math.atan2(foeVel.x, foeVel.z);
+          if (foeVel.lengthSquared() > 0.05) face(foe.root, Math.atan2(foeVel.x, foeVel.z));
           foe.animator.play(foeVel.lengthSquared() > 0.3 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
           // same standoff fix as the defensive poke: bodies rest ~1.1m apart
           if (carrying && !shooting && !dunking && foeIntent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.6) {
@@ -478,6 +496,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (meSlot.intent.action || t >= 1) releaseJumper(ctx, shotMeter.release());
         }
 
+        ctx.camDirector.look(lookX, lookY, dt);
         ctx.camDirector.update(me.root.position, meDribble.vel, RIM);
       }
 
@@ -520,11 +539,12 @@ export const OneVOneMode: ModeDefinition = (() => {
         const sprintOk = turbo.gate(dt, intent.sprint, moving);
         ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
+        const [mx, my] = camRel(ctx, intent.moveX, intent.moveY);
         const drib = meStunSec > 0
           ? meDribble.update(dt, 0, 0, false)
-          : meDribble.update(dt, intent.moveX, intent.moveY, sprintOk);
+          : meDribble.update(dt, mx, my, sprintOk);
         driveBody('me', me.root, meDribble.vel, dt);
-        me.root.rotation.y = drib.facingRad;
+        face(me.root, drib.facingRad);
         contact?.brace('me', intent.brace ?? false);
         if (myJumpAge === Infinity) {
           meAnimTree.update({
@@ -550,7 +570,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             foe.root.position.x += (targetX - foe.root.position.x) * 3 * dt;
             foe.root.position.z += ((RIM.z + 0.8 - foe.root.position.z)) * (0.9 + k) * dt;
           }
-          foe.root.rotation.y = Math.PI;
+          face(foe.root, Math.PI);
           foe.animator.play(SPORT_CLIP.moveLoop, { loop: true });
           foeCarry?.update(dt, 0.75, true);   // the rival dribbles the lane
 
@@ -613,6 +633,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         }
 
         // Ship Pass 6: a two-point fit on a foe within arm's reach put the camera inside a body (sweep frame 2026-09-05); frame the rim instead
+        ctx.camDirector.look(lookX, lookY, dt);
         ctx.camDirector.update(me.root.position, meDribble.vel, Vector3.Distance(me.root.position, foe.root.position) < 2.2 ? RIM : foe.root.position);
       }
     },

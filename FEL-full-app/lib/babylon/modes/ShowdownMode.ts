@@ -65,6 +65,11 @@ export const ShowdownMode: ModeDefinition = (() => {
   let phase: Phase = 'intro';
   let phaseSec = 0;
   let stickX = 0, stickY = 0;
+  let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
+  /** MODE-STICK-FACE (2026-09-07): the L stick as a WORLD wish, camera-relative — up = the camera's flat forward (the
+   *  rival: the fight camera looks at him from behind the player), right = screen right. The raw (x, −y) read walked
+   *  up-stick AWAY from the rival (measured Δscreen −2.8 m) and mirrored X once the camera had swung. */
+  const wish = (ctx: ModeContext): Vector3 => ctx.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx.camDirector.rightFlat().scale(stickX));
   let ultTimer = 0, assistTimer = 0, assistActive = 0;
   let myRounds = 0, foeRounds = 0;
   let parryFlash = 0, giFlash = 0;
@@ -335,6 +340,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (phase !== 'fighting' || !meState.controllable) return;
       if (e.t !== 'button') return;
 
@@ -345,7 +351,8 @@ export const ShowdownMode: ModeDefinition = (() => {
         else meStrike.request('heavy', now());
       }
       if (e.pressed && e.btn === 'L1') {
-        if (meMove.dash(stickX, -stickY) && chakra.spend(DASH_CHI_COST)) {
+        const w = wish(ctx);
+        if (meMove.dash(w.x, w.z) && chakra.spend(DASH_CHI_COST)) {
           SoundKit.play('whoosh', { pitch: 1.5, volume: 0.5 });
         } else if (meMove.dashReady) {
           banner(ctx, 'NO CHAKRA', 400);
@@ -356,7 +363,8 @@ export const ShowdownMode: ModeDefinition = (() => {
       if (e.pressed && e.btn === 'X') {
         // block press — with stick flicked TOWARD the rival = guard impact attempt
         const to = rival.root.position.subtract(player.root.position);
-        const flick = (stickX * to.x + -stickY * to.z) > 0.3;
+        const w = wish(ctx);
+        const flick = (w.x * to.x + w.z * to.z) > 0.3;
         meDef.pressBlock(now(), flick);
         meState.pressBlock(now());
       }
@@ -409,7 +417,8 @@ export const ShowdownMode: ModeDefinition = (() => {
 
       // ── player movement (dash-cancel ready) ──
       if (meState.controllable && !meStrike.busy) {
-        meMove.update(dt, stickX, stickY, false);
+        const w = wish(ctx);
+        meMove.update(dt, w.x, -w.z, false);   // CourtMovement's stick space: +Y = −Z
       } else {
         meMove.update(dt, 0, 0, false);
       }
@@ -481,6 +490,7 @@ export const ShowdownMode: ModeDefinition = (() => {
         wins: myRounds, foeWins: foeRounds, momentum: Math.round(mbus.score01 * 100),
         assist: assistTimer > 0 ? Math.ceil(assistTimer) : 'READY',
       });
+      ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(player.root.position, meMove.vel, rival.root.position);
     },
 

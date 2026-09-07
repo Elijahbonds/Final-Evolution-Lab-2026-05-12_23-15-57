@@ -52,6 +52,7 @@ const S = {
   banner: '',
   bannerT: 0,
   lastSide: null as 'L' | 'R' | null,
+  lookX: 0, lookY: 0,   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
 };
 
 const reset = (): void => {
@@ -167,6 +168,7 @@ return {
   },
 
   onInput(ctx: ModeContext, e: FelInput): void {
+    if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }   // MODE-STICK-FACE: R stick → the director's look orbit
     if (S.done || !core) return;
     if (e.t !== 'dpad' || !e.pressed) return;
     if (e.dir !== 'left' && e.dir !== 'right') return;
@@ -216,6 +218,7 @@ return {
     // 'runner'-preset mode) does. Feeding it a target point pushed the camera to
     // y=8.5 trying to frame both, FrameGuard then reported the hero off-screen
     // and fought back with auto-recenters, and the shot ended up on nothing.
+    ctx.camDirector.look(S.lookX, S.lookY, dt);
     ctx.camDirector.update(runner.root.position, new Vector3(0, 0, -st.speed), null);
     pushHud(ctx);
   },

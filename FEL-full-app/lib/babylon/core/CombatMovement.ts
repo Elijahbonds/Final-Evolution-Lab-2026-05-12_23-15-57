@@ -120,7 +120,7 @@ export class CombatMovement {
    *  eightWay mode — needs the self position for the radial basis.
    *  Stick X orbits the locked opponent, stick Y closes/retreats; facing
    *  always locks to the opponent. Dash still works (bursts radially). */
-  updateWithSelf(dt: number, moveX: number, moveY: number, sprint: boolean, selfPos: Vector3): CombatMoveResult {
+  updateWithSelf(dt: number, moveX: number, moveY: number, sprint: boolean, selfPos: Vector3, worldWish?: Vector3): CombatMoveResult {
     this.dashCooldown = Math.max(0, this.dashCooldown - dt);
     this.iframeTimer = Math.max(0, this.iframeTimer - dt);
 
@@ -136,7 +136,10 @@ export class CombatMovement {
       const radial = toSelf.lengthSquared() > 0.01 ? toSelf.normalize() : Vector3.Forward();
       const tangent = new Vector3(-radial.z, 0, radial.x);   // orbit direction
       // express the orbit/radial wish in the weight model's stick space
-      const wish = tangent.scale(moveX).add(radial.scale(-moveY));
+      // MODE-STICK-FACE (2026-09-07): a mode may hand in the wish in WORLD space (camera-relative: up = the camera's
+      // flat forward, i.e. toward the rival the fight camera looks at) — the radial/tangent basis made raw up-stick
+      // RETREAT (−moveY·radial points away from the foe).
+      const wish = worldWish ?? tangent.scale(moveX).add(radial.scale(-moveY));
       this.base.update(dt, wish.x, -wish.z, sprint);
       // facing locks to the opponent
       const toFoe = this.lockTarget.subtract(selfPos);

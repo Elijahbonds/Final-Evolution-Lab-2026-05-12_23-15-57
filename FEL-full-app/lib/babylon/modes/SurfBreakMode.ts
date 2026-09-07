@@ -50,6 +50,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
   let crowd: Onlookers;
   let t = 0, timeLeft = RUN_SEC, flow = 0;
   let stickX = 0, carve = 0;
+  let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   /** Where the board is turning TO. A cutback is a carve, not a pivot. */
   let yawTarget = 0;
   let ended = false, wipedOut = false;
@@ -141,6 +142,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') stickX = e.x;
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (e.t === 'trigger' && e.side === 'R') carve = e.value;
       if (e.t === 'button' && e.pressed && !wipedOut) {
         if (e.btn === 'A') {
@@ -271,6 +273,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       ctx.setHud({ time: Math.ceil(timeLeft) });
       const vel = rig.rider.vel;
       const leadVel = vel.lengthSquared() > 0.01 ? vel.scale(1.6) : vel;
+      ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(rig.char.root.position, leadVel, lip);
     },
 

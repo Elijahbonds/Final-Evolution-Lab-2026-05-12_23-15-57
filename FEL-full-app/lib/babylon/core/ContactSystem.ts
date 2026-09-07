@@ -90,6 +90,12 @@ export class ContactSystem {
     agg.body.setMassProperties({ inertia: new Vector3(0, 0, 0) });
     agg.body.setLinearDamping(0.4);
     agg.body.setCollisionCallbackEnabled(true);
+    // MODE-STICK-FACE (2026-09-07): let the node's transform reach the body before each step. Rotation is locked
+    // (inertia 0), so the body never turns on its own and Havok wrote the SPAWN orientation back into
+    // root.rotationQuaternion every frame — the mode's Euler yaw was ignored and the hero faced one way all game.
+    // With the pre-step on, the yaw a mode writes into the quaternion is what the body keeps; drive() still owns
+    // the velocity, and a possession reset that moves the node moves the body with it.
+    agg.body.disablePreStep = false;
     const entry: Entry = { id, root, agg, baseMass: mass, braced: false, lastVel: Vector3.Zero() };
     this.entries.push(entry);
     this.byId.set(id, entry);

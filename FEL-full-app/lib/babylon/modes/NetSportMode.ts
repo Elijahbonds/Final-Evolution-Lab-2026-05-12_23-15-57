@@ -114,6 +114,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   /** Is the ball in flight a Zone Shot? It answers differently to everything. */
   let incomingZone = false;
   let aimX = 0;
+  let meBusyUntil = 0, shuffleClip = '';   // MODE-STICK-FACE: the baseline shuffle yields to a swing for this long
+  const meBusy = (): void => { meBusyUntil = performance.now() + 700; shuffleClip = ''; };
   let ended = false;
   let restSec = 0;                 // pause between points
   let heroStreak = 0;              // M107: consecutive points won → tension/hype
@@ -122,6 +124,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let gameLatch = false;
 
   const HERO_SIDE = 1;             // hero defends +Z, opponent defends −Z
+  const SHUFFLE_SPEED = 4;         // m/s along the baseline at full stick
 
   function label(): string {
     if (tennisScore) return tennisScore.callFor(0);
@@ -255,7 +258,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     rally.serve(0);
     const from = new Vector3(me.root.position.x, 1.5, o.cfg.halfLength * 0.92);
     ball.position.copyFrom(from);
-    me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    meBusy(); me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
     SoundKit.play('uiTick', { pitch: 1.2, volume: 0.4 });
     launch(ctx, from, -1, (Math.random() - 0.5) * 0.5, 'good');
     flash(ctx, 'SERVE', 600);
@@ -417,7 +420,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // punishing for the wrong reason. This is the shape the benchmark has: a
     // read that is worth making and hard to make.
     if (!stuffed && (q === 'good' || q === 'perfect')) {
-      me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
+      meBusy(); me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
       EffectsKit.burst(ctx.scene, at, 'sparks');
       ctx.setHud({ shotType: 'BLOCK · TOUCH' });
       setTimeout(() => ctx.setHud({ shotType: '' }), 500);
@@ -432,7 +435,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     }
 
     // A stuff: straight back down on their side, and the point.
-    me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    meBusy(); me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
     EffectsKit.burst(ctx.scene, at, 'sparks');
     ctx.juice.scorePop(at, 'STUFF!', '#00E5FF');
     ctx.feel.impact(0.5);          // A+ P0: ONE thud — feel.impact plays its own; the second impact SFX that stacked on it is gone
@@ -473,7 +476,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     if (rally.touch() === 'fault') { awardPoint(ctx, 1, 'TOO MANY TOUCHES'); return; }
     if (crosses) rally.cross();
 
-    me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    meBusy(); me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
     SoundKit.play('uiTick', { pitch: q === 'perfect' ? 1.6 : 1.1, volume: 0.5 });
     const swingPos = ball.getAbsolutePosition();
     // M107 swing juice: a crisp pop + hit-impact on a perfectly-timed contact so
@@ -594,15 +597,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     },
 
     onInput(_ctx: ModeContext, e: FelInput) {
-      if (e.t === 'stick' && e.side === 'L') {
-        aimX = e.x;
-        // Move laterally along the baseline; depth is fixed so the player is
-        // always in a plausible receiving position rather than wandering.
-        if (me) {
-          const limit = o.cfg.halfWidth * 0.9;
-          me.root.position.x = Math.max(-limit, Math.min(limit, me.root.position.x + e.x * 0.12));
-        }
-      }
+      // The baseline shuffle moves in update() (MODE-STICK-FACE, 2026-09-07): it stepped 12 cm per stick EVENT here —
+      // 60/s on a pad (7 m/s), once per key on a keyboard — in a sliding idle_stand, and toward world +x, which is
+      // screen-LEFT from behind the baseline (measured Δscreen −4.7 m on stick-right).
+      if (e.t === 'stick' && e.side === 'L') aimX = e.x;
       if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5) humanSwing(_ctx);
       // In a ONE-touch sport the four face buttons are the four SHOTS: which
       // button you swing with is the shot you play, decided under the same time
@@ -621,6 +619,18 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
+
+      // Baseline shuffle (MODE-STICK-FACE, 2026-09-07): lateral only (depth is fixed so the player is always in a
+      // plausible receiving position), screen-relative (the camera's right), in the strafe clip — idle when the stick
+      // centres, never over a swing. Runs between points too: a player repositions during the rest.
+      if (me) {
+        const limit = o.cfg.halfWidth * 0.9;
+        const step = Math.abs(aimX) > 0.15 ? aimX * ctx.camDirector.rightFlat().x * SHUFFLE_SPEED * dt : 0;
+        if (step) me.root.position.x = Math.max(-limit, Math.min(limit, me.root.position.x + step));
+        const bodyRightX = Math.cos(me.root.rotation.y);
+        const want = step ? (step * bodyRightX > 0 ? 'strafe_right' : 'strafe_left') : SPORT_CLIP.idle;
+        if (want !== shuffleClip && performance.now() > meBusyUntil) { shuffleClip = want; me.animator.play(want, { loop: true }); }
+      }
 
       if (restSec > 0) {
         restSec -= dt;

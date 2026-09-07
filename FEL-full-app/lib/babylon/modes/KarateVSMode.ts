@@ -88,6 +88,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     console.info('[KVS-JUICE] match punch');
   }
   let stickX = 0, stickY = 0;
+  let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
   function now(): number { return performance.now(); }
@@ -284,6 +285,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (phase !== 'fighting' || !meState.controllable) return;
 
       if (e.t === 'button' && e.pressed) {
@@ -315,23 +317,18 @@ export const KarateVSMode: ModeDefinition = (() => {
 
       meState.tick(sdt); foeState.tick(sdt);
 
-      // player movement — lock-on: always face the rival, stick strafes/closes
+      // player movement — lock-on: always face the rival, stick strafes/closes.
+      // MODE-STICK-FACE (2026-09-07): the stick is CAMERA-relative. The fight camera fits both fighters from behind the
+      // player, so its flat forward IS the line to the rival — up closes, down retreats, right is SCREEN right. The old
+      // world-axis read (x, 0, y) was right only while the camera looked exactly down −z; once it had swung round the
+      // rival (it does, every exchange) stick-right ran screen-LEFT (measured Δscreen −2.5 m). No axis is flipped.
+      const moveVel = ctx.camDirector.forwardFlat().scale(-stickY * MOVE_SPEED).addInPlace(ctx.camDirector.rightFlat().scale(stickX * MOVE_SPEED));
       if (meState.controllable && !striking && !meState.blockHeld) {
-        // FORWARD IS TOWARD THE OPPONENT. Every input source reports up-stick
-        // as NEGATIVE y, and the camera sits behind the player looking down -z,
-        // so "up" on screen is -z. `-stickY` yielded +z and walked you away from
-        // the fight.
-        //
-        // Note this is a THIRD site of the same platform disagreement, and the
-        // LocalInputSource normalisation that fixed 1v1 and 3v3 does NOT reach
-        // it: this mode reads stickX/stickY raw in onInput and never goes
-        // through the adapter. Fixing a seam only fixes the consumers that use
-        // the seam.
-        const vel = new Vector3(stickX, 0, stickY).scale(MOVE_SPEED);
+        const vel = moveVel;
         player.root.position.addInPlace(vel.scale(sdt));
         modeVenue?.constrain(player.root.position); player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z));
         if (vel.lengthSquared() > 0.4 && !striking) {
-          player.animator.play(SPORT_CLIP.moveLoop, { loop: true });
+          player.animator.play(SPORT_CLIP.combatStep, { loop: true });   // guard up on the move
         } else if (!striking) {
           player.animator.play(SPORT_CLIP.karateStance, { loop: true });
         }
@@ -347,13 +344,14 @@ export const KarateVSMode: ModeDefinition = (() => {
         rival.root.position.addInPlace(vel.scale(sdt));
         rival.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.x));
         rival.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.z));
-        if (vel.lengthSquared() > 0.4) rival.animator.play(SPORT_CLIP.moveLoop, { loop: true });
+        if (vel.lengthSquared() > 0.4) rival.animator.play(SPORT_CLIP.combatStep, { loop: true });
       }
 
       faceEachOther();
       // guard HUD trickle (regen is invisible otherwise)
       ctx.setHud({ guard: Math.round(meState.guard), foeGuard: Math.round(foeState.guard) });
-      ctx.camDirector.update(player.root.position, new Vector3(stickX, 0, -stickY).scale(MOVE_SPEED), rival.root.position);
+      ctx.camDirector.look(lookX, lookY, dt);
+      ctx.camDirector.update(player.root.position, moveVel, rival.root.position);
     },
 
     dispose() {

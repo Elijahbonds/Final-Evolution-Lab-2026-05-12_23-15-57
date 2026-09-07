@@ -255,7 +255,9 @@ export function coinStorm(): CarnivalEvent {
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
     },
     tick(ctx, dt) {
-      const vel = new Vector3(stickX * 6, 0, -stickY * 6);
+      // MODE-STICK-FACE (2026-09-07): camera-relative — the runner camera follows the velocity, so a world-axis stick
+      // drifted off screen-right as soon as the camera swung; up = the camera's flat forward, right = screen right.
+      const vel = ctx.camDirector.stickWorldLatched(stickX, stickY).scaleInPlace(6);   // latched: the runner camera follows the velocity
       player.root.position.addInPlace(vel.scale(dt));
       player.root.position.x = Math.max(-11, Math.min(11, player.root.position.x));
       player.root.position.z = Math.max(-11, Math.min(11, player.root.position.z));

@@ -51,7 +51,7 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
       </div>
       <div className="pointer-events-auto absolute bottom-3 right-3 flex flex-col items-center gap-2">
         <ButtonDiamond bus={props.bus} buttons={cfg.buttons} />
-        <AnalogStick bus={props.bus} side="R" label="LOOK" />
+        {cfg.rStick === null ? <HollowStick /> : <AnalogStick bus={props.bus} side="R" label={cfg.rStick} />}
       </div>
     </div>
   );
@@ -91,6 +91,12 @@ function AnalogStick({ bus, side, label }: { bus: InputBus; side: 'L' | 'R'; lab
       </span>
     </div>
   );
+}
+
+/** The R stick's socket on a mode that reads nothing from it (MODE-STICK-FACE, 2026-09-07): the same 96 px footprint
+ *  so the diamond above it never moves, a dashed ring at 30 % like an inert verb — an empty socket, not a control. */
+function HollowStick() {
+  return <div aria-hidden="true" className="pointer-events-none h-24 w-24 rounded-full border border-dashed border-white opacity-30" />;
 }
 
 function DPad({ bus }: { bus: InputBus }) {
