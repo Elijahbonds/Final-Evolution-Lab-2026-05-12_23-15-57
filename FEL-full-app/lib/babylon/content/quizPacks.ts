@@ -70,6 +70,23 @@ export const WHO_SCENE_IT_PACK: QuizPack = {
       answer: 'skate', explain: 'Sovereign Skatepark — grey concrete, two ramps, amber banner.',
       options: [{ id: 'skate', label: 'Sovereign Skatepark' }, { id: 'alpine', label: 'Alpine Pro' },
                 { id: 'street', label: 'Streetball Arena' }, { id: 'market', label: 'Market Hall' }] },
+    // A+ mission #2: the four scene categories (SceneBuzz) need depth in COURTS and OUTDOORS
+    { id: 'ws13', difficulty: 2, sceneVenueId: 'tennis', prompt: 'Which court is this?',
+      answer: 'center', explain: 'Center Court — hard court, low stands on both baselines.',
+      options: [{ id: 'center', label: 'Center Court' }, { id: 'beach', label: 'Beach Pro' },
+                { id: 'venice', label: 'Venice Beach Court' }, { id: 'global', label: 'Global Pitch' }] },
+    { id: 'ws14', difficulty: 2, sceneVenueId: 'golf', prompt: 'Name the course.',
+      answer: 'links', explain: 'Sovereign Links — a tee box, a fairway, the flag out past the bunker.',
+      options: [{ id: 'links', label: 'Sovereign Links' }, { id: 'alpine', label: 'Alpine Pro' },
+                { id: 'global', label: 'Global Pitch' }, { id: 'diamond', label: 'Pro Diamond' }] },
+    { id: 'ws15', difficulty: 3, sceneVenueId: 'football', prompt: 'Where do you run this?',
+      answer: 'grid', explain: 'Gridiron Sovereign — yard lines every five, uprights at the end.',
+      options: [{ id: 'grid', label: 'Gridiron Sovereign' }, { id: 'global', label: 'Global Pitch' },
+                { id: 'diamond', label: 'Pro Diamond' }, { id: 'skate', label: 'Sovereign Skatepark' }] },
+    { id: 'ws16', difficulty: 2, sceneVenueId: 'baseball', prompt: 'Which diamond?',
+      answer: 'diamond', explain: 'Pro Diamond — the infield dirt, the plate, the outfield wall.',
+      options: [{ id: 'diamond', label: 'Pro Diamond' }, { id: 'grid', label: 'Gridiron Sovereign' },
+                { id: 'links', label: 'Sovereign Links' }, { id: 'center', label: 'Center Court' }] },
   ],
 };
 

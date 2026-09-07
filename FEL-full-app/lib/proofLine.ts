@@ -39,6 +39,11 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
       const grade = acc !== null ? gradeFor(acc / 100) : null;
       return `${r.score} PTS${stars !== null ? ` · ${'★'.repeat(Math.max(0, Math.min(5, stars)))}` : ''}${acc !== null ? ` · ${acc}%` : ''}${grade ? ` · GRADE ${grade}` : ''}${combo !== null ? ` · ×${combo} COMBO` : ''}`;
     }
+    case 'who_scene_it': case 'whoSceneIt': {
+      const c = n(s, 'correct'), t = n(s, 'total'), p = n(s, 'players'), p2 = n(s, 'p2score'), w = n(s, 'winner');
+      if (p === 2) return `${r.score}–${p2 ?? 0} · ${w === 0 ? 'P1 TAKES IT' : w === 1 ? 'P2 TAKES IT' : 'TIE'}`;
+      return `${c ?? 0}/${t ?? 0} SCENES · ${r.score} PTS · ${wl(r)}`;
+    }
     default: return null;
   }
 }

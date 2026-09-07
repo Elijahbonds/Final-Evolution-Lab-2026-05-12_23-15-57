@@ -20,7 +20,13 @@ describe('proofLineFor', () => {
     expect(proofLineFor('tennis', { score: 6, opponentScore: 4, won: true })).toBe('6–4 · WON');
   });
   it('returns null for a mode it does not know or stats it cannot read', () => {
-    expect(proofLineFor('whoSceneIt', { score: 1, won: true })).toBeNull();
+    expect(proofLineFor('nope_mode', { score: 1, won: true })).toBeNull();
     expect(proofLineFor('baseball', { score: 5, won: false })).toBeNull();
+  });
+
+  it('who scene it: solo reads scenes + points, a duel reads both scores and who took it', () => {
+    expect(proofLineFor('whoSceneIt', { score: 640, won: true, stats: { correct: 6, total: 8, players: 1 } })).toBe('6/8 SCENES · 640 PTS · WON');
+    expect(proofLineFor('who_scene_it', { score: 300, won: false, stats: { players: 2, p2score: 520, winner: 1 } })).toBe('300–520 · P2 TAKES IT');
+    expect(proofLineFor('whoSceneIt', { score: 300, won: false, stats: { players: 2, p2score: 300, winner: -1 } })).toBe('300–300 · TIE');
   });
 });

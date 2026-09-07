@@ -192,6 +192,28 @@ categories, local buzz-in for two or more players on one screen, rounds with a s
 **Cut risk (60 fps):** none — HUD and content; the venue mounts are the existing per-question mounts. Weak spot known
 from W1: the wide sweep on Venice measures ~933 draws against the 600 budget (venue lane, not this mission).
 
+**Landed — Phases 1–5 (2026-09-06 evening; risk medium: the mode is rewritten around `SceneBuzz`, the host gains the
+scoreboard / player-count overlays, `quizPacks` gains four venues, `proofLine` a case):**
+- P1 Gate 0: N/A (no rig). P2: nothing to convert.
+- P3: `lib/babylon/core/SceneBuzz.ts` (pure, 8 tests) — `SCENE_CATEGORIES` COURTS / COMBAT / OUTDOORS / STAGES, `buildRounds`
+  (one round per category with questions, two questions each, seeded, options shuffled), `BuzzMatch` (first correct buzz
+  locks, a wrong buzz locks that player out and hands the steal over, everyone wrong or the clock = nobody; the round's top
+  scorer claims the category, ties claim nothing; `scoreboard()` rows in HudScoreCard shape; `leader`). `WhoSceneItMode.ts`
+  rewritten: a player-count screen (◀ ▶ picks 1 or 2, any face starts, 6 s auto-start, `?players=2` skips it), P1 on the
+  faces and P2 on the d-pad (▲ ▶ ▼ ◀ = A B C D), the round's category chip + `ROUND n / 4`, the between-rounds SCOREBOARD
+  (3.2 s, names who took which category and what round comes next), results with both scores and the winner; the proof
+  line reads `6/8 SCENES · 640 PTS · WON` solo and `300–520 · P2 TAKES IT` in a duel. Host: bigger prompt and answer cards
+  (Mario Party size), the d-pad glyph on each card in a duel, P1 / P2 score chips, `P1 OUT` / `P2 OUT` chips, the clock
+  only while a question runs. Content: `ws13–ws16` (Center Court, Sovereign Links, Gridiron Sovereign, Pro Diamond).
+- P4: registered as before; no dead end (pick → rounds → board → results → shell). Bundle measured below.
+- P5: `SceneBuzz.test.ts` (8) + proof-line cases; suite **379 / 379**, tsc clean.
+- Verified: dev runner solo (pick screen → question 8 / 8, 60 fps, 0 / 0 / 0) and `?players=2` (P1 locked out, "P2 can
+  steal" banner, into round 2, 57 fps, 0 / 0 / 0); real route 1440×900 first card (COURTS chip, ROUND 1 / 4, P1 / P2 chips,
+  four big cards with ▲ ▶ ▼ ◀) and the scoreboard between rounds 1 and 2.
+- Cut: none. Weak: two players max (one InputBus, one keyboard); touch players are solo; the board keeps the last
+  question's venue behind it (a flat pitch reads plain from the sweep height).
+
+
 ---
 
 ## Mission #3 — Court Carnival — PHASE 0 AUDIT (no code changes; written while the mission #2 sweep ran)
