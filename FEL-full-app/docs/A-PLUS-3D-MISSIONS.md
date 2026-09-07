@@ -274,7 +274,11 @@ overlays; every event is byte-identical):**
   measured it aimed away) → follow preset around a still anchor.
 - The headless source check (`carnival-depth-tests.ts`) still holds: `rivalTookIt` names the reaction's branch.
 - P4: registered as before; the lineup page (`/play/carnival`) still starts a night; `?carnival=1` drops into the mode.
-  Bundle measured below.
+  **Bundle after 2679f80:** `/play/carnival` First Load JS 191 kB (baseline 188 kB, **+1.6 %**); shared-by-all 89.9 kB
+  unchanged. PASS.
+- **P6 (local build + verify, no deploy):** `next build` on 2679f80 compiled (warnings only); `next start` on :3005 served
+  `/play/carnival?carnival=1&players=1` with gzip and rendered event one on the production build. Nothing pushed,
+  nothing live.
 - P5: `CarnivalNight.test.ts` (3); suite **382 / 382**, tsc clean.
 - Verified: dev runner solo (pick → event 2 with the rival ticking, 60 fps, 0 / 0 / 0) and `?players=2` (P1 turn → handoff
   → P2 turn → a 32–32 tie banked, 60 fps, 0 / 0 / 0, frame guard silent); route frames: pick screen and reveal card on
