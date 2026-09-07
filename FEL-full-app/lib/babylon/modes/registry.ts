@@ -23,7 +23,8 @@ import { ShowdownMode } from './ShowdownMode';
 import { DuelMode } from './DuelMode';
 import { DanceMode } from './DanceMode';        // M75 creative discipline
 import { ThreePointMode } from './ThreePointMode'; // Babylon port of the R3F shootout
-import { GymnasticsMode, BigAirMode } from './AirSessionMode'; // shared AirSessionCore, two skins
+import { BigAirMode } from './AirSessionMode'; // shared AirSessionCore (big air skin)
+import { FreeRunMode } from './FreeRunMode';    // A+ mission #10: free-running tricking replaces the gymnastics vault
 import { SprintMode } from './SprintMode';
 import { WhoSceneItMode } from './WhoSceneItMode';   // lane 3 W1 — the live venue quiz
 
@@ -48,8 +49,8 @@ export const MODES: Record<string, ModeDefinition> = {
   onevone: OneVOneMode,
   // Ported off react-three-fiber so the whole basketball family is Babylon.
   threepoint: ThreePointMode,
-  // Gymnastics vault + snowboard big air on ONE shared AirSessionCore.
-  gymnastics: GymnasticsMode,
+  // FreeRun (Havok traversal + Skate's combo scoring) took the gymnastics slot; snowboard big air stays on AirSessionCore.
+  freerun: FreeRunMode,
   bigair: BigAirMode,
   sprint: SprintMode,
   threevthree: ThreeVThreeMode,
@@ -90,4 +91,6 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   'dance',
   // lane 3 W1 — live venue quiz
   'who_scene_it',
+  // A+ mission #10 — FreeRun took the gymnastics slot
+  'freerun',
 ]);

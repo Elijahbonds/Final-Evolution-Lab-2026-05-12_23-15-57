@@ -162,7 +162,7 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   snowboarding: { name: 'Gate Crasher', venue: 'Mountain Slope', href: '/play/snowboard' },
   surfing: { name: 'The Break', venue: 'Surf Break', href: '/play/surf' },
   golf: { name: 'The Loop', venue: 'Coastal Links', href: '/play/golf' },
-  gymnastics: { name: 'Stick It', venue: 'Pacifica Gymnastics', href: '/play/gymnastics' },
+  freerun: { name: 'Free Run', venue: 'The Yard', href: '/play/freerun' },
   training: { name: 'Iron Paradise', venue: 'Muscle Beach Gym', href: '/play/training' },
   hoops1v1: { name: 'Ones', venue: 'Venice Beach Court', href: '/play/onevone' },
   hoops3v3: { name: 'Threes', venue: 'Venice Beach Court', href: '/play/threevthree' },

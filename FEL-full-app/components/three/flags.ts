@@ -7,7 +7,7 @@
 export type GameModeKey =
   | 'dunkContest' | 'hoops1v1' | 'streetball' | 'threePoint'
   | 'karate' | 'tennis' | 'skateboard' | 'soccer' | 'baseball'
-  | 'golf' | 'gymnastics' | 'training' | 'carnival'
+  | 'golf' | 'freerun' | 'training' | 'carnival'
   | 'mixedcombat' | 'dunkduel';
 
 // Modes rendered with the real-time 3D engine. Everything else stays 2D.
@@ -59,9 +59,8 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   // 3PT ported from react-three-fiber to Babylon (ThreePointMode.ts) so the
   // basketball family shares one renderer.
   threePoint: true,
-  // Air-session family: gymnastics vault + snowboard big air, both on the shared
-  // AirSessionCore (lib/babylon/modes/AirSessionMode.ts).
-  gymnastics: true,
+  // FreeRun (A+ mission #10) took the gymnastics slot; big air stays on the shared AirSessionCore.
+  freerun: true,
   bigAir: true,
   // sprint: ON. The black frame was never the camera — a late StrictMode
   // teardown was disposing the engine that held the canvas's shared WebGL

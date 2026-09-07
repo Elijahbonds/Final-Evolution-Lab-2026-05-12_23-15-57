@@ -26,7 +26,6 @@ import { SoundKit } from '../audio/SoundKit';
 import type { AirSessionCore } from '../../feel/cores/air-session-core';
 import type { TrickGrade, CadenceSide } from '../../feel';
 import type { VenueMood } from '../scene/moods';
-import { makeVaultSession, VAULT_TUNING } from '../../feel/cores/vault-skin';
 import { makeBigAirSession, BIG_AIR_TUNING } from '../../feel/cores/big-air-skin';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -246,17 +245,8 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   };
 }
 
-/** Gymnastics vault — cadence run-up, punch off the table, stick the landing. */
-export const GymnasticsMode: ModeDefinition = makeAirSessionMode({
-    modeId: 'gymnastics',
-    mood: 'daylight',
-    buildVenue: (scene) => VenueKit.buildPark(scene),
-    propSet: 'gym',
-    makeSession: (onLanding) => makeVaultSession(undefined, { onLanding }),
-    attempts: VAULT_TUNING.attemptsPerRound,
-    winScore: 800,                                    //TUNE(elijah)
-    launchLabel: 'VAULT TABLE',
-});
+// The gymnastics vault skin left this file with A+ mission #10 (FreeRunMode.ts took the roster slot). The vault session
+// core (makeVaultSession / VAULT_TUNING) stays available in the feel cores for a future skin.
 
 /** Snowboard Big Air — same core, alpine skin. */
 export const BigAirMode: ModeDefinition = makeAirSessionMode({

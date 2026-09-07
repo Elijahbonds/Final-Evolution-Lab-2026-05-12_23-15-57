@@ -16,7 +16,7 @@ import { MODE_INFO } from './game-data';
 export const CARNIVAL_EXTERNAL_POOL = [
   'brainBrawl',
   'bigAir',
-  'gymnastics',
+  'freerun',
   'training',
   'threePoint',
   'whoSceneIt',

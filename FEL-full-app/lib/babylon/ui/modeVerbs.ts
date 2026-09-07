@@ -203,13 +203,15 @@ export const MODE_VERBS: Record<string, ModeVerbConfig> = {
     Y: { label: 'ULTIMATE', emit: A('Y') },
   }),
 
-  // Air-session family (gymnastics vault / snowboard big air). The RUN is the
-  // d-pad cadence — alternating left/right strides — so the face buttons only
-  // carry the two air verbs.
-  gymnastics: verbs({
-    A: { label: 'FLIP', emit: A('A') },
-    B: { label: 'STICK', emit: A('B') },
+  // FreeRun (A+ mission #10): the stick runs; A jumps / vaults / wall-runs by context, B slides (or rolls a landing),
+  // X flips (the stick picks front / back / side), Y twists or cat-leaps a ledge.
+  freerun: verbs({
+    A: { label: 'JUMP', emit: A('A') },
+    B: { label: 'SLIDE', emit: A('B') },
+    X: { label: 'FLIP', emit: A('X') },
+    Y: { label: 'TWIST', emit: A('Y') },
   }),
+  // Snowboard big air (air-session core). The RUN is the d-pad cadence, so the face buttons only carry the two air verbs.
   bigair: verbs({
     A: { label: 'SPIN', emit: A('A') },
     B: { label: 'STOMP', emit: A('B') },

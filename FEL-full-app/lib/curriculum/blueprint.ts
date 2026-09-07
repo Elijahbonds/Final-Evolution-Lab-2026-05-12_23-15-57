@@ -143,7 +143,7 @@ const pillars: BlueprintTrack = {
             'A mentor never coaches range in isolation. Every range cue is paired with a load cue: "deeper" always comes with "and hold it".',
           ],
           keyPoints: ['Flexibility = range with control.', 'The movement screen reads depth, asymmetry, valgus.', 'Pair every range cue with a load cue.'],
-          drill: { modeKey: 'gymnastics', text: 'Stick two landings in a row (B on touchdown). A stuck landing is range under load.' },
+          drill: { modeKey: 'freerun', text: 'Land two big drops clean in a row (B as you touch down rolls it). A rolled landing is range under load.' },
           assessment: [
             q('f1', 'Range without control is…', ['the goal', 'a liability', 'strength', 'endurance'], 1),
             q('f2', 'Which movement-screen reads feed the flexibility picture?', ['Score and combo', 'Depth, asymmetry, valgus', 'Speed and power', 'Wins and losses'], 1),

@@ -117,16 +117,18 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   // ── Air-session family ────────────────────────────────────────────────────
   // The run-up IS a d-pad cadence, so these need the dpad schema as well as the
   // two air verbs. Same shape for both because they are one shared core.
-  gymnastics: {
-    modeId: 'gymnastics',
-    title: 'Stick It',
+  freerun: {
+    modeId: 'freerun',
+    title: 'Free Run',
     maxPlayers: 1,
     askName: true,
     schemas: [
       { kind: 'dpad', dpad: { action: 'dpad' } },
       { kind: 'button', buttons: [
-        { action: 'A', label: 'FLIP' },
-        { action: 'B', label: 'STICK' },
+        { action: 'A', label: 'JUMP' },
+        { action: 'B', label: 'SLIDE' },
+        { action: 'X', label: 'FLIP' },
+        { action: 'Y', label: 'TWIST' },
       ] },
     ],
   },

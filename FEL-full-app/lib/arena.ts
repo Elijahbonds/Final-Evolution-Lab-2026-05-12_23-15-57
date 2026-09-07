@@ -75,7 +75,7 @@ export const ARENA_MODES: readonly string[] = [
   'soccer',
   'tennis',
   'tiebreak',
-  'gymnastics',
+  'freerun',
   'brainBrawl',
   'whoSceneIt',
   'surfing',

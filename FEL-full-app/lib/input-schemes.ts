@@ -224,10 +224,15 @@ export const SCHEMES: Record<string, VCScheme> = {
     buttons: [{ pos: 'a', label: 'STROKE', key: ' ', color: GREEN }],
     hint: 'A sets aim, then power — land it close to the pin.',
   },
-  gymnastics: {
+  freerun: {
     dir: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' },
-    buttons: [],
-    hint: 'Hit the D-Pad arrow that matches each cue in rhythm.',
+    buttons: [
+      { pos: 'a', label: 'JUMP', key: 'j', color: GREEN },
+      { pos: 'b', label: 'SLIDE', key: 'k', color: RED },
+      { pos: 'x', label: 'FLIP', key: 'l', color: CYAN },
+      { pos: 'y', label: 'TWIST', key: 'i', color: GREEN },
+    ],
+    hint: 'Run with the stick — speed unlocks the vault, the wall and the ledges. Flip off anything.',
   },
   training: {
     dir: null,

@@ -163,7 +163,7 @@ export const ARENA_SCORE_BASELINES: Record<string, number> = {
   baseball: 300,
   soccer: 3,
   tiebreak: 7,
-  gymnastics: 300,
+  freerun: 300,
   brainBrawl: 600,
   whoSceneIt: 400,
   surfing: 300,

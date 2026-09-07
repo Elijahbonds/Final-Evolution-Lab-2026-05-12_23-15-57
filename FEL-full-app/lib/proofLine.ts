@@ -26,7 +26,8 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
     case 'skateboarding': { const combo = n(s, 'bestCombo'), coins = n(s, 'coinsCollected'); return `${r.score} PTS${combo !== null ? ` · x${Math.round(combo)} BEST CHAIN` : ''}${coins !== null ? ` · ${coins} COINS` : ''}`; }
     case 'snowboarding': { const gates = n(s, 'gatesHit'), t = n(s, 'elapsed'); return `${gates ?? 0} GATES${t !== null ? ` · ${t}s` : ''} · ${r.score} PTS`; }
     case 'surfing': { const flow = n(s, 'bestFlow'), barrels = n(s, 'barrels'); return `${r.score} PTS${barrels !== null ? ` · ${barrels} BARREL${barrels === 1 ? '' : 'S'}` : ''}${flow !== null ? ` · FLOW ${flow}` : ''}`; }
-    case 'bigAir': case 'gymnastics': return `${r.score} PTS · ${r.outcome === 'win' ? 'STOMPED' : 'COMPLETE'}`;
+    case 'bigAir': return `${r.score} PTS · ${r.outcome === 'win' ? 'STOMPED' : 'COMPLETE'}`;
+    case 'freerun': { const t = n(s, 'timeSec'), tricks = n(s, 'tricks'), combo = n(s, 'bestCombo'), high = n(s, 'highLine'); return `${r.score} PTS${t !== null ? ` · ${t}s` : ''}${tricks !== null ? ` · ${tricks} TRICK` : ''}${combo ? ` · ×${combo}` : ''}${high ? ' · HIGH LINE' : ''}`; }
     case 'sprint': { const st = n(s, 'stumbles'); return `${r.score} PTS${st !== null ? ` · ${st} STUMBLE${st === 1 ? '' : 'S'}` : ''} · ${wl(r)}`; }
     case 'golf': { const strokes = n(s, 'strokes'), holes = n(s, 'holes'); return strokes !== null ? `${strokes} STROKES${holes !== null ? ` · ${holes} HOLES` : ''}` : `${r.score} PTS`; }
     case 'baseball': {

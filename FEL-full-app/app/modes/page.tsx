@@ -25,7 +25,7 @@ const META: Record<string, { icon: any; color: string; desc: string }> = {
   snowboarding: { icon: Snowflake, color: '#00E5FF', desc: 'Gate-crashing descent down the mountain. Carve every gate at speed without wiping out.' },
   surfing: { icon: Waves, color: '#00FF9D', desc: 'Ride the break. Balance the line, pump for speed, and stick tricks on the lip.' },
   golf: { icon: Flag, color: '#00FF9D', desc: 'Coastal links loop. Dial in power and accuracy across three signature holes.' },
-  gymnastics: { icon: Sparkles, color: '#A855F7', desc: 'Floor routine flow. Nail every prompt in rhythm to build your execution score.' },
+  freerun: { icon: Sparkles, color: '#A855F7', desc: 'Free-running tricking. Momentum unlocks vaults, wall runs and cat leaps; flip off anything and land it clean to bank the line.' },
   training: { icon: Dumbbell, color: '#FF3366', desc: 'Iron Paradise circuit at Muscle Beach. Rep timing drills that push every attribute.' },
   hoops1v1: { icon: Target, color: '#FF3366', desc: 'Ones at Venice. Break down your defender on offense, lock up on D. First to 11.' },
   hoops3v3: { icon: Users, color: '#00E5FF', desc: 'Streetball with your squad. Swing it to the open lane and knock down shots. First to 21.' },

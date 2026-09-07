@@ -55,7 +55,7 @@ export function HubWorld({ userName }: { userName: string }) {
     soccer: 'soccer',
     baseball: 'baseball',
     football: 'football',
-    gymnastics: 'gymnastics',
+    freerun: 'freerun',
     training: 'training',
   };
   const venueModeKey = (href?: string): string | null => {

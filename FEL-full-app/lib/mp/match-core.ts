@@ -58,7 +58,7 @@ export const MP_MODES: { key: string; label: string }[] = [
   { key: 'baseball', label: 'Moonshot Derby' },
   { key: 'soccer', label: 'Twelve Yards' },
   { key: 'football', label: 'Breakaway' },
-  { key: 'gymnastics', label: 'Stick It' },
+  { key: 'freerun', label: 'Free Run' },
   { key: 'tennis', label: 'Match Point' },
   { key: 'tiebreak', label: 'Tiebreak Blitz' },
   // pass 5: head-to-head modes join with their session score (rounds × 100 − rival rounds × 40 for fights; points for ball games)
@@ -75,7 +75,7 @@ export const MP_MODES: { key: string; label: string }[] = [
 export const MP_SESSION_MODE: Record<string, string> = {
   dunk: 'dunkContest', threepoint: 'threePoint', sprint: 'sprint', 'big-air': 'bigAir', snowboard: 'snowboarding',
   skateboard: 'skateboarding', surf: 'surfing', golf: 'golf', baseball: 'baseball', soccer: 'soccer', football: 'football',
-  gymnastics: 'gymnastics', tennis: 'tennis', tiebreak: 'tiebreak',
+  freerun: 'freerun', tennis: 'tennis', tiebreak: 'tiebreak',
   'karate-vs': 'karateVersus', onevone: 'hoops1v1', threevthree: 'hoops3v3', carnival: 'carnival', volleyball: 'volleyball', dance: 'dance',
 };
 export function sessionModeFor(mpKey: string): string { return MP_SESSION_MODE[mpKey] ?? mpKey; }
