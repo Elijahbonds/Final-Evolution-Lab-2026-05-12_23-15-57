@@ -355,3 +355,31 @@ distance · wind speed with a bearing arrow), a drawn three-press swing meter (p
 own constants), a hole chip (HOLE n / 3 · PAR · STROKE · card), and a scorecard board between holes (ACE / EAGLE /
 BIRDIE / PAR / BOGEY names). Mode side: publish `windDeg`, `meterT` + `swingPhase`, `hole` + `par`, and `board` rows at
 the hole's end. Pure helpers + tests in `core/golfHud.ts`. **Cut risk:** none (HUD only).
+
+## Mission #6 — Tennis — PHASE 0 AUDIT (no code changes)
+
+**Benchmark (owner):** Mario Tennis feel + Wii Sports readability.
+
+1. **Current implementation.** `TennisMode` = `createNetSportMode` in `lib/babylon/modes/NetSportMode.ts` (662 lines, shared
+   with volleyball): rally arithmetic in `RallyCore` (Babylon-free, tested); four shots on the faces (A DRIVE · B SLICE ·
+   X DROP · Y LOB) graded PERFECT / GOOD / LATE by timing; `TennisScore` games with deuce / advantage, match at 4 games;
+   an energy gauge that pays for a ZONE SHOT; three RACKETS as stakes (lose them all and the match ends); a point streak
+   with pops at the net; the opponent reacts to points. HUD published: `score`, `foeScore`, `callout` (the umpire call),
+   `energy`, `rackets`, `foeRackets`, `shotType` (`DRIVE · PERFECT`), `banner`.
+2. **Registration pattern.** `MODES.tennis`, route `/play/tennis` via the shared timing host. Standard.
+3. **Reusable assets.** All of the above; `RallyCore.planShot` knows the shot in flight; the host's key-gated blocks.
+4. **Gate 0.** PASS (sweep `tennis`: 0 / 0 / 0 at 60 fps, mobile tier too).
+5. **Vitest / bundle.** green; `/play/tennis` measured at Phase 4.
+
+**Gaps against the benchmark:**
+- **Readability:** the host renders `score` and `energy` / `rackets` / `shotType` but **not** `foeScore` or `callout` —
+  the games are one number with no opponent, and the umpire's `40-30 / DEUCE / AD IN` never shows. A couch scoreboard
+  (YOU n – n THEM, the call, the streak) is the Wii read.
+- **Tells (Mario Tennis):** the incoming ball carries no tell; the four shots are chosen blind. Publish the shot in flight
+  (`incomingShot`) and the answer that beats it, so the choice reads as a choice.
+- **Rally speed-up:** the rally's pace is flat across a long exchange; Mario Tennis speeds the ball as the rally grows.
+  Small, config-side in `RallyCore` (Babylon-free, testable).
+- Tiebreak: the match is first to 4 games with win-by-two inside games only; a 3–3 goes to whoever takes the next game.
+  Fine for a party match; noted, not built.
+
+**Cut risk:** none (HUD + one pace curve).
