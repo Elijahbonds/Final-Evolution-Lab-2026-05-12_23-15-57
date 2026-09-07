@@ -78,6 +78,9 @@ export const SkateRunMode: ModeDefinition = (() => {
   let save: BalanceSave | null = null;
   let pushing = false;
   let lastLanding: 'none' | 'clean' | 'sketchy' = 'none';
+  // A+ P0 juice (PM brief BOARD-A-PLUS-P0, 2026-09-06): one punch per beat — a clean land answers softly, a bail hits.
+  let bailLatch = false;                      // one bail punch per touchdown (landing bail OR the failed save, never both)
+  const FLASH_CHAIN = 3;                      // a chain this long earns the short flash on a clean land
   let landingBeatT = 0;
   let goals: GoalTracker;
   let patrolRail: MovingRail;
@@ -92,6 +95,25 @@ export const SkateRunMode: ModeDefinition = (() => {
     setTimeout(() => ctx.setHud({ banner: '' }), 500);
     SoundKit.play('whoosh', { pitch: 1 + difficulty * 0.15, volume: 0.4 });
   };
+
+  // ── A+ P0 juice — Skate attention. No hang slowMo, no juice.impact({slow}), no HoopJuice. ────────────────────────
+  /** A clean landing: a soft shake (the light feel hit stays), a short white-gold flash only when the chain was long. */
+  function landPunch(ctx: ModeContext, chainLen: number): void {
+    const big = chainLen >= FLASH_CHAIN;
+    ctx.juice.shake(big ? 0.08 : 0.06, 120);
+    if (big) ctx.juice.flash('#fff6dd', 80);
+    console.info(`[SKATE-JUICE] clean land (${chainLen} trick${chainLen === 1 ? '' : 's'}${big ? ', flash' : ''})`);
+  }
+  /** A bail: hit-stop + shake + ONE low thud + dust. Heavier than a clean land. Latched once per touchdown. */
+  function bailPunch(ctx: ModeContext): void {
+    if (bailLatch) return;
+    bailLatch = true;
+    ctx.juice.hitStop(45);
+    ctx.juice.shake(0.10, 140);
+    SoundKit.play('impact', { pitch: 0.6, volume: 0.65 });
+    EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'dust');
+    console.info('[SKATE-JUICE] bail punch');
+  }
 
   return {
     modeId: 'skateboard', mood: 'goldenHour', camPreset: 'board',
@@ -274,11 +296,14 @@ export const SkateRunMode: ModeDefinition = (() => {
           error01: air.landingError01(), slopeMismatch01: 0, speed01: move.speed01,
         });
         const chainPts = res.chain.reduce((sum, t) => sum + t.basePts, 0);
+        bailLatch = false;                       // A+ P0: a fresh touchdown gets one bail punch at most
+        console.info(`[SKATE-LAND] touchdown ${res.grade} (${res.chain.length} tricks)`);   // A+ P0 probe: the punch counts are checked against this
         if (res.grade === 'clean') {
           if (chainPts > 0) combo.add(res.chain.map((t) => t.label).join(' → '), chainPts, 'air');
           lastLanding = 'clean'; landingBeatT = 0.35;
           SoundKit.play('uiTick', { pitch: 1.4, volume: 0.4 });
           ctx.feel?.impact?.(0.25);
+          landPunch(ctx, res.chain.length);   // A+ P0: soft shake (+ a short flash on a long chain); no hit-stop on every ollie
         } else if (res.grade === 'sketchy') {
           if (chainPts > 0) combo.add('SKETCHY ' + res.chain.map((t) => t.label).join('+'), Math.round(chainPts * SKETCHY_SCORE_MULT), 'air');
           save = res.save; lastLanding = 'sketchy'; landingBeatT = 0.5;
@@ -290,7 +315,7 @@ export const SkateRunMode: ModeDefinition = (() => {
           bannerFlash(ctx, 'BAILED', 900);
           SoundKit.play('miss');
           rig.char.animator.play('skate_bail', {});
-          ctx.feel?.impact?.(0.7);
+          bailPunch(ctx);   // A+ P0: hit-stop + shake + ONE low thud + dust (replaces feel.impact(0.7), whose thud would double)
         }
         // SWITCH STANCE. BoardMovement.switchStance() existed, applied its 0.92
         // carve tax and its 180-degree flip at the bottom of this update -- and
@@ -312,7 +337,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       if (save?.active) {
         save.update(dt, stickX);
         if (save.saved) { bannerFlash(ctx, 'SAVED IT!', 700); mbus.report({ kind: 'big_make' }); save = null; }
-        else if (save.failed) { combo.bail(); bannerFlash(ctx, 'BAILED', 900); rig.char.animator.play('skate_bail', {}); save = null; }
+        else if (save.failed) { console.info('[SKATE-LAND] save failed'); combo.bail(); bannerFlash(ctx, 'BAILED', 900); rig.char.animator.play('skate_bail', {}); bailPunch(ctx); save = null; }   // A+ P0: the failed save is a bail too
       }
 
       // grind catch: airborne near a rail

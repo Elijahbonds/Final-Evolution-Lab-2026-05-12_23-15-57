@@ -56,6 +56,25 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let stumbleIframe = 0;
   let yeti: Mob | null = null, yetiPool: MobPool | null = null;
   let yetiSec = 0, yetiDone = false;
+  // A+ P0 juice (PM brief BOARD-A-PLUS-P0, 2026-09-06): rock hit / yeti catch share one wipe punch (latched 0.5 s so a rock
+  // and the yeti on the same beat hit once); the finish gets one punch. Gates keep their tiny feel only. No hang slowMo.
+  let wipeLatchUntil = 0, finishLatch = false;
+  function wipePunch(ctx: ModeContext): void {
+    if (elapsed < wipeLatchUntil) return;
+    wipeLatchUntil = elapsed + 0.5;
+    ctx.juice.hitStop(45);
+    ctx.juice.shake(0.10, 140);
+    SoundKit.play('impact', { pitch: 0.6, volume: 0.65 });
+    console.info('[SNOW-JUICE] wipe punch');
+  }
+  function finishPunch(ctx: ModeContext): void {
+    if (finishLatch) return;
+    finishLatch = true;
+    ctx.juice.hitStop(50);
+    ctx.juice.shake(0.10, 160);
+    ctx.juice.flash('#fff6dd', 100);
+    console.info('[SNOW-JUICE] finish punch');
+  }
   const move = new BoardMovement(SNOW_TUNING);   // Phase 12: carve weight + slope energy
   const mbus = new MomentumBus();
   let boost = 0;                                  // SSX boost meter 0..100
@@ -113,6 +132,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 20, modeId: 'snowboard' });
       nextGate = 0; gatesHit = 0; elapsed = 0; ended = false; stickX = 0; tuck = 0;
       stumbleIframe = 0; yeti = null; yetiPool = null; yetiSec = 0; yetiDone = false;
+      wipeLatchUntil = 0; finishLatch = false;
       ctx.objectiveRef.current = world.markers[nextGate] ?? null;
       crowd = new Onlookers(ctx.scene, world.crowdSpots, '#2f3f57');   // L4: spectators on the slope
       // Phase 3 requires snapTo() at load and update() every frame. All three
@@ -225,8 +245,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             stumbleIframe = STUMBLE_IFRAME_SEC;
             tricks.score = Math.max(0, tricks.score - ROCK_PENALTY);
             rig.rider.vel.scaleInPlace(0.35);
-            SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
-            ctx.feel?.impact?.(0.4);
+            wipePunch(ctx);   // A+ P0: hit-stop + shake + ONE low thud (replaces impact SFX + feel.impact, which doubled the thud); dust kept
             EffectsKit.burst(ctx.scene, p.clone(), 'dust');
             rig.char.animator.play(SPORT_CLIP.boardBail, { onEnd: () => rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true }) });
             ctx.setHud({ score: tricks.score, banner: `ROCK! -${ROCK_PENALTY}` });
@@ -256,8 +275,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             tricks.score = Math.max(0, tricks.score - YETI_CATCH_PENALTY);
             rig.rider.vel.scaleInPlace(0.25);
             mob.onContactResolved();
-            SoundKit.play('impact', { pitch: 0.5, volume: 0.7 });
-            ctx.feel?.impact?.(0.6);
+            wipePunch(ctx);   // A+ P0: the yeti catch is a wipe too — same punch, same latch
             EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'dust');
             rig.char.animator.play(SPORT_CLIP.boardBail, { onEnd: () => rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true }) });
             ctx.setHud({ score: tricks.score, banner: `THE YETI GOT YOU -${YETI_CATCH_PENALTY}` });
@@ -313,6 +331,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       if (nextGate >= world.markers.length) {
         ended = true;
         SoundKit.play('whistle');
+        finishPunch(ctx);   // A+ P0: run FINISHED — hit-stop + shake + short flash, once; the whistle stays
         const timeBonus = Math.max(0, Math.round((60 - elapsed) * 10));
         return ctx.end('FINISHED', tricks.score + timeBonus, { gatesHit, elapsed: Math.round(elapsed) });
       }

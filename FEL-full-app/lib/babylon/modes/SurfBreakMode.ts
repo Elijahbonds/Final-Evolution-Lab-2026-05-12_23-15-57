@@ -58,10 +58,16 @@ export const SurfBreakMode: ModeDefinition = (() => {
   let surging = false;
 
   function wipeout(ctx: ModeContext, why: string, lipZ: number): void {
+    console.info(`[SURF-WIPE] call: ${why}${wipedOut ? ' (already down — ignored)' : ''}`);   // A+ P0 probe: punches are checked against accepted calls
     if (wipedOut) return;
     wipedOut = true;
     tricks.bail();
-    ctx.feel?.impact?.(0.5);
+    // A+ P0 juice (PM brief BOARD-A-PLUS-P0, 2026-09-06): the wipe HITS — hit-stop + shake + ONE low thud (replaces the bare
+    // feel.impact, whose thud would double). Once per wipe: this whole function is gated by wipedOut. No hang slowMo.
+    ctx.juice.hitStop(50);
+    ctx.juice.shake(0.12, 160);
+    SoundKit.play('impact', { pitch: 0.6, volume: 0.7 });
+    console.info('[SURF-JUICE] wipeout punch');
     SoundKit.play('crowdGroan', { volume: 0.5 });
     EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'dust');
     ctx.setHud({ banner: why, flow: 0 });
@@ -89,8 +95,10 @@ export const SurfBreakMode: ModeDefinition = (() => {
     // exactly that treatment. The run's biggest moment now looks different as
     // well as sounding different.
     ctx.camDirector.pulse(1, 0.6);
+    // A+ P0: ONE punch feel — this used to call feel.impact twice back to back (two thuds, two freezes). One feel hit + a soft shake.
     ctx.feel?.impact?.(0.45);
-    ctx.feel?.impact?.(0.4);
+    ctx.juice.shake(0.08, 140);
+    console.info('[SURF-JUICE] barrel bank');
     EffectsKit.burst(ctx.scene, rig.char.root.position.add(new Vector3(0, 1.2, 0)), 'net');
     ctx.setHud({ score: tricks.score, banner: `BARRELED! +${BARREL_BONUS}` });
     setTimeout(() => ctx.setHud({ banner: '' }), 900);
