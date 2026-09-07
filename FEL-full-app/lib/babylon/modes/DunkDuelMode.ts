@@ -476,7 +476,9 @@ export const DunkDuelMode: ModeDefinition = (() => {
       // pad's d-pad IS the movement stick there, so the prop needed a face
       // button) arms/clears it during the approach. Both players get the
       // identical option, so the duel stays the identical test.
-      if (e.t === 'dpad' && e.pressed && phase === 'approach') {
+      // Keyboard hotfix (2026-09-07): the arrows are the L stick (InputBus) — ArrowUp runs at the rim, ArrowDown backs
+      // off; the chair is the pad / touch d-pad or X. Mirrors DunkMode.
+      if (e.t === 'dpad' && e.pressed && e.src !== 'key' && phase === 'approach') {
         if (e.dir === 'down' && prop !== 'obstacle') { setProp(ctx, 'obstacle'); SoundKit.play('uiTick', { pitch: 0.8 }); }
         if (e.dir === 'up' && prop !== 'none') { setProp(ctx, 'none'); SoundKit.play('uiTick', { pitch: 1.2 }); }
       }

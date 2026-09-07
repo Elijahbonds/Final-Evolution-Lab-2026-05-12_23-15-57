@@ -283,7 +283,7 @@ export const DunkMode: ModeDefinition = (() => {
       ctx.setHud({
         round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`,
         score: playerTotal, rivalScore: rivalTotal, style: STYLE_LABEL[style], prop: PROP_LABEL[prop], hype: 0, chain: 0,
-        hint: 'Pick your PROP (d-pad) · STYLE to cycle · RUN-UP SPEED buys your air · HOLD to run — then tap jump',
+        hint: 'Pick your PROP (X / d-pad) · STYLE to cycle · RUN-UP SPEED buys your air · HOLD to run — then tap jump',
       });
     },
 
@@ -308,7 +308,10 @@ export const DunkMode: ModeDefinition = (() => {
         SoundKit.play('uiTick', { pitch: 1.3 });
         void setupProp(ctx);
       }
-      if (e.t === 'dpad' && e.pressed && phase === 'approach') {
+      // Keyboard hotfix (2026-09-07): the arrows are the L stick now (InputBus) — ArrowUp RUNS at the rim, it no longer
+      // picks the prop; the pad's d-pad, the touch d-pad and X still do. The keyboard arrows keep arming the mid-air
+      // trick direction below (flight.feedInput sees every d-pad event), so nothing on the keyboard is lost.
+      if (e.t === 'dpad' && e.pressed && e.src !== 'key' && phase === 'approach') {
         prop = e.dir === 'up' ? 'none' : e.dir === 'right' ? 'alleyoop' : 'obstacle';
         ctx.setHud({ prop: PROP_LABEL[prop] });
         SoundKit.play('uiTick', { pitch: 1.3 });
@@ -1063,7 +1066,7 @@ export const DunkMode: ModeDefinition = (() => {
       need: need > 0 ? need : 0,
       hint: need > 0
         ? `FINAL ROUND — you need big numbers (${deficit > 0 ? `down ${deficit}` : `up ${-deficit}`})`
-        : 'Pick your PROP (d-pad) · STYLE to cycle · mid-air STYLE taps for difficulty · HOLD SLAM to hang',
+        : 'Pick your PROP (X / d-pad) · STYLE to cycle · mid-air STYLE taps for difficulty · HOLD SLAM to hang',
       charge: 0, slamPulse: false,
     });
   }

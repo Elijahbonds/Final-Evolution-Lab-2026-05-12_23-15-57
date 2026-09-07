@@ -3,7 +3,10 @@
 
 export type FelInput =
   | { t: 'stick'; side: 'L' | 'R'; x: number; y: number }
-  | { t: 'dpad'; dir: 'up' | 'down' | 'left' | 'right'; pressed: boolean }
+  /** `src: 'key'` marks a keyboard ARROW: the arrows also drive the L stick (see onKey), so a mode whose d-pad
+   *  means something else on the runway (the dunk's PROP) must skip keyboard d-pad presses — pad buttons 12–15,
+   *  the touch d-pad and Controller Link carry no src and stay the real d-pad. */
+  | { t: 'dpad'; dir: 'up' | 'down' | 'left' | 'right'; pressed: boolean; src?: 'key' }
   | { t: 'button'; btn: 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START'; pressed: boolean }
   | { t: 'trigger'; side: 'L' | 'R'; value: number };
 
@@ -12,10 +15,6 @@ import { HAPTIC } from '../premium/Haptics';
 type Listener = (e: FelInput) => void;
 
 const KEYMAP: Record<string, FelInput> = {
-  arrowup: { t: 'dpad', dir: 'up', pressed: true },
-  arrowdown: { t: 'dpad', dir: 'down', pressed: true },
-  arrowleft: { t: 'dpad', dir: 'left', pressed: true },
-  arrowright: { t: 'dpad', dir: 'right', pressed: true },
   j: { t: 'button', btn: 'A', pressed: true },
   k: { t: 'button', btn: 'B', pressed: true },
   l: { t: 'button', btn: 'X', pressed: true },
@@ -25,7 +24,14 @@ const KEYMAP: Record<string, FelInput> = {
   c: { t: 'button', btn: 'SELECT', pressed: true },
   escape: { t: 'button', btn: 'START', pressed: true },
 };
+// Dunk keyboard hotfix (2026-09-07): the ARROWS are the L stick too. They were d-pad only, so on a mode whose d-pad
+// is a picker (the dunk's PROP) ArrowUp cycled the prop instead of running at the rim while W ran — players use the
+// arrows exactly like WASD. Held arrows and WASD sum into ONE L-stick vector (up = −y on every source); the arrows
+// ALSO keep emitting their d-pad press/release tagged `src: 'key'`, because eleven keyboard surfaces read the arrow
+// d-pad (the sprint masher, the quiz answers, the penalty dive, the pre-run pickers, the dunk's mid-air trick
+// direction) and none of them may lose it. A mode that has both a stick and a d-pad picker skips `src === 'key'`.
 const WASD = new Set(['w', 'a', 's', 'd']);
+const ARROWS: Record<string, 'up' | 'down' | 'left' | 'right'> = { arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right' };
 
 export class InputBus {
   private listeners = new Set<Listener>();
@@ -66,10 +72,14 @@ export class InputBus {
     if (down && this.held.has(key)) return;        // no key-repeat spam
     down ? this.held.add(key) : this.held.delete(key);
 
-    if (WASD.has(key)) {
-      const x = (this.held.has('d') ? 1 : 0) - (this.held.has('a') ? 1 : 0);
-      const y = (this.held.has('s') ? 1 : 0) - (this.held.has('w') ? 1 : 0);
+    const arrow = ARROWS[key];
+    if (WASD.has(key) || arrow) {
+      if (arrow) ev.preventDefault();   // a held arrow must not scroll the /try page under the canvas
+      const h = (k: string) => (this.held.has(k) ? 1 : 0);
+      const x = Math.max(-1, Math.min(1, h('d') + h('arrowright') - h('a') - h('arrowleft')));
+      const y = Math.max(-1, Math.min(1, h('s') + h('arrowdown') - h('w') - h('arrowup')));
       this.emit({ t: 'stick', side: 'L', x, y });
+      if (arrow) this.emit({ t: 'dpad', dir: arrow, pressed: down, src: 'key' });
       return;
     }
     if (key === ' ') {
