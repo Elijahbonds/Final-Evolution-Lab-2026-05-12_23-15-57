@@ -552,3 +552,39 @@ rename):**
 `/play/soccer` 158 → 160 kB, `/play/football` 158 → 160 kB (**+1.3 %** each); shared-by-all 89.9 kB unchanged. PASS. The
 production route frames taken 23 s into a cold `next start` with four pages loading at once still showed the arena
 splash — inconclusive, not a failure; the dev-runner captures carry the 0 / 0 / 0 proof for these three.
+
+---
+
+## Mission #11 — Brain Brawl — PHASE 0 AUDIT (no code changes)
+
+**Benchmark (owner):** Trivia Crack category wheel × Big Brain Academy graded cognitive minigames; readability floor = a TV
+at couch distance (Mario Party). **Rules that matter most (owner):** content GENERIC — nothing from The Neuro-Mechanic's
+Blueprint, no curriculum integration; no spaced repetition, ghost duels or feed mechanics (Knowledge Feed territory); no
+backend / auth / db — the personal best is localStorage.
+
+1. **Current BrainBrawlMode.** There is none: `/play/brain-brawl` is a 2D deck, `components/games/brain-brawl-game.tsx`
+   (329 lines, framer-motion) — four multiple-choice trivia categories from `lib/quiz-data.ts` (64 questions: history,
+   science, pop culture, sport) on the feel-layer `lib/feel/quiz-core.ts`, timed answers, a `SessionRecorder`. Salvageable:
+   nothing of the trivia (the mission's challenges are graded minigames, not multiple choice); the route + `GameShell`
+   mode key `brainBrawl`; the venue spec `brain_brawl` (Neuro Arena: indigo stage, two podiums) that nothing mounts yet;
+   `QuizCore.scoreAnswer` (speed-scaled points + streak) and `QuizRound` (an AI-foe duel) in `lib/babylon/core/QuizCore.ts`
+   are the Babylon-side scoring pieces; `BRAIN_BRAWL_PACK` in `quizPacks` is unused trivia.
+2. **Registration pattern.** As missions #1–#10: registry + enabled list, flag, verbs, Controller Link schema, route
+   loader with `next/dynamic`, host under `components/games/`, proof line, gauntlet list.
+3. **Reusable party assets.** `mountVenue('brain_brawl')` for the stage (mood and podiums authored), Who Scene It's
+   local two-player split (P1 faces / P2 d-pad, `SceneBuzz`'s buzz-in rules), Court Carnival's between-round scoreboard
+   (HudScoreCard rows) and player-count screen, the `HostLobby` if a phone pad is wanted later.
+4. **Gate 0.** No rigged character needs to stand on stage for the wheel and the challenges; if the podium bodies are
+   added they use the 22-bone rig through `CharacterLibrary` (PASS on every mode that does).
+5. **Vitest / bundle.** 405 / 405; baseline `/play/brain-brawl` First Load JS 156 kB.
+
+**Knowledge Feed boundary:** no feed code exists in the repo today (`lib/curriculum` is the blueprint); the boundary is
+kept by not building any of it here — generators produce generic challenges from seeds, nothing is scheduled or repeated
+on purpose, nothing is stored beyond the personal best.
+
+**Plan (Phases 1–7):** P1 wheel + claims (`core/BrainBrawlCore.ts`, pure). P2 the five challenge families as seeded
+generators (LOGIC sequence completion + pattern deduction; MEMORY recall grid + order-repeat; COMPUTE rapid arithmetic
++ quantity comparison; ANALYZE rotation + shape match + count-under-pressure; IDENTIFY odd-one-out + fast recognition),
+three tiers each, a per-match seen-set so nothing repeats, speed × accuracy scoring. P3 duel (same challenge, both
+answer, higher score claims) + solo (five categories, composite, localStorage best) + between-round board + results.
+P4 the Neuro Arena mounted, challenge UI at couch size over it. P5 shell. P6 tests. P7 local build + verify.
