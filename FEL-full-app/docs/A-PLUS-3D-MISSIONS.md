@@ -205,7 +205,10 @@ scoreboard / player-count overlays, `quizPacks` gains four venues, `proofLine` a
   line reads `6/8 SCENES · 640 PTS · WON` solo and `300–520 · P2 TAKES IT` in a duel. Host: bigger prompt and answer cards
   (Mario Party size), the d-pad glyph on each card in a duel, P1 / P2 score chips, `P1 OUT` / `P2 OUT` chips, the clock
   only while a question runs. Content: `ws13–ws16` (Center Court, Sovereign Links, Gridiron Sovereign, Pro Diamond).
-- P4: registered as before; no dead end (pick → rounds → board → results → shell). Bundle measured below.
+- P4: registered as before; no dead end (pick → rounds → board → results → shell). **Bundle after cc68ede:**
+  `/play/who-scene-it` First Load JS 160 kB (baseline 158 kB, **+1.3 %**); shared-by-all 89.9 kB unchanged. PASS.
+- **P6 (local build + verify, no deploy):** `next build` on cc68ede compiled (warnings only); `next start` on :3005 served
+  `/play/who-scene-it?players=2` (gzip on the page) and rendered the first two-player card. Nothing pushed, nothing live.
 - P5: `SceneBuzz.test.ts` (8) + proof-line cases; suite **379 / 379**, tsc clean.
 - Verified: dev runner solo (pick screen → question 8 / 8, 60 fps, 0 / 0 / 0) and `?players=2` (P1 locked out, "P2 can
   steal" banner, into round 2, 57 fps, 0 / 0 / 0); real route 1440×900 first card (COURTS chip, ROUND 1 / 4, P1 / P2 chips,
