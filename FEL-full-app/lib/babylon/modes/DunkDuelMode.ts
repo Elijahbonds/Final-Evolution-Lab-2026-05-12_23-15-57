@@ -179,7 +179,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     });
     setTimeout(() => {
       if (phase !== 'handoff' || ended) return;
-      ctx.setHud({ banner: '', hint: 'STYLE to cycle · D-PAD down arms THE CHAIR · run in FAST — the run-up buys your air · HOLD to run' });
+      ctx.setHud({ banner: '', hint: 'STYLE to cycle · D-PAD down arms THE CHAIR · LOOK stick orbits the camera · run in FAST — the run-up buys your air · HOLD to run' });
       setPhase('approach');
     }, 2200);
   }
@@ -463,7 +463,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; if (!lookSeen && (Math.abs(e.x) > 0.12 || Math.abs(e.y) > 0.12)) { lookSeen = true; console.info('[LOOK] R stick live'); } }
       if (phase === 'handoff' && e.t === 'button' && e.pressed) {
         // any button skips the handoff card
-        ctx.setHud({ banner: '', hint: 'STYLE to cycle · HOLD to run — then tap jump' });
+        ctx.setHud({ banner: '', hint: 'STYLE to cycle · LOOK stick orbits the camera · HOLD to run — then tap jump' });
         setPhase('approach');
         return;
       }

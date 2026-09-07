@@ -166,7 +166,18 @@ export const FIXED_PRESETS: Record<string, { offset: Vector3; targetHeight: numb
 /** Camera may never end up closer to the subject than this, in ANY venue —
  *  below this range a wall/prop fills the frame illegibly. */
 // R-stick look (Dunk play tip 2026-09-07): orbit rate, cap, the target's pitch nudge, the return spring.
-const LOOK_DEADZONE = 0.12, LOOK_YAW_RATE = 4.8, LOOK_YAW_MAX = Math.PI * 0.75, LOOK_PITCH_RATE = 3.2, LOOK_PITCH_MAX = 1.1, LOOK_RETURN = 1.6; // F04 2026-09-07: overlay LOOK must be eye-obvious on /try
+// DUNK-LOOK-F04 (2026-09-07): the shipped feel (2.2 rad/s integrated from zero, spring 4/s, plus the contest preset's
+// own follow lag — 0.06/frame × the 0.8 settle bias ≈ 0.35 s time constant) was measurable by a probe holding 0.83
+// deflection for 700 ms (+48°) and INVISIBLE to a human thumb on the overlay: a 20–30 px flick over ~0.4 s at half
+// deflection integrated ~12° of orbit that the lag then ate and the spring undid before the eye landed on it (live
+// /try grade: F04 FAIL). 5c51846 raised the rates (4.8 / return 1.6) — a flick then peaked +50° but the camera was
+// still crawling back +6° two seconds after the release. This is the finished feel, no axis flipped: a deflection is
+// worth an orbit AT ONCE (LOOK_YAW_SNAP × x, slewed in at LOOK_SNAP_RATE) and only then keeps turning at LOOK_YAW_RATE;
+// a released stick HOLDS its orbit for LOOK_HOLD so the eye lands on it, then a decisive return spring; and while the
+// look is live the follow lag runs at its catch-up bias (followLag) so the camera answers the stick, not the lag. A
+// full pad push still caps at LOOK_YAW_MAX and every release springs back to the mode's own composition.
+const LOOK_DEADZONE = 0.12, LOOK_YAW_RATE = 3.6, LOOK_YAW_MAX = Math.PI * 0.7, LOOK_PITCH_RATE = 2.4, LOOK_PITCH_MAX = 1.0, LOOK_RETURN = 3;
+const LOOK_YAW_SNAP = 0.6, LOOK_PITCH_SNAP = 0.45, LOOK_SNAP_RATE = 14, LOOK_HOLD = 0.25;
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 /** Rotate a ground-plane direction about +Y (x' = x·cos − z·sin, z' = x·sin + z·cos). The follow `back` vector is
  *  rotated by −lookYaw: measured on the dunk runway (2026-09-07), that is the sign that raises camera.rotation.y —
@@ -264,18 +275,34 @@ export class CameraDirector {
   // a pitch nudge on the look target (metres); both ease back to zero when the stick centres, so a released look
   // returns to the mode's own composition. Modes that never call it are untouched (offsets stay 0).
   private lookYaw = 0; private lookPitch = 0;
-  /** Feed the R stick each frame (x right, y down as the bus emits it). Zero input decays the offsets. */
+  private lookHold = 0;                           // seconds a released stick's orbit is still held before the spring
+  /** One axis of the look: a deflection snaps toward its own orbit (`snap × v`) and, once there, keeps turning at
+   *  `rate`; below the deadzone the offset holds for LOOK_HOLD, then eases back to 0. `sign` = +1 yaw (x right →
+   *  orbit right), −1 pitch (y down → target down). */
+  private lookAxis(cur: number, v: number, sign: number, snap: number, rate: number, max: number, step: number): number {
+    if (Math.abs(v) > LOOK_DEADZONE) {
+      const floor = sign * v * snap;
+      const snapped = cur + (floor - cur) * Math.min(1, LOOK_SNAP_RATE * step);   // toward the deflection's own orbit (an asymptote — never past it)
+      const turned = clamp(cur + sign * v * rate * step, -max, max);            // keep turning at the rate
+      return floor > 0 ? Math.max(snapped, turned) : Math.min(snapped, turned); // whichever is further along the push
+    }
+    if (this.lookHold > 0) return cur;
+    return cur - cur * Math.min(1, LOOK_RETURN * step);
+  }
+  /** Feed the R stick each frame (x right, y down as the bus emits it). Zero input holds briefly, then decays the offsets. */
   look(x: number, y: number, dt: number): void {
     const step = Math.min(1, Math.max(0, dt));
-    if (Math.abs(x) > LOOK_DEADZONE) this.lookYaw = clamp(this.lookYaw + x * LOOK_YAW_RATE * step, -LOOK_YAW_MAX, LOOK_YAW_MAX);
-    else this.lookYaw -= this.lookYaw * Math.min(1, LOOK_RETURN * step);
-    if (Math.abs(y) > LOOK_DEADZONE) this.lookPitch = clamp(this.lookPitch - y * LOOK_PITCH_RATE * step, -LOOK_PITCH_MAX, LOOK_PITCH_MAX);
-    else this.lookPitch -= this.lookPitch * Math.min(1, LOOK_RETURN * step);
+    const held = Math.abs(x) > LOOK_DEADZONE || Math.abs(y) > LOOK_DEADZONE;
+    this.lookHold = held ? LOOK_HOLD : Math.max(0, this.lookHold - step);
+    this.lookYaw = this.lookAxis(this.lookYaw, x, 1, LOOK_YAW_SNAP, LOOK_YAW_RATE, LOOK_YAW_MAX, step);
+    this.lookPitch = this.lookAxis(this.lookPitch, y, -1, LOOK_PITCH_SNAP, LOOK_PITCH_RATE, LOOK_PITCH_MAX, step);
   }
   /** The current look orbit (radians) — 0 when the stick is centred and settled. */
   get lookYawRad(): number { return this.lookYaw; }
+  /** True while the stick is held or its orbit is still settling — the follow lag runs at catch-up so the eye sees it. */
+  private get lookLive(): boolean { return this.lookHold > 0 || Math.abs(this.lookYaw) > 0.02 || Math.abs(this.lookPitch) > 0.02; }
   /** Drop the look at once — a mode's hard cut (the dunk's takeoff → rimCamCut) must not inherit a half-decayed orbit. */
-  resetLook(): void { this.lookYaw = 0; this.lookPitch = 0; }
+  resetLook(): void { this.lookYaw = 0; this.lookPitch = 0; this.lookHold = 0; }
   // ── MODE-STICK-FACE family (2026-09-07): a camera-relative stick whose basis LATCHES while the stick is held ──
   // A camera that follows the subject's FACING or VELOCITY (overShoulder, runner) swings behind a turn within a few
   // frames; re-deriving "right" from the live camera every frame then turns a held stick-right into a pirouette on the
@@ -493,7 +520,7 @@ export class CameraDirector {
     // Phase 6: cfg.lag was a per-frame fraction, so a 30 fps phone lagged twice as far as a 60 fps
     // desktop. Normalise to frame time, then bias it — catching up (the subject pulling away, a cut
     // still settling) runs faster than settling in, which is what a broadcast operator does.
-    const lag = this.followLag(cfg.lag, Vector3.Distance(finalPos, this.camera.position), tgtR > curR + 0.3);
+    const lag = this.followLag(cfg.lag, Vector3.Distance(finalPos, this.camera.position), tgtR > curR + 0.3 || this.lookLive);   // a live R look is a catch-up, never a settle (DUNK-LOOK-F04)
     let next: Vector3;
     if (curR > 0.01 && tgtR > 0.01) {
       let dx = (curX / curR) + ((tgtX / tgtR) - (curX / curR)) * lag;

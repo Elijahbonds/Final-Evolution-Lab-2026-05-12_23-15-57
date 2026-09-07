@@ -283,7 +283,7 @@ export const DunkMode: ModeDefinition = (() => {
       ctx.setHud({
         round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`,
         score: playerTotal, rivalScore: rivalTotal, style: STYLE_LABEL[style], prop: PROP_LABEL[prop], hype: 0, chain: 0,
-        hint: 'Pick your PROP (X / d-pad) · STYLE to cycle · RUN-UP SPEED buys your air · HOLD to run — then tap jump',
+        hint: 'Pick your PROP (X / d-pad) · STYLE to cycle · LOOK stick orbits the camera · RUN-UP SPEED buys your air · HOLD to run — then tap jump',
       });
     },
 
@@ -369,7 +369,7 @@ export const DunkMode: ModeDefinition = (() => {
           setPhase('charge');
           holdRunSpeed = Math.max(2, runUpPeak);
           playClip(SPORT_CLIP.moveLoop, { loop: true });
-          ctx.setHud({ hint: 'HOLD — running to the rim · steer with the stick · release early to jump from here' });
+          ctx.setHud({ hint: 'HOLD — running to the rim · steer with the stick · LOOK orbits the camera · release early to jump from here' });
         }
         if (phase === 'charge') {
           charge = Math.max(charge, e.value);
@@ -680,7 +680,7 @@ export const DunkMode: ModeDefinition = (() => {
     switch (phase) {
       case 'approach':
         player.root.position.set(0, 0, CFG.gatherZ);
-        ctx.setHud({ hint: 'HOLD to run — then tap jump' });
+        ctx.setHud({ hint: 'HOLD to run — then tap jump · LOOK stick orbits the camera' });
         phaseSec = 0;
         break;
       case 'charge': launchDunk(ctx); break;
