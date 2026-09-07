@@ -383,3 +383,40 @@ the hole's end. Pure helpers + tests in `core/golfHud.ts`. **Cut risk:** none (H
   Fine for a party match; noted, not built.
 
 **Cut risk:** none (HUD + one pace curve).
+
+## Missions #7–#9 — PHASE 0 AUDITS (no code changes)
+
+### #7 Baseball (Home Run Derby) — Wii Sports baseball contact + MLB Home Run Derby presentation
+`DerbyMode` in `precisionModes.ts` (from line ~670): ten pitches; a **PCI** (plate-coverage reticle the stick moves,
+contact quality = overlap, PURE / OFF-CENTRE / EDGE), pitch variety with a movement read (fastball, slider breaking late,
+changeup taking speed off; the pitch aims at the pre-break spot), a pitcher body with two pitch clips, a ballpark with
+foul poles and a distance band that a homer clears, a clutch final pitch. HUD: `round` (`n/10`), `pitch` (label),
+`contact`, `score`, `hint`, dev `pci`. The shared host renders `round`, `score`, `contact`, `banner`, `hint`.
+**Gaps:** no **outs** structure (a derby is outs, not a fixed count), no **distance readout** per homer, no **rival total**
+(the presentation half of the benchmark), the pitch label (`FB` / `SL` / `CH`) is not rendered. **Scope:** outs (a non-homer
+swing is an out; ten outs or the pitch cap ends the round), distance in feet on every homer with a longest-shot chip, a
+rival round posted alongside (rolled and ticking, the Carnival pattern), the pitch label chip, a homer count board.
+
+### #8 Soccer (Penalty shootout) — FIFA penalty shootout feel + Wii-style readability
+`PenaltyMode` in `precisionModes.ts` (last block): aim + two-press power, a keeper who **reads your placement history**,
+street **feints** (max 2: the keeper guesses wrong more, the shot wobbles more, style points paid on a goal), alternating
+kicks with the **keeper round** (you dive at their run-up tell, `KeeperCore` judges; owner decision 2026-09-03),
+regulation kicks then **sudden death** capped at five rounds with STYLE deciding a level tie (owner decision 2026-09-05),
+a pressure line (`SCORE OR YOU ARE OUT`). HUD: `round` (`KICK n/5` / `SUDDEN DEATH`), `feints`, `power`, `score`,
+shootout numbers (`THEM`, `pressure`, `numbers`, `decidedBy`), `banner`, `hint`. The shared host renders `round`,
+`score`, `banner`, `hint` only.
+**Gaps:** the **shootout board** (both sides' kicks as ✓ / ✗ pips, the FIFA read) never renders; `feints` and `power`
+never render; the keeper round has no on-screen dive prompt beyond the hint. **Scope:** a kicks board (key-gated), a feint
+counter chip, the two-press power bar (the golf meter block reused with a different band), a DIVE prompt with the
+run-up tell's timing, keep everything else byte-identical.
+
+### #9 Football (Rush) — Tecmo Bowl feel + Madden readability
+`FootballRushMode.ts` (421 lines) with its own host `football-babylon.tsx`: three drives, downs and yards to go, a
+pre-snap set defense with a **show-blitz disguise**, juke / spin / hurdle / **truck** (a 0.5 s window that knocks the
+defender down, 2.5 s cooldown), a **style chain** for stringing different evades, breakaway speed after three evades,
+sideline banks. HUD rendered by its host: `down`, `toGo`, `yards`, `evades`, `score`, `truckReady`, `breakaway`, `banner`,
+`hint`. **Gaps:** the read is Madden-thin — no **yard-line / field-position** readout (where the ball is on the 40-yard
+field), no **drive summary** between drives (yards, evades, result), no **defense read** beyond the blitz banner (which
+defender is the one to beat), no **scoring drive loop** feedback (the touchdown celebration and the next drive's start
+are a banner). **Scope:** a field-position strip (ball marker on a 0–40 bar with the first-down line), a drive card
+between drives, a TARGET chip naming the nearest defender's angle, a touchdown beat; mechanics byte-identical.
