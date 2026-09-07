@@ -110,12 +110,19 @@ dance. P6: local production build + `next start` verification; report, no deploy
   line reads `… PTS · ★★★★☆ · 88% · GRADE A · ×14 COMBO` (grade derived from accuracy — stats stay numeric; widening
   them to strings broke five shipped hosts and was reverted).
 - P4: already registered; the route is `next/dynamic`, `ssr: false`; no dead end (pick → count-in → routine → results →
-  shell). Bundle re-measured after the commit (below).
+  shell). **Bundle after 97e1641:** `/play/dance` First Load JS 159 kB (baseline 157 kB, **+1.3 %**); shared-by-all 89.9 kB
+  (unchanged); the timing sports that share the host moved 158 → 160 kB. Under the +5 % ceiling. PASS.
 - P5: 10 new tests (`danceTracks.test.ts`: three tracks/difficulties/tempos, seeded repeatability and difficulty ceiling,
   cycle/fallback/deep link, pick banner, grade↔star bands, body speed, lane windowing + order, lane off a live
   performance, kit pattern bounds/density). Suite 370 / 370, tsc clean.
 - Verified on the real route: desktop 1440×900 `/play/dance?track=battle` mid-routine (lane above the pad, spin marker in
   the ring, shoulder bop approaching, "NOW — SPIN"), phone 430×932 pick screen (banner, d-pad, short instruction line).
+- **P6 (local build + verify, no deploy — owner's rule):** `next build` on 97e1641 compiled (warnings only); `next start`
+  on :3005 served `/play/dance?track=battle` and the same mid-routine frame as dev (cue lane, spin in the ring, shoulder
+  bop approaching) with no dev panel; hashed chunks `Cache-Control: public, max-age=31536000, immutable`, pages and
+  chunks `Content-Encoding: gzip` (a 10.6 kB chunk shipped as 4.2 kB); public audio (`/audio/kits/808/*.wav`) is Next's
+  default `max-age=0` — a CDN rule if this ever deploys. `/dev/mode/<key>` has no canvas in production (dev-only runner),
+  so the harness's 0/0/0 line comes from dev. Nothing pushed; nothing claimed live.
 - Cut: none for 60 fps. Weak: the venue's pink floor glow washes the lower frame (venue look, not this mission); the
   dev runner prints HUD JSON instead of rendering the host, so the lane is only visible on `/play/dance`.
 
