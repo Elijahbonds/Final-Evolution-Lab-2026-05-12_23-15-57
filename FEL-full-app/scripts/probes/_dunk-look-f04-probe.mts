@@ -61,8 +61,8 @@ const drag = async (zone: typeof lookZone, dx: number, dy: number, defl: number,
   const box = (await zone.boundingBox())!; const cx = box.x + box.width / 2, cy = box.y + box.height / 2, R = box.width / 2;
   await p.mouse.move(cx, cy); await p.mouse.down();
   for (let i = 1; i <= 5; i++) { await p.mouse.move(cx + dx * defl * R * i / 5, cy + dy * defl * R * i / 5); await p.waitForTimeout(20); }
-  if (mid) await mid();
-  await p.waitForTimeout(Math.max(0, holdMs - 100));
+  const t0 = Date.now(); if (mid) await mid();   // a mid-hold screenshot takes ~300 ms — it must not stretch the thumb's hold
+  await p.waitForTimeout(Math.max(0, holdMs - 100 - (Date.now() - t0)));
   await p.mouse.up();
 };
 
