@@ -588,3 +588,15 @@ generators (LOGIC sequence completion + pattern deduction; MEMORY recall grid + 
 three tiers each, a per-match seen-set so nothing repeats, speed × accuracy scoring. P3 duel (same challenge, both
 answer, higher score claims) + solo (five categories, composite, localStorage best) + between-round board + results.
 P4 the Neuro Arena mounted, challenge UI at couch size over it. P5 shell. P6 tests. P7 local build + verify.
+
+**Scaffold landed — Brain Brawl Phases 1–4 (e76fd81; not registered until the running sweep ends):** `core/BrainBrawlCore.ts`
+(the wheel prefers categories the spinner has not claimed and lands on the named segment; claims / contest / win at five;
+eleven seeded challenge kinds across the five families at three tiers — sequence and pattern for LOGIC, recall grid and
+order-repeat for MEMORY, arithmetic and quantity for COMPUTE, rotation, shape match and count for ANALYZE, odd-one-out and
+recognition for IDENTIFY — a per-match seen-set so nothing repeats, four unique answers always, speed × accuracy scoring
+100 × tier × (0.5 + 0.5 × remaining); 7 tests). `BrainBrawlMode.ts`: pick screen, the wheel spun on the Neuro Arena (2.4 s
+ease-out), exposure → answer with the clock, P1 faces / P2 d-pad, both answers or the clock resolve the round, claims
+board between rounds, duel first-to-five (round cap 15) or solo five-category composite with a localStorage best
+(`fel.brainbrawl.best`). Host: scores, the claims strip coloured by holder, the clock, the challenge card (display as a
+monospace grid, four big answers), the board. Knowledge Feed boundary kept: generic seeded content, nothing scheduled or
+repeated on purpose, nothing stored beyond the best.
