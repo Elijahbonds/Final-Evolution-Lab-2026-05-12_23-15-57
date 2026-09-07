@@ -75,6 +75,10 @@ export const FootballRushMode: ModeDefinition = (() => {
     driveLog.push({ name: `DRIVE ${drive}`, score: driveYards, line: `${result} · ${driveEvades} EVADES` });
   }
   let iframeSec = 0, dodging = false, ended = false;
+  /** HUMAN-READY-HYGIENE (2026-09-07): tackled → DOWN until the reset. The runner kept running at full speed for the 1 s
+   *  between the tackle and the pre-snap reset (measured: +7 m, 6 free yards a down, the fall clip cut by the run loop one
+   *  frame later) and then jogged ON THE SPOT at the line through the whole pre-snap read (left foot 5 m in 1.4 s, root 0). */
+  let downed = false;
   let truckSec = 0, truckCooldown = 0, trucks = 0;
   // A+ P0 juice (PM brief FOOTBALL-A-PLUS-P0, 2026-09-06): the three Street beats each get ONE punch —
   // latched per truck window / per play / per drive so a second body in the same beat never re-fires it.
@@ -215,7 +219,7 @@ export const FootballRushMode: ModeDefinition = (() => {
     styleTypes = new Set();
     truckSec = 0; truckCooldown = 0;
     truckLatch = false; tackleLatch = false; tdLatch = false;   // A+ P0: a new drive gets its own beats
-    preSnap = true; preSnapT = 0;
+    preSnap = true; preSnapT = 0; downed = false;
     runner.root.position.set(0, 0, 0);
     runner.root.rotation.y = 0;
     runner.animator.play(SPORT_CLIP.idle, { loop: true });
@@ -245,7 +249,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       ctx.groundLock?.track(runner.root, runner.skeleton);
       ctx.heroRef.current = runner.root;
       defenders = []; pool = new MobPool();
-      score = 0; evades = 0; trucks = 0; ended = false; iframeSec = 0; dodging = false; drive = 1;
+      score = 0; evades = 0; trucks = 0; ended = false; iframeSec = 0; dodging = false; downed = false; drive = 1;
       driveEvades = 0; breakawaySec = 0; truckSec = 0; truckCooldown = 0;
       truckLatch = false; tackleLatch = false; tdLatch = false;
       ctx.camDirector.snapTo(runner.root.position, runner.root.position.add(new Vector3(0, 0, 12)));
@@ -278,7 +282,7 @@ export const FootballRushMode: ModeDefinition = (() => {
 
       // TRUCK — trigger hold, windowed + cooldown
       if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5 && !ended
-          && truckCooldown === 0 && truckSec === 0 && !dodging) {
+          && truckCooldown === 0 && truckSec === 0 && !dodging && !downed) {
         truckSec = TRUCK_WINDOW_SEC;
         truckCooldown = TRUCK_COOLDOWN_SEC;
         truckLatch = false;                       // A+ P0: a fresh window gets one break punch
@@ -288,7 +292,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         setTimeout(() => ctx.setHud({ banner: '' }), 400);
       }
 
-      if (e.t === 'button' && e.pressed && !dodging && !ended) {
+      if (e.t === 'button' && e.pressed && !dodging && !downed && !ended) {
         const d = DODGES[e.btn as keyof typeof DODGES];
         if (!d) return;
         dodging = true;
@@ -327,12 +331,12 @@ export const FootballRushMode: ModeDefinition = (() => {
 
       const boost = breakawaySec > 0 ? BREAKAWAY_SPEED_MULT : 1;
       const trucking = truckSec > 0;
-      const speed = (5.5 + Math.max(0, -stickY) * 2.5) * boost * (trucking ? 1.08 : 1);
+      const speed = downed ? 0 : (5.5 + Math.max(0, -stickY) * 2.5) * boost * (trucking ? 1.08 : 1);
       // lowered shoulder = committed line: lateral control drops while trucking
-      const vel = new Vector3(stickX * (trucking ? 2 : 5) * boost, 0, speed);
+      const vel = downed ? Vector3.Zero() : new Vector3(stickX * (trucking ? 2 : 5) * boost, 0, speed);
       runner.root.position.addInPlace(vel.scale(dt));
       runner.root.position.x = Math.max(-FIELD_HALF_X, Math.min(FIELD_HALF_X, runner.root.position.x));
-      if (!dodging) {
+      if (!dodging && !downed) {
         // MODE-STICK-FACE (2026-09-07): the runner FACES his line — yaw from the ground velocity, slewed. It was HALF
         // the angle: a 42° cut ran at 21°, the body sliding sideways across the field. (The stick itself was never
         // mirrored here: the runner camera looks up the field, +z, where screen-right IS world +x.)
@@ -342,7 +346,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         runner.animator.play(SPORT_CLIP.footballCarryRun, { loop: true });
       }
 
-      yards = Math.max(yards, Math.floor((runner.root.position.z - lineOfScrimmage) / 0.9144));
+      if (!downed) yards = Math.max(yards, Math.floor((runner.root.position.z - lineOfScrimmage) / 0.9144));
       driveYards = Math.max(driveYards, Math.floor(runner.root.position.z / YARD));
       // A+ mission #9: the field strip (ball, line of scrimmage, first-down line, all in yards) and the TARGET — where the
       // nearest defender is relative to the runner, so the next move is a read, not a guess
@@ -361,6 +365,7 @@ export const FootballRushMode: ModeDefinition = (() => {
 
       const contacts = pool.update(dt, runner.root.position, vel);
       for (const mob of contacts) {
+        if (downed) break;   // a downed runner cannot be tackled (or trucked) again before the reset
         // TRUCK RESOLUTION — the defender goes down, not you
         if (truckSec > 0) {
           trucks++; evades++; driveEvades++;
@@ -403,6 +408,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         tackleWeight(ctx);   // A+ P0: the heavy feel hit + shake + groan (its one thud comes with feel.impact; the extra impact SFX is gone)
         EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, 0.6, 0)), 'dust');
         runner.animator.play(SPORT_CLIP.footballTackled, {});
+        downed = true;
         driveEvades = 0; breakawaySec = 0;
         const gainedY = yards;
         if (gainedY >= toGo) {
@@ -430,6 +436,8 @@ export const FootballRushMode: ModeDefinition = (() => {
         setTimeout(() => {
           ctx.setHud({ banner: '' });
           runner.root.position.x = 0;
+          downed = false;
+          runner.animator.play(SPORT_CLIP.idle, { loop: true });   // set at the line, not the carry-run jogging on the spot
           // a stopped play is a new SET: the front respawns in its alignment
           // and the next snap is the player's call again
           preSnap = true; preSnapT = 0;
