@@ -191,3 +191,37 @@ categories, local buzz-in for two or more players on one screen, rounds with a s
 
 **Cut risk (60 fps):** none — HUD and content; the venue mounts are the existing per-question mounts. Weak spot known
 from W1: the wide sweep on Venice measures ~933 draws against the 600 budget (venue lane, not this mission).
+
+---
+
+## Mission #3 — Court Carnival — PHASE 0 AUDIT (no code changes; written while the mission #2 sweep ran)
+
+**Benchmark (locked):** Wii Sports Resort floor + Mario Party readability. **Spec source:** as for mission #2, the pack's
+Carnival block is a recorded summary, not raw text: a party hub of minigames, a rival that plays rather than rolls, a
+scoreboard, readable from a couch.
+
+1. **Current implementation.** `lib/babylon/modes/CourtCarnivalMode.ts` (165 lines): a night = a random FOUR of six
+   events (`carnivalEvents.ts`, 349 lines: SLAM RUSH, STRIKE STORM, TRICK GAUNTLET, HOT SHOT, COIN STORM, COUNTER STRIKE;
+   each 15–20 s of one verb, built from owned systems — VenueKit courts, boardCore, aimSwingCore, CoinField). Reveal card →
+   play → result card (`YOU n · RIVAL m`) → finale (`CARNIVAL CHAMPION` / `RIVAL TAKES THE CARNIVAL`), watchdogs on every
+   phase. Host `components/games/carnival-babylon.tsx`, route `app/play/carnival`, verbs GO / TRICK / POWER / CHARGE.
+2. **Registration pattern.** `MODES.carnival` + ENABLED, flag `carnival`, dynamic import — the standard.
+3. **Reusable assets.** Everything the events already use; `HudScoreCard[]` for a scoreboard; `SceneBuzz`'s two-player
+   input split (P1 faces / P2 d-pad) from mission #2 for a second human; `mountVenue('court_carnival')` — the venue spec
+   exists ("Game Night", Carnival Court) but the mode never mounts it; each event paints its own VenueKit floor instead.
+4. **Gate 0.** Rigged bodies on stage: PASS by the sweep (carnival 0 / 0 / 0, 60 fps, 101 draws, 42 meshes).
+5. **Vitest / bundle.** 378 / 378 at this audit; bundle baseline stands.
+
+**Faults seen in the sweep frame (STRIKE STORM, 5 s left):** the mode spawns a hero at (−2, 0, 0) and a rival at (2, 0, 0)
+at load as party-goers, and the event spawns ITS OWN player — the hero body appears twice in frame. The rival never plays:
+its score is `rivalRange` × random. The stage is whatever the event paints; no Carnival Court, no crowd, no scoreboard
+between events beyond a banner line.
+
+**Gaps against the spec (Phase 3 scope):** a rival that plays (drive the rival body through a scripted attempt per event
+so the number has a body, or a second human on the d-pad taking turns), a between-events scoreboard (HudScoreCard rows),
+the Carnival Court mounted as the hub with the events dressing it rather than replacing it, one body per role (the event
+reuses the mode's hero instead of spawning another), and readable event cards (title + one-line verb + countdown at couch
+size).
+
+**Cut risk (60 fps):** the hub venue plus event props may push the wide shots past the 600-draw budget — measure before
+keeping both.
