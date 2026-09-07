@@ -8,7 +8,7 @@ import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core'
 import { dressBoard, type BoardKind } from '../visual/meshyProps';
 import type { AbstractMesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
-import { Rider, type GrindLine } from '../core/GroundRide';
+import { Rider, type RiderCfgOverrides, type GrindLine } from '../core/GroundRide';
 import { neverBindPose } from '../anim/importSanitizer';
 import type { ModeContext } from '../core/ModeHarness';
 
@@ -21,7 +21,7 @@ export interface BoardRig {
 
 export async function buildRig(
   ctx: ModeContext, heroUrl: string, start: Vector3, yaw: number,
-  ground: AbstractMesh[], boardColor: string, boardKind?: BoardKind,
+  ground: AbstractMesh[], boardColor: string, boardKind?: BoardKind, riderCfg?: RiderCfgOverrides,
 ): Promise<BoardRig> {
   if (!ground.length) throw new Error('[FEL-SPAWN] buildRig: no ground meshes — world must be built first');
   const char = await CharacterLibrary.spawn(ctx.scene, heroUrl, {
@@ -37,7 +37,7 @@ export async function buildRig(
   mat.specularColor = Color3.Black();
   board.material = mat;
   if (boardKind) void dressBoard(board, boardKind);   // owner 2026-09-05: the Meshy deck rides the box (visual only)
-  const rider = new Rider(ctx.scene, char.root, ground);
+  const rider = new Rider(ctx.scene, char.root, ground, riderCfg);
   ctx.heroRef.current = char.root;
   ctx.camDirector.setPreset('board');
   ctx.camDirector.snapTo(start, start.add(new Vector3(Math.sin(yaw) * 8, 0, Math.cos(yaw) * 8)));

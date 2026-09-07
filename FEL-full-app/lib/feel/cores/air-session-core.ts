@@ -214,7 +214,7 @@ export class AirSessionCore {
     return q;
   }
 
-  /** Mid-air trick tap — adds half a rotation. Ignored outside the Air phase. */
+  /** Mid-air trick tap — adds half a rotation (discrete skins) or starts / plants a time-based spin. Ignored outside the Air phase. */
   trick(): void {
     if (this.fsm.current !== 'Air') return;
     this.airTrick.trick();
@@ -259,6 +259,7 @@ export class AirSessionCore {
         break;
       }
       case 'Air': {
+        this.airTrick.update(dt);                       // time-based spins accumulate through the air (a no-op for the vault's discrete taps)
         s.pos.z -= Math.max(t.airForwardMin, s.speed * t.airForwardFactor) * dt;
         s.vy -= gravityAccelForVy(s.vy, g) * dt;
         s.pos.y += s.vy * dt;

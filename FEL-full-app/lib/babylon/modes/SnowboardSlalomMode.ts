@@ -17,7 +17,7 @@ import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
-import { buildSlopeRun, PISTE_HALF_WIDTH, type RideWorld } from './rideWorlds';
+import { buildSlopeRun, PISTE_HALF_WIDTH, SLOPE_PITCH, SLALOM_START, SLALOM_GATES, SLALOM_SPACING, type RideWorld } from './rideWorlds';
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -127,7 +127,12 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     async load(ctx: ModeContext) {
       world = buildSlopeRun(ctx.scene);
       propsGone = false; void mountVenueProps(ctx.scene, 'slope').then((h) => { if (propsGone) h?.dispose(); else props = h; });
-      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0.2, 4), 0, world.ground, '#ff6b3d', 'snowboard');
+      // The piste is pitched SLOPE_PITCH and drops ~56 m over the run. The Rider's flat-park defaults (6 m ground ray, hard
+      // floor at y 0) pinned the rider at y ≈ 0 above it, so rocks / the yeti (placed ON the piste) never made contact: the
+      // ray missed once the snow was > 4.5 m below and the floor clamp fired every frame below −0.5. A longer ray, a floor
+      // under the run's lowest point and the stick-down glue keep the rider on the snow (owner sign-off 2026-09-07).
+      const pisteBottomY = -Math.sin(SLOPE_PITCH) * (SLALOM_START + SLALOM_GATES * SLALOM_SPACING + 40);
+      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0.2, 4), 0, world.ground, '#ff6b3d', 'snowboard', { hardFloorY: pisteBottomY - 5, rayLength: 80, stickDown: 0.6 });
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h));
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 20, modeId: 'snowboard' });
       nextGate = 0; gatesHit = 0; elapsed = 0; ended = false; stickX = 0; tuck = 0;

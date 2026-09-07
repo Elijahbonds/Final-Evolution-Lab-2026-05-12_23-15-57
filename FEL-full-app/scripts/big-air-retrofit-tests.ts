@@ -10,7 +10,7 @@
  * component relies on so a future core change cannot silently break the surface:
  *   1. The slope self-accelerates with NO taps (negative runDrag) and launches.
  *   2. Launch impulse scales with carried run speed (weak run -> weak air).
- *   3. Mid-air trick() taps add rotation; hold-through-descent stick() upgrades
+ *   3. Mid-air trick() starts / plants a time-based spin; hold-through-descent stick() upgrades
  *      a clean landing to STUCK (2x points in the tuned grade table).
  *   4. Exactly attemptsPerRound (3) attempts, then phase Done + finished.
  *   5. The component's WIN_SCORE (1000) is reachable with strong stuck runs.
@@ -34,16 +34,18 @@ function stepUntilLeaves(c: AirSessionCore, from: string, guard = 6000): void {
   while (phaseOf(c) === from && n < guard) { c.step(DT); n++; }
 }
 
-// Play one full attempt: coast the slope to launch, do `tricks` mid-air taps,
+// Play one full attempt: coast the slope to launch, spin `turns` turns mid-air (the big-air spin is TIME-BASED since the
+// owner's 2026-09-07 decision: one tap starts it, the next plants it — the taps here are placed by watching the rotation),
 // optionally hold to stick, then ride the arc down through touchdown into Land.
-function playAttempt(c: AirSessionCore, tricks: number, stick: boolean): void {
+function playAttempt(c: AirSessionCore, turns: number, stick: boolean): void {
   // Run -> Air
   stepUntilLeaves(c, 'Run');
-  // Do the trick taps at the top of the arc.
-  for (let i = 0; i < tricks; i++) c.trick();
-  // Fly the arc; hold-to-stick during the descent like the component does.
+  if (turns > 0) c.trick();                       // start the spin at the top of the arc
+  let planted = turns <= 0;
+  // Fly the arc; plant the spin at `turns`; hold-to-stick during the descent like the component does.
   let n = 0;
   while (phaseOf(c) === 'Air' && n < 6000) {
+    if (!planted && c.state.spinTurns >= turns) { c.trick(); planted = true; }
     if (stick && c.state.vy < 0) c.stick();
     c.step(DT);
     n++;
@@ -75,21 +77,21 @@ check('launch vy scales with carried run speed via the tuned formula', () => {
 });
 
 // ---- 3. trick() rotation + stick upgrades to STUCK (2x) -------------------
-check('trick() adds rotation; hold-to-stick upgrades a clean land to STUCK', () => {
-  // Clean (no stick): two half-turns = 1.0 rotation, exact -> clean.
+check('trick() spins over time; hold-to-stick upgrades a clean land to STUCK', () => {
+  // Clean (no stick): a spin planted at 1.0 turn (within cleanTolerance) -> clean.
   const clean = makeBigAirSession();
-  playAttempt(clean, 2, false);
+  playAttempt(clean, 1, false);
   assert.strictEqual(clean.state.attempts.length, 1);
   assert.strictEqual(clean.state.attempts[0].grade, 'clean');
-  assert.ok(Math.abs(clean.state.attempts[0].rotations - 1.0) < 1e-6, 'two taps = 1.0 turn');
+  assert.ok(Math.abs(clean.state.attempts[0].rotations - 1.0) < 0.05, `planted at 1.0 turn (got ${clean.state.attempts[0].rotations})`);
 
   // Same rotation but held to stick -> STUCK, worth 2x the clean points.
   const stuck = makeBigAirSession();
-  playAttempt(stuck, 2, true);
+  playAttempt(stuck, 1, true);
   assert.strictEqual(stuck.state.attempts[0].grade, 'stuck');
   assert.ok(
-    stuck.state.attempts[0].pts === clean.state.attempts[0].pts * 2,
-    'STUCK scores exactly 2x CLEAN for the same rotation',
+    Math.abs(stuck.state.attempts[0].pts - clean.state.attempts[0].pts * 2) <= 2,
+    `STUCK scores 2x CLEAN for the same rotation (${stuck.state.attempts[0].pts} vs ${clean.state.attempts[0].pts})`,
   );
 });
 
@@ -110,7 +112,7 @@ check('round ends after attemptsPerRound (3) attempts, then finished', () => {
 check('WIN_SCORE (1000) is reachable with strong stuck landings', () => {
   const c = makeBigAirSession();
   for (let i = 0; i < BIG_AIR_TUNING.attemptsPerRound; i++) {
-    playAttempt(c, 4, true); // 4 taps = 2.0 turns, stuck
+    playAttempt(c, 2, true); // a 2.0-turn spin, stuck
     stepUntilLeaves(c, 'Land');
   }
   assert.strictEqual(c.state.phase, 'Done');

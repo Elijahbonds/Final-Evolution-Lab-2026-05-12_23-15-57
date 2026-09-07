@@ -22,6 +22,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'verb-key-alignment-tests.ts', guards: 'touch verb keys resolve for every mode' },
   { script: 'threepoint-contest-tests.ts', guards: '3PT — NBA 2K9 contest format + real arc' },
   { script: 'air-session-tests.ts', guards: 'gymnastics vault + big air on the shared core' },
+  { script: 'air-trick-spin-tests.ts', guards: 'AirTrick discrete vs time-based spin (big air can crash)' },
   { script: 'controller-link-tests.ts', guards: 'Controller Link transport + schemas' },
   { script: 'kv-signal-store-tests.ts', guards: 'Controller Link KV store is multi-instance safe' },
   { script: 'crossfade-orphan-tests.ts', guards: 'animation crossfade does not strand clips' },

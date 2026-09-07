@@ -55,6 +55,16 @@ function runToAir(core: AirSessionCore, maxFrames = 2000): void {
   throw new Error('never reached Air');
 }
 
+/** Big air's spin is TIME-BASED (owner 2026-09-07): one tap starts it, the next plants it. Spin to `turns` and plant. */
+function spinTo(core: AirSessionCore, turns: number, maxFrames = 2000): void {
+  core.trick();
+  for (let i = 0; i < maxFrames && core.state.phase === 'Air'; i++) {
+    if (core.state.spinTurns >= turns) { core.trick(); return; }
+    core.step(DT);
+  }
+  throw new Error(`never reached ${turns} turns`);
+}
+
 /** Step through the current airborne attempt until it lands (Land phase). */
 function airToLand(core: AirSessionCore, maxFrames = 2000): void {
   for (let i = 0; i < maxFrames; i++) {
@@ -124,21 +134,19 @@ check('launch impulse scales with carried run speed (weak run = weak air)', () =
 check('a completed spin lands clean and scores base + rotation points', () => {
   const core = makeBigAirSession();
   runToAir(core);
-  core.trick();
-  core.trick(); // 1.0 rotation
+  spinTo(core, 1.0);   // start, spin one turn, plant
   airToLand(core);
   assert.strictEqual(core.state.lastGrade, 'clean', `expected clean, got ${core.state.lastGrade}`);
-  assert.strictEqual(core.state.lastRotations, 1, `expected 1 rotation, got ${core.state.lastRotations}`);
+  assert.ok(Math.abs(core.state.lastRotations - 1) < 0.05, `expected ~1 rotation, got ${core.state.lastRotations}`);
   const t = BIG_AIR_TUNING;
-  const expected = Math.round((t.basePoints + 1 * t.pointsPerRotation) * t.gradePoints.clean);
+  const expected = Math.round((t.basePoints + core.state.lastRotations * t.pointsPerRotation) * t.gradePoints.clean);
   assert.strictEqual(core.state.score, expected, `clean score ${core.state.score} != ${expected}`);
 });
 
 check('stick tap upgrades the clean landing to STUCK (2× points)', () => {
   const core = makeBigAirSession();
   runToAir(core);
-  core.trick();
-  core.trick();
+  spinTo(core, 1.0);
   let stuck = false;
   for (let i = 0; i < 2000 && core.state.phase === 'Air'; i++) {
     if (!stuck && core.state.pos.y < 1.0 && core.state.vy < 0) { core.stick(); stuck = true; }
@@ -147,7 +155,7 @@ check('stick tap upgrades the clean landing to STUCK (2× points)', () => {
   assert.ok(stuck, 'should have found a stick window before touchdown');
   assert.strictEqual(core.state.lastGrade, 'stuck', `expected stuck, got ${core.state.lastGrade}`);
   const t = BIG_AIR_TUNING;
-  const expected = Math.round((t.basePoints + 1 * t.pointsPerRotation) * t.gradePoints.stuck);
+  const expected = Math.round((t.basePoints + core.state.lastRotations * t.pointsPerRotation) * t.gradePoints.stuck);
   assert.strictEqual(core.state.score, expected, `stuck score ${core.state.score} != ${expected}`);
 });
 

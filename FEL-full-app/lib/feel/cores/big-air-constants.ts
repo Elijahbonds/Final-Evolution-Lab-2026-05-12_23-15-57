@@ -50,8 +50,11 @@ export const BIG_AIR_TUNING: AirSessionTuning = {
 
 /** Big-air spin feel — bigger tolerance than a skate flip (huge airtime). // TUNE(elijah) */
 export const BIG_AIR_TRICK: AirTrickOpts = {
-  perTapRotation: 0.5, // TUNE(elijah) — half a spin per tap
-  cleanTolerance: 0.15, // TUNE(elijah)
+  perTapRotation: 0.5, // TUNE(elijah) — unused while spinRatePerSec is set (kept for a discrete fallback)
+  // Owner decision 2026-09-07: the spin is TIME-BASED — A starts it, A again plants it, and you land wherever the rotation
+  // is. With discrete half-turn taps the judge's error was always 0 and SKETCHY / CRASH could never happen.
+  spinRatePerSec: 1.2, // TUNE(elijah) — turns per second; ~2 s of air = up to ~2.4 turns
+  cleanTolerance: 0.15, // TUNE(elijah) — ±0.15 turn of a half turn is clean (≈ 250 ms of spin at 1.2 t/s)
   stickWindowMs: 220, // TUNE(elijah) — generous stick window on a big landing
 };
 

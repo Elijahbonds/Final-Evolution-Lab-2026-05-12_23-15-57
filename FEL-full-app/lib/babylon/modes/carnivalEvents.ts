@@ -130,15 +130,20 @@ export function trickGauntlet(): CarnivalEvent {
       rig = await buildRig(ctx, cfg.heroUrl, new Vector3(0, 0, -6), 0, world.ground, '#ffd75e');
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h));
       stickX = 0; pump = 0;
-      ctx.setHud({ hint: 'POP, flip in the air, chain combos before you land' });
+      ctx.setHud({ hint: 'POP, flip in the air — stick sideways + TRICK spins — chain combos before you land' });
     },
     onInput(ctx, e) {
       if (e.t === 'stick' && e.side === 'L') stickX = e.x;
       if (e.t === 'trigger' && e.side === 'R') pump = e.value;
       if (e.t === 'button' && e.pressed) {
         if (e.btn === 'A' && rig.rider.grounded) rig.rider.jump(0.6);
-        if (e.btn === 'B') tricks.start(TRICKS.flipA);
-        if (e.btn === 'Y') tricks.start(TRICKS.flipB);
+        // The carnival deck's four-button budget maps X to CHARGE (RT hold), so the 360 on X was unreachable on touch and
+        // the pad. Owner decision 2026-09-07: TRICK / POWER with the stick pushed sideways is the SPIN (FreeRun's
+        // stick-picks-the-trick rule); X still spins for keyboard / gamepad players.
+        if (e.btn === 'B' || e.btn === 'Y') {
+          if (Math.abs(stickX) > 0.5) { tricks.start(TRICKS.spin); console.info('[CARN-TRICK] spin (stick)'); }
+          else tricks.start(e.btn === 'B' ? TRICKS.flipA : TRICKS.flipB);
+        }
         if (e.btn === 'X') tricks.start(TRICKS.spin);
       }
     },

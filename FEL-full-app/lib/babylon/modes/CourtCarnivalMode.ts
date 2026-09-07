@@ -41,7 +41,7 @@ const HUB_SPOTS: [BABYLON.Vector3, BABYLON.Vector3] = [new BABYLON.Vector3(-1.5,
 const BLURB: Record<string, string> = {
   slam_rush: 'Hold CHARGE, let go at the top — every make counts',
   strike_storm: 'Mash GO · TRICK · POWER on the bag',
-  trick_gauntlet: 'Pop, flip, grab — chain tricks for score',
+  trick_gauntlet: 'Pop, flip, spin (stick + TRICK) — chain tricks for score',
   hot_shot: 'Aim, GO to power, GO to shoot — beat the keeper',
   coin_storm: 'Sprint the pattern — clear it and a fresh one drops',
   counter_strike: 'Read the wind-up, tap GO at the last instant',

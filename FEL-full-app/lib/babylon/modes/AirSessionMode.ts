@@ -115,7 +115,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       best: S.best ? GRADE_LABEL[S.best] : null,
       nextFoot: S.nextFoot,
       banner: S.banner || null,
-      hint: 'D-PAD ←/→ alternate strides · in the air ←/→ picks backside/frontside · A spin · B stick the landing',
+      hint: 'D-PAD ←/→ alternate strides · in the air ←/→ picks backside/frontside · A starts the spin, A again plants it — land on a half turn · B stick the landing',
     });
   };
 

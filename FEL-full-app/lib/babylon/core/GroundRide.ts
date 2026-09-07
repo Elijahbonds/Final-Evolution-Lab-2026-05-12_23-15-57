@@ -12,6 +12,17 @@ export interface GrindLine {
   bonus: number;
 }
 
+/** Per-world overrides for the Rider (pitched pistes need a longer ground ray and a floor below the run). */
+export interface RiderCfgOverrides {
+  /** Absolute safety floor — the rider is never allowed below this. A pitched piste sets it under its lowest point. */
+  hardFloorY?: number;
+  /** Ground raycast length from 1.5 m above the root (m). A piste that drops 45 m needs more than the flat 6. */
+  rayLength?: number;
+  /** While grounded, a surface this far below the root still counts as ridden (glued): descending a pitched slope the
+   *  ground falls away faster than gravity catches up within a frame, and without this the rider flickers airborne. */
+  stickDown?: number;
+}
+
 export class Rider {
   public vel = Vector3.Zero();
   public grounded = true;
@@ -21,18 +32,24 @@ export class Rider {
   /** M42: frames since the raycast last found ground — drives the hard clamp */
   private missedRaycasts = 0;
 
+  private cfg: { gravity: number; carveAccel: number; maxSpeed: number; drag: number; snapHeight: number; hardFloorY: number; missThreshold: number; rayLength: number; stickDown: number };
+
   constructor(
     private scene: Scene,
     public root: TransformNode,
     private groundMeshes: AbstractMesh[],
-    private cfg = {
+    overrides: RiderCfgOverrides = {},
+  ) {
+    this.cfg = {
       gravity: -14, carveAccel: 9, maxSpeed: 16, drag: 0.35, snapHeight: 0.05,
       // M42: absolute floor — the rider is NEVER allowed below this, raycast or
       // not; and how many consecutive missed raycasts trigger the hard clamp.
       hardFloorY: 0,        //TUNE(elijah): safety floor plane
       missThreshold: 6,     //TUNE(elijah): missed frames before clamp
-    },
-  ) {
+      rayLength: 6,         // flat parks; the snow piste passes ~80 (it drops ~56 m over the run)
+      stickDown: 0,         // flat parks: no glue; the snow piste passes 0.6 (see RiderCfgOverrides.stickDown)
+      ...overrides,
+    };
     if (!groundMeshes.length) {
       console.error('[FEL-SPAWN] Rider: constructed with zero ground meshes — hard floor clamp is the only thing that will hold the rider up');
     }
@@ -60,12 +77,15 @@ export class Rider {
     // gravity + ground snap via raycast (the anti-float fix)
     this.vel.y += this.cfg.gravity * dt;
     this.root.position.addInPlace(this.vel.scale(dt));
-    const ray = new Ray(this.root.position.add(new Vector3(0, 1.5, 0)), this.down, 6);
+    const ray = new Ray(this.root.position.add(new Vector3(0, 1.5, 0)), this.down, this.cfg.rayLength);
     const hit = this.scene.pickWithRay(ray, (m) => this.groundMeshes.includes(m as AbstractMesh));
     if (hit?.hit && hit.pickedPoint) {
       this.missedRaycasts = 0;
       const groundY = hit.pickedPoint.y;
-      if (this.root.position.y <= groundY + this.cfg.snapHeight) {
+      // glued: a grounded rider descending a pitched piste stays on it (the surface falls away faster than one frame of
+      // gravity); a jump sets grounded=false first, so the pop is never eaten
+      const glued = this.grounded && this.cfg.stickDown > 0 && this.root.position.y - groundY <= this.cfg.stickDown;
+      if (this.root.position.y <= groundY + this.cfg.snapHeight || glued) {
         if (!this.grounded && this.vel.y < -3) {
           // landing compression is played by the mode: animator.play('jump_land')
         }

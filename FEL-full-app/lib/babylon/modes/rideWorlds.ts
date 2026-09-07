@@ -167,19 +167,26 @@ export function buildSlopeRun(scene: Scene): RideWorld {
   const all: AbstractMesh[] = [];
   const rideable: AbstractMesh[] = [];
   const PITCH = SLOPE_PITCH;
-  const piste = MeshBuilder.CreateGround('piste', { width: PISTE_HALF_WIDTH * 2, height: 220 }, scene);
+  // The snow must cover the RUN: the last gate sits at SLALOM_START + (SLALOM_GATES − 1) × SLALOM_SPACING = 238 m down the
+  // fall line and the finish beyond it, but the piste was a 220 m ground centred on the start (−110 … +110). Nobody noticed
+  // while the rider was pinned at y ≈ 0 (see SnowboardSlalomMode's Rider overrides); once the rider actually rides the
+  // snow, it ran off the end at ~150 m and fell to the hard floor. Centre the ground on the run instead.
+  const RUN_LEN = SLALOM_START + SLALOM_GATES * SLALOM_SPACING + 60;
+  const PISTE_LEN = RUN_LEN + 40;
+  const piste = MeshBuilder.CreateGround('piste', { width: PISTE_HALF_WIDTH * 2, height: PISTE_LEN }, scene);
   piste.rotation.x = PITCH;
-  piste.position.set(0, 0, 0);
+  const pisteCentre = PISTE_LEN / 2 - 20;                      // spans −20 m (behind the start) … RUN_LEN + 20 m
+  piste.position.set(0, -Math.sin(PITCH) * pisteCentre, Math.cos(PITCH) * pisteCentre);
   piste.checkCollisions = true;
   piste.isPickable = true;
-  piste.material = paintGround(scene, 34, 220, (g, W, H) => {
+  piste.material = paintGround(scene, 34, PISTE_LEN, (g, W, H) => {
     // Pass 5 phase 7: near-white snow (#eef3f7) under a white sky read as a 211–221 mean-luminance whiteout in the
     // slalom frames. Cooler snow, denser darker groom lines and shadowed drifts give the run edges to read speed against.
     g.fillStyle = '#c6d5e4'; g.fillRect(0, 0, W, H);
     g.fillStyle = 'rgba(92,126,172,0.55)';
-    for (let i = 0; i < 700; i++) g.fillRect(Math.random() * W, Math.random() * H, 2, 16);
+    for (let i = 0; i < Math.round(700 * H / 220); i++) g.fillRect(Math.random() * W, Math.random() * H, 2, 16);
     g.fillStyle = 'rgba(70,100,150,0.32)';
-    for (let i = 0; i < 160; i++) { g.beginPath(); g.ellipse(Math.random() * W, Math.random() * H, 8 + Math.random() * 20, 2 + Math.random() * 5, 0, 0, Math.PI * 2); g.fill(); }
+    for (let i = 0; i < Math.round(160 * H / 220); i++) { g.beginPath(); g.ellipse(Math.random() * W, Math.random() * H, 8 + Math.random() * 20, 2 + Math.random() * 5, 0, 0, Math.PI * 2); g.fill(); }
     g.strokeStyle = 'rgba(120,150,175,0.25)'; g.lineWidth = 5;
     for (let i = 0; i < 14; i++) { g.beginPath(); g.moveTo((i / 14) * W, 0); g.lineTo((i / 14) * W + 30, H); g.stroke(); }
   });

@@ -64,6 +64,7 @@ for (const [name, make, tuning] of [
   if (core.state.phase === 'Air') {
     const before = core.state.spinTurns;
     core.trick();
+    core.step(DT, DT);   // a time-based spin (big air, owner 2026-09-07) accumulates on the next step; a discrete tap (vault) already added it
     ok(core.state.spinTurns > before, `D-${name} a mid-air tap adds rotation`);
     core.stick();
   }
