@@ -47,6 +47,7 @@ export class InputBus {
     window.addEventListener('keyup', this.onKey);
     window.addEventListener('gamepadconnected', this.onPad);
     window.addEventListener('gamepaddisconnected', this.onPadOff);
+    this.adoptPad();     // a pad plugged in BEFORE this page loaded never fires gamepadconnected — take it now
     this.pollPads();
   }
   stop(): void {
@@ -91,16 +92,78 @@ export class InputBus {
     if (mapped) this.emit({ ...mapped, pressed: down } as FelInput);
   };
 
-  private onPad = (ev: GamepadEvent): void => { this.padIndex = ev.gamepad.index; this.gamepadActive = true; };
-  private onPadOff = (): void => { this.padIndex = null; this.gamepadActive = false; };
+  // ── Gamepad adoption (DUNK-LIVE-INPUT-FAIL, 2026-09-07) ──
+  // ROOT CAUSE of the live /try FAIL (L stick dead, R look dead, arms frozen, hero back-facing): `padIndex` was set
+  // ONLY by `gamepadconnected`, and a DualShock that was already plugged in when the page loaded never fires it —
+  // the browser only raises the event for a pad that connects (or first reports a button press) AFTER the listener
+  // is registered. So on a real /try load with the pad already in, `pollPads` read nothing for the whole contest.
+  // The fake-Gamepad probe dispatched its own connect event after start() and so never saw it. Now: start() scans
+  // `navigator.getGamepads()` and adopts the first live slot; while no pad is held, pollPads re-scans EVERY frame
+  // (Chrome fills the slot only on the first button press — the scan catches it the frame it appears, and catches a
+  // re-plug after a disconnect); a slot that goes null / `connected === false` without an event is dropped the same
+  // way. `getGamepads()` is guarded — it throws in a document whose permissions policy denies the Gamepad API.
+  private onPad = (ev: GamepadEvent): void => { this.adopt(ev.gamepad); };
+  private onPadOff = (ev: GamepadEvent): void => {
+    if (this.padIndex !== null && ev.gamepad?.index !== undefined && ev.gamepad.index !== this.padIndex) return;   // another pad left
+    this.dropPad();
+    this.adoptPad();    // a second pad that is still in takes over at once
+  };
+  private adopt(pad: Gamepad): void {
+    if (this.padIndex === pad.index) return;
+    this.padIndex = pad.index; this.gamepadActive = true;
+    this.lastL = null; this.lastR = null;
+    console.info(`[PAD] adopted slot ${pad.index}: ${pad.id || 'gamepad'}`);
+  }
+  private dropPad(): void {
+    if (this.padIndex === null) return;
+    const idx = this.padIndex;
+    this.padIndex = null; this.gamepadActive = false;
+    // a pad yanked mid-push must not leave its last stick / trigger / button latched in every mode
+    if (this.lastL && (this.lastL.x !== 0 || this.lastL.y !== 0)) this.emit({ t: 'stick', side: 'L', x: 0, y: 0 });
+    if (this.lastR && (this.lastR.x !== 0 || this.lastR.y !== 0)) this.emit({ t: 'stick', side: 'R', x: 0, y: 0 });
+    this.lastL = null; this.lastR = null;
+    for (const k of [...this.held]) {
+      if (!k.startsWith('pad_')) continue;
+      this.held.delete(k);
+      if (k.startsWith('pad_dpad_')) this.emit({ t: 'dpad', dir: k.slice(9) as 'up' | 'down' | 'left' | 'right', pressed: false });
+      else this.emit({ t: 'button', btn: k.slice(4) as 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START', pressed: false });
+    }
+    console.info(`[PAD] dropped slot ${idx}`);
+  }
+  private readPads(): ReadonlyArray<Gamepad | null> {
+    try { return typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function' ? navigator.getGamepads() : []; }
+    catch { return []; }
+  }
+  /** Adopt the first live pad slot when none is held. Returns true when a pad is held afterwards. */
+  private adoptPad(): boolean {
+    if (this.padIndex !== null) return true;
+    for (const p of this.readPads()) {
+      if (p && p.connected !== false) { this.adopt(p); return true; }
+    }
+    return false;
+  }
+  // The pad's sticks are emitted ON CHANGE, like the keyboard's — a centred pad that emitted (0, 0) every frame
+  // overwrote a held W / ArrowUp on every mode that keeps the last stick (all of them), so with a pad plugged in the
+  // keyboard could never move the hero. Last writer wins between the two, exactly as before for two keyboards.
+  private lastL: { x: number; y: number } | null = null;
+  private lastR: { x: number; y: number } | null = null;
+  private emitStick(side: 'L' | 'R', x: number, y: number): void {
+    const last = side === 'L' ? this.lastL : this.lastR;
+    if (last && last.x === x && last.y === y) return;
+    if (side === 'L') this.lastL = { x, y }; else this.lastR = { x, y };
+    this.emit({ t: 'stick', side, x, y });
+  }
 
   private pollPads = (): void => {
+    if (this.padIndex === null) this.adoptPad();
     if (this.padIndex !== null) {
-      const pad = navigator.getGamepads()[this.padIndex];
-      if (pad) {
+      const pad = this.readPads()[this.padIndex];
+      if (!pad || pad.connected === false) {
+        this.dropPad();                              // the slot emptied without a disconnect event
+      } else {
         const dz = (v: number) => (Math.abs(v) < 0.15 ? 0 : v);
-        this.emit({ t: 'stick', side: 'L', x: dz(pad.axes[0]), y: dz(pad.axes[1]) });
-        this.emit({ t: 'stick', side: 'R', x: dz(pad.axes[2]), y: dz(pad.axes[3]) });
+        this.emitStick('L', dz(pad.axes[0] ?? 0), dz(pad.axes[1] ?? 0));
+        this.emitStick('R', dz(pad.axes[2] ?? 0), dz(pad.axes[3] ?? 0));
         this.emit({ t: 'trigger', side: 'L', value: pad.buttons[6]?.value ?? 0 });
         this.emit({ t: 'trigger', side: 'R', value: pad.buttons[7]?.value ?? 0 });
         const btns: Array<['A'|'B'|'X'|'Y'|'L1'|'R1'|'SELECT'|'START', number]> =
