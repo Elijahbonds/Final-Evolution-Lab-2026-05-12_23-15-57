@@ -24,6 +24,8 @@
 //              decides the make, so a button-only controller is not handicapped.
 //   'charge' — live 0..1 wind-up, streamed for the on-screen power ring.
 
+import { SPORT_CLIP } from '../anim/clipRegistry';
+import { SHOT_TARGET as HUD_TARGET, PERFECT_BAND as HUD_PERFECT, GOOD_BAND as HUD_GOOD, heatLevel, pointsLeft, FIRE_STREAK } from '../core/shootoutHud';
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Mesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -48,7 +50,8 @@ const GAME_LEN = 60;
 /** 2009 field size. Top FINALISTS advance from qualifying to the final round. */
 const FIELD_SIZE = 6;
 const FINALISTS = 3;
-const SHOT_TARGET = 0.72;          // release-bar sweet centre // TUNE(elijah)
+// A+ mission #4: the sweet centre and bands live in core/shootoutHud.ts so the host draws the SAME band it grades.
+const SHOT_TARGET = HUD_TARGET;
 // The real NBA three-point line is NOT a constant radius: 6.71m in the corners,
 // 7.24m at the top of the arc. The racks sit ON that line, so a corner rack is a
 // genuinely shorter shot than the top-of-key rack — which is the reason the top
@@ -69,9 +72,9 @@ const RACK_POS = RACK_ANGLES.map(
   (a) => new Vector3(RIM.x + rackRadius(a) * Math.cos(a), 0, RIM.z + rackRadius(a) * Math.sin(a)),
 );
 
-/** How wide the "perfect" window is around SHOT_TARGET. */
-const PERFECT_BAND = 0.06;         //TUNE(elijah)
-const GOOD_BAND = 0.16;            //TUNE(elijah)
+/** How wide the "perfect" window is around SHOT_TARGET (shared with the host). */
+const PERFECT_BAND = HUD_PERFECT;
+const GOOD_BAND = HUD_GOOD;
 /** Bar sweeps a full cycle in this many seconds. */
 const BAR_PERIOD = 1.15;           //TUNE(elijah)
 /** Seconds to travel between rack stations. */
@@ -233,6 +236,8 @@ function pushHud(ctx: ModeContext, banner?: string): void {
     clock: Math.max(0, Math.ceil(S.clock)),
     meter: S.phase === 'shoot' ? Number(S.barT.toFixed(2)) : null,
     money: isMoneyBall(S.ballIdx),
+    // A+ mission #4 (Wii readability): the host draws rack pips, points left and the heat from these numbers
+    rackIdx: S.rack, ballIdx: S.ballIdx, left: pointsLeft(S.rack, S.ballIdx), heat: heatLevel(S.streak),
     charge: S.charge > 0.02 ? Number(S.charge.toFixed(2)) : null,
     round: S.round === 'final' ? 'FINAL' : 'QUALIFYING',
     // The bezel renders a scorecard from {name,score,line} triples, so the
@@ -306,7 +311,7 @@ function fire(ctx: ModeContext, power?: number): void {
     if (money) SoundKit.play('crowdGroan');
   }
   S.charge = 0;
-  pushHud(ctx, made ? (perfect ? 'PERFECT' : 'GOOD') : 'MISS');
+  pushHud(ctx, made ? `${perfect ? 'PERFECT' : 'GOOD'}${S.streak >= FIRE_STREAK ? ' · ON FIRE' : ''}` : 'MISS');
 }
 
 function advanceBall(ctx: ModeContext): void {
@@ -551,6 +556,10 @@ export const ThreePointMode: ModeDefinition = {
           f.score = simulateRival(S.skills[idx - 1] ?? 0.5, S.round);
           f.shot = true;
           SoundKit.play('uiTick', { pitch: 0.8 + f.score * 0.02, volume: 0.4 });
+          // A+ mission #4: the body on the sideline ANSWERS its number — a big round celebrates, a poor one flinches.
+          // (Lock D4 rules out visible rival shooting; a reaction to the posted score is not a shot.)
+          const body = rivalBodies[RIVAL_NAMES.indexOf(f.name)];
+          if (body) body.animator.play(f.score >= 16 ? SPORT_CLIP.scoreCelebrate : SPORT_CLIP.karateHitReact, { onEnd: () => body.animator.play('idle_stand', { loop: true }) });
           pushHud(ctx);
         }
         return;

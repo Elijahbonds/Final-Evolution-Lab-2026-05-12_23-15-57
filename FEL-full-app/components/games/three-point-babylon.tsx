@@ -15,6 +15,7 @@ import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
+import { rackPips, SHOT_TARGET, PERFECT_BAND, GOOD_BAND } from '@/lib/babylon/core/shootoutHud';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { HostLobby } from '@/components/controller-link/host-lobby';
 import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
@@ -130,28 +131,55 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
         />
       )}
 
+      {/* A+ mission #4 — Wii Sports Resort readability on top of the 2K contest: the score and the clock at couch size,
+          the rack as pips (money ball gold, the loaded ball pulsing), points left, the heat, and a wide release meter
+          under the shooter drawn from the SAME bands the mode grades with. */}
       {phase === 'playing' && (
-        <div className="pointer-events-none absolute left-4 top-4 z-20 font-mono text-xs text-white">
-          <div className="text-2xl font-bold text-[#ffd75e]">{hnum(hud.score)}</div>
-          <div className="text-white/60">RACK {String(hud.rack ?? '—')} · BALL {String(hud.ball ?? '—')}</div>
-          <div className="text-white/60">{hnum(hud.clock)}s · streak {hnum(hud.streak)}</div>
+        <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex flex-col items-center gap-1.5 font-mono text-white">
+          <div className="flex items-end gap-5">
+            <div className="fel-panel px-5 py-1.5 text-5xl font-black leading-none text-[#ffd75e]">{hnum(hud.score)}</div>
+            <div className={`fel-panel px-4 py-2 text-3xl font-bold leading-none ${Number(hud.clock) <= 10 ? 'text-[#ff2d78]' : 'text-white'}`}>{hnum(hud.clock)}s</div>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] tracking-widest">
+            <span className="fel-panel px-2 py-0.5 text-white/70">{String(hud.round ?? 'QUALIFYING')}</span>
+            {hud.money ? <span className="fel-panel px-2 py-0.5 font-bold text-[#ffd75e]">MONEY BALL · 2 PTS</span> : null}
+            {hud.heat === 'fire' ? <span className="fel-panel px-2 py-0.5 font-bold text-[#ff6a00]">ON FIRE ×{hnum(hud.streak)}</span>
+              : Number(hud.streak) >= 2 ? <span className="fel-panel px-2 py-0.5 text-[#ffb347]">streak ×{hnum(hud.streak)}</span> : null}
+            {typeof hud.left === 'number' && <span className="fel-panel px-2 py-0.5 text-white/60">{hud.left} LEFT</span>}
+          </div>
+          {typeof hud.rackIdx === 'number' && typeof hud.ballIdx === 'number' && (
+            <div className="flex items-center gap-3">
+              {rackPips(hud.rackIdx, hud.ballIdx).map((row, r) => (
+                <div key={r} className="flex items-center gap-1 rounded bg-black/45 px-1.5 py-1">
+                  {row.map((p, b) => (
+                    <span
+                      key={b}
+                      className={`inline-block rounded-full ${p.money ? 'h-3 w-3' : 'h-2.5 w-2.5'} ${p.state === 'next' ? 'animate-pulse ring-2 ring-white' : ''}`}
+                      style={{ background: p.state === 'taken' ? 'rgba(255,255,255,0.18)' : p.money ? '#ffd75e' : '#e8742c', opacity: p.state === 'ahead' ? 0.85 : 1 }}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="hidden">RACK {String(hud.rack ?? '—')} · BALL {String(hud.ball ?? '—')}</div>
           {/* The contest layer publishes round/money/need/board — all four
               used to be computed every frame and rendered NOWHERE (the classic
               "HUD state is not a bezel" trap; only the dev route's JSON dump
               ever showed them). This is the contest the player is in. */}
-          <div className="mt-0.5 text-[10px] tracking-widest text-white/50">
-            {String(hud.round ?? 'QUALIFYING')}
-            {hud.money ? ' · MONEY BALL' : ''}
-          </div>
-          {typeof hud.meter === 'number' && <ReleaseBar t={hud.meter} />}
           {typeof hud.need === 'number' && (
-            <div className="mt-1 inline-block rounded bg-[#ff2d78]/20 px-2 py-0.5 text-[#ff2d78]">
-              NEED {hnum(hud.need)} TO WIN
-            </div>
+            <div className="fel-panel px-3 py-1 text-sm font-bold text-[#ff2d78]">NEED {hnum(hud.need)} TO WIN</div>
           )}
+        </div>
+      )}
+
+      {/* the release meter + the call — bottom centre, under the shooter, couch-size */}
+      {phase === 'playing' && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 flex flex-col items-center gap-2 font-mono">
           {typeof hud.banner === 'string' && hud.banner && (
-            <div className="mt-2 text-[#00E5FF]">{hud.banner}</div>
+            <div className={`fel-heading fel-panel px-5 py-1.5 text-3xl font-black ${hud.banner.startsWith('MISS') ? 'text-white/70' : 'text-[#00E5FF]'}`}>{hud.banner}</div>
           )}
+          {typeof hud.meter === 'number' && <ReleaseBar t={hud.meter} />}
         </div>
       )}
 
@@ -176,12 +204,15 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   );
 }
 
-/** The timing bar the whole mode hangs on — sweet spot marked at SHOT_TARGET. */
+/** The timing bar the whole mode hangs on — the GOOD and PERFECT bands drawn from the mode's own constants. */
 function ReleaseBar({ t }: { t: number }) {
+  const good = { left: `${(SHOT_TARGET - GOOD_BAND) * 100}%`, width: `${GOOD_BAND * 200}%` };
+  const perfect = { left: `${(SHOT_TARGET - PERFECT_BAND) * 100}%`, width: `${PERFECT_BAND * 200}%` };
   return (
-    <div className="relative mt-2 h-3 w-44 overflow-hidden rounded bg-white/10">
-      <div className="absolute inset-y-0 w-[12%] bg-[#22d3ee]/40" style={{ left: '66%' }} />
-      <div className="absolute inset-y-0 w-[3px] bg-white" style={{ left: `${t * 100}%` }} />
+    <div className="relative h-5 w-[min(520px,70vw)] overflow-hidden rounded-md border border-white/20 bg-black/55">
+      <div className="absolute inset-y-0 bg-[#22d3ee]/35" style={good} />
+      <div className="absolute inset-y-0 bg-[#ffd75e]/80" style={perfect} />
+      <div className="absolute inset-y-0 w-[4px] -translate-x-1/2 bg-white shadow-[0_0_8px_#fff]" style={{ left: `${t * 100}%` }} />
     </div>
   );
 }
