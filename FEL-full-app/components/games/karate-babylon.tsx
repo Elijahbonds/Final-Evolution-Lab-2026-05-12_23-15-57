@@ -86,7 +86,9 @@ export default function KarateBabylon({ onEnd }: GameProps) {
     emit({ t: 'button', btn: 'START', pressed: true });
   }, [emit]);
 
-  const hp = Number(hud.hp ?? 100);
+  // A+ identity P0: the endless mode publishes NO hp — one clean contact puts you down — so the bar draws only when a
+  // mode does publish one (the 1v1 modes still do).
+  const hp = hud.hp == null ? null : Number(hud.hp);
   const chi = Number(hud.chi ?? 0);
 
   return (
@@ -96,9 +98,11 @@ export default function KarateBabylon({ onEnd }: GameProps) {
       {/* HUD bezel */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-4 py-3">
         <div className="min-w-[7rem] space-y-1">
-          <div className="h-2 w-full overflow-hidden rounded-full bg-black/50">
-            <div className="h-full rounded-full bg-[#FF3366] transition-all" style={{ width: `${Math.max(0, Math.min(100, hp))}%` }} />
-          </div>
+          {hp !== null && (
+            <div className="h-2 w-full overflow-hidden rounded-full bg-black/50">
+              <div className="h-full rounded-full bg-[#FF3366] transition-all" style={{ width: `${Math.max(0, Math.min(100, hp))}%` }} />
+            </div>
+          )}
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/50">
             <div className="h-full rounded-full bg-[#00E5FF] transition-all" style={{ width: `${Math.max(0, Math.min(100, chi))}%` }} />
           </div>

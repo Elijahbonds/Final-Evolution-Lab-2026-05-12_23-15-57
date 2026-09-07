@@ -44,7 +44,7 @@ import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
 import {
   waveSpec, spawnRing, buyPerk, PERKS, DownRevive, REVIVE_RANGE,
-  surroundedCount, crowdClear, CROWDCLEAR_RADIUS, JUGGLE_DAMAGE_MULT, JUGGLE_LAUNCH_SEC, inArc,
+  surroundedCount, crowdClear, CROWDCLEAR_RADIUS, inArc,
 } from '../core/OnslaughtCore';
 
 /**
@@ -78,7 +78,9 @@ const STRIKES = {
 const HIT_CHAIN_MS = 1400;
 
 // horde sizing — deliberately bigger/faster than the old wave-survival pace
-const WAVE = { base: 4, max: 12, growEvery: 1, hpBase: 22, hpPerWave: 4 };
+// A+ identity P0 (PM brief 2026-09-06): ONE SOLID STRIKE DROPS A BODY. No enemy HP pool, no chip — the wave escalates
+// by count and speed, never by sponge. (hpBase 22 / hpPerWave 4 made jab 12 / kick 18 chip and only heavy one-tapped.)
+const WAVE = { base: 4, max: 12, growEvery: 1 };
 const DODGE_TAP_MS = 220;          // hold longer than this = block, not dodge
 const DODGE_IFRAME_SEC = 0.38;
 const DODGE_DISTANCE = 3.2;
@@ -127,7 +129,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   let playerSlot: PlayerSlot, partnerSlot: PlayerSlot, localSource: LocalInputSource;
   let pool: MobPool;
   let enemies: Enemy[] = [];
-  let wave = 0, kos = 0, totalKos = 0, playerHp = 100, partnerHp = 100, chi = 0;
+  let wave = 0, kos = 0, totalKos = 0, chi = 0;   // no player HP: one clean contact puts you DOWN (P0 identity)
   // Phase 8: perks, down/revive, crowd-clear
   const ownedPerks = new Set<string>();
   const myDown = new DownRevive();
@@ -185,7 +187,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const mob = new Mob(char, STEERING_PRESETS[archetype]);
     mob.startPursuit();
     pool.add(mob);
-    enemies.push({ mob, hp: WAVE.hpBase + wave * WAVE.hpPerWave, maxHp: WAVE.hpBase + wave * WAVE.hpPerWave, airUntil: 0 });
+    enemies.push({ mob, hp: 1, maxHp: 1, airUntil: 0 });   // one-knock: any land sets hp 0 → KO
   }
 
   async function spawnWave(ctx: ModeContext): Promise<void> {
@@ -204,7 +206,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const proms: Promise<void>[] = [];
     for (let i = 0; i < count; i++) proms.push(spawnEnemy(ctx, (i / count) * Math.PI * 2 + wave, i));
     await Promise.all(proms);
-    ctx.setHud({ wave, enemies: count, hp: playerHp, chi });
+    ctx.setHud({ wave, enemies: count, chi });
   }
 
   const nearest = (from: Vector3): Enemy | null =>
@@ -261,7 +263,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         if (k >= 1) ctx.scene.onBeforeRenderObservable.remove(obs);
       });
       EffectsKit.burst(ctx.scene, from.add(new Vector3(0, 1, 0)), 'sparks');
-      landHit(ctx, e, CHI_BURST_DAMAGE);
+      landHit(ctx, e, true);                                   // the burst launches every body it clears
     }
     chi = 0; ctx.setHud({ chi });
     bursting = false;
@@ -285,23 +287,22 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       if (!hit.length) { if (performance.now() - lastHitAt > HIT_CHAIN_MS) { hitCount = 0; ctx.setHud({ hits: 0 }); } return; }
       const now = performance.now();
       if (now - lastHitAt > HIT_CHAIN_MS) hitCount = 0;
-      for (const t of [...hit]) {
-        const airborne = t.airUntil > now;
-        landHit(ctx, t, s.dmg * (airborne ? JUGGLE_DAMAGE_MULT : 1));
-        if (s.launch && t.hp > 0) t.airUntil = now + JUGGLE_LAUNCH_SEC * 1000;
-      }
+      for (const t of [...hit]) landHit(ctx, t, !!s.launch);   // one contact = one body down; heavy adds launch juice
       hitCount += hit.length; lastHitAt = now;
       ctx.setHud({ hits: hitCount });
       if (hit.length >= 3) ctx.feel?.impact?.(0.55);
     }, 150);
   }
 
-  function landHit(ctx: ModeContext, t: Enemy, dmg: number): void {
-    t.hp -= Math.round(dmg * dmgMult);
+  /** A land is a KO. Revolutions weight: the body drops on ONE solid strike — no damage math, no second hit to
+   *  finish. A heavy (launch) strike lands harder for juice; it never needs a follow-up. */
+  function landHit(ctx: ModeContext, t: Enemy, launch: boolean): void {
+    t.hp = 0;
     gainChi(ctx, 8);
-    ctx.feel?.impact?.(0.35);
+    ctx.feel?.impact?.(launch ? 0.55 : 0.35);
     EffectsKit.burst(ctx.scene, t.mob.char.root.position.add(new Vector3(0, 1.1, 0)), 'sparks');
-    if (t.hp <= 0) ko(ctx, t); else t.mob.char.animator.play(SPORT_CLIP.karateHitReact, {});
+    if (launch) EffectsKit.burst(ctx.scene, t.mob.char.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
+    ko(ctx, t);
   }
 
   function ko(ctx: ModeContext, e: Enemy): void {
@@ -385,13 +386,13 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       ), false);
 
       pool = new MobPool();
-      wave = 0; totalKos = 0; playerHp = 100; partnerHp = 100; chi = 0; enemies = [];
+      wave = 0; totalKos = 0; chi = 0; enemies = [];
       striking = false; blocking = false; dodging = false; xHoldSec = -1; iframeSec = 0; slowMoSec = 0;
       ctx.camDirector.snapTo(player.root.position, player.root.position.add(facingVec()));
       karateVenue?.hidePlaceholders();  // M74
       SoundKit.startAmbient('dojo');
       await spawnWave(ctx);
-      ctx.setHud({ hp: playerHp, partnerHp, chi, hint: 'Quick-tap BLOCK to dodge · hold BLOCK to guard · R1 = CHI BURST at full' });
+      ctx.setHud({ chi, hint: 'One strike drops a body · one clean hit drops YOU — quick-tap BLOCK to dodge, hold to guard · R1 = CHI BURST' });
     },
 
     onInput(ctx, e: FelInput) {
@@ -419,9 +420,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       if (myDown.downed) {
         const near = Vector3.Distance(partner.root.position, player.root.position) <= REVIVE_RANGE;
         if (myDown.channel(dtReal, near)) {
-          playerHp = Math.round(100 * myDown.revive());
+          myDown.revive();
           SoundKit.play('powerUp', { pitch: 1.1 });
-          ctx.setHud({ hp: playerHp, banner: 'REVIVED — BACK IN THE FIGHT' });
+          ctx.setHud({ banner: 'REVIVED — BACK IN THE FIGHT' });
           player.animator.play(STANCE, { loop: true });
           setTimeout(() => ctx.setHud({ banner: '' }), 900);
         }
@@ -432,9 +433,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       if (partnerDown.downed) {
         if (revivingPartner && Vector3.Distance(player.root.position, partner.root.position) <= REVIVE_RANGE) {
           if (partnerDown.channel(dtReal, true)) {
-            partnerHp = Math.round(100 * partnerDown.revive());
+            partnerDown.revive();
             SoundKit.play('powerUp', { pitch: 1.1 });
-            ctx.setHud({ partnerHp, banner: 'PARTNER REVIVED!' });
+            ctx.setHud({ banner: 'PARTNER REVIVED!' });
             setTimeout(() => ctx.setHud({ banner: '' }), 900);
           } else {
             ctx.setHud({ revive: Math.round(partnerDown.channelSec / 3 * 100) });
@@ -490,7 +491,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       if (pIntent.action) {
         const t = nearest(partner.root.position);
         partner.animator.play(SPORT_CLIP.karateJab, { onEnd: () => partner.animator.play(STANCE, { loop: true }) });
-        if (t && Vector3.Distance(t.mob.char.root.position, partner.root.position) < 1.8) landHit(ctx, t, 10);
+        if (t && Vector3.Distance(t.mob.char.root.position, partner.root.position) < 1.8) landHit(ctx, t, false);   // the partner's land drops a body too
       }
 
       // enemy contact — dodge i-frames make you untouchable; a hit landed
@@ -509,27 +510,27 @@ export const KarateEndlessMode: ModeDefinition = (() => {
           gainChi(ctx, 5);
           continue;
         }
-        playerHp -= blocking ? 3 : 10;
-        gainChi(ctx, blocking ? 2 : 4);
         mob.onContactResolved();
-        if (!blocking) { player.animator.play(SPORT_CLIP.karateHitReact, {}); ctx.feel?.impact?.(0.4); }
-        ctx.setHud({ hp: Math.max(0, playerHp) });
-        if (playerHp <= 0) {
-          // Phase 8 co-op rule: go DOWN (not out) while the partner stands;
-          // they can revive you. Both down (or no partner alive) = run over.
-          if (!partnerDown.downed && partnerHp > 0 && !myDown.downed) {
-            myDown.down(clockSec);
-            playerHp = 0;
-            SoundKit.play('crowdGroan');
-            player.animator.play(SPORT_CLIP.karateKnockdown, {});
-            ctx.setHud({ banner: 'YOU ARE DOWN — PARTNER CAN REVIVE YOU', hp: 0 });
-          } else if (myDown.downed) {
-            // already down and got hit again — nothing to do
-          } else {
-            SoundKit.play('crowdGroan');
-            player.animator.play(SPORT_CLIP.karateKnockdown, { onEnd: () => {} });
-            return ctx.end(`WAVE_${wave}`, totalKos * 100 + wave * 50, { wave, kos: totalKos });
-          }
+        if (blocking) {
+          // a guard ABSORBS the hit — pressure, not chip: no bar ticks down
+          gainChi(ctx, 2); ctx.feel?.impact?.(0.2);
+          SoundKit.play('impact', { pitch: 0.8, volume: 0.3 });
+          continue;
+        }
+        // ONE CLEAN CONTACT PUTS YOU DOWN (P0 identity — no 3 / 10 chip, no HP bar as the loop).
+        gainChi(ctx, 4);
+        ctx.feel?.impact?.(0.6);
+        if (myDown.downed) continue;                         // already down — nothing more to take
+        if (!partnerDown.downed) {
+          // Phase 8 co-op rule kept: DOWN (not out) while the partner stands — they can revive you
+          myDown.down(clockSec);
+          SoundKit.play('crowdGroan');
+          player.animator.play(SPORT_CLIP.karateKnockdown, {});
+          ctx.setHud({ banner: 'YOU ARE DOWN — PARTNER CAN REVIVE YOU' });
+        } else {
+          SoundKit.play('crowdGroan');
+          player.animator.play(SPORT_CLIP.karateKnockdown, { onEnd: () => {} });
+          return ctx.end(`WAVE_${wave}`, totalKos * 100 + wave * 50, { wave, kos: totalKos });
         }
       }
 
@@ -554,7 +555,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   };
 })();
 
-// HUD fields introduced: partnerHp (0-100, your ally's health — currently
+// HUD fields: no hp / partnerHp since the A+ identity P0 (one-knock both ways). Formerly: partnerHp (0-100 — currently
 // cosmetic since the ally can't be knocked out in this pass; wire a real
 // down-state if wanted). Existing fields (wave, enemies, hp, chi, kos,
 // banner, hint) unchanged.
