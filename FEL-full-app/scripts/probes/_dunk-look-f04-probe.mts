@@ -43,11 +43,11 @@ await p.evaluate(`(() => {
   const V = scene.activeCamera.position.constructor;
   setInterval(() => { const h = dev.hero(); if (!h) return; const cam = scene.activeCamera; if (!cam) return;
     const right = cam.getDirection(new V(1, 0, 0));
-    window.__smp.rows.push({ t: performance.now(), x: h.position.x, z: h.position.z, cx: cam.position.x, cz: cam.position.z, cry: cam.rotation.y, crx: right.x,
+    window.__smp.rows.push({ t: performance.now(), x: h.position.x, z: h.position.z, cx: cam.position.x, cz: cam.position.z, cry: cam.rotation.y, crx: right.x, fps: scene.getEngine().getFps(),
       prop: (document.body.innerText.match(/(NO PROP|ALLEY-OOP|OBSTACLE)/) || ['?'])[0] });
   }, 33);
 })()`);
-type Row = { t: number; x: number; z: number; cx: number; cz: number; cry: number; crx: number; prop: string };
+type Row = { t: number; x: number; z: number; cx: number; cz: number; cry: number; crx: number; fps: number; prop: string };
 const mark = async (): Promise<number> => p.evaluate('performance.now()') as Promise<number>;
 const rows = async (a: number, z: number): Promise<Row[]> => (await p.evaluate('window.__smp.rows') as Row[]).filter((r) => r.t >= a && r.t <= z);
 const wrap = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a));
@@ -87,7 +87,8 @@ const drag = async (zone: typeof lookZone, dx: number, dy: number, defl: number,
   chk('A LOOK release springs back (< 5° after 1.8 s)', Math.abs(dAfter) < 0.09, `Δ after ${deg(dAfter)}`);
   chk('A LOOK did not move the hero', Math.hypot(settled.x - before.x, settled.z - before.z) < 0.05, `moved ${Math.hypot(settled.x - before.x, settled.z - before.z).toFixed(3)} m`);
   chk('A LOOK right yaws the VIEW right (cam.rotation.y rises)', dir !== 0 && Math.sign(wrap((held[held.length - 1]?.cry ?? 0) - before.cry)) > 0, `sign(Δcam.ry held)=${Math.sign(wrap((held[held.length - 1]?.cry ?? 0) - before.cry))}`);
-  chk('A the mode logged the R stick', lookLog.length > 0, lookLog.join(' | ') || 'no [LOOK] line'); }
+  chk('A the mode logged the R stick', lookLog.length > 0, lookLog.join(' | ') || 'no [LOOK] line');
+  const fps = held.concat(after).map((r) => r.fps); console.log(`      render fps during the drag: min ${Math.min(...fps).toFixed(0)} / mean ${(fps.reduce((s, v) => s + v, 0) / fps.length).toFixed(0)} — look() integrates per rendered frame, so a slow headless run UNDER-reads a 60 fps thumb`); }
 
 // ── B: LOOK drag LEFT mirrors
 { const before = (await rows(await mark() - 300, await mark())).pop()!;
