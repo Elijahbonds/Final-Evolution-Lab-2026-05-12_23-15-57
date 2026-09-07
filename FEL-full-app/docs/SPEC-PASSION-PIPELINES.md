@@ -115,7 +115,10 @@ lookahead scheduler's 100 ms window; no new dependency (Web Audio only).
   the running pattern at the step under the playhead. The Academy (`/play/music`) gains a FLIP tab; flip tracks show in the
   STUDIO grid as `FLIP n`. The Creator hub's Music tile now points at `/play/music` (it pointed at the code studio).
 - Probe `scripts/probes/_flip-diag.mts`: stem → 8 slices, key `1` → pad 1 played, touch → pad 2 played, GRID reslices, no
-  page errors. Phone-pad face buttons over the key bridge: next (M1b).
+  page errors. 
+- **M1b (phone = the pad controller)**: the controller link's button schema gains a generic `columns` hint; `music_flip`
+  declares a 4×4 bank of sixteen `pad_<n>` actions; the FLIP tab mounts the host lobby (room code + QR badge) and routes
+  `pad_<n>` to the pad component's trigger (`padFromAction`, tested). Pairing is the existing WebRTC link.
 
 ## Lane 3 — Who Scene It as a mode + Scene Packs
 
