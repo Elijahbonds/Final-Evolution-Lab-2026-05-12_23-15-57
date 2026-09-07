@@ -117,6 +117,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let ended = false;
   let restSec = 0;                 // pause between points
   let heroStreak = 0;              // M107: consecutive points won → tension/hype
+  // A+ P0 juice (PM brief NET-PRECISION-A-PLUS-P0, 2026-09-06): the GAME win is a latched hit-stop + shake + gold flash +
+  // score pop — NO slowMo (juice.impact({ slow: true }) is forbidden here, same rule as the dunk). One thud per beat.
+  let gameLatch = false;
 
   const HERO_SIDE = 1;             // hero defends +Z, opponent defends −Z
 
@@ -171,6 +174,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       heroStreak++;
       ctx.juice.scorePop(netPop, `+1 ${o.hudLabels.you}`, '#00FF9D');
       ctx.feel.impact(0.22);
+      ctx.juice.shake(0.05, 90);   // A+ P0: a soft shake on your point — no slowMo, no hit-stop beyond the feel hit's own
+      console.info('[NET-JUICE] point won');
     } else {
       heroStreak = 0;
       ctx.juice.scorePop(netPop, o.hudLabels.them, '#FF3366');
@@ -178,7 +183,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
     if (result === 'match' || result === 'set') {
       ended = true;
-      if (side === 0) ctx.juice.impact(netPop, 'GAME!', { color: '#FFD700', slow: true });
+      if (side === 0) gameWinPunch(ctx, netPop);   // A+ P0: was juice.impact(..., { slow: true }) — the forbidden slowMo; same punch without it
       else ctx.juice.flash('#FF3366', 260);
       flash(ctx, side === 0 ? 'YOU WIN' : 'YOU LOSE', 2500);
       ctx.end(
@@ -194,6 +199,17 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       flash(ctx, `${why} — ${side === 0 ? o.hudLabels.you : o.hudLabels.them}`, 1100);
     }
     restSec = 1.4;
+  }
+
+  /** A+ P0: the GAME win — hit-stop + shake + gold flash + the GAME! pop, latched once. No slowMo. The score SFX + YOU WIN banner stay. */
+  function gameWinPunch(ctx: ModeContext, at: Vector3): void {
+    if (gameLatch) return;
+    gameLatch = true;
+    ctx.juice.hitStop(60);
+    ctx.juice.shake(0.14, 150);
+    ctx.juice.flash('#FFD700', 140);
+    ctx.juice.scorePop(at, 'GAME!', '#FFD700');
+    console.info('[NET-JUICE] game win punch');
   }
 
   /** Begin a flight from `from` toward `toSide`, with a quality already graded. */
@@ -419,9 +435,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
     EffectsKit.burst(ctx.scene, at, 'sparks');
     ctx.juice.scorePop(at, 'STUFF!', '#00E5FF');
-    ctx.feel.impact(0.5);
+    ctx.feel.impact(0.5);          // A+ P0: ONE thud — feel.impact plays its own; the second impact SFX that stacked on it is gone
     ctx.juice.shake(0.16, 140);
-    SoundKit.play('impact', { pitch: 1.35, volume: 0.6 });
+    console.info('[NET-JUICE] stuff');
     shot = null;
     // SIDE 0 IS THE HERO. This read `1` — so every successful stuff handed the
     // point to the opponent, which is the reverse of what a block is for. It
@@ -465,8 +481,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     if (q === 'perfect') {
       EffectsKit.burst(ctx.scene, swingPos, 'sparks');
       ctx.juice.scorePop(swingPos, 'PERFECT!', '#00E5FF');
-      ctx.feel.impact(0.4);
+      ctx.feel.impact(0.4);        // A+ P0: the one thud (+ its own 50 ms freeze) — no extra hit-stop, no second impact SFX
       ctx.juice.shake(0.08, 90);
+      console.info('[NET-JUICE] perfect swing');
     } else if (q === 'good') {
       ctx.juice.scorePop(swingPos, 'NICE', '#00FF9D');
     }
@@ -479,8 +496,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     ctx.setHud({ shotType: label, touch: o.cfg.touchesPerSide > 1 ? `${touchNo}/${o.cfg.touchesPerSide}` : '' });
     setTimeout(() => ctx.setHud({ shotType: '' }), 500);
     if (touchKind === 'spike' && q === 'perfect') {
-      SoundKit.play('impact', { pitch: 1.2, volume: 0.6 });
-      ctx.juice.shake(0.14, 130);
+      ctx.juice.shake(0.14, 130);   // A+ P0: the spike's extra impact SFX stacked a second thud on the PERFECT feel hit — shake only now
     }
     // Holding THEIR Zone Shot is the same test in reverse: anything short of a
     // perfect read costs you a racket, and the third one ends the match on the
@@ -568,7 +584,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       rally = new RallyState(o.cfg);
       tennisScore = o.scoring === 'tennis' ? new TennisScore(4) : null;
       volleyScore = o.scoring === 'volley' ? new VolleyScore(25) : null;
-      ended = false; restSec = 0.8; shot = null; aimX = 0; heroStreak = 0;
+      ended = false; restSec = 0.8; shot = null; aimX = 0; heroStreak = 0; gameLatch = false;
 
       ctx.heroRef.current = me.root;
       ctx.objectiveRef.current = new Vector3(0, o.cfg.netHeight, 0);

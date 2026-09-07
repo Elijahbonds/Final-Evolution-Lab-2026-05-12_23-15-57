@@ -242,6 +242,7 @@ export const GolfMode: ModeDefinition = (() => {
   let club = 0;                       // which club is in hand
   let wind = new Vector3();           // per-hole wind, applied in flight
   let strokes = 0, overPar = 0;       // golf is scored in strokes against par
+  let holeLatch = false;              // A+ P0 juice: one holed punch per hole
   let pickUps = 0;   // triple-par pick-ups this round (owner decision 2026-09-05)
   /** Stick-swing state. Runs ALONGSIDE the 3-click swing, never replacing it:
    *  a stick swing does not express on a touch overlay and 3-click is the
@@ -294,6 +295,7 @@ export const GolfMode: ModeDefinition = (() => {
     // HOLE PREVIEW — fly the camera to the green, look back at the tee.
     // Pure camDirector.snapTo, timer-bounded, cannot stall.
     strokes = 0;
+    holeLatch = false;                // A+ P0: a new hole gets its own punch
     settling = false;
     // COURSE READING — the third pillar, and none of its inputs existed. Wind
     // is the cheapest honest one: it is visible in the HUD before you commit,
@@ -553,6 +555,8 @@ export const GolfMode: ModeDefinition = (() => {
             overPar += rel; pickUps++;
             pts += Math.round(Math.max(20, 120 - rel * 40));
             SoundKit.play('miss'); gallery?.cheer(0.2);
+            ctx.feel?.impact?.(0.15);   // A+ P0: a pick-up is a light feel only — never the make punch
+            console.info('[GOLF-JUICE] pick-up (light feel)');
             holeResults.push({ hole: round, par: parNow, strokes, pickedUp: true });
             ctx.setHud({ score: pts, strokes, card: card(), meterT: null, swingPhase: null, powerLock: null, banner: `PICKED UP — ${why} · ${strokes} on a par ${parNow}`, board: holeBoard(holeResults, TOTAL), boardTitle: round >= TOTAL ? 'CARD IN' : `NEXT — HOLE ${round + 1}` });
             settling = true;
@@ -572,6 +576,8 @@ export const GolfMode: ModeDefinition = (() => {
             const back = holePos.subtract(new Vector3(0, 0, 14));
             ball.position.set(back.x, 0.05, Math.max(1, back.z));
             SoundKit.play('miss');
+            ctx.feel?.impact?.(0.15);   // A+ P0: OB is a light feel only
+            console.info('[GOLF-JUICE] out of bounds (light feel)');
             ctx.setHud({ banner: `OUT OF BOUNDS — penalty stroke (${strokes})`, strokes });
             settling = true;
             setTimeout(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1300);
@@ -606,6 +612,14 @@ export const GolfMode: ModeDefinition = (() => {
           pts += gained;
           SoundKit.play('score', { pitch: rel < 0 ? 1.35 : 1 });
           gallery?.cheer(rel <= 0 ? 1 : 0.4);      // louder for a birdie than a bogey
+          // A+ P0 juice (PM brief NET-PRECISION-A-PLUS-P0): the hole drops — under par gets hit-stop + shake + a short gold
+          // flash; par a softer shake; over par the lightest. Latched once per hole. No thud added (the score SFX is the sound).
+          if (!holeLatch) {
+            holeLatch = true;
+            if (rel < 0) { ctx.juice.hitStop(50); ctx.juice.shake(0.12, 150); ctx.juice.flash('#FFD700', 120); }
+            else ctx.juice.shake(rel === 0 ? 0.08 : 0.05, 120);
+            console.info(`[GOLF-JUICE] holed ${rel < 0 ? 'under par (flash)' : rel === 0 ? 'par' : 'over par'}`);
+          }
           ctx.setHud({
             score: pts, strokes, card: card(), meterT: null, swingPhase: null, powerLock: null,
             banner: `${name} — ${strokes} on a par ${par}${clutch ? ' · CLUTCH' : ''}`,
@@ -703,11 +717,13 @@ export const DerbyMode: ModeDefinition = (() => {
   const TOTAL = 20;
   let tally: DerbyTally = freshDerby();
   let rivalTarget = 0;                 // the rival's homers for the round, ticking in through it
+  let homerLatch = false;              // A+ P0 juice: the homer's ONE punch per pitch
   const lastOut = (): boolean => tally.outs === OUTS_CAP - 1;
 
   function pitch(ctx: ModeContext): void {
     round++;
     swung = false; incoming = true;
+    homerLatch = false;                // A+ P0: one homer punch per pitch
     ctx.heroRef.current = me.root;   // back to the batter (see contact branch)
     // CUT, don't ease — the follow cam ends a dinger forty metres downfield,
     // and easing back spent ~2s with the batter off-frame (the residual
@@ -819,7 +835,6 @@ export const DerbyMode: ModeDefinition = (() => {
         const cover = off <= PCI_PURE_M ? 1
           : Math.max(0, 1 - (off - PCI_PURE_M) / (PCI_MISS_M - PCI_PURE_M));
         const q = timing * (0.25 + 0.75 * cover);
-        ctx.feel?.impact?.(0.3 + q * 0.5);
         const clutch = round === TOTAL || lastOut();
         // Where you met the ball decides the launch: under it lifts, on top of
         // it drives the ball into the dirt. That is the PCI doing the job the
@@ -832,6 +847,14 @@ export const DerbyMode: ModeDefinition = (() => {
         // A+ mission #7: a homer clears the band (q > 0.7); anything less is an OUT. Distance in feet is the derby's
         // presentation number — read off the launch (estimated: 300 ft floor, ~470 ft for a pure full-launch strike).
         const homer = q > 0.7;
+        // A+ P0 juice: the contact feel is ONE thud either way (feel.impact plays its own). A homer then gets the latched punch —
+        // hit-stop + shake + gold flash; an out gets clank weight (0.4) and no make punch. The score cheer stays a homer's.
+        ctx.feel?.impact?.(homer ? 0.3 + q * 0.5 : 0.4);
+        if (homer && !homerLatch) {
+          homerLatch = true;
+          ctx.juice.hitStop(60); ctx.juice.shake(0.14, 160); ctx.juice.flash('#FFD700', 130);
+          console.info('[DERBY-JUICE] homer punch');
+        } else if (!homer) console.info('[DERBY-JUICE] out (clank weight)');
         const distFt = homer ? Math.round(300 + q * (80 + launch * 60) * 1.6) : 0;
         const roundOver = bankSwing(tally, homer, distFt);
         // The subject of a hit is the BALL — the same subject-switch golf
@@ -841,7 +864,8 @@ export const DerbyMode: ModeDefinition = (() => {
         // again, exactly golf's fix. Both restore on the next pitch.
         ctx.heroRef.current = ball;
         ctx.camDirector.mode = 'follow';
-        SoundKit.play('score', { pitch: q > 0.85 ? 1.2 : 1 });
+        if (homer) SoundKit.play('score', { pitch: q > 0.85 ? 1.2 : 1 });   // A+ P0: the score cheer is the homer's; an out clanks
+        else SoundKit.play('impact', { pitch: 1.35, volume: 0.4 });
         gallery?.cheer(q);                       // louder for a dinger than a dribbler
         ctx.setHud({
           score: pts,
@@ -890,6 +914,8 @@ export const DerbyMode: ModeDefinition = (() => {
       if (incoming && (ball.position.z <= -1.2 || !flight.active)) {
         incoming = false;
         SoundKit.play('miss');
+        ctx.feel?.impact?.(0.35);   // A+ P0: a whiff is an out — clank-weight feel, no make punch
+        console.info('[DERBY-JUICE] whiff (clank weight)');
         const whiffOut = bankSwing(tally, false);        // a whiff is an out
         // the whiff names the pitch — The Show tells you what beat you
         ctx.setHud({ banner: `WHIFF — ${pitchLabel === 'SLD' ? 'the slider broke late' : pitchLabel === 'CHG' ? 'the change-up pulled the string' : 'beat you with heat'}`, outs: tally.outs });
@@ -922,6 +948,7 @@ export const PenaltyMode: ModeDefinition = (() => {
   let furniture: AbstractMesh[] = [];
   let ball: AbstractMesh, flight: Flight, reticle: Reticle, meter: PowerMeter;
   let round = 0, goals = 0, stylePts = 0, stickX = 0, stickY = 0;
+  let goalLatch = false;               // A+ P0 juice: the goal's ONE punch per kick
   let phase: 'aim' | 'power' | 'flight' | 'keep' = 'aim';
   let keeperTargetX = 0, ended = false;
   // THE KEEPER ROUND (owner decision 2026-09-03): on their kick you are the
@@ -1110,6 +1137,7 @@ export const PenaltyMode: ModeDefinition = (() => {
         else if (phase === 'power') {
           const p = meter.stop();
           phase = 'flight';
+          goalLatch = false;              // A+ P0: a fresh kick gets one goal punch
           SoundKit.play('whoosh');
           me.animator.play(SPORT_CLIP.penaltyStrike, { onEnd: () => me.animator.play(SPORT_CLIP.penaltyIdle, { loop: true }) });
           ctx.feel?.impact?.(0.3 + p * 0.3);
@@ -1177,12 +1205,21 @@ export const PenaltyMode: ModeDefinition = (() => {
           if (scored) {
             goals++;
             stylePts += feints * FEINT_STYLE_PTS;
-            ctx.feel?.impact?.(0.5);
+            // A+ P0 juice: TD-class goal punch — hit-stop + shake + gold flash + ONE thud, latched per kick (replaces the bare feel.impact)
+            if (!goalLatch) {
+              goalLatch = true;
+              ctx.juice.hitStop(60); ctx.juice.shake(0.14, 160); ctx.juice.flash('#FFD700', 130);
+              SoundKit.play('impact', { pitch: 0.7, volume: 0.8 });
+              console.info('[PEN-JUICE] goal punch');
+            }
             SoundKit.play('score');
             SoundKit.play('crowdCheer');
             gallery?.cheer(1);
           } else {
             SoundKit.play(saved ? 'crowdGroan' : 'miss');
+            if (!saved) SoundKit.play('crowdGroan', { volume: 0.3 });   // A+ P0: the miss groans too, quieter
+            ctx.feel?.impact?.(0.45);           // A+ P0: heavier feel on a save / miss — never the goal punch
+            console.info(`[PEN-JUICE] ${saved ? 'saved' : 'miss'} (heavy feel + groan)`);
             gallery?.cheer(0.25);               // a save is THEIR moment
           }
           ctx.setHud({
