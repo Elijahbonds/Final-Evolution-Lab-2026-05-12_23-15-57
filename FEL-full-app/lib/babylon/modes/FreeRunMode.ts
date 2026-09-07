@@ -50,6 +50,8 @@ interface St {
   combo: ComboChain; started: boolean; runSec: number; finished: boolean;
   checkpoint: number; highTouched: boolean; bails: number; barsCleared: Set<number>;
   env: Env; anim: string;
+  /** Vertical velocity, owned here: the controller integrates the velocity it is handed, so gravity is ours to apply. */
+  vy: number;
 }
 const states = new WeakMap<Scene, St>();
 const live = new Set<St>();
@@ -123,8 +125,8 @@ export const FreeRunMode: ModeDefinition = (() => {
 
   // ── the run's beats ──────────────────────────────────────────────────
   function beginAir(S: St, launch: Launch, vy: number): void {
-    const v = S.cc!.getVelocity();
-    S.cc!.setVelocity(new Vector3(S.heading.x * S.speed, vy, S.heading.z * S.speed).add(new Vector3(0, 0, 0)).addInPlace(new Vector3(v.x * 0, 0, v.z * 0)));
+    S.vy = vy;
+    S.cc!.setVelocity(new Vector3(S.heading.x * S.speed, vy, S.heading.z * S.speed));
     S.state = 'air'; S.airStartY = S.hero!.root.position.y; S.airSec = 0; S.launch = launch; S.trick = null; S.trickSpun = 0; S.rollAt = null;
     play(S, 'jump_up', false);
   }
@@ -212,7 +214,7 @@ export const FreeRunMode: ModeDefinition = (() => {
         wallSec: 0, wallNormal: new Vector3(1, 0, 0), slideSec: 0, downSec: 0, groundSec: 0, rollAt: null, clock: 0,
         combo: new ComboChain(), started: false, runSec: 0, finished: false,
         checkpoint: 0, highTouched: false, bails: 0, barsCleared: new Set(),
-        env: { vaultAhead: false, wallAhead: false, ledgeAhead: false, barAhead: false }, anim: '',
+        env: { vaultAhead: false, wallAhead: false, ledgeAhead: false, barAhead: false }, anim: '', vy: 0,
       };
       states.set(ctx.scene, S); live.add(S);
 
@@ -258,7 +260,7 @@ export const FreeRunMode: ModeDefinition = (() => {
           const away = S.wallNormal.clone(); away.y = 0; if (away.lengthSquared() < 0.01) away.set(-S.heading.x, 0, -S.heading.z); away.normalize();
           S.heading.copyFrom(away); S.speed = Math.max(S.speed, 4.5);
           S.state = 'air'; S.airStartY = S.hero.root.position.y; S.airSec = 0; S.launch = 'wallkick'; S.trick = null; S.rollAt = null;
-          S.cc.setVelocity(new Vector3(away.x * WALLKICK_PUSH, WALLKICK_V, away.z * WALLKICK_PUSH));
+          S.vy = WALLKICK_V; S.cc.setVelocity(new Vector3(away.x * WALLKICK_PUSH, WALLKICK_V, away.z * WALLKICK_PUSH));
           S.combo.add('WALL KICK', 60, 'grind'); flash(ctx, 'WALL KICK'); SoundKit.play('impact', { pitch: 1.3, volume: 0.4 }); play(S, 'jump_up', false);
         }
       } else if (e.btn === 'B') {
@@ -270,7 +272,7 @@ export const FreeRunMode: ModeDefinition = (() => {
             // catch the ledge: snap up onto it and keep running the high line
             const p = S.hero.root.position;
             const target = p.add(S.heading.scale(2.2)); target.y = 3.7 + CAPSULE_H / 2;
-            S.cc.setPosition(target); S.cc.setVelocity(new Vector3(S.heading.x * 3, 0, S.heading.z * 3));
+            S.cc.setPosition(target); S.vy = 0; S.cc.setVelocity(new Vector3(S.heading.x * 3, 0, S.heading.z * 3));
             S.state = 'ground'; S.speed = Math.max(3, S.speed * 0.8); S.groundSec = 0; S.highTouched = true;
             S.combo.add('CAT LEAP', 80, 'grind'); flash(ctx, 'CAT LEAP'); SoundKit.play('impact', { pitch: 1.1, volume: 0.35 }); play(S, 'jump_land', false);
             return;
@@ -308,20 +310,22 @@ export const FreeRunMode: ModeDefinition = (() => {
       probe(ctx, S);
 
       // ── the physics step ──
-      const down = new Vector3(0, -1, 0), gravity = new Vector3(0, -9.81, 0);
+      const down = new Vector3(0, -1, 0), gravity = Vector3.Zero();   // gravity is applied to S.vy below; the controller integrates what it is handed
+      const G = -9.81;
       const support = cc.checkSupport(dt, down);
       const supported = support.supportedState === CharacterSupportedState.SUPPORTED;
       let desired: Vector3;
       if (S.state === 'wallrun') {
         S.wallSec -= dt;
         const along = S.heading.clone(); along.y = 0;
-        desired = new Vector3(along.x * Math.max(3.5, S.speed), 2.6 * (S.wallSec / WALLRUN_SEC) - 1.2, along.z * Math.max(3.5, S.speed));
+        S.vy = 2.6 * (S.wallSec / WALLRUN_SEC) - 1.2;
+        desired = new Vector3(along.x * Math.max(3.5, S.speed), S.vy, along.z * Math.max(3.5, S.speed));
         cc.setVelocity(desired);
         if (S.wallSec <= 0 || !S.env.wallAhead && S.wallSec < WALLRUN_SEC - 0.25) { S.state = 'air'; S.airSec = 0; S.launch = 'drop'; play(S, 'jump_up', false); }
       } else if (S.state === 'air') {
         S.airSec += dt;
-        const v = cc.getVelocity();
-        desired = new Vector3(S.heading.x * S.speed, v.y, S.heading.z * S.speed);
+        S.vy = Math.max(-30, S.vy + G * dt);
+        desired = new Vector3(S.heading.x * S.speed, S.vy, S.heading.z * S.speed);
         cc.setVelocity(desired);
         if (S.trick) {
           const t = S.trick, rate = (t.turns * 2 * Math.PI) / t.airSec;
@@ -329,15 +333,15 @@ export const FreeRunMode: ModeDefinition = (() => {
           if (t.axis === 'x') root.rotation.x += rate * dt; else if (t.axis === 'z') root.rotation.z += rate * dt; else root.rotation.y += rate * dt;
         }
       } else if (S.state === 'down') {
-        S.downSec -= dt; cc.setVelocity(new Vector3(0, cc.getVelocity().y, 0));
+        S.downSec -= dt; S.vy = supported ? 0 : Math.max(-30, S.vy + G * dt); cc.setVelocity(new Vector3(0, S.vy, 0));
         if (S.downSec <= 0) { S.state = 'ground'; S.speed = 0; play(S, 'idle_stand', true); }
       } else {
         if (S.state === 'slide') { S.slideSec -= dt; if (S.slideSec <= 0) S.state = 'ground'; }
-        desired = new Vector3(S.heading.x * S.speed, 0, S.heading.z * S.speed);
-        const moved = cc.calculateMovement(dt, S.heading, support.averageSurfaceNormal, cc.getVelocity(), support.averageSurfaceVelocity, desired, new Vector3(0, 1, 0));
-        cc.setVelocity(moved);
+        // on the ground the controller follows the surface; off an edge we fall under our own gravity
+        if (supported) { S.vy = 0; desired = new Vector3(S.heading.x * S.speed, 0, S.heading.z * S.speed); const moved = cc.calculateMovement(dt, S.heading, support.averageSurfaceNormal, cc.getVelocity(), support.averageSurfaceVelocity, desired, new Vector3(0, 1, 0)); moved.y = Math.min(moved.y, 0.5); cc.setVelocity(moved); }
+        else { S.vy = Math.max(-30, S.vy + G * dt); cc.setVelocity(new Vector3(S.heading.x * S.speed, S.vy, S.heading.z * S.speed)); }
         if (S.state === 'ground') {
-          if (!supported && cc.getVelocity().y < -0.5) { S.state = 'air'; S.airStartY = root.position.y; S.airSec = 0; S.launch = 'drop'; S.trick = null; S.rollAt = null; play(S, 'jump_up', false); }
+          if (!supported && S.vy < -1.2) { S.state = 'air'; S.airStartY = root.position.y; S.airSec = 0; S.launch = 'drop'; S.trick = null; S.rollAt = null; play(S, 'jump_up', false); }
           else { S.groundSec += dt; play(S, S.speed > 3.2 ? 'run' : S.speed > 0.4 ? 'walk' : 'idle_stand', true); }
           // touching down without a linked move banks the line
           if (S.groundSec >= BANK_AFTER_SEC && S.combo.pot > 0) { const b = S.combo.bank(); flash(ctx, `BANKED +${b}`, 800); SoundKit.play('score', { volume: 0.5 }); hud(ctx, S); }
@@ -348,7 +352,7 @@ export const FreeRunMode: ModeDefinition = (() => {
       root.position.set(pos.x, pos.y - CAPSULE_H / 2 - 0.02, pos.z);
 
       // landings
-      if ((S.state === 'air') && supported && S.airSec > 0.08) land(ctx, S);
+      if (S.state === 'air' && supported && S.airSec > 0.08 && S.vy <= 0.5) land(ctx, S);
 
       // falls, bars, gates
       if (root.position.y < FALL_Y || (root.position.y < -0.4 && overGap(S.pieces, root.position.x, root.position.z))) respawn(ctx, S);
