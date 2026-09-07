@@ -74,6 +74,9 @@ export const FootballRushMode: ModeDefinition = (() => {
   }
   let iframeSec = 0, dodging = false, ended = false;
   let truckSec = 0, truckCooldown = 0, trucks = 0;
+  // A+ P0 juice (PM brief FOOTBALL-A-PLUS-P0, 2026-09-06): the three Street beats each get ONE punch —
+  // latched per truck window / per play / per drive so a second body in the same beat never re-fires it.
+  let truckLatch = false, tackleLatch = false, tdLatch = false;
   let styleTypes = new Set<string>();          // evade types used this drive
   let lastDodgeType = '';                      // which move earned the current iframes
   let stickX = 0, stickY = 0;
@@ -97,6 +100,7 @@ export const FootballRushMode: ModeDefinition = (() => {
   function snap(ctx: ModeContext): void {
     if (!preSnap) return;
     preSnap = false;
+    tackleLatch = false;                       // A+ P0: one tackle weight per play
     for (const m of defenders) {
       if (m === showBlitz && !showBlitzComes) {
         // the show was a bluff: he drops, and starts late
@@ -171,11 +175,43 @@ export const FootballRushMode: ModeDefinition = (() => {
     showBlitzComes = Math.random() < SHOW_BLITZ_CHANCE;
   }
 
+  // ── A+ P0 juice — NFL Street weight, three beats only. No hang slowMo, no juice.impact({slow}), no HoopJuice. ────────
+  /** The truck BREAK: the contact that downs the defender. Hit-stop + shake + one low thud, once per truck window. */
+  function truckPunch(ctx: ModeContext): void {
+    if (truckLatch) return;
+    truckLatch = true;
+    ctx.juice.hitStop(50);
+    ctx.juice.shake(0.10, 140);
+    SoundKit.play('impact', { pitch: 0.6, volume: 0.7 });
+    console.info('[FB-JUICE] truck punch');
+  }
+  /** Getting tackled: heavier than the evade tick (0.12) — the feel hit carries its own hit-stop + thud + haptic, so only a
+   *  camera shake and the crowd's groan are added on top. Once per play. */
+  function tackleWeight(ctx: ModeContext): void {
+    if (tackleLatch) return;
+    tackleLatch = true;
+    ctx.feel?.impact?.(0.65);
+    ctx.juice.shake(0.08, 160);
+    SoundKit.play('crowdGroan', { volume: 0.45 });
+    console.info('[FB-JUICE] tackle weight');
+  }
+  /** TOUCHDOWN: hit-stop + shake + gold flash + ONE slam thud, once per drive. Confetti, score SFX and the cheer stay. */
+  function tdPunch(ctx: ModeContext): void {
+    if (tdLatch) return;
+    tdLatch = true;
+    ctx.juice.hitStop(60);
+    ctx.juice.shake(0.12, 160);
+    ctx.juice.flash('#ffd75e', 120);
+    SoundKit.play('impact', { pitch: 0.7, volume: 0.8 });
+    console.info('[FB-JUICE] td punch');
+  }
+
   function newDrive(ctx: ModeContext, banner: string): void {
     down = 1; toGo = 10;
     lineOfScrimmage = 0; yards = 0; driveEvades = 0; breakawaySec = 0;
     styleTypes = new Set();
     truckSec = 0; truckCooldown = 0;
+    truckLatch = false; tackleLatch = false; tdLatch = false;   // A+ P0: a new drive gets its own beats
     preSnap = true; preSnapT = 0;
     runner.root.position.set(0, 0, 0);
     runner.root.rotation.y = 0;
@@ -208,6 +244,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       defenders = []; pool = new MobPool();
       score = 0; evades = 0; trucks = 0; ended = false; iframeSec = 0; dodging = false; drive = 1;
       driveEvades = 0; breakawaySec = 0; truckSec = 0; truckCooldown = 0;
+      truckLatch = false; tackleLatch = false; tdLatch = false;
       ctx.camDirector.snapTo(runner.root.position, runner.root.position.add(new Vector3(0, 0, 12)));
       assertSpawned(ctx.scene, { hero: runner.root, minWorldMeshes: 6, modeId: 'football' });
       SoundKit.startAmbient('stadium');
@@ -240,6 +277,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           && truckCooldown === 0 && truckSec === 0 && !dodging) {
         truckSec = TRUCK_WINDOW_SEC;
         truckCooldown = TRUCK_COOLDOWN_SEC;
+        truckLatch = false;                       // A+ P0: a fresh window gets one break punch
         SoundKit.play('powerUp', { pitch: 0.8, volume: 0.4 });
         runner.animator.play(SPORT_CLIP.moveLoop, { loop: true });
         ctx.setHud({ truckReady: false, banner: 'TRUCK!' });
@@ -319,8 +357,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           score += TRUCK_PTS * (breakawaySec > 0 ? 2 : 1);
           mob.onContactResolved();
           mob.char.animator.play(SPORT_CLIP.footballTackled, {});
-          ctx.feel?.impact?.(0.55);
-          SoundKit.play('impact', { pitch: 0.6, volume: 0.6 });
+          truckPunch(ctx);   // A+ P0: hit-stop + shake + ONE low thud, once per window (replaces feel.impact + a second impact SFX)
           EffectsKit.burst(ctx.scene, mob.char.root.position.add(new Vector3(0, 0.8, 0)), 'dust');
           ctx.setHud({ score, banner: 'TRUCKED!' });
           gallery?.cheer(0.6);
@@ -353,8 +390,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           }
           continue;
         }
-        ctx.feel?.impact?.(0.7);
-        SoundKit.play('impact', { pitch: 0.8 });
+        tackleWeight(ctx);   // A+ P0: the heavy feel hit + shake + groan (its one thud comes with feel.impact; the extra impact SFX is gone)
         EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, 0.6, 0)), 'dust');
         runner.animator.play(SPORT_CLIP.footballTackled, {});
         driveEvades = 0; breakawaySec = 0;
@@ -401,7 +437,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         runner.animator.play(SPORT_CLIP.scoreCelebrate, {
           onEnd: () => runner.animator.play(SPORT_CLIP.idle, { loop: true }),
         });
-        ctx.feel?.impact?.(0.6);
+        tdPunch(ctx);   // A+ P0: hit-stop + shake + gold flash + ONE slam, once per drive (replaces the bare feel.impact)
         SoundKit.play('score');
         SoundKit.play('crowdCheer');
         EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, 1.8, 0)), 'confetti');
