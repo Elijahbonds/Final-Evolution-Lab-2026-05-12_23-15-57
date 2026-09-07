@@ -327,3 +327,31 @@ overlays; every event is byte-identical):**
 - Everything else (racks, money ball, rounds, need, tiebreaks) is in place and stays byte-identical.
 
 **Cut risk (60 fps):** none — HUD and clip triggers on existing bodies.
+
+## Mission #5 — Golf — PHASE 0 AUDIT (no code changes)
+
+**Benchmark (owner):** Everybody's Golf feel + Wii Sports Resort readability.
+
+1. **Current implementation.** `GolfMode` in `lib/babylon/modes/precisionModes.ts` (lines ~230–620): the three pillars are
+   in — three clubs (driver / iron / wedge: reach, launch, forgiveness) + an automatic putter inside 9 m, a **three-press
+   swing** (A starts, A at the top locks power, A in the accuracy band 0.28 ± 0.10 strikes; a stick pull-and-drive
+   alternative), per-hole **wind** applied through the flight and shown by the pin flag, three holes with par 3 / 4 / 3,
+   strokes against par with a running card (E / +n), out-of-bounds penalty, triple-par pick-up (owner rule 2026-09-05),
+   a hole preview flyover, a gallery at the green. Venue `golf_loop` under the kit green.
+2. **Registration pattern.** `MODES.golf`, route `/play/golf` via `makeTimingHost({ modeKey: 'golf' })` — the SHARED
+   timing host (tennis, derby, penalty, dance). Verbs A SWING · B CLUB.
+3. **Reusable assets.** All of the above; `aimSwingCore` (Reticle, PowerMeter, Flight); `HudScoreCard[]`; the host's
+   optional-block pattern from mission #1 (a block renders only when a mode publishes its key).
+4. **Gate 0.** PASS (sweep `golf`: 0 / 0 / 0 at 60 fps).
+5. **Vitest / bundle.** 382 / 382 (+4 shootoutHud pending); `/play/golf` measured at Phase 4.
+
+**The gap — the HUD is published into the void.** The mode publishes `club`, `wind`, `pin`, `power`, `strokes`, `card`
+every shot; the shared timing host renders **none of them** (it draws round / score / combo / energy / shotType / contact /
+banner / nextStep). On the couch the player sees a score, a banner and a hint line. Everybody's Golf's whole read — which
+club, how far, which way the wind, where the power locked, the swing band — is missing, as is any scorecard.
+
+**Phase 3 scope:** additive, key-gated blocks in the shared host (no other sport changes): a lie panel (club · pin
+distance · wind speed with a bearing arrow), a drawn three-press swing meter (power lock + accuracy band from the mode's
+own constants), a hole chip (HOLE n / 3 · PAR · STROKE · card), and a scorecard board between holes (ACE / EAGLE /
+BIRDIE / PAR / BOGEY names). Mode side: publish `windDeg`, `meterT` + `swingPhase`, `hole` + `par`, and `board` rows at
+the hole's end. Pure helpers + tests in `core/golfHud.ts`. **Cut risk:** none (HUD only).
