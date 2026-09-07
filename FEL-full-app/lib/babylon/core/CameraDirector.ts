@@ -166,7 +166,7 @@ export const FIXED_PRESETS: Record<string, { offset: Vector3; targetHeight: numb
 /** Camera may never end up closer to the subject than this, in ANY venue —
  *  below this range a wall/prop fills the frame illegibly. */
 // R-stick look (Dunk play tip 2026-09-07): orbit rate, cap, the target's pitch nudge, the return spring.
-const LOOK_DEADZONE = 0.12, LOOK_YAW_RATE = 2.2, LOOK_YAW_MAX = Math.PI * 0.6, LOOK_PITCH_RATE = 1.6, LOOK_PITCH_MAX = 0.9, LOOK_RETURN = 4;
+const LOOK_DEADZONE = 0.12, LOOK_YAW_RATE = 4.8, LOOK_YAW_MAX = Math.PI * 0.75, LOOK_PITCH_RATE = 3.2, LOOK_PITCH_MAX = 1.1, LOOK_RETURN = 1.6; // F04 2026-09-07: overlay LOOK must be eye-obvious on /try
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 /** Rotate a ground-plane direction about +Y (x' = x·cos − z·sin, z' = x·sin + z·cos). The follow `back` vector is
  *  rotated by −lookYaw: measured on the dunk runway (2026-09-07), that is the sign that raises camera.rotation.y —
