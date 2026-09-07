@@ -53,6 +53,15 @@ type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'riva
 const MISS_BEAT_MS = 1400;
 /** HOLD = RUN: the hold ramps the athlete toward the rim at up to the max run (7 m/s) and launches at the gather line. */
 const HOLD_RUN_MAX = 7, HOLD_RUN_RAMP = 6, AIR_LEAN_RAD = 0.32, AIR_DRIFT = 0.8;
+// Dunk play tip (2026-09-07): a full stick runs at APPROACH_SPEED (the hold-run ramps past it to HOLD_RUN_MAX); the
+// flight eases the facing onto the rim at FACE_RIM_RATE per second.
+const APPROACH_SPEED = 6, FACE_RIM_RATE = 6;
+/** The facing slews to the travel direction at this rate (rad/s): a stick flick reads as a turn, not a snap (~0.3 s for 180°). */
+const TURN_RATE = 10;
+/** With no auto-drift a pull-back backs off the runway; it stops this far behind the start line. */
+const RETREAT_Z = CFG.startZ + 1.5;
+/** Keep the Euler yaw in (−π, π] — the slews would otherwise accumulate turns (measured 522° after two strafes). */
+const wrapYaw = (y: number): number => Math.atan2(Math.sin(y), Math.cos(y));
 const STYLES = ['power', 'flashy', 'sig'] as const;
 type Style = (typeof STYLES)[number];
 const PROPS = ['none', 'alleyoop', 'obstacle'] as const;
@@ -145,6 +154,7 @@ export const DunkMode: ModeDefinition = (() => {
   const rim = new Vector3(0, CFG.rimHeight, CFG.rimZ);
   const ebState = { inLeftHand: false };
   let stickX = 0, stickY = 0;
+  let lookX = 0, lookY = 0, lookSeen = false; // R stick → the director's look orbit (Dunk play tip 2026-09-07)
   let holdRunSpeed = 0, airLean = 0;          // pad: hold-run speed this attempt; smoothed air lean from the stick
   const flight = new DunkFlight();               // Phase 6: trick-input flight
   const reveal = new ScoreReveal();              // Phase 7: staged judge reveal
@@ -155,6 +165,33 @@ export const DunkMode: ModeDefinition = (() => {
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
   const obstacleClearHeight = 1.35;
+
+  // ── Dunk play tip (2026-09-07): camera-relative stick, facing from velocity ──
+  /** The L stick as a world velocity: up = the camera's flat forward, right = its flat right, magnitude = speed. */
+  function stickVel(ctx: ModeContext): Vector3 {
+    const mag = Math.hypot(stickX, stickY);
+    if (mag < 0.08) return Vector3.Zero();
+    const k = (mag > 1 ? 1 / mag : 1) * APPROACH_SPEED;   // a keyboard diagonal is (1, 1) — cap the magnitude at one stick
+    const f = ctx.camDirector.forwardFlat(), r = ctx.camDirector.rightFlat();
+    return new Vector3((r.x * stickX - f.x * stickY) * k, 0, (r.z * stickX - f.z * stickY) * k);   // up is −y on every source
+  }
+  /** Face the way we move (OneVOne / KarateEndless); a still hero keeps his last heading. Slewed at TURN_RATE (shortest
+   *  arc) so a flick is a turn, not a snap. The root yaws by Euler — a rotationQuaternion (the replay's) would silently
+   *  win over rotation.y, so it is cleared here. */
+  function faceVel(v: Vector3, dt: number): void {
+    if (v.x * v.x + v.z * v.z < 0.05) return;
+    if (player.root.rotationQuaternion) player.root.rotationQuaternion = null;
+    const want = Math.atan2(v.x, v.z);
+    const d = Math.atan2(Math.sin(want - player.root.rotation.y), Math.cos(want - player.root.rotation.y));
+    player.root.rotation.y = wrapYaw(player.root.rotation.y + Math.sign(d) * Math.min(Math.abs(d), TURN_RATE * dt));
+  }
+  /** Ease the Euler yaw toward a world point (k = fraction this frame). */
+  function faceToward(target: Vector3, k: number): void {
+    const want = Math.atan2(target.x - player.root.position.x, target.z - player.root.position.z);
+    let d = want - player.root.rotation.y;
+    d = Math.atan2(Math.sin(d), Math.cos(d));   // the short way round
+    player.root.rotation.y = wrapYaw(player.root.rotation.y + d * Math.min(1, k));
+  }
 
   function clearProps(): void {
     obstacle?.dispose(); obstacle = null;
@@ -253,6 +290,7 @@ export const DunkMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; if (!lookSeen && (Math.abs(e.x) > 0.12 || Math.abs(e.y) > 0.12)) { lookSeen = true; console.info('[LOOK] R stick live'); } }   // LOOK: read at last (it was emitted and dropped)
 
       if (e.t === 'button' && e.btn === 'B' && e.pressed && phase === 'approach') {
         style = STYLES[(STYLES.indexOf(style) + 1) % STYLES.length];
@@ -355,16 +393,27 @@ export const DunkMode: ModeDefinition = (() => {
       watchdog(ctx);
       hype = Math.max(0, hype - dt * 1.5);       // slow decay between dunks
 
-      const vel = new Vector3(stickX * 4, 0, -Math.max(0, -stickY) * 5 - 2);
+      // R stick: orbit / pitch on the RUNWAY (approach + charge run) — the flight's own framing (rimCamCut) and the
+      // verdict never inherit it; a centred (or gated-off) stick springs the orbit back to the mode's composition.
+      const lookOn = phase === 'approach' || phase === 'charge';
+      ctx.camDirector.look(lookOn ? lookX : 0, lookOn ? lookY : 0, dt);
+      // Dunk play tip (2026-09-07) — ROOT CAUSE of the "inverted stick": the hero NEVER yawed (rotation.y sat at π
+      // while the velocity went wherever it went) and the loco was `(stickX·4, 0, −max(0,−stickY)·5 − 2)`: a
+      // centred stick crawled him at the rim at 2 m/s in the IDLE clip (a slide), and stick-right pushed world +x —
+      // which is screen-LEFT when the follow camera looks down −Z (Babylon is left-handed). Now the stick is
+      // camera-relative (up = the camera's forward = the rim, right = screen right), its magnitude is the speed,
+      // and the facing follows the velocity every approach / charge frame (the OneVOne / KarateEndless pattern).
+      const vel = stickVel(ctx);
       if (phase === 'approach') {
         player.root.position.addInPlace(vel.scale(dt));
-        player.root.position.z = Math.max(player.root.position.z, CFG.gatherZ);
+        player.root.position.z = Math.max(CFG.gatherZ, Math.min(RETREAT_Z, player.root.position.z));   // the runway: gather line … a step behind the start
         player.root.position.x = Math.max(-6, Math.min(6, player.root.position.x));
+        faceVel(vel, dt);
         // THE RUN-UP IS PART OF THE DUNK. Peak approach speed feeds the air
         // budget at launch — a walk-up has less air, and less air means fewer
         // tricks fit before the slam window. Live 08's whole ramp, in one number.
         runUpPeak = Math.max(runUpPeak, Math.hypot(vel.x, vel.z));
-        const moving = Math.hypot(vel.x, vel.z) > 2.5;
+        const moving = Math.hypot(vel.x, vel.z) > 0.5;
         playClip(moving ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
         if (player.root.position.z <= CFG.gatherZ + 0.2) {
           ctx.setHud({
@@ -379,9 +428,11 @@ export const DunkMode: ModeDefinition = (() => {
         // HOLD = RUN (pad acceptance #2): ramp to the max run, curve toward the rim's x, let the stick steer,
         // and launch the moment the gather line is reached. runUpPeak keeps feeding the air budget.
         holdRunSpeed = Math.min(HOLD_RUN_MAX, holdRunSpeed + dt * HOLD_RUN_RAMP);
-        const steer = stickX * 3 + Math.max(-2, Math.min(2, (rim.x - player.root.position.x) * 0.8));
+        // stick-right steers screen-right (the camera's right in world x), and the facing follows the run
+        const steer = ctx.camDirector.rightFlat().x * stickX * 3 + Math.max(-2, Math.min(2, (rim.x - player.root.position.x) * 0.8));
         player.root.position.x = Math.max(-6, Math.min(6, player.root.position.x + steer * dt));
         player.root.position.z -= holdRunSpeed * dt;
+        faceVel(new Vector3(steer, 0, -holdRunSpeed), dt);
         runUpPeak = Math.max(runUpPeak, Math.hypot(steer, holdRunSpeed));
         if (player.root.position.z <= CFG.gatherZ) { player.root.position.z = CFG.gatherZ; launchDunk(ctx); }
       }
@@ -410,6 +461,7 @@ export const DunkMode: ModeDefinition = (() => {
         airLean += (stickX - airLean) * Math.min(1, dt * 8);
         player.root.rotation.z = -airLean * AIR_LEAN_RAD;
         player.root.position.x += airLean * AIR_DRIFT * dt;
+        faceToward(rim, dt * FACE_RIM_RATE);   // an angled run-up launches yawed off the iron — ease onto it through the rise
 
         // THE PROP IS PHYSICAL. Crossing the obstacle with your feet below
         // its top is not a scoring penalty — the dunk DIES at the chair,
@@ -666,6 +718,7 @@ export const DunkMode: ModeDefinition = (() => {
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
     airHeld = false; dropToFloor = false; replaying = false; replayAir = false; launchRealMs = performance.now();   // A+ P8
     console.info('[JUICE-SOFT] launch');
+    ctx.camDirector.resetLook();   // the takeoff → rimCamCut framing never inherits a look orbit
     // The run-up, not the stick at the release instant: during the charge the
     // stick is usually neutral, so the old `hypot(stickX, stickY)` read ~0 and
     // EVERY dunk launched as a walk-up. Peak measured approach speed is the

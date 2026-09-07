@@ -65,6 +65,9 @@ type Prop = 'none' | 'obstacle';
 const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', obstacle: 'THE CHAIR' };
 const PROP_BONUS: Record<Prop, number> = { none: 0, obstacle: 2 };
 const OBSTACLE_CLEAR_HEIGHT = 1.35; // same chair as Dunk Contest
+const APPROACH_SPEED = 6, FACE_RIM_RATE = 6;   // Dunk play tip (2026-09-07): the dunk mirror's stick speed / rim-facing ease
+const TURN_RATE = 10, RETREAT_Z = CFG.startZ + 1.5;   // the facing slew (rad/s); how far a pull-back may back off the runway
+const wrapYaw = (y: number): number => Math.atan2(Math.sin(y), Math.cos(y));   // the Euler yaw stays in (−π, π]
 // A+ P8 athlete hands, mirrored from DunkMode (PM brief VENICE-DUNK-A-PLUS-P8, 2026-09-07): the reach weight ramp, the fall rate.
 const HAND_IK_MAX = 0.6, HAND_IK_LAG_SEC = 0.12, HAND_IK_RIM_UP = 0.08, FALL_SPEED = 2.6;
 
@@ -109,11 +112,36 @@ export const DunkDuelMode: ModeDefinition = (() => {
   const rim = new Vector3(0, CFG.rimHeight, CFG.rimZ);
   const ebState = { inLeftHand: false };
   let stickX = 0, stickY = 0;
+  let lookX = 0, lookY = 0, lookSeen = false; // R stick → the director's look orbit (Dunk play tip 2026-09-07)
 
   const active = (): SpawnedCharacter => (activeIdx === 0 ? p1 : p2);
   const bench = (): SpawnedCharacter => (activeIdx === 0 ? p2 : p1);
   const label = (): string => (activeIdx === 0 ? 'P1' : 'P2');
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
+
+  // ── Dunk play tip (2026-09-07), the dunk mirror: camera-relative stick, facing from velocity ──
+  function stickVel(ctx: ModeContext): Vector3 {
+    const mag = Math.hypot(stickX, stickY);
+    if (mag < 0.08) return Vector3.Zero();
+    const k = (mag > 1 ? 1 / mag : 1) * APPROACH_SPEED;
+    const f = ctx.camDirector.forwardFlat(), r = ctx.camDirector.rightFlat();
+    return new Vector3((r.x * stickX - f.x * stickY) * k, 0, (r.z * stickX - f.z * stickY) * k);
+  }
+  function faceVel(v: Vector3, dt: number): void {   // slewed at TURN_RATE, shortest arc; the Euler yaw wins over any stale quat
+    if (v.x * v.x + v.z * v.z < 0.05) return;
+    const root = active().root;
+    if (root.rotationQuaternion) root.rotationQuaternion = null;
+    const want = Math.atan2(v.x, v.z);
+    const d = Math.atan2(Math.sin(want - root.rotation.y), Math.cos(want - root.rotation.y));
+    root.rotation.y = wrapYaw(root.rotation.y + Math.sign(d) * Math.min(Math.abs(d), TURN_RATE * dt));
+  }
+  function faceToward(target: Vector3, k: number): void {
+    const root = active().root;
+    const want = Math.atan2(target.x - root.position.x, target.z - root.position.z);
+    let d = want - root.rotation.y;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    root.rotation.y = wrapYaw(root.rotation.y + d * Math.min(1, k));
+  }
 
   function setProp(ctx: ModeContext, p: Prop): void {
     prop = p;
@@ -163,6 +191,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
     airHeld = false; dropToFloor = false;   // A+ P8
     console.info('[JUICE-SOFT] launch');
+    ctx.camDirector.resetLook();   // the takeoff → rimCamCut framing never inherits a look orbit
     SoundKit.play('whoosh', { pitch: 0.85 });   // the ONE whoosh — never re-triggered on CONTACT
     playClip(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => {} });   // the no-op chain holds the last frame if the clip ends in the air
   }
@@ -431,6 +460,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; if (!lookSeen && (Math.abs(e.x) > 0.12 || Math.abs(e.y) > 0.12)) { lookSeen = true; console.info('[LOOK] R stick live'); } }
       if (phase === 'handoff' && e.t === 'button' && e.pressed) {
         // any button skips the handoff card
         ctx.setHud({ banner: '', hint: 'STYLE to cycle · HOLD to run — then tap jump' });
@@ -479,17 +509,21 @@ export const DunkDuelMode: ModeDefinition = (() => {
       watchdog(ctx);
       if (ended) return;
 
-      const vel = new Vector3(stickX * 4, 0, -Math.max(0, -stickY) * 5 - 2);
+      const lookOn = phase === 'approach' || phase === 'charge';   // R look on the runway only (the rim cut / verdict keep their framing)
+      ctx.camDirector.look(lookOn ? lookX : 0, lookOn ? lookY : 0, dt);
+      // Dunk play tip (2026-09-07): camera-relative stick, no auto-drift, the facing follows the velocity — see DunkMode
+      const vel = stickVel(ctx);
       if (phase === 'approach') {
         const c = active();
         c.root.position.addInPlace(vel.scale(dt));
-        c.root.position.z = Math.max(c.root.position.z, CFG.gatherZ);
+        c.root.position.z = Math.max(CFG.gatherZ, Math.min(RETREAT_Z, c.root.position.z));
         c.root.position.x = Math.max(-6, Math.min(6, c.root.position.x));
+        faceVel(vel, dt);
         // THE RUN-UP IS PART OF THE DUNK. Peak approach speed feeds the apex
         // at launch and the judges' difficulty read — a walk-up caps both.
         runUpPeak = Math.max(runUpPeak, Math.hypot(vel.x, vel.z));
         launchSpeed01 = Math.max(0, Math.min(1, (runUpPeak - 2) / 6));
-        playClip(Math.hypot(vel.x, vel.z) > 2.5 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
+        playClip(Math.hypot(vel.x, vel.z) > 0.5 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
         if (c.root.position.z <= CFG.gatherZ + 0.2) {
           ctx.setHud({
             hint: runUpPeak < 3.5
@@ -517,6 +551,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
         // the run-up buys air: 0.85× for a walk-up, 1.15× at full runway
         c.root.position.y = Math.sin(k * Math.PI) * (1.05 + charge * 0.55) * (0.85 + launchSpeed01 * 0.3);
         c.root.position.z += (rim.z + 0.6 - c.root.position.z) * 1.6 * dt;
+        faceToward(rim, dt * FACE_RIM_RATE);   // ease the facing onto the iron through the rise
 
         // THE CHAIR IS PHYSICAL. Crossing it with your feet below its top is
         // not a deduction — the dunk DIES at the chair, mid-flight. Clearing

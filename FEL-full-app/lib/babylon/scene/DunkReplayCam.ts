@@ -7,12 +7,16 @@ import type { AbstractMesh, Scene, TargetCamera, TransformNode, Observer } from 
 
 const WINDOW_S = 4, RATE_HZ = 30, SPEED = 0.5;
 
-interface Sample { t: number; cp: Vector3; cq: Quaternion; bp: Vector3 }
+/** cq is recorded only when the root actually carries a rotationQuaternion; otherwise cy (Euler yaw) is what plays back.
+ *  Before (play tip 2026-09-07): `rotationQuaternion ?? Identity` — the dunk root yaws by Euler, so every replay wrote
+ *  Identity and the hero faced +z (the camera) for the whole 8 s replay; measured yaw 180° → 0° on the make. */
+interface Sample { t: number; cp: Vector3; cq: Quaternion | null; cy: number; bp: Vector3 }
 
 export class DunkReplayRecorder {
   private buf: Sample[] = [];
   private acc = 0;
   private obs: Observer<Scene> | null = null;
+  private finishActive: (() => void) | null = null;
 
   constructor(
     private scene: Scene,
@@ -31,7 +35,7 @@ export class DunkReplayRecorder {
     this.buf.push({
       t: now,
       cp: this.character.getAbsolutePosition().clone(),
-      cq: (this.character.rotationQuaternion ?? Quaternion.Identity()).clone(),
+      cq: this.character.rotationQuaternion?.clone() ?? null, cy: this.character.rotation.y,
       bp: this.ball.getAbsolutePosition().clone(),
     });
     while (this.buf.length && this.buf[0].t < now - WINDOW_S) this.buf.shift();
@@ -61,7 +65,8 @@ export class DunkReplayRecorder {
         const cp = Vector3.Lerp(a.cp, b.cp, k);
         const bp = Vector3.Lerp(a.bp, b.bp, k);
         this.character.setAbsolutePosition(cp);
-        this.character.rotationQuaternion = Quaternion.Slerp(a.cq, b.cq, k);
+        if (a.cq && b.cq) this.character.rotationQuaternion = Quaternion.Slerp(a.cq, b.cq, k);
+        else { const d = Math.atan2(Math.sin(b.cy - a.cy), Math.cos(b.cy - a.cy)); this.character.rotation.y = a.cy + d * k; }   // shortest arc
         this.ball.setAbsolutePosition(bp);
 
         if (rt < dur / 2) {
@@ -84,12 +89,18 @@ export class DunkReplayRecorder {
         this.scene.onBeforeRenderObservable.remove(obs);
         window.removeEventListener('pointerdown', skip);
         window.removeEventListener('keydown', onKey);
+        this.finishActive = null;
         resolve();
       };
+      this.finishActive = finish;
     });
   }
 
+  /** End a replay in flight (resolves its promise); a no-op when none is playing. */
+  stop(): void { this.finishActive?.(); }
+
   dispose(): void {
+    this.stop();   // a playback observer must not outlive the mode that owns the root
     if (this.obs) this.scene.onBeforeRenderObservable.remove(this.obs);
     this.buf = [];
   }

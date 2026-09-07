@@ -51,7 +51,7 @@
 // range. Everything else (chest targeting, pitch clamp, fitTwo, snapTo) is
 // unchanged from v2 — this is a targeted occlusion-handling patch.
 
-import { Ray, TargetCamera, Vector3 } from '@babylonjs/core';
+import { Axis, Ray, TargetCamera, Vector3 } from '@babylonjs/core';
 import type { Scene, AbstractMesh } from '@babylonjs/core';
 import { enforceStandoff } from './CameraStandoff';   // M69: last-guard standoff
 import { reportDiag } from './diag';
@@ -165,6 +165,17 @@ export const FIXED_PRESETS: Record<string, { offset: Vector3; targetHeight: numb
 
 /** Camera may never end up closer to the subject than this, in ANY venue —
  *  below this range a wall/prop fills the frame illegibly. */
+// R-stick look (Dunk play tip 2026-09-07): orbit rate, cap, the target's pitch nudge, the return spring.
+const LOOK_DEADZONE = 0.12, LOOK_YAW_RATE = 2.2, LOOK_YAW_MAX = Math.PI * 0.6, LOOK_PITCH_RATE = 1.6, LOOK_PITCH_MAX = 0.9, LOOK_RETURN = 4;
+const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+/** Rotate a ground-plane direction about +Y (x' = x·cos − z·sin, z' = x·sin + z·cos). The follow `back` vector is
+ *  rotated by −lookYaw: measured on the dunk runway (2026-09-07), that is the sign that raises camera.rotation.y —
+ *  the view yaws RIGHT on a right push, the camera swinging round the subject's left. */
+function rotateY(v: Vector3, rad: number): Vector3 {
+  const c = Math.cos(rad), s = Math.sin(rad);
+  return new Vector3(v.x * c - v.z * s, 0, v.x * s + v.z * c);
+}
+
 /** Share of lookAhead a vertical velocity component may claim (see aim()). */
 const VERTICAL_LEAD_SHARE = 0.25;
 /** How much of the frustum half-height an objective may pull the target by. */
@@ -245,6 +256,35 @@ export class CameraDirector {
     if (this.beatT <= 0 || this.beatDur <= 0) return 1;
     const k = this.beatT / this.beatDur;                 // 1→0 over the beat
     return 1 - 0.32 * this.beatStrength * k * k;         // ease-out push-in
+  }
+
+  // ── R-stick LOOK (Dunk play tip 2026-09-07) ──
+  // The pad has always emitted the R stick and TouchOverlay draws a LOOK stick on every mode, but no mode ever read it
+  // and the director had no orbit. `look()` turns the stick into an orbit offset around the subject (yaw, radians) and
+  // a pitch nudge on the look target (metres); both ease back to zero when the stick centres, so a released look
+  // returns to the mode's own composition. Modes that never call it are untouched (offsets stay 0).
+  private lookYaw = 0; private lookPitch = 0;
+  /** Feed the R stick each frame (x right, y down as the bus emits it). Zero input decays the offsets. */
+  look(x: number, y: number, dt: number): void {
+    const step = Math.min(1, Math.max(0, dt));
+    if (Math.abs(x) > LOOK_DEADZONE) this.lookYaw = clamp(this.lookYaw + x * LOOK_YAW_RATE * step, -LOOK_YAW_MAX, LOOK_YAW_MAX);
+    else this.lookYaw -= this.lookYaw * Math.min(1, LOOK_RETURN * step);
+    if (Math.abs(y) > LOOK_DEADZONE) this.lookPitch = clamp(this.lookPitch - y * LOOK_PITCH_RATE * step, -LOOK_PITCH_MAX, LOOK_PITCH_MAX);
+    else this.lookPitch -= this.lookPitch * Math.min(1, LOOK_RETURN * step);
+  }
+  /** The current look orbit (radians) — 0 when the stick is centred and settled. */
+  get lookYawRad(): number { return this.lookYaw; }
+  /** Drop the look at once — a mode's hard cut (the dunk's takeoff → rimCamCut) must not inherit a half-decayed orbit. */
+  resetLook(): void { this.lookYaw = 0; this.lookPitch = 0; }
+  /** The camera's forward on the ground plane (unit; falls back to −Z when the camera looks straight down). */
+  forwardFlat(): Vector3 {
+    const d = this.camera.getDirection(Axis.Z); d.y = 0;
+    return d.lengthSquared() < 1e-6 ? new Vector3(0, 0, -1) : d.normalize();
+  }
+  /** The camera's right on the ground plane (unit) — screen-right in world space. */
+  rightFlat(): Vector3 {
+    const d = this.camera.getDirection(Axis.X); d.y = 0;
+    return d.lengthSquared() < 1e-6 ? new Vector3(-1, 0, 0) : d.normalize();
   }
 
   constructor(
@@ -387,6 +427,8 @@ export class CameraDirector {
       back.y = 0;
       if (back.lengthSquared() < 0.01) back.set(0, 0, 1); else back.normalize();
     }
+
+    if (this.lookYaw !== 0) back = rotateY(back, -this.lookYaw);   // R-stick orbit around the subject (measured: −yaw turns the view right)
 
     const separation = cfg.fitTwo && objective ? Vector3.Distance(subject, objective) : 0;
     // E26: cap the separation pull-back — uncapped, a full-court 3v3
@@ -585,6 +627,7 @@ export class CameraDirector {
       const off = target.subtract(ahead);
       if (off.length() > maxOff) target = ahead.add(off.normalize().scale(maxOff));
     }
+    if (this.lookPitch !== 0) target = target.add(new Vector3(0, this.lookPitch, 0));   // R-stick pitch nudge
     this.camera.setTarget(target);
 
     const flat = Vector3.Distance(

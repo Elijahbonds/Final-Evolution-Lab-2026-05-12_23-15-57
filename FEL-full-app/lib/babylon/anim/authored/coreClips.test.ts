@@ -158,6 +158,28 @@ describe('base clips (the forge\'s nine, built at runtime)', () => {
     expect(Math.sign(a)).not.toBe(Math.sign(b)); expect(Math.abs(a)).toBeGreaterThan(0.25);
     expect(pos('RightHand').y).toBeLessThan(pos('RightArm').y - 0.3);
   });
+  // Dunk play tip (2026-09-07): both arms were keyed on the same phase — no opposition, the gait read dead.
+  for (const name of ['run', 'walk'] as const) {
+    it(`${name}: the arms swing in OPPOSITE phase, each against its own leg`, () => {
+      const g = fresh(() => buildBaseClips(scene, sk).find((c) => c.name === name)!);
+      const dur = name === 'run' ? 0.6 : 1.0;
+      for (const k of [0.25, 0.75]) {
+        at(g, dur * k);
+        const lArm = pos('LeftHand').z - pos('LeftArm').z, rArm = pos('RightHand').z - pos('RightArm').z;
+        const lLeg = pos('LeftFoot').z - pos('LeftUpLeg').z, rLeg = pos('RightFoot').z - pos('RightUpLeg').z;
+        expect(Math.abs(lArm)).toBeGreaterThan(0.05); expect(Math.abs(rArm)).toBeGreaterThan(0.05);
+        expect(Math.sign(lArm)).not.toBe(Math.sign(rArm));                   // opposition between the arms
+        expect(Math.sign(lArm)).not.toBe(Math.sign(lLeg));                   // the left arm opposes the left leg
+        expect(Math.sign(rArm)).not.toBe(Math.sign(rLeg));                   // the right arm opposes the right leg
+      }
+      // a REAL pump (the twist read ~1°): the hands travel fore/aft between the two half-cycles; elbows bent forward
+      at(g, dur * 0.25); const l1 = pos('LeftHand').z, r1 = pos('RightHand').z;
+      at(g, dur * 0.75); const l2 = pos('LeftHand').z, r2 = pos('RightHand').z;
+      expect(Math.abs(l2 - l1)).toBeGreaterThan(name === 'run' ? 0.12 : 0.06); expect(Math.abs(r2 - r1)).toBeGreaterThan(name === 'run' ? 0.12 : 0.06);
+      at(g, 0);
+      for (const s of ['Left', 'Right']) { expect(pos(`${s}Hand`).z).toBeGreaterThan(pos(`${s}ForeArm`).z + 0.04); expect(pos(`${s}Hand`).y).toBeLessThan(pos(`${s}Arm`).y - 0.25); }
+    });
+  }
   it('jumpshot: both hands above the head at the release', () => {
     const g = fresh(() => buildBaseClips(scene, sk).find((c) => c.name === 'jumpshot')!);
     at(g, 0.5); expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);

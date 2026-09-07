@@ -49,8 +49,15 @@ function locomotion(duration: number, thighDeg: number, kneeBase: number, kneeAm
       LeftUpLeg: qAxis('x', -thighDeg * s), RightUpLeg: qAxis('x', thighDeg * s),
       LeftLeg: qAxis('x', kneeL), RightLeg: qAxis('x', kneeR),
       LeftFoot: qAxis('x', -kneeL * 0.4 + thighDeg * 0.3 * s), RightFoot: qAxis('x', -kneeR * 0.4 - thighDeg * 0.3 * s),
-      LeftArm: chain(qAxis('z', -75), qAxis('x', armSwing * s)), RightArm: chain(qAxis('z', 75), qAxis('x', armSwing * s)),
-      LeftForeArm: chain(qAxis('z', -12), qAxis('x', -elbowFlex)), RightForeArm: chain(qAxis('z', 12), qAxis('x', -elbowFlex)),
+      // RUN ARMS (Dunk play tip 2026-09-07). Two defects made the gait read dead: (1) both arms were keyed on the SAME
+      // phase (+armSwing·s), no opposition; (2) the swing was composed BEFORE the drop — chain(a, b) is "b, then a", so
+      // chain(z, x) twisted the T-pose arm about its own axis and then dropped it: measured elbow travel ±5 mm against
+      // the legs' ±300 mm. Drop first, then swing (the guard pose's own order), and the right arm takes the opposite
+      // sign: the left arm goes back as the left thigh (−thighDeg·s) comes forward, the right arm comes forward with it.
+      // (3) The elbow flex was the same twist — about the forearm's own bind axis. It bends about y in the T (forearm
+      // toward +z) before the drop carries it down: a bent, pumping elbow instead of a straight arm.
+      LeftArm: chain(qAxis('x', armSwing * s), qAxis('z', -75)), RightArm: chain(qAxis('x', -armSwing * s), qAxis('z', 75)),
+      LeftForeArm: chain(qAxis('z', -12), qAxis('y', -elbowFlex)), RightForeArm: chain(qAxis('z', 12), qAxis('y', elbowFlex)),
     } });
   }
   return keys;
