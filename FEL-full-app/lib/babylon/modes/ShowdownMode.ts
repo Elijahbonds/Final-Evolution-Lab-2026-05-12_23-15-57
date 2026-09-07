@@ -68,6 +68,21 @@ export const ShowdownMode: ModeDefinition = (() => {
   let ultTimer = 0, assistTimer = 0, assistActive = 0;
   let myRounds = 0, foeRounds = 0;
   let parryFlash = 0, giFlash = 0;
+  // ── A+ P0 juice (PM brief COMBAT-A-PLUS-P0, 2026-09-06): ONE thud per connect (feel.impact plays its own — the SoundKit
+  // impact that stacked on it is gone), a latched hit-stop + shake on heavy / special, a soft round-win beat and a latched
+  // Street Fighter–class MATCH punch. No hang slowMo, no juice.impact({ slow }). The parry's scoped slow-mo is the mode's own.
+  let heavyAt = 0, matchLatch = false;
+  function heavyPunch(ctx: ModeContext, tag: string): void {
+    const t = performance.now(); if (t - heavyAt < 120) return; heavyAt = t;   // once per connect
+    ctx.juice.hitStop(45); ctx.juice.shake(0.10, 130);
+    console.info(`[SD-JUICE] heavy punch (${tag})`);
+  }
+  function roundWinBeat(ctx: ModeContext): void { ctx.juice.shake(0.08, 140); ctx.juice.flash('#fff6dd', 90); console.info('[SD-JUICE] round win'); }
+  function matchPunch(ctx: ModeContext): void {
+    if (matchLatch) return; matchLatch = true;
+    ctx.juice.hitStop(60); ctx.juice.shake(0.14, 160); ctx.juice.flash('#FFD700', 140);
+    console.info('[SD-JUICE] match punch');
+  }
   let foeHitBy: 'light' | 'medium' | 'heavy' | 'finisher' | null = null;
   let meHitBy: 'light' | 'medium' | 'heavy' | 'finisher' | null = null;
   let hitFlashT = 0;
@@ -118,20 +133,21 @@ export const ShowdownMode: ModeDefinition = (() => {
         EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.1, 0)), 'dust');
         break;
       case 'guardBreak':
-        SoundKit.play('impact', { pitch: 0.5, volume: 0.7 });
-        ctx.feel?.impact?.(0.55);
+        ctx.feel?.impact?.(0.55);   // ONE thud (the impact SFX that stacked on it is gone)
+        ctx.juice.shake(0.08, 120);
+        console.info('[SD-JUICE] guard break');
         EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), 'glitch');
         banner(ctx, mine ? 'GUARD BREAK!' : 'YOUR GUARD SHATTERED!');
         break;
       case 'parried':
-        SoundKit.play('impact', { pitch: 1.6, volume: 0.5 });
-        ctx.feel?.impact?.(0.3);
+        SoundKit.play('impact', { pitch: 1.6, volume: 0.5 });   // the parry ping is the one sound; the feel thud is gone
+        ctx.juice.shake(0.05, 80);
         (mine ? foeChakra : chakra).gain('parry');
         banner(ctx, mine ? 'PARRIED!' : 'PERFECT PARRY!');
         break;
       case 'guardImpacted':
-        SoundKit.play('impact', { pitch: 1.9, volume: 0.6 });
-        ctx.feel?.impact?.(0.45);
+        SoundKit.play('impact', { pitch: 1.9, volume: 0.6 });   // the GI stinger is the one sound; the feel thud is replaced by the latched hit-stop + shake
+        heavyPunch(ctx, 'guard impact');
         (mine ? foeChakra : chakra).gain('guardImpact');
         EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.4, 0)), 'sparks');
         ctx.camDirector.pulse(0.4, 0.4);
@@ -146,8 +162,8 @@ export const ShowdownMode: ModeDefinition = (() => {
         atkState.combo += 1; atkState.comboTimer = 1.1;
         if (mine) foeHitBy = w === 'finisher' ? 'finisher' : w; else meHitBy = w === 'finisher' ? 'finisher' : w;
         hitFlashT = 0.3;
-        SoundKit.play('impact', { pitch: w === 'heavy' ? 0.6 : 1, volume: 0.5 });
-        ctx.feel?.impact?.(w === 'heavy' ? 0.55 : 0.3);
+        ctx.feel?.impact?.(w === 'heavy' ? 0.55 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
+        if (w === 'heavy' || w === 'finisher') heavyPunch(ctx, w); else console.info('[SD-JUICE] hit');
         EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), w === 'heavy' ? 'glitch' : 'sparks');
         // knockback via movement velocity impulse
         const dir = defChar.root.position.subtract(atkChar.root.position); dir.y = 0;
@@ -202,8 +218,8 @@ export const ShowdownMode: ModeDefinition = (() => {
       foeState.hp = Math.max(0, foeState.hp - ULT_DMG);
       foeState.staggerSec = 1.6;
       foeHitBy = 'finisher'; hitFlashT = 0.6;
-      SoundKit.play('impact', { pitch: 0.5, volume: 0.9 });
-      ctx.feel?.impact?.(0.9);
+      ctx.feel?.impact?.(0.9);   // ONE thud — the ultimate's own; the impact SFX that doubled it is gone
+      heavyPunch(ctx, 'ultimate');
       EffectsKit.burst(ctx.scene, rival.root.position.add(new Vector3(0, 1.3, 0)), 'glitch');
       // launch toward the north gate — shatter it on contact (destructible beat)
       const launchDir = new Vector3(0, 0, -1);
@@ -251,10 +267,12 @@ export const ShowdownMode: ModeDefinition = (() => {
     if (phase === 'matchOver') return;
     if (playerWon) myRounds++; else foeRounds++;
     SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');
+    if (playerWon) roundWinBeat(ctx);
     const done = myRounds >= 2 || foeRounds >= 2;
     if (done) {
       setPhase('matchOver');
       SoundKit.play('whistle');
+      if (playerWon) matchPunch(ctx);
       ctx.end(playerWon ? 'SHOWDOWN_WON' : 'SHOWDOWN_LOST', myRounds * 100 - foeRounds * 40, { foeRounds });
       return;
     }
@@ -298,7 +316,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       meDef = new DefenseController(); foeDef = new DefenseController();
       meAnim = new CombatAnimTree(player.animator); foeAnim = new CombatAnimTree(rival.animator);
       chakra = new ResourceMeter(CHAKRA); foeChakra = new ResourceMeter(CHAKRA);
-      myRounds = 0; foeRounds = 0; assistTimer = 0; mbus.reset();
+      myRounds = 0; foeRounds = 0; assistTimer = 0; mbus.reset(); matchLatch = false; heavyAt = 0;
 
       SoundKit.startAmbient('dojo');
       EffectsKit.ambient(ctx.scene, 'dojo');

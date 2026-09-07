@@ -85,6 +85,8 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   'carnival',
   // Rollout wave 6 — combat/duel modes (M53/M56)
   'karate_vs', 'mixedcombat', 'dunkduel',
+  // A+ P0 juice — the combat siblings ship with the family
+  'showdown', 'duel',
   // Rollout wave 7 — net-sport family (M74)
   'volleyball',
   // Rollout wave 8 — creative disciplines (M75)

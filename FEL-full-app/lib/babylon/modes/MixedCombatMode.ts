@@ -60,6 +60,21 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let myLoadout: Loadout = 'fists';
   let striking = false, foeStriking = false;
   let slowmoSec = 0, falling = false;
+  // ── A+ P0 juice (PM brief COMBAT-A-PLUS-P0, 2026-09-06): ONE thud per connect (feel.impact plays its own — the SoundKit
+  // impact that stacked on it is gone), a latched hit-stop + shake on heavy / special, a soft round-win beat and a latched
+  // Street Fighter–class MATCH punch. No hang slowMo, no juice.impact({ slow }). The parry's scoped slow-mo is the mode's own.
+  let heavyAt = 0, matchLatch = false;
+  function heavyPunch(ctx: ModeContext, tag: string): void {
+    const t = performance.now(); if (t - heavyAt < 120) return; heavyAt = t;   // once per connect
+    ctx.juice.hitStop(45); ctx.juice.shake(0.10, 130);
+    console.info(`[MC-JUICE] heavy punch (${tag})`);
+  }
+  function roundWinBeat(ctx: ModeContext): void { ctx.juice.shake(0.08, 140); ctx.juice.flash('#fff6dd', 90); console.info('[MC-JUICE] round win'); }
+  function matchPunch(ctx: ModeContext): void {
+    if (matchLatch) return; matchLatch = true;
+    ctx.juice.hitStop(60); ctx.juice.shake(0.14, 160); ctx.juice.flash('#FFD700', 140);
+    console.info('[MC-JUICE] match punch');
+  }
   let fallVictim: 'me' | 'foe' | null = null;
   let myStaff: AbstractMesh | null = null, foeStaff: AbstractMesh | null = null;
   let stickX = 0, stickY = 0;
@@ -254,8 +269,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
           atkState.staggerSec = PARRY_STAGGER_SEC;
           defState.chi = Math.min(CHI_MAX, defState.chi + 15);
           slowmoSec = SLOWMO_SEC;
-          SoundKit.play('impact', { pitch: 1.6, volume: 0.5 });
-          ctx.feel?.impact?.(0.3);
+          SoundKit.play('impact', { pitch: 1.6, volume: 0.5 });   // the parry ping is the one sound; the feel thud that doubled it is gone
+          ctx.juice.shake(0.05, 80);
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.3, 0)), 'sparks');
           atkChar.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => atkChar.animator.play(SPORT_CLIP.karateStance, { loop: true }) });
           ctx.setHud({ banner: mine ? 'PARRIED!' : 'PERFECT PARRY!', ...(mine ? { foeChi: Math.round(defState.chi) } : { chi: Math.round(defState.chi) }) });
@@ -269,8 +284,9 @@ export const MixedCombatMode: ModeDefinition = (() => {
           break;
         }
         case 'guardBreak': {
-          SoundKit.play('impact', { pitch: 0.5, volume: 0.7 });
-          ctx.feel?.impact?.(0.5);
+          ctx.feel?.impact?.(0.5);   // ONE thud (the 0.5-pitch impact SFX that stacked on it is gone)
+          ctx.juice.shake(0.08, 120);
+          console.info('[MC-JUICE] guard break');
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), 'glitch');
           defChar.animator.play(SPORT_CLIP.karateKnockdown, { onEnd: () => defChar.animator.play(SPORT_CLIP.karateStance, { loop: true }) });
           gallery?.cheer(0.6);
@@ -280,8 +296,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
         }
         case 'hit': {
           applyHit(atkState, defState, atk);
-          SoundKit.play('impact', { pitch: special ? 0.6 : 1, volume: 0.5 });
-          ctx.feel?.impact?.(special ? 0.6 : 0.3);
+          ctx.feel?.impact?.(special ? 0.6 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
+          if (special || key === 'heavy') heavyPunch(ctx, special ? 'special' : 'heavy'); else console.info('[MC-JUICE] hit');
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), special ? 'glitch' : 'sparks');
           defChar.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => defChar.animator.play(SPORT_CLIP.karateStance, { loop: true }) });
           const hud: Record<string, HudValue> = mine
@@ -306,6 +322,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
     setPhase('roundOver');
     if (playerWon) myWins++; else foeWins++;
     SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');
+    if (playerWon) roundWinBeat(ctx);
     if (!wasRingOut) {
       const loser = playerWon ? rival : player;
       loser.animator.play(SPORT_CLIP.karateKnockdown, {});
@@ -320,7 +337,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
         setPhase('matchOver');
         const won = myWins > foeWins;
         SoundKit.play('whistle');
-        if (won) EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti');
+        if (won) { matchPunch(ctx); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
         ctx.end(won ? 'MATCH_WON' : 'MATCH_LOST', myWins * 100 - foeWins * 40, { rounds: round, foeWins });
         return;
       }
@@ -385,7 +402,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
 
       meState = new FighterState(100);
       foeState = new FighterState(100);
-      round = 1; myWins = 0; foeWins = 0; myLoadout = 'fists';
+      round = 1; myWins = 0; foeWins = 0; myLoadout = 'fists'; matchLatch = false; heavyAt = 0;
       applyLoadouts(ctx);
 
       SoundKit.startAmbient('dojo');
