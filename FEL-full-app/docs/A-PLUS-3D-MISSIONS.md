@@ -458,3 +458,22 @@ field), no **drive summary** between drives (yards, evades, result), no **defens
 defender is the one to beat), no **scoring drive loop** feedback (the touchdown celebration and the next drive's start
 are a banner). **Scope:** a field-position strip (ball marker on a 0–40 bar with the first-down line), a drive card
 between drives, a TARGET chip naming the nearest defender's angle, a touchdown beat; mechanics byte-identical.
+
+**Landed — Missions #7–#9, Phases 1–5 (af18517; risk medium: the derby's round now ends on ten outs or twenty pitches —
+rules lane; every host block key-gated):**
+- **Derby:** `core/derbyHud.ts` (tally, outs cap 10, feet, distance line, board rows). A swing under the homer band (q ≤ 0.7)
+  or a whiff is an OUT; distance in feet is estimated off the launch (300 ft floor, ~470 ft for a pure full-launch strike —
+  a presentation number, not a physics readout); a rival round of 3–8 homers ticks in on the smoothstep; HUD `HR · OUTS
+  n/10 · LONGEST · RIVAL · pitch` and a distance flash; the proof line reads `n HR vs m · k OUTS · LONGEST f FT`. Verified:
+  dev-runner capture ended on the tenth out (masher whiffs), 0 / 0 / 0 at 60 fps.
+- **Penalty:** `core/penaltyHud.ts` (kick pips ● ○ ·, sudden death after a bar, board rows). Both sides' kicks as pips
+  with goals, a feint counter, the two-press power bar (`kickPower`), a DIVE prompt on their kick. Verified: capture
+  `● ○ ● ● ●` vs `● ● ● ● ●` at KICK 5 / 5, 0 / 0 / 0 at 60 fps.
+- **Football:** field strip in yards (ball marker, line of scrimmage, first-down line, ten-yard ticks, drive), a TARGET read
+  on the nearest defender within 9 m (AHEAD — juke or truck / LEFT — cut right / RIGHT — cut left), a drive card between
+  drives (yards, evades, TOUCHDOWN / TURNOVER ON DOWNS) held 2.6 s. Verified: capture reached the third touchdown with
+  `ballOn 44 / fieldLen 44` and the target flowing, 0 / 0 / 0 at 60 fps.
+- **P4 / P6 pending:** the only dev server on :3000 belongs to another chat (started 19:53 from this worktree) and shares
+  `.next`; a production build under it would corrupt their server, so the bundle check and the production route frames
+  for #7–#9 wait for a dev-server-free window. In dev, the baseball / soccer / football routes sit on their arena splash
+  past 40–60 s (the same strict-mode double-mount load as 3PT); production mounts once.
