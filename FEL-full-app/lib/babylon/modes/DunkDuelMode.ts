@@ -27,7 +27,7 @@
 // prop and is DEFERRED: it needs a second input surface mid-attempt.)
 
 import { Color3, Color4, MeshBuilder, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, Camera, ParticleSystem } from '@babylonjs/core';
+import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -36,6 +36,8 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { attachBallToHand, releaseBall, runEastbayPath, flushThroughRim, clankOffRim } from '../anim/ballRig';
 import { EASTBAY_TIMING } from '../anim/authored/timing';
+import { armChain, reachArm, type ArmChain } from '../anim/HandIK';   // A+ P8 H1 (dunk mirror): the hang wrist reach
+import type { PlayOpts } from '../anim/CharacterAnimator';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { HoopJuice } from '../visual/HoopJuice';
@@ -63,6 +65,8 @@ type Prop = 'none' | 'obstacle';
 const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', obstacle: 'THE CHAIR' };
 const PROP_BONUS: Record<Prop, number> = { none: 0, obstacle: 2 };
 const OBSTACLE_CLEAR_HEIGHT = 1.35; // same chair as Dunk Contest
+// A+ P8 athlete hands, mirrored from DunkMode (PM brief VENICE-DUNK-A-PLUS-P8, 2026-09-07): the reach weight ramp, the fall rate.
+const HAND_IK_MAX = 0.6, HAND_IK_LAG_SEC = 0.12, HAND_IK_RIM_UP = 0.08, FALL_SPEED = 2.6;
 
 
 const BUDGET_SEC: Record<Phase, number> = {
@@ -88,6 +92,14 @@ export const DunkDuelMode: ModeDefinition = (() => {
   let finishing = false, rimCamCut = false, ended = false;
   let hangSlowMoLatch = false;
   let contactLatch = false;                  // contactPunch once per attempt (the make's flush frame)
+  // ── A+ P8 athlete hands (dunk mirror; no replay in the duel) ──
+  const armsOf = new WeakMap<SpawnedCharacter, { Left: ArmChain | null; Right: ArmChain | null }>();   // H1: per body, built once
+  let handIkT = 0;                            // H1: 0..1 ease of the wrist reach
+  let handIkObs: Observer<Scene> | null = null, ikScene: Scene | null = null;
+  const handIkTarget = new Vector3(), handIkPole = new Vector3();
+  let clipToken = 0;                          // H5: a superseded clip's onEnd chain is dead (Babylon fires it on stop() too)
+  let airHeld = false;                        // H5: the aerial clip holds its last frame until feet-down
+  let dropToFloor = false;                    // H5: the root falls from the release height (a miss at the clank, a make at CONTACT)
   // the contest systems (owner re-lock: the real dunk-contest bar)
   let prop: Prop = 'none';
   let obstacle: AbstractMesh | null = null;
@@ -121,7 +133,8 @@ export const DunkDuelMode: ModeDefinition = (() => {
     setProp(ctx, 'none');
     active().root.position.set(0, 0, CFG.startZ);
     active().root.rotation.y = Math.PI;
-    active().animator.play(SPORT_CLIP.idle, { loop: true });
+    airHeld = false; dropToFloor = false; handIkT = 0;   // A+ P8
+    playClip(SPORT_CLIP.idle, { loop: true });
     bench().root.position.set(4.2, 0, CFG.rimZ + 4);
     bench().animator.play(SPORT_CLIP.idle, { loop: true });
     attachBallToHand(ball, active().skeleton, 'RightHand');
@@ -148,9 +161,10 @@ export const DunkDuelMode: ModeDefinition = (() => {
     setPhase('cinematic');
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
+    airHeld = false; dropToFloor = false;   // A+ P8
     console.info('[JUICE-SOFT] launch');
     SoundKit.play('whoosh', { pitch: 0.85 });   // the ONE whoosh — never re-triggered on CONTACT
-    active().animator.play(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => {} });
+    playClip(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => {} });   // the no-op chain holds the last frame if the clip ends in the air
   }
 
   function resolveDunk(ctx: ModeContext): void {
@@ -162,9 +176,46 @@ export const DunkDuelMode: ModeDefinition = (() => {
     releasePos.copyFrom(ball.getAbsolutePosition());
     releaseBall(ball);
     if (!qteHit) { ballSim.launch(releasePos, clankOffRim(ball, rim)); missClank(ctx); setTrail('off'); armSettle(); }   // juice soft #2, #5; A+ P4
-    active().animator.play(qteHit ? SPORT_CLIP.dunkScoreHang : SPORT_CLIP.jumpLand, {
-      onEnd: () => active().animator.play(SPORT_CLIP.idle, { loop: true }),
-    });
+    if (!qteHit) dropToFloor = true;   // A+ P8 H5: a miss falls from the release height — feet-down is where the stumble lands
+    playAir(qteHit ? SPORT_CLIP.dunkScoreHang : SPORT_CLIP.jumpLand);   // A+ P8 H5: holds its last frame in the air; the land clip is feet-down's
+  }
+
+  // ── A+ P8 athlete hands, mirrored from DunkMode (see there for the measurements) ─────────────────────────────────
+  /** H1: after the clips evaluate, the ball hand reaches for the rim with the eased weight — the wrist lags the root into the iron. */
+  function handIkApply(): void {
+    const w = HAND_IK_MAX * handIkT * handIkT * (3 - 2 * handIkT);
+    if (w <= 0.001 || !p1 || !p2) return;
+    const c = active();
+    let arms = armsOf.get(c);
+    if (!arms) { arms = { Left: armChain(c.skeleton, 'Left'), Right: armChain(c.skeleton, 'Right') }; armsOf.set(c, arms); }
+    const side = ebState.inLeftHand ? 'Left' : 'Right';
+    const arm = arms[side] ?? arms.Right; if (!arm) return;
+    const sx = side === 'Left' ? -1 : 1;
+    c.root.computeWorldMatrix(true);
+    handIkTarget.set(rim.x, rim.y + HAND_IK_RIM_UP, rim.z);
+    handIkPole.set(sx * 0.7, -0.2, -0.5).applyRotationQuaternionInPlace(c.root.absoluteRotationQuaternion);
+    reachArm(arm, handIkTarget, handIkPole, w);
+  }
+  /** H5: every active-player clip goes through here — a superseded clip's onEnd chain is dead (Babylon raises it on stop()). */
+  function playClip(name: string, opts: PlayOpts = {}): AnimationGroup | null {
+    const token = ++clipToken;
+    if (opts.loop) return active().animator.play(name, opts);
+    return active().animator.play(name, { ...opts, onEnd: () => {
+      if (token !== clipToken) return;
+      if (opts.onEnd) opts.onEnd(); else active().animator.play(SPORT_CLIP.idle, { loop: true });
+    } });
+  }
+  /** H5: the aerial clip — ends on its own in the air → holds its last frame; feet-down plays the land clip. */
+  function playAir(name: string, speedRatio = 1): void {
+    airHeld = true;
+    playClip(name, { speedRatio, onEnd: () => { if (active().root.position.y > 0.05) console.info(`[HANDS] hold ${name}`); else landNow(); } });
+  }
+  /** H5: feet-down — the land crouch, then the idle loop. Once per attempt. */
+  function landNow(): void {
+    if (!airHeld) return;
+    airHeld = false;
+    console.info('[HANDS] land dunk_land_crouch');
+    playClip(SPORT_CLIP.dunkLandCrouch, { onEnd: () => playClip(SPORT_CLIP.idle, { loop: true }) });
   }
 
   /** The chair caught the dunker mid-flight — the dunk DIES here, whatever
@@ -288,7 +339,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     } else {
       setTimeout(() => SoundKit.play('crowdGroan', { volume: 0.35 }), 260);   // A+ P2: the clank was the one hit; the crowd groans a breath later, quietly
     }
-    active().animator.play(SPORT_CLIP.dunkLandCrouch, { onEnd: () => active().animator.play(SPORT_CLIP.idle, { loop: true }) });
+    if (made) dropToFloor = true; else landNow();   // A+ P8 H5: a make lets go of the iron and falls to feet-down; a miss has normally landed already
     ctx.setHud({
       p1Score: totals[0], p2Score: totals[1],
       judgeReveal: made ? scores : null,
@@ -357,6 +408,8 @@ export const DunkDuelMode: ModeDefinition = (() => {
       neverBindPose(p2.animator, SPORT_CLIP.idle);
       installSafePlay(p2.animator, 'dunkduel-p2');
       ctx.groundLock?.track(p2.root, p2.skeleton);
+      if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1: the reach, after the clips
+      ikScene = ctx.scene; handIkObs = ctx.scene.onAfterAnimationsObservable.add(handIkApply);
 
       ball = MeshBuilder.CreateSphere('duel_ball', { diameter: 0.24 }, ctx.scene);
       ballSim = new BallSim(ball, 0.12);
@@ -404,7 +457,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       if (e.t === 'trigger' && e.side === 'R') {
         if (phase === 'approach' && e.value > 0.02) {
           setPhase('charge');
-          active().animator.play(SPORT_CLIP.dunkChargeGather, { loop: true });
+          playClip(SPORT_CLIP.dunkChargeGather, { loop: true });
         }
         if (phase === 'charge') {
           charge = Math.max(charge, e.value);
@@ -436,7 +489,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
         // at launch and the judges' difficulty read — a walk-up caps both.
         runUpPeak = Math.max(runUpPeak, Math.hypot(vel.x, vel.z));
         launchSpeed01 = Math.max(0, Math.min(1, (runUpPeak - 2) / 6));
-        c.animator.play(Math.hypot(vel.x, vel.z) > 2.5 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
+        playClip(Math.hypot(vel.x, vel.z) > 2.5 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
         if (c.root.position.z <= CFG.gatherZ + 0.2) {
           ctx.setHud({
             hint: runUpPeak < 3.5
@@ -458,6 +511,8 @@ export const DunkDuelMode: ModeDefinition = (() => {
         }
         const c = active();
         if (style === 'sig') runEastbayPath(ball, c.skeleton, clipTime, ebState);
+        // A+ P8 H4: the ball stays parented to the ball hand through the hang — a lost parent that is not a release re-attaches
+        if (!ball.parent && !ball.metadata?.felReleased) { attachBallToHand(ball, c.skeleton, ebState.inLeftHand ? 'LeftHand' : 'RightHand'); console.info('[HANDS] ball re-attached'); }
         const k = Math.min(1, clipTime / EASTBAY_TIMING.duration);
         // the run-up buys air: 0.85× for a walk-up, 1.15× at full runway
         c.root.position.y = Math.sin(k * Math.PI) * (1.05 + charge * 0.55) * (0.85 + launchSpeed01 * 0.3);
@@ -506,6 +561,20 @@ export const DunkDuelMode: ModeDefinition = (() => {
         }
       }
 
+      // ── A+ P8 athlete hands: the fall to feet-down, the reach weight (dunk mirror) ──────────────────────────────
+      if (dropToFloor && !obstacleClipped) {
+        active().root.position.y = Math.max(0, active().root.position.y - FALL_SPEED * dt);
+        if (active().root.position.y <= 0) dropToFloor = false;
+      }
+      if (airHeld && phase !== 'cinematic' && active().root.position.y <= 0.05) landNow();
+      const reachWant = (phase === 'cinematic' && clipTime >= EASTBAY_TIMING.rise && !obstacleClipped)
+        || (phase === 'resolve' && qteHit && !contactLatch && !obstacleClipped);
+      const ikScale = ctx.scene.animationTimeScale ?? 1;
+      const ikStep = dt * (phase === 'cinematic' && Number.isFinite(ikScale) && ikScale > 0 ? ikScale : 1) / HAND_IK_LAG_SEC;
+      const prevIk = handIkT;
+      handIkT = reachWant ? Math.min(1, handIkT + ikStep) : Math.max(0, handIkT - ikStep);
+      if (prevIk === 0 && handIkT > 0) console.info('[HANDS] reach on'); else if (prevIk > 0 && handIkT === 0) console.info('[HANDS] reach off');
+
       if (phase === 'cinematic' && rimCamCut) {
         // hold the rim-cam angle through the flush
       } else if (phase !== 'judging' && phase !== 'matchOver' && phase !== 'handoff') {
@@ -516,6 +585,8 @@ export const DunkDuelMode: ModeDefinition = (() => {
     dispose() {
       hoopJuice?.dispose(); hoopJuice = null;
       modeVenue?.dispose?.(); modeVenue = null;
+      if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
+      handIkObs = null; ikScene = null; handIkT = 0;
       p1?.dispose(); p2?.dispose(); ball?.dispose();
       obstacle?.dispose(); obstacle = null;
       SoundKit.stopAmbient();

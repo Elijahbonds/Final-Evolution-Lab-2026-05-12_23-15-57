@@ -18,7 +18,7 @@
 
 import { Color3, Color4, MeshBuilder, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
-import type { AbstractMesh, Camera, ParticleSystem } from '@babylonjs/core';
+import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, Scene } from '@babylonjs/core';
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -29,6 +29,8 @@ import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { MOCAP_DUNK, DUNK_FINISH_VARIETY } from '../nexus/dressingFlags';
 import { attachBallToHand, releaseBall, runEastbayPath, flushThroughRim, clankOffRim } from '../anim/ballRig';
 import { EASTBAY_TIMING } from '../anim/authored/timing';
+import { armChain, reachArm, type ArmChain } from '../anim/HandIK';   // A+ P8 H1: the hang wrist reach
+import type { PlayOpts } from '../anim/CharacterAnimator';
 import { DunkReplayRecorder } from '../scene/DunkReplayCam';
 import { SoundKit } from '../audio/SoundKit';
 import { VenueKit } from '../visual/VenueKit';
@@ -82,6 +84,13 @@ const FLAT_AVG = 6.35;                         // per-judge avg that reads as a 
 const RIVAL_PACE = Math.round(7.6 * JUDGE_COUNT);
 /** How often the rival blows a dunk. Real contests are full of missed attempts. */
 const RIVAL_BLOWN_CHANCE = 0.18;
+// ── A+ P8 athlete hands (PM brief VENICE-DUNK-A-PLUS-P8, 2026-09-07) ─────────────────────────────────────────────
+/** H1: from the hang rise the ball hand reaches for the rim — weight eased 0 → HAND_IK_MAX over HAND_IK_LAG_SEC of CLIP time
+ *  (the hang slow-mo stretches the lag with the flight), held through a make's flush, let go at CONTACT / the clank / a clip. */
+const HAND_IK_MAX = 0.6, HAND_IK_LAG_SEC = 0.12, HAND_IK_RIM_UP = 0.08;
+/** H5: the root's fall from the release height (the arc's own rate at the release, ~2.6 m/s) — feet-down is where the land clip plays.
+ *  Measured before: the root froze at the resolve height (~0.23 m) and the idle loop played there through the judging. */
+const FALL_SPEED = 2.6;
 
 // Judges + staged reveal + crowd energy now live in the SHARED JudgePanel
 // (lib/babylon/core/JudgePanel.ts) — DunkDuelMode drinks from the same well.
@@ -121,6 +130,18 @@ export const DunkMode: ModeDefinition = (() => {
   let rimCamCut = false;                     // broadcast cut latch (per attempt)
   let hangSlowMoLatch = false;               // JuiceKit.slowMo once per attempt (hang only)
   let contactLatch = false;                  // contactPunch once per attempt (the make's flush frame)
+  // ── A+ P8 athlete hands ──
+  const arms: { Left: ArmChain | null; Right: ArmChain | null } = { Left: null, Right: null };   // H1: built once at spawn
+  let handIkT = 0;                            // H1: 0..1 ease of the wrist reach
+  let handIkObs: Observer<Scene> | null = null, ikScene: Scene | null = null;
+  const handIkTarget = new Vector3(), handIkPole = new Vector3();
+  let clipToken = 0;                          // H5: a superseded clip's onEnd chain is dead (Babylon fires it on stop() too)
+  let airHeld = false;                        // H5: an aerial clip (finish / trick) holds its last frame until feet-down
+  let landingClip: string = SPORT_CLIP.dunkLandCrouch;   // H5: the land clip feet-down plays (a make picks it from the score)
+  let aerialClip: string = SPORT_CLIP.dunkScoreHang;     // the finish chosen at resolve (the replay re-plays it)
+  let dropToFloor = false;                    // H5: the root falls to the floor (a miss from the release; a make after the replay)
+  let replaying = false, replayAir = false, replayAerial = false, replayAirSec = 0, replayAerialAt = 0, replayPrevY = 0;   // H5: replay re-drive
+  let launchRealMs = 0, resolveRealMs = 0, clipTimeAtResolve = 0;   // the live flight's real timing, for the replay's clip rate
   const rim = new Vector3(0, CFG.rimHeight, CFG.rimZ);
   const ebState = { inLeftHand: false };
   let stickX = 0, stickY = 0;
@@ -180,6 +201,12 @@ export const DunkMode: ModeDefinition = (() => {
       neverBindPose(player.animator, SPORT_CLIP.idle);
       installSafePlay(player.animator, 'dunk-player');
       ctx.groundLock?.track(player.root, player.skeleton);
+      // A+ P8 H1: the arm chains once (the eastbay's left hand carries the ball after the hand-off); the reach is applied
+      // AFTER the clips evaluate, on top of the frame's pose — the slot the dribble's HandIK and foot planting use
+      arms.Left = armChain(player.skeleton, 'Left'); arms.Right = armChain(player.skeleton, 'Right');
+      if (!arms.Right) console.warn('[FEL-DUNK] no Right arm chain on this rig — the hang wrist reach is off');
+      if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);
+      ikScene = ctx.scene; handIkObs = ctx.scene.onAfterAnimationsObservable.add(handIkApply);
       // spawnNpc is explicit: the rival must NEVER wear the player's identity,
       // or you end up dunking against yourself.
       rival = await CharacterPipeline.spawnNpc(ctx.scene, CFG.heroUrl, {
@@ -274,7 +301,7 @@ export const DunkMode: ModeDefinition = (() => {
         }
         if (trick) {
           trickLabels.push(trick.label);
-          player.animator.play(trick.clip, { speedRatio: 1.05 });
+          playAir(trick.clip, 1.05);   // A+ P8 H5: a trick that ends in the air holds its last frame (it used to fall to idle mid-flight)
           hype = Math.min(100, hype + 6);
           SoundKit.play('whoosh', { pitch: 1.1 + trick.difficulty * 0.08, volume: 0.45 });
           SoundKit.play('crowdCheer', { volume: 0.3 + trick.difficulty * 0.05 });
@@ -300,7 +327,7 @@ export const DunkMode: ModeDefinition = (() => {
           // loads while you run, and the launch fires at the gather line — or on release, from wherever you are.
           setPhase('charge');
           holdRunSpeed = Math.max(2, runUpPeak);
-          player.animator.play(SPORT_CLIP.moveLoop, { loop: true });
+          playClip(SPORT_CLIP.moveLoop, { loop: true });
           ctx.setHud({ hint: 'HOLD — running to the rim · steer with the stick · release early to jump from here' });
         }
         if (phase === 'charge') {
@@ -338,7 +365,7 @@ export const DunkMode: ModeDefinition = (() => {
         // tricks fit before the slam window. Live 08's whole ramp, in one number.
         runUpPeak = Math.max(runUpPeak, Math.hypot(vel.x, vel.z));
         const moving = Math.hypot(vel.x, vel.z) > 2.5;
-        player.animator.play(moving ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
+        playClip(moving ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
         if (player.root.position.z <= CFG.gatherZ + 0.2) {
           ctx.setHud({
             hint: runUpPeak < 3.5
@@ -370,6 +397,8 @@ export const DunkMode: ModeDefinition = (() => {
           setTrail('hang');   // A+ P6: the trail brightens at the hang rise, not at takeoff
         }
         if (style === 'sig') runEastbayPath(ball, player.skeleton, clipTime, ebState);
+        // A+ P8 H4: the ball stays parented to the ball hand through the hang — a lost parent that is not a release re-attaches
+        if (!ball.parent && !ball.metadata?.felReleased) { attachBallToHand(ball, player.skeleton, ebState.inLeftHand ? 'LeftHand' : 'RightHand'); console.info('[HANDS] ball re-attached'); }
         const k = Math.min(1, clipTime / EASTBAY_TIMING.duration);
         player.root.position.y = Math.sin(k * Math.PI) * (1.05 + charge * 0.55);
         // the flight curves in to the rim on BOTH axes: an angled approach
@@ -456,6 +485,39 @@ export const DunkMode: ModeDefinition = (() => {
           if (sinceRelease > 1.2) void finishAttempt(ctx, false);
         }
       }
+
+      // ── A+ P8 athlete hands: the replay's clips, the fall to feet-down, the reach weight ──────────────────────────
+      if (replaying) {
+        // H5: the replay re-flies the recorded root at 0.5× for up to 8 s — the clips re-fly with it: the run on the floor, the
+        // launch clip from the replayed takeoff (at the live flight's own clip rate: the hang slow-mo stretched it), the finish
+        // where the live flight resolved. Before: idle_stand flew the whole replay.
+        const y = player.root.position.y;
+        if (!replayAir && y > 0.05 && replayPrevY <= 0.05) {
+          replayAir = true; replayAirSec = 0; replayAerial = false;
+          const liveSec = Math.max(0.2, (resolveRealMs - launchRealMs) / 1000);
+          replayAerialAt = liveSec / 0.5;
+          playClip(STYLE_CLIP[style], { speedRatio: Math.max(0.2, 0.5 * clipTimeAtResolve / liveSec), onEnd: () => {} });
+          console.info('[HANDS] replay air');
+        } else if (!replayAir) playClip(SPORT_CLIP.moveLoop, { loop: true });
+        if (replayAir) { replayAirSec += dt; if (!replayAerial && replayAirSec >= replayAerialAt) { replayAerial = true; playAir(aerialClip, 0.5); console.info('[HANDS] replay aerial'); } }
+        replayPrevY = y;
+      }
+      // H5: the fall — a miss from the release height, a make once the replay hands the root back (the chair's own drop stays)
+      if (dropToFloor && !replaying && !obstacleClipped) {
+        player.root.position.y = Math.max(0, player.root.position.y - FALL_SPEED * dt);
+        if (player.root.position.y <= 0) dropToFloor = false;
+      }
+      // H5: feet-down — the land clip plays when the body is back on the floor, never on the hit frame and never in the air
+      if (airHeld && !replaying && phase !== 'cinematic' && player.root.position.y <= 0.05) landNow();
+      // H1: the reach weight — up from the hang rise (in clip time), held through a make's flush to CONTACT, down otherwise
+      const reachWant = (phase === 'cinematic' && clipTime >= EASTBAY_TIMING.rise && !obstacleClipped)
+        || (phase === 'resolve' && qteHit && !contactLatch && !obstacleClipped)
+        || (replaying && replayAir);
+      const ikScale = ctx.scene.animationTimeScale ?? 1;
+      const ikStep = dt * (phase === 'cinematic' && Number.isFinite(ikScale) && ikScale > 0 ? ikScale : 1) / HAND_IK_LAG_SEC;
+      const prevIk = handIkT;
+      handIkT = reachWant ? Math.min(1, handIkT + ikStep) : Math.max(0, handIkT - ikStep);
+      if (prevIk === 0 && handIkT > 0) console.info('[HANDS] reach on'); else if (prevIk > 0 && handIkT === 0) console.info('[HANDS] reach off');
 
       // the building breathes with the contest every frame
       crowd.update(dt, Math.min(1, hype / 100), chain, momentum.tier === 'on_fire');
@@ -549,6 +611,8 @@ export const DunkMode: ModeDefinition = (() => {
 
     dispose() {
       hoopJuice?.dispose(); hoopJuice = null;
+      if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
+      handIkObs = null; ikScene = null; handIkT = 0;
       player?.dispose(); rival?.dispose(); replay?.dispose(); ball?.dispose();
       clearProps(); SoundKit.stopAmbient();
       dunkVenue?.dispose(); dunkVenue = null;  // M74
@@ -600,6 +664,7 @@ export const DunkMode: ModeDefinition = (() => {
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false;
     rimCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
+    airHeld = false; dropToFloor = false; replaying = false; replayAir = false; launchRealMs = performance.now();   // A+ P8
     console.info('[JUICE-SOFT] launch');
     // The run-up, not the stick at the release instant: during the charge the
     // stick is usually neutral, so the old `hypot(stickX, stickY)` read ~0 and
@@ -621,7 +686,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (prop !== 'alleyoop') attachBallToHand(ball, player.skeleton, 'RightHand');
     else releaseBall(ball);   // ball waits at the teammate's hand until the toss beat
     SoundKit.play('whoosh', { pitch: 0.85 });
-    player.animator.play(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => {} });
+    playClip(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => {} });   // the no-op chain holds the last frame if the clip ends in the air
   }
 
   /** The dunk dies at the prop: clip it mid-flight and the attempt is blown
@@ -648,12 +713,52 @@ export const DunkMode: ModeDefinition = (() => {
     releasePos.copyFrom(ball.getAbsolutePosition());
     releaseBall(ball);
     if (!qteHit) { ballSim.launch(releasePos, clankOffRim(ball, rim)); missClank(ctx); setTrail('off'); armSettle(); }   // juice soft #2, #5; A+ P4
-    const aerial = pickAerialFinish(qteHit, qteAccuracy);
+    aerialClip = pickAerialFinish(qteHit, qteAccuracy); resolveRealMs = performance.now(); clipTimeAtResolve = clipTime;
+    if (!qteHit) dropToFloor = true;   // A+ P8 H5: a miss falls from the release height — feet-down is where the stumble lands
     const banner = finishBanner(qteHit, qteAccuracy);
     if (banner) ctx.setHud({ banner });
-    player.animator.play(aerial, {
-      onEnd: () => player.animator.play(SPORT_CLIP.idle, { loop: true }),
-    });
+    playAir(aerialClip);   // A+ P8 H5: holds its last frame in the air; the land clip is feet-down's, the idle loop is the land's
+  }
+
+  // ── A+ P8 athlete hands (PM brief VENICE-DUNK-A-PLUS-P8, 2026-09-07) ─────────────────────────────────────────────
+  /** H1: on top of the frame's clip pose (after-animations) the ball hand reaches for the rim with the eased weight, so the
+   *  wrist LAGS the root into the iron instead of riding the clip rigidly. Pole: outward and slightly back, the dribble's own.
+   *  Rotations only (shoulder / elbow) — never a bone translation, never a scale (TwoBoneIK's node-space solve). */
+  function handIkApply(): void {
+    const w = HAND_IK_MAX * handIkT * handIkT * (3 - 2 * handIkT);
+    if (w <= 0.001 || !player) return;
+    const side = ebState.inLeftHand ? 'Left' : 'Right';
+    const arm = arms[side] ?? arms.Right; if (!arm) return;
+    const sx = side === 'Left' ? -1 : 1;
+    player.root.computeWorldMatrix(true);
+    handIkTarget.set(rim.x, rim.y + HAND_IK_RIM_UP, rim.z);
+    handIkPole.set(sx * 0.7, -0.2, -0.5).applyRotationQuaternionInPlace(player.root.absoluteRotationQuaternion);
+    reachArm(arm, handIkTarget, handIkPole, w);
+  }
+  /** H5: every player clip goes through here. Babylon raises a group's end observable on stop() as well, so a chained onEnd
+   *  used to fire the moment its clip was superseded — measured: the land crouch was cut to idle 150 ms in by the aerial's
+   *  own chain. A superseded clip's chain is dead; only a clip that ends on its own runs it (and, with no chain, the idle
+   *  loop — neverBindPose's contract, gated the same way). */
+  function playClip(name: string, opts: PlayOpts = {}): AnimationGroup | null {
+    const token = ++clipToken;
+    if (opts.loop) return player.animator.play(name, opts);
+    return player.animator.play(name, { ...opts, onEnd: () => {
+      if (token !== clipToken) return;
+      if (opts.onEnd) opts.onEnd(); else player.animator.play(SPORT_CLIP.idle, { loop: true });
+    } });
+  }
+  /** H5: an aerial clip — the finish at resolve, a trick in the hang. Ends on its own in the air → holds its last frame
+   *  (nothing else writes the pose; there is no bind pose to fall to); feet-down plays the land clip. */
+  function playAir(name: string, speedRatio = 1): void {
+    airHeld = true;
+    playClip(name, { speedRatio, onEnd: () => { if (replaying || player.root.position.y > 0.05) console.info(`[HANDS] hold ${name}`); else landNow(); } });
+  }
+  /** H5: feet-down — the land clip, then the idle loop. Once per attempt. */
+  function landNow(): void {
+    if (!airHeld) return;
+    airHeld = false;
+    console.info(`[HANDS] land ${landingClip}`);
+    playClip(landingClip, { onEnd: () => playClip(SPORT_CLIP.idle, { loop: true }) });
   }
 
 
@@ -768,7 +873,7 @@ export const DunkMode: ModeDefinition = (() => {
         banner: 'MISSED — the judges saw it', judgeReveal: [],
         score: playerTotal, chain, hype: Math.round(hype),
       });
-      player.animator.play(SPORT_CLIP.dunkLandCrouch, { onEnd: () => player.animator.play(SPORT_CLIP.idle, { loop: true }) });
+      landingClip = SPORT_CLIP.dunkLandCrouch; landNow();   // A+ P8 H5: normally landed at feet-down already (~0.1 s after the release); this is the floor
       setPhase('judging');
       // Pad acceptance #4: a miss is one beat, then the next run-up — no reveal wait, no card, no re-press
       // (a hold still down streams the trigger and starts the next run the frame the approach resets).
@@ -848,12 +953,15 @@ export const DunkMode: ModeDefinition = (() => {
     SoundKit.play('score', { pitch: 1 + Math.min(1, hype / 100) });
     EffectsKit.burst(ctx.scene, rim, 'net');
     if (dunkTotal >= BAND_TOTAL.eruption) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'confetti'); }
-    const landing = pickLanding(dunkTotal);
+    landingClip = pickLanding(dunkTotal);   // A+ P8 H5: plays at feet-down after the replay hands the root back, not on the flush frame
 
-    player.animator.play(landing, { onEnd: () => player.animator.play(SPORT_CLIP.idle, { loop: true }) });
-
+    // A+ P8 H5: the replay re-flies the recorded root for up to 8 s (a 4 s window at 0.5×) and outlives this 3.5 s race; the
+    // un-raced promise is what knows when the root is the mode's again — then it falls to the floor and lands. The replay
+    // writes a rotationQuaternion the mode never uses (it yaws by Euler), so the Euler yaw is handed back with the root.
+    replaying = true; replayAir = false; replayAerial = false; replayPrevY = player.root.position.y;
+    const replayDone = replay.play(rim).then(() => { replaying = false; replayAir = false; player.root.rotationQuaternion = null; dropToFloor = true; console.info('[HANDS] replay end'); });
     ctx.camDirector.suspended = true;
-    await Promise.race([replay.play(rim), new Promise((r) => setTimeout(r, 3500))]);
+    await Promise.race([replayDone, new Promise((r) => setTimeout(r, 3500))]);
     ctx.camDirector.suspended = false;
 
     // Phase 7: STAGED REVEAL — confer, Silk, Doc, the long Prime beat,
@@ -883,7 +991,8 @@ export const DunkMode: ModeDefinition = (() => {
     player.root.position.set(0, 0, CFG.startZ);
     player.root.rotation.y = Math.PI;
     player.root.rotation.z = 0; airLean = 0; holdRunSpeed = 0;
-    player.animator.play(SPORT_CLIP.idle, { loop: true });
+    airHeld = false; dropToFloor = false; replaying = false; replayAir = false; player.root.rotationQuaternion = null;   // A+ P8
+    playClip(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     styleTaps = 0; hangSec = 0; revealed = [];
     runUpPeak = 0; obstacleClipped = false; toppling = false;
