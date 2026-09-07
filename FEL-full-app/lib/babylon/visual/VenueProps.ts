@@ -68,11 +68,14 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
       // a tinted placement instances a TINTED MASTER (one hidden clone per source × tint, shared by every placement with that
       // tint — the slope's 60 green pines were 60 clones = 60 draws, measured 2026-09-06); untinted ones instance the source
       const master = p.tint ? tintedMaster(scene, src, p.tint) : src;
+      // receiveShadows lives on the SOURCE — an InstancedMesh only reads its source's flag, and setting it on the instance
+      // is a no-op that logs a BJS warning per instance (217 per /try boot, measured 2026-09-07)
+      master.receiveShadows = true;
       const inst: AbstractMesh = master.createInstance(`${src.name}_i${i}`);
       inst.parent = holder;
       // the source mesh keeps its own transform inside the kit file; the instance repeats it under the holder
       inst.position.copyFrom(src.position); inst.rotationQuaternion = src.rotationQuaternion?.clone() ?? null; inst.rotation.copyFrom(src.rotation); inst.scaling.copyFrom(src.scaling);
-      inst.isPickable = false; inst.receiveShadows = true; inst.setEnabled(true);
+      inst.isPickable = false; inst.setEnabled(true);
       instances.push(inst);
     }
     count++;
