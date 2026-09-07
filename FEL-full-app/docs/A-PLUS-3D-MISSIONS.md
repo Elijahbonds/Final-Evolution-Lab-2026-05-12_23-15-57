@@ -328,6 +328,19 @@ overlays; every event is byte-identical):**
 
 **Cut risk (60 fps):** none — HUD and clip triggers on existing bodies.
 
+**Landed — Phases 1–5 (e2fd058; risk low–medium: HUD + clip triggers, contest logic byte-identical):** `core/shootoutHud.ts`
+(the sweet centre and bands as ONE source for the mode's grading and the host's drawn band, rack pips, heat level with
+ON FIRE at four, points left; 4 tests). Mode: publishes `rackIdx` / `ballIdx` / `left` / `heat`, appends `· ON FIRE` to the
+make banner, and on each posted rival number the sideline body **reacts** (a 16+ round celebrates, a poor one flinches —
+lock D4 against visible rival SHOOTING stands; a reaction is not a shot). Host: score at 5xl + clock at 3xl top-centre,
+round / MONEY BALL · 2 PTS / ON FIRE ×n / n LEFT chips, five rack pip groups (money gold, the loaded ball pulsing), the
+NEED chip, the banner at 3xl above a 520 px release meter with the GOOD band and the PERFECT band drawn from the
+constants; the standings board unchanged. Verified: dev-runner capture 0 / 0 / 0 at 60 fps (605 draws — the wide Venice
+court sits at the 600 budget, pre-existing). **Route finding (pre-existing, measured on the pre-mission files too):**
+`/play/threepoint` in dev takes ~70 s to load and the arena splash stays on LOADING even after the mode logs `loaded` —
+React strict mode mounts the host twice, both instances spawn a six-body field under the Venice location, and the splash
+tracks the phantom. Production mounts once; Phase 6 checks the route on the production build.
+
 ## Mission #5 — Golf — PHASE 0 AUDIT (no code changes)
 
 **Benchmark (owner):** Everybody's Golf feel + Wii Sports Resort readability.
