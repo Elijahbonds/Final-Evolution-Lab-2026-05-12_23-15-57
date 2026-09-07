@@ -119,6 +119,15 @@ lookahead scheduler's 100 ms window; no new dependency (Web Audio only).
 - **M1b (phone = the pad controller)**: the controller link's button schema gains a generic `columns` hint; `music_flip`
   declares a 4×4 bank of sixteen `pad_<n>` actions; the FLIP tab mounts the host lobby (room code + QR badge) and routes
   `pad_<n>` to the pad component's trigger (`padFromAction`, tested). Pairing is the existing WebRTC link.
+- **M2–M4 (arrangement, vocals, stems)**: `Song.ts` (pure, 6 tests) — sections are pattern snapshots, a chain of (section,
+  bars) is the song, bar math, take scheduling, render length. `AudioEngine` gains `onBar` (fired at every bar line before
+  that bar schedules), one-shots that start at a bar (`setOneShots`), `renderSong` (per-bar patterns + takes → one WAV, polish
+  chain honoured) and `renderSongStems` (one WAV per track over the song, each take its own stem). `SongPanel.tsx` in the
+  STUDIO view: SAVE GRID AS SECTION (intro/verse/hook/bridge/outro), the chain with ± bars and remove, SONG MODE (the grid
+  swaps at each bar line while playing), RECORD TAKE (arms; the take punches in on the next bar line and rides the song),
+  RENDER SONG + STEMS with download links. Probe `_song-diag`: two sections → 4-bar chain → song mode plays verse, verse,
+  hook by bar → render gives the mix + 8 stems, no page errors. The take path (microphone) is the Flip's mic path and is
+  not exercised headless — verify by ear on device.
 
 ## Lane 3 — Who Scene It as a mode + Scene Packs
 

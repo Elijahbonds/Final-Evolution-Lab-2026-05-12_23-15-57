@@ -28,6 +28,7 @@ import { StudioLibrary, blobToDataUrl, type TrackRecord } from './StudioLibrary'
 import { parseStreamingUrl, PROVIDER_META } from './StreamingBridge';
 import StreamingDeck from './StreamingDeck';
 import FlipPad from './FlipPad';   // lane 2 M1 — the chop pad
+import SongPanel from './SongPanel';   // lane 2 M2–M4 — sections, chain, take, stems
 import { padFromAction } from './Flip';
 import { HostLobby } from '@/components/controller-link/host-lobby';   // M1b — the phone is the pad controller
 import { MODE_CONTROLLERS } from '@/lib/controller-link/schemas/registry';
@@ -411,6 +412,8 @@ export default function StudioMode({
               {saving ? 'RENDERING…' : 'PUBLISH TO LIBRARY'}
             </button>
           </div>
+
+          <SongPanel engine={engineRef.current} tracks={tracks} setTracks={setTracks} playing={playing} bpm={bpm} steps={STEPS} say={say} S={S} />
 
           <div style={S.mentor}>{tip}</div>
         </>

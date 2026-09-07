@@ -35,6 +35,10 @@ export class AudioEngine {
   private state: SequencerState;
   private scheduledSteps: { step: number; time: number }[] = [];
   public onStep: ((step: number) => void) | null = null;
+  /** M2: fired the moment the scheduler crosses a bar line (before that bar's steps are scheduled) — swap patterns here. */
+  public onBar: ((bar: number) => void) | null = null;
+  private bar = 0;
+  private oneShots: { id: string; buffer: AudioBuffer; atBar: number; gain: number }[] = [];
   /** Fired when a step becomes audible — the Perform layer scores against these. */
   public onStepAudible: ((step: number, time: number) => void) | null = null;
 
@@ -95,9 +99,21 @@ export class AudioEngine {
   start(): void {
     if (this.timerId !== null) return;
     if (this.ctx.state === 'suspended') void this.ctx.resume();
-    this.currentStep = 0;
+    this.currentStep = 0; this.bar = 0;
     this.nextNoteTime = this.ctx.currentTime + 0.05;
+    this.onBar?.(0); this.fireOneShots(0, this.nextNoteTime);
     this.timerId = window.setInterval(() => this.scheduler(), LOOKAHEAD_MS);
+  }
+  /** M3: one-shots (vocal takes) that start at a bar line; replaces the list. */
+  setOneShots(list: { id: string; buffer: AudioBuffer; atBar: number; gain: number }[]): void { this.oneShots = list; }
+  get currentBar(): number { return this.bar; }
+  private fireOneShots(bar: number, time: number): void {
+    for (const o of this.oneShots) {
+      if (o.atBar !== bar) continue;
+      const src = this.ctx.createBufferSource(); src.buffer = o.buffer;
+      const g = this.ctx.createGain(); g.gain.value = o.gain;
+      src.connect(g).connect(this.master); src.start(time);
+    }
   }
   stop(): void {
     if (this.timerId !== null) { clearInterval(this.timerId); this.timerId = null; }
@@ -117,6 +133,7 @@ export class AudioEngine {
     const swingOffset = this.currentStep % 2 === 1 ? base * this.state.swing * 0.5 : 0;
     this.nextNoteTime += base + swingOffset;
     this.currentStep = (this.currentStep + 1) % this.state.steps;
+    if (this.currentStep === 0) { this.bar++; this.onBar?.(this.bar); this.fireOneShots(this.bar, this.nextNoteTime); }
   }
   private scheduleStep(step: number, time: number): void {
     for (const track of this.state.tracks) {
@@ -208,6 +225,63 @@ export class AudioEngine {
       }
     }
     return encodeWav(await offline.startRendering());
+  }
+
+  private polishInto(offline: OfflineAudioContext, bus: GainNode): void {
+    if (!this.polished) { bus.connect(offline.destination); return; }
+    const comp = offline.createDynamicsCompressor();
+    comp.threshold.value = -18; comp.knee.value = 24; comp.ratio.value = 3; comp.attack.value = 0.01; comp.release.value = 0.18;
+    const low = offline.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 120; low.gain.value = 2.5;
+    const high = offline.createBiquadFilter(); high.type = 'highshelf'; high.frequency.value = 8000; high.gain.value = 2;
+    bus.connect(comp).connect(low).connect(high).connect(offline.destination);
+  }
+
+  /** M2/M4: render a SONG — per-bar track patterns (from Song.expandChain) plus one-shot takes — to one WAV. */
+  async renderSong(bars: TrackState[][], oneShots: { buffer: AudioBuffer; atBar: number; gain: number }[], lengthSec: number): Promise<Blob> {
+    const stepDur = this.secondsPerStep();
+    const offline = new OfflineAudioContext(2, Math.ceil(44100 * Math.max(1, lengthSec)), 44100);
+    const bus = offline.createGain(); bus.gain.value = 0.8; this.polishInto(offline, bus);
+    bars.forEach((tracks, bar) => this.placeBar(offline, bus, tracks, bar, stepDur));
+    for (const o of oneShots) {
+      const src = offline.createBufferSource(); src.buffer = o.buffer;
+      const g = offline.createGain(); g.gain.value = o.gain; src.connect(g).connect(bus); src.start(o.atBar * this.state.steps * stepDur);
+    }
+    return encodeWav(await offline.startRendering());
+  }
+
+  /** M4: one WAV per track over the whole song, plus each take as its own stem. */
+  async renderSongStems(bars: TrackState[][], oneShots: { id: string; buffer: AudioBuffer; atBar: number; gain: number }[], lengthSec: number): Promise<{ name: string; blob: Blob }[]> {
+    const stepDur = this.secondsPerStep();
+    const ids = [...new Set(bars.flatMap((b) => b.map((t) => t.sampleId)))];
+    const out: { name: string; blob: Blob }[] = [];
+    for (const id of ids) {
+      const sample = this.samples.get(id); if (!sample) continue;
+      const offline = new OfflineAudioContext(2, Math.ceil(44100 * Math.max(1, lengthSec)), 44100);
+      bars.forEach((tracks, bar) => this.placeBar(offline, offline.destination, tracks.filter((t) => t.sampleId === id), bar, stepDur));
+      out.push({ name: sample.name, blob: encodeWav(await offline.startRendering()) });
+    }
+    for (const o of oneShots) {
+      const offline = new OfflineAudioContext(2, Math.ceil(44100 * Math.max(1, lengthSec)), 44100);
+      const src = offline.createBufferSource(); src.buffer = o.buffer; const g = offline.createGain(); g.gain.value = o.gain;
+      src.connect(g).connect(offline.destination); src.start(o.atBar * this.state.steps * stepDur);
+      out.push({ name: `take ${o.id}`, blob: encodeWav(await offline.startRendering()) });
+    }
+    return out;
+  }
+
+  private placeBar(offline: OfflineAudioContext, dest: AudioNode, tracks: TrackState[], bar: number, stepDur: number): void {
+    for (const track of tracks) {
+      const sample = this.samples.get(track.sampleId);
+      if (!sample || track.muted) continue;
+      for (let step = 0; step < this.state.steps; step++) {
+        if (!track.pattern[step]) continue;
+        const at = (bar * this.state.steps + step) * stepDur + (step % 2 === 1 ? stepDur * this.state.swing * 0.5 : 0);
+        const src = offline.createBufferSource(); src.buffer = sample.buffer;
+        const g = offline.createGain(); g.gain.value = track.volume;
+        const pan = offline.createStereoPanner(); pan.pan.value = track.pan;
+        src.connect(g).connect(pan).connect(dest); src.start(at);
+      }
+    }
   }
 
   dispose(): void { this.stop(); void this.ctx.close(); }
