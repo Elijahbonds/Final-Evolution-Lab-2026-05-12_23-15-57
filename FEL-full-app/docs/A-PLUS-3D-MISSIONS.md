@@ -58,21 +58,30 @@ change; sign-off on physics/rig/shared Profile; no new dependency without asking
    rig; `assertSpawned` runs in DanceMode. Gauntlet row `dance`: 60 fps, 132 draws, **0 FEL-FRAME / 0 MISSING CLIP /
    0 errors** (run-20260906-162209). PASS.
 5. **Vitest.** 338 passed / 0 failed (same sweep). Floor for Phase 5.
-6. **Bundle size.** Not measured: `next build` is barred while the dev server runs (standing rule). Measure at a
-   dev-server-down window before Phase 4; Phase 4's +5 % check compares against that number.
+6. **Bundle size (baseline, `next build` on 6b31d5e with the dev server stopped, owner's window 2026-09-06 17:20).**
+   `/play/dance` route 1.56 kB, First Load JS **157 kB**; First Load JS shared by all **89.9 kB** (chunks 31.9 + 53.7 kB);
+   `/dev/mode/[key]` (the dev runner that imports every mode) 2.1 MB. Phase 4's +5 % check compares against these.
 
 **Gaps against the Dance spec (Phase 3 scope):**
 - Timing windows + visible judgement: **have** (windows, PERFECT/GREAT/GOOD/MISS banner with EARLY/LATE on a miss).
 - Note highway / cue readable from couch distance: **partial** — a beat pulse and a banner, no highway or upcoming-cue
   lane. Mario Party readability wants the next hits visible before they land.
-- Full-body animation driven by hit accuracy: **gap** — dance clips are aliases onto walk/run/guard/roundhouse loops
-  (`DANCE_ALIASES`), i.e. canned loops; accuracy drives sparks/SFX, not the body.
+- Full-body animation driven by hit accuracy: **gap** — the dance clips are procedural authored loops built per skeleton
+  (`registerDanceClips`: toprock, two step, arm wave, six step, freezes, windmill…; `DANCE_ALIASES` onto sport clips is
+  only the fallback) and play canned at the step's beat; accuracy drives sparks/SFX, not the body. (Corrected: the first
+  draft of this audit called them plain aliases.)
 - Combo and multiplier with payoff: **have** (combo, `StemBand` mix builds with clean hits).
 - ≥ 3 tracks at different difficulties: **gap** — one routine at fixed `BPM 96 / BARS 16 / DIFFICULTY 2` constants; no
   backing track is wired (the clock runs, the band layer plays).
 - Results: accuracy %, max combo, grade: **have** (stars + accuracy banner; `ctx.end` stats carry maxCombo, counts).
 
 **Cut risk (60 fps):** none foreseen — the mode is at 60 fps with headroom; a note highway is HUD, not geometry.
+
+**Owner decisions (2026-09-06, one round):** Dance now, Phase 1–6; Phase 6 = local build + verify only; KTX2 pipeline
+approved as its own mission with the toolchain **gltf-transform CLI (npm dev dependency) + KTX-Software `toktx` (Homebrew)**
+— still to be installed only when that mission starts; the build window "now" was used for the baseline above; music =
+**FEL 808 kit pulse under the band**. Order after Dance: the pack's (Who Scene It, Carnival, 3PT, Golf, Tennis, Baseball,
+Soccer, Football), then FreeRun and Brain Brawl at the end.
 
 **Phase 1–6 plan (after the owner's go):** P1 no rig work needed (Gate 0 PASS). P2 none (already 3D). P3: a cue lane
 (next 4 beats as approaching markers, colour by move family), three tracks (bpm 88 / 96 / 112 with difficulty 1 / 2 / 3
@@ -81,6 +90,34 @@ step's full clip at speed 1, a GOOD plays it at 0.85 with a settle, a MISS plays
 equivalent motion exists), results card (accuracy %, max combo, grade letter from stars). P4: already registered; confirm
 dynamic import and no dead ends; bundle check. P5: tests for track selection, grade mapping, cue lane timing, Gate 0 in
 dance. P6: local production build + `next start` verification; report, no deploy.
+
+**Landed — Phases 1–5 (2026-09-06, commit after 6b31d5e; risk medium: shared timing host + HUD union touched):**
+- P1 Gate 0: PASS unchanged (capture harness on `/dev/mode/dance` and `?track=battle`: FEL-FRAME 0 · MISSING CLIP 0 ·
+  errors 0 · 60 fps · 132 draws · 44 meshes).
+- P2: nothing to convert.
+- P3 spec fill: `lib/babylon/core/danceTracks.ts` — three tracks (WARM UP 88 bpm · 12 bars · d1, THE CYPHER 96 · 16 · d2,
+  BATTLE 112 · 16 · d3, fixed seeds so a retry is the same chart), a **pick screen** (d-pad / left stick cycles, A or B
+  locks in, six-second auto-start on the default so a controller-less viewer still plays; `?track=<id>` deep link skips
+  it), letter **grade** on the same bands as the stars, `bodySpeedFor` (PERFECT full-out, GREAT 0.95, GOOD 0.85, MISS =
+  the hit-react clip replaces the move until the next beat), and the **cue lane** (`cueLane`: next six steps as markers
+  coloured by move family with a two-letter glyph and the move name, 2.4 s lookahead, 0.2 s linger). `lib/babylon/audio/
+  KitPulse.ts` — the FEL 808 kit (kick / clap / hat / open hat from `/audio/kits/808`) on the same audio clock and
+  lookahead as the StemBand, one pattern per track (denser with difficulty), four audible count-in clicks. `DanceMode.ts`
+  rewritten around a pick → count-in → playing phase machine; the count-in is armed on the first playing tick (on a deep
+  link it used to be armed inside `load`, before the harness's own 3-2-1, and was spent before the player saw it).
+  `DancePerformance.upcoming(now, n)` feeds the lane. HUD: `HudValue` gains `HudCue[]`; the shared timing host renders
+  the lane only when a mode publishes `cues` (every other timing sport unchanged); results add `accuracy` and the proof
+  line reads `… PTS · ★★★★☆ · 88% · GRADE A · ×14 COMBO` (grade derived from accuracy — stats stay numeric; widening
+  them to strings broke five shipped hosts and was reverted).
+- P4: already registered; the route is `next/dynamic`, `ssr: false`; no dead end (pick → count-in → routine → results →
+  shell). Bundle re-measured after the commit (below).
+- P5: 10 new tests (`danceTracks.test.ts`: three tracks/difficulties/tempos, seeded repeatability and difficulty ceiling,
+  cycle/fallback/deep link, pick banner, grade↔star bands, body speed, lane windowing + order, lane off a live
+  performance, kit pattern bounds/density). Suite 370 / 370, tsc clean.
+- Verified on the real route: desktop 1440×900 `/play/dance?track=battle` mid-routine (lane above the pad, spin marker in
+  the ring, shoulder bop approaching, "NOW — SPIN"), phone 430×932 pick screen (banner, d-pad, short instruction line).
+- Cut: none for 60 fps. Weak: the venue's pink floor glow washes the lower frame (venue look, not this mission); the
+  dev runner prints HUD JSON instead of rendering the host, so the lane is only visible on `/play/dance`.
 
 ---
 

@@ -227,6 +227,22 @@ export class DancePerformance {
     return { step: s, time: this.started + s.beat * beatDuration(this.bpm) };
   }
 
+  /** The next `n` steps to be judged with WHEN (audio-clock seconds):
+   *  pending first, then unfired steps in chart order. Feeds the cue lane
+   *  (A+ mission #1) — peekNext is the n=1 case. */
+  upcoming(now: number, n = 4): { time: number; step: DanceStep }[] {
+    void now;
+    const out: { time: number; step: DanceStep }[] = [];
+    for (const p of this.pending) { if (out.length >= n) break; out.push(p); }
+    if (!this.started) return out;
+    const bd = beatDuration(this.bpm);
+    for (let i = this.nextIdx; i < this.steps.length && out.length < n; i++) {
+      const s = this.steps[i];
+      out.push({ step: s, time: this.started + s.beat * bd });
+    }
+    return out;
+  }
+
   /** Player input on the audio clock. */
   hit(now: number): Judgement {
     let bestIdx = -1, best = Infinity, bestSigned = 0;

@@ -1,5 +1,6 @@
 // proofLine — pass 5 phase 3: one line that says what happened, per mode, from the mode's own session stats. Rendered on
 // the results card ("Share proof · …") and minted onto the challenge card as `display`. Dunk keeps its make/miss line.
+import { gradeFor } from '@/lib/babylon/core/danceTracks';
 export interface ProofInput { score: number; opponentScore?: number; won: boolean; outcome?: string; stats?: Record<string, number | string | boolean> }
 const n = (s: ProofInput['stats'], k: string): number | null => { const v = s?.[k]; return typeof v === 'number' && Number.isFinite(v) ? v : null; };
 const wl = (r: ProofInput) => (r.won ? 'WON' : 'LOST');
@@ -33,7 +34,11 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
     case 'football': { const yards = n(s, 'yards'), ev = n(s, 'evades') ?? n(s, 'evaded'), tr = n(s, 'trucks'); return `${yards ?? 0} YDS${ev !== null ? ` · ${ev} EVADES` : ''}${tr !== null ? ` · ${tr} TRUCKS` : ''}`; }
     case 'tennis': case 'tiebreak': case 'volleyball': return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
     case 'carnival': { const ev = n(s, 'events'), rp = n(s, 'rivalPoints'); return `${r.score}–${rp ?? r.opponentScore ?? 0} OVER ${ev ?? '?'} EVENTS · ${r.won ? 'CHAMPION' : 'RUNNER-UP'}`; }
-    case 'dance': { const stars = n(s, 'stars'); return `${r.score} PTS${stars !== null ? ` · ${'★'.repeat(Math.max(0, Math.min(5, stars)))}` : ''}`; }
+    case 'dance': {
+      const stars = n(s, 'stars'), acc = n(s, 'accuracy'), combo = n(s, 'maxCombo');
+      const grade = acc !== null ? gradeFor(acc / 100) : null;
+      return `${r.score} PTS${stars !== null ? ` · ${'★'.repeat(Math.max(0, Math.min(5, stars)))}` : ''}${acc !== null ? ` · ${acc}%` : ''}${grade ? ` · GRADE ${grade}` : ''}${combo !== null ? ` · ×${combo} COMBO` : ''}`;
+    }
     default: return null;
   }
 }

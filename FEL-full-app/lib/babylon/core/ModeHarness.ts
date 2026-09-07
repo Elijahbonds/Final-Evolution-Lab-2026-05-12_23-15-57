@@ -1,6 +1,7 @@
 // ModeHarness — every Babylon mode runs through this: scene boot, LightRig,
 // InputBus, READY gate + 3-2-1, pause, update loop, SessionResult emit.
 
+import type { HudCue } from './danceTracks';
 import { Scene, TargetCamera, Vector3 } from '@babylonjs/core';
 import { createEngine } from './createEngine';
 import type { TransformNode } from '@babylonjs/core';
@@ -47,7 +48,9 @@ export interface HudScoreCard { name: string; score: number | string; line: stri
 /** Values a mode may push to the bezel HUD. Widened at M47 so a judged
  * contest can surface booleans (pulse flags), a cleared field (null) and a
  * 3-judge scorecard array — the bezel decorates them; modes stay declarative. */
-export type HudValue = string | number | boolean | null | HudScoreCard[];
+/** The rhythm cue lane (dance, A+ mission #1) — see core/danceTracks.ts. */
+export type { HudCue } from './danceTracks';
+export type HudValue = string | number | boolean | null | HudScoreCard[] | HudCue[];
 
 export interface ModeContext {
   scene: Scene;

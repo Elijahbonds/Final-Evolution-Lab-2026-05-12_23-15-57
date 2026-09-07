@@ -12,15 +12,19 @@
 // no counter shows it. So every timing call takes AudioContext.currentTime,
 // and the frame loop only ever asks "what time is it in the song?".
 //
+// A+ MISSION #1 (2026-09-06, benchmark Wii Sports Resort floor + Mario Party
+// readability): three tracks with a pick screen, the FEL 808 kit under the
+// band (KitPulse), a cue lane the couch can read (HUD `cues`), the body
+// answering the judgement (clean = full-out, GOOD drags, MISS stumbles), and
+// a graded results card. The count-in now runs on the audio clock too.
+//
 // ADAPTATION NOTES (drop-in -> this repo):
 //   * ModeContext here exposes heroRef/objectiveRef as MutableRef (.current=),
 //     not setter functions; the results screen is ctx.end(outcome,score,stats),
 //     not ctx.onGameOver.
 //   * There is no shared music AudioEngine singleton with a .context/startTrack.
 //     We own a local AudioContext purely as the SONG CLOCK (real audio clock,
-//     frame-drop robust). No backing music track is wired yet — SoundKit
-//     provides the tick/hit SFX and runMode starts the ambient bed. //TUNE(elijah):
-//     wire an authored backing track to this clock when the audio pack lands.
+//     frame-drop robust). The StemBand and the KitPulse both play through it.
 //   * Clip ids register through me.animator.register(group) (the group name IS
 //     the id). Mirrored steps play `<id>.M`, which resolves through the merged
 //     DANCE_ALIASES table to the mirrored base groups registered at spawn.
@@ -40,12 +44,18 @@ import type { FelInput } from '../core/InputBus';
 import {
   DancePerformance, generateRoutine, beatDuration, DANCE_LIBRARY, type Judgement, type DanceStep,
 } from '../core/DanceCore';
+import {
+  DEFAULT_TRACK_ID, trackById, cycleTrack, trackFromQuery, pickBanner, PICK_TIMEOUT_SEC,
+  gradeFor, bodySpeedFor, cueLane, type DanceTrack,
+} from '../core/danceTracks';
 import { StemBand, CATEGORY_STEM } from '../audio/StemBand';
+import { KitPulse, kitPattern } from '../audio/KitPulse';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 
-const BPM = 96;                 // //TUNE(elijah): routine tempo
-const BARS = 16;                // //TUNE(elijah): routine length in bars
-const DIFFICULTY: 1 | 2 | 3 = 2; // //TUNE(elijah): 1 easy .. 3 hard
+/** Clips are authored at 120 BPM; the animator rescales them per track. */
+const CLIP_REF_BPM = 120;
+
+type Phase = 'pick' | 'countin' | 'playing';
 
 export const DanceMode: ModeDefinition = (() => {
   let me: SpawnedCharacter;
@@ -53,13 +63,21 @@ export const DanceMode: ModeDefinition = (() => {
   let perf: DancePerformance;
   let registered = new Set<string>();
   let ended = false;
-  let countInSec = 0;
-  let started = false;
+  let phase: Phase = 'pick';
+  let track: DanceTrack = trackById(DEFAULT_TRACK_ID);
+  let pickSec = 0;
+  let stickLatch = false;
+  /** Audio-clock time the routine's beat 0 lands (set when the count-in begins). */
+  let startAt = 0;
   /** Local AudioContext used ONLY as the song clock (see header). */
   let audioCtx: AudioContext | null = null;
   /** The Class of 3000 layer: the band your dancing builds. */
   let band: StemBand | null = null;
   let bandJoined = new Set<string>();
+  /** The floor: the FEL 808 kit at the track's tempo. */
+  let kit: KitPulse | null = null;
+  /** The clip currently dancing, so a judgement can re-speed it. */
+  let currentClip: string | null = null;
 
   /** The song clock. Falls back to performance.now() only if no audio context
    *  exists — and says so, because silent fallback to the frame clock is the
@@ -69,15 +87,14 @@ export const DanceMode: ModeDefinition = (() => {
     return performance.now() / 1000;
   }
 
+  function clipSpeed(): number { return track.bpm / CLIP_REF_BPM; }
+
   function playStep(s: DanceStep): void {
     const id = resolveDanceClip(s.clipId, (x) => registered.has(x));
-    // Clips are authored at 120 BPM; rescale so one clip serves every tempo.
     // Mirrored steps play `<id>.M` — resolved via the merged DANCE_ALIASES
     // table to the mirrored base groups registered at character spawn.
-    me.animator.play(s.mirrored ? `${id}.M` : id, {
-      fadeSec: 0.12,
-      speedRatio: BPM / 120,
-    });
+    currentClip = s.mirrored ? `${id}.M` : id;
+    me.animator.play(currentClip, { fadeSec: 0.12, speedRatio: clipSpeed() });
   }
 
   function onJudged(ctx: ModeContext, label: Judgement, _pts: number, combo: number, step?: DanceStep, deltaMs?: number): void {
@@ -104,12 +121,26 @@ export const DanceMode: ModeDefinition = (() => {
       ? (deltaMs < 0 ? ' — EARLY' : ' — LATE')
       : '';
     ctx.setHud({
-      banner: joinBanner ?? (combo >= 4 ? `${label}  \u00d7${combo}` : `${label}${dirTag}`),
+      banner: joinBanner ?? (combo >= 4 ? `${label}  ×${combo}` : `${label}${dirTag}`),
       score: perf.score,
       combo,
       energy: band ? Math.round(band.mixLevel() * 100) : 0,
       energyLabel: 'MIX',
     });
+
+    // THE BODY ANSWERS THE JUDGEMENT (A+ mission #1). A clean hit dances the
+    // move full-out; a GOOD drags it; a MISS on a real step breaks the move
+    // into a stumble (the next step's beat picks the routine back up).
+    const spd = bodySpeedFor(label);
+    if (label === 'MISS') {
+      if (step) {
+        me.animator.play(SPORT_CLIP.karateHitReact, { fadeSec: 0.08, speedRatio: 1.15 });
+        currentClip = null;
+      }
+    } else if (currentClip && spd < 1) {
+      me.animator.setSpeed(currentClip, clipSpeed() * spd);
+    }
+
     if (label === 'PERFECT') {
       EffectsKit.burst(ctx.scene, me.root.position.add(new Vector3(0, 1.4, 0)), 'sparks');
       SoundKit.play('uiTick', { pitch: 1.6, volume: 0.35 });
@@ -123,25 +154,79 @@ export const DanceMode: ModeDefinition = (() => {
     if (ended) return;
     ended = true;
     perf.stop();
+    kit?.dispose();
     const r = perf.result();
     const cleanHits = r.counts.PERFECT + r.counts.GREAT + r.counts.GOOD;
     const rounds = cleanHits + r.counts.MISS;
     const mixPct = band ? Math.round(band.mixLevel() * 100) : 0;
+    const accuracy = Math.round(r.accuracy * 100);
+    const grade = gradeFor(r.accuracy);
     ctx.setHud({
-      banner: `${'\u2605'.repeat(r.stars)}${'\u2606'.repeat(5 - r.stars)}  ${Math.round(r.accuracy * 100)}%  \u00b7  MIX ${mixPct}%`,
+      banner: `${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}  ${accuracy}%  ·  GRADE ${grade}  ·  MIX ${mixPct}%`,
+      cues: [],
+      nextStep: '',
     });
     // Results screen: the timing host reads outcome ('GREAT' => won),
-    // stats.hits/stats.rounds for its headline, and score.
+    // stats.hits/stats.rounds for its headline, and score. The proof line
+    // (lib/proofLine.ts 'dance') reads stars / accuracy / maxCombo.
     ctx.end(r.stars >= 3 ? 'GREAT' : 'GOOD', r.score, {
       hits: cleanHits,
       rounds,
       stars: r.stars,
+      accuracy,                 // 0..100; the proof line derives the grade letter from it
       maxCombo: r.maxCombo,
       perfect: r.counts.PERFECT,
       great: r.counts.GREAT,
       good: r.counts.GOOD,
       miss: r.counts.MISS,
+      bpm: track.bpm,
+      difficulty: track.difficulty,
     });
+  }
+
+  // ── the pick screen ───────────────────────────────────────────────────
+
+  function showPick(ctx: ModeContext): void {
+    ctx.setHud({
+      round: track.blurb.toUpperCase(),
+      banner: pickBanner(track),
+      nextStep: '◀ ▶  TRACK   ·   A  START',        // short: on a phone this panel sits beside the TAP button
+      nextStepIn: null,
+      score: 0,
+      combo: 0,
+    });
+  }
+
+  function movePick(ctx: ModeContext, dir: 1 | -1): void {
+    track = cycleTrack(track.id, dir);
+    SoundKit.play('uiTick', { pitch: dir > 0 ? 1.2 : 0.9, volume: 0.3 });
+    showPick(ctx);
+  }
+
+  /** Lock the track in: build the chart, the band and the kit at ITS tempo
+   *  and start a one-bar count-in on the audio clock. */
+  function beginCountIn(ctx: ModeContext): void {
+    if (phase !== 'pick') return;
+    phase = 'countin';
+
+    perf = new DancePerformance(track.bpm);
+    perf.setRoutine(generateRoutine({ bars: track.bars, difficulty: track.difficulty, seed: track.seed }));
+    perf.onStepFired = playStep;
+    // pass ALL of onJudged's args through — a 3-arg arrow here silently
+    // dropped the step (no band motion ever) and the delta (no EARLY/LATE)
+    perf.onJudged = (l, p, c, step, deltaMs) => onJudged(ctx, l, p, c, step, deltaMs);
+
+    void audioCtx?.resume?.();
+    band = audioCtx ? new StemBand(audioCtx, audioCtx.destination, track.bpm) : null;
+    bandJoined = new Set();
+    kit?.retune(track.bpm, kitPattern(track.id));
+
+    // The clock is armed on the first PLAYING tick (update), not here: on a
+    // deep link this runs inside load(), before the harness's own 3-2-1, and
+    // a bar armed now would be spent before the player ever saw it.
+    startAt = 0;
+    ctx.setHud({ round: track.name, banner: '4', nextStep: '', nextStepIn: null });
+    console.log(`[FEL-DANCE] track ${track.id} ${track.bpm}bpm ${track.bars} bars d${track.difficulty} · kit voices ${kit?.voices ?? 0}`);
   }
 
   return {
@@ -173,15 +258,7 @@ export const DanceMode: ModeDefinition = (() => {
       // mirrored groups until the _pN bone-suffix fix in boneLookup.ts.)
       registerMirroredClips(me.animator, ctx.scene, me.skeleton, [...registered]);
 
-      perf = new DancePerformance(BPM);
-      perf.setRoutine(generateRoutine({ bars: BARS, difficulty: DIFFICULTY, seed: Date.now() & 0xffff }));
-      perf.onStepFired = playStep;
-      // pass ALL of onJudged's args through — a 3-arg arrow here silently
-      // dropped the step (no band motion ever) and the delta (no EARLY/LATE)
-      perf.onJudged = (l, p, c, step, deltaMs) => onJudged(ctx, l, p, c, step, deltaMs);
-
-      ended = false; started = false;
-      countInSec = beatDuration(BPM) * 4;          // one bar of count-in
+      ended = false; phase = 'pick'; pickSec = 0; stickLatch = false; currentClip = null;
 
       // Song clock: a real AudioContext.currentTime, robust to dropped frames.
       try {
@@ -192,19 +269,33 @@ export const DanceMode: ModeDefinition = (() => {
       } catch { audioCtx = null; }
       if (!audioCtx) console.warn('[FEL-DANCE] no AudioContext — judging on the frame clock (drift possible).');
 
-      // The band plays through the SAME context that keeps the song clock.
-      band = audioCtx ? new StemBand(audioCtx, audioCtx.destination, BPM) : null;
-      bandJoined = new Set();
+      // The kit loads its stems now (retuned to the picked track later) so the
+      // count-in clicks are audible the moment the player locks a track in.
+      const deepLink = typeof window !== 'undefined' ? trackFromQuery(window.location.search) : null;
+      track = deepLink ?? trackById(DEFAULT_TRACK_ID);
+      kit = audioCtx ? new KitPulse(audioCtx, audioCtx.destination, track.bpm, kitPattern(track.id)) : null;
+      void kit?.load().catch(() => 0);
 
       ctx.heroRef.current = me.root;
       ctx.objectiveRef.current = me.root.position;
       ctx.camDirector.snapTo(me.root.position, me.root.position);
-      ctx.setHud({ score: 0, combo: 0, banner: 'GET READY' });
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 6, modeId: 'dance' });
+
+      if (deepLink) beginCountIn(ctx);       // ?track=<id>: straight to the count-in
+      else showPick(ctx);
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
-      if (ended || !started) return;
+      if (ended) return;
+      if (phase === 'pick') {
+        if (e.t === 'dpad' && e.pressed && (e.dir === 'left' || e.dir === 'right')) movePick(ctx, e.dir === 'right' ? 1 : -1);
+        else if (e.t === 'stick' && e.side === 'L') {
+          if (!stickLatch && Math.abs(e.x) > 0.6) { stickLatch = true; movePick(ctx, e.x > 0 ? 1 : -1); }
+          else if (Math.abs(e.x) < 0.3) stickLatch = false;
+        } else if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B')) beginCountIn(ctx);
+        return;
+      }
+      if (phase !== 'playing') return;
       const tap = (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B'))
         || (e.t === 'trigger' && e.side === 'R' && e.value > 0.5);
       if (tap) {
@@ -215,52 +306,70 @@ export const DanceMode: ModeDefinition = (() => {
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
 
-      if (!started) {
-        countInSec -= dt;
-        if (countInSec <= 0) {
-          started = true;
-          void audioCtx?.resume?.();
-          perf.start(audioNow());
-          band?.start(audioNow());
-          ctx.setHud({ banner: 'GO', hint: 'Every move family is an instrument — hit on the beat and the band builds' });
-          setTimeout(() => ctx.setHud({ banner: '' }), 500);
-        } else {
-          ctx.setHud({ banner: `${Math.ceil(countInSec / beatDuration(BPM))}` });
-        }
+      if (phase === 'pick') {
+        // A viewer with no controller (or a capture harness) still gets a
+        // routine: the default track starts itself after a few seconds.
+        pickSec += dt;
+        if (pickSec >= PICK_TIMEOUT_SEC) beginCountIn(ctx);
         return;
       }
 
       const now = audioNow();
+      const bd = beatDuration(track.bpm);
+
+      if (phase === 'countin') {
+        if (startAt === 0) {                 // first playing tick: one bar of count-in from NOW
+          startAt = now + bd * 4;
+          kit?.countIn(now, 4);
+        }
+        const remaining = startAt - now;
+        if (remaining > 0) {
+          ctx.setHud({ banner: `${Math.min(4, Math.ceil(remaining / bd))}` });
+          return;
+        }
+        phase = 'playing';
+        perf.start(startAt);                 // the grid is the audio clock's, not this frame's
+        band?.start(startAt);
+        kit?.start(startAt);
+        ctx.setHud({ banner: 'GO', hint: 'Every move family is an instrument — hit on the beat and the band builds' });
+        setTimeout(() => ctx.setHud({ banner: '' }), 500);
+      }
+
       perf.update(now);
       band?.update(now);
+      kit?.update(now);
 
       // The beat pulse — rhythm games show the beat, and it is the honest
       // way to publish timing (published = rendered): a dot that pops on
       // every beat, decaying through it.
-      const songBeat = (now - (perf as unknown as { started: number }).started) / beatDuration(BPM);
-      if (songBeat >= 0) ctx.setHud({ beatPulse: 1 - (songBeat % 1) });
+      const songBeat = (now - startAt) / bd;
+      const hud: Parameters<ModeContext['setHud']>[0] = {};
+      if (songBeat >= 0) hud.beatPulse = 1 - (songBeat % 1);
 
       // THE CUE — the next move and when it lands. Without it the judging
       // is unfair by design (a perfect-cadence beat bot hit 28%: it tapped
-      // beats with no step on them). Now the cypher shows its cards.
-      const next = perf.peekNext(now);
+      // beats with no step on them). Now the cypher shows its cards — as a
+      // LANE of the next few moves (couch-readable, A+ mission #1) plus the
+      // one-line "NOW" call the bezel already drew.
+      const upcoming = perf.upcoming(now, 6);
+      hud.cues = cueLane(upcoming, now);
+      const next = upcoming[0];
       if (next) {
         const clip = DANCE_LIBRARY.find((c) => c.id === next.step.clipId);
-        ctx.setHud({
-          nextStep: clip?.name?.toUpperCase() ?? 'MOVE',
-          nextStepIn: Math.max(0, Math.round((next.time - now) * 100) / 100),
-        });
+        hud.nextStep = clip?.name?.toUpperCase() ?? 'MOVE';
+        hud.nextStepIn = Math.max(0, Math.round((next.time - now) * 100) / 100);
       }
+      ctx.setHud(hud);
 
       // The routine is over one full beat after the last step's window closes,
       // so a final PERFECT is never cut off by the results screen.
-      const elapsedBeats = (now - (perf as unknown as { started: number }).started) / beatDuration(BPM);
-      if (elapsedBeats > perf.totalBeats + 1) finish(ctx);
+      if (songBeat > perf.totalBeats + 1) finish(ctx);
     },
 
     dispose() {
       perf?.stop();
       band?.dispose(); band = null;
+      kit?.dispose(); kit = null;
       SoundKit.stopAmbient();
       if (audioCtx) { void audioCtx.close(); audioCtx = null; }
       venue?.dispose(); venue = null;
@@ -269,7 +378,8 @@ export const DanceMode: ModeDefinition = (() => {
   };
 })();
 
-// HUD fields used: score, combo, banner (judgement + final star rating).
+// HUD fields used: round, score, combo, banner (judgement + final grade),
+// beatPulse, energy/energyLabel (MIX), nextStep/nextStepIn, cues (the lane).
 //
 // The Creator Card `dance` payload (choreographyId + sequence) is already
 // defined in M28's CreatorCardTypes — `perf.setRoutine(card.sequence)` is all

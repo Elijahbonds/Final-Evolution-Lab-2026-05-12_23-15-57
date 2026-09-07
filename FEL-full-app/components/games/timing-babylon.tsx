@@ -13,6 +13,14 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
+
+/** The rhythm lane: an array of cue markers (dance publishes it every frame). */
+const isCueLane = (v: unknown): v is HudCue[] =>
+  Array.isArray(v) && v.every((c) => !!c && typeof c === 'object' && 'glyph' in (c as object));
+/** Where the hit ring sits on the lane (% from the left) and how much lane the lookahead spans. */
+const LANE_HIT_PCT = 24;
+const LANE_SPAN_PCT = 66;
 
 type Hud = Record<string, HudValue>;
 
@@ -167,6 +175,43 @@ export function makeTimingHost(opts: TimingHostOpts) {
         {typeof hud.shotType === 'string' && hud.shotType && (
           <div className="pointer-events-none absolute inset-x-0 bottom-24 text-center">
             <span className="fel-panel px-3 py-1 font-mono text-[11px] text-white/85">{hud.shotType}</span>
+          </div>
+        )}
+
+        {/* THE CUE LANE (dance, A+ mission #1): the next moves slide toward the
+            hit ring, coloured by move family (= the band's instrument), glyph
+            + name readable from a couch. Rendered only when a mode publishes
+            `cues`, so every other timing sport is unchanged. */}
+        {isCueLane(hud.cues) && hud.cues.length > 0 && (
+          <div className="pointer-events-none absolute inset-x-6 bottom-[34%] h-16">
+            <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/15" />
+            <div
+              className="absolute top-1/2 h-14 w-14 rounded-full border-4 border-[var(--fel-gold)]/80"
+              style={{ left: `${LANE_HIT_PCT}%`, transform: 'translate(-50%, -50%)' }}
+            />
+            {hud.cues.map((c, i) => {
+              const t = Math.max(-CUE_LINGER_SEC, Math.min(CUE_LOOKAHEAD_SEC, c.in));
+              const x = LANE_HIT_PCT + (t / CUE_LOOKAHEAD_SEC) * LANE_SPAN_PCT;
+              const hot = c.in <= 0.35 && c.in >= -CUE_LINGER_SEC;
+              return (
+                <div
+                  key={i}
+                  className="absolute top-1/2 flex h-12 w-12 items-center justify-center rounded-full font-mono text-sm font-bold text-black"
+                  style={{
+                    left: `${x}%`,
+                    background: c.color,
+                    opacity: c.in < -0.05 ? 0.45 : 1,
+                    transform: `translate(-50%, -50%) scale(${hot ? 1.18 : 1})`,
+                    boxShadow: hot ? `0 0 18px ${c.color}` : '0 2px 6px rgba(0,0,0,0.5)',
+                  }}
+                >
+                  {c.glyph}
+                  <span className="absolute top-full mt-1.5 whitespace-nowrap rounded bg-black/65 px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-wider text-white">
+                    {c.mirrored ? '\u25c1 ' : ''}{c.name.toUpperCase()}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
 
