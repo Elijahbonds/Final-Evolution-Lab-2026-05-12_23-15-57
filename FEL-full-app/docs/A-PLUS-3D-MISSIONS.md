@@ -250,3 +250,36 @@ size).
 
 **Cut risk (60 fps):** the hub venue plus event props may push the wide shots past the 600-draw budget — measure before
 keeping both.
+
+**Landed — Phases 1–5 (2026-09-06 night; risk medium: the mode is rewritten on per-scene state, the host gains
+overlays; every event is byte-identical):**
+- P1 Gate 0: PASS (rigged bodies on the hub and in every event; captures 0 / 0 / 0). P2: nothing to convert.
+- P3: `lib/babylon/core/CarnivalNight.ts` (pure, 3 tests) — seeded `pickNight`, `rollRival`, `rivalProgress` (smoothstep:
+  the rival's points tick onto the board through the event, not at the end), `bankEvent` (ties claim nothing),
+  `nightChampion` (points, then events won, then the host keeps the crown), `nightBoard` rows. `CourtCarnivalMode.ts`
+  v3: a player-count screen (◀ ▶, any face starts, 6 s auto-start, `?players=2` skips it); **pass-and-play** for two —
+  P1 plays, `P2 — YOUR TURN` handoff, the same event rebuilds, P2 plays, the result compares; solo keeps the rolled
+  rival but shows it **playing live** (`RIVAL 64 +64` ticking); **one body per role** — the party-goers on the hub are
+  hidden while an event runs (each event spawns its own player) and come back to react on the result; the **hub** is the
+  Carnival Court (Venice location) mounted for reveal / handoff / result / finale and disposed while an event runs, a
+  follow camera around the court's centre looking at the two actor spots; a **scoreboard** between events (who took
+  which event, what comes next) and readable reveal cards (title + one-line verb). Host: P1 / P2 labels, the live rival
+  delta, a turn label with the clock in a duel, the card + blurb + board overlay.
+- Three faults found and fixed on the way, each measured on `/play/carnival` frames: (1) an event built inside `load()`
+  had its camera reset by the harness's start-of-play step → nothing is built before the first PLAYING tick; (2) the
+  hub merely hidden left its late map-load camera snap on the sky → the hub is mounted / disposed per phase; (3) the
+  route host mounts twice (strict mode) and the two `load()`s interleave — module-level state let the phantom's hub win
+  → all state is per scene (`WeakMap<Scene, St>`), `dispose()` finds the departing instance by `scene.isDisposed` on the
+  next tick and keeps the ambient bed while another instance is live. A fixed hub camera also failed (the frame guard
+  measured it aimed away) → follow preset around a still anchor.
+- The headless source check (`carnival-depth-tests.ts`) still holds: `rivalTookIt` names the reaction's branch.
+- P4: registered as before; the lineup page (`/play/carnival`) still starts a night; `?carnival=1` drops into the mode.
+  Bundle measured below.
+- P5: `CarnivalNight.test.ts` (3); suite **382 / 382**, tsc clean.
+- Verified: dev runner solo (pick → event 2 with the rival ticking, 60 fps, 0 / 0 / 0) and `?players=2` (P1 turn → handoff
+  → P2 turn → a 32–32 tie banked, 60 fps, 0 / 0 / 0, frame guard silent); route frames: pick screen and reveal card on
+  the hub with both party-goers, TRICK GAUNTLET mid-event with `RIVAL 31 +31`, COIN STORM as event 2, COUNTER STRIKE
+  scoreboard frame with one body per role.
+- Cut: none. Weak: the hub is the Venice map (heavy on load: 35–41 fps during the first seconds on the route, 60 fps in
+  play); the second human shares the keyboard; the between-events board holds 3.2 s with no skip.
+

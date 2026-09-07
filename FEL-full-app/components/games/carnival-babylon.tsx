@@ -13,6 +13,9 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+/** The between-events scoreboard rows the mode publishes (HudScoreCard shape). */
+const isBoard = (v: unknown): v is { name: string; score: number | string; line: string }[] =>
+  Array.isArray(v) && v.every((r) => !!r && typeof r === 'object' && 'line' in (r as object));
 
 type Hud = Record<string, HudValue>;
 
@@ -101,7 +104,12 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
       {/* HUD bezel — Carnival Points vs rival + event counter + clock */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-4 py-3">
         <span className="fel-panel fel-stat px-3 py-1 text-lg">
-          {hnode(hud.score, 0)} <span className="text-white/40">vs</span> {hnode(hud.rivalScore, 0)}
+          <span className="mr-1 text-[10px] text-[#22d3ee]">{hnode(hud.p1name, 'YOU')}</span>{hnode(hud.score, 0)}
+          <span className="mx-2 text-white/40">vs</span>
+          <span className="mr-1 text-[10px] text-[#facc15]">{hnode(hud.p2name, 'RIVAL')}</span>{hnode(hud.rivalScore, 0)}
+          {typeof hud.rivalLive === 'number' && hud.rivalLive > 0 && phase === 'playing' && (
+            <span className="ml-1 text-xs text-[#facc15]/80">+{hud.rivalLive}</span>
+          )}
         </span>
         <div className="flex items-center gap-2">
           {hud.eventNum != null && (
@@ -109,8 +117,11 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
               EVENT {hnode(hud.eventNum, '')}
             </span>
           )}
+          {typeof hud.turnLabel === 'string' && hud.turnLabel && phase === 'playing' && (
+            <span className="fel-panel px-3 py-1 font-mono text-xs font-bold text-white">{hud.turnLabel}</span>
+          )}
           {typeof hud.time === 'number' && phase === 'playing' && (
-            <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">
+            <span className="fel-panel px-3 py-1 font-mono text-sm font-bold text-[var(--fel-gold)]">
               {hnode(hud.time, 0)}s
             </span>
           )}
@@ -124,10 +135,30 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
         </div>
       )}
 
-      {/* reveal / result banner */}
+      {/* reveal / result / finale card — A+ mission #3: title, the verb line, and the scoreboard between events */}
       {typeof hud.banner === 'string' && hud.banner && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
-          <span className="fel-heading text-3xl font-bold text-[var(--fel-cyan)] drop-shadow">{hud.banner}</span>
+        <div className="pointer-events-none absolute inset-x-0 top-[22%] flex flex-col items-center gap-2 px-4 text-center">
+          <span className="fel-heading fel-panel px-6 py-2 text-3xl font-black text-[var(--fel-cyan)] drop-shadow md:text-4xl">{hud.banner}</span>
+          {typeof hud.blurb === 'string' && hud.blurb && (
+            <span className="fel-panel px-4 py-1.5 font-mono text-sm font-bold text-white/90">{hud.blurb}</span>
+          )}
+          {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && !(typeof hud.eventNum === 'string' && hud.eventNum) && (
+            <span className="fel-panel px-3 py-1 font-mono text-xs text-white/70">{hud.hint}</span>
+          )}
+          {isBoard(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle && (
+            <div className="fel-panel mt-2 w-full max-w-[460px] px-4 py-3 text-left">
+              <div className="grid gap-1.5">
+                {hud.board.map((r, i) => (
+                  <div key={r.name} className="flex items-center justify-between gap-3 rounded-lg bg-black/40 px-3 py-1.5">
+                    <span className="font-mono text-sm font-bold" style={{ color: i === 0 ? '#22d3ee' : '#facc15' }}>{r.name}</span>
+                    <span className="truncate font-mono text-[11px] text-white/60">{r.line}</span>
+                    <span className="fel-stat text-lg">{r.score}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 text-center font-mono text-[11px] text-[var(--fel-gold)]">{hud.boardTitle}</div>
+            </div>
+          )}
         </div>
       )}
 
