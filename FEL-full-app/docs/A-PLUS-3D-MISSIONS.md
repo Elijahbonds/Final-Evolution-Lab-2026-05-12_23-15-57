@@ -153,3 +153,41 @@ claims) + solo (composite score, personal best in localStorage only) + between-r
 6 green + tests (registration, wheel/claim machine, per-challenge scoring, match completion) · 7 local build + verify.
 **Rules that matter most (owner):** content is GENERIC — nothing from The Neuro-Mechanic's Blueprint, no curriculum
 integration; no spaced repetition, ghost duels or feed mechanics (Knowledge Feed territory); no backend/auth/db.
+
+---
+
+## Mission #2 — Who Scene It — PHASE 0 AUDIT (no code changes)
+
+**Benchmark (locked):** Wii Sports Resort floor + Mario Party readability. **Spec source:** the pack's Who Scene It block
+is not recoverable as raw text after the context compaction; the mission runs on its recorded summary — four scene
+categories, local buzz-in for two or more players on one screen, rounds with a scoreboard between them — and says so here.
+
+1. **Current implementation.** `lib/babylon/modes/WhoSceneItMode.ts` (127 lines, factory; live since lane 3 W1 on
+   2026-09-06): eight questions in a row from `WHO_SCENE_IT_PACK` (or an approved community Scene Pack via `?pack=`),
+   each question mounts its venue live (`mountVenue(sceneVenueId)`) behind the card while a slow orbit sweeps it; A/B/X/Y
+   answer; `QuizCore.drawRound` + `scoreAnswer` (14 s clock, 120 base + 120 speed, streak ×1.25 steps to ×2.5). One
+   player, no categories, no scoreboard, no rounds. Host `components/games/who-scene-it-babylon.tsx` draws the card and
+   four answer buttons (also the pad's faces); results through GameShell (`SCENE MASTER` / `ROUND OVER`).
+2. **Registration pattern.** Same as Dance: `MODES.who_scene_it` + `ENABLED_BABYLON_MODES`, route `/play/who-scene-it`
+   behind the `whoSceneIt` flag, dynamic import, pad verbs A B C D.
+3. **Reusable party assets.** `QuizCore` (scoring, seeded draw), `QuizRound` (the AI-foe duel used by the 2D Brain Brawl —
+   not two humans), `HudScoreCard[]` + the bezel pattern the dunk contest and 3PT use for a scoreboard, `mountVenue` for
+   every category's scenes, `SoundKit`/`juice.flash`/`feel.impact`. Local multiplayer input: `InputBus` is one keyboard
+   map + one gamepad index; a second human can share the keyboard (arrows = d-pad) but there is no second pad.
+4. **Gate 0.** No rigged character on stage (the frame guard's subject is an anchor node). N/A, no rig work.
+5. **Vitest.** 370 / 370 (+8 with `SceneBuzz.test.ts`, written in Phase 0 as pure code, not imported yet). Bundle baseline
+   from mission #1 stands (shared 89.9 kB; `/play/who-scene-it` measured at Phase 4).
+
+**Gaps against the spec (Phase 3 scope):**
+- Four categories: **gap** → `lib/babylon/core/SceneBuzz.ts` `SCENE_CATEGORIES` COURTS / COMBAT / OUTDOORS / STAGES keyed
+  on `sceneVenueId`; `buildRounds` = one round per category, two questions each, seeded, options shuffled.
+- Local 2+ buzz-in: **gap** → `BuzzMatch`: first correct buzz locks, a wrong buzz locks that player out and the other can
+  steal, both wrong or the clock = nobody. P1 = face buttons, P2 = d-pad (▲ ▶ ▼ ◀ = A B C D). Two players max (one bus).
+- Rounds + scoreboard: **gap** → the round's top scorer claims the category; a scoreboard (`board` HudScoreCard rows)
+  between rounds; results carry both scores and the winner.
+- Readability: **partial** → bigger prompt and answer cards, a category chip in the category's colour, round label.
+- Content: 9 questions cover the four categories thinly (2/2/2/3) → add venues the pack never asked about (tennis,
+  volleyball, golf, skatepark, pitch, gridiron, diamond).
+
+**Cut risk (60 fps):** none — HUD and content; the venue mounts are the existing per-question mounts. Weak spot known
+from W1: the wide sweep on Venice measures ~933 draws against the 600 budget (venue lane, not this mission).
