@@ -516,3 +516,39 @@ verbs), vault / slide / wall-run / wall-kick / cat leap / precision jump / landi
 camera that leads and pulls back with speed. P3 tricks + scoring on ComboChain + LandingSystem. P4 one authored course
 with two routes (the harder one pays more), three tiers. P5 rename gymnastics → freerun everywhere (registry, flag, verbs,
 route, host, proof line, gauntlet row). P6 tests. P7 local build + verify (no deploy).
+
+**Landed — FreeRun Phases 1–6 (67341cb scaffold · 7708023 rename · the gravity fix commit after it; risk medium: a roster
+rename):**
+- **P2 traversal core:** a Havok `PhysicsCharacterController` capsule against static box aggregates for every course
+  piece (no fall-through by construction); momentum builds and coasts (`stepSpeed`), and the speed GATES the verbs —
+  walking jumps, running vaults and slides, sprinting opens the wall run and the cat leap; wall-run (1.1 s along the
+  wall, then a drop), wall-kick off a wall from the run or the air, cat leap onto a ledge, precision jumps over gaps,
+  landing roll (B within 0.35 s of touchdown). The camera is the runner preset with the FOV widening with speed. The
+  slide BAR is the one non-physical piece (the capsule cannot crouch): a gate you slide under, clipping it costs speed.
+- **P3 tricks + scoring:** front / back / side flips, twist, 540 spin (X + stick picks, Y twists), rotating the body in the
+  air; scoring is Skate's `ComboChain` imported as-is (the Nth link pays N×, a clean touchdown with no linked move banks
+  after 0.6 s, a bail burns the pot) × `FreeRunCore.trickPoints` (difficulty × launch: vault 1.25, wall-kick 1.5, drop 1.35
+  × execution: clean 1, sketchy = Skate's 0.6, bail 0). Falls respawn at the last checkpoint and burn the pot.
+- **P4 course:** start → two checkpoints → finish; the low line (vault boxes, gaps that widen per tier, a slide bar) and
+  the high line (a wall to run, ledges to cat-leap, a roof) worth the tier's route bonus; three tiers with par times
+  (55 / 45 / 38 s). Results: tricks banked + time bonus + route bonus, graded S / A / B / C.
+- **P5 shell:** `freerun` replaces `gymnastics` everywhere the MODE lived (registry + enabled list, flag, verbs JUMP · SLIDE
+  · FLIP · TWIST, Controller Link schema, `/play/freerun`, proof line, both gauntlet lists, roster / manifest, arena and
+  carnival pools, multiplayer keys, PRQ weights (same 1.1), input scheme, rival table, modes page, curriculum drill,
+  hub-world map). The Evolution Gym venue and its map / question / propset stay as a place. Big Air keeps the
+  AirSessionCore. Bundle: `/play/freerun` 159 kB vs the 158 kB gymnastics slot (+0.6 %).
+- **P6 tests:** `FreeRunCore.test.ts` (8): verb gates, momentum, landing grades, trick points with the sketchy multiplier
+  and the chained-beats-separate proof, tiers / time bonus / grade, course integrity (routes, checkpoints, gaps per tier,
+  no unintended holes between slabs), respawn / gap / route reads. Suite 405 / 405; the verb-key alignment check passes
+  with the new key.
+- **Found and fixed:** the controller integrates the velocity it is handed and does not add gravity into it — with no
+  input the capsule left at the jump speed and climbed to 186 m; the mode now owns the vertical velocity.
+- Verified: dev-runner capture — FRONT FLIP +150 landed, 1950 banked, checkpoint 1 / 2, 60 fps, frame guard silent,
+  0 / 0 / 0.
+- **Cut / weak:** the slide bar is a gate, not a collider; flips reuse the board-air pose (no authored flip clips); the
+  runner is one body (no rival); the course is one layout × three tiers rather than three layouts.
+
+**P4 / P6 for missions #7–#9 (build on the FreeRun tip, dev-server-free window 20:55):** `/play/baseball` 158 → 160 kB,
+`/play/soccer` 158 → 160 kB, `/play/football` 158 → 160 kB (**+1.3 %** each); shared-by-all 89.9 kB unchanged. PASS. The
+production route frames taken 23 s into a cold `next start` with four pages loading at once still showed the arena
+splash — inconclusive, not a failure; the dev-runner captures carry the 0 / 0 / 0 proof for these three.
