@@ -62,11 +62,10 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   // FreeRun (A+ mission #10) took the gymnastics slot; big air stays on the shared AirSessionCore.
   freerun: true,
   bigAir: true,
-  // sprint: ON. The black frame was never the camera — a late StrictMode
-  // teardown was disposing the engine that held the canvas's shared WebGL
-  // context, killing the live instance's render loop. Fixed in the hosts via a
-  // canvas-ownership token; the mode now renders both sprinters on the line.
-  sprint: true,
+  // sprint: RETIRED from the v1 roster (owner, 2026-09-01) — /play/sprint redirects
+  // to /modes and the key is out of ENABLED_BABYLON_MODES; not flagged on until revived.
+  // (The old black-frame fix — a StrictMode teardown disposing the shared WebGL
+  // engine, cured by the hosts' canvas-ownership token — still stands for the revival.)
   // Rollout wave 5 — Court Carnival hub (M49). New Babylon-only hub mode.
   carnival: true,
   // Rollout wave 6 — combat/duel modes (M53/M56)

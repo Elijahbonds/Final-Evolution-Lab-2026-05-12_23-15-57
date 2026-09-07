@@ -85,8 +85,7 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   'carnival',
   // Rollout wave 6 — combat/duel modes (M53/M56)
   'karate_vs', 'mixedcombat', 'dunkduel',
-  // A+ P0 juice — the combat siblings ship with the family
-  'showdown', 'duel',
+  // RETIRED (owner, 2026-09-01): showdown / duel / sprint stay in MODES for revival, but their /play routes redirect to /modes — not in ENABLED until revived.
   // Rollout wave 7 — net-sport family (M74)
   'volleyball',
   // Rollout wave 8 — creative disciplines (M75)
@@ -97,6 +96,6 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   'freerun',
   // A+ P0 CONTACT-lite — the shootout ships with the basketball family
   'threepoint',
-  // A+ P0 thin shells — the parked air-session and sprint shells ship with their juice
-  'bigair', 'sprint',
+  // A+ P0 thin shell — the parked air-session shell ships with its juice (sprint retired, see above)
+  'bigair',
 ]);
