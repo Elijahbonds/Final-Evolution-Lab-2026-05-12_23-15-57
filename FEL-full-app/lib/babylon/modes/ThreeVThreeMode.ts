@@ -24,6 +24,8 @@ import { BallSim } from '../core/BallPhysics';
 import { attachBallToHand, releaseBall } from '../anim/ballRig';
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
+import { AgentControlSource } from '../core/AgentControlSource';  // M69: intent play under ?agent=1 (same seam as 1v1)
+import { agentBridge } from '../core/AgentBridge';
 import {
   DribbleController, ShotMeter, DefenderBrain, TeammateBrain, contestLevel, clampToHalfCourt, isThree,
   resolveBodyCollision, checkAnkleBreak, classifyShot, ANKLE_BREAK_STUN_SEC,
@@ -34,6 +36,7 @@ import { lockTarget, choosePassType, PassFlight, type PassType } from '../core/B
 import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
+import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -41,6 +44,8 @@ import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 
 /** Exported so hoop-alignment-tests can check it against the venue's hoop. */
 export const RIM = new Vector3(0, 3.05, -0.6);
+/** The rim's point on the floor — what a drive's range is measured against (see the checkDriveDunk call). */
+const RIM_FLOOR = new Vector3(RIM.x, 0, RIM.z);
 const TARGET_SCORE = 21;
 // FORMAT FIX: was "1pt inside the paint, 2pts anywhere past it" — no shot
 // was ever worth 3, and a layup scored LESS than a jumper. "First to 21" is
@@ -65,6 +70,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let foes: Body[] = [];
   let ball: AbstractMesh, ballSim: BallSim;
   let localSource: LocalInputSource;
+  let agentCtl: AgentControlSource | null = null;   // M69: the hero slot's source under ?agent=1; null for human play
   let shotMeter: ShotMeter;
   let turbo: TurboMeter;
   let arc: ShotArc;
@@ -90,6 +96,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let marks: number[] = [];
   let switchBannerAt = 0;
   let foeShotBlocked = false;
+  let hoopJuice: HoopJuice | null = null;        // A+ P0 CONTACT-lite: rim spring / net squash / hoop flash on a make
+  let contactLatch = false;                      // A+ P0: the dunk's ONE punch per attempt — never re-fired by the banner or the stun
 
   const cfg = { heroUrl: SHARED_CFG.heroUrl };
 
@@ -153,11 +161,15 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         }
         const slot = ai && brain
           ? new PlayerSlot('ai', new AISource(char.root.position, world, brain), false)
-          : new PlayerSlot('me', localSource, true);
+          : new PlayerSlot('me', agentCtl ?? localSource, true);
         return { char, slot, drib: new DribbleController(), stunSec: 0 };
       };
 
       localSource = new LocalInputSource();
+      // M69 (mirrors 1v1): when driven by an agent (?agent=1), the hero slot reads from the AgentControlSource
+      // instead of local input. Human play is untouched — the bridge is only installed under the dev flag.
+      agentCtl = agentBridge() ? new AgentControlSource() : null;
+      if (agentCtl) { ctx.agent.control = agentCtl; ctx.agent.getScore = () => myScore; }
       me = await spawnBody(new Vector3(0, 0, 6), undefined, false, 'teammate');
       mates = [
         await spawnBody(new Vector3(-3.5, 0, 4), '#22d3ee', true, 'teammate', Math.PI * 0.25),
@@ -183,6 +195,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       arc = new ShotArc();
       EffectsKit.ambient(ctx.scene, 'venice');
       EffectsKit.ballTrail(ctx.scene, ball);
+      hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: juice-only ring + net, material clones — no meshy_hoop_* transform is touched
+      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }
       SoundKit.startAmbient('stadium');
 
       myScore = 0; foeScore = 0; assists = 0; timeLeft = POSSESSION_SEC; ended = false;
@@ -243,8 +257,13 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           if (bigShot || arcQuality === 'perfect') {
             SoundKit.play('crowdCheer', { volume: bigShot ? 1 : 0.7 });
             ctx.camDirector.pulse(bigShot ? 0.85 : 0.5, 0.5);
-            ctx.feel?.impact?.(bigShot ? 0.45 : 0.3);
           }
+          // A+ P0 CONTACT-lite, the soft sibling (mirrors 1v1): every jumper drops through with a small feel hit and a
+          // short shake — no hit-stop latch, no flash, no slam thud (that is the dunk's). The hoop still answers the make.
+          ctx.feel?.impact?.(bigShot ? 0.45 : 0.4);
+          ctx.juice.shake(0.06, 100);
+          hoopJuice?.punch();
+          console.info('[3V3-JUICE] jumper make');
           if (bigShot) EffectsKit.burst(ctx.scene, me.char.root.position.add(new Vector3(0, 1.8, 0)), 'sparks');
           ctx.setHud({ score: myScore, banner: arcQuality === 'perfect' ? `${arcLabel} — SPLASH!` : `${arcLabel} — GOOD!` });
           setTimeout(() => ctx.setHud({ banner: '' }), 800);
@@ -443,7 +462,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         const nearestFoePos = foes.reduce<Vector3 | null>((best, f) =>
           !best || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(best, me.char.root.position)
             ? f.char.root.position : best, null);
-        const kind = checkDriveDunk(me.char.root.position, me.drib.vel, RIM, turbo.t01, nearestFoePos);
+        // A+ P0: the gate measures a 3-D distance and the rim sits 3.05 m up — against RIM itself a floor-bound body can
+        // NEVER be inside DUNK_RANGE (2.8 m), so the drive dunk had never fired in play (same bug 1v1 fixed in ade7c3f).
+        // The range is a floor distance; judge it against the rim's floor point.
+        const kind = checkDriveDunk(me.char.root.position, me.drib.vel, RIM_FLOOR, turbo.t01, nearestFoePos);
         if (kind !== 'none') {
           startDunk(ctx, kind, nearestFoePos);
         } else {
@@ -489,6 +511,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       threeVenue?.dispose(); threeVenue = null;  // M74
       me?.char.dispose(); mates.forEach((m) => m.char.dispose()); foes.forEach((f) => f.char.dispose());
       ball?.dispose(); SoundKit.stopAmbient();
+      hoopJuice?.dispose(); hoopJuice = null;        // A+ P0: restores any hoop material the punch swapped
     },
   };
 
@@ -543,7 +566,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   }
 
   function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster', defenderPos: Vector3 | null): void {
-    dunking = true;
+    dunking = true; contactLatch = false;   // A+ P0: a fresh attempt gets one punch
     turbo.t01 = Math.max(0, turbo.t01 - 0.3);
     const made = Math.random() < DUNK_PCT[kind];
     SoundKit.play('whoosh', { pitch: 0.85 });
@@ -570,7 +593,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         const posterized = kind === 'poster' && defenderPos !== null;
         SoundKit.play('score', { pitch: 0.9 });
         SoundKit.play('crowdCheer', { volume: posterized ? 0.8 : 0.5 });
-        ctx.feel?.impact?.(posterized ? 0.7 : 0.45);
+        contactPunch(ctx);   // A+ P0: hit-stop + shake + flash + the ONE slam thud + HoopJuice (replaces the bare feel.impact, which was a second thud)
         ctx.camDirector.pulse(posterized ? 1 : 0.6, 0.55);
         EffectsKit.burst(ctx.scene, RIM, 'net');
         if (posterized) {
@@ -590,12 +613,34 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       } else {
         SoundKit.play('miss');
         SoundKit.play('crowdGroan', { volume: 0.4 });
+        missClank(ctx);   // A+ P0: the miss has weight too — a clank, never the make's punch
         ballSim.launch(ball.getAbsolutePosition(), new Vector3((Math.random() - 0.5) * 3, 3, 2));
         ctx.setHud({ banner: kind === 'poster' ? 'STUFFED AT THE RIM!' : 'RATTLED OUT' });
         setTimeout(() => ctx.setHud({ banner: '' }), 800);
         setTimeout(() => { if (!ended) void opponentPossession(ctx); }, 900);
       }
     });
+  }
+
+  // ── A+ P0 CONTACT-lite (PM brief THREEVTHREE-A-PLUS-P0, 2026-09-06; mirrors 1v1's ade7c3f) ─────────────────────
+  // The dunk contest's CONTACT orchestra is the ceiling; 3v3 takes the lite cut: one make punch, one miss clank.
+  // No hang slowMo (3v3 has no hang latch), no FOV gather, no land settle, no trail phases.
+  /** The dunk make's flush frame: hit-stop, shake, white-gold flash, ONE slam thud, and the hoop answers. Latched once per attempt. */
+  function contactPunch(ctx: ModeContext): void {
+    if (contactLatch) return;
+    contactLatch = true;
+    ctx.juice.hitStop(70);
+    ctx.juice.shake(0.12, 140);
+    ctx.juice.flash('#fff6dd', 120);
+    SoundKit.play('impact', { pitch: 0.7, volume: 0.8 });
+    hoopJuice?.punch();
+    console.info('[3V3-JUICE] dunk contact punch');
+  }
+  /** The dunk miss / stuff: a light metallic clank with a small feel hit — never the make's punch, never HoopJuice. */
+  function missClank(ctx: ModeContext): void {
+    ctx.feel?.impact?.(0.4);
+    SoundKit.play('impact', { pitch: 1.35, volume: 0.45 });
+    console.info('[3V3-JUICE] dunk miss clank');
   }
 
   async function opponentPossession(ctx: ModeContext): Promise<void> {
