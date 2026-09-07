@@ -356,6 +356,17 @@ own constants), a hole chip (HOLE n / 3 · PAR · STROKE · card), and a scoreca
 BIRDIE / PAR / BOGEY names). Mode side: publish `windDeg`, `meterT` + `swingPhase`, `hole` + `par`, and `board` rows at
 the hole's end. Pure helpers + tests in `core/golfHud.ts`. **Cut risk:** none (HUD only).
 
+**Landed — Phases 1–5 (d156618, with tennis; risk medium: shared timing host gains key-gated blocks):** `core/golfHud.ts`
+(hole names ACE…TRIPLE BOGEY, card string, wind bearing relative to the shot line + words HELPING / INTO / LEFT → RIGHT,
+scorecard rows; 4 tests). Mode: publishes `windDeg` + `windWord`, `hole` / `holes` / `par`, the live meter (`meterT`,
+`swingPhase`, `powerLock`) while the three-press swing runs, and a `board` + `boardTitle` at the hole's end (2.6 s, long
+enough to read); the accuracy band constants now come from golfHud (one source with the drawn band). Host: lie panel
+(club, pin distance, wind arrow rotated by bearing + the word), hole chip, the drawn swing meter with the band and the
+power lock, the scorecard between holes. Verified: dev-runner capture 0 / 0 / 0 at 60 fps; route frame at address
+(HOLE 1 / 3 · PAR 3 · STROKE 0 · E, DRIVER · PIN 30m, WIND 1 m/s · LEFT → RIGHT) and mid-swing (POWER — press at the
+top, the marker running through the band). Weak: the golf venue's wide shot measures 618 draws against the 600 budget
+(venue lane, pre-existing).
+
 ## Mission #6 — Tennis — PHASE 0 AUDIT (no code changes)
 
 **Benchmark (owner):** Mario Tennis feel + Wii Sports readability.
@@ -383,6 +394,14 @@ the hole's end. Pure helpers + tests in `core/golfHud.ts`. **Cut risk:** none (H
   Fine for a party match; noted, not built.
 
 **Cut risk:** none (HUD + one pace curve).
+
+**Landed — Phases 1–5 (d156618, with golf):** `core/tennisHud.ts` (the answer to each shot, the face that plays it, one-line
+tells, `rallyPace` — 3 % faster per touch to a 0.72 floor, scoreboard rows; 3 tests). Mode: the opponent picks a shot
+(50 % drive, 25 % slice, 15 % lob, 10 % drop) and the HUD tells it with the answer (`incomingShot`, `incomingTell`,
+`answer`; cleared when your ball is away and at the point); tennis-only pace scaling on `Shot.duration`; the scoreboard
+keys (`call`, `streak`, YOU / THEM). Host: the scoreboard chip (games both sides, the umpire call, n STRAIGHT) and the tell
+chip. Verified: dev-runner capture 0 / 0 / 0 at 60 fps with `30-40` and `DROP — it dies short · answer X · DROP` flowing;
+route frame `YOU 0 – 0 THEM · 15-15`. Volleyball untouched (every new branch is `touchesPerSide === 1`).
 
 ## Missions #7–#9 — PHASE 0 AUDITS (no code changes)
 
