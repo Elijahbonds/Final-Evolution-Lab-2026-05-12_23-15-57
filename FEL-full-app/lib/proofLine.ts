@@ -29,7 +29,11 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
     case 'bigAir': case 'gymnastics': return `${r.score} PTS · ${r.outcome === 'win' ? 'STOMPED' : 'COMPLETE'}`;
     case 'sprint': { const st = n(s, 'stumbles'); return `${r.score} PTS${st !== null ? ` · ${st} STUMBLE${st === 1 ? '' : 'S'}` : ''} · ${wl(r)}`; }
     case 'golf': { const strokes = n(s, 'strokes'), holes = n(s, 'holes'); return strokes !== null ? `${strokes} STROKES${holes !== null ? ` · ${holes} HOLES` : ''}` : `${r.score} PTS`; }
-    case 'baseball': { const hits = n(s, 'hits'), misses = n(s, 'misses'); return hits !== null ? `${hits}/${hits + (misses ?? 0)} CONTACT · ${r.score} PTS` : null; }
+    case 'baseball': {
+      const hr = n(s, 'homers'), outs = n(s, 'outs'), longest = n(s, 'longestFt'), rival = n(s, 'rivalHomers');
+      if (hr !== null) return `${hr} HR${rival !== null ? ` vs ${rival}` : ''}${outs !== null ? ` · ${outs} OUTS` : ''}${longest ? ` · LONGEST ${longest} FT` : ''}`;
+      const hits = n(s, 'hits'), misses = n(s, 'misses'); return hits !== null ? `${hits}/${hits + (misses ?? 0)} CONTACT · ${r.score} PTS` : null;
+    }
     case 'soccer': return `${r.score} PTS · ${r.outcome?.replace(/_/g, ' ') ?? wl(r)}`;
     case 'football': { const yards = n(s, 'yards'), ev = n(s, 'evades') ?? n(s, 'evaded'), tr = n(s, 'trucks'); return `${yards ?? 0} YDS${ev !== null ? ` · ${ev} EVADES` : ''}${tr !== null ? ` · ${tr} TRUCKS` : ''}`; }
     case 'tennis': case 'tiebreak': case 'volleyball': return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;

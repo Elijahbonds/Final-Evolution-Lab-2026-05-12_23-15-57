@@ -239,6 +239,52 @@ export function makeTimingHost(opts: TimingHostOpts) {
           </div>
         )}
 
+        {/* DERBY (A+ mission #7, MLB Home Run Derby presentation): homers · outs · longest, the rival's total ticking, the
+            pitch label, and the distance flash on a homer. Key-gated on `outs`. */}
+        {typeof hud.outs === 'number' && (
+          <div className="pointer-events-none absolute inset-x-0 top-12 flex flex-col items-center gap-1.5 font-mono">
+            <div className="fel-panel flex items-center gap-3 px-4 py-1.5">
+              <span className="text-[11px] tracking-wider text-[#22d3ee]">HR</span>
+              <span className="fel-stat text-2xl">{hnode(hud.homers, 0)}</span>
+              <span className="text-white/40">·</span>
+              <span className="text-[11px] tracking-wider text-white/70">OUTS</span>
+              <span className={`fel-stat text-2xl ${Number(hud.outs) >= Number(hud.outsCap ?? 10) - 1 ? 'text-[#ff2d78]' : ''}`}>{hnode(hud.outs, 0)}<span className="text-sm text-white/40">/{hnode(hud.outsCap, 10)}</span></span>
+              {Number(hud.longest) > 0 && <span className="ml-2 rounded bg-black/40 px-2 py-0.5 text-[11px] text-[var(--fel-gold)]">LONGEST {hnode(hud.longest, 0)} FT</span>}
+              <span className="ml-2 text-[11px] tracking-wider text-[#facc15]">RIVAL <span className="fel-stat text-lg">{hnode(hud.rivalHomers, 0)}</span></span>
+              {typeof hud.pitch === 'string' && hud.pitch && <span className="ml-2 rounded bg-black/40 px-2 py-0.5 text-[11px] text-white/80">{hud.pitch}</span>}
+            </div>
+            {typeof hud.distance === 'string' && hud.distance && (
+              <span className="fel-heading fel-panel px-4 py-1 text-2xl font-black text-[var(--fel-gold)]">{hud.distance}</span>
+            )}
+          </div>
+        )}
+
+        {/* PENALTY (A+ mission #8, FIFA shootout read): the kicks board both sides, the feint counter, the two-press power
+            bar and the DIVE prompt on their kick. Key-gated on `kicksYou`. */}
+        {typeof hud.kicksYou === 'string' && (
+          <div className="pointer-events-none absolute inset-x-0 top-12 flex flex-col items-center gap-1.5 font-mono">
+            <div className="fel-panel grid grid-cols-[auto_auto_auto] items-center gap-x-3 gap-y-1 px-4 py-1.5">
+              <span className="text-[11px] tracking-wider text-[#22d3ee]">YOU</span><span className="fel-stat text-xl">{hnode(hud.goals, 0)}</span><span className="text-lg tracking-[0.3em] text-white">{hud.kicksYou}</span>
+              <span className="text-[11px] tracking-wider text-[#facc15]">THEM</span><span className="fel-stat text-xl">{hnode(hud.themGoals, 0)}</span><span className="text-lg tracking-[0.3em] text-white">{hnode(hud.kicksThem, '')}</span>
+            </div>
+            {Number(hud.feints) > 0 && <span className="fel-panel px-3 py-0.5 text-[11px] font-bold text-[var(--fel-gold)]">FEINTS {hnode(hud.feints, 0)} / 2 · style banked on a goal</span>}
+          </div>
+        )}
+        {typeof hud.kickPower === 'number' && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-28 flex flex-col items-center gap-1 font-mono">
+            <span className="fel-panel px-3 py-0.5 text-[11px] font-bold tracking-widest text-[var(--fel-cyan)]">POWER — KICK again to strike</span>
+            <div className="relative h-5 w-[min(520px,70vw)] overflow-hidden rounded-md border border-white/20 bg-black/55">
+              <div className="absolute inset-y-0 left-[55%] w-[30%] bg-[var(--fel-gold)]/60" />
+              <div className="absolute inset-y-0 w-[4px] -translate-x-1/2 bg-white shadow-[0_0_8px_#fff]" style={{ left: `${Math.max(0, Math.min(100, hud.kickPower))}%` }} />
+            </div>
+          </div>
+        )}
+        {typeof hud.dive === 'string' && hud.dive && (
+          <div className="pointer-events-none absolute inset-x-0 top-1/4 flex justify-center font-mono">
+            <span className="fel-heading fel-panel px-5 py-2 text-2xl font-black text-[#7CFFB2]">{hud.dive}</span>
+          </div>
+        )}
+
         {/* TENNIS (A+ mission #6, Mario Tennis feel + Wii size): the scoreboard chip — games both sides, the umpire's
             call, the streak — and the TELL on the incoming ball with the answer that beats it. Key-gated. */}
         {typeof hud.call === 'string' && hud.call && (

@@ -110,6 +110,49 @@ export default function FootballBabylon({ onEnd }: GameProps) {
         </span>
       </div>
 
+      {/* A+ mission #9 (Tecmo Bowl feel + Madden readability): the field strip — ball, line of scrimmage, first-down line
+          in yards — the TARGET read on the nearest defender, and the drive card between drives. All key-gated. */}
+      {typeof hud.ballOn === 'number' && typeof hud.fieldLen === 'number' && (
+        <div className="pointer-events-none absolute inset-x-0 top-12 flex flex-col items-center gap-1 font-mono">
+          <div className="relative h-4 w-[min(560px,72vw)] overflow-hidden rounded-sm border border-white/25 bg-[#1f6b2f]/70">
+            {Array.from({ length: Math.floor(hud.fieldLen / 10) + 1 }, (_, i) => (
+              <div key={i} className="absolute inset-y-0 w-px bg-white/40" style={{ left: `${(i * 10 / Number(hud.fieldLen)) * 100}%` }} />
+            ))}
+            {typeof hud.los === 'number' && <div className="absolute inset-y-0 w-[2px] bg-[#22d3ee]" style={{ left: `${(hud.los / hud.fieldLen) * 100}%` }} />}
+            {typeof hud.firstDown === 'number' && <div className="absolute inset-y-0 w-[2px] bg-[var(--fel-gold)]" style={{ left: `${Math.min(100, (hud.firstDown / hud.fieldLen) * 100)}%` }} />}
+            <div className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_8px_#fff]" style={{ left: `${Math.min(100, (hud.ballOn / hud.fieldLen) * 100)}%` }} />
+          </div>
+          <div className="flex items-center gap-3 text-[10px] tracking-wider text-white/70">
+            <span>BALL ON {hud.ballOn}</span>
+            <span className="text-[var(--fel-gold)]">1ST AT {hnode(hud.firstDown, '—')}</span>
+            <span>GOAL {hud.fieldLen}</span>
+            {typeof hud.drive === 'string' && hud.drive && <span className="text-white/50">DRIVE {hud.drive}</span>}
+          </div>
+        </div>
+      )}
+      {typeof hud.target === 'string' && hud.target && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-28 text-center font-mono">
+          <span className="fel-panel px-3 py-1 text-sm font-bold text-[#ff2d78]">TARGET {hud.target}</span>
+        </div>
+      )}
+      {Array.isArray(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 font-mono">
+          <div className="fel-panel w-full max-w-[440px] px-5 py-4">
+            <div className="fel-heading text-2xl font-black text-white">DRIVE CARD</div>
+            <div className="mt-3 grid gap-1.5">
+              {(hud.board as { name: string; score: number | string; line: string }[]).map((r) => (
+                <div key={r.name} className="flex items-center justify-between gap-3 rounded-lg bg-black/40 px-3 py-1.5">
+                  <span className="text-sm font-bold text-white/90">{r.name}</span>
+                  <span className="truncate text-[11px] text-white/60">{r.line}</span>
+                  <span className="fel-stat text-lg">{r.score} YD</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 text-[11px] text-[var(--fel-gold)]">{hud.boardTitle}</div>
+          </div>
+        </div>
+      )}
+
       {typeof hud.hint === 'string' && hud.hint && (
         <div className="pointer-events-none absolute inset-x-0 bottom-16 text-center">
           <span className="fel-panel px-3 py-1 font-mono text-[10px] text-white/70">{hud.hint}</span>

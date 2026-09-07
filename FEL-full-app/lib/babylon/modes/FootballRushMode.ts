@@ -65,6 +65,13 @@ export const FootballRushMode: ModeDefinition = (() => {
   // session ends after the third. Before this, a runner who kept gaining reset to first down forever and never posted.
   const DRIVES = 3; let drive = 1;
   let driveEvades = 0, breakawaySec = 0;
+  /** A+ mission #9 (Madden readability): the drive card between drives — yards, evades, how it ended. */
+  let driveLog: { name: string; score: number | string; line: string }[] = [];
+  let driveYards = 0;
+  const YARD = 0.9144;
+  function logDrive(result: string): void {
+    driveLog.push({ name: `DRIVE ${drive}`, score: driveYards, line: `${result} · ${driveEvades} EVADES` });
+  }
   let iframeSec = 0, dodging = false, ended = false;
   let truckSec = 0, truckCooldown = 0, trucks = 0;
   let styleTypes = new Set<string>();          // evade types used this drive
@@ -174,8 +181,9 @@ export const FootballRushMode: ModeDefinition = (() => {
     runner.root.rotation.y = 0;
     runner.animator.play(SPORT_CLIP.idle, { loop: true });
     ctx.camDirector.snapTo(runner.root.position, runner.root.position.add(new Vector3(0, 0, 12)));
-    ctx.setHud({ down, toGo, banner, breakaway: false, truckReady: true, drive: `${drive}/${DRIVES}` });
-    setTimeout(() => ctx.setHud({ banner: '' }), 1400);
+    driveYards = 0;
+    ctx.setHud({ down, toGo, banner, breakaway: false, truckReady: true, drive: `${drive}/${DRIVES}`, board: driveLog.length ? driveLog : null, boardTitle: driveLog.length ? `DRIVE ${drive} / ${DRIVES}` : '', ballOn: 0, los: 0, firstDown: 10, fieldLen: Math.round(FIELD_LENGTH / YARD) });
+    setTimeout(() => ctx.setHud({ banner: '', board: null, boardTitle: '' }), 2600);   // long enough to read the card
     void spawnDefense(ctx).then(() => {
       ctx.setHud({ hint: 'READ THE FRONT — push ▲/W to SNAP' });
     });
@@ -186,6 +194,7 @@ export const FootballRushMode: ModeDefinition = (() => {
     modeId: 'football', mood: 'nightGame', camPreset: 'runner',
 
     async load(ctx: ModeContext) {
+      driveLog = []; driveYards = 0;
       rushVenue = mountVenue(ctx, 'football_rush', { keepGameplayCamera: true });
       VenueKit.buildGridiron(ctx.scene);   // the kit field keeps its yard lines and posts under the spec's sky
       if (rushVenue) for (const m of rushVenue.built.root.getChildMeshes()) if (m.name === 'venue_ground') m.visibility = 0;
@@ -286,7 +295,14 @@ export const FootballRushMode: ModeDefinition = (() => {
       }
 
       yards = Math.max(yards, Math.floor((runner.root.position.z - lineOfScrimmage) / 0.9144));
-      ctx.setHud({ yards, evades });
+      driveYards = Math.max(driveYards, Math.floor(runner.root.position.z / YARD));
+      // A+ mission #9: the field strip (ball, line of scrimmage, first-down line, all in yards) and the TARGET — where the
+      // nearest defender is relative to the runner, so the next move is a read, not a guess
+      let nearest: Mob | null = null, nd = Infinity;
+      for (const m of defenders) { const d = Vector3.Distance(m.char.root.position, runner.root.position); if (d < nd) { nd = d; nearest = m; } }
+      const dx = nearest ? nearest.char.root.position.x - runner.root.position.x : 0;
+      const target = !nearest || nd > 9 ? '' : Math.abs(dx) < 1.2 ? 'AHEAD — juke or truck' : dx > 0 ? 'RIGHT — cut left' : 'LEFT — cut right';
+      ctx.setHud({ yards, evades, ballOn: Math.max(0, Math.round(runner.root.position.z / YARD)), los: Math.round(lineOfScrimmage / YARD), firstDown: Math.round((lineOfScrimmage + toGo * YARD) / YARD), target });
 
       const gained = coins?.update(dt, runner.root.position) ?? 0;
       if (gained > 0) {
@@ -351,6 +367,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           down++;
           toGo -= gainedY;
           if (down > 4) {
+            logDrive('TURNOVER ON DOWNS');
             if (drive >= DRIVES) {
               ended = true;
               SoundKit.play('whistle');
@@ -390,6 +407,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, 1.8, 0)), 'confetti');
         ctx.setHud({ score, banner: 'TOUCHDOWN!' });
         gallery?.cheer(1);
+        logDrive('TOUCHDOWN');
         if (drive >= DRIVES) {
           ended = true;
           SoundKit.play('whistle');

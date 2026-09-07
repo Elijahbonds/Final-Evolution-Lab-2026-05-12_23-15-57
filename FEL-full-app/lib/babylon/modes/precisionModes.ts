@@ -19,6 +19,9 @@
 //     a little shot wobble. Commitment tradeoff, not a free win.
 // Derby is unchanged from M43 apart from riding the same file.
 
+import { kickPips, type KickResult } from '../core/penaltyHud';
+import { freshDerby, bankSwing, distanceLine, OUTS_CAP, type DerbyTally } from '../core/derbyHud';
+import { rivalProgress } from '../core/CarnivalNight';
 import { holeName, cardString, windBearingDeg, windWord, holeBoard, ACCURACY_CENTER as GH_ACC_CENTER, ACCURACY_HALF as GH_ACC_HALF, type HoleResult } from '../core/golfHud';
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
@@ -695,7 +698,12 @@ export const DerbyMode: ModeDefinition = (() => {
    *  the re-entry guard; using `incoming` for it meant the whiff test — which
    *  now fires on a ball at rest — retriggered during the gap between pitches. */
   let pending = false;
-  const TOTAL = 10;
+  /** A+ mission #7 (MLB Home Run Derby presentation): the round is OUTS_CAP outs or TOTAL pitches, whichever first —
+   *  a swing that is not a homer is an out. Ten pitches used to be the whole round; twenty is the cap now that outs end it. */
+  const TOTAL = 20;
+  let tally: DerbyTally = freshDerby();
+  let rivalTarget = 0;                 // the rival's homers for the round, ticking in through it
+  const lastOut = (): boolean => tally.outs === OUTS_CAP - 1;
 
   function pitch(ctx: ModeContext): void {
     round++;
@@ -729,10 +737,12 @@ export const DerbyMode: ModeDefinition = (() => {
     const travel = aim.subtract(ball.position);
     const t = pitchTotalSec;
     flight.launch(ball.position, new Vector3(travel.x / t, travel.y / t + 3.0, -spec.speed));
-    const clutch = round === TOTAL;
+    const clutch = round === TOTAL || lastOut();
+    const rivalLive = Math.round(rivalTarget * rivalProgress(round / TOTAL));
     ctx.setHud({
-      round: `${round}/${TOTAL}`,
+      round: `PITCH ${round}`,
       pitch: spec.label,
+      homers: tally.homers, outs: tally.outs, outsCap: OUTS_CAP, longest: tally.longestFt, rivalHomers: rivalLive, distance: '',
       contact: '',                              // last pitch's grade is over
       hint: clutch ? `FINAL PITCH — STRIKE as it crosses the plate` : 'STRIKE as it crosses the plate · read the break',
     });
@@ -785,6 +795,7 @@ export const DerbyMode: ModeDefinition = (() => {
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 5, modeId: 'baseball' });
       round = 0; pts = 0; ended = false;
       SoundKit.startAmbient('stadium');
+      tally = freshDerby(); rivalTarget = 3 + Math.floor(Math.random() * 6);   // a rival round of 3–8 homers
       ctx.setHud({ score: 0 });
       pitch(ctx);
     },
@@ -809,7 +820,7 @@ export const DerbyMode: ModeDefinition = (() => {
           : Math.max(0, 1 - (off - PCI_PURE_M) / (PCI_MISS_M - PCI_PURE_M));
         const q = timing * (0.25 + 0.75 * cover);
         ctx.feel?.impact?.(0.3 + q * 0.5);
-        const clutch = round === TOTAL;
+        const clutch = round === TOTAL || lastOut();
         // Where you met the ball decides the launch: under it lifts, on top of
         // it drives the ball into the dirt. That is the PCI doing the job the
         // stick used to do by fiat.
@@ -818,6 +829,11 @@ export const DerbyMode: ModeDefinition = (() => {
         flight.launch(ball.position, new Vector3((Math.random() - 0.5) * 4, 18 * launch * q + 4, 16 + q * 18));
         const distPts = Math.round(q * (80 + launch * 60) * (clutch ? CLUTCH_MULT : 1));
         pts += distPts;
+        // A+ mission #7: a homer clears the band (q > 0.7); anything less is an OUT. Distance in feet is the derby's
+        // presentation number — read off the launch (estimated: 300 ft floor, ~470 ft for a pure full-launch strike).
+        const homer = q > 0.7;
+        const distFt = homer ? Math.round(300 + q * (80 + launch * 60) * 1.6) : 0;
+        const roundOver = bankSwing(tally, homer, distFt);
         // The subject of a hit is the BALL — the same subject-switch golf
         // makes for its ball flight. And the parked swing camera PANS too
         // slowly for a pulled fly ball (measured: one off-LEFT warning as
@@ -830,9 +846,12 @@ export const DerbyMode: ModeDefinition = (() => {
         ctx.setHud({
           score: pts,
           contact: `${cover >= 0.9 ? 'PURE' : cover >= 0.5 ? 'OFF-CENTRE' : 'EDGE OF THE BAT'} · ${pitchLabel}`,
-          banner: clutch ? `CLUTCH DINGER! +${distPts}` : q > 0.85 ? `DINGER! +${distPts}` : `+${distPts}`,
+          banner: homer ? (clutch ? `CLUTCH DINGER! +${distPts}` : q > 0.85 ? `DINGER! +${distPts}` : `HOMER +${distPts}`) : `OUT — ${cover >= 0.5 ? 'caught on the track' : 'weak contact'}`,
+          homers: tally.homers, outs: tally.outs, longest: tally.longestFt,
+          distance: homer ? distanceLine(distFt, tally.longestFt) : '',
         });
         setTimeout(() => ctx.setHud({ banner: '' }), 900);
+        if (roundOver) { ended = true; SoundKit.play('whistle'); setTimeout(() => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }), 1000); }
       }
     },
 
@@ -871,12 +890,14 @@ export const DerbyMode: ModeDefinition = (() => {
       if (incoming && (ball.position.z <= -1.2 || !flight.active)) {
         incoming = false;
         SoundKit.play('miss');
+        const whiffOut = bankSwing(tally, false);        // a whiff is an out
         // the whiff names the pitch — The Show tells you what beat you
-        ctx.setHud({ banner: `WHIFF — ${pitchLabel === 'SLD' ? 'the slider broke late' : pitchLabel === 'CHG' ? 'the change-up pulled the string' : 'beat you with heat'}` });
+        ctx.setHud({ banner: `WHIFF — ${pitchLabel === 'SLD' ? 'the slider broke late' : pitchLabel === 'CHG' ? 'the change-up pulled the string' : 'beat you with heat'}`, outs: tally.outs });
         setTimeout(() => ctx.setHud({ banner: '' }), 900);
+        if (whiffOut) { ended = true; SoundKit.play('whistle'); setTimeout(() => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }), 1000); return; }
       }
       if (!flying && !incoming && !pending) {
-        if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); return ctx.end('DERBY_END', pts, { pitches: TOTAL }); }
+        if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); return ctx.end('DERBY_END', pts, { pitches: TOTAL, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }); }
         pending = true;
         setTimeout(() => { pending = false; if (!ended) pitch(ctx); }, 800);
       }
@@ -911,6 +932,9 @@ export const PenaltyMode: ModeDefinition = (() => {
   const KEEP_RUNUP_SEC = 1.15;
   const SPOT = new Vector3(0, 0, 0), GOAL_LINE = new Vector3(0, 0, 10.4);
   let feints = 0, lastFlickSign = 0, lastFlickMs = 0;
+  /** A+ mission #8 (FIFA read): every kick as a pip, both sides. */
+  let myKicks: KickResult[] = [], theirKicks: KickResult[] = [];
+  const kicksHud = () => ({ kicksYou: kickPips(myKicks, REGULATION_KICKS), kicksThem: kickPips(theirKicks, REGULATION_KICKS), goals, themGoals });
   /** L4 — the bank behind the goal. A shootout is watched. */
   let gallery: Onlookers | null = null;
   // ── the shootout (D1/D2 built in the depth pass) ──
@@ -954,7 +978,7 @@ export const PenaltyMode: ModeDefinition = (() => {
         ? 'SUDDEN DEATH — score and the keeper must answer'
         : 'Snap the stick side-to-side to FEINT (max 2) · aim · KICK twice';
     ctx.setHud({
-      round: kickLabel(), feints: 0,
+      round: kickLabel(), feints: 0, ...kicksHud(), dive: '',
       score: `${goals}–${themGoals}`,
       hint,
     });
@@ -967,6 +991,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     const sd = round > REGULATION_KICKS;
     keepPlan = planRivalKick(Math.random, sd);
     keepT = 0; keepStruck = false; keepDive = 0; keepDiveAt = null;
+    ctx.setHud({ ...kicksHud(), dive: 'THEIR KICK — read the run-up · DIVE ◀ ▶ as he strikes', kickPower: null });
     phase = 'keep';
     keeper.root.position.set(SPOT.x, 0, SPOT.z - 2.2); keeper.root.rotation.set(0, 0, 0);
     keeper.animator.play(SPORT_CLIP.moveLoop, { loop: true });
@@ -1060,7 +1085,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       ctx.camDirector.setFixedBehind(me.root.position, 0, 'flight');
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 6, modeId: 'soccer' });
       round = 0; goals = 0; stylePts = 0; ended = false;
-      themGoals = 0; themKicks = 0; shotHistory = []; hintFlags.read = false;
+      themGoals = 0; themKicks = 0; shotHistory = []; hintFlags.read = false; myKicks = []; theirKicks = [];
       SoundKit.startAmbient('stadium');
       ctx.setHud({ score: '0–0' });
       nextKick(ctx);
@@ -1106,7 +1131,7 @@ export const PenaltyMode: ModeDefinition = (() => {
           const dir = to.normalize();
           const wobble = (1 - p) * 0.5 + feints * FEINT_WOBBLE;
           flight.launch(ball.position, dir.scale(22 + p * 8).add(new Vector3((Math.random() - 0.5) * wobble * 4, 0, 0)));
-          ctx.setHud({ power: Math.round(p * 100), hint: '' });
+          ctx.setHud({ power: Math.round(p * 100), kickPower: null, hint: '' });
         }
       }
     },
@@ -1114,7 +1139,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
       meter.update(dt);
-      if (phase === 'power') ctx.setHud({ power: Math.round(meter.value * 100) });
+      if (phase === 'power') ctx.setHud({ power: Math.round(meter.value * 100), kickPower: Math.round(meter.value * 100) });
       if (phase === 'aim') {
         reticle.update(dt, stickX, stickY);
         // the keeper's read is VISIBLE pressure: aim where you keep going and
@@ -1148,6 +1173,7 @@ export const PenaltyMode: ModeDefinition = (() => {
           if (saved) lastSaveBy = 'them';
           const scored = inFrame && !saved;
           shotHistory.push(Math.sign(reticle.pos.x || 0.01));   // the keeper remembers
+          myKicks.push(scored ? 'goal' : 'miss');
           if (scored) {
             goals++;
             stylePts += feints * FEINT_STYLE_PTS;
@@ -1160,7 +1186,7 @@ export const PenaltyMode: ModeDefinition = (() => {
             gallery?.cheer(0.25);               // a save is THEIR moment
           }
           ctx.setHud({
-            score: `${goals}–${themGoals}`,
+            score: `${goals}–${themGoals}`, ...kicksHud(),
             banner: scored
               ? (feints > 0 ? `GOOOAL! +${feints * FEINT_STYLE_PTS} style` : 'GOOOAL!')
             : diedShort ? 'SCUFFED IT — SHORT' : saved ? 'SAVED' : 'OFF TARGET',
@@ -1201,10 +1227,11 @@ export const PenaltyMode: ModeDefinition = (() => {
             const theyScore = !r.saved && r.why !== 'off_target';
             if (theyScore) themGoals++;
             themKicks++;
+            theirKicks.push(theyScore ? 'goal' : 'miss');
             if (r.saved) { lastSaveBy = 'you'; ctx.juice.scorePop(ball.position, 'SAVED!', '#7CFFB2'); ctx.feel?.impact?.(0.5); }
             SoundKit.play(theyScore ? 'crowdGroan' : 'crowdCheer', { volume: 0.4 });
             ctx.setHud({
-              score: `${goals}–${themGoals}`,
+              score: `${goals}–${themGoals}`, ...kicksHud(), dive: '',
               banner: r.saved ? (timing === 'perfect' ? 'SAVED! — read it perfectly' : 'SAVED!')
                 : r.why === 'wrong_way' ? (keepPlan.feint ? 'THEM: SOLD YOU — the run-up was a feint' : 'THEM: WRONG WAY')
                 : r.why === 'too_slow' ? 'THEM: BURIES IT — dive as he strikes'
