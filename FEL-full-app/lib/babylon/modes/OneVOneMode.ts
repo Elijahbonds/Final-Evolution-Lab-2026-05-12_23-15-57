@@ -46,6 +46,7 @@ import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
+import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk; Meshy never scaled)
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -53,6 +54,8 @@ import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 
 /** Exported so hoop-alignment-tests can check it against the venue's hoop. */
 export const RIM = new Vector3(0, 3.05, -0.6);
+/** The rim's point on the floor — what a drive's range is measured against (see the checkDriveDunk call). */
+const RIM_FLOOR = new Vector3(RIM.x, 0, RIM.z);
 const TARGET_SCORE = 11;
 // FORMAT FIX: scoring used to be "1pt inside a 4.2-unit paint radius, 2pts
 // anywhere past it, no matter how far" — a made shot was never worth 3, and
@@ -117,6 +120,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   let defSec = 0, defReleased = false, defResolved = false, myJumpAge = Infinity;
   let meStunSec = 0;                        // whiffed reach costs you your feet
   let contact: ContactSystem | null = null;      // Phase 4: Havok bodies when ready
+  let hoopJuice: HoopJuice | null = null;        // A+ P0 CONTACT-lite: rim spring / net squash / hoop flash on a make
+  let contactLatch = false;                      // A+ P0: the dunk's ONE punch per attempt — never re-fired by the banner or the stun
 
   /** Move a physics-bound character, or fall back to kinematic writes. */
   function driveBody(id: string, root: TransformNode, vel: Vector3, dt: number): void {
@@ -198,6 +203,8 @@ export const OneVOneMode: ModeDefinition = (() => {
       attachBallToHand(ball, me.skeleton, 'RightHand');
       EffectsKit.ambient(ctx.scene, 'venice');
       EffectsKit.ballTrail(ctx.scene, ball);
+      hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: juice-only ring + net, material clones — no meshy_hoop_* transform is touched
+      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }
       SoundKit.startAmbient('stadium');
 
       localSource = new LocalInputSource();
@@ -288,6 +295,12 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (possession === 'mine') {
             myScore += arcPoints;
             swing('big_make');
+            // A+ P0 CONTACT-lite, the soft sibling: a jumper drops through with a small feel hit and a short shake —
+            // no hit-stop latch, no flash, no slam thud (that is the dunk's). The hoop still answers the make.
+            ctx.feel.impact(0.4);
+            ctx.juice.shake(0.06, 100);
+            hoopJuice?.punch();
+            console.info('[1V1-JUICE] jumper make');
             // the WHY was named at release (GREEN/EARLY/LATE + contest); the
             // resolution just confirms the result and the points
             ctx.setHud({ score: myScore, momentum, banner: `${arcLabel} +${arcPoints}` });
@@ -440,7 +453,10 @@ export const OneVOneMode: ModeDefinition = (() => {
         // shot start — drive context first: a hot drive DUNKS instead of metering
         if (!shooting && !dunking && carrying && meSlot.intent.actionHeld > 0.02) {
           const defenderPos = foeStunSec > 0 ? null : foe.root.position;
-          const kind = checkDriveDunk(me.root.position, meDribble.vel, RIM, turbo.t01, defenderPos);
+          // A+ P0: the gate measures a 3-D distance and the rim sits 3.05 m up — against RIM itself a floor-bound body can
+          // NEVER be inside DUNK_RANGE (2.8 m), so the drive dunk had never fired in play (measured: every squeeze at speed
+          // inside 2.6 m of the rim metered a jumper). The range is a floor distance; judge it against the rim's floor point.
+          const kind = checkDriveDunk(me.root.position, meDribble.vel, RIM_FLOOR, turbo.t01, defenderPos);
           if (kind !== 'none') { startDunk(ctx, kind); }
           else {
             shooting = true;
@@ -608,6 +624,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       me?.dispose(); foe?.dispose(); ball?.dispose();
       meSlot?.dispose(); foeSlot?.dispose();
       SoundKit.stopAmbient();
+      hoopJuice?.dispose(); hoopJuice = null;        // A+ P0: restores any hoop material the punch swapped
       onevoneVenue?.dispose(); onevoneVenue = null;  // M74
     },
   };
@@ -629,7 +646,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
 
   function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster'): void {
-    dunking = true; shooting = false;
+    dunking = true; shooting = false; contactLatch = false;   // A+ P0: a fresh attempt gets one punch
     turbo.t01 = Math.max(0, turbo.t01 - 0.3);           // dunks spend fuel
     const made = Math.random() < DUNK_PCT[kind];
     SoundKit.play('whoosh', { pitch: 0.85 });
@@ -657,7 +674,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         ctx.camDirector.pulse(posterized ? 0.85 : 0.6, 0.5);
         SoundKit.play('score', { pitch: 0.9 });
         SoundKit.play('crowdCheer', { volume: posterized ? 0.8 : 0.5 });
-        ctx.feel?.impact?.(posterized ? 0.7 : 0.45);
+        contactPunch(ctx);   // A+ P0: hit-stop + shake + flash + the ONE slam thud + HoopJuice (replaces the bare feel.impact, which was a second thud)
         EffectsKit.burst(ctx.scene, RIM, 'net');
         if (posterized) {
           foeStunSec = 1.4;
@@ -672,11 +689,33 @@ export const OneVOneMode: ModeDefinition = (() => {
       } else {
         SoundKit.play('miss');
         SoundKit.play('crowdGroan', { volume: 0.4 });
+        missClank(ctx);   // A+ P0: the miss has weight too — a clank, never the make's punch
         ballSim.launch(ball.getAbsolutePosition(), new Vector3((Math.random() - 0.5) * 3, 3, 2));
         bannerFlash(ctx, kind === 'poster' ? 'STUFFED AT THE RIM!' : 'RATTLED OUT');
         setTimeout(() => { if (!ended) startDefense(ctx, 'THEIR BALL'); }, 900);
       }
     });
+  }
+
+  // ── A+ P0 CONTACT-lite (PM brief ONEVONE-A-PLUS-P0, 2026-09-06) ─────────────────────────────────────────────────
+  // The dunk contest's CONTACT orchestra is the ceiling; 1v1 takes the lite cut: one make punch, one miss clank.
+  // No hang slowMo (1v1 has no hang latch), no FOV gather, no land settle, no trail phases.
+  /** The dunk make's flush frame: hit-stop, shake, white-gold flash, ONE slam thud, and the hoop answers. Latched once per attempt. */
+  function contactPunch(ctx: ModeContext): void {
+    if (contactLatch) return;
+    contactLatch = true;
+    ctx.juice.hitStop(70);
+    ctx.juice.shake(0.12, 140);
+    ctx.juice.flash('#fff6dd', 120);
+    SoundKit.play('impact', { pitch: 0.7, volume: 0.8 });
+    hoopJuice?.punch();
+    console.info('[1V1-JUICE] dunk contact punch');
+  }
+  /** The dunk miss / stuff: a light metallic clank with a small feel hit — never the make's punch, never HoopJuice. */
+  function missClank(ctx: ModeContext): void {
+    ctx.feel.impact(0.4);
+    SoundKit.play('impact', { pitch: 1.35, volume: 0.45 });
+    console.info('[1V1-JUICE] dunk miss clank');
   }
 
   function releaseJumper(ctx: ModeContext, quality: ShotQuality): void {
