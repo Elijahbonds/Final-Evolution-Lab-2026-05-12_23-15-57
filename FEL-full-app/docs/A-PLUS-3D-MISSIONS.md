@@ -341,6 +341,12 @@ court sits at the 600 budget, pre-existing). **Route finding (pre-existing, meas
 React strict mode mounts the host twice, both instances spawn a six-body field under the Venice location, and the splash
 tracks the phantom. Production mounts once; Phase 6 checks the route on the production build.
 
+**P4 / P6 for missions #4–#6 (one build on e17a4aa, dev server stopped):** `/play/threepoint`, `/play/golf`, `/play/tennis`
+each First Load JS **160 kB** (baseline 158 kB, **+1.3 %**); shared-by-all 89.9 kB unchanged. PASS. On `next start` (:3005)
+the 3PT route mounts ONCE, logs `loading → loaded → playing`, and renders the new HUD (score 5xl + 38s clock, QUALIFYING ·
+30 LEFT, five rack pip groups with the loaded ball ringed, the release meter with the gold band); golf and tennis routes
+render on production too. Nothing pushed, nothing live.
+
 ## Mission #5 — Golf — PHASE 0 AUDIT (no code changes)
 
 **Benchmark (owner):** Everybody's Golf feel + Wii Sports Resort readability.
