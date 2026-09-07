@@ -19,6 +19,7 @@
 //     a little shot wobble. Commitment tradeoff, not a free win.
 // Derby is unchanged from M43 apart from riding the same file.
 
+import { holeName, cardString, windBearingDeg, windWord, holeBoard, ACCURACY_CENTER as GH_ACC_CENTER, ACCURACY_HALF as GH_ACC_HALF, type HoleResult } from '../core/golfHud';
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import { boneNode } from '../anim/boneLookup';
@@ -262,8 +263,10 @@ export const GolfMode: ModeDefinition = (() => {
   let ended = false;
   const TOTAL = 3;
   const PREVIEW_SEC = 1.8;
-  const ACCURACY_CENTER = 0.28;                  // wave value to hit on the way down
-  const ACCURACY_HALF = 0.1;
+  const ACCURACY_CENTER = GH_ACC_CENTER;         // wave value to hit on the way down (one source with the drawn band: core/golfHud)
+  const ACCURACY_HALF = GH_ACC_HALF;
+  /** A+ mission #5: the card, hole by hole, for the scoreboard between holes. */
+  let holeResults: HoleResult[] = [];
 
   function nextShot(ctx: ModeContext): void {
     round++;
@@ -319,9 +322,7 @@ export const GolfMode: ModeDefinition = (() => {
   }
 
   /** The golf frame: strokes against par, which is how the sport is scored. */
-  function card(): string {
-    return overPar === 0 ? 'E' : overPar > 0 ? `+${overPar}` : `${overPar}`;
-  }
+  function card(): string { return cardString(overPar); }
 
   /** Strike the ball. BOTH swings end here, so the 3-click and the stick
    *  produce the same shot from the same two inputs — power and side error —
@@ -418,9 +419,14 @@ export const GolfMode: ModeDefinition = (() => {
     ctx.camDirector.mode = 'follow';
     ctx.camDirector.snapTo(me.root.position, holePos);
     const toPin = Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos);
+    const windDeg = windBearingDeg(wind, pinVec);
     ctx.setHud({
       club: onGreen() ? PUTTER.id : GOLF_CLUBS[club].id,
       wind: `${wind.length().toFixed(0)} m/s`,
+      // A+ mission #5 (Everybody's Golf read): bearing + word for the lie panel, the hole for the chip; the meter keys
+      // below are published while the three-press swing runs
+      windDeg, windWord: windWord(windDeg, wind.length()), hole: round, holes: TOTAL, par: GOLF_PAR[Math.min(round, GOLF_PAR.length) - 1] ?? 3,
+      meterT: null, swingPhase: null, powerLock: null, board: null, boardTitle: '',
       pin: `${toPin.toFixed(0)}m`,
       strokes, card: card(),
       hint: 'A to start the swing · A at the top for POWER · A in the accuracy band · B cycles CLUB · or pull the stick back and drive through',
@@ -444,7 +450,7 @@ export const GolfMode: ModeDefinition = (() => {
       ctx.camDirector.setFixedBehind(me.root.position, 0, 'swing');
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 6, modeId: 'golf' });
       round = 0; pts = 0; ended = false;
-      overPar = 0; pickUps = 0;   // the round's tallies start clean (overPar used to carry across plays on one page)
+      overPar = 0; pickUps = 0; holeResults = [];   // the round's tallies start clean (overPar used to carry across plays on one page)
       // 'wind', not 'dojo' — a martial-arts room tone on an alpine golf course.
       // Same class of mistake as the skatepark's stadium crowd bed.
       SoundKit.startAmbient('wind');
@@ -512,7 +518,7 @@ export const GolfMode: ModeDefinition = (() => {
         if (previewSec >= PREVIEW_SEC) backToTee(ctx);
         return;                                   // camera holds the green view
       }
-      if (phase === 'power' || phase === 'accuracy') ctx.setHud({ power: Math.round(meter.value * 100) });
+      if (phase === 'power' || phase === 'accuracy') ctx.setHud({ power: Math.round(meter.value * 100), meterT: Number(meter.value.toFixed(3)), swingPhase: phase, powerLock: phase === 'accuracy' ? Math.round(power * 100) : null });
       if (phase === 'aim') reticle.update(dt, stickX, stickY);
       // Phase 3 wants update() EVERY frame; this mode drove its camera only
       // during flight, so between shots the camera never converged on its fixed
@@ -544,10 +550,11 @@ export const GolfMode: ModeDefinition = (() => {
             overPar += rel; pickUps++;
             pts += Math.round(Math.max(20, 120 - rel * 40));
             SoundKit.play('miss'); gallery?.cheer(0.2);
-            ctx.setHud({ score: pts, strokes, card: card(), banner: `PICKED UP — ${why} · ${strokes} on a par ${parNow}` });
+            holeResults.push({ hole: round, par: parNow, strokes, pickedUp: true });
+            ctx.setHud({ score: pts, strokes, card: card(), meterT: null, swingPhase: null, powerLock: null, banner: `PICKED UP — ${why} · ${strokes} on a par ${parNow}`, board: holeBoard(holeResults, TOTAL), boardTitle: round >= TOTAL ? 'CARD IN' : `NEXT — HOLE ${round + 1}` });
             settling = true;
             setTimeout(() => {
-              ctx.setHud({ banner: '' });
+              ctx.setHud({ banner: '', board: null, boardTitle: '' });
               if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); ctx.end('CARD_IN', pts, { holes: TOTAL, overPar, pickUps }); }
               else nextShot(ctx);
             }, 1600);
@@ -590,24 +597,25 @@ export const GolfMode: ModeDefinition = (() => {
           const rel = strokes - par;
           overPar += rel;
           const clutch = round === TOTAL;
-          const name = rel <= -2 ? 'EAGLE' : rel === -1 ? 'BIRDIE' : rel === 0 ? 'PAR'
-            : rel === 1 ? 'BOGEY' : `+${rel}`;
+          const name = holeName(strokes, par);
+          holeResults.push({ hole: round, par, strokes });
           const gained = Math.round(Math.max(20, 120 - rel * 40) * (clutch ? CLUTCH_MULT : 1));
           pts += gained;
           SoundKit.play('score', { pitch: rel < 0 ? 1.35 : 1 });
           gallery?.cheer(rel <= 0 ? 1 : 0.4);      // louder for a birdie than a bogey
           ctx.setHud({
-            score: pts, strokes, card: card(),
+            score: pts, strokes, card: card(), meterT: null, swingPhase: null, powerLock: null,
             banner: `${name} — ${strokes} on a par ${par}${clutch ? ' · CLUTCH' : ''}`,
+            board: holeBoard(holeResults, TOTAL), boardTitle: round >= TOTAL ? 'CARD IN' : `NEXT — HOLE ${round + 1} · PAR ${GOLF_PAR[Math.min(round + 1, GOLF_PAR.length) - 1] ?? 3}`,
           });
           settling = true;
           setTimeout(() => {
-            ctx.setHud({ banner: '' });
+            ctx.setHud({ banner: '', board: null, boardTitle: '' });
             if (round >= TOTAL) {
               ended = true; SoundKit.play('whistle');
               ctx.end('CARD_IN', pts, { holes: TOTAL, overPar, pickUps });
             } else nextShot(ctx);
-          }, 1600);
+          }, 2600);   // long enough to read the card
         }
         return;
       }

@@ -14,10 +14,14 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
+import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
 
 /** The rhythm lane: an array of cue markers (dance publishes it every frame). */
 const isCueLane = (v: unknown): v is HudCue[] =>
   Array.isArray(v) && v.every((c) => !!c && typeof c === 'object' && 'glyph' in (c as object));
+/** A between-rounds / between-holes scoreboard (HudScoreCard rows), rendered only when a mode publishes it. */
+const isBoard = (v: unknown): v is { name: string; score: number | string; line: string }[] =>
+  Array.isArray(v) && v.every((r) => !!r && typeof r === 'object' && 'line' in (r as object));
 /** Where the hit ring sits on the lane (% from the left) and how much lane the lookahead spans. */
 const LANE_HIT_PCT = 24;
 const LANE_SPAN_PCT = 66;
@@ -175,6 +179,87 @@ export function makeTimingHost(opts: TimingHostOpts) {
         {typeof hud.shotType === 'string' && hud.shotType && (
           <div className="pointer-events-none absolute inset-x-0 bottom-24 text-center">
             <span className="fel-panel px-3 py-1 font-mono text-[11px] text-white/85">{hud.shotType}</span>
+          </div>
+        )}
+
+        {/* GOLF (A+ mission #5, Everybody's Golf read + Wii size) — every block is key-gated, so the other timing sports
+            are unchanged: the lie panel (club · pin · wind with a bearing arrow), the hole chip, the drawn three-press
+            swing meter (the band from the mode's own constants), and the scorecard between holes. */}
+        {typeof hud.club === 'string' && hud.club && (
+          <div className="pointer-events-none absolute right-4 top-14 flex flex-col items-end gap-1 font-mono">
+            <div className="fel-panel px-3 py-1.5 text-right">
+              <div className="text-lg font-black text-white">{hud.club}</div>
+              <div className="text-[11px] text-white/70">PIN {hnode(hud.pin, '—')}</div>
+            </div>
+            <div className="fel-panel flex items-center gap-2 px-3 py-1.5">
+              <span
+                className="inline-block text-xl leading-none text-[var(--fel-cyan)]"
+                style={{ transform: `rotate(${typeof hud.windDeg === 'number' ? hud.windDeg : 0}deg)` }}
+              >↑</span>
+              <span className="text-[11px] text-white/85">WIND {hnode(hud.wind, '—')}{typeof hud.windWord === 'string' && hud.windWord ? ` · ${hud.windWord}` : ''}</span>
+            </div>
+          </div>
+        )}
+        {typeof hud.hole === 'number' && (
+          <div className="pointer-events-none absolute inset-x-0 top-12 flex justify-center font-mono text-[12px] tracking-wider">
+            <span className="fel-panel px-3 py-1 text-white/85">
+              HOLE {hud.hole}{typeof hud.holes === 'number' ? ` / ${hud.holes}` : ''} · PAR {hnode(hud.par, '—')} · STROKE {hnode(hud.strokes, 0)} · <span className="font-bold text-[var(--fel-gold)]">{hnode(hud.card, 'E')}</span>
+            </span>
+          </div>
+        )}
+        {typeof hud.meterT === 'number' && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-28 flex flex-col items-center gap-1 font-mono">
+            <span className={`fel-panel px-3 py-0.5 text-[11px] font-bold tracking-widest ${hud.swingPhase === 'accuracy' ? 'text-[var(--fel-gold)]' : 'text-[var(--fel-cyan)]'}`}>
+              {hud.swingPhase === 'accuracy' ? 'ACCURACY — strike in the band' : 'POWER — press at the top'}
+            </span>
+            <div className="relative h-5 w-[min(520px,70vw)] overflow-hidden rounded-md border border-white/20 bg-black/55">
+              <div className="absolute inset-y-0 bg-[var(--fel-gold)]/70" style={{ left: `${(GOLF_ACC_CENTER - GOLF_ACC_HALF) * 100}%`, width: `${GOLF_ACC_HALF * 200}%` }} />
+              {typeof hud.powerLock === 'number' && (
+                <div className="absolute inset-y-0 w-[3px] bg-[var(--fel-cyan)]" style={{ left: `${hud.powerLock}%` }} />
+              )}
+              <div className="absolute inset-y-0 w-[4px] -translate-x-1/2 bg-white shadow-[0_0_8px_#fff]" style={{ left: `${hud.meterT * 100}%` }} />
+            </div>
+          </div>
+        )}
+        {isBoard(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
+            <div className="fel-panel w-full max-w-[440px] px-5 py-4 font-mono">
+              <div className="fel-heading text-2xl font-black text-white">SCORECARD</div>
+              <div className="mt-3 grid gap-1.5">
+                {hud.board.map((r) => (
+                  <div key={r.name} className={`flex items-center justify-between gap-3 rounded-lg px-3 py-1.5 ${r.name === 'CARD' ? 'bg-[var(--fel-gold)]/15' : 'bg-black/40'}`}>
+                    <span className="text-sm font-bold text-white/90">{r.name}</span>
+                    <span className="truncate text-[11px] text-white/60">{r.line}</span>
+                    <span className="fel-stat text-lg">{r.score}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 text-[11px] text-[var(--fel-gold)]">{hud.boardTitle}</div>
+            </div>
+          </div>
+        )}
+
+        {/* TENNIS (A+ mission #6, Mario Tennis feel + Wii size): the scoreboard chip — games both sides, the umpire's
+            call, the streak — and the TELL on the incoming ball with the answer that beats it. Key-gated. */}
+        {typeof hud.call === 'string' && hud.call && (
+          <div className="pointer-events-none absolute inset-x-0 top-12 flex justify-center font-mono">
+            <div className="fel-panel flex items-center gap-3 px-4 py-1.5">
+              <span className="text-[11px] tracking-wider text-[#22d3ee]">{hnode(hud.you, 'YOU')}</span>
+              <span className="fel-stat text-2xl">{hnode(hud.score, 0)}</span>
+              <span className="text-white/40">–</span>
+              <span className="fel-stat text-2xl">{hnode(hud.foeScore, 0)}</span>
+              <span className="text-[11px] tracking-wider text-[#facc15]">{hnode(hud.them, 'THEM')}</span>
+              <span className="ml-2 rounded bg-black/40 px-2 py-0.5 text-sm font-bold text-[var(--fel-gold)]">{hud.call}</span>
+              {Number(hud.streak) >= 2 && <span className="text-[11px] font-bold text-[#ff6a00]">{hnode(hud.streak, 0)} STRAIGHT</span>}
+            </div>
+          </div>
+        )}
+        {typeof hud.incomingTell === 'string' && hud.incomingTell && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-36 flex justify-center font-mono">
+            <span className="fel-panel px-4 py-1.5 text-sm font-bold text-white">
+              INCOMING · {hud.incomingTell}
+              {typeof hud.answer === 'string' && hud.answer ? <span className="ml-2 text-[var(--fel-cyan)]">answer {hud.answer}</span> : null}
+            </span>
           </div>
         )}
 

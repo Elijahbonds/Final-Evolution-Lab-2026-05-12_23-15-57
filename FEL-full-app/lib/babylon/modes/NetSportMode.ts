@@ -10,6 +10,7 @@
 // This file owns meshes, input, animation and HUD, and nothing else.
 
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
+import { answerFor, tellFor, rallyPace, SHOT_FACE } from '../core/tennisHud';
 import { ballKindFor, dressBall } from '../visual/meshyProps';
 import type { AbstractMesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -91,6 +92,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
    *  Chosen by which button they swing with, so it is a decision made under the
    *  same time pressure as the timing itself. */
   let pendingShot: TennisShot = 'drive';
+  /** A+ mission #6 (Mario Tennis): the opponent PICKS a shot — mostly drives, a slice, the odd lob or drop — so the
+   *  tell on the incoming ball is a real read, not a label. */
+  function pickAiShot(): TennisShot { const r = Math.random(); return r < 0.5 ? 'drive' : r < 0.75 ? 'slice' : r < 0.9 ? 'lob' : 'drop'; }
   /**
    * Seconds until the player can commit to the net again.
    *
@@ -134,6 +138,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       score: tennisScore ? tennisScore.games[0] : volleyScore!.points[0],
       foeScore: tennisScore ? tennisScore.games[1] : volleyScore!.points[1],
       callout: label(),
+      // A+ mission #6 (Wii readability): the scoreboard chip — both sides' games, the umpire call, the streak
+      call: tennisScore ? label() : '', streak: heroStreak, you: 'YOU', them: 'THEM',   // hudLabels are the point-flash strings, not side names
     });
   }
 
@@ -147,6 +153,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     rally.end();
     shot = null;
     contactArmed = false;
+    ctx.setHud({ incomingShot: '', incomingTell: '', answer: '' });
     if (o.energy) {
       energy[side] = Math.min(ENERGY_MAX, energy[side] + ENERGY_RALLY_WON);
     }
@@ -199,6 +206,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   ): boolean {
     const planned = planShot(o.cfg, { x: from.x, y: from.y, z: from.z }, toSide, aim, q, touch, tennisShot);
     if (!planned) return false;
+    // A+ mission #6: the rally speeds up as it grows (tennis only; the three-touch sport keeps its pace)
+    if (o.cfg.touchesPerSide === 1) planned.duration *= rallyPace(rally.touches);
+    // the tell describes THEIR ball; once ours is away it is stale
+    if (toSide < 0 && o.cfg.touchesPerSide === 1) _ctx.setHud({ incomingShot: '', incomingTell: '', answer: '' });
 
     const fault: RallyFault | null = judgeShot(o.cfg, planned);
     shot = planned;
@@ -315,7 +326,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     }
     // A self-pass on their side must NOT hand the human a swing window, which
     // is what toSide decides (awaitingHuman = toSide > 0).
-    launch(ctx, ball.getAbsolutePosition(), aiCrosses ? 1 : -1, (Math.random() - 0.5) * 1.6, q, aiIsVolley ? aiTouch : undefined, undefined, aiZone);
+    // A+ mission #6: the opponent picks a shot (tennis) and the HUD tells it, with the answer that beats it
+    const aiShot: TennisShot | undefined = aiIsVolley ? undefined : pickAiShot();
+    if (aiShot) ctx.setHud({ incomingShot: aiShot.toUpperCase(), incomingTell: tellFor(aiShot), answer: `${SHOT_FACE[answerFor(aiShot)]} · ${answerFor(aiShot).toUpperCase()}` });
+    launch(ctx, ball.getAbsolutePosition(), aiCrosses ? 1 : -1, (Math.random() - 0.5) * 1.6, q, aiIsVolley ? aiTouch : undefined, aiShot, aiZone);
   }
 
   /**

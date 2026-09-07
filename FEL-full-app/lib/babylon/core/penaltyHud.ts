@@ -6,7 +6,7 @@ export type KickResult = 'goal' | 'miss';
 
 /** One side's kicks as pips: ● goal, ○ miss, · still to take (regulation), then sudden-death kicks after a bar. */
 export function kickPips(results: readonly KickResult[], regulation = 5): string {
-  const reg = results.slice(0, regulation).map((r) => (r === 'goal' ? '●' : '○'));
+  const reg: string[] = results.slice(0, regulation).map((r) => (r === 'goal' ? '●' : '○'));
   while (reg.length < regulation) reg.push('·');
   const sd = results.slice(regulation).map((r) => (r === 'goal' ? '●' : '○'));
   return sd.length ? `${reg.join(' ')} | ${sd.join(' ')}` : reg.join(' ');
