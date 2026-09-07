@@ -97,4 +97,6 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   'freerun',
   // A+ P0 CONTACT-lite — the shootout ships with the basketball family
   'threepoint',
+  // A+ P0 thin shells — the parked air-session and sprint shells ship with their juice
+  'bigair', 'sprint',
 ]);

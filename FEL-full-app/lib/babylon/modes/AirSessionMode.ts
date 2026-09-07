@@ -65,6 +65,25 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   let gallery: Onlookers | null = null;          // L4 — a judged event is watched
   let loadCount = 0;
   let disposeCount = 0;
+  /** A+ P0 juice (PM brief CARNIVAL-A-PLUS-P0, 2026-09-07): one crash punch per landing, one finish punch per session. */
+  let crashAt = 0;
+  let finishLatch = false;
+
+  /** A clean / stuck landing: a soft shake on top of the scorePop + light feel hit that stay. */
+  const landBeat = (ctx: ModeContext, grade: TrickGrade): void => { ctx.juice.shake(0.06, 120); console.info(`[AIR-JUICE] clean land (${grade})`); };
+  /** A crash: latched hit-stop + shake + ONE low thud (replaces feel.impact(0.7), whose own thud stacked on the miss cue). */
+  const crashPunch = (ctx: ModeContext): void => {
+    const t = performance.now(); if (t - crashAt < 300) return; crashAt = t;
+    ctx.juice.hitStop(45); ctx.juice.shake(0.10, 140);
+    SoundKit.play('impact', { pitch: 0.6, volume: 0.65 });
+    console.info('[AIR-JUICE] crash punch');
+  };
+  /** The session ends on a win (score >= winScore): one gold finish punch. No slowMo. */
+  const finishPunch = (ctx: ModeContext): void => {
+    if (finishLatch) return; finishLatch = true;
+    ctx.juice.hitStop(60); ctx.juice.shake(0.14, 160); ctx.juice.flash('#FFD700', 140);
+    console.info('[AIR-JUICE] finish punch');
+  };
 
   const S = {
     attempt: 0,
@@ -80,6 +99,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   const reset = (): void => {
     S.attempt = 0; S.score = 0; S.combo = 0; S.best = null;
     S.nextFoot = 'L'; S.banner = ''; S.bannerT = 0; S.done = false;
+    crashAt = 0; finishLatch = false;
   };
 
   const pushHud = (ctx: ModeContext): void => {
@@ -104,6 +124,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   const finish = (ctx: ModeContext): void => {
     if (S.done) return;
     S.done = true;
+    if (S.score >= opts.winScore) finishPunch(ctx);
     ctx.end(S.score >= opts.winScore ? 'win' : 'complete', S.score, {
       points: S.score, bestGrade: S.best ? GRADE_RANK[S.best] : 0, attempts: S.attempt,
     });
@@ -151,7 +172,10 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
           athlete ? athlete.root.position.add(new Vector3(0, 2.2, 0)) : Vector3.Zero(),
           GRADE_LABEL[grade], GRADE_COLOR[grade],
         );
-        ctx.feel.impact(grade === 'crash' ? 0.7 : 0.35);
+        // A+ P0: a crash is the latched bail punch (hit-stop + shake + one low thud); the others keep the light feel hit,
+        // and a clean / stuck landing adds a soft shake.
+        if (grade === 'crash') crashPunch(ctx);
+        else { ctx.feel.impact(0.35); if (grade === 'stuck' || grade === 'clean') landBeat(ctx, grade); }
       });
 
       ctx.camDirector.snapTo(athlete.root.position, launchPad.position);

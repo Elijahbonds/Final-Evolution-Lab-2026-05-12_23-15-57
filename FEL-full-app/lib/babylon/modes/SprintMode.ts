@@ -57,9 +57,19 @@ const S = {
 const reset = (): void => {
   S.done = false; S.stumbles = 0; S.rivalDist = 0;
   S.banner = ''; S.bannerT = 0; S.lastSide = null;
+  finishLatch = false;
 };
 
 const say = (t: string, sec = 0.9): void => { S.banner = t; S.bannerT = sec; };
+
+// A+ P0 juice (PM brief CARNIVAL-A-PLUS-P0, 2026-09-07): a false start / stumble is light feel only; the finish is one latched
+// punch — hit-stop + shake + gold flash on a win, a soft shake on a loss. Pad verbs stay inert; no slowMo.
+let finishLatch = false;
+function finishBeat(ctx: ModeContext, won: boolean): void {
+  if (finishLatch) return; finishLatch = true;
+  if (won) { ctx.juice.hitStop(55); ctx.juice.shake(0.12, 150); ctx.juice.flash('#FFD700', 130); console.info('[SPRINT-JUICE] finish punch (win)'); }
+  else { ctx.juice.shake(0.06, 120); console.info('[SPRINT-JUICE] finish soft (loss)'); }
+}
 
 function pushHud(ctx: ModeContext): void {
   const st = core?.state;
@@ -80,6 +90,7 @@ function finish(ctx: ModeContext, timeS: number): void {
   if (S.done) return;
   S.done = true;
   const won = timeS <= WIN_TIME && S.rivalDist < RACE_DIST;
+  finishBeat(ctx, won);
   ctx.end(won ? 'win' : 'complete', Math.max(0, Math.round((20 - timeS) * 120) - S.stumbles * 40), {
     timeS: Number(timeS.toFixed(2)), stumbles: S.stumbles, topSpeed: core?.state.topSpeed ?? 0,
   });
@@ -169,7 +180,7 @@ return {
       S.stumbles += 1;
       say('FALSE START!', 1.1);
       SoundKit.play('miss');
-      ctx.feel.impact(0.5);
+      ctx.feel.impact(0.2);   // A+ P0: light feel only (was 0.5)
       S.lastSide = null;
       return;
     }
@@ -178,6 +189,7 @@ return {
     if (side === S.lastSide && core.state.speed < beforeSpeed) {
       S.stumbles += 1;
       say('STUMBLE', 0.7);
+      ctx.feel.impact(0.15);   // A+ P0: light feel only
     }
     S.lastSide = side;
   },

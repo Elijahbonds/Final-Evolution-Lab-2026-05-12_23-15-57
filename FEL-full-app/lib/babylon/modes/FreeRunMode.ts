@@ -52,6 +52,8 @@ interface St {
   env: Env; anim: string;
   /** Vertical velocity, owned here: the controller integrates the velocity it is handed, so gravity is ours to apply. */
   vy: number;
+  /** A+ P0 juice: performance.now() of the last bail punch (one per crash), and the one finish punch. */
+  bailAt: number; finishLatch: boolean;
 }
 const states = new WeakMap<Scene, St>();
 const live = new Set<St>();
@@ -101,6 +103,25 @@ export const FreeRunMode: ModeDefinition = (() => {
     setTimeout(() => ctx.setHud({ banner: '' }), ms);
   }
 
+  // ── A+ P0 juice (PM brief CARNIVAL-A-PLUS-P0, 2026-09-07) — the skate bail recipe on the gymnastics slot. No slowMo, no
+  // juice.impact({ slow }); Havok traversal untouched.
+  /** A big land or a banked line: a soft shake (the light feel hit on the landing stays). */
+  function softBeat(ctx: ModeContext, tag: string): void { ctx.juice.shake(0.07, 120); console.info(`[FR-JUICE] soft beat (${tag})`); }
+  /** A bail or a fall: hit-stop + shake + ONE low thud (replaces feel.impact(0.7), whose thud would double the miss cue's
+   *  partner). Latched once per crash. */
+  function bailPunch(ctx: ModeContext, S: St, tag: string): void {
+    const t = performance.now(); if (t - S.bailAt < 400) { console.info(`[FR-JUICE] bail latched (${tag})`); return; } S.bailAt = t;
+    ctx.juice.hitStop(45); ctx.juice.shake(0.10, 140);
+    SoundKit.play('impact', { pitch: 0.6, volume: 0.65 });
+    console.info(`[FR-JUICE] bail punch (${tag})`);
+  }
+  /** The finish: one punch — hit-stop + shake + a flash that is gold on an S / A run. Once per run. */
+  function finishPunch(ctx: ModeContext, S: St, top: boolean): void {
+    if (S.finishLatch) return; S.finishLatch = true;
+    ctx.juice.hitStop(55); ctx.juice.shake(0.12, 150); ctx.juice.flash(top ? '#FFD700' : '#fff6dd', top ? 140 : 100);
+    console.info(`[FR-JUICE] finish punch (${top ? 'gold' : 'white'})`);
+  }
+
   function play(S: St, clip: string, loop: boolean): void {
     if (!S.hero || S.anim === clip) return;
     S.anim = clip;
@@ -147,12 +168,13 @@ export const FreeRunMode: ModeDefinition = (() => {
       const lost = S.combo.bail(); S.bails++;
       S.state = 'down'; S.downSec = DOWN_SEC;
       play(S, 'football_tackled_fall', false);
-      ctx.feel?.impact?.(0.7); SoundKit.play('miss');
+      SoundKit.play('miss'); bailPunch(ctx, S, 'bail');   // A+ P0: hit-stop + shake + ONE low thud (feel.impact(0.7) is gone)
       flash(ctx, lost > 0 ? `BAILED — ${lost} lost` : 'BAILED', 900);
     } else {
       S.state = 'ground'; S.groundSec = 0;
       play(S, landing === 'sketchy' ? 'jump_land' : 'jump_land', false);
       ctx.feel?.impact?.(landing === 'sketchy' ? 0.45 : 0.2);
+      if (S.trick || drop >= 2.4) softBeat(ctx, S.trick ? 'trick land' : 'big land');   // A+ P0: a big land answers softly
       if (landing === 'sketchy') flash(ctx, 'HARD LANDING — roll next time', 700);
     }
     EffectsKit.burst(ctx.scene, S.hero!.root.position, 'dust');
@@ -166,7 +188,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     S.cc!.setVelocity(Vector3.Zero());
     const lost = S.combo.bail(); S.bails++;
     S.speed = 0; S.state = 'ground'; S.trick = null; S.hero!.root.rotation.set(0, S.hero!.root.rotation.y, 0);
-    SoundKit.play('miss');
+    SoundKit.play('miss'); bailPunch(ctx, S, 'fell');   // A+ P0: a fall is a crash
     flash(ctx, lost > 0 ? `FELL — ${lost} lost · back to the checkpoint` : 'FELL — back to the checkpoint', 1000);
   }
 
@@ -179,6 +201,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     const total = S.combo.banked + tb + rb;
     const grade = runGrade(total, S.tier);
     SoundKit.play('whistle'); SoundKit.play('crowdCheer');
+    finishPunch(ctx, S, grade === 'S' || grade === 'A');   // A+ P0: one finish punch
     EffectsKit.burst(ctx.scene, S.hero!.root.position.add(new Vector3(0, 1.8, 0)), 'confetti');
     play(S, 'dunk_celebrate_big', false);
     hud(ctx, S, { banner: `FINISH · ${S.runSec.toFixed(1)}s · GRADE ${grade}` });
@@ -215,6 +238,7 @@ export const FreeRunMode: ModeDefinition = (() => {
         combo: new ComboChain(), started: false, runSec: 0, finished: false,
         checkpoint: 0, highTouched: false, bails: 0, barsCleared: new Set(),
         env: { vaultAhead: false, wallAhead: false, ledgeAhead: false, barAhead: false }, anim: '', vy: 0,
+        bailAt: 0, finishLatch: false,
       };
       states.set(ctx.scene, S); live.add(S);
 
@@ -344,7 +368,7 @@ export const FreeRunMode: ModeDefinition = (() => {
           if (!supported && S.vy < -1.2) { S.state = 'air'; S.airStartY = root.position.y; S.airSec = 0; S.launch = 'drop'; S.trick = null; S.rollAt = null; play(S, 'jump_up', false); }
           else { S.groundSec += dt; play(S, S.speed > 3.2 ? 'run' : S.speed > 0.4 ? 'walk' : 'idle_stand', true); }
           // touching down without a linked move banks the line
-          if (S.groundSec >= BANK_AFTER_SEC && S.combo.pot > 0) { const b = S.combo.bank(); flash(ctx, `BANKED +${b}`, 800); SoundKit.play('score', { volume: 0.5 }); hud(ctx, S); }
+          if (S.groundSec >= BANK_AFTER_SEC && S.combo.pot > 0) { const b = S.combo.bank(); flash(ctx, `BANKED +${b}`, 800); SoundKit.play('score', { volume: 0.5 }); softBeat(ctx, 'bank'); hud(ctx, S); }
         }
       }
       cc.integrate(dt, support, gravity);
@@ -359,7 +383,7 @@ export const FreeRunMode: ModeDefinition = (() => {
       for (const [i, p] of S.pieces.entries()) {
         if (p.kind === 'bar' && !S.barsCleared.has(i) && root.position.z > p.z && root.position.z < p.z + 1.2 && Math.abs(root.position.x - p.x) < p.w / 2) {
           S.barsCleared.add(i);
-          if (S.state !== 'slide' && root.position.y < p.y + 0.4) { S.speed *= BAR_CLIP_SPEED; ctx.feel?.impact?.(0.4); SoundKit.play('impact', { pitch: 0.7, volume: 0.4 }); flash(ctx, 'CLIPPED THE BAR — slide under it', 800); }
+          if (S.state !== 'slide' && root.position.y < p.y + 0.4) { S.speed *= BAR_CLIP_SPEED; ctx.feel?.impact?.(0.4); flash(ctx, 'CLIPPED THE BAR — slide under it', 800); }   // A+ P0: ONE thud (feel.impact plays its own; the stacked impact SFX is gone)
         }
         if (p.kind === 'checkpoint' && (p.index ?? 0) > S.checkpoint && root.position.z > p.z) { S.checkpoint = p.index ?? 0; SoundKit.play('uiTick', { pitch: 1.3 }); flash(ctx, `CHECKPOINT ${S.checkpoint}`, 600); }
       }

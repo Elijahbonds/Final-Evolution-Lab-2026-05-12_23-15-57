@@ -78,6 +78,15 @@ export const DanceMode: ModeDefinition = (() => {
   let kit: KitPulse | null = null;
   /** The clip currently dancing, so a judgement can re-speed it. */
   let currentClip: string | null = null;
+  /** A+ P0 juice (PM brief CARNIVAL-A-PLUS-P0, 2026-09-07): one results punch per routine. */
+  let resultLatch = false;
+
+  /** GREAT (stars >= 3): a latched match-class punch — hit-stop + shake + gold flash. GOOD: a softer shake only. No slowMo. */
+  function resultBeat(ctx: ModeContext, great: boolean): void {
+    if (resultLatch) return; resultLatch = true;
+    if (great) { ctx.juice.hitStop(60); ctx.juice.shake(0.14, 160); ctx.juice.flash('#FFD700', 140); console.info('[DANCE-JUICE] great punch'); }
+    else { ctx.juice.shake(0.08, 140); console.info('[DANCE-JUICE] good shake'); }
+  }
 
   /** The song clock. Falls back to performance.now() only if no audio context
    *  exists — and says so, because silent fallback to the frame clock is the
@@ -161,6 +170,7 @@ export const DanceMode: ModeDefinition = (() => {
     const mixPct = band ? Math.round(band.mixLevel() * 100) : 0;
     const accuracy = Math.round(r.accuracy * 100);
     const grade = gradeFor(r.accuracy);
+    resultBeat(ctx, r.stars >= 3);
     ctx.setHud({
       banner: `${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}  ${accuracy}%  ·  GRADE ${grade}  ·  MIX ${mixPct}%`,
       cues: [],
@@ -258,7 +268,7 @@ export const DanceMode: ModeDefinition = (() => {
       // mirrored groups until the _pN bone-suffix fix in boneLookup.ts.)
       registerMirroredClips(me.animator, ctx.scene, me.skeleton, [...registered]);
 
-      ended = false; phase = 'pick'; pickSec = 0; stickLatch = false; currentClip = null;
+      ended = false; phase = 'pick'; pickSec = 0; stickLatch = false; currentClip = null; resultLatch = false;
 
       // Song clock: a real AudioContext.currentTime, robust to dropped frames.
       try {

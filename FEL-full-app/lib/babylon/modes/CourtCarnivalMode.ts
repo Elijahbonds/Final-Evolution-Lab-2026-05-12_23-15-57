@@ -70,6 +70,9 @@ interface St {
   host: SpawnedCharacter | null;
   guest: SpawnedCharacter | null;
   anchor: BABYLON.TransformNode | null;
+  /** A+ P0 juice latches: one event-win punch per event (reset when the next event starts), one champion punch per night. */
+  eventLatch: boolean;
+  champLatch: boolean;
 }
 
 const states = new WeakMap<BABYLON.Scene, St>();
@@ -79,6 +82,24 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
   const st = (ctx: ModeContext): St | undefined => states.get(ctx.scene);
   const names = (S: St): [string, string] => (S.players > 1 ? ['P1', 'P2'] : ['YOU', 'RIVAL']);
   function setPhase(S: St, p: Phase): void { S.phase = p; S.phaseSec = 0; }
+
+  // ── A+ P0 juice (PM brief CARNIVAL-A-PLUS-P0, 2026-09-07): Mario Party readability with Wii Sports weight. No slowMo, no
+  // juice.impact({ slow }), no HoopJuice. The event's own chime, cheer and confetti stay; ONE thud (no feel + SoundKit stack).
+  /** You took the event: latched hit-stop + shake + short flash + one low thud. Once per event. */
+  function eventWinPunch(ctx: ModeContext, S: St): void {
+    if (S.eventLatch) return; S.eventLatch = true;
+    ctx.juice.hitStop(45); ctx.juice.shake(0.10, 140); ctx.juice.flash('#fff6dd', 90);
+    SoundKit.play('impact', { pitch: 0.7, volume: 0.5 });
+    console.info('[CARN-JUICE] event win punch');
+  }
+  /** The rival (or P2) took it: a soft flash only. */
+  function rivalSoftFlash(ctx: ModeContext, tag: string): void { ctx.juice.flash('#ffd9d9', 70); console.info(`[CARN-JUICE] soft flash (${tag})`); }
+  /** CARNIVAL CHAMPION: latched hit-stop + shake + gold flash; the cheer, confetti and celebrate stay. Once per night. */
+  function championPunch(ctx: ModeContext, S: St): void {
+    if (S.champLatch) return; S.champLatch = true;
+    ctx.juice.hitStop(60); ctx.juice.shake(0.14, 160); ctx.juice.flash('#FFD700', 140);
+    console.info('[CARN-JUICE] champion punch');
+  }
 
   /** The hub is MOUNTED for hub phases and DISPOSED while an event runs — not hidden. A mounted venue finishes loading
    *  its map asynchronously and snaps the camera to itself when it lands; with the hub merely hidden, that late snap
@@ -132,7 +153,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
   // ── an event ────────────────────────────────────────────────────────
   async function startEvent(ctx: ModeContext, S: St): Promise<void> {
     S.current = S.events[S.idx];
-    S.turn = 0; S.turnPoints = [0, 0];
+    S.turn = 0; S.turnPoints = [0, 0]; S.eventLatch = false;   // a fresh event gets one win punch at most
     setPhase(S, 'reveal');
     showHub(ctx, S, true);
     hud(ctx, S, { banner: `NEXT UP: ${S.current.title}`, blurb: BLURB[S.current.id] ?? '', board: null, boardTitle: '', hint: '' });
@@ -185,8 +206,8 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     const loserChar = w === -1 ? null : rivalTookIt ? S.host : S.guest;
     winnerChar?.animator.play(SPORT_CLIP.scoreCelebrate, { onEnd: () => winnerChar?.animator.play(SPORT_CLIP.idle, { loop: true }) });
     loserChar?.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => loserChar?.animator.play(SPORT_CLIP.idle, { loop: true }) });
-    if (w === 0) { EffectsKit.burst(ctx.scene, ctx.camera.position, 'confetti'); SoundKit.play('crowdCheer', { volume: 0.4 }); }
-    else if (w === 1) SoundKit.play('crowdGroan', { volume: 0.4 });
+    if (w === 0) { EffectsKit.burst(ctx.scene, ctx.camera.position, 'confetti'); SoundKit.play('crowdCheer', { volume: 0.4 }); eventWinPunch(ctx, S); }
+    else if (w === 1) { SoundKit.play('crowdGroan', { volume: 0.4 }); rivalSoftFlash(ctx, 'event'); }
     const [n1, n2] = names(S);
     hud(ctx, S, {
       banner: `${S.current.title}: ${n1} ${a} · ${n2} ${b}`,
@@ -212,7 +233,8 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     SoundKit.play('whistle');
     const champ = nightChampion(S.tally);
     const won = champ === 0;
-    if (won) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, ctx.camera.position, 'confetti'); }
+    if (won) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, ctx.camera.position, 'confetti'); championPunch(ctx, S); }
+    else rivalSoftFlash(ctx, 'runner-up');
     const champChar = champ === 0 ? S.host : S.guest;
     const runnerUp = champ === 0 ? S.guest : S.host;
     champChar?.animator.play(SPORT_CLIP.scoreCelebrate, {});
@@ -240,7 +262,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
         // harness's own start-of-play step and the first event rendered sky (measured on /play/carnival?players=1).
         autoBegin: !!q, starting: false, current: null,
         players: Math.max(1, Math.min(2, Number(q ?? 1) || 1)), turn: 0, turnPoints: [0, 0], tally: freshTally(), rivalTarget: 0,
-        ended: false, hub: null, host: null, guest: null, anchor: null,
+        ended: false, hub: null, host: null, guest: null, anchor: null, eventLatch: false, champLatch: false,
       };
       states.set(ctx.scene, S); live.add(S);
       SoundKit.startAmbient('stadium');
