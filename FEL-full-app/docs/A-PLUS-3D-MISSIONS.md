@@ -287,3 +287,43 @@ overlays; every event is byte-identical):**
 - Cut: none. Weak: the hub is the Venice map (heavy on load: 35–41 fps during the first seconds on the route, 60 fps in
   play); the second human shares the keyboard; the between-events board holds 3.2 s with no skip.
 
+
+---
+
+## Owner benchmarks confirmed 2026-09-06 (one round)
+
+| Mission | Mode | Benchmark (owner) |
+|---|---|---|
+| #4 | 3PT Shootout | **both** the Wii Sports Resort 3-point contest (readability) **and** NBA 2K's three-point contest (structure) |
+| #5 | Golf | Everybody's Golf feel + Wii Sports Resort readability |
+| #6 | Tennis | Mario Tennis feel + Wii Sports readability |
+| #7 | Baseball (derby) | Wii Sports baseball contact + MLB Home Run Derby presentation |
+| #8 | Soccer (penalty) | FIFA penalty shootout feel + Wii-style readability |
+| #9 | Football (rush) | Tecmo Bowl feel + Madden readability |
+
+## Mission #4 — 3PT Shootout — PHASE 0 AUDIT (no code changes; written while the cd741a5 sweep ran)
+
+1. **Current implementation.** `lib/babylon/modes/ThreePointMode.ts` (629 lines): the 2K structure is already there —
+   5 racks × 5 balls on the real arc radii (corner shorter than the top), the money ball last on each rack worth 2 (30 max),
+   a 60 s clock, a release bar (period 1.15 s, sweet spot 0.72, PERFECT ±0.06 / GOOD ±0.16 with a 55 % make chance), a
+   six-shooter field of fictional rivals (`simulateRival`: qualifying centre 12.5 + skill × 5, final 14 + skill × 5),
+   qualifying → top three → final, staged standings reveal (weakest first), tiebreak playoffs, the live `NEED n TO WIN`
+   number when the player shoots last. Juice: score pop, impact, crowd on money / streak ≥ 4, groan on a bricked money ball.
+   Host `components/games/three-point-babylon.tsx` + Controller Link lobby (phone tilt = wind-up). Verb: A SHOOT.
+2. **Registration pattern.** `MODES.threepoint`, route `/play/threepoint` (+ `/dev/threepoint`), dynamic import. Standard.
+3. **Reusable assets.** Everything in the file; the roster rivals spawn as real bodies (`rivalBodies`) but **never
+   animate** — they stand behind the line while their numbers post; `HudScoreCard[]` standings board; `ctx.juice` /
+   `camDirector.pulse`; `proofLine` case `threePoint`.
+4. **Gate 0.** PASS (sweep `threepoint`: 60 fps, 589 draws, 200 meshes, 0 / 0 / 0).
+5. **Vitest / bundle.** 382 / 382; `/play/threepoint` to be measured at Phase 4 against the baseline build.
+
+**Gaps against the owner's double benchmark:**
+- **Wii readability**: the HUD is 10–12 px mono in the top-left corner and the release bar is 176 × 12 px — unreadable from a
+  couch. Wanted: a big centre score + clock, a wide release meter under the shooter with the sweet band, rack progress
+  pips (five racks × five balls, money ball gold), a MONEY BALL callout, make / miss at banner size.
+- **2K rivals**: the field's numbers appear on a board; the bodies never shoot. Wanted: each rival's body plays a
+  jumpshot (and the rim nets) as its number posts in the staged reveal, so the contest is watched, not read.
+- **Heat**: streak ≥ 4 already pulses the camera; an ON FIRE callout + a hot ball read is the 2K tell.
+- Everything else (racks, money ball, rounds, need, tiebreaks) is in place and stays byte-identical.
+
+**Cut risk (60 fps):** none — HUD and clip triggers on existing bodies.
