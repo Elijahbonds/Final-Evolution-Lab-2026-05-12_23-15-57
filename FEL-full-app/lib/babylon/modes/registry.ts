@@ -93,4 +93,6 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   'who_scene_it',
   // A+ mission #10 — FreeRun took the gymnastics slot
   'freerun',
+  // A+ P0 CONTACT-lite — the shootout ships with the basketball family
+  'threepoint',
 ]);

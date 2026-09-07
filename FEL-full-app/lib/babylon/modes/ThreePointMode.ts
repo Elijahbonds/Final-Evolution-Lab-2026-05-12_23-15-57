@@ -38,6 +38,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { ShotArc } from '../core/BasketballCore';
 import { THREE_CORNER_R, THREE_TOP_R, threePointRadius } from '../core/BasketballCore';
 import { SoundKit } from '../audio/SoundKit';
+import { HoopJuice } from '../visual/HoopJuice';   // A+ P0 CONTACT-lite: the hoop answers a make (shared with Dunk / 1v1 / 3v3; Meshy never scaled)
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 
@@ -158,6 +159,12 @@ function dressBall(): void {
 // ever moves. Counting loads against disposals lets a stale teardown skip.
 let loadCount = 0;
 let disposeCount = 0;
+// ── A+ P0 CONTACT-lite (PM brief THREEPOINT-A-PLUS-P0, 2026-09-06) ────────────────────────────────────────────
+// The release names the result (scorePop / feel.impact / score SFX stay where they were); the RIM answers when the ball
+// arrives — a soft shake + HoopJuice on a make, a clank on a miss. No hang slowMo, no dunk hit-stop, no FOV stack.
+let hoopJuice: HoopJuice | null = null;   // juice-only ring + net + material clones at RIM; no meshy_hoop_* transform is touched
+let contactLatch = false;                 // one landing beat per ball — never re-fired by the HUD or the rack advance
+let landing: { perfect: boolean; money: boolean } = { perfect: false, money: false };   // what the release decided, for the landing beat
 
 const S = {
   phase: 'move' as Phase,
@@ -292,6 +299,7 @@ function fire(ctx: ModeContext, power?: number): void {
   S.phase = 'flight';
 
   const money = isMoneyBall(S.ballIdx);
+  landing = { perfect, money }; contactLatch = false;   // A+ P0: the landing beat (update → 'made' | 'missed') reads these
   if (made) {
     ctx.juice.scorePop(RIM.clone(), perfect ? `PERFECT +${worth}` : `+${worth}`,
       perfect ? '#22d3ee' : '#ffd75e');
@@ -312,6 +320,26 @@ function fire(ctx: ModeContext, power?: number): void {
   }
   S.charge = 0;
   pushHud(ctx, made ? `${perfect ? 'PERFECT' : 'GOOD'}${S.streak >= FIRE_STREAK ? ' · ON FIRE' : ''}` : 'MISS');
+}
+
+/** The make's landing beat: a soft shake, a short flash on a PERFECT or the money ball, and the hoop answers. Latched once per ball.
+ *  No hit-stop here — feel.impact at the release already carries its 45–55 ms freeze and its own thud, so nothing is stacked. */
+function contactMake(ctx: ModeContext): void {
+  if (contactLatch) return;
+  contactLatch = true;
+  const big = landing.perfect || landing.money;
+  ctx.juice.shake(big ? 0.10 : 0.06, 100);
+  if (big) ctx.juice.flash(landing.money ? '#ffd75e' : '#fff6dd', 90);
+  hoopJuice?.punch();
+  console.info(`[3PT-JUICE] make${landing.perfect ? ' perfect' : ''}${landing.money ? ' money' : ''}`);
+}
+/** The miss's landing beat: a light metallic clank with a small feel hit — never the make's answer, never HoopJuice. */
+function missClank(ctx: ModeContext): void {
+  if (contactLatch) return;
+  contactLatch = true;
+  ctx.feel.impact(0.4);
+  SoundKit.play('impact', { pitch: 1.35, volume: 0.45 });
+  console.info('[3PT-JUICE] miss clank');
 }
 
 function advanceBall(ctx: ModeContext): void {
@@ -514,6 +542,8 @@ export const ThreePointMode: ModeDefinition = {
     }
 
     arc = new ShotArc();
+    hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: once per load, at the rim the arc lands on
+    if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }
 
     S.from.copyFrom(RACK_POS[0]);
     S.prevPos.copyFrom(player.root.position);
@@ -605,6 +635,8 @@ export const ThreePointMode: ModeDefinition = {
       player.root.lookAt(new Vector3(RIM.x, player.root.position.y, RIM.z));
     } else if (S.phase === 'flight') {
       const r = arc.step(dt, ball.position);
+      if (r === 'made') contactMake(ctx);          // A+ P0: the hoop answers the make as the ball drops through
+      else if (r === 'missed') missClank(ctx);      // A+ P0: the miss has weight — a clank off the iron, never HoopJuice
       if (r !== 'flying') advanceBall(ctx);
     }
 
@@ -627,6 +659,7 @@ export const ThreePointMode: ModeDefinition = {
     // A newer instance has already loaded — this teardown belongs to an older
     // one and must not touch the live objects.
     if (disposeCount < loadCount) return;
+    hoopJuice?.dispose(); hoopJuice = null;   // A+ P0: restores any hoop material the punch swapped
     player?.dispose(); player = null;
     for (const b of rivalBodies) b.dispose(); rivalBodies = [];
     ball?.dispose(); ball = null;
