@@ -9,7 +9,7 @@ import type { AnimationGroup, Skeleton, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { boneNode } from '../boneLookup';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
-import { buildHitReact, buildKnockdown, buildGuardStep } from './karate';
+import { buildHitReact, buildKnockdown, buildGuardStep, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp } from './karate';
 import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, buildBoardCarveRight } from './boardSuite';
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildCelebrateBig } from './dunkFinishes';
@@ -66,6 +66,33 @@ describe('karate fills', () => {
     const g = fresh(() => buildKnockdown(scene, sk)!);
     at(g, 0); const h0 = hipsY();
     at(g, 0.7); expect(hipsY()).toBeLessThan(h0 - 0.6); expect(pos('Head').z).toBeLessThan(pos('Hips').z - 0.3);
+  });
+  // ANIM-READABILITY (combat, 2026-09-07): the guard verbs and the floor
+  it('block is a HIGH guard held from frame 0 (fists above the stance guard, in front of the face) and wraps seamlessly', () => {
+    const stance = fresh(() => buildGuardStep(scene, sk)!); at(stance, 0); const guardY = (pos('LeftHand').y + pos('RightHand').y) / 2;
+    const g = fresh(() => buildBlockHold(scene, sk)!);
+    at(g, 0); const y0 = (pos('LeftHand').y + pos('RightHand').y) / 2; const l0 = pos('LeftHand').clone(), r0 = pos('RightHand').clone();
+    expect(y0).toBeGreaterThan(guardY + 0.06);
+    expect(Math.abs(pos('LeftHand').x - pos('RightHand').x)).toBeLessThan(0.3);   // elbows in — a tight guard
+    at(g, 0.9); expect(Vector3.Distance(pos('LeftHand'), l0)).toBeLessThan(0.02); expect(Vector3.Distance(pos('RightHand'), r0)).toBeLessThan(0.02);
+  });
+  it('guard impact shoves the guard back into the chin and resets; the parry flicks the lead hand out', () => {
+    const g = fresh(() => buildGuardImpact(scene, sk)!);
+    at(g, 0); const z0 = (pos('LeftHand').z + pos('RightHand').z) / 2; const l0 = pos('LeftHand').clone();
+    at(g, 0.07); expect((pos('LeftHand').z + pos('RightHand').z) / 2).toBeLessThan(z0 - 0.06);
+    at(g, 0.24); expect(Vector3.Distance(pos('LeftHand'), l0)).toBeLessThan(0.03);
+    const p = fresh(() => buildParry(scene, sk)!);
+    at(p, 0); const rz = pos('RightHand').z;
+    at(p, 0.1); expect(pos('RightHand').z).toBeGreaterThan(rz + 0.15);
+  });
+  it('the floor hold starts where the knockdown ends and wraps; the get-up rises from it to the stance', () => {
+    const kd = fresh(() => buildKnockdown(scene, sk)!); at(kd, 0.7); const floorHips = hipsY(), floorHead = pos('Head').clone(); at(kd, 0); const standHips = hipsY();
+    const f = fresh(() => buildFloorHold(scene, sk)!);
+    at(f, 0); expect(Math.abs(hipsY() - floorHips)).toBeLessThan(0.03); expect(Vector3.Distance(pos('Head'), floorHead)).toBeLessThan(0.05);
+    at(f, 1.4); expect(Math.abs(hipsY() - floorHips)).toBeLessThan(0.03);
+    const u = fresh(() => buildGetUp(scene, sk)!);
+    at(u, 0); expect(Math.abs(hipsY() - floorHips)).toBeLessThan(0.03);
+    at(u, 0.45); expect(Math.abs(hipsY() - standHips)).toBeLessThan(0.03); expect(pos('LeftHand').y).toBeGreaterThan(pos('Hips').y + 0.3);   // guard is up
   });
 });
 

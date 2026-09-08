@@ -34,11 +34,10 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   karate_punch_heavy: ['hook', 0.95],
   karate_kick_roundhouse: ['roundhouse', 1.0],
   karate_counter_throw: ['uppercut', 0.9],
-  karate_block: ['guard', 1.6],
   karate_dodge_roll: ['guard', 1.3],
   karate_hit_react: ['guard', 2.0],
   karate_knockdown: ['guard', 0.8],
-  karate_victory_pose: ['uppercut', 0.6],
+  karate_victory_pose: ['dunk_celebrate_big', 1.0],   // ANIM-READABILITY (combat): arms overhead, not a slow uppercut
   // basketball
   bball_dribble_run: ['run', 0.9],
   bball_shoot_jumper: ['jumpshot', 1.0],

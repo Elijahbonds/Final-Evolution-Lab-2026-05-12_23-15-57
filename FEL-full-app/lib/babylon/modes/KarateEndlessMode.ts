@@ -32,6 +32,7 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
+import { CombatAnimTree, type CombatAnimInput, type StrikeWeight } from '../anim/combatTree';
 import type { ControlSource, Intent } from '../core/PlayerSlot';
 import { PlayerSlot, LocalInputSource } from '../core/PlayerSlot';
 import { SoundKit } from '../audio/SoundKit';
@@ -65,6 +66,13 @@ import {
  */
 const ARENA_RADIUS = 7.5;
 const STANCE = SPORT_CLIP.karateStance;
+// ANIM-READABILITY (combat, 2026-09-07): the player and the partner are driven by the CombatAnimTree, the ONE owner of
+// their clips — the same jumble Karate VS had (a per-frame stance / step play racing the strike's onEnd chain, the
+// knockdown cut to 0.08 s by the per-frame stance, guard steps on the spot). The enemies stay on MobSteering's clips.
+const IDLE_CLIP = 'karate_idle_stance';
+const STRIKE_WEIGHT: Record<'A' | 'B' | 'Y', StrikeWeight> = { A: 'light', B: 'medium', Y: 'heavy' };
+const IMPACT_SEC = 0.24, STRIKE_MAX_SEC = 1.5;
+type Strike = { weight: StrikeWeight; clip: string; until: number } | null;
 // THE HORDE GRAMMAR (owner lock 2026-09-03: Matrix Revolutions / Pirate
 // Warriors). Every strike hits EVERYONE in its arc; the heavy LAUNCHES, and an
 // airborne enemy is helpless and takes JUGGLE_DAMAGE_MULT. Before this each
@@ -154,6 +162,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     }
   }
   let striking = false, blocking = false, dodging = false, bursting = false;
+  let meTree: CombatAnimTree, partnerTree: CombatAnimTree;
+  let myStrike: Strike = null, pStrike: Strike = null, impactUntil = 0, outFlag = false;
   let hitCount = 0, lastHitAt = 0;                 // the Musou number
   let camCrowd = false;                             // H8: surrounded → the crowd preset
   let xHoldSec = -1, iframeSec = 0, slowMoSec = 0;
@@ -227,7 +237,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   // M110 — spend a full chi bar: an AoE knockback + heavy damage that reuses the
   // existing landHit/ko/wave-clear path, so a burst can clear a wave cleanly.
   function chiBurst(ctx: ModeContext): void {
-    if (!CHI_BURST_ENABLED || chi < 100 || striking || dodging || bursting) return;
+    if (!CHI_BURST_ENABLED || chi < 100 || striking || dodging || bursting || myDown.downed) return;   // a downed fighter cannot swing (the tree holds the floor)
     // Phase 8: surrounded 3+ makes this the CROWD-CLEAR finisher — bigger
     // radius read, brief invulnerability feel (dodge window), huge payoff.
     const surrounded = surroundedCount(player.root.position,
@@ -249,7 +259,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     EffectsKit.burst(ctx.scene, origin.add(new Vector3(0, 1.1, 0)), 'glitch');
     EffectsKit.burst(ctx.scene, origin.add(new Vector3(0, 0.4, 0)), 'sparks');
     striking = true;
-    player.animator.play(STRIKES.Y.clip, { onEnd: () => { striking = false; player.animator.play(STANCE, { loop: true, fadeSec: 0.12 }); } });
+    myStrike = { weight: 'finisher', clip: STRIKES.Y.clip, until: performance.now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
     for (const e of [...enemies]) {
       const to = e.mob.char.root.position.subtract(origin); to.y = 0;
       const d = to.length();
@@ -271,7 +281,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
 
   function strike(ctx: ModeContext, key: keyof typeof STRIKES): void {
-    if (striking || blocking || dodging) return;
+    if (striking || blocking || dodging || myDown.downed) return;   // a downed fighter cannot swing (the tree holds the floor)
     striking = true;
     const s = STRIKES[key];
     const target = nearest(player.root.position);
@@ -280,7 +290,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       player.root.rotation.y = Math.atan2(to.x, to.z);
     }
     SoundKit.play('whoosh');
-    player.animator.play(s.clip, { onEnd: () => { striking = false; player.animator.play(STANCE, { loop: true, fadeSec: 0.12 }); } });
+    myStrike = { weight: STRIKE_WEIGHT[key], clip: s.clip, until: performance.now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
     setTimeout(() => {
       // everyone in the arc, not the nearest one
       const origin = player.root.position;
@@ -327,8 +337,27 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     }
   }
 
+  /** Once per frame: the player's and the partner's trees (ANIM-READABILITY — the one owner of their clips). */
+  function animate(mySpeed01: number, partnerSpeed01: number): void {
+    if (!meTree || !partnerTree) return;
+    const t = performance.now();
+    if (myStrike && t > myStrike.until) { striking = false; myStrike = null; }   // a strike the tree never settled (safety, never measured)
+    if (pStrike && t > pStrike.until) pStrike = null;
+    const mine: CombatAnimInput = {
+      speed01: blocking || myDown.downed ? 0 : mySpeed01, dashing: false, hasWeapon: false,
+      striking: myStrike?.weight ?? null, strikeClip: myStrike?.clip,
+      blocking, dodging, parryFlash: false, guardImpactFlash: t < impactUntil,
+      hitBy: null, down: myDown.downed, out: outFlag, ulting: false,
+    };
+    meTree.update(mine);
+    partnerTree.update({
+      speed01: partnerSpeed01, dashing: false, hasWeapon: false, striking: pStrike?.weight ?? null, strikeClip: pStrike?.clip,
+      blocking: false, parryFlash: false, guardImpactFlash: false, hitBy: null, down: partnerDown.downed, out: false, ulting: false,
+    });
+  }
+
   function tryDodge(ctx: ModeContext): void {
-    if (dodging || striking) return;
+    if (dodging || striking || myDown.downed) return;
     dodging = true;
     iframeSec = DODGE_IFRAME_SEC;
     const dir = Math.hypot(stickX, stickY) > 0.2
@@ -337,15 +366,13 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     SoundKit.play('whoosh', { pitch: 1.5, volume: 0.4 });
     const from = player.root.position.clone();
     const to = from.add(dir.scale(DODGE_DISTANCE));
-    player.animator.play(SPORT_CLIP.footballJukeLeft, {});
     const t0 = performance.now();
     const obs = ctx.scene.onBeforeRenderObservable.add(() => {
       const k = Math.min(1, (performance.now() - t0) / 320);
       player.root.position = Vector3.Lerp(from, to, k);
       if (k >= 1) {
         ctx.scene.onBeforeRenderObservable.remove(obs);
-        dodging = false;
-        player.animator.play(STANCE, { loop: true });
+        dodging = false;   // the tree's dodge settles on its own
       }
     });
   }
@@ -369,16 +396,21 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       }), '#3B2A52');
       if (!karateVenue) VenueKit.buildDojo(ctx.scene);
       EffectsKit.ambient(ctx.scene, 'dojo');
-      player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, 0, 1.5), startClip: STANCE });
-      neverBindPose(player.animator, STANCE);
+      player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, 0, 1.5), startClip: IDLE_CLIP });
+      neverBindPose(player.animator, IDLE_CLIP);
       installSafePlay(player.animator, 'agent-player');
       ctx.groundLock?.track(player.root, player.skeleton);
       ctx.heroRef.current = player.root;
 
-      partner = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(1.6, 0, 0.8), tint: '#22d3ee', startClip: STANCE });
-      neverBindPose(partner.animator, STANCE);
+      partner = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(1.6, 0, 0.8), tint: '#22d3ee', startClip: IDLE_CLIP });
+      neverBindPose(partner.animator, IDLE_CLIP);
       installSafePlay(partner.animator, 'agent-partner');
       ctx.groundLock?.track(partner.root, partner.skeleton);
+      meTree = new CombatAnimTree(player.animator);
+      partnerTree = new CombatAnimTree(partner.animator);
+      meTree.onSettle = (st) => { if (st.startsWith('strike_')) { striking = false; myStrike = null; } };
+      partnerTree.onSettle = (st) => { if (st.startsWith('strike_')) pStrike = null; };
+      myStrike = null; pStrike = null; impactUntil = 0; outFlag = false;
 
       localSource = new LocalInputSource();
       playerSlot = new PlayerSlot('player', localSource, true);
@@ -411,7 +443,6 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         xHoldSec = -1;
         if (held >= 0 && held * 1000 < DODGE_TAP_MS) tryDodge(ctx);
         blocking = false;
-        if (!dodging) player.animator.play(STANCE, { loop: true });
       }
     },
 
@@ -424,8 +455,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         if (myDown.channel(dtReal, near)) {
           myDown.revive();
           SoundKit.play('powerUp', { pitch: 1.1 });
-          ctx.setHud({ banner: 'REVIVED — BACK IN THE FIGHT' });
-          player.animator.play(STANCE, { loop: true });
+          ctx.setHud({ banner: 'REVIVED — BACK IN THE FIGHT' });   // the tree rises through the get-up
           setTimeout(() => ctx.setHud({ banner: '' }), 900);
         }
         if (myDown.bledOut(clockSec)) {
@@ -455,10 +485,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
       if (xHoldSec >= 0) {
         xHoldSec += dtReal;
-        if (xHoldSec * 1000 >= DODGE_TAP_MS && !blocking && !dodging) {
-          blocking = true;
-          player.animator.play(SPORT_CLIP.karateBlock, { loop: true });
-        }
+        if (xHoldSec * 1000 >= DODGE_TAP_MS && !blocking && !dodging) blocking = true;   // the tree shows the block
       }
       iframeSec = Math.max(0, iframeSec - dtReal);
 
@@ -471,7 +498,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // The basis LATCHES while the stick is held (the over-shoulder camera swings behind every turn — a live basis
       // spun the fighter on the spot on a held stick-right: 0.26 m/s net, measured); a push runs straight.
       const vel = ctx.camDirector.stickWorldLatched(stickX, stickY).scaleInPlace(3);
+      let mySpeed01 = Math.min(1, vel.length() / 3);   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
       if (!striking && !blocking && !dodging && vel.lengthSquared() > 0.05) {
+        const before = player.root.position.clone();
         player.root.position.addInPlace(vel.scale(dt));
         // Inset from the mat so the camera always has somewhere to stand behind
         // the player — see ARENA_RADIUS.
@@ -482,9 +511,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
           player.root.position.z *= k;
         }
         player.root.rotation.y = Math.atan2(vel.x, vel.z);
-        player.animator.play(SPORT_CLIP.combatStep, { loop: true });   // guard up on the move (was the shared run)
-      } else if (!striking && !blocking && !dodging && vel.lengthSquared() <= 0.05) {
-        player.animator.play(STANCE, { loop: true });
+        if (dt > 0 && Vector3.Distance(before, player.root.position) / dt < 0.3) mySpeed01 = 0;   // pinned on the ring's edge: no stepping on the spot
       }
 
       // partner movement/attacks
@@ -494,10 +521,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       partner.root.position.x = Math.max(-8, Math.min(8, partner.root.position.x));
       partner.root.position.z = Math.max(-8, Math.min(8, partner.root.position.z));
       if (pVel.lengthSquared() > 0.05) partner.root.rotation.y = Math.atan2(pVel.x, pVel.z);
-      partner.animator.play(pVel.lengthSquared() > 0.1 ? SPORT_CLIP.combatStep : STANCE, { loop: true });
       if (pIntent.action) {
         const t = nearest(partner.root.position);
-        partner.animator.play(SPORT_CLIP.karateJab, { onEnd: () => partner.animator.play(STANCE, { loop: true }) });
+        if (!pStrike) pStrike = { weight: 'light', clip: SPORT_CLIP.karateJab, until: performance.now() + STRIKE_MAX_SEC * 1000 };   // one jab per swing — the tree plays it
         if (t && Vector3.Distance(t.mob.char.root.position, partner.root.position) < 1.8) landHit(ctx, t, false);   // the partner's land drops a body too
       }
 
@@ -520,6 +546,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         mob.onContactResolved();
         if (blocking) {
           // a guard ABSORBS the hit — pressure, not chip: no bar ticks down
+          impactUntil = performance.now() + IMPACT_SEC * 1000; meTree.clearBeat('guard_impact');   // the guard is shoved back (readable)
           gainChi(ctx, 2); ctx.feel?.impact?.(0.2);
           SoundKit.play('impact', { pitch: 0.8, volume: 0.3 });
           continue;
@@ -531,12 +558,12 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         if (!partnerDown.downed) {
           // Phase 8 co-op rule kept: DOWN (not out) while the partner stands — they can revive you
           myDown.down(clockSec);
-          SoundKit.play('crowdGroan');
-          player.animator.play(SPORT_CLIP.karateKnockdown, {});
+          SoundKit.play('crowdGroan');   // the tree: knockdown → the floor until the revive, then the get-up
+          striking = false; myStrike = null;
           ctx.setHud({ banner: 'YOU ARE DOWN — PARTNER CAN REVIVE YOU' });
         } else {
           SoundKit.play('crowdGroan');
-          player.animator.play(SPORT_CLIP.karateKnockdown, { onEnd: () => {} });
+          outFlag = true; striking = false; myStrike = null; animate(mySpeed01, pVel.length() / 2.6);   // KO: the tree's knockdown → floor
           return ctx.end(`WAVE_${wave}`, totalKos * 100 + wave * 50, { wave, kos: totalKos });
         }
       }
@@ -557,6 +584,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       if (surroundedNow !== camCrowd) { camCrowd = surroundedNow; ctx.camDirector.setPreset(camCrowd ? 'crowd' : 'overShoulder'); }
       ctx.camDirector.look(lookX, lookY, dtReal);
       ctx.camDirector.update(player.root.position, facingVec(), nearest(player.root.position)?.mob.char.root.position ?? null);
+      animate(mySpeed01, Math.min(1, pVel.length() / 2.6));
     },
 
     dispose() { crowd?.dispose(); crowd = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient(); },

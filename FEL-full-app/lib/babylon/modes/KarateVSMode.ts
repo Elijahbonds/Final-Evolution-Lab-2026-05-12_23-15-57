@@ -27,7 +27,8 @@
 import { Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
-import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
+import { installSafePlay } from '../anim/clipRegistry';
+import { CombatAnimTree, type CombatAnimInput, type CombatAnimState, type StrikeWeight } from '../anim/combatTree';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { Onlookers } from '../visual/Onlookers';
@@ -60,6 +61,24 @@ const MOVE_SPEED = 3.4;
 const ARENA_HALF = 4.5;
 const SLOWMO_SEC = 0.5;
 const SLOWMO_SCALE = 0.3;
+// ANIM-READABILITY (combat, 2026-09-07): the CombatAnimTree is the ONE owner of each fighter's clips. The mode never
+// plays a clip itself — it latches beats (hit / parry / guard impact / down / out / celebrate) with a wall-clock window
+// and feeds the tree once per frame. Before, the per-frame stance play, the swing's onEnd chain and the hit branches
+// all played at once: a parried jab froze the hero for 3 s (its chained stance fired from inside the animator's fade
+// handler and stranded the fade at weight 0), every rival strike ended in a one-frame stance flash (0.5 m hand pop),
+// and the block was the stance clip. Measured on the fake pad; see the tree's header.
+const IDLE_CLIP = 'karate_idle_stance';
+const REACT_SEC = 0.32, LAUNCH_SEC = 1.0, PARRY_SEC = 0.3, IMPACT_SEC = 0.24, CELEBRATE_SEC = 1.2, GET_UP_SEC = 0.45, STRIKE_MAX_SEC = 1.5;
+const REACT_STATES: CombatAnimState[] = ['react_light', 'react_medium', 'react_heavy', 'react_launch'];
+interface FighterAnim {
+  tree: CombatAnimTree;
+  strike: { weight: StrikeWeight; clip: string; until: number } | null;
+  hitBy: StrikeWeight | null; hitUntil: number;
+  parryUntil: number; impactUntil: number; downUntil: number; celebrateUntil: number;
+  out: boolean;
+}
+const newFighterAnim = (tree: CombatAnimTree): FighterAnim => ({ tree, strike: null, hitBy: null, hitUntil: 0, parryUntil: 0, impactUntil: 0, downUntil: 0, celebrateUntil: 0, out: false });
+const WEIGHT_OF: Record<'jab' | 'kick' | 'heavy', StrikeWeight> = { jab: 'light', kick: 'medium', heavy: 'heavy' };
 
 const BUDGET_SEC: Record<Phase, number> = { intro: 4, fighting: 120, roundOver: 4, matchOver: 999 };
 
@@ -72,6 +91,7 @@ export const KarateVSMode: ModeDefinition = (() => {
   let round = 1, myWins = 0, foeWins = 0;
   let striking = false, foeStriking = false;
   let slowmoSec = 0;
+  let meAnim: FighterAnim, foeAnim: FighterAnim;
   // ── A+ P0 juice (PM brief COMBAT-A-PLUS-P0, 2026-09-06): ONE thud per connect (feel.impact plays its own — the SoundKit
   // impact that stacked on it is gone), a latched hit-stop + shake on heavy / special, a soft round-win beat and a latched
   // Street Fighter–class MATCH punch. No hang slowMo, no juice.impact({ slow }). The parry's scoped slow-mo is the mode's own.
@@ -115,6 +135,36 @@ export const KarateVSMode: ModeDefinition = (() => {
     });
   }
 
+  // ── the tree's inputs (ANIM-READABILITY) ──
+  function animOf(mine: boolean): FighterAnim { return mine ? meAnim : foeAnim; }
+  /** A fighter's swing is over — naturally (the tree's settle) or interrupted (hit / parried / broken / round end). */
+  function endStrike(mine: boolean): void { if (mine) striking = false; else foeStriking = false; animOf(mine).strike = null; }
+  function beatHit(mine: boolean, weight: StrikeWeight): void {
+    const f = animOf(mine); f.hitBy = weight; f.hitUntil = now() + (weight === 'finisher' ? LAUNCH_SEC : REACT_SEC) * 1000;
+    f.tree.clearBeat(...REACT_STATES);   // a second hit inside the first react re-fires it
+    endStrike(mine);
+  }
+  function beatDown(mine: boolean, staggerSec: number): void { const f = animOf(mine); f.downUntil = now() + (staggerSec - GET_UP_SEC) * 1000; f.tree.clearBeat('knockdown'); endStrike(mine); }
+  function beatParry(mine: boolean): void { const f = animOf(mine); f.parryUntil = now() + PARRY_SEC * 1000; f.tree.clearBeat('parry_flash'); }
+  function beatGuardImpact(mine: boolean): void { const f = animOf(mine); f.impactUntil = now() + IMPACT_SEC * 1000; f.tree.clearBeat('guard_impact'); }
+  function treeInput(f: FighterAnim, s: FighterState, speed01: number): CombatAnimInput {
+    const t = now();
+    if (f.strike && t > f.strike.until) endStrike(f === meAnim);   // a strike the tree never settled (safety, never measured)
+    return {
+      speed01: s.controllable && !s.blockHeld ? speed01 : 0, dashing: false, hasWeapon: false,
+      striking: f.strike?.weight ?? null, strikeClip: f.strike?.clip,
+      blocking: s.blockHeld, parryFlash: t < f.parryUntil, guardImpactFlash: t < f.impactUntil,
+      hitBy: t < f.hitUntil ? f.hitBy : null, down: t < f.downUntil, out: f.out, ulting: false, celebrating: t < f.celebrateUntil,
+    };
+  }
+  /** Once per frame, both fighters, every phase (the KO holds the floor through the round-over beat). */
+  function animate(mySpeed01: number, foeSpeed01: number): void {
+    if (!meAnim || !foeAnim) return;
+    meAnim.tree.update(treeInput(meAnim, meState, mySpeed01));
+    foeAnim.tree.update(treeInput(foeAnim, foeState, foeSpeed01));
+  }
+  function resetAnim(f: FighterAnim): void { f.strike = null; f.hitBy = null; f.hitUntil = 0; f.parryUntil = 0; f.impactUntil = 0; f.downUntil = 0; f.celebrateUntil = 0; f.out = false; f.tree.reset(); }
+
   /** One swing, either direction. `mine` = the player is the attacker. */
   function swing(ctx: ModeContext, mine: boolean, key: 'jab' | 'kick' | 'heavy'): void {
     const atkState = mine ? meState : foeState;
@@ -134,15 +184,10 @@ export const KarateVSMode: ModeDefinition = (() => {
       setTimeout(() => ctx.setHud({ banner: '' }), 700);
     }
     SoundKit.play('whoosh', { pitch: special ? 0.8 : 1.1 });
-    atkChar.animator.play(atk.clip, {
-      onEnd: () => {
-        if (mine) striking = false; else foeStriking = false;
-        atkChar.animator.play(SPORT_CLIP.karateStance, { loop: true, fadeSec: 0.12 });
-      },
-    });
+    animOf(mine).strike = { weight: special ? 'finisher' : WEIGHT_OF[key], clip: atk.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
 
     setTimeout(() => {
-      if (phase !== 'fighting') { if (mine) striking = false; else foeStriking = false; return; }
+      if (phase !== 'fighting') { endStrike(mine); return; }
       const dist = Vector3.Distance(atkChar.root.position, defChar.root.position);
       const outcome = resolveStrike(atk, dist, defState, now());
 
@@ -155,7 +200,7 @@ export const KarateVSMode: ModeDefinition = (() => {
           SoundKit.play('impact', { pitch: 1.6, volume: 0.5 });   // the parry ping is the one sound; the feel thud that doubled it is gone
           ctx.juice.shake(0.05, 80);
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.3, 0)), 'sparks');
-          atkChar.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => atkChar.animator.play(SPORT_CLIP.karateStance, { loop: true }) });
+          beatHit(mine, 'light'); beatParry(!mine);   // the attacker flinches (staggered), the defender's guard flicks
           ctx.setHud({ banner: mine ? 'PARRIED!' : 'PERFECT PARRY!', ...(mine ? { foeChi: Math.round(defState.chi) } : { chi: Math.round(defState.chi) }) });
           setTimeout(() => ctx.setHud({ banner: '' }), 700);
           break;
@@ -163,6 +208,7 @@ export const KarateVSMode: ModeDefinition = (() => {
         case 'blocked': {
           SoundKit.play('impact', { pitch: 0.7, volume: 0.3 });
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.1, 0)), 'dust');
+          beatGuardImpact(!mine);
           ctx.setHud(mine ? { foeGuard: Math.round(defState.guard) } : { guard: Math.round(defState.guard) });
           break;
         }
@@ -172,7 +218,7 @@ export const KarateVSMode: ModeDefinition = (() => {
           ctx.juice.shake(0.08, 120);
           console.info('[KVS-JUICE] guard break');
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), 'glitch');
-          defChar.animator.play(SPORT_CLIP.karateKnockdown, { onEnd: () => defChar.animator.play(SPORT_CLIP.karateStance, { loop: true }) });
+          beatDown(!mine, defState.staggerSec);   // knock down → floor → get up inside the stagger
           ctx.setHud({ banner: mine ? 'GUARD BREAK!' : 'YOUR GUARD SHATTERED!', ...(mine ? { foeGuard: 0 } : { guard: 0 }) });
           setTimeout(() => ctx.setHud({ banner: '' }), 900);
           break;
@@ -182,7 +228,7 @@ export const KarateVSMode: ModeDefinition = (() => {
           ctx.feel?.impact?.(special ? 0.6 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
           if (special || key === 'heavy') heavyPunch(ctx, special ? 'dragon' : 'heavy'); else console.info('[KVS-JUICE] hit');
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), special ? 'glitch' : 'sparks');
-          defChar.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => defChar.animator.play(SPORT_CLIP.karateStance, { loop: true }) });
+          beatHit(!mine, special ? 'finisher' : WEIGHT_OF[key]);   // the DRAGON launches (knockdown → floor → get up)
           knockback(ctx, defChar, atkChar.root.position, atk.knockback);
           const hud: Record<string, HudValue> = mine
             ? { foeHp: defState.hp, chi: Math.round(atkState.chi) }
@@ -203,8 +249,9 @@ export const KarateVSMode: ModeDefinition = (() => {
     if (playerWon) myWins++; else foeWins++;
     SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');
     if (playerWon) roundWinBeat(ctx);
-    const loser = playerWon ? rival : player;
-    loser.animator.play(SPORT_CLIP.karateKnockdown, {});
+    endStrike(true); endStrike(false);
+    animOf(!playerWon).out = true;                                   // KO: knockdown, then the floor until the next round
+    animOf(playerWon).celebrateUntil = now() + CELEBRATE_SEC * 1000;
     ctx.setHud({
       wins: myWins, foeWins,
       banner: playerWon ? `ROUND ${round} — YOU` : `ROUND ${round} — RIVAL SENSEI`,
@@ -229,8 +276,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     player.root.position.set(0, 0, 2.2);
     rival.root.position.set(0, 0, -2.2);
     faceEachOther();
-    player.animator.play(SPORT_CLIP.karateStance, { loop: true });
-    rival.animator.play(SPORT_CLIP.karateStance, { loop: true });
+    resetAnim(meAnim); resetAnim(foeAnim);
     striking = false; foeStriking = false; slowmoSec = 0;
     setPhase('fighting');
     ctx.setHud({
@@ -252,18 +298,22 @@ export const KarateVSMode: ModeDefinition = (() => {
         return new Vector3(Math.sin(a) * 8.8, 0, Math.cos(a) * 8.8);   // off the 14 m mat, on the courtyard gravel
       }), '#3B2A52');
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
-        position: new Vector3(0, 0, 2.2), startClip: SPORT_CLIP.karateStance,
+        position: new Vector3(0, 0, 2.2), startClip: IDLE_CLIP,
       });
-      neverBindPose(player.animator, SPORT_CLIP.karateStance);
+      neverBindPose(player.animator, IDLE_CLIP);
       installSafePlay(player.animator, 'karate-vs-player');
       ctx.groundLock?.track(player.root, player.skeleton);
 
       rival = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
-        position: new Vector3(0, 0, -2.2), tint: '#8b1e2d', startClip: SPORT_CLIP.karateStance,
+        position: new Vector3(0, 0, -2.2), tint: '#8b1e2d', startClip: IDLE_CLIP,
       });
-      neverBindPose(rival.animator, SPORT_CLIP.karateStance);
+      neverBindPose(rival.animator, IDLE_CLIP);
       installSafePlay(rival.animator, 'karate-vs-rival');
       ctx.groundLock?.track(rival.root, rival.skeleton);
+      meAnim = newFighterAnim(new CombatAnimTree(player.animator));
+      foeAnim = newFighterAnim(new CombatAnimTree(rival.animator));
+      meAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(true); };
+      foeAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(false); };
 
       meState = new FighterState(100);
       foeState = new FighterState(100);
@@ -292,12 +342,9 @@ export const KarateVSMode: ModeDefinition = (() => {
         if (e.btn === 'A') swing(ctx, true, 'jab');
         if (e.btn === 'B') swing(ctx, true, 'kick');
         if (e.btn === 'Y') swing(ctx, true, 'heavy');
-        if (e.btn === 'X') { meState.pressBlock(now()); player.animator.play(SPORT_CLIP.karateBlock, { loop: true }); }
+        if (e.btn === 'X') meState.pressBlock(now());   // the tree shows the block (blockHeld → block_hold)
       }
-      if (e.t === 'button' && !e.pressed && e.btn === 'X') {
-        meState.releaseBlock();
-        if (!striking) player.animator.play(SPORT_CLIP.karateStance, { loop: true });
-      }
+      if (e.t === 'button' && !e.pressed && e.btn === 'X') meState.releaseBlock();
     },
 
     update(ctx: ModeContext, dt: number) {
@@ -309,7 +356,7 @@ export const KarateVSMode: ModeDefinition = (() => {
         else if (phase === 'intro' || phase === 'roundOver') startRound(ctx);
         return;
       }
-      if (phase !== 'fighting') return;
+      if (phase !== 'fighting') { animate(0, 0); return; }   // the trees still run: the loser holds the floor, the winner celebrates
 
       // scoped slow-mo (parry payoff) — scales this mode's clock only
       slowmoSec = Math.max(0, slowmoSec - dt);
@@ -323,28 +370,28 @@ export const KarateVSMode: ModeDefinition = (() => {
       // world-axis read (x, 0, y) was right only while the camera looked exactly down −z; once it had swung round the
       // rival (it does, every exchange) stick-right ran screen-LEFT (measured Δscreen −2.5 m). No axis is flipped.
       const moveVel = ctx.camDirector.forwardFlat().scale(-stickY * MOVE_SPEED).addInPlace(ctx.camDirector.rightFlat().scale(stickX * MOVE_SPEED));
+      let mySpeed01 = moveVel.length() / MOVE_SPEED;   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
       if (meState.controllable && !striking && !meState.blockHeld) {
         const vel = moveVel;
+        const before = player.root.position.clone();
         player.root.position.addInPlace(vel.scale(sdt));
         modeVenue?.constrain(player.root.position); player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z));
-        if (vel.lengthSquared() > 0.4 && !striking) {
-          player.animator.play(SPORT_CLIP.combatStep, { loop: true });   // guard up on the move
-        } else if (!striking) {
-          player.animator.play(SPORT_CLIP.karateStance, { loop: true });
-        }
+        if (sdt > 0 && Vector3.Distance(before, player.root.position) / sdt < 0.3) mySpeed01 = 0;   // pinned on the boundary: no stepping on the spot
       }
 
       // rival AI
       const action = brain.decide(sdt, rival.root.position, player.root.position, foeState, striking);
-      if (action.block && !foeState.blockHeld) { foeState.pressBlock(now()); rival.animator.play(SPORT_CLIP.karateBlock, { loop: true }); }
-      if (!action.block && foeState.blockHeld) { foeState.releaseBlock(); if (!foeStriking) rival.animator.play(SPORT_CLIP.karateStance, { loop: true }); }
+      if (action.block && !foeState.blockHeld) foeState.pressBlock(now());
+      if (!action.block && foeState.blockHeld) foeState.releaseBlock();
       if (action.attack) swing(ctx, false, action.attack);
+      let foeSpeed01 = Math.min(1, Math.hypot(action.moveX, action.moveY));   // the brain's INTENT, striking or not — the strike's settle lands on the step, not a one-frame stance
       if (foeState.controllable && !foeStriking && !foeState.blockHeld) {
         const vel = new Vector3(action.moveX, 0, -action.moveY).scale(MOVE_SPEED * 0.92);
+        const before = rival.root.position.clone();
         rival.root.position.addInPlace(vel.scale(sdt));
         rival.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.x));
         rival.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.z));
-        if (vel.lengthSquared() > 0.4) rival.animator.play(SPORT_CLIP.combatStep, { loop: true });
+        foeSpeed01 = sdt > 0 && Vector3.Distance(before, rival.root.position) / sdt < 0.3 ? 0 : vel.length() / MOVE_SPEED;   // the step only while the body moves
       }
 
       faceEachOther();
@@ -352,6 +399,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       ctx.setHud({ guard: Math.round(meState.guard), foeGuard: Math.round(foeState.guard) });
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(player.root.position, moveVel, rival.root.position);
+      animate(mySpeed01, foeSpeed01);
     },
 
     dispose() {

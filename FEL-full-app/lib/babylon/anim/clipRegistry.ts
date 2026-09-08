@@ -37,7 +37,8 @@ export const REAL_CLIPS = new Set<string>([
   'dunk_charge_gather', 'dunk_launch', 'dunk_mocap', 'dunk_360_eastbay', 'dunk_score_hang', 'dunk_land_crouch',
   'dunk_finish_windmill', 'dunk_finish_tomahawk', 'dunk_finish_blown', 'dunk_celebrate_big',
   'football_juke_left', 'football_juke_right', 'football_spin_move', 'football_tackled_fall',
-  'karate_hit_react', 'karate_knockdown',
+  'karate_hit_react', 'karate_knockdown', 'karate_guard_step',   // the guard step (MODE-STICK-FACE) was authored + registered but never listed here
+  'karate_block', 'karate_guard_impact', 'karate_parry', 'karate_floor_hold', 'karate_get_up',   // ANIM-READABILITY (combat, 2026-09-07)
   // basketball packages (anim/authored/basketball) — Phase 4, 2026-09-03
   'bball_dribble_idle', 'bball_crossover_left', 'bball_crossover_right', 'bball_hesi',
   'bball_layup_gather', 'bball_defend_slide_left', 'bball_defend_slide_right',
@@ -107,7 +108,7 @@ export const SPORT_CLIP = {
   karateJab: 'jab',
   karateKick: 'high_kick',
   karateHeavy: 'uppercut',
-  karateBlock: 'guard',
+  karateBlock: 'karate_block',   // ANIM-READABILITY (combat, 2026-09-07): the authored high guard (was the stance clip — invisible)
   karateHitReact: 'karate_hit_react',
   karateKnockdown: 'karate_knockdown',
 
