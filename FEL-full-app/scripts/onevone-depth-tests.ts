@@ -9,9 +9,12 @@
 //     short explode-out window. A hard DIAGONAL snap is still the explosive
 //     crossover. Before this split, a pull-back fired the crossover burst —
 //     and could break ankles while retreating away from the basket.
-//   STEAL IS A READ — the rival's drive weaves (sin curve); the ball is
-//     exposed mid-weave and protected at the gather. A poke has a real
-//     window. It used to be Math.random() < 0.5: beaten by entropy.
+//   STEAL IS A READ — the rival's drive weaves and sidesteps; the ball is
+//     exposed while it crosses over and protected at the gather. A poke has
+//     a real window. It used to be Math.random() < 0.5: beaten by entropy.
+//     (ONEVONE-DEFENSE-LOGIC: the exposure is read off the AttackerBrain's
+//     body, not a 2.2 s timer — scripts/onevone-defense-tests.ts covers the
+//     brain; here the window is checked on a plain open drive.)
 //   SHOT FEEDBACK IS LEGIBLE — the release banner names the quality and the
 //     contest. (Mode-level; asserted here at the source level the same way
 //     basketball-rules-tests asserts rims.)
@@ -21,7 +24,7 @@
 import { readFileSync } from 'node:fs';
 import { Vector3 } from '@babylonjs/core';
 import {
-  DribbleController, driveBallExposure, STEAL_EXPOSURE_MIN,
+  DribbleController, AttackerBrain, STEAL_EXPOSURE_MIN,
 } from '../lib/babylon/core/BasketballCore';
 
 let checks = 0;
@@ -122,25 +125,28 @@ function run(d: DribbleController, frames: [number, number][], sprint = false) {
 }
 
 // ── D. the steal window is real ────────────────────────────────────────────
-// The rival drive weaves at sin(t*2.1) with amplitude decaying to the gather.
-// Exposure must peak mid-weave and vanish at the gather.
+// An open drive weaves; exposure must peak mid-weave and vanish at the gather.
 {
-  const DRIVE = 2.2;                          // DEFENSE_DRIVE_SEC in OneVOneMode
-  let peak = 0;
-  for (let t = 0; t <= DRIVE; t += DT) peak = Math.max(peak, driveBallExposure(t, DRIVE));
+  const brain = new AttackerBrain(() => 0.37);
+  const self = new Vector3(0, 0, 9.2), far = new Vector3(6, 0, 14), rim = new Vector3(0, 0, -0.6);
+  let peak = 0, live = 0, total = 0, gatherExposed = 0;
+  for (let t = 0; t < 6; t += DT) {
+    const dec = brain.decide(DT, self, far, rim);
+    self.addInPlace(dec.wish.scale(DT));
+    if (dec.phase === 'drive') { total += DT; peak = Math.max(peak, dec.exposure); if (dec.exposure >= STEAL_EXPOSURE_MIN) live += DT; }
+    if (dec.phase === 'gather' && dec.exposure > 0) gatherExposed++;
+    if (dec.shot) break;
+  }
   ok(peak >= STEAL_EXPOSURE_MIN, `a real poke window exists (peak exposure ${peak.toFixed(2)})`);
-  ok(driveBallExposure(DRIVE, DRIVE) < STEAL_EXPOSURE_MIN, 'the gather is protected — no free late steals');
-
+  ok(gatherExposed === 0, 'the gather is protected — no free late steals');
   // the window is a meaningful slice of the drive, not a frame
-  let live = 0;
-  for (let t = 0; t <= DRIVE; t += DT) if (driveBallExposure(t, DRIVE) >= STEAL_EXPOSURE_MIN) live += DT;
-  ok(live > 0.5 && live < DRIVE * 0.8, `poke window is a human-scale slice of the drive (${live.toFixed(2)}s of ${DRIVE}s)`);
+  ok(live > 0.3 && live < total * 0.8, `poke window is a human-scale slice of the drive (${live.toFixed(2)}s of ${total.toFixed(2)}s)`);
 }
 
 // ── E. source level: the dice are gone, the feedback names the why ─────────
 {
   const src = readFileSync(new URL('../lib/babylon/modes/OneVOneMode.ts', import.meta.url), 'utf8');
-  ok(src.includes('driveBallExposure'), 'steal reads ball exposure, not Math.random()');
+  ok(src.includes('dec.exposure >= STEAL_EXPOSURE_MIN'), 'steal reads ball exposure, not Math.random()');
   ok(!/intent\.steal[^\n]*Math\.random/.test(src), 'no dice roll on the steal path');
   for (const word of ['GREEN!', 'EARLY', 'LATE', 'CONTESTED', 'WIDE OPEN']) {
     ok(src.includes(`\`${word}`) || src.includes(`'${word}`) || src.includes(word), `release feedback can say "${word}"`);

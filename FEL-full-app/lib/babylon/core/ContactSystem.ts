@@ -33,6 +33,10 @@ export interface ContactEvent {
   a: string; b: string;
   closingSpeed: number;   // m/s along the contact normal at impact
   severity: ContactSeverity;
+  /** ONEVONE-DEFENSE-LOGIC (2026-09-07): who ran into whom — the body moving faster along the normal. `a` was always
+   *  the first body added (the hero), so a mode reading `b === 'me'` as "I was hit" never called a foul FOR the hero and
+   *  called every foul-speed contact on defence AGAINST him. */
+  attacker: string; victim: string;
 }
 
 /** Foul thresholds: light bumps are basketball; a high-speed hit on an
@@ -117,6 +121,15 @@ export class ContactSystem {
     e.lastVel.set(cur.x, 0, cur.z);
   }
 
+  /** ONEVONE-DEFENSE-LOGIC: a vertical hop (the block / contest jump). Gravity brings the body down onto the ground
+   *  collider; drive() keeps the planar wish and leaves y alone, so the jump and the slide compose. */
+  hop(id: string, vy: number): void {
+    const e = this.byId.get(id);
+    if (!e) return;
+    const cur = e.agg.body.getLinearVelocity();
+    e.agg.body.setLinearVelocity(new Vector3(cur.x, vy, cur.z));
+  }
+
   /** Box-out / post-up brace: heavier and deader to pushes. */
   brace(id: string, on: boolean): void {
     const e = this.byId.get(id);
@@ -151,8 +164,13 @@ export class ContactSystem {
     const rel = ea.lastVel.subtract(eb.lastVel);
     const closing = Math.abs(Vector3.Dot(rel, n));
     const sev = classifyContact(closing);
+    // attacker = whichever body is moving faster along the normal
+    const aAlong = Vector3.Dot(ea.lastVel, n);
+    const bAlong = Vector3.Dot(eb.lastVel, n);
+    const attacker = Math.abs(aAlong) >= Math.abs(bAlong) ? ea : eb;
+    const target = attacker === ea ? eb : ea;
     if (sev !== 'bump' || closing > 1.2) {
-      this.contactQueue.push({ a: ea.id, b: eb.id, closingSpeed: closing, severity: sev });
+      this.contactQueue.push({ a: ea.id, b: eb.id, closingSpeed: closing, severity: sev, attacker: attacker.id, victim: target.id });
     }
 
     // ── Momentum exchange — the contact that costs something. A sustained
@@ -164,11 +182,6 @@ export class ContactSystem {
     const now = performance.now();
     if (closing > 0.8 && (this.pairCooldown.get(key) ?? 0) < now) {
       this.pairCooldown.set(key, now + 300);
-      // attacker = whichever body is moving faster along the normal
-      const aAlong = Vector3.Dot(ea.lastVel, n);
-      const bAlong = Vector3.Dot(eb.lastVel, n);
-      const attacker = Math.abs(aAlong) >= Math.abs(bAlong) ? ea : eb;
-      const target = attacker === ea ? eb : ea;
       const aV = attacker.agg.body.getLinearVelocity();
       const tV = target.agg.body.getLinearVelocity();
       if (target.braced) {

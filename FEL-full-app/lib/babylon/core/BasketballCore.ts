@@ -566,16 +566,174 @@ export function checkBlock(blocker: Vector3, shooter: Vector3, jumpAgeSec: numbe
 }
 
 // ── Depth pass: the steal is a read, not a dice roll ─────────────────────
-/** The 1v1 rival's scripted drive weaves — `targetX = sin(t * 2.1) * 2.2
- *  * (1 - k)` — and a ball carrier mid-weave is EXPOSED; gathering for the
- *  shot (k → 1) they're protected. This returns 0..1 exposure so a steal
- *  pressed at the right moment of the drive lands and a reach into a
- *  protected ball whiffs. Pure so the window is headless-testable.
- *  Replaces `Math.random() < 0.5`: defence is a skill, not a coin flip. */
-export function driveBallExposure(driveSec: number, driveDurationSec: number): number {
-  const k = Math.min(1, Math.max(0, driveSec / driveDurationSec));
-  const weaveSpeed = Math.abs(Math.cos(driveSec * 2.1)) * 2.1 * (1 - k);
-  return Math.max(0, Math.min(1, weaveSpeed / 1.6));
-}
-/** Exposure above which a poke connects. ~half the weave is live. */
+/** Exposure above which a poke connects. The rival's ball is exposed while it CROSSES OVER (a sidestep, the weave) and
+ *  protected in the gather — see AttackerBrain.decide().exposure. Replaces `Math.random() < 0.5`: defence is a skill,
+ *  not a coin flip. (The old driveBallExposure(t) read a 2.2 s timer; ONEVONE-DEFENSE-LOGIC reads the body.) */
 export const STEAL_EXPOSURE_MIN = 0.5;
+
+// ── ONEVONE-DEFENSE-LOGIC (2026-09-07): the rival's possession is a DRIVE you can guard ──────────────────────────
+// Before this the rival's possession was a 2.2 s timer: x = sin(t) weave, z lerped to the rim, released on the clock
+// whatever the defender did (measured: the hero in front of the drive 30–60 % of the frames, the rival released 0.8 m
+// from the rim every time — positioning changed nothing but the contest number). This brain reads the DEFENDER:
+//   CONTAINED — a body in the lane inside CONTAIN_RANGE makes the rival SIDESTEP (a crossover: the ball crosses over
+//     = exposed, the steal read) instead of running through it; held in front for CONTAIN_PULLUP_SEC it pulls up from
+//     wherever it is (a worse shot — that is what staying in front buys).
+//   OPEN — a clear lane is a drive to LAYUP_RANGE and a layup.
+//   GATHER — every shot is telegraphed by GATHER_SEC of gather before the release: the block cue (jump on the gather).
+//   BLOW-BY — a whiffed reach or a jump at nothing opens the lane: the rival goes NOW (the read has a price).
+//   CHECK — the possession starts with CHECK_HOLD_SEC of ball-check (an idle dribble): time to get set, no
+//     instant re-steal (measured before: a strip followed by a counter-strip 0.10 s later, four times in four).
+// Pure (Vector3 in, decision out) so every rule is headless-testable (scripts/onevone-defense-tests.ts).
+export const RIVAL_DRIVE_SPEED = 4.6;          // m/s — under the defender's 6.4 so a slide can stay in front
+export const RIVAL_SIDESTEP_SPEED = 3.4;
+export const CONTAIN_RANGE = 1.5;              // a defender this close …
+export const CONTAIN_CONE = 0.45;              // … and this much in the lane (cos) contains the drive
+export const CONTAIN_PULLUP_SEC = 1.3;         // held in front this long → pull-up from wherever
+export const SHOT_CLOCK_SEC = 6;               // the possession never hangs
+export const LAYUP_RANGE = 1.9;                // rim distance that becomes a layup gather
+export const GATHER_SEC = 0.32;                // the telegraph before every release (the block window)
+export const STEPBACK_SEC = 0.3;               // a contained pull-up steps BACK first — space for the shot, a step-in for the block
+export const STEPBACK_SPEED = 3.2;
+export const BLOWBY_SEC = 0.8;
+export const BLOWBY_SPEED = 6.2;               // a beaten defender (6.4 top speed, on their heels) does not catch this before the layup
+export const CAUTION_PER_STEAL = 0.2;          // a rival stripped on a crossover crosses over less next time (floor 0.25) …
+export const CAUTION_DECAY = 0.08;             // … and forgets a little each possession
+export const CHECK_HOLD_SEC = 0.5;
+export const EXPOSURE_LATERAL_SPEED = 2.4;     // lateral m/s that fully exposes the ball
+export const CROSSOVER_EXPOSED_FROM = 0.1;    // the ball leaves the hand this long into a crossover step …
+export const CROSSOVER_EXPOSED_TO = 0.42;     // … and settles on the far hip here — the poke window (a human reads ~0.2–0.3 s late)
+export const SIDESTEP_SEC = 0.55;
+export const CROSSOVER_CHANCE = 0.55;         // the rest of the contained steps are same-hand SHUFFLES — no switch, nothing to poke
+export const CROSSOVER_FLOOR = 0.2;           // a cautious rival still crosses over this often
+export const LAYUP_STRIDE_SPEED = 2.4;        // a layup is gathered IN STRIDE — a rival planted at the rim for the gather was a free chase-down block
+export const HAND_UP_SEC = 0.7;                // a jump this recent still puts a hand in the shot …
+export const HAND_UP_CONTEST = 0.3;            // … worth this much contest
+
+export type AttackPhase = 'check' | 'drive' | 'sidestep' | 'blowby' | 'stepback' | 'gather' | 'released';
+export interface AttackDecision {
+  /** Wish velocity (m/s, planar). */
+  wish: Vector3;
+  phase: AttackPhase;
+  /** The defender is in the lane this frame. */
+  contained: boolean;
+  /** 0..1 — how exposed the ball is to a poke right now. */
+  exposure: number;
+  /** A lateral step started this frame (a crossover or a same-hand shuffle). */
+  step: boolean;
+  /** A crossover started this frame (which side, in the rival's BODY frame — the clip to play). Null on a shuffle. */
+  crossover: 'left' | 'right' | null;
+  /** The release frame: the shot to take now. */
+  shot: 'layup' | 'jumper' | null;
+}
+
+export class AttackerBrain {
+  t = 0;
+  phase: AttackPhase = 'check';
+  containedSec = 0;
+  private side = 1; private sideSec = 0; private blowbySec = 0; private gatherSec = 0;
+  private pending: 'layup' | 'jumper' | null = null; private swayPhase = 0; private stepbackSec = 0; private stepIsCross = false;
+  /** How much the rival has learned to protect the ball against THIS defender (survives reset(); decays per possession). */
+  caution = 0;
+  constructor(private rng: () => number = Math.random) { this.reset(); }
+  /** The defender picked a crossover: fewer crossovers, more shuffles, from now on. */
+  noteStolen(): void { this.caution = Math.min(CROSSOVER_CHANCE - CROSSOVER_FLOOR, this.caution + CAUTION_PER_STEAL); }
+  reset(): void {
+    this.caution = Math.max(0, this.caution - CAUTION_DECAY);
+    this.t = 0; this.phase = 'check'; this.containedSec = 0; this.side = this.rng() < 0.5 ? -1 : 1;
+    this.sideSec = 0; this.blowbySec = 0; this.gatherSec = 0; this.stepbackSec = 0; this.pending = null; this.swayPhase = this.rng() * Math.PI * 2;
+  }
+  /** A whiffed reach / a jump at nothing opens the lane: the rival goes NOW. No effect once the shot is up. */
+  blowBy(): void { if (this.phase === 'gather' || this.phase === 'released' || this.phase === 'check' || this.phase === 'stepback') return; this.phase = 'blowby'; this.blowbySec = 0; }
+  decide(dt: number, self: Vector3, defender: Vector3, hoop: Vector3, opts: { defenderAirborne: boolean } = { defenderAirborne: false }): AttackDecision {
+    this.t += dt;
+    const zero = new Vector3(0, 0, 0);
+    if (this.phase === 'released') return { wish: zero, phase: 'released', contained: false, exposure: 0, step: false, crossover: null, shot: null };
+    const toRim = new Vector3(hoop.x - self.x, 0, hoop.z - self.z);
+    const dist = toRim.length();
+    const dir = dist > 1e-4 ? toRim.scale(1 / dist) : new Vector3(0, 0, -1);
+    if (this.phase === 'gather') {
+      this.gatherSec += dt;
+      // a layup gathers in stride (the last step to the rim); a jumper rises on the spot
+      const stride = this.pending === 'layup' && dist > 0.9 ? dir.scale(LAYUP_STRIDE_SPEED) : zero;
+      if (this.gatherSec >= GATHER_SEC) { this.phase = 'released'; return { wish: zero, phase: 'released', contained: false, exposure: 0, step: false, crossover: null, shot: this.pending }; }
+      return { wish: stride, phase: 'gather', contained: false, exposure: 0, step: false, crossover: null, shot: null };
+    }
+    const perp = new Vector3(-dir.z, 0, dir.x);               // the lane's lateral
+    if (this.phase === 'stepback') {
+      // the step-back: space for the pull-up (the ball is protected — it is on the far hip), then the gather
+      this.stepbackSec += dt;
+      if (this.stepbackSec >= STEPBACK_SEC) { this.phase = 'gather'; this.gatherSec = 0; return { wish: zero, phase: 'gather', contained: false, exposure: 0, step: false, crossover: null, shot: null }; }
+      return { wish: dir.scale(-STEPBACK_SPEED), phase: 'stepback', contained: false, exposure: 0.2, step: false, crossover: null, shot: null };
+    }
+    const dv = new Vector3(defender.x - self.x, 0, defender.z - self.z);
+    const dDist = dv.length();
+    const along = Vector3.Dot(dv, dir), lat = Vector3.Dot(dv, perp);
+    const inLane = dDist < CONTAIN_RANGE && along > 0 && along / Math.max(dDist, 1e-4) > CONTAIN_CONE;
+    if (this.phase === 'check') {
+      if (this.t < CHECK_HOLD_SEC) return { wish: zero, phase: 'check', contained: inLane, exposure: 0, step: false, crossover: null, shot: null };
+      this.phase = 'drive';
+    }
+    // the pump-fake read: a defender in the air with nothing to block gets driven past
+    if (opts.defenderAirborne && dDist < 2.2 && this.phase !== 'blowby') this.blowBy();
+    let crossover: 'left' | 'right' | null = null; let step = false;
+    let wish: Vector3; let exposure = 0;
+    if (this.phase === 'blowby') {
+      this.blowbySec += dt;
+      // AROUND the body, not through it: hard lateral while the defender is close (a run-through was read as a charge),
+      // then the straight line
+      const away = lat >= 0 ? -1 : 1;
+      wish = dir.scale(BLOWBY_SPEED).addInPlace(perp.scale(away * (dDist < 1.6 ? 3.0 : 1.0)));
+      exposure = 0.25;
+      if (this.blowbySec >= BLOWBY_SEC) this.phase = 'drive';
+    } else if (inLane) {
+      this.containedSec += dt; this.phase = 'sidestep';
+      this.sideSec -= dt;
+      if (this.sideSec <= 0) {
+        this.side = Math.abs(lat) < 0.12 ? (this.rng() < 0.5 ? -1 : 1) : lat > 0 ? -1 : 1;   // away from the defender's shoulder
+        this.sideSec = SIDESTEP_SEC; step = true;
+        this.stepIsCross = this.rng() < CROSSOVER_CHANCE - this.caution;
+        if (this.stepIsCross) crossover = bodySide(dir, perp.scale(this.side));
+      }
+      wish = perp.scale(this.side * RIVAL_SIDESTEP_SPEED).addInPlace(dir.scale(0.9));
+      // THE READ: on a CROSSOVER the ball is exposed while it crosses the body — from CROSSOVER_EXPOSED_FROM into the
+      // step (a poke at the very start hits the hand) to CROSSOVER_EXPOSED_TO (then it rides the far hip). A same-hand
+      // SHUFFLE never switches — nothing to poke. Measured: with the whole step exposed a zero-latency bot stole the first
+      // crossover 5 of 5; with a 0.22 s window from the step's first frame a 220 ms human whiffed 12 of 12.
+      const into = SIDESTEP_SEC - this.sideSec;
+      exposure = this.stepIsCross && into >= CROSSOVER_EXPOSED_FROM && into <= CROSSOVER_EXPOSED_TO ? 1 : 0.3;
+    } else {
+      this.phase = 'drive';
+      this.containedSec = Math.max(0, this.containedSec - dt * 0.5);
+      this.sideSec = 0;
+      const swayV = Math.cos(this.t * 2.6 + this.swayPhase) * 0.8 * 2.6;   // d/dt of a 0.8 m weave
+      wish = dir.scale(RIVAL_DRIVE_SPEED).addInPlace(perp.scale(swayV));
+      exposure = Math.min(1, Math.abs(swayV) / EXPOSURE_LATERAL_SPEED);
+    }
+    // the shot: at the rim it is a layup; held in front (or the clock) it is a pull-up from here
+    if (dist < LAYUP_RANGE && (!inLane || this.containedSec > 0.5)) this.pending = 'layup';
+    else if (this.containedSec >= CONTAIN_PULLUP_SEC || this.t >= SHOT_CLOCK_SEC) this.pending = dist < LAYUP_RANGE ? 'layup' : 'jumper';
+    if (this.pending === 'layup') { this.phase = 'gather'; this.gatherSec = 0; wish = zero; exposure = 0; }
+    else if (this.pending === 'jumper') {
+      // a pull-up under a body steps back first; an open pull-up (the clock) just rises
+      if (inLane) { this.phase = 'stepback'; this.stepbackSec = 0; wish = dir.scale(-STEPBACK_SPEED); exposure = 0.2; }
+      else { this.phase = 'gather'; this.gatherSec = 0; wish = zero; exposure = 0; }
+    }
+    return { wish, phase: this.phase, contained: inLane, exposure, step, crossover, shot: null };
+  }
+}
+/** Which side of the body a lateral vector is on. Body-right for a facing (measured, MODE-STICK-FACE): (cos yaw, 0, −sin yaw). */
+function bodySide(facing: Vector3, lateral: Vector3): 'left' | 'right' {
+  const yaw = Math.atan2(facing.x, facing.z);
+  const right = new Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+  return Vector3.Dot(lateral, right) > 0 ? 'right' : 'left';
+}
+/** The rival's make chance: a layup is the best shot, a contested pull-up from range the worst — the same contest that
+ *  grades your jumper grades theirs (contestLevel), plus a hand up (handUpContest). */
+export function rivalShotPct(distToRim: number, contest01: number, style: 'layup' | 'jumper'): number {
+  const base = style === 'layup' ? 0.74 : distToRim < 4.5 ? 0.52 : distToRim < 6.7 ? 0.46 : 0.38;
+  return Math.max(0.06, Math.min(0.95, base - contest01 * 0.42));
+}
+/** A jump inside HAND_UP_SEC of the release that is not a block still gets a hand in the shot. */
+export function handUpContest(contest01: number, jumpAgeSec: number): number {
+  return jumpAgeSec <= HAND_UP_SEC ? Math.min(1, contest01 + HAND_UP_CONTEST) : contest01;
+}

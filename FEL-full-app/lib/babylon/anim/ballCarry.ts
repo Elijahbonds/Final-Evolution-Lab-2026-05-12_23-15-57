@@ -38,11 +38,19 @@ export interface BallCarry {
   readonly side: 'Left' | 'Right';
 }
 
+/** The old arm's let-go on a hand switch. */
+const SWITCH_FADE_SEC = 0.12;
+
 export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   const p = opts.params ?? DEFAULT_DRIBBLE;
   const armW = opts.armIntensity ?? 1;
   let side: 'Left' | 'Right' = opts.side ?? 'Right';
   let arm: ArmChain | null = armChain(opts.skeleton, side);
+  // ONEVONE-DEFENSE-LOGIC (2026-09-07): on a hand switch the OLD arm let go in one frame — it snapped from the ball
+  // back to the clip's pose, a 0.3–0.5 m hand pop on every crossover (measured on both 1v1 bodies). It now lets go
+  // over SWITCH_FADE_SEC while the new arm takes the reach.
+  let prevArm: ArmChain | null = null; let switchLeft = 0;
+  const prevHandT = new Vector3(), prevPole = new Vector3();
   let active = false;
   let phase = 0;
   let pending = false;   // a frame was recorded since the last after-animations pass
@@ -67,7 +75,9 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       toWorld(s.hand.x * sx, s.hand.y, s.hand.z, handT);
       // elbow out to the side and back, never into the ribs
       toWorld(sx * 0.7, s.hand.y - 0.2, -0.5, pole).subtractInPlace(opts.root.getAbsolutePosition());
-      reachArm(arm, handT, pole, s.handWeight * armW);
+      const k = switchLeft > 0 ? 1 - switchLeft / SWITCH_FADE_SEC : 1;
+      reachArm(arm, handT, pole, s.handWeight * armW * k);
+      if (prevArm && k < 1) reachArm(prevArm, prevHandT, prevPole, s.handWeight * armW * (1 - k));
     }
   };
   const obs = opts.scene.onAfterAnimationsObservable.add(apply);
@@ -77,6 +87,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     get phase() { return phase; },
     get side() { return side; },
     switchHand() {
+      if (arm) { prevArm = arm; prevHandT.copyFrom(handT); prevPole.copyFrom(pole); switchLeft = SWITCH_FADE_SEC; }
       side = side === 'Right' ? 'Left' : 'Right';
       arm = armChain(opts.skeleton, side);
       if (!active) attachBallToHand(opts.ball, opts.skeleton, `${side}Hand`);
@@ -91,6 +102,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
         // either may land in the same frame as our deactivation.
         else if (opts.ball.parent === null && !opts.ball.metadata?.felReleased) attachBallToHand(opts.ball, opts.skeleton, `${side}Hand`);
       }
+      switchLeft = Math.max(0, switchLeft - dt);
       if (!active) return;
       phase = advancePhase(phase, dt, speed01, p);
       pending = true;

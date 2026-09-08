@@ -23,7 +23,8 @@ import { boneNode, findBone } from './boneLookup';
 export type BasketballAnimState =
   | 'idle_dribble' | 'speed_dribble' | 'crossover' | 'protect'
   | 'drive' | 'gather' | 'shot_release' | 'layup' | 'dunk'
-  | 'contact_stagger' | 'defend_slide' | 'defend_idle' | 'box_out'
+  | 'contact_stagger' | 'defend_slide' | 'defend_slide_right' | 'defend_idle' | 'box_out'
+  | 'floor'
   | 'celebrate' | 'dejected';
 
 export interface AnimTreeInput {
@@ -37,6 +38,10 @@ export interface AnimTreeInput {
   defending: boolean;        // possession === defense
   bracing: boolean;          // box-out held
   staggered: boolean;        // contact/ankle-break stun active
+  /** ONEVONE-DEFENSE-LOGIC: which way the defender is sliding (body frame) — picks the slide clip. Default left. */
+  slideDir?: 'left' | 'right';
+  /** On the floor (a posterized body) — held until the mode lifts it. */
+  floored?: boolean;
   celebrating?: boolean;
   dejected?: boolean;
 }
@@ -55,8 +60,10 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   dunk:            { clip: 'dunk_launch', loop: false, fadeSec: 0.06 },
   contact_stagger: { clip: 'karate_hit_react', loop: false, fadeSec: 0.06 },
   defend_slide:    { clip: 'bball_defend_slide_left', loop: true, fadeSec: 0.16 },
+  defend_slide_right: { clip: 'bball_defend_slide_right', loop: true, fadeSec: 0.16 },
   defend_idle:     { clip: 'bball_defend_stance', loop: true, fadeSec: 0.2 },
   box_out:         { clip: 'bball_defend_stance', loop: true, fadeSec: 0.12 },
+  floor:           { clip: 'karate_floor_hold', loop: true, fadeSec: 0.12 },
   celebrate:       { clip: 'bball_score_celebrate', loop: false, fadeSec: 0.15 },
   dejected:        { clip: 'football_tackled_fall', loop: false, fadeSec: 0.2 },
 };
@@ -64,13 +71,14 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
 /** The single decision: game context in, clip choice out. Pure. */
 export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
   let state: BasketballAnimState;
-  if (i.staggered) state = 'contact_stagger';
+  if (i.floored) state = 'floor';
+  else if (i.staggered) state = 'contact_stagger';
   else if (i.dunking) state = 'dunk';
   else if (i.shooting) state = 'shot_release';
   else if (i.celebrating) state = 'celebrate';
   else if (i.dejected) state = 'dejected';
   else if (i.defending) {
-    state = i.bracing ? 'box_out' : i.speed01 > 0.2 ? 'defend_slide' : 'defend_idle';
+    state = i.bracing ? 'box_out' : i.speed01 > 0.2 ? (i.slideDir === 'right' ? 'defend_slide_right' : 'defend_slide') : 'defend_idle';
   } else if (i.crossover) state = 'crossover';
   else if (i.driving && i.hasBall) state = 'drive';
   else if (i.speed01 > 0.15) state = i.hasBall ? 'speed_dribble' : 'drive';
@@ -79,20 +87,106 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
   return { state, ...CLIP_FOR[state] };
 }
 
-/** Thin animator wiring: dedupes per-frame play() of the same state and
- *  applies the state's fade time. */
+/** A one-shot state that ran out must not re-fire while the input still names it: the input with that trigger cleared. */
+function withoutTrigger(i: AnimTreeInput, state: BasketballAnimState): AnimTreeInput {
+  switch (state) {
+    case 'contact_stagger': return { ...i, staggered: false };
+    case 'crossover': return { ...i, crossover: false };
+    case 'layup': return { ...i, shooting: false };
+    case 'dunk': return { ...i, dunking: false };
+    case 'celebrate': return { ...i, celebrating: false };
+    case 'dejected': return { ...i, dejected: false };
+    default: return i;
+  }
+}
+/** States that may cut a beat in flight. */
+const PRIORITY = new Set<BasketballAnimState>(['floor', 'contact_stagger', 'dunk']);
+
+export interface TreeBeatOpts { fadeSec?: number; speedRatio?: number; onSettle?: () => void; /** Sit in this loop after the beat until the mode calls release() (a knockdown → the floor). */ settleTo?: { clip: string; fadeSec?: number; speedRatio?: number } }
+export interface TreeHoldOpts { fadeSec?: number; speedRatio?: number }
+
+/**
+ * The ONE owner of a basketball body (ONEVONE-DEFENSE-LOGIC, 2026-09-07 — the boards' / combat's discipline). The mode
+ * feeds update() every frame and never calls animator.play:
+ *   - loops are deduped per state (no per-frame restart);
+ *   - a NON-loop state the tree chooses (crossover, stagger, layup, dunk, celebrate) plays ONCE with the tree's own
+ *     onEnd and settles into the loop the input asks for at that moment — it used to run out and leave the body
+ *     frozen in its last pose (Babylon stops the group) until the state changed;
+ *   - beat(clip) is a mode-owned one-shot (block reach, steal reach, hit react, knockdown → floor) that settles the
+ *     same way; hold(clip) is a mode-owned loop (the meter-paced jumpshot, the gather telegraph) until release();
+ *   - a cut beat's end callback is ignored (token) — Babylon raises the end observable from stop().
+ */
 export class BasketballAnimTree {
   private current: BasketballAnimState | null = null;
-  constructor(private animator: CharacterAnimator) {}
+  private last: AnimTreeInput | null = null;
+  private override: { kind: 'beat' | 'hold'; clip: string; state: BasketballAnimState | null } | null = null;
+  private token = 0;
+  private settledState: BasketballAnimState | null = null;
+  constructor(private animator: Pick<CharacterAnimator, 'play'>) {}
+
   update(input: AnimTreeInput): BasketballAnimState {
-    const c = chooseBasketballClip(input);
+    this.last = input;
+    const raw = chooseBasketballClip(input);
+    if (this.settledState && raw.state !== this.settledState) this.settledState = null;
+    const c = this.settledState ? chooseBasketballClip(withoutTrigger(input, this.settledState)) : raw;
+    if (this.override) {
+      // a mode-owned hold is never interrupted; a beat yields only to a priority state
+      const yields = this.override.kind === 'beat' && PRIORITY.has(c.state) && c.state !== this.override.state;
+      if (!yields) return this.override.state ?? this.current ?? c.state;
+    }
     if (c.state !== this.current) {
-      this.animator.play(c.clip, { loop: c.loop, fadeSec: c.fadeSec });
       this.current = c.state;
+      if (c.loop) { this.token++; this.override = null; this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec }); }
+      else this.playBeat(c.clip, { fadeSec: c.fadeSec }, c.state);
     }
     return c.state;
   }
-  reset(): void { this.current = null; }
+
+  /** A mode-owned one-shot. Settles into the tree's choice (or `settleTo`) on its natural end. */
+  beat(clip: string, opts: TreeBeatOpts = {}): void { this.playBeat(clip, opts, null); }
+
+  /** A mode-owned loop the tree never interrupts — until release(). */
+  hold(clip: string, opts: TreeHoldOpts = {}): void {
+    this.token++;
+    this.override = { kind: 'hold', clip, state: null };
+    this.current = null;
+    this.animator.play(clip, { loop: true, fadeSec: opts.fadeSec ?? 0.12, speedRatio: opts.speedRatio ?? 1 });
+  }
+
+  /** End a beat / hold now and settle into the tree's choice. */
+  release(): void {
+    if (!this.override) return;
+    this.token++;
+    this.override = null; this.current = null;
+    if (this.last) this.update(this.last);
+  }
+
+  /** End a HOLD now (a beat in flight is left to settle on its own — a steal's reach plays out through the reset). */
+  releaseHold(): void { if (this.override?.kind === 'hold') this.release(); }
+
+  /** A beat or hold is in flight. */
+  get busy(): boolean { return this.override !== null; }
+  /** The clip the mode owns right now, if any. */
+  get held(): string | null { return this.override?.clip ?? null; }
+  get state(): BasketballAnimState | null { return this.override?.state ?? this.current; }
+
+  reset(): void { this.token++; this.override = null; this.current = null; this.settledState = null; }
+
+  private playBeat(clip: string, opts: TreeBeatOpts, state: BasketballAnimState | null): void {
+    const tok = ++this.token;
+    this.override = { kind: 'beat', clip, state };
+    this.animator.play(clip, {
+      loop: false, fadeSec: opts.fadeSec ?? 0.08, speedRatio: opts.speedRatio ?? 1, restart: true,
+      onEnd: () => {
+        if (this.token !== tok) return;   // cut by a newer beat / hold / release / reset
+        this.override = null; this.current = null;
+        if (state) this.settledState = state;
+        opts.onSettle?.();
+        if (opts.settleTo) this.hold(opts.settleTo.clip, opts.settleTo);
+        else if (this.last) this.update(this.last);
+      },
+    });
+  }
 }
 
 // ── Foot plant (two-bone IK contact lock) ──────────────────────────────────

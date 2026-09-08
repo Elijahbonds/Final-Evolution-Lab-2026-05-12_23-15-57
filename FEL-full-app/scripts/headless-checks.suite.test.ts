@@ -46,6 +46,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'tennis-rally-tests.ts', guards: 'Mario Tennis Aces vocabulary — four shots, four real trades' },
   { script: 'precision-modes-tests.ts', guards: "baseball's PCI is a real decision and golf's bag is a real bag" },
   { script: 'onevone-depth-tests.ts', guards: '1v1 depth — the hesi is a move, the steal is a read, feedback says why' },
+  { script: 'onevone-defense-tests.ts', guards: '1v1 defence — staying in front contains the drive, the steal is a read, the block has a cue, one owner per body' },
   { script: 'threevthree-depth-tests.ts', guards: '3v3 depth — the low man helps, and the lane picks off bad passes' },
   { script: 'dunk-depth-tests.ts', guards: 'dunk depth — the run-up buys the air, the chair is physical' },
   { script: 'threepoint-depth-tests.ts', guards: '3PT depth — the contest is rendered, the reveal is staged, the final has a number' },
