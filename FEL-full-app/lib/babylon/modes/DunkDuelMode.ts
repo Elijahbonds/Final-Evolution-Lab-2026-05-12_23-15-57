@@ -47,6 +47,7 @@ import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { boneNode } from '../anim/boneLookup';
 import { EASTBAY_TIMING } from '../anim/authored/timing';
 import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';   // A+ P8 H1 (dunk mirror): the hang wrist reach
+import { hitStop as feelHitStop } from '../core/gameFeel';   // DUNK-HANDS-RIM H3 (dunk mirror)
 import { PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the contest's Posture Poses, shared
 import { posturePose, type PostureInput } from '../core/DunkPosture';
 import { legPose } from '../core/DunkLegs';
@@ -398,6 +399,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     if (contactLatch) return;
     contactLatch = true;
     ctx.juice.hitStop(70);
+    feelHitStop(70);   // DUNK-HANDS-RIM H3 (dunk mirror): the mode's clock stops on the iron too — one composed beat, no second slow-mo
     ctx.juice.shake(0.12, 140);
     ctx.juice.flash('#fff6dd', 120);
     SoundKit.play('impact', { pitch: 0.7, volume: 0.8 }); console.info('[JUICE-SFX] impact slam');   // A+ P2: the ONE slam thud of the attempt
