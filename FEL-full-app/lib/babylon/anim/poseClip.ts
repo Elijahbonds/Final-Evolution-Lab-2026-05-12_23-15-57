@@ -77,10 +77,33 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   // targets through it would swap left and right (measured: the golf top landed
   // over the wrong shoulder).
   const rootPos = root ? root.getAbsolutePosition().clone() : Vector3.Zero();
-  const toWorld = (v: [number, number, number]) => rootPos.add(new Vector3(v[0] * scale, v[1] * scale, v[2] * scale));
   const arms = { Left: armChain(sk, 'Left'), Right: armChain(sk, 'Right') };
   const legs = { Left: ['LeftUpLeg', 'LeftLeg', 'LeftFoot'], Right: ['RightUpLeg', 'RightLeg', 'RightFoot'] } as const;
   const dist = (a: TransformNode, b: TransformNode) => Vector3.Distance(a.getAbsolutePosition(), b.getAbsolutePosition());
+  // DUNK-POSTURE-LEGS (2026-09-08): the targets are BODY-frame metres (+x = the hero's right, +z = his front), and the
+  // body's frame is read off the rig at bind — the hip line for RIGHT, the toes for FRONT, world up for UP — not assumed
+  // to be the world axes. A spawn that yaws the root before the clips build (every mode that faces the hero at −z:
+  // yawRad π) had put every hand and foot target on WORLD +z = BEHIND the body, and the leg solver's knee pole behind it
+  // with them: measured on the live dunk hero, the mocap's ankles landed at the authored z NEGATED (a heel kick authored
+  // behind the body hung in front, the knees bent BACKWARD through the whole flight), the gather's "arms swung back"
+  // swung forward, the finishes' "crunch down and through" went behind the head. The node rig tests (no yaw, the
+  // importer's mirror still on the root) resolve to the identity frame, so their convention is unchanged.
+  const bodyFrame = (() => {
+    const up = Vector3.Up();
+    const lul = nodes.get('LeftUpLeg'), rul = nodes.get('RightUpLeg');
+    let right = lul && rul ? rul.getAbsolutePosition().subtract(lul.getAbsolutePosition()) : new Vector3(1, 0, 0);
+    right.y = 0; if (right.lengthSquared() < 1e-6) right = new Vector3(1, 0, 0); right.normalize();
+    const det = frame.getWorldMatrix().determinant();
+    let front = Vector3.Cross(up, right).scale(det < 0 ? -1 : 1);   // a right-handed body: up × right = front, mirrored under a reflected root
+    const toes: Vector3[] = [];
+    for (const side of ['Left', 'Right'] as const) { const f = nodes.get(`${side}Foot`), t = nodes.get(`${side}ToeBase`); if (f && t) { const d = t.getAbsolutePosition().subtract(f.getAbsolutePosition()); d.y = 0; if (d.lengthSquared() > 1e-4) toes.push(d.normalize()); } }
+    if (toes.length) { const toe = toes.reduce((a, b) => a.add(b), Vector3.Zero()).normalize(); if (Vector3.Dot(toe, front) < 0) front = front.scale(-1); }   // the toes settle the sign; the cross product settles the axis
+    front.normalize();
+    return { right, up, front };
+  })();
+  /** A body-frame offset (or direction) expressed in world axes. */
+  const inBody = (v: [number, number, number]) => bodyFrame.right.scale(v[0]).addInPlace(bodyFrame.up.scale(v[1])).addInPlace(bodyFrame.front.scale(v[2]));
+  const toWorld = (v: [number, number, number]) => rootPos.add(inBody([v[0] * scale, v[1] * scale, v[2] * scale]));
   const armRatio = (side: 'Left' | 'Right') => { const a = arms[side]; return a ? (dist(a.shoulder, a.elbow) + dist(a.elbow, a.hand)) / REF_ARM_LEN : 1; };
   const legRatio = (side: 'Left' | 'Right') => { const [h, k, a] = legs[side].map((b) => nodes.get(b)); return h && k && a ? (dist(h, k) + dist(k, a)) / REF_LEG_LEN : 1; };
   const ratios = { arm: { Left: armRatio('Left'), Right: armRatio('Right') }, leg: { Left: legRatio('Left'), Right: legRatio('Right') } };
@@ -91,7 +114,7 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
     joint.computeWorldMatrix(true);
     const j = joint.getAbsolutePosition();
     const jRef = rootPos.add(j.subtract(rootPos).scale(1 / scale));
-    const authored = rootPos.add(new Vector3(...tgt));
+    const authored = rootPos.add(inBody(tgt));
     return j.add(authored.subtract(jRef).scale(ratio));
   };
 
@@ -106,14 +129,14 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
     for (const side of ['Left', 'Right'] as const) {
       const tgt = key.hands?.[side]; const arm = arms[side]; if (!tgt || !arm) continue;
       const pole = key.poles?.[side] ?? [side === 'Left' ? -0.7 : 0.7, -0.2, -0.5];
-      reachArm(arm, forLimb(tgt, arm.shoulder, ratios.arm[side]), new Vector3(...pole), 1);   // pole is a world direction too
+      reachArm(arm, forLimb(tgt, arm.shoulder, ratios.arm[side]), inBody(pole), 1);   // the pole is a body-frame direction too
       refresh();
     }
     // 3) feet
     for (const side of ['Left', 'Right'] as const) {
       const tgt = key.feet?.[side]; if (!tgt) continue;
       const [h, k, a] = legs[side].map((b) => nodes.get(b)); if (!h || !k || !a) continue;
-      plantLeg(h, k, a, forLimb(tgt, h, ratios.leg[side]), Vector3.Forward());
+      plantLeg(h, k, a, forLimb(tgt, h, ratios.leg[side]), bodyFrame.front);   // the knee toward the body's front
       refresh();
     }
     // 4) read back local rotations for every bone the key touched

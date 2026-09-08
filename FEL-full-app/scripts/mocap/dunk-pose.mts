@@ -64,7 +64,10 @@ for (let f = FROM; f <= TO; f += STEP) {
   const shoulderYaw = median(win.map((g) => yawOf(g, 'LeftArm', 'RightArm')));
   const spineYaw = Math.max(-30, Math.min(30, shoulderYaw - hipYaw));
   const hY = Math.max(-0.25, Math.min(0, (hipsY(f) - standing) * SCALE));
-  const P = (v: V): string => `[${R(v[0] * SCALE)}, ${R(REF_HIPS + v[1] * SCALE)}, ${R(v[2] * SCALE)}]`;
+  // DUNK-POSTURE-LEGS (2026-09-08): the targets are HIPS-relative in the capture but ROOT-relative in the clip — the
+  // crouch (hipsY) has to be carried into them, or a foot that is on the floor under crouched hips lands 0.25 m in the
+  // air (measured: both ankles 0.33 / 0.47 m over the floor at the plant, the loaded legs pulled up under the body).
+  const P = (v: V): string => `[${R(v[0] * SCALE)}, ${R(REF_HIPS + hY + v[1] * SCALE)}, ${R(v[2] * SCALE)}]`;
   const handY = Math.max(lh[1], rh[1]) * SCALE + REF_HIPS; handMin = Math.min(handMin, handY); handMax = Math.max(handMax, handY);
   keys.push(`    { t: ${t}, bones: { Hips: [0, ${hipYaw}, 0], Spine: [${Math.max(-25, Math.min(45, pitch))}, ${spineYaw}, 0] }, hands: { Left: ${P(lh)}, Right: ${P(rh)} }, feet: { Left: ${P(lf)}, Right: ${P(rf)} }, hipsY: ${R(hY)} },`);
 }

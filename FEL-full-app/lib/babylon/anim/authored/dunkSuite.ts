@@ -24,16 +24,20 @@ export function buildLaunch(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = D.launchSec;
   return buildPoseClip(scene, sk, 'dunk_launch', T, [
     { t: 0, bones: { Hips: [0, 0, 0], Spine: [30, 0, 0],  ...legs(-55, 80, 8) }, hands: { Left: [-0.28, 0.85, -0.30], Right: [0.28, 0.85, -0.30] }, poles: { Left: [-0.6, 0.4, -0.6], Right: [0.6, 0.4, -0.6] }, hipsY: -0.22 },
-    { t: T, bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], ...legs(-20, 20) },    hands: { Left: [-0.18, 1.98, 0.12], Right: [0.18, 1.98, 0.12] }, poles: UP, hipsY: 0.05 },   // both hands thrown overhead
+    { t: T, bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], ...legs(-26, 34) },    hands: { Left: [-0.18, 1.98, 0.12], Right: [0.18, 1.98, 0.12] }, poles: UP, hipsY: 0.05 },   // both hands thrown overhead, the knees soft (DUNK-POSTURE-LEGS: straight legs read as a stiff hang)
   ]);
 }
 
 export function buildScoreHang(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = D.hangSec;
   return buildPoseClip(scene, sk, 'dunk_score_hang', T, [
-    { t: 0,     bones: { Hips: [0, 0, 0], Spine: [-12, 0, 0], LeftUpLeg: [-25, 0, 4], RightUpLeg: [-25, 0, -4] }, hands: { Left: [-0.12, 2.02, 0.25], Right: [0.30, 1.25, 0.10] }, poles: { Left: UP.Left } },   // left hand on the rim
-    { t: T / 2, bones: { Hips: [0, 0, 0], Spine: [-5, 0, 0],  LeftUpLeg: [-18, 0, 3], RightUpLeg: [-18, 0, -3] }, hands: { Left: [-0.10, 1.95, 0.28], Right: [0.34, 1.35, 0.05] }, poles: { Left: UP.Left } },
-    { t: T,     bones: { Hips: [0, 0, 0], Spine: [2, 0, 0],   LeftUpLeg: [-10, 0, 2], RightUpLeg: [-10, 0, -2] }, hands: { Left: [-0.20, 1.55, 0.30], Right: [0.30, 1.10, 0.15] } },   // letting go
+    // DUNK-POSTURE-LEGS: the knees are keyed too (a soft bend easing out) — un-keyed they held whatever the launch left, a locked leg on the flashy launch
+    { t: 0,     bones: { Hips: [0, 0, 0], Spine: [-12, 0, 0], LeftUpLeg: [-25, 0, 4], RightUpLeg: [-25, 0, -4], LeftLeg: [36, 0, 0], RightLeg: [36, 0, 0] }, hands: { Left: [-0.12, 2.02, 0.25], Right: [0.30, 1.25, 0.10] }, poles: { Left: UP.Left } },   // left hand on the rim
+    { t: T / 2, bones: { Hips: [0, 0, 0], Spine: [-5, 0, 0],  LeftUpLeg: [-18, 0, 3], RightUpLeg: [-18, 0, -3], LeftLeg: [30, 0, 0], RightLeg: [30, 0, 0] }, hands: { Left: [-0.10, 1.95, 0.28], Right: [0.34, 1.35, 0.05] }, poles: { Left: UP.Left } },
+    // DUNK-POSTURE-LEGS (L3): the old "letting go" key put both hands straight out FRONT at shoulder height — the pose the rim hang
+    // held for a second after every clean slam read as a forward T. The ball hand stays up near the iron (elbow bent), the off
+    // hand settles to the chest: a rim hang, and a shape the land crouch's overhead first key blends from without a sweep.
+    { t: T,     bones: { Hips: [0, 0, 0], Spine: [2, 0, 0],   LeftUpLeg: [-10, 0, 2], RightUpLeg: [-10, 0, -2], LeftLeg: [22, 0, 0], RightLeg: [22, 0, 0] }, hands: { Left: [-0.18, 1.74, 0.22], Right: [0.26, 1.30, 0.18] }, poles: { Left: [-0.9, 0.0, -0.3], Right: [0.9, -0.2, -0.3] } },   // letting go: the ball hand still up, the off hand to the chest
   ]);
 }
 

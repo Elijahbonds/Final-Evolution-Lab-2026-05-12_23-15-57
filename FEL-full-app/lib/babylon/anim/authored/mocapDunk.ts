@@ -12,10 +12,10 @@ import { buildPoseClip, type PoseKey } from '../poseClip';
 
 export const DUNK_MOCAP_DURATION = 1.3;
 export const DUNK_MOCAP_KEYS: PoseKey[] = [
-    { t: 0, bones: { Hips: [0, -35, 0], Spine: [25, -20, 0] }, hands: { Left: [0, 1.21, -0.36], Right: [-0.16, 1.13, 0.46] }, feet: { Left: [-0.22, 0.33, 0.09], Right: [0.28, 0.47, -0.25] }, hipsY: -0.25 },
-    { t: 0.05, bones: { Hips: [0, -35, 0], Spine: [17, -30, 0] }, hands: { Left: [0.02, 1.2, -0.42], Right: [-0.23, 1.17, 0.41] }, feet: { Left: [-0.07, 0.28, -0.19], Right: [0.25, 0.42, 0.04] }, hipsY: -0.23 },
-    { t: 0.1, bones: { Hips: [0, -35, 0], Spine: [7, -30, 0] }, hands: { Left: [-0.03, 1.06, -0.35], Right: [-0.22, 1.06, 0.36] }, feet: { Left: [0.08, 0.29, -0.41], Right: [0.15, 0.35, 0.43] }, hipsY: -0.14 },
-    { t: 0.15, bones: { Hips: [0, -35, 0], Spine: [-1, -30, 0] }, hands: { Left: [-0.01, 0.97, -0.27], Right: [-0.13, 1, 0.31] }, feet: { Left: [0.21, 0.32, -0.45], Right: [0.45, 0.63, 0.4] }, hipsY: -0.1 },
+    { t: 0, bones: { Hips: [0, -35, 0], Spine: [25, -20, 0] }, hands: { Left: [0, 0.96, -0.36], Right: [-0.16, 0.88, 0.46] }, feet: { Left: [-0.22, 0.08, 0.09], Right: [0.28, 0.22, -0.25] }, hipsY: -0.25 },
+    { t: 0.05, bones: { Hips: [0, -35, 0], Spine: [17, -30, 0] }, hands: { Left: [0.02, 0.97, -0.42], Right: [-0.23, 0.93, 0.41] }, feet: { Left: [-0.07, 0.05, -0.19], Right: [0.25, 0.18, 0.04] }, hipsY: -0.23 },
+    { t: 0.1, bones: { Hips: [0, -35, 0], Spine: [7, -30, 0] }, hands: { Left: [-0.03, 0.92, -0.35], Right: [-0.22, 0.92, 0.36] }, feet: { Left: [0.08, 0.14, -0.41], Right: [0.15, 0.2, 0.43] }, hipsY: -0.14 },
+    { t: 0.15, bones: { Hips: [0, -35, 0], Spine: [-1, -30, 0] }, hands: { Left: [-0.01, 0.88, -0.27], Right: [-0.13, 0.91, 0.31] }, feet: { Left: [0.21, 0.23, -0.45], Right: [0.45, 0.53, 0.4] }, hipsY: -0.1 },
     { t: 0.2, bones: { Hips: [0, -35, 0], Spine: [-4, -30, 0] }, hands: { Left: [-0.03, 0.95, -0.24], Right: [-0.01, 1.02, 0.35] }, feet: { Left: [0.22, 0.31, -0.42], Right: [0.64, 0.67, 0.12] }, hipsY: 0 },
     { t: 0.25, bones: { Hips: [0, -35, 0], Spine: [-5, -30, 0] }, hands: { Left: [-0.08, 0.95, -0.22], Right: [0.09, 1.05, 0.39] }, feet: { Left: [0.15, 0.29, -0.42], Right: [0.4, 0.5, -0.02] }, hipsY: 0 },
     { t: 0.3, bones: { Hips: [0, -35, 0], Spine: [-5, -12, 0] }, hands: { Left: [-0.15, 0.95, -0.13], Right: [0.18, 1.11, 0.41] }, feet: { Left: [-0.01, 0.27, -0.42], Right: [0.24, 0.42, -0.07] }, hipsY: 0 },
