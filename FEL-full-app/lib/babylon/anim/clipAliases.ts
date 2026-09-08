@@ -24,10 +24,12 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   dunk_airborne_float: ['jumpshot', 0.35],
   dunk_score_hang: ['jumpshot', 0.5],
   dunk_land_crouch: ['guard', 1.4],
-  dunk_360_scoop: ['jumpshot', 0.8],
+  // DUNK-CONTROL-JUICE (2026-09-08): the mid-air tricks used to alias onto the JUMPSHOT (a set shot, 0.8×) — the 360, the
+  // windmill and the between-the-legs now play authored dunk bodies (the eastbay is authored under its own name).
+  dunk_360_scoop: ['dunk_360_spin', 1.0],
   dunk_360_eastbay: ['jumpshot', 0.8],
-  dunk_360_fake_eastbay: ['jumpshot', 0.8],
-  dunk_off_board_windmill: ['jumpshot', 0.8],
+  dunk_360_fake_eastbay: ['dunk_360_eastbay', 1.0],
+  dunk_off_board_windmill: ['dunk_finish_windmill', 1.0],
   // karate
   karate_idle_stance: ['guard', 0.8],
   karate_punch_light: ['jab', 1.1],

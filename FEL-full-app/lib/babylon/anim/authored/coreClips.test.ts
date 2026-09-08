@@ -16,6 +16,7 @@ import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, bui
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildCelebrateBig } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
+import { buildSelfLob, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF } from './dunkTricks';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
 import { buildBaseClips } from './baseClips';
 
@@ -260,6 +261,59 @@ describe('dunk suite', () => {
     const g = fresh(() => buildEastbay(scene, sk)!);
     at(g, 0.75); expect(pos('LeftLeg').y).toBeGreaterThan(pos('RightLeg').y + 0.3);
     at(g, 1.25); expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y + 0.2);
+  });
+});
+
+// DUNK-CONTROL-JUICE (2026-09-08): the named dunks — runway beats and in-air shapes.
+describe('dunk tricks', () => {
+  it('self-lob: both hands overhead on the contact key, eyes up', () => {
+    const g = fresh(() => buildSelfLob(scene, sk)!);
+    at(g, SELF_LOB_CONTACT);
+    expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y + 0.1); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.1);
+    expect(Math.abs(pos('LeftHand').x - pos('RightHand').x)).toBeLessThan(0.45);   // a two-hand toss, not a T
+  });
+  it('kick-up: the right foot swings up front on the contact key, the ball hand starts low', () => {
+    const g = fresh(() => buildKickUp(scene, sk)!);
+    at(g, 0); expect(pos('RightHand').y).toBeLessThan(hipsY() - 0.1);
+    at(g, KICK_UP_CONTACT); expect(pos('RightFoot').y).toBeGreaterThan(pos('LeftFoot').y + 0.45); expect(pos('RightFoot').z).toBeGreaterThan(pos('Hips').z + 0.2);
+  });
+  it('cartwheel: inverted at the half turn with the hands at the floor, the head below the hips; a full turn ends upright', () => {
+    const g = fresh(() => buildCartwheel(scene, sk)!);
+    at(g, 0); const headUp = pos('Head').y;
+    at(g, 0.2); const headSide = Math.sign(pos('Head').x - pos('Hips').x); expect(Math.abs(pos('Head').x - pos('Hips').x)).toBeGreaterThan(0.3);
+    expect(Math.sign(pos('RightHand').x - pos('Hips').x)).toBe(headSide);   // the hands go the way the head goes
+    at(g, 0.4); expect(pos('Head').y).toBeLessThan(pos('Hips').y - 0.3); expect(pos('RightHand').y).toBeLessThan(0.35); expect(pos('LeftHand').y).toBeLessThan(0.35);
+    expect(Math.abs(pos('LeftFoot').x - pos('RightFoot').x)).toBeGreaterThan(0.5);   // straddled
+    at(g, 0.8); expect(pos('Head').y).toBeCloseTo(headUp, 1);
+  });
+  it('double-up: feet together on the load, a hop, and the loaded landing crouch', () => {
+    const g = fresh(() => buildDoubleUp(scene, sk)!);
+    at(g, 0.12); const load = hipsY(); expect(Math.abs(pos('LeftFoot').z - pos('RightFoot').z)).toBeLessThan(0.2); expect(pos('RightHand').z).toBeLessThan(pos('RightArm').z - 0.1);
+    at(g, 0.3); expect(hipsY()).toBeGreaterThan(load + 0.3);
+    at(g, 0.5); expect(hipsY()).toBeLessThan(load + 0.05); expect(pos('RightLeg').z).toBeGreaterThan(pos('RightUpLeg').z + 0.1);   // knees forward of the hips: loaded
+  });
+  it('scorpion: both feet kicked back over the body, head up, the ball hand out front and high', () => {
+    at(fresh(() => buildScorpion(scene, sk)!), 0.35);
+    for (const s of ['Left', 'Right']) { expect(pos(`${s}Foot`).z).toBeLessThan(pos('Hips').z - 0.25); expect(pos(`${s}Foot`).y).toBeGreaterThan(pos(`${s}UpLeg`).y - 0.15); }
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.1); expect(pos('RightHand').z).toBeGreaterThan(pos('Hips').z + 0.3);
+  });
+  it('lost & found: the ball hand goes behind the back, both hands meet there, the other hand ends at the rim', () => {
+    const g = fresh(() => buildLostFound(scene, sk)!);
+    at(g, 0.2); expect(pos('RightHand').z).toBeLessThan(pos('Hips').z - 0.15); expect(pos('RightHand').y).toBeLessThan(hipsY() + 0.15);
+    at(g, LOST_FOUND_HANDOFF); expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.35);
+    at(g, 0.8); expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y + 0.2);
+  });
+  it('hide & seek: both hands behind the head, then the ball hand snaps overhead', () => {
+    const g = fresh(() => buildHideSeek(scene, sk)!);
+    at(g, 0.3); for (const s of ['Left', 'Right']) expect(pos(`${s}Hand`).z).toBeLessThan(pos('Head').z - 0.1);
+    expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.35);
+    at(g, 0.8); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.2);
+  });
+  it('360: the shoulders turn a full circle and the ball hand stays up', () => {
+    const g = fresh(() => buildSpin360(scene, sk)!);
+    at(g, 0); const a = pos('LeftArm').x - pos('RightArm').x;
+    at(g, 0.4); const b = pos('LeftArm').x - pos('RightArm').x; expect(Math.sign(a)).not.toBe(Math.sign(b));
+    at(g, 0.8); const c = pos('LeftArm').x - pos('RightArm').x; expect(Math.sign(c)).toBe(Math.sign(a)); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.1);
   });
 });
 

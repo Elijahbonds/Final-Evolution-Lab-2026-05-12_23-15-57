@@ -7,6 +7,7 @@ import { buildEastbay } from './eastbay';
 import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from './dunkSuite';
 import { buildMocapDunk } from './mocapDunk';
 import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig } from './dunkFinishes';
+import { buildSelfLob, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360 } from './dunkTricks';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
@@ -45,6 +46,15 @@ export function registerAuthoredClips(
     () => buildFinishTomahawk(scene, skeleton),
     () => buildFinishBlown(scene, skeleton),
     () => buildCelebrateBig(scene, skeleton),
+    // DUNK-CONTROL-JUICE (2026-09-08): the named dunks — runway beats (self-lob, kick-up, cartwheel, double-up) and air shapes
+    () => buildSelfLob(scene, skeleton),
+    () => buildKickUp(scene, skeleton),
+    () => buildCartwheel(scene, skeleton),
+    () => buildDoubleUp(scene, skeleton),
+    () => buildScorpion(scene, skeleton),
+    () => buildLostFound(scene, skeleton),
+    () => buildHideSeek(scene, skeleton),
+    () => buildSpin360(scene, skeleton),
     () => buildJuke(scene, skeleton, 'left'),
     () => buildJuke(scene, skeleton, 'right'),
     () => buildSpinMove(scene, skeleton),

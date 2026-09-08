@@ -163,7 +163,7 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick'>> = {
   dunkduel: verbs({
     A: { label: 'SLAM', emit: A('A') },
     B: { label: 'STYLE', emit: A('B') },
-    X: { label: 'CHAIR', emit: A('X') },
+    X: { label: 'PROP', emit: A('X') },
     Y: { label: 'RUN', emit: RT(1), hold: true },
   }),
 

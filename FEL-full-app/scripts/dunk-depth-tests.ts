@@ -76,7 +76,7 @@ const btn = (btn: 'A' | 'B' | 'Y') => ({ t: 'button' as const, btn, pressed: tru
   const CLEAR = 1.35 - 0.05;
   ok(apex(0.2) < CLEAR, `a lazy charge clips the chair (apex ${apex(0.2).toFixed(2)}m < ${CLEAR}m)`);
   ok(apex(0.8) > CLEAR, `a loaded charge clears it (apex ${apex(0.8).toFixed(2)}m > ${CLEAR}m)`);
-  ok(src.includes('CAUGHT THE PROP'), 'the clip is a blown dunk, live, mid-flight');
+  ok(src.includes('CAUGHT THE ${obstacle?.spec.label') && src.includes('clipsObstacle(obstacle.profile, fy, px, pz, obstacle.spec.clearance)'), 'the clip is a blown dunk, live, mid-flight — the feet against the sampled mesh (DUNK-CONTROL-JUICE)');
   ok(!src.includes('CLIPPED THE PROP — flushed anyway'), 'the unreachable "clipped but flushed" branch is gone');
   // the prop sits between the gather line and the rim — the path crosses it
   ok(DUNK_CONFIG.gatherZ > DUNK_CONFIG.rimZ, 'gather is in front of the rim');

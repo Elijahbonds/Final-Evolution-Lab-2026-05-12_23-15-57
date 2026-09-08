@@ -51,15 +51,16 @@ const host = readFileSync(new URL('../components/games/dunkduel-babylon.tsx', im
 
 // ── C. the chair is physical ────────────────────────────────────────────────
 {
-  ok(mode.includes("OBSTACLE_CLEAR_HEIGHT = 1.35"), 'same chair as Dunk Contest');
+  // DUNK-CONTROL-JUICE (2026-09-08): the chair box is gone — the duel dunks over the contest's car / barrier / crate (real meshes, sampled hitboxes)
+  ok(mode.includes("spawnDunkObstacle(ctx.scene, p, rim, 'duel_obstacle')") && mode.includes('OBSTACLE_SPECS.car'), 'same obstacles as Dunk Contest (car, barrier, crate meshes)');
   ok(mode.includes('setProp'), 'the chair is armable per attempt');
   ok(mode.includes("e.dir === 'down'"), 'd-pad arms it (couch)');
   ok(mode.includes("e.btn === 'X'"), 'X arms it (phone — its d-pad is the stick)');
   ok(mode.includes('clipBlown'), 'clipping it blows the dunk');
   ok(mode.includes('obstacleClipped = true'), 'the clip latches');
-  ok(/overProp && c\.root\.position\.y < OBSTACLE_CLEAR_HEIGHT - 0\.05/.test(mode), 'feet below the top at the crossing = blown');
+  ok(mode.includes('clipsObstacle(obstacle.profile, fy, px, pz, obstacle.spec.clearance)'), 'the lowest foot under the mesh top (plus its clearance) = blown');
   ok(mode.includes('toppling'), 'the chair topples with you');
-  ok(mode.includes('CAUGHT THE CHAIR — BLOWN'), 'the failure is named');
+  ok(mode.includes('CAUGHT THE ${obstacle?.spec.label'), 'the failure is named (CAR / BARRIER / CRATE)');
   ok(mode.includes('PROP_BONUS[prop]'), 'clearing it pays the judges');
 }
 
@@ -79,7 +80,7 @@ for (const field of ['p1Score', 'p2Score', 'activePlayer', 'dunkNum', 'style', '
   // phones
   const verbs = readFileSync(new URL('../lib/babylon/ui/modeVerbs.ts', import.meta.url), 'utf8');
   const vblock = verbs.slice(verbs.indexOf('dunkduel:'), verbs.indexOf('})', verbs.indexOf('dunkduel:')));
-  for (const label of ['SLAM', 'STYLE', 'CHAIR', 'RUN']) ok(vblock.includes(label), `touch verb ${label}`);
+  for (const label of ['SLAM', 'STYLE', 'PROP', 'RUN']) ok(vblock.includes(label), `touch verb ${label}`);   // DUNK-CONTROL-JUICE: X cycles the PROP (car / barrier / crate), the chair is gone
   const cl = readFileSync(new URL('../lib/controller-link/schemas/registry.ts', import.meta.url), 'utf8');
   ok(/modeId: 'dunkduel'/.test(cl), 'Controller Link has a dunkduel schema');
   // the camera follows whose turn it is

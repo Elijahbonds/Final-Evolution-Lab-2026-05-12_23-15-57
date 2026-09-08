@@ -1,7 +1,7 @@
 // ballRig (Babylon) — the ball lives in the hands. Ends the floor-ball and
 // invisible-flight bugs. Eastbay path is keyed to timing.ts timestamps.
 
-import { Vector3 } from '@babylonjs/core';
+import { Matrix, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Skeleton, TransformNode } from '@babylonjs/core';
 import { EASTBAY_TIMING as T } from './authored/timing';
 import { boneNode, findBone } from './boneLookup';
@@ -12,6 +12,8 @@ import { boneNode, findBone } from './boneLookup';
 // the palm. After: 7.5 cm along the fingers + 13 cm out of the palm face (ball radius 0.12 + the hand's half thickness) —
 // the ball sits in the palm with the fingers around it (closeups: scratchpad palm-*.png, six candidates, two angles).
 const PALM_OFFSET = new Vector3(0.12, -0.04, -0.08);
+/** The palm offset for callers that settle a caught ball into the hand (read-only: copy it). */
+export const PALM_OFFSET_READONLY: Readonly<Vector3> = PALM_OFFSET;
 
 function handNode(skeleton: Skeleton, hand: 'LeftHand' | 'RightHand'): TransformNode | null {
   return boneNode(skeleton, hand);
@@ -36,19 +38,62 @@ export function releaseBall(ball: AbstractMesh): void {
   ball.setParent(null);   // Babylon setParent(null) preserves world transform
 }
 
-/** Eastbay hand-to-hand — call each frame with clip-local time (sec). */
+/** A hand-to-hand transfer keyed to a clip: which hand gives, which takes, on which clip second. */
+export interface HandOffSpec { at: number; from: 'LeftHand' | 'RightHand'; to: 'LeftHand' | 'RightHand'; blend?: number }
+/** The clip seconds either side of the transfer over which the ball travels palm to palm. */
+export const HAND_OFF_BLEND = 0.08;
+
+/** How far along the transfer the ball is: 0 in the giving hand, 1 in the receiving hand, smooth across the blend. The
+ *  mode's wrist reach (HandIK) crossfades between the arms on the same curve — an arm swap on one frame moved both
+ *  hands 0.66 m (measured) and threw the ball with them. */
+export function handOffK(t: number, spec: HandOffSpec): number {
+  const b = spec.blend ?? HAND_OFF_BLEND;
+  const k0 = Math.min(1, Math.max(0, (t - (spec.at - b)) / (2 * b)));
+  return k0 * k0 * (3 - 2 * k0);
+}
+
+const _palmA = new Vector3(), _palmB = new Vector3(), _inv = Matrix.Identity();
+/** Where a hand's palm is in world space this frame. */
+function palmWorld(node: TransformNode, out: Vector3): Vector3 {
+  node.computeWorldMatrix(true);
+  return Vector3.TransformCoordinatesToRef(PALM_OFFSET, node.getWorldMatrix(), out);
+}
+
+/** A hand-off, per frame with clip-local time (DUNK-CONTROL-JUICE, 2026-09-08). The ball used to re-parent on the
+ *  transfer frame with no travel: whatever gap the clip left between the palms on that frame was a POP (measured 0.3 m on
+ *  the eastbay's under-the-leg pass). Now the ball is parented to the RECEIVING hand from `at − blend` and its local
+ *  position is solved so its WORLD position eases from the giving palm to the receiving palm across the blend — the
+ *  transfer reads on camera as a palm-to-palm pass, and the ball never floats: outside the blend it sits in a palm.
+ *  Returns true on the frame the parent swaps (the mode marks it). */
+export function runHandOffPath(
+  ball: AbstractMesh, skeleton: Skeleton, t: number, spec: HandOffSpec, state: { inLeftHand: boolean },
+): boolean {
+  const blend = spec.blend ?? HAND_OFF_BLEND;
+  const toLeft = spec.to === 'LeftHand';
+  const giveNode = handNode(skeleton, spec.from), takeNode = handNode(skeleton, spec.to);
+  if (!giveNode || !takeNode) return false;
+  let swapped = false;
+  if (t < spec.at - blend) {
+    if (state.inLeftHand !== (spec.from === 'LeftHand') || ball.parent !== giveNode) { attachBallToHand(ball, skeleton, spec.from); state.inLeftHand = spec.from === 'LeftHand'; }
+    return false;
+  }
+  if (state.inLeftHand !== toLeft || ball.parent !== takeNode) { attachBallToHand(ball, skeleton, spec.to); state.inLeftHand = toLeft; swapped = true; }
+  if (t >= spec.at + blend) { ball.position.copyFrom(PALM_OFFSET); return swapped; }
+  // inside the blend: world ease from the giving palm to the receiving palm, expressed in the receiving hand's frame
+  const k0 = (t - (spec.at - blend)) / (2 * blend), k = k0 * k0 * (3 - 2 * k0);
+  palmWorld(giveNode, _palmA); palmWorld(takeNode, _palmB);
+  Vector3.LerpToRef(_palmA, _palmB, k, _palmA);
+  takeNode.getWorldMatrix().invertToRef(_inv);
+  Vector3.TransformCoordinatesToRef(_palmA, _inv, ball.position);
+  return swapped;
+}
+
+/** Eastbay hand-to-hand — call each frame with clip-local time (sec). The right hand carries the ball under the knee,
+ *  the left takes it beneath the thigh on T.handOff and carries it up (the palm-to-palm blend is runHandOffPath's). */
 export function runEastbayPath(
   ball: AbstractMesh, skeleton: Skeleton, t: number, state: { inLeftHand: boolean },
-): void {
-  if (t < T.handOff && state.inLeftHand) {
-    attachBallToHand(ball, skeleton, 'RightHand'); state.inLeftHand = false;
-  } else if (t >= T.handOff && !state.inLeftHand) {
-    attachBallToHand(ball, skeleton, 'LeftHand'); state.inLeftHand = true;
-  }
-  // ball leads the receiving hand slightly around the pass moment
-  const nearPass = Math.max(0, 1 - Math.abs(t - T.handOff) / 0.12);
-  ball.position.copyFrom(PALM_OFFSET);
-  ball.position.addInPlace(new Vector3(0, -0.05 * nearPass, 0.05 * nearPass));
+): boolean {
+  return runHandOffPath(ball, skeleton, t, { at: T.handOff, from: 'RightHand', to: 'LeftHand' }, state);
 }
 
 /** Flush through the rim on a make. Call per frame; true when finished. */
