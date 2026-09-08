@@ -25,6 +25,12 @@ export const STEERING_PRESETS: Record<string, SteeringConfig> = {
   yeti:     { maxSpeed: 7.5, turnRateRad: 3.5, containmentBias: 0.2, giveUpAfterSec: 12, reactionSec: 0.1 },
 };
 
+/** KARATE-NEO-COOP (2026-09-07): a mode that OWNS its mobs' clips (one owner per rig — a BeatOwner / tree on the body)
+ *  passes a hook; the Mob then never plays a clip itself and only reports what its steering wants shown. Modes without
+ *  a hook keep the shared idle / run / knockdown exactly as before. */
+export type MobLocoState = 'idle' | 'move' | 'down';
+export type MobLocoHook = (state: MobLocoState) => void;
+
 export class Mob {
   public state: 'idle' | 'pursuing' | 'gaveUp' | 'downed' = 'idle';
   private chaseTime = 0;
@@ -34,13 +40,32 @@ export class Mob {
   constructor(
     public char: SpawnedCharacter,
     private cfg: SteeringConfig,
+    private loco?: MobLocoHook,
   ) {
     this.yaw = char.root.rotation.y;
     // M45 E22 FIX: route mob clips through clipRegistry/installSafePlay so a
     // stale name (the old literal 'run_forward') can never silently T-pose
     // the entire enemy roster from this shared class again.
     installSafePlay(char.animator, 'mob');
-    char.animator.play(SPORT_CLIP.idle, { loop: true });
+    this.show('idle', 0.15);
+  }
+
+  /** The steering's clip request: the owner's hook when the mode owns the rig, the shared clips otherwise. */
+  private show(state: MobLocoState, fadeSec: number): void {
+    if (this.loco) { this.loco(state); return; }
+    if (state === 'move') this.char.animator.play(SPORT_CLIP.moveLoop, { loop: true });
+    else if (state === 'down') this.char.animator.play(SPORT_CLIP.karateKnockdown, { fadeSec: 0.1 });
+    else this.char.animator.play(SPORT_CLIP.idle, { loop: true, fadeSec });
+  }
+
+  /** KARATE-NEO-COOP: the mode takes the body for an attack beat (wind-up / strike / recover) — the steering stops
+   *  without asking for a clip (the owner shows the beat), and `resume()` puts it straight back on the chase. */
+  hold(): void { if (this.state === 'pursuing') this.state = 'idle'; }
+  resume(): void {
+    if (this.state === 'downed') return;
+    this.state = 'pursuing';
+    this.chaseTime = 0;        // the next update shows the move loop again
+    this.reactionLeft = 0;     // it already noticed you
   }
 
   startPursuit(): void {
@@ -60,12 +85,12 @@ export class Mob {
       this.reactionLeft -= dt;
       return false;
     }
-    if (this.chaseTime === 0) this.char.animator.play(SPORT_CLIP.moveLoop, { loop: true });
+    if (this.chaseTime === 0) this.show('move', 0.15);
 
     this.chaseTime += dt;
     if (this.cfg.giveUpAfterSec && this.chaseTime > this.cfg.giveUpAfterSec) {
       this.state = 'gaveUp';
-      this.char.animator.play(SPORT_CLIP.idle, { loop: true });
+      this.show('idle', 0.15);
       return false;
     }
 
@@ -96,15 +121,18 @@ export class Mob {
     return false;
   }
 
+  /** The owner turned the body itself (a wind-up faces the target): keep the slew's memory in step. */
+  setYaw(yaw: number): void { this.yaw = yaw; this.char.root.rotation.y = yaw; }
+
   /** e.g. yeti swipe or defender wrap landed — play reaction and stand down */
   onContactResolved(): void {
-    this.char.animator.play(SPORT_CLIP.idle, { loop: true, fadeSec: 0.3 });
+    this.show('idle', 0.3);
     this.state = 'idle';
   }
 
   down(): void {
     this.state = 'downed';
-    this.char.animator.play(SPORT_CLIP.karateKnockdown, { fadeSec: 0.1 });
+    this.show('down', 0.1);
   }
 }
 
@@ -114,12 +142,12 @@ export class MobPool {
   private cursor = 0;
   add(m: Mob): void { this.mobs.push(m); }
   all(): Mob[] { return this.mobs; }
-  update(dt: number, targetPos: Vector3, targetVel: Vector3): Mob[] {
+  update(dt: number, targetPos: Vector3, targetVel: Vector3, contactRadius = 0.9): Mob[] {
     const contacts: Mob[] = [];
     const slice = Math.max(1, Math.ceil(this.mobs.length / 4));
     for (let i = 0; i < slice; i++) {
       const m = this.mobs[(this.cursor + i) % Math.max(this.mobs.length, 1)];
-      if (m && m.update(dt * Math.min(4, this.mobs.length), targetPos, targetVel)) contacts.push(m);
+      if (m && m.update(dt * Math.min(4, this.mobs.length), targetPos, targetVel, contactRadius)) contacts.push(m);
     }
     this.cursor = (this.cursor + slice) % Math.max(this.mobs.length, 1);
     return contacts;

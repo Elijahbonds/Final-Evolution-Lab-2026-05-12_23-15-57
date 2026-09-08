@@ -117,6 +117,15 @@ ok('a strike plays the attack\'s own clip and settles straight into the guard st
   tree.update({ ...HELD, striking: 'medium', strikeClip: 'high_kick' });   // a NEW swing fires again
   assert.equal(log[2].clip, 'high_kick');
 });
+ok('the dodge is the authored slip by default and plays its own clip when the mode names one (KARATE-NEO-COOP)', () => {
+  assert.equal(chooseCombatClip({ ...BASE, dodging: true }).clip, 'karate_evade');
+  assert.equal(chooseCombatClip({ ...BASE, dodging: true, dodgeClip: 'karate_lean_dodge' }).clip, 'karate_lean_dodge');
+  assert.ok(isResolvable('karate_evade') && isResolvable('karate_lean_dodge'));
+  assert.equal(chooseCombatClip({ ...BASE, striking: 'light', dodgeClip: 'karate_lean_dodge' }).clip, 'karate_punch_light', 'the dodge clip never leaks into another state');
+  const log: Played[] = []; const tree = new CombatAnimTree(mockAnimator(log));
+  tree.update({ ...HELD, dodging: true, dodgeClip: 'karate_lean_dodge' }); assert.equal(log[0].clip, 'karate_lean_dodge');
+  log[0].onEnd!(); assert.equal(log[1].clip, 'karate_guard_step', 'the lean settles onto the step under a held stick');
+});
 ok('the end callback of a clip the tree itself cut is ignored (a hit interrupts the swing)', () => {
   const log: Played[] = []; const tree = new CombatAnimTree(mockAnimator(log)); let settled = 0; tree.onSettle = () => settled++;
   tree.update({ ...BASE, striking: 'heavy' });

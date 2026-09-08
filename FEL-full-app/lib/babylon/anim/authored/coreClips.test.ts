@@ -9,7 +9,7 @@ import type { AnimationGroup, Skeleton, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { boneNode } from '../boneLookup';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
-import { buildHitReact, buildKnockdown, buildGuardStep, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold } from './karate';
+import { buildHitReact, buildKnockdown, buildGuardStep, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import { buildDanceClip, DANCE_CLIP_IDS } from '../danceClips';
 import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, buildBoardCarveRight } from './boardSuite';
@@ -127,6 +127,34 @@ describe('karate wind-up', () => {
     expect(pos('RightHand').y).toBeLessThan(pos('LeftHand').y - 0.12);     // below the lead guard
     expect(pos('LeftHand').y).toBeGreaterThan(pos('Hips').y + 0.3);        // the lead guard stays up
     at(g, 0.7); expect(Vector3.Distance(pos('RightHand'), r0)).toBeLessThan(0.02);
+  });
+});
+
+// KARATE-NEO-COOP (2026-09-07): the fighter's slip
+describe('karate evade', () => {
+  it('drops the hips and leans the torso back with the guard still up, then returns to the stance', () => {
+    const g = fresh(() => buildEvade(scene, sk)!);
+    at(g, 0); const h0 = hipsY(), l0 = pos('LeftHand').clone();
+    at(g, 0.14);
+    expect(hipsY()).toBeLessThan(h0 - 0.15);                                // low
+    expect(pos('Head').z).toBeLessThan(pos('Hips').z - 0.08);              // leaning back off the line
+    expect(pos('LeftHand').y).toBeGreaterThan(pos('Hips').y + 0.25);       // the guard never drops
+    at(g, 0.36); expect(Math.abs(hipsY() - h0)).toBeLessThan(0.03); expect(Vector3.Distance(pos('LeftHand'), l0)).toBeLessThan(0.04);
+  });
+});
+
+// KARATE-NEO-COOP (2026-09-07): the bullet-time lean (the no-stick dodge)
+describe('karate lean dodge', () => {
+  it('folds the torso back from the hips with the arms trailing behind, then returns to the guard', () => {
+    const g = fresh(() => buildLeanDodge(scene, sk)!);
+    at(g, 0); const h0 = hipsY(), head0 = pos('Head').clone(), l0 = pos('LeftHand').clone(), r0 = pos('RightHand').clone();
+    at(g, 0.13);
+    expect(pos('Head').z).toBeLessThan(head0.z - 0.25);                     // the head goes well behind its stance line — the lean
+    expect(pos('Head').y).toBeLessThan(head0.y - 0.12);                     // and down with it
+    expect(hipsY()).toBeLessThan(h0 - 0.12);                                // knees bent under the lean
+    expect(pos('LeftHand').z).toBeLessThan(pos('Hips').z);                  // arms trailing behind the hips
+    expect(pos('RightHand').z).toBeLessThan(pos('Hips').z);
+    at(g, 0.42); expect(Math.abs(hipsY() - h0)).toBeLessThan(0.03); expect(Vector3.Distance(pos('LeftHand'), l0)).toBeLessThan(0.04); expect(Vector3.Distance(pos('RightHand'), r0)).toBeLessThan(0.04);
   });
 });
 

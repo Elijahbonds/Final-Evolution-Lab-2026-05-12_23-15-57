@@ -127,3 +127,37 @@ export function buildWindupHold(scene: Scene, sk: Skeleton): AnimationGroup | nu
     { t: T, bones: BONES, hands: LOAD, poles: LOAD_POLES, hipsY: -0.05 },
   ]);
 }
+
+/** The EVADE (KARATE-NEO-COOP, 2026-09-07). The endless mode's dodge was `football_juke_left` — the shared walk at
+ *  1.8×, a stumble with the arms at the hips. A fighter SLIPS a strike: the hips drop, the knees fold, the torso leans
+ *  back and turns off the line, the guard stays up; then the stance returns. One-shot, 0.36 s — the mode's dodge
+ *  translation (3.2 m over 0.32 s) rides underneath it. */
+export function buildEvade(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const STAND = { Hips: [0, 0, 0] as V3, Spine: [0, 0, 0] as V3, Neck: [0, 0, 0] as V3, LeftUpLeg: [-12, 0, 4] as V3, RightUpLeg: [-12, 0, -4] as V3, LeftLeg: [10, 0, 0] as V3, RightLeg: [10, 0, 0] as V3 };
+  const SLIP = { Hips: [0, 18, 0] as V3, Spine: [-24, 12, -10] as V3, Neck: [-8, 0, 0] as V3, LeftUpLeg: [-34, 0, 12] as V3, RightUpLeg: [-28, 0, -12] as V3, LeftLeg: [50, 0, 0] as V3, RightLeg: [46, 0, 0] as V3 };
+  return buildPoseClip(scene, sk, 'karate_evade', 0.36, [
+    { t: 0,    bones: STAND, hands: GUARD, hipsY: 0 },
+    { t: 0.14, bones: SLIP,  hands: { Left: [-0.24, 1.30, 0.16], Right: [0.22, 1.26, 0.06] }, hipsY: -0.26 },   // low, back, guard still up (hand targets ride the hips offset: 1.30 − 0.26 ≈ 1.04 m)
+    { t: 0.36, bones: STAND, hands: GUARD, hipsY: 0 },
+  ]);
+}
+
+/** The LEAN — KARATE-NEO-COOP (2026-09-07). The endless mode's dodge was the football juke (a sidestep: fine for a
+ *  directional dodge, nothing like the moment the mode is named for). With no stick held the dodge slides BACK, and
+ *  the body it needs is the bullet-time lean: the torso folds back from the hips, the chin up, the arms trailing out
+ *  and back, the knees bent under it — then it snaps back up into the guard. One-shot, 0.42 s; the mode's slow-mo
+ *  (scene.animationTimeScale) is what stretches it on a perfect read. Starts AND ends in the GUARD so the crossfade in
+ *  from the stance / step and the settle out are both short hops. */
+export function buildLeanDodge(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.42;
+  const STAND = { Hips: [0, 0, 0] as V3, Spine: [0, 0, 0] as V3, Neck: [0, 0, 0] as V3, LeftUpLeg: [-12, 0, 4] as V3, RightUpLeg: [-12, 0, -4] as V3, LeftLeg: [10, 0, 0] as V3, RightLeg: [10, 0, 0] as V3 };
+  const LEAN = { Hips: [0, 0, 0] as V3, Spine: [-58, 0, 6] as V3, Neck: [-16, 0, 0] as V3, LeftUpLeg: [-38, 0, 10] as V3, RightUpLeg: [-30, 0, -10] as V3, LeftLeg: [46, 0, 0] as V3, RightLeg: [40, 0, 0] as V3 };
+  const OUT = { Left: [-0.62, 1.02, -0.34] as V3, Right: [0.60, 1.00, -0.40] as V3 };   // arms trailing out and back behind the lean
+  const OUT_POLES = { Left: [-0.9, 0.4, -0.6] as V3, Right: [0.9, 0.4, -0.6] as V3 };
+  return buildPoseClip(scene, sk, 'karate_lean_dodge', T, [
+    { t: 0,    bones: STAND, hands: GUARD, hipsY: 0 },
+    { t: 0.13, bones: LEAN, hands: OUT, poles: OUT_POLES, hipsY: -0.22 },   // the fold: fast in
+    { t: 0.24, bones: { ...LEAN, Spine: [-54, 0, 6] }, hands: { Left: [-0.60, 1.05, -0.32], Right: [0.58, 1.03, -0.38] }, poles: OUT_POLES, hipsY: -0.21 },   // held a beat at the bottom
+    { t: T,    bones: STAND, hands: GUARD, hipsY: 0 },
+  ]);
+}

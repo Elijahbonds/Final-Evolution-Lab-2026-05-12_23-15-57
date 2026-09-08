@@ -10,7 +10,7 @@ import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebr
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
-import { buildHitReact, buildKnockdown, buildGuardStep, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold } from './karate';
+import { buildHitReact, buildKnockdown, buildGuardStep, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
   buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildDefendSlide, buildBlockReach, buildStealReach,
@@ -60,6 +60,8 @@ export function registerAuthoredClips(
     () => buildFloorHold(scene, skeleton),
     () => buildGetUp(scene, skeleton),
     () => buildWindupHold(scene, skeleton),   // ANIM-READABILITY (creative, 2026-09-07): the counter-strike rival's telegraph
+    () => buildLeanDodge(scene, skeleton),    // KARATE-NEO-COOP (2026-09-07): the bullet-time lean (the endless dodge with no stick held)
+    () => buildEvade(scene, skeleton),        // KARATE-NEO-COOP (2026-09-07): the fighter's slip — the dodge was the football juke
     () => buildFreeRunAirHold(scene, skeleton),   // ANIM-READABILITY (creative): the runner's air hold, tuck and slide
     () => buildFreeRunTuck(scene, skeleton),
     () => buildFreeRunSlide(scene, skeleton),

@@ -1,4 +1,4 @@
-// KarateEndlessMode v5 — "AGENT WAVES." REPLACES the M45 file. A structural
+// KarateEndlessMode v6 — "AGENT WAVES." REPLACES the M45 file. A structural
 // rebuild toward the third-person action-horde feel: you (and an ally)
 // against escalating waves of identical, suited pursuers in a stylized
 // digital arena. Four concrete systems, all new:
@@ -20,6 +20,32 @@
 //   4. HORDE-SCALE WAVES — bigger counts, faster ramp, and every new enemy
 //      materializes with a glitch-burst spawn-in instead of just appearing.
 //
+// KARATE-NEO-COOP (2026-09-07) — the owner's eye on the live soft-OPEN: "co-op beat-em-up, waves of hordes, feel like
+// Neo, Matrix slow-mo juice, NOT knocked down so easily, clean". Measured per rendered frame before this pass (fake
+// pad, 24 s): the hero was DOWN 0.16 s after START on the first touch and spent 20 of the 24 s on the floor (three
+// downs from three contacts — the one-tap the owner rejected); an agent that had touched you stood in idle_stand at
+// 0.24 m for the rest of the wave (contact → MobSteering's `onContactResolved` → idle forever: the zombie); a KO'd
+// agent stood back up into the stance while it sank (neverBindPose's chain after the knockdown); 0 slow-mo beats.
+// The LOGIC lives in core/NeoCombatCore (pure, headless-tested by scripts/karate-neo-tests.ts); this file renders it:
+//   · TOUGHNESS (PlayerVitals): an HP pool — an agent's STRIKE (not its touch) costs enemyHitDamage(wave) (18 → 26,
+//     the kick ×1.4), a landed hit buys VITALS.hurtIframeSec (the horde cannot double-tap), the guard chips and floors
+//     at 1 (a guard never drops you), HP regens after HP_REGEN_DELAY_SEC out of contact, a revive restores
+//     VITALS.reviveRatio with VITALS.reviveIframeSec. DOWN only at 0.
+//   · AGENTS ATTACK, READABLY (EnemyBrain): contact starts a WIND-UP (karate_windup_hold, a held telegraph), then the
+//     strike clip with the hit on the clip's contact beat, then a recovery in the stance, then the chase again. At most
+//     maxAttackers(wave) agents wind up at once; the rest ORBIT in the guard step (ENEMY_ATTACK.orbitSpeed) and press
+//     again; the pack fans out (separate()). A BeatOwner per agent is the ONE owner of its clips (MobSteering reports
+//     loco through a hook, never plays); they chase on the guard step, not the shared jog.
+//   · MATRIX SLOW-MO (SlowMoLatch): one clock on the gameplay dt AND scene.animationTimeScale (the bodies themselves
+//     slow — dt-scaling alone left every clip at full speed), latched once with a cooldown, short: a perfect dodge, a
+//     heavy KO, the jab-jab-UPPERCUT finisher (ComboTracker), the wave clear, the chi burst (the player's special —
+//     always fires). Never a soft freeze: input runs, the camera runs.
+//   · REAL MOVES: jab / kick / heavy are the GLB clips; the dodge is the authored slip (karate_evade) with a stick held
+//     and the bullet-time LEAN (karate_lean_dodge) with none; a perfect read is the lean in slow motion.
+//   · PERKS / PICKUPS (PerkShop, DropDirector): the between-wave shop is REAL (◀ ▶ browse, A buy, B fight, SHOP_SEC),
+//     priced in the run's shards; KOs drop shards, a chi orb every fourth, a health orb when you are hurt (with pity);
+//     a wave clear drops DROPS.waveClearShards — walk over them.
+//
 // IP NOTE: built to match the requested FEEL (third-person combat vs waves
 // of identical suited pursuers, a slow-motion dodge) using entirely
 // original naming, dialogue-free enemies, and a cyan/white palette — no
@@ -27,12 +53,13 @@
 // appear anywhere in this file, consistent with this project's standing
 // original-content-only rule (already enforced for NeuroArena/Who Scene It).
 
-import { Vector3 } from '@babylonjs/core';
+import { Color3, MeshBuilder, StandardMaterial, Vector3, type Mesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { CombatAnimTree, type CombatAnimInput, type StrikeWeight } from '../anim/combatTree';
+import { BeatOwner } from '../anim/beatOwner';
 import type { ControlSource, Intent } from '../core/PlayerSlot';
 import { PlayerSlot, LocalInputSource } from '../core/PlayerSlot';
 import { SoundKit } from '../audio/SoundKit';
@@ -43,10 +70,12 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
+import { waveSpec, spawnRing, DownRevive, REVIVE_RANGE, surroundedCount, inArc } from '../core/OnslaughtCore';
 import {
-  waveSpec, spawnRing, buyPerk, PERKS, DownRevive, REVIVE_RANGE,
-  surroundedCount, crowdClear, CROWDCLEAR_RADIUS, inArc,
-} from '../core/OnslaughtCore';
+  PlayerVitals, VITALS, enemyHitDamage, SlowMoLatch, SLOWMO, type SlowMoKind,
+  EnemyBrain, ENEMY_ATTACK, windupSecFor, maxAttackers, ComboTracker, isFinisher,
+  DropDirector, DROPS, type DropKind, PerkShop, separate,
+} from '../core/NeoCombatCore';
 
 /**
  * Half-extent of the playable floor, INSET from the 24x24 mat.
@@ -68,10 +97,16 @@ const ARENA_RADIUS = 7.5;
 const STANCE = SPORT_CLIP.karateStance;
 // ANIM-READABILITY (combat, 2026-09-07): the player and the partner are driven by the CombatAnimTree, the ONE owner of
 // their clips — the same jumble Karate VS had (a per-frame stance / step play racing the strike's onEnd chain, the
-// knockdown cut to 0.08 s by the per-frame stance, guard steps on the spot). The enemies stay on MobSteering's clips.
+// knockdown cut to 0.08 s by the per-frame stance, guard steps on the spot). KARATE-NEO-COOP: the agents are owned by
+// a BeatOwner each (stance / guard step / wind-up loops, strike / knockdown beats) — MobSteering never plays a clip here.
 const IDLE_CLIP = 'karate_idle_stance';
+const AGENT_STEP = SPORT_CLIP.combatStep;          // the chase: guard up, a fighter's step (was the shared jog)
+const AGENT_WINDUP = SPORT_CLIP.karateWindup;      // the telegraph: rear fist chambered, weight back (a HOLD)
+const AGENT_FLOOR = 'karate_floor_hold';
+const LEAN_DODGE = 'karate_lean_dodge';            // the bullet-time lean (dodge with no stick held)
+const DODGE_SLIP = 'karate_evade';                 // the directional slip (the tree's default — authored, not the football juke)
 const STRIKE_WEIGHT: Record<'A' | 'B' | 'Y', StrikeWeight> = { A: 'light', B: 'medium', Y: 'heavy' };
-const IMPACT_SEC = 0.24, STRIKE_MAX_SEC = 1.5;
+const IMPACT_SEC = 0.24, STRIKE_MAX_SEC = 1.5, REACT_SEC = 0.32;
 type Strike = { weight: StrikeWeight; clip: string; until: number } | null;
 // THE HORDE GRAMMAR (owner lock 2026-09-03: Matrix Revolutions / Pirate
 // Warriors). Every strike hits EVERYONE in its arc; the heavy LAUNCHES, and an
@@ -88,12 +123,19 @@ const HIT_CHAIN_MS = 1400;
 // horde sizing — deliberately bigger/faster than the old wave-survival pace
 // A+ identity P0 (PM brief 2026-09-06): ONE SOLID STRIKE DROPS A BODY. No enemy HP pool, no chip — the wave escalates
 // by count and speed, never by sponge. (hpBase 22 / hpPerWave 4 made jab 12 / kick 18 chip and only heavy one-tapped.)
-const WAVE = { base: 4, max: 12, growEvery: 1 };
 const DODGE_TAP_MS = 220;          // hold longer than this = block, not dodge
 const DODGE_IFRAME_SEC = 0.38;
 const DODGE_DISTANCE = 3.2;
-const PERFECT_DODGE_SLOWMO_SEC = 0.6;
-const SLOWMO_SCALE = 0.28;
+const DODGE_SLIDE_SEC = 0.36;      // the slide, on the GAME clock — a perfect read stretches it with the slow-mo
+const PERFECT_WINDOW_SEC = 0.12;   // a strike that lands inside the FIRST window of the i-frames = you moved at the last instant = the perfect read
+                                   // (M45 had it backwards: it rewarded a strike landing in the LAST 90 ms — a dodge thrown 0.3 s early)
+
+// ── KARATE-NEO-COOP: the player's toughness (VITALS in NeoCombatCore) + what only the renderer knows ──
+const HP_REGEN_DELAY_SEC = 3.5, HP_REGEN_PER_SEC = 4;   // out of contact the pool refills — a beating survived, not attrition
+const ORBIT_SEC = 0.5;             // a capped-out agent circles this long before it presses again
+const AGENT_STRIKE_ARC_DEG = ENEMY_ATTACK.arcDeg + 20;  // the renderer's arc is a hair wider than the core's (the hit-check happens on a body that may have stepped)
+const AGENT_TURN_RATE = 9;         // rad/s — a wound-up agent tracks you
+const SEPARATION_M = 0.9;          // the pack fans out: no two agents inside this
 
 // M110 — CHI BURST. The chi meter (filled by hits/dodges) used to top out at
 // 100 and do nothing. It now powers a screen-clearing special: at full chi,
@@ -101,22 +143,40 @@ const SLOWMO_SCALE = 0.28;
 // resets. Code-level rollback: flip CHI_BURST_ENABLED to false.
 const CHI_BURST_ENABLED = true;
 const CHI_BURST_RADIUS = 4.6;
-const CHI_BURST_DAMAGE = 60;
 const CHI_BURST_KNOCKBACK = 3.4;
 
-interface Enemy { mob: Mob; hp: number; maxHp: number; /** launched: helpless and takes more until this timestamp */ airUntil: number }
+// ── pickups (DropDirector decides WHAT drops; this is how they look and how close you walk) and the shop ──
+const PICKUP_BOB_HZ = 1.6;
+const SHOP_SEC = 6;                            // the between-wave window; B fights early (8 s was a third of a horde run standing still, measured)
+const PICKUP_STYLE: Record<DropKind, { hex: string }> = { shard: { hex: '#FFC53D' }, chi: { hex: '#22d3ee' }, health: { hex: '#7CFFB2' } };
+
+interface Enemy {
+  mob: Mob; anim: BeatOwner; brain: EnemyBrain; hp: number; maxHp: number; /** launched: helpless and takes more until this timestamp */ airUntil: number;
+  /** capped out of a strike: circling until this game-clock time (0 = not orbiting) */ orbitUntil: number; orbitDir: 1 | -1;
+}
+interface Pickup { kind: DropKind; mesh: Mesh; life: number; phase: number }
+/** A tween on the GAME clock (so slow-mo stretches the sink, the knockback, the slide — one clock, not two). */
+interface Tween { t: number; dur: number; step: (k: number) => void; done?: () => void }
 
 // ── Ally: a self-contained AI ControlSource. Doesn't reuse PlayerSlot's
 //    basketball-flavored AIBehavior (ball/hoop shape doesn't fit melee) —
 //    this is the melee equivalent, same ControlSource contract so it slots
-//    into PlayerSlot identically. ─────────────────────────────────────────
+//    into PlayerSlot identically. KARATE-NEO-COOP: a downed ally comes first —
+//    the partner runs to you and stands on the revive (the co-op beat). ──────
 class PartnerAISource implements ControlSource {
   private cooldown = 0;
-  constructor(private self: () => Vector3, private nearestEnemy: () => Vector3 | null, private range: number) {}
+  constructor(private self: () => Vector3, private nearestEnemy: () => Vector3 | null, private range: number, private downedAlly: () => Vector3 | null = () => null) {}
   poll(dt: number): Intent {
     this.cooldown = Math.max(0, this.cooldown - dt);
-    const target = this.nearestEnemy();
     const neutral: Intent = { moveX: 0, moveY: 0, sprint: false, action: false, actionHeld: 0, pass: false, steal: false };
+    const ally = this.downedAlly();
+    if (ally) {
+      const to = ally.subtract(this.self()); to.y = 0;
+      const dist = to.length();
+      if (dist > REVIVE_RANGE * 0.7) { const dir = to.normalize(); return { ...neutral, moveX: dir.x, moveY: -dir.z, sprint: true }; }
+      return neutral;   // in range: the channel runs (the mode counts it)
+    }
+    const target = this.nearestEnemy();
     if (!target) return neutral;
     const to = target.subtract(this.self()); to.y = 0;
     const dist = to.length();
@@ -137,40 +197,64 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   let playerSlot: PlayerSlot, partnerSlot: PlayerSlot, localSource: LocalInputSource;
   let pool: MobPool;
   let enemies: Enemy[] = [];
-  let wave = 0, kos = 0, totalKos = 0, chi = 0;   // no player HP: one clean contact puts you DOWN (P0 identity)
-  // Phase 8: perks, down/revive, crowd-clear
-  const ownedPerks = new Set<string>();
+  let wave = 0, kos = 0, totalKos = 0, chi = 0;
+  // KARATE-NEO-COOP: the core's objects (NeoCombatCore) — the mode renders them
+  const vitals = new PlayerVitals();
+  const slowmo = new SlowMoLatch();
+  const combo = new ComboTracker();
+  const drops = new DropDirector();
+  const shop = new PerkShop();
+  let perks = shop.state();
+  let hpShown = -1, lastHurtAt = -1e9;
+  let hitWeight: StrikeWeight = 'light', hitUntil = 0;
+  // Phase 8: down/revive, crowd-clear
   const myDown = new DownRevive();
   const partnerDown = new DownRevive();
   let revivingPartner = false;
-  let coins = 0;                       // display mirror of server balance
-  let dmgMult = 1, speedMult = 1;
-  let shopOpen = false;
+  let shards = 0;                      // the run's shards (dropped by the horde, spent in the shop) — the bezel's `coins`
+  let shopOpen = false, shopUntil = 0;
   let clockSec = 0;
-  /** Server-authoritative spend: the client sends the perk id ONLY; the
-   *  server owns price/balance. Offline/dev falls back to a local denial. */
-  async function serverSpend(perkId: string, _cost: number): Promise<{ ok: boolean; reason?: string }> {
-    try {
-      const res = await fetch('/api/wallet/spend', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: `onslaught_perk_${perkId}` }),
-      });
-      if (!res.ok) return { ok: false, reason: `server refused (${res.status})` };
-      return { ok: true };
-    } catch {
-      return { ok: false, reason: 'offline — purchases disabled' };
-    }
-  }
   let striking = false, blocking = false, dodging = false, bursting = false;
+  let dodgeClip = DODGE_SLIP;
   let meTree: CombatAnimTree, partnerTree: CombatAnimTree;
   let myStrike: Strike = null, pStrike: Strike = null, impactUntil = 0, outFlag = false;
   let hitCount = 0, lastHitAt = 0;                 // the Musou number
   let camCrowd = false;                             // H8: surrounded → the crowd preset
-  let xHoldSec = -1, iframeSec = 0, slowMoSec = 0;
+  let xHoldSec = -1, iframeSec = 0;
   let stickX = 0, stickY = 0;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
+  let pickups: Pickup[] = [];
+  let tweens: Tween[] = [];
+  let sceneRef: ModeContext['scene'] | null = null;
+  // dev telemetry (the fake-pad probe reads scene.metadata.karateNeo) — counts, never gameplay
+  const stats = { downs: 0, strikesAt: 0, hitsTaken: 0, traded: 0, blocked: 0, dodged: 0, perfect: 0, finishers: 0, pickups: 0, shardsTotal: 0, perksBought: 0, orbits: 0 };
 
+  const now = () => performance.now();
   const facingVec = () => new Vector3(Math.sin(player.root.rotation.y), 0, Math.cos(player.root.rotation.y));
+  const tween = (dur: number, step: (k: number) => void, done?: () => void) => { tweens.push({ t: 0, dur, step, done }); };
+  const clampDisc = (p: Vector3) => { const r = Math.hypot(p.x, p.z); if (r > ARENA_RADIUS) { const k = ARENA_RADIUS / r; p.x *= k; p.z *= k; } };
+
+  /** The Matrix beat. One clock: the latch counts real seconds; the gameplay dt and the scene's animation time both
+   *  run at its scale while it holds. Latched once (cooldown in the core); the chi burst always fires. */
+  function matrix(ctx: ModeContext, kind: SlowMoKind): boolean {
+    if (!slowmo.fire(kind)) return false;
+    ctx.scene.animationTimeScale = slowmo.scale;      // the bodies slow too — the read IS the bodies
+    ctx.camDirector.pulse?.(kind === 'chiBurst' ? 0.8 : 0.55, SLOWMO[kind]);
+    SoundKit.play('powerUp', { pitch: kind === 'perfectDodge' ? 0.6 : 0.5, volume: 0.45 });
+    return true;
+  }
+  function endSlowMo(ctx: ModeContext): void { slowmo.reset(); ctx.scene.animationTimeScale = 1; }
+
+  function publishHp(ctx: ModeContext, force = false): void {
+    const shown = Math.round(100 * vitals.ratio);
+    if (force || shown !== hpShown) { hpShown = shown; ctx.setHud({ hp: shown }); }
+  }
+  /** The shop's perk state, applied to the run. */
+  function applyPerks(ctx: ModeContext, bought: string): void {
+    perks = shop.state();
+    vitals.setMax(perks.maxHp, bought === 'iron');    // IRON BODY heals to full
+    publishHp(ctx, true);
+  }
 
   async function spawnEnemy(ctx: ModeContext, angle: number, i: number): Promise<void> {
     const pos = new Vector3(Math.sin(angle) * 6, 0, Math.cos(angle) * 6);
@@ -184,29 +268,26 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     installSafePlay(char.animator, 'agent');
     ctx.groundLock?.track(char.root, char.skeleton);
     // materialize, don't just appear
+    const targetScale = char.root.scaling.clone();
     char.root.scaling.scaleInPlace(0.001);
     EffectsKit.burst(ctx.scene, pos.add(new Vector3(0, 1, 0)), 'glitch');
     SoundKit.play('powerUp', { pitch: 1.6, volume: 0.25 });
-    const t0 = performance.now();
-    const targetScale = char.root.scaling.clone();
-    const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-      const k = Math.min(1, (performance.now() - t0) / 320);
-      char.root.scaling = Vector3.Lerp(new Vector3(0.001, 0.001, 0.001), targetScale, k);
-      if (k >= 1) ctx.scene.onBeforeRenderObservable.remove(obs);
-    });
+    tween(0.32, (k) => { char.root.scaling = Vector3.Lerp(new Vector3(0.001, 0.001, 0.001), targetScale, k); });
     const archetype = (['striker', 'rusher', 'flanker'] as const)[i % 3];
-    const mob = new Mob(char, STEERING_PRESETS[archetype]);
+    const preset = STEERING_PRESETS[archetype];
+    // ONE owner of this body's clips: the steering reports (idle / move / down), the owner shows it.
+    const anim = new BeatOwner(char.animator);
+    const mob = new Mob(char, preset, (st) => {
+      if (st === 'move') anim.loop(AGENT_STEP, { fadeSec: 0.16, speedRatio: Math.max(0.9, Math.min(1.5, preset.maxSpeed / 3)) });
+      else if (st === 'idle') anim.loop(STANCE, { fadeSec: 0.2 });
+      else { anim.beat(SPORT_CLIP.karateKnockdown, { fadeSec: 0.08 }); anim.loop(AGENT_FLOOR, { fadeSec: 0.15 }); }   // down: knockdown → the floor (was: the stance, standing back up while it sank). Beat BEFORE loop: a loop set first plays for a frame (a 1.45 m floor-pose flash, measured)
+    });
     mob.startPursuit();
     pool.add(mob);
-    enemies.push({ mob, hp: 1, maxHp: 1, airUntil: 0 });   // one-knock: any land sets hp 0 → KO
+    enemies.push({ mob, anim, brain: new EnemyBrain(wave), hp: 1, maxHp: 1, airUntil: 0, orbitUntil: 0, orbitDir: i % 2 ? 1 : -1 });   // one-knock: any land sets hp 0 → KO
   }
 
   async function spawnWave(ctx: ModeContext): Promise<void> {
-    // between waves (not the first): the perk shop opens
-    if (wave >= 1) {
-      shopOpen = true;
-      ctx.setHud({ banner: 'PERKS — d-pad to browse, A to buy, B to fight', perks: PERKS.map((p, i) => `${i + 1}=${p.label} ${p.costCoins}c`).join(' · '), coins });
-    }
     wave++; kos = 0;
     SoundKit.play('powerUp', { pitch: 0.9, volume: 0.5 });   // wave-start horn
     SoundKit.play('crowdCheer', { volume: Math.min(0.3 + wave * 0.06, 0.9) });
@@ -217,7 +298,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const proms: Promise<void>[] = [];
     for (let i = 0; i < count; i++) proms.push(spawnEnemy(ctx, (i / count) * Math.PI * 2 + wave, i));
     await Promise.all(proms);
-    ctx.setHud({ wave, enemies: count, chi });
+    ctx.setHud({ wave, enemies: count, chi, banner: `WAVE ${wave}` });
+    setTimeout(() => { if (!shopOpen) ctx.setHud({ banner: '' }); }, 900);
   }
 
   const nearest = (from: Vector3): Enemy | null =>
@@ -226,18 +308,88 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
   function gainChi(ctx: ModeContext, amount: number): void {
     const before = chi;
-    chi = Math.min(100, chi + amount);
-    ctx.setHud({ chi });
+    chi = Math.min(100, chi + amount * perks.chiMult);
+    ctx.setHud({ chi: Math.round(chi) });
     if (CHI_BURST_ENABLED && !bursting && before < 100 && chi >= 100) {
       ctx.setHud({ banner: 'CHI READY · R1' });
       setTimeout(() => ctx.setHud({ banner: '' }), 900);
     }
   }
 
+  // ── the shop (between waves; the run's shards — PerkShop) ──
+  function publishShop(ctx: ModeContext): void {
+    ctx.setHud({ perks: shop.hudLine(), coins: shards, banner: `WAVE ${wave} CLEAR · ${shop.selected.blurb} · ◀ ▶ browse · A buy · B fight` });
+  }
+  function openShop(ctx: ModeContext): void {
+    if (shop.allOwned) { void spawnWave(ctx); return; }   // nothing left to buy: straight on
+    shopOpen = true; shop.sel = 0; shopUntil = now() + SHOP_SEC * 1000;
+    publishShop(ctx);
+  }
+  function closeShop(ctx: ModeContext): void {
+    if (!shopOpen) return;
+    shopOpen = false;
+    ctx.setHud({ perks: '', banner: '' });
+    void spawnWave(ctx);
+  }
+  function buySelected(ctx: ModeContext): void {
+    const r = shop.buy(shards);
+    if (!r.ok) { ctx.setHud({ banner: r.reason ?? 'NO' }); setTimeout(() => { if (shopOpen) publishShop(ctx); }, 600); SoundKit.play('miss', { volume: 0.3 }); return; }
+    shards -= r.cost; stats.perksBought++;
+    applyPerks(ctx, r.id);
+    SoundKit.play('score', { pitch: 1.2, volume: 0.5 });
+    EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
+    shopUntil = Math.max(shopUntil, now() + 2500);   // a buy buys a moment to read the next one
+    if (shop.allOwned) { closeShop(ctx); return; }
+    publishShop(ctx);
+  }
+
+  // ── pickups ──
+  function dropPickup(ctx: ModeContext, at: Vector3, kind: DropKind): void {
+    if (pickups.length >= DROPS.maxAlive) { const old = pickups.shift()!; old.mesh.material?.dispose(); old.mesh.dispose(); }
+    const style = PICKUP_STYLE[kind];
+    const mesh = kind === 'shard'
+      ? MeshBuilder.CreateCylinder(`ke_pick_${kind}`, { diameter: 0.34, height: 0.06, tessellation: 24 }, ctx.scene)
+      : kind === 'chi' ? MeshBuilder.CreateSphere(`ke_pick_${kind}`, { diameter: 0.32, segments: 12 }, ctx.scene)
+      : MeshBuilder.CreateBox(`ke_pick_${kind}`, { size: 0.28 }, ctx.scene);
+    const mat = new StandardMaterial(`ke_pick_mat_${kind}_${now()}`, ctx.scene);
+    mat.emissiveColor = Color3.FromHexString(style.hex); mat.diffuseColor = Color3.Black(); mat.specularColor = Color3.Black();
+    mesh.material = mat;
+    mesh.position.copyFromFloats(at.x, 0.45, at.z); clampDisc(mesh.position);
+    if (kind === 'shard') mesh.rotation.x = Math.PI / 2;   // a standing disc
+    mesh.isPickable = false;
+    pickups.push({ kind, mesh, life: DROPS.lifeSec, phase: Math.random() * Math.PI * 2 });
+  }
+  function collect(ctx: ModeContext, p: Pickup): void {
+    stats.pickups++;
+    if (p.kind === 'shard') { shards++; stats.shardsTotal++; ctx.setHud({ coins: shards }); SoundKit.play('score', { pitch: 1.5, volume: 0.35 }); }
+    else if (p.kind === 'chi') { gainChi(ctx, DROPS.chiGain / perks.chiMult); SoundKit.play('powerUp', { pitch: 1.3, volume: 0.35 }); }
+    else { vitals.heal(DROPS.healthHeal); publishHp(ctx); SoundKit.play('powerUp', { pitch: 1.0, volume: 0.4 }); }
+    EffectsKit.burst(ctx.scene, p.mesh.position.clone(), 'sparks');
+    p.mesh.material?.dispose(); p.mesh.dispose();
+  }
+  function tickPickups(ctx: ModeContext, dt: number): void {
+    if (!pickups.length) return;
+    const t = clockSec;
+    const keep: Pickup[] = [];
+    for (const p of pickups) {
+      p.life -= dt;
+      p.mesh.rotation.y += 3.2 * dt;
+      p.mesh.position.y = 0.42 + 0.07 * Math.sin(t * PICKUP_BOB_HZ * Math.PI * 2 + p.phase);
+      p.mesh.isVisible = p.life > DROPS.blinkSec || Math.floor(p.life * 8) % 2 === 0;   // blinks out
+      if (p.life <= 0) { p.mesh.material?.dispose(); p.mesh.dispose(); continue; }
+      const dx = player.root.position.x - p.mesh.position.x, dz = player.root.position.z - p.mesh.position.z;
+      const d = Math.hypot(dx, dz);
+      if (!myDown.downed && d < DROPS.collectM) { collect(ctx, p); continue; }
+      if (!myDown.downed && d < DROPS.magnetM) { const k = Math.min(1, 6 * dt); p.mesh.position.x += dx * k; p.mesh.position.z += dz * k; }   // the magnet: it comes to you
+      keep.push(p);
+    }
+    pickups = keep;
+  }
+
   // M110 — spend a full chi bar: an AoE knockback + heavy damage that reuses the
   // existing landHit/ko/wave-clear path, so a burst can clear a wave cleanly.
   function chiBurst(ctx: ModeContext): void {
-    if (!CHI_BURST_ENABLED || chi < 100 || striking || dodging || bursting || myDown.downed) return;   // a downed fighter cannot swing (the tree holds the floor)
+    if (!CHI_BURST_ENABLED || chi < 100 || striking || dodging || bursting || myDown.downed || shopOpen) return;   // a downed fighter cannot swing (the tree holds the floor)
     // Phase 8: surrounded 3+ makes this the CROWD-CLEAR finisher — bigger
     // radius read, brief invulnerability feel (dodge window), huge payoff.
     const surrounded = surroundedCount(player.root.position,
@@ -245,34 +397,30 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const isCrowdClear = surrounded >= 3;
     if (isCrowdClear) {
       ctx.setHud({ banner: 'CROWD CLEAR!' });
-      ctx.feel?.impact?.(1);
       SoundKit.play('crowdCheer', { volume: 0.9 });
-      ctx.camDirector?.pulse?.(0.8, 0.6);
     }
     bursting = true; chi = 0;
-    ctx.setHud({ chi, banner: 'CHI BURST' });
-    setTimeout(() => { ctx.setHud({ banner: '' }); }, 800);
-    SoundKit.play('powerUp', { pitch: 0.8, volume: 0.6 });
+    ctx.setHud({ chi, banner: isCrowdClear ? 'CROWD CLEAR!' : 'CHI BURST' });
+    setTimeout(() => { ctx.setHud({ banner: '' }); }, 900);
+    matrix(ctx, 'chiBurst');                                    // the special is a Matrix beat: the uppercut at full length, the ring slowed
+    vitals.iframeSec = Math.max(vitals.iframeSec, SLOWMO.chiBurst);   // untouchable through the burst
+    combo.reset();
     SoundKit.play('crowdCheer', { volume: 0.5 });
     ctx.feel?.impact?.(0.9);
     const origin = player.root.position.clone();
     EffectsKit.burst(ctx.scene, origin.add(new Vector3(0, 1.1, 0)), 'glitch');
     EffectsKit.burst(ctx.scene, origin.add(new Vector3(0, 0.4, 0)), 'sparks');
     striking = true;
-    myStrike = { weight: 'finisher', clip: STRIKES.Y.clip, until: performance.now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
+    myStrike = { weight: 'finisher', clip: STRIKES.Y.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
     for (const e of [...enemies]) {
       const to = e.mob.char.root.position.subtract(origin); to.y = 0;
       const d = to.length();
-      if (d > CHI_BURST_RADIUS) continue;
+      if (d > CHI_BURST_RADIUS + perks.burstRadius) continue;
       const dir = d > 0.001 ? to.scale(1 / d) : facingVec();
       const from = e.mob.char.root.position.clone();
       const target = from.add(dir.scale(CHI_BURST_KNOCKBACK));
-      const t0 = performance.now();
-      const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-        const k = Math.min(1, (performance.now() - t0) / 260);
-        e.mob.char.root.position = Vector3.Lerp(from, target, k);
-        if (k >= 1) ctx.scene.onBeforeRenderObservable.remove(obs);
-      });
+      const root = e.mob.char.root;
+      tween(0.26, (k) => { root.position = Vector3.Lerp(from, target, k); });
       EffectsKit.burst(ctx.scene, from.add(new Vector3(0, 1, 0)), 'sparks');
       landHit(ctx, e, true);                                   // the burst launches every body it clears
     }
@@ -281,25 +429,29 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
 
   function strike(ctx: ModeContext, key: keyof typeof STRIKES): void {
-    if (striking || blocking || dodging || myDown.downed) return;   // a downed fighter cannot swing (the tree holds the floor)
+    if (striking || blocking || dodging || myDown.downed || shopOpen) return;   // a downed fighter cannot swing (the tree holds the floor)
     striking = true;
-    const s = STRIKES[key];
+    // REAL MOVES: jab-jab-UPPERCUT — the third light inside the combo window is the finisher (ComboTracker)
+    const finisher = key === 'A' ? isFinisher(combo.light(clockSec)) : (combo.reset(), false);
+    const s = finisher ? STRIKES.Y : STRIKES[key];
     const target = nearest(player.root.position);
     if (target) {
       const to = target.mob.char.root.position.subtract(player.root.position);
       player.root.rotation.y = Math.atan2(to.x, to.z);
     }
-    SoundKit.play('whoosh');
-    myStrike = { weight: STRIKE_WEIGHT[key], clip: s.clip, until: performance.now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
+    SoundKit.play('whoosh', finisher ? { pitch: 0.8, volume: 0.7 } : {});
+    myStrike = { weight: finisher ? 'finisher' : STRIKE_WEIGHT[key], clip: s.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
+    if (finisher) { stats.finishers++; ctx.setHud({ banner: 'FINISHER' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
     setTimeout(() => {
       // everyone in the arc, not the nearest one
       const origin = player.root.position;
-      const hit = enemies.filter((e) => inArc(origin, player.root.rotation.y, e.mob.char.root.position, s.range, s.arcDeg));
-      if (!hit.length) { if (performance.now() - lastHitAt > HIT_CHAIN_MS) { hitCount = 0; ctx.setHud({ hits: 0 }); } return; }
-      const now = performance.now();
-      if (now - lastHitAt > HIT_CHAIN_MS) hitCount = 0;
-      for (const t of [...hit]) landHit(ctx, t, !!s.launch);   // one contact = one body down; heavy adds launch juice
-      hitCount += hit.length; lastHitAt = now;
+      const hit = enemies.filter((e) => inArc(origin, player.root.rotation.y, e.mob.char.root.position, s.range * perks.reach, s.arcDeg + perks.arcDeg));
+      if (!hit.length) { if (now() - lastHitAt > HIT_CHAIN_MS) { hitCount = 0; ctx.setHud({ hits: 0 }); } return; }
+      const t = now();
+      if (t - lastHitAt > HIT_CHAIN_MS) hitCount = 0;
+      if (s.launch) matrix(ctx, finisher ? 'finisher' : 'heavyKo');   // the heavy / the finisher connects: a short Matrix beat
+      for (const e of [...hit]) landHit(ctx, e, !!s.launch);   // one contact = one body down; heavy adds launch juice
+      hitCount += hit.length; lastHitAt = t;
       ctx.setHud({ hits: hitCount });
       if (hit.length >= 3) ctx.feel?.impact?.(0.55);
     }, 150);
@@ -319,35 +471,161 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   function ko(ctx: ModeContext, e: Enemy): void {
     enemies = enemies.filter((x) => x !== e);
     kos++; totalKos++;
-    e.mob.down();
+    e.mob.down();                                               // the owner: knockdown → the floor hold
     ctx.groundLock?.release(e.mob.char.root);
     SoundKit.play('crowdCheer', { volume: 0.4 });
     EffectsKit.burst(ctx.scene, e.mob.char.root.position.add(new Vector3(0, 1, 0)), 'glitch');
     const root = e.mob.char.root;
-    const sink = ctx.scene.onBeforeRenderObservable.add(() => {
-      root.position.y -= 0.012;
-      root.scaling.scaleInPlace(0.94);
-      if (root.position.y < -1.6) { ctx.scene.onBeforeRenderObservable.remove(sink); e.mob.char.dispose(); }
-    });
+    const at = root.position.clone();
+    const drop = drops.onKo(vitals.ratio);
+    if (drop) dropPickup(ctx, at, drop);
+    // the body holds the floor for a beat, then sinks and shrinks out (on the game clock — a slow-mo beat slows it too)
+    const y0 = at.y, s0 = root.scaling.clone();
+    tween(2.4, (k) => {
+      const q = Math.max(0, (k - 0.3) / 0.7);                  // the first 0.7 s: the body lies there
+      root.position.y = y0 - 1.6 * q;
+      root.scaling = s0.scale(Math.max(0.02, 1 - q * q));
+    }, () => e.mob.char.dispose());
     ctx.setHud({ kos: totalKos });
     if (enemies.length === 0) {
       SoundKit.play('whistle');
+      matrix(ctx, 'waveClear');
       ctx.setHud({ banner: `WAVE ${wave} CLEAR · ${kos} DOWN` });
-      setTimeout(() => { ctx.setHud({ banner: '' }); void spawnWave(ctx); }, CFG.waveClearBeatMs);
+      for (let i = 0; i < DROPS.waveClearShards; i++) { const a = (i / DROPS.waveClearShards) * Math.PI * 2; dropPickup(ctx, at.add(new Vector3(Math.sin(a) * 0.7, 0, Math.cos(a) * 0.7)), 'shard'); }
+      setTimeout(() => { ctx.setHud({ banner: '' }); openShop(ctx); }, CFG.waveClearBeatMs);
+    }
+  }
+
+  // ── the agents' attack cycle (EnemyBrain steps on the GAME clock — the slow-mo slows the telegraph, that is the point) ──
+  const attackers = () => enemies.filter((e) => e.brain.attacking).length;
+
+  /** The steering reached the player: the agent squares up and winds up — or, capped out, circles and presses again. */
+  function agentContact(ctx: ModeContext, e: Enemy, i: number): void {
+    e.mob.hold();
+    if (attackers() < maxAttackers(wave)) {
+      const kick = wave >= ENEMY_ATTACK.kick.fromWave && (i + wave) % 3 === 0;
+      e.brain.engage(kick ? 'kick' : 'jab');
+      e.anim.loop(AGENT_WINDUP, { fadeSec: 0.12 });
+      SoundKit.play('uiTick', { pitch: 0.7, volume: 0.25 });
+    } else {
+      e.orbitUntil = clockSec + ORBIT_SEC; stats.orbits++;
+      e.anim.loop(AGENT_STEP, { fadeSec: 0.16, speedRatio: 0.8 });   // circling on the guard step
+    }
+  }
+  function tickAgents(ctx: ModeContext, dt: number): void {
+    // the pack fans out (separate()) — a horde, not a conga line; only the chasers move for it
+    const chasers = enemies.filter((e) => e.brain.phase === 'pursue' && e.orbitUntil === 0);
+    if (chasers.length > 1) {
+      const off = separate(chasers.map((e) => ({ x: e.mob.char.root.position.x, z: e.mob.char.root.position.z })), SEPARATION_M);
+      const k = Math.min(1, 6 * dt);
+      chasers.forEach((e, j) => { const p = e.mob.char.root.position; p.x += off[j].x * k; p.z += off[j].z * k; clampDisc(p); });
+    }
+    for (const e of enemies) {
+      const root = e.mob.char.root;
+      const busy = e.brain.phase !== 'pursue' || e.orbitUntil > 0;
+      if (!busy) continue;
+      // a squared-up agent tracks you (the wind-up faces where you ARE — the read is honest)
+      if (e.brain.phase !== 'strike') {
+        const to = player.root.position.subtract(root.position);
+        const want = Math.atan2(to.x, to.z); let d = want - root.rotation.y;
+        while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+        const step = AGENT_TURN_RATE * dt;
+        e.mob.setYaw(root.rotation.y + Math.max(-step, Math.min(step, d)));
+      }
+      if (e.orbitUntil > 0) {
+        // capped out: circle the player at ENEMY_ATTACK.orbitSpeed, then press again
+        const to = player.root.position.subtract(root.position); to.y = 0; const dist = to.length();
+        if (dist > 0.01) { const tang = new Vector3(-to.z, 0, to.x).scale(e.orbitDir / dist); root.position.addInPlace(tang.scale(ENEMY_ATTACK.orbitSpeed * dt)); clampDisc(root.position); }
+        if (clockSec >= e.orbitUntil) { e.orbitUntil = 0; e.mob.resume(); }
+        continue;
+      }
+      const ev = e.brain.step(dt);
+      if (ev === 'strike') {
+        e.anim.beat(e.brain.strike === 'kick' ? SPORT_CLIP.karateKick : SPORT_CLIP.karateJab, { fadeSec: 0.09 });   // 0.09: the chambered fist → the jab's start is a long hop (0.34 m/frame at 0.06, measured)
+        e.anim.loop(STANCE, { fadeSec: 0.12 });         // where the swing settles (recorded, never played under the beat)
+        SoundKit.play('whoosh', { pitch: 0.85, volume: 0.35 });
+        stats.strikesAt++;
+      } else if (ev === 'land') {
+        if (inArc(root.position, root.rotation.y, player.root.position, ENEMY_ATTACK.hitRange, AGENT_STRIKE_ARC_DEG)) agentHitsPlayer(ctx, e);
+      } else if (ev === 'resume') e.mob.resume();
+    }
+  }
+
+  /** An agent's strike reaches the player: dodge i-frames (a late one = the perfect read), then the core's vitals —
+   *  the post-hit window, the guard's chip (never a drop), or a clean hit on the pool. DOWN only at zero. */
+  function agentHitsPlayer(ctx: ModeContext, e: Enemy): void {
+    if (myDown.downed) return;
+    if (iframeSec > 0) {
+      stats.dodged++;
+      if (iframeSec > DODGE_IFRAME_SEC + perks.iframeBonus - PERFECT_WINDOW_SEC && matrix(ctx, 'perfectDodge')) {
+        stats.perfect++;
+        gainChi(ctx, 12);
+        ctx.setHud({ banner: 'BULLET TIME' });
+        setTimeout(() => ctx.setHud({ banner: '' }), 800);
+      } else gainChi(ctx, 5);
+      return;
+    }
+    const outcome = vitals.takeHit(enemyHitDamage(wave, e.brain.strike), { blocking });
+    if (outcome === 'iframe') return;                          // still reeling from the last one — no double-tap
+    lastHurtAt = clockSec; combo.reset();
+    if (outcome === 'blocked') {
+      // the guard ABSORBS — a shove, a sliver of chip, pressure not a beating
+      stats.blocked++;
+      impactUntil = now() + IMPACT_SEC * 1000; meTree.clearBeat('guard_impact');
+      gainChi(ctx, 2); ctx.feel?.impact?.(0.2);
+      SoundKit.play('impact', { pitch: 0.8, volume: 0.3 });
+      shove(e, VITALS.knockbackM * 0.4);
+      publishHp(ctx);
+      return;
+    }
+    // a CLEAN hit: the pool takes it, the body reels, the horde waits out the stagger. NEO ARMOUR: a jab never
+    // interrupts a swing in flight (the fighter trades through it — the pool pays, the punch lands); a kick does.
+    stats.hitsTaken++;
+    if (!striking || e.brain.strike === 'kick') {
+      hitWeight = e.brain.strike === 'kick' ? 'medium' : 'light'; hitUntil = now() + REACT_SEC * 1000;
+      meTree.clearBeat('react_light', 'react_medium');
+      striking = false; myStrike = null;                        // the hit interrupts the swing
+    } else stats.traded++;
+    gainChi(ctx, 4);
+    ctx.feel?.impact?.(e.brain.strike === 'kick' ? 0.55 : 0.4);
+    EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
+    shove(e, VITALS.knockbackM);
+    publishHp(ctx);
+    if (outcome === 'down') downPlayer(ctx);
+  }
+  function shove(e: Enemy, metres: number): void {
+    const dir = player.root.position.subtract(e.mob.char.root.position); dir.y = 0;
+    if (dir.lengthSquared() < 1e-4) dir.copyFrom(facingVec().scale(-1)); else dir.normalize();
+    const from = player.root.position.clone(), to = from.add(dir.scale(metres)); clampDisc(to);
+    tween(0.14, (k) => { if (!dodging) player.root.position = Vector3.Lerp(from, to, k); });
+  }
+  function downPlayer(ctx: ModeContext): void {
+    vitals.hp = 0; publishHp(ctx); stats.downs++; combo.reset(); hitUntil = 0;   // the knockdown, not a flinch first
+    striking = false; myStrike = null; blocking = false;
+    if (!partnerDown.downed) {
+      // Phase 8 co-op rule kept: DOWN (not out) while the partner stands — they can revive you
+      myDown.down(clockSec);
+      SoundKit.play('crowdGroan');   // the tree: knockdown → the floor until the revive, then the get-up
+      ctx.setHud({ banner: 'YOU ARE DOWN — PARTNER CAN REVIVE YOU' });
+    } else {
+      SoundKit.play('crowdGroan');
+      outFlag = true; animate(0, 0);   // KO: the tree's knockdown → floor
+      endSlowMo(ctx);
+      ctx.end(`WAVE_${wave}`, totalKos * 100 + wave * 50, { wave, kos: totalKos });
     }
   }
 
   /** Once per frame: the player's and the partner's trees (ANIM-READABILITY — the one owner of their clips). */
   function animate(mySpeed01: number, partnerSpeed01: number): void {
     if (!meTree || !partnerTree) return;
-    const t = performance.now();
+    const t = now();
     if (myStrike && t > myStrike.until) { striking = false; myStrike = null; }   // a strike the tree never settled (safety, never measured)
     if (pStrike && t > pStrike.until) pStrike = null;
     const mine: CombatAnimInput = {
       speed01: blocking || myDown.downed ? 0 : mySpeed01, dashing: false, hasWeapon: false,
       striking: myStrike?.weight ?? null, strikeClip: myStrike?.clip,
-      blocking, dodging, parryFlash: false, guardImpactFlash: t < impactUntil,
-      hitBy: null, down: myDown.downed, out: outFlag, ulting: false,
+      blocking, dodging, dodgeClip, parryFlash: false, guardImpactFlash: t < impactUntil,
+      hitBy: t < hitUntil ? hitWeight : null, down: myDown.downed, out: outFlag, ulting: false,
     };
     meTree.update(mine);
     partnerTree.update({
@@ -357,30 +635,47 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
 
   function tryDodge(ctx: ModeContext): void {
-    if (dodging || striking || myDown.downed) return;
+    if (dodging || striking || myDown.downed || shopOpen) return;
     dodging = true;
-    iframeSec = DODGE_IFRAME_SEC;
-    const dir = Math.hypot(stickX, stickY) > 0.2
-      ? new Vector3(stickX, 0, -stickY).normalize()
-      : facingVec().scale(-1);            // no input = dodge backward
+    iframeSec = DODGE_IFRAME_SEC + perks.iframeBonus;
+    combo.reset();
+    const steered = Math.hypot(stickX, stickY) > 0.2;
+    const dir = steered
+      ? ctx.camDirector.stickWorldLatched(stickX, stickY).normalize()
+      : facingVec().scale(-1);            // no input = dodge backward: the LEAN
+    dodgeClip = steered ? DODGE_SLIP : LEAN_DODGE;
     SoundKit.play('whoosh', { pitch: 1.5, volume: 0.4 });
     const from = player.root.position.clone();
-    const to = from.add(dir.scale(DODGE_DISTANCE));
-    const t0 = performance.now();
-    const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-      const k = Math.min(1, (performance.now() - t0) / 320);
-      player.root.position = Vector3.Lerp(from, to, k);
-      if (k >= 1) {
-        ctx.scene.onBeforeRenderObservable.remove(obs);
-        dodging = false;   // the tree's dodge settles on its own
-      }
-    });
+    const to = from.add(dir.scale(DODGE_DISTANCE * perks.dodgeMult)); clampDisc(to);
+    // on the GAME clock: a perfect read's slow-mo stretches the slide with the lean
+    tween(DODGE_SLIDE_SEC, (k) => { player.root.position = Vector3.Lerp(from, to, 1 - (1 - k) * (1 - k)); }, () => { dodging = false; });   // the tree's dodge settles on its own
+  }
+
+  const nextLandIn = (): number => {
+    let best = -1;
+    for (const e of enemies) {
+      const b = e.brain; if (!b.attacking) continue;
+      const left = b.phase === 'windup' ? windupSecFor(b.wave) - b.t + b.landAt : b.landAt - b.t;
+      if (left >= 0 && (best < 0 || left < best)) best = left;
+    }
+    return best;
+  };
+  function publishTelemetry(ctx: ModeContext): void {
+    if (process.env.NODE_ENV !== 'development') return;
+    const md = (ctx.scene.metadata ??= {}) as Record<string, unknown>;
+    md.karateNeo = {
+      hp: Math.round(vitals.hp), hpMax: vitals.maxHp, wave, coins: shards, chi: Math.round(chi), slowMo: +slowmo.sec.toFixed(3), slowMoKind: slowmo.kind ?? '', slowMos: slowmo.episodes, timeScale: ctx.scene.animationTimeScale,
+      attackers: attackers(), enemies: enemies.length, shop: shopOpen, down: myDown.downed, partnerRoot: partner?.root.name ?? '',
+      nextLandIn: +nextLandIn().toFixed(3),   // seconds until the nearest agent's strike lands (−1 = none in flight) — the probe's perfect-dodge driver
+      ...stats,
+    };
   }
 
   return {
     modeId: 'karate', mood: 'dojoWarm', camPreset: 'overShoulder',
 
     async load(ctx) {
+      sceneRef = ctx.scene;
       // Build the arena FIRST so the M37 spawn guard sees a populated world
       // (>=8 meshes) and the dojoWarm ambient bed has somewhere to live.
       karateVenue = mountVenue(ctx, 'karate_endless', { keepGameplayCamera: true });
@@ -408,24 +703,34 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       ctx.groundLock?.track(partner.root, partner.skeleton);
       meTree = new CombatAnimTree(player.animator);
       partnerTree = new CombatAnimTree(partner.animator);
-      meTree.onSettle = (st) => { if (st.startsWith('strike_')) { striking = false; myStrike = null; } };
+      meTree.onSettle = (st) => {
+        if (!st.startsWith('strike_')) return;
+        striking = false; myStrike = null;
+        // a press inside the swing is not eaten: the harness buffers every button-down (gameFeel) — the next strike
+        // fires on the settle, so jab-jab-jab chains into the finisher at the clip's own cadence
+        for (const k of ['A', 'B', 'Y'] as const) if (ctx.feel?.buffer?.consume(k)) { strike(ctx, k); break; }
+      };
       partnerTree.onSettle = (st) => { if (st.startsWith('strike_')) pStrike = null; };
-      myStrike = null; pStrike = null; impactUntil = 0; outFlag = false;
+      myStrike = null; pStrike = null; impactUntil = 0; outFlag = false; hitUntil = 0;
 
       localSource = new LocalInputSource();
       playerSlot = new PlayerSlot('player', localSource, true);
       partnerSlot = new PlayerSlot('partner', new PartnerAISource(
         () => partner.root.position, () => nearest(partner.root.position)?.mob.char.root.position ?? null, 1.6,
+        () => (myDown.downed ? player.root.position : null),
       ), false);
 
       pool = new MobPool();
-      wave = 0; totalKos = 0; chi = 0; enemies = [];
-      striking = false; blocking = false; dodging = false; xHoldSec = -1; iframeSec = 0; slowMoSec = 0;
+      wave = 0; totalKos = 0; chi = 0; enemies = []; pickups = []; tweens = []; shards = 0; shop.owned.clear(); shop.sel = 0;
+      perks = shop.state(); vitals.setMax(perks.maxHp, true); vitals.iframeSec = 0; hpShown = -1; lastHurtAt = -1e9;
+      combo.reset(); shopOpen = false;
+      striking = false; blocking = false; dodging = false; xHoldSec = -1; iframeSec = 0; endSlowMo(ctx);
       ctx.camDirector.snapTo(player.root.position, player.root.position.add(facingVec()));
       karateVenue?.hidePlaceholders();  // M74
       SoundKit.startAmbient('dojo');
       await spawnWave(ctx);
-      ctx.setHud({ chi, hint: 'One strike drops a body · one clean hit drops YOU — quick-tap BLOCK to dodge, hold to guard · R1 = CHI BURST' });
+      publishHp(ctx, true);
+      ctx.setHud({ chi, coins: shards, hint: 'Agents wind up before they swing — tap BLOCK at the last instant for BULLET TIME · hold BLOCK to guard · JAB ×3 = FINISHER · R1 = CHI BURST · walk over the drops' });
     },
 
     onInput(ctx, e: FelInput) {
@@ -433,6 +738,17 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       localSource.feed(e);
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
+      if (shopOpen) {
+        // the shop: ◀ ▶ (or ▲ ▼) browse, A buys, B fights now
+        if (e.t === 'dpad' && e.pressed) {
+          shop.move(e.dir === 'right' || e.dir === 'down' ? 1 : -1);
+          SoundKit.play('uiTick', { volume: 0.3 }); publishShop(ctx);
+        }
+        if (e.t === 'button' && e.pressed && e.btn === 'A') buySelected(ctx);
+        if (e.t === 'button' && e.pressed && e.btn === 'B') closeShop(ctx);
+        if (e.t === 'button' && e.btn === 'X') { xHoldSec = -1; blocking = false; }
+        return;
+      }
       if (e.t === 'button' && e.pressed) {
         if (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y') strike(ctx, e.btn);
         if (e.btn === 'X') xHoldSec = 0;
@@ -448,17 +764,20 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
     update(ctx, dtReal) {
       clockSec += dtReal;
-      if (hitCount > 0 && performance.now() - lastHitAt > HIT_CHAIN_MS) { hitCount = 0; ctx.setHud({ hits: 0 }); }
+      if (hitCount > 0 && now() - lastHitAt > HIT_CHAIN_MS) { hitCount = 0; ctx.setHud({ hits: 0 }); }
       // Phase 8: down/revive tick
       if (myDown.downed) {
         const near = Vector3.Distance(partner.root.position, player.root.position) <= REVIVE_RANGE;
         if (myDown.channel(dtReal, near)) {
           myDown.revive();
+          vitals.revive(); publishHp(ctx);                      // VITALS.reviveRatio of the pool, with room to stand up (reviveIframeSec)
+          lastHurtAt = clockSec;
           SoundKit.play('powerUp', { pitch: 1.1 });
           ctx.setHud({ banner: 'REVIVED — BACK IN THE FIGHT' });   // the tree rises through the get-up
           setTimeout(() => ctx.setHud({ banner: '' }), 900);
-        }
+        } else ctx.setHud({ revive: near ? `PARTNER REVIVING ${Math.round(myDown.channelSec / 3 * 100)}%` : '' });
         if (myDown.bledOut(clockSec)) {
+          endSlowMo(ctx);
           return ctx.end(`WAVE_${wave}`, totalKos * 100 + wave * 50, { wave, kos: totalKos });
         }
       }
@@ -480,14 +799,29 @@ export const KarateEndlessMode: ModeDefinition = (() => {
           ctx.setHud({ banner: 'PARTNER BLED OUT' });
         }
       }
-      slowMoSec = Math.max(0, slowMoSec - dtReal);
-      const dt = slowMoSec > 0 ? dtReal * SLOWMO_SCALE : dtReal;
+      // the one clock: the Matrix beat counts down on the real clock, everything in the ring runs at its scale
+      const wasSlow = slowmo.active;
+      slowmo.tick(dtReal);
+      if (wasSlow && !slowmo.active) ctx.scene.animationTimeScale = 1;
+      const dt = dtReal * slowmo.scale;
+      // the shop: the horde is down, the clock runs out into the next wave
+      if (shopOpen && now() >= shopUntil) closeShop(ctx);
 
       if (xHoldSec >= 0) {
         xHoldSec += dtReal;
         if (xHoldSec * 1000 >= DODGE_TAP_MS && !blocking && !dodging) blocking = true;   // the tree shows the block
       }
       iframeSec = Math.max(0, iframeSec - dtReal);
+      vitals.tick(dtReal);
+      // out of contact the pool refills — the run is a beating survived, not attrition
+      if (!myDown.downed && vitals.hp < vitals.maxHp && clockSec - lastHurtAt > HP_REGEN_DELAY_SEC) { vitals.heal(HP_REGEN_PER_SEC * dt); publishHp(ctx); }
+
+      // game-clock tweens (the dodge slide, the shove, the spawn-in, the burst knockback, the KO sink)
+      if (tweens.length) {
+        const keep: Tween[] = [];
+        for (const tw of tweens) { tw.t += dt; const k = Math.min(1, tw.t / tw.dur); tw.step(k); if (k >= 1) tw.done?.(); else keep.push(tw); }
+        tweens = keep;
+      }
 
       playerSlot.poll(dt);
       partnerSlot.poll(dt);
@@ -497,19 +831,14 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // ran screen-LEFT once the camera had swung). Up = the camera's flat forward, right = screen right; no axis flipped.
       // The basis LATCHES while the stick is held (the over-shoulder camera swings behind every turn — a live basis
       // spun the fighter on the spot on a held stick-right: 0.26 m/s net, measured); a push runs straight.
-      const vel = ctx.camDirector.stickWorldLatched(stickX, stickY).scaleInPlace(3);
-      let mySpeed01 = Math.min(1, vel.length() / 3);   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
-      if (!striking && !blocking && !dodging && vel.lengthSquared() > 0.05) {
+      const vel = ctx.camDirector.stickWorldLatched(stickX, stickY).scaleInPlace(3 * perks.speedMult);
+      let mySpeed01 = Math.min(1, vel.length() / (3 * perks.speedMult));   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
+      if (!striking && !blocking && !dodging && !myDown.downed && vel.lengthSquared() > 0.05) {   // the shop never freezes the feet: the ring is empty, the drops are yours to walk over
         const before = player.root.position.clone();
         player.root.position.addInPlace(vel.scale(dt));
         // Inset from the mat so the camera always has somewhere to stand behind
         // the player — see ARENA_RADIUS.
-        const pr = Math.hypot(player.root.position.x, player.root.position.z);
-        if (pr > ARENA_RADIUS) {
-          const k = ARENA_RADIUS / pr;
-          player.root.position.x *= k;
-          player.root.position.z *= k;
-        }
+        clampDisc(player.root.position);
         player.root.rotation.y = Math.atan2(vel.x, vel.z);
         if (dt > 0 && Vector3.Distance(before, player.root.position) / dt < 0.3) mySpeed01 = 0;   // pinned on the ring's edge: no stepping on the spot
       }
@@ -521,52 +850,20 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       partner.root.position.x = Math.max(-8, Math.min(8, partner.root.position.x));
       partner.root.position.z = Math.max(-8, Math.min(8, partner.root.position.z));
       if (pVel.lengthSquared() > 0.05) partner.root.rotation.y = Math.atan2(pVel.x, pVel.z);
-      if (pIntent.action) {
+      if (pIntent.action && !shopOpen) {
         const t = nearest(partner.root.position);
-        if (!pStrike) pStrike = { weight: 'light', clip: SPORT_CLIP.karateJab, until: performance.now() + STRIKE_MAX_SEC * 1000 };   // one jab per swing — the tree plays it
+        if (!pStrike) pStrike = { weight: 'light', clip: SPORT_CLIP.karateJab, until: now() + STRIKE_MAX_SEC * 1000 };   // one jab per swing — the tree plays it
         if (t && Vector3.Distance(t.mob.char.root.position, partner.root.position) < 1.8) landHit(ctx, t, false);   // the partner's land drops a body too
       }
 
-      // enemy contact — dodge i-frames make you untouchable; a hit landed
-      // during the LAST 90ms of the i-frame window counts as a "perfect"
-      // dodge and rewards the slow-mo beat
-      const contacts = pool.update(dt, player.root.position, vel);
+      // the horde: the steering closes; a contact is a SQUARE-UP, the hit comes off the wind-up (tickAgents)
+      const contacts = pool.update(dt, player.root.position, vel, ENEMY_ATTACK.engageRange);
       for (const mob of contacts) {
-        if (iframeSec > 0) {
-          if (iframeSec < 0.09 && slowMoSec <= 0) {
-            slowMoSec = PERFECT_DODGE_SLOWMO_SEC;
-            SoundKit.play('powerUp', { pitch: 0.6 });
-            ctx.setHud({ banner: 'PERFECT DODGE' });
-            setTimeout(() => ctx.setHud({ banner: '' }), 700);
-          }
-          mob.onContactResolved();
-          gainChi(ctx, 5);
-          continue;
-        }
-        mob.onContactResolved();
-        if (blocking) {
-          // a guard ABSORBS the hit — pressure, not chip: no bar ticks down
-          impactUntil = performance.now() + IMPACT_SEC * 1000; meTree.clearBeat('guard_impact');   // the guard is shoved back (readable)
-          gainChi(ctx, 2); ctx.feel?.impact?.(0.2);
-          SoundKit.play('impact', { pitch: 0.8, volume: 0.3 });
-          continue;
-        }
-        // ONE CLEAN CONTACT PUTS YOU DOWN (P0 identity — no 3 / 10 chip, no HP bar as the loop).
-        gainChi(ctx, 4);
-        ctx.feel?.impact?.(0.6);
-        if (myDown.downed) continue;                         // already down — nothing more to take
-        if (!partnerDown.downed) {
-          // Phase 8 co-op rule kept: DOWN (not out) while the partner stands — they can revive you
-          myDown.down(clockSec);
-          SoundKit.play('crowdGroan');   // the tree: knockdown → the floor until the revive, then the get-up
-          striking = false; myStrike = null;
-          ctx.setHud({ banner: 'YOU ARE DOWN — PARTNER CAN REVIVE YOU' });
-        } else {
-          SoundKit.play('crowdGroan');
-          outFlag = true; striking = false; myStrike = null; animate(mySpeed01, pVel.length() / 2.6);   // KO: the tree's knockdown → floor
-          return ctx.end(`WAVE_${wave}`, totalKos * 100 + wave * 50, { wave, kos: totalKos });
-        }
+        const idx = enemies.findIndex((e) => e.mob === mob);
+        if (idx >= 0 && enemies[idx].brain.phase === 'pursue' && enemies[idx].orbitUntil === 0) agentContact(ctx, enemies[idx], idx);
       }
+      tickAgents(ctx, dt);
+      tickPickups(ctx, dt);
 
       // camera: locked behind the player's FACING (not the nearest enemy) —
       // pass a full-magnitude facing-direction vector as "velocity" so the
@@ -585,13 +882,18 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       ctx.camDirector.look(lookX, lookY, dtReal);
       ctx.camDirector.update(player.root.position, facingVec(), nearest(player.root.position)?.mob.char.root.position ?? null);
       animate(mySpeed01, Math.min(1, pVel.length() / 2.6));
+      publishTelemetry(ctx);
     },
 
-    dispose() { crowd?.dispose(); crowd = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient(); },
+    dispose() {
+      if (sceneRef) { sceneRef.animationTimeScale = 1; sceneRef = null; }
+      for (const p of pickups) { p.mesh.material?.dispose(); p.mesh.dispose(); }
+      pickups = []; tweens = [];
+      crowd?.dispose(); crowd = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient();
+    },
   };
 })();
 
-// HUD fields: no hp / partnerHp since the A+ identity P0 (one-knock both ways). Formerly: partnerHp (0-100 — currently
-// cosmetic since the ally can't be knocked out in this pass; wire a real
-// down-state if wanted). Existing fields (wave, enemies, hp, chi, kos,
-// banner, hint) unchanged.
+// HUD fields: hp (KARATE-NEO-COOP: the toughness pool, 0–100 of the max — the bezel draws the bar when a mode publishes
+// one), chi, wave, enemies, kos, hits, coins (= the run's shards), perks (PerkShop.hudLine: '▶' the cursor, '✓' owned),
+// revive (the partner's channel), banner, hint. partnerHp is not published (the ally cannot be knocked out in this pass).

@@ -46,6 +46,8 @@ export interface CombatAnimInput {
   falling?: boolean;
   /** The i-frame dodge roll (Karate endless). */
   dodging?: boolean;
+  /** The dodge's own clip (KARATE-NEO-COOP: the lean with no stick held, the juke with one); the juke plays when absent. */
+  dodgeClip?: string;
   ulting: boolean;
   celebrating?: boolean;
 }
@@ -73,7 +75,7 @@ const CLIP_FOR: Record<CombatAnimState, { clip: string; loop: boolean; fadeSec: 
   fall:            { clip: 'football_tackled_fall', loop: false, fadeSec: 0.06 },
   floor:           { clip: 'karate_floor_hold', loop: true, fadeSec: 0.15 },
   get_up:          { clip: 'karate_get_up', loop: false, fadeSec: 0.1 },
-  dodge:           { clip: 'football_juke_left', loop: false, fadeSec: 0.06 },
+  dodge:           { clip: 'karate_evade', loop: false, fadeSec: 0.1 },    // KARATE-NEO-COOP: the authored slip (was the football juke — the walk at 1.8×); 0.1: the stance → the slip / the lean is a 0.5 m hand move (0.3 m/frame at 0.06, measured)
   ultimate:        { clip: 'karate_counter_throw', loop: false, fadeSec: 0.08 },
   celebrate:       { clip: 'karate_victory_pose', loop: false, fadeSec: 0.2 },
 };
@@ -99,6 +101,7 @@ export function chooseCombatClip(i: CombatAnimInput): CombatClipChoice {
   else state = i.hasWeapon ? 'idle_weapon' : 'idle';
   const c = pick(state);
   if (i.strikeClip && state.startsWith('strike_')) c.clip = i.strikeClip;
+  if (i.dodgeClip && state === 'dodge') c.clip = i.dodgeClip;
   return c;
 }
 
