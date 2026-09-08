@@ -23,11 +23,26 @@
 //              phone sends power we bias the arc, but the TIMING is still what
 //              decides the make, so a button-only controller is not handicapped.
 //   'charge' — live 0..1 wind-up, streamed for the on-screen power ring.
+//
+// BIOMECH-HOOPS-WAVE1 (2026-09-08) — the dunk contest's body control, ported (SPEC-BIOMECH-HOOPS-WAVE1 G1–G6):
+//   G6 the ball rides the shooting HAND (attachBallToHand) through the jog and the load, and leaves it at the jumpshot's
+//      release frame from where the hand is — it used to float 1.9 m over the root and start its arc from there;
+//   G1 the jog to the next rack faces the travel (the body ran sideways between racks), the load slews onto the rim (a
+//      snap at arrival before); G2 the jog carries the ball two-handed at the chest (HandIK) — not an empty-handed run;
+//   G5 the shot holds its FOLLOW-THROUGH (the authored beat, then the eyes on the iron through the arc) instead of
+//      dropping to the idle; the shared Posture Poses layer (anim/PostureLayer) squares the chest to the rim through the
+//      load / release / follow and keeps the eyes on the iron.
 
 import { SPORT_CLIP } from '../anim/clipRegistry';
 import { SHOT_TARGET as HUD_TARGET, PERFECT_BAND as HUD_PERFECT, GOOD_BAND as HUD_GOOD, heatLevel, pointsLeft, FIRE_STREAK } from '../core/shootoutHud';
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
-import type { Mesh } from '@babylonjs/core';
+import type { Mesh, Observer, Scene } from '@babylonjs/core';
+import { attachBallToHand, releaseBall } from '../anim/ballRig';
+import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1
+import { armChain, reachArm, type ArmChain } from '../anim/HandIK';
+import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
+import { slewYaw, yawTo, yawOfVel } from '../core/Biomech';
+import { RELEASE_FRAME_01 } from '../core/BallHandling';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -165,6 +180,33 @@ let disposeCount = 0;
 let hoopJuice: HoopJuice | null = null;   // juice-only ring + net + material clones at RIM; no meshy_hoop_* transform is touched
 let contactLatch = false;                 // one landing beat per ball — never re-fired by the HUD or the rack advance
 let landing: { perfect: boolean; money: boolean } = { perfect: false, money: false };   // what the release decided, for the landing beat
+// ── BIOMECH-HOOPS-WAVE1 (2026-09-08) ────────────────────────────────────────────────────────────────────────────
+let posture: { layer: PostureLayer; dispose(): void } | null = null;
+let carryObs: Observer<Scene> | null = null, carryScene: Scene | null = null;
+let arms: { Left: ArmChain | null; Right: ArmChain | null } | null = null;
+let carryK = 0;                            // the two-hand chest carry's weight (eased in for the jog, out for the load)
+const bio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE, role: 'offense', hasBall: true };
+let shotWin: ShotWindow = 'none', shotSec = 0;
+let releaseIn = -1;                        // seconds until the ball leaves the hand (the jumpshot's release frame); −1 = none pending
+let pendingMade = false;
+/** The jumpshot's pace on the release: the timing decision is the press, the ball leaves at the clip's release frame
+ *  RELEASE_FRAME_01 · 0.9 s / 1.5 ≈ 0.27 s later — the hand, not a point over the head. */
+const SHOT_CLIP_SPEED = 1.5;
+const FACE_RATE = 10, FACE_RIM_RATE = 8;
+/** The jog's two-hand carry: both hands on the ball at the chest, solved off this frame's shoulders (after the posture
+ *  layer, so the arms follow the posed chest). The pole keeps the elbows out and down, never into the ribs. */
+function carryApply(): void {
+  if (!player || !arms || !arms.Left || !arms.Right || carryK <= 0.001) return;
+  const L = arms.Left, R = arms.Right;
+  L.shoulder.computeWorldMatrix(true); R.shoulder.computeWorldMatrix(true);
+  const ls = L.shoulder.getAbsolutePosition(), rs = R.shoulder.getAbsolutePosition();
+  const side = rs.subtract(ls); side.y = 0; if (side.lengthSquared() < 1e-6) return; side.normalize();
+  const yaw = player.root.rotation.y; const fwd = new Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+  const carry = ls.add(rs).scale(0.5).addInPlace(fwd.scale(0.30)).addInPlace(new Vector3(0, -0.30, 0));
+  const w = carryK * carryK * (3 - 2 * carryK) * 0.85;
+  reachArm(R, carry.add(side.scale(0.12)), side.scale(0.7).add(new Vector3(0, -0.35, 0)).subtract(fwd.scale(0.3)), w);
+  reachArm(L, carry.subtract(side.scale(0.12)), side.scale(-0.7).add(new Vector3(0, -0.35, 0)).subtract(fwd.scale(0.3)), w);
+}
 
 const S = {
   phase: 'move' as Phase,
@@ -225,6 +267,8 @@ function resetRun(): void {
   S.phase = 'move'; S.rack = 0; S.ballIdx = 0; S.pts = 0; S.streak = 0;
   S.clock = GAME_LEN; S.barT = 0; S.moveT = 0; S.charge = 0; S.fired = false;
   S.from.copyFrom(RACK_POS[0]);
+  shotWin = 'none'; releaseIn = -1;
+  if (player && ball) attachBallToHand(ball, player.skeleton, 'RightHand');   // BIOMECH-HOOPS-WAVE1
 }
 
 /** Posted shooters by score; anyone still to post sinks to the bottom (their
@@ -293,10 +337,12 @@ function fire(ctx: ModeContext, power?: number): void {
     S.streak = 0;
   }
 
-  // 'jumpshot' is a real registered clip; SPORT_CLIP has no shooting alias.
-  player.animator.play('jumpshot', { speedRatio: 1.05 });
-  ball.position.copyFrom(player.root.position).addInPlace(new Vector3(0, 1.9, 0));
-  arc.start(ball.position.clone(), RIM, made, 'jumper');
+  // 'jumpshot' is a real registered clip; SPORT_CLIP has no shooting alias. BIOMECH-HOOPS-WAVE1: the clip is CUT at its
+  // release frame into the authored FOLLOW-THROUGH (update → flight: the ball leaves the hand there) — chained after the
+  // clip's END it crossfaded from arms-down into the overhead first key, through a T (8–10 T frames a ball, measured).
+  player.animator.play('jumpshot', { speedRatio: SHOT_CLIP_SPEED, onEnd: () => { /* cut at the release; a late end holds */ } });
+  releaseIn = RELEASE_FRAME_01 * (player.animator.durationOf('jumpshot') ?? 0.9) / SHOT_CLIP_SPEED;
+  pendingMade = made;
   S.phase = 'flight';
 
   const money = isMoneyBall(S.ballIdx);
@@ -346,6 +392,8 @@ function missClank(ctx: ModeContext): void {
 function advanceBall(ctx: ModeContext): void {
   S.ballIdx += 1;
   S.fired = false;
+  shotWin = 'none';
+  if (player && ball) attachBallToHand(ball, player.skeleton, 'RightHand');   // BIOMECH-HOOPS-WAVE1 G6: the next ball is in the hand
   if (S.ballIdx >= BALLS_PER_RACK) {
     S.ballIdx = 0;
     S.rack += 1;
@@ -501,7 +549,17 @@ export const ThreePointMode: ModeDefinition = {
     ballMat = new StandardMaterial('tp_ballMat', ctx.scene);
     ball.material = ballMat;
     dressBall();
-    ball.position.copyFrom(RACK_POS[0]).addInPlace(new Vector3(0, 1.9, 0));
+    // BIOMECH-HOOPS-WAVE1 G6: the ball rides the shooting hand (it used to float 1.9 m over the root)
+    attachBallToHand(ball, player.skeleton, 'RightHand');
+    // the Posture Poses layer (chest on the rim, eyes on the iron, feet) — then the jog's two-hand carry, solved after it
+    player.secondary?.setLookTarget(() => null);   // the layer owns the eyes
+    posture?.dispose();
+    posture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => { const { window, pose, legs } = hoopsPose(bio); return { pose, legs, aim: RIM, eyes: RIM, window }; }, '3PT-PP');
+    arms = { Left: armChain(player.skeleton, 'Left'), Right: armChain(player.skeleton, 'Right') };
+    if (carryScene && carryObs) carryScene.onAfterAnimationsObservable.remove(carryObs);
+    carryScene = ctx.scene; carryObs = ctx.scene.onAfterAnimationsObservable.add(carryApply);
+    carryK = 0; shotWin = 'none'; releaseIn = -1;
+    if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; if (dev) dev.hoopsPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ me: { ...bio } }) }; }
     // The objective is the RIM, not the ball. The 'hoops' preset frames hero and
     // objective together (fitTwo), so pointing this at the ball — which sits in
     // the shooter's own hands — gave it two coincident points and the framing
@@ -620,7 +678,9 @@ export const ThreePointMode: ModeDefinition = {
       const k = S.moveT * S.moveT * (3 - 2 * S.moveT);
       player.root.position = Vector3.Lerp(S.from, target, k);
       player.animator.play(k < 1 ? 'run' : 'idle_stand', { loop: true });
-      ball.position.copyFrom(player.root.position).addInPlace(new Vector3(0, 1.9, 0));
+      // BIOMECH-HOOPS-WAVE1 G1: the jog faces its travel (the body ran sideways / backwards to the next rack), slewed
+      const travel = yawOfVel({ x: target.x - S.from.x, z: target.z - S.from.z }, 0.05);
+      if (k < 1 && travel !== null) player.root.rotation.y = slewYaw(player.root.rotation.y, travel, FACE_RATE, dt);
       if (S.moveT >= 1) {
         S.phase = 'shoot';
         S.fired = false;
@@ -632,15 +692,32 @@ export const ThreePointMode: ModeDefinition = {
       // Triangle sweep 0..1..0 — a sine would linger at the extremes and make
       // the sweet spot easier at the top of the arc than the bottom.
       S.barT = (S.barT + dt / BAR_PERIOD) % 1;
-      ball.position.copyFrom(player.root.position).addInPlace(new Vector3(0, 1.9, 0));
-      // Face the rim while loaded.
-      player.root.lookAt(new Vector3(RIM.x, player.root.position.y, RIM.z));
+      // Face the rim while loaded — slewed onto it (BIOMECH-HOOPS-WAVE1 G1/G3: a lookAt snap before), the ball in the hand.
+      player.root.rotation.y = slewYaw(player.root.rotation.y, yawTo(player.root.position, RIM), FACE_RIM_RATE, dt);
     } else if (S.phase === 'flight') {
-      const r = arc.step(dt, ball.position);
-      if (r === 'made') contactMake(ctx);          // A+ P0: the hoop answers the make as the ball drops through
-      else if (r === 'missed') missClank(ctx);      // A+ P0: the miss has weight — a clank off the iron, never HoopJuice
-      if (r !== 'flying') advanceBall(ctx);
+      player.root.rotation.y = slewYaw(player.root.rotation.y, yawTo(player.root.position, RIM), FACE_RIM_RATE, dt);
+      if (releaseIn >= 0) {
+        // BIOMECH-HOOPS-WAVE1 G6: the ball rides the hand up to the jumpshot's release frame and leaves it from where the
+        // hand IS (the arc used to start from a point 1.9 m over the root on the press, arms still at the hips)
+        releaseIn -= dt;
+        if (releaseIn < 0) {
+          const from = ball.getAbsolutePosition().clone(); releaseBall(ball); arc.start(from, RIM, pendingMade, 'jumper'); shotWin = 'release'; shotSec = 0; releaseIn = -1;
+          player.animator.play('bball_follow_through', { fadeSec: 0.08, onEnd: () => player?.animator.play('idle_stand', { loop: true, fadeSec: 0.2 }) });   // from the release frame: arms overhead → the wrist snap → down the front
+        }
+      } else {
+        const r = arc.step(dt, ball.position);
+        if (r === 'made') contactMake(ctx);          // A+ P0: the hoop answers the make as the ball drops through
+        else if (r === 'missed') missClank(ctx);      // A+ P0: the miss has weight — a clank off the iron, never HoopJuice
+        if (r !== 'flying') advanceBall(ctx);
+      }
     }
+    // BIOMECH-HOOPS-WAVE1: the carry weight (the jog only), the shot's posture clock, this frame's window for the layer
+    carryK += ((S.phase === 'move' && S.moveT < 1 ? 1 : 0) - carryK) * Math.min(1, dt / 0.15);
+    if (shotWin === 'release') { shotSec += dt; if (shotSec >= RELEASE_SEC) shotWin = 'follow'; }
+    Object.assign(bio, {
+      role: 'offense', hasBall: S.phase === 'move' || S.phase === 'shoot' || releaseIn >= 0, speed01: S.phase === 'move' && S.moveT < 1 ? 0.5 : 0,   // the jog is a carry (the dribble stance), not a drive
+      shot: S.phase === 'shoot' || (S.phase === 'flight' && releaseIn >= 0) ? 'load' : S.phase === 'flight' ? shotWin : 'none',
+    } satisfies Partial<HoopsPostureInput>);
 
     // Camera follows the shooter, framed against the rim (the 'hoops' preset
     // fits both). Velocity is derived rather than tracked so the lookAhead term
@@ -663,6 +740,8 @@ export const ThreePointMode: ModeDefinition = {
     // one and must not touch the live objects.
     if (disposeCount < loadCount) return;
     hoopJuice?.dispose(); hoopJuice = null;   // A+ P0: restores any hoop material the punch swapped
+    posture?.dispose(); posture = null;        // BIOMECH-HOOPS-WAVE1
+    if (carryScene && carryObs) carryScene.onAfterAnimationsObservable.remove(carryObs); carryObs = null; carryScene = null; arms = null;
     player?.dispose(); player = null;
     for (const b of rivalBodies) b.dispose(); rivalBodies = [];
     ball?.dispose(); ball = null;

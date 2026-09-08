@@ -14,7 +14,7 @@ import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './foo
 import { buildHitReact, buildKnockdown, buildGuardStep, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
-  buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildDefendSlide, buildBlockReach, buildStealReach,
+  buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
 } from './basketball';
 import { buildBatStance, buildBatSwing, buildPitchOver, buildPitchSide } from './baseball';
 import { buildGolfAddress, buildGolfSwing, buildGolfPutt, buildGolfFinishHold } from './golf';
@@ -121,6 +121,7 @@ export function registerAuthoredClips(
     () => buildDefendSlide(scene, skeleton, 'right'),
     () => buildBlockReach(scene, skeleton),
     () => buildStealReach(scene, skeleton),
+    () => buildFollowThrough(scene, skeleton),   // BIOMECH-HOOPS-WAVE1 (2026-09-08): the shot's follow-through (G5)
     // Baseball packages (Phase 6, 2026-09-03) — the derby borrowed karate clips.
     () => buildBatStance(scene, skeleton),
     () => buildBatSwing(scene, skeleton),

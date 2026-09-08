@@ -25,6 +25,12 @@
 //     the obstacle; clearing it pays, clipping it KILLS the dunk mid-air.
 // (The bench-toss alley-oop — P2 throwing P1's lob — is the duel-native
 // prop and is DEFERRED: it needs a second input surface mid-attempt.)
+//
+// BIOMECH-HOOPS-WAVE1 (2026-09-08): the contest's Posture Poses + feet (DUNK-POSTURE / DUNK-POSTURE-LEGS) on BOTH duel
+// bodies through the shared anim/PostureLayer — the same stance table (core/DunkPosture) on the same flight clock, the
+// chest on the iron, the eyes on the rim, the hip-yaw strip, the feet pointed in the air and flat for the land; the
+// facing keeps easing onto the rim through the resolve (it stopped at the takeoff). The bench body stands in the hoops
+// idle stance, chest and eyes on the dunker.
 
 import { Color3, Color4, MeshBuilder, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, Scene, TransformNode } from '@babylonjs/core';
@@ -41,6 +47,10 @@ import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { boneNode } from '../anim/boneLookup';
 import { EASTBAY_TIMING } from '../anim/authored/timing';
 import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';   // A+ P8 H1 (dunk mirror): the hang wrist reach
+import { PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the contest's Posture Poses, shared
+import { posturePose, type PostureInput } from '../core/DunkPosture';
+import { legPose } from '../core/DunkLegs';
+import { HOOPS_LEGS, HOOPS_POSTURE } from '../core/HoopsPosture';
 import type { PlayOpts } from '../anim/CharacterAnimator';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -115,6 +125,21 @@ export const DunkDuelMode: ModeDefinition = (() => {
   let clipToken = 0;                          // H5: a superseded clip's onEnd chain is dead (Babylon fires it on stop() too)
   let airHeld = false;                        // H5: the aerial clip holds its last frame until feet-down
   let dropToFloor = false;                    // H5: the root falls from the release height (a miss at the clank, a make at CONTACT)
+  // ── BIOMECH-HOOPS-WAVE1: the Posture Poses layer per body (the contest's windows on the active dunker, the idle stance on the bench) ──
+  const postureOf = new WeakMap<SpawnedCharacter, PostureLayer>();
+  let landed = false;                         // feet-down: the land crouch owns the stance until its idle returns
+  function activeFeed() {
+    const inp: PostureInput = {
+      phase: phase === 'approach' || phase === 'charge' || phase === 'cinematic' || phase === 'resolve' ? phase : 'other',
+      clipTime, made: phase === 'resolve' ? qteHit : null, clipped: obstacleClipped, landed, celebrate: false, trick: null,
+    };
+    const { window, pose } = posturePose(inp);
+    return { pose, legs: legPose(dropToFloor && window !== 'land' ? 'brace' : window, null), aim: rim, eyes: rim, window };
+  }
+  function benchFeed(c: SpawnedCharacter) {
+    const other = c === p1 ? p2 : p1;
+    return { pose: HOOPS_POSTURE.idle, legs: HOOPS_LEGS.idle, aim: other.root.position, eyes: ball.getAbsolutePosition(), window: 'bench' };
+  }
   // the contest systems (owner re-lock: the real dunk-contest bar)
   let prop: Prop = 'none';
   let obstacle: DunkObstacle | null = null, obstacleToken = 0;
@@ -182,7 +207,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     setProp(ctx, 'none');
     active().root.position.set(0, 0, CFG.startZ);
     active().root.rotation.y = Math.PI;
-    airHeld = false; dropToFloor = false; handIkT = 0;   // A+ P8
+    airHeld = false; dropToFloor = false; handIkT = 0; landed = false;   // A+ P8
     playClip(SPORT_CLIP.idle, { loop: true });
     bench().root.position.set(4.2, 0, CFG.rimZ + 4);
     bench().animator.play(SPORT_CLIP.idle, { loop: true });
@@ -239,6 +264,10 @@ export const DunkDuelMode: ModeDefinition = (() => {
     const w = HAND_IK_MAX * handIkT * handIkT * (3 - 2 * handIkT);
     if (!p1 || !p2) return;
     const c = active();
+    // BIOMECH-HOOPS-WAVE1: the Posture Poses (thoracic / clavicles / head / hips strip / feet) BEFORE the reach — the wrist
+    // solves against the posed shoulders (the contest's order: postureTick → spin → posture → reach)
+    { const pdt = (ikScene?.getEngine().getDeltaTime() ?? 16) / 1000;
+      for (const body of [p1, p2]) { const L = postureOf.get(body); if (L) L.step(pdt, body === c ? activeFeed() : benchFeed(body)); } }
     if (w > 0.001) {
       let arms = armsOf.get(c);
       if (!arms) { arms = { Left: armChain(c.skeleton, 'Left'), Right: armChain(c.skeleton, 'Right') }; armsOf.set(c, arms); }
@@ -285,9 +314,9 @@ export const DunkDuelMode: ModeDefinition = (() => {
   /** H5: feet-down — the land crouch, then the idle loop. Once per attempt. */
   function landNow(): void {
     if (!airHeld) return;
-    airHeld = false;
+    airHeld = false; landed = true;
     console.info('[HANDS] land dunk_land_crouch');
-    playClip(SPORT_CLIP.dunkLandCrouch, { onEnd: () => playClip(SPORT_CLIP.idle, { loop: true }) });
+    playClip(SPORT_CLIP.dunkLandCrouch, { onEnd: () => { landed = false; playClip(SPORT_CLIP.idle, { loop: true }); } });
   }
 
   /** The chair caught the dunker mid-flight — the dunk DIES here, whatever
@@ -482,6 +511,10 @@ export const DunkDuelMode: ModeDefinition = (() => {
       ctx.groundLock?.track(p2.root, p2.skeleton);
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1: the reach, after the clips
       ikScene = ctx.scene; handIkObs = ctx.scene.onAfterAnimationsObservable.add(handIkApply);
+      // BIOMECH-HOOPS-WAVE1: one Posture Poses layer per body; the layer owns the eyes (the secondary head-look stands down)
+      postureOf.set(p1, new PostureLayer(p1.skeleton, p1.root, 'DUEL-PP-P1')); postureOf.set(p2, new PostureLayer(p2.skeleton, p2.root, 'DUEL-PP-P2'));
+      p1.secondary?.setLookTarget(() => null); p2.secondary?.setLookTarget(() => null);
+      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown; dunkPosture?: unknown } }).__FEL_DEV__; if (dev) { const h = { me: () => postureOf.get(active())?.get() ?? null, bench: () => postureOf.get(bench())?.get() ?? null, foe: () => postureOf.get(bench())?.get() ?? null, get: () => postureOf.get(active())?.get() ?? null }; dev.hoopsPosture = h; dev.dunkPosture = h; } }
 
       ball = MeshBuilder.CreateSphere('duel_ball', { diameter: 0.24 }, ctx.scene);
       ballSim = new BallSim(ball, 0.12);
@@ -652,6 +685,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
 
       if (phase === 'resolve') {
         sinceRelease += dt;
+        if (!obstacleClipped) faceToward(rim, dt * FACE_RIM_RATE);   // BIOMECH-HOOPS-WAVE1 G1: the chest stays on the iron through the jam (the ease stopped at the takeoff)
         // a clipped dunk drops the dunker where the chair caught him, and the
         // chair goes over — the failure has to READ as contact
         if (obstacleClipped) {   // down where the prop caught him: the floor before the side he hit, or the top he caught

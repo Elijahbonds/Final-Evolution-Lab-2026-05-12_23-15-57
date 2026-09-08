@@ -15,6 +15,7 @@ export const BASKETBALL_CLIPS = [
   'bball_dribble_idle', 'bball_crossover_left', 'bball_crossover_right', 'bball_hesi',
   'bball_layup_gather', 'bball_defend_slide_left', 'bball_defend_slide_right',
   'bball_block_reach', 'bball_steal_reach',
+  'bball_follow_through',   // BIOMECH-HOOPS-WAVE1 (2026-09-08): the shot's follow-through, held until the arc resolves (G5)
 ] as const;
 type V3 = [number, number, number];
 
@@ -78,6 +79,20 @@ export function buildBlockReach(scene: Scene, sk: Skeleton): AnimationGroup | nu
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [8, 0, 0] },  hands: { Right: [0.25, 1.00, 0.25], Left: mirror([0.25, 1.00, 0.25]) } },
     { t: 0.25, bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0] }, hands: up, poles: { Right: UP_R, Left: UP_L } },
     { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0] }, hands: { Right: [0.22, 1.98, 0.08], Left: [-0.22, 1.98, 0.08] }, poles: { Right: UP_R, Left: UP_L } },
+  ]);
+}
+
+/** The shot's FOLLOW-THROUGH (BIOMECH-HOOPS-WAVE1, G5 end pose): played from the jumpshot's release frame (both arms
+ *  overhead — the first key matches it, so the crossfade is a continuation, not a swap), the shooting wrist snaps down and
+ *  forward while the arm stays up, the off hand drops to the chest, then both come down the FRONT to a soft-knee stance
+ *  (never out to the sides: the dunk's land clips proved a wide descent blends through a T). One-shot; the tree settles it. */
+export function buildFollowThrough(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const soft: Record<string, Deg3> = { LeftUpLeg: [-12, 0, 6], RightUpLeg: [-12, 0, -6], LeftLeg: [18, 0, 0], RightLeg: [18, 0, 0] };
+  return buildPoseClip(scene, sk, 'bball_follow_through', 0.7, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-6, 0, 4], RightUpLeg: [-6, 0, -4], LeftLeg: [8, 0, 0], RightLeg: [8, 0, 0] }, hands: { Right: [0.18, 2.02, 0.22], Left: [-0.16, 1.92, 0.24] }, poles: { Right: UP_R, Left: UP_L } },
+    { t: 0.15, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [-8, 0, 0], LeftUpLeg: [-6, 0, 4], RightUpLeg: [-6, 0, -4], LeftLeg: [8, 0, 0], RightLeg: [8, 0, 0] }, hands: { Right: [0.22, 1.90, 0.46], Left: [-0.22, 1.55, 0.32] }, poles: { Right: UP_R, Left: UP_L } },   // the wrist snap: the ball hand forward, the arm still up; the off hand drops
+    { t: 0.4,  bones: { Hips: [0, 0, 0], Spine: [2, 0, 0],  Neck: [-6, 0, 0], ...soft }, hands: { Right: [0.24, 1.72, 0.44], Left: [-0.24, 1.30, 0.30] }, poles: { Right: UP_R, Left: [-0.7, -0.2, -0.5] }, hipsY: -0.02 },
+    { t: 0.7,  bones: { Hips: [0, 0, 0], Spine: [8, 0, 0],  Neck: [-4, 0, 0], ...soft }, hands: { Right: [0.26, 1.18, 0.34], Left: [-0.26, 1.12, 0.30] }, hipsY: -0.04 },   // down the front to a ready stance
   ]);
 }
 

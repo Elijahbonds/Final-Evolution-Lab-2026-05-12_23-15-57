@@ -10,10 +10,30 @@
 //   BLOCK ON DEFENSE — opponent possessions are now contestable with a
 //     timed jump (A) around their release, on top of the positional make%
 //     your D already sets. Time it in range and the shot is REJECTED.
+//
+// BIOMECH-HOOPS-WAVE1 (2026-09-08) — the dunk contest's body control, ported (SPEC-BIOMECH-HOOPS-WAVE1 G1–G6), the
+// 1v1's discipline on all six bodies:
+//   G2 ONE owner per rig — BasketballAnimTree on every body (the mode played run / idle per frame on all six and cut every
+//      hit react to a frame; the carrier ran the empty-handed run; the shot metered on the dunk CROUCH then popped to the
+//      jumpshot at the release); the meter now paces the jumpshot to the green, the release flows into the authored
+//      follow-through, HELD until the arc resolves (G5), a make celebrates, a knockdown goes to the floor and gets up.
+//   G1 defenders keep their chest ON the carrier inside range (they faced their travel); on defense I face the driver;
+//      the shooter squares to the rim through the meter and the dunker through the flight; every turn a slew.
+//   G3/G6 the drive dunk resolves at the IRON (flush / clank, the land crouch at feet-down); teammate and rival shots FLY
+//      (they let go of the ball and it hung in the air until the next possession).
+//   G4 a block jump before the driver's release says JUMPED EARLY.
+//   The shared Posture Poses layer (anim/PostureLayer) on all six: chest on the rim / the carrier, eyes on the iron / the
+//   ball, feet flat in the stances, the dunk's flight windows on the drive dunk.
 
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
-import type { AbstractMesh } from '@babylonjs/core';
+import type { AbstractMesh, TransformNode } from '@babylonjs/core';
+import { BasketballAnimTree } from '../anim/basketballTree';
+import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
+import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
+import { flushThroughRim, clankOffRim } from '../anim/ballRig';
+import { syncedShotSpeed } from '../core/BallHandling';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
@@ -60,8 +80,15 @@ const TARGET_SCORE = 21;
 // and that difference IS the shot selection: a corner three is the bargain and
 // the top of the key is the hard one. isThree() now answers it per angle.
 const POSSESSION_SEC = 90;
+/** BIOMECH-HOOPS-WAVE1: the facing slew (rad/s); a defender inside this range keeps his chest on the carrier. */
+const FACE_RATE = 10, FACE_RIM_RATE = 6, DEFEND_FACE_RANGE = 6;
 
-interface Body { char: SpawnedCharacter; slot: PlayerSlot; drib: DribbleController; stunSec: number }
+interface Body {
+  char: SpawnedCharacter; slot: PlayerSlot; drib: DribbleController; stunSec: number;
+  // BIOMECH-HOOPS-WAVE1: the one animation owner, the Posture Poses layer and the hoops window it reads
+  tree: BasketballAnimTree; posture: { layer: PostureLayer; dispose(): void } | null; bio: HoopsPostureInput;
+  floored: boolean; shotWin: ShotWindow; shotSec: number; landSec: number; celebrateSec: number; speed01: number;
+}
 
 export const ThreeVThreeMode: ModeDefinition = (() => {
   let threeVenue: VenueHandle | null = null;  // M74
@@ -99,6 +126,38 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let foeShotBlocked = false;
   let hoopJuice: HoopJuice | null = null;        // A+ P0 CONTACT-lite: rim spring / net squash / hoop flash on a make
   let contactLatch = false;                      // A+ P0: the dunk's ONE punch per attempt — never re-fired by the banner or the stun
+  // ── BIOMECH-HOOPS-WAVE1 ──
+  let driver: Body | null = null;                // the rival driving on their possession (its tree carries the ball, it faces the rim, the AI drive skips it)
+  let driveK = 0;                                // the rival drive's clock 0..1 (the block window is its end)
+  let dunkFlight: { k: number; made: boolean | null } | null = null;
+  let dunkFlush: { releasePos: Vector3; since: number } | null = null;
+  const mateArc = new ShotArc();                 // teammate / rival shots FLY (the ball used to hang at the release point)
+  const ballWorld = (): Vector3 => ball.getAbsolutePosition();
+  const isFoe = (b: Body): boolean => foes.includes(b);
+  /** What a body's chest squares to: a defender → the carrier; an attacker → the rim. */
+  function objectiveFor(b: Body): Vector3 {
+    if (isFoe(b)) { const cb = carrierBody(); return carrierId === 'foeTeam' ? RIM : cb ? cb.char.root.position : ballWorld(); }
+    return carrierId === 'foeTeam' ? (driver ? driver.char.root.position : ballWorld()) : RIM;
+  }
+  function feedFor(b: Body) {
+    const { window, pose, legs } = hoopsPose(b.bio);
+    const def = b.bio.role === 'defense';
+    return { pose, legs, aim: objectiveFor(b), eyes: def ? ballWorld() : RIM, window };
+  }
+  /** Face a body the play's way, slewed: the objective inside range, else the travel, else the heading. */
+  const facePlay = (root: TransformNode, vel: Vector3, objective: Vector3 | null, range: number, dt: number, rate = FACE_RATE): number => {
+    root.rotation.y = slewYaw(root.rotation.y, playFacing(root.position, vel, objective, range, root.rotation.y), rate, dt); return root.rotation.y;
+  };
+  const slideDirFor = (yaw: number, vel: Vector3): 'left' | 'right' => (vel.x * Math.cos(yaw) - vel.z * Math.sin(yaw) > 0.3 ? 'right' : 'left');
+  /** The per-frame window clocks and the layer's input for one body. */
+  function bioTick(b: Body, dt: number, role: HoopsPostureInput['role'], hasBall: boolean, nearestDefender: number, reaching: boolean): void {
+    b.landSec = Math.max(0, b.landSec - dt); b.celebrateSec = Math.max(0, b.celebrateSec - dt);
+    if (b.shotWin === 'release') { b.shotSec += dt; if (b.shotSec >= RELEASE_SEC) b.shotWin = 'follow'; }
+    Object.assign(b.bio, {
+      role, hasBall, speed01: b.speed01, nearestDefender, shot: b.shotWin, flight: b === me ? dunkFlight : null, landed: b.landSec > 0, celebrate: b.celebrateSec > 0,
+      reaching, staggered: b.stunSec > 0 && !b.floored, floored: b.floored,
+    } satisfies HoopsPostureInput);
+  }
 
   const cfg = { heroUrl: SHARED_CFG.heroUrl };
 
@@ -112,8 +171,13 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     return null;
   }
 
+  /** BIOMECH-HOOPS-WAVE1 G6 (the 1v1's giveBall discipline): every live dribble is PARKED before the ball is re-parented —
+   *  a carry still active across the hand-off wrote its WORLD dribble point into the now hand-LOCAL ball (measured: the ball
+   *  6 m from the hero, parented to his own hand, after a reset while he was dribbling; a one-frame warp on every steal). */
+  function parkCarries(): void { carries.forEach((c) => c.update(0, 0, false)); }
   function giveBallTo(id: typeof carrierId): void {
     carrierId = id;
+    parkCarries();
     const body = carrierBody();
     if (body) attachBallToHand(ball, body.char.skeleton, 'RightHand');
   }
@@ -129,6 +193,9 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     mates[1].char.root.position.set(3.5, 0, 4);
     foes.forEach((f, i) => f.char.root.position.set((i - 1) * 3, 0, 2));
     shooting = false; currentShot = null;
+    // BIOMECH-HOOPS-WAVE1: the possession's clocks; a held shot is lifted, a floored body gets up
+    driver = null; driveK = 0; dunkFlight = null; dunkFlush = null; mateArc.active = false;
+    for (const b of everyBody()) { b.shotWin = 'none'; b.landSec = 0; b.celebrateSec = 0; b.tree.releaseHold(); if (b.floored) { b.floored = false; b.stunSec = 0; b.tree.beat('karate_get_up'); } }
     if (toMe) giveBallTo('me');
   }
 
@@ -168,7 +235,12 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         const slot = ai && brain
           ? new PlayerSlot('ai', new AISource(char.root.position, world, brain), false)
           : new PlayerSlot('me', agentCtl ?? localSource, true);
-        return { char, slot, drib: new DribbleController(), stunSec: 0 };
+        // BIOMECH-HOOPS-WAVE1: one animation owner per rig, and the Posture Poses layer (mounted here, BEFORE the carries —
+        // the dribble arm solves against the posed shoulders); the layer owns the eyes
+        char.secondary?.setLookTarget(() => null);
+        const body: Body = { char, slot, drib: new DribbleController(), stunSec: 0, tree: new BasketballAnimTree(char.animator), posture: null, bio: { ...HOOPS_INPUT_IDLE }, floored: false, shotWin: 'none', shotSec: 0, landSec: 0, celebrateSec: 0, speed01: 0 };
+        body.posture = mountPostureLayer(ctx.scene, char.skeleton, char.root, () => feedFor(body), `3V3-PP-${ai ? aiKind : 'me'}`);
+        return body;
       };
 
       localSource = new LocalInputSource();
@@ -213,6 +285,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       threeVenue?.hidePlaceholders();  // M74: drop stand-ins now that real chars are in
       assertSpawned(ctx.scene, { hero: me.char.root, minWorldMeshes: 6, modeId: 'threevthree' });
       resetPossession(true);
+      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; if (dev) dev.hoopsPosture = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, foeRoot: foes[0]?.char.root ?? null, nearestFoeRoot: () => foes.reduce<Body | null>((b, f) => !b || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(b.char.root.position, me.char.root.position) ? f : b, null)?.char.root ?? null }; }   // BIOMECH-HOOPS-WAVE1 probes
       ctx.setHud({
         score: myScore, foeScore, target: TARGET_SCORE, time: timeLeft, ast: assists,
         hint: 'Work the court · PASS to the open man · snap the stick to break ankles · HOLD SHOOT, release in the green',
@@ -226,8 +299,9 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       // BLOCK jump while defending an opponent possession
       if (carrierId === 'foeTeam' && e.t === 'button' && e.btn === 'A' && e.pressed && myJumpAge === Infinity) {
         myJumpAge = 0;
-        me.char.animator.play(SPORT_CLIP.jumpUp, { onEnd: () => me.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
+        me.tree.beat('bball_block_reach');   // BIOMECH-HOOPS-WAVE1: the block reach (was jump_up → idle, two owners on the rig)
         SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
+        if (driveK < 0.6) ctx.setHud({ banner: 'JUMPED EARLY — WAIT FOR THE RELEASE' }), setTimeout(() => ctx.setHud({ banner: '' }), 600);   // G4: a wasted jump says so
       }
     },
 
@@ -249,10 +323,15 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       if (myJumpAge !== Infinity) myJumpAge += dt;
 
       // the ball in flight (my arced attempt)
+      // BIOMECH-HOOPS-WAVE1 G6: teammate / rival shots fly; the drive dunk's make flushes through the iron
+      if (mateArc.active) { const r = mateArc.step(dt, ball.position); if (r === 'missed') ballSim.launch(ball.position.clone(), new Vector3((Math.random() - 0.5) * 3, 2.5, 1.5)); else if (r === 'made') ballSim.launch(ball.position.clone(), new Vector3(0, -0.5, 0.6)); }
+      else if (dunkFlush) { dunkFlush.since += dt; if (flushThroughRim(ball, RIM, dunkFlush.releasePos, dunkFlush.since)) { ballSim.launch(ball.position.clone(), new Vector3(0, -0.5, 0.6)); dunkFlush = null; } }
+      else if (!ball.parent && !arc.active && !passFlight.active && !dunking) ballSim.step(dt);
       if (arc.active) {
         const res = arc.step(dt, ball.position);
         if (res === 'made') {
           myScore += arcPoints;
+          me.shotWin = 'none'; me.celebrateSec = CELEBRATE_SEC; me.tree.beat('bball_score_celebrate', { fadeSec: 0.15 });   // BIOMECH-HOOPS-WAVE1 G5
           // A THREE is not a routine bucket and must not land like one. The mode
           // had no camera pulse anywhere, so a deep splash and a two-foot layup
           // produced identical feedback — Phase 7's bar is that the big moment
@@ -278,6 +357,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           setTimeout(() => { if (!ended) void opponentPossession(ctx); }, 300);
         } else if (res === 'missed') {
           SoundKit.play('miss');
+          me.shotWin = 'none';
           ballSim.launch(ball.position.clone(), new Vector3((Math.random() - 0.5) * 3, 2.5, 1.5));
           ctx.setHud({ banner: 'RIMS OUT' });
           setTimeout(() => ctx.setHud({ banner: '' }), 700);
@@ -296,13 +376,18 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       // forward, right = screen right, handed to the dribble in its stick space (+Y = −Z).
       const wish = ctx.camDirector.forwardFlat().scale(meIntent.moveY).addInPlace(ctx.camDirector.rightFlat().scale(meIntent.moveX));
       const drib = me.drib.update(dt, wish.x, -wish.z, sprintOk);
-      meSpeed01 = drib.speed01;
+      meSpeed01 = drib.speed01; me.speed01 = drib.speed01;
       if (drib.crossover) carries.get(me)?.switchHand();
+      const nearestFoeDist = foes.reduce((best, f) => f.stunSec > 0 ? best : Math.min(best, Vector3.Distance(f.char.root.position, me.char.root.position)), Infinity);
+      if (shooting) {   // BIOMECH-HOOPS-WAVE1 G1: the shooter squares to the rim through the meter
+        me.char.root.rotation.y = slewYaw(me.char.root.rotation.y, yawTo(me.char.root.position, RIM), FACE_RIM_RATE, dt); me.drib.setFacing(me.char.root.rotation.y);
+      }
       if (!shooting && !dunking) {
         me.char.root.position.addInPlace(me.drib.vel.scale(dt));
         if (!threeVenue?.constrain(me.char.root.position)) clampToHalfCourt(me.char.root.position, 8, 15);   // phase 3: navmesh first
-        me.char.root.rotation.y = drib.facingRad;
-        me.char.animator.play(drib.speed01 > 0.15 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
+        // BIOMECH-HOOPS-WAVE1 G1: on defense my chest stays on the driver (the slides move me sideways); on offense I face my travel
+        if (carrierId === 'foeTeam') me.drib.setFacing(facePlay(me.char.root, me.drib.vel, driver ? driver.char.root.position : null, DEFEND_FACE_RANGE, dt));
+        else me.char.root.rotation.y = drib.facingRad;
 
         // ANKLE-BREAKER on the nearest set defender
         if (iAmCarrier && drib.crossover) {
@@ -316,7 +401,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
             SoundKit.play('crowdCheer', { volume: 0.5 });
             ctx.feel?.impact?.(0.35);
             EffectsKit.burst(ctx.scene, near.char.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
-            near.char.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => near.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
+            near.tree.beat(SPORT_CLIP.karateHitReact);   // BIOMECH-HOOPS-WAVE1: the tree owns the react (it was cut to a frame by the per-frame run / idle play)
             ctx.setHud({ banner: 'ANKLES!' });
             setTimeout(() => ctx.setHud({ banner: '' }), 800);
           }
@@ -334,7 +419,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
             if (Vector3.Distance(f.char.root.position, me.char.root.position) < 2.4 && (foeCloseMem[fi] ?? 0) > 0.8) {
               f.stunSec = 0.45;
               bit = true;
-              f.char.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => f.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
+              f.tree.beat(SPORT_CLIP.karateHitReact);
               break;                                   // only the man you shook
             }
           }
@@ -348,6 +433,14 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           setTimeout(() => ctx.setHud({ banner: '' }), 700);
         }
       }
+      // BIOMECH-HOOPS-WAVE1 G2: the ONE owner of my rig reads the game every frame (dribble / drive / protect / slides; a
+      // held shot and the dunk / land beats are mode-owned and never raced)
+      if (!dunking) me.tree.update({   // the flight's held launch + the land crouch are mode-owned beats
+        speed01: drib.speed01, crossover: drib.crossover && iAmCarrier, nearestDefender: nearestFoeDist, hasBall: iAmCarrier && !passFlight.active,
+        shooting, dunking, driving: iAmCarrier && sprintOk && drib.speed01 > 0.6 && Vector3.Dot(me.drib.vel, RIM.subtract(me.char.root.position)) > 0,
+        defending: carrierId === 'foeTeam', bracing: false, staggered: false, slideDir: slideDirFor(me.char.root.rotation.y, me.drib.vel),
+      });
+      bioTick(me, dt, carrierId === 'foeTeam' ? 'defense' : 'offense', iAmCarrier && !passFlight.active, nearestFoeDist, me.tree.held === 'bball_block_reach');
 
       // teammates: move via their brain; if they're carrying, chase the hoop a little
       for (let i = 0; i < mates.length; i++) {
@@ -357,8 +450,16 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         mateVel[i]?.copyFrom(vel);
         body.char.root.position.addInPlace(vel.scale(dt));
         if (!threeVenue?.constrain(body.char.root.position)) clampToHalfCourt(body.char.root.position, 8, 15);
-        if (vel.lengthSquared() > 0.1) body.char.root.rotation.y = Math.atan2(vel.x, vel.z);
-        body.char.animator.play(vel.lengthSquared() > 0.3 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
+        const mateId = i === 0 ? 'mate0' : 'mate1';
+        // BIOMECH-HOOPS-WAVE1 G1/G2: a cutter faces his travel (slewed); on defense his chest stays on the driver; the tree owns the rig
+        if (carrierId === 'foeTeam') facePlay(body.char.root, vel, driver ? driver.char.root.position : null, DEFEND_FACE_RANGE, dt);
+        else if (vel.lengthSquared() > 0.1) body.char.root.rotation.y = slewYaw(body.char.root.rotation.y, Math.atan2(vel.x, vel.z), FACE_RATE, dt);
+        body.speed01 = Math.min(1, vel.length() / 4.2);
+        body.tree.update({
+          speed01: body.speed01, crossover: false, nearestDefender: Infinity, hasBall: carrierId === mateId && !passFlight.active, shooting: false, dunking: false, driving: false,
+          defending: carrierId === 'foeTeam', bracing: false, staggered: false, slideDir: slideDirFor(body.char.root.rotation.y, vel),
+        });
+        bioTick(body, dt, carrierId === 'foeTeam' ? 'defense' : 'offense', carrierId === mateId && !passFlight.active, Infinity, false);
         if (carrierId === (i === 0 ? 'mate0' : 'mate1') && Vector3.Distance(body.char.root.position, RIM) < 3.5 && Math.random() < 0.01) {
           void teammateShoots(ctx, body, i);
         }
@@ -379,7 +480,15 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       // closing speed on the carrier, decaying, for the hesi bite read
       for (let fi = 0; fi < foes.length; fi++) {
         const f = foes[fi];
-        if (f.stunSec > 0) { foeCloseMem[fi] = Math.max(0, (foeCloseMem[fi] ?? 0) - dt * 2.5); continue; }
+        if (f.floored && f.stunSec === 0) { f.floored = false; f.tree.beat('karate_get_up'); }   // BIOMECH-HOOPS-WAVE1: a posterized body gets up when the stun ends
+        if (f.stunSec > 0) { foeCloseMem[fi] = Math.max(0, (foeCloseMem[fi] ?? 0) - dt * 2.5); f.speed01 = 0; bioTick(f, dt, carrierId === 'foeTeam' ? 'offense' : 'defense', false, Infinity, false); continue; }
+        if (f === driver) {   // the rival driving on their possession: the scripted drive moves him, he faces the rim, his tree carries the ball
+          f.char.root.rotation.y = slewYaw(f.char.root.rotation.y, yawTo(f.char.root.position, RIM), FACE_RIM_RATE, dt);
+          f.speed01 = driveK < 1 ? 0.9 : 0;
+          f.tree.update({ speed01: f.speed01, crossover: false, nearestDefender: Infinity, hasBall: !!ball.parent, shooting: false, dunking: false, driving: driveK < 1, defending: false, bracing: false, staggered: false });
+          bioTick(f, dt, 'offense', !!ball.parent, Infinity, false);
+          continue;
+        }
         const intent = f.slot.intent;
         const vel = new Vector3(intent.moveX, 0, -intent.moveY).scale(3.8);
         const cb = carrierBody();
@@ -390,8 +499,15 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         }
         f.char.root.position.addInPlace(vel.scale(dt));
         if (!threeVenue?.constrain(f.char.root.position)) clampToHalfCourt(f.char.root.position, 8, 15);
-        if (vel.lengthSquared() > 0.1) f.char.root.rotation.y = Math.atan2(vel.x, vel.z);
-        f.char.animator.play(vel.lengthSquared() > 0.3 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
+        // BIOMECH-HOOPS-WAVE1 G1: a defender's chest stays ON the carrier inside range (he faced his travel — a sideways-shuffling
+        // run through every slide); beyond it he runs to his spot facing the travel; the tree owns the rig (slides / stance)
+        facePlay(f.char.root, vel, cb && carrierId !== 'foeTeam' ? cb.char.root.position : null, DEFEND_FACE_RANGE, dt);
+        f.speed01 = Math.min(1, vel.length() / 3.8);
+        f.tree.update({
+          speed01: f.speed01, crossover: false, nearestDefender: Infinity, hasBall: false, shooting: false, dunking: false, driving: false,
+          defending: carrierId !== 'foeTeam', bracing: false, staggered: false, slideDir: slideDirFor(f.char.root.rotation.y, vel),
+        });
+        bioTick(f, dt, carrierId === 'foeTeam' ? 'offense' : 'defense', false, Infinity, false);
       }
 
       // BODY COLLISION — every pair, every frame (15 pairs; cheap XZ math)
@@ -443,6 +559,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
             && Math.hypot(f.char.root.position.x - ball.position.x, f.char.root.position.z - ball.position.z) < 0.8);
           if (picker) {
             passFlight.active = false;
+            parkCarries();
             attachBallToHand(ball, picker.char.skeleton, 'RightHand');   // the pick reads
             SoundKit.play('impact', { pitch: 1.3, volume: 0.4 });
             SoundKit.play('crowdGroan', { volume: 0.35 });
@@ -485,7 +602,11 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           shotContest = contest;
           currentShot = classifyShot(me.char.root.position, me.drib.vel, RIM, contest);
           shotMeter.start(contest, currentShot.style);
-          me.char.animator.play(SPORT_CLIP.dunkChargeGather, { loop: true });
+          // BIOMECH-HOOPS-WAVE1: the jumpshot paced to the meter's green (1v1's ShotReleaseSync) — it metered on the dunk crouch
+          // and popped to the jumpshot at the release
+          const clipSec = me.char.animator.durationOf('jumpshot') ?? 1.0;
+          me.tree.hold('jumpshot', { speedRatio: syncedShotSpeed(clipSec, shotMeter.durationSec, shotMeter.greenCenter01), fadeSec: 0.08 });
+          me.shotWin = 'load'; me.shotSec = 0;
           ctx.setHud({ shotType: currentShot.label });
         }
       }
@@ -520,6 +641,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
 
     dispose() {
       carries.forEach((c) => c.dispose()); carries.clear();
+      for (const b of [me, ...mates, ...foes]) { b?.posture?.dispose(); if (b) b.posture = null; }   // BIOMECH-HOOPS-WAVE1
       threeVenue?.dispose(); threeVenue = null;  // M74
       me?.char.dispose(); mates.forEach((m) => m.char.dispose()); foes.forEach((f) => f.char.dispose());
       ball?.dispose(); SoundKit.stopAmbient();
@@ -535,7 +657,11 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     // a lob caught at the rim is a high-percentage finish — the read was made on the pass
     const made = Math.random() < (finish === 'alleyoop' ? 0.82 : 0.55);
     releaseBall(ball);
-    body.char.animator.play(finish === 'alleyoop' ? SPORT_CLIP.dunkFinishTomahawk : SPORT_CLIP.dunkLaunchPower, { onEnd: () => body.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    // BIOMECH-HOOPS-WAVE1: the tree owns the beat; a jumper flows into the held follow-through (G5); the ball FLIES (G6)
+    if (finish === 'alleyoop') body.tree.beat(SPORT_CLIP.dunkFinishTomahawk);
+    else body.tree.beat('jumpshot', { onSettle: () => body.tree.beat('bball_follow_through', { fadeSec: 0.1 }) });
+    body.shotWin = 'release'; body.shotSec = 0;
+    mateArc.start(ball.getAbsolutePosition(), RIM, made, finish === 'alleyoop' ? 'layup' : 'jumper');
     if (finish === 'alleyoop') { ctx.juice.shake(0.12, 120); ctx.feel?.impact?.(0.5); }
     if (made) {
       myScore += points;
@@ -562,8 +688,11 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     arcQuality = quality;
     arcMade = Math.random() < Math.min(0.98, pct);
     releaseBall(ball);
-    const releaseClip = currentShot?.style === 'layup' ? SPORT_CLIP.dunkLaunchPower : 'jumpshot';
-    me.char.animator.play(releaseClip, { onEnd: () => me.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    // BIOMECH-HOOPS-WAVE1 G5: the held jumpshot (at its release frame) flows into the authored follow-through, HELD until the
+    // arc resolves; a layup keeps its finish
+    if (currentShot?.style === 'layup') me.tree.beat(SPORT_CLIP.dunkLaunchPower);
+    else me.tree.beat('bball_follow_through', { fadeSec: 0.1 });
+    me.shotWin = 'release'; me.shotSec = 0; me.drib.setFacing(me.char.root.rotation.y);
     ctx.setHud({ shotType: '' });
     // SHOT FEEDBACK (same contract as 1v1): the release names the quality and
     // the contest at the moment you let go — before the arc decides anything.
@@ -579,21 +708,37 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
 
   function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster', defenderPos: Vector3 | null): void {
     dunking = true; contactLatch = false;   // A+ P0: a fresh attempt gets one punch
+    me.shotWin = 'none'; dunkFlush = null; let resolved = false; dunkFlight = { k: 0, made: null };   // BIOMECH-HOOPS-WAVE1
     turbo.t01 = Math.max(0, turbo.t01 - 0.3);
     const made = Math.random() < DUNK_PCT[kind];
     SoundKit.play('whoosh', { pitch: 0.85 });
-    me.char.animator.play(SPORT_CLIP.dunkLaunchPower, { onEnd: () => me.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    // BIOMECH-HOOPS-WAVE1 G6: the dribble parked, the ball in the palm through the flight; the launch's last frame HELD to feet-down (the 1v1's)
+    carries.get(me)?.update(0, 0, false);
+    if (!ball.parent) attachBallToHand(ball, me.char.skeleton, 'RightHand');
+    me.tree.beat(SPORT_CLIP.dunkLaunchPower, { holdEnd: true });
     const from = me.char.root.position.clone();
     const t0 = performance.now();
     const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-      const k = Math.min(1, (performance.now() - t0) / 550);
+      const fdt = ctx.scene.getEngine().getDeltaTime() / 1000;
+      const k = Math.min(1, (performance.now() - t0) / DRIVE_DUNK.flightMs);
       me.char.root.position.x = from.x + (RIM.x - from.x) * k;
-      me.char.root.position.z = from.z + (RIM.z + 0.5 - from.z) * k;
-      me.char.root.position.y = Math.sin(k * Math.PI) * 1.15;
+      me.char.root.position.z = from.z + (RIM.z + DRIVE_DUNK.landAheadZ - from.z) * k;
+      me.char.root.position.y = driveDunkY(k);
+      // BIOMECH-HOOPS-WAVE1 G1/G3/G6 (the 1v1's): the chest eases onto the iron through the flight; the slam resolves AT THE
+      // IRON — a make flushes through the net, a miss clanks off the front (it used to let go on the feet-down frame)
+      me.char.root.rotation.y = slewYaw(me.char.root.rotation.y, yawTo(me.char.root.position, RIM), FACE_RIM_RATE, fdt);
+      dunkFlight = { k, made: resolved ? made : null };
+      if (!resolved && k >= DRIVE_DUNK.resolveK) {
+        resolved = true;
+        const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
+        if (made) dunkFlush = { releasePos, since: 0 };
+        else { missClank(ctx); ballSim.launch(releasePos, clankOffRim(ball, RIM)); }
+      }
       if (k < 1) return;
       ctx.scene.onBeforeRenderObservable.remove(obs);
-      dunking = false;
-      releaseBall(ball);
+      dunking = false; dunkFlight = null; me.landSec = LAND_SEC;
+      me.tree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });   // G5: feet-down is the land crouch
+      me.drib.setFacing(me.char.root.rotation.y);
       if (made) {
         // A DUNK IS WORTH TWO. This awarded 1, left over from the old "1 inside
         // the paint, 2 outside" scale that this file's own header says was
@@ -613,8 +758,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
             !best || Vector3.Distance(f.char.root.position, me.char.root.position)
               < Vector3.Distance(best.char.root.position, me.char.root.position) ? f : best, null);
           if (victim) {
-            victim.stunSec = 1.4;
-            victim.char.animator.play(SPORT_CLIP.karateKnockdown, { onEnd: () => victim.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
+            victim.stunSec = 1.4; victim.floored = true;
+            victim.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });   // BIOMECH-HOOPS-WAVE1 G5: to the floor, up when the stun ends
             EffectsKit.burst(ctx.scene, victim.char.root.position.add(new Vector3(0, 0.3, 0)), 'dust');
           }
         }
@@ -625,8 +770,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       } else {
         SoundKit.play('miss');
         SoundKit.play('crowdGroan', { volume: 0.4 });
-        missClank(ctx);   // A+ P0: the miss has weight too — a clank, never the make's punch
-        ballSim.launch(ball.getAbsolutePosition(), new Vector3((Math.random() - 0.5) * 3, 3, 2));
+        // the clank and the loose ball fired at the resolve (k 0.55), off the front of the iron — BIOMECH-HOOPS-WAVE1 G6
         ctx.setHud({ banner: kind === 'poster' ? 'STUFFED AT THE RIM!' : 'RATTLED OUT' });
         setTimeout(() => ctx.setHud({ banner: '' }), 800);
         setTimeout(() => { if (!ended) void opponentPossession(ctx); }, 900);
@@ -667,11 +811,13 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     const from = shooter.char.root.position.clone();
     // the ball rides the driver's hand (lock carry-forward: AI drives were
     // bodies without a ball — visible if you looked for it)
+    parkCarries();
     attachBallToHand(ball, shooter.char.skeleton, 'RightHand');
-    shooter.char.animator.play(SPORT_CLIP.moveLoop, { loop: true });
+    driver = shooter; driveK = 0;   // BIOMECH-HOOPS-WAVE1: the foe loop feeds his tree (the dribble run) and faces him at the rim; the AI drive skips him
     await new Promise<void>((res) => {
       const obs = ctx.scene.onBeforeRenderObservable.add(() => {
         const k = Math.min(1, (performance.now() - t0) / 1100);
+        driveK = k;
         // drive AT the rim, not 5m short of it (was x*0.6, z to RIM.z+2.2 —
         // the same short drive 1v1 shipped; a drive that never arrives makes
         // your positioning irrelevant and the block dance unreachable)
@@ -687,7 +833,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       SoundKit.play('crowdCheer', { volume: 0.6 });
       ctx.feel?.impact?.(0.5);
       EffectsKit.burst(ctx.scene, shooter.char.root.position.add(new Vector3(0, 1.6, 0)), 'sparks');
-      shooter.char.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => shooter.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
+      shooter.tree.beat(SPORT_CLIP.karateHitReact);
+      releaseBall(ball); ballSim.launch(ball.getAbsolutePosition(), new Vector3((Math.random() - 0.5) * 4, 2, 3));   // BIOMECH-HOOPS-WAVE1 G6: a blocked ball goes loose
       ctx.setHud({ banner: 'REJECTED!' });
       setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · PASS to the open man · HOLD SHOOT, release in the green' }), 900);
       setTimeout(() => { if (!ended) resetPossession(true); }, 1000);
@@ -697,7 +844,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     const defenseFactor = Math.max(0, Math.min(1, 1 - nearestD / 3));
     const made = Math.random() < 0.5 - defenseFactor * 0.3;
     releaseBall(ball);                                          // the shot leaves the hand
-    shooter.char.animator.play(SPORT_CLIP.dunkLaunchPower, { onEnd: () => shooter.char.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    // BIOMECH-HOOPS-WAVE1: the rival's jumper flows into the held follow-through (G5) and the ball FLIES (G6)
+    shooter.tree.beat('jumpshot', { onSettle: () => shooter.tree.beat('bball_follow_through', { fadeSec: 0.1 }) });
+    shooter.shotWin = 'release'; shooter.shotSec = 0;
+    mateArc.start(ball.getAbsolutePosition(), RIM, made, 'jumper');
     if (made) {
       foeScore += 2;
       SoundKit.play('crowdGroan', { volume: 0.4 });

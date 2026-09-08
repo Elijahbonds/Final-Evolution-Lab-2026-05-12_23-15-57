@@ -8,7 +8,7 @@ import type { AnimationGroup, Skeleton, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { boneNode } from '../boneLookup';
 import {
-  buildBlockReach, buildCrossover, buildDefendSlide, buildDribbleIdle, buildHesi, buildLayupGather, buildStealReach,
+  buildBlockReach, buildCrossover, buildDefendSlide, buildDribbleIdle, buildHesi, buildLayupGather, buildStealReach, buildFollowThrough,
 } from './basketball';
 
 let scene: Scene; let sk: Skeleton;
@@ -74,6 +74,25 @@ describe('basketball packages on the forge rig', () => {
     const yaw = Math.abs(hips.rotationQuaternion!.toEulerAngles().y);
     expect(yaw).toBeGreaterThan(0.3);
     expect(Math.abs(pos('RightHand').x - x0)).toBeGreaterThan(0.12);
+  });
+  it('follow-through starts overhead, snaps the shooting wrist forward and comes down the front (never a T)', () => {
+    const g = buildFollowThrough(scene, sk)!;
+    at(g, 0);
+    const head = pos('Head');
+    expect(pos('RightHand').y).toBeGreaterThan(head.y + 0.2);   // both arms overhead at the release frame
+    expect(pos('LeftHand').y).toBeGreaterThan(head.y + 0.1);
+    at(g, 0.15);
+    expect(pos('RightHand').z).toBeGreaterThan(0.3);            // the wrist snap: the ball hand forward
+    expect(pos('RightHand').y).toBeGreaterThan(pos('LeftHand').y + 0.2);   // the arm stays up while the off hand drops
+    for (const t of [0.3, 0.45, 0.6, 0.7]) {
+      at(g, t);
+      const l = pos('LeftHand'), r = pos('RightHand'), la = pos('LeftArm'), ra = pos('RightArm');
+      const along = Math.abs(((l.x - r.x) * (ra.x - la.x) + (l.z - r.z) * (ra.z - la.z)) / (Math.hypot(ra.x - la.x, ra.z - la.z) || 1));
+      expect(along).toBeLessThan(0.9);                           // the hands never spread along the shoulders' line (a T is ~1.3 m)
+      expect(l.z).toBeGreaterThan(0.1); expect(r.z).toBeGreaterThan(0.1);   // down the FRONT
+    }
+    at(g, 0.7);
+    expect(pos('RightHand').y).toBeLessThan(1.4);                // settled to a ready stance
   });
   it('hesi loads the knees without moving the hands much', () => {
     const g = buildHesi(scene, sk)!;

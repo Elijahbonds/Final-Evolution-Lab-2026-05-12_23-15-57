@@ -19,6 +19,20 @@
 //     range; time a BLOCK jump (A) on their gather to erase the shot. Your
 //     positioning drives their make% exactly like theirs drives yours.
 //
+// BIOMECH-HOOPS-WAVE1 (2026-09-08) — the dunk contest's body control, ported (SPEC-BIOMECH-HOOPS-WAVE1 G1–G6):
+//   G1 facing — a defender's chest stays ON the handler through the slide (both bodies faced their TRAVEL while the slide
+//       clip moved them sideways: a sideways-shuffling run); the shooter squares to the rim through the meter, the dunker
+//       through the flight (both kept the last dribble heading); every turn is a slew (Biomech.slewYaw), never a snap.
+//   G2/G5 — the shared Posture Poses layer (anim/PostureLayer, the dunk's) on BOTH bodies: thoracic / clavicles / head /
+//       feet per hoops window (core/HoopsPosture), the chest aimed at the rim (offense) or the handler (defense), the eyes
+//       on the iron / the ball; the follow-through is an authored beat held until the arc resolves (the hold used to
+//       release 420 ms in and drop into the defensive stance mid-arc); a make celebrates; feet-down after a dunk is the
+//       land crouch.
+//   G3/G6 — the drive dunk's slam resolves at the IRON (k 0.55 of the flight, the hand at the rim), the make flushes the
+//       ball through the net and the miss clanks off the front; it used to release the ball on the feet-down frame from
+//       a hand at hip height and leave it floating there until the reset.
+//   G4 — a block jump outside the gather says so (JUMPED EARLY), the way the whiffed reach already did.
+//
 // ONEVONE-DEFENSE-LOGIC (2026-09-07) — the owner's eye: "we can't play defense, the logic is kinda off, the animations
 // need work". Measured on /dev/mode/onevone with a fake pad driving the deny point (scripts/probes/_onevone-defense-probe.mts):
 //   (1) the rival's possession was a 2.2 s TIMER (x = sin(t) weave, z lerped to the rim) that ignored the defender — in
@@ -50,7 +64,10 @@ import { VenueKit } from '../visual/VenueKit';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
-import { attachBallToHand, releaseBall } from '../anim/ballRig';
+import { attachBallToHand, releaseBall, flushThroughRim, clankOffRim } from '../anim/ballRig';
+import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the dunk's Posture Poses, shared
+import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
+import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
 import { AgentControlSource } from '../core/AgentControlSource';  // M69: intent play under ?agent=1
 import { agentBridge } from '../core/AgentBridge';
@@ -105,6 +122,10 @@ const REACH_COOLDOWN_SEC = 0.4;          // a reach is a commitment, not a mash
 const REACH_WHIFF_STUN_SEC = 0.45;       // a whiffed reach costs your feet
 const JUMP_SEC = 0.75;                   // the contest jump's clock (physics lands the body)
 const JUMP_VY = 3.0;                     // m/s — ~0.46 m apex, 0.6 s of air
+/** BIOMECH-HOOPS-WAVE1: the facing slew (rad/s) — a turn, never a snap; the shooter / dunker eases onto the rim at this rate. */
+const FACE_RATE = 10, FACE_RIM_RATE = 6;
+/** A defender inside this range of the handler keeps his chest on him (beyond it he runs to his spot, facing the travel). */
+const DEFEND_FACE_RANGE = 6;
 const HINT_OFFENCE = 'Drive fast at the rim to DUNK · snap the stick for ankles · pull BACK for a HESI · lose the ball and you DEFEND';
 const HINT_DEFENCE = 'STAY IN FRONT — they sidestep, you slide · X: STEAL as the ball crosses over · A: JUMP on the gather to BLOCK · hold L1/LT: BOX OUT';
 
@@ -170,6 +191,22 @@ export const OneVOneMode: ModeDefinition = (() => {
   let hoopJuice: HoopJuice | null = null;        // A+ P0 CONTACT-lite: rim spring / net squash / hoop flash on a make
   let contactLatch = false;                      // A+ P0: the dunk's ONE punch per attempt — never re-fired by the banner or the stun
   let hud: ModeContext['setHud'] = () => {};
+  // ── BIOMECH-HOOPS-WAVE1 (2026-09-08): the Posture Poses layer per body, and the hoops windows it reads ──
+  let mePosture: { layer: PostureLayer; dispose(): void } | null = null, foePosture: { layer: PostureLayer; dispose(): void } | null = null;
+  const meBio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE }, foeBio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE };
+  let meShotWin: ShotWindow = 'none', meShotSec = 0, foeShotWin: ShotWindow = 'none', foeShotSec = 0;   // load (the meter / the gather) → release → follow (until the arc resolves)
+  let meLandSec = 0, meCelebrateSec = 0, meSpeed01 = 0, foeSpeed01 = 0;
+  let dunkFlight: { k: number; made: boolean | null } | null = null;                 // the drive dunk's flight clock (the posture windows ride it)
+  let dunkFlush: { releasePos: Vector3; since: number } | null = null;               // the make's ball through the iron (G6)
+  const ballWorld = (): Vector3 => ball.getAbsolutePosition();
+  /** The layer's feed: the window's stance and feet, the chest on the rim (offense) or the handler (defense), the eyes on the
+   *  iron (offense) or the ball (defense). */
+  const feedFor = (bio: HoopsPostureInput, aim: Vector3, eyes: Vector3) => { const { window, pose, legs } = hoopsPose(bio); return { pose, legs, aim, eyes, window }; };
+  /** Face a body the play's way, slewed: the objective inside range, else the travel, else the heading. */
+  const facePlay = (root: TransformNode, vel: Vector3, objective: Vector3 | null, range: number, dt: number, rate = FACE_RATE): number => {
+    const yaw = slewYaw(root.rotation.y, playFacing(root.position, vel, objective, range, root.rotation.y), rate, dt);
+    face(root, yaw); return yaw;
+  };
 
   /** MODE-STICK-FACE (2026-09-07): the stick is CAMERA-relative. The hoops camera sits behind the offence looking at the
    *  rim (−z) and Babylon is left-handed, so a raw +x intent ran to SCREEN-LEFT (the dunk runway's bug, measured here
@@ -244,6 +281,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0;
     arc.active = false;
+    meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     place('me', me.root, MY_SPAWN, Math.PI);
     place('foe', foe.root, FOE_SPAWN, 0);
     if (!contact?.isReady) me.root.position.y = 0;
@@ -335,6 +373,13 @@ export const OneVOneMode: ModeDefinition = (() => {
       meAnimTree = new BasketballAnimTree(me.animator);
       foeAnimTree = new BasketballAnimTree(foe.animator);
       meFootPlant = new FootPlant(me.skeleton, me.meshes[0] as never);
+      // BIOMECH-HOOPS-WAVE1: the Posture Poses layer on both bodies — mounted BEFORE the carries (observer order = add
+      // order: the dribble arm must solve against the posed shoulders). The layer owns the eyes; the secondary head-look
+      // is stood down (it looked at ball.position — a palm-LOCAL offset while carried, i.e. the world origin).
+      me.secondary?.setLookTarget(() => null); foe.secondary?.setLookTarget(() => null);
+      mePosture?.dispose(); foePosture?.dispose();
+      mePosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => feedFor(meBio, possession === 'mine' ? RIM : foe.root.position, possession === 'mine' ? RIM : ballWorld()), '1V1-PP');
+      foePosture = mountPostureLayer(ctx.scene, foe.skeleton, foe.root, () => feedFor(foeBio, possession === 'mine' ? me.root.position : RIM, possession === 'mine' ? ballWorld() : RIM), '1V1-PP-FOE');
       meCarry?.dispose(); foeCarry?.dispose();
       meCarry = mountBallCarry({ scene: ctx.scene, ball, root: me.root, skeleton: me.skeleton });
       foeCarry = mountBallCarry({ scene: ctx.scene, ball, root: foe.root, skeleton: foe.skeleton });
@@ -356,7 +401,9 @@ export const OneVOneMode: ModeDefinition = (() => {
       ctx.setHud({ score: myScore, foeScore, target: TARGET_SCORE, momentum: 0, turbo: 100, hint: HINT_OFFENCE });
       // dev probes (ONEVONE-DEFENSE-LOGIC): the possession machine, readable without the HUD
       if (process.env.NODE_ENV === 'development') {
-        (ctx.scene.metadata ??= {}).onevone = { possession: () => possession, defPhase: () => defPhase, attackPhase: () => attacker.phase, foeRoot: foe.root, myJumpAge: () => myJumpAge };
+        (ctx.scene.metadata ??= {}).onevone = { possession: () => possession, defPhase: () => defPhase, attackPhase: () => attacker.phase, foeRoot: foe.root, myJumpAge: () => myJumpAge, defend: () => { if (!ended && possession === 'mine') startDefense(ctx, 'PROBE — DEFEND!'); }, offense: () => { if (!ended) resetPositions(); } };   // BIOMECH-HOOPS-WAVE1: `defend()` / `offense()` let a probe reach either possession deterministically
+        const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__;
+        if (dev) dev.hoopsPosture = { me: () => mePosture?.layer.get() ?? null, foe: () => foePosture?.layer.get() ?? null, bio: () => ({ me: { ...meBio }, foe: { ...foeBio } }) };   // BIOMECH-HOOPS-WAVE1 probes
       }
     },
 
@@ -371,6 +418,8 @@ export const OneVOneMode: ModeDefinition = (() => {
         meAnimTree.beat('bball_block_reach');
         if (contact?.isReady) contact.hop('me', JUMP_VY);
         SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
+        // BIOMECH-HOOPS-WAVE1 G4: a jump outside the gather is a wasted one — say so (the whiffed reach already does)
+        if (attacker.phase !== 'gather') bannerFlash(ctx, 'JUMPED EARLY — WAIT FOR THE GATHER', 600);
       }
     },
 
@@ -400,6 +449,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (possession === 'mine') {
             myScore += arcPoints;
             swing('big_make');
+            meShotWin = 'none'; meCelebrateSec = CELEBRATE_SEC; meAnimTree.beat('bball_score_celebrate', { fadeSec: 0.15 });   // BIOMECH-HOOPS-WAVE1 G5: the make's end pose
             // A+ P0 CONTACT-lite, the soft sibling: a jumper drops through with a small feel hit and a short shake —
             // no hit-stop latch, no flash, no slam thud (that is the dunk's). The hoop still answers the make.
             ctx.feel.impact(0.4);
@@ -414,6 +464,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             later(700, () => { ctx.setHud({ banner: '' }); resetPositions(); });   // make it, take it
           } else {
             foeScore += arcPoints;
+            foeShotWin = 'none';
             SoundKit.play('crowdGroan', { volume: 0.4 });
             // your defence is graded on their makes too — a wide-open look
             // you gave them should READ as your mistake
@@ -428,6 +479,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           }
         } else if (res === 'missed') {
           SoundKit.play('miss');
+          meShotWin = 'none'; foeShotWin = 'none';   // BIOMECH-HOOPS-WAVE1: the follow-through ends when the arc does
           launchLoose(ball.position.clone(), new Vector3((Math.random() - 0.5) * 3, 2.5, 1.5 + Math.random()));
           // THE BOARD IS A CONTEST, and BOX OUT is how you win it — on BOTH ends.
           //
@@ -459,6 +511,11 @@ export const OneVOneMode: ModeDefinition = (() => {
       } else if (loose && !dunking) {
         ballSim.step(dt);
       }
+      // BIOMECH-HOOPS-WAVE1 G6: the drive dunk's make flushes THROUGH the iron from the release, then drops out of the net
+      if (dunkFlush) {
+        dunkFlush.since += dt;
+        if (flushThroughRim(ball, RIM, dunkFlush.releasePos, dunkFlush.since)) { launchLoose(ball.position.clone(), new Vector3(0, -0.5, 0.6)); dunkFlush = null; }
+      }
 
       // ══ MY POSSESSION ══
       if (possession === 'mine') {
@@ -469,6 +526,10 @@ export const OneVOneMode: ModeDefinition = (() => {
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
         const [mx, my] = camRel(ctx, intent.moveX, intent.moveY);
         const drib = meDribble.update(dt, mx, my, sprintOk);
+        meSpeed01 = drib.speed01;
+        if (shooting) {   // BIOMECH-HOOPS-WAVE1 G1: the shooter squares to the rim through the meter (he kept the last dribble heading)
+          const yaw = slewYaw(me.root.rotation.y, yawTo(me.root.position, RIM), FACE_RIM_RATE, dt); face(me.root, yaw); meDribble.setFacing(yaw);
+        }
         if (!shooting && !dunking) {
           driveBody('me', me.root, meDribble.vel, dt);
           face(me.root, drib.facingRad);
@@ -539,8 +600,11 @@ export const OneVOneMode: ModeDefinition = (() => {
             : 0;
           foeCloseMemory = Math.max(foeClosingSpeed, foeCloseMemory - dt * 2.5);
           driveBody('foe', foe.root, foeVel, dt);
-          if (foeVel.lengthSquared() > 0.05) face(foe.root, Math.atan2(foeVel.x, foeVel.z));
+          // BIOMECH-HOOPS-WAVE1 G1: a defender's chest stays ON the handler through the slide (he used to face his travel —
+          // a sideways-shuffling run); beyond range he runs to his spot facing the travel; every turn a slew
+          facePlay(foe.root, foeVel, foeStunSec > 0 ? null : me.root.position, DEFEND_FACE_RANGE, dt);
         }
+        foeSpeed01 = Math.min(1, foeVel.length() / 3.6);
         foeAnimTree.update({
           speed01: Math.min(1, foeVel.length() / 3.6), crossover: false, nearestDefender: Infinity,
           hasBall: false, shooting: false, dunking: false, driving: false,
@@ -570,6 +634,12 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (kind !== 'none') { startDunk(ctx, kind); }
           else {
             shooting = true;
+            meShotWin = 'load'; meShotSec = 0;   // BIOMECH-HOOPS-WAVE1: the shot's posture clock
+            // G6: the live dribble is PARKED — the ball comes back to the palm for the meter and leaves the HAND at the release
+            // (the carry's deactivate sat inside the !shooting guard, so the ball stayed at its last bounce point on the floor
+            // through the whole meter and the arc started from there — measured ball–hand 1.56 m in the load)
+            meCarry?.update(0, 0, false);
+            if (!ball.parent) attachBallToHand(ball, me.skeleton, 'RightHand');
             const contest = contestLevel(me.root.position, defenderPos);
             shotContest = contest;
             currentShot = classifyShot(me.root.position, meDribble.vel, RIM, contest);
@@ -640,13 +710,18 @@ export const OneVOneMode: ModeDefinition = (() => {
         const drib = meStunSec > 0
           ? meDribble.update(dt, 0, 0, false)
           : meDribble.update(dt, mx, my, sprintOk);
+        meSpeed01 = drib.speed01;
         driveBody('me', me.root, meDribble.vel, dt);
-        face(me.root, drib.facingRad);
+        // BIOMECH-HOOPS-WAVE1 G1: on defense the chest stays on the handler (the slide clips move the body sideways; facing
+        // the travel read as a sideways-shuffling run, measured facing·travel 1.0 on every slide); the dribble layer is told
+        // so a pull-back away from him stays a back-pedal with the chest on him
+        const defYaw = facePlay(me.root, meDribble.vel, foe.root.position, DEFEND_FACE_RANGE, dt);
+        meDribble.setFacing(defYaw);
         contact?.brace('me', intent.brace ?? false);
         meAnimTree.update({
           speed01: drib.speed01, crossover: false, nearestDefender: Infinity,
           hasBall: false, shooting: false, dunking: false, driving: false,
-          defending: true, bracing: intent.brace ?? false, staggered: false, slideDir: slideDirFor(drib.facingRad, meDribble.vel),
+          defending: true, bracing: intent.brace ?? false, staggered: false, slideDir: slideDirFor(defYaw, meDribble.vel),
         });
         const dist = Vector3.Distance(me.root.position, foe.root.position);
 
@@ -655,6 +730,8 @@ export const OneVOneMode: ModeDefinition = (() => {
           const dec = attacker.decide(dt, foe.root.position, me.root.position, RIM_FLOOR, { defenderAirborne: myJumpAge !== Infinity && myJumpAge < 0.6 });
           if (defPhase === 'check' && dec.phase !== 'check') defPhase = 'drive';
           const sp = dec.wish.length();
+          foeSpeed01 = Math.min(1, sp / RIVAL_DRIVE_SPEED);
+          if (dec.phase === 'gather' || dec.phase === 'stepback') { if (foeShotWin === 'none') foeShotWin = 'load'; }   // BIOMECH-HOOPS-WAVE1: the telegraph is the load
           driveBody('foe', foe.root, dec.wish, dt);
           // a driver faces the rim through a sidestep (a crossover, not a run sideways); a blow-by runs its line
           face(foe.root, dec.phase === 'blowby' && sp > 0.5 ? Math.atan2(dec.wish.x, dec.wish.z) : Math.atan2(RIM.x - foe.root.position.x, RIM.z - foe.root.position.z));
@@ -714,7 +791,8 @@ export const OneVOneMode: ModeDefinition = (() => {
             if (toBall.length() > 0.7) wish.copyFrom(toBall.normalize().scale(3.0));
           }
           driveBody('foe', foe.root, wish, dt);
-          if (wish.lengthSquared() > 0.05) face(foe.root, Math.atan2(wish.x, wish.z));
+          foeSpeed01 = Math.min(1, wish.length() / 3.6);
+          if (wish.lengthSquared() > 0.05) face(foe.root, slewYaw(foe.root.rotation.y, Math.atan2(wish.x, wish.z), FACE_RATE, dt));
           foeAnimTree.update({
             speed01: Math.min(1, wish.length() / 3.6), crossover: false, nearestDefender: Infinity,
             hasBall: false, shooting: false, dunking: false, driving: false,
@@ -732,10 +810,28 @@ export const OneVOneMode: ModeDefinition = (() => {
         ctx.camDirector.look(lookX, lookY, dt);
         ctx.camDirector.update(me.root.position, meDribble.vel, look);
       }
+
+      // ── BIOMECH-HOOPS-WAVE1: this frame's hoops windows for the Posture Poses layer (read in after-animations) ──
+      meLandSec = Math.max(0, meLandSec - dt); meCelebrateSec = Math.max(0, meCelebrateSec - dt);
+      if (meShotWin === 'release') { meShotSec += dt; if (meShotSec >= RELEASE_SEC) meShotWin = 'follow'; }
+      if (foeShotWin === 'release') { foeShotSec += dt; if (foeShotSec >= RELEASE_SEC) foeShotWin = 'follow'; }
+      if (foeShotWin !== 'none' && possession === 'defense' && defPhase === 'over' && !arc.active) foeShotWin = 'none';
+      const foeDist = Vector3.Distance(me.root.position, foe.root.position);
+      Object.assign(meBio, {
+        role: possession === 'mine' ? 'offense' : 'defense', hasBall: possession === 'mine' && carrying, speed01: meSpeed01,
+        nearestDefender: foeStunSec > 0 ? Infinity : foeDist, shot: meShotWin, flight: dunkFlight, landed: meLandSec > 0, celebrate: meCelebrateSec > 0,
+        reaching: meAnimTree.held === 'bball_steal_reach' || meAnimTree.held === 'bball_block_reach', staggered: false, floored: false,
+      } satisfies HoopsPostureInput);
+      Object.assign(foeBio, {
+        role: possession === 'mine' ? 'defense' : 'offense', hasBall: possession === 'defense' && defPhase !== 'shot' && defPhase !== 'over' && !loose, speed01: foeSpeed01,
+        nearestDefender: possession === 'defense' ? foeDist : Infinity, shot: foeShotWin, flight: null, landed: false, celebrate: false,
+        reaching: foeAnimTree.held === 'bball_steal_reach', staggered: foeStunSec > 0 && !foeFloored, floored: foeFloored,
+      } satisfies HoopsPostureInput);
     },
 
     dispose() {
       meFootPlant?.dispose();
+      mePosture?.dispose(); foePosture?.dispose(); mePosture = null; foePosture = null;   // BIOMECH-HOOPS-WAVE1
       meCarry?.dispose(); foeCarry?.dispose(); meCarry = null; foeCarry = null;
       contact?.dispose(); contact = null;
       me?.dispose(); foe?.dispose(); ball?.dispose();
@@ -754,6 +850,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     defPhase = 'check'; attacker.reset(); gatherShown = false; stepbackShown = false;
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
+    meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     place('foe', foe.root, CHECK_FOE, Math.PI);
     place('me', me.root, CHECK_ME, 0);
     if (!contact?.isReady) me.root.position.y = 0;
@@ -770,11 +867,12 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** The rival's release: block check, contest (+ a hand up), the make roll, the arc. */
   function releaseRival(ctx: ModeContext, style: 'layup' | 'jumper'): void {
     defPhase = 'shot'; gatherShown = false;
+    foeShotWin = 'release'; foeShotSec = 0;   // BIOMECH-HOOPS-WAVE1: release → follow-through until the arc resolves
     foeCarry?.update(0, 0, false);
     releaseBall(ball);
     // a jumper rises out of the gather hold; a layup leaves the hand at the top of the layup gather beat, which plays out
     // (a jumpshot cut in over it popped the hand 0.37 m)
-    if (style === 'jumper') foeAnimTree.beat('jumpshot', { fadeSec: 0.1 });
+    if (style === 'jumper') foeAnimTree.beat('jumpshot', { fadeSec: 0.1, onSettle: () => { if (defPhase === 'shot') foeAnimTree.beat('bball_follow_through', { fadeSec: 0.1 }); } });   // BIOMECH-HOOPS-WAVE1 G5: the rival holds his follow-through too
     // BLOCK check — a timed jump in range erases it. A jumper needs the blocker INSIDE the step-back (1.2 m — from further
     // out a hand up is a contest, below); a layup at the rim can be chased down from BLOCK_RANGE.
     const blockRange = style === 'jumper' ? 1.2 : BLOCK_RANGE;
@@ -805,21 +903,41 @@ export const OneVOneMode: ModeDefinition = (() => {
 
   function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster'): void {
     dunking = true; shooting = false; contactLatch = false;   // A+ P0: a fresh attempt gets one punch
+    meShotWin = 'none'; dunkFlush = null; let resolved = false; dunkFlight = { k: 0, made: null };   // BIOMECH-HOOPS-WAVE1
     turbo.t01 = Math.max(0, turbo.t01 - 0.3);           // dunks spend fuel
     const made = Math.random() < DUNK_PCT[kind];
     SoundKit.play('whoosh', { pitch: 0.85 });
-    meAnimTree.beat(SPORT_CLIP.dunkLaunchPower);
+    // BIOMECH-HOOPS-WAVE1 G6: the live dribble is PARKED first — the ball comes back to the palm and rides the hand through
+    // the flight (it used to stay at the last bounce point on the floor while the body flew, measured ballY 0.85 through the
+    // whole flight); the launch's last frame is HELD to feet-down (the 0.35 s clip ran out mid-air into the run loop)
+    meCarry?.update(0, 0, false);
+    if (!ball.parent) attachBallToHand(ball, me.skeleton, 'RightHand');
+    meAnimTree.beat(SPORT_CLIP.dunkLaunchPower, { holdEnd: true });
     const from = me.root.position.clone();
     const t0 = performance.now();
     const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-      const k = Math.min(1, (performance.now() - t0) / 550);
+      const fdt = ctx.scene.getEngine().getDeltaTime() / 1000;
+      const k = Math.min(1, (performance.now() - t0) / DRIVE_DUNK.flightMs);
       me.root.position.x = from.x + (RIM.x - from.x) * k;
-      me.root.position.z = from.z + (RIM.z + 0.5 - from.z) * k;
-      me.root.position.y = Math.sin(k * Math.PI) * 1.15;
+      me.root.position.z = from.z + (RIM.z + DRIVE_DUNK.landAheadZ - from.z) * k;
+      me.root.position.y = driveDunkY(k);
+      // BIOMECH-HOOPS-WAVE1 G1/G3: the chest eases onto the iron through the flight (it kept the drive's heading — a slam
+      // from a body yawed 40° off the rim); the posture windows ride the flight clock (rise / hang / extend / jam / brace)
+      face(me.root, slewYaw(me.root.rotation.y, yawTo(me.root.position, RIM), FACE_RIM_RATE, fdt));
+      dunkFlight = { k, made: resolved ? made : null };
+      if (!resolved && k >= DRIVE_DUNK.resolveK) {
+        // G6: the slam resolves AT THE IRON — the ball leaves the hand at the rim; a make flushes through the net, a miss
+        // clanks off the front (it used to let go on the feet-down frame, from a hand at hip height, and float there)
+        resolved = true;
+        const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
+        if (made) dunkFlush = { releasePos, since: 0 };
+        else { missClank(ctx); launchLoose(releasePos, clankOffRim(ball, RIM)); }
+      }
       if (k < 1) return;
       ctx.scene.onBeforeRenderObservable.remove(obs);
-      dunking = false;
-      releaseBall(ball);
+      dunking = false; dunkFlight = null; meLandSec = LAND_SEC;
+      meAnimTree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });   // G5: feet-down is the land crouch, never an idle flash
+      meDribble.setFacing(me.root.rotation.y);
       if (made) {
         // A DUNK IS WORTH TWO. The comment above TARGET_SCORE records the
         // scoring scale being fixed from "1 inside the paint, 2 outside" to real
@@ -841,14 +959,13 @@ export const OneVOneMode: ModeDefinition = (() => {
         }
         ctx.setHud({ score: myScore, momentum });
         bannerFlash(ctx, posterized ? 'POSTERIZED!' : 'THROWN DOWN!', 1000);
-        carrying = true;
+        carrying = false;   // BIOMECH-HOOPS-WAVE1: the ball is in the net, not in the hand — the reset hands it back (an active carry would have snatched it out of the flush)
         if (checkGameOver(ctx)) return;
         later(posterized ? 1500 : 900, () => resetPositions());   // a posterized body gets up before it is moved
       } else {
         SoundKit.play('miss');
         SoundKit.play('crowdGroan', { volume: 0.4 });
-        missClank(ctx);   // A+ P0: the miss has weight too — a clank, never the make's punch
-        launchLoose(ball.getAbsolutePosition(), new Vector3((Math.random() - 0.5) * 3, 3, 2));
+        // the clank and the loose ball fired at the resolve (k 0.55), off the front of the iron — BIOMECH-HOOPS-WAVE1 G6
         bannerFlash(ctx, kind === 'poster' ? 'STUFFED AT THE RIM!' : 'RATTLED OUT');
         later(900, () => startDefense(ctx, 'THEIR BALL — CHECK UP, DEFEND!'));
       }
@@ -884,11 +1001,13 @@ export const OneVOneMode: ModeDefinition = (() => {
     arcLabel = currentShot?.label ?? 'SHOT';
     const made = Math.random() < Math.min(0.98, pct);
     releaseBall(ball);
-    // The jumpshot is HELD by the tree (meter-paced from shot start) — do NOT restart it here or the release frame pops.
-    // Let it ride out the follow-through, then release the hold (the tree settles into the stance while the arc flies).
-    // Layups keep their own finish clip.
+    meShotWin = 'release'; meShotSec = 0;   // BIOMECH-HOOPS-WAVE1: release → follow-through until the arc resolves
+    // The jumpshot was HELD by the tree (meter-paced from shot start) up to its release frame (both arms overhead). The
+    // authored FOLLOW-THROUGH takes it from there (its first key matches that frame, so the crossfade is a continuation):
+    // the wrist snaps, the arms come down the front — and it is HELD as the end pose until the arc resolves (G5). The
+    // timed release() it replaces dropped the body into the defensive stance 420 ms in, mid-arc. Layups keep their finish.
     if (currentShot?.style === 'layup') meAnimTree.beat(SPORT_CLIP.dunkLaunchPower);
-    else later(420, () => meAnimTree.release());
+    else meAnimTree.beat('bball_follow_through', { fadeSec: 0.1 });
     ctx.setHud({ shotType: '', shotMeterT: 0 });
     // SHOT FEEDBACK — 2K tells you WHY at the moment of release, not after
     // the arc resolves. Quality word + contest tag: an early contested

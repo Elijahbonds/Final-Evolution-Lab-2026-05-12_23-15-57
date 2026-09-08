@@ -24,6 +24,7 @@ export type BasketballAnimState =
   | 'idle_dribble' | 'speed_dribble' | 'crossover' | 'protect'
   | 'drive' | 'gather' | 'shot_release' | 'layup' | 'dunk'
   | 'contact_stagger' | 'defend_slide' | 'defend_slide_right' | 'defend_idle' | 'box_out'
+  | 'watch'
   | 'floor'
   | 'celebrate' | 'dejected';
 
@@ -63,6 +64,10 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   defend_slide_right: { clip: 'bball_defend_slide_right', loop: true, fadeSec: 0.16 },
   defend_idle:     { clip: 'bball_defend_stance', loop: true, fadeSec: 0.2 },
   box_out:         { clip: 'bball_defend_stance', loop: true, fadeSec: 0.12 },
+  // BIOMECH-HOOPS-WAVE1 (2026-09-08): a body with no ball that is NOT defending (the shooter watching his arc, the rival
+  // after his release) stands and watches — it used to drop into the defensive slide stance (G5: the follow-through's
+  // silhouette died into a crouch the moment the hold released).
+  watch:           { clip: 'idle_stand', loop: true, fadeSec: 0.2 },
   floor:           { clip: 'karate_floor_hold', loop: true, fadeSec: 0.12 },
   celebrate:       { clip: 'bball_score_celebrate', loop: false, fadeSec: 0.15 },
   dejected:        { clip: 'football_tackled_fall', loop: false, fadeSec: 0.2 },
@@ -83,7 +88,7 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
   else if (i.driving && i.hasBall) state = 'drive';
   else if (i.speed01 > 0.15) state = i.hasBall ? 'speed_dribble' : 'drive';
   else if (i.nearestDefender < 1.4 && i.hasBall) state = 'protect';
-  else state = i.hasBall ? 'idle_dribble' : 'defend_idle';
+  else state = i.hasBall ? 'idle_dribble' : 'watch';
   return { state, ...CLIP_FOR[state] };
 }
 
@@ -102,7 +107,11 @@ function withoutTrigger(i: AnimTreeInput, state: BasketballAnimState): AnimTreeI
 /** States that may cut a beat in flight. */
 const PRIORITY = new Set<BasketballAnimState>(['floor', 'contact_stagger', 'dunk']);
 
-export interface TreeBeatOpts { fadeSec?: number; speedRatio?: number; onSettle?: () => void; /** Sit in this loop after the beat until the mode calls release() (a knockdown → the floor). */ settleTo?: { clip: string; fadeSec?: number; speedRatio?: number } }
+export interface TreeBeatOpts { fadeSec?: number; speedRatio?: number; onSettle?: () => void; /** Sit in this loop after the beat until the mode calls release() (a knockdown → the floor). */ settleTo?: { clip: string; fadeSec?: number; speedRatio?: number };
+  /** BIOMECH-HOOPS-WAVE1: HOLD the beat's last frame when it runs out (an aerial clip in a flight — the dunk contest's
+   *  playAir) until the mode's next beat / release(): the 0.35 s launch used to run out mid-air and settle into the run
+   *  loop, the arms crossfading down through a T at the jam. */
+  holdEnd?: boolean }
 export interface TreeHoldOpts { fadeSec?: number; speedRatio?: number }
 
 /**
@@ -179,6 +188,7 @@ export class BasketballAnimTree {
       loop: false, fadeSec: opts.fadeSec ?? 0.08, speedRatio: opts.speedRatio ?? 1, restart: true,
       onEnd: () => {
         if (this.token !== tok) return;   // cut by a newer beat / hold / release / reset
+        if (opts.holdEnd) { opts.onSettle?.(); return; }   // the pose holds where the clip left it; the override stands until the next beat / release
         this.override = null; this.current = null;
         if (state) this.settledState = state;
         opts.onSettle?.();
