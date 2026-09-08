@@ -63,7 +63,10 @@ function shuffled<T>(arr: readonly T[]): T[] {
  *  with the flagship 3D experience. */
 export function drawCarnivalLineup(count: number = STOPS_PER_NIGHT): CarnivalStop[] {
   const externals = shuffled(CARNIVAL_EXTERNAL_POOL).slice(0, Math.max(0, count - 1));
-  return shuffled(['carnival', ...externals]);
+  // ARENA-10PHASE P7 (2026-09-07): the comment above promised the night OPENS with the 3D round, but the whole lineup was
+  // shuffled — two nights in three, START THE NIGHT left /play/carnival for a mini-game page and Court Carnival's own canvas
+  // never mounted (playtest d3d4a93: "GAME NIGHT lobby 90 s+, no canvas"). Native first, the externals shuffled behind it.
+  return ['carnival', ...externals];
 }
 
 export function startCarnivalRun(lineup: CarnivalStop[]): CarnivalRunState {

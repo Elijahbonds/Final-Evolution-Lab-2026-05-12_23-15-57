@@ -15,7 +15,7 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
-import { buildSurfBreak, SURF_HALF_WIDTH, type RideWorld } from './rideWorlds';
+import { buildSurfBreak, SURF_HALF_WIDTH, WAVE_SPEED, WAVE_LAP, WAVE_FACE_LEN, type RideWorld } from './rideWorlds';
 import { assertSpawned } from '../core/FrameGuard';
 import { BoardAnimTree } from '../anim/boardTree';
 import { SoundKit } from '../audio/SoundKit';
@@ -29,7 +29,11 @@ const RUN_SEC = 90;
 const CUTBACK_RATE = 6;
 export const POCKET = { min: 2, max: 9 };
 export const MAX_FORWARD_SPEED = 9;
-const WAVE_LAP = 140;
+/** How far past the bottom of the face the rider may drift before the rail holds them (m) — the wave catches up anyway. */
+export const FLAT_LEASH = 8;
+/** Wave-relative drift (m/s): stalled on the flat the wave gains this much on you; the face's slide under the lip; the
+ *  stick's trim up / drop down; the buried rail's drive. */
+export const DRIFT = { flat: -1.7, slide: 0.9, trim: 0.6, climb: 2.4, drop: 2.2, rail: 2.6 };
 export const BARREL_HOLD_SEC = 1.5;
 export const BARREL_BONUS = 250;
 /** Carve depth at which the rider commits and starts SPENDING flow. */
@@ -45,11 +49,14 @@ export const FLOW_MAX = 200;
 export const FLOW_FILL_PER_SEC = 22;
 export const SurfBreakMode: ModeDefinition = (() => {
   let world: RideWorld, waveLipAt: (t: number) => Vector3, barrelActive: (t: number) => boolean;
+  let faceHeightAt: (x: number, z: number, t: number) => number;
   let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
   let rig: BoardRig, tricks: TrickMachine;
   let crowd: Onlookers;
   let t = 0, timeLeft = RUN_SEC, flow = 0;
-  let stickX = 0, carve = 0;
+  let stickX = 0, stickY = 0, carve = 0;
+  /** wave-relative forward drift (m/s): forward speed = WAVE_SPEED + rel (ARENA-10PHASE P3) */
+  let rel = 0;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   /** Where the board is turning TO. A cutback is a carve, not a pivot. */
   let yawTarget = 0;
@@ -99,6 +106,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
     ctx.setHud({ banner: why, flow: 0 });
     flow = 0; barrelSec = 0; inBarrel = false;
     setTimeout(() => {
+      rel = 0;
       rig.char.root.position.set(rig.char.root.position.x, 0, lipZ + 6);
       // A reposition is a teleport, not motion — the camera must follow it in one
       // step rather than lerping across the gap with the rider out of frame.
@@ -136,7 +144,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
 
     async load(ctx: ModeContext) {
       const built = buildSurfBreak(ctx.scene, POCKET);
-      world = built.world; waveLipAt = built.waveLipAt; barrelActive = built.barrelActive;
+      world = built.world; waveLipAt = built.waveLipAt; barrelActive = built.barrelActive; faceHeightAt = built.faceHeightAt;
       propsGone = false; void mountVenueProps(ctx.scene, 'surf-break').then((h) => { if (propsGone) h?.dispose(); else props = h; });
       // Gate 0: Validate skeletal rig by spawning placeholder to check skeleton
       const _validateChar = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, -1000, 0) });
@@ -144,11 +152,14 @@ export const SurfBreakMode: ModeDefinition = (() => {
         // Confirmed: 65-bone Mixamo rig with proper structure
       }
       _validateChar.dispose(); // Clean up validation placeholder
-      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -22), 0, world.ground, '#ffd75e', 'surfboard');
+      // ARENA-10PHASE P3: spawn IN the pocket (the lip starts at z −50; was z −22 = 28 m out on the flat with nothing under
+      // the board for the first 6 s), and glue the rider to the face on the way down it (the wave face falls away faster
+      // than one frame of gravity, exactly like the pitched piste — see RiderCfgOverrides.stickDown).
+      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -50 + POCKET.min + 3), 0, world.ground, '#ffd75e', 'surfboard', { stickDown: 0.9, rayLength: 8 });
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { anim: 'external', onBeat: (b) => { if (b === 'land') landBeatT = LAND_BEAT_SEC; else bailBeatT = BAIL_BEAT_SEC; } });
       animTree = new BoardAnimTree(rig.char.animator);
-      bailBeatT = 0; landBeatT = 0; airT = 0; cutbackUntil = 0;
-      ctx.camDirector.setPreset('board');
+      bailBeatT = 0; landBeatT = 0; airT = 0; cutbackUntil = 0; rel = 0; stickY = 0;
+      ctx.camDirector.setPreset('surf');   // over the swell back, clear of the crest (was 'board': 2.4 m up, inside a 2.6 m wave)
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 4, modeId: 'surf' });
       t = 0; timeLeft = RUN_SEC; flow = 0; ended = false; wipedOut = false; lapsSeen = 0; surging = false;
       yawTarget = rig.char.root.rotation.y;
@@ -163,12 +174,12 @@ export const SurfBreakMode: ModeDefinition = (() => {
       ctx.camDirector.snapTo(rig.char.root.position, waveLipAt(t));
       SoundKit.startAmbient('ocean');
       EffectsKit.ambient(ctx.scene, 'venice');
-      ctx.setHud({ score: 0, flow: 0, time: RUN_SEC, hint: 'Stay in the pocket · ride the open TUBE for barrels · miss the buoys' });
+      ctx.setHud({ score: 0, flow: 0, time: RUN_SEC, hint: 'Ride the pocket under the lip · pull BACK to climb the face, push to drop in · R2 drives · ride the open TUBE for barrels · miss the buoys' });
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
-      if (e.t === 'stick' && e.side === 'L') stickX = e.x;
+      if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }   // P3: y = trim (back climbs the face, forward drops in)
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (e.t === 'trigger' && e.side === 'R') carve = e.value;
       if (e.t === 'button' && e.pressed && !wipedOut) {
@@ -200,10 +211,11 @@ export const SurfBreakMode: ModeDefinition = (() => {
       t += dt; timeLeft -= dt;
       const lip = waveLipAt(t);
 
-      const lap = Math.floor((t * 4.5) / WAVE_LAP);
+      const lap = Math.floor((t * WAVE_SPEED) / WAVE_LAP);
       if (lap > lapsSeen) {
         lapsSeen = lap;
         rig.char.root.position.z -= WAVE_LAP;
+        ctx.camDirector.snapTo(rig.char.root.position, waveLipAt(t));   // the wrap is a cut: the camera cuts with it (it used to lerp 140 m)
       }
 
       if (timeLeft <= 0) {
@@ -233,12 +245,34 @@ export const SurfBreakMode: ModeDefinition = (() => {
         }
         if (surging) flow = Math.max(0, flow - SURGE_DRAIN * dt);
 
-        const ceiling = MAX_FORWARD_SPEED + (surging ? SURGE_SPEED_BONUS : 0);
-        if (rig.rider.vel.z < ceiling) {
-          rig.rider.vel.z += (2.2 + carve * 1.6 + (surging ? 2.5 : 0)) * dt;
-          rig.rider.vel.z = Math.min(ceiling, rig.rider.vel.z);
-        }
+        // ── WAVE-RELATIVE DRIVE (ARENA-10PHASE P3 / SURF-WAVES-BOUNDS, 2026-09-07) ──
+        // The Rider is a flat-park model: its own forward accel (9 m/s² × 0.55 with no pump) ran the surfer up to 14 m/s
+        // while the wave travels at 4.5, so an unattended run left the water strip 11 s in and fell off the world
+        // (measured: z 137 at 12 s, the camera 71 m up and 320 m behind by 43 s — playtest d3d4a93's empty gradient).
+        // A surfer is CARRIED: forward speed = the wave's + a drift the face and the inputs decide. Under the lip the face
+        // slides you ahead (steep there, nothing at the bottom); on the flat you stall and the wave catches up; stick
+        // BACK trims up the face toward the lip, stick FORWARD drops in; R2 buries the rail for drive (and past
+        // SURGE_CARVE spends flow for more). Fall behind the crest and the existing rule wipes you out.
+        const u = rig.char.root.position.z - lip.z;
+        const slope = u < 0 ? 0.3 : u < WAVE_FACE_LEN ? 1 - u / WAVE_FACE_LEN : 0;   // 1 under the lip → 0 at the bottom
+        // hands-off the board trims itself into the face: the slide under the lip beats the trim, the trim wins lower down,
+        // so an untouched rider settles a third of the way up the face (u ≈ 3, ~1.1 m up) and RIDES — not the flat
+        let relTarget = u >= WAVE_FACE_LEN ? DRIFT.flat : DRIFT.slide * slope - DRIFT.trim;
+        if (stickY > 0.2) relTarget -= DRIFT.climb * stickY;
+        else if (stickY < -0.2) relTarget += DRIFT.drop * -stickY;
+        relTarget += carve * DRIFT.rail + (surging ? SURGE_SPEED_BONUS : 0);
+        relTarget = Math.min(relTarget, MAX_FORWARD_SPEED - WAVE_SPEED + (surging ? SURGE_SPEED_BONUS : 0));
+        rel += (relTarget - rel) * Math.min(1, dt * 3.2);
+        rig.rider.vel.z = WAVE_SPEED + rel;
         rig.rider.update(dt, stickX, carve);
+        // NEVER OFF THE WAVE: the leash past the bottom of the face (the wave catches up anyway; this is the frame guard)
+        const leash = lip.z + WAVE_FACE_LEN + FLAT_LEASH;
+        if (rig.char.root.position.z > leash) { rig.char.root.position.z = leash; rel = Math.min(rel, 0); }
+        // the board pitches with the face it is on: nose down riding down the slope, level on the flat
+        const px = rig.char.root.position.x, pz = rig.char.root.position.z;
+        const drop = faceHeightAt(px, pz, t) - faceHeightAt(px, pz + 1, t);
+        const pitch = rig.rider.grounded ? Math.atan(drop) * 0.55 : 0;
+        rig.char.root.rotation.x += (pitch - rig.char.root.rotation.x) * Math.min(1, dt * 8);
 
         // BUOYS — hitting one ends the ride the same way falling behind does
         const p = rig.char.root.position;

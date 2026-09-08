@@ -133,7 +133,8 @@ export function CoinStore() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Coin Store</h1>
-          <p className="text-sm text-white/50">Top up coins, spend on unlocks. Shards are earned only — never for sale.</p>
+          {/* ARENA-10PHASE P10: shards ARE sold (M25 shard packs, /shop/shards) — this line said "never for sale" over a live Buy button */}
+          <p className="text-sm text-white/50">Top up coins, spend on unlocks. Shard packs are sold separately in the <Link href="/shop/shards" className="text-[#C79BFF] hover:underline">Shard Store</Link>.</p>
           <Link href="/wallet" className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-[#00E5FF] hover:underline">
             <History className="h-3.5 w-3.5" /> View wallet history
           </Link>
@@ -177,12 +178,14 @@ export function CoinStore() {
                 </div>
                 <div className="text-sm font-semibold text-white">{pack.label}</div>
                 <div className="mb-3 mt-0.5 flex-1 text-xs text-white/50">{pack.blurb}</div>
+                {/* P10: one truth — while checkout is not configured the badge says COMING SOON and the button agrees (it used to
+                    read $4.99 and only fail after the click) */}
                 <button
                   onClick={() => buyPack(pack.id)}
-                  disabled={busy === pack.id}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#FFD700] px-3 py-2 text-sm font-bold text-black transition hover:brightness-110 disabled:opacity-60"
+                  disabled={busy === pack.id || purchasesEnabled === false}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#FFD700] px-3 py-2 text-sm font-bold text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {busy === pack.id ? <Loader2 className="h-4 w-4 animate-spin" /> : usd(pack.priceUsdCents)}
+                  {busy === pack.id ? <Loader2 className="h-4 w-4 animate-spin" /> : purchasesEnabled === false ? `${usd(pack.priceUsdCents)} · coming soon` : usd(pack.priceUsdCents)}
                 </button>
               </motion.div>
             );

@@ -444,6 +444,55 @@ function paintStudio(scene: Scene, base: string, accent: string): DynamicTexture
   return tex;
 }
 
+/** ARENA-10PHASE P8 (2026-09-07): a courtyard wall that reads as STONE — coursed blocks with mortar, a darker coping, damp
+ *  and moss at the base — instead of one flat colour (the karate_h2h wall was a 14 × 3.6 m pale slab: "giant white
+ *  placeholder plane", playtest d3d4a93). 4:1 like the wall box it wraps. */
+function paintStoneWall(scene: Scene, base: string): DynamicTexture {
+  const W = 1024, H = 256;
+  const tex = new DynamicTexture('stoneWallTex', { width: W, height: H }, scene, false);
+  const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
+  const rnd = seeded(7);
+  ctx.fillStyle = base; ctx.fillRect(0, 0, W, H);
+  const capH = H * 0.14;
+  ctx.fillStyle = mixHex(base, '#3A3530', 0.55); ctx.fillRect(0, 0, W, capH);           // coping tiles
+  ctx.fillStyle = 'rgba(0,0,0,0.22)'; for (let x = 0; x < W; x += 48) ctx.fillRect(x, 0, 2, capH);
+  const rows = 6, rowH = (H - capH) / rows, bw = 128;
+  for (let r = 0; r < rows; r++) {
+    const y = capH + r * rowH, off = (r % 2) * (bw / 2);
+    for (let x = -off; x < W; x += bw) {
+      const v = rnd();
+      ctx.fillStyle = mixHex(base, v < 0.5 ? '#000000' : '#FFFFFF', 0.04 + rnd() * 0.10);
+      ctx.fillRect(x + 3, y + 3, bw - 6, rowH - 6);
+    }
+  }
+  ctx.strokeStyle = 'rgba(40,35,30,0.45)'; ctx.lineWidth = 3;                              // mortar
+  for (let r = 0; r <= rows; r++) { const y = capH + r * rowH; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  const damp = ctx.createLinearGradient(0, H * 0.68, 0, H);
+  damp.addColorStop(0, 'rgba(60,90,50,0)'); damp.addColorStop(1, 'rgba(60,90,50,0.45)');
+  ctx.fillStyle = damp; ctx.fillRect(0, H * 0.68, W, H * 0.32);
+  tex.update(false);
+  return tex;
+}
+
+/** P8: a shrine courtyard is RAKED GRAVEL, not a spotlit stage — fine speckle, rake lines, and the rings the fight reads. */
+function paintGravel(scene: Scene, base: string, accent: string): DynamicTexture {
+  const S = 1024;
+  const tex = new DynamicTexture('gravelTex', { width: S, height: S }, scene, false);
+  const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
+  const rnd = seeded(11);
+  ctx.fillStyle = base; ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 16000; i++) { ctx.fillStyle = rnd() < 0.5 ? 'rgba(90,80,70,0.32)' : 'rgba(255,255,255,0.26)'; ctx.fillRect(rnd() * S, rnd() * S, 2, 2); }
+  ctx.strokeStyle = 'rgba(90,80,70,0.14)'; ctx.lineWidth = 3;
+  for (let y = 0; y < S; y += 14) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(S, y); ctx.stroke(); }
+  ctx.strokeStyle = accent; ctx.globalAlpha = 0.5; ctx.lineWidth = 8;
+  ctx.beginPath(); ctx.arc(S / 2, S / 2, S * 0.34, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(S / 2, S / 2, S * 0.20, 0, Math.PI * 2); ctx.stroke();
+  ctx.globalAlpha = 1;
+  tex.update(false);
+  return tex;
+}
+const lumaOf = (hex: string): number => { const v = hex.replace('#', ''); return (parseInt(v.slice(0, 2), 16) * 0.3 + parseInt(v.slice(2, 4), 16) * 0.59 + parseInt(v.slice(4, 6), 16) * 0.11) / 255; };
+
 function buildGround(scene: Scene, g: GroundSpec, root: TransformNode): Mesh {
   // NAME MATTERS. M64's CameraDirector occlusion probe recognises venue shell
   // by name — /^(venue_ground|venue_box|wall_|...)/ — because VenueKit builds
@@ -464,6 +513,9 @@ function buildGround(scene: Scene, g: GroundSpec, root: TransformNode): Mesh {
     mat.albedoTexture = paintMarkings(scene, g.markings, g.color, g.lineColor ?? '#FFFFFF', g.size);
   } else if (g.kind === 'water' || g.kind === 'snow' || g.kind === 'sand') {
     mat.albedoTexture = paintOrganic(scene, g.kind, g.color);
+  } else if (PREMIUM_DRESSING && g.kind === 'mat' && lumaOf(g.color) > 0.62) {
+    // P8: a light mat is an outdoor courtyard (the shrine gravel) — raked gravel, not the indoor spotlight floor
+    mat.albedoTexture = paintGravel(scene, g.color, g.lineColor ?? '#6B5B4A');
   } else if (PREMIUM_DRESSING && (g.kind === 'mat' || g.kind === 'stage')) {
     // M108: indoor arenas (dojo, gym, dance, quiz stages) get a lit spotlight
     // floor with accent rings instead of one flat colour.
@@ -571,7 +623,9 @@ function buildProp(scene: Scene, p: PropSpec, root: TransformNode, shadows: Shad
       // note on the ground mesh above).
       const m = MeshBuilder.CreateBox('wall_nexus', { width: 24 * s, height: 6 * s, depth: 0.4 }, scene);
       m.position.y = 3 * s;
-      m.material = surface(scene, 'wallMat', p.color ?? '#12151F', 0.9);
+      const wmat = surface(scene, 'wallMat', p.color ?? '#12151F', 0.9);
+      if (PREMIUM_DRESSING) wmat.albedoTexture = paintStoneWall(scene, p.color ?? '#12151F');   // P8: stone, not a painted slab
+      m.material = wmat;
       add(m, false);
       break;
     }

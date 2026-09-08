@@ -142,7 +142,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
 
       opts.buildVenue(ctx.scene);
       propsGone = false;
-      if (opts.propSet) void mountVenueProps(ctx.scene, opts.propSet).then((h) => { if (propsGone) h?.dispose(); else props = h; });   // ship pass 4
+      if (opts.propSet) void mountVenueProps(ctx.scene, opts.propSet, undefined, { snapToGround: true }).then((h) => { if (propsGone) h?.dispose(); else props = h; });   // ship pass 4 · P9: on the ground under them
 
       // The launch object: vault table or kicker lip. Placed at the core's own
       // launchZ so the visual and the physics agree by construction.
@@ -280,7 +280,7 @@ export const BigAirMode: ModeDefinition = makeAirSessionMode({
     modeId: 'bigair',
     mood: 'alpine',
     buildVenue: (scene) => VenueKit.buildSlope(scene),
-    propSet: 'slope',
+    propSet: 'bigair-run',   // P9: pines down the −z run (the 'slope' set stood behind the athlete)
     makeSession: (onLanding) => makeBigAirSession(undefined, { onLanding }),
     attempts: BIG_AIR_TUNING.attemptsPerRound ?? 3,
     winScore: 900,                                    //TUNE(elijah)

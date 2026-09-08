@@ -131,7 +131,9 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   descent: { distance: 9.0, height: 3.6, minHeight: 2.2, pitchFloorDeg: 12, pitchCapDeg: 26, targetHeight: 1.2, lag: 0.08, lookAhead: 4.5 },
   // SURF — wave-following: low and close behind the rider so the face fills
   // frame; barrel treatment = tightest (set via pulse when in the tube).
-  surf: { distance: 5.2, height: 1.5, minHeight: 1.0, pitchFloorDeg: 3, pitchCapDeg: 10, targetHeight: 1.1, lag: 0.12, lookAhead: 2.8 },
+  // ARENA-10PHASE P3 (2026-09-07): the wave is a 2.6 m ribbon now and the camera sits over the swell BACK behind the rider,
+  // so it needs to clear the crest — was 5.2 / 1.5 (unused: the mode ran on 'board'); the mode rides this preset now.
+  surf: { distance: 6.8, height: 3.1, minHeight: 2.0, pitchFloorDeg: 8, pitchCapDeg: 22, targetHeight: 1.0, lag: 0.12, lookAhead: 3.0 },
   // PRE-SNAP — high, wide, centered on the line of scrimmage: formations
   // and the coverage shell must be readable at a glance (the clarity beat).
   presnap: { distance: 10.5, height: 6.0, minHeight: 4.0, pitchFloorDeg: 22, pitchCapDeg: 34, targetHeight: 0.6, lag: 0.12, lookAhead: 0.4, fitTwo: true },

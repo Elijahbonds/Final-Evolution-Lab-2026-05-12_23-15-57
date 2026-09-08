@@ -24,6 +24,7 @@ export const VolleyballMode = createNetSportMode({
   // crowd loop on an empty beach court was the wrong room entirely.
   ambient: 'ocean',
   crowd: true,          // L4 — a Beach Pro court is not empty
+  beach: true,          // ARENA-10PHASE P5 — sand to the horizon, the sea past the far baseline, the props on ground
   swingClip: 'volleyball_spike',   // Phase 3 (2026-09-03): authored spike, was the jumpshot
   aiSkill: 0.78,  //TUNE(elijah)
   hudLabels: { you: 'POINT', them: 'POINT THEM' },

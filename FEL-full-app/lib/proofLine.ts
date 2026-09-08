@@ -1,16 +1,21 @@
 // proofLine — pass 5 phase 3: one line that says what happened, per mode, from the mode's own session stats. Rendered on
 // the results card ("Share proof · …") and minted onto the challenge card as `display`. Dunk keeps its make/miss line.
 import { gradeFor } from '@/lib/babylon/core/danceTracks';
-export interface ProofInput { score: number; opponentScore?: number; won: boolean; outcome?: string; stats?: Record<string, number | string | boolean> }
+/** ARENA-10PHASE (2026-09-07): an outside verdict overrides the mode's own W/L — a Triumph Arena run is settled against the
+ *  house rival, not the mode's in-game rival, and the card must say ONE thing. TIE = both entries refunded; PENDING = the
+ *  opponent has not posted yet. */
+export type ProofVerdict = 'WON' | 'LOST' | 'TIE' | 'PENDING';
+export interface ProofInput { score: number; opponentScore?: number; won: boolean; outcome?: string; stats?: Record<string, number | string | boolean>; verdict?: ProofVerdict }
 const n = (s: ProofInput['stats'], k: string): number | null => { const v = s?.[k]; return typeof v === 'number' && Number.isFinite(v) ? v : null; };
-const wl = (r: ProofInput) => (r.won ? 'WON' : 'LOST');
+const wl = (r: ProofInput) => r.verdict ?? (r.won ? 'WON' : 'LOST');
+const VERDICT_SENTENCE: Record<ProofVerdict, string> = { WON: 'You won', LOST: 'You lost', TIE: 'Tie — refunded', PENDING: 'Result pending' };
 export function proofLineFor(mode: string, r: ProofInput): string | null {
   const s = r.stats ?? {};
   switch (mode) {
     case 'dunkContest': {
       const m = n(s, 'makes') ?? 0, x = n(s, 'misses') ?? 0, tot = m + x;
       const rival = r.opponentScore != null ? ` vs ${r.opponentScore}` : '';
-      const outcome = r.won ? 'You won' : 'You lost';
+      const outcome = VERDICT_SENTENCE[wl(r)];
       if (m > 0) return `You slammed ${m}/${tot} · ${r.score} pts${rival} · ${outcome}`;
       if (tot > 0) return `You missed every dunk · ${r.score} pts${rival} · ${outcome}`;
       return `You missed · ${r.score} pts${rival} · ${outcome}`;
@@ -35,10 +40,10 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
       if (hr !== null) return `${hr} HR${rival !== null ? ` vs ${rival}` : ''}${outs !== null ? ` · ${outs} OUTS` : ''}${longest ? ` · LONGEST ${longest} FT` : ''}`;
       const hits = n(s, 'hits'), misses = n(s, 'misses'); return hits !== null ? `${hits}/${hits + (misses ?? 0)} CONTACT · ${r.score} PTS` : null;
     }
-    case 'soccer': return `${r.score} PTS · ${r.outcome?.replace(/_/g, ' ') ?? wl(r)}`;
+    case 'soccer': return `${r.score} PTS · ${r.verdict ?? r.outcome?.replace(/_/g, ' ') ?? wl(r)}`;
     case 'football': { const yards = n(s, 'yards'), ev = n(s, 'evades') ?? n(s, 'evaded'), tr = n(s, 'trucks'); return `${yards ?? 0} YDS${ev !== null ? ` · ${ev} EVADES` : ''}${tr !== null ? ` · ${tr} TRUCKS` : ''}`; }
     case 'tennis': case 'tiebreak': case 'volleyball': return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
-    case 'carnival': { const ev = n(s, 'events'), rp = n(s, 'rivalPoints'); return `${r.score}–${rp ?? r.opponentScore ?? 0} OVER ${ev ?? '?'} EVENTS · ${r.won ? 'CHAMPION' : 'RUNNER-UP'}`; }
+    case 'carnival': { const ev = n(s, 'events'), rp = n(s, 'rivalPoints'); return `${r.score}–${rp ?? r.opponentScore ?? 0} OVER ${ev ?? '?'} EVENTS · ${r.verdict ?? (r.won ? 'CHAMPION' : 'RUNNER-UP')}`; }
     case 'dance': {
       const stars = n(s, 'stars'), acc = n(s, 'accuracy'), combo = n(s, 'maxCombo');
       const grade = acc !== null ? gradeFor(acc / 100) : null;

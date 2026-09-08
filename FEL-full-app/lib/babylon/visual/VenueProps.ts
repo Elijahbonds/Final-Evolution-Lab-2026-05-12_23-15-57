@@ -6,7 +6,7 @@
 // Each unique model loads once per scene and repeats as instances; props are
 // scenery only — not pickable, no collisions, outside every playing area.
 // Assets: public/models/props/<kit>/<model>.glb (Kenney, CC0; see manifest.json).
-import { Color3, PBRMaterial, SceneLoader, TransformNode } from '@babylonjs/core';
+import { Color3, PBRMaterial, Ray, SceneLoader, TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Mesh, Scene } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { VENUE_PROP_SETS, type PropPlacement } from './venuePropSets';
@@ -19,7 +19,9 @@ const modelCache = new WeakMap<Scene, Map<string, Promise<Mesh[]>>>();
 // texture (measured 2026-09-06, _mat-diag: leafsGreen / woodBark / grass / dirt all met=1) — under image lighting a fully
 // metallic flat colour reads as a dark gem. Untextured metals become matte dielectrics; the kit's teal greens and orange
 // bark take real plant colours (a placement `tint` still multiplies on top).
-const KIT_PALETTE: Record<string, string> = { leafsGreen: '#3F9A55', grass: '#4C9E58', woodBark: '#8B5E3C', dirt: '#8A6A4A' };
+// ARENA-10PHASE P8: the round pines (tree_pineRoundA/B — the dojo set's) carry `leafsDark` / `woodBarkDark`, which the
+// palette missed, so they kept the kit's TEAL (0.17/0.65/0.67) and read as "floating blue geo" over the shrine wall.
+const KIT_PALETTE: Record<string, string> = { leafsGreen: '#3F9A55', leafsDark: '#2F7A45', grass: '#4C9E58', woodBark: '#8B5E3C', woodBarkDark: '#6E4A30', dirt: '#8A6A4A' };
 const kitFixed = new WeakSet<PBRMaterial>();
 function normaliseKitMaterial(mat: PBRMaterial): void {
   if (kitFixed.has(mat)) return; kitFixed.add(mat);
@@ -48,20 +50,39 @@ async function loadModel(scene: Scene, kit: string, model: string): Promise<Mesh
   return p;
 }
 
+export interface MountPropsOptions {
+  /** ARENA-10PHASE P9 (2026-09-07): drop every placement onto the ground UNDER it. Placement tables are authored at y = 0,
+   *  which is the surface only on a flat venue — the snow piste is pitched 0.22 rad and drops 56 m over the run, so the
+   *  'slope' set's pines stood at y 0 while the snow fell away beneath them (playtest d3d4a93: "floating low-poly pine",
+   *  worse the further down the run). A ray from 400 m up finds the pickable ground at (x, z); no hit = the authored y. */
+  snapToGround?: boolean;
+}
+
 /** Mount the prop set for `venueKey` under a fresh root. Resolves after every model loaded (failures skip the prop). */
-export async function mountVenueProps(scene: Scene, venueKey: string, parent?: TransformNode): Promise<VenuePropsHandle | null> {
+export async function mountVenueProps(scene: Scene, venueKey: string, parent?: TransformNode, opts: MountPropsOptions = {}): Promise<VenuePropsHandle | null> {
   const set = VENUE_PROP_SETS[venueKey];
   if (!set || !set.length) return null;
   const root = new TransformNode(`venue_props_${venueKey}`, scene);
   if (parent) root.parent = parent;
   let count = 0;
   const instances: AbstractMesh[] = [];
+  const down = new Vector3(0, -1, 0);
+  let snapped = 0, missed = 0;
+  // the ground was built THIS frame and has not rendered yet: its world matrix is still identity, so a ray would hit a
+  // flat, unrotated, origin-centred copy of it at y 0 (measured 2026-09-08: 62 of 71 slope props "snapped" to y 0 over
+  // snow at −9…−54). Bring every pickable mesh's world matrix up to date before the first ray.
+  if (opts.snapToGround) for (const m of scene.meshes) if (m.isPickable && m.isEnabled() && m.isVisible) m.computeWorldMatrix(true);
+  const groundYAt = (x: number, z: number): number | null => {
+    const hit = scene.pickWithRay(new Ray(new Vector3(x, 400, z), down, 800), (m) => m.isPickable && m.isEnabled() && m.isVisible && !instances.includes(m));
+    return hit?.hit && hit.pickedPoint ? hit.pickedPoint.y : null;
+  };
   await Promise.all(set.map(async (p: PropPlacement, i: number) => {
     let meshes: Mesh[];
     try { meshes = await loadModel(scene, p.kit, p.model); } catch { return; }
     const holder = new TransformNode(`prop_${p.model}_${i}`, scene);
     holder.parent = root;
     holder.position.set(p.at[0], p.at[1], p.at[2]);
+    if (opts.snapToGround) { const gy = groundYAt(p.at[0], p.at[2]); if (gy !== null) { holder.position.y = gy + p.at[1]; snapped++; } else missed++; }
     holder.rotation.y = p.yaw ?? 0;
     const s = p.scale ?? 1; holder.scaling.set(s, s, s);
     for (const src of meshes) {
@@ -81,6 +102,7 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
     }
     count++;
   }));
+  if (opts.snapToGround) console.info(`[FEL-PROPS] ${venueKey}: ${snapped} placements dropped onto the ground, ${missed} kept their authored height`);
   return { root, count, dispose() { for (const m of instances) m.dispose(); root.dispose(); } };
 }
 
@@ -89,7 +111,7 @@ export function propSetFor(specVenueId: string): string | null {
   const map: Record<string, string> = {
     basketball_dunk: 'venice-court-meshy', basketball_h2h: 'venice-court-meshy', basketball_3v3: 'venice-court-meshy', court_carnival: 'venice-court',
     karate_h2h: 'dojo', karate_endless: 'dojo', golf_loop: 'links', derby: 'ballpark', penalty: 'stadium', football_rush: 'gridiron',
-    tennis: 'venice-court', volleyball: 'surf-break', gymnastics: 'gym', dance: 'dojo',
+    tennis: 'venice-court', volleyball: 'beach-court', gymnastics: 'gym', dance: 'dojo',   // P5: volleyball had the SURF set (authored for a 90 m water strip — the bus 60 m out over nothing)
   };
   return map[specVenueId] ?? null;
 }

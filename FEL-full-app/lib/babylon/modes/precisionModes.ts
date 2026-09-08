@@ -366,6 +366,9 @@ export const GolfMode: ModeDefinition = (() => {
     // the bag: on the green the LINE is the whole shot.
     const c = onGreen() ? PUTTER : GOLF_CLUBS[club];
     phase = 'flight';
+    // ARENA-10PHASE P4: the swing meter is over — the accuracy band used to stay on the HUD through the whole flight
+    // (playtest d3d4a93's golf frame shows it mid-flight) because only backToTee cleared it
+    ctx.setHud({ meterT: null, swingPhase: null, powerLock: null, hint: '' });
     // FrameGuard checks that you can see the thing the mode is about, and once
     // the ball is struck that thing is the BALL — the camera follows it down
     // the fairway by design, leaving the player behind. Golf never set heroRef

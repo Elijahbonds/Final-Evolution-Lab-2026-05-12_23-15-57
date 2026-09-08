@@ -16,7 +16,9 @@ const PLAY: Record<string, { hx: number; z: [number, number] }> = {
   'gridiron':     { hx: 22, z: [-2, 42] },       // x ±20 over z 0..40
   'skatepark':    { hx: 34, z: [-34, 34] },
   'slope':        { hx: 17, z: [-30, 260] },     // piste half-width
+  'bigair-run':   { hx: 8, z: [-160, 20] },      // ARENA-10PHASE P9: the run line from the strides (z 0) over the kicker (z −12) to the landing (z −130)
   'surf-break':   { hx: 45, z: [-20, 200] },
+  'beach-court':  { hx: 7.5, z: [-12, 12] },     // ARENA-10PHASE P5: the 18×9 court plus its 3 m free zone
   'gym':          { hx: 10, z: [-12, 12] },
 };
 

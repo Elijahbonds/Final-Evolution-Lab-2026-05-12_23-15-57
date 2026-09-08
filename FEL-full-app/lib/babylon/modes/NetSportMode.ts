@@ -9,10 +9,10 @@
 // All rally arithmetic lives in RallyCore (Babylon-free, 37 executed tests).
 // This file owns meshes, input, animation and HUD, and nothing else.
 
-import { MeshBuilder, Vector3 } from '@babylonjs/core';
+import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, Vector3 } from '@babylonjs/core';
 import { answerFor, tellFor, rallyPace, SHOT_FACE } from '../core/tennisHud';
 import { ballKindFor, dressBall } from '../visual/meshyProps';
-import type { AbstractMesh } from '@babylonjs/core';
+import type { AbstractMesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
@@ -61,6 +61,10 @@ export interface NetSportOptions {
   /** L4 — line the court with spectators. Opt-in per mode so a mode that has
    *  not had a World-Population pass does not silently gain one. */
   crowd?: boolean;
+  /** ARENA-10PHASE P5: a real beach under the court — sand to the horizon, the sea past the far baseline, a foam edge. The
+   *  spec's 15 × 24 sand plate ended 3 m past the lines and every prop past it stood over the void ("floating bus and
+   *  storefront", playtest d3d4a93). Volleyball only. */
+  beach?: boolean;
   /** Aces' energy gauge, Zone Shot and racket break. Tennis only. */
   energy?: boolean;
   swingClip: string;
@@ -69,10 +73,42 @@ export interface NetSportOptions {
   hudLabels: { you: string; them: string };
 }
 
+/** ARENA-10PHASE P5 (2026-09-07): the beach the Beach Pro court sits on. Sand out to ±100 m (tiled ripple grain), the sea
+ *  past the far baseline with a foam line where it meets the sand — so the prop set's shops, bus, palms and rocks all
+ *  stand on ground, and the reverse angles have somewhere to look. */
+function buildBeach(scene: Scene): { dispose(): void } {
+  const sand = MeshBuilder.CreateGround('beach_sand', { width: 220, height: 220 }, scene);
+  sand.position.y = -0.02; sand.isPickable = false; sand.receiveShadows = true;
+  const tex = new DynamicTexture('beach_sand_tex', { width: 1024, height: 1024 }, scene, false);
+  const g = tex.getContext() as unknown as CanvasRenderingContext2D;
+  g.fillStyle = '#d9c28d'; g.fillRect(0, 0, 1024, 1024);
+  g.strokeStyle = 'rgba(255,255,255,0.10)'; g.lineWidth = 3;
+  for (let i = 0; i < 70; i++) { const y = (i / 70) * 1024; g.beginPath(); g.moveTo(0, y); for (let x = 0; x <= 1024; x += 24) g.lineTo(x, y + Math.sin(x * 0.02 + i * 0.9) * 6); g.stroke(); }
+  g.fillStyle = 'rgba(120,95,60,0.14)';
+  for (let i = 0; i < 900; i++) g.fillRect(Math.random() * 1024, Math.random() * 1024, 2, 2);
+  tex.update(); tex.uScale = 7; tex.vScale = 7;
+  const sandM = new PBRMaterial('beach_sand_mat', scene);
+  sandM.albedoTexture = tex; sandM.metallic = 0; sandM.roughness = 0.95; sandM.emissiveColor = Color3.FromHexString('#d9c28d').scale(0.06);
+  sand.material = sandM;
+  const sea = MeshBuilder.CreateGround('beach_sea', { width: 220, height: 140 }, scene);
+  sea.position.set(0, 0.01, -118); sea.isPickable = false;
+  const seaM = new PBRMaterial('beach_sea_mat', scene);
+  seaM.albedoColor = Color3.FromHexString('#2a8fbd'); seaM.metallic = 0.1; seaM.roughness = 0.25; seaM.emissiveColor = Color3.FromHexString('#0f4f70').scale(0.25);
+  sea.material = seaM;
+  const foam = MeshBuilder.CreateCylinder('beach_foam', { diameter: 0.9, height: 220, tessellation: 8 }, scene);
+  foam.rotation.z = Math.PI / 2; foam.position.set(0, 0.12, -48.5); foam.isPickable = false;
+  const foamM = new PBRMaterial('beach_foam_mat', scene);
+  foamM.albedoColor = Color3.White(); foamM.alpha = 0.75; foamM.metallic = 0; foamM.roughness = 0.6;
+  foam.material = foamM;
+  return { dispose() { sand.dispose(); sea.dispose(); foam.dispose(); tex.dispose(); sandM.dispose(); seaM.dispose(); foamM.dispose(); } };
+}
+
 export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let me: SpawnedCharacter, foe: SpawnedCharacter;
   let ball: AbstractMesh;
   let venue: VenueHandle | null = null;
+  let beach: { dispose(): void } | null = null;      // P5
+  let crowdEnds: Onlookers | null = null;            // P5
 
   let rally: RallyState;
   let tennisScore: TennisScore | null = null;
@@ -158,9 +194,16 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     });
   }
 
+  // ARENA-10PHASE P6 (2026-09-07): ONE banner channel. Every flash used to arm its own clear timer, so a second banner inside
+  // the first's window was wiped early by the first's timeout — and the point award ALSO fired a world-space scorePop
+  // ("+1 YOUR POINT") at the net, which projects onto the same screen centre as the HUD banner ("THEY MISSED — YOUR POINT"):
+  // the stacked banners in playtest d3d4a93's tennis-mid.png. The banner is the one text channel now; a new flash replaces
+  // the old one and owns the clear.
+  let bannerTimer: ReturnType<typeof setTimeout> | null = null;
   function flash(ctx: ModeContext, text: string, ms = 900): void {
+    if (bannerTimer) clearTimeout(bannerTimer);
     ctx.setHud({ banner: text });
-    setTimeout(() => ctx.setHud({ banner: '' }), ms);
+    bannerTimer = setTimeout(() => { bannerTimer = null; ctx.setHud({ banner: '' }); }, ms);
   }
 
   /** Award a point to `side` (0 = hero) and set up the next serve. */
@@ -178,26 +221,26 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // L4: they react to the point, or they are set dressing. Louder for the
     // home side, which is what a crowd at a beach court actually does.
     crowd?.cheer(side === 1 ? 1 : 0.35);
+    crowdEnds?.cheer(side === 0 ? 1 : 0.35);   // P5: the end banks are the home crowd
 
-    // M107 point feedback: a world-space pop at the net so a won/lost point
-    // reads instantly, plus a streak that builds tension across a game.
+    // M107 point feedback → ARENA-10PHASE P6: the point's TEXT lives in the banner alone (see flash); the feel hit, the
+    // shake and the loss flash stay. The streak still builds tension across a game.
     const netPop = new Vector3(0, o.cfg.netHeight + 0.5, 0);
     if (side === 0) {
       heroStreak++;
-      ctx.juice.scorePop(netPop, `+1 ${o.hudLabels.you}`, '#00FF9D');
       ctx.feel.impact(0.22);
       ctx.juice.shake(0.05, 90);   // A+ P0: a soft shake on your point — no slowMo, no hit-stop beyond the feel hit's own
       console.info('[NET-JUICE] point won');
     } else {
       heroStreak = 0;
-      ctx.juice.scorePop(netPop, o.hudLabels.them, '#FF3366');
+      ctx.juice.flash('#FF3366', 160);
     }
 
     if (result === 'match' || result === 'set') {
       ended = true;
       if (side === 0) gameWinPunch(ctx, netPop);   // A+ P0: was juice.impact(..., { slow: true }) — the forbidden slowMo; same punch without it
       else ctx.juice.flash('#FF3366', 260);
-      flash(ctx, side === 0 ? 'YOU WIN' : 'YOU LOSE', 2500);
+      flash(ctx, side === 0 ? 'GAME! — YOU WIN' : 'YOU LOSE', 2500);
       ctx.end(
         side === 0 ? 'WIN' : 'LOSS',
         tennisScore ? tennisScore.games[0] : volleyScore!.points[0],
@@ -220,7 +263,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     ctx.juice.hitStop(60);
     ctx.juice.shake(0.14, 150);
     ctx.juice.flash('#FFD700', 140);
-    ctx.juice.scorePop(at, 'GAME!', '#FFD700');
+    void at;   // P6: the GAME! text rides the YOU WIN banner (one text channel); the punch keeps its hit-stop, shake and flash
     console.info('[NET-JUICE] game win punch');
   }
 
@@ -561,6 +604,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
     async load(ctx: ModeContext) {
       venue = mountVenue(ctx, o.venueId, { keepGameplayCamera: true });   // M104 gap: tennis and volleyball rendered through the venue orbit camera — the hero sat at 44 px, cut off at the frame's bottom
+      if (o.beach) beach = buildBeach(ctx.scene);   // P5: sand to the horizon, the sea past the far baseline
 
       me = await CharacterLibrary.spawn(ctx.scene, o.heroUrl, {
         position: new Vector3(0, 0, o.cfg.halfLength * 0.85), yawRad: Math.PI, startClip: clips.ready });
@@ -598,6 +642,14 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
           spots.push(new Vector3(i < 6 ? -sideX : sideX, 0, -spread + t * spread * 2 + (i % 2) * 0.6));
         }
         crowd = new Onlookers(ctx.scene, spots, '#3E5A70');
+        if (o.beach) {
+          // P5: a second bank behind each baseline — the beach court's people read as a crowd, not four figures on a
+          // sideline ("billboard" bodies, playtest d3d4a93). Outside the free zone, in the foe's backdrop and the hero's.
+          const endZ = o.cfg.halfLength + 4.2;
+          const ends: Vector3[] = [];
+          for (let i = 0; i < 10; i++) { const t = (i % 5) / 4; ends.push(new Vector3(-5 + t * 10 + (i % 2) * 0.5, 0, i < 5 ? -endZ - (i % 2) * 0.8 : endZ + (i % 2) * 0.8)); }
+          crowdEnds = new Onlookers(ctx.scene, ends, '#F25F5C');
+        }
       }
 
       rally = new RallyState(o.cfg);
@@ -654,7 +706,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         if (restSec <= 0) serve(ctx);
         return;
       }
-      crowd?.update(dt);
+      crowd?.update(dt); crowdEnds?.update(dt);
       if (blockCooldown > 0) blockCooldown = Math.max(0, blockCooldown - dt);
       if (serveFrom) {
         // the toss: the ball rises off the hand and the serve strikes it on the clip's contact beat
@@ -715,6 +767,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
     dispose() {
       crowd?.dispose(); crowd = null;
+      crowdEnds?.dispose(); crowdEnds = null; beach?.dispose(); beach = null;   // P5
       venue?.dispose(); venue = null;
       me?.dispose(); foe?.dispose();
       SoundKit.stopAmbient();

@@ -162,7 +162,7 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
       {/* Shards */}
       <span
         className="inline-flex items-center gap-1.5 rounded-md border border-[#A855F7]/40 bg-[#A855F7]/5 px-2.5 py-1 font-mono text-xs text-[#C79BFF]"
-        title="Shards — prestige currency, earned only, never purchasable"
+        title="Shards — premium currency, earned in play or bought as packs in the Shard Store"
       >
         <Gem className="h-3.5 w-3.5" aria-hidden="true" />
         {state === 'error' ? (

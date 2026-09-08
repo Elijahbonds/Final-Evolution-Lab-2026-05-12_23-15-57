@@ -30,3 +30,34 @@ describe('proofLineFor', () => {
     expect(proofLineFor('whoSceneIt', { score: 300, won: false, stats: { players: 2, p2score: 300, winner: -1 } })).toBe('300–300 · TIE');
   });
 });
+
+// ARENA-10PHASE P1/P2 (2026-09-08): the proof line follows the Arena settlement's verdict when one is given, and the
+// mode's own W/L otherwise — the two used to disagree on the same card (dunk "YOU LOST" under "You won the duel",
+// 3PT "LOST" under "Tie — refunded").
+describe('proofLineFor verdicts', () => {
+  it('reads the mode result when no verdict is given', () => {
+    expect(proofLineFor('threePoint', { score: 6, won: false, stats: { points: 6 } })).toBe('6 PTS DOWNTOWN · LOST');
+    expect(proofLineFor('dunkContest', { score: 128, opponentScore: 156, won: false, stats: { makes: 1, misses: 3 } }))
+      .toBe('You slammed 1/4 · 128 pts vs 156 · You lost');
+  });
+
+  it('lets an Arena verdict override the mode result', () => {
+    expect(proofLineFor('threePoint', { score: 6, won: false, verdict: 'TIE', stats: { points: 6 } })).toBe('6 PTS DOWNTOWN · TIE');
+    expect(proofLineFor('threePoint', { score: 6, won: false, verdict: 'WON', stats: { points: 6 } })).toBe('6 PTS DOWNTOWN · WON');
+    expect(proofLineFor('dunkContest', { score: 128, opponentScore: 121, won: false, verdict: 'WON', stats: { makes: 1, misses: 3 } }))
+      .toBe('You slammed 1/4 · 128 pts vs 121 · You won');
+    expect(proofLineFor('dunkContest', { score: 128, opponentScore: 128, won: true, verdict: 'TIE', stats: { makes: 1, misses: 3 } }))
+      .toBe('You slammed 1/4 · 128 pts vs 128 · Tie — refunded');
+  });
+
+  it('says pending while the opponent has not posted', () => {
+    expect(proofLineFor('hoops1v1', { score: 11, won: true, verdict: 'PENDING', stats: { foeScore: 6 } })).toBe('11–6 · PENDING');
+    expect(proofLineFor('dunkContest', { score: 40, won: true, verdict: 'PENDING', stats: { makes: 0, misses: 4 } }))
+      .toBe('You missed every dunk · 40 pts · Result pending');
+  });
+
+  it('keeps the modes without a W/L word untouched', () => {
+    expect(proofLineFor('surfing', { score: 900, won: false, verdict: 'WON', stats: { barrels: 2, bestFlow: 120 } })).toBe('900 PTS · 2 BARRELS · FLOW 120');
+    expect(proofLineFor('carnival', { score: 12, won: false, verdict: 'TIE', stats: { events: 4, rivalPoints: 12 } })).toBe('12–12 OVER 4 EVENTS · TIE');
+  });
+});

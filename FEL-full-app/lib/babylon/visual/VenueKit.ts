@@ -367,6 +367,22 @@ export const VenueKit = {
     // Pass 7 phase 2 spread: the same tiled grain the spec floors carry (grass on golf / ballpark / pitch, a faint concrete on tennis)
     const grain = floorDetailFor({ tennis: 'hardcourt', golf: 'green', ballpark: 'diamond', pitch: 'pitch' }[preset]);
     if (grain) applyFloorDetailToMesh(scene, field, grain, [w, l]);
+    if (preset === 'golf') {
+      // ARENA-10PHASE P4 (2026-09-07): a links has no walls. The 7 m box (painted night-sky trim + near-black tree cones,
+      // #0e1a14) stood 3 m past the out-of-bounds line, so every drive that sailed OB had the flight camera looking at a
+      // black wall with cone silhouettes in it — playtest d3d4a93's "near-black world". The course sits on a wide ROUGH
+      // apron instead (the spec's dome, haze and kit trees enclose it), so an OB ball flies over grass, not into a wall.
+      const rough = paintedGround(scene, 240, 320, '#4f7f3c', (ctx, W, H) => {
+        ctx.fillStyle = 'rgba(60,90,40,0.35)';
+        for (let i = 0; i < 900; i++) { const x = Math.random() * W, y = Math.random() * H; ctx.fillRect(x, y, 2 + Math.random() * 6, 1 + Math.random() * 2); }
+        ctx.fillStyle = 'rgba(150,170,110,0.18)';
+        for (let i = 0; i < 260; i++) { ctx.beginPath(); ctx.ellipse(Math.random() * W, Math.random() * H, 10 + Math.random() * 30, 3 + Math.random() * 8, Math.random() * 3, 0, Math.PI * 2); ctx.fill(); }
+      });
+      rough.name = 'venue_rough';
+      rough.position.set(0, -0.03, 15);
+      rough.isPickable = false;
+      return;
+    }
     venueBox(scene, bw, bl, 7, [paintBleachers(CROWD), paintTrees(false)]);
   },
 };

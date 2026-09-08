@@ -168,8 +168,10 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
       // catches this class at build time.
       // shrine courtyard (owner's Luma reference): low pale stone walls, not 6 m of near-black — the black slab hid the Meshy
       // shrine behind it in every versus frame (measured 2026-09-06); at 0.6× the roof shows over the wall
-      { kind: 'wall', position: [0, 0, -12], color: '#B9AFA0', scale: 0.6 },
-      { kind: 'wall', position: [0, 0, 12], rotationY: Math.PI, color: '#B9AFA0', scale: 0.6 },
+      // ARENA-10PHASE P8 (2026-09-07): the walls are coursed STONE now (NexusWebScene paintStoneWall) and a courtyard height
+      // (0.5 → 3 m) — at 0.6 the pale flat box read as a "giant white placeholder plane" behind the fight (playtest d3d4a93)
+      { kind: 'wall', position: [0, 0, -12], color: '#A89B88', scale: 0.5 },
+      { kind: 'wall', position: [0, 0, 12], rotationY: Math.PI, color: '#A89B88', scale: 0.5 },
       { kind: 'banner', position: [0, 0, -11.6], color: '#FF2D55' },
       { kind: 'lamp', position: [6, 0, -6], color: '#FFD79A' },
       { kind: 'lamp', position: [-6, 0, -6], color: '#FFD79A' },
@@ -435,7 +437,11 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   // 44 m gridiron; the holes, mound, penalty spot and field lines below match the modes' code.
   golf_loop: {
     modeId: 'golf_loop', name: 'The Loop', venue: 'Coastal Links',
-    environment: dusk('#9FE0FF', '#0F3A22', '#1C5636', '#FFFAD8', 0.9),
+    // ARENA-10PHASE P4 (2026-09-07): the fog was DARK GREEN (#1C5636) at 0.008 — 55 % of every pixel past 100 m and 70 %
+    // past 150 m was that colour, so the flight camera's look outward (a drive sailing out of bounds, the ball beyond the
+    // course) read as a near-black world with the kit box's painted tree cones floating in it (playtest d3d4a93
+    // golf-mid.png: "near-black world, only a diagonal sliver"). Links daylight: a pale sea haze, thin.
+    environment: dusk('#9FE0FF', '#BFDDE8', '#B9D9D2', '#FFFAD8', 0.9, undefined, 0.0028),
     ground: { kind: 'green', size: [60, 90], color: '#3B8A4E', lineColor: '#FFFFFF', markings: 'none' },
     props: [
       // the mode places its own tee, ball and flag (holes at z 26–39, x −10..10); scenery only here

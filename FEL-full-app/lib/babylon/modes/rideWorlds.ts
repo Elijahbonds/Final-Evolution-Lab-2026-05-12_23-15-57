@@ -15,7 +15,7 @@
 // New in the RideWorld contract: `obstacles` (position+radius list — empty
 // where a world has none). Modes shipped alongside consume it.
 
-import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
 import { applyFloorDetailToMesh } from '../visual/groundTextures';
@@ -192,6 +192,27 @@ export function buildSlopeRun(scene: Scene): RideWorld {
   });
   all.push(piste); rideable.push(piste);
 
+  // ARENA-10PHASE P9 (2026-09-07): OFF-PISTE SNOWFIELDS. The groomed piste is 34 m wide and the tree lines stand at
+  // x ±19…±24 — past its edge, over nothing: the kit pines and the rocks hung in the air with the void under them (and
+  // the void fell away with the pitch, so the further down the run the higher they floated). Two ungroomed fields, the
+  // same pitch, 70 m each side: darker, rougher snow with rock speckle, pickable so the prop set can drop onto them,
+  // not rideable — the rider still clamps to the groomed width.
+  const offM = paintGround(scene, 70, PISTE_LEN, (g, W, H) => {
+    g.fillStyle = '#b3c4d6'; g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgba(70,100,150,0.35)';
+    for (let i = 0; i < Math.round(420 * H / 220); i++) { g.beginPath(); g.ellipse(Math.random() * W, Math.random() * H, 10 + Math.random() * 30, 3 + Math.random() * 7, Math.random() * 3, 0, Math.PI * 2); g.fill(); }
+    g.fillStyle = 'rgba(60,66,74,0.5)';
+    for (let i = 0; i < Math.round(140 * H / 220); i++) g.fillRect(Math.random() * W, Math.random() * H, 2 + Math.random() * 5, 2 + Math.random() * 3);
+  });
+  for (const side of [-1, 1]) {
+    const field = MeshBuilder.CreateGround(`offpiste_${side < 0 ? 'l' : 'r'}`, { width: 70, height: PISTE_LEN }, scene);
+    field.rotation.x = PITCH;
+    field.position.set(side * (PISTE_HALF_WIDTH + 35), -Math.sin(PITCH) * pisteCentre - 0.02, Math.cos(PITCH) * pisteCentre);
+    field.isPickable = true;
+    field.material = offM;
+    all.push(field);
+  }
+
   const onPiste = (x: number, dist: number): Vector3 =>
     new Vector3(x, -Math.sin(PITCH) * dist, Math.cos(PITCH) * dist);
 
@@ -358,55 +379,127 @@ export function slalomGateDist(i: number): number {
   return SLALOM_START + i * SLALOM_SPACING;
 }
 
+// ── SURF BREAK v6 — a wave you are ON (ARENA-10PHASE P3 / SURF-WAVES-BOUNDS, 2026-09-07) ─────────────────────────────
+// v5 was a 3.4 m cylinder lying on a flat 90 × 220 m plate with a 200 × 60 m teal sky PLANE at z −95: no face, no swell,
+// nothing to rise and fall on, and the plate ended 20 m past the lap (playtest d3d4a93: "empty purple→orange gradient, no
+// wave/rider" — the rider had left the plate and the camera was 70 m up looking at the dome). The wave is a RIBBON now:
+// a swell back that rises over 7 m, a crest that peels along its length (sections stand up and back off), and a concave
+// face that falls away over WAVE_FACE_LEN m to the water. The ribbon is a ground mesh — the rider's raycast rides it, so
+// the body climbs as the wave arrives under it and drops as it drifts ahead — and the water is 180 × 380 m with the shore
+// past the lap's furthest reach, so there is nothing to ride off.
+
+/** The wave travels toward the shore (+z) at this speed; the lap wrap and the rider's wave-relative drift both use it. */
+export const WAVE_SPEED = 4.5;
+/** The lip runs −50 → +90 and wraps (the rider wraps with it, see SurfBreakMode). */
+export const WAVE_LAP = 140;
+/** Metres of face ahead of the crest before it flattens into the water (the scored POCKET lives inside it). */
+export const WAVE_FACE_LEN = 9;
+/** Crest height at a standing section's peak (m). */
+export const WAVE_HEIGHT = 2.6;
+
+/** Face height (m above flat water) `u` metres ahead of the crest for a section whose crest stands `h` high: the swell
+ *  back rises over 7 m (smoothstep), the face falls away CONCAVE — steep under the lip, flat at the bottom. */
+export function waveProfile(u: number, h: number): number {
+  if (u <= -7) return 0;
+  if (u < 0) { const t = (u + 7) / 7; return h * t * t * (3 - 2 * t); }
+  if (u >= WAVE_FACE_LEN) return 0;
+  const t = 1 - u / WAVE_FACE_LEN;
+  return h * t * t;
+}
+/** Crest height along the wave: the section PEELS — one shoulder stands up while another backs off — plus a little chop. */
+export function crestHeightAt(x: number, tSec: number): number {
+  return WAVE_HEIGHT * (0.72 + 0.28 * Math.sin(x * 0.085 + tSec * 0.7)) + 0.12 * Math.sin(x * 0.6 - tSec * 2.1);
+}
+
 /**
  * @param pocket The scored pocket band, in metres ahead of the lip. The VENUE
  *   draws exactly the band the MODE scores -- passing it in rather than
  *   duplicating the numbers here is what stops the drawn pocket and the scored
  *   pocket drifting apart, the same reason the patrol rail's mesh is asserted
- *   to sit on its grind line.
+ *   to sit on its grind line. (v6: the band is a lighter run of the face's own
+ *   vertex colours between pocket.min and pocket.max.)
  */
 export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number }): {
   world: RideWorld;
   waveLipAt(tSec: number): Vector3;
   barrelActive(tSec: number): boolean;
+  /** Face height at world (x, z) for the wave at `tSec` — the mode pitches the board with it. */
+  faceHeightAt(x: number, z: number, tSec: number): number;
 } {
   const all: AbstractMesh[] = [];
-  const water = MeshBuilder.CreateGround('water', { width: 90, height: 220 }, scene);
+  // THE WATER — wide and long enough that no lap, no drift and no clamp ever shows an edge (was 90 × 220: the rider ran off
+  // the end 11 s into an unattended run)
+  const WATER_W = 180, WATER_L = 380;
+  const water = MeshBuilder.CreateGround('water', { width: WATER_W, height: WATER_L }, scene);
   water.checkCollisions = true;
   water.isPickable = true;
-  water.material = paintGround(scene, 90, 220, (g, W, H) => {
+  water.material = paintGround(scene, WATER_W, WATER_L, (g, W, H) => {
     const grad = g.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, '#1a7fae'); grad.addColorStop(1, '#0c4a72');
+    grad.addColorStop(0, '#0f5f8f'); grad.addColorStop(0.5, '#1a7fae'); grad.addColorStop(1, '#2492bf');
     g.fillStyle = grad; g.fillRect(0, 0, W, H);
-    g.strokeStyle = 'rgba(255,255,255,0.14)'; g.lineWidth = 3;
-    for (let i = 0; i < 34; i++) {
+    g.strokeStyle = 'rgba(255,255,255,0.12)'; g.lineWidth = 3;
+    for (let i = 0; i < 60; i++) {
       g.beginPath(); g.moveTo(Math.random() * W, Math.random() * H);
       g.bezierCurveTo(Math.random() * W, Math.random() * H, Math.random() * W, Math.random() * H, Math.random() * W, Math.random() * H);
       g.stroke();
     }
+    // swell lines toward the horizon
+    g.strokeStyle = 'rgba(255,255,255,0.07)'; g.lineWidth = 6;
+    for (let i = 0; i < 14; i++) { const y = (i / 14) * H * 0.45; g.beginPath(); g.moveTo(0, y); for (let x = 0; x <= W; x += 24) g.lineTo(x, y + Math.sin(x * 0.03 + i) * 5); g.stroke(); }
   });
   all.push(water);
 
-  const sky = MeshBuilder.CreatePlane('surfSky', { width: 200, height: 60 }, scene);
-  sky.position.set(0, 28, -95);
-  const skyMat = mat(scene, 'surfSkyM', '#2a6f92');
-  skyMat.backFaceCulling = false;
-  sky.material = skyMat;
-  all.push(sky);
-
-  // primary wave the mode rides
-  const lip = MeshBuilder.CreateCylinder('waveLip', { diameter: 3.4, height: 70, tessellation: 12 }, scene);
+  // THE WAVE — one transform the whole set rides on; waveLipAt() moves it down the lap
+  const waveRoot = new TransformNode('waveRoot', scene);
+  const XS: number[] = []; for (let x = -(SURF_HALF_WIDTH + 12); x <= SURF_HALF_WIDTH + 12; x += 3) XS.push(x);
+  // rows run from the flat water AHEAD of the face back over the crest to the swell back: that winding puts the ribbon's
+  // normals on the RIDER's side (reversed, the face lit from behind rendered near-black under the sun, measured 2026-09-08)
+  const US = [12, WAVE_FACE_LEN, 7.2, 5.5, 3.8, 2.4, 1.3, 0.5, 0, -0.8, -1.8, -3.2, -5, -7];
+  const pathsFor = (rows: number[], tSec: number, lift = 0): Vector3[][] =>
+    rows.map((u) => XS.map((x) => new Vector3(x, waveProfile(u, crestHeightAt(x, tSec)) + lift, u)));
+  // FLAT ALBEDO PER STRIP. Both vertex colours and a DynamicTexture rendered this ribbon plain white under the PBR shader
+  // (measured 2026-09-08, four variants — a flat albedoColor on the same mesh rendered blue), so the wave's colour is a set
+  // of ribbons: the face in deep water blue, a foam strip along the crest, whitewater down the back, and the scored
+  // POCKET as a pale translucent band riding the face — the band the mode scores, drawn on the wave itself.
+  const strips: { mesh: Mesh; rows: number[]; lift: number }[] = [];
+  const strip = (name: string, rows: number[], hex: string, alpha: number, lift: number, rough = 0.8): Mesh => {
+    const m = MeshBuilder.CreateRibbon(name, { pathArray: pathsFor(rows, 0, lift), updatable: true }, scene);
+    m.parent = waveRoot;
+    const pm = new PBRMaterial(`${name}M`, scene);
+    pm.albedoColor = Color3.FromHexString(hex);
+    pm.emissiveColor = Color3.FromHexString(hex).scale(0.16);   // the swell back faces away from the sun: deep colour, not black
+    pm.metallic = 0; pm.roughness = rough; pm.environmentIntensity = 0.5; pm.directIntensity = 0.5;
+    pm.backFaceCulling = false; pm.twoSidedLighting = true;
+    if (alpha < 1) pm.alpha = alpha;
+    m.material = pm;
+    m.isPickable = false;
+    strips.push({ mesh: m, rows, lift });
+    all.push(m);
+    return m;
+  };
+  const face = strip('waveFace', US, '#1a7fb0', 1, 0);
+  face.isPickable = true;
+  face.checkCollisions = true;
+  strip('waveFoam', [0.9, 0.4, 0, -0.4, -0.9], '#eef8fc', 1, 0.05, 0.9);
+  strip('waveWhitewater', [-0.9, -1.6, -2.4, -3.4], '#a9d8e8', 0.8, 0.03, 0.9);
+  strip('wavePocket', [pocket.max, (pocket.min + pocket.max) / 2, pocket.min], '#8fdcf2', 0.35, 0.03, 0.9);
+  // the lip line — a foam roll along the crest; the barrel hood hangs off it (as before) so the two breathe together
+  const lip = MeshBuilder.CreateCylinder('waveLip', { diameter: 0.7, height: (SURF_HALF_WIDTH + 12) * 2, tessellation: 10 }, scene);
   lip.rotation.z = Math.PI / 2;
-  lip.position.set(0, 0.9, -30);
-  const lipM = mat(scene, 'lipM', '#37b6d9'); lipM.alpha = 0.85;
+  lip.parent = waveRoot;
+  lip.position.set(0, WAVE_HEIGHT * 0.78, 0.2);
+  const lipM = mat(scene, 'lipM', '#f2fbff'); lipM.alpha = 0.8; lipM.twoSidedLighting = true;
   lip.material = lipM;
+  lip.isPickable = false;
   all.push(lip);
 
   // THE FUNNEL — a partial-arc shell curling over the pocket ahead of the
   // lip. Parented to the lip so it travels with the wave; the barrel cycle
   // fades it in (open tube you can ride inside) and out (wave backs off).
+  // v6: the hood is sized to the wave (was diameter 8.4 on a 0.9 m lip — with the camera 6.8 m behind the rider its shell
+  // crossed the lens as a pale band, measured 2026-09-08): radius 1.7 off the crest, curling forward over the pocket
   const tube = MeshBuilder.CreateCylinder('waveTube', {
-    diameter: 8.4, height: 66, tessellation: 24, arc: 0.45, enclose: false,
+    diameter: 3.4, height: (SURF_HALF_WIDTH + 12) * 2 - 4, tessellation: 24, arc: 0.45, enclose: false,
     sideOrientation: Mesh.DOUBLESIDE,
   }, scene);
   tube.parent = lip;
@@ -415,40 +508,27 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   // over the pocket
   tube.position.set(0, 0, 0);
   tube.rotation.set(0, Math.PI * 0.62, 0);
-  const tubeM = mat(scene, 'tubeM', '#2b98c4');
-  tubeM.alpha = 0.55;
+  const tubeM = mat(scene, 'tubeM', '#a8dff0');   // spray-pale: the darker blue read as a black bar along the crest
+  tubeM.alpha = 0.35;
   tubeM.backFaceCulling = false;
+  tubeM.twoSidedLighting = true;   // the hood is seen from inside AND out
   tube.material = tubeM;
+  tube.isPickable = false;
   all.push(tube);
 
-  // THE POCKET, drawn. This is the one piece of state the whole mode turns on --
-  // ride 2-9m ahead of the lip and you gain flow and score, drift out and you
-  // bleed both -- and it was visible ONLY as a number climbing in the HUD. The
-  // protocol's rule is that state the player needs must be readable from the
-  // object, not just the readout; this is the same defect as 3PT shipping
-  // without ball racks. A soft band on the water, travelling with the lip.
-  // Deliberately low-contrast: it has to be findable without competing with the
-  // lip and the tube, which are what the player is really reading.
-  const pocketBand = MeshBuilder.CreateGround('wavePocket', {
-    width: SURF_HALF_WIDTH * 2 - 6, height: pocket.max - pocket.min,
-  }, scene);
-  const pocketM = mat(scene, 'pocketM', '#7fe3ff');
-  pocketM.alpha = 0.16;
-  pocketM.backFaceCulling = false;
-  pocketBand.material = pocketM;
-  pocketBand.isPickable = false;
-  all.push(pocketBand);
+  // distant swell lines purely for depth/scale cues
+  for (const [z, d] of [[-72, 1.4], [-112, 1.0], [-150, 0.8]] as const) {
+    const farSwell = MeshBuilder.CreateCylinder(`farSwell_${z}`, { diameter: d, height: WATER_W, tessellation: 8 }, scene);
+    farSwell.rotation.z = Math.PI / 2;
+    farSwell.position.set(0, d * 0.3, z);
+    const farM = mat(scene, `farSwellM_${z}`, '#e8f6ff'); farM.alpha = 0.45;
+    farSwell.material = farM; farSwell.isPickable = false;
+    all.push(farSwell);
+  }
 
-  // a second, distant swell line purely for depth/scale cues
-  const farSwell = MeshBuilder.CreateCylinder('farSwell', { diameter: 1.6, height: 70, tessellation: 8 }, scene);
-  farSwell.rotation.z = Math.PI / 2;
-  farSwell.position.set(0, 0.5, -70);
-  const farM = mat(scene, 'farSwellM', '#1e5c82'); farM.alpha = 0.6;
-  farSwell.material = farM;
-  all.push(farSwell);
-
-  const shore = MeshBuilder.CreateGround('shore', { width: 90, height: 18 }, scene);
-  shore.position.set(0, 0.02, 96);
+  // THE SHORE — past the lap's furthest reach (lip 90 + face 9 + the flat clamp), so the wave runs AT the beach and never aground
+  const shore = MeshBuilder.CreateGround('shore', { width: WATER_W, height: 30 }, scene);
+  shore.position.set(0, 0.03, 138);
   shore.material = mat(scene, 'sand', '#d9c28f');
   all.push(shore);
 
@@ -459,37 +539,42 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     const buoy = MeshBuilder.CreateSphere(`buoy_${x}_${z}`, { diameter: 1.1 }, scene);
     buoy.position.set(x, 0.5, z);
     buoy.material = buoyM;
+    buoy.isPickable = false;
     all.push(buoy);
     obstacles.push({ pos: buoy.position, radius: 0.9 });
   }
 
-  // Beachgoers on the sand, watching the break. The shore sits at z 96 (90 wide,
-  // 18 deep) and the rider runs the wave toward it before the lap wraps, so
-  // these are on the horizon for most of a ride and close at the end of one.
-  // Kept off the water entirely: nothing in the lineup to read as an obstacle
-  // next to the buoys, which ARE one.
+  // Beachgoers on the sand, watching the break — on the horizon for most of a ride, close at the end of a lap.
   const crowdSpots: Vector3[] = [];
-  for (const [x, z] of [[-14, 92], [-11.5, 93.4], [-9, 92.2], [4, 93], [6.5, 94.2],
-                        [9, 92.6], [11.5, 93.8], [22, 94], [-24, 93.2]] as const) {
-    crowdSpots.push(new Vector3(x, 0.02, z));
+  for (const [x, z] of [[-14, 126], [-11.5, 127.4], [-9, 126.2], [4, 127], [6.5, 128.2],
+                        [9, 126.6], [11.5, 127.8], [22, 128], [-24, 127.2]] as const) {
+    crowdSpots.push(new Vector3(x, 0.03, z));
   }
 
   const world: RideWorld = {
-    ground: [water], grindLines: [], markers: [], obstacles, crowdSpots,
-    dispose: () => all.forEach((m) => m.dispose()),
+    ground: [face, water], grindLines: [], markers: [], obstacles, crowdSpots,
+    dispose: () => { all.forEach((m) => m.dispose()); waveRoot.dispose(); },
   };
   const BARREL_ON = 8, BARREL_CYCLE = 18;
   const barrelActive = (tSec: number): boolean => (tSec % BARREL_CYCLE) < BARREL_ON;
+  const lipWorld = new Vector3(0, WAVE_HEIGHT * 0.78, -50);
+  let lastRebuild = -1;
   const waveLipAt = (tSec: number): Vector3 => {
-    const z = -50 + ((tSec * 4.5) % 140);
-    lip.position.z = z;
-    lip.position.y = 0.9 + Math.sin(tSec * 2.2) * 0.15;
-    // the drawn band rides with the lip, centred on the scored band
-    pocketBand.position.set(0, 0.06, z + (pocket.min + pocket.max) / 2);
+    const z = -50 + ((tSec * WAVE_SPEED) % WAVE_LAP);
+    waveRoot.position.z = z;
+    // the set peels: rebuild the ribbon's heights (546 points) — every frame is cheap, and the crest visibly travels
+    if (tSec !== lastRebuild) {
+      lastRebuild = tSec;
+      for (const st of strips) MeshBuilder.CreateRibbon(st.mesh.name, { pathArray: pathsFor(st.rows, tSec, st.lift), instance: st.mesh });
+      face.refreshBoundingInfo();
+    }
+    lip.position.y = WAVE_HEIGHT * 0.78 + Math.sin(tSec * 2.2) * 0.08;
     // the funnel breathes with the barrel cycle
     const active = barrelActive(tSec);
-    tubeM.alpha += ((active ? 0.55 : 0.08) - tubeM.alpha) * 0.06;
-    return lip.position;
+    tubeM.alpha += ((active ? 0.35 : 0.05) - tubeM.alpha) * 0.06;
+    lipWorld.set(0, lip.position.y, z);
+    return lipWorld;
   };
-  return { world, waveLipAt, barrelActive };
+  const faceHeightAt = (x: number, z: number, tSec: number): number => waveProfile(z - waveRoot.position.z, crestHeightAt(x, tSec));
+  return { world, waveLipAt, barrelActive, faceHeightAt };
 }

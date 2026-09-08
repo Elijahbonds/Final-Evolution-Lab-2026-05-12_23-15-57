@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { proofLineFor } from '@/lib/proofLine';
+import { proofLineFor, type ProofVerdict } from '@/lib/proofLine';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -244,6 +244,8 @@ function GameShellInner({
                   body: JSON.stringify({ matchId: arenaMatchId, score: arenaScore }),
                 }).then((r2) => (r2.ok ? r2.json() : null));
                 if (ar?.ok) {
+                  // ARENA-10PHASE P1/P2: keep both settled scores — the card reads the duel from them, not from the mode's own rival.
+                  const p1 = typeof ar.p1Score === 'number' ? ar.p1Score : undefined, p2 = typeof ar.p2Score === 'number' ? ar.p2Score : undefined;
                   setArenaResult({
                     settled: Boolean(ar.settled),
                     status: ar.status,
@@ -251,6 +253,8 @@ function GameShellInner({
                     iWon: ar.iWon,
                     payout: ar.payout,
                     feeLc: ar.feeLc,
+                    myScore: arenaScore,
+                    oppScore: p1 === undefined || p2 === undefined ? undefined : p1 === arenaScore ? p2 : p1,
                   });
                 }
               } catch {}
@@ -345,7 +349,24 @@ function GameShellInner({
   }, [result, mode, title]);
 
   // Pass 5 phase 3 (was PACK THE FIVE #3, dunk only): one proof line per mode from its own stats — lib/proofLine.ts.
-  const proofLine = result ? proofLineFor(mode, { score: result.score, opponentScore: result.opponentScore, won: result.won, outcome: result.outcome, stats: result.stats }) : null;
+  // ARENA-10PHASE P1/P2 (2026-09-07): ONE source of truth for an Arena run's W/L. The mode's rival (dunk's in-game rival, the 3PT
+  // field) and the Triumph Arena house rival are different opponents, so the card read "You won the duel — +45 LC" over a
+  // proof line that said "YOU LOST" (playtest d3d4a93, dunk 128–156 in-game vs a lower house draw; 3PT "Tie — refunded" vs
+  // "LOST"). When the run was staked, the settlement is the verdict: headline, score line, proof line and the arena card all
+  // read from it. A run whose submission never came back keeps the mode's own result (no arena card, no arena claim).
+  const arenaVerdict: ProofVerdict | null = arenaMatchId && arenaResult
+    ? (!arenaResult.settled ? 'PENDING' : arenaResult.result === 'tie' ? 'TIE' : arenaResult.iWon ? 'WON' : 'LOST')
+    : null;
+  const arenaOpp = arenaVerdict && arenaVerdict !== 'PENDING' ? arenaResult?.oppScore : undefined;
+  const proofLine = result ? proofLineFor(mode, {
+    score: result.score,
+    opponentScore: arenaOpp ?? result.opponentScore,
+    won: arenaVerdict ? arenaVerdict === 'WON' : result.won,
+    outcome: result.outcome, stats: result.stats,
+    verdict: arenaVerdict ?? undefined,
+  }) : null;
+  const cardWon = arenaVerdict ? arenaVerdict === 'WON' : Boolean(result?.won);
+  const cardHeadline = !result ? '' : arenaVerdict === 'WON' ? 'DUEL WON' : arenaVerdict === 'LOST' ? 'DUEL LOST' : arenaVerdict === 'TIE' ? 'DUEL TIED' : arenaVerdict === 'PENDING' ? 'SCORE LOCKED IN' : (result.headline ?? (result.won ? 'VICTORY' : 'SESSION COMPLETE'));
   const shareProof = useCallback(() => { if (proofLine) void shareChallenge(`PROOF · ${proofLine}`); }, [proofLine, shareChallenge]);
 
   return (
@@ -402,13 +423,14 @@ function GameShellInner({
                 transition={{ type: 'spring', damping: 22 }}
                 className="fel-panel w-full max-w-md rounded-2xl p-7 text-center"
               >
-                <Trophy className={`mx-auto h-12 w-12 ${result.won ? 'text-[#FFD700]' : 'text-white/30'}`} />
+                <Trophy className={`mx-auto h-12 w-12 ${cardWon ? 'text-[#FFD700]' : 'text-white/30'}`} />
                 <h2 className="fel-heading mt-3 text-4xl font-bold text-white">
-                  {result.headline ?? (result.won ? 'VICTORY' : 'SESSION COMPLETE')}
+                  {cardHeadline}
                 </h2>
                 <p className="mt-1 font-mono text-sm text-white/50">
-                  Score {result.score}
-                  {typeof result.opponentScore === 'number' && result.opponentScore > 0 ? ` — ${result.opponentScore}` : ''}
+                  {arenaVerdict && arenaVerdict !== 'PENDING' && typeof arenaOpp === 'number'
+                    ? `Score ${arenaResult?.myScore ?? result.score} — ${arenaOpp} house rival`
+                    : <>Score {result.score}{typeof result.opponentScore === 'number' && result.opponentScore > 0 ? ` — ${result.opponentScore}` : ''}</>}
                 </p>
 
                 {carnivalFlag && carnivalRun && (
@@ -491,6 +513,9 @@ function GameShellInner({
                         <p className="mt-1 font-mono text-sm font-bold text-[#00FF9D]">You won the duel — +{arenaResult.payout} LC</p>
                       ) : (
                         <p className="mt-1 text-sm text-[#FF3366]">You lost this duel. Better luck next time.</p>
+                      )}
+                      {arenaResult.settled && typeof arenaResult.myScore === 'number' && typeof arenaResult.oppScore === 'number' && (
+                        <p className="mt-1 font-mono text-[11px] text-white/60">Your {arenaResult.myScore.toLocaleString('en-US')} vs the house rival&apos;s {arenaResult.oppScore.toLocaleString('en-US')}</p>
                       )}
                       <a href="/arena" className="mt-2 inline-block text-[11px] text-[#00E5FF] underline">
                         Back to the Arena

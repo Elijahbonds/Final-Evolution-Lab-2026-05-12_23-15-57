@@ -81,6 +81,11 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     { kit: 'racing', model: 'tent', at: [-18, 0, -40], scale: 2.2 }, { kit: 'racing', model: 'flagRed', at: [-14, 0, -40], scale: 2.2 },
     // props+depth pass 2026-09-05 — FAR: a tree wall past the fence, rocks along the far rough
     ...line('nature', 'tree_tall', [-40, -80], [40, -80], 8, 0, 6.5), ...line('nature', 'rock_largeC', [-30, -60], [30, -60], 4, 0, 3.2),
+    // ARENA-10PHASE P4 (2026-09-07): the kit box walls are gone (VenueKit.buildField 'golf') — the links closes with a tree
+    // ring on the rough instead: the far shore line past the last green, and the two sides down the length of the course
+    ...line('nature', 'tree_tall', [-70, 96], [70, 96], 9, 0, 7.0), ...line('nature', 'tree_detailed', [-58, 82], [58, 82], 6, 0.4, 5.6),
+    ...line('nature', 'tree_oak', [-64, -50], [-66, 90], 7, 0, 6.0), ...line('nature', 'tree_tall', [64, -50], [66, 90], 7, 0, 6.0),
+    ...line('nature', 'plant_bushLarge', [-50, 70], [50, 70], 7, 0, 3.6), ...line('nature', 'rock_largeB', [-48, -20], [-52, 60], 4, 0, 3.0),
   ],
   'ballpark': [
     { kit: 'racing', model: 'grandStandCovered', at: [0, 0, 46], yaw: Math.PI, scale: 3 }, { kit: 'racing', model: 'grandStand', at: [-32, 0, 34], yaw: Math.PI * 0.75, scale: 3 }, { kit: 'racing', model: 'grandStand', at: [32, 0, 34], yaw: -Math.PI * 0.75, scale: 3 },
@@ -133,6 +138,17 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     ...line('nature', 'fence_simple', [-14, -32], [14, -32], 7, 0, 2.2), { kit: 'racing', model: 'tentRoof', at: [20, 0, 40], scale: 2.6 }, ...line('racing', 'flagRed', [-18, 60], [-18, 200], 4, 0, 2.2),
     ...line('nature', 'tree_tall', [-60, 300], [60, 300], 9, 0, 8.5, GREEN), ...line('nature', 'tree_tall', [-40, 30], [-44, 260], 6, 0, 7.0, GREEN),
   ],
+  // ARENA-10PHASE P9 (2026-09-08): Big Air's run goes −z (the athlete runs from z 0 into the kicker at z −12 and lands out
+  // to z −130); it borrowed 'slope', authored for the slalom's +z run, so every one of its trees stood BEHIND the athlete
+  // and the only trees in shot were the box walls' painted cones. Real pines line the run now, on the ground under them.
+  'bigair-run': [
+    ...line('nature', 'tree_pineTallA', [-26, 20], [-27, -150], 10, 0, 5.0, GREEN), ...line('nature', 'tree_pineTallB', [26, 14], [27, -156], 10, 0, 5.0, GREEN),
+    ...line('nature', 'tree_pineSmallA', [-22, 0], [-23, -140], 7, 0, 3.4, GREEN), ...line('nature', 'tree_pineSmallB', [22, -10], [23, -146], 7, 0, 3.4, GREEN),
+    { kit: 'nature', model: 'rock_largeB', at: [-24, 0, -60], scale: 2.6 }, { kit: 'nature', model: 'rock_tallA', at: [24, 0, -100], scale: 2.6 },
+    { kit: 'racing', model: 'tent', at: [-22, 0, 8], scale: 2.4 }, { kit: 'racing', model: 'flagRed', at: [22, 0, 8], scale: 2.4 },
+    ...line('racing', 'flagRed', [-20, -30], [-20, -130], 4, 0, 2.2), ...line('racing', 'flagCheckers', [20, -40], [20, -120], 3, 0, 2.2),
+    ...line('nature', 'tree_tall', [-28, -175], [28, -175], 7, 0, 7.5, GREEN),
+  ],
   'surf-break': [
     { kit: 'nature', model: 'tree_palmBend', at: [-50, 0, -30], scale: 4.4 }, { kit: 'nature', model: 'tree_palmDetailedShort', at: [-48, 0, -22], scale: 4.4 }, { kit: 'nature', model: 'tree_palmBend', at: [50, 0, -28], yaw: Math.PI, scale: 4.4 },
     { kit: 'nature', model: 'rock_largeC', at: [-52, 0, -36], scale: 2.8 }, { kit: 'nature', model: 'rock_smallG', at: [52, 0, -38], scale: 2.8 },
@@ -140,6 +156,30 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     // props+depth pass 2026-09-05 — MID: a lifeguard tent and a shop up the beach · FAR: the shore's palm line and the bus at the lot
     { kit: 'racing', model: 'tent', at: [0, 0, -50], scale: 2.6 }, { kit: 'meshy', model: 'store', at: [-28, 0, -54], yaw: 0, scale: 0.9 }, { kit: 'meshy', model: 'hoopbus', at: [30, 0, -58], yaw: Math.PI / 2 },
     ...line('nature', 'tree_palmTall', [-80, -70], [80, -70], 9, 0, 5.5), ...line('nature', 'rock_largeA', [-70, -46], [70, -46], 5, 0, 3.0),
+  ],
+  // ARENA-10PHASE P5 (2026-09-07): the Beach Pro court's own set — authored for an 18 × 9 court with a 3 m free zone (x ±7.5,
+  // z ±12), the sea past the far baseline (−z, NetSportMode.buildBeach puts the foam line at z −48) and the boardwalk behind
+  // the hero (+z). Volleyball used to borrow 'surf-break', whose shops and bus stood 55–60 m out over the void.
+  'beach-court': [
+    // NEAR: palms flanking the court, court-end flags, the tents on the hero's side
+    { kit: 'nature', model: 'tree_palmBend', at: [-13, 0, -10], scale: 4.4 }, { kit: 'nature', model: 'tree_palmDetailedTall', at: [13, 0, -11], scale: 4.4 },
+    { kit: 'nature', model: 'tree_palmTall', at: [-14, 0, 8], scale: 4.0 }, { kit: 'nature', model: 'tree_palm', at: [14, 0, 10], scale: 4.2 },
+    { kit: 'nature', model: 'tree_palmShort', at: [-16, 0, -1], scale: 3.4 }, { kit: 'nature', model: 'tree_palmDetailedShort', at: [16, 0, 0], scale: 3.4 },
+    { kit: 'racing', model: 'flagRed', at: [-9, 0, -16.5], scale: 2.2 }, { kit: 'racing', model: 'flagGreen', at: [9, 0, -16.5], scale: 2.2 },
+    { kit: 'racing', model: 'tent', at: [-12, 0, 18], scale: 2.2 }, { kit: 'racing', model: 'tentRoof', at: [12, 0, 18], scale: 2.2 },
+    ...line('nature', 'grass_large', [-10, -14], [10, -14], 5, 0, 2.2), ...line('nature', 'plant_bush', [-11, 15], [11, 15], 5, 0, 2.4),
+    // MID: the boardwalk behind the hero — a fence line, lamps, the shop, the bus and the sedan at the lot
+    ...line('city-suburban', 'fence-low', [-18, 26], [18, 26], 9, 0, 2.2),
+    { kit: 'racing', model: 'lightPostModern', at: [-17, 0, 24], scale: 2.4 }, { kit: 'racing', model: 'lightPostModern', at: [17, 0, 24], scale: 2.4 },
+    { kit: 'meshy', model: 'store', at: [-20, 0, 34], yaw: Math.PI, scale: 0.9 }, { kit: 'meshy', model: 'hoopbus', at: [22, 0, 34], yaw: Math.PI / 2 }, { kit: 'meshy', model: 'sedan', at: [6, 0, 36], yaw: Math.PI / 2 },
+    ...line('city-suburban', 'planter', [-8, 28], [8, 28], 3, 0, 2.2),
+    // MID: rocks at the water's edge
+    { kit: 'nature', model: 'rock_largeA', at: [-30, 0, -45], scale: 2.8 }, { kit: 'nature', model: 'rock_smallG', at: [22, 0, -46], scale: 2.4 },
+    { kit: 'nature', model: 'rock_largeC', at: [36, 0, -44], scale: 3.0 }, { kit: 'nature', model: 'rock_largeD', at: [-44, 0, -42], scale: 3.2 },
+    // FAR: the palm line down the beach both ways, the pier on the water, sail billboards up the sand
+    ...line('nature', 'tree_palmTall', [-60, 52], [60, 52], 9, 0, 5.5), ...line('nature', 'tree_palmBend', [-56, -30], [-58, 40], 5, 0.4, 5.0), ...line('nature', 'tree_palm', [56, -30], [58, 40], 5, 0.4, 5.0),
+    { kit: 'venice', model: 'pier_far', at: [-50, 0, -125], yaw: 0.2 },
+    { kit: 'venice', model: 'sail_billboard_0', at: [36, 0, -8], yaw: -Math.PI / 2 }, { kit: 'venice', model: 'sail_billboard_2', at: [36, 0, 14], yaw: -Math.PI / 2 },
   ],
   'gym': [
     { kit: 'racing', model: 'grandStand', at: [0, 0, 16], yaw: Math.PI, scale: 2.4 }, { kit: 'racing', model: 'overheadLights', at: [0, 0, -14], scale: 2.4 },

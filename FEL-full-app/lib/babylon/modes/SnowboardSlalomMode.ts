@@ -52,6 +52,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
   let crowd: Onlookers;
   let nextGate = 0, gatesHit = 0, elapsed = 0;
+  let hudSec = -1;   // ARENA-10PHASE P9 soft: the run clock the HUD shows (it never published `time` — the chip sat on "0s" all run)
   let stickX = 0, tuck = 0;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   let ended = false;
@@ -135,7 +136,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
 
     async load(ctx: ModeContext) {
       world = buildSlopeRun(ctx.scene);
-      propsGone = false; void mountVenueProps(ctx.scene, 'slope').then((h) => { if (propsGone) h?.dispose(); else props = h; });
+      propsGone = false; void mountVenueProps(ctx.scene, 'slope', undefined, { snapToGround: true }).then((h) => { if (propsGone) h?.dispose(); else props = h; });   // P9: the pines stand ON the pitched snow
       // The piste is pitched SLOPE_PITCH and drops ~56 m over the run. The Rider's flat-park defaults (6 m ground ray, hard
       // floor at y 0) pinned the rider at y ≈ 0 above it, so rocks / the yeti (placed ON the piste) never made contact: the
       // ray missed once the snow was > 4.5 m below and the floor clamp fired every frame below −0.5. A longer ray, a floor
@@ -146,7 +147,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       animTree = new BoardAnimTree(rig.char.animator);
       bailBeatT = 0; landBeatT = 0; airT = 0;
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 20, modeId: 'snowboard' });
-      nextGate = 0; gatesHit = 0; elapsed = 0; ended = false; stickX = 0; tuck = 0;
+      nextGate = 0; gatesHit = 0; elapsed = 0; hudSec = -1; ended = false; stickX = 0; tuck = 0;
       stumbleIframe = 0; yeti = null; yetiPool = null; yetiSec = 0; yetiDone = false;
       wipeLatchUntil = 0; finishLatch = false;
       ctx.objectiveRef.current = world.markers[nextGate] ?? null;
@@ -203,6 +204,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
       elapsed += dt;
+      if (Math.floor(elapsed) !== hudSec) { hudSec = Math.floor(elapsed); ctx.setHud({ time: hudSec }); }   // P9 soft: the clock runs
       stumbleIframe = Math.max(0, stumbleIframe - dt);
       if (rig.rider.grinding && Math.abs(stickX) > 0.7) rig.rider.dismount();
       // Phase 12: slope energy via the shared board movement (descent builds
