@@ -58,7 +58,13 @@ export const SkateRunMode: ModeDefinition = (() => {
   const aheadOfRider = (): Vector3 => rig.char.root.position.add(new Vector3(Math.sin(rig.char.root.rotation.y), 0, Math.cos(rig.char.root.rotation.y)).scale(8));
   let coins: CoinField;
   let timeLeft = RUN_SEC;
-  let stickX = 0, pump = 0;
+  let stickX = 0, stickY = 0, pump = 0;
+  // SKATE-MOVE (2026-09-08): the pump released just before POP still charges the ollie (space on the keyboard emits the
+  // trigger's release BEFORE the A press, so a keyboard ollie always saw pump 0).
+  let pumpReleased = 0, pumpReleasedAt = -1;
+  const ollieCharge = (): number => Math.max(pump, performance.now() - pumpReleasedAt < 250 ? pumpReleased : 0);
+  /** Ollie pop: 0.1 → 5.6 m/s (1.1 m), full charge → 8 m/s (2.3 m). Was 0.55–1.0 → 8–10.5 m/s, a 2.3–3.9 m ollie. */
+  const olliePower = (): number => 0.1 + ollieCharge() * 0.55;
   let ended = false;
 
   const flick = new FlickStick();
@@ -84,7 +90,7 @@ export const SkateRunMode: ModeDefinition = (() => {
   let landingBeatT = 0;
   // ANIM-READABILITY (2026-09-07): the bail is a TREE beat, not a direct play. The direct `play('skate_bail')` was cut by
   // the tree's own play the same frame (the touchdown moved the state air → cruise), so the fall read as a 0.1 s blend.
-  const BAIL_BEAT_SEC = 0.8;                  // skate_bail is 0.75 s; the tree settles it into the idle when it runs out
+  const BAIL_BEAT_SEC = 1.0;                  // skate_bail is 0.75 s; the tree settles it into the idle when it runs out, and the 0.25 s left is the get-up — the next push fades from the idle, not the floor (0.3 m/frame hand pops measured at 0.8)
   let bailBeatT = 0;
   let goals: GoalTracker;
   let patrolRail: MovingRail;
@@ -131,7 +137,9 @@ export const SkateRunMode: ModeDefinition = (() => {
         // Confirmed: 65-bone Mixamo rig with proper structure
       }
       _validateChar.dispose(); // Clean up validation placeholder
-      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -16), 0, world.ground, '#22d3ee', 'skateboard');
+      // carveAccel 0: the momentum model below owns the velocity; the Rider's own 4.95 m/s² forward creep was the only
+      // thing that moved a stick-held rider (0.33 m in 4 s on the baseline probe) and it scaled with frame time
+      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -16), 0, world.ground, '#22d3ee', 'skateboard', { carveAccel: 0 });
       rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true });
       animTree = new BoardAnimTree(rig.char.animator);
       boardSync = new BoardSync(rig.board, rig.char.root);
@@ -157,7 +165,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // the side for the first frames and, on a portrait phone (aspect 0.46),
       // lost the rider until the follow swung round (mobile capture, ~1 run in 2)
       ctx.camDirector.snapTo(rig.char.root.position, aheadOfRider());
-      timeLeft = RUN_SEC; ended = false; stickX = 0; pump = 0; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
+      timeLeft = RUN_SEC; ended = false; stickX = 0; stickY = 0; pump = 0; pumpReleased = 0; pumpReleasedAt = -1; pushing = false; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
       landingBeatT = 0; bailBeatT = 0; bailLatch = false; lastLanding = 'none';
       // 'stadium' is a crowd bed with a breathing LFO -- wrong for a solo run
       // in an outdoor plaza. 'wind' is the open-air option in SoundKit's set.
@@ -171,12 +179,12 @@ export const SkateRunMode: ModeDefinition = (() => {
       coins.line(new Vector3(20, 2.6, -19), new Vector3(20, 0.6, 8), 8);
       // ...and an air arc over the bowl rim
       coins.arc(new Vector3(-22, 1.6, 14), new Vector3(-10, 1.6, 14), 2.6, 6);
-      ctx.setHud({ score: 0, combo: '', coins: 0, time: RUN_SEC, goals: `0/${SKATE_GOALS.length}`, hint: 'PUMP for speed · bomb the downhill · carve the bowl · grind everything' });
+      ctx.setHud({ score: 0, combo: '', coins: 0, time: RUN_SEC, goals: `0/${SKATE_GOALS.length}`, hint: 'HOLD FORWARD to push · steer · pull BACK to drag · POP to ollie · tricks in the air' });
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
-      if (e.t === 'stick' && e.side === 'L') stickX = e.x;
+      if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       // Phase 4: flick-stick is THE trick input (Skate 3 vocabulary).
       if (e.t === 'stick' && e.side === 'R') {
         const g = flick.feed(e);
@@ -187,7 +195,7 @@ export const SkateRunMode: ModeDefinition = (() => {
           setTimeout(() => ctx.setHud({ banner: '' }), 500);
           SoundKit.play('whoosh', { pitch: 1 + g.difficulty * 0.15, volume: 0.4 });
         } else if (g && rig.rider.grounded && g.id === 'ollie') {
-          rig.rider.jump(0.55 + pump * 0.45);
+          rig.rider.jump(olliePower());
           airEntryYaw = rig.char.root.rotation.y;
           air.launch();
           SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
@@ -197,16 +205,16 @@ export const SkateRunMode: ModeDefinition = (() => {
           if (pts > 0) combo.add('GRAB', pts, 'air');
         }
       }
-      if (e.t === 'trigger' && e.side === 'R') pump = e.value;
+      if (e.t === 'trigger' && e.side === 'R') { if (e.value < pump) { pumpReleased = pump; pumpReleasedAt = performance.now(); } pump = e.value; }
       if (e.t === 'button' && e.pressed) {
         if (e.btn === 'X' && rig.rider.grounded && !grindCh && !manualCh) {
-          if (move.push()) { pushing = true; setTimeout(() => { pushing = false; }, 400); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 }); }
+          if (move.push()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });   // the push beat is move.stroking (below)
         }
         if (e.btn === 'A') {
           if (rig.rider.grounded) {
-            rig.rider.jump(0.55 + pump * 0.45);
+            rig.rider.jump(olliePower());
             airEntryYaw = rig.char.root.rotation.y;
-          air.launch();
+            air.launch();
             SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 });
           }
           else if (rig.rider.tryGrind(world.grindLines)) {
@@ -291,10 +299,10 @@ export const SkateRunMode: ModeDefinition = (() => {
       }
 
       // ── air physics + landing truth ──
-      if (!rig.rider.grounded && air.state.airborne) {
-        air.update(dt, stickX, pump);
-        rig.char.root.rotation.y += air.state.angularVel.y * dt * 0.3;
-      }
+      // SKATE-MOVE: the spin the judge integrates (air.state.rotation.y) IS the spin the body shows — the old 0.3× nudge
+      // here was overwritten by the yaw write below every frame, so no spin ever showed. The pump is no longer fed in as
+      // a pitch nudge: holding the throttle through an ollie was tilting the flip axis into a sketchy landing.
+      if (!rig.rider.grounded && air.state.airborne) air.update(dt, stickX, 0);
       if (rig.rider.grounded && air.state.airborne && air.state.airtime > 0.15) {
         // touchdown: grade the landing
         const res = resolveLanding(air, move.balance, {
@@ -320,6 +328,7 @@ export const SkateRunMode: ModeDefinition = (() => {
           bannerFlash(ctx, 'BAILED', 900);
           SoundKit.play('miss');
           bailBeatT = BAIL_BEAT_SEC;   // the tree plays skate_bail and holds it
+          move.vel.scaleInPlace(0.15);   // SKATE-MOVE: a fallen rider does not keep sliding at speed
           bailPunch(ctx);   // A+ P0: hit-stop + shake + ONE low thud + dust (replaces feel.impact(0.7), whose thud would double)
         }
         // SWITCH STANCE. BoardMovement.switchStance() existed, applied its 0.92
@@ -334,15 +343,21 @@ export const SkateRunMode: ModeDefinition = (() => {
           move.switchStance();
           bannerFlash(ctx, move.stance === 'switch' ? 'SWITCH' : 'REGULAR', 700);
         }
+        // SKATE-MOVE: land where the spin left you. The half turns became the stance above; the residual off the nearest
+        // half turn folds into the heading and the board rolls on the way it points (the THPS rule) — the facing is
+        // continuous through touchdown instead of snapping back to the take-off heading (a 73° one-frame snap measured).
+        const spin = air.state.rotation.y;
+        const residual = spin - Math.round(spin / Math.PI) * Math.PI;
+        move.yaw += residual;
+        const sp = move.speed; move.vel.set(Math.sin(move.yaw) * sp, 0, Math.cos(move.yaw) * sp);
         air.land();
-        rig.char.root.rotation.y = Math.atan2(move.vel.x, move.vel.z) || rig.char.root.rotation.y;
       }
 
       // sketchy save window input
       if (save?.active) {
         save.update(dt, stickX);
         if (save.saved) { bannerFlash(ctx, 'SAVED IT!', 700); mbus.report({ kind: 'big_make' }); save = null; }
-        else if (save.failed) { console.info('[SKATE-LAND] save failed'); combo.bail(); bannerFlash(ctx, 'BAILED', 900); bailBeatT = BAIL_BEAT_SEC; bailPunch(ctx); save = null; }   // A+ P0: the failed save is a bail too
+        else if (save.failed) { console.info('[SKATE-LAND] save failed'); combo.bail(); bannerFlash(ctx, 'BAILED', 900); bailBeatT = BAIL_BEAT_SEC; move.vel.scaleInPlace(0.15); bailPunch(ctx); save = null; }   // A+ P0: the failed save is a bail too
       }
 
       // grind catch: airborne near a rail
@@ -355,10 +370,27 @@ export const SkateRunMode: ModeDefinition = (() => {
       if (!rig.rider.grinding && grindCh) { grindCh = null; }
 
       // ── movement: shared momentum economy drives the rider ──
-      const v = move.update(dt, stickX, pump, ctx.scene, rig.char.root.position, world.ground);
+      // SKATE-MOVE: the L stick's forward axis is the push (hold → cooldown-paced strokes up to cruise, then roll), back
+      // is the foot drag; both only with wheels down. In the air the board is ballistic — no steer bends the velocity,
+      // the judged spin turns the body. A bail holds every input for its beat.
+      const grounded = rig.rider.grounded, bailing = bailBeatT > 0;
+      const drive = grounded && !bailing && !rig.rider.grinding && !manualCh?.active ? -stickY : 0;   // no kick from inside a manual
+      const steer = grounded && !bailing ? stickX : 0;
+      const v = move.update(dt, steer, pump, ctx.scene, rig.char.root.position, world.ground, drive);
       rig.rider.vel.x = v.x; rig.rider.vel.z = v.z;
-      rig.rider.update(dt, stickX, 0);              // GroundRide owns snap/air/grind-line
-      rig.char.root.rotation.y = rig.rider.grinding ? rig.char.root.rotation.y : move.yaw + Math.PI * 0 + (move.stance === 'switch' ? Math.PI : 0);
+      rig.rider.update(dt, steer, 0);              // GroundRide owns snap/air/grind-line
+      if (rig.rider.grinding) {
+        // the rail owns the yaw; the momentum model follows it so the dismount rolls away DOWN the rail, not back
+        // toward the pre-grind heading (a 1-frame yaw snap on every rail exit)
+        move.yaw = rig.char.root.rotation.y;
+        const sp = move.speed; move.vel.set(Math.sin(move.yaw) * sp, 0, Math.cos(move.yaw) * sp);
+      } else {
+        // air.state alone (not rider.grounded): the frame the wheels touch, the landing block above has not run yet —
+        // reading grounded here dropped the spin one frame before the fold put it back (a −65° / +67° two-frame flip)
+        const airSpin = air.state.airborne ? air.state.rotation.y : 0;
+        rig.char.root.rotation.y = move.yaw + airSpin + (move.stance === 'switch' ? Math.PI : 0);
+      }
+      pushing = move.stroking;
       boardSync.update(move.balance.lean, !rig.rider.grounded);
       mbus.update(dt);
 

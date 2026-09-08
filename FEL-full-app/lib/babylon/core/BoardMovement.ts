@@ -30,11 +30,27 @@ export interface BoardMoveTuning {
   carveHold: number;        // speed retention through a committed carve
   scrubRate: number;        // speed loss when steering without carving
   drag: number;
+  // ── SKATE-MOVE (2026-09-08): the push / coast / brake loop. All opt-in — snow (SNOW_TUNING) keeps the legacy model.
+  /** A push stroke is a Δv applied over this window (s), not an instant impulse; also the auto-push cadence's stroke. */
+  strokeSec?: number;
+  /** Δv per stroke fades with speed: Δv = pushAccel × (1 − pushFade × speed/maxSpeed). A kick adds less to a fast board. */
+  pushFade?: number;
+  /** Holding the stick forward pushes on its own (cooldown-paced) while speed < cruiseSpeed × autoPushUntil. */
+  autoPushUntil?: number;
+  /** Rolling resistance (m/s²) while coasting with no input — the board comes to a stop instead of creeping forever. */
+  rollResist?: number;
+  /** Foot-drag decel (m/s²) at full stick-back. */
+  brakeDecel?: number;
+  /** Scrub as a per-second rate (× (1 − carveCommit) × scrubRate) instead of the legacy per-FRAME factor, which killed a
+   *  half-deflected analog stick's speed in ~0.3 s (0.89× every frame at steer 0.5). */
+  scrubPerSec?: boolean;
 }
 
 export const SKATE_TUNING: BoardMoveTuning = {
-  pushAccel: 3.2, pushCooldownSec: 0.55, pumpGain: 1.6, cruiseSpeed: 7.5,
+  pushAccel: 3.8, pushCooldownSec: 0.55, pumpGain: 1.6, cruiseSpeed: 7.5,
   maxSpeed: 14, carveTurnRate: 2.4, carveHold: 1.0, scrubRate: 0.9, drag: 0.22,
+  // SKATE-MOVE: the stroke is the board_push clip's 0.42 s; hold forward = push to cruise then roll; back = foot drag.
+  strokeSec: 0.42, pushFade: 0.6, autoPushUntil: 0.8, rollResist: 0.3, brakeDecel: 7, scrubPerSec: true,
 };
 export const SNOW_TUNING: BoardMoveTuning = {
   pushAccel: 0, pushCooldownSec: 1, pumpGain: 2.2, cruiseSpeed: 10,
@@ -51,19 +67,33 @@ export class BoardMovement {
   stance: BoardStance = 'regular';
   readonly balance = new BalanceModel();
   private pushCooldown = 0;
+  /** Seconds left in the current push stroke (strokeSec model) and the Δv it still has to deliver. */
+  private strokeLeft = 0;
+  private strokeDv = 0;
 
   constructor(private tune: BoardMoveTuning = SKATE_TUNING) {}
 
   get speed(): number { return this.vel.length(); }
   get speed01(): number { return Math.min(1, this.speed / this.tune.maxSpeed); }
   get pushing(): boolean { return this.pushCooldown > 0; }
+  /** The back foot is on the ground right now (the stroke window) — the anim tree's push beat. */
+  get stroking(): boolean { return this.strokeLeft > 0; }
 
   /** A push stroke (skate flat-ground). Returns false during cooldown. */
   push(): boolean {
     if (this.pushCooldown > 0 || this.tune.pushAccel === 0) return false;
     this.pushCooldown = this.tune.pushCooldownSec;
+    const fade = this.tune.pushFade ?? 0;
+    const dv = this.tune.pushAccel * Math.max(0.25, 1 - fade * Math.min(1, this.speed / this.tune.maxSpeed));
+    if (this.tune.strokeSec) {
+      // SKATE-MOVE: the Δv lands over the stroke window (the foot is on the ground for the whole push clip), so the
+      // speed ramps instead of stepping — a 3.8 m/s step in one frame read as a teleport.
+      this.strokeLeft = this.tune.strokeSec;
+      this.strokeDv = dv;
+      return true;
+    }
     const fwd = new Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
-    this.vel.addInPlace(fwd.scale(this.tune.pushAccel));
+    this.vel.addInPlace(fwd.scale(dv));
     return true;
   }
 
@@ -76,18 +106,34 @@ export class BoardMovement {
   /**
    * Frame step. steer/pump are -1..1 / 0..1; groundMeshes enable slope
    * response (omit for flat). Returns the new velocity.
+   * `drive` (SKATE-MOVE): the L stick's forward axis, −1..1 — forward auto-pushes (strokeSec / autoPushUntil), back
+   * foot-drags (brakeDecel). Modes that do not pass it (snow) are unchanged.
    */
-  update(dt: number, steer: number, pump: number, scene?: Scene, pos?: Vector3, ground?: AbstractMesh[]): Vector3 {
+  update(dt: number, steer: number, pump: number, scene?: Scene, pos?: Vector3, ground?: AbstractMesh[], drive = 0): Vector3 {
     this.pushCooldown = Math.max(0, this.pushCooldown - dt);
     const t = this.tune;
     const stanceMult = this.stance === 'switch' ? 0.92 : 1;   // switch = slightly duller
     void stanceMult;
 
+    // ── SKATE-MOVE: hold forward = push cadence up to cruise, then roll ──
+    if (drive > 0.3 && t.strokeSec && this.speed < t.cruiseSpeed * (t.autoPushUntil ?? 1)) this.push();
+
     // ── terrain: gravity along slope builds/bleeds speed ──
     let slopeAccel = 0;
+    // the stroke in flight delivers its Δv evenly across the window
+    if (this.strokeLeft > 0 && t.strokeSec) {
+      const step = Math.min(dt, this.strokeLeft);
+      slopeAccel += (this.strokeDv / t.strokeSec) * (step / dt);
+      this.strokeLeft -= step;
+    }
+    // foot drag: the stick pulled back scrubs speed hard, to a stop, never backwards
+    const brake = drive < -0.3 && t.brakeDecel ? t.brakeDecel * Math.min(1, -drive) : 0;
+    // rolling resistance: a coasting board (no push, no pump, no carve) comes to rest
+    const coasting = !this.stroking && drive <= 0.3 && pump < 0.1 && Math.abs(steer) < 0.5;
+    const resist = coasting && t.rollResist ? t.rollResist : 0;
     if (scene && pos && ground?.length) {
       const s = sampleSlope(scene, pos, this.yaw, ground);
-      slopeAccel = s.gravityAlongSlope;
+      slopeAccel += s.gravityAlongSlope;   // += : the stroke above must survive the terrain sample
       // pumping converts slope + transition into extra speed
       if (pump > 0.1) {
         slopeAccel += pump * t.pumpGain * (0.5 + s.steepness01 * 2);
@@ -114,11 +160,15 @@ export class BoardMovement {
     if (speed > 0.01) {
       // turn cost only applies while actually steering; straight running
       // pays nothing (drag handles the bleed).
-      const turnCost = carveCommit > 0.05 ? 1 - (1 - carveCommit) * t.scrubRate * 0.25 : 1;
-      const held = speed * turnCost + slopeAccel * dt;
+      const turnCost = carveCommit > 0.05
+        ? (t.scrubPerSec ? 1 - (1 - carveCommit) * t.scrubRate * 0.6 * dt : 1 - (1 - carveCommit) * t.scrubRate * 0.25)
+        : 1;
+      const held = speed * turnCost + (slopeAccel - brake - resist) * dt;
       this.vel = fwd.scale(Math.max(0, held));
-    } else if (slopeAccel !== 0) {
-      this.vel = fwd.scale(Math.max(0, slopeAccel * dt));
+    } else if (slopeAccel > 0) {
+      this.vel = fwd.scale(slopeAccel * dt);
+    } else if (speed > 0) {
+      this.vel.setAll(0);
     }
 
     // drag + clamp

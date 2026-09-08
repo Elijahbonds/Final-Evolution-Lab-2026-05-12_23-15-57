@@ -21,6 +21,9 @@ export interface RiderCfgOverrides {
   /** While grounded, a surface this far below the root still counts as ridden (glued): descending a pitched slope the
    *  ground falls away faster than gravity catches up within a frame, and without this the rider flickers airborne. */
   stickDown?: number;
+  /** Forward accel the Rider adds on its own every frame (m/s², × 0.55–1 with pump). Skate's momentum model owns the
+   *  velocity outright and passes 0 — the default 9 was a frame-rate-dependent creep under it (SKATE-MOVE). */
+  carveAccel?: number;
 }
 
 export class Rider {
