@@ -40,7 +40,7 @@ import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKin
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { boneNode } from '../anim/boneLookup';
 import { EASTBAY_TIMING } from '../anim/authored/timing';
-import { armChain, reachArm, type ArmChain } from '../anim/HandIK';   // A+ P8 H1 (dunk mirror): the hang wrist reach
+import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';   // A+ P8 H1 (dunk mirror): the hang wrist reach
 import type { PlayOpts } from '../anim/CharacterAnimator';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -79,7 +79,7 @@ const APPROACH_SPEED = 6, FACE_RIM_RATE = 6;   // Dunk play tip (2026-09-07): th
 const TURN_RATE = 10, RETREAT_Z = CFG.startZ + 1.5;   // the facing slew (rad/s); how far a pull-back may back off the runway
 const wrapYaw = (y: number): number => Math.atan2(Math.sin(y), Math.cos(y));   // the Euler yaw stays in (−π, π]
 // A+ P8 athlete hands, mirrored from DunkMode (PM brief VENICE-DUNK-A-PLUS-P8, 2026-09-07): the reach weight ramp, the fall rate.
-const HAND_IK_MAX = 0.6, HAND_IK_LAG_SEC = 0.12, HAND_IK_RIM_UP = 0.08, FALL_SPEED = 2.6;
+const HAND_IK_MAX = 0.6, HAND_IK_LAG_SEC = 0.12, HAND_IK_RIM_UP = 0.08, REACH_POLE_CAP = Math.PI / 2, HAND_IK_FROM = EASTBAY_TIMING.carryUp - 0.05, FALL_SPEED = 2.6;
 /** HOLD = RUN (the contest's): the hold ramps the athlete toward the rim at up to the max run and launches at the takeoff line. */
 const HOLD_RUN_MAX = 7, HOLD_RUN_RAMP = 6;
 
@@ -249,7 +249,15 @@ export const DunkDuelMode: ModeDefinition = (() => {
         const ws = w * (side === 'Left' ? ikSideK : 1 - ikSideK);
         const arm = arms[side]; if (!arm || ws <= 0.001) continue;
         handIkPole.set(side === 'Left' ? -0.7 : 0.7, -0.2, -0.5).applyRotationQuaternionInPlace(c.root.absoluteRotationQuaternion);
-        reachArm(arm, handIkTarget, handIkPole, ws);
+        // DUNK-SOFTS-NAMED: the weight lives in the TARGET, not in a rotation slerp — the hand is solved at full weight toward
+        // the point `ws` of the way from the clip's hand to the rim, the elbow's twist capped in proportion (shapeReach). The
+        // old partial-weight slerp flipped the arm 60° in one frame whenever the mocap wind-up put the hand behind the
+        // shoulder (aim / pole deltas near ±180°: hand 3.40 → 2.92 m in 17 ms, POWER only); the pull it gave is kept.
+        arm.shoulder.computeWorldMatrix(true); arm.elbow.computeWorldMatrix(true); arm.hand.computeWorldMatrix(true);
+        const sh = arm.shoulder.getAbsolutePosition(), el = arm.elbow.getAbsolutePosition(), hd = arm.hand.getAbsolutePosition();
+        const want = hd.add(handIkTarget.subtract(hd).scale(ws));
+        const shaped = shapeReach(sh, el, hd, want, handIkPole, undefined, REACH_POLE_CAP * ws);
+        reachArm(arm, shaped.target, shaped.pole, 1);
       }
     }
     if (activeHandOff && phase === 'cinematic') runHandOffPath(ball, c.skeleton, activeHandOff.t, activeHandOff.spec, ebState);   // the ball after the reach, this frame's hands
@@ -665,7 +673,10 @@ export const DunkDuelMode: ModeDefinition = (() => {
         if (active().root.position.y <= 0) dropToFloor = false;
       }
       if (airHeld && phase !== 'cinematic' && active().root.position.y <= (obstacleClipped ? clipFloorY : 0) + 0.05) landNow();
-      const reachWant = (phase === 'cinematic' && clipTime >= EASTBAY_TIMING.rise && !obstacleClipped)
+      // DUNK-SOFTS-NAMED: the reach starts at the CARRY-UP (the extension toward the iron), not the rise — through the rise and
+      // the mocap's wind-up the hand swings past the shoulder and a reach toward the rim whipped it (0.8 m/frame measured;
+      // the clip alone moves 0.22 m/frame), so the catch and the wind-up ride the clip's own hand now
+      const reachWant = (phase === 'cinematic' && clipTime >= HAND_IK_FROM && !obstacleClipped)
         || (phase === 'resolve' && qteHit && !contactLatch && !obstacleClipped);
       const ikScale = ctx.scene.animationTimeScale ?? 1;
       const ikStep = dt * (phase === 'cinematic' && Number.isFinite(ikScale) && ikScale > 0 ? ikScale : 1) / HAND_IK_LAG_SEC;

@@ -234,6 +234,7 @@ const SCEN = process.env.SCEN ?? '';
 let allErrors: string[] = [], allFrames: string[] = [];
 for (const gi of only) {
   const { p, close, errors, frames } = await boot();
+  curProp = 0; curStyle = 0;   // DUNK-SOFTS-NAMED: a fresh page starts at NO PROP / POWER (the ring carried over between boots and group 4's car never armed)
   for (const sc of GROUPS[gi]) {
     if (SCEN && !sc.name.toLowerCase().includes(SCEN.toLowerCase())) continue;
     console.log(`\n── ${sc.name}`);

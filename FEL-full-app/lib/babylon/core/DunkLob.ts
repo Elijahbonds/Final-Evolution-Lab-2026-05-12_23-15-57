@@ -41,6 +41,15 @@ export function lobFlightTime(dist: number, speed: number, ramping: boolean, cat
   return Math.max(0.05, run + catchRealSec);
 }
 
+/** Seconds to cover `dist` metres starting at `v0` m/s, accelerating at `accel` m/s² up to `vmax` and holding it — the
+ *  hold-run's ramp. A toss timed at the throw frame's speed as if it held arrived late against a run that kept ramping. */
+export function runTimeToLine(dist: number, v0: number, vmax: number, accel: number): number {
+  const d = Math.max(0, dist), a = Math.max(0.01, accel), v = Math.max(0.1, Math.min(v0, vmax)), top = Math.max(v, vmax);
+  const dRamp = (top * top - v * v) / (2 * a);
+  if (d <= dRamp) return (-v + Math.sqrt(v * v + 2 * a * d)) / a;
+  return (top - v) / a + (d - dRamp) / top;
+}
+
 /** A fair catch: the ball inside the catch radius of the hand. */
 export function canCatch(hand: V3, ball: V3, radius = LOB_CATCH_RADIUS): boolean {
   const dx = hand.x - ball.x, dy = hand.y - ball.y, dz = hand.z - ball.z;

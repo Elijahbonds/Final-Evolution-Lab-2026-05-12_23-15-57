@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GRAVITY, LOB_CATCH_RADIUS, canCatch, lobApex, lobAt, lobFlightTime, lobVelocity } from './DunkLob';
+import { GRAVITY, LOB_CATCH_RADIUS, canCatch, lobApex, lobAt, lobFlightTime, lobVelocity, runTimeToLine } from './DunkLob';
 
 describe('DunkLob — the self-lob arc', () => {
   it('arrives at the catch point at the flight time, exactly', () => {
@@ -34,4 +34,16 @@ describe('DunkLob — the self-lob arc', () => {
     expect(canCatch({ x: 0, y: 2.6, z: -9 }, { x: 0.2, y: 2.9, z: -9.2 })).toBe(true);
     expect(canCatch({ x: 0, y: 2.6, z: -9 }, { x: 0, y: 2.6 + LOB_CATCH_RADIUS + 0.05, z: -9 })).toBe(false);
   });
+});
+
+describe('runTimeToLine — the hold-run ramp', () => {
+  it('holds a run already at the max', () => { expect(runTimeToLine(7, 7, 7, 6)).toBeCloseTo(1, 5); });
+  it('ramps 2 → 7 at 6 m/s² then holds', () => {
+    // ramp: 5/6 s over (49 − 4)/12 = 3.75 m, then 2.25 m at 7 m/s
+    expect(runTimeToLine(6, 2, 7, 6)).toBeCloseTo(5 / 6 + 2.25 / 7, 5);
+  });
+  it('is shorter than the throw-frame speed said when the run keeps ramping', () => {
+    expect(runTimeToLine(5.5, 3.4, 7, 6)).toBeLessThan(5.5 / 3.4 - 0.5);
+  });
+  it('never divides by zero on a standing start', () => { expect(Number.isFinite(runTimeToLine(4, 0, 7, 6))).toBe(true); });
 });
