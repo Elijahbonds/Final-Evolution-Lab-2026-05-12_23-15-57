@@ -75,8 +75,18 @@ const SUFFIX = /_c\d+$/;
 const containers = new WeakMap<Scene, Map<string, Promise<AssetContainer>>>();
 function containersFor(scene: Scene): Map<string, Promise<AssetContainer>> {
   let m = containers.get(scene);
-  if (!m) { m = new Map(); containers.set(scene, m); }
+  if (!m) {
+    m = new Map(); containers.set(scene, m);
+    // OOM-HYGIENE (2026-09-07): a container's meshes, geometry, textures and clips sit OUTSIDE the scene's arrays, so
+    // scene.dispose() never frees them — they lived exactly as long as the Scene object, and anything that kept a
+    // disposed scene reachable (a mode's last spawn, Babylon's floating-origin holder) kept the whole GLB with it.
+    scene.onDisposeObservable.addOnce(() => { releaseContainers(m!); containers.delete(scene); });
+  }
   return m;
+}
+function releaseContainers(m: Map<string, Promise<AssetContainer>>): void {
+  for (const p of m.values()) void p.then((c) => { try { c.dispose(); } catch { /* a container from a lost context */ } }, () => undefined);
+  m.clear();
 }
 let spawnCounter = 0;
 

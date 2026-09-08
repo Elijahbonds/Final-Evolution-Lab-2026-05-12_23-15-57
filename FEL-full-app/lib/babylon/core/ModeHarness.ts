@@ -3,6 +3,7 @@
 
 import type { HudCue } from './danceTracks';
 import { Scene, TargetCamera, Vector3 } from '@babylonjs/core';
+import { FloatingOriginCurrentScene } from '@babylonjs/core/Materials/floatingOriginMatrixOverrides';
 import { createEngine } from './createEngine';
 import type { TransformNode } from '@babylonjs/core';
 import { mountLightRig, liftBlackMaterials, type LightRigHandle } from '../scene/LightRig';
@@ -110,6 +111,10 @@ export interface HarnessOpts {
  * fires and surfaces the error screen (no player must ever hang forever). */
 const LOAD_WATCHDOG_MS = 20_000;
 
+/** OOM-HYGIENE: the floating-origin resetter lives at MODULE scope on purpose — an arrow written inside runMode captures the
+ *  harness closure (heap snapshot: `getScene → context: scene → Scene`), and would retain the scene it exists to release. */
+const NO_SCENE = (): undefined => undefined;
+
 export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<() => void> {
   const engine = await createEngine(opts.canvas);
   // M95 (Pass 2): a phone reports devicePixelRatio 3, so the backing buffer is
@@ -193,7 +198,9 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
 
   // M37: hero-framing watchdog — recenters the camera if the hero leaves frame.
   frameGuard = new FrameGuard(scene, camera, () => heroRef.current, camDirector, () => objectiveRef.current);
-  if (process.env.NODE_ENV === 'development') (window as unknown as { __FEL_DEV__?: unknown }).__FEL_DEV__ = { scene, modeId: def.modeId, hero: () => heroRef.current };   // hero for the framing probe (phase 6)   // dev probes (ship pass 4)
+  const devHandle = { scene, modeId: def.modeId, hero: () => heroRef.current };   // hero for the framing probe (phase 6)   // dev probes (ship pass 4)
+  const devWindow = window as unknown as { __FEL_DEV__?: unknown };
+  if (process.env.NODE_ENV === 'development') devWindow.__FEL_DEV__ = devHandle;
   setDiagMode(def.modeId);
   // a lost WebGL context is the one failure the player cannot recover from by playing on
   engine.onContextLostObservable.add(() => {
@@ -337,5 +344,15 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     lights.dispose();
     scene.dispose();
     engine.dispose();
+    // OOM-HYGIENE (2026-09-07): Babylon 9's floating-origin helper keeps a module-level `getScene` closure over the LAST
+    // RENDERED scene (Materials/floatingOriginMatrixOverrides — every scene.render rebinds it, nothing ever clears it). It
+    // was the one strong root left on a disposed dojo after an in-page exit (heap snapshot, karate_vs: 339 MB retained
+    // through Window → webpack module cache → FloatingOriginCurrentScene.getScene → this → Scene, and from the Scene every
+    // per-scene asset cache). Released only when the NEXT mode rendered — the hub / home page in between carried it.
+    // Unconditional: the bound getter answers undefined unless floating-origin mode is on, so it cannot be compared to
+    // this scene, and any other live scene rebinds it on its next render anyway.
+    FloatingOriginCurrentScene.getScene = NO_SCENE;
+    // the dev handle held the disposed scene (and through it every mesh and texture) until the next mount
+    if (devWindow.__FEL_DEV__ === devHandle) delete devWindow.__FEL_DEV__;
   };
 }

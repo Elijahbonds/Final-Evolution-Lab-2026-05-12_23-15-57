@@ -30,7 +30,11 @@ const warned = new Set<string>();
 
 function loadContainer(scene: Scene, key: MeshyPropKey): Promise<AssetContainer | null> {
   let map = containers.get(scene);
-  if (!map) { map = new Map(); containers.set(scene, map); }
+  if (!map) {
+    map = new Map(); containers.set(scene, map);
+    const m = map;   // OOM-HYGIENE: the baked props' containers are outside the scene's arrays — release them with the scene
+    scene.onDisposeObservable.addOnce(() => { for (const q of m.values()) void q.then((c) => { try { c?.dispose(); } catch { /* lost context */ } }, () => undefined); m.clear(); containers.delete(scene); });
+  }
   let p = map.get(key);
   if (!p) {
     p = SceneLoader.LoadAssetContainerAsync('', MESHY_PROP_URL(key), scene).catch((e: unknown) => {

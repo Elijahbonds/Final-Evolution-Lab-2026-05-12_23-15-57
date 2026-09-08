@@ -41,5 +41,12 @@ export async function createEngine(canvas: HTMLCanvasElement): Promise<AbstractE
       console.warn('[FEL] WebGPU init failed, falling back to WebGL2:', err);
     }
   }
-  return new Engine(canvas, true, { ...SHARED });
+  // OOM-HYGIENE (2026-09-07): a disposed engine must also LOSE its WebGL context. Babylon's dispose deletes the
+  // textures and buffers it knows about, but the context itself (its default framebuffer, MSAA resolve buffers and
+  // anything still referenced from JS) lives until the canvas is garbage-collected — and a React key remount (DUNK
+  // AGAIN, REPLAY, the dev double-mount) hands each contest a fresh canvas. Measured on /try (fake-pad loop probe): the
+  // first contest's context was still alive and unlost on its detached canvas after the second contest. Chrome caps
+  // live contexts at 16 per page and evicts the OLDEST when the cap is hit; on a memory-starved box the GPU process
+  // dies first. loseContext() on dispose returns the context's memory the moment the mode exits.
+  return new Engine(canvas, true, { ...SHARED, loseContextOnDispose: true });
 }

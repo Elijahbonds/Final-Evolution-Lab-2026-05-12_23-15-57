@@ -29,7 +29,8 @@ function normaliseKitMaterial(mat: PBRMaterial): void {
 }
 
 async function loadModel(scene: Scene, kit: string, model: string): Promise<Mesh[]> {
-  let cache = modelCache.get(scene); if (!cache) { cache = new Map(); modelCache.set(scene, cache); }
+  let cache = modelCache.get(scene);
+  if (!cache) { cache = new Map(); modelCache.set(scene, cache); const c = cache; scene.onDisposeObservable.addOnce(() => { c.clear(); modelCache.delete(scene); }); }   // OOM-HYGIENE: nothing outlives the scene
   const key = `${kit}/${model}`;
   let p = cache.get(key);
   if (!p) {
@@ -93,8 +94,11 @@ export function propSetFor(specVenueId: string): string | null {
   return map[specVenueId] ?? null;
 }
 
-/** Clone a kit mesh with a tinted copy of its material: the palette texture stays, multiplied by `hex`. Cached per (material, tint). */
-const tintCache = new Map<string, PBRMaterial>();
+/** Clone a kit mesh with a tinted copy of its material: the palette texture stays, multiplied by `hex`. Cached per (material, tint)
+ *  PER SCENE (OOM-HYGIENE, 2026-09-07): this was one module-level Map keyed by the base material's uniqueId, and uniqueIds are
+ *  global-monotonic, so every scene's tinted materials stayed in the Map after the scene was disposed — a PBRMaterial holds its
+ *  scene, so each exited venue with a tinted line was retained whole (meshes, geometry, textures) for the life of the tab. */
+const tintCache = new WeakMap<Scene, Map<string, PBRMaterial>>();
 const masterCache = new WeakMap<Scene, Map<string, Mesh>>();
 /** One hidden tinted clone per (source mesh, tint) per scene; placements instance it so a tinted line stays one draw. */
 function tintedMaster(scene: Scene, src: Mesh, hex: string): Mesh {
@@ -110,8 +114,9 @@ function tintedClone(scene: Scene, src: Mesh, name: string, hex: string): Mesh {
   const base = src.material;
   if (base instanceof PBRMaterial) {
     const key = `${base.uniqueId}|${hex}`;
-    let m = tintCache.get(key);
-    if (!m || m.getScene() !== scene) { m = base.clone(`${base.name}_tint_${hex}`); m.albedoColor = Color3.FromHexString(hex); tintCache.set(key, m); }
+    let mats = tintCache.get(scene); if (!mats) { mats = new Map(); tintCache.set(scene, mats); }
+    let m = mats.get(key);
+    if (!m) { m = base.clone(`${base.name}_tint_${hex}`); m.albedoColor = Color3.FromHexString(hex); mats.set(key, m); }
     c.material = m;
   }
   return c;

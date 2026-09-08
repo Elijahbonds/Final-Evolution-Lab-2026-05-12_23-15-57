@@ -77,7 +77,12 @@ const attached = new WeakMap<AbstractMesh, Set<string>>();   // per body kit mes
 const templates = new WeakMap<Scene, Map<string, { mesh: Mesh; skeleton: Skeleton }>>();
 
 function loadPack(scene: Scene, itemId: string): Promise<AssetContainer | null> {
-  let map = packContainers.get(scene); if (!map) { map = new Map(); packContainers.set(scene, map); }
+  let map = packContainers.get(scene);
+  if (!map) {
+    map = new Map(); packContainers.set(scene, map);
+    const m = map;   // OOM-HYGIENE: a pack container is outside the scene's arrays — release it with the scene
+    scene.onDisposeObservable.addOnce(() => { for (const q of m.values()) void q.then((c) => { try { c?.dispose(); } catch { /* lost context */ } }, () => undefined); m.clear(); packContainers.delete(scene); templates.delete(scene); });
+  }
   let p = map.get(itemId);
   if (!p) {
     p = SceneLoader.LoadAssetContainerAsync('', KIT_PACKS[itemId], scene).catch((e: unknown) => { console.warn(`[FEL-KIT] pack ${itemId} did not load: ${String((e as Error)?.message ?? e).slice(0, 120)}`); return null; });
