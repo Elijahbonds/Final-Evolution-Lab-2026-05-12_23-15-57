@@ -247,6 +247,9 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick'>> = {
   dance: verbs({ A: { label: 'TAP', emit: A('A') } }),
   // lane 3 W1 — the four answers ride the four face buttons
   who_scene_it: verbs({ A: { label: 'A', emit: A('A') }, B: { label: 'B', emit: A('B') }, X: { label: 'C', emit: A('X') }, Y: { label: 'D', emit: A('Y') } }),
+  // VERB-KEY (2026-09-07): Brain Brawl reads the same answer diamond (FACE index 0..3 → option A/B/C/D, the HUD's
+  // optA/optB/optX/optY); before this it fell through to `default` and touch lost three of the four answers.
+  brainbrawl: verbs({ A: { label: 'A', emit: A('A') }, B: { label: 'B', emit: A('B') }, X: { label: 'C', emit: A('X') }, Y: { label: 'D', emit: A('Y') } }),
 
   default: verbs({ A: { label: 'ACTION', emit: A('A') } }),
 };
