@@ -29,7 +29,8 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { MOCAP_DUNK, DUNK_FINISH_VARIETY } from '../nexus/dressingFlags';
 import { attachBallToHand, releaseBall, runEastbayPath, runHandOffPath, handOffK, flushThroughRim, clankOffRim, PALM_OFFSET_READONLY, type HandOffSpec } from '../anim/ballRig';
-import { Matrix } from '@babylonjs/core';
+import { Matrix, Quaternion } from '@babylonjs/core';
+import { bindFrame, type BindFrame } from '../anim/bindFrame';
 import { EASTBAY_TIMING as EB } from '../anim/authored/timing';
 import { EASTBAY_TIMING } from '../anim/authored/timing';
 import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';   // A+ P8 H1: the hang wrist reach
@@ -43,7 +44,7 @@ import { HoopJuice } from '../visual/HoopJuice';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
-import { DunkFlight, runwayTrickFor, DOUBLE_UP_WINDOW_M, DOUBLE_UP_MIN_SPEED, CATCH_DIFFICULTY, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
+import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, DOUBLE_UP_WINDOW_M, DOUBLE_UP_MIN_SPEED, CATCH_DIFFICULTY, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T } from '../core/DunkLob';
 import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind } from '../core/DunkObstacles';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
@@ -207,7 +208,16 @@ export const DunkMode: ModeDefinition = (() => {
   let stickX = 0, stickY = 0;
   // DUNK-SOFTS-NAMED (2026-09-08): the d-pad direction as it is physically held (any phase) and a trick button tapped before
   // the rise, kept for the rise — a direction held from the run-up or a tap as the feet left the floor was a silent nothing
-  let heldDpad: 'up' | 'down' | 'left' | 'right' | null = null, queuedAir: FelInput | null = null;
+  let heldDpad: 'up' | 'down' | 'left' | 'right' | null = null;
+  // DUNK-BIOMECH (2026-09-08): a trick pressed before its cue beat is ARMED and fires on the beat (it replaces the pre-rise
+  // queue: every trick has a named beat now, not just "the rise"); the 360's turn is a yaw LAYER on the hips the mode drives
+  // from the cue (DunkSpin) — never authored into a clip, so no crossfade can leave it half-turned at the slam
+  let armedAir: DunkTrick | null = null;
+  const spin = new DunkSpin();
+  let hipsNode: TransformNode | null = null, hipsBf: BindFrame | null = null;
+  const hipsBindInv = Quaternion.Identity(), hipsRaw = Quaternion.Identity(), hipsOut = Quaternion.Identity(); let hipsLayered = false;
+  let liveTricks: { clip: string; t0: number; speed: number }[] = [], liveSpin = { turns: 0, from: 0, until: 0 };   // this attempt's air tricks, for the replay
+  let replayRateNow = 0.5, replayTrickIdx = 0, replaySpinYaw = 0;
   let lookX = 0, lookY = 0, lookSeen = false; // R stick → the director's look orbit (Dunk play tip 2026-09-07)
   let holdRunSpeed = 0, airLean = 0;          // pad: hold-run speed this attempt; smoothed air lean from the stick
   const flight = new DunkFlight();               // Phase 6: trick-input flight
@@ -338,6 +348,9 @@ export const DunkMode: ModeDefinition = (() => {
       arms.Left = armChain(player.skeleton, 'Left'); arms.Right = armChain(player.skeleton, 'Right');
       if (!arms.Right) console.warn('[FEL-DUNK] no Right arm chain on this rig — the hang wrist reach is off');
       feet = { L: boneNode(player.skeleton, 'LeftFoot'), R: boneNode(player.skeleton, 'RightFoot') };   // DUNK-CONTROL-JUICE: the clear test's feet
+      // DUNK-BIOMECH: the hips carry the trick spin as a yaw layer (bind-relative, the clips' own degree convention)
+      hipsNode = boneNode(player.skeleton, 'Hips'); hipsBf = bindFrame(player.skeleton); hipsLayered = false;
+      if (hipsNode) { const b = hipsBf.bind.get(hipsNode)?.q ?? Quaternion.Identity(); hipsBindInv.copyFrom(b).invertInPlace(); } else console.warn('[FEL-DUNK] no Hips node on this rig — the 360 turn is off');
       if (!feet.L || !feet.R) console.warn('[FEL-DUNK] no foot bones on this rig — the obstacle clear reads the root');
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);
       ikScene = ctx.scene; handIkObs = ctx.scene.onAfterAnimationsObservable.add(handIkApply);
@@ -449,10 +462,8 @@ export const DunkMode: ModeDefinition = (() => {
       // with the buttons, so a direction held from the run-up was never seen); a trick button tapped BEFORE the rise waits
       // for the rise and fires there — the trick the player asked for, at the beat it belongs to.
       if (phase === 'cinematic' && e.t === 'dpad') flight.recognizer.feed(e);
-      if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y')) {
-        if (clipTime >= EASTBAY_TIMING.rise) { if (!qteWindowOpen) airInput(ctx, e); }
-        else if (heldDpad) queuedAir = e;
-      }
+      // DUNK-BIOMECH: every trick has a cue window — early = ARMED (fires on its beat), late = refused with a banner
+      if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y') && !qteWindowOpen) airButton(ctx, e);
 
       if (e.t === 'trigger' && e.side === 'R') {
         if (phase === 'approach' && e.value > 0.02) {
@@ -561,7 +572,8 @@ export const DunkMode: ModeDefinition = (() => {
           setTrail('hang');   // A+ P6: the trail brightens at the hang rise, not at takeoff
         }
         if (clipTime >= EASTBAY_TIMING.rise) setWin('hang');
-        if (queuedAir && clipTime >= EASTBAY_TIMING.rise && !qteWindowOpen) { const q = queuedAir; queuedAir = null; airInput(ctx, q); }
+        if (armedAir && clipTime >= cueFireAt(armedAir) && !qteWindowOpen) { const a = armedAir; armedAir = null; fireTrick(ctx, a, 'armed'); }
+        spin.update(clipTime);   // the momentum-led turn rides the flight's own clock (the hang slow-mo stretches both)
         // ── the lob: the ball flies in CLIP time through the hang (the slow-mo stretches both), the catch is the hand ──
         if (lob.live) {
           ballSim.step(dt * (Number.isFinite(animScale) && animScale > 0 ? animScale : 1));
@@ -660,6 +672,9 @@ export const DunkMode: ModeDefinition = (() => {
 
       if (phase === 'resolve') {
         player.root.rotation.z *= Math.max(0, 1 - dt * 6);   // the air lean settles on the landing
+        // DUNK-BIOMECH contact facing latch: the root keeps easing onto the rim bearing through the flush / the clank and a
+        // turn the flight ended early (the prop, a lost lob) unwinds to rim-facing before the feet come down
+        if (!replaying) faceToward(rim, dt * FACE_RIM_RATE);
         sinceRelease += dt;
         // a clipped dunk drops the dunker where the prop caught him, and the
         // prop goes over — the failure has to READ as contact, not a teleport
@@ -678,6 +693,7 @@ export const DunkMode: ModeDefinition = (() => {
         }
       }
 
+      if (phase !== 'cinematic' && !replaying) { if (spin.active) { const y = spin.settle(dt); if (!spin.active) console.info(`[DUNK-CUE] spin settled ${y.toFixed(2)} rad`); } if (phase !== 'resolve') player.root.rotation.z *= Math.max(0, 1 - dt * 6); }
       obstacle?.tick(dt);
       if (lob.live && phase === 'resolve') ballSim.step(dt);   // a lost lob keeps bouncing through the miss beat
       // ── A+ P8 athlete hands: the replay's clips, the fall to feet-down, the reach weight ──────────────────────────
@@ -693,10 +709,19 @@ export const DunkMode: ModeDefinition = (() => {
           // DUNK-SOFTS-NAMED: the replayed launch clip runs out before the finish is due → it flows into the held hang, as the live
           // flight does (measured: 15 clip-less frames on the replay of every make — a frozen pose mid-replay)
           const replayRate = Math.max(0.2, 0.5 * clipTimeAtResolve / liveSec);
+          replayRateNow = replayRate; replayTrickIdx = 0; replaySpinYaw = 0;
           playClip(STYLE_CLIP[style], { speedRatio: replayRate, onEnd: () => { if (replaying && replayAir && !replayAerial) { playClip(SPORT_CLIP.dunkScoreHang, { speedRatio: replayRate, onEnd: () => {} }); console.info('[HANDS] replay launch → hang'); } } });
           console.info('[HANDS] replay air');
         } else if (!replayAir) playClip(SPORT_CLIP.moveLoop, { loop: true });
-        if (replayAir) { replayAirSec += dt; if (!replayAerial && replayAirSec >= replayAerialAt) { replayAerial = true; playAir(aerialClip, 0.5); console.info('[HANDS] replay aerial'); } }
+        if (replayAir) {
+          replayAirSec += dt;
+          // DUNK-BIOMECH: the replay re-fires the live tricks and the live turn on the replayed flight's clock (the replay used to
+          // re-fly only launch → hang → finish, so a 360 replayed as a plain jump) — same facing as live, Euler yaw from the recorder
+          const replayClipT = replayAirSec * replayRateNow;
+          while (replayTrickIdx < liveTricks.length && !replayAerial && replayClipT >= liveTricks[replayTrickIdx].t0) { const lt = liveTricks[replayTrickIdx++]; playAir(lt.clip, replayRateNow * lt.speed); console.info(`[HANDS] replay trick ${lt.clip}`); }
+          replaySpinYaw = replayAerial ? 0 : DunkSpin.yawAt(liveSpin, replayClipT);
+          if (!replayAerial && replayAirSec >= replayAerialAt) { replayAerial = true; replaySpinYaw = 0; playAir(aerialClip, 0.5); console.info('[HANDS] replay aerial'); }
+        }
         replayPrevY = y;
       }
       // H5: the fall — a miss from the release height, a make once the replay hands the root back (the chair's own drop stays)
@@ -868,26 +893,58 @@ export const DunkMode: ModeDefinition = (() => {
   let obstacleOver = false, obstacleCleared = false, obstacleMargin = Infinity;   // the clear, once per attempt
   let clipFloorY = 0, clipBackZ = 0;          // where a clipped dunker comes down (the top he caught, or the floor before the side he hit)
 
-  /** A trick button in the air (after the rise, before the slam window): a named trick, a refused one, or a style tap. */
-  function airInput(ctx: ModeContext, e: FelInput): void {
-    const trick = flight.feedInput(e);
-    if (!trick && flight.rejectedForAir) {
-      // the run-up didn't buy the air that trick needs — SAY so, or it reads as a dropped input
-      flight.rejectedForAir = false;
-      refuse(ctx, 'NOT ENOUGH AIR — come in faster');
+  /** A trick button in the air: the cue table decides — before the trick's beat it is ARMED (fires on the beat), inside
+   *  its window it fires now, after its last beat it is refused with a banner. A bare button (no direction) after the rise
+   *  is the style tap. DUNK-BIOMECH (2026-09-08): a 360 tapped at the carry-up used to spin through the flush. */
+  function airButton(ctx: ModeContext, e: FelInput): void {
+    const trick = flight.peek(e);
+    if (!trick) { if (clipTime >= EASTBAY_TIMING.rise) styleTap(ctx, e); return; }
+    const v = cueVerdict(trick, clipTime), cue = cueOf(trick);
+    if (v === 'early') {
+      if (armedAir) return;   // one cue armed at a time — the first press is the one that fires
+      armedAir = trick;
+      console.info(`[DUNK-CUE] armed ${trick.id} @${clipTime.toFixed(2)} → fires @${cueFireAt(trick).toFixed(2)} (${cue.fire})`);
+      flash(ctx, `${trick.label} ARMED · ${CUE_BEAT_LABEL[cue.fire]}`, 600);
+      SoundKit.play('uiTick', { pitch: 1.4, volume: 0.3 });
+      return;
     }
-    if (trick) {
-      trickLabels.push(trick.label);
-      airTrick = { trick, t0: clipTime };   // the trick's own clock (the lost-and-found's hand-off is keyed to it)
-      console.info(`[DUNK-TRICK] air ${trick.id} @${clipTime.toFixed(2)}`);
-      playAir(trick.clip, 1.05);   // A+ P8 H5: a trick that ends in the air holds its last frame (it used to fall to idle mid-flight)
-      hype = Math.min(100, hype + 6);
-      SoundKit.play('whoosh', { pitch: 1.1 + trick.difficulty * 0.08, volume: 0.45 });
-      SoundKit.play('crowdCheer', { volume: 0.3 + trick.difficulty * 0.05 });
-      EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'sparks');
-      flash(ctx, trickLabels.length > 1 ? `COMBO: ${trickLabels.join(' → ')}!` : `${trick.label}!`, 700);
-      ctx.camDirector.pulse(trickLabels.length > 1 ? 0.7 : 0.45, 0.5);
-    } else if (e.t === 'button' && e.btn === 'B' && e.pressed && styleTaps < 2) {
+    if (v === 'late') {
+      console.info(`[DUNK-CUE] late ${trick.id} @${clipTime.toFixed(2)} (window ${cueFireAt(trick).toFixed(2)}–${cueLastAt(trick).toFixed(2)})`);
+      refuse(ctx, `TOO LATE FOR THE ${trick.label} — ARM IT BY ${CUE_BEAT_LABEL[cue.last]}`);
+      return;
+    }
+    fireTrick(ctx, trick, 'window');
+  }
+  /** The named trick fires: the air budget pays for it (or says why not), its body plays, a spinThrough trick starts the
+   *  turn that resolves rim-facing by SPIN_RESOLVE_T whatever flight is left (momentum-led: later = quicker). */
+  function fireTrick(ctx: ModeContext, trick: DunkTrick, how: 'window' | 'armed'): void {
+    const got = flight.take(trick);
+    if (!got) {
+      // the run-up didn't buy the air that trick needs (or two are already in the air) — SAY so, or it reads as a dropped input
+      if (flight.refusal === 'limit') refuse(ctx, 'TWO TRICKS A FLIGHT — SLAM IT');
+      else if (flight.rejectedForAir) { flight.rejectedForAir = false; refuse(ctx, 'NOT ENOUGH AIR — come in faster'); }
+      console.info(`[DUNK-CUE] refused ${trick.id} @${clipTime.toFixed(2)}: ${flight.refusal ?? 'phase'}`);
+      return;
+    }
+    trickLabels.push(trick.label);
+    airTrick = { trick, t0: clipTime };   // the trick's own clock (the lost-and-found's hand-off is keyed to it)
+    liveTricks.push({ clip: trick.clip, t0: clipTime, speed: 1.05 });
+    console.info(`[DUNK-TRICK] air ${trick.id} @${clipTime.toFixed(2)} (${how}, cue ${cueOf(trick).fire}→${cueOf(trick).last})`);
+    const cue = cueOf(trick);
+    if (cue.facing === 'spinThrough' && cue.turns) {
+      spin.start(cue.turns, clipTime, SPIN_RESOLVE_T); liveSpin = spin.record;
+      console.info(`[DUNK-CUE] spin ${cue.turns} turn(s) @${clipTime.toFixed(2)} → rim-facing by ${SPIN_RESOLVE_T.toFixed(2)}`);
+    }
+    playAir(trick.clip, 1.05);   // A+ P8 H5: a trick that ends in the air holds its last frame (it used to fall to idle mid-flight)
+    hype = Math.min(100, hype + 6);
+    SoundKit.play('whoosh', { pitch: 1.1 + trick.difficulty * 0.08, volume: 0.45 });
+    SoundKit.play('crowdCheer', { volume: 0.3 + trick.difficulty * 0.05 });
+    EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'sparks');
+    flash(ctx, trickLabels.length > 1 ? `COMBO: ${trickLabels.join(' → ')}!` : `${trick.label}!`, 700);
+    ctx.camDirector.pulse(trickLabels.length > 1 ? 0.7 : 0.45, 0.5);
+  }
+  function styleTap(ctx: ModeContext, e: FelInput): void {
+    if (e.t === 'button' && e.btn === 'B' && e.pressed && styleTaps < 2) {
       // STYLE TAPS — mid-air showboating before the SLAM window opens: +1.2 difficulty each, SLAM window shrinks 25% per tap (max 2)
       styleTaps++;
       SoundKit.play('whoosh', { pitch: 1.6, volume: 0.35 });
@@ -922,7 +979,7 @@ export const DunkMode: ModeDefinition = (() => {
     // from where you actually are; one-foot needs a real run.
     const approach = approachBonus(approachAngle(player.root.position.x, player.root.position.z, rim.x, rim.z), takeoffFor(runUpPeak));
     flight.launch(Math.min(1, charge * 0.5 + launchSpeed01 * 0.5), STYLE_TIER[style], approach.difficulty);
-    queuedAir = null;
+    armedAir = null; spin.reset(); liveTricks = []; liveSpin = { turns: 0, from: 0, until: 0 };
     if (heldDpad) flight.recognizer.feed({ t: 'dpad', dir: heldDpad, pressed: true });   // a direction held through the takeoff is still held
     if (launchSpeed01 < 0.3 && charge > 0.4) flash(ctx, 'WALK-UP — short air', 900);
     else if (approach.difficulty > 0) flash(ctx, `${approach.label}${approach.angleDeg >= 10 ? ` · ${approach.angleDeg}°` : ''}`, 900);
@@ -968,6 +1025,8 @@ export const DunkMode: ModeDefinition = (() => {
       if (!qteHit) { ballSim.launch(releasePos, clankOffRim(ball, rim)); missClank(ctx); setTrail('off'); armSettle(); }   // juice soft #2, #5; A+ P4
     }
     aerialClip = pickAerialFinish(qteHit, qteAccuracy); resolveRealMs = performance.now(); clipTimeAtResolve = clipTime;
+    armedAir = null;
+    if (spin.active) console.info(`[DUNK-CUE] contact latch: turn still ${spin.yaw.toFixed(2)} rad at the resolve — settling`);
     if (!qteHit) dropToFloor = true;   // A+ P8 H5: a miss falls from the release height — feet-down is where the stumble lands
     // DUNK-SOFTS-NAMED: the miss reads the frame it happens — the lost lob, the prop, or the iron, under the dunk's name — and
     // the line holds until the panel's number replaces it (the three miss paths used to flash three different banners whose
@@ -984,6 +1043,8 @@ export const DunkMode: ModeDefinition = (() => {
   function handIkApply(): void {
     const w = HAND_IK_MAX * handIkT * handIkT * (3 - 2 * handIkT);
     if (!player) return;
+    applySpinLayer();
+
     if (w > 0.001 && !REACH_OFF) {
       player.root.computeWorldMatrix(true);
       handIkTarget.set(rim.x, rim.y + HAND_IK_RIM_UP, rim.z);
@@ -1011,6 +1072,21 @@ export const DunkMode: ModeDefinition = (() => {
     }
     if (catchBlend < 1 && ball.parent) { catchBlend = Math.min(1, catchBlend + (ikScene?.getEngine().getDeltaTime() ?? 16) / 80); const k = catchBlend * catchBlend * (3 - 2 * catchBlend); Vector3.LerpToRef(catchFrom, PALM_OFFSET_READONLY as Vector3, k, ball.position); }
   }
+  /** DUNK-BIOMECH: the trick turn, written onto the hips AFTER the clips evaluate (before the wrist reach, which aims at
+   *  the world rim). A yaw about the parent's up in the clips' own bind convention (bindFrame.keyedQ), so +1 turn here is
+   *  the same sense a Hips [0, 360, 0] key would be. A held pose (an aerial clip that ended) is not re-written by any
+   *  animation, so the layer remembers what it wrote and starts from the clip's own value again — never compounds. */
+  function applySpinLayer(): void {
+    const n = hipsNode; if (!n || !hipsBf || !n.rotationQuaternion) return;
+    const yaw = replaying ? replaySpinYaw : spin.yaw;
+    const q = n.rotationQuaternion;
+    const held = hipsLayered && Math.abs(q.x - hipsOut.x) < 1e-6 && Math.abs(q.y - hipsOut.y) < 1e-6 && Math.abs(q.z - hipsOut.z) < 1e-6 && Math.abs(q.w - hipsOut.w) < 1e-6;
+    if (Math.abs(yaw) < 1e-4) { if (held) q.copyFrom(hipsRaw); hipsLayered = false; return; }
+    if (!held) hipsRaw.copyFrom(q);
+    const D = hipsBf.keyedQ(n, Quaternion.RotationAxis(Vector3.Up(), yaw)).multiply(hipsBindInv);
+    D.multiplyToRef(hipsRaw, q); hipsOut.copyFrom(q); hipsLayered = true;
+    n.computeWorldMatrix(true);   // an in-place quaternion write leaves the cached world matrix stale — the reach and any probe read the turned hips
+  }
   /** H5: every player clip goes through here. Babylon raises a group's end observable on stop() as well, so a chained onEnd
    *  used to fire the moment its clip was superseded — measured: the land crouch was cut to idle 150 ms in by the aerial's
    *  own chain. A superseded clip's chain is dead; only a clip that ends on its own runs it (and, with no chain, the idle
@@ -1031,6 +1107,8 @@ export const DunkMode: ModeDefinition = (() => {
       // DUNK-CONTROL-JUICE: a trick that runs out while the flight is still rising flows into the hang (measured: the scorpion
       // left 19 frames with no clip on the body before the finish); the hang itself, or any aerial after the resolve, holds
       if (phase === 'cinematic' && name !== SPORT_CLIP.dunkScoreHang) { console.info(`[HANDS] ${name} → hang`); playAir(SPORT_CLIP.dunkScoreHang, hangRateToResolve()); return; }
+      // DUNK-BIOMECH: the replay's re-fired trick flows into the hang too (it held a frozen last frame for ~0.5 s of replay — 46 clip-less frames measured)
+      if (replaying && replayAir && !replayAerial && name !== SPORT_CLIP.dunkScoreHang) { console.info(`[HANDS] replay ${name} → hang`); playAir(SPORT_CLIP.dunkScoreHang, replayRateNow); return; }
       if (replaying || player.root.position.y > 0.05) console.info(`[HANDS] hold ${name}`); else landNow();
     } });
   }
@@ -1263,8 +1341,13 @@ export const DunkMode: ModeDefinition = (() => {
       // the low 40s and a great one at 50. That IS the benchmark's scale — the
       // 6-10 card is what compresses it — and it keeps a miss expensive without
       // ending the contest.
+      // DUNK-BIOMECH fold (JUDGES 31 soft): the panel scores what it SAW — the tricks thrown, a prop actually cleared (or a
+      // lob actually caught) count on a miss too, so a blown 360 over the car is not the same card as a plain clank
+      // (measured: plain clank 31, a missed 360 32, a missed 360 over the car ~35; at the old ×0.30 every miss rounded to 31)
+      const propSeen = obstacleKindOf(prop) ? (obstacleCleared ? PROP_BONUS[prop] : 0) : (prop === 'none' || lob.caught ? PROP_BONUS[prop] : 0);
+      const seen = flight.attempt.tricks.reduce((a, t) => a + t.difficulty, 0) + runwayDifficulty + (obstacleCleared ? 1 : 0);
       const missScores = judgeDunk(
-        Math.max(0, (STYLE_TIER[style] + PROP_BONUS[prop]) * 0.30),   // they saw the attempt
+        Math.max(0, (STYLE_TIER[style] + propSeen + seen) * 0.60),   // they saw the attempt
         0,                                                            // and they saw it fail
         Math.max(0, STYLE_TIER[style] * 0.22 + styleTaps * 0.4),
       );
@@ -1403,7 +1486,7 @@ export const DunkMode: ModeDefinition = (() => {
     player.root.rotation.y = Math.PI;
     player.root.rotation.z = 0; airLean = 0; holdRunSpeed = 0;
     airHeld = false; dropToFloor = false; replaying = false; replayAir = false; player.root.rotationQuaternion = null;   // A+ P8
-    queuedAir = null;
+    armedAir = null; spin.reset(); replaySpinYaw = 0;
     playClip(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     styleTaps = 0; hangSec = 0; revealed = [];

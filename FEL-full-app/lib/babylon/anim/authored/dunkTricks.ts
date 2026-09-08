@@ -11,7 +11,7 @@
 //   dunk_scorpion   — chest down, head up, both legs kicked back over the body, the ball hand out to the rim.
 //   dunk_lost_found — the ball hand swings it down behind the back, the other hand finds it there and carries it up.
 //   dunk_hide_seek  — both hands hide the ball behind the head, a hip fake, the ball hand snaps it overhead.
-//   dunk_360_spin   — a full turn with the ball up (the 360 trick used to alias onto the jumpshot).
+//   dunk_360_spin   — the 360's body: ball to the chest through the turn, extended at the end (the turn is the mode's yaw layer).
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
 import { buildPoseClip, type Deg3 } from '../poseClip';
 type V3 = [number, number, number];
@@ -110,12 +110,20 @@ export function buildHideSeek(scene: Scene, sk: Skeleton): AnimationGroup | null
   ]);
 }
 
-/** The 360: a full turn of the hips with the ball up; the hands are keyed only at the ends so the arms ride the turn. */
+/** The 360: the BODY of the turn — the ball gathered to the chest through the middle of the spin, extended to the rim at
+ *  the end, the legs tucked. The turn itself is NOT keyed here (DUNK-BIOMECH, 2026-09-08): the mode drives a whole-turn
+ *  yaw layer on the hips from the trick's cue (DunkSpin), resolved rim-facing by the carry-up whatever the flight has
+ *  left. Authored into the clip, a crossfade into the finish (or a second trick) cut the turn half-way — a slam frame
+ *  with the chest to the crowd and a hips slerp through nowhere. Hips yaw 0 on every key: the layer owns it. */
 export function buildSpin360(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const k = (t: number, yaw: number) => ({ t, bones: { Hips: [-4, yaw, 0] as Deg3, Spine: [-8, 0, 0] as Deg3, ...AIR_LEGS } });
+  // the knees tucked the whole turn (a real 360 pulls the feet up; over a car the feet are what clears it — the flat AIR_LEGS
+  // hung the feet 0.15 m under the mocap's own tuck and caught the near door at +0.4 s), let down for the extension
+  const TUCK: Record<string, Deg3> = { LeftUpLeg: [-55, 0, 6], LeftLeg: [80, 0, 0], RightUpLeg: [-55, 0, -6], RightLeg: [80, 0, 0] };
+  const TUCK_IN: Record<string, Deg3> = { LeftUpLeg: [-46, 0, 6], LeftLeg: [66, 0, 0], RightUpLeg: [-46, 0, -6], RightLeg: [66, 0, 0] };
   return buildPoseClip(scene, sk, 'dunk_360_spin', SPIN_SEC, [
-    { ...k(0, 0),     hands: { Right: [0.20, 1.92, 0.12], Left: [-0.26, 1.72, 0.10] }, poles: UP },
-    k(0.2, 90), k(0.4, 180), k(0.6, 270),
-    { ...k(SPIN_SEC, 360), hands: { Right: [0.16, 2.00, 0.28], Left: [-0.28, 1.60, 0.12] }, poles: UP },
+    { t: 0,    bones: { Hips: [-4, 0, 0], Spine: [-8, 0, 0], Neck: [-6, 0, 0], ...TUCK_IN },  hands: { Right: [0.20, 1.92, 0.12], Left: [-0.26, 1.72, 0.10] }, poles: UP },
+    { t: 0.3,  bones: { Hips: [2, 0, 0], Spine: [6, 0, 0], Neck: [4, 0, 0], ...TUCK },    hands: { Right: [0.16, 1.28, 0.30], Left: [-0.16, 1.28, 0.30] }, poles: { Left: [-0.8, -0.3, -0.5], Right: [0.8, -0.3, -0.5] } },   // the ball gathered to the chest through the turn
+    { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [-4, 0, 0], ...TUCK },  hands: { Right: [0.18, 1.62, 0.26], Left: [-0.24, 1.50, 0.18] }, poles: UP },   // coming out of the turn: the ball rises
+    { t: SPIN_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR_LEGS }, hands: { Right: [0.16, 2.00, 0.28], Left: [-0.28, 1.60, 0.12] }, poles: UP },   // extended to the rim
   ]);
 }

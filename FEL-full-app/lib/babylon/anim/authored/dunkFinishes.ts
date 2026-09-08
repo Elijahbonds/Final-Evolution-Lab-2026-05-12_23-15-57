@@ -2,7 +2,7 @@
 // reflects HOW WELL you timed the slam and HOW BIG the judges scored it.
 //   dunk_finish_windmill — perfect-timing aerial: a full one-arm windmill.
 //   dunk_finish_tomahawk — good-timing aerial: two-hand cock-back tomahawk.
-//   dunk_finish_blown    — mistimed/whiffed aerial: arms flail off-balance.
+//   dunk_finish_blown    — mistimed/whiffed aerial: arms flail off-balance, then a brace (not a held T).
 //   dunk_celebrate_big   — landing after a huge score: crouch into a flex.
 //
 // RE-AUTHORED as pose targets (ship pass 3, rung 1): hands as world-axis metres
@@ -40,13 +40,19 @@ export function buildFinishTomahawk(scene: Scene, sk: Skeleton): AnimationGroup 
   ]);
 }
 
-// MISTIMED / whiffed → arms flail wide, torso twists off-balance, legs splay.
+// MISTIMED / whiffed → off the iron off balance, then the body BRACES: arms in front of the face, knees up, chin down.
+// DUNK-BIOMECH (2026-09-08): the clip used to flail wide (both hands out at shoulder height) and the aerial owner holds
+// the last frame through the fall — a T-pose was what the floor got. A blown dunk ends in a readable bail, not a T; the
+// land crouch takes it from feet-down.
 export function buildFinishBlown(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const T = 0.7;
+  // a miss resolves ~0.4 m off the floor and falls at the arc's own 2.6 m/s: ~0.2 s to feet-down, inside the crossfade.
+  // So the brace IS the clip — hands come off the iron and straight in front of the face, knees up, chin down — with the
+  // flail folded into the first tenth (measured: a flail key at 0.14 s was the pose the floor got, arms wide = a T)
+  const T = 0.35;
   return buildPoseClip(scene, sk, 'dunk_finish_blown', T, [
-    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [0, 0, 0],      LeftUpLeg: [-40, 0, 10], LeftLeg: [30, 0, 0], RightUpLeg: [-10, 0, -10], RightLeg: [60, 0, 0] }, hands: { Left: [-0.45, 1.25, 0.15], Right: [0.45, 1.25, 0.15] } },
-    { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [-8, 14, 16],   LeftUpLeg: [-35, 0, 10], LeftLeg: [28, 0, 0], RightUpLeg: [-8, 0, -10],  RightLeg: [50, 0, 0] }, hands: { Left: [-0.60, 1.55, -0.10], Right: [0.62, 1.62, 0.05] }, poles: { Left: [-0.3, -0.6, -0.7], Right: [0.3, -0.6, -0.7] } },   // flail
-    { t: T,    bones: { Hips: [0, 0, 0], Spine: [6, 6, 8],      LeftUpLeg: [-18, 0, 6],  LeftLeg: [22, 0, 0], RightUpLeg: [-8, 0, -6],   RightLeg: [26, 0, 0] }, hands: { Left: [-0.52, 1.30, 0.10], Right: [0.50, 1.32, 0.15] } },
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-4, 8, 8],  Neck: [0, 0, 0],  LeftUpLeg: [-36, 0, 10], LeftLeg: [40, 0, 0], RightUpLeg: [-20, 0, -10], RightLeg: [52, 0, 0] }, hands: { Left: [-0.34, 1.62, 0.18], Right: [0.36, 1.66, 0.22] }, poles: { Left: [-0.6, -0.4, -0.6], Right: [0.6, -0.4, -0.6] } },   // off the iron, off balance
+    { t: 0.12, bones: { Hips: [6, 0, 0], Spine: [22, 4, 6], Neck: [12, 0, 0], LeftUpLeg: [-48, 0, 8], LeftLeg: [70, 0, 0], RightUpLeg: [-40, 0, -8], RightLeg: [62, 0, 0] }, hands: { Left: [-0.18, 1.40, 0.34], Right: [0.22, 1.34, 0.36] }, poles: { Left: [-0.7, -0.5, -0.4], Right: [0.7, -0.5, -0.4] } },   // the brace: arms in front of the face, knees up, chin down
+    { t: T,    bones: { Hips: [8, 0, 0], Spine: [26, 2, 4], Neck: [14, 0, 0], LeftUpLeg: [-50, 0, 8], LeftLeg: [72, 0, 0], RightUpLeg: [-44, 0, -8], RightLeg: [66, 0, 0] }, hands: { Left: [-0.17, 1.36, 0.36], Right: [0.21, 1.30, 0.38] }, poles: { Left: [-0.7, -0.5, -0.4], Right: [0.7, -0.5, -0.4] } },   // held to feet-down
   ]);
 }
 

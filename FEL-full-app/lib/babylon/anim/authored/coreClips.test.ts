@@ -14,7 +14,7 @@ import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './free
 import { buildDanceClip, DANCE_CLIP_IDS } from '../danceClips';
 import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, buildBoardCarveRight } from './boardSuite';
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
-import { buildFinishTomahawk, buildCelebrateBig } from './dunkFinishes';
+import { buildFinishTomahawk, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
 import { buildSelfLob, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF } from './dunkTricks';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
@@ -309,11 +309,18 @@ describe('dunk tricks', () => {
     expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.35);
     at(g, 0.8); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.2);
   });
-  it('360: the shoulders turn a full circle and the ball hand stays up', () => {
+  it('360: the body of the turn — the ball to the chest through it, extended at the end; the shoulders never turn in the clip (the turn is the mode\'s yaw layer)', () => {
     const g = fresh(() => buildSpin360(scene, sk)!);
     at(g, 0); const a = pos('LeftArm').x - pos('RightArm').x;
-    at(g, 0.4); const b = pos('LeftArm').x - pos('RightArm').x; expect(Math.sign(a)).not.toBe(Math.sign(b));
+    at(g, 0.3); expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.4); expect(pos('RightHand').y).toBeLessThan(pos('Head').y);   // gathered
+    const b = pos('LeftArm').x - pos('RightArm').x; expect(Math.sign(b)).toBe(Math.sign(a));   // DUNK-BIOMECH: no hips yaw authored — a crossfade can never cut a half-turn
     at(g, 0.8); const c = pos('LeftArm').x - pos('RightArm').x; expect(Math.sign(c)).toBe(Math.sign(a)); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.1);
+  });
+  it('blown finish: ends in a brace (hands in front of the face, knees up), not a T held to the floor', () => {
+    const g = fresh(() => buildFinishBlown(scene, sk)!);
+    at(g, 0.35);
+    expect(Math.abs(pos('LeftHand').x - pos('RightHand').x)).toBeLessThan(0.55);   // a T has them ~1.2 m apart
+    for (const s of ['Left', 'Right']) { expect(pos(`${s}Hand`).z).toBeGreaterThan(pos('Hips').z + 0.15); expect(pos(`${s}Leg`).y).toBeGreaterThan(pos(`${s}UpLeg`).y - 0.35); }
   });
 });
 
