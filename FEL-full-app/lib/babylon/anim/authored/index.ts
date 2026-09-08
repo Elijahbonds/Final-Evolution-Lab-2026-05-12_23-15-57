@@ -10,7 +10,8 @@ import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebr
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
-import { buildHitReact, buildKnockdown, buildGuardStep, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp } from './karate';
+import { buildHitReact, buildKnockdown, buildGuardStep, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold } from './karate';
+import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
   buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildDefendSlide, buildBlockReach, buildStealReach,
 } from './basketball';
@@ -58,6 +59,10 @@ export function registerAuthoredClips(
     () => buildParry(scene, skeleton),
     () => buildFloorHold(scene, skeleton),
     () => buildGetUp(scene, skeleton),
+    () => buildWindupHold(scene, skeleton),   // ANIM-READABILITY (creative, 2026-09-07): the counter-strike rival's telegraph
+    () => buildFreeRunAirHold(scene, skeleton),   // ANIM-READABILITY (creative): the runner's air hold, tuck and slide
+    () => buildFreeRunTuck(scene, skeleton),
+    () => buildFreeRunSlide(scene, skeleton),
     // Board suite — skate / surf / snowboard all ride on these. Without them
     // every board clip fell through the alias table onto a karate stance.
     // Phase 3 (2026-09-03): the racket, club, net and keeper sports stop borrowing karate

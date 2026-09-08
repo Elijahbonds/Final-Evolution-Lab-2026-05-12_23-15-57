@@ -17,6 +17,7 @@ import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { installSafePlay } from '../anim/clipRegistry';
+import { FreeRunAnimTree } from '../anim/freeRunTree';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { assertSpawned } from '../core/FrameGuard';
@@ -31,6 +32,9 @@ import { coursePieces, courseLength, checkpoints, respawnFor, overGap, routeAt, 
 const CAPSULE_H = 1.7, CAPSULE_R = 0.32;
 const JUMP_V = 6.4, VAULT_V = 4.6, WALLRUN_SEC = 1.1, WALLKICK_V = 6.8, WALLKICK_PUSH = 5.2, SLIDE_SEC = 0.7, DOWN_SEC = 1.3;
 const BANK_AFTER_SEC = 0.6;          // Skate's revert window: roll clean this long and the pot banks
+const JUMP_BEAT_SEC = 0.42;          // jump_up is 0.45 s: the take-off clip, then the tree holds the air pose
+const LAND_BEAT_SEC = 0.38;          // jump_land is 0.35 s: the whole absorb shows before the run takes over
+const RISE_SEC = 0.45;               // karate_get_up: the last part of DOWN_SEC is the get-up
 const PICK_TIMEOUT_S = 6;
 const FALL_Y = -2.5;
 const BAR_CLIP_SPEED = 0.45;         // clip the bar without sliding: keep this much speed
@@ -49,7 +53,10 @@ interface St {
   rollAt: number | null; clock: number;
   combo: ComboChain; started: boolean; runSec: number; finished: boolean;
   checkpoint: number; highTouched: boolean; bails: number; barsCleared: Set<number>;
-  env: Env; anim: string;
+  env: Env;
+  /** ANIM-READABILITY (creative, 2026-09-07): the ONE OWNER of the runner's clips. The mode never calls animator.play;
+   *  it latches wall-clock beats (take-off, landing) and feeds the tree once per frame. */
+  tree: FreeRunAnimTree | null; jumpAt: number; landAt: number; landing: 'none' | 'clean' | 'sketchy';
   /** Vertical velocity, owned here: the controller integrates the velocity it is handed, so gravity is ours to apply. */
   vy: number;
   /** A+ P0 juice: performance.now() of the last bail punch (one per crash), and the one finish punch. */
@@ -122,10 +129,26 @@ export const FreeRunMode: ModeDefinition = (() => {
     console.info(`[FR-JUICE] finish punch (${top ? 'gold' : 'white'})`);
   }
 
-  function play(S: St, clip: string, loop: boolean): void {
-    if (!S.hero || S.anim === clip) return;
-    S.anim = clip;
-    S.hero.animator.play(clip, { loop, fadeSec: 0.1 });
+  /** A take-off / a touchdown: latch the beat for the tree (re-fires on a new beat of the same kind). */
+  function jumpBeat(S: St): void { S.jumpAt = S.clock; S.tree?.clearBeat('jump'); }
+  function landBeat(S: St, landing: 'clean' | 'sketchy'): void { S.landAt = S.clock; S.landing = landing; S.tree?.clearBeat('land_clean', 'land_sketchy'); }
+
+  /** The tree is fed once per frame, every phase, from the run's context — the movement INTENT included (S.speed is the
+   *  speed the runner keeps through a landing, so a landing under a held stick settles onto the run, not an idle flash). */
+  function feedTree(S: St): void {
+    if (!S.tree) return;
+    const airborne = S.state === 'air';
+    S.tree.update({
+      speed01: S.finished ? 0 : Math.min(1, S.speed / RUN_MAX),   // the finish: the celebrate settles into the idle, not a run on the spot under the results banner
+      airborne,
+      jumpBeat: airborne && S.clock - S.jumpAt < JUMP_BEAT_SEC,
+      tricking: airborne && !!S.trick,
+      wallrun: S.state === 'wallrun',
+      sliding: S.state === 'slide',
+      landing: !airborne && S.clock - S.landAt < LAND_BEAT_SEC ? S.landing : 'none',
+      down: S.state === 'down' && S.downSec > RISE_SEC,   // the last RISE_SEC of DOWN_SEC is the get-up
+      celebrating: S.finished,
+    });
   }
 
   // ── probes: what the course offers right now ─────────────────────────
@@ -149,7 +172,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     S.vy = vy;
     S.cc!.setVelocity(new Vector3(S.heading.x * S.speed, vy, S.heading.z * S.speed));
     S.state = 'air'; S.airStartY = S.hero!.root.position.y; S.airSec = 0; S.launch = launch; S.trick = null; S.trickSpun = 0; S.rollAt = null;
-    play(S, 'jump_up', false);
+    jumpBeat(S);
   }
 
   function land(ctx: ModeContext, S: St): void {
@@ -166,13 +189,12 @@ export const FreeRunMode: ModeDefinition = (() => {
     S.speed = speedAfterLanding(S.speed, landing);
     if (landing === 'bail') {
       const lost = S.combo.bail(); S.bails++;
-      S.state = 'down'; S.downSec = DOWN_SEC;
-      play(S, 'football_tackled_fall', false);
+      S.state = 'down'; S.downSec = DOWN_SEC;   // the tree: fall → the floor → the get-up inside DOWN_SEC
       SoundKit.play('miss'); bailPunch(ctx, S, 'bail');   // A+ P0: hit-stop + shake + ONE low thud (feel.impact(0.7) is gone)
       flash(ctx, lost > 0 ? `BAILED — ${lost} lost` : 'BAILED', 900);
     } else {
       S.state = 'ground'; S.groundSec = 0;
-      play(S, landing === 'sketchy' ? 'jump_land' : 'jump_land', false);
+      landBeat(S, landing);
       ctx.feel?.impact?.(landing === 'sketchy' ? 0.45 : 0.2);
       if (S.trick || drop >= 2.4) softBeat(ctx, S.trick ? 'trick land' : 'big land');   // A+ P0: a big land answers softly
       if (landing === 'sketchy') flash(ctx, 'HARD LANDING — roll next time', 700);
@@ -188,6 +210,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     S.cc!.setVelocity(Vector3.Zero());
     const lost = S.combo.bail(); S.bails++;
     S.speed = 0; S.state = 'ground'; S.trick = null; S.hero!.root.rotation.set(0, S.hero!.root.rotation.y, 0);
+    landBeat(S, 'sketchy');   // put back down hard at the checkpoint (the tree read the teleport as an idle flash)
     SoundKit.play('miss'); bailPunch(ctx, S, 'fell');   // A+ P0: a fall is a crash
     flash(ctx, lost > 0 ? `FELL — ${lost} lost · back to the checkpoint` : 'FELL — back to the checkpoint', 1000);
   }
@@ -203,7 +226,6 @@ export const FreeRunMode: ModeDefinition = (() => {
     SoundKit.play('whistle'); SoundKit.play('crowdCheer');
     finishPunch(ctx, S, grade === 'S' || grade === 'A');   // A+ P0: one finish punch
     EffectsKit.burst(ctx.scene, S.hero!.root.position.add(new Vector3(0, 1.8, 0)), 'confetti');
-    play(S, 'dunk_celebrate_big', false);
     hud(ctx, S, { banner: `FINISH · ${S.runSec.toFixed(1)}s · GRADE ${grade}` });
     setTimeout(() => ctx.end(grade === 'S' || grade === 'A' ? 'win' : 'complete', total, {
       timeSec: Math.round(S.runSec * 10) / 10, tricks: S.combo.banked, timeBonus: tb, routeBonus: rb, bestCombo: S.combo.bestCombo,
@@ -237,7 +259,8 @@ export const FreeRunMode: ModeDefinition = (() => {
         wallSec: 0, wallNormal: new Vector3(1, 0, 0), slideSec: 0, downSec: 0, groundSec: 0, rollAt: null, clock: 0,
         combo: new ComboChain(), started: false, runSec: 0, finished: false,
         checkpoint: 0, highTouched: false, bails: 0, barsCleared: new Set(),
-        env: { vaultAhead: false, wallAhead: false, ledgeAhead: false, barAhead: false }, anim: '', vy: 0,
+        env: { vaultAhead: false, wallAhead: false, ledgeAhead: false, barAhead: false }, vy: 0,
+        tree: null, jumpAt: -9, landAt: -9, landing: 'none',
         bailAt: 0, finishLatch: false,
       };
       states.set(ctx.scene, S); live.add(S);
@@ -250,6 +273,7 @@ export const FreeRunMode: ModeDefinition = (() => {
 
       S.hero = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: new Vector3(0, 0, 3), yawRad: 0, startClip: 'idle_stand', modeId: 'freerun' });
       installSafePlay(S.hero.animator, 'freerun');
+      S.tree = new FreeRunAnimTree(S.hero.animator);
       if (S.scene.isDisposed) return;
       S.cc = new PhysicsCharacterController(new Vector3(0, CAPSULE_H / 2 + 0.05, 3), { capsuleHeight: CAPSULE_H, capsuleRadius: CAPSULE_R }, ctx.scene);
       buildCourse(ctx, S);                                      // the pick screen shows the course
@@ -277,7 +301,7 @@ export const FreeRunMode: ModeDefinition = (() => {
       const verbs = verbsFor(S.state, S.speed, S.env);
       if (e.btn === 'A') {
         if (S.state === 'ground') {
-          if (verbs.includes('WALL RUN')) { S.state = 'wallrun'; S.wallSec = WALLRUN_SEC; S.airStartY = S.hero.root.position.y; play(S, 'run', true); S.combo.add('WALL RUN', 45, 'grind'); flash(ctx, 'WALL RUN'); SoundKit.play('whoosh'); }
+          if (verbs.includes('WALL RUN')) { S.state = 'wallrun'; S.wallSec = WALLRUN_SEC; S.airStartY = S.hero.root.position.y; S.combo.add('WALL RUN', 45, 'grind'); flash(ctx, 'WALL RUN'); SoundKit.play('whoosh'); }
           else if (verbs.includes('VAULT')) { beginAir(S, 'vault', VAULT_V); S.combo.add('VAULT', 40, 'grind'); flash(ctx, 'VAULT'); SoundKit.play('whoosh'); }
           else { beginAir(S, 'ground', JUMP_V); }
         } else if ((S.state === 'wallrun' || S.state === 'air') && (verbs.includes('WALL KICK'))) {
@@ -285,10 +309,10 @@ export const FreeRunMode: ModeDefinition = (() => {
           S.heading.copyFrom(away); S.speed = Math.max(S.speed, 4.5);
           S.state = 'air'; S.airStartY = S.hero.root.position.y; S.airSec = 0; S.launch = 'wallkick'; S.trick = null; S.rollAt = null;
           S.vy = WALLKICK_V; S.cc.setVelocity(new Vector3(away.x * WALLKICK_PUSH, WALLKICK_V, away.z * WALLKICK_PUSH));
-          S.combo.add('WALL KICK', 60, 'grind'); flash(ctx, 'WALL KICK'); SoundKit.play('impact', { pitch: 1.3, volume: 0.4 }); play(S, 'jump_up', false);
+          S.combo.add('WALL KICK', 60, 'grind'); flash(ctx, 'WALL KICK'); SoundKit.play('impact', { pitch: 1.3, volume: 0.4 }); jumpBeat(S);
         }
       } else if (e.btn === 'B') {
-        if (S.state === 'ground' && verbs.includes('SLIDE')) { S.state = 'slide'; S.slideSec = SLIDE_SEC; play(S, 'football_juke_left', false); S.combo.add('SLIDE', 35, 'manual'); flash(ctx, 'SLIDE'); SoundKit.play('whoosh', { pitch: 0.8 }); }
+        if (S.state === 'ground' && verbs.includes('SLIDE')) { S.state = 'slide'; S.slideSec = SLIDE_SEC; S.combo.add('SLIDE', 35, 'manual'); flash(ctx, 'SLIDE'); SoundKit.play('whoosh', { pitch: 0.8 }); }
         else if (S.state === 'air') { S.rollAt = S.clock; }                    // the roll is timed against touchdown
       } else if (e.btn === 'X' || e.btn === 'Y') {
         if (S.state === 'air' && !S.trick) {
@@ -298,14 +322,13 @@ export const FreeRunMode: ModeDefinition = (() => {
             const target = p.add(S.heading.scale(2.2)); target.y = 3.7 + CAPSULE_H / 2;
             S.cc.setPosition(target); S.vy = 0; S.cc.setVelocity(new Vector3(S.heading.x * 3, 0, S.heading.z * 3));
             S.state = 'ground'; S.speed = Math.max(3, S.speed * 0.8); S.groundSec = 0; S.highTouched = true;
-            S.combo.add('CAT LEAP', 80, 'grind'); flash(ctx, 'CAT LEAP'); SoundKit.play('impact', { pitch: 1.1, volume: 0.35 }); play(S, 'jump_land', false);
+            S.combo.add('CAT LEAP', 80, 'grind'); flash(ctx, 'CAT LEAP'); SoundKit.play('impact', { pitch: 1.1, volume: 0.35 }); landBeat(S, 'clean');
             return;
           }
           const sx = S.stick.x, sz = S.stick.z;
           const t: FreeRunTrick = e.btn === 'Y' ? (Math.abs(sx) > 0.5 ? FREERUN_TRICKS.spin : FREERUN_TRICKS.twist)
             : sz < -0.5 ? FREERUN_TRICKS.back : Math.abs(sx) > 0.5 ? FREERUN_TRICKS.side : FREERUN_TRICKS.front;
-          S.trick = t; S.trickSpun = 0;
-          play(S, 'board_air', true);
+          S.trick = t; S.trickSpun = 0;   // the tree plays the tuck while S.trick holds
           SoundKit.play('whoosh', { pitch: 1.2, volume: 0.5 });
         }
       }
@@ -315,6 +338,7 @@ export const FreeRunMode: ModeDefinition = (() => {
       const S = st(ctx); if (!S || !S.hero || !S.cc) return;
       S.clock += dt;
       if (S.phase === 'pick') { S.pickSec += dt; if (S.autoBegin || S.pickSec >= PICK_TIMEOUT_S) void begin(ctx, S); return; }
+      if (S.phase === 'done') { feedTree(S); return; }   // the finish celebrate plays out under the results banner
       if (S.phase !== 'run') return;
 
       const cc = S.cc, root = S.hero.root;
@@ -345,7 +369,7 @@ export const FreeRunMode: ModeDefinition = (() => {
         S.vy = 2.6 * (S.wallSec / WALLRUN_SEC) - 1.2;
         desired = new Vector3(along.x * Math.max(3.5, S.speed), S.vy, along.z * Math.max(3.5, S.speed));
         cc.setVelocity(desired);
-        if (S.wallSec <= 0 || !S.env.wallAhead && S.wallSec < WALLRUN_SEC - 0.25) { S.state = 'air'; S.airSec = 0; S.launch = 'drop'; play(S, 'jump_up', false); }
+        if (S.wallSec <= 0 || !S.env.wallAhead && S.wallSec < WALLRUN_SEC - 0.25) { S.state = 'air'; S.airSec = 0; S.launch = 'drop'; }   // off the wall: the tree holds the air pose (no second take-off)
       } else if (S.state === 'air') {
         S.airSec += dt;
         S.vy = Math.max(-30, S.vy + G * dt);
@@ -358,15 +382,15 @@ export const FreeRunMode: ModeDefinition = (() => {
         }
       } else if (S.state === 'down') {
         S.downSec -= dt; S.vy = supported ? 0 : Math.max(-30, S.vy + G * dt); cc.setVelocity(new Vector3(0, S.vy, 0));
-        if (S.downSec <= 0) { S.state = 'ground'; S.speed = 0; play(S, 'idle_stand', true); }
+        if (S.downSec <= 0) { S.state = 'ground'; S.speed = 0; }
       } else {
         if (S.state === 'slide') { S.slideSec -= dt; if (S.slideSec <= 0) S.state = 'ground'; }
         // on the ground the controller follows the surface; off an edge we fall under our own gravity
         if (supported) { S.vy = 0; desired = new Vector3(S.heading.x * S.speed, 0, S.heading.z * S.speed); const moved = cc.calculateMovement(dt, S.heading, support.averageSurfaceNormal, cc.getVelocity(), support.averageSurfaceVelocity, desired, new Vector3(0, 1, 0)); moved.y = Math.min(moved.y, 0.5); cc.setVelocity(moved); }
         else { S.vy = Math.max(-30, S.vy + G * dt); cc.setVelocity(new Vector3(S.heading.x * S.speed, S.vy, S.heading.z * S.speed)); }
         if (S.state === 'ground') {
-          if (!supported && S.vy < -1.2) { S.state = 'air'; S.airStartY = root.position.y; S.airSec = 0; S.launch = 'drop'; S.trick = null; S.rollAt = null; play(S, 'jump_up', false); }
-          else { S.groundSec += dt; play(S, S.speed > 3.2 ? 'run' : S.speed > 0.4 ? 'walk' : 'idle_stand', true); }
+          if (!supported && S.vy < -1.2) { S.state = 'air'; S.airStartY = root.position.y; S.airSec = 0; S.launch = 'drop'; S.trick = null; S.rollAt = null; }   // a drop off an edge: no take-off, the air hold
+          else { S.groundSec += dt; }
           // touching down without a linked move banks the line
           if (S.groundSec >= BANK_AFTER_SEC && S.combo.pot > 0) { const b = S.combo.bank(); flash(ctx, `BANKED +${b}`, 800); SoundKit.play('score', { volume: 0.5 }); softBeat(ctx, 'bank'); hud(ctx, S); }
         }
@@ -391,6 +415,8 @@ export const FreeRunMode: ModeDefinition = (() => {
       if (S.started && !S.finished) S.runSec += dt;
       if (routeAt(root.position.x, root.position.y) === 'high') S.highTouched = true;
       if (!S.finished && root.position.z >= courseLength(S.pieces)) finish(ctx, S);
+
+      feedTree(S);
 
       // camera: leads the momentum and pulls back with speed (FOV widens)
       const c = ctx.scene.activeCamera; if (c) c.fov = 0.8 + S.speed * 0.018;

@@ -7,10 +7,19 @@
 // id resolved to nothing. That is why Dance has no mode: the engine had
 // nothing to play.
 //
-// These are built the same way M64 built the locomotion set — quaternion keys
-// on the LIVE skeleton via buildQuatClip, so a bone-name mismatch is
-// impossible and a missing bone warns instead of breaking. Bone names are
-// UNPREFIXED (`Hips`, `LeftArm`), per AvatarSkeletonSpec.md.
+// RE-AUTHORED as pose targets (ANIM-READABILITY creative, 2026-09-07), the way
+// the rest of the suite is authored since ship pass 3: torso and legs in degrees
+// about the parent's bind axes, the HANDS as body-local metres fitted by the
+// two-bone solver. The first cut keyed the arms as Euler guesses about the
+// bind axes — on this rig the toprock's arms came out reaching forward at
+// shoulder height (a zombie, measured: hands 1.41 m up, 0.50 m forward), the
+// two-step and the windmill keyed no arms at all (they froze on whatever the
+// previous step left), and the freeze / six-step / windmill started standing
+// and ENDED on the floor, so their loop wrap snapped the body upright. Every
+// clip now starts AND ends in the same standing groove, so a step that
+// overruns its beat repeats a standing frame and the next step crossfades from
+// a matching pose; the floor moves drop in over their first 3/4 beat and rise
+// over their last.
 //
 // HONEST STATUS: these are procedural stand-ins, not motion-captured dance.
 // They are readable, on-beat and clearly distinct from one another, which is
@@ -19,7 +28,8 @@
 // The alias fallback below means that swap needs no code change.
 
 import type { AnimationGroup, Scene, Skeleton } from '@babylonjs/core';
-import { buildQuatClip, eulerQ, type QuatKeys } from './restPose';
+import { buildPoseClip, type Deg3, type PoseKey } from './poseClip';
+type V3 = [number, number, number];
 
 /** If a procedural clip cannot be built, fall back to motion that definitely
  *  exists. A dancer doing a jumpshot on beat is wrong but legible; a dancer
@@ -35,124 +45,152 @@ export const DANCE_ALIASES: Record<string, string> = {
   dance_bounce_shoulder: 'idle_stand',
 };
 
-const D = (deg: number) => deg;
-
 /** beats → seconds at a reference 120 BPM. Clips are authored at this tempo
  *  and the animator's speedRatio rescales them, so one clip serves every BPM. */
 const REF_BPM = 120;
 const beats = (n: number) => (n * 60) / REF_BPM;
 
-function toprock(): QuatKeys {
-  // Weight shifts side to side, opposite arm swings across. 4 beats.
-  return {
-    Hips: [[0, eulerQ(0, D(-8), D(3))], [beats(1), eulerQ(0, D(8), D(-3))],
-           [beats(2), eulerQ(0, D(-8), D(3))], [beats(3), eulerQ(0, D(8), D(-3))],
-           [beats(4), eulerQ(0, D(-8), D(3))]],
-    LeftArm: [[0, eulerQ(D(-30), 0, D(62))], [beats(1), eulerQ(D(-55), 0, D(48))],
-              [beats(2), eulerQ(D(-30), 0, D(62))], [beats(3), eulerQ(D(-55), 0, D(48))],
-              [beats(4), eulerQ(D(-30), 0, D(62))]],
-    RightArm: [[0, eulerQ(D(-55), 0, D(-48))], [beats(1), eulerQ(D(-30), 0, D(-62))],
-               [beats(2), eulerQ(D(-55), 0, D(-48))], [beats(3), eulerQ(D(-30), 0, D(-62))],
-               [beats(4), eulerQ(D(-55), 0, D(-48))]],
-    Spine: [[0, eulerQ(D(4), D(6), 0)], [beats(2), eulerQ(D(4), D(-6), 0)], [beats(4), eulerQ(D(4), D(6), 0)]],
-  };
+// ── the standing groove every clip starts and ends in ──────────────────────
+const HANG = { Left: [-0.26, 0.86, 0.08] as V3, Right: [0.26, 0.86, 0.08] as V3 };
+const HANG_POLES = { Left: [-0.4, -0.3, -0.9] as V3, Right: [0.4, -0.3, -0.9] as V3 };
+const STAND_BONES: Record<string, Deg3> = { Hips: [0, 0, 0], Spine: [3, 0, 0], Neck: [0, 0, 0], LeftUpLeg: [-6, 0, 4], LeftLeg: [10, 0, 0], RightUpLeg: [-6, 0, -4], RightLeg: [10, 0, 0] };
+const STAND: Omit<PoseKey, 't'> = { bones: STAND_BONES, hands: HANG, poles: HANG_POLES, hipsY: 0 };
+const key = (t: number, k: Omit<PoseKey, 't'>): PoseKey => ({ t, ...k });
+
+function toprock(): PoseKey[] {
+  // Weight shifts side to side, one foot crossing in front on the beat, the opposite arm swinging low across the body;
+  // the feet come together on the off-beat with a bounce. 4 beats.
+  const cross = (s: 1 | -1): Omit<PoseKey, 't'> => ({
+    bones: {
+      Hips: [0, 10 * s, 3 * s], Spine: [6, -8 * s, -2 * s], Neck: [0, 6 * s, 0],
+      ...(s > 0
+        ? { LeftUpLeg: [-28, 0, -6], LeftLeg: [12, 0, 0], RightUpLeg: [8, 0, -4], RightLeg: [8, 0, 0] }
+        : { RightUpLeg: [-28, 0, 6], RightLeg: [12, 0, 0], LeftUpLeg: [8, 0, 4], LeftLeg: [8, 0, 0] }),
+    },
+    hands: s > 0
+      ? { Right: [0.06, 0.96, 0.36], Left: [-0.32, 0.90, -0.20] }    // right arm swings across low, left arm back
+      : { Left: [-0.06, 0.96, 0.36], Right: [0.32, 0.90, -0.20] },
+    poles: HANG_POLES, hipsY: -0.02,
+  });
+  const together: Omit<PoseKey, 't'> = { bones: { ...STAND_BONES, LeftLeg: [16, 0, 0], RightLeg: [16, 0, 0] }, hands: { Left: [-0.30, 0.86, 0.02], Right: [0.30, 0.86, 0.02] }, poles: HANG_POLES, hipsY: -0.06 };
+  return [key(0, cross(1)), key(beats(1), together), key(beats(2), cross(-1)), key(beats(3), together), key(beats(4), cross(1))];
 }
 
-function twoStep(): QuatKeys {
-  return {
-    Hips: [[0, eulerQ(D(2), 0, 0)], [beats(0.5), eulerQ(D(-3), 0, 0)],
-           [beats(1), eulerQ(D(2), 0, 0)], [beats(1.5), eulerQ(D(-3), 0, 0)],
-           [beats(2), eulerQ(D(2), 0, 0)], [beats(3), eulerQ(D(-3), 0, 0)],
-           [beats(4), eulerQ(D(2), 0, 0)]],
-    LeftUpLeg: [[0, eulerQ(D(-14), 0, 0)], [beats(1), eulerQ(D(10), 0, 0)],
-                [beats(2), eulerQ(D(-14), 0, 0)], [beats(3), eulerQ(D(10), 0, 0)],
-                [beats(4), eulerQ(D(-14), 0, 0)]],
-    RightUpLeg: [[0, eulerQ(D(10), 0, 0)], [beats(1), eulerQ(D(-14), 0, 0)],
-                 [beats(2), eulerQ(D(10), 0, 0)], [beats(3), eulerQ(D(-14), 0, 0)],
-                 [beats(4), eulerQ(D(10), 0, 0)]],
-  };
-}
-
-function armWave(): QuatKeys {
-  // A travelling wave: shoulder leads, forearm follows a beat later. The lag
-  // is the whole illusion — key them together and it reads as a shrug.
-  return {
-    RightArm: [[0, eulerQ(0, 0, D(-55))], [beats(0.5), eulerQ(0, 0, D(-95))],
-               [beats(1), eulerQ(0, 0, D(-55))], [beats(2), eulerQ(0, 0, D(-55))]],
-    RightForeArm: [[0, eulerQ(0, D(-10), 0)], [beats(0.75), eulerQ(0, D(-55), 0)],
-                   [beats(1.25), eulerQ(0, D(-10), 0)], [beats(2), eulerQ(0, D(-10), 0)]],
-    LeftArm: [[0, eulerQ(0, 0, D(55))], [beats(1), eulerQ(0, 0, D(95))],
-              [beats(1.5), eulerQ(0, 0, D(55))], [beats(2), eulerQ(0, 0, D(55))]],
-    Spine: [[0, eulerQ(0, 0, D(-5))], [beats(1), eulerQ(0, 0, D(5))], [beats(2), eulerQ(0, 0, D(-5))]],
-  };
-}
-
-function sixStep(): QuatKeys {
-  const k: QuatKeys = { Hips: [], LeftUpLeg: [], RightUpLeg: [], Spine: [] };
-  for (let i = 0; i <= 8; i++) {
-    const t = beats(i);
-    const phase = (i / 8) * Math.PI * 2;
-    k.Hips.push([t, eulerQ(D(38), D(Math.sin(phase) * 40), 0)]);
-    k.LeftUpLeg.push([t, eulerQ(D(-40 + Math.sin(phase) * 35), 0, D(18))]);
-    k.RightUpLeg.push([t, eulerQ(D(-40 - Math.sin(phase) * 35), 0, D(-18))]);
-    k.Spine.push([t, eulerQ(D(-18), D(Math.cos(phase) * 20), 0)]);
+function twoStep(): PoseKey[] {
+  // A knee bounce on every half beat, the thighs alternating each beat, the arms loose and pumping opposite the legs. 4 beats.
+  const out: PoseKey[] = [];
+  for (let h = 0; h <= 8; h++) {
+    const t = beats(h / 2), down = h % 2 === 1, phase = Math.floor(h / 2) % 2 === 0 ? 1 : -1;
+    out.push(key(t, {
+      bones: {
+        Hips: [down ? 3 : -1, 0, 0], Spine: [down ? 8 : 3, 0, 0], Neck: [down ? 4 : 0, 0, 0],
+        LeftUpLeg: [-6 - 10 * phase, 0, 4], LeftLeg: [down ? 30 : 12, 0, 0], RightUpLeg: [-6 + 10 * phase, 0, -4], RightLeg: [down ? 30 : 12, 0, 0],
+      },
+      hands: { Left: [-0.27, down ? 0.82 : 0.88, 0.08 - 0.10 * phase], Right: [0.27, down ? 0.82 : 0.88, 0.08 + 0.10 * phase] },
+      poles: HANG_POLES, hipsY: down ? -0.07 : 0,
+    }));
   }
-  return k;
+  return out;
 }
 
-function babyFreeze(): QuatKeys {
-  return {
-    Hips: [[0, eulerQ(0, 0, 0)], [beats(0.5), eulerQ(D(55), D(20), D(28))], [beats(2), eulerQ(D(55), D(20), D(28))]],
-    Spine: [[0, eulerQ(0, 0, 0)], [beats(0.5), eulerQ(D(28), 0, D(16))], [beats(2), eulerQ(D(28), 0, D(16))]],
-    LeftArm: [[0, eulerQ(0, 0, D(62))], [beats(0.5), eulerQ(D(-70), 0, D(30))], [beats(2), eulerQ(D(-70), 0, D(30))]],
-    RightUpLeg: [[0, eulerQ(0, 0, 0)], [beats(0.5), eulerQ(D(-75), 0, 0)], [beats(2), eulerQ(D(-75), 0, 0)]],
-  };
+function armWave(): PoseKey[] {
+  // A travelling wave: both arms out at shoulder height, the right hand rises and falls, then the left — the lag is the
+  // whole illusion. The torso rolls with it. 2 beats.
+  const OUT_POLES = { Left: [-0.3, -0.9, 0] as V3, Right: [0.3, -0.9, 0] as V3 };   // elbows down: a wave, not a shrug
+  const wave = (rY: number, lY: number, roll: number): Omit<PoseKey, 't'> => ({
+    bones: { ...STAND_BONES, Spine: [2, 0, roll], Neck: [0, 0, -roll * 0.5] },
+    hands: { Right: [0.60, rY, 0.06], Left: [-0.60, lY, 0.06] }, poles: OUT_POLES, hipsY: 0,
+  });
+  return [key(0, wave(1.34, 1.34, 0)), key(beats(0.5), wave(1.62, 1.28, -5)), key(beats(1), wave(1.22, 1.48, 4)), key(beats(1.5), wave(1.34, 1.62, 6)), key(beats(2), wave(1.34, 1.34, 0))];
 }
 
-function windmill(): QuatKeys {
-  const k: QuatKeys = { Hips: [], Spine: [], LeftUpLeg: [], RightUpLeg: [] };
-  for (let i = 0; i <= 8; i++) {
-    const t = beats(i);
-    const a = (i / 8) * Math.PI * 4;                 // two full rotations
-    k.Hips.push([t, eulerQ(D(60), D((a * 180) / Math.PI), D(25))]);
-    k.Spine.push([t, eulerQ(D(20), 0, D(Math.sin(a) * 22))]);
-    k.LeftUpLeg.push([t, eulerQ(D(-60 + Math.sin(a) * 45), 0, D(38))]);
-    k.RightUpLeg.push([t, eulerQ(D(-60 - Math.sin(a) * 45), 0, D(-38))]);
+/** The floor: hips as low as the ground lock allows, torso folded forward, hands planted out front. */
+const FLOOR_HIPS = -0.52;   // the ground lock allows 0.45 × the bind hips (0.43 m): this is as low as a body gets
+const floorPose = (legs: Record<string, Deg3>, spineYaw: number): Omit<PoseKey, 't'> => ({
+  bones: { Hips: [0, 0, 0], Spine: [70, spineYaw, 0], Neck: [-24, 0, 0], ...legs },
+  hands: { Left: [-0.26, 0.08, 0.42], Right: [0.26, 0.08, 0.42] },   // within a straight arm of the folded shoulders — the palms reach the floor
+  poles: { Left: [-0.9, 0.3, 0.2], Right: [0.9, 0.3, 0.2] }, hipsY: FLOOR_HIPS,
+});
+
+function sixStep(): PoseKey[] {
+  // Drop to the floor over the first 3/4 beat, the legs circle under the body for six beats (one leg sweeping forward as
+  // the other tucks), rise over the last 3/4 beat. 8 beats.
+  const out: PoseKey[] = [key(0, STAND)];
+  const N = 8;
+  for (let i = 0; i <= N; i++) {
+    const t = beats(0.75 + (6.5 * i) / N), phase = (i / N) * Math.PI * 2, s = Math.sin(phase), c = Math.cos(phase);
+    out.push(key(t, floorPose({
+      LeftUpLeg: [-45 + 35 * s, 0, 22 + 12 * c], LeftLeg: [70 - 40 * s, 0, 0],
+      RightUpLeg: [-45 - 35 * s, 0, -22 + 12 * c], RightLeg: [70 + 40 * s, 0, 0],
+    }, 18 * c)));
   }
-  return k;
+  out.push(key(beats(8), STAND));
+  return out;
 }
 
-function spin(): QuatKeys {
-  return {
-    Hips: [[0, eulerQ(0, 0, 0)], [beats(1), eulerQ(0, D(180), 0)], [beats(2), eulerQ(0, D(360), 0)]],
-    LeftArm: [[0, eulerQ(0, 0, D(70))], [beats(1), eulerQ(0, 0, D(88))], [beats(2), eulerQ(0, 0, D(70))]],
-    RightArm: [[0, eulerQ(0, 0, D(-70))], [beats(1), eulerQ(0, 0, D(-88))], [beats(2), eulerQ(0, 0, D(-70))]],
-  };
+function babyFreeze(): PoseKey[] {
+  // Drop into the freeze over the first half beat: hands planted, the left knee driven up onto the elbow, the right leg
+  // folded; hold; rise over the last half beat. 2 beats.
+  const freeze = floorPose({ LeftUpLeg: [-100, 0, 22], LeftLeg: [110, 0, 0], RightUpLeg: [-30, 0, -10], RightLeg: [95, 0, 0] }, 12);
+  return [key(0, STAND), key(beats(0.5), freeze), key(beats(1.5), { ...freeze, bones: { ...freeze.bones, Neck: [-24, 0, 0] } }), key(beats(2), STAND)];
 }
 
-function shoulderBop(): QuatKeys {
-  return {
-    Spine: [[0, eulerQ(0, 0, D(-7))], [beats(1), eulerQ(0, 0, D(7))],
-            [beats(2), eulerQ(0, 0, D(-7))], [beats(3), eulerQ(0, 0, D(7))],
-            [beats(4), eulerQ(0, 0, D(-7))]],
-    Head: [[0, eulerQ(D(6), D(-8), 0)], [beats(1), eulerQ(D(-4), D(8), 0)],
-           [beats(2), eulerQ(D(6), D(-8), 0)], [beats(3), eulerQ(D(-4), D(8), 0)],
-           [beats(4), eulerQ(D(6), D(-8), 0)]],
-    LeftArm: [[0, eulerQ(D(-18), 0, D(64))], [beats(2), eulerQ(D(-34), 0, D(56))], [beats(4), eulerQ(D(-18), 0, D(64))]],
-    RightArm: [[0, eulerQ(D(-34), 0, D(-56))], [beats(2), eulerQ(D(-18), 0, D(-64))], [beats(4), eulerQ(D(-34), 0, D(-56))]],
-  };
+function windmill(): PoseKey[] {
+  // Drop onto the back over the first 3/4 beat, the hips turn two full circles with the legs scissoring wide, rise over
+  // the last 3/4 beat. The hands stay planted by the hips. 8 beats.
+  const out: PoseKey[] = [key(0, STAND)];
+  const N = 8;
+  for (let i = 0; i <= N; i++) {
+    const t = beats(0.75 + (6.5 * i) / N), yaw = (720 * i) / N, s = Math.sin((i / N) * Math.PI * 4);
+    out.push(key(t, {
+      bones: { Hips: [0, yaw, 0], Spine: [-62, 0, 8 * s], Neck: [34, 0, 0], LeftUpLeg: [-55 + 30 * s, 0, 48], LeftLeg: [12, 0, 0], RightUpLeg: [-55 - 30 * s, 0, -48], RightLeg: [12, 0, 0] },
+      hands: { Left: [-0.42, 0.10, -0.12], Right: [0.42, 0.10, -0.12] }, poles: { Left: [-0.9, 0.3, -0.3], Right: [0.9, 0.3, -0.3] }, hipsY: FLOOR_HIPS,
+    }));
+  }
+  out.push(key(beats(8), STAND));
+  return out;
 }
 
-const BUILDERS: Record<string, { keys: () => QuatKeys; beats: number; hipsY?: [number, number][] }> = {
+function spin(): PoseKey[] {
+  // A full turn on the spot: arms pulled in to the chest for the spin, flung out at the half, back in to land. 2 beats.
+  const at = (yaw: number, out: number): Omit<PoseKey, 't'> => ({
+    bones: { ...STAND_BONES, Hips: [0, yaw, 0], LeftLeg: [14, 0, 0], RightLeg: [14, 0, 0] },
+    hands: { Left: [-0.12 - 0.45 * out, 1.24 + 0.06 * out, 0.22 - 0.16 * out], Right: [0.12 + 0.45 * out, 1.24 + 0.06 * out, 0.22 - 0.16 * out] },
+    poles: { Left: [-0.9, -0.3, -0.3], Right: [0.9, -0.3, -0.3] }, hipsY: -0.02,
+  });
+  return [key(0, STAND), key(beats(0.35), at(60, 0)), key(beats(1), at(180, 1)), key(beats(1.65), at(300, 0)), key(beats(2), { ...STAND, bones: { ...STAND_BONES, Hips: [0, 360, 0] } })];
+}
+
+function shoulderBop(): PoseKey[] {
+  // The groove: the torso rolls side to side on the beat, the head nods against it, the shoulder that rises lifts its hand
+  // a touch. 4 beats.
+  const bop = (s: 1 | -1): Omit<PoseKey, 't'> => ({
+    bones: { ...STAND_BONES, Spine: [4, 0, 7 * s], Neck: [6, -8 * s, -4 * s], LeftLeg: [14, 0, 0], RightLeg: [14, 0, 0] },
+    hands: { Left: [-0.27, 0.86 + 0.05 * s, 0.10], Right: [0.27, 0.86 - 0.05 * s, 0.10] }, poles: HANG_POLES, hipsY: -0.03,
+  });
+  return [key(0, bop(1)), key(beats(1), bop(-1)), key(beats(2), bop(1)), key(beats(3), bop(-1)), key(beats(4), bop(1))];
+}
+
+const BUILDERS: Record<string, { keys: () => PoseKey[]; beats: number }> = {
   dance_toprock_basic: { keys: toprock, beats: 4 },
-  dance_bounce_two_step: { keys: twoStep, beats: 4, hipsY: [[0, 0], [beats(0.5), -0.06], [beats(1), 0], [beats(1.5), -0.06], [beats(2), 0], [beats(3), -0.06], [beats(4), 0]] },
+  dance_bounce_two_step: { keys: twoStep, beats: 4 },
   dance_wave_arm: { keys: armWave, beats: 2 },
-  dance_footwork_six: { keys: sixStep, beats: 8, hipsY: [[0, -0.45], [beats(8), -0.45]] },
-  dance_freeze_baby: { keys: babyFreeze, beats: 2, hipsY: [[0, 0], [beats(0.5), -0.55], [beats(2), -0.55]] },
-  dance_power_windmill: { keys: windmill, beats: 8, hipsY: [[0, -0.6], [beats(8), -0.6]] },
+  dance_footwork_six: { keys: sixStep, beats: 8 },
+  dance_freeze_baby: { keys: babyFreeze, beats: 2 },
+  dance_power_windmill: { keys: windmill, beats: 8 },
   dance_trans_spin: { keys: spin, beats: 2 },
   dance_bounce_shoulder: { keys: shoulderBop, beats: 4 },
 };
+
+/** The ids this file builds (the mode registers exactly these). */
+export const DANCE_CLIP_IDS = Object.keys(BUILDERS);
+
+/** Build one dance clip on a live skeleton (the rig tests use this). */
+export function buildDanceClip(scene: Scene, skeleton: Skeleton, id: string): AnimationGroup | null {
+  const def = BUILDERS[id];
+  if (!def) return null;
+  return buildPoseClip(scene, skeleton, id, beats(def.beats), def.keys());
+}
 
 export interface RegisteredDanceClips {
   built: string[];
@@ -173,10 +211,10 @@ export function registerDanceClips(
   const built: string[] = [];
   const aliased: string[] = [];
 
-  for (const [id, def] of Object.entries(BUILDERS)) {
+  for (const id of DANCE_CLIP_IDS) {
     let group: AnimationGroup | null = null;
     try {
-      group = buildQuatClip(scene, skeleton, id, beats(def.beats), def.keys(), def.hipsY);
+      group = buildDanceClip(scene, skeleton, id);
     } catch (e) {
       console.warn(`[FEL-ANIM] danceClips: "${id}" failed to build (${String(e).slice(0, 120)})`);
     }

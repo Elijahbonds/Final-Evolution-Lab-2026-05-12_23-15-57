@@ -5,12 +5,20 @@
 // The four M49 events are byte-identical. Same design rule throughout: each
 // event is 15-20 seconds of ONE clear verb, built entirely from systems
 // this project already owns and trusts.
+//
+// ANIM-READABILITY (creative, 2026-09-07): ONE OWNER per body. Every event used to play clips from onInput AND tick with
+// neverBindPose's onEnd chain settling them, and the chain fires when a one-shot is CUT too — so the trick gauntlet's
+// per-frame ride-idle play cut the bail to 0.08 s, and a counter's rival hit-react chained the stance from inside the
+// animator's fade handler (the stranded-fade freeze the combat pass measured). Bodies on a loop + beats use BeatOwner;
+// the trick gauntlet rides BoardAnimTree with the TrickMachine in external mode, exactly like the skate mode.
 
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
+import { BeatOwner } from '../anim/beatOwner';
+import { BoardAnimTree } from '../anim/boardTree';
 import { VenueKit } from '../visual/VenueKit';
 import { buildSkatepark } from './rideWorlds';
 import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
@@ -39,7 +47,7 @@ const cfg = { heroUrl: SHARED_CFG.heroUrl };
 
 // ── SLAM RUSH — as many dunks as you can charge-and-release in the clock ──
 export function slamRush(): CarnivalEvent {
-  let player: SpawnedCharacter, ball: AbstractMesh;
+  let player: SpawnedCharacter, ball: AbstractMesh, body: BeatOwner;
   let charging = false, charge = 0, makes = 0, cooldown = 0;
   const rim = new Vector3(0, 3.05, -0.6);
 
@@ -49,6 +57,7 @@ export function slamRush(): CarnivalEvent {
       VenueKit.buildCourt(ctx.scene, 'venice');
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 2.2), yawRad: Math.PI, startClip: SPORT_CLIP.idle });
       neverBindPose(player.animator, SPORT_CLIP.idle); installSafePlay(player.animator, 'carnival-slam');
+      body = new BeatOwner(player.animator); body.loop(SPORT_CLIP.idle);
       ctx.groundLock?.track(player.root, player.skeleton);
       ball = MeshBuilder.CreateSphere('carn_ball', { diameter: 0.24 }, ctx.scene);
       makes = 0; charging = false; charge = 0; cooldown = 0;
@@ -60,12 +69,12 @@ export function slamRush(): CarnivalEvent {
     },
     onInput(ctx, e) {
       if (e.t === 'trigger' && e.side === 'R') {
-        if (e.value > 0.02) { charging = true; charge = Math.max(charge, e.value); player.animator.play(SPORT_CLIP.dunkChargeGather, { loop: true }); }
+        if (e.value > 0.02) { charging = true; charge = Math.max(charge, e.value); body.loop(SPORT_CLIP.dunkChargeGather, { fadeSec: 0.12 }); }   // a launch in flight settles into the new charge
         if (e.value === 0 && charging && cooldown <= 0) {
           charging = false;
           const quality = 1 - Math.abs(charge - 0.85);   // sweet spot near-full charge
           const made = Math.random() < Math.max(0.15, Math.min(0.95, quality * 1.3));
-          player.animator.play(SPORT_CLIP.dunkLaunchPower, { onEnd: () => player.animator.play(SPORT_CLIP.idle, { loop: true }) });
+          body.loop(SPORT_CLIP.idle); body.beat(SPORT_CLIP.dunkLaunchPower, { fadeSec: 0.08 });
           if (made) {
             makes++;
             SoundKit.play('score', { pitch: 1.1 }); EffectsKit.burst(ctx.scene, rim, 'net');
@@ -83,7 +92,7 @@ export function slamRush(): CarnivalEvent {
 
 // ── STRIKE STORM — land as many strikes as you can on a training bag ──────
 export function strikeStorm(): CarnivalEvent {
-  let player: SpawnedCharacter, bag: SpawnedCharacter;
+  let player: SpawnedCharacter, bag: SpawnedCharacter, body: BeatOwner, bagBody: BeatOwner;
   let hits = 0, striking = false;
 
   return {
@@ -95,6 +104,8 @@ export function strikeStorm(): CarnivalEvent {
       ctx.groundLock?.track(player.root, player.skeleton);
       bag = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 0), tint: '#8b1e2d', startClip: SPORT_CLIP.karateStance });
       neverBindPose(bag.animator, SPORT_CLIP.karateStance); installSafePlay(bag.animator, 'carnival-bag');
+      body = new BeatOwner(player.animator); body.loop(SPORT_CLIP.karateStance);
+      bagBody = new BeatOwner(bag.animator); bagBody.loop(SPORT_CLIP.karateStance);
       hits = 0; striking = false;
       ctx.heroRef.current = player.root;
       ctx.camDirector.setPreset('fight');
@@ -105,9 +116,9 @@ export function strikeStorm(): CarnivalEvent {
       if (e.t === 'button' && e.pressed && !striking && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y')) {
         striking = true;
         const clip = e.btn === 'A' ? SPORT_CLIP.karateJab : e.btn === 'B' ? SPORT_CLIP.karateKick : SPORT_CLIP.karateHeavy;
-        player.animator.play(clip, { onEnd: () => { striking = false; player.animator.play(SPORT_CLIP.karateStance, { loop: true }); } });
+        body.beat(clip, { fadeSec: 0.06, onSettle: () => { striking = false; } });   // the strike settles into the stance on its own
         hits++;
-        bag.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => bag.animator.play(SPORT_CLIP.karateStance, { loop: true }) });
+        bagBody.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.05 });   // a mashed bag flinches again from the top
         SoundKit.play('impact', { pitch: 1.2, volume: 0.35 });
         EffectsKit.burst(ctx.scene, bag.root.position.add(new Vector3(0, 1.1, 0)), 'dust');
         ctx.setHud({ banner: `${hits}` });
@@ -120,16 +131,21 @@ export function strikeStorm(): CarnivalEvent {
 
 // ── TRICK GAUNTLET — chain skate tricks for score, reusing boardCore as-is ─
 export function trickGauntlet(): CarnivalEvent {
-  let world: ReturnType<typeof buildSkatepark>, rig: BoardRig, tricks: TrickMachine;
-  let stickX = 0, pump = 0;
+  let world: ReturnType<typeof buildSkatepark>, rig: BoardRig, tricks: TrickMachine, animTree: BoardAnimTree;
+  let stickX = 0, pump = 0, airT = 0, landBeatT = 0, bailBeatT = 0;
+  const LAND_BEAT_SEC = 0.4, BAIL_BEAT_SEC = 0.8;   // board_land 0.42 s, skate_bail 0.75 s — the tree settles them when the window closes
 
   return {
     id: 'trick_gauntlet', title: 'TRICK GAUNTLET', durationSec: 20, pointsPerUnit: 0.4, rivalRange: [300, 900],
     async build(ctx) {
       world = buildSkatepark(ctx.scene);
       rig = await buildRig(ctx, cfg.heroUrl, new Vector3(0, 0, -6), 0, world.ground, '#ffd75e');
-      tricks = new TrickMachine(rig, (h) => ctx.setHud(h));
-      stickX = 0; pump = 0;
+      animTree = new BoardAnimTree(rig.char.animator);
+      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), {
+        anim: 'external',   // the tree owns the rider's clips; the machine reports beats
+        onBeat: (b) => { if (b === 'land') { landBeatT = LAND_BEAT_SEC; animTree.clearBeat('land_clean', 'land_sketchy'); } else { bailBeatT = BAIL_BEAT_SEC; animTree.clearBeat('bail'); } },
+      });
+      stickX = 0; pump = 0; airT = 0; landBeatT = 0; bailBeatT = 0;
       ctx.setHud({ hint: 'POP, flip in the air — stick sideways + TRICK spins — chain combos before you land' });
     },
     onInput(ctx, e) {
@@ -149,8 +165,20 @@ export function trickGauntlet(): CarnivalEvent {
     },
     tick(ctx, dt) {
       rig.rider.update(dt, stickX, pump);
-      rig.char.animator.play(rig.rider.grounded ? SPORT_CLIP.boardIdle : SPORT_CLIP.boardAir, { loop: true });
-      tricks.update(dt);
+      tricks.update(dt);   // grades the touchdown BEFORE the tree sees this frame (the skate ordering lesson)
+      const grounded = rig.rider.grounded;
+      airT = grounded ? 0 : airT + dt;
+      animTree.update({
+        speed01: Math.min(1, Math.hypot(rig.rider.vel.x, rig.rider.vel.z) / 8), pushing: false,
+        lean: grounded ? stickX : 0,
+        airborne: !grounded && (airT > 0.05 || rig.rider.vel.y > 0.5),
+        grabHeld: tricks.grabHeld, flipping: tricks.flipping, spinning: tricks.spinning,
+        grinding: false, manual: false,
+        landing: landBeatT > 0 ? 'clean' : 'none', bailing: bailBeatT > 0,
+        tucking: grounded && pump > 0.5,
+      });
+      if (landBeatT > 0) { landBeatT -= dt; if (landBeatT <= 0) animTree.clearBeat('land_clean', 'land_sketchy'); }
+      if (bailBeatT > 0) { bailBeatT -= dt; if (bailBeatT <= 0) animTree.clearBeat('bail'); }
       rig.char.root.position.x = Math.max(-20, Math.min(20, rig.char.root.position.x));
       rig.char.root.position.z = Math.max(-20, Math.min(20, rig.char.root.position.z));
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, null);
@@ -162,7 +190,7 @@ export function trickGauntlet(): CarnivalEvent {
 
 // ── HOT SHOT — quick-fire shots on goal, reusing aimSwingCore as-is ───────
 export function hotShot(): CarnivalEvent {
-  let player: SpawnedCharacter, ball: AbstractMesh, reticle: Reticle, meter: PowerMeter, flight: Flight;
+  let player: SpawnedCharacter, ball: AbstractMesh, reticle: Reticle, meter: PowerMeter, flight: Flight, body: BeatOwner;
   let goal: AbstractMesh[] = [];
   let goals = 0, phase: 'aim' | 'power' | 'flight' = 'aim', stickX = 0, stickY = 0;
   const goalCenter = new Vector3(0, 1.2, 11);
@@ -174,6 +202,7 @@ export function hotShot(): CarnivalEvent {
       goal = buildGoal(ctx.scene);
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 0), startClip: SPORT_CLIP.penaltyIdle });
       neverBindPose(player.animator, SPORT_CLIP.penaltyIdle); installSafePlay(player.animator, 'carnival-hotshot');
+      body = new BeatOwner(player.animator); body.loop(SPORT_CLIP.penaltyIdle);
       ball = MeshBuilder.CreateSphere('carn_sball', { diameter: 0.22 }, ctx.scene);
       flight = new Flight(ball, -9.8);
       reticle = new Reticle(ctx.scene, goalCenter, { x: 3.3, y: 1.05 });
@@ -189,7 +218,7 @@ export function hotShot(): CarnivalEvent {
         if (phase === 'aim') { phase = 'power'; meter.start(); }
         else if (phase === 'power') {
           const p = meter.stop(); phase = 'flight';
-          player.animator.play(SPORT_CLIP.penaltyStrike, { onEnd: () => player.animator.play(SPORT_CLIP.penaltyIdle, { loop: true }) });
+          body.beat(SPORT_CLIP.penaltyStrike, { fadeSec: 0.08 });
           const to = reticle.pos.subtract(ball.position).normalize();
           flight.launch(ball.position, to.scale(13 + p * 7).add(new Vector3(0, 0, 0)));
         }
@@ -216,9 +245,9 @@ export function hotShot(): CarnivalEvent {
 
 // ── COIN STORM — clear the pattern, a fresh one drops, keep sprinting ─────
 export function coinStorm(): CarnivalEvent {
-  let player: SpawnedCharacter;
+  let player: SpawnedCharacter, body: BeatOwner;
   let coins: CoinField | null = null;
-  let collected = 0, wave = 0;
+  let collected = 0, wave = 0, moving = false;
   let stickX = 0, stickY = 0;
 
   function layPattern(ctx: ModeContext): void {
@@ -243,8 +272,9 @@ export function coinStorm(): CarnivalEvent {
       VenueKit.buildCourt(ctx.scene, 'street');
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 0), startClip: SPORT_CLIP.idle });
       neverBindPose(player.animator, SPORT_CLIP.idle); installSafePlay(player.animator, 'carnival-coins');
+      body = new BeatOwner(player.animator); body.loop(SPORT_CLIP.idle);
       ctx.groundLock?.track(player.root, player.skeleton);
-      collected = 0; wave = 0; stickX = 0; stickY = 0;
+      collected = 0; wave = 0; moving = false; stickX = 0; stickY = 0;
       layPattern(ctx);
       ctx.heroRef.current = player.root;
       ctx.camDirector.setPreset('runner');
@@ -262,7 +292,8 @@ export function coinStorm(): CarnivalEvent {
       player.root.position.x = Math.max(-11, Math.min(11, player.root.position.x));
       player.root.position.z = Math.max(-11, Math.min(11, player.root.position.z));
       if (vel.lengthSquared() > 0.2) player.root.rotation.y = Math.atan2(vel.x, vel.z);
-      player.animator.play(vel.lengthSquared() > 0.4 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
+      moving = vel.length() > (moving ? 0.5 : 0.9);   // hysteresis: a thumb on the dead-zone edge used to restart the run / idle crossfade every frame
+      body.loop(moving ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { fadeSec: 0.15 });
       const gained = coins?.update(dt, player.root.position) ?? 0;
       if (gained > 0) {
         collected += gained;
@@ -281,7 +312,7 @@ export function coinStorm(): CarnivalEvent {
 
 // ── COUNTER STRIKE — pure parry timing: read the wind-up, GUARD the window ─
 export function counterStrike(): CarnivalEvent {
-  let player: SpawnedCharacter, rival: SpawnedCharacter;
+  let player: SpawnedCharacter, rival: SpawnedCharacter, body: BeatOwner, rivalBody: BeatOwner;
   let parries = 0;
   let state: 'idle' | 'telegraph' | 'cooldown' = 'idle';
   let stateSec = 0, parried = false;
@@ -298,6 +329,8 @@ export function counterStrike(): CarnivalEvent {
       rival = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, -0.8), tint: '#6b1e8b', startClip: SPORT_CLIP.karateStance });
       neverBindPose(rival.animator, SPORT_CLIP.karateStance); installSafePlay(rival.animator, 'carnival-counter-rival');
       ctx.groundLock?.track(rival.root, rival.skeleton);
+      body = new BeatOwner(player.animator); body.loop(SPORT_CLIP.karateStance);
+      rivalBody = new BeatOwner(rival.animator); rivalBody.loop(SPORT_CLIP.karateStance);
       parries = 0; state = 'idle'; stateSec = 0; parried = false;
       ctx.heroRef.current = player.root;
       ctx.camDirector.setPreset('fight');
@@ -315,8 +348,8 @@ export function counterStrike(): CarnivalEvent {
           parries++;
           SoundKit.play('impact', { pitch: 1.6, volume: 0.5 });
           EffectsKit.burst(ctx.scene, rival.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
-          player.animator.play(SPORT_CLIP.karateJab, { onEnd: () => player.animator.play(SPORT_CLIP.karateStance, { loop: true }) });
-          rival.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => rival.animator.play(SPORT_CLIP.karateStance, { loop: true }) });
+          body.beat(SPORT_CLIP.karateJab, { fadeSec: 0.06 });
+          rivalBody.loop(SPORT_CLIP.karateStance); rivalBody.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.05 });   // countered out of the wind-up: he reels, the punch never comes
           ctx.setHud({ banner: `COUNTER ${parries}!` });
           setTimeout(() => ctx.setHud({ banner: '' }), 450);
         } else {
@@ -330,13 +363,14 @@ export function counterStrike(): CarnivalEvent {
       stateSec += dt;
       if (state === 'idle' && stateSec > 0.4 + Math.random() * 0.5) {
         state = 'telegraph'; stateSec = 0; parried = false;
-        rival.animator.play(SPORT_CLIP.dunkChargeGather, { loop: true });   // readable wind-up
+        rivalBody.loop(SPORT_CLIP.karateWindup, { fadeSec: 0.12 });   // readable wind-up: the rear fist chambered, weight back (was the dunk charge crouch)
         SoundKit.play('whoosh', { pitch: 0.7, volume: 0.3 });
       } else if (state === 'telegraph' && stateSec >= TELEGRAPH_SEC + 0.15) {
-        rival.animator.play(SPORT_CLIP.karateJab, { onEnd: () => rival.animator.play(SPORT_CLIP.karateStance, { loop: true }) });
+        rivalBody.loop(SPORT_CLIP.karateStance);
         if (!parried) {
+          rivalBody.beat(SPORT_CLIP.karateJab, { fadeSec: 0.06 });   // a countered rival is already reeling — only an unanswered wind-up throws
           SoundKit.play('impact', { pitch: 0.8, volume: 0.4 });
-          player.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => player.animator.play(SPORT_CLIP.karateStance, { loop: true }) });
+          body.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.05 });
           ctx.setHud({ banner: 'HIT!' });
           setTimeout(() => ctx.setHud({ banner: '' }), 400);
         }

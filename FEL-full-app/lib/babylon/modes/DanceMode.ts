@@ -32,6 +32,7 @@
 import { Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
+import { BeatOwner } from '../anim/beatOwner';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { registerDanceClips, resolveDanceClip } from '../anim/danceClips';
@@ -78,6 +79,13 @@ export const DanceMode: ModeDefinition = (() => {
   let kit: KitPulse | null = null;
   /** The clip currently dancing, so a judgement can re-speed it. */
   let currentClip: string | null = null;
+  /** ANIM-READABILITY (creative, 2026-09-07): the ONE OWNER of the dancer's clips. Steps used to play as one-shots with
+   *  neverBindPose's chain settling them, and the chain fires when a step is CUT too: the previous step's chained idle
+   *  played from inside the animator's fade handler 0.05 s after the next step began and replaced it — measured on the
+   *  warm-up chart, half the steps were 2.5 s of idle_stand. Now every step is a LOOP the next step crossfades over (a
+   *  step that overruns its beat by a frame repeats its first frame, never the idle), and the MISS stumble is a beat the
+   *  owner settles back into the running step. */
+  let body: BeatOwner | null = null;
   /** A+ P0 juice (PM brief CARNIVAL-A-PLUS-P0, 2026-09-07): one results punch per routine. */
   let resultLatch = false;
 
@@ -103,7 +111,8 @@ export const DanceMode: ModeDefinition = (() => {
     // Mirrored steps play `<id>.M` — resolved via the merged DANCE_ALIASES
     // table to the mirrored base groups registered at character spawn.
     currentClip = s.mirrored ? `${id}.M` : id;
-    me.animator.play(currentClip, { fadeSec: 0.12, speedRatio: clipSpeed() });
+    body?.loop(currentClip, { fadeSec: 0.12, speedRatio: clipSpeed() });
+    me.animator.setSpeed(currentClip, clipSpeed());   // the same step twice in a row keeps the loop; a GOOD's drag is undone here
   }
 
   function onJudged(ctx: ModeContext, label: Judgement, _pts: number, combo: number, step?: DanceStep, deltaMs?: number): void {
@@ -142,10 +151,7 @@ export const DanceMode: ModeDefinition = (() => {
     // into a stumble (the next step's beat picks the routine back up).
     const spd = bodySpeedFor(label);
     if (label === 'MISS') {
-      if (step) {
-        me.animator.play(SPORT_CLIP.karateHitReact, { fadeSec: 0.08, speedRatio: 1.15 });
-        currentClip = null;
-      }
+      if (step) body?.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.08, speedRatio: 1.15 });   // the stumble settles back into the running step
     } else if (currentClip && spd < 1) {
       me.animator.setSpeed(currentClip, clipSpeed() * spd);
     }
@@ -164,6 +170,8 @@ export const DanceMode: ModeDefinition = (() => {
     ended = true;
     perf.stop();
     kit?.dispose();
+    body?.loop(SPORT_CLIP.idle, { fadeSec: 0.3 });
+    currentClip = null;
     const r = perf.result();
     const cleanHits = r.counts.PERFECT + r.counts.GREAT + r.counts.GOOD;
     const rounds = cleanHits + r.counts.MISS;
@@ -253,6 +261,8 @@ export const DanceMode: ModeDefinition = (() => {
       });
       neverBindPose(me.animator, SPORT_CLIP.idle);
       installSafePlay(me.animator, 'dance-me');
+      body = new BeatOwner(me.animator);
+      body.loop(SPORT_CLIP.idle, { fadeSec: 0.2 });
       ctx.groundLock?.track(me.root, me.skeleton);
       venue?.hidePlaceholders();
 
@@ -383,6 +393,7 @@ export const DanceMode: ModeDefinition = (() => {
       SoundKit.stopAmbient();
       if (audioCtx) { void audioCtx.close(); audioCtx = null; }
       venue?.dispose(); venue = null;
+      body = null;
       ended = true;
     },
   };

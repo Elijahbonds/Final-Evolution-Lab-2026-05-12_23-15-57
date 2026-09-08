@@ -9,7 +9,9 @@ import type { AnimationGroup, Skeleton, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { boneNode } from '../boneLookup';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
-import { buildHitReact, buildKnockdown, buildGuardStep, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp } from './karate';
+import { buildHitReact, buildKnockdown, buildGuardStep, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold } from './karate';
+import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
+import { buildDanceClip, DANCE_CLIP_IDS } from '../danceClips';
 import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, buildBoardCarveRight } from './boardSuite';
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildCelebrateBig } from './dunkFinishes';
@@ -93,6 +95,79 @@ describe('karate fills', () => {
     const u = fresh(() => buildGetUp(scene, sk)!);
     at(u, 0); expect(Math.abs(hipsY() - floorHips)).toBeLessThan(0.03);
     at(u, 0.45); expect(Math.abs(hipsY() - standHips)).toBeLessThan(0.03); expect(pos('LeftHand').y).toBeGreaterThan(pos('Hips').y + 0.3);   // guard is up
+  });
+});
+
+// ANIM-READABILITY (creative, 2026-09-07): the runner's holds, the counter-strike wind-up, the dance pack
+describe('freerun fills', () => {
+  it('air hold: arms overhead like the take-off, held (frame T matches frame 0); the tuck folds the knees to the chest', () => {
+    const g = fresh(() => buildFreeRunAirHold(scene, sk)!);
+    at(g, 0); const l0 = pos('LeftHand').clone(); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y); expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y);
+    at(g, 0.8); expect(Vector3.Distance(pos('LeftHand'), l0)).toBeLessThan(0.02);
+    const t = fresh(() => buildFreeRunTuck(scene, sk)!);
+    at(t, 0); expect(pos('LeftLeg').y).toBeGreaterThan(hipsY() - 0.15);   // knees up by the hips
+    expect(pos('LeftHand').y).toBeLessThan(pos('LeftArm').y - 0.3);       // hands down on the shins, not out
+    expect(pos('LeftHand').z).toBeGreaterThan(pos('Hips').z + 0.15);
+  });
+  it('slide: hips dropped, the lead leg out front, the torso back — and wraps', () => {
+    const stand = fresh(() => buildIdleStand(scene, sk)!); at(stand, 0); const standHips = hipsY();
+    const g = fresh(() => buildFreeRunSlide(scene, sk)!);
+    at(g, 0); expect(hipsY()).toBeLessThan(standHips - 0.4); const h0 = pos('Head').clone();
+    expect(pos('LeftFoot').z).toBeGreaterThan(pos('Hips').z + 0.4);       // the lead leg reaches forward
+    expect(pos('Head').z).toBeLessThan(pos('Hips').z + 0.1);              // torso back, not folded over the knee
+    at(g, 0.7); expect(Vector3.Distance(pos('Head'), h0)).toBeLessThan(0.03);
+  });
+});
+
+describe('karate wind-up', () => {
+  it('the rear fist is chambered back below the lead guard, the body turned, and the hold wraps', () => {
+    const g = fresh(() => buildWindupHold(scene, sk)!);
+    at(g, 0); const r0 = pos('RightHand').clone();
+    expect(pos('RightHand').z).toBeLessThan(pos('Hips').z - 0.1);          // chambered behind the hip line
+    expect(pos('RightHand').y).toBeLessThan(pos('LeftHand').y - 0.12);     // below the lead guard
+    expect(pos('LeftHand').y).toBeGreaterThan(pos('Hips').y + 0.3);        // the lead guard stays up
+    at(g, 0.7); expect(Vector3.Distance(pos('RightHand'), r0)).toBeLessThan(0.02);
+  });
+});
+
+describe('dance pack', () => {
+  const build = (id: string) => fresh(() => buildDanceClip(scene, sk, id)!);
+  it('every clip builds, starts and ends standing in the same groove (loop wrap = no snap), hands never out in a T', () => {
+    const stand = fresh(() => buildIdleStand(scene, sk)!); at(stand, 0); const standHips = hipsY();
+    for (const id of DANCE_CLIP_IDS) {
+      const g = build(id); expect(g, id).toBeTruthy();
+      const T = g.to / 30;
+      at(g, 0); const hips0 = hipsY(), head0 = pos('Head').clone(), l0 = pos('LeftHand').clone(), r0 = pos('RightHand').clone();
+      expect(Math.abs(hips0 - standHips), `${id} starts standing`).toBeLessThan(0.1);
+      at(g, T); expect(Math.abs(hipsY() - hips0), `${id} ends at its start height`).toBeLessThan(0.03);
+      expect(Vector3.Distance(pos('Head'), head0), `${id} head wraps`).toBeLessThan(0.05);
+      expect(Vector3.Distance(pos('LeftHand'), l0), `${id} left hand wraps`).toBeLessThan(0.05);
+      expect(Vector3.Distance(pos('RightHand'), r0), `${id} right hand wraps`).toBeLessThan(0.05);
+      for (const f of [0, 0.25, 0.5, 0.75]) { at(g, T * f); const l = pos('LeftHand'), r = pos('RightHand'); expect(!(Math.abs(l.x) > 0.62 && Math.abs(r.x) > 0.62 && Math.abs(l.y - r.y) < 0.05 && l.y > pos('LeftArm').y - 0.05), `${id} @${f} not a T`).toBe(true); }
+    }
+  });
+  it('toprock crosses a foot and swings the opposite arm low across; the two-step bounces; the shoulder bop stays home', () => {
+    const g = build('dance_toprock_basic');
+    at(g, 0); expect(pos('LeftFoot').z).toBeGreaterThan(pos('RightFoot').z + 0.15); expect(pos('RightHand').x).toBeLessThan(pos('RightArm').x); expect(pos('RightHand').y).toBeLessThan(pos('RightArm').y - 0.25);
+    at(g, 1.0); expect(pos('RightFoot').z).toBeGreaterThan(pos('LeftFoot').z + 0.15); expect(pos('LeftHand').x).toBeGreaterThan(pos('LeftArm').x);
+    const b = build('dance_bounce_two_step'); at(b, 0); const up = hipsY(); at(b, 0.25); expect(hipsY()).toBeLessThan(up - 0.04);
+    const s = build('dance_bounce_shoulder'); at(s, 0.5); expect(pos('LeftHand').y).toBeLessThan(pos('LeftArm').y - 0.35);
+  });
+  it('the arm wave travels: the right hand peaks first, then the left; the spin turns the hips a full circle', () => {
+    const g = build('dance_wave_arm');
+    at(g, 0.25); expect(pos('RightHand').y).toBeGreaterThan(pos('LeftHand').y + 0.2); expect(Math.abs(pos('RightHand').x)).toBeGreaterThan(0.4);
+    at(g, 0.75); expect(pos('LeftHand').y).toBeGreaterThan(pos('RightHand').y + 0.2);
+    const sp = build('dance_trans_spin'); at(sp, 0.5); expect(pos('LeftFoot').x).toBeGreaterThan(pos('RightFoot').x + 0.2);   // half-way round: the feet have swapped sides
+  });
+  it('six-step, freeze and windmill drop to the floor with the hands planted, and rise before the wrap', () => {
+    const stand = fresh(() => buildIdleStand(scene, sk)!); at(stand, 0); const standHips = hipsY();
+    for (const [id, mid] of [['dance_footwork_six', 2.0], ['dance_freeze_baby', 0.5], ['dance_power_windmill', 2.0]] as const) {
+      const g = build(id);
+      at(g, mid); expect(hipsY(), `${id} low`).toBeLessThan(standHips - 0.4); expect(Math.min(pos('LeftHand').y, pos('RightHand').y), `${id} hands planted`).toBeLessThan(hipsY() - 0.2);
+      at(g, g.to / 30 - 0.05); expect(hipsY(), `${id} rises before the wrap`).toBeGreaterThan(standHips - 0.2);
+    }
+    const w = build('dance_power_windmill'); at(w, 1.1); const hx = pos('Head').x; at(w, 2.0); expect(Math.abs(pos('Head').x - hx) + Math.abs(pos('Head').z)).toBeGreaterThan(0.1);   // the hips turned
+    const f = build('dance_freeze_baby'); at(f, 0.5); expect(pos('LeftLeg').y).toBeGreaterThan(pos('RightLeg').y + 0.15);   // the left knee is the one driven up
   });
 });
 

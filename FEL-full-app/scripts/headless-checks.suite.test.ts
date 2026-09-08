@@ -58,6 +58,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'mixedcombat-depth-tests.ts', guards: 'mixed combat — verticals can be stepped, sweeps catch steppers, the bezel warns about the edge, phones can join' },
   { script: 'dunkduel-depth-tests.ts', guards: 'dunk duel — judges remember each player, the run-up buys air, the chair kills the dunk, the reveal renders' },
   { script: 'dance-depth-tests.ts', guards: 'the cypher — the band is earned: hits turn instruments up, misses duck them, the bezel shows the mix' },
+  { script: 'creative-anim-tests.ts', guards: 'carnival / dance / freerun — one owner per body: the FreeRun tree settles, the BeatOwner never strands a step' },
   { script: 'prove-it-tests.ts', guards: 'prove it — synthetic pose streams produce measured flight physics; families separate; PRQ-relative scoring' },
   { script: 'mirror-v2-tests.ts', guards: 'mirror v2 — reps count with tempo, flicker never counts, the jump pattern runs the Prove It tracker, the skeleton paints' },
   { script: 'mirror-coach-tests.ts', guards: "mirror coach — the squat audit measures the book's four faults; the cue engine holds down, escalates, confirms once; the guided flow wires it" },

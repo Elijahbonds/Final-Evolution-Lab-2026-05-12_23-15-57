@@ -66,7 +66,11 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   refresh();
   const frame = frameAbove(hips);
   const keyed = (n: TransformNode, deg: Deg3): Quaternion => bf.keyed(n, deg);
-  const scale = hips.getAbsolutePosition().y / REF_HIPS_Y || 1;          // body height ratio
+  // Body height ratio = the hips' height ABOVE THE ROOT. This read the hips' absolute y, so a body spawned above y = 0 built
+  // every clip over-scaled: the dancer stands on a 0.7 m podium and every hand target came out 1.73× — the idle's hanging
+  // hands sat at its face for the whole routine (ANIM-READABILITY creative, 2026-09-07). Identical for a body at y = 0.
+  const rootY = root ? root.getAbsolutePosition().y : 0;
+  const scale = (hips.getAbsolutePosition().y - rootY) / REF_HIPS_Y || 1;
   // Targets are WORLD-AXIS offsets from the root's position — the same frame the
   // rig tests and the arm-solver tool always measured in (+x = the hero's right
   // at bind). The root's import matrix carries a handedness mirror, so pushing

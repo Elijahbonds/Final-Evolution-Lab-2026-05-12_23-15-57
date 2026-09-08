@@ -18,6 +18,7 @@ import * as BABYLON from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
+import { BeatOwner } from '../anim/beatOwner';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
@@ -69,6 +70,9 @@ interface St {
   hub: VenueHandle | null;
   host: SpawnedCharacter | null;
   guest: SpawnedCharacter | null;
+  /** ANIM-READABILITY (creative, 2026-09-07): the one owner of each party-goer's clips (idle + the result / finale beats). */
+  hostBody: BeatOwner | null;
+  guestBody: BeatOwner | null;
   anchor: BABYLON.TransformNode | null;
   /** A+ P0 juice latches: one event-win punch per event (reset when the next event starts), one champion punch per night. */
   eventLatch: boolean;
@@ -202,10 +206,10 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     showHub(ctx, S, true);
     // the party-goers REACT to WHO took the event: the winner celebrates, the loser takes it on the chin; a tie shrugs
     const rivalTookIt = w === 1;
-    const winnerChar = w === -1 ? null : rivalTookIt ? S.guest : S.host;
-    const loserChar = w === -1 ? null : rivalTookIt ? S.host : S.guest;
-    winnerChar?.animator.play(SPORT_CLIP.scoreCelebrate, { onEnd: () => winnerChar?.animator.play(SPORT_CLIP.idle, { loop: true }) });
-    loserChar?.animator.play(SPORT_CLIP.karateHitReact, { onEnd: () => loserChar?.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    const winnerBody = w === -1 ? null : rivalTookIt ? S.guestBody : S.hostBody;
+    const loserBody = w === -1 ? null : rivalTookIt ? S.hostBody : S.guestBody;
+    winnerBody?.beat(SPORT_CLIP.scoreCelebrate, { fadeSec: 0.12 });   // both settle back into SPORT_CLIP.idle on their own
+    loserBody?.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.08 });
     if (w === 0) { EffectsKit.burst(ctx.scene, ctx.camera.position, 'confetti'); SoundKit.play('crowdCheer', { volume: 0.4 }); eventWinPunch(ctx, S); }
     else if (w === 1) { SoundKit.play('crowdGroan', { volume: 0.4 }); rivalSoftFlash(ctx, 'event'); }
     const [n1, n2] = names(S);
@@ -235,10 +239,10 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     const won = champ === 0;
     if (won) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, ctx.camera.position, 'confetti'); championPunch(ctx, S); }
     else rivalSoftFlash(ctx, 'runner-up');
-    const champChar = champ === 0 ? S.host : S.guest;
-    const runnerUp = champ === 0 ? S.guest : S.host;
-    champChar?.animator.play(SPORT_CLIP.scoreCelebrate, {});
-    runnerUp?.animator.play(SPORT_CLIP.karateHitReact, {});
+    const champBody = champ === 0 ? S.hostBody : S.guestBody;
+    const runnerUpBody = champ === 0 ? S.guestBody : S.hostBody;
+    champBody?.beat(SPORT_CLIP.scoreCelebrate, { fadeSec: 0.12 });
+    runnerUpBody?.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.08 });
     const [n1, n2] = names(S);
     hud(ctx, S, {
       banner: S.players > 1 ? `${names(S)[champ]} TAKES THE CARNIVAL` : (won ? 'CARNIVAL CHAMPION!' : 'RIVAL TAKES THE CARNIVAL'),
@@ -255,14 +259,18 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     modeId: 'carnival', mood: 'goldenHour', camPreset: 'court',
 
     async load(ctx: ModeContext) {
-      const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('players') : null;
+      const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const q = qs?.get('players') ?? null;
+      // `?events=slam_rush,counter_strike` names the night's draw in order (probes / dev); the seeded draw otherwise.
+      const pool = allCarnivalEvents();
+      const named = (qs?.get('events') ?? '').split(',').map((id) => pool.find((e) => e.id === id.trim())).filter((e): e is CarnivalEvent => !!e);
       const S: St = {
-        scene: ctx.scene, events: pickNight(allCarnivalEvents(), Date.now() % 100000), idx: 0, phase: 'pick', phaseSec: 0, pickSec: 0,
+        scene: ctx.scene, events: named.length ? named : pickNight(pool, Date.now() % 100000), idx: 0, phase: 'pick', phaseSec: 0, pickSec: 0,
         // Nothing is built before the harness is PLAYING: an event built inside load() had its camera reset by the
         // harness's own start-of-play step and the first event rendered sky (measured on /play/carnival?players=1).
         autoBegin: !!q, starting: false, current: null,
         players: Math.max(1, Math.min(2, Number(q ?? 1) || 1)), turn: 0, turnPoints: [0, 0], tally: freshTally(), rivalTarget: 0,
-        ended: false, hub: null, host: null, guest: null, anchor: null, eventLatch: false, champLatch: false,
+        ended: false, hub: null, host: null, guest: null, hostBody: null, guestBody: null, anchor: null, eventLatch: false, champLatch: false,
       };
       states.set(ctx.scene, S); live.add(S);
       SoundKit.startAmbient('stadium');
@@ -270,8 +278,10 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       // THE HUB: the Carnival Court under the cards, party-goers on its actor spots — you (and P2 / the rival)
       S.host = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: HUB_SPOTS[0].clone(), yawRad: Math.PI });
       installSafePlay(S.host.animator, 'carnival-host');
+      S.hostBody = new BeatOwner(S.host.animator); S.hostBody.loop(SPORT_CLIP.idle);
       S.guest = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: HUB_SPOTS[1].clone(), yawRad: 0, tint: '#ff2d78' });
       installSafePlay(S.guest.animator, 'carnival-guest');
+      S.guestBody = new BeatOwner(S.guest.animator); S.guestBody.loop(SPORT_CLIP.idle);
       if (S.scene.isDisposed) return;
       showHub(ctx, S, true);
       if (!S.autoBegin) showPick(ctx, S);

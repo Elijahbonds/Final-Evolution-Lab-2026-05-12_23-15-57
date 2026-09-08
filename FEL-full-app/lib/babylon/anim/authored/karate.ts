@@ -111,3 +111,19 @@ export function buildGetUp(scene: Scene, sk: Skeleton): AnimationGroup | null {
     { t: 0.45, bones: { Hips: [0, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0], LeftUpLeg: [-12, 0, 4], RightUpLeg: [-12, 0, -4] }, hands: GUARD, hipsY: 0 },
   ]);
 }
+
+/** The WIND-UP (ANIM-READABILITY creative, 2026-09-07 — the carnival COUNTER STRIKE rival's telegraph). The rival used
+ *  to announce the punch with the dunk CHARGE crouch (a basketball gather: hips down, arms swung back). A fighter loads a
+ *  punch: the rear fist chambered back at the ribs, the lead guard still up, weight on the back leg, the shoulder turned.
+ *  A HOLD loop — the crossfade is the way in — so the player has a clean silhouette to read the window from. */
+export function buildWindupHold(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.7;
+  const LOAD = { Left: [-0.20, 1.34, 0.30] as V3, Right: [0.30, 1.10, -0.28] as V3 };   // lead guard up, rear fist chambered back
+  const LOAD_POLES = { Left: [-0.7, -0.2, -0.5] as V3, Right: [0.9, -0.3, -0.5] as V3 };
+  const BONES = { Hips: [0, 22, 0] as V3, Spine: [6, 14, 4] as V3, Neck: [4, -12, 0] as V3, LeftUpLeg: [-8, 0, 6] as V3, RightUpLeg: [-18, 0, -6] as V3, RightLeg: [22, 0, 0] as V3 };
+  return buildPoseClip(scene, sk, 'karate_windup_hold', T, [
+    { t: 0, bones: BONES, hands: LOAD, poles: LOAD_POLES, hipsY: -0.05 },
+    { t: T / 2, bones: { ...BONES, Spine: [7, 16, 4] }, hands: { Left: LOAD.Left, Right: [0.31, 1.08, -0.31] }, poles: LOAD_POLES, hipsY: -0.06 },
+    { t: T, bones: BONES, hands: LOAD, poles: LOAD_POLES, hipsY: -0.05 },
+  ]);
+}

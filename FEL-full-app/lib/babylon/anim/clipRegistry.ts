@@ -39,6 +39,7 @@ export const REAL_CLIPS = new Set<string>([
   'football_juke_left', 'football_juke_right', 'football_spin_move', 'football_tackled_fall',
   'karate_hit_react', 'karate_knockdown', 'karate_guard_step',   // the guard step (MODE-STICK-FACE) was authored + registered but never listed here
   'karate_block', 'karate_guard_impact', 'karate_parry', 'karate_floor_hold', 'karate_get_up',   // ANIM-READABILITY (combat, 2026-09-07)
+  'karate_windup_hold', 'freerun_air_hold', 'freerun_tuck', 'freerun_slide',   // ANIM-READABILITY (creative, 2026-09-07)
   // basketball packages (anim/authored/basketball) — Phase 4, 2026-09-03
   'bball_dribble_idle', 'bball_crossover_left', 'bball_crossover_right', 'bball_hesi',
   'bball_layup_gather', 'bball_defend_slide_left', 'bball_defend_slide_right',
@@ -111,6 +112,7 @@ export const SPORT_CLIP = {
   karateBlock: 'karate_block',   // ANIM-READABILITY (combat, 2026-09-07): the authored high guard (was the stance clip — invisible)
   karateHitReact: 'karate_hit_react',
   karateKnockdown: 'karate_knockdown',
+  karateWindup: 'karate_windup_hold',   // ANIM-READABILITY (creative, 2026-09-07): the telegraph — rear fist chambered, weight back
 
   // football
   footballJukeLeft: 'football_juke_left',
