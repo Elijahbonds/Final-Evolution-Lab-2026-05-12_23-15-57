@@ -148,6 +148,22 @@ export async function earn(
     if (!v.ok) return reject(v.reason ?? 'validation_failed');
   }
 
+  // 3b. FEATURES-UX-SHOP (2026-09-08): the cross-mode session earns are only as real as the session behind them. The shell
+  //     posts /api/sessions first and an idle run records none, so run_id must name a GameSession this player owns, a
+  //     "won" earn needs that session to be a win, and each run pays each event type once whatever idempotency key it
+  //     arrives under (the same run resubmitted under a fresh key used to pass replay detection after 30 s).
+  if (reasonCode === REASON.MODE_SESSION_COMPLETED || reasonCode === REASON.MODE_SESSION_WON) {
+    const runId = typeof payload?.run_id === 'string' ? payload.run_id : '';
+    if (!runId) return reject('no_session');
+    const sess = await prisma.gameSession.findFirst({ where: { id: runId, userId: playerId }, select: { won: true } });
+    if (!sess) return reject('no_session');
+    if (reasonCode === REASON.MODE_SESSION_WON && !sess.won) return reject('session_not_won');
+    const paid = await prisma.perfEarnEvent.count({
+      where: { playerId, eventType, resolvedEntryId: { not: null }, payload: { path: ['run_id'], equals: runId } },
+    });
+    if (paid > 0) return reject('run_already_paid');
+  }
+
   // 4. Replay detection: an identical payload (different idempotency key) within
   //    a short band is a resubmitted run — flag + reject. Exact idempotency-key
   //    replays are handled separately (return original) at the ledger layer.

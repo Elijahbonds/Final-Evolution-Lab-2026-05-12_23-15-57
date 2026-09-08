@@ -19,6 +19,8 @@ import { Coins, Gem, Loader2, Check, ShoppingCart, Sparkles, History } from 'luc
 import { toast } from 'sonner';
 import { COIN_STORE_PACKS, CATALOG, coinStorePackTotal, type CatalogSku } from '@/lib/wallet/catalog';
 import { newIdempotencyKey, syncWalletBalances } from '@/lib/wallet/client';
+import { shardSaleCopy } from '@/lib/wallet/purchases';
+import { usePurchasesEnabled } from '@/lib/wallet/use-purchases-enabled';
 
 interface Balances { coins: number; shards: number }
 
@@ -33,7 +35,10 @@ function usd(cents: number): string {
 
 export function CoinStore() {
   const [balances, setBalances] = useState<Balances>({ coins: 0, shards: 0 });
-  const [purchasesEnabled, setPurchasesEnabled] = useState<boolean | null>(null);
+  // FEATURES-UX-SHOP (2026-09-08): ONE purchases truth (lib/wallet/purchases.ts) — this store said "shard packs are sold
+  // separately" while /shop/shards showed COMING SOON with every Buy disabled. Both now read the same flag and the same copy.
+  const purchasesEnabled = usePurchasesEnabled();
+  const copy = shardSaleCopy(purchasesEnabled);
   const [owned, setOwned] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -58,13 +63,7 @@ export function CoinStore() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadWallet();
-    fetch('/api/v1/wallet/config', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : { purchasesEnabled: false }))
-      .then((d) => setPurchasesEnabled(Boolean(d.purchasesEnabled)))
-      .catch(() => setPurchasesEnabled(false));
-  }, [loadWallet]);
+  useEffect(() => { void loadWallet(); }, [loadWallet]);
 
   const buyPack = useCallback(async (packId: string) => {
     setBusy(packId);
@@ -133,8 +132,13 @@ export function CoinStore() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Coin Store</h1>
-          {/* ARENA-10PHASE P10: shards ARE sold (M25 shard packs, /shop/shards) — this line said "never for sale" over a live Buy button */}
-          <p className="text-sm text-white/50">Top up coins, spend on unlocks. Shard packs are sold separately in the <Link href="/shop/shards" className="text-[#C79BFF] hover:underline">Shard Store</Link>.</p>
+          {/* ARENA-10PHASE P10 said "sold separately" unconditionally; FEATURES-UX-SHOP: the line is the purchases flag's own words,
+              and "Shard Store" is the link in every state. */}
+          <p className="text-sm text-white/50">
+            {copy.coinStoreShards.split('Shard Store')[0]}
+            <Link href="/shop/shards" className="text-[#C79BFF] hover:underline">Shard Store</Link>
+            {copy.coinStoreShards.split('Shard Store')[1]}
+          </p>
           <Link href="/wallet" className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-[#00E5FF] hover:underline">
             <History className="h-3.5 w-3.5" /> View wallet history
           </Link>
@@ -154,8 +158,8 @@ export function CoinStore() {
         <div className="mb-3 flex items-center gap-2">
           <ShoppingCart className="h-4 w-4 text-[#00E5FF]" />
           <h2 className="text-lg font-semibold text-white">Coin Packs</h2>
-          {purchasesEnabled === false && (
-            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/50">Coming soon</span>
+          {copy.badge && (
+            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/50">{copy.badge}</span>
           )}
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

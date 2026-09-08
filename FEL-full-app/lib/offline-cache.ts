@@ -37,6 +37,8 @@ export interface SessionResultPayload {
   storyNodeId?: string;
   /** Mode-specific stat bag, passed through opaquely. */
   stats?: Record<string, number>;
+  /** FEATURES-UX-SHOP: the shell saw input during the run (lib/session-evidence.ts). */
+  played?: boolean;
 }
 
 export interface QueuedResult {

@@ -7,12 +7,15 @@ import { AppHeader } from '@/components/app-header';
 import { BottomNav } from '@/components/bottom-nav';
 import { LedgerHistory } from '@/components/wallet/ledger-history';
 import { ExchangeWidget } from '@/components/wallet/exchange-widget';
+import { purchasesEnabledFromEnv, shardSaleCopy } from '@/lib/wallet/purchases';
 
 export const dynamic = 'force-dynamic';
 
 export default async function WalletPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect('/login');
+  // FEATURES-UX-SHOP: "Get Shards" led to a store that said COMING SOON — the button now carries the purchases truth itself.
+  const shardCopy = shardSaleCopy(purchasesEnabledFromEnv());
   return (
     <div className="min-h-screen bg-[#050505] pb-24">
       <AppHeader />
@@ -21,7 +24,7 @@ export default async function WalletPage() {
           <ShoppingCart className="h-4 w-4" /> Coin Store
         </Link>
         <Link href="/shop/shards" className="inline-flex items-center gap-2 rounded-lg border border-[#C79BFF]/40 bg-[#C79BFF]/5 px-3 py-1.5 text-sm font-semibold text-[#C79BFF] transition hover:bg-[#C79BFF]/10">
-          <Gem className="h-4 w-4" /> Get Shards
+          <Gem className="h-4 w-4" /> {shardCopy.walletShardButton}
         </Link>
       </div>
       <ExchangeWidget />

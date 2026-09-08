@@ -56,6 +56,8 @@ interface MasteryRecap {
   ups: { tier: string }[];
 }
 interface RecapData {
+  /** FEATURES-UX-SHOP: the server recorded no session — the run ended with no evidence of play. */
+  noPlay?: boolean;
   xp: number;
   shards: number;
   credits: number;
@@ -119,6 +121,14 @@ function GameShellInner({
     | null
   >(null);
   const [gameKey, setGameKey] = useState(0);
+  // FEATURES-UX-SHOP (2026-09-08): browsing is not playing. A mode left idle ends on its own clock and used to post a
+  // score-0 session that paid XP, a profile shard, streak credits and the 40-coin "Session completed" floor. The shell
+  // now counts the presses it saw while the run was live (keys — the pad bridge and the touch deck both emit them —
+  // pointers, touches; the results card's buttons come after the run and do not count) and sends `played` with the
+  // session; the server pays only on evidence of play (lib/session-evidence.ts). Three presses, so a lone tap on a
+  // "ready" overlay followed by nothing still reads as no play.
+  const inputCount = useRef(0);
+  const runLive = useRef(true);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
   const scheme = getScheme(mode);
@@ -136,6 +146,20 @@ function GameShellInner({
     raf = requestAnimationFrame(tick);
     return () => { active = false; cancelAnimationFrame(raf); poller.setScheme(null); };
   }, [scheme, gameKey]);
+
+  useEffect(() => { runLive.current = result === null; }, [result]);
+  useEffect(() => {
+    inputCount.current = 0;
+    const mark = () => { if (runLive.current) inputCount.current += 1; };
+    window.addEventListener('keydown', mark);
+    window.addEventListener('pointerdown', mark);
+    window.addEventListener('touchstart', mark, { passive: true });
+    return () => {
+      window.removeEventListener('keydown', mark);
+      window.removeEventListener('pointerdown', mark);
+      window.removeEventListener('touchstart', mark);
+    };
+  }, [gameKey]);
 
   useEffect(() => {
     let live = true;
@@ -170,12 +194,14 @@ function GameShellInner({
           duration: res?.duration ?? 0,
           tallies: res?.tallies,
           maxCombo: res?.maxCombo,
+          played: inputCount.current >= 3,
         }),
       })
         .then((r) => (r?.ok ? r.json() : null))
         .then(async (j) => {
           if (j?.ok) {
             setRecap({
+              noPlay: Boolean(j?.noPlay),
               xp: j?.xp ?? 0,
               shards: j?.shards ?? 0,
               credits: j?.credits ?? 0,
@@ -446,6 +472,12 @@ function GameShellInner({
 
                 {recap ? (
                   <>
+                  {recap.noPlay ? (
+                    <div className="fel-card mt-6 rounded-lg p-4 text-center">
+                      <div className="font-mono text-sm font-bold text-white/70">NO PLAY RECORDED</div>
+                      <div className="mt-1 text-xs text-white/40">The run ended before you got going — nothing earned, nothing counted. Play again to score.</div>
+                    </div>
+                  ) : (
                   <div className="mt-6 grid grid-cols-2 gap-3">
                     <div className="fel-card rounded-lg p-3">
                       <Sparkles className="mx-auto h-4 w-4 text-[#00FF9D]" />
@@ -475,6 +507,7 @@ function GameShellInner({
                       <div className="text-[10px] uppercase tracking-wider text-white/40">PRQ Δ</div>
                     </div>
                   </div>
+                  )}
                   {storyReward && (
                     <div className="mt-3 rounded-lg border border-[#A855F7]/30 bg-[#A855F7]/10 p-3 text-center">
                       <p className="text-xs font-bold text-[#A855F7]">STORY NODE COMPLETE</p>

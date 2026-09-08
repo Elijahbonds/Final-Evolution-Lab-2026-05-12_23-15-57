@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getStripe } from '@/lib/stripe';
+import { purchasesEnabledFromEnv } from '@/lib/wallet/purchases';
 import { getShardPack, shardPackTotal } from '@/lib/shard-packs';
 
 /**
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
   const playerId = (session?.user as any)?.id as string | undefined;
   if (!playerId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!purchasesEnabledFromEnv()) {
     return NextResponse.json({ error: 'not_configured' }, { status: 503 });
   }
 

@@ -21,6 +21,8 @@ import { Coins, Gem, Landmark } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { WALLET_EARN_EVENT, WALLET_SYNC_EVENT, reportEarn, type WalletEarnDetail, type WalletSyncDetail } from '@/lib/wallet/client';
+import { shardSaleCopy } from '@/lib/wallet/purchases';
+import { usePurchasesEnabled } from '@/lib/wallet/use-purchases-enabled';
 
 type FetchState = 'loading' | 'ready' | 'error';
 
@@ -43,6 +45,9 @@ function useCountUp() {
 
 export function DualWalletChip({ className }: DualWalletChipProps) {
   const [state, setState] = useState<FetchState>('loading');
+  // FEATURES-UX-SHOP: the tooltip said shards are "bought as packs in the Shard Store" on every page while the store said
+  // COMING SOON — it now reads the same purchases truth as the stores.
+  const shardsTitle = shardSaleCopy(usePurchasesEnabled()).chipShardsTitle;
   const coins = useCountUp();
   const shards = useCountUp();
   const lc = useCountUp();   // lab credits — the arena's and the shop's currency, folded into the wallet 2026-09-04
@@ -162,7 +167,7 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
       {/* Shards */}
       <span
         className="inline-flex items-center gap-1.5 rounded-md border border-[#A855F7]/40 bg-[#A855F7]/5 px-2.5 py-1 font-mono text-xs text-[#C79BFF]"
-        title="Shards — premium currency, earned in play or bought as packs in the Shard Store"
+        title={shardsTitle}
       >
         <Gem className="h-3.5 w-3.5" aria-hidden="true" />
         {state === 'error' ? (

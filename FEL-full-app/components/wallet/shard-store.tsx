@@ -14,20 +14,18 @@ import { useSearchParams } from 'next/navigation';
 import { Gem, Sparkles, Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { SHARD_PACKS, shardPackTotal, usd, type ShardPack } from '@/lib/shard-packs';
+import { shardSaleCopy } from '@/lib/wallet/purchases';
+import { usePurchasesEnabled } from '@/lib/wallet/use-purchases-enabled';
 
 export function ShardStore() {
   const params = useSearchParams();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
-  // ARENA-10PHASE P10: the same truth the coin store reads — no STRIPE key means no checkout, and the buttons say so up front
-  // instead of a live "Buy" that toasts "coming soon" after the click.
-  const [purchasesEnabled, setPurchasesEnabled] = useState<boolean | null>(null);
-  useEffect(() => {
-    fetch('/api/v1/wallet/config', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : { purchasesEnabled: false }))
-      .then((d) => setPurchasesEnabled(Boolean(d.purchasesEnabled)))
-      .catch(() => setPurchasesEnabled(false));
-  }, []);
+  // ARENA-10PHASE P10: no STRIPE key means no checkout, and the buttons say so up front instead of a live "Buy" that toasts
+  // "coming soon" after the click. FEATURES-UX-SHOP: the flag AND the copy come from lib/wallet/purchases.ts — the same words
+  // the coin store, the wallet page and the header chip use.
+  const purchasesEnabled = usePurchasesEnabled();
+  const copy = shardSaleCopy(purchasesEnabled);
 
   async function refreshBalance() {
     try {
@@ -92,13 +90,11 @@ export function ShardStore() {
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
             <Gem className="h-6 w-6 text-[#C79BFF]" /> Get Shards
-            {purchasesEnabled === false && (
-              <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/50">Coming soon</span>
+            {copy.badge && (
+              <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/50">{copy.badge}</span>
             )}
           </h1>
-          <p className="mt-1 text-sm text-white/50">
-            Shards are the premium currency for plans, scans, class passes, seminars &amp; 1-on-1s.
-          </p>
+          <p className="mt-1 text-sm text-white/50">{copy.shardStoreIntro}</p>
         </div>
         <div className="shrink-0 rounded-xl border border-[#C79BFF]/30 bg-[#C79BFF]/5 px-3 py-2 text-right">
           <div className="text-[10px] uppercase tracking-wide text-white/40">Balance</div>
@@ -141,7 +137,7 @@ export function ShardStore() {
                   className="inline-flex items-center gap-2 rounded-lg bg-[#C79BFF] px-4 py-2 text-sm font-bold text-[#0a0416] transition hover:bg-[#d6b3ff] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gem className="h-4 w-4" />}
-                  {busy ? 'Starting…' : purchasesEnabled === false ? 'Coming soon' : 'Buy'}
+                  {busy ? 'Starting…' : copy.shardBuyLabel}
                 </button>
               </div>
             </div>

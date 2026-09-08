@@ -10,6 +10,7 @@ import { createPrqEntry } from '@/lib/prq-entries';
 import { addSeasonXp } from '@/lib/season/season-service';
 import { recordMastery } from '@/lib/mastery/mastery-service';
 import { recordServerEvent } from '@/lib/analytics-server';
+import { sessionHasPlay } from '@/lib/session-evidence';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +36,20 @@ export async function POST(req: Request) {
 
     const profile = await getOrCreateProfile(userId);
     const before = prqScore(profile as any);
+
+    // FEATURES-UX-SHOP (2026-09-08): a run with no evidence of play (no points, no win, no tally, no combo, and the shell saw
+    // no input) is a mode left idle until its own clock ended it. It records no session and grants nothing — no XP, no
+    // profile shards, no streak credits, no PRQ, no season XP, no mastery sample — and returns sessionId null so the shell's
+    // "Session completed" coin earn has nothing to key on (lib/session-evidence.ts has the measured drift).
+    if (!sessionHasPlay({ score, won, hits, misses, dodges, combos, maxCombo, played: body?.played === true })) {
+      await recordServerEvent({ name: 'session_noplay', userId, props: { mode, duration } });
+      return NextResponse.json({
+        ok: true, noPlay: true, sessionId: null,
+        xp: 0, shards: 0, credits: 0, streakDays: profile?.streakDays ?? 0, streakBonus: 0,
+        prqDelta: 0, prqBefore: before, prqAfter: before, grade: prqGrade(before),
+        labCredits: (profile as any)?.labCredits ?? 0, season: null, mastery: null,
+      });
+    }
 
     const prqDelta = computePrqDelta({ mode, score, won, duration });
     const xp = Math.max(5, Math.round(score * 1.5) + (won ? 50 : 10));
