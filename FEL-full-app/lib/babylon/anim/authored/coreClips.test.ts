@@ -16,7 +16,7 @@ import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, bui
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
-import { buildSelfLob, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF } from './dunkTricks';
+import { buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF } from './dunkTricks';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
 import { buildBaseClips } from './baseClips';
 
@@ -271,6 +271,14 @@ describe('dunk tricks', () => {
     at(g, SELF_LOB_CONTACT);
     expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y + 0.1); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.1);
     expect(Math.abs(pos('LeftHand').x - pos('RightHand').x)).toBeLessThan(0.45);   // a two-hand toss, not a T
+  });
+  it('bounce throw: two hands at the chest, then both driven down past the hips and forward on the contact key (DUNK-GLASS-BOUNCE)', () => {
+    const g = fresh(() => buildBounceThrow(scene, sk)!);
+    at(g, 0); expect(pos('RightHand').y).toBeGreaterThan(hipsY()); expect(Math.abs(pos('LeftHand').x - pos('RightHand').x)).toBeLessThan(0.5);
+    at(g, BOUNCE_THROW_CONTACT);
+    expect(pos('RightHand').y).toBeLessThan(hipsY() - 0.1); expect(pos('LeftHand').y).toBeLessThan(hipsY() - 0.1);   // down at the floor
+    expect(pos('RightHand').z).toBeGreaterThan(pos('Hips').z + 0.25); expect(pos('LeftHand').z).toBeGreaterThan(pos('Hips').z + 0.25);   // out front
+    expect(Math.abs(pos('LeftHand').x - pos('RightHand').x)).toBeLessThan(0.45);   // a two-hand throw
   });
   it('kick-up: the right foot swings up front on the contact key, the ball hand starts low', () => {
     const g = fresh(() => buildKickUp(scene, sk)!);

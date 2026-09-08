@@ -56,9 +56,12 @@ export const DUNK_TRICK_ID_BY_CLIP: Record<string, string> = Object.fromEntries(
 // cartwheel tosses the lob itself and rolls under it, the double-up is the two-foot hop gather into the takeoff.
 // None of them spend the air budget — they are judged as difficulty on top of the flight's own tricks.
 export interface RunwayTrick {
-  id: 'selflob' | 'kickup' | 'cartwheel' | 'doubleup';
+  id: 'selflob' | 'kickup' | 'cartwheel' | 'doubleup' | 'offglass' | 'bounce';
   label: string;
   btn: 'A' | 'B' | 'X' | 'Y';
+  /** DUNK-GLASS-BOUNCE: a d-pad direction HELD with the button picks a variant (up + Y = off the glass, down + Y = the
+   *  bounce lob); a bare button is the plain trick. The stick still steers. */
+  dir?: 'up' | 'down' | 'left' | 'right';
   clip: string;
   /** Clip seconds. */
   sec: number;
@@ -73,8 +76,16 @@ export const RUNWAY_TRICKS: RunwayTrick[] = [
   { id: 'kickup', label: 'KICK-UP', btn: 'B', clip: 'dunk_kick_up', sec: 0.55, difficulty: 2.2, releaseAt: 0.32, runScale: 0.55 },
   { id: 'cartwheel', label: 'CARTWHEEL', btn: 'X', clip: 'dunk_cartwheel', sec: 0.8, difficulty: 2.8, releaseAt: 0.05, runScale: 0.7 },
   { id: 'doubleup', label: 'DOUBLE-UP', btn: 'A', clip: 'dunk_double_up', sec: 0.5, difficulty: 1.5, runScale: 0.6 },
+  // DUNK-GLASS-BOUNCE (2026-09-08): the same two-hand toss thrown AT THE GLASS (the ball comes back off the board to the
+  // hand), and a two-hand throw DOWN into the floor that bounces up to the hand once or twice (WDA "Bounce Ball")
+  { id: 'offglass', label: 'OFF-GLASS LOB', btn: 'Y', dir: 'up', clip: 'dunk_self_lob', sec: 0.5, difficulty: 2.4, releaseAt: 0.3, runScale: 0.85 },
+  { id: 'bounce', label: 'BOUNCE LOB', btn: 'Y', dir: 'down', clip: 'dunk_bounce_throw', sec: 0.5, difficulty: 2.4, releaseAt: 0.3, runScale: 0.85 },
 ];
-export function runwayTrickFor(btn: string): RunwayTrick | null { return RUNWAY_TRICKS.find((t) => t.btn === btn) ?? null; }
+/** The runway trick on a button — a held d-pad direction picks that button's variant, a bare press the plain trick. */
+export function runwayTrickFor(btn: string, dir: 'up' | 'down' | 'left' | 'right' | null = null): RunwayTrick | null {
+  return (dir ? RUNWAY_TRICKS.find((t) => t.btn === btn && t.dir === dir) : null) ?? RUNWAY_TRICKS.find((t) => t.btn === btn && !t.dir) ?? null;
+}
+export function runwayTrickById(id: RunwayTrick['id']): RunwayTrick { return RUNWAY_TRICKS.find((t) => t.id === id)!; }
 /** The double-up is only a double-up inside the last stretch before the takeoff line (metres) at a real run (m/s). */
 export const DOUBLE_UP_WINDOW_M = 1.8, DOUBLE_UP_MIN_SPEED = 4;
 /** A dunk that catches its own toss (or a passer's) is judged on top of the flight. */

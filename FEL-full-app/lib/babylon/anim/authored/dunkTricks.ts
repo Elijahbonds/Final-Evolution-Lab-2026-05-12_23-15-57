@@ -25,6 +25,9 @@ const stride = (leftForward: boolean): Record<string, Deg3> => leftForward
 
 /** Clip-local seconds at which the ball leaves the hands / the foot. */
 export const SELF_LOB_CONTACT = 0.3;
+/** DUNK-GLASS-BOUNCE: the bounce throw lets go on this clip second (both hands drive the ball DOWN at the floor). */
+export const BOUNCE_THROW_CONTACT = 0.3;
+export const BOUNCE_THROW_SEC = 0.5;
 export const KICK_UP_CONTACT = 0.32;
 /** Clip-local second of the lost-and-found's behind-the-back transfer (ballRig parents the ball to the other hand). */
 export const LOST_FOUND_HANDOFF = 0.32;
@@ -37,6 +40,17 @@ export function buildSelfLob(scene: Scene, sk: Skeleton): AnimationGroup | null 
     { t: 0.15, bones: { Hips: [2, 0, 0], Spine: [4, 0, 0],  ...stride(false) }, hands: { Right: [0.16, 1.35, 0.32], Left: [-0.16, 1.35, 0.32] } },
     { t: SELF_LOB_CONTACT, bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], Neck: [-14, 0, 0], ...stride(true) }, hands: { Right: [0.14, 1.98, 0.22], Left: [-0.14, 1.98, 0.22] }, poles: UP },   // the toss: both hands overhead, eyes on it
     { t: SELF_LOB_SEC, bones: { Hips: [2, 0, 0], Spine: [2, 0, 0], Neck: [-10, 0, 0], ...stride(false) }, hands: { Right: [0.26, 1.35, 0.25], Left: [-0.26, 1.35, 0.25] } },   // follow-through, arms settling
+  ]);
+}
+
+/** DUNK-GLASS-BOUNCE: the bounce lob's throw — the ball up to the chest in both hands, a short lift, then both hands drive it
+ *  DOWN and forward past the hips (the WDA bounce pass to yourself), the trunk folding with it, eyes following the ball. */
+export function buildBounceThrow(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'dunk_bounce_throw', BOUNCE_THROW_SEC, [
+    { t: 0,    bones: { Hips: [4, 0, 0], Spine: [8, 0, 0], ...stride(true) },  hands: { Right: [0.22, 1.05, 0.28], Left: [-0.22, 1.05, 0.28] } },   // the ball at the chest, two hands
+    { t: 0.12, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], ...stride(false) }, hands: { Right: [0.20, 1.40, 0.22], Left: [-0.20, 1.40, 0.22] } },   // a short lift to load the throw
+    { t: BOUNCE_THROW_CONTACT, bones: { Hips: [18, 0, 0], Spine: [40, 0, 0], Neck: [20, 0, 0], ...stride(true) }, hands: { Right: [0.18, 0.60, 0.46], Left: [-0.18, 0.60, 0.46] }, poles: UP },   // the throw: both hands drive it down and out, the trunk folds, eyes on the floor
+    { t: BOUNCE_THROW_SEC, bones: { Hips: [4, 0, 0], Spine: [6, 0, 0], Neck: [-12, 0, 0], ...stride(false) }, hands: { Right: [0.26, 1.10, 0.30], Left: [-0.26, 1.10, 0.30] } },   // up out of it, eyes up for the bounce
   ]);
 }
 

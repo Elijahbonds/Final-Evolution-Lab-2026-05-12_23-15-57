@@ -50,8 +50,9 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, DOUBLE_UP_WINDOW_M, DOUBLE_UP_MIN_SPEED, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
-import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T } from '../core/DunkLob';
+import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind } from '../core/DunkObstacles';
+import { runwayTrickById } from '../core/DunkSystem';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
@@ -83,9 +84,16 @@ type Style = (typeof STYLES)[number];
 // DUNK-CONTROL-JUICE (2026-09-08): the prop cycle — nothing, a passer's lob, your own lob, and three things to dunk OVER
 // (the owner's sedan, a race barrier, a crate). d-pad: up = none, right = alley-oop, left = self-lob, down = the next
 // obstacle; X cycles the whole ring. The obstacles are real meshes with hitboxes read off the geometry (dunkObstacleProps).
-const PROPS = ['none', 'alleyoop', 'selflob', 'car', 'barrier', 'crate'] as const;
+// DUNK-GLASS-BOUNCE (2026-09-08): two more self-lobs on the ring — OFF THE GLASS (the toss goes at the backboard and comes
+// back off it to the hand: WDA "Off The Backboard") and the BOUNCE LOB (thrown down into the floor, up to the hand: WDA
+// "Bounce Ball"; from standing it is the bounce-BOUNCE with a RUN cue). d-pad left cycles the lob family.
+const PROPS = ['none', 'alleyoop', 'selflob', 'offglass', 'bounce', 'car', 'barrier', 'crate'] as const;
 type Prop = (typeof PROPS)[number];
 const obstacleKindOf = (p: Prop): ObstacleKind | null => (p === 'car' || p === 'barrier' || p === 'crate' ? p : null);
+const LOB_PROPS = ['selflob', 'offglass', 'bounce'] as const;
+type LobProp = (typeof LOB_PROPS)[number];
+const lobPropOf = (p: Prop): LobProp | null => (p === 'selflob' || p === 'offglass' || p === 'bounce' ? p : null);
+const nextLobProp = (p: Prop): LobProp => { const k = lobPropOf(p); return k ? LOB_PROPS[(LOB_PROPS.indexOf(k) + 1) % LOB_PROPS.length] : 'selflob'; };
 
 const STYLE_CLIP: Record<Style, string> = {
   // POWER launch plays the user's real motion capture when MOCAP_DUNK is on
@@ -97,9 +105,9 @@ const STYLE_CLIP: Record<Style, string> = {
   flashy: SPORT_CLIP.dunkLaunchPower, sig: SPORT_CLIP.dunkLaunchSig,
 };
 const STYLE_LABEL: Record<Style, string> = { power: 'POWER', flashy: 'FLASHY', sig: 'SIGNATURE' };
-const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', alleyoop: 'ALLEY-OOP', selflob: 'SELF-LOB', car: OBSTACLE_SPECS.car.label, barrier: OBSTACLE_SPECS.barrier.label, crate: OBSTACLE_SPECS.crate.label };
+const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', alleyoop: 'ALLEY-OOP', selflob: 'SELF-LOB', offglass: 'OFF THE GLASS', bounce: 'BOUNCE LOB', car: OBSTACLE_SPECS.car.label, barrier: OBSTACLE_SPECS.barrier.label, crate: OBSTACLE_SPECS.crate.label };
 const STYLE_TIER: Record<Style, number> = { power: 3, flashy: 5.5, sig: 8 };
-const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, selflob: 1.5, car: OBSTACLE_SPECS.car.bonus, barrier: OBSTACLE_SPECS.barrier.bonus, crate: OBSTACLE_SPECS.crate.bonus };
+const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, selflob: 1.5, offglass: 2.5, bounce: 2.5, car: OBSTACLE_SPECS.car.bonus, barrier: OBSTACLE_SPECS.barrier.bonus, crate: OBSTACLE_SPECS.crate.bonus };
 /** Where the ball hand is at the lob's catch beat (LOB_CATCH_CLIP_T), relative to the root, per launch clip — measured on the
  *  live rig with the reach off through the rise (DUNK-SOFTS-NAMED probe, hand − root at clip 0.62): the mocap POWER gather
  *  holds both hands overhead and a touch behind; the authored FLASHY takeoff has them up and level; the SIG eastbay's ball
@@ -114,6 +122,22 @@ const BEAT_TAKEOFF_LEAD = 0.12;
 const LAUNCH_OUT_OF_BEAT_M = 1.0;
 /** The self-lob prop tosses itself this far before the takeoff line when the runner has not thrown it by hand. */
 const AUTO_LOB_AHEAD_M = 2.6;
+/** DUNK-GLASS-BOUNCE: the off-glass prop throws itself here — measured on the flight's own catch point: a throw released
+ *  2.4–4 m out clears the iron on the way in (0.15–0.5 m) and meets the glass 3.5–3.8 m up; nearer than 2.2 m the ball is
+ *  under the rim's front lip (a CLANK, honest), further and it meets the board near its top. */
+const AUTO_GLASS_AHEAD_M = 3.8;
+/** The off-glass lob is aimed at the HANG beat (the hand still overhead, the body near its apex), not the rise: measured on
+ *  the flight's own catch point, a rise-beat throw released inside 0.5 m of the line passes the iron's front lip by 5 cm
+ *  or under it (a CLANK on two of three runs); at the hang beat the same release meets the board 3.5–3.8 m up with
+ *  0.3–0.5 m over the iron, and a throw 2 m+ out sails over the board's top (OVER THE GLASS, honest). */
+const GLASS_CATCH_CLIP_T = 0.8;
+/** The highest a toss onto a prop's top may go (the last hop's apex); beyond it the throw reads as a rocket, not a lob. */
+const ENV_TOSS_APEX_CAP = 6.5;
+/** The judges see the ball come off something that is not the floor (a car roof, a crate). */
+const ENV_BOUNCE_DIFFICULTY = 1;
+/** The standing bounce lob is thrown on the ball's own clock: the RUN cue lands when the hold-run (the pad's 2 → 7 m/s
+ *  ramp from standing) plus the flight's catch beat exactly fills what is left of the flight. */
+const RUN_CUE_MARGIN_SEC = 0.05;
 /** The anim windows — one clip owner per window, logged on every change. */
 type Win = 'run' | 'gather' | 'takeoff' | 'hang' | 'contact' | 'land';
 
@@ -166,7 +190,12 @@ export const DunkMode: ModeDefinition = (() => {
   let feet: { L: TransformNode | null; R: TransformNode | null } = { L: null, R: null };   // the clear test reads the FEET
   let win: Win = 'run';                       // the anim window in charge of the body
   // ── the lob (self-lob / kick-up / cartwheel toss / the alley-oop pass): one real arc, one fair catch ──
-  const lob = { live: false, thrown: false, caught: false, lost: false, label: '' };
+  const lob = { live: false, thrown: false, caught: false, lost: false, label: '', kind: 'plain' as 'plain' | 'glass' | 'bounce', glass: false, over: false, bounces: 0, wantBounces: 0, env: '' as string, clanked: false, t: 0, runCueAt: -1, runCued: false };
+  // DUNK-GLASS-BOUNCE: the backboard's front face (read off the venue's board mesh at load; the regulation fallback) and the
+  // iron as twelve small colliders — the lob is swept against both every step
+  const glass = { z: CFG.rimZ - 0.39, xMin: -0.9, xMax: 0.9, yMin: CFG.rimHeight - 0.075, yMax: CFG.rimHeight + 0.975, found: false };
+  const RIM_RING = rimRing({ x: 0, y: CFG.rimHeight, z: CFG.rimZ }, 0.45).map((p) => new Vector3(p.x, p.y, p.z));
+  const RIM_IRON_R = 0.03;
   // ── runway tricks (thrown during the hold-run) ──
   let runwayBeat: RunwayTrick | null = null, runwayT = 0, runwayReleased = false, runwayToken = 0;
   let runwayLabels: string[] = [], runwayDifficulty = 0, doubleUp = false, launchQueued = false;
@@ -228,6 +257,8 @@ export const DunkMode: ModeDefinition = (() => {
   // DUNK-SOFTS-NAMED (2026-09-08): the d-pad direction as it is physically held (any phase) and a trick button tapped before
   // the rise, kept for the rise — a direction held from the run-up or a tap as the feet left the floor was a silent nothing
   let heldDpad: 'up' | 'down' | 'left' | 'right' | null = null;
+  let heldDpadKey = false;   // DUNK-GLASS-BOUNCE: the keyboard's arrows are the L stick (ArrowUp = run) — they never pick a runway variant
+  let dpadPick: { dir: 'up' | 'down' | 'left' | 'right'; fired: boolean } | null = null;   // a pad d-pad held in the approach: the prop cycles on its RELEASE unless Y threw a variant under it
   // DUNK-BIOMECH (2026-09-08): a trick pressed before its cue beat is ARMED and fires on the beat (it replaces the pre-rise
   // queue: every trick has a named beat now, not just "the rise"); the 360's turn is a yaw LAYER on the hips the mode drives
   // from the cue (DunkSpin) — never authored into a clip, so no crossfade can leave it half-turned at the slam
@@ -358,6 +389,7 @@ export const DunkMode: ModeDefinition = (() => {
       // M74: try Nexus venue first; fallback to VenueKit if no spec
       dunkVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true, location: ctx.location });
       if (!dunkVenue) { VenueKit.buildCourt(ctx.scene); applyOceanCourt(ctx.scene, 'venice'); }
+      findGlass(ctx.scene);
       // spawnPlayer, not CharacterLibrary.spawn — this is the route that applies
       // the player's own identity: closet wardrobe colours, skin tone, and body
       // proportions from a body scan. Football, BoardRun and TimingSport all used
@@ -440,7 +472,7 @@ export const DunkMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
-      if (e.t === 'dpad') { if (e.pressed) heldDpad = e.dir; else if (heldDpad === e.dir) heldDpad = null; }
+      if (e.t === 'dpad') { if (e.pressed) { heldDpad = e.dir; heldDpadKey = e.src === 'key'; } else if (heldDpad === e.dir) heldDpad = null; }
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; if (!lookSeen && (Math.abs(e.x) > 0.12 || Math.abs(e.y) > 0.12)) { lookSeen = true; console.info('[LOOK] R stick live'); } }   // LOOK: read at last (it was emitted and dropped)
 
       if (e.t === 'button' && e.btn === 'B' && e.pressed && phase === 'approach') {
@@ -462,17 +494,28 @@ export const DunkMode: ModeDefinition = (() => {
       // Keyboard hotfix (2026-09-07): the arrows are the L stick now (InputBus) — ArrowUp RUNS at the rim, it no longer
       // picks the prop; the pad's d-pad, the touch d-pad and X still do. The keyboard arrows keep arming the mid-air
       // trick direction below (flight.feedInput sees every d-pad event), so nothing on the keyboard is lost.
-      if (e.t === 'dpad' && e.pressed && e.src !== 'key' && phase === 'approach') {
-        prop = e.dir === 'up' ? 'none' : e.dir === 'right' ? 'alleyoop' : e.dir === 'left' ? 'selflob' : nextObstacle(obstacleKindOf(prop));
-        ctx.setHud({ prop: PROP_LABEL[prop] });
-        SoundKit.play('uiTick', { pitch: 1.3 });
-        void setupProp(ctx);
+      // DUNK-GLASS-BOUNCE: the pick lands on the d-pad's RELEASE — a direction HELD while Y is tapped throws that variant standing
+      // (up = off the glass, down = the bounce lob, onto the prop when one stands there) and leaves the prop alone
+      if (e.t === 'dpad' && e.pressed && e.src !== 'key' && phase === 'approach') dpadPick = { dir: e.dir, fired: false };
+      if (e.t === 'dpad' && !e.pressed && e.src !== 'key' && dpadPick && dpadPick.dir === e.dir) {
+        const pick = dpadPick; dpadPick = null;
+        if (!pick.fired && phase === 'approach') {
+          prop = e.dir === 'up' ? 'none' : e.dir === 'right' ? 'alleyoop' : e.dir === 'left' ? nextLobProp(prop) : nextObstacle(obstacleKindOf(prop));   // left cycles SELF-LOB → OFF THE GLASS → BOUNCE LOB
+          ctx.setHud({ prop: PROP_LABEL[prop] });
+          SoundKit.play('uiTick', { pitch: 1.3 });
+          void setupProp(ctx);
+        }
       }
       // ── RUNWAY TRICKS (DUNK-CONTROL-JUICE): a bare face button while RUN is held — the stick steers, so no direction.
       // Y = SELF-LOB (also standing, in the approach), B = KICK-UP, X = CARTWHEEL (it tosses the lob itself), A = DOUBLE-UP
       // inside the last stretch before the takeoff line at a real run; A anywhere else on the run = jump from here.
       if (e.t === 'button' && e.pressed && (phase === 'charge' || (phase === 'approach' && e.btn === 'Y'))) {
-        const rt = runwayTrickFor(e.btn);
+        // DUNK-GLASS-BOUNCE: Y with the d-pad HELD up = off the glass, down = the bounce lob (pad / touch; the keyboard's arrows
+        // are the stick); a bare Y throws the variant the PROP ring picked, or the plain self-lob
+        const held = heldDpad && !heldDpadKey && (heldDpad === 'up' || heldDpad === 'down') ? heldDpad : null;
+        const variant = e.btn === 'Y' ? (held ?? (prop === 'offglass' ? 'up' : prop === 'bounce' ? 'down' : null)) : null;
+        if (held && dpadPick && dpadPick.dir === held) dpadPick.fired = true;   // the d-pad was the variant, not a prop pick
+        const rt = runwayTrickFor(e.btn, variant);
         if (rt && rt.id === 'doubleup') {
           const dist = player.root.position.z - gatherLine();
           if (dist <= DOUBLE_UP_WINDOW_M && holdRunSpeed >= DOUBLE_UP_MIN_SPEED && !runwayBeat) startRunwayBeat(ctx, rt);
@@ -481,6 +524,7 @@ export const DunkMode: ModeDefinition = (() => {
           // DUNK-SOFTS-NAMED: a runway trick that cannot happen says so (it used to be a silent nothing)
           if (prop === 'alleyoop') refuse(ctx, `${rt.label} — THE PASSER HAS THE BALL`);
           else if (lob.thrown) refuse(ctx, `${rt.label} — THE BALL IS ALREADY UP · CATCH IT`);
+          else if (rt.id === 'bounce' && phase === 'charge' && !bounceFits()) refuse(ctx, 'BOUNCE LOB — TOO CLOSE TO THE LINE · THROW IT STANDING');   // a bounce needs ~1 s of air: on the run it has to leave as the run starts
           else startRunwayBeat(ctx, rt);
         }
       }
@@ -596,6 +640,10 @@ export const DunkMode: ModeDefinition = (() => {
         if (!runwayBeat) setWin('run');
         // the SELF-LOB prop tosses itself ahead of the takeoff when the runner has not thrown it by hand
         if (prop === 'selflob' && !lob.thrown && !runwayBeat && player.root.position.z <= gatherLine() + AUTO_LOB_AHEAD_M) startRunwayBeat(ctx, runwayTrickFor('Y')!);
+        // DUNK-GLASS-BOUNCE: the off-glass prop throws where the geometry says (AUTO_GLASS_AHEAD_M); the bounce prop throws as the
+        // run starts (a single bounce is a ~1 s throw — from standing, Y throws the bounce-BOUNCE with a RUN cue)
+        if (prop === 'offglass' && !lob.thrown && !runwayBeat && !pendingBeat && player.root.position.z <= gatherLine() + AUTO_GLASS_AHEAD_M) startRunwayBeat(ctx, runwayTrickById('offglass'));
+        if (prop === 'bounce' && !lob.thrown && !runwayBeat && !pendingBeat && phaseSec >= 0.05) startRunwayBeat(ctx, runwayTrickById('bounce'));
         const line = gatherLine();
         if (player.root.position.z <= line) {
           player.root.position.z = line;
@@ -620,7 +668,7 @@ export const DunkMode: ModeDefinition = (() => {
         if (dribble.active !== wasActive) console.info(`[DUNK-LL] dribble ${dribble.active ? 'on' : 'off'}`);
         gatherK = Math.max(0, Math.min(1, gatherK + (gatherLatched && onRunway && ballOurs ? dt / 0.15 : -dt / 0.1)));
       }
-      if (lob.live && phase !== 'cinematic') { ballSim.step(dt); }   // the lob flies in real time on the runway
+      if (lob.live && phase !== 'cinematic' && phase !== 'resolve') stepLob(ctx, dt);   // the lob flies in real time on the runway
       if (phase === 'cinematic') {
         // Hang mid-flight slow-mo: JuiceKit owns animationTimeScale; gate clip advance to it.
         const animScale = ctx.scene.animationTimeScale ?? 1;
@@ -637,7 +685,7 @@ export const DunkMode: ModeDefinition = (() => {
         spin.update(clipTime);   // the momentum-led turn rides the flight's own clock (the hang slow-mo stretches both)
         // ── the lob: the ball flies in CLIP time through the hang (the slow-mo stretches both), the catch is the hand ──
         if (lob.live) {
-          ballSim.step(dt * (Number.isFinite(animScale) && animScale > 0 ? animScale : 1));
+          stepLob(ctx, dt * (Number.isFinite(animScale) && animScale > 0 ? animScale : 1));
           const hand = ballHandNode();
           if (hand && clipTime >= 0.12) {   // through the slam window too: a late catch leaves less time to slam, and that is the trade
             hand.computeWorldMatrix(true);
@@ -762,7 +810,7 @@ export const DunkMode: ModeDefinition = (() => {
 
       if (phase !== 'cinematic' && !replaying) { if (spin.active) { const y = spin.settle(dt); if (!spin.active) console.info(`[DUNK-CUE] spin settled ${y.toFixed(2)} rad`); } if (phase !== 'resolve') player.root.rotation.z *= Math.max(0, 1 - dt * 6); }
       obstacle?.tick(dt);
-      if (lob.live && phase === 'resolve') ballSim.step(dt);   // a lost lob keeps bouncing through the miss beat
+      if (lob.live && phase === 'resolve') stepLob(ctx, dt);   // a lost lob keeps bouncing through the miss beat
       // ── A+ P8 athlete hands: the replay's clips, the fall to feet-down, the reach weight ──────────────────────────
       if (replaying) {
         // H5: the replay re-flies the recorded root at 0.5× for up to 8 s — the clips re-fly with it: the run on the floor, the
@@ -1080,7 +1128,7 @@ export const DunkMode: ModeDefinition = (() => {
   /** Why the attempt died, for the banner: the toss the hand never met, the prop the feet caught, or the iron. */
   function missWhy(): string {
     if (obstacleClipped) return `CAUGHT THE ${obstacle?.spec.label ?? 'PROP'}`;   // the prop ended it, whatever the toss was doing
-    if (lob.live || lob.lost) return `LOST THE ${lob.label}`;
+    if (lob.live || lob.lost) return lob.clanked ? `${lob.label} OFF THE IRON` : lob.over ? `${lob.label} OVER THE GLASS` : `LOST THE ${lob.label}`;
     return namedTricks() || 'OFF THE IRON';
   }
   function resolveDunk(ctx: ModeContext): void {
@@ -1347,7 +1395,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
   /** Dev probes (`__FEL_DEV__.dunkPosture`): the live window / stance / corrections, and an override to force a stance. */
   const postureDevHandle = {
-    get: () => ({ window: ppWindow, trick: ppTrick, pose: ppPose, legs: llPose, phase, clipTime, replaying, dribble: dribble ? { active: dribble.active, phase: dribble.phase } : null, gather: gatherLatched, gatherK, finishRelease, aimDeg: ppAim * 180 / Math.PI, chestYawDeg: ppChestYaw * 180 / Math.PI, clipHipYawDeg: ppClipHipYaw * 180 / Math.PI, headYawDeg: ppHeadYaw * 180 / Math.PI, headPitchDeg: ppHeadPitch * 180 / Math.PI, sign: ppSign, off: POSTURE_OFF }),
+    get: () => ({ window: ppWindow, trick: ppTrick, pose: ppPose, legs: llPose, phase, clipTime, replaying, lob: { ...lob }, prop, glass: { ...glass }, dribble: dribble ? { active: dribble.active, phase: dribble.phase } : null, gather: gatherLatched, gatherK, finishRelease, aimDeg: ppAim * 180 / Math.PI, chestYawDeg: ppChestYaw * 180 / Math.PI, clipHipYawDeg: ppClipHipYaw * 180 / Math.PI, headYawDeg: ppHeadYaw * 180 / Math.PI, headPitchDeg: ppHeadPitch * 180 / Math.PI, sign: ppSign, off: POSTURE_OFF }),
     set override(p: PosturePose | null) { ppOverride = p; },
     get override(): PosturePose | null { return ppOverride; },
   };
@@ -1392,7 +1440,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
 
   // ── DUNK-CONTROL-JUICE (2026-09-08): runway tricks, the lob, the catch ──────────────────────────────────────────
-  function resetLob(): void { lob.live = false; lob.thrown = false; lob.caught = false; lob.lost = false; lob.label = ''; }
+  function resetLob(): void { lob.live = false; lob.thrown = false; lob.caught = false; lob.lost = false; lob.label = ''; lob.kind = 'plain'; lob.glass = false; lob.over = false; lob.bounces = 0; lob.wantBounces = 0; lob.env = ''; lob.clanked = false; lob.t = 0; lob.runCueAt = -1; lob.runCued = false; }
   function resetRunway(): void { pendingBeat = null; runwayBeat = null; runwayT = 0; runwayReleased = false; runwayLabels = []; runwayDifficulty = 0; doubleUp = false; launchQueued = false; airTrick = null; runwayToken++; }
   /** A runway beat owns the body until it ends (the per-frame run / idle loops stand aside); the run keeps going under it. */
   function startRunwayBeat(ctx: ModeContext, rt: RunwayTrick): void {
@@ -1432,7 +1480,9 @@ export const DunkMode: ModeDefinition = (() => {
       const runTime = (phase === 'charge' ? runTimeToLine(dist, holdRunSpeed, HOLD_RUN_MAX, HOLD_RUN_RAMP) : lobFlightTime(dist, 6.5, false, 0) + 0.15) + beatLeft * (1 - rt.runScale);   // a standing thrower runs in at the stick's 6 m/s, then the hold ramps past it
       const tLaunch = Math.max(runTime, beatLeft);
       chargeAtLaunch = Math.max(charge, Math.min(1, (phaseSec + tLaunch) / 1.1));   // the keyboard's hold ramps over 1.1 s; a pad's depth is what it is
-      throwLob(ctx, from, rt.id === 'cartwheel' ? 'SELF-LOB' : rt.label, tLaunch + LOB_CATCH_CLIP_T);
+      if (rt.id === 'offglass') throwGlassLob(ctx, from, tLaunch + GLASS_CATCH_CLIP_T, phase !== 'charge', dist);
+      else if (rt.id === 'bounce') throwBounceLob(ctx, from, tLaunch + LOB_CATCH_CLIP_T, phase !== 'charge', dist);
+      else throwLob(ctx, from, rt.id === 'cartwheel' ? 'SELF-LOB' : rt.label, tLaunch + LOB_CATCH_CLIP_T);
     }
     // DUNK-SOFTS-NAMED: a queued takeoff leaves while the beat is still playing, so the launch clip crossfades out of its last
     // pose — launched from the beat's END (the hop's crouch, the cartwheel's upright) that pose was already gone and the takeoff
@@ -1466,6 +1516,134 @@ export const DunkMode: ModeDefinition = (() => {
     lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = label; catchBlend = 1; catchPending = false;
     setTrail('soft');
     console.info(`[LOB] ${label} from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${tf.toFixed(2)} s`);
+  }
+  /** DUNK-GLASS-BOUNCE: the flight's catch point for a lob thrown now (throwLob's aim, shared by the glass and bounce throws). */
+  function catchPointNow(catchT = LOB_CATCH_CLIP_T): Vector3 {
+    const line = phase === 'cinematic' ? launchZ : gatherLine();
+    const carry = carryU(catchT, EASTBAY_TIMING.extend);
+    const kk = arcK(catchT, EASTBAY_TIMING.duration);
+    const off = CATCH_HAND_OFFSET[style];
+    return new Vector3(rim.x + off.x, 4 * kk * (1 - kk) * (phase === 'cinematic' ? apexFor() : apexPredicted()) + off.y, line + (rim.z + FLUSH_Z_AHEAD - line) * carry + off.z);
+  }
+  /** The backboard's front face, read off the venue's board mesh (the Nexus hoop's `board`, VenueKit's `backboard`). */
+  function findGlass(scene: Scene): void {
+    const boards = scene.meshes.filter((m) => /^(board|backboard)(\.|$)/.test(m.name) && m.getTotalVertices() > 0);
+    let best: AbstractMesh | null = null, bestD = Infinity;
+    for (const m of boards) { m.computeWorldMatrix(true); const c = m.getBoundingInfo().boundingBox.centerWorld; const d = Math.hypot(c.x - rim.x, c.z - rim.z); if (d < 3 && d < bestD) { best = m; bestD = d; } }
+    if (!best) { console.warn(`[FEL-DUNK] no backboard mesh near the rim — the off-glass throw uses the regulation face at z ${glass.z.toFixed(2)}`); return; }
+    best.refreshBoundingInfo({}); best.computeWorldMatrix(true);
+    const b = best.getBoundingInfo().boundingBox;
+    glass.z = b.maximumWorld.z; glass.xMin = b.minimumWorld.x; glass.xMax = b.maximumWorld.x; glass.yMin = b.minimumWorld.y; glass.yMax = b.maximumWorld.y; glass.found = true;
+    console.info(`[LOB] glass = ${best.name} face z ${glass.z.toFixed(2)} x ${glass.xMin.toFixed(2)}..${glass.xMax.toFixed(2)} y ${glass.yMin.toFixed(2)}..${glass.yMax.toFixed(2)}`);
+  }
+  const v3 = (v: Vector3): V3 => ({ x: v.x, y: v.y, z: v.z });
+  /** Can a bounce lob thrown NOW (on the run) still bounce once and reach the hand at the catch beat? */
+  function bounceFits(): boolean {
+    const dist = Math.max(0, player.root.position.z - gatherLine());
+    const tf = runTimeToLine(dist, holdRunSpeed, HOLD_RUN_MAX, HOLD_RUN_RAMP) + LOB_CATCH_CLIP_T;
+    const from = ball.getAbsolutePosition(); from.y = Math.max(from.y, 0.7); from.z -= 0.3 * holdRunSpeed * 0.85;
+    return bounceLobVelocity(v3(from), v3(catchPointNow()), tf, 1) != null;
+  }
+  /** The first point along the throw's line (from → the catch) where the prop's sampled top reads as the prop (≥ half its
+   *  peak and ≥ 0.6 m), a step in from the edge; null when the line never crosses it. */
+  function roofPointAlong(f: V3, c: V3): { x: number; z: number; h: number } | null {
+    if (!obstacle) return null;
+    const dz = c.z - f.z; if (Math.abs(dz) < 1e-6) return null;
+    for (let z = obstacle.nearZ; z >= obstacle.farZ; z -= 0.05) {
+      const k = (z - f.z) / dz; if (k <= 0 || k >= 1) continue;
+      const x = f.x + (c.x - f.x) * k; const h = heightAt(obstacle.profile, x, z);
+      // the car's flank / hood (≥ half its roof, ≥ 0.6 m) is the car too — the roof proper sits past the catch point on the car line
+      if (h >= Math.max(0.6, obstacle.peak * 0.5)) { const zz = z - 0.15; const hh = heightAt(obstacle.profile, x, zz); return hh >= h * 0.9 ? { x, z: zz, h: hh } : { x, z, h }; }
+    }
+    return null;
+  }
+  /** The floor under the ball: a prop's top when the ball is over it (the same profile the feet are tested against). */
+  function groundUnderBall(): number { return obstacle ? Math.max(0, heightAt(obstacle.profile, ballSim.pos.x, ballSim.pos.z)) : 0; }
+  /** A standing throw: the run cue lands when the hold-run from here + the catch beat fills what is left of the flight. */
+  function armRunCue(tf: number, dist: number, catchT = LOB_CATCH_CLIP_T): void {
+    const run = runTimeToLine(dist, 2, HOLD_RUN_MAX, HOLD_RUN_RAMP) + 0.15;   // the pad's ramp from standing, a beat to react
+    lob.runCueAt = Math.max(0, tf - catchT - run); lob.runCued = false;
+    console.info(`[LOB] RUN cue in ${lob.runCueAt.toFixed(2)} s (flight ${tf.toFixed(2)} s, run ${run.toFixed(2)} s)`);
+    ctx0?.setHud({ hint: 'WAIT FOR IT…' });
+  }
+  /** OFF THE GLASS: the toss goes AT the board and comes back off it to the catch point on the flight's clock. On the run
+   *  the throw's timing is the run's (a throw too near the line meets the iron — a CLANK — and one too far the board's top);
+   *  standing, the flight time is picked so the ball meets the glass 0.7 m over the iron and the run is cued to it. */
+  function throwGlassLob(ctx: ModeContext, from: Vector3, tf: number, standing: boolean, dist: number): void {
+    const to = catchPointNow(GLASS_CATCH_CLIP_T);
+    let t = tf;
+    if (standing) {   // bisect the flight time for a hit 0.7 m over the rim (the mid-board), then cue the run to it
+      const want = rim.y + 0.7; let lo = 0.45, hi = 2.5;
+      for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; const g = glassLobVelocity(v3(from), v3(to), glass.z, mid); if (!g || g.hit.y < want) lo = mid; else hi = mid; }
+      t = hi;
+    }
+    const g = glassLobVelocity(v3(from), v3(to), glass.z, t);
+    if (!g) { console.warn('[LOB] off-glass throw impossible from here — a plain self-lob instead'); throwLob(ctx, from, 'SELF-LOB', tf); return; }
+    if (ball.parent) { releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ball.position.copyFrom(releasePos); }
+    ballSim.launch(from, new Vector3(g.v.x, g.v.y, g.v.z));
+    lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = 'OFF-GLASS LOB'; lob.kind = 'glass'; lob.t = 0; catchBlend = 1; catchPending = false;
+    setTrail('soft');
+    const onBoard = g.hit.x >= glass.xMin && g.hit.x <= glass.xMax && g.hit.y >= glass.yMin && g.hit.y <= glass.yMax;
+    console.info(`[LOB] OFF-GLASS LOB from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) at the glass (${g.hit.x.toFixed(2)},${g.hit.y.toFixed(2)}) @${g.t1.toFixed(2)} s${onBoard ? '' : ' — OFF THE BOARD'} then to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${t.toFixed(2)} s${standing ? ' (standing)' : ''}`);
+    if (standing) armRunCue(t, dist, GLASS_CATCH_CLIP_T);
+  }
+  /** The BOUNCE LOB: thrown DOWN into the floor and up to the catch point. On the run one bounce on the run's clock (the beat
+   *  is refused when it cannot fit); standing, the bounce-BOUNCE on the ball's own clock with a RUN cue — and when a prop's
+   *  top lies under the bounce it is the floor: OFF THE CAR. */
+  function throwBounceLob(ctx: ModeContext, from: Vector3, tf: number, standing: boolean, dist: number): void {
+    const to = catchPointNow();
+    const f = v3(from), c = v3(to);
+    let b = null as ReturnType<typeof bounceLobVelocity>, t = tf, n: 1 | 2 = 1, floorY = 0;
+    if (standing) {
+      // the env bounce first: with a prop on the runway the one contact is pinned ONTO its top (the first point along the
+      // throw where the sampled profile reads as the roof), the throw on its own clock — a toss up onto the car, back up to
+      // the hand; out of reach from here (a near-vertical drop) it falls through to the plain bounce-bounce
+      if (obstacle) {
+        const roof = roofPointAlong(f, c);
+        // a toss over ENV_TOSS_APEX_CAP reads as a rocket; a contact inside 0.35 m / 0.35 s of the catch is the ball falling into
+        // the hand before it meets the roof (measured: an 11 m toss "caught" on its way down) — both fall through to the floor
+        if (roof) { const bo = bounceOntoVelocity(f, c, roof.z, roof.h, ballSim.radius, FLOOR_E, FLOOR_FRICTION, ENV_TOSS_APEX_CAP); if (bo && bo.tf != null && roof.z - c.z >= 0.35 && bo.tf - bo.times[0] >= 0.35) { b = bo; t = bo.tf; n = 1; floorY = roof.h; } else console.info(`[LOB] the ${obstacle.spec.label}'s top at z ${roof.z.toFixed(2)} is out of reach from here (${bo ? `toss ${bo.apex.toFixed(1)} m, contact ${(roof.z - c.z).toFixed(2)} m / ${(bo.tf! - bo.times[0]).toFixed(2)} s before the catch` : 'no toss under the cap'}) — a floor bounce instead`); }
+      }
+      if (!b) {
+        n = 2; let min = bounceLobMinTime(f, c, 2);
+        if (min == null) { n = 1; min = bounceLobMinTime(f, c, 1); }
+        if (min != null) { t = Math.max(min + RUN_CUE_MARGIN_SEC, tf); b = bounceLobVelocity(f, c, t, n); }
+      }
+    } else b = bounceLobVelocity(f, c, tf, 1);
+    if (!b) { console.warn('[LOB] bounce lob cannot fit — a plain self-lob instead'); throwLob(ctx, from, 'SELF-LOB', tf); return; }
+    if (ball.parent) { releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ball.position.copyFrom(releasePos); }
+    ballSim.launch(from, new Vector3(b.v.x, b.v.y, b.v.z));
+    lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = n === 2 ? 'BOUNCE-BOUNCE LOB' : 'BOUNCE LOB'; lob.kind = 'bounce'; lob.wantBounces = n; lob.t = 0; catchBlend = 1; catchPending = false;
+    setTrail('soft');
+    console.info(`[LOB] ${lob.label} from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) ${b.bounces.map((p, i) => `bounce ${i + 1} at (${p.x.toFixed(2)},${p.z.toFixed(2)}) @${b!.times[i].toFixed(2)} s${floorY > 0 ? ` on the ${obstacle?.spec.label} (${floorY.toFixed(2)} m)` : ''}`).join(', ')} then to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${t.toFixed(2)} s, last apex ${b.apex.toFixed(2)}${standing ? ' (standing)' : ''}`);
+    if (standing) armRunCue(t, dist);
+  }
+  /** One step of a live lob on the ball's clock (real seconds on the runway, clip seconds in the air): the floor / a prop's
+   *  top under it, the glass, the iron, and the words for each. */
+  function stepLob(ctx: ModeContext, dt: number): void {
+    if (!lob.live) return;
+    lob.t += dt;
+    const wasOverProp = obstacle ? heightAt(obstacle.profile, ballSim.pos.x, ballSim.pos.z) : 0;
+    const prevZ = ballSim.pos.z;
+    const ground = groundUnderBall();
+    ballSim.step(dt, ground, FLOOR_E, FLOOR_FRICTION);
+    // a ball flying INTO a prop's side (it was beside the prop, now inside its footprint below the top) comes back off the side
+    if (obstacle && !wasOverProp) { const h = heightAt(obstacle.profile, ballSim.pos.x, ballSim.pos.z); if (h > 0 && ballSim.pos.y - ballSim.radius < h - 0.02) { ballSim.pos.z = prevZ; ballSim.vel.z = -ballSim.vel.z * 0.5; ballSim.vel.x *= 0.8; ballSim.mesh.position.copyFrom(ballSim.pos); if (!lob.env) { lob.env = obstacle.spec.label; console.info(`[LOB] off the side of the ${obstacle.spec.label}`); flash(ctx, `OFF THE ${obstacle.spec.label}`, 500); SoundKit.play('impact', { pitch: 0.9, volume: 0.4 }); } } }
+    if (ballSim.bounced) {
+      lob.bounces++;
+      if (ground > 0 && obstacle) { lob.env = obstacle.spec.label; runwayDifficulty += ENV_BOUNCE_DIFFICULTY; console.info(`[LOB] BOUNCE ${lob.bounces} off the ${obstacle.spec.label} (${ground.toFixed(2)} m) @${lob.t.toFixed(2)} s`); flash(ctx, `OFF THE ${obstacle.spec.label}!`, 600); SoundKit.play('impact', { pitch: 1.1, volume: 0.45 }); EffectsKit.burst(ctx.scene, ball.getAbsolutePosition(), 'sparks'); ctx.camDirector.pulse(0.25, 0.25); }
+      else if (lob.kind === 'bounce') { console.info(`[LOB] BOUNCE ${lob.bounces} @${lob.t.toFixed(2)} s at z ${ballSim.pos.z.toFixed(2)}`); flash(ctx, lob.bounces >= 2 ? 'BOUNCE · BOUNCE' : 'BOUNCE', 450); SoundKit.play('impact', { pitch: 1.4, volume: 0.3 }); }
+    }
+    // the glass: the front face inside the board, or over / beside it
+    if (!lob.glass && !lob.over) {
+      const hit = ballSim.sweptPanelHit(glass.z, glass.xMin, glass.xMax, glass.yMin, glass.yMax, GLASS_E_N, GLASS_E_T);
+      if (hit) { lob.glass = true; console.info(`[LOB] OFF THE GLASS at (${hit.x.toFixed(2)},${hit.y.toFixed(2)}) @${lob.t.toFixed(2)} s`); flash(ctx, 'OFF THE GLASS!', 600); SoundKit.play('impact', { pitch: 1.6, volume: 0.45 }); EffectsKit.burst(ctx.scene, hit, 'sparks'); ctx.camDirector.pulse(0.3, 0.3); hoopJuice?.punch(); }
+      else if (ballSim.prevPos.z >= glass.z + ballSim.radius && ballSim.pos.z < glass.z + ballSim.radius && lob.kind === 'glass') { lob.over = true; const y = ballSim.pos.y; console.info(`[LOB] ${y > glass.yMax ? 'OVER' : 'WIDE OF'} THE GLASS (${ballSim.pos.x.toFixed(2)},${y.toFixed(2)}) @${lob.t.toFixed(2)} s`); flash(ctx, y > glass.yMax ? 'OVER THE GLASS' : 'WIDE OF THE GLASS', 700); SoundKit.play('crowdGroan', { volume: 0.4 }); }
+    }
+    // the iron: a toss through the rim's ring clanks off it
+    if (!lob.clanked) for (const c of RIM_RING) { const h = ballSim.sweptHit(c, RIM_IRON_R); if (h) { const n = ballSim.pos.subtract(c); if (n.lengthSquared() < 1e-6) n.set(0, 1, 0); ballSim.deflect(n, 0.55); ballSim.pos.copyFrom(h); ballSim.mesh.position.copyFrom(h); lob.clanked = true; console.info(`[LOB] CLANK off the iron @${lob.t.toFixed(2)} s (${h.x.toFixed(2)},${h.y.toFixed(2)},${h.z.toFixed(2)})`); flash(ctx, 'OFF THE IRON', 600); SoundKit.play('impact', { pitch: 1.2, volume: 0.5 }); break; } }
+    // the standing throw's RUN cue
+    if (lob.runCueAt >= 0 && !lob.runCued && lob.t >= lob.runCueAt) { lob.runCued = true; if (phase === 'approach') { console.info(`[LOB] RUN! @${lob.t.toFixed(2)} s`); flash(ctx, 'RUN!', 700); ctx.setHud({ hint: 'RUN! HOLD to run — then tap jump' }); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.5 }); ctx.camDirector.pulse(0.3, 0.3); } }
   }
   function catchLob(ctx: ModeContext): void {
     if (!lob.live) return;
