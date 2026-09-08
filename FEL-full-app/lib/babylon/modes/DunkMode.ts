@@ -34,6 +34,8 @@ import { bindFrame, type BindFrame } from '../anim/bindFrame';
 import { EASTBAY_TIMING as EB } from '../anim/authored/timing';
 import { EASTBAY_TIMING } from '../anim/authored/timing';
 import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';   // A+ P8 H1: the hang wrist reach
+import { chainRotation, frameAbove } from '../anim/TwoBoneIK';
+import { POSTURE, posturePose, chestAimCorrection, hipYawStrip, easePose, clonePose, lowPassK, wrapRad, clamp, POSTURE_TAU, AIM_TAU, AIM_SPLIT, EYES_SPLIT, HEAD_YAW_CAP, HEAD_PITCH_CAP, type PosturePose, type PostureWindow, type PostureInput } from '../core/DunkPosture';   // DUNK-POSTURE: the Posture Poses layer
 import type { PlayOpts } from '../anim/CharacterAnimator';
 import { DunkReplayRecorder } from '../scene/DunkReplayCam';
 import { SoundKit } from '../audio/SoundKit';
@@ -44,7 +46,7 @@ import { HoopJuice } from '../visual/HoopJuice';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
-import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, DOUBLE_UP_WINDOW_M, DOUBLE_UP_MIN_SPEED, CATCH_DIFFICULTY, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
+import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, DOUBLE_UP_WINDOW_M, DOUBLE_UP_MIN_SPEED, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T } from '../core/DunkLob';
 import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind } from '../core/DunkObstacles';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
@@ -132,7 +134,14 @@ const RIVAL_BLOWN_CHANCE = 0.18;
  *  (the hang slow-mo stretches the lag with the flight), held through a make's flush, let go at CONTACT / the clank / a clip. */
 const HAND_IK_MAX = 0.6, HAND_IK_LAG_SEC = 0.12, HAND_IK_RIM_UP = 0.08, REACH_POLE_CAP = Math.PI / 2, HAND_IK_FROM = EASTBAY_TIMING.carryUp - 0.05;
 /** Dev probes only: `?noreach=1` on /dev/mode/dunk plays the clips with no wrist reach (to tell a clip's own snap from the IK's). */
+/** DUNK-POSTURE S3: through the JAM (the slam press → CONTACT) the ball hand sits ON the iron, not 60 % of the way there. */
+const HAND_IK_MAX_JAM = 0.95;
 const REACH_OFF = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' && /[?&]noreach=1/.test(location.search);
+/** Dev probes only: `?noposture=1` plays the clips with no Posture Poses layer (the before / after of DUNK-POSTURE). */
+const POSTURE_OFF = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' && /[?&]noposture=1/.test(location.search);
+/** DUNK-POSTURE: the clavicle key signs, measured on the shipped hero (rig-diag 2026-09-08): +Z lifts the LEFT clavicle and
+ *  drops the right, +Y pulls the left clavicle BACK and the right forward — so a `shrug` / `forward` is mirrored per side. */
+const CLAVICLE_SIGN = { Left: { shrug: 1, forward: -1 }, Right: { shrug: -1, forward: 1 } } as const;
 /** H5: the root's fall from the release height (the arc's own rate at the release, ~2.6 m/s) — feet-down is where the land clip plays.
  *  Measured before: the root froze at the resolve height (~0.23 m) and the idle loop played there through the judging. */
 const FALL_SPEED = 2.6;
@@ -217,6 +226,17 @@ export const DunkMode: ModeDefinition = (() => {
   let hipsNode: TransformNode | null = null, hipsBf: BindFrame | null = null;
   const hipsBindInv = Quaternion.Identity(), hipsRaw = Quaternion.Identity(), hipsOut = Quaternion.Identity(); let hipsLayered = false;
   let liveTricks: { clip: string; t0: number; speed: number }[] = [], liveSpin = { turns: 0, from: 0, until: 0 };   // this attempt's air tricks, for the replay
+  // ── DUNK-POSTURE (2026-09-08): the Posture Poses layer — see core/DunkPosture.ts ──────────────────────────────────
+  // The clips key the hips and ONE spine bone: the thoracic chain, the clavicles and the head were never authored and held
+  // whatever the run loop last left them (a mid-stride twist) for the whole flight. This layer owns them per window,
+  // squares the chest to the rim (the spin subtracted), puts the eyes on the iron and strips the clip's own hip yaw.
+  interface PpNode { n: TransformNode; raw: Quaternion; out: Quaternion; layered: boolean; bindChain: Quaternion }
+  let ppFrame: TransformNode | null = null;
+  const ppNodes: { spine: PpNode | null; spine1: PpNode | null; spine2: PpNode | null; neck: PpNode | null; head: PpNode | null; Left: PpNode | null; Right: PpNode | null } = { spine: null, spine1: null, spine2: null, neck: null, head: null, Left: null, Right: null };
+  let ppSign: 1 | -1 = 1;                     // world yaw per frame-space yaw (−1 under a mirrored import root)
+  let ppPose: PosturePose = clonePose(POSTURE.stance), ppWindow: PostureWindow = 'stance', ppTrick: string | null = null;
+  let ppAim = 0, ppHeadYaw = 0, ppHeadPitch = 0, ppClipHipYaw = 0, ppChestYaw = 0;   // smoothed corrections (rad) and the readouts
+  let ppOverride: PosturePose | null = null;  // dev probes: a stance forced on the rig (calibration)
   let replayRateNow = 0.5, replayTrickIdx = 0, replaySpinYaw = 0;
   let lookX = 0, lookY = 0, lookSeen = false; // R stick → the director's look orbit (Dunk play tip 2026-09-07)
   let holdRunSpeed = 0, airLean = 0;          // pad: hold-run speed this attempt; smoothed air lean from the stick
@@ -352,6 +372,7 @@ export const DunkMode: ModeDefinition = (() => {
       hipsNode = boneNode(player.skeleton, 'Hips'); hipsBf = bindFrame(player.skeleton); hipsLayered = false;
       if (hipsNode) { const b = hipsBf.bind.get(hipsNode)?.q ?? Quaternion.Identity(); hipsBindInv.copyFrom(b).invertInPlace(); } else console.warn('[FEL-DUNK] no Hips node on this rig — the 360 turn is off');
       if (!feet.L || !feet.R) console.warn('[FEL-DUNK] no foot bones on this rig — the obstacle clear reads the root');
+      setupPosture();   // DUNK-POSTURE: the thoracic chain, the clavicles and the head, and the frame's yaw sense
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);
       ikScene = ctx.scene; handIkObs = ctx.scene.onAfterAnimationsObservable.add(handIkApply);
       // spawnNpc is explicit: the rival must NEVER wear the player's identity,
@@ -379,7 +400,7 @@ export const DunkMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'venice');
       trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
-      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }   // OOM-HYGIENE: the handle is gone once the harness is disposed (a load that resolves after an unmount)
+      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown; dunkPosture?: unknown } }).__FEL_DEV__; if (dev) { dev.hoopJuiceUsed = hoopJuice.used; dev.dunkPosture = postureDevHandle; } }   // OOM-HYGIENE: the handle is gone once the harness is disposed (a load that resolves after an unmount)
       // Venice LOOK: KEEP/HIDE, palm tip ~10m, golden-haze (no GLB edits).
       // Court locations (docs/SPEC-COURT-LOCATIONS.md): the Venice look (golden sky, surround palms) is Venice's own —
       // under any other location the location's environment stands, so the pass steps aside.
@@ -487,6 +508,12 @@ export const DunkMode: ModeDefinition = (() => {
         const center = EASTBAY_TIMING.extend;
         const window = CFG.qteWindowSec * (1 - styleTaps * 0.25) * flight.slamWindowScale;
         qteAccuracy = Math.max(0, 1 - Math.abs(clipTime - center) / (window / 2));
+        // DUNK-POSTURE S3: the slam resolves ON THE PRESS. It used to wait for the window to close (clip 1.41 — the body
+        // 0.3 m off the floor on the way down), so the ball left a hand at chest height and lerped 2.7 m up into the iron on
+        // its own; the "jam" the eye saw was a reach forward at knee height. Pressed inside the window the hand IS at the
+        // rim (the extension rides the top of the arc); the release, the finish and the flush follow from there, the root
+        // hangs at that height until the replay hands it back (the rim hang), the accuracy read above is unchanged.
+        resolveDunk(ctx);
       }
       // RIM HANG — hold SLAM through the flush to hang on the iron
       if (e.t === 'button' && e.btn === 'A') aHeld = e.pressed;
@@ -1041,9 +1068,12 @@ export const DunkMode: ModeDefinition = (() => {
    *  wrist LAGS the root into the iron instead of riding the clip rigidly. Pole: outward and slightly back, the dribble's own.
    *  Rotations only (shoulder / elbow) — never a bone translation, never a scale (TwoBoneIK's node-space solve). */
   function handIkApply(): void {
-    const w = HAND_IK_MAX * handIkT * handIkT * (3 - 2 * handIkT);
+    const wMax = phase === 'resolve' && qteHit && !contactLatch && !obstacleClipped ? HAND_IK_MAX_JAM : HAND_IK_MAX;
+    const w = wMax * handIkT * handIkT * (3 - 2 * handIkT);
     if (!player) return;
+    postureTick();         // DUNK-POSTURE: this frame's stance (eased between windows) — the spin layer reads its hip-yaw keep
     applySpinLayer();
+    applyPostureLayer();   // DUNK-POSTURE: thoracic / clavicles / head, the rim-locked chest aim, the eyes — before the reach
 
     if (w > 0.001 && !REACH_OFF) {
       player.root.computeWorldMatrix(true);
@@ -1078,15 +1108,157 @@ export const DunkMode: ModeDefinition = (() => {
    *  animation, so the layer remembers what it wrote and starts from the clip's own value again — never compounds. */
   function applySpinLayer(): void {
     const n = hipsNode; if (!n || !hipsBf || !n.rotationQuaternion) return;
-    const yaw = replaying ? replaySpinYaw : spin.yaw;
+    const spinYaw = replaying ? replaySpinYaw : spin.yaw;
     const q = n.rotationQuaternion;
     const held = hipsLayered && Math.abs(q.x - hipsOut.x) < 1e-6 && Math.abs(q.y - hipsOut.y) < 1e-6 && Math.abs(q.z - hipsOut.z) < 1e-6 && Math.abs(q.w - hipsOut.w) < 1e-6;
-    if (Math.abs(yaw) < 1e-4) { if (held) q.copyFrom(hipsRaw); hipsLayered = false; return; }
     if (!held) hipsRaw.copyFrom(q);
+    // DUNK-POSTURE: the hip-yaw strip — the clip's OWN hip yaw (the mocap gather swings the hips ±35°, the fakes turn them
+    // 30°) is read off the clip's value in frame space and only `hipYawKeep` of it survives; the turn is added on top. A
+    // function of the clip's value (never of the last write), so a held pose cannot compound it.
+    const keep = POSTURE_OFF ? 1 : ppPose.hipYawKeep;
+    ppClipHipYaw = keep < 0.999 && ppFrame ? frameYawOf(n, hipsRaw, hipsBindChain) : 0;
+    const yaw = spinYaw + hipYawStrip(ppClipHipYaw, keep);
+    if (Math.abs(yaw) < 1e-4) { if (held) q.copyFrom(hipsRaw); hipsLayered = false; return; }
     const D = hipsBf.keyedQ(n, Quaternion.RotationAxis(Vector3.Up(), yaw)).multiply(hipsBindInv);
     D.multiplyToRef(hipsRaw, q); hipsOut.copyFrom(q); hipsLayered = true;
     n.computeWorldMatrix(true);   // an in-place quaternion write leaves the cached world matrix stale — the reach and any probe read the turned hips
   }
+
+  // ── DUNK-POSTURE (2026-09-08): the Posture Poses layer ──────────────────────────────────────────────────────────
+  // Frame space = the product of the LOCAL rotations from the topmost node down (TwoBoneIK's chainRotation, bindFrame's
+  // convention): the space every degree key is written in, so a yaw here is the same sense as a Hips [0, +deg, 0] key and
+  // the spin layer's own yaw. World enters only through the root's error to the rim (mapped by ppSign) and the head's
+  // elevation to the iron (y is y in every frame).
+  const hipsBindChain = Quaternion.Identity();
+  const _ppQ = Quaternion.Identity(), _ppD = Quaternion.Identity(), _ppV = new Vector3(), _ppRho = Quaternion.Identity();
+  /** The frame-space yaw of a node's rotation `local` against its bind chain (the clip's own turn: 0 at bind). */
+  function frameYawOf(n: TransformNode, local: Quaternion, bindChain: Quaternion): number {
+    const par = n.parent as TransformNode | null; const Rp = par && par !== ppFrame ? chainRotation(par, ppFrame!) : Quaternion.Identity();
+    Rp.multiplyToRef(local, _ppQ); _ppQ.multiplyToRef(Quaternion.Inverse(bindChain), _ppD);
+    Vector3.Forward().rotateByQuaternionToRef(_ppD, _ppV);
+    return Math.atan2(_ppV.x, _ppV.z);
+  }
+  /** The frame-space forward of a node NOW against its bind chain: x/z = the yaw, y = the elevation. */
+  function frameForwardOf(p: PpNode, out: Vector3): Vector3 {
+    chainRotation(p.n, ppFrame!).multiplyToRef(Quaternion.Inverse(p.bindChain), _ppD);
+    return Vector3.Forward().rotateByQuaternionToRef(_ppD, out);
+  }
+  /** Rotate a node by `rho` in frame space (q' = Rp⁻¹ ∘ ρ ∘ Rp ∘ q): the node turns about the frame's axis, wherever the
+   *  chain above it is — the way the solver writes a world delta back as a local. */
+  function rotateInFrame(n: TransformNode, rho: Quaternion): void {
+    const par = n.parent as TransformNode | null; const Rp = par && par !== ppFrame ? chainRotation(par, ppFrame!) : Quaternion.Identity();
+    const q = n.rotationQuaternion!;
+    Quaternion.Inverse(Rp).multiply(rho).multiply(Rp).multiplyToRef(q, _ppQ); q.copyFrom(_ppQ);
+  }
+  const qEq = (a: Quaternion, b: Quaternion): boolean => Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6 && Math.abs(a.z - b.z) < 1e-6 && Math.abs(a.w - b.w) < 1e-6;
+  /** The clip's value this frame — or, on a held pose (no animation rewrote the node), the value it held before this layer
+   *  wrote it. The layer's own last write is never mistaken for a clip's: it cannot compound. */
+  function ppBase(p: PpNode): Quaternion { const q = p.n.rotationQuaternion!; if (!(p.layered && qEq(q, p.out))) p.raw.copyFrom(q); return p.raw; }
+  function ppCommit(p: PpNode): void { p.out.copyFrom(p.n.rotationQuaternion!); p.layered = true; }
+  function ppNodeFor(name: string): PpNode | null {
+    const n = boneNode(player.skeleton, name); if (!n || !hipsBf) return null;
+    if (!n.rotationQuaternion) n.rotationQuaternion = Quaternion.FromEulerVector(n.rotation);
+    const b = hipsBf.bind.get(n); const Rp = hipsBf.parentRot.get(n) ?? Quaternion.Identity();
+    return { n, raw: n.rotationQuaternion.clone(), out: n.rotationQuaternion.clone(), layered: false, bindChain: b ? Rp.multiply(b.q) : Quaternion.Identity() };
+  }
+  function setupPosture(): void {
+    ppFrame = hipsNode ? frameAbove(hipsNode) : null;
+    ppNodes.spine = ppNodeFor('Spine'); ppNodes.spine1 = ppNodeFor('Spine1'); ppNodes.spine2 = ppNodeFor('Spine2'); ppNodes.neck = ppNodeFor('Neck'); ppNodes.head = ppNodeFor('Head');
+    ppNodes.Left = ppNodeFor('LeftShoulder'); ppNodes.Right = ppNodeFor('RightShoulder');
+    ppPose = clonePose(POSTURE.stance); ppWindow = 'stance'; ppTrick = null; ppAim = 0; ppHeadYaw = 0; ppHeadPitch = 0;
+    if (hipsNode && hipsBf) { const b = hipsBf.bind.get(hipsNode); const Rp = hipsBf.parentRot.get(hipsNode) ?? Quaternion.Identity(); hipsBindChain.copyFrom(b ? Rp.multiply(b.q) : Quaternion.Identity()); }
+    // the frame's yaw sense: a +yaw in frame space is a +yaw in world unless the import root reflects (Babylon's glTF
+    // (1, 1, −1) root) — read off the frame's own world matrix rather than assumed
+    ppSign = ppFrame && ppFrame.getWorldMatrix().determinant() < 0 ? -1 : 1;
+    const missing = (['spine', 'spine1', 'spine2', 'neck', 'head', 'Left', 'Right'] as const).filter((k) => !ppNodes[k]);
+    if (missing.length) console.warn(`[FEL-DUNK] posture layer: no ${missing.join(' / ')} on this rig — that part of the stance is off`);
+    else console.info(`[DUNK-PP] posture layer on (frame ${ppFrame?.name ?? '?'}, yaw sense ${ppSign})`);
+  }
+  /** This frame's stance: the window on the flight's clock (the replay's own clock when it re-flies), the trick's chest
+   *  over it while its body plays, eased between windows so a change is a movement, never a pop. */
+  function postureTick(): void {
+    const dt = clamp((ikScene?.getEngine().getDeltaTime() ?? 16) / 1000, 0, 0.05);
+    const rep = replaying && replayAir;
+    const t = rep ? replayAirSec * replayRateNow : clipTime;
+    let trick: PostureInput['trick'] = null;
+    if (rep) { const lt = liveTricks[replayTrickIdx - 1]; const id = lt ? DUNK_TRICK_ID_BY_CLIP[lt.clip] : undefined; if (lt && id) trick = { id, t0: lt.t0, sec: (player.animator.durationOf(lt.clip) ?? 0.8) / lt.speed }; }
+    else if (airTrick) trick = { id: airTrick.trick.id, t0: airTrick.t0, sec: (player.animator.durationOf(airTrick.trick.clip) ?? 0.8) / 1.05 };
+    const inp: PostureInput = {
+      phase: rep ? (replayAerial ? 'resolve' : 'cinematic') : phase === 'approach' || phase === 'charge' || phase === 'cinematic' || phase === 'resolve' ? phase : 'other',
+      clipTime: t, made: rep ? true : phase === 'resolve' ? qteHit : null, clipped: obstacleClipped && !rep,
+      landed: win === 'land', celebrate: landingClip === SPORT_CLIP.dunkCelebrateBig, trick,
+    };
+    const { window, pose, trick: trickId } = posturePose(inp);
+    if (window !== ppWindow || trickId !== ppTrick) { ppWindow = window; ppTrick = trickId; console.info(`[DUNK-PP] ${window}${trickId ? ' · ' + trickId : ''}`); }
+    ppPose = ppOverride ? clonePose(ppOverride) : easePose(ppPose, pose, lowPassK(dt, POSTURE_TAU));
+  }
+  function applyPostureLayer(): void {
+    if (!ppFrame || !hipsBf || !hipsNode) return;
+    const dt = clamp((ikScene?.getEngine().getDeltaTime() ?? 16) / 1000, 0, 0.05);
+    const P = ppPose, w = POSTURE_OFF ? 0 : clamp(P.weight, 0, 1);
+    const bf = hipsBf;
+    // 1) the stance: thoracic, clavicles, head — absolute from bind, the clip's (or the held) value under it by 1 − w
+    const stance = (p: PpNode | null, deg: [number, number, number]) => { if (!p) return; const base = ppBase(p); Quaternion.SlerpToRef(base, bf.keyed(p.n, deg), w, _ppQ); p.n.rotationQuaternion!.copyFrom(_ppQ); ppCommit(p); };
+    // 0) the lumbar lean, ADDED to the clip's Spine (a pitch about the bone's own right axis in frame space, +X = forward)
+    if (ppNodes.spine && Math.abs(P.lean) * w > 0.05) {
+      const sp = ppNodes.spine; const base = ppBase(sp); sp.n.rotationQuaternion!.copyFrom(base);
+      chainRotation(sp.n, ppFrame).multiplyToRef(Quaternion.Inverse(sp.bindChain), _ppD);
+      const axis = Vector3.Right().rotateByQuaternionToRef(_ppD, new Vector3()).normalize();
+      Quaternion.RotationAxisToRef(axis, P.lean * w * Math.PI / 180, _ppRho); rotateInFrame(sp.n, _ppRho); ppCommit(sp);
+    } else if (ppNodes.spine) { const sp = ppNodes.spine; const base = ppBase(sp); sp.n.rotationQuaternion!.copyFrom(base); ppCommit(sp); }
+    stance(ppNodes.spine1, P.spine1); stance(ppNodes.spine2, P.spine2);
+    for (const side of ['Left', 'Right'] as const) stance(ppNodes[side], [0, CLAVICLE_SIGN[side].forward * P.forward, CLAVICLE_SIGN[side].shrug * P.shrug]);
+    stance(ppNodes.neck, P.neck); stance(ppNodes.head, P.head);
+    // 2) the rim-locked chest aim: the chest's frame-space yaw vs where the rim is (the turn subtracted), split over the two
+    //    thoracic bones, capped at a hip–shoulder separation, eased so the aim never jitters against the clip
+    const rootYaw = player.root.rotationQuaternion ? player.root.rotationQuaternion.toEulerAngles().y : player.root.rotation.y;
+    const rootErr = wrapRad(Math.atan2(rim.x - player.root.position.x, rim.z - player.root.position.z) - rootYaw);
+    const spinYaw = replaying ? replaySpinYaw : spin.yaw;
+    const kAim = lowPassK(dt, AIM_TAU);
+    if (ppNodes.spine2) {
+      frameForwardOf(ppNodes.spine2, _ppV); ppChestYaw = Math.atan2(_ppV.x, _ppV.z);
+      const want = chestAimCorrection(ppChestYaw, spinYaw, rootErr, ppSign) * P.chestAim * w;
+      ppAim += (want - ppAim) * kAim;
+      if (Math.abs(ppAim) > 1e-4) {
+        const parts: [PpNode | null, number][] = [[ppNodes.spine1, AIM_SPLIT[0]], [ppNodes.spine2, AIM_SPLIT[1]]];
+        for (const [p, k] of parts) { if (!p) continue; Quaternion.RotationAxisToRef(Vector3.Up(), ppAim * k, _ppRho); rotateInFrame(p.n, _ppRho); ppCommit(p); }
+      }
+    }
+    // 3) the eyes: the neck and the head turn and tilt toward the iron on top of the chest (a dunker watches the rim, not the
+    //    floor) — measured on the head, split over the two bones
+    if (ppNodes.head) {
+      const hp = ppNodes.head;
+      frameForwardOf(hp, _ppV);
+      const headYaw = Math.atan2(_ppV.x, _ppV.z), headEl = Math.asin(clamp(_ppV.y, -1, 1));
+      hp.n.computeWorldMatrix(true); const hw = hp.n.getAbsolutePosition();
+      const el = Math.atan2(rim.y - hw.y, Math.max(0.3, Math.hypot(rim.x - hw.x, rim.z - hw.z)));
+      const wantYaw = clamp(wrapRad(spinYaw + ppSign * rootErr - headYaw), -HEAD_YAW_CAP, HEAD_YAW_CAP) * P.eyes * w;
+      const wantPitch = clamp(el - headEl, -HEAD_PITCH_CAP, HEAD_PITCH_CAP) * P.eyes * w;
+      ppHeadYaw += (wantYaw - ppHeadYaw) * kAim; ppHeadPitch += (wantPitch - ppHeadPitch) * kAim;
+      const parts: [PpNode | null, number][] = [[ppNodes.neck, EYES_SPLIT[0]], [hp, EYES_SPLIT[1]]];
+      for (const [p, k] of parts) {
+        if (!p) continue;
+        if (Math.abs(ppHeadYaw) > 1e-4) { Quaternion.RotationAxisToRef(Vector3.Up(), ppHeadYaw * k, _ppRho); rotateInFrame(p.n, _ppRho); }
+        if (Math.abs(ppHeadPitch) > 1e-4) {
+          // pitch about the bone's own right axis in frame space (+X = forward / down in every clip key, so up is −pitch)
+          chainRotation(p.n, ppFrame).multiplyToRef(Quaternion.Inverse(p.bindChain), _ppD);
+          const axis = Vector3.Right().rotateByQuaternionToRef(_ppD, new Vector3()).normalize();
+          Quaternion.RotationAxisToRef(axis, -ppHeadPitch * k, _ppRho); rotateInFrame(p.n, _ppRho);
+        }
+        ppCommit(p);
+      }
+    }
+    // 4) fresh world matrices top-down from the hips (a forced compute reads the parent's CACHED matrix): the reach solves
+    //    against this frame's shoulders, the ball rides this frame's hand
+    const walk = (n: TransformNode) => { n.computeWorldMatrix(true); for (const c of n.getChildTransformNodes(true)) walk(c); };
+    walk(hipsNode);
+  }
+  /** Dev probes (`__FEL_DEV__.dunkPosture`): the live window / stance / corrections, and an override to force a stance. */
+  const postureDevHandle = {
+    get: () => ({ window: ppWindow, trick: ppTrick, pose: ppPose, aimDeg: ppAim * 180 / Math.PI, chestYawDeg: ppChestYaw * 180 / Math.PI, clipHipYawDeg: ppClipHipYaw * 180 / Math.PI, headYawDeg: ppHeadYaw * 180 / Math.PI, headPitchDeg: ppHeadPitch * 180 / Math.PI, sign: ppSign, off: POSTURE_OFF }),
+    set override(p: PosturePose | null) { ppOverride = p; },
+    get override(): PosturePose | null { return ppOverride; },
+  };
   /** H5: every player clip goes through here. Babylon raises a group's end observable on stop() as well, so a chained onEnd
    *  used to fire the moment its clip was superseded — measured: the land crouch was cut to idle 150 ms in by the aerial's
    *  own chain. A superseded clip's chain is dead; only a clip that ends on its own runs it (and, with no chain, the idle

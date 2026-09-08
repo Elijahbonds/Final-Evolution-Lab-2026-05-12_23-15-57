@@ -62,8 +62,12 @@ export function buildCelebrateBig(scene: Scene, sk: Skeleton): AnimationGroup | 
   const T = 0.9, M = 0.3;
   const FLEX = { Left: [-0.34, 1.52, 0.12] as V3, Right: [0.34, 1.52, 0.12] as V3 };   // fists up beside the head, elbows out at shoulder height
   const FLEX_POLES = { Left: [-0.9, -0.2, -0.3] as V3, Right: [0.9, -0.2, -0.3] as V3 };
+  // DUNK-POSTURE (2026-09-08): the same authored descent as the land crouch — feet-down crossfades in from a finish with the
+  // hands overhead, and a low first key left the arms' way down to the blend (measured: the tomahawk → celebrate blend swept
+  // the hands to a 1.1 m T at shoulder height). Overhead first (the finishes' UP poles), then down the front into the crouch.
   return buildPoseClip(scene, sk, 'dunk_celebrate_big', T, [
-    { t: 0,   bones: { Hips: [0, 0, 0], Spine: [20, 0, 0], LeftUpLeg: [-55, 0, 8], LeftLeg: [80, 0, 0], RightUpLeg: [-55, 0, -8], RightLeg: [80, 0, 0] }, hands: { Left: [-0.30, 0.85, 0.30], Right: [0.30, 0.85, 0.30] }, hipsY: 0.02 },
+    { t: 0,   bones: { Hips: [0, 0, 0], Spine: [4, 0, 0],  LeftUpLeg: [-14, 0, 6], LeftLeg: [18, 0, 0], RightUpLeg: [-14, 0, -6], RightLeg: [18, 0, 0] }, hands: { Left: [-0.20, 1.92, 0.08], Right: [0.20, 1.92, 0.08] }, poles: { Left: [-0.9, 0.1, -0.3], Right: [0.9, 0.1, -0.3] }, hipsY: 0.04 },
+    { t: 0.1, bones: { Hips: [0, 0, 0], Spine: [20, 0, 0], LeftUpLeg: [-55, 0, 8], LeftLeg: [80, 0, 0], RightUpLeg: [-55, 0, -8], RightLeg: [80, 0, 0] }, hands: { Left: [-0.30, 0.85, 0.30], Right: [0.30, 0.85, 0.30] }, poles: { Left: [-0.9, 0.0, -0.3], Right: [0.9, 0.0, -0.3] }, hipsY: -0.06 },   // down the front, into the crouch — the elbows stay OUT (a pole flip between keys is a lateral sweep of the arm)
     { t: M,   bones: { Hips: [0, 0, 0], Spine: [26, 0, 0], LeftUpLeg: [-60, 0, 8], LeftLeg: [85, 0, 0], RightUpLeg: [-60, 0, -8], RightLeg: [85, 0, 0] }, hands: { Left: [-0.34, 0.80, 0.34], Right: [0.34, 0.80, 0.34] }, hipsY: -0.26 },
     { t: 0.6, bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], LeftUpLeg: [-10, 0, 4], LeftLeg: [14, 0, 0], RightUpLeg: [-10, 0, -4], RightLeg: [14, 0, 0] }, hands: FLEX, poles: FLEX_POLES, hipsY: -0.02 },
     { t: T,   bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], LeftUpLeg: [-10, 0, 4], LeftLeg: [14, 0, 0], RightUpLeg: [-10, 0, -4], RightLeg: [14, 0, 0] }, hands: FLEX, poles: FLEX_POLES, hipsY: 0 },

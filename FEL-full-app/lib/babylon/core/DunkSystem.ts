@@ -47,6 +47,9 @@ export const DUNK_TRICKS: DunkTrick[] = [
   { id: 'hideseek', label: 'HIDE & SEEK', dir: 'left', btn: 'A', clip: 'dunk_hide_seek', difficulty: 3.0, windowCost: 0.38 },
 ];
 
+/** Trick id by its clip (the replay re-fires clips; the posture layer wants the trick). */
+export const DUNK_TRICK_ID_BY_CLIP: Record<string, string> = Object.fromEntries(DUNK_TRICKS.map((t) => [t.clip, t.id]));
+
 // ── Runway tricks (DUNK-CONTROL-JUICE, 2026-09-08) ─────────────────────────
 // Thrown DURING THE HOLD-RUN (the stick steers, so no direction is held): a bare face button while RUN is down. The
 // self-lob and the kick-up put the ball in the air ahead of the dunker (a catch in the hang finishes them), the

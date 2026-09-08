@@ -39,8 +39,15 @@ export function buildScoreHang(scene: Scene, sk: Skeleton): AnimationGroup | nul
 
 export function buildLandCrouch(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = D.landSec, M = T * 0.4;
+  // DUNK-POSTURE (2026-09-08): feet-down crossfades into this clip from a finish (hands overhead) or the blown brace (hands
+  // in front of the face), and the old low first key left the arms' descent to the BLEND — the shortest rotation from an
+  // overhead arm to a low one passes through the side (measured: the tomahawk → land blend swept the hands to a 1.2 m T
+  // at shoulder height for ~100 ms, the "dead land" the eye called). The descent is AUTHORED now: the first key meets the
+  // finishes overhead (their own UP elbow poles, so the blend has nothing to turn), the second brings the hands down the
+  // FRONT to the chest, then the absorb. A brace's hands (face height, in front) blend into the same front path.
   return buildPoseClip(scene, sk, 'dunk_land_crouch', T, [
-    { t: 0, bones: { Hips: [0, 0, 0], Spine: [0, 0, 0],  ...legs(-10, 12) },    hands: { Left: [-0.26, 1.00, 0.20], Right: [0.26, 1.00, 0.20] }, hipsY: 0.05 },
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [2, 0, 0],  ...legs(-12, 16) },    hands: { Left: [-0.20, 1.92, 0.08], Right: [0.20, 1.92, 0.08] }, poles: { Left: [-0.9, 0.1, -0.3], Right: [0.9, 0.1, -0.3] }, hipsY: 0.04 },
+    { t: 0.08, bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], ...legs(-30, 42, 6) }, hands: { Left: [-0.22, 1.38, 0.38], Right: [0.22, 1.38, 0.38] }, poles: { Left: [-0.9, 0.0, -0.3], Right: [0.9, 0.0, -0.3] }, hipsY: -0.08 },   // down the front, into the crouch — the elbows stay OUT until the hands are low (a pole flip between keys is a lateral sweep of the arm; at hip height it is invisible)
     { t: M, bones: { Hips: [0, 0, 0], Spine: [26, 0, 0], ...legs(-60, 85, 8) }, hands: { Left: [-0.34, 0.85, 0.34], Right: [0.34, 0.85, 0.34] }, hipsY: -0.26 },   // absorb, arms forward for balance
     { t: T, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],  ...legs(-14, 18) },    hands: { Left: [-0.26, 0.86, 0.12], Right: [0.26, 0.86, 0.12] }, hipsY: 0 },
   ]);
