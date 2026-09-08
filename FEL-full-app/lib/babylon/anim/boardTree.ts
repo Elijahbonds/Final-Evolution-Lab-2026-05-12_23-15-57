@@ -14,7 +14,7 @@
 import type { CharacterAnimator } from './CharacterAnimator';
 
 export type BoardAnimState =
-  | 'cruise' | 'push' | 'carve_left' | 'carve_right'
+  | 'cruise' | 'push' | 'carve_left' | 'carve_right' | 'tuck'
   | 'air_tuck' | 'air_grab' | 'air_flip' | 'air_spin'
   | 'grind' | 'manual'
   | 'land_clean' | 'land_sketchy' | 'bail'
@@ -33,28 +33,36 @@ export interface BoardAnimInput {
   landing: 'none' | 'clean' | 'sketchy';   // one-beat
   bailing: boolean;
   celebrating?: boolean;
+  /** Grounded speed tuck (snow's throttle, surf's buried rail). A carve wins over it — a racer rises to turn. */
+  tucking?: boolean;
 }
 
 const CLIP_FOR: Record<BoardAnimState, { clip: string; loop: boolean; fadeSec: number }> = {
   cruise:        { clip: 'board_ride_idle', loop: true, fadeSec: 0.18 },
-  push:          { clip: 'walk_forward', loop: false, fadeSec: 0.12 },
-  carve_left:    { clip: 'board_carve_left', loop: true, fadeSec: 0.14 },
-  carve_right:   { clip: 'board_carve_right', loop: true, fadeSec: 0.14 },
-  air_tuck:      { clip: 'board_tuck', loop: true, fadeSec: 0.1 },
-  air_grab:      { clip: 'board_grab', loop: true, fadeSec: 0.08 },
+  push:          { clip: 'board_push', loop: false, fadeSec: 0.1 },       // was 'walk_forward': walk arms on a board
+  carve_left:    { clip: 'board_carve_left', loop: true, fadeSec: 0.2 },   // the lean-in IS the fade — the clips hold the pose
+  carve_right:   { clip: 'board_carve_right', loop: true, fadeSec: 0.2 },
+  tuck:          { clip: 'board_tuck', loop: true, fadeSec: 0.22 },
+  air_tuck:      { clip: 'board_tuck', loop: true, fadeSec: 0.12 },
+  air_grab:      { clip: 'board_grab', loop: true, fadeSec: 0.12 },
   air_flip:      { clip: 'skate_kickflip', loop: false, fadeSec: 0.06 },
-  air_spin:      { clip: 'board_air', loop: true, fadeSec: 0.08 },
+  air_spin:      { clip: 'board_air', loop: true, fadeSec: 0.12 },
   grind:         { clip: 'board_grind', loop: true, fadeSec: 0.08 },
   manual:        { clip: 'board_ride_idle', loop: true, fadeSec: 0.1 },
-  land_clean:    { clip: 'board_land', loop: false, fadeSec: 0.06 },
-  land_sketchy:  { clip: 'board_land', loop: false, fadeSec: 0.06 },
+  land_clean:    { clip: 'board_land', loop: false, fadeSec: 0.08 },
+  land_sketchy:  { clip: 'board_land', loop: false, fadeSec: 0.08 },
   bail:          { clip: 'skate_bail', loop: false, fadeSec: 0.05 },
   idle:          { clip: 'board_ride_idle', loop: true, fadeSec: 0.2 },
   celebrate:     { clip: 'bball_score_celebrate', loop: false, fadeSec: 0.15 },
 };
 
-export function chooseBoardClip(i: BoardAnimInput): { state: BoardAnimState; clip: string; loop: boolean; fadeSec: number } {
+/** Carve hysteresis: enter above 0.4, leave below 0.3 — a lean hovering on one threshold used to flip the state every
+ *  frame, and each flip restarts the animator's crossfade from weight 0 (measured as a 0.33 m hand snap per flip). */
+const CARVE_ON = 0.4, CARVE_OFF = 0.3;
+
+export function chooseBoardClip(i: BoardAnimInput, prev: BoardAnimState | null = null): { state: BoardAnimState; clip: string; loop: boolean; fadeSec: number } {
   let state: BoardAnimState;
+  const inCarve = prev === 'carve_left' || prev === 'carve_right';
   if (i.bailing) state = 'bail';
   else if (i.celebrating) state = 'celebrate';
   else if (i.landing === 'sketchy') state = 'land_sketchy';
@@ -64,25 +72,55 @@ export function chooseBoardClip(i: BoardAnimInput): { state: BoardAnimState; cli
   else if (i.airborne) {
     state = i.grabHeld ? 'air_grab' : i.flipping ? 'air_flip' : i.spinning ? 'air_spin' : 'air_tuck';
   } else if (i.pushing) state = 'push';
-  else if (Math.abs(i.lean) > 0.4 && i.speed01 > 0.2) state = i.lean < 0 ? 'carve_left' : 'carve_right';
+  else if (Math.abs(i.lean) > (inCarve ? CARVE_OFF : CARVE_ON) && i.speed01 > 0.2) state = i.lean < 0 ? 'carve_left' : 'carve_right';
+  else if (i.tucking) state = 'tuck';
   else if (i.speed01 > 0.15) state = 'cruise';
   else state = 'idle';
   return { state, ...CLIP_FOR[state] };
 }
 
+/** Where a finished one-shot settles while its trigger still holds (a flip that ran out mid-air holds the tuck). */
+export const AFTER_ONESHOT: Partial<Record<BoardAnimState, BoardAnimState>> = {
+  push: 'cruise', air_flip: 'air_tuck', land_clean: 'cruise', land_sketchy: 'cruise', bail: 'idle', celebrate: 'idle',
+};
+
+// ONE OWNER (ANIM-READABILITY, 2026-09-07). The tree is the only thing that plays clips on a board rider. Before, the
+// modes and the TrickMachine also called play() directly, and the tree's (or the mode's own per-frame) play cut every
+// one of them a frame later: the wipe read as a 0.13 s blend, the grab and the landing never showed. And a one-shot the
+// tree DID own ran out on its own: the animator's neverBindPose chain then crossfaded to the ride idle from inside the
+// animator's own fade handler, which stranded the fade it was replacing — two loco clips at partial weight for ~1 s
+// (skate baseline: ride idle + tuck 0.93 s, ride idle + walk 1.2 s). The tree now passes its own onEnd for every
+// one-shot, settles it into AFTER_ONESHOT, and ignores the end callback when it fired because the tree itself moved on.
 export class BoardAnimTree {
   private current: BoardAnimState | null = null;
+  /** A one-shot that ran out while its trigger still held; re-armed when the trigger drops. */
+  private spent: BoardAnimState | null = null;
+  private token = 0;
   constructor(private animator: CharacterAnimator) {}
   update(input: BoardAnimInput): BoardAnimState {
-    const c = chooseBoardClip(input);
-    if (c.state !== this.current) {
-      this.animator.play(c.clip, { loop: c.loop, fadeSec: c.fadeSec });
-      this.current = c.state;
-    }
+    let c = chooseBoardClip(input, this.current);
+    if (this.spent && c.state !== this.spent) this.spent = null;
+    if (this.spent && c.state === this.spent) { const after = AFTER_ONESHOT[c.state] ?? 'idle'; c = { state: after, ...CLIP_FOR[after] }; }
+    if (c.state !== this.current) this.enter(c);
     return c.state;
   }
+  private enter(c: { state: BoardAnimState; clip: string; loop: boolean; fadeSec: number }): void {
+    const st = c.state;
+    const tok = ++this.token;
+    const onEnd = c.loop ? undefined : () => {
+      // Fires on a natural end — and also when the animator cuts this clip for the next one (Babylon raises the group's
+      // end observable from stop()). Only the natural case is ours: the tree must still be sitting in this state.
+      if (this.current !== st || this.token !== tok) return;
+      this.spent = st;
+      const after = AFTER_ONESHOT[st] ?? 'idle';
+      this.enter({ state: after, ...CLIP_FOR[after] });
+    };
+    this.animator.play(c.clip, onEnd ? { loop: c.loop, fadeSec: c.fadeSec, onEnd } : { loop: c.loop, fadeSec: c.fadeSec });
+    this.current = st;
+  }
+  /** The mode's beat window closed: forget the beat state so the next update re-chooses (a no-op if already moved on). */
   clearBeat(...states: BoardAnimState[]): void {
     if (this.current && states.includes(this.current)) this.current = null;
   }
-  reset(): void { this.current = null; }
+  reset(): void { this.current = null; this.spent = null; }
 }

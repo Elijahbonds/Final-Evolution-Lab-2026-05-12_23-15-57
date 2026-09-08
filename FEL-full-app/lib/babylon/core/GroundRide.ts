@@ -64,7 +64,9 @@ export class Rider {
     const fwd = new Vector3(Math.sin(yaw), 0, Math.cos(yaw));
     this.vel.addInPlace(fwd.scale((this.cfg.carveAccel * (0.55 + 0.45 * pump)) * dt));
     this.root.rotation.y += steer * 1.9 * dt * (this.grounded ? 1 : 0.5);
-    this.root.rotation.z = -steer * 0.28;            // carve lean reads the turn
+    // carve lean reads the turn — eased (~0.1 s), not set: written straight from the stick it rolled the whole rider 16° in
+    // one frame on every stick edge (measured 0.3–0.45 m hand jumps at each press / release; ANIM-READABILITY 2026-09-07)
+    this.root.rotation.z += (-steer * 0.28 - this.root.rotation.z) * Math.min(1, 12 * dt);
 
     // drag + clamp
     this.vel.scaleInPlace(1 - this.cfg.drag * dt);

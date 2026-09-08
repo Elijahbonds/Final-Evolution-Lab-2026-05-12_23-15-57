@@ -6,11 +6,14 @@
  *      > carve > cruise.
  *   C. Air pose selection reflects the trick in progress.
  *   D. Tree dedupes (no per-frame restarts).
+ *   E. Grounded tuck (ANIM-READABILITY 2026-09-07): a carve rises out of it, air beats it.
+ *   F. One-shots settle: a flip that runs out mid-air holds the tuck and does not re-fire while the trigger holds;
+ *      the end callback of a clip the tree itself cut is ignored (the neverBindPose chain used to strand fades here).
  *
  * Run: npx tsx scripts/board-anim-tests.ts
  */
 import assert from 'node:assert';
-import { chooseBoardClip, BoardAnimTree, type BoardAnimInput } from '../lib/babylon/anim/boardTree';
+import { chooseBoardClip, BoardAnimTree, AFTER_ONESHOT, type BoardAnimInput } from '../lib/babylon/anim/boardTree';
 import { isResolvable } from '../lib/babylon/anim/clipRegistry';
 
 let pass = 0;
@@ -31,6 +34,7 @@ ok('every reachable state -> resolvable clip', () => {
     { ...BASE, grinding: true }, { ...BASE, manual: true },
     { ...BASE, landing: 'clean' }, { ...BASE, landing: 'sketchy' },
     { ...BASE, bailing: true }, { ...BASE, celebrating: true },
+    { ...BASE, tucking: true },
   ];
   const seen = new Set<string>();
   for (const i of probes) {
@@ -39,7 +43,7 @@ ok('every reachable state -> resolvable clip', () => {
     assert.ok(c.fadeSec > 0, `${c.state} hard-cut`);
     seen.add(c.state);
   }
-  assert.equal(seen.size, 15, `all 15 states, got ${seen.size}`);
+  assert.equal(seen.size, 16, `all 16 states, got ${seen.size}`);
 });
 
 console.log('\nB. priorities');
@@ -66,6 +70,64 @@ ok('same state plays once', () => {
   assert.equal(plays, 1);
   tree.update({ ...BASE, speed01: 0.6 });
   assert.equal(plays, 2);
+});
+
+console.log('\nE. grounded tuck');
+ok('tuck is a state; a carve rises out of it; air beats it', () => {
+  assert.equal(chooseBoardClip({ ...BASE, tucking: true }).state, 'tuck');
+  assert.equal(chooseBoardClip({ ...BASE, tucking: true }).clip, 'board_tuck');
+  assert.equal(chooseBoardClip({ ...BASE, tucking: true, speed01: 0.6 }).state, 'tuck');
+  assert.equal(chooseBoardClip({ ...BASE, tucking: true, speed01: 0.6, lean: -0.8 }).state, 'carve_left');
+  assert.equal(chooseBoardClip({ ...BASE, tucking: true, airborne: true }).state, 'air_tuck');
+  assert.equal(chooseBoardClip({ ...BASE, tucking: true, grinding: true }).state, 'grind');
+});
+ok('push is the authored board push, not the walk cycle', () => {
+  assert.equal(chooseBoardClip({ ...BASE, pushing: true }).clip, 'board_push');
+  assert.ok(isResolvable('board_push'));
+});
+
+console.log('\nF. one-shots settle');
+type Played = { clip: string; loop: boolean; onEnd?: () => void };
+const mockAnimator = (log: Played[]) => ({ play: (clip: string, o: { loop?: boolean; onEnd?: () => void } = {}) => { log.push({ clip, loop: !!o.loop, onEnd: o.onEnd }); } }) as never;
+ok('every one-shot state has a settle target and carries its own onEnd', () => {
+  for (const st of ['push', 'air_flip', 'land_clean', 'land_sketchy', 'bail', 'celebrate'] as const) assert.ok(AFTER_ONESHOT[st], `${st} settles somewhere`);
+  const log: Played[] = []; const tree = new BoardAnimTree(mockAnimator(log));
+  tree.update({ ...BASE, airborne: true, flipping: true });
+  assert.equal(log[0].clip, 'skate_kickflip'); assert.equal(log[0].loop, false); assert.ok(log[0].onEnd, 'one-shot has the tree\'s onEnd');
+  tree.update({ ...BASE, airborne: true });          // loop states carry none (neverBindPose leaves loops alone)
+  assert.equal(log[1].clip, 'board_tuck'); assert.equal(log[1].onEnd, undefined);
+});
+ok('a flip that runs out mid-air holds the tuck and does not re-fire while the trigger holds', () => {
+  const log: Played[] = []; const tree = new BoardAnimTree(mockAnimator(log));
+  const flip = { ...BASE, airborne: true, flipping: true };
+  tree.update(flip); assert.equal(log.length, 1);
+  log[0].onEnd!();                                    // natural end
+  assert.equal(log.length, 2); assert.equal(log[1].clip, 'board_tuck'); assert.equal(log[1].loop, true);
+  tree.update(flip); tree.update(flip);               // still flipping: no kickflip loop
+  assert.equal(log.length, 2);
+  tree.update({ ...BASE, airborne: true });           // trigger dropped → tuck already current, nothing new
+  assert.equal(log.length, 2);
+  tree.update(BASE);                                  // landed → idle
+  assert.equal(log[2].clip, 'board_ride_idle');
+  tree.update(flip);                                  // a NEW flip fires again
+  assert.equal(log[3].clip, 'skate_kickflip');
+});
+ok('the end callback of a clip the tree itself cut is ignored', () => {
+  const log: Played[] = []; const tree = new BoardAnimTree(mockAnimator(log));
+  tree.update({ ...BASE, airborne: true, flipping: true });
+  tree.update({ ...BASE, airborne: true, grabHeld: true });   // the tree moved on (grab wins) — the animator will stop the flip
+  assert.equal(log.length, 2);
+  log[0].onEnd!();                                    // Babylon raises the end observable from stop()
+  assert.equal(log.length, 2, 'no extra play from a cut one-shot');
+});
+ok('a mode beat (bail) plays once, settles into the idle, and the cleared beat re-chooses', () => {
+  const log: Played[] = []; const tree = new BoardAnimTree(mockAnimator(log));
+  const bail = { ...BASE, speed01: 0.6, bailing: true };
+  tree.update(bail); assert.equal(log[0].clip, 'skate_bail');
+  log[0].onEnd!(); assert.equal(log[1].clip, 'board_ride_idle');   // AFTER bail = idle
+  tree.update(bail); assert.equal(log.length, 2);
+  tree.clearBeat('bail');
+  assert.equal(tree.update({ ...BASE, speed01: 0.6 }), 'cruise');
 });
 
 console.log(`\n${pass} checks green`);

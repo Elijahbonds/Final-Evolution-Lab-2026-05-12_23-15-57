@@ -10,7 +10,7 @@ import '@babylonjs/loaders/glTF';
 import { boneNode } from '../boneLookup';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildHitReact, buildKnockdown, buildGuardStep } from './karate';
-import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail } from './boardSuite';
+import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, buildBoardCarveRight } from './boardSuite';
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildCelebrateBig } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
@@ -78,10 +78,22 @@ describe('board suite', () => {
     expect(Math.abs(pos('LeftHand').x - pos('RightHand').x) + Math.abs(pos('LeftHand').z - pos('RightHand').z)).toBeGreaterThan(0.7);
     expect(Math.abs(pos('Head').x)).toBeLessThan(0.25);
   });
-  it('tuck folds the torso down', () => {
+  it('tuck is a HELD fold — lower than the ride idle from its first frame, and its loop wraps seamlessly', () => {
+    // ANIM-READABILITY (2026-09-07): the tuck used to key stance → fold and loop, snapping upright every cycle. The fold-in
+    // is now the animator's crossfade; the clip holds the fold, so frame 0 is already low and frame T matches frame 0.
+    at(fresh(() => buildBoardRideIdle(scene, sk)!), 0); const rideHead = pos('Head').y - hipsY();
     const g = fresh(() => buildBoardTuck(scene, sk)!);
-    at(g, 0); const head0 = pos('Head').y - hipsY();
-    at(g, 0.6); expect(pos('Head').y - hipsY()).toBeLessThan(head0 - 0.12);
+    at(g, 0); const head0 = pos('Head').y - hipsY(); const lh0 = pos('LeftHand').clone();
+    expect(head0).toBeLessThan(rideHead - 0.12);
+    at(g, 1.2); expect(Math.abs(pos('Head').y - hipsY() - head0)).toBeLessThan(0.02);
+    expect(Vector3.Distance(pos('LeftHand'), lh0)).toBeLessThan(0.03);
+  });
+  it('carve and grab loops wrap seamlessly too (held poses, no snap-back)', () => {
+    for (const [build, T] of [[buildBoardCarveRight, 0.8], [buildBoardGrab, 0.8]] as const) {
+      const g = fresh(() => build(scene, sk)!);
+      at(g, 0); const lh0 = pos('LeftHand').clone(), rh0 = pos('RightHand').clone();
+      at(g, T); expect(Vector3.Distance(pos('LeftHand'), lh0)).toBeLessThan(0.03); expect(Vector3.Distance(pos('RightHand'), rh0)).toBeLessThan(0.03);
+    }
   });
   it('grab brings a hand down toward the deck', () => {
     at(fresh(() => buildBoardGrab(scene, sk)!), 0.35);

@@ -46,7 +46,7 @@ export const REAL_CLIPS = new Set<string>([
   'baseball_stance', 'baseball_swing', 'baseball_pitch_over', 'baseball_pitch_side',
   // board suite — skate / surf / snowboard share these (anim/authored/boardSuite)
   'board_ride_idle', 'board_carve_left', 'board_carve_right', 'board_tuck',
-  'board_grab', 'board_air', 'board_grind', 'board_land',
+  'board_grab', 'board_air', 'board_grind', 'board_land', 'board_push',
   'skate_kickflip', 'skate_bail',
 ]);
 

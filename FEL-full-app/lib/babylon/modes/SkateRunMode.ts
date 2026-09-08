@@ -82,6 +82,10 @@ export const SkateRunMode: ModeDefinition = (() => {
   let bailLatch = false;                      // one bail punch per touchdown (landing bail OR the failed save, never both)
   const FLASH_CHAIN = 3;                      // a chain this long earns the short flash on a clean land
   let landingBeatT = 0;
+  // ANIM-READABILITY (2026-09-07): the bail is a TREE beat, not a direct play. The direct `play('skate_bail')` was cut by
+  // the tree's own play the same frame (the touchdown moved the state air → cruise), so the fall read as a 0.1 s blend.
+  const BAIL_BEAT_SEC = 0.8;                  // skate_bail is 0.75 s; the tree settles it into the idle when it runs out
+  let bailBeatT = 0;
   let goals: GoalTracker;
   let patrolRail: MovingRail;
   let crowd: Onlookers;
@@ -154,6 +158,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // lost the rider until the follow swung round (mobile capture, ~1 run in 2)
       ctx.camDirector.snapTo(rig.char.root.position, aheadOfRider());
       timeLeft = RUN_SEC; ended = false; stickX = 0; pump = 0; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
+      landingBeatT = 0; bailBeatT = 0; bailLatch = false; lastLanding = 'none';
       // 'stadium' is a crowd bed with a breathing LFO -- wrong for a solo run
       // in an outdoor plaza. 'wind' is the open-air option in SoundKit's set.
       SoundKit.startAmbient('wind');
@@ -314,7 +319,7 @@ export const SkateRunMode: ModeDefinition = (() => {
           lastLanding = 'none';
           bannerFlash(ctx, 'BAILED', 900);
           SoundKit.play('miss');
-          rig.char.animator.play('skate_bail', {});
+          bailBeatT = BAIL_BEAT_SEC;   // the tree plays skate_bail and holds it
           bailPunch(ctx);   // A+ P0: hit-stop + shake + ONE low thud + dust (replaces feel.impact(0.7), whose thud would double)
         }
         // SWITCH STANCE. BoardMovement.switchStance() existed, applied its 0.92
@@ -337,7 +342,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       if (save?.active) {
         save.update(dt, stickX);
         if (save.saved) { bannerFlash(ctx, 'SAVED IT!', 700); mbus.report({ kind: 'big_make' }); save = null; }
-        else if (save.failed) { console.info('[SKATE-LAND] save failed'); combo.bail(); bannerFlash(ctx, 'BAILED', 900); rig.char.animator.play('skate_bail', {}); bailPunch(ctx); save = null; }   // A+ P0: the failed save is a bail too
+        else if (save.failed) { console.info('[SKATE-LAND] save failed'); combo.bail(); bannerFlash(ctx, 'BAILED', 900); bailBeatT = BAIL_BEAT_SEC; bailPunch(ctx); save = null; }   // A+ P0: the failed save is a bail too
       }
 
       // grind catch: airborne near a rail
@@ -360,12 +365,15 @@ export const SkateRunMode: ModeDefinition = (() => {
       // ── animation tree ──
       animTree.update({
         speed01: move.speed01, pushing, lean: move.balance.lean,
-        airborne: !rig.rider.grounded, grabHeld: !!air.state.grabHeld,
+        // the touchdown is graded one frame AFTER the rider re-grounds (rider.update runs after the grading block), so
+        // the tree stays in the air pose through that frame instead of flashing the ride idle between tuck and land
+        airborne: !rig.rider.grounded || (air.state.airborne && air.state.airtime > 0.15), grabHeld: !!air.state.grabHeld,
         flipping: Math.abs(air.state.angularVel.z) > 1, spinning: Math.abs(air.state.angularVel.y) > 1,
         grinding: rig.rider.grinding !== null, manual: manualCh?.active ?? false,
-        landing: landingBeatT > 0 ? lastLanding : 'none', bailing: false,
+        landing: landingBeatT > 0 ? lastLanding : 'none', bailing: bailBeatT > 0,
       });
       if (landingBeatT > 0) { landingBeatT -= dt; if (landingBeatT <= 0) animTree.clearBeat('land_clean', 'land_sketchy'); }
+      if (bailBeatT > 0) { bailBeatT -= dt; if (bailBeatT <= 0) animTree.clearBeat('bail'); }
 
       // goals: combo completion + banking feed the tracker
       if (!combo.active && combo.banked > 0) {

@@ -21,7 +21,7 @@ import { buildVolleyBlock, buildVolleyReady, buildVolleySpike } from './volleyba
 import { buildKeeperDive, buildKeeperSet, buildSoccerKick } from './soccer';
 import {
   buildBoardRideIdle, buildBoardCarveLeft, buildBoardCarveRight, buildBoardTuck,
-  buildBoardGrab, buildBoardAir, buildBoardGrind, buildBoardLand,
+  buildBoardGrab, buildBoardAir, buildBoardGrind, buildBoardLand, buildBoardPush,
   buildSkateKickflip, buildSkateBail,
 } from './boardSuite';
 
@@ -75,6 +75,7 @@ export function registerAuthoredClips(
     () => buildBoardAir(scene, skeleton),
     () => buildBoardGrind(scene, skeleton),
     () => buildBoardLand(scene, skeleton),
+    () => buildBoardPush(scene, skeleton),   // ANIM-READABILITY (2026-09-07): the skate push, replacing the walk alias
     () => buildSkateKickflip(scene, skeleton),
     () => buildSkateBail(scene, skeleton),
     // Basketball packages (Phase 4, 2026-09-03) — size-ups, gather, slide,

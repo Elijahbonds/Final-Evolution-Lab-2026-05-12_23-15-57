@@ -17,7 +17,7 @@ import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
 import { buildSurfBreak, SURF_HALF_WIDTH, type RideWorld } from './rideWorlds';
 import { assertSpawned } from '../core/FrameGuard';
-import { SPORT_CLIP } from '../anim/clipRegistry';
+import { BoardAnimTree } from '../anim/boardTree';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
@@ -57,6 +57,31 @@ export const SurfBreakMode: ModeDefinition = (() => {
   let lapsSeen = 0;
   let barrelSec = 0, inBarrel = false, barrels = 0;
   let surging = false;
+  // ANIM-READABILITY (2026-09-07): ONE owner of the rider's clips. The per-frame play(...) here cut every one-shot a
+  // frame later (grab 0.13 s, landing 0.13 s; the air one-shot ran out mid-flight and flashed the idle; steering had no
+  // lean at all). The BoardAnimTree holds beats and settles one-shots; the mode feeds it state — stick = lean, a
+  // cutback leans into its turn, the buried rail is the tuck, the wipe is the bail held through the reset.
+  let animTree: BoardAnimTree;
+  let bailBeatT = 0, landBeatT = 0, airT = 0, cutbackUntil = 0;
+  const BAIL_BEAT_SEC = 1.55, LAND_BEAT_SEC = 0.4;   // the wipe resets the rider at 1.6 s
+  const CUTBACK_LEAN_SEC = 0.5;                      // the board leans into a cutback for as long as it comes around
+  function driveAnim(dt: number): void {
+    if (landBeatT > 0) { landBeatT -= dt; if (landBeatT <= 0) animTree.clearBeat('land_clean', 'land_sketchy'); }
+    if (bailBeatT > 0) { bailBeatT -= dt; if (bailBeatT <= 0) animTree.clearBeat('bail'); }
+    airT = rig.rider.grounded ? 0 : airT + dt;   // a flicker of lost contact on the wave is not air
+    // the stick is intent; a cutback leans into its turn while it comes around (the yaw spring alone would read a
+    // released steer as a counter-carve for a few frames)
+    const turning = yawTarget - rig.char.root.rotation.y;
+    const cutbackLean = t < cutbackUntil && Math.abs(turning) > 0.15 ? Math.sign(turning) : 0;
+    animTree.update({
+      speed01: rig.rider.vel.length() / MAX_FORWARD_SPEED, pushing: false,
+      lean: !rig.rider.grounded ? 0 : Math.abs(stickX) > 0.3 ? stickX : cutbackLean,
+      airborne: !rig.rider.grounded && (airT > 0.1 || rig.rider.vel.y > 0.5),
+      grabHeld: tricks.grabHeld, flipping: tricks.flipping, spinning: tricks.spinning,
+      grinding: rig.rider.grinding !== null, manual: false,
+      landing: landBeatT > 0 ? 'clean' : 'none', bailing: bailBeatT > 0, tucking: carve > 0.5,
+    });
+  }
 
   function wipeout(ctx: ModeContext, why: string, lipZ: number): void {
     console.info(`[SURF-WIPE] call: ${why}${wipedOut ? ' (already down — ignored)' : ''}`);   // A+ P0 probe: punches are checked against accepted calls
@@ -120,7 +145,9 @@ export const SurfBreakMode: ModeDefinition = (() => {
       }
       _validateChar.dispose(); // Clean up validation placeholder
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -22), 0, world.ground, '#ffd75e', 'surfboard');
-      tricks = new TrickMachine(rig, (h) => ctx.setHud(h));
+      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { anim: 'external', onBeat: (b) => { if (b === 'land') landBeatT = LAND_BEAT_SEC; else bailBeatT = BAIL_BEAT_SEC; } });
+      animTree = new BoardAnimTree(rig.char.animator);
+      bailBeatT = 0; landBeatT = 0; airT = 0; cutbackUntil = 0;
       ctx.camDirector.setPreset('board');
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 4, modeId: 'surf' });
       t = 0; timeLeft = RUN_SEC; flow = 0; ended = false; wipedOut = false; lapsSeen = 0; surging = false;
@@ -146,7 +173,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       if (e.t === 'trigger' && e.side === 'R') carve = e.value;
       if (e.t === 'button' && e.pressed && !wipedOut) {
         if (e.btn === 'A') {
-          if (rig.rider.grounded) { rig.rider.jump(0.5 + flow / 200); rig.char.animator.play(SPORT_CLIP.boardAir, {}); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); }
+          if (rig.rider.grounded) { rig.rider.jump(0.5 + flow / 200); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); }   // the tree reads the air
         }
         if (e.btn === 'B') {
           // This snapped the board through 90 degrees in a single frame. A
@@ -156,6 +183,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
           // where surf's remaining [FEL-FRAME] lines came from. Aim the turn
           // and let update() carve into it.
           yawTarget += Math.PI * 0.5 * (stickX >= 0 ? 1 : -1);
+          cutbackUntil = t + CUTBACK_LEAN_SEC;
           tricks.score += 40 + Math.round(flow / 4);
           ctx.feel?.impact?.(0.12);
           SoundKit.play('whoosh', { pitch: 1.5, volume: 0.35 });
@@ -221,7 +249,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
             break;
           }
         }
-        if (wipedOut) { ctx.setHud({ time: Math.ceil(timeLeft) }); return; }
+        if (wipedOut) { driveAnim(dt); ctx.setHud({ time: Math.ceil(timeLeft) }); return; }
 
         const ahead = rig.char.root.position.z - lip.z;
         const hollow = barrelActive(t);
@@ -258,12 +286,13 @@ export const SurfBreakMode: ModeDefinition = (() => {
           ctx.setHud({ banner });
           setTimeout(() => ctx.setHud({ banner: '' }), 900);
         }
-        rig.char.animator.play(rig.rider.grounded ? (carve > 0.5 ? SPORT_CLIP.boardTuck : SPORT_CLIP.boardIdle) : SPORT_CLIP.boardAir, { loop: true });
         // Clamp AT the water's edge, not 5m inside it. The rider used to stop
         // against nothing while the ocean visibly continued past him.
         const edge = SURF_HALF_WIDTH - 1;
         rig.char.root.position.x = Math.max(-edge, Math.min(edge, rig.char.root.position.x));
       }
+
+      driveAnim(dt);   // every frame, wiped out or not — the tree is the one owner of the rider's clips
 
       // carve toward the aimed heading (~0.4s to come around)
       const yawErr = yawTarget - rig.char.root.rotation.y;

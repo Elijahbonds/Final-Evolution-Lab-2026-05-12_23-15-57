@@ -22,6 +22,7 @@ import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
+import { BoardAnimTree } from '../anim/boardTree';
 import { BoardMovement, SNOW_TUNING } from '../core/BoardMovement';
 import { MomentumBus } from '../core/MomentumBus';
 import { assertSpawned } from '../core/FrameGuard';
@@ -60,6 +61,13 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   // A+ P0 juice (PM brief BOARD-A-PLUS-P0, 2026-09-06): rock hit / yeti catch share one wipe punch (latched 0.5 s so a rock
   // and the yeti on the same beat hit once); the finish gets one punch. Gates keep their tiny feel only. No hang slowMo.
   let wipeLatchUntil = 0, finishLatch = false;
+  // ANIM-READABILITY (2026-09-07): ONE owner of the rider's clips. This mode used to play(...) every frame AND fire
+  // one-shots from onInput / the rock / the yeti / the TrickMachine — the per-frame play cut each of them a frame later
+  // (measured: the wipe's bail clip visible 0.13 s, the grab 0.12 s, the landing 0.12 s; the 0.8 s air one-shot ran
+  // out mid-flight and flashed the idle). The BoardAnimTree holds beats and settles one-shots; the mode feeds it state.
+  let animTree: BoardAnimTree;
+  let bailBeatT = 0, landBeatT = 0, airT = 0;
+  const BAIL_BEAT_SEC = 0.9, LAND_BEAT_SEC = 0.4;
   function wipePunch(ctx: ModeContext): void {
     if (elapsed < wipeLatchUntil) return;
     wipeLatchUntil = elapsed + 0.5;
@@ -134,7 +142,9 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // under the run's lowest point and the stick-down glue keep the rider on the snow (owner sign-off 2026-09-07).
       const pisteBottomY = -Math.sin(SLOPE_PITCH) * (SLALOM_START + SLALOM_GATES * SLALOM_SPACING + 40);
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0.2, 4), 0, world.ground, '#ff6b3d', 'snowboard', { hardFloorY: pisteBottomY - 5, rayLength: 80, stickDown: 0.6 });
-      tricks = new TrickMachine(rig, (h) => ctx.setHud(h));
+      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { anim: 'external', onBeat: (b) => { if (b === 'land') landBeatT = LAND_BEAT_SEC; else bailBeatT = BAIL_BEAT_SEC; } });
+      animTree = new BoardAnimTree(rig.char.animator);
+      bailBeatT = 0; landBeatT = 0; airT = 0;
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 20, modeId: 'snowboard' });
       nextGate = 0; gatesHit = 0; elapsed = 0; ended = false; stickX = 0; tuck = 0;
       stumbleIframe = 0; yeti = null; yetiPool = null; yetiSec = 0; yetiDone = false;
@@ -160,8 +170,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       if (e.t === 'button' && e.pressed) {
         if (e.btn === 'A') {
           if (rig.rider.grounded) {
-            rig.rider.jump(0.5 + tuck * 0.5);
-            rig.char.animator.play(SPORT_CLIP.boardAir, {});
+            rig.rider.jump(0.5 + tuck * 0.5);   // the tree reads the air and plays board_air (a direct one-shot here ran out mid-flight)
             SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 });
           } else if (rig.rider.tryGrind(world.grindLines)) {
             // credit the line actually closest to the rider (lift cable pays 400)
@@ -254,7 +263,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             rig.rider.vel.scaleInPlace(0.35);
             wipePunch(ctx);   // A+ P0: hit-stop + shake + ONE low thud (replaces impact SFX + feel.impact, which doubled the thud); dust kept
             EffectsKit.burst(ctx.scene, p.clone(), 'dust');
-            rig.char.animator.play(SPORT_CLIP.boardBail, { onEnd: () => rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true }) });
+            bailBeatT = BAIL_BEAT_SEC;   // the tree plays the bail and holds it for the beat
             ctx.setHud({ score: tricks.score, banner: `ROCK! -${ROCK_PENALTY}` });
             setTimeout(() => ctx.setHud({ banner: '' }), 700);
             break;
@@ -284,7 +293,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             mob.onContactResolved();
             wipePunch(ctx);   // A+ P0: the yeti catch is a wipe too — same punch, same latch
             EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'dust');
-            rig.char.animator.play(SPORT_CLIP.boardBail, { onEnd: () => rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true }) });
+            bailBeatT = BAIL_BEAT_SEC;
             ctx.setHud({ score: tricks.score, banner: `THE YETI GOT YOU -${YETI_CATCH_PENALTY}` });
             setTimeout(() => ctx.setHud({ banner: '' }), 900);
             despawnYeti(ctx);
@@ -325,10 +334,17 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         ctx.setHud({ banner: trickBanner });
         setTimeout(() => ctx.setHud({ banner: '' }), 900);
       }
-      rig.char.animator.play(
-        rig.rider.grinding ? SPORT_CLIP.boardGrind
-          : rig.rider.grounded ? (tuck > 0.5 ? SPORT_CLIP.boardTuck : SPORT_CLIP.boardIdle) : SPORT_CLIP.boardAir,
-        { loop: true });
+      // ── animation: the tree is the one owner (see the note at the top) ──
+      if (landBeatT > 0) { landBeatT -= dt; if (landBeatT <= 0) animTree.clearBeat('land_clean', 'land_sketchy'); }
+      if (bailBeatT > 0) { bailBeatT -= dt; if (bailBeatT <= 0) animTree.clearBeat('bail'); }
+      airT = rig.rider.grounded ? 0 : airT + dt;   // a flicker of lost contact on the pitched piste is not air
+      animTree.update({
+        speed01: move.speed01, pushing: false, lean: rig.rider.grounded ? move.balance.lean : 0,
+        airborne: !rig.rider.grounded && (airT > 0.1 || rig.rider.vel.y > 0.5),
+        grabHeld: tricks.grabHeld, flipping: tricks.flipping, spinning: tricks.spinning,
+        grinding: rig.rider.grinding !== null, manual: false,
+        landing: landBeatT > 0 ? 'clean' : 'none', bailing: bailBeatT > 0, tucking: tuck > 0.5,
+      });
       // Clamp at the edge of the snow, from the piste's own constant — the same
       // one-number rule skate's fence and surf's water edge now follow, so the
       // edge a player feels is always an edge they can see.

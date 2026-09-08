@@ -71,25 +71,44 @@ export function landsSwitch(entryYaw: number, exitYaw: number): boolean {
   return Math.abs(Math.round((exitYaw - entryYaw) / Math.PI)) % 2 === 1;
 }
 
+export interface TrickMachineOpts {
+  /** 'self' (default): the machine plays its own grab / land / fall clips (the Carnival trick gauntlet). 'external': a
+   *  BoardAnimTree owns the rig's clips and reads `grabHeld` / `spinning` / `flipping` plus `onBeat` instead — the
+   *  direct plays used to be cut a frame later by the mode's per-frame play (ANIM-READABILITY, 2026-09-07). */
+  anim?: 'self' | 'external';
+  /** A clean landing or a bail happened this frame (external anim drives its beat window from this). */
+  onBeat?: (beat: 'land' | 'bail') => void;
+}
+
 export class TrickMachine {
   score = 0; combo = 0; comboPts = 0;
   private active: TrickDef | null = null;
   private spun = 0;
   private grabbing = false;
 
-  constructor(private rig: BoardRig, private onHud: (h: Record<string, string | number>) => void) {}
+  constructor(private rig: BoardRig, private onHud: (h: Record<string, string | number>) => void, private opts: TrickMachineOpts = {}) {}
+
+  /** The grab is being held in the air. */
+  get grabHeld(): boolean { return this.grabbing; }
+  /** A yaw spin trick is in progress in the air. */
+  get spinning(): boolean { return !!this.active && this.active.spinAxis === 'y' && this.active.turns !== 0 && !this.rig.rider.grounded; }
+  /** A flip trick is in progress in the air. */
+  get flipping(): boolean { return !!this.active && this.active.spinAxis === 'z' && !this.rig.rider.grounded; }
+  private playClip(name: string, o: { loop?: boolean } = {}): void {
+    if (this.opts.anim !== 'external') this.rig.char.animator.play(name, o);
+  }
 
   start(t: TrickDef): void {
     if (this.rig.rider.grounded && t.turns === 0 && t.name === 'OLLIE') this.rig.rider.jump(0.6);
     if (this.rig.rider.grounded) return;                 // air tricks need air
     this.active = t;
     this.spun = 0;
-    if (t.clip) { this.grabbing = true; this.rig.char.animator.play(t.clip, { loop: true }); }
+    if (t.clip) { this.grabbing = true; this.playClip(t.clip, { loop: true }); }
   }
   endGrab(): void {
     if (this.grabbing) {
       this.grabbing = false;
-      this.rig.char.animator.play('board_ride_idle', { loop: true });
+      this.playClip('board_ride_idle', { loop: true });
     }
   }
 
@@ -116,7 +135,8 @@ export class TrickMachine {
       if (clean) {
         this.combo++;
         this.comboPts += t.pts * this.combo;
-        this.rig.char.animator.play('jump_land', {});
+        this.playClip('jump_land');
+        this.opts.onBeat?.('land');
         this.onHud({ combo: `${this.combo}x` });
         return `${t.name} +${t.pts * this.combo}`;
       }
@@ -135,7 +155,8 @@ export class TrickMachine {
     this.active = null; this.grabbing = false;
     this.comboPts = 0; this.combo = 0;
     this.rig.rider.vel.scaleInPlace(0.25);
-    this.rig.char.animator.play('football_tackled_fall', {});   // reuse the fall
+    this.playClip('football_tackled_fall');   // reuse the fall (self anim only — the tree plays the board bail)
+    this.opts.onBeat?.('bail');
     this.onHud({ combo: '' });
   }
 

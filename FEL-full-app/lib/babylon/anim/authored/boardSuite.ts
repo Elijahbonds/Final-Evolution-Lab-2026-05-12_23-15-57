@@ -97,58 +97,87 @@ export function buildBoardRideIdle(scene: Scene, sk: Skeleton): AnimationGroup |
   }, T), [[0, -0.26], [T / 2, -0.29], [T, -0.26]]);
 }
 
-/** Lean into the turn. `sign` is +1 for a toeside/right carve, -1 for heelside. */
+// HOLD LOOPS (ANIM-READABILITY, 2026-09-07). The carve, the tuck and the grab were keyed as one-way transitions —
+// stance at t=0, the pose at t=T — and played as LOOPS, so every cycle snapped the rider back upright: measured on the
+// snowboard baseline as a 0.60 m hand jump every 0.6 s for the whole run (the tuck is the throttle there), 0.5 s on a
+// held carve, 0.7 s on a held grab. The way IN is the animator's crossfade; the loop itself starts in the pose, breathes
+// a hair deeper at the midpoint and returns, so its wrap is seamless.
+
+/** Lean into the turn. `sign` is +1 for a toeside/right carve, -1 for heelside. Held pose, loops clean. */
 function carve(scene: Scene, sk: Skeleton, name: string, sign: number): AnimationGroup | null {
-  const T = 0.5;
+  const T = 0.8;
   const roll = 22 * sign;
   return buildClip(scene, sk, name, T, withStance({
-    // a carve is a LEAN — the whole body banks, it does not step
-    Spine: [[0, 14, 16, 0], [T, 16, 16 + 8 * sign, roll]],
-    Spine1: [[0, 4, 10, 0], [T, 6, 10, roll * 0.5]],
-    LeftUpLeg: [[0, -44, 0, 8], [T, -52, 0, 8 + 5 * sign]],
-    LeftLeg: [[0, 72, 0, 0], [T, 84, 0, 0]],
-    RightUpLeg: [[0, -40, 0, -10], [T, -48, 0, -10 + 5 * sign]],
-    RightLeg: [[0, 68, 0, 0], [T, 80, 0, 0]],
+    // a carve is a LEAN — the whole body banks, it does not step; the bank pumps a little deeper mid-loop
+    Spine: [[0, 16, 16 + 8 * sign, roll], [T / 2, 18, 16 + 8 * sign, roll * 1.15], [T, 16, 16 + 8 * sign, roll]],
+    Spine1: [[0, 6, 10, roll * 0.5], [T, 6, 10, roll * 0.5]],
+    LeftUpLeg: [[0, -52, 0, 8 + 5 * sign], [T / 2, -56, 0, 8 + 5 * sign], [T, -52, 0, 8 + 5 * sign]],
+    LeftLeg: [[0, 84, 0, 0], [T / 2, 90, 0, 0], [T, 84, 0, 0]],
+    RightUpLeg: [[0, -48, 0, -10 + 5 * sign], [T / 2, -52, 0, -10 + 5 * sign], [T, -48, 0, -10 + 5 * sign]],
+    RightLeg: [[0, 80, 0, 0], [T / 2, 86, 0, 0], [T, 80, 0, 0]],
     // outside arm reaches across the turn, inside arm drops
-    LeftArm: [[0, 26, 0, 34], [T, 6 - 24 * sign, 0, 62 + 14 * sign]],
-    RightArm: [[0, 30, 0, -30], [T, 10 - 24 * sign, 0, -56 + 14 * sign]],
-  }, T), [[0, -0.24], [T, -0.32]]);
+    LeftArm: [[0, 6 - 24 * sign, 0, 62 + 14 * sign], [T / 2, 2 - 24 * sign, 0, 66 + 14 * sign], [T, 6 - 24 * sign, 0, 62 + 14 * sign]],
+    RightArm: [[0, 10 - 24 * sign, 0, -56 + 14 * sign], [T / 2, 6 - 24 * sign, 0, -60 + 14 * sign], [T, 10 - 24 * sign, 0, -56 + 14 * sign]],
+  }, T), [[0, -0.32], [T / 2, -0.34], [T, -0.32]]);
 }
 export const buildBoardCarveLeft = (s: Scene, k: Skeleton) => carve(s, k, 'board_carve_left', -1);
 export const buildBoardCarveRight = (s: Scene, k: Skeleton) => carve(s, k, 'board_carve_right', 1);
 
-/** Speed tuck — fold up small, arms swept back. */
+/** Speed tuck — folded up small, arms swept back. Held pose, loops clean (the fold-in is the crossfade). */
 export function buildBoardTuck(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const T = 0.6;
+  const T = 1.2;
   return buildClip(scene, sk, 'board_tuck', T, withStance({
-    Spine: [[0, 14, 16, 0], [T, 46, 12, 0]],
-    Spine1: [[0, 4, 10, 0], [T, 16, 8, 0]],
-    Neck: [[0, -6, -14, 0], [T, -26, -10, 0]],
-    LeftUpLeg: [[0, -26, 0, 7], [T, -58, 0, 7]],
-    LeftLeg: [[0, 42, 0, 0], [T, 86, 0, 0]],
-    RightUpLeg: [[0, -22, 0, -9], [T, -54, 0, -9]],
-    RightLeg: [[0, 38, 0, 0], [T, 82, 0, 0]],
-    LeftArm: [[0, 26, 0, 34], [T, 34, 0, 22]],
-    LeftForeArm: [[0, 18, 0, 0], [T, 62, 0, 0]],
-    RightArm: [[0, 30, 0, -30], [T, 34, 0, -22]],
-    RightForeArm: [[0, 22, 0, 0], [T, 62, 0, 0]],
-  }, T), [[0, -0.16], [T, -0.34]]);
+    Spine: [[0, 46, 12, 0], [T / 2, 49, 12, 0], [T, 46, 12, 0]],
+    Spine1: [[0, 16, 8, 0], [T, 16, 8, 0]],
+    Neck: [[0, -26, -10, 0], [T, -26, -10, 0]],
+    LeftUpLeg: [[0, -58, 0, 7], [T / 2, -62, 0, 7], [T, -58, 0, 7]],
+    LeftLeg: [[0, 86, 0, 0], [T / 2, 92, 0, 0], [T, 86, 0, 0]],
+    RightUpLeg: [[0, -54, 0, -9], [T / 2, -58, 0, -9], [T, -54, 0, -9]],
+    RightLeg: [[0, 82, 0, 0], [T / 2, 88, 0, 0], [T, 82, 0, 0]],
+    LeftArm: [[0, 34, 0, 22], [T / 2, 36, 0, 20], [T, 34, 0, 22]],
+    LeftForeArm: [[0, 62, 0, 0], [T, 62, 0, 0]],
+    RightArm: [[0, 34, 0, -22], [T / 2, 36, 0, -20], [T, 34, 0, -22]],
+    RightForeArm: [[0, 62, 0, 0], [T, 62, 0, 0]],
+  }, T), [[0, -0.34], [T / 2, -0.37], [T, -0.34]]);
 }
 
-/** Reach down and hold the board — the shape every board sport shares in the air. */
+/**
+ * Skate push (one-shot): the back foot comes off the deck, drops to the ground, shoves behind and steps back on. The
+ * torso stays low and open in the stance and the arms hold the counterweight. This replaces the alias onto the walk
+ * cycle, whose arms hung and swung at the rider's sides — measured 40 arms-down frames across two pushes on the baseline.
+ */
+export function buildBoardPush(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.42;
+  return buildClip(scene, sk, 'board_push', T, withStance({
+    Spine: [[0, 14, 16, 0], [T * 0.4, 22, 16, -4], [T, 14, 16, 0]],
+    Spine1: [[0, 4, 10, 0], [T, 4, 10, 0]],
+    // front leg stays bent and carries the weight
+    LeftUpLeg: [[0, -44, 0, 8], [T * 0.4, -50, 0, 8], [T, -44, 0, 8]],
+    LeftLeg: [[0, 72, 0, 0], [T * 0.4, 80, 0, 0], [T, 72, 0, 0]],
+    // back leg: off the deck, straight down to the ground, shove behind, back on
+    RightUpLeg: [[0, -40, 0, -10], [T * 0.25, -8, 0, -14], [T * 0.6, 24, 0, -14], [T, -40, 0, -10]],
+    RightLeg: [[0, 68, 0, 0], [T * 0.25, 14, 0, 0], [T * 0.6, 8, 0, 0], [T, 68, 0, 0]],
+    LeftArm: [[0, 26, 0, 34], [T * 0.4, 18, 0, 40], [T, 26, 0, 34]],
+    LeftForeArm: [[0, 34, 0, 0], [T, 34, 0, 0]],
+    RightArm: [[0, 30, 0, -30], [T * 0.4, 22, 0, -36], [T, 30, 0, -30]],
+    RightForeArm: [[0, 38, 0, 0], [T, 38, 0, 0]],
+  }, T), [[0, -0.26], [T * 0.25, -0.2], [T * 0.6, -0.22], [T, -0.26]]);
+}
+
+/** Reach down and hold the board — the shape every board sport shares in the air. Held pose, loops clean. */
 export function buildBoardGrab(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const T = 0.7;
+  const T = 0.8;
   return buildClip(scene, sk, 'board_grab', T, withStance({
-    Spine: [[0, 20, 16, 0], [T / 2, 44, 22, 6], [T, 40, 20, 4]],
-    LeftUpLeg: [[0, -30, 0, 7], [T / 2, -74, 0, 12], [T, -70, 0, 12]],
-    LeftLeg: [[0, 46, 0, 0], [T / 2, 96, 0, 0], [T, 92, 0, 0]],
-    RightUpLeg: [[0, -26, 0, -9], [T / 2, -62, 0, -12], [T, -58, 0, -12]],
-    RightLeg: [[0, 42, 0, 0], [T / 2, 88, 0, 0], [T, 84, 0, 0]],
-    // lead hand down to the deck, trailing arm up for balance
-    LeftArm: [[0, 6, 0, 62], [T / 2, 74, 0, 26], [T, 70, 0, 26]],
-    LeftForeArm: [[0, 18, 0, 0], [T / 2, 46, 0, 0], [T, 44, 0, 0]],
-    RightArm: [[0, 10, 0, -56], [T / 2, -34, 0, -76], [T, -30, 0, -74]],
-  }, T), [[0, -0.2], [T / 2, -0.3], [T, -0.28]]);
+    Spine: [[0, 40, 20, 4], [T / 2, 44, 22, 6], [T, 40, 20, 4]],
+    LeftUpLeg: [[0, -70, 0, 12], [T / 2, -74, 0, 12], [T, -70, 0, 12]],
+    LeftLeg: [[0, 92, 0, 0], [T / 2, 96, 0, 0], [T, 92, 0, 0]],
+    RightUpLeg: [[0, -58, 0, -12], [T / 2, -62, 0, -12], [T, -58, 0, -12]],
+    RightLeg: [[0, 84, 0, 0], [T / 2, 88, 0, 0], [T, 84, 0, 0]],
+    // lead hand down on the deck, trailing arm up for balance
+    LeftArm: [[0, 70, 0, 26], [T / 2, 74, 0, 26], [T, 70, 0, 26]],
+    LeftForeArm: [[0, 44, 0, 0], [T / 2, 46, 0, 0], [T, 44, 0, 0]],
+    RightArm: [[0, -30, 0, -74], [T / 2, -34, 0, -76], [T, -30, 0, -74]],
+  }, T), [[0, -0.28], [T / 2, -0.3], [T, -0.28]]);
 }
 
 /** Loose air pose — legs gathered, arms wide, used for spins. */
