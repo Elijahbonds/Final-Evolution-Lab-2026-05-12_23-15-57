@@ -51,11 +51,19 @@ export function buildIdleStand(scene: Scene, sk: Skeleton): AnimationGroup | nul
   return buildPoseClip(scene, sk, 'idle_stand', 3.0, [key(0, 2, [0, 0, 0], 0, 0), key(1.5, 4.5, [2, 3, 0], 0.02, -0.012), key(3, 2, [0, 0, 0], 0, 0)]);
 }
 
+/** The strafe's hips / spine / thigh keys for one phase of the side-step (shared with the sport shuffles — a tennis or
+ *  volleyball player side-steps on the same legs with the READY arms, ANIM-READABILITY net / precision 2026-09-07). */
+export function strafeBones(dir: 'left' | 'right', roll: number, lead: number, trail: number): Record<string, Deg3> {
+  const s = dir === 'left' ? 1 : -1;
+  return { Hips: [0, 0, roll * s], Spine: [4 + roll * 0.4, 0, -roll * 0.7 * s], LeftUpLeg: [-12 - lead, 0, 8 * s], RightUpLeg: [-12 + trail, 0, 8 * s] };
+}
+/** The three phases of the 0.6 s side-step: (t, roll, lead, trail). */
+export const STRAFE_PHASES: [number, number, number, number][] = [[0, 6, 0, 0], [0.3, 10, 10, 8], [0.6, 6, 0, 0]];
+
 export function buildStrafe(scene: Scene, sk: Skeleton, dir: 'left' | 'right'): AnimationGroup | null {
   const HANG = hangFor(sk);
-  const s = dir === 'left' ? 1 : -1;
   const key = (t: number, roll: number, lead: number, trail: number, swing: number) => ({
-    t, bones: { Hips: [0, 0, roll * s] as Deg3, Spine: [4 + roll * 0.4, 0, -roll * 0.7 * s] as Deg3, LeftUpLeg: [-12 - lead, 0, 8 * s] as Deg3, RightUpLeg: [-12 + trail, 0, 8 * s] as Deg3 },
+    t, bones: strafeBones(dir, roll, lead, trail),
     hands: { Left: [HANG.Left[0], HANG.Left[1] + swing, HANG.Left[2] + swing * 2] as V3, Right: [HANG.Right[0], HANG.Right[1] + swing, HANG.Right[2] + swing * 2] as V3 }, poles: HANG_POLES,
   });
   return buildPoseClip(scene, sk, `strafe_${dir}`, 0.6, [key(0, 6, 0, 0, 0.02), key(0.3, 10, 10, 8, 0.05), key(0.6, 6, 0, 0, 0.02)]);

@@ -16,10 +16,10 @@ import {
   buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildDefendSlide, buildBlockReach, buildStealReach,
 } from './basketball';
 import { buildBatStance, buildBatSwing, buildPitchOver, buildPitchSide } from './baseball';
-import { buildGolfAddress, buildGolfSwing } from './golf';
-import { buildTennisReady, buildTennisServe, buildTennisSwing } from './tennis';
-import { buildVolleyBlock, buildVolleyReady, buildVolleySpike } from './volleyball';
-import { buildKeeperDive, buildKeeperSet, buildSoccerKick } from './soccer';
+import { buildGolfAddress, buildGolfSwing, buildGolfPutt, buildGolfFinishHold } from './golf';
+import { buildTennisReady, buildTennisServe, buildTennisSwing, buildTennisShuffle } from './tennis';
+import { buildVolleyBlock, buildVolleyReady, buildVolleySpike, buildVolleyShuffle } from './volleyball';
+import { buildKeeperDive, buildKeeperSet, buildSoccerKick, buildKeeperDiveHold, buildKeeperRise } from './soccer';
 import {
   buildBoardRideIdle, buildBoardCarveLeft, buildBoardCarveRight, buildBoardTuck,
   buildBoardGrab, buildBoardAir, buildBoardGrind, buildBoardLand, buildBoardPush,
@@ -77,6 +77,15 @@ export function registerAuthoredClips(
     () => buildSoccerKick(scene, skeleton),
     () => buildKeeperSet(scene, skeleton),
     () => buildKeeperDive(scene, skeleton),
+    // ANIM-READABILITY (net / precision, 2026-09-07): the putt, the ready shuffles, the keeper's held stretch and rise
+    () => buildGolfPutt(scene, skeleton),
+    () => buildGolfFinishHold(scene, skeleton),
+    () => buildTennisShuffle(scene, skeleton, 'left'),
+    () => buildTennisShuffle(scene, skeleton, 'right'),
+    () => buildVolleyShuffle(scene, skeleton, 'left'),
+    () => buildVolleyShuffle(scene, skeleton, 'right'),
+    () => buildKeeperDiveHold(scene, skeleton),
+    () => buildKeeperRise(scene, skeleton),
     () => buildBoardRideIdle(scene, skeleton),
     () => buildBoardCarveLeft(scene, skeleton),
     () => buildBoardCarveRight(scene, skeleton),

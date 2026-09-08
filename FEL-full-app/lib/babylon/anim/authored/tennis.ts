@@ -12,8 +12,9 @@
 // shoulder goes back and the target stays inside the arm's reach.
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
 import { buildPoseClip, type Deg3 } from '../poseClip';
+import { strafeBones, STRAFE_PHASES } from './locomotion';
 
-export const TENNIS_CLIPS = ['tennis_ready', 'tennis_swing', 'tennis_serve'] as const;
+export const TENNIS_CLIPS = ['tennis_ready', 'tennis_swing', 'tennis_serve', 'tennis_shuffle_left', 'tennis_shuffle_right'] as const;
 type V3 = [number, number, number];
 
 const RACKET_READY: V3 = [0.32, 1.03, 0.27];
@@ -50,4 +51,17 @@ export function buildTennisServe(scene: Scene, sk: Skeleton): AnimationGroup | n
     // follow through low left
     { t: 0.9, bones: { Hips: [0, 25, 0], Spine: [26, 20, 0],  LeftUpLeg: [-10, 0, 8],  RightUpLeg: [-30, 0, -6],  LeftLeg: [10, 0, 0], RightLeg: [20, 0, 0] }, hands: { Right: [-0.25, 1.00, 0.30], Left: [-0.12, 1.00, 0.10] }, poles: { Right: [-0.3, -0.7, 0.4] }, hipsY: -0.04 },
   ]);
+}
+
+/** The baseline SHUFFLE (ANIM-READABILITY net / precision, 2026-09-07): the side-step's legs under the READY arms — racket
+ *  hand front-right, free hand up. The generic strafe hung both arms (a player sliding along the baseline with a racket
+ *  at the knee); the split-step bounce on its own read as a slide. Loop, same 0.6 s cadence as the strafe. */
+export function buildTennisShuffle(scene: Scene, sk: Skeleton, dir: 'left' | 'right'): AnimationGroup | null {
+  const s = dir === 'left' ? 1 : -1;
+  const key = (t: number, roll: number, lead: number, trail: number) => ({
+    // the LEADING leg (the one on the side you move to) lifts; the generic strafe lifts the left thigh both ways
+    t, bones: { ...strafeBones(dir, roll, lead, trail), Spine: [14 + roll * 0.4, 0, -roll * 0.7 * s] as Deg3, LeftUpLeg: [-16 - (s > 0 ? lead : -trail), 0, 8 * s] as Deg3, RightUpLeg: [-16 - (s > 0 ? -trail : lead), 0, 8 * s] as Deg3, LeftLeg: [30, 0, 0] as Deg3, RightLeg: [30, 0, 0] as Deg3 },
+    hands: { Right: [RACKET_READY[0], RACKET_READY[1] + roll * 0.004, RACKET_READY[2]] as V3, Left: [FREE_READY[0], FREE_READY[1] + roll * 0.004, FREE_READY[2]] as V3 }, hipsY: -0.06 - (lead ? 0.02 : 0),
+  });
+  return buildPoseClip(scene, sk, `tennis_shuffle_${dir}`, 0.6, STRAFE_PHASES.map(([t, r, l, tr]) => key(t, r, l, tr)));
 }

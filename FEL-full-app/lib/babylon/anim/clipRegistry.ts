@@ -40,6 +40,13 @@ export const REAL_CLIPS = new Set<string>([
   'karate_hit_react', 'karate_knockdown', 'karate_guard_step',   // the guard step (MODE-STICK-FACE) was authored + registered but never listed here
   'karate_block', 'karate_guard_impact', 'karate_parry', 'karate_floor_hold', 'karate_get_up',   // ANIM-READABILITY (combat, 2026-09-07)
   'karate_windup_hold', 'freerun_air_hold', 'freerun_tuck', 'freerun_slide',   // ANIM-READABILITY (creative, 2026-09-07)
+  // the racket / club / net / keeper sports (anim/authored/{tennis,volleyball,golf,soccer}) — Phase 3, 2026-09-03; never
+  // listed here (installSafePlay's clipNames check carried them). ANIM-READABILITY (net / precision, 2026-09-07) adds
+  // the putt, the ready shuffles, the keeper's held stretch and rise.
+  'tennis_ready', 'tennis_swing', 'tennis_serve', 'tennis_shuffle_left', 'tennis_shuffle_right',
+  'volleyball_ready', 'volleyball_spike', 'volleyball_block', 'volleyball_shuffle_left', 'volleyball_shuffle_right',
+  'golf_address_idle', 'golf_swing_full', 'golf_putt', 'golf_finish_hold',
+  'soccer_kick_shoot', 'keeper_set', 'keeper_dive', 'keeper_dive_hold', 'keeper_rise',
   // basketball packages (anim/authored/basketball) — Phase 4, 2026-09-03
   'bball_dribble_idle', 'bball_crossover_left', 'bball_crossover_right', 'bball_hesi',
   'bball_layup_gather', 'bball_defend_slide_left', 'bball_defend_slide_right',
@@ -144,8 +151,15 @@ export const SPORT_CLIP = {
   // precision sports
   golfAddress: 'golf_address_idle',   // Phase 3: authored (was the karate guard)
   golfSwing: 'golf_swing_full',       // (was the roundhouse)
+  golfPutt: 'golf_putt',              // ANIM-READABILITY (net / precision, 2026-09-07): on the green (was the full swing)
+  golfFinish: 'golf_finish_hold',     // ANIM-READABILITY: the finish held after the swing (was a 0.12 s snap back to the address)
   tennisIdle: 'tennis_ready',
   tennisForehand: 'tennis_swing',
+  tennisServe: 'tennis_serve',        // ANIM-READABILITY: the serve (was the forehand)
+  tennisShuffleLeft: 'tennis_shuffle_left', tennisShuffleRight: 'tennis_shuffle_right',   // the baseline shuffle in the ready arms (was the hanging strafe)
+  volleyReady: 'volleyball_ready', volleySpike: 'volleyball_spike',
+  volleyBlock: 'volleyball_block',    // ANIM-READABILITY: the block (was the spike)
+  volleyShuffleLeft: 'volleyball_shuffle_left', volleyShuffleRight: 'volleyball_shuffle_right',
   derbyStance: 'baseball_stance',        // Phase 6: real bat stance (was the karate guard)
   derbySwing: 'baseball_swing',          // (was the uppercut)
   derbyPitch: 'baseball_pitch_over',     // fastball + changeup: the same look, by design
@@ -154,6 +168,8 @@ export const SPORT_CLIP = {
   penaltyStrike: 'soccer_kick_shoot',  // (was the karate high kick)
   keeperIdle: 'keeper_set',
   keeperDive: 'keeper_dive',           // (was the jumpshot)
+  keeperDiveHold: 'keeper_dive_hold',  // ANIM-READABILITY: the stretch held on the ground until the kick is decided
+  keeperRise: 'keeper_rise',           // ANIM-READABILITY: off the ground back to the set
 } as const;
 
 export type SportGesture = keyof typeof SPORT_CLIP;

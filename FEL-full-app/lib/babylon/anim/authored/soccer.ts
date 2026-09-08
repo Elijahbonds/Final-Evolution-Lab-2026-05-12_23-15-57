@@ -8,11 +8,13 @@
 //
 //   soccer_kick_shoot — plant, back-swing, strike through the ball, follow high
 //   keeper_set        — low, wide, hands at knee height (loop)
-//   keeper_dive       — set → full stretch to the right (mirror by scaling x)
+//   keeper_dive       — set → full stretch to the right (the left dive is the registered mirror 'keeper_dive.M')
+//   keeper_dive_hold  — the stretch, held on the ground until the kick is decided (loop; ANIM-READABILITY 2026-09-07)
+//   keeper_rise       — the dive in reverse: off the ground back to the set (one-shot)
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
 import { buildPoseClip, type Deg3 } from '../poseClip';
 
-export const SOCCER_CLIPS = ['soccer_kick_shoot', 'keeper_set', 'keeper_dive'] as const;
+export const SOCCER_CLIPS = ['soccer_kick_shoot', 'keeper_set', 'keeper_dive', 'keeper_dive_hold', 'keeper_rise'] as const;
 type V3 = [number, number, number];
 
 /** Right-footed strike. Legs carry it; the arms counterbalance. */
@@ -45,5 +47,34 @@ export function buildKeeperDive(scene: Scene, sk: Skeleton): AnimationGroup | nu
     // the body tips to the right (roll) and folds toward the ball
     { t: 0.25, bones: { Hips: [0, 0, 25], Spine: [15, 0, 20], LeftUpLeg: [-60, 0, 10], RightUpLeg: [-10, 0, -10], LeftLeg: [60, 0, 0], RightLeg: [10, 0, 0] }, hands: { Right: [0.50, 1.15, 0.25], Left: [0.05, 1.20, 0.25] }, poles: { Left: [0.2, 0.6, -0.6] }, hipsY: -0.10 },
     { t: 0.6,  bones: { Hips: [0, 0, 55], Spine: [5, 0, 30],  LeftUpLeg: [-20, 0, 0],  RightUpLeg: [0, 0, -6],    LeftLeg: [10, 0, 0], RightLeg: [4, 0, 0] },  hands: { Right: [0.62, 1.37, 0.21], Left: [0.38, 1.56, 0.26] }, poles: { Right: [0.3, -0.8, -0.4], Left: [0.2, 0.7, -0.6] }, hipsY: -0.30 },
+  ]);
+}
+
+/** The dive's END pose — the keys the dive lands on, shared by the hold and the rise. */
+const STRETCH = {
+  bones: { Hips: [0, 0, 55] as Deg3, Spine: [5, 0, 30] as Deg3, LeftUpLeg: [-20, 0, 0] as Deg3, RightUpLeg: [0, 0, -6] as Deg3, LeftLeg: [10, 0, 0] as Deg3, RightLeg: [4, 0, 0] as Deg3 },
+  hands: { Right: [0.62, 1.37, 0.21] as V3, Left: [0.38, 1.56, 0.26] as V3 },
+  poles: { Right: [0.3, -0.8, -0.4] as V3, Left: [0.2, 0.7, -0.6] as V3 },
+  hipsY: -0.30,
+};
+
+/** The stretch HELD (ANIM-READABILITY net / precision, 2026-09-07): the dive used to run out 0.6 s after the press and
+ *  neverBindPose's chain stood the keeper straight up in a 0.12 s fade while the ball was still in the air. A HOLD loop:
+ *  starts in the stretch, breathes a hair, returns — the crossfade from the dive is the way in and the loop never snaps. */
+export function buildKeeperDiveHold(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 1.0;
+  return buildPoseClip(scene, sk, 'keeper_dive_hold', T, [
+    { t: 0, ...STRETCH },
+    { t: T / 2, ...STRETCH, bones: { ...STRETCH.bones, Spine: [7, 0, 32] }, hands: { Right: [0.63, 1.35, 0.22], Left: [0.39, 1.54, 0.27] }, hipsY: -0.31 },
+    { t: T, ...STRETCH },
+  ]);
+}
+
+/** Off the ground and back to the set — the dive's keys in reverse. One-shot, settles into keeper_set. */
+export function buildKeeperRise(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'keeper_rise', 0.5, [
+    { t: 0, ...STRETCH },
+    { t: 0.28, bones: { Hips: [0, 0, 25], Spine: [15, 0, 20], LeftUpLeg: [-60, 0, 10], RightUpLeg: [-10, 0, -10], LeftLeg: [60, 0, 0], RightLeg: [10, 0, 0] }, hands: { Right: [0.50, 1.15, 0.25], Left: [0.05, 1.20, 0.25] }, poles: { Left: [0.2, 0.6, -0.6] }, hipsY: -0.10 },
+    { t: 0.5, bones: { Hips: [0, 0, 0], Spine: [30, 0, 0], ...SET_LEGS(-36, 50) }, hands: SET_HANDS, hipsY: -0.14 },
   ]);
 }

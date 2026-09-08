@@ -15,7 +15,8 @@ import { ballKindFor, dressBall } from '../visual/meshyProps';
 import type { AbstractMesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
-import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
+import { installSafePlay } from '../anim/clipRegistry';
+import { NetAnimTree, TENNIS_CLIPS, VOLLEYBALL_CLIPS, NET_CONTACT_SEC, type NetClipSet } from '../anim/netTree';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -114,8 +115,16 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   /** Is the ball in flight a Zone Shot? It answers differently to everything. */
   let incomingZone = false;
   let aimX = 0;
-  let meBusyUntil = 0, shuffleClip = '';   // MODE-STICK-FACE: the baseline shuffle yields to a swing for this long
-  const meBusy = (): void => { meBusyUntil = performance.now() + 700; shuffleClip = ''; };
+  // ANIM-READABILITY (net / precision, 2026-09-07): the tree is the ONE owner of each body's clips. The mode never calls
+  // animator.play — it latches beats (swing / serve / block) and feeds the tree once per frame, every phase, with the
+  // shuffle INTENT, so a beat that runs out under a held stick settles onto the shuffle (the per-frame shuffle play + the
+  // swing's neverBindPose chain used to flash idle_stand for 0.08 s at every settle: a 0.33–0.47 m hand pop). The sport's
+  // own ready bounce and ready shuffles replace idle_stand / the hanging strafe; the serve and the block are their own clips.
+  const clips: NetClipSet = { ...(o.cfg.touchesPerSide > 1 ? VOLLEYBALL_CLIPS : TENNIS_CLIPS), swing: o.swingClip };
+  let meTree: NetAnimTree, foeTree: NetAnimTree;
+  let meSwing = false, meServe = false, meBlock = false, foeSwing = false;
+  /** The serve: the ball leaves on the clip's contact beat (the trophy → overhead), not at the toss. */
+  let serveIn = 0, serveTotal = 0, serveAim = 0; let serveFrom: Vector3 | null = null;
   let ended = false;
   let restSec = 0;                 // pause between points
   let heroStreak = 0;              // M107: consecutive points won → tension/hype
@@ -258,9 +267,11 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     rally.serve(0);
     const from = new Vector3(me.root.position.x, 1.5, o.cfg.halfLength * 0.92);
     ball.position.copyFrom(from);
-    meBusy(); me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    meTree.clearBeat('serve'); meServe = true;
     SoundKit.play('uiTick', { pitch: 1.2, volume: 0.4 });
-    launch(ctx, from, -1, (Math.random() - 0.5) * 0.5, 'good');
+    // the ball is tossed now and struck on the serve's contact beat (update() launches it); the aim is drawn now
+    serveFrom = from; serveAim = (Math.random() - 0.5) * 0.5; serveIn = serveTotal = NET_CONTACT_SEC[clips.serve] ?? 0;
+    if (serveIn <= 0) { launch(ctx, from, -1, serveAim, 'good'); serveFrom = null; }
     flash(ctx, 'SERVE', 600);
   }
 
@@ -326,7 +337,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     if (rally.touch() === 'fault') { awardPoint(ctx, 0, 'FOUR TOUCHES'); return; }
     if (aiCrosses) rally.cross();
 
-    foe.animator.play(o.swingClip, { onEnd: () => foe.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    foeTree.clearBeat('swing'); foeSwing = true;
     SoundKit.play('uiTick', { pitch: 0.9, volume: 0.35 });
     EffectsKit.burst(ctx.scene, ball.getAbsolutePosition(), 'sparks');
 
@@ -420,7 +431,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // punishing for the wrong reason. This is the shape the benchmark has: a
     // read that is worth making and hard to make.
     if (!stuffed && (q === 'good' || q === 'perfect')) {
-      meBusy(); me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
+      meTree.clearBeat('block'); meBlock = true;
       EffectsKit.burst(ctx.scene, at, 'sparks');
       ctx.setHud({ shotType: 'BLOCK · TOUCH' });
       setTimeout(() => ctx.setHud({ shotType: '' }), 500);
@@ -435,7 +446,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     }
 
     // A stuff: straight back down on their side, and the point.
-    meBusy(); me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    meTree.clearBeat('block'); meBlock = true;
     EffectsKit.burst(ctx.scene, at, 'sparks');
     ctx.juice.scorePop(at, 'STUFF!', '#00E5FF');
     ctx.feel.impact(0.5);          // A+ P0: ONE thud — feel.impact plays its own; the second impact SFX that stacked on it is gone
@@ -476,7 +487,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     if (rally.touch() === 'fault') { awardPoint(ctx, 1, 'TOO MANY TOUCHES'); return; }
     if (crosses) rally.cross();
 
-    meBusy(); me.animator.play(o.swingClip, { onEnd: () => me.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    meTree.clearBeat('swing'); meSwing = true;
     SoundKit.play('uiTick', { pitch: q === 'perfect' ? 1.6 : 1.1, volume: 0.5 });
     const swingPos = ball.getAbsolutePosition();
     // M107 swing juice: a crisp pop + hit-impact on a perfectly-timed contact so
@@ -552,14 +563,19 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       venue = mountVenue(ctx, o.venueId, { keepGameplayCamera: true });   // M104 gap: tennis and volleyball rendered through the venue orbit camera — the hero sat at 44 px, cut off at the frame's bottom
 
       me = await CharacterLibrary.spawn(ctx.scene, o.heroUrl, {
-        position: new Vector3(0, 0, o.cfg.halfLength * 0.85), yawRad: Math.PI, startClip: SPORT_CLIP.idle });
-      neverBindPose(me.animator, SPORT_CLIP.idle); installSafePlay(me.animator, `${o.modeId}-me`);
+        position: new Vector3(0, 0, o.cfg.halfLength * 0.85), yawRad: Math.PI, startClip: clips.ready });
+      neverBindPose(me.animator, clips.ready); installSafePlay(me.animator, `${o.modeId}-me`);
       ctx.groundLock?.track(me.root, me.skeleton);
+      meTree = new NetAnimTree(me.animator, clips);
+      meTree.onSettle = (st) => { if (st === 'swing') meSwing = false; else if (st === 'serve') meServe = false; else if (st === 'block') meBlock = false; };
 
       foe = await CharacterLibrary.spawn(ctx.scene, o.heroUrl, {
-        position: new Vector3(0, 0, -o.cfg.halfLength * 0.85), tint: '#ff2d78', startClip: SPORT_CLIP.idle });
-      neverBindPose(foe.animator, SPORT_CLIP.idle); installSafePlay(foe.animator, `${o.modeId}-foe`);
+        position: new Vector3(0, 0, -o.cfg.halfLength * 0.85), tint: '#ff2d78', startClip: clips.ready });
+      neverBindPose(foe.animator, clips.ready); installSafePlay(foe.animator, `${o.modeId}-foe`);
       ctx.groundLock?.track(foe.root, foe.skeleton);
+      foeTree = new NetAnimTree(foe.animator, clips);
+      foeTree.onSettle = (st) => { if (st === 'swing') foeSwing = false; };
+      meSwing = meServe = meBlock = foeSwing = false; serveIn = 0; serveFrom = null;
 
       // Real characters are in — drop the venue's placeholder bodies, or every
       // player is on the court twice.
@@ -628,8 +644,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         const step = Math.abs(aimX) > 0.15 ? aimX * ctx.camDirector.rightFlat().x * SHUFFLE_SPEED * dt : 0;
         if (step) me.root.position.x = Math.max(-limit, Math.min(limit, me.root.position.x + step));
         const bodyRightX = Math.cos(me.root.rotation.y);
-        const want = step ? (step * bodyRightX > 0 ? 'strafe_right' : 'strafe_left') : SPORT_CLIP.idle;
-        if (want !== shuffleClip && performance.now() > meBusyUntil) { shuffleClip = want; me.animator.play(want, { loop: true }); }
+        // the tree owns the clips: the shuffle INTENT in the body frame, plus the beat latches — fed every frame, every phase
+        meTree.update({ move: step ? (step * bodyRightX > 0 ? 1 : -1) : 0, swing: meSwing, serve: meServe, block: meBlock });
+        foeTree.update({ move: 0, swing: foeSwing, serve: false, block: false });
       }
 
       if (restSec > 0) {
@@ -639,6 +656,14 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       }
       crowd?.update(dt);
       if (blockCooldown > 0) blockCooldown = Math.max(0, blockCooldown - dt);
+      if (serveFrom) {
+        // the toss: the ball rises off the hand and the serve strikes it on the clip's contact beat
+        serveIn -= dt;
+        const u = serveTotal > 0 ? 1 - Math.max(0, serveIn) / serveTotal : 1;
+        ball.position.set(serveFrom.x, serveFrom.y + 0.5 * Math.sin(Math.PI * u), serveFrom.z);
+        if (serveIn <= 0) { const from = serveFrom; serveFrom = null; launch(ctx, from, -1, serveAim, 'good'); }
+        return;
+      }
       if (!shot) return;
 
       flightT += dt / shot.duration;

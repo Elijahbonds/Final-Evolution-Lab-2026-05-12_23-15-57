@@ -36,6 +36,9 @@ import {
   spawnAthlete, Reticle, PowerMeter, Flight, swingQuality,
   buildTennisNet, buildGolfGreen, buildPlateAndMound, buildGoal, buildBallparkOutfield, spawnFoe } from './aimSwingCore';
 import { SPORT_CLIP } from '../anim/clipRegistry';
+import { BeatOwner } from '../anim/beatOwner';
+import { registerMirroredClips } from '../anim/mirrored-clips';
+import { GOLF_CONTACT_SEC } from '../anim/authored/golf';
 import { SoundKit } from '../audio/SoundKit';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
@@ -48,6 +51,19 @@ import { PRECISION_CONFIG as CFG } from './modeConfigs';
 let golfVenue: VenueHandle | null = null, derbyVenue: VenueHandle | null = null, penaltyVenue: VenueHandle | null = null;
 
 const CLUTCH_MULT = 1.5;
+
+// ANIM-READABILITY (net / precision, 2026-09-07). Golf, derby and penalty each played clips from their event handlers with
+// neverBindPose's chain settling them, and the ball left on the PRESS: the golf swing's held finish (hips turned 80°,
+// hands high left) was crossfaded back into the address in 0.12 s the moment the clip ran out (0.28–0.38 m of hand travel
+// per frame, 28 pops in four swings), the keeper's dive ran out 0.6 s after the press and the chain stood the keeper
+// straight up while the ball was still in the air, the pitcher's ball was 8 m down the line before the arm came over,
+// and the golfer's club came down on a ball already gone. Now each body has ONE owner (BeatOwner: a loop + beats, own
+// onEnd, cut callbacks ignored), the swing settles into a held finish, the dive into a held stretch that rises through
+// keeper_rise, the putt is a putt, the left dive is the registered mirror — and the ball leaves on each clip's CONTACT key.
+/** Seconds into soccer_kick_shoot where the boot meets the ball (the strike-through key). */
+const KICK_CONTACT_SEC = 0.45;
+/** Seconds into baseball_pitch_over / _side where the ball leaves the hand (between the over-the-top key and the release). */
+const PITCH_RELEASE_SEC = 0.52;
 
 // ── GOLF: the three pillars the benchmark's own lock names ──────────────────
 // "Club selection + shot timing + course reading". Shot timing was here and
@@ -233,6 +249,9 @@ export const TennisMode: ModeDefinition = (() => {
 // ══════════════════════════════════════════════════════════════════ GOLF ══
 export const GolfMode: ModeDefinition = (() => {
   let me: SpawnedCharacter;
+  let meAnim: BeatOwner;
+  /** The strike is a beat: the ball leaves on the clip's contact key, not on the press. */
+  let strikeIn = 0; let pendingStrike: (() => void) | null = null; let pendingVel: Vector3 | null = null;
   let furniture: AbstractMesh[] = [];
   let ball: AbstractMesh, flight: Flight, reticle: Reticle, meter: PowerMeter;
   let holePos = new Vector3(0, 0, 55);
@@ -291,7 +310,8 @@ export const GolfMode: ModeDefinition = (() => {
     flag.position = holePos.add(new Vector3(0.35, 1.85, 0));
     flag.material = furniture[0]?.material ?? null;
     ball.position.set(0, 0.05, 0.6);
-    me.animator.play(SPORT_CLIP.golfAddress, { loop: true });
+    meAnim.loop(SPORT_CLIP.golfAddress, { fadeSec: 0.3 });
+    strikeIn = 0; pendingStrike = null;
     // HOLE PREVIEW — fly the camera to the green, look back at the tee.
     // Pure camDirector.snapTo, timer-bounded, cannot stall.
     strokes = 0;
@@ -360,25 +380,32 @@ export const GolfMode: ModeDefinition = (() => {
     // the target lerps toward the pin.
     ctx.camDirector.mode = 'follow';
     strokes++;
-    SoundKit.play('whoosh', { pitch: 0.9 });
-    me.animator.play(SPORT_CLIP.golfSwing, {});
-    ctx.feel?.impact?.(0.25 + pwr * 0.35);
+    // The swing is a BEAT that settles into the HELD finish (a golfer watches the ball; the address comes back when they
+    // walk to the lie); on the green it is the putt, which settles into the address. The ball leaves on the contact key.
+    const clip = c === PUTTER ? SPORT_CLIP.golfPutt : SPORT_CLIP.golfSwing;
+    meAnim.beat(clip, { fadeSec: 0.1 });   // the beat first, then where it settles (a loop asked for during a beat is where the beat lands)
+    meAnim.loop(c === PUTTER ? SPORT_CLIP.golfAddress : SPORT_CLIP.golfFinish, { fadeSec: 0.25 });
+    strikeIn = GOLF_CONTACT_SEC[clip as keyof typeof GOLF_CONTACT_SEC] ?? 0;
     const dir = reticle.pos.subtract(new Vector3(0, 0.4, 0)).normalize();
     // A forgiving club punishes a bad strike less. That is the trade for its
     // shorter reach, and it is the reason not to simply always take the driver.
     const spread = (sideErr * 6) / c.forgive;
     const hookSlice = new Vector3(spread * (Math.random() < 0.5 ? -1 : 1), 0, 0);
-    flight.launch(
-      ball.position,
-      // Scaled to THIS course. The holes sit 42-70m out and a full driver was
-      // carrying ~240m, so every shot sailed the green, the hole could never be
-      // completed, and the ball ended up somewhere the camera could not hold.
-      // A driver now reaches the far pin and a wedge does not — which is what
-      // makes the club a decision instead of a label.
-      dir.scale((10 + pwr * 15) * c.reach)
-        .add(new Vector3(0, (5 + pwr * 5) * c.launch, 0))
-        .add(hookSlice),
-    );
+    // Scaled to THIS course. The holes sit 42-70m out and a full driver was
+    // carrying ~240m, so every shot sailed the green, the hole could never be
+    // completed, and the ball ended up somewhere the camera could not hold.
+    // A driver now reaches the far pin and a wedge does not — which is what
+    // makes the club a decision instead of a label.
+    const vel = dir.scale((10 + pwr * 15) * c.reach)
+      .add(new Vector3(0, (5 + pwr * 5) * c.launch, 0))
+      .add(hookSlice);
+    pendingVel = vel;   // the follow camera sets up behind the line of the coming shot while the club comes down
+    pendingStrike = () => {
+      SoundKit.play('whoosh', { pitch: 0.9 });
+      ctx.feel?.impact?.(0.25 + pwr * 0.35);   // the contact feel, ON the contact (A+ P0 weight unchanged)
+      flight.launch(ball.position, vel);
+    };
+    if (strikeIn <= 0) { pendingStrike(); pendingStrike = null; }
     ctx.setHud({
       accuracy: sideErr === 0 ? 'PURE' : sideErr > 0.5 ? 'SHANKED' : 'DRIFTED',
       hint: '', strokes,
@@ -390,6 +417,8 @@ export const GolfMode: ModeDefinition = (() => {
     settling = false;
     ctx.camDirector.suspended = false;      // the cinematic is over
     pulling = false; backswing = 0;
+    meAnim.loop(SPORT_CLIP.golfAddress, { fadeSec: 0.3 });   // at the lie: the held finish gives way to the address
+    strikeIn = 0; pendingStrike = null;
     ctx.heroRef.current = me.root;      // addressing the ball: frame the player
     // Behind the BALL, not the tee. Golf is played from where it lies; this
     // mode gave every shot from the tee because a hole WAS one shot.
@@ -447,6 +476,7 @@ export const GolfMode: ModeDefinition = (() => {
       if (golfVenue) for (const m of golfVenue.built.root.getChildMeshes()) if (m.name === 'venue_ground') m.visibility = 0;
       EffectsKit.ambient(ctx.scene, 'park');
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.5, 0, 0), 0, SPORT_CLIP.golfAddress);
+      meAnim = new BeatOwner(me.animator); meAnim.loop(SPORT_CLIP.golfAddress);
       ball = MeshBuilder.CreateSphere('gball', { diameter: 0.1 }, ctx.scene);
       flight = new Flight(ball, -9.8);
       reticle = new Reticle(ctx.scene, new Vector3(0, 1.3, 12), { x: 5, y: 1.1 });
@@ -540,6 +570,13 @@ export const GolfMode: ModeDefinition = (() => {
         ctx.camDirector.update(me.root.position, aimDir, holePos);
       }
       if (phase === 'flight') {
+        if (strikeIn > 0) {
+          // the club is still coming down: the ball waits on the contact key
+          strikeIn -= dt;
+          if (strikeIn <= 0 && pendingStrike) { pendingStrike(); pendingStrike = null; }
+          ctx.camDirector.update(ball.position, pendingVel ?? Vector3.Zero(), holePos);
+          return;
+        }
         // Wind acts for the whole flight, so a long club spends longer in it.
         if (flight.active) flight.vel.addInPlace(wind.scale(dt));
         const flying = flight.step(dt);
@@ -694,6 +731,9 @@ export function pitchSpec(round: number): PitchSpec {
 
 export const DerbyMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, pitcher: SpawnedCharacter;
+  let meAnim: BeatOwner, pitcherAnim: BeatOwner;
+  /** The pitch is a beat: the ball leaves the hand on the release key, not at the wind-up. */
+  let throwIn = 0; let pendingThrow: (() => void) | null = null;
   let bat: AbstractMesh | null = null;
   let furniture: AbstractMesh[] = [];
   let ball: AbstractMesh, flight: Flight;
@@ -740,7 +780,7 @@ export const DerbyMode: ModeDefinition = (() => {
     const spec = pitchSpec(round);
     // The slider comes from a three-quarter slot; the changeup deliberately
     // shares the fastball's look (the ball flight is the tell, not the arm).
-    pitcher.animator.play(spec.type === 'slider' ? SPORT_CLIP.derbyPitchSide : SPORT_CLIP.derbyPitch, { onEnd: () => pitcher.animator.play(SPORT_CLIP.idle, { loop: true }) });
+    pitcherAnim.beat(spec.type === 'slider' ? SPORT_CLIP.derbyPitchSide : SPORT_CLIP.derbyPitch, { fadeSec: 0.1 });
     pitchAt = spec.arrive.clone();
     pitchBreakA = spec.breakShift === 0 ? 0
       : (2 * spec.breakShift) / Math.pow(0.45 * (17.5 / spec.speed), 2);
@@ -752,7 +792,9 @@ export const DerbyMode: ModeDefinition = (() => {
     ball.position.set(aim.x * 0.4, 1.5, 17.5);
     const travel = aim.subtract(ball.position);
     const t = pitchTotalSec;
-    flight.launch(ball.position, new Vector3(travel.x / t, travel.y / t + 3.0, -spec.speed));
+    const vel = new Vector3(travel.x / t, travel.y / t + 3.0, -spec.speed);
+    throwIn = PITCH_RELEASE_SEC;   // the ball waits in the hand through the leg lift; update() releases it
+    pendingThrow = () => flight.launch(ball.position, vel);
     const clutch = round === TOTAL || lastOut();
     const rivalLive = Math.round(rivalTarget * rivalProgress(round / TOTAL));
     ctx.setHud({
@@ -788,6 +830,7 @@ export const DerbyMode: ModeDefinition = (() => {
         ...[0, 1, 2, 3, 4, 5].map((i) => new Vector3(-6.5 - i * 0.9, 0, 3 + i * 1.4)),
       ]);
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.7, 0, 0), Math.PI / 2, SPORT_CLIP.derbyStance);
+      meAnim = new BeatOwner(me.animator); meAnim.loop(SPORT_CLIP.derbyStance);
       // The bat (Phase 6, 2026-09-03): the stance and swing are real now; the
       // hands were empty. A hand-parented prop, the way mixed combat's staff is.
       {
@@ -802,6 +845,8 @@ export const DerbyMode: ModeDefinition = (() => {
         }
       }
       pitcher = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0.35, 18), Math.PI, SPORT_CLIP.idle);
+      pitcherAnim = new BeatOwner(pitcher.animator); pitcherAnim.loop(SPORT_CLIP.idle);
+      throwIn = 0; pendingThrow = null;
       pci = new Reticle(ctx.scene, new Vector3(0, 1.1, 0.2), { x: ZONE_HALF.x, y: ZONE_HALF.y });
       ctx.heroRef.current = me.root;
       ball = MeshBuilder.CreateSphere('bball', { diameter: 0.12 }, ctx.scene);
@@ -822,7 +867,7 @@ export const DerbyMode: ModeDefinition = (() => {
       if (e.t === 'button' && e.btn === 'A' && e.pressed && incoming && !swung) {
         swung = true;
         SoundKit.play('whoosh');
-        me.animator.play(SPORT_CLIP.derbySwing, { onEnd: () => me.animator.play(SPORT_CLIP.derbyStance, { loop: true }) });
+        meAnim.beat(SPORT_CLIP.derbySwing, { fadeSec: 0.06 });
         // time against THIS pitch's speed — the window conversion divides by
         // speed, and a hardcoded 14 mistimed every fastball and change-up
         const timing = swingQuality(ball.position.z, 0.3, pitchSpeed, 0.3);
@@ -881,6 +926,11 @@ export const DerbyMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
+      if (throwIn > 0) {
+        // the wind-up: the ball leaves the hand on the release key
+        throwIn -= dt;
+        if (throwIn <= 0 && pendingThrow) { pendingThrow(); pendingThrow = null; }
+      }
       // The PCI is only yours to move while a pitch is on the way.
       if (incoming) {
         pci.update(dt, stickX, stickY);
@@ -911,7 +961,7 @@ export const DerbyMode: ModeDefinition = (() => {
       // It survived play-testing because the generic capture bot swings on a
       // cadence and its first swing happened to connect. A driver that aims the
       // PCI and swings ONCE per pitch found it immediately.
-      if (incoming && (ball.position.z <= -1.2 || !flight.active)) {
+      if (incoming && throwIn <= 0 && (ball.position.z <= -1.2 || !flight.active)) {
         incoming = false;
         SoundKit.play('miss');
         ctx.feel?.impact?.(0.35);   // A+ P0: a whiff is an out — clank-weight feel, no make punch
@@ -945,6 +995,23 @@ export const DerbyMode: ModeDefinition = (() => {
 // ═══════════════════════════════════════════════════════ PENALTY SHOOTOUT ══
 export const PenaltyMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, keeper: SpawnedCharacter;
+  let meAnim: BeatOwner, keeperAnim: BeatOwner;
+  let meDove = false, keeperDove = false;
+  /** Your kick and their kick are beats: the ball leaves on the boot's contact key, not on the press / the run-up's end. */
+  let kickIn = 0; let pendingKick: (() => void) | null = null;
+  let keepKickIn = 0; let pendingKeepKick: (() => void) | null = null;
+  /** Both keepers face −z, so world +x is their LEFT: the authored dive / hold / rise stretch to the keeper's right; a dive
+   *  to +x plays the registered mirrors ('<clip>.M') — hold and rise on the SAME side as the dive, or the body flips over
+   *  at the hold (measured 0.35–0.77 m). */
+  const sided = (clip: string, sign: DiveSign): string => (sign > 0 ? `${clip}.M` : clip);
+  const MIRRORED = [SPORT_CLIP.keeperDive, SPORT_CLIP.keeperDiveHold, SPORT_CLIP.keeperRise];
+  /** The dive: stretch, then HOLD the stretch on the ground until the kick is decided. */
+  const dive = (owner: BeatOwner, sign: DiveSign): void => { owner.beat(sided(SPORT_CLIP.keeperDive, sign), { fadeSec: 0.1 }); owner.loop(sided(SPORT_CLIP.keeperDiveHold, sign), { fadeSec: 0.2 }); };
+  /** Off the ground through keeper_rise, settling into `then`. Called a beat AFTER the decision (RISE_DELAY_MS): the ball
+   *  crosses the line 0.4 s after the boot, and a rise on the decision cut the dive before it stretched. */
+  const rise = (owner: BeatOwner, sign: DiveSign, then: string): void => { owner.beat(sided(SPORT_CLIP.keeperRise, sign), { fadeSec: 0.12 }); owner.loop(then, { fadeSec: 0.25 }); };
+  const RISE_DELAY_MS = 650;
+  let meDiveSign: DiveSign = 0, keeperDiveSign: DiveSign = 0;
   let furniture: AbstractMesh[] = [];
   let ball: AbstractMesh, flight: Flight, reticle: Reticle, meter: PowerMeter;
   let round = 0, goals = 0, stylePts = 0, stickX = 0, stickY = 0;
@@ -993,8 +1060,9 @@ export const PenaltyMode: ModeDefinition = (() => {
     feints = 0; lastFlickSign = 0;
     ball.position.set(0, 0.11, 0);
     keeper.root.position.set(0, 0, 10.4);
-    keeper.animator.play(SPORT_CLIP.keeperIdle, { loop: true });
-    me.animator.play(SPORT_CLIP.penaltyIdle, { loop: true });
+    keeperAnim.loop(SPORT_CLIP.keeperIdle, { fadeSec: 0.25 });
+    meAnim.loop(SPORT_CLIP.penaltyIdle, { fadeSec: 0.25 });
+    kickIn = 0; pendingKick = null;
     hintFlags.read = false;
     // the pressure line: a must-score kick SAYS so (sudden death or last kick down)
     const s = shootoutState(goals, themGoals, round - 1, themKicks);
@@ -1021,9 +1089,10 @@ export const PenaltyMode: ModeDefinition = (() => {
     ctx.setHud({ ...kicksHud(), dive: 'THEIR KICK — read the run-up · DIVE ◀ ▶ as he strikes', kickPower: null });
     phase = 'keep';
     keeper.root.position.set(SPOT.x, 0, SPOT.z - 2.2); keeper.root.rotation.set(0, 0, 0);
-    keeper.animator.play(SPORT_CLIP.moveLoop, { loop: true });
+    keeperAnim.loop(SPORT_CLIP.moveLoop, { fadeSec: 0.2 });
     me.root.position.copyFrom(GOAL_LINE); me.root.rotation.set(0, Math.PI, 0);
-    me.animator.play(SPORT_CLIP.keeperIdle, { loop: true });
+    meAnim.loop(SPORT_CLIP.keeperIdle, { fadeSec: 0.25 });
+    keepKickIn = 0; pendingKeepKick = null;
     ball.position.set(SPOT.x, 0.11, SPOT.z + 0.3);
     ctx.camDirector.setFixedBehind(SPOT, 0, 'keeper', true);   // high behind the spot, the keeper faces the camera at the goal
     ctx.setHud({ hint: `THEIR KICK — read the run-up · dive ◀ / ▶ as he strikes${sd ? ' · sudden death: he lies more' : ''}`, banner: '' });
@@ -1055,7 +1124,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       return;
     }
     me.root.position.set(-0.4, 0, -1.6); me.root.rotation.set(0, 0, 0);
-    me.animator.play(SPORT_CLIP.penaltyIdle, { loop: true });
+    meAnim.loop(SPORT_CLIP.penaltyIdle, { fadeSec: 0.25 });
     nextKick(ctx);
     ctx.camDirector.setFixedBehind(me.root.position, 0, 'flight', true);
   }
@@ -1068,7 +1137,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     if (lastFlickSign !== 0 && sign !== lastFlickSign && nowMs - lastFlickMs < 450) {
       feints++;
       SoundKit.play('whoosh', { pitch: 1.6, volume: 0.35 });
-      me.animator.play(SPORT_CLIP.footballJukeLeft, { onEnd: () => me.animator.play(SPORT_CLIP.penaltyIdle, { loop: true }) });
+      meAnim.beat(SPORT_CLIP.footballJukeLeft, { fadeSec: 0.08 });
       ctx.setHud({ feints, banner: `FEINT${feints > 1 ? ` x${feints}` : '!'}` });
       setTimeout(() => ctx.setHud({ banner: '' }), 500);
     }
@@ -1102,6 +1171,12 @@ export const PenaltyMode: ModeDefinition = (() => {
       }));
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.4, 0, -1.6), 0, SPORT_CLIP.penaltyIdle);
       keeper = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0, 10.4), Math.PI, SPORT_CLIP.keeperIdle);
+      // the left dive is the authored right dive reflected across the sagittal plane, registered as 'keeper_dive.M'
+      registerMirroredClips(me.animator, ctx.scene, me.skeleton, MIRRORED);
+      registerMirroredClips(keeper.animator, ctx.scene, keeper.skeleton, MIRRORED);
+      meAnim = new BeatOwner(me.animator); meAnim.loop(SPORT_CLIP.penaltyIdle);
+      keeperAnim = new BeatOwner(keeper.animator); keeperAnim.loop(SPORT_CLIP.keeperIdle);
+      meDove = keeperDove = false; kickIn = keepKickIn = 0; pendingKick = pendingKeepKick = null;
       ctx.heroRef.current = me.root;
       ball = MeshBuilder.CreateSphere('sball', { diameter: 0.22 }, ctx.scene);
       void dressBall(ball, 'soccer');   // Meshy ball skin rides the sphere (visual only)
@@ -1126,7 +1201,7 @@ export const PenaltyMode: ModeDefinition = (() => {
           : e.t === 'stick' && e.side === 'L' && Math.abs(e.x) > 0.6 ? (e.x < 0 ? -1 : 1) : 0;
         if (side !== 0 && keepDiveAt == null) {
           keepDive = side; keepDiveAt = performance.now();
-          me.animator.play(SPORT_CLIP.keeperDive, {});
+          dive(meAnim, side); meDove = true; meDiveSign = side;
           ctx.setHud({ hint: '' });
         }
         return;
@@ -1138,16 +1213,14 @@ export const PenaltyMode: ModeDefinition = (() => {
           const p = meter.stop();
           phase = 'flight';
           goalLatch = false;              // A+ P0: a fresh kick gets one goal punch
-          SoundKit.play('whoosh');
-          me.animator.play(SPORT_CLIP.penaltyStrike, { onEnd: () => me.animator.play(SPORT_CLIP.penaltyIdle, { loop: true }) });
-          ctx.feel?.impact?.(0.3 + p * 0.3);
+          meAnim.beat(SPORT_CLIP.penaltyStrike, { fadeSec: 0.08 });
+          kickIn = KICK_CONTACT_SEC;      // the boot meets the ball on the strike-through key; update() launches it
           // feints send the keeper the wrong way more often — and the keeper
           // READS your history: repeat a side and he is waiting for it, break
           // the habit and he leans the wrong way (keeperReadProb, D2)
           const aimSign = Math.sign(reticle.pos.x || 0.01);
           const correctGuess = keeperReadProb(aimSign, shotHistory, feints);
           keeperTargetX = Math.random() < correctGuess ? aimSign * 2.2 : -aimSign * 2.2;
-          keeper.animator.play(SPORT_CLIP.keeperDive, {});
           // A penalty is DRIVEN: 22–30 m/s with real loft. The old numbers
           // (13–20 m/s, aimed flat at the reticle) died 3–6m short of the
           // goal under gravity — measured: ZERO goals were physically
@@ -1158,7 +1231,14 @@ export const PenaltyMode: ModeDefinition = (() => {
           to.y += 1.2;
           const dir = to.normalize();
           const wobble = (1 - p) * 0.5 + feints * FEINT_WOBBLE;
-          flight.launch(ball.position, dir.scale(22 + p * 8).add(new Vector3((Math.random() - 0.5) * wobble * 4, 0, 0)));
+          const vel = dir.scale(22 + p * 8).add(new Vector3((Math.random() - 0.5) * wobble * 4, 0, 0));
+          pendingKick = () => {
+            SoundKit.play('whoosh');
+            ctx.feel?.impact?.(0.3 + p * 0.3);   // the contact feel, ON the contact (A+ P0 weight unchanged)
+            keeperDiveSign = keeperTargetX > 0 ? 1 : -1;
+            dive(keeperAnim, keeperDiveSign); keeperDove = true;   // the keeper commits as the boot lands
+            flight.launch(ball.position, vel);
+          };
           ctx.setHud({ power: Math.round(p * 100), kickPower: null, hint: '' });
         }
       }
@@ -1186,6 +1266,12 @@ export const PenaltyMode: ModeDefinition = (() => {
       }
       gallery?.update(dt);
       if (phase === 'flight') {
+        if (kickIn > 0) {
+          // the run-up / wind-up: the ball waits for the boot
+          kickIn -= dt;
+          if (kickIn <= 0 && pendingKick) { pendingKick(); pendingKick = null; }
+          return;
+        }
         keeper.root.position.x += (keeperTargetX - keeper.root.position.x) * 5 * dt;
         flight.step(dt);
         // A scuffed pen can DIE SHORT of the line (weak meter + gravity) —
@@ -1201,6 +1287,7 @@ export const PenaltyMode: ModeDefinition = (() => {
           if (saved) lastSaveBy = 'them';
           const scored = inFrame && !saved;
           shotHistory.push(Math.sign(reticle.pos.x || 0.01));   // the keeper remembers
+          if (keeperDove) { keeperDove = false; setTimeout(() => { if (!ended) rise(keeperAnim, keeperDiveSign, SPORT_CLIP.keeperIdle); }, RISE_DELAY_MS); }   // decided: off the ground, a beat later
           myKicks.push(scored ? 'goal' : 'miss');
           if (scored) {
             goals++;
@@ -1245,13 +1332,24 @@ export const PenaltyMode: ModeDefinition = (() => {
           keeper.root.position.z = SPOT.z - 2.2 * (1 - lean);
           keeper.root.rotation.y = keepPlan.tellSign * 0.18 * lean;
           if (keepT >= KEEP_RUNUP_SEC) {
-            keepStruck = true; keepStrikeAt = performance.now();
-            keeper.animator.play(SPORT_CLIP.penaltyStrike, { onEnd: () => keeper.animator.play(SPORT_CLIP.penaltyIdle, { loop: true }) });
-            SoundKit.play('whoosh');
-            ball.position.set(SPOT.x, 0.11, SPOT.z + 0.3);
-            const to = new Vector3(keepPlan.aimX, keepPlan.aimY + 1.0, 10.9).subtract(ball.position).normalize();
-            flight.launch(ball.position, to.scale(25));
+            keepStruck = true;
+            keeperAnim.beat(SPORT_CLIP.penaltyStrike, { fadeSec: 0.08 });
+            keeperAnim.loop(SPORT_CLIP.penaltyIdle, { fadeSec: 0.2 });   // a kicker stands after the strike (was the keeper's crouch)
+            keepKickIn = KICK_CONTACT_SEC;
+            const plan = keepPlan;
+            pendingKeepKick = () => {
+              keepStrikeAt = performance.now();   // the strike instant the dive is graded against = the boot on the ball
+              SoundKit.play('whoosh');
+              ball.position.set(SPOT.x, 0.11, SPOT.z + 0.3);
+              const to = new Vector3(plan.aimX, plan.aimY + 1.0, 10.9).subtract(ball.position).normalize();
+              flight.launch(ball.position, to.scale(25));
+            };
           }
+        } else if (keepKickIn > 0) {
+          // the boot is on its way to the ball; a dive already committed keeps carrying you
+          keepKickIn -= dt;
+          if (keepDive !== 0) me.root.position.x += (keepDive * 2.4 - me.root.position.x) * 6 * dt;
+          if (keepKickIn <= 0 && pendingKeepKick) { pendingKeepKick(); pendingKeepKick = null; }
         } else {
           flight.step(dt);
           // your dive carries you toward the side you chose
@@ -1264,6 +1362,7 @@ export const PenaltyMode: ModeDefinition = (() => {
             const theyScore = !r.saved && r.why !== 'off_target';
             if (theyScore) themGoals++;
             themKicks++;
+            if (meDove) { meDove = false; setTimeout(() => { if (!ended) rise(meAnim, meDiveSign, SPORT_CLIP.keeperIdle); }, RISE_DELAY_MS); }   // decided: off the ground, a beat later
             theirKicks.push(theyScore ? 'goal' : 'miss');
             if (r.saved) { lastSaveBy = 'you'; ctx.juice.scorePop(ball.position, 'SAVED!', '#7CFFB2'); ctx.feel?.impact?.(0.5); }
             SoundKit.play(theyScore ? 'crowdGroan' : 'crowdCheer', { volume: 0.4 });
