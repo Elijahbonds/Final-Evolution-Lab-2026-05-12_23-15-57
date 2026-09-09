@@ -84,9 +84,11 @@ export class BalanceModel {
 export class BoardSync {
   constructor(private board: TransformNode, private riderRoot: TransformNode) {}
 
-  update(lean: number, airborne: boolean): void {
+  /** `pitch` (VENICE-SKATE-THPS, 2026-09-09): the deck's nose angle in radians — a manual rides the back trucks with
+   *  the nose in the air, and the deck has to show it or the trick is invisible. 0 for every other window. */
+  update(lean: number, airborne: boolean, pitch = 0): void {
     this.board.position.set(0, 0.03, 0);
-    this.board.rotation.set(airborne ? 0 : 0, 0, -lean * 0.22);
+    this.board.rotation.set(pitch, 0, -lean * 0.22);
     // parent is the rider root — position is local, so the pair is synced
     // by construction. This guard exists so a future refactor that re-
     // parents the board fails loudly here instead of shipping a desync.

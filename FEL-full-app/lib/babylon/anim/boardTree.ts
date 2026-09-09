@@ -15,7 +15,7 @@ import type { CharacterAnimator } from './CharacterAnimator';
 
 export type BoardAnimState =
   | 'cruise' | 'push' | 'carve_left' | 'carve_right' | 'tuck'
-  | 'air_tuck' | 'air_grab' | 'air_flip' | 'air_spin'
+  | 'ollie' | 'air_tuck' | 'air_grab' | 'air_flip' | 'air_spin'
   | 'grind' | 'manual'
   | 'land_clean' | 'land_sketchy' | 'bail'
   | 'idle' | 'celebrate';
@@ -33,6 +33,8 @@ export interface BoardAnimInput {
   landing: 'none' | 'clean' | 'sketchy';   // one-beat
   bailing: boolean;
   celebrating?: boolean;
+  /** The pop beat (VENICE-SKATE-THPS): the mode holds this for the ollie clip's plant/pop/hang, then drops it. */
+  popping?: boolean;
   /** Grounded speed tuck (snow's throttle, surf's buried rail). A carve wins over it — a racer rises to turn. */
   tucking?: boolean;
 }
@@ -43,12 +45,14 @@ const CLIP_FOR: Record<BoardAnimState, { clip: string; loop: boolean; fadeSec: n
   carve_left:    { clip: 'board_carve_left', loop: true, fadeSec: 0.2 },   // the lean-in IS the fade — the clips hold the pose
   carve_right:   { clip: 'board_carve_right', loop: true, fadeSec: 0.2 },
   tuck:          { clip: 'board_tuck', loop: true, fadeSec: 0.22 },
+  ollie:         { clip: 'skate_ollie', loop: false, fadeSec: 0.05 },   // VENICE-SKATE-THPS: plant -> pop -> hang; the pop had no body before
+
   air_tuck:      { clip: 'board_tuck', loop: true, fadeSec: 0.12 },
   air_grab:      { clip: 'board_grab', loop: true, fadeSec: 0.12 },
   air_flip:      { clip: 'skate_kickflip', loop: false, fadeSec: 0.06 },
   air_spin:      { clip: 'board_air', loop: true, fadeSec: 0.12 },
   grind:         { clip: 'board_grind', loop: true, fadeSec: 0.08 },
-  manual:        { clip: 'board_ride_idle', loop: true, fadeSec: 0.1 },
+  manual:        { clip: 'board_manual', loop: true, fadeSec: 0.12 },   // VENICE-SKATE-THPS: was the ride idle — the THPS link looked exactly like coasting
   land_clean:    { clip: 'board_land', loop: false, fadeSec: 0.08 },
   land_sketchy:  { clip: 'board_land', loop: false, fadeSec: 0.08 },
   bail:          { clip: 'skate_bail', loop: false, fadeSec: 0.05 },
@@ -70,6 +74,8 @@ export function chooseBoardClip(i: BoardAnimInput, prev: BoardAnimState | null =
   else if (i.landing === 'clean') state = 'land_clean';
   else if (i.grinding) state = 'grind';
   else if (i.manual) state = 'manual';
+  // the pop beat wins over the air pose it leads into, but never over a trick the player actually threw
+  else if (i.popping && !i.grabHeld && !i.flipping && !i.spinning) state = 'ollie';
   else if (i.airborne) {
     state = i.grabHeld ? 'air_grab' : i.flipping ? 'air_flip' : i.spinning ? 'air_spin' : 'air_tuck';
   } else if (i.pushing) state = 'push';
@@ -82,7 +88,7 @@ export function chooseBoardClip(i: BoardAnimInput, prev: BoardAnimState | null =
 
 /** Where a finished one-shot settles while its trigger still holds (a flip that ran out mid-air holds the tuck). */
 export const AFTER_ONESHOT: Partial<Record<BoardAnimState, BoardAnimState>> = {
-  push: 'cruise', air_flip: 'air_tuck', land_clean: 'cruise', land_sketchy: 'cruise', bail: 'idle', celebrate: 'idle',
+  push: 'cruise', ollie: 'air_tuck', air_flip: 'air_tuck', land_clean: 'cruise', land_sketchy: 'cruise', bail: 'idle', celebrate: 'idle',
 };
 
 // ONE OWNER (ANIM-READABILITY, 2026-09-07). The tree is the only thing that plays clips on a board rider. Before, the

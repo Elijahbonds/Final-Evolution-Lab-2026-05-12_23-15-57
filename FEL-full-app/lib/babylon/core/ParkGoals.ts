@@ -120,10 +120,21 @@ export class MovingRail {
   dispose(): void { this.mesh?.dispose(); this.mesh = null; }
 
   get offset(): Vector3 { return Vector3.Lerp(this.from, this.to, this.t); }
-  /** Current world-space grind line (feed the Rider's line list per frame). */
-  get line(): { a: Vector3; b: Vector3; bonus: number } {
+  /**
+   * Current world-space grind line (feed the Rider's line list per frame).
+   *
+   * ONE object, mutated in place (VENICE-SKATE-THPS, 2026-09-09). This used to return a fresh literal on every read,
+   * and the mode re-reads it every frame — so the line the Rider locked onto was, one frame later, an object that no
+   * longer appeared in the world's list at all. Identifying the patrol rail by `indexOf` therefore always failed, and
+   * the run goal it exists for ("GRIND THE PATROL RAIL") could not tick even when the grind was real. The line carries
+   * its own `gapId` now, so the lock handler reads the credit off the rail it caught.
+   */
+  private readonly liveLine = { a: Vector3.Zero(), b: Vector3.Zero(), bonus: 300, gapId: 'moving_rail' };
+  get line(): { a: Vector3; b: Vector3; bonus: number; gapId: string } {
     const o = this.offset;
-    return { a: this.a.add(o), b: this.b.add(o), bonus: 300 };
+    this.a.addToRef(o, this.liveLine.a);
+    this.b.addToRef(o, this.liveLine.b);
+    return this.liveLine;
   }
 
   /** Gap credit when a grind locks onto this rail in motion. */

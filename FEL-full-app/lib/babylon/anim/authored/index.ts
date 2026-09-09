@@ -28,6 +28,7 @@ import {
   buildBoardRideIdle, buildBoardCarveLeft, buildBoardCarveRight, buildBoardTuck,
   buildBoardGrab, buildBoardAir, buildBoardGrind, buildBoardLand, buildBoardPush,
   buildSkateKickflip, buildSkateBail,
+  buildBoardManual, buildSkateOllie,   // VENICE-SKATE-THPS (2026-09-09): the manual had no clip and the pop had no body
 } from './boardSuite';
 
 export function registerAuthoredClips(
@@ -115,6 +116,8 @@ export function registerAuthoredClips(
     () => buildBoardPush(scene, skeleton),   // ANIM-READABILITY (2026-09-07): the skate push, replacing the walk alias
     () => buildSkateKickflip(scene, skeleton),
     () => buildSkateBail(scene, skeleton),
+    () => buildBoardManual(scene, skeleton),   // VENICE-SKATE-THPS: the back-truck balance act (the tree pointed 'manual' at the ride idle)
+    () => buildSkateOllie(scene, skeleton),    // VENICE-SKATE-THPS: plant -> pop -> hang, the sticky beat under the pop
     // Basketball packages (Phase 4, 2026-09-03) — size-ups, gather, slide,
     // block and steal used to alias onto run/guard/jumpshot.
     () => buildDribbleIdle(scene, skeleton),

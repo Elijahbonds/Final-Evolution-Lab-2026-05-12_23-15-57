@@ -27,6 +27,15 @@ export interface PoseKey {
   bones?: Record<string, Deg3>;
   /** Wrist targets, body-local metres (+x right, +y up, +z forward), authored for REF_HIPS_Y. */
   hands?: { Left?: [number, number, number]; Right?: [number, number, number] };
+  /**
+   * Wrist targets measured FROM THE POSED SHOULDER, body-local metres, in REF_ARM_LEN proportions (VENICE-SKATE-THPS,
+   * 2026-09-09). `hands` is absolute-from-the-root, which is right for a reach at a fixed thing in the world (the rim,
+   * the ball) — but wrong for a stance, where the author means "hands out to the sides", and the shoulder has already
+   * been carried somewhere else by the torso keys (the board stance yaws the hips 74°). Authoring the offset makes the
+   * elbow angle a direct function of its LENGTH: |rel| = REF_ARM_LEN is a locked straight arm, and each 0.04 m shorter
+   * bends it roughly another 10°. Wins over `hands` for the same side when both are given.
+   */
+  handsRel?: { Left?: [number, number, number]; Right?: [number, number, number] };
   /** Elbow pole directions (body-local); default: out to the side and back. */
   poles?: { Left?: [number, number, number]; Right?: [number, number, number] };
   /** Ankle targets, body-local metres. */
@@ -127,9 +136,16 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
     refresh();
     // 2) hands
     for (const side of ['Left', 'Right'] as const) {
-      const tgt = key.hands?.[side]; const arm = arms[side]; if (!tgt || !arm) continue;
+      const rel = key.handsRel?.[side]; const tgt = key.hands?.[side]; const arm = arms[side];
+      if (!arm || (!rel && !tgt)) continue;
       const pole = key.poles?.[side] ?? [side === 'Left' ? -0.7 : 0.7, -0.2, -0.5];
-      reachArm(arm, forLimb(tgt, arm.shoulder, ratios.arm[side]), inBody(pole), 1);   // the pole is a body-frame direction too
+      let world: Vector3;
+      if (rel) {
+        const r = ratios.arm[side];
+        arm.shoulder.computeWorldMatrix(true);
+        world = arm.shoulder.getAbsolutePosition().add(inBody([rel[0] * r, rel[1] * r, rel[2] * r]));
+      } else world = forLimb(tgt as [number, number, number], arm.shoulder, ratios.arm[side]);
+      reachArm(arm, world, inBody(pole), 1);   // the pole is a body-frame direction too
       refresh();
     }
     // 3) feet
@@ -141,7 +157,7 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
     }
     // 4) read back local rotations for every bone the key touched
     const touched = new Set<string>(Object.keys(key.bones ?? {}));
-    for (const side of ['Left', 'Right'] as const) { if (key.hands?.[side]) for (const b of ARM_BONES) if (b.startsWith(side)) touched.add(b); if (key.feet?.[side]) for (const b of LEG_BONES) if (b.startsWith(side)) touched.add(b); }
+    for (const side of ['Left', 'Right'] as const) { if (key.hands?.[side] || key.handsRel?.[side]) for (const b of ARM_BONES) if (b.startsWith(side)) touched.add(b); if (key.feet?.[side]) for (const b of LEG_BONES) if (b.startsWith(side)) touched.add(b); }
     for (const bone of touched) { const n = nodes.get(bone); if (n?.rotationQuaternion) push(bone, key.t, n.rotationQuaternion); }
     if (key.hipsY != null) hipsY.push([key.t, key.hipsY * scale]);
   }

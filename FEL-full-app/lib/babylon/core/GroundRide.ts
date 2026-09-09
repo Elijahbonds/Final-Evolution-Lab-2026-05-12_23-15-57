@@ -10,6 +10,10 @@ export interface GrindLine {
   /** big-air only lines (the ski-lift cable) need this much height to catch */
   minApproachHeight?: number;
   bonus: number;
+  /** Goal credit this rail pays when a grind locks onto it (VENICE-SKATE-THPS). The lock handler reads it off the line
+   *  the Rider actually caught — identifying the rail by its INDEX in the world's list cannot work for a rail that
+   *  moves, because a moving rail hands out a fresh line object every frame. */
+  gapId?: string;
 }
 
 /** Per-world overrides for the Rider (pitched pistes need a longer ground ray and a floor below the run). */
@@ -24,6 +28,9 @@ export interface RiderCfgOverrides {
   /** Forward accel the Rider adds on its own every frame (m/s², × 0.55–1 with pump). Skate's momentum model owns the
    *  velocity outright and passes 0 — the default 9 was a frame-rate-dependent creep under it (SKATE-MOVE). */
   carveAccel?: number;
+  /** Top speed ALONG a rail (m/s). A grind scrubs — riding a 4 m rail at 8 m/s is over in 0.5 s and reads as a bump,
+   *  not a trick (VENICE-SKATE-THPS). Omit for the historic behaviour (the run's own speed, floored at 6). */
+  grindSpeed?: number;
 }
 
 export class Rider {
@@ -35,7 +42,7 @@ export class Rider {
   /** M42: frames since the raycast last found ground — drives the hard clamp */
   private missedRaycasts = 0;
 
-  private cfg: { gravity: number; carveAccel: number; maxSpeed: number; drag: number; snapHeight: number; hardFloorY: number; missThreshold: number; rayLength: number; stickDown: number };
+  private cfg: { gravity: number; carveAccel: number; maxSpeed: number; drag: number; snapHeight: number; hardFloorY: number; missThreshold: number; rayLength: number; stickDown: number; grindSpeed: number };
 
   constructor(
     private scene: Scene,
@@ -49,6 +56,7 @@ export class Rider {
       // not; and how many consecutive missed raycasts trigger the hard clamp.
       hardFloorY: 0,        //TUNE(elijah): safety floor plane
       missThreshold: 6,     //TUNE(elijah): missed frames before clamp
+      grindSpeed: 0,        // 0 = the historic rule below (max(6, run speed))
       rayLength: 6,         // flat parks; the snow piste passes ~80 (it drops ~56 m over the run)
       stickDown: 0,         // flat parks: no glue; the snow piste passes 0.6 (see RiderCfgOverrides.stickDown)
       ...overrides,
@@ -125,21 +133,32 @@ export class Rider {
     this.grounded = false;
   }
 
-  /** Try to catch a grind line (rail or lift cable). Call when airborne. */
-  tryGrind(lines: GrindLine[]): GrindLine | null {
+  /**
+   * Try to catch a grind line (rail or lift cable). Call when airborne.
+   *
+   * `radius` (VENICE-SKATE-THPS, 2026-09-09) is the catch sphere in metres, default the historic 1.1. That default is
+   * measured from `root.position`, which on a board rider sits at the FEET — so a rail whose bar is 0.5 m up already
+   * spends half the budget on height, leaving well under a metre of horizontal window to thread at 8 m/s. Skate's own
+   * eye never once locked a rail. The mode passes a real magnet radius and an alignment test of its own; nothing else
+   * that calls this changes.
+   */
+  tryGrind(lines: GrindLine[], radius = 1.1): GrindLine | null {
     if (this.grounded || this.grinding) return null;
+    let best: GrindLine | null = null, bestD = Infinity, bestT = 0;
     for (const line of lines) {
       if (line.minApproachHeight && this.root.position.y < line.minApproachHeight) continue;
       const t = closestT(line.a, line.b, this.root.position);
       const point = Vector3.Lerp(line.a, line.b, t);
-      if (Vector3.Distance(point, this.root.position) < 1.1) {
-        this.grinding = line;
-        this.grindT = t;
-        this.vel.y = 0;
-        return line;
-      }
+      const d = Vector3.Distance(point, this.root.position);
+      if (d < radius && d < bestD) { best = line; bestD = d; bestT = t; }
     }
-    return null;
+    if (!best) return null;
+    // the NEAREST rail wins, not the first one in the list: the plaza's five lines cross, and taking list order handed
+    // the lock to a rail the rider was not on
+    this.grinding = best;
+    this.grindT = bestT;
+    this.vel.y = 0;
+    return best;
   }
 
   private updateGrind(dt: number): void {
@@ -147,7 +166,9 @@ export class Rider {
     const len = Vector3.Distance(line.a, line.b);
     const dir = Math.hypot(this.vel.x, this.vel.z) >= 0.5 ? Math.sign(
       Vector3.Dot(line.b.subtract(line.a), this.vel)) || 1 : 1;
-    this.grindT += (dir * Math.max(6, Math.hypot(this.vel.x, this.vel.z)) * dt) / len;
+    const run = Math.hypot(this.vel.x, this.vel.z);
+    const alongSpeed = this.cfg.grindSpeed > 0 ? Math.max(3.5, Math.min(this.cfg.grindSpeed, run)) : Math.max(6, run);
+    this.grindT += (dir * alongSpeed * dt) / len;
     if (this.grindT <= 0 || this.grindT >= 1) { this.dismount(); return; }
     const p = Vector3.Lerp(line.a, line.b, this.grindT);
     this.root.position.copyFrom(p);

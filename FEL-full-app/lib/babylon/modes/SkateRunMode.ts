@@ -22,7 +22,8 @@ import { FlickStick } from '../core/FlickStick';
 import { BoardMovement, SKATE_TUNING } from '../core/BoardMovement';
 import { AirControl } from '../core/AirControl';
 import { resolveLanding, BalanceSave, SKETCHY_SCORE_MULT } from '../core/LandingSystem';
-import { BalanceChannel, tryRevert } from '../core/GrindManual';
+import { BalanceChannel, tryRevert, type BalanceChannelKind } from '../core/GrindManual';
+import { pickRail, nearestOnSegment } from '../core/RailMagnet';   // VENICE-SKATE-THPS: the catch window, testable on its own
 import { ComboChain } from '../core/ComboChain';
 import { BoardAnimTree } from '../anim/boardTree';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the board family (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Measured on
@@ -112,6 +113,51 @@ export const SkateRunMode: ModeDefinition = (() => {
   let goals: GoalTracker;
   let patrolRail: MovingRail;
   let crowd: Onlookers;
+  // ── VENICE-SKATE-THPS (2026-09-09) ────────────────────────────────────────────────────────────────────────────────
+  /** Seconds of spectacle slow-mo left (H4). 0 = real time. */
+  let slowT = 0;
+  /** Seconds until another spectacle beat may fire — a slow-mo on every ollie is a slow game, not a THPS one. */
+  let slowCool = 0;
+  let slowCount = 0;
+  const SLOW_SCALE = 0.42;          // gameplay AND clip time; the whole beat, not a clip effect
+  const SLOW_SEC = 0.34;            // short: the spectacle, not the flight
+  const SLOW_COOLDOWN = 2.2;
+  /** The pop beat: skate_ollie's plant -> pop -> hang, held while the tree owns it. */
+  let popBeatT = 0;
+  const POP_BEAT_SEC = 0.4;         // = skate_ollie's own length
+  /** The keyboard's crouch is a HOLD (space emits a 0.01 sentinel down, 0 up); a pad's trigger carries its own value. */
+  let crouchAt = -1;
+  /** The manual link: a stick flick pair (back->forward = manual, forward->back = nose manual) within this window. */
+  let flickSign = 0, flickAt = -1;
+  const FLICK_WINDOW_MS = 420;
+  /** Entering a manual costs a moment of the foot drag; do not let the tap brake the line it is linking. */
+  let brakeMuteUntil = -1;
+  /** A manual request raised by onInput and consumed by update (the channel needs move.balance, which lives there). */
+  let manualWanted: BalanceChannelKind | null = null;
+  /** The rail magnet: the catch sphere around the FEET, and how aligned with the rail the run has to be. */
+  const GRIND_MAGNET = 2.0;         // auto-lock, no button — the THPS rule
+  const GRIND_REACH = 3.0;          // with POP pressed: the player asked for it
+  const GRIND_ALIGN = 0.34;         // |cos| between the run and the rail
+  const GRIND_ASK_MS = 260;         // how long a POP press keeps asking for a rail
+  const RELOCK_MS = 350;            // after a dismount, before the same rail may catch again
+  /** When the player last pressed POP in the air (the ASK), and when the rail is allowed to catch again. */
+  let grindAskedAt = -1, relockUntil = -1;
+  /** Airtime + height of the current air, for the big-air spectacle beat. The floor is the last y the wheels were on —
+   *  a raycast per frame for one number the park already told us when it landed. */
+  let apexDone = false, lastVy = 0, lastGroundY = 0;
+  const groundUnder = (): number => lastGroundY;
+  /** Eased deck pitch (radians): a manual rides the tail with the nose up, everything else is flat. */
+  let boardPitch = 0;
+  /** THE NaN TRAP (VENICE-SKATE-THPS). The last frame whose position and heading were real numbers, and how many times
+   *  the run has had to be put back there. */
+  let lastGoodPos: Vector3 | null = null, lastGoodYaw = 0, nanReports = 0;
+  /** Distance to the nearest grind line (metres); Infinity before the world exists. */
+  const railDistance = (): number => {
+    if (!world?.grindLines?.length) return Infinity;
+    let best = Infinity;
+    for (const l of world.grindLines) best = Math.min(best, nearestOnSegment(l.a, l.b, rig.char.root.position).d);
+    return best;
+  };
   /** Apply a trick to the air chain and flash it -- shared by flick and buttons. */
   const airTrick = (
     ctx: ModeContext, id: string, label: string,
@@ -130,6 +176,23 @@ export const SkateRunMode: ModeDefinition = (() => {
     ctx.juice.shake(big ? 0.08 : 0.06, 120);
     if (big) ctx.juice.flash('#fff6dd', 80);
     console.info(`[SKATE-JUICE] clean land (${chainLen} trick${chainLen === 1 ? '' : 's'}${big ? ', flash' : ''})`);
+  }
+  /**
+   * THE SPECTACLE BEAT (H4, VENICE-SKATE-THPS). THPS2's air hangs for a moment when something is actually happening —
+   * the gap you are clearing, the rail you just caught, the chain you just landed. Skate had NO slow-mo at all: the
+   * A+ pass had ruled out the dunk's hang slowMo (a permanent, every-attempt hold, and rightly forbidden) and left the
+   * mode with a land punch and nothing else.
+   *
+   * This one is scoped the way the parry's is: short (0.34 s), earned (three named beats, never a plain ollie), rate
+   * limited (2.2 s between them) and it slows the WHOLE beat — `ctx.juice.slowMo` only moves `animationTimeScale`, so
+   * on its own it slows the clips while the board keeps flying, which reads as a stutter. The mode scales its own dt
+   * with it; the run clock stays honest and keeps counting real seconds.
+   */
+  function spectacle(ctx: ModeContext, why: string): void {
+    if (slowT > 0 || slowCool > 0) return;
+    slowT = SLOW_SEC; slowCool = SLOW_COOLDOWN; slowCount++;
+    ctx.juice.slowMo(SLOW_SCALE, SLOW_SEC * 1000);
+    console.info(`[SKATE-SLOWMO] ${why} (${slowCount})`);
   }
   /** A bail: hit-stop + shake + ONE low thud + dust. Heavier than a clean land. Latched once per touchdown. */
   function bailPunch(ctx: ModeContext): void {
@@ -156,7 +219,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       _validateChar.dispose(); // Clean up validation placeholder
       // carveAccel 0: the momentum model below owns the velocity; the Rider's own 4.95 m/s² forward creep was the only
       // thing that moved a stick-held rider (0.33 m in 4 s on the baseline probe) and it scaled with frame time
-      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -16), 0, world.ground, '#22d3ee', 'skateboard', { carveAccel: 0 });
+      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -16), 0, world.ground, '#22d3ee', 'skateboard', { carveAccel: 0, grindSpeed: 6.5 });
       rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true });
       animTree = new BoardAnimTree(rig.char.animator);
       posture?.dispose();
@@ -169,8 +232,25 @@ export const SkateRunMode: ModeDefinition = (() => {
         return { pose, legs, aim: at, eyes: at, window };
       }, 'SKATE-PP');
       if (process.env.NODE_ENV === 'development') {
-        const dev = (window as unknown as { __FEL_DEV__?: { boardPosture?: unknown } }).__FEL_DEV__;
+        const dev = (window as unknown as { __FEL_DEV__?: { boardPosture?: unknown; skate?: unknown } }).__FEL_DEV__;
         if (dev) dev.boardPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), aim: () => { const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5); return la; } };   // BIOMECH-WAVE2 probes
+        // VENICE-SKATE-THPS (2026-09-09): the ride state the probe grades — speed, the push cadence, the air, the rail
+        // latch, the manual channel and the two roll writers. Dev only; nothing here changes what the mode does.
+        if (dev) dev.skate = () => ({
+          pos: { x: rig.char.root.position.x, y: rig.char.root.position.y, z: rig.char.root.position.z },
+          rot: { x: rig.char.root.rotation.x, y: rig.char.root.rotation.y, z: rig.char.root.rotation.z },
+          speed: move.speed, speed01: move.speed01, stroking: move.stroking, pushing,
+          drive: -stickY, steer: stickX, grounded: rig.rider.grounded, airtime: air.state.airtime,
+          grinding: rig.rider.grinding !== null, grindNeedle: grindCh?.needle ?? null, grindHeld: grindCh?.heldSec ?? null,
+          manual: manualCh?.active ?? false, manualNeedle: manualCh?.needle ?? null, manualHeld: manualCh?.heldSec ?? null,
+          railD: railDistance(), slow: slowT, slows: slowCount, pop: popBeatT > 0, boardPitch,
+          // the golden goal rail, live: a probe has to be able to LINE UP with it, and a rail that patrols is
+          // somewhere different every second
+          patrol: { a: { ...patrolRail.line.a }, b: { ...patrolRail.line.b } },
+          onPatrol: rig.rider.grinding?.gapId === patrolRail.gapId,
+          chain: air.state.chain.map((t) => t.label), pot: combo.pot, banked: combo.banked,
+          goals: goals.doneCount, height: rig.char.root.position.y - lastGroundY,
+        });
       }
       boardSync = new BoardSync(rig.board, rig.char.root);
       mbus.reset();
@@ -197,6 +277,10 @@ export const SkateRunMode: ModeDefinition = (() => {
       ctx.camDirector.snapTo(rig.char.root.position, aheadOfRider());
       timeLeft = RUN_SEC; ended = false; stickX = 0; stickY = 0; pump = 0; pumpReleased = 0; pumpReleasedAt = -1; pushing = false; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
       landingBeatT = 0; bailBeatT = 0; bailLatch = false; lastLanding = 'none';
+      slowT = 0; slowCool = 0; slowCount = 0; popBeatT = 0; crouchAt = -1; boardPitch = 0; lastGroundY = 0;
+      grindAskedAt = -1; relockUntil = -1; lastGoodPos = null; lastGoodYaw = 0; nanReports = 0;
+      flickSign = 0; flickAt = -1; brakeMuteUntil = -1; manualWanted = null; apexDone = false; lastVy = 0;
+      grindCh = null; manualCh = null; save = null;
       // 'stadium' is a crowd bed with a breathing LFO -- wrong for a solo run
       // in an outdoor plaza. 'wind' is the open-air option in SoundKit's set.
       SoundKit.startAmbient('wind');
@@ -209,12 +293,30 @@ export const SkateRunMode: ModeDefinition = (() => {
       coins.line(new Vector3(20, 2.6, -19), new Vector3(20, 0.6, 8), 8);
       // ...and an air arc over the bowl rim
       coins.arc(new Vector3(-22, 1.6, 14), new Vector3(-10, 1.6, 14), 2.6, 6);
-      ctx.setHud({ score: 0, combo: '', coins: 0, time: RUN_SEC, goals: `0/${SKATE_GOALS.length}`, hint: 'HOLD FORWARD to push · steer · pull BACK to drag · POP to ollie · tricks in the air' });
+      ctx.setHud({ score: 0, combo: '', coins: 0, time: RUN_SEC, goals: `0/${SKATE_GOALS.length}`, hint: 'HOLD FORWARD to push · POP to ollie · ride over a rail to GRIND · tap BACK then FORWARD for a MANUAL' });
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
-      if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      if (e.t === 'stick' && e.side === 'L') {
+        // THE MANUAL LINK (VENICE-SKATE-THPS). There was no manual input at all: the only door into the channel was
+        // tryRevert, which needs a transition landing AND |stickX| > 0.8 AND a low pump in the same frame — measured
+        // 0 manual frames in a 40 s run, and the mode's own goal list asks for an 800-point combo you cannot link.
+        // THPS2's door is the one every player already knows: tap the stick back then forward (or forward then back)
+        // and the board rides its trucks. The two taps also brake for a moment, so the brake is muted through the link.
+        if (Math.abs(e.y) > 0.7 && rig?.rider.grounded) {
+          const sign = Math.sign(e.y), now = performance.now();
+          if (flickSign !== 0 && sign !== flickSign && now - flickAt < FLICK_WINDOW_MS) {
+            manualWanted = sign < 0 ? 'manual' : 'nosemanual';   // back then FORWARD = the back trucks
+            brakeMuteUntil = now + 260;
+            flickSign = 0; flickAt = -1;
+          } else { flickSign = sign; flickAt = now; }
+        } else if (Math.abs(e.y) < 0.3 && flickAt > 0 && performance.now() - flickAt > FLICK_WINDOW_MS) { flickSign = 0; flickAt = -1; }
+        // a stick that arrives as NaN (a driver hiccup, a probe, a mis-scaled axis) used to be multiplied straight into
+        // the yaw, and one NaN frame poisons the whole run: position, heading and camera all go NaN together and the
+        // screen turns to void (VENICE-SKATE-THPS)
+        stickX = Number.isFinite(e.x) ? e.x : 0; stickY = Number.isFinite(e.y) ? e.y : 0;
+      }
       // Phase 4: flick-stick is THE trick input (Skate 3 vocabulary).
       if (e.t === 'stick' && e.side === 'R') {
         const g = flick.feed(e);
@@ -235,7 +337,18 @@ export const SkateRunMode: ModeDefinition = (() => {
           if (pts > 0) combo.add('GRAB', pts, 'air');
         }
       }
-      if (e.t === 'trigger' && e.side === 'R') { if (e.value < pump) { pumpReleased = pump; pumpReleasedAt = performance.now(); } pump = e.value; }
+      if (e.t === 'trigger' && e.side === 'R') {
+        if (e.value > 0 && pump <= 0) crouchAt = performance.now();
+        if (e.value < pump) {
+          // VENICE-SKATE-THPS: CROUCH SCALES POP on a keyboard too. Space emits `trigger 0.01` down and `trigger 0` up
+          // (InputBus), so every keyboard ollie charged 0.01 and popped at the floor of the curve — the pop was the
+          // same height however long you held it. A sentinel-sized value means the crouch was a HOLD: read its length.
+          const held = crouchAt > 0 ? Math.min(1, (performance.now() - crouchAt) / 520) : 0;
+          pumpReleased = pump <= 0.02 ? Math.max(pump, held) : pump;
+          pumpReleasedAt = performance.now();
+        }
+        pump = e.value;
+      }
       if (e.t === 'button' && e.pressed) {
         if (e.btn === 'X' && rig.rider.grounded && !grindCh && !manualCh) {
           if (move.push()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });   // the push beat is move.stroking (below)
@@ -245,22 +358,15 @@ export const SkateRunMode: ModeDefinition = (() => {
             rig.rider.jump(olliePower());
             airEntryYaw = rig.char.root.rotation.y;
             air.launch();
+            popBeatT = POP_BEAT_SEC;   // VENICE-SKATE-THPS: the pop is a BODY beat now (plant -> pop -> hang)
+            apexDone = false; lastVy = rig.rider.vel.y;
             SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 });
           }
-          else if (rig.rider.tryGrind(world.grindLines)) {
-            // credit the rail actually under you — the transfers/downhill pay more
-            const p = rig.char.root.position;
-            const nearest = world.grindLines.reduce((best, l) =>
-              Vector3.Distance(Vector3.Center(l.a, l.b), p) < Vector3.Distance(Vector3.Center(best.a, best.b), p) ? l : best,
-            world.grindLines[0]);
-            // Bank the rail's bonus into the LIVE combo. TrickMachine.bankGrind
-            // adds to a comboPts that nothing in this mode ever reads, so every
-            // transfer and rail bonus was being thrown away.
-            combo.add(nearest.bonus >= 260 ? 'TRANSFER GRIND' : 'GRIND', nearest.bonus, 'grind');
-            ctx.setHud({ banner: nearest.bonus >= 260 ? `TRANSFER GRIND +${nearest.bonus}` : 'GRIND!' });
-            SoundKit.play('powerUp', { volume: 0.4, pitch: nearest.bonus >= 260 ? 1.3 : 1 });
-            ctx.feel?.impact?.(0.3);
-          }
+          // VENICE-SKATE-THPS: the press only ASKS for the rail — it never catches one itself. A raw `tryGrind` here
+          // skipped every qualification the magnet applies, so a press over a rail's last centimetre locked and
+          // dismounted on the same frame (measured: two 0.00 s "GRIND!" beats in one run, each paying a full bonus).
+          // The ask widens the magnet's own window for a moment instead, and one handler pays the lock.
+          else grindAskedAt = performance.now();
         }
         // The face buttons are not a SECOND trick system -- they are the same
         // one. These called TrickMachine, whose points accumulate in a score
@@ -284,9 +390,14 @@ export const SkateRunMode: ModeDefinition = (() => {
       }
     },
 
-    update(ctx: ModeContext, dt: number) {
+    update(ctx: ModeContext, dtRaw: number) {
       if (ended) return;
-      timeLeft -= dt;
+      // H4: the spectacle beat slows the WHOLE mode — the board, the air, the clips, the camera — for a third of a
+      // second. The run clock is not part of the beat: a slow-mo must never buy the player time.
+      slowCool = Math.max(0, slowCool - dtRaw);
+      if (slowT > 0) slowT = Math.max(0, slowT - dtRaw);
+      const dt = slowT > 0 ? dtRaw * SLOW_SCALE : dtRaw;
+      timeLeft -= dtRaw;
       if (timeLeft <= 0) {
         ended = true;
         SoundKit.play('whistle');
@@ -309,22 +420,51 @@ export const SkateRunMode: ModeDefinition = (() => {
       // ── balance channels (grind/manual) feed the combo ──
       if (grindCh?.active) {
         const r = grindCh.update(dt, stickX, move.speed01);
-        if (r.slipped) { grindCh = null; rig.rider.dismount(); bannerFlash(ctx, 'SLIPPED OFF', 600); }
+        // the fail-out: a slipped grind drops you off the rail AND holds the magnet off, so a rail you just fell from
+        // does not immediately catch you again on the way down (VENICE-SKATE-THPS)
+        if (r.slipped) { grindCh = null; rig.rider.dismount(); relockUntil = performance.now() + RELOCK_MS; console.info('[SKATE-GRIND] slipped off'); bannerFlash(ctx, 'SLIPPED OFF', 600); }
         else if (r.pts > 0) combo.add('GRIND', Math.round(r.pts), 'grind');
+      }
+      // ── the manual link (VENICE-SKATE-THPS) ──
+      // THE INPUT IS READ BEFORE THE BALANCE IS STEPPED. With the channel updated first, a revert flick that lands on
+      // the same frame the needle finally tips is scored as a SLIP: the player sees "LOST THE MANUAL", the combo bails,
+      // and the trick they actually performed is the one thing that does not happen (measured once in a 45 s run).
+      // A flick pair while already in one is the way OUT: the rider sets the nose down and the link banks with the
+      // combo. Rolling too slowly to balance on two wheels ends it too — a manual is a moving trick.
+      if (manualWanted) {
+        const kind = manualWanted; manualWanted = null;
+        if (manualCh?.active) {
+          manualCh.stop(); manualCh = null;
+          bannerFlash(ctx, 'REVERT', 450);
+          console.info('[SKATE-MANUAL] out');
+        } else if (rig.rider.grounded && !grindCh && move.speed01 > 0.08) {
+          manualCh = new BalanceChannel(kind, move.balance);
+          manualCh.start(move.speed01);
+          bannerFlash(ctx, kind === 'manual' ? 'MANUAL' : 'NOSE MANUAL', 600);
+          SoundKit.play('uiTick', { pitch: 1.2, volume: 0.35 });
+          console.info(`[SKATE-MANUAL] ${kind}`);
+        }
       }
       if (manualCh?.active) {
         const r = manualCh.update(dt, stickX, move.speed01);
-        if (r.slipped) { manualCh = null; combo.bail(); bannerFlash(ctx, 'LOST THE MANUAL', 600); }
+        if (r.slipped) { manualCh = null; console.info('[SKATE-MANUAL] lost it'); combo.bail(); bannerFlash(ctx, 'LOST THE MANUAL', 600); }
         else if (r.pts > 0) combo.add('MANUAL', Math.round(r.pts), 'manual');
+      }
+      if (manualCh?.active && (!rig.rider.grounded || move.speed01 < 0.05)) {
+        manualCh.stop(); manualCh = null; console.info('[SKATE-MANUAL] out (rolled out)');
       }
 
       // ── revert: stick snap on transition landing flows into a manual ──
       if (rig.rider.grounded && !grindCh && !manualCh && air.state.airtime > 0.25) {
         const rev = tryRevert(Math.abs(stickX) > 0.8, move.balance.instability > 0.2 || rig.char.root.position.y > 0.4, pump - 0.5);
         if (rev) {
+          // this door is the LANDING one — a stick snapped on a transition rolls the landing into a manual. It used to
+          // open silently under a banner that only said "REVERT!", so a run that entered a manual this way showed no
+          // manual anywhere: no label, no console line, and (before this tip) the ride idle under it (VENICE-SKATE-THPS).
           manualCh = new BalanceChannel(rev, move.balance);
           manualCh.start(move.speed01);
-          bannerFlash(ctx, 'REVERT!', 500);
+          bannerFlash(ctx, rev === 'manual' ? 'REVERT → MANUAL' : 'REVERT → NOSE MANUAL', 600);
+          console.info(`[SKATE-MANUAL] revert into ${rev}`);
         }
       }
 
@@ -347,6 +487,7 @@ export const SkateRunMode: ModeDefinition = (() => {
           SoundKit.play('uiTick', { pitch: 1.4, volume: 0.4 });
           ctx.feel?.impact?.(0.25);
           landPunch(ctx, res.chain.length);   // A+ P0: soft shake (+ a short flash on a long chain); no hit-stop on every ollie
+          if (res.chain.length >= 2) spectacle(ctx, `landed ${res.chain.length}-trick chain`);   // H4: the beat is the CHAIN, not the ollie
         } else if (res.grade === 'sketchy') {
           if (chainPts > 0) combo.add('SKETCHY ' + res.chain.map((t) => t.label).join('+'), Math.round(chainPts * SKETCHY_SCORE_MULT), 'air');
           save = res.save; lastLanding = 'sketchy'; landingBeatT = 0.5;
@@ -392,21 +533,78 @@ export const SkateRunMode: ModeDefinition = (() => {
 
       // grind catch: airborne near a rail
       if (!rig.rider.grounded && !air.state.airborne) { /* falling without air state (rolled off an edge) */ airEntryYaw = rig.char.root.rotation.y; air.launch(); }
+      // ── THE RAIL MAGNET (H3, VENICE-SKATE-THPS) ──
+      // The rail never locked. `tryGrind`'s 1.1 m sphere is measured from the ROOT — the rider's FEET — so a bar 0.5 m
+      // off the deck spends half of it on height before the run even starts, and what is left is a sub-metre horizontal
+      // window to thread at 8 m/s, on the ONE frame a button is pressed. The eye's verdict, "Y / i toward the golden
+      // patrol rail, no lock, no console line, goal 0/4", is exactly what that geometry produces.
+      // THPS does not ask for the button: ride over a rail and the board finds it. So does this — a 2 m magnet, but
+      // only while FALLING onto the rail and only when the run actually points down it (|cos| > 0.34), so crossing a
+      // rail sideways still crosses it. The press keeps its longer reach for the player who asks early.
+      const asked = performance.now() - grindAskedAt < GRIND_ASK_MS;   // POP held toward a rail: reach further, forgive the line
+      if (!rig.rider.grounded && !rig.rider.grinding && rig.rider.vel.y <= 0.6 && performance.now() >= relockUntil) {
+        const reach = asked ? GRIND_REACH : GRIND_MAGNET;
+        const caught = pickRail(world.grindLines, rig.char.root.position, move.vel,
+          { reach, align: asked ? GRIND_ALIGN * 0.6 : GRIND_ALIGN });
+        if (caught) rig.rider.tryGrind([caught], reach);
+      }
       if (rig.rider.grinding && !grindCh) {
+        // ONE lock handler: the magnet and the button pay the same rail the same way, and the goal ticks HERE — it used
+        // to wait on a per-frame proximity test that a 0.6 s lock could miss entirely.
+        const line = rig.rider.grinding;
+        const patrol = line.gapId === patrolRail.gapId;
+        grindAskedAt = -1;
         grindCh = new BalanceChannel('grind', move.balance);
         grindCh.start(move.speed01);
-        bannerFlash(ctx, 'GRIND!', 500);
+        combo.add(line.bonus >= 260 ? 'TRANSFER GRIND' : 'GRIND', line.bonus, 'grind');
+        bannerFlash(ctx, line.bonus >= 260 ? `TRANSFER GRIND +${line.bonus}` : 'GRIND!', 700);
+        SoundKit.play('powerUp', { volume: 0.4, pitch: line.bonus >= 260 ? 1.3 : 1 });
+        ctx.feel?.impact?.(0.3);
+        console.info(`[SKATE-GRIND] locked +${line.bonus}${patrol ? ' (patrol rail)' : ''}`);
+        if (line.bonus >= 260) spectacle(ctx, 'grind lock');
+        if (patrol) {
+          for (const g of goals.report({ type: 'gap', gapId: patrolRail.gapId })) {
+            bannerFlash(ctx, `GAP: ${g.label}`, 1200);
+            SoundKit.play('crowdCheer', { volume: 0.6 });
+            crowd.cheer(1);
+          }
+        }
       }
-      if (!rig.rider.grinding && grindCh) { grindCh = null; }
+      if (!rig.rider.grinding && grindCh) { console.info(`[SKATE-GRIND] off after ${grindCh.heldSec.toFixed(2)}s`); grindCh = null; relockUntil = performance.now() + RELOCK_MS; }
 
       // ── movement: shared momentum economy drives the rider ──
       // SKATE-MOVE: the L stick's forward axis is the push (hold → cooldown-paced strokes up to cruise, then roll), back
       // is the foot drag; both only with wheels down. In the air the board is ballistic — no steer bends the velocity,
       // the judged spin turns the body. A bail holds every input for its beat.
       const grounded = rig.rider.grounded, bailing = bailBeatT > 0;
-      const drive = grounded && !bailing && !rig.rider.grinding && !manualCh?.active ? -stickY : 0;   // no kick from inside a manual
+      let drive = grounded && !bailing && !rig.rider.grinding && !manualCh?.active ? -stickY : 0;   // no kick from inside a manual
+      if (drive < 0 && performance.now() < brakeMuteUntil) drive = 0;   // the manual link's own back-tap must not drag the line to a stop
       const steer = grounded && !bailing ? stickX : 0;
       const v = move.update(dt, steer, pump, ctx.scene, rig.char.root.position, world.ground, drive);
+      // ── THE NaN TRAP (VENICE-SKATE-THPS, 2026-09-09) ──
+      // A run that goes non-finite never comes back on its own: every frame after it multiplies NaN into the position,
+      // the heading, the camera target and the rig's bones, so the park vanishes and the rider is gone — which is what
+      // the arena eye photographed as a hero "detached, floating, upside down". Measured on the baseline probe: 646 of
+      // 1887 recorded frames had a NaN position, i.e. the last third of the run was already dead.
+      // One frame of NaN is now survivable: the run is put back where it was last real, the trap says what the frame
+      // looked like, and the player keeps skating.
+      const pos = rig.char.root.position;
+      if (!Number.isFinite(v.x) || !Number.isFinite(v.z) || !Number.isFinite(move.yaw)
+        || !Number.isFinite(pos.x) || !Number.isFinite(pos.y) || !Number.isFinite(pos.z)) {
+        if (nanReports < 3) {
+          nanReports++;
+          console.error('[SKATE-NAN] ' + JSON.stringify({
+            dt: +dt.toFixed(4), stickX, stickY, pump, drive, steer, vx: v.x, vz: v.z,
+            yaw: move.yaw, speed: move.speed, px: pos.x, py: pos.y, pz: pos.z,
+            grounded, grinding: rig.rider.grinding !== null, airtime: +air.state.airtime.toFixed(2),
+            spin: air.state.rotation.y, angVel: air.state.angularVel.y, slow: +slowT.toFixed(2),
+          }));
+        }
+        move.vel.setAll(0);
+        if (!Number.isFinite(move.yaw)) move.yaw = lastGoodYaw;
+        rig.rider.vel.setAll(0);
+        if (lastGoodPos) pos.copyFrom(lastGoodPos); else pos.set(0, 0, -16);
+      } else if (grounded) { lastGoodPos = (lastGoodPos ?? new Vector3()).copyFrom(pos); lastGoodYaw = move.yaw; }
       rig.rider.vel.x = v.x; rig.rider.vel.z = v.z;
       rig.rider.update(dt, steer, 0);              // GroundRide owns snap/air/grind-line
       if (rig.rider.grinding) {
@@ -417,12 +615,30 @@ export const SkateRunMode: ModeDefinition = (() => {
       } else {
         // air.state alone (not rider.grounded): the frame the wheels touch, the landing block above has not run yet —
         // reading grounded here dropped the spin one frame before the fold put it back (a −65° / +67° two-frame flip)
-        const airSpin = air.state.airborne ? air.state.rotation.y : 0;
+        const rawSpin = air.state.airborne ? air.state.rotation.y : 0;
+        const airSpin = Number.isFinite(rawSpin) ? rawSpin : 0;   // a NaN spin used to be written onto the root's yaw
         rig.char.root.rotation.y = move.yaw + airSpin + (move.stance === 'switch' ? Math.PI : 0);
       }
       pushing = move.stroking;
-      boardSync.update(move.balance.lean, !rig.rider.grounded);
+      if (rig.rider.grounded) lastGroundY = rig.char.root.position.y;
+      // the deck rides its back trucks through a manual — nose up, and it eases in and out so the link reads as a beat
+      const wantPitch = manualCh?.active ? (manualCh.kind === 'nosemanual' ? 0.30 : -0.30) : 0;
+      boardPitch += (wantPitch - boardPitch) * Math.min(1, 9 * dt);
+      boardSync.update(move.balance.lean, !rig.rider.grounded, boardPitch);
       mbus.update(dt);
+
+      // ── the spectacle beats (H4) ──
+      // The APEX of a real air: rising turns to falling, more than a third of a second up, and high enough off the deck
+      // that it is a gap or a lip rather than a kerb hop. One per air, and never inside the cooldown.
+      if (!rig.rider.grounded && air.state.airborne) {
+        const height = rig.char.root.position.y - groundUnder();
+        if (!apexDone && lastVy > 0 && rig.rider.vel.y <= 0 && air.state.airtime > 0.32 && height > 1.15) {
+          apexDone = true;
+          spectacle(ctx, `big air ${height.toFixed(1)}m`);
+        }
+        lastVy = rig.rider.vel.y;
+      } else { apexDone = false; lastVy = 0; }
+      if (popBeatT > 0) { popBeatT -= dt; if (popBeatT <= 0) animTree.clearBeat('ollie'); }
 
       // ── animation tree ──
       // BIOMECH-WAVE2: one object, two consumers — the tree picks the clip, the posture layer picks the body under it,
@@ -447,6 +663,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         flipping: Math.abs(air.state.angularVel.z) > 1, spinning: Math.abs(air.state.angularVel.y) > 1,
         grinding: rig.rider.grinding !== null, manual: manualCh?.active ?? false,
         landing: landingBeatT > 0 ? lastLanding : 'none', bailing: bailBeatT > 0,
+        popping: popBeatT > 0,
       });
       if (landingBeatT > 0) { landingBeatT -= dt; if (landingBeatT <= 0) animTree.clearBeat('land_clean', 'land_sketchy'); }
       if (bailBeatT > 0) { bailBeatT -= dt; if (bailBeatT <= 0) animTree.clearBeat('bail'); }
@@ -458,12 +675,6 @@ export const SkateRunMode: ModeDefinition = (() => {
           SoundKit.play('powerUp', { pitch: 1.3 });
           crowd.cheer(1);
           mbus.report({ kind: 'big_make' });
-        }
-      }
-      if (grindCh?.active && patrolRail && Vector3.Distance(Vector3.Center(patrolRail.line.a, patrolRail.line.b), rig.char.root.position) < 2.5) {
-        for (const g of goals.report({ type: 'gap', gapId: patrolRail.gapId })) {
-          bannerFlash(ctx, `GAP: ${g.label}`, 1200);
-          SoundKit.play('crowdCheer', { volume: 0.6 });
         }
       }
       if (combo.multiplier > 0 && combo.pot >= 800) {
