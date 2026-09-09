@@ -71,12 +71,18 @@ import {
   DribbleController, ShotMeter, DefenderBrain, TeammateBrain, contestLevel, clampToHalfCourt, isThree,
   resolveBodyCollision, checkAnkleBreak, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, DUNK_PCT,
-  SHOT_QUALITY_PCT, type ShotQuality, type ShotContext,
+  SHOT_QUALITY_PCT, type ShotQuality, type ShotContext, type PostShot, type ShotStyle,
 } from '../core/BasketballCore';
 import { lockTarget, choosePassType, PassFlight, type PassType } from '../core/BallHandling';
 import { HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import {   // HOOPS-MOVE-KIT-A
-  planGather, gatherWish, gatherLabel, stickBack01, type GatherPlan,
+  canPostUp, postYaw, postWish, postFadeAway, POST_FADE_STICK_MIN, fadeDrift,   // HOOPS-MOVE-KIT-B (2026-09-08): M4 the fade
+  pickHookSide, hookShield,                                                      // M5 the hook
+  planSpin, spinYaw, spinPos, spinOffContact, postSpinSide, SPIN_ARM_SEC, SPIN_BEAT_K, SPIN_EXIT_SPEED, SPIN_STUN_SEC, SPIN_TRIGGER_RANGE, SPIN_COOLDOWN_SEC, type SpinPlan,   // M6 the spin
+  runningHook, HOOK_ON_ME, isPumpFake, planStepThrough, STEP_THROUGH_SEC, PUMP_BITE_RANGE, PUMP_BITE_CHANCE, PUMP_BITE_STUN,   // wave 2: M7 / M8
+  pivotFrom, planPivot, PIVOT_MAX_SPEED, rimProtected, isReverseFinish, reverseSide,                               // M9 / M10 / M11
+  inBankBand, bankPoint, BANK_PCT_BONUS, planHopStep, HOP_RANGE, planEuro, euroSell, euroAvailable, gatherTravel,  // M12 / M13 / M14
+  planGather, gatherWish, gatherLabel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
   pickLayupSide, planFinish, finishHopY, finishStride, FINISH_LABEL, type FinishPlan, type FinishStyle,
   contestDrive, bumpShove, BUMP_SLOW, BUMP_SLOW_SEC, type DriveContest, resolveBodyContact,
 } from '../core/HoopsMoves';
@@ -99,6 +105,8 @@ import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 export const RIM = new Vector3(0, 3.05, -0.6);
 /** The rim's point on the floor — what a drive's range is measured against (see the checkDriveDunk call). */
 const RIM_FLOOR = new Vector3(RIM.x, 0, RIM.z);
+/** HOOPS-MOVE-KIT-B M12: the backboard hangs behind the ring and faces the court (+z). */
+const BOARD_NORMAL = new Vector3(0, 0, 1);
 const TARGET_SCORE = 21;
 // FORMAT FIX: was "1pt inside the paint, 2pts anywhere past it" — no shot
 // was ever worth 3, and a layup scored LESS than a jumper. "First to 21" is
@@ -176,6 +184,13 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   // ── HOOPS-MOVE-KIT-A ──
   let gather: { plan: GatherPlan; t: number } | null = null;                         // M1: the jumper's gather before the rise
   let finish: { plan: FinishPlan; t: number; released: boolean } | null = null;      // M3: a layup / floater in flight
+  // ── HOOPS-MOVE-KIT-B: the post kit (M4–M6) ──
+  let posting = false;                                                               // the seal I hold (the path into the fade / the hook / the quick spin)
+  let spin: { plan: SpinPlan; t: number; beat: boolean } | null = null;              // M6: the pivot in flight
+  let spinCooldown = 0, spinArmed = 0;   // M6: a body I meet ARMS the spin; the stick swung across throws it
+  let spinClip = 'bball_spin';           // M9: the same machinery turns a PIVOT (a shorter sweep, no travel)
+  let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
+  let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
   let driveContest: DriveContest | null = null;                                      // M2: the body in the dunk's path
   let finishFoul = false;                                                            // M2: fouled in the air — and-one / the ball back
   const contactCooldown = new Map<string, number>();                                 // M2: one contact event per pair per 300 ms (the Havok solver's own gate)
@@ -275,8 +290,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     mates[1].char.root.position.set(3.5, 0, 4);
     foes.forEach((f, i) => f.char.root.position.set((i - 1) * 3, 0, 2));
     shooting = false; currentShot = null;
-    if (gather || finish) me.tree.release();   // HOOPS-MOVE-KIT-A: a held gather / finish beat is lifted with the possession
-    gather = null; finish = null; driveContest = null; finishFoul = false; me.char.root.position.y = 0;
+    if (gather || finish || spin || posting) me.tree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; me.char.root.position.y = 0;
     clearDefense();
     // BIOMECH-HOOPS-WAVE1: the possession's clocks; a held shot is lifted, a floored body gets up
     driver = null; driveK = 0; dunkFlight = null; dunkFlush = null; mateArc.active = false;
@@ -375,12 +390,12 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       threeVenue?.hidePlaceholders();  // M74: drop stand-ins now that real chars are in
       assertSpawned(ctx.scene, { hero: me.char.root, minWorldMeshes: 6, modeId: 'threevthree' });
       resetPossession(true);
-      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; if (dev) dev.hoopsPosture = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: !!foeHandUp }), driverRoot: () => driver?.char.root ?? null, ended: () => ended, boxing: () => boxingOut,
+      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; if (dev) dev.hoopsPosture = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: !!foeHandUp }), post: () => { const n = nearestLiveFoe(); return { posting, spinning: !!spin, brace: !!me.slot.intent.brace, can: canPostUp(me.char.root.position, RIM_FLOOR, n ? n.char.root.position : null), carrying: carrierId === 'me', shooting, finish: !!finish, gather: !!gather, foeStun: n ? n.stunSec : -1, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: me.tree.held ?? '' }; }, driverRoot: () => driver?.char.root ?? null, ended: () => ended, boxing: () => boxingOut,
           // O3: every body's job, its objective and how squarely it faces it (the probes' awareness read)
           jobs: () => everyBody().map((b, i) => { const mb = mateBrain(b), db = foeBrain(b); const obj = b === me ? (carrierId === 'me' ? RIM : (driver?.char.root.position ?? ballWorld())) : objectiveFor(b); const p = bodyPos(b); const yaw = b.char.root.rotation.y; const v = b === me ? me.drib.vel : b.vel; return { id: b === me ? 'me' : isFoe(b) ? `foe${foes.indexOf(b)}` : `mate${mates.indexOf(b)}`, i, job: jobOf(b), phase: mb?.screen.phase ?? (db ? (db.fightingOver === null ? '' : db.fightingOver ? 'over' : 'under') : ''), x: p.x, z: p.z, y: p.y, speed: Math.hypot(v.x, v.z), facing: facingCos(yaw, p, obj), objX: obj.x, objZ: obj.z, boxing: !!(mb?.boxing || db?.boxing), root: b.char.root }; }), foeRoot: foes[0]?.char.root ?? null, nearestFoeRoot: () => foes.reduce<Body | null>((b, f) => !b || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(b.char.root.position, me.char.root.position) ? f : b, null)?.char.root ?? null }; }   // BIOMECH-HOOPS-WAVE1 probes
       ctx.setHud({
         score: myScore, foeScore, target: TARGET_SCORE, time: timeLeft, ast: assists,
-        hint: 'Work the court · PASS to the open man · snap the stick to break ankles · HOLD SHOOT, release in the green',
+        hint: 'Work the court · PASS to the open man · snap the stick to break ankles · HOLD SHOOT, release in the green · hold L1/LT on the block to POST UP (shoot = HOOK, pull off the rim = FADEAWAY, stick across = SPIN)',
       });
     },
 
@@ -411,7 +426,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       // HOOPS-MOVE-KIT-A: never while the ball is in the air or on a finish — an active carry on the release frame yanked the
       // flying ball to the dribble point (carrierId stays 'me' until the next possession)
       const ballReleased = !!(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased;
-      for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : 0.5, cbNow === b && !shooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased);
+      for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : 0.5, cbNow === b && !shooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased && !(b === me && !!spin));
 
       // poll every body; tick stagger timers
       for (const b of everyBody()) { b.slot.poll(dt); b.stunSec = Math.max(0, b.stunSec - dt); if (b.jumpAge !== Infinity) { b.jumpAge += dt; b.char.root.position.y = jumpY(b.jumpAge); if (b.jumpAge >= JUMP_SEC) { b.jumpAge = Infinity; b.char.root.position.y = 0; } } }
@@ -501,7 +516,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       meSpeed01 = drib.speed01; me.speed01 = drib.speed01;
       // HOOPS-MOVE-KIT-A: never inside a shot / finish — the hand swap moved the finishing hand's ball to the other palm mid-hop
       // (measured on a right-hand layup: the ball to the left hand at +207 ms; 1v1 had this line under its guard)
-      if (drib.crossover && !shooting && !dunking && !finish && !gather) carries.get(me)?.switchHand();
+      if (drib.crossover && !shooting && !dunking && !finish && !gather && !posting && !spin) carries.get(me)?.switchHand();
       const nearestFoeDist = foes.reduce((best, f) => f.stunSec > 0 ? best : Math.min(best, Vector3.Distance(f.char.root.position, me.char.root.position)), Infinity);
       if (shooting) {   // BIOMECH-HOOPS-WAVE1 G1: the shooter squares to the rim through the meter
         me.char.root.rotation.y = slewYaw(me.char.root.rotation.y, yawTo(me.char.root.position, RIM), FACE_RIM_RATE, dt); me.drib.setFacing(me.char.root.rotation.y);
@@ -510,18 +525,35 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       if (gather) {
         gather.t += dt;
         moveMe(gatherWish(gather.plan, gather.t), dt);
-        if (gather.t >= gather.plan.sec) { gather = null; beginRise(); }
+        if (gather.t >= gather.plan.sec) {
+          const plan = gather.plan; gather = null;
+          // HOOPS-MOVE-KIT-B wave 2: the footwork gathers (step-through / hop / euro) end IN a finish, where the feet land
+          if (plan.then && plan.then !== 'rise') startFinish(ctx, plan.then, shotContest, nearestLiveFoe()?.char.root.position ?? null, plan.side, plan.sec);
+          else beginRise();
+        }
       }
       if (finish) stepFinish(dt);
-      if (!shooting && !dunking) {
-        if (!finish) me.char.root.position.addInPlace(me.drib.vel.scale(dt));
+      // HOOPS-MOVE-KIT-B: M6 the pivot owns the body while it turns; otherwise the POST-UP seal (M4–M6's path)
+      spinCooldown = Math.max(0, spinCooldown - dt);
+      spinArmed = Math.max(0, spinArmed - dt);
+      const postDef = nearestLiveFoe();
+      if (spin) stepSpin(ctx, dt);
+      else if (iAmCarrier && updatePost(ctx, dt, wish.x, -wish.z, postDef ? postDef.char.root.position : null)) { /* the seal owns the stick */ }
+      else if (iAmCarrier && spinArmed > 0 && spinCooldown <= 0 && !shooting && !dunking && !finish && !gather) {
+        // M6: on the swing ACROSS MY PATH — against the travel, not the body's yaw (which lags the stick through a turn)
+        const heading = me.drib.vel.lengthSquared() > 1 ? Math.atan2(me.drib.vel.x, me.drib.vel.z) : me.char.root.rotation.y;
+        const side = postSpinSide(wish.x, wish.z, heading);
+        if (side) { spinArmed = 0; startSpin(ctx, postDef ? postDef.char.root.position : null, side); }
+      } else if (!iAmCarrier && posting) { posting = false; me.tree.releaseHold(); }
+      if (!shooting && !dunking && !spin) {
+        if (!finish && !posting) me.char.root.position.addInPlace(me.drib.vel.scale(dt));
         if (!threeVenue?.constrain(me.char.root.position)) clampToHalfCourt(me.char.root.position, 8, 15);   // phase 3: navmesh first
         // BIOMECH-HOOPS-WAVE1 G1: on defense my chest stays on the driver (the slides move me sideways); on offense I face my travel
         if (carrierId === 'foeTeam') me.drib.setFacing(facePlay(me.char.root, me.drib.vel, driver ? driver.char.root.position : null, DEFEND_FACE_RANGE, dt));
-        else me.char.root.rotation.y = drib.facingRad;
+        else if (!posting) me.char.root.rotation.y = drib.facingRad;
 
         // ANKLE-BREAKER on the nearest set defender (never inside a finish's hop)
-        if (iAmCarrier && drib.crossover && !finish) {
+        if (iAmCarrier && drib.crossover && !finish && !posting) {
           SoundKit.play('whoosh', { pitch: 1.4, volume: 0.4 });
           const near = foes.reduce<Body | null>((best, f) =>
             !best || Vector3.Distance(f.char.root.position, me.char.root.position)
@@ -540,7 +572,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
 
         // HESITATION — same vocabulary as 1v1: the pull-back tap plants you,
         // and a defender who has been CLOSING (not one standing set) bites.
-        if (iAmCarrier && drib.hesitation && !finish) {
+        if (iAmCarrier && drib.hesitation && !finish && !posting) {
           turbo.t01 = Math.max(0, turbo.t01 - 0.05);
           SoundKit.play('whoosh', { pitch: 0.8, volume: 0.3 });
           let bit = false;
@@ -574,6 +606,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         defending: carrierId === 'foeTeam', bracing: meBoxing, staggered: false, slideDir: slideDirFor(me.char.root.rotation.y, me.drib.vel),
       });
       bioTick(me, dt, carrierId === 'foeTeam' ? 'defense' : 'offense', iAmCarrier && !passFlight.active, nearestFoeDist, me.tree.held === 'bball_block_reach' || meHandUp);
+      Object.assign(me.bio, { posting, spinning: !!spin });   // HOOPS-MOVE-KIT-B: the seal turns the chest AWAY from the rim; the pivot owns it through the turn
 
       // teammates: move via their brain; if they're carrying, chase the hoop a little
       for (let i = 0; i < mates.length; i++) {
@@ -755,23 +788,32 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       // HOOPS-MOVE-KIT-A: the ball must be OURS (not released — the live dribble keeps it un-parented, so `ball.parent` is no
       // test): a trigger still held past the meter's end restarted a shot with the ball in the air (a second gather on top of
       // the arc, measured)
-      if (iAmCarrier && !shooting && !dunking && !finish && !arc.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased && meIntent.actionHeld > 0.02) {
+      if (iAmCarrier && !shooting && !dunking && !finish && !spin && !arc.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased && meIntent.actionHeld > 0.02) {
         const nearestFoePos = foes.reduce<Vector3 | null>((best, f) =>
           !best || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(best, me.char.root.position)
             ? f.char.root.position : best, null);
         // A+ P0: the gate measures a 3-D distance and the rim sits 3.05 m up — against RIM itself a floor-bound body can
         // NEVER be inside DUNK_RANGE (2.8 m), so the drive dunk had never fired in play (same bug 1v1 fixed in ade7c3f).
         // The range is a floor distance; judge it against the rim's floor point.
-        const kind = checkDriveDunk(me.char.root.position, me.drib.vel, RIM_FLOOR, turbo.t01, nearestFoePos);
+        // HOOPS-MOVE-KIT-B M4/M5: with my back to the basket the squeeze is the POST's own shot — the stick pulled off the
+        // rim asks for the FADEAWAY, anything else is the JUMP HOOK. (A sealed body is never fast enough to dunk.)
+        const toRimNow = RIM_FLOOR.subtract(me.char.root.position); toRimNow.y = 0; toRimNow.normalize();
+        const post: PostShot = posting ? (stickBack01(wish.x, wish.z, toRimNow) >= POST_FADE_STICK_MIN ? 'fade' : 'hook') : 'none';
+        const kind = posting ? 'none' : checkDriveDunk(me.char.root.position, me.drib.vel, RIM_FLOOR, turbo.t01, nearestFoePos);
         if (kind !== 'none') {
           startDunk(ctx, kind, nearestFoePos);
+        // the FOOTWORK reads a frozen body too: a defender who has just BITTEN a pump is the man you step through
+        } else if (!posting && startFootwork(ctx, wish.x, -wish.z, nearestFoeAny() ?? nearestFoePos)) {
+          // M8 / M13 / M14: the footwork owns this squeeze
         } else {
           shooting = true;
+          banked = null;   // M12: each release calls its own glass
           const contest = contestLevel(me.char.root.position, nearestFoePos);
           shotContest = contest;
-          currentShot = classifyShot(me.char.root.position, me.drib.vel, RIM, contest);
-          // HOOPS-MOVE-KIT-A: a layup / floater is a FINISH (M3); a jumper GATHERS first (M1) — a set body rises at once
-          if (currentShot.style === 'layup' || currentShot.style === 'floater') startFinish(ctx, currentShot.style, contest, nearestFoePos);
+          currentShot = classifyShot(me.char.root.position, me.drib.vel, RIM, contest, posting ? post : faceUpRead(nearestFoePos));
+          // HOOPS-MOVE-KIT-A: a layup / floater is a FINISH (M3); a jumper GATHERS first (M1) — a set body rises at once.
+          // HOOPS-MOVE-KIT-B: the hook (M5) and the fadeaway (M4) are finishes too — their own clip, their own hop.
+          if (currentShot.style === 'layup' || currentShot.style === 'floater' || currentShot.style === 'hook' || currentShot.style === 'fadeaway' || currentShot.style === 'reverse') startFinish(ctx, currentShot.style, contest, nearestFoePos);
           else startRise(ctx, contest, wish.x, -wish.z);
           aiContestLoad();   // D1/D3: the nearest defender puts a hand up on the load, or times a block jump to the green
         }
@@ -779,11 +821,14 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       if (iAmCarrier && shooting) {
         const t = shotMeter.update(dt);
         ctx.setHud({ shotMeterT: t });
-        if (meIntent.action || t >= 1) {
+        // HOOPS-MOVE-KIT-B M8: let go this early and it is a PUMP FAKE, not a 0.35-pct brick — and he can bite it
+        if (meIntent.action && isPumpFake(t * shotMeter.durationSec) && !finish) pumpFake(ctx, nearestLiveFoe());
+        else if (meIntent.action || t >= 1) {
           const quality = shotMeter.release();
           void resolveMyShot(ctx, quality);
         }
       }
+      pumpWindow = Math.max(0, pumpWindow - dt);
 
       // steal (defenders occasionally poke the carrier) — 1.6m, not 1.2:
       // body collision holds two players ~1.1m apart, so a 1.2m application
@@ -791,7 +836,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       const carrier = carrierBody();
       if (carrier && carrierId !== 'foeTeam' && !shooting) {
         for (const f of foes) {
-          if (f.stunSec === 0 && f.slot.intent.steal && !finish && !gather && !dunking && Vector3.Distance(f.char.root.position, carrier.char.root.position) < 1.6) {
+          // HOOPS-MOVE-KIT-B: a SEALED post man cannot be poked from behind (the body is between him and the ball) — front
+          // him and the poke is live again
+          const sealed = carrier === me && posting && facingCos(me.char.root.rotation.y, me.char.root.position, f.char.root.position) < 0.2;
+          if (f.stunSec === 0 && f.slot.intent.steal && !finish && !gather && !dunking && !sealed && Vector3.Distance(f.char.root.position, carrier.char.root.position) < 1.6) {
             stripBall(ctx, f, 'STOLEN!');   // D2: the ball goes LOOSE from the hand (it used to warp to the rival's possession)
             break;
           }
@@ -853,7 +901,12 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     const nearFacing = near ? facingCos(near.char.root.rotation.y, near.char.root.position, me.char.root.position) : -1;
     const nearUp = !!near && (foeHandUp === near || near.jumpAge <= HAND_UP_SEC || near === armed);
     shotContest = Math.min(1, handUpContest(contestLevel(me.char.root.position, near ? near.char.root.position : null), near ? near.jumpAge : Infinity) + groundContest(nearDist, nearFacing, foeHandUp === near && !!near));
-    const pct = contestedPct(SHOT_QUALITY_PCT[quality] * pctMod, shotContest);
+    // HOOPS-MOVE-KIT-B M5: the shielding shoulder is between him and the ball — the hand that gets there is worth less
+    if (currentShot?.style === 'hook') shotContest = hookShield(shotContest);
+    // M12: CALLED GLASS — R1 held inside the band routes the ball through the square, and a bank from there is a real edge
+    if (!banked && me.slot.intent.glass && inBankBand(me.char.root.position, RIM_FLOOR, BOARD_NORMAL)) banked = bankPoint(me.char.root.position, RIM, BOARD_NORMAL);
+    if (banked) console.info(`[3V3-MOVE] called glass at ${banked.x.toFixed(2)}, ${banked.y.toFixed(2)}, ${banked.z.toFixed(2)}`);
+    const pct = contestedPct(SHOT_QUALITY_PCT[quality] * pctMod, shotContest) + (banked ? BANK_PCT_BONUS : 0);
     const dist = Vector3.Distance(me.char.root.position, RIM);
     arcPoints = isThree(me.char.root.position, RIM) ? 3 : 2;
     arcLabel = currentShot?.label ?? 'SHOT';
@@ -870,18 +923,22 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     // feet-down (it used to cut to the dunk launch clip — a two-arm sweep through a T)
     if (finish) finish.released = true;
     else me.tree.beat('bball_follow_through', { fadeSec: 0.1 });
-    me.shotWin = 'release'; me.shotSec = 0; me.drib.setFacing(me.char.root.rotation.y);
+    // HOOPS-MOVE-KIT-B: a fade / a hook keeps its OWN posture window to feet-down (the release stance would stand the lean
+    // back up in mid-air, which IS the shot)
+    me.shotWin = finish && (finish.plan.style === 'fadeaway' || finish.plan.style === 'hook')
+      ? (finish.plan.style === 'fadeaway' ? 'fade' : 'hook') : 'release';
+    me.shotSec = 0; me.drib.setFacing(me.char.root.rotation.y);
     ctx.setHud({ shotType: '' });
     // SHOT FEEDBACK (same contract as 1v1): the release names the quality and
     // the contest at the moment you let go — before the arc decides anything.
-    const tag = shotContest >= 0.5 ? ' — CONTESTED' : shotContest <= 0.15 ? ' — WIDE OPEN' : '';
+    const tag = (shotContest >= 0.5 ? ' — CONTESTED' : shotContest <= 0.15 ? ' — WIDE OPEN' : '') + (banked ? ' — OFF THE GLASS' : '');
     if (quality === 'perfect') ctx.setHud({ banner: `GREEN!${tag}` });
     else if (quality === 'early') ctx.setHud({ banner: `EARLY${tag}` });
     else if (quality === 'late') ctx.setHud({ banner: `LATE${tag}` });
     else if (quality === 'brick') ctx.setHud({ banner: `WAY LATE${tag}` });
     // no clear here: the arc's make/miss banner replaces it and owns the timeout
     // the ball flies — score/possession resolve when it lands (update loop)
-    arc.start(ball.getAbsolutePosition(), RIM, arcMade, currentShot?.style ?? 'jumper', alteredApex(shotContest));   // D3: a strong contest ALTERS the release
+    arc.start(ball.getAbsolutePosition(), RIM, arcMade, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked);   // D3: a strong contest ALTERS the release; M12: the glass
     startBoxOut('mine');   // O2: the shot is up — the defenders seal their men, the offense crashes
   }
 
@@ -1031,14 +1088,23 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     me.tree.hold('jumpshot', { speedRatio: syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01), fadeSec: 0.08 });
   }
   /** M3: a layup / floater — the ball into the finishing hand, the finish clip paced to the green, the stride and the hop. */
-  function startFinish(ctx: ModeContext, style: FinishStyle, contest: number, defenderPos: Vector3 | null): void {
-    const side = style === 'layup' ? pickLayupSide(me.char.root.position, RIM_FLOOR, me.char.root.rotation.y, defenderPos) : 'right';
+  function startFinish(ctx: ModeContext, style: FinishStyle, contest: number, defenderPos: Vector3 | null, sideIn?: 'left' | 'right', preSec = 0): void {
+    // HOOPS-MOVE-KIT-B M5: a hook shoots with the hand AWAY from him (the off shoulder is the shield) — and the shield is
+    // worth something before the ball leaves: the contest that reaches the meter is cut. Wave 2: `sideIn` is the hand the
+    // FOOTWORK ended on and `preSec` the meter it already spent — the clip is paced to what is left before the green.
+    const side = sideIn ?? (style === 'layup' ? pickLayupSide(me.char.root.position, RIM_FLOOR, me.char.root.rotation.y, defenderPos)
+      : style === 'hook' ? pickHookSide(me.char.root.position, RIM_FLOOR, me.char.root.rotation.y, defenderPos)
+      : style === 'reverse' ? reverseSide(me.char.root.position, RIM_FLOOR, me.char.root.rotation.y, me.drib.vel) : 'right');
     carries.get(me)?.update(0, 0, false);
     attachBallToHand(ball, me.char.skeleton, side === 'left' ? 'LeftHand' : 'RightHand');
-    shotMeter.start(contest, style);
-    const plan = planFinish(style, side, shotMeter.durationSec, shotMeter.greenCenter01);
+    if (preSec <= 0) shotMeter.start(style === 'hook' ? hookShield(contest) : contest, style);
+    // M4: the fade's escape line — off the defender when he is on me, straight off the rim otherwise
+    const plan = planFinish(style, side, shotMeter.durationSec, shotMeter.greenCenter01,
+      style === 'fadeaway' ? postFadeAway(me.char.root.position, RIM_FLOOR, defenderPos) : undefined, preSec);
     finish = { plan, t: 0, released: false };
-    me.shotWin = 'gather'; me.shotSec = 0;
+    posting = false;
+    if (style === 'reverse') banked = bankPoint(me.char.root.position, RIM, BOARD_NORMAL);   // M11/M12: a reverse is laid off the glass
+    me.shotWin = style === 'fadeaway' ? 'fade' : style === 'hook' ? 'hook' : 'gather'; me.shotSec = 0;
     me.tree.beat(plan.clip, { holdEnd: true, fadeSec: 0.06, speedRatio: plan.speedRatio });
     SoundKit.play('whoosh', { pitch: 1.1, volume: 0.25 });
     ctx.setHud({ shotType: FINISH_LABEL[style][side] });
@@ -1048,14 +1114,181 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     if (!finish) return;
     finish.t += dt;
     const k = finish.t / finish.plan.hopSec;
-    moveMe(finishStride(finish.plan.style, me.char.root.position, RIM_FLOOR, finish.released), dt);
+    // HOOPS-MOVE-KIT-B M4: a fadeaway does not stride at the rim — it GIVES GROUND, ballistically, from the push-off to
+    // feet-down (fadeDrift), which is the separation the shot exists to buy.
+    moveMe(finish.plan.style === 'fadeaway' ? fadeDrift(finish.plan) : finishStride(finish.plan.style, me.char.root.position, RIM_FLOOR, finish.released), dt);
     me.char.root.position.y = finishHopY(finish.plan.style, k);
     if (k < 1) return;
     me.char.root.position.y = 0;
+    if (me.shotWin === 'fade' || me.shotWin === 'hook') { me.shotWin = 'follow'; me.shotSec = 0; }   // the lean / the sweep holds to feet-down, then the follow-through
     finish = null;
     me.tree.release();
     me.drib.setFacing(me.char.root.rotation.y);
   }
+  // ── HOOPS-MOVE-KIT-B wave 2 (2026-09-08): M7–M14 (the 1v1's, body for body) ───────────────────────────────────────
+  /** M7 / M10 / M11: the face-up read at the squeeze — a drive across the rim finishes REVERSE off the glass, a body in
+   *  the way in the paint is a RUNNING HOOK over him, a protected rim is a FLOATER over the length. */
+  function faceUpRead(defenderPos: Vector3 | null): PostShot {
+    if (isReverseFinish(me.char.root.position, RIM_FLOOR, me.drib.vel)) return 'reverse';
+    const onMe = defenderPos ? distXZ(me.char.root.position, defenderPos) : Infinity;
+    // he is on my HIP: hook over him. He is waiting AT the rim: float it over him. Same read, two shots — and the order
+    // matters (with the hook first it took every floater in the paint).
+    if (onMe <= HOOK_ON_ME && runningHook(me.drib.vel, me.char.root.position, RIM_FLOOR, defenderPos)) return 'hook';
+    // the floater over length only takes shots that were NOT layups: inside the layup band a drive still finishes at the
+    // rim (KIT-A M3 — the contest and the block are what punish driving into a chest, not a silent style swap)
+    if (distXZ(me.char.root.position, RIM_FLOOR) >= 2.2 && rimProtected(me.char.root.position, RIM_FLOOR, defenderPos)) return 'floater';
+    return 'none';
+  }
+  /** M8 / M13 / M14: the FOOTWORK squeezes — a step-through inside the pump window, a euro when the stick sells a side
+   *  against help, a hop step off an explosive gather. Each is a GatherPlan with real legs that ends IN a finish. */
+  function startFootwork(ctx: ModeContext, mx: number, my: number, defenderPos: Vector3 | null): boolean {
+    const contest = contestLevel(me.char.root.position, defenderPos);
+    const yaw = me.char.root.rotation.y;
+    const dist = distXZ(me.char.root.position, RIM_FLOOR);
+    let plan: GatherPlan | null = null;
+    if (pumpWindow > 0 && defenderPos && dist < 5.4) plan = planStepThrough(me.char.root.position, RIM_FLOOR, yaw, defenderPos);
+    else if (euroAvailable(me.drib.vel, me.char.root.position, RIM_FLOOR, defenderPos)) {
+      const sell = euroSell(mx, -my, yaw);
+      if (sell) plan = planEuro(me.char.root.position, RIM_FLOOR, yaw, sell, rimProtected(me.char.root.position, RIM_FLOOR, defenderPos) ? 'floater' : 'layup');
+    }
+    // M13: the explosive two-foot gather. The face-up READS beat it — a body on my hip is a hook over him, a body sitting
+    // at the rim is a floater over him, a drive across the rim is a reverse — because hopping into a chest is not a move.
+    // With none of those on, an explosive squeeze is a HOP STEP. (Without this order the hop swallowed every driving
+    // squeeze at full stick: 5 of 5 running-hook attempts; with the order inverted it never fired at all in 1v1, where
+    // the on-ball defender is on the line the whole way.)
+    const read = faceUpRead(defenderPos);
+    const onMeNow = defenderPos ? distXZ(me.char.root.position, defenderPos) : Infinity;
+    const hopBeaten = read === 'reverse' || read === 'floater' || (read === 'hook' && onMeNow <= HOOK_ON_ME);
+    // … and a stick pulled AWAY from the rim is asking for a STEP-BACK (KIT-A M1) or a FADE, never a hop: a hop step goes
+    // forward by definition (measured: the KIT-A step-back scenario came out HOP STEP in 3v3).
+    const toRimNow = new Vector3(RIM_FLOOR.x - me.char.root.position.x, 0, RIM_FLOOR.z - me.char.root.position.z).normalize();
+    const pullingBack = stickBack01(mx, -my, toRimNow) >= STEPBACK_STICK_BACK_MIN;
+    if (!plan && !hopBeaten && !pullingBack && me.slot.intent.sprint && dist < HOP_RANGE && me.drib.vel.length() > 2.0) {
+      plan = planHopStep(me.drib.vel, me.char.root.position, RIM_FLOOR, dist < 2.8 ? 'layup' : 'rise');
+    }
+    if (!plan) return false;
+    shooting = true;
+    shotContest = contest;
+    pumpWindow = 0;
+    carries.get(me)?.update(0, 0, false);
+    if (!ball.parent) attachBallToHand(ball, me.char.skeleton, 'RightHand');
+    currentShot = plan.then === 'rise' ? classifyShot(me.char.root.position, me.drib.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : 1.18 };
+    shotMeter.start(contest, currentShot.style, plan.sec);
+    gather = { plan, t: 0 };
+    me.shotWin = 'footwork'; me.shotSec = 0;
+    const clip = plan.kind === 'stepthrough' ? 'bball_step_through' : plan.kind === 'hop' ? 'bball_hop_step' : 'bball_euro_step';
+    const clipSec = me.char.animator.durationOf(clip) ?? plan.sec;
+    me.tree.beat(clip, { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });
+    SoundKit.play('whoosh', { pitch: 1.15, volume: 0.3 });
+    ctx.setHud({ shotType: gatherLabel(plan.kind, currentShot.label) });
+    console.info(`[3V3-MOVE] footwork ${plan.kind} ${plan.sec.toFixed(2)} s → ${plan.then} ${plan.side ?? ''} travel ${gatherTravel(plan).toFixed(2)} m`);
+    aiContestLoad();
+    return true;
+  }
+  /** M8: the PUMP FAKE — the trigger came up before the meter had run PUMP_MAX_SEC. The shot is off, and a contesting
+   *  body inside range can LEAVE ITS FEET (he bit), which opens the step-through window. */
+  function pumpFake(ctx: ModeContext, near: Body | null): void {
+    shooting = false; gather = null; currentShot = null;
+    shotMeter.active = false;
+    me.shotWin = 'pump'; me.shotSec = 0;
+    pumpWindow = STEP_THROUGH_SEC;
+    me.tree.beat('bball_pump_fake', { fadeSec: 0.06 });
+    SoundKit.play('whoosh', { pitch: 1.3, volume: 0.25 });
+    const bit = !!near && near.stunSec === 0 && !near.floored && distXZ(me.char.root.position, near.char.root.position) <= PUMP_BITE_RANGE && roll() < PUMP_BITE_CHANCE;
+    if (bit && near) { near.stunSec = PUMP_BITE_STUN; near.tree.beat('bball_block_reach'); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.4 }); }
+    ctx.setHud({ shotType: '', shotMeterT: 0, banner: bit ? 'HE BIT THE PUMP!' : 'PUMP FAKE' });
+    setTimeout(() => ctx0?.setHud({ banner: '' }), 500);
+    console.info(`[3V3-MOVE] pump fake bit ${bit}`);
+  }
+
+  // ── HOOPS-MOVE-KIT-B (2026-09-08): M4–M6's path (the seal) and M6 (the pivot) ──────────────────────────────────────
+  /** The POST-UP: L1/LT held with a body to back down inside the post band seals him — the BACK to the basket (slewed), the
+   *  authored seal HELD, the stick a slow back-down / a shuffle along the lane instead of a drive. Swing it ACROSS the body
+   *  and it is a quick spin off his shoulder (M6). */
+  function updatePost(ctx: ModeContext, dt: number, mx: number, my: number, defPos: Vector3 | null): boolean {
+    const plant = !!me.slot.intent.brace && !shooting && !dunking && !finish && !gather && !passFlight.active;
+    // HOOPS-MOVE-KIT-B M9: L1 is PLANT YOUR FOOT — the seal inside the band with a body, TRIPLE THREAT anywhere else
+    // (the stick swung across turns you on the planted foot; across and back is a reverse pivot). No travel either way.
+    const want = plant && canPostUp(me.char.root.position, RIM_FLOOR, defPos);
+    if (plant && !want) {
+      if (posting) { posting = false; me.tree.releaseHold(); }
+      if (me.drib.vel.length() < PIVOT_MAX_SPEED && spinCooldown <= 0) {
+        const pv = pivotFrom(mx, -my, me.char.root.rotation.y);
+        if (pv) { startSpin(ctx, defPos, pv.side, pv); return true; }
+      }
+      me.drib.vel.scaleInPlace(0);
+      return true;
+    }
+    if (want !== posting) {
+      posting = want;
+      if (posting) { me.tree.hold('bball_post_up', { fadeSec: 0.12 }); SoundKit.play('whoosh', { pitch: 0.7, volume: 0.2 }); console.info('[3V3-MOVE] post up'); }
+      else me.tree.releaseHold();
+    }
+    if (!posting) return false;
+    // the quick spin is read against the LANE (the post's own facing), not the body's transient yaw: through the turn-around
+    // into the seal the live yaw sweeps past perpendicular, and a stick held straight at the rim read as fully lateral
+    // there — every back-down fired a spin one frame in (measured). And a seal that has not settled cannot spin out of
+    // itself yet.
+    const seal = postYaw(me.char.root.position, RIM_FLOOR);
+    const settled = Math.abs(Math.atan2(Math.sin(me.char.root.rotation.y - seal), Math.cos(me.char.root.rotation.y - seal))) < 0.6;
+    const side = postSpinSide(mx, -my, seal);
+    if (settled && side && spinCooldown <= 0) { startSpin(ctx, defPos, side); return true; }
+    const yaw = slewYaw(me.char.root.rotation.y, seal, FACE_RIM_RATE, dt);
+    me.char.root.rotation.y = yaw; me.drib.setFacing(yaw);
+    const toRim = RIM_FLOOR.subtract(me.char.root.position); toRim.y = 0; toRim.normalize();
+    const wish = postWish(mx, -my, toRim);
+    me.drib.vel.copyFrom(wish);   // the seal IS the velocity (the movement layer would otherwise store a full-stick drive)
+    moveMe(wish, dt);
+    return true;
+  }
+  /** M6: the SPIN — the foot plants on his side, the body swings a full eased turn around it while the root ARCS out the
+   *  far side on the exit line, and the exit hands the drive its speed back so the move ends IN a finish. */
+  function startSpin(ctx: ModeContext, defPos: Vector3 | null, side?: 'left' | 'right', pivotRead?: { side: 'left' | 'right'; reverse: boolean }): void {
+    if (spin || shooting || dunking || finish || gather) return;
+    // M9: a PIVOT is the same machinery with a shorter sweep and NO travel — the planted foot never moves
+    const plan = pivotRead ? planPivot(me.char.root.position, me.char.root.rotation.y, pivotRead.side, pivotRead.reverse)
+      : planSpin(me.char.root.position, me.char.root.rotation.y, RIM_FLOOR, defPos, side);
+    spin = { plan, t: 0, beat: !!pivotRead };
+    spinClip = pivotRead ? 'bball_pivot' : 'bball_spin';
+    spinCooldown = SPIN_COOLDOWN_SEC;
+    posting = false;
+    carries.get(me)?.update(0, 0, false);
+    if (!ball.parent) attachBallToHand(ball, me.char.skeleton, 'RightHand');
+    const clipSec = me.char.animator.durationOf(spinClip) ?? plan.sec;
+    me.tree.beat(spinClip, { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });
+    SoundKit.play('whoosh', { pitch: pivotRead ? 0.95 : 1.25, volume: pivotRead ? 0.2 : 0.35 });
+    if (pivotRead) { ctx.setHud({ banner: pivotRead.reverse ? 'REVERSE PIVOT' : 'PIVOT' }); setTimeout(() => ctx0?.setHud({ banner: '' }), 400); }
+    console.info(`[3V3-MOVE] ${pivotRead ? (pivotRead.reverse ? 'reverse pivot' : 'front pivot') : 'spin'} ${plan.side} yaw ${plan.yaw0.toFixed(2)} sweep ${(plan.sweep * 180 / Math.PI).toFixed(0)}°`);
+  }
+  function stepSpin(ctx: ModeContext, dt: number): void {
+    if (!spin) return;
+    spin.t += dt;
+    const t = Math.min(spin.t, spin.plan.sec);
+    const target = spinPos(spin.plan, t);
+    me.char.root.position.x = target.x; me.char.root.position.z = target.z;
+    if (!threeVenue?.constrain(me.char.root.position)) clampToHalfCourt(me.char.root.position, 8, 15);
+    me.char.root.rotation.y = spinYaw(spin.plan, t);
+    if (!spin.beat && t >= spin.plan.sec * SPIN_BEAT_K) {
+      spin.beat = true;
+      ctx.feel?.impact?.(0.22); ctx.juice.shake(0.05, 90);
+      SoundKit.play('whoosh', { pitch: 0.85, volume: 0.45 });
+      const near = nearestLiveFoe();
+      const beaten = !!near && distXZ(near.char.root.position, me.char.root.position) <= SPIN_TRIGGER_RANGE + 0.5;
+      if (beaten && near) { near.stunSec = SPIN_STUN_SEC; near.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); }
+      ctx.setHud({ banner: beaten ? 'SPIN — BEAT HIM!' : 'SPIN!' });
+      setTimeout(() => ctx0?.setHud({ banner: '' }), 500);
+      console.info(`[3V3-MOVE] spin shoulder clear beaten ${beaten}`);
+    }
+    if (spin.t < spin.plan.sec) return;
+    const exitYaw = Math.atan2(spin.plan.exit.x, spin.plan.exit.z);
+    me.char.root.rotation.y = exitYaw;
+    me.drib.setFacing(exitYaw);
+    // M6 the spin comes out INTO the drive; M9 a pivot is a turn in place — it hands nothing back
+    me.drib.vel.copyFrom(spinClip === 'bball_pivot' ? new Vector3(0, 0, 0) : spin.plan.exit.scale(SPIN_EXIT_SPEED));
+    spin = null;
+    me.tree.release();
+  }
+
   /** M2: the bodies meet in the dunk's flight — hit-stop micro, the thud, the shove or the knockdown at the contact. */
   function driveBump(ctx: ModeContext, c: DriveContest, wall: Body, floorHim: boolean, banner: boolean): void {
     ctx.juice.hitStop(45);
@@ -1119,6 +1352,11 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     ctx.setHud({ banner: winner === 'me' ? (me.slot.intent.brace ? 'BOXED OUT — YOUR BOARD' : 'YOUR BOARD') : 'THEIR BOARD' });
     setTimeout(() => ctx.setHud({ banner: '' }), 700);
     if (winner === 'me') resetPossession(true); else void opponentPossession(ctx);
+  }
+  /** The nearest foe who is still ON HIS FEET — stunned or not (a body you have frozen is still a body to step past). */
+  function nearestFoeAny(): Vector3 | null {
+    const b = foes.reduce<Body | null>((best, f) => f.floored ? best : !best || distXZ(f.char.root.position, me.char.root.position) < distXZ(best.char.root.position, me.char.root.position) ? f : best, null);
+    return b ? b.char.root.position : null;
   }
   function nearestLiveFoe(): Body | null {
     return foes.reduce<Body | null>((best, f) => f.stunSec > 0 || f.floored ? best : !best || distXZ(f.char.root.position, me.char.root.position) < distXZ(best.char.root.position, me.char.root.position) ? f : best, null);
@@ -1275,6 +1513,13 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     if (severity === 'hard' && onBall && attacker === me && attackerSpeed >= 4.0 && performance.now() - lastBumpStripAt > 2500 && (lastBumpStripAt = performance.now()) > 0 && isFoe(victim) && victim.stunSec === 0 && !victim.floored && aiBumpStrips(victim.vel.length() < 1.0, facingCos(victim.char.root.rotation.y, victim.char.root.position, me.char.root.position), roll)) {
       stripBall(ctx, victim, 'STRIPPED ON THE BUMP!');
       return;
+    }
+    // HOOPS-MOVE-KIT-B M6: he did not take it — a drive that MEETS a body still in front of it spins off him
+    // a body met at speed ARMS the spin (the stick swung across throws it) — never with the shot trigger already down: a
+    // committed squeeze is a shot, not a pivot
+    if (onBall && !spin && spinCooldown <= 0 && me.slot.intent.actionHeld <= 0.02 && (attacker === me || victim === me)) {
+      const other = attacker === me ? victim : attacker;
+      if (isFoe(other) && spinOffContact(me.drib.vel, me.char.root.position, me.char.root.rotation.y, other.char.root.position)) spinArmed = SPIN_ARM_SEC;
     }
     if (severity === 'foul' && onBall && victim === me && isFoe(attacker) && attackerSpeed >= FOUL_CLOSING_SPEED) {
       // a defender running THROUGH the handler at foul speed — the ball back

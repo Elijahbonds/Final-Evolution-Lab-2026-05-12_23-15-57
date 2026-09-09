@@ -37,7 +37,10 @@ export const AI_BLOCK_JUMP_CHANCE = 0.3;
 export const AI_BLOCK_RANGE = 1.9;   // a JUMPING defender's reach (measured: the armed blocker released from 1.6–1.8 m and the chance came out 0)
 /** The AI's block chance at the release with a hand up inside range, set and square: a layup / dunk at the rim is far more
  *  blockable than a jumper from range. */
-export const AI_BLOCK_BASE: Record<'jumper' | 'layup' | 'floater' | 'fadeaway' | 'dunk', number> = { jumper: 0.12, layup: 0.3, floater: 0.22, fadeaway: 0.08, dunk: 0.35 };
+// HOOPS-MOVE-KIT-B M5: the jump hook is the LOWEST in the table on purpose — the shielding shoulder and the sweep out to
+// the side are the whole reason the shot has survived seventy years of taller people.
+// M11: a REVERSE finish puts the rim between him and the ball — harder to block than a straight layup, easier than a hook.
+export const AI_BLOCK_BASE: Record<'jumper' | 'layup' | 'floater' | 'fadeaway' | 'hook' | 'reverse' | 'dunk', number> = { jumper: 0.12, layup: 0.3, floater: 0.22, fadeaway: 0.08, hook: 0.05, reverse: 0.11, dunk: 0.35 };
 /** A dunker in the air can be swatted between the takeoff and the resolve (flight clock 0..1). */
 export const SWAT_K_FROM = 0.12, SWAT_K_TO = 0.75;   // to just before feet-down: the bump's slow-mo stretches the flight past 600 ms
 /** A full contest takes this much off the shooter's make chance. */

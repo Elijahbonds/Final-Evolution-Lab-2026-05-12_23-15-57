@@ -202,16 +202,20 @@ export function checkAnkleBreak(crossover: boolean, handler: Vector3, defender: 
 
 // ── Shooting ─────────────────────────────────────────────────────────────
 export type ShotQuality = 'perfect' | 'good' | 'early' | 'late' | 'brick';
-export type ShotStyle = 'layup' | 'floater' | 'jumper' | 'fadeaway';
+export type ShotStyle = 'layup' | 'floater' | 'jumper' | 'fadeaway' | 'hook' | 'reverse';   // HOOPS-MOVE-KIT-B M5 the jump hook, M11 the reverse layup
 
 export interface ShotContext { style: ShotStyle; label: string; pctMod: number }
 
 /** A floater is a paint shot: inside this floor distance of the rim (the old 4.5 m band, planar, made a 1-dribble pull-up
  *  from the elbow a floater). */
 export const FLOATER_RANGE = 3.4;
+/** HOOPS-MOVE-KIT-B M4/M5: what the POST asks for at the squeeze — the mode reads it off the stick while the back is to
+ *  the basket (pulled away from the rim = a fade, anything else = the hook). 'none' is every face-up shot, and leaves this
+ *  classifier exactly as KIT-A left it. */
+export type PostShot = 'none' | 'fade' | 'hook' | 'reverse' | 'floater';
 /** Type the attempt from real context. `moveVel` is the shooter's current
  *  velocity; moving away from the hoop under a tight contest = fadeaway. */
-export function classifyShot(shooter: Vector3, moveVel: Vector3, hoop: Vector3, contest01: number): ShotContext {
+export function classifyShot(shooter: Vector3, moveVel: Vector3, hoop: Vector3, contest01: number, post: PostShot = 'none'): ShotContext {
   // HOOPS-MOVE-KIT-A (2026-09-08): PLANAR. This was Vector3.Distance against a rim 3.05 m up, so a floor-bound shooter was
   // never inside the 2.2 m layup band (√(2.2² − 3.05²) is imaginary) — every shot at the rim classified as a FLOATER and
   // the layup style had never fired in play (the drive-dunk gate had the identical bug, fixed in the modes in A+ P0).
@@ -220,6 +224,13 @@ export function classifyShot(shooter: Vector3, moveVel: Vector3, hoop: Vector3, 
   const speed = moveVel.length();
   const movingAway = speed > 1.2 && Vector3.Dot(moveVel, toHoop) < -0.3 * speed * toHoop.length();
 
+  // HOOPS-MOVE-KIT-B: the post's own two shots come first — a body with its back to the basket is not taking a layup
+  if (post === 'fade') return { style: 'fadeaway', label: 'FADEAWAY', pctMod: 0.86 };   // the lean costs a little; the separation is what you paid for
+  if (post === 'hook') return { style: 'hook', label: 'JUMP HOOK', pctMod: 1.06 };      // quick, shielded, from the block
+  // M11 the drive that goes UNDER the rim finishes on the far side, off the glass; M10 a protected rim is a floater over
+  // the length rather than a layup into a chest
+  if (post === 'reverse') return { style: 'reverse', label: 'REVERSE', pctMod: 1.1 };
+  if (post === 'floater') return { style: 'floater', label: 'FLOATER', pctMod: 1.0 };
   if (movingAway && contest01 > 0.25) return { style: 'fadeaway', label: 'FADEAWAY', pctMod: 0.82 };
   if (dist < 2.2) return { style: 'layup', label: 'LAYUP', pctMod: 1.18 };
   if (dist < FLOATER_RANGE) return { style: 'floater', label: 'FLOATER', pctMod: 1.0 };
@@ -247,6 +258,9 @@ export class ShotMeter {
     // a layup is a quick finish off the stride (it used to run 0.8 s — longer than a jumper — on the jumpshot's meter)
     if (style === 'layup') { half = Math.max(0.05, half) * 1.5; rise = 0.55 - contestLevel01 * 0.1; }
     if (style === 'floater') { half *= 1.2; rise = 0.6 - contestLevel01 * 0.12; }
+    // HOOPS-MOVE-KIT-B M5: the jump hook is a QUICK release off the block — short, and no harder than a jumper to time
+    if (style === 'hook') { half = Math.max(0.05, half) * 1.25; rise = 0.52 - contestLevel01 * 0.08; }
+    if (style === 'reverse') { half = Math.max(0.05, half) * 1.4; rise = 0.58 - contestLevel01 * 0.1; }   // M11: a layup's forgiveness, a beat longer under the rim
     if (style === 'fadeaway') { half *= 0.75; rise -= 0.06; }
     const g = Math.max(0, gatherSec);
     this.rise = rise; this.gather = g;
@@ -616,17 +630,24 @@ export class ShotArc {
   active = false;
   private made = false;
 
-  start(from: Vector3, rim: Vector3, made: boolean, style: ShotStyle, apexAdd = 0): void {
+  /** HOOPS-MOVE-KIT-B M12: the glass point the ball is routed through on an intentional BANK — set with `bank`, cleared
+   *  on any other shot. A banked ball is a quadratic Bezier from → glass → rim: it goes UP AND OUT to the square, kisses
+   *  it and drops, instead of the straight parabola every shot in the game shared. */
+  private glass: Vector3 | null = null;
+  start(from: Vector3, rim: Vector3, made: boolean, style: ShotStyle, apexAdd = 0, bank: Vector3 | null = null): void {
     this.from.copyFrom(from);
     this.made = made;
+    this.glass = bank ? bank.clone() : null;
     this.to.copyFrom(rim);
     if (!made) {                       // clang point on the front of the iron
       this.to.x += (Math.random() - 0.5) * 0.3;
       this.to.z += 0.22;
     }
     const dist = Vector3.Distance(from, rim);
-    this.duration = style === 'layup' ? 0.4 : Math.min(0.9, 0.45 + dist * 0.045);
-    this.apex = (style === 'floater' ? 2.2 : style === 'layup' ? 0.9 : 1.6) + apexAdd;   // HOOPS-MOVE-KIT-A D3: an ALTERED release arcs higher
+    this.duration = style === 'layup' || style === 'reverse' ? 0.4 : Math.min(0.9, 0.45 + dist * 0.045);
+    // HOOPS-MOVE-KIT-B: a hook goes UP and over the shoulder (a high soft arc off the block); a fadeaway is a longer,
+    // higher ball because the body is falling away from the rim as it leaves
+    this.apex = (style === 'floater' ? 2.2 : style === 'layup' || style === 'reverse' ? 0.9 : style === 'hook' ? 2.0 : style === 'fadeaway' ? 1.85 : 1.6) + apexAdd;   // HOOPS-MOVE-KIT-A D3: an ALTERED release arcs higher
     this.t = 0;
     this.active = true;
   }
@@ -635,9 +656,26 @@ export class ShotArc {
     if (!this.active) return 'flying';
     this.t = Math.min(1, this.t + dt / this.duration);
     const k = this.t;
+    if (this.glass) {
+      // M12: the ball is thrown AT the square and comes off it — two legs, not one curve that merely leans at the board.
+      // (A quadratic Bezier never reaches its control point: measured, the "bank" never got behind the ring at all.)
+      const BANK_K = 0.62;
+      if (k <= BANK_K) {
+        const u = k / BANK_K;
+        ball.x = this.from.x + (this.glass.x - this.from.x) * u;
+        ball.z = this.from.z + (this.glass.z - this.from.z) * u;
+        ball.y = this.from.y + (this.glass.y - this.from.y) * u + Math.sin(u * Math.PI) * this.apex * 0.55;
+      } else {
+        const u = (k - BANK_K) / (1 - BANK_K);
+        ball.x = this.glass.x + (this.to.x - this.glass.x) * u;
+        ball.z = this.glass.z + (this.to.z - this.glass.z) * u;
+        ball.y = this.glass.y + (this.to.y - this.glass.y) * u + Math.sin(u * Math.PI) * 0.06;   // off the glass and down
+      }
+    } else {
     ball.x = this.from.x + (this.to.x - this.from.x) * k;
     ball.z = this.from.z + (this.to.z - this.from.z) * k;
     ball.y = this.from.y + (this.to.y - this.from.y) * k + Math.sin(k * Math.PI) * this.apex;
+    }
     if (this.t >= 1) {
       this.active = false;
       return this.made ? 'made' : 'missed';

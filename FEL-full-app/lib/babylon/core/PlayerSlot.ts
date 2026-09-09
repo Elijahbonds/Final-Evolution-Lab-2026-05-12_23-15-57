@@ -26,6 +26,8 @@ export interface Intent {
   brace?: boolean;                     // held — box-out/post-up (Phase 4 contact)
   /** HOOPS-MOVE-KIT-A D3: the steal button HELD (past a tap) — a grounded hand-up contest (verticality). */
   contest?: boolean;
+  /** HOOPS-MOVE-KIT-B M12: R1 held — use the GLASS (an intentional bank inside the band). */
+  glass?: boolean;
 }
 
 const NEUTRAL: Intent = { moveX: 0, moveY: 0, sprint: false, action: false, actionHeld: 0, pass: false, steal: false };
@@ -47,7 +49,12 @@ export class LocalInputSource implements ControlSource {
   private moveX = 0; private moveY = 0;
   private actionDown = false; private actionEdge = false; private held = 0;
   private passEdge = false; private stealEdge = false;
-  private braceHeld = false;
+  // HOOPS-MOVE-KIT-B (2026-09-08): the two sources of BRACE are latched SEPARATELY. InputBus emits the L trigger's value
+  // every frame while a pad is adopted (a resting trigger is a real 0), and L1 is emitted only on its transitions — so one
+  // shared `braceHeld` meant the trigger's per-frame 0 wiped the held L1 on the very next frame. On a pad, holding L1 did
+  // nothing at all: no box-out (KIT-A O2), and no post-up (measured on the KIT-B probe: brace false with the button down).
+  private braceTrigger = false; private braceButton = false;
+  private glassHeld = false;   // HOOPS-MOVE-KIT-B M12: R1 held = call glass
   private stealDownAt = -1;   // D3: X held past CONTEST_HOLD_MS = the hand-up contest (a tap stays the poke)
 
   /** Call from the mode's onInput(ctx, e) for every event. */
@@ -81,8 +88,9 @@ export class LocalInputSource implements ControlSource {
       if (e.value === 0 && this.actionDown) { this.actionEdge = true; this.actionDown = false; }
       if (e.value > 0.02) this.actionDown = true;
     }
-    if (e.t === 'trigger' && e.side === 'L') this.braceHeld = e.value > 0.4;
-    if (e.t === 'button' && e.btn === 'L1') this.braceHeld = e.pressed;
+    if (e.t === 'trigger' && e.side === 'L') this.braceTrigger = e.value > 0.4;
+    if (e.t === 'button' && e.btn === 'L1') this.braceButton = e.pressed;
+    if (e.t === 'button' && e.btn === 'R1') this.glassHeld = e.pressed;
     if (e.t === 'button' && e.pressed && e.btn === 'B') this.passEdge = true;
     if (e.t === 'button' && e.pressed && e.btn === 'X') { this.stealEdge = true; this.stealDownAt = performance.now(); }
     if (e.t === 'button' && !e.pressed && e.btn === 'X') this.stealDownAt = -1;
@@ -94,7 +102,8 @@ export class LocalInputSource implements ControlSource {
       sprint: Math.hypot(this.moveX, this.moveY) > 0.85,
       action: this.actionEdge, actionHeld: this.held,
       pass: this.passEdge, steal: this.stealEdge,
-      brace: this.braceHeld,
+      brace: this.braceTrigger || this.braceButton,
+      glass: this.glassHeld,
       contest: this.stealDownAt >= 0 && performance.now() - this.stealDownAt >= CONTEST_HOLD_MS,
     };
     this.actionEdge = false; this.passEdge = false; this.stealEdge = false;

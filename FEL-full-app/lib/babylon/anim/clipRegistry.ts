@@ -56,6 +56,8 @@ export const REAL_CLIPS = new Set<string>([
   'bball_block_reach', 'bball_steal_reach',
   'bball_follow_through',   // BIOMECH-HOOPS-WAVE1 (the tree resolves it through the animator; listed so isResolvable agrees)
   'bball_pullup_gather', 'bball_layup_gather_left', 'bball_floater', 'bball_hand_up', 'bball_screen_set',   // HOOPS-MOVE-KIT-A (2026-09-08): M1 gather, M3 left layup + floater, D3 hand-up, O1 screen
+  'bball_post_up', 'bball_fadeaway', 'bball_hook', 'bball_hook_left', 'bball_spin',   // HOOPS-MOVE-KIT-B (2026-09-08): the post seal, M4 fade, M5 hook (L/R), M6 spin
+  'bball_pump_fake', 'bball_step_through', 'bball_pivot', 'bball_layup_reverse', 'bball_layup_reverse_left', 'bball_hop_step', 'bball_euro_step',   // KIT-B wave 2: M8 pump + step-through, M9 pivot, M11 reverse, M13 hop, M14 euro
   // baseball packages (anim/authored/baseball) — Phase 6, 2026-09-03
   'baseball_stance', 'baseball_swing', 'baseball_pitch_over', 'baseball_pitch_side',
   // board suite — skate / surf / snowboard share these (anim/authored/boardSuite)

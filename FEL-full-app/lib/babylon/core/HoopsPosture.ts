@@ -17,6 +17,8 @@ import type { FlightWindow } from './Biomech';
 export type HoopsWindow =
   | 'idle' | 'run' | 'dribble' | 'drive' | 'protect'
   | 'gather' | 'load' | 'release' | 'follow'
+  | 'post' | 'fade' | 'hook' | 'spin'   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit's own shapes (M4–M6)
+  | 'pump' | 'footwork'   // wave 2: the fake that sells (M8) and the footwork legs — step-through / hop / euro (M8/M13/M14)
   | 'defend' | 'slide' | 'reach'
   | FlightWindow | 'land' | 'celebrate'
   | 'stagger' | 'floor';
@@ -40,6 +42,22 @@ export const HOOPS_POSTURE: Record<HoopsWindow, PosturePose> = {
   load:      P({ lean: 3,  spine1: [-2, 0, 0],  spine2: [-6, 0, 0],  neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 6,  forward: -2, eyes: 1,   chestAim: 0.9,  weight: 1 }),
   release:   P({ lean: -2, spine1: [-6, 0, 0],  spine2: [-12, 0, 0], neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 12, forward: -4, eyes: 1,   chestAim: 1,    weight: 1 }),
   follow:    P({ lean: 0,  spine1: [-4, 0, 0],  spine2: [-8, 0, 0],  neck: [-2, 0, 0], head: [-6, 0, 0],  shrug: 8,  forward: -2, eyes: 1,   chestAim: 0.9,  weight: 1 }),
+  // HOOPS-MOVE-KIT-B (M4–M6). The POST seals with the back to the basket: the chest must NOT square to the rim (chestAim 0
+  // — the whole point is that it is turned away), the shoulders round into him, the eyes come off the iron and onto the
+  // help. The FADE is the one window in the game whose thoracic chain opens BACKWARD hard — the authored lean and the
+  // layer pull the same way instead of fighting (the clip alone was cancelled to a straight body by the release stance) —
+  // and the head stays on the rim through it. The HOOK is shoulder-on: a partial chest aim (squaring it would put the
+  // shield arm behind the ball), the near shoulder up under the sweep, the eyes on the iron. The SPIN keeps the chest
+  // tall and lets the mode's own yaw own the turn (chestAim 0: aiming it at the rim would fight the pivot).
+  post:      P({ lean: 8,  spine1: [8, 0, 0],   spine2: [-2, 0, 0],  neck: [-4, 0, 0], head: [-6, 0, 0],  shrug: 5,  forward: 7,  eyes: 0.5, chestAim: 0,    weight: 0.9 }),
+  fade:      P({ lean: -14, spine1: [-10, 0, 0], spine2: [-14, 0, 0], neck: [10, 0, 0], head: [4, 0, 0],  shrug: 10, forward: -6, eyes: 1,   chestAim: 0.8,  weight: 1 }),
+  hook:      P({ lean: 2,  spine1: [-2, 0, 0],  spine2: [-8, 0, 0],  neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 12, forward: 0,  eyes: 1,   chestAim: 0.35, weight: 1 }),
+  spin:      P({ lean: 6,  spine1: [4, 0, 0],   spine2: [-6, 0, 0],  neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 4,  forward: 2,  eyes: 0.6, chestAim: 0,    weight: 0.8 }),
+  // wave 2: the PUMP has to SELL — it is the release's own chest and eyes, held over feet that never left (the clip owns
+  // the feet); the FOOTWORK legs (the step-through, the hop, the euro) are a low, squared gather with the eyes on the rim
+  // and the chest kept OFF the turn the legs are making (chestAim low: squaring it would undo the sell of a euro's step A).
+  pump:      P({ lean: 2,  spine1: [-4, 0, 0],  spine2: [-10, 0, 0], neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 10, forward: -3, eyes: 1,   chestAim: 0.9,  weight: 1 }),
+  footwork:  P({ lean: 11, spine1: [7, 0, 0],   spine2: [-4, 0, 0],  neck: [-4, 0, 0], head: [-10, 0, 0], shrug: 4,  forward: 4,  eyes: 1,   chestAim: 0.25, weight: 0.85 }),
   // defense: low, chest ON the handler through the slide, eyes on the ball
   defend:    P({ lean: 10, spine1: [8, 0, 0],   spine2: [-6, 0, 0],  neck: [-6, 0, 0], head: [-10, 0, 0], shrug: 2,  forward: 4,  eyes: 1,   chestAim: 0.8,  weight: 0.9 }),
   slide:     P({ lean: 8,  spine1: [8, 0, 0],   spine2: [-6, 0, 0],  neck: [-6, 0, 0], head: [-10, 0, 0], shrug: 2,  forward: 4,  eyes: 1,   chestAim: 0.9,  weight: 1 }),
@@ -59,13 +77,17 @@ const L = (footPitch: number, weight: number, toeCurl = 0): LegPose => ({ footPi
 export const HOOPS_LEGS: Record<HoopsWindow, LegPose> = {
   idle: L(0, 0.5), run: L(0, 0), dribble: L(0, 0.5), drive: L(0, 0), protect: L(0, 0.5),
   gather: L(0, 0.5), load: L(0, 0.6), release: L(-30, 0.7), follow: L(0, 0.8),
+  // the post is planted (flat, heavy); the fade and the hook leave the floor off one plant (the toes point); the spin
+  // rides its own planted pivot foot and the clip's swing leg — the layer stays out of it
+  post: L(0, 0.7), fade: L(-24, 0.7), hook: L(-26, 0.7), spin: L(0, 0.3),
+  pump: L(0, 0.6), footwork: L(0, 0.2),   // the pump's feet stay flat on the floor (the tell); the footwork clips key their own
   defend: L(0, 0.6), slide: L(0, 0.6), reach: L(0, 0.5),
   rise: LEGS.rise, hang: LEGS.hang, extend: LEGS.extend, jam: LEGS.jam, brace: LEGS.brace, land: LEGS.land, celebrate: LEGS.celebrate,
   stagger: L(0, 0), floor: L(0, 0),
 };
 
 // ── The window resolver ────────────────────────────────────────────────────
-export type ShotWindow = 'none' | 'gather' | 'load' | 'release' | 'follow';
+export type ShotWindow = 'none' | 'gather' | 'load' | 'release' | 'follow' | 'fade' | 'hook' | 'pump' | 'footwork';   // HOOPS-MOVE-KIT-B M4/M5 + wave 2 M8/M13/M14
 export interface HoopsPostureInput {
   role: 'offense' | 'defense' | 'idle';
   hasBall: boolean;
@@ -82,6 +104,9 @@ export interface HoopsPostureInput {
   reaching: boolean;
   staggered: boolean;
   floored: boolean;
+  /** HOOPS-MOVE-KIT-B: backing him down with the back to the basket (M4–M6's path) / mid-pivot (M6). */
+  posting?: boolean;
+  spinning?: boolean;
 }
 export const HOOPS_INPUT_IDLE: HoopsPostureInput = { role: 'idle', hasBall: false, speed01: 0, nearestDefender: Infinity, shot: 'none', flight: null, landed: false, celebrate: false, reaching: false, staggered: false, floored: false };
 
@@ -111,7 +136,9 @@ export function hoopsWindow(i: HoopsPostureInput): HoopsWindow {
   if (i.landed) return i.celebrate ? 'celebrate' : 'land';
   if (i.celebrate) return 'celebrate';
   if (i.shot !== 'none') return i.shot;
+  if (i.spinning) return 'spin';        // HOOPS-MOVE-KIT-B M6: the pivot owns the chest (the mode owns the yaw)
   if (i.reaching) return 'reach';
+  if (i.posting) return 'post';         // M4–M6's path: the back to the basket, the chest NOT squared to the rim
   if (i.role === 'defense') return i.speed01 > SLIDE_SPEED01 ? 'slide' : 'defend';
   if (i.hasBall) {
     if (i.speed01 > DRIVE_SPEED01) return 'drive';

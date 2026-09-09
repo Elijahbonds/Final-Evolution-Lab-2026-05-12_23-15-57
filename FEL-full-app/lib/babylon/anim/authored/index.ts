@@ -16,6 +16,8 @@ import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './free
 import {
   buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,   // HOOPS-MOVE-KIT-A
+  buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
+  buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // HOOPS-MOVE-KIT-B wave 2: the footwork (M8–M14)
 } from './basketball';
 import { buildBatStance, buildBatSwing, buildPitchOver, buildPitchSide } from './baseball';
 import { buildGolfAddress, buildGolfSwing, buildGolfPutt, buildGolfFinishHold } from './golf';
@@ -128,6 +130,18 @@ export function registerAuthoredClips(
     () => buildFloater(scene, skeleton),               // HOOPS-MOVE-KIT-A: the floater (M3)
     () => buildHandUp(scene, skeleton),                // HOOPS-MOVE-KIT-A: the grounded hand-up contest (D3)
     () => buildScreenSet(scene, skeleton),             // HOOPS-MOVE-KIT-A: the planted screen (O1)
+    () => buildPostUp(scene, skeleton),                // HOOPS-MOVE-KIT-B (2026-09-08): the post-up seal (the path into M4–M6)
+    () => buildFadeaway(scene, skeleton),              // HOOPS-MOVE-KIT-B: the fadeaway's lean (M4)
+    () => buildHook(scene, skeleton),                  // HOOPS-MOVE-KIT-B: the jump hook (M5)
+    () => buildHook(scene, skeleton, 'left'),
+    () => buildSpin(scene, skeleton),                  // HOOPS-MOVE-KIT-B: the spin's body (M6)
+    () => buildPumpFake(scene, skeleton),              // HOOPS-MOVE-KIT-B wave 2 (2026-09-08): the pump fake (M8)
+    () => buildStepThrough(scene, skeleton),           // the step past his shoulder (M8)
+    () => buildPivot(scene, skeleton),                 // the turn on a planted foot (M9)
+    () => buildReverseLayup(scene, skeleton),          // the far side, off the glass (M11)
+    () => buildReverseLayup(scene, skeleton, 'left'),
+    () => buildHopStep(scene, skeleton),               // the two-foot gather (M13)
+    () => buildEuroStep(scene, skeleton),              // sell, cross (M14)
     // Baseball packages (Phase 6, 2026-09-03) — the derby borrowed karate clips.
     () => buildBatStance(scene, skeleton),
     () => buildBatSwing(scene, skeleton),

@@ -4,8 +4,21 @@ import {
   planGather, gatherWish, gatherTravel, gatherLabel, stickBack01, PULLUP_TRAVEL_MAX, GATHER_PULLUP_MAX_SEC, GATHER_PULLUP_MIN_SEC,
   pickLayupSide, planFinish, finishHopY, finishStride, FINISH_RELEASE_KEY_SEC, FINISH_HOP_APEX,
   contestDrive, bumpShove, resolveBodyContact, DRIVE_BUMP_RADIUS,
+  // HOOPS-MOVE-KIT-B (2026-09-08): M4 the fade, M5 the hook, M6 the spin
+  canPostUp, postYaw, postWish, POST_BAND_MAX, POST_BACKDOWN_SPEED, POST_SLIDE_SPEED,
+  postFadeAway, fadeDrift, fadeSeparation, FADE_DRIFT_SPEED, FADE_SEPARATION_MIN,
+  pickHookSide, hookShield, HOOK_SHIELD,
+  planSpin, spinEase, spinYaw, spinPos, spinDone, spinOffContact, postSpinSide, bodyRight, gatherTravel as travelOf,
+  SPIN_SEC, SPIN_TRAVEL, SPIN_SWEEP, SPIN_MIN_SPEED, SPIN_TRIGGER_RANGE, POST_SPIN_STICK_MIN,
+  // wave 2: M7–M14
+  gatherWish as legWish, runningHook, helpInTheWay, isPumpFake, PUMP_MAX_SEC, planStepThrough, STEP_THROUGH_SPEED,
+  pivotFrom, planPivot, PIVOT_FRONT_SWEEP, PIVOT_REVERSE_SWEEP, PIVOT_SEC, PIVOT_STICK_MIN,
+  rimProtected, isReverseFinish, reverseSide, REVERSE_RANGE,
+  inBankBand, bankPoint, BANK_MIN_DEG, BANK_MAX_DEG, BANK_UP,
+  planHopStep, HOP_TRAVEL_MAX, HOP_SEC, planEuro, euroSell, euroAvailable, EURO_A_SEC, EURO_B_SEC,
 } from './HoopsMoves';
 import { DUNK_PCT, STEPBACK_SEC, STEPBACK_SPEED, ShotMeter, classifyShot } from './BasketballCore';
+import { aiBlockChance, AI_BLOCK_BASE } from './HoopsDefense';
 import { FOUL_CLOSING_SPEED, HARD_CONTACT_SPEED } from './ContactSystem';
 
 const RIM = new Vector3(0, 0, -0.6);
@@ -181,5 +194,352 @@ describe('M2 — kinematic body contact (3v3)', () => {
     const va = V(0.3, 0), vb = V(0, 0);
     const c = resolveBodyContact(V(0, 0), V(1.0, 0), va, vb)!;
     expect(c.severity).toBe('bump'); expect(va.x).toBe(0.3);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// HOOPS-MOVE-KIT-B (2026-09-08) — M4 the post fadeaway, M5 the jump hook, M6 the spin move.
+// yaw = π throughout (a body at +z facing the rim at −z): body-right is −x, so a defender at −x is on my RIGHT.
+// ════════════════════════════════════════════════════════════════════════════
+const PI = Math.PI;
+
+describe('KIT-B path — the post-up', () => {
+  it('the post needs the band AND a body to back down', () => {
+    expect(canPostUp(V(0, 2.6), RIM, V(0, 1.6))).toBe(true);
+    expect(canPostUp(V(0, 2.6), RIM, null)).toBe(false);              // nobody to post up
+    expect(canPostUp(V(0, 2.6), RIM, V(0, 6))).toBe(false);           // he is not there
+    expect(canPostUp(V(0, -0.2), RIM, V(0, 0.4))).toBe(false);        // already at the rim: that is a layup
+    expect(canPostUp(V(0, POST_BAND_MAX + 1), RIM, V(0, POST_BAND_MAX))).toBe(false);   // that is a face-up jumper
+  });
+  it('the post turns the BACK to the basket', () => {
+    const yawBack = postYaw(V(0, 2.6), RIM);
+    // facing = (sin, cos): the chest points AWAY from the rim (+z), the back at it
+    expect(Math.sin(yawBack)).toBeCloseTo(0, 5); expect(Math.cos(yawBack)).toBeCloseTo(1, 5);
+  });
+  it('backing him down is slow; sliding along the lane is not a drive either', () => {
+    const toRim = V(0, -1);
+    const back = postWish(0, -1, toRim);                   // the stick INTO the rim
+    expect(back.length()).toBeCloseTo(POST_BACKDOWN_SPEED, 5);
+    expect(back.z).toBeLessThan(0);                        // toward the rim
+    const slide = postWish(1, 0, toRim);                   // across the lane
+    expect(slide.length()).toBeCloseTo(POST_SLIDE_SPEED, 5);
+    expect(postWish(0, 0, toRim).length()).toBe(0);
+    expect(back.length()).toBeLessThan(slide.length());
+  });
+});
+
+describe('M4 — the post fadeaway', () => {
+  it('the fade escapes the DEFENDER when he is on me, the rim when he is not', () => {
+    const off = postFadeAway(V(0, 2.6), RIM, V(0, 1.6));   // he is between me and the rim
+    expect(off.length()).toBeCloseTo(1, 5); expect(off.z).toBeGreaterThan(0.9);   // away from him = away from the rim
+    const side = postFadeAway(V(0, 2.6), RIM, V(1.2, 2.6));
+    expect(side.x).toBeLessThan(-0.9);                     // straight off his body
+    const none = postFadeAway(V(0, 2.6), RIM, null);
+    expect(none.z).toBeCloseTo(1, 5);                      // off the rim
+    expect(postFadeAway(V(0, 2.6), RIM, V(0, 9)).z).toBeCloseTo(1, 5);   // too far to be what I am escaping
+  });
+  it('the drift is BALLISTIC and buys real separation — the release is already behind the take-off, the landing further still', () => {
+    const m = new ShotMeter(); m.start(0.4, 'fadeaway');
+    const plan = planFinish('fadeaway', 'right', m.durationSec, m.greenCenter01, postFadeAway(V(0, 2.6), RIM, V(0, 1.6)));
+    expect(plan.clip).toBe('bball_fadeaway');
+    expect(fadeSeparation(plan)).toBeGreaterThanOrEqual(FADE_SEPARATION_MIN);
+    // integrate the hop at 60 Hz: the same speed every frame (a jump is ballistic), and it never stops at the release
+    let travel = 0, atRelease = 0;
+    for (let t = 0; t < plan.hopSec; t += 1 / 60) {
+      const d = fadeDrift(plan);
+      expect(d.length()).toBeCloseTo(FADE_DRIFT_SPEED, 5);
+      travel += d.length() / 60;
+      if (t <= plan.releaseSec) atRelease = travel;
+    }
+    expect(atRelease).toBeGreaterThanOrEqual(FADE_SEPARATION_MIN);
+    expect(travel).toBeGreaterThan(atRelease + 0.2);       // still going backwards when the feet come down
+    expect(fadeDrift(planFinish('layup', 'right', m.durationSec, m.greenCenter01)).length()).toBe(0);
+  });
+  it('the fade hops higher than a layup and does NOT stride at the rim', () => {
+    expect(FINISH_HOP_APEX.fadeaway).toBeGreaterThan(FINISH_HOP_APEX.layup);
+    expect(finishStride('fadeaway', V(0, 2.6), RIM, false).length()).toBe(0);
+  });
+  it('a post squeeze with the stick off the rim is a FADEAWAY wherever I am — it was a label on a standing jumpshot', () => {
+    const c = classifyShot(V(0, 2.6), V(0, 0), new Vector3(0, 3.05, -0.6), 0, 'fade');
+    expect(c.style).toBe('fadeaway'); expect(c.label).toBe('FADEAWAY');
+    // and KIT-A's face-up read is untouched: no post context, no fade
+    expect(classifyShot(V(0, 2.6), V(0, 0), new Vector3(0, 3.05, -0.6), 0).style).toBe('floater');
+  });
+});
+
+describe('M5 — the jump hook', () => {
+  it('the hook shoots with the hand AWAY from him: the off shoulder is the shield', () => {
+    expect(pickHookSide(V(0, 2.6), RIM, PI, V(-0.9, 2.6))).toBe('left');    // he is on my right → left hand
+    expect(pickHookSide(V(0, 2.6), RIM, PI, V(0.9, 2.6))).toBe('right');    // he is on my left → right hand
+    expect(pickHookSide(V(-2, 2.6), RIM, PI, null)).toBe('right');          // nobody: the middle-of-the-floor hand
+    expect(pickHookSide(V(2, 2.6), RIM, PI, null)).toBe('left');
+  });
+  it('the shield is worth something: the contest that reaches the ball is cut, and it is the hardest shot in the game to block', () => {
+    expect(hookShield(1)).toBeCloseTo(1 - HOOK_SHIELD, 5);
+    expect(hookShield(0)).toBe(0);
+    expect(AI_BLOCK_BASE.hook).toBeLessThan(AI_BLOCK_BASE.layup);
+    expect(AI_BLOCK_BASE.hook).toBeLessThan(AI_BLOCK_BASE.jumper);
+    expect(aiBlockChance('hook', 1.0, true, true)).toBeLessThan(aiBlockChance('layup', 1.0, true, true));
+  });
+  it('a post squeeze without the stick pulled off the rim is a JUMP HOOK, on its own clip and its own quick meter', () => {
+    const c = classifyShot(V(0, 2.6), V(0, 0), new Vector3(0, 3.05, -0.6), 0, 'hook');
+    expect(c.style).toBe('hook'); expect(c.label).toBe('JUMP HOOK');
+    expect(c.pctMod).toBeGreaterThan(classifyShot(V(0, 5.4), V(0, 0), new Vector3(0, 3.05, -0.6), 0).pctMod);   // better than a jumper
+    const m = new ShotMeter(); m.start(0.3, 'hook'); const j = new ShotMeter(); j.start(0.3, 'jumper');
+    expect(m.durationSec).toBeLessThan(j.durationSec);                     // a quick release off the block
+    const left = planFinish('hook', 'left', m.durationSec, m.greenCenter01);
+    expect(left.clip).toBe('bball_hook_left');
+    expect(planFinish('hook', 'right', m.durationSec, m.greenCenter01).clip).toBe('bball_hook');
+    expect(FINISH_RELEASE_KEY_SEC.hook / left.speedRatio).toBeCloseTo(left.releaseSec, 5);
+    expect(left.hopSec).toBeGreaterThan(left.releaseSec);
+  });
+});
+
+describe('M6 — the spin move', () => {
+  const me = () => V(0, 2.6);
+  it('the foot plants on HIS side and the body turns the other way, a full revolution', () => {
+    const right = planSpin(me(), PI, RIM, V(-0.9, 2.2));    // he is on my right (−x at yaw π)
+    expect(right.side).toBe('left');
+    expect(right.sweep).toBeCloseTo(-SPIN_SWEEP, 5);
+    expect(right.pivot.x).toBeLessThan(me().x);             // the pivot foot toward him
+    const left = planSpin(me(), PI, RIM, V(0.9, 2.2));
+    expect(left.side).toBe('right'); expect(left.sweep).toBeCloseTo(SPIN_SWEEP, 5);
+    expect(left.pivot.x).toBeGreaterThan(me().x);
+    expect(planSpin(me(), PI, RIM, null).side).toBe('right');           // nobody there: off the right shoulder
+    expect(planSpin(me(), PI, RIM, V(-0.9, 2.2), 'right').side).toBe('right');   // the post's own stick overrides the read
+  });
+  it('the exit line comes out past his shoulder but still AT the rim — the spin ends in a finish', () => {
+    const p = planSpin(me(), PI, RIM, V(-0.9, 2.2));
+    expect(p.exit.length()).toBeCloseTo(1, 5);
+    const toRim = new Vector3(RIM.x - 0, 0, RIM.z - 2.6).normalize();
+    const dot = Vector3.Dot(p.exit, toRim);
+    expect(dot).toBeGreaterThan(0.9);                        // at the rim …
+    expect(dot).toBeLessThan(0.999);                         // … but leaned off it, past his shoulder
+  });
+  it('a readable PIVOT: the turn is eased and monotonic, never a snap, and it lands on the exit facing', () => {
+    const p = planSpin(me(), PI, RIM, V(-0.9, 2.2));
+    expect(spinEase(0)).toBe(0); expect(spinEase(1)).toBe(1); expect(spinEase(0.5)).toBeCloseTo(0.5, 5);
+    expect(spinYaw(p, 0)).toBeCloseTo(PI, 5);
+    expect(spinYaw(p, p.sec)).toBeCloseTo(PI - SPIN_SWEEP, 5);           // a full turn: the same facing, gone all the way round
+    let prev = spinYaw(p, 0), maxStep = 0;
+    for (let t = 1 / 60; t <= p.sec + 1e-9; t += 1 / 60) {
+      const y = spinYaw(p, t);
+      expect(y).toBeLessThan(prev + 1e-9);                                // monotonic (this one turns negative)
+      maxStep = Math.max(maxStep, Math.abs(y - prev)); prev = y;
+    }
+    expect(maxStep).toBeLessThan(0.5);                                    // ≤ ~29° a frame: a pivot you can read
+    expect(spinDone(p, p.sec)).toBe(true); expect(spinDone(p, p.sec - 0.01)).toBe(false);
+  });
+  it('the root ARCS around the planted foot and comes out down the exit line', () => {
+    const start = me();
+    const p = planSpin(start, PI, RIM, V(-0.9, 2.2));
+    const at0 = spinPos(p, 0);
+    expect(at0.x).toBeCloseTo(start.x, 5); expect(at0.z).toBeCloseTo(start.z, 5);
+    const end = spinPos(p, p.sec);
+    // back around to the pivot's far side + the travel down the exit
+    expect(Vector3.Distance(end, start)).toBeGreaterThan(SPIN_TRAVEL * 0.9);
+    expect(end.z).toBeLessThan(start.z);                                  // closer to the rim than I started
+    let maxStep = 0, prev = at0;
+    for (let t = 1 / 60; t <= p.sec; t += 1 / 60) { const q = spinPos(p, t); maxStep = Math.max(maxStep, Vector3.Distance(q, prev)); prev = q; }
+    expect(maxStep).toBeLessThan(6.4 / 60);                               // never faster than the dribble's own sprint: a body, not a teleport
+  });
+  it('the DRIVE trigger: a body in front of me, at speed, inside reach', () => {
+    const vel = V(0, -5);                                                 // driving at the rim
+    expect(spinOffContact(vel, me(), PI, V(0, 1.7))).toBe(true);          // he is in front, 0.9 m off
+    expect(spinOffContact(V(0, -1), me(), PI, V(0, 1.7))).toBe(false);    // walking: no spin
+    expect(spinOffContact(vel, me(), PI, V(0, 0.2))).toBe(false);         // too far away to be the body I met
+    expect(spinOffContact(vel, me(), PI, V(1.5, 2.6))).toBe(false);       // beside me, not in front
+    expect(spinOffContact(vel, me(), PI, null)).toBe(false);
+    expect(SPIN_MIN_SPEED).toBeLessThan(6.4); expect(SPIN_TRIGGER_RANGE).toBeGreaterThan(1.1);   // reachable off a real drive, past the standoff
+  });
+  it('the POST trigger: the stick swung across the body, not into it', () => {
+    // body-right at yaw π is −x
+    expect(postSpinSide(-1, 0, PI)).toBe('right');
+    expect(postSpinSide(1, 0, PI)).toBe('left');
+    expect(postSpinSide(0, -1, PI)).toBeNull();                           // straight at the rim: that is a back-down
+    expect(postSpinSide(0, 0, PI)).toBeNull();
+    expect(postSpinSide(-0.2, -0.98, PI)).toBeNull();                     // mostly a back-down
+    expect(POST_SPIN_STICK_MIN).toBeGreaterThan(0.4);                     // a real swing across, not a drift
+  });
+  it('the spin is one pivot: SPIN_SEC is a beat, not a drill', () => {
+    expect(SPIN_SEC).toBeGreaterThan(0.35); expect(SPIN_SEC).toBeLessThan(0.8);
+  });
+});
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// HOOPS-MOVE-KIT-B wave 2 (2026-09-08) — M7 running hook, M8 pump + step-through, M9 pivots, M10 floater over length,
+// M11 reverse, M12 bank, M13 hop step, M14 euro step.
+// ════════════════════════════════════════════════════════════════════════════
+/** Integrate a gather's legs at 60 Hz: where the body ends up, and how far it walked. */
+function walk(plan: ReturnType<typeof planEuro>): { end: Vector3; travel: number; samples: Vector3[] } {
+  const end = new Vector3(0, 0, 0); let travel = 0; const samples: Vector3[] = [];
+  for (let t = 0; t < plan.sec - 1e-6; t += 1 / 60) {
+    const w = legWish(plan, t);
+    end.addInPlace(w.scale(1 / 60)); travel += w.length() / 60; samples.push(end.clone());
+  }
+  return { end, travel, samples };
+}
+
+describe('M7 — the running hook', () => {
+  it('a body in the way between me and the rim is what the read is', () => {
+    expect(helpInTheWay(V(0, 3), RIM, V(0, 1.5), 2.4, 1.2)).toBe(true);
+    expect(helpInTheWay(V(0, 3), RIM, V(1.6, 1.5), 2.4, 1.2)).toBe(false);   // off the line
+    expect(helpInTheWay(V(0, 3), RIM, V(0, 4.2), 2.4, 1.2)).toBe(false);     // behind me
+    expect(helpInTheWay(V(0, 3), RIM, null, 2.4, 1.2)).toBe(false);
+  });
+  it('a hook ON THE MOVE: in the paint band, moving, over a body — not from a standstill, not from the arc', () => {
+    expect(runningHook(V(0, -3), V(0, 3), RIM, V(0, 1.6))).toBe(true);
+    expect(runningHook(V(0, -0.4), V(0, 3), RIM, V(0, 1.6))).toBe(false);    // standing: that is the jump hook
+    expect(runningHook(V(0, -3), V(0, 3), RIM, null)).toBe(false);           // nobody to hook over: lay it in
+    expect(runningHook(V(0, -3), V(0, 8), RIM, V(0, 6.6))).toBe(false);      // out past the band
+  });
+});
+
+describe('M8 — the pump fake and the step-through', () => {
+  it('a squeeze let go this early is a FAKE, not a brick', () => {
+    expect(isPumpFake(0.1)).toBe(true);
+    expect(isPumpFake(PUMP_MAX_SEC + 0.01)).toBe(false);
+    expect(PUMP_MAX_SEC).toBeLessThan(0.35);   // well before any green: nothing shootable is lost
+  });
+  it('the step goes PAST the shoulder he is NOT on, and ends in a layup on that hand', () => {
+    const onMyRight = planStepThrough(V(0, 3), RIM, PI, V(-0.7, 3));   // body-right at yaw π is −x
+    expect(onMyRight.kind).toBe('stepthrough');
+    expect(onMyRight.then).toBe('layup');
+    expect(onMyRight.side).toBe('left');
+    const w = walk(onMyRight);
+    expect(w.travel).toBeGreaterThan(0.5); expect(w.travel).toBeLessThan(0.85);   // one step, not a drive
+    expect(w.end.z).toBeLessThan(0);                                              // and it goes at the rim …
+    expect(w.end.x).toBeGreaterThan(0.2);                                         // … around his other side (+x = my left)
+    const onMyLeft = planStepThrough(V(0, 3), RIM, PI, V(0.7, 3));
+    expect(onMyLeft.side).toBe('right');
+    expect(walk(onMyLeft).end.x).toBeLessThan(-0.2);
+    expect(legWish(onMyRight, onMyRight.sec + 0.01).length()).toBe(0);            // the step is over when it is over
+    expect(legWish(onMyRight, 0).length()).toBeCloseTo(STEP_THROUGH_SPEED, 5);
+  });
+});
+
+describe('M9 — the pivot and the reverse pivot', () => {
+  it('the stick across opens a FRONT pivot; across and BACK is a reverse', () => {
+    // body-right at yaw π is −x, forward is −z
+    expect(pivotFrom(-1, 0, PI)).toEqual({ side: 'right', reverse: false });
+    expect(pivotFrom(1, 0, PI)).toEqual({ side: 'left', reverse: false });
+    expect(pivotFrom(-0.7, 0.7, PI)!.reverse).toBe(true);      // across and back through my own body
+    expect(pivotFrom(0, -1, PI)).toBeNull();                    // straight ahead: that is a drive
+    expect(pivotFrom(0, 0, PI)).toBeNull();
+    expect(PIVOT_STICK_MIN).toBeGreaterThan(0.3);
+  });
+  it('a pivot turns IN PLACE — the planted foot never moves and the body goes nowhere', () => {
+    const start = V(0, 3);
+    const front = planPivot(start, PI, 'right', false);
+    expect(Math.abs(front.sweep)).toBeCloseTo(PIVOT_FRONT_SWEEP, 5);
+    expect(front.sec).toBeCloseTo(PIVOT_SEC, 5);
+    const end = spinPos(front, front.sec);
+    // the root swings around the foot, so it moves a little — but never a step, and it never travels down a line
+    expect(Vector3.Distance(end, start)).toBeLessThan(0.45);
+    expect(Vector3.Distance(spinPos(front, 0), start)).toBeCloseTo(0, 5);
+    const reverse = planPivot(start, PI, 'right', true);
+    expect(Math.abs(reverse.sweep)).toBeCloseTo(PIVOT_REVERSE_SWEEP, 5);
+    expect(Math.sign(reverse.sweep)).toBe(-Math.sign(front.sweep));   // it turns the OTHER way, through the back
+    expect(Vector3.Distance(spinPos(reverse, reverse.sec), start)).toBeLessThan(0.45);
+  });
+  it('a pivot is readable: eased, monotonic, and it ends facing where it turned to', () => {
+    const p = planPivot(V(0, 3), PI, 'right', false);
+    let prev = spinYaw(p, 0), maxStep = 0;
+    for (let t = 1 / 60; t <= p.sec + 1e-9; t += 1 / 60) { const y = spinYaw(p, t); maxStep = Math.max(maxStep, Math.abs(y - prev)); prev = y; }
+    expect(maxStep).toBeLessThan(0.35);
+    expect(spinYaw(p, p.sec)).toBeCloseTo(PI + PIVOT_FRONT_SWEEP, 5);
+    expect(Math.atan2(p.exit.x, p.exit.z)).toBeCloseTo(Math.atan2(Math.sin(PI + PIVOT_FRONT_SWEEP), Math.cos(PI + PIVOT_FRONT_SWEEP)), 5);
+  });
+});
+
+describe('M10 — the floater over length', () => {
+  it('a body sitting in the lane protects the rim; one standing off it does not', () => {
+    expect(rimProtected(V(0, 3), RIM, V(0, 1.0))).toBe(true);        // in the lane, near the rim, on my line
+    expect(rimProtected(V(0, 3), RIM, V(0, 4.0))).toBe(false);       // behind me
+    expect(rimProtected(V(0, 3), RIM, V(2.6, 0.4))).toBe(false);     // near the rim but off my line
+    expect(rimProtected(V(0, 3), RIM, null)).toBe(false);
+  });
+});
+
+describe('M11 — the reverse', () => {
+  it('a drive ACROSS the rim from under it finishes reverse; a drive AT it does not', () => {
+    expect(isReverseFinish(V(0.2, -1.3), RIM, V(-4, 0))).toBe(true);      // carried past the ring, running across it
+    expect(isReverseFinish(V(0, 1.2), RIM, V(0, -4))).toBe(false);        // straight at it: that is a layup
+    expect(isReverseFinish(V(0, 4), RIM, V(-4, 0))).toBe(false);          // too far out
+    expect(isReverseFinish(V(0.2, -1.3), RIM, V(-0.3, 0))).toBe(false);   // walking: no reverse
+    expect(REVERSE_RANGE).toBeLessThan(2.2);                              // it is a shot from UNDER the rim
+  });
+  it('it finishes on the side the drive is carrying me to', () => {
+    expect(reverseSide(V(0, 0), RIM, PI, V(-3, 0))).toBe('right');   // body-right at yaw π is −x
+    expect(reverseSide(V(0, 0), RIM, PI, V(3, 0))).toBe('left');
+  });
+});
+
+describe('M12 — the bank', () => {
+  const N = new Vector3(0, 0, 1);   // the board faces the court
+  it('the band is the angle at which the square helps — not straight on, not from the baseline', () => {
+    expect(inBankBand(V(0, 3), RIM, N)).toBe(false);                 // dead straight: 0° — swish it
+    expect(inBankBand(V(2.4, 2.4), RIM, N)).toBe(true);              // ~45° off the board: the wing
+    expect(inBankBand(V(4.5, 0.2), RIM, N)).toBe(false);             // along the baseline: no square
+    expect(inBankBand(V(0.2, 0.3), RIM, N)).toBe(false);             // under the rim: too close for the square
+    expect(inBankBand(V(4.5, 7.5), RIM, N)).toBe(false);             // too far
+    expect(BANK_MIN_DEG).toBeGreaterThan(0); expect(BANK_MAX_DEG).toBeLessThan(90);
+  });
+  it('the point is ON the square: above the ring, behind it, on my side of the box', () => {
+    const rim = new Vector3(0, 3.05, -0.6);
+    const right = bankPoint(V(2.4, 2.4), rim, N);
+    expect(right.y).toBeCloseTo(rim.y + BANK_UP, 5);
+    expect(right.z).toBeLessThan(rim.z);                             // behind the ring, on the glass
+    const left = bankPoint(V(-2.4, 2.4), rim, N);
+    expect(Math.sign(right.x - rim.x)).toBe(-Math.sign(left.x - rim.x));   // the box is used on the shooter's side
+  });
+});
+
+describe('M13 — the hop step', () => {
+  it('the hop is ONE forward gather onto two feet — legal, never a travel pop', () => {
+    const p = planHopStep(V(0, -5), V(0, 3), RIM, 'layup');
+    expect(p.kind).toBe('hop'); expect(p.then).toBe('layup'); expect(p.sec).toBeCloseTo(HOP_SEC, 5);
+    const w = walk(p);
+    expect(w.travel).toBeLessThanOrEqual(HOP_TRAVEL_MAX);
+    expect(travelOf(p)).toBeLessThanOrEqual(HOP_TRAVEL_MAX);
+    expect(w.end.z).toBeLessThan(-0.4);                              // it hops where the drive was going: at the rim
+    expect(gatherLabel(p.kind, 'X')).toBe('HOP STEP');
+  });
+  it('a hop from a standstill goes at the rim, and it can end in a rise instead', () => {
+    const p = planHopStep(V(0, 0), V(2, 3), RIM, 'rise');
+    expect(p.then).toBe('rise');
+    const w = walk(p);
+    expect(w.end.x).toBeLessThan(0); expect(w.end.z).toBeLessThan(0);   // toward (0, −0.6) from (2, 3)
+  });
+});
+
+describe('M14 — the euro step', () => {
+  it('a euro needs a drive, the band, and help to evade', () => {
+    expect(euroAvailable(V(0, -4), V(0, 3.4), RIM, V(0, 1.8))).toBe(true);
+    expect(euroAvailable(V(0, -0.5), V(0, 3.4), RIM, V(0, 1.8))).toBe(false);   // walking
+    expect(euroAvailable(V(0, -4), V(0, 3.4), RIM, null)).toBe(false);          // nobody to euro around
+    expect(euroAvailable(V(0, -4), V(0, 9), RIM, V(0, 7)), 'out past the band').toBe(false);
+  });
+  it('step A SELLS one way and step B CROSSES the other — two steps, opposite sides, both gaining ground', () => {
+    const p = planEuro(V(0, 3.4), RIM, PI, 'right');
+    expect(p.kind).toBe('euro'); expect(p.side).toBe('left');   // it finishes on the CROSSING hand
+    expect(p.sec).toBeCloseTo(EURO_A_SEC + EURO_B_SEC, 5);
+    const a = legWish(p, EURO_A_SEC * 0.5), b = legWish(p, EURO_A_SEC + EURO_B_SEC * 0.5);
+    const right = bodyRight(PI);
+    const latA = Vector3.Dot(a, right) / a.length(), latB = Vector3.Dot(b, right) / b.length();
+    expect(latA).toBeGreaterThan(0.4);                          // A sells to my right …
+    expect(latB).toBeLessThan(-0.4);                            // … B crosses to my left
+    expect(a.z).toBeLessThan(0); expect(b.z).toBeLessThan(0);   // both steps gain ground at the rim
+    expect(b.length()).toBeGreaterThan(a.length());             // the crossing step is the hard one
+    const w = walk(p);
+    expect(w.end.z).toBeLessThan(-0.5);                         // net: closer to the rim
+    expect(w.end.x).toBeGreaterThan(0);                         // and out the far side (+x = my left at yaw π)
+    expect(gatherLabel(p.kind, 'X')).toBe('EURO STEP');
+  });
+  it('the stick picks the side it sells to; a straight stick asks for no euro', () => {
+    expect(euroSell(-1, 0, PI)).toBe('right');
+    expect(euroSell(1, 0, PI)).toBe('left');
+    expect(euroSell(0, -1, PI)).toBeNull();
   });
 });

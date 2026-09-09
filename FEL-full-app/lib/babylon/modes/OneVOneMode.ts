@@ -106,14 +106,27 @@ import {
   resolveBodyCollision, checkAnkleBreak, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, BLOCK_RANGE, DUNK_PCT,
   STEAL_EXPOSURE_MIN, AttackerBrain, RIVAL_DRIVE_SPEED, rivalShotPct, handUpContest, distXZ, HAND_UP_SEC,
-  SHOT_QUALITY_PCT, type ShotQuality, type ShotContext,
+  SHOT_QUALITY_PCT, type ShotQuality, type ShotContext, type PostShot, type ShotStyle,
 } from '../core/BasketballCore';
 import { DribbleStateMachine, syncedShotSpeed } from '../core/BallHandling';
 import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import {   // HOOPS-MOVE-KIT-A (2026-09-08): the gather, the finish kit, the drive contest
-  planGather, gatherWish, gatherLabel, stickBack01, type GatherPlan,
+  planGather, gatherWish, gatherLabel, gatherTravel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
   pickLayupSide, planFinish, finishHopY, finishStride, FINISH_LABEL, type FinishPlan, type FinishStyle,
   contestDrive, bumpShove, BUMP_SLOW, BUMP_SLOW_SEC, type DriveContest,
+} from '../core/HoopsMoves';
+import {   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit — M4 the fade, M5 the hook, M6 the spin
+  canPostUp, postYaw, postWish, postFadeAway, POST_FADE_STICK_MIN, fadeDrift,
+  pickHookSide, hookShield,
+  planSpin, spinYaw, spinPos, spinOffContact, postSpinSide, SPIN_ARM_SEC, SPIN_BEAT_K, SPIN_EXIT_SPEED, SPIN_STUN_SEC, SPIN_TRIGGER_RANGE, SPIN_COOLDOWN_SEC, type SpinPlan,
+} from '../core/HoopsMoves';
+import {   // HOOPS-MOVE-KIT-B wave 2 (2026-09-08): M7 the running hook, M8 the pump + step-through, M9 the pivot,
+  // M10 the floater over length, M11 the reverse, M12 the glass, M13 the hop step, M14 the euro
+  runningHook, HOOK_ON_ME, isPumpFake, planStepThrough, PUMP_MAX_SEC, STEP_THROUGH_SEC, PUMP_BITE_RANGE, PUMP_BITE_CHANCE, PUMP_BITE_STUN,
+  pivotFrom, planPivot, PIVOT_MAX_SPEED,
+  rimProtected, isReverseFinish, reverseSide,
+  inBankBand, bankPoint, BANK_PCT_BONUS,
+  planHopStep, HOP_RANGE, planEuro, euroSell, euroAvailable,
 } from '../core/HoopsMoves';
 import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package
   groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, contestedPct, alteredApex, aiHandsUp, facingCos,
@@ -135,6 +148,8 @@ import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 export const RIM = new Vector3(0, 3.05, -0.6);
 /** The rim's point on the floor — what a drive's range is measured against (see the checkDriveDunk call). */
 const RIM_FLOOR = new Vector3(RIM.x, 0, RIM.z);
+/** HOOPS-MOVE-KIT-B M12: the backboard hangs behind the ring and faces the court (+z) — the square's own direction. */
+const BOARD_NORMAL = new Vector3(0, 0, 1);
 const TARGET_SCORE = 11;
 // FORMAT FIX: scoring used to be "1pt inside a 4.2-unit paint radius, 2pts
 // anywhere past it, no matter how far" — a made shot was never worth 3, and
@@ -166,7 +181,7 @@ const JUMP_VY = 3.0;                     // m/s — ~0.46 m apex, 0.6 s of air
 const FACE_RATE = 10, FACE_RIM_RATE = 6;
 /** A defender inside this range of the handler keeps his chest on him (beyond it he runs to his spot, facing the travel). */
 const DEFEND_FACE_RANGE = 6;
-const HINT_OFFENCE = 'Drive fast at the rim to DUNK · snap the stick for ankles · pull BACK for a HESI · lose the ball and you DEFEND';
+const HINT_OFFENCE = 'Drive fast at the rim to DUNK · snap the stick for ankles · pull BACK for a HESI · hold L1/LT near the block to POST UP (back to the rim: shoot for a HOOK, pull off the rim for a FADEAWAY, swing the stick across to SPIN) · drive into a body to SPIN off him';
 const HINT_DEFENCE = 'STAY IN FRONT — they sidestep, you slide · X: STEAL as the ball crosses over · A: JUMP on the gather to BLOCK · hold L1/LT: BOX OUT';
 
 type Possession = 'mine' | 'defense';
@@ -240,6 +255,13 @@ export const OneVOneMode: ModeDefinition = (() => {
   let dunkFlush: { releasePos: Vector3; since: number } | null = null;               // the make's ball through the iron (G6)
   // ── HOOPS-MOVE-KIT-A ──
   let gather: { plan: GatherPlan; t: number } | null = null;                         // M1: the jumper's gather before the rise (the body still moves)
+  // HOOPS-MOVE-KIT-B: the post kit's live state — the seal I hold (M4–M6's path) and the pivot in flight (M6)
+  let posting = false;
+  let spin: { plan: SpinPlan; t: number; beat: boolean } | null = null;
+  let spinCooldown = 0, spinArmed = 0;   // M6: a body I meet ARMS the spin; the stick swung across throws it
+  let spinClip = 'bball_spin';           // M9: the same machinery turns a PIVOT (a shorter sweep, no travel)
+  let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
+  let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
   let finish: { plan: FinishPlan; t: number; released: boolean } | null = null;      // M3: a layup / floater in flight (the stride, the hop, the finish clip)
   let driveContest: DriveContest | null = null;                                      // M2: the body in the dunk's path
   let finishFoul = false;                                                            // M2: fouled in the air on a dunk / a finish — and-one on a make, the ball back on a miss
@@ -339,8 +361,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0;
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
-    if (gather || finish) meAnimTree.release();   // HOOPS-MOVE-KIT-A: a held gather / finish beat is lifted with the possession
-    gather = null; finish = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
+    if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
     clearDefense();
     place('me', me.root, MY_SPAWN, Math.PI);
     place('foe', foe.root, FOE_SPAWN, 0);
@@ -461,7 +483,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       ctx.setHud({ score: myScore, foeScore, target: TARGET_SCORE, momentum: 0, turbo: 100, hint: HINT_OFFENCE });
       // dev probes (ONEVONE-DEFENSE-LOGIC): the possession machine, readable without the HUD
       if (process.env.NODE_ENV === 'development') {
-        (ctx.scene.metadata ??= {}).onevone = { possession: () => possession, defPhase: () => defPhase, attackPhase: () => attacker.phase, foeRoot: foe.root, myJumpAge: () => myJumpAge, contacts: () => devContacts.slice(), luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: foeHandUp }), ended: () => ended, foeJob: () => (foeBrain?.boxing ? 'boxout' : foeBrain?.job ?? ''), foeBoxing: () => !!foeBrain?.boxing, defend: () => { if (!ended && possession === 'mine') startDefense(ctx, 'PROBE — DEFEND!'); }, offense: () => { if (!ended) resetPositions(); } };   // BIOMECH-HOOPS-WAVE1: `defend()` / `offense()` let a probe reach either possession deterministically
+        (ctx.scene.metadata ??= {}).onevone = { possession: () => possession, defPhase: () => defPhase, attackPhase: () => attacker.phase, foeRoot: foe.root, myJumpAge: () => myJumpAge, contacts: () => devContacts.slice(), luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: foeHandUp }), ended: () => ended, post: () => ({ posting, spinning: !!spin, brace: !!meSlot.intent.brace, can: canPostUp(me.root.position, RIM_FLOOR, foeStunSec > 0 || foeFloored ? null : foe.root.position), carrying, shooting, finish: !!finish, gather: !!gather, foeStun: foeStunSec, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: meAnimTree.held ?? '' }), foeJob: () => (foeBrain?.boxing ? 'boxout' : foeBrain?.job ?? ''), foeBoxing: () => !!foeBrain?.boxing, defend: () => { if (!ended && possession === 'mine') startDefense(ctx, 'PROBE — DEFEND!'); }, offense: () => { if (!ended) resetPositions(); } };   // BIOMECH-HOOPS-WAVE1: `defend()` / `offense()` let a probe reach either possession deterministically
         const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__;
         if (dev) dev.hoopsPosture = { me: () => mePosture?.layer.get() ?? null, foe: () => foePosture?.layer.get() ?? null, bio: () => ({ me: { ...meBio }, foe: { ...foeBio } }) };   // BIOMECH-HOOPS-WAVE1 probes
       }
@@ -583,6 +605,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         const [mx, my] = camRel(ctx, intent.moveX, intent.moveY);
         const drib = meDribble.update(dt, mx, my, sprintOk);
         meSpeed01 = drib.speed01;
+        const defPos = foeStunSec > 0 || foeFloored ? null : foe.root.position;   // HOOPS-MOVE-KIT-B: the body the post / the spin read
         if (shooting) {   // BIOMECH-HOOPS-WAVE1 G1: the shooter squares to the rim through the meter (he kept the last dribble heading)
           const yaw = slewYaw(me.root.rotation.y, yawTo(me.root.position, RIM), FACE_RIM_RATE, dt); face(me.root, yaw); meDribble.setFacing(yaw);
         }
@@ -591,11 +614,30 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (gather) {
           gather.t += dt;
           driveBody('me', me.root, gatherWish(gather.plan, gather.t), dt);
-          if (gather.t >= gather.plan.sec) { gather = null; beginRise(); }
+          if (gather.t >= gather.plan.sec) {
+            const plan = gather.plan; gather = null;
+            // HOOPS-MOVE-KIT-B wave 2: the footwork gathers (step-through / hop / euro) end IN a finish, where the feet land
+            if (plan.then && plan.then !== 'rise') startFinish(ctx, plan.then, shotContest, defPos, plan.side, plan.sec);
+            else beginRise();
+          }
         }
         if (finish) stepFinish(dt);   // M3: the finish's stride and hop (before and after the release, to feet-down)
-        if (!shooting && !dunking) {
-          if (!finish) { driveBody('me', me.root, meDribble.vel, dt); face(me.root, drib.facingRad); }
+        // HOOPS-MOVE-KIT-B: M6 the pivot owns the body while it turns; otherwise M4–M6's path — L1/LT held with a body to
+        // back down is a POST-UP (the back to the basket, a slow back-down, the stick across = a quick spin out of it)
+        spinCooldown = Math.max(0, spinCooldown - dt);
+        spinArmed = Math.max(0, spinArmed - dt);
+        if (spin) stepSpin(ctx, dt);
+        else if (updatePost(ctx, dt, mx, my, defPos)) { /* the seal owns the stick */ }
+        else if (spinArmed > 0 && spinCooldown <= 0 && carrying && !shooting && !dunking && !finish && !gather) {
+          // M6: off the body I just met, on the swing ACROSS MY PATH — read against the travel, not the body's yaw, which
+          // lags the stick through a turn (a diagonal drive read as a full swing for the few frames the chest was catching
+          // up, and spun on its own: measured on the KIT-A layup scenario)
+          const heading = meDribble.vel.lengthSquared() > 1 ? Math.atan2(meDribble.vel.x, meDribble.vel.z) : me.root.rotation.y;
+          const side = postSpinSide(mx, -my, heading);
+          if (side) { spinArmed = 0; startSpin(ctx, defPos, side); }
+        }
+        if (!shooting && !dunking && !spin) {
+          if (!finish && !posting) { driveBody('me', me.root, meDribble.vel, dt); face(me.root, drib.facingRad); }
           const nearestDef = foeStunSec > 0 ? Infinity : Vector3.Distance(me.root.position, foe.root.position);
           meAnimTree.update({
             speed01: drib.speed01, crossover: drib.crossover, nearestDefender: nearestDef,
@@ -612,8 +654,8 @@ export const OneVOneMode: ModeDefinition = (() => {
           meFootPlant.update(dt);
           // the ball leaves the palm while I carry; a crossover swaps hands
           meCarry?.update(dt, drib.speed01, carrying && !shooting && !dunking && !finish);
-          if (drib.crossover && !finish) meCarry?.switchHand();   // HOOPS-MOVE-KIT-A: no size-up reads inside a finish's hop
-          if (drib.crossover && !finish) {
+          if (drib.crossover && !finish && !posting) meCarry?.switchHand();   // HOOPS-MOVE-KIT-A: no size-up reads inside a finish's hop (KIT-B: nor inside a seal)
+          if (drib.crossover && !finish && !posting) {
             SoundKit.play('whoosh', { pitch: 1.4, volume: 0.4 });
             ctx.feel?.impact?.(0.1);
             if (foeStunSec === 0 && checkAnkleBreak(true, me.root.position, foe.root.position)) {
@@ -632,7 +674,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           // defender was CLOSING on you, they bite and you own the next beat
           // (the controller's explode-out window is already armed). A set
           // defender standing off does NOT bite — that's the read.
-          if (drib.hesitation && !finish) {
+          if (drib.hesitation && !finish && !posting) {
             turbo.t01 = Math.max(0, turbo.t01 - 0.05);
             SoundKit.play('whoosh', { pitch: 0.8, volume: 0.3 });
             ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
@@ -675,7 +717,11 @@ export const OneVOneMode: ModeDefinition = (() => {
           defending: true, bracing: !!foeBrain?.boxing, staggered: false, slideDir: slideDirFor(foe.root.rotation.y, foeVel),   // O2: the seal stance while boxing
         });
         // same standoff fix as the defensive poke: bodies rest ~1.1m apart
-        if (foeStunSec === 0 && carrying && !shooting && !dunking && !finish && !gather && foeIntent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.6) {
+        // HOOPS-MOVE-KIT-B: a SEALED post man cannot be poked from behind — the body is between him and the ball, which is
+        // what the seal is for (the ball is held out on the ball side). Front the post (get on my chest side) and the poke
+        // is live again; a bump strip roll always is.
+        const sealed = posting && facingCos(me.root.rotation.y, me.root.position, foe.root.position) < 0.2;
+        if (foeStunSec === 0 && carrying && !shooting && !dunking && !finish && !gather && !sealed && foeIntent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.6) {
           stripBall(ctx, 'STRIPPED!');   // D2: the ball goes LOOSE from the hand (it used to warp both bodies to the check)
           return;
         }
@@ -689,18 +735,30 @@ export const OneVOneMode: ModeDefinition = (() => {
 
         if (!contact?.isReady && resolveBodyCollision(me.root.position, foe.root.position) && meDribble.vel.lengthSquared() > 9) {
           SoundKit.play('impact', { pitch: 1.1, volume: 0.15 });
+          // HOOPS-MOVE-KIT-B M6 (no-Havok path): I met his body at speed with the ball — the spin is ARMED (the swing of
+          // the stick across throws it). Never with the shot trigger already down: a squeeze is a committed shot.
+          if (carrying && !shooting && !dunking && !finish && !gather && !spin && spinCooldown <= 0 && intent.actionHeld <= 0.02
+            && spinOffContact(meDribble.vel, me.root.position, me.root.rotation.y, defPos)) spinArmed = SPIN_ARM_SEC;
         }
 
         // shot start — drive context first: a hot drive DUNKS instead of metering
-        if (!shooting && !dunking && carrying && meSlot.intent.actionHeld > 0.02) {
+        if (!shooting && !dunking && !spin && carrying && meSlot.intent.actionHeld > 0.02) {
           const defenderPos = foeStunSec > 0 ? null : foe.root.position;
           // A+ P0: the gate measures a 3-D distance and the rim sits 3.05 m up — against RIM itself a floor-bound body can
           // NEVER be inside DUNK_RANGE (2.8 m), so the drive dunk had never fired in play (measured: every squeeze at speed
           // inside 2.6 m of the rim metered a jumper). The range is a floor distance; judge it against the rim's floor point.
-          const kind = checkDriveDunk(me.root.position, meDribble.vel, RIM_FLOOR, turbo.t01, defenderPos);
+          // HOOPS-MOVE-KIT-B M4/M5: with my back to the basket the squeeze is the POST's own shot — the stick pulled off
+          // the rim asks for the FADEAWAY, anything else is the JUMP HOOK. (A sealed body is never fast enough to dunk.)
+          const toRimNow = RIM_FLOOR.subtract(me.root.position); toRimNow.y = 0; toRimNow.normalize();
+          const post: PostShot = posting ? (stickBack01(mx, -my, toRimNow) >= POST_FADE_STICK_MIN ? 'fade' : 'hook') : 'none';
+          const kind = posting ? 'none' : checkDriveDunk(me.root.position, meDribble.vel, RIM_FLOOR, turbo.t01, defenderPos);
           if (kind !== 'none') { startDunk(ctx, kind); }
+          // the FOOTWORK reads the body even when he is frozen: a defender who has just BITTEN a pump is exactly the man you
+          // step through, and passing null there killed every step-through the fake had earned (measured: 0 of 1).
+          else if (!posting && startFootwork(ctx, mx, my, foeFloored ? null : foe.root.position)) { /* M8 / M13 / M14 */ }
           else {
             shooting = true;
+            banked = null;   // M12: each release calls its own glass
             // G6: the live dribble is PARKED — the ball comes back to the palm for the meter and leaves the HAND at the release
             // (the carry's deactivate sat inside the !shooting guard, so the ball stayed at its last bounce point on the floor
             // through the whole meter and the arc started from there — measured ball–hand 1.56 m in the load)
@@ -708,9 +766,10 @@ export const OneVOneMode: ModeDefinition = (() => {
             if (!ball.parent) attachBallToHand(ball, me.skeleton, 'RightHand');
             const contest = contestLevel(me.root.position, defenderPos);
             shotContest = contest;
-            currentShot = classifyShot(me.root.position, meDribble.vel, RIM, contest);
-            // HOOPS-MOVE-KIT-A: a layup / floater is a FINISH (M3); a jumper GATHERS first (M1) — a set body rises at once
-            if (currentShot.style === 'layup' || currentShot.style === 'floater') startFinish(ctx, currentShot.style, contest, defenderPos);
+            currentShot = classifyShot(me.root.position, meDribble.vel, RIM, contest, posting ? post : faceUpRead(defenderPos));
+            // HOOPS-MOVE-KIT-A: a layup / floater is a FINISH (M3); a jumper GATHERS first (M1) — a set body rises at once.
+            // HOOPS-MOVE-KIT-B: the hook (M5) and the fadeaway (M4) are finishes too — their own clip, their own hop.
+            if (currentShot.style === 'layup' || currentShot.style === 'floater' || currentShot.style === 'hook' || currentShot.style === 'fadeaway' || currentShot.style === 'reverse') startFinish(ctx, currentShot.style, contest, defenderPos);
             else startRise(ctx, contest, mx, my);
             aiContestLoad(ctx);   // D1/D3: the AI puts a hand up on the load, or times a block jump to the green
           }
@@ -718,8 +777,11 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (shooting) {
           const t = shotMeter.update(dt);
           ctx.setHud({ shotMeterT: t });
-          if (meSlot.intent.action || t >= 1) releaseJumper(ctx, shotMeter.release());
+          // HOOPS-MOVE-KIT-B M8: let go this early and it is a PUMP FAKE, not a 0.35-pct brick — and he can bite it
+          if (meSlot.intent.action && isPumpFake(t * shotMeter.durationSec) && !finish) { pumpFake(ctx, defPos); }
+          else if (meSlot.intent.action || t >= 1) releaseJumper(ctx, shotMeter.release());
         }
+        pumpWindow = Math.max(0, pumpWindow - dt);
 
         ctx.camDirector.look(lookX, lookY, dt);
         ctx.camDirector.update(me.root.position, meDribble.vel, RIM);
@@ -786,6 +848,13 @@ export const OneVOneMode: ModeDefinition = (() => {
               lastBumpStripAt = performance.now();   // I barrelled into him: one roll per collision, never on a defender bumping ME
               const facing = facingCos(foe.root.rotation.y, foe.root.position, me.root.position);
               if (aiBumpStrips(foeVelLast.length() < 1.0, facing, roll)) { stripBall(ctx, 'STRIPPED ON THE BUMP!'); return; }
+            }
+            // HOOPS-MOVE-KIT-B M6: he did not take it — a drive that MEETS a body still in front of it ARMS the spin
+            if (possession === 'mine' && carrying && !shooting && !dunking && !finish && !gather && !spin && spinCooldown <= 0
+              && meSlot.intent.actionHeld <= 0.02   // a committed squeeze is a shot, never a pivot
+              && (c.attacker === 'me' || c.victim === 'me')
+              && spinOffContact(meDribble.vel, me.root.position, me.root.rotation.y, foeStunSec > 0 || foeFloored ? null : foe.root.position)) {
+              spinArmed = SPIN_ARM_SEC;
             }
           }
         }
@@ -931,6 +1000,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         role: possession === 'mine' ? 'offense' : 'defense', hasBall: possession === 'mine' && carrying, speed01: meSpeed01,
         nearestDefender: foeStunSec > 0 ? Infinity : foeDist, shot: meShotWin, flight: dunkFlight, landed: meLandSec > 0, celebrate: meCelebrateSec > 0,
         reaching: meAnimTree.held === 'bball_steal_reach' || meAnimTree.held === 'bball_block_reach' || meHandUp, staggered: meStunSec > 0 && !meFloored && possession === 'defense', floored: meFloored,
+        posting, spinning: !!spin,   // HOOPS-MOVE-KIT-B: the seal turns the chest AWAY from the rim; the pivot owns it through the turn
       } satisfies HoopsPostureInput);
       Object.assign(foeBio, {
         role: possession === 'mine' ? 'defense' : 'offense', hasBall: possession === 'defense' && defPhase !== 'shot' && defPhase !== 'over' && !loose, speed01: foeSpeed01,
@@ -961,8 +1031,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
-    if (gather || finish) meAnimTree.release();   // HOOPS-MOVE-KIT-A: a held gather / finish beat is lifted with the possession
-    gather = null; finish = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
+    if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
     clearDefense();
     place('foe', foe.root, CHECK_FOE, Math.PI);
     place('me', me.root, CHECK_ME, 0);
@@ -1155,13 +1225,24 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
   /** M3: a layup / floater. The ball into the finishing hand (the side the drive comes from, or away from the defender),
    *  the finish clip paced so its release key (the top of the hop) is the green, the body strides the last step and hops. */
-  function startFinish(ctx: ModeContext, style: FinishStyle, contest: number, defenderPos: Vector3 | null): void {
-    const side = style === 'layup' ? pickLayupSide(me.root.position, RIM_FLOOR, me.root.rotation.y, defenderPos) : 'right';
+  function startFinish(ctx: ModeContext, style: FinishStyle, contest: number, defenderPos: Vector3 | null, sideIn?: 'left' | 'right', preSec = 0): void {
+    // HOOPS-MOVE-KIT-B M5: a hook shoots with the hand AWAY from him (the off shoulder is the shield) — and that shield is
+    // worth something before the ball even leaves: the contest that reaches the meter is cut.
+    // Wave 2: `sideIn` is the hand the FOOTWORK ended on (the euro's crossing hand, the step-through's shoulder) and
+    // `preSec` is the meter that footwork already spent — the clip is paced to what is LEFT before the green.
+    const side = sideIn ?? (style === 'layup' ? pickLayupSide(me.root.position, RIM_FLOOR, me.root.rotation.y, defenderPos)
+      : style === 'hook' ? pickHookSide(me.root.position, RIM_FLOOR, me.root.rotation.y, defenderPos)
+      : style === 'reverse' ? reverseSide(me.root.position, RIM_FLOOR, me.root.rotation.y, meDribble.vel) : 'right');
+    meCarry?.update(0, 0, false);
     attachBallToHand(ball, me.skeleton, side === 'left' ? 'LeftHand' : 'RightHand');
-    shotMeter.start(contest, style);
-    const plan = planFinish(style, side, shotMeter.durationSec, shotMeter.greenCenter01);
+    if (preSec <= 0) shotMeter.start(style === 'hook' ? hookShield(contest) : contest, style);   // a footwork gather already started it
+    // M4: the fade's escape line — off the defender when he is on me, straight off the rim otherwise
+    const plan = planFinish(style, side, shotMeter.durationSec, shotMeter.greenCenter01,
+      style === 'fadeaway' ? postFadeAway(me.root.position, RIM_FLOOR, defenderPos) : undefined, preSec);
     finish = { plan, t: 0, released: false };
-    meShotWin = 'gather'; meShotSec = 0;
+    posting = false;
+    meShotWin = style === 'fadeaway' ? 'fade' : style === 'hook' ? 'hook' : 'gather'; meShotSec = 0;
+    if (style === 'reverse') banked = bankPoint(me.root.position, RIM, BOARD_NORMAL);   // M11/M12: a reverse is laid off the glass
     meAnimTree.beat(plan.clip, { holdEnd: true, fadeSec: 0.06, speedRatio: plan.speedRatio });
     contact?.setAirborne('me', true);
     SoundKit.play('whoosh', { pitch: 1.1, volume: 0.25 });
@@ -1173,15 +1254,192 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (!finish) return;
     finish.t += dt;
     const k = finish.t / finish.plan.hopSec;
-    driveBody('me', me.root, finishStride(finish.plan.style, me.root.position, RIM_FLOOR, finish.released), dt);
+    // HOOPS-MOVE-KIT-B M4: a fadeaway does not stride at the rim — it GIVES GROUND, ballistically, from the push-off to
+    // feet-down (fadeDrift), which is the separation the shot exists to buy.
+    driveBody('me', me.root, finish.plan.style === 'fadeaway' ? fadeDrift(finish.plan) : finishStride(finish.plan.style, me.root.position, RIM_FLOOR, finish.released), dt);
     me.root.position.y = finishHopY(finish.plan.style, k);
     if (k < 1) return;
     me.root.position.y = 0;
+    if (meShotWin === 'fade' || meShotWin === 'hook') { meShotWin = 'follow'; meShotSec = 0; }   // the lean / the sweep holds to feet-down, then the follow-through
     finish = null;
     contact?.setAirborne('me', false);
     meAnimTree.release();   // the landing key → the loop the game asks for
     meDribble.setFacing(me.root.rotation.y);
   }
+  // ── HOOPS-MOVE-KIT-B wave 2 (2026-09-08): M7–M14 ──────────────────────────────────────────────────────────────────
+  /** The FACE-UP read at the squeeze (M7 / M10 / M11): a drive across the rim finishes REVERSE off the glass, a body in
+   *  the way in the paint is a RUNNING HOOK over him, a protected rim is a FLOATER over the length rather than a layup
+   *  driven into a chest. 'none' leaves KIT-A's classifier exactly as it was. */
+  function faceUpRead(defenderPos: Vector3 | null): PostShot {
+    if (isReverseFinish(me.root.position, RIM_FLOOR, meDribble.vel)) return 'reverse';
+    const onMe = defenderPos ? distXZ(me.root.position, defenderPos) : Infinity;
+    // he is on my HIP: hook over him. He is waiting AT the rim: float it over him. Same read, two shots — and the order
+    // matters (with the hook first it took every floater in the paint).
+    if (onMe <= HOOK_ON_ME && runningHook(meDribble.vel, me.root.position, RIM_FLOOR, defenderPos)) return 'hook';
+    // the floater over length only takes shots that were NOT layups: inside the layup band a drive still finishes at the
+    // rim (KIT-A M3 — the contest and the block are what punish driving into a chest, not a silent style swap)
+    if (distXZ(me.root.position, RIM_FLOOR) >= 2.2 && rimProtected(me.root.position, RIM_FLOOR, defenderPos)) return 'floater';
+    return 'none';
+  }
+  /** M8 / M13 / M14: the FOOTWORK squeezes — a step-through inside the pump window, a euro when the stick sells a side
+   *  against help, a hop step off an explosive gather. Each is a GatherPlan with real legs that ends IN a finish; the
+   *  meter runs through the footwork exactly as it runs through the pull-up's plant. Returns whether one took the squeeze. */
+  function startFootwork(ctx: ModeContext, mx: number, my: number, defenderPos: Vector3 | null): boolean {
+    const contest = contestLevel(me.root.position, defenderPos);
+    const yaw = me.root.rotation.y;
+    const dist = distXZ(me.root.position, RIM_FLOOR);
+    let plan: GatherPlan | null = null;
+    if (pumpWindow > 0 && defenderPos && dist < 5.4) plan = planStepThrough(me.root.position, RIM_FLOOR, yaw, defenderPos);   // M8
+    else if (euroAvailable(meDribble.vel, me.root.position, RIM_FLOOR, defenderPos)) {                                        // M14
+      const sell = euroSell(mx, -my, yaw);
+      if (sell) plan = planEuro(me.root.position, RIM_FLOOR, yaw, sell, rimProtected(me.root.position, RIM_FLOOR, defenderPos) ? 'floater' : 'layup');
+    }
+    // M13: the explosive two-foot gather. The face-up READS beat it — a body on my hip is a hook over him, a body sitting
+    // at the rim is a floater over him, a drive across the rim is a reverse — because hopping into a chest is not a move.
+    // With none of those on, an explosive squeeze is a HOP STEP. (Without this order the hop swallowed every driving
+    // squeeze at full stick: 5 of 5 running-hook attempts; with the order inverted it never fired at all in 1v1, where
+    // the on-ball defender is on the line the whole way.)
+    const read = faceUpRead(defenderPos);
+    const onMeNow = defenderPos ? distXZ(me.root.position, defenderPos) : Infinity;
+    const hopBeaten = read === 'reverse' || read === 'floater' || (read === 'hook' && onMeNow <= HOOK_ON_ME);
+    // … and a stick pulled AWAY from the rim is asking for a STEP-BACK (KIT-A M1) or a FADE, never a hop: a hop step goes
+    // forward by definition (measured: the KIT-A step-back scenario came out HOP STEP in 3v3).
+    const toRimNow = new Vector3(RIM_FLOOR.x - me.root.position.x, 0, RIM_FLOOR.z - me.root.position.z).normalize();
+    const pullingBack = stickBack01(mx, -my, toRimNow) >= STEPBACK_STICK_BACK_MIN;
+    if (!plan && !hopBeaten && !pullingBack && meSlot.intent.sprint && dist < HOP_RANGE && meDribble.vel.length() > 2.0) {
+      plan = planHopStep(meDribble.vel, me.root.position, RIM_FLOOR, dist < 2.8 ? 'layup' : 'rise');
+    }
+    if (!plan) return false;
+    shooting = true;
+    shotContest = contest;
+    pumpWindow = 0;
+    meCarry?.update(0, 0, false);
+    if (!ball.parent) attachBallToHand(ball, me.skeleton, 'RightHand');
+    currentShot = plan.then === 'rise' ? classifyShot(me.root.position, meDribble.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : 1.18 };
+    shotMeter.start(contest, currentShot.style, plan.sec);
+    gather = { plan, t: 0 };
+    meShotWin = 'footwork'; meShotSec = 0;
+    const clip = plan.kind === 'stepthrough' ? 'bball_step_through' : plan.kind === 'hop' ? 'bball_hop_step' : 'bball_euro_step';
+    const clipSec = me.animator.durationOf(clip) ?? plan.sec;
+    meAnimTree.beat(clip, { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });
+    SoundKit.play('whoosh', { pitch: 1.15, volume: 0.3 });
+    ctx.setHud({ shotType: gatherLabel(plan.kind, currentShot.label) });
+    console.info(`[1V1-MOVE] footwork ${plan.kind} ${plan.sec.toFixed(2)} s → ${plan.then} ${plan.side ?? ''} travel ${gatherTravel(plan).toFixed(2)} m`);
+    aiContestLoad(ctx);
+    return true;
+  }
+  /** M8: the PUMP FAKE — the trigger came up before the meter had run PUMP_MAX_SEC. The ball goes back to the chest, the
+   *  shot is off, and a contesting body inside range can LEAVE ITS FEET (he bit) — which opens the step-through window. */
+  function pumpFake(ctx: ModeContext, defPos: Vector3 | null): void {
+    shooting = false; gather = null; currentShot = null;
+    shotMeter.active = false;
+    meShotWin = 'pump'; meShotSec = 0;
+    pumpWindow = STEP_THROUGH_SEC;
+    meAnimTree.beat('bball_pump_fake', { fadeSec: 0.06 });
+    SoundKit.play('whoosh', { pitch: 1.3, volume: 0.25 });
+    const bit = !!defPos && foeStunSec === 0 && !foeFloored && distXZ(me.root.position, defPos) <= PUMP_BITE_RANGE && roll() < PUMP_BITE_CHANCE;
+    if (bit) {
+      foeStunSec = PUMP_BITE_STUN;
+      foeAnimTree.beat('bball_block_reach');
+      if (contact?.isReady) contact.hop('foe', JUMP_VY);
+      SoundKit.play('whoosh', { pitch: 0.9, volume: 0.4 });
+    }
+    ctx.setHud({ shotType: '', shotMeterT: 0 });
+    bannerFlash(ctx, bit ? 'HE BIT THE PUMP!' : 'PUMP FAKE', 500);
+    console.info(`[1V1-MOVE] pump fake bit ${bit}`);
+  }
+
+  // ── HOOPS-MOVE-KIT-B (2026-09-08): M4–M6's path (the seal) and M6 (the pivot) ──────────────────────────────────────
+  /** The POST-UP: L1/LT held with a body to back down inside the post band seals him — the BACK to the basket (the chest
+   *  turned away, slewed), the authored seal HELD, and the stick becomes a slow back-down / a shuffle along the lane
+   *  (postWish) instead of a drive. Swing the stick ACROSS the body and it is a quick spin off his shoulder (M6). */
+  function updatePost(ctx: ModeContext, dt: number, mx: number, my: number, defPos: Vector3 | null): boolean {
+    const plant = !!meSlot.intent.brace && carrying && !shooting && !dunking && !finish && !gather;
+    // HOOPS-MOVE-KIT-B M9: L1 is PLANT YOUR FOOT. With a body to back down inside the band it is the post seal (M4–M6);
+    // anywhere else it is TRIPLE THREAT — the feet stop and the stick swung across turns you on the planted foot (a front
+    // pivot opens to the stick; swung across AND back it is a reverse pivot, through your own back). No travel either way.
+    const want = plant && canPostUp(me.root.position, RIM_FLOOR, defPos);
+    if (plant && !want) {
+      if (posting) { posting = false; meAnimTree.releaseHold(); }
+      if (meDribble.vel.length() < PIVOT_MAX_SPEED && spinCooldown <= 0) {
+        const pv = pivotFrom(mx, -my, me.root.rotation.y);
+        if (pv) { startSpin(ctx, defPos, pv.side, pv); return true; }
+      }
+      meDribble.vel.scaleInPlace(0);   // the plant foot is down: a triple-threat body does not drift
+      return true;
+    }
+    if (want !== posting) {
+      posting = want;
+      if (posting) { meAnimTree.hold('bball_post_up', { fadeSec: 0.12 }); SoundKit.play('whoosh', { pitch: 0.7, volume: 0.2 }); console.info('[1V1-MOVE] post up'); }
+      else meAnimTree.releaseHold();
+    }
+    if (!posting) return false;
+    // the stick swung across the body out of the seal is the QUICK SPIN (M6)
+    // the quick spin is read against the LANE (the post's own facing), not the body's transient yaw: through the turn-around
+    // into the seal the live yaw sweeps past perpendicular, and a stick held straight at the rim read as fully lateral
+    // there — every back-down fired a spin one frame in (measured). And a seal that has not settled cannot spin out of
+    // itself yet.
+    const seal = postYaw(me.root.position, RIM_FLOOR);
+    const settled = Math.abs(Math.atan2(Math.sin(me.root.rotation.y - seal), Math.cos(me.root.rotation.y - seal))) < 0.6;
+    const side = postSpinSide(mx, -my, seal);
+    if (settled && side && spinCooldown <= 0) { startSpin(ctx, defPos, side); return true; }
+    const yaw = slewYaw(me.root.rotation.y, seal, FACE_RIM_RATE, dt);
+    face(me.root, yaw); meDribble.setFacing(yaw);
+    const toRim = RIM_FLOOR.subtract(me.root.position); toRim.y = 0; toRim.normalize();
+    const wish = postWish(mx, -my, toRim);
+    // the movement layer keeps ramping toward the stick while the seal holds it to a back-down — let go of L1 at full
+    // stick and the stored 6 m/s would fire the body out of the post on the frame. The seal IS the velocity.
+    meDribble.vel.copyFrom(wish);
+    driveBody('me', me.root, wish, dt);
+    return true;
+  }
+  /** M6: the SPIN. The foot plants on his side and the body swings a full turn around it (an eased, monotonic pivot — never
+   *  a snap) while the root ARCS around that foot and carries out the far side on the exit line; the exit hands the drive
+   *  its speed back, so the move ends IN a finish rather than in a standstill. */
+  function startSpin(ctx: ModeContext, defPos: Vector3 | null, side?: 'left' | 'right', pivotRead?: { side: 'left' | 'right'; reverse: boolean }): void {
+    if (spin || shooting || dunking || finish || gather) return;
+    // M9: a PIVOT is the same machinery with a shorter sweep and NO travel — the planted foot never moves
+    const plan = pivotRead ? planPivot(me.root.position, me.root.rotation.y, pivotRead.side, pivotRead.reverse)
+      : planSpin(me.root.position, me.root.rotation.y, RIM_FLOOR, defPos, side);
+    spin = { plan, t: 0, beat: !!pivotRead };   // a pivot has no shoulder-clear beat: nobody was beaten
+    spinClip = pivotRead ? 'bball_pivot' : 'bball_spin';
+    spinCooldown = SPIN_COOLDOWN_SEC;
+    if (posting) { posting = false; }
+    meCarry?.update(0, 0, false);   // the ball comes into the hands for the turn (the clip holds it at the chest)
+    if (!ball.parent) attachBallToHand(ball, me.skeleton, 'RightHand');
+    const clipSec = me.animator.durationOf(spinClip) ?? plan.sec;
+    meAnimTree.beat(spinClip, { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });
+    SoundKit.play('whoosh', { pitch: pivotRead ? 0.95 : 1.25, volume: pivotRead ? 0.2 : 0.35 });
+    if (pivotRead) bannerFlash(ctx, pivotRead.reverse ? 'REVERSE PIVOT' : 'PIVOT', 400);
+    console.info(`[1V1-MOVE] ${pivotRead ? (pivotRead.reverse ? 'reverse pivot' : 'front pivot') : 'spin'} ${plan.side} yaw ${plan.yaw0.toFixed(2)} sweep ${(plan.sweep * 180 / Math.PI).toFixed(0)}°`);
+  }
+  function stepSpin(ctx: ModeContext, dt: number): void {
+    if (!spin) return;
+    spin.t += dt;
+    const t = Math.min(spin.t, spin.plan.sec);
+    const target = spinPos(spin.plan, t);
+    const to = new Vector3(target.x - me.root.position.x, 0, target.z - me.root.position.z);
+    driveBody('me', me.root, dt > 1e-4 ? to.scale(1 / dt) : to, dt);   // the arc as a velocity: physics and the kinematic path agree
+    face(me.root, spinYaw(spin.plan, t));
+    if (!spin.beat && t >= spin.plan.sec * SPIN_BEAT_K) {
+      spin.beat = true;
+      ctx.feel?.impact?.(0.22); ctx.juice.shake(0.05, 90);
+      SoundKit.play('whoosh', { pitch: 0.85, volume: 0.45 });
+      const beaten = foeStunSec === 0 && !foeFloored && Vector3.Distance(me.root.position, foe.root.position) <= SPIN_TRIGGER_RANGE + 0.5;
+      if (beaten) { foeStunSec = SPIN_STUN_SEC; foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); }
+      bannerFlash(ctx, beaten ? 'SPIN — BEAT HIM!' : 'SPIN!', 500);
+      console.info(`[1V1-MOVE] spin shoulder clear beaten ${beaten}`);
+    }
+    if (spin.t < spin.plan.sec) return;
+    const exitYaw = Math.atan2(spin.plan.exit.x, spin.plan.exit.z);
+    face(me.root, exitYaw);
+    meDribble.setFacing(exitYaw);
+    // M6 the spin comes out INTO the drive; M9 a pivot is a turn in place — it hands nothing back, the feet are still set
+    meDribble.vel.copyFrom(spinClip === 'bball_pivot' ? new Vector3(0, 0, 0) : spin.plan.exit.scale(SPIN_EXIT_SPEED));
+    spin = null;
+    meAnimTree.release();
+  }
+
   /** M2: a hard hit on the floor READS on the body that took it (the solver already bleeds the runner's momentum) — never on
    *  a body the dunk's own bump is handling, never on a floored one, never on a body inside a held beat (the follow-through,
    *  a reach: a react cut the held follow-through, measured). */
@@ -1246,7 +1504,12 @@ export const OneVOneMode: ModeDefinition = (() => {
     const foeUp = foeHandUp || foeBlockJumpAge <= HAND_UP_SEC;
     const ground = foeStunSec > 0 || foeFloored ? 0 : groundContest(foeDist, foeFacing, foeHandUp);
     shotContest = Math.min(1, handUpContest(contestLevel(me.root.position, foeStunSec > 0 ? null : foe.root.position), foeBlockJumpAge) + ground);
-    const pct = contestedPct(SHOT_QUALITY_PCT[quality] * pctMod * mbus.multiplier(), shotContest);
+    // HOOPS-MOVE-KIT-B M5: the shielding shoulder is between him and the ball — the hand that gets there is worth less
+    if (currentShot?.style === 'hook') shotContest = hookShield(shotContest);
+    // M12: CALLED GLASS — R1 held inside the band routes the ball through the square, and a bank from there is a real edge
+    if (!banked && meSlot.intent.glass && inBankBand(me.root.position, RIM_FLOOR, BOARD_NORMAL)) banked = bankPoint(me.root.position, RIM, BOARD_NORMAL);
+    if (banked) console.info(`[1V1-MOVE] called glass at ${banked.x.toFixed(2)}, ${banked.y.toFixed(2)}, ${banked.z.toFixed(2)}`);
+    const pct = contestedPct(SHOT_QUALITY_PCT[quality] * pctMod * mbus.multiplier(), shotContest) + (banked ? BANK_PCT_BONUS : 0);
     arcPoints = isThree(me.root.position, RIM) ? 3 : 2;
     arcLabel = currentShot?.label ?? 'SHOT';
     const made = Math.random() < Math.min(0.98, pct);
@@ -1255,7 +1518,11 @@ export const OneVOneMode: ModeDefinition = (() => {
     console.info(`[1V1-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} handUp ${foeHandUp} jump ${foeBlockJumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)}`);
     if (blockChance > 0 && roll() < blockChance) { blockedShot(ctx); return; }
     releaseBall(ball);
-    meShotWin = 'release'; meShotSec = 0;   // BIOMECH-HOOPS-WAVE1: release → follow-through until the arc resolves
+    // BIOMECH-HOOPS-WAVE1: release → follow-through until the arc resolves. HOOPS-MOVE-KIT-B: a fade / a hook keeps its
+    // OWN window to feet-down (the release stance would stand the lean back up mid-air, which is the shot).
+    meShotWin = finish && (finish.plan.style === 'fadeaway' || finish.plan.style === 'hook')
+      ? (finish.plan.style === 'fadeaway' ? 'fade' : 'hook') : 'release';
+    meShotSec = 0;
     gather = null;   // HOOPS-MOVE-KIT-A M1: a release inside the gather is a rushed shot — the plant stops where it is
     // The jumpshot was HELD by the tree (meter-paced from shot start) up to its release frame (both arms overhead). The
     // authored FOLLOW-THROUGH takes it from there (its first key matches that frame, so the crossfade is a continuation):
@@ -1270,7 +1537,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     // the arc resolves. Quality word + contest tag: an early contested
     // fadeaway that rims out was legible as a bad shot before it landed.
     // Before this, only a perfect release said anything at all.
-    const tag = shotContest >= 0.5 ? ' — CONTESTED' : shotContest <= 0.15 ? ' — WIDE OPEN' : '';
+    const tag = (shotContest >= 0.5 ? ' — CONTESTED' : shotContest <= 0.15 ? ' — WIDE OPEN' : '') + (banked ? ' — OFF THE GLASS' : '');
     if (quality === 'perfect') {
       SoundKit.play('uiTick', { pitch: 1.5, volume: 0.4 });
       SoundKit.play('crowdCheer', { volume: 0.35 });
@@ -1286,7 +1553,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     }
     if (!made) swing('miss');
     carrying = false;
-    arc.start(ball.getAbsolutePosition(), RIM, made, currentShot?.style ?? 'jumper', alteredApex(shotContest));   // D3: a strong contest ALTERS the release
+    arc.start(ball.getAbsolutePosition(), RIM, made, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked);   // D3: a strong contest ALTERS the release; M12: the glass
     // O2: the shot is up — the rival SEALS me (the box-out between me and the rim, his chest on me) until the ball comes down
     if (foeStunSec === 0 && !foeFloored && distXZ(foe.root.position, RIM_FLOOR) < BOX_OUT_RANGE) { foeBrain?.boxOut(me.root.position); console.info('[1V1-OFF] box out (the rival seals me)'); }
   }
