@@ -25,6 +25,21 @@ import { resolveLanding, BalanceSave, SKETCHY_SCORE_MULT } from '../core/Landing
 import { BalanceChannel, tryRevert } from '../core/GrindManual';
 import { ComboChain } from '../core/ComboChain';
 import { BoardAnimTree } from '../anim/boardTree';
+// BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the board family (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Measured on
+// 2942860, per rendered frame:
+//   G1/G5  boardSuite's clips key the hips, the legs and the arms and never the thoracic chain or the head, so the
+//          rider's chest sat wherever the last carve left it and his eyes pointed down the ROOT yaw for a whole run —
+//          on a board sport there is no objective to look at, so nobody had ever given him one. The Posture Poses
+//          layer now carries the chest / shoulders / head per ride window, with the eyes on a point 7 m DOWN THE LINE.
+//   G6     the lean was real (GroundRide rolls the root toward −steer·0.28; the before run peaks at 14.4°) but it is
+//          SPEED-BLIND and it reads the RAW STICK, while the carve CLIP is chosen from `move.balance.lean` — two
+//          independent signals for one move. The roll now comes off the same lean the tree reads, scaled by speed
+//          (BoardPosture.boardBank). On skate the two signals already agreed closely and the measured roll barely
+//          moves (11/220 carve-clip frames upright before, 11/212 after, peak 14.4° → 12.8°); the gain here is that
+//          the body and the clip can no longer disagree. Surf, whose cutback had no stick under it at all, is where
+//          the number moves (25/146 → 7/145) — see SurfBreakMode.
+import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
 import { MomentumBus } from '../core/MomentumBus';
 import { BoardSync } from '../core/BoardPhysics';
 import { GoalTracker, MovingRail, SKATE_GOALS } from '../core/ParkGoals';
@@ -78,6 +93,8 @@ export const SkateRunMode: ModeDefinition = (() => {
   const combo = new ComboChain();
   const mbus = new MomentumBus();
   let animTree: InstanceType<typeof BoardAnimTree>;
+  let posture: { layer: PostureLayer; dispose(): void } | null = null;
+  const bio: BoardPostureInput = { ...BOARD_INPUT_IDLE };
   let boardSync: BoardSync;
   let grindCh: BalanceChannel | null = null;
   let manualCh: BalanceChannel | null = null;
@@ -142,6 +159,19 @@ export const SkateRunMode: ModeDefinition = (() => {
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -16), 0, world.ground, '#22d3ee', 'skateboard', { carveAccel: 0 });
       rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true });
       animTree = new BoardAnimTree(rig.char.animator);
+      posture?.dispose();
+      posture = mountPostureLayer(ctx.scene, rig.char.skeleton, rig.char.root, () => {
+        const { window, pose, legs } = boardPose(bio);
+        // G1 on a board sport: the "objective" is where the board is TAKING you. 7 m down the current heading at head
+        // height — the chest squares to it and the eyes go with it.
+        const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5);
+        const at = new Vector3(la.x, la.y, la.z);
+        return { pose, legs, aim: at, eyes: at, window };
+      }, 'SKATE-PP');
+      if (process.env.NODE_ENV === 'development') {
+        const dev = (window as unknown as { __FEL_DEV__?: { boardPosture?: unknown } }).__FEL_DEV__;
+        if (dev) dev.boardPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), aim: () => { const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5); return la; } };   // BIOMECH-WAVE2 probes
+      }
       boardSync = new BoardSync(rig.board, rig.char.root);
       mbus.reset();
       goals = new GoalTracker(SKATE_GOALS);
@@ -395,6 +425,20 @@ export const SkateRunMode: ModeDefinition = (() => {
       mbus.update(dt);
 
       // ── animation tree ──
+      // BIOMECH-WAVE2: one object, two consumers — the tree picks the clip, the posture layer picks the body under it,
+      // so the clip and the chest can never disagree about which window the rider is in.
+      bio.speed01 = move.speed01; bio.pushing = pushing; bio.lean = move.balance.lean;
+      bio.airborne = !rig.rider.grounded || (air.state.airborne && air.state.airtime > 0.15);
+      bio.grabHeld = !!air.state.grabHeld;
+      bio.flipping = Math.abs(air.state.angularVel.z) > 1; bio.spinning = Math.abs(air.state.angularVel.y) > 1;
+      bio.grinding = rig.rider.grinding !== null; bio.manual = manualCh?.active ?? false;
+      bio.landing = landingBeatT > 0 && lastLanding !== 'none'; bio.bailing = bailBeatT > 0; bio.tucking = false;
+      // G6: the roll comes off the SAME lean the clip does, scaled by speed — the stick-fed 16° that banked a parked
+      // rider (and left a carving one upright) is layered over here, the way the yaw already is
+      if (!bio.airborne && !bio.bailing) {
+        const want = boardBank(move.balance.lean, move.speed01);
+        rig.char.root.rotation.z += (want - rig.char.root.rotation.z) * Math.min(1, 10 * dt);
+      }
       animTree.update({
         speed01: move.speed01, pushing, lean: move.balance.lean,
         // the touchdown is graded one frame AFTER the rider re-grounds (rider.update runs after the grading block), so
@@ -492,6 +536,6 @@ export const SkateRunMode: ModeDefinition = (() => {
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, null);
     },
 
-    dispose() { propsGone = true; props?.dispose(); props = null; rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },
   };
 })();

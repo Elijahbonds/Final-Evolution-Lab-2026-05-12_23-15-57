@@ -23,6 +23,15 @@
 // arms are out as a counterweight, turning is a LEAN rather than a step, and
 // air is a tuck.
 //
+// OPEN (BIOMECH-WAVE2, 2026-09-09 — flagged, NOT fixed here). The `*ForeArm` keys in this suite do not bend an elbow.
+// A clipBuilder key rotates a bone about its PARENT's bind axes, and on this rig the upper arm's bind X is (near) the
+// arm's own long axis — so `LeftForeArm: [.., 34, 0, 0]` is a TWIST, not flexion. Measured live off the rig, per
+// rendered frame: the elbow holds 169–170° through board_ride_idle (whose keys ask for 34° / 38°), board_tuck and
+// board_push, and by the dunk probe's own T test that reads as a T-pose for 123/1053 skate frames and 158/977 surf
+// frames. The arms being OUT is correct for a rider; both elbows locked straight is not. karate.ts hit exactly this and
+// the fix was to stop keying arm Eulers and author HAND TARGETS instead (buildPoseClip solves the chain on the live
+// rig). Re-authoring this suite on pose targets is its own pass: it is shared by skate, surf, snowboard and big air.
+//
 // But the thing that reads first, before any of that, is that a rider stands
 // ACROSS the deck. Feet point along the board, hips and shoulders square to it,
 // and the head turns back over the leading shoulder to look down the line. The

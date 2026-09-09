@@ -21,6 +21,20 @@ import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { CoinField } from '../core/Pickups';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
+// BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the rush (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Measured on 2942860:
+//   G4/G5  this mode had NO ANIMATION OWNER. It played clips from five places — a per-frame
+//          `animator.play(footballCarryRun, { loop: true })` inside update(), the dodge one-shot, the truck, the tackle
+//          and the touchdown celebrate — and CharacterAnimator only dedupes the SAME clip, so the per-frame carry run
+//          cut every one-shot on the next frame. The TOUCHDOWN SPIKE never played at all (one frame, then the carry
+//          run, then `newDrive` reset the body on the same frame). A `FootballAnimTree` had been written and
+//          unit-tested since Mode 4 Phase 8 and was never wired in; it is the one owner now, and the score HOLDS.
+//   G3     a juke TELEPORTED the runner 3.2 m sideways in the frame the button went down (`root.position.x += d.dx`)
+//          while the juke clip played a body that never went anywhere. The cut is a slide over the move's own window.
+//   G1/G5  nothing touched the thoracic chain or the head: a runner reading a front never looked at the man in front
+//          of him. The Posture Poses layer carries the body per window, eyes on the nearest defender inside 9 m.
+import { FootballAnimTree, type FootballAnimInput } from '../anim/footballTree';
+import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { footballWindow, runPose, FOOTBALL_INPUT_IDLE, type FootballPostureInput } from '../core/RunPosture';
 import { assertSpawned } from '../core/FrameGuard';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -75,6 +89,17 @@ export const FootballRushMode: ModeDefinition = (() => {
     driveLog.push({ name: `DRIVE ${drive}`, score: driveYards, line: `${result} · ${driveEvades} EVADES` });
   }
   let iframeSec = 0, dodging = false, ended = false;
+  /** BIOMECH-WAVE2: the ONE owner of the runner's clips, plus the beats the mode latches for it. */
+  let animTree: FootballAnimTree | null = null;
+  let move: 'juke' | 'spin' | 'stiffArm' | null = null, moveClip = '', moveUntil = 0;
+  /** The juke's lateral cut, run as a SLIDE over the move's window instead of a one-frame teleport. */
+  let cutFrom = 0, cutTo = 0, cutT = 0, cutSec = 0;
+  const MOVE_SEC = 0.5;
+  /** The touchdown holds: the spike is the mode's biggest end pose and the drive used to reset on the same frame. */
+  const TD_HOLD_SEC = 1.4;
+  let tdPending = false, celebrateUntil = 0;
+  let posture: { layer: PostureLayer; dispose(): void } | null = null;
+  const bio: FootballPostureInput = { ...FOOTBALL_INPUT_IDLE };
   /** HUMAN-READY-HYGIENE (2026-09-07): tackled → DOWN until the reset. The runner kept running at full speed for the 1 s
    *  between the tackle and the pre-snap reset (measured: +7 m, 6 free yards a down, the fall clip cut by the run loop one
    *  frame later) and then jogged ON THE SPOT at the line through the whole pre-snap read (left foot 5 m in 1.4 s, root 0). */
@@ -213,6 +238,37 @@ export const FootballRushMode: ModeDefinition = (() => {
     console.info('[FB-JUICE] td punch');
   }
 
+  /** Eight metres down his own line, at chest height — where the carrier is RUNNING. */
+  function lineAhead(): Vector3 {
+    return runner.root.position.add(new Vector3(Math.sin(runner.root.rotation.y) * 8, 1.4, Math.cos(runner.root.rotation.y) * 8));
+  }
+  /** The man he has to beat: the nearest defender inside 9 m, at chest height. Null out of range — then the eyes go
+   *  down his own line instead (a runner in space looks where he is running, not back at the pursuit). */
+  function threat(): Vector3 | null {
+    let best: Mob | null = null, bd = Infinity;
+    for (const m of defenders) { const d = Vector3.Distance(m.char.root.position, runner.root.position); if (d < bd) { bd = d; best = m; } }
+    return best && bd <= 9 ? best.char.root.position.add(new Vector3(0, 1.35, 0)) : null;
+  }
+
+  /** BIOMECH-WAVE2: one read of the play, two consumers — the tree picks the clip, the Posture Poses layer picks the
+   *  body under it. Called once per frame in EVERY phase (the pre-snap read included, which is where the runner used
+   *  to jog on the spot). */
+  function drive3D(speed01: number, trucking: boolean): void {
+    const t = performance.now();
+    if (move && t > moveUntil) { move = null; dodging = false; }   // a move the tree never settled (safety)
+    const celebrating = t < celebrateUntil;
+    bio.presnap = preSnap; bio.speed01 = speed01;
+    bio.move = move === 'spin' ? 'spin' : move === 'stiffArm' ? 'hurdle' : move === 'juke' ? 'juke' : null;
+    bio.trucking = trucking; bio.downed = downed; bio.celebrating = celebrating;
+    const input: FootballAnimInput = {
+      presnap: preSnap, snapped: !preSnap, isQB: false, droppingBack: false, throwing: false,
+      runningRoute: false, carrying: !preSnap && !downed && speed01 > 0.15,
+      move, moveClip: move ? moveClip : undefined, catching: 'none',
+      beingTackled: downed, blocking: false, rushing: false, celebrating,
+    };
+    animTree?.update(input);
+  }
+
   function newDrive(ctx: ModeContext, banner: string): void {
     down = 1; toGo = 10;
     lineOfScrimmage = 0; yards = 0; driveEvades = 0; breakawaySec = 0;
@@ -222,7 +278,8 @@ export const FootballRushMode: ModeDefinition = (() => {
     preSnap = true; preSnapT = 0; downed = false;
     runner.root.position.set(0, 0, 0);
     runner.root.rotation.y = 0;
-    runner.animator.play(SPORT_CLIP.idle, { loop: true });
+    move = null; moveUntil = 0; cutSec = 0; celebrateUntil = 0; tdPending = false;
+    animTree?.reset();   // the tree is the one owner: the pre-snap idle is a WINDOW, not a play() from here
     ctx.camDirector.snapTo(runner.root.position, runner.root.position.add(new Vector3(0, 0, 12)));
     driveYards = 0;
     ctx.setHud({ down, toGo, banner, breakaway: false, truckReady: true, drive: `${drive}/${DRIVES}`, board: driveLog.length ? driveLog : null, boardTitle: driveLog.length ? `DRIVE ${drive} / ${DRIVES}` : '', ballOn: 0, los: 0, firstDown: 10, fieldLen: Math.round(FIELD_LENGTH / YARD) });
@@ -248,6 +305,21 @@ export const FootballRushMode: ModeDefinition = (() => {
       installSafePlay(runner.animator, 'football');
       ctx.groundLock?.track(runner.root, runner.skeleton);
       ctx.heroRef.current = runner.root;
+      animTree = new FootballAnimTree(runner.animator);
+      animTree.onSettle = (st) => { if (st === 'juke' || st === 'spin' || st === 'stiff_arm') { move = null; dodging = false; } };
+      posture?.dispose();
+      posture = mountPostureLayer(ctx.scene, runner.skeleton, runner.root, () => {
+        const { window, pose, legs } = runPose(footballWindow(bio));
+        // G1 for the run family is the LINE (SPEC-FEL-BIOMECH-GAMEWIDE: "football / freerun / boards — G1 = fall line").
+        // The chest squares to where he is running; the EYES go to the man he has to beat. Aiming the chest at a
+        // defender off to the side instead turned the carrier's shoulders across his own line — measured, 77/513 carry
+        // frames within 30° of it.
+        return { pose, legs, aim: lineAhead(), eyes: threat() ?? lineAhead(), window };
+      }, 'FB-PP');
+      if (process.env.NODE_ENV === 'development') {
+        const dev = (window as unknown as { __FEL_DEV__?: { runPosture?: unknown } }).__FEL_DEV__;
+        if (dev) dev.runPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), tree: () => animTree?.state ?? null, aim: () => { const t = lineAhead(); return { x: t.x, y: t.y, z: t.z }; }, eyes: () => { const t = threat() ?? lineAhead(); return { x: t.x, y: t.y, z: t.z }; } };   // BIOMECH-WAVE2 probes
+      }
       defenders = []; pool = new MobPool();
       score = 0; evades = 0; trucks = 0; ended = false; iframeSec = 0; dodging = false; downed = false; drive = 1;
       driveEvades = 0; breakawaySec = 0; truckSec = 0; truckCooldown = 0;
@@ -287,8 +359,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         truckCooldown = TRUCK_COOLDOWN_SEC;
         truckLatch = false;                       // A+ P0: a fresh window gets one break punch
         SoundKit.play('powerUp', { pitch: 0.8, volume: 0.4 });
-        runner.animator.play(SPORT_CLIP.footballCarryRun, { loop: true });
-        ctx.setHud({ truckReady: false, banner: 'TRUCK!' });
+        ctx.setHud({ truckReady: false, banner: 'TRUCK!' });   // the tree reads truckSec — it never needed a play() here
         setTimeout(() => ctx.setHud({ banner: '' }), 400);
       }
 
@@ -299,8 +370,17 @@ export const FootballRushMode: ModeDefinition = (() => {
         iframeSec = d.iframes;
         lastDodgeType = e.btn === 'B' ? 'spin' : e.btn === 'A' ? 'hurdle' : 'juke';
         SoundKit.play('whoosh', { pitch: 1.15 });
-        runner.animator.play(SPORT_CLIP[d.gesture], { onEnd: () => { dodging = false; } });
-        if (d.dx) runner.root.position.x = Math.max(-FIELD_HALF_X, Math.min(FIELD_HALF_X, runner.root.position.x + d.dx));
+        // the tree plays it (its settle ends the dodge); A = the hurdle, which has no lateral cut and rides the
+        // 'stiffArm' slot's own clip through moveClip
+        move = e.btn === 'B' ? 'spin' : e.btn === 'A' ? 'stiffArm' : 'juke';
+        moveClip = SPORT_CLIP[d.gesture]; moveUntil = performance.now() + MOVE_SEC * 1000;
+        if (d.dx) {
+          // G3: the cut is a SLIDE across the move's own window. It used to be `position.x += 3.2` in the frame the
+          // button went down — the runner arrived a lane over before the juke clip had played a single frame.
+          cutFrom = runner.root.position.x;
+          cutTo = Math.max(-FIELD_HALF_X, Math.min(FIELD_HALF_X, runner.root.position.x + d.dx));
+          cutT = 0; cutSec = MOVE_SEC * 0.7;
+        }
         ctx.feel?.impact?.(0.12);
       }
     },
@@ -317,6 +397,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           if (preSnapT < 0.1) ctx.setHud({ hint: 'SHOWING BLITZ — snap into it, or wait him out' });
         }
         if (preSnapT >= PRESNAP_AUTOSNAP_SEC) snap(ctx);
+        drive3D(0, false);   // the tree runs every phase: SET at the line is a window, not the absence of one
         ctx.camDirector.look(lookX, lookY, dt);   // read the front from the R stick
         ctx.camDirector.update(runner.root.position, Vector3.Zero(), null);
         return;
@@ -331,19 +412,26 @@ export const FootballRushMode: ModeDefinition = (() => {
 
       const boost = breakawaySec > 0 ? BREAKAWAY_SPEED_MULT : 1;
       const trucking = truckSec > 0;
-      const speed = downed ? 0 : (5.5 + Math.max(0, -stickY) * 2.5) * boost * (trucking ? 1.08 : 1);
+      const held = downed || tdPending;   // a scored runner HOLDS the spike; he does not keep running out of the end zone
+      const speed = held ? 0 : (5.5 + Math.max(0, -stickY) * 2.5) * boost * (trucking ? 1.08 : 1);
       // lowered shoulder = committed line: lateral control drops while trucking
-      const vel = downed ? Vector3.Zero() : new Vector3(stickX * (trucking ? 2 : 5) * boost, 0, speed);
+      const vel = held ? Vector3.Zero() : new Vector3(stickX * (trucking ? 2 : 5) * boost, 0, speed);
       runner.root.position.addInPlace(vel.scale(dt));
+      // G3: the juke's lateral cut rides its own window (it was a one-frame 3.2 m teleport)
+      if (cutSec > 0) {
+        cutT = Math.min(cutSec, cutT + dt);
+        const k = cutT / cutSec, e = 1 - (1 - k) * (1 - k);
+        runner.root.position.x = cutFrom + (cutTo - cutFrom) * e;
+        if (cutT >= cutSec) cutSec = 0;
+      }
       runner.root.position.x = Math.max(-FIELD_HALF_X, Math.min(FIELD_HALF_X, runner.root.position.x));
-      if (!dodging && !downed) {
+      if (!dodging && !held) {
         // MODE-STICK-FACE (2026-09-07): the runner FACES his line — yaw from the ground velocity, slewed. It was HALF
         // the angle: a 42° cut ran at 21°, the body sliding sideways across the field. (The stick itself was never
         // mirrored here: the runner camera looks up the field, +z, where screen-right IS world +x.)
         const want = Math.atan2(vel.x, vel.z);
         const d = Math.atan2(Math.sin(want - runner.root.rotation.y), Math.cos(want - runner.root.rotation.y));
         runner.root.rotation.y += Math.sign(d) * Math.min(Math.abs(d), TURN_RATE * dt);
-        runner.animator.play(SPORT_CLIP.footballCarryRun, { loop: true });
       }
 
       if (!downed) yards = Math.max(yards, Math.floor((runner.root.position.z - lineOfScrimmage) / 0.9144));
@@ -407,8 +495,8 @@ export const FootballRushMode: ModeDefinition = (() => {
         }
         tackleWeight(ctx);   // A+ P0: the heavy feel hit + shake + groan (its one thud comes with feel.impact; the extra impact SFX is gone)
         EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, 0.6, 0)), 'dust');
-        runner.animator.play(SPORT_CLIP.footballTackled, {});
-        downed = true;
+        downed = true; move = null; cutSec = 0;
+        animTree?.clearBeat('tackled');   // a second tackle in a session re-fires the fall from the top
         driveEvades = 0; breakawaySec = 0;
         const gainedY = yards;
         if (gainedY >= toGo) {
@@ -436,8 +524,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         setTimeout(() => {
           ctx.setHud({ banner: '' });
           runner.root.position.x = 0;
-          downed = false;
-          runner.animator.play(SPORT_CLIP.idle, { loop: true });   // set at the line, not the carry-run jogging on the spot
+          downed = false;   // SET at the line: the tree's pre-snap window, not the carry run jogging on the spot
           // a stopped play is a new SET: the front respawns in its alignment
           // and the next snap is the player's call again
           preSnap = true; preSnapT = 0;
@@ -449,12 +536,13 @@ export const FootballRushMode: ModeDefinition = (() => {
         lineOfScrimmage = runner.root.position.z;
       }
 
-      if (runner.root.position.z >= FIELD_LENGTH) {
+      if (runner.root.position.z >= FIELD_LENGTH && !tdPending) {
         const mult = breakawaySec > 0 ? 1.5 : 1;
         score += Math.round((100 + evades * 10) * mult);
-        runner.animator.play(SPORT_CLIP.scoreCelebrate, {
-          onEnd: () => runner.animator.play(SPORT_CLIP.idle, { loop: true }),
-        });
+        // G5: the SPIKE is this mode's biggest end pose and it had never been seen — the per-frame carry run cut it on
+        // the next frame and `newDrive` reset the body on this one. It holds for TD_HOLD_SEC now, feet planted.
+        tdPending = true; celebrateUntil = performance.now() + TD_HOLD_SEC * 1000; move = null; cutSec = 0;
+        animTree?.clearBeat('celebrate');
         tdPunch(ctx);   // A+ P0: hit-stop + shake + gold flash + ONE slam, once per drive (replaces the bare feel.impact)
         SoundKit.play('score');
         SoundKit.play('crowdCheer');
@@ -467,17 +555,18 @@ export const FootballRushMode: ModeDefinition = (() => {
           SoundKit.play('whistle');
           return ctx.end('DRIVES_DONE', score, { yards, evades, trucks, coinsCollected: coins?.collected ?? 0, drives: DRIVES });
         }
-        drive++;
-        newDrive(ctx, `TOUCHDOWN! · DRIVE ${drive}/${DRIVES}`);
+        const next = drive + 1;
+        setTimeout(() => { if (ended) return; drive = next; newDrive(ctx, `TOUCHDOWN! · DRIVE ${next}/${DRIVES}`); }, TD_HOLD_SEC * 1000);
       }
 
+      drive3D(Math.min(1, vel.length() / 8), trucking);
       gallery?.update(dt);
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(runner.root.position, vel, null);
     },
 
     dispose() {
-
+      posture?.dispose(); posture = null; animTree = null;
       rushVenue?.dispose?.(); rushVenue = null;
       gallery?.dispose(); gallery = null;
       runner?.dispose();

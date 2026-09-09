@@ -56,6 +56,17 @@
 import { Color3, MeshBuilder, StandardMaterial, Vector3, type Mesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
+// BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the gauntlet (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Two findings:
+//   G1/G4  a strike SNAPPED the fighter onto the nearest agent in one frame (`player.root.rotation.y = atan2(to)` at
+//          the top of `strike()`, up to 180° in a single frame with the swing clip already crossfading in) — the exact
+//          "random mid-clip pop that inverts facing" the spec names. It is a TURN now: aimed on the press, and slewed
+//          to arrive inside the strike's own 150 ms startup so the arc test still measures the line it committed to.
+//   G5     nothing in the mode touched the thoracic chain or the head, so the hero and the ally never looked at the
+//          horde — the Posture Poses layer now carries them (the agents keep the clip-only body they had: up to 20
+//          rigs a wave is not a budget this layer belongs in, and their read is the WIND-UP silhouette, not the chest).
+import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { combatPose, COMBAT_INPUT_IDLE, type CombatPostureInput } from '../core/CombatPosture';
+import { slewYaw, wrapYaw } from '../core/Biomech';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { CombatAnimTree, type CombatAnimInput, type StrikeWeight } from '../anim/combatTree';
@@ -223,6 +234,11 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   let xHoldSec = -1, iframeSec = 0;
   let stickX = 0, stickY = 0;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
+  /** BIOMECH-WAVE2 G1: the yaw a committed strike is turning ONTO, and the rate that gets it there inside the startup. */
+  let faceTarget: number | null = null, faceRate = 0;
+  /** BIOMECH-WAVE2 G5: the Posture Poses layer on the hero and the ally, and the bodies it is fed. */
+  let mePosture: { layer: PostureLayer; dispose(): void } | null = null, partnerPosture: { layer: PostureLayer; dispose(): void } | null = null;
+  const meBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE }, pBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE };
   let pickups: Pickup[] = [];
   let tweens: Tween[] = [];
   let sceneRef: ModeContext['scene'] | null = null;
@@ -230,6 +246,10 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   const stats = { downs: 0, strikesAt: 0, hitsTaken: 0, traded: 0, blocked: 0, dodged: 0, perfect: 0, finishers: 0, pickups: 0, shardsTotal: 0, perksBought: 0, orbits: 0 };
 
   const now = () => performance.now();
+  /** The floor under a strike's aim turn (rad/s): a pivot on the balls of the feet, never a snap. */
+  const STRIKE_TURN_RATE = 12;
+  /** How fast the fighter turns onto a new travel line (rad/s): a 180° stick reversal is ~0.26 s of body, not one frame. */
+  const TRAVEL_TURN_RATE = 12;
   const facingVec = () => new Vector3(Math.sin(player.root.rotation.y), 0, Math.cos(player.root.rotation.y));
   const tween = (dur: number, step: (k: number) => void, done?: () => void) => { tweens.push({ t: 0, dur, step, done }); };
   const clampDisc = (p: Vector3) => { const r = Math.hypot(p.x, p.z); if (r > ARENA_RADIUS) { const k = ARENA_RADIUS / r; p.x *= k; p.z *= k; } };
@@ -436,8 +456,13 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const s = finisher ? STRIKES.Y : STRIKES[key];
     const target = nearest(player.root.position);
     if (target) {
+      // G1/G4: AIM the swing, do not teleport onto it. The startup is 150 ms; the rate is whatever gets the body there
+      // inside 120 ms of it, floored at a normal pivot — so the arc test below still measures the committed line, and
+      // a 180° turn reads as seven frames of body instead of one frame of pop.
       const to = target.mob.char.root.position.subtract(player.root.position);
-      player.root.rotation.y = Math.atan2(to.x, to.z);
+      const want = Math.atan2(to.x, to.z);
+      const d = Math.abs(wrapYaw(want - player.root.rotation.y));
+      faceTarget = want; faceRate = Math.max(STRIKE_TURN_RATE, d / 0.12);
     }
     SoundKit.play('whoosh', finisher ? { pitch: 0.8, volume: 0.7 } : {});
     myStrike = { weight: finisher ? 'finisher' : STRIKE_WEIGHT[key], clip: s.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
@@ -627,6 +652,15 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       blocking, dodging, dodgeClip, parryFlash: false, guardImpactFlash: t < impactUntil,
       hitBy: t < hitUntil ? hitWeight : null, down: myDown.downed, out: outFlag, ulting: false,
     };
+    // BIOMECH-WAVE2 G5: the same reads, as a BODY. `engaged` is "there is a horde in the ring" — between waves and in
+    // the shop the hero stands in the idle instead of guarding an empty arena.
+    meBio.speed01 = mine.speed01; meBio.strafe = 0; meBio.approach = 0;
+    meBio.striking = myStrike?.weight ?? null; meBio.blocking = blocking; meBio.dodging = dodging;
+    meBio.guardImpact = t < impactUntil; meBio.hitBy = t < hitUntil ? hitWeight : null;
+    meBio.down = myDown.downed || outFlag; meBio.out = outFlag;
+    meBio.rising = myDown.downed && myDown.channelSec > 0; meBio.engaged = enemies.length > 0 && !shopOpen;
+    pBio.speed01 = partnerSpeed01; pBio.striking = pStrike?.weight ?? null; pBio.down = partnerDown.downed;
+    pBio.engaged = enemies.length > 0 && !shopOpen;
     meTree.update(mine);
     partnerTree.update({
       speed01: partnerSpeed01, dashing: false, hasWeapon: false, striking: pStrike?.weight ?? null, strikeClip: pStrike?.clip,
@@ -667,6 +701,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       hp: Math.round(vitals.hp), hpMax: vitals.maxHp, wave, coins: shards, chi: Math.round(chi), slowMo: +slowmo.sec.toFixed(3), slowMoKind: slowmo.kind ?? '', slowMos: slowmo.episodes, timeScale: ctx.scene.animationTimeScale,
       attackers: attackers(), enemies: enemies.length, shop: shopOpen, down: myDown.downed, partnerRoot: partner?.root.name ?? '',
       nextLandIn: +nextLandIn().toFixed(3),   // seconds until the nearest agent's strike lands (−1 = none in flight) — the probe's perfect-dodge driver
+      pp: mePosture?.layer.get() ?? null, ppAlly: partnerPosture?.layer.get() ?? null, bio: { ...meBio },   // BIOMECH-WAVE2 probes
+      aim: (() => { const n = nearest(player.root.position); return n ? { x: n.mob.char.root.position.x, y: n.mob.char.root.position.y + 1.32, z: n.mob.char.root.position.z } : null; })(),
       ...stats,
     };
   }
@@ -703,6 +739,13 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       ctx.groundLock?.track(partner.root, partner.skeleton);
       meTree = new CombatAnimTree(player.animator);
       partnerTree = new CombatAnimTree(partner.animator);
+      // G5: the hero and the ally carry the chest / shoulders / head; the aim is the nearest agent's chest (the ring's
+      // objective), the eyes go with it. No horde body gets a layer — see the header.
+      mePosture?.dispose(); partnerPosture?.dispose();
+      const chestOfNearest = (from: Vector3): Vector3 | null => { const n = nearest(from); return n ? n.mob.char.root.position.add(new Vector3(0, 1.32, 0)) : null; };
+      mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => { const { window, pose, legs } = combatPose(meBio); const at = chestOfNearest(player.root.position); return { pose, legs, aim: at, eyes: at, window }; }, 'KE-PP');
+      partnerPosture = mountPostureLayer(ctx.scene, partner.skeleton, partner.root, () => { const { window, pose, legs } = combatPose(pBio); const at = chestOfNearest(partner.root.position); return { pose, legs, aim: at, eyes: at, window }; }, 'KE-PP-ALLY');
+      faceTarget = null;
       meTree.onSettle = (st) => {
         if (!st.startsWith('strike_')) return;
         striking = false; myStrike = null;
@@ -839,8 +882,16 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         // Inset from the mat so the camera always has somewhere to stand behind
         // the player — see ARENA_RADIUS.
         clampDisc(player.root.position);
-        player.root.rotation.y = Math.atan2(vel.x, vel.z);
+        // G1/G3: the body TURNS onto its travel. This was `rotation.y = atan2(vel)` — a stick reversal moved the whole
+        // body (and the over-shoulder camera behind it) in ONE frame; measured 172° between two rendered frames.
+        player.root.rotation.y = slewYaw(player.root.rotation.y, Math.atan2(vel.x, vel.z), TRAVEL_TURN_RATE, dt);
+        faceTarget = null;                       // the stick owns the facing again the moment the feet are free
         if (dt > 0 && Vector3.Distance(before, player.root.position) / dt < 0.3) mySpeed01 = 0;   // pinned on the ring's edge: no stepping on the spot
+      }
+      // G1: a committed strike TURNS onto its target across the startup (it used to arrive in one frame)
+      if (faceTarget !== null) {
+        player.root.rotation.y = slewYaw(player.root.rotation.y, faceTarget, faceRate, dtReal);
+        if (Math.abs(wrapYaw(faceTarget - player.root.rotation.y)) < 1e-3) faceTarget = null;
       }
 
       // partner movement/attacks
@@ -849,7 +900,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       partner.root.position.addInPlace(pVel.scale(dt));
       partner.root.position.x = Math.max(-8, Math.min(8, partner.root.position.x));
       partner.root.position.z = Math.max(-8, Math.min(8, partner.root.position.z));
-      if (pVel.lengthSquared() > 0.05) partner.root.rotation.y = Math.atan2(pVel.x, pVel.z);
+      if (pVel.lengthSquared() > 0.05) partner.root.rotation.y = slewYaw(partner.root.rotation.y, Math.atan2(pVel.x, pVel.z), TRAVEL_TURN_RATE, dt);   // the ally turns too
       if (pIntent.action && !shopOpen) {
         const t = nearest(partner.root.position);
         if (!pStrike) pStrike = { weight: 'light', clip: SPORT_CLIP.karateJab, until: now() + STRIKE_MAX_SEC * 1000 };   // one jab per swing — the tree plays it
@@ -889,6 +940,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       if (sceneRef) { sceneRef.animationTimeScale = 1; sceneRef = null; }
       for (const p of pickups) { p.mesh.material?.dispose(); p.mesh.dispose(); }
       pickups = []; tweens = [];
+      mePosture?.dispose(); mePosture = null; partnerPosture?.dispose(); partnerPosture = null;
       crowd?.dispose(); crowd = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient();
     },
   };

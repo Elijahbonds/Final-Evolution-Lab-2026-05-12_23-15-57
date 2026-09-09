@@ -18,6 +18,19 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { installSafePlay } from '../anim/clipRegistry';
 import { FreeRunAnimTree } from '../anim/freeRunTree';
+// BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the traceur (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Measured on
+// 2942860, per rendered frame:
+//   G1/G3  on the ground the stick's direction was COPIED into the heading (`S.heading.copyFrom(w)`) and written
+//          straight onto the root (`root.rotation.y = atan2(heading)`), so a flicked stick turned the whole body in a
+//          single frame — up to 180° between two rendered frames, with the run loop still striding the old way.
+//   G3/G5  the landing wrote `root.rotation.x = 0; root.rotation.z = 0` on the touchdown frame, teleporting away the
+//          last quarter of every somersault: a front flip that came down at 300° simply became 0° between frames. The
+//          residual SETTLES upright now (Biomech.settleAngle), so the flip finishes on the feet.
+//   G5     nothing touched the thoracic chain or the head — a traceur never looked at the ledge he was catching. The
+//          Posture Poses layer carries the body per run window with the eyes down the line.
+import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { freeRunWindow, runPose, FREERUN_INPUT_IDLE, RUNNER_TURN_RATE, type FreeRunPostureInput } from '../core/RunPosture';
+import { slewYaw, settleAngle, wrapYaw } from '../core/Biomech';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { assertSpawned } from '../core/FrameGuard';
@@ -57,6 +70,8 @@ interface St {
   /** ANIM-READABILITY (creative, 2026-09-07): the ONE OWNER of the runner's clips. The mode never calls animator.play;
    *  it latches wall-clock beats (take-off, landing) and feeds the tree once per frame. */
   tree: FreeRunAnimTree | null; jumpAt: number; landAt: number; landing: 'none' | 'clean' | 'sketchy';
+  /** BIOMECH-WAVE2: the Posture Poses layer and the body it is fed. */
+  posture: { layer: PostureLayer; dispose(): void } | null; bio: FreeRunPostureInput;
   /** Vertical velocity, owned here: the controller integrates the velocity it is handed, so gravity is ours to apply. */
   vy: number;
   /** A+ P0 juice: performance.now() of the last bail punch (one per crash), and the one finish punch. */
@@ -138,6 +153,14 @@ export const FreeRunMode: ModeDefinition = (() => {
   function feedTree(S: St): void {
     if (!S.tree) return;
     const airborne = S.state === 'air';
+    // one read, two consumers (the clip and the body under it)
+    S.bio.state = S.state === 'ground' || S.state === 'air' || S.state === 'wallrun' || S.state === 'slide' || S.state === 'down' ? S.state : 'ground';
+    S.bio.speed01 = S.finished ? 0 : Math.min(1, S.speed / RUN_MAX);
+    S.bio.tricking = airborne && !!S.trick;
+    S.bio.landing = !airborne && S.clock - S.landAt < LAND_BEAT_SEC;
+    S.bio.rising = S.state === 'down' && S.downSec <= RISE_SEC;
+    S.bio.vaulting = S.env.vaultAhead && S.state === 'ground' && S.speed > RUN_MAX * 0.4;
+    S.bio.celebrating = S.finished;
     S.tree.update({
       speed01: S.finished ? 0 : Math.min(1, S.speed / RUN_MAX),   // the finish: the celebrate settles into the idle, not a run on the spot under the results banner
       airborne,
@@ -185,7 +208,7 @@ export const FreeRunMode: ModeDefinition = (() => {
       const pts = trickPoints(S.trick, S.launch, landing);
       if (pts > 0) { S.combo.add(`${S.trick.name}${S.launch !== 'ground' ? ` OFF ${S.launch.toUpperCase()}` : ''}`, pts, 'air'); flash(ctx, `${S.trick.name} ${landing === 'sketchy' ? '· SKETCHY' : ''} +${pts}`); }
     } else if (landing === 'clean' && drop >= 2.4) { S.combo.add('ROLL', 30, 'revert'); flash(ctx, 'ROLL +30'); }
-    S.hero!.root.rotation.x = 0; S.hero!.root.rotation.z = 0;
+    // G3/G5: the flip's residual is NOT written to 0 here — it settles upright over the next few frames (see update).
     S.speed = speedAfterLanding(S.speed, landing);
     if (landing === 'bail') {
       const lost = S.combo.bail(); S.bails++;
@@ -261,6 +284,7 @@ export const FreeRunMode: ModeDefinition = (() => {
         checkpoint: 0, highTouched: false, bails: 0, barsCleared: new Set(),
         env: { vaultAhead: false, wallAhead: false, ledgeAhead: false, barAhead: false }, vy: 0,
         tree: null, jumpAt: -9, landAt: -9, landing: 'none',
+        posture: null, bio: { ...FREERUN_INPUT_IDLE },
         bailAt: 0, finishLatch: false,
       };
       states.set(ctx.scene, S); live.add(S);
@@ -274,6 +298,19 @@ export const FreeRunMode: ModeDefinition = (() => {
       S.hero = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: new Vector3(0, 0, 3), yawRad: 0, startClip: 'idle_stand', modeId: 'freerun' });
       installSafePlay(S.hero.animator, 'freerun');
       S.tree = new FreeRunAnimTree(S.hero.animator);
+      // G1/G5: the body under the clips. There is no objective on a course, so the aim IS the line — 8 m down the
+      // heading at head height; a vault / a wall run puts the eyes on the surface through the window's own stance.
+      S.posture?.dispose();
+      S.posture = mountPostureLayer(ctx.scene, S.hero.skeleton, S.hero.root, () => {
+        const hero = S.hero; if (!hero) return null;
+        const { window, pose, legs } = runPose(freeRunWindow(S.bio));
+        const at = hero.root.position.add(new Vector3(S.heading.x * 8, 1.5, S.heading.z * 8));
+        return { pose, legs, aim: at, eyes: at, window };
+      }, 'FR-PP');
+      if (process.env.NODE_ENV === 'development') {
+        const dev = (window as unknown as { __FEL_DEV__?: { runPosture?: unknown } }).__FEL_DEV__;
+        if (dev) dev.runPosture = { me: () => S.posture?.layer.get() ?? null, bio: () => ({ ...S.bio }), aim: () => { const h = S.hero; if (!h) return null; return { x: h.root.position.x + S.heading.x * 8, y: h.root.position.y + 1.5, z: h.root.position.z + S.heading.z * 8 }; } };   // BIOMECH-WAVE2 probes
+      }
       if (S.scene.isDisposed) return;
       S.cc = new PhysicsCharacterController(new Vector3(0, CAPSULE_H / 2 + 0.05, 3), { capsuleHeight: CAPSULE_H, capsuleRadius: CAPSULE_R }, ctx.scene);
       buildCourse(ctx, S);                                      // the pick screen shows the course
@@ -287,6 +324,10 @@ export const FreeRunMode: ModeDefinition = (() => {
 
     onInput(ctx: ModeContext, e: FelInput) {
       const S = st(ctx); if (!S || !S.hero || !S.cc) return;
+      // BIOMECH-WAVE2: the stick is recorded in EVERY phase. InputBus only emits a stick event when the value CHANGES,
+      // and the pick branch below used to swallow them — so a player who was already holding forward when the course
+      // started stood still until they let go and pushed again (measured on the fake pad: 15 s of a held stick, 0 m).
+      if (e.t === 'stick' && e.side === 'L') { S.stick.set(e.x, 0, -e.y); if (S.phase === 'run') return; }
       if (S.phase === 'pick') {
         if (e.t === 'dpad' && e.pressed && (e.dir === 'left' || e.dir === 'right')) {
           const i = TIERS.findIndex((t) => t.id === S.tier.id);
@@ -296,7 +337,6 @@ export const FreeRunMode: ModeDefinition = (() => {
         return;
       }
       if (S.phase !== 'run') return;
-      if (e.t === 'stick' && e.side === 'L') { S.stick.set(e.x, 0, -e.y); return; }
       if (e.t !== 'button' || !e.pressed) return;
       const verbs = verbsFor(S.state, S.speed, S.env);
       if (e.btn === 'A') {
@@ -353,7 +393,16 @@ export const FreeRunMode: ModeDefinition = (() => {
         else S.heading = Vector3.Lerp(S.heading, w, 0.04).normalize();          // faint air control
       }
       if (S.state === 'ground') S.speed = stepSpeed(S.speed, wishLen * RUN_MAX, dt);
-      root.rotation.y = Math.atan2(S.heading.x, S.heading.z);
+      // G1: the body TURNS onto the heading. A traceur turns fast, but never in one frame — and a trick owns the yaw
+      // while it is spinning (the mode integrates it below), so the slew stands aside for it.
+      if (!(S.state === 'air' && S.trick && S.trick.axis === 'y')) {
+        root.rotation.y = slewYaw(root.rotation.y, Math.atan2(S.heading.x, S.heading.z), RUNNER_TURN_RATE, dt);
+      }
+      // G3/G5: a flip's residual pitch / roll settles upright instead of being written to 0 on the landing frame
+      // The trick integrates raw radians (a 1.5-turn side flip leaves rotation.z at 9.6 rad, measured), so the residual
+      // is WRAPPED to the short way round first — settling 9.6 rad to 0 would un-spin the body backwards through a
+      // whole revolution on the way to standing up.
+      if (S.state !== 'air') { root.rotation.x = settleAngle(wrapYaw(root.rotation.x), dt, 0.11); root.rotation.z = settleAngle(wrapYaw(root.rotation.z), dt, 0.11); }
 
       probe(ctx, S);
 
@@ -425,7 +474,7 @@ export const FreeRunMode: ModeDefinition = (() => {
 
     dispose() {
       setTimeout(() => {
-        for (const S of live) if (S.scene.isDisposed) live.delete(S);
+        for (const S of live) if (S.scene.isDisposed) { S.posture?.dispose(); S.posture = null; live.delete(S); }
         if (live.size === 0) SoundKit.stopAmbient();
       }, 0);
     },

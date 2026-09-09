@@ -58,7 +58,8 @@ const CLIP_FOR: Record<BoardAnimState, { clip: string; loop: boolean; fadeSec: n
 
 /** Carve hysteresis: enter above 0.4, leave below 0.3 — a lean hovering on one threshold used to flip the state every
  *  frame, and each flip restarts the animator's crossfade from weight 0 (measured as a 0.33 m hand snap per flip). */
-const CARVE_ON = 0.4, CARVE_OFF = 0.3;
+export const CARVE_ON = 0.4;
+const CARVE_OFF = 0.3;
 
 export function chooseBoardClip(i: BoardAnimInput, prev: BoardAnimState | null = null): { state: BoardAnimState; clip: string; loop: boolean; fadeSec: number } {
   let state: BoardAnimState;

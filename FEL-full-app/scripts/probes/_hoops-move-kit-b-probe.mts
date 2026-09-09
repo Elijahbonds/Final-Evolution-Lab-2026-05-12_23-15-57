@@ -15,6 +15,7 @@
 //   MODE=onevone PORT=3040 npx tsx scripts/probes/_hoops-move-kit-b-probe.mts     (TAG= · OUT_DIR= · VERBOSE=1 · ONLY=…)
 import { chromium, type Page } from 'playwright-core';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { chromiumExe } from './_chromium.mts';
 const MODE = (process.env.MODE ?? 'onevone') as 'onevone' | 'threevthree';
 const PORT = process.env.PORT ?? '3040', OUT = process.env.OUT_DIR ?? 'docs/shots/hoops-move-kit-b', TAG = process.env.TAG ?? 'after';
 const VERBOSE = !!process.env.VERBOSE;
@@ -22,7 +23,7 @@ const VERBOSE = !!process.env.VERBOSE;
 const ONLY = (process.env.ONLY ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const want = (k: string) => ONLY.length === 0 || ONLY.includes(k);
 mkdirSync(OUT, { recursive: true });
-const EXE = process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
+const EXE = chromiumExe();   // BIOMECH-WAVE2: the hardcoded chromium-1234 path broke when the cache was reinstalled at 1243 — see _chromium.mts
 
 type Job = { id: string; job: string; phase: string; x: number; z: number; y: number; speed: number; facing: number; boxing: boolean; objX: number; objZ: number; yaw: number; clips: string };
 type Row = { t: number; x: number; y: number; z: number; yaw: number; chestRim: number; jobs: Job[]; spread: number; lat: number; elb: number; lhy: number; rhy: number; shy: number; headY: number; lean: number; ballLat: number; ballHand: number; ballSide: string; ballY: number; ballX: number; ballZ: number; clips: string[]; win: string; foeClips: string[]; foeDist: number; foeX: number; foeZ: number; foeY: number; banner: string; hint: string; shotType: string; meter: number; poss: string; att: string };

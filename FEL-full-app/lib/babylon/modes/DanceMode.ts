@@ -49,6 +49,14 @@ import {
   DEFAULT_TRACK_ID, trackById, cycleTrack, trackFromQuery, pickBanner, PICK_TIMEOUT_SEC,
   gradeFor, bodySpeedFor, cueLane, type DanceTrack,
 } from '../core/danceTracks';
+// BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the stage family (SPEC-FEL-BIOMECH-GAMEWIDE asks dance for "G2 +
+// G5 minimum"). Measured on 2942860: danceClips' procedural steps key the hips, the arms and ONE spine bone and never
+// touch the head, so a dancer performed an entire routine looking straight down his own root yaw at the back wall —
+// no lift on a PERFECT, no drop on a MISS, and the routine's biggest read (the judgement) happened only in the HUD.
+// The Posture Poses layer now carries the chest / shoulders / head: the step stays LIGHT (the routine is the clip's),
+// a clean hit opens the chest and lifts the chin, a MISS closes them, and the finish holds the celebrate.
+import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { stagePose, STAGE_INPUT_IDLE, STAGE_BEAT_SEC, type StagePostureInput } from '../core/StagePosture';
 import { StemBand, CATEGORY_STEM } from '../audio/StemBand';
 import { KitPulse, kitPattern } from '../audio/KitPulse';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
@@ -86,6 +94,12 @@ export const DanceMode: ModeDefinition = (() => {
    *  step that overruns its beat by a frame repeats its first frame, never the idle), and the MISS stumble is a beat the
    *  owner settles back into the running step. */
   let body: BeatOwner | null = null;
+  let posture: { layer: PostureLayer; dispose(): void } | null = null;
+  const bio: StagePostureInput = { ...STAGE_INPUT_IDLE };
+  /** The judgement beat's wall clock (short: the next step must be able to take the body back). */
+  let beatUntil = 0;
+  /** Where the dancer performs TO. The stage faces −z (the body spawns at yaw π), so the room is in front of it. */
+  const AUDIENCE = new Vector3(0, 1.7, -6);
   /** A+ P0 juice (PM brief CARNIVAL-A-PLUS-P0, 2026-09-07): one results punch per routine. */
   let resultLatch = false;
 
@@ -149,6 +163,9 @@ export const DanceMode: ModeDefinition = (() => {
     // THE BODY ANSWERS THE JUDGEMENT (A+ mission #1). A clean hit dances the
     // move full-out; a GOOD drags it; a MISS on a real step breaks the move
     // into a stumble (the next step's beat picks the routine back up).
+    // G5: the judgement is a BODY read, not only a banner
+    bio.beat = label === 'MISS' ? 'stumble' : label === 'PERFECT' || label === 'GREAT' ? 'hit' : null;
+    beatUntil = performance.now() + STAGE_BEAT_SEC * 1000;
     const spd = bodySpeedFor(label);
     if (label === 'MISS') {
       if (step) body?.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.08, speedRatio: 1.15 });   // the stumble settles back into the running step
@@ -170,6 +187,7 @@ export const DanceMode: ModeDefinition = (() => {
     ended = true;
     perf.stop();
     kit?.dispose();
+    bio.beat = null; beatUntil = 0;
     body?.loop(SPORT_CLIP.idle, { fadeSec: 0.3 });
     currentClip = null;
     const r = perf.result();
@@ -264,6 +282,19 @@ export const DanceMode: ModeDefinition = (() => {
       body = new BeatOwner(me.animator);
       body.loop(SPORT_CLIP.idle, { fadeSec: 0.2 });
       ctx.groundLock?.track(me.root, me.skeleton);
+      posture?.dispose();
+      posture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => {
+        bio.stepping = phase === 'playing' && !!currentClip;
+        bio.beat = performance.now() < beatUntil ? bio.beat : null;
+        bio.celebrating = ended;
+        bio.watching = phase !== 'playing' && !ended;
+        const { window, pose, legs } = stagePose(bio);
+        return { pose, legs, aim: AUDIENCE, eyes: AUDIENCE, window };
+      }, 'DANCE-PP');
+      if (process.env.NODE_ENV === 'development') {
+        const dev = (window as unknown as { __FEL_DEV__?: { stagePosture?: unknown } }).__FEL_DEV__;
+        if (dev) dev.stagePosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), aim: () => ({ x: AUDIENCE.x, y: AUDIENCE.y, z: AUDIENCE.z }) };   // BIOMECH-WAVE2 probes
+      }
       venue?.hidePlaceholders();
 
       // Build the dance clips against THIS skeleton (group name IS the id).
@@ -388,6 +419,7 @@ export const DanceMode: ModeDefinition = (() => {
 
     dispose() {
       perf?.stop();
+      posture?.dispose(); posture = null;
       band?.dispose(); band = null;
       kit?.dispose(); kit = null;
       SoundKit.stopAmbient();

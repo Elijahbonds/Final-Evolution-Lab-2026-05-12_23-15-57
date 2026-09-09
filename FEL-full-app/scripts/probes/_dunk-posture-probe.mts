@@ -11,10 +11,11 @@
 //   PORT=3004 npx tsx scripts/probes/_dunk-posture-probe.mts        (QS=noposture=1 for the BEFORE set · SCEN= · OUT_DIR= · TAG=)
 import { chromium, type Page } from 'playwright-core';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { chromiumExe } from './_chromium.mts';
 const PORT = process.env.PORT ?? '3004', OUT = process.env.OUT_DIR ?? 'docs/shots/dunk-posture', TAG = process.env.TAG ?? (process.env.QS?.includes('noposture') ? 'before' : 'after');
 const SCEN = process.env.SCEN ?? '', VERBOSE = !!process.env.VERBOSE;
 mkdirSync(OUT, { recursive: true });
-const EXE = process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
+const EXE = chromiumExe();   // BIOMECH-WAVE2: the hardcoded chromium-1234 path broke when the cache was reinstalled at 1243 — see _chromium.mts
 
 type Row = { t: number; dt: number; y: number; yaw: number; chest: number; trunk: number; open: number; roll: number; eyes: number; headEl: number; rimEl: number; spread: number; lat: number; elb: number; lhy: number; rhy: number; shy: number; rhandY: number; lhandY: number; feetDy: number; clips: string[]; ats: number; banner: string; hint: string; win: string; ppw: string; trick: string; aim: number };
 type Mark = { t: number; msg: string };

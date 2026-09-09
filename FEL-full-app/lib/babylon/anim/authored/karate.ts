@@ -50,6 +50,44 @@ export function buildGuardStep(scene: Scene, sk: Skeleton): AnimationGroup | nul
   return buildPoseClip(scene, sk, 'karate_guard_step', T, keys);
 }
 
+/** The SHUFFLE — BIOMECH-WAVE2 (2026-09-09), G2 on the combat family. Karate VS and Mixed Combat are LOCK-ON games: the
+ *  root is aimed at the opponent every frame and the stick strafes, so most of every round is spent moving SIDEWAYS —
+ *  and the only loco either mode had was `karate_guard_step`, a forward stepping cadence (thigh flexion, ±26° about X).
+ *  Measured on the fake pad: a fighter circling at 3.4 m/s played a forward walk while travelling 90° off his facing —
+ *  the moon-walk read the spec's G2 names ("dead arms... arms-down rest while legs move" has a twin: right arms, wrong
+ *  legs). A fighter does not walk sideways, he SHUFFLES: the near foot pushes out, the far foot follows, the feet never
+ *  cross, the guard never drops and the hips stay square to the man.
+ *
+ *  `side` is the body's own right (+) or left (−). The legs abduct about Z — the axis the guard's own ±4° splay uses —
+ *  so the sign convention is the clip's, not a guess: +Z opens the LEFT leg away from the midline, −Z opens the right. */
+export function buildShuffle(scene: Scene, sk: Skeleton, side: 'left' | 'right'): AnimationGroup | null {
+  const T = 0.5;
+  const s = side === 'right' ? 1 : -1;
+  // the lead leg is the one on the side you are going to; it pushes OUT first, the trail follows and closes
+  const lead = side === 'right' ? 'Right' : 'Left', trail = side === 'right' ? 'Left' : 'Right';
+  const abduct = (bone: 'Left' | 'Right', deg: number): V3 => [-6, 0, (bone === 'Left' ? 1 : -1) * deg];
+  const key = (t: number, leadDeg: number, trailDeg: number, leadKnee: number, trailKnee: number, roll: number, hipsY: number) => ({
+    t,
+    bones: {
+      Hips: [0, 0, 0] as V3,
+      Spine: [4, 0, roll] as V3,                                    // a hair of lumbar roll INTO the step (the layer only adds pitch, so this survives)
+      [`${lead}UpLeg`]: abduct(lead as 'Left' | 'Right', leadDeg),
+      [`${trail}UpLeg`]: abduct(trail as 'Left' | 'Right', trailDeg),
+      [`${lead}Leg`]: [leadKnee, 0, 0] as V3,
+      [`${trail}Leg`]: [trailKnee, 0, 0] as V3,
+    } as Record<string, V3>,
+    hands: { Left: [GUARD.Left[0], GUARD.Left[1], GUARD.Left[2]] as V3, Right: [GUARD.Right[0], GUARD.Right[1], GUARD.Right[2]] as V3 },
+    hipsY,
+  });
+  return buildPoseClip(scene, sk, `karate_shuffle_${side}`, T, [
+    key(0,        4,  4, 12, 12,  0,       -0.02),
+    key(T * 0.28, 22, 4, 10, 16,  3 * s,   -0.05),   // the lead foot pushes OUT, weight over the trail
+    key(T * 0.55, 20, 2, 12, 12,  2 * s,   -0.03),   // planted wide
+    key(T * 0.8,  8, 14, 14, 10, -1 * s,   -0.05),   // the trail closes, never crossing
+    key(T,        4,  4, 12, 12,  0,       -0.02),
+  ]);
+}
+
 // ── ANIM-READABILITY (combat, 2026-09-07): the guard verbs and the floor ───────────────────────────────────────────────
 // The block was the stance clip at 1.6× (the alias table) — pressing GUARD changed nothing on screen. A guard has to READ:
 // a high, tight guard with the chin down, a shove back when a hit lands on it, a flick when a parry lands. The knockdown

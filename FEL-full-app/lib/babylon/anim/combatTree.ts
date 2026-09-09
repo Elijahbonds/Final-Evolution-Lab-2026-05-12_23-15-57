@@ -22,7 +22,7 @@ import type { CharacterAnimator } from './CharacterAnimator';
 export type StrikeWeight = 'light' | 'medium' | 'heavy' | 'finisher';
 
 export type CombatAnimState =
-  | 'idle' | 'idle_weapon' | 'walk' | 'dash'
+  | 'idle' | 'idle_weapon' | 'walk' | 'walk_back' | 'strafe_left' | 'strafe_right' | 'dash'
   | 'strike_light' | 'strike_medium' | 'strike_heavy' | 'strike_finisher'
   | 'block_hold' | 'parry_flash' | 'guard_impact'
   | 'react_light' | 'react_medium' | 'react_heavy' | 'react_launch'
@@ -31,6 +31,12 @@ export type CombatAnimState =
 
 export interface CombatAnimInput {
   speed01: number;
+  /** BIOMECH-WAVE2 (2026-09-09) G2: which way the feet are actually going, relative to the FACING — −1 stepping left,
+   *  +1 right, 0 forward-or-back (Biomech.strafeAxis). A lock-on duel spends most of a round travelling sideways and
+   *  the only loco this tree had was the forward `karate_guard_step`. 0 (the default) keeps the old behaviour. */
+  strafe?: -1 | 0 | 1;
+  /** Giving ground: the step plays in reverse rather than walking backwards on a forward cadence. */
+  backing?: boolean;
   dashing: boolean;
   hasWeapon: boolean;
   striking: StrikeWeight | null;
@@ -52,12 +58,19 @@ export interface CombatAnimInput {
   celebrating?: boolean;
 }
 
-export interface CombatClipChoice { state: CombatAnimState; clip: string; loop: boolean; fadeSec: number }
+export interface CombatClipChoice { state: CombatAnimState; clip: string; loop: boolean; fadeSec: number; speedRatio?: number }
 
-const CLIP_FOR: Record<CombatAnimState, { clip: string; loop: boolean; fadeSec: number }> = {
+/** A fighter giving ground runs the step's own cadence in reverse (CharacterAnimator plays a negative ratio from the
+ *  clip's end — the same path the dunk's replayed beats use). */
+export const BACK_SPEED = -1;
+
+const CLIP_FOR: Record<CombatAnimState, { clip: string; loop: boolean; fadeSec: number; speedRatio?: number }> = {
   idle:            { clip: 'karate_idle_stance', loop: true, fadeSec: 0.2 },
   idle_weapon:     { clip: 'karate_idle_stance', loop: true, fadeSec: 0.2 },
   walk:            { clip: 'karate_guard_step', loop: true, fadeSec: 0.16 },   // MODE-STICK-FACE: the guard stays up on the walk (was the shared walk, arms at the hips)
+  walk_back:       { clip: 'karate_guard_step', loop: true, fadeSec: 0.16, speedRatio: BACK_SPEED },   // BIOMECH-WAVE2: the same cadence, played BACKWARDS — a fighter giving ground steps back, he does not walk forward away from you
+  strafe_left:     { clip: 'karate_shuffle_left', loop: true, fadeSec: 0.14 },  // BIOMECH-WAVE2 G2: the lock-on shuffle — the feet never cross, the guard never drops
+  strafe_right:    { clip: 'karate_shuffle_right', loop: true, fadeSec: 0.14 },
   dash:            { clip: 'run_forward', loop: true, fadeSec: 0.06 },
   strike_light:    { clip: 'karate_punch_light', loop: false, fadeSec: 0.06 },
   strike_medium:   { clip: 'karate_kick_roundhouse', loop: false, fadeSec: 0.06 },
@@ -97,7 +110,7 @@ export function chooseCombatClip(i: CombatAnimInput): CombatClipChoice {
   else if (i.dashing) state = 'dash';
   else if (i.blocking) state = 'block_hold';
   else if (i.celebrating) state = 'celebrate';
-  else if (i.speed01 > 0.15) state = 'walk';
+  else if (i.speed01 > 0.15) state = i.strafe === -1 ? 'strafe_left' : i.strafe === 1 ? 'strafe_right' : i.backing ? 'walk_back' : 'walk';
   else state = i.hasWeapon ? 'idle_weapon' : 'idle';
   const c = pick(state);
   if (i.strikeClip && state.startsWith('strike_')) c.clip = i.strikeClip;
@@ -163,7 +176,8 @@ export class CombatAnimTree {
       this.onSettle?.(st);
       this.enter(settleAfter(st, this.lastInput ?? EMPTY_INPUT));
     } : undefined;
-    this.animator.play(c.clip, onEnd ? { loop: c.loop, fadeSec: c.fadeSec, onEnd } : { loop: c.loop, fadeSec: c.fadeSec });
+    const opts = { loop: c.loop, fadeSec: c.fadeSec, ...(c.speedRatio === undefined ? {} : { speedRatio: c.speedRatio }) };
+    this.animator.play(c.clip, onEnd ? { ...opts, onEnd } : opts);
     this.current = st;
   }
   /** One-beat states must be re-playable: call when the beat ends or a NEW beat of the same kind lands. */

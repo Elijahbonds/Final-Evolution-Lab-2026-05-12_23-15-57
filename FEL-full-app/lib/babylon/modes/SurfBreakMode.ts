@@ -18,6 +18,8 @@ import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
 import { buildSurfBreak, SURF_HALF_WIDTH, WAVE_SPEED, WAVE_LAP, WAVE_FACE_LEN, type RideWorld } from './rideWorlds';
 import { assertSpawned } from '../core/FrameGuard';
 import { BoardAnimTree } from '../anim/boardTree';
+import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
@@ -69,6 +71,21 @@ export const SurfBreakMode: ModeDefinition = (() => {
   // lean at all). The BoardAnimTree holds beats and settles one-shots; the mode feeds it state — stick = lean, a
   // cutback leans into its turn, the buried rail is the tuck, the wipe is the bail held through the reset.
   let animTree: BoardAnimTree;
+  // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the wave (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Measured on 2942860:
+  //   G1/G5  no clip in the board suite keys the thoracic chain or the head, so the surfer's chest held the last carve
+  //          and his eyes pointed down the root yaw — including inside the TUBE, where he looked at the wall instead
+  //          of out the end of it. The Posture Poses layer now carries the body per ride window and puts the eyes on a
+  //          point down the line (and the barrel gets its own window: crouched under the lip, chest open, eyes out).
+  //   G6     the CUTBACK — the mode's signature move, and the whole reason `yawTarget` exists — had NO LEAN in it. The
+  //          only thing that rolled the rider was GroundRide's `−steer · 0.28` off the raw stick, and a cutback is
+  //          fired on B with the stick anywhere: the board came round 90° with the body standing straight up on it.
+  //          Measured over the frames where a carve CLIP is playing, the body was upright (< 3° of roll) on 25/146 of
+  //          them before and 7/145 after. The roll reads the same lean the clip does now, scaled by speed
+  //          (BoardPosture.boardBank).
+  let posture: { layer: PostureLayer; dispose(): void } | null = null;
+  const bio: BoardPostureInput = { ...BOARD_INPUT_IDLE };
+  /** The lean the tree and the body BOTH ride (the stick, or the cutback coming around). */
+  let rideLean = 0;
   let bailBeatT = 0, landBeatT = 0, airT = 0, cutbackUntil = 0;
   const BAIL_BEAT_SEC = 1.55, LAND_BEAT_SEC = 0.4;   // the wipe resets the rider at 1.6 s
   const CUTBACK_LEAN_SEC = 0.5;                      // the board leans into a cutback for as long as it comes around
@@ -80,10 +97,19 @@ export const SurfBreakMode: ModeDefinition = (() => {
     // released steer as a counter-carve for a few frames)
     const turning = yawTarget - rig.char.root.rotation.y;
     const cutbackLean = t < cutbackUntil && Math.abs(turning) > 0.15 ? Math.sign(turning) : 0;
+    rideLean = !rig.rider.grounded ? 0 : Math.abs(stickX) > 0.3 ? stickX : cutbackLean;
+    const speed01 = Math.min(1, rig.rider.vel.length() / MAX_FORWARD_SPEED);
+    const airborne = !rig.rider.grounded && (airT > 0.1 || rig.rider.vel.y > 0.5);
+    // one object, two consumers: the tree picks the clip, the posture layer picks the body under it
+    bio.speed01 = speed01; bio.pushing = false; bio.lean = rideLean; bio.airborne = airborne;
+    bio.grabHeld = tricks.grabHeld; bio.flipping = tricks.flipping; bio.spinning = tricks.spinning;
+    bio.grinding = rig.rider.grinding !== null; bio.manual = false;
+    bio.landing = landBeatT > 0; bio.bailing = bailBeatT > 0; bio.tucking = carve > 0.5;
+    bio.barrelled = inBarrel;
     animTree.update({
-      speed01: rig.rider.vel.length() / MAX_FORWARD_SPEED, pushing: false,
-      lean: !rig.rider.grounded ? 0 : Math.abs(stickX) > 0.3 ? stickX : cutbackLean,
-      airborne: !rig.rider.grounded && (airT > 0.1 || rig.rider.vel.y > 0.5),
+      speed01, pushing: false,
+      lean: rideLean,
+      airborne,
       grabHeld: tricks.grabHeld, flipping: tricks.flipping, spinning: tricks.spinning,
       grinding: rig.rider.grinding !== null, manual: false,
       landing: landBeatT > 0 ? 'clean' : 'none', bailing: bailBeatT > 0, tucking: carve > 0.5,
@@ -158,7 +184,19 @@ export const SurfBreakMode: ModeDefinition = (() => {
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -50 + POCKET.min + 3), 0, world.ground, '#ffd75e', 'surfboard', { stickDown: 0.9, rayLength: 8 });
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { anim: 'external', onBeat: (b) => { if (b === 'land') landBeatT = LAND_BEAT_SEC; else bailBeatT = BAIL_BEAT_SEC; } });
       animTree = new BoardAnimTree(rig.char.animator);
-      bailBeatT = 0; landBeatT = 0; airT = 0; cutbackUntil = 0; rel = 0; stickY = 0;
+      posture?.dispose();
+      posture = mountPostureLayer(ctx.scene, rig.char.skeleton, rig.char.root, () => {
+        const { window, pose, legs } = boardPose(bio);
+        // G1 on the wave: down the line, at head height — and in the barrel that IS out the end of the tube
+        const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5);
+        const at = new Vector3(la.x, la.y, la.z);
+        return { pose, legs, aim: at, eyes: at, window };
+      }, 'SURF-PP');
+      if (process.env.NODE_ENV === 'development') {
+        const dev = (window as unknown as { __FEL_DEV__?: { boardPosture?: unknown } }).__FEL_DEV__;
+        if (dev) dev.boardPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), aim: () => { const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5); return la; } };   // BIOMECH-WAVE2 probes
+      }
+      bailBeatT = 0; landBeatT = 0; airT = 0; cutbackUntil = 0; rel = 0; stickY = 0; rideLean = 0;
       ctx.camDirector.setPreset('surf');   // over the swell back, clear of the crest (was 'board': 2.4 m up, inside a 2.6 m wave)
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 4, modeId: 'surf' });
       t = 0; timeLeft = RUN_SEC; flow = 0; ended = false; wipedOut = false; lapsSeen = 0; surging = false;
@@ -331,6 +369,12 @@ export const SurfBreakMode: ModeDefinition = (() => {
       // carve toward the aimed heading (~0.4s to come around)
       const yawErr = yawTarget - rig.char.root.rotation.y;
       if (Math.abs(yawErr) > 0.001) rig.char.root.rotation.y += yawErr * Math.min(1, dt * CUTBACK_RATE);
+      // G6: BURY THE RAIL. The turn above is the whole move and it had no lean under it — the roll now reads the same
+      // lean the clip does (stick, or the cutback coming around), scaled by speed, layered over GroundRide's own ease.
+      if (!wipedOut && rig.rider.grounded) {
+        const want = boardBank(rideLean, Math.min(1, rig.rider.vel.length() / MAX_FORWARD_SPEED));
+        rig.char.root.rotation.z += (want - rig.char.root.rotation.z) * Math.min(1, 10 * dt);
+      }
 
       crowd.update(dt);
       ctx.setHud({ time: Math.ceil(timeLeft) });
@@ -340,7 +384,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       ctx.camDirector.update(rig.char.root.position, leadVel, lip);
     },
 
-    dispose() { propsGone = true; props?.dispose(); props = null; crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 

@@ -109,7 +109,10 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
   ok(mode.includes('STEP_CHI_GAIN'), 'the step pays chi');
   // commitment: the striker is NOT re-faced mid-swing (measured: per-frame
   // auto-facing erased every step before this)
-  ok(mode.includes('if (!striking) player.root.rotation.y') && mode.includes('if (!foeStriking) rival.root.rotation.y'), 'strikers are committed to their line');
+  // BIOMECH-WAVE2 (2026-09-09): the same guard, now in front of a SLEWED lock-on (lockOnYaw) instead of a raw atan2
+  // write — the commitment is what this check is about, not the shape of the turn.
+  ok(/if \(!striking\b.*\bplayer\.root\.rotation\.y =/.test(mode) && /if \(!foeStriking\b.*\brival\.root\.rotation\.y =/.test(mode), 'strikers are committed to their line');
+  ok(mode.includes('lockOnYaw(') && !/rotation\.y = Math\.atan2\(to\.x/.test(mode), 'the lock-on TURNS onto the opponent (it never snaps the root)');
   ok(mode.includes('committedYaw'), 'impact is measured against the committed facing');
 }
 

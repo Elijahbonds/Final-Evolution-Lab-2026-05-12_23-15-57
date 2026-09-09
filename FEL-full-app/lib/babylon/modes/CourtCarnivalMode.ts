@@ -19,6 +19,14 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { BeatOwner } from '../anim/beatOwner';
+// BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the carnival hub (SPEC-FEL-BIOMECH-GAMEWIDE asks carnival for "G2 +
+// G5 minimum; facing where loco exists"). Measured on 2942860: the host and the guest stand at FIXED yaws in
+// `SPORT_CLIP.idle` for the whole night — they never look at each other, at the player, or at the event that is being
+// played, and the result beats (the winner's celebrate, the loser's flinch) play on a body whose chest is still in the
+// idle's shape. There is no loco here, so G1 is the OTHER BODY: the Posture Poses layer squares each of them onto the
+// other, and the result windows finally read as a body (chest open and chin up / shoulders in and chin down).
+import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { stagePose, STAGE_INPUT_IDLE, type StagePostureInput } from '../core/StagePosture';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
@@ -73,6 +81,11 @@ interface St {
   /** ANIM-READABILITY (creative, 2026-09-07): the one owner of each party-goer's clips (idle + the result / finale beats). */
   hostBody: BeatOwner | null;
   guestBody: BeatOwner | null;
+  /** BIOMECH-WAVE2: the Posture Poses layer on each party-goer, and the body each is fed. */
+  hostPP: { layer: PostureLayer; dispose(): void } | null;
+  guestPP: { layer: PostureLayer; dispose(): void } | null;
+  hostBio: StagePostureInput;
+  guestBio: StagePostureInput;
   anchor: BABYLON.TransformNode | null;
   /** A+ P0 juice latches: one event-win punch per event (reset when the next event starts), one champion punch per night. */
   eventLatch: boolean;
@@ -85,7 +98,17 @@ const live = new Set<St>();
 export const CourtCarnivalMode: ModeDefinition = (() => {
   const st = (ctx: ModeContext): St | undefined => states.get(ctx.scene);
   const names = (S: St): [string, string] => (S.players > 1 ? ['P1', 'P2'] : ['YOU', 'RIVAL']);
-  function setPhase(S: St, p: Phase): void { S.phase = p; S.phaseSec = 0; }
+  function setPhase(S: St, p: Phase): void {
+    S.phase = p; S.phaseSec = 0;
+    // G1: between results the two of them WATCH each other (and whatever is being played) instead of staring past it
+    if (p !== 'eventOver' && p !== 'finale') { S.hostBio.celebrating = S.hostBio.dejected = false; S.guestBio.celebrating = S.guestBio.dejected = false; }
+    S.hostBio.watching = S.guestBio.watching = true;
+  }
+  /** `winner` 0 = host, 1 = guest, null = a tie (both keep watching). */
+  function setResult(S: St, winner: 0 | 1 | null): void {
+    S.hostBio.celebrating = winner === 0; S.hostBio.dejected = winner === 1;
+    S.guestBio.celebrating = winner === 1; S.guestBio.dejected = winner === 0;
+  }
 
   // ── A+ P0 juice (PM brief CARNIVAL-A-PLUS-P0, 2026-09-07): Mario Party readability with Wii Sports weight. No slowMo, no
   // juice.impact({ slow }), no HoopJuice. The event's own chime, cheer and confetti stay; ONE thud (no feel + SoundKit stack).
@@ -210,6 +233,8 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     const loserBody = w === -1 ? null : rivalTookIt ? S.hostBody : S.guestBody;
     winnerBody?.beat(SPORT_CLIP.scoreCelebrate, { fadeSec: 0.12 });   // both settle back into SPORT_CLIP.idle on their own
     loserBody?.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.08 });
+    // G5: the body under those beats — the winner's chest opens, the loser's closes (they used to play on the idle's shape)
+    setResult(S, w === -1 ? null : rivalTookIt ? 1 : 0);
     if (w === 0) { EffectsKit.burst(ctx.scene, ctx.camera.position, 'confetti'); SoundKit.play('crowdCheer', { volume: 0.4 }); eventWinPunch(ctx, S); }
     else if (w === 1) { SoundKit.play('crowdGroan', { volume: 0.4 }); rivalSoftFlash(ctx, 'event'); }
     const [n1, n2] = names(S);
@@ -243,6 +268,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     const runnerUpBody = champ === 0 ? S.guestBody : S.hostBody;
     champBody?.beat(SPORT_CLIP.scoreCelebrate, { fadeSec: 0.12 });
     runnerUpBody?.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.08 });
+    setResult(S, champ === 0 ? 0 : 1);
     const [n1, n2] = names(S);
     hud(ctx, S, {
       banner: S.players > 1 ? `${names(S)[champ]} TAKES THE CARNIVAL` : (won ? 'CARNIVAL CHAMPION!' : 'RIVAL TAKES THE CARNIVAL'),
@@ -271,6 +297,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
         autoBegin: !!q, starting: false, current: null,
         players: Math.max(1, Math.min(2, Number(q ?? 1) || 1)), turn: 0, turnPoints: [0, 0], tally: freshTally(), rivalTarget: 0,
         ended: false, hub: null, host: null, guest: null, hostBody: null, guestBody: null, anchor: null, eventLatch: false, champLatch: false,
+        hostPP: null, guestPP: null, hostBio: { ...STAGE_INPUT_IDLE, watching: true }, guestBio: { ...STAGE_INPUT_IDLE, watching: true },
       };
       states.set(ctx.scene, S); live.add(S);
       SoundKit.startAmbient('stadium');
@@ -282,6 +309,27 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       S.guest = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: HUB_SPOTS[1].clone(), yawRad: 0, tint: '#ff2d78' });
       installSafePlay(S.guest.animator, 'carnival-guest');
       S.guestBody = new BeatOwner(S.guest.animator); S.guestBody.loop(SPORT_CLIP.idle);
+      // G1/G5: each one squares onto the other's chest and holds a readable result silhouette
+      const chestOf = (c: SpawnedCharacter): BABYLON.Vector3 => c.root.position.add(new BABYLON.Vector3(0, 1.32, 0));
+      S.hostPP?.dispose(); S.guestPP?.dispose();
+      S.hostPP = mountPostureLayer(ctx.scene, S.host.skeleton, S.host.root, () => {
+        const g = S.guest; if (!g) return null;
+        const { window, pose, legs } = stagePose(S.hostBio);
+        const at = chestOf(g); return { pose, legs, aim: at, eyes: at, window };
+      }, 'CARN-PP');
+      S.guestPP = mountPostureLayer(ctx.scene, S.guest.skeleton, S.guest.root, () => {
+        const h = S.host; if (!h) return null;
+        const { window, pose, legs } = stagePose(S.guestBio);
+        const at = chestOf(h); return { pose, legs, aim: at, eyes: at, window };
+      }, 'CARN-PP-GUEST');
+      if (process.env.NODE_ENV === 'development') {
+        const dev = (window as unknown as { __FEL_DEV__?: { stagePosture?: unknown } }).__FEL_DEV__;
+        if (dev) dev.stagePosture = {   // BIOMECH-WAVE2 probes — the HUB pair (each event spawns its own body, which dev.hero() points at)
+          host: () => S.hostPP?.layer.get() ?? null, guest: () => S.guestPP?.layer.get() ?? null,
+          bio: () => ({ host: { ...S.hostBio }, guest: { ...S.guestBio } }),
+          aim: () => { const g = S.guest; return g ? { x: g.root.position.x, y: g.root.position.y + 1.32, z: g.root.position.z } : null; },
+        };
+      }
       if (S.scene.isDisposed) return;
       showHub(ctx, S, true);
       if (!S.autoBegin) showPick(ctx, S);
@@ -339,7 +387,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       // things to do by hand are the instance whose scene is GOING away — found on the next tick by `isDisposed` —
       // and the ambient bed, which stays up while another instance is still live (strict-mode phantom stop).
       setTimeout(() => {
-        for (const S of live) if (S.scene.isDisposed) { S.ended = true; S.current = null; live.delete(S); }
+        for (const S of live) if (S.scene.isDisposed) { S.ended = true; S.current = null; S.hostPP?.dispose(); S.hostPP = null; S.guestPP?.dispose(); S.guestPP = null; live.delete(S); }
         if (live.size === 0) SoundKit.stopAmbient();
       }, 0);
     },

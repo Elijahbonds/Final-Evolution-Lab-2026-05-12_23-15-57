@@ -26,6 +26,13 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
 import { CombatAnimTree, type CombatAnimInput, type CombatAnimState, type StrikeWeight } from '../anim/combatTree';
+// BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the weapon duel (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Same four
+// findings as Karate VS, plus the one this mode owns: a RING-OUT victim was still being re-aimed at his opponent every
+// frame on the way down the pit (`faceEachOther` ran from the falling branch's `animate` path), so the body that had
+// just been knocked off the platform spun to keep facing the winner while it fell.
+import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { combatPose, COMBAT_INPUT_IDLE, COMBAT_TURN_RATE, combatApproach, type CombatPostureInput } from '../core/CombatPosture';
+import { lockOnYaw, strafeAxis, wrapYaw } from '../core/Biomech';
 import {
   FighterState, RivalFightBrain, resolveStrike, applyHit,
   KARATE_ATTACKS, STAFF_ATTACKS, SPECIAL_ATTACK, CHI_MAX, PARRY_STAGGER_SEC,
@@ -78,6 +85,16 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let striking = false, foeStriking = false;
   let slowmoSec = 0, falling = false;
   let meAnim: FighterAnim, foeAnim: FighterAnim;
+  // BIOMECH-WAVE2 G5: the Posture Poses layer on both fighters (see the header). The staff loadout makes it matter more
+  // here than in Karate VS — a bo is held in front of the CHEST, and the chest was wherever the last clip left it.
+  let mePosture: { layer: PostureLayer; dispose(): void } | null = null, foePosture: { layer: PostureLayer; dispose(): void } | null = null;
+  const meBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE }, foeBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE };
+  const chestOf = (c: SpawnedCharacter): Vector3 => c.root.position.add(new Vector3(0, 1.32, 0));
+  const feedFor = (bio: CombatPostureInput, foe: () => SpawnedCharacter) => {
+    const { window, pose, legs } = combatPose(bio);
+    const at = chestOf(foe());
+    return { pose, legs, aim: at, eyes: at, window };
+  };
   // ── A+ P0 juice (PM brief COMBAT-A-PLUS-P0, 2026-09-06): ONE thud per connect (feel.impact plays its own — the SoundKit
   // impact that stacked on it is gone), a latched hit-stop + shake on heavy / special, a soft round-win beat and a latched
   // Street Fighter–class MATCH punch. No hang slowMo, no juice.impact({ slow }). The parry's scoped slow-mo is the mode's own.
@@ -178,14 +195,14 @@ export const MixedCombatMode: ModeDefinition = (() => {
     brain = new RivalFightBrain(0.6, foeAttacks());
   }
 
-  function faceEachOther(): void {
-    // A striker is COMMITTED to their line: no re-tracking mid-swing. Without
-    // this the per-frame auto-face erases every sidestep — the attack line
-    // follows the defender and the step grammar can never fire (measured:
-    // 150s of orbiting, zero steps).
-    const to = rival.root.position.subtract(player.root.position);
-    if (!striking) player.root.rotation.y = Math.atan2(to.x, to.z);
-    if (!foeStriking) rival.root.rotation.y = Math.atan2(-to.x, -to.z);
+  const downNow = (f: FighterAnim | undefined): boolean => !!f && (f.out || f.falling || now() < f.downUntil);
+  /** G1: a striker is COMMITTED to their line (no re-tracking mid-swing — without it the auto-face erases every sidestep
+   *  and the step grammar can never fire: measured, 150 s of orbiting, zero steps), and outside a swing the lock-on now
+   *  TURNS at a pivot rate instead of writing atan2 onto the root. A floored, KO'd or FALLING body is left alone. */
+  function faceEachOther(dt: number): void {
+    const p = player.root.position, r = rival.root.position;
+    if (!striking && !downNow(meAnim)) player.root.rotation.y = lockOnYaw(p, r, player.root.rotation.y, COMBAT_TURN_RATE, dt);
+    if (!foeStriking && !downNow(foeAnim)) rival.root.rotation.y = lockOnYaw(r, p, rival.root.rotation.y, COMBAT_TURN_RATE, dt);
   }
 
   // ── the tree's inputs (ANIM-READABILITY) ──
@@ -200,21 +217,33 @@ export const MixedCombatMode: ModeDefinition = (() => {
   function beatDown(mine: boolean, staggerSec: number): void { const f = animOf(mine); f.downUntil = now() + (staggerSec - GET_UP_SEC) * 1000; f.tree.clearBeat('knockdown'); endStrike(mine); }
   function beatParry(mine: boolean): void { const f = animOf(mine); f.parryUntil = now() + PARRY_SEC * 1000; f.tree.clearBeat('parry_flash'); }
   function beatGuardImpact(mine: boolean): void { const f = animOf(mine); f.impactUntil = now() + IMPACT_SEC * 1000; f.tree.clearBeat('guard_impact'); }
-  function treeInput(f: FighterAnim, s: FighterState, speed01: number, weapon: boolean): CombatAnimInput {
+  function treeInput(f: FighterAnim, s: FighterState, speed01: number, weapon: boolean, mine: boolean, vel: Vector3): CombatAnimInput {
     const t = now();
     if (f.strike && t > f.strike.until) endStrike(f === meAnim);   // a strike the tree never settled (safety, never measured)
+    const me = mine ? player : rival, foe = mine ? rival : player;
+    // G2 — a ring fighter travels SIDEWAYS (the whole 8-way spacing game is lateral): the feet now match the travel
+    const strafe = strafeAxis(vel, me.root.rotation.y);
+    const toFoe = foe.root.position.subtract(me.root.position); toFoe.y = 0;
+    const closing = toFoe.lengthSquared() > 1e-6 ? Vector3.Dot(vel, toFoe.normalize()) : 0;
+    const moving = s.controllable && !s.blockHeld ? speed01 : 0;
+    const bio = mine ? meBio : foeBio;
+    bio.speed01 = moving; bio.strafe = strafe; bio.approach = combatApproach(closing);
+    bio.striking = f.strike?.weight ?? null; bio.windingUp = false;
+    bio.blocking = s.blockHeld; bio.parrying = t < f.parryUntil; bio.guardImpact = t < f.impactUntil;
+    bio.hitBy = t < f.hitUntil ? f.hitBy : null; bio.down = t < f.downUntil; bio.out = f.out || f.falling;
+    bio.rising = false; bio.dodging = false; bio.celebrating = t < f.celebrateUntil; bio.engaged = phase === 'fighting';
     return {
-      speed01: s.controllable && !s.blockHeld ? speed01 : 0, dashing: false, hasWeapon: weapon,
+      speed01: moving, strafe, backing: strafe === 0 && bio.approach < 0, dashing: false, hasWeapon: weapon,
       striking: f.strike?.weight ?? null, strikeClip: f.strike?.clip,
       blocking: s.blockHeld, parryFlash: t < f.parryUntil, guardImpactFlash: t < f.impactUntil,
       hitBy: t < f.hitUntil ? f.hitBy : null, down: t < f.downUntil, out: f.out, falling: f.falling, ulting: false, celebrating: t < f.celebrateUntil,
     };
   }
   /** Once per frame, both fighters, every phase (a ring-out victim falls, the loser holds the floor, the winner celebrates). */
-  function animate(mySpeed01: number, foeSpeed01: number): void {
+  function animate(mySpeed01: number, foeSpeed01: number, myVel = Vector3.Zero(), foeVel = Vector3.Zero()): void {
     if (!meAnim || !foeAnim) return;
-    meAnim.tree.update(treeInput(meAnim, meState, mySpeed01, myLoadout === 'staff'));
-    foeAnim.tree.update(treeInput(foeAnim, foeState, foeSpeed01, foeLoadout() === 'staff'));
+    meAnim.tree.update(treeInput(meAnim, meState, mySpeed01, myLoadout === 'staff', true, myVel));
+    foeAnim.tree.update(treeInput(foeAnim, foeState, foeSpeed01, foeLoadout() === 'staff', false, foeVel));
   }
   function resetAnim(f: FighterAnim): void { f.strike = null; f.hitBy = null; f.hitUntil = 0; f.parryUntil = 0; f.impactUntil = 0; f.downUntil = 0; f.celebrateUntil = 0; f.out = false; f.falling = false; f.tree.reset(); }
 
@@ -222,18 +251,23 @@ export const MixedCombatMode: ModeDefinition = (() => {
     return Math.hypot(pos.x, pos.z) > RING_RADIUS;
   }
 
+  /** G3: constant SPEED, so the distance sets the duration — a jab's 0.4 m shove and the special's ring-out shove used
+   *  to take the same 180 ms, which is why the DRAGON read as a teleport rather than as the thing that ends rounds. */
+  const KNOCKBACK_SPEED = 9;
   function knockback(ctx: ModeContext, char: SpawnedCharacter, fromPos: Vector3, meters: number, onDone: () => void): void {
     const dir = char.root.position.subtract(fromPos); dir.y = 0;
     if (dir.lengthSquared() < 1e-4) { onDone(); return; }
     dir.normalize();
     const from = char.root.position.clone();
     const to = from.add(dir.scale(meters));       // deliberately NOT clamped — the edge is live
+    const ms = Math.max(80, (Vector3.Distance(from, to) / KNOCKBACK_SPEED) * 1000);
     const t0 = now();
     const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-      const k = Math.min(1, (now() - t0) / 180);
+      const u = Math.min(1, (now() - t0) / ms);
+      const k = 1 - (1 - u) * (1 - u);
       char.root.position.x = from.x + (to.x - from.x) * k;
       char.root.position.z = from.z + (to.z - from.z) * k;
-      if (k >= 1) { ctx.scene.onBeforeRenderObservable.remove(obs); onDone(); }
+      if (u >= 1) { ctx.scene.onBeforeRenderObservable.remove(obs); onDone(); }
     });
   }
 
@@ -413,7 +447,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
   function startRound(ctx: ModeContext): void {
     meState.resetRound(); foeState.resetRound();
     applyLoadouts(ctx);
-    faceEachOther();
+    player.root.rotation.y = Math.atan2(rival.root.position.x - player.root.position.x, rival.root.position.z - player.root.position.z);
+    rival.root.rotation.y = wrapYaw(player.root.rotation.y + Math.PI);   // a ROUND START is a cut, not a turn
     striking = false; foeStriking = false; slowmoSec = 0; falling = false;
     setPhase('fighting');
     ctx.setHud({
@@ -430,14 +465,14 @@ export const MixedCombatMode: ModeDefinition = (() => {
     async load(ctx: ModeContext) {
       buildArena(ctx);
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
-        position: new Vector3(0, 0, 2.2), startClip: IDLE_CLIP,
+        position: new Vector3(0, 0, 2.2), yawRad: Math.PI, startClip: IDLE_CLIP,   // BIOMECH-WAVE2 G1/G3: spawned facing each other (the round start used to snap both bodies 180°)
       });
       neverBindPose(player.animator, IDLE_CLIP);
       installSafePlay(player.animator, 'mixedcombat-player');
       ctx.groundLock?.track(player.root, player.skeleton);
 
       rival = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
-        position: new Vector3(0, 0, -2.2), tint: '#1e3a8b', startClip: IDLE_CLIP,
+        position: new Vector3(0, 0, -2.2), yawRad: 0, tint: '#1e3a8b', startClip: IDLE_CLIP,
       });
       neverBindPose(rival.animator, IDLE_CLIP);
       installSafePlay(rival.animator, 'mixedcombat-rival');
@@ -446,6 +481,13 @@ export const MixedCombatMode: ModeDefinition = (() => {
       foeAnim = newFighterAnim(new CombatAnimTree(rival.animator));
       meAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(true); };
       foeAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(false); };
+      mePosture?.dispose(); foePosture?.dispose();
+      mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => feedFor(meBio, () => rival), 'MC-PP');
+      foePosture = mountPostureLayer(ctx.scene, rival.skeleton, rival.root, () => feedFor(foeBio, () => player), 'MC-PP-FOE');
+      if (process.env.NODE_ENV === 'development') {
+        const dev = (window as unknown as { __FEL_DEV__?: { combatPosture?: unknown } }).__FEL_DEV__;
+        if (dev) dev.combatPosture = { me: () => mePosture?.layer.get() ?? null, foe: () => foePosture?.layer.get() ?? null, bio: () => ({ me: { ...meBio }, foe: { ...foeBio } }), aim: () => { const a = chestOf(rival); return { x: a.x, y: a.y, z: a.z }; } };   // BIOMECH-WAVE2 probes
+      }
 
       meState = new FighterState(100);
       foeState = new FighterState(100);
@@ -558,8 +600,9 @@ export const MixedCombatMode: ModeDefinition = (() => {
       if (!action.block && foeState.blockHeld) foeState.releaseBlock();
       if (action.attack) swing(ctx, false, action.attack);
       let foeSpeed01 = Math.min(1, Math.hypot(action.moveX, action.moveY));   // the brain's INTENT, striking or not — the strike's settle lands on the step, not a one-frame stance
+      const foeVel = new Vector3(action.moveX, 0, -action.moveY).scale(MOVE_SPEED * 0.9);
       if (foeState.controllable && !foeStriking && !foeState.blockHeld) {
-        const vel = new Vector3(action.moveX, 0, -action.moveY).scale(MOVE_SPEED * 0.9);
+        const vel = foeVel;
         const before = rival.root.position.clone();
         rival.root.position.addInPlace(vel.scale(sdt));
         const r = Math.hypot(rival.root.position.x, rival.root.position.z);
@@ -570,7 +613,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
         foeSpeed01 = sdt > 0 && Vector3.Distance(before, rival.root.position) / sdt < 0.3 ? 0 : vel.length() / MOVE_SPEED;   // the step only while the body moves
       }
 
-      faceEachOther();
+      faceEachOther(dt);
       // Edge legibility — the ring-out is the signature, so the danger has
       // to be READABLE: warn when YOUR back is near the rim, and name the
       // opening when the RIVAL's is. Soul Calibur teaches this with stage
@@ -581,10 +624,11 @@ export const MixedCombatMode: ModeDefinition = (() => {
       ctx.setHud({ guard: Math.round(meState.guard), foeGuard: Math.round(foeState.guard), edge });
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(player.root.position, moveVel, rival.root.position);
-      animate(mySpeed01, foeSpeed01);
+      animate(mySpeed01, foeSpeed01, moveVel, foeVel);
     },
 
     dispose() {
+      mePosture?.dispose(); mePosture = null; foePosture?.dispose(); foePosture = null;
       myStaff?.dispose(); foeStaff?.dispose();
       gallery?.dispose(); gallery = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
