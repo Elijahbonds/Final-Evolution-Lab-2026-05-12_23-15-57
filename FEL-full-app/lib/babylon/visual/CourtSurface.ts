@@ -15,8 +15,9 @@
 // and swaps its material, so it works with every basketball mode as a
 // one-line call and can't desync from the venue's geometry.
 
-import { Color3, DynamicTexture, StandardMaterial, PBRMaterial, Vector2 } from '@babylonjs/core';
-import type { Scene } from '@babylonjs/core';
+import { Color3, DynamicTexture, Mesh, MeshBuilder, PBRMaterial, Texture, Vector2 } from '@babylonjs/core';
+import type { Scene, TransformNode } from '@babylonjs/core';
+import { applyFloorDetailToMesh } from './groundTextures';
 
 const TEX = 2048;                       // court lines need the resolution
 
@@ -170,6 +171,14 @@ export function applyOceanCourt(scene: Scene, style: CourtWaterStyle = 'venice')
     console.warn('[FEL-COURT] applyOceanCourt: no "venue_ground" mesh — call after VenueKit.buildCourt()');
     return false;
   }
+  // DUNK-VISUAL-POLISH: a mapped venue HIDES venue_ground (NexusVenue) and the Venice courts paint their surface with
+  // mountStreetCourt instead — painting the ocean onto the hidden plane costs a second 2048² court texture that nothing
+  // can ever see. Measured 2026-09-09: three-point mounts twice, so it carried FOUR of them and lost the WebGL context
+  // ("Graphics were reset by the device") on the first load of the mode. If the ground is not rendering, neither is this.
+  if (!ground.isVisible || ground.visibility === 0) {
+    console.info('[FEL-COURT] ocean court skipped — venue_ground is hidden (the venue paints its own surface)');
+    return false;
+  }
   // Pass 5 phase 8: the mobile tier paints the court at half resolution — measured 21 MB at 2048² on three-point and dunk duel,
   // the largest single texture on the phone tier after the hero variant landed.
   const size = (scene.metadata as { felTier?: string } | undefined)?.felTier === 'mobile' ? TEX / 2 : TEX;
@@ -199,4 +208,216 @@ export function applyOceanCourt(scene: Scene, style: CourtWaterStyle = 'venice')
   });
   console.info(`[FEL-COURT] ocean court applied (${style})`);
   return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DUNK-VISUAL-POLISH — the STREET COURT paint.
+//
+// The Venice court's playing surface was the baked photogrammetry scan
+// (venice-blue-court.glb, Mesh_0): a 1024² texture stretched over 26 m of court
+// — 39 texels a metre — lit at environmentIntensity 0.02 by the map's
+// `matteFloor` rule. Measured on 3083e17 it renders as a near-black slick with
+// the scan's own smears reading as oil on water, which is what the owner saw
+// ("the floor looks wrong/ugly").
+//
+// This paints the court instead: a 2048² sealed-blacktop albedo laid on a clean
+// planar ground over the scan, with real markings placed from METRES (not from
+// texture insets — the lesson volleyball and three-point both paid for), plus a
+// tiling asphalt grain as a detail map so the surface still has aggregate when
+// the camera is on the floor. No image assets.
+//
+// The paint is z- and x-symmetric (a full court: two keys, two arcs), so it can
+// never be mounted the wrong way round.
+
+const COURT_LINE = '#F4F8FB';
+const courtTexCache = new WeakMap<Scene, Map<string, DynamicTexture>>();
+
+
+/** Per-pixel aggregate over the whole canvas in one pass. `amount` scales the spread in 8-bit levels.
+ *  A headless canvas hands back no pixels — the paint is simply left ungrained rather than dying. */
+function grain(g: CanvasRenderingContext2D, S: number, rnd: () => number, amount: number): void {
+  const img = g.getImageData?.(0, 0, S, S);
+  const d = img?.data;
+  if (!d) return;
+  const spread = 46 * amount;
+  for (let i = 0; i < d.length; i += 4) {
+    // one draw of the rng per pixel, biased so half the grain is dark aggregate and half is the light stone in it
+    const n = (rnd() - 0.5) * spread;
+    d[i] = Math.max(0, Math.min(255, d[i] + n * 0.8));
+    d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
+    d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n * 1.15));
+  }
+  g.putImageData(img as ImageData, 0, 0);
+}
+
+/** Deterministic street-court albedo. `wM`/`lM` are the real court metres the texture covers. */
+export function paintStreetCourt(
+  g: CanvasRenderingContext2D, S: number, wM: number, lM: number,
+  palette: { base: string; base2: string; key: string; seam: string } = {
+    // The key has to READ from the dunk camera at 14 m under a golden-hour grade that lifts everything warm: at #16506E
+    // against this base it measured as the same teal (shot 2026-09-09). A painted key is a different colour, not a shade.
+    base: '#2C6B88', base2: '#37809C', key: '#0D3448', seam: '#1B4A61',
+  },
+): void {
+  const rnd = makeRng(0x5eed17);
+  const pxW = S / wM, pxL = S / lM;             // pixels per metre on each axis
+  const px = (pxW + pxL) / 2;                   // for widths that must read the same both ways
+  const X = (m: number) => S / 2 + m * pxW;     // court metres → texture pixels
+  const Z = (m: number) => S / 2 + m * pxL;
+
+  // ── 1. sealed blacktop base, with the coat laid in overlapping passes
+  g.fillStyle = palette.base;
+  g.fillRect(0, 0, S, S);
+  g.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < 34; i++) {                       // sealcoat blotches: the surface is never one value
+    const x = rnd() * S, y = rnd() * S, r = S * (0.06 + rnd() * 0.18);
+    const grd = g.createRadialGradient(x, y, 1, x, y, r);
+    const lighter = rnd() < 0.55;
+    grd.addColorStop(0, lighter ? 'rgba(120,180,205,0.10)' : 'rgba(8,32,48,0.12)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grd; g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  for (let i = 0; i < 16; i++) {                       // squeegee sweeps — how a court is actually coated
+    const y = rnd() * S;
+    g.strokeStyle = `rgba(${rnd() < 0.5 ? '150,200,220' : '10,38,54'}, ${0.04 + rnd() * 0.05})`;
+    g.lineWidth = 30 + rnd() * 90;
+    g.beginPath(); g.moveTo(-40, y);
+    for (let x = -40; x <= S + 40; x += 60) g.lineTo(x, y + Math.sin(x * 0.004 + i) * (18 + rnd() * 22));
+    g.stroke();
+  }
+  // ── 2. aggregate — the grain that stops the court reading as a flat fill.
+  //      ONE pass over the pixel buffer, not 26 000 fillRects: at 2048² the per-call `fillStyle = 'rgba(…)'` string parse
+  //      cost ~3.9 s of main thread (measured on the dunk's own HUD, 2026-09-09) and three-point lost the WebGL context
+  //      outright on the frame it painted. A buffer pass is the same grain in ~40 ms.
+  grain(g, S, rnd, 0.55);
+  // ── 3. hairline cracks + the two expansion seams a poured slab always has
+  for (let i = 0; i < 14; i++) {
+    let x = rnd() * S, y = rnd() * S;
+    let a = rnd() * Math.PI * 2;
+    g.strokeStyle = `rgba(11,36,50,${0.16 + rnd() * 0.2})`;
+    g.lineWidth = 1 + rnd();
+    g.beginPath(); g.moveTo(x, y);
+    for (let k = 0; k < 9; k++) { a += (rnd() - 0.5) * 1.1; x += Math.cos(a) * (14 + rnd() * 46); y += Math.sin(a) * (14 + rnd() * 46); g.lineTo(x, y); }
+    g.stroke();
+  }
+  g.strokeStyle = `${palette.seam}88`; g.lineWidth = Math.max(1.5, px * 0.02);
+  for (const zm of [-lM / 6, lM / 6]) { g.beginPath(); g.moveTo(0, Z(zm)); g.lineTo(S, Z(zm)); g.stroke(); }
+
+  // ── 4. the KEYS, painted before the lines so the lines sit on top
+  const KEY_W = 4.9, KEY_D = 5.8, RIM_FROM_BASE = 1.575, HALF_L = lM / 2, HALF_W = wM / 2;
+  const inset = 0.15;
+  g.fillStyle = palette.key;
+  for (const s of [-1, 1]) {
+    const zBase = s * (HALF_L - inset);
+    g.fillRect(X(-KEY_W / 2), Math.min(Z(zBase), Z(zBase - s * KEY_D)), KEY_W * pxW, KEY_D * pxL);
+  }
+  // a wash of the base back over the keys so they read as worn paint, not a decal
+  g.globalAlpha = 0.16;
+  for (let i = 0; i < 240; i++) { const x = rnd() * S, y = rnd() * S; g.fillStyle = rnd() < 0.5 ? palette.base : palette.base2; g.fillRect(x, y, 6 + rnd() * 22, 5 + rnd() * 18); }
+  g.globalAlpha = 1;
+
+  // ── 5. the markings, from the rulebook's metres
+  const stroke = (w: number, alpha = 0.95) => { g.strokeStyle = COURT_LINE; g.lineWidth = Math.max(1.5, w * px); g.globalAlpha = alpha; g.lineCap = 'butt'; };
+  const LINE_M = 0.05;
+  stroke(LINE_M);
+  g.strokeRect(X(-HALF_W + inset), Z(-HALF_L + inset), (wM - inset * 2) * pxW, (lM - inset * 2) * pxL);   // boundary
+  g.beginPath(); g.moveTo(X(-HALF_W + inset), Z(0)); g.lineTo(X(HALF_W - inset), Z(0)); g.stroke();       // halfway
+  g.beginPath(); g.ellipse(X(0), Z(0), 1.8 * pxW, 1.8 * pxL, 0, 0, Math.PI * 2); g.stroke();              // centre circle
+
+  for (const s of [-1, 1]) {
+    const zBase = s * (HALF_L - inset);
+    const zRim = zBase - s * RIM_FROM_BASE;
+    const zFt = zBase - s * KEY_D;
+    // key box
+    g.beginPath();
+    g.moveTo(X(-KEY_W / 2), Z(zBase)); g.lineTo(X(-KEY_W / 2), Z(zFt));
+    g.lineTo(X(KEY_W / 2), Z(zFt)); g.lineTo(X(KEY_W / 2), Z(zBase));
+    g.stroke();
+    // free-throw circle: solid toward the rim, dashed away from it
+    g.beginPath(); g.ellipse(X(0), Z(zFt), 1.8 * pxW, 1.8 * pxL, 0, 0, Math.PI * 2); g.stroke();
+    // restricted area under the rim
+    g.beginPath(); g.ellipse(X(0), Z(zRim), 1.25 * pxW, 1.25 * pxL, 0, 0, Math.PI * 2); g.stroke();
+    // three-point line: 6.75 m arc off the rim, closed with the corner straights
+    const R = 6.75, CORNER_X = HALF_W - 0.9;
+    const th = Math.acos(Math.min(1, CORNER_X / R));          // where the arc meets the corner line
+    const dz = Math.sin(th) * R;
+    g.beginPath();
+    g.moveTo(X(-CORNER_X), Z(zBase));
+    g.lineTo(X(-CORNER_X), Z(zRim - s * dz));
+    g.stroke();
+    g.beginPath();
+    g.moveTo(X(CORNER_X), Z(zBase));
+    g.lineTo(X(CORNER_X), Z(zRim - s * dz));
+    g.stroke();
+    g.beginPath();
+    const a0 = s > 0 ? Math.PI + th : th, a1 = s > 0 ? -th : Math.PI - th;
+    g.ellipse(X(0), Z(zRim), R * pxW, R * pxL, 0, a0, a1, s > 0);
+    g.stroke();
+    // the backboard mark on the baseline
+    g.beginPath(); g.moveTo(X(-0.9), Z(zBase)); g.lineTo(X(0.9), Z(zBase)); g.stroke();
+  }
+  g.globalAlpha = 1;
+
+  // ── 6. wear — the paint is not new: the same buffer pass, lighter, over the lines and the key edges
+  grain(g, S, rnd, 0.3);
+  // ── 7. sun bleach across the length so the far baseline reads lighter
+  const bleach = g.createLinearGradient(0, 0, 0, S);
+  bleach.addColorStop(0, 'rgba(255,226,178,0.10)');
+  bleach.addColorStop(0.5, 'rgba(255,226,178,0.02)');
+  bleach.addColorStop(1, 'rgba(255,226,178,0.09)');
+  g.fillStyle = bleach; g.fillRect(0, 0, S, S);
+}
+
+/**
+ * Lay the painted court over whatever surface the venue already has, as a clean planar ground with its own UVs.
+ * `x` / `z` are the WORLD extents of the playing surface in metres. Returns the mesh so the caller can park it
+ * under the venue root and let it die with the venue.
+ */
+export function mountStreetCourt(
+  scene: Scene, holder: TransformNode, x: readonly [number, number], z: readonly [number, number], y = 0.02,
+): Mesh {
+  const wM = Math.abs(x[1] - x[0]), lM = Math.abs(z[1] - z[0]);
+  const mobile = (scene.metadata as { felTier?: string } | undefined)?.felTier === 'mobile';
+  const S = mobile ? 1024 : 2048;
+  // Cached per scene, per court size. A 2048² court is ~21 MB with its mipmaps and every basketball venue in this app
+  // mounts TWICE on a page load (measured 2026-09-09: three-point logged its build twice and lost the WebGL context —
+  // "Graphics were reset by the device" — on the first one). The paint is deterministic, so the second mount takes the
+  // first one's texture. It lives and dies with the scene, like every other cached ground texture here.
+  const key = `${S}:${wM.toFixed(2)}x${lM.toFixed(2)}`;
+  let byKey = courtTexCache.get(scene);
+  if (!byKey) { byKey = new Map(); courtTexCache.set(scene, byKey); }
+  let tex = byKey.get(key);
+  let paintMs = 0;
+  if (!tex) {
+    const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
+    tex = new DynamicTexture('court_street_tex', { width: S, height: S }, scene, true);
+    paintStreetCourt(tex.getContext() as unknown as CanvasRenderingContext2D, S, wM, lM);
+    tex.update(false);
+    paintMs = Math.round((typeof performance !== 'undefined' ? performance.now() : 0) - t0);
+    tex.wrapU = Texture.CLAMP_ADDRESSMODE; tex.wrapV = Texture.CLAMP_ADDRESSMODE;
+    tex.anisotropicFilteringLevel = 8;
+    byKey.set(key, tex);
+  }
+
+  const mesh = MeshBuilder.CreateGround('vb_court_paint', { width: wM, height: lM }, scene);
+  mesh.position.set((x[0] + x[1]) / 2, y, (z[0] + z[1]) / 2);
+  mesh.parent = holder;
+  mesh.isPickable = false;
+  mesh.receiveShadows = true;
+
+  const mat = new PBRMaterial('court_street_mat', scene);
+  mat.albedoTexture = tex;
+  mat.albedoColor = Color3.White();
+  mat.metallic = 0;
+  // A sealed outdoor court has a sheen — it is not chalk. 0.66 keeps a soft
+  // sun lobe without the mirror that made the scan read as water (M12.2).
+  mat.roughness = 0.66;
+  mat.environmentIntensity = 0.45;
+  mat.specularIntensity = 0.35;
+  mesh.material = mat;
+  // aggregate at close range: the albedo carries the markings, the grain carries the asphalt
+  applyFloorDetailToMesh(scene, mesh, { kind: 'asphalt', blend: 0.28 }, [wM, lM]);
+  mesh.onDisposeObservable.add(() => mat.dispose());   // the texture is the scene's (courtTexCache), not this mesh's
+  console.info(`[FEL-COURT] street court ${wM.toFixed(1)}×${lM.toFixed(1)} m at y ${y} — ${S}² ${paintMs ? `painted in ${paintMs} ms` : '(cached)'}`);
+  return mesh;
 }

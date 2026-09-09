@@ -31,7 +31,8 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     { kit: 'nature', model: 'tree_palmBend', at: [-17, 0, -10], scale: 4.4 }, { kit: 'nature', model: 'tree_palmShort', at: [17, 0, -12], scale: 4.4 },
     { kit: 'racing', model: 'lightPostModern', at: [-15, 0, 0], scale: 2.4 }, { kit: 'racing', model: 'lightPostModern', at: [15, 0, 0], yaw: Math.PI, scale: 2.4 },
     // props+depth pass 2026-09-05 (tennis keeps the plain court) — NEAR planters · FAR palm line
-    ...line('city-suburban', 'planter', [19, -12], [19, 12], 4, 0, 2.2), ...line('nature', 'tree_palmTall', [-28, -40], [-28, 40], 5, 0.3, 5.0),
+    ...line('nature', 'plant_bushLarge', [19, -12], [19, 12], 4, 0, 2.6),   // was an empty planter row — see venice-court-meshy
+    ...line('nature', 'tree_palmTall', [-28, -40], [-28, 40], 5, 0.3, 5.0),
   ],
   // Owner 2026-09-05 ("use my other Meshy assets too"): the basketball courts add the owner's Meshy hoopbus and sedan
   // parked on the boardwalk side behind the hoop (real-metre bakes under /models/meshy, aliased as kit 'meshy').
@@ -42,7 +43,10 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     ...line('nature', 'tree_palmTall', [24, -44], [24, 44], 7, 0, 4.4), ...line('nature', 'tree_palmBend', [15, -30], [15, 30], 3, 0.8, 3.8),
     ...line('nature', 'tree_palmShort', [-12, -42], [12, -42], 4, 0, 3.6),
     ...line('racing', 'lightPostModern', [19, -36], [19, 36], 7, Math.PI, 2.4), ...line('racing', 'lightPostModern', [-15, -30], [-15, 30], 4, 0, 2.4),
-    ...line('city-suburban', 'planter', [21, -33], [21, 33], 6, 0, 2.2),
+    // DUNK-VISUAL-POLISH: this was six EMPTY terracotta troughs evenly spaced down the boardwalk — once the court stopped
+    // being a black slick they were the clearest 'placeholder' read left in frame (shot 2026-09-09: a dotted orange line
+    // along the grass, nothing in any of them). A planted hedge does the same midground job and reads as a place.
+    ...line('nature', 'plant_bushLarge', [21, -33], [21, 33], 6, 0, 2.6),
     { kit: 'racing', model: 'tent', at: [33, 0, -21], yaw: -Math.PI / 2, scale: 2.6 }, { kit: 'racing', model: 'tent', at: [33, 0, 18], yaw: -Math.PI / 2, scale: 2.6 },
     { kit: 'racing', model: 'tent', at: [22, 0, -48], yaw: 0, scale: 2.6 },
     { kit: 'meshy', model: 'hoopbus', at: [30, 0, -46], yaw: Math.PI / 2 }, { kit: 'meshy', model: 'sedan', at: [29, 0, 44], yaw: Math.PI / 2 },

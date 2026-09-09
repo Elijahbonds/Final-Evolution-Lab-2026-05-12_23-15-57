@@ -139,12 +139,15 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   //  · penalty: the stadium's two "goals" are SOLID low-poly blocks ~2 m deep on each goal line — the keeper stood inside one
   //    (feet showing) and sliding the map only moved the other under the camera (measured 2026-09-06). Both go; the spec's
   //    white goal frame stands alone.
+  //  · the venice courts need no box: their scan carries no mesh at all now (map-data meshDisabled) — its two 5.7 m walls
+  //    of sideline clutter were the black slab on the right of the court, and its floor is painted over.
   const MAP_FLATTEN: Record<string, FlattenBox[]> = {
     penalty: [{ x: [-4.6, 4.6], z: [6.8, 12.0] }, { x: [-4.6, 4.6], z: [-12.0, -6.8] }],
   };
   const scanShiftZ = !location && spec.mapKey ? (MAP_SLIDE_Z[modeId] ?? 0) : 0;
   const flatten = !location && spec.mapKey ? MAP_FLATTEN[modeId] : undefined;
-  if ((scanShiftZ || flatten) && spec.mapKey) {
+  // A meshDisabled map never puts a node in the scene — polling 80 times for one is 20 s of nothing.
+  if ((scanShiftZ || flatten) && spec.mapKey && !MAPS[spec.mapKey]?.meshDisabled) {
     const key = `nexus_venue_map_${spec.mapKey}`; let tries = 0;
     const settle = (): void => {
       const node = ctx.scene.getTransformNodeByName(key);

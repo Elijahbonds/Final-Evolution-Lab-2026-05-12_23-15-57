@@ -25,6 +25,13 @@ export interface MapConfig {
   mapRotationY?: number;  // Y-axis rotation (radians) applied to the loaded map mesh, e.g. to align a painted hoop under the functional rim
   matteFloor?: boolean;   // M12.2: treat the surface as matte painted blacktop (kills specular/reflection sheen that made the blue court read as water) and brightens albedo
   surfaceY?: number;      // MEASURED walking-surface height in world units under the full transform (scripts/map/measure-surface.mts). Consumers drop the map by this so the real court/floor lands on the gameplay invariant floorY=0. Never guess it — re-run the probe after changing scale/offset/rotation.
+  /**
+   * DUNK-VISUAL-POLISH (2026-09-09): keep the entry — its bounds, navmesh key and camera box still describe the venue —
+   * but do NOT put the baked mesh in the scene. For a scan whose art has been replaced by something better (the Venice
+   * court is painted now, visual/CourtSurface.mountStreetCourt) this is the difference between a venue that carries the
+   * old art as dead geometry and one that does not load it at all.
+   */
+  meshDisabled?: boolean;
 }
 
 export const MAPS: Record<string, MapConfig> = {
@@ -94,6 +101,14 @@ export const MAPS: Record<string, MapConfig> = {
     // the neon rig. Force a matte, brightened blacktop look so it reads as a painted court.
     matteFloor: true,
     surfaceY: -2.34, // measured: scan dips below y=0 — characters floated before this
+    // The scan is not the court any more. Measured 2026-09-09 (scripts/probes/_dunk-visual-scan.mts): 55 329 of its
+    // 65 873 vertices — 84 % — stand ABOVE the floor as two 5.7 m walls of photogrammetry clutter down both sidelines
+    // (every cell above 0.25 m sits at |x| ≥ 8), which is the black slab the owner sees on the right of the court; and
+    // the remaining floor is a 1024² texture over 26 m (39 texels a metre) lit at environmentIntensity 0.02 by the
+    // matteFloor rule above, so it renders as a near-black slick with the scan's own smears reading as oil on water.
+    // The court is painted now and the venue's own dressing carries the sides, so the mesh stays out of the scene. The
+    // entry itself stays: the navmesh, the camera box and the boardwalk's own z-slide are all keyed to it.
+    meshDisabled: true,
   },
   'venice-skatepark': {
     key: 'venice-skatepark',

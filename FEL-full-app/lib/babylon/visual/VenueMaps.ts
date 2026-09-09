@@ -29,7 +29,7 @@ const mounted = new WeakSet<Scene>();
  */
 export async function mountVenueMap(scene: Scene, root: TransformNode, mapKey: string): Promise<boolean> {
   const cfg = MAPS[mapKey];
-  if (!cfg || mounted.has(scene)) return false;
+  if (!cfg || cfg.meshDisabled || mounted.has(scene)) return false;   // meshDisabled: the entry describes the venue, the art is elsewhere
   const url = `/models/maps/baked/${mapKey}.glb`;
 
   try {
