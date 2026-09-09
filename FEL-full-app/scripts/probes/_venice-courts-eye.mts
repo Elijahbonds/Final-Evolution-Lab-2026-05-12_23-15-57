@@ -33,13 +33,16 @@ async function main() {
     };
     p.on('console', onMsg);
     try {
-      await p.goto(`${BASE}/play/${route}?arena=1`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+      // "dunk" → /play/dunk?arena=1 · "dunk@blossom-park" → /play/dunk?location=blossom-park&arena=1
+      const [mode, loc] = route.split('@');
+      const url = `${BASE}/play/${mode}?${loc ? `location=${loc}&` : ''}arena=1`;
+      await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 180000 });
       await p.waitForSelector('canvas', { timeout: 180000 });
       await p.waitForTimeout(2500);
       const btn = p.getByRole('button', { name: /TAP TO START/i });
       if (await btn.count()) await btn.click({ force: true }).catch(() => {});
       await p.waitForTimeout(5000);
-      await p.screenshot({ path: `${OUT}/${route}.png` });
+      await p.screenshot({ path: `${OUT}/${route.replace('@', '-')}.png` });
       const hud = (await p.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ').slice(0, 160);
       console.log(`${route}: OK  errs=${errs.length}  ${notes.join(' | ')}  HUD="${hud}"`);
       if (errs.length) console.log('   ERR', errs.slice(0, 3).join(' ;; '));

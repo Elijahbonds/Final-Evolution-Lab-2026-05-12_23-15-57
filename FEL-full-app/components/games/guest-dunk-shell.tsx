@@ -95,12 +95,32 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
     <div className="flex min-h-screen flex-col bg-[#050505]">
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1200px] items-center gap-3 px-4 py-2.5">
-          <Link href="/" className="fel-heading text-lg font-bold text-white">
-            <span className="text-[#00E5FF] fel-glow-cyan">FINAL EVOLUTION</span> LAB
-          </Link>
+          {/* DUNK-VISUAL-POLISH: on /try the brand is the only thing in the chrome above a live run, and it was a link
+              HOME — one stray click on the header and a guest's contest is gone, with no confirm and nothing to come
+              back to (a guest run is not saved anywhere). It stays plain text while the run is live and becomes the
+              way out again once the card is up, which is this shell's "quit". */}
+          {result ? (
+            <Link href="/" className="fel-heading text-lg font-bold text-white">
+              <span className="text-[#00E5FF] fel-glow-cyan">FINAL EVOLUTION</span> LAB
+            </Link>
+          ) : (
+            <span className="fel-heading text-lg font-bold text-white" aria-label="Final Evolution Lab">
+              <span className="text-[#00E5FF] fel-glow-cyan">FINAL EVOLUTION</span> LAB
+            </span>
+          )}
           <span className="ml-auto rounded-md border border-[#00FF9D]/40 px-2.5 py-1 font-mono text-[10px] text-[#00FF9D]">
             GUEST · NO ACCOUNT NEEDED
           </span>
+          {/* …and because the brand no longer navigates, the way out is named. A guest run is not saved, so leaving is
+              a real decision and it should look like one rather than hiding under the logo. */}
+          {!result && (
+            <Link
+              href="/"
+              className="rounded-md border border-white/15 px-2.5 py-1 font-mono text-[10px] text-white/45 transition-colors hover:border-white/40 hover:text-white"
+            >
+              QUIT
+            </Link>
+          )}
         </div>
       </header>
 
