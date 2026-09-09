@@ -16,7 +16,7 @@ import { chromium, type Page } from 'playwright-core';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromiumExe } from './_chromium.mts';
 const PORT = process.env.PORT ?? '3056', OUT = process.env.OUT_DIR ?? 'docs/shots/dunk-body-mid';
-const SCEN = process.env.SCEN ?? '', VERBOSE = !!process.env.VERBOSE;
+const SCEN = process.env.SCEN ?? '', VERBOSE = !!process.env.VERBOSE, SHOTS = !!process.env.SHOTS;
 mkdirSync(OUT, { recursive: true });
 
 type Row = { t: number; y: number; z: number; clipTime: number; chest: number; hips: number; spread: number; lhy: number; rhy: number; shy: number;
@@ -72,6 +72,18 @@ async function boot(): Promise<{ p: Page; close: () => Promise<void>; errors: st
   await p.evaluate(`(() => {
     const dev = window.__FEL_DEV__, scene = dev.scene;
     const S = window.__bm = { rows: [], marks: [], sign: 0 };
+    // A 1.5 s flight cannot be photographed from a polling loop — a screenshot round-trip is longer than the beat. The
+    // probe parks the SCENE CLOCK at a named clip second instead (animationTimeScale, which the mode's own clipTime is
+    // already gated on for the hang slow-mo), shoots the held frame, and hands the clock back.
+    window.__freezeAt = null; window.__frozen = false;
+    // the CONTACT / jam beat runs on raw dt, not the animation clock, so parking animationTimeScale cannot hold it —
+    // that one stops the render loop outright and hands the engine its own loops back afterwards
+    const eng = scene.getEngine();
+    window.__freezePhase = null; window.__loops = null;
+    window.__thaw = () => {
+      scene.animationTimeScale = 1; window.__freezeAt = null; window.__frozen = false; window.__freezePhase = null;
+      if (window.__loops) { for (const fn of window.__loops) eng.runRenderLoop(fn); window.__loops = null; }
+    };
     const oi = console.info.bind(console), ow = console.warn.bind(console);
     console.info = (...a) => { const s = String(a[0]); if (/^\\[(DUNK-WIN|DUNK-LAUNCH|DUNK-PP|DUNK-PROP|DUNK-TRICK|DUNK-CUE|DUNK-SLAM|DUNK-CAM|HANDS|JUICE-SOFT|JUICE-SFX)/.test(s)) S.marks.push({ t: performance.now(), msg: s.slice(0, 200) }); oi(...a); };
     console.warn = (...a) => { const s = String(a[0]); if (/FEL-DUNK|HANDS/.test(s)) S.marks.push({ t: performance.now(), msg: 'WARN ' + s.slice(0, 200) }); ow(...a); };
@@ -104,6 +116,11 @@ async function boot(): Promise<{ p: Page; close: () => Promise<void>; errors: st
         camDist: cam ? Math.hypot(cam.position.x - h.position.x, cam.position.y - h.position.y - 1.2, cam.position.z - h.position.z) : 0,
         phase: pp.phase, ppw: pp.window, banner: String(hud.banner ?? ''), hint: String(hud.hint ?? '') });
       if (S.rows.length > 40000) S.rows.splice(0, 10000);
+      if (window.__freezeAt != null && !window.__frozen && (pp.clipTime ?? 0) >= window.__freezeAt) { window.__frozen = true; scene.animationTimeScale = 0.0005; }
+      const hit = window.__freezePhase === 'contact' ? !!pp.jamContact : (window.__freezePhase && pp.phase === window.__freezePhase);
+      if (window.__freezePhase && !window.__frozen && hit) {
+        window.__frozen = true; window.__loops = [...(eng._activeRenderLoops ?? [])]; eng.stopRenderLoop();
+      }
     });
   })()`);
   await tapBtn(p, 'A');
@@ -155,6 +172,30 @@ function bannerRuns(rows: Row[]): { text: string; ms: number }[] {
  *  slow-mo runs the clip at 0.4x for 400 ms, so a beat driven on wall-clock ms lands somewhere different every run. */
 const clipNow = async (p: Page): Promise<number> => p.evaluate(`(() => { const r = window.__bm.rows; return r.length ? r[r.length - 1].clipTime : 0; })()`) as Promise<number>;
 
+/** A frame for the EYE: the harness overlays hidden, and — when `at` is given — the scene clock parked on that clip
+ *  second first, so the picture is the beat it names and not wherever a 400 ms screenshot round-trip landed. */
+async function eyeShot(p: Page, path: string, at?: number | string): Promise<void> {
+  if (at != null) {
+    await p.evaluate(typeof at === 'string' ? `window.__freezePhase = ${JSON.stringify(at)}` : `window.__freezeAt = ${at}`);
+    const t0 = Date.now();
+    while (Date.now() - t0 < 4000) { if (await p.evaluate('window.__frozen')) break; await p.waitForTimeout(12); }
+  }
+  // hide every overlay that is not the canvas or one of its ancestors — the dev harness's JSON dump, its perf panel and
+  // its START button all sit on top of the picture the eye is being asked to read
+  await p.evaluate(`(() => {
+    const c = document.querySelector('canvas'); if (!c) return;
+    window.__hid = [];
+    for (const el of document.querySelectorAll('body *')) {
+      if (el === c || el.contains(c) || c.contains(el)) continue;
+      const pos = getComputedStyle(el).position;
+      if ((pos === 'fixed' || pos === 'absolute') && el.getBoundingClientRect().width > 0) { window.__hid.push(el); el.style.visibility = 'hidden'; }
+    }
+  })()`).catch(() => {});
+  await p.screenshot({ path });
+  await p.evaluate(`(() => { for (const el of (window.__hid ?? [])) el.style.visibility = ''; window.__hid = []; })()`).catch(() => {});
+  if (at != null) await p.evaluate('window.__thaw && window.__thaw()');
+}
+
 async function attempt(p: Page, sc: Scenario, idx: number): Promise<string[]> {
   const lines: string[] = [];
   const say = (ok: boolean, what: string) => lines.push(`${ok ? 'PASS' : 'FAIL'}  ${what}`);
@@ -180,6 +221,7 @@ async function attempt(p: Page, sc: Scenario, idx: number): Promise<string[]> {
   const stillHeld: Dir[] = [];
   const mode = sc.slam ?? 'mash';
   let slamPressedAt = -1, mashes = 0;
+  const shot = new Set<string>();
   const t0 = Date.now();
   while (Date.now() - t0 < 2600) {
     const ct = await clipNow(p);
@@ -191,15 +233,25 @@ async function attempt(p: Page, sc: Scenario, idx: number): Promise<string[]> {
       lines.push(`      air ${a.dir ?? ''}${a.hold ? ' (HELD)' : ''}+${a.btn} at clip ${f2(ct)}`);
       continue;
     }
+    // the EYE frames, parked on the flight's own clock (SHOTS=1 only — the freeze perturbs the run it photographs)
+    if (SHOTS) for (const [key, at] of [['trick', (sc.air?.[0]?.at ?? 0.35) + 0.14], ['hang', 0.85], ['carry', 1.12]] as [string, number][]) {
+      if (!shot.has(key) && ct >= at - 0.06) { shot.add(key); await eyeShot(p, `${OUT}/${slug}-${key}.png`, at); }
+    }
     if (mode === 'once' && slamPressedAt < 0 && ct >= (sc.slamAt ?? 0.95)) { slamPressedAt = ct; await tapBtn(p, 'A', 60); lines.push(`      SLAM (one press) at clip ${f2(ct)}`); }
     else if (mode === 'mash' && ct >= (sc.slamAt ?? 0.95) && mashes < 12) { if (slamPressedAt < 0) slamPressedAt = ct; mashes++; await tapBtn(p, 'A', 50); }
     const st = await p.evaluate(`(() => { const r = window.__bm.rows; return r.length ? r[r.length - 1].phase : ''; })()`);
-    if (st !== 'cinematic' && st !== 'charge' && st !== 'approach' && !air.length) break;
+    // the JAM is a resolve-phase pose, not a clip second — the buffered slam resolves the flight at the window's edge
+    // the CONTACT frame itself: the ball on the iron, the jam pose. The freeze is ARMED here and never waited on — the
+    // slam press has to keep flowing or there is no contact to photograph; the shot is taken once the engine has parked.
+    if (SHOTS && !shot.has('armContact') && ct >= 0.9) { shot.add('armContact'); await p.evaluate(`window.__freezePhase = 'contact'`); }
+    if (SHOTS && shot.has('armContact') && !shot.has('contact') && await p.evaluate('window.__frozen')) { shot.add('contact'); await eyeShot(p, `${OUT}/${slug}-contact.png`); await p.evaluate('window.__thaw && window.__thaw()'); }
+    if (st !== 'cinematic' && st !== 'resolve' && st !== 'charge' && st !== 'approach' && !air.length) break;
+    if (st === 'resolve' && (!SHOTS || shot.has('contact') || !shot.has('armContact')) && !air.length) break;
     await p.waitForTimeout(14);
   }
   for (const d of stillHeld) await dpad(p, d, false);
   await p.waitForTimeout(250);
-  await p.screenshot({ path: `${OUT}/${slug}-end.png` });
+  await eyeShot(p, `${OUT}/${slug}-end.png`);
   const tEnd0 = Date.now();
   while (Date.now() - tEnd0 < 14000) { const t = await text(p); if (/HOLD to run|Pick your PROP|FINAL ROUND|RIVAL ROUND/.test(t) && !/SLAM!|CONFER|CARD/.test(t) && Date.now() - tEnd0 > 1500) break; await p.waitForTimeout(140); }
   const tZ = await now(p);
