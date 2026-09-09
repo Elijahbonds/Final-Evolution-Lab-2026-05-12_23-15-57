@@ -17,10 +17,32 @@ import { hnode, hnum } from './hud-format';
 
 type Hud = Record<string, HudValue>;
 
-export default function DunkBabylon({ onEnd }: GameProps) {
+/** TRY-ONBOARD (G1/G3/G7): a continuous host wants the NIGHT CARD, not a session end.
+ *  `continuous` puts the mode on its GO AGAIN loop; `onCard` receives each night's
+ *  scoreboard so the host can bank the run / offer a claim WITHOUT the run stopping. */
+export interface DunkBabylonProps extends GameProps {
+  continuous?: boolean;
+  onCard?: (result: GameResult) => void;
+  /** G3: the host's optional claim / share offer, rendered UNDER the card's GO AGAIN.
+   *  It lives inside the card on purpose — a claim that is a sibling of GO AGAIN can
+   *  never be a wall in front of it, which is exactly what a modal was. */
+  cardSlot?: React.ReactNode;
+}
+
+export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = false }: DunkBabylonProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  // TRY-ONBOARD G7: the boot effect must never re-run because a PARENT re-rendered.
+  // It used to list `onEnd` as a dependency, so any host that handed down a fresh
+  // callback identity — a shell that holds state of its own, which the guest shell now
+  // does — would dispose the Babylon engine and cold-boot the whole venue underneath a
+  // live run. The callbacks live in refs; the effect owns the stage for the mount.
+  const onEndRef = useRef(onEnd);
+  const onCardRef = useRef(onCard);
+  onEndRef.current = onEnd;
+  onCardRef.current = onCard;
+  const continuousRef = useRef(continuous);
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -47,7 +69,21 @@ export default function DunkBabylon({ onEnd }: GameProps) {
         headline: won ? 'CONTEST WON' : 'CONTEST OVER',
         tallies: { hits: r.stats?.makes ?? 0, misses: r.stats?.misses ?? 0, dodges: 0, combos: r.stats?.bestChain ?? 0 },   // PACK #3: make/miss proof
       };
-      onEnd(result);
+      onEndRef.current(result);
+    };
+
+    // TRY-ONBOARD G1: a night's card. Same shape the session end reports, but the mode
+    // is still running behind it — the host must not treat this as a teardown.
+    const cardSink = async (r: SessionResult) => {
+      onCardRef.current?.({
+        score: r.score,
+        stats: r.stats, outcome: r.outcome,
+        opponentScore: r.stats?.rivalTotal ?? 0,
+        won: r.outcome === 'CONTEST_WON',
+        duration: r.durationSec,
+        headline: r.outcome === 'CONTEST_WON' ? 'NIGHT WON' : 'THAT WAS THE CARD',
+        tallies: { hits: r.stats?.makes ?? 0, misses: r.stats?.misses ?? 0, dodges: 0, combos: r.stats?.bestChain ?? 0 },
+      });
     };
 
     // StrictMode runs effect -> cleanup -> effect. Starting the harness
@@ -64,6 +100,8 @@ export default function DunkBabylon({ onEnd }: GameProps) {
         canvas,
         location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
         input: bus,
+        continuous: continuousRef.current,
+        cardSink,
         onPhase: (p, cd) => {
           setPhase(p);
           setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
@@ -85,12 +123,33 @@ export default function DunkBabylon({ onEnd }: GameProps) {
       stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
+
+  // The mode is deaf for a beat when the card lands, so that a SLAM already in flight
+  // cannot skip the one screen that says how the night went (DunkMode CARD_SETTLE_SEC).
+  // The button follows the same clock — a live-looking button that eats a click is
+  // worse than one that is visibly not ready yet.
+  const card = typeof hud.nightCard === 'string' && hud.nightCard ? hud.nightCard : null;
+  const [cardArmed, setCardArmed] = useState(false);
+  useEffect(() => {
+    if (!card) { setCardArmed(false); return; }
+    const t = setTimeout(() => setCardArmed(true), 800);
+    return () => clearTimeout(t);
+  }, [card]);
 
   // ── touch bridge ──────────────────────────────────────────────────────────
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
   }, []);
+
+  // TRY-ONBOARD G1: the card's GO AGAIN is the same event a pad button sends — the mode
+  // owns the reset, this is only a finger on it. Press AND release, or a held 'A' latch
+  // in the mode would still be down when the next runway starts.
+  const tapGoAgain = useCallback(() => {
+    emit({ t: 'button', btn: 'A', pressed: true });
+    emit({ t: 'button', btn: 'A', pressed: false });
+  }, [emit]);
 
   const tapStart = useCallback(() => {
     // READY gate + pause both advance on any button press.
@@ -185,6 +244,39 @@ export default function DunkBabylon({ onEnd }: GameProps) {
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
         <div className="pointer-events-none absolute inset-x-0 px-3 text-center" style={{ bottom: 'clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem)' }}>
           <span className="fel-panel px-3 py-1.5 font-mono text-[11px] text-white/80">{hud.hint}</span>
+        </div>
+      )}
+
+      {/* NIGHT CARD (TRY-ONBOARD G1) — the end of a contest, held on the live court. This is
+          deliberately NOT a modal over a dead canvas: the game is still running behind it, the
+          camera is still on the dunker, and one button puts him back on the runway. It covers
+          nothing at the bottom of the screen, where the touch pad lives. */}
+      {card && (
+        <div className="pointer-events-none absolute inset-x-0 top-[18%] flex flex-col items-center px-4 text-center">
+          <div className="fel-panel pointer-events-auto w-full max-w-sm rounded-2xl px-6 py-5">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">
+              Night {hnum(hud.nightNum) || 1} · Flight Night
+            </p>
+            <h2 className={`fel-heading mt-1 text-3xl font-black ${card === 'WON' ? 'text-[var(--fel-gold)]' : 'text-white'}`}>
+              {card === 'WON' ? 'YOU TOOK THE CARD' : 'RIVAL TOOK THE CARD'}
+            </h2>
+            <p className="mt-2 font-mono text-sm text-white/70">
+              YOU {hnode(hud.score, 0)} <span className="text-white/35">·</span> RIVAL {hnode(hud.rivalScore, 0)}
+            </p>
+            <p className="mt-1 font-mono text-[11px] text-white/45">
+              {hnum(hud.nightMakes)} dunked · {hnum(hud.nightMisses)} missed
+              {hnum(hud.nightBest) > 1 ? ` · best run ${hnum(hud.nightBest)}` : ''}
+            </p>
+            <button
+              onClick={tapGoAgain}
+              disabled={!cardArmed}
+              className={`mt-4 w-full rounded-xl bg-[var(--fel-cyan)] px-6 py-3 fel-heading text-lg font-bold text-black transition-all ${cardArmed ? 'opacity-100 hover:scale-[1.02]' : 'opacity-40'}`}
+            >
+              GO AGAIN
+            </button>
+            <p className="mt-2 font-mono text-[10px] text-white/35">or press any button</p>
+            {cardSlot}
+          </div>
         </div>
       )}
 

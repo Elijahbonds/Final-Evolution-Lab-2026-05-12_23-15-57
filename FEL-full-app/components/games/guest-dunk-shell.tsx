@@ -37,15 +37,19 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
   // it T-POSES on screen. Gate 0 passing did not save this path, because this
   // path never used the Gate-0-compliant procedural rig at all.
   const babylon = isBabylon('dunkContest');
-  const Game = (babylon
-    ? DunkBabylon
-    : is3D('dunkContest') ? DunkGame3D : DunkGame2D) as React.ComponentType<GameProps>;
+  const Fallback = (is3D('dunkContest') ? DunkGame3D : DunkGame2D) as React.ComponentType<GameProps>;
   const grade = prqGrade(50);
   const [gameKey, setGameKey] = useState(0);
   const [result, setResult] = useState<GameResult | null>(null);
   const [beat, setBeat] = useState<boolean | null>(null);
   const [rematch, setRematch] = useState<string | null>(null);
+  // TRY-ONBOARD G1/G3: how many NIGHT CARDS this guest has finished. It is the "has
+  // dunked at least once" gate for the claim offer, and it is a counter rather than a
+  // flag because the claim is shown once — on the first card — and after that lives as
+  // a quiet header link that is always reachable and never in front of the game.
+  const [cards, setCards] = useState(0);
   const started = useRef(false);
+  const judged = useRef(false);
 
   // Ensure an anonymous guest token exists, then record the play_now click.
   useEffect(() => {
@@ -84,12 +88,52 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
     [challengeCode],
   );
 
+  // TRY-ONBOARD G1/G7: a NIGHT CARD is not the end of the run. The Babylon dunk keeps
+  // its stage and its input through the card and resets itself when the guest says GO
+  // AGAIN, so this handler banks the night and offers the claim — and touches nothing
+  // that could stop play. In particular it never sets `result`, which is the state that
+  // raises the wall below, and never bumps `gameKey`, which would remount the engine.
+  const handleCard = useCallback(
+    async (res: GameResult) => {
+      setCards((c) => c + 1);
+      // the funnel event is the FIRST card, not every one of them — a continuous night
+      // reaches this handler once a contest and would otherwise re-fire it all evening
+      if (!judged.current) { judged.current = true; track('first_dunk_judged', { card: 1 }); void flush(); }
+      if (challengeCode) {
+        try {
+          const j = await fetch(`/api/challenge/${challengeCode}/attempt`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ attemptScore: res?.score ?? 0, attemptTag: 'GUEST' }),
+          }).then((r) => (r.ok ? r.json() : null));
+          if (j) {
+            setBeat(Boolean(j.beat));
+            if (j.rematch?.path) setRematch(j.rematch.path);
+          }
+        } catch {}
+      }
+    },
+    [challengeCode],
+  );
+
+  // The 2D/3D fallback dunk has no in-mode reset, so its only way back is a remount —
+  // that path keeps the modal AND the cold restart. The Babylon dunk never gets here.
   const replay = () => {
     setResult(null);
     setBeat(null);
     setRematch(null);
     setGameKey((k) => k + 1);
   };
+
+  const claimLink = (
+    <Link
+      href={claimHref}
+      onClick={() => { track('guest_claim', { converted: true }); void flush(); }}
+      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-[#00E5FF]/40 px-5 py-2.5 font-mono text-xs text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/10"
+    >
+      <Flame className="h-4 w-4" /> CLAIM YOUR ATHLETE — SAVE THIS RUN
+    </Link>
+  );
 
   return (
     <div className="flex min-h-screen flex-col bg-[#050505]">
@@ -111,6 +155,19 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
           <span className="ml-auto rounded-md border border-[#00FF9D]/40 px-2.5 py-1 font-mono text-[10px] text-[#00FF9D]">
             GUEST · NO ACCOUNT NEEDED
           </span>
+          {/* TRY-ONBOARD G3: after the first night the claim is ALWAYS reachable and NEVER in
+              front of the game — one quiet link in the chrome. The old shape was the opposite:
+              a full-screen modal whose primary button left the page, with DUNK AGAIN as a small
+              grey afterthought beside it. */}
+          {cards > 0 && !result && (
+            <Link
+              href={claimHref}
+              onClick={() => { track('guest_claim', { converted: true }); void flush(); }}
+              className="rounded-md border border-[#00E5FF]/40 px-2.5 py-1 font-mono text-[10px] text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/10"
+            >
+              CLAIM
+            </Link>
+          )}
           {/* …and because the brand no longer navigates, the way out is named. A guest run is not saved, so leaving is
               a real decision and it should look like one rather than hiding under the logo. */}
           {!result && (
@@ -125,7 +182,21 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
       </header>
 
       <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4">
-        <Game key={gameKey} grade={grade} prq={50} onEnd={handleEnd} />
+        {babylon ? (
+          // G7: NO `key={gameKey}` on this one. The Babylon dunk resets itself in place;
+          // remounting it would dispose the engine and cold-boot the venue, the rig and the
+          // 3-2-1 for what the mode does on the next frame.
+          <DunkBabylon
+            grade={grade}
+            prq={50}
+            continuous
+            onEnd={handleEnd}
+            onCard={handleCard}
+            cardSlot={cards === 1 ? claimLink : null}
+          />
+        ) : (
+          <Fallback key={gameKey} grade={grade} prq={50} onEnd={handleEnd} />
+        )}
 
         <AnimatePresence>
           {result && (

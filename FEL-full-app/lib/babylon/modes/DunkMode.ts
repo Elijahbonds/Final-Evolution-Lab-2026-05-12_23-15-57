@@ -25,6 +25,7 @@ import { CharacterPipeline } from '../core/characterPipeline';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { BallSim } from '../core/BallPhysics';
+import { firstNight, nextNight, cardWon, type NightState } from '../core/ContinuousNight';   // TRY-ONBOARD G1: the GO AGAIN ledger
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { MOCAP_DUNK, DUNK_FINISH_VARIETY } from '../nexus/dressingFlags';
@@ -180,8 +181,16 @@ const FALL_SPEED = 2.6;
 // Judges + staged reveal + crowd energy now live in the SHARED JudgePanel
 // (lib/babylon/core/JudgePanel.ts) — DunkDuelMode drinks from the same well.
 
+/** How long the night card is deaf to buttons — long enough that a press already in
+ *  flight when it lands cannot skip it, short enough that it never feels stuck. */
+const CARD_SETTLE_SEC = 0.7;
+
 const BUDGET_SEC: Record<Phase, number> = {
-  approach: 30, charge: 5, cinematic: 4, resolve: 3, judging: 6, rivalTurn: 8, contestOver: 999,
+  // TRY-ONBOARD G1: the card has NO budget. It used to be 999 s because it lasted the
+  // 40 ms before ctx.end tore the mode down; on a continuous night the guest sits on it
+  // for as long as they like, and a tripped watchdog with no case for this phase logs a
+  // warning every frame from minute seventeen on.
+  approach: 30, charge: 5, cinematic: 4, resolve: 3, judging: 6, rivalTurn: 8, contestOver: Infinity,
 };
 
 export const DunkMode: ModeDefinition = (() => {
@@ -232,6 +241,7 @@ export const DunkMode: ModeDefinition = (() => {
   let toppling = false;                       // the prop goes over with you
   const usedCombos = new Set<string>();       // variety memory: "style_prop" combos thrown
   let round = 1, dunkInRound = 0;
+  let night = 1;                              // TRY-ONBOARD G1: which card of a continuous Flight Night this is
   let playerTotal = 0, rivalTotal = 0, hype = 0, chain = 0;
   let makes = 0, misses = 0, bestChain = 0;   // PACK #3: the proof card's make/miss line
   let lastScores: JudgeScore[] = [];
@@ -475,14 +485,15 @@ export const DunkMode: ModeDefinition = (() => {
       // under any other location the location's environment stands, so the pass steps aside.
       if (!ctx.location || ctx.location === 'venice') await applyVeniceDunkLookPass(ctx.scene);
 
-      round = 1; dunkInRound = 0; playerTotal = 0; rivalTotal = 0; hype = 0; chain = 0; finishing = false; ended = false; rivalClipToken = 0; makes = 0; misses = 0; bestChain = 0;
+      ({ night, round, dunkInRound, playerTotal, rivalTotal, makes, misses, bestChain } = firstNight());
+      hype = 0; chain = 0; finishing = false; ended = false; rivalClipToken = 0;
       style = 'power'; prop = 'none'; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
       resetLob(); resetRunway(); win = 'run';
       setPhase('approach');
       ctx.setHud({
-        round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`,
+        round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`, nightCard: null, nightNum: night,
         score: playerTotal, rivalScore: rivalTotal, style: STYLE_LABEL[style], prop: PROP_LABEL[prop], hype: 0, chain: 0,
         hint: 'Pick your PROP (X / d-pad) · STYLE to cycle · LOOK stick orbits the camera · RUN-UP SPEED buys your air · HOLD to run — then tap jump',
       });
@@ -493,6 +504,19 @@ export const DunkMode: ModeDefinition = (() => {
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       if (e.t === 'dpad') { if (e.pressed) { heldDpad = e.dir; heldDpadKey = e.src === 'key'; } else if (heldDpad === e.dir) heldDpad = null; }
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; if (!lookSeen && (Math.abs(e.x) > 0.12 || Math.abs(e.y) > 0.12)) { lookSeen = true; console.info('[LOOK] R stick live'); } }   // LOOK: read at last (it was emitted and dropped)
+
+      // TRY-ONBOARD G1: on a CONTINUOUS night the card is a beat, not a wall — any
+      // button on it is GO AGAIN. Nothing else in the mode reads input here, so the
+      // gate returns: a stale hold or a d-pad direction never leaks into night N+1.
+      // (START never reaches a mode — the harness spends it on pause.)
+      if (phase === 'contestOver') {
+        // …but not on the button that was already travelling. A guest ends their last
+        // dunk mashing SLAM, and without this the card is dismissed by a press thrown
+        // before it existed — the one screen that tells them how the night went, gone
+        // in the same frame it arrived. The card has to be READ before it can be left.
+        if (e.t === 'button' && e.pressed && phaseSec >= CARD_SETTLE_SEC) goAgain(ctx);
+        return;
+      }
 
       if (e.t === 'button' && e.btn === 'B' && e.pressed && phase === 'approach') {
         style = STYLES[(STYLES.indexOf(style) + 1) % STYLES.length];
@@ -979,7 +1003,14 @@ export const DunkMode: ModeDefinition = (() => {
         // to. Anything else in frame (the ball is the obvious candidate, and it
         // is wherever it bounced) drags the composition somewhere arbitrary.
         ctx.camDirector.update(player.root.position, Vector3.Zero(), null);
-      } else if (phase !== 'contestOver') {
+      } else if (phase === 'contestOver') {
+        // TRY-ONBOARD G1: the night card sits on a LIVE shot. The camera used to be
+        // left undriven in this phase — which was harmless when the phase was the last
+        // 40 ms before ctx.end tore the stage down, and is a frozen frame now that a
+        // guest can sit on the card as long as they like. Same framing the verdict
+        // uses: the dunker, waiting, with nothing else pulling on the composition.
+        ctx.camDirector.update(player.root.position, Vector3.Zero(), null);
+      } else {
         // ALWAYS frame against the RIM, never the ball.
         //
         // This used the ball as the objective for every phase except the
@@ -2097,11 +2128,68 @@ export const DunkMode: ModeDefinition = (() => {
       return;
     }
     setPhase('contestOver');
-    ended = true;
     SoundKit.play('whistle');
-    const won = playerTotal >= rivalTotal;
+    const won = cardWon({ playerTotal, rivalTotal });
     if (won) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
-    ctx.end(won ? 'CONTEST_WON' : 'CONTEST_LOST', playerTotal, { rivalTotal, rounds: TOTAL_ROUNDS, makes, misses, bestChain });
+    const stats = { rivalTotal, rounds: TOTAL_ROUNDS, makes, misses, bestChain, night };
+    // TRY-ONBOARD G1 (BUG-001). The card is finite by design — 2 rounds x 2 dunks
+    // against the rival — and that part is right: it is the contest. What was wrong
+    // is what the card DID. `ctx.end` parks the harness in 'ended', which stops
+    // update() and drops every input on the floor, and the only answer a host has to
+    // that is to throw the whole mode away and boot a new one. So a guest's night
+    // died on a modal, and the way back was a cold reload of the venue, the rig, the
+    // clips and the 3-2-1 — for a game whose entire pitch is "go again".
+    // On a continuous night the card REPORTS (the host still gets the same
+    // SessionResult, so the run is banked and the claim can be offered) and the mode
+    // keeps the stage: any button starts night N+1 as a soft reset in place.
+    if (ctx.continuous) {
+      ctx.card(won ? 'CONTEST_WON' : 'CONTEST_LOST', playerTotal, stats);
+      showNightCard(ctx, won);
+      return;
+    }
+    ended = true;
+    ctx.end(won ? 'CONTEST_WON' : 'CONTEST_LOST', playerTotal, stats);
+  }
+
+  /** The night's scoreboard, held on a live shot until the player says GO AGAIN. */
+  function showNightCard(ctx: ModeContext, won: boolean): void {
+    clearBanner(ctx);
+    ctx.setHud({
+      nightCard: won ? 'WON' : 'OVER', nightNum: night,
+      nightMakes: makes, nightMisses: misses, nightBest: bestChain,
+      judgeReveal: null, hint: '', charge: 0, slamPulse: false, need: 0,
+    });
+  }
+
+  /** GO AGAIN — the whole contest resets INSIDE the mode. Nothing is disposed and
+   *  nothing is re-loaded: the venue, the rig, the clips, the ball and the camera are
+   *  the ones already on screen, so the next night starts on the very next frame. */
+  function goAgain(ctx: ModeContext): void {
+    if (phase !== 'contestOver') return;
+    // the ledger owns what survives a night (lib/babylon/core/ContinuousNight.ts):
+    // the night number, and nothing else a contest scored
+    const led: NightState = nextNight({ night, round, dunkInRound, playerTotal, rivalTotal, makes, misses, bestChain });
+    ({ night, round, dunkInRound, playerTotal, rivalTotal, makes, misses, bestChain } = led);
+    hype = 0; chain = 0;
+    ended = false; finishing = false;
+    usedCombos.clear(); momentum.reset(); flight.reset();
+    lastScores = []; revealed = [];
+    // the run's own held state — a button or a stick still down when the card came up
+    stickX = 0; stickY = 0; lookX = 0; lookY = 0; heldDpad = null; dpadPick = null; aHeld = false;
+    // the rival goes back to the bench spot he spawned on, in the idle loop
+    rival.root.position.set(3.2, 0, CFG.rimZ + 3);
+    rival.root.rotation.y = 0;
+    rivalClipToken++; rivalClip(SPORT_CLIP.idle, { loop: true });
+    ctx.heroRef.current = player.root;
+    ctx.camDirector.suspended = false;
+    ctx.setHud({
+      nightCard: null, nightNum: night, nightMakes: null, nightMisses: null, nightBest: null,
+      round: `1/${TOTAL_ROUNDS}`, score: 0, rivalScore: 0, hype: 0, chain: 0,
+    });
+    crowd.onScore(0);
+    SoundKit.play('uiTick', { pitch: 1.4 });
+    resetForNextAttempt(ctx);           // -> phase 'approach', the runway HUD, a fresh prop
+    flash(ctx, `NIGHT ${night}`, 1400);
   }
 
   return def;

@@ -77,6 +77,16 @@ export interface ModeContext {
   /** current phase — modes may read, never write */
   phase(): ModePhase;
   end(outcome: string, score: number, stats: Record<string, number>): void;
+  /** TRY-ONBOARD (G1/G7): the host asked for a CONTINUOUS night. A mode that would
+   *  otherwise finish its card must offer GO AGAIN in-mode — report through card()
+   *  and keep playing — instead of calling end(), which parks the harness in
+   *  'ended' and hands the host a modal it can only answer by remounting. */
+  continuous: boolean;
+  /** A finished card that does NOT end the session. Same SessionResult the sink
+   *  would get from end(), but the phase stays 'playing': the scene, the camera,
+   *  the input and every loaded asset survive, so the next night is a soft reset
+   *  inside the mode rather than a cold reboot of the whole stage. */
+  card(outcome: string, score: number, stats: Record<string, number>): void;
   setHud(update: Record<string, HudValue>): void;   // bezel HUD bridge
 }
 
@@ -98,6 +108,10 @@ export interface HarnessOpts {
   /** Dev only (ship pass 3 rollout flag): every spawn of the default hero uses this GLB instead. */
   heroOverride?: string;
   resultSink?: ResultSink;
+  /** TRY-ONBOARD (G1): run this mode as a CONTINUOUS night — see ModeContext.continuous. */
+  continuous?: boolean;
+  /** Where ctx.card() lands: a scoreboard the host may show without ending the run. */
+  cardSink?: ResultSink;
   /** Optional host-owned bus so a touch overlay can emit() the same events. */
   input?: InputBus;
   /** Court location pick (docs/SPEC-COURT-LOCATIONS.md) — basketball venues swap their environment half. */
@@ -192,6 +206,12 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       setPhase('ended');
       const result: SessionResult = buildResult(def.modeId, outcome, score, stats, startedAt);
       (opts.resultSink ?? defaultResultSink)(result);
+    },
+    continuous: opts.continuous === true,
+    card(outcome, score, stats) {
+      if (phase === 'ended') return;
+      const result: SessionResult = buildResult(def.modeId, outcome, score, stats, startedAt);
+      void opts.cardSink?.(result);
     },
     setHud(update) { opts.onHud?.(update); },
   };
