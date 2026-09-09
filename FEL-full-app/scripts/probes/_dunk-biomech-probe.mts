@@ -9,11 +9,12 @@
 //   B5 end poses: a dunk clip on the body every frame from the resolve to feet-down, no T-pose held through the fall, feet-down lands
 //   PORT=3004 npx tsx scripts/probes/_dunk-biomech-probe.mts        (SRC=pad · SCEN= filters · VERBOSE=1 · GROUP=n)
 import { chromium, type Page } from 'playwright-core';
+import { chromiumExe } from './_chromium.mts';
 import { mkdirSync, writeFileSync } from 'node:fs';
 const PORT = process.env.PORT ?? '3004', SRC = (process.env.SRC ?? 'key') as 'pad' | 'key', OUT = process.env.OUT_DIR ?? 'docs/shots/dunk-biomech';
 const SCEN = process.env.SCEN ?? '', VERBOSE = !!process.env.VERBOSE, GROUP = process.env.GROUP ? Number(process.env.GROUP) : null;
 mkdirSync(OUT, { recursive: true });
-const EXE = process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
+const EXE = chromiumExe();
 
 type Row = { t: number; dt: number; x: number; y: number; z: number; yaw: number; rq: number; chest: number; hips: number; rimB: number; spread: number; lhy: number; rhy: number; shy: number; clips: string[]; ats: number; banner: string; hint: string; score: number };
 type Mark = { t: number; msg: string };

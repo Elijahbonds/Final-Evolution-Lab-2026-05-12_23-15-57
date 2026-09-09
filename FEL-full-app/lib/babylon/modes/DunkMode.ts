@@ -251,6 +251,20 @@ export const DunkMode: ModeDefinition = (() => {
   let rimCamCut = false;                     // broadcast cut latch (per attempt)
   let hangSlowMoLatch = false;               // JuiceKit.slowMo once per attempt (hang only)
   let contactLatch = false;                  // contactPunch once per attempt (the make's flush frame)
+  // ── DUNK-BODY-MID (2026-09-09): the SLAM input contract ──────────────────────────────────────────────────────────
+  // A IS THE SLAM BUTTON, and the slam window is 0.24–0.28 clip seconds wide (0.28 base, taxed by every trick) around
+  // clip 1.25 — about 14 rendered frames. Before this a press that arrived even three frames early was simply DROPPED,
+  // and if a d-pad direction was still held from the trick it had just thrown, that press was spent as a SECOND trick
+  // and came back as a refusal banner. Measured on the eye's dump at 99109f7: the windmill fired at clip 0.83, the slam
+  // press landed at 0.93 (0.20 s before the window opened at 1.13), the recognizer read it as another windmill, the air
+  // budget refused it — `[DUNK-CUE] refused windmill @0.93: air` — and the flight resolved as "WINDMILL — MISSED".
+  // The trick had landed. The slam was never seen. Now: the SLAM CUE opens a buffer's width before the window, a press
+  // inside it is HELD and fires on the frame the window opens (scored as the early press it was), and a press that
+  // resolves to a trick which cannot fire falls through to that buffer instead of a banner.
+  const SLAM_BUFFER_SEC = 0.22;              // how early a SLAM press still counts (clip seconds)
+  let slamBufferAt = -1;                     // clip second of a SLAM press waiting for the window (−1 = none)
+  let slamSeen = false;                      // an A press reached the flight at all (the miss banner names WHAT missed)
+  let slamCueOn = false;                     // the SLAM read is up: the buffer's edge through the window's close
   // ── A+ P8 athlete hands ──
   const arms: { Left: ArmChain | null; Right: ArmChain | null } = { Left: null, Right: null };   // H1: built once at spawn
   let handIkT = 0;                            // H1: 0..1 ease of the wrist reach
@@ -608,18 +622,7 @@ export const DunkMode: ModeDefinition = (() => {
       }
 
       // SLAM needs the ball: a lob still in the air cannot be flushed (the catch is what puts it in the hand)
-      if (e.t === 'button' && e.btn === 'A' && e.pressed && qteWindowOpen && !lob.live) {
-        qteHit = true;
-        const center = EASTBAY_TIMING.extend;
-        const window = CFG.qteWindowSec * (1 - styleTaps * 0.25) * flight.slamWindowScale;
-        qteAccuracy = Math.max(0, 1 - Math.abs(clipTime - center) / (window / 2));
-        // DUNK-POSTURE S3: the slam resolves ON THE PRESS. It used to wait for the window to close (clip 1.41 — the body
-        // 0.3 m off the floor on the way down), so the ball left a hand at chest height and lerped 2.7 m up into the iron on
-        // its own; the "jam" the eye saw was a reach forward at knee height. Pressed inside the window the hand IS at the
-        // rim (the extension rides the top of the arc); the release, the finish and the flush follow from there, the root
-        // hangs at that height until the replay hands it back (the rim hang), the accuracy read above is unchanged.
-        resolveDunk(ctx);
-      }
+      if (e.t === 'button' && e.btn === 'A' && e.pressed && qteWindowOpen && !lob.live) slamNow(ctx, clipTime);
       // RIM HANG — hold SLAM through the flush to hang on the iron
       if (e.t === 'button' && e.btn === 'A') aHeld = e.pressed;
     },
@@ -814,14 +817,20 @@ export const DunkMode: ModeDefinition = (() => {
           if (clipTime >= EASTBAY_TIMING.rise * 0.9) throwLob(ctx, ball.getAbsolutePosition().clone(), 'ALLEY-OOP', Math.max(0.35, LOB_CATCH_CLIP_T - clipTime));   // from the palm the ball is in
         }
 
-        const wasOpen = qteWindowOpen;
+        const wasOpen = qteWindowOpen, wasCue = slamCueOn;
         flight.update(dt * (Number.isFinite(animScale) && animScale > 0 ? animScale : 1));   // the air budget burns in CLIP time — the hang slow-mo stretched the flight but not the budget, so a second trick was refused for air the player could see
         const window = CFG.qteWindowSec * (1 - styleTaps * 0.25) * flight.slamWindowScale;
-        qteWindowOpen = clipTime >= EASTBAY_TIMING.extend - window / 2
-          && clipTime <= EASTBAY_TIMING.extend + window / 2;
-        if (qteWindowOpen && !wasOpen) ctx.setHud({ hint: lob.live ? 'CATCH IT!' : 'SLAM!', slamPulse: true });
-        if (!qteWindowOpen && wasOpen) ctx.setHud({ slamPulse: false });
-        if (clipTime >= EASTBAY_TIMING.extend + window / 2) { if (lob.live) lostLob(ctx); else resolveDunk(ctx); }   // the hand never met the toss — a miss, the ball bounces away
+        const openAt = EASTBAY_TIMING.extend - window / 2, closeAt = EASTBAY_TIMING.extend + window / 2;
+        qteWindowOpen = clipTime >= openAt && clipTime <= closeAt;
+        // DUNK-BODY-MID: the SLAM READ and the accepted input are the same thing. The window is ~14 rendered frames wide;
+        // the call used to appear on its opening frame, so the honest reaction — press when you see it — arrived after the
+        // press that would have worked. The cue lifts a buffer's width early and every press from there is taken.
+        slamCueOn = !lob.live && clipTime >= openAt - SLAM_BUFFER_SEC && clipTime <= closeAt;
+        if ((slamCueOn || (qteWindowOpen && lob.live)) && !(wasCue || wasOpen)) ctx.setHud({ hint: lob.live ? 'CATCH IT!' : 'SLAM!', slamPulse: true });
+        if (!slamCueOn && !qteWindowOpen && (wasCue || wasOpen)) ctx.setHud({ slamPulse: false });
+        // a press the buffer was holding fires on the frame the window opens — its execution is scored from where the finger was
+        if (qteWindowOpen && !wasOpen && slamBufferAt >= 0 && !lob.live && clipTime - slamBufferAt <= SLAM_BUFFER_SEC) slamNow(ctx, slamBufferAt);   // resolveDunk moves the phase; the resolve block below picks the jam up on this same frame
+        if (clipTime >= closeAt) { if (lob.live) lostLob(ctx); else resolveDunk(ctx); }   // the hand never met the toss — a miss, the ball bounces away
       }
 
       if (phase === 'resolve') {
@@ -1095,12 +1104,55 @@ export const DunkMode: ModeDefinition = (() => {
   let obstacleOver = false, obstacleCleared = false, obstacleMargin = Infinity;   // the clear, once per attempt
   let clipFloorY = 0, clipBackZ = 0;          // where a clipped dunker comes down (the top he caught, or the floor before the side he hit)
 
+  /** DUNK-BODY-MID: the SLAM lands. Called on the press inside the window, and from the window's opening frame for a
+   *  press the buffer was holding — an early press is scored as the early press it was, never dropped. `at` is the clip
+   *  second the FINGER moved, not the frame this runs on. */
+  function slamNow(ctx: ModeContext, at: number): void {
+    if (phase !== 'cinematic' || lob.live) return;
+    slamBufferAt = -1; slamSeen = true;
+    qteHit = true;
+    const center = EASTBAY_TIMING.extend;
+    const window = CFG.qteWindowSec * (1 - styleTaps * 0.25) * flight.slamWindowScale;
+    // The execution curve is ONE curve over the whole accepted press — late of centre it falls across the window's own
+    // half, early of centre across that half PLUS the buffer. A press is scored by how far it was from the perfect
+    // beat, and being earlier is always worth less than being later-but-still-early; a two-branch version (a flat floor
+    // for a buffered press) put a cliff on the window's opening edge where pressing one frame EARLIER scored better.
+    const half = window / 2, d = at - center;
+    qteAccuracy = Math.max(0, 1 - (d < 0 ? -d / (half + SLAM_BUFFER_SEC) : d / half));
+    const early = Math.max(0, (center - half) - at);   // how far in front of the window the finger actually was
+    if (early > 0) console.info(`[DUNK-SLAM] buffered press @${at.toFixed(2)} fired at the window (${(early * 1000).toFixed(0)} ms early, execution ${qteAccuracy.toFixed(2)})`);
+    // DUNK-POSTURE S3: the slam resolves ON THE PRESS. It used to wait for the window to close (clip 1.41 — the body
+    // 0.3 m off the floor on the way down), so the ball left a hand at chest height and lerped 2.7 m up into the iron on
+    // its own; the "jam" the eye saw was a reach forward at knee height. Pressed inside the window the hand IS at the
+    // rim (the extension rides the top of the arc); the release, the finish and the flush follow from there, the root
+    // hangs at that height until the replay hands it back (the rim hang), the accuracy read above is unchanged.
+    resolveDunk(ctx);
+  }
+  /** DUNK-BODY-MID: a SLAM press the window has not opened for yet. Held (the newest press wins) and fired on the frame
+   *  it opens, if it is still inside SLAM_BUFFER_SEC by then. A press earlier than that is a genuine mistime — it is
+   *  logged and let go, never turned into a banner for a trick the player did not ask for. */
+  function bufferSlam(): void {
+    if (phase !== 'cinematic' || lob.live) return;
+    slamSeen = true; slamBufferAt = clipTime;
+    console.info(`[DUNK-SLAM] buffered @${clipTime.toFixed(2)} (window opens @${(EASTBAY_TIMING.extend - CFG.qteWindowSec * (1 - styleTaps * 0.25) * flight.slamWindowScale / 2).toFixed(2)})`);
+  }
+
   /** A trick button in the air: the cue table decides — before the trick's beat it is ARMED (fires on the beat), inside
    *  its window it fires now, after its last beat it is refused with a banner. A bare button (no direction) after the rise
    *  is the style tap. DUNK-BIOMECH (2026-09-08): a 360 tapped at the carry-up used to spin through the flush. */
   function airButton(ctx: ModeContext, e: FelInput): void {
+    const isA = e.t === 'button' && e.btn === 'A';
     const trick = flight.peek(e);
-    if (!trick) { if (clipTime >= EASTBAY_TIMING.rise) styleTap(ctx, e); return; }
+    // DUNK-BODY-MID: A IS THE SLAM. Three presses used to be swallowed here — a bare A (nothing matched, nothing
+    // happened), an A under a direction the last trick had already spent, and an A under a direction whose trick could
+    // no longer fire. All three are the player asking to slam; all three go to the buffer now. Only a FRESH direction
+    // (pressed since the last trick fired) still speaks for the trick, and only B / Y — which are not the slam button —
+    // still earn a refusal banner when their beat has passed.
+    if (!trick || (isA && flight.recognizer.dirSpent)) {
+      if (clipTime >= EASTBAY_TIMING.rise) styleTap(ctx, e);
+      if (isA) { if (trick) console.info(`[DUNK-CUE] ${trick.id}'s direction is spent — the press is the SLAM`); bufferSlam(); }
+      return;
+    }
     const v = cueVerdict(trick, clipTime), cue = cueOf(trick);
     if (v === 'early') {
       if (armedAir) return;   // one cue armed at a time — the first press is the one that fires
@@ -1112,6 +1164,7 @@ export const DunkMode: ModeDefinition = (() => {
     }
     if (v === 'late') {
       console.info(`[DUNK-CUE] late ${trick.id} @${clipTime.toFixed(2)} (window ${cueFireAt(trick).toFixed(2)}–${cueLastAt(trick).toFixed(2)})`);
+      if (isA) { bufferSlam(); return; }   // the beat has gone; the button in his hand is still the slam
       refuse(ctx, `TOO LATE FOR THE ${trick.label} — ARM IT BY ${CUE_BEAT_LABEL[cue.last]}`);
       return;
     }
@@ -1129,6 +1182,7 @@ export const DunkMode: ModeDefinition = (() => {
       return;
     }
     trickLabels.push(trick.label);
+    flight.recognizer.spend();            // DUNK-BODY-MID: one direction, one trick — the next A under this same hold is the SLAM
     airTrick = { trick, t0: clipTime };   // the trick's own clock (the lost-and-found's hand-off is keyed to it)
     liveTricks.push({ clip: trick.clip, t0: clipTime, speed: 1.05 });
     console.info(`[DUNK-TRICK] air ${trick.id} @${clipTime.toFixed(2)} (${how}, cue ${cueOf(trick).fire}→${cueOf(trick).last})`);
@@ -1165,6 +1219,7 @@ export const DunkMode: ModeDefinition = (() => {
     activeHandOff = null; ikSideK = 0;
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false;
     rimCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
+    slamBufferAt = -1; slamSeen = false; slamCueOn = false;   // DUNK-BODY-MID: the slam buffer is per attempt
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
     airHeld = false; dropToFloor = false; replaying = false; replayAir = false; launchRealMs = performance.now();   // A+ P8
     jamSec = -1; jamContact = false; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
@@ -1208,11 +1263,19 @@ export const DunkMode: ModeDefinition = (() => {
     resolveDunk(ctx);   // qteHit is false → the clank path; judging follows (the MISSED line is the resolve's)
   }
 
-  /** Why the attempt died, for the banner: the toss the hand never met, the prop the feet caught, or the iron. */
+  /** Why the attempt died, for the banner: the toss the hand never met, the prop the feet caught, or the iron.
+   *  DUNK-BODY-MID: the miss is named after WHAT MISSED. This used to return the attempt's trick list, so a windmill that
+   *  had landed perfectly read as "WINDMILL — MISSED" — the one line the eye saw on the flight where the trick fired and
+   *  the SLAM press was eaten (99109f7). The trick is what you did; the slam is what you missed. The name still leads,
+   *  because the judges scored it and the card names it, but it no longer wears the failure. */
   function missWhy(): string {
     if (obstacleClipped) return `CAUGHT THE ${obstacle?.spec.label ?? 'PROP'}`;   // the prop ended it, whatever the toss was doing
     if (lob.live || lob.lost) return lob.clanked ? `${lob.label} OFF THE IRON` : lob.over ? `${lob.label} OVER THE GLASS` : `LOST THE ${lob.label}`;
-    return namedTricks() || 'OFF THE IRON';
+    // Every press inside the accepted window (the buffer's edge through the close) is a MAKE, so a miss with a press on
+    // the record is a press that came in front of it — say that, not "off the iron": it is the one thing the player can fix.
+    const named = namedTricks();
+    const why = slamSeen ? 'TOO EARLY ON THE SLAM' : 'NO SLAM';
+    return named ? `${named} · ${why}` : why;
   }
   function resolveDunk(ctx: ModeContext): void {
     if (phase === 'resolve') return;
@@ -1858,6 +1921,7 @@ export const DunkMode: ModeDefinition = (() => {
     feelHitStop(70);   // DUNK-HANDS-RIM H3: the mode's clock stops on the iron too (the ball on the ring, the body) — one beat, composed; never a second slow-mo
     ctx.juice.shake(0.12, 140);
     ctx.juice.flash('#fff6dd', 120);
+    ctx.camDirector.pulse(0.9, 0.32);   // DUNK-BODY-MID: the CONTACT is a camera beat too — a short hard push onto the iron under the hit-stop, so the punch reads from behind (the flight had a push-in at the hang rise and nothing at the rim)
     SoundKit.play('impact', { pitch: 0.7, volume: 0.8 }); console.info('[JUICE-SFX] impact slam');   // A+ P2: the ONE slam thud of the attempt
     fovRelease(); trailFlash();   // juice soft #4, #5: CONTACT restores the fov and cuts the trail with a flash
     armSettle();                  // A+ P4: the settle fires at feet-down, not on this frame

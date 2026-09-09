@@ -10,11 +10,12 @@
 // Pad driver (pre-boot fake DualShock). Closeups: the active camera parked at the ball hand for the eye (hang / extend / jam / contact).
 //   PORT=3004 npx tsx scripts/probes/_dunk-hands-rim-probe.mts        (SCEN= · OUT_DIR= · TAG= · QS= · VERBOSE=1)
 import { chromium, type Page } from 'playwright-core';
+import { chromiumExe } from './_chromium.mts';
 import { mkdirSync, writeFileSync } from 'node:fs';
 const PORT = process.env.PORT ?? '3004', OUT = process.env.OUT_DIR ?? 'docs/shots/dunk-hands-rim', TAG = process.env.TAG ?? 'after';
 const SCEN = process.env.SCEN ?? '', VERBOSE = !!process.env.VERBOSE;
 mkdirSync(OUT, { recursive: true });
-const EXE = process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
+const EXE = chromiumExe();
 
 type V = { x: number; y: number; z: number };
 type Row = { t: number; dt: number; y: number; z: number; ats: number; phase: string; ppw: string; win: string; clips: string[];

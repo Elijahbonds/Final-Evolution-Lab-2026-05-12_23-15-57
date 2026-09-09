@@ -134,6 +134,9 @@ export function cueVerdict(trick: DunkTrick, t: number): CueVerdict {
 /** The contact latch's unwind rate (rad/s): a spin the flight ended early (the prop, a lost lob) eases to the nearest
  *  whole turn in ~a quarter second, never a snap and never a back-to-rim freeze. */
 export const SPIN_SETTLE_RATE = 14;
+/** DUNK-BODY-MID: the fraction of a turn's window the turn itself takes — the remainder is the body held square to the
+ *  iron before the carry-up's reach. 0.8 keeps the peak rate of even a hang-called 360 (0.30 s of flight) inside 40°/frame. */
+export const SPIN_LAND_FRAC = 0.8;
 const TAU = Math.PI * 2;
 /** The momentum-led turn: a whole number of turns of the hips from clip `from`, resolved (rim-facing again) by clip
  *  `until` whatever the flight has left — fired at the rise it is an easy turn, fired at the hang a quick one. Smoothstep:
@@ -149,7 +152,13 @@ export class DunkSpin {
   }
   static yawAt(rec: { turns: number; from: number; until: number }, t: number): number {
     if (!rec.turns) return 0;
-    const u = Math.min(1, Math.max(0, (t - rec.from) / (rec.until - rec.from)));
+    // DUNK-BODY-MID (2026-09-09): the turn LANDS, then the body holds square. The smoothstep ran the full width of the
+    // window, so the last tenth of the turn ate its last third — the chest was still coming home while the reach for the
+    // iron had already started, and a 360 called at the hang measured 50° off the rim a quarter-second before the jam
+    // (the SLAM buffer resolves the flight at the window's opening edge now, which is where that tail became visible).
+    // The turn is finished inside SPIN_LAND_FRAC of its window and the rest is a settled, rim-facing beat before the
+    // carry-up. Same wind-up, same eased catch, just not spread over the reach.
+    const u = Math.min(1, Math.max(0, (t - rec.from) / ((rec.until - rec.from) * SPIN_LAND_FRAC)));
     const k = u * u * (3 - 2 * u);
     return k >= 1 ? 0 : rec.turns * TAU * k;   // a completed turn IS rim-facing: 0, not 2π (nothing to unwind)
   }
@@ -174,6 +183,17 @@ export class DunkSpin {
   reset(): void { this.turns = 0; this.from = 0; this.until = 0; this.yawNow = 0; this.settling = false; }
 }
 
+/** DUNK-BODY-MID (2026-09-09): the air a flight needs to hold TWO tricks, decided ONCE at the takeoff from the run-up
+ *  (`airTotal`) and never re-litigated mid-flight.
+ *
+ *  Before this the second trick needed 42 % of the ORIGINAL budget while the first one had already spent 34 % of what
+ *  was left, so the owner's own dunk — 360 into a WINDMILL over the car — was refused by a hundredth: measured on the
+ *  baseline at c4b86f9, `refused windmill @0.49: air` at 0.41 remaining against a 0.42 bar, off a full-speed run with
+ *  a full charge. A combo you are allowed to start and never allowed to finish is not a risk ladder; it is a dropped
+ *  input wearing a banner. The run-up buys HOW MANY tricks fit, the cue table decides WHEN each may fire, and the
+ *  refusal — when there is one — is knowable before the first trick is ever thrown. */
+export const COMBO_AIR_SEC = 1.32;
+
 /** Combo bonus multiplier for chaining a second trick before the slam. */
 export const COMBO_CHAIN_BONUS = 1.35;
 /** Extra difficulty nod for a combo the judges haven't seen this contest. */
@@ -184,6 +204,14 @@ type Dir = 'up' | 'down' | 'left' | 'right';
 
 export class GestureRecognizer {
   private heldDir: Dir | null = null;
+  private spent = false;                    // the direction held right now already threw its trick this flight
+
+  /** DUNK-BODY-MID: ONE DIRECTION, ONE TRICK. A direction that has already thrown is STALE until it is let go and
+   *  pressed again — so the A that follows a windmill is the SLAM, not a second windmill. (The eye's dump at 99109f7:
+   *  UP was still down from the windmill when the slam press arrived, the recognizer read it as another windmill, and
+   *  the dunk resolved as a miss named after the trick that had actually landed.) A fresh press re-arms it. */
+  get dirSpent(): boolean { return this.spent && this.heldDir !== null; }
+  spend(): void { this.spent = true; }
 
   /** Feed raw input: d-pad presses set/clear the held direction; a face
    *  button tap while a direction is held looks up that combo's trick. A
@@ -191,8 +219,8 @@ export class GestureRecognizer {
    *  treats that as the separate STYLE TAP showboat, not a named trick. */
   feed(e: FelInput): DunkTrick | null {
     if (e.t === 'dpad') {
-      if (e.pressed) this.heldDir = e.dir;
-      else if (this.heldDir === e.dir) this.heldDir = null;
+      if (e.pressed) { this.heldDir = e.dir; this.spent = false; }
+      else if (this.heldDir === e.dir) { this.heldDir = null; this.spent = false; }
       return null;
     }
     if (e.t === 'button' && e.pressed && this.heldDir && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y')) {
@@ -211,7 +239,7 @@ export class GestureRecognizer {
     return null;
   }
 
-  reset(): void { this.heldDir = null; }
+  reset(): void { this.heldDir = null; this.spent = false; }
 }
 
 // ── Dunk flight state machine ──────────────────────────────────────────────
@@ -252,11 +280,10 @@ export class DunkFlight {
   /** Why the last take() refused: the air budget, or the two-tricks-a-flight limit. */
   refusal: 'air' | 'limit' | null = null;
 
-  /** Mid-air: feed input; each recognized trick spends window. The air
-   *  budget is now ENFORCED: a trick needs 30% of the air left, a combo
-   *  trick 42% — so the run-up genuinely decides what exists in the air.
-   *  Before this, `airTotal` was computed and never consulted: a walk-up and
-   *  a full-speed runway attack had the same trick menu. */
+  /** Mid-air: feed input; each recognized trick spends window (the finish
+   *  timing tightens with every one). How MANY fit was decided at the takeoff
+   *  by the run-up — `trickCapacity` — so the run-up genuinely decides what
+   *  exists in the air, and the cue table decides when each may fire. */
   feedInput(e: FelInput): DunkTrick | null {
     this.rejectedForAir = false;
     const trick = this.recognizer.feed(e);
@@ -265,16 +292,30 @@ export class DunkFlight {
   }
   /** The trick a button press would throw now (the direction held), without spending anything. */
   peek(e: FelInput): DunkTrick | null { return this.recognizer.peek(e); }
+  /** How many tricks THIS flight can hold: the run-up bought it at the takeoff (COMBO_AIR_SEC), and it does not move
+   *  while the player is in the air. A walk-up gets one, a real run-up gets two. */
+  get trickCapacity(): number { return this.airTotal >= COMBO_AIR_SEC ? 2 : 1; }
+  /** Whether a trick could be taken on this frame — the mode asks BEFORE it turns a press into a refusal banner. */
+  canTake(): boolean {
+    if (this.phase !== 'airborne' && this.phase !== 'slamWindow') return false;
+    return this.tricks.length < this.trickCapacity;
+  }
   /** Spend the air for a trick already recognised (a cue armed before its beat fires through here). */
   take(trick: DunkTrick): DunkTrick | null {
     this.rejectedForAir = false; this.refusal = null;
-    // A recognized trick in a spent budget is a REFUSAL, not a non-input —
-    // whether the air ran out early (threshold) or entirely (slamWindow).
-    if (this.phase === 'slamWindow') { this.rejectedForAir = true; this.refusal = 'air'; return null; }
-    if (this.phase !== 'airborne') return null;
-    if (this.tricks.length >= 2) { this.refusal = 'limit'; return null; }   // DUNK-BIOMECH: a third trick is refused OUT LOUD (it used to be a silent null)
-    const need = this.tricks.length === 0 ? 0.30 : 0.42;
-    if (this.airRemaining01 < need) { this.rejectedForAir = true; this.refusal = 'air'; return null; }
+    if (this.phase !== 'airborne' && this.phase !== 'slamWindow') return null;
+    // DUNK-BODY-MID (2026-09-09): the AIR is read ONCE, at the takeoff (trickCapacity), never against a remainder the
+    // earlier tricks have already spent. Two gates used to sit between a legal press and its trick: a 30 %/42 % share of
+    // the ORIGINAL budget, and a blanket refusal the moment the flight entered its own `slamWindow` phase (airLeft ≤ 28 %
+    // of the total, which on the minimum 0.85 s budget arrives ~0.6 s into a 1.25 s flight). Both fired inside cue
+    // windows the table had already declared open — measured at 99109f7, `refused windmill @0.93: air`, and on the
+    // baseline's own combo scenario `refused windmill @0.49: air` at 0.41 against a 0.42 bar. The cue table owns WHEN a
+    // trick may fire; the run-up owns HOW MANY fit; nothing owns "not this one, not now, no reason you could have known".
+    if (this.tricks.length >= this.trickCapacity) {
+      if (this.tricks.length >= 2) this.refusal = 'limit';                  // DUNK-BIOMECH: a third trick is refused OUT LOUD
+      else { this.rejectedForAir = true; this.refusal = 'air'; }            // a walk-up never had the air for a second one
+      return null;
+    }
     this.tricks.push(trick);
     this.airLeft *= 1 - trick.windowCost;    // showboating costs air
     this.slamWindow *= 1 - trick.windowCost * 0.5;

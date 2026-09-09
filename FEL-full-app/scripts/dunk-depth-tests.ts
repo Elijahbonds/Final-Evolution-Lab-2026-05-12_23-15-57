@@ -2,9 +2,12 @@
 // Dunk Contest depth pass — the approach is part of the dunk, and the prop
 // is physical.
 //
-//   AIR IS A BUDGET — the run-up's peak speed buys airtime; a trick needs
-//     30% of the air left, a combo 42%. A walk-up and a runway attack used
-//     to have the same trick menu (airTotal was computed and never read).
+//   AIR IS A BUDGET — the run-up's peak speed buys airtime, and at the takeoff
+//     that airtime decides how many tricks the flight can hold (one, or two).
+//     A walk-up and a runway attack used to have the same trick menu (airTotal
+//     was computed and never read); then, for a while, the budget was also
+//     consulted mid-flight and refused presses inside cue windows the table had
+//     already opened. The run-up owns HOW MANY; the cue table owns WHEN.
 //   THE CHAIR IS REAL — crossing the obstacle with your feet below 1.30m is
 //     a blown dunk on contact, whatever the slam timing was going to be. The
 //     old check sampled y at the FLUSH (past the prop, near apex) with a 1.0m
@@ -32,37 +35,53 @@ const btn = (btn: 'A' | 'B' | 'Y') => ({ t: 'button' as const, btn, pressed: tru
   const fast = new DunkFlight();
   fast.launch(1.0, 3);                        // full runway attack
   ok(fast.airRemaining01 > 0 && slow.airRemaining01 > 0, 'both launch airborne');
-  // decay both to ~35% air remaining, then throw the same trick
   const decayTo = (f: DunkFlight, frac: number) => { while (f.airRemaining01 > frac && f.phase === 'airborne') f.update(DT); };
   decayTo(slow, 0.35);
   decayTo(fast, 0.35);
   ok(slow.phase === 'slamWindow' || slow.airRemaining01 <= 0.35, 'slow flight decays to the window');
   ok(fast.airRemaining01 > 0.30, 'fast flight still has usable air');
 
-  // a trick needs 30% left: fine early, refused late — and it SAYS so
+  // THE RUN-UP BUYS THE MENU, AND IT BUYS IT AT THE TAKEOFF (DUNK-BODY-MID, 2026-09-09)
+  ok(slow.trickCapacity === 1 && fast.trickCapacity === 2, 'a walk-up holds one trick, a runway attack two');
+
   const rich = new DunkFlight();
   rich.launch(1.0, 3);
   rich.feedInput(dpad('up', true));
   ok(rich.feedInput(btn('A'))?.id === 'windmill', 'trick fires with air in the tank');
   ok(rich.rejectedForAir === false, 'no rejection flag on a paid trick');
 
+  // A FIRST TRICK IS THE CUE TABLE'S CALL, NEVER THE BUDGET'S. This used to be refused for air deep in a walk-up's
+  // flight — inside a cue window the game had already declared open, which reads as a dropped input, not as a risk.
   const poor = new DunkFlight();
-  poor.launch(0.1, 3);                        // ~0.9s of air
+  poor.launch(0.1, 3);                        // ~0.9 s of air
   decayTo(poor, 0.2);                         // nearly out
   poor.feedInput(dpad('up', true));
-  const refused = poor.feedInput(btn('A'));
-  ok(refused === null && poor.rejectedForAir === true, 'a trick without air is refused AND flagged');
+  ok(poor.feedInput(btn('A'))?.id === 'windmill', "a walk-up's FIRST trick still fires, deep into the flight");
+  ok(poor.rejectedForAir === false, 'no air refusal on a first trick');
 
-  // the combo asks more than the single
+  // ...but the SECOND one is exactly what a walk-up did not buy, and it says so
+  poor.feedInput(dpad('up', false)); poor.feedInput(dpad('right', true));
+  const second = poor.feedInput(btn('B'));
+  ok(second === null && poor.rejectedForAir === true && poor.refusal === 'air', "a walk-up's second trick is refused AND flagged");
+  ok(poor.attempt.tricks.length === 1, 'a refused trick is not banked');
+
+  // the combo the run-up DID buy fires at the beat the old budget refused it on (measured: "refused windmill @0.49: air")
   const mid = new DunkFlight();
-  mid.launch(0.6, 3);
-  mid.feedInput(dpad('up', true));
-  mid.feedInput(btn('A'));                    // windmill, paid
-  decayTo(mid, 0.35);                         // below the 42% combo bar
+  mid.launch(1.0, 3);
   mid.feedInput(dpad('right', true));
-  const comboRefused = mid.feedInput(btn('B'));
-  ok(comboRefused === null && mid.rejectedForAir === true, 'the combo needs more air than the single');
-  ok(mid.attempt.tricks.length === 1, 'a refused trick is not banked');
+  ok(mid.feedInput(btn('B'))?.id === 'spin360', 'the 360 fires at the rise');
+  for (let i = 0; i < 12; i++) mid.update(DT);   // clip 0.30 → ~0.49
+  mid.feedInput(dpad('right', false)); mid.feedInput(dpad('up', true));
+  ok(mid.feedInput(btn('A'))?.id === 'windmill', 'the WINDMILL fires on top of the 360 — the run-up bought both');
+  ok(mid.attempt.isCombo, 'and the pair is judged as a combo');
+
+  // ONE DIRECTION, ONE TRICK: the A that follows a trick under the same hold is the SLAM, not a second trick
+  const held = new DunkFlight();
+  held.launch(1.0, 3);
+  held.feedInput(dpad('up', true));
+  held.feedInput(btn('A'));
+  held.recognizer.spend();
+  ok(held.recognizer.dirSpent, 'a direction that has thrown is spent until it is let go');
 }
 
 // ── B. the chair demands a real jump ───────────────────────────────────────
