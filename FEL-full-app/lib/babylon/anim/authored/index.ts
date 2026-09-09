@@ -15,6 +15,7 @@ import { buildHitReact, buildKnockdown, buildGuardStep, buildBlockHold, buildGua
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
   buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
+  buildPullupGather, buildFloater, buildHandUp, buildScreenSet,   // HOOPS-MOVE-KIT-A
 } from './basketball';
 import { buildBatStance, buildBatSwing, buildPitchOver, buildPitchSide } from './baseball';
 import { buildGolfAddress, buildGolfSwing, buildGolfPutt, buildGolfFinishHold } from './golf';
@@ -122,6 +123,11 @@ export function registerAuthoredClips(
     () => buildBlockReach(scene, skeleton),
     () => buildStealReach(scene, skeleton),
     () => buildFollowThrough(scene, skeleton),   // BIOMECH-HOOPS-WAVE1 (2026-09-08): the shot's follow-through (G5)
+    () => buildLayupGather(scene, skeleton, 'left'),   // HOOPS-MOVE-KIT-A (2026-09-08): the left-hand finish (M3)
+    () => buildPullupGather(scene, skeleton),          // HOOPS-MOVE-KIT-A: the player's pull-up gather (M1)
+    () => buildFloater(scene, skeleton),               // HOOPS-MOVE-KIT-A: the floater (M3)
+    () => buildHandUp(scene, skeleton),                // HOOPS-MOVE-KIT-A: the grounded hand-up contest (D3)
+    () => buildScreenSet(scene, skeleton),             // HOOPS-MOVE-KIT-A: the planted screen (O1)
     // Baseball packages (Phase 6, 2026-09-03) — the derby borrowed karate clips.
     () => buildBatStance(scene, skeleton),
     () => buildBatSwing(scene, skeleton),

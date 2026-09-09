@@ -24,6 +24,8 @@ export interface Intent {
   pass: boolean;                       // edge-detected
   steal: boolean;                      // edge-detected (defensive slot)
   brace?: boolean;                     // held — box-out/post-up (Phase 4 contact)
+  /** HOOPS-MOVE-KIT-A D3: the steal button HELD (past a tap) — a grounded hand-up contest (verticality). */
+  contest?: boolean;
 }
 
 const NEUTRAL: Intent = { moveX: 0, moveY: 0, sprint: false, action: false, actionHeld: 0, pass: false, steal: false };
@@ -38,11 +40,15 @@ export interface ControlSource {
 //    `onInput(ctx, e)` callback (every mode this project ships uses this
 //    pattern) — LocalInputSource plugs into that exact seam via feed(e),
 //    rather than inventing a separate subscription API on InputBus. ──────
+/** X held this long is a hand-up contest (D3), not a poke. */
+export const CONTEST_HOLD_MS = 150;
+
 export class LocalInputSource implements ControlSource {
   private moveX = 0; private moveY = 0;
   private actionDown = false; private actionEdge = false; private held = 0;
   private passEdge = false; private stealEdge = false;
   private braceHeld = false;
+  private stealDownAt = -1;   // D3: X held past CONTEST_HOLD_MS = the hand-up contest (a tap stays the poke)
 
   /** Call from the mode's onInput(ctx, e) for every event. */
   feed(e: FelInput): void {
@@ -78,7 +84,8 @@ export class LocalInputSource implements ControlSource {
     if (e.t === 'trigger' && e.side === 'L') this.braceHeld = e.value > 0.4;
     if (e.t === 'button' && e.btn === 'L1') this.braceHeld = e.pressed;
     if (e.t === 'button' && e.pressed && e.btn === 'B') this.passEdge = true;
-    if (e.t === 'button' && e.pressed && e.btn === 'X') this.stealEdge = true;
+    if (e.t === 'button' && e.pressed && e.btn === 'X') { this.stealEdge = true; this.stealDownAt = performance.now(); }
+    if (e.t === 'button' && !e.pressed && e.btn === 'X') this.stealDownAt = -1;
   }
 
   poll(): Intent {
@@ -88,6 +95,7 @@ export class LocalInputSource implements ControlSource {
       action: this.actionEdge, actionHeld: this.held,
       pass: this.passEdge, steal: this.stealEdge,
       brace: this.braceHeld,
+      contest: this.stealDownAt >= 0 && performance.now() - this.stealDownAt >= CONTEST_HOLD_MS,
     };
     this.actionEdge = false; this.passEdge = false; this.stealEdge = false;
     return out;

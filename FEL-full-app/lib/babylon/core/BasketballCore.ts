@@ -21,6 +21,10 @@
 import { Vector3 } from '@babylonjs/core';
 import type { AIBehavior, Intent } from './PlayerSlot';
 import { CourtMovement, DEFAULT_MOVEMENT } from './CourtMovement';
+import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop / crash, box-out, navigating a screen)
+  screenSpot, pickScreenSide, stepScreen, SCREEN_IDLE, rollLaneOpen, rollTarget, crashSpot, navigateAround, boxOutSpot, SCREEN_MIN_RIM_DIST,
+  type OffenseJob, type DefenseJob, type ScreenState,
+} from './HoopsOffball';
 
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean }
@@ -202,17 +206,23 @@ export type ShotStyle = 'layup' | 'floater' | 'jumper' | 'fadeaway';
 
 export interface ShotContext { style: ShotStyle; label: string; pctMod: number }
 
+/** A floater is a paint shot: inside this floor distance of the rim (the old 4.5 m band, planar, made a 1-dribble pull-up
+ *  from the elbow a floater). */
+export const FLOATER_RANGE = 3.4;
 /** Type the attempt from real context. `moveVel` is the shooter's current
  *  velocity; moving away from the hoop under a tight contest = fadeaway. */
 export function classifyShot(shooter: Vector3, moveVel: Vector3, hoop: Vector3, contest01: number): ShotContext {
-  const dist = Vector3.Distance(shooter, hoop);
+  // HOOPS-MOVE-KIT-A (2026-09-08): PLANAR. This was Vector3.Distance against a rim 3.05 m up, so a floor-bound shooter was
+  // never inside the 2.2 m layup band (√(2.2² − 3.05²) is imaginary) — every shot at the rim classified as a FLOATER and
+  // the layup style had never fired in play (the drive-dunk gate had the identical bug, fixed in the modes in A+ P0).
+  const dist = distXZ(shooter, hoop);
   const toHoop = hoop.subtract(shooter); toHoop.y = 0;
   const speed = moveVel.length();
   const movingAway = speed > 1.2 && Vector3.Dot(moveVel, toHoop) < -0.3 * speed * toHoop.length();
 
   if (movingAway && contest01 > 0.25) return { style: 'fadeaway', label: 'FADEAWAY', pctMod: 0.82 };
   if (dist < 2.2) return { style: 'layup', label: 'LAYUP', pctMod: 1.18 };
-  if (dist < 4.5) return { style: 'floater', label: 'FLOATER', pctMod: 1.0 };
+  if (dist < FLOATER_RANGE) return { style: 'floater', label: 'FLOATER', pctMod: 1.0 };
   return { style: 'jumper', label: 'JUMPER', pctMod: 0.95 };
 }
 
@@ -222,15 +232,27 @@ export class ShotMeter {
   private duration = 0.72;
   private greenCenter = 0.62;
   private greenHalfWidth = 0.09;
+  /** HOOPS-MOVE-KIT-A: the gather's share of the meter (seconds) and the rise's own duration (what the clip is paced to). */
+  private gather = 0;
+  private rise = 0.72;
 
-  /** A tight defender narrows the window and speeds the rise; shot style
-   *  tunes it further (layups forgiving, fadeaways demanding). */
-  start(contestLevel01: number, style: ShotStyle = 'jumper'): void {
+  /** A tight defender narrows the window and speeds the rise; shot style tunes it further (layups quick and forgiving,
+   *  floaters between, fadeaways demanding). `gatherSec` (HOOPS-MOVE-KIT-A M1) puts the player's gather INSIDE the meter:
+   *  the bar runs from the squeeze, the green sits at the rise's 0.62 AFTER the gather (the same width in seconds), so a
+   *  pull-up's release frame — the clip paced to `riseSec` and started when the gather ends — is where the green is. */
+  start(contestLevel01: number, style: ShotStyle = 'jumper', gatherSec = 0): void {
     this.active = true; this.t = 0;
-    this.duration = 0.72 - contestLevel01 * 0.22;
-    this.greenHalfWidth = Math.max(0.035, 0.09 - contestLevel01 * 0.05);
-    if (style === 'layup') { this.greenHalfWidth *= 1.5; this.duration += 0.08; }
-    if (style === 'fadeaway') { this.greenHalfWidth *= 0.75; this.duration -= 0.06; }
+    let rise = 0.72 - contestLevel01 * 0.22;
+    let half = Math.max(0.035, 0.09 - contestLevel01 * 0.05);
+    // a layup is a quick finish off the stride (it used to run 0.8 s — longer than a jumper — on the jumpshot's meter)
+    if (style === 'layup') { half = Math.max(0.05, half) * 1.5; rise = 0.55 - contestLevel01 * 0.1; }
+    if (style === 'floater') { half *= 1.2; rise = 0.6 - contestLevel01 * 0.12; }
+    if (style === 'fadeaway') { half *= 0.75; rise -= 0.06; }
+    const g = Math.max(0, gatherSec);
+    this.rise = rise; this.gather = g;
+    this.duration = rise + g;
+    this.greenCenter = (g + 0.62 * rise) / this.duration;
+    this.greenHalfWidth = half * rise / this.duration;
   }
   update(dt: number): number {
     if (!this.active) return 0;
@@ -240,6 +262,12 @@ export class ShotMeter {
   /** Meter pacing, exposed for ShotReleaseSync (BallHandling.ts). */
   get durationSec(): number { return this.duration; }
   get greenCenter01(): number { return this.greenCenter; }
+  get greenHalfWidth01(): number { return this.greenHalfWidth; }
+  /** The gather's seconds at the front of the meter, and the rise's own seconds (pace the shot clip to THIS, not durationSec). */
+  get gatherSec(): number { return this.gather; }
+  get riseSec(): number { return this.rise; }
+  /** 0..1 of the meter at which the gather ends and the rise starts. */
+  get gatherEnd01(): number { return this.duration > 0 ? this.gather / this.duration : 0; }
 
   /** Release NOW — call on the actionEdge; returns the quality band. */
   release(): ShotQuality {
@@ -312,10 +340,31 @@ export class DefenderBrain implements AIBehavior {
   /** Re-mark this defender (the scram switch, lib/babylon/core/Matchups.ts). */
   setMark(index: number | null): void { this.markIndex = index; }
   get mark(): number | null { return this.markIndex; }
+  // ── HOOPS-MOVE-KIT-A O1–O3 ──
+  /** The man to BOX OUT (a shot is up): the seal between him and the rim; null = play. */
+  private boxTarget: Vector3 | null = null;
+  /** Fight OVER a screen (toward the ball) or go UNDER — picked per screen, kept while the screener is there. */
+  private over = true; private navigating = 0; private prevFoes: Vector3[] = [];
+  /** The job this frame, for the mode's stance / facing / probes. */
+  job: DefenseJob = 'deny';
+  /** The objective the job faces (the handler, the boxed man, the ball). */
+  objective: Vector3 | null = null;
+  boxOut(mark: Vector3 | null): void { this.boxTarget = mark ? mark.clone() : null; }
+  get boxing(): boolean { return this.boxTarget !== null; }
 
   decide(dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
     const mark = this.markIndex !== null ? foes[this.markIndex] ?? null : null;
     const markHasBall = mark ? distXZ(mark, ball) < 1.8 : false;
+    // O2 BOX OUT — a shot is up: seal the man between him and the rim, chest on him; nothing else matters
+    if (this.boxTarget) {
+      const { spot } = boxOutSpot(this.boxTarget, hoop);
+      this.job = 'boxout'; this.objective = this.boxTarget;
+      const to = spot.subtract(self);
+      return steer(to, false, 0.25);
+    }
+    // O1 NAVIGATE — a set attacker (not the handler) planted between me and where I am going: fight over or go under
+    const foeSpeeds = foes.map((f, i) => this.prevFoes[i] && dt > 1e-4 ? distXZ(f, this.prevFoes[i]) / dt : 9);
+    this.prevFoes = foes.map((f) => f.clone());
 
     // Two different speeds, two different jobs:
     //   ballDelta — the BALL's motion. Off-ball defenders need this too:
@@ -384,6 +433,15 @@ export class DefenderBrain implements AIBehavior {
 
     const to = denyPoint.subtract(self);
     to.addInPlace(separation(self, allies, 2.0).scale(1.4));
+    let fighting = false;
+    for (let i = 0; i < foes.length; i++) {
+      if (foes[i] === mark || distXZ(foes[i], ball) < 1.2 || foeSpeeds[i] > 0.6) continue;   // the handler and moving bodies are not screens
+      const nav = navigateAround(self, denyPoint, foes[i], ball, this.over);
+      if (nav) { if (this.navigating <= 0) this.over = Math.random() < 0.6; this.navigating = 0.5; to.addInPlace(nav.scale(1.6)); fighting = true; break; }
+    }
+    this.navigating = Math.max(0, this.navigating - dt);
+    this.job = fighting ? 'navigate' : helping ? 'help' : onBall ? 'onball' : 'deny';
+    this.objective = onBall ? (mark ?? ball) : ball;
     // PLANAR distance. Vector3.Distance includes Y, and the deny point's Y
     // is lerped toward the rim (y=3.05) while the defender's feet are at 0 —
     // so `dist` carried ~1.3m of phantom altitude and the steal gate
@@ -395,9 +453,13 @@ export class DefenderBrain implements AIBehavior {
     // approach 0.6m short of the press point, which parked the defender at
     // ~1.4m — just OUTSIDE poke range (1.1m). Pressure without arrival is a
     // statue with intent. Measured live: never stripped, never stole.
-    return steer(to, dist > 3, press ? 0.2 : onBall ? 0.6 : 1.4,
+    const out = steer(to, dist > 3 && !fighting, press ? 0.2 : onBall ? 0.6 : 1.4,
       onBall && dist < 1.1 && Math.random() < this.aggression * 0.02);
+    if (fighting && this.over) { out.moveX *= 0.7; out.moveY *= 0.7; }   // fighting OVER the screen costs speed (FIGHT_SLOW)
+    return out;
   }
+  /** Fighting over / under this frame (for the mode's marks). */
+  get fightingOver(): boolean | null { return this.navigating > 0 ? this.over : null; }
 }
 
 /** How contested is `ballHandler` right now, 0..1 — feeds ShotMeter.start(). */
@@ -413,14 +475,60 @@ export function contestLevel(ballHandler: Vector3, defender: Vector3 | null): nu
  *  ball" without needing a full playbook system. */
 export class TeammateBrain implements AIBehavior {
   constructor(private slotAngle: number, private holdRadius = 5.5) {}
+  // ── HOOPS-MOVE-KIT-A O1–O3: one JOB per possession, readable ──
+  /** The job the mode hands this body for the possession ('screen' runs the screen state machine; 'crash' on a shot). */
+  job: OffenseJob = 'space';
+  /** The screen's state while the job is 'screen' / 'roll' / 'pop'. */
+  screen: ScreenState = { ...SCREEN_IDLE };
+  /** The objective the job faces (the screened defender, the rim, the ball). */
+  objective: Vector3 | null = null;
+  /** The defender being screened (the handler's man), for the mode's facing / marks. */
+  screened: Vector3 | null = null;
+  setJob(job: OffenseJob): void { this.job = job; if (job === 'screen') this.screen = { ...SCREEN_IDLE, side: 1 }; }
+  /** O2: on THEIR shot, seal this man (the seal between him and the rim); null = play. */
+  private boxTarget: Vector3 | null = null;
+  boxOut(mark: Vector3 | null): void { this.boxTarget = mark ? mark.clone() : null; }
+  get boxing(): boolean { return this.boxTarget !== null; }
 
-  decide(_dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
+  decide(dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
     const lane = new Vector3(Math.sin(this.slotAngle), 0, Math.cos(this.slotAngle));
     const spot = hoop.add(lane.scale(this.holdRadius));
+    if (this.boxTarget) {   // O2 BOX OUT on their shot
+      this.job = 'boxout'; this.objective = this.boxTarget; this.screened = null;
+      return steer(boxOutSpot(this.boxTarget, hoop).spot.subtract(self), false, 0.25);
+    }
+    // O2 CRASH — a shot is up: to the crash lane on my side
+    if (this.job === 'crash') {
+      this.objective = hoop; this.screened = null;
+      const to = crashSpot(self, hoop).subtract(self);
+      to.addInPlace(separation(self, allies, 2.0).scale(1.2));
+      return steer(to, true, 0.4);
+    }
+    // O1 SCREEN — to the handler's defender's shoulder, plant, then roll / pop
+    if (this.job === 'screen' || this.job === 'roll' || this.job === 'pop') {
+      const handler = ball;
+      const def = foes.reduce<Vector3 | null>((b, f) => !b || distXZ(f, handler) < distXZ(b, handler) ? f : b, null);
+      const farEnough = distXZ(handler, hoop) >= SCREEN_MIN_RIM_DIST;
+      if (def && (farEnough || this.screen.phase === 'set' || this.screen.phase === 'roll' || this.screen.phase === 'pop') && this.screen.phase !== 'done') {
+        const side = this.screen.side === -1 || this.screen.side === 1 ? (this.screen.phase === 'approach' ? pickScreenSide(handler, hoop) : this.screen.side) : 1;
+        const sSpot = screenSpot(def, handler, hoop, side);
+        const laneOpen = rollLaneOpen(self, hoop, foes);
+        this.screen = stepScreen({ ...this.screen, side }, dt, self, sSpot, handler, hoop, laneOpen);
+        this.screened = def;
+        if (this.screen.phase === 'approach') { this.objective = def; const to = sSpot.subtract(self); return steer(to, distXZ(self, sSpot) > 2.5, 0.2); }
+        if (this.screen.phase === 'set') { this.objective = def; this.job = 'screen'; return steer(new Vector3(0, 0, 0), false, 1); }   // PLANTED
+        if (this.screen.phase === 'roll') { this.job = 'roll'; this.objective = hoop; const to = rollTarget(self, hoop).subtract(self); return steer(to, true, 0.5); }
+        if (this.screen.phase === 'pop') { this.job = 'pop'; this.objective = ball; const to = spot.subtract(self); return steer(to, false, 0.6); }
+      }
+      // the screen is over (or the handler is inside the paint): back to spacing
+      this.job = 'space'; this.screened = null;
+    }
 
     // if the lane to the hoop is clear, cut hard
     const nearestFoe = foes.reduce<number>((m, f) => Math.min(m, Vector3.Distance(f, self)), 99);
     const cutting = nearestFoe > 3.2 && Vector3.Distance(self, ball) < 8;
+    this.job = cutting ? 'cut' : 'space';
+    this.objective = cutting ? hoop : ball; this.screened = null;
 
     // A cut used to target the hoop EXACTLY, so both teammates cut to the same
     // point and arrived stacked on each other. Each cuts to its own side of the
@@ -508,7 +616,7 @@ export class ShotArc {
   active = false;
   private made = false;
 
-  start(from: Vector3, rim: Vector3, made: boolean, style: ShotStyle): void {
+  start(from: Vector3, rim: Vector3, made: boolean, style: ShotStyle, apexAdd = 0): void {
     this.from.copyFrom(from);
     this.made = made;
     this.to.copyFrom(rim);
@@ -518,7 +626,7 @@ export class ShotArc {
     }
     const dist = Vector3.Distance(from, rim);
     this.duration = style === 'layup' ? 0.4 : Math.min(0.9, 0.45 + dist * 0.045);
-    this.apex = style === 'floater' ? 2.2 : style === 'layup' ? 0.9 : 1.6;
+    this.apex = (style === 'floater' ? 2.2 : style === 'layup' ? 0.9 : 1.6) + apexAdd;   // HOOPS-MOVE-KIT-A D3: an ALTERED release arcs higher
     this.t = 0;
     this.active = true;
   }
@@ -622,8 +730,8 @@ export interface AttackDecision {
   step: boolean;
   /** A crossover started this frame (which side, in the rival's BODY frame — the clip to play). Null on a shuffle. */
   crossover: 'left' | 'right' | null;
-  /** The release frame: the shot to take now. */
-  shot: 'layup' | 'jumper' | null;
+  /** The release frame: the shot to take now. HOOPS-MOVE-KIT-A D1: a beaten defender (the blow-by) gets DUNKED on. */
+  shot: 'layup' | 'jumper' | 'dunk' | null;
 }
 
 export class AttackerBrain {
@@ -631,19 +739,23 @@ export class AttackerBrain {
   phase: AttackPhase = 'check';
   containedSec = 0;
   private side = 1; private sideSec = 0; private blowbySec = 0; private gatherSec = 0;
-  private pending: 'layup' | 'jumper' | null = null; private swayPhase = 0; private stepbackSec = 0; private stepIsCross = false;
+  private pending: 'layup' | 'jumper' | 'dunk' | null = null; private swayPhase = 0; private stepbackSec = 0; private stepIsCross = false;
   /** How much the rival has learned to protect the ball against THIS defender (survives reset(); decays per possession). */
   caution = 0;
+  /** HOOPS-MOVE-KIT-A D1: this defender was IN FRONT and got beaten (a blow-by / a whiffed reach) — the finish at the rim is a
+   *  DUNK on him. A defender who was never there (an unguarded drive) is just a layup line, which is what the open-drive
+   *  check expects. */
+  private beaten = false;
   constructor(private rng: () => number = Math.random) { this.reset(); }
   /** The defender picked a crossover: fewer crossovers, more shuffles, from now on. */
   noteStolen(): void { this.caution = Math.min(CROSSOVER_CHANCE - CROSSOVER_FLOOR, this.caution + CAUTION_PER_STEAL); }
   reset(): void {
     this.caution = Math.max(0, this.caution - CAUTION_DECAY);
     this.t = 0; this.phase = 'check'; this.containedSec = 0; this.side = this.rng() < 0.5 ? -1 : 1;
-    this.sideSec = 0; this.blowbySec = 0; this.gatherSec = 0; this.stepbackSec = 0; this.pending = null; this.swayPhase = this.rng() * Math.PI * 2;
+    this.sideSec = 0; this.blowbySec = 0; this.gatherSec = 0; this.stepbackSec = 0; this.pending = null; this.beaten = false; this.swayPhase = this.rng() * Math.PI * 2;
   }
   /** A whiffed reach / a jump at nothing opens the lane: the rival goes NOW. No effect once the shot is up. */
-  blowBy(): void { if (this.phase === 'gather' || this.phase === 'released' || this.phase === 'check' || this.phase === 'stepback') return; this.phase = 'blowby'; this.blowbySec = 0; }
+  blowBy(): void { if (this.phase === 'gather' || this.phase === 'released' || this.phase === 'check' || this.phase === 'stepback') return; this.phase = 'blowby'; this.blowbySec = 0; this.beaten = this.containedSec > 0.15; }
   decide(dt: number, self: Vector3, defender: Vector3, hoop: Vector3, opts: { defenderAirborne: boolean } = { defenderAirborne: false }): AttackDecision {
     this.t += dt;
     const zero = new Vector3(0, 0, 0);
@@ -654,7 +766,7 @@ export class AttackerBrain {
     if (this.phase === 'gather') {
       this.gatherSec += dt;
       // a layup gathers in stride (the last step to the rim); a jumper rises on the spot
-      const stride = this.pending === 'layup' && dist > 0.9 ? dir.scale(LAYUP_STRIDE_SPEED) : zero;
+      const stride = (this.pending === 'layup' || this.pending === 'dunk') && dist > 0.9 ? dir.scale(LAYUP_STRIDE_SPEED) : zero;
       if (this.gatherSec >= GATHER_SEC) { this.phase = 'released'; return { wish: zero, phase: 'released', contained: false, exposure: 0, step: false, crossover: null, shot: this.pending }; }
       return { wish: stride, phase: 'gather', contained: false, exposure: 0, step: false, crossover: null, shot: null };
     }
@@ -709,10 +821,11 @@ export class AttackerBrain {
       wish = dir.scale(RIVAL_DRIVE_SPEED).addInPlace(perp.scale(swayV));
       exposure = Math.min(1, Math.abs(swayV) / EXPOSURE_LATERAL_SPEED);
     }
-    // the shot: at the rim it is a layup; held in front (or the clock) it is a pull-up from here
-    if (dist < LAYUP_RANGE && (!inLane || this.containedSec > 0.5)) this.pending = 'layup';
+    // the shot: at the rim it is a layup — a DUNK off a blow-by (the defender is beaten: D1, something to block); held in
+    // front (or the clock) it is a pull-up from here
+    if (dist < LAYUP_RANGE && (!inLane || this.containedSec > 0.5)) this.pending = this.beaten && !inLane ? 'dunk' : 'layup';
     else if (this.containedSec >= CONTAIN_PULLUP_SEC || this.t >= SHOT_CLOCK_SEC) this.pending = dist < LAYUP_RANGE ? 'layup' : 'jumper';
-    if (this.pending === 'layup') { this.phase = 'gather'; this.gatherSec = 0; wish = zero; exposure = 0; }
+    if (this.pending === 'layup' || this.pending === 'dunk') { this.phase = 'gather'; this.gatherSec = 0; wish = zero; exposure = 0; }
     else if (this.pending === 'jumper') {
       // a pull-up under a body steps back first; an open pull-up (the clock) just rises
       if (inLane) { this.phase = 'stepback'; this.stepbackSec = 0; wish = dir.scale(-STEPBACK_SPEED); exposure = 0.2; }

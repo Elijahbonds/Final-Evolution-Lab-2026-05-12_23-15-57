@@ -37,6 +37,9 @@ export interface ContactEvent {
    *  the first body added (the hero), so a mode reading `b === 'me'` as "I was hit" never called a foul FOR the hero and
    *  called every foul-speed contact on defence AGAINST him. */
   attacker: string; victim: string;
+  /** HOOPS-MOVE-KIT-A M2: the attacker's OWN speed along the normal (m/s) — a foul read wants the reckless body's speed,
+   *  not the closing sum of two bodies. */
+  attackerSpeed: number;
 }
 
 /** Foul thresholds: light bumps are basketball; a high-speed hit on an
@@ -58,6 +61,8 @@ interface Entry {
   baseMass: number;
   braced: boolean;
   lastVel: Vector3;
+  /** HOOPS-MOVE-KIT-A M2: in the air on a shot / a finish / a dunk flight — a foul-speed hit on it is a FOUL. */
+  airborne: boolean;
 }
 
 export class ContactSystem {
@@ -100,7 +105,7 @@ export class ContactSystem {
     // With the pre-step on, the yaw a mode writes into the quaternion is what the body keeps; drive() still owns
     // the velocity, and a possession reset that moves the node moves the body with it.
     agg.body.disablePreStep = false;
-    const entry: Entry = { id, root, agg, baseMass: mass, braced: false, lastVel: Vector3.Zero() };
+    const entry: Entry = { id, root, agg, baseMass: mass, braced: false, lastVel: Vector3.Zero(), airborne: false };
     this.entries.push(entry);
     this.byId.set(id, entry);
   }
@@ -128,6 +133,22 @@ export class ContactSystem {
     if (!e) return;
     const cur = e.agg.body.getLinearVelocity();
     e.agg.body.setLinearVelocity(new Vector3(cur.x, vy, cur.z));
+  }
+
+  /** HOOPS-MOVE-KIT-A M2: an impulse (m/s, planar) added to a body's velocity — the drive dunk's bump shoving the defender. */
+  shove(id: string, dv: Vector3): void {
+    const e = this.byId.get(id);
+    if (!e) return;
+    const cur = e.agg.body.getLinearVelocity();
+    e.agg.body.setLinearVelocity(new Vector3(cur.x + dv.x, cur.y, cur.z + dv.z));
+  }
+
+  /** HOOPS-MOVE-KIT-A M2: mark a body airborne on a shot / a finish / a dunk flight. classifyContact() has always taken a
+   *  `shooterAirborne` context and onCollision never passed one, so a hit on an airborne shooter needed the reckless
+   *  threshold (5.25 m/s) to whistle. */
+  setAirborne(id: string, on: boolean): void {
+    const e = this.byId.get(id);
+    if (e) e.airborne = on;
   }
 
   /** Box-out / post-up brace: heavier and deader to pushes. */
@@ -163,14 +184,14 @@ export class ContactSystem {
     const n = e.normal ?? Vector3.Up();
     const rel = ea.lastVel.subtract(eb.lastVel);
     const closing = Math.abs(Vector3.Dot(rel, n));
-    const sev = classifyContact(closing);
+    const sev = classifyContact(closing, { shooterAirborne: ea.airborne || eb.airborne });
     // attacker = whichever body is moving faster along the normal
     const aAlong = Vector3.Dot(ea.lastVel, n);
     const bAlong = Vector3.Dot(eb.lastVel, n);
     const attacker = Math.abs(aAlong) >= Math.abs(bAlong) ? ea : eb;
     const target = attacker === ea ? eb : ea;
     if (sev !== 'bump' || closing > 1.2) {
-      this.contactQueue.push({ a: ea.id, b: eb.id, closingSpeed: closing, severity: sev, attacker: attacker.id, victim: target.id });
+      this.contactQueue.push({ a: ea.id, b: eb.id, closingSpeed: closing, severity: sev, attacker: attacker.id, victim: target.id, attackerSpeed: Math.abs(attacker === ea ? aAlong : bAlong) });
     }
 
     // ── Momentum exchange — the contact that costs something. A sustained

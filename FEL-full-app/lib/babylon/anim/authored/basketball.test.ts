@@ -9,6 +9,7 @@ import '@babylonjs/loaders/glTF';
 import { boneNode } from '../boneLookup';
 import {
   buildBlockReach, buildCrossover, buildDefendSlide, buildDribbleIdle, buildHesi, buildLayupGather, buildStealReach, buildFollowThrough,
+  buildPullupGather, buildFloater, buildHandUp, buildScreenSet,
 } from './basketball';
 
 let scene: Scene; let sk: Skeleton;
@@ -30,6 +31,8 @@ function at(g: AnimationGroup, sec: number): void {
   for (const [n, t] of bind) { n.position.copyFrom(t.p); n.rotationQuaternion = t.q.clone(); }
   g.start(false, 1, g.from, g.to, false); g.goToFrame(sec * 30); scene.render();
 }
+/** Back to bind with nothing playing — build a clip from HERE (the builder fits the hands against the current pose). */
+function rest(): void { for (const x of scene.animationGroups) x.stop(); for (const [n, t] of bind) { n.position.copyFrom(t.p); n.rotationQuaternion = t.q.clone(); } }
 function pos(name: string): Vector3 {
   const n = boneNode(sk, name)!; n.computeWorldMatrix(true); return n.getAbsolutePosition();
 }
@@ -52,6 +55,64 @@ describe('basketball packages on the forge rig', () => {
     at(buildLayupGather(scene, sk)!, 0.3);
     expect(pos('RightLeg').y).toBeGreaterThan(pos('LeftLeg').y + 0.3);   // knee well above the other knee
     expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);
+  });
+  // HOOPS-MOVE-KIT-A (2026-09-08)
+  // (each clip is built ONCE, from bind, before any scrub: the builder fits the hands against the skeleton's current pose)
+  it('the LEFT layup is the mirror: the left knee up, the left hand high, the right hand low', () => {
+    rest(); const left = buildLayupGather(scene, sk, 'left')!, right = buildLayupGather(scene, sk, 'right')!;
+    at(left, 0.3);
+    expect(pos('LeftLeg').y).toBeGreaterThan(pos('RightLeg').y + 0.3);
+    expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y);
+    expect(pos('RightHand').y).toBeLessThan(pos('Head').y);
+    const lx = pos('LeftHand').x, rx = pos('RightHand').x;
+    at(right, 0.3);
+    expect(pos('RightHand').x).toBeCloseTo(-lx, 1);   // the high hand on the other side of the body
+    expect(pos('LeftHand').x).toBeCloseTo(-rx, 1);
+  });
+  it('the layup lands with the feet under the body and the hands down the front (no T)', () => {
+    at(buildLayupGather(scene, sk)!, 0.7);
+    const lf = pos('LeftFoot'), rf = pos('RightFoot'), lh = pos('LeftHand'), rh = pos('RightHand'), sh = (pos('LeftArm').y + pos('RightArm').y) / 2;
+    expect(Math.abs(lf.y - rf.y)).toBeLessThan(0.12);
+    expect(lh.y).toBeLessThan(sh - 0.15); expect(rh.y).toBeLessThan(sh - 0.15);
+    expect(Math.hypot(lh.x - rh.x, lh.z - rh.z)).toBeLessThan(0.7);
+  });
+  it('the pull-up gather brings both hands onto the ball at the hip with the knees loaded, then sets it at the chest', () => {
+    rest(); const g = buildPullupGather(scene, sk)!;
+    at(g, 0.14);
+    const lh = pos('LeftHand'), rh = pos('RightHand'), hips = pos('Hips');
+    expect(Vector3.Distance(lh, rh)).toBeLessThan(0.34);                 // both hands on the ball
+    expect(rh.y).toBeLessThan(hips.y + 0.1);                             // at the hip
+    expect(pos('LeftLeg').y).toBeLessThan(0.62); expect(pos('RightLeg').y).toBeLessThan(0.62);   // the knees loaded (bind ≈ 0.5 + hips drop)
+    at(g, 0.3);
+    const lh2 = pos('LeftHand'), rh2 = pos('RightHand');
+    expect(Vector3.Distance(lh2, rh2)).toBeLessThan(0.34);
+    expect(rh2.y).toBeGreaterThan(pos('Hips').y + 0.2);                  // up to the chest
+    expect(rh2.y).toBeLessThan(pos('Head').y);
+  });
+  it('the hand-up contest: one arm straight up over the head, the other low, both feet on the floor, no jump', () => {
+    rest(); const g = buildHandUp(scene, sk)!;
+    at(g, 0.35);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.25);
+    expect(pos('LeftHand').y).toBeLessThan(pos('Head').y - 0.2);
+    expect(pos('LeftFoot').y).toBeLessThan(0.15); expect(pos('RightFoot').y).toBeLessThan(0.15);
+    expect(Math.abs(pos('LeftFoot').x - pos('RightFoot').x)).toBeGreaterThan(0.4);   // a wide stance
+  });
+  it('the screen: a wide planted base, both hands low in front of the hips, the chest tall', () => {
+    rest(); const g = buildScreenSet(scene, sk)!;
+    at(g, 0.45);
+    expect(Math.abs(pos('LeftFoot').x - pos('RightFoot').x)).toBeGreaterThan(0.4);
+    expect(pos('LeftHand').y).toBeLessThan(pos('Hips').y + 0.1); expect(pos('RightHand').y).toBeLessThan(pos('Hips').y + 0.1);
+    expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.3);
+    expect(pos('Head').y).toBeGreaterThan(pos('Hips').y + 0.45);
+  });
+  it('the floater releases from a hand above the head, one-handed, the off hand at the chest', () => {
+    rest(); const g = buildFloater(scene, sk)!;
+    at(g, 0.35);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.1);
+    expect(pos('LeftHand').y).toBeLessThan(pos('Head').y);
+    expect(pos('RightLeg').y).toBeGreaterThan(pos('LeftLeg').y + 0.25);   // the runner's knee
+    at(g, 0.7);
+    expect(pos('RightHand').y).toBeLessThan((pos('LeftArm').y + pos('RightArm').y) / 2 - 0.15);   // down the front at feet-down
   });
   it('defensive slide is wide and low with the hands below the shoulders', () => {
     at(buildDefendSlide(scene, sk, 'left')!, 0.25);

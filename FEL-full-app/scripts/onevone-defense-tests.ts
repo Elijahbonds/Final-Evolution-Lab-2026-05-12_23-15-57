@@ -33,7 +33,7 @@ function possession(defender: (t: number, rival: Vector3) => Vector3, opts: { se
   const brain = new AttackerBrain(seeded(opts.seed ?? 7));
   const self = new Vector3(0, 0, 9.2);
   const log: { t: number; phase: string; dist: number; exposure: number; contained: boolean; step: boolean; crossover: string | null }[] = [];
-  let shot: { style: 'layup' | 'jumper'; t: number; dist: number } | null = null;
+  let shot: { style: 'layup' | 'jumper' | 'dunk'; t: number; dist: number } | null = null;
   let gatherSec = 0;
   for (let t = 0; t < (opts.maxSec ?? 10) && !shot; t += DT) {
     const dec = brain.decide(DT, self, defender(t, self), RIM, { defenderAirborne: opts.airborne?.(t) ?? false });

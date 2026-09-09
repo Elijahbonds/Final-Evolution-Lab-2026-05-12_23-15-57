@@ -16,7 +16,7 @@ import type { FlightWindow } from './Biomech';
 
 export type HoopsWindow =
   | 'idle' | 'run' | 'dribble' | 'drive' | 'protect'
-  | 'load' | 'release' | 'follow'
+  | 'gather' | 'load' | 'release' | 'follow'
   | 'defend' | 'slide' | 'reach'
   | FlightWindow | 'land' | 'celebrate'
   | 'stagger' | 'floor';
@@ -34,6 +34,9 @@ export const HOOPS_POSTURE: Record<HoopsWindow, PosturePose> = {
   drive:     P({ lean: 12, spine1: [8, 0, 0],   spine2: [-4, 0, 0],  neck: [-4, 0, 0], head: [-12, 0, 0], shrug: 3,  forward: 4,  eyes: 0.8, chestAim: 0.4,  weight: 0.85 }),
   protect:   P({ lean: 9,  spine1: [10, 0, 0],  spine2: [-2, 0, 0],  neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 4,  forward: 6,  eyes: 0.6, chestAim: 0,    weight: 0.85 }),   // the shield: the back to the defender, the chest stays where the hips are
   // the shot: square to the rim, eyes on the iron; tall through the release; the follow-through held
+  // HOOPS-MOVE-KIT-A (M1/M3): the GATHER — the plant before the rise (the pull-up, the step-back, the layup's stride): low,
+  // the chest forward over the loaded knees, the eyes already on the iron
+  gather:    P({ lean: 10, spine1: [6, 0, 0],   spine2: [-4, 0, 0],  neck: [-4, 0, 0], head: [-10, 0, 0], shrug: 4,  forward: 4,  eyes: 1,   chestAim: 0.8,  weight: 0.9 }),
   load:      P({ lean: 3,  spine1: [-2, 0, 0],  spine2: [-6, 0, 0],  neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 6,  forward: -2, eyes: 1,   chestAim: 0.9,  weight: 1 }),
   release:   P({ lean: -2, spine1: [-6, 0, 0],  spine2: [-12, 0, 0], neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 12, forward: -4, eyes: 1,   chestAim: 1,    weight: 1 }),
   follow:    P({ lean: 0,  spine1: [-4, 0, 0],  spine2: [-8, 0, 0],  neck: [-2, 0, 0], head: [-6, 0, 0],  shrug: 8,  forward: -2, eyes: 1,   chestAim: 0.9,  weight: 1 }),
@@ -55,14 +58,14 @@ export const HOOPS_POSTURE: Record<HoopsWindow, PosturePose> = {
 const L = (footPitch: number, weight: number, toeCurl = 0): LegPose => ({ footPitch, toeCurl, weight });
 export const HOOPS_LEGS: Record<HoopsWindow, LegPose> = {
   idle: L(0, 0.5), run: L(0, 0), dribble: L(0, 0.5), drive: L(0, 0), protect: L(0, 0.5),
-  load: L(0, 0.6), release: L(-30, 0.7), follow: L(0, 0.8),
+  gather: L(0, 0.5), load: L(0, 0.6), release: L(-30, 0.7), follow: L(0, 0.8),
   defend: L(0, 0.6), slide: L(0, 0.6), reach: L(0, 0.5),
   rise: LEGS.rise, hang: LEGS.hang, extend: LEGS.extend, jam: LEGS.jam, brace: LEGS.brace, land: LEGS.land, celebrate: LEGS.celebrate,
   stagger: L(0, 0), floor: L(0, 0),
 };
 
 // ── The window resolver ────────────────────────────────────────────────────
-export type ShotWindow = 'none' | 'load' | 'release' | 'follow';
+export type ShotWindow = 'none' | 'gather' | 'load' | 'release' | 'follow';
 export interface HoopsPostureInput {
   role: 'offense' | 'defense' | 'idle';
   hasBall: boolean;

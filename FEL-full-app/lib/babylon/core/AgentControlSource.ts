@@ -77,6 +77,7 @@ export class AgentControlSource implements ControlSource {
     if (typeof src.actionHeld === 'number') out.actionHeld = clamp01(src.actionHeld);
     out.sprint = src.sprint ?? Math.hypot(out.moveX, out.moveY) > 0.85;
     out.guard = src.guard ?? false;
+    out.contest = src.contest ?? false;   // HOOPS-MOVE-KIT-A D3: the held hand-up contest
 
     // Edge fields: delivered on exactly one frame, matching LocalInputSource.
     for (const key of ['action', 'pass', 'steal'] as const) {

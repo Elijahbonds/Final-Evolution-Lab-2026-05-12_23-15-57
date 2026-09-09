@@ -33,6 +33,36 @@
 //       a hand at hip height and leave it floating there until the reset.
 //   G4 — a block jump outside the gather says so (JUMPED EARLY), the way the whiffed reach already did.
 //
+// HOOPS-MOVE-KIT-A (2026-09-08) — the owner's eye: "is the 1-dribble pull-up natural? does a contested drive dunk feel body
+// contact? real layups?" (SPEC-HOOPS-MOVE-KIT M1–M3, the pure rules in core/HoopsMoves):
+//   M1 the player's shot had NO GATHER — the squeeze stopped the feet on the frame (driveBody skipped while `shooting`) and
+//      the jumpshot rose from wherever the body was, at whatever speed (the teleport shot). Now a moving squeeze is a
+//      PULL-UP: the plant bleeds the speed over 0.2–0.34 s (≤ 1 m of travel) on the authored gather clip, the ball into both
+//      hands, then the rise; a set body rises at once; contested with the stick pulled off the rim it is a STEP-BACK (the
+//      rival's own). The meter runs THROUGH the gather (ShotMeter.start(…, gatherSec)): the green is the clip's release frame.
+//   M2 the drive dunk's contest was a make% rolled at the squeeze and a scripted parabola THROUGH the defender. Now the
+//      contest is a BODY in the flight path (contestDrive): the bump fires where the flying root meets him — hit-stop micro,
+//      thud, the flight clock slows (the velocity kill), he is shoved or (a made poster) put on the floor RIGHT THERE; a set
+//      body squarely in the lane is a harder finish than a late one. A foul-speed hit on the airborne body (the ContactSystem
+//      now knows who is airborne) is an AND-ONE on a make / the ball back on a miss — it used to reset the possession mid-flight.
+//   M3 a layup METERED ON THE JUMPSHOT and finished on the dunk launch clip (a two-arm sweep through a T); a floater was a
+//      jumper. Now a layup is gathered on the side the drive comes from (left / right authored finishes, the ball in that
+//      hand), paced so the top of the hop is the green, a real hop to feet-down; the floater is its own clip on the soft arc.
+//
+// HOOPS-MOVE-KIT-A amendment (2026-09-08) — the DEFENSE contest package (core/HoopsDefense, D1–D3). The owner: "defense
+// must block dunks, shots and layups; strip the ball easier during body collisions; contest without jumping."
+//   D1 BLOCK — the rival never blocked anything and never dunked (nothing to swat). Now the AI puts a hand up on my load
+//      (aiHandsUp) or jumps to block timed to my green, and blocks a layup / jumper / dunk at the release by aiBlockChance
+//      (a hand up inside range, more when set); the ball is knocked LOOSE from my hand (BLOCKED! / SWATTED AT THE RIM!). The
+//      rival DUNKS a lane he has beaten (a blow-by: AttackerBrain 'dunk') — a real flight I can SWAT with a timed jump inside
+//      range while he is in the air (jumpSwats: REJECTED AT THE RIM!), or take a poster on if he makes it through me.
+//   D2 STRIP — a hard body contact opens a 0.4 s window in which the ball is loose in the hands: my poke connects inside it
+//      whatever the crossover read says (bumpExposure), and a set AI defender I run into strips me on his roll (aiBumpStrips).
+//      A strip knocks the ball LOOSE from the palm (stripBall / the loose ball) — it used to warp the possession to the check.
+//   D3 CONTEST NO-JUMP — X HELD is a grounded hand-up (bball_hand_up, verticality): inside 1.6 m facing the shooter it adds
+//      contest (groundContest) to the rival's release, and the AI's hand-up adds it to mine; the contest now bites the make
+//      chance itself (contestedPct — it used to narrow only the meter) and a strong one ALTERS the release (a higher arc).
+//
 // ONEVONE-DEFENSE-LOGIC (2026-09-07) — the owner's eye: "we can't play defense, the logic is kinda off, the animations
 // need work". Measured on /dev/mode/onevone with a fake pad driving the deny point (scripts/probes/_onevone-defense-probe.mts):
 //   (1) the rival's possession was a 2.2 s TIMER (x = sin(t) weave, z lerped to the rim) that ignored the defender — in
@@ -75,11 +105,21 @@ import {
   DribbleController, ShotMeter, DefenderBrain, contestLevel, clampToHalfCourt, isThree,
   resolveBodyCollision, checkAnkleBreak, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, BLOCK_RANGE, DUNK_PCT,
-  STEAL_EXPOSURE_MIN, AttackerBrain, RIVAL_DRIVE_SPEED, rivalShotPct, handUpContest, distXZ,
+  STEAL_EXPOSURE_MIN, AttackerBrain, RIVAL_DRIVE_SPEED, rivalShotPct, handUpContest, distXZ, HAND_UP_SEC,
   SHOT_QUALITY_PCT, type ShotQuality, type ShotContext,
 } from '../core/BasketballCore';
 import { DribbleStateMachine, syncedShotSpeed } from '../core/BallHandling';
-import { ContactSystem } from '../core/ContactSystem';
+import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
+import {   // HOOPS-MOVE-KIT-A (2026-09-08): the gather, the finish kit, the drive contest
+  planGather, gatherWish, gatherLabel, stickBack01, type GatherPlan,
+  pickLayupSide, planFinish, finishHopY, finishStride, FINISH_LABEL, type FinishPlan, type FinishStyle,
+  contestDrive, bumpShove, BUMP_SLOW, BUMP_SLOW_SEC, type DriveContest,
+} from '../core/HoopsMoves';
+import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package
+  groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, contestedPct, alteredApex, aiHandsUp, facingCos,
+  AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE,
+} from '../core/HoopsDefense';
+import { BOX_OUT_RANGE } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O2: the rival boxes me out on my shot
 import { MomentumBus } from '../core/MomentumBus';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
@@ -198,6 +238,23 @@ export const OneVOneMode: ModeDefinition = (() => {
   let meLandSec = 0, meCelebrateSec = 0, meSpeed01 = 0, foeSpeed01 = 0;
   let dunkFlight: { k: number; made: boolean | null } | null = null;                 // the drive dunk's flight clock (the posture windows ride it)
   let dunkFlush: { releasePos: Vector3; since: number } | null = null;               // the make's ball through the iron (G6)
+  // ── HOOPS-MOVE-KIT-A ──
+  let gather: { plan: GatherPlan; t: number } | null = null;                         // M1: the jumper's gather before the rise (the body still moves)
+  let finish: { plan: FinishPlan; t: number; released: boolean } | null = null;      // M3: a layup / floater in flight (the stride, the hop, the finish clip)
+  let driveContest: DriveContest | null = null;                                      // M2: the body in the dunk's path
+  let finishFoul = false;                                                            // M2: fouled in the air on a dunk / a finish — and-one on a make, the ball back on a miss
+  const foeVelLast = new Vector3();                                                  // the defender's velocity this frame (the contest reads set vs moving)
+  const devContacts: { t: number; severity: string; closing: number; attacker: string; victim: string; attackerSpeed: number }[] = [];   // dev: the last Havok contact events (probes)
+  // ── the DEFENSE contest package (D1–D3) ──
+  let bumpAge = Infinity;                       // D2: seconds since the last hard body contact with the handler (the strip window)
+  let meHandUp = false, foeHandUp = false, foeHandUpLeft = 0;   // D3: the grounded hand-up contests (mine held on X; the AI's on my load)
+  let foeBlockJumpAge = Infinity, foeBlockAt = -1;               // D1: the AI's contest jump (timed to my green: seconds into the meter)
+  let meFloored = false;                        // D1: posterized BY the rival — on the floor until the stun ends
+  let foeDunkFlight: { k: number; made: boolean | null } | null = null;   // D1: the rival's dunk in the air (the posture windows ride it)
+  let defenseLuck: number | null = null;        // dev: force the AI's block / strip / hand-up rolls (1 = always, 0 = never)
+  const roll = (): number => defenseLuck ?? Math.random();   // dev: the roll VALUE forced (0 = every chance lands, 0.99 = none)
+  let foeBrain: DefenderBrain | null = null;     // O2/O3: the rival's brain (his job / box-out readouts)
+  let lastBumpStripAt = 0;                       // D2: one bump-strip roll per 1.5 s
   const ballWorld = (): Vector3 => ball.getAbsolutePosition();
   /** The layer's feed: the window's stance and feet, the chest on the rim (offense) or the handler (defense), the eyes on the
    *  iron (offense) or the ball (defense). */
@@ -282,6 +339,9 @@ export const OneVOneMode: ModeDefinition = (() => {
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0;
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
+    if (gather || finish) meAnimTree.release();   // HOOPS-MOVE-KIT-A: a held gather / finish beat is lifted with the possession
+    gather = null; finish = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
+    clearDefense();
     place('me', me.root, MY_SPAWN, Math.PI);
     place('foe', foe.root, FOE_SPAWN, 0);
     if (!contact?.isReady) me.root.position.y = 0;
@@ -352,7 +412,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         // rim — measured live: the "defender" parked at (0, 0.3) and never
         // marked anyone, in every game this mode has ever played.
         ball: () => ball.getAbsolutePosition(), hoop: () => RIM, allies: () => [], foes: () => [me.root.position],
-      }, new DefenderBrain(0.7)), false);
+      }, (foeBrain = new DefenderBrain(0.7))), false);
 
       // Phase 4: Havok contact bodies. If the physics wasm is unavailable
       // the mode falls back to the kinematic path unchanged.
@@ -401,7 +461,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       ctx.setHud({ score: myScore, foeScore, target: TARGET_SCORE, momentum: 0, turbo: 100, hint: HINT_OFFENCE });
       // dev probes (ONEVONE-DEFENSE-LOGIC): the possession machine, readable without the HUD
       if (process.env.NODE_ENV === 'development') {
-        (ctx.scene.metadata ??= {}).onevone = { possession: () => possession, defPhase: () => defPhase, attackPhase: () => attacker.phase, foeRoot: foe.root, myJumpAge: () => myJumpAge, defend: () => { if (!ended && possession === 'mine') startDefense(ctx, 'PROBE — DEFEND!'); }, offense: () => { if (!ended) resetPositions(); } };   // BIOMECH-HOOPS-WAVE1: `defend()` / `offense()` let a probe reach either possession deterministically
+        (ctx.scene.metadata ??= {}).onevone = { possession: () => possession, defPhase: () => defPhase, attackPhase: () => attacker.phase, foeRoot: foe.root, myJumpAge: () => myJumpAge, contacts: () => devContacts.slice(), luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: foeHandUp }), ended: () => ended, foeJob: () => (foeBrain?.boxing ? 'boxout' : foeBrain?.job ?? ''), foeBoxing: () => !!foeBrain?.boxing, defend: () => { if (!ended && possession === 'mine') startDefense(ctx, 'PROBE — DEFEND!'); }, offense: () => { if (!ended) resetPositions(); } };   // BIOMECH-HOOPS-WAVE1: `defend()` / `offense()` let a probe reach either possession deterministically
         const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__;
         if (dev) dev.hoopsPosture = { me: () => mePosture?.layer.get() ?? null, foe: () => foePosture?.layer.get() ?? null, bio: () => ({ me: { ...meBio }, foe: { ...foeBio } }) };   // BIOMECH-HOOPS-WAVE1 probes
       }
@@ -439,10 +499,15 @@ export const OneVOneMode: ModeDefinition = (() => {
       }
       // a posterized rival gets up when the stun ends (the tree held the floor)
       if (foeFloored && foeStunSec === 0) { foeFloored = false; foeAnimTree.beat('karate_get_up'); }
+      if (meFloored && meStunSec === 0) { meFloored = false; meAnimTree.beat('karate_get_up'); }   // D1: posterized by the rival, back up
+      bumpAge += dt;   // D2: the strip window's clock
+      if (foeBlockJumpAge !== Infinity) { foeBlockJumpAge += dt; if (foeBlockJumpAge >= JUMP_SEC) foeBlockJumpAge = Infinity; }   // D1: the AI's contest jump
+      if (foeHandUp) { foeHandUpLeft -= dt; if (foeHandUpLeft <= 0) { foeHandUp = false; foeAnimTree.releaseHold(); } }
 
       // ── the ball in flight (either end's shot) ──
       if (arc.active) {
         const res = arc.step(dt, ball.position);
+        if (res !== 'flying') foeBrain?.boxOut(null);   // O2: the seal ends with the ball
         if (res === 'made') {
           SoundKit.play('score', { pitch: 1 });
           EffectsKit.burst(ctx.scene, RIM, 'net');
@@ -458,7 +523,8 @@ export const OneVOneMode: ModeDefinition = (() => {
             console.info('[1V1-JUICE] jumper make');
             // the WHY was named at release (GREEN/EARLY/LATE + contest); the
             // resolution just confirms the result and the points
-            ctx.setHud({ score: myScore, momentum, banner: `${arcLabel} +${arcPoints}` });
+            ctx.setHud({ score: myScore, momentum, banner: finishFoul ? `${arcLabel} +${arcPoints} — AND ONE!` : `${arcLabel} +${arcPoints}` });   // HOOPS-MOVE-KIT-A M2: fouled on the finish
+            if (finishFoul) { finishFoul = false; SoundKit.play('crowdCheer', { volume: 0.5 }); }
             carrying = true;
             if (checkGameOver(ctx)) return;
             later(700, () => { ctx.setHud({ banner: '' }); resetPositions(); });   // make it, take it
@@ -481,6 +547,8 @@ export const OneVOneMode: ModeDefinition = (() => {
           SoundKit.play('miss');
           meShotWin = 'none'; foeShotWin = 'none';   // BIOMECH-HOOPS-WAVE1: the follow-through ends when the arc does
           launchLoose(ball.position.clone(), new Vector3((Math.random() - 0.5) * 3, 2.5, 1.5 + Math.random()));
+          // HOOPS-MOVE-KIT-A M2: fouled in the air on a finish that missed — the ball back, no board race
+          if (finishFoul && possession === 'mine') { finishFoul = false; bannerFlash(ctx, 'FOULED ON THE FINISH — BALL BACK', 1000); later(900, () => resetPositions()); return; }
           // THE BOARD IS A CONTEST, and BOX OUT is how you win it — on BOTH ends.
           //
           // This was a bare distance comparison, which made it deterministic —
@@ -494,19 +562,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           // length on top of it — which is the whole point of a verb the mode
           // tells you to hold — and a little randomness keeps a board from being
           // decided before the ball leaves the rim.
-          later(900, () => {
-            const meD = Vector3.Distance(me.root.position, ball.position);
-            const foeD = Vector3.Distance(foe.root.position, ball.position);
-            const boxing = meSlot.intent.brace ?? false;
-            const edge = (foeD - meD)
-              + (boxing ? BOX_OUT_EDGE : 0)
-              + (Math.random() - 0.5) * REBOUND_JITTER;
-            if (edge <= 0) startDefense(ctx, possession === 'mine' ? 'THEIR BOARD — DEFEND!' : 'THEIR BOARD — DEFEND AGAIN!');
-            else {
-              bannerFlash(ctx, boxing ? 'BOXED OUT — YOUR BOARD' : 'YOUR BOARD');
-              resetPositions();
-            }
-          });
+          later(900, () => boardRace(ctx));
         }
       } else if (loose && !dunking) {
         ballSim.step(dt);
@@ -530,9 +586,16 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (shooting) {   // BIOMECH-HOOPS-WAVE1 G1: the shooter squares to the rim through the meter (he kept the last dribble heading)
           const yaw = slewYaw(me.root.rotation.y, yawTo(me.root.position, RIM), FACE_RIM_RATE, dt); face(me.root, yaw); meDribble.setFacing(yaw);
         }
+        // HOOPS-MOVE-KIT-A M1: the GATHER moves the body — the pull-up's plant bleeds the speed to zero, the step-back goes
+        // away from the rim — then the rise starts (the meter has been running since the squeeze)
+        if (gather) {
+          gather.t += dt;
+          driveBody('me', me.root, gatherWish(gather.plan, gather.t), dt);
+          if (gather.t >= gather.plan.sec) { gather = null; beginRise(); }
+        }
+        if (finish) stepFinish(dt);   // M3: the finish's stride and hop (before and after the release, to feet-down)
         if (!shooting && !dunking) {
-          driveBody('me', me.root, meDribble.vel, dt);
-          face(me.root, drib.facingRad);
+          if (!finish) { driveBody('me', me.root, meDribble.vel, dt); face(me.root, drib.facingRad); }
           const nearestDef = foeStunSec > 0 ? Infinity : Vector3.Distance(me.root.position, foe.root.position);
           meAnimTree.update({
             speed01: drib.speed01, crossover: drib.crossover, nearestDefender: nearestDef,
@@ -548,9 +611,9 @@ export const OneVOneMode: ModeDefinition = (() => {
           wasPlanting = drib.planting;
           meFootPlant.update(dt);
           // the ball leaves the palm while I carry; a crossover swaps hands
-          meCarry?.update(dt, drib.speed01, carrying && !shooting && !dunking);
-          if (drib.crossover) meCarry?.switchHand();
-          if (drib.crossover) {
+          meCarry?.update(dt, drib.speed01, carrying && !shooting && !dunking && !finish);
+          if (drib.crossover && !finish) meCarry?.switchHand();   // HOOPS-MOVE-KIT-A: no size-up reads inside a finish's hop
+          if (drib.crossover && !finish) {
             SoundKit.play('whoosh', { pitch: 1.4, volume: 0.4 });
             ctx.feel?.impact?.(0.1);
             if (foeStunSec === 0 && checkAnkleBreak(true, me.root.position, foe.root.position)) {
@@ -569,7 +632,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           // defender was CLOSING on you, they bite and you own the next beat
           // (the controller's explode-out window is already armed). A set
           // defender standing off does NOT bite — that's the read.
-          if (drib.hesitation) {
+          if (drib.hesitation && !finish) {
             turbo.t01 = Math.max(0, turbo.t01 - 0.05);
             SoundKit.play('whoosh', { pitch: 0.8, volume: 0.3 });
             ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
@@ -592,6 +655,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         // the rival defends: the DefenderBrain's deny point, the press, the strip roll
         const foeIntent = foeSlot.intent;
         const foeVel = foeStunSec > 0 ? new Vector3(0, 0, 0) : new Vector3(foeIntent.moveX, 0, -foeIntent.moveY).scale(3.6);
+        foeVelLast.copyFrom(foeVel);   // HOOPS-MOVE-KIT-A M2: the drive contest reads set vs moving
         if (foeStunSec === 0) {
           // closing speed toward the handler feeds the hesi bite read
           const toMe = me.root.position.subtract(foe.root.position); toMe.y = 0;
@@ -608,16 +672,19 @@ export const OneVOneMode: ModeDefinition = (() => {
         foeAnimTree.update({
           speed01: Math.min(1, foeVel.length() / 3.6), crossover: false, nearestDefender: Infinity,
           hasBall: false, shooting: false, dunking: false, driving: false,
-          defending: true, bracing: false, staggered: false, slideDir: slideDirFor(foe.root.rotation.y, foeVel),
+          defending: true, bracing: !!foeBrain?.boxing, staggered: false, slideDir: slideDirFor(foe.root.rotation.y, foeVel),   // O2: the seal stance while boxing
         });
         // same standoff fix as the defensive poke: bodies rest ~1.1m apart
-        if (foeStunSec === 0 && carrying && !shooting && !dunking && foeIntent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.6) {
-          SoundKit.play('impact', { pitch: 1.2, volume: 0.3 });
-          swing('turnover');
-          ctx.setHud({ momentum });
-          foeAnimTree.beat('bball_steal_reach');
-          startDefense(ctx, 'STRIPPED — CHECK UP, DEFEND!');
+        if (foeStunSec === 0 && carrying && !shooting && !dunking && !finish && !gather && foeIntent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.6) {
+          stripBall(ctx, 'STRIPPED!');   // D2: the ball goes LOOSE from the hand (it used to warp both bodies to the check)
           return;
+        }
+        // D1: the AI's contest jump, timed to my green
+        if (shooting && foeBlockAt >= 0 && shotMeter.t * shotMeter.durationSec >= foeBlockAt) {
+          foeBlockAt = -1; foeBlockJumpAge = 0; foeHandUp = false;
+          foeAnimTree.beat('bball_block_reach');
+          if (contact?.isReady) contact.hop('foe', JUMP_VY);
+          console.info('[1V1-DEF] ai block jump');
         }
 
         if (!contact?.isReady && resolveBodyCollision(me.root.position, foe.root.position) && meDribble.vel.lengthSquared() > 9) {
@@ -634,7 +701,6 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (kind !== 'none') { startDunk(ctx, kind); }
           else {
             shooting = true;
-            meShotWin = 'load'; meShotSec = 0;   // BIOMECH-HOOPS-WAVE1: the shot's posture clock
             // G6: the live dribble is PARKED — the ball comes back to the palm for the meter and leaves the HAND at the release
             // (the carry's deactivate sat inside the !shooting guard, so the ball stayed at its last bounce point on the floor
             // through the whole meter and the arc started from there — measured ball–hand 1.56 m in the load)
@@ -643,13 +709,10 @@ export const OneVOneMode: ModeDefinition = (() => {
             const contest = contestLevel(me.root.position, defenderPos);
             shotContest = contest;
             currentShot = classifyShot(me.root.position, meDribble.vel, RIM, contest);
-            shotMeter.start(contest, currentShot.style);
-            // ShotReleaseSync: pace the jumpshot so its contact frame lands
-            // exactly on the meter's green center — what you see is what you time.
-            const clipSec = me.animator.durationOf('jumpshot') ?? 1.0;
-            const speed = syncedShotSpeed(clipSec, shotMeter.durationSec, shotMeter.greenCenter01);
-            meAnimTree.hold('jumpshot', { speedRatio: speed, fadeSec: 0.08 });
-            ctx.setHud({ shotType: currentShot.label });
+            // HOOPS-MOVE-KIT-A: a layup / floater is a FINISH (M3); a jumper GATHERS first (M1) — a set body rises at once
+            if (currentShot.style === 'layup' || currentShot.style === 'floater') startFinish(ctx, currentShot.style, contest, defenderPos);
+            else startRise(ctx, contest, mx, my);
+            aiContestLoad(ctx);   // D1/D3: the AI puts a hand up on the load, or times a block jump to the green
           }
         }
         if (shooting) {
@@ -665,14 +728,36 @@ export const OneVOneMode: ModeDefinition = (() => {
       // ── Phase 4: contact events (fouls/hard contact) from Havok ──
       if (contact?.isReady) {
         for (const c of contact.drainContacts()) {
+          if (process.env.NODE_ENV === 'development') { devContacts.push({ t: performance.now(), severity: c.severity, closing: c.closingSpeed, attacker: c.attacker, victim: c.victim, attackerSpeed: c.attackerSpeed }); if (devContacts.length > 40) devContacts.shift(); }
           if (c.severity === 'foul') {
-            if (possession === 'mine' && (shooting || dunking) && c.victim === 'me') {
+            if (possession === 'mine' && (dunking || finish) && c.victim === 'me') {
+              // HOOPS-MOVE-KIT-A M2: fouled IN THE AIR — the attempt plays out (it used to reset the possession mid-flight, with
+              // the flight observer still flying the body): a make is an AND-ONE, a miss is the ball back
+              if (!finishFoul) { finishFoul = true; SoundKit.play('whistle'); bannerFlash(ctx, 'FOUL!', 400); console.info(`[1V1-CONTACT] foul in the air (${c.closingSpeed.toFixed(1)} m/s) — and-one pending`); }
+            } else if (possession === 'mine' && !shooting && !dunking && !finish && carrying && c.attacker === 'me' && c.attackerSpeed >= FOUL_CLOSING_SPEED && foeVelLast.length() < 1.0 && foeStunSec === 0) {
+              // HOOPS-MOVE-KIT-A M2: a sprint THROUGH a set defender is a CHARGE (a foul-speed contact on offense was never
+              // read — the handler ran through bodies for free); a moving defender who gets hit is just beaten (below)
+              SoundKit.play('whistle');
+              swing('turnover');
+              ctx.setHud({ momentum });
+              bannerFlash(ctx, 'CHARGE — THEIR BALL', 1000);
+              console.info(`[1V1-CONTACT] charge ${c.closingSpeed.toFixed(1)} m/s into a set body`);
+              later(900, () => startDefense(ctx, 'CHECK UP — DEFEND!'));
+            } else if (possession === 'mine' && !shooting && !dunking && !finish && carrying && c.attacker === 'foe' && c.victim === 'me' && c.attackerSpeed >= FOUL_CLOSING_SPEED) {
+              // M2: a defender running THROUGH the handler at foul speed — the ball back
+              SoundKit.play('whistle');
+              bannerFlash(ctx, 'FOUL ON THE DEFENDER — BALL BACK', 1000);
+              console.info(`[1V1-CONTACT] foul ${c.closingSpeed.toFixed(1)} m/s by the defender`);
+              resetPositions();
+            } else if (possession === 'mine' && (c.attacker === 'me' || c.attacker === 'foe') && !shooting && !dunking && !finish) {
+              hardHit(ctx, c.attacker, c.victim, c.closingSpeed);   // a foul-speed collision with a MOVING defender: a hard hit, no whistle
+            } else if (possession === 'mine' && shooting && c.victim === 'me') {
               SoundKit.play('whistle');
               mbus.report({ kind: 'big_make', weight: 8 }); momentum = Math.round(mbus.score01 * 100);
               ctx.setHud({ momentum });
               bannerFlash(ctx, 'FOUL! — BALL BACK', 1000);
               resetPositions();
-            } else if (possession === 'defense' && defPhase !== 'over' && c.attacker === 'me') {
+            } else if (possession === 'defense' && defPhase !== 'over' && c.attacker === 'me' && c.attackerSpeed >= FOUL_CLOSING_SPEED) {
               // I ran through them: their ball again, checked up
               SoundKit.play('whistle');
               mbus.report({ kind: 'turnover', weight: -10 }); momentum = Math.round(mbus.score01 * 100);
@@ -690,8 +775,18 @@ export const OneVOneMode: ModeDefinition = (() => {
               later(900, () => resetPositions());
             }
           } else if (c.severity === 'hard') {
-            SoundKit.play('impact', { pitch: 1.0, volume: 0.3 });
-            ctx.feel?.impact?.(0.25);
+            hardHit(ctx, c.attacker, c.victim, c.closingSpeed);
+          }
+          // D2: any hard / foul contact with the handler opens the strip window — mine on defense (the poke connects inside it),
+          // the AI's on my possession (a set defender I bump strips on his roll)
+          if (c.severity !== 'bump') {
+            if (possession === 'defense' && (defPhase === 'check' || defPhase === 'drive')) bumpAge = 0;
+            else if (c.severity === 'hard' && possession === 'mine' && carrying && !shooting && !dunking && !finish && !gather && foeStunSec === 0 && !foeFloored
+              && c.attacker === 'me' && c.attackerSpeed >= 4.0 && performance.now() - lastBumpStripAt > 2500) {
+              lastBumpStripAt = performance.now();   // I barrelled into him: one roll per collision, never on a defender bumping ME
+              const facing = facingCos(foe.root.rotation.y, foe.root.position, me.root.position);
+              if (aiBumpStrips(foeVelLast.length() < 1.0, facing, roll)) { stripBall(ctx, 'STRIPPED ON THE BUMP!'); return; }
+            }
           }
         }
       }
@@ -724,6 +819,10 @@ export const OneVOneMode: ModeDefinition = (() => {
           defending: true, bracing: intent.brace ?? false, staggered: false, slideDir: slideDirFor(defYaw, meDribble.vel),
         });
         const dist = Vector3.Distance(me.root.position, foe.root.position);
+        // D3: X HELD = the grounded hand-up (verticality) — a hold the tree never interrupts; re-held after a reach beat
+        const wantHandUp = !!intent.contest && myJumpAge === Infinity && meStunSec === 0 && !meFloored && defPhase !== 'over';
+        if (wantHandUp !== meHandUp) { meHandUp = wantHandUp; if (meHandUp) console.info('[1V1-DEF] hand up (me)'); else meAnimTree.releaseHold(); }
+        if (meHandUp && !meAnimTree.busy) meAnimTree.hold('bball_hand_up', { fadeSec: 0.1 });
 
         if (defPhase === 'check' || defPhase === 'drive') {
           // the rival attacks — reading ME: contained → sidestep, open → drive, held → pull-up, a jump at nothing → blow-by
@@ -767,13 +866,24 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (intent.steal && reachCooldown === 0 && meStunSec === 0) {
             reachCooldown = REACH_COOLDOWN_SEC;
             meAnimTree.beat('bball_steal_reach');
-            if (dist < STEAL_RANGE && dec.exposure >= STEAL_EXPOSURE_MIN && dec.phase !== 'gather' && dec.phase !== 'check') {
+            // D2: inside the bump window the ball is loose in his hands — the poke connects whatever the crossover read says
+            const exposure = bumpExposure(dec.exposure, bumpAge);
+            if (dist < STEAL_RANGE && (dec.exposure >= STEAL_EXPOSURE_MIN || exposure >= STEAL_EXPOSURE_MIN) && dec.phase !== 'gather' && dec.phase !== 'check') {
+              const onBump = bumpAge <= 0.4 && dec.exposure < STEAL_EXPOSURE_MIN;
               SoundKit.play('impact', { pitch: 1.3, volume: 0.4 });
               swing('steal');
               attacker.noteStolen();   // the rival learns: fewer crossovers in front of this defender
               ctx.setHud({ momentum });
-              bannerFlash(ctx, 'PICKED THEIR POCKET!');
-              resetPositions();
+              // the ball is knocked LOOSE toward me (no warp into a palm); the possession follows after it settles
+              foeCarry?.update(0, 0, false);
+              const from = ballWorld().clone(); releaseBall(ball);
+              const toMe = me.root.position.subtract(foe.root.position); toMe.y = 0; toMe.normalize();
+              launchLoose(from, toMe.scale(1.8).add(new Vector3(0, 1.0, 0)));
+              defPhase = 'over';
+              foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.08 });
+              bannerFlash(ctx, onBump ? 'STRIPPED ON THE BUMP!' : 'PICKED THEIR POCKET!');
+              console.info(`[1V1-DEF] strip by me ${onBump ? 'on the bump' : 'on the crossover'} exposure ${exposure.toFixed(2)} bumpAge ${bumpAge.toFixed(2)}`);
+              later(750, () => resetPositions());
               return;
             }
             meStunSec = REACH_WHIFF_STUN_SEC;
@@ -782,7 +892,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             bannerFlash(ctx, 'REACH — THEY GO BY', 700);
           }
 
-          if (dec.shot) releaseRival(ctx, dec.shot);
+          if (dec.shot === 'dunk') foeDunk(ctx); else if (dec.shot) releaseRival(ctx, dec.shot);   // D1: the beaten lane is a DUNK — swat it
         } else if (defPhase === 'shot') {
           // the shot is up: the rival crashes the board when the ball is loose, else holds the follow-through / a stance
           const wish = new Vector3(0, 0, 0);
@@ -820,12 +930,12 @@ export const OneVOneMode: ModeDefinition = (() => {
       Object.assign(meBio, {
         role: possession === 'mine' ? 'offense' : 'defense', hasBall: possession === 'mine' && carrying, speed01: meSpeed01,
         nearestDefender: foeStunSec > 0 ? Infinity : foeDist, shot: meShotWin, flight: dunkFlight, landed: meLandSec > 0, celebrate: meCelebrateSec > 0,
-        reaching: meAnimTree.held === 'bball_steal_reach' || meAnimTree.held === 'bball_block_reach', staggered: false, floored: false,
+        reaching: meAnimTree.held === 'bball_steal_reach' || meAnimTree.held === 'bball_block_reach' || meHandUp, staggered: meStunSec > 0 && !meFloored && possession === 'defense', floored: meFloored,
       } satisfies HoopsPostureInput);
       Object.assign(foeBio, {
         role: possession === 'mine' ? 'defense' : 'offense', hasBall: possession === 'defense' && defPhase !== 'shot' && defPhase !== 'over' && !loose, speed01: foeSpeed01,
-        nearestDefender: possession === 'defense' ? foeDist : Infinity, shot: foeShotWin, flight: null, landed: false, celebrate: false,
-        reaching: foeAnimTree.held === 'bball_steal_reach', staggered: foeStunSec > 0 && !foeFloored, floored: foeFloored,
+        nearestDefender: possession === 'defense' ? foeDist : Infinity, shot: foeShotWin, flight: foeDunkFlight, landed: false, celebrate: false,
+        reaching: foeAnimTree.held === 'bball_steal_reach' || foeAnimTree.held === 'bball_block_reach' || foeHandUp, staggered: foeStunSec > 0 && !foeFloored, floored: foeFloored,
       } satisfies HoopsPostureInput);
     },
 
@@ -851,6 +961,9 @@ export const OneVOneMode: ModeDefinition = (() => {
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
+    if (gather || finish) meAnimTree.release();   // HOOPS-MOVE-KIT-A: a held gather / finish beat is lifted with the possession
+    gather = null; finish = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
+    clearDefense();
     place('foe', foe.root, CHECK_FOE, Math.PI);
     place('me', me.root, CHECK_ME, 0);
     if (!contact?.isReady) me.root.position.y = 0;
@@ -890,22 +1003,38 @@ export const OneVOneMode: ModeDefinition = (() => {
       return;
     }
     // no block — my contest (distance + a hand up) and their range set the make%
-    const contest = handUpContest(contestLevel(foe.root.position, me.root.position), myJumpAge);
+    // D3: a grounded hand-up inside range facing him counts (verticality) on top of the distance and a contest jump
+    const ground = groundContest(distXZ(me.root.position, foe.root.position), facingCos(me.root.rotation.y, me.root.position, foe.root.position), meHandUp);
+    const contest = Math.min(1, handUpContest(contestLevel(foe.root.position, me.root.position), myJumpAge) + ground);
     defContest = contest;
     const range = distXZ(foe.root.position, RIM_FLOOR);
     const made = Math.random() < rivalShotPct(range, contest, style);
     arcPoints = style === 'layup' ? 2 : isThree(foe.root.position, RIM) ? 3 : 2;
-    arc.start(ball.getAbsolutePosition(), RIM, made, style);
+    arc.start(ball.getAbsolutePosition(), RIM, made, style, alteredApex(contest));   // a strong contest ALTERS the release
+    console.info(`[1V1-DEF] rival release ${style} contest ${contest.toFixed(2)} handUp ${ground > 0} pct ${rivalShotPct(range, contest, style).toFixed(2)}`);
     // the read at the release, before the arc lands — same as the hero's GREEN / CONTESTED tags
-    if (contest >= 0.5) bannerFlash(ctx, 'CONTESTED!', 500);
+    if (contest >= 0.5) bannerFlash(ctx, ground > 0 ? 'CONTESTED — HAND UP!' : 'CONTESTED!', 500);
     else if (contest <= 0.15) bannerFlash(ctx, 'WIDE OPEN…', 500);
   }
 
   function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster'): void {
-    dunking = true; shooting = false; contactLatch = false;   // A+ P0: a fresh attempt gets one punch
+    dunking = true; shooting = false; contactLatch = false; finishFoul = false;   // A+ P0: a fresh attempt gets one punch
     meShotWin = 'none'; dunkFlush = null; let resolved = false; dunkFlight = { k: 0, made: null };   // BIOMECH-HOOPS-WAVE1
     turbo.t01 = Math.max(0, turbo.t01 - 0.3);           // dunks spend fuel
-    const made = Math.random() < DUNK_PCT[kind];
+    const from = me.root.position.clone();
+    const landing = new Vector3(RIM.x, 0, RIM.z + DRIVE_DUNK.landAheadZ);
+    // HOOPS-MOVE-KIT-A M2: the contest is a BODY in the flight's path — where the bump lands, how square he is, whether he is
+    // set; the make chance follows the body (a set wall on a poster: 0.62; a late, moving one: nearer the open 0.78)
+    const defenderPos = foeStunSec > 0 ? null : foe.root.position;
+    const c = contestDrive(from, landing, defenderPos, defenderPos ? foeVelLast : null, kind);
+    driveContest = c;
+    console.info(`[1V1-CONTACT] drive contest ${kind} contested ${c.contested} t ${c.t.toFixed(2)} lateral ${c.lateral.toFixed(2)} set ${c.set} pct ${c.pct.toFixed(2)}`);
+    let made = Math.random() < c.pct;
+    let swatted = false;
+    // D1: the AI reads the takeoff — a hand up (or a live contest jump) in the lane can SWAT the dunk at the bump
+    if (c.contested && defenderPos && !foeHandUp && foeBlockJumpAge === Infinity && aiHandsUp(distXZ(me.root.position, foe.root.position), facingCos(foe.root.rotation.y, foe.root.position, me.root.position), roll)) {
+      foeHandUp = true; foeHandUpLeft = 1.2; foeAnimTree.hold('bball_hand_up', { fadeSec: 0.08 }); console.info('[1V1-DEF] ai hand up on the takeoff');
+    }
     SoundKit.play('whoosh', { pitch: 0.85 });
     // BIOMECH-HOOPS-WAVE1 G6: the live dribble is PARKED first — the ball comes back to the palm and rides the hand through
     // the flight (it used to stay at the last bounce point on the floor while the body flew, measured ballY 0.85 through the
@@ -913,11 +1042,17 @@ export const OneVOneMode: ModeDefinition = (() => {
     meCarry?.update(0, 0, false);
     if (!ball.parent) attachBallToHand(ball, me.skeleton, 'RightHand');
     meAnimTree.beat(SPORT_CLIP.dunkLaunchPower, { holdEnd: true });
-    const from = me.root.position.clone();
-    const t0 = performance.now();
+    contact?.setAirborne('me', true);
+    // the flight's own clock: real time, FROZEN for the bump's hit-stop and slowed for BUMP_SLOW_SEC after it (the velocity kill)
+    let flightMs = 0, last = performance.now(), bumped = false, freezeMs = 0, slowMs = 0;
     const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-      const fdt = ctx.scene.getEngine().getDeltaTime() / 1000;
-      const k = Math.min(1, (performance.now() - t0) / DRIVE_DUNK.flightMs);
+      const nowMs = performance.now(); const realMs = Math.min(50, nowMs - last); last = nowMs;
+      const fdt = realMs / 1000;
+      let scale = 1;
+      if (freezeMs > 0) { freezeMs -= realMs; scale = 0; }
+      else if (slowMs > 0) { slowMs -= realMs; scale = BUMP_SLOW; }
+      flightMs += realMs * scale;
+      const k = Math.min(1, flightMs / DRIVE_DUNK.flightMs);
       me.root.position.x = from.x + (RIM.x - from.x) * k;
       me.root.position.z = from.z + (RIM.z + DRIVE_DUNK.landAheadZ - from.z) * k;
       me.root.position.y = driveDunkY(k);
@@ -925,7 +1060,23 @@ export const OneVOneMode: ModeDefinition = (() => {
       // from a body yawed 40° off the rim); the posture windows ride the flight clock (rise / hang / extend / jam / brace)
       face(me.root, slewYaw(me.root.rotation.y, yawTo(me.root.position, RIM), FACE_RIM_RATE, fdt));
       dunkFlight = { k, made: resolved ? made : null };
-      if (!resolved && k >= DRIVE_DUNK.resolveK) {
+      // M2: the bodies meet — the bump
+      if (!bumped && c.bumpK !== null && k >= c.bumpK) {
+        bumped = true; freezeMs = 45; slowMs = BUMP_SLOW_SEC * 1000;
+        // D1: a hand up (or a contest jump) on a set body squarely in the lane can SWAT it — the ball knocked loose HERE
+        const handUp = foeHandUp || foeBlockJumpAge <= HAND_UP_SEC;
+        const swatChance = aiBlockChance('dunk', 0, handUp, c.set, c.strength01);
+        if (swatChance > 0 && roll() < swatChance) {
+          swatted = true; made = false; carrying = false;   // the ball is LOOSE — an active carry re-attached it to my palm at feet-down (a 3 m warp)
+          const at = ballWorld().clone(); releaseBall(ball);
+          launchLoose(at, c.dir.scale(-2.2).add(new Vector3((Math.random() - 0.5) * 2, 1.3, 0)));
+          SoundKit.play('impact', { pitch: 0.7, volume: 0.6 }); SoundKit.play('crowdGroan', { volume: 0.5 });
+          ctx.feel?.impact?.(0.5); ctx.juice.shake(0.1, 120);
+          foeAnimTree.beat('bball_block_reach', { fadeSec: 0.06 });
+          console.info(`[1V1-DEF] ai swat at the bump chance ${swatChance.toFixed(2)}`);
+        } else driveBump(ctx, c, made && kind === 'poster', (1 - k) * DRIVE_DUNK.flightMs > 320);
+      }
+      if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
         // G6: the slam resolves AT THE IRON — the ball leaves the hand at the rim; a make flushes through the net, a miss
         // clanks off the front (it used to let go on the feet-down frame, from a hand at hip height, and float there)
         resolved = true;
@@ -935,9 +1086,11 @@ export const OneVOneMode: ModeDefinition = (() => {
       }
       if (k < 1) return;
       ctx.scene.onBeforeRenderObservable.remove(obs);
-      dunking = false; dunkFlight = null; meLandSec = LAND_SEC;
+      dunking = false; dunkFlight = null; meLandSec = LAND_SEC; driveContest = null;
+      contact?.setAirborne('me', false);
       meAnimTree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });   // G5: feet-down is the land crouch, never an idle flash
       meDribble.setFacing(me.root.rotation.y);
+      const fouled = finishFoul; finishFoul = false;
       if (made) {
         // A DUNK IS WORTH TWO. The comment above TARGET_SCORE records the
         // scoring scale being fixed from "1 inside the paint, 2 outside" to real
@@ -952,13 +1105,13 @@ export const OneVOneMode: ModeDefinition = (() => {
         SoundKit.play('crowdCheer', { volume: posterized ? 0.8 : 0.5 });
         contactPunch(ctx);   // A+ P0: hit-stop + shake + flash + the ONE slam thud + HoopJuice (replaces the bare feel.impact, which was a second thud)
         EffectsKit.burst(ctx.scene, RIM, 'net');
-        if (posterized) {
+        if (posterized && !foeFloored) {   // M2: a contested poster put him down AT THE BUMP; an uncontested one drops him here
           foeStunSec = 1.4; foeFloored = true;
           foeAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
           EffectsKit.burst(ctx.scene, foe.root.position.add(new Vector3(0, 0.3, 0)), 'dust');
         }
         ctx.setHud({ score: myScore, momentum });
-        bannerFlash(ctx, posterized ? 'POSTERIZED!' : 'THROWN DOWN!', 1000);
+        bannerFlash(ctx, fouled ? (posterized ? 'POSTERIZED — AND ONE!' : 'THROWN DOWN — AND ONE!') : posterized ? 'POSTERIZED!' : 'THROWN DOWN!', 1000);
         carrying = false;   // BIOMECH-HOOPS-WAVE1: the ball is in the net, not in the hand — the reset hands it back (an active carry would have snatched it out of the flush)
         if (checkGameOver(ctx)) return;
         later(posterized ? 1500 : 900, () => resetPositions());   // a posterized body gets up before it is moved
@@ -966,10 +1119,101 @@ export const OneVOneMode: ModeDefinition = (() => {
         SoundKit.play('miss');
         SoundKit.play('crowdGroan', { volume: 0.4 });
         // the clank and the loose ball fired at the resolve (k 0.55), off the front of the iron — BIOMECH-HOOPS-WAVE1 G6
-        bannerFlash(ctx, kind === 'poster' ? 'STUFFED AT THE RIM!' : 'RATTLED OUT');
-        later(900, () => startDefense(ctx, 'THEIR BALL — CHECK UP, DEFEND!'));
+        if (fouled) { bannerFlash(ctx, 'FOULED AT THE RIM — BALL BACK', 1000); later(900, () => resetPositions()); }
+        else if (swatted) { swing('turnover'); ctx.setHud({ momentum }); bannerFlash(ctx, 'SWATTED AT THE RIM!', 1000); later(900, () => boardRace(ctx)); }   // D1: the ball went loose at the bump — the board decides
+        else {
+          bannerFlash(ctx, kind === 'poster' ? 'STUFFED AT THE RIM!' : 'RATTLED OUT');
+          later(900, () => startDefense(ctx, 'THEIR BALL — CHECK UP, DEFEND!'));
+        }
       }
     });
+  }
+
+  // ── HOOPS-MOVE-KIT-A (2026-09-08): M1 the gather, M2 the bump, M3 the finish ────────────────────────────────────────
+  /** M1: the jumper. A moving body GATHERS (the pull-up plant, or the step-back under a contest with the stick pulled off
+   *  the rim) on the authored gather clip while the meter runs; a set body rises at once. */
+  function startRise(ctx: ModeContext, contest: number, mx: number, my: number): void {
+    const toRim = RIM_FLOOR.subtract(me.root.position); toRim.y = 0; toRim.normalize();
+    const plan = planGather(meDribble.vel, me.root.position, RIM_FLOOR, contest, stickBack01(mx, -my, toRim));
+    shotMeter.start(contest, currentShot?.style ?? 'jumper', plan.sec);
+    if (plan.sec > 0) {
+      gather = { plan, t: 0 };
+      meShotWin = 'gather'; meShotSec = 0;
+      const clipSec = me.animator.durationOf('bball_pullup_gather') ?? 0.3;
+      meAnimTree.beat('bball_pullup_gather', { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });
+      SoundKit.play('whoosh', { pitch: 1.0, volume: 0.2 });
+      console.info(`[1V1-MOVE] gather ${plan.kind} ${plan.sec.toFixed(2)} s from ${plan.v0.length().toFixed(1)} m/s`);
+    } else { gather = null; beginRise(); }
+    ctx.setHud({ shotType: gatherLabel(plan.kind, currentShot?.label ?? 'JUMPER') });
+  }
+  /** The rise: the jumpshot HELD, paced so its release frame lands on the meter's green (ShotReleaseSync) — after the gather. */
+  function beginRise(): void {
+    meShotWin = 'load'; meShotSec = 0;   // BIOMECH-HOOPS-WAVE1: the shot's posture clock
+    const clipSec = me.animator.durationOf('jumpshot') ?? 1.0;
+    const greenInRise01 = (shotMeter.greenCenter01 * shotMeter.durationSec - shotMeter.gatherSec) / shotMeter.riseSec;
+    meAnimTree.hold('jumpshot', { speedRatio: syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01), fadeSec: 0.08 });
+  }
+  /** M3: a layup / floater. The ball into the finishing hand (the side the drive comes from, or away from the defender),
+   *  the finish clip paced so its release key (the top of the hop) is the green, the body strides the last step and hops. */
+  function startFinish(ctx: ModeContext, style: FinishStyle, contest: number, defenderPos: Vector3 | null): void {
+    const side = style === 'layup' ? pickLayupSide(me.root.position, RIM_FLOOR, me.root.rotation.y, defenderPos) : 'right';
+    attachBallToHand(ball, me.skeleton, side === 'left' ? 'LeftHand' : 'RightHand');
+    shotMeter.start(contest, style);
+    const plan = planFinish(style, side, shotMeter.durationSec, shotMeter.greenCenter01);
+    finish = { plan, t: 0, released: false };
+    meShotWin = 'gather'; meShotSec = 0;
+    meAnimTree.beat(plan.clip, { holdEnd: true, fadeSec: 0.06, speedRatio: plan.speedRatio });
+    contact?.setAirborne('me', true);
+    SoundKit.play('whoosh', { pitch: 1.1, volume: 0.25 });
+    ctx.setHud({ shotType: FINISH_LABEL[style][side] });
+    console.info(`[1V1-MOVE] finish ${style} ${side} release ${plan.releaseSec.toFixed(2)} s hop ${plan.hopSec.toFixed(2)} s`);
+  }
+  /** The finish in flight: the stride to the rim until the release, the hop to feet-down, then the tree's loop. */
+  function stepFinish(dt: number): void {
+    if (!finish) return;
+    finish.t += dt;
+    const k = finish.t / finish.plan.hopSec;
+    driveBody('me', me.root, finishStride(finish.plan.style, me.root.position, RIM_FLOOR, finish.released), dt);
+    me.root.position.y = finishHopY(finish.plan.style, k);
+    if (k < 1) return;
+    me.root.position.y = 0;
+    finish = null;
+    contact?.setAirborne('me', false);
+    meAnimTree.release();   // the landing key → the loop the game asks for
+    meDribble.setFacing(me.root.rotation.y);
+  }
+  /** M2: a hard hit on the floor READS on the body that took it (the solver already bleeds the runner's momentum) — never on
+   *  a body the dunk's own bump is handling, never on a floored one, never on a body inside a held beat (the follow-through,
+   *  a reach: a react cut the held follow-through, measured). */
+  function hardHit(ctx: ModeContext, attacker: string, victim: string, closing: number): void {
+    SoundKit.play('impact', { pitch: 1.0, volume: 0.3 });
+    ctx.feel?.impact?.(0.25);
+    if (dunking || closing < HARD_CONTACT_SPEED) return;
+    let react = false;
+    if (victim === 'foe' && foeStunSec === 0 && !foeFloored && !foeAnimTree.busy) { foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); react = true; }
+    else if (victim === 'me' && meStunSec === 0 && !shooting && !finish && !gather && meShotWin === 'none' && !meAnimTree.busy) { meAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); react = true; }
+    ctx.juice.shake(0.05, 80);
+    console.info(`[1V1-CONTACT] hard ${attacker} → ${victim} ${closing.toFixed(1)} m/s react ${react}`);
+  }
+  /** M2: the bodies meet in the flight — hit-stop micro (the flight clock freezes with the clips), the thud, the shove or
+   *  the knockdown. CONTACT you feel before the iron, not a make% number. */
+  function driveBump(ctx: ModeContext, c: DriveContest, floorHim: boolean, banner: boolean): void {
+    ctx.juice.hitStop(45);
+    ctx.juice.shake(0.08, 110);
+    ctx.feel.impact(0.3);
+    SoundKit.play('impact', { pitch: 0.95, volume: 0.55 });
+    EffectsKit.burst(ctx.scene, foe.root.position.add(new Vector3(0, 1.0, 0)), 'dust');
+    const shove = bumpShove(c);
+    if (floorHim) {
+      foeStunSec = 1.4; foeFloored = true;
+      foeAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+    } else if (!foeFloored) {
+      foeStunSec = Math.max(foeStunSec, 0.35);
+      foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+    }
+    if (contact?.isReady) contact.shove('foe', shove); else foe.root.position.addInPlace(shove.scale(0.16));
+    if (banner) bannerFlash(ctx, c.set ? 'CONTACT!' : 'BUMP!', 260);
+    console.info(`[1V1-CONTACT] drive bump strength ${c.strength01.toFixed(2)} set ${c.set} floor ${floorHim} shove ${shove.length().toFixed(1)}`);
   }
 
   // ── A+ P0 CONTACT-lite (PM brief ONEVONE-A-PLUS-P0, 2026-09-06) ─────────────────────────────────────────────────
@@ -996,17 +1240,30 @@ export const OneVOneMode: ModeDefinition = (() => {
   function releaseJumper(ctx: ModeContext, quality: ShotQuality): void {
     shooting = false;
     const pctMod = currentShot?.pctMod ?? 1;
-    const pct = SHOT_QUALITY_PCT[quality] * pctMod * mbus.multiplier();
+    // D3: the contest at the RELEASE (a hand up, a contest jump, the body) bites the make chance itself
+    const foeDist = distXZ(me.root.position, foe.root.position);
+    const foeFacing = facingCos(foe.root.rotation.y, foe.root.position, me.root.position);
+    const foeUp = foeHandUp || foeBlockJumpAge <= HAND_UP_SEC;
+    const ground = foeStunSec > 0 || foeFloored ? 0 : groundContest(foeDist, foeFacing, foeHandUp);
+    shotContest = Math.min(1, handUpContest(contestLevel(me.root.position, foeStunSec > 0 ? null : foe.root.position), foeBlockJumpAge) + ground);
+    const pct = contestedPct(SHOT_QUALITY_PCT[quality] * pctMod * mbus.multiplier(), shotContest);
     arcPoints = isThree(me.root.position, RIM) ? 3 : 2;
     arcLabel = currentShot?.label ?? 'SHOT';
     const made = Math.random() < Math.min(0.98, pct);
+    // D1: the AI's block at the release — a hand up (or a jump) inside range; the ball is knocked LOOSE from the hand
+    const blockChance = foeStunSec > 0 || foeFloored ? 0 : aiBlockChance(currentShot?.style ?? 'jumper', foeDist, foeUp, foeVelLast.length() < 1.0);
+    console.info(`[1V1-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} handUp ${foeHandUp} jump ${foeBlockJumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)}`);
+    if (blockChance > 0 && roll() < blockChance) { blockedShot(ctx); return; }
     releaseBall(ball);
     meShotWin = 'release'; meShotSec = 0;   // BIOMECH-HOOPS-WAVE1: release → follow-through until the arc resolves
+    gather = null;   // HOOPS-MOVE-KIT-A M1: a release inside the gather is a rushed shot — the plant stops where it is
     // The jumpshot was HELD by the tree (meter-paced from shot start) up to its release frame (both arms overhead). The
     // authored FOLLOW-THROUGH takes it from there (its first key matches that frame, so the crossfade is a continuation):
     // the wrist snaps, the arms come down the front — and it is HELD as the end pose until the arc resolves (G5). The
-    // timed release() it replaces dropped the body into the defensive stance 420 ms in, mid-arc. Layups keep their finish.
-    if (currentShot?.style === 'layup') meAnimTree.beat(SPORT_CLIP.dunkLaunchPower);
+    // timed release() it replaces dropped the body into the defensive stance 420 ms in, mid-arc.
+    // HOOPS-MOVE-KIT-A M3: a layup / floater lets go FROM ITS OWN CLIP at the top of the hop and rides it to feet-down (it
+    // used to cut to the dunk launch clip — a two-arm sweep through a T).
+    if (finish) finish.released = true;
     else meAnimTree.beat('bball_follow_through', { fadeSec: 0.1 });
     ctx.setHud({ shotType: '', shotMeterT: 0 });
     // SHOT FEEDBACK — 2K tells you WHY at the moment of release, not after
@@ -1029,7 +1286,157 @@ export const OneVOneMode: ModeDefinition = (() => {
     }
     if (!made) swing('miss');
     carrying = false;
-    arc.start(ball.getAbsolutePosition(), RIM, made, currentShot?.style ?? 'jumper');
+    arc.start(ball.getAbsolutePosition(), RIM, made, currentShot?.style ?? 'jumper', alteredApex(shotContest));   // D3: a strong contest ALTERS the release
+    // O2: the shot is up — the rival SEALS me (the box-out between me and the rim, his chest on me) until the ball comes down
+    if (foeStunSec === 0 && !foeFloored && distXZ(foe.root.position, RIM_FLOOR) < BOX_OUT_RANGE) { foeBrain?.boxOut(me.root.position); console.info('[1V1-OFF] box out (the rival seals me)'); }
+  }
+
+  // ── HOOPS-MOVE-KIT-A amendment: the DEFENSE contest package (D1–D3) ────────────────────────────────────────────────
+  function clearDefense(): void {
+    bumpAge = Infinity; foeBlockJumpAge = Infinity; foeBlockAt = -1; foeDunkFlight = null;
+    if (foeHandUp) { foeHandUp = false; foeAnimTree.releaseHold(); }
+    if (meHandUp) { meHandUp = false; meAnimTree.releaseHold(); }
+    contact?.setAirborne('foe', false);
+  }
+  /** The board is a race (both ends): distance names the favourite, BOX OUT is worth a body length, the bounce jitters it. */
+  function boardRace(ctx: ModeContext): void {
+    const meD = Vector3.Distance(me.root.position, ball.position);
+    const foeD = Vector3.Distance(foe.root.position, ball.position);
+    const boxing = meSlot.intent.brace ?? false;
+    const edge = (foeD - meD) + (boxing ? BOX_OUT_EDGE : 0) + (Math.random() - 0.5) * REBOUND_JITTER;
+    if (edge <= 0) startDefense(ctx, possession === 'mine' ? 'THEIR BOARD — DEFEND!' : 'THEIR BOARD — DEFEND AGAIN!');
+    else { bannerFlash(ctx, boxing ? 'BOXED OUT — YOUR BOARD' : 'YOUR BOARD'); resetPositions(); }
+  }
+  /** D2: the AI takes the ball — knocked LOOSE from my hand toward him, the reach on him, the possession follows once it
+   *  settles (it used to warp both bodies to the check on the frame). */
+  function stripBall(ctx: ModeContext, banner: string): void {
+    SoundKit.play('impact', { pitch: 1.2, volume: 0.35 });
+    swing('turnover');
+    ctx.setHud({ momentum });
+    foeAnimTree.beat('bball_steal_reach');
+    meCarry?.update(0, 0, false);
+    const from = ballWorld().clone(); releaseBall(ball);
+    const toFoe = foe.root.position.subtract(me.root.position); toFoe.y = 0; toFoe.normalize();
+    launchLoose(from, toFoe.scale(1.6).add(new Vector3(0, 1.2, 0)));
+    carrying = false;
+    bannerFlash(ctx, banner, 900);
+    console.info(`[1V1-DEF] strip by the ai: ${banner}`);
+    later(750, () => startDefense(ctx, 'CHECK UP — DEFEND!'));
+  }
+  /** D1/D3: the AI's read on my load — a hand up inside range facing me (the contest), or a block jump timed to the green. */
+  function aiContestLoad(ctx: ModeContext): void {
+    if (foeStunSec > 0 || foeFloored) return;
+    const dist = distXZ(me.root.position, foe.root.position);
+    const facing = facingCos(foe.root.rotation.y, foe.root.position, me.root.position);
+    if (dist <= AI_BLOCK_RANGE + 0.3 && facing >= 0 && roll() < AI_BLOCK_JUMP_CHANCE) {
+      foeBlockAt = Math.max(0.05, shotMeter.greenCenter01 * shotMeter.durationSec - 0.15);
+      console.info(`[1V1-DEF] ai block jump armed at ${foeBlockAt.toFixed(2)} s`);
+    } else if (aiHandsUp(dist, facing, roll)) {
+      foeHandUp = true; foeHandUpLeft = shotMeter.durationSec + 0.6;
+      foeAnimTree.hold('bball_hand_up', { fadeSec: 0.1 });
+      console.info(`[1V1-DEF] ai hand up at ${dist.toFixed(2)} m`);
+    }
+    void ctx;
+  }
+  /** D1: BLOCKED at the release — the ball knocked loose from my hand, low, back the way it came; the follow-through still
+   *  goes up (the hands come up empty); the board decides. */
+  function blockedShot(ctx: ModeContext): void {
+    const from = ballWorld().clone(); releaseBall(ball);
+    const away = me.root.position.subtract(foe.root.position); away.y = 0; away.normalize();
+    launchLoose(from, away.scale(2.2).add(new Vector3((Math.random() - 0.5) * 1.5, 1.0, 0)));
+    carrying = false; gather = null;
+    meShotWin = 'release'; meShotSec = 0;
+    if (finish) finish.released = true; else meAnimTree.beat('bball_follow_through', { fadeSec: 0.1 });
+    swing('miss');
+    SoundKit.play('impact', { pitch: 0.75, volume: 0.55 });
+    SoundKit.play('crowdGroan', { volume: 0.4 });
+    ctx.feel?.impact?.(0.4);
+    ctx.juice.shake(0.08, 100);
+    ctx.setHud({ shotType: '', shotMeterT: 0, momentum });
+    bannerFlash(ctx, foeBlockJumpAge <= HAND_UP_SEC ? 'BLOCKED!' : 'BLOCKED — HAND IN THE SHOT!', 900);
+    console.info('[1V1-DEF] blocked at the release');
+    later(900, () => boardRace(ctx));
+  }
+  /** D1: the rival THROWS IT DOWN on a lane he has beaten — a real flight (the drive dunk's clock) I can SWAT with a timed
+   *  jump inside range while he is in the air; a body in his path is bumped, and floored if he finishes through it. */
+  function foeDunk(ctx: ModeContext): void {
+    defPhase = 'shot'; gatherShown = false; foeShotWin = 'none';
+    foeCarry?.update(0, 0, false);
+    if (!ball.parent) attachBallToHand(ball, foe.skeleton, 'RightHand');
+    const from = foe.root.position.clone();
+    const landing = new Vector3(RIM.x, 0, RIM.z + DRIVE_DUNK.landAheadZ);
+    const inLane = distXZ(me.root.position, foe.root.position) < 1.5 && meStunSec === 0 && !meFloored;
+    const c = contestDrive(from, landing, meStunSec > 0 || meFloored ? null : me.root.position, meDribble.vel, inLane ? 'poster' : 'dunk');
+    const ground = groundContest(distXZ(me.root.position, foe.root.position), facingCos(me.root.rotation.y, me.root.position, foe.root.position), meHandUp);
+    const contest = Math.min(1, contestLevel(foe.root.position, me.root.position) * 0.5 + ground + (myJumpAge <= HAND_UP_SEC ? 0.3 : 0));
+    let made = Math.random() < contestedPct(c.pct, contest);
+    let swatted = false, bumped = false, resolved = false;
+    defContest = contest;
+    foeAnimTree.beat(SPORT_CLIP.dunkLaunchPower, { holdEnd: true });
+    contact?.setAirborne('foe', true);
+    SoundKit.play('whoosh', { pitch: 0.85 });
+    console.info(`[1V1-DEF] rival dunk ${inLane ? 'poster' : 'open'} contest ${contest.toFixed(2)} pct ${contestedPct(c.pct, contest).toFixed(2)} bumpK ${c.bumpK === null ? 'none' : c.bumpK.toFixed(2)}`);
+    let flightMs = 0, last = performance.now(), freezeMs = 0, slowMs = 0;
+    const obs = ctx.scene.onBeforeRenderObservable.add(() => {
+      const nowMs = performance.now(); const realMs = Math.min(50, nowMs - last); last = nowMs;
+      const fdt = realMs / 1000;
+      let scale = 1;
+      if (freezeMs > 0) { freezeMs -= realMs; scale = 0; }
+      else if (slowMs > 0) { slowMs -= realMs; scale = BUMP_SLOW; }
+      flightMs += realMs * scale;
+      const k = Math.min(1, flightMs / DRIVE_DUNK.flightMs);
+      foe.root.position.x = from.x + (RIM.x - from.x) * k;
+      foe.root.position.z = from.z + (RIM.z + DRIVE_DUNK.landAheadZ - from.z) * k;
+      foe.root.position.y = driveDunkY(k);
+      face(foe.root, slewYaw(foe.root.rotation.y, yawTo(foe.root.position, RIM), FACE_RIM_RATE, fdt));
+      foeDunkFlight = { k, made: resolved ? made && !swatted : null };
+      // the SWAT: my fresh jump inside range while he is between the takeoff and the resolve
+      if (!swatted && !resolved && jumpSwats(k, myJumpAge, distXZ(me.root.position, foe.root.position))) {
+        swatted = true; made = false;
+        const at = ballWorld().clone(); releaseBall(ball);
+        const away = foe.root.position.subtract(me.root.position); away.y = 0; away.normalize();
+        launchLoose(at, away.scale(-2.5).add(new Vector3((Math.random() - 0.5) * 2, 1.5, 0)));
+        swing('block');
+        SoundKit.play('impact', { pitch: 0.7, volume: 0.6 }); SoundKit.play('crowdCheer', { volume: 0.7 });
+        ctx.feel?.impact?.(0.5); ctx.juice.hitStop(50); ctx.juice.shake(0.1, 120);
+        EffectsKit.burst(ctx.scene, at, 'sparks');
+        ctx.setHud({ momentum });
+        bannerFlash(ctx, 'REJECTED AT THE RIM!', 1000);
+        console.info(`[1V1-DEF] swat at k ${k.toFixed(2)} jumpAge ${myJumpAge.toFixed(2)}`);
+      }
+      // the bump: he goes THROUGH me — the hit, and the floor if he finishes
+      if (!bumped && !swatted && c.bumpK !== null && k >= c.bumpK) {
+        bumped = true; freezeMs = 45; slowMs = BUMP_SLOW_SEC * 1000;
+        ctx.juice.hitStop(45); ctx.juice.shake(0.08, 110); ctx.feel?.impact?.(0.3);
+        SoundKit.play('impact', { pitch: 0.95, volume: 0.55 });
+        if (made && inLane) { meStunSec = 1.4; meFloored = true; meHandUp = false; meAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } }); }
+        else if (!meFloored && meStunSec === 0) { meStunSec = Math.max(meStunSec, 0.3); meAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); meHandUp = false; }
+        if (contact?.isReady) contact.shove('me', bumpShove(c)); else me.root.position.addInPlace(bumpShove(c).scale(0.16));
+        console.info(`[1V1-DEF] rival dunk bump strength ${c.strength01.toFixed(2)} floorMe ${made && inLane}`);
+      }
+      if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
+        resolved = true;
+        const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
+        if (made) dunkFlush = { releasePos, since: 0 };
+        else { missClank(ctx); launchLoose(releasePos, clankOffRim(ball, RIM)); }
+      }
+      if (k < 1) return;
+      ctx.scene.onBeforeRenderObservable.remove(obs);
+      foeDunkFlight = null; contact?.setAirborne('foe', false);
+      foeAnimTree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });
+      if (made) {
+        foeScore += 2;
+        SoundKit.play('score', { pitch: 0.9 }); SoundKit.play('crowdGroan', { volume: 0.5 });
+        contactPunch(ctx);
+        EffectsKit.burst(ctx.scene, RIM, 'net');
+        ctx.setHud({ foeScore, banner: inLane ? 'POSTERIZED — THEY THREW IT DOWN ON YOU' : 'THEY THREW IT DOWN' });
+        if (checkGameOver(ctx)) return;
+        later(meFloored ? 1600 : 1000, () => { ctx.setHud({ banner: '' }); startDefense(ctx, 'MAKE IT, TAKE IT — DEFEND!'); });
+      } else {
+        if (!swatted) { SoundKit.play('miss'); bannerFlash(ctx, 'THEY RATTLED IT OUT', 800); }
+        later(900, () => boardRace(ctx));
+      }
+    });
   }
 })();
 
