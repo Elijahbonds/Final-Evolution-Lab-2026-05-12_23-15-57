@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { MasteryBadge } from '@/components/mastery-badge';
 import { motion } from 'framer-motion';
 import { PRQ_ATTRS } from '@/lib/prq';
@@ -104,7 +105,7 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
       </motion.div>
 
       <h2 className="fel-heading mt-8 text-2xl font-bold text-white">SELECT YOUR ATHLETE</h2>
-      <p className="text-xs text-white/45">Pick the body type you're building toward. Your athlete shows up across the Lab.</p>
+      <p className="text-xs text-white/45">Pick the body type you&apos;re building toward. Your athlete shows up across the Lab.</p>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {ROSTER.map((r, i) => {
           const selected = p?.avatarKey === r.key;
@@ -160,7 +161,12 @@ function MasteryPanel() {
   const entries = Object.entries(map).filter(([, v]) => v.tierIndex > 0);
   return (
     <>
-      <h2 className="fel-heading mt-8 text-2xl font-bold text-white">MODE MASTERY</h2>
+      <div className="mt-8 flex items-baseline justify-between gap-3">
+        <h2 className="fel-heading text-2xl font-bold text-white">MODE MASTERY</h2>
+        <Link href="/mastery" className="shrink-0 font-mono text-xs text-[#00E5FF] hover:underline">
+          Full ladder &rarr;
+        </Link>
+      </div>
       <p className="text-xs text-white/45">Earned on a rolling window of your best sessions per mode. Tiers never decay.</p>
       {entries.length === 0 ? (
         <p className="mt-4 rounded-lg border border-white/10 bg-white/[0.02] p-4 text-sm text-white/40">

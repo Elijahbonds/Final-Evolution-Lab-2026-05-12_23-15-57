@@ -74,7 +74,7 @@ export default function FoodScan({
       {photo && !result && (
         <>
           <div style={{ ...S.row, marginTop: 14 }}>
-            <span style={{ fontSize: 12, opacity: 0.8 }}>WHAT'S ON IT? (tap all that apply)</span>
+            <span style={{ fontSize: 12, opacity: 0.8 }}>WHAT&apos;S ON IT? (tap all that apply)</span>
           </div>
           <div style={S.row}>
             {(Object.keys(TAG_LABEL) as PlateTag[]).map((t) => (

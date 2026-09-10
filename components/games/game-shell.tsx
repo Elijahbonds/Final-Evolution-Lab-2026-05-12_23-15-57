@@ -449,11 +449,15 @@ function GameShellInner({
 
                   {/* M13.3 mastery-up feedback */}
                   {recap.mastery && recap.mastery.ups.length > 0 && (
-                    <div className="mt-3 rounded-lg border border-[#00E5FF]/30 bg-[#00E5FF]/10 p-3 text-center">
+                    <Link
+                      href="/mastery"
+                      className="mt-3 block rounded-lg border border-[#00E5FF]/30 bg-[#00E5FF]/10 p-3 text-center transition-colors hover:bg-[#00E5FF]/20"
+                    >
                       <p className="flex items-center justify-center gap-1.5 text-xs font-bold text-[#00E5FF]">
                         <Award className="h-3.5 w-3.5" /> MASTERY UP — {recap.mastery.ups[recap.mastery.ups.length - 1].tier}
                       </p>
-                    </div>
+                      <p className="mt-0.5 font-mono text-[10px] text-white/45">See the full ladder &rarr;</p>
+                    </Link>
                   )}
 
                   {/* M13.4 share challenge (K-factor loop) */}

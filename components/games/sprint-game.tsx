@@ -237,7 +237,7 @@ export default function SprintGame({ grade, prq, onEnd, gamepad }: GameProps) {
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
             <h2 className="fel-heading text-4xl text-white">BEACH SPRINT</h2>
             <p className="max-w-md text-sm text-gray-300">
-              100m dash on the boardwalk. Wait for the gun — tap before <span className="text-[#FF3366]">GO</span> and it's a false start. Alternate <span className="text-[#00FF9D]">← →</span> in rhythm to build speed; mistime a step and you stumble. Clock under {WIN_TIME.toFixed(0)}s to win.
+              100m dash on the boardwalk. Wait for the gun — tap before <span className="text-[#FF3366]">GO</span> and it&apos;s a false start. Alternate <span className="text-[#00FF9D]">← →</span> in rhythm to build speed; mistime a step and you stumble. Clock under {WIN_TIME.toFixed(0)}s to win.
             </p>
             <button onClick={() => setStarted(true)} className="rounded-lg bg-[#FFD700] px-8 py-3 font-bold text-black transition hover:bg-[#e6c200]">ON YOUR MARKS</button>
           </div>

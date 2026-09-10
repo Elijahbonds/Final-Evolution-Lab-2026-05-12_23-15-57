@@ -61,7 +61,7 @@ export function EmailCapture({ source = 'landing', heading = 'Join the Lab', sub
       <p className="mt-1 text-sm text-white/55">{sub}</p>
       {done ? (
         <div className="mt-4 inline-flex items-center gap-2 rounded-lg border border-[#00FF9D]/40 bg-[#00FF9D]/10 px-4 py-3 text-sm font-semibold text-[#00FF9D]">
-          <CheckCircle2 className="h-5 w-5" /> You're on the list!
+          <CheckCircle2 className="h-5 w-5" /> You&apos;re on the list!
         </div>
       ) : (
         <form onSubmit={submit} className="mt-4 flex flex-col gap-2 sm:flex-row">

@@ -93,8 +93,10 @@ jobs:
       - name: Typecheck
         run: yarn typecheck
 
+      # `eslint .` via eslint.config.mjs — NOT `next lint`, which cannot drive
+      # ESLint 9 from Next 14.2. See docs/DEPLOYMENT.md.
       - name: Lint
-        run: yarn lint
+        run: yarn lint --max-warnings 40
 
   # ── 3. Production build (standalone bundle, uploaded as an artifact) ───────
   build:

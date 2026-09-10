@@ -156,7 +156,7 @@ export default function KitchenHub({
           <div style={S.row}>
             <input style={S.input} placeholder="plan title…" value={pTitle} onChange={(e) => setPTitle(e.target.value)} />
             <select style={S.input} value={pKitchen} onChange={(e) => setPKitchen(e.target.value)}>
-              <option value="">where's it made?</option>
+              <option value="">where&apos;s it made?</option>
               {KitchenMarket.myKitchenSubs(profile.id).map((s) => {
                 const k = KitchenMarket.kitchen(s.kitchenId);
                 return k ? <option key={s.kitchenId + s.shiftId} value={k.id}>{k.name}</option> : null;

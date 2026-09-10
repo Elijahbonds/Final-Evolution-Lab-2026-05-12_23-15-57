@@ -60,6 +60,7 @@ async function run() {
   await test('balanced transaction posts and derives balances', async () => {
     await inRollback(async (tx) => {
       const userId = U();
+      const extBefore = await getBalance(tx, { type: 'EXTERNAL', currency: 'LC' });
       const res = await postTransaction(tx, {
         kind: 'TEST_EARN',
         idempotencyKey: `t:${userId}:1`,
@@ -73,7 +74,11 @@ async function run() {
       const wallet = await getBalance(tx, { type: 'USER_WALLET', currency: 'LC', userId });
       const ext = await getBalance(tx, { type: 'EXTERNAL', currency: 'LC' });
       assert.equal(wallet, 100, 'wallet should be 100');
-      assert.equal(wallet + ext, 0, 'wallet + external must net to zero');
+      // EXTERNAL is a shared house account: any prior activity in this database
+      // (a signup grant, a seed) leaves a balance on it, so assert the DELTA
+      // this transaction caused rather than its absolute value. Asserting
+      // `wallet + ext === 0` only held on a pristine database.
+      assert.equal(wallet + (ext - extBefore), 0, 'this transaction must net to zero');
     });
   });
 

@@ -16,6 +16,7 @@
 import { prisma } from '@/lib/db';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { MasteryCore, type MasteryModeState, type MasteryUpEvent } from './mastery-core';
+import { buildLadder, type Ladder } from './mastery-ladder';
 
 export interface SessionSignal {
   mode: string;
@@ -104,4 +105,21 @@ export async function getMasteryMap(userId: string): Promise<Record<string, { ti
     out[r.mode] = { tier: r.tier ? TIERS[r.tier - 1] : 'Unranked', tierIndex: r.tier };
   }
   return out;
+}
+
+/**
+ * Full ladder read for the athlete-facing progression page: per-mode tier,
+ * position inside the band, form trend and what moves it next. Derived
+ * entirely from the persisted snapshots — see mastery-ladder.ts.
+ */
+export async function getMasteryLadder(userId: string): Promise<Ladder> {
+  const rows = await prisma.modeMastery.findMany({ where: { userId } });
+  const snapshots: Record<string, MasteryModeState> = {};
+  for (const r of rows) {
+    snapshots[r.mode] = {
+      samples: Array.isArray(r.samples) ? (r.samples as number[]) : [],
+      tier: r.tier ?? 0,
+    };
+  }
+  return buildLadder(snapshots);
 }

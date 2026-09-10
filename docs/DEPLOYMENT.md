@@ -11,7 +11,7 @@ gate builds but was referenced by nothing. This is the real one.
 | App | Next.js 14 (app router), Node 22 |
 | Database | Postgres, via Prisma 6 (`prisma/schema.prisma`) |
 | Auth | NextAuth (credentials + Prisma adapter) |
-| Test gate | `scripts/ci-suite.ts` — 134 suites, discovered not listed |
+| Test gate | `scripts/ci-suite.ts` — 135 suites, discovered not listed |
 
 ## 1. Environment
 
@@ -83,14 +83,25 @@ at `__dirname`.
 `typescript.ignoreBuildErrors` is `false`: a type error fails the build. That is
 deliberate — don't flip it to unblock a deploy.
 
+### A note on lint
+
+Lint runs as `eslint .` against `eslint.config.mjs`, **not** `next lint`. Next
+14.2 drives ESLint through the v8 API and this tree is on ESLint 9, which
+removed the options it passes, so `next lint` fails before linting anything.
+Running `eslint` directly avoids downgrading either. `eslint-config-next` is
+still a legacy shareable config, so the flat config wraps it with `FlatCompat`.
+
+`eslint-plugin-react-hooks` is pinned to 5.x for the same reason: 4.6 calls
+`context.getSource()`, removed in ESLint 9, and crashed the run.
+
 ## 5. CI
 
 `.github/workflows/ci.yml` runs on pushes to `main` and `claude/**`, and on PRs
 into `main`. Three jobs:
 
 1. **Regression suite** — boots a Postgres 16 service, applies the schema and
-   the wallet constraints, runs all 134 suites with `--require-db`.
-2. **Typecheck & lint** — `tsc --noEmit` plus `next lint`.
+   the wallet constraints, runs all 135 suites with `--require-db`.
+2. **Typecheck & lint** — `tsc --noEmit` plus `eslint .`.
 3. **Standalone build** — needs both of the above; builds, packages, boots the
    server and curls `/` before uploading `fel-standalone.tar.gz` as an artifact
    (14-day retention).

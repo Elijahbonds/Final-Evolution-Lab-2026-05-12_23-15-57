@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { Lock, Play, Flame, Sparkles, Coins, Zap, Trophy, Swords } from 'lucide-react';
+import { Lock, Play, Flame, Sparkles, Coins, Zap, Trophy, Swords, Award } from 'lucide-react';
 import { VENUES } from '@/lib/game-data';
 import { SeasonPassTrack } from '@/components/season-pass-track';
 import { MasteryBadge } from '@/components/mastery-badge';
@@ -148,6 +148,21 @@ export function HubWorld({ userName }: { userName: string }) {
           </div>
         </div>
         <span className="font-mono text-xs text-[#FFD700]">PLAY →</span>
+      </Link>
+
+      {/* Mastery ladder entry — the per-mode graded progression surface */}
+      <Link
+        href="/mastery"
+        className="mt-4 flex items-center justify-between rounded-xl border border-[#00E5FF]/30 bg-gradient-to-r from-[#00E5FF]/10 to-transparent px-5 py-4 transition-transform hover:scale-[1.01]"
+      >
+        <div className="flex items-center gap-3">
+          <Award className="h-6 w-6 text-[#00E5FF]" />
+          <div>
+            <div className="fel-heading text-base font-bold text-white">Mode Mastery</div>
+            <div className="font-mono text-[11px] text-white/50">Bronze → Venice Legend · graded play, never grind</div>
+          </div>
+        </div>
+        <span className="font-mono text-xs text-[#00E5FF]">CLIMB →</span>
       </Link>
 
       {/* M14 Triumph Arena entry */}

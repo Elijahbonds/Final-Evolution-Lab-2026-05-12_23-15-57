@@ -129,8 +129,13 @@ function runSuite(file: string): Promise<Result> {
   });
 }
 
-async function runPool(files: string[], concurrency: number): Promise<Result[]> {
+async function runPool(
+  files: string[],
+  concurrency: number,
+  progress?: { done: number; total: number },
+): Promise<Result[]> {
   const results: Result[] = [];
+  const counter = progress ?? { done: 0, total: files.length };
   let next = 0;
   const workers = Array.from({ length: Math.min(concurrency, files.length) }, async () => {
     for (;;) {
@@ -138,9 +143,10 @@ async function runPool(files: string[], concurrency: number): Promise<Result[]> 
       if (i >= files.length) return;
       const r = await runSuite(files[i]);
       results.push(r);
+      counter.done++;
       const mark = r.status === 'pass' ? '✓' : '❌';
       console.log(
-        `  ${mark} [${results.length}/${files.length}] ${r.file} (${(r.ms / 1000).toFixed(1)}s)`,
+        `  ${mark} [${counter.done}/${counter.total}] ${r.file} (${(r.ms / 1000).toFixed(1)}s)`,
       );
     }
   });
@@ -174,7 +180,18 @@ async function main() {
   console.log('='.repeat(64));
 
   const started = Date.now();
-  const results = await runPool(runnable, args.concurrency);
+  // Pure suites parallelise freely. DB suites all share ONE database — several
+  // of them assert on shared house state (the EXTERNAL ledger account, wallet
+  // totals), so running them concurrently makes them read each other's writes.
+  // They go last, one at a time.
+  const pure = runnable.filter((f) => !DB_SUITES.has(f));
+  const db = runnable.filter((f) => DB_SUITES.has(f));
+  const progress = { done: 0, total: runnable.length };
+  const results = await runPool(pure, args.concurrency, progress);
+  if (db.length) {
+    console.log(`\n  — ${db.length} DB suite(s), serial —`);
+    results.push(...(await runPool(db, 1, progress)));
+  }
   const failures = results.filter((r) => r.status === 'fail');
 
   for (const f of failures) {

@@ -313,7 +313,7 @@ export default function StudioMode({
   const creators = [...new Map(allTracks.map((t) => [t.authorId, t.authorName])).entries()];
   void libraryRev;                                        // read to re-render on library writes
 
-  if (!ready) return <div style={S.root}>Tuning the Academy's instruments…</div>;
+  if (!ready) return <div style={S.root}>Tuning the Academy&apos;s instruments…</div>;
 
   return (
     <div style={S.root}>
@@ -340,7 +340,7 @@ export default function StudioMode({
         <>
           {remixOf && (
             <div style={{ fontSize: 12, color: '#22d3ee', marginBottom: 6 }}>
-              remixing "{remixOf.title}" by {remixOf.authorName}
+              remixing &ldquo;{remixOf.title}&rdquo; by {remixOf.authorName}
             </div>
           )}
           <div style={S.grid}>

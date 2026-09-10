@@ -35,7 +35,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
-        <script src="https://apps.abacus.ai/chatllm/appllm-lib.js"></script>
+        <script defer src="https://apps.abacus.ai/chatllm/appllm-lib.js"></script>
       </head>
       <body className={`${barlow.variable} ${plexSans.variable} ${jetbrainsMono.variable} font-sans min-h-screen bg-[#050505]`}>
         <Providers>
