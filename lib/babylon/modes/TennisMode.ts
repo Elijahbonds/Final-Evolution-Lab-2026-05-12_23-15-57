@@ -1,4 +1,5 @@
-// TennisMode — one touch per side, deuce/advantage scoring, first to 4 games.
+// TennisMode — one touch per side, deuce/advantage scoring, best of three
+// short sets (four games, two-game margin, tiebreak at 4-4).
 //
 // Everything mechanical lives in NetSportMode + RallyCore. This file is the
 // config, and that is the point: adding a net sport should cost a config, not

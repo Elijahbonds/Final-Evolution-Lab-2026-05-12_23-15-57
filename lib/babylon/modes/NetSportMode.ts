@@ -19,9 +19,10 @@ import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
+import { TennisMatch } from '@/lib/sports/match/tennis-match';
 import type { FelInput } from '../core/InputBus';
 import {
-  gradeSwing, planShot, shotAt, judgeShot, TennisScore, VolleyScore, RallyState,
+  gradeSwing, planShot, shotAt, judgeShot, VolleyScore, RallyState,
   type RallyConfig, type Shot, type SwingQuality, type RallyFault,
 } from '../core/RallyCore';
 
@@ -47,7 +48,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let venue: VenueHandle | null = null;
 
   let rally: RallyState;
-  let tennisScore: TennisScore | null = null;
+  // Tennis now plays a MATCH, not a single first-to-4-games set: TennisMatch
+  // adds sets, the two-game margin and a tiebreak on top of the point scoring
+  // RallyCore's TennisScore already owned. Volleyball is unchanged.
+  let tennisScore: TennisMatch | null = null;
   let volleyScore: VolleyScore | null = null;
 
   // flight state
@@ -73,6 +77,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       score: tennisScore ? tennisScore.games[0] : volleyScore!.points[0],
       foeScore: tennisScore ? tennisScore.games[1] : volleyScore!.points[1],
       callout: label(),
+      // Where the match stands above the current game — the set score and the
+      // sets already banked. Blank for volleyball, which has no such level.
+      matchLine: tennisScore ? tennisScore.progress().detail : '',
+      setLine: tennisScore ? tennisScore.setLine() : '',
     });
   }
 
@@ -86,7 +94,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     rally.end();
     shot = null;
     contactArmed = false;
-    const result = tennisScore ? tennisScore.award(side) : volleyScore!.award(side);
+    const result = tennisScore ? tennisScore.awardPoint(side) : volleyScore!.award(side);
     pushHud(ctx);
     SoundKit.play(side === 0 ? 'score' : 'miss');
 
@@ -102,16 +110,42 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ctx.juice.scorePop(netPop, o.hudLabels.them, '#FF3366');
     }
 
-    if (result === 'match' || result === 'set') {
+    if (result === 'match') {
       ended = true;
-      if (side === 0) ctx.juice.impact(netPop, 'GAME!', { color: '#FFD700', slow: true });
+      if (side === 0) ctx.juice.impact(netPop, 'MATCH!', { color: '#FFD700', slow: true });
       else ctx.juice.flash('#FF3366', 260);
-      flash(ctx, side === 0 ? 'YOU WIN' : 'YOU LOSE', 2500);
+      const summary = tennisScore ? tennisScore.progress().summary : '';
+      flash(ctx, side === 0 ? `YOU WIN ${summary}` : `YOU LOSE ${summary}`, 2500);
+      // Numbers only in `stats`; the readable score line rides the outcome.
       ctx.end(
-        side === 0 ? 'WIN' : 'LOSS',
-        tennisScore ? tennisScore.games[0] : volleyScore!.points[0],
-        { streak: heroStreak },
+        tennisScore ? `${side === 0 ? 'WIN' : 'LOSS'}_${summary.replace(/[ ()]/g, '_')}` : side === 0 ? 'WIN' : 'LOSS',
+        tennisScore ? tennisScore.progress().score : volleyScore!.points[0],
+        tennisScore
+          ? {
+              streak: heroStreak,
+              sets: tennisScore.sets[0],
+              setsAgainst: tennisScore.sets[1],
+              games: tennisScore.totalGames(0),
+              gamesAgainst: tennisScore.totalGames(1),
+            }
+          : { streak: heroStreak },
       );
+      return;
+    }
+
+    // A set changing hands is a beat of its own now that a match has more than
+    // one of them — it used to be indistinguishable from the end of the match.
+    if (result === 'set') {
+      const setNo = tennisScore ? tennisScore.completedSets.length : 0;
+      if (side === 0) ctx.juice.impact(netPop, 'SET!', { color: '#FFD700', slow: true });
+      flash(ctx, `${side === 0 ? 'SET' : 'SET THEM'} — ${tennisScore?.setLine() ?? ''} (set ${setNo + 1} next)`, 1800);
+      restSec = 2.2;
+      return;
+    }
+
+    if (result === 'game' && tennisScore) {
+      flash(ctx, `GAME ${side === 0 ? o.hudLabels.you : o.hudLabels.them} — ${tennisScore.games[0]}-${tennisScore.games[1]}`, 1200);
+      restSec = 1.8;
       return;
     }
     if (side === 0 && heroStreak >= 3) {
@@ -231,7 +265,11 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       SoundKit.startAmbient(o.ambient);
 
       rally = new RallyState(o.cfg);
-      tennisScore = o.scoring === 'tennis' ? new TennisScore(4) : null;
+      // Best of three short sets: four games with the two-game margin, and a
+      // tiebreak at 4-4 so a set always resolves inside a session.
+      tennisScore = o.scoring === 'tennis'
+        ? new TennisMatch({ setsToWin: 2, gamesPerSet: 4, tiebreak: true, tiebreakPoints: 5 })
+        : null;
       volleyScore = o.scoring === 'volley' ? new VolleyScore(25) : null;
       ended = false; restSec = 0.8; shot = null; aimX = 0; heroStreak = 0;
 

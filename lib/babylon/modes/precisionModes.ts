@@ -34,6 +34,9 @@ import { SoundKit } from '../audio/SoundKit';
 import { VenueKit } from '../visual/VenueKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { PRECISION_CONFIG as CFG } from './modeConfigs';
+import { GolfRound, type RoundHole } from '@/lib/sports/match/golf-round';
+import { SoccerShootout } from '@/lib/sports/match/soccer-shootout';
+import { BaseballGame, type HitType } from '@/lib/sports/match/baseball-game';
 
 const CLUTCH_MULT = 1.5;
 
@@ -172,42 +175,90 @@ export const TennisMode: ModeDefinition = (() => {
 })();
 
 // ══════════════════════════════════════════════════════════════════ GOLF ══
+// Now plays a ROUND, not three proximity shots. The swing (3-click power +
+// accuracy band), the hole preview flyover and the ball flight are unchanged —
+// they were already proven. What changed is the structure around them:
+// GolfRound (lib/sports/match/golf-round.ts) owns holes, strokes and the card,
+// and crucially the ball is NO LONGER RESET TO THE TEE after every swing. A
+// shot that finishes 30m short leaves you 30m short, and you play the next
+// stroke from there. That is what makes a par mean something.
 export const GolfMode: ModeDefinition = (() => {
   let me: SpawnedCharacter;
   let furniture: AbstractMesh[] = [];
   let ball: AbstractMesh, flight: Flight, reticle: Reticle, meter: PowerMeter;
   let holePos = new Vector3(0, 0, 55);
-  let round = 0, pts = 0, stickX = 0, stickY = 0;
+  let stickX = 0, stickY = 0;
   let phase: 'preview' | 'aim' | 'power' | 'accuracy' | 'flight' = 'aim';
   let previewSec = 0, power = 0;
   let ended = false;
-  const TOTAL = 3;
+  let card: GolfRound;
   const PREVIEW_SEC = 1.8;
   const ACCURACY_CENTER = 0.28;                  // wave value to hit on the way down
   const ACCURACY_HALF = 0.1;
+  // Inside this radius the ball is holed. Putting is not a separate mechanic
+  // here, so the green is generous on purpose — the skill being graded is
+  // approach play, and a 1.2m gimme is honest about that rather than adding a
+  // putting minigame this mode does not have.
+  const HOLE_RADIUS = 1.2;
 
-  function nextShot(ctx: ModeContext): void {
-    round++;
-    holePos = new Vector3(((round * 53) % 21) - 10, 0, 42 + ((round * 31) % 28));
+  /** A nine-hole card. Par sets both the yardage and the stroke budget. */
+  const COURSE: RoundHole[] = [
+    { id: 'g1', par: 4 }, { id: 'g2', par: 3 }, { id: 'g3', par: 5 },
+    { id: 'g4', par: 4 }, { id: 'g5', par: 4 }, { id: 'g6', par: 3 },
+    { id: 'g7', par: 5 }, { id: 'g8', par: 4 }, { id: 'g9', par: 4 },
+  ];
+
+  /** Pin distance from the tee, by par. A par 3 is one good swing away. */
+  const PIN_DISTANCE: Record<number, number> = { 3: 30, 4: 46, 5: 62 };
+
+  function hudLine(ctx: ModeContext, extra: Record<string, unknown> = {}): void {
+    const p = card.progress();
+    ctx.setHud({
+      round: `H${Math.min(card.holeIndex + 1, COURSE.length)}/${COURSE.length}`,
+      score: p.score,
+      toPar: p.line,
+      hole: p.detail,
+      ...extra,
+    });
+  }
+
+  function nextHole(ctx: ModeContext): void {
+    const hole = card.hole;
+    const holeNo = card.holeIndex + 1;
+    // Lay the pin out from the tee: distance by par, offset seeded off the
+    // hole number so the nine holes are distinct but deterministic.
+    const lateral = ((holeNo * 53) % 21) - 10;
+    holePos = new Vector3(lateral * 0.6, 0, PIN_DISTANCE[hole.par] ?? 46);
     furniture.forEach((f) => f.dispose());
     furniture = buildGolfGreen(ctx.scene, holePos);
     ball.position.set(0, 0.05, 0.6);
     me.animator.play(SPORT_CLIP.golfAddress, { loop: true });
+    ctx.objectiveRef.current = holePos;
     // HOLE PREVIEW — fly the camera to the green, look back at the tee.
     // Pure camDirector.snapTo, timer-bounded, cannot stall.
     phase = 'preview'; previewSec = 0;
     ctx.camDirector.snapTo(holePos.add(new Vector3(0, 0, 3)), ball.position.add(new Vector3(0, 0.6, 0)));
-    const clutch = round === TOTAL;
-    ctx.setHud({
-      round: `${round}/${TOTAL}`, power: 0, accuracy: '',
-      hint: clutch ? 'FINAL SHOT — study the green' : `HOLE ${round} — ${Math.round(Vector3.Distance(ball.position, holePos))}m out`,
+    const finishing = holeNo === COURSE.length;
+    hudLine(ctx, {
+      power: 0, accuracy: '',
+      hint: `HOLE ${holeNo} · PAR ${hole.par} · ${Math.round(Vector3.Distance(ball.position, holePos))}m${finishing ? ' — last hole' : ''}`,
     });
   }
 
-  function backToTee(ctx: ModeContext): void {
+  /** Address the ball where it actually lies and aim from there. */
+  function addressBall(ctx: ModeContext): void {
     phase = 'aim';
-    ctx.camDirector.setFixedBehind(me.root.position, 0, 'swing');
-    ctx.setHud({ hint: 'Aim with the stick · SWING starts the meter · set POWER up top · nail ACCURACY on the way down' });
+    // Stand at the lie, facing the pin, so the swing camera frames the shot
+    // the player is really about to play.
+    const toPin = holePos.subtract(ball.position);
+    me.root.position.set(ball.position.x - 0.5, 0, ball.position.z);
+    me.root.rotation.y = Math.atan2(toPin.x, toPin.z);
+    reticle.pos.copyFrom(ball.position.add(toPin.scale(0.6)).add(new Vector3(0, 1.3, 0)));
+    ctx.camDirector.setFixedBehind(me.root.position, me.root.rotation.y, 'swing');
+    const remaining = Math.round(Vector3.Distance(ball.position, holePos));
+    hudLine(ctx, {
+      hint: `${remaining}m to the pin · stroke ${card.strokes + 1} · SWING starts the meter`,
+    });
   }
 
   return {
@@ -224,17 +275,18 @@ export const GolfMode: ModeDefinition = (() => {
       ctx.objectiveRef.current = holePos;
       ctx.camDirector.setFixedBehind(me.root.position, 0, 'swing');
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 6, modeId: 'golf' });
-      round = 0; pts = 0; ended = false;
+      ended = false;
+      card = new GolfRound({ holes: COURSE });
       SoundKit.startAmbient('dojo');
-      ctx.setHud({ score: 0 });
-      nextShot(ctx);
+      hudLine(ctx);
+      nextHole(ctx);
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       if (e.t === 'button' && e.btn === 'A' && e.pressed) {
-        if (phase === 'preview') { backToTee(ctx); return; }   // skip the flyover
+        if (phase === 'preview') { addressBall(ctx); return; }   // skip the flyover
         if (phase === 'aim') { phase = 'power'; meter.start(); ctx.setHud({ hint: 'SWING at the top for POWER' }); }
         else if (phase === 'power') {
           power = meter.value;                    // keep the wave running — accuracy rides it down
@@ -249,10 +301,15 @@ export const GolfMode: ModeDefinition = (() => {
           SoundKit.play('whoosh', { pitch: 0.9 });
           me.animator.play(SPORT_CLIP.golfSwing, {});
           ctx.feel?.impact?.(0.25 + power * 0.35);
-          const dir = reticle.pos.subtract(new Vector3(0, 0.4, 0)).normalize();
+          const dir = reticle.pos.subtract(ball.position).normalize();
+          // Scale the swing to what is left: a full-blooded drive from 4m past
+          // the pin would make the round unplayable, so the shot is capped by
+          // the distance remaining. Power still decides how much of it you get.
+          const remaining = Vector3.Distance(ball.position, holePos);
+          const reach = Math.min(14 + power * 21, remaining * (0.55 + power * 0.85) + 4);
           // a missed accuracy click hooks (early) or slices (late) the ball
           const hookSlice = new Vector3(sideErr * 6 * (Math.random() < 0.5 ? -1 : 1), 0, 0);
-          flight.launch(ball.position, dir.scale(14 + power * 21).add(new Vector3(0, 6 + power * 6, 0)).add(hookSlice));
+          flight.launch(ball.position, dir.scale(reach).add(new Vector3(0, 3 + power * 5, 0)).add(hookSlice));
           ctx.setHud({ accuracy: clean ? 'PURE' : sideErr > 0.5 ? 'SHANKED' : 'DRIFTED', hint: '' });
         }
       }
@@ -263,7 +320,7 @@ export const GolfMode: ModeDefinition = (() => {
       meter.update(dt);
       if (phase === 'preview') {
         previewSec += dt;
-        if (previewSec >= PREVIEW_SEC) backToTee(ctx);
+        if (previewSec >= PREVIEW_SEC) addressBall(ctx);
         return;                                   // camera holds the green view
       }
       if (phase === 'power' || phase === 'accuracy') ctx.setHud({ power: Math.round(meter.value * 100) });
@@ -272,17 +329,60 @@ export const GolfMode: ModeDefinition = (() => {
         const flying = flight.step(dt);
         ctx.camDirector.update(ball.position, flight.vel, holePos);
         if (!flying) {
+          // The ball STAYS where it came to rest — the next stroke plays from
+          // the lie. Only the vertical is settled onto the deck.
+          ball.position.y = 0.05;
           const dist = Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos);
-          const clutch = round === TOTAL;
-          const gained = Math.round((dist < 0.5 ? 100 : Math.max(0, Math.round(60 - dist * 3))) * (clutch ? CLUTCH_MULT : 1));
-          pts += gained;
-          SoundKit.play(dist < 0.5 ? 'score' : 'uiTick');
-          ctx.setHud({ score: pts, banner: dist < 0.5 ? (clutch ? `CLUTCH HOLE OUT! +${gained}` : `HOLED OUT! +${gained}`) : `${dist.toFixed(1)}m out · +${gained}` });
+          const holed = dist <= HOLE_RADIUS;
+          const par = card.hole.par;
+          const result = card.stroke(holed);
+
+          if (result === 'stroke') {
+            SoundKit.play('uiTick');
+            hudLine(ctx, { banner: `${dist.toFixed(1)}m to the pin` });
+            setTimeout(() => { ctx.setHud({ banner: '' }); addressBall(ctx); }, 900);
+            phase = 'aim';
+            return;
+          }
+
+          // The hole is finished — card it and play the beat it earned.
+          const holeScore = card.lastHole;
+          const label = holeScore?.label ?? '';
+          if (holed) {
+            SoundKit.play('score');
+            if (holeScore?.gameBreaker) {
+              SoundKit.play('crowdCheer', { volume: 0.7 });
+              ctx.feel?.impact?.(0.8);
+            }
+          } else {
+            SoundKit.play('uiTick', { pitch: 0.7 });
+          }
+          const p = card.progress();
+          hudLine(ctx, {
+            banner: holed
+              ? `${label} · ${holeScore?.strokes} on par ${par} · ${p.line}`
+              : `PICKED UP · ${holeScore?.strokes} on par ${par}`,
+          });
+
           setTimeout(() => {
             ctx.setHud({ banner: '' });
-            if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); ctx.end('CARD_IN', pts, { shots: TOTAL }); }
-            else nextShot(ctx);
-          }, 1400);
+            if (result === 'round-complete') {
+              ended = true;
+              SoundKit.play('whistle');
+              const done = card.progress();
+              // `stats` is numbers only, so the human-readable card goes in the
+              // outcome string — the same convention as TACKLED_17YD / WAVE_6.
+              ctx.end(`CARD_IN_${card.totalStrokes}_${GolfRound.toParLabel(card.card.toPar)}`, done.score, {
+                holes: COURSE.length,
+                strokes: card.totalStrokes,
+                toPar: card.card.toPar,
+                frontNine: card.frontNine,
+                backNine: card.backNine,
+              });
+              return;
+            }
+            nextHole(ctx);
+          }, 1600);
           phase = 'aim';
         }
         return;
@@ -294,23 +394,107 @@ export const GolfMode: ModeDefinition = (() => {
   };
 })();
 
-// ══════════════════════════════════════════════════════════ HOME RUN DERBY ══
+// ═════════════════════════════════════════════════════════════ BALLGAME ══
+// Was a home-run derby: swing at ten pitches, total the distance points. The
+// swing, the pitch flight and the contact window are unchanged — they were
+// already proven. What is new is the GAME: BaseballGame owns innings, outs and
+// base runners, the opponent bats the top half, and the session ends on a
+// final score that can be lost. Contact quality now decides what KIND of hit
+// you got instead of how many points it was worth.
 export const DerbyMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, pitcher: SpawnedCharacter;
   let furniture: AbstractMesh[] = [];
   let ball: AbstractMesh, flight: Flight;
-  let round = 0, pts = 0, stickY = 0;
+  let stickY = 0;
   let incoming = false, swung = false, ended = false;
-  const TOTAL = 10;
+  let game: BaseballGame;
+  const INNINGS = 3;
+  /** Contact quality needed for each hit. Anything under SINGLE is an out. */
+  const HIT_TIERS: { q: number; type: HitType; call: string }[] = [
+    { q: 0.92, type: 'homer', call: 'GONE!' },
+    { q: 0.8, type: 'triple', call: 'TRIPLE — into the gap!' },
+    { q: 0.66, type: 'double', call: 'DOUBLE off the wall' },
+    { q: 0.45, type: 'single', call: 'BASE HIT' },
+  ];
+  /** Runs the opponent scores per half-inning at bat. TUNE(elijah). */
+  const OPPONENT_RUN_CHANCE = 0.45;
+
+  function hudLine(ctx: ModeContext, extra: Record<string, unknown> = {}): void {
+    const p = game.progress();
+    ctx.setHud({
+      score: game.runs[0], foeScore: game.runs[1],
+      round: p.detail, callout: p.line,
+      bases: game.bases.map((b) => (b ? '●' : '○')).join(' '),
+      ...extra,
+    });
+  }
 
   function pitch(ctx: ModeContext): void {
-    round++;
     swung = false; incoming = true;
     pitcher.animator.play(SPORT_CLIP.derbyPitch, { onEnd: () => pitcher.animator.play(SPORT_CLIP.idle, { loop: true }) });
     ball.position.set(0.2, 1.4, 17.5);
-    flight.launch(ball.position, new Vector3(-0.1, 1.1, -14 - round * 0.5));
-    const clutch = round === TOTAL;
-    ctx.setHud({ round: `${round}/${TOTAL}`, hint: clutch ? 'FINAL PITCH — STRIKE as it crosses the plate' : 'STRIKE as it crosses the plate' });
+    // Pitches get quicker as the game goes on rather than as a counter climbs.
+    flight.launch(ball.position, new Vector3(-0.1, 1.1, -14 - game.inning * 1.2));
+    const closing = game.inning >= INNINGS && game.half === 'bottom';
+    hudLine(ctx, {
+      hint: closing ? 'LAST AT-BATS — STRIKE as it crosses the plate' : 'STRIKE as it crosses the plate',
+    });
+  }
+
+  /**
+   * The opponent's half. Their at-bats are a resolved beat rather than a
+   * second minigame, but the runs are real and can lose the player the game.
+   */
+  function opponentHalf(ctx: ModeContext): void {
+    ctx.setHud({ banner: 'THEY BAT…' });
+    let closed: string = 'play';
+    const swing = () => {
+      if (ended) return;
+      if (Math.random() < OPPONENT_RUN_CHANCE) {
+        const r = game.hit(Math.random() < 0.25 ? 'homer' : 'single');
+        closed = r.result;
+        if (r.runs > 0) SoundKit.play('crowdGroan', { volume: 0.5 });
+      } else {
+        closed = game.out();
+      }
+      hudLine(ctx, { banner: closed === 'play' ? 'THEY BAT…' : '' });
+      if (closed === 'game') { finish(ctx); return; }
+      if (closed === 'play') { setTimeout(swing, 550); return; }
+      // Their half is over — the player is up.
+      setTimeout(() => { ctx.setHud({ banner: 'YOU BAT' }); setTimeout(() => { ctx.setHud({ banner: '' }); pitch(ctx); }, 700); }, 500);
+    };
+    setTimeout(swing, 800);
+  }
+
+  /**
+   * One place decides what happens after any play resolves: keep batting, hand
+   * the half over, or end the game. Every path through the at-bat funnels here
+   * so a play can never leave the mode without a next step.
+   */
+  function afterPlay(ctx: ModeContext, closed: string): void {
+    if (ended) return;
+    ctx.setHud({ banner: '' });
+    if (closed === 'game') { finish(ctx); return; }
+    if (closed === 'play') { pitch(ctx); return; }
+    // The player's half ended — the opponent bats the next top half.
+    hudLine(ctx, { banner: closed === 'inning' ? `END ${game.inning - 1}` : 'SIDE RETIRED' });
+    setTimeout(() => { if (!ended) opponentHalf(ctx); }, 900);
+  }
+
+  function finish(ctx: ModeContext): void {
+    ended = true;
+    SoundKit.play('whistle');
+    const p = game.progress();
+    SoundKit.play(p.winner === 0 ? 'crowdCheer' : 'crowdGroan');
+    ctx.setHud({ banner: p.detail });
+    // Numbers only in `stats`; the readable final rides the outcome string.
+    ctx.end(`GAME_${p.winner === 0 ? 'WON' : p.winner === 1 ? 'LOST' : 'TIED'}_${game.runs[0]}_${game.runs[1]}`,
+      p.score, {
+        runs: game.runs[0],
+        allowed: game.runs[1],
+        innings: game.inning,
+        walkOff: game.wonOnWalkOff ? 1 : 0,
+      });
   }
 
   return {
@@ -328,10 +512,12 @@ export const DerbyMode: ModeDefinition = (() => {
       ctx.objectiveRef.current = ball.position;
       ctx.camDirector.setFixedBehind(me.root.position, Math.PI, 'swing');
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 5, modeId: 'baseball' });
-      round = 0; pts = 0; ended = false;
+      ended = false;
+      game = new BaseballGame({ innings: INNINGS });
       SoundKit.startAmbient('stadium');
-      ctx.setHud({ score: 0 });
-      pitch(ctx);
+      ctx.setHud({ score: 0, foeScore: 0 });
+      // The player is the home side, so the opponent bats the top of the first.
+      opponentHalf(ctx);
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -345,30 +531,40 @@ export const DerbyMode: ModeDefinition = (() => {
         if (q <= 0) return;
         incoming = false;
         ctx.feel?.impact?.(0.3 + q * 0.5);
-        const clutch = round === TOTAL;
         const launch = 0.45 - stickY * 0.3;
         flight.launch(ball.position, new Vector3((Math.random() - 0.5) * 4, 18 * launch * q + 4, 16 + q * 18));
-        const distPts = Math.round(q * (80 + launch * 60) * (clutch ? CLUTCH_MULT : 1));
-        pts += distPts;
-        SoundKit.play('score', { pitch: q > 0.85 ? 1.2 : 1 });
-        ctx.setHud({ score: pts, banner: clutch ? `CLUTCH DINGER! +${distPts}` : q > 0.85 ? `DINGER! +${distPts}` : `+${distPts}` });
-        setTimeout(() => ctx.setHud({ banner: '' }), 900);
+
+        // Contact quality now decides WHAT the hit was. Squaring one up is a
+        // home run; a mishit is an out, which is what gives an at-bat stakes.
+        const tier = HIT_TIERS.find((t) => q >= t.q);
+        if (!tier) {
+          SoundKit.play('miss', { pitch: 0.8 });
+          const closed = game.out();
+          hudLine(ctx, { banner: 'PUT OUT' });
+          setTimeout(() => afterPlay(ctx, closed), 1000);
+          return;
+        }
+
+        const { runs, result } = game.hit(tier.type);
+        SoundKit.play('score', { pitch: tier.type === 'homer' ? 1.2 : 1 });
+        if (runs > 0) SoundKit.play('crowdCheer', { volume: Math.min(0.8, 0.3 + runs * 0.2) });
+        if (tier.type === 'homer') ctx.feel?.impact?.(0.8);
+        hudLine(ctx, { banner: runs > 0 ? `${tier.call} ${runs} in` : tier.call });
+        setTimeout(() => afterPlay(ctx, result), 1200);
       }
     },
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
-      const flying = flight.step(dt);
+      flight.step(dt);
+      // A pitch that crosses the plate unswung is a strikeout — an out, not a
+      // free retry. This is the change that makes an at-bat cost something.
       if (incoming && ball.position.z <= -1.2) {
         incoming = false;
         SoundKit.play('miss');
-        ctx.setHud({ banner: 'WHIFF' });
-        setTimeout(() => ctx.setHud({ banner: '' }), 700);
-      }
-      if (!flying && !incoming) {
-        if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); return ctx.end('DERBY_END', pts, { pitches: TOTAL }); }
-        incoming = true;
-        setTimeout(() => { if (!ended) pitch(ctx); }, 800);
+        const closed = game.out();
+        hudLine(ctx, { banner: swung ? 'SWING AND A MISS' : 'CALLED STRIKE' });
+        setTimeout(() => afterPlay(ctx, closed), 1000);
       }
       ctx.camDirector.update(me.root.position, Vector3.Zero(), ball.position);
     },
@@ -382,26 +578,90 @@ export const PenaltyMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, keeper: SpawnedCharacter;
   let furniture: AbstractMesh[] = [];
   let ball: AbstractMesh, flight: Flight, reticle: Reticle, meter: PowerMeter;
-  let round = 0, goals = 0, stylePts = 0, stickX = 0, stickY = 0;
+  let stylePts = 0, stickX = 0, stickY = 0;
   let phase: 'aim' | 'power' | 'flight' = 'aim';
   let keeperTargetX = 0, ended = false;
   let feints = 0, lastFlickSign = 0, lastFlickMs = 0;
+  // The shootout owns the structure: alternating kicks, an early clinch the
+  // moment a side cannot be caught, and sudden death when the five are level.
+  // The fixed five-kick counter this replaces could express none of that.
+  let shootout: SoccerShootout;
   const TOTAL = 5;
+  /** How often the opponent converts. TUNE(elijah) — a shade under a real
+   *  shootout's ~75% so a clean player round is genuinely rewarded. */
+  const OPPONENT_CONVERSION = 0.7;
   const MAX_FEINTS = 2;
   const FEINT_KEEPER_SHIFT = 0.12;               // each feint: keeper guesses wrong this much more
   const FEINT_WOBBLE = 0.25;                     // ...and the shot wobbles this much more
   const FEINT_STYLE_PTS = 8;                     // banked per feint, paid only on a goal
 
   function nextKick(ctx: ModeContext): void {
-    round++;
     phase = 'aim';
     feints = 0; lastFlickSign = 0;
     ball.position.set(0, 0.11, 0);
     keeper.root.position.set(0, 0, 10.4);
     keeper.animator.play(SPORT_CLIP.keeperIdle, { loop: true });
     me.animator.play(SPORT_CLIP.penaltyIdle, { loop: true });
-    const clutch = round === TOTAL;
-    ctx.setHud({ round: `${round}/${TOTAL}`, feints: 0, hint: clutch ? 'FINAL KICK — feint, aim, bury it' : 'Snap the stick side-to-side to FEINT (max 2) · aim · KICK twice' });
+    const p = shootout.progress();
+    // "Must score" is now a real state, not a round number: it is true when a
+    // miss hands the shootout to the opponent there and then.
+    const mustScore = shootout.goals[1] > shootout.goals[0] + shootout.remaining(0) - 1;
+    ctx.setHud({
+      round: shootout.inSuddenDeath ? 'SUDDEN DEATH' : `${shootout.round}/${TOTAL}`,
+      score: shootout.goals[0], foeScore: shootout.goals[1],
+      callout: p.detail, feints: 0,
+      hint: mustScore
+        ? 'MUST SCORE — miss and it is over'
+        : shootout.inSuddenDeath
+          ? 'SUDDEN DEATH — score, or they win it'
+          : 'Snap the stick side-to-side to FEINT (max 2) · aim · KICK twice',
+    });
+  }
+
+  /**
+   * The opponent's reply. The player's half of a shootout is the skill test;
+   * the opponent's kick is a resolved beat, not a second minigame — but it is
+   * a real kick that can win or lose the shootout.
+   */
+  function opponentKick(ctx: ModeContext): void {
+    ctx.setHud({ banner: 'THEIR KICK…' });
+    setTimeout(() => {
+      if (ended) return;
+      const scored = Math.random() < OPPONENT_CONVERSION;
+      keeper.animator.play(SPORT_CLIP.keeperDive, {});
+      SoundKit.play(scored ? 'crowdGroan' : 'score', { volume: 0.5 });
+      const result = shootout.take(scored);
+      const p = shootout.progress();
+      ctx.setHud({
+        score: shootout.goals[0], foeScore: shootout.goals[1],
+        callout: p.detail,
+        banner: scored ? 'THEY SCORE' : 'THEY MISS!',
+      });
+      setTimeout(() => {
+        ctx.setHud({ banner: '' });
+        if (result === 'shootout') { finish(ctx); return; }
+        nextKick(ctx);
+        ctx.camDirector.setFixedBehind(me.root.position, 0, 'flight');
+      }, 1100);
+    }, 900);
+  }
+
+  function finish(ctx: ModeContext): void {
+    ended = true;
+    SoundKit.play('whistle');
+    const p = shootout.progress();
+    SoundKit.play(p.winner === 0 ? 'crowdCheer' : 'crowdGroan');
+    ctx.setHud({ banner: p.detail });
+    // Numbers only in `stats`; the readable score line rides the outcome
+    // string, the same convention as TACKLED_17YD / WAVE_6.
+    ctx.end(`SHOOTOUT_${p.winner === 0 ? 'WON' : p.winner === 1 ? 'LOST' : 'LEVEL'}_${shootout.goals[0]}_${shootout.goals[1]}`,
+      p.score + stylePts, {
+        goals: shootout.goals[0],
+        conceded: shootout.goals[1],
+        stylePts,
+        kicks: shootout.taken[0],
+        suddenDeath: shootout.inSuddenDeath ? 1 : 0,
+      });
   }
 
   /** Street-style feint: a hard left↔right stick snap during aim. */
@@ -437,9 +697,10 @@ export const PenaltyMode: ModeDefinition = (() => {
       ctx.objectiveRef.current = new Vector3(0, 1.2, 11);
       ctx.camDirector.setFixedBehind(me.root.position, 0, 'flight');
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 6, modeId: 'soccer' });
-      round = 0; goals = 0; stylePts = 0; ended = false;
+      stylePts = 0; ended = false;
+      shootout = new SoccerShootout({ rounds: TOTAL });
       SoundKit.startAmbient('stadium');
-      ctx.setHud({ score: 0 });
+      ctx.setHud({ score: 0, foeScore: 0 });
       nextKick(ctx);
     },
 
@@ -479,9 +740,11 @@ export const PenaltyMode: ModeDefinition = (() => {
           const inFrame = Math.abs(ball.position.x) < 3.6 && ball.position.y < 2.4 && ball.position.y > 0;
           const saved = Math.abs(ball.position.x - keeper.root.position.x) < 0.9 && ball.position.y < 1.9;
           const scored = inFrame && !saved;
-          const clutch = round === TOTAL;
+          // A kick is "clutch" when the shootout turns on it, which the engine
+          // knows and a round counter never did.
+          const clutch = shootout.inSuddenDeath
+            || shootout.goals[1] > shootout.goals[0] + shootout.remaining(0) - 1;
           if (scored) {
-            goals++;
             stylePts += feints * FEINT_STYLE_PTS;
             ctx.feel?.impact?.(0.5);
             SoundKit.play('score');
@@ -489,16 +752,18 @@ export const PenaltyMode: ModeDefinition = (() => {
           } else {
             SoundKit.play(saved ? 'crowdGroan' : 'miss');
           }
+          const result = shootout.take(scored);
+          const p = shootout.progress();
           ctx.setHud({
-            score: goals,
+            score: shootout.goals[0], foeScore: shootout.goals[1], callout: p.detail,
             banner: scored
               ? (feints > 0 ? `${clutch ? 'CLUTCH ' : ''}GOOOAL! +${feints * FEINT_STYLE_PTS} style` : clutch ? 'CLUTCH GOOOAL!' : 'GOOOAL!')
               : saved ? 'SAVED' : 'OFF TARGET',
           });
           setTimeout(() => {
             ctx.setHud({ banner: '' });
-            if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); ctx.end('SHOOTOUT_END', goals * 20 + stylePts, { goals, stylePts }); }
-            else { nextKick(ctx); ctx.camDirector.setFixedBehind(me.root.position, 0, 'flight'); }
+            if (result === 'shootout') { finish(ctx); return; }
+            opponentKick(ctx);
           }, 1300);
           phase = 'aim';
         }

@@ -28,6 +28,7 @@ import { VenueKit } from '../visual/VenueKit';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { FOOTBALL_CONFIG as CFG } from './modeConfigs';
+import { FootballGame, type DriveOutcome } from '@/lib/sports/match/football-game';
 
 const FIELD_HALF_X = 9;
 // MAP-SIZE FIX (M44): FIELD_LENGTH matches the real 90-unit venue.
@@ -53,6 +54,19 @@ export const FootballRushMode: ModeDefinition = (() => {
   let defenders: Mob[] = [];
   let coins: CoinField | null = null;
   let down = 1, toGo = 10, lineOfScrimmage = 0, yards = 0, score = 0, evades = 0;
+  // The game above the drive: both sides get the same number of possessions,
+  // drives resolve into real points, and the scoreboard decides it. Before
+  // this a touchdown just started another drive and the session only ended
+  // when the player finally failed on downs — nothing to win or lose.
+  let match: FootballGame;
+  const POSSESSIONS = 3;
+  /** Points the opponent's answering drive tends to produce. TUNE(elijah). */
+  const OPPONENT_DRIVE: { outcome: DriveOutcome; weight: number }[] = [
+    { outcome: 'touchdown', weight: 0.32 },
+    { outcome: 'field-goal', weight: 0.28 },
+    { outcome: 'punt', weight: 0.25 },
+    { outcome: 'downs', weight: 0.15 },
+  ];
   let driveEvades = 0, breakawaySec = 0;
   let iframeSec = 0, dodging = false, ended = false;
   let truckSec = 0, truckCooldown = 0, trucks = 0;
@@ -109,6 +123,64 @@ export const FootballRushMode: ModeDefinition = (() => {
     }
   }
 
+  function hudLine(ctx: ModeContext, extra: Record<string, unknown> = {}): void {
+    const p = match.progress();
+    ctx.setHud({ score: match.points[0], foeScore: match.points[1], callout: p.line, possession: p.detail, ...extra });
+  }
+
+  /**
+   * The opponent's answering possession. Their drive is a resolved beat rather
+   * than a second minigame, but the points are real and can lose the game.
+   */
+  function opponentDrive(ctx: ModeContext): void {
+    hudLine(ctx, { banner: 'THEIR BALL…' });
+    setTimeout(() => {
+      if (ended) return;
+      let roll = Math.random();
+      let outcome: DriveOutcome = 'punt';
+      for (const o of OPPONENT_DRIVE) {
+        if (roll < o.weight) { outcome = o.outcome; break; }
+        roll -= o.weight;
+      }
+      const result = match.resolveDrive(outcome);
+      SoundKit.play(outcome === 'touchdown' ? 'crowdGroan' : outcome === 'field-goal' ? 'uiTick' : 'whistle');
+      hudLine(ctx, {
+        banner: outcome === 'touchdown' ? 'THEY SCORE — TD' : outcome === 'field-goal' ? 'THEY KICK A FIELD GOAL' : 'THEY GO NOWHERE',
+      });
+      setTimeout(() => {
+        if (ended) return;
+        if (result === 'game') { finishGame(ctx); return; }
+        newDrive(ctx, match.inOvertime ? 'OVERTIME — YOUR BALL' : 'YOUR BALL');
+      }, 1400);
+    }, 1000);
+  }
+
+  /** Hand the drive that just ended to the game, then take the next step. */
+  function endDrive(ctx: ModeContext, outcome: DriveOutcome): void {
+    const result = match.resolveDrive(outcome);
+    hudLine(ctx);
+    if (result === 'game') { finishGame(ctx); return; }
+    setTimeout(() => { if (!ended) opponentDrive(ctx); }, 1200);
+  }
+
+  function finishGame(ctx: ModeContext): void {
+    ended = true;
+    SoundKit.play('whistle');
+    const p = match.progress();
+    SoundKit.play(p.winner === 0 ? 'crowdCheer' : 'crowdGroan');
+    hudLine(ctx, { banner: p.detail });
+    // Numbers only in `stats`; the readable final rides the outcome string,
+    // the same convention as the mode's old TURNOVER_ON_DOWNS.
+    ctx.end(`GAME_${p.winner === 0 ? 'WON' : p.winner === 1 ? 'LOST' : 'TIED'}_${match.points[0]}_${match.points[1]}`,
+      p.score + score, {
+        points: match.points[0],
+        allowed: match.points[1],
+        yards, evades, trucks,
+        coinsCollected: coins?.collected ?? 0,
+        overtime: match.inOvertime ? 1 : 0,
+      });
+  }
+
   function newDrive(ctx: ModeContext, banner: string): void {
     down = 1; toGo = 10;
     lineOfScrimmage = 0; yards = 0; driveEvades = 0; breakawaySec = 0;
@@ -138,6 +210,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       ctx.heroRef.current = runner.root;
       defenders = []; pool = new MobPool();
       score = 0; evades = 0; trucks = 0; ended = false; iframeSec = 0; dodging = false;
+      match = new FootballGame({ possessions: POSSESSIONS });
       driveEvades = 0; breakawaySec = 0; truckSec = 0; truckCooldown = 0;
       ctx.camDirector.snapTo(runner.root.position, runner.root.position.add(new Vector3(0, 0, 12)));
       assertSpawned(ctx.scene, { hero: runner.root, minWorldMeshes: 6, modeId: 'football' });
@@ -262,9 +335,12 @@ export const FootballRushMode: ModeDefinition = (() => {
           down++;
           toGo -= gainedY;
           if (down > 4) {
-            ended = true;
+            // Failing on downs now costs you the POSSESSION, not the session.
             SoundKit.play('whistle');
-            return ctx.end('TURNOVER_ON_DOWNS', score, { yards, evades, trucks, coinsCollected: coins?.collected ?? 0 });
+            ctx.setHud({ banner: 'TURNOVER ON DOWNS' });
+            mob.onContactResolved();
+            endDrive(ctx, 'downs');
+            return;
           }
           ctx.setHud({ down, toGo, banner: `TACKLED — DOWN ${down}` });
         }
@@ -288,8 +364,8 @@ export const FootballRushMode: ModeDefinition = (() => {
         SoundKit.play('score');
         SoundKit.play('crowdCheer');
         EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, 1.8, 0)), 'confetti');
-        ctx.setHud({ score, banner: 'TOUCHDOWN!' });
-        newDrive(ctx, 'NEXT DRIVE');
+        ctx.setHud({ banner: 'TOUCHDOWN!' });
+        endDrive(ctx, 'touchdown');
       }
 
       ctx.camDirector.update(runner.root.position, vel, null);

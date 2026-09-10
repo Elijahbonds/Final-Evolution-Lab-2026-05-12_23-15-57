@@ -18,6 +18,13 @@ import type { HoleDef } from './GolfCourse';
 
 export interface HoleScore { holeId: string; par: number; strokes: number }
 
+/**
+ * The only part of a hole the card needs. Widened from HoleDef so a round can
+ * card a hole it knows the par of without carrying the full 3D definition
+ * (zones, tee/pin coordinates) — every HoleDef still satisfies it.
+ */
+export type CardableHole = { id: string; par: number };
+
 export function scoreLabel(par: number, strokes: number): string {
   const d = strokes - par;
   if (strokes === 1) return 'HOLE IN ONE';
@@ -32,7 +39,7 @@ export function scoreLabel(par: number, strokes: number): string {
 
 export class Scorecard {
   holes: HoleScore[] = [];
-  record(hole: HoleDef, strokes: number): HoleScore {
+  record(hole: CardableHole, strokes: number): HoleScore {
     const s = { holeId: hole.id, par: hole.par, strokes };
     this.holes.push(s);
     return s;

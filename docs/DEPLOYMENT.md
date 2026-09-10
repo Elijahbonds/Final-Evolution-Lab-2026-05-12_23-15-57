@@ -11,7 +11,7 @@ gate builds but was referenced by nothing. This is the real one.
 | App | Next.js 14 (app router), Node 22 |
 | Database | Postgres, via Prisma 6 (`prisma/schema.prisma`) |
 | Auth | NextAuth (credentials + Prisma adapter) |
-| Test gate | `scripts/ci-suite.ts` — 135 suites, discovered not listed |
+| Test gate | `scripts/ci-suite.ts` — 137 suites, discovered not listed |
 
 ## 1. Environment
 
@@ -100,7 +100,7 @@ still a legacy shareable config, so the flat config wraps it with `FlatCompat`.
 into `main`. Three jobs:
 
 1. **Regression suite** — boots a Postgres 16 service, applies the schema and
-   the wallet constraints, runs all 135 suites with `--require-db`.
+   the wallet constraints, runs all 137 suites with `--require-db`.
 2. **Typecheck & lint** — `tsc --noEmit` plus `eslint .`.
 3. **Standalone build** — needs both of the above; builds, packages, boots the
    server and curls `/` before uploading `fel-standalone.tar.gz` as an artifact
