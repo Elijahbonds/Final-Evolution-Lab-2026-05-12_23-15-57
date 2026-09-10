@@ -1,0 +1,161 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # ── 1. Full regression suite (134 suites, Postgres-backed) ──────────────────
+  test:
+    name: Regression suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: fel
+          POSTGRES_PASSWORD: fel
+          POSTGRES_DB: fel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://fel:fel@localhost:5432/fel_test?schema=public
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ci-only-not-a-real-secret
+      CHALLENGE_SIGN_SECRET: ci-only-not-a-real-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: yarn prisma generate
+
+      - name: Apply schema to test database
+        run: yarn prisma db push --skip-generate
+
+      # psql rejects Prisma's ?schema= query parameter, so connect with flags.
+      - name: Apply wallet constraints
+        run: psql -h localhost -p 5432 -U fel -d fel_test -f prisma/wallet-constraints.sql
+        env:
+          PGPASSWORD: fel
+
+      # --require-db makes a skipped DB suite a hard failure: CI provides
+      # Postgres, so a skip there means the gate silently stopped working.
+      - name: Run full suite
+        run: yarn tsx scripts/ci-suite.ts --require-db --concurrency 4
+
+  # ── 2. Typecheck + lint ────────────────────────────────────────────────────
+  static:
+    name: Typecheck & lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: yarn prisma generate
+
+      - name: Typecheck
+        run: yarn typecheck
+
+      - name: Lint
+        run: yarn lint
+
+  # ── 3. Production build (standalone bundle, uploaded as an artifact) ───────
+  build:
+    name: Standalone build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [test, static]
+
+    env:
+      NEXT_OUTPUT_MODE: standalone
+      # next build imports route modules; Prisma's client constructor requires
+      # a syntactically valid URL even though CI never opens a connection.
+      DATABASE_URL: postgresql://build:build@localhost:5432/build?schema=public
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ci-only-not-a-real-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: yarn prisma generate
+
+      - name: Build
+        run: yarn build
+
+      # next.config.js pins outputFileTracingRoot to __dirname, so the bundle is
+      # flat: .next/standalone/server.js. `public` and `.next/static` are not
+      # traced and must be copied in beside it.
+      - name: Package standalone server
+        run: |
+          cp -r public .next/standalone/public
+          cp -r .next/static .next/standalone/.next/static
+          tar -czf fel-standalone.tar.gz -C .next/standalone .
+
+      # Prove the artifact actually boots and serves before we call it green.
+      - name: Smoke test standalone server
+        working-directory: .next/standalone
+        env:
+          PORT: 3111
+        run: |
+          node server.js &
+          SERVER_PID=$!
+          for i in $(seq 1 30); do
+            curl -fsS -o /dev/null http://localhost:3111/ && break
+            sleep 1
+          done
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3111/)
+          kill $SERVER_PID
+          echo "GET / -> $code"
+          test "$code" = "200"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fel-standalone-${{ github.sha }}
+          path: fel-standalone.tar.gz
+          retention-days: 14

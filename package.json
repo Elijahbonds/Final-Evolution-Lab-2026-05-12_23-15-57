@@ -5,7 +5,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx scripts/ci-suite.ts",
+    "test:ci": "tsx scripts/ci-suite.ts --require-db --concurrency 4",
+    "test:list": "tsx scripts/ci-suite.ts --list",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/safe-seed.ts"

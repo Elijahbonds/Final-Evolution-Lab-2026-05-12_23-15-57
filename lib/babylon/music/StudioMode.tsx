@@ -27,6 +27,7 @@ import { synthesizeKit, KIT_SLOTS, KIT_META, type KitId } from './SynthKit';
 import { StudioLibrary, blobToDataUrl, type TrackRecord } from './StudioLibrary';
 import { parseStreamingUrl, PROVIDER_META } from './StreamingBridge';
 import StreamingDeck from './StreamingDeck';
+import type { GameProps } from '@/components/games/game-shell';
 
 const STEPS = 16;
 const EXPIRE_S = 0.25;
@@ -78,7 +79,8 @@ export default function StudioMode({
   onPublish,
   profile = { id: 'me', name: 'You' },
   spendShards,
-}: {
+  onEnd,
+}: GameProps & {
   onPublish?: (payload: unknown) => void;
   profile?: { id: string; name: string };
   /** SHARDS SEAM — wire to the real economy; absent = allowed + logged. */
@@ -114,6 +116,8 @@ export default function StudioMode({
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [judgement, setJudgement] = useState('');
+  const [bestCombo, setBestCombo] = useState(0);
+  const performStartRef = useRef(0);
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
   useEffect(() => {
@@ -210,12 +214,31 @@ export default function StudioMode({
       exp.splice(best, 1);
       const perfect = bestDt < 0.08;
       setScore((s) => s + (perfect ? 100 : 50) * (1 + Math.floor(combo / 5)));
-      setCombo((c) => c + 1);
+      setCombo((c) => { const next = c + 1; setBestCombo((b) => Math.max(b, next)); return next; });
       setJudgement(perfect ? 'PERFECT' : 'GOOD');
     } else {
       setCombo(0);
       setJudgement('EARLY');
     }
+  };
+
+  /**
+   * Bank the PERFORM set. Reports through GameShell so a studio set earns the
+   * same progression every other mode does, then resets back to BUILD.
+   */
+  const endSet = (): void => {
+    const duration = performStartRef.current ? (performance.now() - performStartRef.current) / 1000 : 0;
+    engineRef.current?.stop();
+    setPlaying(false);
+    setPlayhead(-1);
+    onEnd({
+      score,
+      // A set holding a 10+ chain is a clean run rather than a scratch take.
+      won: bestCombo >= 10,
+      duration,
+      headline: bestCombo >= 10 ? `SET LOCKED · x${bestCombo} CHAIN` : 'SET COMPLETE',
+    });
+    setMode('build');
   };
 
   const publishTrack = async (): Promise<void> => {
@@ -363,11 +386,15 @@ export default function StudioMode({
 
           <div style={S.row}>
             <button style={{ ...S.tab, ...(mode === 'build' ? S.tabOn : {}) }} onClick={() => setMode('build')}>BUILD</button>
-            <button style={{ ...S.tab, ...(mode === 'perform' ? S.tabOn : {}) }} onClick={() => { setMode('perform'); setScore(0); setCombo(0); }}>PERFORM</button>
+            <button
+              style={{ ...S.tab, ...(mode === 'perform' ? S.tabOn : {}) }}
+              onClick={() => { setMode('perform'); setScore(0); setCombo(0); setBestCombo(0); performStartRef.current = performance.now(); }}
+            >PERFORM</button>
             {mode === 'perform' && (
               <>
                 <button style={S.btn} onClick={performTap}>TAP</button>
                 <span style={{ fontSize: 13 }}>score {score} · combo x{combo} · {judgement}</span>
+                <button style={S.btn} onClick={endSet} disabled={score === 0}>END SET</button>
               </>
             )}
           </div>

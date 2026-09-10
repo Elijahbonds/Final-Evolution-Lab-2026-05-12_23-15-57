@@ -107,5 +107,7 @@ InitTestScene*.unity*
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 node_modules/
 .next/
+# generated at build time by next.config.js in standalone mode
+__abacus_error_reporter.js
 tsconfig.tsbuildinfo
 .env

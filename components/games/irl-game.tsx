@@ -18,6 +18,7 @@ import {
   type MotionSample,
   type IRLSession,
 } from '@/lib/babylon/core/IRLCore';
+import type { GameProps } from '@/components/games/game-shell';
 
 const BG = '#050505';
 const CYAN = '#00E5FF';
@@ -29,7 +30,11 @@ type Phase = 'gate' | 'unsupported' | 'needs-permission' | 'live' | 'results';
 
 type DME = typeof DeviceMotionEvent & { requestPermission?: () => Promise<'granted' | 'denied'> };
 
-export default function IrlGame() {
+// Mounted through <GameShell> (app/play/irl/_components/loader.tsx): reporting
+// the finished jump set via `onEnd` is what earns XP / shards / credits / PRQ
+// and feeds the mastery ladder. Motion samples never leave the device — only
+// the summarised session result is reported.
+export default function IrlGame({ onEnd }: GameProps) {
   const [phase, setPhase] = useState<Phase>('gate');
   const [jumpCount, setJumpCount] = useState(0);
   const [bestCm, setBestCm] = useState(0);
@@ -105,9 +110,19 @@ export default function IrlGame() {
   const finish = useCallback(() => {
     stopListening();
     const jumps = detectJumps(samplesRef.current);
-    setSession(summarise(jumps));
+    const summary = summarise(jumps);
+    const duration = t0Ref.current ? (performance.now() - t0Ref.current) / 1000 : 0;
+    setSession(summary);
     setPhase('results');
-  }, [stopListening]);
+    // Score is the best jump in centimetres; landing any measured jump counts
+    // as a completed set (a session with zero detected jumps does not).
+    onEnd({
+      score: Math.round(summary.best),
+      won: summary.total > 0,
+      duration,
+      headline: summary.total > 0 ? `${Math.round(summary.best)} CM HANG TIME` : 'NO JUMPS DETECTED',
+    });
+  }, [stopListening, onEnd]);
 
   const reset = useCallback(() => {
     stopListening();

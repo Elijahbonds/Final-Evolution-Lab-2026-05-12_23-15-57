@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Mic, MicOff, Play, RotateCcw, Star } from 'lucide-react';
 import { ACTING_SCENES } from '@/lib/babylon/content/actingScenes';
+import type { GameProps } from '@/components/games/game-shell';
 import {
   scorePerformance,
   type Delivery,
@@ -44,7 +45,12 @@ function supportsMic(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof AudioContext !== 'undefined';
 }
 
-export default function ActingGame() {
+// Mounted through <GameShell> (app/play/acting/_components/loader.tsx), which
+// owns the shared input contract and the progression choke point: reporting the
+// finished scene via `onEnd` is what earns XP / shards / credits / PRQ and feeds
+// the mastery ladder. The in-mode ResultsScreen still renders the per-line
+// delivery breakdown underneath GameShell's reward recap.
+export default function ActingGame({ onEnd }: GameProps) {
   const [phase, setPhase] = useState<Phase>('menu');
   const [scene, setScene] = useState<Scene>(ACTING_SCENES[0]);
   const [elapsed, setElapsed] = useState(0);
@@ -163,10 +169,18 @@ export default function ActingGame() {
 
   const finish = useCallback(() => {
     const res = scorePerformance(scene, deliveriesRef.current);
+    const duration = t0Ref.current ? (performance.now() - t0Ref.current) / 1000 : 0;
     setResult(res);
     cleanupAudio();
     setPhase('results');
-  }, [scene, cleanupAudio]);
+    // Score is the delivery average on a 0-100 scale; 3+ stars is a clean take.
+    onEnd({
+      score: Math.round(res.average * 100),
+      won: res.stars >= 3,
+      duration,
+      headline: res.stars >= 3 ? 'SCENE NAILED' : 'SCENE COMPLETE',
+    });
+  }, [scene, cleanupAudio, onEnd]);
 
   // Auto-finish once every line has been delivered.
   useEffect(() => {

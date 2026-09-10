@@ -7,7 +7,12 @@ const nextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   experimental: {
-    outputFileTracingRoot: path.join(__dirname, '../'),
+    // Trace from the app root, NOT its parent. With '../' the standalone bundle
+    // nests the server under a directory named after the build machine's
+    // checkout folder (.next/standalone/<dirname>/server.js), so the deploy
+    // layout changed with wherever it happened to be built. __dirname keeps the
+    // output flat and portable: .next/standalone/server.js everywhere.
+    outputFileTracingRoot: __dirname,
   },
   eslint: {
     ignoreDuringBuilds: true,
