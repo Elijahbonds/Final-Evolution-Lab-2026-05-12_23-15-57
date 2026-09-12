@@ -49,7 +49,6 @@ export function winnerIdFor(outcome: MpOutcome, hostId: string, guestId: string 
 export const MP_MODES: { key: string; label: string }[] = [
   { key: 'dunk', label: 'Flight Night' },
   { key: 'threepoint', label: 'Downtown' },
-  { key: 'sprint', label: 'Beach Sprint' },
   { key: 'big-air', label: 'Stomp' },
   { key: 'snowboard', label: 'Gate Crasher' },
   { key: 'skateboard', label: 'Venice Lines' },
@@ -68,15 +67,23 @@ export const MP_MODES: { key: string; label: string }[] = [
   { key: 'carnival', label: 'Game Night' },
   { key: 'volleyball', label: 'Beach Rally' },
   { key: 'dance', label: 'The Cypher' },
+  // 2026-09-12: four ENABLED modes had no challenge at all, so a player could finish a run and
+  // find nothing to stake it against. Their session keys are taken from what the hosts actually
+  // post under, not guessed.
+  { key: 'karate', label: 'The Hundred' },
+  { key: 'mixedcombat', label: 'Mixed Rules' },
+  { key: 'dunkduel', label: 'Prove It' },
+  { key: 'who-scene-it', label: 'Who Scene It' },
 ];
 
 // Challenge key → the `mode` a GameSession is stored under (the GameShell prop). Measured 2026-09-04: twelve of the
 // fourteen keys never matched a session mode, so best scores read 0 and those challenges settled as ties.
 export const MP_SESSION_MODE: Record<string, string> = {
-  dunk: 'dunkContest', threepoint: 'threePoint', sprint: 'sprint', 'big-air': 'bigAir', snowboard: 'snowboarding',
+  dunk: 'dunkContest', threepoint: 'threePoint', 'big-air': 'bigAir', snowboard: 'snowboarding',
   skateboard: 'skateboarding', surf: 'surfing', golf: 'golf', baseball: 'baseball', soccer: 'soccer', football: 'football',
   freerun: 'freerun', tennis: 'tennis', tiebreak: 'tiebreak',
   'karate-vs': 'karateVersus', onevone: 'hoops1v1', threevthree: 'hoops3v3', carnival: 'carnival', volleyball: 'volleyball', dance: 'dance',
+  karate: 'karateEndless', mixedcombat: 'mixedcombat', dunkduel: 'dunkduel', 'who-scene-it': 'whoSceneIt',
 };
 export function sessionModeFor(mpKey: string): string { return MP_SESSION_MODE[mpKey] ?? mpKey; }
 const MP_MODE_KEYS = new Set(MP_MODES.map((m) => m.key));
