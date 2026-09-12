@@ -401,7 +401,17 @@ export const SkateRunMode: ModeDefinition = (() => {
       if (timeLeft <= 0) {
         ended = true;
         SoundKit.play('whistle');
-        const finalScore = combo.banked + combo.pot + coins.collected * 5;
+        // THE BUZZER DOES NOT PAY FOR A COMBO YOU NEVER LANDED (2026-09-12 mechanic pass).
+        // This totalled `combo.banked + combo.pot`, and pot is the LIVE chain — so a run that
+        // ended mid-air paid out in full, and the optimal play was to throw the biggest
+        // possible chain as the clock died and simply never land it. That directly contradicts
+        // this mode's own rule, stated at the banking block below: you bank by landing and
+        // rolling away clean.
+        // The generous half is kept: a rider who IS down and clean at the buzzer is in the
+        // settle window and would have banked a moment later, so bank them now. Anyone still
+        // in the air, on a rail or in a manual loses the pot, exactly as a bail would.
+        if (combo.active && rig.rider.grounded && !grindCh && !manualCh && !air.state.airborne) combo.bank();
+        const finalScore = combo.banked + coins.collected * 5;
         return ctx.end('RUN_COMPLETE', finalScore, { runSec: RUN_SEC, coinsCollected: coins.collected, bestCombo: combo.bestCombo });
       }
       const gained = coins.update(dt, rig.char.root.position);
@@ -677,11 +687,6 @@ export const SkateRunMode: ModeDefinition = (() => {
           mbus.report({ kind: 'big_make' });
         }
       }
-      if (combo.multiplier > 0 && combo.pot >= 800) {
-        for (const g of goals.report({ type: 'comboLanded', value: combo.pot })) {
-          bannerFlash(ctx, `GOAL: ${g.label}`, 1200);
-        }
-      }
       // Name the goals, do not just count them. The tracker banners a goal as
       // it falls and the bezel showed "GOALS 0/4", so a player was chasing four
       // objectives nobody had told them about. THPS puts the list on screen;
@@ -725,6 +730,16 @@ export const SkateRunMode: ModeDefinition = (() => {
             // flat 0 through a whole scoring run, which tells the player
             // nothing about how their line is going.
             mbus.report({ kind: 'big_make', weight: Math.max(3, Math.min(25, banked / 40)) });
+            // THE GOAL SAYS "LAND", SO IT IS SCORED ON THE LANDING (2026-09-12 mechanic pass).
+            // It used to be tested every frame against combo.pot — the LIVE, unlanded pot — so
+            // it credited the instant an in-progress chain crossed 800, mid-air, and a bail on
+            // the very next frame kept the goal anyway. That deletes the only tension skating
+            // has: a pot is worth nothing until you roll away from it. Scored off `banked`, the
+            // value bank() actually returns, so the label and the rule finally agree.
+            for (const g of goals.report({ type: 'comboLanded', value: banked })) {
+              bannerFlash(ctx, `GOAL: ${g.label}`, 1200);
+              SoundKit.play('crowdCheer', { volume: 0.6 });
+            }
           }
           settleT = 0;
         }
