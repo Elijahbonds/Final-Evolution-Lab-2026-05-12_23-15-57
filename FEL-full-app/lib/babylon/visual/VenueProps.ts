@@ -6,7 +6,7 @@
 // Each unique model loads once per scene and repeats as instances; props are
 // scenery only — not pickable, no collisions, outside every playing area.
 // Assets: public/models/props/<kit>/<model>.glb (Kenney, CC0; see manifest.json).
-import { Color3, PBRMaterial, Ray, SceneLoader, TransformNode, Vector3 } from '@babylonjs/core';
+import { Color3, Matrix, PBRMaterial, Quaternion, Ray, SceneLoader, TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Mesh, Scene } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { VENUE_PROP_SETS, type PropPlacement } from './venuePropSets';
@@ -66,6 +66,8 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
   if (parent) root.parent = parent;
   let count = 0;
   const instances: AbstractMesh[] = [];
+  /** Collected per master, then uploaded once as a thin-instance matrix buffer. */
+  const thin: Array<{ master: Mesh; matrix: Matrix }> = [];
   const down = new Vector3(0, -1, 0);
   let snapped = 0, missed = 0;
   // the ground was built THIS frame and has not rendered yet: its world matrix is still identity, so a ray would hit a
@@ -86,24 +88,57 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
     holder.rotation.y = p.yaw ?? 0;
     const s = p.scale ?? 1; holder.scaling.set(s, s, s);
     for (const src of meshes) {
-      // a tinted placement gets a clone with its own material (instances share the source's); untinted ones instance
       // a tinted placement instances a TINTED MASTER (one hidden clone per source × tint, shared by every placement with that
       // tint — the slope's 60 green pines were 60 clones = 60 draws, measured 2026-09-06); untinted ones instance the source
       const master = p.tint ? tintedMaster(scene, src, p.tint) : src;
       // receiveShadows lives on the SOURCE — an InstancedMesh only reads its source's flag, and setting it on the instance
       // is a no-op that logs a BJS warning per instance (217 per /try boot, measured 2026-09-07)
       master.receiveShadows = true;
-      const inst: AbstractMesh = master.createInstance(`${src.name}_i${i}`);
-      inst.parent = holder;
-      // the source mesh keeps its own transform inside the kit file; the instance repeats it under the holder
-      inst.position.copyFrom(src.position); inst.rotationQuaternion = src.rotationQuaternion?.clone() ?? null; inst.rotation.copyFrom(src.rotation); inst.scaling.copyFrom(src.scaling);
-      inst.isPickable = false; inst.setEnabled(true);
-      instances.push(inst);
+      // THIN INSTANCES (2026-09-12). createInstance produced one node — and, measured, one shadow-map
+      // draw per cascade — for every copy: 321 casters generating ~1017 draws on 1v1, which is the
+      // whole draw budget. A thin instance is a matrix in a buffer on the master, so every copy of a
+      // palm is ONE draw in the main pass and one per cascade, shadows included. The master must be
+      // enabled for that (it is the mesh being drawn), which is also why registering disabled masters
+      // as shadow casters silently deleted 187 scenery shadows earlier today.
+      // The matrix is the placement's world transform composed with the part's own transform inside
+      // the kit file, expressed relative to the master — which is parented to nothing and left at
+      // identity below, so "relative to the master" is world space.
+      holder.computeWorldMatrix(true);
+      const local = Matrix.Compose(
+        src.scaling.clone(),
+        src.rotationQuaternion?.clone() ?? Quaternion.FromEulerVector(src.rotation),
+        src.position.clone(),
+      );
+      thin.push({ master, matrix: local.multiply(holder.getWorldMatrix()) });
     }
     count++;
   }));
   if (opts.snapToGround) console.info(`[FEL-PROPS] ${venueKey}: ${snapped} placements dropped onto the ground, ${missed} kept their authored height`);
-  return { root, count, dispose() { for (const m of instances) m.dispose(); root.dispose(); } };
+
+  // upload one matrix buffer per master: N copies collapse to a single draw each
+  const byMaster = new Map<Mesh, Matrix[]>();
+  for (const t of thin) { const list = byMaster.get(t.master) ?? []; list.push(t.matrix); byMaster.set(t.master, list); }
+  const touched: Mesh[] = [];
+  for (const [master, mats] of byMaster) {
+    const buf = new Float32Array(mats.length * 16);
+    mats.forEach((m, k) => m.copyToArray(buf, k * 16));
+    // the master IS the drawn mesh now: parked at identity so its thin matrices read as world space
+    master.parent = null;
+    master.position.set(0, 0, 0); master.rotation.set(0, 0, 0); master.rotationQuaternion = null; master.scaling.set(1, 1, 1);
+    master.isPickable = false;
+    master.setEnabled(true);
+    master.thinInstanceSetBuffer('matrix', buf, 16, true);
+    touched.push(master);
+  }
+  console.info(`[FEL-PROPS] ${venueKey}: ${thin.length} placements across ${byMaster.size} thin-instanced masters`);
+  return {
+    root, count,
+    dispose() {
+      for (const m of touched) { try { m.thinInstanceCount = 0; m.setEnabled(false); } catch { /* disposed */ } }
+      for (const m of instances) m.dispose();
+      root.dispose();
+    },
+  };
 }
 
 /** For a spec venue: the root is the built scene's root; the venue key comes from the spec's venue name map. */
