@@ -10,3 +10,12 @@ docs/shots/*/
 .next-*/
 .next-*
 scripts/avatar/out/
+
+# Env files (2026-09-12 release pass). The only env rule in this tree lived in the
+# repo-root .gitignore as `.env*.local`, which leaves `.env.production` tracked — and
+# that is precisely the file a Next/Firebase deploy asks you to create, holding
+# DATABASE_URL and NEXTAUTH_SECRET. One `git add -A` on deploy day and the database
+# credentials are in the history. Everything but the documented example is ignored here.
+.env
+.env.*
+!.env.example
