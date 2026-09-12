@@ -34,9 +34,16 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      const won = r.outcome === 'WIN';
+      // KarateVSMode ends with 'MATCH_WON' / 'MATCH_LOST' (KarateVSMode.ts:314). This compared
+      // against 'WIN', which the mode never emits, so `won` was false for every match ever
+      // played here — a won fight was recorded and displayed as DEFEATED. Its sibling
+      // mixedcombat-babylon.tsx already carries the fix and the note; karate_vs was missed.
+      // The score had the same shape of bug: the mode's stats are { rounds, foeWins } with no
+      // `wins` key at all, so this read 0 every time. The score rides r.score, and is floored
+      // at 0 because the mode's formula (myWins * 100 - foeWins * 40) goes negative on a sweep.
+      const won = r.outcome === 'MATCH_WON';
       const result: GameResult = {
-        score: Number(r.stats?.wins ?? 0),
+        score: Math.max(0, Math.round(r.score ?? 0)),
         stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
         opponentScore: Number(r.stats?.foeWins ?? 0),
         won,

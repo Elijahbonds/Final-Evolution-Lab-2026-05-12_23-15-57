@@ -34,7 +34,10 @@ export default function DuelBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      const won = r.outcome === 'WIN';
+      // DuelMode ends with 'DUEL_WON' / 'DUEL_LOST', never 'WIN' — the same mismatch that made
+      // every karate_vs and (before it) every dunk session record as a loss. Duel is retired from
+      // ENABLED_BABYLON_MODES today, so this was harming nobody; it would have bitten on revival.
+      const won = r.outcome === 'DUEL_WON';
       const result: GameResult = {
         score: Number(r.stats?.wins ?? 0),
         stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these

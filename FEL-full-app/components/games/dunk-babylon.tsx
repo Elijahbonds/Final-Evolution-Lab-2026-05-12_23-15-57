@@ -59,7 +59,11 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      const won = r.outcome === 'WIN' || r.outcome === 'CONTEST_WON';   // PACK #3: the mode emits CONTEST_WON, not WIN — dunk sessions had always posted as losses
+      // PACK #3: the mode emits CONTEST_WON, not WIN — dunk sessions had always posted as losses.
+      // The `|| 'WIN'` half of that fix was dead on arrival: DunkMode only ever emits
+      // CONTEST_WON / CONTEST_LOST. Dropped, because a comparison against a string the mode
+      // cannot produce reads like a second supported outcome and is how this drifts again.
+      const won = r.outcome === 'CONTEST_WON';
       const result: GameResult = {
         score: r.score,
         stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these

@@ -55,3 +55,41 @@ change it, because it is a design decision rather than a defect.**
 ## Not yet reviewed
 Combat (karate / karate_vs / mixedcombat), football, carnival, freerun, dance, golf/derby/penalty,
 who_scene_it, big air, snowboard, surf. This pass covered skate, dunk, 3v3 and the net sports.
+
+---
+
+# Pass 2 — the verdict contract
+
+## Fixed: Karate VS recorded every win as a loss
+
+`KarateVSMode.ts:314` ends with `'MATCH_WON'` / `'MATCH_LOST'`. `karate-vs-babylon.tsx:37` compared
+`r.outcome === 'WIN'` — a string the mode never emits. `won` was therefore **false for every match
+ever played**, so a won fight displayed "DEFEATED" and posted as a loss.
+
+The same file had a second bug of the same shape: `score: Number(r.stats?.wins ?? 0)`, but the mode's
+stats are `{ rounds, foeWins }` — there is no `wins` key, so the score was **always 0**. The score
+rides `r.score`, now floored at 0 because the mode's own formula (`myWins * 100 - foeWins * 40`) goes
+negative on a sweep.
+
+Its sibling `mixedcombat-babylon.tsx` already carried both fixes *and a comment describing them*.
+karate_vs was simply missed.
+
+## Fixed: Duel had the identical mismatch
+`DuelMode` emits `'DUEL_WON'`; the host compared `'WIN'`. Duel is retired from
+`ENABLED_BABYLON_MODES`, so it harmed nobody — it would have bitten on revival.
+
+## Fixed: dead residue in the dunk host
+`dunk-babylon.tsx` still compared `'WIN' || 'CONTEST_WON'`. The `'WIN'` half was dead on arrival —
+`DunkMode` only emits `CONTEST_WON` / `CONTEST_LOST`. Removed: a comparison against a string the mode
+cannot produce reads like a second supported outcome, and is how this drifts again.
+
+## The root cause, and the fix that outlives this pass
+
+A mode ends with `ctx.end('SOME_STRING')`. Its host decides "did the player win" by comparing
+`r.outcome` to a literal it holds **independently**. Nothing links them. That pair has now drifted
+apart four times — dunk, mixedcombat, karate_vs, duel — each found by hand, months apart.
+
+`tests/locomotion/verdict-contract.test.ts` reads both sides from source and fails if a host compares
+any outcome its mode cannot emit. It caught the dunk residue on its first run.
+
+**Add a row when you add a mode.** That is the point of the list being explicit.
