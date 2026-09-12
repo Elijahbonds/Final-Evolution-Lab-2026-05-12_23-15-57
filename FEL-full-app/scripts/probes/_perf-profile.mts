@@ -61,7 +61,12 @@ async function profile(p: Page, mode: string) {
         for (const m of list) {
           let r = 0;
           try { r = m.getBoundingInfo().boundingSphere.radiusWorld; } catch { /* */ }
-          casters.push({ name: String(m.name).slice(0, 40), r: +r.toFixed(2) });
+          casters.push({
+            name: String(m.name).slice(0, 40), r: +r.toFixed(2),
+            // a disabled source casts nothing: 'optimising' by registering one would delete the shadow
+            on: typeof m.isEnabled === 'function' ? !!m.isEnabled() : true,
+            inst: (m.instances?.length ?? 0),
+          });
         }
       }
     } catch { /* */ }
@@ -97,6 +102,10 @@ async function profile(p: Page, mode: string) {
     drawCalls: stat(pick('draws')),
     activeMeshes: stat(pick('meshes')),
     casterCount: casters.length,
+    castersEnabled: casters.filter((c: any) => c.on).length,
+    castersDisabled: casters.filter((c: any) => !c.on).length,
+    instancedCasters: casters.filter((c: any) => c.inst > 0).length,
+    instancesCovered: casters.reduce((n: number, c: any) => n + (c.inst ?? 0), 0),
     castersUnder: {
       r0_15: casters.filter((c) => c.r < 0.15).length,
       r0_30: casters.filter((c) => c.r < 0.30).length,

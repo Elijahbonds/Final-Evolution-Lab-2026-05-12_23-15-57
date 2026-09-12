@@ -88,6 +88,15 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // costing one draw per cascade each. Trunks, crowns, lamp posts and fences KEEP casting, because
   // those are the silhouettes a player actually reads on the ground.
   const FOLIAGE_NO_CAST = /^(leafs|grass|plant_bush|plant_grass|flower)/i;
+  // INSTANCES AND SHADOWS — A FIX THAT WAS WRONG, RECORDED SO IT IS NOT RETRIED (2026-09-12).
+  // VenueProps places scenery with createInstance, and Babylon draws all enabled instances of one
+  // source in a SINGLE instanced draw — so registering the SOURCE once instead of each instance
+  // looks like a free 50% cut, and measured like one: casters 321 -> 158, draws 1016 -> 504.
+  // It was not free. Those sources are hidden TEMPLATES and are disabled; measured directly, 59 of
+  // the 158 casters were disabled and they were exactly the 59 instanced sources, covering 187
+  // instances. A disabled source renders nothing into the shadow map, so the "optimisation" was
+  // scenery shadows quietly vanishing. Reverted: instances are registered individually again.
+  // The real fix is thin instances (one draw including shadows) in VenueProps, not a change here.
   const classify = (mesh: AbstractMesh): void => {
     if (!mesh.name || mesh.name.startsWith('__')) return;
     if (RECEIVER_HINTS.test(mesh.name)) { mesh.receiveShadows = true; return; }
