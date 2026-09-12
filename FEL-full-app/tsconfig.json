@@ -36,7 +36,8 @@
     ".next/types/**/*.ts",
     ".build/types/**/*.ts",
     ".next-prod/types/**/*.ts",
-    ".next-verify/types/**/*.ts"
+    ".next-verify/types/**/*.ts",
+    ".next-rc2/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
@@ -48,6 +49,8 @@
     "lib/babylon/modes/BaseballMode.ts",
     "lib/babylon/modes/ModeAuditTests.ts",
     "lib/babylon/modes/ModeAuditRegistry.ts",
-    "lib/babylon/modes/DunkMode.audit.ts"
+    "lib/babylon/modes/DunkMode.audit.ts",
+    "server/netd/dist",
+    "server/netd/src/index.ts"
   ]
 }
