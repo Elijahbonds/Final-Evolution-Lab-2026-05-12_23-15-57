@@ -8,7 +8,14 @@ generator client {
 
 datasource db {
     provider = "postgresql"
-    url      = env("DATABASE_URL")
+    // Supabase hands out TWO connection strings and they are not interchangeable.
+    // DATABASE_URL is the POOLED one (pgbouncer, port 6543): every SSR invocation opens
+    // its own client, and without the pooler a serverless app exhausts Supabase's
+    // connection cap almost immediately. It needs ?pgbouncer=true&connection_limit=1.
+    // DIRECT_URL is the direct connection (port 5432) and is used only by `prisma db
+    // push` / `migrate`, which cannot run through a transaction pooler at all.
+    url       = env("DATABASE_URL")
+    directUrl = env("DIRECT_URL")
 }
 
 model User {
