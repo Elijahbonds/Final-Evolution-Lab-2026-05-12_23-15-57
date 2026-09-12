@@ -2,3 +2,4 @@
 export * from './protocol';
 export * from './NetClock';
 export * from './NetdTransport';
+export * from './NetSession';
