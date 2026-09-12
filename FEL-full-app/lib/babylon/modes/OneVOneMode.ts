@@ -99,6 +99,7 @@ import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   /
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
+import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-in: ?net=<room>, same shape as ?agent=1
 import { AgentControlSource } from '../core/AgentControlSource';  // M69: intent play under ?agent=1
 import { agentBridge } from '../core/AgentBridge';
 import {
@@ -192,6 +193,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, foe: SpawnedCharacter, ball: AbstractMesh, ballSim: BallSim;
   let onevoneVenue: VenueHandle | null = null;  // M74
   let meSlot: PlayerSlot, foeSlot: PlayerSlot, localSource: LocalInputSource;
+  /** Null unless ?net=<room> and NEXT_PUBLIC_NETD_URL are both present. */
+  let net: NetplayHandle | null = null;
   let meDribble: DribbleController;
   let meDribbleSM: DribbleStateMachine;
   let meAnimTree: BasketballAnimTree, foeAnimTree: BasketballAnimTree;
@@ -427,7 +430,13 @@ export const OneVOneMode: ModeDefinition = (() => {
         ctx.agent.getScore = () => myScore;
       }
       meSlot = new PlayerSlot('me', agentCtl ?? localSource, true);
-      foeSlot = new PlayerSlot('foe', new AISource(foe.root.position, {
+      // NETPLAY (2026-09-12): with ?net=<room> the opponent is driven by a remote player instead
+      // of the DefenderBrain. Exactly the ?agent=1 precedent above — one source swap, and with no
+      // flag present nothing is constructed and nothing connects.
+      net = attachNetplay('onevone');
+      foeSlot = net
+        ? new PlayerSlot('foe', net.sourceFor('foe'), false)
+        : new PlayerSlot('foe', new AISource(foe.root.position, {
         // getAbsolutePosition, NOT .position: while the ball rides a hand it
         // is PARENTED to the hand bone and .position is a palm-local offset
         // (~origin). Fed that, the defender's deny point collapsed onto the
@@ -459,6 +468,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       // order: the dribble arm must solve against the posed shoulders). The layer owns the eyes; the secondary head-look
       // is stood down (it looked at ball.position — a palm-LOCAL offset while carried, i.e. the world origin).
       me.secondary?.setLookTarget(() => null); foe.secondary?.setLookTarget(() => null);
+      net?.dispose(); net = null;   // NETPLAY: say bye and close the socket with the rest of teardown
       mePosture?.dispose(); foePosture?.dispose();
       mePosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => feedFor(meBio, possession === 'mine' ? RIM : foe.root.position, possession === 'mine' ? RIM : ballWorld()), '1V1-PP');
       foePosture = mountPostureLayer(ctx.scene, foe.skeleton, foe.root, () => feedFor(foeBio, possession === 'mine' ? me.root.position : RIM, possession === 'mine' ? ballWorld() : RIM), '1V1-PP-FOE');
@@ -511,6 +521,9 @@ export const OneVOneMode: ModeDefinition = (() => {
       SoundKit.setAmbientLevel(0.3 + mbus.score01 * 0.7);
       meSlot.poll(dt);
       foeSlot.poll(dt);
+      // NETPLAY: publish this player's intent at the tick rate (the session throttles; calling it
+      // every rendered frame is correct and cheap). No-op when ?net= was absent.
+      net?.tick(meSlot.intent);
       foeStunSec = Math.max(0, foeStunSec - dt);
       reachCooldown = Math.max(0, reachCooldown - dt);
       // the contest jump's clock; the kinematic fallback flies the root itself (physics lands the Havok body)
