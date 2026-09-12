@@ -8,6 +8,17 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../'),
+    // Prisma's generated client lives in node_modules/.prisma, which the hosting
+    // packager reinstalls from scratch — the deployed function got the stubs and
+    // threw "@prisma/client did not initialize yet" on every page. Tracing it (and
+    // the schema the client resolves at runtime) into .next means it ships with the
+    // build instead of depending on a generate step that never runs there.
+    outputFileTracingIncludes: {
+      '/**/*': [
+        './node_modules/.prisma/client/**/*',
+        './prisma/schema.prisma',
+      ],
+    },
   },
   eslint: {
     ignoreDuringBuilds: true,
