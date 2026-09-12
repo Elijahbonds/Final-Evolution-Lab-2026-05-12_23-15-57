@@ -72,10 +72,17 @@ export interface FollowConfig {
    *  player's right, framing them on the left third (classic third-person
    *  over-the-shoulder). 0/undefined = centered (every existing preset). */
   shoulderOffset?: number;
+  /** LOCOMOTION Phase 4: how much the FOV widens at top speed, in radians.
+   *  A camera whose FOV never moves reads as a diorama however good the animation is —
+   *  speed is communicated by the frame opening up, not by the legs moving faster.
+   *  Undefined = static FOV, which is every preset's behaviour before this. */
+  fovGain?: number;
+  /** Speed (m/s) at which fovGain is fully applied. */
+  fovAtSpeed?: number;
 }
 
 export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
-  court:  { distance: 8.0, height: 2.6, minHeight: 1.5, pitchFloorDeg: 6,  pitchCapDeg: 16, targetHeight: 1.35, lag: 0.10, lookAhead: 1.0, fitTwo: true },
+  court:  { distance: 8.0, height: 2.6, minHeight: 1.5, pitchFloorDeg: 6,  pitchCapDeg: 16, targetHeight: 1.35, lag: 0.10, lookAhead: 1.0, fitTwo: true, fovGain: 0.10, fovAtSpeed: 6.4 },
   runner: { distance: 7.5, height: 3.2, minHeight: 2.0, pitchFloorDeg: 10, pitchCapDeg: 22, targetHeight: 1.2,  lag: 0.08, lookAhead: 3.0 },
   board:  { distance: 6.5, height: 2.4, minHeight: 1.6, pitchFloorDeg: 10, pitchCapDeg: 24, targetHeight: 1.1,  lag: 0.12, lookAhead: 4.0 },
   // fight distance pulled in (5.2 → 4.2): the dojo's walled room is narrower
@@ -95,7 +102,7 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   fight:  { distance: 4.2, height: 1.9, minHeight: 1.4, pitchFloorDeg: 4,  pitchCapDeg: 12, targetHeight: 1.15, lag: 0.15, lookAhead: 0.3, fitTwo: true, shoulderOffset: 3.0 },
   // 1v1 isolation — tight and low, broadcast iso-cam framing on the
   // ball-handler vs the defender/hoop
-  hoops:  { distance: 6.2, height: 2.4, minHeight: 1.6, pitchFloorDeg: 6,  pitchCapDeg: 18, targetHeight: 1.3,  lag: 0.11, lookAhead: 1.2, fitTwo: true },
+  hoops:  { distance: 6.2, height: 2.4, minHeight: 1.6, pitchFloorDeg: 6,  pitchCapDeg: 18, targetHeight: 1.3,  lag: 0.11, lookAhead: 1.2, fitTwo: true, fovGain: 0.10, fovAtSpeed: 6.4 },
   // 3v3 — wide enough that all six bodies stay legible, but NOT the old
   // full-court height. This was distance 11 / height 5.2, written for "full-court
   // flow"; 3v3 is a HALF-COURT game (clampToHalfCourt, one basket), so fitTwo
@@ -444,6 +451,10 @@ export class CameraDirector {
     return new Vector3(-dir.z, 0, dir.x);
   }
 
+  /** The FOV the camera was authored with, captured once. Dynamic FOV is expressed as a
+   *  delta from this so repeated updates cannot drift the lens wider every frame. */
+  private baseFov: number | null = null;
+
   update(subject: Vector3, velocity: Vector3, objective: Vector3 | null): void {
     if (this.suspended) return;
     this.beatT = Math.max(0, this.beatT - this.scene.getEngine().getDeltaTime() / 1000);
@@ -684,5 +695,38 @@ export class CameraDirector {
     if (pitch < floor) this.camera.position.y = target.y + Math.tan(floor) * flat;
     if (pitch > cap) this.camera.position.y = target.y + Math.tan(cap) * flat;
     if (pitch < floor || pitch > cap) this.camera.setTarget(target);
+
+    this.applyDynamicFov(velocity);
+  }
+
+  /**
+   * LOCOMOTION Phase 4 — FOV widens with speed.
+   *
+   * A lens that never moves reads as a diorama however good the animation underneath it is:
+   * speed is communicated by the frame opening up, not by legs cycling faster. This eases
+   * toward a target derived from the CURRENT speed rather than setting it outright, so a
+   * collision or a hit-stop cannot snap the lens, and it is expressed as a delta from the
+   * FOV the camera was authored with so repeated frames cannot drift it permanently wider.
+   *
+   * Opt-in per preset: a config without `fovGain` behaves exactly as before.
+   */
+  private applyDynamicFov(velocity: Vector3 | undefined): void {
+    const cfg = this.cfg;
+    if (this.baseFov === null) this.baseFov = this.camera.fov;
+    if (!cfg.fovGain) {
+      // a preset that does not opt in must not be left holding a widened lens from a
+      // previous preset that did
+      if (Math.abs(this.camera.fov - this.baseFov) > 1e-4) {
+        this.camera.fov += (this.baseFov - this.camera.fov) * 0.1;
+      }
+      return;
+    }
+    const speed = velocity ? Math.hypot(velocity.x, velocity.z) : 0;
+    const at = cfg.fovAtSpeed && cfg.fovAtSpeed > 0 ? cfg.fovAtSpeed : 8;
+    const t = Math.max(0, Math.min(1, speed / at));
+    // ease-out: most of the widening arrives early, so the first strides read as acceleration
+    const eased = 1 - (1 - t) * (1 - t);
+    const want = this.baseFov + cfg.fovGain * eased;
+    this.camera.fov += (want - this.camera.fov) * 0.08;
   }
 }
