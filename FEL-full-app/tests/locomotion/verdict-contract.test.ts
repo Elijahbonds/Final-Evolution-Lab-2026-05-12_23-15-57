@@ -24,13 +24,28 @@ const PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['lib/babylon/modes/ShowdownMode.ts', 'components/games/showdown-babylon.tsx'],
   ['lib/babylon/modes/DuelMode.ts', 'components/games/duel-babylon.tsx'],
   ['lib/babylon/modes/FootballMode.ts', 'components/games/football-babylon.tsx'],
+  ['lib/babylon/modes/ThreeVThreeMode.ts', 'components/games/three-v-three-babylon.tsx'],
 ];
 
-/** Every literal the mode can pass as ctx.end's first argument. */
+/**
+ * Every literal the mode can pass as ctx.end's first argument.
+ *
+ * Follows one level of indirection: a mode may compute the verdict into a local first
+ * (`const verdict = a ? 'WIN' : b ? 'DRAW' : 'LOSS'; ctx.end(verdict, ...)`), which reads better
+ * than a three-way ternary inline. Reading only the call site would report such a mode as
+ * emitting nothing and fail honest code — this test exists to catch drift, not to dictate style.
+ */
 function emittedOutcomes(src: string): string[] {
   const out = new Set<string>();
+  const LIT = /'([A-Za-z_][A-Za-z_0-9]*)'/g;
   for (const m of src.matchAll(/ctx\.end\(\s*([^,]+?),/g)) {
-    for (const lit of m[1].matchAll(/'([A-Za-z_][A-Za-z_0-9]*)'/g)) out.add(lit[1]);
+    const arg = m[1];
+    const lits = [...arg.matchAll(LIT)].map((x) => x[1]);
+    if (lits.length) { for (const l of lits) out.add(l); continue; }
+    const ident = arg.trim().match(/^[A-Za-z_$][\w$]*$/)?.[0];
+    if (!ident) continue;
+    const assign = src.match(new RegExp('(?:const|let|var)\\s+' + ident + '\\s*=([^;]+);'));
+    if (assign) for (const l of assign[1].matchAll(LIT)) out.add(l[1]);
   }
   return [...out];
 }

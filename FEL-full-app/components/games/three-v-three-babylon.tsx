@@ -36,6 +36,9 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
+      // 'DRAW' is a real outcome at the buzzer now, and it is neither a win nor a defeat.
+      // Reporting a level game as GAME OVER would be as dishonest as the WIN it replaced.
+      const drew = r.outcome === 'DRAW';
       const won = r.outcome === 'WIN';
       const result: GameResult = {
         score: r.score,
@@ -43,7 +46,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
         opponentScore: r.stats?.foeScore ?? 0,
         won,
         duration: r.durationSec,
-        headline: won ? 'GAME WON' : 'GAME OVER',
+        headline: won ? 'GAME WON' : drew ? 'DEAD EVEN' : 'GAME OVER',
       };
       onEnd(result);
     };

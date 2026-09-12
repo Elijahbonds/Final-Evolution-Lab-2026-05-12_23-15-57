@@ -417,7 +417,13 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       timeLeft -= dt;
       if (timeLeft <= 0) {
         ended = true; SoundKit.play('whistle');
-        return ctx.end(myScore >= foeScore ? 'WIN' : 'LOSS', myScore, { foeScore, assists });
+        // A TIE IS NOT A WIN (2026-09-12 mechanic pass). This read `myScore >= foeScore`, so a
+        // game that ran out of clock level — 21-21 — reported WIN and the recap said GAME WON.
+        // It is a rule the game never states, and a player who ties and is told they won has
+        // been given a reason not to trust the scoreboard. Reaching TARGET_SCORE is still an
+        // outright win; only the buzzer can produce a level game, and it says so now.
+        const verdict = myScore > foeScore ? 'WIN' : myScore === foeScore ? 'DRAW' : 'LOSS';
+        return ctx.end(verdict, myScore, { foeScore, assists });
       }
       ctx.setHud({ time: Math.ceil(timeLeft) });
       // the carrier dribbles (ball off the palm, arm reaches); everyone else's
