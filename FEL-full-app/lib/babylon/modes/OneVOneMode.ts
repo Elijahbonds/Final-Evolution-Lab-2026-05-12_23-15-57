@@ -94,6 +94,8 @@ import { VenueKit } from '../visual/VenueKit';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
+import { resolveRim, forcedMissProfile } from '../core/RimPhysics';              // the miss meets the iron it earned
+import { ballVsBodies, resolvePickup, bobbleVelocity, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
 import { attachBallToHand, releaseBall, flushThroughRim, clankOffRim } from '../anim/ballRig';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the dunk's Posture Poses, shared
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
@@ -219,6 +221,10 @@ export const OneVOneMode: ModeDefinition = (() => {
   let carrying = true, shooting = false, dunking = false;
   /** The ball is live on the floor (a miss, a block) — BallSim owns it, whoever's possession it is. */
   let loose = false;
+  /** What the shot earned, recorded at the RELEASE so the iron can answer it when the arc arrives. */
+  let shotMiss: { quality01: number; short: number; lateral: number } | null = null;
+  /** A live board: the ball is off the iron and nobody has secured it. Bodies must go and get it. */
+  let board: { age: number; contestedCalled: boolean; shooter: 'mine' | 'defense' } | null = null;
   let ended = false;
   let foeStunSec = 0;
   /** The rival is on the floor (posterized) — held there by the tree until the stun ends. */
@@ -279,6 +285,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let defenseLuck: number | null = null;        // dev: force the AI's block / strip / hand-up rolls (1 = always, 0 = never)
   const roll = (): number => defenseLuck ?? Math.random();   // dev: the roll VALUE forced (0 = every chance lands, 0.99 = none)
   let foeBrain: DefenderBrain | null = null;     // O2/O3: the rival's brain (his job / box-out readouts)
+  let foeSealing = false;                       // mirrors the brain's seal so the board can read it as real position
   let lastBumpStripAt = 0;                       // D2: one bump-strip roll per 1.5 s
   const ballWorld = (): Vector3 => ball.getAbsolutePosition();
   /** The layer's feed: the window's stance and feet, the chest on the rim (offense) or the handler (defense), the eyes on the
@@ -542,7 +549,10 @@ export const OneVOneMode: ModeDefinition = (() => {
       // ── the ball in flight (either end's shot) ──
       if (arc.active) {
         const res = arc.step(dt, ball.position);
-        if (res !== 'flying') foeBrain?.boxOut(null);   // O2: the seal ends with the ball
+        // O2: the seal ends with the ball — but on a MISS the ball is not done, it is live off the iron, and a
+        // seal that releases the instant the arc resolves is a seal that never contests the thing it exists for.
+        // It now holds until somebody actually comes down with it (liveBoard clears it).
+        if (res === 'made') { foeBrain?.boxOut(null); foeSealing = false; }
         if (res === 'made') {
           SoundKit.play('score', { pitch: 1 });
           EffectsKit.burst(ctx.scene, RIM, 'net');
@@ -581,7 +591,22 @@ export const OneVOneMode: ModeDefinition = (() => {
         } else if (res === 'missed') {
           SoundKit.play('miss');
           meShotWin = 'none'; foeShotWin = 'none';   // BIOMECH-HOOPS-WAVE1: the follow-through ends when the arc does
-          launchLoose(ball.position.clone(), new Vector3((Math.random() - 0.5) * 3, 2.5, 1.5 + Math.random()));
+          // THE MISS IS THE FEEDBACK — it used to be `new Vector3((Math.random()-0.5)*3, 2.5, 1.5+Math.random())`,
+          // so the ball never touched the ring and every miss looked identical. Now the iron answers the shot
+          // that was actually taken: EARLY is short off the front and comes BACK at the shooter, LATE is long
+          // off the back and runs AWAY, a contest pushes it short. That is how a shooter reads their stroke.
+          const shooterPos = possession === 'mine' ? me.root.position : foe.root.position;
+          const toShooter = shooterPos.subtract(RIM); toShooter.y = 0;
+          const rim = resolveRim(RIM, toShooter, forcedMissProfile(
+            shotMiss?.quality01 ?? 0.45,
+            { short: shotMiss?.short ?? 0.4, lateral: shotMiss?.lateral ?? 0 },
+          ), 0.06);
+          shotMiss = null;
+          launchLoose(rim.contact, rim.outVel);
+          SoundKit.play('impact', { pitch: 0.85, volume: 0.32 });   // it hit iron; it should sound like it
+          hoopJuice?.punch();
+          if (possession === 'mine') bannerFlash(ctx, rim.label, 850);
+          console.info(`[1V1-RIM] ${rim.kind} — ${rim.label}`);
           // HOOPS-MOVE-KIT-A M2: fouled in the air on a finish that missed — the ball back, no board race
           if (finishFoul && possession === 'mine') { finishFoul = false; bannerFlash(ctx, 'FOULED ON THE FINISH — BALL BACK', 1000); later(900, () => resetPositions()); return; }
           // THE BOARD IS A CONTEST, and BOX OUT is how you win it — on BOTH ends.
@@ -597,10 +622,15 @@ export const OneVOneMode: ModeDefinition = (() => {
           // length on top of it — which is the whole point of a verb the mode
           // tells you to hold — and a little randomness keeps a board from being
           // decided before the ball leaves the rim.
-          later(900, () => boardRace(ctx));
+          // and now the ball is LIVE. boardRace compared two distances, added a box-out bonus and rolled a
+          // die — the ball's real position was read once and it was never in play, so there was nothing to
+          // chase. The board is now decided by bodies actually reaching the ball (liveBoard below);
+          // boardRace survives only as the stall guard if nobody comes down with it.
+          board = { age: 0, contestedCalled: false, shooter: possession };
         }
       } else if (loose && !dunking) {
         ballSim.step(dt);
+        if (board) liveBoard(ctx, dt);
       }
       // BIOMECH-HOOPS-WAVE1 G6: the drive dunk's make flushes THROUGH the iron from the release, then drops out of the net
       if (dunkFlush) {
@@ -1565,10 +1595,18 @@ export const OneVOneMode: ModeDefinition = (() => {
       bannerFlash(ctx, `WAY LATE${tag}`, 800);
     }
     if (!made) swing('miss');
+    // What this shot earned, handed to the iron when the arc gets there. EARLY is rushed — short, off the
+    // front. LATE is long, off the back. A brick sprays laterally. A hand in the face pushes it short on
+    // top of whatever the timing did, which is why a contested miss comes back at you.
+    shotMiss = {
+      quality01: quality === 'perfect' ? 0.95 : quality === 'early' || quality === 'late' ? 0.55 : 0.2,
+      short: (quality === 'early' ? 0.8 : quality === 'late' ? -0.8 : quality === 'brick' ? 0.3 : 0) + shotContest * 0.7,
+      lateral: quality === 'brick' ? (Math.random() < 0.5 ? -0.7 : 0.7) : 0,
+    };
     carrying = false;
     arc.start(ball.getAbsolutePosition(), RIM, made, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked);   // D3: a strong contest ALTERS the release; M12: the glass
     // O2: the shot is up — the rival SEALS me (the box-out between me and the rim, his chest on me) until the ball comes down
-    if (foeStunSec === 0 && !foeFloored && distXZ(foe.root.position, RIM_FLOOR) < BOX_OUT_RANGE) { foeBrain?.boxOut(me.root.position); console.info('[1V1-OFF] box out (the rival seals me)'); }
+    if (foeStunSec === 0 && !foeFloored && distXZ(foe.root.position, RIM_FLOOR) < BOX_OUT_RANGE) { foeBrain?.boxOut(me.root.position); foeSealing = true; console.info('[1V1-OFF] box out (the rival seals me)'); }
   }
 
   // ── HOOPS-MOVE-KIT-A amendment: the DEFENSE contest package (D1–D3) ────────────────────────────────────────────────
@@ -1578,6 +1616,139 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (meHandUp) { meHandUp = false; meAnimTree.releaseHold(); }
     contact?.setAirborne('foe', false);
   }
+  /** The two bodies as the loose ball sees them: a jumper reaches higher, a floored body cannot reach at all. */
+  function reboundBodies(): BodyRef[] {
+    return [
+      {
+        id: 'me', pos: me.root.position, radius: 0.34,
+        reachY: 2.15 + (myJumpAge !== Infinity ? 0.4 : 0),
+        boxingOut: meSlot.intent.brace ?? false,
+        unavailable: meFloored || meStunSec > 0,
+      },
+      {
+        id: 'foe', pos: foe.root.position, radius: 0.34,
+        reachY: 2.15 + (foeBlockJumpAge !== Infinity ? 0.4 : 0),
+        boxingOut: foeSealing,
+        unavailable: foeFloored || foeStunSec > 0,
+      },
+    ];
+  }
+
+  /**
+   * THE LIVE BOARD — the ball is off the iron and in play, and whoever gets to it comes down with it.
+   *
+   * This is the difference between a rebound and a result. The ball bounces off bodies on its way
+   * down, a seal is worth real position because the sealed body is physically further from the ball,
+   * and a hot ball in traffic can squirt loose and keep the board alive. BRACE still matters — but it
+   * matters by putting you where the ball is, not by adding to a roll.
+   *
+   * boardRace is kept as the stall guard: if the ball somehow settles untouched, the mode must still
+   * hand out a possession rather than sit there.
+   */
+  function liveBoard(ctx: ModeContext, dt: number): void {
+    if (!board) return;
+    board.age += dt;
+    const bodies = reboundBodies();
+
+    // the ball off a chest — a tip is a real event and the crowd should hear it
+    const hit = ballVsBodies(ballSim.prevPos as Vector3, ballSim.pos, ballSim.vel, ballSim.radius, bodies);
+    if (hit) {
+      ballSim.vel.copyFrom(hit.outVel);
+      ballSim.pos.copyFrom(hit.contact);
+      ball.position.copyFrom(ballSim.pos);
+      SoundKit.play('impact', { pitch: 1.1, volume: 0.25 });
+      console.info(`[1V1-BOARD] tipped off ${hit.body.id}`);
+    }
+
+    const r = resolvePickup(ballSim.pos, ballSim.vel, bodies);
+    if (r.contested && !board.contestedCalled) { board.contestedCalled = true; bannerFlash(ctx, 'CONTESTED BOARD!', 600); }
+
+    if (r.winner && r.bobbled) {
+      // secured but not cleanly — it squirts away and the board is still live
+      ballSim.vel.copyFrom(bobbleVelocity(ballSim.vel));
+      SoundKit.play('impact', { pitch: 1.3, volume: 0.2 });
+      console.info(`[1V1-BOARD] bobbled by ${r.winner.id} — still live`);
+      return;
+    }
+
+    if (r.winner) { awardBoard(ctx, r.winner.id === 'me' ? 'me' : 'foe', r.contested); return; }
+
+    // stall guard: the ball has settled and nobody went and got it
+    if (board.age > 4) {
+      console.info('[1V1-BOARD] nobody came down with it — falling back to the race');
+      board = null;
+      boardRace(ctx);
+    }
+  }
+
+  /**
+   * Somebody came down with it.
+   *
+   * WHOSE miss it was decides what happens next, because those are two different basketball events.
+   * Win the board off YOUR OWN miss and it is an offensive rebound: the play does not stop, nobody is
+   * teleported to the check, and you can go straight back up — a PUTBACK. Win it off THEIR miss and
+   * it is a change of possession, which in a half-court 1v1 means taking it back out.
+   *
+   * Resetting on every board was what made offensive rebounds worthless: the reward for winning one
+   * was the same check-up you would have got for losing it.
+   */
+  function awardBoard(ctx: ModeContext, who: 'me' | 'foe', contested: boolean): void {
+    const shooter = board?.shooter ?? possession;
+    const sealed = who === 'me' ? (meSlot.intent.brace ?? false) : foeSealing;
+    board = null;
+    foeBrain?.boxOut(null); foeSealing = false;
+    ballSim.stop(); loose = false;
+    const offensive = (who === 'me' && shooter === 'mine') || (who === 'foe' && shooter === 'defense');
+    console.info(`[1V1-BOARD] ${who} secures it${contested ? ' (contested)' : ''}${offensive ? ' — OFFENSIVE, play on' : ''}`);
+
+    if (offensive && who === 'me') { securePutback(ctx, contested); return; }
+    if (offensive && who === 'foe') { foePutback(ctx, contested); return; }
+
+    if (who === 'foe') startDefense(ctx, contested ? 'THEY RIP IT AWAY — DEFEND!' : 'THEIR BOARD — DEFEND!');
+    else {
+      bannerFlash(ctx, contested ? 'YOU RIP IT AWAY — YOUR BALL' : sealed ? 'BOXED OUT — YOUR BOARD' : 'YOUR BOARD');
+      resetPositions();
+    }
+  }
+
+  /** PUTBACK — my own board, my ball, right where I am. No teleport, no check, go straight back up. */
+  function securePutback(ctx: ModeContext, contested: boolean): void {
+    possessionToken++;
+    possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
+    currentShot = null; arc.active = false; myJumpAge = Infinity;
+    meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null;
+    if (gather || finish || spin || posting) meAnimTree.release();
+    gather = null; finish = null; spin = null; posting = false; pumpWindow = 0; banked = null; finishFoul = false;
+    clearDefense();
+    giveBall('me');
+    meAnimTree.releaseHold();
+    // the body keeps its feet and its heading — it is the same play, still going
+    meDribble.setFacing(yawTo(me.root.position, RIM));
+    swing('big_make');
+    SoundKit.play('crowdCheer', { volume: 0.35 });
+    bannerFlash(ctx, contested ? 'RIPS THE BOARD — PUT IT BACK!' : 'OFFENSIVE BOARD — PUT IT BACK!', 900);
+    ctx.setHud({ hint: HINT_OFFENCE, shotType: '', shotMeterT: 0, momentum });
+  }
+
+  /** Their offensive board: they keep the possession where they stand and can go straight back up at me. */
+  function foePutback(ctx: ModeContext, contested: boolean): void {
+    possessionToken++;
+    possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
+    // straight to 'drive', never 'check': they already have the ball at the rim, there is nothing to check up for
+    defPhase = 'drive'; attacker.reset(); gatherShown = false; stepbackShown = false;
+    myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
+    arc.active = false; meShotWin = 'none'; foeShotWin = 'none';
+    if (gather || finish || spin || posting) meAnimTree.release();
+    gather = null; finish = null; spin = null; posting = false; pumpWindow = 0; banked = null; finishFoul = false;
+    clearDefense();
+    giveBall('foe');
+    meAnimTree.releaseHold();
+    if (!foeFloored) foeAnimTree.releaseHold();
+    SoundKit.play('crowdGroan', { volume: 0.3 });
+    bannerFlash(ctx, contested ? 'THEY RIP THE BOARD — CONTEST IT!' : 'THEIR OFFENSIVE BOARD — CONTEST IT!', 900);
+    ctx.setHud({ hint: HINT_DEFENCE, shotType: '', shotMeterT: 0 });
+  }
+
   /** The board is a race (both ends): distance names the favourite, BOX OUT is worth a body length, the bounce jitters it. */
   function boardRace(ctx: ModeContext): void {
     const meD = Vector3.Distance(me.root.position, ball.position);
