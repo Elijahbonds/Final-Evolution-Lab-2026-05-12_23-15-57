@@ -12,10 +12,25 @@
 // are the ones the engine actually computes for this session.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  NeuroMirror, ZONE_LABEL, ZONE_STATE_COLOR, ZONE_STATE_LABEL,
-  PATTERN_ZONES, type MirrorRuntime, type SessionSummary, type ZoneId, type ZoneState,
-} from '@/lib/babylon/nexus/neuro-mirror';
+// CODE-SPLIT (2026-09-12). `NeuroMirror` reaches @babylonjs through render/overlay-compositor and
+// rig/zone-binding, so importing it here as a VALUE pulled the whole engine into this route's
+// first-load bundle: /play/mirror shipped 2.03 MB against ~160 kB for every other /play route,
+// which lazy-load Babylon via dynamicImport (see app/play/onevone/_components/loader.tsx).
+// The labels and zone tables below are plain data and stay static; the engine loads on demand.
+// Pulled from the SOURCE modules, not the barrel. The barrel's own top-level import of
+// render/overlay-compositor reaches @babylonjs, so importing even a label through index.ts loads
+// the engine — which is why splitting only the NeuroMirror value changed nothing (measured:
+// still 2.03 MB). These two modules are plain data and carry no engine.
+import { PATTERN_ZONES, ZONE_LABEL } from '@/lib/babylon/nexus/neuro-mirror/patterns/split-stance-press-row';
+import { ZONE_STATE_COLOR, ZONE_STATE_LABEL, type ZoneState } from '@/lib/babylon/nexus/neuro-mirror/rules/config';
+import type { ZoneId } from '@/lib/babylon/nexus/neuro-mirror/patterns/split-stance-press-row';
+import type { MirrorRuntime, SessionSummary } from '@/lib/babylon/nexus/neuro-mirror/render/overlay-compositor';
+
+type MirrorModule = typeof import('@/lib/babylon/nexus/neuro-mirror');
+/** Cached so a second session does not re-fetch the chunk. */
+let mirrorModPromise: Promise<MirrorModule> | null = null;
+const loadMirror = (): Promise<MirrorModule> =>
+  (mirrorModPromise ??= import('@/lib/babylon/nexus/neuro-mirror'));
 import { DunkTracker, type DunkMetrics } from '@/lib/irl/dunkTracker';
 import type { PoseFrame } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import type { RepState } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
@@ -198,6 +213,7 @@ export function MirrorHarness() {
       await v.play();
 
       setStatus('loading-model');
+      const { NeuroMirror } = await loadMirror();
       const runtime = await NeuroMirror.session({
         video: v,
         overlayCanvas: canvasRef.current!,
@@ -275,7 +291,9 @@ export function MirrorHarness() {
 
   const endSession = useCallback(() => {
     const rt = runtimeRef.current;
-    if (rt) setSummary(NeuroMirror.sessionSummary(rt));
+    // the module is necessarily loaded by now (a runtime only exists after session() resolved),
+    // but this stays async-safe rather than assuming it
+    if (rt) void loadMirror().then((m) => setSummary(m.NeuroMirror.sessionSummary(rt)));
     stop();
     setStatus('idle');
   }, [stop]);
