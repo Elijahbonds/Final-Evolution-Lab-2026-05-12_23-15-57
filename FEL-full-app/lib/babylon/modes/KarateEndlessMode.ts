@@ -73,6 +73,7 @@ import { CombatAnimTree, type CombatAnimInput, type StrikeWeight } from '../anim
 import { BeatOwner } from '../anim/beatOwner';
 import type { ControlSource, Intent } from '../core/PlayerSlot';
 import { PlayerSlot, LocalInputSource } from '../core/PlayerSlot';
+import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-in co-op: ?net=<room>
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
@@ -206,6 +207,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   let crowd: Onlookers | null = null;   // L4 — the gauntlet's audience
   let player: SpawnedCharacter, partner: SpawnedCharacter;
   let playerSlot: PlayerSlot, partnerSlot: PlayerSlot, localSource: LocalInputSource;
+  /** Null unless ?net=<room>. The PARTNER is the remote seat here — this is co-op, not versus. */
+  let net: NetplayHandle | null = null;
   let pool: MobPool;
   let enemies: Enemy[] = [];
   let wave = 0, kos = 0, totalKos = 0, chi = 0;
@@ -758,10 +761,16 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
       localSource = new LocalInputSource();
       playerSlot = new PlayerSlot('player', localSource, true);
-      partnerSlot = new PlayerSlot('partner', new PartnerAISource(
-        () => partner.root.position, () => nearest(partner.root.position)?.mob.char.root.position ?? null, 1.6,
-        () => (myDown.downed ? player.root.position : null),
-      ), false);
+      // NETPLAY CO-OP (2026-09-12): the partner is an ALLY, so ?net=<room> seats a second human
+      // beside you against the horde rather than opposite you. Same one-line source swap as 1v1;
+      // with no flag present the PartnerAISource is constructed exactly as before.
+      net = attachNetplay('karate');
+      partnerSlot = net
+        ? new PlayerSlot('partner', net.sourceFor('partner'), false)
+        : new PlayerSlot('partner', new PartnerAISource(
+          () => partner.root.position, () => nearest(partner.root.position)?.mob.char.root.position ?? null, 1.6,
+          () => (myDown.downed ? player.root.position : null),
+        ), false);
 
       pool = new MobPool();
       wave = 0; totalKos = 0; chi = 0; enemies = []; pickups = []; tweens = []; shards = 0; shop.owned.clear(); shop.sel = 0;
@@ -868,6 +877,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
       playerSlot.poll(dt);
       partnerSlot.poll(dt);
+      net?.tick(playerSlot.intent);   // no-op without ?net=
 
       // MODE-STICK-FACE (2026-09-07): the stick is CAMERA-relative. The over-shoulder camera follows the FACING, so a
       // world-axis stick turned the fighter and the camera together until "right" meant "forward" (measured: stick-right
@@ -937,6 +947,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      net?.dispose(); net = null;
       if (sceneRef) { sceneRef.animationTimeScale = 1; sceneRef = null; }
       for (const p of pickups) { p.mesh.material?.dispose(); p.mesh.dispose(); }
       pickups = []; tweens = [];

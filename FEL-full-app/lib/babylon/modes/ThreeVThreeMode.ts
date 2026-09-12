@@ -65,6 +65,7 @@ import { BallSim } from '../core/BallPhysics';
 import { attachBallToHand, releaseBall } from '../anim/ballRig';
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
+import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-in: ?net=<room> seats a human in the first AI slot
 import { AgentControlSource } from '../core/AgentControlSource';  // M69: intent play under ?agent=1 (same seam as 1v1)
 import { agentBridge } from '../core/AgentBridge';
 import {
@@ -147,6 +148,9 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let foes: Body[] = [];
   let ball: AbstractMesh, ballSim: BallSim;
   let localSource: LocalInputSource;
+  /** Null unless ?net=<room>. One AI seat becomes a remote player. */
+  let net: NetplayHandle | null = null;
+  let netSeatTaken = false;
   let agentCtl: AgentControlSource | null = null;   // M69: the hero slot's source under ?agent=1; null for human play
   let shotMeter: ShotMeter;
   let turbo: TurboMeter;
@@ -337,9 +341,16 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           if (aiKind === 'teammate') brain = new TeammateBrain(slotAngle);
           else { const db = new DefenderBrain(0.55, markIndex); defenderBrains.push(db); marks.push(markIndex ?? 0); brain = db; }
         }
-        const slot = ai && brain
-          ? new PlayerSlot('ai', new AISource(char.root.position, world, brain), false)
-          : new PlayerSlot('me', agentCtl ?? localSource, true);
+        // NETPLAY (2026-09-12): with ?net=<room> the FIRST AI seat becomes a remote player — one
+        // human opponent among the AI, which is the smallest honest step for a 6-body mode. The
+        // rest keep their brains. No flag, no change.
+        const takeNetSeat = !!net && ai && !netSeatTaken;
+        if (takeNetSeat) netSeatTaken = true;
+        const slot = takeNetSeat
+          ? new PlayerSlot('net1', net!.sourceFor('net1'), false)
+          : ai && brain
+            ? new PlayerSlot('ai', new AISource(char.root.position, world, brain), false)
+            : new PlayerSlot('me', agentCtl ?? localSource, true);
         // BIOMECH-HOOPS-WAVE1: one animation owner per rig, and the Posture Poses layer (mounted here, BEFORE the carries —
         // the dribble arm solves against the posed shoulders); the layer owns the eyes
         char.secondary?.setLookTarget(() => null);
@@ -349,6 +360,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       };
 
       localSource = new LocalInputSource();
+
+      net = attachNetplay('threevthree'); netSeatTaken = false;   // no-op without ?net=
       // M69 (mirrors 1v1): when driven by an agent (?agent=1), the hero slot reads from the AgentControlSource
       // instead of local input. Human play is untouched — the bridge is only installed under the dev flag.
       agentCtl = agentBridge() ? new AgentControlSource() : null;
@@ -435,6 +448,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : 0.5, cbNow === b && !shooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased && !(b === me && !!spin));
 
       // poll every body; tick stagger timers
+      net?.tick(me.slot.intent);   // no-op without ?net=
       for (const b of everyBody()) { b.slot.poll(dt); b.stunSec = Math.max(0, b.stunSec - dt); if (b.jumpAge !== Infinity) { b.jumpAge += dt; b.char.root.position.y = jumpY(b.jumpAge); if (b.jumpAge >= JUMP_SEC) { b.jumpAge = Infinity; b.char.root.position.y = 0; } } }
       if (myJumpAge !== Infinity) myJumpAge += dt;
       // D1–D3 clocks
@@ -857,6 +871,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      net?.dispose(); net = null;
       carries.forEach((c) => c.dispose()); carries.clear();
       for (const b of [me, ...mates, ...foes]) { b?.posture?.dispose(); if (b) b.posture = null; }   // BIOMECH-HOOPS-WAVE1
       threeVenue?.dispose(); threeVenue = null;  // M74
