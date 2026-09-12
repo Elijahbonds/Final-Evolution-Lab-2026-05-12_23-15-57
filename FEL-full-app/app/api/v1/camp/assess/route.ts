@@ -3,12 +3,13 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { CURRICULUM, CURRICULUM_VERSION, gradeModule, requiredModules } from '@/lib/curriculum/blueprint';
-import { currentUserId, recomputeCertification, bad } from '@/lib/camp/server';
+import { currentUserId, recomputeCertification, bad, requirePaidFacilitator } from '@/lib/camp/server';
 
 /** GET /api/v1/camp/assess — my credentials, status, and what is still missing. */
 export async function GET() {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
+  { const paywalled = await requirePaidFacilitator(userId); if (paywalled) return paywalled; }
   const creds = await prisma.credential.findMany({ where: { userId }, orderBy: { earnedAt: 'desc' } });
   const cert = await recomputeCertification(userId);
   return NextResponse.json({
@@ -24,6 +25,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
+  { const paywalled = await requirePaidFacilitator(userId); if (paywalled) return paywalled; }
   let body: { trackKey?: string; moduleKey?: string; answers?: Record<string, unknown> };
   try { body = await req.json(); } catch { return bad('invalid_json'); }
   const trackKey = String(body.trackKey ?? ''), moduleKey = String(body.moduleKey ?? '');

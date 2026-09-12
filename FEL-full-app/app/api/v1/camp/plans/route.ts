@@ -4,12 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { CURRICULUM_VERSION, lessonByRef } from '@/lib/curriculum/blueprint';
 import { needsGuardianConsent } from '@/lib/camp/certification';
-import { currentUserId, bad } from '@/lib/camp/server';
+import { currentUserId, bad, requirePaidFacilitator } from '@/lib/camp/server';
 
 /** GET /api/v1/camp/plans — plans I facilitate and plans where I am the mentee. */
 export async function GET() {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
+  { const paywalled = await requirePaidFacilitator(userId); if (paywalled) return paywalled; }
   const plans = await prisma.goalPlan.findMany({
     where: { OR: [{ menteeId: userId }, { facilitatorUserId: userId }] },
     orderBy: { updatedAt: 'desc' },
@@ -28,6 +29,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
+  { const paywalled = await requirePaidFacilitator(userId); if (paywalled) return paywalled; }
   let body: any;
   try { body = await req.json(); } catch { return bad('invalid_json'); }
 

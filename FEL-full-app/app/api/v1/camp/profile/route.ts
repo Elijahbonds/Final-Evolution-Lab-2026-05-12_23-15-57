@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { composeProfile } from '@/lib/camp/profile';
-import { currentUserId, bad } from '@/lib/camp/server';
+import { currentUserId, bad, requirePaidFacilitator } from '@/lib/camp/server';
 
 /** GET /api/v1/camp/profile?userId=…&since=… — the composed Shared Profile.
  *  Own profile always; another user's only for a facilitator who has a plan with them. */

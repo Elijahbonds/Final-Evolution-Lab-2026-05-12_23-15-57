@@ -41,6 +41,24 @@ export const STRIPE_PRODUCTS = {
     interval: 'month' as const,
     product: 'FEL_PRO' as const,   // SAME entitlement: one Pro, two ways to pay
   },
+  // ── THE B2B LANE (2026-09-12) ────────────────────────────────────────────────────────────────
+  // Camp, mentees, assessments, credentialed facilitators, guardian consent and a CRM have all
+  // existed and been free. This is a coaching business running on the platform, priced per the
+  // thing it replaces — a spreadsheet plus a booking tool plus a CRM — not per player.
+  FEL_COACH: {
+    name: 'FEL Coach',
+    description: 'Run mentees, plans, assessments and session logging as a credentialed facilitator.',
+    priceUsd: 3900,                 // $39/month, one facilitator
+    interval: 'month' as const,
+    product: 'FEL_COACH' as const,
+  },
+  FEL_FACILITY: {
+    name: 'FEL Facility',
+    description: 'Everything in Coach, plus CRM, camp templates and multiple facilitators.',
+    priceUsd: 19900,                // $199/month, the organisation
+    interval: 'month' as const,
+    product: 'FEL_FACILITY' as const,
+  },
   STUDIO_CREATOR: {
     name: 'Studio Creator',
     description: 'NEXUS Studio unlimited builds, marketplace publishing, partner API.',

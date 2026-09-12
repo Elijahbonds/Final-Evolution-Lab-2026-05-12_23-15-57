@@ -57,3 +57,69 @@ export function paywall(feature: string, freeAlternative: string): PaywallBody {
 
 /** HTTP 402 Payment Required is the honest status for this, not 403. */
 export const PAYWALL_STATUS = 402;
+
+// ── THE B2B LANE ─────────────────────────────────────────────────────────────────────────────
+// Camp, mentees, assessments, credentialed facilitators and the CRM were all free. They are a
+// coaching business running on the platform, and they are priced now — with one carve-out that
+// is not negotiable.
+//
+// SAFEGUARDING IS NEVER PAYWALLED. Guardian consent and credential revocation stay open to every
+// account, subscribed or not. A guardian must always be able to record or withdraw consent for a
+// minor, and a revoked facilitator must always be revocable, including on a lapsed or unpaid
+// account. Billing may gate features; it must never gate a safety control or a consent record.
+// Anyone tempted to "simplify" by gating these should read this paragraph first.
+
+export type B2BTier = 'coach' | 'facility';
+
+/** Routes that must work regardless of subscription state. Safety, not features. */
+export const NEVER_GATED = [
+  '/api/v1/camp/consent',   // a guardian recording or withdrawing consent for a minor
+  '/api/v1/camp/revoke',    // removing a facilitator's credential
+] as const;
+
+export function isNeverGated(pathname: string): boolean {
+  return NEVER_GATED.some((p) => pathname.startsWith(p));
+}
+
+/** A single credentialed facilitator, or anything above it. */
+export async function isCoachUser(userId: string): Promise<boolean> {
+  const subs = await prisma.subscription.findMany({
+    where: { userId, status: 'ACTIVE' },
+    select: { product: true },
+  });
+  return subs.some((s) => s.product === 'FEL_COACH' || s.product === 'FEL_FACILITY');
+}
+
+/**
+ * An organisation: camp templates and multiple facilitators.
+ *
+ * NOT the CRM. lib/crm/helpers.ts restricts every CRM route to role === 'admin' or the platform
+ * owner's own email — it is an internal sales tool, not a customer surface, and putting a price on
+ * it would be selling something no customer can reach.
+ */
+export async function isFacilityUser(userId: string): Promise<boolean> {
+  const subs = await prisma.subscription.findMany({
+    where: { userId, status: 'ACTIVE' },
+    select: { product: true },
+  });
+  return subs.some((s) => s.product === 'FEL_FACILITY');
+}
+
+export interface B2BPaywallBody extends PaywallBody {
+  tier: B2BTier;
+}
+
+/** The 402 body for a B2B surface. Names the tier and what the caller can still do. */
+export function b2bPaywall(feature: string, tier: B2BTier, freeAlternative: string): B2BPaywallBody {
+  const price = tier === 'coach' ? 39 : 199;
+  const key = tier === 'coach' ? 'FEL_COACH' : 'FEL_FACILITY';
+  return {
+    error: 'pro_required',
+    feature,
+    tier,
+    message: `${feature} is part of ${tier === 'coach' ? 'FEL Coach' : 'FEL Facility'} ($${price}/month).`,
+    weeklyUsd: FEL_PRO_WEEKLY_USD,
+    checkout: { weekly: `/api/stripe/checkout?product=${key}`, monthly: `/api/stripe/checkout?product=${key}` },
+    free: freeAlternative,
+  };
+}

@@ -1,6 +1,7 @@
 // Camp server helpers — shared by the /api/v1/camp/* routes. Thin: auth
 // resolution, the facilitator upsert, and the certification recompute that
 // every credential write must run (so status is never stale).
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
@@ -43,4 +44,24 @@ export async function recomputeCertification(userId: string) {
 
 export function bad(error: string, status = 400) {
   return Response.json({ error }, { status });
+}
+
+/**
+ * The paid facilitator gate (2026-09-12).
+ *
+ * Certification says a facilitator is QUALIFIED; a subscription says the business is PAID FOR.
+ * They are different questions and this asks the second, after the first.
+ *
+ * Deliberately NOT applied to consent or revoke. A guardian must always be able to record or
+ * withdraw consent for a minor, and a credential must always be revocable, on any account, paid or
+ * lapsed. Billing gates features; it must never gate a safeguarding control.
+ */
+export async function requirePaidFacilitator(userId: string): Promise<NextResponse | null> {
+  const { isCoachUser, b2bPaywall, PAYWALL_STATUS } = await import('../pro-guard');
+  if (await isCoachUser(userId)) return null;
+  return NextResponse.json(
+    b2bPaywall('Camp mentees, plans and assessments', 'coach',
+      'Your own training, the Mirror and every game mode stay free. Consent records and credential revocation are never gated.'),
+    { status: PAYWALL_STATUS },
+  );
 }

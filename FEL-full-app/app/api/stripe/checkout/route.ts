@@ -47,7 +47,8 @@ export async function POST(req: NextRequest) {
   }
 
   // --- Subscription product ---
-  if (product === 'FEL_PRO' || product === 'FEL_PRO_MONTHLY' || product === 'STUDIO_CREATOR') {
+  if (product === 'FEL_PRO' || product === 'FEL_PRO_MONTHLY' || product === 'STUDIO_CREATOR'
+    || product === 'FEL_COACH' || product === 'FEL_FACILITY') {
     const cfg = STRIPE_PRODUCTS[product as keyof typeof STRIPE_PRODUCTS];
     // FEL Pro sells at two cadences (weekly / monthly) that grant the SAME entitlement, so the
     // row written to Subscription — and every check that reads it — uses cfg.product, not the

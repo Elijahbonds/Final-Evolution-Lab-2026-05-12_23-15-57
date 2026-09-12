@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db';
 import { latestPerAttribute, prqDelta, numericDelta, toOutcomes } from '@/lib/camp/profile';
 import { computeResiliency } from '@/lib/camp/resiliency';
 import { analyzeMovement } from '@/lib/workout/movement-screen';
-import { currentUserId, bad } from '@/lib/camp/server';
+import { currentUserId, bad, requirePaidFacilitator } from '@/lib/camp/server';
 
 /**
  * POST /api/v1/camp/sessions — record a facilitated session on an ACTIVE plan.
@@ -17,6 +17,7 @@ import { currentUserId, bad } from '@/lib/camp/server';
 export async function POST(req: NextRequest) {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
+  { const paywalled = await requirePaidFacilitator(userId); if (paywalled) return paywalled; }
   let body: { goalPlanId?: string; moduleKeys?: unknown; notes?: unknown; clientSessionId?: unknown };
   try { body = await req.json(); } catch { return bad('invalid_json'); }
   const plan = await prisma.goalPlan.findUnique({ where: { id: String(body.goalPlanId ?? '') } });
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
+  { const paywalled = await requirePaidFacilitator(userId); if (paywalled) return paywalled; }
   const goalPlanId = req.nextUrl.searchParams.get('goalPlanId') ?? '';
   const plan = await prisma.goalPlan.findUnique({ where: { id: goalPlanId } });
   if (!plan) return bad('not_found', 404);

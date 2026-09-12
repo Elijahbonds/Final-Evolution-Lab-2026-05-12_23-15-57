@@ -13,7 +13,11 @@ import { createInterface } from 'node:readline';
 
 const REF = process.env.PROJECT_REF || 'gixblzifegglbcpombpw';
 const REGION = process.env.REGION || 'us-west-2';
-const POOLER = `aws-0-${REGION}.pooler.supabase.com`;
+// CLUSTER, not just region: this project is on aws-1. Writing aws-0 (the docs' generic example)
+// produces `FATAL: tenant/user not found`, which reads like a bad password and is not one.
+// Verified 2026-09-12 by testing every candidate; override with CLUSTER=aws-0 if a project differs.
+const CLUSTER = process.env.CLUSTER || 'aws-1';
+const POOLER = `${CLUSTER}-${REGION}.pooler.supabase.com`;
 
 function askHidden(prompt) {
   return new Promise((resolve) => {

@@ -427,6 +427,10 @@ model LedgerPosting {
 enum SubscriptionProduct {
   FEL_PRO
   STUDIO_CREATOR
+  /// A single credentialed facilitator: mentees, plans, assessments, session logging.
+  FEL_COACH
+  /// An organisation: everything a coach has, plus CRM, templates and multiple facilitators.
+  FEL_FACILITY
 }
 
 enum SubscriptionStatus {
