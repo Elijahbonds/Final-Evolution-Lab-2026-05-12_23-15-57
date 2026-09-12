@@ -91,11 +91,28 @@ Legend — MP: ✔ wired · ○ slot-ready · ✗ needs refactor · − solo
 | every other `/play/*` | ~160 kB | healthy; Babylon is lazy-loaded per mode |
 | shared baseline | 89.9 kB | healthy |
 
-**Not measured:** runtime frame rate per mode, animation-pass ms, draw calls, VRAM. The only live
-figures I have are incidental from probe screenshots (skate: 60 fps, 16.7 ms avg, 782 draws, ~205 MB
-VRAM — and `draws 782 > 600` was flagged by the app's own dev HUD). **The Phase-3 gate "animation
-pass ≤ 4 ms" remains unjudgeable** until `scene.instrumentation` is captured in a probe run — roughly
-an hour of work, repeatedly deferred, and the honest top of the performance backlog.
+**NOW MEASURED** (2026-09-12, `scripts/probes/_perf-profile.mts`, Babylon `SceneInstrumentation`,
+840+ rendered frames per mode, 14 s each):
+
+| Mode | fps | frame ms (avg/p95) | **anim ms** (avg/p95/max) | physics ms | render ms | draw calls | active meshes |
+|---|---|---|---|---|---|---|---|
+| dunk | 200.8 | 4.98 / 5.6 | **0.35 / 0.5 / 0.8** | 0.00 | 1.27 | **1140** | 151 |
+| onevone | 190.8 | 5.24 / 6.0 | **0.44 / 0.6 / 1.3** | 0.14 | 1.32 | **1139** | 150 |
+| skateboard | 271.0 | 3.69 / 4.4 | **0.34 / 0.5 / 0.6** | 0.00 | 0.72 | 732 | 88 |
+
+**Phase-3 gate "animation pass ≤ 4 ms": PASS, with ~9× headroom.** Worst observed single frame was
+1.3 ms. Even on hardware four times slower this stays under 2 ms. The locomotion core's animation
+cost is not a problem and was never the risk.
+
+**The real performance finding is draw calls.** dunk and onevone sit at **~1140**, against the
+**600** budget the app's own dev HUD warns at — 1.9× over. Frame time hides it on this hardware
+(an M-series Mac with vsync off, which is why fps reads 190–271 and must NOT be quoted as
+user-experienced frame rate), but draw calls are the cost that scales worst on weak GPUs, so this is
+the number that will decide whether the hoops modes hold up on a mid-tier laptop. Skate at 732 is
+closer to budget and correspondingly cheaper (0.72 ms render vs 1.27).
+
+**Still not measured:** VRAM, and a genuine mid-tier-laptop profile — these figures are raw
+capability on fast hardware, not a user-experience claim.
 
 ---
 

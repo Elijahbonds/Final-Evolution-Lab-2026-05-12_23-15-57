@@ -2,7 +2,7 @@
 // InputBus, READY gate + 3-2-1, pause, update loop, SessionResult emit.
 
 import type { HudCue } from './danceTracks';
-import { Scene, TargetCamera, Vector3 } from '@babylonjs/core';
+import { Scene, TargetCamera, Vector3, SceneInstrumentation } from '@babylonjs/core';
 import { FloatingOriginCurrentScene } from '@babylonjs/core/Materials/floatingOriginMatrixOverrides';
 import { createEngine } from './createEngine';
 import type { TransformNode } from '@babylonjs/core';
@@ -218,7 +218,15 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
 
   // M37: hero-framing watchdog — recenters the camera if the hero leaves frame.
   frameGuard = new FrameGuard(scene, camera, () => heroRef.current, camDirector, () => objectiveRef.current);
-  const devHandle = { scene, modeId: def.modeId, hero: () => heroRef.current };   // hero for the framing probe (phase 6)   // dev probes (ship pass 4)
+  // `instrument` (2026-09-12): SceneInstrumentation is a bare module specifier, so a probe running
+  // IN the page cannot import it — which is why per-mode performance had never been measured and the
+  // locomotion Phase 3 gate ("animation pass <= 4 ms") had to be reported unjudgeable. Handing the
+  // constructor out here costs nothing: the whole devHandle is development-only, and instrumentation
+  // is not constructed unless a probe asks for it.
+  const devHandle = {
+    scene, modeId: def.modeId, hero: () => heroRef.current,   // hero for the framing probe (phase 6)   // dev probes (ship pass 4)
+    instrument: () => new SceneInstrumentation(scene),
+  };
   const devWindow = window as unknown as { __FEL_DEV__?: unknown };
   if (process.env.NODE_ENV === 'development') devWindow.__FEL_DEV__ = devHandle;
   setDiagMode(def.modeId);
