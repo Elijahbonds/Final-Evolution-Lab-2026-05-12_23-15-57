@@ -20,12 +20,26 @@ export function getStripe(): Stripe {
 // -----------------------------------------------------------------------
 
 export const STRIPE_PRODUCTS = {
+  // FEL PRO — TWO CADENCES, ONE ENTITLEMENT (owner, 2026-09-12: "keep both price models and
+  // combine them"). Weekly is the low-commitment door; monthly is the committed price. Both grant
+  // exactly the same thing, so nothing in the gate or the entitlement check has to know which one
+  // a player bought — `product` stays FEL_PRO for both.
+  //
+  // The description is what the subscription actually DOES. It previously read "premium modes,
+  // exclusive drills, 2x LC earn", none of which is what is being sold now.
   FEL_PRO: {
-    name: 'FEL Pro',
-    description: 'Unlock premium modes, exclusive drills, and 2× LC earn rate.',
-    priceUsd: 999, // $9.99/mo in cents
-    interval: 'month' as const,
+    name: 'FEL Pro — Weekly',
+    description: 'Keep the attribute upgrades you earn. Playing and PRQ scanning stay free, and your scanned base is always yours.',
+    priceUsd: 600,                 // $6.00/week — FEL_PRO_WEEKLY_USD is the source of truth for copy
+    interval: 'week' as const,
     product: 'FEL_PRO' as const,
+  },
+  FEL_PRO_MONTHLY: {
+    name: 'FEL Pro — Monthly',
+    description: 'Keep the attribute upgrades you earn, billed monthly. Playing and PRQ scanning stay free.',
+    priceUsd: 999,                 // $9.99/month — the original FEL Pro price, kept
+    interval: 'month' as const,
+    product: 'FEL_PRO' as const,   // SAME entitlement: one Pro, two ways to pay
   },
   STUDIO_CREATOR: {
     name: 'Studio Creator',

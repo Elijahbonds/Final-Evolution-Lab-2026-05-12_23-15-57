@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db';
 import { getStripe, STRIPE_PRODUCTS, COSMETIC_SKUS } from '@/lib/stripe';
 import { STUDIO_CREDIT_PACKS } from '@/lib/studio-plan';
 import { isStudioCreatorEnabled } from '@/lib/flags';
+import { paymentMethodsFor } from '@/lib/stripe-payment-methods';   // Cash App / BNPL / PayPal where each is actually supported
 
 /**
  * POST /api/stripe/checkout
@@ -46,17 +47,23 @@ export async function POST(req: NextRequest) {
   }
 
   // --- Subscription product ---
-  if (product === 'FEL_PRO' || product === 'STUDIO_CREATOR') {
-    const cfg = STRIPE_PRODUCTS[product];
-    // Check for existing active sub
+  if (product === 'FEL_PRO' || product === 'FEL_PRO_MONTHLY' || product === 'STUDIO_CREATOR') {
+    const cfg = STRIPE_PRODUCTS[product as keyof typeof STRIPE_PRODUCTS];
+    // FEL Pro sells at two cadences (weekly / monthly) that grant the SAME entitlement, so the
+    // row written to Subscription — and every check that reads it — uses cfg.product, not the
+    // checkout key. A monthly subscriber must never look un-subscribed to the attribute gate.
+    const entitlementProduct = cfg.product;
+    // Check for existing active sub — on the ENTITLEMENT, so buying weekly while already on
+    // monthly is caught as a duplicate rather than quietly billing twice for the same thing.
     const existing = await prisma.subscription.findFirst({
-      where: { userId, product, status: 'ACTIVE' },
+      where: { userId, product: entitlementProduct, status: 'ACTIVE' },
     });
     if (existing) return NextResponse.json({ error: 'Already subscribed' }, { status: 409 });
 
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: stripeCustomer.stripeCustomerId,
       mode: 'subscription',
+      payment_method_types: paymentMethodsFor('subscription') as never,
       line_items: [{
         price_data: {
           currency: 'usd',
@@ -66,7 +73,8 @@ export async function POST(req: NextRequest) {
         },
         quantity: 1,
       }],
-      metadata: { userId, product },
+      // `plan` keeps the cadence for reporting; `product` stays the entitlement the webhook writes
+      metadata: { userId, product: entitlementProduct, plan: String(product) },
       success_url: `${origin}/account?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/account?stripe=cancel`,
     });
@@ -82,6 +90,7 @@ export async function POST(req: NextRequest) {
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: stripeCustomer.stripeCustomerId,
       mode: 'payment',
+      payment_method_types: paymentMethodsFor('payment') as never,
       line_items: [{
         price_data: {
           currency: 'usd',
@@ -109,6 +118,7 @@ export async function POST(req: NextRequest) {
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: stripeCustomer.stripeCustomerId,
       mode: 'payment',
+      payment_method_types: paymentMethodsFor('payment') as never,
       line_items: [{
         price_data: {
           currency: 'usd',
@@ -144,6 +154,7 @@ export async function POST(req: NextRequest) {
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: stripeCustomer.stripeCustomerId,
       mode: 'payment',
+      payment_method_types: paymentMethodsFor('payment') as never,
       line_items: [{
         price_data: {
           currency: 'usd',
