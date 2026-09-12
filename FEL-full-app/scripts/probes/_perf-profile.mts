@@ -51,12 +51,28 @@ async function profile(p: Page, mode: string) {
         meshes: scene.getActiveMeshes().length,
       });
     });
+    // also dump the shadow-caster population: draw calls are ~7.5x active meshes, and LightRig's
+    // own comment says every caster is re-drawn into each cascade, so this is where the cost is
+    const casters: Array<{ name: string; r: number }> = [];
+    try {
+      for (const l of scene.lights) {
+        const sg = l.getShadowGenerator?.();
+        const list = sg?.getShadowMap?.()?.renderList ?? [];
+        for (const m of list) {
+          let r = 0;
+          try { r = m.getBoundingInfo().boundingSphere.radiusWorld; } catch { /* */ }
+          casters.push({ name: String(m.name).slice(0, 40), r: +r.toFixed(2) });
+        }
+      }
+    } catch { /* */ }
+    w.__PERF.casters = casters;
     return 'instrumented';
   });
 
   await p.waitForTimeout(SECONDS * 1000);
 
   const rows: any[] = await p.evaluate(() => (window as any).__PERF?.frames ?? []);
+  const casters: Array<{ name: string; r: number }> = await p.evaluate(() => (window as any).__PERF?.casters ?? []);
   const pick = (k: string) => rows.map((r) => r[k]).filter((n) => typeof n === 'number' && isFinite(n));
   const stat = (xs: number[]) => {
     if (!xs.length) return null;
@@ -80,6 +96,20 @@ async function profile(p: Page, mode: string) {
     meshEvalMs: stat(pick('meshEval')),
     drawCalls: stat(pick('draws')),
     activeMeshes: stat(pick('meshes')),
+    casterCount: casters.length,
+    castersUnder: {
+      r0_15: casters.filter((c) => c.r < 0.15).length,
+      r0_30: casters.filter((c) => c.r < 0.30).length,
+      r0_50: casters.filter((c) => c.r < 0.50).length,
+    },
+    smallestCasters: casters.filter((c) => c.r < 0.30).slice(0, 8),
+    // where the bulk actually is: group by the name stem, since rig parts repeat per character
+    casterGroups: Object.entries(
+      casters.reduce((acc: Record<string, number>, c) => {
+        const stem = c.name.replace(/_c\d+$/, '').replace(/\(Clone\)$/, '').replace(/\d+$/, '');
+        acc[stem] = (acc[stem] ?? 0) + 1; return acc;
+      }, {}),
+    ).sort((a, b) => b[1] - a[1]).slice(0, 18),
   };
   await p.screenshot({ path: `${OUT}/${mode}.png` });
   return out;

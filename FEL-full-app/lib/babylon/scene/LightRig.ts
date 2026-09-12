@@ -79,10 +79,20 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // again into each cascade. Scenery that can never throw a useful shadow stays out of the map: the scanned venue maps and
   // seas (bounding radius > 25 m), the sky and backdrop domes, the boardwalk flats, the gulls, the contact-shadow discs.
   const NEVER_CAST = /^(vb_|bk_|nexus_sky|sky|fel_ground|venue_props_)|_contact$|_gull_|nexus_venue_map/i;
+  // FOLIAGE DOES NOT CAST (2026-09-12). Measured on 1v1 with SceneInstrumentation: 377 shadow
+  // casters against 150 active meshes, and 377 x 3 cascades accounts for essentially all 1136 draw
+  // calls — the draw budget IS the shadow pass. Grouping the casters by name showed the bulk is
+  // decorative planting, not characters: palms 45, leaves 24, grass 12, bushes 17, against roughly
+  // 30 for every rig part on the court combined.
+  // Leaves and grass throw a shadow that is noise at the camera distances these modes use, while
+  // costing one draw per cascade each. Trunks, crowns, lamp posts and fences KEEP casting, because
+  // those are the silhouettes a player actually reads on the ground.
+  const FOLIAGE_NO_CAST = /^(leafs|grass|plant_bush|plant_grass|flower)/i;
   const classify = (mesh: AbstractMesh): void => {
     if (!mesh.name || mesh.name.startsWith('__')) return;
     if (RECEIVER_HINTS.test(mesh.name)) { mesh.receiveShadows = true; return; }
     if (NEVER_CAST.test(mesh.name)) return;
+    if (FOLIAGE_NO_CAST.test(mesh.name)) { mesh.receiveShadows = true; return; }   // still RECEIVES
     try {
       const r = mesh.getBoundingInfo().boundingSphere.radiusWorld;
       if (r > 25) return;                       // a scan, a sea, a dome: receives at most, never casts
