@@ -389,10 +389,17 @@ describe('M7 — the running hook', () => {
     expect(helpInTheWay(V(0, 3), RIM, null, 2.4, 1.2)).toBe(false);
   });
   it('a hook ON THE MOVE: in the paint band, moving, over a body — not from a standstill, not from the arc', () => {
-    expect(runningHook(V(0, -3), V(0, 3), RIM, V(0, 1.6))).toBe(true);
-    expect(runningHook(V(0, -0.4), V(0, 3), RIM, V(0, 1.6))).toBe(false);    // standing: that is the jump hook
-    expect(runningHook(V(0, -3), V(0, 3), RIM, null)).toBe(false);           // nobody to hook over: lay it in
+    // THE BAND IS MEASURED FROM THE RIM, AND THE RIM IS NOT THE ORIGIN (2026-09-12 release pass). This case carried the
+    // shooter fixture over from the helpInTheWay test above, which has no distance constraint — but RIM sits at z -0.6,
+    // so `V(0, 3)` stands 3.6 m out, past RUN_HOOK_MAX (3.0), and the hook correctly refused it. The test has been red
+    // since M7 landed and it was the test that was wrong: the band is the deliberate, probe-measured narrow one
+    // (outside it a drive is a layup inside 2.2 m or a pull-up / floater past 3.0), so the fixture moves into the paint
+    // rather than the band moving out to meet it.
+    expect(runningHook(V(0, -3), V(0, 2), RIM, V(0, 0.9))).toBe(true);       // 2.6 m out, a body a metre up the line
+    expect(runningHook(V(0, -0.4), V(0, 2), RIM, V(0, 0.9))).toBe(false);    // standing: that is the jump hook
+    expect(runningHook(V(0, -3), V(0, 2), RIM, null)).toBe(false);           // nobody to hook over: lay it in
     expect(runningHook(V(0, -3), V(0, 8), RIM, V(0, 6.6))).toBe(false);      // out past the band
+    expect(runningHook(V(0, -3), V(0, 3), RIM, V(0, 1.6))).toBe(false);      // 3.6 m: past the band, by design
   });
 });
 

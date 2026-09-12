@@ -2,6 +2,11 @@
 docs/shots/*/
 !docs/shots/ref/
 
-# Verification builds (npm run build:check) — kept out of the dev server's .next
-.next-verify/
+# Build output. `.next` is next's own default; every `NEXT_DIST_DIR=.next-<tag>` a
+# parallel dev server or verification build uses lands beside it. None of it belongs
+# in git, and leaving the variants untracked-but-not-ignored is how 43 GB of stale
+# build cache hid in plain sight inside `git status` (2026-09-12 release pass).
+.next
+.next-*/
+.next-*
 scripts/avatar/out/
