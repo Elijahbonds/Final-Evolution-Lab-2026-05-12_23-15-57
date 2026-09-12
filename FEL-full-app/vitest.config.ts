@@ -9,10 +9,7 @@ import path from 'node:path';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: [
-      'lib/**/*.test.ts',
-      'scripts/**/*.suite.test.ts',
-    ],
+    include: ['lib/**/*.test.ts', 'scripts/**/*.suite.test.ts', 'tests/**/*.test.ts'],
     // Babylon's NullEngine work and the 3000-sample statistical checks are not
     // fast; the default 5s timeout fails them for no good reason.
     testTimeout: 180_000,   // the headless check suites spawn a script with its own 120 s limit; under a sweep load a 60 s test timeout fired first (three false alarms 2026-09-05 and 06)
