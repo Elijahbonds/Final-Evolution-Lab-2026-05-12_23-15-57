@@ -40,6 +40,7 @@ model User {
   // M2 relations
   stripeCustomer   StripeCustomer?
   subscriptions    Subscription[]
+  mirrorSessions   MirrorSession[]
   orders           Order[]
   payoutRequests   PayoutRequest[]
   creatorListings  MarketplaceListing[] @relation("CreatorListings")
@@ -1711,4 +1712,30 @@ model CampTemplate {
 
   @@index([authorId])
   @@index([published])
+}
+
+/// A Neuromechanic Mirror session — the summary the overlay already computes and, until
+/// 2026-09-12, discarded when the tab closed. Persisting it is what turns a live coaching toy
+/// into a training record: reps, tempo, time-in-stable per zone and fault counts over time.
+/// Free tier writes and reads its own recent sessions; trends across history are FEL Pro.
+model MirrorSession {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patternId      String
+  startedAt      DateTime
+  durationMs     Int
+  reps           Int      @default(0)
+  /// Average tempo across completed reps, ms. Null before the first rep.
+  avgTempoMs     Int?
+  /// Rolling average per-frame engine+pose processing time — a quality signal for the capture.
+  avgFrameMs     Float    @default(0)
+  /// Real accumulated ms each zone spent estimated-stable. Zone-keyed.
+  timeInStableMs Json
+  /// Real count of transitions INTO an estimated-fault state. Zone-keyed.
+  faultCounts    Json
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, patternId, createdAt])
 }

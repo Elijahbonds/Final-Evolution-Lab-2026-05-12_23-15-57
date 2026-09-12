@@ -293,7 +293,28 @@ export function MirrorHarness() {
     const rt = runtimeRef.current;
     // the module is necessarily loaded by now (a runtime only exists after session() resolved),
     // but this stays async-safe rather than assuming it
-    if (rt) void loadMirror().then((m) => setSummary(m.NeuroMirror.sessionSummary(rt)));
+    if (rt) void loadMirror().then((m) => {
+      const s = m.NeuroMirror.sessionSummary(rt);
+      setSummary(s);
+      // PERSIST IT (2026-09-12). This summary — reps, tempo, per-zone time-in-stable and fault
+      // counts — was computed on every session and then discarded when the tab closed, so the
+      // Mirror could never show whether anyone was improving. Saving is best-effort and silent:
+      // a failed write must never interrupt the end of a workout.
+      void fetch('/api/mirror/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          patternId: s.patternId,
+          startedAtMs: s.startedAtMs,
+          durationMs: s.durationMs,
+          reps: s.reps,
+          avgTempoMs: s.avgTempo ?? null,
+          avgFrameMs: s.avgFrameMs,
+          timeInStableMs: s.timeInStableMs,
+          faultCounts: s.faultCounts,
+        }),
+      }).catch(() => { /* offline or signed out: the session still showed on screen */ });
+    });
     stop();
     setStatus('idle');
   }, [stop]);
