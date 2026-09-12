@@ -12,10 +12,13 @@
 import { copyFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-const dist = process.env.NEXT_DIST_DIR || '.next';
+// public/ is the only directory that reaches the deployed function intact. .next is
+// copied as a curated subset and silently drops anything extra (measured: the schema
+// written to .next/prisma never arrived), node_modules/.prisma is reinstalled to stubs,
+// and the function's package.json has its scripts stripped.
 const src = join('prisma', 'schema.prisma');
 if (!existsSync(src)) { console.error(`[prisma-schema] ${src} missing`); process.exit(1); }
-const destDir = join(dist, 'prisma');
+const destDir = join('public', '_prisma');
 mkdirSync(destDir, { recursive: true });
 copyFileSync(src, join(destDir, 'schema.prisma'));
 console.log(`[prisma-schema] copied ${src} -> ${join(destDir, 'schema.prisma')}`);

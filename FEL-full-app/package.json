@@ -18,7 +18,7 @@
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/safe-seed.ts",
-    "schema": ".next/prisma/schema.prisma"
+    "schema": "public/_prisma/schema.prisma"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.0",
