@@ -50,6 +50,10 @@ import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
+import { readWeapon } from '../combat/arsenal';
+import { readBlend, blendTraits } from '../combat/schools';
+import { styleAttacks } from '../combat/loadout';
+import { MIN_STARTUP_SEC } from '../core/StrikeSystem';
 import { boneNode } from '../anim/boneLookup';
 
 type Phase = 'loadout' | 'fighting' | 'roundOver' | 'matchOver';
@@ -90,7 +94,14 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let myRatings: FightRatings = { ...BASELINE_RATINGS };
   const foeRatings: FightRatings = { ...BASELINE_RATINGS };
   let myLanded: RouteStrike[] = [], foeLanded: RouteStrike[] = [];
+  // Set from the start-up screen's pick in load(), NEVER here. This factory body runs when the mode registry
+  // is BUILT, which on Next happens during SSR where there is no window and no URL — read here, every pick
+  // resolved to the default and (measured, live) `?weapon=staff` gave the STAFF TO THE OPPONENT, because the
+  // foe's loadout is derived as the opposite of the player's. Same class as the mood getter on the racing
+  // modes: anything a player chose has to be read after the page exists.
   let myLoadout: Loadout = 'fists';
+  /** The player's strikes with their chosen school applied. The rival fights the unstyled tables. */
+  let myStyled: Record<'jab' | 'kick' | 'heavy', AttackDef> | null = null;
   let striking = false, foeStriking = false;
   let slowmoSec = 0, falling = false;
   let meAnim: FighterAnim, foeAnim: FighterAnim;
@@ -131,7 +142,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let gallery: Onlookers | null = null;
 
   const foeLoadout = (): Loadout => (myLoadout === 'fists' ? 'staff' : 'fists');
-  const myAttacks = (): Record<'jab' | 'kick' | 'heavy', AttackDef> => (myLoadout === 'staff' ? STAFF_ATTACKS : KARATE_ATTACKS);
+  const myAttacks = (): Record<'jab' | 'kick' | 'heavy', AttackDef> =>
+    myStyled ?? (myLoadout === 'staff' ? STAFF_ATTACKS : KARATE_ATTACKS);
   const foeAttacks = (): Record<'jab' | 'kick' | 'heavy', AttackDef> => (foeLoadout() === 'staff' ? STAFF_ATTACKS : KARATE_ATTACKS);
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
@@ -204,6 +216,12 @@ export const MixedCombatMode: ModeDefinition = (() => {
   function applyLoadouts(ctx: ModeContext): void {
     myStaff?.dispose(); myStaff = null;
     foeStaff?.dispose(); foeStaff = null;
+    // THE START-UP SCREEN'S PICK. This mode fights with fists or a staff; the blade and the gauntlet are not
+    // its weapons, so anything else falls back to fists rather than mismatching a prop with a moveset.
+    myLoadout = readWeapon().id === 'staff' ? 'staff' : 'fists';
+    // weapon first, then style — see combat/loadout.ts for why that order is the rule
+    myStyled = styleAttacks(myLoadout === 'staff' ? STAFF_ATTACKS : KARATE_ATTACKS,
+                            blendTraits(readBlend()), MIN_STARTUP_SEC * 1000);
     if (myLoadout === 'staff') myStaff = makeStaff(ctx, player, 'mc_staff_me');
     if (foeLoadout() === 'staff') foeStaff = makeStaff(ctx, rival, 'mc_staff_foe');
     brain = new RivalFightBrain(0.6, foeAttacks());

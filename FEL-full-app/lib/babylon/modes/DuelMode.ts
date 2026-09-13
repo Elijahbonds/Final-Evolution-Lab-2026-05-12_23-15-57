@@ -22,7 +22,7 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { FighterState, KARATE_ATTACKS, STAFF_ATTACKS } from '../core/FightCore';
 import {
-  StrikeController, karateMoveset, staffMoveset, bladeMoveset, type CombatMove,
+  StrikeController, karateMoveset, staffMoveset, bladeMoveset, MIN_STARTUP_SEC, type CombatMove,
 } from '../core/StrikeSystem';
 import { DefenseController, applyDefenseOutcome } from '../core/DefenseSystem';
 import { CombatMovement } from '../core/CombatMovement';
@@ -33,6 +33,10 @@ import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
+import { weaponById, readWeapon, equipWeapon } from '../combat/arsenal';
+import type { Mesh } from '@babylonjs/core';
+import { readBlend, blendTraits } from '../combat/schools';
+import { styleMoveset } from '../combat/loadout';
 
 export type DuelWeapon = 'fists' | 'staff' | 'blade';
 const WEAPON_MOVESET: Record<DuelWeapon, () => Record<string, CombatMove>> = {
@@ -41,7 +45,25 @@ const WEAPON_MOVESET: Record<DuelWeapon, () => Record<string, CombatMove>> = {
   blade: () => bladeMoveset(),
 };
 const WEAPON_TAG: Record<DuelWeapon, string> = { fists: 'FISTS', staff: 'STAFF', blade: 'BLADE' };
-const WEAPON_RANGE: Record<DuelWeapon, number> = { fists: 1.6, staff: 2.6, blade: 1.9 };
+
+/**
+ * The player's start-up screen picks, applied to whatever weapon this round is using.
+ *
+ * The in-round A/B/Y phase is untouched — the screen sets what you WALK IN with, and the phase still lets you
+ * change your mind. The STYLE comes from the screen either way, because a school is how you fight rather than
+ * what you fight with.
+ */
+const styled = (w: DuelWeapon): Record<string, CombatMove> =>
+  styleMoveset(WEAPON_MOVESET[w](), blendTraits(readBlend()), MIN_STARTUP_SEC);
+/**
+ * Reach per weapon — the AI spaces off this, so it has to be the FURTHEST move, not the jab.
+ *
+ * It was the jab's: fists at 1.6 while their kick reaches 1.9, so the rival stood at 1.8 believing it was
+ * safe and ate a kick there every round. Read from the arsenal now, which is the one place that knows.
+ */
+const WEAPON_RANGE: Record<DuelWeapon, number> = {
+  fists: weaponById('fists').reach, staff: weaponById('staff').reach, blade: weaponById('blade').reach,
+};
 
 const DISC_RADIUS = 6.5;            // ring-out boundary
 const EDGE_WARN = 5.4;
@@ -57,7 +79,11 @@ export const DuelMode: ModeDefinition = (() => {
   let meMove: CombatMovement, foeMove: CombatMovement;
   let meDef: DefenseController, foeDef: DefenseController;
   let meAnim: CombatAnimTree, foeAnim: CombatAnimTree;
+  // Set in load() from the start-up screen's pick, never here: this factory body runs when the registry is
+  // built, which on Next is during SSR with no window and no URL. See MixedCombatMode for the measured
+  // version of that bug.
   let myWeapon: DuelWeapon = 'fists';
+  let myProp: Mesh | null = null, foeProp: Mesh | null = null;
   let foeWeapon: DuelWeapon = 'staff';
   let phase: Phase = 'intro';
   let phaseSec = 0;
@@ -202,6 +228,21 @@ export const DuelMode: ModeDefinition = (() => {
     });
   }
 
+  /**
+   * Put the chosen weapons in both fighters' hands.
+   *
+   * Duel swapped the staff MOVESET — a metre of extra reach and a slower, punishable fight — while the
+   * fighter's hands stayed empty, so the single most important read in a weapon duel (what is the other
+   * person holding, and how far can it reach me) was invisible. Called on every weapon change, including the
+   * in-round A/B/Y phase, so what you see is always what you are swinging.
+   */
+  function showWeapons(ctx: ModeContext): void {
+    myProp?.dispose(); myProp = null;
+    foeProp?.dispose(); foeProp = null;
+    if (player) myProp = equipWeapon(ctx.scene, player.skeleton, weaponById(myWeapon), 'duel_weapon_me');
+    if (rival) foeProp = equipWeapon(ctx.scene, rival.skeleton, weaponById(foeWeapon), 'duel_weapon_foe');
+  }
+
   return {
     modeId: 'duel', mood: 'dojoWarm', camPreset: 'duel',  // Phase 9: side-on disc framing
 
@@ -230,8 +271,11 @@ export const DuelMode: ModeDefinition = (() => {
       installSafePlay(rival.animator, 'duel-rival');
 
       meState = new FighterState(100); foeState = new FighterState(100);
-      meStrike = new StrikeController(WEAPON_MOVESET.fists());
-      foeStrike = new StrikeController(WEAPON_MOVESET[foeWeapon]());
+      // what the start-up screen chose, if it is one this mode offers (the gauntlet is not a duel weapon)
+      myWeapon = (['fists', 'staff', 'blade'] as const).find((w) => w === readWeapon().id) ?? 'fists';
+      meStrike = new StrikeController(styled(myWeapon));
+      showWeapons(ctx);
+      foeStrike = new StrikeController(WEAPON_MOVESET[foeWeapon]());   // the rival fights unstyled
       meMove = new CombatMovement(); foeMove = new CombatMovement();
       meMove.moveMode = 'eightWay'; foeMove.moveMode = 'eightWay';
       meMove.lockTarget = rival.root.position; foeMove.lockTarget = player.root.position;
@@ -262,7 +306,8 @@ export const DuelMode: ModeDefinition = (() => {
         else if (e.btn === 'B') myWeapon = 'blade';
         else if (e.btn === 'Y') myWeapon = 'staff';
         else return;
-        meStrike.swapMoveset(WEAPON_MOVESET[myWeapon]());
+        meStrike.swapMoveset(styled(myWeapon));
+        showWeapons(ctx);
         banner(ctx, `${WEAPON_TAG[myWeapon]} — ROUND 1`, 1200);
         round = 1; myWins = 0; foeWins = 0; matchLatch = false; heavyAt = 0;
         setTimeout(() => startRound(ctx), 900);
@@ -270,7 +315,7 @@ export const DuelMode: ModeDefinition = (() => {
       }
       if (phase !== 'fighting' || !meState.controllable) return;
 
-      const moveIds = Object.keys(WEAPON_MOVESET[myWeapon]());
+      const moveIds = Object.keys(styled(myWeapon));
       const whooshPitch = { fists: 1.2, blade: 1.5, staff: 0.8 }[myWeapon];
       const trySwing = (id: string) => {
         if (meStrike.request(id, now())) SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 });
@@ -291,7 +336,7 @@ export const DuelMode: ModeDefinition = (() => {
       phaseSec += dt;
       if (phaseSec > BUDGET_SEC[phase]) {
         if (phase === 'fighting') endRound(ctx, meState.hp >= foeState.hp, 'TIME');
-        else if (phase === 'weaponSelect') { meStrike.swapMoveset(WEAPON_MOVESET[myWeapon]()); startRound(ctx); }
+        else if (phase === 'weaponSelect') { meStrike.swapMoveset(styled(myWeapon)); startRound(ctx); }
         return;
       }
       if (phase !== 'fighting') return;
@@ -359,6 +404,10 @@ export const DuelMode: ModeDefinition = (() => {
 
     dispose() {
       discMesh?.dispose();
+      // the props are parented to a hand bone, so disposing the character takes them — but they are also
+      // rebuilt on every weapon change, and a stale one left behind would ride the next round's rig
+      myProp?.dispose(); myProp = null;
+      foeProp?.dispose(); foeProp = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
     },
   };

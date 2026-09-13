@@ -11,6 +11,11 @@ import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } fr
 import { skinsFor, readBoardSkin, writeBoardSkin } from '@/lib/babylon/nexus/boardSkins';
 import { readyCourses, readCourse, writeCourse } from '@/lib/babylon/core/RaceCourse';
 import { readyVehicles, readVehicle, writeVehicle, type RaceKind } from '@/lib/babylon/racing/garage';
+import { readyWeapons, readWeapon, writeWeapon } from '@/lib/babylon/combat/arsenal';
+import {
+  readySchools, readBlend, writeBlend, blendName, schoolById, blendTraits, STYLE_TRAIT_KEYS,
+  type StyleBlend,
+} from '@/lib/babylon/combat/schools';
 
 // M37 E12 FIX: venue slugs resolve to PROCEDURAL canvas thumbnails (venueThumbs)
 // instead of /img/venues/*.jpg files that 404 on every mode route.
@@ -30,6 +35,16 @@ const VENUE_ART: Record<string, { venue: string; sub: string; tint: string }> = 
   aeroaces: { venue: 'surf-break', sub: 'BAY CIRCUIT', tint: '#22d3ee' },
   default: { venue: 'default', sub: 'FINAL EVOLUTION', tint: '#22d3ee' },
 };
+
+/**
+ * The fighting modes, split by what they let you choose.
+ *
+ * WEAPON is for the modes whose fight is a weapon duel; STYLE is for the karate modes, which is what the
+ * owner asked for ("for the karate modes allow them to select their fighting style"). Duel gets both: it is
+ * the weapon mode, and a school changes how you carry whatever you brought.
+ */
+const WEAPON_MODES = new Set(['mixedcombat', 'duel']);
+const STYLE_MODES = new Set(['karate', 'karate-vs', 'duel', 'showdown', 'mixedcombat']);
 
 /** Which racing mode this splash belongs to, or null. */
 const RACE_OF: Record<string, RaceKind> = { velocitykart: 'kart', aeroaces: 'aero' };
@@ -123,6 +138,24 @@ export function BootSplash(props: {
   const pickRide = (id: string) => {
     if (!race || id === ride) return;
     writeVehicle(race, id); setRide(id);
+  };
+
+  // THE FIGHT PICKS (2026-09-13). A weapon for the weapon modes, a fighting style — and a blend of two — for
+  // the karate ones. Neither reloads: the moveset and the style multipliers are read when the mode loads.
+  const isWeaponMode = WEAPON_MODES.has(props.modeId);
+  const isStyleMode = STYLE_MODES.has(props.modeId);
+  const [weapon, setWeapon] = useState<string>('fists');
+  useEffect(() => { if (isWeaponMode) setWeapon(readWeapon().id); }, [isWeaponMode]);
+  const pickWeapon = (id: string) => { if (id === weapon) return; writeWeapon(id); setWeapon(id); };
+
+  const [style, setStyle] = useState<StyleBlend>({ primary: 'straight', secondary: 'straight', mix: 0 });
+  useEffect(() => { if (isStyleMode) setStyle(readBlend()); }, [isStyleMode]);
+  const setBlend = (next: StyleBlend) => { writeBlend(next); setStyle(next); };
+  // Tapping a school sets the PRIMARY and keeps the secondary, so a blend survives changing your mind about
+  // half of it. Tapping the school that is already primary is how you go back to a pure style.
+  const pickSchool = (id: string) => {
+    if (id === style.primary) { setBlend({ primary: id, secondary: id, mix: 0 }); return; }
+    setBlend({ primary: id, secondary: style.secondary === style.primary ? id : style.secondary, mix: style.mix });
   };
 
   const [inserted, setInserted] = useState(false);
@@ -285,6 +318,86 @@ export function BootSplash(props: {
             <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
               {readyVehicles(race).find((r) => r.id === ride)?.sub ?? ''}
             </p>
+          </div>
+        )}
+
+        {isWeaponMode && (props.phase === 'ready' || props.phase === 'loading') && readyWeapons().length > 1 && (
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">WEAPON</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {readyWeapons().map((w) => (
+                <button key={w.id} type="button" onClick={() => pickWeapon(w.id)} title={w.sub}
+                  aria-label={`${w.name} — ${w.sub}`} aria-pressed={w.id === weapon}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${w.id === weapon ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={w.id === weapon ? { background: w.tint, borderColor: w.tint } : { borderColor: `${w.tint}88` }}>
+                  <Bars bars={{ speed: w.bars.reach, hold: w.bars.speed, edge: w.bars.power }} tint={w.id === weapon ? '#000' : w.tint} />
+                  {w.name}
+                </button>
+              ))}
+            </div>
+            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+              {readyWeapons().find((w) => w.id === weapon)?.sub ?? ''}
+            </p>
+          </div>
+        )}
+
+        {isStyleMode && (props.phase === 'ready' || props.phase === 'loading') && (
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">FIGHTING STYLE</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {readySchools().map((sc) => (
+                <button key={sc.id} type="button" onClick={() => pickSchool(sc.id)} title={sc.sub}
+                  aria-label={`${sc.name} — ${sc.sub}`} aria-pressed={sc.id === style.primary}
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${sc.id === style.primary ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={sc.id === style.primary ? { background: sc.tint, borderColor: sc.tint } : { borderColor: `${sc.tint}88` }}>
+                  {sc.name}
+                </button>
+              ))}
+            </div>
+            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+              {schoolById(style.primary).sub}
+            </p>
+
+            {/* THE BLEND. A secondary school and a slider between the two — the owner's "ability to create
+                different blends of fighting styles". Safe at every setting by construction: both schools
+                spend the same trait budget and a mix is a convex combination, so no blend can exceed it. */}
+            <div className="mt-1 flex flex-wrap items-center justify-center gap-1.5">
+              <span className="text-[9px] font-black tracking-[0.3em] text-white/35">BLEND WITH</span>
+              {readySchools().filter((sc) => sc.id !== style.primary).map((sc) => (
+                <button key={sc.id} type="button" aria-pressed={sc.id === style.secondary}
+                  onClick={() => setBlend({ primary: style.primary, secondary: sc.id, mix: style.mix > 0 ? style.mix : 0.3 })}
+                  className={`rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-wider transition ${sc.id === style.secondary ? 'text-black' : 'text-white/60 hover:bg-white/10'}`}
+                  style={sc.id === style.secondary ? { background: sc.tint, borderColor: sc.tint } : { borderColor: 'rgba(255,255,255,0.18)' }}>
+                  {sc.name}
+                </button>
+              ))}
+            </div>
+
+            {style.secondary !== style.primary && (
+              <div className="mt-1 flex w-64 flex-col items-center gap-1">
+                <input
+                  type="range" min={0} max={100} step={1} value={Math.round(style.mix * 100)}
+                  aria-label={`Blend balance: ${blendName(style)}`}
+                  onChange={(e) => setBlend({ ...style, mix: Number(e.currentTarget.value) / 100 })}
+                  className="w-full accent-white"
+                />
+                <span className="font-mono text-[10px] font-black tracking-wider text-white/80">{blendName(style)}</span>
+                {/* the six traits of the blend you are actually going to fight with — the slider is only
+                    meaningful if you can see what it does */}
+                <div className="flex items-end gap-2">
+                  {STYLE_TRAIT_KEYS.map((k) => {
+                    const v = blendTraits(style)[k];
+                    return (
+                      <span key={k} className="flex flex-col items-center gap-0.5">
+                        <span className="inline-block w-[6px] rounded-sm"
+                          style={{ height: Math.max(2, Math.round(v * 14)), background: v >= 1 ? '#8fe0a0' : '#e0847a', opacity: 0.85 }} />
+                        <span className="text-[7px] uppercase tracking-wider text-white/35">{k}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

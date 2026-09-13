@@ -58,6 +58,9 @@ import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
+import { readBlend, blendTraits } from '../combat/schools';
+import { styleAttacks } from '../combat/loadout';
+import { MIN_STARTUP_SEC } from '../core/StrikeSystem';
 
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 let crowd: Onlookers | null = null;         // Pass 7 phase 6: a ring of onlookers on the gravel, as the endless gauntlet has
@@ -102,6 +105,8 @@ export const KarateVSMode: ModeDefinition = (() => {
   let player: SpawnedCharacter, rival: SpawnedCharacter;
   let meState: FighterState, foeState: FighterState;
   let brain: RivalFightBrain;
+  /** The player's strikes with their chosen school applied. The rival keeps the unstyled table. */
+  let myAttacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS;
   let phase: Phase = 'intro';
   let phaseSec = 0;
   let round = 1, myWins = 0, foeWins = 0;
@@ -249,7 +254,12 @@ export const KarateVSMode: ModeDefinition = (() => {
     // can fill the gauge and still not throw it, which is what makes upgrading the scan visible in a fight.
     const canDragon = hasFightMove('dragon', mine ? myRatings : foeRatings);
     const special = key === 'heavy' && atkState.chi >= CHI_MAX && canDragon;
-    const atk: AttackDef = special ? SPECIAL_ATTACK : KARATE_ATTACKS[key];
+    // THE PLAYER'S SCHOOL applies to the player's strikes and to nobody else's (2026-09-13). The rival
+    // fights the unstyled table, so a school is a thing YOU brought rather than a global difficulty dial —
+    // picking ANCHORED must not also make the opponent hit harder. The finisher is deliberately unstyled
+    // too: the dragon is earned through FORCE (FighterStyle), and letting a school scale it would let the
+    // pre-game screen buy part of something the scan is supposed to be the only route to.
+    const atk: AttackDef = special ? SPECIAL_ATTACK : (mine ? myAttacks : KARATE_ATTACKS)[key];
     if (mine) striking = true; else foeStriking = true;
     if (special) {
       atkState.chi = 0;
@@ -433,6 +443,9 @@ export const KarateVSMode: ModeDefinition = (() => {
       meState = new FighterState(100);
       foeState = new FighterState(100);
       brain = new RivalFightBrain(0.65, KARATE_ATTACKS);
+      // read once at mount — a style cannot change mid-fight, and re-deriving it per strike would be work
+      // on the hot path for a value that never moves
+      myAttacks = styleAttacks(KARATE_ATTACKS, blendTraits(readBlend()), MIN_STARTUP_SEC * 1000);
       round = 1; myWins = 0; foeWins = 0; matchLatch = false; heavyAt = 0;
       myLanded = []; foeLanded = [];
       // `?fight=` sets MY ratings so the earned routes and the DRAGON can actually be driven and measured;

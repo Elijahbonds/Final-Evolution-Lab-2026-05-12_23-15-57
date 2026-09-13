@@ -15,7 +15,7 @@ const b = await chromium.launch({ executablePath: exe, args: ['--use-gl=angle','
 const p = await b.newPage({ viewport: { width: 1000, height: 720 } });
 await p.addInitScript(`(() => { const pad = { index:0,id:'fake',connected:true,mapping:'standard',axes:[0,0,0,0],timestamp:0,
   buttons: Array.from({length:17},()=>({pressed:false,touched:false,value:0})) }; window.__PAD=pad; navigator.getGamepads=()=>[pad]; })()`);
-await p.goto(`http://localhost:3061/dev/mode/${MODE}`, { waitUntil: 'domcontentloaded' });
+await p.goto(`http://localhost:3061/dev/mode/${MODE}${process.env.QS ? '?' + process.env.QS : ''}`, { waitUntil: 'domcontentloaded' });
 await p.waitForSelector('canvas', { timeout: 240000 });
 await p.waitForTimeout(10000);
 const s0 = p.locator('text=/^START$/').first();
