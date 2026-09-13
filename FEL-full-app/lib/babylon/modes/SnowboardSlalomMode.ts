@@ -17,6 +17,10 @@ import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
+import { trickFor, bestFitting, asTrickDef, heldTrickDir, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
+import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
+import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out
 import { buildSlopeRun, PISTE_HALF_WIDTH, SLOPE_PITCH, SLALOM_START, SLALOM_GATES, SLALOM_SPACING, type RideWorld } from './rideWorlds';
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { CharacterLibrary } from '../core/CharacterLibrary';
@@ -53,7 +57,9 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let crowd: Onlookers;
   let nextGate = 0, gatesHit = 0, elapsed = 0;
   let hudSec = -1;   // ARENA-10PHASE P9 soft: the run clock the HUD shows (it never published `time` — the chip sat on "0s" all run)
-  let stickX = 0, tuck = 0;
+  /** A full snowboard air's hang, for judging which trick the rider can finish. */
+  const AIR_BUDGET_SEC = 1.2;
+  let stickX = 0, stickY = 0, tuck = 0;   // stickY was dropped entirely, so up/down was unreadable for a trick grammar
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   let ended = false;
   let stumbleIframe = 0;
@@ -67,6 +73,11 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   // (measured: the wipe's bail clip visible 0.13 s, the grab 0.12 s, the landing 0.12 s; the 0.8 s air one-shot ran
   // out mid-flight and flashed the idle). The BoardAnimTree holds beats and settles one-shots; the mode feeds it state.
   let animTree: BoardAnimTree;
+  // THE SNOW MODES HAD NO POSTURE LAYER AT ALL. Skate and surf have carried one since BIOMECH-WAVE2 and the snowboard
+  // never got it, so none of the body work — the authored ride stances, the grab shapes, the eyes on the line, the
+  // angulation — could reach a snowboarder. It reads the same BoardPosture table the other two do.
+  let posture: { layer: PostureLayer; dispose(): void } | null = null;
+  const bio: BoardPostureInput = { ...BOARD_INPUT_IDLE };
   let bailBeatT = 0, landBeatT = 0, airT = 0;
   const BAIL_BEAT_SEC = 0.9, LAND_BEAT_SEC = 0.4;
   function wipePunch(ctx: ModeContext): void {
@@ -145,9 +156,19 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0.2, 4), 0, world.ground, '#ff6b3d', 'snowboard', { hardFloorY: pisteBottomY - 5, rayLength: 80, stickDown: 0.6 });
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { anim: 'external', onBeat: (b) => { if (b === 'land') landBeatT = LAND_BEAT_SEC; else bailBeatT = BAIL_BEAT_SEC; } });
       animTree = new BoardAnimTree(rig.char.animator);
+      posture?.dispose();
+      posture = mountPostureLayer(ctx.scene, rig.char.skeleton, rig.char.root, () => {
+        const { window, pose, legs } = boardPose(bio);
+        // the board banks at the root; the spine counter-angles against it rather than riding over as one piece
+        const angled = angulate(pose, rig.char.root.rotation.z, window);
+        // the objective on a board sport is where the board is TAKING you — 7 m down the heading at head height
+        const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5);
+        const at = new Vector3(la.x, la.y, la.z);
+        return { pose: angled, legs, aim: at, eyes: at, window };
+      }, 'SNOW-PP');
       bailBeatT = 0; landBeatT = 0; airT = 0;
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 20, modeId: 'snowboard' });
-      nextGate = 0; gatesHit = 0; elapsed = 0; hudSec = -1; ended = false; stickX = 0; tuck = 0;
+      nextGate = 0; gatesHit = 0; elapsed = 0; hudSec = -1; ended = false; stickX = 0; stickY = 0; tuck = 0;
       stumbleIframe = 0; yeti = null; yetiPool = null; yetiSec = 0; yetiDone = false;
       wipeLatchUntil = 0; finishLatch = false;
       ctx.objectiveRef.current = world.markers[nextGate] ?? null;
@@ -165,7 +186,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
-      if (e.t === 'stick' && e.side === 'L') stickX = e.x;
+      if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = Number.isFinite(e.y) ? e.y : 0; }
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (e.t === 'trigger' && e.side === 'R') tuck = e.value;
       if (e.t === 'button' && e.pressed) {
@@ -189,14 +210,27 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             ctx.feel?.impact?.(isCable ? 0.45 : 0.3);
           }
         }
-        if (e.btn === 'B') {
-          tricks.start(TRICKS.spin);
-          boost = Math.min(BOOST_MAX, boost + BOOST_PER_SPIN);
-          ctx.setHud({ boost: Math.round(boost) });   // the meter has to move as it FILLS, not only as it drains
+        // THE NAMED VOCABULARY (BoardTricks). Three buttons used to mean three fixed tricks — a 360, a grab and a
+        // kickflip on a SNOWBOARD, which is not even a snowboard trick. The held direction now picks which of the
+        // twelve snow tricks a button throws, and the air the rider actually has decides what is legal: a cork 720
+        // needs over a second of hang and must not be thrown off a roller.
+        if (e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') {
+          const held = heldTrickDir(stickX, stickY);
+          const air = Math.max(0.3, rig.rider.grounded ? 0 : AIR_BUDGET_SEC);
+          const want = trickFor('snow', held, e.btn as BoardTrick['btn']);
+          const fits = want && want.airSec <= air ? want : bestFitting('snow', e.btn as BoardTrick['btn'], air);
+          if (fits) {
+            tricks.start(asTrickDef(fits));
+            ctx.setHud({ banner: fits.label });
+            setTimeout(() => ctx.setHud({ banner: '' }), 520);
+            // the boost still fills off a SPIN, which is what it always rewarded — now it scales with the rotation
+            if (fits.spinDeg > 0) {
+              boost = Math.min(BOOST_MAX, boost + BOOST_PER_SPIN * (fits.spinDeg / 360));
+              ctx.setHud({ boost: Math.round(boost) });   // the meter has to move as it FILLS, not only as it drains
+            }
+          }
         }
         if (e.btn === 'R1') boosting = boost > 10;
-        if (e.btn === 'X') tricks.start(TRICKS.grab);
-        if (e.btn === 'Y') tricks.start(TRICKS.flipA);
       }
       if (e.t === 'button' && !e.pressed && e.btn === 'X') tricks.endGrab();
     },
@@ -347,6 +381,27 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         grinding: rig.rider.grinding !== null, manual: false,
         landing: landBeatT > 0 ? 'clean' : 'none', bailing: bailBeatT > 0, tucking: tuck > 0.5,
       });
+      // THE POSTURE LAYER'S OWN READ. Same signals as the tree, in the shape BoardPosture wants: without this the
+      // layer would sit on the idle stance for the whole run and the mount would be decoration.
+      bio.speed01 = move.speed01;
+      bio.pushing = false;
+      bio.lean = rig.rider.grounded ? move.balance.lean : 0;
+      bio.airborne = !rig.rider.grounded && (airT > 0.1 || rig.rider.vel.y > 0.5);
+      bio.grabHeld = tricks.grabHeld;
+      bio.flipping = tricks.flipping;
+      bio.spinning = tricks.spinning;
+      bio.grinding = rig.rider.grinding !== null;
+      bio.manual = false;
+      bio.landing = landBeatT > 0;
+      bio.bailing = bailBeatT > 0;
+      bio.tucking = tuck > 0.5;
+      // THE BOARD BANKS. Skate and surf have rolled the root off their lean since BIOMECH-WAVE2 G6; the snowboard —
+      // the discipline whose whole identity is laying a board over on edge — never did, so it carved bolt upright.
+      // The same function, the same easing, so a bank means one thing across all three.
+      if (!bio.airborne && !bio.bailing) {
+        const wantRoll = boardBank(move.balance.lean, move.speed01);
+        rig.char.root.rotation.z += (wantRoll - rig.char.root.rotation.z) * Math.min(1, 10 * dt);
+      }
       // Clamp at the edge of the snow, from the piste's own constant — the same
       // one-number rule skate's fence and surf's water edge now follow, so the
       // edge a player feels is always an edge they can see.
@@ -365,6 +420,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      posture?.dispose(); posture = null;
       yeti?.char.dispose(); yeti = null; yetiPool = null;
       crowd?.dispose();
       propsGone = true; props?.dispose(); props = null;

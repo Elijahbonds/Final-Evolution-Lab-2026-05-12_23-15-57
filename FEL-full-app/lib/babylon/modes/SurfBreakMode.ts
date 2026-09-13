@@ -20,6 +20,7 @@ import { assertSpawned } from '../core/FrameGuard';
 import { BoardAnimTree } from '../anim/boardTree';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
+import { trickFor, bestFitting, asTrickDef, heldTrickDir, basePts as trickPts, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out of it
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -57,6 +58,8 @@ export const SurfBreakMode: ModeDefinition = (() => {
   let rig: BoardRig, tricks: TrickMachine;
   let crowd: Onlookers;
   let t = 0, timeLeft = RUN_SEC, flow = 0;
+  /** A surf air off the lip is short — this is the hang a pop actually buys. */
+  const AIR_BUDGET_SEC = 0.7;
   let stickX = 0, stickY = 0, carve = 0;
   /** wave-relative forward drift (m/s): forward speed = WAVE_SPEED + rel (ARENA-10PHASE P3) */
   let rel = 0;
@@ -232,19 +235,37 @@ export const SurfBreakMode: ModeDefinition = (() => {
           if (rig.rider.grounded) { rig.rider.jump(0.5 + flow / 200); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); }   // the tree reads the air
         }
         if (e.btn === 'B') {
-          // This snapped the board through 90 degrees in a single frame. A
-          // cutback is the most drawn-out turn in surfing -- you bury the rail
-          // and come back around -- and an instant pivot both looks wrong and
-          // whips the chase camera hard enough to lose the rider, which is
-          // where surf's remaining [FEL-FRAME] lines came from. Aim the turn
-          // and let update() carve into it.
-          yawTarget += Math.PI * 0.5 * (stickX >= 0 ? 1 : -1);
-          cutbackUntil = t + CUTBACK_LEAN_SEC;
-          tricks.score += 40 + Math.round(flow / 4);
-          ctx.feel?.impact?.(0.12);
+          // THE WAVE LIST (BoardTricks, surf). B used to be one hardcoded cutback; the held direction now picks among
+          // five wave tricks — bottom turn, cutback, snap, floater, tube — and each carries its own score.
+          //
+          // The DRAWN-OUT TURN IS PRESERVED, deliberately. An earlier version snapped the board through 90 degrees in a
+          // single frame: a cutback is the most drawn-out turn in surfing (you bury the rail and come back around), and
+          // an instant pivot both looks wrong and whips the chase camera hard enough to lose the rider — which is where
+          // surf's remaining [FEL-FRAME] lines came from. So the turn is still AIMED here and carved in update().
+          const held = heldTrickDir(stickX, stickY);
+          const wave = trickFor('surf', held, 'B') ?? trickFor('surf', null, 'B')!;
+          // only the reverts swing the board round; a floater or a tube ride holds the line
+          if (wave.kind === 'revert') {
+            yawTarget += Math.PI * 0.5 * (stickX >= 0 ? 1 : -1);
+            cutbackUntil = t + CUTBACK_LEAN_SEC;
+          }
+          tricks.score += trickPts(wave) + Math.round(flow / 4);
+          ctx.feel?.impact?.(wave.difficulty >= 3 ? 0.2 : 0.12);
           SoundKit.play('whoosh', { pitch: 1.5, volume: 0.35 });
-          ctx.setHud({ score: tricks.score, banner: 'CUTBACK' });
+          ctx.setHud({ score: tricks.score, banner: wave.label });
           setTimeout(() => ctx.setHud({ banner: '' }), 600);
+        }
+        if (e.btn === 'Y') {
+          // the AIRS: only legal off the lip, and the air the rider has decides which one
+          const air = rig.rider.grounded ? 0 : Math.max(0.35, AIR_BUDGET_SEC);
+          const held = heldTrickDir(stickX, stickY);
+          const want = trickFor('surf', held, 'Y');
+          const fits = want && want.airSec <= air ? want : bestFitting('surf', 'Y', air);
+          if (fits) {
+            tricks.start(asTrickDef(fits));
+            ctx.setHud({ banner: fits.label });
+            setTimeout(() => ctx.setHud({ banner: '' }), 560);
+          }
         }
         if (e.btn === 'X') tricks.start(TRICKS.grab);
       }

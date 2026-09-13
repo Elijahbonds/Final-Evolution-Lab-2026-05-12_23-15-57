@@ -103,13 +103,17 @@ export const SNOW_TRICKS: readonly BoardTrick[] = [
 // A wave is not a ramp: most of the list happens ON the face, so most of these are 'manual' and 'revert' links rather
 // than airs — a cutback is a direction change you hold, not a jump.
 export const SURF_TRICKS: readonly BoardTrick[] = [
-  T({ id: 'bottom_turn', label: 'BOTTOM TURN', discipline: 'surf', kind: 'manual', dir: 'down', btn: 'A', spinDeg: 0, flipDeg: 0, grab: 'none', difficulty: 1.0, airSec: 0, clip: 'board_carve_right' }),
-  T({ id: 'cutback', label: 'CUTBACK', discipline: 'surf', kind: 'revert', dir: 'left', btn: 'A', spinDeg: 180, flipDeg: 0, grab: 'none', difficulty: 1.8, airSec: 0, clip: 'board_carve_left' }),
-  T({ id: 'snap', label: 'SNAP', discipline: 'surf', kind: 'revert', dir: 'up', btn: 'A', spinDeg: 180, flipDeg: 0, grab: 'none', difficulty: 2.4, airSec: 0, clip: 'board_carve_right' }),
-  T({ id: 'floater', label: 'FLOATER', discipline: 'surf', kind: 'manual', dir: 'up', btn: 'B', spinDeg: 0, flipDeg: 0, grab: 'none', difficulty: 2.0, airSec: 0, clip: 'board_tuck' }),
+  // The BUTTONS here are chosen to fit SurfBreakMode as it already is, not to override it: A stays the pop, X stays the
+  // grab hold, so the wave list lives on B and the airs on Y. A trick table that steals a mode's existing verbs is a
+  // table that breaks the mode.
+  T({ id: 'bottom_turn', label: 'BOTTOM TURN', discipline: 'surf', kind: 'manual', dir: null, btn: 'B', spinDeg: 0, flipDeg: 0, grab: 'none', difficulty: 1.0, airSec: 0, clip: 'board_carve_right' }),
+  T({ id: 'cutback', label: 'CUTBACK', discipline: 'surf', kind: 'revert', dir: 'left', btn: 'B', spinDeg: 180, flipDeg: 0, grab: 'none', difficulty: 1.8, airSec: 0, clip: 'board_carve_left' }),
+  T({ id: 'snap', label: 'SNAP', discipline: 'surf', kind: 'revert', dir: 'up', btn: 'B', spinDeg: 180, flipDeg: 0, grab: 'none', difficulty: 2.4, airSec: 0, clip: 'board_carve_right' }),
+  T({ id: 'floater', label: 'FLOATER', discipline: 'surf', kind: 'manual', dir: 'right', btn: 'B', spinDeg: 0, flipDeg: 0, grab: 'none', difficulty: 2.0, airSec: 0, clip: 'board_tuck' }),
   T({ id: 'tube', label: 'TUBE RIDE', discipline: 'surf', kind: 'manual', dir: 'down', btn: 'B', spinDeg: 0, flipDeg: 0, grab: 'none', difficulty: 3.6, airSec: 0, clip: 'board_tuck' }),
   T({ id: 'air_reverse', label: 'AIR REVERSE', discipline: 'surf', kind: 'air', dir: 'right', btn: 'Y', spinDeg: 360, flipDeg: 0, grab: 'tail', difficulty: 4.0, airSec: 0.6, clip: 'board_grab' }),
   T({ id: 'alley_oop', label: 'ALLEY-OOP', discipline: 'surf', kind: 'air', dir: 'left', btn: 'Y', spinDeg: 180, flipDeg: 0, grab: 'indy', difficulty: 3.4, airSec: 0.5, clip: 'board_grab' }),
+  T({ id: 'air_straight', label: 'STRAIGHT AIR', discipline: 'surf', kind: 'air', dir: null, btn: 'Y', spinDeg: 0, flipDeg: 0, grab: 'none', difficulty: 2.2, airSec: 0.35, clip: 'board_air' }),
 ];
 
 export const TRICKS_BY_DISCIPLINE: Readonly<Record<BoardDiscipline, readonly BoardTrick[]>> = {
@@ -165,3 +169,36 @@ export function scoreTrick(t: BoardTrick, landed01 = 1): number {
 
 /** Does this trick need a rail under it? For the modes' own gating. */
 export function needsRail(t: BoardTrick): boolean { return t.kind === 'grind'; }
+
+// ── ADAPTER to the existing TrickMachine ─────────────────────────────────────────────────────────────────
+// boardCore's TrickMachine takes `{ name, pts, spinAxis, turns, clip }` and the snow and surf modes drive it. Returned
+// structurally rather than importing boardCore's type, so this module stays free of a cycle (boardCore already reaches
+// into the modes layer).
+
+export interface TrickMachineDef {
+  name: string; pts: number; spinAxis: 'y' | 'z' | 'x'; turns: number; clip?: string;
+}
+
+/**
+ * A vocabulary trick as the TrickMachine wants it.
+ *
+ * The axis is what the trick IS: a spin turns about the rider's up axis (y), a flip about the board's long axis (z), a
+ * grab is held rather than rotated (x, zero turns). `turns` is signed, so a heelflip's −360 stays a heelflip rather
+ * than becoming a kickflip.
+ */
+export function asTrickDef(t: BoardTrick): TrickMachineDef {
+  const spinAxis: 'y' | 'z' | 'x' = t.spinDeg !== 0 ? 'y' : t.flipDeg !== 0 ? 'z' : 'x';
+  const turns = spinAxis === 'y' ? t.spinDeg / 360 : spinAxis === 'z' ? t.flipDeg / 360 : 0;
+  return { name: t.label, pts: basePts(t), spinAxis, turns, clip: t.clip };
+}
+
+/**
+ * Which direction a stick is HOLDING, as the grammar wants it.
+ *
+ * Shared so skate, snow and surf read a held direction identically — three modes each rolling their own threshold is
+ * how one discipline ends up needing a harder push than another for no reason a player could name.
+ */
+export function heldTrickDir(x: number, y: number, deadzone = 0.45): BoardTrick['dir'] {
+  if (Math.hypot(x, y) < deadzone) return null;
+  return Math.abs(x) > Math.abs(y) ? (x > 0 ? 'right' : 'left') : (y > 0 ? 'down' : 'up');
+}

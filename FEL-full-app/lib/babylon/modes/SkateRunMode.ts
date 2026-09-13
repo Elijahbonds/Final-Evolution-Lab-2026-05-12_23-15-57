@@ -15,7 +15,7 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, landsSwitch, TRICKS, type BoardRig } from './boardCore';
-import { trickFor, bestFitting, basePts as trickPts, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
+import { trickFor, bestFitting, basePts as trickPts, heldTrickDir, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { buildSkatepark, PARK_BOUND, type RideWorld } from './rideWorlds';
 import { assertSpawned } from '../core/FrameGuard';
 import { SPORT_CLIP } from '../anim/clipRegistry';
@@ -164,11 +164,6 @@ export const SkateRunMode: ModeDefinition = (() => {
     return best;
   };
   /** Apply a trick to the air chain and flash it -- shared by flick and buttons. */
-  /** Which direction the stick is HOLDING, as the trick grammar wants it. A centred stick is no direction. */
-  const heldDir = (x: number, y: number): BoardTrick['dir'] => {
-    if (Math.hypot(x, y) < 0.45) return null;
-    return Math.abs(x) > Math.abs(y) ? (x > 0 ? 'right' : 'left') : (y > 0 ? 'down' : 'up');
-  };
   const airTrick = (
     ctx: ModeContext, id: string, label: string,
     family: 'flip' | 'grab' | 'spin', basePts: number, difficulty: number,
@@ -401,7 +396,7 @@ export const SkateRunMode: ModeDefinition = (() => {
           // And the AIR BUDGET decides what is legal: a 360 flip off a kerb used to be thrown, fail to rotate and get
           // graded as a bail the player did not cause. bestFitting() asks for the hardest version this air can hold,
           // so the budget is the skill rather than a trap.
-          const held = heldDir(stickX, stickY);
+          const held = heldTrickDir(stickX, stickY);   // shared, so every board discipline reads a held stick alike
           const want = trickFor('skate', held, e.btn as BoardTrick['btn']);
           // AirControl tracks the airtime ALREADY SPENT, so what is left is the pop's budget minus that. No Rider API
           // exposes a remaining-air figure, and inventing one would have been a silent `undefined`.
