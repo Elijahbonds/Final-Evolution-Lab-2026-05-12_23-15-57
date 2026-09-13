@@ -77,14 +77,20 @@ const report = await p.evaluate(`(() => {
     const oz = Math.min(a.z1, c.z1) - Math.max(a.z0, c.z0);
     if (ox <= 0 || oz <= 0) continue;
     // Two slabs at clearly different HEIGHTS are layers, not redundancy: the wave face rides 1.3 m above the
-    // water on purpose, and a deck over a floor is a deck. Redundancy is two floors at the SAME height, which
-    // is also the only case that z-fights. (First run of this probe called the wave face redundant with the
-    // sea it is a wave ON, which is how a rule gets written.)
-    if (Math.abs(a.y - c.y) > 0.5) continue;
+    // water on purpose, and a deck over a floor is a deck. (First run of this probe called the wave face
+    // redundant with the sea it is a wave ON, which is how a rule gets written.)
+    const dy = Math.abs(a.y - c.y);
+    if (dy > 0.5) continue;
+    // A DELIBERATE OFFSET is a base layer, not a duplicate: the venue surround is laid 4 cm under the playing
+    // surface precisely so it shows only where nothing else reaches, and a crowd tier is a riser standing on
+    // the ground. What is worth flagging is two floors at the SAME height — that is the case that z-fights,
+    // and it is the case that found football's two coplanar venue_ground planes. (Backticks are not allowed
+    // in this comment: it lives inside the evaluate template literal.)
+    const layered = dy >= 0.02;
     const shared = ox * oz;
     const smaller = Math.min(a.area, c.area);
-    overlaps.push({ a: a.name, b: c.name, shared: Math.round(shared),
-      ofSmaller: +(shared / smaller).toFixed(2), dy: +Math.abs(a.y - c.y).toFixed(2),
+    overlaps.push({ a: a.name, b: c.name, shared: Math.round(shared), layered,
+      ofSmaller: +(shared / smaller).toFixed(2), dy: +dy.toFixed(2),
       ox: +ox.toFixed(1), oz: +oz.toFixed(1) });
   }
   overlaps.sort((p, q) => q.ofSmaller - p.ofSmaller);
@@ -111,7 +117,7 @@ for (const s of report.slabs) {
 }
 if (!report.overlaps.length) console.log('   OVERLAPS: none — every piece of this floor is covered exactly once');
 for (const o of report.overlaps) {
-  const verdict = o.ofSmaller > 0.5 ? 'REDUNDANT' : o.ofSmaller > 0.2 ? 'check' : 'seam';
+  const verdict = o.layered ? 'layer' : o.ofSmaller > 0.5 ? 'REDUNDANT' : o.ofSmaller > 0.2 ? 'check' : 'seam';
   console.log(`   ${verdict.padEnd(10)} ${o.a} / ${o.b}: ${o.shared} m² shared (${(o.ofSmaller * 100).toFixed(0)}% of the smaller), ${o.ox} x ${o.oz} m, dy ${o.dy}`);
 }
 if (!report.floating.length) console.log('   FLOATING: none — every prop stands on something');

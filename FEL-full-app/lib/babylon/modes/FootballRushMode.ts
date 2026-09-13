@@ -297,7 +297,13 @@ export const FootballRushMode: ModeDefinition = (() => {
       driveLog = []; driveYards = 0;
       rushVenue = mountVenue(ctx, 'football_rush', { keepGameplayCamera: true });
       VenueKit.buildGridiron(ctx.scene);   // the kit field keeps its yard lines and posts under the spec's sky
-      if (rushVenue) for (const m of rushVenue.built.root.getChildMeshes()) if (m.name === 'venue_ground') m.visibility = 0;
+      // The kit's gridiron stands ON TOP of the spec's ground, so the spec's is hidden — but it kept the NAME
+      // `venue_ground`, and two coplanar meshes under one name is not only redundant floor: Physics.ts binds
+      // `scene.getMeshByName('venue_ground')`, which returns the FIRST match, and the venue mounts before the
+      // kit. So the physics floor was the hidden 44 × 52 plane under a visible 44 × 90 field — no floor at all
+      // past x ±22 / z ±26. Renamed rather than disposed: the camera's venue-shell regex still matches it, and
+      // the mesh is still wanted for bounds. (Found by scripts/probes/_ground-audit.mts.)
+      if (rushVenue) for (const m of rushVenue.built.root.getChildMeshes()) if (m.name === 'venue_ground') { m.visibility = 0; m.name = 'venue_ground_under'; m.isPickable = false; }
       runner = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 0), yawRad: 0, startClip: SPORT_CLIP.idle,
       });

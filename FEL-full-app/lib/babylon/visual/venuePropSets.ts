@@ -212,3 +212,63 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     ...line('mini-arena', 'wall', [-16, -22], [16, -22], 5, 0, 2.6),
   ],
 };
+
+// ── THE SURROUND ───────────────────────────────────────────────────────────
+//
+// Ground audit, 2026-09-13 (scripts/probes/_ground-audit.mts): three of the four ball sports stand props
+// over the VOID. Tennis was the worst — its `venue_ground` is the court plus a margin (16 × 34 m) and it
+// borrows the basketball court's prop set, so eighteen things (palms at x ±16…±28, bushes, and the whole
+// crowd TIER at z ±28) hang in the air. Derby floats a grandstand at z 47.5 and trees at ±38…±46.
+//
+// This is the same defect the surf beach had, and fixing it venue by venue is how it came back: the
+// placements are authored by eye against a playing surface, and nobody checks that the world extends far
+// enough to hold them. So the SURROUND is derived from the props themselves — whatever a venue stands
+// around itself, there is ground under it — and the derivation is a pure function so a test can hold it.
+
+/** How far past the furthest prop the surround reaches, metres. A prop standing on the very edge of a plane
+ *  reads as standing on a cliff, and a tree is wider than its origin. */
+export const SURROUND_MARGIN = 14;
+
+/**
+ * The ground a venue needs under it, given what it stands around itself.
+ *
+ * Returns [width, depth] centred on the origin — never smaller than the playing surface, because a surround
+ * that is smaller than the court it surrounds is not a surround.
+ */
+export function surroundSize(placements: readonly PropPlacement[], groundSize: readonly [number, number]): [number, number] {
+  let maxX = groundSize[0] / 2, maxZ = groundSize[1] / 2;
+  for (const p of placements) {
+    maxX = Math.max(maxX, Math.abs(p.at[0]));
+    maxZ = Math.max(maxZ, Math.abs(p.at[2]));
+  }
+  return [(maxX + SURROUND_MARGIN) * 2, (maxZ + SURROUND_MARGIN) * 2];
+}
+
+/** Does this surround actually hold every prop in the set? The question the audit asked. */
+export function surroundCovers(placements: readonly PropPlacement[], size: readonly [number, number]): boolean {
+  return placements.every((p) => Math.abs(p.at[0]) <= size[0] / 2 && Math.abs(p.at[2]) <= size[1] / 2);
+}
+
+/**
+ * What the ground around a venue is made of.
+ *
+ * The playing surface has a `kind`; the world around it is a different material, and getting this wrong is
+ * as visible as the hole it fills — grass around a pitch, concrete around a hardcourt, sand around a beach.
+ */
+export const SURROUND_KIND: Record<string, { color: string; kind: string }> = {
+  pitch:     { color: '#276b3c', kind: 'grass' },     // a shade darker than the mown pitch
+  diamond:   { color: '#2c6b3a', kind: 'grass' },
+  green:     { color: '#33714a', kind: 'grass' },
+  court:     { color: '#5d6470', kind: 'concrete' },
+  hardcourt: { color: '#5a6270', kind: 'concrete' },
+  street:    { color: '#3f434e', kind: 'asphalt' },
+  sand:      { color: '#cdae7d', kind: 'sand' },
+  snow:      { color: '#d5e2ee', kind: 'snow' },
+  water:     { color: '#0b5a7c', kind: 'water' },
+  mat:       { color: '#4a4238', kind: 'floor' },
+  stage:     { color: '#120c26', kind: 'floor' },
+};
+
+export function surroundColor(groundKind: string): string {
+  return (SURROUND_KIND[groundKind] ?? SURROUND_KIND.court).color;
+}

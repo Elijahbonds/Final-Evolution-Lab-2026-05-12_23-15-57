@@ -1,7 +1,7 @@
 // venuePropSets — every prop stands outside its play area and every model it names ships.
 import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
-import { VENUE_PROP_SETS } from './venuePropSets';
+import { VENUE_PROP_SETS, surroundSize, surroundCovers, surroundColor, SURROUND_MARGIN, SURROUND_KIND } from './venuePropSets';
 
 // Play areas (x half-width, z range) the props must clear — from the modes' own venues.
 //
@@ -62,5 +62,51 @@ describe('venuePropSets', () => {
     for (const k of ['venice-court', 'dojo', 'links', 'ballpark', 'stadium', 'gridiron', 'skatepark', 'slope', 'surf-break', 'gym']) {
       expect(VENUE_PROP_SETS[k]?.length, k).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('THE SURROUND — every prop stands on something', () => {
+  // The ground audit (scripts/probes/_ground-audit.mts) found eighteen props standing over the VOID in
+  // tennis, sixteen in derby and a handful in football and penalty: a venue's `ground` is its PLAYING
+  // SURFACE (tennis is 16 × 34 m) while its props are authored in a much wider ring, and nothing checked
+  // that the world reached them. The surround is derived from the props so it cannot drift; these hold the
+  // derivation.
+  it('the surround holds every prop in every set', () => {
+    for (const [venue, set] of Object.entries(VENUE_PROP_SETS)) {
+      const size = surroundSize(set, [16, 16]);
+      expect(surroundCovers(set, size), `${venue} leaves a prop off its own ground`).toBe(true);
+    }
+  });
+
+  it('it never shrinks below the playing surface — a surround smaller than the court is not a surround', () => {
+    const [w, d] = surroundSize([], [46, 46]);
+    expect(w).toBeGreaterThanOrEqual(46);
+    expect(d).toBeGreaterThanOrEqual(46);
+  });
+
+  it('it reaches PAST the furthest prop, because a tree on the edge of a plane stands on a cliff', () => {
+    const [w] = surroundSize([{ kit: 'k', model: 'm', at: [30, 0, 0] }], [10, 10]);
+    expect(w / 2).toBeGreaterThanOrEqual(30 + SURROUND_MARGIN);
+    expect(SURROUND_MARGIN).toBeGreaterThan(4);
+  });
+
+  it('tennis — the worst case — gets a surround several times its court', () => {
+    // its own ground is 16 × 34 and it borrows the basketball court's set (palms at x ±16…±28, tier at z ±28)
+    const [w, d] = surroundSize(VENUE_PROP_SETS['venice-court'], [16, 34]);
+    expect(w).toBeGreaterThan(16 * 2);
+    expect(d).toBeGreaterThan(34);
+  });
+
+  it('the surround is made of something, and it is not the court', () => {
+    for (const kind of Object.keys(SURROUND_KIND)) {
+      expect(surroundColor(kind)).toMatch(/^#[0-9a-f]{6}$/);
+    }
+    // grass around a pitch, concrete around a hardcourt, sand around a beach — getting this wrong is as
+    // visible as the hole it fills
+    expect(SURROUND_KIND.pitch.kind).toBe('grass');
+    expect(SURROUND_KIND.hardcourt.kind).toBe('concrete');
+    expect(SURROUND_KIND.sand.kind).toBe('sand');
+    // an unknown ground kind falls back rather than throwing
+    expect(surroundColor('no-such-kind')).toMatch(/^#[0-9a-f]{6}$/);
   });
 });

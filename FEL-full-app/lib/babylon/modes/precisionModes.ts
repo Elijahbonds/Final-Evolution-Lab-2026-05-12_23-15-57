@@ -478,7 +478,9 @@ export const GolfMode: ModeDefinition = (() => {
     async load(ctx: ModeContext) {
       golfVenue = mountVenue(ctx, 'golf_loop', { keepGameplayCamera: true });
       VenueKit.buildField(ctx.scene, 'golf');   // the kit green and pines stay under the spec's sky and props; the spec's pale ground hides
-      if (golfVenue) for (const m of golfVenue.built.root.getChildMeshes()) if (m.name === 'venue_ground') m.visibility = 0;
+      // Same stacking as football, same rename, same reason: two coplanar meshes under one name made the
+      // physics floor the hidden one (see FootballRushMode).
+      if (golfVenue) for (const m of golfVenue.built.root.getChildMeshes()) if (m.name === 'venue_ground') { m.visibility = 0; m.name = 'venue_ground_under'; m.isPickable = false; }
       EffectsKit.ambient(ctx.scene, 'park');
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.5, 0, 0), 0, SPORT_CLIP.golfAddress);
       meAnim = new BeatOwner(me.animator); meAnim.loop(SPORT_CLIP.golfAddress);

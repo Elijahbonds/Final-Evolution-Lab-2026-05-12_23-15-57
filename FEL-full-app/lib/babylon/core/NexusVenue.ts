@@ -16,9 +16,11 @@
 //
 // Everything is under one root, so dispose() is total.
 
-import type { Scene, TransformNode } from '@babylonjs/core';
+import type { AbstractMesh, Scene, TransformNode } from '@babylonjs/core';
 import { buildNexusScene, type BuiltScene } from '../nexus/NexusWebScene';
 import { mountVenueProps, propSetFor, type VenuePropsHandle } from '../visual/VenueProps';
+import { VENUE_PROP_SETS, surroundSize, surroundColor } from '../visual/venuePropSets';
+import { Color3, MeshBuilder, PBRMaterial } from '@babylonjs/core';
 import { dressHoop } from '../visual/meshyProps';
 import { decorateVeniceBoardwalk } from '../nexus/veniceBoardwalk';
 import { NavBounds } from './NavBounds';
@@ -129,6 +131,36 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   let nav: NavBounds | null = null;
   if (spec.mapKey) void NavBounds.load(spec.mapKey).then((n) => { nav = n; if (n) console.info(`[NEXUS] navmesh "${spec.mapKey}": ${n.data.polys.length} polys`); });
   const propSet = location && location.propSet !== undefined && location.propSet !== null ? (location.propSet || null) : propSetFor(modeId);
+
+  // THE SURROUND (2026-09-13). A venue's `ground` is its PLAYING SURFACE — tennis 16 × 34 m, the diamond
+  // 46 × 46 — and its props are authored by eye in a much wider ring around it. Nothing ever checked that
+  // the world reached them, so the ground audit found eighteen things standing over the void in tennis
+  // alone (the palms at x ±16…±28 and the entire crowd tier at z ±28), a grandstand floating at z 47.5 in
+  // derby, and trees past the touchline in football and penalty.
+  //
+  // Derived rather than authored, because authoring it per venue is exactly how it drifted: whatever a
+  // venue stands around itself, there is now ground under it. Unlit-cheap (one plane, one material) and
+  // laid 4 cm under the playing surface so it never z-fights the markings.
+  let surround: AbstractMesh | null = null;
+  // NOT gated on spec.mapKey. A scanned map is a floor for the PLAYING AREA only — it is a scan of a court,
+  // not of the county around it — so a mapped venue needs the surround at least as much as an unmapped one:
+  // tennis, derby and penalty all carry a mapKey and all three were the ones floating props. The surround sits
+  // 4 cm under everything, so it shows only where nothing else reaches.
+  if (propSet && VENUE_PROP_SETS[propSet]?.length) {
+    const [sw, sd] = surroundSize(VENUE_PROP_SETS[propSet], spec.ground.size);
+    if (sw > spec.ground.size[0] || sd > spec.ground.size[1]) {
+      surround = MeshBuilder.CreateGround('venue_surround', { width: sw, height: sd }, ctx.scene);
+      surround.position.y = -0.04;
+      surround.parent = built.root;
+      surround.isPickable = true;                 // props snapToGround onto it, and bodies can stand on it
+      surround.receiveShadows = true;
+      const sm = new PBRMaterial('venue_surround_m', ctx.scene);
+      sm.albedoColor = Color3.FromHexString(surroundColor(spec.ground.kind));
+      sm.metallic = 0; sm.roughness = 1;
+      surround.material = sm;
+      console.info(`[NEXUS] surround ${sw.toFixed(0)} x ${sd.toFixed(0)} m under "${propSet}" (ground ${spec.ground.size.join('x')})`);
+    }
+  }
   if (location?.decorate) location.decorate(ctx.scene, built.root);   // blossom trees, starfields: meshes after the build, under the venue root
   // The scanned court is mounted for the half-court rim (z −1.32). Dunk's rim is at z −11, so under dunk the scan slides −9 so
   // its north baseline meets the rim (owner's Luma reference, 2026-09-06: the hoop stands on the apron right behind the paint).
