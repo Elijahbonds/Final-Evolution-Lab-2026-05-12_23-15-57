@@ -47,6 +47,13 @@ export function winnerIdFor(outcome: MpOutcome, hostId: string, guestId: string 
  * Quiz/co-op modes are intentionally excluded. Labels drive the lobby UI.
  */
 export const MP_MODES: { key: string; label: string }[] = [
+  // REVIVED 2026-09-13 — the four that came back into the nav. The multiplayer contract is that an ENABLED
+  // mode can always be staked against; a mode you can finish with nothing to challenge is a dead end, and
+  // the contract test caught these the moment they were re-enabled.
+  { key: 'sprint', label: 'The Track' },
+  { key: 'showdown', label: 'Showdown' },
+  { key: 'duel', label: 'Duel' },
+  { key: 'brainbrawl', label: 'Brain Brawl' },
   // NEW MODE (owner ask 2026-09-12): a time-attack course, so it stakes the same way every score run does.
   { key: 'aeroaces', label: 'Aero Aces' },
   { key: 'velocitykart', label: 'Velocity Kart' },
@@ -88,6 +95,7 @@ export const MP_SESSION_MODE: Record<string, string> = {
   'karate-vs': 'karateVersus', onevone: 'hoops1v1', threevthree: 'hoops3v3', carnival: 'carnival', volleyball: 'volleyball', dance: 'dance',
   karate: 'karateEndless', mixedcombat: 'mixedcombat', dunkduel: 'dunkduel', 'who-scene-it': 'whoSceneIt',
   aeroaces: 'aeroAces', velocitykart: 'velocityKart',
+  sprint: 'sprint', showdown: 'showdown', duel: 'duel', brainbrawl: 'brainBrawl',
 };
 export function sessionModeFor(mpKey: string): string { return MP_SESSION_MODE[mpKey] ?? mpKey; }
 const MP_MODE_KEYS = new Set(MP_MODES.map((m) => m.key));

@@ -16,6 +16,11 @@
 
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Mesh, TransformNode } from '@babylonjs/core';
+import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { DEFAULT_HERO_URL } from '../core/athleteRoster';
+import { buildPoseClip, REF_HIPS_Y } from '../anim/poseClip';
+import { seatedKeys, WHEEL_RADIUS } from '../anim/authored/seated';
+import type { AnimationGroup } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -39,6 +44,8 @@ const CEILING = 520, FLOOR = 14, HALF_WORLD = 700;
 export function makeAeroAcesMode(): ModeDefinition {
 let plane: TransformNode | null = null;
 let venueRoot: TransformNode | null = null;
+let pilot: SpawnedCharacter | null = null;
+let seated: AnimationGroup | null = null;
 let rings: Mesh[] = [];
 let course: Course = AERO_COURSES[0];
 let flight: FlightState | null = null;
@@ -58,6 +65,21 @@ const S = {
 const say = (t: string, sec = 1.1): void => { S.banner = t; S.bannerT = sec; };
 
 /** A stylised plane: fuselage, wings, tail. Yaw/pitch/roll are applied to the root. */
+// THE COCKPIT AND THE PILOT (2026-09-13). Phase 0 booted every mode and found three with ZERO skeletons —
+// this was one of them: an aircraft flying itself, which is the same defect Velocity Kart shipped with and
+// the sharpest version of the unfinished signal in a game whose standing rule is that every body in a scene
+// is a humanoid that moves well.
+//
+// The fuselage was a solid 1.5 x 1.2 x 7 box, so like the kart there was nowhere for a body to BE. It gets a
+// well cut into the top and a yoke to hold. The pose is the SAME authored stance the kart driver uses
+// (anim/authored/seated.ts) and that is not a shortcut: reclined into a seat with the legs stretched forward
+// and the hands up at chest height is a cockpit posture before it is a karting one. A YOKE rather than a
+// stick, because the authored pose puts both hands together at the centre line and a yoke is the control
+// that actually matches that — a side-stick would have one hand gripping air.
+const PILOT_HIPS = { y: 0.34, z: 1.05 };
+const PILOT_SCALE = 0.94;
+const YOKE = { y: 0.78, z: 1.62, tiltDeg: 24 };
+
 function buildPlane(ctx: ModeContext): TransformNode {
   const body = MeshBuilder.CreateBox('aero_body', { width: 1.5, height: 1.2, depth: 7 }, ctx.scene);
   const paint = new StandardMaterial('aero_paint', ctx.scene);
@@ -82,6 +104,37 @@ function buildPlane(ctx: ModeContext): TransformNode {
   fin.position.set(0, 0.9, -3.1);
   fin.material = accent;
   fin.parent = body;
+
+  // the well the pilot sits in — dark, so the opening reads as an opening rather than a decal
+  const well = new StandardMaterial('aero_well', ctx.scene);
+  well.diffuseColor = Color3.FromHexString('#14171d');
+  well.specularColor = Color3.FromHexString('#2a3038');
+  const tub = MeshBuilder.CreateBox('aero_cockpit', { width: 0.86, height: 0.5, depth: 1.9 }, ctx.scene);
+  tub.position.set(0, 0.46, 1.0);
+  tub.material = well;
+  tub.parent = body;
+
+  // yoke: a column with a horizontal bar, where the authored pose's hands land
+  const col = MeshBuilder.CreateCylinder('aero_column', { diameter: 0.07, height: 0.5, tessellation: 8 }, ctx.scene);
+  col.position.set(0, YOKE.y - 0.22, YOKE.z - 0.1);
+  col.rotation.x = -YOKE.tiltDeg * Math.PI / 180;
+  col.material = well;
+  col.parent = body;
+  const yoke = MeshBuilder.CreateBox('aero_yoke', { width: WHEEL_RADIUS * 2, height: 0.05, depth: 0.07 }, ctx.scene);
+  yoke.position.set(0, YOKE.y, YOKE.z);
+  yoke.material = well;
+  yoke.parent = body;
+
+  // a windscreen in front of the pilot's face, so the head reads as sheltered rather than bolted on
+  const glass = new StandardMaterial('aero_glass', ctx.scene);
+  glass.diffuseColor = Color3.FromHexString('#9fd7e8');
+  glass.alpha = 0.42;
+  glass.specularColor = Color3.FromHexString('#ffffff');
+  const screen = MeshBuilder.CreateBox('aero_screen', { width: 0.8, height: 0.42, depth: 0.06 }, ctx.scene);
+  screen.position.set(0, 0.92, 1.95);
+  screen.rotation.x = -28 * Math.PI / 180;
+  screen.material = glass;
+  screen.parent = body;
 
   return body;
 }
@@ -166,6 +219,22 @@ return {
     venueRoot = buildCourseVenue(ctx.scene, course);
     rings = buildRings(ctx);
     plane = buildPlane(ctx);
+
+    // A BODY IN THE AIRCRAFT. Parented to the plane, so the airframe carries the pilot: the flight model
+    // already owns position and attitude every frame and a parented body inherits both without a second copy
+    // of that maths that could drift by a frame. The character's root is at its FEET and a seated pose does
+    // not move it, so the root goes wherever puts the HIPS in the tub — subtracting the scaled REF_HIPS_Y
+    // rather than eyeballing a height, which is the mistake that first put the kart's driver on the bodywork.
+    pilot = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
+      position: new Vector3(0, 0, 0), yawRad: 0, startClip: 'idle_stand',
+    });
+    pilot.animator.park();          // NOT stopAll — that fades to idle_stand and becomes a second owner
+    pilot.root.parent = plane;
+    pilot.root.scaling.setAll(PILOT_SCALE);
+    pilot.root.position.set(0, PILOT_HIPS.y - REF_HIPS_Y * PILOT_SCALE, PILOT_HIPS.z);
+    const seatClip = buildPoseClip(ctx.scene, pilot.skeleton, 'aero_seated', 0.5, seatedKeys());
+    if (seatClip) { seatClip.start(true, 1, 0, 0.5, false); seated = seatClip; }
+    else console.warn('[FEL-AERO] seated pose could not be built — the pilot stands');
 
     flight = spawnFlight(course.start.at, course.start.heading, FRAME);
     prevPos.copyFrom(flight.pos);
@@ -264,6 +333,8 @@ return {
 
   dispose(): void {
     plane?.dispose(); plane = null;
+    seated?.dispose(); seated = null;
+    pilot?.dispose(); pilot = null;
     venueRoot?.dispose(); venueRoot = null;
     for (const r of rings) r.dispose();
     rings = [];

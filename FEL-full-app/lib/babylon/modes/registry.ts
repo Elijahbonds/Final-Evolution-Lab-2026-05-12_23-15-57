@@ -102,7 +102,14 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   'carnival',
   // Rollout wave 6 — combat/duel modes (M53/M56)
   'karate_vs', 'mixedcombat', 'dunkduel',
-  // RETIRED (owner, 2026-09-01): showdown / duel / sprint stay in MODES for revival, but their /play routes redirect to /modes — not in ENABLED until revived.
+  // REVIVED (owner, 2026-09-13: "i want to include and improve them, wire them in"). These three were retired
+  // on 2026-09-01 for ONE stated reason — "no locked benchmark and none chosen" (PHASE2_BENCHMARK_LOCKS TIER
+  // B). Phase 0 of the convergence pass locked a benchmark and a defining mechanic for all 28 modes
+  // (docs/ROSTER-BASELINE.md), so the blocker that retired them no longer exists. All three boot clean at
+  // 60 fps, measured.
+  'sprint',      // Track & Field — rhythm, not mashing
+  'showdown',    // Naruto Storm — your partner is a resource you spend
+  'duel',        // Soul Calibur — reach decides the fight before the hands do
   // Rollout wave 7 — net-sport family (M74)
   'volleyball',
   // Rollout wave 8 — creative disciplines (M75)
@@ -119,4 +126,7 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   // never existed in this codebase; the owner asked for it, so it is built rather than revived.
   'aeroaces',
   'velocitykart',
+  // Brain Brawl was registered in MODES but never in ENABLED, so its Babylon mode was unreachable while the
+  // route quietly rendered the 2D version instead.
+  'brainbrawl',
 ]);

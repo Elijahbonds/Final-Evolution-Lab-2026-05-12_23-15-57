@@ -8,7 +8,7 @@ export type GameModeKey =
   | 'dunkContest' | 'hoops1v1' | 'streetball' | 'threePoint'
   | 'karate' | 'tennis' | 'skateboard' | 'soccer' | 'baseball'
   | 'golf' | 'freerun' | 'training' | 'carnival'
-  | 'mixedcombat' | 'dunkduel';
+  | 'mixedcombat' | 'dunkduel' | 'sprint' | 'showdown' | 'duel' | 'brainBrawl';
 
 // Modes rendered with the real-time 3D engine. Everything else stays 2D.
 const THREE_D_MODES: Partial<Record<string, boolean>> = {
@@ -62,10 +62,12 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   // FreeRun (A+ mission #10) took the gymnastics slot; big air stays on the shared AirSessionCore.
   freerun: true,
   bigAir: true,
-  // sprint: RETIRED from the v1 roster (owner, 2026-09-01) — /play/sprint redirects
-  // to /modes and the key is out of ENABLED_BABYLON_MODES; not flagged on until revived.
-  // (The old black-frame fix — a StrictMode teardown disposing the shared WebGL
-  // engine, cured by the hosts' canvas-ownership token — still stands for the revival.)
+  // REVIVED 2026-09-13 (owner: "wire them in"). The black-frame fix these were parked behind — a StrictMode
+  // teardown disposing the shared WebGL engine, cured by the hosts' canvas-ownership token — still stands.
+  sprint: true,
+  showdown: true,
+  duel: true,
+  brainBrawl: true,
   // Rollout wave 5 — Court Carnival hub (M49). New Babylon-only hub mode.
   carnival: true,
   // Rollout wave 6 — combat/duel modes (M53/M56)
