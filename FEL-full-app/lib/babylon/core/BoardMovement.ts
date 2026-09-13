@@ -46,19 +46,27 @@ export interface BoardMoveTuning {
   scrubPerSec?: boolean;
 }
 
+// SLOWER AND WEIGHTIER (owner call, 2026-09-12). A board should be heavy and you should BUILD speed rather than
+// starting at it. Measured before: the rider was at 6-8 m/s within two seconds of a standing start and crossed the
+// whole park in eight. Cruise and top speed come down about a quarter, the push gives less per kick and fades harder
+// so speed is earned over several strokes, and a touch more roll resistance means letting off actually costs you.
+// The venues grew at the same time, so a run is now a line through a place instead of a dash across one.
 export const SKATE_TUNING: BoardMoveTuning = {
-  pushAccel: 3.8, pushCooldownSec: 0.55, pumpGain: 1.6, cruiseSpeed: 7.5,
-  maxSpeed: 14, carveTurnRate: 2.4, carveHold: 1.0, scrubRate: 0.9, drag: 0.22,
+  pushAccel: 3.1, pushCooldownSec: 0.6, pumpGain: 1.6, cruiseSpeed: 5.6,
+  maxSpeed: 10.5, carveTurnRate: 2.4, carveHold: 1.0, scrubRate: 0.9, drag: 0.26,
   // SKATE-MOVE: the stroke is the board_push clip's 0.42 s; hold forward = push to cruise then roll; back = foot drag.
-  strokeSec: 0.42, pushFade: 0.6, autoPushUntil: 0.8, rollResist: 0.3, brakeDecel: 7, scrubPerSec: true,
+  strokeSec: 0.42, pushFade: 0.72, autoPushUntil: 0.8, rollResist: 0.4, brakeDecel: 7, scrubPerSec: true,
 };
+// Snow keeps more of its speed than skate — gravity is doing the work and a slope should feel fast — but the same
+// quarter comes off the top so a rider is not outrunning the run.
 export const SNOW_TUNING: BoardMoveTuning = {
-  pushAccel: 0, pushCooldownSec: 1, pumpGain: 2.2, cruiseSpeed: 10,
-  maxSpeed: 22, carveTurnRate: 1.9, carveHold: 1.02, scrubRate: 0.7, drag: 0.1,
+  pushAccel: 0, pushCooldownSec: 1, pumpGain: 2.2, cruiseSpeed: 8.4,
+  maxSpeed: 17, carveTurnRate: 1.9, carveHold: 1.02, scrubRate: 0.7, drag: 0.12,
 };
+// A surfboard is the heaviest of the three: the wave supplies the speed and the rider trades it for turns.
 export const SURF_TUNING: BoardMoveTuning = {
-  pushAccel: 0, pushCooldownSec: 1, pumpGain: 2.6, cruiseSpeed: 8,
-  maxSpeed: 16, carveTurnRate: 2.8, carveHold: 1.03, scrubRate: 0.6, drag: 0.16,
+  pushAccel: 0, pushCooldownSec: 1, pumpGain: 2.6, cruiseSpeed: 6.2,
+  maxSpeed: 12, carveTurnRate: 2.8, carveHold: 1.03, scrubRate: 0.6, drag: 0.19,
 };
 
 export class BoardMovement {

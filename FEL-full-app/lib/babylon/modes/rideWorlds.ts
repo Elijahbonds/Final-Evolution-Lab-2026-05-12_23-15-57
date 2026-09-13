@@ -18,6 +18,7 @@
 import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, TransformNode, Vector3, Matrix, Material } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
+import { SKATE_VENUES, type BoardVenue } from '../nexus/boardVenues';
 import { applyFloorDetailToMesh } from '../visual/groundTextures';
 
 export interface RideObstacle { pos: Vector3; radius: number }
@@ -31,6 +32,9 @@ export interface RideWorld {
    *  belong is knowledge the venue has and a mode does not, so the builder
    *  hands them over rather than each mode guessing coordinates. */
   crowdSpots: Vector3[];
+  /** Half-extent of the rideable world, metres. The mode's clamp and the fence read THIS, not a module constant, so a
+   *  venue can be a different size without the two disagreeing. */
+  bound: number;
   dispose(): void;
 }
 
@@ -69,97 +73,147 @@ function makeRail(scene: Scene, all: AbstractMesh[], lines: GrindLine[], a: Vect
 export const PARK_BOUND = 33;
 
 // ── SKATEPARK v2 — bowl, downhill straight, five rails ─────────────────────
-export function buildSkatepark(scene: Scene): RideWorld {
+/**
+ * THE SKATEPARK, built to a VENUE.
+ *
+ * Two things were wrong with the one fixed park this replaces, and both were measured rather than felt:
+ *
+ *   COLOUR. Every surface was a shade of one grey-purple — ground #8d8496, ramps #6f6680, bowl #5f5670, lane #79708a,
+ *   boxes #5a5266, fence #3c3947. Six materials, one value. That is why it read washed-out beside the snow run, which
+ *   has green against white against blue. Each venue now brings a real palette and the surfaces take their colours
+ *   from it, so the place has ground, structure, markings, edges and one accent that is allowed to shout.
+ *
+ *   SIZE. The park was 70 units across with the rider clamped at 33, and a rider crosses that in EIGHT SECONDS at ride
+ *   speed. The layout is now laid out in FRACTIONS of the venue's own bound, so a bigger venue is genuinely a bigger
+ *   place with more in it rather than the same furniture pushed further apart.
+ */
+export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]): RideWorld {
   const all: AbstractMesh[] = [];
   const rideable: AbstractMesh[] = [];
-  const ground = MeshBuilder.CreateGround('park_floor', { width: 70, height: 70 }, scene);
+  const P = venue.palette;
+  const B = venue.bound;
+  /** Place a feature at a fraction of the bound, so every venue keeps its proportions. */
+  const f = (frac: number): number => frac * B;
+
+  const ground = MeshBuilder.CreateGround('park_floor', { width: B * 2 + 8, height: B * 2 + 8 }, scene);
   ground.checkCollisions = true;
   ground.isPickable = true;
-  ground.material = paintGround(scene, 70, 70, (g, W, H) => {
-    g.fillStyle = '#8d8496'; g.fillRect(0, 0, W, H);
-    g.strokeStyle = 'rgba(255,255,255,0.08)'; g.lineWidth = 3;
-    for (let i = 0; i < 14; i++) { g.beginPath(); g.moveTo((i / 14) * W, 0); g.lineTo((i / 14) * W, H); g.stroke(); }
-    g.fillStyle = 'rgba(34,211,238,0.5)'; g.font = 'bold 90px sans-serif';
-    g.fillText('FEL', W * 0.42, H * 0.52);
+  ground.material = paintGround(scene, B * 2 + 8, B * 2 + 8, (g, W, H) => {
+    g.fillStyle = P.ground; g.fillRect(0, 0, W, H);
+    // slab joints, and a few of them stained — a flat grid reads as graph paper, not concrete
+    g.strokeStyle = P.line; g.globalAlpha = 0.10; g.lineWidth = 3;
+    for (let i = 1; i < 16; i++) {
+      g.beginPath(); g.moveTo((i / 16) * W, 0); g.lineTo((i / 16) * W, H); g.stroke();
+      g.beginPath(); g.moveTo(0, (i / 16) * H); g.lineTo(W, (i / 16) * H); g.stroke();
+    }
+    g.globalAlpha = 0.06; g.fillStyle = P.edge;
+    for (let i = 0; i < 90; i++) {
+      const x = Math.random() * W, y = Math.random() * H, r = 12 + Math.random() * 46;
+      g.beginPath(); g.ellipse(x, y, r, r * 0.6, Math.random() * Math.PI, 0, Math.PI * 2); g.fill();
+    }
+    // painted lines: a place people marked, which is most of what makes concrete read as a park
+    g.globalAlpha = 0.5; g.strokeStyle = P.accent; g.lineWidth = 8;
+    g.beginPath(); g.arc(W * 0.31, H * 0.63, W * 0.11, 0, Math.PI * 2); g.stroke();
+    g.beginPath(); g.moveTo(W * 0.62, H * 0.18); g.lineTo(W * 0.62, H * 0.82); g.stroke();
+    g.globalAlpha = 0.42; g.fillStyle = P.accent; g.font = `bold ${Math.round(W * 0.07)}px sans-serif`;
+    g.fillText('FEL', W * 0.44, H * 0.53);
+    g.globalAlpha = 1;
   });
-  applyFloorDetailToMesh(scene, ground, { kind: 'asphalt', blend: 0.6 }, [70, 70]);   // Pass 7 phase 2 spread: asphalt grain over the slab paint
+  applyFloorDetailToMesh(scene, ground, { kind: 'asphalt', blend: 0.55 }, [B * 2 + 8, B * 2 + 8]);
   all.push(ground); rideable.push(ground);
 
-  const rampM = mat(scene, 'rampM', '#6f6680');
-  for (const [x, z, ry] of [[-22, -26, 0], [22, -26, 0], [0, 28, Math.PI], [-28, 0, Math.PI / 2], [28, 6, -Math.PI / 2]] as const) {
+  const rampM = mat(scene, `rampM_${venue.id}`, P.structure);
+  const bankM = mat(scene, `bowlM_${venue.id}`, P.structure);
+  const laneM = mat(scene, `laneM_${venue.id}`, P.structure);
+  const boxM = mat(scene, `funM_${venue.id}`, P.structure);
+  const accentM = mat(scene, `accentM_${venue.id}`, P.accent);
+
+  // BANKS around the outside, laid out on the bound so the far ones are reachable rather than decorative
+  for (const [fx, fz, ry] of [
+    [-0.66, -0.78, 0], [0.66, -0.78, 0], [0, 0.84, Math.PI], [-0.84, 0, Math.PI / 2], [0.84, 0.18, -Math.PI / 2],
+    [-0.34, -0.34, Math.PI * 0.25], [0.42, 0.52, -Math.PI * 0.75],
+  ] as const) {
     const ramp = MeshBuilder.CreateBox('ramp', { width: 10, height: 0.6, depth: 6 }, scene);
-    ramp.position.set(x, 1.15, z);
+    ramp.position.set(f(fx), 1.15, f(fz));
     ramp.rotation.set(-0.42, ry, 0);
     ramp.material = rampM;
     ramp.checkCollisions = true;
     all.push(ramp); rideable.push(ramp);
   }
 
-  // THE BOWL — an octagon of inward-tilted banks around a sunken center;
-  // carve the rim, drop in off any bank
-  const bowlC = new Vector3(-16, 0, 14), bowlR = 6.5;
-  const bankM = mat(scene, 'bowlM', '#5f5670');
+  // THE BOWL — an octagon of inward-tilted banks around a sunken centre
+  const bowlC = new Vector3(f(-0.48), 0, f(0.42)), bowlR = 6.5;
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
     const bank = MeshBuilder.CreateBox(`bowl_${i}`, { width: 5.4, height: 0.5, depth: 3.6 }, scene);
     bank.position.set(bowlC.x + Math.sin(a) * bowlR, 0.8, bowlC.z + Math.cos(a) * bowlR);
-    bank.rotation.set(0.5, a + Math.PI, 0);         // tilted down toward the center
+    bank.rotation.set(0.5, a + Math.PI, 0);
     bank.material = bankM;
     bank.checkCollisions = true;
     all.push(bank); rideable.push(bank);
   }
 
-  // THE DOWNHILL STRAIGHT — a long descending lane; drop in at the high
-  // end and it builds real speed toward the rail beside it
-  const lane = MeshBuilder.CreateBox('dh_lane', { width: 8, height: 0.5, depth: 30 }, scene);
-  lane.position.set(20, 1.6, -6);
+  // THE DOWNHILL STRAIGHT — longer in a longer park, which is the point of a longer park
+  const laneLen = Math.max(30, B * 0.9);
+  const lane = MeshBuilder.CreateBox('dh_lane', { width: 8, height: 0.5, depth: laneLen }, scene);
+  lane.position.set(f(0.6), 1.6, f(-0.18));
   lane.rotation.set(0.14, 0, 0);
-  lane.material = mat(scene, 'laneM', '#79708a');
+  lane.material = laneM;
   lane.checkCollisions = true;
   all.push(lane); rideable.push(lane);
 
-  const boxM = mat(scene, 'funM', '#5a5266');
-  for (const [x, z] of [[0, -2], [-8, -12]] as const) {
+  // FUNBOXES and a STAIR SET — something to ollie down rather than only things to ride up
+  for (const [fx, fz] of [[0, -0.06], [-0.24, -0.36], [0.3, 0.68], [-0.6, -0.6]] as const) {
     const box = MeshBuilder.CreateBox('funbox', { width: 6, height: 1.1, depth: 4 }, scene);
-    box.position.set(x, 0.55, z);
+    box.position.set(f(fx), 0.55, f(fz));
     box.material = boxM;
-    all.push(box);
+    box.checkCollisions = true;
+    all.push(box); rideable.push(box);
+  }
+  for (let i = 0; i < 4; i++) {
+    const step = MeshBuilder.CreateBox('stair', { width: 9, height: 0.34, depth: 1.1 }, scene);
+    step.position.set(f(0.12), 0.17 + i * 0.34, f(-0.62) + i * 1.1);
+    step.material = boxM;
+    step.checkCollisions = true;
+    all.push(step); rideable.push(step);
   }
 
-  // L3 BOUNDARY — the rider was clamped at PARK_BOUND with nothing there to see,
-  // so the park ended at an invisible wall two metres inside a ground plane that
-  // visibly continued. A chain-link run on all four sides makes the edge a place
-  // rather than a stop, and it reads from the gameplay camera because it stands
-  // above the deck line.
-  const fenceM = mat(scene, 'fenceM', '#3c3947');
+  // L3 BOUNDARY — the fence reads the venue's bound, so the thing you can see and the thing that stops you agree
+  const fenceM = mat(scene, `fenceM_${venue.id}`, P.edge);
   for (const [dx, dz] of [[0, 1], [0, -1], [1, 0], [-1, 0]] as const) {
     const span = MeshBuilder.CreateBox('wall_fence', {
-      width: dx === 0 ? PARK_BOUND * 2 : 0.25,
-      height: 1.9,
-      depth: dz === 0 ? PARK_BOUND * 2 : 0.25,
+      width: dx === 0 ? B * 2 : 0.25, height: 1.9, depth: dz === 0 ? B * 2 : 0.25,
     }, scene);
-    span.position.set(dx * PARK_BOUND, 0.95, dz * PARK_BOUND);
+    span.position.set(dx * B, 0.95, dz * B);
     span.material = fenceM;
-    span.isPickable = false;      // never let the fence catch the camera's occlusion ray
+    span.isPickable = false;
     all.push(span);
   }
 
   const grindLines: GrindLine[] = [];
-  makeRail(scene, all, grindLines, new Vector3(-6, 0.8, 4), new Vector3(-6, 0.8, 12), 180);
-  makeRail(scene, all, grindLines, new Vector3(6, 0.8, -4), new Vector3(6, 0.8, -12), 180);
-  makeRail(scene, all, grindLines, new Vector3(16, 2.9, -18), new Vector3(16, 0.9, 6), 220);   // beside the downhill lane
-  makeRail(scene, all, grindLines, new Vector3(-2, 0.8, 20), new Vector3(6, 0.8, 24), 260);    // kinked pair, part 1
-  makeRail(scene, all, grindLines, new Vector3(6, 0.8, 24), new Vector3(14, 0.8, 20), 300);    // part 2 — transfer pays most
+  makeRail(scene, all, grindLines, new Vector3(f(-0.18), 0.8, f(0.12)), new Vector3(f(-0.18), 0.8, f(0.36)), 180);
+  makeRail(scene, all, grindLines, new Vector3(f(0.18), 0.8, f(-0.12)), new Vector3(f(0.18), 0.8, f(-0.36)), 180);
+  makeRail(scene, all, grindLines, new Vector3(f(0.48), 2.9, f(-0.54)), new Vector3(f(0.48), 0.9, f(0.18)), 220);
+  makeRail(scene, all, grindLines, new Vector3(f(-0.06), 0.8, f(0.6)), new Vector3(f(0.18), 0.8, f(0.72)), 260);
+  makeRail(scene, all, grindLines, new Vector3(f(0.18), 0.8, f(0.72)), new Vector3(f(0.42), 0.8, f(0.6)), 300);
+  // the HANDRAIL down the stair set — the one every skater looks for
+  makeRail(scene, all, grindLines, new Vector3(f(0.12) + 5, 1.5, f(-0.62)), new Vector3(f(0.12) + 5, 0.5, f(-0.62) + 4.4), 340);
 
-  // Where people actually watch a plaza from: the ledges and the bowl rim,
-  // clear of every line the player rides.
+  // one accent object so the eye has somewhere to land — the thing a place is known by
+  const totem = MeshBuilder.CreateCylinder('park_totem', { diameter: 0.9, height: 5.2, tessellation: 8 }, scene);
+  totem.position.set(f(-0.78), 2.6, f(0.78));
+  totem.material = accentM;
+  totem.isPickable = false;
+  all.push(totem);
+
+  // Where people watch from: the ledges and the bowl rim, clear of every line the player rides, scaled to the venue
   const crowdSpots = [
-    new Vector3(-24, 0, -4), new Vector3(-24, 0, -1.4), new Vector3(-22.4, 0, 1),
-    new Vector3(12, 0, 22), new Vector3(14.2, 0, 22.6), new Vector3(16, 0, 21.4),
-    new Vector3(-9.5, 0, 18), new Vector3(-7.2, 0, 19.2),
-    new Vector3(26, 0, -14), new Vector3(27.4, 0, -11.6),
-  ];
-  return { ground: rideable, grindLines, markers: [], obstacles: [], crowdSpots, dispose: () => all.forEach((m) => m.dispose()) };
+    new Vector3(f(-0.72), 0, f(-0.12)), new Vector3(f(-0.72), 0, f(-0.04)), new Vector3(f(-0.67), 0, f(0.03)),
+    new Vector3(f(0.36), 0, f(0.66)), new Vector3(f(0.43), 0, f(0.68)), new Vector3(f(0.48), 0, f(0.64)),
+    new Vector3(f(-0.29), 0, f(0.54)), new Vector3(f(-0.22), 0, f(0.58)),
+    new Vector3(f(0.78), 0, f(-0.42)), new Vector3(f(0.83), 0, f(-0.35)),
+  ].slice(0, Math.max(2, venue.crowd));
+  return { ground: rideable, grindLines, markers: [], obstacles: [], crowdSpots, bound: B, dispose: () => all.forEach((m) => m.dispose()) };
 }
 
 // ── SLOPE v2 — rocks, rails, kickers, the ski-lift grind, the yeti den ─────
@@ -358,7 +412,7 @@ export function buildSlopeRun(scene: Scene): RideWorld {
   for (const [side, dist] of [[-1, 55], [-1, 58], [1, 60], [1, 120], [-1, 124], [1, 127], [-1, 190], [1, 193]] as const) {
     crowdSpots.push(onPiste(side * 13 + side * Math.random() * 1.5, dist));
   }
-  return { ground: rideable, grindLines, markers, obstacles, crowdSpots, dispose: () => all.forEach((m) => m.dispose()) };
+  return { ground: rideable, grindLines, markers, obstacles, crowdSpots, bound: PISTE_HALF_WIDTH, dispose: () => all.forEach((m) => m.dispose()) };
 }
 
 // ── SURF v3 — the curling funnel wave + buoys ──────────────────────────────
@@ -579,7 +633,7 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   }
 
   const world: RideWorld = {
-    ground: [face, water], grindLines: [], markers: [], obstacles, crowdSpots,
+    ground: [face, water], grindLines: [], markers: [], obstacles, crowdSpots, bound: 70,
     dispose: () => { all.forEach((m) => m.dispose()); waveRoot.dispose(); },
   };
   const BARREL_ON = 8, BARREL_CYCLE = 18;

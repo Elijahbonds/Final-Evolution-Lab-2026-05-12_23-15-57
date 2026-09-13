@@ -134,11 +134,15 @@ ok(!scene.meshes.some((m) => m.name === 'rail_patrol'), 'E5 dispose() takes it a
 const park = buildSkatepark(scene);
 const fences = scene.meshes.filter((m) => m.name === 'wall_fence');
 ok(fences.length === 4, `E6 the park is fenced on four sides (got ${fences.length})`);
+// The bound is per VENUE now, not a module constant — a bigger place is genuinely bigger — so the invariant is that
+// the fence stands on THE WORLD'S OWN bound, which is the thing the mode clamps against. Asserting a hardcoded 33
+// would only ever be testing that nobody had built a second venue.
 for (const f of fences) {
-  const onBound = Math.abs(Math.abs(f.position.x) - PARK_BOUND) < 0.01
-                || Math.abs(Math.abs(f.position.z) - PARK_BOUND) < 0.01;
-  ok(onBound, `E7 fence at (${f.position.x}, ${f.position.z}) stands on PARK_BOUND ${PARK_BOUND}`);
+  const onBound = Math.abs(Math.abs(f.position.x) - park.bound) < 0.01
+                || Math.abs(Math.abs(f.position.z) - park.bound) < 0.01;
+  ok(onBound, `E7 fence at (${f.position.x}, ${f.position.z}) stands on the world bound ${park.bound}`);
 }
+ok(park.bound > PARK_BOUND, `E7b the venue is bigger than the old fixed park (${park.bound} > ${PARK_BOUND})`);
 // The camera probes occlusion against anything matching wall_*; a fence that
 // caught that ray would yank the camera in every time the rider neared an edge.
 ok(fences.every((f) => !f.isPickable), 'E8 the fence never catches the camera occlusion ray');

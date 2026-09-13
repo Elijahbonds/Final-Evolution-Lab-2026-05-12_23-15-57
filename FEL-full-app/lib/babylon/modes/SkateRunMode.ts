@@ -17,6 +17,7 @@ import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, landsSwitch, TRICKS, type BoardRig } from './boardCore';
 import { trickFor, bestFitting, basePts as trickPts, heldTrickDir, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { buildSkatepark, PARK_BOUND, type RideWorld } from './rideWorlds';
+import { readBoardVenue } from '../nexus/boardVenues';   // different places to ride
 import { assertSpawned } from '../core/FrameGuard';
 import { SPORT_CLIP } from '../anim/clipRegistry';
 import { FlickStick } from '../core/FlickStick';
@@ -216,7 +217,10 @@ export const SkateRunMode: ModeDefinition = (() => {
     modeId: 'skateboard', mood: 'goldenHour', camPreset: 'board',
 
     async load(ctx: ModeContext) {
-      world = buildSkatepark(ctx.scene);
+      // the player's venue: a different palette, a different size, a different place
+      const venue = readBoardVenue('skate');
+      world = buildSkatepark(ctx.scene, venue);
+      console.info(`[SKATE-VENUE] ${venue.name} · bound ${venue.bound} · ${venue.mood}`);
       propsGone = false; void mountVenueProps(ctx.scene, 'skatepark').then((h) => { if (propsGone) h?.dispose(); else props = h; });
       // Gate 0: Validate skeletal rig by spawning placeholder to check skeleton
       const _validateChar = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, -1000, 0) });
@@ -781,8 +785,8 @@ export const SkateRunMode: ModeDefinition = (() => {
       // working, the world stopped moving, and nothing told the player why. A wall you cannot feel is worse than a
       // wall you can see.
       const beforeX = rig.char.root.position.x, beforeZ = rig.char.root.position.z;
-      rig.char.root.position.x = Math.max(-PARK_BOUND, Math.min(PARK_BOUND, rig.char.root.position.x));
-      rig.char.root.position.z = Math.max(-PARK_BOUND, Math.min(PARK_BOUND, rig.char.root.position.z));
+      rig.char.root.position.x = Math.max(-world.bound, Math.min(world.bound, rig.char.root.position.x));
+      rig.char.root.position.z = Math.max(-world.bound, Math.min(world.bound, rig.char.root.position.z));
       const hitX = rig.char.root.position.x !== beforeX, hitZ = rig.char.root.position.z !== beforeZ;
       if (hitX || hitZ) {
         // kill the speed INTO the fence and keep whatever runs along it, so a rider scrubs along the edge rather than
