@@ -12,8 +12,7 @@
 // The kart is primitives, like the aircraft and for the same reason: there is no kart in public/models/meshy,
 // and the no-placeholder rule here is about BODIES, not vehicles.
 
-import { Color3, MeshBuilder, TransformNode, Vector3 } from '@babylonjs/core';
-import type { PBRMaterial } from '@babylonjs/core';
+import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, Texture, TransformNode, Vector3, Vector4 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { buildPoseClip, REF_HIPS_Y } from '../anim/poseClip';
@@ -49,6 +48,7 @@ let driver: SpawnedCharacter | null = null;
 let seated: AnimationGroup | null = null;
 let steerWheel: Mesh | null = null;
 let venueRoot: TransformNode | null = null;
+let roadTex: DynamicTexture | null = null;
 /** The picked kart's handling. Defaults to the starter, so a mode with no pick is byte-identical to before. */
 let kartSpec: KartSpec = KART_STARTER;
 let race: RaceProgress = startRace();
@@ -87,8 +87,16 @@ function buildKart(ctx: ModeContext): TransformNode {
 
   // PBR, not StandardMaterial: these venues light for PBR (directional 2.60 + hemispheric 0.85) and a
   // StandardMaterial clips to white under that — this kart rendered WHITE instead of red. See VenueKit.paint.
+  //
+  // PBR alone was not enough: it came back PINK, for the same reason the tarmac came back sky-blue. The
+  // venues' IBL is tuned for their own props, and a vehicle the camera sits three metres behind takes the
+  // sky's colour straight across its flanks. Pulling the environment down is what lets the paint be the
+  // colour it says it is; the road does the same thing for the same reason (see paintTarmac).
   const paint = VenueKit.paint(ctx.scene, 'kart_paint', '#f25f5c', 0.08, 0.45);
+  paint.environmentIntensity = 0.4;
+  paint.specularIntensity = 0.5;
   const dark = VenueKit.paint(ctx.scene, 'kart_tyre', '#15181f', 0.05, 0.92);
+  dark.environmentIntensity = 0.3;
 
   const part = (name: string, dims: { width: number; height: number; depth: number }, at: [number, number, number], mat: PBRMaterial): Mesh => {
     const m = MeshBuilder.CreateBox(name, dims, ctx.scene);
@@ -150,12 +158,81 @@ function buildKart(ctx: ModeContext): TransformNode {
   return rig;
 }
 
+/**
+ * THE TARMAC, painted rather than tinted (2026-09-13).
+ *
+ * A flat albedo cannot survive these venues. Measured on the live stadium map: no fog, ACES tone mapping,
+ * exposure 1.15 — and a hemispheric at 0.55 in PALE BLUE (#9fb7ff) under a directional at 2.20, about 3.6x of
+ * light landing on a 0.16-luminance surface. The venue's own ground gets away with the same lighting because
+ * it is a PHOTO with dark pixels in it; a single mid-dark colour has nothing to hold the value down, so the
+ * road came out the pale blue-lavender of the sky and the whole course read as a sheet of plastic. Switching
+ * StandardMaterial to PBR fixed the kart's paint and did nothing for this, which is how I know it is the flat
+ * fill and not the material model.
+ *
+ * So the road gets a real surface: dark asphalt with tonal variation, a dashed centre line, and — the part
+ * that is gameplay and not decoration — SOLID WHITE EDGE LINES at the track boundary. `onTrack()` is what
+ * decides whether you keep your grip and your top speed, and until now the line it tests was invisible: you
+ * found the edge by losing the car. The texture's u runs across the full 2 x TRACK_HALF_WIDTH, so the painted
+ * edge IS the tested edge, the same way the road polyline is the gate polyline.
+ */
+const ROAD_TEX_PX = 512;
+
+function paintTarmac(scene: ModeContext['scene']): DynamicTexture {
+  const tex = new DynamicTexture('kart_tarmac_tex', { width: ROAD_TEX_PX, height: ROAD_TEX_PX }, scene, true);
+  const g = tex.getContext() as unknown as CanvasRenderingContext2D;
+  const S = ROAD_TEX_PX;
+  let seed = 7;
+  const rnd = (): number => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+
+  g.fillStyle = '#14171c';                                  // dark, because 3.6x of light is coming
+  g.fillRect(0, 0, S, S);
+  // aggregate: broad patches first, then speckle. Patches are what stop a surface reading as noise-over-flat.
+  for (let i = 0; i < 260; i++) {
+    const r = 6 + rnd() * 34;
+    g.fillStyle = `rgba(${rnd() < 0.5 ? '44,48,56' : '10,12,15'},${0.10 + rnd() * 0.16})`;
+    g.beginPath(); g.arc(rnd() * S, rnd() * S, r, 0, Math.PI * 2); g.fill();
+  }
+  // speckle in ONE buffer pass: 28k fillRects painted per-frame is what killed an earlier floor (DUNK-VISUAL-POLISH)
+  const img = g.getImageData(0, 0, S, S);
+  const px = img.data;
+  for (let i = 0; i < px.length; i += 4) {
+    const n = (rnd() - 0.5) * 26;
+    px[i] = Math.max(0, Math.min(255, px[i] + n));
+    px[i + 1] = Math.max(0, Math.min(255, px[i + 1] + n));
+    px[i + 2] = Math.max(0, Math.min(255, px[i + 2] + n));
+  }
+  g.putImageData(img, 0, 0);
+
+  // EDGE LINES at the track boundary — u = 0 and u = 1 are the two edges onTrack() tests
+  const edge = Math.round(S * 0.035);
+  g.fillStyle = 'rgba(232,236,242,0.88)';
+  g.fillRect(0, 0, edge, S);
+  g.fillRect(S - edge, 0, edge, S);
+  // and the dashed centre line, which is what gives the road SPEED at 26 m/s
+  g.fillStyle = 'rgba(226,214,150,0.72)';
+  const dash = Math.round(S * 0.17), gap = Math.round(S * 0.13), w = Math.round(S * 0.018);
+  for (let y = 0; y < S; y += dash + gap) g.fillRect(S / 2 - w / 2, y, w, dash);
+
+  tex.update(false);
+  tex.wrapU = Texture.CLAMP_ADDRESSMODE;    // across the road: one span, never tiled, or the edge lines repeat
+  tex.wrapV = Texture.WRAP_ADDRESSMODE;     // along the road: tiles with the segment's length
+  tex.anisotropicFilteringLevel = 8;
+  return tex;
+}
+
 /** The road: a slab per segment of the centre line, so what you SEE is what onTrack() tests. */
 function buildRoad(ctx: ModeContext): Mesh[] {
   const out: Mesh[] = [];
-  // the tarmac was the worst StandardMaterial casualty: #2a2f38 × the venue's 3.45 of light came out a pale
-  // blue-grey, so the whole course read as a sheet of sky-coloured plastic rather than a road
-  const tarmac = VenueKit.paint(ctx.scene, 'kart_tarmac', '#2a2f38', 0.05, 0.95);
+  roadTex = paintTarmac(ctx.scene);
+  const tarmac = new PBRMaterial('kart_tarmac', ctx.scene);
+  tarmac.albedoTexture = roadTex;
+  tarmac.albedoColor = Color3.White();
+  tarmac.metallic = 0;
+  tarmac.roughness = 0.92;
+  // the venue's IBL is tuned for its own props; a road is 300 m of it, and at full strength the sky's colour
+  // is exactly what was washing the tarmac out
+  tarmac.environmentIntensity = 0.35;
+  tarmac.specularIntensity = 0.22;
   const pts = [course.start.at, ...course.gates.map((g) => g.at)];
   for (let i = 0; i < pts.length; i++) {
     const a = pts[i], b = pts[(i + 1) % pts.length];
@@ -163,7 +240,14 @@ function buildRoad(ctx: ModeContext): Mesh[] {
     const dx = b.x - a.x, dz = b.z - a.z;
     const len = Math.hypot(dx, dz);
     if (len < 0.5) continue;
-    const slab = MeshBuilder.CreateBox(`kart_road_${i}`, { width: TRACK_HALF_WIDTH * 2, height: 0.08, depth: len }, ctx.scene);
+    // ONE material, but the tiling is baked into each slab's UVs at creation — so a 220 m straight and a 60 m
+    // arc carry the same SIZE of dash rather than the same NUMBER of them. Scaling the shared texture instead
+    // would make every slab agree, which is the wrong thing to agree about.
+    const tiles = Math.max(1, Math.round(len / (TRACK_HALF_WIDTH * 2)));
+    const faceUV = Array.from({ length: 6 }, () => new Vector4(0, 0, 1, tiles));
+    const slab = MeshBuilder.CreateBox(`kart_road_${i}`, {
+      width: TRACK_HALF_WIDTH * 2, height: 0.08, depth: len, faceUV, wrap: true,
+    }, ctx.scene);
     slab.position.set((a.x + b.x) / 2, 0.04, (a.z + b.z) / 2);
     slab.rotation.y = Math.atan2(dx, dz);
     slab.material = tarmac;
@@ -374,6 +458,7 @@ return {
     driver?.dispose(); driver = null;
     steerWheel = null;
     venueRoot?.dispose(); venueRoot = null;
+    roadTex?.dispose(); roadTex = null;
     state = null;
   },
 };
