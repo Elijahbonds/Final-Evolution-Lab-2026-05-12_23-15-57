@@ -10,7 +10,9 @@
 // earned/built on. Bump CURRICULUM_VERSION when content changes meaning, not
 // wording.
 
-export const CURRICULUM_VERSION = '2026.09-draft1';
+// Bumped for Module 4 (the four mechanism lessons). Content changed MEANING, not wording, which is the
+// documented trigger. Facilitator certification is unaffected: m4 is not required for it.
+export const CURRICULUM_VERSION = '2026.09-draft2';
 export const PASS_MARK = 80;
 
 export interface AssessmentQuestion {
@@ -221,6 +223,100 @@ const pillars: BlueprintTrack = {
           assessment: [
             q('re1', 'A template built on curriculum 2026.09 is imported under 2027.01. What happens?', ['It imports silently', 'The facilitator reconciles differences first', 'It is deleted', 'It downgrades the curriculum'], 1),
             q('re2', 'Forking a template…', ['is forbidden', 'keeps the author\'s credit and records the source', 'erases the original', 'requires owner approval'], 1),
+          ],
+        },
+      ],
+    },
+    {
+      // MODULE 4 — THE MECHANISMS (2026-09-13). The Coaching brief calls for a 12-module Academy and names
+      // the topics: movement mechanics, vertical explosion, neuromuscular control, breathwork, force
+      // absorption. The eight PILLAR lessons in m1 and m2 cover WHAT a body produces (one per PRQ
+      // attribute); these four cover HOW it produces it, which is the stated goal of movement autonomy —
+      // an athlete learning why their body makes power, not only what to follow. Eight plus four is twelve.
+      //
+      // A NEW MODULE KEY RATHER THAN A RENUMBER, deliberately: `Credential.moduleKey` and
+      // `LessonProgress.lessonKey` are persisted, so inserting these as "m3" and pushing Facilitating to m4
+      // would orphan every credential already earned. m3 stays exactly where it is.
+      //
+      // requiredForCertification is FALSE. These are athlete-facing mechanics; a facilitator certified
+      // against the previous version stays certified, which is the other half of not breaking earned work.
+      key: 'm4', title: 'Module 4 — The Mechanisms', requiredForCertification: false,
+      summary: 'How the body actually produces what the pillars measure: absorbing force, the step that sets a jump, elastic control, and the breath underneath all of it.',
+      lessons: [
+        {
+          ref: 'blueprint/m4/absorption', title: 'Force absorption — landing is a skill',
+          body: [
+            'Everyone trains the jump. Almost nobody trains the landing, and the landing is where the larger forces are: coming down from height, a body meets several times its own weight in a fraction of a second, and it either distributes that through ankle, knee and hip together or it sends it somewhere that was not ready.',
+            'Absorption is a SKILL, which means it is learnable and it is visible. A good landing is quiet, the joints share the work, and the athlete is already balanced at the bottom. A poor one is loud, lands stiff, and needs a second step to recover. The Mirror reads the difference as drift at the lumbo-pelvic and posterior-chain zones.',
+            'This is why the depth drop is the most gated protocol in the catalogue. It is not that it is dangerous to think about — it is that it asks for absorption at its limit, and asking for that before the pattern exists teaches the pattern wrong.',
+          ],
+          keyPoints: [
+            'The landing carries more force than the take-off.',
+            'Quiet, shared across three joints, balanced at the bottom — that is the whole read.',
+            'Train absorption before height; height only proves what absorption already built.',
+          ],
+          drill: { modeKey: 'freerun', text: 'Take six drops from the mid rail and land each one balanced enough to keep moving without a recovery step.' },
+          assessment: [
+            q('fa1', 'Where are the larger forces in a jump?', ['The take-off', 'The landing', 'The approach', 'The arm swing'], 1),
+            q('fa2', 'What does a good landing look like?', ['Loud and stiff, absorbed by the knees alone', 'Quiet, shared across ankle, knee and hip, balanced at the bottom', 'Fast, with a recovery step', 'Deep, with the heels up'], 1),
+            q('fa3', 'Why is the depth drop gated on readiness?', ['It is dangerous to attempt at all', 'It asks for absorption at its limit, and asking early teaches the pattern wrong', 'It needs special equipment', 'It only works for tall athletes'], 1),
+          ],
+        },
+        {
+          ref: 'blueprint/m4/vertical', title: 'Vertical explosion — the step before the step',
+          body: [
+            'A vertical jump is decided before the foot that jumps ever lands. The PENULTIMATE step — the second to last — is where an athlete lowers their centre of mass and sets the angle everything after it inherits. Long and low, and the final plant has something to push against. Short and tall, and the jump is whatever the legs can produce from standing.',
+            'This is the most coachable centimetre in the sport, and it is almost never coached, because it happens too fast to see and too early to feel. It is why Flight Night scores the run-up at all: the charge and the approach angle are not decoration, they are the jump.',
+            'A mentor watching for it is not watching the jump. They are watching two steps earlier, and they are watching height of hips rather than speed of feet.',
+          ],
+          keyPoints: [
+            'The penultimate step sets the plant; the plant only spends what it was given.',
+            'Long and low beats short and tall.',
+            'Watch the hips two steps out, not the feet at take-off.',
+          ],
+          drill: { modeKey: 'dunk', text: 'Run the approach three times watching only the second-to-last step. Land the charge on a long, low penultimate and compare the card.' },
+          assessment: [
+            q('ve1', 'Which step decides a vertical jump?', ['The final plant', 'The penultimate step', 'The first step of the run-up', 'The step after landing'], 1),
+            q('ve2', 'What shape should the penultimate step have?', ['Short and tall', 'Long and low', 'Sideways', 'As fast as possible'], 1),
+            q('ve3', 'Where should a mentor look?', ['The hands at take-off', 'The hips two steps out', 'The rim', 'The landing'], 1),
+          ],
+        },
+        {
+          ref: 'blueprint/m4/neuromuscular', title: 'Neuromuscular control — elasticity, not effort',
+          body: [
+            'Some movement is produced by pushing harder. Some is produced by the tissue itself returning energy it just stored — the stretch-shortening cycle, where a rapid load is immediately reversed and the body gets some of that load back for free. Short ground contacts, small amplitudes, repeated: that is oscillatory work, and it trains timing rather than force.',
+            'The mistake is to do it hard. Oscillatory work done with maximum effort stops being elastic and becomes a set of small heavy repetitions, which trains the opposite of what it is for. The instruction is rhythm and quickness off the floor, not height.',
+            'This is the pillar the PRQ agility and power axes read together, and it is the clearest example of why the lab measures separately: an athlete can be strong and slow to react, or quick and unable to hold the position they react into.',
+          ],
+          keyPoints: [
+            'Elastic return is energy you already paid for — the skill is not losing it.',
+            'Short contacts, small amplitude, rhythm over height.',
+            'Done at maximum effort it stops being elastic work at all.',
+          ],
+          drill: { modeKey: 'threepoint', text: 'Run a rack keeping the feet quick and the release rhythm identical on every shot — the timing is the drill, not the power.' },
+          assessment: [
+            q('nc1', 'What is the stretch-shortening cycle?', ['Pushing harder against resistance', 'A rapid load immediately reversed, returning stored energy', 'Holding a stretch before effort', 'Slow eccentric lowering'], 1),
+            q('nc2', 'How should oscillatory work be performed?', ['Maximum effort every rep', 'Short contacts, small amplitude, rhythm over height', 'As slowly as possible', 'Only after failure'], 1),
+            q('nc3', 'Why does the lab measure agility and power separately?', ['They are the same thing', 'An athlete can be strong but slow to react, or quick but unable to hold the position', 'One is for jumping and one is for running', 'Only one is trainable'], 1),
+          ],
+        },
+        {
+          ref: 'blueprint/m4/breath', title: 'Breathwork — the brace underneath everything',
+          body: [
+            'Breath is not a warm-up ritual. It is the mechanism that sets rib position over the pelvis, and rib position is what decides whether a brace has anything to brace against. An athlete stacked and exhaled can transmit force through the middle; an athlete holding air high in a lifted chest is producing force into a section that gives.',
+            'The practical version is short: a full exhale to empty, ribs settling down rather than flaring, and the effort happening on that exhale. Every corrective in the Mirror pairs with a breath for this reason — the position is not held by trying harder, it is held by breathing in a way that makes the position available.',
+            'It is also the only lesson here an athlete can practise with no equipment, no readiness threshold and no supervision, which is why the breathing reset is the one protocol in the catalogue that is never gated.',
+          ],
+          keyPoints: [
+            'Rib position over the pelvis is what a brace braces against.',
+            'Full exhale, ribs down, effort on the exhale.',
+            'Never gated — it is the one thing always available on any day.',
+          ],
+          drill: { modeKey: 'karate', text: 'Run a full wave exhaling on every strike and inhaling only on the reset. The rhythm should feel slower and the guard should hold longer.' },
+          assessment: [
+            q('bw1', 'What does breath actually set?', ['Heart rate only', 'Rib position over the pelvis, which the brace works against', 'Muscle temperature', 'Grip strength'], 1),
+            q('bw2', 'When should the effort happen?', ['On the inhale', 'On the exhale', 'While holding the breath', 'It does not matter'], 1),
+            q('bw3', 'Why is the breathing reset never gated on readiness?', ['It is not important enough to gate', 'It needs no equipment, no threshold and no supervision — it is available on any day', 'It only works when you are tired', 'It is gated, at PRQ 40'], 1),
           ],
         },
       ],

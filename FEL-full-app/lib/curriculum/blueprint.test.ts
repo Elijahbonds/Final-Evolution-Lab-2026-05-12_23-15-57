@@ -38,3 +38,81 @@ describe('the Blueprint curriculum', () => {
     expect(gradeModule('blueprint', 'nope', {})).toEqual({ score: 0, passed: false, graded: [] });
   });
 });
+
+// ── THE 12-LESSON ACADEMY (2026-09-13) ──────────────────────────────────────
+//
+// The Coaching brief calls for a 12-module Academy; the Blueprint shipped with EIGHT athlete lessons (one
+// per PRQ attribute, m1 + m2). Module 4 adds the four mechanism lessons the brief names. These tests hold
+// the count and — more importantly — hold the two things that could quietly break work people already own.
+
+import { CURRICULUM as C12, allLessons as all12, requiredModules as req12, gradeModule as grade12, PASS_MARK as PM12 } from './blueprint';
+
+describe('the Academy is twelve athlete lessons', () => {
+  const blueprint = C12.tracks.find((t) => t.key === 'blueprint')!;
+  const athleteModules = blueprint.modules.filter((m) => m.key !== 'm3');   // m3 is the facilitator track
+
+  it('eight pillars plus four mechanisms', () => {
+    const lessons = athleteModules.flatMap((m) => m.lessons);
+    expect(lessons).toHaveLength(12);
+  });
+
+  it('the four new ones are the topics the brief names', () => {
+    const m4 = blueprint.modules.find((m) => m.key === 'm4')!;
+    expect(m4.lessons.map((l) => l.ref)).toEqual([
+      'blueprint/m4/absorption',
+      'blueprint/m4/vertical',
+      'blueprint/m4/neuromuscular',
+      'blueprint/m4/breath',
+    ]);
+  });
+
+  it('EXISTING LESSON REFS ARE UNCHANGED — credentials and progress are keyed on them', () => {
+    // inserting the new module as "m3" and pushing Facilitating to m4 would have orphaned every credential
+    // already earned. These eleven refs must survive every future edit to this file.
+    const refs = all12().map((l) => l.ref);
+    for (const ref of [
+      'blueprint/m1/strength', 'blueprint/m1/power', 'blueprint/m1/speed', 'blueprint/m1/endurance',
+      'blueprint/m2/agility', 'blueprint/m2/flexibility', 'blueprint/m2/recovery', 'blueprint/m2/mental',
+      'blueprint/m3/intake', 'blueprint/m3/session', 'blueprint/m3/replication',
+    ]) {
+      expect(refs, ref).toContain(ref);
+    }
+  });
+
+  it('FACILITATOR CERTIFICATION IS UNAFFECTED — m4 is not required for it', () => {
+    // somebody certified against the previous curriculum version stays certified
+    expect(req12()).not.toContain('blueprint/m4');
+    expect(req12()).toEqual(['blueprint/m1', 'blueprint/m2', 'blueprint/m3']);
+  });
+
+  it('every new lesson is real teaching, not a title', () => {
+    const m4 = C12.tracks.find((t) => t.key === 'blueprint')!.modules.find((m) => m.key === 'm4')!;
+    for (const l of m4.lessons) {
+      expect(l.body.length, l.ref).toBeGreaterThanOrEqual(3);
+      expect(l.body.join(' ').length, l.ref).toBeGreaterThan(600);
+      expect(l.keyPoints.length, l.ref).toBeGreaterThanOrEqual(3);
+      expect(l.assessment.length, l.ref).toBeGreaterThanOrEqual(3);
+      expect(l.drill.modeKey, l.ref).toBeTruthy();
+    }
+  });
+
+  it('and the new module grades like any other', () => {
+    const m4 = C12.tracks.find((t) => t.key === 'blueprint')!.modules.find((m) => m.key === 'm4')!;
+    const allRight = Object.fromEntries(m4.lessons.flatMap((l) => l.assessment).map((a) => [a.key, a.answer]));
+    const perfect = grade12('blueprint', 'm4', allRight);
+    expect(perfect.score).toBe(100);
+    expect(perfect.passed).toBe(true);
+    const nothing = grade12('blueprint', 'm4', {});
+    expect(nothing.score).toBe(0);
+    expect(nothing.passed).toBe(false);
+    expect(PM12).toBe(80);
+  });
+
+  it('no clinical language in the new lessons', () => {
+    const m4 = C12.tracks.find((t) => t.key === 'blueprint')!.modules.find((m) => m.key === 'm4')!;
+    const text = JSON.stringify(m4).toLowerCase();
+    for (const bad of ['diagnos', 'patholog', 'symptom', 'therap', 'patient', 'disorder', 'treat ']) {
+      expect(text, bad).not.toContain(bad);
+    }
+  });
+});
