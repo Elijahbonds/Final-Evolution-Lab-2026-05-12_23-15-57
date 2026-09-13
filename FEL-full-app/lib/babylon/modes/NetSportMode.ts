@@ -21,6 +21,12 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
+import { mountPostureLayer } from '../anim/PostureLayer';
+import { fieldPose, netWindow, fieldBank, NET_REACH_M } from '../core/FieldPosture';
+import {
+  TENNIS_FOOTWORK, VOLLEY_FOOTWORK, FOOTWORK_IDLE, stepFootwork, splitTimed, splitBoostActive,
+  reachOf, gradeAfterStretch, recoveryX, aiTargetX, MAX_REACH_M, type FootworkState,
+} from '../core/CourtFootwork';
 
 /** Seconds before the blocker can commit to the net again. */
 const BLOCK_COOLDOWN_SEC = 7;
@@ -169,7 +175,24 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let gameLatch = false;
 
   const HERO_SIDE = 1;             // hero defends +Z, opponent defends −Z
-  const SHUFFLE_SPEED = 4;         // m/s along the baseline at full stick
+
+  // ── FOOTWORK (2026-09-13) ────────────────────────────────────────────────
+  // This file used to say, in its own words, that Zone Speed and the trick-shot dash were out of scope because
+  // "this mode has no player positioning to reach with". It does now. The old shuffle moved the body at a flat
+  // 4 m/s with no momentum and, crucially, WITHOUT THE BALL CARING — every shot arrived in the stance wherever
+  // the player happened to be standing, so planShot's careful depth and angle landed on nobody.
+  const FOOT = o.cfg.touchesPerSide > 1 ? VOLLEY_FOOTWORK : TENNIS_FOOTWORK;
+  let foot: FootworkState = { ...FOOTWORK_IDLE };
+  /** Seconds since the OPPONENT last struck — the split step is timed against this. */
+  let sinceOppStrike = Infinity;
+  /** Where the player should recover to after their own shot (the bisector, not the middle). */
+  let recoverTo = 0;
+  /** How far the last contact was from the body, for the HUD and the posture window. */
+  let lastReach = 0;
+  let posture: { dispose(): void } | null = null;
+  /** A mark on the player's own baseline showing the bisector to recover to. */
+  let recoverMark: AbstractMesh | null = null;
+  let swingingNow = false, splittingNow = 0;
 
   function label(): string {
     if (tennisScore) return tennisScore.callFor(0);
@@ -292,6 +315,17 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // Who is receiving decides whether WE get a swing window this flight.
     awaitingHuman = toSide > 0;
 
+    // WHERE TO RECOVER TO. Not the middle of the court: the bisector of the angles they can now hit into,
+    // which shades toward the side you just hit to. Standing in the middle after a sharp cross-court is the
+    // most common mistake a club player makes, and the marker is here so the player can learn the habit
+    // rather than be told about it.
+    if (toSide < 0) {
+      recoverTo = recoveryX(planned.to.x, o.cfg.halfWidth);
+      if (recoverMark) { recoverMark.position.x = recoverTo; recoverMark.isVisible = true; }
+    } else if (recoverMark) {
+      recoverMark.isVisible = false;                 // the ball is coming: play it, do not admire the marker
+    }
+
     if (fault) {
       // The ball still flies — it just ends in a fault when it lands. Playing
       // the flight out is what makes a net-cord read as a near miss instead of
@@ -402,7 +436,15 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // A+ mission #6: the opponent picks a shot (tennis) and the HUD tells it, with the answer that beats it
     const aiShot: TennisShot | undefined = aiIsVolley ? undefined : pickAiShot();
     if (aiShot) ctx.setHud({ incomingShot: aiShot.toUpperCase(), incomingTell: tellFor(aiShot), answer: `${SHOT_FACE[answerFor(aiShot)]} · ${answerFor(aiShot).toUpperCase()}` });
-    launch(ctx, ball.getAbsolutePosition(), aiCrosses ? 1 : -1, (Math.random() - 0.5) * 1.6, q, aiIsVolley ? aiTouch : undefined, aiShot, aiZone);
+    // AIM INTO THE SPACE THE PLAYER LEFT. This was `(Math.random() - 0.5) * 1.6` — a coin flip, which is the
+    // only aim that makes sense when the player has no position to be out of. It now plays the open court,
+    // committing harder the further out of position the player is, and never paints the line (AI_LINE_SAFETY):
+    // an opponent who hits the chalk every ball is not playing tennis.
+    sinceOppStrike = 0;                              // the split step is timed against THIS moment
+    const aiIntent = aiCrosses
+      ? aiTargetX(foot.x, o.cfg.halfWidth, q === 'perfect' ? 1 : q === 'good' ? 0.75 : 0.45) / o.cfg.halfWidth
+      : (Math.random() - 0.5) * 1.6;                 // a self-pass is not aimed at the opponent
+    launch(ctx, ball.getAbsolutePosition(), aiCrosses ? 1 : -1, aiIntent, q, aiIsVolley ? aiTouch : undefined, aiShot, aiZone);
   }
 
   /**
@@ -508,9 +550,22 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     if (!shot || !awaitingHuman) return;
     // dt vs the ideal contact moment, which is the end of the flight
     const dt = (flightT - 1) * shot.duration;
-    const q = gradeSwing(dt);
+    const timing = gradeSwing(dt);
 
-    if (q === 'miss') return;                       // early flail; not a fault yet
+    // THE STRETCH. Timing was the whole game here; now WHERE YOU ARE multiplies it. A perfect swing at full
+    // stretch is not a perfect shot — you got your racket on it, which is not the same as hitting it — and a
+    // ball further away than MAX_REACH_M cannot be touched at all, however well it was timed. This is the
+    // line that makes planShot's placement mean something for the first time.
+    lastReach = reachOf(foot.x, ball.position.x);
+    const q = gradeAfterStretch(timing as 'perfect' | 'good' | 'early' | 'late' | 'miss', lastReach);
+
+    if (q === 'miss') return;                       // early flail, or never got there; not a fault yet
+    if (timing !== q) {
+      ctx.setHud({ shotType: lastReach > NET_REACH_M ? 'STRETCHED' : 'REACHING' });
+      setTimeout(() => ctx.setHud({ shotType: '' }), 450);
+    }
+    swingingNow = true;
+    setTimeout(() => { swingingNow = false; }, 320);
 
     // WHICH touch this is decides what the swing DOES. Previously every human
     // swing called rally.cross(), and cross() zeroes the touch counter, so the
@@ -658,6 +713,37 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ended = false; restSec = 0.8; shot = null; aimX = 0; heroStreak = 0; gameLatch = false;
 
       ctx.heroRef.current = me.root;
+      // THE BODY. Neither net sport mounted a posture layer, so between shots the chest, the neck and the head
+      // sat wherever the last swing clip left them — no ready position, no split step, and the eyes never on
+      // the ball. FieldPosture's net windows are the ready / split / move / load / strike / reach / serve chain.
+      foot = { ...FOOTWORK_IDLE }; sinceOppStrike = Infinity; recoverTo = 0; lastReach = 0;
+      // the recovery mark: a flat chevron on the player's own baseline. Unlit and unpickable — it is a coaching
+      // cue drawn on the court, not a thing in the world.
+      recoverMark?.dispose();
+      recoverMark = MeshBuilder.CreateDisc('recover_mark', { radius: 0.34, tessellation: 3 }, ctx.scene);
+      recoverMark.rotation.x = Math.PI / 2;
+      recoverMark.position.set(0, 0.02, HERO_SIDE * (o.cfg.halfLength - 0.5));
+      const rm = new PBRMaterial('recover_mark_m', ctx.scene);
+      rm.albedoColor = Color3.FromHexString('#ffd75e'); rm.emissiveColor = Color3.FromHexString('#ffd75e').scale(0.5);
+      rm.metallic = 0; rm.roughness = 1; rm.alpha = 0.5;
+      recoverMark.material = rm;
+      recoverMark.isPickable = false;
+      recoverMark.isVisible = false;
+      posture?.dispose();
+      posture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => {
+        const w = netWindow({
+          incoming: awaitingHuman && !!shot,
+          serving: !!serveFrom,
+          swinging: swingingNow,
+          reachM: shot && awaitingHuman ? reachOf(foot.x, ball.position.x) : lastReach,
+          speed: Math.abs(foot.vx),
+          splitting: splittingNow > 0,
+        });
+        const { pose, legs } = fieldPose(w);
+        // G1 for a ball sport is THE BALL — it moves, so the aim is a live position, never a fixed objective
+        const at = ball ? ball.getAbsolutePosition() : new Vector3(0, o.cfg.netHeight, 0);
+        return { pose, legs, aim: at, eyes: at, window: w };
+      }, 'NET-PP');
       ctx.objectiveRef.current = new Vector3(0, o.cfg.netHeight, 0);
       ctx.camDirector.snapTo(me.root.position, new Vector3(0, 1, 0));
       pushHud(ctx);
@@ -670,6 +756,16 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       // screen-LEFT from behind the baseline (measured Δscreen −4.7 m on stick-right).
       if (e.t === 'stick' && e.side === 'L') aimX = e.x;
       if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5) humanSwing(_ctx);
+      // THE SPLIT STEP (L1). The highest-skill, lowest-visibility mechanic in tennis: hop just before the
+      // opponent strikes so you land as they hit and can push either way. Timed against their contact — early
+      // is forgiven, late is not — and it buys ONE faster first step, never a sprint button.
+      if (e.t === 'button' && e.btn === 'L1' && e.pressed) {
+        const timed = splitTimed(sinceOppStrike === Infinity ? Infinity : -sinceOppStrike);
+        foot = { ...foot, sinceSplit: timed ? 0 : Infinity };
+        splittingNow = 0.22;
+        _ctx.setHud({ shotType: timed ? 'SPLIT' : '' });
+        if (timed) { SoundKit.play('uiTick', { pitch: 1.8, volume: 0.3 }); setTimeout(() => _ctx.setHud({ shotType: '' }), 360); }
+      }
       // In a ONE-touch sport the four face buttons are the four SHOTS: which
       // button you swing with is the shot you play, decided under the same time
       // pressure as the timing. In a multi-touch sport (volleyball) B is the
@@ -692,14 +788,25 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       // plausible receiving position), screen-relative (the camera's right), in the strafe clip — idle when the stick
       // centres, never over a swing. Runs between points too: a player repositions during the rest.
       if (me) {
-        const limit = o.cfg.halfWidth * 0.9;
-        const step = Math.abs(aimX) > 0.15 ? aimX * ctx.camDirector.rightFlat().x * SHUFFLE_SPEED * dt : 0;
-        if (step) me.root.position.x = Math.max(-limit, Math.min(limit, me.root.position.x + step));
+        // REAL FOOTWORK. The stick is an INTENT now, not a per-frame displacement: the body accelerates, carries
+        // momentum, takes longer to turn round than to start, and can be wrong-footed. Screen-relative as before
+        // (the camera's right), because behind a baseline world +x is screen-LEFT.
+        const intent = Math.abs(aimX) > 0.12 ? aimX * Math.sign(ctx.camDirector.rightFlat().x || 1) : 0;
+        const before = foot.x;
+        foot = stepFootwork({ ...foot, sinceOppStrike }, intent, dt, FOOT);
+        sinceOppStrike += dt;
+        me.root.position.x = foot.x;
+        // lean INTO the run, the same rule the boards carry: a body that changes direction without banking
+        // reads as a body on rails. Capped at 12° — a person is not a snowboard.
+        me.root.rotation.z += (fieldBank(-foot.vx / FOOT.topSpeed, Math.abs(foot.vx) / FOOT.topSpeed) - me.root.rotation.z) * Math.min(1, 9 * dt);
+        const step = foot.x - before;
         const bodyRightX = Math.cos(me.root.rotation.y);
         // the tree owns the clips: the shuffle INTENT in the body frame, plus the beat latches — fed every frame, every phase
         meTree.update({ move: step ? (step * bodyRightX > 0 ? 1 : -1) : 0, swing: meSwing, serve: meServe, block: meBlock });
         foeTree.update({ move: 0, swing: foeSwing, serve: false, block: false });
       }
+
+      if (splittingNow > 0) splittingNow = Math.max(0, splittingNow - dt);
 
       if (restSec > 0) {
         restSec -= dt;
@@ -769,6 +876,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       crowd?.dispose(); crowd = null;
       crowdEnds?.dispose(); crowdEnds = null; beach?.dispose(); beach = null;   // P5
       venue?.dispose(); venue = null;
+      posture?.dispose(); posture = null;
+      recoverMark?.dispose(); recoverMark = null;
       me?.dispose(); foe?.dispose();
       SoundKit.stopAmbient();
       shot = null; ended = true;

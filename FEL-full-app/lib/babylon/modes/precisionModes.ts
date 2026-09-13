@@ -44,6 +44,8 @@ import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
+import { mountPostureLayer } from '../anim/PostureLayer';
+import { fieldPose, batWindow, keeperWindow, strikerWindow } from '../core/FieldPosture';
 import { keeperReadProb, rivalConverts, shootoutState, REGULATION_KICKS } from '../core/ShootoutCore';
 import { PRECISION_CONFIG as CFG } from './modeConfigs';
 
@@ -751,6 +753,7 @@ export const DerbyMode: ModeDefinition = (() => {
   let incoming = false, swung = false, ended = false;
   /** L4 — the crowd down the baselines. A derby is watched. */
   let gallery: Onlookers | null = null;
+  let batPosture: { dispose(): void } | null = null, pitchPosture: { dispose(): void } | null = null;
   /** A pitch is on the way from the timer but has not been thrown yet. This is
    *  the re-entry guard; using `incoming` for it meant the whiff test — which
    *  now fires on a ball at rest — retriggered during the gap between pitches. */
@@ -857,6 +860,30 @@ export const DerbyMode: ModeDefinition = (() => {
       ctx.objectiveRef.current = ball.position;
       ctx.camDirector.setFixedBehind(me.root.position, Math.PI, 'swing');
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 5, modeId: 'baseball' });
+
+      // THE BODY (2026-09-13). Derby mounted no posture layer at all, so a batter waited on a 14 m/s pitch
+      // with his chest wherever the idle left it and his eyes on nothing. FieldPosture's batting chain is
+      // wait → load → fire, and the thing it is really for is the HEAD: the clips key hips, legs and arms and
+      // never the neck, so nobody in this mode was watching the ball.
+      batPosture?.dispose();
+      batPosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => {
+        const w = batWindow({
+          incoming, swinging: swung && incoming, checked: false,
+          // the load runs through the back half of the pitch's flight: you start your hands as it comes
+          load01: incoming && pitchTotalSec > 0 ? Math.max(0, (pitchT / pitchTotalSec - 0.45) / 0.55) : 0,
+        });
+        const { pose, legs } = fieldPose(w);
+        const at = ball ? ball.getAbsolutePosition() : new Vector3(0, 1.1, 6);
+        return { pose, legs, aim: at, eyes: at, window: w };
+      }, 'BAT-PP');
+      pitchPosture?.dispose();
+      pitchPosture = mountPostureLayer(ctx.scene, pitcher.skeleton, pitcher.root, () => {
+        const w = throwIn > 0 ? 'pitch_set' : 'pitch_throw';
+        const { pose, legs } = fieldPose(w);
+        const at = me ? me.root.position.add(new Vector3(0, 1.1, 0)) : new Vector3(0, 1.1, 0);
+        return { pose, legs, aim: at, eyes: at, window: w };
+      }, 'PITCH-PP');
+
       round = 0; pts = 0; ended = false;
       SoundKit.startAmbient('stadium');
       tally = freshDerby(); rivalTarget = 3 + Math.floor(Math.random() * 6);   // a rival round of 3–8 homers
@@ -991,7 +1018,7 @@ export const DerbyMode: ModeDefinition = (() => {
       ctx.camDirector.update(me.root.position, Vector3.Zero(), incoming ? pitchAt : ball.position);
     },
 
-    dispose() { derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 
@@ -1034,6 +1061,7 @@ export const PenaltyMode: ModeDefinition = (() => {
   const kicksHud = () => ({ kicksYou: kickPips(myKicks, REGULATION_KICKS), kicksThem: kickPips(theirKicks, REGULATION_KICKS), goals, themGoals });
   /** L4 — the bank behind the goal. A shootout is watched. */
   let gallery: Onlookers | null = null;
+  let strikerPosture: { dispose(): void } | null = null, keeperPosture: { dispose(): void } | null = null;
   // ── the shootout (D1/D2 built in the depth pass) ──
   /** The rival's goals — a shootout is against SOMEONE. Their kicks are
    *  simulated and revealed between yours (the numbers-only rival
@@ -1189,6 +1217,31 @@ export const PenaltyMode: ModeDefinition = (() => {
       ctx.objectiveRef.current = new Vector3(0, 1.2, 11);
       ctx.camDirector.setFixedBehind(me.root.position, 0, 'flight');
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 6, modeId: 'soccer' });
+
+      // THE BODIES (2026-09-13). Penalty mounted no posture layer either, and the two it needs are the two
+      // the sport is about: a KEEPER who sets low and wide with his eyes on the ball instead of standing to
+      // attention, and a STRIKER whose eyes stay DOWN on the ball through the run-up. A striker whose head
+      // comes up to find the keeper is telling the keeper where the ball is going — a real tell, and the
+      // reason kick_runup pins the eyes rather than aiming them at the goal.
+      strikerPosture?.dispose();
+      strikerPosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => {
+        const w = strikerWindow({
+          runup01: phase === 'flight' || phase === 'power' ? 1 : 0,
+          planted: phase === 'flight',
+          struck: phase === 'flight' && flight.active,   // the ball is away and travelling
+        });
+        const { pose, legs } = fieldPose(w);
+        const at = ball ? ball.getAbsolutePosition() : new Vector3(0, 0.3, 0);
+        return { pose, legs, aim: at, eyes: at, window: w };
+      }, 'KICK-PP');
+      keeperPosture?.dispose();
+      keeperPosture = mountPostureLayer(ctx.scene, keeper.skeleton, keeper.root, () => {
+        const w = keeperWindow({ diving: keeperDove, rising: false, reading: phase !== 'keep' });
+        const { pose, legs } = fieldPose(w);
+        const at = ball ? ball.getAbsolutePosition() : new Vector3(0, 0.3, 0);
+        return { pose, legs, aim: at, eyes: at, window: w };
+      }, 'KEEP-PP');
+
       round = 0; goals = 0; stylePts = 0; ended = false;
       themGoals = 0; themKicks = 0; shotHistory = []; hintFlags.read = false; myKicks = []; theirKicks = [];
       SoundKit.startAmbient('stadium');
@@ -1390,6 +1443,6 @@ export const PenaltyMode: ModeDefinition = (() => {
       ctx.camDirector.update(me.root.position, Vector3.Zero(), reticle.pos);
     },
 
-    dispose() { penaltyVenue?.dispose?.(); penaltyVenue = null; gallery?.dispose(); gallery = null; me?.dispose(); keeper?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { strikerPosture?.dispose(); strikerPosture = null; keeperPosture?.dispose(); keeperPosture = null; penaltyVenue?.dispose?.(); penaltyVenue = null; gallery?.dispose(); gallery = null; me?.dispose(); keeper?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
