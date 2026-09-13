@@ -98,8 +98,12 @@ import { resolveRim, forcedMissProfile } from '../core/RimPhysics';             
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT } from '../core/Ref';   // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, canChain, pushChain, tickChain, chainTier, ankleBreakOdds, isHardBreak,
-  hasMove, tightness, moveFromContext, type ChainState, type HandleMove,
+  hasMove, tightness, moveFromContext, gathersIntoShot, type ChainState, type HandleMove,
 } from '../core/HandleSystem';   // Street chains x 2K brakes, gated on the handle the PRQ scan earned
+import {
+  THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
+  type ThreatState,
+} from '../core/TripleThreat';   // the stance the half-court game starts from
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
 import { attachBallToHand, releaseBall, flushThroughRim, clankOffRim } from '../anim/ballRig';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the dunk's Posture Poses, shared
@@ -172,6 +176,10 @@ const TARGET_SCORE = 11;
 // 6.71m in the corners and 7.24m at the top, and that gap is the shot selection.
 // isThree() answers it per angle.
 /** Metres of rebound advantage for holding BOX OUT — worth a body length. */
+/** How long the spin's exit keeps your feet set for a shot. Short: it is a reward for the move, not a
+ *  free permanent gather. */
+const SPIN_GATHER_SEC = 0.45;
+
 /** The paint, as a floor radius from the ring — the ref's three-second clock runs inside it.
  *  A real key is ~4.9 m deep and 4.9 m wide measured from the baseline, so the ring sits well inside it;
  *  2.6 m was tighter than any actual lane and a defender's body denies that ground anyway (measured: a
@@ -291,6 +299,16 @@ export const OneVOneMode: ModeDefinition = (() => {
   let handle = BASELINE_HANDLE;
   /** What just happened in my hands, and how long ago — a chain, not a sequence of separate presses. */
   let chain: ChainState = { ...CHAIN_IDLE };
+  /** Seconds left of the spin's gather window: a shot pressed inside it skips the load and rises at once. */
+  let spinGather = 0;
+  /** TRIPLE THREAT: the jab's clocks and how many lies he has already seen this possession. */
+  let threat: ThreatState = { ...THREAT_IDLE };
+  /** How long the stick has been pushed, and how hard — a TAP is a jab, a LEAN is a drive. */
+  let stickHeld = 0, stickPeak = 0;
+  /** The jab's burst is an impulse on the first step out of the stance, never a per-frame multiplier. */
+  let burstArmed = false;
+  /** Was I in the stance when this push STARTED? The jab is judged on that, not on the release frame. */
+  let jabEligible = false;
   let spinClip = 'bball_spin';           // M9: the same machinery turns a PIVOT (a shorter sweep, no travel)
   let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
@@ -392,6 +410,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0;
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
@@ -739,6 +758,58 @@ export const OneVOneMode: ModeDefinition = (() => {
         // HOOPS-MOVE-KIT-B: M6 the pivot owns the body while it turns; otherwise M4–M6's path — L1/LT held with a body to
         // back down is a POST-UP (the back to the basket, a slow back-down, the stick across = a quick spin out of it)
         chain = tickChain(chain, dt, handle);   // the chain expires on its own; a late press starts a new one
+        spinGather = Math.max(0, spinGather - dt);
+        threat = tickThreat(threat, dt);
+
+        // ── TRIPLE THREAT ─────────────────────────────────────────────────────────────────────────
+        // Standing still with the ball is not idle, it is THREATENING: shoot, drive and the footwork that
+        // sells either are all live, and the JAB is how you find out which one he is guessing. The same
+        // stick direction is both the lie and the truth — a TAP jabs, a LEAN drives — which is why the jab
+        // cannot have its own button without losing the thing that makes it work.
+        const stickMag = Math.hypot(mx, my);
+        const threatening = inTripleThreat({
+          carrying, speed01: drib.speed01, busy: shooting || dunking || !!finish || !!gather || !!spin, posting,
+        });
+        if (stickMag > 0.45) {
+          // LATCH the stance at the START of the push. Evaluating it at the release was wrong: the tap
+          // itself moves the body past the stance's speed limit, so by the time the stick came back to
+          // centre the read was always "driving" and no jab ever fired (measured: 0 jabs in 80 s).
+          if (stickHeld === 0) jabEligible = threatening;
+          stickHeld += dt; stickPeak = Math.max(stickPeak, stickMag);
+        }
+        else {
+          if (jabEligible && stickHeld > 0 && isJabInput(stickHeld, stickPeak) && canJab(threat)) {
+            const dist = distXZ(me.root.position, foe.root.position);
+            const live = foeStunSec === 0 && !foeFloored;
+            const odds = live ? jabBiteOdds({
+              defenderDist: dist,
+              defenderClosing: foeVelLast.length() > 1.4,
+              defenderSet: foeVelLast.length() < 0.6,
+              handle,
+              shownThisPossession: threat.shown,
+            }) : 0;
+            const bought = live && roll() < odds;
+            threat = throwJab(threat, bought);
+            burstArmed = bought;
+            meAnimTree.beat('bball_hesi', { fadeSec: 0.05 });   // the sharpest authored weight-shift: the jab
+            SoundKit.play('whoosh', { pitch: 1.25, volume: 0.28 });
+            if (bought) {
+              foeStunSec = Math.max(foeStunSec, 0.3);
+              foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.07 });
+              ctx.feel?.impact?.(0.2);
+              bannerFlash(ctx, 'HE BIT THE JAB — GO!', 600);
+            } else if (threat.shown >= 3) bannerFlash(ctx, 'HE IS NOT BUYING IT', 550);
+            console.info(`[1V1-THREAT] jab #${threat.shown} odds ${odds.toFixed(2)} bought ${bought}`);
+          }
+          stickHeld = 0; stickPeak = 0; jabEligible = false;
+        }
+        // the advantage is ONE impulse on the first step out of the stance, not a per-frame multiplier
+        // (scaling the velocity every frame would compound into a teleport)
+        if (burstArmed && threat.advantage > 0 && drib.speed01 > 0.3) {
+          meDribble.vel.scaleInPlace(jabBurst(threat));
+          burstArmed = false;
+          console.info('[1V1-THREAT] jab burst spent');
+        }
         spinCooldown = Math.max(0, spinCooldown - dt);
         spinArmed = Math.max(0, spinArmed - dt);
         if (spin) stepSpin(ctx, dt);
@@ -1148,6 +1219,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     defPhase = 'check'; attacker.reset(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0;
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
@@ -1335,6 +1407,20 @@ export const OneVOneMode: ModeDefinition = (() => {
   function startRise(ctx: ModeContext, contest: number, mx: number, my: number): void {
     const toRim = RIM_FLOOR.subtract(me.root.position); toRim.y = 0; toRim.normalize();
     const plan = planGather(meDribble.vel, me.root.position, RIM_FLOOR, contest, stickBack01(mx, -my, toRim));
+    // THE SPIN ALREADY GATHERED. Its exit squares you at the rim with your feet under you, so paying the
+    // gather again is charging twice for footwork you have done — and it is what made the spin dead-end
+    // into a separate shot input instead of flowing into one. Inside the spin's window the body rises at
+    // once, which is the reward for the move.
+    const gathered = spinGather > 0;
+    if (gathered) {
+      spinGather = 0;
+      shotMeter.start(contest, currentShot?.style ?? 'jumper', 0);
+      gather = null;
+      beginRise();
+      ctx.setHud({ shotType: `${currentShot?.label ?? 'JUMPER'} — OFF THE SPIN` });
+      console.info('[1V1-HANDLE] spin gather consumed — rising at once');
+      return;
+    }
     shotMeter.start(contest, currentShot?.style ?? 'jumper', plan.sec);
     if (plan.sec > 0) {
       gather = { plan, t: 0 };
@@ -1568,6 +1654,15 @@ export const OneVOneMode: ModeDefinition = (() => {
     meDribble.vel.copyFrom(spinClip === 'bball_pivot' ? new Vector3(0, 0, 0) : spin.plan.exit.scale(SPIN_EXIT_SPEED));
     spin = null;
     meAnimTree.release();
+    // "SPIN MOVE GATHERS" — the spin used to DEAD-END here: it finished, spinCooldown armed, and the
+    // player had to start a fresh shot input, which is the exact opposite of a chain. The exit is already
+    // squared at the rim with the feet under me, so it flows straight into the gather: the spin becomes a
+    // chain link that sets your feet rather than a move you recover from.
+    if (gathersIntoShot('spin')) {
+      chain = pushChain('spin', chain, handle);
+      spinGather = SPIN_GATHER_SEC;
+      console.info(`[1V1-HANDLE] spin gathers — chain ${chain.length}, window ${SPIN_GATHER_SEC}s`);
+    }
   }
 
   /** M2: a hard hit on the floor READS on the body that took it (the solver already bleeds the runner's momentum) — never on
