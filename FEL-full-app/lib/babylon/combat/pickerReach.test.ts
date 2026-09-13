@@ -38,9 +38,14 @@ function modesById(): Map<string, string> {
     if (!f.endsWith('.ts') || f.includes('.test.')) continue;
     const src = stripComments(fs.readFileSync(path.join(MODES_DIR, f), 'utf8'));
     for (const m of src.matchAll(/modeId:\s*'([^']+)'/g)) {
-      // a file may name sub-ids for its spawned characters ('duel-me'); the mode's own id is the one that
-      // sits beside a mood or a camPreset in the ModeDefinition
-      if (/modeId:\s*'[^']+',\s*(mood|camPreset)/.test(m[0] + src.slice(m.index ?? 0, (m.index ?? 0) + 80))) {
+      // A file may name sub-ids for its spawned characters ('duel-me'); the mode's own id is the one that
+      // sits beside a mood or a camPreset in the ModeDefinition.
+      //
+      // `get mood()` counts. The racing modes read their mood through a getter (the map has to be picked
+      // before the mood is known), and a pattern that only accepted `mood:` stopped recognising them as
+      // modes at all — this guard reported "velocitykart: no mode file declares this modeId" for a mode
+      // that plainly does.
+      if (/modeId:\s*'[^']+',\s*(get\s+)?(mood|camPreset)/.test(m[0] + src.slice(m.index ?? 0, (m.index ?? 0) + 120))) {
         out.set(m[1], f);
       }
     }
@@ -81,6 +86,21 @@ describe('THE SPLASH ONLY OFFERS WHAT A MODE ACTUALLY READS', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('every mode in TIER_MODES reads the difficulty pick', () => {
+    // The guard that caught me writing this very list wrong: the first draft of TIER_MODES named all
+    // eighteen modes with an opponent, and sixteen of them read nothing — a difficulty picker that changed
+    // the opponent in two games and decorated the screen in the rest.
+    const offenders: string[] = [];
+    for (const id of setLiteral(splash, 'TIER_MODES')) {
+      const file = byId.get(id);
+      if (!file) { offenders.push(`${id}: no mode file declares this modeId`); continue; }
+      if (!reads(file, /readProfile|readTier|profileFor/)) {
+        offenders.push(`${id} (${file}): the splash offers a DIFFICULTY picker, nothing reads it`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it('and the racing modes read their map and their vehicle', () => {
     for (const [id, file] of [['velocitykart', 'VelocityKartMode.ts'], ['aeroaces', 'AeroAcesMode.ts']] as const) {
       const src = stripComments(fs.readFileSync(path.join(MODES_DIR, file), 'utf8'));
@@ -96,7 +116,7 @@ describe('THE PICK IS READ AFTER THE PAGE EXISTS, NEVER WHEN THE REGISTRY IS BUI
   // because Mixed Combat derives the foe's loadout as the opposite of the player's. It looks completely
   // correct in the source. The rule is LEXICAL — a reader must not be evaluated while the factory is being
   // evaluated — so that is what is checked, not where the call happens to sit in the file.
-  const READERS = /\b(readBlend|readWeapon|readCourse|readKart|readPlane|readVehicle|readLoadout)\s*\(/;
+  const READERS = /\b(readBlend|readWeapon|readCourse|readKart|readPlane|readVehicle|readLoadout|readProfile|readTier)\s*\(/;
 
   it('NO MODE READS A PICK AT FACTORY TOP LEVEL', () => {
     // "before load()" is the wrong rule and my first version of this test used it: it flagged three readers
@@ -106,7 +126,7 @@ describe('THE PICK IS READ AFTER THE PAGE EXISTS, NEVER WHEN THE REGISTRY IS BUI
     // function (brace depth >= 2 puts it inside one), or if its own statement is an arrow body.
     const files = [
       'KarateEndlessMode.ts', 'KarateVSMode.ts', 'ShowdownMode.ts', 'DuelMode.ts', 'MixedCombatMode.ts',
-      'VelocityKartMode.ts', 'AeroAcesMode.ts',
+      'VelocityKartMode.ts', 'AeroAcesMode.ts', 'FootballRushMode.ts',
     ];
     const offenders: string[] = [];
     for (const f of files) {
@@ -138,7 +158,7 @@ describe('THE PICK IS READ AFTER THE PAGE EXISTS, NEVER WHEN THE REGISTRY IS BUI
 
 describe('the picker lists are honest about themselves', () => {
   it('every id on the splash names a mode that exists', () => {
-    for (const name of ['STYLE_MODES', 'WEAPON_MODES']) {
+    for (const name of ['STYLE_MODES', 'WEAPON_MODES', 'TIER_MODES']) {
       for (const id of setLiteral(splash, name)) {
         expect(byId.has(id), `${name} lists '${id}', which no mode declares`).toBe(true);
       }

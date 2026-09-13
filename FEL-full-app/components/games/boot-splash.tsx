@@ -12,6 +12,7 @@ import { skinsFor, readBoardSkin, writeBoardSkin } from '@/lib/babylon/nexus/boa
 import { readyCourses, readCourse, writeCourse } from '@/lib/babylon/core/RaceCourse';
 import { readyVehicles, readVehicle, writeVehicle, type RaceKind } from '@/lib/babylon/racing/garage';
 import { readyWeapons, readWeapon, writeWeapon } from '@/lib/babylon/combat/arsenal';
+import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
 import {
   readySchools, readBlend, writeBlend, blendName, schoolById, blendTraits, STYLE_TRAIT_KEYS,
   type StyleBlend,
@@ -45,6 +46,18 @@ const VENUE_ART: Record<string, { venue: string; sub: string; tint: string }> = 
  */
 const WEAPON_MODES = new Set(['mixedcombat', 'duel']);
 const STYLE_MODES = new Set(['karate', 'karate-vs', 'duel', 'showdown', 'mixedcombat']);
+
+/**
+ * Modes that face you with an opponent, and therefore offer a DIFFICULTY.
+ *
+ * Not every mode: a time trial, a routine and a quiz have nobody to be difficult. Offering a tier where
+ * nothing reads it is the hollow-picker failure the pickerReach test exists to catch.
+ */
+const TIER_MODES = new Set(['velocitykart', 'aeroaces', 'football']);
+// Deliberately SHORT, and it grows as modes are wired rather than ahead of them. The first draft listed
+// eighteen — every mode with an opponent — and sixteen of those read nothing, which is the exact hollow
+// picker the pickerReach guard exists to catch. Dunk, 1v1, 3v3 and the net sports already have their own
+// tiering that works; unifying them onto this ladder is follow-up, and until it happens they are not listed.
 
 /** Which racing mode this splash belongs to, or null. */
 const RACE_OF: Record<string, RaceKind> = { velocitykart: 'kart', aeroaces: 'aero' };
@@ -157,6 +170,13 @@ export function BootSplash(props: {
     if (id === style.primary) { setBlend({ primary: id, secondary: id, mix: 0 }); return; }
     setBlend({ primary: id, secondary: style.secondary === style.primary ? id : style.secondary, mix: style.mix });
   };
+
+  // DIFFICULTY (2026-09-13). Phase 0 measured four modes with no tiering at all and four more each inventing
+  // their own; this is the one picker, reading the one shared ladder.
+  const hasTiers = TIER_MODES.has(props.modeId);
+  const [tier, setTier] = useState<Tier>('pro');
+  useEffect(() => { if (hasTiers) setTier(readTier()); }, [hasTiers]);
+  const pickTier = (t: Tier) => { if (t === tier) return; writeTier(t); setTier(t); };
 
   const [inserted, setInserted] = useState(false);
   // Procedural venue art generated client-side (no network request, no 404).
@@ -398,6 +418,27 @@ export function BootSplash(props: {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {hasTiers && (props.phase === 'ready' || props.phase === 'loading') && (
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">OPPONENT</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {tierList().map((t) => (
+                <button key={t.id} type="button" onClick={() => pickTier(t.id)} title={t.sub}
+                  aria-label={`${t.name} — ${t.sub}`} aria-pressed={t.id === tier}
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${t.id === tier ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={t.id === tier ? { background: t.tint, borderColor: t.tint } : { borderColor: `${t.tint}88` }}>
+                  {t.name}
+                </button>
+              ))}
+            </div>
+            {/* the line says what the opponent is LIKE, never "easy" or "hard" — a tier is a different
+                opponent, not the same one with a handicap */}
+            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+              {profileFor(tier).sub}
+            </p>
           </div>
         )}
 

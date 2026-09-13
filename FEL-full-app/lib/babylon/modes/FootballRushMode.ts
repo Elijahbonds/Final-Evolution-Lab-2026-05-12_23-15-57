@@ -21,6 +21,7 @@ import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { CoinField } from '../core/Pickups';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
+import { readProfile, profileFor, blunders, DEFAULT_TIER } from '../core/Difficulty';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the rush (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Measured on 2942860:
 //   G4/G5  this mode had NO ANIMATION OWNER. It played clips from five places — a per-frame
 //          `animator.play(footballCarryRun, { loop: true })` inside update(), the dodge one-shot, the truck, the tackle
@@ -129,18 +130,30 @@ export const FootballRushMode: ModeDefinition = (() => {
   let showBlitz: Mob | null = null, showBlitzComes = false;
   const SHOW_BLITZ_CHANCE = 0.55, SHOW_BLITZ_CREEP = 0.9, SHOW_BLITZ_DROP_SEC = 0.8;
 
+  /** The picked opponent. Read at load, never at module scope — see modes/shipStatus and the SSR trap. */
+  let tier = profileFor(DEFAULT_TIER);
+
   function snap(ctx: ModeContext): void {
     if (!preSnap) return;
     preSnap = false;
     tackleLatch = false;                       // A+ P0: one tackle weight per play
-    for (const m of defenders) {
+    // DIFFICULTY IS THE SNAP REACTION, not a speed multiplier (2026-09-13). Phase 0 measured this mode with
+    // no tiering at all. What separates a rookie defense from an elite one is not how fast they run — it is
+    // how long they take to READ the play, and whether anybody blows their assignment. A rookie is 420 ms
+    // late off the snap and busts one now and then; an elite is moving at 120 ms and nobody busts. Per-
+    // defender jitter on top, so a defense never releases as one block.
+    for (const [i, m] of defenders.entries()) {
       if (m === showBlitz && !showBlitzComes) {
         // the show was a bluff: he drops, and starts late
         m.char.root.position.z += 3.5;
         setTimeout(() => { if (!ended) m.startPursuit(); }, SHOW_BLITZ_DROP_SEC * 1000);
         continue;
       }
-      m.startPursuit();
+      const jitter = i * 35;
+      // an unforced error: this defender reads it wrong and is a long beat late getting going
+      const bust = blunders(tier) ? 520 : 0;
+      const delay = tier.reactionMs + jitter + bust;
+      setTimeout(() => { if (!ended) m.startPursuit(); }, delay);
     }
     if (showBlitz) {
       ctx.setHud({ banner: showBlitzComes ? 'BLITZ!' : 'HE DROPPED — coverage' });
@@ -294,6 +307,7 @@ export const FootballRushMode: ModeDefinition = (() => {
     modeId: 'football', mood: 'nightGame', camPreset: 'runner',
 
     async load(ctx: ModeContext) {
+      tier = readProfile();
       driveLog = []; driveYards = 0;
       rushVenue = mountVenue(ctx, 'football_rush', { keepGameplayCamera: true });
       VenueKit.buildGridiron(ctx.scene);   // the kit field keeps its yard lines and posts under the spec's sky

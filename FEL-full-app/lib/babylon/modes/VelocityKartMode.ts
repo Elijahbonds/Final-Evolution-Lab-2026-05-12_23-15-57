@@ -33,6 +33,7 @@ import {
   type Course, type RaceProgress,
 } from '../core/RaceCourse';
 import { buildCourseVenue } from '../racing/venueForCourse';
+import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import { taperedPlank, taperedSection, roadWheel } from '../racing/shapes';
 import {
   buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldFor,
@@ -64,6 +65,7 @@ let rivals: Rival[] = [];
 let rivalKarts: TransformNode[] = [];
 /** The player's own distance along the racing line — what the standings are computed against. */
 let playerDist = 0;
+let tier = profileFor(DEFAULT_TIER);
 /** The picked kart's handling. Defaults to the starter, so a mode with no pick is byte-identical to before. */
 let kartSpec: KartSpec = KART_STARTER;
 let race: RaceProgress = startRace();
@@ -451,8 +453,11 @@ return {
 
     // the field: one simplified kart per rival, tinted so they are telling apart at speed
     line = buildRaceLine(course);
+    // THE TIER drives the field's pace. `fieldFor` still decides how MANY rivals a course can hold (a tight
+    // circuit cannot take eight karts whatever the difficulty), but how fast they run is the player's pick.
     const shape = fieldFor(course, kartSpec.vMax, kartSpec.grip);
-    rivals = makeField(shape.count, kartSpec.vMax, shape.difficulty);
+    tier = readProfile();
+    rivals = makeField(shape.count, kartSpec.vMax, tier.edge);
     rivalKarts = rivals.map((r) => buildRivalKart(ctx, r.name, r.tint));
     playerDist = 0;
 

@@ -34,6 +34,7 @@ import {
   AERO_COURSES, readCourse, startRace, stepRace, toNextGate, medalFor, type Course, type RaceProgress,
 } from '../core/RaceCourse';
 import { buildCourseVenue } from '../racing/venueForCourse';
+import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import {
   buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal,
   type RaceLine, type Rival,
@@ -59,6 +60,7 @@ let line: RaceLine | null = null;
 let rivals: Rival[] = [];
 let rivalPlanes: TransformNode[] = [];
 let playerDist = 0;
+let tier = profileFor(DEFAULT_TIER);
 let rings: Mesh[] = [];
 let course: Course = AERO_COURSES[0];
 let flight: FlightState | null = null;
@@ -392,7 +394,8 @@ return {
     // the field: a simplified airframe per rival, tinted. Four in the air rather than the kart's five —
     // a ring course is read by looking THROUGH it, and a crowded sky hides the gate you are chasing.
     line = buildRaceLine(course);
-    rivals = makeField(4, FRAME.cruise, 0.5);
+    tier = readProfile();
+    rivals = makeField(4, FRAME.cruise, tier.edge);
     rivalPlanes = rivals.map((r) => buildRivalPlane(ctx, r.name, r.tint));
     playerDist = 0;
 
