@@ -61,6 +61,7 @@ import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
 import { approachAngle, approachBonus, takeoffFor } from '../core/DunkApproach';
+import { emptyCard, addAttempt, forWire } from '@/lib/mp/dunkCard';
 import {
   judgeDunk, ScoreReveal, CrowdEnergy, REVEAL_DURATION_SEC, BAND_TOTAL, JUDGE_COUNT,
   PERFECT_TOTAL, perJudgeAvg, type JudgeScore,
@@ -246,6 +247,11 @@ export const DunkMode: ModeDefinition = (() => {
   let round = 1, dunkInRound = 0;
   let night = 1;                              // TRY-ONBOARD G1: which card of a continuous Flight Night this is
   let playerTotal = 0, rivalTotal = 0, hype = 0, chain = 0;
+  // THE CARD (2026-09-13, owner: "in multiplayer we should see other peoples dunk and score"). A challenge
+  // has only ever carried a NUMBER — CompetitionMatch stores player1Score/player2Score and nothing else — so
+  // staking a run against somebody told you they got 214 and not one thing about what they threw. The card
+  // is the description of each attempt, small enough to ride in the JSON payload MatchEvent already has.
+  let card = emptyCard();
   let makes = 0, misses = 0, bestChain = 0;   // PACK #3: the proof card's make/miss line
   let lastScores: JudgeScore[] = [];
   let finishing = false;
@@ -509,7 +515,7 @@ export const DunkMode: ModeDefinition = (() => {
       if (!ctx.location || ctx.location === 'venice') await applyVeniceDunkLookPass(ctx.scene);
 
       ({ night, round, dunkInRound, playerTotal, rivalTotal, makes, misses, bestChain } = firstNight());
-      hype = 0; chain = 0; finishing = false; ended = false; rivalClipToken = 0;
+      hype = 0; chain = 0; finishing = false; ended = false; rivalClipToken = 0; card = emptyCard();
       style = 'power'; prop = 'none'; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
@@ -1978,6 +1984,11 @@ export const DunkMode: ModeDefinition = (() => {
       );
       const missTotal = missScores.reduce((a, j) => a + j.score, 0);
       playerTotal += missTotal; misses++;
+      card = addAttempt(card, {
+        round, style: STYLE_LABEL[style], prop: PROP_LABEL[prop],
+        finish: SPORT_CLIP.dunkFinishBlown, label: 'BLOWN',
+        judges: missScores.map((j) => j.score), total: missTotal, made: false,
+      });
       lastScores = missScores;
       crowd.onScore(missTotal);
       revealed = [];
@@ -2056,6 +2067,13 @@ export const DunkMode: ModeDefinition = (() => {
     }
 
     playerTotal += dunkTotal; makes++; bestChain = Math.max(bestChain, chain);
+    // the FINISH CLIP goes in, not only a label: the body's finish is picked deterministically from these
+    // same values, so the card is enough to re-perform the attempt if a replay is ever built
+    card = addAttempt(card, {
+      round, style: STYLE_LABEL[style], prop: PROP_LABEL[prop],
+      finish: aerialClip, label: finishBanner(true, qteAccuracy).replace('!', '') || STYLE_LABEL[style],
+      judges: scores.map((j) => j.score), total: dunkTotal, made: true,
+    });
     // Hype is fed by the QUALITY of the dunk, not the raw total — the total's
     // range moved with the ceiling and `dunkTotal * 2` would now fill the meter
     // almost instantly, quietly wrecking the momentum curve. Per-judge average
@@ -2243,7 +2261,10 @@ export const DunkMode: ModeDefinition = (() => {
     SoundKit.play('whistle');
     const won = cardWon({ playerTotal, rivalTotal });
     if (won) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
+    // the card rides out with the result, which is what the arena submit forwards
     const stats = { rivalTotal, rounds: TOTAL_ROUNDS, makes, misses, bestChain, night };
+    // the card goes out on `detail`, not `stats` — stats is numbers-only because the reward layer reads it
+    const detail = { card: forWire(card) };
     // TRY-ONBOARD G1 (BUG-001). The card is finite by design — 2 rounds x 2 dunks
     // against the rival — and that part is right: it is the contest. What was wrong
     // is what the card DID. `ctx.end` parks the harness in 'ended', which stops
@@ -2255,12 +2276,12 @@ export const DunkMode: ModeDefinition = (() => {
     // SessionResult, so the run is banked and the claim can be offered) and the mode
     // keeps the stage: any button starts night N+1 as a soft reset in place.
     if (ctx.continuous) {
-      ctx.card(won ? 'CONTEST_WON' : 'CONTEST_LOST', playerTotal, stats);
+      ctx.card(won ? 'CONTEST_WON' : 'CONTEST_LOST', playerTotal, stats, detail);
       showNightCard(ctx, won);
       return;
     }
     ended = true;
-    ctx.end(won ? 'CONTEST_WON' : 'CONTEST_LOST', playerTotal, stats);
+    ctx.end(won ? 'CONTEST_WON' : 'CONTEST_LOST', playerTotal, stats, detail);
   }
 
   /** The night's scoreboard, held on a live shot until the player says GO AGAIN. */

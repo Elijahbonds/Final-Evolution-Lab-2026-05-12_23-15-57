@@ -19,6 +19,7 @@ import {
   Bot,
 } from 'lucide-react';
 import { WALLET_REFRESH_EVENT } from '@/components/wallet-chip';
+import { DuelCards } from '@/components/arena/duel-cards';
 
 // ---------------------------------------------------------------------------
 // Types mirroring the /api/arena/* responses.
@@ -61,6 +62,10 @@ interface MyDuel {
   myScore: number | null;
   oppScore: number | null;
   mySubmitted: boolean;
+  /** What each player actually threw. Null on older duels, and the row degrades to the scores. */
+  myCard?: unknown;
+  oppCard?: unknown;
+  oppCardLocked?: boolean;
   winnerId: string | null;
   iWon: boolean | null;
   seed: string | null;
@@ -512,6 +517,20 @@ export function ArenaView() {
                           You{' '}
                           <span className="text-white">{d.myScore ?? '—'}</span> &middot; Opponent{' '}
                           <span className="text-white">{d.oppScore ?? '—'}</span>
+                        </div>
+                      )}
+                      {/* WHAT THEY THREW, not just what it added up to. Only rendered when a card exists —
+                          an older duel has none and keeps exactly the line above. */}
+                      {Boolean(d.myCard || d.oppCard) && (
+                        <div className="mt-2">
+                          <DuelCards
+                            myScore={d.myScore}
+                            oppScore={d.oppScore}
+                            myCard={d.myCard}
+                            oppCard={d.oppCard}
+                            oppCardLocked={d.oppCardLocked !== false && !d.oppCard}
+                            oppName={d.opponent ?? undefined}
+                          />
                         </div>
                       )}
                     </div>

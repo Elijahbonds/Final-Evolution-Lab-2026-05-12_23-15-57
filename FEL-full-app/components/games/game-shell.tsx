@@ -267,7 +267,12 @@ function GameShellInner({
                 const ar = await fetch('/api/arena/submit-score', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ matchId: arenaMatchId, score: arenaScore }),
+                  // the dunk card rides along when the mode produced one, so the other player can see what
+                  // was actually thrown rather than only the number it added up to
+                  body: JSON.stringify({
+                    matchId: arenaMatchId, score: arenaScore,
+                    ...((res as { detail?: { card?: unknown } })?.detail?.card ? { card: (res as { detail?: { card?: unknown } }).detail!.card } : {}),
+                  }),
                 }).then((r2) => (r2.ok ? r2.json() : null));
                 if (ar?.ok) {
                   // ARENA-10PHASE P1/P2: keep both settled scores — the card reads the duel from them, not from the mode's own rival.

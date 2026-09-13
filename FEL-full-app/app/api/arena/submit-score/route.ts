@@ -13,6 +13,7 @@ import {
 } from '@/lib/arena';
 import { drawRivalScore, median } from '@/lib/arena-rivals';
 import { recordServerEvent } from '@/lib/analytics-server';
+import { parseCard, forWire } from '@/lib/mp/dunkCard';
 
 /**
  * POST /api/arena/submit-score
@@ -29,6 +30,11 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const matchId = String(body?.matchId ?? '');
   const score = Number(body?.score);
+  // THE CARD (2026-09-13, owner: "in multiplayer we should see other peoples dunk and score"). Optional and
+  // parsed defensively: a duel from a client that does not send one settles exactly as it always did, and a
+  // malformed card is dropped rather than rejecting a score somebody actually earned. It rides in the
+  // MatchEvent payload that already exists, so there is no schema change and no migration.
+  const card = parseCard(body?.card) ?? null;
   if (!matchId) return NextResponse.json({ error: 'matchId is required' }, { status: 400 });
   if (!Number.isInteger(score) || score < 0) {
     return NextResponse.json({ error: 'score must be a non-negative integer' }, { status: 400 });
@@ -61,7 +67,9 @@ export async function POST(req: NextRequest) {
       }
       if (Object.keys(data).length) {
         await tx.competitionMatch.update({ where: { id: matchId }, data });
-        await appendMatchEvent(tx, matchId, 'SCORE_SUBMITTED', userId, { player: isP1 ? 'p1' : 'p2', score });
+        await appendMatchEvent(tx, matchId, 'SCORE_SUBMITTED', userId, {
+          player: isP1 ? 'p1' : 'p2', score, ...(card ? { card: forWire(card) } : {}),
+        });
       }
 
       // GHOST_DUEL (Quick Match): the house rival's score is drawn NOW, from
