@@ -365,10 +365,22 @@ export class DefenderBrain implements AIBehavior {
   objective: Vector3 | null = null;
   boxOut(mark: Vector3 | null): void { this.boxTarget = mark ? mark.clone() : null; }
   get boxing(): boolean { return this.boxTarget !== null; }
+  /** The ball is LOOSE on the floor — go and get it. Outranks the seal, because a seal you hold while
+   *  the ball rolls away unclaimed is not defence. Null = back to the normal job. */
+  private chaseTarget: Vector3 | null = null;
+  chaseBall(at: Vector3 | null): void { this.chaseTarget = at ? at.clone() : null; }
+  get chasing(): boolean { return this.chaseTarget !== null; }
 
   decide(dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
     const mark = this.markIndex !== null ? foes[this.markIndex] ?? null : null;
     const markHasBall = mark ? distXZ(mark, ball) < 1.8 : false;
+    // A LIVE BALL outranks everything. Measured in 3v3: after a miss every one of the six bodies sat
+    // 8-19 m from the ball holding its seal or its crash lane, and the board fell through to the dice
+    // roll — because no job in the system meant "go and get the actual ball".
+    if (this.chaseTarget) {
+      this.job = 'chase'; this.objective = this.chaseTarget;
+      return steer(this.chaseTarget.subtract(self), true, 0.6);
+    }
     // O2 BOX OUT — a shot is up: seal the man between him and the rim, chest on him; nothing else matters
     if (this.boxTarget) {
       const { spot } = boxOutSpot(this.boxTarget, hoop);
@@ -503,10 +515,21 @@ export class TeammateBrain implements AIBehavior {
   private boxTarget: Vector3 | null = null;
   boxOut(mark: Vector3 | null): void { this.boxTarget = mark ? mark.clone() : null; }
   get boxing(): boolean { return this.boxTarget !== null; }
+  /** The ball is LOOSE — crash it for real instead of holding a lane near where it might land. */
+  private chaseTarget: Vector3 | null = null;
+  chaseBall(at: Vector3 | null): void { this.chaseTarget = at ? at.clone() : null; }
+  get chasing(): boolean { return this.chaseTarget !== null; }
 
   decide(dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
     const lane = new Vector3(Math.sin(this.slotAngle), 0, Math.cos(this.slotAngle));
     const spot = hoop.add(lane.scale(this.holdRadius));
+    // a loose ball beats the crash lane: the lane is a guess about where it will land, the ball is where it IS
+    if (this.chaseTarget) {
+      this.job = 'chase'; this.objective = this.chaseTarget; this.screened = null;
+      const to = this.chaseTarget.subtract(self);
+      to.addInPlace(separation(self, allies, 1.6).scale(0.8));   // six bodies must not stack on one ball
+      return steer(to, true, 0.6);
+    }
     if (this.boxTarget) {   // O2 BOX OUT on their shot
       this.job = 'boxout'; this.objective = this.boxTarget; this.screened = null;
       return steer(boxOutSpot(this.boxTarget, hoop).spot.subtract(self), false, 0.25);

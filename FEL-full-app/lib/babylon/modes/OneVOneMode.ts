@@ -95,7 +95,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';              // the miss meets the iron it earned
-import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
+import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
 import { attachBallToHand, releaseBall, flushThroughRim, clankOffRim } from '../anim/ballRig';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the dunk's Posture Poses, shared
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
@@ -1668,6 +1668,17 @@ export const OneVOneMode: ModeDefinition = (() => {
       ball.position.copyFrom(ballSim.pos);
       SoundKit.play('impact', { pitch: 1.1, volume: 0.25 });
       console.info(`[1V1-BOARD] tipped off ${hit.body.id}`);
+    }
+
+    // OUT OF PLAY — a dead ball. The bodies are held inside the court; a ball that is not cannot be won.
+    if (ballOutOfPlay(ballSim.pos, HOOPS_BALL_BOUNDS)) {
+      const mine = (board.shooter === 'mine') === false;   // the shooter's ball going out is the other team's
+      board = null; foeBrain?.boxOut(null); foeSealing = false; ballSim.stop(); loose = false;
+      console.info(`[1V1-BOARD] out of play — dead ball to ${mine ? 'me' : 'foe'}`);
+      SoundKit.play('whistle');
+      if (mine) { bannerFlash(ctx, 'OUT OF BOUNDS — YOUR BALL', 900); resetPositions(); }
+      else startDefense(ctx, 'OUT OF BOUNDS — THEIR BALL, DEFEND!');
+      return;
     }
 
     const r = resolvePickup(ballSim.pos, ballSim.vel, bodies);

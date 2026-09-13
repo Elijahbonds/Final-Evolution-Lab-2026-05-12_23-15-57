@@ -78,3 +78,27 @@ finishes, `spinCooldown` arms, and the player must start a fresh shot input. A s
 the Street Vol 2 chain point — the pivot's exit momentum feeds straight into the shot gather, so
 spin→gather→finish is one continuous action instead of three separate presses. This is the single
 clearest example of the "moves CHAIN without returning to idle" requirement.
+
+> "put a ref that enforces rules via a handbook"
+
+A REF is the right next structural move and it has a natural home: rule calls are currently scattered
+as inline literals across the modes — the charge, the foul in the air, the and-one, make-it-take-it,
+and (added 2026-09-12) the out-of-bounds dead ball. Each mode re-implements the ones it happens to
+care about, which is why 3v3 and 1v1 disagree about what a board even means.
+
+Shape to build: a declarative HANDBOOK (data — the rule, its call, its banner, its consequence) and a
+`Ref` that reads it and emits calls. The modes report events ("ball left the floor", "foul-speed
+contact into a set body", "shot released past the line") and the Ref decides. That makes the rules
+auditable in one place, testable without a scene, and consistent across hoops modes — and it is the
+honest place to put the 2K-style whistle the owner is asking for.
+
+Candidate first handbook entries, all of which already exist as scattered code: out of bounds, charge,
+shooting foul / and-one, make-it-take-it, backcourt, travel (missing), three-second (missing),
+goaltending (missing), loose-ball foul (missing).
+
+> "let people choose their ball on the same screen as their map, look at the meshy assets, hoopbus and rainbow balls"
+
+The court/venue splash picker already exists (Venice + Blossom Park / Orbit / Canopy / Rooftop) and the
+Meshy ball exports are already in-game (hoop / balls / decks / hoopbus via the bake-prop pipeline). So
+this is a picker extension plus asset wiring, not new tech: put ball selection on the SAME screen as
+the map so one choice-screen covers both, and surface the rainbow balls and the hoopbus.

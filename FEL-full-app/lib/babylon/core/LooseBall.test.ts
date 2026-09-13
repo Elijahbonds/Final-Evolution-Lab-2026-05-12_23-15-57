@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
 import { resolveRim, missProfileFor, forcedMissProfile, RIM_RADIUS, BALL_RADIUS } from './RimPhysics';
-import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, type BodyRef } from './LooseBall';
+import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from './LooseBall';
 
 const RIM = new Vector3(0, 3.05, -6);
 /** Shooter stands at +z of the rim, so "toward the shooter" is +z. */
@@ -230,5 +230,35 @@ describe('what winning a board MEANS depends on whose miss it was', () => {
   it('an offensive rebound is never worth the same as losing it — the bug this rule fixes', () => {
     // resetting on EVERY board meant these two were identical outcomes
     expect(boardOutcome('me', 'me')).not.toBe(boardOutcome('foe', 'me'));
+  });
+});
+
+describe('a rebound that leaves the floor is dead, not a four-second wait', () => {
+  const B = HOOPS_BALL_BOUNDS;
+
+  it('a ball on the floor is in play', () => {
+    expect(ballOutOfPlay({ x: 0, z: 6 }, B)).toBe(false);
+    expect(ballOutOfPlay({ x: 7.5, z: 14 }, B)).toBe(false);
+  });
+
+  it('THE BALL BOUNDS ARE NOT THE BODY CLAMP — a ball at the rim is in play', () => {
+    // the rim is at z -0.6 and bodies are clamped to z >= 0.5, so reusing the body clamp called every
+    // rebound out of bounds: measured 5 of 5, and the dead-ball rule ate the entire board
+    expect(ballOutOfPlay({ x: 0, z: -0.6 }, B)).toBe(false);
+    expect(ballOutOfPlay({ x: 0.23, z: -0.83 }, B)).toBe(false);   // off the back iron, behind the ring
+  });
+
+  it('a ball past the sideline is out', () => {
+    expect(ballOutOfPlay({ x: 11, z: 6 }, B)).toBe(true);
+    expect(ballOutOfPlay({ x: -11, z: 6 }, B)).toBe(true);
+  });
+
+  it('a ball well behind the backboard, or past the half line, is out', () => {
+    expect(ballOutOfPlay({ x: 0, z: -4 }, B)).toBe(true);
+    expect(ballOutOfPlay({ x: 0, z: 18 }, B)).toBe(true);
+  });
+
+  it('the measured failure: a ball every clamped body sits equidistant from is out', () => {
+    expect(ballOutOfPlay({ x: 12, z: 6 }, B)).toBe(true);
   });
 });

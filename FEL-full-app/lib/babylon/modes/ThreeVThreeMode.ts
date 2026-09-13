@@ -93,6 +93,8 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package 
 } from '../core/HoopsDefense';
 import { HAND_UP_SEC, handUpContest, distXZ } from '../core/BasketballCore';
 import { boardWinner, BOX_OUT_RANGE, jobObjective, type BoardBody } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O1–O3
+import { resolveRim, forcedMissProfile } from '../core/RimPhysics';                               // the miss meets the iron it earned
+import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and six bodies contest it
 import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -162,6 +164,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let currentShot: ShotContext | null = null;
   /** Contest at shot start — so the release banner can say why. */
   let shotContest = 0;
+  /** What a NON-hero shot earned (the mate's and the opponent's both fly on mateArc), read at the iron. */
+  let mateMiss: { from: Vector3; team: 'me' | 'foe'; quality01: number; short: number; lateral: number } | null = null;
+  /** A live board: the ball is off the iron and none of the six bodies has it yet. */
+  let board: { age: number; contestedCalled: boolean; shooter: 'me' | 'foe' } | null = null;
   /** Per-foe closing-speed memory for the hesi bite (same read as 1v1). */
   let foeCloseMem: number[] = [];
   let myJumpAge = Infinity;                      // block-jump timer (defense)
@@ -474,9 +480,19 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
 
       // the ball in flight (my arced attempt)
       // BIOMECH-HOOPS-WAVE1 G6: teammate / rival shots fly; the drive dunk's make flushes through the iron
-      if (mateArc.active) { const r = mateArc.step(dt, ball.position); if (r === 'missed') ballSim.launch(ball.position.clone(), new Vector3((Math.random() - 0.5) * 3, 2.5, 1.5)); else if (r === 'made') ballSim.launch(ball.position.clone(), new Vector3(0, -0.5, 0.6)); }
+      if (mateArc.active) {
+        const r = mateArc.step(dt, ball.position);
+        if (r === 'missed') {
+          // a teammate's or an opponent's miss also meets the iron now, and also leaves a LIVE ball —
+          // it used to launch a random vector and then no board was contested for it at all
+          deflectMiss(mateMiss?.from ?? ball.position, mateMiss?.quality01 ?? 0.45, mateMiss?.short ?? 0.4, mateMiss?.lateral ?? 0);
+          board = { age: 0, contestedCalled: false, shooter: mateMiss?.team ?? 'foe' };
+          mateMiss = null;
+        } else if (r === 'made') ballSim.launch(ball.position.clone(), new Vector3(0, -0.5, 0.6));
+      }
       else if (dunkFlush) { dunkFlush.since += dt; if (flushThroughRim(ball, RIM, dunkFlush.releasePos, dunkFlush.since)) { ballSim.launch(ball.position.clone(), new Vector3(0, -0.5, 0.6)); dunkFlush = null; } }
       else if (!ball.parent && !arc.active && !passFlight.active && !dunking) ballSim.step(dt);
+      if (board && !arc.active && !mateArc.active) liveBoard(ctx, dt);
       if (arc.active) {
         const res = arc.step(dt, ball.position);
         if (res === 'made') {
@@ -509,7 +525,15 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         } else if (res === 'missed') {
           SoundKit.play('miss');
           me.shotWin = 'none';
-          ballSim.launch(ball.position.clone(), new Vector3((Math.random() - 0.5) * 3, 2.5, 1.5));
+          // EARLY is short off the front and comes back at me, LATE is long off the back; a hand in my
+          // face pushes it short on top of the timing. arcQuality / shotContest were already recorded
+          // at the release, so the iron can answer the shot that was actually taken.
+          deflectMiss(
+            me.char.root.position,
+            arcQuality === 'perfect' ? 0.95 : arcQuality === 'early' || arcQuality === 'late' ? 0.55 : 0.2,
+            (arcQuality === 'early' ? 0.8 : arcQuality === 'late' ? -0.8 : arcQuality === 'brick' ? 0.3 : 0) + shotContest * 0.7,
+            arcQuality === 'brick' ? (Math.random() < 0.5 ? -0.7 : 0.7) : 0,
+          );
           if (finishFoul) {   // HOOPS-MOVE-KIT-A M2: fouled in the air on a miss — the ball back
             finishFoul = false; ctx.setHud({ banner: 'FOULED ON THE FINISH — BALL BACK' });
             setTimeout(() => ctx.setHud({ banner: '' }), 900);
@@ -517,7 +541,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           } else {
             ctx.setHud({ banner: 'RIMS OUT' });
             setTimeout(() => ctx.setHud({ banner: '' }), 700);
-            later(900, () => boardAfterMiss(ctx));   // O2: the board is a race
+            board = { age: 0, contestedCalled: false, shooter: 'me' };   // O2: the board is LIVE, not a race
           }
         }
       }
@@ -893,6 +917,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     if (finish === 'alleyoop') body.tree.beat(SPORT_CLIP.dunkFinishTomahawk);
     else body.tree.beat('jumpshot', { onSettle: () => body.tree.beat('bball_follow_through', { fadeSec: 0.1 }) });
     body.shotWin = 'release'; body.shotSec = 0;
+    // my teammate's miss is readable too, and it is MY team's board to go and get
+    mateMiss = { from: ball.getAbsolutePosition().clone(), team: 'me', quality01: 0.6, short: 0.2, lateral: (Math.random() - 0.5) * 0.8 };
     mateArc.start(ball.getAbsolutePosition(), RIM, made, finish === 'alleyoop' ? 'layup' : 'jumper');
     if (finish === 'alleyoop') { ctx.juice.shake(0.12, 120); ctx.feel?.impact?.(0.5); }
     if (made) {
@@ -1354,12 +1380,126 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     console.info(`[3V3-OFF] box out (${whose === 'mine' ? 'they seal, we crash' : 'we seal, they crash'})`);
     ctx0?.setHud({ hint: whose === 'theirs' ? 'BOX OUT — hold L1 to seal your man' : 'CRASH THE GLASS · hold L1 to box out' });
   }
+  /** The ball is someone's again: nobody is chasing it. */
+  function endChase(): void {
+    for (const f of foes) foeBrain(f)?.chaseBall(null);
+    for (const m of mates) mateBrain(m)?.chaseBall(null);
+  }
   function endBoxOut(): void {
     if (!boxingOut) return;
     boxingOut = false;
     for (const f of foes) foeBrain(f)?.boxOut(null);
     for (const m of mates) { const mb = mateBrain(m); if (mb) { mb.boxOut(null); if (mb.job === 'crash' || mb.job === 'boxout') mb.setJob('space'); } }
   }
+  /**
+   * The miss meets the iron it earned (ported from 1v1's HOOPS-LIVE-BALL).
+   *
+   * Every miss in here used to be `new Vector3((Math.random()-0.5)*3, 2.5, 1.5)` — the ball never
+   * touched the ring, so a short shot and a long one rebounded identically and told the shooter
+   * nothing. Short is the front iron and comes BACK at the shooter; long is the back iron and runs
+   * AWAY; a contested shot misses short. With six bodies on the floor this matters more than in 1v1,
+   * because where the ball goes is what decides who had a chance at it.
+   */
+  function deflectMiss(shooterPos: Vector3, q01: number, short: number, lateral: number): void {
+    const toShooter = shooterPos.subtract(RIM); toShooter.y = 0;
+    const r = resolveRim(RIM, toShooter, forcedMissProfile(q01, { short, lateral }), 0.06);
+    ballSim.launch(r.contact, r.outVel);
+    SoundKit.play('impact', { pitch: 0.85, volume: 0.3 });
+    console.info(`[3V3-RIM] ${r.kind} — ${r.label}`);
+  }
+
+  /** All six bodies as the loose ball sees them — a floored or stunned body cannot go up for it. */
+  function reboundBodies(): BodyRef[] {
+    const mk = (id: string, b: Body, boxing: boolean): BodyRef => ({
+      id, pos: b.char.root.position, radius: 0.34, reachY: 2.15,
+      boxingOut: boxing, unavailable: b.floored || b.stunSec > 0,
+    });
+    return [
+      mk('me', me, !!me.slot.intent.brace),
+      ...mates.map((m, i) => mk(`mate${i}`, m, !!mateBrain(m)?.boxing)),
+      ...foes.map((f, i) => mk(`foe${i}`, f, !!foeBrain(f)?.boxing)),
+    ];
+  }
+
+  /**
+   * THE LIVE BOARD — the ball is in play off the iron and one of six bodies comes down with it.
+   *
+   * boardWinner read the ball's position once to compare distances, added a seal bonus and rolled a
+   * die. Now the ball bounces off chests on the way down and is secured by whoever physically reaches
+   * it, so crashing the glass and sealing your man are positions rather than modifiers.
+   * boardAfterMiss survives as the stall guard.
+   */
+  function liveBoard(ctx: ModeContext, dt: number): void {
+    if (!board) return;
+    board.age += dt;
+    const bodies = reboundBodies();
+    // EVERY AI BODY GOES FOR IT. Without this the brains held their seals and crash lanes while the ball
+    // rolled away: measured 8-19 m from the ball on all six bodies, and the board fell through to the
+    // dice roll. The crash lane is a guess about where a rebound lands; the ball is where it actually is.
+    const at = ballSim.pos;
+    for (const f of foes) if (!f.floored && f.stunSec <= 0) foeBrain(f)?.chaseBall(at);
+    for (const m of mates) if (!m.floored && m.stunSec <= 0) mateBrain(m)?.chaseBall(at);
+
+    const hit = ballVsBodies(ballSim.prevPos as Vector3, ballSim.pos, ballSim.vel, ballSim.radius, bodies);
+    if (hit) {
+      ballSim.vel.copyFrom(hit.outVel);
+      ballSim.pos.copyFrom(hit.contact);
+      ball.position.copyFrom(ballSim.pos);
+      SoundKit.play('impact', { pitch: 1.1, volume: 0.22 });
+      console.info(`[3V3-BOARD] tipped off ${hit.body.id}`);
+    }
+
+    // OUT OF PLAY — a dead ball, awarded at once. The bodies are clamped inside the court and the ball
+    // was not, so waiting for someone to reach it could only ever time out.
+    if (ballOutOfPlay(ballSim.pos, HOOPS_BALL_BOUNDS)) {
+      const toTeam: 'me' | 'foe' = board.shooter === 'me' ? 'foe' : 'me';
+      board = null; endChase(); endBoxOut(); ballSim.stop();
+      console.info(`[3V3-BOARD] the rebound went out of play — dead ball to ${toTeam}`);
+      SoundKit.play('whistle');
+      ctx.setHud({ banner: toTeam === 'me' ? 'OUT OF BOUNDS — YOUR BALL' : 'OUT OF BOUNDS — THEIR BALL' });
+      setTimeout(() => ctx.setHud({ banner: '' }), 800);
+      if (toTeam === 'me') resetPossession(true); else void opponentPossession(ctx);
+      return;
+    }
+
+    const r = resolvePickup(ballSim.pos, ballSim.vel, bodies);
+    if (r.contested && !board.contestedCalled) {
+      board.contestedCalled = true;
+      ctx.setHud({ banner: 'CONTESTED BOARD!' });
+      setTimeout(() => ctx.setHud({ banner: '' }), 600);
+    }
+    if (r.winner && r.bobbled) {
+      ballSim.vel.copyFrom(bobbleVelocity(ballSim.vel));
+      console.info(`[3V3-BOARD] bobbled by ${r.winner.id} — still live`);
+      return;
+    }
+    if (r.winner) {
+      const team: 'me' | 'foe' = r.winner.id.startsWith('foe') ? 'foe' : 'me';
+      const putback = boardOutcome(team, board.shooter) === 'putback';
+      board = null;
+      endChase();
+      endBoxOut();
+      ballSim.stop();
+      console.info(`[3V3-BOARD] ${r.winner.id} secures it${r.contested ? ' (contested)' : ''}${putback ? ' — OFFENSIVE, play on' : ''}`);
+      ctx.setHud({
+        banner: team === 'me'
+          ? (putback ? 'OFFENSIVE BOARD — PUT IT BACK!' : r.contested ? 'YOU RIP IT AWAY — YOUR BALL' : 'YOUR BOARD')
+          : (putback ? 'THEIR OFFENSIVE BOARD — CONTEST IT!' : 'THEIR BOARD'),
+      });
+      setTimeout(() => ctx.setHud({ banner: '' }), 700);
+      if (team === 'me') resetPossession(true); else void opponentPossession(ctx);
+      return;
+    }
+
+    if (board.age > 4) {
+      const why = bodies.map((x) => `${x.id} d=${Math.hypot(ballSim.pos.x - x.pos.x, ballSim.pos.z - x.pos.z).toFixed(2)}${x.unavailable ? '!' : ''}`).join(' ');
+      console.info(`[3V3-BOARD] nobody came down with it (${why}) — falling back to the race`);
+      board = null;
+      endChase();
+      boardAfterMiss(ctx);
+    }
+  }
+
   /** O2: the board is a race — the nearest body names the favourite, a seal is worth a body length, the bounce jitters it. */
   function boardAfterMiss(ctx: ModeContext): void {
     const bodies: BoardBody[] = [
@@ -1654,6 +1794,12 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     // BIOMECH-HOOPS-WAVE1: the rival's jumper flows into the held follow-through (G5) and the ball FLIES (G6)
     shooter.tree.beat('jumpshot', { onSettle: () => shooter.tree.beat('bball_follow_through', { fadeSec: 0.1 }) });
     shooter.shotWin = 'release'; shooter.shotSec = 0;
+    // the contest my team put on him decides how he misses: a hand in his face is short off the front
+    mateMiss = {
+      from: shooter.char.root.position.clone(), team: 'foe',
+      quality01: Math.max(0.15, 0.85 - defenseFactor * 0.5),
+      short: defenseFactor * 0.8, lateral: (Math.random() - 0.5) * 0.9,
+    };
     mateArc.start(ball.getAbsolutePosition(), RIM, made, 'jumper', alteredApex(defenseFactor));
     startBoxOut('theirs');   // O2: my team seals their bodies while the ball is up
     if (made) {

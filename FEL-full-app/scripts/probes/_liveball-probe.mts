@@ -12,6 +12,7 @@
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 const BASE = process.env.BASE ?? 'http://localhost:3061';
+const MODE = process.env.MODE ?? 'onevone';   // onevone | threevthree
 const MAXMS = Number(process.env.MAXMS ?? 150000);
 const exe = (() => {
   const root = process.env.HOME + '/Library/Caches/ms-playwright';
@@ -24,8 +25,8 @@ const rim: string[] = [], board: string[] = [], banners: string[] = [];
 let errors = 0;
 p.on('console', (m) => {
   const x = m.text();
-  if (/\[1V1-RIM\]/.test(x)) rim.push(x);
-  if (/\[1V1-BOARD\]/.test(x)) board.push(x);
+  if (/\[(1V1|3V3)-RIM\]/.test(x)) rim.push(x);
+  if (/\[(1V1|3V3)-BOARD\]/.test(x)) board.push(x);
   if (m.type() === 'error' && !/401 \(Unauthorized\)/.test(x)) errors++;
 });
 p.on('pageerror', (e) => { errors++; console.log('PAGEERROR', e.message.slice(0, 160)); });
@@ -34,7 +35,7 @@ await p.addInitScript(`(() => {
     buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })) };
   window.__PAD = pad; navigator.getGamepads = () => [pad];
 })()`);
-await p.goto(`${BASE}/dev/mode/onevone`, { waitUntil: 'domcontentloaded' });
+await p.goto(`${BASE}/dev/mode/${MODE}`, { waitUntil: 'domcontentloaded' });
 await p.waitForSelector('canvas', { timeout: 240000 });
 await p.waitForTimeout(9000);
 const start = p.locator('text=/^START$/').first();

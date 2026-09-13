@@ -163,3 +163,27 @@ export type BoardOutcome = 'putback' | 'possession';
 export function boardOutcome(winner: string, shooter: string): BoardOutcome {
   return winner === shooter ? 'putback' : 'possession';
 }
+
+/** Where the BALL may legally be. Deliberately NOT the body clamp — see ballOutOfPlay. */
+export interface BallBounds { minX: number; maxX: number; minZ: number; maxZ: number }
+
+/**
+ * Is the loose ball out of play?
+ *
+ * A rebound that leaves the floor is a DEAD BALL. Without that rule the board simply waits: the bodies
+ * are clamped inside the court while the ball is not, so every body converges on the boundary at an
+ * identical distance and nobody can ever reach it (measured in 3v3: all six pinned 8.3-9.4 m away,
+ * twice in four boards, each burning the full stall timeout).
+ *
+ * IMPORTANT, and the bug this signature exists to prevent: the ball's bounds are NOT the body clamp.
+ * The rim sits at z -0.6 while bodies are clamped to z >= 0.5, so the ring is over a metre BEHIND the
+ * body limit — reusing the body clamp called every single rebound out of bounds (measured 5 of 5) and
+ * the dead-ball rule swallowed the whole board. Pass real ball bounds that contain the area behind the
+ * backboard, which is why this takes an explicit region instead of a width and a depth.
+ */
+export function ballOutOfPlay(pos: { x: number; z: number }, b: BallBounds): boolean {
+  return pos.x < b.minX || pos.x > b.maxX || pos.z < b.minZ || pos.z > b.maxZ;
+}
+
+/** The half-court ball region for the hoops modes: wide of the sidelines, and behind the backboard. */
+export const HOOPS_BALL_BOUNDS: BallBounds = { minX: -9.5, maxX: 9.5, minZ: -2.5, maxZ: 16.5 };
