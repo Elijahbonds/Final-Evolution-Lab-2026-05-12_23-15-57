@@ -95,6 +95,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';              // the miss meets the iron it earned
+import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT } from '../core/Ref';   // the rules live in the handbook, not in here
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
 import { attachBallToHand, releaseBall, flushThroughRim, clankOffRim } from '../anim/ballRig';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the dunk's Posture Poses, shared
@@ -167,6 +168,11 @@ const TARGET_SCORE = 11;
 // 6.71m in the corners and 7.24m at the top, and that gap is the shot selection.
 // isThree() answers it per angle.
 /** Metres of rebound advantage for holding BOX OUT — worth a body length. */
+/** The paint, as a floor radius from the ring — the ref's three-second clock runs inside it.
+ *  A real key is ~4.9 m deep and 4.9 m wide measured from the baseline, so the ring sits well inside it;
+ *  2.6 m was tighter than any actual lane and a defender's body denies that ground anyway (measured: a
+ *  handler walking at the ring was held at 3.19 m and never entered). 3.6 m is the honest half-court key. */
+const PAINT_RADIUS = 3.6;
 const BOX_OUT_EDGE = 1.6;
 /** How much a board is decided by the bounce rather than by position. */
 const REBOUND_JITTER = 2.6;
@@ -225,6 +231,13 @@ export const OneVOneMode: ModeDefinition = (() => {
   let shotMiss: { quality01: number; short: number; lateral: number } | null = null;
   /** A live board: the ball is off the iron and nobody has secured it. Bodies must go and get it. */
   let board: { age: number; contestedCalled: boolean; shooter: 'mine' | 'defense' } | null = null;
+  /** Seconds I have been standing in the paint with the ball — the ref's three-second clock. */
+  let paintSec = 0;
+  /** The ball's height last frame, so the ref can tell a ball on the way UP from one on the way DOWN. */
+  let prevBallY = 0;
+  /** One goaltending call per shot — the test is true for many frames of one falling ball. */
+  let goaltendCalled = false;
+  let paintWarned = false;   // dev-only: the warning logs once per trip into the paint
   let ended = false;
   let foeStunSec = 0;
   /** The rival is on the floor (posterized) — held there by the tree until the stun ends. */
@@ -368,7 +381,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   function resetPositions(): void {
     possessionToken++;
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
-    currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0;
+    currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
@@ -631,6 +644,50 @@ export const OneVOneMode: ModeDefinition = (() => {
       } else if (loose && !dunking) {
         ballSim.step(dt);
         if (board) liveBoard(ctx, dt);
+      }
+
+      // ── THE REF, per frame ──────────────────────────────────────────────────────────────────────
+      // THREE SECONDS: an offensive body may not camp in the paint. Without it the strongest strategy in
+      // a half-court game is to stand under the ring and wait, which is why the rule exists in basketball.
+      // The clock resets the instant I leave, so cutting through is free — it is camping that is called.
+      if (possession === 'mine' && carrying && !dunking && !ended) {
+        paintSec = paintClock(paintSec, distXZ(me.root.position, RIM_FLOOR) < PAINT_RADIUS, dt);
+        if (paintSec === 0) paintWarned = false;
+        if (paintSec >= THREE_SECOND_LIMIT) {
+          paintSec = 0;
+          const call = judge('three_seconds', { offense: 'me' });
+          console.info(`[1V1-REF] ${call.id} → ${call.ball}`);
+          if (call.whistle) SoundKit.play('whistle');
+          swing('turnover');
+          ctx.setHud({ momentum });
+          bannerFlash(ctx, `${call.banner} — THEIR BALL`, 1000);
+          later(900, () => startDefense(ctx, 'CHECK UP — DEFEND!'));
+        } else if (paintSec > THREE_SECOND_LIMIT - 1) {
+          ctx.setHud({ hint: 'GET OUT OF THE PAINT' });   // the ref warns before he calls it
+          if (process.env.NODE_ENV === 'development' && !paintWarned) {
+            paintWarned = true;
+            console.info(`[1V1-REF] paint clock ${paintSec.toFixed(2)}s — warning`);
+          }
+        }
+      } else { paintSec = 0; paintWarned = false; }
+
+      // GOALTENDING: a ball touched on its way DOWN counts. The existing block fires at the RELEASE,
+      // which is a clean block on the way up; this is the other case — a late contest jump that reaches
+      // a ball already falling toward the ring. Swatting that away used to be free, which made a
+      // mistimed jump strictly better than a well-timed one.
+      const ballVelY = dt > 1e-5 ? (ball.position.y - prevBallY) / dt : 0;
+      prevBallY = ball.position.y;
+      if (arc.active && possession === 'defense' && myJumpAge !== Infinity && !goaltendCalled
+          && distXZ(me.root.position, RIM_FLOOR) < 1.5
+          && isGoaltending(ballVelY, ball.position.y, RIM.y)) {
+        goaltendCalled = true;
+        const call = judge('goaltending', { offense: 'foe', shooter: 'foe' });
+        console.info(`[1V1-REF] ${call.id} (ball y ${ball.position.y.toFixed(2)} falling ${ballVelY.toFixed(1)}) → ${call.ball}`);
+        if (call.whistle) SoundKit.play('whistle');
+        arc.active = false;
+        foeScore += arcPoints || 2;
+        ctx.setHud({ foeScore, banner: call.banner });
+        later(900, () => { ctx.setHud({ banner: '' }); if (!checkGameOver(ctx)) resetPositions(); });
       }
       // BIOMECH-HOOPS-WAVE1 G6: the drive dunk's make flushes THROUGH the iron from the release, then drops out of the net
       if (dunkFlush) {
@@ -1070,7 +1127,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   function startDefense(ctx: ModeContext, banner: string): void {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
-    defPhase = 'check'; attacker.reset(); gatherShown = false; stepbackShown = false;
+    defPhase = 'check'; attacker.reset(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
@@ -1670,14 +1727,18 @@ export const OneVOneMode: ModeDefinition = (() => {
       console.info(`[1V1-BOARD] tipped off ${hit.body.id}`);
     }
 
-    // OUT OF PLAY — a dead ball. The bodies are held inside the court; a ball that is not cannot be won.
+    // OUT OF PLAY — the REF calls it, reading the handbook. The mode reports the fact (the ball left the
+    // floor, and who shot it) and carries out whatever comes back; it does not decide the consequence.
     if (ballOutOfPlay(ballSim.pos, HOOPS_BALL_BOUNDS)) {
-      const mine = (board.shooter === 'mine') === false;   // the shooter's ball going out is the other team's
+      const call = judge('out_of_bounds', {
+        offense: possession === 'mine' ? 'me' : 'foe',
+        shooter: board.shooter === 'mine' ? 'me' : 'foe',
+      });
       board = null; foeBrain?.boxOut(null); foeSealing = false; ballSim.stop(); loose = false;
-      console.info(`[1V1-BOARD] out of play — dead ball to ${mine ? 'me' : 'foe'}`);
-      SoundKit.play('whistle');
-      if (mine) { bannerFlash(ctx, 'OUT OF BOUNDS — YOUR BALL', 900); resetPositions(); }
-      else startDefense(ctx, 'OUT OF BOUNDS — THEIR BALL, DEFEND!');
+      console.info(`[1V1-REF] ${call.id} → ${call.ball}`);
+      if (call.whistle) SoundKit.play('whistle');
+      if (call.ball === 'me') { bannerFlash(ctx, `${call.banner} — YOUR BALL`, 900); resetPositions(); }
+      else startDefense(ctx, `${call.banner} — THEIR BALL, DEFEND!`);
       return;
     }
 

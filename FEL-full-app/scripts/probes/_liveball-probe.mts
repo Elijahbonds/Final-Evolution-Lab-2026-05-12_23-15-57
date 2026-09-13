@@ -21,11 +21,12 @@ const exe = (() => {
 })();
 const b = await chromium.launch({ executablePath: exe, args: ['--use-gl=angle', '--use-angle=metal'] });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
-const rim: string[] = [], board: string[] = [], banners: string[] = [];
+const rim: string[] = [], board: string[] = [], banners: string[] = [], ref: string[] = [];
 let errors = 0;
 p.on('console', (m) => {
   const x = m.text();
   if (/\[(1V1|3V3)-RIM\]/.test(x)) rim.push(x);
+  if (/\[(1V1|3V3)-REF\]/.test(x)) ref.push(x);
   if (/\[(1V1|3V3)-BOARD\]/.test(x)) board.push(x);
   if (m.type() === 'error' && !/401 \(Unauthorized\)/.test(x)) errors++;
 });
@@ -99,6 +100,8 @@ console.log('=== RIM CONTACTS (' + rim.length + ')');
 for (const r of rim.slice(0, 24)) console.log('  ' + r);
 console.log('=== BOARD EVENTS (' + board.length + ')');
 for (const r of board.slice(0, 30)) console.log('  ' + r);
+console.log('=== REF CALLS (' + ref.length + ')');
+for (const r of ref.slice(0, 20)) console.log('  ' + r);
 console.log('=== BANNERS (' + bn.length + ')');
 console.log('  ' + bn.filter((x) => x).join(' | ').slice(0, 1400));
 console.log('errors: ' + errors);
