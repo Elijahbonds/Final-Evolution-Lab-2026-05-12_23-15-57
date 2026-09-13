@@ -15,7 +15,7 @@
 // New in the RideWorld contract: `obstacles` (position+radius list — empty
 // where a world has none). Modes shipped alongside consume it.
 
-import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, TransformNode, Vector3 } from '@babylonjs/core';
+import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, TransformNode, Vector3, Matrix, Material } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
 import { applyFloorDetailToMesh } from '../visual/groundTextures';
@@ -230,30 +230,57 @@ export function buildSlopeRun(scene: Scene): RideWorld {
   // 3.2m -> 5.0m a side (6.4m -> 10m gate to gate): comfortable at the top of
   // the course, genuinely demanding at the bottom. Gate 0 sits dead ahead so
   // the run starts fair rather than with an immediate cut across the hill.
+  const gateLeftM: Matrix[] = [], gateRightM: Matrix[] = [];
   for (let i = 0; i < SLALOM_GATES; i++) {
     const dist = slalomGateDist(i);
     const cx = slalomGateX(i);
     markers.push(onPiste(cx, dist));
     for (const side of [-1, 1]) {
-      const pole = MeshBuilder.CreateCylinder('gate', { diameter: 0.12, height: 1.6 }, scene);
-      pole.position = onPiste(cx + side * 1.7, dist).add(new Vector3(0, 0.8, 0));
-      pole.material = side < 0 ? gateMatL : gateMatR;
-      all.push(pole);
+      // one MATRIX per pole, not one mesh — batched below
+      (side < 0 ? gateLeftM : gateRightM).push(
+        Matrix.Translation(...(() => { const q = onPiste(cx + side * 1.7, dist).add(new Vector3(0, 0.8, 0)); return [q.x, q.y, q.z] as [number, number, number]; })()),
+      );
     }
   }
+  // THIN INSTANCES for the slalom poles. 24 poles were 24 draw calls and the mode flags its own budget at
+  // `draws 786 > 600`; they are the same cylinder in two colours, which is exactly what thin instances are for. Two
+  // masters (one per gate colour) carry the lot, so 24 draws become 2.
+  const gatePole = (name: string, m: Material, mats: Matrix[]): AbstractMesh | null => {
+    if (!mats.length) return null;
+    const master = MeshBuilder.CreateCylinder(name, { diameter: 0.12, height: 1.6 }, scene);
+    master.material = m;
+    const buf = new Float32Array(mats.length * 16);
+    mats.forEach((mm, i) => mm.copyToArray(buf, i * 16));
+    master.thinInstanceSetBuffer('matrix', buf, 16, true);
+    return master;
+  };
+  { const l = gatePole('gate', gateMatL, gateLeftM); if (l) all.push(l); }
+  { const r = gatePole('gate', gateMatR, gateRightM); if (r) all.push(r); }
 
   // trees (scenery, off-piste) — unchanged from M39
   const trunkM = mat(scene, 'trunk', '#5a3d26'), leafM = mat(scene, 'leaf', '#1d4d2b');
+  // 22 trees were 44 draw calls (a trunk and a leaf each) and every one is the same pair of cylinders. Batched to two
+  // masters: 44 draws become 2. Together with the poles this is 68 of the mode's ~786.
+  const trunkMats: Matrix[] = [], leafMats: Matrix[] = [];
   for (let i = 0; i < 22; i++) {
     const dist = 10 + i * 9.5;
     const x = (i % 2 ? 1 : -1) * (15 + (i * 7) % 4);
     const p = onPiste(x, dist);
-    const trunk = MeshBuilder.CreateCylinder('trunk', { diameter: 0.3, height: 1.4 }, scene);
-    trunk.position = p.add(new Vector3(0, 0.7, 0)); trunk.material = trunkM;
-    const leaf = MeshBuilder.CreateCylinder('leaf', { diameterTop: 0, diameterBottom: 1.9, height: 3.2 }, scene);
-    leaf.position = p.add(new Vector3(0, 3, 0)); leaf.material = leafM;
-    all.push(trunk, leaf);
+    const t = p.add(new Vector3(0, 0.7, 0)), l = p.add(new Vector3(0, 3, 0));
+    trunkMats.push(Matrix.Translation(t.x, t.y, t.z));
+    leafMats.push(Matrix.Translation(l.x, l.y, l.z));
   }
+  const batch = (name: string, opts: Parameters<typeof MeshBuilder.CreateCylinder>[1], m: Material, mats: Matrix[]): AbstractMesh | null => {
+    if (!mats.length) return null;
+    const master = MeshBuilder.CreateCylinder(name, opts, scene);
+    master.material = m;
+    const buf = new Float32Array(mats.length * 16);
+    mats.forEach((mm, i) => mm.copyToArray(buf, i * 16));
+    master.thinInstanceSetBuffer('matrix', buf, 16, true);
+    return master;
+  };
+  { const t = batch('trunk', { diameter: 0.3, height: 1.4 }, trunkM, trunkMats); if (t) all.push(t); }
+  { const l = batch('leaf', { diameterTop: 0, diameterBottom: 1.9, height: 3.2 }, leafM, leafMats); if (l) all.push(l); }
 
   // ROCKS — actually on the piste, between gates, never ON a gate line
   const obstacles: RideObstacle[] = [];
