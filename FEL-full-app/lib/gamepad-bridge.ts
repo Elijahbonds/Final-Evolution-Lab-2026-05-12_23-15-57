@@ -7,6 +7,7 @@
  */
 
 import type { VCScheme } from './input-schemes';
+import { readPad, type PadLike, type PadButton } from '@/lib/input/profiles';
 import {
   resolveShoulders,
   resolveLook,
@@ -95,20 +96,26 @@ export class PhysicalGamepadPoller {
     } catch { return; }
     if (!pad) { this.releaseAll(); return; }
 
-    const btn = (i: number) => !!pad!.buttons[i]?.pressed;
-    const posIndex: Record<string, number> = { a: 0, b: 1, x: 2, y: 3 };
+    // Input & Presence Phase A (2026-09-13): read through the PROFILE rather than straight into
+    // buttons[0..15]. This file was half-converted — it imported AXIS_INDEX for the right stick and then
+    // indexed the left one by hand — which is the state that hides a mapping bug best. A Switch Pro's face
+    // buttons are in a different physical order, and nothing here could previously notice.
+    const c = readPad(pad as unknown as PadLike);
+    const CANON: Record<string, PadButton> = { a: 'A', b: 'B', x: 'X', y: 'Y' };
 
     // Face buttons
     for (const b of scheme.buttons) {
       const id = 'face-' + b.pos;
       this._keyById[id] = b.key;
-      this.edge(id, b.key, btn(posIndex[b.pos]));
+      this.edge(id, b.key, c.buttons[CANON[b.pos] ?? 'A']);
     }
     // Legacy single trigger (e.g. BLOCK/GUARD): fires on ANY shoulder button.
     if (scheme.trigger) {
       const id = 'trig';
       this._keyById[id] = scheme.trigger.key;
-      this.edge(id, scheme.trigger.key, btn(4) || btn(5) || btn(6) || btn(7));
+      // "any shoulder" keeps reading the raw analog trigger values, because a half-pulled trigger is not a
+      // pressed BUTTON on every pad and this legacy binding wants either
+      this.edge(id, scheme.trigger.key, c.buttons.L1 || c.buttons.R1 || c.triggers.L > 0.3 || c.triggers.R > 0.3);
     }
     // Multi-shoulder array (board spins, tennis lob/topspin, …) mapped to the
     // individual L1/R1/L2/R2 buttons via the unified controller map.
@@ -118,15 +125,15 @@ export class PhysicalGamepadPoller {
       if (!t) return;
       const id = 'sh-' + slot;
       this._keyById[id] = t.key;
-      this.edge(id, t.key, btn(SHOULDER_PAD_INDEX[slot]));
+      const down = slot === 'l1' ? c.buttons.L1 : slot === 'r1' ? c.buttons.R1
+        : slot === 'l2' ? c.triggers.L > 0.3 : c.triggers.R > 0.3;
+      this.edge(id, t.key, down);
     });
     // Right stick (look / camera / aim) → same synthetic-keyboard bridge. Dormant
     // for modes that declare no `look`; the Camera Rig phase (P4) lights it up.
     const look = resolveLook(scheme);
     if (look) {
-      const rx = pad.axes[AXIS_INDEX.rightX] ?? 0;
-      const ry = pad.axes[AXIS_INDEX.rightY] ?? 0;
-      const rd = stickToDirs(rx, ry);
+      const rd = stickToDirs(c.rx, c.ry);
       if (look.left) { this._keyById['look-left'] = look.left; this.edge('look-left', look.left, rd.left); }
       if (look.right) { this._keyById['look-right'] = look.right; this.edge('look-right', look.right, rd.right); }
       if (look.up) { this._keyById['look-up'] = look.up; this.edge('look-up', look.up, rd.up); }
@@ -134,17 +141,15 @@ export class PhysicalGamepadPoller {
     }
     // Directions: dpad buttons OR left stick past deadzone.
     if (scheme.dir) {
-      const lx = pad.axes[0] ?? 0;
-      const ly = pad.axes[1] ?? 0;
-      const stickLeft = lx < -this.DEADZONE;
-      const stickRight = lx > this.DEADZONE;
-      const stickUp = ly < -this.DEADZONE;
-      const stickDown = ly > this.DEADZONE;
+      const stickLeft = c.lx < -this.DEADZONE;
+      const stickRight = c.lx > this.DEADZONE;
+      const stickUp = c.ly < -this.DEADZONE;
+      const stickDown = c.ly > this.DEADZONE;
       const d = scheme.dir;
-      if (d.left) { this._keyById['d-left'] = d.left; this.edge('d-left', d.left, btn(14) || stickLeft); }
-      if (d.right) { this._keyById['d-right'] = d.right; this.edge('d-right', d.right, btn(15) || stickRight); }
-      if (d.up) { this._keyById['d-up'] = d.up; this.edge('d-up', d.up, btn(12) || stickUp); }
-      if (d.down) { this._keyById['d-down'] = d.down; this.edge('d-down', d.down, btn(13) || stickDown); }
+      if (d.left) { this._keyById['d-left'] = d.left; this.edge('d-left', d.left, c.dpad.left || stickLeft); }
+      if (d.right) { this._keyById['d-right'] = d.right; this.edge('d-right', d.right, c.dpad.right || stickRight); }
+      if (d.up) { this._keyById['d-up'] = d.up; this.edge('d-up', d.up, c.dpad.up || stickUp); }
+      if (d.down) { this._keyById['d-down'] = d.down; this.edge('d-down', d.down, c.dpad.down || stickDown); }
     }
   }
 }

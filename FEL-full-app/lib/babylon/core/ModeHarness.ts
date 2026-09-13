@@ -246,6 +246,10 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   const devHandle = {
     scene, modeId: def.modeId, hero: () => heroRef.current,   // hero for the framing probe (phase 6)   // dev probes (ship pass 4)
     instrument: () => new SceneInstrumentation(scene),
+    // INPUT (2026-09-13): the bus itself, so a probe can subscribe and read the CANONICAL events a pad
+    // produces. That is what makes the controller-profile claim checkable on a running game rather than only
+    // against fixtures — a Switch Pro's bottom face button has to arrive in a real mode as A.
+    input,
   };
   const devWindow = window as unknown as { __FEL_DEV__?: unknown };
   if (process.env.NODE_ENV === 'development') devWindow.__FEL_DEV__ = devHandle;

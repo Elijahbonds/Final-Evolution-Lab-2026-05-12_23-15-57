@@ -193,6 +193,13 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   /** A mark on the player's own baseline showing the bisector to recover to. */
   let recoverMark: AbstractMesh | null = null;
   let swingingNow = false, splittingNow = 0;
+  /** Reused so the per-frame camera feed allocates nothing. */
+  const camVel = new Vector3();
+  const camSubject = new Vector3();
+  /** How much of the player's lateral travel the camera takes. The rest is pan. */
+  const CAM_PAN_FRAC = 0.35;
+  /** And it never leaves this box, whatever the player does — the scenery starts just past the sidelines. */
+  const CAM_PAN_M = 2.6;
 
   function label(): string {
     if (tennisScore) return tennisScore.callFor(0);
@@ -655,7 +662,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   return {
     modeId: o.modeId,
     mood: 'goldenHour',
-    camPreset: 'hoops',
+    camPreset: 'net',   // see CameraDirector: 'hoops' is an isolation cam and a running net player outruns it
 
     async load(ctx: ModeContext) {
       venue = mountVenue(ctx, o.venueId, { keepGameplayCamera: true });   // M104 gap: tennis and volleyball rendered through the venue orbit camera — the hero sat at 44 px, cut off at the frame's bottom
@@ -744,7 +751,15 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         const at = ball ? ball.getAbsolutePosition() : new Vector3(0, o.cfg.netHeight, 0);
         return { pose, legs, aim: at, eyes: at, window: w };
       }, 'NET-PP');
-      ctx.objectiveRef.current = new Vector3(0, o.cfg.netHeight, 0);
+      // FRAME THE PLAYER AGAINST THE BALL, not against the middle of the net.
+      //
+      // The objective was a fixed point at the net's centre, and the follow camera's fitTwo frames the hero
+      // against whatever this is — so with the player pinned to the middle of the baseline it looked correct
+      // and, the moment CourtFootwork let them run to the sideline, the camera stayed at x 0 and the player
+      // left the frame (measured: hero x 7.1, cam x 0, projected −274 px on a 900 px view). `ball.position`
+      // is a LIVE reference that the flight mutates in place, so the camera now tracks the rally the way a
+      // broadcast does: both ends of the exchange stay in shot because the ball IS the other end.
+      ctx.objectiveRef.current = ball.position;
       ctx.camDirector.snapTo(me.root.position, new Vector3(0, 1, 0));
       pushHud(ctx);
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 6, modeId: o.modeId });
@@ -800,6 +815,20 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         // reads as a body on rails. Capped at 12° — a person is not a snowboard.
         me.root.rotation.z += (fieldBank(-foot.vx / FOOT.topSpeed, Math.abs(foot.vx) / FOOT.topSpeed) - me.root.rotation.z) * Math.min(1, 9 * dt);
         const step = foot.x - before;
+        // THE CAMERA HAS TO FOLLOW NOW. This mode called snapTo() once at load and never update() again —
+        // correct while the player was pinned to the middle of the baseline, and the exact mirror of the
+        // defect the board pass found (those had update() and no snapTo). With footwork, a lateral sprint
+        // left the camera at x 0 and the player at x 7.1, off the left edge of the frame, with FrameGuard
+        // auto-recentering mid-rally. Fed the player's own velocity so the follow leads the run.
+        // …but it PANS, it does not chase. Feeding the player's raw position walked the camera out to the
+        // sideline and straight into the palm trees standing there (screenshotted: the frame was entirely
+        // foliage). A tennis camera sits behind the middle of the baseline and turns; so the subject handed
+        // to the director is the player's position with its lateral travel damped and clamped, which keeps
+        // the camera inside the court's own footprint while the AIM still follows the rally.
+        const camX = Math.max(-CAM_PAN_M, Math.min(CAM_PAN_M, foot.x * CAM_PAN_FRAC));
+        camSubject.set(camX, me.root.position.y, me.root.position.z);
+        camVel.set(foot.vx * CAM_PAN_FRAC, 0, 0);
+        ctx.camDirector.update(camSubject, camVel, ball ? ball.position : null);
         const bodyRightX = Math.cos(me.root.rotation.y);
         // the tree owns the clips: the shuffle INTENT in the body frame, plus the beat latches — fed every frame, every phase
         meTree.update({ move: step ? (step * bodyRightX > 0 ? 1 : -1) : 0, swing: meSwing, serve: meServe, block: meBlock });

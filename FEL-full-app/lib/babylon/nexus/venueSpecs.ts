@@ -556,7 +556,13 @@ const VENUE_MAP_KEYS: Record<string, string> = {
   // the rim sits at world origin in all four specs, where the map's painted baseline hoop was tuned to land
   basketball_3v3: 'venice-blue-court', basketball_dunk: 'venice-blue-court', basketball_h2h: 'venice-blue-court', court_carnival: 'venice-blue-court',
   skateboarding: 'venice-skatepark',
-  tennis: 'tennis-court',
+  // tennis: NO map (2026-09-13). The scan named 'tennis-court' measures 18.8 x 18 m — that is not a tennis
+  // court, which is 10.97 x 23.77. The rally geometry (RallyCore.TENNIS: 11 m wide, 24 m long) therefore put
+  // both baselines 3 m PAST the scan's edge, and the players stood on bare ground outside the painted lines.
+  // Invisible while the receiver could not move; obvious the moment CourtFootwork let them run. The spec's
+  // own ground is 16 x 34 with `markings: 'tennis'` — correctly proportioned for this rally — so tennis uses
+  // it, the same call karate already made for the same reason (its baked pavilion roofed the fight).
+  // tennis: 'tennis-court',
   soccer: 'soccer-stadium',
   baseball: 'baseball-park',
   golf: 'coastal-links', derby: 'baseball-park', penalty: 'soccer-stadium',   // golf_loop: no map — coastal-links is a ±15 m island, the course runs to z 39

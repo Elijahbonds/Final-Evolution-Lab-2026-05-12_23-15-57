@@ -102,6 +102,13 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   fight:  { distance: 4.2, height: 1.9, minHeight: 1.4, pitchFloorDeg: 4,  pitchCapDeg: 12, targetHeight: 1.15, lag: 0.15, lookAhead: 0.3, fitTwo: true, shoulderOffset: 3.0 },
   // 1v1 isolation — tight and low, broadcast iso-cam framing on the
   // ball-handler vs the defender/hoop
+  // NET SPORTS (2026-09-13). Tennis and volleyball ran on 'hoops' — a 6.2 m ISOLATION camera authored for
+  // 1v1 basketball, where two bodies stand within arm's reach of each other. It was survivable while the net
+  // player could not move; now that CourtFootwork lets them cover the full 14 m width, a lateral sprint
+  // outran the frame and FrameGuard was auto-recentering mid-rally ("hero off-screen, off LEFT", measured
+  // on a Joy-Con run). Further back and higher so both baselines read, and a shorter lag because the thing
+  // being followed now accelerates sideways at 21 m/s².
+  net:    { distance: 11.5, height: 4.6, minHeight: 3.0, pitchFloorDeg: 10, pitchCapDeg: 24, targetHeight: 1.3, lag: 0.08, lookAhead: 0.8, fitTwo: true, fovGain: 0.08, fovAtSpeed: 7.0 },
   hoops:  { distance: 6.2, height: 2.4, minHeight: 1.6, pitchFloorDeg: 6,  pitchCapDeg: 18, targetHeight: 1.3,  lag: 0.11, lookAhead: 1.2, fitTwo: true, fovGain: 0.10, fovAtSpeed: 6.4 },
   // 3v3 — wide enough that all six bodies stay legible, but NOT the old
   // full-court height. This was distance 11 / height 5.2, written for "full-court

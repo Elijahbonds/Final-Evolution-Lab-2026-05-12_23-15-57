@@ -11,6 +11,11 @@ export type FelInput =
   | { t: 'trigger'; side: 'L' | 'R'; value: number };
 
 import { HAPTIC } from '../premium/Haptics';
+// Input & Presence Phase A: the pad is read through a PROFILE now. Everything below keeps its FelInput
+// contract exactly — no mode file and no existing test changes — but the indices it reads are the profile's
+// rather than a hardcoded Standard Gamepad table, and the stick deadzone is radial instead of per-axis.
+import { profileFor, readPad, type ControllerProfile } from '@/lib/input/profiles';
+import { applyRemap, readRemap } from '@/lib/input/remap';
 
 type Listener = (e: FelInput) => void;
 
@@ -108,16 +113,19 @@ export class InputBus {
     this.dropPad();
     this.adoptPad();    // a second pad that is still in takes over at once
   };
+  /** The profile for the pad currently held. Re-resolved on every adopt, because it is a different pad. */
+  private profile: ControllerProfile | null = null;
   private adopt(pad: Gamepad): void {
     if (this.padIndex === pad.index) return;
     this.padIndex = pad.index; this.gamepadActive = true;
     this.lastL = null; this.lastR = null;
-    console.info(`[PAD] adopted slot ${pad.index}: ${pad.id || 'gamepad'}`);
+    this.profile = profileFor(pad);
+    console.info(`[PAD] adopted slot ${pad.index}: ${pad.id || 'gamepad'} → profile "${this.profile.id}" (mapping ${pad.mapping || 'none'})`);
   }
   private dropPad(): void {
     if (this.padIndex === null) return;
     const idx = this.padIndex;
-    this.padIndex = null; this.gamepadActive = false;
+    this.padIndex = null; this.gamepadActive = false; this.profile = null;
     // a pad yanked mid-push must not leave its last stick / trigger / button latched in every mode
     if (this.lastL && (this.lastL.x !== 0 || this.lastL.y !== 0)) this.emit({ t: 'stick', side: 'L', x: 0, y: 0 });
     if (this.lastR && (this.lastR.x !== 0 || this.lastR.y !== 0)) this.emit({ t: 'stick', side: 'R', x: 0, y: 0 });
@@ -161,26 +169,25 @@ export class InputBus {
       if (!pad || pad.connected === false) {
         this.dropPad();                              // the slot emptied without a disconnect event
       } else {
-        const dz = (v: number) => (Math.abs(v) < 0.15 ? 0 : v);
-        this.emitStick('L', dz(pad.axes[0] ?? 0), dz(pad.axes[1] ?? 0));
-        this.emitStick('R', dz(pad.axes[2] ?? 0), dz(pad.axes[3] ?? 0));
-        this.emit({ t: 'trigger', side: 'L', value: pad.buttons[6]?.value ?? 0 });
-        this.emit({ t: 'trigger', side: 'R', value: pad.buttons[7]?.value ?? 0 });
-        const btns: Array<['A'|'B'|'X'|'Y'|'L1'|'R1'|'SELECT'|'START', number]> =
-          [['A', 0], ['B', 1], ['X', 2], ['Y', 3], ['L1', 4], ['R1', 5], ['SELECT', 8], ['START', 9]];
-        // Standard Gamepad API d-pad mapping (buttons 12-15) — keyboard arrows
-        // and the touch overlay's d-pad already emit these same events, so a
-        // real controller's physical d-pad needs to feed the identical path.
-        const dpad: Array<['up'|'down'|'left'|'right', number]> =
-          [['up', 12], ['down', 13], ['left', 14], ['right', 15]];
-        for (const [dir, i] of dpad) {
-          const pressed = !!pad.buttons[i]?.pressed;
+        // ONE read, through the profile: the indices, the axis order and the deadzone are all the pad's own.
+        // A Switch Pro's bottom face button arrives here as A, the same as an Xbox pad's — before this it
+        // arrived as B, on every Switch controller, with nothing in the tree able to notice.
+        const profile = this.profile ?? profileFor(pad);
+        const canon = applyRemap(readPad(pad, profile), readRemap(profile.id));
+        this.emitStick('L', canon.lx, canon.ly);
+        this.emitStick('R', canon.rx, canon.ry);
+        this.emit({ t: 'trigger', side: 'L', value: canon.triggers.L });
+        this.emit({ t: 'trigger', side: 'R', value: canon.triggers.R });
+        // the keyboard arrows and the touch overlay's d-pad already emit these same events, so a real
+        // controller's physical d-pad feeds the identical path
+        for (const dir of ['up', 'down', 'left', 'right'] as const) {
+          const pressed = canon.dpad[dir];
           const key = `pad_dpad_${dir}`;
           if (pressed && !this.held.has(key)) { this.held.add(key); this.emit({ t: 'dpad', dir, pressed: true }); }
           if (!pressed && this.held.has(key)) { this.held.delete(key); this.emit({ t: 'dpad', dir, pressed: false }); }
         }
-        for (const [btn, i] of btns) {
-          const pressed = !!pad.buttons[i]?.pressed;
+        for (const btn of ['A', 'B', 'X', 'Y', 'L1', 'R1', 'SELECT', 'START'] as const) {
+          const pressed = canon.buttons[btn];
           const key = `pad_${btn}`;
           if (pressed && !this.held.has(key)) { this.held.add(key); this.emit({ t: 'button', btn, pressed: true }); }
           if (!pressed && this.held.has(key)) { this.held.delete(key); this.emit({ t: 'button', btn, pressed: false }); }

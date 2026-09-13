@@ -1,3 +1,4 @@
+import { readPad, type PadLike } from '@/lib/input/profiles';
 /**
  * Canvas Juice Utilities — screen shake, floating score popups, hit flash.
  * Import into any game-*.tsx and call from the game loop.
@@ -122,6 +123,17 @@ export function createGamepadState(): GamepadState {
 
 const DEADZONE = 0.2;
 
+/**
+ * Read the pad for the Canvas-2D games.
+ *
+ * Input & Presence Phase A (2026-09-13): this held eleven hardcoded button indices and a per-axis deadzone —
+ * the largest single raw-index violation in the audit. It reads through the profile layer now, so these
+ * games gain Switch Pro and Joy-Con support for free (their face buttons are in a different physical order,
+ * which this could not previously notice) and the stick gets a radial deadzone instead of a square hole.
+ *
+ * The GamepadState shape is unchanged, so every caller — game-shell, karate-game, rail-grind, glitch-boss —
+ * is untouched.
+ */
 export function pollGamepad(gs: GamepadState): boolean {
   try {
     const pads = navigator?.getGamepads?.();
@@ -129,24 +141,13 @@ export function pollGamepad(gs: GamepadState): boolean {
     const gp = pads[0] || pads[1] || pads[2] || pads[3];
     if (!gp) return false;
 
-    gs.a = !!gp.buttons[0]?.pressed;
-    gs.b = !!gp.buttons[1]?.pressed;
-    gs.x = !!gp.buttons[2]?.pressed;
-    gs.y = !!gp.buttons[3]?.pressed;
-    gs.lb = !!gp.buttons[4]?.pressed;
-    gs.rb = !!gp.buttons[5]?.pressed;
-    gs.up = !!gp.buttons[12]?.pressed;
-    gs.down = !!gp.buttons[13]?.pressed;
-    gs.left = !!gp.buttons[14]?.pressed;
-    gs.right = !!gp.buttons[15]?.pressed;
-    gs.start = !!gp.buttons[9]?.pressed;
+    const c = readPad(gp as unknown as PadLike);
+    gs.a = c.buttons.A; gs.b = c.buttons.B; gs.x = c.buttons.X; gs.y = c.buttons.Y;
+    gs.lb = c.buttons.L1; gs.rb = c.buttons.R1; gs.start = c.buttons.START;
+    gs.up = c.dpad.up; gs.down = c.dpad.down; gs.left = c.dpad.left; gs.right = c.dpad.right;
+    gs.lx = c.lx; gs.ly = c.ly;
 
-    const lx = gp.axes[0] ?? 0;
-    const ly = gp.axes[1] ?? 0;
-    gs.lx = Math.abs(lx) > DEADZONE ? lx : 0;
-    gs.ly = Math.abs(ly) > DEADZONE ? ly : 0;
-
-    // also map stick to dpad
+    // also map stick to dpad — these games steer with either
     if (gs.lx < -DEADZONE) gs.left = true;
     if (gs.lx > DEADZONE) gs.right = true;
     if (gs.ly < -DEADZONE) gs.up = true;
