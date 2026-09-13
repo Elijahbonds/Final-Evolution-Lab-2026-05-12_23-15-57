@@ -23,18 +23,22 @@ import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness'
 import type { FelInput } from '../core/InputBus';
 import {
   AERO_TRAINER, spawnFlight, stepFlight, noseOf, levelOut, clampFlight,
-  type FlightInput, type FlightState,
+  type FlightInput, type FlightState, type Airframe,
 } from '../core/FlightModel';
 import {
-  AERO_COURSES, startRace, stepRace, toNextGate, medalFor, type Course, type RaceProgress,
+  AERO_COURSES, readCourse, startRace, stepRace, toNextGate, medalFor, type Course, type RaceProgress,
 } from '../core/RaceCourse';
+import { buildCourseVenue } from '../racing/venueForCourse';
+import { readPlane } from '../racing/garage';
 
-const FRAME = AERO_TRAINER;
+/** The picked airframe. Defaults to the trainer, so a mode with no pick flies exactly as it was tuned. */
+let FRAME: Airframe = AERO_TRAINER;
 /** The world's lid, floor and walls. clampFlight holds the aircraft inside them. */
 const CEILING = 520, FLOOR = 14, HALF_WORLD = 700;
 
 export function makeAeroAcesMode(): ModeDefinition {
 let plane: TransformNode | null = null;
+let venueRoot: TransformNode | null = null;
 let rings: Mesh[] = [];
 let course: Course = AERO_COURSES[0];
 let flight: FlightState | null = null;
@@ -145,21 +149,21 @@ function finish(ctx: ModeContext): void {
 
 return {
   modeId: 'aeroaces',
-  mood: 'daylight',
+  // A GETTER, read at mount after the course has been picked — see VelocityKartMode for why a plain value
+  // would light every course for the first one.
+  get mood(): ModeDefinition['mood'] { return readCourse('aero').mood; },
   camPreset: 'descent',
 
   async load(ctx: ModeContext): Promise<void> {
     S.done = false; S.crashes = 0; S.banner = ''; S.bannerT = 0;
     S.input = { pitch: 0, roll: 0, yaw: 0, throttle: 0.75, boost: false };
 
-    // the course is DATA, so a map is a pick rather than a code path
-    if (typeof window !== 'undefined') {
-      const want = new URLSearchParams(window.location.search).get('course');
-      course = AERO_COURSES.find((c) => c.id === want) ?? AERO_COURSES[0];
-    }
+    // the course is DATA, so a map is a pick rather than a code path — and so is the aircraft
+    course = readCourse('aero');
+    FRAME = readPlane().spec;
     race = startRace();
 
-    VenueKit.buildPark(ctx.scene);
+    venueRoot = buildCourseVenue(ctx.scene, course);
     rings = buildRings(ctx);
     plane = buildPlane(ctx);
 
@@ -260,6 +264,7 @@ return {
 
   dispose(): void {
     plane?.dispose(); plane = null;
+    venueRoot?.dispose(); venueRoot = null;
     for (const r of rings) r.dispose();
     rings = [];
     flight = null;

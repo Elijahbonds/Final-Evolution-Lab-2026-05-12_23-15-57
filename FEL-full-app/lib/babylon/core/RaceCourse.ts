@@ -25,6 +25,16 @@ export interface Gate {
   radius: number;
 }
 
+/**
+ * Which of FEL's existing worlds a course is set in.
+ *
+ * A KEY, not a builder: this file is maths and data, and importing VenueKit here would drag the whole visual
+ * layer into something the tests run headless. The mode resolves the key when it mounts (see venueForCourse
+ * in the racing modes), which is also the seam that lets a course pick a mood the mode does not hard-code —
+ * `mood` on a ModeDefinition may be a GETTER, read at mount, after the course has been picked.
+ */
+export type CourseVenue = 'park' | 'slope' | 'pitch' | 'street' | 'orbit';
+
 export interface Course {
   id: string;
   name: string;
@@ -32,6 +42,12 @@ export interface Course {
   sub: string;
   /** 'aero' rings in the air, 'kart' checkpoints on the ground. */
   kind: 'aero' | 'kart';
+  /** The world this course is set in. */
+  venue: CourseVenue;
+  /** The scene mood the venue is lit with — the same vocabulary every other mode uses. */
+  mood: 'goldenHour' | 'daylight' | 'dojoWarm' | 'nightGame' | 'alpine' | 'overcast';
+  /** Splash accent for the picker. */
+  tint: string;
   gates: Gate[];
   /** Does the last gate lead back to the first? */
   loop: boolean;
@@ -41,6 +57,8 @@ export interface Course {
   start: { at: Vector3; heading: number };
   /** Target time for a gold, seconds — the thing worth chasing. */
   gold: number;
+  /** Unready courses are authored but hidden from the picker until their pass lands. */
+  ready: boolean;
 }
 
 /** A gate before its facing is known — the path decides that. */
@@ -71,14 +89,47 @@ function withFacings(specs: readonly GateSpec[], loop: boolean): Gate[] {
 }
 
 /**
+ * Put the start ON the racing line, just before gate 0 — and never anywhere else on a loop.
+ *
+ * THE BUG THIS REMOVES (found 2026-09-13, shipped in Boardwalk Loop since the mode was built): a gate is
+ * passed only by crossing its plane from behind, and gate 0's facing on a loop is derived from the chord
+ * between its neighbours. On a symmetric diamond that chord is PERPENDICULAR to the way you arrive from an
+ * authored start line — so the start sat exactly ON gate 0's plane, `dPrev < 0` was never true, and the first
+ * checkpoint of the course could not be passed by anybody, ever. The race could not begin. Nothing about it
+ * looked wrong: the gate was in the right place, the facing was correctly derived, the start was sensibly
+ * behind it on the map.
+ *
+ * Deriving the start from the same geometry that derives the facing removes the whole class rather than the
+ * one instance, which is exactly what `withFacings` did for hand-written facings. It also guarantees the
+ * start is ON the road, since the racing line IS the road.
+ */
+function startBefore(gates: readonly Gate[], frac = 0.45): { at: Vector3; heading: number } {
+  const first = gates[0].at;
+  const last = gates[gates.length - 1].at;
+  const at = first.add(last.subtract(first).scale(frac));
+  const to = first.subtract(at);
+  // Babylon's rotation.y: forward is (sin h, 0, cos h), so the heading that points at gate 0 is atan2(x, z)
+  return { at, heading: Math.atan2(to.x, to.z) };
+}
+
+/**
  * A ring circuit in the air: a long climb, a descending sweep, and two rings low enough that taking them fast
  * means diving for the speed and pulling out. The gates are deliberately at different HEIGHTS, because a
  * flying course that is flat is just a driving course.
  */
+const ALPINE_GATE_RINGS = withFacings([
+  g(-90, 130, -140, 16),
+  g(110, 190, -30, 15),
+  g(150, 110, 170, 15),
+  g(-40, 165, 250, 16),
+  g(-190, 105, 90, 15),
+], true);
+
 export const AERO_COURSES: readonly Course[] = [
   {
     id: 'bay-circuit', name: 'BAY CIRCUIT', sub: 'Four rings, two heights. Dive for the speed.',
-    kind: 'aero', loop: true, laps: 2, gold: 95,
+    kind: 'aero', venue: 'park', mood: 'goldenHour', tint: '#ffb36b', ready: true,
+    loop: true, laps: 2, gold: 95,
     start: { at: new Vector3(0, 140, -360), heading: 0 },
     gates: withFacings([
       g(0, 150, -120, 26),
@@ -89,7 +140,8 @@ export const AERO_COURSES: readonly Course[] = [
   },
   {
     id: 'canyon-run', name: 'CANYON RUN', sub: 'Point to point, low and fast. No second chances.',
-    kind: 'aero', loop: false, laps: 1, gold: 62,
+    kind: 'aero', venue: 'slope', mood: 'daylight', tint: '#e0a06a', ready: true,
+    loop: false, laps: 1, gold: 62,
     start: { at: new Vector3(-420, 70, -420), heading: Math.PI * 0.25 },
     gates: withFacings([
       g(-240, 60, -240, 20),
@@ -99,31 +151,234 @@ export const AERO_COURSES: readonly Course[] = [
       g(440, 130, 440, 24),
     ], false),
   },
+  {
+    id: 'alpine-gates', name: 'ALPINE GATES', sub: 'Tight rings between the peaks. The turner’s course.',
+    kind: 'aero', venue: 'slope', mood: 'alpine', tint: '#cfe8ff', ready: true,
+    loop: true, laps: 2, gold: 104,
+    // the start is DERIVED, not authored: the hand-placed one sat past gate 0's plane and the first ring
+    // could never be passed — the same failure Boardwalk Loop shipped with, caught here by the test rather
+    // than by a player. On a loop there is no reason to author a start at all.
+    // SMALL RADII AND SHORT LEGS, on purpose: this is the course the KESTREL is built for and the DARTER has
+    // to fly conservatively. A garage of trade-offs is only real if the maps ask different questions, so one
+    // course rewards the turn rate and another (canyon-run's long diagonal) rewards outright pace.
+    start: startBefore(ALPINE_GATE_RINGS),
+    gates: ALPINE_GATE_RINGS,
+  },
+  {
+    id: 'orbit-ring', name: 'ORBIT RING', sub: 'Night rings over the water. Nothing to judge height against.',
+    kind: 'aero', venue: 'orbit', mood: 'nightGame', tint: '#9db4ff', ready: true,
+    loop: true, laps: 2, gold: 88,
+    // the rings sit at WILDLY different heights and the venue gives almost no ground reference, so the read
+    // is the gate marker and your own instrument — which is the one thing none of the other three ask for
+    start: { at: new Vector3(0, 200, -340), heading: 0 },
+    gates: withFacings([
+      g(0, 240, -120, 24),
+      g(230, 120, 120, 22),
+      g(-30, 300, 300, 24),
+      g(-240, 140, 90, 22),
+    ], true),
+  },
 ];
 
-/** A square-ish kart circuit with one long straight worth spending boost on. */
+/**
+ * The kart maps.
+ *
+ * Every one of them is sized against the SAME measured number, because on a kart the size of a corner is the
+ * whole game: grip is m/s², so the tightest corner a kart can hold without sliding is v²/a — about 61 m for
+ * the starter kart at its 26 m/s top speed. A course whose corners are all tighter than that breaks traction
+ * on its OWN, which is what the first boardwalk loop did (a run with drifting DISABLED still logged 516 drift
+ * frames), and a drift you cannot avoid is not a choice.
+ *
+ * So the four courses below deliberately ask different questions of that number, which is also what makes the
+ * garage's trade-offs real:
+ *
+ *   BOARDWALK LOOP    corners near the limit — the balanced course, and the one everything is tuned against
+ *   ALPINE DESCENT    point to point, long sweepers — pace, with no second lap to repair a mistake
+ *   STADIUM OVAL      two long straights, two big ends — outright top speed, barely a drift on it
+ *   ROOFTOP CIRCUIT   every corner inside the limit — you cannot hold it, so the whole lap is the drift
+ */
+const BOARDWALK_GATES = withFacings([
+  g(0, 0, 0, 9),
+  g(140, 0, 160, 9),
+  g(0, 0, 320, 9),
+  g(-140, 0, 160, 9),
+], true);
+
+/**
+ * The stadium oval, laid as ARCS rather than as a hexagon.
+ *
+ * A six-gate "oval" is a hexagon, and a hexagon's ends turn through 98 degrees in a single vertex: measured,
+ * the first attempt's tightest corner was 54 m — TIGHTER than the tight technical circuit it was supposed to
+ * contrast with, and well inside the 61 m the starter kart can hold. Walking the ends as a real radius fixes
+ * it (a polygon on a circle of radius R has corner radius ~R), so the ends are an 82 m arc and the straights
+ * are 220 m of flat out.
+ */
+const OVAL_GATES = withFacings([
+  g(82, 0, 80, 9),            // start / finish, bottom of the right-hand straight
+  g(82, 0, 300, 9),
+  g(58, 0, 358, 9), g(0, 0, 382, 9), g(-58, 0, 358, 9),
+  g(-82, 0, 300, 9),
+  g(-82, 0, 80, 9),
+  g(-58, 0, 22, 9), g(0, 0, -2, 9), g(58, 0, 22, 9),
+], true);
+
+/**
+ * The rooftop circuit: eight gates on ALTERNATING radii, which is what makes it a switchback.
+ *
+ * The outer points turn through 111 degrees over 93 m legs, so the corner radius there is 32 m — half what
+ * the starter kart can hold. That is deliberate and the picker says so. Everywhere else in this file a course
+ * tighter than grip is the bug the boardwalk loop was scaled to fix; here it is the premise, and the
+ * difference between those two is entirely whether the player was told.
+ */
+const ROOFTOP_GATES = withFacings([
+  g(130, 0, 0, 9), g(53, 0, 53, 9), g(0, 0, 130, 9), g(-53, 0, 53, 9),
+  g(-130, 0, 0, 9), g(-53, 0, -53, 9), g(0, 0, -130, 9), g(53, 0, -53, 9),
+], true);
+
+/**
+ * The kart maps.
+ *
+ * Every one of them is sized against the SAME measured number, because on a kart the size of a corner is the
+ * whole game: grip is m/s^2, so the tightest corner a kart can hold without sliding is v^2/a - about 61 m for
+ * the starter kart at its 26 m/s top speed. A course whose corners are all tighter than that breaks traction
+ * on its OWN, which is what the first boardwalk loop did (a run with drifting DISABLED still logged 516 drift
+ * frames), and a drift you cannot avoid is not a choice.
+ *
+ * So the four courses below deliberately ask different questions of that number, which is also what makes the
+ * garage's trade-offs real:
+ *
+ *   BOARDWALK LOOP    corners near the limit - the balanced course, and the one everything is tuned against
+ *   ALPINE DESCENT    point to point, long sweepers - pace, with no second lap to repair a mistake
+ *   STADIUM OVAL      two long straights, two big ends - outright top speed, barely a drift on it
+ *   ROOFTOP CIRCUIT   every corner inside the limit - you cannot hold it, so the whole lap is the drift
+ */
 export const KART_COURSES: readonly Course[] = [
   {
     id: 'boardwalk-loop', name: 'BOARDWALK LOOP', sub: 'One long straight. Bank boost in the hairpin.',
-    kind: 'kart', loop: true, laps: 2, gold: 110,
-    start: { at: new Vector3(0, 0, -150), heading: 0 },
+    kind: 'kart', venue: 'park', mood: 'goldenHour', tint: '#ffb36b', ready: true,
+    loop: true, laps: 2, gold: 110,
     // SCALED UP from a 60-70 m loop, and the reason is measured rather than aesthetic: the kart's grip is
     // 11 m/s^2, so at its 26 m/s top speed the tightest corner it can hold is about v^2/a = 61 m. On the
-    // original loop every corner was tighter than that, which meant traction broke on its OWN every time —
+    // original loop every corner was tighter than that, which meant traction broke on its OWN every time -
     // the handbrake added nothing and a run with drifting DISABLED still logged 516 drift frames and banked a
     // full boost meter. A drift you cannot avoid is not a choice, and the choice is the entire mechanic. At
     // this size a corner can be held on grip, so sliding it is a decision with a cost and a payoff.
+    start: startBefore(BOARDWALK_GATES),
+    gates: BOARDWALK_GATES,
+  },
+  {
+    id: 'alpine-descent', name: 'ALPINE DESCENT', sub: 'One run down the mountain. No lap to fix it on.',
+    kind: 'kart', venue: 'slope', mood: 'alpine', tint: '#cfe8ff', ready: true,
+    loop: false, laps: 1, gold: 54,
+    // POINT TO POINT, and that is the whole character: there is no second lap, so a corner thrown away is
+    // thrown away for good. Long sweepers at or above the holdable radius, so it rewards carrying speed
+    // rather than banking boost - the course where SLIPSTREAM's missing grip costs least.
+    start: { at: new Vector3(-30, 0, -430), heading: 0 },
     gates: withFacings([
-      g(0, 0, 0, 9),
-      g(140, 0, 160, 9),
-      g(0, 0, 320, 9),
-      g(-140, 0, 160, 9),
-    ], true),
+      g(0, 0, -260, 9),
+      g(125, 0, -75, 9),
+      g(60, 0, 125, 9),
+      g(-120, 0, 295, 9),
+      g(-40, 0, 470, 9),
+    ], false),
+  },
+  {
+    id: 'stadium-oval', name: 'STADIUM OVAL', sub: 'Two straights under the lights. Top speed wins here.',
+    kind: 'kart', venue: 'pitch', mood: 'nightGame', tint: '#9fb7ff', ready: true,
+    loop: true, laps: 2, gold: 112,
+    start: startBefore(OVAL_GATES),
+    gates: OVAL_GATES,
+  },
+  {
+    id: 'rooftop-circuit', name: 'ROOFTOP CIRCUIT', sub: 'Every corner is tighter than grip. Slide the whole lap.',
+    kind: 'kart', venue: 'street', mood: 'overcast', tint: '#b8c4d4', ready: true,
+    loop: true, laps: 2, gold: 104,
+    start: startBefore(ROOFTOP_GATES),
+    gates: ROOFTOP_GATES,
   },
 ];
 
 export function courseById(id: string): Course | null {
   return [...AERO_COURSES, ...KART_COURSES].find((c) => c.id === id) ?? null;
+}
+
+export function coursesFor(kind: 'aero' | 'kart'): readonly Course[] {
+  return kind === 'aero' ? AERO_COURSES : KART_COURSES;
+}
+
+export function readyCourses(kind: 'aero' | 'kart'): Course[] {
+  return coursesFor(kind).filter((c) => c.ready);
+}
+
+export const COURSE_KEY_PREFIX = 'fel-race-map-';
+
+/**
+ * The player's pick: `?map=` wins, then the remembered pick, then the first ready course.
+ *
+ * Same order as every other picker in the app (court location, ball, board venue, deck), and for the same
+ * reason: the query parameter is what a picker RELOADS with, because the world is built at mount and a new
+ * map cannot be swapped under a running scene.
+ */
+export function readCourse(kind: 'aero' | 'kart'): Course {
+  const list = readyCourses(kind);
+  const first = list[0] ?? coursesFor(kind)[0];
+  try {
+    if (typeof window !== 'undefined') {
+      // `?course=` is the name both modes already accepted; `?map=` is what the picker writes. Honour both,
+      // because a link someone saved before the picker existed should still open the course it names.
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('map') ?? params.get('course');
+      const byQuery = list.find((c) => c.id === q);
+      if (byQuery) return byQuery;
+      const s = window.localStorage.getItem(COURSE_KEY_PREFIX + kind);
+      const byStore = list.find((c) => c.id === s);
+      if (byStore) return byStore;
+    }
+  } catch { /* private mode: the default */ }
+  return first;
+}
+
+export function writeCourse(kind: 'aero' | 'kart', id: string): void {
+  try { window.localStorage.setItem(COURSE_KEY_PREFIX + kind, id); } catch { /* convenience only */ }
+}
+
+/** Total length of the racing line, metres — one lap. */
+export function courseLength(course: Course): number {
+  const gs = course.gates;
+  let total = Vector3.Distance(course.start.at, gs[0].at);
+  for (let i = 0; i < gs.length; i++) {
+    if (!course.loop && i === gs.length - 1) break;
+    total += Vector3.Distance(gs[i].at, gs[(i + 1) % gs.length].at);
+  }
+  return total;
+}
+
+/**
+ * The tightest corner on the course, metres of radius.
+ *
+ * Measured as the circle that fits the turn between two straights — for a turn of angle θ between legs of
+ * length a and b, the inscribed radius at that vertex is `min(a,b)/2 / tan(θ/2)`. Compared against a kart's
+ * v²/grip, this says whether a course can be driven on grip at all, which is the single number that decides
+ * whether drifting on it is a decision or a fact of life.
+ */
+export function tightestCorner(course: Course): number {
+  const gs = course.gates;
+  let tightest = Infinity;
+  const n = gs.length;
+  for (let i = 0; i < n; i++) {
+    const prev = i === 0 ? course.start.at : gs[i - 1].at;
+    const next = gs[(i + 1) % n].at;
+    if (!course.loop && i === n - 1) break;
+    const inV = gs[i].at.subtract(prev); inV.y = 0;
+    const outV = next.subtract(gs[i].at); outV.y = 0;
+    const a = inV.length(), b = outV.length();
+    if (a < 1e-6 || b < 1e-6) continue;
+    const cos = Math.max(-1, Math.min(1, Vector3.Dot(inV, outV) / (a * b)));
+    const turn = Math.acos(cos);                       // 0 = straight on, π = a hairpin back
+    if (turn < 1e-3) continue;                          // a straight has no corner
+    tightest = Math.min(tightest, (Math.min(a, b) / 2) / Math.tan(turn / 2));
+  }
+  return tightest;
 }
 
 /**

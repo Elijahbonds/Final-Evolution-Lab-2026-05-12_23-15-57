@@ -27,14 +27,14 @@ import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness'
 import type { FelInput } from '../core/InputBus';
 import {
   KART_STARTER, spawnKart, stepKart, travelOf, driftQuality, kartHitWall,
-  type KartInput, type KartState,
+  type KartInput, type KartState, type KartSpec,
 } from '../core/KartModel';
 import {
-  KART_COURSES, startRace, stepRace, toNextGate, medalFor, onTrack, TRACK_HALF_WIDTH,
+  KART_COURSES, readCourse, startRace, stepRace, toNextGate, medalFor, onTrack, TRACK_HALF_WIDTH,
   type Course, type RaceProgress,
 } from '../core/RaceCourse';
-
-const SPEC = KART_STARTER;
+import { buildCourseVenue } from '../racing/venueForCourse';
+import { readKart } from '../racing/garage';
 
 /** A kart is small; a full-size body swamps it. */
 const DRIVER_SCALE = 0.92;
@@ -48,6 +48,9 @@ let state: KartState | null = null;
 let driver: SpawnedCharacter | null = null;
 let seated: AnimationGroup | null = null;
 let steerWheel: Mesh | null = null;
+let venueRoot: TransformNode | null = null;
+/** The picked kart's handling. Defaults to the starter, so a mode with no pick is byte-identical to before. */
+let kartSpec: KartSpec = KART_STARTER;
 let race: RaceProgress = startRace();
 const prevPos = new Vector3();
 
@@ -224,20 +227,22 @@ function finish(ctx: ModeContext): void {
 
 return {
   modeId: 'velocitykart',
-  mood: 'daylight',
+  // A GETTER, read at mount after the course has been picked: a plain value would be evaluated when the mode
+  // definition is built, which is before anybody has chosen a map, and every track would be lit for Venice.
+  get mood(): ModeDefinition['mood'] { return readCourse('kart').mood; },
   camPreset: 'runner',
 
   async load(ctx: ModeContext): Promise<void> {
     S.done = false; S.banner = ''; S.bannerT = 0; S.bestDrift = 0; S.offRoadSec = 0;
     S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false };
 
-    if (typeof window !== 'undefined') {
-      const want = new URLSearchParams(window.location.search).get('course');
-      course = KART_COURSES.find((c) => c.id === want) ?? KART_COURSES[0];
-    }
+    // THE MAP AND THE KART ARE BOTH PICKS (2026-09-13). Read once, here, at mount — the world is built from
+    // the course and the handling comes from the vehicle, and neither can be swapped under a running scene.
+    course = readCourse('kart');
+    kartSpec = readKart().spec;
     race = startRace();
 
-    VenueKit.buildPark(ctx.scene);
+    venueRoot = buildCourseVenue(ctx.scene, course);
     road = buildRoad(ctx);
     marks = buildMarks(ctx);
     kart = buildKart(ctx);
@@ -301,7 +306,7 @@ return {
     const on = onTrack(state.pos, course);
     if (!on) S.offRoadSec += dt;
     const wasBoosting = state.boosting > 0;
-    stepKart(state, S.input, dt, on, SPEC);
+    stepKart(state, S.input, dt, on, kartSpec);
 
     // the kart rides the road; y is cosmetic here because the track is flat
     kart.position.set(state.pos.x, KART_RIDE_Y, state.pos.z);
@@ -311,7 +316,7 @@ return {
     // the driver leans into the corner — shoulders following the turn, not a board rider's whole-body bank:
     // a seated body is belted in and cannot lean like that (8° at full lock against the boards' 22°)
     if (driver) {
-      const want = driverLean(S.input.steer, Math.min(1, state.speed / Math.max(1, KART_STARTER.vMax)));
+      const want = driverLean(S.input.steer, Math.min(1, state.speed / Math.max(1, kartSpec.vMax)));
       driver.root.rotation.z += (want - driver.root.rotation.z) * Math.min(1, 8 * dt);
     }
     // and the wheel turns under the hands, on the same damping, so the two never disagree about the corner
@@ -368,6 +373,7 @@ return {
     seated?.stop(); seated?.dispose(); seated = null;
     driver?.dispose(); driver = null;
     steerWheel = null;
+    venueRoot?.dispose(); venueRoot = null;
     state = null;
   },
 };

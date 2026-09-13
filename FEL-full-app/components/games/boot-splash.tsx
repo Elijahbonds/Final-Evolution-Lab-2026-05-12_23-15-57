@@ -9,6 +9,8 @@ import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLoca
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
 import { skinsFor, readBoardSkin, writeBoardSkin } from '@/lib/babylon/nexus/boardSkins';
+import { readyCourses, readCourse, writeCourse } from '@/lib/babylon/core/RaceCourse';
+import { readyVehicles, readVehicle, writeVehicle, type RaceKind } from '@/lib/babylon/racing/garage';
 
 // M37 E12 FIX: venue slugs resolve to PROCEDURAL canvas thumbnails (venueThumbs)
 // instead of /img/venues/*.jpg files that 404 on every mode route.
@@ -24,8 +26,31 @@ const VENUE_ART: Record<string, { venue: string; sub: string; tint: string }> = 
   golf: { venue: 'coastal-links', sub: 'COASTAL LINKS', tint: '#8fe0a0' },
   baseball: { venue: 'ballpark', sub: 'THE BALLPARK', tint: '#ffd08a' },
   soccer: { venue: 'fc-stadium', sub: 'FC STADIUM', tint: '#7be0a8' },
+  velocitykart: { venue: 'skatepark', sub: 'BOARDWALK LOOP', tint: '#ffb36b' },
+  aeroaces: { venue: 'surf-break', sub: 'BAY CIRCUIT', tint: '#22d3ee' },
   default: { venue: 'default', sub: 'FINAL EVOLUTION', tint: '#22d3ee' },
 };
+
+/** Which racing mode this splash belongs to, or null. */
+const RACE_OF: Record<string, RaceKind> = { velocitykart: 'kart', aeroaces: 'aero' };
+
+/** A course's world, as a venueThumbs palette — so the cover art follows the MAP you picked. */
+const RACE_THUMB: Record<string, string> = {
+  park: 'skatepark', slope: 'mountain-slope', pitch: 'fc-stadium',
+  street: 'venice-court', orbit: 'orbit',
+};
+
+/** A vehicle's three bars, drawn small enough to sit under a chip. */
+function Bars({ bars, tint }: { bars: { speed: number; hold: number; edge: number }; tint: string }) {
+  return (
+    <span aria-hidden className="flex items-end gap-[2px]" style={{ height: 10 }}>
+      {([bars.speed, bars.hold, bars.edge]).map((v, i) => (
+        <span key={i} className="inline-block w-[3px] rounded-sm"
+          style={{ height: Math.max(2, Math.round(v * 10)), background: tint, opacity: 0.55 + v * 0.45 }} />
+      ))}
+    </span>
+  );
+}
 
 export function BootSplash(props: {
   modeId: string;
@@ -40,7 +65,16 @@ export function BootSplash(props: {
   const [loc, setLoc] = useState<CourtLocationId>('venice');
   useEffect(() => { if (isCourt) setLoc(readCourtLocation()); }, [isCourt]);
   const art0 = VENUE_ART[props.modeId] ?? VENUE_ART.default;
-  const v = isCourt && loc !== 'venice' ? { venue: COURT_LOCATIONS[loc].thumb, sub: COURT_LOCATIONS[loc].sub, tint: COURT_LOCATIONS[loc].tint } : art0;
+  // The racing splashes take their art from the picked MAP, the same way the basketball splash takes its art
+  // from the picked location — otherwise all four tracks boot behind one cover and the pick reads as cosmetic
+  // text. Resolved below `race`, which is declared further down; hoisted here so `v` stays one expression.
+  const raceKind = RACE_OF[props.modeId] ?? null;
+  const picked = raceKind ? readCourse(raceKind) : null;
+  const v = picked
+    ? { venue: RACE_THUMB[picked.venue] ?? 'default', sub: picked.name, tint: picked.tint }
+    : isCourt && loc !== 'venice'
+      ? { venue: COURT_LOCATIONS[loc].thumb, sub: COURT_LOCATIONS[loc].sub, tint: COURT_LOCATIONS[loc].tint }
+      : art0;
   const pickLocation = (id: CourtLocationId) => {
     if (id === loc) return;
     writeCourtLocation(id);
@@ -71,6 +105,24 @@ export function BootSplash(props: {
   const pickDeck = (id: string) => {
     if (!disc || id === deck) return;
     writeBoardSkin(disc, id); setDeck(id);   // the deck is dressed when the rig builds; remembering it is enough
+  };
+
+  // THE RACING MODES pick a MAP and a VEHICLE on this same screen (2026-09-13, owner: "Different maps,
+  // different vehicles, like the start up screen from the dunk mode"). Same ritual, same place, same rules as
+  // the court and the board venue: the map reloads (the world is built at mount and cannot be swapped under a
+  // running scene) and the vehicle does not (its spec is read when the mode loads).
+  const race = raceKind;
+  const [map, setMap] = useState<string>('');
+  const [ride, setRide] = useState<string>('');
+  useEffect(() => { if (race) { setMap(readCourse(race).id); setRide(readVehicle(race).id); } }, [race]);
+  const pickMap = (id: string) => {
+    if (!race || id === map) return;
+    writeCourse(race, id);
+    const u = new URL(window.location.href); u.searchParams.set('map', id); window.location.assign(u.toString());
+  };
+  const pickRide = (id: string) => {
+    if (!race || id === ride) return;
+    writeVehicle(race, id); setRide(id);
   };
 
   const [inserted, setInserted] = useState(false);
@@ -192,6 +244,47 @@ export function BootSplash(props: {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {race && (props.phase === 'ready' || props.phase === 'loading') && readyCourses(race).length > 1 && (
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">MAP</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {readyCourses(race).map((c) => (
+                <button key={c.id} type="button" onClick={() => pickMap(c.id)} title={c.sub}
+                  aria-label={`${c.name} — ${c.sub}`} aria-pressed={c.id === map}
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${c.id === map ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={c.id === map ? { background: c.tint, borderColor: c.tint } : { borderColor: `${c.tint}88` }}>
+                  {c.name}
+                </button>
+              ))}
+            </div>
+            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+              {readyCourses(race).find((c) => c.id === map)?.sub ?? ''}
+            </p>
+          </div>
+        )}
+
+        {race && (props.phase === 'ready' || props.phase === 'loading') && readyVehicles(race).length > 1 && (
+          <div className="mt-2 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">{race === 'kart' ? 'KART' : 'AIRCRAFT'}</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {readyVehicles(race).map((r) => (
+                <button key={r.id} type="button" onClick={() => pickRide(r.id)} title={r.sub}
+                  aria-label={`${r.name} — ${r.sub}`} aria-pressed={r.id === ride}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${r.id === ride ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={r.id === ride ? { background: r.tint, borderColor: r.tint } : { borderColor: `${r.tint}88` }}>
+                  <Bars bars={r.bars} tint={r.id === ride ? '#000' : r.tint} />
+                  {r.name}
+                </button>
+              ))}
+            </div>
+            {/* the SUB names the cost. A vehicle pick with no downside is not a choice, so the screen says
+                what you are giving up rather than only what you are getting. */}
+            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+              {readyVehicles(race).find((r) => r.id === ride)?.sub ?? ''}
+            </p>
           </div>
         )}
 
