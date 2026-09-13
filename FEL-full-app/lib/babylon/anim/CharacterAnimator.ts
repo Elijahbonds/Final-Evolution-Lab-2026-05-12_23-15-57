@@ -173,6 +173,27 @@ export class CharacterAnimator {
     this.play(fadeToIdle, { loop: true, fadeSec: 0.2 });
   }
 
+  /**
+   * Hand the rig over: stop every clip and start NOTHING.
+   *
+   * `stopAll` does not do this — it fades to the idle loop, which is the right behaviour for "this mode is
+   * done driving the body" and the wrong one for "something else owns this body now". Velocity Kart's driver
+   * paid for that difference: the seated pose was built, started, and then quietly overlaid by the
+   * `idle_stand` that `stopAll` had just started, so the driver sat in the kart with its arms hanging at its
+   * sides (measured: hands 0.03 m in front of the sternum instead of 0.36 m out on the wheel).
+   *
+   * Use this before an authored pose clip, an IK rig, or anything else that wants to be the ONE owner —
+   * which is the rule the board and combat trees already run on.
+   */
+  park(): void {
+    this.fadeObs?.remove();
+    this.fadeObs = null;
+    this.fadingOut = null;
+    this.current = null;
+    this.currentName = '';
+    this.groups.forEach((g) => g.stop());
+  }
+
   dispose(): void {
     this.fadeObs?.remove();
     this.endObs.forEach((o, g) => g.onAnimationGroupEndObservable.remove(o as never));

@@ -178,6 +178,20 @@ const CROWD = ['#e07a5f', '#3d5a80', '#81b29a', '#f2cc8f', '#f4f1de', '#9d4edd']
 
 // ── VENUES ──────────────────────────────────────────────────────────────────
 export const VenueKit = {
+  /**
+   * The house paint for a coloured prop: PBR, matte, with the emissive floor so nothing goes black.
+   *
+   * Exported (2026-09-13) because modes that build their own props were all reaching for StandardMaterial,
+   * and a StandardMaterial is WRONG in these scenes. The venues light for PBR — hemispheric 0.85 plus a
+   * directional at 2.60 — and StandardMaterial multiplies its diffuse by that linearly and clips at white.
+   * Velocity Kart is the worked example: a `#f25f5c` kart rendered WHITE and a `#2a2f38` tarmac rendered pale
+   * blue-grey (0.16,0.18,0.22 × 3.45), so the track read as a sheet of sky-coloured plastic. Nobody had
+   * mis-typed a colour; the material simply could not survive the lighting the venue sets up.
+   */
+  paint(scene: Scene, name: string, hex: string, emissive = 0.06, roughness = 0.85): PBRMaterial {
+    return mat(scene, name, hex, emissive, roughness);
+  },
+
   buildCourt(scene: Scene, style: 'venice' | 'street' = 'venice'): void {
     paintedGround(scene, 30, 40, style === 'venice' ? '#39547a' : '#3a3a3e', (ctx, W, H) => {
       ctx.strokeStyle = '#f4f1de'; ctx.lineWidth = 6;
