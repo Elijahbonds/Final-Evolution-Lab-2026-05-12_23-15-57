@@ -111,3 +111,52 @@ export function readLoadout(minStartupSec: number, overrides?: { weaponId?: stri
     label: `${weapon.name} · ${blendName(blend)}`,
   };
 }
+
+// ── THE HORDE ────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A style, translated for a mode where ONE CONTACT IS ONE BODY DOWN.
+ *
+ * Karate Endless does not run damage. Its own comment says so — "one contact = one body down", "no damage
+ * math, no second hit to finish" — which is the Revolutions/Musou weight the owner locked in. Multiplying its
+ * `dmg` by a school's POWER would therefore have changed nothing at all, and the CRASHING school would have
+ * been a chip on a screen that did not move a single number in the fight. That is the hollow-picker failure
+ * in its purest form, and it is only visible if you read what the mode actually resolves rather than
+ * pattern-matching on a field called `dmg`.
+ *
+ * So power maps to ARC. In a horde game the weight of a swing is not how hard one body is hit — every body
+ * goes down on contact — it is HOW MANY bodies the swing clears. A heavy style sweeping wider is the same
+ * statement the school's line already makes, said in the grammar this mode speaks.
+ *
+ * The rest map to seams the mode already has, which is why they can be honest: reach and chi multiply the
+ * mode's own perk values, speed scales the swing's startup, flow scales the window a combo route has to
+ * chain in, and guard scales what a block costs you.
+ */
+export interface HordeStyle {
+  /** × on the strike's range, alongside the shop's reach perk. */
+  reachMult: number;
+  /** × on the swing's startup delay. */
+  startupMult: number;
+  /** DEGREES added to the swing's arc — power, in a game where power means bodies-per-swing. */
+  arcBonusDeg: number;
+  /** × on the chip a block costs. */
+  blockChipMult: number;
+  /** × on chi gained, alongside the shop's chi perk. */
+  chiMult: number;
+  /** × on the route-chain window. */
+  chainMult: number;
+}
+
+/** How much arc a full point of POWER is worth. 1.20 power => +20 degrees, which is one more body in a crowd. */
+export const HORDE_ARC_PER_POWER = 100;
+
+export function hordeStyle(traits: StyleTraits): HordeStyle {
+  return {
+    reachMult: rangeMult(traits),
+    startupMult: startupMult(traits),
+    arcBonusDeg: (traits.power - 1) * HORDE_ARC_PER_POWER,
+    blockChipMult: guardTakenMult(traits),
+    chiMult: chiMult(traits),
+    chainMult: cancelMult(traits),
+  };
+}

@@ -9,7 +9,9 @@ for (const job of (process.env.JOBS ?? '').split(';').filter(Boolean)) {
   const [mode, qs] = job.split('?');
   const p = await b.newPage({ viewport: { width: 900, height: 600 } });
   const errs: string[] = [];
+  const notes: string[] = [];
   p.on('pageerror', (e) => errs.push(String(e).slice(0, 150)));
+  p.on('console', (m) => { const t = m.text(); if (/\[KE-STYLE\]/.test(t)) notes.push(t); });
   try {
     await p.goto(`http://localhost:3061/dev/mode/${mode}?${qs ?? ''}`, { waitUntil: 'domcontentloaded' });
     await p.waitForSelector('canvas', { timeout: 240000 });
@@ -25,6 +27,7 @@ for (const job of (process.env.JOBS ?? '').split(';').filter(Boolean)) {
       };
     })()`);
     console.log(job.padEnd(52), JSON.stringify(out), 'err=' + errs.length, errs[0] ?? '');
+    for (const n of notes) console.log('   ', n);
   } catch (e) { console.log(job.padEnd(52), 'FAILED', String(e).slice(0, 110)); }
   await p.close();
 }

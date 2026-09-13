@@ -93,6 +93,8 @@ import {
   EnemyBrain, ENEMY_ATTACK, windupSecFor, maxAttackers, ComboTracker, isFinisher,
   DropDirector, DROPS, type DropKind, PerkShop, separate,
 } from '../core/NeoCombatCore';
+import { readBlend, blendTraits, blendName, SCHOOLS } from '../combat/schools';
+import { hordeStyle, type HordeStyle } from '../combat/loadout';
 
 /**
  * Half-extent of the playable floor, INSET from the 24x24 mat.
@@ -242,6 +244,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   const drops = new DropDirector();
   const shop = new PerkShop();
   let perks = shop.state();
+  /** The school picked on the start-up screen, translated into this mode's grammar. Read in load(). */
+  let style: HordeStyle = hordeStyle(SCHOOLS[0].traits);
   let hpShown = -1, lastHurtAt = -1e9;
   let hitWeight: StrikeWeight = 'light', hitUntil = 0;
   // Phase 8: down/revive, crowd-clear
@@ -354,7 +358,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
   function gainChi(ctx: ModeContext, amount: number): void {
     const before = chi;
-    chi = Math.min(100, chi + amount * perks.chiMult);
+    chi = Math.min(100, chi + amount * perks.chiMult * style.chiMult);
     ctx.setHud({ chi: Math.round(chi) });
     // The burst is the finisher-class move here, so it is EARNED the way the DRAGON is in the duel modes:
     // full chi is the cost, FORCE is the licence. A baseline body fills the gauge and still cannot throw it.
@@ -500,11 +504,11 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // strike that completes a route swings wider and further than the same strike on its own. The chain is
       // only consumed if the swing actually connects, so a whiffed route-finisher does not eat the sequence.
       const kind = ROUTE_KIND[key];
-      const fresh = clockSec - lastLandAt > cancelWindowSec(myRatings);
+      const fresh = clockSec - lastLandAt > cancelWindowSec(myRatings) * style.chainMult;
       const seq = fresh ? [kind] : [...landed, kind];
       const route = routeFor(seq, myRatings);
-      const reach = s.range * perks.reach * (route ? 1.45 : 1);
-      const arc = s.arcDeg + perks.arcDeg + (route ? (route.fx === 3 ? 110 : 60) : 0);
+      const reach = s.range * perks.reach * style.reachMult * (route ? 1.45 : 1);
+      const arc = s.arcDeg + perks.arcDeg + style.arcBonusDeg + (route ? (route.fx === 3 ? 110 : 60) : 0);
 
       // everyone in the arc, not the nearest one
       const origin = player.root.position;
@@ -537,7 +541,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         setTimeout(() => ctx.setHud({ banner: '' }), 900);
         console.info(`[KE-ROUTE] ${route.label} fx${route.fx} cleared ${hit.length} arc ${arc.toFixed(0)}deg reach ${reach.toFixed(2)}`);
       }
-    }, 150);
+    }, 150 * style.startupMult);
   }
 
   /** A land is a KO. Revolutions weight: the body drops on ONE solid strike — no damage math, no second hit to
@@ -648,7 +652,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       } else gainChi(ctx, 5);
       return;
     }
-    const outcome = vitals.takeHit(enemyHitDamage(wave, e.brain.strike), { blocking });
+    const outcome = vitals.takeHit(enemyHitDamage(wave, e.brain.strike), { blocking, blockChipMult: style.blockChipMult });
     if (outcome === 'iframe') return;                          // still reeling from the last one — no double-tap
     lastHurtAt = clockSec; combo.reset(); landed = [];   // a route dies when you do
     if (outcome === 'blocked') {
@@ -774,6 +778,13 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
     async load(ctx) {
       sceneRef = ctx.scene;
+      // THE SCHOOL, read HERE and not in the factory body — that runs when the mode registry is built, which
+      // on Next is during SSR with no window and no URL, so every pick would resolve to the default. See
+      // combat/loadout.ts hordeStyle() for why POWER becomes arc rather than damage in this mode.
+      style = hordeStyle(blendTraits(readBlend()));
+      // logged like [KE-ROUTE] beside it: the one line that lets a probe (or a bug report) confirm the pick
+      // actually reached the fight, rather than only that the screen stored it
+      console.info(`[KE-STYLE] ${blendName(readBlend())} reach ${style.reachMult.toFixed(2)} startup ${style.startupMult.toFixed(2)} arc ${style.arcBonusDeg >= 0 ? '+' : ''}${style.arcBonusDeg.toFixed(0)} block ${style.blockChipMult.toFixed(2)} chi ${style.chiMult.toFixed(2)} chain ${style.chainMult.toFixed(2)}`);
       // Build the arena FIRST so the M37 spawn guard sees a populated world
       // (>=8 meshes) and the dojoWarm ambient bed has somewhere to live.
       karateVenue = mountVenue(ctx, 'karate_endless', { keepGameplayCamera: true });

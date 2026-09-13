@@ -27,7 +27,9 @@ import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { FighterState, KARATE_ATTACKS, CHI_MAX } from '../core/FightCore';
-import { StrikeController, karateMoveset, type CombatMove } from '../core/StrikeSystem';
+import { StrikeController, karateMoveset, MIN_STARTUP_SEC, type CombatMove } from '../core/StrikeSystem';
+import { readBlend, blendTraits } from '../combat/schools';
+import { styleMoveset } from '../combat/loadout';
 import { DefenseController, applyDefenseOutcome, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';
 import { CombatMovement } from '../core/CombatMovement';
 import { ResourceMeter, CHAKRA } from '../core/ResourceMeter';
@@ -316,7 +318,12 @@ export const ShowdownMode: ModeDefinition = (() => {
       wallMesh.material = wm;
 
       meState = new FighterState(100); foeState = new FighterState(100);
-      meStrike = new StrikeController(MOVES); foeStrike = new StrikeController(MOVES);
+      // ONE MOVESET OBJECT WAS HANDED TO BOTH FIGHTERS. StrikeController holds what it is given, so the two
+      // shared their move table — the kind of bug that surfaces as "the rival's combo cancelled mine". Each
+      // gets its own now, and the player's carries the school they picked on the start-up screen; the rival
+      // fights the unstyled set, so a style is something YOU brought rather than a difficulty dial.
+      meStrike = new StrikeController(styleMoveset(karateMoveset(KARATE_ATTACKS), blendTraits(readBlend()), MIN_STARTUP_SEC));
+      foeStrike = new StrikeController(karateMoveset(KARATE_ATTACKS));
       meMove = new CombatMovement(); foeMove = new CombatMovement();
       meDef = new DefenseController(); foeDef = new DefenseController();
       meAnim = new CombatAnimTree(player.animator); foeAnim = new CombatAnimTree(rival.animator);

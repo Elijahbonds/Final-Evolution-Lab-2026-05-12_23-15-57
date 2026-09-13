@@ -44,10 +44,15 @@ export class PlayerVitals {
   get downed(): boolean { return this.hp <= 0; }
   tick(dt: number): void { this.iframeSec = Math.max(0, this.iframeSec - dt); }
   /** One enemy strike lands. `dodging` = inside the dodge's i-frames (untouchable). */
-  takeHit(dmg: number, opts: { blocking?: boolean; dodging?: boolean } = {}): HitOutcome {
+  /**
+   * `blockChipMult` scales what a guard costs — it is how a FIGHTING STYLE reaches this mode's block.
+   * Defaults to 1, so every existing caller is unchanged. Still floors at 1 hp: a guard can never drop you,
+   * whatever style you brought.
+   */
+  takeHit(dmg: number, opts: { blocking?: boolean; dodging?: boolean; blockChipMult?: number } = {}): HitOutcome {
     if (this.hp <= 0) return 'down';
     if (opts.dodging || this.iframeSec > 0) return 'iframe';
-    if (opts.blocking) { this.hp = Math.max(1, this.hp - VITALS.blockChip); return 'blocked'; }
+    if (opts.blocking) { this.hp = Math.max(1, this.hp - VITALS.blockChip * (opts.blockChipMult ?? 1)); return 'blocked'; }
     this.hp = Math.max(0, this.hp - dmg);
     if (this.hp <= 0) return 'down';
     this.iframeSec = VITALS.hurtIframeSec;
