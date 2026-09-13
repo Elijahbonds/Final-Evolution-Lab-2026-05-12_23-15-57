@@ -51,6 +51,7 @@ import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, TransformNode } from '@babylonjs/core';
 import { BasketballAnimTree } from '../anim/basketballTree';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
 import { flushThroughRim, clankOffRim } from '../anim/ballRig';
@@ -140,6 +141,9 @@ interface Body {
   // BIOMECH-HOOPS-WAVE1: the one animation owner, the Posture Poses layer and the hoops window it reads
   tree: BasketballAnimTree; posture: { layer: PostureLayer; dispose(): void } | null; bio: HoopsPostureInput;
   floored: boolean; shotWin: ShotWindow; shotSec: number; landSec: number; celebrateSec: number; speed01: number;
+  /** DYNAMIC POSTURE: this body's own motion tracker. Per body, because an acceleration only means 'braking' or
+   *  'turning' once it is resolved in the frame of the body that felt it — six bodies, six frames. */
+  motion: BodyMotion;
 }
 
 export const ThreeVThreeMode: ModeDefinition = (() => {
@@ -243,7 +247,11 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   function feedFor(b: Body) {
     const { window, pose, legs } = hoopsPose(b.bio);
     const def = b.bio.role === 'defense';
-    return { pose, legs, aim: objectiveFor(b), eyes: def ? ballWorld() : RIM, window };
+    // the authored stance says what the window looks like; the tracker says how hard this body is living in it.
+    // Before this, six bodies in the same window were byte-identical however differently they were moving.
+    const airborne = b.jumpAge !== Infinity;
+    const dyn = dynamicPose(pose, b.motion.signals(b.speed01, 0, airborne), window);
+    return { pose: dyn, legs, aim: objectiveFor(b), eyes: def ? ballWorld() : RIM, window };
   }
   /** Face a body the play's way, slewed: the objective inside range, else the travel, else the heading. */
   const facePlay = (root: TransformNode, vel: Vector3, objective: Vector3 | null, range: number, dt: number, rate = FACE_RATE): number => {
@@ -252,6 +260,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   const slideDirFor = (yaw: number, vel: Vector3): 'left' | 'right' => (vel.x * Math.cos(yaw) - vel.z * Math.sin(yaw) > 0.3 ? 'right' : 'left');
   /** The per-frame window clocks and the layer's input for one body. */
   function bioTick(b: Body, dt: number, role: HoopsPostureInput['role'], hasBall: boolean, nearestDefender: number, reaching: boolean): void {
+    // DYNAMIC POSTURE: feed this body's own tracker. The hero's live vector is his dribble controller's; an AI
+    // body's is the one the movement step wrote this frame (see Body.vel).
+    const v = b === me ? me.drib.vel : b.vel;
+    b.motion.update(v.x, v.z, b.char.root.rotation.y, dt);
     b.landSec = Math.max(0, b.landSec - dt); b.celebrateSec = Math.max(0, b.celebrateSec - dt);
     if (b.shotWin === 'release') { b.shotSec += dt; if (b.shotSec >= RELEASE_SEC) b.shotWin = 'follow'; }
     Object.assign(b.bio, {
@@ -290,6 +302,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   }
   function resetPossession(toMe = true): void {
     possessionToken++;
+    // every body is about to be teleported; a reset is not an acceleration
+    for (const b of everyBody()) b.motion.reset();
     me.char.root.position.set(0, 0, 6);
     // MODE-STICK-FACE (2026-09-07): face the rim AND tell the dribble so. The movement layer's facing starts at 0 no
     // matter which way the model spawned, and a push AGAINST the facing is a back-pedal that keeps the chest where it
@@ -360,7 +374,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         // BIOMECH-HOOPS-WAVE1: one animation owner per rig, and the Posture Poses layer (mounted here, BEFORE the carries —
         // the dribble arm solves against the posed shoulders); the layer owns the eyes
         char.secondary?.setLookTarget(() => null);
-        const body: Body = { char, slot, drib: new DribbleController(), stunSec: 0, vel: new Vector3(), jumpAge: Infinity, brain, screenHeld: false, tree: new BasketballAnimTree(char.animator), posture: null, bio: { ...HOOPS_INPUT_IDLE }, floored: false, shotWin: 'none', shotSec: 0, landSec: 0, celebrateSec: 0, speed01: 0 };
+        const body: Body = { char, slot, drib: new DribbleController(), stunSec: 0, vel: new Vector3(), jumpAge: Infinity, brain, screenHeld: false, tree: new BasketballAnimTree(char.animator), posture: null, bio: { ...HOOPS_INPUT_IDLE }, floored: false, shotWin: 'none', shotSec: 0, landSec: 0, celebrateSec: 0, speed01: 0, motion: new BodyMotion() };
         body.posture = mountPostureLayer(ctx.scene, char.skeleton, char.root, () => feedFor(body), `3V3-PP-${ai ? aiKind : 'me'}`);
         return body;
       };

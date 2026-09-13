@@ -41,6 +41,7 @@ import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK'; 
 import { lagToward, jamWeight, ironContact, hangHold, WRIST_LAG_TAU, HANG_MAX_SEC } from '../core/DunkHands';   // DUNK-HANDS-RIM: the wrist lag, the jam, the iron contact, the hang
 import { hitStop as feelHitStop } from '../core/gameFeel';   // DUNK-HANDS-RIM H3: the mode's own clock stops on the iron too (the harness scales dt by it)
 import { chainRotation, frameAbove } from '../anim/TwoBoneIK';
+import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the runway answers its MOTION
 import { POSTURE, posturePose, chestAimCorrection, hipYawStrip, easePose, clonePose, lowPassK, wrapRad, clamp, POSTURE_TAU, AIM_TAU, AIM_SPLIT, EYES_SPLIT, HEAD_YAW_CAP, HEAD_PITCH_CAP, type PosturePose, type PostureWindow, type PostureInput } from '../core/DunkPosture';   // DUNK-POSTURE: the Posture Poses layer
 import type { PlayOpts } from '../anim/CharacterAnimator';
 import { DunkReplayRecorder } from '../scene/DunkReplayCam';
@@ -321,6 +322,12 @@ export const DunkMode: ModeDefinition = (() => {
   const llPitch = { Left: 0, Right: 0 };   // the eased ankle correction per side (rad)
   let ppSign: 1 | -1 = 1;                     // world yaw per frame-space yaw (−1 under a mirrored import root)
   let ppPose: PosturePose = clonePose(POSTURE.stance), ppWindow: PostureWindow = 'stance', ppTrick: string | null = null;
+  // DYNAMIC POSTURE on the RUNWAY only. The flight windows are choreography — rise / hang / extend / jam / brace
+  // are paced to the flight clock and DynamicPosture's allowlist refuses them — but the approach is locomotion:
+  // it ramps up to speed and it strafes between the obstacles, so it should lean and bank like a body running.
+  const runMotion = new BodyMotion();
+  /** This frame's runway velocity, for the posture tracker (the flight writes nothing here). */
+  const runwayVel = { x: 0, z: 0 };
   let ppAim = 0, ppHeadYaw = 0, ppHeadPitch = 0, ppClipHipYaw = 0, ppChestYaw = 0;   // smoothed corrections (rad) and the readouts
   let ppOverride: PosturePose | null = null;  // dev probes: a stance forced on the rig (calibration)
   let replayRateNow = 0.5, replayTrickIdx = 0, replaySpinYaw = 0;
@@ -682,6 +689,9 @@ export const DunkMode: ModeDefinition = (() => {
         const runNow = holdRunSpeed * (runwayBeat ? runwayBeat.runScale : 1);
         player.root.position.z -= runNow * dt;
         faceVel(new Vector3(steer, 0, -runNow), dt);
+        // the posture tracker: the run ramping up is a forward lean, the strafe between obstacles is a bank
+        runwayVel.x = steer; runwayVel.z = -runNow;
+        runMotion.update(steer, -runNow, player.root.rotation.y, dt);
         runUpPeak = Math.max(runUpPeak, Math.hypot(steer, holdRunSpeed));
         if (!runwayBeat) setWin('run');
         // the SELF-LOB prop tosses itself ahead of the takeoff when the runner has not thrown it by hand
@@ -1459,7 +1469,11 @@ export const DunkMode: ModeDefinition = (() => {
     };
     const { window, pose, trick: trickId } = posturePose(inp);
     if (window !== ppWindow || trickId !== ppTrick) { ppWindow = window; ppTrick = trickId; console.info(`[DUNK-PP] ${window}${trickId ? ' · ' + trickId : ''}`); }
-    ppPose = ppOverride ? clonePose(ppOverride) : easePose(ppPose, pose, lowPassK(dt, POSTURE_TAU));
+    // Modulated BEFORE the ease, so easePose smooths the MODULATED target rather than chasing a raw one. The
+    // allowlist means only 'stance' (the runway) is touched; every flight beat is returned untouched.
+    const speed01 = Math.min(1, Math.hypot(runwayVel.x, runwayVel.z) / Math.max(0.1, HOLD_RUN_MAX));
+    const dyn = dynamicPose(pose, runMotion.signals(speed01, 0, window !== 'stance'), window);
+    ppPose = ppOverride ? clonePose(ppOverride) : easePose(ppPose, dyn, lowPassK(dt, POSTURE_TAU));
     // the feet flatten on the way DOWN (a miss's fall, a make's drop after the replay), not on the feet-down frame
     llPose = easeLegPose(llPose, legPose(dropToFloor && !rep && window !== 'land' && window !== 'celebrate' ? 'brace' : window, trickId), lowPassK(dt, POSTURE_TAU));
   }

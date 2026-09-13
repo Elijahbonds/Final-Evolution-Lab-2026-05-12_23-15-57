@@ -110,6 +110,7 @@ import {
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
 import { attachBallToHand, releaseBall, flushThroughRim, clankOffRim } from '../anim/ballRig';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the dunk's Posture Poses, shared
+import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
@@ -336,7 +337,16 @@ export const OneVOneMode: ModeDefinition = (() => {
   const ballWorld = (): Vector3 => ball.getAbsolutePosition();
   /** The layer's feed: the window's stance and feet, the chest on the rim (offense) or the handler (defense), the eyes on the
    *  iron (offense) or the ball (defense). */
-  const feedFor = (bio: HoopsPostureInput, aim: Vector3, eyes: Vector3) => { const { window, pose, legs } = hoopsPose(bio); return { pose, legs, aim, eyes, window }; };
+  // DYNAMIC POSTURE. hoopsPose returns the authored stance for the window; the motion tracker says how hard the
+  // body is living in it. Before this a drive at a walk and a drive at a sprint were byte-identical, and a hard
+  // cut looked exactly like running straight because every authored stance is pitch-only. One tracker per body,
+  // because the acceleration has to be resolved in THAT body's frame to tell a brake from a turn.
+  const meMotion = new BodyMotion();
+  const foeMotion = new BodyMotion();
+  const feedFor = (bio: HoopsPostureInput, aim: Vector3, eyes: Vector3, motion: BodyMotion, exertion: number, airborne: boolean) => {
+    const { window, pose, legs } = hoopsPose(bio);
+    return { pose: dynamicPose(pose, motion.signals(bio.speed01, exertion, airborne), window), legs, aim, eyes, window };
+  };
   /** Face a body the play's way, slewed: the objective inside range, else the travel, else the heading. */
   const facePlay = (root: TransformNode, vel: Vector3, objective: Vector3 | null, range: number, dt: number, rate = FACE_RATE): number => {
     const yaw = slewYaw(root.rotation.y, playFacing(root.position, vel, objective, range, root.rotation.y), rate, dt);
@@ -416,6 +426,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
     threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null;
+    meMotion.reset(); foeMotion.reset();   // a check-up moves bodies metres in a frame; that is not acceleration
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
@@ -528,8 +539,8 @@ export const OneVOneMode: ModeDefinition = (() => {
       me.secondary?.setLookTarget(() => null); foe.secondary?.setLookTarget(() => null);
       net?.dispose(); net = null;   // NETPLAY: say bye and close the socket with the rest of teardown
       mePosture?.dispose(); foePosture?.dispose();
-      mePosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => feedFor(meBio, possession === 'mine' ? RIM : foe.root.position, possession === 'mine' ? RIM : ballWorld()), '1V1-PP');
-      foePosture = mountPostureLayer(ctx.scene, foe.skeleton, foe.root, () => feedFor(foeBio, possession === 'mine' ? me.root.position : RIM, possession === 'mine' ? ballWorld() : RIM), '1V1-PP-FOE');
+      mePosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => feedFor(meBio, possession === 'mine' ? RIM : foe.root.position, possession === 'mine' ? RIM : ballWorld(), meMotion, 1 - turbo.t01, myJumpAge !== Infinity || dunking), '1V1-PP');
+      foePosture = mountPostureLayer(ctx.scene, foe.skeleton, foe.root, () => feedFor(foeBio, possession === 'mine' ? me.root.position : RIM, possession === 'mine' ? ballWorld() : RIM, foeMotion, 0, foeBlockJumpAge !== Infinity || !!foeDunkFlight), '1V1-PP-FOE');
       meCarry?.dispose(); foeCarry?.dispose();
       meCarry = mountBallCarry({ scene: ctx.scene, ball, root: me.root, skeleton: me.skeleton });
       foeCarry = mountBallCarry({ scene: ctx.scene, ball, root: foe.root, skeleton: foe.skeleton });
@@ -894,6 +905,10 @@ export const OneVOneMode: ModeDefinition = (() => {
         const foeIntent = foeSlot.intent;
         const foeVel = foeStunSec > 0 ? new Vector3(0, 0, 0) : new Vector3(foeIntent.moveX, 0, -foeIntent.moveY).scale(3.6);
         foeVelLast.copyFrom(foeVel);   // HOOPS-MOVE-KIT-A M2: the drive contest reads set vs moving
+        // the posture trackers: each body's acceleration resolved in its OWN frame (a brake and a turn are the
+        // same world-space number otherwise)
+        meMotion.update(meDribble.vel.x, meDribble.vel.z, me.root.rotation.y, dt);
+        foeMotion.update(foeVel.x, foeVel.z, foe.root.rotation.y, dt);
         if (foeStunSec === 0) {
           // closing speed toward the handler feeds the hesi bite read
           const toMe = me.root.position.subtract(foe.root.position); toMe.y = 0;
@@ -1225,6 +1240,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     defPhase = 'check'; attacker.reset(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
     threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null;
+    meMotion.reset(); foeMotion.reset();   // a check-up moves bodies metres in a frame; that is not acceleration
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
