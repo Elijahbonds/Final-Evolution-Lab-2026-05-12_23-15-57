@@ -3,6 +3,7 @@
 // sections into a song, play the song (the engine swaps patterns at every bar line), record a take that starts on the next
 // bar, export the mixdown and per-track stems as WAV links. Pure math lives in Song.ts; audio in AudioEngine.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { exportSongToDance, saveExportedTrack } from './DanceExport';
 import type { AudioEngine, TrackState } from './AudioEngine';
 import { SECTION_NAMES, expandChain, newSectionId, normalizeChain, renderLengthSec, sectionAtBar, snapshotTracks, songBars, type Section, type SongChain, type Take } from './Song';
 
@@ -15,6 +16,10 @@ export interface SongPanelProps {
 
 export default function SongPanel({ engine, tracks, setTracks, playing, bpm, steps, say, S }: SongPanelProps) {
   const [sections, setSections] = useState<Section[]>([]);
+  /** Has this song been sent to the dance floor? Resets when the arrangement changes under it. */
+  const [danced, setDanced] = useState(false);
+  /** Stable per mount, so re-exporting the same song overwrites its slot instead of piling up. */
+  const songId = useRef(`s${Date.now().toString(36)}`).current;
   const [chain, setChain] = useState<SongChain>([]);
   const [songMode, setSongMode] = useState(false);
   const [bar, setBar] = useState(0);
@@ -27,6 +32,8 @@ export default function SongPanel({ engine, tracks, setTracks, playing, bpm, ste
   const recRef = useRef<MediaRecorder | null>(null); const streamRef = useRef<MediaStream | null>(null);
   const armedRef = useRef(armed); useEffect(() => { armedRef.current = armed; }, [armed]);
   const chainRef = useRef(chain); useEffect(() => { chainRef.current = chain; }, [chain]);
+  // an arrangement edited after an export no longer matches what the dance floor holds — the tick would be a lie
+  useEffect(() => { setDanced(false); }, [chain, sections]);
   const sectionsRef = useRef(sections); useEffect(() => { sectionsRef.current = sections; }, [sections]);
   const songModeRef = useRef(songMode); useEffect(() => { songModeRef.current = songMode; }, [songMode]);
 
@@ -120,6 +127,21 @@ export default function SongPanel({ engine, tracks, setTracks, playing, bpm, ste
         {takes.map((t) => <span key={t.id} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 8, background: '#33244a' }}>take {t.id} · bar {t.atBar + 1} · {t.durationSec.toFixed(1)}s <button onClick={() => setTakes((a) => a.filter((x) => x.id !== t.id))} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.6 }}>×</button></span>)}
       </div>
       <div style={S.row}>
+        {/* DANCE RHYTHM EXPORT. The chart is built from the song's own drums (music/DanceExport.ts), not from a
+            seed, so the routine lands on the hits the player wrote. Available whenever there is something to
+            dance to — a single bar of kicks is already a chart, which is the point of putting it at the grid
+            tier rather than behind the arrangement. */}
+        <button
+          style={{ ...S.btnAlt, ...(danced ? { background: '#4FD1E8', color: '#101018', borderColor: '#4FD1E8' } : {}) }}
+          disabled={!chain.length}
+          onClick={() => {
+            const out = exportSongToDance({ id: songId, name: 'My Track', bpm, steps, chain, sections });
+            if (!out) { say('nothing to dance to yet — put a hit in the grid first'); return; }
+            saveExportedTrack(out);
+            setDanced(true);
+            say(`sent to the dance floor · ${out.summary.hits} hits · ${out.track.bars} bars · ${'●'.repeat(out.track.difficulty)}`);
+          }}
+        >{danced ? '✓ ON THE DANCE FLOOR' : '♪ SEND TO THE DANCE FLOOR'}</button>
         <button style={S.btn} disabled={rendering || !chain.length} onClick={() => void exportSong()}>{rendering ? 'RENDERING…' : 'RENDER SONG + STEMS'}</button>
         {mixUrl && <a href={mixUrl} download="fel-song-mix.wav" style={{ ...S.btnAlt, textDecoration: 'none' }}>⬇ MIX</a>}
         {stems.map((s) => <a key={s.name} href={s.url} download={`fel-stem-${s.name.replace(/\s+/g, '_')}.wav`} style={{ ...S.btnAlt, textDecoration: 'none', fontSize: 11 }}>⬇ {s.name}</a>)}

@@ -11,6 +11,7 @@
 // three charts, not three dice rolls.
 
 import type { DanceClip, DanceStep, Judgement } from './DanceCore';
+import { readExportedTrack } from '../music/DanceExport';
 import { DANCE_LIBRARY } from './DanceCore';
 
 export interface DanceTrack {
@@ -32,15 +33,41 @@ export const DANCE_TRACKS: readonly DanceTrack[] = [
 
 export const DEFAULT_TRACK_ID = 'cypher';
 
+/**
+ * The three shipped charts PLUS the player's exported song, if they have made one.
+ *
+ * Music Mode's Dance Rhythm export (music/DanceExport.ts) writes one slot; it appears at the end of the
+ * pick screen so "dance to the thing I just made" is one left-press away from the default. DANCE_TRACKS
+ * stays a shipped constant — a player's song is not shipped content and must not be mistaken for it.
+ */
+export function allTracks(): readonly DanceTrack[] {
+  const mine = readExportedTrack();
+  return mine ? [...DANCE_TRACKS, mine.track] : DANCE_TRACKS;
+}
+
 export function trackById(id: string | null | undefined): DanceTrack {
-  return DANCE_TRACKS.find((t) => t.id === id) ?? DANCE_TRACKS.find((t) => t.id === DEFAULT_TRACK_ID)!;
+  const all = allTracks();
+  return all.find((t) => t.id === id) ?? all.find((t) => t.id === DEFAULT_TRACK_ID)!;
 }
 
 /** Left/right on the pick screen; wraps. */
 export function cycleTrack(id: string, dir: 1 | -1): DanceTrack {
-  const i = Math.max(0, DANCE_TRACKS.findIndex((t) => t.id === id));
-  const n = DANCE_TRACKS.length;
-  return DANCE_TRACKS[(i + dir + n) % n];
+  const all = allTracks();
+  const i = Math.max(0, all.findIndex((t) => t.id === id));
+  const n = all.length;
+  return all[(i + dir + n) % n];
+}
+
+/**
+ * The steps for a track.
+ *
+ * A shipped track GENERATES its routine from its seed (a retry must hand back the same chart); the player's
+ * exported track carries its own steps, because those steps are the point — they are the song's own drums,
+ * and re-generating them from a seed would throw away the thing the export exists to preserve.
+ */
+export function stepsFor(t: DanceTrack): DanceStep[] | null {
+  const mine = readExportedTrack();
+  return mine && mine.track.id === t.id ? mine.steps : null;
 }
 
 /** `?track=battle` deep link (probes, shares). null when absent or unknown —

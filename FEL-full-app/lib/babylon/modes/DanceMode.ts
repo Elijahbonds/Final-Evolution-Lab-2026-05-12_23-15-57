@@ -46,7 +46,7 @@ import {
   DancePerformance, generateRoutine, beatDuration, DANCE_LIBRARY, type Judgement, type DanceStep,
 } from '../core/DanceCore';
 import {
-  DEFAULT_TRACK_ID, trackById, cycleTrack, trackFromQuery, pickBanner, PICK_TIMEOUT_SEC,
+  DEFAULT_TRACK_ID, trackById, cycleTrack, trackFromQuery, pickBanner, PICK_TIMEOUT_SEC, stepsFor,
   gradeFor, bodySpeedFor, cueLane, type DanceTrack,
 } from '../core/danceTracks';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the stage family (SPEC-FEL-BIOMECH-GAMEWIDE asks dance for "G2 +
@@ -246,7 +246,10 @@ export const DanceMode: ModeDefinition = (() => {
     phase = 'countin';
 
     perf = new DancePerformance(track.bpm);
-    perf.setRoutine(generateRoutine({ bars: track.bars, difficulty: track.difficulty, seed: track.seed }));
+    // A player's exported song carries its OWN steps — they are the song's drums, and re-rolling them from a
+    // seed would discard the only thing the export exists to preserve. Shipped tracks generate as before.
+    const mine = stepsFor(track);
+    perf.setRoutine(mine ?? generateRoutine({ bars: track.bars, difficulty: track.difficulty, seed: track.seed }));
     perf.onStepFired = playStep;
     // pass ALL of onJudged's args through — a 3-arg arrow here silently
     // dropped the step (no band motion ever) and the delta (no EARLY/LATE)
