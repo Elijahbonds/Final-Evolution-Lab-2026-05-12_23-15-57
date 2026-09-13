@@ -842,6 +842,8 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (!finish && !posting) { driveBody('me', me.root, meDribble.vel, dt); face(me.root, drib.facingRad); }
           const nearestDef = foeStunSec > 0 ? Infinity : Vector3.Distance(me.root.position, foe.root.position);
           meAnimTree.update({
+            // STRIDE MATCHING needs real ground speed: speed01 is normalised and cannot pace a stride
+            speedMps: Math.hypot(meDribble.vel.x, meDribble.vel.z),
             speed01: drib.speed01, crossover: drib.crossover, nearestDefender: nearestDef,
             hasBall: carrying, shooting, dunking,
             driving: sprintOk && drib.speed01 > 0.6
@@ -923,6 +925,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         }
         foeSpeed01 = Math.min(1, foeVel.length() / 3.6);
         foeAnimTree.update({
+          speedMps: Math.hypot(foeVel.x, foeVel.z),
           speed01: Math.min(1, foeVel.length() / 3.6), crossover: false, nearestDefender: Infinity,
           hasBall: false, shooting: false, dunking: false, driving: false,
           defending: true, bracing: !!foeBrain?.boxing, staggered: false, slideDir: slideDirFor(foe.root.rotation.y, foeVel),   // O2: the seal stance while boxing
@@ -1094,6 +1097,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         meDribble.setFacing(defYaw);
         contact?.brace('me', intent.brace ?? false);
         meAnimTree.update({
+          speedMps: Math.hypot(meDribble.vel.x, meDribble.vel.z),
           speed01: drib.speed01, crossover: false, nearestDefender: Infinity,
           hasBall: false, shooting: false, dunking: false, driving: false,
           defending: true, bracing: intent.brace ?? false, staggered: false, slideDir: slideDirFor(defYaw, meDribble.vel),
@@ -1117,6 +1121,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           // the gather / step-back are mode-owned beats — the tree's loop choice must not race them (a 'protect'
           // stance played on the gather's first frame popped the hand 0.45 m)
           if (dec.phase !== 'gather' && dec.phase !== 'stepback') foeAnimTree.update({
+            speedMps: sp,
             speed01: Math.min(1, sp / RIVAL_DRIVE_SPEED), crossover: false, nearestDefender: dist,
             hasBall: true, shooting: false, dunking: false, driving: dec.phase === 'blowby',
             defending: false, bracing: false, staggered: false,

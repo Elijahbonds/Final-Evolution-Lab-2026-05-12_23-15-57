@@ -17,6 +17,7 @@ import { Vector3 } from '@babylonjs/core';
 import type { Mesh, Observer, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { plantLeg } from './FootPlanting';
 import type { CharacterAnimator } from './CharacterAnimator';
+import { rateFor, StrideRateFilter } from '../core/StrideMatch';
 import { boneNode, findBone } from './boneLookup';
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
@@ -30,6 +31,13 @@ export type BasketballAnimState =
 
 export interface AnimTreeInput {
   speed01: number;
+  /**
+   * The body's PLANAR SPEED in m/s, for stride matching (StrideMatch).
+   *
+   * speed01 is normalised and cannot drive a stride: a clip has to be paced against real ground speed or the feet
+   * and the floor disagree. Optional, so a mode that has not been wired yet simply keeps the old fixed cadence.
+   */
+  speedMps?: number;
   crossover: boolean;
   nearestDefender: number;
   hasBall: boolean;
@@ -131,7 +139,10 @@ export class BasketballAnimTree {
   private override: { kind: 'beat' | 'hold'; clip: string; state: BasketballAnimState | null } | null = null;
   private token = 0;
   private settledState: BasketballAnimState | null = null;
-  constructor(private animator: Pick<CharacterAnimator, 'play'>) {}
+  /** The stride rate for the loop that is running, smoothed so a cadence never stutters. */
+  private strideFilter = new StrideRateFilter();
+  private strideClip: string | null = null;
+  constructor(private animator: Pick<CharacterAnimator, 'play' | 'setSpeed'>) {}
 
   update(input: AnimTreeInput): BasketballAnimState {
     this.last = input;
@@ -145,8 +156,21 @@ export class BasketballAnimTree {
     }
     if (c.state !== this.current) {
       this.current = c.state;
-      if (c.loop) { this.token++; this.override = null; this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec }); }
-      else this.playBeat(c.clip, { fadeSec: c.fadeSec }, c.state);
+      if (c.loop) {
+        this.token++; this.override = null;
+        // adopt the new state's stride rate rather than sliding from the old one
+        const r0 = rateFor(c.state, input.speedMps ?? 0);
+        this.strideClip = c.loop ? c.clip : null;
+        if (r0 !== null) this.strideFilter.set(r0);
+        this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec, speedRatio: r0 ?? 1 });
+      } else { this.strideClip = null; this.playBeat(c.clip, { fadeSec: c.fadeSec }, c.state); }
+    }
+    // STRIDE MATCHING, every frame. The loop is only (re)played on a STATE CHANGE — which is what keeps it stable —
+    // so the rate has to be set on the RUNNING animation instead, or a per-frame play() would restart the clip every
+    // frame. Only locomotion states have a rate; a shot or a knockdown returns null and is left alone.
+    if (this.strideClip && !this.override && input.speedMps !== undefined) {
+      const want = rateFor(c.state, input.speedMps);
+      if (want !== null) this.animator.setSpeed(this.strideClip, this.strideFilter.step(want, 1 / 60));
     }
     return c.state;
   }

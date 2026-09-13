@@ -659,6 +659,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       const meBoxing = boxingOut && !!meIntent.brace && !finish && !dunking;   // O2: L1 held on a shot = my seal on the nearest foe
       if (meBoxing) { const nf = nearestLiveFoe(); if (nf) me.char.root.rotation.y = slewYaw(me.char.root.rotation.y, yawTo(me.char.root.position, nf.char.root.position), FACE_RATE, dt); }
       if (!dunking) me.tree.update({   // the flight's held launch + the land crouch are mode-owned beats
+        // STRIDE MATCHING: real ground speed, because speed01 is normalised and cannot pace a stride
+        speedMps: Math.hypot(me.drib.vel.x, me.drib.vel.z),
         speed01: drib.speed01, crossover: drib.crossover && iAmCarrier, nearestDefender: nearestFoeDist, hasBall: iAmCarrier && !passFlight.active,
         shooting, dunking, driving: iAmCarrier && sprintOk && drib.speed01 > 0.6 && Vector3.Dot(me.drib.vel, RIM.subtract(me.char.root.position)) > 0,
         defending: carrierId === 'foeTeam', bracing: meBoxing, staggered: false, slideDir: slideDirFor(me.char.root.rotation.y, me.drib.vel),
@@ -692,6 +694,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         else if (vel.lengthSquared() > 0.1) body.char.root.rotation.y = slewYaw(body.char.root.rotation.y, Math.atan2(vel.x, vel.z), FACE_RATE, dt);
         body.speed01 = Math.min(1, vel.length() / 4.2);
         body.tree.update({
+          speedMps: Math.hypot(vel.x, vel.z),
           speed01: body.speed01, crossover: false, nearestDefender: Infinity, hasBall: carrierId === mateId && !passFlight.active, shooting: false, dunking: false, driving: false,
           defending: carrierId === 'foeTeam', bracing: !!mb?.boxing, staggered: false, slideDir: slideDirFor(body.char.root.rotation.y, vel),
         });
@@ -722,7 +725,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           f.vel.setAll(0);   // the rival driving on their possession: the scripted drive moves him, he faces the rim, his tree carries the ball
           f.char.root.rotation.y = slewYaw(f.char.root.rotation.y, yawTo(f.char.root.position, RIM), FACE_RIM_RATE, dt);
           f.speed01 = driveK < 1 ? 0.9 : 0;
-          if (!foeDunkFlight) f.tree.update({ speed01: f.speed01, crossover: false, nearestDefender: Infinity, hasBall: !!ball.parent, shooting: false, dunking: false, driving: driveK < 1, defending: false, bracing: false, staggered: false });   // the dunk's launch / land are mode-owned beats
+          if (!foeDunkFlight) f.tree.update({ speedMps: Math.hypot(f.vel.x, f.vel.z), speed01: f.speed01, crossover: false, nearestDefender: Infinity, hasBall: !!ball.parent, shooting: false, dunking: false, driving: driveK < 1, defending: false, bracing: false, staggered: false });   // the dunk's launch / land are mode-owned beats
           bioTick(f, dt, 'offense', !!ball.parent, Infinity, false);
           if (foeDunkFlight) f.bio.flight = foeDunkFlight;
           continue;
@@ -748,6 +751,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         else if (db && db.fightingOver === null) f.screenHeld = false;
         f.speed01 = Math.min(1, vel.length() / 3.8);
         f.tree.update({
+          speedMps: Math.hypot(vel.x, vel.z),
           speed01: f.speed01, crossover: false, nearestDefender: Infinity, hasBall: false, shooting: false, dunking: false, driving: false,
           defending: carrierId !== 'foeTeam', bracing: !!db?.boxing, staggered: false, slideDir: slideDirFor(f.char.root.rotation.y, vel),
         });
