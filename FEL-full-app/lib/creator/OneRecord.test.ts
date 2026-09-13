@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { stripComments } from '@/lib/testing/sourceScan';
 
 const ROOT = path.resolve(__dirname, '../..');
 const SEARCH = ['lib/babylon/modes', 'lib/babylon/core', 'lib/babylon/music', 'lib/courts'];
@@ -29,22 +30,13 @@ function tsFiles(dir: string): string[] {
 /** Words that mean "this stored thing is a profile". */
 const PROFILE_KEY = /localStorage\.setItem\(\s*[`'"][^`'"]*(profile|engagement|history|activity|sessions|visits|places|creator)/i;
 
-/**
- * Strip comments before matching.
- *
- * The first run of this failed on CheckIn.ts's own sentence "There is no watchPosition in this module" —
- * a rule about what the CODE does must not be satisfiable or breakable by prose, in either direction.
- */
-function code(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-}
 
 describe('no mode keeps its own profile', () => {
   it('nothing outside lib/creator writes a profile-shaped key to storage', () => {
     const offenders: string[] = [];
     for (const dir of SEARCH) {
       for (const file of tsFiles(dir)) {
-        const src = code(fs.readFileSync(file, 'utf8'));
+        const src = stripComments(fs.readFileSync(file, 'utf8'));
         for (const line of src.split('\n')) {
           if (PROFILE_KEY.test(line)) offenders.push(`${path.relative(ROOT, file)}: ${line.trim().slice(0, 90)}`);
         }
@@ -54,7 +46,7 @@ describe('no mode keeps its own profile', () => {
   });
 
   it('the canonical record has exactly one storage key, and it lives in its own module', () => {
-    const src = code(fs.readFileSync(path.join(ROOT, 'lib/creator/CreatorRecord.ts'), 'utf8'));
+    const src = stripComments(fs.readFileSync(path.join(ROOT, 'lib/creator/CreatorRecord.ts'), 'utf8'));
     const keys = [...src.matchAll(/localStorage\.(setItem|getItem|removeItem)\(\s*([A-Z_]+)/g)].map((m) => m[2]);
     expect(new Set(keys).size).toBe(1);
     expect(keys[0]).toBe('CREATOR_RECORD_KEY');
@@ -62,14 +54,14 @@ describe('no mode keeps its own profile', () => {
 
   it('COURTS WRITES THROUGH emit() AND NOTHING ELSE', () => {
     // the mission names this dependency explicitly; the check is that Courts never reaches storage itself
-    const src = code(fs.readFileSync(path.join(ROOT, 'lib/courts/CheckIn.ts'), 'utf8'));
+    const src = stripComments(fs.readFileSync(path.join(ROOT, 'lib/courts/CheckIn.ts'), 'utf8'));
     expect(src).not.toMatch(/localStorage/);
     expect(src).not.toMatch(/fetch\(|axios|XMLHttpRequest/);
     expect(src).toMatch(/emit/);
   });
 
   it('COURTS NEVER STORES OR TRANSMITS A COORDINATE', () => {
-    const src = code(fs.readFileSync(path.join(ROOT, 'lib/courts/CheckIn.ts'), 'utf8'));
+    const src = stripComments(fs.readFileSync(path.join(ROOT, 'lib/courts/CheckIn.ts'), 'utf8'));
     // the only geolocation call in the module is the single foreground getCurrentPosition
     expect((src.match(/getCurrentPosition/g) ?? []).length).toBe(1);
     expect(src).not.toMatch(/watchPosition/);            // no background tracking, ever
@@ -78,11 +70,11 @@ describe('no mode keeps its own profile', () => {
   });
 
   it('the harness is the one place a session is recorded', () => {
-    const src = code(fs.readFileSync(path.join(ROOT, 'lib/babylon/core/ModeHarness.ts'), 'utf8'));
+    const src = stripComments(fs.readFileSync(path.join(ROOT, 'lib/babylon/core/ModeHarness.ts'), 'utf8'));
     expect((src.match(/emitCreator\(\{ kind: 'session'/g) ?? []).length).toBe(1);
     // every mode goes through runMode, so one call site covers all of them and no mode has to remember
     const modeFiles = tsFiles('lib/babylon/modes');
-    const modesEmitting = modeFiles.filter((f) => /emitCreator|CreatorRecord/.test(code(fs.readFileSync(f, 'utf8'))));
+    const modesEmitting = modeFiles.filter((f) => /emitCreator|CreatorRecord/.test(stripComments(fs.readFileSync(f, 'utf8'))));
     expect(modesEmitting.map((f) => path.basename(f))).toEqual([]);
   });
 });

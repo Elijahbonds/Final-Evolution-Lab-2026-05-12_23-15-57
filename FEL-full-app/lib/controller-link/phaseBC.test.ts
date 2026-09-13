@@ -15,9 +15,9 @@ import { controllerConfigFor } from './schemas/registry';
 import { factorFor, widen } from './tvMode';
 import { PERFECT_BAND, GOOD_BAND, SHOT_TARGET } from '@/lib/babylon/core/shootoutHud';
 import type { PadLike } from '@/lib/input/profiles';
+import { stripComments } from '@/lib/testing/sourceScan';
 
 const ROOT = path.resolve(__dirname, '../..');
-const code = (s: string): string => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 const padFixture = (id: string, down: number[] = [], axes = [0, 0, 0, 0]): PadLike => ({
   id, mapping: 'standard', axes,
@@ -87,13 +87,13 @@ describe('ALL FOUR INPUT PATHS REACH THE SAME MODE VOCABULARY', () => {
   });
 
   it('and the KEYBOARD path is in the bus that all of them feed', () => {
-    const src = code(fs.readFileSync(path.join(ROOT, 'lib/babylon/core/InputBus.ts'), 'utf8'));
+    const src = stripComments(fs.readFileSync(path.join(ROOT, 'lib/babylon/core/InputBus.ts'), 'utf8'));
     expect(src).toMatch(/KEYMAP/);
     expect(src).toMatch(/readPad\(/);          // the local pad path, same file, same emit
   });
 
   it('3PT reads only FelInput — it cannot tell which path a press came from', () => {
-    const src = code(fs.readFileSync(path.join(ROOT, 'lib/babylon/modes/ThreePointMode.ts'), 'utf8'));
+    const src = stripComments(fs.readFileSync(path.join(ROOT, 'lib/babylon/modes/ThreePointMode.ts'), 'utf8'));
     expect(src).not.toMatch(/getGamepads|\.buttons\[|\.axes\[/);
     expect(src).not.toMatch(/decodePadFrame|PeerLink|RTCDataChannel/);
   });
@@ -101,7 +101,7 @@ describe('ALL FOUR INPUT PATHS REACH THE SAME MODE VOCABULARY', () => {
 
 describe('NO JSON PER FRAME', () => {
   it('the transport sends input as bytes and control as text, and never confuses them', () => {
-    const src = code(fs.readFileSync(path.join(ROOT, 'lib/controller-link/transport/webrtc.ts'), 'utf8'));
+    const src = stripComments(fs.readFileSync(path.join(ROOT, 'lib/controller-link/transport/webrtc.ts'), 'utf8'));
     expect(src).toMatch(/sendFrame/);
     expect(src).toMatch(/binaryType/);
     // the hot path does not stringify
@@ -123,13 +123,13 @@ describe('NO JSON PER FRAME', () => {
   });
 
   it('the input channel stays unordered and unreliable — a late frame is worse than a lost one', () => {
-    const src = code(fs.readFileSync(path.join(ROOT, 'lib/controller-link/transport/webrtc.ts'), 'utf8'));
+    const src = stripComments(fs.readFileSync(path.join(ROOT, 'lib/controller-link/transport/webrtc.ts'), 'utf8'));
     expect(src).toMatch(/ordered:\s*false/);
     expect(src).toMatch(/maxRetransmits:\s*0/);
   });
 
   it('and there is a WebSocket fallback when the datachannel will not open', () => {
-    const src = code(fs.readFileSync(path.join(ROOT, 'lib/controller-link/transport/webrtc.ts'), 'utf8'));
+    const src = stripComments(fs.readFileSync(path.join(ROOT, 'lib/controller-link/transport/webrtc.ts'), 'utf8'));
     expect(src).toMatch(/sendViaSocket/);
     expect(src).toMatch(/'socket'/);
   });
@@ -146,7 +146,7 @@ describe('TV MODE WIDENS THE REAL WINDOW', () => {
   });
 
   it('3PT actually applies it rather than importing it decoratively', () => {
-    const src = code(fs.readFileSync(path.join(ROOT, 'lib/babylon/modes/ThreePointMode.ts'), 'utf8'));
+    const src = stripComments(fs.readFileSync(path.join(ROOT, 'lib/babylon/modes/ThreePointMode.ts'), 'utf8'));
     expect(src).toMatch(/readDisplaySetting/);
     expect(src).toMatch(/perfectBand\(\)/);
     expect(src).toMatch(/goodBand\(\)/);
@@ -164,7 +164,7 @@ describe('TV MODE WIDENS THE REAL WINDOW', () => {
 
 describe('PRESENCE IS ON THE HOST, BEHIND A GESTURE', () => {
   it('the host stage asks for fullscreen, wake lock and orientation from a click handler', () => {
-    const src = code(fs.readFileSync(path.join(ROOT, 'components/controller-link/host-stage.tsx'), 'utf8'));
+    const src = stripComments(fs.readFileSync(path.join(ROOT, 'components/controller-link/host-stage.tsx'), 'utf8'));
     expect(src).toMatch(/HostPresence/);
     expect(src).toMatch(/onClick=\{start\}/);
     // and presence is started, not AWAITED: requestFullscreen can stay pending forever, and a host that
@@ -175,14 +175,14 @@ describe('PRESENCE IS ON THE HOST, BEHIND A GESTURE', () => {
   });
 
   it('presence releases the wake lock when the stage unmounts', () => {
-    const src = code(fs.readFileSync(path.join(ROOT, 'components/controller-link/host-stage.tsx'), 'utf8'));
+    const src = stripComments(fs.readFileSync(path.join(ROOT, 'components/controller-link/host-stage.tsx'), 'utf8'));
     expect(src).toMatch(/presenceRef\.current\.exit\(\)/);
   });
 
   it('the wake lock is RE-ACQUIRED after the tab is hidden', () => {
     // a wake lock is dropped automatically whenever the tab hides and is not restored on return; without
     // this the screen sleeps a few minutes after the first time anyone glances away
-    const src = code(fs.readFileSync(path.join(ROOT, 'lib/controller-link/presence.ts'), 'utf8'));
+    const src = stripComments(fs.readFileSync(path.join(ROOT, 'lib/controller-link/presence.ts'), 'utf8'));
     expect(src).toMatch(/visibilitychange/);
   });
 

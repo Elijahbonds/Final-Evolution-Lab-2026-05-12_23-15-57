@@ -14,9 +14,9 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { MODES, ENABLED_BABYLON_MODES } from './registry';
+import { stripComments } from '@/lib/testing/sourceScan';
 
 const ROOT = path.resolve(__dirname, '../../..');
-const code = (s: string): string => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 describe('the registry says what it means', () => {
   it('EVERY KEY MATCHES ITS MODE’S OWN modeId', () => {
@@ -86,7 +86,7 @@ describe('nothing calls runMode with a mode that is not registered', () => {
 
     const bad: string[] = [];
     for (const rel of files) {
-      const src = code(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+      const src = stripComments(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
       // only where the reference is handed to the harness — `MODES.map(...)` elsewhere is a different array
       for (const m of src.matchAll(/runMode\(\s*MODES(?:\.([a-z_0-9]+)|\[['"]([a-z_0-9]+)['"]\])/g)) {
         const key = m[1] ?? m[2];
@@ -94,5 +94,40 @@ describe('nothing calls runMode with a mode that is not registered', () => {
       }
     }
     expect(bad).toEqual([]);
+  });
+});
+
+describe('EVERY ENABLED MODE HAS A DOOR', () => {
+  // Aero Aces and Velocity Kart were ENABLED, registered, and reachable only from /dev/mode — no player
+  // route at all, and an MP challenge that could never settle because no host posted their session. This is
+  // the check that would have caught it the day they were added.
+  //
+  // A mode is mounted one of THREE ways and all three count: a literal `MODES.<key>` in a host, a factory
+  // host handed `modeKey: '<key>'`, or a factory called with the id positionally — makeAirHost('bigair',
+  // 'STOMP'). Missing that third spelling is what made this test first report Big Air as doorless when it
+  // has had a /play route all along.
+  it('every id in ENABLED_BABYLON_MODES is mounted by some host', () => {
+    const files: string[] = [];
+    const walk = (dir: string): void => {
+      const abs = path.join(ROOT, dir);
+      if (!fs.existsSync(abs)) return;
+      for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
+        if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+        const rel = path.join(dir, e.name);
+        if (e.isDirectory()) walk(rel);
+        else if (/\.tsx?$/.test(e.name) && !e.name.includes('.test.')) files.push(rel);
+      }
+    };
+    walk('app'); walk('components');
+    const all = files.map((f) => stripComments(fs.readFileSync(path.join(ROOT, f), 'utf8'))).join('\n');
+
+    const undoored = [...ENABLED_BABYLON_MODES].filter((id) => {
+      const literal = new RegExp(`MODES\\.${id}\\b`).test(all);
+      const viaFactory = new RegExp(`modeKey:\\s*['"]${id}['"]`).test(all)
+        || new RegExp(`modeKey=["']${id}["']`).test(all)
+        || new RegExp(`make\\w*Host\\(\\s*['"]${id}['"]`).test(all);
+      return !literal && !viaFactory;
+    });
+    expect(undoored).toEqual([]);
   });
 });

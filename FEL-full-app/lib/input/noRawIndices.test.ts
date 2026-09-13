@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { stripComments } from '@/lib/testing/sourceScan';
 
 const ROOT = path.resolve(__dirname, '../..');
 const ROOTS = ['lib', 'components', 'app'];
@@ -37,9 +38,6 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-function code(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-}
 
 describe('ZERO RAW BUTTON-INDEX READS OUTSIDE THE INPUT LAYER', () => {
   it('no file outside lib/input indexes a gamepad array', () => {
@@ -47,7 +45,7 @@ describe('ZERO RAW BUTTON-INDEX READS OUTSIDE THE INPUT LAYER', () => {
     for (const root of ROOTS) {
       for (const rel of walk(root)) {
         if (rel.startsWith(ALLOWED_DIR)) continue;
-        const src = code(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+        const src = stripComments(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
         src.split('\n').forEach((line, i) => {
           if (RAW_INDEX.test(line)) offenders.push(`${rel}:${i + 1}  ${line.trim().slice(0, 80)}`);
         });
@@ -66,7 +64,7 @@ describe('ZERO RAW BUTTON-INDEX READS OUTSIDE THE INPUT LAYER', () => {
   it('every pad consumer goes through readPad', () => {
     // the three that read hardware: the Babylon bus, the Canvas-2D juice, and the scheme bridge
     for (const f of ['lib/babylon/core/InputBus.ts', 'lib/canvas-juice.ts', 'lib/gamepad-bridge.ts']) {
-      const src = code(fs.readFileSync(path.join(ROOT, f), 'utf8'));
+      const src = stripComments(fs.readFileSync(path.join(ROOT, f), 'utf8'));
       expect(src, f).toMatch(/readPad\(/);
     }
   });
@@ -75,7 +73,7 @@ describe('ZERO RAW BUTTON-INDEX READS OUTSIDE THE INPUT LAYER', () => {
     // the strongest form of the rule, and the one the audit found already true: every mode is a thin skin
     // over FelInput, and nothing in lib/babylon/modes has ever seen a button index
     const modes = walk(path.join('lib', 'babylon', 'modes'));
-    const offenders = modes.filter((rel) => /getGamepads|\.buttons\[|\.axes\[/.test(code(fs.readFileSync(path.join(ROOT, rel), 'utf8'))));
+    const offenders = modes.filter((rel) => /getGamepads|\.buttons\[|\.axes\[/.test(stripComments(fs.readFileSync(path.join(ROOT, rel), 'utf8'))));
     expect(offenders).toEqual([]);
   });
 });
