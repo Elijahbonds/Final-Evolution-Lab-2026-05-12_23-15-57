@@ -36,7 +36,9 @@ export async function buildRig(
   mat.diffuseColor = Color3.FromHexString(boardColor);
   mat.specularColor = Color3.Black();
   board.material = mat;
-  if (boardKind) void dressBoard(board, boardKind);   // owner 2026-09-05: the Meshy deck rides the box (visual only)
+  // the deck's DISCIPLINE decides which skin list the pick comes from — a skate graphic on a surfboard is not a feature
+  const deckDisc = boardKind === 'snowboard' ? 'snow' : boardKind === 'surfboard' ? 'surf' : 'skate';
+  if (boardKind) void dressBoard(board, boardKind, deckDisc);   // owner 2026-09-05: the Meshy deck rides the box (visual only)
   const rider = new Rider(ctx.scene, char.root, ground, riderCfg);
   ctx.heroRef.current = char.root;
   ctx.camDirector.setPreset('board');

@@ -214,7 +214,12 @@ export const SkateRunMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'skateboard', mood: 'goldenHour', camPreset: 'board',
+    modeId: 'skateboard', camPreset: 'board',
+    // The LIGHT and the SKY are the venue's, not the module's. Getters, because the harness reads both at mount —
+    // after the splash has written the pick, before load() runs. THE WAREHOUSE rendered under Venice's sunset sky
+    // until this existed: the palette was per-venue and the lighting was a literal declared here at module scope.
+    get mood() { return readBoardVenue('skate').mood; },
+    get backdrop() { return readBoardVenue('skate').sky; },
 
     async load(ctx: ModeContext) {
       // the player's venue: a different palette, a different size, a different place

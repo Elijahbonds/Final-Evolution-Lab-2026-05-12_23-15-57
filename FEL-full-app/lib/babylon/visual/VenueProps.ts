@@ -56,6 +56,16 @@ export interface MountPropsOptions {
    *  'slope' set's pines stood at y 0 while the snow fell away beneath them (playtest d3d4a93: "floating low-poly pine",
    *  worse the further down the run). A ray from 400 m up finds the pickable ground at (x, z); no hit = the authored y. */
   snapToGround?: boolean;
+  /**
+   * BOARD VENUES (2026-09-12): push every placement OUTWARD along x by this many metres, keeping its sign.
+   *
+   * Placement tables are authored against one world's width. The slope set's pines stand at x ±19…±24 because
+   * the piste was 17 m half-wide; now that each snow venue brings its own corridor the glacier's groom is 34 m
+   * half-wide, and those same pines would stand in the middle of the run — trees you ride through. Shifting the
+   * set out by (venue bound − the width it was authored for) keeps a hand-composed treeline composed instead of
+   * re-authoring three sets, and a placement ON the centre line (x 0: the start flag) stays there.
+   */
+  lateralShift?: number;
 }
 
 /** Mount the prop set for `venueKey` under a fresh root. Resolves after every model loaded (failures skip the prop). */
@@ -83,8 +93,10 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
     try { meshes = await loadModel(scene, p.kit, p.model); } catch { return; }
     const holder = new TransformNode(`prop_${p.model}_${i}`, scene);
     holder.parent = root;
-    holder.position.set(p.at[0], p.at[1], p.at[2]);
-    if (opts.snapToGround) { const gy = groundYAt(p.at[0], p.at[2]); if (gy !== null) { holder.position.y = gy + p.at[1]; snapped++; } else missed++; }
+    const shift = opts.lateralShift ?? 0;
+    const px = p.at[0] === 0 ? 0 : p.at[0] + Math.sign(p.at[0]) * shift;
+    holder.position.set(px, p.at[1], p.at[2]);
+    if (opts.snapToGround) { const gy = groundYAt(px, p.at[2]); if (gy !== null) { holder.position.y = gy + p.at[1]; snapped++; } else missed++; }
     holder.rotation.y = p.yaw ?? 0;
     const s = p.scale ?? 1; holder.scaling.set(s, s, s);
     for (const src of meshes) {

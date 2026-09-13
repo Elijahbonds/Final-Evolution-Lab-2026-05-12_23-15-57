@@ -20,6 +20,7 @@ import { Shaker, InputBuffer, impact as feelImpact, timeScale } from './gameFeel
 import { SoundKit } from '../audio/SoundKit';   // M43: unlock audio on first user gesture
 import { autoInk } from '../visual/AnimeInk';    // M59: anime ink outlines
 import { mountBackdrop, MOOD_TO_FAMILY } from '../visual/Backdrops'; // M61: painted backdrops
+import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
 import { applyCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { PerfMonitor } from './PerfMonitor';          // M67: dev frame-budget monitor
@@ -92,7 +93,18 @@ export interface ModeContext {
 
 export interface ModeDefinition {
   modeId: string;
+  /**
+   * The light rig to run.
+   *
+   * May be declared as a GETTER, which is how a mode whose venue is PICKED gets its own sky. The harness
+   * reads this at mount — after the splash has written the pick and before load() runs — so
+   * `get mood() { return readBoardVenue('skate').mood; }` resolves to the chosen venue's mood. Before this
+   * the board modes declared a literal at module scope, which is why The Warehouse (a night venue) rendered
+   * under Venice's sunset: the palette was per-venue and the LIGHT was not.
+   */
   mood: VenueMood;
+  /** Painted horizon. Defaults to the mood's family; name it (or get it) to override per venue. */
+  backdrop?: BackdropFamily;
   camPreset: keyof typeof FOLLOW_PRESETS;
   load(ctx: ModeContext): Promise<void>;        // spawn venue + characters
   onInput(ctx: ModeContext, e: FelInput): void;
@@ -147,12 +159,15 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
   installAgentBridge(AGENT_MODES);
   const camera = new TargetCamera('cam', new Vector3(0, 3, -8), scene);
-  const lights = mountLightRig(scene, def.mood, tier);
+  const mood = def.mood;   // read once — it may be a per-venue getter
+  const lights = mountLightRig(scene, mood, tier);
   // Desktop tier only: SSAO grounds feet and darkens the crease between close
   // bodies. Attached to the one gameplay camera; disposed with the mode.
-  const ssao: SsaoHandle | null = tierRigSettings(tier, def.mood).ssao ? mountSsao(scene, camera) : null;
+  const ssao: SsaoHandle | null = tierRigSettings(tier, mood).ssao ? mountSsao(scene, camera) : null;
   // M61: painted sky + horizon backdrop (2 meshes, unlit, auto-rotating)
-  const backdrop = mountBackdrop(scene, MOOD_TO_FAMILY[def.mood] ?? 'park');
+  // def.mood / def.backdrop may be getters (see ModeDefinition.mood): read each ONCE here so the rig, the
+  // post pipeline, the backdrop and the ambient bed all agree on one mood for the life of the mount.
+  const backdrop = mountBackdrop(scene, def.backdrop ?? MOOD_TO_FAMILY[mood] ?? 'park');
   // M59: anime ink outlines on every skinned character (auto-hooks spawns)
   const unink = autoInk(scene);
   const input = opts.input ?? new InputBus();
@@ -311,7 +326,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     if (!ambientStarted) {
       ambientStarted = true;
       // mood -> ambient bed: dojo hush, alpine wind-quiet, everything else a stadium crowd.
-      const bed = def.mood === 'dojoWarm' ? 'dojo' : def.mood === 'alpine' ? 'none' : 'stadium';
+      const bed = mood === 'dojoWarm' ? 'dojo' : mood === 'alpine' || mood === 'overcast' ? 'none' : 'stadium';
       SoundKit.startAmbient(bed);
     }
     // Error phase: any press retries the load (the UI shows a RETRY button too)

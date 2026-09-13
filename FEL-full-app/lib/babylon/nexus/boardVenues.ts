@@ -17,6 +17,9 @@
 // Data, so a new venue is a list entry rather than a code path, and so the three disciplines stop each inventing their
 // own idea of what a place is.
 
+import type { VenueMood } from '../scene/moods';
+import type { BackdropFamily } from '../visual/Backdrops';
+
 export type BoardDiscipline = 'skate' | 'snow' | 'surf';
 
 export interface VenuePalette {
@@ -43,10 +46,31 @@ export interface BoardVenue {
   palette: VenuePalette;
   /** Half-extent of the rideable world, metres. The fence and the clamp both read this one number. */
   bound: number;
-  /** The mood the light rig should run. */
-  mood: 'daylight' | 'sunset' | 'night' | 'alpine' | 'overcast';
+  /**
+   * The mood the light rig should run — in the RIG'S OWN vocabulary (scene/moods.ts), deliberately.
+   *
+   * The first cut of this file had its own words ('sunset', 'night'), which meant a translation table
+   * between venue moods and rig moods, which meant two places to keep in step and a silent fallback when
+   * they drifted. The venue now names a mood the rig already has, so a venue that names a mood that does
+   * not exist is a TYPE ERROR rather than a scene that renders under the wrong sky.
+   */
+  mood: VenueMood;
+  /**
+   * What is painted BEHIND the place.
+   *
+   * Separate from the mood because the two are genuinely independent: the glacier and the reef run the same
+   * flat overcast light over completely different horizons (a ridge line vs open water). Mapping backdrop
+   * from mood alone is what left the 'ocean' family — a painted sea, a pier, palms — mounted by nothing at
+   * all, while every surf break sat under Venice's city skyline.
+   */
+  sky: BackdropFamily;
   /** Bodies watching. A place with nobody in it is a level, not a place. */
   crowd: number;
+  /**
+   * SNOW ONLY: pines beside the run. Zero is a real answer — the glacier's own line is "above the trees",
+   * and a venue whose copy says that and then grows a treeline is lying to the player.
+   */
+  trees?: number;
   ready: boolean;
 }
 
@@ -56,17 +80,17 @@ export interface BoardVenue {
 export const SKATE_VENUES: readonly BoardVenue[] = [
   {
     id: 'venice-park', name: 'VENICE PARK', sub: 'Warm concrete, low sun, the boardwalk behind you.',
-    discipline: 'skate', bound: 56, mood: 'sunset', crowd: 8, ready: true,
+    discipline: 'skate', bound: 56, mood: 'goldenHour', sky: 'venice', crowd: 8, ready: true,
     palette: { ground: '#b8a48c', line: '#f4ead8', structure: '#8d7f6d', accent: '#ff8a3d', edge: '#4a4038', backdrop: '#f0a675' },
   },
   {
     id: 'city-plaza', name: 'CITY PLAZA', sub: 'Granite ledges, painted kerbs, hard midday light.',
-    discipline: 'skate', bound: 62, mood: 'daylight', crowd: 10, ready: true,
+    discipline: 'skate', bound: 62, mood: 'daylight', sky: 'stadium', crowd: 10, ready: true,
     palette: { ground: '#9aa3ad', line: '#eef2f6', structure: '#6d7681', accent: '#22d3ee', edge: '#2b323a', backdrop: '#c7d3de' },
   },
   {
     id: 'warehouse', name: 'THE WAREHOUSE', sub: 'Poured concrete, sodium light, nobody to tell you to leave.',
-    discipline: 'skate', bound: 48, mood: 'night', crowd: 5, ready: true,
+    discipline: 'skate', bound: 48, mood: 'nightGame', sky: 'stadium', crowd: 5, ready: true,
     palette: { ground: '#4c4a52', line: '#ffd75e', structure: '#3a3841', accent: '#ff4d6d', edge: '#23222a', backdrop: '#14131a' },
   },
 ];
@@ -75,17 +99,17 @@ export const SKATE_VENUES: readonly BoardVenue[] = [
 export const SNOW_VENUES: readonly BoardVenue[] = [
   {
     id: 'alpine-run', name: 'ALPINE RUN', sub: 'Blue shadows on white, pines to the treeline.',
-    discipline: 'snow', bound: 70, mood: 'alpine', crowd: 8, ready: true,
+    discipline: 'snow', bound: 24, mood: 'alpine', sky: 'alpine', crowd: 8, trees: 22, ready: true,
     palette: { ground: '#eef4fb', line: '#9fc0e8', structure: '#dce8f6', accent: '#ff4d6d', edge: '#7f97b5', backdrop: '#9dbfe0' },
   },
   {
     id: 'night-park', name: 'NIGHT PARK', sub: 'Floodlit kickers, everything else is dark.',
-    discipline: 'snow', bound: 62, mood: 'night', crowd: 6, ready: true,
+    discipline: 'snow', bound: 20, mood: 'nightGame', sky: 'alpine', crowd: 6, trees: 14, ready: true,
     palette: { ground: '#c6d3e4', line: '#ffd75e', structure: '#9fb0c6', accent: '#4dd4ff', edge: '#2b3648', backdrop: '#141b28' },
   },
   {
     id: 'glacier', name: 'GLACIER', sub: 'Above the trees. Ice blue, flat light, a long way down.',
-    discipline: 'snow', bound: 84, mood: 'overcast', crowd: 3, ready: true,
+    discipline: 'snow', bound: 34, mood: 'overcast', sky: 'alpine', crowd: 3, trees: 0, ready: true,
     palette: { ground: '#e6f2f8', line: '#7fb8d4', structure: '#cfe4ef', accent: '#2ec4b6', edge: '#6a8ea3', backdrop: '#c3dbe8' },
   },
 ];
@@ -94,17 +118,17 @@ export const SNOW_VENUES: readonly BoardVenue[] = [
 export const SURF_VENUES: readonly BoardVenue[] = [
   {
     id: 'the-break', name: 'THE BREAK', sub: 'Green water, a pier down the line, afternoon glass.',
-    discipline: 'surf', bound: 70, mood: 'daylight', crowd: 6, ready: true,
+    discipline: 'surf', bound: 70, mood: 'daylight', sky: 'ocean', crowd: 6, ready: true,
     palette: { ground: '#2f8f8a', line: '#bfeee9', structure: '#1f6f6b', accent: '#ffd75e', edge: '#134f4c', backdrop: '#8fd6cf' },
   },
   {
     id: 'sunset-point', name: 'SUNSET POINT', sub: 'Gold on the face, long walls, nobody out.',
-    discipline: 'surf', bound: 78, mood: 'sunset', crowd: 3, ready: true,
+    discipline: 'surf', bound: 78, mood: 'goldenHour', sky: 'ocean', crowd: 3, ready: true,
     palette: { ground: '#2b6f86', line: '#ffd9a8', structure: '#1d5468', accent: '#ff8a3d', edge: '#123a48', backdrop: '#f0a675' },
   },
   {
     id: 'reef', name: 'THE REEF', sub: 'Dark water over coral. It breaks hard and it breaks shallow.',
-    discipline: 'surf', bound: 64, mood: 'overcast', crowd: 2, ready: true,
+    discipline: 'surf', bound: 64, mood: 'overcast', sky: 'ocean', crowd: 2, ready: true,
     palette: { ground: '#1f5d70', line: '#9fd6e8', structure: '#164654', accent: '#b07cf5', edge: '#0d2f39', backdrop: '#6f9db0' },
   },
 ];
@@ -150,11 +174,17 @@ export function writeBoardVenue(d: BoardDiscipline, id: string): void {
 }
 
 /**
- * How much bigger this venue is than the old fixed park.
+ * How much bigger this venue is than the one fixed world its discipline used to have.
  *
- * The skate world was 70 units across with a clamp at 33, and a rider crosses that in EIGHT SECONDS — measured, not
- * estimated. Every venue here is bigger, and the smallest (the warehouse, deliberately tight) is still half again the
- * old rideable extent.
+ * Per discipline, because `bound` is a half-extent of DIFFERENT things and comparing them to one number would be
+ * meaningless: the skate bound is half a square slab (was 33, and a rider crossed it in EIGHT SECONDS — measured),
+ * the snow bound is half the groomed corridor's WIDTH (was PISTE_HALF_WIDTH 17; the length comes from the gate
+ * course), and the surf bound is half the surfable water's width (was SURF_HALF_WIDTH 45).
+ *
+ * Every venue grows on its own baseline. The tight ones are tight on purpose — the warehouse and the night park are
+ * small places, and a floor under the growth is what keeps "deliberately tight" from sliding back to "cramped".
  */
-export const LEGACY_PARK_BOUND = 33;
-export function boundGrowth(v: BoardVenue): number { return v.bound / LEGACY_PARK_BOUND; }
+export const LEGACY_BOUND: Readonly<Record<BoardDiscipline, number>> = { skate: 33, snow: 17, surf: 45 };
+/** Kept for the skate tests that named it before the other two disciplines had venues. */
+export const LEGACY_PARK_BOUND = LEGACY_BOUND.skate;
+export function boundGrowth(v: BoardVenue): number { return v.bound / LEGACY_BOUND[v.discipline]; }

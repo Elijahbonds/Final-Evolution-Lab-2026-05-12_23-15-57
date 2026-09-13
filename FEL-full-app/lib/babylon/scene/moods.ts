@@ -1,6 +1,6 @@
 // Venue mood presets for LightRig. One place to tune every scene's look.
 
-export type VenueMood = 'goldenHour' | 'daylight' | 'dojoWarm' | 'nightGame' | 'alpine';
+export type VenueMood = 'goldenHour' | 'daylight' | 'dojoWarm' | 'nightGame' | 'alpine' | 'overcast';
 
 export interface MoodDef {
   sky: string; ground: string; hemiIntensity: number;
@@ -20,6 +20,14 @@ export const MOODS: Record<VenueMood, MoodDef> = {
   nightGame:  { sky: '#9fb7ff', ground: '#22262e', hemiIntensity: 0.55, sun: '#e8f0ff', sunIntensity: 2.2, sunDir: [-0.35, -1, -0.2], exposure: 1.15, clearColor: '#0b0e16', bloomThreshold: 0.55, bloomWeight: 0.5, bloomScale: 0.6, contrast: 1.22, vignetteColor: [0, 0.02, 0.06, 0], vignetteWeight: 2.2 },
   // Pass 5 phase 7: sun 2.8 + hemi 0.9 + exposure 1.05 + bloom from 0.78 on near-white snow read as a 211–221 mean-
   // luminance whiteout in slalom frames (piste band 236). Cooler sky, a real sun/shade ratio, bloom only on true highlights.
+  // BOARD VENUES (2026-09-12): the glacier and the reef are both FLAT-LIGHT places, and neither of the four
+  // existing moods can be one — goldenHour, daylight and nightGame all throw a 2.2+ directional sun, which is
+  // exactly what an overcast sky does not have. So the sun drops to 0.9 and the HEMI carries the scene (0.95):
+  // that inversion of the usual ratio is what overcast light physically is, and it is why the shadows go soft
+  // and the colour goes out of the place without the whole frame going dark. Bloom is effectively off (0.95
+  // threshold) because there is no highlight to bloom, and contrast stays near 1 so it reads grey rather than
+  // moody — a flat day, not a night.
+  overcast:   { sky: '#d8dee6', ground: '#6e747c', hemiIntensity: 0.95, sun: '#e9edf2', sunIntensity: 0.9, sunDir: [-0.25, -1, -0.15], exposure: 1.0, clearColor: '#bcc6d1', bloomThreshold: 0.95, bloomWeight: 0.18, bloomScale: 0.4, contrast: 1.02, vignetteColor: [0.08, 0.1, 0.12, 0], vignetteWeight: 1.3 },
   alpine:     { sky: '#cfe0f4', ground: '#7d90a8', hemiIntensity: 0.55, sun: '#fff1dc', sunIntensity: 1.6, sunDir: [-0.45, -1, -0.25], exposure: 0.92, clearColor: '#a9c7e8', bloomThreshold: 0.92, bloomWeight: 0.22, bloomScale: 0.5, contrast: 1.14, vignetteColor: [0.05, 0.08, 0.12, 0], vignetteWeight: 1.1 },
 };
 

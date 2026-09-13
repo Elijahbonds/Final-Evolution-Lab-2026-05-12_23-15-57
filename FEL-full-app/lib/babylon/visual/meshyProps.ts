@@ -82,6 +82,7 @@ export async function dressHoop(scene: Scene, venueRoot: TransformNode): Promise
 }
 
 import { BALL_SKINS, readBallSkin, hexToRgb01 } from '../nexus/ballSkins';
+import { readBoardSkin } from '../nexus/boardSkins';
 
 const BALL_KEY: Record<BallKind, MeshyPropKey | null> = { basketball: 'ball-basketball', soccer: 'ball-soccer', tennis: 'ball-tennis', volleyball: null };
 
@@ -129,9 +130,27 @@ export async function dressBall(ball: AbstractMesh, kind: BallKind | null): Prom
 }
 
 /** A textured deck rides the board box (length along z like the box, pivot at its underside). */
-export async function dressBoard(board: AbstractMesh, kind: BoardKind): Promise<boolean> {
+export async function dressBoard(board: AbstractMesh, kind: BoardKind, discipline?: 'skate' | 'snow' | 'surf'): Promise<boolean> {
   const root = await spawnMeshyProp(board.getScene(), kind, board, `meshy_${kind}`);
   if (!root || board.isDisposed()) { root?.dispose(); return false; }
+  // THE PLAYER'S DECK. Picked on the boot splash beside the venue (boardSkins.ts) and applied by re-tinting the baked
+  // deck, so every skin is free at runtime and nothing on that screen can 404. Wrapped whole: a cosmetic must never be
+  // the thing that breaks a mode, so a bad skin leaves the deck as it was and the run carries on.
+  if (discipline) {
+    try {
+      const skin = readBoardSkin(discipline);
+      const { r, g, b } = hexToRgb01(skin.tint);
+      for (const m of root.getChildMeshes()) {
+        const mm = m.material as { albedoColor?: { set: (r: number, g: number, b: number) => void }; diffuseColor?: { set: (r: number, g: number, b: number) => void }; emissiveColor?: { set: (r: number, g: number, b: number) => void } } | null;
+        if (!mm) continue;
+        mm.albedoColor?.set(r, g, b);
+        mm.diffuseColor?.set(r, g, b);
+        mm.emissiveColor?.set(r * skin.glow, g * skin.glow, b * skin.glow);
+      }
+      (board.metadata ??= {} as Record<string, unknown>).felBoardSkin = skin.id;
+      console.info(`[FEL-BOARD] deck ${skin.id}`);
+    } catch (e) { console.warn('[FEL-BOARD] deck skin not applied', (e as Error)?.message ?? e); }
+  }
   root.rotation.y = Math.PI / 2;         // baked with its length along x; the rig's box runs along z
   root.position.y = -0.03;               // the box is 6 cm tall and centred; the deck's pivot is its underside
   board.visibility = 0;

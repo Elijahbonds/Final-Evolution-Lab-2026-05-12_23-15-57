@@ -7,6 +7,8 @@ import type { ModePhase } from '@/lib/babylon';
 import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
+import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
+import { skinsFor, readBoardSkin, writeBoardSkin } from '@/lib/babylon/nexus/boardSkins';
 
 // M37 E12 FIX: venue slugs resolve to PROCEDURAL canvas thumbnails (venueThumbs)
 // instead of /img/venues/*.jpg files that 404 on every mode route.
@@ -52,6 +54,24 @@ export function BootSplash(props: {
   const [ball, setBall] = useState<BallSkinId>('classic');
   useEffect(() => { if (isCourt) setBall(readBallSkin()); }, [isCourt]);
   const pickBall = (id: BallSkinId) => { if (id === ball) return; writeBallSkin(id); setBall(id); };
+
+  // THE BOARD SPORTS pick a venue and a deck on this same screen, beside the court and the ball. One ritual, one place
+  // to choose everything — a second setup screen for a cosmetic would be worse than no picker.
+  const boardOf: Record<string, BoardDiscipline> = { skateboard: 'skate', snowboard_slalom: 'snow', snowboard: 'snow', bigair: 'snow', surf: 'surf' };
+  const disc = boardOf[props.modeId] ?? null;
+  const [venue, setVenue] = useState<string>('');
+  const [deck, setDeck] = useState<string>('');
+  useEffect(() => { if (disc) { setVenue(readBoardVenue(disc).id); setDeck(readBoardSkin(disc).id); } }, [disc]);
+  const pickVenue = (id: string) => {
+    if (!disc || id === venue) return;
+    writeBoardVenue(disc, id);
+    // the world is built at load, so a new venue reloads the route with the pick in the URL — same as the court does
+    const u = new URL(window.location.href); u.searchParams.set('venue', id); window.location.assign(u.toString());
+  };
+  const pickDeck = (id: string) => {
+    if (!disc || id === deck) return;
+    writeBoardSkin(disc, id); setDeck(id);   // the deck is dressed when the rig builds; remembering it is enough
+  };
 
   const [inserted, setInserted] = useState(false);
   // Procedural venue art generated client-side (no network request, no 404).
@@ -135,6 +155,43 @@ export function BootSplash(props: {
               ))}
             </div>
             <p className="max-w-[22rem] text-[9px] leading-tight tracking-wide text-white/40">{BALL_SKINS[ball].sub}</p>
+          </div>
+        )}
+
+        {disc && (props.phase === 'ready' || props.phase === 'loading') && readyVenues(disc).length > 1 && (
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">VENUE</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {readyVenues(disc).map((v) => (
+                <button key={v.id} type="button" onClick={() => pickVenue(v.id)} title={v.sub}
+                  aria-label={`${v.name} — ${v.sub}`} aria-pressed={v.id === venue}
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${v.id === venue ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={v.id === venue ? { background: v.palette.accent, borderColor: v.palette.accent } : { borderColor: `${v.palette.accent}88` }}>
+                  {v.name}
+                </button>
+              ))}
+            </div>
+            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+              {readyVenues(disc).find((v) => v.id === venue)?.sub ?? ''}
+            </p>
+          </div>
+        )}
+
+        {disc && (props.phase === 'ready' || props.phase === 'loading') && skinsFor(disc).length > 1 && (
+          <div className="mt-2 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">DECK</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {skinsFor(disc).map((d) => (
+                <button key={d.id} type="button" onClick={() => pickDeck(d.id)} title={d.sub}
+                  aria-label={`${d.label} — ${d.sub}`} aria-pressed={d.id === deck}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${d.id === deck ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={d.id === deck ? { background: d.tint, borderColor: d.tint } : { borderColor: `${d.tint}88` }}>
+                  <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ background: d.tint2 ? `linear-gradient(135deg, ${d.tint}, ${d.tint2})` : d.tint, boxShadow: `0 0 6px ${d.tint}aa` }} />
+                  {d.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

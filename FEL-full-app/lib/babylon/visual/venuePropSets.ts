@@ -139,7 +139,10 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     { kit: 'nature', model: 'rock_tallA', at: [-21, 0, 120], scale: 2.8 }, { kit: 'nature', model: 'rock_largeD', at: [21, 0, 180], scale: 2.8 },
     { kit: 'racing', model: 'tent', at: [-20, 0, 8], scale: 2.4 }, { kit: 'racing', model: 'flagRed', at: [20, 0, 8], scale: 2.4 },
     // props+depth pass 2026-09-05 — NEAR: a fence at the start gate · MID: a lodge tent and flags down the run · FAR: a silhouette tree wall
-    ...line('nature', 'fence_simple', [-14, -32], [14, -32], 7, 0, 2.2), { kit: 'racing', model: 'tentRoof', at: [20, 0, 40], scale: 2.6 }, ...line('racing', 'flagRed', [-18, 60], [-18, 200], 4, 0, 2.2),
+    // the start gate, at z −12: the snow begins at z −19.5 (buildSlopeRun centres the piste on the run) and this
+    // fence was authored at z −32, which is 12 m off the back of it — the one thing the ground audit found
+    // standing over nothing on this run.
+    ...line('nature', 'fence_simple', [-14, -12], [14, -12], 7, 0, 2.2), { kit: 'racing', model: 'tentRoof', at: [20, 0, 40], scale: 2.6 }, ...line('racing', 'flagRed', [-18, 60], [-18, 200], 4, 0, 2.2),
     ...line('nature', 'tree_tall', [-60, 300], [60, 300], 9, 0, 8.5, GREEN), ...line('nature', 'tree_tall', [-40, 30], [-44, 260], 6, 0, 7.0, GREEN),
   ],
   // ARENA-10PHASE P9 (2026-09-08): Big Air's run goes −z (the athlete runs from z 0 into the kicker at z −12 and lands out
@@ -153,13 +156,29 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     ...line('racing', 'flagRed', [-20, -30], [-20, -130], 4, 0, 2.2), ...line('racing', 'flagCheckers', [20, -40], [20, -120], 3, 0, 2.2),
     ...line('nature', 'tree_tall', [-28, -175], [28, -175], 7, 0, 7.5, GREEN),
   ],
+  // BOARD VENUES (2026-09-12): THE BEACH IS AT +Z, AND IT WAS IN THE WATER.
+  //
+  // Every placement in this set used to sit at z −22 … −70: palms, two tents, a lifeguard tent, a shop and the
+  // Venice bus, all standing on open sea BEHIND the breaking wave, which is the direction the swell arrives from.
+  // The surf world's only sand is the shore at z 123…153 (buildSurfBreak), and the set was authored against older
+  // geometry that put the beach on −z. Measured by scripts/probes/_ground-audit.mts: a 48 m tent group at
+  // z −52…−40 with nothing under it but water.
+  //
+  // The whole set is now composed on the sand, ordered NEAR → FAR from the rider's point of view (the rider rides
+  // toward +z and the lap never passes z 99, so none of this is ever in the line): rocks in the shallows at the
+  // waterline, the beach furniture on the dry sand, the palm line and the lot behind it.
   'surf-break': [
-    { kit: 'nature', model: 'tree_palmBend', at: [-50, 0, -30], scale: 4.4 }, { kit: 'nature', model: 'tree_palmDetailedShort', at: [-48, 0, -22], scale: 4.4 }, { kit: 'nature', model: 'tree_palmBend', at: [50, 0, -28], yaw: Math.PI, scale: 4.4 },
-    { kit: 'nature', model: 'rock_largeC', at: [-52, 0, -36], scale: 2.8 }, { kit: 'nature', model: 'rock_smallG', at: [52, 0, -38], scale: 2.8 },
-    { kit: 'racing', model: 'tent', at: [-46, 0, -40], scale: 2.4 }, { kit: 'racing', model: 'tentRoof', at: [46, 0, -40], scale: 2.4 }, { kit: 'racing', model: 'flagGreen', at: [0, 0, -44], scale: 2.4 },
-    // props+depth pass 2026-09-05 — MID: a lifeguard tent and a shop up the beach · FAR: the shore's palm line and the bus at the lot
-    { kit: 'racing', model: 'tent', at: [0, 0, -50], scale: 2.6 }, { kit: 'meshy', model: 'store', at: [-28, 0, -54], yaw: 0, scale: 0.9 }, { kit: 'meshy', model: 'hoopbus', at: [30, 0, -58], yaw: Math.PI / 2 },
-    ...line('nature', 'tree_palmTall', [-80, -70], [80, -70], 9, 0, 5.5), ...line('nature', 'rock_largeA', [-70, -46], [70, -46], 5, 0, 3.0),
+    // the waterline — rock in the shallows where the whitewater runs out
+    { kit: 'nature', model: 'rock_largeC', at: [-64, 0, 124], scale: 2.8 }, { kit: 'nature', model: 'rock_smallG', at: [64, 0, 126], scale: 2.8 },
+    ...line('nature', 'rock_largeA', [-80, 122], [80, 122], 5, 0, 3.0),
+    // the dry sand — a contest flag on the centre line, two tents flanking it, the lifeguard's behind
+    { kit: 'racing', model: 'flagGreen', at: [0, 0, 133], scale: 2.4 },
+    { kit: 'racing', model: 'tent', at: [-30, 0, 138], scale: 2.4 }, { kit: 'racing', model: 'tentRoof', at: [30, 0, 139], scale: 2.4 },
+    { kit: 'racing', model: 'tent', at: [-8, 0, 144], scale: 2.6 },
+    // the back of the beach — palms, the shop and the bus at the lot, all facing the water (yaw π looks down −z)
+    { kit: 'nature', model: 'tree_palmBend', at: [-52, 0, 140], scale: 4.4 }, { kit: 'nature', model: 'tree_palmDetailedShort', at: [-44, 0, 146], scale: 4.4 }, { kit: 'nature', model: 'tree_palmBend', at: [52, 0, 141], yaw: Math.PI, scale: 4.4 },
+    { kit: 'meshy', model: 'store', at: [-46, 0, 150], yaw: Math.PI, scale: 0.9 }, { kit: 'meshy', model: 'hoopbus', at: [46, 0, 150], yaw: Math.PI / 2 },
+    ...line('nature', 'tree_palmTall', [-88, 148], [88, 148], 9, 0, 5.5),
   ],
   // ARENA-10PHASE P5 (2026-09-07): the Beach Pro court's own set — authored for an 18 × 9 court with a 3 m free zone (x ±7.5,
   // z ±12), the sea past the far baseline (−z, NetSportMode.buildBeach puts the foam line at z −48) and the boardwalk behind

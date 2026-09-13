@@ -15,7 +15,8 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
-import { buildSurfBreak, SURF_HALF_WIDTH, WAVE_SPEED, WAVE_LAP, WAVE_FACE_LEN, type RideWorld } from './rideWorlds';
+import { buildSurfBreak, WAVE_SPEED, WAVE_LAP, WAVE_FACE_LEN, type RideWorld } from './rideWorlds';
+import { readBoardVenue } from '../nexus/boardVenues';   // three breaks, three seas
 import { assertSpawned } from '../core/FrameGuard';
 import { BoardAnimTree } from '../anim/boardTree';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
@@ -170,10 +171,17 @@ export const SurfBreakMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'surf', mood: 'goldenHour', camPreset: 'surf',
+    modeId: 'surf', camPreset: 'surf',
+    // Per-venue light and horizon, read at mount (see SkateRunMode). This is also what finally mounts the painted
+    // OCEAN backdrop — a sea, a pier and palms that had existed in Backdrops.ts since M61 and were reachable from
+    // no mood at all, so every break sat under Venice's city skyline.
+    get mood() { return readBoardVenue('surf').mood; },
+    get backdrop() { return readBoardVenue('surf').sky; },
 
     async load(ctx: ModeContext) {
-      const built = buildSurfBreak(ctx.scene, POCKET);
+      const venue = readBoardVenue('surf');
+      const built = buildSurfBreak(ctx.scene, POCKET, venue);
+      ctx.setHud({ banner: `${venue.name} · ${venue.sub}` });
       world = built.world; waveLipAt = built.waveLipAt; barrelActive = built.barrelActive; faceHeightAt = built.faceHeightAt;
       propsGone = false; void mountVenueProps(ctx.scene, 'surf-break').then((h) => { if (propsGone) h?.dispose(); else props = h; });
       // Gate 0: Validate skeletal rig by spawning placeholder to check skeleton
@@ -388,7 +396,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
         }
         // Clamp AT the water's edge, not 5m inside it. The rider used to stop
         // against nothing while the ocean visibly continued past him.
-        const edge = SURF_HALF_WIDTH - 1;
+        const edge = world.bound - 1;   // the break's own width, so the clamp and the water's edge are one number
         rig.char.root.position.x = Math.max(-edge, Math.min(edge, rig.char.root.position.x));
       }
 

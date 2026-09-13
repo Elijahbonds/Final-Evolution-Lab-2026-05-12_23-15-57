@@ -21,7 +21,8 @@ import { trickFor, bestFitting, asTrickDef, heldTrickDir, type BoardTrick } from
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
 import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out
-import { buildSlopeRun, PISTE_HALF_WIDTH, SLOPE_PITCH, SLALOM_START, SLALOM_GATES, SLALOM_SPACING, type RideWorld } from './rideWorlds';
+import { buildSlopeRun, SLOPE_PITCH, SLALOM_START, SLALOM_GATES, SLALOM_SPACING, type RideWorld } from './rideWorlds';
+import { readBoardVenue } from '../nexus/boardVenues';   // three mountains, not three tints of one
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -143,11 +144,20 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'snowboard', mood: 'alpine', camPreset: 'descent',
+    modeId: 'snowboard', camPreset: 'descent',
+    // The LIGHT is the venue's. A getter, because the harness reads this at mount — after the splash has written the
+    // pick and before load() runs — and a module-level literal is why the night park would have rendered under an
+    // alpine midday sun. Same reasoning for the painted horizon.
+    get mood() { return readBoardVenue('snow').mood; },
+    get backdrop() { return readBoardVenue('snow').sky; },
 
     async load(ctx: ModeContext) {
-      world = buildSlopeRun(ctx.scene);
-      propsGone = false; void mountVenueProps(ctx.scene, 'slope', undefined, { snapToGround: true }).then((h) => { if (propsGone) h?.dispose(); else props = h; });   // P9: the pines stand ON the pitched snow
+      const venue = readBoardVenue('snow');
+      world = buildSlopeRun(ctx.scene, venue);
+      ctx.setHud({ banner: `${venue.name} · ${venue.sub}` });
+      // lateralShift: the 'slope' set's treeline is authored at x ±19…±24 for a 17 m half-piste. A wider venue
+      // pushes it out by the difference, so the glacier's 34 m groom does not have pines standing in it.
+      propsGone = false; void mountVenueProps(ctx.scene, 'slope', undefined, { snapToGround: true, lateralShift: Math.max(0, venue.bound - 17) }).then((h) => { if (propsGone) h?.dispose(); else props = h; });   // P9: the pines stand ON the pitched snow
       // The piste is pitched SLOPE_PITCH and drops ~56 m over the run. The Rider's flat-park defaults (6 m ground ray, hard
       // floor at y 0) pinned the rider at y ≈ 0 above it, so rocks / the yeti (placed ON the piste) never made contact: the
       // ray missed once the snow was > 4.5 m below and the floor clamp fired every frame below −0.5. A longer ray, a floor
@@ -402,10 +412,12 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         const wantRoll = boardBank(move.balance.lean, move.speed01);
         rig.char.root.rotation.z += (wantRoll - rig.char.root.rotation.z) * Math.min(1, 10 * dt);
       }
-      // Clamp at the edge of the snow, from the piste's own constant — the same
+      // Clamp at the edge of the snow, from the WORLD the venue built — the same
       // one-number rule skate's fence and surf's water edge now follow, so the
-      // edge a player feels is always an edge they can see.
-      const edge = PISTE_HALF_WIDTH - 1;
+      // edge a player feels is always an edge they can see. Reading the module
+      // constant here was the bug the skate fence already had: a wide venue
+      // clamped the rider to a narrow corridor over visibly wider snow.
+      const edge = world.bound - 1;
       rig.char.root.position.x = Math.max(-edge, Math.min(edge, rig.char.root.position.x));
 
       if (nextGate >= world.markers.length) {

@@ -18,7 +18,7 @@
 import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, TransformNode, Vector3, Matrix, Material } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
-import { SKATE_VENUES, type BoardVenue } from '../nexus/boardVenues';
+import { SKATE_VENUES, SNOW_VENUES, SURF_VENUES, type BoardVenue } from '../nexus/boardVenues';
 import { applyFloorDetailToMesh } from '../visual/groundTextures';
 
 export interface RideObstacle { pos: Vector3; radius: number }
@@ -44,6 +44,18 @@ function mat(scene: Scene, name: string, hex: string): PBRMaterial {
   m.albedoColor = Color3.FromHexString(hex);
   m.metallic = 0; m.roughness = 0.9;
   return m;
+}
+
+/**
+ * Blend two palette colours.
+ *
+ * A venue palette names six colours, and a place needs more surfaces than six — off-piste snow is the groomed
+ * snow pushed toward its own shadow, whitewater is the water pushed toward its foam. Deriving them keeps a new
+ * venue to six decisions instead of twenty, and keeps the derived surfaces in the family whatever the six are.
+ */
+function mixHex(a: string, b: string, t: number): string {
+  const A = Color3.FromHexString(a), B = Color3.FromHexString(b);
+  return Color3.Lerp(A, B, Math.max(0, Math.min(1, t))).toHexString();
 }
 
 function paintGround(scene: Scene, w: number, h: number, painter: (g: CanvasRenderingContext2D, W: number, H: number) => void): PBRMaterial {
@@ -217,9 +229,25 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
 }
 
 // ── SLOPE v2 — rocks, rails, kickers, the ski-lift grind, the yeti den ─────
-export function buildSlopeRun(scene: Scene): RideWorld {
+/**
+ * THE RUN, built to a VENUE.
+ *
+ * Same reasoning as the skatepark: the run had one fixed palette (#c6d5e4 snow, green pines, grey rock) and one
+ * fixed width, so all three snow venues would have been the same mountain under three different skies. The snow,
+ * the groom lines, the drifts, the kickers and the lift all take their colour from the venue now, the groomed
+ * corridor takes its width from the venue's bound, and the TREELINE is a venue number — the glacier is above the
+ * trees and grows none, which is the difference between a venue and a tint.
+ *
+ * What does NOT come from the venue: the gate course. Slalom gates are red and blue everywhere in the world, the
+ * rhythm was sized against measured carve speed (see slalomGateX), and the run's LENGTH is the course's length.
+ * A venue changes the place, not the sport.
+ */
+export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]): RideWorld {
   const all: AbstractMesh[] = [];
   const rideable: AbstractMesh[] = [];
+  const P = venue.palette;
+  /** Half-width of the groomed corridor in THIS venue. The rider's clamp reads the same number back. */
+  const HALF = venue.bound;
   const PITCH = SLOPE_PITCH;
   // The snow must cover the RUN: the last gate sits at SLALOM_START + (SLALOM_GATES − 1) × SLALOM_SPACING = 238 m down the
   // fall line and the finish beyond it, but the piste was a 220 m ground centred on the start (−110 … +110). Nobody noticed
@@ -227,22 +255,26 @@ export function buildSlopeRun(scene: Scene): RideWorld {
   // snow, it ran off the end at ~150 m and fell to the hard floor. Centre the ground on the run instead.
   const RUN_LEN = SLALOM_START + SLALOM_GATES * SLALOM_SPACING + 60;
   const PISTE_LEN = RUN_LEN + 40;
-  const piste = MeshBuilder.CreateGround('piste', { width: PISTE_HALF_WIDTH * 2, height: PISTE_LEN }, scene);
+  const piste = MeshBuilder.CreateGround('piste', { width: HALF * 2, height: PISTE_LEN }, scene);
   piste.rotation.x = PITCH;
   const pisteCentre = PISTE_LEN / 2 - 20;                      // spans −20 m (behind the start) … RUN_LEN + 20 m
   piste.position.set(0, -Math.sin(PITCH) * pisteCentre, Math.cos(PITCH) * pisteCentre);
   piste.checkCollisions = true;
   piste.isPickable = true;
-  piste.material = paintGround(scene, 34, PISTE_LEN, (g, W, H) => {
-    // Pass 5 phase 7: near-white snow (#eef3f7) under a white sky read as a 211–221 mean-luminance whiteout in the
-    // slalom frames. Cooler snow, denser darker groom lines and shadowed drifts give the run edges to read speed against.
-    g.fillStyle = '#c6d5e4'; g.fillRect(0, 0, W, H);
-    g.fillStyle = 'rgba(92,126,172,0.55)';
+  piste.material = paintGround(scene, HALF * 2, PISTE_LEN, (g, W, H) => {
+    // Pass 5 phase 7 (kept): near-white snow under a white sky read as a 211–221 mean-luminance whiteout in the
+    // slalom frames, so the snow is never paper-white and the groom lines are dark enough to read speed against.
+    // The three colours are the venue's now — the glacier's ice and the night park's blue-grey are the same
+    // painting with a different family.
+    g.fillStyle = P.ground; g.fillRect(0, 0, W, H);
+    g.globalAlpha = 0.55; g.fillStyle = P.line;
     for (let i = 0; i < Math.round(700 * H / 220); i++) g.fillRect(Math.random() * W, Math.random() * H, 2, 16);
-    g.fillStyle = 'rgba(70,100,150,0.32)';
+    g.globalAlpha = 0.32; g.fillStyle = P.edge;
     for (let i = 0; i < Math.round(160 * H / 220); i++) { g.beginPath(); g.ellipse(Math.random() * W, Math.random() * H, 8 + Math.random() * 20, 2 + Math.random() * 5, 0, 0, Math.PI * 2); g.fill(); }
-    g.strokeStyle = 'rgba(120,150,175,0.25)'; g.lineWidth = 5;
+    // corduroy: the groomer's tracks, the one thing that says a human prepared this
+    g.globalAlpha = 0.25; g.strokeStyle = P.edge; g.lineWidth = 5;
     for (let i = 0; i < 14; i++) { g.beginPath(); g.moveTo((i / 14) * W, 0); g.lineTo((i / 14) * W + 30, H); g.stroke(); }
+    g.globalAlpha = 1;
   });
   all.push(piste); rideable.push(piste);
 
@@ -252,16 +284,17 @@ export function buildSlopeRun(scene: Scene): RideWorld {
   // same pitch, 70 m each side: darker, rougher snow with rock speckle, pickable so the prop set can drop onto them,
   // not rideable — the rider still clamps to the groomed width.
   const offM = paintGround(scene, 70, PISTE_LEN, (g, W, H) => {
-    g.fillStyle = '#b3c4d6'; g.fillRect(0, 0, W, H);
-    g.fillStyle = 'rgba(70,100,150,0.35)';
+    g.fillStyle = mixHex(P.ground, P.edge, 0.28); g.fillRect(0, 0, W, H);   // ungroomed: the snow toward its own shadow
+    g.globalAlpha = 0.35; g.fillStyle = P.edge;
     for (let i = 0; i < Math.round(420 * H / 220); i++) { g.beginPath(); g.ellipse(Math.random() * W, Math.random() * H, 10 + Math.random() * 30, 3 + Math.random() * 7, Math.random() * 3, 0, Math.PI * 2); g.fill(); }
-    g.fillStyle = 'rgba(60,66,74,0.5)';
+    g.globalAlpha = 0.5; g.fillStyle = mixHex(P.edge, '#000000', 0.45);     // rock speckle showing through
     for (let i = 0; i < Math.round(140 * H / 220); i++) g.fillRect(Math.random() * W, Math.random() * H, 2 + Math.random() * 5, 2 + Math.random() * 3);
+    g.globalAlpha = 1;
   });
   for (const side of [-1, 1]) {
     const field = MeshBuilder.CreateGround(`offpiste_${side < 0 ? 'l' : 'r'}`, { width: 70, height: PISTE_LEN }, scene);
     field.rotation.x = PITCH;
-    field.position.set(side * (PISTE_HALF_WIDTH + 35), -Math.sin(PITCH) * pisteCentre - 0.02, Math.cos(PITCH) * pisteCentre);
+    field.position.set(side * (HALF + 35), -Math.sin(PITCH) * pisteCentre - 0.02, Math.cos(PITCH) * pisteCentre);
     field.isPickable = true;
     field.material = offM;
     all.push(field);
@@ -311,14 +344,19 @@ export function buildSlopeRun(scene: Scene): RideWorld {
   { const l = gatePole('gate', gateMatL, gateLeftM); if (l) all.push(l); }
   { const r = gatePole('gate', gateMatR, gateRightM); if (r) all.push(r); }
 
-  // trees (scenery, off-piste) — unchanged from M39
-  const trunkM = mat(scene, 'trunk', '#5a3d26'), leafM = mat(scene, 'leaf', '#1d4d2b');
+  // THE TREELINE — scenery, off-piste, and a VENUE NUMBER. The pines were teal once (they took the Kenney kit's
+  // palette); they are a real conifer green mixed toward the venue's edge colour now, so the night park's trees go
+  // dark with the rest of it. The glacier declares 0 and the loop simply does not run: "above the trees" is copy
+  // the place has to honour.
+  const trunkM = mat(scene, 'trunk', mixHex('#5a3d26', P.edge, 0.3));
+  const leafM = mat(scene, 'leaf', mixHex('#1d4d2b', P.edge, 0.28));
   // 22 trees were 44 draw calls (a trunk and a leaf each) and every one is the same pair of cylinders. Batched to two
   // masters: 44 draws become 2. Together with the poles this is 68 of the mode's ~786.
+  const TREES = venue.trees ?? 22;
   const trunkMats: Matrix[] = [], leafMats: Matrix[] = [];
-  for (let i = 0; i < 22; i++) {
+  for (let i = 0; i < TREES; i++) {
     const dist = 10 + i * 9.5;
-    const x = (i % 2 ? 1 : -1) * (15 + (i * 7) % 4);
+    const x = (i % 2 ? 1 : -1) * (HALF - 2 + (i * 7) % 4);   // just outside the groom, whatever the groom's width is
     const p = onPiste(x, dist);
     const t = p.add(new Vector3(0, 0.7, 0)), l = p.add(new Vector3(0, 3, 0));
     trunkMats.push(Matrix.Translation(t.x, t.y, t.z));
@@ -338,7 +376,7 @@ export function buildSlopeRun(scene: Scene): RideWorld {
 
   // ROCKS — actually on the piste, between gates, never ON a gate line
   const obstacles: RideObstacle[] = [];
-  const rockM = mat(scene, 'rockM', '#7d838c');
+  const rockM = mat(scene, 'rockM', mixHex(P.edge, '#6b7079', 0.5));
   for (let i = 0; i < 8; i++) {
     const dist = 26 + i * 21;
     const x = Math.sin(i * 2.9) * 10;
@@ -360,7 +398,7 @@ export function buildSlopeRun(scene: Scene): RideWorld {
   }
 
   // KICKERS — two launch ramps; the second sits under the lift cable
-  const kickM = mat(scene, 'kickM', '#cfd8e2');
+  const kickM = mat(scene, 'kickM', P.structure);
   for (const [x, dist] of [[3, 70], [11.5, 125]] as const) {
     const kick = MeshBuilder.CreateBox('kicker', { width: 5, height: 0.5, depth: 4 }, scene);
     kick.position = onPiste(x, dist).add(new Vector3(0, 0.7, 0));
@@ -372,11 +410,11 @@ export function buildSlopeRun(scene: Scene): RideWorld {
 
   // SKI-LIFT — pylons down the right edge, cable strung pylon-to-pylon,
   // and the cable IS a grind line (hit the second kicker to reach it)
-  const pylonM = mat(scene, 'pylonM', '#3a424c');
-  const cableM = mat(scene, 'cableM', '#20262d');
+  const pylonM = mat(scene, 'pylonM', mixHex(P.edge, '#000000', 0.35));
+  const cableM = mat(scene, 'cableM', mixHex(P.edge, '#000000', 0.6));
   const pylonTops: Vector3[] = [];
   for (let i = 0; i < 5; i++) {
-    const p = onPiste(13.5, 30 + i * 40);
+    const p = onPiste(HALF - 3.5, 30 + i * 40);
     const pylon = MeshBuilder.CreateCylinder(`pylon_${i}`, { diameter: 0.35, height: 5.4 }, scene);
     pylon.position = p.add(new Vector3(0, 2.7, 0));
     pylon.material = pylonM;
@@ -408,11 +446,17 @@ export function buildSlopeRun(scene: Scene): RideWorld {
   // +-5m; these stand at +-13m) so they never read as an obstacle on the line.
   // Clustered at three points down the course, because a slope's spectators
   // gather at the interesting corners rather than lining the whole run.
+  // Spectators beside the piste, OUTSIDE the gate corridor (gates run to ±5 m) and inside the venue's own width, so
+  // they never read as an obstacle on the line. Clustered at three points down the course, because a slope's
+  // spectators gather at the interesting corners rather than lining the whole run. How MANY is the venue's call —
+  // the glacier has three people on it and the alpine run has eight, and that is most of what "a busy place" is.
   const crowdSpots: Vector3[] = [];
-  for (const [side, dist] of [[-1, 55], [-1, 58], [1, 60], [1, 120], [-1, 124], [1, 127], [-1, 190], [1, 193]] as const) {
-    crowdSpots.push(onPiste(side * 13 + side * Math.random() * 1.5, dist));
+  const spots = [[-1, 55], [-1, 58], [1, 60], [1, 120], [-1, 124], [1, 127], [-1, 190], [1, 193]] as const;
+  for (let i = 0; i < Math.min(venue.crowd, spots.length); i++) {
+    const [side, dist] = spots[i];
+    crowdSpots.push(onPiste(side * (HALF - 6) + side * Math.random() * 1.5, dist));
   }
-  return { ground: rideable, grindLines, markers, obstacles, crowdSpots, bound: PISTE_HALF_WIDTH, dispose: () => all.forEach((m) => m.dispose()) };
+  return { ground: rideable, grindLines, markers, obstacles, crowdSpots, bound: HALF, dispose: () => all.forEach((m) => m.dispose()) };
 }
 
 // ── SURF v3 — the curling funnel wave + buoys ──────────────────────────────
@@ -500,7 +544,7 @@ export function crestHeightAt(x: number, tSec: number): number {
  *   to sit on its grind line. (v6: the band is a lighter run of the face's own
  *   vertex colours between pocket.min and pocket.max.)
  */
-export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number }): {
+export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number }, venue: BoardVenue = SURF_VENUES[0]): {
   world: RideWorld;
   waveLipAt(tSec: number): Vector3;
   barrelActive(tSec: number): boolean;
@@ -508,15 +552,36 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   faceHeightAt(x: number, z: number, tSec: number): number;
 } {
   const all: AbstractMesh[] = [];
-  // THE WATER — wide and long enough that no lap, no drift and no clamp ever shows an edge (was 90 × 220: the rider ran off
-  // the end 11 s into an unattended run)
-  const WATER_W = 180, WATER_L = 380;
+  const P = venue.palette;
+  /** Half-width of the surfable water in THIS break. The rider's clamp reads the same number back. */
+  const HALF = venue.bound;
+  // THE WATER — wide and long enough that no lap, no drift and no clamp ever shows an edge (was 90 × 220: the rider ran
+  // off the end 11 s into an unattended run). Sized off the break's own width so a wider venue is wider water, not a
+  // wider clamp over the same painting.
+  //
+  // REDUNDANT GROUND, removed: the sea was 380 m long and centred on the origin, so it ran to z +190 — past the BEACH
+  // at z 138. Two costs, both real. Looking down the line the player saw a band of open sea BEHIND the sand, which is
+  // not a thing a coast does; and the full painted sea — a 1024² dynamic texture — was being rasterised underneath 30 m
+  // of opaque beach for nothing. The water now ENDS at the shore, overlapping it by SHORE_OVERLAP so there is no seam
+  // to see at the waterline, and one ground covers each piece of the world exactly once.
+  const SHORE_Z = 138, SHORE_DEPTH = 30, SHORE_OVERLAP = 4;   // 4 m hides the waterline seam; 16 buried half the beach
+                                                            // (measured by scripts/probes/_ground-audit.mts)
+  const WATER_W = HALF * 2 + 90;
+  const WATER_BACK = -190;                                       // out the back, past every lap position
+  const WATER_FRONT = SHORE_Z - SHORE_DEPTH / 2 + SHORE_OVERLAP; // under the sand's near edge, and no further
+  const WATER_L = WATER_FRONT - WATER_BACK;
   const water = MeshBuilder.CreateGround('water', { width: WATER_W, height: WATER_L }, scene);
+  water.position.z = (WATER_BACK + WATER_FRONT) / 2;
   water.checkCollisions = true;
   water.isPickable = true;
   water.material = paintGround(scene, WATER_W, WATER_L, (g, W, H) => {
+    // Depth gradient: the venue's structure colour is the deep water out the back, its ground colour the water you
+    // ride, lifted toward its own foam at the shore. Three breaks, three seas — the reef's dark coral water and the
+    // break's green glass are this one gradient with a different family.
     const grad = g.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, '#0f5f8f'); grad.addColorStop(0.5, '#1a7fae'); grad.addColorStop(1, '#2492bf');
+    grad.addColorStop(0, mixHex(P.structure, '#000000', 0.25));
+    grad.addColorStop(0.5, P.structure);
+    grad.addColorStop(1, P.ground);
     g.fillStyle = grad; g.fillRect(0, 0, W, H);
     g.strokeStyle = 'rgba(255,255,255,0.12)'; g.lineWidth = 3;
     for (let i = 0; i < 60; i++) {
@@ -532,7 +597,7 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
 
   // THE WAVE — one transform the whole set rides on; waveLipAt() moves it down the lap
   const waveRoot = new TransformNode('waveRoot', scene);
-  const XS: number[] = []; for (let x = -(SURF_HALF_WIDTH + 12); x <= SURF_HALF_WIDTH + 12; x += 3) XS.push(x);
+  const XS: number[] = []; for (let x = -(HALF + 12); x <= HALF + 12; x += 3) XS.push(x);
   // rows run from the flat water AHEAD of the face back over the crest to the swell back: that winding puts the ribbon's
   // normals on the RIDER's side (reversed, the face lit from behind rendered near-black under the sun, measured 2026-09-08)
   const US = [12, WAVE_FACE_LEN, 7.2, 5.5, 3.8, 2.4, 1.3, 0.5, 0, -0.8, -1.8, -3.2, -5, -7];
@@ -558,18 +623,18 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     all.push(m);
     return m;
   };
-  const face = strip('waveFace', US, '#1a7fb0', 1, 0);
+  const face = strip('waveFace', US, mixHex(P.ground, P.structure, 0.45), 1, 0);
   face.isPickable = true;
   face.checkCollisions = true;
-  strip('waveFoam', [0.9, 0.4, 0, -0.4, -0.9], '#eef8fc', 1, 0.05, 0.9);
-  strip('waveWhitewater', [-0.9, -1.6, -2.4, -3.4], '#a9d8e8', 0.8, 0.03, 0.9);
-  strip('wavePocket', [pocket.max, (pocket.min + pocket.max) / 2, pocket.min], '#8fdcf2', 0.35, 0.03, 0.9);
+  strip('waveFoam', [0.9, 0.4, 0, -0.4, -0.9], mixHex(P.line, '#ffffff', 0.55), 1, 0.05, 0.9);
+  strip('waveWhitewater', [-0.9, -1.6, -2.4, -3.4], P.line, 0.8, 0.03, 0.9);
+  strip('wavePocket', [pocket.max, (pocket.min + pocket.max) / 2, pocket.min], P.accent, 0.35, 0.03, 0.9);
   // the lip line — a foam roll along the crest; the barrel hood hangs off it (as before) so the two breathe together
-  const lip = MeshBuilder.CreateCylinder('waveLip', { diameter: 0.7, height: (SURF_HALF_WIDTH + 12) * 2, tessellation: 10 }, scene);
+  const lip = MeshBuilder.CreateCylinder('waveLip', { diameter: 0.7, height: (HALF + 12) * 2, tessellation: 10 }, scene);
   lip.rotation.z = Math.PI / 2;
   lip.parent = waveRoot;
   lip.position.set(0, WAVE_HEIGHT * 0.78, 0.2);
-  const lipM = mat(scene, 'lipM', '#f2fbff'); lipM.alpha = 0.8; lipM.twoSidedLighting = true;
+  const lipM = mat(scene, 'lipM', mixHex(P.line, '#ffffff', 0.7)); lipM.alpha = 0.8; lipM.twoSidedLighting = true;
   lip.material = lipM;
   lip.isPickable = false;
   all.push(lip);
@@ -580,7 +645,7 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   // v6: the hood is sized to the wave (was diameter 8.4 on a 0.9 m lip — with the camera 6.8 m behind the rider its shell
   // crossed the lens as a pale band, measured 2026-09-08): radius 1.7 off the crest, curling forward over the pocket
   const tube = MeshBuilder.CreateCylinder('waveTube', {
-    diameter: 3.4, height: (SURF_HALF_WIDTH + 12) * 2 - 4, tessellation: 24, arc: 0.45, enclose: false,
+    diameter: 3.4, height: (HALF + 12) * 2 - 4, tessellation: 24, arc: 0.45, enclose: false,
     sideOrientation: Mesh.DOUBLESIDE,
   }, scene);
   tube.parent = lip;
@@ -589,7 +654,7 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   // over the pocket
   tube.position.set(0, 0, 0);
   tube.rotation.set(0, Math.PI * 0.62, 0);
-  const tubeM = mat(scene, 'tubeM', '#a8dff0');   // spray-pale: the darker blue read as a black bar along the crest
+  const tubeM = mat(scene, 'tubeM', mixHex(P.line, '#ffffff', 0.35));   // spray-pale: a darker blue read as a black bar along the crest
   tubeM.alpha = 0.35;
   tubeM.backFaceCulling = false;
   tubeM.twoSidedLighting = true;   // the hood is seen from inside AND out
@@ -607,15 +672,16 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     all.push(farSwell);
   }
 
-  // THE SHORE — past the lap's furthest reach (lip 90 + face 9 + the flat clamp), so the wave runs AT the beach and never aground
-  const shore = MeshBuilder.CreateGround('shore', { width: WATER_W, height: 30 }, scene);
-  shore.position.set(0, 0.03, 138);
-  shore.material = mat(scene, 'sand', '#d9c28f');
+  // THE SHORE — past the lap's furthest reach (lip 90 + face 9 + the flat clamp), so the wave runs AT the beach and never
+  // aground. It is the LAST ground down the line: nothing is drawn beyond it, and the painted backdrop takes over there.
+  const shore = MeshBuilder.CreateGround('shore', { width: WATER_W, height: SHORE_DEPTH }, scene);
+  shore.position.set(0, 0.03, SHORE_Z);
+  shore.material = mat(scene, 'sand', mixHex('#d9c28f', P.backdrop, 0.3));   // the sand takes the light of the place
   all.push(shore);
 
   // BUOYS — fixed obstacles in the lineup; hitting one is a wipeout
   const obstacles: RideObstacle[] = [];
-  const buoyM = mat(scene, 'buoyM', '#ff5a3c');
+  const buoyM = mat(scene, 'buoyM', P.accent);
   for (const [x, z] of [[-14, -8], [18, 12], [-22, 38], [9, 62]] as const) {
     const buoy = MeshBuilder.CreateSphere(`buoy_${x}_${z}`, { diameter: 1.1 }, scene);
     buoy.position.set(x, 0.5, z);
@@ -625,15 +691,18 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     obstacles.push({ pos: buoy.position, radius: 0.9 });
   }
 
-  // Beachgoers on the sand, watching the break — on the horizon for most of a ride, close at the end of a lap.
+  // Beachgoers on the sand, watching the break. How many is the venue's: the break has six people on it and the reef
+  // has two, which is the difference between a spot and somewhere you paddled out to alone.
   const crowdSpots: Vector3[] = [];
-  for (const [x, z] of [[-14, 126], [-11.5, 127.4], [-9, 126.2], [4, 127], [6.5, 128.2],
-                        [9, 126.6], [11.5, 127.8], [22, 128], [-24, 127.2]] as const) {
+  const sandSpots = [[-14, 126], [-11.5, 127.4], [-9, 126.2], [4, 127], [6.5, 128.2],
+                     [9, 126.6], [11.5, 127.8], [22, 128], [-24, 127.2]] as const;
+  for (let i = 0; i < Math.min(venue.crowd, sandSpots.length); i++) {
+    const [x, z] = sandSpots[i];
     crowdSpots.push(new Vector3(x, 0.03, z));
   }
 
   const world: RideWorld = {
-    ground: [face, water], grindLines: [], markers: [], obstacles, crowdSpots, bound: 70,
+    ground: [face, water], grindLines: [], markers: [], obstacles, crowdSpots, bound: HALF,
     dispose: () => { all.forEach((m) => m.dispose()); waveRoot.dispose(); },
   };
   const BARREL_ON = 8, BARREL_CYCLE = 18;
