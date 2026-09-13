@@ -29,6 +29,7 @@ import { installAgentBridge, agentBridge } from './AgentBridge';  // M69: agent 
 import { AGENT_MODES } from './agentModes';
 import type { AgentControlSource } from './AgentControlSource';  // M69: per-mode intent play
 import { reportDiag, setDiagMode } from './diag';
+import { emit as emitCreator } from '@/lib/creator/CreatorRecord';   // the ONE canonical record
 
 /** M37 mutable slot a mode fills right after spawn (hero root / live objective). */
 export interface MutableRef<T> { current: T | null; }
@@ -220,6 +221,10 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       if (phase === 'ended') return;
       setPhase('ended');
       const result: SessionResult = buildResult(def.modeId, outcome, score, stats, startedAt);
+      // a run that REACHED ITS END is a completion; the time is whatever it actually took. Both go to the
+      // same record the session went to, and nowhere else.
+      emitCreator({ kind: 'completion', discipline: def.modeId });
+      emitCreator({ kind: 'time', discipline: def.modeId, seconds: Math.round((performance.now() - startedAt) / 1000) });
       (opts.resultSink ?? defaultResultSink)(result);
     },
     continuous: opts.continuous === true,
@@ -351,6 +356,11 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
         clearInterval(tick);
         startedAt = performance.now();
         setPhase('playing');
+        // CREATOR CARD (2026-09-13): one canonical record, one writer. Every mode's session is recorded HERE
+        // rather than in each mode, which is the mission's rule ("No mode may persist its own parallel
+        // profile") enforced by there being exactly one call site. A discipline id is the mode id — nothing
+        // finer, because a richer stream would be more useful to us and worse for the person it is about.
+        emitCreator({ kind: 'session', discipline: def.modeId });
       } else {
         opts.onPhase?.('countdown', n);
       }
