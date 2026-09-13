@@ -35,6 +35,8 @@ import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
 import { weaponById, readWeapon, equipWeapon } from '../combat/arsenal';
 import type { Mesh } from '@babylonjs/core';
+import { VenueKit } from '../visual/VenueKit';
+import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readBlend, blendTraits } from '../combat/schools';
 import { styleMoveset } from '../combat/loadout';
 
@@ -66,6 +68,8 @@ const WEAPON_RANGE: Record<DuelWeapon, number> = {
 };
 
 const DISC_RADIUS = 6.5;            // ring-out boundary
+/** How far the platform stands proud of the venue floor. Non-zero or the two surfaces z-fight. */
+const DISC_LIFT = 0.12;
 const EDGE_WARN = 5.4;
 const ROUNDS_TO_WIN = 2;
 
@@ -84,6 +88,7 @@ export const DuelMode: ModeDefinition = (() => {
   // version of that bug.
   let myWeapon: DuelWeapon = 'fists';
   let myProp: Mesh | null = null, foeProp: Mesh | null = null;
+  let modeVenue: VenueHandle | null = null;
   let foeWeapon: DuelWeapon = 'staff';
   let phase: Phase = 'intro';
   let phaseSec = 0;
@@ -247,25 +252,37 @@ export const DuelMode: ModeDefinition = (() => {
     modeId: 'duel', mood: 'dojoWarm', camPreset: 'duel',  // Phase 9: side-on disc framing
 
     async load(ctx: ModeContext) {
+      // A ROOM TO FIGHT IN (2026-09-13). Phase 0 measured this mode at SIXTEEN visible meshes — the sparsest
+      // world in the roster against dunk's 174 — and the reason was simply that it mounted no venue at all:
+      // a disc and a rim floating in front of a backdrop. Its two sibling combat modes (Showdown and Karate
+      // VS) have always mounted the dojo with a kit fallback; Duel was the one that never got the line. Same
+      // spec, same fallback, so the three combat modes are finally the same room.
+      modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true });
+      if (!modeVenue) VenueKit.buildDojo(ctx.scene);
+
       // raised disc arena (ring-out platform)
       discMesh = MeshBuilder.CreateCylinder('duel_disc', { diameter: DISC_RADIUS * 2, height: 0.4 }, ctx.scene);
-      discMesh.position.y = -0.2;
+      // THE DISC IS A RAISED PLATFORM, and it has to be raised for a reason beyond flavour: with the dojo
+      // now under it, a disc whose top sat exactly at the venue floor's y = 0 was COPLANAR with it, and the
+      // floor photographed covered in purple z-fighting blotches. It is a ring-out arena — standing it proud
+      // of the floor fixes the artifact and makes the boundary the fight turns on visible at the same time.
+      discMesh.position.y = -0.2 + DISC_LIFT;
       const dm = new StandardMaterial('discMat', ctx.scene);
       dm.diffuseColor = new Color3(0.16, 0.18, 0.24);
       discMesh.material = dm;
       const rim = MeshBuilder.CreateTorus('duel_rim', { diameter: DISC_RADIUS * 2, thickness: 0.08 }, ctx.scene);
-      rim.position.y = 0.02;
+      rim.position.y = DISC_LIFT + 0.02;
 
       // 'karate_idle_stance' is a deliberate CLIP_ALIASES entry (guard @ 0.8x
       // — a slower, more grounded ready-stance pace than plain SPORT_CLIP.
       // karateStance's 1.0x), not a typo — keep the raw alias key here.
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
-        position: new Vector3(0, 0, 2.4), startClip: 'karate_idle_stance', modeId: 'duel-me',
+        position: new Vector3(0, DISC_LIFT, 2.4), startClip: 'karate_idle_stance', modeId: 'duel-me',
       });
       neverBindPose(player.animator, 'karate_idle_stance');
       installSafePlay(player.animator, 'duel-me');
       rival = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
-        position: new Vector3(0, 0, -2.4), tint: '#8b1e2d', startClip: 'karate_idle_stance', modeId: 'duel-rival',
+        position: new Vector3(0, DISC_LIFT, -2.4), tint: '#8b1e2d', startClip: 'karate_idle_stance', modeId: 'duel-rival',
       });
       neverBindPose(rival.animator, 'karate_idle_stance');
       installSafePlay(rival.animator, 'duel-rival');
@@ -403,6 +420,7 @@ export const DuelMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      modeVenue?.dispose?.(); modeVenue = null;
       discMesh?.dispose();
       // the props are parented to a hand bone, so disposing the character takes them — but they are also
       // rebuilt on every weapon change, and a stale one left behind would ride the next round's rig
