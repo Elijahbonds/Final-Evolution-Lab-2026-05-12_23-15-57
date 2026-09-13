@@ -5,6 +5,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ControllerClient } from '@/lib/controller-link/client';
+import { usePadRelay } from './use-pad-relay';
+import type { TouchState } from '@/lib/controller-link/padSampler';
 import {
   motionNeedsPermission, requestMotionPermission, subscribeMotion, TiltCharge,
 } from '@/lib/controller-link/schemas/motion';
@@ -28,6 +30,11 @@ export default function ControllerPage({ code }: { code: string }) {
   const [config, setConfig] = useState<ModeControllerConfig | null>(null);
   const [slot, setSlot] = useState<number | null>(null);
   const clientRef = useRef<ControllerClient | null>(null);
+  // PHASE B: a controller paired to THIS PHONE is relayed as canonical binary frames. The touch layout below
+  // feeds the same frame, so the host has one code path whether this phone has a gamepad or not.
+  const touchRef = useRef<TouchState>({});
+  const [relayClient, setRelayClient] = useState<ControllerClient | null>(null);
+  const relay = usePadRelay(relayClient, touchRef);
 
   const join = useCallback(async () => {
     const client = new ControllerClient({
@@ -38,6 +45,7 @@ export default function ControllerPage({ code }: { code: string }) {
       onSlot: setSlot,
     });
     clientRef.current = client;
+    setRelayClient(client);
     setJoined(true);
     await client.connect();
   }, [code, name]);
@@ -59,6 +67,17 @@ export default function ControllerPage({ code }: { code: string }) {
           {STATE_LABEL[state]}{slot !== null ? ` · P${slot + 1}` : ''}
         </span>
       </header>
+
+      {/* The controller this phone is holding, and the honest truth about the link it is on. A session on
+          the WebSocket fallback is playable but noticeably worse, and saying so beats letting the game
+          just feel bad for no visible reason. */}
+      {(relay.padName || relay.unsupported || relay.path === 'socket') && (
+        <div className="px-4 pb-1 text-[11px] font-mono text-white/45">
+          {relay.padName && <span>{relay.padName} · {relay.framesSent} frames</span>}
+          {relay.path === 'socket' && <span className="text-[#ffd75e]"> · slow path (relay)</span>}
+          {relay.unsupported && <p className="mt-1 text-[#ffd75e]">{relay.unsupported}</p>}
+        </div>
+      )}
 
       <main className="flex flex-1 flex-col justify-center gap-6 px-4 pb-8">
         {!config && (

@@ -20,7 +20,7 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
 async function main(): Promise<void> {
   // ── A. room codes ────────────────────────────────────────────────────────
   const codes = Array.from({ length: 400 }, () => makeRoomCode());
-  ok(codes.every((c) => c.length === 4), 'A1 codes are 4 chars');
+  ok(codes.every((c) => c.length === 6), 'A1 codes are 6 chars');
   // These get read off a TV across a room; 0/O and 1/I/L are support tickets.
   ok(codes.every((c) => !/[01OIL]/.test(c)), 'A2 alphabet excludes ambiguous glyphs');
   ok(new Set(codes).size > 380, 'A3 codes are not colliding wholesale');

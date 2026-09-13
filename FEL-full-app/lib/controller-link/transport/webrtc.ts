@@ -27,6 +27,21 @@ export interface PeerLinkOpts {
   onState: (state: LinkState) => void;
   /** Outbound signaling — implementation posts to /api/controller-link/signal. */
   sendSignal: (data: unknown) => void;
+  /**
+   * Phase B: raw BINARY input frames, handed over untouched.
+   *
+   * Separate from onMessage because they are a different kind of thing: onMessage is the control plane
+   * (JSON, occasional, must arrive) and this is the hot path (16 bytes, 60 Hz, droppable). Keeping them
+   * apart means a frame never goes through JSON.parse and a control message can never be mistaken for input.
+   */
+  onFrame?: (data: ArrayBuffer) => void;
+  /**
+   * The mission's fallback: "Fall back to WebSocket for input if the datachannel fails."
+   *
+   * Supplied by the caller because the socket belongs to the signaling layer, which already has one open.
+   * Returns true if it took the bytes.
+   */
+  sendViaSocket?: (data: Uint8Array) => boolean;
 }
 
 export class PeerLink {
@@ -64,6 +79,8 @@ export class PeerLink {
     this.fast = this.pc.createDataChannel('fel-input', {
       ordered: false, maxRetransmits: 0,
     });
+    // binary frames arrive as ArrayBuffer rather than Blob, so the host can decode without an async read
+    this.fast.binaryType = 'arraybuffer';
     this.safe = this.pc.createDataChannel('fel-control', { ordered: true });
     this.bind(this.fast);
     this.bind(this.safe);
@@ -97,13 +114,45 @@ export class PeerLink {
   }
 
   private bind(ch: RTCDataChannel): void {
-    if (ch.label === 'fel-input') this.fast = ch;
+    if (ch.label === 'fel-input') { this.fast = ch; ch.binaryType = 'arraybuffer'; }
     if (ch.label === 'fel-control') this.safe = ch;
     ch.onmessage = (e) => {
-      try { this.opts.onMessage(JSON.parse(e.data as string) as LinkMessage); }
+      // BINARY IS INPUT, TEXT IS CONTROL. The two share a transport and must never be confused: a frame is
+      // 16 bytes with a magic byte, and running JSON.parse over it would throw 60 times a second.
+      const d = e.data;
+      if (typeof d !== 'string') {
+        if (d instanceof ArrayBuffer) this.opts.onFrame?.(d);
+        else if (d && typeof (d as Blob).arrayBuffer === 'function') {
+          // some browsers still hand back a Blob when binaryType was not honoured
+          void (d as Blob).arrayBuffer().then((b) => this.opts.onFrame?.(b)).catch(() => {});
+        }
+        return;
+      }
+      try { this.opts.onMessage(JSON.parse(d) as LinkMessage); }
       catch { /* a malformed frame must never take the session down */ }
     };
     ch.onopen = () => { if (this.isOpen()) this.opts.onState('connected'); };
+  }
+
+  /** Is the unreliable input channel up? False means input is riding the fallback. */
+  get fastOpen(): boolean { return this.fast?.readyState === 'open'; }
+
+  /**
+   * Send one binary input frame.
+   *
+   * Datachannel first; if it is not open, the WebSocket fallback. Returns how it went so the pad can show
+   * the player which path they are on — a session running on the fallback is playable but noticeably worse,
+   * and that is worth saying rather than hiding.
+   */
+  sendFrame(bytes: Uint8Array): 'rtc' | 'socket' | 'dropped' {
+    if (this.fast?.readyState === 'open') {
+      try {
+        // a copy, because the sender reuses one buffer and send() is asynchronous
+        this.fast.send(bytes.slice().buffer);
+        return 'rtc';
+      } catch { /* fall through to the socket */ }
+    }
+    return this.opts.sendViaSocket?.(bytes) ? 'socket' : 'dropped';
   }
 
   isOpen(): boolean {

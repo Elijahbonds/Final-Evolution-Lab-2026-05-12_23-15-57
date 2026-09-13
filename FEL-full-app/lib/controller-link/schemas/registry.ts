@@ -31,7 +31,13 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   threepoint: {
     modeId: 'threepoint',
     title: 'Downtown',
-    maxPlayers: 1,
+    // FOUR PADS, ONE HOST (mission Phase C: "Support 4 PAD clients against 1 HOST").
+    //
+    // A shootout is the right shape for this: everyone shoots the same racks and the scores stand beside
+    // each other, so a fourth player costs a column on the board rather than a second body in the scene.
+    // The four slots are already on the wire (the frame carries its own slot) and the host already gates
+    // them independently — this number is what lets the fourth phone through the lobby door.
+    maxPlayers: 4,
     askName: true,
     schemas: [
       {

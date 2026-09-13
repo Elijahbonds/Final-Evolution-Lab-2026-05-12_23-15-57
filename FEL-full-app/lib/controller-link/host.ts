@@ -9,6 +9,8 @@ import { PeerLink } from './transport/webrtc';
 import { createRoom, pollSignals, postSignal } from './transport/signaling';
 import { getOrCreatePeerId, joinUrl } from './codes';
 import type { ControlEvent, LinkState, LobbyPeer, ModeControllerConfig, PeerId } from './types';
+import type { FelInput } from '@/lib/babylon/core/InputBus';
+import { HostInput, type LinkStats } from './hostInput';
 
 export interface HostSessionOpts {
   config: ModeControllerConfig;
@@ -16,6 +18,16 @@ export interface HostSessionOpts {
   onInput: (ev: ControlEvent, slot: number, peerId: PeerId) => void;
   onLobby?: (peers: LobbyPeer[]) => void;
   onState?: (state: LinkState) => void;
+  /**
+   * Phase B: canonical FelInput decoded from a BINARY frame, tagged with its slot.
+   *
+   * Separate from onInput because they are two different protocols living on one session. onInput is the
+   * schema layer — a phone's on-screen buttons emitting a mode's own vocabulary ('shoot', 'pad_3'). This is
+   * the pad relay: a controller attached to the phone, forwarded as canonical actions at 60 Hz. A mode can
+   * consume either or both; 3PT consumes both, which is what makes "touch-only, keyboard, local gamepad and
+   * remote PAD relay" four paths into one game rather than four games.
+   */
+  onPadInput?: (e: FelInput, slot: number, peerId: PeerId) => void;
 }
 
 interface HostPeer {
@@ -32,6 +44,18 @@ interface HostPeer {
 const PING_MS = 1000;
 
 export class HostSession {
+  /**
+   * The binary pad relay's decoder, shared across peers.
+   *
+   * One per session rather than one per peer because the SLOT is on the wire: a frame says which player it
+   * is, so a single gate can order four pads independently and the stats read as one link rather than four.
+   */
+  private padInput = new HostInput({
+    emit: (slot, e) => {
+      const peer = [...this.peers.values()].find((p) => p.slot === slot);
+      this.opts.onPadInput?.(e, slot, peer?.peerId ?? '');
+    },
+  });
   /** Room-scoped creator id, recorded server-side when the room is made. */
   readonly hostId = getOrCreatePeerId();
   /**
@@ -98,12 +122,21 @@ export class HostSession {
         const p = this.peers.get(peerId);
         if (!p) return;
         p.connected = s === 'connected';
+        // a link that drops must not leave its slot holding buttons down (see releaseSlot)
+        if (s === 'failed' || s === 'reconnecting') this.releaseSlot(p.slot);
         if (s === 'connected') {
           // Re-send the lobby so a reconnected phone re-renders the right UI.
           p.link.sendSafe({ type: 'lobby', peers: this.lobby(), config: this.opts.config });
           if (p.slot !== null) p.link.sendSafe({ type: 'assign', slot: p.slot });
         }
         this.emitLobby();
+      },
+      // BINARY INPUT FRAMES (Phase B). Decoded, gated for order, and turned into the same FelInput a local
+      // controller produces — so a mode cannot tell a remote pad from one plugged into the machine.
+      onFrame: (data) => {
+        const p = this.peers.get(peerId);
+        if (!p || !this.opts.onPadInput) return;
+        this.padInput.onMessage(data);
       },
       onMessage: (msg) => {
         const p = this.peers.get(peerId);
@@ -134,6 +167,20 @@ export class HostSession {
     const offer = await link.createOffer();
     await postSignal(this.code, this.addr, peerId, { offer });
     this.emitLobby();
+  }
+
+  /** What the debug overlay reads: frames, drops, jitter, and who is actually sending. */
+  padStats(): LinkStats { return this.padInput.stats(); }
+
+  /**
+   * A peer has gone: let go of everything its slot was holding.
+   *
+   * Without this a phone that dies mid-press leaves the button latched down forever — the character sprints
+   * into a wall until someone restarts the game. (hostInput.release also clears the sequence, so the same
+   * phone rejoining from seq 1 is not judged against its old counter.)
+   */
+  private releaseSlot(slot: number | null): void {
+    if (slot !== null) this.padInput.release(slot);
   }
 
   private nextFreeSlot(): number {

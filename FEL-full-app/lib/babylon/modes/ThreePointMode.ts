@@ -35,6 +35,7 @@
 
 import { SPORT_CLIP } from '../anim/clipRegistry';
 import { SHOT_TARGET as HUD_TARGET, PERFECT_BAND as HUD_PERFECT, GOOD_BAND as HUD_GOOD, heatLevel, pointsLeft, FIRE_STREAK } from '../core/shootoutHud';
+import { readDisplaySetting, displayBanner, widen } from '@/lib/controller-link/tvMode';
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Mesh, Observer, Scene } from '@babylonjs/core';
 import { attachBallToHand, releaseBall } from '../anim/ballRig';
@@ -92,6 +93,20 @@ const RACK_POS = RACK_ANGLES.map(
 
 /** How wide the "perfect" window is around SHOT_TARGET (shared with the host). */
 const PERFECT_BAND = HUD_PERFECT;
+/**
+ * TV MODE (mission Phase C, 2026-09-13).
+ *
+ * Mirroring delays the PICTURE, not the input: on AirPlay or Chromecast the player sees the meter at the
+ * perfect moment, presses, and the press lands 60–300 ms late — every time, consistently, through no error
+ * of their own. So on a mirrored display the bands are widened to give that time back. It is compensation
+ * for a display, not a difficulty setting, and `widen` can only ever ADD time (FACTOR_MIN is 1).
+ *
+ * Read once per load rather than per shot: a player who changes the setting mid-rack would otherwise be
+ * judged by two different windows inside one rack.
+ */
+let shotFactor = 1;
+const perfectBand = (): number => widen(PERFECT_BAND, shotFactor);
+const goodBand = (): number => widen(GOOD_BAND, shotFactor);
 /** How long the ball lives off the iron before the next ball is in the hand. Long enough to SEE where
  *  the miss went (that is the whole point), short enough that a shootout still feels like a shootout. */
 const RIM_OUT_SEC = 0.85;
@@ -337,8 +352,8 @@ function fire(ctx: ModeContext, power?: number): void {
   // A tilt charge nudges the odds but never replaces timing — a phone player and
   // a keyboard player are judged on the same window.
   const powerBonus = typeof power === 'number' ? (1 - Math.abs(power - 0.75)) * 0.05 : 0;
-  const made = err < PERFECT_BAND || (err < GOOD_BAND && Math.random() < 0.55 + powerBonus);
-  const perfect = err < PERFECT_BAND;
+  const made = err < perfectBand() || (err < goodBand() && Math.random() < 0.55 + powerBonus);
+  const perfect = err < perfectBand();
 
   const worth = isMoneyBall(S.ballIdx) ? 2 : 1;
   if (made) {
@@ -534,6 +549,18 @@ export const ThreePointMode: ModeDefinition = {
   async load(ctx: ModeContext): Promise<void> {
     loadCount += 1;
     resetState();
+
+    // TV MODE. Read once at load (see shotFactor): a player who flips the setting mid-rack must not be
+    // judged by two different windows inside one rack. The banner says WHY the timing moved, so a widened
+    // window can never be mistaken for the game quietly going easy.
+    const display = readDisplaySetting(typeof navigator === 'undefined' ? undefined : {
+      userAgent: navigator.userAgent,
+      touchPoints: navigator.maxTouchPoints,
+      width: typeof window === 'undefined' ? 0 : window.innerWidth,
+      height: typeof window === 'undefined' ? 0 : window.innerHeight,
+    });
+    shotFactor = display.factor;
+    if (display.mode === 'mirrored') console.info(`[3PT] ${displayBanner(display)}`);
 
     // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
 

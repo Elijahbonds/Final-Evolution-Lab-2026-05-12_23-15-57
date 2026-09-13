@@ -78,7 +78,7 @@ export class ControllerClient {
         onMessage: (msg) => {
           if (msg.type === 'ping') this.link?.sendFast({ type: 'pong', t: msg.t });
           else if (msg.type === 'lobby') this.opts.onConfig(msg.config);
-          else if (msg.type === 'assign') this.opts.onSlot?.(msg.slot);
+          else if (msg.type === 'assign') { this.slot = msg.slot; this.opts.onSlot?.(msg.slot); }
         },
       });
       const answer = await this.link.acceptOffer(data.offer as RTCSessionDescriptionInit);
@@ -105,6 +105,25 @@ export class ControllerClient {
     const ev: ControlEvent = { a: action, p: payload, t: Date.now() };
     this.link?.sendFast({ type: 'input', ev });
   }
+
+  /**
+   * THE PAD RELAY (Phase B): stream canonical controller state as binary frames.
+   *
+   * Separate from send() because the two are different protocols with different costs. send() is the schema
+   * layer — a discrete gesture ("shoot") carrying a payload, a handful per second, JSON is fine. This is a
+   * 60 Hz stream of what is held, and at that rate the format is the whole difference between a link that
+   * feels immediate and one that does not.
+   *
+   * Returns how the frame travelled so the phone can tell the player it is on the slower path: a session on
+   * the WebSocket fallback is playable but noticeably worse, and hiding that just makes the game feel bad
+   * for no visible reason.
+   */
+  sendFrame(bytes: Uint8Array): 'rtc' | 'socket' | 'dropped' {
+    return this.link?.sendFrame(bytes) ?? 'dropped';
+  }
+
+  /** Which slot the host gave this phone, or 0 until it says. The frame carries it. */
+  slot = 0;
 
   private setState(s: LinkState): void {
     if (this.state === s) return;
