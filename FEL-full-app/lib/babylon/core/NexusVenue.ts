@@ -19,7 +19,7 @@
 import type { AbstractMesh, Scene, TransformNode } from '@babylonjs/core';
 import { buildNexusScene, type BuiltScene } from '../nexus/NexusWebScene';
 import { mountVenueProps, propSetFor, type VenuePropsHandle } from '../visual/VenueProps';
-import { VENUE_PROP_SETS, surroundSize, surroundColor } from '../visual/venuePropSets';
+import { VENUE_PROP_SETS, surroundSize, surroundColor, surroundDetail } from '../visual/venuePropSets';
 import { Color3, MeshBuilder, PBRMaterial } from '@babylonjs/core';
 import { dressHoop } from '../visual/meshyProps';
 import { decorateVeniceBoardwalk } from '../nexus/veniceBoardwalk';
@@ -27,7 +27,7 @@ import { NavBounds } from './NavBounds';
 import { MAPS } from '../../map-data';
 import type { Vector3 } from '@babylonjs/core';
 import { specFor } from '../nexus/venueSpecs';
-import { applyFloorDetail } from '../visual/groundTextures';
+import { applyFloorDetail, applyFloorDetailToMesh } from '../visual/groundTextures';
 import { flattenMapBoxes, type FlattenBox } from '../visual/mapSurgery';
 import { applyLocation, COURT_LOCATIONS, isCourtLocationId } from '../nexus/courtLocations';
 
@@ -158,6 +158,13 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
       sm.albedoColor = Color3.FromHexString(surroundColor(spec.ground.kind));
       sm.metallic = 0; sm.roughness = 1;
       surround.material = sm;
+      // grain, so it is not an unbroken plane the eye reads as paper (the tennis frame that caught the value)
+      // GroundKind is the four the grain generator actually draws; snow, water and floor have no tile and
+      // simply go without one rather than borrowing a wrong grain.
+      const dk = surroundDetail(spec.ground.kind);
+      if (dk === 'grass' || dk === 'concrete' || dk === 'asphalt' || dk === 'sand') {
+        applyFloorDetailToMesh(ctx.scene, surround, { kind: dk, blend: 0.5 }, [sw, sd]);
+      }
       console.info(`[NEXUS] surround ${sw.toFixed(0)} x ${sd.toFixed(0)} m under "${propSet}" (ground ${spec.ground.size.join('x')})`);
     }
   }

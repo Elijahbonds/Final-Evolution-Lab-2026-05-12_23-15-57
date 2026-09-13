@@ -255,19 +255,29 @@ export function surroundCovers(placements: readonly PropPlacement[], size: reado
  * The playing surface has a `kind`; the world around it is a different material, and getting this wrong is
  * as visible as the hole it fills — grass around a pitch, concrete around a hardcourt, sand around a beach.
  */
+// Values are deliberately DARK. The first cut used mid-greys (#5a6270 for a hardcourt) and the tennis frame
+// came back with a blown-out white apron filling the bottom half of the screen: these venues run a hot IBL at
+// exposure 1.05–1.15, and the surround is a single unbroken plane with no markings to break it up, so it takes
+// the full hit with nothing to read against. Ground the player never stands on should sit UNDER the playing
+// surface in value — that is what makes the court read as the lit thing in the frame.
 export const SURROUND_KIND: Record<string, { color: string; kind: string }> = {
-  pitch:     { color: '#276b3c', kind: 'grass' },     // a shade darker than the mown pitch
-  diamond:   { color: '#2c6b3a', kind: 'grass' },
-  green:     { color: '#33714a', kind: 'grass' },
-  court:     { color: '#5d6470', kind: 'concrete' },
-  hardcourt: { color: '#5a6270', kind: 'concrete' },
-  street:    { color: '#3f434e', kind: 'asphalt' },
-  sand:      { color: '#cdae7d', kind: 'sand' },
-  snow:      { color: '#d5e2ee', kind: 'snow' },
-  water:     { color: '#0b5a7c', kind: 'water' },
-  mat:       { color: '#4a4238', kind: 'floor' },
-  stage:     { color: '#120c26', kind: 'floor' },
+  pitch:     { color: '#1c4f2c', kind: 'grass' },     // rough grass past the touchline, not the mown pitch
+  diamond:   { color: '#204f2a', kind: 'grass' },
+  green:     { color: '#245234', kind: 'grass' },
+  court:     { color: '#33383f', kind: 'concrete' },
+  hardcourt: { color: '#2f343b', kind: 'concrete' },
+  street:    { color: '#2a2d34', kind: 'asphalt' },
+  sand:      { color: '#9c8360', kind: 'sand' },
+  snow:      { color: '#9fb2c4', kind: 'snow' },
+  water:     { color: '#083f57', kind: 'water' },
+  mat:       { color: '#2e2922', kind: 'floor' },
+  stage:     { color: '#0b0718', kind: 'floor' },
 };
+
+/** The grain a surround takes, so it is not one flat unbroken plane. */
+export function surroundDetail(groundKind: string): string {
+  return (SURROUND_KIND[groundKind] ?? SURROUND_KIND.court).kind;
+}
 
 export function surroundColor(groundKind: string): string {
   return (SURROUND_KIND[groundKind] ?? SURROUND_KIND.court).color;
