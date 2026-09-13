@@ -68,6 +68,8 @@ export const SkateRunMode: ModeDefinition = (() => {
   let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
   /** Seconds rolling clean on the ground before the pot banks (revert window). */
   let settleT = 0;
+  /** Latched while the rider is against the fence, so the cue fires once per contact rather than every frame. */
+  let fenceHit = false;
   /** Heading when the wheels left the ground — decides switch stance on landing. */
   let airEntryYaw = 0;
   /** Has the camera been snapped since play actually began? */
@@ -286,7 +288,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // the side for the first frames and, on a portrait phone (aspect 0.46),
       // lost the rider until the follow swung round (mobile capture, ~1 run in 2)
       ctx.camDirector.snapTo(rig.char.root.position, aheadOfRider());
-      timeLeft = RUN_SEC; ended = false; stickX = 0; stickY = 0; pump = 0; pumpReleased = 0; pumpReleasedAt = -1; pushing = false; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
+      timeLeft = RUN_SEC; ended = false; fenceHit = false; stickX = 0; stickY = 0; pump = 0; pumpReleased = 0; pumpReleasedAt = -1; pushing = false; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
       landingBeatT = 0; bailBeatT = 0; bailLatch = false; lastLanding = 'none';
       slowT = 0; slowCool = 0; slowCount = 0; popBeatT = 0; crouchAt = -1; boardPitch = 0; lastGroundY = 0;
       grindAskedAt = -1; relockUntil = -1; lastGoodPos = null; lastGoodYaw = 0; nanReports = 0;
@@ -773,8 +775,27 @@ export const SkateRunMode: ModeDefinition = (() => {
       // combo HUD
       const hud = combo.hud;
       ctx.setHud({ combo: hud.combo, pot: hud.pot, score: hud.banked, momentum: Math.round(mbus.score01 * 100) });
+      // THE FENCE HAS TO TAKE YOUR SPEED. This clamped the POSITION and left the velocity alone, so a rider who rode
+      // into the boundary was pinned there while the movement model still reported 6-8 m/s — measured: position frozen
+      // at z 33 from t8s to the end of a 60 s run, speed never below 6.1. The board kept rolling, the push kept
+      // working, the world stopped moving, and nothing told the player why. A wall you cannot feel is worse than a
+      // wall you can see.
+      const beforeX = rig.char.root.position.x, beforeZ = rig.char.root.position.z;
       rig.char.root.position.x = Math.max(-PARK_BOUND, Math.min(PARK_BOUND, rig.char.root.position.x));
       rig.char.root.position.z = Math.max(-PARK_BOUND, Math.min(PARK_BOUND, rig.char.root.position.z));
+      const hitX = rig.char.root.position.x !== beforeX, hitZ = rig.char.root.position.z !== beforeZ;
+      if (hitX || hitZ) {
+        // kill the speed INTO the fence and keep whatever runs along it, so a rider scrubs along the edge rather than
+        // sticking to it — and the momentum model and the world agree about what is happening again
+        if (hitX) { move.vel.x = 0; rig.rider.vel.x = 0; }
+        if (hitZ) { move.vel.z = 0; rig.rider.vel.z = 0; }
+        if (!fenceHit) {
+          fenceHit = true;
+          SoundKit.play('impact', { pitch: 0.9, volume: 0.3 });
+          ctx.feel?.impact?.(0.2);
+          bannerFlash(ctx, 'EDGE OF THE PARK — TURN IT AROUND', 900);
+        }
+      } else fenceHit = false;
       ctx.setHud({ time: Math.ceil(timeLeft) });
       // Snap once more on the first PLAYED frame. The load-time snapTo is
       // correct when it runs and stale by the time it matters: between load and
