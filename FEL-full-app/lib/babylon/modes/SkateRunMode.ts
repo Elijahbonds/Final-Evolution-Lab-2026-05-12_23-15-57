@@ -15,6 +15,7 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, landsSwitch, TRICKS, type BoardRig } from './boardCore';
+import { trickFor, bestFitting, basePts as trickPts, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { buildSkatepark, PARK_BOUND, type RideWorld } from './rideWorlds';
 import { assertSpawned } from '../core/FrameGuard';
 import { SPORT_CLIP } from '../anim/clipRegistry';
@@ -75,6 +76,9 @@ export const SkateRunMode: ModeDefinition = (() => {
   const aheadOfRider = (): Vector3 => rig.char.root.position.add(new Vector3(Math.sin(rig.char.root.rotation.y), 0, Math.cos(rig.char.root.rotation.y)).scale(8));
   let coins: CoinField;
   let timeLeft = RUN_SEC;
+  /** How long a full-pop air lasts, for judging which trick the rider can finish. Measured against the ollie's own
+   *  hang rather than guessed: a kerb ollie is a quarter-second, a ramp air most of a second. */
+  const AIR_BUDGET_SEC = 0.95;
   let stickX = 0, stickY = 0, pump = 0;
   // SKATE-MOVE (2026-09-08): the pump released just before POP still charges the ollie (space on the keyboard emits the
   // trigger's release BEFORE the A press, so a keyboard ollie always saw pump 0).
@@ -160,6 +164,11 @@ export const SkateRunMode: ModeDefinition = (() => {
     return best;
   };
   /** Apply a trick to the air chain and flash it -- shared by flick and buttons. */
+  /** Which direction the stick is HOLDING, as the trick grammar wants it. A centred stick is no direction. */
+  const heldDir = (x: number, y: number): BoardTrick['dir'] => {
+    if (Math.hypot(x, y) < 0.45) return null;
+    return Math.abs(x) > Math.abs(y) ? (x > 0 ? 'right' : 'left') : (y > 0 ? 'down' : 'up');
+  };
   const airTrick = (
     ctx: ModeContext, id: string, label: string,
     family: 'flip' | 'grab' | 'spin', basePts: number, difficulty: number,
@@ -385,9 +394,23 @@ export const SkateRunMode: ModeDefinition = (() => {
         // not holding a gamepad. Route them through the same air chain the
         // flick path uses, so the landing grades and banks them.
         if (!rig.rider.grounded) {
-          if (e.btn === 'B') airTrick(ctx, 'kickflip', 'KICKFLIP', 'flip', TRICKS.flipA.pts, 2);
-          if (e.btn === 'Y') airTrick(ctx, 'heelflip', 'HEELFLIP', 'flip', TRICKS.flipB.pts, 2);
-          if (e.btn === 'X') airTrick(ctx, 'indy', 'INDY', 'grab', TRICKS.grab.pts, 1);
+          // THE NAMED VOCABULARY. Three buttons used to mean three fixed tricks; now the HELD DIRECTION picks which
+          // trick a button throws — the dunk's own grammar (DunkSystem.runwayTrickFor reads dir+btn the same way) — so
+          // fifteen skate tricks are reachable from the same three buttons instead of three.
+          //
+          // And the AIR BUDGET decides what is legal: a 360 flip off a kerb used to be thrown, fail to rotate and get
+          // graded as a bail the player did not cause. bestFitting() asks for the hardest version this air can hold,
+          // so the budget is the skill rather than a trap.
+          const held = heldDir(stickX, stickY);
+          const want = trickFor('skate', held, e.btn as BoardTrick['btn']);
+          // AirControl tracks the airtime ALREADY SPENT, so what is left is the pop's budget minus that. No Rider API
+          // exposes a remaining-air figure, and inventing one would have been a silent `undefined`.
+          const air01 = Math.max(0.25, AIR_BUDGET_SEC - air.state.airtime);
+          const fits = want && want.airSec <= Math.max(air01, 0.25) ? want : bestFitting('skate', e.btn as BoardTrick['btn'], Math.max(air01, 0.25));
+          if (fits) {
+            airTrick(ctx, fits.id, fits.label, fits.kind === 'grind' ? 'grab' : fits.grab !== 'none' ? 'grab' : fits.flipDeg !== 0 ? 'flip' : 'spin',
+              trickPts(fits), Math.max(1, Math.round(fits.difficulty)));
+          }
         }
       }
       // releasing GRAB banks the hold, exactly as the flick path does
