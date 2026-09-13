@@ -147,6 +147,8 @@ type Win = 'run' | 'gather' | 'takeoff' | 'hang' | 'contact' | 'land';
 
 const DUNKS_PER_ROUND = 2;
 const RIVAL_HOP_MS = 1300;                 // the rival's scripted hop bench → rim
+/** The run-up before that hop. A dunk that starts from a standing launch is not a dunk anybody runs up to. */
+const RIVAL_RUNUP_MS = 900;
 const TOTAL_ROUNDS = 2;
 // Every threshold below is derived from the panel, never a bare number. The D1
 // bug was exactly this: the judge total was written as a literal tuned to a
@@ -2146,42 +2148,74 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.setHud({ hint: 'RIVAL ROUND', judgeReveal: null });
     for (let i = 0; i < DUNKS_PER_ROUND; i++) {
       ctx.camDirector.snapTo(rival.root.position, rim);
-      const t0 = performance.now();
+      // THE RIVAL'S CARD IS ROLLED BEFORE THE JUMP (2026-09-13, owner: "we need the ai's animations to look
+      // good too during the dunk contest"). It used to be rolled AFTER the hop, which meant the body could
+      // not perform the dunk it was about to be scored for: every rival attempt played dunkLaunchPower ->
+      // dunkScoreHang -> celebrate, the IDENTICAL animation whether it scored a 48 or blew it. The player
+      // has had finish variety since M111 — windmill, tomahawk, hang, blown, picked by how well the slam was
+      // timed — and the rival simply did not, so the contest looked like a person competing against a loop.
+      // Rolling first lets the rival run the SAME pickAerialFinish vocabulary off its own execution score.
+      const rivalBlew = Math.random() < RIVAL_BLOWN_CHANCE;
+      const rDiff = rivalBlew ? 0.4 : 2.6 + Math.random() * 3.4;
+      const rExec = rivalBlew ? 0 : 3.4 + Math.random() * 3.4;
+      const rStyle = rivalBlew ? 0.5 : 2.2 + Math.random() * 3.2;
+      // exec runs 3.4..6.8 on a made dunk; map it onto the same 0..1 accuracy the player's timing produces
+      const rAcc = rivalBlew ? 0 : Math.max(0, Math.min(1, (rExec - 3.4) / 3.4));
+      const rAerial = pickAerialFinish(!rivalBlew, rAcc);
+
       const from = rival.root.position.clone();
       // Soft-OPEN #3 (fel-full-app-50's measurement): the rival spawns at yaw 0 — facing the CAMERA — and flew its whole
       // hop backwards (the rim sits at −139° from the bench spot); its 0.35 s launch clip then chained to idle IN THE AIR
       // (219 of 288 airborne frames in idle_stand). Face the rim for the hop; launch → held hang until the verdict clip.
       rival.root.rotation.y = Math.atan2(rim.x - from.x, rim.z - from.z);
+
+      // THE RUN-UP. The rival used to launch from a standstill at the bench and slide to the rim with the
+      // launch clip playing over the translation — the body was never running, so the approach read as a
+      // dolly rather than an athlete. It now covers the first third of the gap on the shared run loop and
+      // gathers where the hop begins, which is the same shape the player's runway has.
+      const gather = from.add(new Vector3(rim.x - from.x, 0, rim.z - from.z).scale(0.34));
+      rivalClip(SPORT_CLIP.moveLoop, { loop: true });
+      await new Promise<void>((res) => {
+        const r0 = performance.now();
+        const obs = ctx.scene.onBeforeRenderObservable.add(() => {
+          const k = Math.min(1, (performance.now() - r0) / RIVAL_RUNUP_MS);
+          rival.root.position.x = from.x + (gather.x - from.x) * k;
+          rival.root.position.z = from.z + (gather.z - from.z) * k;
+          if (k >= 1) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); }
+        });
+      });
+      if (phase !== 'rivalTurn') return;
+      const liftOff = rival.root.position.clone();
       // The hang is paced to span the rest of the hop (+150 ms so the verdict clip supersedes it, never a held pose): measured
       // at speed 1 it ran out ~130 ms before the landing and the rival flew those frames with no clip at all.
       const hopLeft = RIVAL_HOP_MS / 1000 - (rival.animator.durationOf(SPORT_CLIP.dunkLaunchPower) ?? 0.35) + 0.15;
-      const hangRate = Math.max(0.25, Math.min(1.5, (rival.animator.durationOf(SPORT_CLIP.dunkScoreHang) ?? hopLeft) / hopLeft));
-      rivalClip(SPORT_CLIP.dunkLaunchPower, { onEnd: () => rivalClip(SPORT_CLIP.dunkScoreHang, { speedRatio: hangRate, onEnd: () => {} }) });
+      const hangRate = Math.max(0.25, Math.min(1.5, (rival.animator.durationOf(rAerial) ?? hopLeft) / hopLeft));
+      // launch -> the finish this attempt actually earned, rate-matched to span the rest of the hop so the
+      // body is never clip-less in the air (the measured failure this pacing exists for: the hang ran out
+      // ~130 ms early and the rival flew those frames with no clip at all)
+      rivalClip(SPORT_CLIP.dunkLaunchPower, { onEnd: () => rivalClip(rAerial, { speedRatio: hangRate, onEnd: () => {} }) });
+      const hopT0 = performance.now();
       await new Promise<void>((res) => {
         const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-          const k = Math.min(1, (performance.now() - t0) / RIVAL_HOP_MS);
-          rival.root.position.x = from.x + (rim.x - from.x) * k;
-          rival.root.position.z = from.z + (rim.z + 0.7 - from.z) * k;
+          const k = Math.min(1, (performance.now() - hopT0) / RIVAL_HOP_MS);
+          rival.root.position.x = liftOff.x + (rim.x - liftOff.x) * k;
+          rival.root.position.z = liftOff.z + (rim.z + 0.7 - liftOff.z) * k;
           rival.root.position.y = Math.sin(k * Math.PI) * 1.2;
           if (k >= 1) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); }
         });
       });
       if (phase !== 'rivalTurn') return;   // soft-OPEN #3: the watchdog advanced the contest under this hop — its end owns the rest
-      // The rival is a CONTENDER, not a wall. These inputs used to average a
-      // ~43 card, which is near the top of what a good player can produce, on
-      // every single attempt — so the contest was effectively decided before the
-      // player took their second dunk. A real field is beatable and streaky:
-      // this averages high-30s, swings, and BLOWS one now and then, which is
-      // also what real dunk contests look like.
-      const rivalBlew = Math.random() < RIVAL_BLOWN_CHANCE;
-      const rDiff = rivalBlew ? 0.4 : 2.6 + Math.random() * 3.4;
-      const rExec = rivalBlew ? 0 : 3.4 + Math.random() * 3.4;
-      const rStyle = rivalBlew ? 0.5 : 2.2 + Math.random() * 3.2;
+      // The rival is a CONTENDER, not a wall. These inputs used to average a ~43 card, near the top of what
+      // a good player can produce, on every single attempt — so the contest was decided before the player
+      // took their second dunk. A real field is beatable and streaky: this averages high-30s, swings, and
+      // BLOWS one now and then. (The roll itself now happens before the jump — see above.)
       const rScores = judgeDunk(rDiff, rExec, rStyle);
       const rTotal = rScores.reduce((s, j) => s + j.score, 0);
       rivalTotal += rTotal;
       SoundKit.play(rivalBlew ? 'miss' : 'crowdGroan', { volume: 0.35 });
-      rivalClip(rivalBlew ? SPORT_CLIP.dunkLandCrouch : SPORT_CLIP.scoreCelebrate);   // soft-OPEN #3: the verdict clip plays out, then idle
+      // the landing reads the CARD, exactly as the player's pickLanding does — a rival that just posted an
+      // eruption celebrates like one, and one that blew it does not
+      rivalClip(rivalBlew ? SPORT_CLIP.dunkFinishBlown : pickLanding(rTotal));   // soft-OPEN #3: the verdict clip plays out, then idle
       ctx.setHud({ rivalScore: rivalTotal }); flash(ctx, rivalBlew ? `RIVAL BLOWS IT — ${rTotal}` : `RIVAL SCORES ${rTotal}`);
       rival.root.position.set(3.2, 0, CFG.rimZ + 3);
       rival.root.rotation.y = 0;   // back at the bench spot, facing the court as it spawned
