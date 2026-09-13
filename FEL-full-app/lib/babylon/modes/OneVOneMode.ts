@@ -95,7 +95,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';              // the miss meets the iron it earned
-import { ballVsBodies, resolvePickup, bobbleVelocity, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
+import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
 import { attachBallToHand, releaseBall, flushThroughRim, clankOffRim } from '../anim/ballRig';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the dunk's Posture Poses, shared
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
@@ -1123,6 +1123,16 @@ export const OneVOneMode: ModeDefinition = (() => {
     const range = distXZ(foe.root.position, RIM_FLOOR);
     const made = Math.random() < rivalShotPct(range, contest, style);
     arcPoints = style === 'layup' ? 2 : isThree(foe.root.position, RIM) ? 3 : 2;
+    // The RIVAL's miss has to be readable too. Measured with a probe: every rim contact in a 150 s run
+    // came back "front — SHORT", because only the hero's release recorded a profile and the AI fell
+    // through to the default short bias — so the iron answered identically every single time, which is
+    // the exact failure the rim work existed to fix. His miss now comes off the contest and the range:
+    // a hand in his face or a shot past his limit is short off the front, an open look sprays.
+    shotMiss = {
+      quality01: Math.max(0.15, 0.85 - contest * 0.5 - Math.max(0, range - 6) * 0.05),
+      short: contest * 0.8 + Math.max(0, range - 7) * 0.12,
+      lateral: (Math.random() - 0.5) * 0.9,
+    };
     arc.start(ball.getAbsolutePosition(), RIM, made, style, alteredApex(contest));   // a strong contest ALTERS the release
     console.info(`[1V1-DEF] rival release ${style} contest ${contest.toFixed(2)} handUp ${ground > 0} pct ${rivalShotPct(range, contest, style).toFixed(2)}`);
     // the read at the release, before the arc lands — same as the hero's GREEN / CONTESTED tags
@@ -1673,9 +1683,15 @@ export const OneVOneMode: ModeDefinition = (() => {
 
     if (r.winner) { awardBoard(ctx, r.winner.id === 'me' ? 'me' : 'foe', r.contested); return; }
 
-    // stall guard: the ball has settled and nobody went and got it
+    // stall guard: the ball has settled and nobody went and got it. The log names WHY — which body was
+    // where, and whether it was even able to go — because "nobody came down with it" on its own tells
+    // you nothing about whether the pursuit is broken or the bodies were legitimately beaten to it.
     if (board.age > 4) {
-      console.info('[1V1-BOARD] nobody came down with it — falling back to the race');
+      const why = bodies.map((x) => {
+        const d = Math.hypot(ballSim.pos.x - x.pos.x, ballSim.pos.z - x.pos.z);
+        return `${x.id} d=${d.toFixed(2)}${x.unavailable ? ' UNAVAILABLE' : ''}${x.boxingOut ? ' sealing' : ''}`;
+      }).join(' · ');
+      console.info(`[1V1-BOARD] nobody came down with it (${why}) ball y=${ballSim.pos.y.toFixed(2)} — falling back to the race`);
       board = null;
       boardRace(ctx);
     }
@@ -1698,7 +1714,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     board = null;
     foeBrain?.boxOut(null); foeSealing = false;
     ballSim.stop(); loose = false;
-    const offensive = (who === 'me' && shooter === 'mine') || (who === 'foe' && shooter === 'defense');
+    // shooter is the mode's possession wording ('mine' = me, 'defense' = the rival had it)
+    const offensive = boardOutcome(who, shooter === 'mine' ? 'me' : 'foe') === 'putback';
     console.info(`[1V1-BOARD] ${who} secures it${contested ? ' (contested)' : ''}${offensive ? ' — OFFENSIVE, play on' : ''}`);
 
     if (offensive && who === 'me') { securePutback(ctx, contested); return; }

@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
 import { resolveRim, missProfileFor, forcedMissProfile, RIM_RADIUS, BALL_RADIUS } from './RimPhysics';
-import { ballVsBodies, resolvePickup, bobbleVelocity, type BodyRef } from './LooseBall';
+import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, type BodyRef } from './LooseBall';
 
 const RIM = new Vector3(0, 3.05, -6);
 /** Shooter stands at +z of the rim, so "toward the shooter" is +z. */
@@ -207,5 +207,28 @@ describe('loose ball: somebody has to come down with it', () => {
     const r = resolvePickup(new Vector3(0, 0.4, 0), new Vector3(0, -1, 0.5), [body('a', 0, 0.1)], { rand: () => 0.5 });
     expect(r.winner!.id).toBe('a');
     expect(r.bobbled).toBe(false);
+  });
+});
+
+describe('what winning a board MEANS depends on whose miss it was', () => {
+  it('my board off my own miss is a PUTBACK — the play does not stop', () => {
+    expect(boardOutcome('me', 'me')).toBe('putback');
+  });
+
+  it('their board off their own miss is their putback — they go straight back up', () => {
+    expect(boardOutcome('foe', 'foe')).toBe('putback');
+  });
+
+  it('my board off THEIR miss is a change of possession, not a putback', () => {
+    expect(boardOutcome('me', 'foe')).toBe('possession');
+  });
+
+  it('their board off MY miss is a change of possession', () => {
+    expect(boardOutcome('foe', 'me')).toBe('possession');
+  });
+
+  it('an offensive rebound is never worth the same as losing it — the bug this rule fixes', () => {
+    // resetting on EVERY board meant these two were identical outcomes
+    expect(boardOutcome('me', 'me')).not.toBe(boardOutcome('foe', 'me'));
   });
 });

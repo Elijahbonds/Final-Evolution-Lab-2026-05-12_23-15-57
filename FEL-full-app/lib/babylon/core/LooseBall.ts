@@ -148,3 +148,18 @@ export function bobbleVelocity(ballVel: Vector3, rand: () => number = Math.rando
     ballVel.z * keep + (rand() - 0.5) * 1.6,
   );
 }
+
+/** What winning a board means. Whose miss it was is half the answer. */
+export type BoardOutcome = 'putback' | 'possession';
+
+/**
+ * Securing a rebound off YOUR OWN miss is an offensive rebound: the play continues and you can go
+ * straight back up. Securing it off THEIRS is a change of possession.
+ *
+ * This distinction is the whole value of an offensive rebound, and collapsing it was a real bug: every
+ * board reset both bodies to the check, so winning your own miss earned you exactly what losing it
+ * would have. Kept as a pure rule so all four combinations are provable without a scene.
+ */
+export function boardOutcome(winner: string, shooter: string): BoardOutcome {
+  return winner === shooter ? 'putback' : 'possession';
+}
