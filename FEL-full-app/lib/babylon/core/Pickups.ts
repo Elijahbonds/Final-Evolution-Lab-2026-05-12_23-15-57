@@ -1,16 +1,33 @@
 // Pickups — coin lines/arcs on courses. Collected coins report through
 // SessionResult stats (coinsCollected) — the SERVER validates against the
 // per-run cap and pays the wallet. Client never mints currency.
+//
+// THIN INSTANCED (2026-09-13). This used to build ONE MESH AND ONE MATERIAL PER COIN: a forty-coin
+// skatepark line was forty draw calls and — worse — forty identical StandardMaterials, each its own shader
+// binding. The skate mode flags its own budget at `draws 694 > 600`, and this was the single biggest group
+// in the scene (coin ×40, ahead of every piece of park furniture).
+//
+// One master cylinder, one material, one matrix buffer rewritten per frame. The buffer has to be dynamic
+// because coins are not static scenery: they spin, the magnet drags them toward the player, and a collected
+// one has to vanish on its own. A taken coin is scaled to zero rather than removed, so the buffer keeps a
+// stable layout and no index ever shifts under the collection logic.
 
-import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, Scene } from '@babylonjs/core';
+import { Color3, Matrix, MeshBuilder, Quaternion, StandardMaterial, Vector3 } from '@babylonjs/core';
+import type { Mesh, Scene } from '@babylonjs/core';
 
 export const COIN_RUN_CAP = 60;      // must match server-side validation
 
+/** A coin the player can still take. Position is authoritative; the matrix is derived from it each frame. */
+interface Coin { pos: Vector3; taken: boolean }
+
 export class CoinField {
-  private coins: { mesh: AbstractMesh; taken: boolean }[] = [];
+  private coins: Coin[] = [];
   public collected = 0;
   private spin = 0;
+  private master: Mesh | null = null;
+  private buf: Float32Array | null = null;
+  /** Reused so the per-frame rebuild allocates nothing. */
+  private scratch = { m: Matrix.Identity(), q: Quaternion.Identity(), s: new Vector3(1, 1, 1) };
 
   constructor(private scene: Scene) {}
 
@@ -32,40 +49,79 @@ export class CoinField {
   }
 
   private place(pos: Vector3): void {
-    const mesh = MeshBuilder.CreateCylinder(`coin_${this.coins.length}`,
-      { diameter: 0.34, height: 0.05, tessellation: 16 }, this.scene);
-    mesh.rotation.x = Math.PI / 2;
-    mesh.position.copyFrom(pos);
-    const mat = new StandardMaterial('coinMat', this.scene);
-    mat.diffuseColor = Color3.FromHexString('#f5b91a');
-    mat.emissiveColor = Color3.FromHexString('#8a6200');
-    mesh.material = mat;
-    mesh.isPickable = false;
-    this.coins.push({ mesh, taken: false });
+    this.coins.push({ pos: pos.clone(), taken: false });
+    this.buf = null;                    // the layout changed; rebuilt on the next update
+  }
+
+  /** Build (or rebuild) the master and its buffer. Idempotent. */
+  private ensure(): void {
+    if (!this.master) {
+      const m = MeshBuilder.CreateCylinder('coin', { diameter: 0.34, height: 0.05, tessellation: 16 }, this.scene);
+      const mat = new StandardMaterial('coinMat', this.scene);
+      mat.diffuseColor = Color3.FromHexString('#f5b91a');
+      mat.emissiveColor = Color3.FromHexString('#8a6200');
+      mat.freeze();                     // one material, and it never changes
+      m.material = mat;
+      m.isPickable = false;
+      // the master itself must not render at the origin on top of its instances
+      m.setEnabled(this.coins.length > 0);
+      this.master = m;
+    }
+    if (!this.buf || this.buf.length !== this.coins.length * 16) {
+      this.buf = new Float32Array(this.coins.length * 16);
+      this.writeAll();
+      this.master.thinInstanceSetBuffer('matrix', this.buf, 16, false);   // false: updated per frame
+      this.master.setEnabled(this.coins.length > 0);
+    }
+  }
+
+  /** Rewrite every coin's matrix from its current position, spin and taken state. */
+  private writeAll(): void {
+    if (!this.buf) return;
+    const { q, s, m } = this.scratch;
+    for (let i = 0; i < this.coins.length; i++) {
+      const c = this.coins[i];
+      // a taken coin is scaled to nothing rather than removed: the index stays put, so nothing downstream
+      // has to care that the set has holes in it
+      const k = c.taken ? 0 : 1;
+      s.set(k, k, k);
+      // the coin lies face-up (rotation.x = π/2 in the original) and spins about its own axis
+      Quaternion.RotationYawPitchRollToRef(this.spin, Math.PI / 2, 0, q);
+      Matrix.ComposeToRef(s, q, c.pos, m);
+      m.copyToArray(this.buf, i * 16);
+    }
   }
 
   /** Call per frame with the player position. magnetRadius eases collection. */
   update(dt: number, playerPos: Vector3, magnetRadius = 1.1): number {
+    this.ensure();
     this.spin += dt * 3;
     let gained = 0;
     for (const c of this.coins) {
       if (c.taken) continue;
-      c.mesh.rotation.y = this.spin;
-      const d = Vector3.Distance(c.mesh.position, playerPos);
+      const d = Vector3.Distance(c.pos, playerPos);
       if (d < magnetRadius * 0.45) {
         c.taken = true;
-        c.mesh.setEnabled(false);
         if (this.collected < COIN_RUN_CAP) { this.collected++; gained++; }
       } else if (d < magnetRadius) {
-        // magnet pull
-        c.mesh.position = Vector3.Lerp(c.mesh.position, playerPos, 10 * dt);
+        Vector3.LerpToRef(c.pos, playerPos, 10 * dt, c.pos);      // magnet pull
       }
     }
+    this.writeAll();
+    if (this.master && this.buf) this.master.thinInstanceBufferUpdated('matrix');
     return gained;           // caller pops "+1◆" HUD float per gain
   }
 
+  /** How many coins are still out there — for a HUD or a test. */
+  get remaining(): number {
+    return this.coins.reduce((n, c) => n + (c.taken ? 0 : 1), 0);
+  }
+
   dispose(): void {
-    this.coins.forEach((c) => c.mesh.dispose());
+    this.master?.material?.dispose();
+    this.master?.dispose();
+    this.master = null;
+    this.buf = null;
     this.coins = [];
   }
 }
