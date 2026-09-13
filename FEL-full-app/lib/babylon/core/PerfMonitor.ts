@@ -38,6 +38,29 @@ export const DEFAULT_BUDGET: PerfBudget = {
   frameMs: 16.7, drawCalls: 600, activeMeshes: 400, textureMb: 256,
 };
 
+// ── THE BUDGET IS PER TIER (2026-09-13) ──────────────────────────────────────────────────────────────────
+//
+// One budget was being applied to two very different machines, and it fired on the wrong one. Measured on
+// the same scene, same content, same build:
+//
+//   threepoint @ desktop tier (1100×700):  833 draws, 60 fps   → "⚠ draws 833 > 600"
+//   threepoint @ mobile tier  (390×760):   277 draws, 60 fps, worst frame 17.7 ms → no warning
+//
+// The tier system is already doing its job: the mobile tier renders the same crowd in a third of the draws.
+// So the 600 ceiling — measured on mobile-ish content — was only ever displayed on DESKTOP, where 833 draws
+// costs nothing and the warning is noise, and stayed silent on mobile, where it would have meant something.
+// A budget line that cannot fire where it matters is worse than no budget line: it trains you to ignore it.
+//
+// Desktop gets a ceiling sized to what a desktop actually chokes on; mobile keeps the measured one.
+export const MOBILE_BUDGET: PerfBudget = DEFAULT_BUDGET;
+export const DESKTOP_BUDGET: PerfBudget = {
+  frameMs: 16.7, drawCalls: 1600, activeMeshes: 900, textureMb: 512,
+};
+
+export function budgetForTier(tier: 'mobile' | 'desktop' | undefined): PerfBudget {
+  return tier === 'desktop' ? DESKTOP_BUDGET : MOBILE_BUDGET;
+}
+
 export interface PerfSample {
   fps: number;
   frameMs: number;

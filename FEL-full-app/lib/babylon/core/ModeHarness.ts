@@ -23,7 +23,7 @@ import { mountBackdrop, MOOD_TO_FAMILY } from '../visual/Backdrops'; // M61: pai
 import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
 import { applyCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
-import { PerfMonitor } from './PerfMonitor';          // M67: dev frame-budget monitor
+import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
 import { installAgentBridge, agentBridge } from './AgentBridge';  // M69: agent control plane
 import { AGENT_MODES } from './agentModes';
@@ -177,7 +177,9 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   // M67: dev-only frame-budget monitor. mount() is a no-op in production, so
   // the overlay and its per-frame bookkeeping cost nothing for real players.
   const DEV = process.env.NODE_ENV === 'development';
-  const perf = new PerfMonitor(scene, engine);
+  // the budget follows the TIER: one ceiling across both was firing on desktop (833 draws at a steady 60 fps)
+  // and never on mobile (277 draws, the same scene), which is exactly backwards — see PerfMonitor.
+  const perf = new PerfMonitor(scene, engine, budgetForTier(tier));
   perf.mount(DEV);
 
   let phase: ModePhase = 'loading';
