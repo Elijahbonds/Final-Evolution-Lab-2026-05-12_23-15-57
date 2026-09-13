@@ -142,7 +142,7 @@ export class BasketballAnimTree {
   /** The stride rate for the loop that is running, smoothed so a cadence never stutters. */
   private strideFilter = new StrideRateFilter();
   private strideClip: string | null = null;
-  constructor(private animator: Pick<CharacterAnimator, 'play' | 'setSpeed'>) {}
+  constructor(private animator: Pick<CharacterAnimator, 'play' | 'setPlaybackScale'>) {}
 
   update(input: AnimTreeInput): BasketballAnimState {
     this.last = input;
@@ -170,7 +170,7 @@ export class BasketballAnimTree {
     // frame. Only locomotion states have a rate; a shot or a knockdown returns null and is left alone.
     if (this.strideClip && !this.override && input.speedMps !== undefined) {
       const want = rateFor(c.state, input.speedMps);
-      if (want !== null) this.animator.setSpeed(this.strideClip, this.strideFilter.step(want, 1 / 60));
+      if (want !== null) this.animator.setPlaybackScale(this.strideClip, this.strideFilter.step(want, 1 / 60));
     }
     return c.state;
   }

@@ -96,4 +96,6 @@ console.log('root travel per frame: ' + Number(fp.avgRootStep).toFixed(4) + ' m 
 console.log('PLANTED-foot travel per frame — median ' + Number(fp.medianSlide).toFixed(4)
   + '  p90 ' + Number(fp.p90Slide).toFixed(4) + '  max ' + Number(fp.maxSlide).toFixed(4) + ' m');
 console.log('planted samples: ' + fp.plantedSamples + '  errors: ' + errors);
+const stride = await p.evaluate('window.__KVS_STRIDE || null');
+if (stride) console.log('tree states while MOVING: ' + JSON.stringify(stride));
 await b.close();

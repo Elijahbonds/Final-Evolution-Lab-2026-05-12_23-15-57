@@ -8,7 +8,8 @@ import { describe, it, expect } from 'vitest';
 import { HOOPS_POSTURE } from './HoopsPosture';
 import {
   SIGNALS_IDLE, MAX_BANK_DEG, HEAD_LEVEL, BANK_FULL_ACCEL, LEAN_FULL_ACCEL,
-  dynamicPose, isDynamic, DYNAMIC_WINDOWS, BodyMotion, type BodySignals,
+  dynamicPose, isDynamic, DYNAMIC_WINDOWS, HOOPS_DYNAMIC, COMBAT_DYNAMIC, BOARD_DYNAMIC,
+  angulate, MAX_ANGULATION_DEG, BodyMotion, type BodySignals,
 } from './DynamicPosture';
 
 const base = HOOPS_POSTURE.drive;
@@ -249,5 +250,99 @@ describe('the motion tracker turns a velocity stream into those signals', () => 
       expect(Number.isFinite(p.lean)).toBe(true);
       expect(Math.abs(p.spine1[2] + p.spine2[2])).toBeLessThanOrEqual(MAX_BANK_DEG + 1e-6);
     }
+  });
+});
+
+describe('the allowlist is PER DISCIPLINE, and a name collision is why', () => {
+  it('"spin" is locomotion in hoops and choreography on a board — the same word, opposite answers', () => {
+    // hoops 'spin' is a planted PIVOT; board 'spin' is an AIR TRICK. One shared set would have started modulating
+    // board air spins the moment boards were added, which is the whole argument for the parameter.
+    expect(isDynamic('spin', HOOPS_DYNAMIC)).toBe(true);
+    expect(isDynamic('spin', BOARD_DYNAMIC)).toBe(false);
+  });
+
+  it('combat footwork is dynamic; every strike and reaction is not', () => {
+    for (const w of ['idle', 'guard', 'advance', 'strafe', 'retreat']) {
+      expect(isDynamic(w, COMBAT_DYNAMIC), `${w} should be dynamic`).toBe(true);
+    }
+    for (const w of ['windup', 'strike_light', 'strike_heavy', 'strike_finisher', 'block', 'parry',
+      'guard_impact', 'react', 'launch', 'knockdown', 'floor', 'get_up', 'dodge', 'celebrate']) {
+      expect(isDynamic(w, COMBAT_DYNAMIC), `${w} must NOT be dynamic`).toBe(false);
+    }
+  });
+
+  it('a strike is returned untouched however hard the body is moving', () => {
+    const strike = HOOPS_POSTURE.release;        // any authored beat-shaped pose will do
+    const p = dynamicPose(strike, sig({ lateralAccel: 9, longAccel: 8, speed01: 1 }), 'strike_heavy', COMBAT_DYNAMIC);
+    expect(p).toBe(strike);
+  });
+
+  it('board riding is dynamic; nothing in the air is', () => {
+    for (const w of ['cruise', 'push', 'carve', 'tuck']) expect(isDynamic(w, BOARD_DYNAMIC)).toBe(true);
+    for (const w of ['air', 'grab', 'spin', 'flip', 'grind', 'manual', 'land', 'bail', 'barrel']) {
+      expect(isDynamic(w, BOARD_DYNAMIC), `${w} must NOT be dynamic`).toBe(false);
+    }
+  });
+
+  it('each discipline refuses the OTHERS\' locomotion windows, so a set cannot leak', () => {
+    expect(isDynamic('carve', HOOPS_DYNAMIC)).toBe(false);
+    expect(isDynamic('dribble', BOARD_DYNAMIC)).toBe(false);
+    expect(isDynamic('strafe', BOARD_DYNAMIC)).toBe(false);
+    expect(isDynamic('cruise', COMBAT_DYNAMIC)).toBe(false);
+  });
+});
+
+describe('ANGULATION — a rider is not a plank on a hinge', () => {
+  const ride = HOOPS_POSTURE.drive;             // a pitch-only stance, which every board stance also is
+  const bank = (deg: number) => deg * Math.PI / 180;
+
+  it('the spine counter-angles AGAINST the board\'s bank — the opposite sign to the hoops lean', () => {
+    const p = angulate(ride, bank(20), 'carve');
+    expect(p.spine2[2]).toBeLessThan(0);        // board rolled +, spine comes back −
+    const other = angulate(ride, bank(-20), 'carve');
+    expect(other.spine2[2]).toBeGreaterThan(0);
+  });
+
+  it('it gives back MOST of the bank, not all — angulation is not a correction to vertical', () => {
+    const rootDeg = 20;
+    const p = angulate(ride, bank(rootDeg), 'carve');
+    const given = Math.abs(p.spine1[2] + p.spine2[2]);
+    expect(given).toBeGreaterThan(rootDeg * 0.3);
+    expect(given).toBeLessThan(rootDeg);
+  });
+
+  it('the upper back carries more of it than the lower', () => {
+    const p = angulate(ride, bank(20), 'carve');
+    expect(Math.abs(p.spine2[2])).toBeGreaterThan(Math.abs(p.spine1[2]));
+  });
+
+  it('it is capped, however far the board is laid over', () => {
+    const p = angulate(ride, bank(90), 'carve');
+    expect(Math.abs(p.spine1[2] + p.spine2[2])).toBeLessThanOrEqual(MAX_ANGULATION_DEG + 1e-6);
+  });
+
+  it('the head levels against the TOTAL tilt — the board AND the counter-angle', () => {
+    const p = angulate(ride, bank(20), 'carve');
+    expect(p.head[2]).not.toBe(ride.head[2]);
+    // the rider's eyes stay on the line whatever the board is doing
+    expect(Math.sign(p.head[2] - ride.head[2])).toBe(-1);
+  });
+
+  it('riding level changes nothing', () => {
+    const p = angulate(ride, 0, 'carve');
+    expect(p.spine1[2]).toBe(ride.spine1[2]);
+    expect(p.spine2[2]).toBe(ride.spine2[2]);
+  });
+
+  it('AIR IS UNTOUCHED — the trick clips own the body', () => {
+    for (const w of ['air', 'spin', 'flip', 'grab', 'grind', 'bail']) {
+      expect(angulate(ride, bank(20), w)).toBe(ride);
+    }
+  });
+
+  it('it never mutates the shared stance', () => {
+    const before = JSON.stringify(HOOPS_POSTURE.drive);
+    angulate(HOOPS_POSTURE.drive, bank(25), 'carve');
+    expect(JSON.stringify(HOOPS_POSTURE.drive)).toBe(before);
   });
 });

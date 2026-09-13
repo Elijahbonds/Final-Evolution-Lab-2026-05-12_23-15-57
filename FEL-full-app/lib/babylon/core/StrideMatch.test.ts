@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   HOOPS_STRIDE, RATE_MIN, RATE_MAX,
-  strideRate, strideKindFor, rateFor, StrideRateFilter,
+  strideRate, strideKindFor, rateFor, StrideRateFilter, combatRateFor, COMBAT_STRIDE,
 } from './StrideMatch';
 
 describe('one stride covers the ground the body covers', () => {
@@ -136,5 +136,60 @@ describe('the arithmetic that makes a foot stop skating', () => {
     const speed = 20;                                    // far past what the clip can stretch to
     const covered = HOOPS_STRIDE.run * strideRate(speed, HOOPS_STRIDE.run);
     expect(covered).toBeLessThan(speed);                 // a residue remains, by design
+  });
+});
+
+describe('combat strides, and the backwards-step trap', () => {
+  it('the guard step and the shuffles are rate-matched', () => {
+    expect(combatRateFor('walk', COMBAT_STRIDE.walk)).toBeCloseTo(1, 5);
+    expect(combatRateFor('strafe_left', COMBAT_STRIDE.strafe)).toBeCloseTo(1, 5);
+    expect(combatRateFor('strafe_right', COMBAT_STRIDE.strafe)).toBeCloseTo(1, 5);
+    expect(combatRateFor('dash', COMBAT_STRIDE.dash)).toBeCloseTo(1, 5);
+  });
+
+  it('A RETREAT KEEPS ITS NEGATIVE SIGN — the trap this function exists for', () => {
+    // walk_back is the guard step at speedRatio −1: the same cadence played BACKWARDS, because a fighter giving ground
+    // steps back rather than walking forward away from you. Returning a positive rate would make a retreating fighter
+    // walk FORWARD while travelling backwards — worse than the skate it is fixing.
+    const r = combatRateFor('walk_back', 2.5, -1);
+    expect(r).not.toBeNull();
+    expect(r as number).toBeLessThan(0);
+  });
+
+  it('and its MAGNITUDE still matches the speed, inside the band', () => {
+    // A guard step's reference is 0.6 m/s, so the linear band is roughly 0.33..1.11 m/s. Picked inside it: at 3.5 and
+    // 1.2 BOTH saturate at RATE_MAX and the magnitudes are equal, which is the combat residue, not a bug.
+    const fast = combatRateFor('walk_back', 1.0, -1) as number;
+    const slow = combatRateFor('walk_back', 0.5, -1) as number;
+    expect(Math.abs(fast)).toBeGreaterThan(Math.abs(slow));
+    expect(fast).toBeLessThan(0);
+    expect(slow).toBeLessThan(0);
+  });
+
+  it('COMBAT SATURATES at real fighting speeds — the residue is a budget, not a wiring bug', () => {
+    // A fighter's root moves ~3 m/s while a guard step strides ~0.6; covering that needs a rate near 5 and RATE_MAX is
+    // 1.85, deliberately, because a stance clip played five times over reads as a fast-forward rather than a fighter.
+    expect(Math.abs(combatRateFor('walk', 3.0) as number)).toBe(RATE_MAX);
+    expect(Math.abs(combatRateFor('strafe_left', 3.0) as number)).toBe(RATE_MAX);
+  });
+
+  it('a forward loop with no authored ratio stays positive', () => {
+    expect(combatRateFor('walk', 2.5) as number).toBeGreaterThan(0);
+  });
+
+  it('a shuffle is measured against a SHORTER step than a guard step, and a dash a longer one', () => {
+    expect(COMBAT_STRIDE.strafe).toBeLessThan(COMBAT_STRIDE.walk);
+    expect(COMBAT_STRIDE.dash).toBeGreaterThan(COMBAT_STRIDE.walk);
+  });
+
+  it('strikes, blocks, reactions and the floor are refused', () => {
+    for (const s of ['strike_light', 'strike_heavy', 'strike_finisher', 'block_hold', 'parry',
+      'react', 'knockdown', 'floor', 'get_up', 'dodge', 'idle']) {
+      expect(combatRateFor(s, 3), `${s} must not be rate-matched`).toBeNull();
+    }
+  });
+
+  it('an unknown combat state is refused, not scaled by default', () => {
+    expect(combatRateFor('some_state_added_next_year', 3)).toBeNull();
   });
 });

@@ -20,6 +20,7 @@ import { assertSpawned } from '../core/FrameGuard';
 import { BoardAnimTree } from '../anim/boardTree';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
+import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out of it
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
@@ -187,10 +188,16 @@ export const SurfBreakMode: ModeDefinition = (() => {
       posture?.dispose();
       posture = mountPostureLayer(ctx.scene, rig.char.skeleton, rig.char.root, () => {
         const { window, pose, legs } = boardPose(bio);
+        // ANGULATION. The ROOT already banks (boardBank, applied to root.rotation.z) but every authored board stance is
+        // [x, 0, 0] — pitch only — so today the whole body rolls as ONE RIGID PIECE. A real rider banks the board and
+        // keeps their upper body out of it; the spine counter-angles against the edge. Deliberately the OPPOSITE sign
+        // to the hoops bank: a basketball player rolls INTO the turn because nothing else is tilted, a rider's board
+        // is already over. Reads the root's own eased roll, so the counter-angle can never disagree with the bank.
+        const angled = angulate(pose, rig.char.root.rotation.z, window);
         // G1 on the wave: down the line, at head height — and in the barrel that IS out the end of the tube
         const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5);
         const at = new Vector3(la.x, la.y, la.z);
-        return { pose, legs, aim: at, eyes: at, window };
+        return { pose: angled, legs, aim: at, eyes: at, window };
       }, 'SURF-PP');
       if (process.env.NODE_ENV === 'development') {
         const dev = (window as unknown as { __FEL_DEV__?: { boardPosture?: unknown } }).__FEL_DEV__;

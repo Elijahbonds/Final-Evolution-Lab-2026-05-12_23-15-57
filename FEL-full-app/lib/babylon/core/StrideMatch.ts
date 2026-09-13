@@ -32,16 +32,20 @@ export interface StrideRef {
 /**
  * Reference speeds for the hoops clip set.
  *
- * These are the speeds the clips look correct at, not the speeds the modes move at — and `run` is CALIBRATED, not
- * guessed. Swept against the foot-slide probe in a live 1v1, reading a planted foot's travel as a fraction of the
- * body's:
+ * These are the speeds the clips look correct at, not the speeds the modes move at — and `run` is CALIBRATED against
+ * the foot-slide probe, as a planted foot's travel over the body's, in a live 1v1:
  *
- *     reference 3.0 m/s -> 55.7%      reference 4.2 m/s -> 29.9%      reference 5.4 m/s -> 47.7%
+ *     2.9 -> 39.2%     3.3 -> 31.5%     3.6 -> 31.5%     4.2 -> 33.9%     4.8 -> 35.2%
  *
- * 4.2 is a clear minimum of the three. Picking it by eye and leaving it would have been a coin flip between a
- * constant that helps and one that makes the skate worse, which is what reference 3.0 does.
+ * 3.6 is the floor (and the lowest absolute median of the pair) — though 3.3 and 3.6 are within run-to-run noise of
+ * each other, and a later run at 3.6 read 25.5%, so treat these as a band of roughly 25-32% rather than exact
+ * figures. Worth recording WHY this moved from the 4.2 that an
+ * earlier sweep picked: that sweep ran while the stride matcher was overwriting the alias's own rate instead of
+ * multiplying it, and `bball_dribble_run` is `['run', 0.9]`. Violating that 0.9 happened to read 29.9% — slightly
+ * better than this — but it was disobeying an authoring decision about how the run should look to win a metric.
+ * Honouring the alias and calibrating on top of it is the correct trade, and it costs about 1.5 points.
  */
-export const HOOPS_STRIDE: StrideRef = { run: 4.2, slide: 2.0 };
+export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0 };
 
 /**
  * Rate limits.
@@ -110,3 +114,53 @@ export class StrideRateFilter {
   set(rate: number): void { this.rate = rate; }
   get value(): number { return this.rate; }
 }
+
+// ── COMBAT ───────────────────────────────────────────────────────────────────────────────────────────────
+// The fighting tree has real locomotion loops — a guard step, two lock-on shuffles and a dash — and like the hoops
+// tree it plays them on a STATE CHANGE and never touches the rate again. Same skate, same fix.
+
+/**
+ * Authored speeds for the combat clip set.
+ *
+ * A guard step and a lock-on shuffle are TINY — a fighter's feet barely travel, which is the point of a stance. These
+ * are measured-order-of-magnitude figures, not guesses at a run: my first pass used 1.9 / 1.6, and doubling them moved
+ * the measured foot slide by 1.5 percentage points, because the references were the wrong SIZE rather than slightly
+ * off. See the note on combat's residue below.
+ */
+export const COMBAT_STRIDE = { walk: 0.6, strafe: 0.5, dash: 4.0 } as const;
+
+/**
+ * The rate for a combat state, PRESERVING THE SIGN of the clip's authored ratio.
+ *
+ * `walk_back` is the guard step played at speedRatio −1 — the same cadence, backwards, because a fighter giving ground
+ * steps back rather than walking forward away from you. A rate-matcher that returns a positive number would make a
+ * retreating fighter WALK FORWARD while travelling backwards, which is worse than the skate it is fixing.
+ */
+export function combatRateFor(state: string, speed: number, authoredRatio = 1): number | null {
+  let ref: number;
+  switch (state) {
+    case 'walk': case 'walk_back': ref = COMBAT_STRIDE.walk; break;
+    case 'strafe_left': case 'strafe_right': ref = COMBAT_STRIDE.strafe; break;
+    case 'dash': ref = COMBAT_STRIDE.dash; break;
+    default: return null;                      // strikes, blocks, reactions, the floor: choreography
+  }
+  const sign = authoredRatio < 0 ? -1 : 1;
+  return strideRate(speed, ref) * sign;
+}
+
+// ── WHY COMBAT STILL SLIDES, AND WHAT WOULD FIX IT ───────────────────────────────────────────────────────
+// Measured in a live karate_vs: the root travels 0.054 m per frame (~3.2 m/s) while a DOWN foot travels 0.037 — 69%.
+// Rate matching is reaching those frames: a dev counter showed the tree in a stride state on 95% of moving frames
+// (walk 1376, strafe_left 1392, strafe_right 725, walk_back 433, refused:idle 219). So the matcher works and the
+// residue is not a wiring bug.
+//
+// The residue is a BUDGET problem. A guard step covers on the order of half a metre per second of its own cadence; the
+// mode moves the root at ~3 m/s. Covering that needs a rate around 6, and RATE_MAX is 1.85 — deliberately, because a
+// stance clip played six times over stops reading as a fighter and starts reading as a fast-forward. So the honest
+// ceiling here is roughly a third of the gap, and the rest is not fixable by a playback rate:
+//
+//   · author a real stepping cycle for the fighting locomotion (the proper fix), or
+//   · move the root slower while a stance clip is the one playing.
+//
+// Recorded rather than tuned around, because raising RATE_MAX to "fix" the number would trade a skate for a
+// fast-forward, which is a worse-looking bug that is harder to name.

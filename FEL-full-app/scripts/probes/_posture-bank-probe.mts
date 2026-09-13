@@ -44,7 +44,7 @@ await p.evaluate(`(() => {
   const under = (n, root) => { for (let c = n; c; c = c.parent) if (c === root) return true; return false; };
   const node = (name) => scene.transformNodes.find((n) => bare(n.name) === name && (!hr || under(n, hr)));
   const S1 = node('Spine1'), S2 = node('Spine2'), HD = node('Head');
-  window.__PB = { bound: { s1: !!S1, s2: !!S2, hd: !!HD }, roll1: [], roll2: [], rollHead: [], frames: 0 };
+  window.__PB = { bound: { s1: !!S1, s2: !!S2, hd: !!HD }, roll1: [], roll2: [], rollHead: [], rootRoll: [], frames: 0 };
   const rollOf = (n) => {
     if (!n) return 0;
     // the bone's own euler z, which is the axis the stance triple's third slot writes
@@ -56,7 +56,9 @@ await p.evaluate(`(() => {
     window.__PB.roll1.push(rollOf(S1));
     window.__PB.roll2.push(rollOf(S2));
     window.__PB.rollHead.push(rollOf(HD));
-    if (window.__PB.roll1.length > 4000) { window.__PB.roll1.shift(); window.__PB.roll2.shift(); window.__PB.rollHead.shift(); }
+    // the ROOT's own roll: on a board this is boardBank's output, and angulation must be its OPPOSITE
+    window.__PB.rootRoll.push(hr ? hr.rotation.z : 0);
+    if (window.__PB.roll1.length > 4000) { window.__PB.roll1.shift(); window.__PB.roll2.shift(); window.__PB.rollHead.shift(); window.__PB.rootRoll.shift(); }
   });
   // HARD CUTS: full stick, reversing every ~700 ms. That is a real lateral acceleration, not a drift.
   let t = 0, dir = 1;
@@ -81,6 +83,19 @@ const pb = await p.evaluate(`(() => {
     bound: d.bound, frames: d.frames,
     s1SpanDeg: deg(span(d.roll1)), s2SpanDeg: deg(span(d.roll2)), headSpanDeg: deg(span(d.rollHead)),
     s1PeakDeg: deg(peak(d.roll1)), s2PeakDeg: deg(peak(d.roll2)),
+    rootSpanDeg: deg(span(d.rootRoll)), rootPeakDeg: deg(peak(d.rootRoll)),
+    // ANGULATION TEST: correlate the spine's roll against the ROOT's. Negative means the spine counter-angles.
+    corr: (() => {
+      const a = d.rootRoll, b = d.roll2;
+      const n = Math.min(a.length, b.length);
+      if (n < 30) return 0;
+      let ma = 0, mb = 0;
+      for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
+      ma /= n; mb /= n;
+      let num = 0, da = 0, db = 0;
+      for (let i = 0; i < n; i++) { const x = a[i] - ma, y = b[i] - mb; num += x * y; da += x * x; db += y * y; }
+      return da > 1e-12 && db > 1e-12 ? num / Math.sqrt(da * db) : 0;
+    })(),
   };
 })()`) as Record<string, unknown>;
 await p.evaluate('clearInterval(window.__PBI)');
@@ -88,5 +103,7 @@ console.log('mode: ' + MODE);
 console.log('bones bound: ' + JSON.stringify(pb.bound) + ' over ' + pb.frames + ' frames');
 console.log('SPINE ROLL swept (deg):  spine1 ' + Number(pb.s1SpanDeg).toFixed(2) + '  spine2 ' + Number(pb.s2SpanDeg).toFixed(2) + '  head ' + Number(pb.headSpanDeg).toFixed(2));
 console.log('peak |roll| (deg):       spine1 ' + Number(pb.s1PeakDeg).toFixed(2) + '  spine2 ' + Number(pb.s2PeakDeg).toFixed(2));
+console.log('ROOT roll swept (deg): ' + Number(pb.rootSpanDeg).toFixed(2) + '  peak ' + Number(pb.rootPeakDeg).toFixed(2));
+console.log('spine-vs-root correlation: ' + Number(pb.corr).toFixed(3) + '   (NEGATIVE = the spine counter-angles = angulation)');
 console.log('errors: ' + errors + (errs.length ? ' :: ' + errs.join(' | ') : ''));
 await b.close();

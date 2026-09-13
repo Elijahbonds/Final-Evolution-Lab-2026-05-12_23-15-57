@@ -32,10 +32,11 @@ import { CombatAnimTree, type CombatAnimInput, type CombatAnimState, type Strike
 // just been knocked off the platform spun to keep facing the winner while it fell.
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { combatPose, COMBAT_INPUT_IDLE, COMBAT_TURN_RATE, combatApproach, type CombatPostureInput } from '../core/CombatPosture';
+import { BodyMotion, dynamicPose, COMBAT_DYNAMIC } from '../core/DynamicPosture';   // footwork answers its MOTION
 import { lockOnYaw, strafeAxis, wrapYaw } from '../core/Biomech';
 import {
   FighterState, RivalFightBrain, resolveStrike, applyHit,
-  KARATE_ATTACKS, STAFF_ATTACKS, SPECIAL_ATTACK, CHI_MAX, PARRY_STAGGER_SEC,
+  KARATE_ATTACKS, STAFF_ATTACKS, SPECIAL_ATTACK, CHI_MAX, GUARD_MAX, PARRY_STAGGER_SEC,
   STEP_CHI_GAIN, type AttackDef,
 } from '../core/FightCore';
 import { SoundKit } from '../audio/SoundKit';
@@ -98,10 +99,15 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let mePosture: { layer: PostureLayer; dispose(): void } | null = null, foePosture: { layer: PostureLayer; dispose(): void } | null = null;
   const meBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE }, foeBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE };
   const chestOf = (c: SpawnedCharacter): Vector3 => c.root.position.add(new Vector3(0, 1.32, 0));
-  const feedFor = (bio: CombatPostureInput, foe: () => SpawnedCharacter) => {
+  // DYNAMIC POSTURE for the footwork — the same layer and the same allowlist as Karate VS, so a circling body leans
+  // the same way in both. The ring-out matters here: a fighter backing toward the edge should LOOK like it.
+  const meMotion = new BodyMotion();
+  const foeMotion = new BodyMotion();
+  const feedFor = (bio: CombatPostureInput, foe: () => SpawnedCharacter, motion: BodyMotion, exertion: number) => {
     const { window, pose, legs } = combatPose(bio);
     const at = chestOf(foe());
-    return { pose, legs, aim: at, eyes: at, window };
+    const dyn = dynamicPose(pose, motion.signals(bio.speed01, exertion, false), window, COMBAT_DYNAMIC);
+    return { pose: dyn, legs, aim: at, eyes: at, window };
   };
   // ── A+ P0 juice (PM brief COMBAT-A-PLUS-P0, 2026-09-06): ONE thud per connect (feel.impact plays its own — the SoundKit
   // impact that stacked on it is gone), a latched hit-stop + shake on heavy / special, a soft round-win beat and a latched
@@ -245,11 +251,15 @@ export const MixedCombatMode: ModeDefinition = (() => {
       striking: f.strike?.weight ?? null, strikeClip: f.strike?.clip,
       blocking: s.blockHeld, parryFlash: t < f.parryUntil, guardImpactFlash: t < f.impactUntil,
       hitBy: t < f.hitUntil ? f.hitBy : null, down: t < f.downUntil, out: f.out, falling: f.falling, ulting: false, celebrating: t < f.celebrateUntil,
+      speedMps: Math.hypot(vel.x, vel.z),   // STRIDE MATCHING: real ground speed, not the normalised one
     };
   }
   /** Once per frame, both fighters, every phase (a ring-out victim falls, the loser holds the floor, the winner celebrates). */
   function animate(mySpeed01: number, foeSpeed01: number, myVel = Vector3.Zero(), foeVel = Vector3.Zero()): void {
     if (!meAnim || !foeAnim) return;
+    const dt = 1 / 60;
+    if (player) meMotion.update(myVel.x, myVel.z, player.root.rotation.y, dt);
+    if (rival) foeMotion.update(foeVel.x, foeVel.z, rival.root.rotation.y, dt);
     meAnim.tree.update(treeInput(meAnim, meState, mySpeed01, myLoadout === 'staff', true, myVel));
     foeAnim.tree.update(treeInput(foeAnim, foeState, foeSpeed01, foeLoadout() === 'staff', false, foeVel));
   }
@@ -516,8 +526,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
       meAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(true); };
       foeAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(false); };
       mePosture?.dispose(); foePosture?.dispose();
-      mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => feedFor(meBio, () => rival), 'MC-PP');
-      foePosture = mountPostureLayer(ctx.scene, rival.skeleton, rival.root, () => feedFor(foeBio, () => player), 'MC-PP-FOE');
+      mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => feedFor(meBio, () => rival, meMotion, 1 - meState.guard / GUARD_MAX), 'MC-PP');
+      foePosture = mountPostureLayer(ctx.scene, rival.skeleton, rival.root, () => feedFor(foeBio, () => player, foeMotion, 1 - foeState.guard / GUARD_MAX), 'MC-PP-FOE');
       if (process.env.NODE_ENV === 'development') {
         const dev = (window as unknown as { __FEL_DEV__?: { combatPosture?: unknown } }).__FEL_DEV__;
         if (dev) dev.combatPosture = { me: () => mePosture?.layer.get() ?? null, foe: () => foePosture?.layer.get() ?? null, bio: () => ({ me: { ...meBio }, foe: { ...foeBio } }), aim: () => { const a = chestOf(rival); return { x: a.x, y: a.y, z: a.z }; } };   // BIOMECH-WAVE2 probes

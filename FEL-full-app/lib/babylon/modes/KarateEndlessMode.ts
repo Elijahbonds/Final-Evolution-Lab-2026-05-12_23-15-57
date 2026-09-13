@@ -66,6 +66,7 @@ import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 //          rigs a wave is not a budget this layer belongs in, and their read is the WIND-UP silhouette, not the chest).
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { combatPose, COMBAT_INPUT_IDLE, type CombatPostureInput } from '../core/CombatPosture';
+import { BodyMotion, dynamicPose, COMBAT_DYNAMIC } from '../core/DynamicPosture';   // footwork answers its MOTION
 import { slewYaw, wrapYaw } from '../core/Biomech';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
@@ -220,6 +221,12 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   const vitals = new PlayerVitals();
   const slowmo = new SlowMoLatch();
   const combo = new ComboTracker();
+  /** DYNAMIC POSTURE for the hero's footwork. A horde mode is ALL circling — you are always moving around bodies —
+   *  so a flat, unbanked body is most of what the mode looks like. Exertion comes off the vitals: a fighter deep in a
+   *  wave on low health carries himself like it. */
+  const meMotion = new BodyMotion();
+  /** The hero's planar speed in m/s this frame, for stride matching (animate() is handed normalised speeds only). */
+  let myMps = 0;
   // ROUTES IN A HORDE. The duel modes pay a route off in DAMAGE, which is meaningless here: Endless is one solid
   // strike = one body down, by owner lock, so there is no damage to multiply. The horde's currency is how many
   // bodies you clear, so a completed route pays off in REACH AND ARC — the ender becomes a crowd move. That is
@@ -699,6 +706,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     if (pStrike && t > pStrike.until) pStrike = null;
     const mine: CombatAnimInput = {
       speed01: blocking || myDown.downed ? 0 : mySpeed01, dashing: false, hasWeapon: false,
+      speedMps: blocking || myDown.downed ? 0 : myMps,   // STRIDE MATCHING: real ground speed
       striking: myStrike?.weight ?? null, strikeClip: myStrike?.clip,
       blocking, dodging, dodgeClip, parryFlash: false, guardImpactFlash: t < impactUntil,
       hitBy: t < hitUntil ? hitWeight : null, down: myDown.downed, out: outFlag, ulting: false,
@@ -797,7 +805,13 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // objective), the eyes go with it. No horde body gets a layer — see the header.
       mePosture?.dispose(); partnerPosture?.dispose();
       const chestOfNearest = (from: Vector3): Vector3 | null => { const n = nearest(from); return n ? n.mob.char.root.position.add(new Vector3(0, 1.32, 0)) : null; };
-      mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => { const { window, pose, legs } = combatPose(meBio); const at = chestOfNearest(player.root.position); return { pose, legs, aim: at, eyes: at, window }; }, 'KE-PP');
+      mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => {
+        const { window, pose, legs } = combatPose(meBio);
+        const at = chestOfNearest(player.root.position);
+        const spent = 1 - Math.max(0, Math.min(1, vitals.hp / VITALS.maxHp));
+        const dyn = dynamicPose(pose, meMotion.signals(meBio.speed01, spent, false), window, COMBAT_DYNAMIC);
+        return { pose: dyn, legs, aim: at, eyes: at, window };
+      }, 'KE-PP');
       partnerPosture = mountPostureLayer(ctx.scene, partner.skeleton, partner.root, () => { const { window, pose, legs } = combatPose(pBio); const at = chestOfNearest(partner.root.position); return { pose, legs, aim: at, eyes: at, window }; }, 'KE-PP-ALLY');
       faceTarget = null;
       meTree.onSettle = (st) => {
@@ -947,6 +961,10 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // The basis LATCHES while the stick is held (the over-shoulder camera swings behind every turn — a live basis
       // spun the fighter on the spot on a held stick-right: 0.26 m/s net, measured); a push runs straight.
       const vel = ctx.camDirector.stickWorldLatched(stickX, stickY).scaleInPlace(3 * perks.speedMult);
+      // the posture tracker: resolved in the fighter's own frame, so circling a body reads as a bank and backing off
+      // a swing reads as sitting back
+      meMotion.update(vel.x, vel.z, player.root.rotation.y, dt);
+      myMps = Math.hypot(vel.x, vel.z);
       let mySpeed01 = Math.min(1, vel.length() / (3 * perks.speedMult));   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
       if (!striking && !blocking && !dodging && !myDown.downed && vel.lengthSquared() > 0.05) {   // the shop never freezes the feet: the ring is empty, the drops are yours to walk over
         const before = player.root.position.clone();

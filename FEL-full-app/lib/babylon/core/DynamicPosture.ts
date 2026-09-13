@@ -80,24 +80,50 @@ const unit = (v: number, full: number): number => clamp(v / full, -1, 1);
  * knockdown are choreography, paced to a meter or a clock, and they are left alone. The dunk's runway is in
  * ('stance'); the dunk's flight is not.
  */
-export const DYNAMIC_WINDOWS: ReadonlySet<string> = new Set([
-  // hoops locomotion
+export const HOOPS_DYNAMIC: ReadonlySet<string> = new Set([
+  // hoops locomotion. 'spin' here is the PIVOT — a planted turn, which is locomotion.
   'idle', 'run', 'dribble', 'drive', 'protect', 'defend', 'slide', 'post', 'spin', 'footwork',
   // the dunk runway
   'stance',
 ]);
 
-/** Is this window the layer's to modulate? */
-export function isDynamic(window: string): boolean { return DYNAMIC_WINDOWS.has(window); }
+/**
+ * Combat locomotion: the footwork a fighter does between strikes.
+ *
+ * Every strike, block, parry, react, knockdown and get-up is choreography — a strike's lean is the authored shape of
+ * that strike, and modulating it would make a jab pitch forward by however fast the body happened to be moving.
+ */
+export const COMBAT_DYNAMIC: ReadonlySet<string> = new Set([
+  'idle', 'guard', 'advance', 'strafe', 'retreat',
+]);
+
+/**
+ * Board locomotion: riding, and nothing in the air.
+ *
+ * THIS IS WHY THE ALLOWLIST IS A PARAMETER. 'spin' means two different things: in hoops it is a planted PIVOT and is
+ * locomotion; on a board it is an AIR SPIN and is choreography. One shared set would have started modulating board
+ * air tricks the moment combat and boards were added — the collision is the argument.
+ */
+export const BOARD_DYNAMIC: ReadonlySet<string> = new Set([
+  'idle', 'cruise', 'push', 'carve', 'tuck',
+]);
+
+/** The hoops set, which was the first one. Kept as the default so existing callers read the same. */
+export const DYNAMIC_WINDOWS = HOOPS_DYNAMIC;
+
+/** Is this window the layer's to modulate, against a given discipline's set? */
+export function isDynamic(window: string, allow: ReadonlySet<string> = HOOPS_DYNAMIC): boolean {
+  return allow.has(window);
+}
 
 /**
  * Modulate an authored stance with what the body is actually doing.
  *
  * Returns a NEW pose; the table is never mutated, because it is shared by every body on the floor.
  */
-export function dynamicPose(base: PosturePose, s: BodySignals, window = 'run'): PosturePose {
+export function dynamicPose(base: PosturePose, s: BodySignals, window = 'run', allow: ReadonlySet<string> = HOOPS_DYNAMIC): PosturePose {
   // anything that is not locomotion is returned untouched: one owner per bone
-  if (!isDynamic(window) || s.airborne) return base;
+  if (!isDynamic(window, allow) || s.airborne) return base;
 
   const sp = clamp(s.speed01, 0, 1);
   const ex = clamp(s.exertion, 0, 1);
@@ -177,4 +203,40 @@ export class BodyMotion {
 
   /** A teleport (a reset, a check-up) must not read as an enormous acceleration. */
   reset(): void { this.vx = 0; this.vz = 0; this.haveVel = false; this.latAcc = 0; this.longAcc = 0; }
+}
+
+// ── ANGULATION — the board half of the ask ───────────────────────────────────────────────────────────────
+// Boards are the one discipline that ALREADY banks: BoardPosture.boardBank rolls the ROOT up to 22 degrees, and it is
+// driven by the rider's lean rather than the yaw rate, which is right (a slow pivot has no lean in it).
+//
+// What is missing is ANGULATION. A real rider banks the BOARD and keeps their upper body more upright than it — the
+// spine counter-angles against the edge, which is the difference between a snowboarder and a plank on a hinge. Every
+// authored board stance is [x, 0, 0], so nothing counter-angles today: the whole body rolls as one rigid piece.
+//
+// So this is deliberately the OPPOSITE sign to the hoops bank. A cutting basketball player rolls their chest INTO the
+// turn because nothing else is tilted; a rider's board is already over, so their chest comes BACK out of it.
+
+/** How much of the root's bank the spine gives back. Real angulation is most of it, not all. */
+export const ANGULATION = 0.55;
+/** Anatomical cap on the counter-angle, degrees. */
+export const MAX_ANGULATION_DEG = 16;
+
+/**
+ * Counter-angle a board stance against the root's bank.
+ *
+ * `rootBankRad` is what boardBank() returned for this frame — positive rolling one way, negative the other. The spine
+ * takes the opposite sign, split across the thoracic bones with the upper carrying more, and the head comes back level
+ * on top of that, because a rider's eyes stay on the line whatever the board is doing.
+ */
+export function angulate(base: PosturePose, rootBankRad: number, window: string): PosturePose {
+  if (!isDynamic(window, BOARD_DYNAMIC)) return base;
+  const deg = -(rootBankRad * 180 / Math.PI) * ANGULATION;
+  const capped = Math.max(-MAX_ANGULATION_DEG, Math.min(MAX_ANGULATION_DEG, deg));
+  return {
+    ...base,
+    spine1: [base.spine1[0], base.spine1[1], base.spine1[2] + capped * 0.4],
+    spine2: [base.spine2[0], base.spine2[1], base.spine2[2] + capped * 0.6],
+    // the head levels against the TOTAL tilt — the board's bank plus the counter-angle the spine just added
+    head: [base.head[0], base.head[1], base.head[2] - (rootBankRad * 180 / Math.PI + capped) * HEAD_LEVEL],
+  };
 }

@@ -155,6 +155,20 @@ export class CharacterAnimator {
     if (g?.isPlaying) g.speedRatio = speedRatio;
   }
 
+  /**
+   * Scale a playing clip's rate RELATIVE to what the alias authored — for stride matching.
+   *
+   * setSpeed() sets the group's ratio outright, which quietly DISCARDS the alias's own multiplier: play() computes
+   * `speedRatio * r.speedRatio`, and `bball_dribble_run` is `['run', 0.9]`. A stride matcher calling setSpeed(clip, 1)
+   * was therefore playing that loop 11% faster than the alias asked for, every frame, and the calibration on top of it
+   * was silently compensating. This multiplies instead, so an alias's authored rate survives.
+   */
+  setPlaybackScale(name: string, scale: number): void {
+    const r = resolveClip(name, this.clipNames);
+    const g = this.groups.get(r.clip);
+    if (g?.isPlaying) g.speedRatio = scale * r.speedRatio;
+  }
+
   stopAll(fadeToIdle = 'idle_stand'): void {
     this.play(fadeToIdle, { loop: true, fadeSec: 0.2 });
   }

@@ -18,6 +18,7 @@
 // floor after a knockdown until the mode lets the fighter rise, and rises through the get-up before any standing state.
 
 import type { CharacterAnimator } from './CharacterAnimator';
+import { combatRateFor, StrideRateFilter } from '../core/StrideMatch';
 
 export type StrikeWeight = 'light' | 'medium' | 'heavy' | 'finisher';
 
@@ -31,6 +32,9 @@ export type CombatAnimState =
 
 export interface CombatAnimInput {
   speed01: number;
+  /** The body's PLANAR SPEED in m/s, for stride matching. speed01 is normalised and cannot pace a stride.
+   *  Optional: a mode that has not been wired keeps the old fixed cadence. */
+  speedMps?: number;
   /** BIOMECH-WAVE2 (2026-09-09) G2: which way the feet are actually going, relative to the FACING — −1 stepping left,
    *  +1 right, 0 forward-or-back (Biomech.strafeAxis). A lock-on duel spends most of a round travelling sideways and
    *  the only loco this tree had was the forward `karate_guard_step`. 0 (the default) keeps the old behaviour. */
@@ -151,6 +155,10 @@ export class CombatAnimTree {
   private lastInput: CombatAnimInput | null = null;
   /** Fires when a one-shot ENDS on its own (never when the tree cut it) — the mode clears its strike / beat here. */
   onSettle: ((state: CombatAnimState) => void) | null = null;
+  /** Stride matching: the rate for the loop that is running, smoothed so a cadence never stutters. */
+  private strideFilter = new StrideRateFilter();
+  private strideClip: string | null = null;
+  private strideAuthored = 1;
   constructor(private animator: CharacterAnimator) {}
   get state(): CombatAnimState | null { return this.current; }
   update(input: CombatAnimInput): CombatAnimState {
@@ -163,6 +171,19 @@ export class CombatAnimTree {
     if (cur === 'floor' && isReact(c.state)) c = pick('floor');                                // a flinch on the floor stays on the floor
     if (cur && FLOOR_FAMILY.has(cur) && cur !== 'get_up' && !FLOOR_FAMILY.has(c.state)) c = pick('get_up');   // the floor is left through the get-up
     if (c.state !== cur) this.enter(c);
+    // STRIDE MATCHING, every frame. Set on the RUNNING animation, never through play(): the state-change guard above is
+    // what keeps this tree stable, and a per-frame play() would restart the clip every frame.
+    if (this.strideClip && input.speedMps !== undefined) {
+      const want = combatRateFor(c.state, input.speedMps, this.strideAuthored);
+      if (want !== null) this.animator.setPlaybackScale(this.strideClip, this.strideFilter.step(want, 1 / 60));
+      // dev diagnostic: how often a MOVING fighter is actually in a stride state at all
+      if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && input.speedMps > 0.4) {
+        const w = window as unknown as { __KVS_STRIDE?: Record<string, number> };
+        w.__KVS_STRIDE ??= {};
+        const key = want === null ? `refused:${c.state}` : `matched:${c.state}`;
+        w.__KVS_STRIDE[key] = (w.__KVS_STRIDE[key] ?? 0) + 1;
+      }
+    }
     return c.state;
   }
   private enter(c: CombatClipChoice): void {
@@ -178,6 +199,12 @@ export class CombatAnimTree {
     } : undefined;
     const opts = { loop: c.loop, fadeSec: c.fadeSec, ...(c.speedRatio === undefined ? {} : { speedRatio: c.speedRatio }) };
     this.animator.play(c.clip, onEnd ? { ...opts, onEnd } : opts);
+    // remember what this loop was authored at, so stride matching can scale it while KEEPING ITS SIGN (walk_back is
+    // the guard step at −1: the same cadence played backwards)
+    this.strideAuthored = c.speedRatio ?? 1;
+    this.strideClip = c.loop ? c.clip : null;
+    const r0 = combatRateFor(st, this.lastInput?.speedMps ?? 0, this.strideAuthored);
+    if (r0 !== null) this.strideFilter.set(r0);
     this.current = st;
   }
   /** One-beat states must be re-playable: call when the beat ends or a NEW beat of the same kind lands. */
