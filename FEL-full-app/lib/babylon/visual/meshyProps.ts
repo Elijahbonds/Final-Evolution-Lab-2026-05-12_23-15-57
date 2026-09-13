@@ -81,6 +81,8 @@ export async function dressHoop(scene: Scene, venueRoot: TransformNode): Promise
   return n;
 }
 
+import { BALL_SKINS, readBallSkin, hexToRgb01 } from '../nexus/ballSkins';
+
 const BALL_KEY: Record<BallKind, MeshyPropKey | null> = { basketball: 'ball-basketball', soccer: 'ball-soccer', tennis: 'ball-tennis', volleyball: null };
 
 /** The Meshy ball for a mode's ball diameter — soccer 0.22, basketball 0.24, tennis ≤ 0.07; anything else keeps its sphere. */
@@ -98,6 +100,26 @@ export async function dressBall(ball: AbstractMesh, kind: BallKind | null): Prom
   if (!key) return false;
   const root = await spawnMeshyProp(ball.getScene(), key, ball, `meshy_${key}`);
   if (!root || ball.isDisposed()) { root?.dispose(); return false; }
+  // THE PLAYER'S BALL. Picked on the boot splash beside the court (ballSkins.ts) and applied here, by
+  // re-tinting the baked mesh rather than fetching another one — so every skin is free at runtime and
+  // nothing on that screen can 404. A cosmetic must never be the thing that breaks a mode, so the whole
+  // application is wrapped: a bad skin leaves the classic leather and the game carries on.
+  try {
+    const skin = BALL_SKINS[readBallSkin()];
+    if (skin && skin.id !== 'classic') {
+      const { r, g, b } = hexToRgb01(skin.tint);
+      for (const m of root.getChildMeshes()) {
+        const mat = m.material as { albedoColor?: { set: (r: number, g: number, b: number) => void }; diffuseColor?: { set: (r: number, g: number, b: number) => void }; emissiveColor?: { set: (r: number, g: number, b: number) => void } } | null;
+        if (!mat) continue;
+        mat.albedoColor?.set(r, g, b);
+        mat.diffuseColor?.set(r, g, b);
+        // the glow is what makes a loud ball read as loud under the court lights
+        mat.emissiveColor?.set(r * skin.glow, g * skin.glow, b * skin.glow);
+      }
+      (ball.metadata ??= {} as Record<string, unknown>).felBallSkin = skin.id;
+      console.info(`[FEL-BALL] skin ${skin.id}`);
+    }
+  } catch (e) { console.warn('[FEL-BALL] skin not applied', (e as Error)?.message ?? e); }
   // the baked ball is real diameter; the sphere's own diameter may differ by mode — match it
   const d = ball.getBoundingInfo().boundingBox.extendSizeWorld.x * 2 / (ball.scaling.x || 1);
   const baked = { basketball: 0.24, soccer: 0.22, tennis: 0.067, volleyball: 0.21 }[kind];

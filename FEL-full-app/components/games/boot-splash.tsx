@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import type { ModePhase } from '@/lib/babylon';
 import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
+import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 
 // M37 E12 FIX: venue slugs resolve to PROCEDURAL canvas thumbnails (venueThumbs)
 // instead of /img/venues/*.jpg files that 404 on every mode route.
@@ -44,6 +45,14 @@ export function BootSplash(props: {
     // the venue mounts when the mode loads, so a new pick reloads the route with the pick in the URL
     const u = new URL(window.location.href); u.searchParams.set('location', id); window.location.assign(u.toString());
   };
+  // The BALL pick lives on THIS screen, beside the map pick — the owner asked for one screen that covers
+  // where you are playing and what you are playing with, and a second screen for a cosmetic would be worse
+  // than no picker. Unlike the location it needs no reload: the ball is dressed when the mode builds it, and
+  // the mode reads the pick then, so remembering it is enough.
+  const [ball, setBall] = useState<BallSkinId>('classic');
+  useEffect(() => { if (isCourt) setBall(readBallSkin()); }, [isCourt]);
+  const pickBall = (id: BallSkinId) => { if (id === ball) return; writeBallSkin(id); setBall(id); };
+
   const [inserted, setInserted] = useState(false);
   // Procedural venue art generated client-side (no network request, no 404).
   const [art, setArt] = useState<string | null>(null);
@@ -107,6 +116,25 @@ export function BootSplash(props: {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {isCourt && (props.phase === 'ready' || props.phase === 'loading') && readyBallSkins().length > 1 && (
+          <div className="mt-2 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">BALL</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {readyBallSkins().map((b) => (
+                <button key={b.id} type="button" onClick={() => pickBall(b.id)} title={b.sub}
+                  aria-label={`${b.label} — ${b.sub}`} aria-pressed={b.id === ball}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${b.id === ball ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={b.id === ball ? { background: b.tint, borderColor: b.tint } : { borderColor: `${b.tint}88` }}>
+                  <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ background: b.tint2 ? `linear-gradient(135deg, ${b.tint}, ${b.tint2})` : b.tint, boxShadow: `0 0 6px ${b.tint}aa` }} />
+                  {b.label}
+                </button>
+              ))}
+            </div>
+            <p className="max-w-[22rem] text-[9px] leading-tight tracking-wide text-white/40">{BALL_SKINS[ball].sub}</p>
           </div>
         )}
 
