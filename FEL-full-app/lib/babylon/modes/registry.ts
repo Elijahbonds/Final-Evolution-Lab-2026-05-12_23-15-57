@@ -29,6 +29,7 @@ import { BigAirMode } from './AirSessionMode'; // shared AirSessionCore (big air
 import { FreeRunMode } from './FreeRunMode';    // A+ mission #10: free-running tricking replaces the gymnastics vault
 import { SprintMode } from './SprintMode';
 import { WhoSceneItMode } from './WhoSceneItMode';   // lane 3 W1 — the live venue quiz
+import { BrainBrawlMode } from './BrainBrawlMode';   // A+ mission #11 — the trivia deck as a party mode
 
 export const MODES: Record<string, ModeDefinition> = {
   // P3–P4 proof mode — shipped and playtested FIRST
@@ -74,6 +75,17 @@ export const MODES: Record<string, ModeDefinition> = {
   dance: DanceMode,
   // Lane 3 W1 (2026-09-06): Who Scene It as a live mode — the question's venue mounts behind the card
   who_scene_it: WhoSceneItMode,
+  // A+ mission #11 — the trivia deck as a Babylon party mode.
+  //
+  // REGISTERED 2026-09-13 because it never was. BrainBrawlMode shipped with modeId 'brainbrawl' and
+  // components/games/brainbrawl-babylon.tsx calls runMode(MODES.brainbrawl, …) — which was UNDEFINED, so
+  // that host would have thrown the moment anything mounted it. Nothing does today (the player route still
+  // serves the 2D deck), so the mode was simply unreachable work rather than a live crash.
+  //
+  // In MODES, deliberately NOT in ENABLED_BABYLON_MODES: registering makes it reachable from /dev/mode and
+  // makes its own host valid, while whether players get the Babylon version instead of the deck stays an
+  // owner call rather than something a registry edit decides by accident.
+  brainbrawl: BrainBrawlMode,
 };
 
 /** Modes proven safe to serve on Babylon right now (dunk = the gate; karate +
