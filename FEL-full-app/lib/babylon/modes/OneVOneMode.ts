@@ -1305,6 +1305,15 @@ export const OneVOneMode: ModeDefinition = (() => {
     const defenderPos = foeStunSec > 0 ? null : foe.root.position;
     const c = contestDrive(from, landing, defenderPos, defenderPos ? foeVelLast : null, kind);
     driveContest = c;
+    // OFF THE BACKBOARD. The off-glass throw existed only in the dunk contest (DunkLob.glassLobVelocity) even
+    // though 1v1 already has the square's geometry — BOARD_NORMAL, bankPoint, inBankBand and the glass button
+    // that routes a bank SHOT. So the one thing missing was routing a DUNK through it. Hold the glass button
+    // into the takeoff from the bank band and the ball is thrown off the square and caught at the iron: a
+    // self-pass, which is what an off-the-backboard dunk actually is.
+    const glassDunk = !!meSlot.intent.glass && inBankBand(me.root.position, RIM_FLOOR, BOARD_NORMAL)
+      ? bankPoint(me.root.position, RIM, BOARD_NORMAL)
+      : null;
+    if (glassDunk) { releaseBall(ball); bannerFlash(ctx, 'OFF THE GLASS!', 700); console.info('[1V1-GLASS] off-the-backboard dunk armed'); }
     console.info(`[1V1-CONTACT] drive contest ${kind} contested ${c.contested} t ${c.t.toFixed(2)} lateral ${c.lateral.toFixed(2)} set ${c.set} pct ${c.pct.toFixed(2)}`);
     let made = Math.random() < c.pct;
     let swatted = false;
@@ -1356,6 +1365,12 @@ export const OneVOneMode: ModeDefinition = (() => {
       // the victim goes down once the ball is past him — held through the rise, released at the FLUSH, so the
       // fall lands after the ball is through rather than at the moment of contact
       if (posterVictim && k >= POSTER_RELEASE_K) posterVictimRelease(ctx);
+      // the self-pass: out to the square on the way up, back to the iron to meet the hand
+      if (glassDunk) {
+        const g = Math.min(1, k / 0.55);
+        if (k < 0.55) ball.position.copyFrom(Vector3.Lerp(from.add(new Vector3(0, 1.2, 0)), glassDunk, g));
+        else ball.position.copyFrom(Vector3.Lerp(glassDunk, RIM, Math.min(1, (k - 0.55) / 0.35)));
+      }
       if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
         // G6: the slam resolves AT THE IRON — the ball leaves the hand at the rim; a make flushes through the net, a miss
         // clanks off the front (it used to let go on the feet-down frame, from a hand at hip height, and float there)

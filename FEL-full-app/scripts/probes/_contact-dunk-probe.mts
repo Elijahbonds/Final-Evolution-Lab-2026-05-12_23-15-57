@@ -19,7 +19,7 @@ const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
 const hits: string[] = []; let errors = 0;
 p.on('console', (m) => {
   const x = m.text();
-  if (/\[1V1-CONTACT\]/.test(x)) hits.push(x);
+  if (/\[1V1-(CONTACT|GLASS)\]/.test(x)) hits.push(x);
   if (m.type() === 'error' && !/401 \(Unauthorized\)/.test(x)) errors++;
 });
 p.on('pageerror', (e) => { errors++; console.log('PAGEERROR', e.message.slice(0, 170)); });
@@ -64,10 +64,12 @@ for (let i = 0; i < ATTEMPTS; i++) {
   // RUN UP with the stick held: the dribble controller integrates its own velocity, so the drive-dunk
   // speed minimum is only met by actually accelerating into the ring.
   await p.waitForTimeout(700);
-  // squeeze the shot: inside the shot-start branch checkDriveDunk turns this into the dunk
-  await p.evaluate(`(() => { const b = window.__PAD.buttons; b[7] = { pressed: true, touched: true, value: 1 }; window.__PAD.timestamp = performance.now(); })()`);
+  // squeeze the shot: inside the shot-start branch checkDriveDunk turns this into the dunk.
+  // On alternate attempts HOLD R1 (the glass button) into the takeoff: that is the off-the-backboard dunk.
+  const glass = i % 2 === 1;
+  await p.evaluate(`(() => { const b = window.__PAD.buttons; b[5] = { pressed: ${glass}, touched: ${glass}, value: ${glass ? 1 : 0} }; b[7] = { pressed: true, touched: true, value: 1 }; window.__PAD.timestamp = performance.now(); })()`);
   await p.waitForTimeout(90);
-  await p.evaluate(`(() => { const b = window.__PAD.buttons; b[7] = { pressed: false, touched: false, value: 0 }; window.__PAD.timestamp = performance.now(); })()`);
+  await p.evaluate(`(() => { const b = window.__PAD.buttons; b[7] = { pressed: false, touched: false, value: 0 }; b[5] = { pressed: false, touched: false, value: 0 }; window.__PAD.timestamp = performance.now(); })()`);
   await p.waitForTimeout(3200);   // the flight, the flush, the fall
   await p.evaluate(`(() => { window.__PAD.axes[0] = 0; window.__PAD.axes[1] = 0; window.__PAD.timestamp = performance.now(); })()`);
 }
@@ -81,5 +83,6 @@ for (const h of hits.slice(0, 18)) console.log('  ' + h);
 console.log('kinds: ' + JSON.stringify(Object.fromEntries(kinds)));
 console.log('planted chest-to-chest: ' + hits.filter((h) => /planted chest to chest/.test(h)).length);
 console.log('victims went down: ' + hits.filter((h) => /victim goes down/.test(h)).length);
+console.log('off-the-backboard dunks: ' + hits.filter((h) => /off-the-backboard/.test(h)).length);
 console.log('errors: ' + errors);
 await b.close();
