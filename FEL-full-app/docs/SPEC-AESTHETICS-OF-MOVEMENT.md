@@ -102,3 +102,23 @@ The court/venue splash picker already exists (Venice + Blossom Park / Orbit / Ca
 Meshy ball exports are already in-game (hoop / balls / decks / hoopbus via the bake-prop pipeline). So
 this is a picker extension plus asset wiring, not new tech: put ball selection on the SAME screen as
 the map so one choice-screen covers both, and surface the rainbow balls and the hoopbus.
+
+## Status at the end of the 2026-09-12 run
+
+Everything in the queue above was built. What was VERIFIED in a running mode, and what was not:
+
+| Item | State |
+|---|---|
+| Rim bounce / readable misses | DONE, proven live in 1v1, 3v3 and 3PT |
+| Rebounds, ball-body collisions, putbacks | DONE, proven live (`tipped off foe1`, chest-to-chest plants) |
+| Ref + handbook | DONE; `out_of_bounds` proven live. Three-seconds wired + unit-tested, NOT seen firing |
+| Handle / chains / ankle breakers | DONE, proven live: baseline chain depth 2 vs max 4, hard break floors the defender |
+| Triple threat + spin gathers | DONE, proven live; jab odds decay 0.64 -> 0.35 within a possession |
+| Contact dunks (body bag, chest to chest) | DONE, proven live via a probe seam |
+| Off-the-backboard dunk | DONE, proven live (2 of 2 glass-held attempts) |
+| Placeholder-body audit | CLEAN, and now guarded by a test |
+| Ball picker on the map screen | DONE; skin proven applied live. Picker UI NOT seen rendering (auth wall + a pre-existing WebGL error on the only ungated route) |
+| Fighter style / routes (karate_vs, mixedcombat) | DONE; TRIPLE (3-step) proven live in mixedcombat |
+| Aero Aces | BUILT + enabled; flies, gate passed. Full course NOT completed by the autopilot |
+| Velocity Kart | BUILT + enabled; drives, drifts, 100% boost, TWO LAPS completed |
+| Karate Endless routes | NOT ported — it is a horde mode on NeoCombatCore with its own combo tracker; folding it into the duel vocabulary is a rewrite, not a port |
