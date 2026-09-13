@@ -172,6 +172,30 @@ return {
     ctx.camDirector.snapTo(flight.pos, null);
     tintRings();
     say(`${course.name} — ${course.sub}`, 2.2);
+
+    // THE PROBE SEAM (2026-09-13). Every other mode in the tree publishes one and this had none, which is
+    // exactly why "the autopilot never finished a lap" sat open: a probe could fly the aircraft but could
+    // not see WHERE THE NEXT GATE IS, so it had nothing to steer at. The same shape as 1v1's
+    // scene.metadata.onevone — read-only getters, development cost only.
+    (ctx.scene.metadata ??= {}).aero = {
+      state: () => {
+        const g = course.gates[Math.min(race.next, course.gates.length - 1)];
+        return {
+          next: race.next, lap: race.lap, laps: course.laps, gates: course.gates.length,
+          time: +race.time.toFixed(2), finished: race.finished,
+          // `through` as well as the centre: a gate is PASSED by crossing its plane inside the radius going
+          // the right way, so anything steering at the centre alone arrives at a random angle and can orbit
+          // a ring forever without ever passing it (measured: a pursuit autopilot circled gate 3 for 150 s).
+          nextGate: g ? { x: g.at.x, y: g.at.y, z: g.at.z, radius: g.radius,
+                          through: { x: g.through.x, y: g.through.y, z: g.through.z } } : null,
+          pos: flight ? { x: flight.pos.x, y: flight.pos.y, z: flight.pos.z } : null,
+          speed: flight ? +flight.speed.toFixed(1) : 0,
+          heading: flight ? +flight.heading.toFixed(3) : 0,
+          crashes: S.crashes,
+        };
+      },
+    };
+
     pushHud(ctx);
   },
 
