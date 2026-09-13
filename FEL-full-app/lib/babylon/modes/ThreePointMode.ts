@@ -51,6 +51,8 @@ import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { ShotArc } from '../core/BasketballCore';
+import { BallSim } from '../core/BallPhysics';
+import { resolveRim, forcedMissProfile } from '../core/RimPhysics';   // a shootout miss you can READ
 import { THREE_CORNER_R, THREE_TOP_R, threePointRadius } from '../core/BasketballCore';
 import { SoundKit } from '../audio/SoundKit';
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0 CONTACT-lite: the hoop answers a make (shared with Dunk / 1v1 / 3v3; Meshy never scaled)
@@ -90,6 +92,9 @@ const RACK_POS = RACK_ANGLES.map(
 
 /** How wide the "perfect" window is around SHOT_TARGET (shared with the host). */
 const PERFECT_BAND = HUD_PERFECT;
+/** How long the ball lives off the iron before the next ball is in the hand. Long enough to SEE where
+ *  the miss went (that is the whole point), short enough that a shootout still feels like a shootout. */
+const RIM_OUT_SEC = 0.85;
 const GOOD_BAND = HUD_GOOD;
 /** Bar sweeps a full cycle in this many seconds. */
 const BAR_PERIOD = 1.15;           //TUNE(elijah)
@@ -133,6 +138,11 @@ let rivalBodies: SpawnedCharacter[] = [];
 const RIVAL_SEEDS = ['#F25F5C', '#2EC4B6', '#FFBF47', '#5B8DEF', '#B07CF5'];
 let ball: Mesh | null = null;
 let arc: ShotArc | null = null;
+let ballSim: BallSim | null = null;
+/** Seconds left of the ball living off the iron after a miss; -1 = not rimming out. */
+let rimOut = -1;
+/** Signed timing error of the shot in flight: negative = EARLY (short), positive = LATE (long). */
+let shotErr = 0;
 let ballMat: StandardMaterial | null = null;
 /** One ball-rack per station: the frame plus its five balls. */
 let rackBalls: Mesh[][] = [];
@@ -321,7 +331,9 @@ function fire(ctx: ModeContext, power?: number): void {
   if (S.phase !== 'shoot' || S.fired || !player || !ball || !arc) return;
   S.fired = true;
 
-  const err = Math.abs(S.barT - SHOT_TARGET);
+  const signed = S.barT - SHOT_TARGET;   // the SIGN is the feedback: early is short, late is long
+  shotErr = signed;
+  const err = Math.abs(signed);
   // A tilt charge nudges the odds but never replaces timing — a phone player and
   // a keyboard player are judged on the same window.
   const powerBonus = typeof power === 'number' ? (1 - Math.abs(power - 0.75)) * 0.05 : 0;
@@ -601,6 +613,7 @@ export const ThreePointMode: ModeDefinition = {
     }
 
     arc = new ShotArc();
+    if (ball) ballSim = new BallSim(ball, 0.12);
     hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: once per load, at the rim the arc lands on
     if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }
 
@@ -704,11 +717,28 @@ export const ThreePointMode: ModeDefinition = {
           const from = ball.getAbsolutePosition().clone(); releaseBall(ball); arc.start(from, RIM, pendingMade, 'jumper'); shotWin = 'release'; shotSec = 0; releaseIn = -1;
           player.animator.play('bball_follow_through', { fadeSec: 0.08, onEnd: () => player?.animator.play('idle_stand', { loop: true, fadeSec: 0.2 }) });   // from the release frame: arms overhead → the wrist snap → down the front
         }
+      } else if (rimOut >= 0) {
+        // the ball is live off the iron: let it bounce where the timing sent it, then the next ball is up
+        ballSim?.step(dt);
+        rimOut -= dt;
+        if (rimOut < 0) { rimOut = -1; advanceBall(ctx); }
       } else {
         const r = arc.step(dt, ball.position);
-        if (r === 'made') contactMake(ctx);          // A+ P0: the hoop answers the make as the ball drops through
-        else if (r === 'missed') missClank(ctx);      // A+ P0: the miss has weight — a clank off the iron, never HoopJuice
-        if (r !== 'flying') advanceBall(ctx);
+        if (r === 'made') { contactMake(ctx); advanceBall(ctx); }   // A+ P0: the hoop answers the make as the ball drops through
+        else if (r === 'missed') {
+          missClank(ctx);                             // A+ P0: the miss has weight — a clank off the iron, never HoopJuice
+          // A shootout is nothing but shooting feedback, and the ball used to vanish to the next rack the
+          // instant a shot missed — so EARLY and LATE looked identical and the shooter learned nothing
+          // from the one thing the mode is about. Now the iron answers the timing: early is short off the
+          // front and comes back at me, late is long off the back and runs away.
+          const toShooter = player.root.position.subtract(RIM); toShooter.y = 0;
+          const q01 = Math.max(0.15, 1 - Math.abs(shotErr) / Math.PI);
+          const hit = resolveRim(RIM, toShooter, forcedMissProfile(q01, { short: shotErr < 0 ? 0.8 : -0.8 }), 0.05);
+          ballSim?.launch(hit.contact, hit.outVel);
+          rimOut = RIM_OUT_SEC;
+          pushHud(ctx, hit.label);
+          console.info(`[3PT-RIM] ${hit.kind} — ${hit.label} (err ${shotErr.toFixed(2)})`);
+        }
       }
     }
     // BIOMECH-HOOPS-WAVE1: the carry weight (the jog only), the shot's posture clock, this frame's window for the layer
@@ -749,5 +779,6 @@ export const ThreePointMode: ModeDefinition = {
     for (const m of rackMeshes) m.dispose();
     rackMeshes = []; rackBalls = [];
     arc = null;
+    ballSim = null; rimOut = -1;
   },
 };
