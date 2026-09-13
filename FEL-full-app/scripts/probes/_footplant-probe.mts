@@ -59,11 +59,23 @@ await p.evaluate(`(() => {
       prev[i] = w;
       if (!was) return;
       const step = Math.hypot(w.x - was.x, w.z - was.z);
-      // PLANTED, by the SYSTEM'S OWN contract: FootPlanting's DEFAULT_CONTACT has downAt 0.09 / upAt 0.15, so a
-      // foot between those is mid-lift and is SUPPOSED to travel. My first pass used 0.14 and therefore measured
-      // swinging feet as skating ones. 0.09 is a genuinely down foot.
+      // PLANTED = LOW **AND** THE STANCE FOOT **AND** NOT RISING (2026-09-13).
+      //
+      // Height alone was not enough, and the header claimed a velocity test this code never did. In a WALK
+      // both feet stay low, so 'low' is a fair proxy; in a RUN the swing foot passes THROUGH low altitude at
+      // full speed, so height alone counts a correctly-animated swing as a skate — and the metric therefore
+      // rewarded shuffling and punished running, which is the opposite of what it is for. (Found when a gait
+      // split that visibly put the fighter into a run clip moved the number by 5 points.)
+      //
+      // Three conditions, which together are what "in contact" means:
+      //   · low (the system's own DEFAULT_CONTACT downAt),
+      //   · the LOWER of the two feet — the one bearing weight; in a run's flight phase neither qualifies,
+      //   · not rising — a foot on its way up has left the floor whatever its height.
+      const other = FEET[1 - i] ? FEET[1 - i].getAbsolutePosition() : null;
+      const isStance = !other || w.y <= other.y;
+      const rising = w.y - was.y > 0.002;
       const low = w.y < 0.09;
-      if (low && rootStep > 0.01) {
+      if (low && isStance && !rising && rootStep > 0.01) {
         window.__FP.planted++;
         window.__FP.slides.push(step);
         if (step > window.__FP.maxSlide) window.__FP.maxSlide = step;

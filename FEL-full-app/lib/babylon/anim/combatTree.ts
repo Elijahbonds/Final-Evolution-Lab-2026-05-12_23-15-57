@@ -18,12 +18,13 @@
 // floor after a knockdown until the mode lets the fighter rise, and rises through the get-up before any standing state.
 
 import type { CharacterAnimator } from './CharacterAnimator';
+import { combatGait } from '../core/StrideMatch';
 import { combatRateFor, StrideRateFilter } from '../core/StrideMatch';
 
 export type StrikeWeight = 'light' | 'medium' | 'heavy' | 'finisher';
 
 export type CombatAnimState =
-  | 'idle' | 'idle_weapon' | 'walk' | 'walk_back' | 'strafe_left' | 'strafe_right' | 'dash'
+  | 'idle' | 'idle_weapon' | 'walk' | 'walk_back' | 'run' | 'run_back' | 'strafe_left' | 'strafe_right' | 'dash'
   | 'strike_light' | 'strike_medium' | 'strike_heavy' | 'strike_finisher'
   | 'block_hold' | 'parry_flash' | 'guard_impact'
   | 'react_light' | 'react_medium' | 'react_heavy' | 'react_launch'
@@ -76,6 +77,14 @@ const CLIP_FOR: Record<CombatAnimState, { clip: string; loop: boolean; fadeSec: 
   strafe_left:     { clip: 'karate_shuffle_left', loop: true, fadeSec: 0.14 },  // BIOMECH-WAVE2 G2: the lock-on shuffle — the feet never cross, the guard never drops
   strafe_right:    { clip: 'karate_shuffle_right', loop: true, fadeSec: 0.14 },
   dash:            { clip: 'run_forward', loop: true, fadeSec: 0.06 },
+  // THE GAIT SPLIT (2026-09-13). Free locomotion above the guard step's ceiling runs instead of stepping —
+  // see StrideMatch.combatGait. The fade is slower than the dash's because this is a gait CHANGE a player
+  // crosses in both directions while holding one stick, not a committed burst: snapping between a guard step
+  // and a run at 0.06 s reads as a twitch every time the thumb wavers on the threshold.
+  run:             { clip: 'run_forward', loop: true, fadeSec: 0.18 },
+  // giving ground at speed: the run, reversed — the same trick walk_back uses on the guard step, and for the
+  // same reason (there is no authored backpedal, and a forward run while travelling backwards is worse)
+  run_back:        { clip: 'run_backward', loop: true, fadeSec: 0.18 },
   strike_light:    { clip: 'karate_punch_light', loop: false, fadeSec: 0.06 },
   strike_medium:   { clip: 'karate_kick_roundhouse', loop: false, fadeSec: 0.06 },
   strike_heavy:    { clip: 'karate_punch_heavy', loop: false, fadeSec: 0.06 },
@@ -114,7 +123,17 @@ export function chooseCombatClip(i: CombatAnimInput): CombatClipChoice {
   else if (i.dashing) state = 'dash';
   else if (i.blocking) state = 'block_hold';
   else if (i.celebrating) state = 'celebrate';
-  else if (i.speed01 > 0.15) state = i.strafe === -1 ? 'strafe_left' : i.strafe === 1 ? 'strafe_right' : i.backing ? 'walk_back' : 'walk';
+  else if (i.speed01 > 0.15) {
+    // A GAIT, NOT A SPEED. Sideways movement keeps its shuffle whatever the pace (a fighter circling is
+    // circling, and there is no authored running strafe); forward and back pick the gait that can actually
+    // cover the ground. Without a measured speed the old fixed cadence stands, so an unwired mode is
+    // unchanged.
+    const running = i.speedMps !== undefined && combatGait(i.speedMps) === 'run';
+    state = i.strafe === -1 ? 'strafe_left'
+      : i.strafe === 1 ? 'strafe_right'
+      : i.backing ? (running ? 'run_back' : 'walk_back')
+      : (running ? 'run' : 'walk');
+  }
   else state = i.hasWeapon ? 'idle_weapon' : 'idle';
   const c = pick(state);
   if (i.strikeClip && state.startsWith('strike_')) c.clip = i.strikeClip;

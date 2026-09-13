@@ -141,14 +141,61 @@ export function combatRateFor(state: string, speed: number, authoredRatio = 1): 
   switch (state) {
     case 'walk': case 'walk_back': ref = COMBAT_STRIDE.walk; break;
     case 'strafe_left': case 'strafe_right': ref = COMBAT_STRIDE.strafe; break;
-    case 'dash': ref = COMBAT_STRIDE.dash; break;
+    case 'dash': case 'run': case 'run_back': ref = COMBAT_STRIDE.dash; break;
     default: return null;                      // strikes, blocks, reactions, the floor: choreography
   }
   const sign = authoredRatio < 0 ? -1 : 1;
   return strideRate(speed, ref) * sign;
 }
 
-// ── WHY COMBAT STILL SLIDES, AND WHAT WOULD FIX IT ───────────────────────────────────────────────────────
+// ── THE GAIT SPLIT — the fix the note below asked for (2026-09-13) ──────────────────────────────────────
+//
+// The note below (kept, because it is the measurement that led here) concluded that the residue was a BUDGET
+// problem with two honest fixes: author a real stepping cycle, or move the root slower while a stance clip
+// plays. It missed a third, and the third was already sitting in the tree: there is a RUN clip, referenced at
+// 4.0 m/s, used only when an explicit dash input fires. Free locomotion never reached it.
+//
+// So a fighter travelling at 3.4 m/s was being animated with a GUARD STEP — a clip that covers 0.6 m/s of
+// ground — and no playback rate can close a 5.7× gap. The answer is not a faster stance, it is a different
+// gait, and it is what the sport actually looks like: you guard-step when you are spacing at range and you
+// RUN when you are closing distance. Nobody guard-steps across a ring at jogging speed.
+//
+// The threshold is not a taste call — it is exactly where the guard step runs out of rate.
+
+/** The fastest ground speed a guard step can cover before it becomes a fast-forward. 0.6 × 1.85 = 1.11 m/s. */
+export const GUARD_STEP_CEILING = COMBAT_STRIDE.walk * RATE_MAX;
+
+/** Which gait a body moving at `speed` should be in. */
+export function combatGait(speed: number): 'step' | 'run' {
+  return Math.abs(speed) > GUARD_STEP_CEILING ? 'run' : 'step';
+}
+
+// ── WHAT IS STILL UNRESOLVED, MEASURED 2026-09-13 ───────────────────────────────────────────────────────
+//
+// The gait split above is correct on its own terms — a body at 3.4 m/s belongs in a run clip, not a guard
+// step — and the tree now reaches `run` / `run_back` on ~1400 of ~3900 moving frames in a live karate_vs.
+// It did NOT close the skate, and chasing it turned up a contradiction that should be resolved before
+// anyone retunes these numbers:
+//
+//   · scripts/probes/_footplant-probe.mts, with its planted test corrected (see below), measures the STANCE
+//     foot travelling 0.0386 m/frame against a root of 0.0502 — 77%.
+//   · scripts/probes/_clip-stride-measure.mts, playing each clip at rate 1 on a frozen root, measures the
+//     clips covering: run 1.11 m/s, karate_guard_step 1.95, karate_shuffle_left 1.70 — three times the
+//     references declared in COMBAT_STRIDE (0.6 / 0.5 / 4.0), and in BOTH directions.
+//   · those two cannot both be right. If the guard step really covers 1.95 m/s then declaring it 0.6 pins
+//     the rate at RATE_MAX and the clip covers 1.95 × 1.85 = 3.6 m/s — which is the root speed, and the
+//     skate should be small. It is not.
+//
+// So one of the three (the plant test, the clip measurement, or the matcher's reach) is lying, and a retune
+// on top of an unresolved contradiction would be a guess wearing a measurement's clothes. The numbers are
+// recorded here so the next pass starts from them rather than re-deriving them.
+//
+// NOTE ON THE PLANT TEST, because it cost a wrong conclusion: it used to call a foot planted on HEIGHT
+// alone. In a walk both feet stay low, so that is a fair proxy; in a RUN the swing foot passes through low
+// altitude at full speed, so the metric counted a correctly-animated swing as a skate and therefore
+// REWARDED shuffling over running. It now requires low + stance (the lower foot) + not rising.
+//
+// ── WHY COMBAT USED TO SLIDE ────────────────────────────────────────────────────────────────────────────
 // Measured in a live karate_vs: the root travels 0.054 m per frame (~3.2 m/s) while a DOWN foot travels 0.037 — 69%.
 // Rate matching is reaching those frames: a dev counter showed the tree in a stride state on 95% of moving frames
 // (walk 1376, strafe_left 1392, strafe_right 725, walk_back 433, refused:idle 219). So the matcher works and the
