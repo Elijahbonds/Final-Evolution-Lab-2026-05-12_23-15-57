@@ -14,8 +14,8 @@
 // no-placeholder rule this repo now enforces is about BODIES, not vehicles. A board is a box in boardCore and a
 // ramp is a box in rideWorlds for the same reason. If a plane asset lands later, only buildPlane changes.
 
-import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
-import type { Mesh, TransformNode } from '@babylonjs/core';
+import { Color3, MeshBuilder, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
+import type { Mesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { buildPoseClip, REF_HIPS_Y } from '../anim/poseClip';
@@ -34,6 +34,10 @@ import {
   AERO_COURSES, readCourse, startRace, stepRace, toNextGate, medalFor, type Course, type RaceProgress,
 } from '../core/RaceCourse';
 import { buildCourseVenue } from '../racing/venueForCourse';
+import {
+  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal,
+  type RaceLine, type Rival,
+} from '../racing/RaceField';
 import { readPlane } from '../racing/garage';
 
 /** The picked airframe. Defaults to the trainer, so a mode with no pick flies exactly as it was tuned. */
@@ -46,6 +50,13 @@ let plane: TransformNode | null = null;
 let venueRoot: TransformNode | null = null;
 let pilot: SpawnedCharacter | null = null;
 let seated: AnimationGroup | null = null;
+// THE FIELD. Same module the karts use — see racing/RaceField.ts. Rivals fly the racing line as PACERS
+// rather than running the flight model: an AI that actually flies needs stall recovery, and an aircraft
+// recovering badly in front of the player is worse than no aircraft at all.
+let line: RaceLine | null = null;
+let rivals: Rival[] = [];
+let rivalPlanes: TransformNode[] = [];
+let playerDist = 0;
 let rings: Mesh[] = [];
 let course: Course = AERO_COURSES[0];
 let flight: FlightState | null = null;
@@ -139,6 +150,25 @@ function buildPlane(ctx: ModeContext): TransformNode {
   return body;
 }
 
+/** A rival's aircraft: the player's silhouette, simplified and tinted. No pilot — see buildRivalKart. */
+function buildRivalPlane(ctx: ModeContext, name: string, tint: string): TransformNode {
+  const rig = new TransformNode(`rival_${name}`, ctx.scene);
+  const paint = new StandardMaterial(`rival_paint_${name}`, ctx.scene);
+  paint.diffuseColor = Color3.FromHexString(tint);
+  paint.specularColor = Color3.FromHexString('#222833');
+  const box = (n: string, w: number, h: number, d: number, at: [number, number, number]): void => {
+    const b = MeshBuilder.CreateBox(`${n}_${name}`, { width: w, height: h, depth: d }, ctx.scene);
+    b.position.set(at[0], at[1], at[2]);
+    b.material = paint;
+    b.parent = rig;
+  };
+  box('rv_body', 1.5, 1.2, 7, [0, 0, 0]);
+  box('rv_wing', 11, 0.22, 1.9, [0, 0.1, -0.3]);
+  box('rv_tail', 3.4, 0.18, 1.0, [0, 0.35, -3.1]);
+  box('rv_fin', 0.16, 1.5, 1.1, [0, 0.9, -3.1]);
+  return rig;
+}
+
 /** One ring per gate, tinted so the NEXT one reads as the one to chase. */
 function buildRings(ctx: ModeContext): Mesh[] {
   return course.gates.map((gate, i) => {
@@ -178,6 +208,7 @@ function pushHud(ctx: ModeContext): void {
     lap: `${Math.min(race.lap, course.laps)}/${course.laps}`,
     time: race.time.toFixed(1),
     toGate: Math.round(dist),
+    pos: rivals.length ? `${ordinal(playerPosition(playerDist, rivals))} / ${rivals.length + 1}` : '',
     banner: S.banner,
     hint: 'STICK to fly · RT throttle · A boost · roll INTO the turn',
   };
@@ -235,6 +266,13 @@ return {
     const seatClip = buildPoseClip(ctx.scene, pilot.skeleton, 'aero_seated', 0.5, seatedKeys());
     if (seatClip) { seatClip.start(true, 1, 0, 0.5, false); seated = seatClip; }
     else console.warn('[FEL-AERO] seated pose could not be built — the pilot stands');
+
+    // the field: a simplified airframe per rival, tinted. Four in the air rather than the kart's five —
+    // a ring course is read by looking THROUGH it, and a crowded sky hides the gate you are chasing.
+    line = buildRaceLine(course);
+    rivals = makeField(4, FRAME.cruise, 0.5);
+    rivalPlanes = rivals.map((r) => buildRivalPlane(ctx, r.name, r.tint));
+    playerDist = 0;
 
     flight = spawnFlight(course.start.at, course.start.heading, FRAME);
     prevPos.copyFrom(flight.pos);
@@ -295,6 +333,19 @@ return {
 
     prevPos.copyFrom(flight.pos);
     stepFlight(flight, S.input, dt, FRAME);
+
+    // THE FIELD MOVES. Rivals ride the racing line, which on an aero course runs THROUGH the rings — so a
+    // rival ahead of you is a rival you can see taking the gate you are about to take, which is the whole
+    // reason to put opponents in a time-attack course.
+    playerDist += flight.speed * dt;
+    if (line) {
+      for (const [i, r] of rivals.entries()) {
+        stepRival(r, line, dt, playerDist, { topSpeed: FRAME.cruise, cornerBite: 0.35 }, race.time);
+        const at = rivalPlacement(r, line);
+        const rp = rivalPlanes[i];
+        if (rp) { rp.position.copyFrom(at.pos); rp.rotation.y = at.heading; }
+      }
+    }
     if (!S.rolling) levelOut(flight, dt);    // hands off, the wings come level
 
     // the world has edges, and hitting one is a crash that costs speed rather than ending the run
@@ -335,6 +386,8 @@ return {
     plane?.dispose(); plane = null;
     seated?.dispose(); seated = null;
     pilot?.dispose(); pilot = null;
+    for (const rp of rivalPlanes) rp.dispose();
+    rivalPlanes = []; rivals = []; line = null;
     venueRoot?.dispose(); venueRoot = null;
     for (const r of rings) r.dispose();
     rings = [];

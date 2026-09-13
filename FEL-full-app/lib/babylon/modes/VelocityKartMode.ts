@@ -33,6 +33,10 @@ import {
   type Course, type RaceProgress,
 } from '../core/RaceCourse';
 import { buildCourseVenue } from '../racing/venueForCourse';
+import {
+  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldFor,
+  type RaceLine, type Rival,
+} from '../racing/RaceField';
 import { readKart } from '../racing/garage';
 
 /** A kart is small; a full-size body swamps it. */
@@ -49,6 +53,16 @@ let seated: AnimationGroup | null = null;
 let steerWheel: Mesh | null = null;
 let venueRoot: TransformNode | null = null;
 let roadTex: DynamicTexture | null = null;
+// THE FIELD (2026-09-13). This mode shipped as a time trial: a clock does not overtake you on the last
+// corner, and Phase 0 recorded it as the one racing mode with no opponent of any kind. The rivals are
+// PACERS, not drivers — they advance along the racing line at a believable pace rather than running the
+// handling model, which means they can never spin, wall themselves or drive the wrong way, and from a chase
+// camera the difference is invisible. See racing/RaceField.ts for why that is the honest trade.
+let line: RaceLine | null = null;
+let rivals: Rival[] = [];
+let rivalKarts: TransformNode[] = [];
+/** The player's own distance along the racing line — what the standings are computed against. */
+let playerDist = 0;
 /** The picked kart's handling. Defaults to the starter, so a mode with no pick is byte-identical to before. */
 let kartSpec: KartSpec = KART_STARTER;
 let race: RaceProgress = startRace();
@@ -220,6 +234,44 @@ function paintTarmac(scene: ModeContext['scene']): DynamicTexture {
   return tex;
 }
 
+/**
+ * A rival's kart: the player's silhouette, simplified and tinted.
+ *
+ * Deliberately the SAME shape rather than a different one — a field of visibly cheaper cars reads as
+ * placeholder art, and the pan/pods/wheels are six boxes either way. What it does not get is a driver: five
+ * more skinned humanoids on screen is the frame budget spent on bodies nobody looks at, and the rule the
+ * owner set is that every body MOVES WELL, which a second-tier rig would not.
+ */
+function buildRivalKart(ctx: ModeContext, name: string, tint: string): TransformNode {
+  const rig = new TransformNode(`rival_${name}`, ctx.scene);
+  const paint = VenueKit.paint(ctx.scene, `rival_paint_${name}`, tint, 0.1, 0.45);
+  paint.environmentIntensity = 0.4;
+  const dark = VenueKit.paint(ctx.scene, `rival_tyre_${name}`, '#15181f', 0.05, 0.92);
+  dark.environmentIntensity = 0.3;
+  const box = (n: string, w: number, h: number, d: number, at: [number, number, number], m = paint): void => {
+    const b = MeshBuilder.CreateBox(`${n}_${name}`, { width: w, height: h, depth: d }, ctx.scene);
+    b.position.set(at[0], at[1], at[2]);
+    b.material = m;
+    b.parent = rig;
+  };
+  box('rv_pan', 1.08, 0.14, 2.0, [0, KART_GROUND_Y + 0.13, 0]);
+  box('rv_pod_l', 0.2, 0.34, 1.15, [-0.62, KART_GROUND_Y + 0.30, -0.18]);
+  box('rv_pod_r', 0.2, 0.34, 1.15, [0.62, KART_GROUND_Y + 0.30, -0.18]);
+  box('rv_nose', 0.8, 0.18, 0.66, [0, KART_GROUND_Y + 0.20, 0.92]);
+  box('rv_seat', 0.6, 0.52, 0.12, [0, KART_HIPS.y + 0.22, KART_HIPS.z - 0.32]);
+  for (const [i, [x, z, dia, wide]] of ([
+    [-0.60, 0.74, 0.56, 0.20], [0.60, 0.74, 0.56, 0.20],
+    [-0.66, -0.74, 0.64, 0.30], [0.66, -0.74, 0.64, 0.30],
+  ] as const).entries()) {
+    const w = MeshBuilder.CreateCylinder(`rv_wheel_${i}_${name}`, { diameter: dia, height: wide, tessellation: 10 }, ctx.scene);
+    w.rotation.z = Math.PI / 2;
+    w.position.set(x, KART_GROUND_Y + dia / 2, z);
+    w.material = dark;
+    w.parent = rig;
+  }
+  return rig;
+}
+
 /** The road: a slab per segment of the centre line, so what you SEE is what onTrack() tests. */
 function buildRoad(ctx: ModeContext): Mesh[] {
   const out: Mesh[] = [];
@@ -289,6 +341,7 @@ function pushHud(ctx: ModeContext): void {
     time: race.time.toFixed(1),
     toGate: Math.round(dist),
     drift: state.drifting ? Math.round(driftQuality(state) * 100) : 0,
+    pos: rivals.length ? `${ordinal(playerPosition(playerDist, rivals))} / ${rivals.length + 1}` : '',
     banner: S.banner,
     hint: 'RT throttle · X drift into the corner · A spend the boost',
   } satisfies Record<string, HudValue>);
@@ -364,6 +417,13 @@ return {
     if (seatClip) { seatClip.start(true, 1, 0, 0.5, false); seated = seatClip; }
     else console.warn('[FEL-KART] seated pose could not be built — the driver stands');
 
+    // the field: one simplified kart per rival, tinted so they are telling apart at speed
+    line = buildRaceLine(course);
+    const shape = fieldFor(course, kartSpec.vMax, kartSpec.grip);
+    rivals = makeField(shape.count, kartSpec.vMax, shape.difficulty);
+    rivalKarts = rivals.map((r) => buildRivalKart(ctx, r.name, r.tint));
+    playerDist = 0;
+
     ctx.heroRef.current = kart;
     ctx.objectiveRef.current = null;
     ctx.camDirector.snapTo(state.pos, null);
@@ -394,6 +454,19 @@ return {
 
     // the kart rides the road; y is cosmetic here because the track is flat
     kart.position.set(state.pos.x, KART_RIDE_Y, state.pos.z);
+
+    // THE FIELD MOVES. playerDist is measured as distance TRAVELLED rather than progress along the line, so
+    // a player who cuts a corner does not get credited for the metres they skipped — the standings read the
+    // same racing line the rivals run.
+    playerDist += state.speed * dt;
+    if (line) {
+      for (const [i, r] of rivals.entries()) {
+        stepRival(r, line, dt, playerDist, { topSpeed: kartSpec.vMax }, race.time);
+        const at = rivalPlacement(r, line);
+        const rk = rivalKarts[i];
+        if (rk) { rk.position.set(at.pos.x, KART_RIDE_Y, at.pos.z); rk.rotation.y = at.heading; }
+      }
+    }
     // the BODY points where the nose does while the kart travels at the slip angle — that difference is the
     // drift, and showing it is the whole read
     kart.rotation.y = state.heading;
@@ -459,6 +532,8 @@ return {
     steerWheel = null;
     venueRoot?.dispose(); venueRoot = null;
     roadTex?.dispose(); roadTex = null;
+    for (const rk of rivalKarts) rk.dispose();
+    rivalKarts = []; rivals = []; line = null;
     state = null;
   },
 };
