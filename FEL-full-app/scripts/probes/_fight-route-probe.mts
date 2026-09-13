@@ -20,8 +20,8 @@ const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
 const routes: string[] = [], style: string[] = []; let errors = 0;
 p.on('console', (m) => {
   const x = m.text();
-  if (/\[(KVS|MC)-ROUTE\]/.test(x)) routes.push(x);
-  if (/\[(KVS|MC)-STYLE\]/.test(x)) style.push(x);
+  if (/\[(KVS|MC|KE)-ROUTE\]/.test(x)) routes.push(x);
+  if (/\[(KVS|MC|KE)-STYLE\]/.test(x)) style.push(x);
   if (m.type() === 'error' && !/401 \(Unauthorized\)/.test(x)) errors++;
 });
 p.on('pageerror', (e) => { errors++; console.log('PAGEERROR', e.message.slice(0, 170)); });
@@ -62,6 +62,8 @@ const names = new Map<string, number>();
 for (const r of routes) { const n = (r.match(/\] (\w+) fx/) ?? [])[1] ?? '?'; names.set(n, (names.get(n) ?? 0) + 1); }
 console.log(`fight=${FIGHT || 'baseline'}  ${style.join(' | ')}`);
 console.log('routes fired (' + routes.length + '): ' + JSON.stringify(Object.fromEntries(names)));
+const cleared = routes.map((r) => Number((r.match(/cleared (\d+)/) ?? [])[1] ?? 0)).filter((n) => n > 0);
+if (cleared.length) console.log('bodies cleared per route: ' + cleared.join(' ') + '  (max ' + Math.max(...cleared) + ')');
 for (const r of routes.slice(0, 10)) console.log('  ' + r);
 console.log('errors: ' + errors);
 await b.close();

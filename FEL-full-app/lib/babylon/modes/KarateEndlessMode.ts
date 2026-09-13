@@ -75,6 +75,10 @@ import type { ControlSource, Intent } from '../core/PlayerSlot';
 import { PlayerSlot, LocalInputSource } from '../core/PlayerSlot';
 import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-in co-op: ?net=<room>
 import { SoundKit } from '../audio/SoundKit';
+import {
+  BASELINE_RATINGS, ratingsFrom, routeFor, routeHitStopMs, routeShake, cancelWindowSec, hasFightMove,
+  type FightRatings, type RouteStrike,
+} from '../core/FighterStyle';   // the same named routes the duel modes use, read for a CROWD
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
 import { VenueKit } from '../visual/VenueKit';
@@ -216,6 +220,18 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   const vitals = new PlayerVitals();
   const slowmo = new SlowMoLatch();
   const combo = new ComboTracker();
+  // ROUTES IN A HORDE. The duel modes pay a route off in DAMAGE, which is meaningless here: Endless is one solid
+  // strike = one body down, by owner lock, so there is no damage to multiply. The horde's currency is how many
+  // bodies you clear, so a completed route pays off in REACH AND ARC — the ender becomes a crowd move. That is
+  // what makes a mixed-verb route worth learning in a mode where mashing one button already works.
+  //
+  // This sits ALONGSIDE the existing jab-jab-UPPERCUT finisher rather than replacing it: ComboTracker counts
+  // LIGHT strikes and any other verb resets it, so the two cover different sequences and neither breaks.
+  let myRatings: FightRatings = { ...BASELINE_RATINGS };
+  let landed: RouteStrike[] = [];
+  let lastLandAt = -Infinity;
+  /** The Endless button -> the shared route vocabulary. */
+  const ROUTE_KIND: Record<'A' | 'B' | 'Y', RouteStrike> = { A: 'jab', B: 'kick', Y: 'heavy' };
   const drops = new DropDirector();
   const shop = new PerkShop();
   let perks = shop.state();
@@ -333,7 +349,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const before = chi;
     chi = Math.min(100, chi + amount * perks.chiMult);
     ctx.setHud({ chi: Math.round(chi) });
-    if (CHI_BURST_ENABLED && !bursting && before < 100 && chi >= 100) {
+    // The burst is the finisher-class move here, so it is EARNED the way the DRAGON is in the duel modes:
+    // full chi is the cost, FORCE is the licence. A baseline body fills the gauge and still cannot throw it.
+    if (CHI_BURST_ENABLED && !bursting && before < 100 && chi >= 100 && hasFightMove('dragon', myRatings)) {
       ctx.setHud({ banner: 'CHI READY · R1' });
       setTimeout(() => ctx.setHud({ banner: '' }), 900);
     }
@@ -471,17 +489,47 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     myStrike = { weight: finisher ? 'finisher' : STRIKE_WEIGHT[key], clip: s.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
     if (finisher) { stats.finishers++; ctx.setHud({ banner: 'FINISHER' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
     setTimeout(() => {
+      // THE PROSPECTIVE ROUTE. It has to be resolved BEFORE the arc test, because the payoff IS the arc: the
+      // strike that completes a route swings wider and further than the same strike on its own. The chain is
+      // only consumed if the swing actually connects, so a whiffed route-finisher does not eat the sequence.
+      const kind = ROUTE_KIND[key];
+      const fresh = clockSec - lastLandAt > cancelWindowSec(myRatings);
+      const seq = fresh ? [kind] : [...landed, kind];
+      const route = routeFor(seq, myRatings);
+      const reach = s.range * perks.reach * (route ? 1.45 : 1);
+      const arc = s.arcDeg + perks.arcDeg + (route ? (route.fx === 3 ? 110 : 60) : 0);
+
       // everyone in the arc, not the nearest one
       const origin = player.root.position;
-      const hit = enemies.filter((e) => inArc(origin, player.root.rotation.y, e.mob.char.root.position, s.range * perks.reach, s.arcDeg + perks.arcDeg));
+      const hit = enemies.filter((e) => inArc(origin, player.root.rotation.y, e.mob.char.root.position, reach, arc));
       if (!hit.length) { if (now() - lastHitAt > HIT_CHAIN_MS) { hitCount = 0; ctx.setHud({ hits: 0 }); } return; }
+
+      // the swing connected, so the sequence advances
+      landed = seq.slice(-6);
+      lastLandAt = clockSec;
+
       const t = now();
       if (t - lastHitAt > HIT_CHAIN_MS) hitCount = 0;
-      if (s.launch) matrix(ctx, finisher ? 'finisher' : 'heavyKo');   // the heavy / the finisher connects: a short Matrix beat
-      for (const e of [...hit]) landHit(ctx, e, !!s.launch);   // one contact = one body down; heavy adds launch juice
+      if (s.launch || route) matrix(ctx, finisher || route?.fx === 3 ? 'finisher' : 'heavyKo');
+      const launches = !!s.launch || (route ? route.ender !== 'stun' : false);
+      for (const e of [...hit]) landHit(ctx, e, launches);   // one contact = one body down; heavy adds launch juice
       hitCount += hit.length; lastHitAt = t;
       ctx.setHud({ hits: hitCount });
       if (hit.length >= 3) ctx.feel?.impact?.(0.55);
+
+      if (route) {
+        landed = [];                                  // a completed route is spent
+        const shake = routeShake(route.fx);
+        ctx.juice.hitStop(routeHitStopMs(route.fx));
+        ctx.juice.shake(shake.amp, shake.ms);
+        ctx.feel?.impact?.(route.fx === 3 ? 0.7 : 0.45);
+        SoundKit.play('impact', { pitch: route.fx === 3 ? 0.72 : 0.9, volume: 0.65 });
+        EffectsKit.burst(ctx.scene, origin.add(new Vector3(0, 1.2, 0)), route.fx === 3 ? 'glitch' : 'sparks');
+        stats.finishers += route.fx === 3 ? 1 : 0;
+        ctx.setHud({ banner: `${route.label}! — ${hit.length} DOWN` });
+        setTimeout(() => ctx.setHud({ banner: '' }), 900);
+        console.info(`[KE-ROUTE] ${route.label} fx${route.fx} cleared ${hit.length} arc ${arc.toFixed(0)}deg reach ${reach.toFixed(2)}`);
+      }
     }, 150);
   }
 
@@ -595,7 +643,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     }
     const outcome = vitals.takeHit(enemyHitDamage(wave, e.brain.strike), { blocking });
     if (outcome === 'iframe') return;                          // still reeling from the last one — no double-tap
-    lastHurtAt = clockSec; combo.reset();
+    lastHurtAt = clockSec; combo.reset(); landed = [];   // a route dies when you do
     if (outcome === 'blocked') {
       // the guard ABSORBS — a shove, a sliver of chip, pressure not a beating
       stats.blocked++;
@@ -628,7 +676,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     tween(0.14, (k) => { if (!dodging) player.root.position = Vector3.Lerp(from, to, k); });
   }
   function downPlayer(ctx: ModeContext): void {
-    vitals.hp = 0; publishHp(ctx); stats.downs++; combo.reset(); hitUntil = 0;   // the knockdown, not a flinch first
+    vitals.hp = 0; publishHp(ctx); stats.downs++; combo.reset(); landed = []; hitUntil = 0;   // the knockdown, not a flinch first
     striking = false; myStrike = null; blocking = false;
     if (!partnerDown.downed) {
       // Phase 8 co-op rule kept: DOWN (not out) while the partner stands — they can revive you
@@ -675,6 +723,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     if (dodging || striking || myDown.downed || shopOpen) return;
     dodging = true;
     iframeSec = DODGE_IFRAME_SEC + perks.iframeBonus;
+    // A dodge breaks the LIGHT chain (ComboTracker's own rule) but deliberately NOT a route: dodge-cancelling
+    // into the next link is the signature move of every beat-em-up worth playing, and a route that a dodge
+    // killed would punish the exact thing the mode should reward.
     combo.reset();
     const steered = Math.hypot(stickX, stickY) > 0.2;
     const dir = steered
@@ -774,8 +825,19 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
       pool = new MobPool();
       wave = 0; totalKos = 0; chi = 0; enemies = []; pickups = []; tweens = []; shards = 0; shop.owned.clear(); shop.sel = 0;
+      landed = []; lastLandAt = -Infinity;
+      // `?fight=` sets the ratings so the earned routes and the chi burst can be driven and measured; without a
+      // PRQ scan plumbed into the modes a fighter is a baseline body. Same seam as Karate VS and Mixed Combat.
+      myRatings = { ...BASELINE_RATINGS };
+      if (typeof window !== 'undefined') {
+        const v = Number(new URLSearchParams(window.location.search).get('fight'));
+        if (Number.isFinite(v) && v > 0) {
+          myRatings = ratingsFrom({ agility: v, speed: v, flexibility: v, power: v, strength: v, mental: v });
+          console.info(`[KE-STYLE] ratings quickness ${myRatings.quickness.toFixed(0)} force ${myRatings.force.toFixed(0)} (override)`);
+        }
+      }
       perks = shop.state(); vitals.setMax(perks.maxHp, true); vitals.iframeSec = 0; hpShown = -1; lastHurtAt = -1e9;
-      combo.reset(); shopOpen = false;
+      combo.reset(); landed = []; shopOpen = false;
       striking = false; blocking = false; dodging = false; xHoldSec = -1; iframeSec = 0; endSlowMo(ctx);
       ctx.camDirector.snapTo(player.root.position, player.root.position.add(facingVec()));
       karateVenue?.hidePlaceholders();  // M74

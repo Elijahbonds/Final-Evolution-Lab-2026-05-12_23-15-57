@@ -121,4 +121,4 @@ Everything in the queue above was built. What was VERIFIED in a running mode, an
 | Fighter style / routes (karate_vs, mixedcombat) | DONE; TRIPLE (3-step) proven live in mixedcombat |
 | Aero Aces | BUILT + enabled; flies, gate passed. Full course NOT completed by the autopilot |
 | Velocity Kart | BUILT + enabled; drives, drifts, 100% boost, TWO LAPS completed |
-| Karate Endless routes | NOT ported — it is a horde mode on NeoCombatCore with its own combo tracker; folding it into the duel vocabulary is a rewrite, not a port |
+| Karate Endless routes | DONE (owner asked for it after the first pass). Ported on the HORDE's terms: the payoff is arc and reach, not damage, because Endless is one-strike-one-body by owner lock. Proven live — baseline reaches only CRUSHER, upgraded reaches TRIPLE / SWEEP / CRUSHER, one clear took 3 bodies |
