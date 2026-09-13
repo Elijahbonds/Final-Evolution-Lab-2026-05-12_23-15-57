@@ -12,6 +12,7 @@ import type { HudValue, ModeContext, ModeDefinition } from '../core/ModeHarness'
 import type { FelInput } from '../core/InputBus';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { SoundKit } from '../audio/SoundKit';
+import { Contestants, podiums } from '../party/Contestants';
 import { EffectsKit } from '../visual/EffectsKit';
 import {
   CATEGORIES, CATEGORY_COLOR, mulberry32, makeChallenge, challengeScore, freshClaims, spinWheel, resolveClaim, claimedBy,
@@ -31,6 +32,10 @@ interface St {
   spinT: number; spinTurns: number; spinFrom: number; category: Category | null;
   challenge: Challenge | null; clock: number; exposeT: number; answers: (number | null)[]; answerTimes: number[]; resultT: number;
   best: number;
+  // BODIES AT THE PODIUMS (2026-09-13). Phase 0 measured this mode at ZERO skeletons: a wheel, a card and
+  // nobody. Its benchmark is Mario Party readability — a spectator understands it in three seconds — and
+  // with no bodies there is no way to see WHO answered, which in a two-player buzz game is the mechanic.
+  cast: Contestants | null;
 }
 const states = new WeakMap<Scene, St>();
 const live = new Set<St>();
@@ -86,6 +91,12 @@ export const BrainBrawlMode: ModeDefinition = (() => {
   function begin(ctx: ModeContext, S: St): void {
     if (S.phase !== 'pick') return;
     S.scores = names(S).map(() => 0);
+    // spawned HERE, not at mount: the player count is chosen on the pick screen, and a solo run stands
+    // centred rather than beside an empty second podium
+    if (!S.cast) {
+      void Contestants.spawn(S.scene, podiums(S.players, { z: 5.0, stageZ: -1.5 }), 'brainbrawl')
+        .then((c) => { if (!S.scene.isDisposed) S.cast = c; else c.dispose(); });
+    }
     spin(ctx, S);
   }
 
@@ -119,6 +130,9 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     if (S.phase !== 'answer' || !S.challenge || player >= S.players || S.answers[player] !== null) return;
     S.answers[player] = choice; S.answerTimes[player] = S.clock;
     const correct = choice === S.challenge.answer;
+    // the buzz is visible, then the verdict — so a watcher sees who went for it and how it went
+    S.cast?.buzz(player);
+    setTimeout(() => S.cast?.verdict(player, correct), 260);
     SoundKit.play(correct ? 'score' : 'miss', { volume: 0.5, pitch: correct ? 1.1 : 0.9 });
     hud(ctx, S);
     if (S.answers.every((a) => a !== null)) resolve(ctx, S);
@@ -173,7 +187,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       const S: St = {
         scene: ctx.scene, phase: 'pick', pickSec: 0, autoBegin: !!q, players: Math.max(1, Math.min(2, Number(q ?? 1) || 1)),
         rnd: mulberry32(Date.now() % 1000003), seen: new Set(), claims: freshClaims(), played: new Set(), scores: [0], round: 0, tier: 1,
-        venue: null, anchor: null, wheel: null, spinT: 0, spinTurns: 0, spinFrom: 0, category: null,
+        venue: null, anchor: null, wheel: null, cast: null, spinT: 0, spinTurns: 0, spinFrom: 0, category: null,
         challenge: null, clock: 0, exposeT: 0, answers: [null], answerTimes: [0], resultT: 0, best: loadBest(),
       };
       states.set(ctx.scene, S); live.add(S);
@@ -221,7 +235,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
 
     dispose() {
       setTimeout(() => {
-        for (const S of live) if (S.scene.isDisposed) live.delete(S);
+        for (const S of live) if (S.scene.isDisposed) { S.cast?.dispose(); S.cast = null; live.delete(S); }
         if (live.size === 0) SoundKit.stopAmbient();
       }, 0);
     },

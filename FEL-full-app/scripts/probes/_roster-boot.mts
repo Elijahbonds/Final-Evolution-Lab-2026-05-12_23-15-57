@@ -36,7 +36,9 @@ for (const key of MODES) {
     await p.waitForTimeout(9000);
     const s0 = p.locator('text=/^START$/').first();
     if (await s0.count()) { await s0.click(); }
-    await p.waitForTimeout(5000);                       // settle, then measure
+    // 5 s was not enough: the party modes spawn their contestants AFTER a pick screen resolves, and a
+    // measurement taken too early recorded "0 skeletons" for a mode that spawns one at t+8 s.
+    await p.waitForTimeout(11000);                      // settle, then measure
     Object.assign(row, await p.evaluate(`(() => {
       const s = window.__FEL_DEV__ && window.__FEL_DEV__.scene;
       if (!s) return { loads: 'NO SCENE' };

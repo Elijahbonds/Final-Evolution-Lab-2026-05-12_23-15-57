@@ -16,6 +16,7 @@ import { WHO_SCENE_IT, type QuizPack, type QuizQuestion } from '../core/QuizCore
 import { BuzzMatch, buildRounds, MAX_PLAYERS, type Resolution } from '../core/SceneBuzz';
 import { WHO_SCENE_IT_PACK } from '../content/quizPacks';
 import { SoundKit } from '../audio/SoundKit';
+import { Contestants, podiums } from '../party/Contestants';
 
 const REVEAL_S = 1.5;            // how long the answer card stays up before the next venue mounts
 const BOARD_S = 3.2;             // the between-rounds scoreboard
@@ -34,6 +35,11 @@ export function makeWhoSceneItMode(): ModeDefinition {
   let pack: QuizPack = WHO_SCENE_IT_PACK;
   let match: BuzzMatch | null = null;
   let players = 1;
+  // BODIES AT THE PODIUMS (2026-09-13). Phase 0 booted this mode and measured ZERO skeletons: a card, a
+  // venue sweep and nobody. That breaks the benchmark this mode was given — Mario Party readability, where a
+  // spectator understands what is happening in three seconds — because the BUZZ is the whole mechanic of a
+  // buzz-in game and there was no way to see who buzzed. The card just locked.
+  let cast: Contestants | null = null;
   let phase: Phase = 'pick';
   let pickT = 0;
   let clock = WHO_SCENE_IT.timeLimit;
@@ -100,6 +106,20 @@ export function makeWhoSceneItMode(): ModeDefinition {
     });
   }
 
+  /**
+   * Put bodies at the podiums, once.
+   *
+   * Spawned on the first question rather than at mount, because the player COUNT is chosen on the pick
+   * screen — a solo run stands centred instead of beside an empty second podium. Guarded so both entry
+   * paths (begin and startQuestion) can call it, and the result is dropped if the mode left play while the
+   * GLB was still loading.
+   */
+  function ensureCast(ctx: ModeContext): void {
+    if (cast) return;
+    void Contestants.spawn(ctx.scene, podiums(players, { z: 4.4, stageZ: -2.4 }), 'who-scene-it')
+      .then((c) => { if (phase === 'play' || phase === 'board') cast = c; else c.dispose(); });
+  }
+
   function begin(ctx: ModeContext): void {
     if (phase !== 'pick') return;
     match = new BuzzMatch(buildRounds(pack, Date.now() % 100000, QUESTIONS_PER_CATEGORY), WHO_SCENE_IT, players);
@@ -107,6 +127,7 @@ export function makeWhoSceneItMode(): ModeDefinition {
     if (match.finished) { finish(ctx); return; }
     phase = 'play';
     clock = WHO_SCENE_IT.timeLimit; revealT = 0;
+    ensureCast(ctx);
     mountFor(ctx, current());
     const cat = match.round?.category;
     hud(ctx, { banner: `${packTitle.toUpperCase()} — ${cat ? `ROUND 1: ${cat.name}` : 'name the place'}`, reveal: null, board: null, boardTitle: '' });
@@ -119,11 +140,13 @@ export function makeWhoSceneItMode(): ModeDefinition {
     const right = q.options.find((o) => o.id === q.answer)?.label ?? '';
     const name = (i: number) => (players > 1 ? `${match!.players[i].name} ` : '');
     if (r.kind === 'correct') {
+      cast?.verdict(r.player, true);
       const p = match.players[r.player];
       bestStreak[r.player] = Math.max(bestStreak[r.player], p.streak);
       SoundKit.play('score', { pitch: 1 + Math.min(0.5, p.streak * 0.08) }); ctx.juice.flash('#fff6dd', 90);
       hud(ctx, { banner: `${name(r.player)}CORRECT +${r.points}${p.streak > 1 ? ` · streak x${r.multiplier.toFixed(2)}` : ''}`, reveal: q.explain ?? `It's ${right}.` });
     } else {
+      if (by !== null) cast?.verdict(by, false);
       SoundKit.play(r.timeout ? 'whistle' : 'miss'); ctx.feel.impact(0.25);
       const who = by !== null && choice !== null ? `${name(by)}WRONG` : 'TIME';
       hud(ctx, { banner: `${who} — it was ${right}`, reveal: q.explain ?? '' });
@@ -133,6 +156,7 @@ export function makeWhoSceneItMode(): ModeDefinition {
 
   function answer(ctx: ModeContext, player: number, choice: number): void {
     if (phase !== 'play' || !match || revealT > 0) return;
+    cast?.buzz(player);          // the buzz is visible now, whatever the answer turns out to be
     const r = match.answer(player, choice, clock);
     if (r === null) return;
     if (r === 'wrong') {
@@ -173,6 +197,7 @@ export function makeWhoSceneItMode(): ModeDefinition {
   function startQuestion(ctx: ModeContext): void {
     phase = 'play';
     clock = WHO_SCENE_IT.timeLimit; revealT = 0;
+    ensureCast(ctx);
     mountFor(ctx, current());
     hud(ctx, { banner: '', reveal: null, board: null, boardTitle: '' });
   }
@@ -244,7 +269,7 @@ export function makeWhoSceneItMode(): ModeDefinition {
       if (Math.floor((clock + dt) * 2) !== Math.floor(clock * 2)) hud(ctx);   // twice a second is plenty for a clock
     },
 
-    dispose(): void { venue?.dispose?.(); venue = null; anchor?.dispose(); anchor = null; match = null; },
+    dispose(): void { venue?.dispose?.(); venue = null; anchor?.dispose(); anchor = null; match = null; cast?.dispose(); cast = null; },
   };
 }
 
