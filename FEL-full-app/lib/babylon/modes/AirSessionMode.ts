@@ -16,6 +16,8 @@
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Mesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { mountPostureLayer } from '../anim/PostureLayer';
+import { BOARD_POSTURE, BOARD_LEGS, type BoardWindow } from '../core/BoardPosture';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
@@ -59,6 +61,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   // modes exist, and module state would let gymnastics and big-air overwrite
   // each other's athlete the moment both had been mounted in one session.
   let athlete: SpawnedCharacter | null = null;
+  let posture: { dispose(): void } | null = null;
   let props: VenuePropsHandle | null = null; let propsGone = false;
   let core: AirSessionCore | null = null;
   let launchPad: Mesh | null = null;
@@ -159,6 +162,36 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       installSafePlay(athlete.animator, opts.modeId);
       ctx.groundLock.track(athlete.root, athlete.skeleton);
       ctx.heroRef.current = athlete.root;
+
+      // THE BODY (2026-09-13). Big Air was the ONE board mode with no posture layer — skate, surf and the
+      // slalom all got one; this shares their clips and their problem, and a posture audit across every
+      // enabled mode is what turned it up. The board table already has exactly the windows this mechanic
+      // needs, because it is the same mechanic: a run-up, an air, a spin, a landing that absorbs.
+      //
+      // Mapping the core's four phases onto them:
+      //   Run  → cruise (tall over the board, eyes up the run — the run-up is not a sprint, it is a set-up)
+      //   Air  → spin while the core reports rotation, else air (the spin window deliberately STAYS OUT of
+      //          the chest aim: squaring the chest mid-rotation would cancel the rotation, the same rule the
+      //          hoops and board spins already carry)
+      //   Land → land (chest down over loaded knees, heels DOWN — never a landing on the toes)
+      //   Done → idle
+      posture?.dispose();
+      posture = mountPostureLayer(ctx.scene, athlete.skeleton, athlete.root, () => {
+        const st = core?.state ?? null;
+        const phase = st?.phase ?? 'Run';
+        const spinning = phase === 'Air' && Math.abs(st?.spinTurns ?? 0) > 0.05;
+        const w: BoardWindow = phase === 'Air' ? (spinning ? 'spin' : 'air')
+          : phase === 'Land' ? 'land'
+          : phase === 'Run' ? 'cruise' : 'idle';
+        const { pose, legs } = { pose: BOARD_POSTURE[w], legs: BOARD_LEGS[w] };
+        // eyes on the LANDING, which is what an air is actually about — a rider looking at the sky is a
+        // rider who does not know where the snow is
+        // the pad is built before the athlete spawns, but the feed runs on its own observable and must not
+        // assume the world still exists mid-teardown
+        const at = launchPad ? launchPad.position.add(new Vector3(0, 0, 14)) : new Vector3(0, 1.5, 14);
+        return { pose, legs, aim: at, eyes: at, window: w };
+      }, 'AIR-PP');
+
       // Frame the athlete against the thing they are running at.
       ctx.objectiveRef.current = launchPad.position;
 
@@ -265,6 +298,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       if (disposeCount < loadCount) return;
       athlete?.dispose(); athlete = null;
       propsGone = true; props?.dispose(); props = null;
+      posture?.dispose(); posture = null;
       launchPad?.dispose(); launchPad = null;
       gallery?.dispose(); gallery = null;
       core = null;

@@ -24,7 +24,7 @@ let errors = 0; const errs: string[] = [];
 const windows = new Map<string, number>();
 p.on('console', (m) => {
   const x = m.text();
-  const w = /\[(BAT|PITCH|KICK|KEEP|NET)-PP\]\s+(\S+)/.exec(x);
+  const w = /\[(BAT|PITCH|KICK|KEEP|NET|AIR)-PP\]\s+(\S+)/.exec(x);
   if (w) windows.set(`${w[1]}:${w[2]}`, (windows.get(`${w[1]}:${w[2]}`) ?? 0) + 1);
   if (m.type() === 'error' && !/401/.test(x)) { errors++; if (errs.length < 3) errs.push(x.slice(0, 140)); }
 });
@@ -63,9 +63,13 @@ await p.evaluate(`(() => {
   setInterval(() => {
     t += 0.06;
     pad.axes[0] = Math.sin(t * 1.1);           // sweep the stick across the court
-    pad.buttons[0].pressed = (Math.floor(t * 3) % 7) === 0;   // A: swing
+    pad.buttons[0].pressed = (Math.floor(t * 3) % 7) === 0;   // A: swing / start the spin
+    pad.buttons[1].pressed = (Math.floor(t * 3) % 9) === 0;   // B: stick the landing
     pad.buttons[4].pressed = (Math.floor(t * 3) % 11) === 0;  // L1: split step
     pad.buttons[7].value = (Math.floor(t * 3) % 5) === 0 ? 1 : 0;
+    // the big-air run-up is ALTERNATING d-pad strides — without them the athlete never launches
+    pad.buttons[14].pressed = (Math.floor(t * 6) % 4) === 0;
+    pad.buttons[15].pressed = (Math.floor(t * 6) % 4) === 2;
     pad.timestamp = performance.now();
   }, 60);
 })()`);
