@@ -29,6 +29,8 @@ export type ModeVerbConfig = {
 
 const A = (btn: 'A' | 'B' | 'X' | 'Y'): FelInput => ({ t: 'button', btn, pressed: true });
 const RT = (value: number): FelInput => ({ t: 'trigger', side: 'R', value });
+/** The LEFT trigger. Added for Aero Aces' rudder — no mode had needed an analog left before. */
+const LT = (value: number): FelInput => ({ t: 'trigger', side: 'L', value });
 /** Shoulder button. Held verbs like BOX OUT live here, not on the face diamond. */
 const L1 = (): FelInput => ({ t: 'button', btn: 'L1', pressed: true });
 
@@ -178,6 +180,16 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick'>> = {
     B: { label: 'KICK', emit: A('B') },
     X: { label: 'BLOCK', emit: A('X') },
     Y: { label: 'HEAVY', emit: A('Y') },
+  }),
+  // AERO ACES (new mode, owner ask 2026-09-12). A flying mode's verbs are not buttons-as-strikes: the THROTTLE
+  // is the verb you hold most of the time, so it is a HOLD on the right trigger, and BOOST is the one tap that
+  // matters. Without an entry here touch falls through to MODE_VERBS.default — one generic ACTION button — and
+  // a phone player would have had no throttle at all, which is the karate_vs bug repeated.
+  aeroaces: verbs({
+    Y: { label: 'THROTTLE', emit: RT(1), hold: true },
+    A: { label: 'BOOST', emit: A('A') },
+    X: { label: 'RUDDER', emit: LT(1), hold: true },
+    B: { label: 'LEVEL', emit: A('B') },
   }),
   mixedcombat: verbs({
     A: { label: 'STRIKE', emit: A('A') },

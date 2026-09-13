@@ -18,6 +18,7 @@ import { ThreeVThreeMode } from './ThreeVThreeMode';
 import { CourtCarnivalMode } from './CourtCarnivalMode';
 import { KarateVSMode } from './KarateVSMode';
 import { MixedCombatMode } from './MixedCombatMode';
+import { AeroAcesMode } from './AeroAcesMode';
 import { DunkDuelMode } from './DunkDuelMode';
 import { ShowdownMode } from './ShowdownMode';
 import { DuelMode } from './DuelMode';
@@ -64,6 +65,8 @@ export const MODES: Record<string, ModeDefinition> = {
   showdown: ShowdownMode,
   duel: DuelMode,
   mixedcombat: MixedCombatMode,
+  // NEW (owner ask 2026-09-12): Aero Aces had never existed here — see the mode's header.
+  aeroaces: AeroAcesMode,
   dunkduel: DunkDuelMode,
   // Rollout wave 8 — creative disciplines (M75): rhythm dance on the audio clock
   dance: DanceMode,
@@ -98,4 +101,7 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   'threepoint',
   // A+ P0 thin shell — the parked air-session shell ships with its juice (sprint retired, see above)
   'bigair',
+  // NEW MODE (owner ask 2026-09-12). Aero Aces Flyer was listed "retired by decision, do not resurrect" and had
+  // never existed in this codebase; the owner asked for it, so it is built rather than revived.
+  'aeroaces',
 ]);
