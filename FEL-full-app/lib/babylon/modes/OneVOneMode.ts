@@ -104,6 +104,9 @@ import {
   THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
   type ThreatState,
 } from '../core/TripleThreat';   // the stance the half-court game starts from
+import {
+  dunkKindFor, isContactDunk, posterPlant, posterFall, contactBanner, contactHitStopMs, POSTER_RELEASE_K,
+} from '../core/ContactDunk';   // dunked ON, not dunked beside
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
 import { attachBallToHand, releaseBall, flushThroughRim, clankOffRim } from '../anim/ballRig';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the dunk's Posture Poses, shared
@@ -309,6 +312,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   let burstArmed = false;
   /** Was I in the stance when this push STARTED? The jab is judged on that, not on the release frame. */
   let jabEligible = false;
+  /** A body planted chest-to-chest for a contact dunk, waiting to go down at the flush. */
+  let posterVictim: { kind: ReturnType<typeof dunkKindFor>; released: boolean } | null = null;
   let spinClip = 'bball_spin';           // M9: the same machinery turns a PIVOT (a shorter sweep, no travel)
   let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
@@ -410,7 +415,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null;
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
@@ -546,7 +551,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       ctx.setHud({ score: myScore, foeScore, target: TARGET_SCORE, momentum: 0, turbo: 100, hint: HINT_OFFENCE });
       // dev probes (ONEVONE-DEFENSE-LOGIC): the possession machine, readable without the HUD
       if (process.env.NODE_ENV === 'development') {
-        (ctx.scene.metadata ??= {}).onevone = { possession: () => possession, defPhase: () => defPhase, attackPhase: () => attacker.phase, foeRoot: foe.root, myJumpAge: () => myJumpAge, contacts: () => devContacts.slice(), luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: foeHandUp }), ended: () => ended, post: () => ({ posting, spinning: !!spin, brace: !!meSlot.intent.brace, can: canPostUp(me.root.position, RIM_FLOOR, foeStunSec > 0 || foeFloored ? null : foe.root.position), carrying, shooting, finish: !!finish, gather: !!gather, foeStun: foeStunSec, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: meAnimTree.held ?? '' }), foeJob: () => (foeBrain?.boxing ? 'boxout' : foeBrain?.job ?? ''), foeBoxing: () => !!foeBrain?.boxing, defend: () => { if (!ended && possession === 'mine') startDefense(ctx, 'PROBE — DEFEND!'); }, offense: () => { if (!ended) resetPositions(); } };   // BIOMECH-HOOPS-WAVE1: `defend()` / `offense()` let a probe reach either possession deterministically
+        (ctx.scene.metadata ??= {}).onevone = { possession: () => possession, defPhase: () => defPhase, attackPhase: () => attacker.phase, foeRoot: foe.root, myJumpAge: () => myJumpAge, contacts: () => devContacts.slice(), luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: foeHandUp }), ended: () => ended, post: () => ({ posting, spinning: !!spin, brace: !!meSlot.intent.brace, can: canPostUp(me.root.position, RIM_FLOOR, foeStunSec > 0 || foeFloored ? null : foe.root.position), carrying, shooting, finish: !!finish, gather: !!gather, foeStun: foeStunSec, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: meAnimTree.held ?? '' }), foeJob: () => (foeBrain?.boxing ? 'boxout' : foeBrain?.job ?? ''), foeBoxing: () => !!foeBrain?.boxing, defend: () => { if (!ended && possession === 'mine') startDefense(ctx, 'PROBE — DEFEND!'); }, offense: () => { if (!ended) resetPositions(); }, poster: () => { if (ended) return false; /* A poster needs three things at once: my possession, a run-up, and a defender ON HIS FEET inside 1.5 m    between me and the ring. A driver cannot arrange that — bumping him on the way in keeps him STUNNED,    and 1v1 passes a null defender while he is stunned, so contestDrive returns its no-defender sentinel    (t NaN lateral NaN) and the contact dunk can never be read. This seam sets the geometry up exactly    once, the same way defend()/offense() exist so a probe can reach either possession deterministically. */ if (possession !== 'mine') resetPositions(); foeStunSec = 0; foeFloored = false; posterVictim = null; const toRim = RIM_FLOOR.subtract(me.root.position); toRim.y = 0; if (toRim.lengthSquared() < 1e-4) return false; toRim.normalize(); /* far enough out for a real run-up: the dribble controller integrates its own velocity from the stick    and discards a direct write, so the drive-dunk speed minimum is only met by actually accelerating. */ me.root.position.set(RIM_FLOOR.x - toRim.x * 5.2, 0, RIM_FLOOR.z - toRim.z * 5.2); foe.root.position.set(RIM_FLOOR.x - toRim.x * 1.3, 0, RIM_FLOOR.z - toRim.z * 1.3); face(foe.root, yawTo(foe.root.position, me.root.position)); meDribble.setFacing(yawTo(me.root.position, RIM_FLOOR)); meDribble.vel.copyFrom(toRim.scale(6.2)); turbo.t01 = 1; console.info('[1V1-CONTACT] probe poster geometry set'); return true; } };   // BIOMECH-HOOPS-WAVE1: `defend()` / `offense()` let a probe reach either possession deterministically
         const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__;
         if (dev) dev.hoopsPosture = { me: () => mePosture?.layer.get() ?? null, foe: () => foePosture?.layer.get() ?? null, bio: () => ({ me: { ...meBio }, foe: { ...foeBio } }) };   // BIOMECH-HOOPS-WAVE1 probes
       }
@@ -1219,7 +1224,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     defPhase = 'check'; attacker.reset(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null;
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
@@ -1348,6 +1353,9 @@ export const OneVOneMode: ModeDefinition = (() => {
           console.info(`[1V1-DEF] ai swat at the bump chance ${swatChance.toFixed(2)}`);
         } else driveBump(ctx, c, made && kind === 'poster', (1 - k) * DRIVE_DUNK.flightMs > 320);
       }
+      // the victim goes down once the ball is past him — held through the rise, released at the FLUSH, so the
+      // fall lands after the ball is through rather than at the moment of contact
+      if (posterVictim && k >= POSTER_RELEASE_K) posterVictimRelease(ctx);
       if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
         // G6: the slam resolves AT THE IRON — the ball leaves the hand at the rim; a make flushes through the net, a miss
         // clanks off the front (it used to let go on the feet-down frame, from a hand at hip height, and float there)
@@ -1681,22 +1689,57 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** M2: the bodies meet in the flight — hit-stop micro (the flight clock freezes with the clips), the thud, the shove or
    *  the knockdown. CONTACT you feel before the iron, not a make% number. */
   function driveBump(ctx: ModeContext, c: DriveContest, floorHim: boolean, banner: boolean): void {
-    ctx.juice.hitStop(45);
-    ctx.juice.shake(0.08, 110);
-    ctx.feel.impact(0.3);
-    SoundKit.play('impact', { pitch: 0.95, volume: 0.55 });
+    // WHAT KIND of dunk the contact makes this. The distinction decides whether the victim is pulled into
+    // the animation at all: a late-sliding body is a shoulder you went THROUGH and dragging him under the
+    // rim would read as a teleport, while a SET body is a man you went OVER.
+    const kind = dunkKindFor({ strength01: c.strength01, set: c.set, present: true });
+    ctx.juice.hitStop(contactHitStopMs(kind));
+    ctx.juice.shake(kind === 'body_bag' ? 0.13 : 0.08, kind === 'body_bag' ? 150 : 110);
+    ctx.feel.impact(kind === 'body_bag' ? 0.5 : 0.3);
+    SoundKit.play('impact', { pitch: kind === 'body_bag' ? 0.82 : 0.95, volume: kind === 'body_bag' ? 0.7 : 0.55 });
     EffectsKit.burst(ctx.scene, foe.root.position.add(new Vector3(0, 1.0, 0)), 'dust');
-    const shove = bumpShove(c);
-    if (floorHim) {
-      foeStunSec = 1.4; foeFloored = true;
-      foeAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
-    } else if (!foeFloored) {
-      foeStunSec = Math.max(foeStunSec, 0.35);
-      foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+
+    if (isContactDunk(kind) && !foeFloored) {
+      // CHEST TO CHEST. bumpShove pushed him off the drive line, so by the flush he was somewhere else and
+      // the slam landed beside a bystander — the one thing "chest to chest dunked on" is not. He is planted
+      // BETWEEN me and the ring, squared at me, and held there through the flight; the fall comes at the
+      // flush (posterVictim below), after the ball is through, which is the order those things happen in.
+      const plant = posterPlant(RIM_FLOOR, me.root.position);
+      if (contact?.isReady) contact.setAirborne('foe', false);
+      foe.root.position.copyFrom(plant.spot);
+      face(foe.root, plant.faceYaw);
+      foeStunSec = Math.max(foeStunSec, 1.2);
+      foeAnimTree.beat('bball_hand_up', { holdEnd: true, fadeSec: 0.05 });   // he is CONTESTING it, arms up
+      posterVictim = { kind, released: false };
+      console.info(`[1V1-CONTACT] ${kind} — victim planted chest to chest at ${plant.spot.z.toFixed(2)}`);
+    } else {
+      const shove = bumpShove(c);
+      if (floorHim) {
+        foeStunSec = 1.4; foeFloored = true;
+        foeAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      } else if (!foeFloored) {
+        foeStunSec = Math.max(foeStunSec, 0.35);
+        foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+      }
+      if (contact?.isReady) contact.shove('foe', shove); else foe.root.position.addInPlace(shove.scale(0.16));
+      console.info(`[1V1-CONTACT] drive bump ${kind} strength ${c.strength01.toFixed(2)} set ${c.set} floor ${floorHim} shove ${shove.length().toFixed(1)}`);
     }
-    if (contact?.isReady) contact.shove('foe', shove); else foe.root.position.addInPlace(shove.scale(0.16));
-    if (banner) bannerFlash(ctx, c.set ? 'CONTACT!' : 'BUMP!', 260);
-    console.info(`[1V1-CONTACT] drive bump strength ${c.strength01.toFixed(2)} set ${c.set} floor ${floorHim} shove ${shove.length().toFixed(1)}`);
+    if (banner) bannerFlash(ctx, contactBanner(kind), kind === 'body_bag' ? 1100 : 500);
+  }
+
+  /** The victim of a contact dunk goes down at the FLUSH, not at the bump — the ball is through first. */
+  function posterVictimRelease(ctx: ModeContext): void {
+    if (!posterVictim || posterVictim.released) return;
+    posterVictim.released = true;
+    const fall = posterFall(RIM_FLOOR, foe.root.position, posterVictim.kind);
+    foeFloored = true;
+    foeStunSec = posterVictim.kind === 'body_bag' ? 2.1 : 1.5;
+    foeAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+    if (contact?.isReady) contact.shove('foe', fall); else foe.root.position.addInPlace(fall.scale(0.16));
+    EffectsKit.burst(ctx.scene, foe.root.position.add(new Vector3(0, 0.3, 0)), 'dust');
+    SoundKit.play('crowdCheer', { volume: 0.7 });
+    console.info(`[1V1-CONTACT] ${posterVictim.kind} victim goes down, fall ${fall.length().toFixed(1)}`);
+    posterVictim = null;
   }
 
   // ── A+ P0 CONTACT-lite (PM brief ONEVONE-A-PLUS-P0, 2026-09-06) ─────────────────────────────────────────────────
