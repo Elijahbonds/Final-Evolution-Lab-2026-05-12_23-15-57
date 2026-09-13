@@ -191,6 +191,15 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick'>> = {
     X: { label: 'RUDDER', emit: LT(1), hold: true },
     B: { label: 'LEVEL', emit: A('B') },
   }),
+  // VELOCITY KART (new mode, owner ask 2026-09-12). The THROTTLE is held, DRIFT is held into a corner, and
+  // BOOST is the tap that spends what the drift banked — so two of the three verbs are holds, which is what a
+  // racing mode needs and what MODE_VERBS.default could never have given a phone.
+  velocitykart: verbs({
+    Y: { label: 'GAS', emit: RT(1), hold: true },
+    X: { label: 'DRIFT', emit: A('X'), hold: true },
+    A: { label: 'BOOST', emit: A('A') },
+    B: { label: 'BRAKE', emit: LT(1), hold: true },
+  }),
   mixedcombat: verbs({
     A: { label: 'STRIKE', emit: A('A') },
     B: { label: 'KICK', emit: A('B') },

@@ -105,13 +105,19 @@ export const AERO_COURSES: readonly Course[] = [
 export const KART_COURSES: readonly Course[] = [
   {
     id: 'boardwalk-loop', name: 'BOARDWALK LOOP', sub: 'One long straight. Bank boost in the hairpin.',
-    kind: 'kart', loop: true, laps: 3, gold: 78,
-    start: { at: new Vector3(0, 0, -90), heading: 0 },
+    kind: 'kart', loop: true, laps: 2, gold: 110,
+    start: { at: new Vector3(0, 0, -150), heading: 0 },
+    // SCALED UP from a 60-70 m loop, and the reason is measured rather than aesthetic: the kart's grip is
+    // 11 m/s^2, so at its 26 m/s top speed the tightest corner it can hold is about v^2/a = 61 m. On the
+    // original loop every corner was tighter than that, which meant traction broke on its OWN every time —
+    // the handbrake added nothing and a run with drifting DISABLED still logged 516 drift frames and banked a
+    // full boost meter. A drift you cannot avoid is not a choice, and the choice is the entire mechanic. At
+    // this size a corner can be held on grip, so sliding it is a decision with a cost and a payoff.
     gates: withFacings([
       g(0, 0, 0, 9),
-      g(60, 0, 70, 9),
-      g(0, 0, 140, 9),
-      g(-60, 0, 70, 9),
+      g(140, 0, 160, 9),
+      g(0, 0, 320, 9),
+      g(-140, 0, 160, 9),
     ], true),
   },
 ];
@@ -195,4 +201,41 @@ export function medalFor(course: Course, seconds: number, finished: boolean): Me
   if (seconds <= course.gold * 1.25) return 'silver';
   if (seconds <= course.gold * 1.5) return 'bronze';
   return 'none';
+}
+
+// ── THE TRACK SURFACE ────────────────────────────────────────────────────────────────────────────────────
+// A kart needs something the flyer does not: a road, and a rule for being off it. The road is the polyline
+// through the gates, which means the track and the checkpoints can never disagree about where the course goes.
+
+/** Half the road's width, metres. The gates' radius is the same figure, so a gate spans the road exactly. */
+export const TRACK_HALF_WIDTH = 9;
+
+/** Shortest distance from a point to the segment a-b, on the floor (XZ). */
+export function distToSegment(p: { x: number; z: number }, a: Vector3, b: Vector3): number {
+  const abx = b.x - a.x, abz = b.z - a.z;
+  const apx = p.x - a.x, apz = p.z - a.z;
+  const len2 = abx * abx + abz * abz;
+  const t = len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, (apx * abx + apz * abz) / len2));
+  const cx = a.x + abx * t - p.x, cz = a.z + abz * t - p.z;
+  return Math.hypot(cx, cz);
+}
+
+/** How far off the centre line a point is. */
+export function distToTrack(p: { x: number; z: number }, course: Course): number {
+  const n = course.gates.length;
+  let best = Infinity;
+  for (let i = 0; i < n; i++) {
+    const a = course.gates[i].at;
+    const b = course.gates[(i + 1) % n].at;
+    if (!course.loop && i === n - 1) break;
+    best = Math.min(best, distToSegment(p, a, b));
+  }
+  // the start sits before the first gate, so the run-up counts as road too
+  best = Math.min(best, distToSegment(p, course.start.at, course.gates[0].at));
+  return best;
+}
+
+/** Is the kart on the road? */
+export function onTrack(p: { x: number; z: number }, course: Course, halfWidth = TRACK_HALF_WIDTH): boolean {
+  return distToTrack(p, course) <= halfWidth;
 }

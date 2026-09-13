@@ -49,6 +49,7 @@ export function winnerIdFor(outcome: MpOutcome, hostId: string, guestId: string 
 export const MP_MODES: { key: string; label: string }[] = [
   // NEW MODE (owner ask 2026-09-12): a time-attack course, so it stakes the same way every score run does.
   { key: 'aeroaces', label: 'Aero Aces' },
+  { key: 'velocitykart', label: 'Velocity Kart' },
   { key: 'dunk', label: 'Flight Night' },
   { key: 'threepoint', label: 'Downtown' },
   { key: 'big-air', label: 'Stomp' },
@@ -86,7 +87,7 @@ export const MP_SESSION_MODE: Record<string, string> = {
   freerun: 'freerun', tennis: 'tennis', tiebreak: 'tiebreak',
   'karate-vs': 'karateVersus', onevone: 'hoops1v1', threevthree: 'hoops3v3', carnival: 'carnival', volleyball: 'volleyball', dance: 'dance',
   karate: 'karateEndless', mixedcombat: 'mixedcombat', dunkduel: 'dunkduel', 'who-scene-it': 'whoSceneIt',
-  aeroaces: 'aeroAces',
+  aeroaces: 'aeroAces', velocitykart: 'velocityKart',
 };
 export function sessionModeFor(mpKey: string): string { return MP_SESSION_MODE[mpKey] ?? mpKey; }
 const MP_MODE_KEYS = new Set(MP_MODES.map((m) => m.key));

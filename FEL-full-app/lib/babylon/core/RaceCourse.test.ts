@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
 import {
   AERO_COURSES, KART_COURSES, courseById, passedGate, startRace, stepRace, toNextGate, medalFor,
+  distToSegment, distToTrack, onTrack, TRACK_HALF_WIDTH,
   type Course, type Gate,
 } from './RaceCourse';
 
@@ -210,6 +211,50 @@ describe('gate facings follow the racing line', () => {
         }
       }
       expect(p.finished, `${c.id} never finished`).toBe(true);
+    }
+  });
+});
+
+describe('the road, and the rule for being off it', () => {
+  const kart = KART_COURSES[0];
+
+  it('distance to a segment is measured to the NEAREST POINT, not to an endpoint', () => {
+    const a = new Vector3(0, 0, 0), b = new Vector3(100, 0, 0);
+    expect(distToSegment({ x: 50, z: 7 }, a, b)).toBeCloseTo(7, 5);
+    // past the end it falls back to the endpoint, which is what a segment means
+    expect(distToSegment({ x: 130, z: 0 }, a, b)).toBeCloseTo(30, 5);
+  });
+
+  it('the centre line of the course IS the road', () => {
+    for (const gt of kart.gates) expect(onTrack(gt.at, kart)).toBe(true);
+  });
+
+  it('halfway between two gates is still on the road — the road is the line, not the gates', () => {
+    const a = kart.gates[0].at, b = kart.gates[1].at;
+    expect(onTrack({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 }, kart)).toBe(true);
+  });
+
+  it('well off the line is off the road', () => {
+    expect(onTrack({ x: 400, z: 400 }, kart)).toBe(false);
+  });
+
+  it('the start line counts as road, so a kart does not begin in the dirt', () => {
+    expect(onTrack(kart.start.at, kart)).toBe(true);
+  });
+
+  it('the edge is where the width says it is', () => {
+    const a = kart.gates[0].at;
+    // step sideways off the first gate, perpendicular to its facing
+    const side = new Vector3(-kart.gates[0].through.z, 0, kart.gates[0].through.x);
+    const inside = { x: a.x + side.x * (TRACK_HALF_WIDTH - 1), z: a.z + side.z * (TRACK_HALF_WIDTH - 1) };
+    const outside = { x: a.x + side.x * (TRACK_HALF_WIDTH + 6), z: a.z + side.z * (TRACK_HALF_WIDTH + 6) };
+    expect(onTrack(inside, kart)).toBe(true);
+    expect(onTrack(outside, kart)).toBe(false);
+  });
+
+  it('distToTrack never returns a NaN, even for silly input', () => {
+    for (const p of [{ x: 0, z: 0 }, { x: 1e6, z: -1e6 }, { x: -0, z: 0 }]) {
+      expect(Number.isFinite(distToTrack(p, kart))).toBe(true);
     }
   });
 });

@@ -19,6 +19,7 @@ import { CourtCarnivalMode } from './CourtCarnivalMode';
 import { KarateVSMode } from './KarateVSMode';
 import { MixedCombatMode } from './MixedCombatMode';
 import { AeroAcesMode } from './AeroAcesMode';
+import { VelocityKartMode } from './VelocityKartMode';
 import { DunkDuelMode } from './DunkDuelMode';
 import { ShowdownMode } from './ShowdownMode';
 import { DuelMode } from './DuelMode';
@@ -67,6 +68,7 @@ export const MODES: Record<string, ModeDefinition> = {
   mixedcombat: MixedCombatMode,
   // NEW (owner ask 2026-09-12): Aero Aces had never existed here — see the mode's header.
   aeroaces: AeroAcesMode,
+  velocitykart: VelocityKartMode,
   dunkduel: DunkDuelMode,
   // Rollout wave 8 — creative disciplines (M75): rhythm dance on the audio clock
   dance: DanceMode,
@@ -104,4 +106,5 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   // NEW MODE (owner ask 2026-09-12). Aero Aces Flyer was listed "retired by decision, do not resurrect" and had
   // never existed in this codebase; the owner asked for it, so it is built rather than revived.
   'aeroaces',
+  'velocitykart',
 ]);
