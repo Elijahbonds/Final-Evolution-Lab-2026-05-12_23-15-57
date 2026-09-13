@@ -96,6 +96,10 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';              // the miss meets the iron it earned
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT } from '../core/Ref';   // the rules live in the handbook, not in here
+import {
+  CHAIN_IDLE, BASELINE_HANDLE, canChain, pushChain, tickChain, chainTier, ankleBreakOdds, isHardBreak,
+  hasMove, tightness, moveFromContext, type ChainState, type HandleMove,
+} from '../core/HandleSystem';   // Street chains x 2K brakes, gated on the handle the PRQ scan earned
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
 import { attachBallToHand, releaseBall, flushThroughRim, clankOffRim } from '../anim/ballRig';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the dunk's Posture Poses, shared
@@ -107,7 +111,7 @@ import { AgentControlSource } from '../core/AgentControlSource';  // M69: intent
 import { agentBridge } from '../core/AgentBridge';
 import {
   DribbleController, ShotMeter, DefenderBrain, contestLevel, clampToHalfCourt, isThree,
-  resolveBodyCollision, checkAnkleBreak, classifyShot, ANKLE_BREAK_STUN_SEC,
+  resolveBodyCollision, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, BLOCK_RANGE, DUNK_PCT,
   STEAL_EXPOSURE_MIN, AttackerBrain, RIVAL_DRIVE_SPEED, rivalShotPct, handUpContest, distXZ, HAND_UP_SEC,
   SHOT_QUALITY_PCT, type ShotQuality, type ShotContext, type PostShot, type ShotStyle,
@@ -281,6 +285,12 @@ export const OneVOneMode: ModeDefinition = (() => {
   let posting = false;
   let spin: { plan: SpinPlan; t: number; beat: boolean } | null = null;
   let spinCooldown = 0, spinArmed = 0;   // M6: a body I meet ARMS the spin; the stick swung across throws it
+  /** The handle drives the vocabulary, the chain window and how tight the ball rides (HandleSystem).
+   *  PRQ is not plumbed into the modes yet, so this is the baseline scan; `?handle=` overrides it so the
+   *  max-handle behaviour can actually be driven and proved rather than only unit-tested. */
+  let handle = BASELINE_HANDLE;
+  /** What just happened in my hands, and how long ago — a chain, not a sequence of separate presses. */
+  let chain: ChainState = { ...CHAIN_IDLE };
   let spinClip = 'bball_spin';           // M9: the same machinery turns a PIVOT (a shorter sweep, no travel)
   let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
@@ -438,6 +448,10 @@ export const OneVOneMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'venice');
       EffectsKit.ballTrail(ctx.scene, ball);
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: juice-only ring + net, material clones — no meshy_hoop_* transform is touched
+      if (typeof window !== 'undefined') {
+        const q = Number(new URLSearchParams(window.location.search).get('handle'));
+        if (Number.isFinite(q) && q > 0) { handle = Math.max(0, Math.min(100, q)); console.info(`[1V1-HANDLE] handle ${handle} (override)`); }
+      }
       if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }
       SoundKit.startAmbient('stadium');
 
@@ -724,6 +738,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (finish) stepFinish(dt);   // M3: the finish's stride and hop (before and after the release, to feet-down)
         // HOOPS-MOVE-KIT-B: M6 the pivot owns the body while it turns; otherwise M4–M6's path — L1/LT held with a body to
         // back down is a POST-UP (the back to the basket, a slow back-down, the stick across = a quick spin out of it)
+        chain = tickChain(chain, dt, handle);   // the chain expires on its own; a late press starts a new one
         spinCooldown = Math.max(0, spinCooldown - dt);
         spinArmed = Math.max(0, spinArmed - dt);
         if (spin) stepSpin(ctx, dt);
@@ -758,23 +773,28 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (drib.crossover && !finish && !posting) {
             SoundKit.play('whoosh', { pitch: 1.4, volume: 0.4 });
             ctx.feel?.impact?.(0.1);
-            if (foeStunSec === 0 && checkAnkleBreak(true, me.root.position, foe.root.position)) {
-              foeStunSec = ANKLE_BREAK_STUN_SEC;
-              swing('ankle_break');
-              SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
-              SoundKit.play('crowdCheer', { volume: 0.5 });
-              ctx.feel?.impact?.(0.35);
-              EffectsKit.burst(ctx.scene, foe.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
-              foeAnimTree.beat(SPORT_CLIP.karateHitReact);
-              ctx.setHud({ momentum });
-              bannerFlash(ctx, 'ANKLES!');
-            }
+            // A crossover is a CHAIN LINK now, not an isolated event. The old read was a single
+            // checkAnkleBreak on one move, so depth could not matter and a spammed crossover was as
+            // dangerous as a real sequence. Chain depth is the skill, and the chain cannot repeat a move.
+            //
+            // WHICH move the flick becomes is read off the situation (moveFromContext), not off a new
+            // button: the vocabulary had eight moves and two bindings, so measured in a probe every chain
+            // was depth 1 forever and the hard ankle break was unreachable in play. A low handle still
+            // only ever gets the basics out of the same input.
+            const toRim = RIM_FLOOR.subtract(me.root.position); toRim.y = 0;
+            doMove(ctx, moveFromContext({
+              speed01: drib.speed01,
+              retreating: Vector3.Dot(meDribble.vel, toRim) < -0.2,
+              pressured: distXZ(me.root.position, foe.root.position) < 2.0 && foeStunSec === 0 && !foeFloored,
+              last: chain.last,
+            }, handle));
           }
           // HESITATION — the pullback plant. You spent your momentum; if the
           // defender was CLOSING on you, they bite and you own the next beat
           // (the controller's explode-out window is already armed). A set
           // defender standing off does NOT bite — that's the read.
           if (drib.hesitation && !finish && !posting) {
+            doMove(ctx, 'hesi');   // the pull-back is a link: hesi into cross is the oldest combo there is
             turbo.t01 = Math.max(0, turbo.t01 - 0.05);
             SoundKit.play('whoosh', { pitch: 0.8, volume: 0.3 });
             ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
@@ -1683,6 +1703,67 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (meHandUp) { meHandUp = false; meAnimTree.releaseHold(); }
     contact?.setAirborne('foe', false);
   }
+  /**
+   * A MOVE HAPPENED — one door for every handle move, so the chain is always correct.
+   *
+   * Street Vol 2's signature is that moves chain: the second one starts before the first has finished,
+   * and three together read as a highlight rather than three inputs. 2K's half is that none of it is
+   * free — you must own the move, you must be inside the window, and you cannot repeat one.
+   *
+   * The ankles are decided HERE rather than at the crossover, because depth is the skill: a single
+   * crossover should rarely break anyone and a three-deep chain at a real handle should look inevitable.
+   */
+  function doMove(ctx: ModeContext, move: HandleMove): void {
+    if (!hasMove(move, handle)) return;              // not in my hands yet — the gate IS the upgrade
+    if (!canChain(move, chain, handle)) {
+      if (process.env.NODE_ENV === 'development') console.info(`[1V1-HANDLE] ${move} refused (last ${chain.last} since ${chain.since.toFixed(2)}s) — new chain`);
+      chain = pushChain(move, { ...CHAIN_IDLE }, handle);
+      return;
+    }
+    chain = pushChain(move, chain, handle);
+    const tier = chainTier(chain.length);
+    if (process.env.NODE_ENV === 'development') console.info(`[1V1-HANDLE] move ${move} chain ${chain.length} (${tier})`);
+    if (tier !== 'single') {
+      SoundKit.play('whoosh', { pitch: 1.1 + chain.length * 0.12, volume: 0.35 });
+      ctx.feel?.impact?.(0.08 * chain.length);
+    }
+    if (foeStunSec > 0 || foeFloored) return;        // already cooked; nothing left to break
+
+    const closing = foeVelLast.length() > 1.4 && facingCos(foe.root.rotation.y, foe.root.position, me.root.position) > 0;
+    const set = foeVelLast.length() < 0.6;
+    const within = distXZ(me.root.position, foe.root.position) < 2.6;
+    if (!within) return;                            // you cannot break a man you are nowhere near
+
+    const odds = ankleBreakOdds({ chainLength: chain.length, handle, defenderClosing: closing, defenderSet: set });
+    if (roll() >= odds) return;
+
+    swing('ankle_break');
+    SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
+    SoundKit.play('crowdCheer', { volume: 0.55 });
+    EffectsKit.burst(ctx.scene, foe.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
+    ctx.setHud({ momentum });
+
+    if (isHardBreak(chain.length, handle)) {
+      // "ankle breakers" — he goes DOWN, and has to get up. The same floored state the poster dunk uses,
+      // so there is one way a body ends up on this floor and one way it comes back.
+      foeFloored = true;
+      foeStunSec = ANKLE_BREAK_STUN_SEC * 1.8;
+      // the SAME knockdown + floor hold the poster dunk uses: one way a body goes down here, one way it
+      // gets up. 'karate_floored' is not a registered clip — beating it would have left him clip-less.
+      foeAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      ctx.feel?.impact?.(0.55);
+      ctx.juice.shake(0.09, 140);
+      bannerFlash(ctx, 'ANKLES — HE IS DOWN!', 1100);
+      console.info(`[1V1-HANDLE] HARD ankle break, chain ${chain.length} handle ${handle}`);
+    } else {
+      foeStunSec = ANKLE_BREAK_STUN_SEC;
+      foeAnimTree.beat(SPORT_CLIP.karateHitReact);
+      ctx.feel?.impact?.(0.35);
+      bannerFlash(ctx, tier === 'highlight' ? 'ANKLES!' : 'SHOOK HIM!');
+      console.info(`[1V1-HANDLE] ankle break, chain ${chain.length} handle ${handle} odds ${odds.toFixed(2)}`);
+    }
+  }
+
   /** The two bodies as the loose ball sees them: a jumper reaches higher, a floored body cannot reach at all. */
   function reboundBodies(): BodyRef[] {
     return [

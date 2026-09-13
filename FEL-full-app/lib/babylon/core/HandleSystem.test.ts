@@ -1,0 +1,287 @@
+// Does a max handle actually feel different, and is the difference EARNED?
+//
+// These tests are written against the owner's brief rather than the implementation: a baseline scan owns
+// a crossover and nothing fancy; a maxed one owns the whole vocabulary, chains it, and puts people on
+// the floor. And the gate runs off the same PRQ attributes the subscription protects, because that is
+// what makes the upgrade legible.
+
+import { describe, it, expect } from 'vitest';
+import {
+  MOVE_HANDLE, BASELINE_HANDLE, CHAIN_IDLE,
+  hasMove, movesFor, handleFrom, chainWindowSec, tightness,
+  canChain, pushChain, tickChain, chainTier, ankleBreakOdds, isHardBreak, gathersIntoShot,
+  moveFromContext, MAX_CHAIN, chainSpent,
+  type ChainState,
+} from './HandleSystem';
+
+const MAX = 100;
+
+describe('the vocabulary is the upgrade', () => {
+  it('a baseline scan owns the basics and none of the flash', () => {
+    expect(hasMove('crossover', BASELINE_HANDLE)).toBe(true);
+    expect(hasMove('hesi', BASELINE_HANDLE)).toBe(true);
+    expect(hasMove('shammgod', BASELINE_HANDLE)).toBe(false);
+    expect(hasMove('snatch_back', BASELINE_HANDLE)).toBe(false);
+    expect(hasMove('double_cross', BASELINE_HANDLE)).toBe(false);
+  });
+
+  it('a maxed handle owns everything', () => {
+    const all = movesFor(MAX);
+    expect(all).toContain('shammgod');
+    expect(all.length).toBe(Object.keys(MOVE_HANDLE).length);
+  });
+
+  it('every upgrade step adds strictly more than it takes away', () => {
+    // the move set must only ever GROW with handle: a gate that swapped moves would feel like a
+    // sidegrade rather than a reward
+    let prev = movesFor(0).length;
+    for (let h = 5; h <= 100; h += 5) {
+      const n = movesFor(h).length;
+      expect(n).toBeGreaterThanOrEqual(prev);
+      prev = n;
+    }
+  });
+
+  it('the top of the vocabulary is genuinely out of reach at baseline', () => {
+    const locked = (Object.keys(MOVE_HANDLE) as (keyof typeof MOVE_HANDLE)[])
+      .filter((m) => MOVE_HANDLE[m] > BASELINE_HANDLE);
+    expect(locked.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('handle comes out of the PRQ scan, not a cosmetic stat', () => {
+  it('a default scan sits at the baseline', () => {
+    expect(handleFrom({})).toBeCloseTo(BASELINE_HANDLE, 5);
+  });
+
+  it('agility moves it most — a handle is mostly hands and feet', () => {
+    const byAgility = handleFrom({ agility: 90 });
+    const byFlex = handleFrom({ flexibility: 90 });
+    const byMental = handleFrom({ mental: 90 });
+    expect(byAgility).toBeGreaterThan(byFlex);
+    expect(byFlex).toBeGreaterThan(byMental);
+  });
+
+  it('upgrading the scan is what unlocks the flash — the subscription link', () => {
+    // this is the thing a subscriber keeps: not a number, a move
+    const before = handleFrom({ agility: 50, flexibility: 50, mental: 50 });
+    const after = handleFrom({ agility: 95, flexibility: 90, mental: 85 });
+    expect(hasMove('snatch_back', before)).toBe(false);
+    expect(hasMove('snatch_back', after)).toBe(true);
+  });
+
+  it('it never leaves 0..100 however absurd the scan', () => {
+    expect(handleFrom({ agility: 500, flexibility: 500, mental: 500 })).toBeLessThanOrEqual(100);
+    expect(handleFrom({ agility: -90, flexibility: -90, mental: -90 })).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('moves CHAIN — the Street half of the brief', () => {
+  const state = (over: Partial<ChainState> = {}): ChainState => ({ ...CHAIN_IDLE, ...over });
+
+  it('opening a chain is always allowed if you own the move', () => {
+    expect(canChain('crossover', CHAIN_IDLE, BASELINE_HANDLE)).toBe(true);
+  });
+
+  it('a second DIFFERENT move inside the window chains', () => {
+    const s = state({ last: 'crossover', since: 0.1, length: 1 });
+    expect(canChain('between_legs', s, MAX)).toBe(true);
+    expect(pushChain('between_legs', s, MAX).length).toBe(2);
+  });
+
+  it('the SAME move twice is not a combo — a spammed crossover must not read as one', () => {
+    const s = state({ last: 'crossover', since: 0.1, length: 1 });
+    expect(canChain('crossover', s, MAX)).toBe(false);
+  });
+
+  it('outside the window the chain is over and the next move STARTS a new one', () => {
+    const s = state({ last: 'crossover', since: 2.0, length: 2 });
+    expect(canChain('between_legs', s, MAX)).toBe(false);
+    expect(pushChain('between_legs', s, MAX).length).toBe(1);
+  });
+
+  it('a max handle can string three together where a baseline handle cannot', () => {
+    // the same real-time gap between presses: one player chains, the other does not
+    // a gap that sits BETWEEN the two windows: inside max's, outside baseline's
+    const gap = 0.55;
+    const maxS = pushChain('crossover', CHAIN_IDLE, MAX);
+    const baseS = pushChain('crossover', CHAIN_IDLE, BASELINE_HANDLE);
+    expect(canChain('between_legs', { ...maxS, since: gap }, MAX)).toBe(true);
+    expect(canChain('between_legs', { ...baseS, since: gap }, BASELINE_HANDLE)).toBe(false);
+  });
+
+  it('the chain clock expires on its own', () => {
+    let s = pushChain('crossover', CHAIN_IDLE, MAX);
+    for (let i = 0; i < 60; i++) s = tickChain(s, 1 / 60, MAX);
+    expect(s.last).toBeNull();
+    expect(s.length).toBe(0);
+  });
+
+  it('three deep is a highlight, two is a combo, one is just a move', () => {
+    expect(chainTier(1)).toBe('single');
+    expect(chainTier(2)).toBe('combo');
+    expect(chainTier(3)).toBe('highlight');
+    expect(chainTier(5)).toBe('highlight');
+  });
+});
+
+describe('ankle breakers', () => {
+  const read = (over: Partial<Parameters<typeof ankleBreakOdds>[0]> = {}) => ankleBreakOdds({
+    chainLength: 1, handle: BASELINE_HANDLE, defenderClosing: false, defenderSet: false, ...over,
+  });
+
+  it('a SET defender is nearly unbreakable — sitting down on defence has to work', () => {
+    expect(read({ defenderSet: true, chainLength: 3, handle: MAX })).toBeLessThan(0.1);
+  });
+
+  it('a CLOSING defender is the one you break — that is the read', () => {
+    expect(read({ defenderClosing: true })).toBeGreaterThan(read({ defenderClosing: false }));
+  });
+
+  it('chain depth matters more than anything else — it is the skill expression', () => {
+    const one = read({ chainLength: 1 });
+    const three = read({ chainLength: 3 });
+    expect(three).toBeGreaterThan(one * 2.5);
+  });
+
+  it('a single crossover rarely breaks anybody', () => {
+    expect(read({ chainLength: 1 })).toBeLessThan(0.2);
+  });
+
+  it('a three-move chain at a real handle looks inevitable', () => {
+    expect(read({ chainLength: 3, handle: MAX, defenderClosing: true })).toBeGreaterThan(0.7);
+  });
+
+  it('the odds never reach certainty — defence is never pointless', () => {
+    expect(read({ chainLength: 9, handle: 100, defenderClosing: true })).toBeLessThan(1);
+  });
+
+  it('only a deep chain at a real handle puts him on the FLOOR; anything less is a stagger', () => {
+    // "ankle breakers" means he goes down. A stumble is not one — but if every break floored a body the
+    // floor moment would stop meaning anything
+    expect(isHardBreak(3, MAX)).toBe(true);
+    expect(isHardBreak(1, MAX)).toBe(false);
+    expect(isHardBreak(3, BASELINE_HANDLE)).toBe(false);
+  });
+});
+
+describe('the 2K half: nothing here is free', () => {
+  it('a low handle rides the ball loose and high, a max handle keeps it low and tight', () => {
+    expect(tightness(0)).toBeLessThan(tightness(BASELINE_HANDLE));
+    expect(tightness(BASELINE_HANDLE)).toBeLessThan(tightness(MAX));
+    expect(tightness(MAX)).toBeLessThanOrEqual(1);
+  });
+
+  it('the chain window grows with the handle but stays tight at the bottom', () => {
+    expect(chainWindowSec(0)).toBeLessThan(chainWindowSec(MAX));
+    expect(chainWindowSec(0)).toBeLessThan(0.25);
+  });
+
+  it('a max window CLEARS the real move cadence, or the top of the tree is unreachable', () => {
+    // measured: the dribble controller commits a crossover about every 0.6 s, so at a 0.52 s window a
+    // maxed handle capped at a two-move chain in every probe run and the hard ankle break could never fire
+    const MEASURED_MOVE_CADENCE_SEC = 0.6;
+    expect(chainWindowSec(MAX)).toBeGreaterThan(MEASURED_MOVE_CADENCE_SEC);
+    // but it must never be so long that a baseline handle backs into combos it did not earn
+    expect(chainWindowSec(BASELINE_HANDLE)).toBeLessThan(MEASURED_MOVE_CADENCE_SEC);
+  });
+});
+
+describe('spin move gathers', () => {
+  it('a spin flows into the shot gather instead of dead-ending', () => {
+    expect(gathersIntoShot('spin')).toBe(true);
+  });
+
+  it('and so do the other moves whose exit faces the rim', () => {
+    expect(gathersIntoShot('snatch_back')).toBe(true);
+    expect(gathersIntoShot('hesi')).toBe(true);
+  });
+
+  it('a crossover does not — it beats a man sideways, it does not set your feet', () => {
+    expect(gathersIntoShot('crossover')).toBe(false);
+    expect(gathersIntoShot('between_legs')).toBe(false);
+  });
+});
+
+describe('one flick, different moves — the vocabulary needs no new buttons', () => {
+  const read = (over: Partial<Parameters<typeof moveFromContext>[0]> = {}) => ({
+    speed01: 0.5, retreating: false, pressured: false, last: null, ...over,
+  });
+
+  it('a baseline handle reaches only for the BASICS, never the flash', () => {
+    // between-the-legs unlocks at 45 and baseline is 50, so a fresh scan legitimately owns it — it is a
+    // basic move, not a highlight. What baseline must never produce is the earned vocabulary.
+    const flash = ['behind_back', 'double_cross', 'snatch_back', 'shammgod', 'spin'];
+    for (const o of [{ speed01: 0.1, pressured: true }, { retreating: true }, { speed01: 0.9, pressured: true }]) {
+      expect(flash).not.toContain(moveFromContext(read(o), BASELINE_HANDLE));
+    }
+  });
+
+  it('the SAME situation gives a maxed handle a better move than a baseline one', () => {
+    const situation = read({ speed01: 0.9, pressured: true });
+    expect(moveFromContext(situation, MAX)).toBe('snatch_back');
+    expect(moveFromContext(situation, BASELINE_HANDLE)).not.toBe('snatch_back');
+  });
+
+  it('standing still under pressure at a real handle puts it through the legs', () => {
+    expect(moveFromContext(read({ speed01: 0.1, pressured: true }), MAX)).toBe('between_legs');
+  });
+
+  it('backing out goes behind the back, away from the trailing hand', () => {
+    expect(moveFromContext(read({ retreating: true }), MAX)).toBe('behind_back');
+  });
+
+  it('full speed into a body is the snatch-back', () => {
+    expect(moveFromContext(read({ speed01: 0.9, pressured: true }), MAX)).toBe('snatch_back');
+  });
+
+  it('it never returns the move you just did — that is what lets a chain build', () => {
+    // the measured failure: only crossover and hesi were bound, so every chain was depth 1 forever
+    for (const last of ['between_legs', 'behind_back', 'double_cross', 'snatch_back'] as const) {
+      const got = moveFromContext(read({ last, speed01: 0.6, pressured: true, retreating: true }), MAX);
+      expect(got).not.toBe(last);
+    }
+  });
+
+  it('it only ever returns a move you actually own', () => {
+    for (const h of [0, 30, 50, 70, 90, 100]) {
+      const got = moveFromContext(read({ speed01: 0.8, pressured: true, retreating: true, last: 'crossover' }), h);
+      expect(hasMove(got, h) || got === 'crossover').toBe(true);
+    }
+  });
+
+  it('a mid-chain move at speed escalates to the double cross', () => {
+    expect(moveFromContext(read({ last: 'crossover', speed01: 0.6 }), MAX)).toBe('double_cross');
+  });
+});
+
+describe('a chain is spent eventually — a combo, not a treadmill', () => {
+  it('a chain cannot run past the cap however fast the inputs come', () => {
+    // measured without a cap: a maxed handle reached an EIGHTEEN-move chain, which made the hard ankle
+    // break continuous instead of special
+    let s = { ...CHAIN_IDLE };
+    const cycle = ['crossover', 'hesi', 'double_cross'] as const;
+    for (let i = 0; i < 40; i++) s = pushChain(cycle[i % 3], { ...s, since: 0.05 }, MAX);
+    expect(s.length).toBeLessThanOrEqual(MAX_CHAIN);
+  });
+
+  /** Exactly MAX_CHAIN distinct-enough links, which lands the chain on the cap. */
+  const runToCap = () => {
+    let s = { ...CHAIN_IDLE };
+    const cycle = ['crossover', 'hesi', 'double_cross'] as const;
+    for (let i = 0; i < MAX_CHAIN; i++) s = pushChain(cycle[i % 3], { ...s, since: 0.05 }, MAX);
+    return s;
+  };
+
+  it('the cap is reachable, so the highlight tier is real content', () => {
+    const s = runToCap();
+    expect(s.length).toBe(MAX_CHAIN);
+    expect(chainSpent(s)).toBe(true);
+    expect(chainTier(s.length)).toBe('highlight');
+  });
+
+  it('a spent chain starts over rather than sticking at the cap', () => {
+    const after = pushChain('crossover', { ...runToCap(), since: 0.05 }, MAX);
+    expect(after.length).toBe(1);
+  });
+});

@@ -1,0 +1,264 @@
+// THE HANDLE — what your hands can do, and how that is earned (2026-09-12).
+//
+// Owner's brief, verbatim:
+//   "should feel like street vol 2 or 3" / "x 2k"
+//   "if you have max ball ahndle you should feel like allen iverson x steezo"
+//   "ankle breakers"
+//   "spin move gathers"
+//
+// Decoded into mechanics, because "feels like Street" is not implementable and these three things are:
+//
+//   STREET VOL 2/3 = moves CHAIN. A move does not return to idle before the next one starts, and a
+//     chain reads bigger than its parts. That is the single most distinctive thing about those games.
+//   x 2K          = the chain is not free. A window you can miss, a repeat you cannot spam, and
+//     momentum you actually spend.
+//   IVERSON x STEEZO at MAX = the handle GATES the vocabulary. At baseline you get a crossover. At the
+//     top you get the double, the shammgod, the snatch-back, a long chain window, and a tight low
+//     dribble. The move set IS the upgrade.
+//
+// Why that last point matters beyond feel: the subscription keeps earned attributes
+// (lib/progression/upgradeGate.ts). If the handle gates MOVES, then the thing a subscriber keeps is a
+// move they can see and feel rather than a number on a sheet. That is the most legible possible answer
+// to "why subscribe", so the gate is deliberately wired to the same attributes the gate protects.
+//
+// PRQ HAS NO "BALL HANDLE" ATTRIBUTE. It is a physical scan: strength, speed, endurance, agility, power,
+// flexibility, recovery, mental. So handle is DERIVED (handleFrom below) from agility, flexibility and
+// mental — the three that actually govern hands, hips and reading a defender. Inventing a cosmetic
+// "handle" stat would have broken the link to the scan, and the link is the point.
+//
+// Pure: no Babylon, no scene. Every rule here is provable without a game running.
+
+/** The vocabulary. Ordered roughly by what a handle has to be to own it. */
+export type HandleMove =
+  | 'crossover'
+  | 'hesi'
+  | 'between_legs'
+  | 'behind_back'
+  | 'spin'
+  | 'double_cross'
+  | 'snatch_back'
+  | 'shammgod';
+
+/**
+ * The handle a move needs before you have it at all.
+ *
+ * Baseline PRQ is 50, so a fresh scan owns the crossover and the hesi and nothing else. The top of the
+ * list is deliberately out of reach without real upgrades — that is what makes reaching it feel like
+ * anything.
+ */
+export const MOVE_HANDLE: Readonly<Record<HandleMove, number>> = {
+  crossover: 0,
+  hesi: 0,
+  between_legs: 45,
+  behind_back: 58,
+  spin: 64,
+  double_cross: 72,
+  snatch_back: 80,
+  shammgod: 88,
+};
+
+/** Is this move in my hands? */
+export function hasMove(move: HandleMove, handle: number): boolean {
+  return handle >= MOVE_HANDLE[move];
+}
+
+/** Everything I can currently do, in vocabulary order — for a HUD, a tutorial, or a move wheel. */
+export function movesFor(handle: number): HandleMove[] {
+  return (Object.keys(MOVE_HANDLE) as HandleMove[]).filter((m) => hasMove(m, handle));
+}
+
+/**
+ * Handle out of a PRQ scan.
+ *
+ * Agility is the hands and the feet, flexibility is the hips and the low dribble, mental is reading the
+ * body in front of you and knowing what to chain. Weighted toward agility because that is what a
+ * handle mostly is.
+ */
+export function handleFrom(prq: { agility?: number; flexibility?: number; mental?: number }): number {
+  const a = prq.agility ?? 50, f = prq.flexibility ?? 50, m = prq.mental ?? 50;
+  return Math.max(0, Math.min(100, a * 0.55 + f * 0.25 + m * 0.20));
+}
+
+/** Baseline scan: what a brand-new player's hands are. */
+export const BASELINE_HANDLE = 50;
+
+/**
+ * How long after one move the next can still chain off it.
+ *
+ * This is the Street dial. A low handle gets a window so short that moves are effectively separate
+ * presses; a max handle gets long enough to actually string three together, which is what turns a
+ * sequence into a highlight instead of three inputs.
+ */
+export function chainWindowSec(handle: number): number {
+  const t = Math.max(0, Math.min(1, handle / 100));
+  // 0.18 s at nothing, 0.70 s at max. The top figure is MEASURED, not chosen: the dribble controller
+  // only commits a crossover about every 0.6 s (it wants a committed direction, deliberately — a
+  // crossover is a skilled cut, not a stick wiggle). At a 0.52 s window a maxed handle therefore topped
+  // out at a two-move chain in every probe run, which made depth 3 — and with it the whole hard ankle
+  // break and the 'highlight' tier — unreachable content. The window has to clear the real move cadence
+  // or the top of the upgrade tree is decoration.
+  return 0.18 + t * 0.52;
+}
+
+/**
+ * How tight and low the dribble rides: 0 is loose and high, 1 is on the floor and under the knees.
+ *
+ * The Iverson/Steezo read is mostly silhouette — the ball living low and close. This is what a mode
+ * feeds its dribble amplitude so a max handle LOOKS different before it does anything different.
+ */
+export function tightness(handle: number): number {
+  const t = Math.max(0, Math.min(1, handle / 100));
+  return 0.25 + t * 0.7;
+}
+
+export interface ChainState {
+  /** The move that just happened, or null if we are not in a chain. */
+  last: HandleMove | null;
+  /** Seconds since it happened. */
+  since: number;
+  /** How many moves have strung together, including the first. */
+  length: number;
+}
+
+export const CHAIN_IDLE: ChainState = { last: null, since: Infinity, length: 0 };
+
+/**
+ * How many moves a single chain can run to before it is spent.
+ *
+ * Measured without one: a maxed handle reached an EIGHTEEN-move chain, because each move landed inside
+ * the window and extended it again forever. That is a treadmill, not a highlight — and it made the
+ * hard ankle break continuous rather than special. A chain now tops out and you have to start another,
+ * which is what a combo is in the games this is drawn from.
+ */
+export const MAX_CHAIN = 4;
+
+/**
+ * Can `next` chain off what just happened?
+ *
+ * Three rules, and each one is a 2K-side brake on the Street-side freedom:
+ *   - you must own the move;
+ *   - you must be inside the window;
+ *   - you cannot repeat the same move back-to-back, because a spammed crossover is not a combo.
+ */
+export function canChain(next: HandleMove, state: ChainState, handle: number): boolean {
+  if (!hasMove(next, handle)) return false;
+  if (state.last === null) return true;                 // opening a chain is always allowed
+  if (state.last === next) return false;                // no double-tapping one move into a "combo"
+  return state.since <= chainWindowSec(handle);
+}
+
+/** Advance the chain. A move outside the window STARTS a new chain rather than extending the old one. */
+export function pushChain(next: HandleMove, state: ChainState, handle: number): ChainState {
+  const continues = state.last !== null && state.last !== next && state.since <= chainWindowSec(handle)
+    && state.length < MAX_CHAIN;
+  return { last: next, since: 0, length: continues ? state.length + 1 : 1 };
+}
+
+/** Is this chain spent? A mode can use it to cue the finish rather than letting it run on. */
+export function chainSpent(state: ChainState): boolean {
+  return state.length >= MAX_CHAIN;
+}
+
+/** Tick the chain's clock. Past the window the chain is over. */
+export function tickChain(state: ChainState, dt: number, handle: number): ChainState {
+  const since = state.since + dt;
+  if (state.last !== null && since > chainWindowSec(handle)) return { ...CHAIN_IDLE };
+  return { ...state, since };
+}
+
+export type ChainTier = 'single' | 'combo' | 'highlight';
+
+/** What the crowd should be told. Three strung together is a highlight; one is just a move. */
+export function chainTier(length: number): ChainTier {
+  if (length >= 3) return 'highlight';
+  if (length === 2) return 'combo';
+  return 'single';
+}
+
+export interface AnkleBreakRead {
+  /** How many moves deep the chain is. */
+  chainLength: number;
+  handle: number;
+  /** The defender was CLOSING rather than sitting back — a moving body is the one you can break. */
+  defenderClosing: boolean;
+  /** The defender is SET and low. Hard to break, and correctly so. */
+  defenderSet: boolean;
+}
+
+/**
+ * The odds a defender's ankles go.
+ *
+ * A set defender is nearly unbreakable and a closing one is vulnerable — which is the read the player is
+ * making. Chain depth is the biggest term because that is the skill expression: a single crossover
+ * should rarely break anyone, and a three-move chain at a high handle should look inevitable.
+ */
+export function ankleBreakOdds(read: AnkleBreakRead): number {
+  if (read.defenderSet) return 0.04;                    // you can break a set man, but barely
+  const depth = Math.min(3, Math.max(1, read.chainLength));
+  const base = 0.10 + (depth - 1) * 0.22;               // 0.10 / 0.32 / 0.54
+  const skill = (Math.max(0, read.handle - BASELINE_HANDLE) / 50) * 0.22;
+  const closing = read.defenderClosing ? 0.14 : 0;
+  return Math.max(0, Math.min(0.92, base + skill + closing));
+}
+
+/**
+ * Did the ankles actually GO, or was it only a stumble?
+ *
+ * The owner asked for "ankle breakers", and a stumble is not one. A deep chain at a real handle puts the
+ * defender ON THE FLOOR — the same floored state a poster dunk already uses, so he has to get up. A
+ * shallow break is still just a stagger, which keeps the floor moment rare enough to mean something.
+ */
+export function isHardBreak(chainLength: number, handle: number): boolean {
+  return chainLength >= 3 && handle >= MOVE_HANDLE.double_cross;
+}
+
+/**
+ * Does this move's exit flow straight into a shot GATHER?
+ *
+ * Owner: "spin move gathers". The spin used to dead-end — it finished, a cooldown armed, and the player
+ * had to start a fresh shot input, which is the opposite of chaining. A move that carries you INTO the
+ * shot is the whole reason to use it.
+ */
+export function gathersIntoShot(move: HandleMove): boolean {
+  return move === 'spin' || move === 'snatch_back' || move === 'shammgod' || move === 'hesi';
+}
+
+export interface MoveRead {
+  /** 0..1 of top speed. */
+  speed01: number;
+  /** Moving AWAY from the rim — a retreat dribble. */
+  retreating: boolean;
+  /** A defender is right on me. */
+  pressured: boolean;
+  /** The move that just happened, so a chain can escalate instead of repeating. */
+  last: HandleMove | null;
+}
+
+/**
+ * WHICH move a reversal becomes.
+ *
+ * The reason this exists rather than more buttons: the handle vocabulary had eight moves and only two
+ * input bindings, so a maxed handle could never chain past a single move — and past experience in this
+ * tree is that new dribble bindings collide with the spin / hook / hop inputs already on the stick.
+ *
+ * So one flick reads differently by SITUATION, which is also how the Street games actually feel: the
+ * same input is a different move depending on what your body is doing. A low handle always gets the
+ * plain crossover, because reading the situation IS the skill being gated.
+ */
+export function moveFromContext(read: MoveRead, handle: number): HandleMove {
+  const candidates: HandleMove[] = [];
+  // standing still and pressured: the ball goes through the legs, the safest place for it
+  if (read.speed01 < 0.3 && read.pressured) candidates.push('between_legs');
+  // backing out: behind the back protects it from the trailing hand
+  if (read.retreating) candidates.push('behind_back');
+  // already mid-chain and moving: escalate to the double
+  if (read.last !== null && read.speed01 > 0.45) candidates.push('double_cross');
+  // full speed into a body: snatch it back and make him commit
+  if (read.speed01 > 0.7 && read.pressured) candidates.push('snatch_back');
+  candidates.push('crossover');                      // the floor: always available, always legal
+
+  // the best move I actually own that is not the one I just did
+  for (const m of candidates) if (hasMove(m, handle) && m !== read.last) return m;
+  // everything I own is the move I just did; return it and let canChain refuse the repeat
+  return 'crossover';
+}
