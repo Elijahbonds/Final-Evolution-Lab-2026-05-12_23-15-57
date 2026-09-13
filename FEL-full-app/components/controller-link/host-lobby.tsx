@@ -15,9 +15,11 @@ export interface HostLobbyProps {
   onInput: (ev: ControlEvent, slot: number, peerId: PeerId) => void;
   /** Collapse the panel once play starts; the badge stays visible. */
   collapsed?: boolean;
+  /** Who is connected, for a host that needs a running order (see shootoutTurns). */
+  onPeers?: (peers: LobbyPeer[]) => void;
 }
 
-export function HostLobby({ config, onInput, collapsed }: HostLobbyProps) {
+export function HostLobby({ config, onInput, collapsed, onPeers }: HostLobbyProps) {
   // Owner call 2026-09-05: on desktop the pairing panel is a badge until a phone joins or the player taps it — the
   // panel used to sit open beside play on every three-point load. A connected peer opens it on its own.
   const [open, setOpen] = useState(false);
@@ -30,13 +32,16 @@ export function HostLobby({ config, onInput, collapsed }: HostLobbyProps) {
   // Keep the latest sink in a ref so the session is created once, not per render.
   const inputRef = useRef(onInput);
   inputRef.current = onInput;
+  // same ref trick as the input sink: the session is created once, not per render
+  const peersRef = useRef(onPeers);
+  peersRef.current = onPeers;
 
   useEffect(() => {
     let disposed = false;
     const session = new HostSession({
       config,
       onInput: (ev, slot, peerId) => inputRef.current(ev, slot, peerId),
-      onLobby: setPeers,
+      onLobby: (ps) => { setPeers(ps); peersRef.current?.(ps); },
       onState: setState,
     });
     sessionRef.current = session;

@@ -10,6 +10,8 @@
 // mode cheap.
 
 import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
+import { freshOrder, syncLobby, slotDrives, recordTurn, turnBanner, MAX_SHOOTERS, type ShootoutOrder } from '@/lib/controller-link/shootoutTurns';
+import type { LobbyPeer } from '@/lib/controller-link/types';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
@@ -42,6 +44,10 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
   const [phase, setPhase] = useState<ModePhase>('loading');
+  // the running order lives in a ref AND state: the input callback reads it every frame (ref) while the
+  // banner renders from it (state)
+  const orderRef = useRef<ShootoutOrder>(freshOrder());
+  const [order, setOrder] = useState<ShootoutOrder>(orderRef.current);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
@@ -58,6 +64,15 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
 
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
+      // A SHOOTOUT IS TURN-BASED. With phones in the room the run that just ended was one player's turn:
+      // bank it, pass the ball, and only end the session once the last shooter has been.
+      const score = Number(r.stats?.points ?? r.score ?? 0);
+      if (orderRef.current.shooters.length > 1) {
+        const next = recordTurn(orderRef.current, score);
+        orderRef.current = next;
+        setOrder(next);
+        if (!next.done) return;      // the next phone is up; the host remounts for their turn
+      }
       endedRef.current = true;
       onEnd({
         score: Number(r.stats?.points ?? r.score ?? 0),
@@ -95,13 +110,25 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
     emit({ t: 'button', btn: 'START', pressed: true });
   }, [emit]);
 
-  // A phone's input is fed to the same bus as every other input source.
-  const onControllerInput = useCallback((ev: Parameters<ReturnType<typeof toInputBus>>[0]) => {
+  // FOUR PHONES, ONE BALL (Phase C). A phone's input is fed to the same bus as every other input source —
+  // but a shootout has ONE shooter, so without a turn order four phones would be four people fighting over
+  // one pair of hands. slotDrives() answers the single question this callback needs; with no phones
+  // connected it is always true, so keyboard and local-pad play are never gated by a lobby nobody is using.
+  const onControllerInput = useCallback((ev: Parameters<ReturnType<typeof toInputBus>>[0], slot: number) => {
+    if (!slotDrives(orderRef.current, slot)) return;
     const bus = busRef.current;
     if (bus) toInputBus(bus)(ev);
   }, []);
 
+  const onPeers = useCallback((peers: LobbyPeer[]) => {
+    const next = syncLobby(orderRef.current, peers.map((p) => ({ slot: p.slot, name: p.name, connected: p.connected })));
+    orderRef.current = next;
+    setOrder(next);
+  }, []);
+
   const controllerConfig = useMemo(() => controllerConfigFor('threepoint'), []);
+  const turnLine = turnBanner(order);
+  void MAX_SHOOTERS;
 
   return (
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
@@ -115,6 +142,13 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
         onStart={tapStart}
         onRetry={tapStart}
       />
+      {/* Whose turn it is, on the TV, whenever more than one phone is in the room. */}
+      {turnLine && (
+        <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-1.5">
+          <span className="fel-heading text-sm font-bold tracking-[0.2em] text-[#00E5FF]">{turnLine}</span>
+        </div>
+      )}
+
       {phase === 'paused' && (
         <button onClick={tapStart} className="absolute inset-0 flex items-center justify-center bg-black/60">
           <span className="fel-heading text-3xl font-bold text-white">PAUSED — TAP TO RESUME</span>
@@ -127,6 +161,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
         <HostLobby
           config={controllerConfig}
           onInput={onControllerInput}
+          onPeers={onPeers}
           collapsed={phase === 'playing'}
         />
       )}
