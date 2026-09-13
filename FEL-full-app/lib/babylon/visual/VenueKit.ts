@@ -280,7 +280,9 @@ export const VenueKit = {
   buildSlope(scene: Scene, liftCable?: GrindLine): void {
     // Pass 5 phase 7: big air's piste was near-white (#eef4fa) with faint groom lines under the alpine sky and read as a
     // flat white sheet. Cooler snow, denser darker groom lines and shadowed drifts give the run edges to read speed against.
-    paintedGround(scene, 60, 400, '#cbd9e7', (ctx, W, H) => {
+    // The piste's own extent, so nothing placed on it can drift past its edge (see the gate flags below).
+    const SLOPE_W = 60, SLOPE_L = 400;
+    paintedGround(scene, SLOPE_W, SLOPE_L, '#cbd9e7', (ctx, W, H) => {
       ctx.fillStyle = 'rgba(96,130,176,0.55)';
       for (let i = 0; i < 420; i++) ctx.fillRect(Math.random() * W, Math.random() * H, 3, 14);  // groom lines
       ctx.fillStyle = 'rgba(70,100,150,0.30)';
@@ -289,7 +291,11 @@ export const VenueKit = {
       }
     });
     venueBox(scene, 64, 404, 12, [paintTrees(true)]);
-    for (let z = -40; z > -360; z -= 60) for (const x of [-24, 24]) {   // gate flags
+    // GATE FLAGS, ON THE SNOW. This ran to z −360 on a piste that ends at −200, so the last three pairs hung
+    // in the air 160 m past the ground (found by scripts/probes/_ground-audit.mts: six gates over nothing).
+    // Bound to the piste's own length now, with a margin, so the two cannot drift apart again.
+    const lastGateZ = -(SLOPE_L / 2) + 24;
+    for (let z = -40; z > lastGateZ; z -= 60) for (const x of [-24, 24]) {   // gate flags
       const flag = MeshBuilder.CreatePlane(`gate_${x}_${z}`, { width: 0.7, height: 0.5 }, scene);
       flag.position.set(x * 0.6, 1.2, z);
       flag.material = mat(scene, 'gate', z % 120 === -40 ? '#ff3d5e' : '#3a86ff', 0.3);

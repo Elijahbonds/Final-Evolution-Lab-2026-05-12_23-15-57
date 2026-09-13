@@ -57,6 +57,10 @@ const report = await p.evaluate(`(() => {
     // and it is what this probe needed: the first run reported 'tree_palmTall 109 x 47 m' and 'fence-1x4
     // 75 x 73 m' as giant redundant slabs, because a thin-instance / merged master's bounding box spans every
     // instance it carries. Those are a palm line and a fence, not two floors.
+    // 10 m on both axes. A PARKOUR COURSE IS BUILT OF SMALLER PIECES THAN THIS — freerun's platforms are
+    // 12 × 6 and its gaps are the mechanic — so this audit reads that mode as holes and it is not wrong to,
+    // it is just asking the wrong question there. For arena and course venues, which is what it is for, a
+    // floor piece under 10 m is furniture.
     if (w < 10 || d < 10) continue;
     if (h > Math.min(w, d) * 0.35) continue;
     if (!m.isPickable) continue;
@@ -105,7 +109,11 @@ const report = await p.evaluate(`(() => {
     const e = bb.extendSizeWorld, c = bb.centerWorld;
     if (e.x * 2 >= 10 && e.z * 2 >= 10) continue;            // that is a slab, not a prop
     if (c.y > 14 || c.y < -80) continue;                      // banners/sky and the long drop are not props
-    const over = slabs.some((sl) => c.x >= sl.x0 - 1 && c.x <= sl.x1 + 1 && c.z >= sl.z0 - 1 && c.z <= sl.z1 + 1);
+    // A WALL STANDS ON THE BOUNDARY. The venue box's four walls sit a couple of metres outside the ground
+    // they enclose, which is what a wall IS — flagging them as floating trained the eye to skim this list.
+    // The margin is generous enough for a boundary and far too small to excuse a gate 160 m out to sea.
+    const EDGE_M = 4;
+    const over = slabs.some((sl) => c.x >= sl.x0 - EDGE_M && c.x <= sl.x1 + EDGE_M && c.z >= sl.z0 - EDGE_M && c.z <= sl.z1 + EDGE_M);
     if (!over) floating.push({ name: m.name, x: +c.x.toFixed(1), y: +c.y.toFixed(1), z: +c.z.toFixed(1) });
   }
   return { slabs, overlaps, floating, totalArea: slabs.reduce((t, x) => t + x.area, 0) };
