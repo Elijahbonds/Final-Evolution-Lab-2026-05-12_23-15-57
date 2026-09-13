@@ -122,3 +122,12 @@ Everything in the queue above was built. What was VERIFIED in a running mode, an
 | Aero Aces | BUILT + enabled; flies, gate passed. Full course NOT completed by the autopilot |
 | Velocity Kart | BUILT + enabled; drives, drifts, 100% boost, TWO LAPS completed |
 | Karate Endless routes | DONE (owner asked for it after the first pass). Ported on the HORDE's terms: the payoff is arc and reach, not damage, because Endless is one-strike-one-body by owner lock. Proven live — baseline reaches only CRUSHER, upgraded reaches TRIPLE / SWEEP / CRUSHER, one clear took 3 bodies |
+
+## Dynamic posture + aesthetics of movement (2026-09-12, after the first table)
+
+| Item | State |
+|---|---|
+| Dynamic posture (bank / lean / exertion) on 1v1, 3v3, dunk runway | DONE, measured ON THE BONES: spine2 roll swept 29.79 deg (1v1), 42.13 (3v3), 10.57 (dunk runway, peaks within a degree of the designed cap) |
+| Lateral lean at all | This did not exist before — every authored hoops stance is pitch-only |
+| Stride matching (foot slide) | DONE and measured: planted-foot travel 38% -> 30% of body motion (1v1), 36% (3v3). Reference speed calibrated by sweep, not guessed |
+| Foot slide fully solved | NO. The rate clamps cap the correction; the remainder is the clips' own foot trajectories, which is an authoring fix rather than a code one. The probe reports the number so the next pass can see if it moved |
