@@ -167,7 +167,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   // M61: painted sky + horizon backdrop (2 meshes, unlit, auto-rotating)
   // def.mood / def.backdrop may be getters (see ModeDefinition.mood): read each ONCE here so the rig, the
   // post pipeline, the backdrop and the ambient bed all agree on one mood for the life of the mount.
-  const backdrop = mountBackdrop(scene, def.backdrop ?? MOOD_TO_FAMILY[mood] ?? 'park');
+  const backdrop = mountBackdrop(scene, def.backdrop ?? MOOD_TO_FAMILY[mood] ?? 'park', mood);
   // M59: anime ink outlines on every skinned character (auto-hooks spawns)
   const unink = autoInk(scene);
   const input = opts.input ?? new InputBus();

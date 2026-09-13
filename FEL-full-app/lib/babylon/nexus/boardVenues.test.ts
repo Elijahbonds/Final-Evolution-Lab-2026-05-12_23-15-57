@@ -80,6 +80,25 @@ describe('THE MOOD IS THE LIGHT RIG’S OWN WORD', () => {
   });
 });
 
+describe('the light and the sky agree', () => {
+  // THE REEF ran flat overcast light under ocean.jpg, which is a photograph of a SUNSET: two times of day in
+  // one frame. A mood that contradicts the bake it will be mounted over has to be able to take the sky back.
+  it('the flat-light and night moods wash the baked photograph; the others leave it alone', () => {
+    expect(MOODS.overcast.skyWash).toBeGreaterThan(0.5);
+    expect(MOODS.nightGame.skyWash).toBeGreaterThan(0.3);
+    expect(MOODS.goldenHour.skyWash).toBe(0);   // the bakes were chosen for this light
+    expect(MOODS.daylight.skyWash).toBe(0);
+    expect(MOODS.alpine.skyWash).toBe(0);
+  });
+
+  it('every mood declares a wash, and it is a fraction', () => {
+    for (const m of Object.values(MOODS)) {
+      expect(m.skyWash).toBeGreaterThanOrEqual(0);
+      expect(m.skyWash).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
 describe('EVERY SURF BREAK GETS THE OCEAN', () => {
   it('the surf venues mount the ocean backdrop', () => {
     for (const v of SURF_VENUES) expect(v.sky).toBe('ocean');

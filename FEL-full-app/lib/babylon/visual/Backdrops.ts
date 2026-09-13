@@ -19,6 +19,8 @@ import {
 } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 
+import { MOODS, type VenueMood } from '../scene/moods';
+
 export type BackdropFamily = 'venice' | 'dojo' | 'alpine' | 'stadium' | 'ocean' | 'park';
 
 /** modes already carry a mood — this maps mood → backdrop family so the
@@ -344,7 +346,17 @@ export interface Backdrop { dispose(): void }
  */
 const BAKED: Partial<Record<BackdropFamily, string>> = { park: 'neon', alpine: 'mountains', ocean: 'ocean', stadium: 'stadium', dojo: 'dojo', venice: 'beach' };
 
-export function mountBackdrop(scene: Scene, family: BackdropFamily): Backdrop {
+/**
+ * Mount the painted horizon for `family`, optionally TINTED to a mood.
+ *
+ * Why the tint exists (2026-09-12): the baked domes are single photographs. ocean.jpg is a sunset, so THE REEF —
+ * a venue whose entire point is flat overcast light — rendered its rig at sun 0.9 / hemi 0.95 under a burning
+ * orange sky. The light said one thing and the sky said another, in the same frame.
+ *
+ * The tint is a MULTIPLY, normalised so its brightest channel is 1: it moves the sky's colour toward the mood
+ * without darkening the photograph, so a grey mood greys the sunset out and a golden one leaves it alone.
+ */
+export function mountBackdrop(scene: Scene, family: BackdropFamily, mood?: VenueMood): Backdrop {
   // A venue built by NexusWebScene already owns a painted sky ('nexus_sky',
   // radius 200) that fully occludes this dome (280) and ring (235) — mounting
   // both pays for two skies and shows one. The venue sky wins; stand down.
@@ -355,7 +367,29 @@ export function mountBackdrop(scene: Scene, family: BackdropFamily): Backdrop {
   const domeMat = new StandardMaterial('bk_dome_m', scene);
   const baked = BAKED[family];
   let usedBake = false;
-  if (baked) {
+  const wash = mood ? MOODS[mood].skyWash : 0;
+  if (baked && wash > 0) {
+    // THE MOOD TAKES THE SKY BACK. Tinting the material is not available here: the emissive texture is ADDED to
+    // emissiveColor (see below), which can only brighten, and moving it to the diffuse channel renders BLACK
+    // because lighting is disabled on this dome — both measured, in that order, on 2026-09-12. So the wash is
+    // composited into the PIXELS once at mount: the photograph is drawn, then the mood's own sky is laid over it
+    // at `skyWash` alpha. The reef keeps the pier and the cloud structure and loses the sunset.
+    const tinted = new DynamicTexture(`bk_dome_${mood}`, { width: 1024, height: 512 }, scene, false);
+    const g = tinted.getContext() as unknown as CanvasRenderingContext2D;
+    const paintWash = (): void => {
+      g.globalAlpha = wash; g.fillStyle = MOODS[mood!].sky; g.fillRect(0, 0, 1024, 512); g.globalAlpha = 1;
+      tinted.update();
+    };
+    const img = typeof Image !== 'undefined' ? new Image() : null;
+    if (img) {
+      img.crossOrigin = 'anonymous';
+      img.onload = () => { g.drawImage(img, 0, 0, 1024, 512); paintWash(); };
+      img.onerror = () => { console.warn(`[FEL-SKY] baked dome "${baked}" missing — washed ${mood} flat`); paintWash(); };
+      img.src = `/backdrops/baked/${baked}.jpg`;
+    } else paintWash();
+    tinted.wrapU = Texture.WRAP_ADDRESSMODE; tinted.wrapV = Texture.CLAMP_ADDRESSMODE;
+    domeMat.emissiveTexture = tinted; usedBake = true;
+  } else if (baked) {
     const tex = new Texture(`/backdrops/baked/${baked}.jpg`, scene, false, false, Texture.BILINEAR_SAMPLINGMODE, undefined,
       () => { domeMat.emissiveTexture = paintSky(scene, SKIES[family]); console.warn(`[FEL-SKY] baked dome "${baked}" missing — painted ${family} sky`); });
     tex.wrapU = Texture.WRAP_ADDRESSMODE; tex.wrapV = Texture.CLAMP_ADDRESSMODE;
