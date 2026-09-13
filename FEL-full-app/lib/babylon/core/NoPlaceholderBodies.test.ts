@@ -77,3 +77,30 @@ describe('a start clip that does not exist is the same bug as no start clip', ()
     expect(missing).toEqual([]);
   });
 });
+
+describe('THE CAPSULE STAND-INS ARE NEVER ON SCREEN', () => {
+  // The venue specs still BUILD armless capsule actors — they are the only way to compose a venue before any
+  // rig exists — and Ship Pass 6 made every mode hide them once its real bodies landed, with a 2.5 s
+  // auto-hide for the modes that forgot. Which meant that for the first two and a half seconds of every
+  // venue mount, capsule people were on screen. Measured before this changed: 12 of 12 parts visible at
+  // 2.75 s in tennis; after: 0 at every sample.
+  const venue = fs.readFileSync(path.join(ROOT, 'lib/babylon/core/NexusVenue.ts'), 'utf8');
+
+  it('mountVenue hides them AT THE MOUNT, not on a timer', () => {
+    // positional rather than sliced at the first `return {` — this file has several, and slicing on the
+    // first one cut the check off before the line it was looking for
+    const hideAtMount = venue.indexOf('for (const a of placeholders) a.getChildMeshes()');
+    const handleMethod = venue.indexOf('hidePlaceholders() {');
+    expect(hideAtMount, 'no hide-at-mount loop').toBeGreaterThan(-1);
+    expect(hideAtMount, 'the hide happens after the handle is returned').toBeLessThan(handleMethod);
+  });
+
+  it('there is no auto-hide timer left to race the first frames', () => {
+    expect(venue).not.toMatch(/setTimeout\([^)]*placeholders/);
+    expect(venue).not.toMatch(/autoHide/);
+  });
+
+  it('revealing them is possible but explicit — authoring only', () => {
+    expect(venue).toMatch(/showPlaceholders\(\)/);
+  });
+});

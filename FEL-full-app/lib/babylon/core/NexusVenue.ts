@@ -42,6 +42,8 @@ export interface VenueHandle {
   placeholders: TransformNode[];
   /** Hide the stand-ins. Call right after CharacterLibrary.spawn() resolves. */
   hidePlaceholders(): void;
+  /** Reveal the capsule stand-ins. Authoring only — see the note at the mount. */
+  showPlaceholders(): void;
   dispose(): void;
 }
 
@@ -244,24 +246,40 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   ctx.camDirector?.setBounds?.(camBox);
 
   const placeholders = built.actors;
-  // Ship Pass 6 phase 3 (owner: "fix the arms of the NPCs"): the spec's placeholder actors are armless capsules. Modes that
-  // spawn real bodies are meant to call hidePlaceholders() and several never did (karate rails, skate rail, three-point
-  // lanes). They now go on their own two and a half seconds after the mount — long enough for every mode's spawns to land.
+  // NO PLACEHOLDER BODIES, EVER (owner's standing rule; 2026-09-13).
+  //
+  // These are armless capsule stand-ins. Ship Pass 6 made every mode hide them once its real bodies landed,
+  // and added a 2.5 s auto-hide for the modes that forgot — which meant that for the first two and a half
+  // seconds of EVERY venue mount, capsule people were on screen. Usually behind a loading splash; not always,
+  // and "usually" is not the standard the rule sets.
+  //
+  // They are built HIDDEN now. Nothing depended on seeing them — every consumer in the tree calls
+  // hidePlaceholders() — and the original rationale (a readable scene if spawning fails) is served better by
+  // the error screen the harness already shows than by a court full of capsules. showPlaceholders() stays for
+  // an authoring pass that genuinely wants to compose a venue before any rig exists.
+  for (const a of placeholders) a.getChildMeshes().forEach((m) => { m.isVisible = false; });
   let disposed = false;
-  const autoHide = setTimeout(() => { if (!disposed) for (const a of placeholders) a.getChildMeshes().forEach((m) => { m.isVisible = false; }); }, 2500);
+  void disposed;
 
   return {
     built,
     placeholders,
     get nav() { return nav; },
     constrain(pos: Vector3) { if (!nav) return false; const [x, z] = nav.constrain(pos.x, pos.z); pos.x = x; pos.z = z; return true; },
+    /** Kept for every caller that already asks; they start hidden, so this is now a belt-and-braces no-op. */
     hidePlaceholders() {
       for (const a of placeholders) {
         a.getChildMeshes().forEach((m) => { m.isVisible = false; });
       }
     },
+    /** Compose a venue before any rig exists — the only reason these bodies are still built at all. */
+    showPlaceholders() {
+      for (const a of placeholders) {
+        a.getChildMeshes().forEach((m) => { m.isVisible = true; });
+      }
+    },
     dispose() {
-      disposed = true; clearTimeout(autoHide);
+      disposed = true;
       ctx.camDirector?.invalidateBounds?.();
       propsGone = true; props?.dispose(); props = null;
       built.dispose();
