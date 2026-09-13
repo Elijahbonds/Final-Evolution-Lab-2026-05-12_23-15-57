@@ -49,6 +49,8 @@ export function makeAeroAcesMode(): ModeDefinition {
 let plane: TransformNode | null = null;
 let venueRoot: TransformNode | null = null;
 let pilot: SpawnedCharacter | null = null;
+/** The propeller, spun in update — a still prop on a flying aircraft reads as a model on a stick. */
+let propHub: TransformNode | null = null;
 let seated: AnimationGroup | null = null;
 // THE FIELD. Same module the karts use — see racing/RaceField.ts. Rivals fly the racing line as PACERS
 // rather than running the flight model: an AI that actually flies needs stall recovery, and an aircraft
@@ -91,81 +93,201 @@ const PILOT_HIPS = { y: 0.34, z: 1.05 };
 const PILOT_SCALE = 0.94;
 const YOKE = { y: 0.78, z: 1.62, tiltDeg: 24 };
 
+/**
+ * SHAPE, NOT DECALS (2026-09-13, owner: "we need to do a visual upgrades on the karts and planes").
+ *
+ * The aircraft was five flat boxes and photographed exactly like that — a white slab with rectangular wings,
+ * reading as a paper cutout against the sky. The single biggest win on a vehicle seen in silhouette against
+ * open air is the SILHOUETTE, so that is where the work goes: a round tapered fuselage, tapered swept wings
+ * with dihedral and winglets, a spinner and a turning propeller, and a fin with a real leading edge.
+ *
+ * THE TAPER TRICK, because it is not obvious: Babylon has no tapered box. `CreateCylinder` with
+ * `tessellation: 4` is a four-sided prism, and giving it a different top and bottom diameter makes it
+ * TAPERED — lay it on its side, flatten one axis, and that is a wing with a root chord, a tip chord and a
+ * thickness, for one draw call. Everything wing-shaped on this aircraft is that one primitive.
+ */
+const PROP_RPM = 12;    // radians/sec of the spinner, fast enough to blur, slow enough not to strobe
+
+/**
+ * A tapered plank — the wing/fin primitive. See the header.
+ *
+ * THE ROOT SITS AT THE ORIGIN and the tip extends to +X. That matters and the first version got it wrong:
+ * baking a centred cylinder left the root at −X for both wings, so the LEFT wing was mounted tip-first —
+ * photographed, it tapered the wrong way and the aircraft was visibly asymmetric. With the root at the
+ * origin a wing is placed at the fuselage skin and mirrored with a negative x scale, which cannot be
+ * lopsided by construction.
+ */
+function taperedPlank(
+  ctx: ModeContext, name: string,
+  span: number, rootChord: number, tipChord: number, thickness: number,
+): Mesh {
+  const m = MeshBuilder.CreateCylinder(name, {
+    height: span, diameterBottom: rootChord, diameterTop: tipChord, tessellation: 4,
+  }, ctx.scene);
+  m.rotation.z = -Math.PI / 2;                   // +Y (tip) maps to +X
+  m.position.x = span / 2;                       // root to the origin
+  m.bakeCurrentTransformIntoVertices();
+  m.scaling.y = thickness / Math.max(rootChord, tipChord);
+  return m;
+}
+
 function buildPlane(ctx: ModeContext): TransformNode {
-  const body = MeshBuilder.CreateBox('aero_body', { width: 1.5, height: 1.2, depth: 7 }, ctx.scene);
-  const paint = new StandardMaterial('aero_paint', ctx.scene);
-  paint.diffuseColor = Color3.FromHexString('#d7dbe8');
-  paint.specularColor = Color3.FromHexString('#222833');
-  body.material = paint;
+  const rig = new TransformNode('aero_body', ctx.scene);
 
-  const wing = MeshBuilder.CreateBox('aero_wing', { width: 11, height: 0.22, depth: 1.9 }, ctx.scene);
-  wing.position.set(0, 0.1, -0.3);
-  const accent = new StandardMaterial('aero_accent', ctx.scene);
-  accent.diffuseColor = Color3.FromHexString('#22d3ee');
-  accent.emissiveColor = Color3.FromHexString('#0b3b44');
-  wing.material = accent;
-  wing.parent = body;
+  // PBR with the environment pulled down — the same lesson the kart's paint and the tarmac both taught:
+  // these venues light for PBR and an aircraft the camera sits behind takes the sky straight across its
+  // flanks unless the IBL is reined in.
+  const shell = VenueKit.paint(ctx.scene, 'aero_shell', '#e8ecf4', 0.05, 0.34);
+  shell.environmentIntensity = 0.45; shell.specularIntensity = 0.7; shell.metallic = 0.25;
+  const accent = VenueKit.paint(ctx.scene, 'aero_accent', '#22d3ee', 0.18, 0.4);
+  accent.environmentIntensity = 0.45;
+  const dark = VenueKit.paint(ctx.scene, 'aero_dark', '#171b22', 0.04, 0.6);
+  dark.environmentIntensity = 0.3; dark.metallic = 0.5;
 
-  const tail = MeshBuilder.CreateBox('aero_tail', { width: 3.4, height: 0.18, depth: 1.0 }, ctx.scene);
-  tail.position.set(0, 0.35, -3.1);
-  tail.material = accent;
-  tail.parent = body;
+  // ── fuselage: a round barrel with a nose cone and a tail cone, not a box ──
+  const barrel = MeshBuilder.CreateCylinder('aero_fuse', { height: 4.2, diameter: 1.15, tessellation: 14 }, ctx.scene);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.z = 0.1;
+  barrel.material = shell;
+  barrel.parent = rig;
 
-  const fin = MeshBuilder.CreateBox('aero_fin', { width: 0.16, height: 1.5, depth: 1.1 }, ctx.scene);
-  fin.position.set(0, 0.9, -3.1);
+  const nose = MeshBuilder.CreateCylinder('aero_nose', { height: 1.7, diameterBottom: 1.15, diameterTop: 0.32, tessellation: 14 }, ctx.scene);
+  nose.rotation.x = -Math.PI / 2;
+  nose.position.z = 3.05;
+  nose.material = shell;
+  nose.parent = rig;
+
+  // −PI/2 like the nose: the WIDE end has to meet the fuselage. With +PI/2 it flared the other way and the
+  // tail opened out into a funnel.
+  const tailCone = MeshBuilder.CreateCylinder('aero_tailcone', { height: 1.9, diameterBottom: 1.15, diameterTop: 0.26, tessellation: 14 }, ctx.scene);
+  tailCone.rotation.x = -Math.PI / 2;
+  tailCone.scaling.z = -1;                       // point it aft
+  tailCone.position.z = -2.95;
+  tailCone.material = shell;
+  tailCone.parent = rig;
+
+  // ── wings: tapered, swept back, with dihedral and winglets ──
+  for (const side of [-1, 1]) {
+    const wing = taperedPlank(ctx, `aero_wing_${side > 0 ? 'r' : 'l'}`, 4.4, 1.9, 0.95, 0.16);
+    wing.position.set(side * 0.5, -0.05, -0.15);   // root at the fuselage skin
+    wing.scaling.x = side;                          // mirror, so both roots meet the body
+    wing.rotation.y = side * -0.12;                 // sweep back
+    wing.rotation.z = side * 0.05;                  // dihedral
+    wing.material = accent;
+    wing.parent = rig;
+
+    // PARENTED TO THE WING, not placed in body space. Positioned independently they floated off the tips —
+    // the wing sweeps back and has dihedral, so its tip is nowhere near the x it started at, and matching
+    // that by hand is a sum that goes stale the moment the sweep is retuned. At the wing's own local
+    // +X = span it rides the tip whatever the wing does.
+    const winglet = taperedPlank(ctx, `aero_winglet_${side > 0 ? 'r' : 'l'}`, 0.5, 0.75, 0.3, 0.09);
+    winglet.rotation.z = -Math.PI / 2;              // stand it up from the tip
+    winglet.position.set(4.4, 0, 0);
+    winglet.material = accent;
+    winglet.parent = wing;
+  }
+
+  // ── tail: a tapered stabiliser and a swept fin ──
+  for (const side of [-1, 1]) {
+    const stab = taperedPlank(ctx, `aero_stab_${side > 0 ? 'r' : 'l'}`, 1.2, 0.95, 0.5, 0.11);
+    stab.position.set(side * 0.2, 0.18, -3.25);
+    stab.scaling.x = side;
+    stab.material = accent;
+    stab.parent = rig;
+  }
+
+  const fin = taperedPlank(ctx, 'aero_fin', 1.25, 1.15, 0.42, 0.1);
+  fin.rotation.z = -Math.PI / 2;                 // root down, tip up
+  fin.position.set(0, 0.3, -3.3);
+  fin.rotation.x = -0.2;                         // leading edge raked back
   fin.material = accent;
-  fin.parent = body;
+  fin.parent = rig;
 
-  // the well the pilot sits in — dark, so the opening reads as an opening rather than a decal
-  const well = new StandardMaterial('aero_well', ctx.scene);
-  well.diffuseColor = Color3.FromHexString('#14171d');
-  well.specularColor = Color3.FromHexString('#2a3038');
-  const tub = MeshBuilder.CreateBox('aero_cockpit', { width: 0.86, height: 0.5, depth: 1.9 }, ctx.scene);
-  tub.position.set(0, 0.46, 1.0);
-  tub.material = well;
-  tub.parent = body;
+  // ── spinner and propeller ──
+  const spinner = MeshBuilder.CreateCylinder('aero_spinner', { height: 0.5, diameterBottom: 0.32, diameterTop: 0.05, tessellation: 12 }, ctx.scene);
+  spinner.rotation.x = -Math.PI / 2;
+  spinner.position.z = 4.05;
+  spinner.material = dark;
+  spinner.parent = rig;
 
-  // yoke: a column with a horizontal bar, where the authored pose's hands land
+  const hub = new TransformNode('aero_prop_hub', ctx.scene);
+  hub.position.z = 3.95;
+  hub.parent = rig;
+  // the blades radiate in the hub's XY plane so the disc faces forward; `rotation.y` would have turned them
+  // edge-on to the camera, which is why the first pass photographed a bare spinner and no propeller
+  for (const i of [0, 1, 2]) {
+    const blade = taperedPlank(ctx, `aero_blade_${i}`, 1.15, 0.26, 0.12, 0.05);
+    blade.rotation.z = (i * Math.PI * 2) / 3;
+    blade.rotation.x = 0.35;                     // a little pitch, so it reads as a blade not a stick
+    blade.material = dark;
+    blade.parent = hub;
+  }
+  propHub = hub;
+
+  // ── the cockpit the pilot actually sits in, on the top of the barrel ──
+  const tub = MeshBuilder.CreateBox('aero_cockpit', { width: 0.8, height: 0.46, depth: 1.7 }, ctx.scene);
+  tub.position.set(0, 0.44, 0.95);
+  tub.material = dark;
+  tub.parent = rig;
+
   const col = MeshBuilder.CreateCylinder('aero_column', { diameter: 0.07, height: 0.5, tessellation: 8 }, ctx.scene);
   col.position.set(0, YOKE.y - 0.22, YOKE.z - 0.1);
   col.rotation.x = -YOKE.tiltDeg * Math.PI / 180;
-  col.material = well;
-  col.parent = body;
+  col.material = dark;
+  col.parent = rig;
   const yoke = MeshBuilder.CreateBox('aero_yoke', { width: WHEEL_RADIUS * 2, height: 0.05, depth: 0.07 }, ctx.scene);
   yoke.position.set(0, YOKE.y, YOKE.z);
-  yoke.material = well;
-  yoke.parent = body;
+  yoke.material = dark;
+  yoke.parent = rig;
 
-  // a windscreen in front of the pilot's face, so the head reads as sheltered rather than bolted on
   const glass = new StandardMaterial('aero_glass', ctx.scene);
   glass.diffuseColor = Color3.FromHexString('#9fd7e8');
-  glass.alpha = 0.42;
+  glass.alpha = 0.4;
   glass.specularColor = Color3.FromHexString('#ffffff');
-  const screen = MeshBuilder.CreateBox('aero_screen', { width: 0.8, height: 0.42, depth: 0.06 }, ctx.scene);
-  screen.position.set(0, 0.92, 1.95);
-  screen.rotation.x = -28 * Math.PI / 180;
+  const screen = MeshBuilder.CreateBox('aero_screen', { width: 0.72, height: 0.4, depth: 0.06 }, ctx.scene);
+  screen.position.set(0, 0.88, 1.85);
+  screen.rotation.x = -30 * Math.PI / 180;
   screen.material = glass;
-  screen.parent = body;
+  screen.parent = rig;
 
-  return body;
+  return rig;
 }
 
-/** A rival's aircraft: the player's silhouette, simplified and tinted. No pilot — see buildRivalKart. */
+/**
+ * A rival's aircraft: the player's silhouette, tinted.
+ *
+ * Deliberately the SAME build rather than a cheaper one — a field of visibly worse aircraft reads as
+ * placeholder art, and the taper trick costs the same either way. No pilot and no propeller: five more
+ * skinned humanoids is frame budget spent on bodies nobody looks at, and a spinning prop on a rival 200 m
+ * away is invisible.
+ */
 function buildRivalPlane(ctx: ModeContext, name: string, tint: string): TransformNode {
   const rig = new TransformNode(`rival_${name}`, ctx.scene);
-  const paint = new StandardMaterial(`rival_paint_${name}`, ctx.scene);
-  paint.diffuseColor = Color3.FromHexString(tint);
-  paint.specularColor = Color3.FromHexString('#222833');
-  const box = (n: string, w: number, h: number, d: number, at: [number, number, number]): void => {
-    const b = MeshBuilder.CreateBox(`${n}_${name}`, { width: w, height: h, depth: d }, ctx.scene);
-    b.position.set(at[0], at[1], at[2]);
-    b.material = paint;
-    b.parent = rig;
-  };
-  box('rv_body', 1.5, 1.2, 7, [0, 0, 0]);
-  box('rv_wing', 11, 0.22, 1.9, [0, 0.1, -0.3]);
-  box('rv_tail', 3.4, 0.18, 1.0, [0, 0.35, -3.1]);
-  box('rv_fin', 0.16, 1.5, 1.1, [0, 0.9, -3.1]);
+  const shell = VenueKit.paint(ctx.scene, `rival_shell_${name}`, '#dfe5ef', 0.05, 0.36);
+  shell.environmentIntensity = 0.45; shell.metallic = 0.25;
+  const accent = VenueKit.paint(ctx.scene, `rival_accent_${name}`, tint, 0.18, 0.4);
+  accent.environmentIntensity = 0.45;
+
+  const barrel = MeshBuilder.CreateCylinder(`rv_fuse_${name}`, { height: 4.2, diameter: 1.15, tessellation: 10 }, ctx.scene);
+  barrel.rotation.x = Math.PI / 2; barrel.position.z = 0.1; barrel.material = shell; barrel.parent = rig;
+  const nose = MeshBuilder.CreateCylinder(`rv_nose_${name}`, { height: 1.7, diameterBottom: 1.15, diameterTop: 0.32, tessellation: 10 }, ctx.scene);
+  nose.rotation.x = -Math.PI / 2; nose.position.z = 3.05; nose.material = shell; nose.parent = rig;
+  const tailCone = MeshBuilder.CreateCylinder(`rv_tailcone_${name}`, { height: 1.9, diameterBottom: 1.15, diameterTop: 0.26, tessellation: 10 }, ctx.scene);
+  tailCone.rotation.x = -Math.PI / 2; tailCone.scaling.z = -1; tailCone.position.z = -2.95; tailCone.material = shell; tailCone.parent = rig;
+
+  for (const side of [-1, 1]) {
+    const wing = taperedPlank(ctx, `rv_wing_${side > 0 ? 'r' : 'l'}_${name}`, 4.4, 1.9, 0.95, 0.16);
+    wing.position.set(side * 0.5, -0.05, -0.15);
+    wing.scaling.x = side;
+    wing.rotation.y = side * -0.12; wing.rotation.z = side * 0.05;
+    wing.material = accent; wing.parent = rig;
+    const stab = taperedPlank(ctx, `rv_stab_${side > 0 ? 'r' : 'l'}_${name}`, 1.2, 0.95, 0.5, 0.11);
+    stab.position.set(side * 0.2, 0.18, -3.25); stab.scaling.x = side;
+    stab.material = accent; stab.parent = rig;
+  }
+  const fin = taperedPlank(ctx, `rv_fin_${name}`, 1.25, 1.15, 0.42, 0.1);
+  fin.rotation.z = -Math.PI / 2; fin.position.set(0, 0.3, -3.3); fin.rotation.x = -0.2;
+  fin.material = accent; fin.parent = rig;
   return rig;
 }
 
@@ -333,6 +455,8 @@ return {
 
     prevPos.copyFrom(flight.pos);
     stepFlight(flight, S.input, dt, FRAME);
+    // the propeller turns with the throttle — a still prop on a flying aircraft reads as a model on a stick
+    if (propHub) propHub.rotation.z += PROP_RPM * (0.35 + S.input.throttle * 0.65) * dt;
 
     // THE FIELD MOVES. Rivals ride the racing line, which on an aero course runs THROUGH the rings — so a
     // rival ahead of you is a rival you can see taking the gate you are about to take, which is the whole
@@ -386,6 +510,7 @@ return {
     plane?.dispose(); plane = null;
     seated?.dispose(); seated = null;
     pilot?.dispose(); pilot = null;
+    propHub = null;
     for (const rp of rivalPlanes) rp.dispose();
     rivalPlanes = []; rivals = []; line = null;
     venueRoot?.dispose(); venueRoot = null;

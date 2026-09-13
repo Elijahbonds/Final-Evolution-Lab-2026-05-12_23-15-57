@@ -33,6 +33,7 @@ import {
   type Course, type RaceProgress,
 } from '../core/RaceCourse';
 import { buildCourseVenue } from '../racing/venueForCourse';
+import { taperedPlank, taperedSection, roadWheel } from '../racing/shapes';
 import {
   buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldFor,
   type RaceLine, type Rival,
@@ -95,25 +96,21 @@ const KART_HIPS = { y: -0.08, z: -0.30 };
 const KART_WHEEL = { y: 0.28, z: -0.02, tiltDeg: 22 };
 
 function buildKart(ctx: ModeContext): TransformNode {
-  // the ROOT is an empty the mode drives (position + heading); every part hangs off it in kart space, so no
-  // part's own offset can be clobbered by the per-frame `kart.position.set(...)` in update()
   const rig = new TransformNode('kart', ctx.scene);
 
-  // PBR, not StandardMaterial: these venues light for PBR (directional 2.60 + hemispheric 0.85) and a
-  // StandardMaterial clips to white under that — this kart rendered WHITE instead of red. See VenueKit.paint.
-  //
-  // PBR alone was not enough: it came back PINK, for the same reason the tarmac came back sky-blue. The
-  // venues' IBL is tuned for their own props, and a vehicle the camera sits three metres behind takes the
-  // sky's colour straight across its flanks. Pulling the environment down is what lets the paint be the
-  // colour it says it is; the road does the same thing for the same reason (see paintTarmac).
-  const paint = VenueKit.paint(ctx.scene, 'kart_paint', '#f25f5c', 0.08, 0.45);
-  paint.environmentIntensity = 0.4;
-  paint.specularIntensity = 0.5;
-  const dark = VenueKit.paint(ctx.scene, 'kart_tyre', '#15181f', 0.05, 0.92);
+  // PBR with the environment reined in — these venues light for PBR and a vehicle the camera sits three
+  // metres behind takes the sky straight across its flanks otherwise. That is what made it render PINK.
+  // #f25f5c is a salmon and it PHOTOGRAPHED as one even on PBR with the IBL down — under this much light a
+  // mid-tone red lands pink. A deeper base pigment is what actually reads as a red kart on screen.
+  const paint = VenueKit.paint(ctx.scene, 'kart_paint', '#b8302c', 0.08, 0.32);
+  paint.environmentIntensity = 0.4; paint.specularIntensity = 0.8; paint.metallic = 0.2;
+  const dark = VenueKit.paint(ctx.scene, 'kart_tyre', '#15181f', 0.05, 0.88);
   dark.environmentIntensity = 0.3;
+  const chrome = VenueKit.paint(ctx.scene, 'kart_chrome', '#b9c0cc', 0.06, 0.22);
+  chrome.environmentIntensity = 0.5; chrome.metallic = 0.85;
 
-  const part = (name: string, dims: { width: number; height: number; depth: number }, at: [number, number, number], mat: PBRMaterial): Mesh => {
-    const m = MeshBuilder.CreateBox(name, dims, ctx.scene);
+  const box = (name: string, w: number, h: number, d: number, at: [number, number, number], mat = paint): Mesh => {
+    const m = MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, ctx.scene);
     m.position.set(at[0], at[1], at[2]);
     m.material = mat;
     m.parent = rig;
@@ -121,31 +118,67 @@ function buildKart(ctx: ModeContext): TransformNode {
   };
 
   // the floor pan IS the kart — a slab you sit ON, not a block you sit on top of
-  part('kart_body', { width: 1.08, height: 0.14, depth: 2.0 }, [0, KART_GROUND_Y + 0.13, 0], paint);
-  // side pods: the walls the driver's hips sit between, which is what makes the gap in the middle a COCKPIT
-  part('kart_pod_l', { width: 0.20, height: 0.34, depth: 1.15 }, [-0.62, KART_GROUND_Y + 0.30, -0.18], paint);
-  part('kart_pod_r', { width: 0.20, height: 0.34, depth: 1.15 }, [0.62, KART_GROUND_Y + 0.30, -0.18], paint);
-  // the nose the stretched-out legs reach to, with the pedals on it
-  part('kart_nose', { width: 0.80, height: 0.18, depth: 0.66 }, [0, KART_GROUND_Y + 0.20, 0.92], paint);
-  // PEDALS where the feet MEASURED out to (z 0.44, y −0.28), not where a nose cone happens to be — a foot
-  // resting on bare floor pan is a foot that is not driving anything
+  box('kart_body', 1.02, 0.12, 1.95, [0, KART_GROUND_Y + 0.13, 0]);
+
+  // SIDE PODS, tapered rather than square: a kart's bodywork narrows toward the nose, and that taper is most
+  // of what separates a kart silhouette from a shoebox on wheels
   for (const side of [-1, 1]) {
-    const pedal = part(`kart_pedal_${side > 0 ? 'r' : 'l'}`, { width: 0.16, height: 0.05, depth: 0.20 },
-                       [side * 0.20, KART_GROUND_Y + 0.10, 0.46], dark);
+    const pod = taperedPlank(ctx.scene, `kart_pod_${side > 0 ? 'r' : 'l'}`, 1.15, 0.40, 0.22, 0.34);
+    pod.rotation.y = Math.PI / 2;                 // run it along Z
+    // pods sit ALONGSIDE the driver, centred on the wheelbase — at z −0.72 they bunched at the back axle
+    pod.position.set(side * 0.58, KART_GROUND_Y + 0.28, -0.55);
+    pod.material = paint;
+    pod.parent = rig;
+  }
+
+  // NOSE CONE, tapered to a point — the old one was a slab that ended in a wall
+  // Kept LOW and SMALL. The first pass used a 0.78 x 0.95 cone standing proud of the pan and it dominated
+  // the whole vehicle — a kart's nose is a shin-high wedge, not a prow.
+  const nose = taperedSection(ctx.scene, 'kart_nose', 0.72, 0.46, 0.16, 4);
+  nose.rotation.z = Math.PI / 4;                  // a diamond section reads as a moulded cone
+  nose.scaling.y = 0.30;
+  nose.position.set(0, KART_GROUND_Y + 0.14, 1.02);
+  nose.material = paint;
+  nose.parent = rig;
+  // NO SPLITTER. Two attempts at one (a plank, then a lip) both photographed as a white slab floating in
+  // front of the kart — at this scale anything ahead of the nose separates from it visually, and a bright
+  // trim colour is the first thing the eye goes to. The nose wedge alone reads better than the nose wedge
+  // plus a distraction, which is the whole argument for cutting a detail rather than tuning it a third time.
+
+  // PEDALS where the feet MEASURED out to (z 0.44, y −0.28), not where a nose cone happens to be
+  for (const side of [-1, 1]) {
+    const pedal = box(`kart_pedal_${side > 0 ? 'r' : 'l'}`, 0.16, 0.05, 0.20, [side * 0.20, KART_GROUND_Y + 0.10, 0.46], dark);
     pedal.rotation.x = -18 * Math.PI / 180;
   }
-  // a seat BACK, not a seat block: something to recline into, behind the hips rather than under them
-  const back = part('kart_seat', { width: 0.60, height: 0.52, depth: 0.12 }, [0, KART_HIPS.y + 0.22, KART_HIPS.z - 0.32], paint);
-  back.rotation.x = -14 * Math.PI / 180;
 
-  // the engine sits on the right hip, the way a real kart's does — the one asymmetry that says "kart"
-  part('kart_engine', { width: 0.34, height: 0.40, depth: 0.46 }, [0.52, KART_GROUND_Y + 0.32, -0.86], dark);
+  // a BUCKET seat: a back and two sides, rather than one flat panel behind the driver
+  const back = box('kart_seat', 0.56, 0.50, 0.10, [0, KART_HIPS.y + 0.22, KART_HIPS.z - 0.32]);
+  back.rotation.x = -14 * Math.PI / 180;
+  for (const side of [-1, 1]) {
+    const wall = box(`kart_seat_${side > 0 ? 'r' : 'l'}`, 0.09, 0.34, 0.42, [side * 0.28, KART_HIPS.y + 0.12, KART_HIPS.z - 0.14]);
+    wall.rotation.z = side * 0.12;
+  }
+
+  // the engine on the right hip, with a real exhaust rather than a bare block
+  box('kart_engine', 0.32, 0.38, 0.44, [0.52, KART_GROUND_Y + 0.32, -0.86], dark);
+  const pipe = MeshBuilder.CreateCylinder('kart_exhaust', { diameter: 0.09, height: 0.72, tessellation: 10 }, ctx.scene);
+  pipe.rotation.set(Math.PI / 2, 0.25, 0);
+  pipe.position.set(0.6, KART_GROUND_Y + 0.46, -1.12);
+  pipe.material = chrome;
+  pipe.parent = rig;
+
+  // a ROLL HOOP behind the seat: the tallest thing on the kart and the part that reads at distance
+  const hoop = MeshBuilder.CreateTorus('kart_hoop', { diameter: 0.56, thickness: 0.05, tessellation: 14 }, ctx.scene);
+  hoop.rotation.x = Math.PI / 2;
+  hoop.position.set(0, KART_HIPS.y + 0.34, KART_HIPS.z - 0.46);
+  hoop.material = chrome;
+  hoop.parent = rig;
 
   // the wheel, and the column running down from it to the pan
-  const col = MeshBuilder.CreateCylinder('kart_column', { diameter: 0.06, height: 0.46, tessellation: 8 }, ctx.scene);
+  const col = MeshBuilder.CreateCylinder('kart_column', { diameter: 0.055, height: 0.46, tessellation: 8 }, ctx.scene);
   col.position.set(0, KART_WHEEL.y - 0.20, KART_WHEEL.z + 0.10);
   col.rotation.x = KART_WHEEL.tiltDeg * Math.PI / 180;
-  col.material = dark;
+  col.material = chrome;
   col.parent = rig;
   // the tilt lives on a HUB and the ring is its child, so the ring's own rotation.y spins it about the column
   // rather than about world up — Babylon composes Y·X·Z, so a y on the tilted mesh itself would not
@@ -153,17 +186,54 @@ function buildKart(ctx: ModeContext): TransformNode {
   hub.position.set(0, KART_WHEEL.y, KART_WHEEL.z);
   hub.rotation.x = (90 - KART_WHEEL.tiltDeg) * Math.PI / 180;
   hub.parent = rig;
-  const wheel = MeshBuilder.CreateTorus('kart_wheel_steer', { diameter: WHEEL_RADIUS * 2, thickness: 0.045, tessellation: 18 }, ctx.scene);
+  const wheel = MeshBuilder.CreateTorus('kart_wheel_steer', { diameter: WHEEL_RADIUS * 2, thickness: 0.042, tessellation: 18 }, ctx.scene);
   wheel.material = dark;
   wheel.parent = hub;
   steerWheel = wheel;
 
-  // tyres: fronts narrow, rears fat, all four sitting ON the road rather than hovering over it
+  // tyres: fronts narrow, rears fat, all four ON the road — and each with a RIM, because a bare cylinder
+  // reads as a disc and a disc at speed reads as nothing at all
   for (const [i, [x, z, dia, wide]] of ([
     [-0.60, 0.74, 0.56, 0.20], [0.60, 0.74, 0.56, 0.20],
     [-0.66, -0.74, 0.64, 0.30], [0.66, -0.74, 0.64, 0.30],
   ] as const).entries()) {
-    const w = MeshBuilder.CreateCylinder(`kart_wheel_${i}`, { diameter: dia, height: wide, tessellation: 14 }, ctx.scene);
+    const w = roadWheel(ctx.scene, `kart_wheel_${i}`, dia, wide, dark, chrome);
+    w.position.set(x, KART_GROUND_Y + dia / 2, z);
+    w.parent = rig;
+  }
+  return rig;
+}
+
+/**
+ * A rival's kart: the player's silhouette, simplified and tinted.
+ *
+ * Deliberately the SAME shape rather than a different one — a field of visibly cheaper cars reads as
+ * placeholder art, and the pan/pods/wheels are six boxes either way. What it does not get is a driver: five
+ * more skinned humanoids on screen is the frame budget spent on bodies nobody looks at, and the rule the
+ * owner set is that every body MOVES WELL, which a second-tier rig would not.
+ */
+function buildRivalKart(ctx: ModeContext, name: string, tint: string): TransformNode {
+  const rig = new TransformNode(`rival_${name}`, ctx.scene);
+  const paint = VenueKit.paint(ctx.scene, `rival_paint_${name}`, tint, 0.1, 0.45);
+  paint.environmentIntensity = 0.4;
+  const dark = VenueKit.paint(ctx.scene, `rival_tyre_${name}`, '#15181f', 0.05, 0.92);
+  dark.environmentIntensity = 0.3;
+  const box = (n: string, w: number, h: number, d: number, at: [number, number, number], m = paint): void => {
+    const b = MeshBuilder.CreateBox(`${n}_${name}`, { width: w, height: h, depth: d }, ctx.scene);
+    b.position.set(at[0], at[1], at[2]);
+    b.material = m;
+    b.parent = rig;
+  };
+  box('rv_pan', 1.08, 0.14, 2.0, [0, KART_GROUND_Y + 0.13, 0]);
+  box('rv_pod_l', 0.2, 0.34, 1.15, [-0.62, KART_GROUND_Y + 0.30, -0.18]);
+  box('rv_pod_r', 0.2, 0.34, 1.15, [0.62, KART_GROUND_Y + 0.30, -0.18]);
+  box('rv_nose', 0.8, 0.18, 0.66, [0, KART_GROUND_Y + 0.20, 0.92]);
+  box('rv_seat', 0.6, 0.52, 0.12, [0, KART_HIPS.y + 0.22, KART_HIPS.z - 0.32]);
+  for (const [i, [x, z, dia, wide]] of ([
+    [-0.60, 0.74, 0.56, 0.20], [0.60, 0.74, 0.56, 0.20],
+    [-0.66, -0.74, 0.64, 0.30], [0.66, -0.74, 0.64, 0.30],
+  ] as const).entries()) {
+    const w = MeshBuilder.CreateCylinder(`rv_wheel_${i}_${name}`, { diameter: dia, height: wide, tessellation: 10 }, ctx.scene);
     w.rotation.z = Math.PI / 2;
     w.position.set(x, KART_GROUND_Y + dia / 2, z);
     w.material = dark;
@@ -232,44 +302,6 @@ function paintTarmac(scene: ModeContext['scene']): DynamicTexture {
   tex.wrapV = Texture.WRAP_ADDRESSMODE;     // along the road: tiles with the segment's length
   tex.anisotropicFilteringLevel = 8;
   return tex;
-}
-
-/**
- * A rival's kart: the player's silhouette, simplified and tinted.
- *
- * Deliberately the SAME shape rather than a different one — a field of visibly cheaper cars reads as
- * placeholder art, and the pan/pods/wheels are six boxes either way. What it does not get is a driver: five
- * more skinned humanoids on screen is the frame budget spent on bodies nobody looks at, and the rule the
- * owner set is that every body MOVES WELL, which a second-tier rig would not.
- */
-function buildRivalKart(ctx: ModeContext, name: string, tint: string): TransformNode {
-  const rig = new TransformNode(`rival_${name}`, ctx.scene);
-  const paint = VenueKit.paint(ctx.scene, `rival_paint_${name}`, tint, 0.1, 0.45);
-  paint.environmentIntensity = 0.4;
-  const dark = VenueKit.paint(ctx.scene, `rival_tyre_${name}`, '#15181f', 0.05, 0.92);
-  dark.environmentIntensity = 0.3;
-  const box = (n: string, w: number, h: number, d: number, at: [number, number, number], m = paint): void => {
-    const b = MeshBuilder.CreateBox(`${n}_${name}`, { width: w, height: h, depth: d }, ctx.scene);
-    b.position.set(at[0], at[1], at[2]);
-    b.material = m;
-    b.parent = rig;
-  };
-  box('rv_pan', 1.08, 0.14, 2.0, [0, KART_GROUND_Y + 0.13, 0]);
-  box('rv_pod_l', 0.2, 0.34, 1.15, [-0.62, KART_GROUND_Y + 0.30, -0.18]);
-  box('rv_pod_r', 0.2, 0.34, 1.15, [0.62, KART_GROUND_Y + 0.30, -0.18]);
-  box('rv_nose', 0.8, 0.18, 0.66, [0, KART_GROUND_Y + 0.20, 0.92]);
-  box('rv_seat', 0.6, 0.52, 0.12, [0, KART_HIPS.y + 0.22, KART_HIPS.z - 0.32]);
-  for (const [i, [x, z, dia, wide]] of ([
-    [-0.60, 0.74, 0.56, 0.20], [0.60, 0.74, 0.56, 0.20],
-    [-0.66, -0.74, 0.64, 0.30], [0.66, -0.74, 0.64, 0.30],
-  ] as const).entries()) {
-    const w = MeshBuilder.CreateCylinder(`rv_wheel_${i}_${name}`, { diameter: dia, height: wide, tessellation: 10 }, ctx.scene);
-    w.rotation.z = Math.PI / 2;
-    w.position.set(x, KART_GROUND_Y + dia / 2, z);
-    w.material = dark;
-    w.parent = rig;
-  }
-  return rig;
 }
 
 /** The road: a slab per segment of the centre line, so what you SEE is what onTrack() tests. */

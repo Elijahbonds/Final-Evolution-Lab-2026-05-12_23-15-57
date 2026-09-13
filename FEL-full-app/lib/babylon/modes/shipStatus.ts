@@ -35,14 +35,16 @@ export interface WalledMode {
  * gap is both honest and a promise we can be held to.
  */
 export const WALLED: readonly WalledMode[] = [
-  {
-    key: 'velocitykart',
-    reason: 'Handling and tracks are in. The karts and the world still need an art pass.',
-  },
-  {
-    key: 'aeroaces',
-    reason: 'Flight model and courses are in. The aircraft still need an art pass.',
-  },
+  // EMPTY, and that is the wall working rather than the wall being pointless.
+  //
+  // It went up on 2026-09-13 holding exactly two modes — velocitykart and aeroaces, the only two registered
+  // modes with no documented A+ pass — and the reason it gave players was specific: "the karts/aircraft
+  // still need an art pass." That art pass landed the same day (tapered bodywork, wheels with rims, a roll
+  // hoop, a round fuselage with swept wings and a turning propeller, and a field of rivals in both), so the
+  // reason no longer holds and the modes come off.
+  //
+  // The mechanism stays. Adding an entry here is how a mode goes back behind the wall, and the label has to
+  // name the real gap — "coming soon" is a non-answer that reads as a content gate.
 ];
 
 const WALLED_KEYS = new Set(WALLED.map((w) => w.key));
