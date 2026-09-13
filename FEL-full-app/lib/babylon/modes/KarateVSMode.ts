@@ -48,6 +48,10 @@ import {
   KARATE_ATTACKS, SPECIAL_ATTACK, CHI_MAX, PARRY_STAGGER_SEC, type AttackDef,
 } from '../core/FightCore';
 import { SoundKit } from '../audio/SoundKit';
+import {
+  BASELINE_RATINGS, ratingsFrom, routeFor, routeHitStopMs, routeShake, damageScale, hasFightMove, cancelWindowSec,
+  type FightRatings, type RouteStrike,
+} from '../core/FighterStyle';   // PRQ gates the vocabulary; a combo is a ROUTE, not a counter
 import { EffectsKit } from '../visual/EffectsKit';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
@@ -100,6 +104,12 @@ export const KarateVSMode: ModeDefinition = (() => {
   let phase: Phase = 'intro';
   let phaseSec = 0;
   let round = 1, myWins = 0, foeWins = 0;
+  /** PRQ gates what this body can do (FighterStyle). No scan is plumbed into the modes yet, so both
+   *  fighters start at the baseline; `?fight=` overrides MY ratings so the earned routes can be driven. */
+  let myRatings: FightRatings = { ...BASELINE_RATINGS };
+  const foeRatings: FightRatings = { ...BASELINE_RATINGS };
+  /** The strikes each fighter has LANDED inside the current combo window — a route reads this tail. */
+  let myLanded: RouteStrike[] = [], foeLanded: RouteStrike[] = [];
   let striking = false, foeStriking = false;
   let slowmoSec = 0;
   let meAnim: FighterAnim, foeAnim: FighterAnim;
@@ -221,7 +231,10 @@ export const KarateVSMode: ModeDefinition = (() => {
     const defChar = mine ? rival : player;
     if (!atkState.controllable || (mine ? striking : foeStriking)) return;
 
-    const special = key === 'heavy' && atkState.chi >= CHI_MAX;
+    // The DRAGON is EARNED as well as charged: full chi is the cost, FORCE is the licence. A baseline body
+    // can fill the gauge and still not throw it, which is what makes upgrading the scan visible in a fight.
+    const canDragon = hasFightMove('dragon', mine ? myRatings : foeRatings);
+    const special = key === 'heavy' && atkState.chi >= CHI_MAX && canDragon;
     const atk: AttackDef = special ? SPECIAL_ATTACK : KARATE_ATTACKS[key];
     if (mine) striking = true; else foeStriking = true;
     if (special) {
@@ -273,6 +286,19 @@ export const KarateVSMode: ModeDefinition = (() => {
         }
         case 'hit': {
           const dealt = applyHit(atkState, defState, atk);
+          // A COMBO IS A ROUTE. `combo++` counted hits, so jab-jab-jab and jab-kick-heavy were worth exactly
+          // the same and neither had a name. The landed strikes are recorded and their TAIL is matched against
+          // the route list, so a route can complete inside a real exchange rather than only from a clean start.
+          const landed = mine ? myLanded : foeLanded;
+          const ratings = mine ? myRatings : foeRatings;
+          // A QUICK BODY HOLDS THE ROUTE TOGETHER. FightCore's window is a fixed 1.1 s for everyone, so the
+          // quickness rating bought nothing where it matters most — stringing strikes. Measured before this:
+          // the landed tail was a single strike over and over and only the two-step CRUSHER ever completed.
+          atkState.comboTimer = cancelWindowSec(ratings);
+          landed.push(key as RouteStrike);
+          if (landed.length > 6) landed.shift();
+          const route = routeFor(landed, ratings);
+          if (process.env.NODE_ENV === 'development' && mine) console.info(`[KVS-ROUTE] landed ${landed.join('>')}`);
           ctx.feel?.impact?.(special ? 0.6 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
           if (special || key === 'heavy') heavyPunch(ctx, special ? 'dragon' : 'heavy'); else console.info('[KVS-JUICE] hit');
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), special ? 'glitch' : 'sparks');
@@ -281,9 +307,28 @@ export const KarateVSMode: ModeDefinition = (() => {
           const hud: Record<string, HudValue> = mine
             ? { foeHp: defState.hp, chi: Math.round(atkState.chi) }
             : { hp: defState.hp, foeChi: Math.round(atkState.chi) };
-          if (atkState.combo >= 2) hud.banner = mine ? `COMBO x${atkState.combo} — ${dealt} DMG` : `RIVAL COMBO x${atkState.combo}`;
+          if (route) {
+            // the route's payoff lands on its LAST hit, on top of what applyHit already did
+            const bonus = Math.max(1, Math.round(dealt * (route.payoff - 1) * damageScale(ratings)));
+            defState.hp = Math.max(0, defState.hp - bonus);
+            const shake = routeShake(route.fx);
+            ctx.juice.hitStop(routeHitStopMs(route.fx));
+            ctx.juice.shake(shake.amp, shake.ms);
+            ctx.feel?.impact?.(route.fx === 3 ? 0.7 : 0.45);
+            EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.3, 0)), route.fx === 3 ? 'glitch' : 'sparks');
+            SoundKit.play('impact', { pitch: route.fx === 3 ? 0.72 : 0.9, volume: 0.65 });
+            if (route.fx === 3) SoundKit.play('crowdCheer', { volume: 0.6 });
+            // the ender is what the route DOES beyond damage: a launch or a knockdown puts him on the floor
+            if (route.ender !== 'stun') beatDown(!mine, route.ender === 'launch' ? 1.7 : 1.2);
+            landed.length = 0;                     // a completed route is spent; start the next one
+            if (mine) hud.foeHp = defState.hp; else hud.hp = defState.hp;
+            hud.banner = mine ? `${route.label}! — ${dealt + bonus} DMG` : `RIVAL ${route.label}!`;
+            console.info(`[KVS-ROUTE] ${route.label} fx${route.fx} payoff ${route.payoff} bonus ${bonus} mine ${mine}`);
+          } else if (atkState.combo >= 2) {
+            hud.banner = mine ? `COMBO x${atkState.combo} — ${dealt} DMG` : `RIVAL COMBO x${atkState.combo}`;
+          }
           ctx.setHud(hud);
-          if (atkState.combo >= 2) setTimeout(() => ctx.setHud({ banner: '' }), 700);
+          if (route || atkState.combo >= 2) setTimeout(() => ctx.setHud({ banner: '' }), route ? 900 : 700);
           if (defState.hp <= 0) endRound(ctx, mine);
           break;
         }
@@ -375,6 +420,17 @@ export const KarateVSMode: ModeDefinition = (() => {
       foeState = new FighterState(100);
       brain = new RivalFightBrain(0.65, KARATE_ATTACKS);
       round = 1; myWins = 0; foeWins = 0; matchLatch = false; heavyAt = 0;
+      myLanded = []; foeLanded = [];
+      // `?fight=` sets MY ratings so the earned routes and the DRAGON can actually be driven and measured;
+      // without a PRQ scan plumbed into the modes both fighters are a baseline body.
+      if (typeof window !== 'undefined') {
+        const q = new URLSearchParams(window.location.search).get('fight');
+        const v = Number(q);
+        if (Number.isFinite(v) && v > 0) {
+          myRatings = ratingsFrom({ agility: v, speed: v, flexibility: v, power: v, strength: v, mental: v });
+          console.info(`[KVS-STYLE] ratings quickness ${myRatings.quickness.toFixed(0)} force ${myRatings.force.toFixed(0)} (override)`);
+        }
+      }
 
       SoundKit.startAmbient('dojo');
       EffectsKit.ambient(ctx.scene, 'dojo');
@@ -419,6 +475,10 @@ export const KarateVSMode: ModeDefinition = (() => {
       const sdt = slowmoSec > 0 ? dt * SLOWMO_SCALE : dt;
 
       meState.tick(sdt); foeState.tick(sdt);
+      // A route must not complete across two unrelated exchanges: when FightCore closes the combo window it
+      // zeroes `combo`, so the landed sequence is dropped on the same beat.
+      if (meState.combo === 0 && myLanded.length) myLanded = [];
+      if (foeState.combo === 0 && foeLanded.length) foeLanded = [];
 
       // player movement — lock-on: always face the rival, stick strafes/closes.
       // MODE-STICK-FACE (2026-09-07): the stick is CAMERA-relative. The fight camera fits both fighters from behind the
