@@ -20,12 +20,13 @@ const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
 const routes: string[] = [], style: string[] = []; let errors = 0;
 p.on('console', (m) => {
   const x = m.text();
-  if (/\[KVS-ROUTE\]/.test(x)) routes.push(x);
-  if (/\[KVS-STYLE\]/.test(x)) style.push(x);
+  if (/\[(KVS|MC)-ROUTE\]/.test(x)) routes.push(x);
+  if (/\[(KVS|MC)-STYLE\]/.test(x)) style.push(x);
   if (m.type() === 'error' && !/401 \(Unauthorized\)/.test(x)) errors++;
 });
 p.on('pageerror', (e) => { errors++; console.log('PAGEERROR', e.message.slice(0, 170)); });
-await p.goto(`${BASE}/dev/mode/karate_vs${FIGHT ? `?fight=${FIGHT}` : ''}`, { waitUntil: 'domcontentloaded' });
+const MODE = process.env.MODE ?? 'karate_vs';
+await p.goto(`${BASE}/dev/mode/${MODE}${FIGHT ? `?fight=${FIGHT}` : ''}`, { waitUntil: 'domcontentloaded' });
 await p.waitForSelector('canvas', { timeout: 240000 });
 await p.waitForTimeout(9000);
 const start = p.locator('text=/^START$/').first();

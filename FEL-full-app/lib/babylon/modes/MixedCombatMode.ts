@@ -39,6 +39,10 @@ import {
   STEP_CHI_GAIN, type AttackDef,
 } from '../core/FightCore';
 import { SoundKit } from '../audio/SoundKit';
+import {
+  BASELINE_RATINGS, ratingsFrom, routeFor, routeHitStopMs, routeShake, damageScale, hasFightMove, cancelWindowSec,
+  type FightRatings, type RouteStrike,
+} from '../core/FighterStyle';   // the same routes and the same PRQ gate as Karate VS — one vocabulary
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
 import { assertSpawned } from '../core/FrameGuard';
@@ -81,6 +85,10 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let phase: Phase = 'loadout';
   let phaseSec = 0;
   let round = 1, myWins = 0, foeWins = 0;
+  /** PRQ gates the vocabulary (FighterStyle), shared with Karate VS so a route means the same thing in both. */
+  let myRatings: FightRatings = { ...BASELINE_RATINGS };
+  const foeRatings: FightRatings = { ...BASELINE_RATINGS };
+  let myLanded: RouteStrike[] = [], foeLanded: RouteStrike[] = [];
   let myLoadout: Loadout = 'fists';
   let striking = false, foeStriking = false;
   let slowmoSec = 0, falling = false;
@@ -302,7 +310,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
     if (!atkState.controllable || (mine ? striking : foeStriking) || falling) return;
 
     const set = mine ? myAttacks() : foeAttacks();
-    const special = key === 'heavy' && atkState.chi >= CHI_MAX;
+    // the finisher is EARNED as well as charged — full chi is the cost, force is the licence
+    const special = key === 'heavy' && atkState.chi >= CHI_MAX && hasFightMove('dragon', mine ? myRatings : foeRatings);
     const atk: AttackDef = special ? SPECIAL_ATTACK : set[key];
     if (mine) striking = true; else foeStriking = true;
     // Commit to the line at swing start — the impact check measures the
@@ -379,12 +388,37 @@ export const MixedCombatMode: ModeDefinition = (() => {
           if (special || key === 'heavy') heavyPunch(ctx, special ? 'special' : 'heavy'); else console.info('[MC-JUICE] hit');
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), special ? 'glitch' : 'sparks');
           beatHit(!mine, special ? 'finisher' : WEIGHT_OF[key]);   // the DRAGON launches (knockdown → floor → get up)
+          // THE SAME ROUTES AS KARATE VS. A combo was a counter here too, so jab-jab-jab and jab-kick-heavy
+          // were worth the same. Matched on the TAIL of the landed strikes; a quick body holds the window
+          // open longer (cancelWindowSec), which is what the quickness rating buys.
+          const landed = mine ? myLanded : foeLanded;
+          const ratings = mine ? myRatings : foeRatings;
+          atkState.comboTimer = cancelWindowSec(ratings);
+          landed.push(key as RouteStrike);
+          if (landed.length > 6) landed.shift();
+          const route = routeFor(landed, ratings);
           const hud: Record<string, HudValue> = mine
             ? { foeHp: defState.hp, chi: Math.round(atkState.chi) }
             : { hp: defState.hp, foeChi: Math.round(atkState.chi) };
-          if (atkState.combo >= 2) hud.banner = mine ? `COMBO x${atkState.combo}` : `RIVAL COMBO x${atkState.combo}`;
+          if (route) {
+            const bonus = Math.max(1, Math.round(atk.dmg * (route.payoff - 1) * damageScale(ratings)));
+            defState.hp = Math.max(0, defState.hp - bonus);
+            const shake = routeShake(route.fx);
+            ctx.juice.hitStop(routeHitStopMs(route.fx));
+            ctx.juice.shake(shake.amp, shake.ms);
+            ctx.feel?.impact?.(route.fx === 3 ? 0.7 : 0.45);
+            EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.3, 0)), route.fx === 3 ? 'glitch' : 'sparks');
+            SoundKit.play('impact', { pitch: route.fx === 3 ? 0.72 : 0.9, volume: 0.65 });
+            if (route.ender !== 'stun') beatHit(!mine, 'finisher');
+            landed.length = 0;
+            if (mine) hud.foeHp = defState.hp; else hud.hp = defState.hp;
+            hud.banner = mine ? `${route.label}!` : `RIVAL ${route.label}!`;
+            console.info(`[MC-ROUTE] ${route.label} fx${route.fx} bonus ${bonus} mine ${mine}`);
+          } else if (atkState.combo >= 2) {
+            hud.banner = mine ? `COMBO x${atkState.combo}` : `RIVAL COMBO x${atkState.combo}`;
+          }
           ctx.setHud(hud);
-          if (atkState.combo >= 2) setTimeout(() => ctx.setHud({ banner: '' }), 700);
+          if (route || atkState.combo >= 2) setTimeout(() => ctx.setHud({ banner: '' }), route ? 900 : 700);
           // knockback resolves BEFORE the KO check — the edge is always live
           knockback(ctx, defChar, atkChar.root.position, atk.knockback, () => {
             if (offRing(defChar.root.position)) { ringOut(ctx, defChar === player); return; }
@@ -492,6 +526,14 @@ export const MixedCombatMode: ModeDefinition = (() => {
       meState = new FighterState(100);
       foeState = new FighterState(100);
       round = 1; myWins = 0; foeWins = 0; myLoadout = 'fists'; matchLatch = false; heavyAt = 0;
+      myLanded = []; foeLanded = [];
+      if (typeof window !== 'undefined') {
+        const v = Number(new URLSearchParams(window.location.search).get('fight'));
+        if (Number.isFinite(v) && v > 0) {
+          myRatings = ratingsFrom({ agility: v, speed: v, flexibility: v, power: v, strength: v, mental: v });
+          console.info(`[MC-STYLE] ratings quickness ${myRatings.quickness.toFixed(0)} force ${myRatings.force.toFixed(0)} (override)`);
+        }
+      }
       applyLoadouts(ctx);
 
       SoundKit.startAmbient('dojo');
@@ -578,6 +620,9 @@ export const MixedCombatMode: ModeDefinition = (() => {
       slowmoSec = Math.max(0, slowmoSec - dt);
       const sdt = slowmoSec > 0 ? dt * SLOWMO_SCALE : dt;
       meState.tick(sdt); foeState.tick(sdt);
+      // a route must not complete across two unrelated exchanges
+      if (meState.combo === 0 && myLanded.length) myLanded = [];
+      if (foeState.combo === 0 && foeLanded.length) foeLanded = [];
 
       // player 8-way movement — NO clamp: walking off the edge is a real
       // (terrible) option, which is what makes edge pressure meaningful.
