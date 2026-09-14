@@ -67,6 +67,7 @@ import {
   PERFECT_TOTAL, perJudgeAvg, type JudgeScore,
 } from '../core/JudgePanel';
 import { MomentumBus } from '../core/MomentumBus';
+import { rivalNerve, rivalExecution } from '../core/RivalNerve';   // the rival feels the contest too
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'contestOver';
 /** Venice DualShock pad (2026-09-05): a miss is one beat, not the full judged reveal — the next run-up follows at once. */
@@ -161,8 +162,8 @@ const FLAT_AVG = 6.35;                         // per-judge avg that reads as a 
 // Rival pace per dunk, measured from the simulated rival's score distribution
 // (~8.5 a card). The player's NEED is quoted against it in the final round.
 const RIVAL_PACE = Math.round(7.6 * JUDGE_COUNT);
-/** How often the rival blows a dunk. Real contests are full of missed attempts. */
-const RIVAL_BLOWN_CHANCE = 0.18;
+// The rival's blow rate now comes from `RivalNerve.BASE_BLOWN` and moves with the situation — a rival
+// going for one misses more, a rival protecting a lead misses less. The old flat constant lived here.
 // ── A+ P8 athlete hands (PM brief VENICE-DUNK-A-PLUS-P8, 2026-09-07) ─────────────────────────────────────────────
 /** H1: from the hang rise the ball hand reaches for the rim — weight eased 0 → HAND_IK_MAX over HAND_IK_LAG_SEC of CLIP time
  *  (the hang slow-mo stretches the lag with the flight), held through a make's flush, let go at CONTACT / the clank / a clip. */
@@ -2176,12 +2177,26 @@ export const DunkMode: ModeDefinition = (() => {
       // has had finish variety since M111 — windmill, tomahawk, hang, blown, picked by how well the slam was
       // timed — and the rival simply did not, so the contest looked like a person competing against a loop.
       // Rolling first lets the rival run the SAME pickAerialFinish vocabulary off its own execution score.
-      const rivalBlew = Math.random() < RIVAL_BLOWN_CHANCE;
-      const rDiff = rivalBlew ? 0.4 : 2.6 + Math.random() * 3.4;
-      const rExec = rivalBlew ? 0 : 3.4 + Math.random() * 3.4;
+      // THE RIVAL FEELS THE CONTEST NOW. These were three fixed random ranges: identical on the first dunk
+      // and the last, identical twenty up and twenty down. It never went for one, never played it safe and
+      // never choked — most of what a dunk contest is to watch. `rivalNerve` moves reach and risk TOGETHER,
+      // so falling behind is never strictly better than leading.
+      const nerve = rivalNerve({
+        deficit: rivalTotal - playerTotal,
+        isFinalRound: round === TOTAL_ROUNDS,
+        attemptsLeft: DUNKS_PER_ROUND - i + (TOTAL_ROUNDS - round) * DUNKS_PER_ROUND,
+      });
+      const rExecBand = rivalExecution(nerve);
+      const rivalBlew = Math.random() < nerve.blownChance;
+      const rDiff = rivalBlew ? 0.4 : nerve.diffMin + Math.random() * (nerve.diffMax - nerve.diffMin);
+      const rExec = rivalBlew ? 0 : rExecBand.min + Math.random() * (rExecBand.max - rExecBand.min);
       const rStyle = rivalBlew ? 0.5 : 2.2 + Math.random() * 3.2;
+      if (nerve.label) console.info(`[DUNK-RIVAL] ${nerve.label} (deficit ${rivalTotal - playerTotal})`);
       // exec runs 3.4..6.8 on a made dunk; map it onto the same 0..1 accuracy the player's timing produces
-      const rAcc = rivalBlew ? 0 : Math.max(0, Math.min(1, (rExec - 3.4) / 3.4));
+      // map onto the same 0..1 accuracy the player's timing produces — off the BAND that was actually
+      // rolled, not the old hardcoded 3.4..6.8, or a reaching rival reads as a clean one
+      const rAcc = rivalBlew ? 0
+        : Math.max(0, Math.min(1, (rExec - rExecBand.min) / Math.max(0.1, rExecBand.max - rExecBand.min)));
       const rAerial = pickAerialFinish(!rivalBlew, rAcc);
 
       const from = rival.root.position.clone();
