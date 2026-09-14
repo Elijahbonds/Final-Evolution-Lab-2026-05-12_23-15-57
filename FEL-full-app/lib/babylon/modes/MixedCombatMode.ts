@@ -20,6 +20,8 @@
 // Best of 3. Reliability standard since M42: installSafePlay, watchdogs,
 // groundLock (released on a ring-out fall), fight-cam framing.
 
+import { EvadeMoves } from '../core/EvadeMoves';
+import { dodgeReward, tickCounter, counterMult } from '../core/DodgeRead';
 import { nerve, standingOf } from '../core/Nerve';
 import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
@@ -141,6 +143,12 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let fallVictim: 'me' | 'foe' | null = null;
   let myStaff: AbstractMesh | null = null, foeStaff: AbstractMesh | null = null;
   let stickX = 0, stickY = 0;
+  // ROLL, JUMP AND THE DODGE READ (2026-09-14). EvadeMoves rather than CombatMovement: this mode writes
+  // its own camera-relative velocity and owns a ring-out check, neither of which survives a migration.
+  const meEvade = new EvadeMoves();
+  let meCounter = 0;
+  /** When the rival's in-flight strike would connect (game clock); null when nothing is incoming. */
+  let foeImpactAt: number | null = null;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   let gallery: Onlookers | null = null;
 
@@ -266,9 +274,10 @@ export const MixedCombatMode: ModeDefinition = (() => {
     bio.striking = f.strike?.weight ?? null; bio.windingUp = false;
     bio.blocking = s.blockHeld; bio.parrying = t < f.parryUntil; bio.guardImpact = t < f.impactUntil;
     bio.hitBy = t < f.hitUntil ? f.hitBy : null; bio.down = t < f.downUntil; bio.out = f.out || f.falling;
-    bio.rising = false; bio.dodging = false; bio.celebrating = t < f.celebrateUntil; bio.engaged = phase === 'fighting';
+    bio.rising = false; bio.dodging = mine ? meEvade.rolling : false; bio.celebrating = t < f.celebrateUntil; bio.engaged = phase === 'fighting';
     return {
       speed01: moving, strafe, backing: strafe === 0 && bio.approach < 0, dashing: false, hasWeapon: weapon,
+      rolling: mine ? meEvade.rolling : false, airborne: mine ? meEvade.airborne : false,
       striking: f.strike?.weight ?? null, strikeClip: f.strike?.clip,
       blocking: s.blockHeld, parryFlash: t < f.parryUntil, guardImpactFlash: t < f.impactUntil,
       hitBy: t < f.hitUntil ? f.hitBy : null, down: t < f.downUntil, out: f.out, falling: f.falling, ulting: false, celebrating: t < f.celebrateUntil,
@@ -358,6 +367,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
     SoundKit.play('whoosh', { pitch: special ? 0.8 : 1.05 });
     animOf(mine).strike = { weight: special ? 'finisher' : WEIGHT_OF[key], clip: atk.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
 
+    // the dodge window is read against when THIS strike would connect -- see DodgeRead
+    if (!mine) foeImpactAt = now() + atk.startupMs;
     setTimeout(() => {
       if (phase !== 'fighting' || falling) { endStrike(mine); return; }
       const dist = Vector3.Distance(atkChar.root.position, defChar.root.position);
@@ -636,6 +647,36 @@ export const MixedCombatMode: ModeDefinition = (() => {
         if (e.btn === 'B') swing(ctx, true, 'kick');
         if (e.btn === 'Y') swing(ctx, true, 'heavy');
         if (e.btn === 'X') meState.pressBlock(now());   // the tree shows the block (blockHeld → block_hold)
+        // L1 ROLLS, R1 JUMPS -- the four faces are spoken for. A neutral stick rolls BACKWARDS: the panic
+        // input should be the defensive one.
+        //
+        // AND A ROLL CAN RING YOU OUT. This mode's whole shape is a raised octagon, so the roll is checked
+        // against the SAME `offRing` the walk is, not exempted from it. That is the point rather than a
+        // hazard: 3.2 m of committed travel inside a 6.2 m ring means a panicked roll near the edge kills
+        // you, which is exactly the tension a ring-out mode is for.
+        if (e.btn === 'L1' && meState.controllable) {
+          const dir = Math.hypot(stickX, stickY) > 0.2
+            ? ctx.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx.camDirector.rightFlat().scale(stickX))
+            : ctx.camDirector.forwardFlat().scale(1);
+          if (meEvade.roll(dir.x, dir.z)) {
+            const secTo = foeImpactAt === null ? null : (foeImpactAt - now()) / 1000;
+            const r = dodgeReward(secTo);
+            if (r.perfect) {
+              meCounter = r.counterSec;
+              ctx.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000));
+              ctx.feel?.impact?.(0.3);
+              ctx.momentum.report({ kind: 'near_miss', weight: 14 });
+              SoundKit.play('powerUp', { volume: 0.5, pitch: 1.3 });
+              ctx.setHud({ banner: r.label ?? '' });
+              setTimeout(() => ctx.setHud({ banner: '' }), 800);
+            } else {
+              SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
+            }
+          }
+        }
+        if (e.btn === 'R1' && meState.controllable) {
+          if (meEvade.jump()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });
+        }
       }
       if (e.t === 'button' && !e.pressed && e.btn === 'X') meState.releaseBlock();
     },
@@ -677,12 +718,19 @@ export const MixedCombatMode: ModeDefinition = (() => {
       // looks at from behind the player), right = screen right. The world-axis read walked up-stick AWAY from the rival
       // (Δscreen −3.4 m toward the camera) and mirrored X whenever the camera had swung. No axis is flipped.
       const moveVel = ctx.camDirector.forwardFlat().scale(-stickY * MOVE_SPEED).addInPlace(ctx.camDirector.rightFlat().scale(stickX * MOVE_SPEED));
-      const mySpeed01 = moveVel.length() / MOVE_SPEED;   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
-      if (meState.controllable && !striking && !meState.blockHeld) {
+      const rollVel = meEvade.update(sdt);
+      meCounter = tickCounter(meCounter, sdt);
+      const mySpeed01 = rollVel ? 0 : moveVel.length() / MOVE_SPEED;   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
+      if (rollVel) {
+        // the roll owns the body AND takes the same ring check the walk does -- see the input branch
+        player.root.position.addInPlace(rollVel.scale(sdt));
+        if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
+      } else if (meState.controllable && !striking && !meState.blockHeld) {
         const vel = moveVel;
         player.root.position.addInPlace(vel.scale(sdt));
         if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
       }
+      player.root.position.y = meEvade.height;   // the arc is EvadeMoves'; nothing here integrates gravity
 
       // rival AI (its brain uses its own loadout's ranges); it never
       // voluntarily steps off — clamp ITS walk to the ring, so only

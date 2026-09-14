@@ -29,6 +29,20 @@
  */
 export const PERFECT_WINDOW_SEC = 0.22;
 
+/**
+ * The same read, in a HORDE.
+ *
+ * Karate endless had its own `PERFECT_WINDOW_SEC = 0.12` measured from the other end — "did the strike
+ * land inside the first window of the i-frames" — which is the same question asked backwards, and it was
+ * correct. It is kept as a separate, tighter number rather than unified to one, because the situations
+ * genuinely differ: in a duel you are reading ONE telegraph, and against eight attackers a window that
+ * generous would make a perfect dodge the default outcome of pressing dodge at all.
+ *
+ * What is NOT kept is two constants with the same name in two files. They live here together so the gap
+ * between them is a visible decision instead of a drift nobody notices.
+ */
+export const HORDE_WINDOW_SEC = 0.12;
+
 /** How long the punish stays open after a perfect dodge. */
 export const COUNTER_SEC = 0.85;
 /** Slow-mo beat on a perfect dodge — a taste, never the scoped parry slow-mo the duel owns. */

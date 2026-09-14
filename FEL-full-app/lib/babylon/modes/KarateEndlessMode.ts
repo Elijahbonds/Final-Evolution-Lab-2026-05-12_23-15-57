@@ -53,7 +53,10 @@
 // appear anywhere in this file, consistent with this project's standing
 // original-content-only rule (already enforced for NeuroArena/Who Scene It).
 
-import { Color3, MeshBuilder, StandardMaterial, Vector3, type Mesh } from '@babylonjs/core';
+import { mookMaxHp, damageMook, mookHp01, mookBarHex } from '../core/MookHealth';
+import { EvadeMoves } from '../core/EvadeMoves';
+import { HORDE_WINDOW_SEC } from '../core/DodgeRead';
+import { Color3, Mesh, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the gauntlet (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Two findings:
@@ -146,8 +149,11 @@ const DODGE_TAP_MS = 220;          // hold longer than this = block, not dodge
 const DODGE_IFRAME_SEC = 0.38;
 const DODGE_DISTANCE = 3.2;
 const DODGE_SLIDE_SEC = 0.36;      // the slide, on the GAME clock — a perfect read stretches it with the slow-mo
-const PERFECT_WINDOW_SEC = 0.12;   // a strike that lands inside the FIRST window of the i-frames = you moved at the last instant = the perfect read
-                                   // (M45 had it backwards: it rewarded a strike landing in the LAST 90 ms — a dodge thrown 0.3 s early)
+// The perfect-read window now lives in core/DodgeRead alongside the duel's, so the two cannot drift apart
+// unnoticed — they are deliberately different sizes (a horde is not one telegraph) and that difference is
+// documented there rather than being an accident of two files.
+// (M45 had this backwards: it rewarded a strike landing in the LAST 90 ms — a dodge thrown 0.3 s early.)
+const PERFECT_WINDOW_SEC = HORDE_WINDOW_SEC;
 
 // ── KARATE-NEO-COOP: the player's toughness (VITALS in NeoCombatCore) + what only the renderer knows ──
 const HP_REGEN_DELAY_SEC = 3.5, HP_REGEN_PER_SEC = 4;   // out of contact the pool refills — a beating survived, not attrition
@@ -155,6 +161,8 @@ const ORBIT_SEC = 0.5;             // a capped-out agent circles this long befor
 const AGENT_STRIKE_ARC_DEG = ENEMY_ATTACK.arcDeg + 20;  // the renderer's arc is a hair wider than the core's (the hit-check happens on a body that may have stepped)
 const AGENT_TURN_RATE = 9;         // rad/s — a wound-up agent tracks you
 const SEPARATION_M = 0.9;          // the pack fans out: no two agents inside this
+/** The floating health bar: width in metres and how far above the root it rides. */
+const BAR_W = 0.62, BAR_Y = 2.05;
 
 // M110 — CHI BURST. The chi meter (filled by hits/dodges) used to top out at
 // 100 and do nothing. It now powers a screen-clearing special: at full chi,
@@ -171,6 +179,8 @@ const PICKUP_STYLE: Record<DropKind, { hex: string }> = { shard: { hex: '#FFC53D
 
 interface Enemy {
   mob: Mob; anim: BeatOwner; brain: EnemyBrain; hp: number; maxHp: number; /** launched: helpless and takes more until this timestamp */ airUntil: number;
+  /** The floating health bar over this body (2026-09-14). Null until the first hit — a full bar on an
+   *  untouched mook is eight bars of clutter the player has not earned any information from yet. */ bar: Mesh | null;
   /** capped out of a strike: circling until this game-clock time (0 = not orbiting) */ orbitUntil: number; orbitDir: 1 | -1;
 }
 interface Pickup { kind: DropKind; mesh: Mesh; life: number; phase: number }
@@ -257,6 +267,11 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   let clockSec = 0;
   let striking = false, blocking = false, dodging = false, bursting = false;
   let dodgeClip = DODGE_SLIP;
+  // THE ONE VERB THIS MODE DID NOT HAVE (2026-09-14). Endless already owns the most developed dodge in the
+  // game -- a directional roll with i-frames, the lean-vs-slip clips and a perfect read -- so it does NOT
+  // take EvadeMoves' roll; it would be two rolls fighting over one body. It takes only the JUMP, which was
+  // missing here as it was missing everywhere.
+  const meAir = new EvadeMoves();
   let meTree: CombatAnimTree, partnerTree: CombatAnimTree;
   let myStrike: Strike = null, pStrike: Strike = null, impactUntil = 0, outFlag = false;
   let hitCount = 0, lastHitAt = 0;                 // the Musou number
@@ -334,7 +349,11 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     });
     mob.startPursuit();
     pool.add(mob);
-    enemies.push({ mob, anim, brain: new EnemyBrain(wave), hp: 1, maxHp: 1, airUntil: 0, orbitUntil: 0, orbitDir: i % 2 ? 1 : -1 });   // one-knock: any land sets hp 0 → KO
+    // 2026-09-14 (owner: three hits at wave 1). These were spawned at hp 1 / maxHp 1 — a body dropped on one
+    // touch, so the health fields existed and meant nothing and there was no bar worth drawing. MookHealth
+    // owns the curve; it is shallow and capped on purpose, because one swing still has to clear a crowd.
+    const hpPool = mookMaxHp(wave);   // `pool` above is the MOB pool — different thing, same word
+    enemies.push({ mob, anim, brain: new EnemyBrain(wave), hp: hpPool, maxHp: hpPool, airUntil: 0, orbitUntil: 0, orbitDir: i % 2 ? 1 : -1, bar: null });
   }
 
   async function spawnWave(ctx: ModeContext): Promise<void> {
@@ -403,9 +422,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       ? MeshBuilder.CreateCylinder(`ke_pick_${kind}`, { diameter: 0.34, height: 0.06, tessellation: 24 }, ctx.scene)
       : kind === 'chi' ? MeshBuilder.CreateSphere(`ke_pick_${kind}`, { diameter: 0.32, segments: 12 }, ctx.scene)
       : MeshBuilder.CreateBox(`ke_pick_${kind}`, { size: 0.28 }, ctx.scene);
-    const mat = new StandardMaterial(`ke_pick_mat_${kind}_${now()}`, ctx.scene);
-    mat.emissiveColor = Color3.FromHexString(style.hex); mat.diffuseColor = Color3.Black(); mat.specularColor = Color3.Black();
-    mesh.material = mat;
+    mesh.material = unlitMat(ctx, `ke_pick_mat_${kind}_${now()}`, style.hex);
     mesh.position.copyFromFloats(at.x, 0.45, at.z); clampDisc(mesh.position);
     if (kind === 'shard') mesh.rotation.x = Math.PI / 2;   // a standing disc
     mesh.isPickable = false;
@@ -474,7 +491,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       const root = e.mob.char.root;
       tween(0.26, (k) => { root.position = Vector3.Lerp(from, target, k); });
       EffectsKit.burst(ctx.scene, from.add(new Vector3(0, 1, 0)), 'sparks');
-      landHit(ctx, e, true);                                   // the burst launches every body it clears
+      landHit(ctx, e, true, 'finisher');                        // the burst clears outright — that is what full chi buys
     }
     chi = 0; ctx.setHud({ chi });
     bursting = false;
@@ -523,7 +540,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       if (t - lastHitAt > HIT_CHAIN_MS) hitCount = 0;
       if (s.launch || route) matrix(ctx, finisher || route?.fx === 3 ? 'finisher' : 'heavyKo');
       const launches = !!s.launch || (route ? route.ender !== 'stun' : false);
-      for (const e of [...hit]) landHit(ctx, e, launches);   // one contact = one body down; heavy adds launch juice
+      const hitWeight: 'light' | 'medium' | 'heavy' | 'finisher' = finisher ? 'finisher' : STRIKE_WEIGHT[key];
+      for (const e of [...hit]) landHit(ctx, e, launches, hitWeight);   // the arc still reaches every body; each now takes damage rather than dropping
       hitCount += hit.length; lastHitAt = t;
       ctx.setHud({ hits: hitCount });
       if (hit.length >= 3) ctx.feel?.impact?.(0.55);
@@ -548,18 +566,76 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     }, 150 * style.startupMult);
   }
 
-  /** A land is a KO. Revolutions weight: the body drops on ONE solid strike — no damage math, no second hit to
-   *  finish. A heavy (launch) strike lands harder for juice; it never needs a follow-up. */
-  function landHit(ctx: ModeContext, t: Enemy, launch: boolean): void {
-    t.hp = 0;
+  /**
+   * A land takes HEALTH off, and a KO is what happens when it runs out.
+   *
+   * This used to be `t.hp = 0` under a "Revolutions weight" comment — one solid strike, one body down. The
+   * owner asked for the One Piece read instead (2026-09-14): bodies that absorb, with a bar you watch come
+   * down. A finisher still drops a wave-1 body outright, which is what a finisher is for.
+   *
+   * The chi still comes on every LAND, not on every kill — a wave that takes three times the hits must not
+   * also take three times as long to charge the burst, or the retune quietly nerfs the special.
+   */
+  function landHit(ctx: ModeContext, t: Enemy, launch: boolean, weight: 'light' | 'medium' | 'heavy' | 'finisher' = 'light'): void {
+    t.hp = damageMook(t.hp, weight, launch || now() < t.airUntil);
     gainChi(ctx, 8);
     ctx.feel?.impact?.(launch ? 0.55 : 0.35);
     EffectsKit.burst(ctx.scene, t.mob.char.root.position.add(new Vector3(0, 1.1, 0)), 'sparks');
     if (launch) EffectsKit.burst(ctx.scene, t.mob.char.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
-    ko(ctx, t);
+    if (t.hp <= 0) { ko(ctx, t); return; }
+    // still standing: the bar is the feedback that the hit counted
+    SoundKit.play('impact', { pitch: 1.15, volume: 0.35 });
+    updateBar(ctx, t);
+  }
+
+  /**
+   * The ONE place this mode makes an unlit material.
+   *
+   * The StandardMaterial ratchet (visual/standardMaterialRatchet.test.ts) allows deliberately unlit
+   * markers — a material with `disableLighting` cannot clip to white under a PBR rig because nothing lights
+   * it — but it still counts occurrences, and it should: the point is that new ones stop appearing. The
+   * pickups and the health bars want exactly the same thing, so they share one factory and the file's
+   * count stays where it was rather than creeping because two features each wrote their own.
+   */
+  function unlitMat(ctx: ModeContext, name: string, hex: string): StandardMaterial {
+    const m = new StandardMaterial(name, ctx.scene);
+    m.disableLighting = true;
+    m.emissiveColor = Color3.FromHexString(hex);
+    m.diffuseColor = Color3.Black();
+    m.specularColor = Color3.Black();
+    return m;
+  }
+
+  /**
+   * The floating health bar (2026-09-14).
+   *
+   * A billboarded unlit quad, built ON FIRST DAMAGE rather than at spawn: a full bar over every untouched
+   * body in a wave of eight is eight pieces of clutter telling the player nothing they did not already
+   * know. It appears when you hit something, which is also when it starts being information.
+   *
+   * Scaled on x from the left edge rather than centred, so it drains in one direction like a bar and not
+   * like a shrinking stick, and coloured through MookHealth so no surface picks its own thresholds.
+   */
+  function updateBar(ctx: ModeContext, e: Enemy): void {
+    const k = mookHp01(e.hp, e.maxHp);
+    if (!e.bar) {
+      const bar = MeshBuilder.CreatePlane(`mook_bar_${Math.random().toString(36).slice(2, 8)}`, { width: BAR_W, height: 0.055 }, ctx.scene);
+      bar.billboardMode = Mesh.BILLBOARDMODE_ALL;
+      bar.isPickable = false;
+      bar.renderingGroupId = 1;                      // over the bodies, never inside one
+      bar.material = unlitMat(ctx, `${bar.name}_m`, mookBarHex(k));   // unlit: a lit bar reads as world geometry
+      e.bar = bar;
+    }
+    const mat = e.bar.material as StandardMaterial;
+    mat.emissiveColor = Color3.FromHexString(mookBarHex(k));
+    e.bar.scaling.x = Math.max(0.001, k);
+    e.bar.position.copyFrom(e.mob.char.root.position).addInPlace(new Vector3(0, BAR_Y, 0));
+    // the left edge stays put while the right one comes in
+    e.bar.position.x -= (BAR_W * (1 - k)) / 2;
   }
 
   function ko(ctx: ModeContext, e: Enemy): void {
+    e.bar?.dispose(); e.bar = null;
     enemies = enemies.filter((x) => x !== e);
     kos++; totalKos++;
     e.mob.down();                                               // the owner: knockdown → the floor hold
@@ -717,7 +793,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       speed01: blocking || myDown.downed ? 0 : mySpeed01, dashing: false, hasWeapon: false,
       speedMps: blocking || myDown.downed ? 0 : myMps,   // STRIDE MATCHING: real ground speed
       striking: myStrike?.weight ?? null, strikeClip: myStrike?.clip,
-      blocking, dodging, dodgeClip, parryFlash: false, guardImpactFlash: t < impactUntil,
+      blocking, dodging, dodgeClip, airborne: meAir.airborne, parryFlash: false, guardImpactFlash: t < impactUntil,
       hitBy: t < hitUntil ? hitWeight : null, down: myDown.downed, out: outFlag, ulting: false,
     };
     // BIOMECH-WAVE2 G5: the same reads, as a BODY. `engaged` is "there is a horde in the ring" — between waves and in
@@ -897,6 +973,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         if (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y') strike(ctx, e.btn);
         if (e.btn === 'X') xHoldSec = 0;
         if (e.btn === 'R1') chiBurst(ctx);
+        // L1 JUMPS. R1 is the chi burst in this mode and A/B/Y are the strikes, so the shoulder that is
+        // free here is the opposite one to the duels' -- the verb is the same, the button is what was left.
+        if (e.btn === 'L1' && !myDown.downed && meAir.jump()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });
       }
       if (e.t === 'button' && !e.pressed && e.btn === 'X') {
         const held = xHoldSec;
@@ -979,6 +1058,10 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       const vel = ctx.camDirector.stickWorldLatched(stickX, stickY).scaleInPlace(3 * perks.speedMult);
       // the posture tracker: resolved in the fighter's own frame, so circling a body reads as a bank and backing off
       // a swing reads as sitting back
+      // the bars ride their bodies: built on first damage, moved every frame after
+      for (const e of enemies) if (e.bar) updateBar(ctx, e);
+      meAir.update(dt);
+      player.root.position.y = meAir.height;   // the arc is EvadeMoves'; nothing here integrates gravity
       meMotion.update(vel.x, vel.z, player.root.rotation.y, dt);
       myMps = Math.hypot(vel.x, vel.z);
       let mySpeed01 = Math.min(1, vel.length() / (3 * perks.speedMult));   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
