@@ -44,6 +44,7 @@ export const REAL_CLIPS = new Set<string>([
   'karate_lean_dodge',   // KARATE-NEO-COOP (2026-09-07): the bullet-time lean
   'karate_evade',   // KARATE-NEO-COOP (2026-09-07): the fighter's slip (the endless dodge)
   'karate_shuffle_left', 'karate_shuffle_right',   // BIOMECH-WAVE2 (2026-09-09): the lock-on strafe
+  'karate_roll', 'karate_jump',   // 2026-09-14: combat had no roll and no jump in ANY of its four modes
   'football_carry_run',   // BIOMECH-WAVE2: authored (MODE-STICK-FACE) and registered on the animator, never listed — the football tree resolves it (same case as bball_follow_through)
   // the racket / club / net / keeper sports (anim/authored/{tennis,volleyball,golf,soccer}) — Phase 3, 2026-09-03; never
   // listed here (installSafePlay's clipNames check carried them). ANIM-READABILITY (net / precision, 2026-09-07) adds

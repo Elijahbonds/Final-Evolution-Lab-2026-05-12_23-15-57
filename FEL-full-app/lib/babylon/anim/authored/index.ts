@@ -11,7 +11,7 @@ import { buildSelfLob, buildBounceThrow, buildKickUp, buildCartwheel, buildDoubl
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
-import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge } from './karate';
+import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge, buildCombatRoll, buildCombatJump } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
   buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
@@ -74,6 +74,8 @@ export function registerAuthoredClips(
     () => buildGuardStep(scene, skeleton),
     () => buildShuffle(scene, skeleton, 'left'),    // BIOMECH-WAVE2 (2026-09-09) G2: a lock-on fighter travels SIDEWAYS — the forward guard step was the only loco either duel had
     () => buildShuffle(scene, skeleton, 'right'),
+    () => buildCombatRoll(scene, skeleton),    // 2026-09-14: combat had no roll and no jump at all
+    () => buildCombatJump(scene, skeleton),
     () => buildBlockHold(scene, skeleton),     // ANIM-READABILITY (combat, 2026-09-07): the guard verbs and the floor
     () => buildGuardImpact(scene, skeleton),
     () => buildParry(scene, skeleton),

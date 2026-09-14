@@ -29,7 +29,7 @@ export type CombatAnimState =
   | 'block_hold' | 'parry_flash' | 'guard_impact'
   | 'react_light' | 'react_medium' | 'react_heavy' | 'react_launch'
   | 'knockdown' | 'ko' | 'fall' | 'floor' | 'get_up'
-  | 'dodge' | 'ultimate' | 'celebrate';
+  | 'dodge' | 'roll' | 'jump' | 'ultimate' | 'celebrate';
 
 export interface CombatAnimInput {
   speed01: number;
@@ -57,6 +57,10 @@ export interface CombatAnimInput {
   falling?: boolean;
   /** The i-frame dodge roll (Karate endless). */
   dodging?: boolean;
+  /** CombatMovement.roll() — a committed ground evade. Outranks everything but the floor family. */
+  rolling?: boolean;
+  /** CombatMovement airborne — the tuck. */
+  airborne?: boolean;
   /** The dodge's own clip (KARATE-NEO-COOP: the lean with no stick held, the juke with one); the juke plays when absent. */
   dodgeClip?: string;
   ulting: boolean;
@@ -101,6 +105,8 @@ const CLIP_FOR: Record<CombatAnimState, { clip: string; loop: boolean; fadeSec: 
   fall:            { clip: 'football_tackled_fall', loop: false, fadeSec: 0.06 },
   floor:           { clip: 'karate_floor_hold', loop: true, fadeSec: 0.15 },
   get_up:          { clip: 'karate_get_up', loop: false, fadeSec: 0.1 },
+  roll:            { clip: 'karate_roll', loop: false, fadeSec: 0.05 },   // 0.05: a roll must leave the guard NOW or the i-frames start after the body has
+  jump:            { clip: 'karate_jump', loop: false, fadeSec: 0.07 },
   dodge:           { clip: 'karate_evade', loop: false, fadeSec: 0.1 },    // KARATE-NEO-COOP: the authored slip (was the football juke — the walk at 1.8×); 0.1: the stance → the slip / the lean is a 0.5 m hand move (0.3 m/frame at 0.06, measured)
   ultimate:        { clip: 'karate_counter_throw', loop: false, fadeSec: 0.08 },
   celebrate:       { clip: 'karate_victory_pose', loop: false, fadeSec: 0.2 },
@@ -116,7 +122,14 @@ export function chooseCombatClip(i: CombatAnimInput): CombatClipChoice {
   else if (i.ulting) state = 'ultimate';
   else if (i.hitBy) state = i.hitBy === 'finisher' ? 'react_launch' : (`react_${i.hitBy}` as CombatAnimState);
   else if (i.down) state = 'knockdown';
+  // THE ROLL OUTRANKS EVERY STANDING STATE (2026-09-14). It is the committed evade: CombatMovement refuses
+  // to let you act during it, so the tree must not let a held guard or a stick direction show through it
+  // either — a roll that looks like a walk is a roll the opponent cannot read.
+  else if (i.rolling) state = 'roll';
   else if (i.dodging) state = 'dodge';
+  // airborne sits BELOW the strike so an air attack still reads as the strike; above locomotion so a jump
+  // is never a run with the feet off the floor.
+  else if (i.airborne && !i.striking) state = 'jump';
   else if (i.guardImpactFlash) state = 'guard_impact';
   else if (i.parryFlash) state = 'parry_flash';
   else if (i.striking) state = i.striking === 'finisher' ? 'strike_finisher' : (`strike_${i.striking}` as CombatAnimState);
@@ -159,6 +172,8 @@ export function settleAfter(st: CombatAnimState, i: CombatAnimInput): CombatClip
     case 'parry_flash': return chooseCombatClip({ ...i, parryFlash: false });
     case 'guard_impact': return chooseCombatClip({ ...i, guardImpactFlash: false });
     case 'dodge': return chooseCombatClip({ ...i, dodging: false });
+    case 'roll': return chooseCombatClip({ ...i, rolling: false });
+    case 'jump': return chooseCombatClip({ ...i, airborne: false });
     case 'ultimate': return chooseCombatClip({ ...i, ulting: false });
     case 'celebrate': return chooseCombatClip({ ...i, celebrating: false });
     default: return chooseCombatClip(i);

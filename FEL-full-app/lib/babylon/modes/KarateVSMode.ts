@@ -24,6 +24,8 @@
 // Reliability: clipRegistry/installSafePlay, per-phase watchdogs, groundLock,
 // fight-preset framing, SoundKit/EffectsKit — all standard since M42.
 
+import { EvadeMoves } from '../core/EvadeMoves';
+import { dodgeReward, tickCounter, counterMult } from '../core/DodgeRead';
 import { nerve, standingOf } from '../core/Nerve';
 import { Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -158,6 +160,15 @@ export const KarateVSMode: ModeDefinition = (() => {
     console.info('[KVS-JUICE] match punch');
   }
   let stickX = 0, stickY = 0;
+  // ROLL, JUMP AND DODGE (2026-09-14). Before today this mode's entire movement verb set was a stick: no
+  // roll, no jump, no dodge. EvadeMoves rather than CombatMovement on purpose -- this mode writes its own
+  // camera-relative velocity (MODE-STICK-FACE) and migrating that to deliver a verb would risk a feel that
+  // was tuned for a reason.
+  const meEvade = new EvadeMoves();
+  /** Seconds of counter window open on the player from a perfect dodge (DodgeRead). */
+  let meCounter = 0;
+  /** When the rival's in-flight strike would connect, as a game-clock time; null when nothing is coming. */
+  let foeImpactAt: number | null = null;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
@@ -223,9 +234,10 @@ export const KarateVSMode: ModeDefinition = (() => {
     bio.striking = f.strike?.weight ?? null; bio.windingUp = false;
     bio.blocking = s.blockHeld; bio.parrying = t < f.parryUntil; bio.guardImpact = t < f.impactUntil;
     bio.hitBy = t < f.hitUntil ? f.hitBy : null; bio.down = t < f.downUntil; bio.out = f.out;
-    bio.rising = false; bio.dodging = false; bio.celebrating = t < f.celebrateUntil; bio.engaged = phase === 'fighting';
+    bio.rising = false; bio.dodging = mine ? meEvade.rolling : false; bio.celebrating = t < f.celebrateUntil; bio.engaged = phase === 'fighting';
     return {
       speed01: moving, strafe, backing: strafe === 0 && bio.approach < 0, dashing: false, hasWeapon: false,
+      rolling: mine ? meEvade.rolling : false, airborne: mine ? meEvade.airborne : false,
       striking: f.strike?.weight ?? null, strikeClip: f.strike?.clip,
       blocking: s.blockHeld, parryFlash: t < f.parryUntil, guardImpactFlash: t < f.impactUntil,
       hitBy: t < f.hitUntil ? f.hitBy : null, down: t < f.downUntil, out: f.out, ulting: false, celebrating: t < f.celebrateUntil,
@@ -274,9 +286,14 @@ export const KarateVSMode: ModeDefinition = (() => {
     SoundKit.play('whoosh', { pitch: special ? 0.8 : 1.1 });
     animOf(mine).strike = { weight: special ? 'finisher' : WEIGHT_OF[key], clip: atk.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
 
+    // WHAT MAKES A DODGE "WELL TIMED" MEASURABLE. The window is read against the moment this strike would
+    // CONNECT, so the player is rewarded for reacting to THIS attack rather than to a cooldown. Only the
+    // rival's swing is announced: dodging your own strike is not a read.
+    if (!mine) foeImpactAt = now() + atk.startupMs;
     setTimeout(() => {
       if (phase !== 'fighting') { endStrike(mine); return; }
       const dist = Vector3.Distance(atkChar.root.position, defChar.root.position);
+      if (!mine) foeImpactAt = null;   // it landed or it did not; either way nothing is incoming now
       const outcome = resolveStrike(atk, dist, defState, now());
 
       switch (outcome) {
@@ -315,7 +332,13 @@ export const KarateVSMode: ModeDefinition = (() => {
           break;
         }
         case 'hit': {
-          const dealt = applyHit(atkState, defState, atk);
+          // A PERFECT DODGE IS AN OPENING, and this is where it is spent: the counter window multiplies the
+          // punish and then closes. Bounded at 1.5x by DodgeRead -- an opening, never an execute.
+          const counter = mine ? counterMult(meCounter) : 1;
+          if (mine && counter > 1) { meCounter = 0; ctx.setHud({ banner: 'COUNTER!' }); setTimeout(() => ctx.setHud({ banner: '' }), 700); }
+          const base = applyHit(atkState, defState, atk);
+          const dealt = Math.round(base * counter);
+          if (counter > 1) defState.hp = Math.max(0, defState.hp - (dealt - base));
           // A COMBO IS A ROUTE. `combo++` counted hits, so jab-jab-jab and jab-kick-heavy were worth exactly
           // the same and neither had a name. The landed strikes are recorded and their TAIL is matched against
           // the route list, so a route can complete inside a real exchange rather than only from a clean start.
@@ -501,6 +524,35 @@ export const KarateVSMode: ModeDefinition = (() => {
         if (e.btn === 'B') swing(ctx, true, 'kick');
         if (e.btn === 'Y') swing(ctx, true, 'heavy');
         if (e.btn === 'X') meState.pressBlock(now());   // the tree shows the block (blockHeld → block_hold)
+        // L1 ROLLS and R1 JUMPS. The four face buttons are spoken for (A jab, B kick, Y heavy, X guard), so
+        // the new verbs go on the shoulders rather than overloading a strike -- the same reasoning the dunk
+        // contest's CALL went to L1 for. A neutral stick rolls BACKWARDS: the panic input should be the
+        // defensive one.
+        if (e.btn === 'L1' && meState.controllable) {
+          const dir = Math.hypot(stickX, stickY) > 0.2
+            ? ctx.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx.camDirector.rightFlat().scale(stickX))
+            : ctx.camDirector.forwardFlat().scale(1);   // neutral: away from the rival the camera is looking at
+          if (meEvade.roll(dir.x, dir.z)) {
+            // THE REWARD IS A READ, NOT A PRESS (DodgeRead). The window is binary: dodging early pays
+            // NOTHING, because any payout for a mistimed press makes mashing optimal again.
+            const secTo = foeImpactAt === null ? null : (foeImpactAt - now()) / 1000;
+            const r = dodgeReward(secTo);
+            if (r.perfect) {
+              meCounter = r.counterSec;
+              ctx.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000));
+              ctx.feel?.impact?.(0.3);
+              ctx.momentum.report({ kind: 'near_miss', weight: 14 });
+              SoundKit.play('powerUp', { volume: 0.5, pitch: 1.3 });
+              ctx.setHud({ banner: r.label ?? '' });
+              setTimeout(() => ctx.setHud({ banner: '' }), 800);
+            } else {
+              SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
+            }
+          }
+        }
+        if (e.btn === 'R1' && meState.controllable) {
+          if (meEvade.jump()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });
+        }
       }
       if (e.t === 'button' && !e.pressed && e.btn === 'X') meState.releaseBlock();
     },
@@ -532,8 +584,18 @@ export const KarateVSMode: ModeDefinition = (() => {
       // world-axis read (x, 0, y) was right only while the camera looked exactly down −z; once it had swung round the
       // rival (it does, every exchange) stick-right ran screen-LEFT (measured Δscreen −2.5 m). No axis is flipped.
       const moveVel = ctx.camDirector.forwardFlat().scale(-stickY * MOVE_SPEED).addInPlace(ctx.camDirector.rightFlat().scale(stickX * MOVE_SPEED));
+      // the roll outranks the stick: while it owns the body the stick is ignored entirely, which is the
+      // commitment that makes it a read rather than a better walk
+      const rollVel = meEvade.update(sdt);
+      meCounter = tickCounter(meCounter, sdt);
       let mySpeed01 = moveVel.length() / MOVE_SPEED;   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
-      if (meState.controllable && !striking && !meState.blockHeld) {
+      if (rollVel) {
+        player.root.position.addInPlace(rollVel.scale(sdt));
+        modeVenue?.constrain(player.root.position);
+        player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x));
+        player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z));
+        mySpeed01 = 0;
+      } else if (meState.controllable && !striking && !meState.blockHeld) {
         const vel = moveVel;
         const before = player.root.position.clone();
         player.root.position.addInPlace(vel.scale(sdt));
@@ -542,6 +604,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       }
 
       // rival AI
+      player.root.position.y = meEvade.height;   // the arc is EvadeMoves'; nothing here integrates gravity
       const action = brain.decide(sdt, rival.root.position, player.root.position, foeState, striking);
       if (action.block && !foeState.blockHeld) foeState.pressBlock(now());
       if (!action.block && foeState.blockHeld) foeState.releaseBlock();

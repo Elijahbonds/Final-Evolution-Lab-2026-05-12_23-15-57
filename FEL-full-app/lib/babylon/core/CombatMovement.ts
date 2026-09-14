@@ -14,6 +14,9 @@
 
 import { Vector3 } from '@babylonjs/core';
 import { CourtMovement, DEFAULT_MOVEMENT, type MovementTuning } from './CourtMovement';
+import {
+  EvadeMoves, ROLL_SPEED, ROLL_SEC, ROLL_IFRAMES_SEC, ROLL_RECOVER_SEC, ROLL_COOLDOWN_SEC, JUMP_V, JUMP_G,
+} from './EvadeMoves';
 
 // ── Stances ────────────────────────────────────────────────────────────────
 export type Stance = 'orthodox' | 'cat' | 'rooted';
@@ -60,6 +63,16 @@ export interface CombatMoveResult {
   dashing: boolean;
   dashIFrames: boolean;
   planting: boolean;
+  /** Mid-roll. The body is committed — see the header on ROLL vs DASH. */
+  rolling: boolean;
+  /** Invulnerable, from a dash OR a roll. Modes should read this, never the dash flag alone. */
+  iframes: boolean;
+  /** Off the floor. */
+  airborne: boolean;
+  /** Metres above the floor — the mode adds this to the root's y. */
+  height: number;
+  /** Free to strike, block or move. False through a roll and its recovery. */
+  canAct: boolean;
 }
 
 export class CombatMovement {
@@ -71,11 +84,26 @@ export class CombatMovement {
   private dashDir = Vector3.Zero();
   private iframeTimer = 0;
   private dashCooldown = 0;
+  private readonly evade = new EvadeMoves();
 
   static readonly DASH_SPEED = 9.5;        // m/s burst
   static readonly DASH_SEC = 0.22;
   static readonly DASH_IFRAMES_SEC = 0.16;
   static readonly DASH_COOLDOWN_SEC = 0.55;
+
+  // ── ROLL and JUMP ────────────────────────────────────────────────────────────────────────────────────
+  //
+  // The state machine lives in EvadeMoves, NOT here, and the reason is worth keeping: of the five combat
+  // modes only duel and showdown own a CombatMovement. Karate endless, karate_vs and mixedcombat write a
+  // velocity straight onto the root. Putting the roll in here would have meant migrating three shipped,
+  // tuned locomotions to deliver one verb. These re-exports keep the old constant names working.
+  static readonly ROLL_SPEED = ROLL_SPEED;
+  static readonly ROLL_SEC = ROLL_SEC;
+  static readonly ROLL_IFRAMES_SEC = ROLL_IFRAMES_SEC;
+  static readonly ROLL_RECOVER_SEC = ROLL_RECOVER_SEC;
+  static readonly ROLL_COOLDOWN_SEC = ROLL_COOLDOWN_SEC;
+  static readonly JUMP_V = JUMP_V;
+  static readonly JUMP_G = JUMP_G;
 
   constructor(tune: Partial<MovementTuning> = {}) {
     this.base = new CourtMovement({ ...DEFAULT_MOVEMENT, ...tune });
@@ -86,6 +114,21 @@ export class CombatMovement {
   get dashIFrames(): boolean { return this.iframeTimer > 0; }
   get dashing(): boolean { return this.dashTimer > 0; }
   get dashReady(): boolean { return this.dashCooldown === 0 && this.dashTimer === 0; }
+  get rolling(): boolean { return this.evade.rolling; }
+  get rollIFrames(): boolean { return this.evade.rollIFrames; }
+  /** Invulnerable from EITHER source. Modes read this; reading `dashIFrames` alone misses the roll. */
+  get iframes(): boolean { return this.iframeTimer > 0 || this.evade.rollIFrames; }
+  get airborne(): boolean { return this.evade.airborne; }
+  get height(): number { return this.evade.height; }
+  get rollReady(): boolean { return this.evade.rollReady; }
+  /** Free to strike, block or steer. One predicate — see EvadeMoves. */
+  get canAct(): boolean { return this.evade.canAct; }
+
+  /** Committed defensive evade. False on cooldown, mid-roll, or airborne. */
+  roll(dirX: number, dirZ: number): boolean { return this.evade.roll(dirX, dirZ); }
+
+  /** Leave the floor. Refused mid-roll and mid-air. */
+  jump(): boolean { return this.evade.jump(); }
 
   /** Dash-cancel: a fast directional burst with i-frames. Returns false if
    *  on cooldown (modes gate the resource spend on this returning true). */
@@ -100,9 +143,20 @@ export class CombatMovement {
     return true;
   }
 
+  /** Advance the evade state; returns true while it owns the body (the roll AND its recovery). */
+  private stepEvade(dt: number): boolean {
+    const v = this.evade.update(dt);
+    if (!v) return false;
+    this.base.vel.copyFrom(v);
+    if (this.evade.rolling) this.base.facing = Math.atan2(this.evade.rollDir.x, this.evade.rollDir.z);
+    return true;
+  }
+
   update(dt: number, moveX: number, moveY: number, sprint: boolean): CombatMoveResult {
     this.dashCooldown = Math.max(0, this.dashCooldown - dt);
     this.iframeTimer = Math.max(0, this.iframeTimer - dt);
+    // the roll outranks the stick and the dash: it is the committed state
+    if (this.stepEvade(dt)) return this.result(false);
 
     if (this.dashTimer > 0) {
       this.dashTimer = Math.max(0, this.dashTimer - dt);
@@ -123,6 +177,7 @@ export class CombatMovement {
   updateWithSelf(dt: number, moveX: number, moveY: number, sprint: boolean, selfPos: Vector3, worldWish?: Vector3): CombatMoveResult {
     this.dashCooldown = Math.max(0, this.dashCooldown - dt);
     this.iframeTimer = Math.max(0, this.iframeTimer - dt);
+    if (this.stepEvade(dt)) return this.result(false);
 
     if (this.dashTimer > 0) {
       this.dashTimer = Math.max(0, this.dashTimer - dt);
@@ -157,6 +212,11 @@ export class CombatMovement {
       dashing,
       dashIFrames: this.iframeTimer > 0,
       planting: false,
+      rolling: this.evade.rolling,
+      iframes: this.iframes,
+      airborne: this.evade.airborne,
+      height: this.evade.height,
+      canAct: this.evade.canAct,
     };
   }
 }

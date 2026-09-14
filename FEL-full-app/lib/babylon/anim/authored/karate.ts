@@ -96,14 +96,63 @@ export function buildShuffle(scene: Scene, sk: Skeleton, side: 'left' | 'right')
 const HIGH_GUARD = { Left: [-0.12, 1.46, 0.22] as V3, Right: [0.12, 1.43, 0.20] as V3 };   // fists in front of the face, elbows in
 const BLOCK_BONES = { Hips: [0, 0, 0] as V3, Spine: [8, 0, 0] as V3, Neck: [10, 0, 0] as V3, LeftLeg: [8, 0, 0] as V3, RightLeg: [8, 0, 0] as V3 };
 
+/**
+ * THE COMBAT ROLL (2026-09-14) — a committed evade along the ground.
+ *
+ * `roll` appeared ZERO times across all four combat modes before today; the entire verb set was a dash and
+ * a sprint flag. This is the body for `CombatMovement.roll()`.
+ *
+ * Keyed as a TUCK-AND-OPEN rather than as a rotation. The rig's root is driven by the mode (the roll's
+ * velocity moves it), so a clip that also spun the body would fight it — the same reason the 360's turn is
+ * a yaw layer and not clip keys (DUNK-BIOMECH). What the clip owns is the SHAPE: drop, ball up, pass
+ * through the low point, and rise onto the feet ready to be punished.
+ */
+export function buildCombatRoll(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'karate_roll', 0.42, [
+    { t: 0,    bones: { Hips: [10, 0, 0], Spine: [16, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-30, 0, 6], LeftLeg: [46, 0, 0], RightUpLeg: [-22, 0, -6], RightLeg: [38, 0, 0] }, hands: { Left: [-0.24, 1.10, 0.28], Right: [0.24, 1.08, 0.30] }, hipsY: -0.10 },   // the drop
+    { t: 0.12, bones: { Hips: [34, 0, 0], Spine: [40, 0, 0], Neck: [-22, 0, 0], LeftUpLeg: [-88, 0, 8], LeftLeg: [104, 0, 0], RightUpLeg: [-80, 0, -8], RightLeg: [98, 0, 0] }, hands: { Left: [-0.20, 0.52, 0.30], Right: [0.20, 0.50, 0.32] }, hipsY: -0.34 },   // tucked into a ball, hands to the floor
+    { t: 0.22, bones: { Hips: [46, 0, 0], Spine: [52, 0, 0], Neck: [-30, 0, 0], LeftUpLeg: [-104, 0, 10], LeftLeg: [118, 0, 0], RightUpLeg: [-98, 0, -10], RightLeg: [112, 0, 0] }, hands: { Left: [-0.16, 0.34, 0.22], Right: [0.16, 0.32, 0.24] }, hipsY: -0.46 },   // the low point: the i-frames live here
+    { t: 0.32, bones: { Hips: [24, 0, 0], Spine: [26, 0, 0], Neck: [-14, 0, 0], LeftUpLeg: [-62, 0, 8], LeftLeg: [84, 0, 0], RightUpLeg: [-40, 0, -8], RightLeg: [62, 0, 0] }, hands: { Left: [-0.26, 0.86, 0.26], Right: [0.26, 0.82, 0.28] }, hipsY: -0.24 },   // coming up out of it
+    // ends in the guard, but LOW and still rising — this is the recovery the roll is punished during, and
+    // a clip that snapped back to a clean stance would hide exactly the window that makes the roll a read.
+    { t: 0.42, bones: { Hips: [6, 0, 0], Spine: [12, 0, 0], Neck: [4, 0, 0], LeftUpLeg: [-18, 0, 6], LeftLeg: [30, 0, 0], RightUpLeg: [-8, 0, -6], RightLeg: [20, 0, 0] }, hands: { Left: [-0.14, 1.32, 0.22], Right: [0.14, 1.28, 0.20] }, hipsY: -0.09 },
+  ]);
+}
+
+/**
+ * THE COMBAT JUMP (2026-09-14) — a tuck over a sweep.
+ *
+ * The HEIGHT is the mode's: `CombatMovement` runs the arc and adds it to the root's y, so this clip must
+ * NOT key hipsY upward or the two would sum and the fighter would leave the arena. It keys the tuck and
+ * the landing absorb only — the shape of a jump, with none of its travel.
+ */
+export function buildCombatJump(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'karate_jump', 0.62, [
+    { t: 0,    bones: { Hips: [8, 0, 0], Spine: [12, 0, 0], LeftUpLeg: [-26, 0, 6], LeftLeg: [44, 0, 0], RightUpLeg: [-26, 0, -6], RightLeg: [44, 0, 0] }, hands: { Left: [-0.20, 1.24, 0.18], Right: [0.20, 1.22, 0.16] }, hipsY: -0.08 },   // the crouch that launches it
+    { t: 0.16, bones: { Hips: [-4, 0, 0], Spine: [-8, 0, 0], Neck: [-8, 0, 0], LeftUpLeg: [-48, 0, 6], LeftLeg: [76, 0, 0], RightUpLeg: [-44, 0, -6], RightLeg: [72, 0, 0] }, hands: { Left: [-0.26, 1.50, 0.16], Right: [0.26, 1.48, 0.14] } },   // knees up — the tuck that clears the sweep
+    { t: 0.34, bones: { Hips: [-2, 0, 0], Spine: [-6, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-40, 0, 6], LeftLeg: [64, 0, 0], RightUpLeg: [-36, 0, -6], RightLeg: [58, 0, 0] }, hands: { Left: [-0.24, 1.46, 0.18], Right: [0.24, 1.44, 0.16] } },   // the hang
+    { t: 0.48, bones: { Hips: [6, 0, 0], Spine: [10, 0, 0], LeftUpLeg: [-20, 0, 6], LeftLeg: [34, 0, 0], RightUpLeg: [-18, 0, -6], RightLeg: [30, 0, 0] }, hands: { Left: [-0.20, 1.30, 0.20], Right: [0.20, 1.28, 0.18] } },   // legs down for the floor
+    { t: 0.62, bones: { Hips: [14, 0, 0], Spine: [18, 0, 0], Neck: [6, 0, 0], LeftUpLeg: [-30, 0, 6], LeftLeg: [50, 0, 0], RightUpLeg: [-28, 0, -6], RightLeg: [48, 0, 0] }, hands: { Left: [-0.16, 1.34, 0.22], Right: [0.16, 1.30, 0.20] }, hipsY: -0.12 },   // the absorb
+  ]);
+}
+
 /** The BLOCK — a HOLD loop (starts IN the pose, breathes a hair, returns): the crossfade is the way in. */
 export function buildBlockHold(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 0.9;
   const breathe = (d: number) => ({ Left: [HIGH_GUARD.Left[0], HIGH_GUARD.Left[1] + d, HIGH_GUARD.Left[2]] as V3, Right: [HIGH_GUARD.Right[0], HIGH_GUARD.Right[1] + d, HIGH_GUARD.Right[2]] as V3 });
+  /** Down AND in: a loading guard pulls the elbows toward the ribs, it does not just drop the fists. */
+  const tuck = (dy: number, dz: number) => ({
+    Left: [HIGH_GUARD.Left[0] + 0.02, HIGH_GUARD.Left[1] - dy, HIGH_GUARD.Left[2] - dz] as V3,
+    Right: [HIGH_GUARD.Right[0] - 0.02, HIGH_GUARD.Right[1] - dy, HIGH_GUARD.Right[2] - dz] as V3,
+  });
+  // 2026-09-14: this was a 1.2 cm breathe on a static pose — a held photograph rather than a body bracing
+  // against something. A guard is ISOMETRIC: the legs are loaded, the shoulders are working, and the whole
+  // frame settles and re-sets. Bigger breathe, a real knee bend, and the elbows drawing in on the settle.
   return buildPoseClip(scene, sk, 'karate_block', T, [
-    { t: 0,     bones: BLOCK_BONES, hands: HIGH_GUARD, hipsY: -0.03 },
-    { t: T / 2, bones: { ...BLOCK_BONES, Spine: [9, 0, 0] }, hands: breathe(0.012), hipsY: -0.04 },
-    { t: T,     bones: BLOCK_BONES, hands: HIGH_GUARD, hipsY: -0.03 },
+    { t: 0,       bones: BLOCK_BONES, hands: HIGH_GUARD, hipsY: -0.03 },
+    { t: T * 0.3, bones: { ...BLOCK_BONES, Spine: [11, 0, 0], Neck: [12, 0, 0], LeftLeg: [15, 0, 0], RightLeg: [13, 0, 0] }, hands: tuck(0.03, 0.035), hipsY: -0.065 },   // loading down into it
+    { t: T * 0.6, bones: { ...BLOCK_BONES, Spine: [7, 0, 0], Neck: [9, 0, 0], LeftLeg: [10, 0, 0], RightLeg: [9, 0, 0] }, hands: breathe(0.022), hipsY: -0.028 },        // and back up
+    { t: T,       bones: BLOCK_BONES, hands: HIGH_GUARD, hipsY: -0.03 },
   ]);
 }
 
@@ -118,10 +167,15 @@ export function buildGuardImpact(scene: Scene, sk: Skeleton): AnimationGroup | n
 
 /** The PARRY — the lead hand flicks the strike aside and snaps back to the high guard. One-shot. */
 export function buildParry(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  return buildPoseClip(scene, sk, 'karate_parry', 0.3, [
-    { t: 0,   bones: BLOCK_BONES, hands: HIGH_GUARD, hipsY: -0.03 },
-    { t: 0.1, bones: { ...BLOCK_BONES, Spine: [2, 14, 0] }, hands: { Left: HIGH_GUARD.Left, Right: [0.26, 1.34, 0.50] }, hipsY: -0.04 },
-    { t: 0.3, bones: BLOCK_BONES, hands: HIGH_GUARD, hipsY: -0.03 },
+  // 2026-09-14: this swept one hand out and came straight back to the guard, so the clip said "I blocked
+  // that" when the mechanic says "I took their turn away". A parry ends OPEN — the deflecting arm carries
+  // across and past, the shoulders finish rotated, the far hand is already cocked. The animation now shows
+  // the punish window the parry actually creates, which is the thing the player needs to see to use it.
+  return buildPoseClip(scene, sk, 'karate_parry', 0.34, [
+    { t: 0,    bones: BLOCK_BONES, hands: HIGH_GUARD, hipsY: -0.03 },
+    { t: 0.08, bones: { ...BLOCK_BONES, Spine: [2, 16, 0], Neck: [6, -8, 0] }, hands: { Left: HIGH_GUARD.Left, Right: [0.30, 1.36, 0.46] }, hipsY: -0.05 },   // the catch, out on the line
+    { t: 0.17, bones: { ...BLOCK_BONES, Hips: [0, 10, 0], Spine: [0, 26, 0], Neck: [4, -14, 0] }, hands: { Left: [-0.18, 1.40, 0.10], Right: [-0.06, 1.30, 0.34] }, hipsY: -0.05 },   // carried ACROSS the body — the deflection, not a block
+    { t: 0.34, bones: { ...BLOCK_BONES, Hips: [0, 6, 0], Spine: [-2, 16, 0], Neck: [2, -10, 0] }, hands: { Left: [-0.22, 1.44, 0.04], Right: [0.02, 1.22, 0.30] }, hipsY: -0.02 },   // finishes OPEN and cocked: the punish is available
   ]);
 }
 
