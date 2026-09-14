@@ -20,6 +20,10 @@ And then you press the button and the game tells you nothing.
 
 **7.5 / 10** — *Deep, good-looking, and almost entirely unwilling to explain itself.*
 
+> **RE-SCORE after the depth pass: 9 / 10.** The silence is gone, the camera holds the money shot, and
+> the replay is the dunk instead of the walk-up. What is still between it and a 10 is listed at the bottom
+> — and it is short, but none of it is cosmetic.
+
 ---
 
 ## What works
@@ -110,3 +114,27 @@ already computed; it goes to `console.info` instead of the screen. Highest value
 **F3 — ~~Chase the long frames~~.** Withdrawn: the mode holds 60 fps and the counter was miscalibrated. Fixed in `PerfMonitor` instead.
 
 **F4 — Cut the approach hint down** to the two things that matter on your first run.
+
+
+---
+
+## After the depth pass (same day)
+
+| | fix | evidence |
+|---|---|---|
+| F1 | the timing verdict and the judges' three-way split are on screen, on makes **and** misses; a press too early even for the buffer now says how early | `257 ms EARLY · EXECUTION 29%` / `DIFF 10.0 · EXEC 2.9 · STYLE 1.8` read back off the live HUD |
+| F2 | the rim cut holds a broadcast position and **pans** instead of holding a fixed point | 30/30 flight frames keep dunker **and** rim inside 28° of the camera axis, worst 15° |
+| F3 | withdrawn — the mode holds 60 fps; the **counter** was miscalibrated at exactly the vsync target | long frames 53/120 → **2/120** after fixing the threshold |
+| F4 | the approach hint is one line in both places it appeared | — |
+| **depth** | the replay is trimmed to the **flight** rather than the whole 4 s ring | filmed: the same replay moment went from "jogging mid-court, ball on the floor" to the dunker at the rim with the ball |
+
+### What still stands between this and a 10
+
+1. **The verdict camera crops the dunker.** Filmed during the judges' confer: the hero is cut off at the
+   bottom of frame with the rim half out at the left. Same class of bug as F2, different phase.
+2. **The called dunk is a blind bet.** You commit on L1 with no idea what landing it pays or what failing
+   it costs, which makes the most interesting decision in the mode a guess the first several times.
+3. **A miss has no spectacle.** The rim rattles, and that is it. A near-miss that hangs on the iron and
+   drops out is the other half of what makes a dunk contest watchable.
+4. **The rival dunks offscreen.** `rivalTurn` frames him, but he never gets the broadcast treatment the
+   player does — no replay, no rim cut — so his run is a number appearing rather than a thing you watched.

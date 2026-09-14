@@ -1,5 +1,5 @@
 // DunkReplayCam (Babylon) — records last ~4s of character-root + ball transforms;
-// replays at 0.5× from two angles (low baseline → rim-side) after a made dunk.
+// replays the FLIGHT at 0.5× from two angles (low baseline → rim-side) after a made dunk.
 // Recorded transforms, not video. Tap/space skips.
 
 import { Quaternion, Vector3 } from '@babylonjs/core';
@@ -42,9 +42,26 @@ export class DunkReplayRecorder {
   }
 
   /** Play the replay; resolves when done or skipped. Caller pauses gameplay. */
-  play(rimCenter: Vector3): Promise<void> {
+  /**
+   * Play the replay.
+   *
+   * `lastSeconds` trims the front of the buffer — the replay shows only the last N seconds of what was
+   * recorded.
+   *
+   * WHY THIS EXISTS (2026-09-14, from filming the replay for a review). The recorder keeps a 4 s ring and
+   * `play` showed ALL of it at 0.5x: eight seconds of replay, and most of it was the dunker jogging up the
+   * floor with the ball nowhere near his hands. A broadcast replay of a dunk is the takeoff to the flush —
+   * nobody re-watches the walk to the baseline. The buffer stays 4 s because the mode cannot know at record
+   * time how long the run-up will be; the TRIM happens at playback, when it does.
+   */
+  play(rimCenter: Vector3, lastSeconds = WINDOW_S): Promise<void> {
     if (this.buf.length < RATE_HZ) return Promise.resolve();
-    const frames = [...this.buf];
+    const all = [...this.buf];
+    const endT = all[all.length - 1].t;
+    // keep at least half a second whatever is asked for: a trim that leaves two frames is not a replay
+    const cut = endT - Math.max(0.5, lastSeconds);
+    const trimmed = all.filter((f) => f.t >= cut);
+    const frames = trimmed.length >= 2 ? trimmed : all;
     const t0 = frames[0].t, dur = frames[frames.length - 1].t - t0;
 
     return new Promise<void>((resolve) => {

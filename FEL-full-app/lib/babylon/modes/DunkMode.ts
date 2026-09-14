@@ -197,6 +197,8 @@ const FALL_SPEED = 2.6;
 /** How long the night card is deaf to buttons — long enough that a press already in
  *  flight when it lands cannot skip it, short enough that it never feels stuck. */
 const CARD_SETTLE_SEC = 0.7;
+/** Seconds of run-up kept in front of the takeoff, so the replay has a beat of context before the leap. */
+const REPLAY_LEAD_IN_SEC = 0.55;
 
 const BUDGET_SEC: Record<Phase, number> = {
   // TRY-ONBOARD G1: the card has NO budget. It used to be 999 s because it lasted the
@@ -2268,7 +2270,13 @@ export const DunkMode: ModeDefinition = (() => {
     // un-raced promise is what knows when the root is the mode's again — then it falls to the floor and lands. The replay
     // writes a rotationQuaternion the mode never uses (it yaws by Euler), so the Euler yaw is handed back with the root.
     replaying = true; replayAir = false; replayAerial = false; replayPrevY = player.root.position.y;
-    const replayDone = replay.play(rim).then(() => { replaying = false; replayAir = false; player.root.rotationQuaternion = null; dropToFloor = true; console.info('[HANDS] replay end'); });
+    // THE REPLAY IS THE FLIGHT, not the walk to the baseline. Filmed for a review (2026-09-14): the 4 s
+    // buffer played whole at 0.5x was eight seconds of replay, most of it the dunker jogging up the floor
+    // with the ball on the ground behind him. The mode knows exactly how long this flight took --
+    // `launchRealMs` to now -- so it trims to that plus a beat of run-up for context, which is the shape a
+    // broadcast actually cuts.
+    const flightSec = Math.max(0, (performance.now() - launchRealMs) / 1000);
+    const replayDone = replay.play(rim, Math.min(4, flightSec + REPLAY_LEAD_IN_SEC)).then(() => { replaying = false; replayAir = false; player.root.rotationQuaternion = null; dropToFloor = true; console.info('[HANDS] replay end'); });
     ctx.camDirector.suspended = true;
     await Promise.race([replayDone, new Promise((r) => setTimeout(r, 3500))]);
     ctx.camDirector.suspended = false;
