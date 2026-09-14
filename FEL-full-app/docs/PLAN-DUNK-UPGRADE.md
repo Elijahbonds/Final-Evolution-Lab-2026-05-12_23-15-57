@@ -2,6 +2,8 @@
 
 **2026-09-14.** Owner ask: *"upgrade the dunking mode, come up with a plan, assess the needs."*
 
+> **STATUS: P1–P5 shipped the same day. P6 withdrawn — see the bottom.**
+
 Assessment first, because dunk is the mode everything else was just measured against, and the fastest way
 to waste this pass is to rebuild something that is already there. Everything below was grepped, not
 remembered — two things I *did* remember turned out to be stale and are listed as such.
@@ -31,6 +33,42 @@ remembered — two things I *did* remember turned out to be stale and are listed
   run-up gets two tricks and the chain bonus applies.
 - *"`dunkResume` is a dead export."* **Wrong.** It is consumed by `cardProgression.ts:307` inside the card
   projection. Checked before writing it down.
+
+---
+
+## Outcome
+
+| | gap | shipped |
+|---|---|---|
+| P1 | takeoff distance judged nowhere | `rangeBonus` — nothing under 1.6 m, **+1.6 at the stripe** (4.19 m, real geometry), then a slow taper. Worth more than the angle and the one-foot takeoff combined. |
+| P2 | a miss was just a low score | three attempts, growing penalty (1 / 0.85 / 0.70). **A retry is not scored** — only the attempt you finish on is judged. A make can never be retried. |
+| P3 | the Music Room binding never landed | `WalkOutCue` + the mode. Your authored track plays you out and stops at the takeoff; the credential is on the card. |
+| P4 | one anonymous rival | five, walked not rolled, so night 2 is somebody new. `reach` and `risk` move together across the ladder. |
+| P5 | you could not call your shot | optional, on **L1** (all four faces were taken — Y is the self-lob). Landing the call pays; failing it costs more than never calling. |
+
+### The invariant that shaped P2/P4/P5
+
+Three separate modules now carry the same rule, which is the one `RivalNerve` was built around:
+
+> **Reaching further must always cost more.** A called dunk that pays more than it costs is a button
+> marked "more points". A rival who swings bigger and lands at the same rate is a difficulty increase
+> wearing a name. Each has a test sweeping every combination to prove the pair never comes apart.
+
+### P6 — withdrawn, because two of its three items were already done
+
+I wrote P6 from reading the mode, and then checked:
+
+- *"`CrowdEnergy` does not read `ctx.momentum`"* — **wrong.** `DunkMode.ts:1050` already passes
+  `momentum.tier === 'on_fire'` into `crowd.update`.
+- *"`ScuffFx` is not wired to the runway"* — **pointless.** The landing already bursts dust and shakes
+  (`DunkMode.ts:2000`), and a dunker does not hard-stop on the floor the way a 1v1 handler cutting does.
+  `ScuffFx` solves a problem this mode does not have.
+- A round-one equivalent of the `need` chip is the only genuinely open item, and it is a marginal
+  addition — the final-round pressure number works because the final round is when it matters.
+
+That is the seventh absence-claim this session that did not survive a grep, and the third that was mine.
+**Grep the consumer before calling a producer unused** now has an art-side twin — *check what the venue
+already paints* (P1's deleted stripe) — and a self-directed one: **check your own plan before building it.**
 
 ---
 
