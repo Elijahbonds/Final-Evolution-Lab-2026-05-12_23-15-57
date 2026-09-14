@@ -724,6 +724,49 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     crowdSpots.push(new Vector3(x, 0.03, z));
   }
 
+  // THE SEAWARD HORIZON — the direction the player is actually looking.
+  //
+  // Per-mode audit: surf graded C on an empty horizon. I built the pier first and it did not help, because
+  // the pier is SHOREWARD and the surf camera faces out to sea (measured: forward.z -0.98 from z -38). The
+  // pier was the right object in the wrong direction for this defect.
+  //
+  // Seaward there is water to z -190 and then nothing until the backdrop dome. Two things a real ocean
+  // always shows from the water, and neither existed:
+  //
+  //   A POINT OF LAND, which is what gives a break its scale and its name — you cannot tell how big a wave
+  //   is against an empty horizon, and "Sunset POINT" was a point with no point.
+  //
+  //   SWELL LINES out the back: the sets that have not arrived yet. They are the single cheapest thing that
+  //   makes an ocean read as an ocean rather than a plane, because they say the water is GOING somewhere.
+  //
+  // Both sit inside the dome (radius 280) and on the water, so nothing floats past the world's own edge.
+  {
+    // PLACED INSIDE THE VIEW CONE, which is the part I got wrong first. The surf camera sits low on the
+    // water (y 3) with a ~0.8 rad FOV, so its half-angle is about 23 degrees. My first position — x -112 at
+    // z -168 — is 40 degrees off-axis: `isInFrustum` said true (the bounding sphere is 48 m across) and the
+    // headland was off the side of the screen. Off-axis angle is what matters, not the frustum flag.
+    const HEAD_Z = -182, HEAD_X = 46 * (venue.id === 'sunset-point' ? 1 : -1);   // ~17 deg off-axis
+    // a low wedge, not a mountain: it reads at distance and costs four triangles
+    const head = MeshBuilder.CreateCylinder('surf_headland',
+      { height: 34, diameterTop: 30, diameterBottom: 88, tessellation: 5 }, scene);
+    head.position.set(HEAD_X, 6, HEAD_Z);
+    head.rotation.z = 0.06;
+    head.material = VenueKit.paint(scene, 'surf_headland_mat',
+      Color3.Lerp(Color3.FromHexString(P.structure), new Color3(0.07, 0.1, 0.09), 0.62).toHexString(), 0.02, 0.98);
+    head.isPickable = false;
+    all.push(head);
+
+    // the sets coming in. Thin, flat, far apart, and progressively fainter with distance.
+    for (let i = 0; i < 3; i++) {
+      const z = -108 - i * 26;
+      const line = MeshBuilder.CreateGround(`surf_swell_${i}`, { width: WATER_W * 0.82, height: 2.6 }, scene);
+      line.position.set(0, 0.06 + i * 0.01, z);
+      line.material = VenueKit.paint(scene, `surf_swell_mat_${i}`, P.line, 0.10 - i * 0.02, 0.9);
+      line.isPickable = false;
+      all.push(line);
+    }
+  }
+
   // THE PIER THE COPY PROMISES.
   //
   // The Break's own line is "Green water, a pier down the line, afternoon glass" and there was no pier —
