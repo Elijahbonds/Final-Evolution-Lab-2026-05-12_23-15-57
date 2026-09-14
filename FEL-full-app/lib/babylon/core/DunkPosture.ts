@@ -70,6 +70,10 @@ export const TRICK_POSTURE: Record<string, Partial<PosturePose>> = {
   betweenlegs: { spine1: [4, 0, 0],  spine2: [0, 0, 0],   neck: [-8, 0, 0], head: [-10, 0, 0], shrug: 4, forward: 2,  eyes: 1 },
   lostfound:   { spine1: [-2, 0, 0], spine2: [-6, 0, 0],  neck: [-4, 0, 0], head: [-4, 0, 0], shrug: 6,  forward: 0,  chestAim: 0.7 },        // the fake's hip turn reads; the chest stays on the iron
   hideseek:    { spine1: [-2, 0, 0], spine2: [-6, 0, 0],  neck: [-2, 0, 0], head: [-2, 0, 0], shrug: 8,  forward: 2,  chestAim: 0.7 },
+  // 2026-09-14. The test above this table is the reason these exist: every air trick must carry a chest of
+  // its own, or two different tricks read as the same body from the waist up however different their arms are.
+  cradle:      { spine1: [-4, 0, 0], spine2: [-12, 0, 0], neck: [2, 0, 0],   head: [4, 0, 0],   shrug: 14, forward: -4, chestAim: 0.6 },   // the circle opens the near shoulder; the head follows the ball round
+  clutch:      { spine1: [10, 0, 0], spine2: [14, 0, 0],  neck: [-18, 0, 0], head: [-12, 0, 0], shrug: 4,  forward: 8,  chestAim: 0.75 },  // folded over the ball at the bottom, eyes up at the rim it is going back to
 };
 
 // ── Limits and rates ───────────────────────────────────────────────────────

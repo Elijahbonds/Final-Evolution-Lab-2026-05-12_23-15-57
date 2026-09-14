@@ -46,6 +46,12 @@ export const SCORPION_SEC = 0.7, LOST_FOUND_SEC = 0.8, HIDE_SEEK_SEC = 0.8, SPIN
  * is the trick, and a body that keeps AIR_LEGS has nothing for the ball to pass through.
  */
 export const BETWEEN_LEGS_SEC = 0.8;
+/** Rock the cradle: the ball circles the head on a bent arm, then is driven down. */
+export const CRADLE_SEC = 0.75;
+/** Double clutch: the ball is brought all the way down to the waist at the apex and thrown back up. */
+export const CLUTCH_SEC = 0.7;
+/** Clip-local second the cradle's ball passes closest to the head — the rig keeps it in the one hand. */
+export const CRADLE_ROUND = 0.34;
 /** Clip-local second the ball changes hands under the thigh (DunkMode reparents it here, as it does for lost & found). */
 export const BETWEEN_LEGS_HANDOFF = 0.34;
 
@@ -146,6 +152,41 @@ export function buildBetweenLegs(scene: Scene, sk: Skeleton): AnimationGroup | n
     { t: 0.52, bones: { Hips: [8, 0, 0], Spine: [4, 0, 0], Neck: [-12, 0, 0], LeftUpLeg: [-44, 0, 8], LeftLeg: [54, 0, 0], RightUpLeg: [4, 0, -6], RightLeg: [46, 0, 0] }, hands: { Left: [-0.46, 1.28, 0.20], Right: [0.38, 1.10, 0.06] }, poles: { Left: [-0.9, -0.1, -0.4] }, hipsY: 0.04 },
     // the flush, left-handed, the body long — the same shape lost & found finishes in, because both end the same way
     { t: BETWEEN_LEGS_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], LeftUpLeg: [-24, 0, 4], LeftLeg: [28, 0, 0], RightUpLeg: [-12, 0, -4], RightLeg: [16, 0, 0] }, hands: { Left: [-0.14, 2.02, 0.26], Right: [0.36, 1.40, -0.08] }, poles: { Left: UP.Left } },
+  ]);
+}
+
+/**
+ * ROCK THE CRADLE — the ball swung in a circle around the head on one bent arm, then hammered down.
+ *
+ * One hand the whole way, which is what separates it from lost & found and between the legs: those are
+ * TRANSFERS and this is a carry. The circle is keyed as four hand positions around the head rather than as
+ * a bone rotation, because the arm's shape through it is the trick and a wrist spin would not read.
+ */
+export function buildCradle(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'dunk_cradle', CRADLE_SEC, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR_LEGS }, hands: { Right: [0.28, 1.58, 0.28], Left: [-0.30, 1.30, 0.14] } },
+    { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], Neck: [-6, 0, 0], ...AIR_LEGS }, hands: { Right: [0.46, 1.86, 0.16], Left: [-0.34, 1.34, 0.10] }, poles: { Right: [0.9, 0.2, -0.2] } },   // out and up, to the side of the head
+    { t: CRADLE_ROUND, bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [8, 0, 0], ...AIR_LEGS }, hands: { Right: [0.12, 1.94, -0.26], Left: [-0.34, 1.34, 0.08] }, poles: { Right: [0.7, 0.3, -0.5] } },   // BEHIND the head — the top of the circle
+    { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [2, 0, 0], ...AIR_LEGS }, hands: { Right: [-0.20, 1.80, 0.10], Left: [-0.36, 1.32, 0.06] }, poles: { Right: [-0.2, 0.3, -0.6] } },   // across to the far side: the circle closes
+    { t: 0.62, bones: { Hips: [2, 0, 0], Spine: [2, 0, 0], Neck: [-10, 0, 0], ...AIR_LEGS }, hands: { Right: [0.10, 1.62, 0.34], Left: [-0.34, 1.36, 0.12] } },   // back in front, loaded
+    { t: CRADLE_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], LeftUpLeg: [-22, 0, 4], LeftLeg: [26, 0, 0], RightUpLeg: [-12, 0, -4], RightLeg: [16, 0, 0] }, hands: { Right: [0.16, 2.02, 0.28], Left: [-0.34, 1.44, 0.06] }, poles: UP },   // hammered down through the rim
+  ]);
+}
+
+/**
+ * DOUBLE CLUTCH — the ball taken all the way DOWN to the waist at the top of the flight and thrown back up.
+ *
+ * The whole read is vertical travel of the ball against a body that is still rising, so the keys are about
+ * the HANDS moving a long way in y while the trunk barely changes. A shallow version of this is just a
+ * dunk; the depth is the trick.
+ */
+export function buildDoubleClutch(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'dunk_double_clutch', CLUTCH_SEC, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], Neck: [-6, 0, 0], ...AIR_LEGS }, hands: { Right: [0.20, 1.88, 0.26], Left: [-0.24, 1.80, 0.24] }, poles: UP },   // both hands already high
+    { t: 0.22, bones: { Hips: [16, 0, 0], Spine: [22, 0, 0], Neck: [-18, 0, 0], LeftUpLeg: [42, 0, 8], LeftLeg: [96, 0, 0], RightUpLeg: [42, 0, -8], RightLeg: [96, 0, 0] }, hands: { Right: [0.22, 1.06, 0.34], Left: [-0.24, 1.06, 0.34] }, hipsY: 0.06 },   // ALL the way down to the waist, knees folding up to meet it
+    { t: 0.34, bones: { Hips: [18, 0, 0], Spine: [24, 0, 0], Neck: [-20, 0, 0], LeftUpLeg: [46, 0, 8], LeftLeg: [100, 0, 0], RightUpLeg: [46, 0, -8], RightLeg: [100, 0, 0] }, hands: { Right: [0.20, 1.00, 0.36], Left: [-0.22, 1.00, 0.36] }, hipsY: 0.07 },   // the clutch: held at the bottom
+    { t: 0.52, bones: { Hips: [2, 0, 0], Spine: [-4, 0, 0], Neck: [-14, 0, 0], ...AIR_LEGS }, hands: { Right: [0.18, 1.70, 0.30], Left: [-0.22, 1.58, 0.28] } },   // driven back up
+    { t: CLUTCH_SEC, bones: { Hips: [-6, 0, 0], Spine: [-14, 0, 0], Neck: [-16, 0, 0], LeftUpLeg: [-22, 0, 4], LeftLeg: [26, 0, 0], RightUpLeg: [-12, 0, -4], RightLeg: [16, 0, 0] }, hands: { Right: [0.14, 2.06, 0.26], Left: [-0.28, 1.72, 0.20] }, poles: UP },   // the flush, higher than it started
   ]);
 }
 

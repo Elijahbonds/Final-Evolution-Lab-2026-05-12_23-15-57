@@ -36,7 +36,7 @@ export const REAL_CLIPS = new Set<string>([
   'idle_stand', 'strafe_left', 'strafe_right', 'jump_up', 'jump_land',
   'dunk_charge_gather', 'dunk_launch', 'dunk_mocap', 'dunk_360_eastbay', 'dunk_score_hang', 'dunk_land_crouch',
   'dunk_finish_windmill', 'dunk_finish_tomahawk', 'dunk_finish_blown', 'dunk_celebrate_big',
-  'dunk_self_lob', 'dunk_bounce_throw', 'dunk_kick_up', 'dunk_cartwheel', 'dunk_double_up', 'dunk_scorpion', 'dunk_lost_found', 'dunk_hide_seek', 'dunk_360_spin', 'dunk_between_legs',   // DUNK-CONTROL-JUICE (2026-09-08): the named dunks
+  'dunk_self_lob', 'dunk_bounce_throw', 'dunk_kick_up', 'dunk_cartwheel', 'dunk_double_up', 'dunk_scorpion', 'dunk_lost_found', 'dunk_hide_seek', 'dunk_360_spin', 'dunk_between_legs', 'dunk_cradle', 'dunk_double_clutch',   // DUNK-CONTROL-JUICE (2026-09-08): the named dunks
   'football_juke_left', 'football_juke_right', 'football_spin_move', 'football_tackled_fall',
   'karate_hit_react', 'karate_knockdown', 'karate_guard_step',   // the guard step (MODE-STICK-FACE) was authored + registered but never listed here
   'karate_block', 'karate_guard_impact', 'karate_parry', 'karate_floor_hold', 'karate_get_up',   // ANIM-READABILITY (combat, 2026-09-07)

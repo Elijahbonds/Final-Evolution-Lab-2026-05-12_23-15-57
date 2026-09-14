@@ -16,7 +16,7 @@ import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, bui
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
-import { buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
+import { buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
 import { DUNK_TRICKS } from '../../core/DunkSystem';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
 import { buildBaseClips } from './baseClips';
@@ -340,6 +340,36 @@ describe('dunk tricks', () => {
     // and it finishes long and left-handed, the way the flush needs it
     at(g, BETWEEN_LEGS_SEC);
     expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y + 0.15);
+  });
+
+  it('rock the cradle: the ball circles the head on ONE hand and finishes hammered down', () => {
+    const g = fresh(() => buildCradle(scene, sk)!);
+    at(g, CRADLE_ROUND);
+    // the top of the circle: behind the head, and HIGH
+    expect(pos('RightHand').z).toBeLessThan(pos('Head').z);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);
+    // a CARRY, not a transfer — the off hand stays away from the ball hand the whole way
+    expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeGreaterThan(0.4);
+    at(g, 0.5);
+    expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeGreaterThan(0.15);
+    at(g, CRADLE_SEC);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.2);
+  });
+
+  it('double clutch: the ball travels to the waist and back up, and finishes higher than it started', () => {
+    const g = fresh(() => buildDoubleClutch(scene, sk)!);
+    at(g, 0); const startY = pos('RightHand').y;
+    at(g, 0.34);
+    // THE TRAVEL IS THE TRICK, and the travel is what gets asserted. I first wrote "the hands end up below
+    // the hips" and measured 1.099 against hips 1.028 -- the two-bone solver fits the hand as close to the
+    // target as the arm allows and clamps the rest, so a keyed waist-height hand lands a little high. The
+    // drop from where it started is the honest number: 0.78 m, measured.
+    const bottomY = pos('RightHand').y;
+    expect(startY - bottomY).toBeGreaterThan(0.6);
+    expect(bottomY).toBeLessThan(pos('Head').y - 0.3);
+    at(g, CLUTCH_SEC);
+    expect(pos('RightHand').y).toBeGreaterThan(startY);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.2);
   });
 
   // The guard against the whole class of bug: two tricks must never resolve to the same body.

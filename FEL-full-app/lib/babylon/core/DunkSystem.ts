@@ -47,6 +47,11 @@ export const DUNK_TRICKS: DunkTrick[] = [
   { id: 'scorpion', label: 'SCORPION', dir: 'right', btn: 'Y', clip: 'dunk_scorpion', difficulty: 3.2, windowCost: 0.36 },
   { id: 'lostfound', label: 'LOST & FOUND', dir: 'left', btn: 'B', clip: 'dunk_lost_found', difficulty: 3.6, windowCost: 0.42 },
   { id: 'hideseek', label: 'HIDE & SEEK', dir: 'left', btn: 'A', clip: 'dunk_hide_seek', difficulty: 3.0, windowCost: 0.38 },
+  // 2026-09-14: four of the twelve direction+button slots were unused, and two iconic bodies were missing.
+  // A CARRY (one hand the whole way) and a VERTICAL (the ball travels, the body barely does) -- deliberately
+  // different in kind from the transfers above, so the vocabulary grows in shape and not just in count.
+  { id: 'cradle', label: 'ROCK THE CRADLE', dir: 'right', btn: 'A', clip: 'dunk_cradle', difficulty: 2.6, windowCost: 0.32 },
+  { id: 'clutch', label: 'DOUBLE CLUTCH', dir: 'down', btn: 'A', clip: 'dunk_double_clutch', difficulty: 3.0, windowCost: 0.36 },
 ];
 
 /** Trick id by its clip (the replay re-fires clips; the posture layer wants the trick). */
@@ -123,6 +128,8 @@ export const DUNK_CUES: Record<string, DunkCue> = {
   scorpion:    { fire: 'hang', last: 'preSlam', facing: 'faceRim' },
   lostfound:   { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // the behind-the-back hand-off is at 0.32 of its 0.8
   hideseek:    { fire: 'rise', last: 'preSlam', facing: 'faceRim' },
+  cradle:      { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // the circle needs most of the flight
+  clutch:      { fire: 'hang', last: 'preSlam', facing: 'faceRim' },                 // the clutch reads at the APEX, not on the way up
 };
 export type CueVerdict = 'early' | 'fire' | 'late';
 export const cueOf = (trick: DunkTrick): DunkCue => DUNK_CUES[trick.id] ?? { fire: 'rise', last: 'preSlam', facing: 'faceRim' };
