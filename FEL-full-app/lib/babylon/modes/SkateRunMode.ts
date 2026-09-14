@@ -10,6 +10,7 @@
 // Everything else from M45 kept: pump/pop/flips, manual window via
 // boardCore, park ambient, coin audio.
 
+import { Coyote } from '../core/gameFeel';
 import { stepSpeedFov } from '../core/SpeedFov';
 import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -103,6 +104,8 @@ export const SkateRunMode: ModeDefinition = (() => {
   // ── Mode 3 shared stack (P2-P9) ──
   const move = new BoardMovement(tuneForVenue(SKATE_TUNING, readBoardVenue('skate')));
   const air = new AirControl();
+  /** Grace window on the ollie: the wheels have left, the press still counts (gameFeel.Coyote). */
+  const coyote = new Coyote();
   const combo = new ComboChain();
   let mbus = new MomentumBus();
   let animTree: InstanceType<typeof BoardAnimTree>;
@@ -352,17 +355,29 @@ export const SkateRunMode: ModeDefinition = (() => {
       // Phase 4: flick-stick is THE trick input (Skate 3 vocabulary).
       if (e.t === 'stick' && e.side === 'R') {
         const g = flick.feed(e);
-        if (g && !rig.rider.grounded) {
+        // COYOTE TIME, finally used. `gameFeel` has exported a `Coyote` class since the juice toolkit was
+        // written and NOTHING in the game referenced it — audited 2026-09-14, the only file naming it was
+        // gameFeel itself.
+        //
+        // It belongs here more than anywhere, because rolling off a lip does not just lose you the pop: the
+        // branch order below means a late ollie press falls into the MID-AIR branch and is spent as a
+        // trick you did not ask for, off a board with no height under it. So the ollie test runs first now,
+        // and it accepts the press for 110 ms after the wheels leave.
+        //
+        // `!air.state.airborne` is load-bearing: the window is still open on the frame after a real pop
+        // (the rider WAS grounded a moment ago), so without it every ollie would immediately re-pop itself.
+        const canPop = (rig.rider.grounded || coyote.ok) && !air.state.airborne;
+        if (g && g.id === 'ollie' && canPop) {
+          rig.rider.jump(olliePower());
+          airEntryYaw = rig.char.root.rotation.y;
+          air.launch();
+          SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
+        } else if (g && !rig.rider.grounded) {
           // mid-air: real rotation physics + combo chain entry
           air.applyTrick({ id: g.id, label: g.label, family: g.family, basePts: TRICKS[g.trickKey].pts, difficulty: g.difficulty });
           ctx.setHud({ banner: g.label });
           setTimeout(() => ctx.setHud({ banner: '' }), 500);
           SoundKit.play('whoosh', { pitch: 1 + g.difficulty * 0.15, volume: 0.4 });
-        } else if (g && rig.rider.grounded && g.id === 'ollie') {
-          rig.rider.jump(olliePower());
-          airEntryYaw = rig.char.root.rotation.y;
-          air.launch();
-          SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
         }
         if (!flick.heldGrab && air.state.grabHeld) {
           const pts = air.releaseGrab();
@@ -528,6 +543,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // SKATE-MOVE: the spin the judge integrates (air.state.rotation.y) IS the spin the body shows — the old 0.3× nudge
       // here was overwritten by the yaw write below every frame, so no spin ever showed. The pump is no longer fed in as
       // a pitch nudge: holding the throttle through an ollie was tilting the flip axis into a sketchy landing.
+      coyote.update(rig.rider.grounded);   // one feed per frame, from the flag the ollie test reads
       if (!rig.rider.grounded && air.state.airborne) air.update(dt, stickX, 0);
       if (rig.rider.grounded && air.state.airborne && air.state.airtime > 0.15) {
         // touchdown: grade the landing

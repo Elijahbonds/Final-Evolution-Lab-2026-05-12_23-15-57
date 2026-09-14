@@ -11,6 +11,7 @@
 // multiplier). Tricks come off vaults, wall-kicks and drops, not only flat ground.
 // STATE: per scene (a host that mounts twice must never share a controller or a course — the Carnival lesson).
 
+import { Coyote } from '../core/gameFeel';
 import { stepSpeedFov } from '../core/SpeedFov';
 import { Vector3, MeshBuilder, Color3, type PBRMaterial, PhysicsAggregate, PhysicsShapeType, PhysicsCharacterController, CharacterSupportedState, Ray, type Mesh, type Scene, type AbstractMesh } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
@@ -223,6 +224,9 @@ export const FreeRunMode: ModeDefinition = (() => {
   }
 
   // ── the run's beats ──────────────────────────────────────────────────
+  /** Grace window on the jump: the ledge is behind you, the press still counts (gameFeel.Coyote). */
+  const coyote = new Coyote();
+
   function beginAir(S: St, launch: Launch, vy: number): void {
     S.vy = vy;
     S.cc!.setVelocity(new Vector3(S.heading.x * S.speed, vy, S.heading.z * S.speed));
@@ -384,6 +388,22 @@ export const FreeRunMode: ModeDefinition = (() => {
           S.state = 'air'; S.airStartY = S.hero.root.position.y; S.airSec = 0; S.launch = 'wallkick'; S.trick = null; S.rollAt = null;
           S.vy = WALLKICK_V; S.cc.setVelocity(new Vector3(away.x * WALLKICK_PUSH, WALLKICK_V, away.z * WALLKICK_PUSH));
           S.combo.add('WALL KICK', 60, 'grind'); flash(ctx, 'WALL KICK'); SoundKit.play('impact', { pitch: 1.3, volume: 0.4 }); jumpBeat(S);
+        } else if (S.state === 'air' && S.launch === 'drop' && coyote.ok) {
+          // COYOTE TIME. Running off a ledge and pressing jump a frame late is the oldest unfair-feeling
+          // moment in any game that has a ledge, and this is a PARKOUR mode -- it is made of ledges. The
+          // press was simply dropped: `S.state` had already flipped to 'air' and nothing below the ground
+          // branch answered A unless a wall kick happened to be available.
+          //
+          // TWO GUARDS, AND BOTH MATTER. `launch === 'drop'` is the mode's own word for air entered WITHOUT
+          // a take-off (an edge at line 475, sliding off a wall at 455), so a deliberate jump can never be
+          // extended by this. And `beginAir` rewrites launch to 'ground', so the window closes behind it --
+          // a second press inside the same 110 ms cannot become a double jump.
+          //
+          // `Coyote` had been exported by gameFeel since the juice toolkit was written and referenced by
+          // nothing -- audited 2026-09-14, the only file naming it was gameFeel itself. Here and the skate
+          // ollie are its first two consumers.
+          beginAir(S, 'ground', JUMP_V);
+          SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 });
         }
       } else if (e.btn === 'B') {
         if (S.state === 'ground' && verbs.includes('SLIDE')) { S.state = 'slide'; S.slideSec = SLIDE_SEC; S.combo.add('SLIDE', 35, 'manual'); flash(ctx, 'SLIDE'); SoundKit.play('whoosh', { pitch: 0.8 }); }
@@ -497,6 +517,7 @@ export const FreeRunMode: ModeDefinition = (() => {
       if (!S.started && root.position.z > 1.5) { S.started = true; flash(ctx, 'GO', 500); }
       if (S.started && !S.finished) S.runSec += dt;
       if (routeAt(root.position.x, root.position.y) === 'high') S.highTouched = true;
+      coyote.update(S.state === 'ground');   // one feed per frame, from the state the jump branch reads
       if (!S.finished && root.position.z >= courseLength(S.pieces)) finish(ctx, S);
 
       feedTree(S);
