@@ -8,6 +8,10 @@ import { getStripe, STRIPE_PRODUCTS, COSMETIC_SKUS } from '@/lib/stripe';
 import { STUDIO_CREDIT_PACKS } from '@/lib/studio-plan';
 import { isStudioCreatorEnabled } from '@/lib/flags';
 import { paymentMethodsFor } from '@/lib/stripe-payment-methods';   // Cash App / BNPL / PayPal where each is actually supported
+import { previewPurchase } from '@/lib/store/coachListing';
+import { loadSharedProfile } from '@/lib/profile/profileServer';
+import { PLATFORM_PROTOCOLS } from '@/lib/profile/protocol';
+import type { CoachProgram } from '@/lib/profile/assignment';
 
 /**
  * POST /api/stripe/checkout
@@ -78,6 +82,84 @@ export async function POST(req: NextRequest) {
       metadata: { userId, product: entitlementProduct, plan: String(product) },
       success_url: `${origin}/account?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/account?stripe=cancel`,
+    });
+    return NextResponse.json({ url: checkoutSession.url });
+  }
+
+  // --- A coach's training block (lib/store/) ---
+  //
+  // THE CLIENT'S PREVIEW IS NOT EVIDENCE. The buyer's page already ran `previewPurchase` and showed them
+  // "5 of 12 open to you today" — and that computation happened on their machine, against data they could
+  // edit, with a `sellable` boolean they could flip. So it is recomputed here, from the buyer's real
+  // profile, and THIS answer is the one that decides whether money moves.
+  //
+  // Two things beyond the refusal that this branch exists to prevent:
+  //   · THE PRICE COMES FROM THE LISTING, never the request body. A client-supplied amount is free money.
+  //   · A COACH CANNOT BUY THEIR OWN BLOCK, which would otherwise be a clean way to launder a payment
+  //     through the referral tree and back out as a commission.
+  if (product === 'COACH_PROGRAM') {
+    if (!listingId) return NextResponse.json({ error: 'listingId required' }, { status: 400 });
+
+    const listing = await prisma.marketplaceListing.findUnique({ where: { id: listingId } });
+    if (!listing || !listing.active || listing.listingType !== 'COACH_PROGRAM') {
+      return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+    }
+    if (listing.creatorId === userId) {
+      return NextResponse.json({ error: 'You cannot buy your own block.' }, { status: 400 });
+    }
+
+    const already = await prisma.marketplacePurchase.findUnique({
+      where: { buyerId_listingId: { buyerId: userId, listingId: listing.id } },
+      select: { id: true },
+    });
+    if (already) return NextResponse.json({ error: 'You already own this.' }, { status: 409 });
+
+    let program: CoachProgram;
+    try {
+      program = JSON.parse(listing.manifest) as CoachProgram;
+    } catch {
+      console.error('coach program listing has an unreadable manifest', listing.id);
+      return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+    }
+
+    // the authoritative recompute
+    const buyer = await loadSharedProfile(prisma, userId);
+    const preview = previewPurchase(program, PLATFORM_PROTOCOLS, buyer);
+    if (!preview.sellable) {
+      // 409, not 400: the request is fine, the STATE says this sale should not happen. `advice` is the
+      // sentence the buyer should read, and it already says what to do about it.
+      return NextResponse.json(
+        { error: 'not_sellable', detail: preview.advice, actionable: true, preview },
+        { status: 409 },
+      );
+    }
+
+    // price from the listing, in cents, never from the caller
+    const checkoutSession = await stripe.checkout.sessions.create({
+      customer: stripeCustomer.stripeCustomerId,
+      mode: 'payment',
+      payment_method_types: paymentMethodsFor('payment') as never,
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: listing.title,
+            description: (listing.description ?? program.outcome ?? '').slice(0, 300) || undefined,
+          },
+          unit_amount: listing.priceUsd,
+        },
+        quantity: 1,
+      }],
+      metadata: {
+        userId,
+        product: 'COACH_PROGRAM',
+        listingId: listing.id,
+        coachId: listing.creatorId,
+        // what the buyer was told at the till, so a dispute can be answered with what they actually saw
+        openAtPurchase: `${preview.openNow}/${preview.total}`,
+      },
+      success_url: `${origin}/coach/programs?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/coach/programs?stripe=cancel`,
     });
     return NextResponse.json({ url: checkoutSession.url });
   }

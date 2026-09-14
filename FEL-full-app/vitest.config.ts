@@ -16,6 +16,12 @@ export default defineConfig({
     hookTimeout: 120_000,
   },
   resolve: {
-    alias: { '@': path.resolve(__dirname, '.') },
+    alias: {
+      '@': path.resolve(__dirname, '.'),
+      // `import 'server-only'` throws outside a React Server Component, which is the point of it in the app
+      // and useless noise in a unit test. Stubbed so service modules that carry the guard can be tested
+      // directly rather than being split in half to dodge it.
+      'server-only': path.resolve(__dirname, 'tests/stubs/server-only.ts'),
+    },
   },
 });

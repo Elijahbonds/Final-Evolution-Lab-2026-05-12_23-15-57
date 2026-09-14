@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { PLATFORM_TAKE_RATE } from '@/lib/stripe';
+import { splitPayment } from '@/lib/store/split';
 import { prisma } from '@/lib/db';
 import {
   ledgerSubscriptionPayment,
@@ -193,6 +194,63 @@ async function handleCheckoutCompleted(event: Stripe.Event, idempotencyKey: stri
           metadata: { stripeSessionId: session.id, itemKey, credits },
         });
       }
+    });
+    return;
+  }
+
+  // A coach's training block. Separate from MARKETPLACE because the rate is different and the split is
+  // computed rather than rounded: coaching takes PLATFORM_TAKE (30%, lib/marketing/referralTree.ts), where
+  // cosmetics take PLATFORM_TAKE_RATE (15%, lib/stripe.ts). Two near-identically-named constants for two
+  // genuinely different products — importing the wrong one here would silently underpay a coach by half.
+  if (product === 'COACH_PROGRAM') {
+    const listingId = meta.listingId ?? '';
+    const coachId = meta.coachId ?? '';
+    const totalCents = session.amount_total ?? 0;
+    if (!listingId || !coachId || totalCents <= 0) {
+      console.error('coach program webhook missing metadata', { listingId, coachId, totalCents });
+      return;
+    }
+
+    const split = splitPayment(
+      { id: session.id, payerId: userId, amountCents: totalCents, kind: 'program_purchase', recurring: false },
+      [],
+    );
+    // a one-off block is not a QUALIFYING_KIND, so the tree pays nothing and the whole take stays with the
+    // platform. Asserted rather than assumed: if that boundary ever moves, this ledger call would quietly
+    // book commission money as platform revenue.
+    if (split.commissionCents !== 0) {
+      console.error('unexpected commission on a program purchase', session.id);
+      return;
+    }
+
+    await prisma.$transaction(async (tx: any) => {
+      const order = await tx.order.upsert({
+        where: { stripeSessionId: session.id },
+        update: { status: 'PAID' },
+        create: {
+          userId,
+          stripeSessionId: session.id,
+          type: 'MARKETPLACE',
+          amount: totalCents,
+          status: 'PAID',
+          itemKey: listingId,
+          metadata: meta,
+        },
+      });
+      const { transactionId } = await ledgerMarketplaceSale(tx, {
+        buyerId: userId,
+        creatorId: coachId,
+        totalCents: split.grossCents,
+        platformCutCents: split.platformCents,     // coach receives gross - platform, which is split.coachCents
+        idempotencyKey,
+        metadata: { stripeSessionId: session.id, listingId, coachId, kind: 'coach_program' },
+      });
+      // the entitlement. Unique on (buyer, listing), so a replayed webhook updates rather than duplicates.
+      await tx.marketplacePurchase.upsert({
+        where: { buyerId_listingId: { buyerId: userId, listingId } },
+        update: { orderId: order.id, ledgerTxId: transactionId },
+        create: { buyerId: userId, listingId, orderId: order.id, ledgerTxId: transactionId },
+      });
     });
     return;
   }

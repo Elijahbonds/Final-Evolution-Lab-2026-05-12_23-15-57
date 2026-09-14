@@ -45,6 +45,7 @@ model User {
   payoutRequests   PayoutRequest[]
   creatorListings  MarketplaceListing[] @relation("CreatorListings")
   buyerPurchases   MarketplacePurchase[] @relation("BuyerPurchases")
+  coachShares      ShareLink[]          @relation("CoachShares")
   ladderEntries    LadderEntry[] @relation("LadderEntries")
 
   // M3 relations (Track C — Studio Creator)
@@ -1742,4 +1743,49 @@ model MirrorSession {
 
   @@index([userId, createdAt])
   @@index([userId, patternId, createdAt])
+}
+
+// ===========================================================================
+// TRAINER SHARING — a coach texts programming to a client (lib/share/).
+// Free between a trainer and their own clients; selling to strangers is the
+// store (lib/store/) and is the only path that takes a platform cut.
+// ===========================================================================
+
+/// One shared thing at one unguessable URL.
+///
+/// The URL is the entire access control (a text gets forwarded — see
+/// lib/share/shareable.ts), so `token` is 192 bits of randomness and is the
+/// only lookup key. The payload is a built Share and carries content only,
+/// never a client's PRQ, scans or id; `assertNoAthleteData` enforces that
+/// before anything is written here.
+model ShareLink {
+  id        String   @id @default(cuid())
+  /// base64url, 32 chars. Unique, unguessable, never derived from the content.
+  token     String   @unique
+  coachId   String
+  coach     User     @relation("CoachShares", fields: [coachId], references: [id], onDelete: Cascade)
+  /// program | drill | recommendation | selection
+  kind      String
+  /// The built Share object. Screened and leak-checked before it lands here.
+  /// Nullable because revoking CLEARS it — a revoked link has no content, not
+  /// content behind a flag.
+  payload   Json?
+  /// Shown in the trainer's own list so they can tell two links apart.
+  title     String
+  /// Optional first name the trainer typed. The only personal data a share carries.
+  forName   String?
+
+  /// Revocation NULLS `payload` rather than setting a flag: the content is
+  /// genuinely unreadable afterwards, including to a render path that forgot
+  /// to check a boolean. The row survives so the trainer keeps their history.
+  revokedAt DateTime?
+  /// Optional self-destruct for a capability URL. Null means no expiry.
+  expiresAt DateTime?
+
+  views     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([coachId, createdAt])
+  @@index([revokedAt])
 }
