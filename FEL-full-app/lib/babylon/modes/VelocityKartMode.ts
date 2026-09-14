@@ -49,6 +49,8 @@ const DRIVER_SCALE = 0.92;
 
 /** The camera preset's resting fov, captured on the first frame after load and restored to by SpeedFov. */
 let baseFov: number | null = null;
+/** Last frame's finishing place, so an OVERTAKE can be detected as a change rather than a state. */
+let lastPlace = 0;
 
 export function makeVelocityKartMode(): ModeDefinition {
 let kart: TransformNode | null = null;
@@ -416,6 +418,7 @@ return {
     baseFov = null;
     S.done = false; S.banner = ''; S.bannerT = 0; S.bestDrift = 0; S.offRoadSec = 0;
     S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false };
+    lastPlace = 0;   // a remount must not inherit last race's place (it would read as an overtake on frame one)
 
     // THE MAP AND THE KART ARE BOTH PICKS (2026-09-13). Read once, here, at mount — the world is built from
     // the course and the handling comes from the vehicle, and neither can be swapped under a running scene.
@@ -522,6 +525,16 @@ return {
     // a player who cuts a corner does not get credited for the metres they skipped — the standings read the
     // same racing line the rivals run.
     playerDist += state.speed * dt;
+    // AN OVERTAKE IS THE HIGHLIGHT OF A RACE, and neither racing mode could see one happen -- both reported
+    // nothing into the Game-Breaker layer, so the crowd was as loud in last as in first. `playerPosition`
+    // already exists and the HUD already prints it; this only remembers last frame's. Improving a place
+    // sings; losing one is quiet, because falling back is punishment enough and a jeer on every trade of
+    // places during a scrap would be constant.
+    if (rivals.length) {
+      const place = playerPosition(playerDist, rivals);
+      if (lastPlace > 0 && place < lastPlace) ctx.momentum.report({ kind: 'overtake', weight: 13 * (lastPlace - place) });
+      lastPlace = place;
+    }
     if (line) {
       for (const [i, r] of rivals.entries()) {
         stepRival(r, line, dt, playerDist, { topSpeed: kartSpec.vMax }, race.time);

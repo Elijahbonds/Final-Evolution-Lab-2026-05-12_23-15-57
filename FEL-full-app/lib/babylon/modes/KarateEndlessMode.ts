@@ -527,6 +527,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       hitCount += hit.length; lastHitAt = t;
       ctx.setHud({ hits: hitCount });
       if (hit.length >= 3) ctx.feel?.impact?.(0.55);
+      // THE HORDE FEEDS THE METER. Clearing three bodies with one swing is the fantasy this mode sells and
+      // the Game-Breaker layer could not see it happen.
+      if (hit.length) ctx.momentum.report({ kind: 'clean_hit', weight: Math.min(24, 6 * hit.length) });
 
       if (route) {
         landed = [];                                  // a completed route is spent
@@ -534,6 +537,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         ctx.juice.hitStop(routeHitStopMs(route.fx));
         ctx.juice.shake(shake.amp, shake.ms);
         ctx.feel?.impact?.(route.fx === 3 ? 0.7 : 0.45);
+        ctx.momentum.report({ kind: 'chain', weight: route.fx === 3 ? 26 : 14 });
         SoundKit.play('impact', { pitch: route.fx === 3 ? 0.72 : 0.9, volume: 0.65 });
         EffectsKit.burst(ctx.scene, origin.add(new Vector3(0, 1.2, 0)), route.fx === 3 ? 'glitch' : 'sparks');
         stats.finishers += route.fx === 3 ? 1 : 0;
@@ -675,6 +679,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     } else stats.traded++;
     gainChi(ctx, 4);
     ctx.feel?.impact?.(e.brain.strike === 'kick' ? 0.55 : 0.4);
+    ctx.momentum.report({ kind: 'blunder', weight: -10 });   // taking one cools the run
     EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
     shove(e, VITALS.knockbackM);
     publishHp(ctx);

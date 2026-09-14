@@ -300,6 +300,9 @@ export const KarateVSMode: ModeDefinition = (() => {
         case 'guardBreak': {
           SoundKit.play('crowdGroan', { volume: 0.4 });
           ctx.feel?.impact?.(0.5);   // ONE thud (the 0.5-pitch impact SFX that stacked on it is gone)
+          // THE METER HEARS THE FIGHT. `mine` already says who swung, so the same event is a highlight for
+          // one fighter and a blunder for the other -- reported from the one branch that knows.
+          ctx.momentum.report({ kind: mine ? 'clean_hit' : 'blunder', weight: mine ? 14 : -10 });
           ctx.juice.shake(0.08, 120);
           console.info('[KVS-JUICE] guard break');
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), 'glitch');
@@ -324,6 +327,7 @@ export const KarateVSMode: ModeDefinition = (() => {
           const route = routeFor(landed, ratings);
           if (process.env.NODE_ENV === 'development' && mine) console.info(`[KVS-ROUTE] landed ${landed.join('>')}`);
           ctx.feel?.impact?.(special ? 0.6 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
+          ctx.momentum.report(mine ? { kind: 'clean_hit', weight: special ? 16 : 9 } : { kind: 'blunder', weight: -8 });
           if (special || key === 'heavy') heavyPunch(ctx, special ? 'dragon' : 'heavy'); else console.info('[KVS-JUICE] hit');
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), special ? 'glitch' : 'sparks');
           beatHit(!mine, special ? 'finisher' : WEIGHT_OF[key]);   // the DRAGON launches (knockdown → floor → get up)
@@ -339,6 +343,8 @@ export const KarateVSMode: ModeDefinition = (() => {
             ctx.juice.hitStop(routeHitStopMs(route.fx));
             ctx.juice.shake(shake.amp, shake.ms);
             ctx.feel?.impact?.(route.fx === 3 ? 0.7 : 0.45);
+            // a completed ROUTE is the mode's signature play -- it is what earns ON FIRE here
+            if (mine) ctx.momentum.report({ kind: 'chain', weight: route.fx === 3 ? 26 : 14 });
             EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.3, 0)), route.fx === 3 ? 'glitch' : 'sparks');
             SoundKit.play('impact', { pitch: route.fx === 3 ? 0.72 : 0.9, volume: 0.65 });
             if (route.fx === 3) SoundKit.play('crowdCheer', { volume: 0.6 });

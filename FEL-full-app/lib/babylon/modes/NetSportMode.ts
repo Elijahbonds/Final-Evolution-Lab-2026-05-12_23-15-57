@@ -258,11 +258,17 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     const netPop = new Vector3(0, o.cfg.netHeight + 0.5, 0);
     if (side === 0) {
       heroStreak++;
+      // A RALLY WON IS THIS MODE'S HIGHLIGHT. Net sports reported nothing into the Game-Breaker layer, so a
+      // player taking six straight points sounded exactly like a player losing six. The streak is reported
+      // SEPARATELY from the point because a run is worth more than the sum of its rallies.
+      ctx.momentum.report({ kind: 'clean_run', weight: 12 });
+      if (heroStreak >= 3) ctx.momentum.report({ kind: 'chain', weight: Math.min(20, 4 * heroStreak) });
       ctx.feel.impact(0.22);
       ctx.juice.shake(0.05, 90);   // A+ P0: a soft shake on your point — no slowMo, no hit-stop beyond the feel hit's own
       console.info('[NET-JUICE] point won');
     } else {
       heroStreak = 0;
+      ctx.momentum.report({ kind: 'blunder', weight: -9 });
       ctx.juice.flash('#FF3366', 160);
     }
 

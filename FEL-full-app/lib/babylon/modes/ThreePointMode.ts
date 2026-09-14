@@ -378,6 +378,10 @@ function fire(ctx: ModeContext, power?: number): void {
     ctx.juice.scorePop(RIM.clone(), perfect ? `PERFECT +${worth}` : `+${worth}`,
       perfect ? '#22d3ee' : '#ffd75e');
     ctx.feel.impact(perfect ? 0.5 : 0.3);
+    // THE RACK RUN IS THE EVENT. A shooter going 5-for-5 is the moment this mode exists for and the
+    // Game-Breaker layer could not see a single make -- 3PT reported nothing into it.
+    ctx.momentum.report({ kind: 'big_make', weight: perfect ? 12 : 7 });
+    if (money || S.streak >= 4) ctx.momentum.report({ kind: 'chain', weight: money ? 18 : 12 });
     SoundKit.play('score');
     // Phase 7/8 — a money ball IS the crowd moment in this event, and a hot
     // streak is the other one. Landing them identically to a routine make is

@@ -18,8 +18,20 @@
 export type MomentumTier = 'cold' | 'warming' | 'hot' | 'on_fire';
 
 export interface MomentumEvent {
-  kind: 'posterize' | 'ankle_break' | 'block' | 'steal' | 'highlight_dunk'
-      | 'big_make' | 'contest_50' | 'contest_low' | 'miss' | 'turnover';
+  kind:
+    // Basketball, where the meter was born. Kept exactly as they were.
+    | 'posterize' | 'ankle_break' | 'block' | 'steal' | 'highlight_dunk'
+    | 'big_make' | 'contest_50' | 'contest_low' | 'miss' | 'turnover'
+    // DISCIPLINE-NEUTRAL (2026-09-14). Seventeen enabled modes reported nothing into this meter, and
+    // the reason was not oversight: there was no kind a karateka, a driver or a surfer could honestly
+    // send. 'posterize' is not what happens when you park a kart on the inside line. Rather than let
+    // every mode pass a bare `weight` and mean something private by it, the vocabulary grew.
+    | 'clean_hit'     // a strike that landed, a ball struck true, a tackle broken
+    | 'chain'         // a combo, a rally, a streak continued
+    | 'near_miss'     // a dodge, a parry, a pass at speed with paint to spare
+    | 'overtake'      // a position taken
+    | 'clean_run'     // a lap, a section, a rally taken without an error
+    | 'blunder';      // a crash, a whiff, a rally dropped
   /** Optional explicit weight override. */
   weight?: number;
 }
@@ -27,6 +39,10 @@ export interface MomentumEvent {
 const WEIGHT: Record<MomentumEvent['kind'], number> = {
   posterize: 22, ankle_break: 12, block: 15, steal: 10, highlight_dunk: 16,
   big_make: 8, contest_50: 25, contest_low: -10, miss: -6, turnover: -14,
+  // Pitched against the basketball weights on purpose: a clean hit is worth about a big make, an
+  // overtake about a block, and nothing in the neutral set is worth a posterize -- the meter's ceiling
+  // should still belong to the plays it was built for.
+  clean_hit: 9, chain: 7, near_miss: 6, overtake: 15, clean_run: 18, blunder: -12,
 };
 
 const TIERS: [MomentumTier, number][] = [

@@ -50,6 +50,8 @@ const CEILING = 520, FLOOR = 14, HALF_WORLD = 700;
 
 /** The camera preset's resting fov, captured on the first frame after load and restored to by SpeedFov. */
 let baseFov: number | null = null;
+/** Last frame's finishing place, so an OVERTAKE can be detected as a change rather than a state. */
+let lastPlace = 0;
 
 export function makeAeroAcesMode(): ModeDefinition {
 let plane: TransformNode | null = null;
@@ -369,8 +371,10 @@ return {
   camPreset: 'descent',
 
   async load(ctx: ModeContext): Promise<void> {
-    // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
+    // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's,
+    // and must not inherit last race's finishing place (which would read as an overtake on frame one).
     baseFov = null;
+    lastPlace = 0;
     S.done = false; S.crashes = 0; S.banner = ''; S.bannerT = 0;
     S.input = { pitch: 0, roll: 0, yaw: 0, throttle: 0.75, boost: false };
 
@@ -479,6 +483,16 @@ return {
     // rival ahead of you is a rival you can see taking the gate you are about to take, which is the whole
     // reason to put opponents in a time-attack course.
     playerDist += flight.speed * dt;
+    // AN OVERTAKE IS THE HIGHLIGHT OF A RACE, and neither racing mode could see one happen -- both reported
+    // nothing into the Game-Breaker layer, so the crowd was as loud in last as in first. `playerPosition`
+    // already exists and the HUD already prints it; this only remembers last frame's. Improving a place
+    // sings; losing one is quiet, because falling back is punishment enough and a jeer on every trade of
+    // places during a scrap would be constant.
+    if (rivals.length) {
+      const place = playerPosition(playerDist, rivals);
+      if (lastPlace > 0 && place < lastPlace) ctx.momentum.report({ kind: 'overtake', weight: 13 * (lastPlace - place) });
+      lastPlace = place;
+    }
     if (line) {
       for (const [i, r] of rivals.entries()) {
         stepRival(r, line, dt, playerDist, { topSpeed: FRAME.cruise, cornerBite: 0.35 }, race.time);
@@ -492,6 +506,7 @@ return {
     // the world has edges, and hitting one is a crash that costs speed rather than ending the run
     if (clampFlight(flight, FLOOR, CEILING, HALF_WORLD)) {
       S.crashes += 1;
+      ctx.momentum.report({ kind: 'blunder', weight: -14 });   // scraping the world costs the run its heat
       flight.speed *= 0.45;
       SoundKit.play('impact', { pitch: 0.7, volume: 0.5 });
       ctx.juice.shake(0.12, 160);

@@ -158,12 +158,17 @@ export const DuelMode: ModeDefinition = (() => {
         break;
       case 'guardBreak':
         ctx.feel?.impact?.(0.55);   // ONE thud (the impact SFX that stacked on it is gone)
+        // THE METER HEARS THE FIGHT. `mine` says who swung: one fighter's highlight is the other's blunder.
+        ctx.momentum.report({ kind: mine ? 'clean_hit' : 'blunder', weight: mine ? 14 : -10 });
         ctx.juice.shake(0.08, 120);
         console.info('[DUEL-JUICE] guard break');
         banner(ctx, mine ? 'GUARD BREAK!' : 'GUARD SHATTERED!');
         break;
       case 'parried':
         SoundKit.play('impact', { pitch: 1.6, volume: 0.5 });
+        // A PARRY IS THE NEAR MISS. Reach decides this fight, so reading a swing and answering it is the
+        // skill the mode is about -- and it was worth nothing to the meter.
+        ctx.momentum.report({ kind: mine ? 'near_miss' : 'blunder', weight: mine ? 12 : -6 });
         banner(ctx, mine ? 'PARRIED!' : 'PERFECT PARRY!');
         break;
       case 'guardImpacted':
@@ -185,6 +190,7 @@ export const DuelMode: ModeDefinition = (() => {
         if (mine) foeHitBy = w; else meHitBy = w;
         hitT = 0.3;
         ctx.feel?.impact?.(w === 'heavy' ? 0.55 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
+        ctx.momentum.report(mine ? { kind: 'clean_hit', weight: w === 'heavy' || w === 'finisher' ? 16 : 9 } : { kind: 'blunder', weight: -8 });
         if (w === 'heavy' || w === 'finisher') heavyPunch(ctx, w); else console.info('[DUEL-JUICE] hit');
         // knockback drives the ring-out game
         const dir = defChar.root.position.subtract(atkChar.root.position); dir.y = 0;

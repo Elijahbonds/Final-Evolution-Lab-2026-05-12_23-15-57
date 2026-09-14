@@ -341,6 +341,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   function missClank(ctx: ModeContext): void {
     if (obstacleClipped) { console.info('[JUICE-SFX] clank skipped — the chair thud was the one hit'); return; }   // A+ P2: one hit per miss
     ctx.feel.impact(0.4);
+    ctx.momentum.report({ kind: 'miss' });   // the duel's meter cools on a clank, the way the contest's does
     SoundKit.play('impact', { pitch: 1.35, volume: 0.45 });
     console.info('[JUICE-SOFT] miss clank'); console.info('[JUICE-SFX] impact clank');
   }
