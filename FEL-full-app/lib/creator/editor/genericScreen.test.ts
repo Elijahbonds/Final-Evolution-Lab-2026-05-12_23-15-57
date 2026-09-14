@@ -55,3 +55,14 @@ describe('the generic editor screen', () => {
     expect(SRC).toContain('rowIssues');
   });
 });
+
+// The colour swatch is the one thing the screen infers from a value, and it has to stay that way: it keys
+// off the value LOOKING like a hex, so it works for the kit colours, the hair colour and anything added
+// later, and it still does not know Appearance or Gear exist.
+describe('the one inference the screen is allowed', () => {
+  it('draws a swatch off the shape of the value, not off a section or a row id', () => {
+    expect(SRC).toMatch(/isHex/);
+    expect(SRC).toMatch(/\^#\[0-9a-fA-F\]\{6\}\$/);
+    expect(SRC).not.toMatch(/['"`](skinTone|hairColor|colorPrimary)['"`]/);
+  });
+});

@@ -7,7 +7,7 @@
 // NONE, which is how a player loses their jump shot without noticing).
 
 import { describe, it, expect } from 'vitest';
-import { step, canStep, displayValue, rowCeiling } from './rowState';
+import { step, canStep, displayValue, rowCeiling, defaultValueFor } from './rowState';
 import type { RatedRow, TraitRow, SlotRow } from '../schema/types';
 
 const rated: RatedRow = { kind: 'rated', id: 'speed', label: 'Speed', section: 'attributes', tab: 'Athleticism', min: 0, max: 99, prqAxis: 'speed', glossary: 'x' };
@@ -76,10 +76,25 @@ describe('rowState — slots', () => {
     expect(step(slot, v, 1, null)).toBe('Whip');
   });
 
-  it('offers NONE only when the slot allows it', () => {
+  // Found on the running page: every untouched required slot — skin tone, build, footwear, every hot zone
+  // — read NONE, which is not one of its options and which the resolver would call a violation. A row that
+  // must have a value shows the first one, because that IS its default.
+  it('offers NONE only when the slot allows it, and shows its default when it does not', () => {
     const required: SlotRow = { ...slot, allowNone: false };
-    expect(step(required, 'Coil', -1, null)).toBe('Coil');   // cannot step off into nothing
-    expect(displayValue(required, null)).toBe('NONE');       // but an absent value still reads
+    expect(step(required, 'Coil', -1, null)).toBe('Coil');       // cannot step off into nothing
+    expect(displayValue(required, null)).toBe(required.options[0]);
+    expect(displayValue(slot, null)).toBe('NONE');               // optional slots still read NONE
+    expect(defaultValueFor(required)).toBe(required.options[0]);
+    expect(defaultValueFor(slot)).toBeNull();
+  });
+
+  // ...and the stepper must agree with what is on screen, or ◀ is a live button whose only effect is to
+  // look broken: it "changes" the stored null into the option already displayed.
+  it('greys ◀ on an untouched required slot rather than offering a step to where it already is', () => {
+    const required: SlotRow = { ...slot, allowNone: false };
+    expect(canStep(required, null, -1, null)).toBe(false);
+    expect(canStep(required, null, 1, null)).toBe(true);
+    expect(canStep(slot, null, 1, null)).toBe(true);
   });
 
   it('starts from the first option when the current value is unknown', () => {

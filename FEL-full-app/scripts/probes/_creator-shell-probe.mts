@@ -44,7 +44,14 @@ await p.screenshot({ path: `${OUT}/01-attributes.png` });
 await p.getByText('Intangibles', { exact: false }).first().click().catch(() => {});
 await p.waitForTimeout(400);
 const steppersNow = await p.evaluate(`[...document.querySelectorAll('button')].filter(b=>b.textContent==='\u25c0'||b.textContent==='\u25b6').length`) as number;
-const readVal = async () => (await p.evaluate(`(() => { const m = document.body.innerText.match(/INTANGIBLES\\s+(\\d+)/); return m ? +m[1] : null; })()`)) as number | null;
+const readVal = async () => (await p.evaluate(`(() => {
+  for (const el of document.querySelectorAll('div')) {
+    const p0 = el.querySelector(':scope > div > div > p');
+    const v = el.querySelector(':scope > div > div > span');
+    if (p0 && v && p0.textContent?.trim().toUpperCase() === 'INTANGIBLES') return v.textContent?.trim() ?? null;
+  }
+  return null;
+})()`)) as string | null;
 const before = await readVal();
 await p.evaluate(`(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent==='\u25b6'); b && b.click(); })()`);
 await p.waitForTimeout(350);
@@ -57,9 +64,72 @@ await p.evaluate(`(() => { const b=[...document.querySelectorAll('button')].find
 await p.waitForTimeout(600);
 const zones = await p.evaluate(`(() => {
   const t = document.body.innerText.toUpperCase();
-  return { title: t.includes('HOT ZONES'), zoneRow: t.includes('CORNER THREE LEFT'), state: /NEUTRAL|HOT|COLD/.test(t) };
+  // The old check tested the whole page for /HOT|COLD/ and passed on the words in the TITLE "Hot Zones".
+  // Read the row's own value control.
+  let state = null;
+  for (const el of document.querySelectorAll('div')) {
+    const p0 = el.querySelector(':scope > div > div > p');
+    const v = el.querySelector(':scope > div > div > span');
+    // textContent is the RAW text; only innerText applies the CSS uppercase. Matching an uppercased
+    // literal against textContent reported "no zone row" on a row that was on screen — the third time
+    // this probe has been fooled by that.
+    if (p0 && v && /CORNER THREE LEFT/.test((p0.textContent || '').toUpperCase())) state = v.textContent?.trim() ?? null;
+  }
+  return { title: t.includes('HOT ZONES'), zoneRow: t.includes('CORNER THREE LEFT'), state };
 })()`) as Record<string, unknown>;
 console.log('[CREATOR] hot zones through the SAME component:', JSON.stringify(zones));
 await p.screenshot({ path: `${OUT}/03-hotzones.png` });
+
+// THE COSMETIC SECTIONS. Each one is a different row shape reaching the same screen: Vitals is a rated
+// row with a unit, Appearance is a catalog list, Gear is an item name that has to resolve back to an id.
+const open = async (label: string) => {
+  await p.evaluate(`(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent===${JSON.stringify(label)}); b && b.click(); })()`);
+  await p.waitForTimeout(500);
+};
+
+await open('Vitals');
+await p.getByText('Height', { exact: false }).first().click().catch(() => {});
+await p.waitForTimeout(300);
+// READ THE ROW, NOT THE PAGE TEXT. A regex over innerText looked like the obvious thing and reported null
+// on a value plainly on screen: once the row is focused the ◀ sits BETWEEN the label and the number, so
+// /HEIGHT\s+(\d+)%/ cannot match. Walk the row's own elements instead — label from its first <p>, value
+// from the .fel-stat span.
+const readRow = async (label: string) => (await p.evaluate(`(() => {
+  for (const el of document.querySelectorAll('div')) {
+    const p0 = el.querySelector(':scope > div > div > p');
+    const v = el.querySelector(':scope > div > div > span');
+    if (p0 && v && p0.textContent?.trim().toUpperCase() === ${JSON.stringify(label)}.toUpperCase()) return v.textContent?.trim() ?? null;
+  }
+  return null;
+})()`)) as string | null;
+const readPct = async () => readRow('Height');
+const pctBefore = await readPct();
+await p.evaluate(`(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent==='▶'); b && b.click(); })()`);
+await p.waitForTimeout(300);
+console.log(`[CREATOR] vitals: HEIGHT ${pctBefore} -> ${await readPct()} · unit printed: ${/%$/.test(pctBefore ?? '') ? 'YES' : 'NO'}`);
+await p.screenshot({ path: `${OUT}/04-vitals.png` });
+
+await open('Appearance');
+const look = await p.evaluate(`(() => {
+  const t = document.body.innerText.toUpperCase();
+  const btn = [...document.querySelectorAll('button')].map(b => b.textContent?.trim() ?? '');
+  return { title: t.includes('APPEARANCE'), hairRow: t.includes('HAIR'), skinHex: /#[0-9A-F]{6}/.test(t), tabs: btn.filter(x => x === 'Face' || x === 'Fine Tune').length };
+})()`) as Record<string, unknown>;
+console.log('[CREATOR] appearance:', JSON.stringify(look));
+await p.screenshot({ path: `${OUT}/05-appearance.png` });
+
+await open('Footwear / Gear');
+const gear = await p.evaluate(`(() => {
+  const t = document.body.innerText.toUpperCase();
+  return { footwear: t.includes('FOOTWEAR'), realItem: t.includes('FLIGHT TRAINERS') || t.includes('EVOLUTION HI-TOPS'), colourTab: t.includes('COLOURS') };
+})()`) as Record<string, unknown>;
+console.log('[CREATOR] gear:', JSON.stringify(gear));
+await p.screenshot({ path: `${OUT}/06-gear.png` });
+
+// and the one section that is still closed says WHY, rather than "not built yet"
+await open('Ink');
+const ink = await p.evaluate(`(() => { const t = document.body.innerText; return { saysWhy: /artwork|decal/i.test(t), notJustNotBuilt: t.length > 0 && !/^\\s*Not built yet\\.?\\s*$/.test(t) }; })()`) as Record<string, unknown>;
+console.log('[CREATOR] ink (closed, on purpose):', JSON.stringify(ink));
+await p.screenshot({ path: `${OUT}/07-ink.png` });
 console.log(`[CREATOR] errors: ${errs.length}${errs.length ? ' :: ' + errs.slice(0,2).join(' | ') : ''}`);
 await b.close();

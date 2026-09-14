@@ -12,7 +12,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import CreatorEditor from '@/components/creator/editor/creator-editor';
 import { SIDEBAR } from '@/lib/creator/schema/sections';
-import { resolve, type CreatorBuild } from '@/lib/creator/schema/resolve';
+import { resolve, LOOK_SECTIONS, type CreatorBuild } from '@/lib/creator/schema/resolve';
 import { emptyAthleteProfile, exportProfile, importProfile } from '@/lib/creator/schema/athleteProfile';
 import type { RowValue } from '@/lib/creator/editor/rowState';
 import type { PrqAxisId } from '@/lib/creator/schema/types';
@@ -39,6 +39,9 @@ export default function AthleteCreator({ axes, profileId }: Props) {
     traits: numeric(values.traits),
     hotZones: strings(values.hotZones),
     mechanics: nullableStrings(values.mechanics),
+    // The cosmetic sections go in under one key, the way the resolver walks them — the shell does not
+    // name Vitals or Gear individually, so a new one appears here without this file being edited.
+    look: Object.fromEntries(Object.keys(LOOK_SECTIONS).map((k) => [k, values[k] ?? {}])),
     prq: axes,
   }), [values, axes]);
 
@@ -53,6 +56,11 @@ export default function AthleteCreator({ axes, profileId }: Props) {
     p.attributes = build.attributes; p.tendencies = build.tendencies ?? {};
     p.traits = build.traits; p.hot_zones = build.hotZones ?? {};
     p.mechanics = build.mechanics ?? {}; p.prq = axes;
+    p.vitals = values.vitals ?? {}; p.appearance = values.appearance ?? {}; p.body = values.body ?? {};
+    // Accessories rides in `gear`: the profile has no separate field for it, both sections are wearable
+    // slots keyed by row id, and the ids are unique across the two — so the merge is lossless and the
+    // alternative is a schema bump for one row.
+    p.gear = { ...(values.gear ?? {}), ...(values.accessories ?? {}) };
     p.budgets = {
       attribute_points_spent: resolution.budgets.attributePointsSpent,
       trait_points_spent: resolution.budgets.traitPointsSpent,
@@ -71,6 +79,12 @@ export default function AthleteCreator({ axes, profileId }: Props) {
       traits: r.profile.traits as Record<string, RowValue>,
       hotZones: r.profile.hot_zones as Record<string, RowValue>,
       mechanics: r.profile.mechanics as Record<string, RowValue>,
+      vitals: r.profile.vitals as Record<string, RowValue>,
+      appearance: r.profile.appearance as Record<string, RowValue>,
+      body: r.profile.body as Record<string, RowValue>,
+      // Split back out by asking each table which ids are its own, rather than by remembering the merge.
+      gear: pick(r.profile.gear, LOOK_SECTIONS.gear.rows.map((x) => x.id)),
+      accessories: pick(r.profile.gear, LOOK_SECTIONS.accessories.rows.map((x) => x.id)),
     });
     setNote(r.notes.join(' ') || 'Loaded.');
   }, []);
@@ -139,13 +153,25 @@ export default function AthleteCreator({ axes, profileId }: Props) {
         ) : (
           <div className="p-6">
             <h2 className="fel-heading text-xl font-bold">{entry.label}</h2>
-            <p className="mt-2 font-mono text-xs text-white/50">Not built yet. The schema layer is in place; this section&rsquo;s rows are not authored.</p>
+            <p className="mt-2 max-w-prose font-mono text-xs leading-relaxed text-white/50">
+              {entry.reason ?? 'Not built yet. The schema layer is in place; this section’s rows are not authored.'}
+            </p>
           </div>
         )}
       </main>
     </div>
   );
 }
+
+/** The entries of `m` whose keys are in `ids` — how a merged section is split back apart on import. */
+const pick = (m: Record<string, unknown>, ids: string[]): Record<string, RowValue> => {
+  const out: Record<string, RowValue> = {};
+  for (const id of ids) {
+    const v = m?.[id];
+    if (typeof v === 'string' || typeof v === 'number' || v === null) out[id] = v;
+  }
+  return out;
+};
 
 const numeric = (m?: Record<string, RowValue>): Record<string, number> => {
   const out: Record<string, number> = {};

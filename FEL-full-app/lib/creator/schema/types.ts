@@ -30,6 +30,21 @@ export interface RatedRow extends SchemaRow {
   min: number;
   max: number;
   /**
+   * Printed straight after the number, or absent for a bare rating.
+   *
+   * Data rather than a rule in the component: a Vitals row is a percent of a standard frame and an
+   * attribute is a 0–99 rating, and the editor must not be the thing that knows the difference.
+   */
+  suffix?: string;
+  /**
+   * What the row reads as before anybody touches it. Defaults to `min`.
+   *
+   * Needed the moment a rated row's neutral value is not its floor: a Vitals height of 88% is the shortest
+   * frame in the game, and an untouched creator opening on it would hand every player who never visited
+   * the section a body they did not choose.
+   */
+  defaultValue?: number;
+  /**
    * The PRQ axis that CAPS this row, or null when nothing measured should limit it.
    *
    * OWNER DECISION (2026-09-14): **PRQ sets the ceiling; the editor spends underneath it.** Training in
@@ -76,6 +91,17 @@ export interface SlotRow extends SchemaRow {
   options: readonly string[];
   /** May the slot be left empty? Dunk packages 2–5 may; a jump-shot base may not. */
   allowNone: boolean;
+  /**
+   * What an untouched row reads as, when that is not the first option.
+   *
+   * Caught on the running page: a required slot with nothing stored was showing its first option, which is
+   * right for a jump-shot base and WRONG for a hot zone, where the first option is FRIGID and the rest of
+   * the system treats an untouched zone as NEUTRAL. The screen would have been telling a player their
+   * whole court was ice-cold while the resolver scored it neutral. The default belongs to whichever
+   * module owns the concept — `ZONE_DEFAULT`, `defaultFace()`, `defaultEquipped()` — and is passed in
+   * from there rather than inferred from array order.
+   */
+  defaultOption?: string;
   /** Gate: this slot only offers its options when the attribute clears the minimum. */
   requires: { attribute: string; min: number } | null;
 }

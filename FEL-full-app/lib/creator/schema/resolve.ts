@@ -21,12 +21,32 @@
 //
 // Pure: no Babylon, no DOM, no storage.
 
-import type { PrqAxisId, RatedRow, TraitRow } from './types';
+import type { PrqAxisId, RatedRow, TraitRow, SectionTable, SlotRow } from './types';
 import { ATTRIBUTES } from './attributes';
 import { TRAITS } from './traits';
 import { ceilingFor } from './ceilings';
 import { HOT_ZONES, ZONE_STATES, ZONE_POINT_CAP, zonePointsSpent } from './hotZones';
 import { MECHANICS, slotGate } from './mechanics';
+import { VITALS } from './vitals';
+import { APPEARANCE } from './appearance';
+import { BODY } from './body';
+import { GEAR, ACCESSORIES } from './gear';
+
+/**
+ * The sections that cost nothing and are validated the same way.
+ *
+ * Vitals, Appearance, Body, Gear and Accessories have no budget, no ceiling and no gate — every one of
+ * them is "is this value one this row offers". So they are walked by ONE loop over this map rather than
+ * five passes, and adding a sixth cosmetic section is a line here and nothing else. That is the same claim
+ * the rest of the folder makes, tested in the same place.
+ */
+export const LOOK_SECTIONS: Record<string, SectionTable> = {
+  vitals: VITALS as SectionTable,
+  appearance: APPEARANCE,
+  body: BODY as SectionTable,
+  gear: GEAR as SectionTable,
+  accessories: ACCESSORIES as SectionTable,
+};
 
 export interface CreatorBuild {
   attributes: Record<string, number>;
@@ -37,6 +57,8 @@ export interface CreatorBuild {
   /** trait id → tier index (0-based). Absent = unequipped. */
   traits: Record<string, number>;
   tendencies?: Record<string, number>;
+  /** section key → row id → value, for the cosmetic sections in LOOK_SECTIONS. */
+  look?: Record<string, Record<string, string | number | null>>;
   /** The athlete's measured axes, or null for a guest. */
   prq?: Partial<Record<PrqAxisId, number>> | null;
 }
@@ -168,6 +190,33 @@ export function resolve(build: CreatorBuild): Resolution {
     if (!HOT_ZONES.rows.some((r) => r.id === id)) { issues.push({ kind: 'warning', rowId: id, section: 'hotZones', message: `Unknown zone "${id}" — kept, not editable here.` }); continue; }
     if (!(ZONE_STATES as readonly string[]).includes(state)) {
       issues.push({ kind: 'violation', rowId: id, section: 'hotZones', message: `"${state}" is not a zone state.` });
+    }
+  }
+
+  // THE COSMETIC SECTIONS, all five through one loop — see LOOK_SECTIONS. Nothing here costs points; the
+  // only question is whether a value is one the row offers, which matters on IMPORT: the editor can only
+  // produce legal values, and a hand-edited or older profile can arrive carrying a hairstyle that no
+  // longer ships. §9 says report it and let them fix it, so it is reported next to the row.
+  for (const [sectionKey, table] of Object.entries(LOOK_SECTIONS)) {
+    for (const [id, value] of Object.entries(build.look?.[sectionKey] ?? {})) {
+      const row = table.rows.find((r) => r.id === id);
+      if (!row) { issues.push({ kind: 'warning', rowId: id, section: sectionKey, message: `Unknown "${id}" — kept, not editable here.` }); continue; }
+      if (row.kind === 'rated') {
+        const v = Number(value);
+        if (!Number.isFinite(v) || v < row.min || v > row.max) {
+          issues.push({ kind: 'violation', rowId: id, section: sectionKey, message: `${row.label} must be between ${row.min} and ${row.max}.` });
+        }
+        continue;
+      }
+      if (row.kind !== 'slot') continue;
+      const slot = row as SlotRow;
+      if (value === null || value === undefined) {
+        if (!slot.allowNone) issues.push({ kind: 'violation', rowId: id, section: sectionKey, message: `${slot.label} cannot be empty.` });
+        continue;
+      }
+      if (!slot.options.includes(String(value))) {
+        issues.push({ kind: 'violation', rowId: id, section: sectionKey, message: `"${value}" is not an option for ${slot.label} any more. Pick another.` });
+      }
     }
   }
 

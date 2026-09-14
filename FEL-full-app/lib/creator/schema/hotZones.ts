@@ -62,7 +62,7 @@ export const ZONE_PLACEMENT: Record<string, ZonePlacement> = {
 
 const z = (id: string, label: string, glossary: string): SlotRow => ({
   kind: 'slot', id, label, section: 'hotZones', tab: 'Court',
-  options: ZONE_STATES, allowNone: false, requires: null, glossary,
+  options: ZONE_STATES, allowNone: false, defaultOption: ZONE_DEFAULT, requires: null, glossary,
 });
 
 export const HOT_ZONES: SectionTable<SlotRow> = {

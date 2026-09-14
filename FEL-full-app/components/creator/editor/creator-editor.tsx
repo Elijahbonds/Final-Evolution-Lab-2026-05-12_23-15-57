@@ -34,6 +34,10 @@ export interface CreatorEditorProps {
   onBack?: () => void;
 }
 
+/** Does this value name a colour? The only thing the screen infers from a value, and it infers it from
+ *  the value's own shape rather than from the row it came from. */
+const isHex = (s: string) => /^#[0-9a-fA-F]{6}$/.test(s);
+
 export default function CreatorEditor({ table, values, onChange, axes, issues = [], preview, onBack }: CreatorEditorProps) {
   const tabs = useMemo(() => tabsOf(table), [table]);
   const [tabIdx, setTabIdx] = useState(0);
@@ -123,6 +127,14 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
                       <button onClick={(e) => { e.stopPropagation(); bump(row, -1); }}
                         disabled={!canStep(row, val, -1, axes)}
                         className="fel-panel h-7 w-7 font-mono text-sm disabled:opacity-25" aria-label={`Decrease ${row.label}`}>◀</button>
+                    )}
+                    {/* A value that IS a colour shows the colour. Driven by the shape of the value, never
+                        by which section it came from — a hex swatch beside "#C68642" is the difference
+                        between picking a skin tone and reading a hex dump, and the component still has no
+                        idea Appearance exists. */}
+                    {isHex(displayValue(row, val)) && (
+                      <span aria-hidden className="h-4 w-4 shrink-0 rounded border border-white/25"
+                        style={{ backgroundColor: displayValue(row, val) }} />
                     )}
                     <span className={`min-w-[7ch] text-right fel-stat font-mono text-sm ${bad ? 'text-[var(--fel-red)]' : ''}`}>
                       {displayValue(row, val)}
