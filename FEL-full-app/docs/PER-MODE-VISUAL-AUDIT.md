@@ -27,7 +27,7 @@ step-0 audit isolated. Lighting and post are shared and already good (`LightRig`
 | Mode | Defect | Cause |
 |---|---|---|
 | **Freerun** | Untextured white/grey blocks on a white plane in heavy fog. Nothing reads as a material. | Platforms are bare geometry with no venue dressing and no painted ground. The worst-looking shipping mode. |
-| **Surf** | Flat teal water, one white wave band, empty horizon. "A pier down the line" is copy with no object. | `buildSurfBreak` builds water + wave + rider only; no mid-ground exists for surf. |
+| **Surf** | Flat teal water, one white wave band, empty horizon. | Pier built 2026-09-13 (deck + 24 thin-instanced pilings, The Break only). **It does not fix the defect**: measured, the surf camera faces SEAWARD (forward.z −0.98) from z −38 while the pier sits shoreward at z +77, so it is behind the viewer. A pier belongs on the beach, so the placement is right and the conclusion is that surf's empty horizon needs something on the SEAWARD side — a headland, a point, a distant swell line — which is a separate object, not this one. |
 | **Aero Aces** | Near-empty gradient. Floor added this pass and still not resolving — see `VISUAL-AUDIT-2026-09-13.md`. | Open; strongest hypothesis is the `bk_dome` backdrop (radius 682) vs a world larger than it. |
 
 ## The three jobs this implies, in value order

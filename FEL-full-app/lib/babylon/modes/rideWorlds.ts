@@ -15,6 +15,7 @@
 // New in the RideWorld contract: `obstacles` (position+radius list — empty
 // where a world has none). Modes shipped alongside consume it.
 
+import { VenueKit } from '../visual/VenueKit';
 import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, TransformNode, Vector3, Matrix, Material } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
@@ -721,6 +722,39 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   for (let i = 0; i < Math.min(venue.crowd, sandSpots.length); i++) {
     const [x, z] = sandSpots[i];
     crowdSpots.push(new Vector3(x, 0.03, z));
+  }
+
+  // THE PIER THE COPY PROMISES.
+  //
+  // The Break's own line is "Green water, a pier down the line, afternoon glass" and there was no pier —
+  // the per-mode audit graded surf C partly on an empty horizon. Built only for the venue that CLAIMS one,
+  // because a pier at the reef ("dark water over coral", nobody out) would contradict its copy just as
+  // loudly as the missing one did here. Thin-instanced pilings, one deck: cheap, and it gives the eye
+  // something to measure the wave against, which is most of what a mid-ground is for.
+  if (venue.id === 'the-break') {
+    const PIER_X = -34, PIER_Z0 = 118, PIER_LEN = 82, DECK_Y = 4.2;
+    const deck = MeshBuilder.CreateBox('surf_pier_deck',
+      { width: 7, height: 0.6, depth: PIER_LEN }, scene);
+    deck.position.set(PIER_X, DECK_Y, PIER_Z0 - PIER_LEN / 2);
+    deck.material = VenueKit.paint(scene, 'surf_pier_deck_mat', '#6b5745', 0.04, 0.92);
+    deck.isPickable = false;
+    all.push(deck);
+
+    const piling = MeshBuilder.CreateCylinder('surf_pier_piling',
+      { height: DECK_Y * 2.2, diameter: 0.8, tessellation: 6 }, scene);
+    piling.material = VenueKit.paint(scene, 'surf_pier_piling_mat', '#4a3b30', 0.03, 0.95);
+    piling.isPickable = false;
+    piling.isVisible = false;
+    const mats: number[] = [];
+    for (let i = 0; i < 12; i++) {
+      const z = PIER_Z0 - (i / 11) * PIER_LEN;
+      for (const dx of [-2.4, 2.4]) {
+        mats.push(1,0,0,0, 0,1,0,0, 0,0,1,0, PIER_X + dx, DECK_Y * 0.4, z, 1);
+      }
+    }
+    piling.thinInstanceSetBuffer('matrix', new Float32Array(mats), 16);
+    piling.isVisible = true;
+    all.push(piling);
   }
 
   const world: RideWorld = {
