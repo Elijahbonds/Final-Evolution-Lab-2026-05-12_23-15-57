@@ -48,13 +48,26 @@ repeat it. On `bay-circuit`, after adding the floor:
 | Material | PBR via `VenueKit.paint` (was StandardMaterial — that WAS a real bug, fixed) |
 | Trackside buoys placed | 202 |
 
-Two hypotheses were tested and killed: far-plane clipping (maxZ is 10000) and the StandardMaterial blow-out
-(`VenueKit.paint`'s own doc names Velocity Kart as the worked example; switching to PBR was correct and
-changed nothing here). Aero mounts no backdrop sphere, so occlusion by one is out too.
+### Second pass (same day) — further ruled out, and one earlier claim corrected
 
-What is left, in order of likelihood: something in `AeroAcesMode`'s own camera or render setup — a second
-camera, a layer mask, or a render-group ordering — is drawing the sky over the world. That is a defect in
-the MODE, not in the trackside layer, and it wants its own pass with the aero mode's author.
+- Far-plane clipping: **out** (`maxZ` 10000, fog off).
+- StandardMaterial blow-out: **out**. Switching to `VenueKit.paint` was correct on its own merits and
+  changed nothing here.
+- Not drawn at all: **out**. The floor is in `getActiveMeshes()`, material `isReady`, alpha 1, visibility 1.
+- Not in front of the camera: **out**. With picking temporarily enabled, a centre-screen pick hits
+  `aero_floor` at **318 m** and a low-frame pick at **181 m**. It occupies most of the view.
+- Reflecting the sky: **out**. PBR, `metallic 0`, `roughness 0.95`.
+- Too bright to separate from the sunset: **tested, not the cause.** Albedo was pushed from mid-value to
+  near-black (0.012, 0.045, 0.055) and the frame did not change.
+
+**CORRECTION to the first pass: aero DOES mount a backdrop dome.** I wrote that it did not. There is a
+`bk_dome`, radius **682**, `backFaceCulling: true`, rendering group 0, depth-write on — and the camera sits
+inside it at y 201 while the floor (radius 1697) extends well outside it.
+
+That is now the strongest remaining hypothesis and the place to start: the dome encloses the camera, and
+the interaction between an inside-out opaque dome and a ground plane that crosses its shell is the only
+thing left that both objects participate in. It is a MODE-level concern (who mounts the dome, at what
+radius, relative to a world that is bigger than it), not a trackside-layer one.
 
 The trackside layer itself is proven on Velocity Kart, where the same code visibly places verges either
 side of the road.

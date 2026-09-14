@@ -187,7 +187,7 @@ export function buildTrackside(scene: Scene, course: Course): TracksideHandle {
     const floorSpan = Math.max(b.span * 4, AERO_FLOOR_MIN_SPAN);
     const floor = MeshBuilder.CreateGround('aero_floor', { width: floorSpan, height: floorSpan, subdivisions: 2 }, scene);
     floor.position.set(b.cx, b.minY - AERO_FLOOR_DROP, b.cz);
-    const fm = VenueKit.paint(scene, 'aero_floor_mat', '#0d2b33', 0.03, 0.95);
+    const fm = VenueKit.paint(scene, 'aero_floor_mat', '#05161b', 0.0, 1.0);
     // GROUND HAS TO READ AS GROUND, WHICH MEANS NOT THE COLOUR OF THE SKY.
     //
     // My first version lerped the course tint 78% toward dark navy, and the bay circuit's night sky IS dark
@@ -196,7 +196,13 @@ export function buildTrackside(scene: Scene, course: Course): TracksideHandle {
     // Diagnosed by querying the scene rather than by staring at the screenshot.
     //
     // A deep saturated water/land tone instead, with only a trace of the course tint so venues still differ.
-    fm.albedoColor = Color3.Lerp(new Color3(0.05, 0.16, 0.19), Color3.FromHexString(course.tint), 0.12);
+    // FAR darker than looks right in a colour picker, and the reason is measured. The floor was already
+    // drawn and already filling the centre of the frame (picking hit it at 318 m dead centre) — it simply
+    // read AS SKY, because a mid-value albedo under a 2.60 warm directional plus ACES lifts to roughly the
+    // same tone as the sunset behind it. A ground plane only reads as ground when it is clearly DARKER than
+    // the horizon, so the albedo is pushed down until it separates rather than until it looks correct
+    // unlit. The venue tint survives as a trace so courses still differ.
+    fm.albedoColor = Color3.Lerp(new Color3(0.012, 0.045, 0.055), Color3.FromHexString(course.tint), 0.07);
     floor.material = fm;
     floor.isPickable = false;
     floor.parent = root;
