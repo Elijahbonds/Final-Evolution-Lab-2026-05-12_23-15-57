@@ -6,6 +6,7 @@
 // what makes the upgrade legible.
 
 import { describe, it, expect } from 'vitest';
+import { Vector3 } from '@babylonjs/core';
 import {
   MOVE_HANDLE, BASELINE_HANDLE, CHAIN_IDLE,
   hasMove, movesFor, handleFrom, chainWindowSec, tightness,
@@ -13,7 +14,11 @@ import {
   moveFromContext, MAX_CHAIN, chainSpent,
   type ChainState,
   resolveHandleMove,
-  type DefenderRead} from './HandleSystem';
+  type DefenderRead,
+  offTheHeadOdds,
+  offTheHeadLoose,
+  OFF_THE_HEAD_RANGE,
+  type MoveRead} from './HandleSystem';
 
 const MAX = 100;
 
@@ -384,5 +389,134 @@ describe('resolveHandleMove', () => {
     for (const m of ['double_cross', 'snatch_back', 'shammgod'] as const) {
       expect(resolveHandleMove(m, { ...CHAIN_IDLE }, BASELINE_HANDLE, ON_HIM, always).owned, m).toBe(false);
     }
+  });
+});
+
+// ── STREET MOVES, AND THE DEAD ONE (owner, 2026-09-13) ───────────────────────────────────────────────────
+//
+// Owner asked about between-the-legs, behind-the-back, the shammgod, slip-and-slide, the yo-yo and off the
+// head. Checking turned up a hole: `shammgod` was priced at handle 88, named in `gathersIntoShot`, and
+// NOTHING could produce it — not a candidate in `moveFromContext`, not called directly by either mode. A
+// player who earned an 88 handle had bought a move that could not fire.
+//
+// The test that matters most here is the sweep: EVERY move in the table must be reachable by some read.
+
+describe('every move in the vocabulary can actually happen', () => {
+  const READS: MoveRead[] = [
+    { speed01: 0.0, retreating: false, pressured: false, last: null },
+    { speed01: 0.2, retreating: false, pressured: true, last: null },
+    { speed01: 0.2, retreating: false, pressured: false, last: null },
+    { speed01: 0.5, retreating: false, pressured: false, last: 'crossover' },
+    { speed01: 0.5, retreating: true, pressured: false, last: null },
+    { speed01: 0.8, retreating: false, pressured: true, last: 'crossover' },
+    { speed01: 0.6, retreating: false, pressured: false, last: 'crossover', chainLength: 2 },
+    { speed01: 0.4, retreating: false, pressured: true, last: 'hesi' },
+    { speed01: 0.4, retreating: false, pressured: false, last: 'hesi' },
+    { speed01: 0.2, retreating: false, pressured: true, last: 'crossover', chainLength: 2, inHisChest: true },
+    { speed01: 0.8, retreating: false, pressured: true, last: null },          // snatch_back: no `last`, or double_cross outranks it
+    // The plain crossover at a max handle is genuinely hard to reach — something better nearly always
+    // applies, which is correct (why would a 100-handle player throw a basic cross?). It needs the gap:
+    // jogging, unpressured, nothing behind it.
+    { speed01: 0.4, retreating: false, pressured: false, last: null },
+  ];
+
+  it('NO MOVE IS DEAD — each one is produced by some situation at a full handle', () => {
+    const produced = new Set(READS.map((r) => moveFromContext(r, 100)));
+    // Two moves are produced by their OWN input rather than by the situational read: `spin` (the spin
+    // machinery) and `hesi` (the pull-back plant, `doMove(ctx, 'hesi')`). Everything else has to be
+    // reachable from a read, or it is priced vocabulary a player can never actually use.
+    const expected = (Object.keys(MOVE_HANDLE) as HandleMove[]).filter((m) => m !== 'spin' && m !== 'hesi');
+    const missing = expected.filter((m) => !produced.has(m));
+    expect(missing, `unreachable: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('specifically: the shammgod, which could not fire before today', () => {
+    const deep = moveFromContext({ speed01: 0.6, retreating: false, pressured: false, last: 'crossover', chainLength: 2 }, 100);
+    expect(deep).toBe('shammgod');
+  });
+
+  it('and it is a FINISHER — shallow in a chain it is not offered', () => {
+    const shallow = moveFromContext({ speed01: 0.6, retreating: false, pressured: false, last: 'crossover', chainLength: 0 }, 100);
+    expect(shallow).not.toBe('shammgod');
+  });
+});
+
+describe('off the hesi', () => {
+  it('he bit the stop → slip and slide past his hip', () => {
+    expect(moveFromContext({ speed01: 0.4, retreating: false, pressured: true, last: 'hesi' }, 100)).toBe('slip_slide');
+  });
+
+  it('he did not → show it and keep it', () => {
+    expect(moveFromContext({ speed01: 0.4, retreating: false, pressured: false, last: 'hesi' }, 100)).toBe('in_and_out');
+  });
+
+  it('a hesi at a BASELINE handle still leads somewhere', () => {
+    // slip_slide is 68 and out of reach, but in_and_out is priced at 40 — deliberately BELOW baseline, so
+    // the first thing a fresh scan learns past the basics is the one that comes off a hesitation
+    const m = moveFromContext({ speed01: 0.4, retreating: false, pressured: true, last: 'hesi' }, BASELINE_HANDLE);
+    expect(m).toBe('in_and_out');
+    expect(MOVE_HANDLE.in_and_out).toBeLessThanOrEqual(BASELINE_HANDLE);
+  });
+});
+
+describe('the reads read', () => {
+  it('space and no hurry is the yo-yo; a body on you is not', () => {
+    expect(moveFromContext({ speed01: 0.2, retreating: false, pressured: false, last: null }, 100)).toBe('yoyo');
+    expect(moveFromContext({ speed01: 0.2, retreating: false, pressured: true, last: null }, 100)).toBe('between_legs');
+  });
+
+  it('THE GATE STILL HOLDS — a baseline handle gets the basics and nothing else, from any read', () => {
+    for (const r of [
+      { speed01: 0.2, retreating: false, pressured: false, last: null },
+      { speed01: 0.8, retreating: false, pressured: true, last: 'crossover' as const, chainLength: 3 },
+      { speed01: 0.2, retreating: false, pressured: true, last: 'crossover' as const, chainLength: 2, inHisChest: true },
+    ]) {
+      const m = moveFromContext(r, BASELINE_HANDLE);
+      expect(MOVE_HANDLE[m], m).toBeLessThanOrEqual(BASELINE_HANDLE);
+    }
+  });
+
+  it('and it never returns the move you just did', () => {
+    for (const last of Object.keys(MOVE_HANDLE) as HandleMove[]) {
+      const m = moveFromContext({ speed01: 0.5, retreating: false, pressured: true, last, chainLength: 2, inHisChest: true }, 100);
+      if (m !== 'crossover') expect(m, `after ${last}`).not.toBe(last);
+    }
+  });
+});
+
+describe('OFF THE HEAD is the only move that can cost you the ball', () => {
+  const close = { handle: 100, dist: 0.9, facingCos: 0.8, defenderSpeed: 0 };
+
+  it('chest to chest and facing you: it is on', () => {
+    expect(offTheHeadOdds(close)).toBeGreaterThan(0.5);
+  });
+
+  it('out of range: not a move, zero odds — never a "try anyway"', () => {
+    expect(offTheHeadOdds({ ...close, dist: OFF_THE_HEAD_RANGE + 0.2 })).toBe(0);
+  });
+
+  it('turned away: you do not throw it off the back of his head', () => {
+    expect(offTheHeadOdds({ ...close, facingCos: -0.5 })).toBe(0);
+  });
+
+  it('a moving target is worse', () => {
+    expect(offTheHeadOdds({ ...close, defenderSpeed: 2.5 })).toBeLessThan(offTheHeadOdds(close));
+  });
+
+  it('a bigger handle is better, but it is NEVER a certainty', () => {
+    expect(offTheHeadOdds({ ...close, handle: 100 })).toBeGreaterThan(offTheHeadOdds({ ...close, handle: 92 }));
+    expect(offTheHeadOdds({ ...close, handle: 100 })).toBeLessThan(1);
+  });
+
+  it('AND WHEN IT MISSES THE BALL IS BEHIND HIM — the worst place for you', () => {
+    const dir = offTheHeadLoose(new Vector3(0, 0, 0), new Vector3(0, 0, 2));
+    expect(dir.z).toBeCloseTo(1, 6);          // past him, away from me
+    expect(dir.length()).toBeCloseTo(1, 6);
+  });
+
+  it('a move that is pure upside at the top of a progression is a dominant strategy, so this one is not', () => {
+    // it is the most expensive move in the table AND the only one with a failure mode
+    expect(MOVE_HANDLE.off_the_head).toBeGreaterThanOrEqual(Math.max(...Object.values(MOVE_HANDLE)));
+    expect(offTheHeadOdds(close)).toBeLessThan(1);
   });
 });

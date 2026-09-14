@@ -99,7 +99,7 @@ import { resolveRim, forcedMissProfile } from '../core/RimPhysics';             
 import { judge, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
-  type ChainState, type HandleMove,
+  OFF_THE_HEAD_RANGE, type ChainState, type HandleMove,
 } from '../core/HandleSystem';   // the vocabulary 1v1 had and this mode did not
 import {
   THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
@@ -650,11 +650,14 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         // commissioned lived in 1v1 alone. Same read, same resolver, this mode's clips.
         const toRimFlat = RIM_FLOOR.subtract(me.char.root.position); toRimFlat.y = 0;
         const nf = nearestLiveFoe();
+        const nfDist = nf ? distXZ(me.char.root.position, nf.char.root.position) : Infinity;
         doMove(ctx, moveFromContext({
           speed01: drib.speed01,
           retreating: Vector3.Dot(me.drib.vel, toRimFlat) < -0.2,
-          pressured: !!nf && distXZ(me.char.root.position, nf.char.root.position) < 2.0,
+          pressured: nfDist < 2.0,
           last: chain.last,
+          chainLength: chain.length,
+          inHisChest: nfDist < OFF_THE_HEAD_RANGE,
         }, handle));
       }
       const nearestFoeDist = foes.reduce((best, f) => f.stunSec > 0 ? best : Math.min(best, Vector3.Distance(f.char.root.position, me.char.root.position)), Infinity);
@@ -765,6 +768,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         // HESITATION — same vocabulary as 1v1: the pull-back tap plants you,
         // and a defender who has been CLOSING (not one standing set) bites.
         if (iAmCarrier && drib.hesitation && !finish && !posting) {
+          // THE PULL-BACK IS A LINK. 3v3 had the hesitation and the bite but never registered it on the
+          // chain, so nothing could come OFF the hesi here — the slip-and-slide and the in-and-out read
+          // `last === 'hesi'` and it was never set. Hesi into cross is the oldest combo there is.
+          doMove(ctx, 'hesi');
           turbo.t01 = Math.max(0, turbo.t01 - 0.05);
           SoundKit.play('whoosh', { pitch: 0.8, volume: 0.3 });
           let bit = false;

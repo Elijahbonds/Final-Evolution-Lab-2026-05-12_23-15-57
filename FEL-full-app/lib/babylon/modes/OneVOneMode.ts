@@ -99,7 +99,7 @@ import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide w
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot,
-  resolveHandleMove, SHAKE_RANGE, type ChainState, type HandleMove,
+  resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, type ChainState, type HandleMove,
 } from '../core/HandleSystem';   // Street chains x 2K brakes, gated on the handle the PRQ scan earned
 import {
   THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
@@ -886,11 +886,17 @@ export const OneVOneMode: ModeDefinition = (() => {
             // was depth 1 forever and the hard ankle break was unreachable in play. A low handle still
             // only ever gets the basics out of the same input.
             const toRim = RIM_FLOOR.subtract(me.root.position); toRim.y = 0;
+            const foeDist = distXZ(me.root.position, foe.root.position);
+            const foeLive = foeStunSec === 0 && !foeFloored;
             doMove(ctx, moveFromContext({
               speed01: drib.speed01,
               retreating: Vector3.Dot(meDribble.vel, toRim) < -0.2,
-              pressured: distXZ(me.root.position, foe.root.position) < 2.0 && foeStunSec === 0 && !foeFloored,
+              pressured: foeDist < 2.0 && foeLive,
               last: chain.last,
+              // the two reads the deep vocabulary needs: without them `shammgod` and `off_the_head` are
+              // priced moves that no situation can ever produce
+              chainLength: chain.length,
+              inHisChest: foeLive && foeDist < OFF_THE_HEAD_RANGE,
             }, handle));
           }
           // HESITATION — the pullback plant. You spent your momentum; if the

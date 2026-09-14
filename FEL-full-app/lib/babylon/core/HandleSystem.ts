@@ -28,16 +28,22 @@
 //
 // Pure: no Babylon, no scene. Every rule here is provable without a game running.
 
+import { Vector3 } from '@babylonjs/core';   // `offTheHeadLoose` returns a direction; nothing else here touches Babylon
+
 /** The vocabulary. Ordered roughly by what a handle has to be to own it. */
 export type HandleMove =
   | 'crossover'
   | 'hesi'
+  | 'in_and_out'
+  | 'yoyo'
   | 'between_legs'
   | 'behind_back'
   | 'spin'
+  | 'slip_slide'
   | 'double_cross'
   | 'snatch_back'
-  | 'shammgod';
+  | 'shammgod'
+  | 'off_the_head';
 
 /**
  * The handle a move needs before you have it at all.
@@ -49,12 +55,19 @@ export type HandleMove =
 export const MOVE_HANDLE: Readonly<Record<HandleMove, number>> = {
   crossover: 0,
   hesi: 0,
+  in_and_out: 40,     // fake the cross and keep the hand — the first thing past the basics
+  yoyo: 52,           // the ball on a string, sizing him up: only with space and a handle
   between_legs: 45,
   behind_back: 58,
   spin: 64,
+  slip_slide: 68,     // off the hesi, past his hip once he has committed
   double_cross: 72,
   snatch_back: 80,
   shammgod: 88,
+  // OFF THE HEAD. The And1 move: the ball goes off HIM and you pick it up behind him. The most
+  // disrespectful thing in the vocabulary, so it is the last thing you earn — and mechanically it is the
+  // odd one out, because the ball leaves your hands and touches another player to get where it is going.
+  off_the_head: 92,
 };
 
 /** Is this move in my hands? */
@@ -220,7 +233,8 @@ export function isHardBreak(chainLength: number, handle: number): boolean {
  * shot is the whole reason to use it.
  */
 export function gathersIntoShot(move: HandleMove): boolean {
-  return move === 'spin' || move === 'snatch_back' || move === 'shammgod' || move === 'hesi';
+  return move === 'spin' || move === 'snatch_back' || move === 'shammgod' || move === 'hesi'
+    || move === 'slip_slide' || move === 'off_the_head';
 }
 
 export interface MoveRead {
@@ -232,6 +246,17 @@ export interface MoveRead {
   pressured: boolean;
   /** The move that just happened, so a chain can escalate instead of repeating. */
   last: HandleMove | null;
+  /**
+   * How deep the chain already is.
+   *
+   * Added because the top of the vocabulary was unreachable without it: `shammgod` sat in the table priced
+   * at 88, referenced by `gathersIntoShot`, and NOTHING could ever produce it — it was not a candidate and
+   * no mode called it directly. A player who earned an 88 handle had paid for a move that could not fire.
+   * It is a finisher, so what it needed was a read that only exists deep in a chain.
+   */
+  chainLength?: number;
+  /** Practically chest to chest — the only range at which the ball can go off HIM. */
+  inHisChest?: boolean;
 }
 
 /**
@@ -247,14 +272,33 @@ export interface MoveRead {
  */
 export function moveFromContext(read: MoveRead, handle: number): HandleMove {
   const candidates: HandleMove[] = [];
+  const deep = (read.chainLength ?? 0) >= 2;
+
+  // OFF THE HESI. A hesitation is a question, and these are the answers — he has just shifted his weight
+  // to the stop, so the move that beats him is the one that goes PAST him rather than around him. Making
+  // `hesi` a real link is the difference between a pull-back that leads somewhere and a dead end.
+  if (read.last === 'hesi') {
+    if (read.pressured) candidates.push('slip_slide');   // he bit the stop: slide past his hip
+    candidates.push('in_and_out');                       // he did not: show it and keep it
+  }
+  // OFF THE HEAD — only when you are practically in his chest and already showing out. It is not a way
+  // past a defender, it is a way past THAT defender, right there, and the read says so: chest to chest.
+  if (read.pressured && read.inHisChest && deep) candidates.push('off_the_head');
+  // THE FINISHER. Only deep in a chain, at speed — push it out like you have lost it, snatch it back.
+  // This is the read `shammgod` never had, which is why the top of the vocabulary was dead.
+  if (deep && read.speed01 > 0.5) candidates.push('shammgod');
   // standing still and pressured: the ball goes through the legs, the safest place for it
   if (read.speed01 < 0.3 && read.pressured) candidates.push('between_legs');
+  // space and no hurry: the ball on a string, up and down, daring him to reach
+  if (read.speed01 < 0.35 && !read.pressured) candidates.push('yoyo');
   // backing out: behind the back protects it from the trailing hand
   if (read.retreating) candidates.push('behind_back');
   // already mid-chain and moving: escalate to the double
   if (read.last !== null && read.speed01 > 0.45) candidates.push('double_cross');
   // full speed into a body: snatch it back and make him commit
   if (read.speed01 > 0.7 && read.pressured) candidates.push('snatch_back');
+  // moving with a body on you but not yet flat out: fake the cross, keep the hand
+  if (read.pressured && read.speed01 >= 0.3) candidates.push('in_and_out');
   candidates.push('crossover');                      // the floor: always available, always legal
 
   // the best move I actually own that is not the one I just did
@@ -339,4 +383,47 @@ export function resolveHandleMove(
   });
   if (roll() >= odds) return { ...base, broke: 'none', odds };
   return { ...base, broke: isHardBreak(next.length, handle) ? 'hard' : 'shook', odds };
+}
+
+/**
+ * OFF THE HEAD — the one move where the ball leaves your hands (owner, 2026-09-13).
+ *
+ * Every other move in this file is a decision about a chain and a defender's ankles; the ball never stops
+ * being yours. This one throws it off HIM and picks it up behind him, which makes it the only move with a
+ * real failure mode: if he is not where you thought, the ball is gone.
+ *
+ * So it is priced as the highest move in the vocabulary AND it is the only one that can turn the ball over.
+ * A move that is pure upside at the top of a progression is not a flex, it is a dominant strategy.
+ */
+export const OFF_THE_HEAD_RANGE = 1.15;
+/** How often it comes off clean at a full handle. Below that it degrades — see `offTheHeadOdds`. */
+export const OFF_THE_HEAD_BASE = 0.62;
+/** He has to be roughly facing you: the ball goes off the front of him, not the back of his head. */
+export const OFF_THE_HEAD_FACING_MIN = 0.15;
+
+export interface OffTheHeadRead {
+  handle: number;
+  /** Planar metres to him. */
+  dist: number;
+  /** cos of his facing to me — he is looking at me. */
+  facingCos: number;
+  /** A moving target is a miss waiting to happen. */
+  defenderSpeed: number;
+}
+
+/** Odds it comes off clean. Zero when the geometry is not there at all. */
+export function offTheHeadOdds(read: OffTheHeadRead): number {
+  if (read.dist > OFF_THE_HEAD_RANGE) return 0;
+  if (read.facingCos < OFF_THE_HEAD_FACING_MIN) return 0;
+  const skill = Math.max(0, Math.min(1, (read.handle - MOVE_HANDLE.off_the_head) / (100 - MOVE_HANDLE.off_the_head)));
+  const moving = Math.max(0, Math.min(0.35, read.defenderSpeed * 0.12));
+  return Math.max(0, Math.min(0.95, OFF_THE_HEAD_BASE + skill * 0.25 - moving));
+}
+
+/** It missed: the ball is loose, and it is loose BEHIND him, which is the worst place for you. */
+export function offTheHeadLoose(passer: Vector3, defender: Vector3): Vector3 {
+  const past = new Vector3(defender.x - passer.x, 0, defender.z - passer.z);
+  const d = past.length();
+  if (d < 1e-4) return new Vector3(0, 0, 1);
+  return past.scale(1 / d);
 }
