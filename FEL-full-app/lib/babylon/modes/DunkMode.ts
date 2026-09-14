@@ -16,6 +16,7 @@
 //     enough it pays +1 style ("HANG TIME!") before the judges reveal.
 // All additions are animation-independent on purpose (E25/M51-safe).
 
+import { rivalForNight, rivalIntro, type DunkRival } from '../core/DunkRivals';
 import {
   freshStakes, call as callTrick, spendAttempt, attemptsLeft, canRetry,
   stakesScale, callLanded, stakesLabel, type Stakes,
@@ -389,6 +390,10 @@ export const DunkMode: ModeDefinition = (() => {
   // (owner decisions, 2026-09-14). The rules live in core/DunkStakes.ts, including the invariant that
   // calling must never be strictly better than not calling; this end only holds the ledger and the input.
   let stakes: Stakes = freshStakes();
+  // WHO YOU ARE FACING TONIGHT. The rival was situational (RivalNerve) but never SOMEBODY -- no name, no
+  // style, nothing that changed when you came back. The roster walks rather than rolls, so night 2 is a
+  // different opponent instead of a coin-flip that can hand you the same one twice.
+  let foe: DunkRival = rivalForNight(1);
   let trickLabels: string[] = [];                // this attempt's thrown tricks
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
@@ -496,6 +501,7 @@ export const DunkMode: ModeDefinition = (() => {
       momentum = ctx.momentum;
       // the walk-out is resolved ONCE at mount against the live library: a song deleted since it was
       // chosen resolves to null, and the card must not print a title nobody can hear.
+      foe = rivalForNight(night);
       walkOut = readWalkOut(); walkCounted = false;
       walkCue = resolveWalkOut(walkOut, walkOut ? StudioLibrary.get(walkOut.songId) : null);
       // M74: try Nexus venue first; fallback to VenueKit if no spec
@@ -573,7 +579,8 @@ export const DunkMode: ModeDefinition = (() => {
       style = 'power'; prop = 'none'; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
-      stakes = freshStakes();
+        foe = rivalForNight(night);
+    stakes = freshStakes();
       resetLob(); resetRunway(); win = 'run';
       setPhase('approach');
       startWalkOut();
@@ -584,6 +591,7 @@ export const DunkMode: ModeDefinition = (() => {
         // one line, phrased by the module: a mode must not invent its own wording for somebody's track
         walkOutNow: walkOutLine(walkCue),
         attempt: stakesLabel(stakes, calledLabel()),
+        rivalName: foe.name,
       });
     },
 
@@ -2321,8 +2329,12 @@ export const DunkMode: ModeDefinition = (() => {
         attemptsLeft: DUNKS_PER_ROUND - i + (TOTAL_ROUNDS - round) * DUNKS_PER_ROUND,
       });
       const rExecBand = rivalExecution(nerve);
-      const rivalBlew = Math.random() < nerve.blownChance;
-      const rDiff = rivalBlew ? 0.4 : nerve.diffMin + Math.random() * (nerve.diffMax - nerve.diffMin);
+      // THE OPPONENT'S OWN TEMPERAMENT, on top of the situation. `reach` and `risk` move together across the
+      // whole roster (DunkRivals holds the same invariant RivalNerve does), so a showman who goes for more
+      // also blows more -- otherwise a personality is just a difficulty increase with a name on it, and
+      // drawing the steady one becomes a punishment.
+      const rivalBlew = Math.random() < Math.min(0.85, nerve.blownChance * foe.risk);
+      const rDiff = rivalBlew ? 0.4 : (nerve.diffMin + Math.random() * (nerve.diffMax - nerve.diffMin)) * foe.reach;
       const rExec = rivalBlew ? 0 : rExecBand.min + Math.random() * (rExecBand.max - rExecBand.min);
       const rStyle = rivalBlew ? 0.5 : 2.2 + Math.random() * 3.2;
       if (nerve.label) console.info(`[DUNK-RIVAL] ${nerve.label} (deficit ${rivalTotal - playerTotal})`);
@@ -2441,6 +2453,7 @@ export const DunkMode: ModeDefinition = (() => {
     clearBanner(ctx);
     ctx.setHud({
       nightCard: won ? 'WON' : 'OVER', nightNum: night,
+      rivalName: foe.name,
       nightMakes: makes, nightMisses: misses, nightBest: bestChain,
       // the Passion Pipeline credential -- engagement, stated as engagement, never a rating and never a gate
       walkOut: walkCue ? musicCredential(walkOut, StudioLibrary.list().length).label : '',
@@ -2477,6 +2490,8 @@ export const DunkMode: ModeDefinition = (() => {
     SoundKit.play('uiTick', { pitch: 1.4 });
     resetForNextAttempt(ctx);           // -> phase 'approach', the runway HUD, a fresh prop
     flash(ctx, `NIGHT ${night}`, 1400);
+    // who walked in tonight — phrased by the module so no surface writes its own version of a name
+    setTimeout(() => flash(ctx, rivalIntro(foe), 1600), 1500);
   }
 
   return def;

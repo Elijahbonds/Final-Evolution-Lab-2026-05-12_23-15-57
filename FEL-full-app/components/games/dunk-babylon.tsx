@@ -282,6 +282,13 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
               {hnum(hud.nightMakes)} dunked · {hnum(hud.nightMisses)} missed
               {hnum(hud.nightBest) > 1 ? ` · best run ${hnum(hud.nightBest)}` : ''}
             </p>
+            {/* WHO YOU WERE UP AGAINST. A roster means coming back is a different night; the card is where
+                that becomes visible, because it is the screen a player actually reads. */}
+            {typeof hud.rivalName === 'string' && hud.rivalName ? (
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-white/45">
+                vs {hud.rivalName}
+              </p>
+            ) : null}
             {/* THE PASSION PIPELINE CREDENTIAL. Engagement, stated as engagement -- the label is phrased by
                 musicCredential so no surface here can turn a play count into a rating or a gate. Absent
                 when the athlete has no walk-out, rather than shown as a zero. */}
