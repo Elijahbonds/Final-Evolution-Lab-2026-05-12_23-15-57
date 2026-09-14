@@ -19,7 +19,7 @@ step-0 audit isolated. Lighting and post are shared and already good (`LightRig`
 | Mode | Weakness | Cause |
 |---|---|---|
 | **Golf** | The putting green is a large flat untextured disc that reads as paper. | No detail map on the green mesh; the surrounding terrain has one. |
-| **Skate** | Ramps sit on a flat tan plane; horizon bare; `crowd: 8` authored and rendered by nothing. | Ground lacks a detail map. The board venue `crowd` field has no consumer. |
+| **Skate** | Ramps sit on a flat tan plane; horizon bare. | Ground lacks a detail map. (~~crowd unread~~ — see correction below.) |
 | **Velocity Kart** | Fixed this pass — verges now read either side. Still no crowd or grandstand. | `trackside` covers furniture; spectators are not part of it yet. |
 
 **C — looks unfinished.**
@@ -34,9 +34,20 @@ step-0 audit isolated. Lighting and post are shared and already good (`LightRig`
 
 1. **Freerun venue dressing** — biggest single jump available, and it is currently the mode most likely to
    make the project look unfinished to a first-time viewer.
-2. **A crowd consumer.** `crowd` is authored on nine board venues and read by nothing; `Onlookers` exists
-   (`MAX_BODIES 8`). Wiring one to the other lights up skate, surf and both racing modes at once.
+2. ~~**A crowd consumer.**~~ **WITHDRAWN — I was wrong, again.** `venue.crowd` is read in all three board
+   builders (`rideWorlds.ts` lines 227, 457, 721) and all three modes mount `Onlookers` from
+   `world.crowdSpots`. The crowd system is fully wired. I did not see bodies in the skate capture because
+   `Onlookers` spawns its roster asynchronously and the pre-start camera does not face the spots. Racing is
+   the only family with genuinely no spectators.
 3. **Ground detail maps** on golf's green and skate's park floor — `groundTextures.ts` already exists and is
    used elsewhere (the Venice court's grain), so this is application, not authoring.
 
 Deliberately NOT on the list: any lighting, tone-mapping or AA work. That layer is shared, tiered and good.
+
+## A note on this audit's own reliability
+
+Two claims in it were wrong on first writing and are struck above — "no shared render pipeline" (there is
+one, `LightRig`, mounted for every mode) and "crowd read by nothing" (read in three places). Both were
+written from a screenshot plus a narrow grep, and both were killed in under a minute by actually opening
+the file. **Screenshots show what is not visible; they do not show what is not built.** Grep the consumer
+before claiming a producer is unread.
