@@ -72,6 +72,58 @@ export interface BoardVenue {
    */
   trees?: number;
   ready: boolean;
+  /**
+   * HOW THE PLACE RIDES (2026-09-13).
+   *
+   * Everything above this line is how a venue LOOKS. That was the whole record: palette, mood, sky, crowd,
+   * trees — and `bound`, the only field that touched play. So three genuinely different-looking places rode
+   * identically, and the copy was writing cheques the physics did not honour. "Granite ledges" skated like
+   * warm Venice concrete. The glacier, whose own line is "a long way down", descended at the same pitch as
+   * the alpine run. The reef "breaks hard and it breaks shallow" and broke exactly like an afternoon point.
+   *
+   * `ride` is that promise kept. It is optional so a venue may still be authored visuals-first, and every
+   * field is a MULTIPLIER on the discipline's tuning rather than an absolute — a venue describes how it
+   * differs from the norm, it does not re-specify the sport.
+   */
+  ride?: RideCharacter;
+}
+
+/**
+ * A venue's physical character, as multipliers on the discipline's own tuning.
+ *
+ * All default to 1 (or 0 for the additive ones), so an unauthored venue rides exactly as the sport does and
+ * nothing changes underneath the modes that have not opted in.
+ */
+export interface RideCharacter {
+  /** Grip underfoot. Below 1 is slick — granite, ice, wet reef. Above 1 bites. */
+  grip?: number;
+  /** Top speed the place allows. Long open walls above 1; tight technical places below. */
+  speed?: number;
+  /** How hard it is to hold a carve. Below 1 washes out. */
+  carve?: number;
+  /** SNOW: the pitch of the run, as a multiple of SLOPE_PITCH. Steeper is faster and less forgiving. */
+  pitch?: number;
+  /** SNOW: gate spacing, as a multiple of SLALOM_SPACING. Tighter demands more turn. */
+  gateSpacing?: number;
+  /** SURF: wave height, as a multiple of WAVE_HEIGHT. */
+  waveHeight?: number;
+  /** SURF: how fast the wall runs, as a multiple of WAVE_SPEED. A fast wall is a hard wall. */
+  wavePeriod?: number;
+  /** SKATE: obstacle density, as a multiple of the venue's default furniture count. */
+  density?: number;
+  /** How punishing a mistake is here — a shallow reef and a floodlit park are not the same fall. */
+  hazard?: number;
+}
+
+/** Every multiplier at its neutral value: the sport exactly as tuned. */
+export const NEUTRAL_RIDE: Required<RideCharacter> = {
+  grip: 1, speed: 1, carve: 1, pitch: 1, gateSpacing: 1,
+  waveHeight: 1, wavePeriod: 1, density: 1, hazard: 1,
+};
+
+/** A venue's ride with every gap filled from neutral, so callers never branch on undefined. */
+export function rideOf(venue: BoardVenue): Required<RideCharacter> {
+  return { ...NEUTRAL_RIDE, ...(venue.ride ?? {}) };
 }
 
 // ── SKATE ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -82,16 +134,22 @@ export const SKATE_VENUES: readonly BoardVenue[] = [
     id: 'venice-park', name: 'VENICE PARK', sub: 'Warm concrete, low sun, the boardwalk behind you.',
     discipline: 'skate', bound: 56, mood: 'goldenHour', sky: 'venice', crowd: 8, ready: true,
     palette: { ground: '#b8a48c', line: '#f4ead8', structure: '#8d7f6d', accent: '#ff8a3d', edge: '#4a4038', backdrop: '#f0a675' },
+    // warm, slightly rough concrete: it grips, and the park is busy with furniture
+    ride: { grip: 1.08, speed: 0.97, density: 1.15, hazard: 0.9 },
   },
   {
     id: 'city-plaza', name: 'CITY PLAZA', sub: 'Granite ledges, painted kerbs, hard midday light.',
     discipline: 'skate', bound: 62, mood: 'daylight', sky: 'stadium', crowd: 10, ready: true,
     palette: { ground: '#9aa3ad', line: '#eef2f6', structure: '#6d7681', accent: '#22d3ee', edge: '#2b323a', backdrop: '#c7d3de' },
+    // granite is FAST and slick — the copy says granite, so it skates like granite
+    ride: { grip: 0.86, speed: 1.1, carve: 0.92, density: 0.85, hazard: 1.0 },
   },
   {
     id: 'warehouse', name: 'THE WAREHOUSE', sub: 'Poured concrete, sodium light, nobody to tell you to leave.',
     discipline: 'skate', bound: 48, mood: 'nightGame', sky: 'stadium', crowd: 5, ready: true,
     palette: { ground: '#4c4a52', line: '#ffd75e', structure: '#3a3841', accent: '#ff4d6d', edge: '#23222a', backdrop: '#14131a' },
+    // poured concrete indoors: the best surface here, in the smallest space, in the dark
+    ride: { grip: 1.12, speed: 1.0, density: 1.3, hazard: 1.1 },
   },
 ];
 
@@ -101,16 +159,22 @@ export const SNOW_VENUES: readonly BoardVenue[] = [
     id: 'alpine-run', name: 'ALPINE RUN', sub: 'Blue shadows on white, pines to the treeline.',
     discipline: 'snow', bound: 24, mood: 'alpine', sky: 'alpine', crowd: 8, trees: 22, ready: true,
     palette: { ground: '#eef4fb', line: '#9fc0e8', structure: '#dce8f6', accent: '#ff4d6d', edge: '#7f97b5', backdrop: '#9dbfe0' },
+    // the reference run: everything else is described against this
+    ride: { },
   },
   {
     id: 'night-park', name: 'NIGHT PARK', sub: 'Floodlit kickers, everything else is dark.',
     discipline: 'snow', bound: 20, mood: 'nightGame', sky: 'alpine', crowd: 6, trees: 14, ready: true,
     palette: { ground: '#c6d3e4', line: '#ffd75e', structure: '#9fb0c6', accent: '#4dd4ff', edge: '#2b3648', backdrop: '#141b28' },
+    // groomed and tight under the lights — good grip, short gaps, and you cannot see the fall
+    ride: { grip: 1.06, gateSpacing: 0.85, speed: 0.95, hazard: 1.15 },
   },
   {
     id: 'glacier', name: 'GLACIER', sub: 'Above the trees. Ice blue, flat light, a long way down.',
     discipline: 'snow', bound: 34, mood: 'overcast', sky: 'alpine', crowd: 3, trees: 0, ready: true,
     palette: { ground: '#e6f2f8', line: '#7fb8d4', structure: '#cfe4ef', accent: '#2ec4b6', edge: '#6a8ea3', backdrop: '#c3dbe8' },
+    // "a long way down": the steepest pitch, ice underfoot, gates strung out wide
+    ride: { pitch: 1.28, grip: 0.82, gateSpacing: 1.2, speed: 1.12, carve: 0.9, hazard: 1.2 },
   },
 ];
 
@@ -120,16 +184,22 @@ export const SURF_VENUES: readonly BoardVenue[] = [
     id: 'the-break', name: 'THE BREAK', sub: 'Green water, a pier down the line, afternoon glass.',
     discipline: 'surf', bound: 70, mood: 'daylight', sky: 'ocean', crowd: 6, ready: true,
     palette: { ground: '#2f8f8a', line: '#bfeee9', structure: '#1f6f6b', accent: '#ffd75e', edge: '#134f4c', backdrop: '#8fd6cf' },
+    // the reference wave: afternoon glass, honest and mid-sized
+    ride: { },
   },
   {
     id: 'sunset-point', name: 'SUNSET POINT', sub: 'Gold on the face, long walls, nobody out.',
     discipline: 'surf', bound: 78, mood: 'goldenHour', sky: 'ocean', crowd: 3, ready: true,
     palette: { ground: '#2b6f86', line: '#ffd9a8', structure: '#1d5468', accent: '#ff8a3d', edge: '#123a48', backdrop: '#f0a675' },
+    // "long walls": a slower, longer wave — more room to work, less punch
+    ride: { waveHeight: 0.88, wavePeriod: 0.85, speed: 0.95, carve: 1.08, hazard: 0.8 },
   },
   {
     id: 'reef', name: 'THE REEF', sub: 'Dark water over coral. It breaks hard and it breaks shallow.',
     discipline: 'surf', bound: 64, mood: 'overcast', sky: 'ocean', crowd: 2, ready: true,
     palette: { ground: '#1f5d70', line: '#9fd6e8', structure: '#164654', accent: '#b07cf5', edge: '#0d2f39', backdrop: '#6f9db0' },
+    // "it breaks hard and it breaks shallow" — the biggest, fastest wave and the worst place to fall
+    ride: { waveHeight: 1.35, wavePeriod: 1.25, speed: 1.15, grip: 0.9, carve: 0.94, hazard: 1.6 },
   },
 ];
 
@@ -188,3 +258,27 @@ export const LEGACY_BOUND: Readonly<Record<BoardDiscipline, number>> = { skate: 
 /** Kept for the skate tests that named it before the other two disciplines had venues. */
 export const LEGACY_PARK_BOUND = LEGACY_BOUND.skate;
 export function boundGrowth(v: BoardVenue): number { return v.bound / LEGACY_BOUND[v.discipline]; }
+
+
+/**
+ * Apply a venue's character to a discipline's tuning.
+ *
+ * The multipliers land on the three numbers a rider actually feels — top speed, how hard a carve turns, and
+ * how much speed a non-carved steer scrubs off. Grip is deliberately spent on scrub rather than on turn
+ * rate: a slick surface does not stop you turning, it stops the turn HOLDING, which is what washing out is.
+ *
+ * Pure, and it returns a new object — a mode that applied this to its module-level tuning in place would
+ * compound the venue every time the mode remounted.
+ */
+export function tuneForVenue<T extends { maxSpeed: number; carveTurnRate: number; carveHold: number; scrubRate: number }>(
+  tuning: T, venue: BoardVenue,
+): T {
+  const r = rideOf(venue);
+  return {
+    ...tuning,
+    maxSpeed: tuning.maxSpeed * r.speed,
+    carveTurnRate: tuning.carveTurnRate * r.carve,
+    carveHold: 1 + (tuning.carveHold - 1) * r.grip,
+    scrubRate: tuning.scrubRate / Math.max(0.2, r.grip),
+  };
+}

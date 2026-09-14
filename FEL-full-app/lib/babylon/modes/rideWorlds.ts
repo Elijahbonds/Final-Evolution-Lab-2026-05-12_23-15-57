@@ -18,7 +18,7 @@
 import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, TransformNode, Vector3, Matrix, Material } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
-import { SKATE_VENUES, SNOW_VENUES, SURF_VENUES, type BoardVenue } from '../nexus/boardVenues';
+import { SKATE_VENUES, SNOW_VENUES, SURF_VENUES, rideOf, type BoardVenue } from '../nexus/boardVenues';
 import { applyFloorDetailToMesh } from '../visual/groundTextures';
 
 export interface RideObstacle { pos: Vector3; radius: number }
@@ -248,7 +248,9 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   const P = venue.palette;
   /** Half-width of the groomed corridor in THIS venue. The rider's clamp reads the same number back. */
   const HALF = venue.bound;
-  const PITCH = SLOPE_PITCH;
+  // THE VENUE'S OWN PITCH. The glacier's copy is "a long way down" and it descended at exactly the same
+  // angle as the alpine run — the three snow venues looked different and rode identically.
+  const PITCH = SLOPE_PITCH * rideOf(venue).pitch;
   // The snow must cover the RUN: the last gate sits at SLALOM_START + (SLALOM_GATES − 1) × SLALOM_SPACING = 238 m down the
   // fall line and the finish beyond it, but the piste was a 220 m ground centred on the start (−110 … +110). Nobody noticed
   // while the rider was pinned at y ≈ 0 (see SnowboardSlalomMode's Rider overrides); once the rider actually rides the
@@ -496,6 +498,15 @@ export const SLOPE_PITCH = 0.22;
  * asking for more than the rider has -- and boost, which shortens the window
  * by making the descent faster, still fits inside the remainder.
  */
+/** Gate spacing at a venue — the night park strings them tight, the glacier runs them out wide. */
+export function slalomSpacingAt(venue: BoardVenue): number {
+  return SLALOM_SPACING * rideOf(venue).gateSpacing;
+}
+/** Distance to gate `i` at a venue. `slalomGateDist` stays the neutral-course answer. */
+export function slalomGateDistAt(i: number, venue: BoardVenue): number {
+  return SLALOM_START + i * slalomSpacingAt(venue);
+}
+
 export function slalomGateX(i: number): number {
   return i === 0 ? 0 : (i % 2 === 0 ? -1 : 1) * (3.1 + (i / 11) * 1.0);
 }
@@ -514,6 +525,15 @@ export function slalomGateDist(i: number): number {
 // past the lap's furthest reach, so there is nothing to ride off.
 
 /** The wave travels toward the shore (+z) at this speed; the lap wrap and the rider's wave-relative drift both use it. */
+/** Wave height at a venue — the reef "breaks hard", the point has "long walls". */
+export function waveHeightAt(venue: BoardVenue): number {
+  return WAVE_HEIGHT * rideOf(venue).waveHeight;
+}
+/** How fast the wall runs at a venue. A fast wall is a hard wall. */
+export function waveSpeedAt(venue: BoardVenue): number {
+  return WAVE_SPEED * rideOf(venue).wavePeriod;
+}
+
 export const WAVE_SPEED = 4.5;
 /** The lip runs −50 → +90 and wraps (the rider wraps with it, see SurfBreakMode). */
 export const WAVE_LAP = 140;
