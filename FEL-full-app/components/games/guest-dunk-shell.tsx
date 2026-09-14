@@ -4,7 +4,7 @@ import dynamicImport from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Trophy, Flame, ArrowRight } from 'lucide-react';
+import { Loader2, Trophy, Flame, ArrowRight, ExternalLink, X } from 'lucide-react';
 import { prqGrade } from '@/lib/prq';
 import { is3D, isBabylon } from '@/components/three/flags';
 import { track, flush } from '@/lib/analytics';
@@ -48,6 +48,10 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
   // flag because the claim is shown once — on the first card — and after that lives as
   // a quiet header link that is always reachable and never in front of the game.
   const [cards, setCards] = useState(0);
+  // CLAIM-NOT-BLOCK: every CLAIM on this page opens a soft sheet over the live run, never a
+  // same-tab /signup. A guest run is not saved anywhere, so a claim that navigates away is a
+  // claim that throws the night (and GO AGAIN) away — the one trade this page must never ask.
+  const [claimOpen, setClaimOpen] = useState(false);
   const started = useRef(false);
   const judged = useRef(false);
 
@@ -125,14 +129,87 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
     setGameKey((k) => k + 1);
   };
 
+  // While the sheet is up it owns the keyboard. InputBus listens on window in the BUBBLE phase and
+  // maps Escape to START (pause) and any key to "GO AGAIN", so a capture-phase listener swallows
+  // keydowns before the game sees them: Esc closes the sheet instead of pausing the run under it,
+  // and Enter/Space still activate the sheet's own buttons (no preventDefault). Keyups pass, so a
+  // key held when the sheet opened is still released in the mode.
+  useEffect(() => {
+    if (!claimOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.stopPropagation();
+      if (e.key === 'Escape') setClaimOpen(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [claimOpen]);
+
+  // Secondary by construction: an outline button UNDER GO AGAIN that only opens the sheet.
   const claimLink = (
-    <Link
-      href={claimHref}
-      onClick={() => { track('guest_claim', { converted: true }); void flush(); }}
+    <button
+      type="button"
+      onClick={() => setClaimOpen(true)}
       className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-[#00E5FF]/40 px-5 py-2.5 font-mono text-xs text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/10"
     >
       <Flame className="h-4 w-4" /> CLAIM YOUR ATHLETE — SAVE THIS RUN
-    </Link>
+    </button>
+  );
+
+  // The sheet. Sign-up opens in a NEW TAB (the guest cookie rides along, so the claim still lands
+  // on this run) and the sheet closes itself; this tab — the stage, the card, GO AGAIN — is never
+  // touched. KEEP DUNKING / ✕ / Esc / the backdrop all just close it.
+  const claimSheet = (
+    <AnimatePresence>
+      {claimOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setClaimOpen(false)}
+          data-testid="claim-sheet"
+        >
+          <motion.div
+            role="dialog"
+            aria-label="Claim your athlete"
+            initial={{ y: 24, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ type: 'spring', damping: 24 }}
+            onClick={(e) => e.stopPropagation()}
+            className="fel-panel relative w-full max-w-sm rounded-2xl p-6 text-center"
+          >
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setClaimOpen(false)}
+              className="absolute right-3 top-3 rounded-md p-1 text-white/40 transition-colors hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <p className="fel-heading text-xl font-bold text-white">Claim your athlete</p>
+            <p className="mt-1 text-xs text-white/60">
+              Save this run, earn XP, climb the season track and challenge friends. Sign-up opens in a new tab — your contest stays right here.
+            </p>
+            <a
+              href={claimHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => { track('guest_claim', { converted: true }); void flush(); setClaimOpen(false); }}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-[#00E5FF]/50 px-5 py-2.5 font-mono text-xs text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/10"
+            >
+              <ExternalLink className="h-4 w-4" /> OPEN SIGN-UP (NEW TAB)
+            </a>
+            <button
+              type="button"
+              onClick={() => setClaimOpen(false)}
+              className="mt-3 w-full rounded-xl bg-[#00E5FF] px-5 py-3 fel-heading text-base font-bold text-black transition-transform hover:scale-[1.02]"
+            >
+              KEEP DUNKING
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 
   return (
@@ -160,13 +237,13 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
               a full-screen modal whose primary button left the page, with DUNK AGAIN as a small
               grey afterthought beside it. */}
           {cards > 0 && !result && (
-            <Link
-              href={claimHref}
-              onClick={() => { track('guest_claim', { converted: true }); void flush(); }}
+            <button
+              type="button"
+              onClick={() => setClaimOpen(true)}
               className="rounded-md border border-[#00E5FF]/40 px-2.5 py-1 font-mono text-[10px] text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/10"
             >
               CLAIM
-            </Link>
+            </button>
           )}
           {/* …and because the brand no longer navigates, the way out is named. A guest run is not saved, so leaving is
               a real decision and it should look like one rather than hiding under the logo. */}
@@ -230,27 +307,17 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
                   </div>
                 )}
 
-                <div className="mt-6 rounded-xl border border-[#00E5FF]/30 bg-[#00E5FF]/5 p-4">
-                  <p className="fel-heading text-lg font-bold text-white">Claim your athlete</p>
-                  <p className="mt-1 text-xs text-white/60">
-                    Save this run, earn XP, climb the season track and challenge friends.
-                  </p>
-                  <Link
-                    href={claimHref}
-                    onClick={() => { track('guest_claim', { converted: true }); void flush(); }}
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#00E5FF] px-6 py-3.5 fel-heading text-lg font-bold text-black transition-transform hover:scale-[1.02]"
-                  >
-                    <Flame className="h-5 w-5" /> CLAIM YOUR ATHLETE
-                  </Link>
-                </div>
+                {/* CLAIM-NOT-BLOCK: the 2D/3D fallback card had the same inversion — a filled CLAIM
+                    that left the page over a grey DUNK AGAIN. GO AGAIN is the primary here too. */}
+                <button
+                  onClick={replay}
+                  className="mt-6 flex w-full items-center justify-center rounded-xl bg-[#00E5FF] px-6 py-3.5 fel-heading text-lg font-bold text-black transition-transform hover:scale-[1.02]"
+                >
+                  GO AGAIN
+                </button>
+                {claimLink}
 
                 <div className="mt-4 flex items-center justify-center gap-3">
-                  <button
-                    onClick={replay}
-                    className="rounded-lg border border-white/15 px-4 py-2 font-mono text-xs text-white/70 transition-colors hover:border-white/40 hover:text-white"
-                  >
-                    DUNK AGAIN
-                  </button>
                   {rematch && (
                     <Link
                       href={rematch}
@@ -264,6 +331,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
             </motion.div>
           )}
         </AnimatePresence>
+        {claimSheet}
       </div>
     </div>
   );
