@@ -101,6 +101,11 @@ import {
   CHAIN_IDLE, BASELINE_HANDLE, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
   type ChainState, type HandleMove,
 } from '../core/HandleSystem';   // the vocabulary 1v1 had and this mode did not
+import {
+  THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
+  type ThreatState,
+} from '../core/TripleThreat';   // standing still with the ball is not idle — it is threatening
+import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and six bodies contest it
 import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
@@ -219,6 +224,9 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let posting = false;                                                               // the seal I hold (the path into the fade / the hook / the quick spin)
   let spin: { plan: SpinPlan; t: number; beat: boolean } | null = null;              // M6: the pivot in flight
   let spinCooldown = 0, spinArmed = 0;   // M6: a body I meet ARMS the spin; the stick swung across throws it
+  /** STATIONARY OFFENCE: the stance the half-court game starts from. 3v3 stood in idle holding the ball. */
+  let threat: ThreatState = { ...THREAT_IDLE };
+  let stickHeld = 0, stickPeak = 0, jabEligible = false, burstArmed = false;
   // One fake per wind-up: the button is HELD, so without this it re-fires every frame.
   // There is deliberately no separate "lane is open" timer — the defender has been physically moved and
   // frozen, so the opening is the geometry itself. A second timer nothing reads is dead state.
@@ -336,7 +344,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     foes.forEach((f, i) => f.char.root.position.set((i - 1) * 3, 0, 2));
     shooting = false; currentShot = null;
     if (gather || finish || spin || posting) me.tree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
-    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; me.char.root.position.y = 0;
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; jabEligible = false; burstArmed = false; me.char.root.position.y = 0;
     clearDefense();
     // BIOMECH-HOOPS-WAVE1: the possession's clocks; a held shot is lifted, a floored body gets up
     driver = null; driveK = 0; dunkFlight = null; dunkFlush = null; mateArc.active = false;
@@ -617,7 +625,20 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       // MODE-STICK-FACE (2026-09-07): CAMERA-relative — the team camera looks at the rim (−z) from behind me, and in a
       // left-handed world a raw +x intent is SCREEN-LEFT (measured: stick-right Δscreen −5.6 m). Up = the camera's flat
       // forward, right = screen right, handed to the dribble in its stick space (+Y = −Z).
-      const wish = ctx.camDirector.forwardFlat().scale(meIntent.moveY).addInPlace(ctx.camDirector.rightFlat().scale(meIntent.moveX));
+      let wish = ctx.camDirector.forwardFlat().scale(meIntent.moveY).addInPlace(ctx.camDirector.rightFlat().scale(meIntent.moveX));
+      // THE STANCE NOW COSTS AND PAYS. The slide animation was already here and did nothing to the body —
+      // a crouched defender covered ground exactly like an upright one. In a stance you slide faster and
+      // go forward slower; upright it is the other way round, which is what makes the crossover work.
+      {
+        const man = carrierId === 'foeTeam' ? (driver ?? nearestLiveFoe()) : null;
+        const engaged = inStance({
+          onDefense: carrierId === 'foeTeam',
+          distToMan: man ? distXZ(me.char.root.position, man.char.root.position) : Infinity,
+          speed01: meSpeed01,
+          disabled: meStunSec > 0,
+        });
+        if (carrierId === 'foeTeam') wish = stanceWish(wish, me.char.root.rotation.y, engaged);
+      }
       const drib = me.drib.update(dt, wish.x, -wish.z, sprintOk);
       meSpeed01 = drib.speed01; me.speed01 = drib.speed01;
       // HOOPS-MOVE-KIT-A: never inside a shot / finish — the hand swap moved the finishing hand's ball to the other palm mid-hop
@@ -656,6 +677,56 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       spinCooldown = Math.max(0, spinCooldown - dt);
       chain = tickChain(chain, dt, handle);   // the chain expires on its own; a late crossover starts a new one
       passFakeCooldown = Math.max(0, passFakeCooldown - dt);
+      threat = tickThreat(threat, dt);
+
+      // ── TRIPLE THREAT (ported from 1v1, owner's stationary-offence ask) ──────────────────────────
+      // Standing still with the ball was literally idle in this mode: no stance, no jab, nothing to read.
+      // The same stick direction is both the lie and the truth — a TAP jabs, a LEAN drives — which is why
+      // the jab cannot have its own button without losing the thing that makes it work.
+      if (iAmCarrier) {
+        const stickMag = Math.hypot(meIntent.moveX, meIntent.moveY);
+        const threatening = inTripleThreat({
+          carrying: true, speed01: drib.speed01,
+          busy: shooting || dunking || !!finish || !!gather || !!spin, posting,
+        });
+        if (stickMag > 0.45) {
+          // LATCH at the START of the push: the tap itself moves the body past the stance's speed limit, so
+          // reading it at the release always said "driving" and no jab ever fired (measured in 1v1).
+          if (stickHeld === 0) jabEligible = threatening;
+          stickHeld += dt; stickPeak = Math.max(stickPeak, stickMag);
+        } else {
+          if (jabEligible && stickHeld > 0 && isJabInput(stickHeld, stickPeak) && canJab(threat)) {
+            const nf = nearestLiveFoe();
+            const odds = nf ? jabBiteOdds({
+              defenderDist: distXZ(me.char.root.position, nf.char.root.position),
+              defenderClosing: nf.speed01 > 0.25,
+              defenderSet: nf.speed01 < 0.1,
+              handle,
+              shownThisPossession: threat.shown,
+            }) : 0;
+            const bought = !!nf && Math.random() < odds;
+            threat = throwJab(threat, bought);
+            burstArmed = bought;
+            me.tree.beat('bball_hesi', { fadeSec: 0.05 });
+            SoundKit.play('whoosh', { pitch: 1.25, volume: 0.28 });
+            if (bought && nf) {
+              nf.stunSec = Math.max(nf.stunSec, 0.3);
+              nf.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.07 });
+              ctx.feel?.impact?.(0.2);
+              ctx.setHud({ banner: 'HE BIT THE JAB — GO!' });
+              setTimeout(() => ctx.setHud({ banner: '' }), 600);
+            }
+            console.info(`[3V3-THREAT] jab #${threat.shown} odds ${odds.toFixed(2)} bought ${bought}`);
+          }
+          stickHeld = 0; stickPeak = 0; jabEligible = false;
+        }
+        // ONE impulse on the first step out of the stance, never a per-frame multiplier (that compounds
+        // into a teleport — the reason it is written this way in 1v1)
+        if (burstArmed && threat.advantage > 0 && drib.speed01 > 0.3) {
+          me.drib.vel.scaleInPlace(jabBurst(threat));
+          burstArmed = false;
+        }
+      } else if (stickHeld !== 0 || jabEligible) { stickHeld = 0; stickPeak = 0; jabEligible = false; }
       spinArmed = Math.max(0, spinArmed - dt);
       const postDef = nearestLiveFoe();
       if (spin) stepSpin(ctx, dt);

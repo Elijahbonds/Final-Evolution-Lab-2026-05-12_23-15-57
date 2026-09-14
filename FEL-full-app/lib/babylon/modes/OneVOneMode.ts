@@ -95,6 +95,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';              // the miss meets the iron it earned
+import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot,
@@ -1098,7 +1099,18 @@ export const OneVOneMode: ModeDefinition = (() => {
         const sprintOk = turbo.gate(dt, intent.sprint, moving);
         ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
-        const [mx, my] = camRel(ctx, intent.moveX, intent.moveY);
+        const [mxRaw, myRaw] = camRel(ctx, intent.moveX, intent.moveY);
+        // THE STANCE COSTS AND PAYS (DefensiveStance). The slide clips were already playing here and did
+        // nothing to the body — a crouched defender covered ground exactly like an upright one. In a stance
+        // you slide faster and go forward slower; upright it inverts, which is what makes a crossover work.
+        const engagedStance = inStance({
+          onDefense: true,
+          distToMan: distXZ(me.root.position, foe.root.position),
+          speed01: meSpeed01,   // last frame's push: the stance reads what the body is already doing
+          disabled: meStunSec > 0 || meFloored,
+        });
+        const scaled = stanceWish(new Vector3(mxRaw, 0, myRaw), me.root.rotation.y, engagedStance);
+        const mx = scaled.x, my = scaled.z;
         const drib = meStunSec > 0
           ? meDribble.update(dt, 0, 0, false)
           : meDribble.update(dt, mx, my, sprintOk);
