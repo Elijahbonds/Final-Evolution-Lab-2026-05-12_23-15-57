@@ -46,6 +46,7 @@
 //      a flight I can SWAT with a timed jump inside range (REJECTED); a hard contact opens the strip window (my X poke inside
 //      1.6 m connects; a set defender I bump strips me on his roll, the ball loose, no warp); X HELD is a grounded hand-up
 //      that contests the driver's release (and the AI's contests mine), the contest biting the make chance and altering the arc.
+import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, TransformNode } from '@babylonjs/core';
@@ -202,6 +203,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   const passFlight = new PassFlight();
   const carries = new Map<Body, BallCarry>();   // live dribble per body on my team
   let meSpeed01 = 0;
+  let scuff: ScuffState = { ...SCUFF_IDLE };
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   let passTargetId: 'mate0' | 'mate1' = 'mate0';
   let passType: PassType = 'chest';
@@ -662,6 +664,18 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       }
       const drib = me.drib.update(dt, wish.x, -wish.z, sprintOk);
       meSpeed01 = drib.speed01; me.speed01 = drib.speed01;
+      // THE FLOOR ANSWERS A HARD STOP. Dust existed and ten modes used it — for knockdowns, tackles and
+      // landings, never for STOPPING, which is the most violent thing a body does on a court on purpose.
+      // `tickScuff` thresholds on DECELERATION rather than a per-frame speed drop, so the same cut puffs at
+      // 30 fps and at 144; a per-frame delta would fire on one and not the other.
+      {
+        const sc = tickScuff(scuff, Math.hypot(me.drib.vel.x, me.drib.vel.z), dt, true);
+        scuff = sc.state;
+        if (sc.strength > 0) {
+          EffectsKit.burst(ctx.scene, me.char.root.position.clone(), 'dust', scuffPuffScale(sc.strength));
+          SoundKit.play('squeak', { volume: scuffVolume(sc.strength), pitch: 0.92 + sc.strength * 0.2 });
+        }
+      }
       // HOOPS-MOVE-KIT-A: never inside a shot / finish — the hand swap moved the finishing hand's ball to the other palm mid-hop
       // (measured on a right-hand layup: the ball to the left hand at +207 ms; 1v1 had this line under its guard)
       if (drib.crossover && !shooting && !dunking && !finish && !gather && !posting && !spin) {

@@ -84,6 +84,7 @@
 // holds, cut callbacks ignored); giveBall() hands the ball over with both carries off; possessionToken guards every
 // timer; make-it-take-it both ways; the board is a race on both ends; the loose ball always steps.
 
+import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
 import { MeshBuilder, Quaternion, TransformNode as BABYLON_TransformNode, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, TransformNode } from '@babylonjs/core';
@@ -299,6 +300,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   const meBio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE }, foeBio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE };
   let meShotWin: ShotWindow = 'none', meShotSec = 0, foeShotWin: ShotWindow = 'none', foeShotSec = 0;   // load (the meter / the gather) → release → follow (until the arc resolves)
   let meLandSec = 0, meCelebrateSec = 0, meSpeed01 = 0, foeSpeed01 = 0;
+  let scuff: ScuffState = { ...SCUFF_IDLE };
   let dunkFlight: { k: number; made: boolean | null } | null = null;                 // the drive dunk's flight clock (the posture windows ride it)
   let dunkFlush: { releasePos: Vector3; since: number } | null = null;               // the make's ball through the iron (G6)
   // ── HOOPS-MOVE-KIT-A ──
@@ -1238,6 +1240,25 @@ export const OneVOneMode: ModeDefinition = (() => {
         const look = past.lengthSquared() > 1e-4 ? foe.root.position.add(past.normalize().scale(1.5)) : foe.root.position;
         ctx.camDirector.look(lookX, lookY, dt);
         ctx.camDirector.update(me.root.position, meDribble.vel, look);
+      }
+
+      // THE FLOOR ANSWERS A HARD STOP. Dust existed and ten modes called it — for knockdowns, tackles and
+      // landings, never for STOPPING, which is the most violent thing a body does on a court on purpose.
+      //
+      // Two placement decisions:
+      //   · DECELERATION, not a per-frame speed drop. The same cut has to puff at 30 fps and at 144, and a
+      //     frame delta scales with the frame — see ScuffFx.
+      //   · ONCE PER FRAME, not inside the possession branch. `meDribble` drives the body on offense AND on
+      //     defense (two update() call sites), and a tick that only ran on offense would carry a stale
+      //     prevSpeed across the turnover and puff for a stop that happened a possession ago. A defensive
+      //     slide stopping dead is the squeak you most want anyway.
+      {
+        const sc = tickScuff(scuff, Math.hypot(meDribble.vel.x, meDribble.vel.z), dt, myJumpAge === Infinity && !meFloored);
+        scuff = sc.state;
+        if (sc.strength > 0) {
+          EffectsKit.burst(ctx.scene, me.root.position.clone(), 'dust', scuffPuffScale(sc.strength));
+          SoundKit.play('squeak', { volume: scuffVolume(sc.strength), pitch: 0.92 + sc.strength * 0.2 });
+        }
       }
 
       // ── BIOMECH-HOOPS-WAVE1: this frame's hoops windows for the Posture Poses layer (read in after-animations) ──

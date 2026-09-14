@@ -96,8 +96,14 @@ export const EffectsKit = {
     return ps;
   },
 
-  /** One-shot burst helpers (dust, sparks, net splash, confetti). */
-  burst(scene: Scene, at: Vector3, kind: 'dust' | 'sparks' | 'net' | 'confetti' | 'glitch'): void {
+  /**
+   * One-shot burst helpers (dust, sparks, net splash, confetti).
+   *
+   * `scale` (default 1, i.e. every existing caller is untouched) lets a caller say HOW HARD the thing that
+   * caused this was — a shoe-scuff on a light cut and one on a planted stop are the same effect at two
+   * sizes, and firing the identical puff for both is what makes particle work read as canned.
+   */
+  burst(scene: Scene, at: Vector3, kind: 'dust' | 'sparks' | 'net' | 'confetti' | 'glitch', scale = 1): void {
     const cfg = {
       dust: { colors: ['#c9c2b6', '#a89f90'], count: 26, speed: 1.4, size: 0.16, life: 0.7, gy: -1.5 },
       sparks: { colors: ['#ffd75e', '#ff8f3d'], count: 20, speed: 3.2, size: 0.06, life: 0.35, gy: -3 },
@@ -106,17 +112,21 @@ export const EffectsKit = {
       // M50 — tight, fast, cyan/white fragment pop for the enemy spawn-in flourish
       glitch: { colors: ['#22d3ee', '#e6fbff'], count: 34, speed: 4.2, size: 0.05, life: 0.28, gy: 0 },
     }[kind];
-    const ps = baseSystem(scene, `fx_${kind}_${Date.now()}`, cfg.count);
+    // clamped: a caller passing 0 would allocate a system that emits nothing, and one passing 50 would
+    // budget thousands of particles for a footstep.
+    const k = Math.max(0.25, Math.min(2, scale));
+    const count = Math.max(4, Math.round(cfg.count * k));
+    const ps = baseSystem(scene, `fx_${kind}_${Date.now()}`, count);
     ps.emitter = at.clone();
     const c1 = Color3.FromHexString(cfg.colors[0]), c2 = Color3.FromHexString(cfg.colors[1 % cfg.colors.length]);
     ps.color1 = new Color4(c1.r, c1.g, c1.b, 1);
     ps.color2 = new Color4(c2.r, c2.g, c2.b, 1);
-    ps.minSize = cfg.size * 0.6; ps.maxSize = cfg.size;
+    ps.minSize = cfg.size * 0.6 * k; ps.maxSize = cfg.size * k;
     ps.minLifeTime = cfg.life * 0.6; ps.maxLifeTime = cfg.life;
-    ps.minEmitPower = cfg.speed * 0.5; ps.maxEmitPower = cfg.speed;
+    ps.minEmitPower = cfg.speed * 0.5 * k; ps.maxEmitPower = cfg.speed * k;
     ps.direction1 = new Vector3(-1, 1, -1); ps.direction2 = new Vector3(1, 1.6, 1);
     ps.gravity = new Vector3(0, cfg.gy, 0);
-    ps.manualEmitCount = cfg.count;
+    ps.manualEmitCount = count;
     ps.disposeOnStop = true;
     ps.start();
     setTimeout(() => ps.stop(), 120);
