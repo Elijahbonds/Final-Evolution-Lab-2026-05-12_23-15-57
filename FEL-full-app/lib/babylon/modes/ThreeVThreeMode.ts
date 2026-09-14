@@ -99,7 +99,7 @@ import { resolveRim, forcedMissProfile } from '../core/RimPhysics';             
 import { judge, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
-  OFF_THE_HEAD_RANGE, type ChainState, type HandleMove,
+  OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, type ChainState, type HandleMove,
 } from '../core/HandleSystem';   // the vocabulary 1v1 had and this mode did not
 import {
   THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
@@ -1758,6 +1758,42 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     });
     if (!outcome.owned) return;                      // not in my hands yet — the gate IS the upgrade
     chain = outcome.chain;
+
+    // OFF THE HEAD resolves here, not through the ankle-break roll: it is the one move where the ball
+    // leaves your hands, so it is the one move that can lose it. Same rule in 1v1.
+    if (move === 'off_the_head' && carrierId === 'me' && foe && !foe.floored && foe.stunSec <= 0) {
+      const odds = offTheHeadOdds({
+        handle,
+        dist: distXZ(me.char.root.position, foe.char.root.position),
+        facingCos: facingCos(foe.char.root.rotation.y, foe.char.root.position, me.char.root.position),
+        defenderSpeed: foe.speed01 * 6,
+      });
+      SoundKit.play('whoosh', { pitch: 1.35, volume: 0.4 });
+      if (odds > 0 && Math.random() < odds) {
+        foe.stunSec = Math.max(foe.stunSec, 0.8);
+        foe.tree.beat(SPORT_CLIP.karateHitReact);
+        SoundKit.play('impact', { pitch: 1.2, volume: 0.55 });
+        SoundKit.play('crowdCheer', { volume: 0.8 });
+        EffectsKit.burst(ctx.scene, foe.char.root.position.add(new Vector3(0, 1.5, 0)), 'sparks');
+        ctx.feel?.impact?.(0.5);
+        ctx.juice.shake(0.1, 150);
+        ctx.setHud({ banner: 'OFF THE HEAD!' });
+        setTimeout(() => ctx.setHud({ banner: '' }), 1100);
+        console.info(`[3V3-HANDLE] off the head — CLEAN (odds ${odds.toFixed(2)})`);
+      } else {
+        const dir = offTheHeadLoose(me.char.root.position, foe.char.root.position);
+        const from = ball.getAbsolutePosition().clone();
+        releaseBall(ball);
+        ballSim.launch(from, new Vector3(dir.x * 5.5, 1.2, dir.z * 5.5));
+        board = { age: 0, contestedCalled: false, shooter: 'me' };
+        SoundKit.play('miss');
+        ctx.setHud({ banner: 'OFF THE HEAD — LOST IT' });
+        setTimeout(() => ctx.setHud({ banner: '' }), 1000);
+        console.info(`[3V3-HANDLE] off the head — MISSED (odds ${odds.toFixed(2)})`);
+      }
+      return;
+    }
+
     if (outcome.restarted) return;
     if (outcome.tier !== 'single') {
       SoundKit.play('whoosh', { pitch: 1.1 + chain.length * 0.12, volume: 0.35 });

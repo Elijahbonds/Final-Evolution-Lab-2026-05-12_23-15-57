@@ -99,7 +99,8 @@ import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide w
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot,
-  resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, type ChainState, type HandleMove,
+  resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose,
+  type ChainState, type HandleMove,
 } from '../core/HandleSystem';   // Street chains x 2K brakes, gated on the handle the PRQ scan earned
 import {
   THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
@@ -1933,6 +1934,44 @@ export const OneVOneMode: ModeDefinition = (() => {
     }, roll);
     if (!outcome.owned) return;                      // not in my hands yet — the gate IS the upgrade
     chain = outcome.chain;
+
+    // OFF THE HEAD is the only move where the ball leaves your hands, so it resolves HERE rather than
+    // through the ankle-break roll below. Everything else in this vocabulary is a decision about a chain;
+    // this one is a decision about the ball, and it can lose it.
+    if (move === 'off_the_head' && carrying && foeStunSec === 0 && !foeFloored) {
+      const odds = offTheHeadOdds({
+        handle,
+        dist: distXZ(me.root.position, foe.root.position),
+        facingCos: facingCos(foe.root.rotation.y, foe.root.position, me.root.position),
+        defenderSpeed: foeVelLast.length(),
+      });
+      SoundKit.play('whoosh', { pitch: 1.35, volume: 0.4 });
+      if (odds > 0 && roll() < odds) {
+        // off him and back to me: he is cooked, and the crowd knows
+        foeStunSec = Math.max(foeStunSec, 0.8);
+        foeAnimTree.beat(SPORT_CLIP.karateHitReact);
+        SoundKit.play('impact', { pitch: 1.2, volume: 0.55 });
+        SoundKit.play('crowdCheer', { volume: 0.8 });
+        EffectsKit.burst(ctx.scene, foe.root.position.add(new Vector3(0, 1.5, 0)), 'sparks');
+        ctx.feel?.impact?.(0.5);
+        ctx.juice.shake(0.1, 150);
+        swing('ankle_break');
+        bannerFlash(ctx, 'OFF THE HEAD!', 1100);
+        console.info(`[1V1-HANDLE] off the head — CLEAN (odds ${odds.toFixed(2)})`);
+      } else {
+        // it did not come back. The ball is loose BEHIND him, which is the worst place for you.
+        const dir = offTheHeadLoose(me.root.position, foe.root.position);
+        const from = ballWorld().clone();
+        releaseBall(ball); carrying = false;
+        launchLoose(from, new Vector3(dir.x * 5.5, 1.2, dir.z * 5.5));
+        board = { age: 0, contestedCalled: false, shooter: 'mine' };
+        SoundKit.play('miss');
+        bannerFlash(ctx, 'OFF THE HEAD — LOST IT', 1000);
+        console.info(`[1V1-HANDLE] off the head — MISSED (odds ${odds.toFixed(2)})`);
+      }
+      return;
+    }
+
     if (outcome.restarted) {
       if (process.env.NODE_ENV === 'development') console.info(`[1V1-HANDLE] ${move} out of window — new chain`);
       return;
