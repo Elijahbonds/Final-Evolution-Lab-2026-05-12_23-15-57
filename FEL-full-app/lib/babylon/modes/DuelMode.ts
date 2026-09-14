@@ -15,6 +15,11 @@
 //   ROUNDS — best-of-3 scored through the shared JudgePanel's pacing
 //     (staged round markers), not a number flash.
 
+import { mountPostureLayer } from '../anim/PostureLayer';
+type PostureHandle = ReturnType<typeof mountPostureLayer>;
+import { combatPose, combatApproach, COMBAT_INPUT_IDLE, type CombatPostureInput } from '../core/CombatPosture';
+import { BodyMotion, dynamicPose, COMBAT_DYNAMIC } from '../core/DynamicPosture';
+import { strafeAxis } from '../core/Biomech';
 import { nerve, standingOf } from '../core/Nerve';
 import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
@@ -84,6 +89,22 @@ export const DuelMode: ModeDefinition = (() => {
   let meMove: CombatMovement, foeMove: CombatMovement;
   let meDef: DefenseController, foeDef: DefenseController;
   let meAnim: CombatAnimTree, foeAnim: CombatAnimTree;
+  // THE BODY REACTS, NOT JUST THE CLIPS (2026-09-14).
+  //
+  // Duel and showdown were the two combat modes with no posture layer: karate, karate_vs and mixedcombat
+  // all mount one, and these two -- their direct siblings, on the same CombatAnimTree and the same
+  // FighterState -- did not. So a duellist's spine, chest and head never answered what his feet were doing.
+  // Nothing here is new machinery; it is the karate_vs mount, on the mode that was missing it.
+  let mePosture: PostureHandle | null = null, foePosture: PostureHandle | null = null;
+  const meBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE }, foeBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE };
+  const meMotion = new BodyMotion(), foeMotion = new BodyMotion();
+  const chestOf = (c: SpawnedCharacter): Vector3 => c.root.position.add(new Vector3(0, 1.32, 0));
+  const feedFor = (bio: CombatPostureInput, foeC: () => SpawnedCharacter, motion: BodyMotion, exertion: number) => {
+    const { window, pose, legs } = combatPose(bio);
+    const at = chestOf(foeC());
+    const dyn = dynamicPose(pose, motion.signals(bio.speed01, exertion, false), window, COMBAT_DYNAMIC);
+    return { pose: dyn, legs, aim: at, eyes: at, window };
+  };
   // Set in load() from the start-up screen's pick, never here: this factory body runs when the registry is
   // built, which on Next is during SSR with no window and no URL. See MixedCombatMode for the measured
   // version of that bug.
@@ -305,6 +326,16 @@ export const DuelMode: ModeDefinition = (() => {
       meMove.lockTarget = rival.root.position; foeMove.lockTarget = player.root.position;
       meDef = new DefenseController(); foeDef = new DefenseController();
       meAnim = new CombatAnimTree(player.animator); foeAnim = new CombatAnimTree(rival.animator);
+      // GUARD is the exertion signal here, the same reading karate_vs uses: a fighter whose guard is gone
+      // is a fighter who has been working, and the dynamic layer leans the body accordingly.
+      mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => feedFor(meBio, () => rival, meMotion, 1 - meState.guard / 100), 'DUEL-PP');
+      foePosture = mountPostureLayer(ctx.scene, rival.skeleton, rival.root, () => feedFor(foeBio, () => player, foeMotion, 1 - foeState.guard / 100), 'DUEL-PP-FOE');
+      if (process.env.NODE_ENV === 'development') {
+        // the same dev seam karate_vs carries: without it, "the posture layer is mounted" is a claim about
+        // source rather than about a running game, and this pass has spent all day on that distinction.
+        const dev = (window as unknown as { __FEL_DEV__?: { combatPosture?: unknown } }).__FEL_DEV__;
+        if (dev) dev.combatPosture = { me: () => mePosture?.layer.get() ?? null, foe: () => foePosture?.layer.get() ?? null, bio: () => ({ me: { ...meBio }, foe: { ...foeBio } }) };
+      }
 
       SoundKit.startAmbient('dojo');
       EffectsKit.ambient(ctx.scene, 'dojo');
@@ -434,6 +465,24 @@ export const DuelMode: ModeDefinition = (() => {
         hitBy: foeHitBy, down: foeState.staggerSec > 0.8, out: foeState.hp <= 0, ulting: false,
       });
 
+      // the posture bios, resolved in each fighter's OWN frame so a backstep and a circle read differently
+      // rather than being the same world-space number
+      const meYaw = player.root.rotation.y, foeYaw = rival.root.rotation.y;
+      meMotion.update(meMove.vel.x, meMove.vel.z, meYaw, dt);
+      foeMotion.update(foeMove.vel.x, foeMove.vel.z, foeYaw, dt);
+      const feedBio = (bio: CombatPostureInput, mv: typeof meMove, st: typeof meState, df: typeof meDef, str: typeof meStrike, hb: typeof meHitBy, yaw: number, foeC: SpawnedCharacter, selfC: SpawnedCharacter) => {
+        const sp = Math.hypot(mv.vel.x, mv.vel.z);
+        const toFoe = foeC.root.position.subtract(selfC.root.position); toFoe.y = 0;
+        const closing = toFoe.lengthSquared() > 1e-6 ? Vector3.Dot(mv.vel, toFoe.normalize()) : 0;
+        bio.speed01 = Math.min(1, sp / 6.4); bio.strafe = strafeAxis(mv.vel, yaw); bio.approach = combatApproach(closing);
+        bio.striking = str.current?.move.weight ?? null; bio.windingUp = false;
+        bio.blocking = df.blocking; bio.parrying = false; bio.guardImpact = false;
+        bio.hitBy = hb; bio.down = st.staggerSec > 0.8; bio.out = st.hp <= 0;
+        bio.rising = false; bio.dodging = false; bio.celebrating = false; bio.engaged = phase === 'fighting';
+      };
+      feedBio(meBio, meMove, meState, meDef, meStrike, meHitBy, meYaw, rival, player);
+      feedBio(foeBio, foeMove, foeState, foeDef, foeStrike, foeHitBy, foeYaw, player, rival);
+
       ctx.setHud({ hp: meState.hp, foeHp: foeState.hp, guard: Math.round(meState.guard), foeGuard: Math.round(foeState.guard) });
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(player.root.position, meMove.vel, rival.root.position);
@@ -446,6 +495,7 @@ export const DuelMode: ModeDefinition = (() => {
       // rebuilt on every weapon change, and a stale one left behind would ride the next round's rig
       myProp?.dispose(); myProp = null;
       foeProp?.dispose(); foeProp = null;
+      mePosture?.dispose(); foePosture?.dispose(); mePosture = null; foePosture = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
     },
   };

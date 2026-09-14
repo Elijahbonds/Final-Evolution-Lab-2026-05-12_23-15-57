@@ -19,6 +19,11 @@
 //     into the north gate (destructible beat).
 // All naming/visuals original.
 
+import { mountPostureLayer } from '../anim/PostureLayer';
+type PostureHandle = ReturnType<typeof mountPostureLayer>;
+import { combatPose, combatApproach, COMBAT_INPUT_IDLE, type CombatPostureInput } from '../core/CombatPosture';
+import { BodyMotion, dynamicPose, COMBAT_DYNAMIC } from '../core/DynamicPosture';
+import { strafeAxis } from '../core/Biomech';
 import { nerve, standingOf } from '../core/Nerve';
 import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
@@ -62,6 +67,18 @@ export const ShowdownMode: ModeDefinition = (() => {
   let meMove: CombatMovement, foeMove: CombatMovement;
   let meDef: DefenseController, foeDef: DefenseController;
   let meAnim: CombatAnimTree, foeAnim: CombatAnimTree;
+  // THE BODY REACTS, NOT JUST THE CLIPS (2026-09-14). Showdown and duel were the two combat modes with no
+  // posture layer, while karate, karate_vs and mixedcombat -- their siblings on the same CombatAnimTree and
+  // the same FighterState -- all mount one. Same mount, on the mode that was missing it.
+  let mePosture: PostureHandle | null = null, foePosture: PostureHandle | null = null;
+  const meBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE }, foeBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE };
+  const meMotion = new BodyMotion(), foeMotion = new BodyMotion();
+  const chestOf = (c: SpawnedCharacter): Vector3 => c.root.position.add(new Vector3(0, 1.32, 0));
+  const feedFor = (bio: CombatPostureInput, foeC: () => SpawnedCharacter, motion: BodyMotion, exertion: number) => {
+    const { window, pose, legs } = combatPose(bio);
+    const at = chestOf(foeC());
+    return { pose: dynamicPose(pose, motion.signals(bio.speed01, exertion, false), window, COMBAT_DYNAMIC), legs, aim: at, eyes: at, window };
+  };
   let chakra: ResourceMeter, foeChakra: ResourceMeter;
   let mbus = new MomentumBus();
   let wallMesh: AbstractMesh | null = null;
@@ -332,6 +349,16 @@ export const ShowdownMode: ModeDefinition = (() => {
       meMove = new CombatMovement(); foeMove = new CombatMovement();
       meDef = new DefenseController(); foeDef = new DefenseController();
       meAnim = new CombatAnimTree(player.animator); foeAnim = new CombatAnimTree(rival.animator);
+      // CHI is the exertion signal here rather than guard: in this mode the meter you spend IS the effort,
+      // and a fighter who has emptied it should carry himself like someone who just spent it.
+      mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => feedFor(meBio, () => rival, meMotion, 1 - chakra.value / CHI_MAX), 'SHOW-PP');
+      foePosture = mountPostureLayer(ctx.scene, rival.skeleton, rival.root, () => feedFor(foeBio, () => player, foeMotion, 0.5), 'SHOW-PP-FOE');
+      if (process.env.NODE_ENV === 'development') {
+        // the same dev seam karate_vs carries: without it, "the posture layer is mounted" is a claim about
+        // source rather than about a running game, and this pass has spent all day on that distinction.
+        const dev = (window as unknown as { __FEL_DEV__?: { combatPosture?: unknown } }).__FEL_DEV__;
+        if (dev) dev.combatPosture = { me: () => mePosture?.layer.get() ?? null, foe: () => foePosture?.layer.get() ?? null, bio: () => ({ me: { ...meBio }, foe: { ...foeBio } }) };
+      }
       chakra = new ResourceMeter(CHAKRA); foeChakra = new ResourceMeter(CHAKRA);
       myRounds = 0; foeRounds = 0; assistTimer = 0; mbus.reset(); matchLatch = false; heavyAt = 0;
 
@@ -510,6 +537,23 @@ export const ShowdownMode: ModeDefinition = (() => {
         hitBy: foeHitBy, down: foeState.staggerSec > 0.8, out: foeState.hp <= 0, ulting: false,
       });
 
+      // the posture bios, each resolved in that fighter's OWN frame
+      const meYaw = player.root.rotation.y, foeYaw = rival.root.rotation.y;
+      meMotion.update(meMove.vel.x, meMove.vel.z, meYaw, dt);
+      foeMotion.update(foeMove.vel.x, foeMove.vel.z, foeYaw, dt);
+      const feedBio = (bio: CombatPostureInput, mv: typeof meMove, st: typeof meState, df: typeof meDef, striking: CombatPostureInput['striking'], hb: typeof meHitBy, yaw: number, foeC: SpawnedCharacter, selfC: SpawnedCharacter) => {
+        const toFoe = foeC.root.position.subtract(selfC.root.position); toFoe.y = 0;
+        const closing = toFoe.lengthSquared() > 1e-6 ? Vector3.Dot(mv.vel, toFoe.normalize()) : 0;
+        bio.speed01 = Math.min(1, Math.hypot(mv.vel.x, mv.vel.z) / 6.4);
+        bio.strafe = strafeAxis(mv.vel, yaw); bio.approach = combatApproach(closing);
+        bio.striking = striking; bio.windingUp = false;
+        bio.blocking = df.blocking; bio.parrying = false; bio.guardImpact = false;
+        bio.hitBy = hb; bio.down = st.staggerSec > 0.8; bio.out = st.hp <= 0;
+        bio.rising = false; bio.dodging = false; bio.celebrating = false; bio.engaged = phase === 'fighting';
+      };
+      feedBio(meBio, meMove, meState, meDef, meStrike.current ? WEIGHT_BY_MOVE[meStrike.current.move.atk.id] ?? 'light' : null, meHitBy, meYaw, rival, player);
+      feedBio(foeBio, foeMove, foeState, foeDef, foeStrike.current ? WEIGHT_BY_MOVE[foeStrike.current.move.atk.id] ?? 'light' : null, foeHitBy, foeYaw, player, rival);
+
       ctx.setHud({
         chi: Math.round(chakra.value), hp: meState.hp, foeHp: foeState.hp,
         wins: myRounds, foeWins: foeRounds, momentum: Math.round(mbus.score01 * 100),
@@ -523,6 +567,7 @@ export const ShowdownMode: ModeDefinition = (() => {
 
       modeVenue?.dispose?.(); modeVenue = null;
       support?.dispose(); wallMesh?.dispose();
+      mePosture?.dispose(); foePosture?.dispose(); mePosture = null; foePosture = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
     },
   };
