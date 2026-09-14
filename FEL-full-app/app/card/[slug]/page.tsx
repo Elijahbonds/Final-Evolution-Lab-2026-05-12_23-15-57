@@ -7,6 +7,8 @@ import { publicStatsFor } from '@/lib/creator/card-stats-server';
 import type { Highlight } from '@/lib/creator/card-stats';
 import { CreatorCard } from '@/components/creator/creator-card';
 import { CardShare } from '@/components/creator/card-share';
+import { CardProgressionPanel } from '@/components/creator/card-progression';
+import { progressionFor } from '@/lib/creator/cardProgression-server';
 import { Sparkles } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -33,6 +35,9 @@ export default async function CardPage({ params }: { params: { slug: string } })
   // lane 5: the scouting blocks, masked by the owner
   const { stats, visibility } = await publicStatsFor(card.ownerId, card.showStats);
   const highlights = visibility.highlights ? ((card.highlights ?? []) as unknown as Highlight[]) : [];
+  // build-order item 8: the progression read surface. Null for a minor, and null when there is nothing
+  // measured, earned or cleared — an empty "Progression" heading is worse than no heading.
+  const progression = await progressionFor(prisma, card.ownerId);
 
   return (
     <div className="min-h-screen bg-[#050505]">
@@ -54,6 +59,8 @@ export default async function CardPage({ params }: { params: { slug: string } })
             highlights={highlights}
           />
         </div>
+
+        {progression && <CardProgressionPanel progression={progression} accent={card.accent} />}
 
         {/* the share surface: bio link + QR (stickers/flyers) */}
         <CardShare slug={card.slug} accent={card.accent} />
