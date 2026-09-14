@@ -77,6 +77,19 @@ export interface PerfSample {
 
 const WINDOW = 120;        // ~2s at 60fps
 
+// A LONG FRAME IS A HITCH, NOT A FRAME THAT MISSED BY A MICROSECOND (2026-09-14).
+//
+// `longFrames` counted every frame over `budget.frameMs`, and that budget is 16.7 ms — the vsync target
+// itself. A mode holding a locked 60 fps averages 16.7 ms by definition, so jitter puts roughly HALF its
+// frames a hair over the line and the readout says "53/120 long". It did, on the dunk contest, and I wrote
+// it up in a review as "44% of frames are late" before checking what the number meant. It is not judder;
+// it is a threshold sitting exactly on the target.
+//
+// This file's own header says it best: "A budget line that cannot fire where it matters is worse than no
+// budget line: it trains you to ignore it." A frame is LONG when a player would feel it — a missed vsync
+// interval, not a rounding error — so the count gets headroom the budget does not.
+export const LONG_FRAME_HEADROOM = 1.35;   // 16.7 ms budget → ~22.5 ms, i.e. an actually-dropped frame
+
 export class PerfMonitor {
   private times: number[] = [];
   private last = performance.now();
@@ -171,7 +184,7 @@ export class PerfMonitor {
     const sum = this.times.reduce((a, b) => a + b, 0);
     const avgMs = sum / this.times.length;
     const worstMs = Math.max(...this.times);
-    const longFrames = this.times.filter((t) => t > this.budget.frameMs).length;
+    const longFrames = this.times.filter((t) => t > this.budget.frameMs * LONG_FRAME_HEADROOM).length;
     // Babylon keeps the real per-frame draw-call counter on the engine as `_drawCalls` (what SceneInstrumentation reads);
     // `engine.drawCalls` does not exist, so this always fell back to the ACTIVE MESH count — the slalom's 60 instanced pines
     // read as 60 "draws" when they are one (measured 2026-09-06). Active meshes stay their own field.

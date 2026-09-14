@@ -915,8 +915,20 @@ export const DunkMode: ModeDefinition = (() => {
         // lost & found played their whole shape under the follow camera from behind and the cut arrived for the flush only
         if (!rimCamCut && (clipTime >= EASTBAY_TIMING.extend * 0.55 || airTrick)) {
           rimCamCut = true; console.info(`[DUNK-CAM] rim cut @${clipTime.toFixed(2)}`);
-          const baseline = new Vector3(rim.x + 2.6, 0.4, rim.z - 1.2);
-          ctx.camDirector.snapTo(baseline, player.root.position.add(new Vector3(0, 1.4, 0)));
+          // REVIEW F2 (2026-09-14): THE CUT HELD A POINT AND LET THE DUNKER LEAVE THE FRAME.
+          //
+          // `snapTo(baseline, playerPos)` reads its FIRST argument as the subject, so this framed a fixed
+          // spot 2.6 m off the rim and treated the dunker as an angle hint — and then the camera was held
+          // for the rest of the flight ("no per-frame follow"), while he travelled another 1.4 m and rose.
+          // The review's own screenshot is the result: at the flush, the backboard is half out of the left
+          // edge and the dunker is away to the right. The money shot of a dunk contest showed a man jumping
+          // NEAR a hoop.
+          //
+          // A broadcast rim-cam holds its POSITION and pans. `setFixed` is exactly that: the camera sits
+          // still and `update()` aims at the subject lerped toward the objective, so the dunker AND the rim
+          // stay in shot for the whole flight. Placed low and to the baseline side, which is where the
+          // under-basket camera actually lives.
+          ctx.camDirector.setFixed(new Vector3(rim.x + 2.9, 1.15, rim.z + 1.9), 1.5, true);
         }
 
         // alley-oop: teammate releases the toss partway through the rise;
@@ -1122,7 +1134,9 @@ export const DunkMode: ModeDefinition = (() => {
       if (phase === 'rivalTurn') {
         ctx.camDirector.update(rival.root.position, Vector3.Zero(), rim);
       } else if (phase === 'cinematic' && rimCamCut) {
-        // hold the rim-cam angle through the flush — no per-frame follow
+        // The position is fixed; the AIM tracks. This is the half that was missing — the camera used to
+        // hold both and the subject walked out of frame. See the cut above.
+        ctx.camDirector.update(player.root.position, Vector3.Zero(), rim);
       } else if (phase === 'judging') {
         // THE VERDICT. The camera used to be left entirely undriven here, so it
         // froze on whatever angle the replay cam happened to end on — for the
@@ -1344,6 +1358,8 @@ export const DunkMode: ModeDefinition = (() => {
     launchZ = player.root.position.z; airTrick = null; obstacleOver = false; obstacleCleared = false; obstacleMargin = Infinity;
     activeHandOff = null; ikSideK = 0;
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false;
+    // the broadcast cut is per-attempt: hand the follow camera back or the next runway is shot from the rim
+    ctx.camDirector.mode = 'follow';
     rimCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
     slamBufferAt = -1; slamSeen = false; slamCueOn = false;   // DUNK-BODY-MID: the slam buffer is per attempt
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it

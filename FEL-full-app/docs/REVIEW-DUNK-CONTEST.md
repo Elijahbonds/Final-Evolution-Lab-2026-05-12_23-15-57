@@ -77,10 +77,20 @@ edge with the dunker off to the right — so the money shot shows a man jumping 
 one. The flight itself is fine (the hero tracks dead down the x=0 line the whole way, measured); it's the
 framing that sells a miss.
 
-### 3. It judders
+### 3. ~~It judders~~ — WITHDRAWN, and the counter was the problem
 
-58 fps average sounds fine. The frame log says **53 of 120 frames were over budget**, worst 66.8 ms. That's
-44% of frames late, and you feel it in the hang — the one part of the flight the whole mode is built around.
+I wrote that 53 of 120 frames were over budget and called it judder. Then I checked what the number meant:
+the budget is `frameMs: 16.7` — **the vsync target itself** — and the mode averages exactly 16.7 at a
+locked 60 fps. A mode holding 60 puts about half its frames a hair over a line drawn at 60. It was jitter
+crossing a threshold set in the wrong place, not dropped frames.
+
+The real reading: **60 fps, average 16.7 ms, worst 19.5 ms** in steady play, with an occasional single-frame
+hitch. That is fine.
+
+What was genuinely broken is the instrument, and it is fixed: a frame now counts as LONG only past 1.35×
+the budget (~22.5 ms — an actually-missed interval). `PerfMonitor`'s own header warned about exactly this —
+*"a budget line that cannot fire where it matters is worse than no budget line: it trains you to ignore
+it"* — and I still took the reading at face value and put it in a review.
 
 ### 4. Small stuff
 
@@ -95,8 +105,8 @@ framing that sells a miss.
 three-way split on the judges' card (difficulty / execution / style). The data already exists and is
 already computed; it goes to `console.info` instead of the screen. Highest value, smallest change.
 
-**F2 — Fix the rim cut's framing** so the rim and the dunker are both in shot.
+**F2 — Fix the rim cut's framing** so the rim and the dunker are both in shot. **DONE** — the cut held a fixed POINT and let the dunker leave frame; it now holds a broadcast position and pans. Measured: 30 of 30 flight frames keep both the dunker and the rim inside 28° of the camera axis, worst 15°.
 
-**F3 — Chase the long frames.** 44% over budget is the "smoothness" problem in one number.
+**F3 — ~~Chase the long frames~~.** Withdrawn: the mode holds 60 fps and the counter was miscalibrated. Fixed in `PerfMonitor` instead.
 
 **F4 — Cut the approach hint down** to the two things that matter on your first run.
