@@ -16,6 +16,10 @@
 //     enough it pays +1 style ("HANG TIME!") before the judges reveal.
 // All additions are animation-independent on purpose (E25/M51-safe).
 
+import {
+  freshStakes, call as callTrick, spendAttempt, attemptsLeft, canRetry,
+  stakesScale, callLanded, stakesLabel, type Stakes,
+} from '../core/DunkStakes';
 import { readWalkOut, saveWalkOut, countPlay, musicCredential, type WalkOut } from '../music/WalkOut';
 import { resolveWalkOut, walkOutLine, type WalkOutCue } from '../music/WalkOutCue';
 import { StudioLibrary } from '../music/StudioLibrary';
@@ -59,7 +63,7 @@ import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, DOUBLE_UP_WINDOW_M, DOUBLE_UP_MIN_SPEED, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind } from '../core/DunkObstacles';
-import { runwayTrickById } from '../core/DunkSystem';
+import { runwayTrickById, DUNK_TRICKS } from '../core/DunkSystem';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
@@ -381,6 +385,10 @@ export const DunkMode: ModeDefinition = (() => {
     if (!walkAudio) return;
     try { walkAudio.pause(); walkAudio.currentTime = 0; } catch { /* already gone */ }
   }
+  // WHAT THIS DUNK COST YOU TO GET. Three attempts, a growing penalty, and an optional called shot
+  // (owner decisions, 2026-09-14). The rules live in core/DunkStakes.ts, including the invariant that
+  // calling must never be strictly better than not calling; this end only holds the ledger and the input.
+  let stakes: Stakes = freshStakes();
   let trickLabels: string[] = [];                // this attempt's thrown tricks
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
@@ -565,15 +573,17 @@ export const DunkMode: ModeDefinition = (() => {
       style = 'power'; prop = 'none'; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
+      stakes = freshStakes();
       resetLob(); resetRunway(); win = 'run';
       setPhase('approach');
       startWalkOut();
       ctx.setHud({
         round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`, nightCard: null, nightNum: night,
         score: playerTotal, rivalScore: rivalTotal, style: STYLE_LABEL[style], prop: PROP_LABEL[prop], hype: 0, chain: 0,
-        hint: 'Pick your PROP (X / d-pad) · STYLE to cycle · LOOK stick orbits the camera · RUN-UP SPEED buys your air · HOLD to run — then tap jump',
+        hint: 'Pick your PROP (X / d-pad) · STYLE to cycle · L1 CALLS your dunk · RUN-UP SPEED buys your air · HOLD to run — then tap jump',
         // one line, phrased by the module: a mode must not invent its own wording for somebody's track
         walkOutNow: walkOutLine(walkCue),
+        attempt: stakesLabel(stakes, calledLabel()),
       });
     },
 
@@ -600,6 +610,25 @@ export const DunkMode: ModeDefinition = (() => {
         style = STYLES[(STYLES.indexOf(style) + 1) % STYLES.length];
         ctx.setHud({ style: STYLE_LABEL[style] });
         SoundKit.play('uiTick');
+      }
+      // CALL YOUR DUNK (owner decision: optional, with a bonus). Land what you called and the panel pays
+      // more; fail it and it costs more than never calling.
+      //
+      // L1, NOT A FACE BUTTON. All four faces are spoken for on the runway — A jumps, B cycles the style,
+      // X picks the prop, and Y is the SELF-LOB runway trick (line ~655, `phase === 'approach' && btn ===
+      // 'Y'`). Putting the call on Y would have fired both the call and the lob off one press. L1 is read
+      // nowhere in this mode.
+      //
+      // The cycle passes through NOT CALLED on its way round, so backing out is one more press rather than
+      // a trap: a player who scrolls past the one they wanted can reach "no call" again without taking a
+      // run they did not want to take.
+      if (e.t === 'button' && e.btn === 'L1' && e.pressed && phase === 'approach') {
+        const i = stakes.called ? DUNK_TRICKS.findIndex((t) => t.id === stakes.called) : -1;
+        const next = i + 1 >= DUNK_TRICKS.length ? null : DUNK_TRICKS[i + 1].id;
+        stakes = callTrick(stakes, next);
+        ctx.setHud({ attempt: stakesLabel(stakes, calledLabel()) });
+        flash(ctx, stakes.called ? `CALLING ${calledLabel()}` : 'NO CALL', 700);
+        SoundKit.play('uiTick', { pitch: stakes.called ? 1.3 : 0.9 });
       }
       // d-pad cycles PROP during approach (up=none, right=alley-oop,
       // down=obstacle); the SAME d-pad, held during the mid-air cinematic
@@ -2042,7 +2071,22 @@ export const DunkMode: ModeDefinition = (() => {
         0,                                                            // and they saw it fail
         Math.max(0, STYLE_TIER[style] * 0.22 + styleTaps * 0.4),
       );
-      const missTotal = missScores.reduce((a, j) => a + j.score, 0);
+      // A RETRY IS NOT SCORED. In a real contest only the attempt you finish on is judged, which is what
+      // makes burning one cost something without costing everything. The miss is judged only when there is
+      // nothing left to try.
+      stakes = spendAttempt(stakes);
+      if (canRetry(stakes, false)) {
+        SoundKit.play('crowdGroan', { volume: 0.35 });
+        flash(ctx, `${missWhy()} — MISSED · ${attemptsLeft(stakes)} LEFT`);
+        ctx.setHud({ judgeReveal: null, hint: '', attempt: stakesLabel(stakes, calledLabel()) });
+        landingClip = SPORT_CLIP.dunkLandCrouch; landNow();
+        setPhase('judging');
+        setTimeout(() => { clearBanner(ctx); void retryThisDunk(ctx); }, MISS_BEAT_MS);
+        finishing = false;
+        return;
+      }
+      const missTotal = Math.round(missScores.reduce((a, j) => a + j.score, 0)
+        * stakesScale(stakes, flight.attempt.tricks.map((t) => t.id), false));
       playerTotal += missTotal; misses++;
       card = addAttempt(card, {
         round, style: STYLE_LABEL[style], prop: PROP_LABEL[prop],
@@ -2101,7 +2145,16 @@ export const DunkMode: ModeDefinition = (() => {
     // judges. `CROWD_SWAY` is sized to move the marginal card and nothing else.
     const scores = judgeDunk(difficulty, execution, styleScore, momentum.score01);
     lastScores = scores;
-    const dunkTotal = scores.reduce((s, j) => s + j.score, 0);   // MIN_TOTAL..PERFECT_TOTAL (30..50)
+    // THE STAKES SCALE THE PANEL, they do not replace it: the judges still judge the dunk, and then what
+    // it cost to get there is applied on top. A called trick that fired pays a bonus; one that did not
+    // costs more than never calling. See core/DunkStakes.ts for why the penalty is bigger than the bonus.
+    stakes = spendAttempt(stakes);
+    const landedIds = flight.attempt.tricks.map((t) => t.id);
+    const scale = stakesScale(stakes, landedIds, true);
+    const dunkTotal = Math.round(scores.reduce((s, j) => s + j.score, 0) * scale);   // MIN_TOTAL..PERFECT_TOTAL (30..50)
+    if (stakes.called) {
+      flash(ctx, callLanded(stakes, landedIds, true) ? `CALLED IT — ${calledLabel()}!` : `CALLED ${calledLabel()} — DIDN'T SHOW IT`, 1100);
+    }
 
     // CHAIN: consecutive approval-band dunks build the multiplier; each link
     // pumps extra hype (which feeds the NEXT dunk's style score — real teeth)
@@ -2175,9 +2228,30 @@ export const DunkMode: ModeDefinition = (() => {
     finishing = false;
   }
 
+  /** The label of the trick the player called, or '' — one place, so the banner and the bezel agree. */
+  function calledLabel(): string {
+    return stakes.called ? (DUNK_TRICKS.find((t) => t.id === stakes.called)?.label ?? '') : '';
+  }
+
+  /**
+   * SAME DUNK, ONE FEWER TRY.
+   *
+   * Deliberately NOT advanceAfterJudging: `dunkInRound` does not move, the round does not move, and the
+   * stakes ledger survives — it is the thing counting down. Everything else about the runway resets
+   * exactly as it does between dunks, so a retry starts from the same standing position as a first
+   * attempt and the only difference is what it is worth.
+   */
+  function retryThisDunk(ctx: ModeContext): void {
+    if (phase !== 'judging') return;
+    clearBanner(ctx); ctx.setHud({ judgeReveal: null });
+    resetForNextAttempt(ctx);
+  }
+
   async function advanceAfterJudging(ctx: ModeContext): Promise<void> {
     if (phase !== 'judging') return;   // already advanced (watchdog vs normal path race)
     clearBanner(ctx); ctx.setHud({ judgeReveal: null });
+    // the dunk is over however it ended: fresh attempts, and the call cleared. A call belongs to one dunk.
+    stakes = freshStakes();
     dunkInRound++;
     if (dunkInRound < DUNKS_PER_ROUND) {
       resetForNextAttempt(ctx);
@@ -2210,6 +2284,7 @@ export const DunkMode: ModeDefinition = (() => {
     const need = isFinalRound ? Math.max(0, deficit + RIVAL_PACE) : 0;
     ctx.setHud({
       dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`,
+      attempt: stakesLabel(stakes, calledLabel()),
       need: need > 0 ? need : 0,
       hint: need > 0
         ? `FINAL ROUND — you need big numbers (${deficit > 0 ? `down ${deficit}` : `up ${-deficit}`})`
