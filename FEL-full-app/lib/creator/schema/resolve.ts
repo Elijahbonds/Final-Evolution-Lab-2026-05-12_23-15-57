@@ -25,9 +25,12 @@ import type { PrqAxisId, RatedRow, TraitRow } from './types';
 import { ATTRIBUTES } from './attributes';
 import { TRAITS } from './traits';
 import { ceilingFor } from './ceilings';
+import { HOT_ZONES, ZONE_STATES, ZONE_POINT_CAP, zonePointsSpent } from './hotZones';
 
 export interface CreatorBuild {
   attributes: Record<string, number>;
+  /** zone id → state name. Absent zones read as NEUTRAL. */
+  hotZones?: Record<string, string>;
   /** trait id → tier index (0-based). Absent = unequipped. */
   traits: Record<string, number>;
   tendencies?: Record<string, number>;
@@ -50,6 +53,8 @@ export interface Budgets {
   attributePointsCap: number;
   traitPointsSpent: number;
   traitPointsCap: number;
+  hotZonePointsSpent: number;
+  hotZonePointsCap: number;
 }
 
 export interface Resolution {
@@ -132,6 +137,19 @@ export function resolve(build: CreatorBuild): Resolution {
     }
   }
 
+  // HOT ZONES. Cold zones refund, so this can be negative — a build that admitted where it cannot score.
+  // Only going OVER is a violation; being under just means unspent room.
+  const hotZonePointsSpent = zonePointsSpent(build.hotZones ?? {});
+  if (hotZonePointsSpent > ZONE_POINT_CAP) {
+    issues.push({ kind: 'violation', rowId: '__budget', section: 'hotZones', message: `${hotZonePointsSpent} hot-zone points of ${ZONE_POINT_CAP}. Cool a zone down to afford another hot one.` });
+  }
+  for (const [id, state] of Object.entries(build.hotZones ?? {})) {
+    if (!HOT_ZONES.rows.some((r) => r.id === id)) { issues.push({ kind: 'warning', rowId: id, section: 'hotZones', message: `Unknown zone "${id}" — kept, not editable here.` }); continue; }
+    if (!(ZONE_STATES as readonly string[]).includes(state)) {
+      issues.push({ kind: 'violation', rowId: id, section: 'hotZones', message: `"${state}" is not a zone state.` });
+    }
+  }
+
   if (attributePointsSpent > ATTRIBUTE_POINT_CAP) {
     issues.push({ kind: 'violation', rowId: '__budget', section: 'attributes', message: `${attributePointsSpent} attribute points spent of ${ATTRIBUTE_POINT_CAP}.` });
   }
@@ -141,7 +159,11 @@ export function resolve(build: CreatorBuild): Resolution {
 
   return {
     issues,
-    budgets: { attributePointsSpent, attributePointsCap: ATTRIBUTE_POINT_CAP, traitPointsSpent, traitPointsCap: TRAIT_POINT_CAP },
+    budgets: {
+      attributePointsSpent, attributePointsCap: ATTRIBUTE_POINT_CAP,
+      traitPointsSpent, traitPointsCap: TRAIT_POINT_CAP,
+      hotZonePointsSpent, hotZonePointsCap: ZONE_POINT_CAP,
+    },
     valid: !issues.some((i) => i.kind === 'violation'),
   };
 }
@@ -156,7 +178,11 @@ export const TENDENCY_BACKED_BY: Record<string, string> = {
   shoot: 'shotIq', drive: 'drivingLayup', pullUp: 'midRange', spotUpThree: 'threePoint',
   offScreenThree: 'threePoint', stepback: 'midRange', deepRange: 'threePoint',
   standingDunk: 'standingDunk', drivingDunk: 'drivingDunk', flashyDunk: 'drivingDunk',
-  alleyOop: 'drivingDunk', postUp: 'postControl', postHook: 'postHook', postFade: 'postFade',
+  alleyOop: 'drivingDunk', postUp: 'postControl',
+  // BILATERAL, and the map has to say so: the tendency rows are per-shoulder (postHookL/R), so a single
+  // `postHook` key mapped to nothing and the warning it was supposed to raise could never fire. Caught by
+  // the test that asserts every mapped tendency is a row that exists.
+  postHookL: 'postHook', postHookR: 'postHook', postFadeL: 'postFade', postFadeR: 'postFade',
   pass: 'passAccuracy', flashyPass: 'passAccuracy', throwAhead: 'passAccuracy',
   onBallSteal: 'steal', blockShot: 'block', contestShot: 'perimeterD', takeCharge: 'interiorD',
   crashGlass: 'offRebound', playPassingLanes: 'passPerception',
