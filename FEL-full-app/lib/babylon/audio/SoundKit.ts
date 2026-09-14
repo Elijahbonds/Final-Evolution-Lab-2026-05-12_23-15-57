@@ -7,7 +7,19 @@
 // "procedural, zero external assets" philosophy VenueKit used for visuals.
 // One singleton, lazily created on first user gesture (autoplay policy safe).
 
-type SfxName = 'whoosh' | 'impact' | 'score' | 'miss' | 'whistle' | 'uiTick' | 'crowdCheer' | 'crowdGroan' | 'powerUp';
+// THE IMPACT VOCABULARY (2026-09-14). The kit shipped with nine cues and every physical contact in the
+// game — a body hitting the floor, a ball off the iron, a shoe stopping hard, a ball through the net —
+// played the SAME `impact` with a different pitch. Nine sounds cannot carry a sports game: a rim rattle and
+// a chest-to-chest collision are not the same event and should not be the same noise.
+//
+// Five added, all synthesised like the rest (no assets, nothing to license):
+//   thud    — a body or a heavy landing on the floor: low, short, no ring
+//   rattle  — the ball bouncing around the iron before it decides
+//   swish   — clean through the net: a soft filtered hiss, no impact at all
+//   clang   — a chain net, or metal taking a hit
+//   squeak  — rubber on a hard floor: the sound a hard cut actually makes
+type SfxName = 'whoosh' | 'impact' | 'score' | 'miss' | 'whistle' | 'uiTick' | 'crowdCheer' | 'crowdGroan' | 'powerUp'
+  | 'thud' | 'rattle' | 'swish' | 'clang' | 'squeak';
 
 class SoundKitImpl {
   private ctx: AudioContext | null = null;
@@ -69,6 +81,96 @@ class SoundKitImpl {
     const pitch = opts.pitch ?? 1;
 
     switch (name) {
+      // A BODY ON THE FLOOR. Low sine that drops fast, plus a short noise slap for the contact — no ring,
+      // because a floor does not ring. This is the landing/knockdown sound the modes were faking with a
+      // pitched-down `impact`.
+      case 'thud': {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(110 * pitch, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(38 * pitch, ctx.currentTime + 0.14);
+        const og = ctx.createGain();
+        this.env(og, ctx, 0.004, 0.16, 0.9 * vol);
+        osc.connect(og).connect(this.master);
+        osc.start(); osc.stop(ctx.currentTime + 0.2);
+
+        const slap = ctx.createBufferSource();
+        slap.buffer = this.noiseBuffer(ctx, 0.08, 'brown');
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 420;
+        const sg = ctx.createGain();
+        this.env(sg, ctx, 0.002, 0.07, 0.5 * vol);
+        slap.connect(lp).connect(sg).connect(this.master);
+        slap.start(); slap.stop(ctx.currentTime + 0.1);
+        break;
+      }
+
+      // THE IRON MAKING UP ITS MIND. Three quick metallic pings at falling amplitude — a rattle is a
+      // SEQUENCE, and one ping is what makes a miss read as a clank instead.
+      case 'rattle': {
+        for (let i = 0; i < 3; i++) {
+          const t0 = ctx.currentTime + i * 0.055;
+          const osc = ctx.createOscillator();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime((820 + i * 90) * pitch, t0);
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(0.30 * vol * (1 - i * 0.28), t0 + 0.004);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
+          osc.connect(g).connect(this.master);
+          osc.start(t0); osc.stop(t0 + 0.1);
+        }
+        break;
+      }
+
+      // CLEAN THROUGH. Deliberately NOT an impact: nylon on a ball is a short filtered hiss, and the whole
+      // point of a swish is that nothing hard was touched.
+      case 'swish': {
+        const src = ctx.createBufferSource();
+        src.buffer = this.noiseBuffer(ctx, 0.22);
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass'; bp.Q.value = 1.6;
+        bp.frequency.setValueAtTime(3200 * pitch, ctx.currentTime);
+        bp.frequency.exponentialRampToValueAtTime(1300 * pitch, ctx.currentTime + 0.18);
+        const g = ctx.createGain();
+        this.env(g, ctx, 0.012, 0.2, 0.22 * vol);
+        src.connect(bp).connect(g).connect(this.master);
+        src.start(); src.stop(ctx.currentTime + 0.24);
+        break;
+      }
+
+      // CHAIN NET / METAL. Two detuned partials that beat against each other — the beating IS the metal.
+      case 'clang': {
+        for (const [mul, amp] of [[1, 0.28], [1.48, 0.2], [2.31, 0.12]] as const) {
+          const osc = ctx.createOscillator();
+          osc.type = 'square';
+          osc.frequency.value = 640 * mul * pitch;
+          const g = ctx.createGain();
+          this.env(g, ctx, 0.003, 0.34, amp * vol);
+          const lp = ctx.createBiquadFilter();
+          lp.type = 'lowpass'; lp.frequency.value = 5200;
+          osc.connect(lp).connect(g).connect(this.master);
+          osc.start(); osc.stop(ctx.currentTime + 0.4);
+        }
+        break;
+      }
+
+      // RUBBER ON A HARD FLOOR. A fast upward chirp through a tight bandpass — a squeak is pitch MOVING,
+      // which is why a static tone reads as a beep and never as a shoe.
+      case 'squeak': {
+        const src = ctx.createBufferSource();
+        src.buffer = this.noiseBuffer(ctx, 0.14);
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass'; bp.Q.value = 12;
+        bp.frequency.setValueAtTime(1400 * pitch, ctx.currentTime);
+        bp.frequency.exponentialRampToValueAtTime(2600 * pitch, ctx.currentTime + 0.09);
+        const g = ctx.createGain();
+        this.env(g, ctx, 0.006, 0.1, 0.16 * vol);
+        src.connect(bp).connect(g).connect(this.master);
+        src.start(); src.stop(ctx.currentTime + 0.16);
+        break;
+      }
+
       case 'whoosh': {
         const src = ctx.createBufferSource();
         src.buffer = this.noiseBuffer(ctx, 0.28);

@@ -627,6 +627,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (res === 'made') { foeBrain?.boxOut(null); foeSealing = false; }
         if (res === 'made') {
           SoundKit.play('score', { pitch: 1 });
+          SoundKit.play('swish', { volume: 0.7 });   // through the net, which is not an impact at all
           EffectsKit.burst(ctx.scene, RIM, 'net');
           if (possession === 'mine') {
             myScore += arcPoints;
@@ -681,7 +682,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           ), 0.06);
           shotMiss = null;
           launchLoose(rim.contact, rim.outVel);
-          SoundKit.play('impact', { pitch: 0.85, volume: 0.32 });   // it hit iron; it should sound like it
+          SoundKit.play('rattle', { volume: 0.34 });   // it hit IRON — a rattle, not a generic thump
           hoopJuice?.punch();
           if (possession === 'mine') bannerFlash(ctx, rim.label, 850);
           console.info(`[1V1-RIM] ${rim.kind} — ${rim.label}`);
@@ -1457,6 +1458,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (posterized && !foeFloored) {   // M2: a contested poster put him down AT THE BUMP; an uncontested one drops him here
           foeStunSec = 1.4; foeFloored = true;
           foeAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
           EffectsKit.burst(ctx.scene, foe.root.position.add(new Vector3(0, 0.3, 0)), 'dust');
         }
         ctx.setHud({ score: myScore, momentum });
@@ -1788,6 +1790,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (floorHim) {
         foeStunSec = 1.4; foeFloored = true;
         foeAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
       } else if (!foeFloored) {
         foeStunSec = Math.max(foeStunSec, 0.35);
         foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
@@ -1806,6 +1809,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     foeFloored = true;
     foeStunSec = posterVictim.kind === 'body_bag' ? 2.1 : 1.5;
     foeAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
     if (contact?.isReady) contact.shove('foe', fall); else foe.root.position.addInPlace(fall.scale(0.16));
     EffectsKit.burst(ctx.scene, foe.root.position.add(new Vector3(0, 0.3, 0)), 'dust');
     SoundKit.play('crowdCheer', { volume: 0.7 });
@@ -2015,6 +2019,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       // the SAME knockdown + floor hold the poster dunk uses: one way a body goes down here, one way it
       // gets up. 'karate_floored' is not a registered clip — beating it would have left him clip-less.
       foeAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
       ctx.feel?.impact?.(0.55);
       ctx.juice.shake(0.09, 140);
       bannerFlash(ctx, 'ANKLES — HE IS DOWN!', 1100);
@@ -2294,7 +2299,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         bumped = true; freezeMs = 45; slowMs = BUMP_SLOW_SEC * 1000;
         ctx.juice.hitStop(45); ctx.juice.shake(0.08, 110); ctx.feel?.impact?.(0.3);
         SoundKit.play('impact', { pitch: 0.95, volume: 0.55 });
-        if (made && inLane) { meStunSec = 1.4; meFloored = true; meHandUp = false; meAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } }); }
+        if (made && inLane) { meStunSec = 1.4; meFloored = true; meHandUp = false; meAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } }); SoundKit.play('thud', { volume: 0.8 }); }
         else if (!meFloored && meStunSec === 0) { meStunSec = Math.max(meStunSec, 0.3); meAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); meHandUp = false; }
         if (contact?.isReady) contact.shove('me', bumpShove(c)); else me.root.position.addInPlace(bumpShove(c).scale(0.16));
         console.info(`[1V1-DEF] rival dunk bump strength ${c.strength01.toFixed(2)} floorMe ${made && inLane}`);

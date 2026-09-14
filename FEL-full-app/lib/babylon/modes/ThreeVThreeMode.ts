@@ -574,6 +574,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           // get the juice.
           const bigShot = arcPoints === 3;
           SoundKit.play('score', { pitch: arcQuality === 'perfect' ? 1.2 : 1 });
+          SoundKit.play('swish', { volume: arcQuality === 'perfect' ? 0.85 : 0.6 });
           EffectsKit.burst(ctx.scene, RIM, 'net');
           if (bigShot || arcQuality === 'perfect') {
             SoundKit.play('crowdCheer', { volume: bigShot ? 1 : 0.7 });
@@ -1603,6 +1604,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       if (floorHim) {
         wall.stunSec = 1.4; wall.floored = true;
         wall.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
       } else if (!wall.floored) {
         wall.stunSec = Math.max(wall.stunSec, 0.35);
         wall.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
@@ -1625,6 +1627,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     v.floored = true;
     v.stunSec = posterVictim.kind === 'body_bag' ? 2.1 : 1.5;
     v.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
     v.char.root.position.addInPlace(fall.scale(0.16));
     swing('posterize');
     ctx.setHud({ momentum });
@@ -1682,7 +1685,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     const toShooter = shooterPos.subtract(RIM); toShooter.y = 0;
     const r = resolveRim(RIM, toShooter, forcedMissProfile(q01, { short, lateral }), 0.06);
     ballSim.launch(r.contact, r.outVel);
-    SoundKit.play('impact', { pitch: 0.85, volume: 0.3 });
+    SoundKit.play('rattle', { volume: 0.32 });   // the iron, not a generic thump
     console.info(`[3V3-RIM] ${r.kind} — ${r.label}`);
   }
 
@@ -1889,6 +1892,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       foe.floored = true;
       foe.stunSec = ANKLE_BREAK_STUN_SEC * 1.8;
       foe.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
       ctx.feel?.impact?.(0.55);
       ctx.juice.shake(0.09, 140);
       ctx.setHud({ banner: 'ANKLES — HE IS DOWN!' });
@@ -1999,7 +2003,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           bumped = true; freezeMs = 45; slowMs = BUMP_SLOW_SEC * 1000;
           ctx.juice.hitStop(45); ctx.juice.shake(0.08, 110); ctx.feel?.impact?.(0.3);
           SoundKit.play('impact', { pitch: 0.95, volume: 0.55 });
-          if (made && inLane) { meStunSec = 1.4; meFloored = true; meHandUp = false; me.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } }); }
+          if (made && inLane) { meStunSec = 1.4; meFloored = true; meHandUp = false; me.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } }); SoundKit.play('thud', { volume: 0.8 }); }
           else if (!meFloored && meStunSec === 0) { meStunSec = 0.3; meHandUp = false; me.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); }
           me.char.root.position.addInPlace(bumpShove(c).scale(0.16));
           console.info(`[3V3-DEF] rival dunk bump strength ${c.strength01.toFixed(2)} floorMe ${made && inLane}`);
