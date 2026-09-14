@@ -32,7 +32,25 @@ The lighting and post are already good; they are falling on an empty world.
 This also corrects the visual-fidelity brief's step 2 ("build the render pipeline"): it exists, it is
 shared, it is tiered, and it should be left alone.
 
-## Aero floor — measured, built, and still not on screen (unresolved)
+## Aero floor — **RESOLVED 2026-09-13**. The sky was smaller than the ground.
+
+`Backdrops.mountBackdrop` builds `bk_dome` at a fixed `diameter: 560` — a 280 m radius, generous for the
+court-scale venues it was written for, far too small for a race course. It is `Mesh.BACKSIDE`, so the camera
+sits inside an **opaque shell**, and the camera's sightline met the floor at **318 m — outside it**. The
+floor rendered, was enabled, was in frustum, had a ready material, and picking hit it dead centre. It was
+behind the inside of the sky the whole time.
+
+Found by hiding the dome at runtime: ground and a horizon appeared in the same frame.
+
+Fix in `trackside.ts`: the one mode whose world is larger than the default sky scales its own dome to
+enclose the floor, with margin so the horizon is sky rather than the floor's cut edge. Measured after:
+sky radius 1500, floor half-span 1200, floor now picks at 207 m — inside the shell. Four regression tests
+hold the arithmetic.
+
+**The lesson worth keeping:** every check I ran asked "is this object OK?" and the answer was always yes.
+None of them asked "is something else in front of it?" — and that was the question.
+
+### The record of what was ruled out first (kept for the next occlusion bug)
 
 Recorded rather than hand-waved, because everything cheap has been ruled out and the next person should not
 repeat it. On `bay-circuit`, after adding the floor:

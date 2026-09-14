@@ -4,7 +4,7 @@
 // authored per course, so a course edited tomorrow is dressed correctly with nobody touching a venue.
 
 import { describe, it, expect } from 'vitest';
-import { pathSamples, courseBounds, furnitureFor, MARKER_SPACING, MAX_PER_SIDE, VERGE_OFFSET, AERO_FLOOR_MIN_SPAN } from './trackside';
+import { pathSamples, courseBounds, furnitureFor, MARKER_SPACING, MAX_PER_SIDE, VERGE_OFFSET, AERO_FLOOR_MIN_SPAN, DOME_MARGIN, BACKDROP_DOME_RADIUS} from './trackside';
 import { AERO_COURSES, KART_COURSES, TRACK_HALF_WIDTH, type Course } from '../core/RaceCourse';
 
 const ALL = [...AERO_COURSES, ...KART_COURSES];
@@ -110,5 +110,51 @@ describe('an aerial course gets a floor big enough to BE the ground', () => {
         expect(g.at.y, c.id).toBeGreaterThanOrEqual(b.minY);
       }
     }
+  });
+});
+
+// ── THE SKY MUST BE BIGGER THAN THE GROUND (2026-09-13) ──────────────────────────────────────────────────
+//
+// This is the bug that survived two passes and every check I could think of. `Backdrops.mountBackdrop`
+// builds `bk_dome` at a fixed 560 diameter — a 280 m radius, generous for the court-scale venues it was
+// written for and far too small for a race course. It is BACKSIDE-oriented, so the camera sits inside an
+// opaque shell, and the camera's sightline met the aero floor at 318 m: OUTSIDE it. The floor rendered,
+// was enabled, was in frustum, had a ready material, and picking hit it dead centre — and it was behind
+// the inside of the sky.
+//
+// Found by hiding the dome at runtime, at which point the ground and a horizon appeared immediately.
+// These tests hold the arithmetic so it cannot come back quietly when a course is made bigger.
+
+describe('the sky encloses the ground', () => {
+  const floorSpanFor = (c: Course) => Math.max(courseBounds(c).span * 4, AERO_FLOOR_MIN_SPAN);
+
+  it('every aero course ends up with a sky larger than its floor', () => {
+    for (const c of AERO_COURSES) {
+      const span = floorSpanFor(c);
+      const scale = Math.max(1, ((span / 2) * DOME_MARGIN) / BACKDROP_DOME_RADIUS);
+      const skyRadius = BACKDROP_DOME_RADIUS * scale;
+      expect(skyRadius, `${c.id}: sky ${skyRadius} vs ground half-span ${span / 2}`)
+        .toBeGreaterThan(span / 2);
+    }
+  });
+
+  it('and with MARGIN, so the horizon is sky rather than the floor’s cut edge', () => {
+    for (const c of AERO_COURSES) {
+      const span = floorSpanFor(c);
+      const scale = Math.max(1, ((span / 2) * DOME_MARGIN) / BACKDROP_DOME_RADIUS);
+      expect(BACKDROP_DOME_RADIUS * scale).toBeGreaterThanOrEqual((span / 2) * DOME_MARGIN);
+    }
+  });
+
+  it('the authored dome is NOT big enough on its own — which is the whole bug', () => {
+    for (const c of AERO_COURSES) {
+      expect(BACKDROP_DOME_RADIUS, c.id).toBeLessThan(floorSpanFor(c) / 2);
+    }
+  });
+
+  it('the sky is never SHRUNK — a venue smaller than the default keeps the default', () => {
+    const tiny = { ...AERO_COURSES[0], gates: AERO_COURSES[0].gates.slice(0, 2) } as Course;
+    const span = Math.max(courseBounds(tiny).span * 4, AERO_FLOOR_MIN_SPAN);
+    expect(Math.max(1, ((span / 2) * DOME_MARGIN) / BACKDROP_DOME_RADIUS)).toBeGreaterThanOrEqual(1);
   });
 });

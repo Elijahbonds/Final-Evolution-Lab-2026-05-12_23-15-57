@@ -59,6 +59,11 @@ export interface TracksideHandle {
 export const AERO_FLOOR_DROP = 26;
 /** Floor never smaller than this, whatever the course. One plane costs nothing; a visible horizon is the point. */
 export const AERO_FLOOR_MIN_SPAN = 2400;
+/** The backdrop sphere Backdrops.mountBackdrop builds, and its authored radius (diameter 560). */
+export const BACKDROP_DOME_NAME = 'bk_dome';
+export const BACKDROP_DOME_RADIUS = 280;
+/** How far past the ground the sky must reach, so the horizon is sky and not the floor's cut edge. */
+export const DOME_MARGIN = 1.25;
 
 /** The course's own extent — centre, lowest gate, and the largest planar span. */
 export function courseBounds(course: Course): { cx: number; cz: number; minY: number; span: number } {
@@ -206,6 +211,28 @@ export function buildTrackside(scene: Scene, course: Course): TracksideHandle {
     floor.material = fm;
     floor.isPickable = false;
     floor.parent = root;
+
+    // THE SKY HAS TO BE BIGGER THAN THE GROUND, and it was not.
+    //
+    // This is why the floor was invisible for two passes. `Backdrops.mountBackdrop` builds `bk_dome` at a
+    // fixed diameter of 560 — a 280 m radius, which is generous for the court-scale venues it was written
+    // for and far too small for a race course hundreds of metres across. It is BACKSIDE-oriented, so the
+    // camera sits inside an opaque shell; and the camera's sightline met the floor at 318 m, OUTSIDE that
+    // shell. So the floor rendered, passed every check (enabled, in frustum, material ready, picking hit
+    // it dead centre) and was hidden behind the inside of the sky.
+    //
+    // Measured by hiding the dome at runtime: the ground and a real horizon appeared immediately.
+    //
+    // The dome is built for everybody at a sane default, so the fix belongs here rather than there: the one
+    // mode whose world is bigger than the default sky enlarges its own. Uniform scale keeps a sphere a
+    // sphere, and the margin means the horizon is sky rather than the floor's own cut edge.
+    const dome = scene.getMeshByName(BACKDROP_DOME_NAME);
+    if (dome) {
+      const needed = (floorSpan / 2) * DOME_MARGIN;
+      const scale = Math.max(1, needed / BACKDROP_DOME_RADIUS);
+      dome.scaling.setAll(scale);
+      console.info(`[RACE-VENUE] sky scaled x${scale.toFixed(1)} to enclose a ${floorSpan.toFixed(0)} m world`);
+    }
   }
   const rough = pathSamples(course, MARKER_SPACING);
   const spacing = rough.length > MAX_PER_SIDE
