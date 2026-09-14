@@ -245,6 +245,17 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
 
       {/* Venice DualShock pad: on phones (< 640 px) the hint plate sits above the pad column (the diamond stacks over the
           LOOK stick, ≈ 264 px); the clamp is a media switch in pure CSS — this project's Tailwind emits no max-* variants. */}
+      {/* WHOSE TRACK IS PLAYING. The walk-out is audio first -- it plays whether or not this draws -- but a
+          player should be able to see that the thing they authored in the Music Room is the thing coming
+          out of the speakers. Phrased by walkOutLine so the wording lives in one place. */}
+      {typeof hud.walkOutNow === 'string' && hud.walkOutNow && phase === 'playing' && (
+        <div className="pointer-events-none absolute left-3 top-3">
+          <span className="fel-panel px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide text-[var(--fel-cyan)]/80">
+            {hud.walkOutNow}
+          </span>
+        </div>
+      )}
+
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
         <div className="pointer-events-none absolute inset-x-0 px-3 text-center" style={{ bottom: 'clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem)' }}>
           <span className="fel-panel px-3 py-1.5 font-mono text-[11px] text-white/80">{hud.hint}</span>
@@ -271,6 +282,14 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
               {hnum(hud.nightMakes)} dunked · {hnum(hud.nightMisses)} missed
               {hnum(hud.nightBest) > 1 ? ` · best run ${hnum(hud.nightBest)}` : ''}
             </p>
+            {/* THE PASSION PIPELINE CREDENTIAL. Engagement, stated as engagement -- the label is phrased by
+                musicCredential so no surface here can turn a play count into a rating or a gate. Absent
+                when the athlete has no walk-out, rather than shown as a zero. */}
+            {typeof hud.walkOut === 'string' && hud.walkOut ? (
+              <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-[var(--fel-cyan)]/70">
+                {hud.walkOut}
+              </p>
+            ) : null}
             <button
               onClick={tapGoAgain}
               disabled={!cardArmed}

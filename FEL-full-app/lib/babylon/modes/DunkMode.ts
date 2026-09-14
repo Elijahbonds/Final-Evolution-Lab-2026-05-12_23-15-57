@@ -16,6 +16,9 @@
 //     enough it pays +1 style ("HANG TIME!") before the judges reveal.
 // All additions are animation-independent on purpose (E25/M51-safe).
 
+import { readWalkOut, saveWalkOut, countPlay, musicCredential, type WalkOut } from '../music/WalkOut';
+import { resolveWalkOut, walkOutLine, type WalkOutCue } from '../music/WalkOutCue';
+import { StudioLibrary } from '../music/StudioLibrary';
 import { Color3, Color4, MeshBuilder, Vector3 } from '@babylonjs/core';
 import type { TransformNode } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
@@ -347,6 +350,37 @@ export const DunkMode: ModeDefinition = (() => {
   const crowd = new CrowdEnergy();               // Phase 7: building voice
   let revealed: JudgeScore[] = [];               // cards shown so far
   let momentum = new MomentumBus();            // Phase 6: shared Game-Breaker
+  // YOUR TRACK IS WHAT PLAYS WHEN YOU WALK OUT.
+  //
+  // The Music Room brief names this as the first of three bindings and says, in capitals, that the room is
+  // not the point without them. It was never built: before today DunkMode referenced WalkOut zero times and
+  // `musicCredential` was consumed by nothing but its own test. The producer shipped; the consumer did not.
+  //
+  // The audio is the library's own rendered mixdown -- synthesised by SynthKit, so there is nothing
+  // licensed here and nothing to ship. `resolveWalkOut` decides whether there is anything to play at all
+  // (the song can have been deleted after it was chosen); this end only owns the element.
+  let walkOut: WalkOut | null = null;
+  let walkCue: WalkOutCue | null = null;
+  let walkAudio: HTMLAudioElement | null = null;
+  let walkCounted = false;                       // one play per night, counted when audio actually starts
+  function startWalkOut(): void {
+    if (!walkCue || typeof Audio === 'undefined') return;
+    try {
+      if (!walkAudio) { walkAudio = new Audio(walkCue.src); walkAudio.loop = true; walkAudio.volume = 0.45; }
+      void walkAudio.play().then(() => {
+        // COUNTED WHERE IT HAPPENS, and only if it actually started. An autoplay block is not a play, and
+        // an engagement number that counts intentions is not an engagement number.
+        if (walkCounted || !walkOut) return;
+        walkCounted = true;
+        walkOut = countPlay(walkOut); saveWalkOut(walkOut);
+        StudioLibrary.countPlay(walkCue!.songId);
+      }).catch(() => { /* autoplay refused until a gesture — the contest is not worse for it */ });
+    } catch { /* no audio on this device */ }
+  }
+  function stopWalkOut(): void {
+    if (!walkAudio) return;
+    try { walkAudio.pause(); walkAudio.currentTime = 0; } catch { /* already gone */ }
+  }
   let trickLabels: string[] = [];                // this attempt's thrown tricks
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
@@ -452,6 +486,10 @@ export const DunkMode: ModeDefinition = (() => {
       // INAUDIBLE: the crowd swell and the tier sting are bound to the harness's bus, and there was
       // exactly one onTierChange subscriber in the game. Same reports, same weights, now heard.
       momentum = ctx.momentum;
+      // the walk-out is resolved ONCE at mount against the live library: a song deleted since it was
+      // chosen resolves to null, and the card must not print a title nobody can hear.
+      walkOut = readWalkOut(); walkCounted = false;
+      walkCue = resolveWalkOut(walkOut, walkOut ? StudioLibrary.get(walkOut.songId) : null);
       // M74: try Nexus venue first; fallback to VenueKit if no spec
       dunkVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true, location: ctx.location });
       if (!dunkVenue) { VenueKit.buildCourt(ctx.scene); applyOceanCourt(ctx.scene, 'venice'); }
@@ -529,10 +567,13 @@ export const DunkMode: ModeDefinition = (() => {
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
       resetLob(); resetRunway(); win = 'run';
       setPhase('approach');
+      startWalkOut();
       ctx.setHud({
         round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`, nightCard: null, nightNum: night,
         score: playerTotal, rivalScore: rivalTotal, style: STYLE_LABEL[style], prop: PROP_LABEL[prop], hype: 0, chain: 0,
         hint: 'Pick your PROP (X / d-pad) · STYLE to cycle · LOOK stick orbits the camera · RUN-UP SPEED buys your air · HOLD to run — then tap jump',
+        // one line, phrased by the module: a mode must not invent its own wording for somebody's track
+        walkOutNow: walkOutLine(walkCue),
       });
     },
 
@@ -1071,6 +1112,7 @@ export const DunkMode: ModeDefinition = (() => {
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
       handIkObs = null; ikScene = null; handIkT = 0;
       player?.dispose(); rival?.dispose(); replay?.dispose(); ball?.dispose();
+      stopWalkOut(); walkAudio = null; walkCue = null; walkOut = null;
       clearProps(); SoundKit.stopAmbient(); feet = { L: null, R: null };
       dunkVenue?.dispose(); dunkVenue = null;  // M74
     },
@@ -1278,6 +1320,8 @@ export const DunkMode: ModeDefinition = (() => {
     dribble?.update(0, 0, false); gatherLatched = false; finishRelease = -1;   // DUNK-POSTURE-LEGS: the dribble is parked (the ball back in the palm) before the takeoff takes it
     if (prop === 'alleyoop') { if (teammate) attachBallToHand(ball, teammate.skeleton, 'RightHand'); else releaseBall(ball); }   // the ball rides the passer's palm until the toss (it used to wait at his idle hand and teleport 0.87 m up on the throw)
     else if (!lob.live) attachBallToHand(ball, player.skeleton, 'RightHand');   // a lob already in the air stays there — the catch is the hand's job
+    // the track plays you OUT; it does not play under the dunk. The crowd owns the flight.
+    stopWalkOut();
     SoundKit.play('whoosh', { pitch: 0.85 });
     // Soft-OPEN #2 (2026-09-07, measured by fel-full-app-50 + this probe): the launch clip (dunk_mocap 1.3 s) ran out ~3 frames
     // BEFORE the resolve, so for 34–50 ms NO clip played on the athlete — a held pose (pose Δ 0.000) that the finish then
@@ -2323,6 +2367,8 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.setHud({
       nightCard: won ? 'WON' : 'OVER', nightNum: night,
       nightMakes: makes, nightMisses: misses, nightBest: bestChain,
+      // the Passion Pipeline credential -- engagement, stated as engagement, never a rating and never a gate
+      walkOut: walkCue ? musicCredential(walkOut, StudioLibrary.list().length).label : '',
       judgeReveal: null, hint: '', charge: 0, slamPulse: false, need: 0,
     });
   }
