@@ -1261,7 +1261,15 @@ export const DunkMode: ModeDefinition = (() => {
     // FREE APPROACH (owner decision 2026-09-03): where you came from and how
     // you left the floor are judged, as in the real contest. The angle is read
     // from where you actually are; one-foot needs a real run.
-    const approach = approachBonus(approachAngle(player.root.position.x, player.root.position.z, rim.x, rim.z), takeoffFor(runUpPeak));
+    // HOW FAR OUT HE LEFT THE FLOOR is the third thing judged now. It was judged nowhere before, so the
+    // free-throw-line dunk -- the most iconic moment the event has -- paid exactly what a standing dunk
+    // paid. XZ only: the rim is 3.05 m up and counting that would make every dunk read as "from range".
+    const takeoffRange = Math.hypot(player.root.position.x - rim.x, player.root.position.z - rim.z);
+    const approach = approachBonus(
+      approachAngle(player.root.position.x, player.root.position.z, rim.x, rim.z),
+      takeoffFor(runUpPeak),
+      takeoffRange,
+    );
     flight.launch(Math.min(1, charge * 0.5 + launchSpeed01 * 0.5), STYLE_TIER[style], approach.difficulty);
     armedAir = null; spin.reset(); liveTricks = []; liveSpin = { turns: 0, from: 0, until: 0 };
     if (heldDpad) flight.recognizer.feed({ t: 'dpad', dir: heldDpad, pressed: true });   // a direction held through the takeoff is still held
