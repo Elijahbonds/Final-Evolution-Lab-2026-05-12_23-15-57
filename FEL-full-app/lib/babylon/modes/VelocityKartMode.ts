@@ -12,6 +12,7 @@
 // The kart is primitives, like the aircraft and for the same reason: there is no kart in public/models/meshy,
 // and the no-placeholder rule here is about BODIES, not vehicles.
 
+import { Onlookers } from '../visual/Onlookers';
 import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, Texture, TransformNode, Vector3, Vector4 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
@@ -56,6 +57,7 @@ let seated: AnimationGroup | null = null;
 let steerWheel: Mesh | null = null;
 let venueRoot: TransformNode | null = null;
 let trackside: TracksideHandle | null = null;
+let crowd: Onlookers | null = null;
 let roadTex: DynamicTexture | null = null;
 // THE FIELD (2026-09-13). This mode shipped as a time trial: a clock does not overtake you on the last
 // corner, and Phase 0 recorded it as the one racing mode with no opponent of any kind. The rivals are
@@ -422,6 +424,15 @@ return {
     trackside?.dispose();
     trackside = buildTrackside(ctx.scene, course);
     console.info(`[RACE-VENUE] ${course.id}: ${trackside.count} trackside instances`);
+    // RACING WAS THE LAST FAMILY WITH NOBODY WATCHING. The board modes have had Onlookers since it landed;
+    // both racing modes had an empty circuit, which reads as a test track rather than an event. The spots
+    // come from the course's own geometry (start line + tightest corner) rather than being spread evenly —
+    // nobody stands at uniform intervals around a racetrack.
+    crowd?.dispose?.();
+    crowd = trackside.crowdSpots.length
+      ? new Onlookers(ctx.scene, trackside.crowdSpots, course.tint, course.start.at)
+      : null;
+    if (crowd) console.info(`[RACE-VENUE] ${crowd.count} trackside spectators`);
     road = buildRoad(ctx);
     marks = buildMarks(ctx);
     kart = buildKart(ctx);
@@ -489,6 +500,7 @@ return {
   },
 
   update(ctx: ModeContext, dt: number): void {
+    crowd?.update(dt);   // they idle and bob whether or not the race is running
     if (!state || !kart || S.done) return;
 
     prevPos.copyFrom(state.pos);
@@ -566,6 +578,7 @@ return {
   },
 
   dispose(): void {
+    crowd?.dispose?.(); crowd = null;
     kart?.dispose(); kart = null;
     for (const m of marks) m.dispose();
     for (const r of road) r.dispose();

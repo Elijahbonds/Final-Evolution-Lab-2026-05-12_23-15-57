@@ -52,7 +52,64 @@ export interface TracksideHandle {
   root: TransformNode;
   /** Instances actually placed, both sides. The audit and the tests read this. */
   count: number;
+  /** Spectator spots handed to Onlookers. The mode owns the crowd; this decides WHERE. */
+  crowdSpots: Vector3[];
   dispose(): void;
+}
+
+/**
+ * WHERE PEOPLE WATCH A RACE FROM (2026-09-13).
+ *
+ * Racing was the last family in the project with no spectators at all — the board modes have had them since
+ * `Onlookers` landed and both racing modes had nobody. An empty circuit is a test track.
+ *
+ * They are deliberately NOT spread evenly along the lap. Nobody stands at uniform intervals around a
+ * racetrack; they cluster where something happens — the start/finish line, and the corner where cars
+ * actually lose it. So the spots come from the course's own geometry: a knot at the line and a knot at the
+ * tightest corner, which `RaceCourse` already computes for the drift tuning.
+ *
+ * Aero courses get none. There is nowhere to stand.
+ */
+export function crowdSpotsFor(course: Course, pts: Vector3[]): Vector3[] {
+  if (course.kind === 'aero' || pts.length < 4) return [];
+  const out: Vector3[] = [];
+  const side = TRACK_HALF_WIDTH + VERGE_OFFSET + 2.6;      // behind the verge, not on it
+
+  /** A knot of people around one point on the path, on the outside of the bend. */
+  const knot = (i: number, n: number) => {
+    const across = acrossAt(pts, i, course.loop);
+    for (let k = 0; k < n; k++) {
+      const along = pts[(i + k - Math.floor(n / 2) + pts.length) % pts.length];
+      const jitter = ((k % 3) - 1) * 1.4;
+      out.push(along.add(across.scale(side + jitter)));
+    }
+  };
+
+  knot(0, 5);                                             // the line
+  // the tightest corner: the index RaceCourse's own radius walk finds, mapped onto the resampled path
+  const gateIdx = Math.max(0, tightestCornerIndex(course));
+  knot(Math.floor((gateIdx / Math.max(1, course.gates.length)) * pts.length), 4);
+  return out;
+}
+
+/** Which gate is the tightest corner. `tightestCorner` returns the radius; this returns where it is. */
+export function tightestCornerIndex(course: Course): number {
+  const gs = course.gates;
+  let best = 0, tightest = Infinity;
+  for (let i = 0; i < gs.length; i++) {
+    const prev = i === 0 ? course.start.at : gs[i - 1].at;
+    const next = gs[(i + 1) % gs.length].at;
+    if (!course.loop && i === gs.length - 1) break;
+    const inV = gs[i].at.subtract(prev); inV.y = 0;
+    const outV = next.subtract(gs[i].at); outV.y = 0;
+    const a = inV.length(), b = outV.length();
+    if (a < 1e-6 || b < 1e-6) continue;
+    const cos = Math.max(-1, Math.min(1, Vector3.Dot(inV, outV) / (a * b)));
+    const turn = Math.acos(cos);
+    const radius = turn > 1e-4 ? Math.min(a, b) / Math.max(1e-4, turn) : Infinity;
+    if (radius < tightest) { tightest = radius; best = i; }
+  }
+  return best;
 }
 
 /** How far below the lowest gate the aero floor sits. Far enough to fly under a ring, close enough to read. */
@@ -240,7 +297,7 @@ export function buildTrackside(scene: Scene, course: Course): TracksideHandle {
     : MARKER_SPACING;
   const pts = spacing === MARKER_SPACING ? rough : pathSamples(course, spacing);
 
-  if (!pts.length) return { root, count: 0, dispose: () => root.dispose() };
+  if (!pts.length) return { root, count: 0, crowdSpots: [], dispose: () => root.dispose() };
 
   const tint = Color3.FromHexString(course.tint);
   const kit = furnitureFor(course);
@@ -273,6 +330,7 @@ export function buildTrackside(scene: Scene, course: Course): TracksideHandle {
   return {
     root,
     count,
+    crowdSpots: crowdSpotsFor(course, pts),
     dispose() { src.dispose(); root.dispose(); },
   };
 }
