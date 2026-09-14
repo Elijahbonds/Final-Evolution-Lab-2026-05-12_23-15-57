@@ -10,6 +10,7 @@
 // Everything from M44 kept: pocket flow, cutbacks, grabs, the 140-unit
 // rider/wave lockstep wrap (E24's fix).
 
+import { stepSpeedFov } from '../core/SpeedFov';
 import { MomentumBus } from '../core/MomentumBus';
 import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -33,6 +34,9 @@ import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 const RUN_SEC = 90;
 /** How fast a cutback comes around. ~0.4s to complete the turn. */
 const CUTBACK_RATE = 6;
+/** The camera preset's resting fov, captured on the first frame after load and restored to by SpeedFov. */
+let baseFov: number | null = null;
+
 export const POCKET = { min: 2, max: 9 };
 export const MAX_FORWARD_SPEED = 9;
 /** How far past the bottom of the face the rider may drift before the rail holds them (m) — the wave catches up anyway. */
@@ -182,6 +186,8 @@ export const SurfBreakMode: ModeDefinition = (() => {
     get backdrop() { return readBoardVenue('surf').sky; },
 
     async load(ctx: ModeContext) {
+      // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
+      baseFov = null;
       const venue = readBoardVenue('surf');
       const built = buildSurfBreak(ctx.scene, POCKET, venue);
       ctx.setHud({ banner: `${venue.name} · ${venue.sub}` });
@@ -421,6 +427,11 @@ export const SurfBreakMode: ModeDefinition = (() => {
       const leadVel = vel.lengthSquared() > 0.01 ? vel.scale(1.6) : vel;
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(rig.char.root.position, leadVel, lip);
+      // SPEED YOU CANNOT SEE IS NOT SPEED. The lens widens toward top speed and eases back, normalised
+      // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
+      // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
+      baseFov ??= ctx.camera.fov;
+      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov, Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
     },
 
     dispose() { posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },

@@ -12,6 +12,7 @@
 // The kart is primitives, like the aircraft and for the same reason: there is no kart in public/models/meshy,
 // and the no-placeholder rule here is about BODIES, not vehicles.
 
+import { stepSpeedFov } from '../core/SpeedFov';
 import { Onlookers } from '../visual/Onlookers';
 import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, Texture, TransformNode, Vector3, Vector4 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -45,6 +46,9 @@ import { readKart } from '../racing/garage';
 
 /** A kart is small; a full-size body swamps it. */
 const DRIVER_SCALE = 0.92;
+
+/** The camera preset's resting fov, captured on the first frame after load and restored to by SpeedFov. */
+let baseFov: number | null = null;
 
 export function makeVelocityKartMode(): ModeDefinition {
 let kart: TransformNode | null = null;
@@ -408,6 +412,8 @@ return {
   camPreset: 'runner',
 
   async load(ctx: ModeContext): Promise<void> {
+    // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
+    baseFov = null;
     S.done = false; S.banner = ''; S.bannerT = 0; S.bestDrift = 0; S.offRoadSec = 0;
     S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false };
 
@@ -574,6 +580,11 @@ return {
 
     ctx.camDirector.look(S.lookX, S.lookY, dt);
     ctx.camDirector.update(kart.position, travelOf(state).scale(state.speed), null);
+    // SPEED YOU CANNOT SEE IS NOT SPEED. The lens widens toward top speed and eases back, normalised
+    // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
+    // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
+    baseFov ??= ctx.camera.fov;
+    ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov, state.speed, kartSpec.vMax, dt);
     pushHud(ctx);
   },
 

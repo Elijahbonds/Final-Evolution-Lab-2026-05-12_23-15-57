@@ -11,6 +11,7 @@
 // multiplier). Tricks come off vaults, wall-kicks and drops, not only flat ground.
 // STATE: per scene (a host that mounts twice must never share a controller or a course — the Carnival lesson).
 
+import { stepSpeedFov } from '../core/SpeedFov';
 import { Vector3, MeshBuilder, Color3, type PBRMaterial, PhysicsAggregate, PhysicsShapeType, PhysicsCharacterController, CharacterSupportedState, Ray, type Mesh, type Scene, type AbstractMesh } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
 import type { HudValue, ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -84,6 +85,9 @@ const live = new Set<St>();
 /** How far the StandardMaterial-era palette is pulled down to sit correctly as PBR albedo. */
 const PBR_ALBEDO_SCALE = 0.42;
 const MAT: Record<string, string> = { ground: '#8E8A84', vault: '#C9A15A', wall: '#B8735A', ledge: '#3FB8B0', roof: '#3FB8B0', bar: '#E0C060', start: '#3DDC97', finish: '#F4C542', checkpoint: '#4FD1E8', gap: '#000000' };
+
+/** The camera preset's resting fov, captured on the first frame after load. */
+let baseFov: number | null = null;
 
 export const FreeRunMode: ModeDefinition = (() => {
   const st = (ctx: ModeContext): St | undefined => states.get(ctx.scene);
@@ -301,6 +305,8 @@ export const FreeRunMode: ModeDefinition = (() => {
     modeId: 'freerun', mood: 'nightGame', camPreset: 'runner',
 
     async load(ctx: ModeContext) {
+      // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
+      baseFov = null;
       const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tier') : null;
       const S: St = {
         scene: ctx.scene, phase: 'pick', pickSec: 0, autoBegin: !!q,
@@ -495,8 +501,13 @@ export const FreeRunMode: ModeDefinition = (() => {
 
       feedTree(S);
 
-      // camera: leads the momentum and pulls back with speed (FOV widens)
-      const c = ctx.scene.activeCamera; if (c) c.fov = 0.8 + S.speed * 0.018;
+      // camera: leads the momentum and pulls back with speed (FOV widens).
+      // This was `c.fov = 0.8 + S.speed * 0.018` — the game's only real speed kick, and unclamped: nothing
+      // stopped a fast enough run from widening the lens into a fisheye, and the hard-coded 0.8 ignored
+      // whatever fov the camera preset was actually tuned at. Same effect, bounded, and eased on a time
+      // constant so it settles identically at 30 fps and 144.
+      const c = ctx.scene.activeCamera;
+      if (c) { baseFov ??= c.fov; c.fov = stepSpeedFov(c.fov, baseFov, S.speed, RUN_MAX, dt); }
       if (Math.floor(S.clock * 6) !== Math.floor((S.clock - dt) * 6)) hud(ctx, S);   // six HUD frames a second is plenty for numbers
     },
 

@@ -66,6 +66,10 @@ export class Rider {
     }
   }
 
+  /** Top speed this rider is capped at, m/s. Read-only: the SPEED FOV kick normalises against the mode's own
+   *  ceiling (a skater flat out and a kart flat out must get the same lens), and `cfg` is private. */
+  get topSpeed(): number { return this.cfg.maxSpeed; }
+
   /** steer: -1..1 · pump: 0..1 (R2) · dt seconds */
   update(dt: number, steer: number, pump: number): void {
     if (this.grinding) { this.updateGrind(dt); return; }

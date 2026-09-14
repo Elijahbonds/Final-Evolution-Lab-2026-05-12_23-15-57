@@ -14,6 +14,7 @@
 // no-placeholder rule this repo now enforces is about BODIES, not vehicles. A board is a box in boardCore and a
 // ramp is a box in rideWorlds for the same reason. If a plane asset lands later, only buildPlane changes.
 
+import { stepSpeedFov } from '../core/SpeedFov';
 import { Color3, MeshBuilder, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import type { Mesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -46,6 +47,9 @@ import { readPlane } from '../racing/garage';
 let FRAME: Airframe = AERO_TRAINER;
 /** The world's lid, floor and walls. clampFlight holds the aircraft inside them. */
 const CEILING = 520, FLOOR = 14, HALF_WORLD = 700;
+
+/** The camera preset's resting fov, captured on the first frame after load and restored to by SpeedFov. */
+let baseFov: number | null = null;
 
 export function makeAeroAcesMode(): ModeDefinition {
 let plane: TransformNode | null = null;
@@ -365,6 +369,8 @@ return {
   camPreset: 'descent',
 
   async load(ctx: ModeContext): Promise<void> {
+    // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
+    baseFov = null;
     S.done = false; S.crashes = 0; S.banner = ''; S.bannerT = 0;
     S.input = { pitch: 0, roll: 0, yaw: 0, throttle: 0.75, boost: false };
 
@@ -514,6 +520,11 @@ return {
     const vel = noseOf(flight).scale(flight.speed);
     ctx.camDirector.look(S.lookX, S.lookY, dt);
     ctx.camDirector.update(flight.pos, vel, null);
+    // SPEED YOU CANNOT SEE IS NOT SPEED. The lens widens toward top speed and eases back, normalised
+    // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
+    // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
+    baseFov ??= ctx.camera.fov;
+    ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov, flight.speed, FRAME.vMax, dt);
     pushHud(ctx);
   },
 

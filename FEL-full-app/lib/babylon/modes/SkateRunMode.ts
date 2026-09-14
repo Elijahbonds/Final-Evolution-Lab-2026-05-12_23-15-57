@@ -10,6 +10,7 @@
 // Everything else from M45 kept: pump/pop/flips, manual window via
 // boardCore, park ambient, coin audio.
 
+import { stepSpeedFov } from '../core/SpeedFov';
 import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -63,6 +64,9 @@ const BIG_BANK_PTS = 500;
 // are the SAME number by construction -- they were 33 and 35 (the ground's own
 // half-width), so the rider stopped two metres short of a fence that was not
 // there anyway.
+
+/** The camera preset's resting fov, captured on the first frame after load and restored to by SpeedFov. */
+let baseFov: number | null = null;
 
 export const SkateRunMode: ModeDefinition = (() => {
   let world: RideWorld, rig: BoardRig;
@@ -222,6 +226,8 @@ export const SkateRunMode: ModeDefinition = (() => {
     get backdrop() { return readBoardVenue('skate').sky; },
 
     async load(ctx: ModeContext) {
+      // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
+      baseFov = null;
       // the player's venue: a different palette, a different size, a different place
       const venue = readBoardVenue('skate');
       world = buildSkatepark(ctx.scene, venue);
@@ -815,6 +821,11 @@ export const SkateRunMode: ModeDefinition = (() => {
       // mobile playtest and never in any desktop capture.
       if (!snappedForPlay) { ctx.camDirector.snapTo(rig.char.root.position, aheadOfRider()); snappedForPlay = true; }
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, null);
+      // SPEED YOU CANNOT SEE IS NOT SPEED. The lens widens toward top speed and eases back, normalised
+      // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
+      // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
+      baseFov ??= ctx.camera.fov;
+      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov, Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
     },
 
     dispose() { posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },

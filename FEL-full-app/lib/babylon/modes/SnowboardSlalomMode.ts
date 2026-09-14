@@ -13,6 +13,7 @@
 //     (-100, hard speed cut). One appearance per run, watchdog-bounded.
 // Everything from M44 kept: gates, tricks, tuck, gate/miss audio language.
 
+import { stepSpeedFov } from '../core/SpeedFov';
 import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -44,6 +45,9 @@ const YETI_CATCH_PENALTY = 100;
 const ROCK_PENALTY = 50;
 const STUMBLE_IFRAME_SEC = 1.2;
 /** Tuck depth at which the rider commits and starts SPENDING the boost meter. */
+/** The camera preset's resting fov, captured on the first frame after load and restored to by SpeedFov. */
+let baseFov: number | null = null;
+
 export const BOOST_TUCK = 0.85;
 /** Boost burned per second while boosting. */
 export const BOOST_DRAIN = 30;
@@ -154,6 +158,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     get backdrop() { return readBoardVenue('snow').sky; },
 
     async load(ctx: ModeContext) {
+      // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
+      baseFov = null;
       const venue = readBoardVenue('snow');
       world = buildSlopeRun(ctx.scene, venue);
       ctx.setHud({ banner: `${venue.name} · ${venue.sub}` });
@@ -431,6 +437,11 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       }
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, gate ?? null);
+      // SPEED YOU CANNOT SEE IS NOT SPEED. The lens widens toward top speed and eases back, normalised
+      // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
+      // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
+      baseFov ??= ctx.camera.fov;
+      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov, Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
     },
 
     dispose() {

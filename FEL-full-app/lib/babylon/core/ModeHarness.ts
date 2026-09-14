@@ -17,6 +17,10 @@ import { JuiceKit } from '../premium/JuiceKit';
 import { RenderWatchdog } from './RenderWatchdog';
 import { GroundLock } from '../anim/importSanitizer';
 import { Shaker, InputBuffer, impact as feelImpact, timeScale } from './gameFeel';
+import {
+  kickImpactFrame, decayImpactFrame, impactGrade, IMPACT_FRAME_IDLE,
+  type ImpactFrameState, type Grade,
+} from './ImpactFrame';
 import { SoundKit } from '../audio/SoundKit';   // M43: unlock audio on first user gesture
 import { autoInk } from '../visual/AnimeInk';    // M59: anime ink outlines
 import { mountBackdrop, MOOD_TO_FAMILY } from '../visual/Backdrops'; // M61: painted backdrops
@@ -209,7 +213,26 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   const groundLock = new GroundLock(scene);
   const shaker = new Shaker(scene, camera);
   const buffer = new InputBuffer();
-  const feel: ModeFeel = { shaker, buffer, impact: (s: number) => feelImpact(shaker, s) };
+  // THE FRAME ANSWERS AN IMPACT TOO.
+  //
+  // `LightRig` mounts a real post pipeline for every mode and then nothing ever touches it again — audited
+  // 2026-09-14: `rig.pipeline` had no reader outside LightRig and `flashBeat()` had exactly one caller in
+  // the whole game. Meanwhile twenty-one modes already report their heaviest moments through
+  // `ctx.feel.impact`. Putting the response HERE means all twenty-one gain it without a line of per-mode
+  // code — the same argument gameFeel made when it added audio to `impact()`.
+  //
+  // The resting grade is captured once, from whatever mood the venue chose, so a night court and a bright
+  // gym each pulse around their OWN look instead of being graded to shared constants.
+  const restGrade: Grade = {
+    vignette: lights.pipeline.imageProcessing.vignetteWeight,
+    exposure: lights.pipeline.imageProcessing.exposure,
+  };
+  let frame: ImpactFrameState = IMPACT_FRAME_IDLE;
+  let framePainted = false;
+  const feel: ModeFeel = {
+    shaker, buffer,
+    impact: (s: number) => { feelImpact(shaker, s); frame = kickImpactFrame(frame, s); },
+  };
   const heroRef: MutableRef<TransformNode> = { current: null };
   const objectiveRef: MutableRef<Vector3> = { current: null };
 
@@ -377,6 +400,16 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     const dt = engine.getDeltaTime() / 1000;
     // M37 hit-stop: dt scales to 0 during an impact freeze, then eases back.
     if (phase === 'playing') def.update(ctx, dt * timeScale());
+    // The impact pulse runs on REAL dt and in every phase, so a mode that ends mid-pulse still hands the
+    // frame back at its resting grade instead of leaving the end card dimmed. `framePainted` means the
+    // restore is written exactly once rather than every frame for the rest of the session.
+    if (frame.level > 0 || framePainted) {
+      frame = decayImpactFrame(frame, dt);
+      const g = impactGrade(frame.level, restGrade);
+      lights.pipeline.imageProcessing.vignetteWeight = g.vignette;
+      lights.pipeline.imageProcessing.exposure = g.exposure;
+      framePainted = frame.level > 0;
+    }
     scene.render();
   });
   const onResize = () => { applyCanvasFit(engine, opts.canvas); };   // M95: re-cap on rotate/resize (applyCanvasFit calls engine.resize)
