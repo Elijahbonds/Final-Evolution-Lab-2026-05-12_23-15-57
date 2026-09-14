@@ -53,6 +53,8 @@
 // appear anywhere in this file, consistent with this project's standing
 // original-content-only rule (already enforced for NeuroArena/Who Scene It).
 
+import { prqMaxHp, prqSpeedMult } from '../core/PrqVitals';
+import { prqGrade } from '../../prq';
 import { mookMaxHp, damageMook, mookHp01, mookBarHex } from '../core/MookHealth';
 import { EvadeMoves } from '../core/EvadeMoves';
 import { HORDE_WINDOW_SEC } from '../core/DodgeRead';
@@ -160,6 +162,8 @@ const HP_REGEN_DELAY_SEC = 3.5, HP_REGEN_PER_SEC = 4;   // out of contact the po
 const ORBIT_SEC = 0.5;             // a capped-out agent circles this long before it presses again
 const AGENT_STRIKE_ARC_DEG = ENEMY_ATTACK.arcDeg + 20;  // the renderer's arc is a hair wider than the core's (the hit-check happens on a body that may have stepped)
 const AGENT_TURN_RATE = 9;         // rad/s — a wound-up agent tracks you
+/** The middle of each band, for re-deriving the grade's own speedMult from a band name. */
+const BAND_SCORE = { RECOVERING: 20, READY: 50, PRIMED: 70, ELITE: 90 } as const;
 const SEPARATION_M = 0.9;          // the pack fans out: no two agents inside this
 /** The floating health bar: width in metres and how far above the root it rides. */
 const BAR_W = 0.62, BAR_Y = 2.05;
@@ -230,7 +234,12 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   let enemies: Enemy[] = [];
   let wave = 0, kos = 0, totalKos = 0, chi = 0;
   // KARATE-NEO-COOP: the core's objects (NeoCombatCore) — the mode renders them
-  const vitals = new PlayerVitals();
+  // THE POOL IS THE ATHLETE'S NOW (2026-09-14). VITALS.maxHp was a flat 100 for everyone, and prqGrade has
+  // published a speedMult per band this whole time that nothing read. Rebuilt at load once the band is
+  // known; a guest has none and is treated as READY, never penalised -- see core/PrqVitals.
+  let vitals = new PlayerVitals();
+  /** Movement multiplier from the band, 1 for a guest. Multiplies the perk tree's own, never replaces it. */
+  let prqSpeed = 1;
   const slowmo = new SlowMoLatch();
   const combo = new ComboTracker();
   /** DYNAMIC POSTURE for the hero's footwork. A horde mode is ALL circling — you are always moving around bodies —
@@ -859,6 +868,10 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
     async load(ctx) {
       sceneRef = ctx.scene;
+      // THE POOL IS THE ATHLETE'S. The band arrives from the host through the harness; absent is a guest,
+      // and a guest is READY rather than penalised (core/PrqVitals).
+      vitals = new PlayerVitals(prqMaxHp(VITALS.maxHp, ctx.prqBand));
+      prqSpeed = prqSpeedMult(ctx.prqBand ? prqGrade(BAND_SCORE[ctx.prqBand]) : null);
       // THE SCHOOL, read HERE and not in the factory body — that runs when the mode registry is built, which
       // on Next is during SSR with no window and no URL, so every pick would resolve to the default. See
       // combat/loadout.ts hordeStyle() for why POWER becomes arc rather than damage in this mode.
@@ -1055,7 +1068,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // ran screen-LEFT once the camera had swung). Up = the camera's flat forward, right = screen right; no axis flipped.
       // The basis LATCHES while the stick is held (the over-shoulder camera swings behind every turn — a live basis
       // spun the fighter on the spot on a held stick-right: 0.26 m/s net, measured); a push runs straight.
-      const vel = ctx.camDirector.stickWorldLatched(stickX, stickY).scaleInPlace(3 * perks.speedMult);
+      const vel = ctx.camDirector.stickWorldLatched(stickX, stickY).scaleInPlace(3 * perks.speedMult * prqSpeed);
       // the posture tracker: resolved in the fighter's own frame, so circling a body reads as a bank and backing off
       // a swing reads as sitting back
       // the bars ride their bodies: built on first damage, moved every frame after
@@ -1064,7 +1077,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       player.root.position.y = meAir.height;   // the arc is EvadeMoves'; nothing here integrates gravity
       meMotion.update(vel.x, vel.z, player.root.rotation.y, dt);
       myMps = Math.hypot(vel.x, vel.z);
-      let mySpeed01 = Math.min(1, vel.length() / (3 * perks.speedMult));   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
+      let mySpeed01 = Math.min(1, vel.length() / (3 * perks.speedMult * prqSpeed));   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
       if (!striking && !blocking && !dodging && !myDown.downed && vel.lengthSquared() > 0.05) {   // the shop never freezes the feet: the ring is empty, the drops are yours to walk over
         const before = player.root.position.clone();
         player.root.position.addInPlace(vel.scale(dt));

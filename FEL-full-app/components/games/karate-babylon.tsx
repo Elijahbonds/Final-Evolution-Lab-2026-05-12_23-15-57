@@ -50,10 +50,25 @@ export default function KarateBabylon({ onEnd }: GameProps) {
     // StrictMode runs effect -> cleanup -> effect. Starting immediately lets the
     // PHANTOM mount build a Babylon engine its own cleanup cannot cancel, and two
     // engines fight over one WebGL context — 3v3 rendered an empty void this way.
+    // THE ATHLETE'S BAND, resolved before the mode starts (2026-09-14).
+    //
+    // /api/profile already returns { prq, grade }; nothing in the game read it. The fetch is fire-and-forget
+    // and the mode starts either way: a guest, an offline load or a failed request all resolve to no band,
+    // and core/PrqVitals treats that as READY rather than as a penalty. Nobody waits on a network call to
+    // start a fight, and nobody is handed a worse fighter for not having done a body scan.
+    let band: 'RECOVERING' | 'READY' | 'PRIMED' | 'ELITE' | null = null;
+    const bandReady = fetch('/api/profile')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { const k = j?.grade?.key; if (k === 'RECOVERING' || k === 'READY' || k === 'PRIMED' || k === 'ELITE') band = k; })
+      .catch(() => { /* guest, offline, or signed out — READY it is */ });
+
     const startTimer = setTimeout(() => {
+      if (disposed) return;
+      void bandReady.finally(() => {
       if (disposed) return;
       runMode(MODES.karate, {
       canvas,
+      prqBand: band,
       input: bus,
       onPhase: (p, cd) => {
         setPhase(p);
@@ -68,6 +83,7 @@ export default function KarateBabylon({ onEnd }: GameProps) {
         stop = s;
       })
         .catch((e) => console.error('[FEL-KARATE] boot failed', e));
+      });
     }, 0);
 
     return () => {

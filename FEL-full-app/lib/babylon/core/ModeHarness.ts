@@ -35,6 +35,8 @@ import { installAgentBridge, agentBridge } from './AgentBridge';  // M69: agent 
 import { AGENT_MODES } from './agentModes';
 import type { AgentControlSource } from './AgentControlSource';  // M69: per-mode intent play
 import { reportDiag, setDiagMode } from './diag';
+import type { PrqGrade } from '../../prq';
+type PrqBand = PrqGrade['key'];
 import { emit as emitCreator } from '@/lib/creator/CreatorRecord';   // the ONE canonical record
 
 /** M37 mutable slot a mode fills right after spawn (hero root / live objective). */
@@ -65,6 +67,13 @@ export interface ModeContext {
   scene: Scene;
   /** Court location pick (docs/SPEC-COURT-LOCATIONS.md), passed through to mountVenue by the basketball modes. */
   location?: string;
+  /**
+   * The player's PRQ band, when the host knows it.
+   *
+   * READ-ONLY and optional, and modes must treat absent as READY rather than as a penalty -- see
+   * core/PrqVitals. A guest who has never done a body scan must not be handed a worse fighter.
+   */
+  prqBand?: PrqBand | null;
   camera: TargetCamera;
   camDirector: CameraDirector;
   input: InputBus;
@@ -154,6 +163,8 @@ export interface HarnessOpts {
   input?: InputBus;
   /** Court location pick (docs/SPEC-COURT-LOCATIONS.md) — basketball venues swap their environment half. */
   location?: string;
+  /** The player's PRQ band, if the host resolved one. Absent is a guest, and a guest is never penalised. */
+  prqBand?: PrqBand | null;
   /** M28 art round-trip: called once after the venue loads so a published art
    * card can reskin the court/board/kit mesh. Runs post-liftBlackMaterials. */
   applySkin?: (scene: Scene) => void;
@@ -273,6 +284,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   const agentHooks: ModeContext['agent'] = {};   // M69: filled by a mode's load() if it opts in
   const ctx: ModeContext = {
     location: opts.location,
+    prqBand: opts.prqBand ?? null,
     scene, camera, camDirector, input, lights, juice,
     feel, momentum, heroRef, objectiveRef, groundLock, agent: agentHooks,
     phase: () => phase,
