@@ -95,7 +95,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';              // the miss meets the iron it earned
-import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT } from '../core/Ref';   // the rules live in the handbook, not in here
+import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, canChain, pushChain, tickChain, chainTier, ankleBreakOdds, isHardBreak,
   hasMove, tightness, moveFromContext, gathersIntoShot, type ChainState, type HandleMove,
@@ -167,6 +167,14 @@ const RIM_FLOOR = new Vector3(RIM.x, 0, RIM.z);
 /** HOOPS-MOVE-KIT-B M12: the backboard hangs behind the ring and faces the court (+z) — the square's own direction. */
 const BOARD_NORMAL = new Vector3(0, 0, 1);
 const TARGET_SCORE = 11;
+/**
+ * Score and you keep it — classic 1-on-1, both ways.
+ *
+ * DECLARED alongside 3v3's `alternating` (FIBA 3x3), because the two modes answering the most basic
+ * question in a half-court game differently used to be an accident of where each one happened to call
+ * `startDefense` / `opponentPossession`, rather than a decision. The ref answers it now.
+ */
+const FORMAT: ScoringFormat = 'make_it_take_it';
 // FORMAT FIX: scoring used to be "1pt inside a 4.2-unit paint radius, 2pts
 // anywhere past it, no matter how far" — a made shot was never worth 3, and
 // a layup was worth LESS than a jumper, which is backwards from every real
@@ -648,7 +656,13 @@ export const OneVOneMode: ModeDefinition = (() => {
             });
             if (checkGameOver(ctx)) return;
             // MAKE IT, TAKE IT — both ways. This handed ME the ball after their make (loser's ball).
-            later(900, () => { ctx.setHud({ banner: '' }); startDefense(ctx, 'MAKE IT, TAKE IT — DEFEND!'); });
+            // The format decides; `possessionAfterScore` is the one place that answers it.
+            const after = possessionAfterScore(FORMAT, 'foe');
+            later(900, () => {
+              ctx.setHud({ banner: '' });
+              if (after === 'foe') startDefense(ctx, 'MAKE IT, TAKE IT — DEFEND!');
+              else resetPositions();
+            });
           }
         } else if (res === 'missed') {
           SoundKit.play('miss');

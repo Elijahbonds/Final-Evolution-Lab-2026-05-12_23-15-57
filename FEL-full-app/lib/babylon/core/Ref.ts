@@ -280,3 +280,53 @@ export const THREE_SECOND_LIMIT = 3;
 export function paintClock(held: number, inPaint: boolean, dt: number): number {
   return inPaint ? held + dt : 0;
 }
+
+// ── THE FORMAT: who gets the ball after a bucket ─────────────────────────────────────────────────────────
+//
+// THIS IS THE RULE THE TWO MODES ACTUALLY DISAGREED ABOUT, and the disagreement was invisible because
+// neither of them asked the ref. 1v1 runs make-it-take-it both ways (score and you keep it — the reset
+// after my make is my own possession, and their make sends me to defence). 3v3 hands the ball over on
+// every make, mine and my teammates'. Two half-court games on the same court with opposite answers to the
+// most basic question in either of them.
+//
+// Neither is WRONG. Make-it-take-it is the classic 1-on-1 and streetball rule; a change of possession on
+// every make is the modern FIBA 3x3 rule, and 3-on-3 is the format that actually plays it. What was wrong
+// is that each mode's answer lived in a `later(300, () => opponentPossession(ctx))` buried in a scoring
+// branch, so the difference was an accident of two implementations rather than a decision anybody made.
+//
+// So the format is DECLARED, per mode, and the ref answers the question. Changing 3v3 to make-it-take-it is
+// now a one-word edit at the top of the mode instead of an archaeology exercise.
+
+export type ScoringFormat =
+  /** Score and you keep it. Classic 1-on-1 / streetball. */
+  | 'make_it_take_it'
+  /** Every make is a change of possession. FIBA 3x3. */
+  | 'alternating';
+
+/**
+ * Who has the ball after `scorer` scores.
+ *
+ * The only place this question is answered. A mode reports who scored and gets back who is on offence.
+ */
+export function possessionAfterScore(format: ScoringFormat, scorer: Side): Side {
+  return format === 'make_it_take_it' ? scorer : other(scorer);
+}
+
+/**
+ * Free throws are NOT implemented in this build, in either mode.
+ *
+ * The handbook carries `shots` because a rulebook should say what a foul is worth, and `judge()` returns
+ * it — but nothing has ever read it. Both modes play a pickup format (first to 11 / first to 21,
+ * make-it-take-it or alternating) where a foul is answered with the ball rather than with free throws, so
+ * that is what they do: an and-one keeps the basket and the possession, a foul on a miss hands the ball
+ * back. That is correct for the format and it is the reason nobody noticed `shots` going unread.
+ *
+ * This flag exists so the gap is stated rather than implied. A mode that starts honouring `Call.shots`
+ * should flip it, and the test that pins this should be updated in the same commit.
+ */
+export const FREE_THROWS_IMPLEMENTED = false;
+
+/** What a foul is actually worth today: possession, not shots. */
+export function foulAward(call: Call): 'ball_back' | 'shots' {
+  return FREE_THROWS_IMPLEMENTED && call.shots > 0 ? 'shots' : 'ball_back';
+}

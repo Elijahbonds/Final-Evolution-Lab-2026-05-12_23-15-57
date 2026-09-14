@@ -95,6 +95,7 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package 
 import { HAND_UP_SEC, handUpContest, distXZ, rivalShotPct, proximityContest01, LAYUP_RANGE } from '../core/BasketballCore';
 import { boardWinner, BOX_OUT_RANGE, jobObjective, type BoardBody } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O1–O3
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';                               // the miss meets the iron it earned
+import { judge, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and six bodies contest it
 import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
@@ -112,6 +113,14 @@ const RIM_FLOOR = new Vector3(RIM.x, 0, RIM.z);
 /** HOOPS-MOVE-KIT-B M12: the backboard hangs behind the ring and faces the court (+z). */
 const BOARD_NORMAL = new Vector3(0, 0, 1);
 const TARGET_SCORE = 21;
+/**
+ * Every make is a change of possession — the FIBA 3x3 rule, which is the format 3-on-3 actually plays.
+ *
+ * DECLARED, because 1v1 runs `make_it_take_it` and the two modes disagreeing about who gets the ball after
+ * a bucket used to be an accident of two `later(…, opponentPossession)` calls buried in scoring branches
+ * rather than a decision. Changing this line changes the format; nothing else needs touching.
+ */
+const FORMAT: ScoringFormat = 'alternating';
 // FORMAT FIX: was "1pt inside the paint, 2pts anywhere past it" — no shot
 // was ever worth 3, and a layup scored LESS than a jumper. "First to 21" is
 // the real streetball 2s-and-3s format (matching NBA 2K's stated
@@ -531,11 +540,26 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           hoopJuice?.punch();
           console.info('[3V3-JUICE] jumper make');
           if (bigShot) EffectsKit.burst(ctx.scene, me.char.root.position.add(new Vector3(0, 1.8, 0)), 'sparks');
-          const andOne = finishFoul; finishFoul = false;   // HOOPS-MOVE-KIT-A M2: fouled on the finish
-          ctx.setHud({ score: myScore, banner: andOne ? `${arcLabel} — AND ONE!` : arcQuality === 'perfect' ? `${arcLabel} — SPLASH!` : `${arcLabel} — GOOD!` });
+          // HOOPS-MOVE-KIT-A M2: fouled on the finish. The REF names the call and decides who gets the
+          // ball; this branch used to write the banner itself and then hand the ball over unconditionally,
+          // which meant an and-one in 3v3 was worth strictly less than an and-one in 1v1 for no stated
+          // reason. `foulAward` says what a foul is worth in a format with no free throws: the ball.
+          const andOneCall = finishFoul ? judge('and_one', { offense: 'me', shooter: 'me', fouled: 'me' }) : null;
+          finishFoul = false;
+          ctx.setHud({
+            score: myScore,
+            banner: andOneCall ? `${arcLabel} — ${andOneCall.banner}`
+              : arcQuality === 'perfect' ? `${arcLabel} — SPLASH!` : `${arcLabel} — GOOD!`,
+          });
           setTimeout(() => ctx.setHud({ banner: '' }), 800);
           if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
-          later(300, () => void opponentPossession(ctx));
+          if (andOneCall) {
+            console.info(`[3V3-REF] ${andOneCall.id} → ${andOneCall.ball} (${foulAward(andOneCall)})`);
+            if (andOneCall.whistle) SoundKit.play('whistle');
+          }
+          // an and-one keeps the ball with the fouled team; otherwise the FORMAT decides, and 3x3 alternates
+          const next = andOneCall ? andOneCall.ball ?? 'me' : possessionAfterScore(FORMAT, 'me');
+          later(300, () => (next === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
         } else if (res === 'missed') {
           SoundKit.play('miss');
           me.shotWin = 'none';
@@ -548,10 +572,16 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
             (arcQuality === 'early' ? 0.8 : arcQuality === 'late' ? -0.8 : arcQuality === 'brick' ? 0.3 : 0) + shotContest * 0.7,
             arcQuality === 'brick' ? (Math.random() < 0.5 ? -0.7 : 0.7) : 0,
           );
-          if (finishFoul) {   // HOOPS-MOVE-KIT-A M2: fouled in the air on a miss — the ball back
-            finishFoul = false; ctx.setHud({ banner: 'FOULED ON THE FINISH — BALL BACK' });
+          if (finishFoul) {   // HOOPS-MOVE-KIT-A M2: fouled in the air on a miss — the ref calls it
+            finishFoul = false;
+            const call = judge('shooting_foul', { offense: 'me', shooter: 'me', fouled: 'me', detail: 'ON THE FINISH' });
+            console.info(`[3V3-REF] ${call.id} → ${call.ball} (${foulAward(call)})`);
+            if (call.whistle) SoundKit.play('whistle');
+            // no free throws in this format (Ref.FREE_THROWS_IMPLEMENTED) — a foul is answered with the ball
+            ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'BALL BACK' : 'THEIR BALL'}` });
             setTimeout(() => ctx.setHud({ banner: '' }), 900);
-            later(900, () => resetPossession(true));
+            const back = call.ball ?? 'me';
+            later(900, () => (back === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
           } else {
             ctx.setHud({ banner: 'RIMS OUT' });
             setTimeout(() => ctx.setHud({ banner: '' }), 700);
@@ -976,7 +1006,14 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     lastPasserWasMe = false;
     setTimeout(() => ctx.setHud({ banner: '' }), 800);
     if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
-    later(made ? 200 : 900, () => void opponentPossession(ctx));
+    // A MISS IS A REBOUND, NOT A HANDOVER. This used to schedule `opponentPossession` on a miss too, 900 ms
+    // after the release — while the arc's own miss branch was setting a LIVE board for the same shot. Two
+    // owners for one outcome: six bodies would go and contest the rebound and then the ball was taken off
+    // whoever won it and given to the other team anyway. The board decides a miss; only a MAKE is a
+    // possession change, and the FORMAT decides that.
+    if (!made) return;
+    const next = possessionAfterScore(FORMAT, 'me');
+    later(200, () => (next === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
   }
 
   async function resolveMyShot(ctx: ModeContext, quality: ShotQuality): Promise<void> {
@@ -1492,16 +1529,20 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       console.info(`[3V3-BOARD] tipped off ${hit.body.id}`);
     }
 
-    // OUT OF PLAY — a dead ball, awarded at once. The bodies are clamped inside the court and the ball
-    // was not, so waiting for someone to reach it could only ever time out.
+    // OUT OF PLAY — the REF calls it now, reading the handbook, exactly as 1v1 does. The bodies are
+    // clamped inside the court and the ball is not, so waiting for someone to reach it could only ever
+    // time out; what changed is that the mode no longer decides the consequence. It reports the fact (the
+    // ball left the floor, and who shot it) and carries out the call.
     if (ballOutOfPlay(ballSim.pos, HOOPS_BALL_BOUNDS)) {
-      const toTeam: 'me' | 'foe' = board.shooter === 'me' ? 'foe' : 'me';
+      // nobody is carrying during a live board, so the team that shot IS the offence for this call
+      const shooter: 'me' | 'foe' = board.shooter === 'foe' ? 'foe' : 'me';
+      const call = judge('out_of_bounds', { offense: shooter, shooter });
       board = null; endChase(); endBoxOut(); ballSim.stop();
-      console.info(`[3V3-BOARD] the rebound went out of play — dead ball to ${toTeam}`);
-      SoundKit.play('whistle');
-      ctx.setHud({ banner: toTeam === 'me' ? 'OUT OF BOUNDS — YOUR BALL' : 'OUT OF BOUNDS — THEIR BALL' });
+      console.info(`[3V3-REF] ${call.id} → ${call.ball}`);
+      if (call.whistle) SoundKit.play('whistle');
+      ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
       setTimeout(() => ctx.setHud({ banner: '' }), 800);
-      if (toTeam === 'me') resetPossession(true); else void opponentPossession(ctx);
+      if (call.ball === 'me') resetPossession(true); else void opponentPossession(ctx);
       return;
     }
 

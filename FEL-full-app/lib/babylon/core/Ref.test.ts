@@ -6,8 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   HANDBOOK, rule, judge, contactFoul, shotFoul, isGoaltending, paintClock,
-  THREE_SECOND_LIMIT, type RuleId,
-} from './Ref';
+  THREE_SECOND_LIMIT, type RuleId, possessionAfterScore, FREE_THROWS_IMPLEMENTED, foulAward} from './Ref';
 
 describe('the handbook is a rulebook, not a config blob', () => {
   it('every rule says what it means in plain language', () => {
@@ -163,5 +162,53 @@ describe('flow rules keep the ball live', () => {
   it('taking it back is the offence keeping the ball, not a violation', () => {
     expect(judge('backcourt', { offense: 'foe' }).ball).toBe('foe');
     expect(rule('backcourt').deadBall).toBe(false);
+  });
+});
+
+// ── THE FORMAT (2026-09-13) ──────────────────────────────────────────────────────────────────────────────
+//
+// The rule the two modes actually disagreed about, and the one the Ref existed to end. 1v1 ran
+// make-it-take-it; 3v3 handed the ball over on every make. Neither is wrong — one is streetball, the other
+// is FIBA 3x3 — but the difference lived in two `later(…)` calls buried in scoring branches, so it was an
+// accident rather than a decision.
+
+describe('possessionAfterScore', () => {
+  it('make-it-take-it keeps the ball with the scorer', () => {
+    expect(possessionAfterScore('make_it_take_it', 'me')).toBe('me');
+    expect(possessionAfterScore('make_it_take_it', 'foe')).toBe('foe');
+  });
+
+  it('alternating hands it over, whoever scored', () => {
+    expect(possessionAfterScore('alternating', 'me')).toBe('foe');
+    expect(possessionAfterScore('alternating', 'foe')).toBe('me');
+  });
+
+  it('IT IS SYMMETRIC — the format cannot favour one side', () => {
+    // 1v1's original bug was exactly this: their make gave ME the ball (loser's ball) while my make kept it
+    for (const f of ['make_it_take_it', 'alternating'] as const) {
+      const mine = possessionAfterScore(f, 'me');
+      const theirs = possessionAfterScore(f, 'foe');
+      expect(mine, f).not.toBe(theirs);
+    }
+  });
+});
+
+describe('what a foul is worth in a game with no free throws', () => {
+  it('the handbook still says what a foul SHOULD be worth', () => {
+    expect(rule('and_one').shots).toBe(1);
+    expect(rule('shooting_foul').shots).toBe(2);
+  });
+
+  it('BUT NOTHING IMPLEMENTS THEM, and the flag says so rather than implying it', () => {
+    // `Call.shots` has been computed and returned since the Ref was written and read by nobody. Both modes
+    // play a pickup format where a foul is answered with the ball. This is the honest statement of that.
+    expect(FREE_THROWS_IMPLEMENTED).toBe(false);
+    expect(foulAward(judge('and_one', { offense: 'me', fouled: 'me' }))).toBe('ball_back');
+    expect(foulAward(judge('shooting_foul', { offense: 'me', fouled: 'me' }))).toBe('ball_back');
+  });
+
+  it('and a foul gives the ball to the fouled team, which is what both modes now do', () => {
+    expect(judge('and_one', { offense: 'me', shooter: 'me', fouled: 'me' }).ball).toBe('me');
+    expect(judge('shooting_foul', { offense: 'me', shooter: 'me', fouled: 'me' }).ball).toBe('me');
   });
 });
