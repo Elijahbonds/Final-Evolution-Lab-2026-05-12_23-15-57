@@ -2,6 +2,8 @@
 // the eight PRQ attributes, mode mastery tiers, records per mode, resiliency, the movement-signature delta and up to six
 // pinned highlights — each block behind an owner-chosen visibility mask. Babylon-free, Prisma-free, tested.
 
+import type { Freshness } from './claimClock';
+
 export const STAT_BLOCKS = ['prq', 'mastery', 'records', 'resiliency', 'movement', 'highlights'] as const;
 export type StatBlock = (typeof STAT_BLOCKS)[number];
 export type Visibility = Record<StatBlock, boolean>;
@@ -62,12 +64,25 @@ export function normalizeHighlights(input: unknown, candidates: HighlightCandida
 export interface PublicStats {
   prq: Record<string, number> | null;                                  // eight attributes, measured over card
   prqSource: 'measured' | 'profile' | null;                            // measured = from PrqEntry rows; profile = the stored self-reported profile
+  /** When the newest contributing measurement was taken, when there is one. Null for a self-reported block. */
+  prqMeasuredAt: string | null;
+  /** fresh | stale | expired — see lib/creator/cardProgression.ts. Null when nothing was measured. */
+  prqFreshness: Freshness | null;
+  /** "Measured 8 months ago." Printed next to the block whenever the reading is no longer current. */
+  prqNote: string | null;
   mastery: { mode: string; tier: number; label: string; best: number | null }[];
   records: { mode: string; best: number; sessions: number; wins: number }[];
   resiliency: { attempts: number; retryRate: number; returnedAfterLoss: boolean | null } | null;
   movement: { latestAt: string | null; delta: Record<string, number> | null } | null;
   ladder: { mode: string; bestScore: number; weekStart: string } | null;
-  verified: boolean;                                                   // the PRQ block came from measured entries (records/mastery are always from played sessions)
+  /**
+   * The shield.
+   *
+   * Measured AND still current. It used to mean only "measured", which meant a shield sat beside an
+   * eight-month-old reading forever — the card stores a snapshot and a snapshot has no clock. A stale
+   * measurement is still shown, with its age, but it is not vouched for.
+   */
+  verified: boolean;
 }
 
 /** Apply the owner's mask: hidden blocks come back null/empty so the wire shape stays stable. */
@@ -75,6 +90,9 @@ export function maskStats(stats: PublicStats, vis: Visibility): PublicStats {
   return {
     prq: vis.prq ? stats.prq : null,
     prqSource: vis.prq ? stats.prqSource : null,
+    prqMeasuredAt: vis.prq ? stats.prqMeasuredAt : null,
+    prqFreshness: vis.prq ? stats.prqFreshness : null,
+    prqNote: vis.prq ? stats.prqNote : null,
     mastery: vis.mastery ? stats.mastery : [],
     records: vis.records ? stats.records : [],
     resiliency: vis.resiliency ? stats.resiliency : null,

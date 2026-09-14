@@ -7,9 +7,11 @@ describe('visibility mask', () => {
     expect(normalizeVisibility({ prq: false, bogus: true, movement: 'yes' })).toEqual({ ...DEFAULT_VISIBILITY, prq: false });
   });
   it('masks blocks to a stable wire shape', () => {
-    const s: PublicStats = { prq: { strength: 1 }, prqSource: 'measured', mastery: [{ mode: 'dunk', tier: 3, label: 'Gold', best: 40 }], records: [{ mode: 'dunk', best: 40, sessions: 2, wins: 1 }], resiliency: { attempts: 2, retryRate: 0.5, returnedAfterLoss: true }, movement: { latestAt: null, delta: null }, ladder: { mode: 'dunk', bestScore: 40, weekStart: '2026-09-01' }, verified: true };
+    const s: PublicStats = { prq: { strength: 1 }, prqSource: 'measured', prqMeasuredAt: '2026-09-10T00:00:00Z', prqFreshness: 'fresh', prqNote: 'Measured 3 days ago.', mastery: [{ mode: 'dunk', tier: 3, label: 'Gold', best: 40 }], records: [{ mode: 'dunk', best: 40, sessions: 2, wins: 1 }], resiliency: { attempts: 2, retryRate: 0.5, returnedAfterLoss: true }, movement: { latestAt: null, delta: null }, ladder: { mode: 'dunk', bestScore: 40, weekStart: '2026-09-01' }, verified: true };
     const m = maskStats(s, { ...DEFAULT_VISIBILITY, prq: false, records: false });
     expect(m.prq).toBeNull(); expect(m.prqSource).toBeNull(); expect(m.records).toEqual([]); expect(m.ladder).toBeNull(); expect(m.mastery.length).toBe(1); expect(m.verified).toBe(true);
+    // hiding the block hides WHEN it was taken too — a date with no number is still a fact about the owner
+    expect(m.prqMeasuredAt).toBeNull(); expect(m.prqFreshness).toBeNull(); expect(m.prqNote).toBeNull();
   });
 });
 

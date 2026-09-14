@@ -135,7 +135,13 @@ function StatBlocks({ stats, accent }: { stats: PublicStats; accent: string }) {
     <div className="mt-4 space-y-4">
       {stats.prq && (
         <div>
-          <div className="mb-2 flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-white/40">PRQ profile {stats.prqSource === 'measured' ? <ShieldCheck className="h-3 w-3" style={{ color: accent }} /> : <span className="normal-case tracking-normal text-white/30">· self-reported until measured</span>}</div>
+          {/* the shield needs BOTH measured and current — a stale reading keeps its numbers but loses the
+              badge and prints its age instead, because a shield beside an eight-month-old scan is the most
+              misleading thing this card can say (lib/creator/claimClock.ts) */}
+          <div className="mb-2 flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-white/40">PRQ profile {stats.verified ? <ShieldCheck className="h-3 w-3" style={{ color: accent }} /> : <span className="normal-case tracking-normal text-white/30">· {stats.prqSource === 'measured' ? 'not a current reading' : 'self-reported until measured'}</span>}</div>
+          {stats.prqNote && stats.prqFreshness !== 'fresh' && (
+            <div className="mb-2 text-[10px] text-white/35">{stats.prqNote}</div>
+          )}
           <div className="space-y-1">
             {PRQ_ORDER.filter((k) => stats.prq && k in stats.prq).map((k) => {
               const v = Math.max(0, Math.min(100, stats.prq![k]));
