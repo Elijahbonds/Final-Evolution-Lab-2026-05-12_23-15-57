@@ -26,11 +26,14 @@ import { ATTRIBUTES } from './attributes';
 import { TRAITS } from './traits';
 import { ceilingFor } from './ceilings';
 import { HOT_ZONES, ZONE_STATES, ZONE_POINT_CAP, zonePointsSpent } from './hotZones';
+import { MECHANICS, slotGate } from './mechanics';
 
 export interface CreatorBuild {
   attributes: Record<string, number>;
   /** zone id → state name. Absent zones read as NEUTRAL. */
   hotZones?: Record<string, string>;
+  /** slot id → chosen set, or null for an empty optional slot. */
+  mechanics?: Record<string, string | null>;
   /** trait id → tier index (0-based). Absent = unequipped. */
   traits: Record<string, number>;
   tendencies?: Record<string, number>;
@@ -133,6 +136,24 @@ export function resolve(build: CreatorBuild): Resolution {
       issues.push({
         kind: 'warning', rowId: id, section: 'tendencies',
         message: `This is set to ${v} but ${cap?.label ?? backing} is only ${have} — you will do it often and badly.`,
+      });
+    }
+  }
+
+  // MECHANICS SLOTS. A slot the player has selected but cannot perform is the creator lying to them, so
+  // the gate is checked here against the same attribute the game reads.
+  for (const [id, value] of Object.entries(build.mechanics ?? {})) {
+    const row = MECHANICS.rows.find((r) => r.id === id);
+    if (!row) { issues.push({ kind: 'warning', rowId: id, section: 'mechanics', message: `Unknown slot "${id}" — kept, not editable here.` }); continue; }
+    if (value === null || value === undefined) continue;            // an empty optional slot is fine
+    const gate = slotGate(row);
+    if (!gate) continue;
+    const have = Math.round(build.attributes?.[gate.attribute] ?? 0);
+    if (have < gate.min) {
+      const need = attrById.get(gate.attribute);
+      issues.push({
+        kind: 'violation', rowId: id, section: 'mechanics',
+        message: `${row.label} needs ${need?.label ?? gate.attribute} ${gate.min}; you have ${have}.`,
       });
     }
   }

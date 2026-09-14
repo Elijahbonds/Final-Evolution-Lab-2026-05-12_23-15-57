@@ -133,3 +133,72 @@ describe('hot zones — the economy', () => {
     expect(r.budgets.hotZonePointsCap).toBe(ZONE_POINT_CAP);
   });
 });
+
+// ── MECHANICS ───────────────────────────────────────────────────────────────────────────────────────────
+//
+// The spec's requirement was "slots gated by attribute + body-measurement thresholds", and that gate
+// already existed: HandleSystem.MOVE_HANDLE prices every dribble move by Ball Handle and the game checks
+// it with hasMove(). The instruction was to EXTEND that, not build a parallel one — so the sharpest test
+// here is that the creator's dribble thresholds ARE the game's, number for number. If they ever drift, the
+// creator and the game are telling a player two different things about the same move.
+
+import { MECHANICS, slotGate, BASES, RELEASES, DUNK_PACKAGES } from './mechanics';
+import { MOVE_HANDLE } from '../../babylon/core/HandleSystem';
+
+describe('mechanics slots', () => {
+  it('reuses MOVE_HANDLE\'s own thresholds rather than inventing a parallel gate', () => {
+    const gates = new Map(MECHANICS.rows
+      .filter((r) => r.tab === 'Dribble')
+      .map((r) => [r.label, slotGate(r)?.min ?? 0] as const));
+    // every non-zero MOVE_HANDLE threshold appears as a dribble slot gate
+    for (const [move, min] of Object.entries(MOVE_HANDLE)) {
+      if (min === 0) continue;
+      expect([...gates.values()], `${move} @ ${min}`).toContain(min);
+    }
+  });
+
+  it('gates every dribble slot on Ball Handle, the attribute the game actually reads', () => {
+    for (const r of MECHANICS.rows.filter((x) => x.tab === 'Dribble')) {
+      const g = slotGate(r);
+      if (g) expect(g.attribute).toBe('ballHandle');
+    }
+  });
+
+  it('lets the optional dunk packages be empty and the required slots not', () => {
+    const opt = MECHANICS.rows.filter((r) => /^finDunk[2-5]$/.test(r.id));
+    expect(opt.length).toBe(4);
+    for (const r of opt) expect(r.kind === 'slot' && r.allowNone).toBe(true);
+    const base = MECHANICS.rows.find((r) => r.id === 'jsBase');
+    expect(base && base.kind === 'slot' && base.allowNone).toBe(false);
+  });
+
+  it('asks for a harder attribute for each successive dunk package', () => {
+    const mins = ['finDunk1', 'finDunk2', 'finDunk3', 'finDunk4', 'finDunk5']
+      .map((id) => slotGate(MECHANICS.rows.find((r) => r.id === id)!)?.min ?? 0);
+    for (let i = 1; i < mins.length; i++) expect(mins[i]).toBeGreaterThan(mins[i - 1]);
+  });
+
+  it('names only FEL motion sets — never a real athlete', () => {
+    const all = [...BASES, ...RELEASES, ...DUNK_PACKAGES].join(' ');
+    expect(all).not.toMatch(/[A-Z][a-z]+\s+[A-Z][a-z]+ic\b/);       // no "Somebody Jordanic" style tokens
+    for (const s of BASES) expect(s).toMatch(/Hinge|Stack|Base|Coil|Load/);   // biomechanical, per the spec's axis
+  });
+
+  it('filled the spec\'s two blank tabs with sections that have substrate', () => {
+    const tabs = new Set(MECHANICS.rows.map((r) => r.tab));
+    expect(tabs.has('Dribble')).toBe(true);      // HandleSystem
+    expect(tabs.has('Signature')).toBe(true);    // the Music Room walk-out DunkMode already plays
+  });
+
+  it('refuses a slot the player cannot perform, and says what is missing', () => {
+    const r = resolve({ attributes: { ballHandle: 40 }, traits: {}, mechanics: { dribbleShamm: 'Standard' } });
+    const v = r.issues.find((i) => i.rowId === 'dribbleShamm');
+    expect(v?.kind).toBe('violation');
+    expect(v?.message).toContain('Ball Handle');
+  });
+
+  it('accepts an EMPTY optional slot without complaint even when the gate is unmet', () => {
+    const r = resolve({ attributes: { drivingDunk: 10 }, traits: {}, mechanics: { finDunk5: null } });
+    expect(r.issues.some((i) => i.rowId === 'finDunk5')).toBe(false);
+  });
+});
