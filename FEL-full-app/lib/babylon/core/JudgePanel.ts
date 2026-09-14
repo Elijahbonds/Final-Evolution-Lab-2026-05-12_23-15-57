@@ -102,12 +102,41 @@ export function cannedLine(name: string, score: number): string {
   return `${name}: gets it done — I've seen bigger.`;
 }
 
-export function judgeDunk(difficulty: number, execution: number, style: number): JudgeScore[] {
+/**
+ * How far a hot or cold building can move a card, in points.
+ *
+ * Deliberately smaller than a bias. `MomentumBus`'s own header names judge generosity as a thing
+ * `multiplier()` exists for, and the dunk contest is the only mode on the platform with judges — it had
+ * never read it. Momentum reached the scoring only indirectly, as hype into the NEXT attempt's style term.
+ *
+ * The size is the whole argument. A building on fire should move the MARGINAL card — the 8 that could have
+ * been a 9 — and must never manufacture a verdict. A perfect dunk reads 50 in a silent gym and a bad one
+ * cannot be lifted off the floor by noise, both asserted in the tests. Anything larger and the contest
+ * stops being about the dunk.
+ */
+export const CROWD_SWAY = 0.35;
+
+/**
+ * Judge one attempt.
+ *
+ * `crowd01` is 0..1 — the building's temperature, normally `MomentumBus.score01`. It defaults to a neutral
+ * room so every existing caller scores exactly as it did.
+ */
+export function judgeDunk(difficulty: number, execution: number, style: number, crowd01 = 0.5): JudgeScore[] {
+  const sway = (Math.max(0, Math.min(1, crowd01)) - 0.5) * 2 * CROWD_SWAY;
   return JUDGES.map((j) => {
     const raw = difficulty * j.w.difficulty + execution * j.w.execution + style * j.w.style;
     // Bias is small enough that a genuinely perfect dunk still reads 10 on
     // every card — a 50 must remain reachable, or the ceiling is decorative.
-    const score = Math.max(6, Math.min(10, Math.round(6 + raw * 0.4 + j.bias)));
+    const base = 6 + raw * 0.4 + j.bias;
+    // THE SWAY FADES OUT AT THE EXTREMES, and it has to. My first version applied it flat, and the tests
+    // immediately caught the two things this must never do: a silent gym took a perfect dunk to 49, and a
+    // hot one lifted a nothing dunk off the floor to 31. A room can talk a judge out of an 8 and into a 9;
+    // it cannot talk anybody into calling a clean 10 a 9, or a blown attempt a 7. Marginality is 1 in the
+    // middle of the card range and 0 at either end, so the crowd only ever moves the card that was already
+    // a coin flip.
+    const marginal = Math.max(0, 1 - Math.abs((base - 8) / 2));
+    const score = Math.max(6, Math.min(10, Math.round(base + sway * marginal)));
     return { name: j.name, score, line: cannedLine(j.name, score) };
   });
 }

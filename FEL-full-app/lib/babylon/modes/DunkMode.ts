@@ -2036,7 +2036,10 @@ export const DunkMode: ModeDefinition = (() => {
     const execution = Math.max(0, Math.min(10, qteAccuracy * 10));
     const styleScore = Math.max(0, Math.min(10, STYLE_TIER[style] * 0.6 + Math.min(2, hype / 50) + styleTaps * 0.8 + hangBonus));
 
-    const scores = judgeDunk(difficulty, execution, styleScore);
+    // THE BUILDING IS PART OF THE PANEL. Momentum reached the score only as hype into the NEXT attempt's
+    // style term; the judges themselves never heard the room, in the one mode on the platform that has
+    // judges. `CROWD_SWAY` is sized to move the marginal card and nothing else.
+    const scores = judgeDunk(difficulty, execution, styleScore, momentum.score01);
     lastScores = scores;
     const dunkTotal = scores.reduce((s, j) => s + j.score, 0);   // MIN_TOTAL..PERFECT_TOTAL (30..50)
 
