@@ -106,6 +106,11 @@ import {
   type ThreatState,
 } from '../core/TripleThreat';   // standing still with the ball is not idle — it is threatening
 import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
+import { MomentumBus } from '../core/MomentumBus';   // Phase 6: the shared Game-Breaker layer
+import {
+  dunkKindFor, isContactDunk, posterPlant, posterFall, contactBanner, contactHitStopMs, POSTER_RELEASE_K,
+  type ContactDunkKind,
+} from '../core/ContactDunk';   // dunked ON, not dunked beside
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and six bodies contest it
 import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
@@ -224,6 +229,16 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let posting = false;                                                               // the seal I hold (the path into the fade / the hook / the quick spin)
   let spin: { plan: SpinPlan; t: number; beat: boolean } | null = null;              // M6: the pivot in flight
   let spinCooldown = 0, spinArmed = 0;   // M6: a body I meet ARMS the spin; the stick swung across throws it
+  // Phase 6's shared Game-Breaker layer. 3v3 reported NOTHING into it: posters, ankle-breakers, swats and
+  // steals in this mode were invisible to the momentum system, so the tier never moved, the multiplier
+  // never applied and the crowd never escalated — the highlight plays happened and the game did not notice.
+  const mbus = new MomentumBus();
+  let momentum = 0;
+  /** Report a highlight and mirror the bus into the HUD momentum meter (the 1v1's). */
+  function swing(kind: Parameters<MomentumBus['report']>[0]['kind']): void {
+    mbus.report({ kind });
+    momentum = Math.round(mbus.score01 * 100);
+  }
   /** STATIONARY OFFENCE: the stance the half-court game starts from. 3v3 stood in idle holding the ball. */
   let threat: ThreatState = { ...THREAT_IDLE };
   let stickHeld = 0, stickPeak = 0, jabEligible = false, burstArmed = false;
@@ -235,6 +250,11 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
   let driveContest: DriveContest | null = null;                                      // M2: the body in the dunk's path
+  /** The man being dunked ON — held chest to chest through the flight, dropped at the flush. */
+  let posterVictim: { body: Body; kind: ContactDunkKind; released: boolean } | null = null;
+  /** What the contact made this dunk. Captured AT THE BUMP because `driveContest` is cleared on
+   *  feet-down, before the score is awarded — so reading it there narrowed to `never`. */
+  let lastDunkKind: ContactDunkKind = 'clean';
   let finishFoul = false;                                                            // M2: fouled in the air — and-one / the ball back
   const contactCooldown = new Map<string, number>();                                 // M2: one contact event per pair per 300 ms (the Havok solver's own gate)
   /** Bumped on every possession change; every timer that changes possession checks it (the 1v1's rule) — a stale
@@ -347,7 +367,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; jabEligible = false; burstArmed = false; me.char.root.position.y = 0;
     clearDefense();
     // BIOMECH-HOOPS-WAVE1: the possession's clocks; a held shot is lifted, a floored body gets up
-    driver = null; driveK = 0; dunkFlight = null; dunkFlush = null; mateArc.active = false;
+    driver = null; driveK = 0; dunkFlight = null; dunkFlush = null; mateArc.active = false; posterVictim = null; lastDunkKind = 'clean';
     for (const b of everyBody()) { b.shotWin = 'none'; b.landSec = 0; b.celebrateSec = 0; b.tree.releaseHold(); if (b.floored) { b.floored = false; b.stunSec = 0; b.tree.beat('karate_get_up'); } }
     if (toMe) giveBallTo('me');
     // O1/O3: one job each for the possession — one mate SCREENS my defender, the other spaces (alternating)
@@ -522,7 +542,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         if (me.slot.intent.steal && driver && !driveStolen && !foeDunkFlight && meStunSec === 0 && distXZ(me.char.root.position, driver.char.root.position) < 1.6) {
           me.tree.beat('bball_steal_reach');
           const exposure = bumpExposure(0.3, bumpAge);
-          if (exposure >= 0.5 || roll() < 0.3) { driveStolen = true; console.info(`[3V3-DEF] strip by me ${bumpAge <= BUMP_STRIP_WINDOW_SEC ? 'on the bump' : 'on the roll'} bumpAge ${bumpAge.toFixed(2)}`); }
+          if (exposure >= 0.5 || roll() < 0.3) { driveStolen = true; swing('steal'); ctx.setHud({ momentum }); console.info(`[3V3-DEF] strip by me ${bumpAge <= BUMP_STRIP_WINDOW_SEC ? 'on the bump' : 'on the roll'} bumpAge ${bumpAge.toFixed(2)}`); }
           else { meStunSec = 0.35; ctx.setHud({ banner: 'REACH — THEY GO BY' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
         }
       } else if (meHandUp) { meHandUp = false; me.tree.releaseHold(); }
@@ -1208,6 +1228,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster', defenderPos: Vector3 | null): void {
     dunking = true; contactLatch = false; finishFoul = false;   // A+ P0: a fresh attempt gets one punch
     me.shotWin = 'none'; dunkFlush = null; let resolved = false; dunkFlight = { k: 0, made: null };   // BIOMECH-HOOPS-WAVE1
+    lastDunkKind = 'clean';   // a clean dunk after a poster must not inherit the poster
     turbo.t01 = Math.max(0, turbo.t01 - 0.3);
     const from = me.char.root.position.clone();
     const landing = new Vector3(RIM.x, 0, RIM.z + DRIVE_DUNK.landAheadZ);
@@ -1253,6 +1274,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         const swatChance = aiBlockChance('dunk', 0, handUp, c.set, c.strength01);
         if (swatChance > 0 && roll() < swatChance) {
           swatted = true; made = false;
+          swing('block'); ctx.setHud({ momentum });
           const at = ball.getAbsolutePosition().clone(); releaseBall(ball);
           ballSim.launch(at, c.dir.scale(-2.2).add(new Vector3((Math.random() - 0.5) * 2, 1.3, 0)));
           SoundKit.play('impact', { pitch: 0.7, volume: 0.6 }); SoundKit.play('crowdGroan', { volume: 0.5 });
@@ -1261,6 +1283,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           console.info(`[3V3-DEF] ai swat at the bump chance ${swatChance.toFixed(2)}`);
         } else driveBump(ctx, c, wall, made && kind === 'poster', (1 - k) * DRIVE_DUNK.flightMs > 320);
       }
+      if (posterVictim && k >= POSTER_RELEASE_K) posterVictimRelease(ctx);
       if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
         resolved = true;
         const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
@@ -1281,23 +1304,21 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         // highest-percentage and most spectacular shot in the game stayed worth
         // half a jump shot. A dunk is always inside the arc, so it is a two.
         myScore += 2;
-        const posterized = kind === 'poster' && defenderPos !== null;
+        // WHO went down is decided by the CONTACT now, not by proximity at the moment of scoring. This used
+        // to pick whichever body happened to be nearest and knock it over — so a bystander could be
+        // "posterized" by a dunk he was not part of, and the man actually contested got nothing. The
+        // planted victim (driveBump) is already on the floor by here: he is released at POSTER_RELEASE_K,
+        // after the ball is through, which is the order those things actually happen in.
+        const posterized = isContactDunk(lastDunkKind);
         SoundKit.play('score', { pitch: 0.9 });
         SoundKit.play('crowdCheer', { volume: posterized ? 0.8 : 0.5 });
         contactPunch(ctx);   // A+ P0: hit-stop + shake + flash + the ONE slam thud + HoopJuice (replaces the bare feel.impact, which was a second thud)
         ctx.camDirector.pulse(posterized ? 1 : 0.6, 0.55);
         EffectsKit.burst(ctx.scene, RIM, 'net');
-        if (posterized) {
-          const victim = wall ?? foes.reduce<Body | null>((best, f) =>
-            !best || Vector3.Distance(f.char.root.position, me.char.root.position)
-              < Vector3.Distance(best.char.root.position, me.char.root.position) ? f : best, null);
-          if (victim && !victim.floored) {   // M2: a contested poster put him down AT THE BUMP
-            victim.stunSec = 1.4; victim.floored = true;
-            victim.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });   // BIOMECH-HOOPS-WAVE1 G5: to the floor, up when the stun ends
-            EffectsKit.burst(ctx.scene, victim.char.root.position.add(new Vector3(0, 0.3, 0)), 'dust');
-          }
-        }
-        ctx.setHud({ score: myScore, banner: fouled ? (posterized ? 'POSTERIZED — AND ONE!' : 'THROWN DOWN — AND ONE!') : posterized ? 'POSTERIZED!' : 'THROWN DOWN!' });
+        // the banner comes from the CONTACT too, so a body bag reads as one — hand-writing 'POSTERIZED!'
+        // here meant the hardest finish in the game announced itself as the ordinary one
+        const slamCall = posterized ? contactBanner(lastDunkKind) : 'THROWN DOWN!';
+        ctx.setHud({ score: myScore, banner: fouled ? `${slamCall.replace(/!+$/, '')} — AND ONE!` : slamCall });
         setTimeout(() => ctx.setHud({ banner: '' }), 1000);
         if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
         later(400, () => void opponentPossession(ctx));
@@ -1555,22 +1576,62 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
 
   /** M2: the bodies meet in the dunk's flight — hit-stop micro, the thud, the shove or the knockdown at the contact. */
   function driveBump(ctx: ModeContext, c: DriveContest, wall: Body, floorHim: boolean, banner: boolean): void {
-    ctx.juice.hitStop(45);
-    ctx.juice.shake(0.08, 110);
-    ctx.feel?.impact?.(0.3);
-    SoundKit.play('impact', { pitch: 0.95, volume: 0.55 });
+    // PORTED ONTO ContactDunk (2026-09-13). 3v3 had a local poster that knocked the NEAREST body down
+    // wherever it happened to be standing, which is "dunked beside" — the exact thing the shared module's
+    // header says it exists to fix. It also had no `body_bag` at all: `DriveDunkKind` is none|dunk|poster,
+    // so the hardest contested finish in the game read the same as an ordinary one.
+    const kind = dunkKindFor({ strength01: c.strength01, set: c.set, present: true });
+    lastDunkKind = kind;
+    ctx.juice.hitStop(contactHitStopMs(kind));
+    ctx.juice.shake(kind === 'body_bag' ? 0.13 : 0.08, kind === 'body_bag' ? 150 : 110);
+    ctx.feel?.impact?.(kind === 'body_bag' ? 0.5 : 0.3);
+    SoundKit.play('impact', { pitch: kind === 'body_bag' ? 0.82 : 0.95, volume: kind === 'body_bag' ? 0.7 : 0.55 });
     EffectsKit.burst(ctx.scene, wall.char.root.position.add(new Vector3(0, 1.0, 0)), 'dust');
-    const shove = bumpShove(c);
-    if (floorHim) {
-      wall.stunSec = 1.4; wall.floored = true;
-      wall.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
-    } else if (!wall.floored) {
-      wall.stunSec = Math.max(wall.stunSec, 0.35);
-      wall.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+
+    if (isContactDunk(kind) && !wall.floored) {
+      // CHEST TO CHEST: planted BETWEEN me and the ring and squared at me, held through the flight. The
+      // shove used to push him off the drive line, so by the flush the slam landed beside a bystander.
+      const plant = posterPlant(RIM_FLOOR, me.char.root.position);
+      wall.char.root.position.copyFrom(plant.spot);
+      wall.char.root.rotation.y = plant.faceYaw;
+      wall.stunSec = Math.max(wall.stunSec, 1.2);
+      wall.tree.beat('bball_hand_up', { holdEnd: true, fadeSec: 0.05 });   // he is CONTESTING it, arms up
+      posterVictim = { body: wall, kind, released: false };
+      console.info(`[3V3-CONTACT] ${kind} — victim planted chest to chest`);
+    } else {
+      const shove = bumpShove(c);
+      if (floorHim) {
+        wall.stunSec = 1.4; wall.floored = true;
+        wall.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      } else if (!wall.floored) {
+        wall.stunSec = Math.max(wall.stunSec, 0.35);
+        wall.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+      }
+      wall.char.root.position.addInPlace(shove.scale(0.16));
+      console.info(`[3V3-CONTACT] drive bump ${kind} strength ${c.strength01.toFixed(2)} set ${c.set} floor ${floorHim} shove ${shove.length().toFixed(1)}`);
     }
-    wall.char.root.position.addInPlace(shove.scale(0.16));
-    if (banner) { ctx.setHud({ banner: c.set ? 'CONTACT!' : 'BUMP!' }); setTimeout(() => ctx.setHud({ banner: '' }), 260); }
-    console.info(`[3V3-CONTACT] drive bump strength ${c.strength01.toFixed(2)} set ${c.set} floor ${floorHim} shove ${shove.length().toFixed(1)}`);
+    if (banner) {
+      ctx.setHud({ banner: contactBanner(kind) });
+      setTimeout(() => ctx.setHud({ banner: '' }), kind === 'body_bag' ? 1100 : 500);
+    }
+  }
+
+  /** The victim of a contact dunk goes down at the FLUSH, not at the bump — the ball is through first. */
+  function posterVictimRelease(ctx: ModeContext): void {
+    if (!posterVictim || posterVictim.released) return;
+    posterVictim.released = true;
+    const v = posterVictim.body;
+    const fall = posterFall(RIM_FLOOR, v.char.root.position, posterVictim.kind);
+    v.floored = true;
+    v.stunSec = posterVictim.kind === 'body_bag' ? 2.1 : 1.5;
+    v.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+    v.char.root.position.addInPlace(fall.scale(0.16));
+    swing('posterize');
+    ctx.setHud({ momentum });
+    EffectsKit.burst(ctx.scene, v.char.root.position.add(new Vector3(0, 0.3, 0)), 'dust');
+    SoundKit.play('crowdCheer', { volume: 0.7 });
+    console.info(`[3V3-CONTACT] ${posterVictim.kind} victim goes down, fall ${fall.length().toFixed(1)}`);
+    posterVictim = null;
   }
   // ── HOOPS-MOVE-KIT-A amendment: the DEFENSE contest package (D1–D3) ────────────────────────────────────────────────
   function clearDefense(): void {
@@ -1818,6 +1879,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     }
     if (outcome.broke === 'none' || !foe) return;
 
+    swing('ankle_break');
+    ctx.setHud({ momentum });
     SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
     SoundKit.play('crowdCheer', { volume: 0.55 });
     EffectsKit.burst(ctx.scene, foe.char.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
@@ -1941,7 +2004,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           me.char.root.position.addInPlace(bumpShove(c).scale(0.16));
           console.info(`[3V3-DEF] rival dunk bump strength ${c.strength01.toFixed(2)} floorMe ${made && inLane}`);
         }
-        if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
+        if (posterVictim && k >= POSTER_RELEASE_K) posterVictimRelease(ctx);
+      if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
           resolved = true;
           const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
           if (made) dunkFlush = { releasePos, since: 0 };
