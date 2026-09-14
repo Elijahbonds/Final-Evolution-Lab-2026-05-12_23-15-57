@@ -1,19 +1,54 @@
-# Character Creation System (v1) — audit + gap table
+# Character Creation System (v1) — audit + build status
 
-Method per the spec's own §5 ("capture before build"). No code written. Fourteen sidebar sections mapped
-onto what is on disk today.
+Audited per the spec's own §5 ("capture before build"). **The blocker is resolved and the data foundation
+is built** — §10 steps 1, 3, 4 and 5. What remains is the generic editor screen, the live preview binding,
+and the sections with no substrate yet.
 
-## The one thing to settle before anything is built
+## The blocker, settled (owner, 2026-09-14)
 
-**The 0–99 attribute model collides with PRQ.** `lib/prq.ts` defines 8 axes on 0–100 and is documented as
-*the* gating primitive — "other systems read it; they do not duplicate its logic". This spec adds ~45
-attributes on a parallel 0–99 scale, several of which are the same quantity under another name (Speed,
-Strength, Stamina, Agility, Vertical ↔ PRQ speed/strength/endurance/agility/power).
+**The 0–99 attribute model collided with PRQ.** `lib/prq.ts` defines 8 measured axes and is documented as
+*the* gating primitive — "other systems read it; they do not duplicate its logic". The spec added ~45
+attributes on a parallel scale, several the same quantity under another name.
 
-Two numbers describing one athlete is the exact failure the shared-profile rule exists to prevent, and it
-already bit this project once (the Creator Card's `prqSource: 'profile'` vs measured path). It needs an
-explicit decision: **derived from PRQ**, **feeding PRQ**, or **deliberately separate with a stated reason**.
-I would not start §2 until that is answered.
+**Decision: PRQ sets the CEILING; the editor spends underneath it.** Training in the real world raises what
+a body attribute can reach; the build decides how points are distributed under that cap. Real work moves
+the number, and a slider in a character creator can never claim you got faster.
+
+The split fell out principled rather than convenient: PRQ measures a **body**, so it caps bodies (speed,
+strength, vertical, stamina, agility, block, perimeter D) and has no business capping a jump shot, a post
+hook or court vision. Those are skill — `prqAxis: null`.
+
+**And the half that matters more than the cap: no PRQ means no ceiling.** The full 0–99, exactly as in a
+game with no fitness layer. PRQ is upside for those who have it and never a tax on those who do not.
+`lib/creator/schema/ceilings.ts`, swept by a test over every row.
+
+**Durability: built, performance language only** (owner, same day). Every glossary line is about how the
+body performs under repetition; a test greps the whole tab for injury/pain/risk/diagnosis wording.
+
+## Built
+
+| layer | file | note |
+|---|---|---|
+| row types + derived tabs | `schema/types.ts` | tabs derive first-seen from the data, never declared |
+| attributes (51 rows, 6 tabs) | `schema/attributes.ts` | each row names the PRQ axis that caps it, or null |
+| PRQ ceilings | `schema/ceilings.ts` | no profile ⇒ no cap; skill never capped |
+| traits (42 rows, 6 tabs) | `schema/traits.ts` | every one a **tiered multiplier over a hook that already exists**, each hook verified present first |
+| resolver + budgets | `schema/resolve.ts` | reports, never refuses; violations vs warnings |
+| Athlete Profile | `schema/athleteProfile.ts` | deterministic, migrating, unknown-key-preserving |
+| the spec's own acceptance test | `schema/dataDriven.test.ts` | adds a new attribute and trait *in the test* and runs every consumer against them |
+
+Resolved along the way: the spec's `[MISSING TOP ROW]` in Durability was the **hip** pair; `Tab 1 [MISSING]`
+in Traits is **All**, derived rather than authored.
+
+## Still to build
+
+1. **The generic editor screen** (§10 step 2) — tab strip, row list, stepper, preview pane, glossary modal.
+   Every section above is a config of this one component. Nothing else should be written until it exists,
+   or sections start growing bespoke UI.
+2. **Live preview binding** (§10 step 6) — last, deliberately; it consumes everything above.
+3. **Sections with no substrate**: Tendencies (table shape ready, rows not authored), Hot Zones, Ink,
+   Vitals, and the Mechanics slots — which should sit on `MOVE_HANDLE`'s existing attribute gating rather
+   than inventing a second one.
 
 ## Gap table
 
