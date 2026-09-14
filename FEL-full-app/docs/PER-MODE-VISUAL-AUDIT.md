@@ -18,8 +18,8 @@ step-0 audit isolated. Lighting and post are shared and already good (`LightRig`
 
 | Mode | Weakness | Cause |
 |---|---|---|
-| **Golf** | The putting green is a large flat untextured disc that reads as paper. | No detail map on the green mesh; the surrounding terrain has one. |
-| **Skate** | Ramps sit on a flat tan plane; horizon bare. | Ground lacks a detail map. (~~crowd unread~~ — see correction below.) |
+| ~~**Golf**~~ | **FIXED 2026-09-13.** | The cause was NOT a missing detail map — the field already had grass grain via `applyFloorDetail`. The disc is `buildGolfGreen`'s 6 m `CreateDisc`, painted `#35a352` through a **StandardMaterial**, which clips to a pale wash under the PBR rig. Fourth occurrence of that bug in one day. Also added fairway mow stripes, which is what actually makes turf read as a golf course — `buildField`'s painter had branches for tennis, ballpark and pitch and **none for golf**. |
+| **Skate** | Reads as a place; the ground is pale. | ~~Ground lacks a detail map~~ — **wrong, a fourth time**. `buildSkatepark` paints slab joints and stains AND calls `applyFloorDetailToMesh` with asphalt at blend 0.55. The remaining paleness is the authored venice-park palette (`#b8a48c`, a light tan) under a bright rig — an ART decision, not a defect, and not mine to change unasked. |
 | **Velocity Kart** | Fixed this pass — verges now read either side. Still no crowd or grandstand. | `trackside` covers furniture; spectators are not part of it yet. |
 
 **C — looks unfinished.**

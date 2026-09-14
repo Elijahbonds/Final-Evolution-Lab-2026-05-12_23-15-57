@@ -8,17 +8,27 @@
 // plus the missing furniture (net, flag+hole, plate+mound, goal+keeper) and a
 // ballistic flight solver. Athletes are real characters with swing clips.
 
+import { VenueKit } from '../visual/VenueKit';
 import { Color3, DynamicTexture, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, Scene } from '@babylonjs/core';
+import type { AbstractMesh, PBRMaterial, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';
 import { neverBindPose } from '../anim/importSanitizer';
 import type { ModeContext } from '../core/ModeHarness';
 
-const mat = (scene: Scene, hex: string, alpha = 1): StandardMaterial => {
-  const m = new StandardMaterial(`m_${hex}_${alpha}`, scene);
-  m.diffuseColor = Color3.FromHexString(hex);
-  m.specularColor = Color3.Black();
+/**
+ * PBR, not StandardMaterial — and the golf green is why.
+ *
+ * The per-mode audit called golf's putting green "a large flat untextured disc that reads as paper". It is
+ * a 6 m `CreateDisc` painted `#35a352`, which is a perfectly good green — through a StandardMaterial, under
+ * a rig running hemispheric 0.85 plus a directional at 2.60, it clips to a pale wash. Same bug as Velocity
+ * Kart, the trackside layer and Freerun: fourth occurrence, all on one day, all one line each.
+ *
+ * Tracked down the slow way — the disc was non-pickable, so every ray through it reported the ground behind
+ * and I spent two fixes on the wrong mesh before naming this one.
+ */
+const mat = (scene: Scene, hex: string, alpha = 1): PBRMaterial => {
+  const m = VenueKit.paint(scene, `m_${hex}_${alpha}`, hex, 0.05, 0.85);
   m.alpha = alpha;
   return m;
 };

@@ -21,6 +21,11 @@ const mat = (scene: Scene, name: string, hex: string, emissive = 0.06, roughness
 };
 
 /** Painted ground via DynamicTexture — court lines, yard lines, tatami grid… */
+/** Ground up to this span keeps the full baked vignette (a court). */
+export const GLOW_FULL_M = 45;
+/** Past this it has none — the pipeline's own vignette is the only one, and it moves with the camera. */
+export const GLOW_MAX_M = 80;
+
 function paintedGround(
   scene: Scene, w: number, l: number, base: string,
   paint: (ctx: CanvasRenderingContext2D, W: number, H: number) => void,
@@ -31,13 +36,29 @@ function paintedGround(
   ctx.fillStyle = base; ctx.fillRect(0, 0, 1024, 1024);
   paint(ctx, 1024, 1024);
   tex.update();
-  // the finish: a soft center glow painted INTO the texture (no lights added)
-  const glow = ctx.createRadialGradient(512, 512, 60, 512, 512, 640);
-  glow.addColorStop(0, 'rgba(255,255,255,0.10)');
-  glow.addColorStop(1, 'rgba(0,0,0,0.12)');
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, 1024, 1024);
-  tex.update();
+  // THE CENTRE GLOW FADES OUT ON BIG GROUND, and that is the whole golf fix.
+  //
+  // This is one radial gradient baked into a 1024² texture and then stretched over whatever the ground
+  // happens to be. On a 30 × 40 court it is a pleasing vignette. On golf's 60 × 90 field it becomes a pale
+  // disc tens of metres across sitting exactly where the player stands — the per-mode audit read it as "a
+  // flat untextured disc that reads as paper", and picking confirmed the disc IS venue_ground, 3 m away.
+  //
+  // It is also redundant at that size: `LightRig`'s DefaultRenderingPipeline already applies a real,
+  // mood-tinted vignette to the whole frame. A baked one is a second vignette that does not move with the
+  // camera, which is exactly what makes it read as an object rather than as light.
+  //
+  // So it scales with the ground's own size and is gone entirely past GLOW_MAX_M. Small venues are
+  // unchanged; a field keeps its texture and loses the blob.
+  const span = Math.max(w, l);
+  const glowK = Math.max(0, Math.min(1, (GLOW_MAX_M - span) / (GLOW_MAX_M - GLOW_FULL_M)));
+  if (glowK > 0) {
+    const glow = ctx.createRadialGradient(512, 512, 60, 512, 512, 640);
+    glow.addColorStop(0, `rgba(255,255,255,${(0.10 * glowK).toFixed(3)})`);
+    glow.addColorStop(1, `rgba(0,0,0,${(0.12 * glowK).toFixed(3)})`);
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, 1024, 1024);
+    tex.update();
+  }
   const m = new PBRMaterial('venue_ground_mat', scene);
   m.albedoTexture = tex;
   m.emissiveColor = Color3.FromHexString(base).scale(0.08);
@@ -382,6 +403,22 @@ export const VenueKit = {
         ctx.moveTo(W / 2, H * 0.9); ctx.lineTo(W * 0.9, H * 0.4); ctx.stroke();
       } else if (preset === 'pitch') {
         ctx.strokeRect(W * 0.3, H * 0.02, W * 0.4, H * 0.16);            // box
+      } else if (preset === 'golf') {
+        // GOLF HAD NO BRANCH HERE AT ALL — tennis, ballpark and pitch each got their line work and golf got
+        // base colour plus grain, which is why the per-mode audit read it as "a flat untextured disc that
+        // reads as paper". A links has no lines to paint, so the thing that makes turf look like a golf
+        // course is the MOW: alternating cut directions leave alternating light and dark bands, and that
+        // one detail is what the eye uses to read distance down a fairway.
+        const BANDS = 14;
+        for (let i = 0; i < BANDS; i++) {
+          if (i % 2 === 0) continue;                       // every other band is the against-the-grain cut
+          ctx.fillStyle = 'rgba(255,255,255,0.055)';
+          ctx.fillRect(0, (i / BANDS) * H, W, H / BANDS);
+        }
+        // NO PAINTED GREEN. The hole has a real `green` mesh of its own (picked it at 8 m), so painting a
+        // second one into the turf gives the course two greens that do not line up — my first cut drew a
+        // 174 px ellipse on a 1024 texture stretched over 90 m and put a pale blob across the tee. The mow
+        // is the whole point here: it is what a fairway reads as, and the green is somebody else's mesh.
       }
     });
     // Pass 7 phase 2 spread: the same tiled grain the spec floors carry (grass on golf / ballpark / pitch, a faint concrete on tennis)
