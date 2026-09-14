@@ -19,7 +19,7 @@
 import { rivalForNight, rivalIntro, type DunkRival } from '../core/DunkRivals';
 import {
   freshStakes, call as callTrick, spendAttempt, attemptsLeft, canRetry,
-  stakesScale, callLanded, stakesLabel, type Stakes,
+  stakesScale, callLanded, stakesLabel, callPreview, type Stakes,
 } from '../core/DunkStakes';
 import { readWalkOut, saveWalkOut, countPlay, musicCredential, type WalkOut } from '../music/WalkOut';
 import { resolveWalkOut, walkOutLine, type WalkOutCue } from '../music/WalkOutCue';
@@ -65,6 +65,7 @@ import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cue
 import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind } from '../core/DunkObstacles';
 import { runwayTrickById, DUNK_TRICKS, slamReadout, type SlamReadout } from '../core/DunkSystem';
+import { missBeat } from '../core/MissFlavour';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
@@ -273,6 +274,8 @@ export const DunkMode: ModeDefinition = (() => {
   let ended = false;                          // soft-OPEN #3: ctx.end / resultSink once — the watchdog and rivalRound's own end can both reach advanceAfterRivalTurn
   let rivalClipToken = 0;                     // soft-OPEN #3: the rival's clip chains carry the same token guard as the player's
   let rimCamCut = false;                     // broadcast cut latch (per attempt)
+  let verdictCamSet = false;                 // the portrait for the confer, placed once per attempt
+  let rivalCamCut = false;                   // the rival's own broadcast cut, once per his turn
   let hangSlowMoLatch = false;               // JuiceKit.slowMo once per attempt (hang only)
   let contactLatch = false;                  // contactPunch once per attempt (the make's flush frame)
   // ── DUNK-BODY-MID (2026-09-09): the SLAM input contract ──────────────────────────────────────────────────────────
@@ -642,7 +645,8 @@ export const DunkMode: ModeDefinition = (() => {
         const next = i + 1 >= DUNK_TRICKS.length ? null : DUNK_TRICKS[i + 1].id;
         stakes = callTrick(stakes, next);
         ctx.setHud({ attempt: stakesLabel(stakes, calledLabel()) });
-        flash(ctx, stakes.called ? `CALLING ${calledLabel()}` : 'NO CALL', 700);
+        // the bet is PRICED now, not dared -- see DunkStakes.callPreview
+        flash(ctx, stakes.called ? callPreview(calledLabel()) : 'NO CALL', 1100);
         SoundKit.play('uiTick', { pitch: stakes.called ? 1.3 : 0.9 });
       }
       // d-pad cycles PROP during approach (up=none, right=alley-oop,
@@ -1134,6 +1138,14 @@ export const DunkMode: ModeDefinition = (() => {
       }
 
       if (phase === 'rivalTurn') {
+        // REVIEW (2026-09-14): "the rival dunks offscreen" — he was framed by the gameplay follow camera
+        // while the player got a broadcast cut, so his run was a number appearing rather than something you
+        // watched him do. He gets the same under-basket cut now: you have to SEE what you are chasing, or
+        // the deficit on the HUD is just arithmetic.
+        if (!rivalCamCut) {
+          rivalCamCut = true;
+          ctx.camDirector.setFixed(new Vector3(rim.x + 2.9, 1.15, rim.z + 1.9), 1.5, true);
+        }
         ctx.camDirector.update(rival.root.position, Vector3.Zero(), rim);
       } else if (phase === 'cinematic' && rimCamCut) {
         // The position is fixed; the AIM tracks. This is the half that was missing — the camera used to
@@ -1147,6 +1159,21 @@ export const DunkMode: ModeDefinition = (() => {
         // the dunker, waiting on his card, which is the shot the broadcast cuts
         // to. Anything else in frame (the ball is the obvious candidate, and it
         // is wherever it bounced) drags the composition somewhere arbitrary.
+        // REVIEW (2026-09-14): filmed during the confer, this CROPPED him — the hero cut off at the bottom
+        // of frame with the rim half out at the left. A null objective gives the follow preset's own
+        // distance and height, and that preset is tuned for gameplay, not for a man standing still waiting
+        // on a card. Same class of mistake as the rim cut: the right framing for one phase is the wrong one
+        // for another. A fixed three-quarter portrait, placed off his shooting shoulder.
+        if (!verdictCamSet) {
+          verdictCamSet = true;
+          const away = player.root.position.subtract(rim); away.y = 0;
+          if (away.lengthSquared() < 0.01) away.set(0, 0, 1); else away.normalize();
+          const side = new Vector3(-away.z, 0, away.x);
+          ctx.camDirector.setFixed(
+            player.root.position.add(away.scale(3.1)).add(side.scale(1.7)).add(new Vector3(0, 1.75, 0)),
+            1.25, true,
+          );
+        }
         ctx.camDirector.update(player.root.position, Vector3.Zero(), null);
       } else if (phase === 'contestOver') {
         // TRY-ONBOARD G1: the night card sits on a LIVE shot. The camera used to be
@@ -1362,7 +1389,7 @@ export const DunkMode: ModeDefinition = (() => {
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false;
     // the broadcast cut is per-attempt: hand the follow camera back or the next runway is shot from the rim
     ctx.camDirector.mode = 'follow';
-    rimCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
+    rimCamCut = false; verdictCamSet = false; rivalCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
     slamBufferAt = -1; slamSeen = false; slamCueOn = false;   // DUNK-BODY-MID: the slam buffer is per attempt
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
     airHeld = false; dropToFloor = false; replaying = false; replayAir = false; launchRealMs = performance.now();   // A+ P8
@@ -2017,9 +2044,23 @@ export const DunkMode: ModeDefinition = (() => {
   /** #2 miss clank weight: a light metallic hit and a small feel impact on the clank — never the make's contactPunch. */
   function missClank(ctx: ModeContext): void {
     if (obstacleClipped) { console.info('[JUICE-SFX] clank skipped — the chair thud was the one hit'); return; }   // A+ P2: one hit per miss
-    ctx.feel.impact(0.4);
-    SoundKit.play('impact', { pitch: 1.35, volume: 0.45 });
-    console.info('[JUICE-SOFT] miss clank'); console.info('[JUICE-SFX] impact clank');
+    // A MISS TELLS YOU HOW CLOSE YOU WERE NOW (review, 2026-09-14). Every miss used to be one impact sound
+    // whether the press was 40 ms out or half a second out, which throws away the best feedback a
+    // basketball game has: the ball. The flavour is DETERMINISTIC on the timing -- a rolled rattle would be
+    // prettier and would teach nothing. See core/MissFlavour.
+    const beat = missBeat(slamTiming?.offsetMs ?? null);
+    ctx.feel.impact(beat.punch);
+    if (beat.ringIt) {
+      // it actually touched the iron: spring the ring and rattle it, rather than a flat clank in the air
+      hoopJuice?.punch();
+      SoundKit.play('rattle', { pitch: beat.flavour === 'in_and_out' ? 0.95 : 1.1, volume: 0.55 });
+      SoundKit.play('clang', { pitch: 1.2, volume: 0.35 });
+    } else {
+      SoundKit.play('impact', { pitch: 1.35, volume: 0.45 });
+    }
+    SoundKit.play('crowdGroan', { volume: beat.groan });
+    ctx.momentum.report({ kind: 'miss', weight: beat.flavour === 'in_and_out' ? -3 : -6 });   // an in-and-out barely cools the room
+    console.info(`[JUICE-SOFT] miss ${beat.flavour} (${slamTiming?.offsetMs ?? 'no press'} ms)`);
   }
   /** #3 land settle: a micro shake (amp 0.05) and dust at the feet, once per attempt; the miss keeps its one-breath retry. */
   /** A+ P4: armed at CONTACT (make) or at the clank (miss); fires from update() once the body is back on the floor. */
@@ -2147,7 +2188,8 @@ export const DunkMode: ModeDefinition = (() => {
       // explained; no card flip for the one-beat miss (the reveal's CONFER hint used to stack under the banner)
       // a MISS is where the silence hurt most: three of six measured attempts scored nothing and said
       // nothing. If the finger moved at all, say what it did.
-      flash(ctx, slamTiming ? `${missWhy()} — MISSED · ${slamTiming.label}` : `${missWhy()} — MISSED · JUDGES ${missTotal}`);
+      const mb = missBeat(slamTiming?.offsetMs ?? null);
+      flash(ctx, slamTiming ? `${missWhy()} — ${mb.label} · ${slamTiming.label}` : `${missWhy()} — ${mb.label} · JUDGES ${missTotal}`);
       ctx.setHud({ slamTiming: slamTiming?.label ?? '' });
       ctx.setHud({ judgeReveal: [], hint: '', score: playerTotal, chain, hype: Math.round(hype) });
       landingClip = SPORT_CLIP.dunkLandCrouch; landNow();   // A+ P8 H5: normally landed at feet-down already (~0.1 s after the release); this is the floor

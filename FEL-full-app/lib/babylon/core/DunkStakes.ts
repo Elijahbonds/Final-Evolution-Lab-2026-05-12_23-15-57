@@ -106,6 +106,19 @@ export function callLanded(s: Stakes, landedTrickIds: readonly string[], made: b
   return !!s.called && made && landedTrickIds.includes(s.called);
 }
 
+/**
+ * What calling this dunk is worth, in words, BEFORE the run.
+ *
+ * From the review: "the called dunk is a blind bet — you commit on L1 with no idea what landing it pays or
+ * what failing it costs, which makes the most interesting decision in the mode a guess the first several
+ * times." A risk you cannot price is not a decision, it is a dare. The numbers were always here.
+ */
+export function callPreview(trickLabel: string): string {
+  const up = Math.round((CALL_BONUS - 1) * 100);
+  const down = Math.round((1 - CALL_MISS_SCALE) * 100);
+  return `CALLING ${trickLabel} · LAND IT +${up}% · MISS IT −${down}%`;
+}
+
 /** The bezel's attempt chip: "1 OF 3", and the called trick when there is one. */
 export function stakesLabel(s: Stakes, calledLabel?: string): string {
   const n = Math.min(ATTEMPTS_PER_DUNK, Math.max(1, s.attemptsUsed + 1));

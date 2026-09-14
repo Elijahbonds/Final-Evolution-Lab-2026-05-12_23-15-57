@@ -20,7 +20,8 @@ And then you press the button and the game tells you nothing.
 
 **7.5 / 10** — *Deep, good-looking, and almost entirely unwilling to explain itself.*
 
-> **RE-SCORE after the depth pass: 9 / 10.** The silence is gone, the camera holds the money shot, and
+> **RE-SCORE after the depth pass: 9 / 10.** *(All four remaining items closed the same day — see the
+> bottom. The list below is what they were.)* The silence is gone, the camera holds the money shot, and
 > the replay is the dunk instead of the walk-up. What is still between it and a 10 is listed at the bottom
 > — and it is short, but none of it is cosmetic.
 
@@ -128,13 +129,18 @@ already computed; it goes to `console.info` instead of the screen. Highest value
 | F4 | the approach hint is one line in both places it appeared | — |
 | **depth** | the replay is trimmed to the **flight** rather than the whole 4 s ring | filmed: the same replay moment went from "jogging mid-court, ball on the floor" to the dunker at the rim with the ball |
 
-### What still stands between this and a 10
+### What stood between this and a 10 — all four now closed
 
-1. **The verdict camera crops the dunker.** Filmed during the judges' confer: the hero is cut off at the
-   bottom of frame with the rim half out at the left. Same class of bug as F2, different phase.
-2. **The called dunk is a blind bet.** You commit on L1 with no idea what landing it pays or what failing
-   it costs, which makes the most interesting decision in the mode a guess the first several times.
-3. **A miss has no spectacle.** The rim rattles, and that is it. A near-miss that hangs on the iron and
-   drops out is the other half of what makes a dunk contest watchable.
-4. **The rival dunks offscreen.** `rivalTurn` frames him, but he never gets the broadcast treatment the
+| | was | now |
+|---|---|---|
+| verdict camera cropped the dunker | hero cut off at the bottom, rim half out at the left | fixed three-quarter portrait off his shooting shoulder — **measured 3.9° off axis**, dead centre |
+| the called dunk was a blind bet | `CALLING WINDMILL` and nothing else | `CALLING WINDMILL · LAND IT +20% · MISS IT −25%` — priced before you commit |
+| a miss had no spectacle | one impact sound, identical at 40 ms out and half a second out | `MissFlavour` — **air / off the iron / in-and-out**, deterministic on your timing, the rim actually springs |
+| the rival dunked offscreen | gameplay follow camera while the player got a broadcast cut | the same under-basket cut, so you watch what you are chasing |
+
+**The miss flavour is deterministic on purpose.** A rolled rattle would look better and teach nothing — and
+"so close!" that turns out to be a dice roll is an insult the second time a player notices. How far the
+ball gets *is* how close the press was. Verified: a run with no slam press at all correctly reads `air`
+rather than inventing a near-miss.
+
    player does — no replay, no rim cut — so his run is a number appearing rather than a thing you watched.
