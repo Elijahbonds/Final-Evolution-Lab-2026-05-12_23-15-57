@@ -7,12 +7,16 @@
 // lives in lib/babylon/* cores; nothing game-specific is duplicated here.
 
 import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue, type HudScoreCard } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
+import { PadChips } from '@/lib/babylon/ui/PadChips';
+import { HostLobby } from '@/components/controller-link/host-lobby';
+import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
+import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnode, hnum } from './hud-format';
 
 type Hud = Record<string, HudValue>;
@@ -47,12 +51,15 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  // CONTROLLER-UNIVERSAL-MULTI: the chips and the phone link need the bus in RENDER, and busRef alone never re-renders
+  const [bus, setBus] = useState<InputBus | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const bus = new InputBus();
     busRef.current = bus;
+    setBus(bus);
     let stop: (() => void) | null = null;
     let disposed = false;
 
@@ -159,6 +166,15 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
     // READY gate + pause both advance on any button press.
     emit({ t: 'button', btn: 'START', pressed: true });
   }, [emit]);
+
+  // ── Controller Link (CONTROLLER-UNIVERSAL-MULTI) ──────────────────────────
+  // A phone joins by QR as this contest's pad while the host is on the TV. ONE adapter per bus: toInputBus keeps the
+  // held RUN ramp and the held d-pad between events, so a fresh adapter per event could never stop a charge it started.
+  const controllerConfig = useMemo(() => controllerConfigFor('dunk'), []);
+  const linkSink = useMemo(() => (bus ? toInputBus(bus) : null), [bus]);
+  const onControllerInput = useCallback((ev: Parameters<ReturnType<typeof toInputBus>>[0]) => { linkSink?.(ev); }, [linkSink]);
+  // a controller paired to the PHONE arrives already canonical — straight onto the hero stream, like a local pad
+  const onPhonePad = useCallback((e: Parameters<InputBus['emit']>[0]) => { bus?.emit(e); }, [bus]);
 
   return (
     <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent">
@@ -342,6 +358,13 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           <span className="fel-heading text-3xl font-bold text-white">PAUSED — TAP TO RESUME</span>
         </button>
       )}
+
+      {/* CONTROLLER-UNIVERSAL-MULTI: phones join as pads (lazy — no room until the badge is tapped), TV MODE lives in its
+          panel, and every local controller gets a named chip (bottom-left: a connected pad hides the touch deck that lives there). */}
+      {controllerConfig && bus && (
+        <HostLobby config={controllerConfig} onInput={onControllerInput} onPadInput={onPhonePad} collapsed={phase === 'playing'} lazy anchor="left-4 top-14" />
+      )}
+      {bus && <PadChips bus={bus} className="left-4 bottom-4" />}
 
       {/* M35: THE single touch control surface — one overlay per mode, ever. */}
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (

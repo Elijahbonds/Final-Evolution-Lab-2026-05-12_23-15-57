@@ -14,10 +14,40 @@ import { HAPTIC } from '../premium/Haptics';
 // Input & Presence Phase A: the pad is read through a PROFILE now. Everything below keeps its FelInput
 // contract exactly — no mode file and no existing test changes — but the indices it reads are the profile's
 // rather than a hardcoded Standard Gamepad table, and the stick deadzone is radial instead of per-axis.
-import { profileFor, readPad, type ControllerProfile } from '@/lib/input/profiles';
+import { profileFor, readPad, supportCheck, type CanonicalPad, type ControllerProfile } from '@/lib/input/profiles';
 import { applyRemap, readRemap } from '@/lib/input/remap';
+import { MAX_SLOTS } from '@/lib/input/PlayerSlots';
+import { mergePads } from '@/lib/input/padMerge';
 
 type Listener = (e: FelInput) => void;
+type SlotListener = (e: FelInput, slot: number) => void;
+type FelButton = 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START';
+type PadDirName = 'up' | 'down' | 'left' | 'right';
+const FEL_BUTTONS: readonly FelButton[] = ['A', 'B', 'X', 'Y', 'L1', 'R1', 'SELECT', 'START'];
+const DPAD_DIRS: readonly PadDirName[] = ['up', 'down', 'left', 'right'];
+
+/** One connected local pad, as the connect chips show it: `P{slot + 1} {name}`. */
+export interface PadInfo {
+  slot: number;
+  /** The browser's gamepad index (not the player number). */
+  index: number;
+  id: string;
+  profileId: string;
+  name: string;
+  /** The profile's own "does not work on this device" reason (the Switch 2 Pro on iOS), or null. */
+  unsupported: string | null;
+}
+type PadsListener = (pads: PadInfo[]) => void;
+interface HeldPad {
+  index: number;
+  id: string;
+  profile: ControllerProfile;
+  lastL: { x: number; y: number } | null;
+  lastR: { x: number; y: number } | null;
+  trigL: number;
+  trigR: number;
+  held: Set<string>;
+}
 
 const KEYMAP: Record<string, FelInput> = {
   j: { t: 'button', btn: 'A', pressed: true },
@@ -40,11 +70,13 @@ const ARROWS: Record<string, 'up' | 'down' | 'left' | 'right'> = { arrowup: 'up'
 
 export class InputBus {
   private listeners = new Set<Listener>();
+  private slotListeners = new Set<SlotListener>();
+  private padListeners = new Set<PadsListener>();
   private held = new Set<string>();
-  private padIndex: number | null = null;
   private raf = 0;
   /** Space doubles as R-trigger analog (hold-depth) for charge mechanics. */
   private spaceDownAt = 0;
+  /** True while ANY local pad is held (the touch overlay hides on it). */
   public gamepadActive = false;
 
   start(): void {
@@ -52,7 +84,7 @@ export class InputBus {
     window.addEventListener('keyup', this.onKey);
     window.addEventListener('gamepadconnected', this.onPad);
     window.addEventListener('gamepaddisconnected', this.onPadOff);
-    this.adoptPad();     // a pad plugged in BEFORE this page loaded never fires gamepadconnected — take it now
+    this.syncPads(this.readPads());   // a pad plugged in BEFORE this page loaded never fires gamepadconnected — take it now
     this.pollPads();
   }
   stop(): void {
@@ -70,6 +102,36 @@ export class InputBus {
   emit(e: FelInput): void {                        // touch overlay calls this directly
     if (e.t === 'button' && e.pressed) HAPTIC.tap();  // 10ms button-down buzz (throttled in Haptics) //TUNE(elijah)
     this.listeners.forEach((fn) => fn(e));
+  }
+
+  /**
+   * The SLOT-TAGGED stream (CONTROLLER-UNIVERSAL-MULTI): every local pad as its own player, slot 0 = P1 … 3 = P4.
+   * A multi-local mode subscribes HERE and ignores `on()` — `on()` carries every pad merged into one hero (padMerge)
+   * plus the keyboard and the touch overlay, which is what every single-player mode wants.
+   */
+  onSlot(fn: SlotListener): () => void {
+    this.slotListeners.add(fn);
+    return () => this.slotListeners.delete(fn);
+  }
+  /** Feed one player's event from outside the local pads (a Controller Link relay, a test). */
+  emitSlot(slot: number, e: FelInput): void {
+    this.slotListeners.forEach((fn) => fn(e, slot));
+  }
+  /** The connected pads, for the connect chips. Called with the current roster at once, then on every change. */
+  onPads(fn: PadsListener): () => void {
+    this.padListeners.add(fn);
+    fn(this.pads());
+    return () => this.padListeners.delete(fn);
+  }
+  pads(): PadInfo[] {
+    const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent ?? '';
+    const out: PadInfo[] = [];
+    this.slots.forEach((s, slot) => {
+      if (!s) return;
+      const support = supportCheck(s.profile, ua);
+      out.push({ slot, index: s.index, id: s.id, profileId: s.profile.id, name: s.profile.name, unsupported: support.ok ? null : support.why });
+    });
+    return out;
   }
 
   private onKey = (ev: KeyboardEvent): void => {
@@ -98,101 +160,130 @@ export class InputBus {
   };
 
   // ── Gamepad adoption (DUNK-LIVE-INPUT-FAIL, 2026-09-07) ──
-  // ROOT CAUSE of the live /try FAIL (L stick dead, R look dead, arms frozen, hero back-facing): `padIndex` was set
-  // ONLY by `gamepadconnected`, and a DualShock that was already plugged in when the page loaded never fires it —
+  // ROOT CAUSE of the live /try FAIL (L stick dead, R look dead, arms frozen, hero back-facing): the pad was adopted
+  // ONLY on `gamepadconnected`, and a DualShock that was already plugged in when the page loaded never fires it —
   // the browser only raises the event for a pad that connects (or first reports a button press) AFTER the listener
-  // is registered. So on a real /try load with the pad already in, `pollPads` read nothing for the whole contest.
-  // The fake-Gamepad probe dispatched its own connect event after start() and so never saw it. Now: start() scans
-  // `navigator.getGamepads()` and adopts the first live slot; while no pad is held, pollPads re-scans EVERY frame
-  // (Chrome fills the slot only on the first button press — the scan catches it the frame it appears, and catches a
-  // re-plug after a disconnect); a slot that goes null / `connected === false` without an event is dropped the same
-  // way. `getGamepads()` is guarded — it throws in a document whose permissions policy denies the Gamepad API.
-  private onPad = (ev: GamepadEvent): void => { this.adopt(ev.gamepad); };
-  private onPadOff = (ev: GamepadEvent): void => {
-    if (this.padIndex !== null && ev.gamepad?.index !== undefined && ev.gamepad.index !== this.padIndex) return;   // another pad left
-    this.dropPad();
-    this.adoptPad();    // a second pad that is still in takes over at once
-  };
-  /** The profile for the pad currently held. Re-resolved on every adopt, because it is a different pad. */
-  private profile: ControllerProfile | null = null;
-  private adopt(pad: Gamepad): void {
-    if (this.padIndex === pad.index) return;
-    this.padIndex = pad.index; this.gamepadActive = true;
-    this.lastL = null; this.lastR = null;
-    this.profile = profileFor(pad);
-    console.info(`[PAD] adopted slot ${pad.index}: ${pad.id || 'gamepad'} → profile "${this.profile.id}" (mapping ${pad.mapping || 'none'})`);
-  }
-  private dropPad(): void {
-    if (this.padIndex === null) return;
-    const idx = this.padIndex;
-    this.padIndex = null; this.gamepadActive = false; this.profile = null;
-    // a pad yanked mid-push must not leave its last stick / trigger / button latched in every mode
-    if (this.lastL && (this.lastL.x !== 0 || this.lastL.y !== 0)) this.emit({ t: 'stick', side: 'L', x: 0, y: 0 });
-    if (this.lastR && (this.lastR.x !== 0 || this.lastR.y !== 0)) this.emit({ t: 'stick', side: 'R', x: 0, y: 0 });
-    this.lastL = null; this.lastR = null;
-    for (const k of [...this.held]) {
-      if (!k.startsWith('pad_')) continue;
-      this.held.delete(k);
-      if (k.startsWith('pad_dpad_')) this.emit({ t: 'dpad', dir: k.slice(9) as 'up' | 'down' | 'left' | 'right', pressed: false });
-      else this.emit({ t: 'button', btn: k.slice(4) as 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START', pressed: false });
-    }
-    console.info(`[PAD] dropped slot ${idx}`);
-  }
+  // is registered. So start() scans `navigator.getGamepads()`, and pollPads re-scans EVERY frame (Chrome fills the
+  // slot only on the first button press — the scan catches it the frame it appears, and catches a re-plug after a
+  // disconnect); a slot that goes null / `connected === false` without an event is dropped the same way.
+  // `getGamepads()` is guarded — it throws in a document whose permissions policy denies the Gamepad API.
+  //
+  // ── FOUR PADS (CONTROLLER-UNIVERSAL-MULTI, 2026-09-14) ──
+  // The bus held exactly ONE pad, so a second DualSense / Switch Pro in the room was invisible. Now every live
+  // gamepad takes the lowest free player slot (the first pad is P1) and keeps it until it leaves — slots are NOT
+  // compacted, so P2 stays P2 when P1's battery dies. Each pad is read through its OWN profile. Two streams:
+  //   • on()      — all pads merged (padMerge: furthest push / deepest pull / any-held), plus keyboard and touch.
+  //                 With one pad this is byte-for-byte the old single-pad stream.
+  //   • onSlot()  — each pad's own edges tagged with its slot, for a mode that seats more than one player.
+  private slots: (HeldPad | null)[] = Array.from({ length: MAX_SLOTS }, () => null);
+  private onPad = (): void => { this.syncPads(this.readPads()); };
+  private onPadOff = (): void => { this.syncPads(this.readPads()); };
   private readPads(): ReadonlyArray<Gamepad | null> {
     try { return typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function' ? navigator.getGamepads() : []; }
     catch { return []; }
   }
-  /** Adopt the first live pad slot when none is held. Returns true when a pad is held afterwards. */
-  private adoptPad(): boolean {
-    if (this.padIndex !== null) return true;
-    for (const p of this.readPads()) {
-      if (p && p.connected !== false) { this.adopt(p); return true; }
+  /** Drop pads that left, seat pads that arrived. Returns the live Gamepad per held slot. */
+  private syncPads(list: ReadonlyArray<Gamepad | null>): (Gamepad | null)[] {
+    const live = new Map<number, Gamepad>();
+    list.forEach((p, i) => { if (p && p.connected !== false) live.set(p.index ?? i, p); });
+    let changed = false;
+    this.slots.forEach((s, slot) => {
+      if (s && !live.has(s.index)) { this.dropSlot(slot); changed = true; }
+    });
+    for (const [index, pad] of live) {
+      if (this.slots.some((s) => s?.index === index)) continue;
+      const free = this.slots.findIndex((s) => s === null);
+      if (free < 0) break;                            // four players is the couch
+      const profile = profileFor(pad);
+      this.slots[free] = { index, id: pad.id || 'gamepad', profile, lastL: null, lastR: null, trigL: -1, trigR: -1, held: new Set() };
+      console.info(`[PAD] P${free + 1} adopted slot ${index}: ${pad.id || 'gamepad'} → profile "${profile.id}" (mapping ${pad.mapping || 'none'})`);
+      changed = true;
     }
-    return false;
+    this.gamepadActive = this.slots.some((s) => s !== null);
+    if (changed) { const roster = this.pads(); this.padListeners.forEach((fn) => fn(roster)); }
+    return this.slots.map((s) => (s ? live.get(s.index) ?? null : null));
   }
-  // The pad's sticks are emitted ON CHANGE, like the keyboard's — a centred pad that emitted (0, 0) every frame
-  // overwrote a held W / ArrowUp on every mode that keeps the last stick (all of them), so with a pad plugged in the
-  // keyboard could never move the hero. Last writer wins between the two, exactly as before for two keyboards.
+  /** A pad left: release everything IT was holding on its own slot stream. The merged stream re-derives next read. */
+  private dropSlot(slot: number): void {
+    const s = this.slots[slot];
+    if (!s) return;
+    this.slots[slot] = null;
+    // a pad yanked mid-push must not leave its last stick / trigger / button latched in a multi-local mode
+    if (s.lastL && (s.lastL.x !== 0 || s.lastL.y !== 0)) this.emitSlot(slot, { t: 'stick', side: 'L', x: 0, y: 0 });
+    if (s.lastR && (s.lastR.x !== 0 || s.lastR.y !== 0)) this.emitSlot(slot, { t: 'stick', side: 'R', x: 0, y: 0 });
+    if (s.trigL > 0) this.emitSlot(slot, { t: 'trigger', side: 'L', value: 0 });
+    if (s.trigR > 0) this.emitSlot(slot, { t: 'trigger', side: 'R', value: 0 });
+    for (const k of s.held) {
+      if (k.startsWith('dpad_')) this.emitSlot(slot, { t: 'dpad', dir: k.slice(5) as PadDirName, pressed: false });
+      else this.emitSlot(slot, { t: 'button', btn: k as FelButton, pressed: false });
+    }
+    console.info(`[PAD] P${slot + 1} dropped slot ${s.index}`);
+  }
+  // The MERGED pad's sticks are emitted ON CHANGE, like the keyboard's — a centred pad that emitted (0, 0) every
+  // frame overwrote a held W / ArrowUp on every mode that keeps the last stick (all of them), so with a pad plugged in
+  // the keyboard could never move the hero. Last writer wins between the two, exactly as before for two keyboards.
   private lastL: { x: number; y: number } | null = null;
   private lastR: { x: number; y: number } | null = null;
+  /** The merged stream had at least one pad last frame. */
+  private mergedLive = false;
   private emitStick(side: 'L' | 'R', x: number, y: number): void {
     const last = side === 'L' ? this.lastL : this.lastR;
     if (last && last.x === x && last.y === y) return;
     if (side === 'L') this.lastL = { x, y }; else this.lastR = { x, y };
     this.emit({ t: 'stick', side, x, y });
   }
+  /** One pad's own edges on the slot stream: sticks and triggers on change, buttons on press / release. */
+  private emitSlotPad(slot: number, s: HeldPad, c: CanonicalPad): void {
+    if (!s.lastL || s.lastL.x !== c.lx || s.lastL.y !== c.ly) { s.lastL = { x: c.lx, y: c.ly }; this.emitSlot(slot, { t: 'stick', side: 'L', x: c.lx, y: c.ly }); }
+    if (!s.lastR || s.lastR.x !== c.rx || s.lastR.y !== c.ry) { s.lastR = { x: c.rx, y: c.ry }; this.emitSlot(slot, { t: 'stick', side: 'R', x: c.rx, y: c.ry }); }
+    if (s.trigL !== c.triggers.L) { s.trigL = c.triggers.L; this.emitSlot(slot, { t: 'trigger', side: 'L', value: c.triggers.L }); }
+    if (s.trigR !== c.triggers.R) { s.trigR = c.triggers.R; this.emitSlot(slot, { t: 'trigger', side: 'R', value: c.triggers.R }); }
+    for (const dir of DPAD_DIRS) {
+      const key = `dpad_${dir}`, pressed = c.dpad[dir];
+      if (pressed !== s.held.has(key)) { pressed ? s.held.add(key) : s.held.delete(key); this.emitSlot(slot, { t: 'dpad', dir, pressed }); }
+    }
+    for (const btn of FEL_BUTTONS) {
+      const pressed = c.buttons[btn];
+      if (pressed !== s.held.has(btn)) { pressed ? s.held.add(btn) : s.held.delete(btn); this.emitSlot(slot, { t: 'button', btn, pressed }); }
+    }
+  }
 
   private pollPads = (): void => {
-    if (this.padIndex === null) this.adoptPad();
-    if (this.padIndex !== null) {
-      const pad = this.readPads()[this.padIndex];
-      if (!pad || pad.connected === false) {
-        this.dropPad();                              // the slot emptied without a disconnect event
-      } else {
-        // ONE read, through the profile: the indices, the axis order and the deadzone are all the pad's own.
-        // A Switch Pro's bottom face button arrives here as A, the same as an Xbox pad's — before this it
-        // arrived as B, on every Switch controller, with nothing in the tree able to notice.
-        const profile = this.profile ?? profileFor(pad);
-        const canon = applyRemap(readPad(pad, profile), readRemap(profile.id));
-        this.emitStick('L', canon.lx, canon.ly);
-        this.emitStick('R', canon.rx, canon.ry);
-        this.emit({ t: 'trigger', side: 'L', value: canon.triggers.L });
-        this.emit({ t: 'trigger', side: 'R', value: canon.triggers.R });
-        // the keyboard arrows and the touch overlay's d-pad already emit these same events, so a real
-        // controller's physical d-pad feeds the identical path
-        for (const dir of ['up', 'down', 'left', 'right'] as const) {
-          const pressed = canon.dpad[dir];
-          const key = `pad_dpad_${dir}`;
-          if (pressed && !this.held.has(key)) { this.held.add(key); this.emit({ t: 'dpad', dir, pressed: true }); }
-          if (!pressed && this.held.has(key)) { this.held.delete(key); this.emit({ t: 'dpad', dir, pressed: false }); }
-        }
-        for (const btn of ['A', 'B', 'X', 'Y', 'L1', 'R1', 'SELECT', 'START'] as const) {
-          const pressed = canon.buttons[btn];
-          const key = `pad_${btn}`;
-          if (pressed && !this.held.has(key)) { this.held.add(key); this.emit({ t: 'button', btn, pressed: true }); }
-          if (!pressed && this.held.has(key)) { this.held.delete(key); this.emit({ t: 'button', btn, pressed: false }); }
-        }
+    const live = this.syncPads(this.readPads());
+    const canons: CanonicalPad[] = [];
+    live.forEach((pad, slot) => {
+      const s = this.slots[slot];
+      if (!pad || !s) return;
+      // ONE read per pad, through ITS profile: the indices, the axis order and the deadzone are all the pad's own.
+      // A Switch Pro's bottom face button arrives here as A, the same as an Xbox pad's — before the profile layer it
+      // arrived as B, on every Switch controller, with nothing in the tree able to notice.
+      const canon = applyRemap(readPad(pad, s.profile), readRemap(s.profile.id));
+      canons.push(canon);
+      if (this.slotListeners.size) this.emitSlotPad(slot, s, canon);
+    });
+    // The merged hero. It also runs on the ONE frame after the last pad leaves, so that pad's latches are released.
+    if (canons.length || this.mergedLive) {
+      const canon = mergePads(canons);
+      this.emitStick('L', canon.lx, canon.ly);
+      this.emitStick('R', canon.rx, canon.ry);
+      this.emit({ t: 'trigger', side: 'L', value: canon.triggers.L });
+      this.emit({ t: 'trigger', side: 'R', value: canon.triggers.R });
+      // the keyboard arrows and the touch overlay's d-pad already emit these same events, so a real
+      // controller's physical d-pad feeds the identical path
+      for (const dir of DPAD_DIRS) {
+        const pressed = canon.dpad[dir];
+        const key = `pad_dpad_${dir}`;
+        if (pressed && !this.held.has(key)) { this.held.add(key); this.emit({ t: 'dpad', dir, pressed: true }); }
+        if (!pressed && this.held.has(key)) { this.held.delete(key); this.emit({ t: 'dpad', dir, pressed: false }); }
       }
+      for (const btn of FEL_BUTTONS) {
+        const pressed = canon.buttons[btn];
+        const key = `pad_${btn}`;
+        if (pressed && !this.held.has(key)) { this.held.add(key); this.emit({ t: 'button', btn, pressed: true }); }
+        if (!pressed && this.held.has(key)) { this.held.delete(key); this.emit({ t: 'button', btn, pressed: false }); }
+      }
+      this.mergedLive = canons.length > 0;
+      if (!this.mergedLive) { this.lastL = null; this.lastR = null; console.info('[PAD] no pads held'); }
     }
     // Space analog charge depth while held (0→1 over 1.1s)
     if (this.held.has(' ')) {

@@ -12,6 +12,7 @@ import { BootSplash } from './boot-splash';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
+import { PadChips } from '@/lib/babylon/ui/PadChips';   // CONTROLLER-UNIVERSAL-MULTI: pass-the-pad nights name each controller
 import { hnode } from './hud-format';
 /** The between-events scoreboard rows the mode publishes (HudScoreCard shape). */
 const isBoard = (v: unknown): v is { name: string; score: number | string; line: string }[] =>
@@ -177,6 +178,7 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
         </button>
       )}
 
+      {busRef.current && <PadChips bus={busRef.current} className="left-4 bottom-4" />}
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (
         <TouchOverlay bus={busRef.current} modeId="carnival" visible />
       )}

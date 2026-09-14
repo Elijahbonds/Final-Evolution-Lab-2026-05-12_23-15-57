@@ -61,6 +61,7 @@ import { HoopJuice } from '../visual/HoopJuice';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
+import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
 import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, DOUBLE_UP_WINDOW_M, DOUBLE_UP_MIN_SPEED, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind } from '../core/DunkObstacles';
@@ -404,6 +405,13 @@ export const DunkMode: ModeDefinition = (() => {
   // different opponent instead of a coin-flip that can hand you the same one twice.
   let foe: DunkRival = rivalForNight(1);
   let trickLabels: string[] = [];                // this attempt's thrown tricks
+  // TV MODE (CONTROLLER-UNIVERSAL-MULTI, 2026-09-14). Mirroring to a TV delays the PICTURE, not the pad, so a player who
+  // presses on what they see presses late. The host's TV MODE toggle widens the slam window by the display factor
+  // (tvMode.ts, 1.35x) exactly as 3PT widens its release bands. Read once per jump at takeoff, never inside one — and
+  // 1.0 with TV MODE off, so the direct-display window is the tuned 0.28 s byte for byte. Every read of the base window
+  // (open/close, the scoring half, the hang pace to the resolve) goes through the one helper so they cannot disagree.
+  let tvFactor = 1;
+  function slamWindowBase(): number { return CFG.qteWindowSec * tvFactor; }
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
   function setWin(w: Win): void { if (win === w) return; win = w; console.info(`[DUNK-WIN] ${w}`); }
@@ -949,7 +957,7 @@ export const DunkMode: ModeDefinition = (() => {
 
         const wasOpen = qteWindowOpen, wasCue = slamCueOn;
         flight.update(dt * (Number.isFinite(animScale) && animScale > 0 ? animScale : 1));   // the air budget burns in CLIP time — the hang slow-mo stretched the flight but not the budget, so a second trick was refused for air the player could see
-        const window = CFG.qteWindowSec * (1 - styleTaps * 0.25) * flight.slamWindowScale;
+        const window = slamWindowBase() * (1 - styleTaps * 0.25) * flight.slamWindowScale;
         const openAt = EASTBAY_TIMING.extend - window / 2, closeAt = EASTBAY_TIMING.extend + window / 2;
         qteWindowOpen = clipTime >= openAt && clipTime <= closeAt;
         // DUNK-BODY-MID: the SLAM READ and the accepted input are the same thing. The window is ~14 rendered frames wide;
@@ -1278,7 +1286,7 @@ export const DunkMode: ModeDefinition = (() => {
     slamBufferAt = -1; slamSeen = true;
     qteHit = true;
     const center = EASTBAY_TIMING.extend;
-    const window = CFG.qteWindowSec * (1 - styleTaps * 0.25) * flight.slamWindowScale;
+    const window = slamWindowBase() * (1 - styleTaps * 0.25) * flight.slamWindowScale;
     // The execution curve is ONE curve over the whole accepted press — late of centre it falls across the window's own
     // half, early of centre across that half PLUS the buffer. A press is scored by how far it was from the perfect
     // beat, and being earlier is always worth less than being later-but-still-early; a two-branch version (a flat floor
@@ -1303,7 +1311,7 @@ export const DunkMode: ModeDefinition = (() => {
   function bufferSlam(): void {
     if (phase !== 'cinematic' || lob.live) return;
     slamSeen = true; slamBufferAt = clipTime;
-    console.info(`[DUNK-SLAM] buffered @${clipTime.toFixed(2)} (window opens @${(EASTBAY_TIMING.extend - CFG.qteWindowSec * (1 - styleTaps * 0.25) * flight.slamWindowScale / 2).toFixed(2)})`);
+    console.info(`[DUNK-SLAM] buffered @${clipTime.toFixed(2)} (window opens @${(EASTBAY_TIMING.extend - slamWindowBase() * (1 - styleTaps * 0.25) * flight.slamWindowScale / 2).toFixed(2)})`);
   }
 
   /** A trick button in the air: the cue table decides — before the trick's beat it is ARMED (fires on the beat), inside
@@ -1384,6 +1392,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (runwayBeat && runwayBeat.id !== 'doubleup') endRunwayBeat(true);   // a toss / kick / cartwheel still running gives the body to the takeoff (no run loop in between — the launch clip crossfades out of the beat)
     runwayBeat = null; launchQueued = false;
     setPhase('cinematic'); setWin('takeoff');
+    { const f = readDisplaySetting().factor; if (f !== tvFactor) console.info(`[DUNK] TV MODE slam window x${f.toFixed(2)}`); tvFactor = f; }
     launchZ = player.root.position.z; airTrick = null; obstacleOver = false; obstacleCleared = false; obstacleMargin = Infinity;
     activeHandOff = null; ikSideK = 0;
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false;
@@ -1772,7 +1781,7 @@ export const DunkMode: ModeDefinition = (() => {
   /** The hang paced to last until the resolve (the rival's hop trick): a 0.35 s takeoff flowed into a 0.8 s hang that ran out
    *  0.24 s before the finish — 12 frames with no clip on the body (measured on the duel's plain launch). */
   function hangRateToResolve(): number {
-    const left = Math.max(0.3, EASTBAY_TIMING.extend + CFG.qteWindowSec / 2 + 0.05 - clipTime);
+    const left = Math.max(0.3, EASTBAY_TIMING.extend + slamWindowBase() / 2 + 0.05 - clipTime);
     const hang = player.animator.durationOf(SPORT_CLIP.dunkScoreHang) ?? 0.8;
     return Math.max(0.35, Math.min(1, hang / left));
   }

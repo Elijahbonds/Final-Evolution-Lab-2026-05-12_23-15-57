@@ -19,6 +19,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { rackPips, SHOT_TARGET, PERFECT_BAND, GOOD_BAND } from '@/lib/babylon/core/shootoutHud';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
+import { PadChips } from '@/lib/babylon/ui/PadChips';
 import { HostLobby } from '@/components/controller-link/host-lobby';
 import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
@@ -114,10 +115,19 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   // but a shootout has ONE shooter, so without a turn order four phones would be four people fighting over
   // one pair of hands. slotDrives() answers the single question this callback needs; with no phones
   // connected it is always true, so keyboard and local-pad play are never gated by a lobby nobody is using.
+  // ONE adapter per bus (CONTROLLER-UNIVERSAL-MULTI): toInputBus holds the held-charge ramp between events, and a
+  // fresh adapter per event could never stop the ramp its own 'charge:down' started.
+  const linkSink = useRef<{ bus: InputBus; sink: ReturnType<typeof toInputBus> } | null>(null);
   const onControllerInput = useCallback((ev: Parameters<ReturnType<typeof toInputBus>>[0], slot: number) => {
     if (!slotDrives(orderRef.current, slot)) return;
     const bus = busRef.current;
-    if (bus) toInputBus(bus)(ev);
+    if (!bus) return;
+    if (linkSink.current?.bus !== bus) linkSink.current = { bus, sink: toInputBus(bus) };
+    linkSink.current.sink(ev);
+  }, []);
+  // a controller paired to a phone arrives canonical (the binary relay) — same turn gate, straight onto the bus
+  const onPhonePad = useCallback((e: Parameters<InputBus['emit']>[0], slot: number) => {
+    if (slotDrives(orderRef.current, slot)) busRef.current?.emit(e);
   }, []);
 
   const onPeers = useCallback((peers: LobbyPeer[]) => {
@@ -162,9 +172,11 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           config={controllerConfig}
           onInput={onControllerInput}
           onPeers={onPeers}
+          onPadInput={onPhonePad}
           collapsed={phase === 'playing'}
         />
       )}
+      {busReady && busRef.current && <PadChips bus={busRef.current} className="left-4 top-4" />}
 
       {/* A+ mission #4 — Wii Sports Resort readability on top of the 2K contest: the score and the clock at couch size,
           the rack as pips (money ball gold, the loaded ball pulsing), points left, the heat, and a wide release meter
