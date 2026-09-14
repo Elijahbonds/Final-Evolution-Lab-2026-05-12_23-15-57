@@ -19,7 +19,9 @@ import {
   offTheHeadLoose,
   OFF_THE_HEAD_RANGE,
   type MoveRead,
-  moveDanger} from './HandleSystem';
+  moveDanger,
+  moveImpulse,
+  movesTheBody} from './HandleSystem';
 
 const MAX = 100;
 
@@ -581,5 +583,56 @@ describe('the odds respect the move', () => {
     const cheap = resolveHandleMove('crossover', { ...CHAIN_IDLE }, 100, on, () => 1);
     const dear = resolveHandleMove('snatch_back', { ...CHAIN_IDLE }, 100, on, () => 1);
     expect(dear.odds).toBeGreaterThan(cheap.odds);
+  });
+});
+
+// ── A MOVE NAMED FOR A MOVEMENT SHOULD MOVE YOU (2026-09-13) ─────────────────────────────────────────────
+//
+// Every handle move produced the same body: a chain link, a whoosh, a roll. `slip_slide` is literally named
+// for going past his hip and left you standing still.
+
+describe('moveImpulse', () => {
+  it('THE FAKES MOVE YOU NOTHING — that is what makes them lies', () => {
+    for (const m of ['hesi', 'yoyo', 'in_and_out'] as const) {
+      expect(movesTheBody(m), m).toBe(false);
+    }
+  });
+
+  it('and the evasions do', () => {
+    for (const m of ['slip_slide', 'behind_back', 'double_cross', 'crossover', 'between_legs'] as const) {
+      expect(movesTheBody(m), m).toBe(true);
+    }
+  });
+
+  it('slip and slide is the most SIDEWAYS thing in the vocabulary — it goes past his hip', () => {
+    const slip = moveImpulse('slip_slide');
+    expect(slip.lateral).toBeGreaterThan(slip.forward);
+    for (const m of ['crossover', 'behind_back', 'between_legs', 'double_cross'] as const) {
+      expect(slip.lateral, m).toBeGreaterThan(moveImpulse(m).lateral);
+    }
+  });
+
+  it('a shammgod goes FORWARD — you push it out and go', () => {
+    const sham = moveImpulse('shammgod');
+    expect(sham.forward).toBeGreaterThan(sham.lateral);
+    expect(sham.forward).toBeGreaterThan(0);
+  });
+
+  it('a snatch-back goes BACKWARD — the ball and the body both come back', () => {
+    expect(moveImpulse('snatch_back').forward).toBeLessThan(0);
+  });
+
+  it('the moves with their own resolution paths add no impulse of their own', () => {
+    // `spin` has the spin machinery and `off_the_head` throws the ball; a second impulse here would
+    // fight whatever those are already doing to the body
+    expect(movesTheBody('spin')).toBe(false);
+    expect(movesTheBody('off_the_head')).toBe(false);
+  });
+
+  it('no impulse is large enough to read as a teleport', () => {
+    for (const m of Object.keys(MOVE_HANDLE) as HandleMove[]) {
+      const i = moveImpulse(m);
+      expect(Math.hypot(i.forward, i.lateral), m).toBeLessThan(4);
+    }
   });
 });

@@ -447,3 +447,57 @@ export function offTheHeadLoose(passer: Vector3, defender: Vector3): Vector3 {
   if (d < 1e-4) return new Vector3(0, 0, 1);
   return past.scale(1 / d);
 }
+
+// ── A MOVE THAT IS NAMED FOR A MOVEMENT SHOULD MOVE YOU (2026-09-13) ─────────────────────────────────────
+//
+// Every handle move produced exactly the same body: a chain link, a whoosh, and a roll against the
+// defender's ankles. Nothing displaced you. `slip_slide` is literally named for going past his hip and it
+// left you standing where you were; `behind_back` is a move you make while going somewhere; `snatch_back`
+// is the ball AND the body coming back.
+//
+// So each move now carries a one-shot impulse in the BODY's frame. One shot, never a per-frame multiplier —
+// scaling velocity every frame compounds into a teleport, which is why the jab burst is written the way it
+// is and why this is written the same way.
+//
+// THE FAKES DELIBERATELY MOVE YOU NOTHING. A yo-yo, an in-and-out and a hesi work precisely because your
+// body did not go anywhere: that is what makes them lies. Giving them an impulse would make every move in
+// the vocabulary the same kind of move again, in the other direction.
+
+export interface MoveImpulse {
+  /** Metres per second along the shooter's facing. Negative retreats. */
+  forward: number;
+  /** Metres per second across it. Sign is applied by the caller from the move's side. */
+  lateral: number;
+}
+
+const NO_IMPULSE: MoveImpulse = { forward: 0, lateral: 0 };
+
+/**
+ * How the body moves on this move.
+ *
+ * Returns zero for the fakes — see the header. The caller multiplies `lateral` by the direction it wants
+ * the move to go (the side away from the defender), because which way is a mode's read, not this table's.
+ */
+export function moveImpulse(move: HandleMove): MoveImpulse {
+  switch (move) {
+    // evasions: the body goes somewhere
+    case 'slip_slide': return { forward: 1.4, lateral: 3.2 };   // past his hip, mostly sideways
+    case 'behind_back': return { forward: 0.6, lateral: 2.2 };
+    case 'double_cross': return { forward: 0.8, lateral: 2.4 };
+    case 'crossover': return { forward: 0.4, lateral: 1.6 };
+    case 'between_legs': return { forward: 0.5, lateral: 1.2 };
+    case 'shammgod': return { forward: 3.4, lateral: 0.8 };     // push it out and GO
+    case 'snatch_back': return { forward: -2.6, lateral: 0.6 }; // ball and body both come back
+    // fakes: you did not go anywhere, which is the entire point
+    case 'hesi': case 'yoyo': case 'in_and_out': return NO_IMPULSE;
+    // these resolve on their own paths (the spin machinery, the ball off his head)
+    case 'spin': case 'off_the_head': return NO_IMPULSE;
+    default: return NO_IMPULSE;
+  }
+}
+
+/** Does this move displace the body at all? A fake does not. */
+export function movesTheBody(move: HandleMove): boolean {
+  const i = moveImpulse(move);
+  return i.forward !== 0 || i.lateral !== 0;
+}

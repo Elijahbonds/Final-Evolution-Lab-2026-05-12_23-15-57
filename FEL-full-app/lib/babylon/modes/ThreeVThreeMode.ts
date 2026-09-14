@@ -99,7 +99,7 @@ import { resolveRim, forcedMissProfile } from '../core/RimPhysics';             
 import { judge, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
-  OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, type ChainState, type HandleMove,
+  OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, moveImpulse, type ChainState, type HandleMove,
 } from '../core/HandleSystem';   // the vocabulary 1v1 had and this mode did not
 import {
   THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
@@ -1795,6 +1795,23 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     }
 
     if (outcome.restarted) return;
+    // the body goes where the move says (see 1v1) — one shot, lateral sign away from him
+    {
+      const imp = moveImpulse(move);
+      if (imp.forward !== 0 || imp.lateral !== 0) {
+        const yaw = me.char.root.rotation.y;
+        const fx = Math.sin(yaw), fz = Math.cos(yaw);
+        const rx = fz, rz = -fx;
+        let side = 1;
+        if (foe) {
+          const toFoe = foe.char.root.position.subtract(me.char.root.position);
+          side = (toFoe.x * rx + toFoe.z * rz) > 0 ? -1 : 1;
+        }
+        me.drib.vel.addInPlace(new Vector3(
+          fx * imp.forward + rx * imp.lateral * side, 0, fz * imp.forward + rz * imp.lateral * side,
+        ));
+      }
+    }
     if (outcome.tier !== 'single') {
       SoundKit.play('whoosh', { pitch: 1.1 + chain.length * 0.12, volume: 0.35 });
       ctx.feel?.impact?.(0.08 * chain.length);

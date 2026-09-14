@@ -99,7 +99,7 @@ import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide w
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot,
-  resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose,
+  resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, moveImpulse,
   type ChainState, type HandleMove,
 } from '../core/HandleSystem';   // Street chains x 2K brakes, gated on the handle the PRQ scan earned
 import {
@@ -1975,6 +1975,22 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (outcome.restarted) {
       if (process.env.NODE_ENV === 'development') console.info(`[1V1-HANDLE] ${move} out of window — new chain`);
       return;
+    }
+    // THE BODY GOES WHERE THE MOVE SAYS. One shot, never a per-frame scale (that compounds into a
+    // teleport — same reason the jab burst is written the way it is). The lateral sign is AWAY from him,
+    // which is the mode's read rather than the table's.
+    {
+      const imp = moveImpulse(move);
+      if (imp.forward !== 0 || imp.lateral !== 0) {
+        const yaw = me.root.rotation.y;
+        const fx = Math.sin(yaw), fz = Math.cos(yaw);
+        const rx = fz, rz = -fx;
+        const toFoe = foe.root.position.subtract(me.root.position);
+        const side = (toFoe.x * rx + toFoe.z * rz) > 0 ? -1 : 1;    // go the other way from him
+        meDribble.vel.addInPlace(new Vector3(
+          fx * imp.forward + rx * imp.lateral * side, 0, fz * imp.forward + rz * imp.lateral * side,
+        ));
+      }
     }
     const tier = outcome.tier;
     if (process.env.NODE_ENV === 'development') console.info(`[1V1-HANDLE] move ${move} chain ${chain.length} (${tier})`);
