@@ -11,7 +11,8 @@
 // multiplier). Tricks come off vaults, wall-kicks and drops, not only flat ground.
 // STATE: per scene (a host that mounts twice must never share a controller or a course — the Carnival lesson).
 
-import { Vector3, MeshBuilder, StandardMaterial, Color3, PhysicsAggregate, PhysicsShapeType, PhysicsCharacterController, CharacterSupportedState, Ray, type Mesh, type Scene, type AbstractMesh } from '@babylonjs/core';
+import { Vector3, MeshBuilder, Color3, type PBRMaterial, PhysicsAggregate, PhysicsShapeType, PhysicsCharacterController, CharacterSupportedState, Ray, type Mesh, type Scene, type AbstractMesh } from '@babylonjs/core';
+import { VenueKit } from '../visual/VenueKit';
 import type { HudValue, ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -80,6 +81,8 @@ interface St {
 const states = new WeakMap<Scene, St>();
 const live = new Set<St>();
 
+/** How far the StandardMaterial-era palette is pulled down to sit correctly as PBR albedo. */
+const PBR_ALBEDO_SCALE = 0.42;
 const MAT: Record<string, string> = { ground: '#8E8A84', vault: '#C9A15A', wall: '#B8735A', ledge: '#3FB8B0', roof: '#3FB8B0', bar: '#E0C060', start: '#3DDC97', finish: '#F4C542', checkpoint: '#4FD1E8', gap: '#000000' };
 
 export const FreeRunMode: ModeDefinition = (() => {
@@ -88,10 +91,35 @@ export const FreeRunMode: ModeDefinition = (() => {
   function buildCourse(ctx: ModeContext, S: St): void {
     for (const m of S.meshes) m.dispose(); S.meshes = []; S.aggs = [];
     S.pieces = coursePieces(S.tier);
-    const mats = new Map<string, StandardMaterial>();
-    const matFor = (kind: string) => {
+    // EVERY PIECE WAS A StandardMaterial, AND THAT IS WHY THIS MODE LOOKED UNFINISHED.
+    //
+    // Per-mode visual audit (2026-09-13): Freerun graded C — "untextured white/grey blocks on a white plane"
+    // and the mode most likely to make the project look unfinished. The cause is not missing art. These
+    // venues light for PBR (hemispheric 0.85 + a directional at 2.60), and a StandardMaterial multiplies its
+    // diffuse by that linearly and CLIPS AT WHITE: the `#8E8A84` ground and the `#C9A15A` vault both land on
+    // white, so an authored palette of seven distinct colours rendered as one grey. Nobody mis-typed a
+    // colour; the material could not survive the lighting. VenueKit.paint's own doc names this exact bug
+    // with Velocity Kart as its worked example, and it is the third place today it has turned up.
+    //
+    // Roughness varies by what the thing IS — concrete ground is matte, a metal bar is not — which is a
+    // distinction StandardMaterial could not express here at all.
+    const mats = new Map<string, PBRMaterial>();
+    const GLOW = new Set(['ledge', 'roof', 'finish', 'start', 'checkpoint']);
+    const ROUGH: Record<string, number> = { ground: 0.95, vault: 0.8, wall: 0.85, bar: 0.35 };
+    const matFor = (kind: string): PBRMaterial => {
       let m = mats.get(kind);
-      if (!m) { m = new StandardMaterial(`fr_mat_${kind}`, ctx.scene); m.diffuseColor = Color3.FromHexString(MAT[kind] ?? '#888888'); m.specularColor = Color3.Black(); if (kind === 'ledge' || kind === 'roof' || kind === 'finish' || kind === 'start' || kind === 'checkpoint') m.emissiveColor = Color3.FromHexString(MAT[kind]).scale(0.25); mats.set(kind, m); }
+      if (!m) {
+        const hex = MAT[kind] ?? '#888888';
+        // the gates and ledges read as markers, so they keep a real emissive floor; surfaces do not
+        m = VenueKit.paint(ctx.scene, `fr_mat_${kind}`, hex, GLOW.has(kind) ? 0.3 : 0.05, ROUGH[kind] ?? 0.7);
+        // AND THE PALETTE ITSELF WAS AUTHORED FOR THE WRONG MATERIAL MODEL. These hexes were picked against
+        // StandardMaterial's linear multiply; the same values as PBR albedo, under this rig's exposure,
+        // land far lighter — the `#8E8A84` ground measured 0.556 albedo and read as white concrete-paper.
+        // Surfaces are pulled down so they sit where the author meant them to; the markers keep their value
+        // because a marker is supposed to be brighter than the thing it is stuck to.
+        if (!GLOW.has(kind)) m.albedoColor = m.albedoColor.scale(PBR_ALBEDO_SCALE);
+        mats.set(kind, m);
+      }
       return m;
     };
     for (const [i, p] of S.pieces.entries()) {
