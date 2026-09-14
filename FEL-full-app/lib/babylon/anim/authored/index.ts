@@ -7,7 +7,7 @@ import { buildEastbay } from './eastbay';
 import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from './dunkSuite';
 import { buildMocapDunk } from './mocapDunk';
 import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig } from './dunkFinishes';
-import { buildSelfLob, buildBounceThrow, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360 } from './dunkTricks';
+import { buildSelfLob, buildBounceThrow, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs } from './dunkTricks';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
@@ -59,6 +59,7 @@ export function registerAuthoredClips(
     () => buildScorpion(scene, skeleton),
     () => buildLostFound(scene, skeleton),
     () => buildHideSeek(scene, skeleton),
+    () => buildBetweenLegs(scene, skeleton),   // the hardest trick finally has its own body (it shared the eastbay's)
     () => buildSpin360(scene, skeleton),
     () => buildJuke(scene, skeleton, 'left'),
     () => buildJuke(scene, skeleton, 'right'),

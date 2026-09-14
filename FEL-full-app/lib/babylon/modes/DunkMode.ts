@@ -66,7 +66,7 @@ import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, 
 import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind } from '../core/DunkObstacles';
 import { runwayTrickById, DUNK_TRICKS } from '../core/DunkSystem';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
-import { LOST_FOUND_HANDOFF } from '../anim/authored/dunkTricks';
+import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
 import { approachAngle, approachBonus, takeoffFor } from '../core/DunkApproach';
 import { emptyCard, addAttempt, forWire } from '@/lib/mp/dunkCard';
@@ -230,6 +230,10 @@ export const DunkMode: ModeDefinition = (() => {
   let ikSideK = 0;                            // the reach: 0 = the right arm, 1 = the left, blended across a hand-off
   const EASTBAY_HANDOFF: HandOffSpec = { at: EB.handOff, from: 'RightHand', to: 'LeftHand' };
   const LOST_FOUND_SPEC: HandOffSpec = { at: LOST_FOUND_HANDOFF, from: 'RightHand', to: 'LeftHand' };
+  // BETWEEN THE LEGS is a transfer too — the ball passes under the lead thigh and comes up in the other
+  // hand. Without this the clip mimes a swap the ball never makes, which is worse than no clip at all:
+  // the body says one thing and the object in it says another.
+  const BETWEEN_LEGS_SPEC: HandOffSpec = { at: BETWEEN_LEGS_HANDOFF, from: 'RightHand', to: 'LeftHand' };
   let trail: ParticleSystem | null = null;   // juice soft #5
   let fovCam: Camera | null = null, fovBase = 0, fovT = 0, fovOn = false;   // juice soft #4
   let settleLatch = false;                    // juice soft #3
@@ -848,6 +852,9 @@ export const DunkMode: ModeDefinition = (() => {
           if (airTrick?.trick.id === 'lostfound') {
             const t = clipTime - airTrick.t0; activeHandOff = { spec: LOST_FOUND_SPEC, t };
             if (runHandOffPath(ball, player.skeleton, t, LOST_FOUND_SPEC, ebState)) console.info(`[HANDS] handoff R→L lost&found @${t.toFixed(2)}`);
+          } else if (airTrick?.trick.id === 'betweenlegs') {
+            const t = clipTime - airTrick.t0; activeHandOff = { spec: BETWEEN_LEGS_SPEC, t };
+            if (runHandOffPath(ball, player.skeleton, t, BETWEEN_LEGS_SPEC, ebState)) console.info(`[HANDS] handoff R→L between-the-legs @${t.toFixed(2)}`);
           } else if (style === 'sig') {
             activeHandOff = { spec: EASTBAY_HANDOFF, t: clipTime };
             if (runEastbayPath(ball, player.skeleton, clipTime, ebState)) console.info(`[HANDS] handoff R→L eastbay @${clipTime.toFixed(2)}`);

@@ -33,6 +33,21 @@ export const KICK_UP_CONTACT = 0.32;
 export const LOST_FOUND_HANDOFF = 0.32;
 export const SELF_LOB_SEC = 0.5, KICK_UP_SEC = 0.55, CARTWHEEL_SEC = 0.8, DOUBLE_UP_SEC = 0.5;
 export const SCORPION_SEC = 0.7, LOST_FOUND_SEC = 0.8, HIDE_SEEK_SEC = 0.8, SPIN_SEC = 0.8;
+/**
+ * BETWEEN THE LEGS (2026-09-14) — the hardest trick in the list, and until today it had no body of its own.
+ *
+ * `DUNK_TRICKS.betweenlegs` pointed at `dunk_360_fake_eastbay`, which `clipAliases` resolves straight to
+ * `dunk_360_eastbay` — the EASTBAY's clip. Two tricks, two names, two difficulties (3.4 and 3.8), two
+ * buttons, and one animation: a player throwing the hardest dunk in the game watched the one they had
+ * already seen. Eight names, seven bodies.
+ *
+ * The shape is the real one: the ball goes DOWN and THROUGH the gap the split legs make, changes hands
+ * under the lead thigh, and comes up the other side. That is why the legs split rather than tuck — the gap
+ * is the trick, and a body that keeps AIR_LEGS has nothing for the ball to pass through.
+ */
+export const BETWEEN_LEGS_SEC = 0.8;
+/** Clip-local second the ball changes hands under the thigh (DunkMode reparents it here, as it does for lost & found). */
+export const BETWEEN_LEGS_HANDOFF = 0.34;
 
 export function buildSelfLob(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'dunk_self_lob', SELF_LOB_SEC, [
@@ -110,6 +125,27 @@ export function buildLostFound(scene: Scene, sk: Skeleton): AnimationGroup | nul
     { t: LOST_FOUND_HANDOFF, bones: { Hips: [2, 30, 0], Spine: [6, 22, 0], ...AIR_LEGS }, hands: { Right: [0.10, 0.92, -0.34], Left: [-0.08, 0.92, -0.34] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] } },   // found: both hands meet behind the back
     { t: 0.5,  bones: { Hips: [0, -8, 0], Spine: [-4, -10, 0], ...AIR_LEGS }, hands: { Left: [-0.52, 1.30, 0.05], Right: [0.40, 1.15, -0.10] }, poles: { Left: [-0.9, -0.2, -0.4] } },   // the other hand carries it out and up
     { t: LOST_FOUND_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], LeftUpLeg: [-26, 0, 4], LeftLeg: [30, 0, 0], RightUpLeg: [-14, 0, -4], RightLeg: [18, 0, 0] }, hands: { Left: [-0.14, 2.02, 0.26], Right: [0.36, 1.42, -0.10] }, poles: { Left: UP.Left } },   // extended to the rim, left-handed
+  ]);
+}
+
+/** Between the legs: the ball dropped through the split, swapped under the lead thigh, and carried up the far side. */
+export function buildBetweenLegs(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  // The split: the LEAD (left) thigh drives up and the trail leg kicks back, which is what opens the gap.
+  // AIR_LEGS is deliberately not used here — a tucked body has nowhere to put the ball.
+  const SPLIT: Record<string, Deg3> = { LeftUpLeg: [-86, 0, 10], LeftLeg: [58, 0, 0], RightUpLeg: [34, 0, -8], RightLeg: [64, 0, 0] };
+  const SPLIT_WIDE: Record<string, Deg3> = { LeftUpLeg: [-98, 0, 14], LeftLeg: [44, 0, 0], RightUpLeg: [44, 0, -10], RightLeg: [78, 0, 0] };
+  return buildPoseClip(scene, sk, 'dunk_between_legs', BETWEEN_LEGS_SEC, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR_LEGS }, hands: { Right: [0.26, 1.62, 0.30], Left: [-0.30, 1.32, 0.14] } },
+    // the knees come up and the trunk folds over them — the dunker makes the gap before the ball goes near it
+    { t: 0.18, bones: { Hips: [14, 0, 0], Spine: [20, 0, 0], Neck: [-18, 0, 0], ...SPLIT }, hands: { Right: [0.22, 1.20, 0.34], Left: [-0.26, 1.22, 0.22] }, hipsY: 0.06 },
+    // THROUGH: the ball hand takes it down past the lead thigh, eyes down on it
+    { t: 0.28, bones: { Hips: [20, 0, 0], Spine: [26, 0, 0], Neck: [-26, 0, 0], ...SPLIT_WIDE }, hands: { Right: [0.16, 0.86, 0.30], Left: [-0.30, 1.06, 0.18] }, poles: { Right: [0.9, -0.3, -0.2] }, hipsY: 0.1 },
+    // the swap, under the thigh: both palms meet on the ball, which is what makes the transfer read
+    { t: BETWEEN_LEGS_HANDOFF, bones: { Hips: [20, 0, 0], Spine: [26, 0, 0], Neck: [-28, 0, 0], ...SPLIT_WIDE }, hands: { Right: [0.06, 0.84, 0.32], Left: [-0.10, 0.84, 0.32] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] }, hipsY: 0.1 },
+    // up the far side: the legs close, the trunk opens out of the fold, the left hand carries it
+    { t: 0.52, bones: { Hips: [8, 0, 0], Spine: [4, 0, 0], Neck: [-12, 0, 0], LeftUpLeg: [-44, 0, 8], LeftLeg: [54, 0, 0], RightUpLeg: [4, 0, -6], RightLeg: [46, 0, 0] }, hands: { Left: [-0.46, 1.28, 0.20], Right: [0.38, 1.10, 0.06] }, poles: { Left: [-0.9, -0.1, -0.4] }, hipsY: 0.04 },
+    // the flush, left-handed, the body long — the same shape lost & found finishes in, because both end the same way
+    { t: BETWEEN_LEGS_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], LeftUpLeg: [-24, 0, 4], LeftLeg: [28, 0, 0], RightUpLeg: [-12, 0, -4], RightLeg: [16, 0, 0] }, hands: { Left: [-0.14, 2.02, 0.26], Right: [0.36, 1.40, -0.08] }, poles: { Left: UP.Left } },
   ]);
 }
 

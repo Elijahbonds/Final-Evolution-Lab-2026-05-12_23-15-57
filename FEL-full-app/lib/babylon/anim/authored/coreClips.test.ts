@@ -16,7 +16,8 @@ import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, bui
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
-import { buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF } from './dunkTricks';
+import { buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
+import { DUNK_TRICKS } from '../../core/DunkSystem';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
 import { buildBaseClips } from './baseClips';
 
@@ -311,6 +312,42 @@ describe('dunk tricks', () => {
     at(g, LOST_FOUND_HANDOFF); expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.35);
     at(g, 0.8); expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y + 0.2);
   });
+  // THE GAP IS THE TRICK. Until 2026-09-14 `betweenlegs` pointed at `dunk_360_fake_eastbay`, which aliases
+  // to the EASTBAY's clip: two tricks, two names, two difficulties, one body. A player throwing the hardest
+  // dunk in the list watched an animation they had already seen. These assertions are the ones that would
+  // have caught it — they are about a SPLIT and a transfer underneath it, which the eastbay's body has not
+  // got, so the shared clip could never have passed them.
+  it('between the legs: the legs split, the ball goes down through the gap and swaps under the lead thigh', () => {
+    const g = fresh(() => buildBetweenLegs(scene, sk)!);
+    at(g, 0.28);
+    // a real gap: the lead foot is carried HIGHER than the trail foot, which a tuck (both legs matched)
+    // cannot produce. This is the assertion the shared eastbay clip could never have passed.
+    // THE SPLIT IS A SCISSOR, not a lift. Measured on the rig: the lead foot goes to z +0.61 and the trail
+    // foot to z -0.62, a 1.23 m gap. I first asserted the lead foot would be HIGHER and it is not -- a
+    // negative thigh angle drives the leg forward on this rig, not up, so the shape is a hurdle stride.
+    // The assertion follows what the body actually does.
+    expect(pos('LeftFoot').z - pos('RightFoot').z).toBeGreaterThan(0.8);
+    // and the ball is DOWN, below the hips, inside the gap the legs just made
+    expect(pos('RightHand').y).toBeLessThan(hipsY());
+    expect(pos('RightHand').z).toBeLessThan(pos('LeftFoot').z);
+    expect(pos('RightHand').z).toBeGreaterThan(pos('RightFoot').z);
+
+    at(g, BETWEEN_LEGS_HANDOFF);
+    // both palms on the ball, under the thigh rather than in front of it — this is the transfer
+    expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.35);
+    expect(pos('LeftHand').y).toBeLessThan(hipsY());
+
+    // and it finishes long and left-handed, the way the flush needs it
+    at(g, BETWEEN_LEGS_SEC);
+    expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y + 0.15);
+  });
+
+  // The guard against the whole class of bug: two tricks must never resolve to the same body.
+  it('gives every air trick its own clip — no two share one', () => {
+    const clips = DUNK_TRICKS.map((t) => t.clip);
+    expect(new Set(clips).size).toBe(clips.length);
+  });
+
   it('hide & seek: both hands behind the head, then the ball hand snaps overhead', () => {
     const g = fresh(() => buildHideSeek(scene, sk)!);
     at(g, 0.3); for (const s of ['Left', 'Right']) expect(pos(`${s}Hand`).z).toBeLessThan(pos('Head').z - 0.1);
