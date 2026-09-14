@@ -12,7 +12,7 @@ Ranked by how much of the frame is wrong, worst first. Every row names a cause, 
 | 2 | **Velocity Kart** | Tarmac + centre line + sky. Absolutely nothing either side of the track. | Same cause: the track ribbon is generated from gates; there is no trackside layer at all. No barriers, no kerbs, no crowd, no props. |
 | 3 | **Surf Break** | Flat teal water plane, one white wave band, empty horizon. "A pier down the line" is in the copy and not in the scene. | `buildSurfBreak` builds water + wave + rider. No mid-ground objects exist for surf at all. |
 | 4 | **Skate Run** | Ramps sit on a flat untextured tan plane; bare horizon; no crowd despite `crowd: 8`. | Ground is a single unlit-looking plane with no detail map. The venue's `crowd` field is authored and read by nothing. |
-| 5 | **All five** | Flat, low-contrast lighting; washed skies; no post at all. | No shared render pipeline. Each mode mounts its own lights; there is no ACES tone map, no FXAA, no bloom, no vignette, no SSAO anywhere in the project. |
+| 5 | ~~All five~~ | ~~Flat lighting, no post.~~ **WITHDRAWN — I was wrong.** | `lib/babylon/scene/LightRig.ts` already builds a `DefaultRenderingPipeline` with ACES tone mapping, FXAA, bloom, sharpen, a mood-tinted vignette and cascaded shadow maps, on a Low/Med/High tier — and `ModeHarness` mounts it for EVERY mode. I nearly built a duplicate. The flat look in the captures is not the grade; it is that there is nothing in the frame for the light to fall on, which is defect #1–4. |
 | 6 | Snowboard | The best of the five — real ridge backdrop, treeline, gates. Pines are flat green cones. | Kenney kit palette (known); acceptable at distance, weak in the near field. |
 
 ## What is NOT broken (leave alone)
@@ -22,11 +22,12 @@ Ranked by how much of the frame is wrong, worst first. Every row names a cause, 
   venues. The gap was that it was cosmetic, closed 2026-09-13 (`RideCharacter`).
 - **Racing course data** — 8 courses, gate facings derived from the path, per-course venue/mood/tint.
 
-## The two systemic causes
+## The one systemic cause
 
-Everything above collapses into two, and both want ONE module rather than per-mode work:
+After withdrawing #5 there is exactly one, and it wants ONE module rather than per-mode work:
 
-1. **No trackside/mid-ground layer.** Four of five modes render their playable surface against nothing.
-2. **No shared render pipeline.** Every mode lights itself; nothing tone-maps or anti-aliases.
+**No trackside / mid-ground layer.** Four of five modes render their playable surface against nothing.
+The lighting and post are already good; they are falling on an empty world.
 
-Fixing per-mode before those exist means touching every map twice.
+This also corrects the visual-fidelity brief's step 2 ("build the render pipeline"): it exists, it is
+shared, it is tiered, and it should be left alone.
