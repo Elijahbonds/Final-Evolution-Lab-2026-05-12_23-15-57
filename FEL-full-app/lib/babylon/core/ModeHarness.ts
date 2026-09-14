@@ -17,6 +17,8 @@ import { JuiceKit } from '../premium/JuiceKit';
 import { RenderWatchdog } from './RenderWatchdog';
 import { GroundLock } from '../anim/importSanitizer';
 import { Shaker, InputBuffer, impact as feelImpact, timeScale } from './gameFeel';
+import { MomentumBus } from './MomentumBus';
+import { crowdLevel, tierSting, tierImpact } from './MomentumFx';
 import {
   kickImpactFrame, decayImpactFrame, impactGrade, IMPACT_FRAME_IDLE,
   type ImpactFrameState, type Grade,
@@ -71,6 +73,16 @@ export interface ModeContext {
   juice: JuiceKit;
   /** M37 game-feel: input buffer, screen shake, hit-stop bundle. */
   feel: ModeFeel;
+  /**
+   * The shared Game-Breaker meter, one per mount.
+   *
+   * It lives on the context rather than in each mode because the RESPONSE is the harness's: the crowd bed
+   * tracks the score every frame and a tier RISE stings, flashes and shakes, so a mode gets all of that by
+   * calling `ctx.momentum.report(...)` and nothing else. Eight modes used to build their own bus, and in
+   * seven of them going ON FIRE was inaudible -- there was exactly one `onTierChange` subscriber in the
+   * entire game. The harness also owns the per-frame `update(dt)` decay.
+   */
+  momentum: MomentumBus;
   /** M37: set to the hero root right after spawn → FrameGuard + camera framing. */
   heroRef: MutableRef<TransformNode>;
   /** M37: set to the live objective (ball/rim/gate/opponent) → cameras keep it framed. */
@@ -111,6 +123,15 @@ export interface ModeDefinition {
   /** Painted horizon. Defaults to the mood's family; name it (or get it) to override per venue. */
   backdrop?: BackdropFamily;
   camPreset: keyof typeof FOLLOW_PRESETS;
+  /**
+   * Set when the mode drives the crowd bed itself and the harness must keep its hands off.
+   *
+   * Only DunkMode does. It has CrowdEnergy -- a building voice tied to the contest's own beats (the
+   * hush before an attempt, the roar on a flush) -- and that is better than a meter-driven bed, not
+   * worse. The harness's `setAmbientLevel(crowdLevel(score01))` runs after `update()`, so without this
+   * flag it would overwrite dunk's crowd every single frame.
+   */
+  ownsCrowd?: boolean;
   load(ctx: ModeContext): Promise<void>;        // spawn venue + characters
   onInput(ctx: ModeContext, e: FelInput): void;
   update(ctx: ModeContext, dt: number): void;   // called only while 'playing'
@@ -233,6 +254,19 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     shaker, buffer,
     impact: (s: number) => { feelImpact(shaker, s); frame = kickImpactFrame(frame, s); },
   };
+  // MOMENTUM IS HEARD, NOT DISPLAYED. `momentum:` in setHud only draws in hosts that happen to render it,
+  // and there are twenty-one separate host components. The crowd bed and the tier sting need no host at
+  // all, so they work in every mode -- including the nineteen whose HUD never had a meter.
+  const momentum = new MomentumBus();
+  momentum.onTierChange((next, prev) => {
+    const sting = tierSting(next, prev);
+    if (!sting) return;                                    // falls are silent: decay makes them routine
+    SoundKit.play(sting.sfx, { volume: sting.volume });
+    if (sting.flash) lights.flashBeat();
+    const punch = tierImpact(next, prev);
+    if (punch > 0) feel.impact(punch);
+  });
+
   const heroRef: MutableRef<TransformNode> = { current: null };
   const objectiveRef: MutableRef<Vector3> = { current: null };
 
@@ -240,7 +274,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   const ctx: ModeContext = {
     location: opts.location,
     scene, camera, camDirector, input, lights, juice,
-    feel, heroRef, objectiveRef, groundLock, agent: agentHooks,
+    feel, momentum, heroRef, objectiveRef, groundLock, agent: agentHooks,
     phase: () => phase,
     end(outcome, score, stats, detail) {
       if (phase === 'ended') return;
@@ -399,7 +433,12 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   engine.runRenderLoop(() => {
     const dt = engine.getDeltaTime() / 1000;
     // M37 hit-stop: dt scales to 0 during an impact freeze, then eases back.
-    if (phase === 'playing') def.update(ctx, dt * timeScale());
+    if (phase === 'playing') {
+      def.update(ctx, dt * timeScale());
+      // the meter cools on REAL time, so a hit-stop cannot be used to bank momentum
+      momentum.update(dt);
+      if (!def.ownsCrowd) SoundKit.setAmbientLevel(crowdLevel(momentum.score01));
+    }
     // The impact pulse runs on REAL dt and in every phase, so a mode that ends mid-pulse still hands the
     // frame back at its resting grade instead of leaving the end card dimmed. `framePainted` means the
     // restore is written exactly once rather than every frame for the rest of the session.

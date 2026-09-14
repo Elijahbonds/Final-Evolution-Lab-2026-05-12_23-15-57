@@ -104,7 +104,7 @@ export const SkateRunMode: ModeDefinition = (() => {
   const move = new BoardMovement(tuneForVenue(SKATE_TUNING, readBoardVenue('skate')));
   const air = new AirControl();
   const combo = new ComboChain();
-  const mbus = new MomentumBus();
+  let mbus = new MomentumBus();
   let animTree: InstanceType<typeof BoardAnimTree>;
   let posture: { layer: PostureLayer; dispose(): void } | null = null;
   const bio: BoardPostureInput = { ...BOARD_INPUT_IDLE };
@@ -226,6 +226,10 @@ export const SkateRunMode: ModeDefinition = (() => {
     get backdrop() { return readBoardVenue('skate').sky; },
 
     async load(ctx: ModeContext) {
+      // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was
+      // INAUDIBLE: the crowd swell and the tier sting are bound to the harness's bus, and there was
+      // exactly one onTierChange subscriber in the game. Same reports, same weights, now heard.
+      mbus = ctx.momentum;
       // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
       baseFov = null;
       // the player's venue: a different palette, a different size, a different place
@@ -677,7 +681,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       const wantPitch = manualCh?.active ? (manualCh.kind === 'nosemanual' ? 0.30 : -0.30) : 0;
       boardPitch += (wantPitch - boardPitch) * Math.min(1, 9 * dt);
       boardSync.update(move.balance.lean, !rig.rider.grounded, boardPitch);
-      mbus.update(dt);
+      // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
 
       // ── the spectacle beats (H4) ──
       // The APEX of a real air: rising turns to falling, more than a third of a second up, and high enough off the deck

@@ -61,7 +61,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
   let world: RideWorld, waveLipAt: (t: number) => Vector3, barrelActive: (t: number) => boolean;
   let faceHeightAt: (x: number, z: number, t: number) => number;
   // deep runs light the building here too, not only on a skateboard (boardCore.TrickMachine)
-  const trickMomentum = new MomentumBus();
+  let trickMomentum = new MomentumBus();
   let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
   let rig: BoardRig, tricks: TrickMachine;
   let crowd: Onlookers;
@@ -186,6 +186,10 @@ export const SurfBreakMode: ModeDefinition = (() => {
     get backdrop() { return readBoardVenue('surf').sky; },
 
     async load(ctx: ModeContext) {
+      // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was
+      // INAUDIBLE: the crowd swell and the tier sting are bound to the harness's bus, and there was
+      // exactly one onTierChange subscriber in the game. Same reports, same weights, now heard.
+      trickMomentum = ctx.momentum;
       // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
       baseFov = null;
       const venue = readBoardVenue('surf');

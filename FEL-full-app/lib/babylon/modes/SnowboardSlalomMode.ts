@@ -61,7 +61,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
   let crowd: Onlookers;
   // deep runs light the building here too, not only on a skateboard (boardCore.TrickMachine)
-  const trickMomentum = new MomentumBus();
+  let trickMomentum = new MomentumBus();
   let nextGate = 0, gatesHit = 0, elapsed = 0;
   let hudSec = -1;   // ARENA-10PHASE P9 soft: the run clock the HUD shows (it never published `time` — the chip sat on "0s" all run)
   /** A full snowboard air's hang, for judging which trick the rider can finish. */
@@ -104,7 +104,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     console.info('[SNOW-JUICE] finish punch');
   }
   const move = new BoardMovement(tuneForVenue(SNOW_TUNING, readBoardVenue('snow')));   // Phase 12: carve weight + slope energy
-  const mbus = new MomentumBus();
+  let mbus = new MomentumBus();
   let boost = 0;                                  // SSX boost meter 0..100
   let boosting = false;
 
@@ -158,6 +158,14 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     get backdrop() { return readBoardVenue('snow').sky; },
 
     async load(ctx: ModeContext) {
+      // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was
+      // INAUDIBLE: the crowd swell and the tier sting are bound to the harness's bus, and there was
+      // exactly one onTierChange subscriber in the game. Same reports, same weights, now heard.
+      mbus = ctx.momentum;
+      // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was
+      // INAUDIBLE: the crowd swell and the tier sting are bound to the harness's bus, and there was
+      // exactly one onTierChange subscriber in the game. Same reports, same weights, now heard.
+      trickMomentum = ctx.momentum;
       // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
       baseFov = null;
       const venue = readBoardVenue('snow');
@@ -305,7 +313,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         if (boost === 0) boosting = false;
         ctx.setHud({ boost: Math.round(boost) });
       }
-      mbus.update(dt);
+      // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
 
       // ROCKS — grounded contact is a stumble; airborne clears clean
       if (stumbleIframe === 0 && rig.rider.grounded && !rig.rider.grinding) {

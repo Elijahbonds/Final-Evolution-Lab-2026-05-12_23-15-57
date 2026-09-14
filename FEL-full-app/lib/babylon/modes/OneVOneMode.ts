@@ -241,7 +241,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let arc: ShotArc;
   let arcPoints = 0, arcLabel = '';
   let myScore = 0, foeScore = 0, momentum = 0;
-  const mbus = new MomentumBus();               // Phase 6: shared Game-Breaker
+  let mbus = new MomentumBus();               // Phase 6: shared Game-Breaker
   /** Report a highlight and mirror the bus into the HUD momentum meter. */
   function swing(kind: Parameters<MomentumBus['report']>[0]['kind']): void {
     mbus.report({ kind });
@@ -475,6 +475,10 @@ export const OneVOneMode: ModeDefinition = (() => {
     modeId: 'onevone', mood: 'goldenHour', camPreset: 'hoops',
 
     async load(ctx: ModeContext) {
+      // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was
+      // INAUDIBLE: the crowd swell and the tier sting are bound to the harness's bus, and there was
+      // exactly one onTierChange subscriber in the game. Same reports, same weights, now heard.
+      mbus = ctx.momentum;
       hud = (u) => ctx.setHud(u);
       onevoneVenue = mountVenue(ctx, 'basketball_h2h', { keepGameplayCamera: true, location: ctx.location });
       if (!onevoneVenue) { VenueKit.buildCourt(ctx.scene, 'venice'); applyOceanCourt(ctx.scene, 'venice'); }
@@ -598,8 +602,9 @@ export const OneVOneMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
-      mbus.update(dt);
-      SoundKit.setAmbientLevel(0.3 + mbus.score01 * 0.7);
+      // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
+      // this exact curve is now MomentumFx.crowdLevel, applied by the harness for every mode --
+      // it was extracted FROM here because this is the mode people have actually played
       meSlot.poll(dt);
       foeSlot.poll(dt);
       // NETPLAY: publish this player's intent at the tick rate (the session throttles; calling it

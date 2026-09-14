@@ -62,7 +62,7 @@ export const ShowdownMode: ModeDefinition = (() => {
   let meDef: DefenseController, foeDef: DefenseController;
   let meAnim: CombatAnimTree, foeAnim: CombatAnimTree;
   let chakra: ResourceMeter, foeChakra: ResourceMeter;
-  const mbus = new MomentumBus();
+  let mbus = new MomentumBus();
   let wallMesh: AbstractMesh | null = null;
   let phase: Phase = 'intro';
   let phaseSec = 0;
@@ -296,6 +296,10 @@ export const ShowdownMode: ModeDefinition = (() => {
     modeId: 'showdown', mood: 'dojoWarm', camPreset: 'fight',
 
     async load(ctx: ModeContext) {
+      // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was
+      // INAUDIBLE: the crowd swell and the tier sting are bound to the harness's bus, and there was
+      // exactly one onTierChange subscriber in the game. Same reports, same weights, now heard.
+      mbus = ctx.momentum;
       // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
       modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true });
       if (!modeVenue) VenueKit.buildDojo(ctx.scene);
@@ -396,7 +400,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       if (giFlash > 0) { giFlash -= dt; if (giFlash <= 0) { meAnim.clearBeat('parry_flash', 'guard_impact'); } }
       chakra.update(dt); foeChakra.update(dt);
       meState.tick(dt); foeState.tick(dt);
-      mbus.update(dt);
+      // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
 
       // ── ultimate cinematic beat ──
       if (phase === 'ultimate') {

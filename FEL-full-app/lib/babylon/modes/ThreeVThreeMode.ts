@@ -234,7 +234,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   // Phase 6's shared Game-Breaker layer. 3v3 reported NOTHING into it: posters, ankle-breakers, swats and
   // steals in this mode were invisible to the momentum system, so the tier never moved, the multiplier
   // never applied and the crowd never escalated — the highlight plays happened and the game did not notice.
-  const mbus = new MomentumBus();
+  let mbus = new MomentumBus();
   let momentum = 0;
   /** Report a highlight and mirror the bus into the HUD momentum meter (the 1v1's). */
   function swing(kind: Parameters<MomentumBus['report']>[0]['kind']): void {
@@ -382,6 +382,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     modeId: 'threevthree', mood: 'goldenHour', camPreset: 'team',
 
     async load(ctx: ModeContext) {
+      // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was
+      // INAUDIBLE: the crowd swell and the tier sting are bound to the harness's bus, and there was
+      // exactly one onTierChange subscriber in the game. Same reports, same weights, now heard.
+      mbus = ctx.momentum;
       ctx0 = ctx;
       threeVenue = mountVenue(ctx, 'basketball_3v3', { keepGameplayCamera: true, location: ctx.location });
       if (!threeVenue) { VenueKit.buildCourt(ctx.scene, 'venice'); applyOceanCourt(ctx.scene, 'venice'); }

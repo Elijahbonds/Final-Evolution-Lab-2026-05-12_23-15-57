@@ -346,7 +346,7 @@ export const DunkMode: ModeDefinition = (() => {
   const reveal = new ScoreReveal();              // Phase 7: staged judge reveal
   const crowd = new CrowdEnergy();               // Phase 7: building voice
   let revealed: JudgeScore[] = [];               // cards shown so far
-  const momentum = new MomentumBus();            // Phase 6: shared Game-Breaker
+  let momentum = new MomentumBus();            // Phase 6: shared Game-Breaker
   let trickLabels: string[] = [];                // this attempt's thrown tricks
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
@@ -443,8 +443,15 @@ export const DunkMode: ModeDefinition = (() => {
 
   const def: ModeDefinition = {
     modeId: 'dunk', mood: 'goldenHour', camPreset: 'contest',  // Phase 8: cinematic, not broadcast
+    // CrowdEnergy owns this venue's voice (the hush before an attempt, the roar on a flush), which is
+    // better than a meter-driven bed -- see ModeDefinition.ownsCrowd.
+    ownsCrowd: true,
 
     async load(ctx: ModeContext) {
+      // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was
+      // INAUDIBLE: the crowd swell and the tier sting are bound to the harness's bus, and there was
+      // exactly one onTierChange subscriber in the game. Same reports, same weights, now heard.
+      momentum = ctx.momentum;
       // M74: try Nexus venue first; fallback to VenueKit if no spec
       dunkVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true, location: ctx.location });
       if (!dunkVenue) { VenueKit.buildCourt(ctx.scene); applyOceanCourt(ctx.scene, 'venice'); }
