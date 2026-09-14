@@ -20,8 +20,22 @@
 // trainer and their clients is the thing that gets trainers onto the platform, and the store earns instead.
 
 import 'server-only';
+import { randomBytes } from 'crypto';
 import { Prisma, type PrismaClient } from '@prisma/client';
-import { assertNoAthleteData, isShareToken, newShareToken, shareIsPublishable, type Share } from './shareable';
+import { assertNoAthleteData, isShareToken, shareIsPublishable, type Share } from './shareable';
+
+/**
+ * 192 bits, base64url.
+ *
+ * The URL is the entire access control, so this is sized against being guessed rather than against looking
+ * tidy. Never derived from the title, the coach or the date — a token you can construct is not a token.
+ *
+ * It lives here rather than beside the other share helpers because it is the only one needing node's crypto,
+ * and ./shareable.ts is imported by the trainer's compose screen, which is a client component.
+ */
+export function newShareToken(): string {
+  return randomBytes(24).toString('base64url');
+}
 
 type Db = PrismaClient;
 

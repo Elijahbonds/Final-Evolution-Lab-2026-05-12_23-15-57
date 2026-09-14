@@ -32,7 +32,6 @@
 //
 // Pure: no Prisma, no DOM. Persistence and routes live above this.
 
-import { randomBytes } from 'crypto';
 import type { CoachProgram } from '../profile/assignment';
 import type { Protocol } from '../profile/protocol';
 import { screenText, isPublishable, MAX_NOTE_CHARS, MAX_RECOMMENDATION_CHARS, type TextFlag } from './screen';
@@ -313,15 +312,10 @@ export function shareSelection(
 
 // ── the link ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/**
- * 192 bits, base64url.
- *
- * The URL is the entire access control, so this is sized against being guessed rather than against looking
- * tidy. Never derived from the title, the coach or the date — a token you can construct is not a token.
- */
-export function newShareToken(): string {
-  return randomBytes(24).toString('base64url');
-}
+// `newShareToken` deliberately lives in ./service.ts, not here. It is the only thing in this area that needs
+// node's crypto, and this module is imported by the trainer's compose screen — a client component. One value
+// import from a file that pulls in `node:crypto` breaks that build, so the crypto stays on the server side
+// of the line and this file has no runtime imports at all.
 
 /** Tokens are opaque; this is only shape validation, to reject junk before hitting the database. */
 export function isShareToken(v: unknown): v is string {

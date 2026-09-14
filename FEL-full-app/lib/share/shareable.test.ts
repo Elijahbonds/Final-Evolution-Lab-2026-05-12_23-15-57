@@ -7,12 +7,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   shareProgram, shareDrill, shareRecommendation, shareSelection,
-  assertNoAthleteData, ShareLeak, newShareToken, isShareToken, shareUrl, shareIsPublishable,
+  assertNoAthleteData, ShareLeak, isShareToken, shareUrl, shareIsPublishable,
   MAX_SELECTION_ITEMS, MAX_FOR_NAME_CHARS, type SharedBy,
 } from './shareable';
 import type { CoachProgram } from '../profile/assignment';
 import { PLATFORM_PROTOCOLS } from '../profile/protocol';
 import { emptyProfile } from '../profile/sharedProfile';
+import { newShareToken } from './service';
 
 const NOW = Date.parse('2026-09-13T12:00:00.000Z');
 const BY: SharedBy = { coachId: 'coach_me', displayName: 'Coach Mike', credentialed: true };
