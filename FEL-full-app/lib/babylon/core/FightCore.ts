@@ -195,16 +195,23 @@ export class RivalFightBrain {
   constructor(private difficulty = 0.6, private attacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS) {}
 
   /**
-   * Retune mid-fight.
+   * How hard it is pressing, and what that costs it. Both 1 = it is playing its normal game.
    *
-   * NERVE (2026-09-14): the rival attacked on the same difficulty-scaled cooldown at 0-0 and at match
-   * point, because `difficulty` was fixed at construction. It is the one thing separating every opponent
-   * in the game from the dunk contest's rival, and it was a private field with no setter. Clamped away
-   * from both ends: below ~0.2 the rival stops fighting, and at 1 it blocks everything.
+   * NERVE (2026-09-14). The rival fought the decider exactly the way it fought round one, because
+   * `difficulty` was fixed at construction — the one thing separating every opponent in the game from the
+   * dunk contest's rival.
+   *
+   * THIS IS TWO DIALS AND NOT ONE ON PURPOSE. `difficulty` bundles pressure and skill: raising it makes
+   * the rival attack more often AND guard more, so nerving it upward when the rival is behind would be a
+   * straight buff — which is exactly the trap Nerve exists to refuse. So the two halves are separated.
+   * `press` shortens the attack cooldown; `loose` widens the reactive guard's failure. A rival that is
+   * behind comes forward more and reads less, which is what chasing a fight looks like.
    */
-  setDifficulty(d: number): void {
-    if (!Number.isFinite(d)) return;
-    this.difficulty = Math.max(0.2, Math.min(0.95, d));
+  private press = 1;
+  private loose = 1;
+  setNerve(aggression: number, mistake: number): void {
+    if (Number.isFinite(aggression)) this.press = Math.max(0.5, Math.min(2, aggression));
+    if (Number.isFinite(mistake)) this.loose = Math.max(0.5, Math.min(2, mistake));
   }
 
   /** `foeStriking` = the player is mid-swing (readable startup — what the
@@ -244,10 +251,13 @@ export class RivalFightBrain {
         // One read per wind-up, split between the two honest answers to a
         // vertical: step off the line (the sidestep grammar pays chi and
         // opens a punish) or guard it. Difficulty scales both.
-        if (roll < this.difficulty * 0.35) {
+        // NERVE: `loose` is the price of pressing. A rival chasing the fight reads the wind-up less often,
+        // so the guard it does not put up is what pays for the pressure it is applying.
+        const read = this.difficulty / this.loose;
+        if (roll < read * 0.35) {
           this.stepHoldSec = 0.22;
           this.stepDir = Math.random() < 0.5 ? -1 : 1;
-        } else if (roll < this.difficulty * 0.85) {
+        } else if (roll < read * 0.85) {
           this.blockHoldSec = 0.45;
         }
       }
@@ -260,7 +270,8 @@ export class RivalFightBrain {
 
     // attack when in range and off cooldown
     if (dist <= this.attacks.heavy.range && this.cooldown <= 0) {
-      this.cooldown = (1.0 + Math.random() * 0.9) / Math.max(0.3, this.difficulty);
+      // NERVE: pressing comes forward sooner. The skill baseline stays `difficulty`; `press` is situation.
+      this.cooldown = (1.0 + Math.random() * 0.9) / Math.max(0.3, this.difficulty * this.press);
       const roll = Math.random();
       const attack = selfState.chi >= CHI_MAX ? 'heavy'          // full chi → the mode upgrades heavy to the special
         : roll < 0.45 ? 'jab' : roll < 0.8 ? 'kick' : 'heavy';

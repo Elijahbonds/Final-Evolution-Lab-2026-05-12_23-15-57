@@ -24,7 +24,7 @@
 // Reliability: clipRegistry/installSafePlay, per-phase watchdogs, groundLock,
 // fight-preset framing, SoundKit/EffectsKit — all standard since M42.
 
-import { nerve, nervedSkill, standingOf } from '../core/Nerve';
+import { nerve, standingOf } from '../core/Nerve';
 import { Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -380,7 +380,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     {
       const sit = standingOf(foeWins, myWins, ROUNDS_TO_WIN, Math.min(1, Math.max(myWins, foeWins) / ROUNDS_TO_WIN));
       const shift = nerve(sit);
-      brain.setDifficulty(nervedSkill(BASE_RIVAL_DIFFICULTY, shift));
+      brain.setNerve(shift.aggression, shift.mistake);
       if (shift.label) console.info(`[KAR-NERVE] ${shift.label} (rounds ${foeWins}-${myWins})`);
     }
     SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');

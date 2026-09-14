@@ -859,6 +859,15 @@ export class AttackerBrain {
   private pending: 'layup' | 'jumper' | 'dunk' | null = null; private swayPhase = 0; private stepbackSec = 0; private stepIsCross = false;
   /** How much the rival has learned to protect the ball against THIS defender (survives reset(); decays per possession). */
   caution = 0;
+  /**
+   * How long he is willing to wait for a good look, as a multiple of the normal hold. Survives reset().
+   *
+   * NERVE (2026-09-14): this is the AGGRESSION half of the invariant, and without it applying nerve to the
+   * rival would have been a straight buff. A rival who is behind FORCES shots -- he pulls up out of a
+   * contain sooner and takes the look that is there rather than the one he wants. A rival protecting a
+   * lead waits. Below 1 he is pressing; above 1 he is being patient.
+   */
+  patience = 1;
   /** HOOPS-MOVE-KIT-A D1: this defender was IN FRONT and got beaten (a blow-by / a whiffed reach) — the finish at the rim is a
    *  DUNK on him. A defender who was never there (an unguarded drive) is just a layup line, which is what the open-drive
    *  check expects. */
@@ -941,7 +950,9 @@ export class AttackerBrain {
     // the shot: at the rim it is a layup — a DUNK off a blow-by (the defender is beaten: D1, something to block); held in
     // front (or the clock) it is a pull-up from here
     if (dist < LAYUP_RANGE && (!inLane || this.containedSec > 0.5)) this.pending = this.beaten && !inLane ? 'dunk' : 'layup';
-    else if (this.containedSec >= CONTAIN_PULLUP_SEC || this.t >= SHOT_CLOCK_SEC) this.pending = dist < LAYUP_RANGE ? 'layup' : 'jumper';
+    // `patience` is nerve's aggression half: pressing pulls up out of a contain sooner (a forced look),
+    // protecting waits longer for a better one. Floored so a desperate rival still plays basketball.
+    else if (this.containedSec >= CONTAIN_PULLUP_SEC * Math.max(0.45, this.patience) || this.t >= SHOT_CLOCK_SEC) this.pending = dist < LAYUP_RANGE ? 'layup' : 'jumper';
     if (this.pending === 'layup' || this.pending === 'dunk') { this.phase = 'gather'; this.gatherSec = 0; wish = zero; exposure = 0; }
     else if (this.pending === 'jumper') {
       // a pull-up under a body steps back first; an open pull-up (the clock) just rises

@@ -84,6 +84,7 @@
 // holds, cut callbacks ignored); giveBall() hands the ball over with both carries off; possessionToken guards every
 // timer; make-it-take-it both ways; the board is a race on both ends; the loose ball always steps.
 
+import { nerve, standingOf } from '../core/Nerve';
 import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
 import { MeshBuilder, Quaternion, TransformNode as BABYLON_TransformNode, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
@@ -287,6 +288,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   // defense phase state
   let defPhase: DefensePhase = 'over';
   const attacker = new AttackerBrain();
+  /** Push the scoreboard into the rival's shot selection. Called wherever a possession starts. */
+  const nerveTheAttacker = (): void => { attacker.patience = 1 / Math.max(0.5, nerve(rivalStanding()).aggression); };
   let gatherShown = false, stepbackShown = false;
   let myJumpAge = Infinity;                 // seconds since my contest jump left the floor
   let meStunSec = 0;                        // whiffed reach costs you your feet
@@ -343,6 +346,9 @@ export const OneVOneMode: ModeDefinition = (() => {
   let foeDunkFlight: { k: number; made: boolean | null } | null = null;   // D1: the rival's dunk in the air (the posture windows ride it)
   let defenseLuck: number | null = null;        // dev: force the AI's block / strip / hand-up rolls (1 = always, 0 = never)
   const roll = (): number => defenseLuck ?? Math.random();   // dev: the roll VALUE forced (0 = every chance lands, 0.99 = none)
+  /** Where the RIVAL stands, for Nerve. Lateness reads off whoever is closer to 11 — at 10-2 it is nearly over. */
+  const rivalStanding = () =>
+    standingOf(foeScore, myScore, TARGET_SCORE, Math.min(1, Math.max(myScore, foeScore) / TARGET_SCORE));
   let foeBrain: DefenderBrain | null = null;     // O2/O3: the rival's brain (his job / box-out readouts)
   let foeSealing = false;                       // mirrors the brain's seal so the board can read it as real position
   let lastBumpStripAt = 0;                       // D2: one bump-strip roll per 1.5 s
@@ -1303,7 +1309,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   function startDefense(ctx: ModeContext, banner: string): void {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
-    defPhase = 'check'; attacker.reset(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
+    defPhase = 'check'; attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
     threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null;
     meMotion.reset(); foeMotion.reset();   // a check-up moves bodies metres in a frame; that is not acceleration
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
@@ -1356,7 +1362,17 @@ export const OneVOneMode: ModeDefinition = (() => {
     const contest = Math.min(1, handUpContest(contestLevel(foe.root.position, me.root.position), myJumpAge) + ground);
     defContest = contest;
     const range = distXZ(foe.root.position, RIM_FLOOR);
-    const made = Math.random() < rivalShotPct(range, contest, style);
+    // THE RIVAL FEELS THE SCORE NOW. His make chance came straight off range and contest, so he shot the
+    // same at 0-0 as down 2-10 with the game gone.
+    //
+    // THE INVARIANT HAS TO HOLD IN THE GAME, NOT JUST IN THE MODULE. Applying nerve's `edge` upward here
+    // would have made a trailing rival shoot BETTER for free, which is the exact trap Nerve exists to
+    // refuse. So the two halves are split where they honestly belong: `aggression` drives
+    // AttackerBrain.patience (a rival who is behind FORCES the look -- he pulls up out of a contain
+    // sooner), and `mistake` DIVIDES the make chance, because a forced shot is a worse shot. Down big and
+    // late he shoots more often and makes fewer, which is what chasing a game looks like.
+    const nrv = nerve(rivalStanding());
+    const made = Math.random() < rivalShotPct(range, contest, style) / Math.max(0.5, nrv.mistake);
     arcPoints = style === 'layup' ? 2 : isThree(foe.root.position, RIM) ? 3 : 2;
     // The RIVAL's miss has to be readable too. Measured with a probe: every rim contact in a 150 s run
     // came back "front — SHORT", because only the hero's release recorded a profile and the AI fell
@@ -2200,7 +2216,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     // straight to 'drive', never 'check': they already have the ball at the rim, there is nothing to check up for
-    defPhase = 'drive'; attacker.reset(); gatherShown = false; stepbackShown = false;
+    defPhase = 'drive'; attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false;
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false; meShotWin = 'none'; foeShotWin = 'none';
     if (gather || finish || spin || posting) meAnimTree.release();

@@ -20,7 +20,7 @@
 // Best of 3. Reliability standard since M42: installSafePlay, watchdogs,
 // groundLock (released on a ring-out fall), fight-cam framing.
 
-import { nerve, nervedSkill, standingOf } from '../core/Nerve';
+import { nerve, standingOf } from '../core/Nerve';
 import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -478,7 +478,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
     {
       const sit = standingOf(foeWins, myWins, ROUNDS_TO_WIN, Math.min(1, Math.max(myWins, foeWins) / ROUNDS_TO_WIN));
       const shift = nerve(sit);
-      brain.setDifficulty(nervedSkill(BASE_RIVAL_DIFFICULTY, shift));
+      brain.setNerve(shift.aggression, shift.mistake);
       if (shift.label) console.info(`[MIX-NERVE] ${shift.label} (rounds ${foeWins}-${myWins})`);
     }
     SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');

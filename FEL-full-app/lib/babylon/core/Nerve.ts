@@ -23,10 +23,17 @@
 // lead is punished for building it. So `aggression` and `mistake` move together, ALWAYS, and there is a
 // test that sweeps the whole grid asserting they never come apart.
 //
-// AND THE SECOND HALF OF IT, WHICH RivalNerve DID NOT NEED AND THIS DOES: `edge` — the honest scalar, a
-// shot percentage or a race pace — moves LESS than `mistake`. A pressing opponent may swing bigger and it
-// may connect slightly more often, but it must always be paying more in errors than it is gaining in
-// quality. Otherwise pressing is just a buff with a story attached.
+// THE SHAPE THIS MODULE ARRIVED AT, AFTER GETTING IT WRONG ONCE. The first version also returned `edge` —
+// an "honest scalar" multiplier for a shot percentage or a race pace, moving a little in the same
+// direction as aggression. Wiring it into three real opponents showed that is a trap in itself: every one
+// of them exposed skill as ONE number that bundled pressure and accuracy (`aiSkill` gates a tennis shank,
+// `difficulty` gates both the karate rival's cooldown AND its guard), so nudging that number upward for a
+// trailing opponent was a straight buff with a story attached. There is no scalar to move.
+//
+// So there are exactly two dials and they always point opposite ways in the fiction: press harder, read
+// worse. Each consumer has to find two DIFFERENT mechanisms to attach them to — a shorter attack cooldown
+// against a wider guard failure, an earlier forced pull-up against a lower make chance, a bigger angle
+// against a worse contact. If a mode cannot name both, it is not ready to be nerved.
 //
 // Pure: no Babylon, no clock, no randomness. The mode rolls; this decides what it is rolling on.
 
@@ -45,15 +52,13 @@ export interface Standing {
 export interface NerveShift {
   /** How hard it presses — initiates rather than waits. */
   aggression: number;
-  /** Its unforced-error rate. */
+  /** Its unforced-error rate. Always moves WITH `aggression` — that is the invariant. */
   mistake: number;
-  /** The honest scalar (shot percentage, race pace). Always moves less than `mistake`. */
-  edge: number;
   /** For a console line or a banner. Null when it is just playing its game. */
   label: string | null;
 }
 
-export const NEUTRAL: NerveShift = { aggression: 1, mistake: 1, edge: 1, label: null };
+export const NEUTRAL: NerveShift = { aggression: 1, mistake: 1, label: null };
 
 /** Below this margin nothing changes — a one-point game is not a situation. */
 export const CALM_MARGIN = 0.12;
@@ -61,8 +66,6 @@ export const CALM_MARGIN = 0.12;
 export const MAX_AGGRESSION_SWING = 0.55;
 /** How far the error rate swings. Deliberately larger than the aggression swing: pressing is paid for. */
 export const MAX_MISTAKE_SWING = 0.70;
-/** And the honest scalar barely moves. This is the ceiling on "pressing made it better". */
-export const MAX_EDGE_SWING = 0.12;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -91,24 +94,19 @@ export function nerve(s: Standing): NerveShift {
   return {
     aggression: 1 + dir * MAX_AGGRESSION_SWING * urgency,
     mistake: 1 + dir * MAX_MISTAKE_SWING * urgency,
-    edge: 1 + dir * MAX_EDGE_SWING * urgency,
     label: urgency < 0.25 ? null : behind ? 'PRESSING' : 'PROTECTING THE LEAD',
   };
 }
 
 /**
- * Apply a shift to a raw 0..1 skill scalar — for the modes whose opponent IS one number.
+ * Bounds for a consumer clamping its own skill scalar after dividing it by `mistake`.
  *
- * Clamped away from both ends: a 0 opponent stops playing and a 1 opponent cannot be beaten, and neither
- * is a comeback story.
+ * A 0 opponent stops playing and a 1 opponent cannot be beaten, and neither is a comeback story. Exported
+ * rather than applied here, because this module deliberately no longer offers to move a skill number for
+ * you — see the header.
  */
 export const SKILL_FLOOR = 0.15;
 export const SKILL_CEIL = 0.97;
-
-export function nervedSkill(skill: number, shift: NerveShift): number {
-  if (!Number.isFinite(skill)) return skill;
-  return clamp(skill * shift.edge, SKILL_FLOOR, SKILL_CEIL);
-}
 
 /**
  * The standing, derived from two scores and how far through the contest you are.

@@ -3,14 +3,13 @@
 // This is RivalNerve's invariant, carried into the module that serves every other opponent in the game. An
 // AI that presses harder when trailing and pays nothing for it is an AI that is REWARDED for being beaten:
 // the player who builds a lead is punished for building it, and the contest inverts. The sweep below walks
-// the entire margin x lateness grid and asserts the pair never comes apart — plus the half RivalNerve did
-// not need, that the honest scalar always moves less than the error rate, so pressing is never just a buff.
+// the entire margin x lateness grid and asserts the pair never comes apart, and that the error rate always
+// swings hardest — so whatever a consumer attaches these to, pressing is never free.
 
 import { describe, it, expect } from 'vitest';
 import {
-  nerve, nervedSkill, standingOf, NEUTRAL,
-  CALM_MARGIN, MAX_AGGRESSION_SWING, MAX_MISTAKE_SWING, MAX_EDGE_SWING,
-  SKILL_FLOOR, SKILL_CEIL,
+  nerve, standingOf, NEUTRAL,
+  CALM_MARGIN, MAX_AGGRESSION_SWING, MAX_MISTAKE_SWING,
 } from './Nerve';
 
 const GRID: { margin01: number; lateness01: number }[] = [];
@@ -30,10 +29,15 @@ describe('Nerve — the invariant', () => {
     }
   });
 
-  it('always pays more in errors than it gains in quality', () => {
+  // The module used to also return `edge`, a multiplier for a skill scalar. Wiring three real opponents
+  // showed every one of them exposes skill as ONE number bundling pressure and accuracy, so nudging it
+  // up for a trailing opponent was a straight buff. There is no scalar to move, and this test is the
+  // guard against re-adding one: whatever a consumer attaches these to, the error rate must swing hardest.
+  it('always swings the error rate hardest, so pressing is never free', () => {
     for (const s of GRID) {
       const n = nerve(s);
-      expect(Math.abs(n.mistake - 1)).toBeGreaterThanOrEqual(Math.abs(n.edge - 1) - 1e-9);
+      if (n === NEUTRAL) continue;
+      expect(Math.abs(n.mistake - 1)).toBeGreaterThanOrEqual(Math.abs(n.aggression - 1) - 1e-9);
     }
   });
 
@@ -42,7 +46,6 @@ describe('Nerve — the invariant', () => {
       const n = nerve(s);
       expect(Math.abs(n.aggression - 1)).toBeLessThanOrEqual(MAX_AGGRESSION_SWING + 1e-9);
       expect(Math.abs(n.mistake - 1)).toBeLessThanOrEqual(MAX_MISTAKE_SWING + 1e-9);
-      expect(Math.abs(n.edge - 1)).toBeLessThanOrEqual(MAX_EDGE_SWING + 1e-9);
     }
   });
 
@@ -51,7 +54,6 @@ describe('Nerve — the invariant', () => {
       const n = nerve(s);
       expect(n.aggression).toBeGreaterThan(0);
       expect(n.mistake).toBeGreaterThan(0);
-      expect(n.edge).toBeGreaterThan(0);
     }
   });
 });
@@ -100,23 +102,6 @@ describe('Nerve — the situation', () => {
   it('refuses garbage rather than propagating it', () => {
     expect(nerve({ margin01: NaN, lateness01: 1 })).toEqual(NEUTRAL);
     expect(nerve({ margin01: -99, lateness01: 99 }).aggression).toBeLessThanOrEqual(1 + MAX_AGGRESSION_SWING);
-  });
-});
-
-describe('Nerve — the skill scalar', () => {
-  it('keeps an opponent playable and beatable at both extremes', () => {
-    const desperate = nerve({ margin01: -1, lateness01: 1 });
-    const cruising = nerve({ margin01: 1, lateness01: 1 });
-    expect(nervedSkill(0.99, desperate)).toBeLessThanOrEqual(SKILL_CEIL);
-    expect(nervedSkill(0.02, cruising)).toBeGreaterThanOrEqual(SKILL_FLOOR);
-  });
-
-  it('leaves a skill alone in a close game', () => {
-    expect(nervedSkill(0.82, NEUTRAL)).toBeCloseTo(0.82, 9);
-  });
-
-  it('passes a non-number through rather than turning it into one', () => {
-    expect(nervedSkill(NaN, NEUTRAL)).toBeNaN();
   });
 });
 

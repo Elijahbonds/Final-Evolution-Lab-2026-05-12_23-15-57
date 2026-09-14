@@ -9,7 +9,7 @@
 // All rally arithmetic lives in RallyCore (Babylon-free, 37 executed tests).
 // This file owns meshes, input, animation and HUD, and nothing else.
 
-import { nerve, nervedSkill, standingOf, type Standing } from '../core/Nerve';
+import { nerve, standingOf, SKILL_FLOOR, SKILL_CEIL, type Standing } from '../core/Nerve';
 import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, Vector3 } from '@babylonjs/core';
 import { answerFor, tellFor, rallyPace, SHOT_FACE } from '../core/tennisHud';
 import { ballKindFor, dressBall } from '../visual/meshyProps';
@@ -388,8 +388,14 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // swung exactly the same down 0-3 as up 3-0 -- the same constant-opponent problem RivalNerve solved for
     // the dunk contest and nowhere else. Nerve holds the invariant: a rival that presses when trailing pays
     // for it in errors, so falling behind is never strictly better than leading.
+    //
+    // THE INVARIANT HAS TO HOLD IN THE GAME, NOT JUST IN THE MODULE. Feeding nerve's `edge` into the skill
+    // would have made a trailing opponent swing BETTER for free -- the exact trap Nerve refuses. So the
+    // halves go where they honestly belong: `mistake` DIVIDES the skill here (a player chasing a set
+    // shanks more), and `aggression` drives how hard they commit to the open court below. Down a set they
+    // go for more and land less.
     const shift = nerve(aiStanding());
-    const skill = nervedSkill(o.aiSkill, shift);
+    const skill = Math.max(SKILL_FLOOR, Math.min(SKILL_CEIL, o.aiSkill / Math.max(0.5, shift.mistake)));
     let q: SwingQuality = roll > skill ? 'miss'
       : roll > skill * 0.75 ? 'late'
       : roll > skill * 0.45 ? 'good' : 'perfect';
@@ -476,8 +482,12 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // committing harder the further out of position the player is, and never paints the line (AI_LINE_SAFETY):
     // an opponent who hits the chalk every ball is not playing tennis.
     sinceOppStrike = 0;                              // the split step is timed against THIS moment
+    // NERVE's aggression half: how hard they commit to the open court. Chasing the match they go for the
+    // bigger angle; protecting a lead they play it safer. Capped at 1 so AI_LINE_SAFETY still keeps them
+    // off the chalk -- an opponent who paints the line every ball is not playing tennis, at any scoreline.
+    const commit = Math.min(1, (q === 'perfect' ? 1 : q === 'good' ? 0.75 : 0.45) * shift.aggression);
     const aiIntent = aiCrosses
-      ? aiTargetX(foot.x, o.cfg.halfWidth, q === 'perfect' ? 1 : q === 'good' ? 0.75 : 0.45) / o.cfg.halfWidth
+      ? aiTargetX(foot.x, o.cfg.halfWidth, commit) / o.cfg.halfWidth
       : (Math.random() - 0.5) * 1.6;                 // a self-pass is not aimed at the opponent
     launch(ctx, ball.getAbsolutePosition(), aiCrosses ? 1 : -1, aiIntent, q, aiIsVolley ? aiTouch : undefined, aiShot, aiZone);
   }
