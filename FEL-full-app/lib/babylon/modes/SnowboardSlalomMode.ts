@@ -56,6 +56,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let world: RideWorld, rig: BoardRig, tricks: TrickMachine;
   let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
   let crowd: Onlookers;
+  // deep runs light the building here too, not only on a skateboard (boardCore.TrickMachine)
+  const trickMomentum = new MomentumBus();
   let nextGate = 0, gatesHit = 0, elapsed = 0;
   let hudSec = -1;   // ARENA-10PHASE P9 soft: the run clock the HUD shows (it never published `time` — the chip sat on "0s" all run)
   /** A full snowboard air's hang, for judging which trick the rider can finish. */
@@ -164,7 +166,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // under the run's lowest point and the stick-down glue keep the rider on the snow (owner sign-off 2026-09-07).
       const pisteBottomY = -Math.sin(SLOPE_PITCH) * (SLALOM_START + SLALOM_GATES * SLALOM_SPACING + 40);
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0.2, 4), 0, world.ground, '#ff6b3d', 'snowboard', { hardFloorY: pisteBottomY - 5, rayLength: 80, stickDown: 0.6 });
-      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { anim: 'external', onBeat: (b) => { if (b === 'land') landBeatT = LAND_BEAT_SEC; else bailBeatT = BAIL_BEAT_SEC; } });
+      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { momentum: trickMomentum, anim: 'external', onBeat: (b) => { if (b === 'land') landBeatT = LAND_BEAT_SEC; else bailBeatT = BAIL_BEAT_SEC; } });
       animTree = new BoardAnimTree(rig.char.animator);
       posture?.dispose();
       posture = mountPostureLayer(ctx.scene, rig.char.skeleton, rig.char.root, () => {

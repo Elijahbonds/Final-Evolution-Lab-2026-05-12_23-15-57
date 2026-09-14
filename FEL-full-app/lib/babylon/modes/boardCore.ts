@@ -4,6 +4,7 @@
 // Fixes E10 root cause pattern: a mode using this core CANNOT reach playing
 // with no world — buildRig demands ground meshes up front.
 
+import { MomentumBus } from '../core/MomentumBus';
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { dressBoard, type BoardKind } from '../visual/meshyProps';
 import type { AbstractMesh } from '@babylonjs/core';
@@ -80,15 +81,31 @@ export interface TrickMachineOpts {
   anim?: 'self' | 'external';
   /** A clean landing or a bail happened this frame (external anim drives its beat window from this). */
   onBeat?: (beat: 'land' | 'bail') => void;
+  /** The shared Game-Breaker bus. Pass one and deep combos light the building, as they do on a skateboard. */
+  momentum?: MomentumBus;
 }
 
 export class TrickMachine {
   score = 0; combo = 0; comboPts = 0;
+  /**
+   * The shared Game-Breaker layer (2026-09-13).
+   *
+   * THERE ARE TWO COMBO IMPLEMENTATIONS IN THIS PROJECT. Skate runs `ComboChain`, which reports to
+   * `MomentumBus` at 5x and again at 8x; snow and surf run this class, which counted an identical combo and
+   * told the momentum system NOTHING. So a deep run on a snowboard — the thing the mode is for — never
+   * moved the tier, never lit the crowd and never applied the multiplier, while the same feat on a
+   * skateboard did. Exactly the gap 3v3 had against 1v1, in a different corner.
+   *
+   * Optional, so every existing construction site keeps working untouched.
+   */
+  private momentum?: MomentumBus;
   private active: TrickDef | null = null;
   private spun = 0;
   private grabbing = false;
 
-  constructor(private rig: BoardRig, private onHud: (h: Record<string, string | number>) => void, private opts: TrickMachineOpts = {}) {}
+  constructor(private rig: BoardRig, private onHud: (h: Record<string, string | number>) => void, private opts: TrickMachineOpts = {}) {
+    this.momentum = opts.momentum;
+  }
 
   /** The grab is being held in the air. */
   get grabHeld(): boolean { return this.grabbing; }
@@ -137,6 +154,9 @@ export class TrickMachine {
       if (clean) {
         this.combo++;
         this.comboPts += t.pts * this.combo;
+        // the same thresholds ComboChain uses, so a 5-trick run means the same thing on either board
+        if (this.combo === 5) this.momentum?.report({ kind: 'big_make' });
+        else if (this.combo >= 8) this.momentum?.report({ kind: 'highlight_dunk', weight: Math.min(30, this.combo * 2) });
         this.playClip('jump_land');
         this.opts.onBeat?.('land');
         this.onHud({ combo: `${this.combo}x` });

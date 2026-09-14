@@ -10,6 +10,7 @@
 // Everything from M44 kept: pocket flow, cutbacks, grabs, the 140-unit
 // rider/wave lockstep wrap (E24's fix).
 
+import { MomentumBus } from '../core/MomentumBus';
 import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -55,6 +56,8 @@ export const FLOW_FILL_PER_SEC = 22;
 export const SurfBreakMode: ModeDefinition = (() => {
   let world: RideWorld, waveLipAt: (t: number) => Vector3, barrelActive: (t: number) => boolean;
   let faceHeightAt: (x: number, z: number, t: number) => number;
+  // deep runs light the building here too, not only on a skateboard (boardCore.TrickMachine)
+  const trickMomentum = new MomentumBus();
   let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
   let rig: BoardRig, tricks: TrickMachine;
   let crowd: Onlookers;
@@ -194,7 +197,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       // the board for the first 6 s), and glue the rider to the face on the way down it (the wave face falls away faster
       // than one frame of gravity, exactly like the pitched piste — see RiderCfgOverrides.stickDown).
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -50 + POCKET.min + 3), 0, world.ground, '#ffd75e', 'surfboard', { stickDown: 0.9, rayLength: 8 });
-      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { anim: 'external', onBeat: (b) => { if (b === 'land') landBeatT = LAND_BEAT_SEC; else bailBeatT = BAIL_BEAT_SEC; } });
+      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { momentum: trickMomentum, anim: 'external', onBeat: (b) => { if (b === 'land') landBeatT = LAND_BEAT_SEC; else bailBeatT = BAIL_BEAT_SEC; } });
       animTree = new BoardAnimTree(rig.char.animator);
       posture?.dispose();
       posture = mountPostureLayer(ctx.scene, rig.char.skeleton, rig.char.root, () => {
