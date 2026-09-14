@@ -11,6 +11,27 @@ one is built and deliberately switched off, and one is a real, total gap.
 
 ---
 
+## Status — C1, C2 and C3 shipped; C4 is next
+
+| | gap | shipped |
+|---|---|---|
+| C1 | no roll, no jump, dodge in one mode of four | `EvadeMoves` (roll with i-frames that **end before the roll does**, jump), `DodgeRead` (a binary perfect-dodge reward). Wired into karate_vs, mixedcombat and endless. New `karate_roll` / `karate_jump` clips; block and parry rebuilt. |
+| C2 | enemies dropped on one touch | `MookHealth` — **3 hits at wave 1** (owner), a shallow capped curve so one swing still clears a crowd, and a bar built on first damage. |
+| C3 | PRQ tied to nothing | `PrqVitals` — max HP and speed from the band, spread capped at a fifth of a pool, guest = READY. `/api/profile` → host → harness → mode. |
+| **C4** | **"better speed, smoother" — unmeasured** | **next.** |
+
+Two things worth carrying forward from the build:
+
+- **The roll went in the wrong place first.** I wrote it inside `CombatMovement`, then found only duel and
+  showdown own one — the other three write velocity straight onto the root. `EvadeMoves` stands alone so a
+  mode can adopt the verb without adopting a locomotion controller.
+- **Karate endless keeps its own dodge.** It already had the best one in the game; giving it a second roll
+  would have been two rolls fighting over one body. It took only the jump. Its perfect-read window moved
+  into `DodgeRead` beside the duel's — **the two values still differ on purpose** (a horde is not one
+  telegraph); what was wrong was two constants of the same name in two files.
+
+---
+
 ## What is already true
 
 **You cannot be one-tapped, and you already have a health bar.** `NeoCombatCore.VITALS` gives the player
