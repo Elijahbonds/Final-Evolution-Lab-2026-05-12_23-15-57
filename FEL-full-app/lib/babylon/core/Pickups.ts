@@ -12,7 +12,8 @@
 // one has to vanish on its own. A taken coin is scaled to zero rather than removed, so the buffer keeps a
 // stable layout and no index ever shifts under the collection logic.
 
-import { Color3, Matrix, MeshBuilder, Quaternion, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Matrix, MeshBuilder, Quaternion, Vector3 } from '@babylonjs/core';
+import { VenueKit } from '../visual/VenueKit';
 import type { Mesh, Scene } from '@babylonjs/core';
 
 export const COIN_RUN_CAP = 60;      // must match server-side validation
@@ -57,9 +58,16 @@ export class CoinField {
   private ensure(): void {
     if (!this.master) {
       const m = MeshBuilder.CreateCylinder('coin', { diameter: 0.34, height: 0.05, tessellation: 16 }, this.scene);
-      const mat = new StandardMaterial('coinMat', this.scene);
-      mat.diffuseColor = Color3.FromHexString('#f5b91a');
-      mat.emissiveColor = Color3.FromHexString('#8a6200');
+      // PBR, AND A COIN IS THE CASE THAT MAKES THE POINT. This was a StandardMaterial with a bright gold
+      // diffuse (#f5b91a) — under a rig running hemispheric 0.85 plus a directional at 2.60 that clips to
+      // white, so every coin in FIVE modes was a pale blob rather than gold. Fifth occurrence of this bug
+      // in two days; VenueKit.paint exists for it.
+      //
+      // The upgrade is not only the clipping. A coin is METAL, and metalness is a thing StandardMaterial
+      // cannot express at all: as PBR it catches the venue's own light and the environment, so a coin
+      // reads as gold in sun and as dull brass in shade instead of being one flat colour everywhere.
+      const mat = VenueKit.paint(this.scene, 'coinMat', '#f5b91a', 0.22, 0.34);
+      mat.metallic = 0.9;
       mat.freeze();                     // one material, and it never changes
       m.material = mat;
       m.isPickable = false;
