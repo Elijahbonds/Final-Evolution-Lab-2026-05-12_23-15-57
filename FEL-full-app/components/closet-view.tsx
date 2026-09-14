@@ -8,6 +8,7 @@ import { Loader2, Shirt, Palette, Check, Coins, Sparkles } from 'lucide-react';
 import { newIdempotencyKey } from '@/lib/wallet/client';
 import { FaceScanCapture } from '@/components/facescan/face-scan-capture';
 import { invalidateIdentity } from '@/lib/babylon/core/characterPipeline';
+import { canEquip as canEquipItem } from '@/lib/closet/ownership';
 import {
   SKIN_TONES, FACE_SHAPES, HAIR_STYLES, HAIR_COLORS, EYE_SHAPES, EYE_COLORS,
   BROWS, MOUTHS, NOSES, defaultFace, defaultEquipped, defaultJersey, sanitizeJersey, SLOTS,
@@ -20,7 +21,8 @@ const AvatarPreview = dynamic(() => import('@/components/closet/avatar-preview')
 type Equipped = Record<WearableSlot, string | null>;
 type CardSkin = { id: string; displayName: string; accent: string; rarity: string };
 
-const FREE_ITEMS = new Set(['top_lab', 'shorts_court', 'shoes_flight']);
+// The free starters come from lib/closet/ownership.ts — the server decides entitlement and this screen
+// must not hold a second opinion about it.
 
 function Swatch({ color, active, onClick }: { color: string; active: boolean; onClick: () => void }) {
   return (
@@ -131,7 +133,7 @@ export function ClosetView() {
   const setF = (k: keyof FaceConfig, v: string) => setFace((p) => ({ ...p, [k]: v }));
   const setSlider = (k: string, v: number) => setFace((p) => ({ ...p, sliders: { ...(p.sliders ?? {}), [k]: v } }));
 
-  const canEquip = (itemId: string) => owned.has(itemId) || FREE_ITEMS.has(itemId);
+  const canEquip = (itemId: string) => canEquipItem(itemId, owned);
 
   const buy = async (itemId: string) => {
     const w = getWearable(itemId);

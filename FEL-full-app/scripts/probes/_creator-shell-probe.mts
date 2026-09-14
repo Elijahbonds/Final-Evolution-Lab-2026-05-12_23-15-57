@@ -131,5 +131,25 @@ await open('Ink');
 const ink = await p.evaluate(`(() => { const t = document.body.innerText; return { saysWhy: /artwork|decal/i.test(t), notJustNotBuilt: t.length > 0 && !/^\\s*Not built yet\\.?\\s*$/.test(t) }; })()`) as Record<string, unknown>;
 console.log('[CREATOR] ink (closed, on purpose):', JSON.stringify(ink));
 await p.screenshot({ path: `${OUT}/07-ink.png` });
+// FINALIZE. On /dev/creator there is no session, so the save must come back as a sentence a person can
+// act on — not a silent no-op and not a stack trace. That is the whole behaviour worth checking without a
+// database: the button is live, it calls the route, and it reports what the server said.
+await open('Finalize');
+const beforeSave = await p.evaluate(`(() => {
+  const btn = [...document.querySelectorAll('button')].find(b => /save athlete/i.test(b.textContent || ''));
+  return { present: !!btn, disabled: btn ? btn.disabled : null };
+})()`) as Record<string, unknown>;
+await p.evaluate(`(() => { const b=[...document.querySelectorAll('button')].find(x=>/save athlete/i.test(x.textContent||'')); b && b.click(); })()`);
+await p.waitForTimeout(1800);
+const afterSave = await p.evaluate(`(() => {
+  // Not a backslash escape: tsx resolves it inside this template before the page sees it, so a literal
+  // newline lands inside a quoted string and the whole block fails to parse. Split on the character.
+  const lines = document.body.innerText.split(String.fromCharCode(10)).map(s => s.trim());
+  const starts = ['Sign in to save', 'Saved', 'The athlete table', 'The server refused', 'Could not'];
+  return lines.find(l => starts.some(p => l.startsWith(p))) || null;
+})()`) as string | null;
+console.log('[CREATOR] finalize:', JSON.stringify({ ...beforeSave, said: afterSave }));
+await p.screenshot({ path: `${OUT}/08-finalize.png` });
+
 console.log(`[CREATOR] errors: ${errs.length}${errs.length ? ' :: ' + errs.slice(0,2).join(' | ') : ''}`);
 await b.close();

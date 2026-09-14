@@ -9,7 +9,7 @@
 // SECTIONS WITHOUT ROWS SAY SO. A creator that opens a blank "Ink" page has told the player it is broken;
 // one that says "not built yet" has told them the truth, and the truth is cheaper to trust.
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import CreatorEditor from '@/components/creator/editor/creator-editor';
 import { bindPreview } from '@/lib/creator/editor/previewBinding';
@@ -18,7 +18,7 @@ import { bindPreview } from '@/lib/creator/editor/previewBinding';
 // server at all.
 const CreatorPreview = dynamic(() => import('@/components/creator/editor/creator-preview'), { ssr: false });
 import { SIDEBAR } from '@/lib/creator/schema/sections';
-import { resolve, LOOK_SECTIONS, type CreatorBuild } from '@/lib/creator/schema/resolve';
+import { resolve, LOOK_SECTIONS, type CreatorBuild, type Issue } from '@/lib/creator/schema/resolve';
 import { emptyAthleteProfile, exportProfile, importProfile } from '@/lib/creator/schema/athleteProfile';
 import type { RowValue } from '@/lib/creator/editor/rowState';
 import type { PrqAxisId } from '@/lib/creator/schema/types';
@@ -38,6 +38,10 @@ export default function AthleteCreator({ axes, profileId }: Props) {
   // The name plate is free text, which is not one of the three row kinds — so it lives here rather than
   // becoming a fourth kind that puts a special case in the generic screen.
   const [plate, setPlate] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+  /** What the save came back with — a confirmation, a refusal, or the server's own list of violations. */
+  const [saveNote, setSaveNote] = useState<string>('');
+  const [serverIssues, setServerIssues] = useState<Issue[]>([]);
 
   const entry = SIDEBAR.find((s) => s.key === openKey) ?? SIDEBAR[6];
 
@@ -59,6 +63,54 @@ export default function AthleteCreator({ axes, profileId }: Props) {
   // §10 step 6: the preview CONSUMES the build. It is derived here, once, and handed down — the editor
   // screen renders whatever node it is given and knows nothing about Babylon.
   const binding = useMemo(() => bindPreview(values, plate), [values, plate]);
+
+  // LOAD WHAT WAS SAVED. A creator that opens on defaults for someone who finalized last week has lost
+  // their athlete as far as they are concerned, even though the row is still there.
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/v1/creator/athlete');
+        if (!r.ok) return;                       // 401 guest, 503 un-pushed schema: start on defaults
+        const body = await r.json();
+        if (dead || !body?.values) return;
+        setValues(body.values as Values);
+        if (typeof body.plate === 'string') setPlate(body.plate);
+      } catch { /* offline: the editor still works, it just starts empty */ }
+    })();
+    return () => { dead = true; };
+  }, []);
+
+  const doSave = useCallback(async () => {
+    setSaving(true); setSaveNote(''); setServerIssues([]);
+    try {
+      const r = await fetch('/api/v1/creator/athlete', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ values, plate }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (r.status === 422) {
+        // The server ran the same resolver on the same values and disagreed. Show ITS issues, not ours.
+        setServerIssues((body.issues ?? []) as Issue[]);
+        setSaveNote('The server refused this build. The rows below are what it objected to.');
+      } else if (r.status === 401) {
+        setSaveNote('Sign in to save an athlete. Everything you have built stays on this screen.');
+      } else if (r.status === 503) {
+        setSaveNote(String(body.detail ?? 'The athlete table is not in the database yet.'));
+      } else if (r.ok) {
+        const refused = (body.refused ?? []) as Array<{ name: string }>;
+        setSaveNote(refused.length
+          ? `Saved. Not equipped — you do not own: ${refused.map((x) => x.name).join(', ')}.`
+          : 'Saved.');
+      } else {
+        setSaveNote('Could not save. Nothing was changed.');
+      }
+    } catch {
+      setSaveNote('Could not reach the server. Nothing was changed.');
+    } finally {
+      setSaving(false);
+    }
+  }, [values, plate]);
 
   const onChange = useCallback((section: string, rowId: string, next: RowValue) => {
     setValues((v) => ({ ...v, [section]: { ...(v[section] ?? {}), [rowId]: next } }));
@@ -171,9 +223,19 @@ export default function AthleteCreator({ axes, profileId }: Props) {
                 </li>
               ))}
             </ul>
-            <button disabled={violations > 0}
+            {serverIssues.length > 0 && (
+              <ul className="mt-3 space-y-1 rounded-xl bg-[var(--fel-red)]/10 p-3">
+                {serverIssues.map((i, n) => (
+                  <li key={`s${n}`} className="font-mono text-[11px] text-[var(--fel-red)]">
+                    <button onClick={() => setOpenKey(i.section)} className="underline">{i.section}</button> · {i.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {saveNote && <p className="mt-3 font-mono text-[11px] text-[var(--fel-gold)]">{saveNote}</p>}
+            <button disabled={violations > 0 || saving} onClick={doSave}
               className="mt-4 rounded-xl bg-[var(--fel-cyan)] px-5 py-2 fel-heading text-sm font-bold text-black disabled:opacity-30">
-              Save Athlete
+              {saving ? 'Saving…' : 'Save Athlete'}
             </button>
           </div>
         ) : (

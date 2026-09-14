@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { defaultFace, defaultEquipped, sanitizeJersey, sanitizeFaceSliders, type FaceConfig } from '@/lib/closet/wearable-catalog';
+import { filterEquipped } from '@/lib/closet/ownership';
 
 /** GET /api/v1/closet — current look + owned wearables + applied card skin. */
 export async function GET() {
@@ -35,12 +36,12 @@ export async function POST(req: NextRequest) {
   if (sliders) face.sliders = sliders; else delete face.sliders;
   const equipped = body?.equipped ?? defaultEquipped();
 
-  // Only equip owned wearables (server-side ownership check).
+  // Only equip owned wearables (server-side ownership check). The rule — owned OR one of the free
+  // starters, and unowned resolves to EMPTY rather than a substitute — now lives in one module, because
+  // it was written out here, again in components/closet-view.tsx, and the creator was about to be the
+  // third copy. Same behaviour, one owner.
   const owned = new Set((await prisma.ownedWearable.findMany({ where: { userId } })).map((o) => o.itemId));
-  const cleanEquipped: Record<string, string | null> = {};
-  for (const [slot, itemId] of Object.entries(equipped)) {
-    cleanEquipped[slot] = itemId && (owned.has(itemId as string) || ['top_lab', 'shorts_court', 'shoes_flight'].includes(itemId as string)) ? (itemId as string) : (itemId == null ? null : cleanEquipped[slot] ?? null);
-  }
+  const cleanEquipped = filterEquipped(equipped as Record<string, string | null>, owned);
 
   // Creator-card skin: verify ownership before applying.
   let skinCardId: string | null = null;
