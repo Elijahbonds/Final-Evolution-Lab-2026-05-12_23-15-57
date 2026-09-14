@@ -16,10 +16,19 @@
 // is where the server refuses what you have not bought. Hiding unowned items here would put a second
 // opinion about ownership in the client, which is the thing that rule forbids.
 //
-// COLOURS ARE THE PALETTE THE GAME ALREADY USES. `TintSet` is three hex zones on an RGB mask. Rather than
-// inventing a colour picker's worth of swatches, the options are the accent colours the shipped wearables
-// are authored in plus the three defaults — every one of them a colour that already appears on screen
-// somewhere in FEL.
+// THE COLOURS ARE THE PALETTE THE IDENTITY PIPE READS, and this is the second time in one section that the
+// obvious answer was the wrong one. `AvatarConfig.colors` is a TintSet of three RGB-mask zones and looks
+// exactly like what a kit colour picker should write to — and `applyIdentity`, the function that actually
+// dresses every hero in every mode, never reads it. What it reads is
+// `palette.{jersey, shorts, shoes, accent}`, tinted onto meshes by slot name. So these four rows are that,
+// and a colour chosen here reaches the player instead of a field nothing consumes.
+//
+// THEIR DEFAULTS ARE THE CLOSET'S DERIVATION — each equipped item's own accent, the same mapping
+// `closet-view` computes and `resolveIdentity` applies at spawn — so an untouched creator and the Closet
+// dress the same player the same way.
+//
+// The option list is every accent the shipped wearables are authored in plus the avatar defaults: a
+// picker's worth of swatches without inventing one, and every colour already appears on screen in FEL.
 //
 // ACCESSORIES IS ONE ROW, ON PURPOSE. `AvatarSlot` carries exactly one `accessory` and the builder binds
 // one mesh per slot. A section offering two accessory slots would be describing an avatar the builder
@@ -80,10 +89,15 @@ export const KIT_COLOURS: string[] = (() => {
   return seen;
 })();
 
-const colour = (id: string, label: string, zone: keyof typeof DEFAULT_AVATAR.colors, glossary: string): SlotRow => ({
+/** The accent of whatever the closet equips in that slot by default — closet-view's own mapping. */
+function defaultAccentFor(slot: WearableSlot, fallback: string): string {
+  const id = defaultEquipped()[slot];
+  return ((id && getWearable(id)?.accent) || fallback).toUpperCase();
+}
+
+const colour = (id: string, label: string, defaultOption: string, glossary: string): SlotRow => ({
   kind: 'slot', id, label, section: 'gear', tab: 'Colours',
-  options: KIT_COLOURS, allowNone: false, defaultOption: DEFAULT_AVATAR.colors[zone].toUpperCase(),
-  requires: null, glossary,
+  options: KIT_COLOURS, allowNone: false, defaultOption, requires: null, glossary,
 });
 
 export const GEAR: SectionTable<SlotRow> = {
@@ -94,9 +108,14 @@ export const GEAR: SectionTable<SlotRow> = {
     kit('tops', 'Top', 'tops', false, 'The jersey or shirt. Carries the number plate on the back.'),
     kit('shorts', 'Shorts', 'shorts', false, 'Lower body.'),
     kit('shoes', 'Footwear', 'shoes', false, 'Shoes. Cosmetic only — nothing you wear changes how you play.'),
-    colour('colorPrimary', 'Primary Colour', 'primary', 'The mask\'s red zone: the main body of the kit.'),
-    colour('colorSecondary', 'Secondary Colour', 'secondary', 'The mask\'s green zone: panels and trim.'),
-    colour('colorAccent', 'Accent Colour', 'accent', 'The mask\'s blue zone: the small bright parts that read at distance.'),
+    colour('paletteJersey', 'Jersey Colour', defaultAccentFor('tops', '#00E5FF'),
+      'Tints the jersey, top and shirt meshes. Starts as the colour your equipped top is authored in.'),
+    colour('paletteShorts', 'Shorts Colour', defaultAccentFor('shorts', '#0B1220'),
+      'Tints shorts and bottoms.'),
+    colour('paletteShoes', 'Footwear Colour', defaultAccentFor('shoes', '#A855F7'),
+      'Tints shoes and boots.'),
+    colour('paletteAccent', 'Accent', DEFAULT_AVATAR.colors.primary.toUpperCase(),
+      'The small bright parts — trim, laces, the details that read from the stands.'),
   ],
 };
 

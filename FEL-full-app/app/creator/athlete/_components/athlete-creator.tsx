@@ -10,7 +10,13 @@
 // one that says "not built yet" has told them the truth, and the truth is cheaper to trust.
 
 import { useCallback, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import CreatorEditor from '@/components/creator/editor/creator-editor';
+import { bindPreview } from '@/lib/creator/editor/previewBinding';
+
+// The preview pulls Babylon in; it must not be in the page's first bundle, and it cannot render on the
+// server at all.
+const CreatorPreview = dynamic(() => import('@/components/creator/editor/creator-preview'), { ssr: false });
 import { SIDEBAR } from '@/lib/creator/schema/sections';
 import { resolve, LOOK_SECTIONS, type CreatorBuild } from '@/lib/creator/schema/resolve';
 import { emptyAthleteProfile, exportProfile, importProfile } from '@/lib/creator/schema/athleteProfile';
@@ -29,6 +35,9 @@ export default function AthleteCreator({ axes, profileId }: Props) {
   const [openKey, setOpenKey] = useState<string>('attributes');
   const [values, setValues] = useState<Values>({});
   const [note, setNote] = useState<string>('');
+  // The name plate is free text, which is not one of the three row kinds — so it lives here rather than
+  // becoming a fourth kind that puts a special case in the generic screen.
+  const [plate, setPlate] = useState<string>('');
 
   const entry = SIDEBAR.find((s) => s.key === openKey) ?? SIDEBAR[6];
 
@@ -47,6 +56,10 @@ export default function AthleteCreator({ axes, profileId }: Props) {
 
   const resolution = useMemo(() => resolve(build), [build]);
 
+  // §10 step 6: the preview CONSUMES the build. It is derived here, once, and handed down — the editor
+  // screen renders whatever node it is given and knows nothing about Babylon.
+  const binding = useMemo(() => bindPreview(values, plate), [values, plate]);
+
   const onChange = useCallback((section: string, rowId: string, next: RowValue) => {
     setValues((v) => ({ ...v, [section]: { ...(v[section] ?? {}), [rowId]: next } }));
   }, []);
@@ -61,6 +74,7 @@ export default function AthleteCreator({ axes, profileId }: Props) {
     // slots keyed by row id, and the ids are unique across the two — so the merge is lossless and the
     // alternative is a schema bump for one row.
     p.gear = { ...(values.gear ?? {}), ...(values.accessories ?? {}) };
+    p.vitals = { ...p.vitals, namePlate: binding.jersey.name };
     p.budgets = {
       attribute_points_spent: resolution.budgets.attributePointsSpent,
       trait_points_spent: resolution.budgets.traitPointsSpent,
@@ -69,7 +83,7 @@ export default function AthleteCreator({ axes, profileId }: Props) {
     // Handed to the player as text rather than a download: the viewer sandbox makes script-driven saves
     // inert, and a button that silently does nothing is worse than a box you can copy from.
     setNote(exportProfile(p));
-  }, [build, resolution, axes, profileId]);
+  }, [build, resolution, axes, profileId, values, binding]);
 
   const doImport = useCallback((raw: string) => {
     const r = importProfile(raw);
@@ -112,6 +126,17 @@ export default function AthleteCreator({ axes, profileId }: Props) {
         </div>
       </nav>
 
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        {/* IDENTITY HEADER (§1). The name plate is free text and therefore not a schema row — putting it
+            here is what keeps the editor three row kinds wide. It is sanitised by the closet's own
+            sanitizeJersey before it reaches the preview, so what is on the hero's back is what saves. */}
+        <div className="flex items-center gap-2 rounded-xl bg-white/[0.03] px-3 py-2">
+          <label htmlFor="plate" className="font-mono text-[10px] uppercase tracking-widest text-white/40">Name plate</label>
+          <input id="plate" value={plate} onChange={(e) => setPlate(e.target.value)} placeholder="SURNAME"
+            maxLength={12} className="w-40 rounded-lg bg-black/40 px-2 py-1 font-mono text-xs uppercase text-white placeholder:text-white/25" />
+          <span className="font-mono text-[10px] text-white/35">{binding.jersey.name || '—'} · #{binding.jersey.number}</span>
+        </div>
+
       <main className="min-h-[70vh] flex-1 rounded-2xl bg-white/[0.02]">
         {entry.table ? (
           <CreatorEditor
@@ -120,6 +145,7 @@ export default function AthleteCreator({ axes, profileId }: Props) {
             onChange={(rowId, next) => onChange(entry.key, rowId, next)}
             axes={axes}
             issues={resolution.issues.filter((i) => i.section === entry.key)}
+            preview={<CreatorPreview binding={binding} />}
           />
         ) : entry.key === 'export' ? (
           <div className="p-4">
@@ -159,6 +185,7 @@ export default function AthleteCreator({ axes, profileId }: Props) {
           </div>
         )}
       </main>
+      </div>
     </div>
   );
 }

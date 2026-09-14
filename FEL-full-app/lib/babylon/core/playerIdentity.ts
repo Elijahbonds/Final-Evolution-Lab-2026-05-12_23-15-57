@@ -93,8 +93,10 @@ export function invalidateIdentity(): void { cached = null; }
 
 // ── Application layers ──────────────────────────────────────────────────
 
-const TORSO_BONES = ['Spine', 'Spine1', 'Spine2', 'Chest'];
-const ARM_BONES = ['LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm'];
+// Exported so a LIVE editor can drive the same bones this file scales, instead of keeping a second list
+// of which bones "build" and "reach" mean. Nothing about how they are applied here changes.
+export const TORSO_BONES = ['Spine', 'Spine1', 'Spine2', 'Chest'];
+export const ARM_BONES = ['LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm'];
 
 export function applyIdentity(
   spawn: SpawnedCharacter,
