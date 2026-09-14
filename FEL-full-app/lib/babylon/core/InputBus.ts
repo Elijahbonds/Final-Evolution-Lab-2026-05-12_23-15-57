@@ -39,10 +39,19 @@ export interface PadInfo {
   unsupported: string | null;
 }
 type PadsListener = (pads: PadInfo[]) => void;
+/** One seated pad as it reads THIS frame (CONTROLLER-STICK-LIVE): what a probe polls to see a stick move. */
+export interface PadState extends PadInfo {
+  lx: number; ly: number; rx: number; ry: number;
+  triggers: { L: number; R: number };
+  /** FEL buttons and d-pad directions (`dpad_up` …) held right now. */
+  held: string[];
+}
 interface HeldPad {
   index: number;
   id: string;
   profile: ControllerProfile;
+  /** This frame's canonical read, kept whether or not anyone subscribes to the slot stream. */
+  canon: CanonicalPad | null;
   lastL: { x: number; y: number } | null;
   lastR: { x: number; y: number } | null;
   trigL: number;
@@ -134,6 +143,18 @@ export class InputBus {
     });
     return out;
   }
+  /**
+   * The seated pads WITH their live reading (CONTROLLER-STICK-LIVE, 2026-09-14). A QA eye polls this through
+   * `__FEL_DEV__.input` on a production build: a chip with a stick that reads non-zero on a push is a pad that
+   * drives the game, where `pads()` alone only proves the chip. Empty until the harness starts the bus (after load).
+   */
+  padState(): PadState[] {
+    return this.pads().map((p) => {
+      const c = this.slots[p.slot]?.canon;
+      const held = c ? [...FEL_BUTTONS.filter((b) => c.buttons[b]), ...DPAD_DIRS.filter((d) => c.dpad[d]).map((d) => `dpad_${d}`)] : [];
+      return { ...p, lx: c?.lx ?? 0, ly: c?.ly ?? 0, rx: c?.rx ?? 0, ry: c?.ry ?? 0, triggers: { L: c?.triggers.L ?? 0, R: c?.triggers.R ?? 0 }, held };
+    });
+  }
 
   private onKey = (ev: KeyboardEvent): void => {
     const key = ev.key.toLowerCase();
@@ -196,7 +217,7 @@ export class InputBus {
       const free = this.slots.findIndex((s) => s === null);
       if (free < 0) break;                            // four players is the couch
       const profile = profileFor(pad);
-      this.slots[free] = { index, id: pad.id || 'gamepad', profile, lastL: null, lastR: null, trigL: -1, trigR: -1, held: new Set() };
+      this.slots[free] = { index, id: pad.id || 'gamepad', profile, canon: null, lastL: null, lastR: null, trigL: -1, trigR: -1, held: new Set() };
       console.info(`[PAD] P${free + 1} adopted slot ${index}: ${pad.id || 'gamepad'} → profile "${profile.id}" (mapping ${pad.mapping || 'none'})`);
       changed = true;
     }
@@ -259,6 +280,7 @@ export class InputBus {
       // A Switch Pro's bottom face button arrives here as A, the same as an Xbox pad's — before the profile layer it
       // arrived as B, on every Switch controller, with nothing in the tree able to notice.
       const canon = applyRemap(readPad(pad, s.profile), readRemap(s.profile.id));
+      s.canon = canon;
       canons.push(canon);
       if (this.slotListeners.size) this.emitSlotPad(slot, s, canon);
     });

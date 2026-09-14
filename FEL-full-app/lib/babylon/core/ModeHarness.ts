@@ -327,8 +327,13 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     // mode reports at all is to read its source and hope.
     momentum: () => ({ score01: momentum.score01, tier: momentum.tier }),
   };
+  // CONTROLLER-STICK-LIVE (2026-09-14): a QA eye on the production server (`next start`, /try) waited 120 s for
+  // `__FEL_DEV__.input`, which only a dev build published — so it read an empty roster and zero slot events under
+  // four live chips, and its reload timed out. Production now publishes the INPUT seam alone: no scene, no hero,
+  // nothing that retains a disposed mount. The full handle stays development-only.
+  const probeHandle = process.env.NODE_ENV === 'development' ? devHandle : { modeId: def.modeId, input };
   const devWindow = window as unknown as { __FEL_DEV__?: unknown };
-  if (process.env.NODE_ENV === 'development') devWindow.__FEL_DEV__ = devHandle;
+  devWindow.__FEL_DEV__ = probeHandle;
   setDiagMode(def.modeId);
   // a lost WebGL context is the one failure the player cannot recover from by playing on
   engine.onContextLostObservable.add(() => {
@@ -502,6 +507,6 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     // this scene, and any other live scene rebinds it on its next render anyway.
     FloatingOriginCurrentScene.getScene = NO_SCENE;
     // the dev handle held the disposed scene (and through it every mesh and texture) until the next mount
-    if (devWindow.__FEL_DEV__ === devHandle) delete devWindow.__FEL_DEV__;
+    if (devWindow.__FEL_DEV__ === probeHandle) delete devWindow.__FEL_DEV__;
   };
 }

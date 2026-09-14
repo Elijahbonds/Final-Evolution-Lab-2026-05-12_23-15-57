@@ -162,6 +162,27 @@ describe('InputBus — up to four local pads', () => {
     r.tick();
     expect(r.roster()[0].unsupported).toMatch(/does not connect reliably/);
   });
+
+  it('padState reads each seated pad live, with nobody on the slot stream (CONTROLLER-STICK-LIVE)', () => {
+    const bus = new InputBus();
+    bus.start();                                   // no on / onSlot / onPads — exactly what a QA eye polling it sees
+    const tick = () => (bus as unknown as { pollPads: () => void }).pollPads();
+    expect(bus.padState()).toEqual([]);
+    pads[0] = fake('DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)', 0);
+    pads[1] = fake('Pro Controller (Vendor: 057e Product: 2009)', 1, '');
+    tick();
+    expect(bus.padState().map((p) => [p.slot, p.name, p.lx, p.ly])).toEqual([[0, 'DualSense', 0, 0], [1, 'Switch Pro Controller', 0, 0]]);
+    pads[1]!.axes = [0, -1, 0.6, 0]; press(pads[1]!, 1); press(pads[1]!, 12);
+    tick();
+    const p2 = bus.padState()[1];
+    expect(p2.ly).toBeLessThan(-0.9);
+    expect(p2.rx).toBeGreaterThan(0.4);
+    expect(p2.held).toEqual(['A', 'dpad_up']);   // the Switch Pro's bottom button, through its own profile
+    expect(bus.padState()[0].ly).toBe(0);
+    pads[1] = null;
+    tick();
+    expect(bus.padState().map((p) => p.slot)).toEqual([0]);
+  });
 });
 
 describe('the couch wiring stays mounted (source scan)', () => {
@@ -171,6 +192,12 @@ describe('the couch wiring stays mounted (source scan)', () => {
     expect(dunk).toMatch(/<HostLobby[^>]*onPadInput=\{onPhonePad\}[^>]*lazy/);
     expect(dunk).toMatch(/<PadChips bus=\{bus\}/);
     expect(read('components/controller-link/host-lobby.tsx')).toMatch(/z-\[45\]/);   // the splash is z-40: READY is when a phone pairs
+  });
+  it('production publishes the input seam on __FEL_DEV__ (the full dev handle stays development-only)', () => {
+    const h = read('lib/babylon/core/ModeHarness.ts');
+    expect(h).toMatch(/const probeHandle = process\.env\.NODE_ENV === 'development' \? devHandle : \{ modeId: def\.modeId, input \};/);
+    expect(h).toMatch(/\n  devWindow\.__FEL_DEV__ = probeHandle;/);
+    expect(h).toMatch(/if \(devWindow\.__FEL_DEV__ === probeHandle\) delete devWindow\.__FEL_DEV__;/);
   });
   it('TV MODE is on the host lobby and the dunk reads it at takeoff through one window helper', () => {
     expect(read('components/controller-link/host-lobby.tsx')).toMatch(/data-testid="tv-mode-toggle"/);
