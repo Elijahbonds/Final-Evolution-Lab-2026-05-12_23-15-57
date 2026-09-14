@@ -309,6 +309,10 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     // produces. That is what makes the controller-profile claim checkable on a running game rather than only
     // against fixtures — a Switch Pro's bottom face button has to arrive in a real mode as A.
     input,
+    // MOMENTUM (2026-09-14): the shared meter, so a probe can watch a run heat up. The response is a crowd
+    // bed and a sting -- neither of which a probe can hear -- so without this the only way to check that a
+    // mode reports at all is to read its source and hope.
+    momentum: () => ({ score01: momentum.score01, tier: momentum.tier }),
   };
   const devWindow = window as unknown as { __FEL_DEV__?: unknown };
   if (process.env.NODE_ENV === 'development') devWindow.__FEL_DEV__ = devHandle;
