@@ -19,6 +19,7 @@
 //     into the north gate (destructible beat).
 // All naming/visuals original.
 
+import { nerve, standingOf } from '../core/Nerve';
 import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -458,12 +459,25 @@ export const ShowdownMode: ModeDefinition = (() => {
           foeMove.update(dt, dir.x, -dir.z, dist > 6);
         } else {
           foeMove.update(dt, 0, 0, false);
-          if (!foeStrike.busy && dist <= 2 && Math.random() < 0.02) {
+          // AI RATES ARE PER SECOND NOW, NOT PER FRAME.
+          //
+          // These were `Math.random() < 0.02` evaluated once per rendered frame, which makes the rival's
+          // aggression a function of the player's REFRESH RATE: at 144 fps it rolls 2.4x as often as at 60, so
+          // the same opponent attacks more than twice as much on a better monitor. `1 - exp(-rate*dt)` is the
+          // same chance per second of wall-clock time at any frame rate. The rates below are the old per-frame
+          // numbers x 60, so a 60 fps game plays exactly as it did.
+          //
+          // NERVE rides the same line, on two DIFFERENT mechanisms as the module requires: `aggression` speeds
+          // the swing rate up, `mistake` cuts the reactive block down. Behind on rounds it comes forward more
+          // and guards less.
+          const nrv = nerve(standingOf(foeRounds, myRounds, 2, Math.min(1, Math.max(myRounds, foeRounds) / 2)));
+          const chance = (perSec: number) => Math.random() < 1 - Math.exp(-perSec * dt);
+          if (!foeStrike.busy && dist <= 2 && chance(1.2 * nrv.aggression)) {
             foeStrike.request(['jab', 'kick', 'heavy'][Math.floor(Math.random() * 3)], now());
           }
           // reactive block
-          if (meStrike.busy && Math.random() < 0.03) { foeDef.pressBlock(now(), false); foeState.pressBlock(now()); }
-          else if (foeState.blockHeld && Math.random() < 0.02) { foeDef.releaseBlock(); foeState.releaseBlock(); }
+          if (meStrike.busy && chance(1.8 / Math.max(0.5, nrv.mistake))) { foeDef.pressBlock(now(), false); foeState.pressBlock(now()); }
+          else if (foeState.blockHeld && chance(1.2)) { foeDef.releaseBlock(); foeState.releaseBlock(); }
         }
         rival.root.position.addInPlace(foeMove.vel.scale(dt));
         if (!modeVenue?.constrain(rival.root.position)) { rival.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.x)); rival.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.z)); }

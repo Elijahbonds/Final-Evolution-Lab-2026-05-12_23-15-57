@@ -46,6 +46,7 @@
 //      a flight I can SWAT with a timed jump inside range (REJECTED); a hard contact opens the strip window (my X poke inside
 //      1.6 m connects; a set defender I bump strips me on his roll, the ball loose, no warp); X HELD is a grounded hand-up
 //      that contests the driver's release (and the AI's contests mine), the contest biting the make chance and altering the arc.
+import { nerve, standingOf } from '../core/Nerve';
 import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
@@ -188,6 +189,9 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let arc: ShotArc;
   let arcMade = false, arcPoints = 0, arcLabel = '', arcQuality: ShotQuality = 'good';
   let myScore = 0, foeScore = 0, assists = 0, timeLeft = POSSESSION_SEC;
+  /** Where the OTHER team stands, for Nerve. Lateness reads off whoever is closer to 21. */
+  const foeStanding = () =>
+    standingOf(foeScore, myScore, TARGET_SCORE, Math.min(1, Math.max(myScore, foeScore) / TARGET_SCORE));
   let carrierId: 'me' | 'mate0' | 'mate1' | 'foeTeam' = 'me';
   let shooting = false, dunking = false, ended = false, lastPasserWasMe = false;
   let currentShot: ShotContext | null = null;
@@ -2173,9 +2177,19 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       later(750, () => resetPossession(true));
       return;
     }
+    // THE OTHER TEAM FEELS THE SCORE NOW, and the two halves of Nerve go on two different mechanisms
+    // because that is the only way the invariant survives contact with a game (see core/Nerve.ts).
+    //
+    //   aggression -> the lane they will take it up in. Down and late they attack the rim on a lane they
+    //                 would normally pass up; protecting a lead they wait for a clean one.
+    //   mistake    -> the jumper they settle for instead goes in less often.
+    //
+    // Together: chasing the game they go at the rim more and shoot worse, which is what chasing looks like.
+    const foeNrv = nerve(foeStanding());
     // D1: an OPEN lane at the rim is a DUNK — a real flight I can swat
     const nearestAlly = Math.min(...allyPositions().map((p) => distXZ(p, shooter.char.root.position)));
-    if (nearestAlly > 1.6 || (nearestAlly > 1.1 && roll() < 0.5)) { await driverDunk(ctx, shooter); return; }
+    const lane = 1.6 / Math.max(0.6, foeNrv.aggression);        // pressing takes it up in traffic
+    if (nearestAlly > lane || (nearestAlly > lane * 0.69 && roll() < 0.5)) { await driverDunk(ctx, shooter); return; }
     // THE BLOCK — a timed jump in range at this exact release moment
     if (checkBlock(me.char.root.position, shooter.char.root.position, myJumpAge)) {
       foeShotBlocked = true;
@@ -2194,7 +2208,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     // D3: my grounded hand-up inside range, facing him, contests on top of the distance
     const ground = groundContest(distXZ(me.char.root.position, shooter.char.root.position), facingCos(me.char.root.rotation.y, me.char.root.position, shooter.char.root.position), meHandUp);
     const defenseFactor = Math.min(1, proximityContest01(nearestD) + ground);
-    const made = Math.random() < contestedPct(0.5 - Math.min(0.5, defenseFactor * 0.3), ground);
+    const made = Math.random() < contestedPct(0.5 - Math.min(0.5, defenseFactor * 0.3), ground) / Math.max(0.5, foeNrv.mistake);
     console.info(`[3V3-DEF] rival release jumper contest ${defenseFactor.toFixed(2)} handUp ${ground > 0}`);
     if (ground > 0) { ctx.setHud({ banner: 'CONTESTED — HAND UP!' }); }
     releaseBall(ball);                                          // the shot leaves the hand

@@ -62,21 +62,19 @@ here is **grep the consumer before calling a producer unused**, and the withdraw
 
 ## Still open, in priority order
 
-### 1. GO AGAIN — the biggest one
 
-`ctx.continuous` and `ctx.card()` are already on `ModeContext`, so the harness support is universal and
-only `DunkMode` uses it. Every other mode ends by calling `ctx.end()`, which parks the harness in `'ended'`
-— no update, no input — so the host's only answer is to throw the mode away and boot a cold one. For a
-roster whose pitch is "go again", the session flow is the difference the player feels on *every single run*.
+### 1. GO AGAIN — CLOSED AS A NON-GOAL (owner, 2026-09-14)
 
-The per-mode work is a soft reset; `ContinuousNight`'s `NightState` is dunk-specific, so this wants a
-shared `RunLedger` with the same "what survives" discipline and a per-mode reset beside it.
+Asked and answered: **modes should end.** `ctx.end()` stays the roster's session flow, and `ContinuousNight`
+stays dunk's, where it was built for the logged-out funnel (TRY-ONBOARD G1).
 
-**It also needs a host decision, and mode-side work alone would be dead code.** `continuous` is passed by
-exactly one component in the app — `guest-dunk-shell.tsx`, to `DunkBabylon`. The other twenty hosts never
-set it, so a mode that implemented GO AGAIN would never be asked to. Both halves have to land together,
-and *which* modes should keep playing instead of ending is a product call: a score-attack run wants GO
-AGAIN, a match to 11 arguably wants to end. Blocked on that answer, not on the engineering.
+Recorded because the engineering case was real and someone will re-derive it: `ctx.continuous` and
+`ctx.card()` are already on `ModeContext`, and only `DunkMode` uses them. Also recorded because the
+*implementation* was not the blocker — `continuous` is passed by exactly one component in the app
+(`guest-dunk-shell.tsx`, to `DunkBabylon`), so the mode-side half alone would have been dead code, and
+which modes should refuse to finish is a product call rather than an engineering one. If it is ever
+revisited: the card should be drawn by `ModeHarness` on the overlay `JuiceKit` already owns, not by the
+twenty-one host components (owner's call, same day).
 
 ### 2. Nerve for the remaining opponents
 
