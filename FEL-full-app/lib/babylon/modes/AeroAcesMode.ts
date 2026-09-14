@@ -34,6 +34,7 @@ import {
   AERO_COURSES, readCourse, startRace, stepRace, toNextGate, medalFor, type Course, type RaceProgress,
 } from '../core/RaceCourse';
 import { buildCourseVenue } from '../racing/venueForCourse';
+import { buildTrackside, type TracksideHandle } from '../racing/trackside';   // the world that follows the racing line
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import {
   buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal,
@@ -49,6 +50,7 @@ const CEILING = 520, FLOOR = 14, HALF_WORLD = 700;
 export function makeAeroAcesMode(): ModeDefinition {
 let plane: TransformNode | null = null;
 let venueRoot: TransformNode | null = null;
+let trackside: TracksideHandle | null = null;
 let pilot: SpawnedCharacter | null = null;
 /** The propeller, spun in update — a still prop on a flying aircraft reads as a model on a stick. */
 let propHub: TransformNode | null = null;
@@ -372,6 +374,12 @@ return {
     race = startRace();
 
     venueRoot = buildCourseVenue(ctx.scene, course);
+    // THE VENUE IS COURT-SIZED AND THE COURSE IS HUNDREDS OF METRES, so the world was a small island near
+    // the start and the rest of the lap ran off into nothing (step-0 audit: this mode was one of the two
+    // worst frames in the project). Trackside dresses the PATH instead, at whatever scale the course is.
+    trackside?.dispose();
+    trackside = buildTrackside(ctx.scene, course);
+    console.info(`[RACE-VENUE] ${course.id}: ${trackside.count} trackside instances`);
     rings = buildRings(ctx);
     plane = buildPlane(ctx);
 
@@ -516,7 +524,7 @@ return {
     propHub = null;
     for (const rp of rivalPlanes) rp.dispose();
     rivalPlanes = []; rivals = []; line = null;
-    venueRoot?.dispose(); venueRoot = null;
+    venueRoot?.dispose(); venueRoot = null; trackside?.dispose(); trackside = null;
     for (const r of rings) r.dispose();
     rings = [];
     flight = null;

@@ -31,3 +31,30 @@ The lighting and post are already good; they are falling on an empty world.
 
 This also corrects the visual-fidelity brief's step 2 ("build the render pipeline"): it exists, it is
 shared, it is tiered, and it should be left alone.
+
+## Aero floor — measured, built, and still not on screen (unresolved)
+
+Recorded rather than hand-waved, because everything cheap has been ruled out and the next person should not
+repeat it. On `bay-circuit`, after adding the floor:
+
+| Checked | Value |
+|---|---|
+| Mesh exists / enabled / visible | yes / yes / yes |
+| `camera.isInFrustum(floor)` | **true** |
+| Floor Y vs camera Y | 64 vs 201 (137 m below) |
+| Camera forward Y | −0.21 (pitched **down**, toward it) |
+| Floor span | 2400 m, centred 184 m from the camera |
+| `camera.maxZ` / fog | 10000 / fog mode 0 (off) |
+| Material | PBR via `VenueKit.paint` (was StandardMaterial — that WAS a real bug, fixed) |
+| Trackside buoys placed | 202 |
+
+Two hypotheses were tested and killed: far-plane clipping (maxZ is 10000) and the StandardMaterial blow-out
+(`VenueKit.paint`'s own doc names Velocity Kart as the worked example; switching to PBR was correct and
+changed nothing here). Aero mounts no backdrop sphere, so occlusion by one is out too.
+
+What is left, in order of likelihood: something in `AeroAcesMode`'s own camera or render setup — a second
+camera, a layer mask, or a render-group ordering — is drawing the sky over the world. That is a defect in
+the MODE, not in the trackside layer, and it wants its own pass with the aero mode's author.
+
+The trackside layer itself is proven on Velocity Kart, where the same code visibly places verges either
+side of the road.

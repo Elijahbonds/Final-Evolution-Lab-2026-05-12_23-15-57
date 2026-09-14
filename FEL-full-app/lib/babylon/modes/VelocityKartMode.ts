@@ -33,6 +33,7 @@ import {
   type Course, type RaceProgress,
 } from '../core/RaceCourse';
 import { buildCourseVenue } from '../racing/venueForCourse';
+import { buildTrackside, type TracksideHandle } from '../racing/trackside';   // the world that follows the racing line
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import { taperedPlank, taperedSection, roadWheel } from '../racing/shapes';
 import {
@@ -54,6 +55,7 @@ let driver: SpawnedCharacter | null = null;
 let seated: AnimationGroup | null = null;
 let steerWheel: Mesh | null = null;
 let venueRoot: TransformNode | null = null;
+let trackside: TracksideHandle | null = null;
 let roadTex: DynamicTexture | null = null;
 // THE FIELD (2026-09-13). This mode shipped as a time trial: a clock does not overtake you on the last
 // corner, and Phase 0 recorded it as the one racing mode with no opponent of any kind. The rivals are
@@ -414,6 +416,12 @@ return {
     race = startRace();
 
     venueRoot = buildCourseVenue(ctx.scene, course);
+    // THE VENUE IS COURT-SIZED AND THE COURSE IS HUNDREDS OF METRES, so the world was a small island near
+    // the start and the rest of the lap ran off into nothing (step-0 audit: this mode was one of the two
+    // worst frames in the project). Trackside dresses the PATH instead, at whatever scale the course is.
+    trackside?.dispose();
+    trackside = buildTrackside(ctx.scene, course);
+    console.info(`[RACE-VENUE] ${course.id}: ${trackside.count} trackside instances`);
     road = buildRoad(ctx);
     marks = buildMarks(ctx);
     kart = buildKart(ctx);
@@ -567,7 +575,7 @@ return {
     seated?.stop(); seated?.dispose(); seated = null;
     driver?.dispose(); driver = null;
     steerWheel = null;
-    venueRoot?.dispose(); venueRoot = null;
+    venueRoot?.dispose(); venueRoot = null; trackside?.dispose(); trackside = null;
     roadTex?.dispose(); roadTex = null;
     for (const rk of rivalKarts) rk.dispose();
     rivalKarts = []; rivals = []; line = null;
