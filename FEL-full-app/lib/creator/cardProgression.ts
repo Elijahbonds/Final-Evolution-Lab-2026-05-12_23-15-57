@@ -46,6 +46,7 @@ import { currentPRQ, credentials } from '../profile/sharedProfile';
 import type { Protocol } from '../profile/protocol';
 import { partition } from '../profile/protocol';
 import { PROGRAM_DISCLAIMER } from '../mirror/program';
+import type { PassionCredential } from '../babylon/music/WalkOut';
 import { ageDaysOf, freshnessNote, freshnessOf, type Freshness } from './claimClock';
 
 export { FRESH_DAYS, EXPIRES_DAYS, freshnessOf, ageLabel, type Freshness } from './claimClock';
@@ -135,8 +136,32 @@ export interface CardProgression {
   signature: CardSignature | null;
   /** Recorded sessions behind the card, so "played" claims have a denominator. */
   sessionsPlayed: number;
+  /**
+   * The best dunk this athlete has landed, and how many they have thrown.
+   *
+   * The brief's "Creator Card as dunk résumé" — a card that lists credentials and gates but not the one
+   * thing a dunk contest produces is a résumé with the job history left off. `basis: 'played'`, because it
+   * comes from recorded attempts rather than from anything measured.
+   */
+  dunk: DunkResume | null;
+  /**
+   * Passion Pipeline credentials — the Music Room's authored-track record (lib/babylon/music/WalkOut.ts).
+   *
+   * Passed IN rather than read here: this module is pure and the walk-out lives in browser storage. A card
+   * with no music has no music section, rather than an empty one.
+   */
+  passion: PassionCredential[];
   /** Every basis appearing anywhere above, for a legend. */
   bases: Basis[];
+}
+
+/** What the résumé says about dunking. Attempts are a denominator, never a rating. */
+export interface DunkResume {
+  attempts: number;
+  /** The best score recorded, and when. Null when nothing has been landed. */
+  best: number | null;
+  bestAt: string | null;
+  basis: 'played';
 }
 
 export interface ProjectOptions {
@@ -146,8 +171,15 @@ export interface ProjectOptions {
   catalogue?: readonly Protocol[];
   /** The live curriculum version, for marking superseded credentials. */
   curriculumVersion?: string;
+  /** Mode ids that count as dunking for the résumé. Defaults to the dunk family. */
+  dunkModes?: readonly string[];
+  /** Passion Pipeline credentials, assembled by the caller (they live in browser storage). */
+  passion?: readonly PassionCredential[];
   now?: number;
 }
+
+/** Which recorded modes are "a dunk" for résumé purposes. */
+export const DUNK_MODE_IDS: readonly string[] = ['dunk', 'dunkduel', 'bigair'];
 
 /**
  * A snapshot the card may stand behind.
@@ -272,7 +304,29 @@ export function projectCard(
     unlocks,
     signature,
     sessionsPlayed: profile.history.length,
+    dunk: dunkResume(profile, opts.dunkModes ?? DUNK_MODE_IDS),
+    passion: [...(opts.passion ?? [])],
     bases,
+  };
+}
+
+/**
+ * The dunk half of the résumé.
+ *
+ * Null when they have never thrown one — an athlete with no dunks has no dunk section, rather than a
+ * section reading zero. `best` is separately nullable from `attempts`: somebody can have thrown ten and
+ * landed none, and "10 attempts, no score yet" is a different and more honest line than "10 attempts, 0".
+ */
+export function dunkResume(profile: SharedProfile, modes: readonly string[]): DunkResume | null {
+  const runs = profile.history.filter((h) => modes.includes(h.modeId));
+  if (!runs.length) return null;
+  const scored = runs.filter((r) => Number.isFinite(r.score) && r.score > 0);
+  const best = scored.length ? scored.reduce((a, b) => (b.score > a.score ? b : a)) : null;
+  return {
+    attempts: runs.length,
+    best: best ? best.score : null,
+    bestAt: best ? best.at : null,
+    basis: 'played',
   };
 }
 

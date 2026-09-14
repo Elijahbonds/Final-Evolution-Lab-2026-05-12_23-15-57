@@ -297,3 +297,68 @@ describe('THE CARD COMPARES AN ATHLETE TO NOBODY', () => {
     expect(blob).not.toContain('41');
   });
 });
+
+// ── THE DUNK RÉSUMÉ + PASSION PIPELINE (2026-09-13) ──────────────────────────────────────────────────────
+//
+// The brief calls the card a "dunk résumé". It listed credentials and cleared gates and said nothing about
+// the one thing a dunk contest actually produces — a résumé with the job history left off.
+
+describe('the dunk résumé', () => {
+  const withRuns = (runs: { modeId: string; score: number; daysAgo: number }[]) => {
+    const p = measured([{ composite: 70, daysAgo: 2 }]);
+    p.history = runs.map((r) => ({ modeId: r.modeId, score: r.score, at: ago(r.daysAgo) }));
+    return p;
+  };
+
+  it('reports attempts and the best landed', () => {
+    const card = projectCard(withRuns([
+      { modeId: 'dunk', score: 41, daysAgo: 9 },
+      { modeId: 'dunk', score: 47, daysAgo: 3 },
+      { modeId: 'dunkduel', score: 38, daysAgo: 1 },
+    ]), { now: NOW })!;
+    expect(card.dunk!.attempts).toBe(3);
+    expect(card.dunk!.best).toBe(47);
+    expect(card.dunk!.basis).toBe('played');
+  });
+
+  it('NEVER THROWN ONE IS NO SECTION, not a section reading zero', () => {
+    const card = projectCard(withRuns([{ modeId: 'tennis', score: 12, daysAgo: 2 }]), { now: NOW })!;
+    expect(card.dunk).toBeNull();
+  });
+
+  it('THROWN TEN AND LANDED NONE is a different line from "0" — best is separately nullable', () => {
+    const card = projectCard(withRuns([
+      { modeId: 'dunk', score: 0, daysAgo: 4 },
+      { modeId: 'dunk', score: 0, daysAgo: 2 },
+    ]), { now: NOW })!;
+    expect(card.dunk!.attempts).toBe(2);
+    expect(card.dunk!.best).toBeNull();
+    expect(card.dunk!.bestAt).toBeNull();
+  });
+
+  it('only counts the dunk family, not every mode played', () => {
+    const card = projectCard(withRuns([
+      { modeId: 'dunk', score: 40, daysAgo: 2 },
+      { modeId: 'golf', score: 99, daysAgo: 2 },
+    ]), { now: NOW })!;
+    expect(card.dunk!.attempts).toBe(1);
+    expect(card.dunk!.best).toBe(40);
+  });
+});
+
+describe('passion pipeline credentials ride along, they are not invented here', () => {
+  it('a card with no music has an empty list rather than a fake entry', () => {
+    expect(projectCard(measured([{ composite: 70, daysAgo: 2 }]), { now: NOW })!.passion).toEqual([]);
+  });
+
+  it('and one passed in is carried verbatim', () => {
+    const cred = { pipeline: 'music' as const, authored: 2, walkOut: { title: 'Boardwalk', bpm: 96 }, plays: 5, label: 'Boardwalk · 96 BPM · 5 plays' };
+    const card = projectCard(measured([{ composite: 70, daysAgo: 2 }]), { now: NOW, passion: [cred] })!;
+    expect(card.passion).toEqual([cred]);
+  });
+
+  it('a minor still gets no card at all, music or not', () => {
+    const cred = { pipeline: 'music' as const, authored: 9, walkOut: null, plays: 0, label: '9 tracks authored' };
+    expect(projectCard(measured([{ composite: 90, daysAgo: 1 }]), { now: NOW, minor: true, passion: [cred] })).toBeNull();
+  });
+});
