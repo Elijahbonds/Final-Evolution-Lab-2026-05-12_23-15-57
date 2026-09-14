@@ -194,6 +194,19 @@ export class RivalFightBrain {
 
   constructor(private difficulty = 0.6, private attacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS) {}
 
+  /**
+   * Retune mid-fight.
+   *
+   * NERVE (2026-09-14): the rival attacked on the same difficulty-scaled cooldown at 0-0 and at match
+   * point, because `difficulty` was fixed at construction. It is the one thing separating every opponent
+   * in the game from the dunk contest's rival, and it was a private field with no setter. Clamped away
+   * from both ends: below ~0.2 the rival stops fighting, and at 1 it blocks everything.
+   */
+  setDifficulty(d: number): void {
+    if (!Number.isFinite(d)) return;
+    this.difficulty = Math.max(0.2, Math.min(0.95, d));
+  }
+
   /** `foeStriking` = the player is mid-swing (readable startup — what the
    *  rival reacts to, exactly like a human watching the wind-up). */
   decide(dt: number, self: Vector3, foe: Vector3, selfState: FighterState, foeStriking: boolean): FightAction {

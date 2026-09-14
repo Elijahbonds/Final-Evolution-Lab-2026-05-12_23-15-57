@@ -24,6 +24,7 @@
 // Reliability: clipRegistry/installSafePlay, per-phase watchdogs, groundLock,
 // fight-preset framing, SoundKit/EffectsKit — all standard since M42.
 
+import { nerve, nervedSkill, standingOf } from '../core/Nerve';
 import { Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -67,6 +68,8 @@ let crowd: Onlookers | null = null;         // Pass 7 phase 6: a ring of onlooke
 
 type Phase = 'intro' | 'fighting' | 'roundOver' | 'matchOver';
 const ROUNDS_TO_WIN = 2;
+/** What the rival fights at in a level match. Nerve moves it from here as the rounds go. */
+const BASE_RIVAL_DIFFICULTY = 0.65;
 const MOVE_SPEED = 3.4;
 // THE FIGHT AREA MUST BE INSET FROM THE ROOM. The dojo floor is 18x18, so its
 // half-extent is 9 — and this was 7.5, leaving 1.5m between a fighter at the
@@ -370,6 +373,16 @@ export const KarateVSMode: ModeDefinition = (() => {
     if (phase !== 'fighting') return;
     setPhase('roundOver');
     if (playerWon) myWins++; else foeWins++;
+    // THE RIVAL FEELS THE SCOREBOARD NOW. Its difficulty was fixed at construction, so it fought a decider
+    // exactly the way it fought round one -- the constant-opponent problem RivalNerve solved for the dunk
+    // contest and nowhere else in the game. Nerve keeps the invariant: pressing when behind is paid for in
+    // errors, so losing a round is never strictly better than winning one.
+    {
+      const sit = standingOf(foeWins, myWins, ROUNDS_TO_WIN, Math.min(1, Math.max(myWins, foeWins) / ROUNDS_TO_WIN));
+      const shift = nerve(sit);
+      brain.setDifficulty(nervedSkill(BASE_RIVAL_DIFFICULTY, shift));
+      if (shift.label) console.info(`[KAR-NERVE] ${shift.label} (rounds ${foeWins}-${myWins})`);
+    }
     SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');
     if (playerWon) roundWinBeat(ctx);
     endStrike(true); endStrike(false);
@@ -448,7 +461,7 @@ export const KarateVSMode: ModeDefinition = (() => {
 
       meState = new FighterState(100);
       foeState = new FighterState(100);
-      brain = new RivalFightBrain(0.65, KARATE_ATTACKS);
+      brain = new RivalFightBrain(BASE_RIVAL_DIFFICULTY, KARATE_ATTACKS);
       // read once at mount — a style cannot change mid-fight, and re-deriving it per strike would be work
       // on the hot path for a value that never moves
       myAttacks = styleAttacks(KARATE_ATTACKS, blendTraits(readBlend()), MIN_STARTUP_SEC * 1000);

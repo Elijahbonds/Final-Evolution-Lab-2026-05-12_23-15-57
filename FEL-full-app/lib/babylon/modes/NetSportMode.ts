@@ -9,6 +9,7 @@
 // All rally arithmetic lives in RallyCore (Babylon-free, 37 executed tests).
 // This file owns meshes, input, animation and HUD, and nothing else.
 
+import { nerve, nervedSkill, standingOf, type Standing } from '../core/Nerve';
 import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, Vector3 } from '@babylonjs/core';
 import { answerFor, tellFor, rallyPace, SHOT_FACE } from '../core/tennisHud';
 import { ballKindFor, dressBall } from '../visual/meshyProps';
@@ -365,12 +366,33 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     flash(ctx, 'SERVE', 600);
   }
 
+  /**
+   * Where the opponent stands, for Nerve.
+   *
+   * Both scorers expose what it takes to win -- `gamesToWin` for tennis, `target` for volleyball -- so the
+   * margin normalises without this file knowing which sport it is running. Lateness is how close the
+   * LEADER is to closing it out, which is the honest reading of "how much time is left": at 3-0 in a
+   * first-to-4 the match is nearly over whoever you ask.
+   */
+  function aiStanding(): Standing {
+    const toWin = tennisScore ? tennisScore.gamesToWin : volleyScore!.target;
+    const mine = tennisScore ? tennisScore.games[0] : volleyScore!.points[0];
+    const theirs = tennisScore ? tennisScore.games[1] : volleyScore!.points[1];
+    return standingOf(theirs, mine, toWin, Math.min(1, Math.max(mine, theirs) / Math.max(1, toWin)));
+  }
+
   /** The opponent's return. Skill decides how often they find a good one. */
   function aiReturn(ctx: ModeContext): void {
     const roll = Math.random();
-    let q: SwingQuality = roll > o.aiSkill ? 'miss'
-      : roll > o.aiSkill * 0.75 ? 'late'
-      : roll > o.aiSkill * 0.45 ? 'good' : 'perfect';
+    // THE OPPONENT FEELS THE SCOREBOARD NOW. This read used the config's `aiSkill` unchanged, so the AI
+    // swung exactly the same down 0-3 as up 3-0 -- the same constant-opponent problem RivalNerve solved for
+    // the dunk contest and nowhere else. Nerve holds the invariant: a rival that presses when trailing pays
+    // for it in errors, so falling behind is never strictly better than leading.
+    const shift = nerve(aiStanding());
+    const skill = nervedSkill(o.aiSkill, shift);
+    let q: SwingQuality = roll > skill ? 'miss'
+      : roll > skill * 0.75 ? 'late'
+      : roll > skill * 0.45 ? 'good' : 'perfect';
 
     // A bump and a set are routine CONTROL touches. Errors in volleyball happen
     // on the attack and the serve-receive, not on the second ball -- and the

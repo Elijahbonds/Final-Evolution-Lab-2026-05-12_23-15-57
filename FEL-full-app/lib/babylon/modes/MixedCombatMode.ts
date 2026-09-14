@@ -20,6 +20,7 @@
 // Best of 3. Reliability standard since M42: installSafePlay, watchdogs,
 // groundLock (released on a ring-out fall), fight-cam framing.
 
+import { nerve, nervedSkill, standingOf } from '../core/Nerve';
 import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -59,6 +60,8 @@ import { boneNode } from '../anim/boneLookup';
 type Phase = 'loadout' | 'fighting' | 'roundOver' | 'matchOver';
 type Loadout = 'fists' | 'staff';
 const ROUNDS_TO_WIN = 2;
+/** What the rival fights at in a level match. Nerve moves it from here as the rounds go. */
+const BASE_RIVAL_DIFFICULTY = 0.6;
 const RING_RADIUS = 6.2;
 const MOVE_SPEED = 3.3;
 const SLOWMO_SEC = 0.5;
@@ -224,7 +227,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
                             blendTraits(readBlend()), MIN_STARTUP_SEC * 1000);
     if (myLoadout === 'staff') myStaff = makeStaff(ctx, player, 'mc_staff_me');
     if (foeLoadout() === 'staff') foeStaff = makeStaff(ctx, rival, 'mc_staff_foe');
-    brain = new RivalFightBrain(0.6, foeAttacks());
+    brain = new RivalFightBrain(BASE_RIVAL_DIFFICULTY, foeAttacks());
   }
 
   const downNow = (f: FighterAnim | undefined): boolean => !!f && (f.out || f.falling || now() < f.downUntil);
@@ -468,6 +471,16 @@ export const MixedCombatMode: ModeDefinition = (() => {
     if (phase !== 'fighting') return;
     setPhase('roundOver');
     if (playerWon) myWins++; else foeWins++;
+    // THE RIVAL FEELS THE SCOREBOARD NOW. Its difficulty was fixed at construction, so it fought a decider
+    // exactly the way it fought round one -- the constant-opponent problem RivalNerve solved for the dunk
+    // contest and nowhere else in the game. Nerve keeps the invariant: pressing when behind is paid for in
+    // errors, so losing a round is never strictly better than winning one.
+    {
+      const sit = standingOf(foeWins, myWins, ROUNDS_TO_WIN, Math.min(1, Math.max(myWins, foeWins) / ROUNDS_TO_WIN));
+      const shift = nerve(sit);
+      brain.setDifficulty(nervedSkill(BASE_RIVAL_DIFFICULTY, shift));
+      if (shift.label) console.info(`[MIX-NERVE] ${shift.label} (rounds ${foeWins}-${myWins})`);
+    }
     SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');
     if (playerWon) roundWinBeat(ctx);
     endStrike(true); endStrike(false);
