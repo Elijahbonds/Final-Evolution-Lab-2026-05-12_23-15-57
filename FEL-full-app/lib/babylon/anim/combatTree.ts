@@ -47,6 +47,11 @@ export interface CombatAnimInput {
   striking: StrikeWeight | null;
   /** The attack's own clip (FightCore's AttackDef.clip); the weight's default clip plays when absent. */
   strikeClip?: string;
+  /** THE-HUNDRED-COMBAT-DYNAMICS (2026-09-14): the strike clip's playback rate (the horde's de-lag). Absent = authored. */
+  strikeSpeed?: number;
+  /** A new swing of the SAME weight (a jab cancelled into a jab) re-enters the strike when this changes. Absent = the
+   *  old dedupe: one strike state plays once until it settles. */
+  strikeSeq?: number;
   blocking: boolean;
   parryFlash: boolean;          // one-beat, set on successful parry (the defender)
   guardImpactFlash: boolean;    // one-beat, set when a hit lands on the guard
@@ -150,6 +155,7 @@ export function chooseCombatClip(i: CombatAnimInput): CombatClipChoice {
   else state = i.hasWeapon ? 'idle_weapon' : 'idle';
   const c = pick(state);
   if (i.strikeClip && state.startsWith('strike_')) c.clip = i.strikeClip;
+  if (i.strikeSpeed !== undefined && state.startsWith('strike_')) c.speedRatio = i.strikeSpeed;
   if (i.dodgeClip && state === 'dodge') c.clip = i.dodgeClip;
   return c;
 }
@@ -187,6 +193,7 @@ export class CombatAnimTree {
   private spent: CombatAnimState | null = null;
   private token = 0;
   private lastInput: CombatAnimInput | null = null;
+  private strikeSeq: number | undefined = undefined;
   /** Fires when a one-shot ENDS on its own (never when the tree cut it) — the mode clears its strike / beat here. */
   onSettle: ((state: CombatAnimState) => void) | null = null;
   /** Stride matching: the rate for the loop that is running, smoothed so a cadence never stutters. */
@@ -204,7 +211,10 @@ export class CombatAnimTree {
     if (cur === 'get_up' && !RISE_INTERRUPTS.has(c.state)) return cur;                       // the get-up finishes before any standing state
     if (cur === 'floor' && isReact(c.state)) c = pick('floor');                                // a flinch on the floor stays on the floor
     if (cur && FLOOR_FAMILY.has(cur) && cur !== 'get_up' && !FLOOR_FAMILY.has(c.state)) c = pick('get_up');   // the floor is left through the get-up
-    if (c.state !== cur) this.enter(c);
+    // a cancelled swing into a new one: the same strike state, a new seq — replay from the top (restart), never a dedupe
+    const reswing = input.strikeSeq !== undefined && input.strikeSeq !== this.strikeSeq && isStrike(c.state);
+    if (input.strikeSeq !== undefined && isStrike(c.state)) this.strikeSeq = input.strikeSeq;
+    if (c.state !== cur || (reswing && cur !== null && isStrike(cur))) this.enter(c, reswing);
     // STRIDE MATCHING, every frame. Set on the RUNNING animation, never through play(): the state-change guard above is
     // what keeps this tree stable, and a per-frame play() would restart the clip every frame.
     if (this.strideClip && input.speedMps !== undefined) {
@@ -220,7 +230,7 @@ export class CombatAnimTree {
     }
     return c.state;
   }
-  private enter(c: CombatClipChoice): void {
+  private enter(c: CombatClipChoice, restart = false): void {
     const st = c.state;
     const tok = ++this.token;
     const onEnd = isOneShot(st) ? () => {
@@ -231,7 +241,7 @@ export class CombatAnimTree {
       this.onSettle?.(st);
       this.enter(settleAfter(st, this.lastInput ?? EMPTY_INPUT));
     } : undefined;
-    const opts = { loop: c.loop, fadeSec: c.fadeSec, ...(c.speedRatio === undefined ? {} : { speedRatio: c.speedRatio }) };
+    const opts = { loop: c.loop, fadeSec: c.fadeSec, ...(c.speedRatio === undefined ? {} : { speedRatio: c.speedRatio }), ...(restart ? { restart: true } : {}) };
     this.animator.play(c.clip, onEnd ? { ...opts, onEnd } : opts);
     // remember what this loop was authored at, so stride matching can scale it while KEEPING ITS SIGN (walk_back is
     // the guard step at −1: the same cadence played backwards)

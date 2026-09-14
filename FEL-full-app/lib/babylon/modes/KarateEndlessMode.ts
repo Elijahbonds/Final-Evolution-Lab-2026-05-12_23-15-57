@@ -95,9 +95,17 @@ import { KARATE_CONFIG as CFG } from './modeConfigs';
 import { waveSpec, spawnRing, DownRevive, REVIVE_RANGE, surroundedCount, inArc } from '../core/OnslaughtCore';
 import {
   PlayerVitals, VITALS, enemyHitDamage, SlowMoLatch, SLOWMO, type SlowMoKind,
-  EnemyBrain, ENEMY_ATTACK, windupSecFor, maxAttackers, ComboTracker, isFinisher,
+  EnemyBrain, ENEMY_ATTACK, windupSecFor, maxAttackers,
   DropDirector, DROPS, type DropKind, PerkShop, separate,
 } from '../core/NeoCombatCore';
+// THE-HUNDRED-COMBAT-DYNAMICS (2026-09-14) — the feel layer: cancel + queue, the string book, crowd stun, redirect, the
+// body throw. Pure and tested in core/HordeDynamics(.test); this file only renders it. See that header for the base
+// measurement (12 presses → 3 swings: nine eaten by a full-clip lock under a 140 ms buffer).
+import {
+  StringBook, StrikeQueue, STRIKE_TIMING, QUEUE_SEC, MOVES, THROW, FLINCH_SEC, TARGET,
+  pickTarget, stickDirTo, lungeFor, crowdStun, pathHits, pickGrab,
+  type HordeMove, type StrikeBtn,
+} from '../core/HordeDynamics';
 import { readBlend, blendTraits, blendName, SCHOOLS } from '../combat/schools';
 import { hordeStyle, type HordeStyle } from '../combat/loadout';
 
@@ -129,7 +137,6 @@ const AGENT_WINDUP = SPORT_CLIP.karateWindup;      // the telegraph: rear fist c
 const AGENT_FLOOR = 'karate_floor_hold';
 const LEAN_DODGE = 'karate_lean_dodge';            // the bullet-time lean (dodge with no stick held)
 const DODGE_SLIP = 'karate_evade';                 // the directional slip (the tree's default — authored, not the football juke)
-const STRIKE_WEIGHT: Record<'A' | 'B' | 'Y', StrikeWeight> = { A: 'light', B: 'medium', Y: 'heavy' };
 const IMPACT_SEC = 0.24, STRIKE_MAX_SEC = 1.5, REACT_SEC = 0.32;
 type Strike = { weight: StrikeWeight; clip: string; until: number } | null;
 // THE HORDE GRAMMAR (owner lock 2026-09-03: Matrix Revolutions / Pirate
@@ -141,6 +148,12 @@ const STRIKES = {
   B: { clip: SPORT_CLIP.karateKick, dmg: 18, range: 1.9, arcDeg: 150, launch: false },
   Y: { clip: SPORT_CLIP.karateHeavy, dmg: 24, range: 1.6, arcDeg: 90, launch: true },
 } as const;
+/** THE-HUNDRED: ground speed (m/s) — was 3 (2.83 measured under the stride filter). The horde is circled, not walked. */
+const MOVE_SPEED = 4.4;
+/** A held stick cuts a swing's recovery this long after its cancel point (the jab keeps its extension on screen). */
+const MOVE_CANCEL_EXTRA_SEC = 0.1;
+/** The ring the crowd stun throws (unlit, on the floor): peak radius is the move's stun radius. */
+const SHOCK_SEC = 0.32;
 /** The running hit count decays after this long without a hit (the Musou number). */
 const HIT_CHAIN_MS = 1400;
 
@@ -186,6 +199,9 @@ interface Enemy {
   /** The floating health bar over this body (2026-09-14). Null until the first hit — a full bar on an
    *  untouched mook is eight bars of clutter the player has not earned any information from yet. */ bar: Mesh | null;
   /** capped out of a strike: circling until this game-clock time (0 = not orbiting) */ orbitUntil: number; orbitDir: 1 | -1;
+  /** THE-HUNDRED: staggered (helpless, steering held) until this GAME-clock time; 0 = standing */ stunUntil: number;
+  /** game-clock time of the last hit this body took (a freshly hit body is grabbable) */ hitAt: number;
+  /** in the hero's hands (or in flight): out of the brain, the steering, the arcs and the targeting */ carried: boolean;
 }
 interface Pickup { kind: DropKind; mesh: Mesh; life: number; phase: number }
 /** A tween on the GAME clock (so slow-mo stretches the sink, the knockback, the slide — one clock, not two). */
@@ -241,7 +257,20 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   /** Movement multiplier from the band, 1 for a guest. Multiplies the perk tree's own, never replaces it. */
   let prqSpeed = 1;
   const slowmo = new SlowMoLatch();
-  const combo = new ComboTracker();
+  // THE-HUNDRED: the string book replaces the jab-only ComboTracker (A A A is still the uppercut finisher, now one of six
+  // strings); the queue holds a press made before the swing's cancel point.
+  const book = new StringBook();
+  const queue = new StrikeQueue();
+  /** The GAME clock (slow-mo scaled). Strike timing lives on it — the hit used to land on a real-time setTimeout. */
+  let gameSec = 0;
+  let strikeSeq = 0, strikeStartedAt = -Infinity, strikeMove: HordeMove | null = null, strikeHitDone = true;
+  /** The body in the hero's hands. `swinging` while the 360 sweep runs. */
+  let carry: { e: Enemy; since: number; swinging: boolean } | null = null;
+  let shockRings: { mesh: Mesh; t: number; r: number }[] = [];
+  let turnClock: { at: number; deg: number } | null = null;
+  /** L1 pressed inside a swing before its hit: the grab waits for the hit (QUEUE_SEC), like a queued strike. */
+  let grabQueuedAt = -Infinity;
+  const dyn = { swings: 0, cancels: 0, queued: 0, eatenPresses: 0, redirects: 0, maxTurnDeg: 0, lunges: 0, stuns: 0, stunnedMax: 0, flinches: 0, grabs: 0, weaponSwings: 0, throws: 0, weaponHits: 0, lastMove: '', lastString: '', lastRedirect: '', lastGrabMiss: '' };
   /** DYNAMIC POSTURE for the hero's footwork. A horde mode is ALL circling — you are always moving around bodies —
    *  so a flat, unbanked body is most of what the mode looks like. Exertion comes off the vitals: a fighter deep in a
    *  wave on low health carries himself like it. */
@@ -303,7 +332,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   /** The floor under a strike's aim turn (rad/s): a pivot on the balls of the feet, never a snap. */
   const STRIKE_TURN_RATE = 12;
   /** How fast the fighter turns onto a new travel line (rad/s): a 180° stick reversal is ~0.26 s of body, not one frame. */
-  const TRAVEL_TURN_RATE = 12;
+  const TRAVEL_TURN_RATE = 22;   // THE-HUNDRED: was 12 (180° in 0.26 s) — 0.14 s now; a crowd fight turns on a dime
   const facingVec = () => new Vector3(Math.sin(player.root.rotation.y), 0, Math.cos(player.root.rotation.y));
   const tween = (dur: number, step: (k: number) => void, done?: () => void) => { tweens.push({ t: 0, dur, step, done }); };
   const clampDisc = (p: Vector3) => { const r = Math.hypot(p.x, p.z); if (r > ARENA_RADIUS) { const k = ARENA_RADIUS / r; p.x *= k; p.z *= k; } };
@@ -362,7 +391,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     // touch, so the health fields existed and meant nothing and there was no bar worth drawing. MookHealth
     // owns the curve; it is shallow and capped on purpose, because one swing still has to clear a crowd.
     const hpPool = mookMaxHp(wave);   // `pool` above is the MOB pool — different thing, same word
-    enemies.push({ mob, anim, brain: new EnemyBrain(wave), hp: hpPool, maxHp: hpPool, airUntil: 0, orbitUntil: 0, orbitDir: i % 2 ? 1 : -1, bar: null });
+    enemies.push({ mob, anim, brain: new EnemyBrain(wave), hp: hpPool, maxHp: hpPool, airUntil: 0, orbitUntil: 0, orbitDir: i % 2 ? 1 : -1, bar: null, stunUntil: 0, hitAt: -1e9, carried: false });
   }
 
   async function spawnWave(ctx: ModeContext): Promise<void> {
@@ -382,7 +411,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
   const nearest = (from: Vector3): Enemy | null =>
     enemies.reduce<Enemy | null>((best, e) =>
-      !best || Vector3.Distance(e.mob.char.root.position, from) < Vector3.Distance(best.mob.char.root.position, from) ? e : best, null);
+      e.carried ? best : !best || Vector3.Distance(e.mob.char.root.position, from) < Vector3.Distance(best.mob.char.root.position, from) ? e : best, null);
 
   function gainChi(ctx: ModeContext, amount: number): void {
     const before = chi;
@@ -467,7 +496,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   // M110 — spend a full chi bar: an AoE knockback + heavy damage that reuses the
   // existing landHit/ko/wave-clear path, so a burst can clear a wave cleanly.
   function chiBurst(ctx: ModeContext): void {
-    if (!CHI_BURST_ENABLED || chi < 100 || striking || dodging || bursting || myDown.downed || shopOpen) return;   // a downed fighter cannot swing (the tree holds the floor)
+    if (!CHI_BURST_ENABLED || chi < 100 || !swingCancelable() || carry || dodging || bursting || myDown.downed || shopOpen) return;   // a downed fighter cannot swing (the tree holds the floor)
     // Phase 8: surrounded 3+ makes this the CROWD-CLEAR finisher — bigger
     // radius read, brief invulnerability feel (dodge window), huge payoff.
     const surrounded = surroundedCount(player.root.position,
@@ -482,15 +511,15 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     setTimeout(() => { ctx.setHud({ banner: '' }); }, 900);
     matrix(ctx, 'chiBurst');                                    // the special is a Matrix beat: the uppercut at full length, the ring slowed
     vitals.iframeSec = Math.max(vitals.iframeSec, SLOWMO.chiBurst);   // untouchable through the burst
-    combo.reset();
+    book.reset(); queue.clear();
     SoundKit.play('crowdCheer', { volume: 0.5 });
     ctx.feel?.impact?.(0.9);
     const origin = player.root.position.clone();
     EffectsKit.burst(ctx.scene, origin.add(new Vector3(0, 1.1, 0)), 'glitch');
     EffectsKit.burst(ctx.scene, origin.add(new Vector3(0, 0.4, 0)), 'sparks');
-    striking = true;
+    striking = true; strikeSeq++; strikeMove = MOVES.typhoon; strikeStartedAt = gameSec; strikeHitDone = true;
     myStrike = { weight: 'finisher', clip: STRIKES.Y.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
-    for (const e of [...enemies]) {
+    for (const e of liveBodies()) {
       const to = e.mob.char.root.position.subtract(origin); to.y = 0;
       const d = to.length();
       if (d > CHI_BURST_RADIUS + perks.burstRadius) continue;
@@ -506,73 +535,293 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     bursting = false;
   }
 
-  function strike(ctx: ModeContext, key: keyof typeof STRIKES): void {
-    if (striking || blocking || dodging || myDown.downed || shopOpen) return;   // a downed fighter cannot swing (the tree holds the floor)
-    striking = true;
-    // REAL MOVES: jab-jab-UPPERCUT — the third light inside the combo window is the finisher (ComboTracker)
-    const finisher = key === 'A' ? isFinisher(combo.light(clockSec)) : (combo.reset(), false);
-    const s = finisher ? STRIKES.Y : STRIKES[key];
-    const target = nearest(player.root.position);
+  // ── THE-HUNDRED-COMBAT-DYNAMICS: the strike pipeline ─────────────────────────────────────────────────────────────
+  /** Bodies still in the fight (not in the hero's hands, not in flight). */
+  const liveBodies = (): Enemy[] => enemies.filter((e) => !e.carried);
+  const xz = (e: Enemy) => ({ x: e.mob.char.root.position.x, z: e.mob.char.root.position.z });
+  /** The L stick in WORLD space, or null inside the dead zone. */
+  const stickWorld = (ctx: ModeContext): { x: number; z: number } | null => {
+    if (Math.hypot(stickX, stickY) <= TARGET.stickDead) return null;
+    const v = ctx.camDirector.stickWorldLatched(stickX, stickY);
+    return { x: v.x, z: v.z };
+  };
+  const cancelSec = (m: HordeMove) => STRIKE_TIMING[m.weight].cancelAt * style.startupMult;
+  /** A new command may cut the swing in flight: its hit has resolved and its cancel point has passed. */
+  const swingCancelable = () => !striking || (!!strikeMove && strikeHitDone && gameSec - strikeStartedAt >= cancelSec(strikeMove));
+  function endSwing(): void { striking = false; myStrike = null; strikeMove = null; strikeHitDone = true; }
+
+  /** A strike button. Carrying a body: the weapon verbs. Mid-swing before the cancel point: QUEUED (fires the frame it
+   *  opens). Otherwise the string book names the move, the redirect picks its target, and the swing starts NOW. */
+  function strike(ctx: ModeContext, key: StrikeBtn): void {
+    if (blocking || dodging || myDown.downed || shopOpen) return;   // a downed fighter cannot swing (the tree holds the floor)
+    if (carry) { if (key === 'Y') throwCarried(ctx); else swingCarried(ctx); return; }
+    if (striking && !swingCancelable()) { queue.push(key, 'n', gameSec); grabQueuedAt = -Infinity; dyn.queued++; return; }
+    if (striking) dyn.cancels++;
+    const origin = player.root.position;
+    const stick = stickWorld(ctx);
+    const bodies = liveBodies();
+    const ti = pickTarget({ x: origin.x, z: origin.z }, stick, bodies.map((e) => ({ x: e.mob.char.root.position.x, z: e.mob.char.root.position.z, threat: e.brain.attacking })));
+    const target = ti >= 0 ? bodies[ti] : null;
+    // the stick variant reads against the FACING before the turn: pulled back + B is the spin kick that hits behind
+    const dir = stickDirTo(stick, player.root.rotation.y);
+    const move = book.press(key, dir, gameSec);
+    const reachMult = perks.reach * style.reachMult;
+    // REDIRECT: every press re-aims — onto the target, or down the stick's line when nobody is in its cone. The turn
+    // arrives inside the hit beat (never a one-frame pop: G1/G4 still hold, it is just a faster pivot).
+    const lineYaw = target
+      ? Math.atan2(target.mob.char.root.position.x - origin.x, target.mob.char.root.position.z - origin.z)
+      : stick ? Math.atan2(stick.x, stick.z) : player.root.rotation.y;
+    const turn = Math.abs(wrapYaw(lineYaw - player.root.rotation.y));
+    faceTarget = lineYaw; faceRate = Math.max(STRIKE_TURN_RATE, turn / (STRIKE_TIMING[move.weight].hitAt * 0.7));
+    if (turn > (100 * Math.PI) / 180) { dyn.redirects++; turnClock = { at: now(), deg: Math.round((turn * 180) / Math.PI) }; }
+    dyn.maxTurnDeg = Math.max(dyn.maxTurnDeg, Math.round((turn * 180) / Math.PI));
+    // the gap-close: a far target inside the move's lunge is closed on during the startup (on the game clock)
     if (target) {
-      // G1/G4: AIM the swing, do not teleport onto it. The startup is 150 ms; the rate is whatever gets the body there
-      // inside 120 ms of it, floored at a normal pivot — so the arc test below still measures the committed line, and
-      // a 180° turn reads as seven frames of body instead of one frame of pop.
-      const to = target.mob.char.root.position.subtract(player.root.position);
-      const want = Math.atan2(to.x, to.z);
-      const d = Math.abs(wrapYaw(want - player.root.rotation.y));
-      faceTarget = want; faceRate = Math.max(STRIKE_TURN_RATE, d / 0.12);
-    }
-    SoundKit.play('whoosh', finisher ? { pitch: 0.8, volume: 0.7 } : {});
-    myStrike = { weight: finisher ? 'finisher' : STRIKE_WEIGHT[key], clip: s.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
-    if (finisher) { stats.finishers++; ctx.setHud({ banner: 'FINISHER' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
-    setTimeout(() => {
-      // THE PROSPECTIVE ROUTE. It has to be resolved BEFORE the arc test, because the payoff IS the arc: the
-      // strike that completes a route swings wider and further than the same strike on its own. The chain is
-      // only consumed if the swing actually connects, so a whiffed route-finisher does not eat the sequence.
-      const kind = ROUTE_KIND[key];
-      const fresh = clockSec - lastLandAt > cancelWindowSec(myRatings) * style.chainMult;
-      const seq = fresh ? [kind] : [...landed, kind];
-      const route = routeFor(seq, myRatings);
-      const reach = s.range * perks.reach * style.reachMult * (route ? 1.45 : 1);
-      const arc = s.arcDeg + perks.arcDeg + style.arcBonusDeg + (route ? (route.fx === 3 ? 110 : 60) : 0);
-
-      // everyone in the arc, not the nearest one
-      const origin = player.root.position;
-      const hit = enemies.filter((e) => inArc(origin, player.root.rotation.y, e.mob.char.root.position, reach, arc));
-      if (!hit.length) { if (now() - lastHitAt > HIT_CHAIN_MS) { hitCount = 0; ctx.setHud({ hits: 0 }); } return; }
-
-      // the swing connected, so the sequence advances
-      landed = seq.slice(-6);
-      lastLandAt = clockSec;
-
-      const t = now();
-      if (t - lastHitAt > HIT_CHAIN_MS) hitCount = 0;
-      if (s.launch || route) matrix(ctx, finisher || route?.fx === 3 ? 'finisher' : 'heavyKo');
-      const launches = !!s.launch || (route ? route.ender !== 'stun' : false);
-      const hitWeight: 'light' | 'medium' | 'heavy' | 'finisher' = finisher ? 'finisher' : STRIKE_WEIGHT[key];
-      for (const e of [...hit]) landHit(ctx, e, launches, hitWeight);   // the arc still reaches every body; each now takes damage rather than dropping
-      hitCount += hit.length; lastHitAt = t;
-      ctx.setHud({ hits: hitCount });
-      if (hit.length >= 3) ctx.feel?.impact?.(0.55);
-      // THE HORDE FEEDS THE METER. Clearing three bodies with one swing is the fantasy this mode sells and
-      // the Game-Breaker layer could not see it happen.
-      if (hit.length) ctx.momentum.report({ kind: 'clean_hit', weight: Math.min(24, 6 * hit.length) });
-
-      if (route) {
-        landed = [];                                  // a completed route is spent
-        const shake = routeShake(route.fx);
-        ctx.juice.hitStop(routeHitStopMs(route.fx));
-        ctx.juice.shake(shake.amp, shake.ms);
-        ctx.feel?.impact?.(route.fx === 3 ? 0.7 : 0.45);
-        ctx.momentum.report({ kind: 'chain', weight: route.fx === 3 ? 26 : 14 });
-        SoundKit.play('impact', { pitch: route.fx === 3 ? 0.72 : 0.9, volume: 0.65 });
-        EffectsKit.burst(ctx.scene, origin.add(new Vector3(0, 1.2, 0)), route.fx === 3 ? 'glitch' : 'sparks');
-        stats.finishers += route.fx === 3 ? 1 : 0;
-        ctx.setHud({ banner: `${route.label}! — ${hit.length} DOWN` });
-        setTimeout(() => ctx.setHud({ banner: '' }), 900);
-        console.info(`[KE-ROUTE] ${route.label} fx${route.fx} cleared ${hit.length} arc ${arc.toFixed(0)}deg reach ${reach.toFixed(2)}`);
+      const tp = target.mob.char.root.position;
+      const L = lungeFor(Math.hypot(tp.x - origin.x, tp.z - origin.z), move, reachMult);
+      if (L > 0.05) {
+        const from = origin.clone(), to = from.add(new Vector3(Math.sin(lineYaw), 0, Math.cos(lineYaw)).scale(L)); clampDisc(to);
+        tween(Math.max(0.06, STRIKE_TIMING[move.weight].hitAt * 0.9), (k) => { if (!dodging && !myDown.downed) { player.root.position.x = from.x + (to.x - from.x) * k; player.root.position.z = from.z + (to.z - from.z) * k; } });
+        dyn.lunges++;
       }
-    }, 150 * style.startupMult);
+    }
+    striking = true; strikeSeq++; strikeStartedAt = gameSec; strikeMove = move; strikeHitDone = false;
+    const tok = strikeSeq;
+    myStrike = { weight: move.weight, clip: move.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it (strikeSeq replays a same-weight link)
+    dyn.swings++; dyn.lastMove = move.id; dyn.lastString = [...book.history].join('') || key;
+    SoundKit.play('whoosh', move.ender ? { pitch: 0.8, volume: 0.7 } : { pitch: 1 + book.history.length * 0.08 });
+    if (move.ender || move.id === 'rush' || move.id === 'backSpin') { ctx.setHud({ banner: move.label }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+    tween(STRIKE_TIMING[move.weight].hitAt * style.startupMult, () => {}, () => resolveHit(ctx, key, move, tok));
+  }
+
+  /** The hit beat of swing `tok` (game clock). */
+  function resolveHit(ctx: ModeContext, key: StrikeBtn, move: HordeMove, tok: number): void {
+    if (tok !== strikeSeq || !myStrike) return;          // the swing was interrupted (a clean hit taken, a dodge, a grab)
+    strikeHitDone = true;
+    // THE PROSPECTIVE ROUTE. It has to be resolved BEFORE the arc test, because the payoff IS the arc: the strike that
+    // completes a route swings wider and further than the same strike on its own. The chain is only consumed if the
+    // swing actually connects, so a whiffed route-finisher does not eat the sequence.
+    const kind = ROUTE_KIND[key];
+    const fresh = clockSec - lastLandAt > cancelWindowSec(myRatings) * style.chainMult;
+    const seq = fresh ? [kind] : [...landed, kind];
+    const route = routeFor(seq, myRatings);
+    const reach = move.range * perks.reach * style.reachMult * (route ? 1.45 : 1);
+    const arc = Math.min(360, move.arcDeg + perks.arcDeg + style.arcBonusDeg + (route ? (route.fx === 3 ? 110 : 60) : 0));
+
+    // everyone in the arc, not the nearest one
+    const origin = player.root.position;
+    const hit = liveBodies().filter((e) => inArc(origin, player.root.rotation.y, e.mob.char.root.position, reach, arc));
+    if (!hit.length) { if (now() - lastHitAt > HIT_CHAIN_MS) { hitCount = 0; ctx.setHud({ hits: 0 }); } return; }
+
+    // the swing connected, so the sequence advances
+    landed = seq.slice(-6);
+    lastLandAt = clockSec;
+
+    const t = now();
+    if (t - lastHitAt > HIT_CHAIN_MS) hitCount = 0;
+    if ((move.launch && move.ender) || route) matrix(ctx, 'finisher');
+    else if (move.launch) matrix(ctx, 'heavyKo');
+    const launches = move.launch || (route ? route.ender !== 'stun' : false);
+    if (move.ender) stats.finishers++;
+    // SOUL CALIBUR WEIGHT: the connect holds for a beat that grows with the weight (hit-stop is the harness's, not a slow-mo)
+    ctx.juice.hitStop(move.weight === 'light' ? 28 : move.weight === 'medium' ? 45 : 70);
+    for (const e of [...hit]) landHit(ctx, e, launches, move.weight);   // the arc still reaches every body; each takes damage rather than dropping
+    hitCount += hit.length; lastHitAt = t;
+    ctx.setHud({ hits: hitCount });
+    if (hit.length >= 3) ctx.feel?.impact?.(0.55);
+    // CROWD STUN: an ender (or the heavy) that connects staggers the whole pack around you, not only the arc
+    if (move.stunRadius > 0) stunCrowd(ctx, origin, move.stunRadius * perks.reach, move.stunSec);
+    // THE HORDE FEEDS THE METER. Clearing three bodies with one swing is the fantasy this mode sells and
+    // the Game-Breaker layer could not see it happen.
+    ctx.momentum.report({ kind: 'clean_hit', weight: Math.min(24, 6 * hit.length) });
+
+    if (route) {
+      landed = [];                                  // a completed route is spent
+      const shake = routeShake(route.fx);
+      ctx.juice.hitStop(routeHitStopMs(route.fx));
+      ctx.juice.shake(shake.amp, shake.ms);
+      ctx.feel?.impact?.(route.fx === 3 ? 0.7 : 0.45);
+      ctx.momentum.report({ kind: 'chain', weight: route.fx === 3 ? 26 : 14 });
+      SoundKit.play('impact', { pitch: route.fx === 3 ? 0.72 : 0.9, volume: 0.65 });
+      EffectsKit.burst(ctx.scene, origin.add(new Vector3(0, 1.2, 0)), route.fx === 3 ? 'glitch' : 'sparks');
+      stats.finishers += route.fx === 3 ? 1 : 0;
+      ctx.setHud({ banner: `${route.label}! — ${hit.length} DOWN` });
+      setTimeout(() => ctx.setHud({ banner: '' }), 900);
+      console.info(`[KE-ROUTE] ${route.label} fx${route.fx} cleared ${hit.length} arc ${arc.toFixed(0)}deg reach ${reach.toFixed(2)}`);
+    }
+  }
+
+  /** A body takes a stagger: whatever it was doing is cancelled, the steering holds, it flinches and slides out. */
+  function staggerEnemy(e: Enemy, sec: number, push: number, dx: number, dz: number): void {
+    if (e.carried) return;
+    e.brain.interrupt(); e.orbitUntil = 0; e.mob.hold();
+    e.stunUntil = Math.max(e.stunUntil, gameSec + sec);
+    e.anim.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.05 });   // beat BEFORE loop (a loop set first plays for a frame)
+    e.anim.loop(STANCE, { fadeSec: 0.15 });
+    if (push > 0.01) {
+      const root = e.mob.char.root; const from = root.position.clone();
+      const to = from.add(new Vector3(dx, 0, dz).scale(push)); clampDisc(to);
+      tween(0.18, (k) => { if (!e.carried) { const q = 1 - (1 - k) * (1 - k); root.position.x = from.x + (to.x - from.x) * q; root.position.z = from.z + (to.z - from.z) * q; } });
+    }
+  }
+
+  /** CROWD STUN — every body inside the radius staggers (falloff to the edge), a floor shock-ring, a hit-stop and a shake. */
+  function stunCrowd(ctx: ModeContext, origin: Vector3, radius: number, sec: number): number {
+    const bodies = liveBodies();
+    const hits = crowdStun({ x: origin.x, z: origin.z }, bodies.map((e) => ({ x: e.mob.char.root.position.x, z: e.mob.char.root.position.z })), radius, sec);
+    shockRing(ctx, origin, radius);
+    if (!hits.length) return 0;
+    for (const h of hits) staggerEnemy(bodies[h.index], h.sec, h.push, h.dx, h.dz);
+    dyn.stuns++; dyn.stunnedMax = Math.max(dyn.stunnedMax, hits.length);
+    ctx.juice.hitStop(hits.length >= 3 ? 90 : 60);
+    ctx.juice.shake(0.1 + 0.03 * Math.min(6, hits.length), 240);
+    ctx.feel?.impact?.(0.6);
+    SoundKit.play('impact', { pitch: 0.6, volume: 0.8 });
+    if (hits.length >= 3) { ctx.setHud({ banner: `CROWD STUN ×${hits.length}` }); setTimeout(() => ctx.setHud({ banner: '' }), 800); }
+    return hits.length;
+  }
+  function shockRing(ctx: ModeContext, at: Vector3, radius: number): void {
+    const mesh = MeshBuilder.CreateTorus(`ke_shock_${strikeSeq}_${shockRings.length}`, { diameter: 1, thickness: 0.06, tessellation: 40 }, ctx.scene);
+    mesh.material = unlitMat(ctx, `${mesh.name}_m`, '#9FF6FF');
+    mesh.position.copyFromFloats(at.x, 0.08, at.z); mesh.isPickable = false;
+    shockRings.push({ mesh, t: 0, r: radius });
+  }
+  function tickShock(dt: number): void {
+    if (!shockRings.length) return;
+    shockRings = shockRings.filter((s) => {
+      s.t += dt; const k = Math.min(1, s.t / SHOCK_SEC);
+      const d = 2 * s.r * (0.25 + 0.75 * (1 - (1 - k) * (1 - k)));
+      s.mesh.scaling.copyFromFloats(d, 1 + 3 * (1 - k), d);
+      s.mesh.visibility = 1 - k;
+      if (k >= 1) { s.mesh.material?.dispose(); s.mesh.dispose(); return false; }
+      return true;
+    });
+  }
+
+  // ── THE BODY AS A WEAPON: L1 on a staggered body grabs it; carried, A/B swings it round (a 360° sweep), Y or L1 throws
+  //    it down the aim. The grab cancels a swing once its hit has resolved, so it lives INSIDE a string. X drops it. ──
+  const grabbable = (e: Enemy) => !e.carried && (e.stunUntil > gameSec || gameSec - e.hitAt < THROW.grabbableSec);
+  function tryGrab(ctx: ModeContext): boolean {
+    if (carry || myDown.downed || dodging || blocking || shopOpen || meAir.airborne) return false;
+    if (striking && !strikeHitDone) return false;
+    const bodies = liveBodies();
+    const gi = pickGrab({ x: player.root.position.x, z: player.root.position.z, yaw: player.root.rotation.y },
+      bodies.map((e) => ({ x: e.mob.char.root.position.x, z: e.mob.char.root.position.z, grabbable: grabbable(e) })));
+    if (gi < 0) {
+      const g = bodies.filter(grabbable).map((b) => Math.hypot(b.mob.char.root.position.x - player.root.position.x, b.mob.char.root.position.z - player.root.position.z));
+      dyn.lastGrabMiss = `${g.length} grabbable, nearest ${g.length ? Math.min(...g).toFixed(2) : '-'} m of ${bodies.length}`;
+      return false;
+    }
+    const e = bodies[gi];
+    queue.clear(); book.reset();
+    e.carried = true; e.brain.interrupt(); e.mob.hold(); e.orbitUntil = 0; e.stunUntil = 0;
+    ctx.groundLock?.release(e.mob.char.root);          // it leaves the floor now
+    e.anim.beat(SPORT_CLIP.karateKnockdown, { fadeSec: 0.06 }); e.anim.loop(AGENT_FLOOR, { fadeSec: 0.12 });   // limp
+    carry = { e, since: gameSec, swinging: false };
+    strikeSeq++; striking = true; strikeMove = MOVES.jab; strikeStartedAt = gameSec; strikeHitDone = true;   // the reach
+    myStrike = { weight: 'light', clip: 'jab', until: now() + STRIKE_MAX_SEC * 1000 };
+    faceTarget = Math.atan2(e.mob.char.root.position.x - player.root.position.x, e.mob.char.root.position.z - player.root.position.z); faceRate = 30;
+    dyn.grabs++;
+    ctx.juice.hitStop(50);
+    SoundKit.play('impact', { pitch: 0.75, volume: 0.5 });
+    ctx.setHud({ banner: 'GRABBED · A SWING · Y THROW' }); setTimeout(() => ctx.setHud({ banner: '' }), 700);
+    return true;
+  }
+  /** The carried body rides in front of the hero (limp, tilted) until it is swung or thrown. */
+  function holdCarried(ctx: ModeContext): void {
+    if (!carry || carry.swinging) return;
+    const r = carry.e.mob.char.root; const f = facingVec();
+    r.position.copyFromFloats(player.root.position.x + f.x * THROW.carryDist, 0.55, player.root.position.z + f.z * THROW.carryDist);
+    r.rotation.y = player.root.rotation.y + Math.PI / 2; r.rotation.z = 1.25;
+    if (gameSec - carry.since > THROW.carryMaxSec) throwCarried(ctx);   // nobody holds a body for ever: it goes
+  }
+  /** A body the weapon (or the thrown body) passes: damage, a long stagger, a big shove outward. */
+  function weaponHit(ctx: ModeContext, e: Enemy, dx: number, dz: number, weight: 'medium' | 'heavy'): void {
+    dyn.weaponHits++;
+    landHit(ctx, e, true, weight);
+    if (enemies.includes(e)) staggerEnemy(e, THROW.hitStunSec, 1.5, dx, dz);
+    ctx.juice.shake(0.14, 160);
+  }
+  function swingCarried(ctx: ModeContext): void {
+    if (!carry || carry.swinging) return;
+    const c = carry; c.swinging = true; dyn.weaponSwings++;
+    const r = c.e.mob.char.root;
+    strikeSeq++; striking = true; strikeMove = MOVES.whirl; strikeStartedAt = gameSec; strikeHitDone = true;
+    myStrike = { weight: 'medium', clip: 'roundhouse', until: now() + STRIKE_MAX_SEC * 1000 };
+    faceTarget = null;
+    const y0 = player.root.rotation.y, hitSet = new Set<Enemy>();
+    let prev = { x: r.position.x, z: r.position.z };
+    SoundKit.play('whoosh', { pitch: 0.6, volume: 0.8 });
+    ctx.setHud({ banner: 'BODY SWING' }); setTimeout(() => ctx.setHud({ banner: '' }), 600);
+    tween(THROW.swingSec, (k) => {
+      if (carry !== c) return;
+      const a = y0 + k * Math.PI * 2;
+      player.root.rotation.y = a;
+      const p = { x: player.root.position.x + Math.sin(a) * THROW.swingRadius, z: player.root.position.z + Math.cos(a) * THROW.swingRadius };
+      r.position.copyFromFloats(p.x, 0.85, p.z); r.rotation.y = a + Math.PI / 2; r.rotation.z = 1.45;
+      const bodies = liveBodies();
+      for (const i of pathHits(prev, p, bodies.map(xz), THROW.swingHitM)) {
+        const e = bodies[i]; if (hitSet.has(e)) continue; hitSet.add(e);
+        const ox = e.mob.char.root.position.x - player.root.position.x, oz = e.mob.char.root.position.z - player.root.position.z; const ol = Math.hypot(ox, oz) || 1;
+        weaponHit(ctx, e, ox / ol, oz / ol, 'medium');
+      }
+      prev = p;
+    }, () => {
+      if (carry !== c) return;
+      c.swinging = false; endSwing();
+      if (hitSet.size >= 2) { ctx.setHud({ banner: `BODY SWING ×${hitSet.size}` }); setTimeout(() => ctx.setHud({ banner: '' }), 700); }
+      throwCarried(ctx);                              // the swing lets go at the end of the turn: swing → throw is one verb
+    });
+  }
+  function throwCarried(ctx: ModeContext): void {
+    if (!carry || carry.swinging) return;
+    const e = carry.e; carry = null; dyn.throws++;
+    const r = e.mob.char.root; const origin = player.root.position;
+    // the aim: the stick, else the most urgent body, else straight ahead
+    const stick = stickWorld(ctx);
+    const bodies = liveBodies();
+    const ti = stick ? -1 : pickTarget({ x: origin.x, z: origin.z }, null, bodies.map((b) => ({ x: b.mob.char.root.position.x, z: b.mob.char.root.position.z, threat: b.brain.attacking })));
+    const yaw = stick ? Math.atan2(stick.x, stick.z)
+      : ti >= 0 ? Math.atan2(bodies[ti].mob.char.root.position.x - origin.x, bodies[ti].mob.char.root.position.z - origin.z)
+      : player.root.rotation.y;
+    const dx = Math.sin(yaw), dz = Math.cos(yaw);
+    faceTarget = yaw; faceRate = 40;
+    strikeSeq++; striking = true; strikeMove = MOVES.heavy; strikeStartedAt = gameSec; strikeHitDone = true;
+    myStrike = { weight: 'heavy', clip: 'hook', until: now() + STRIKE_MAX_SEC * 1000 };
+    const from = new Vector3(origin.x + dx * 0.8, 1.0, origin.z + dz * 0.8);
+    const to = from.add(new Vector3(dx, 0, dz).scale(THROW.throwDist)); clampDisc(to);
+    const hitSet = new Set<Enemy>(); let prev = { x: from.x, z: from.z };
+    ctx.juice.hitStop(70);
+    SoundKit.play('whoosh', { pitch: 0.5, volume: 0.9 });
+    tween(THROW.throwSec, (k) => {
+      const x = from.x + (to.x - from.x) * k, z = from.z + (to.z - from.z) * k;
+      r.position.copyFromFloats(x, Math.max(0.15, from.y + THROW.throwApex * 4 * k * (1 - k) - 0.85 * k), z);
+      r.rotation.y = yaw + Math.PI / 2; r.rotation.z = 1.4; r.rotation.x = k * Math.PI * 3;   // the tumble
+      const live = liveBodies();
+      for (const i of pathHits(prev, { x, z }, live.map(xz), THROW.throwHitM)) {
+        const b = live[i]; if (hitSet.has(b)) continue; hitSet.add(b);
+        weaponHit(ctx, b, dx, dz, 'heavy');
+      }
+      prev = { x, z };
+    }, () => {
+      r.rotation.x = 0; r.rotation.z = 0; r.position.y = 0;
+      e.carried = false;
+      EffectsKit.burst(ctx.scene, r.position.add(new Vector3(0, 0.3, 0)), 'dust');
+      ctx.juice.shake(0.2, 260); SoundKit.play('impact', { pitch: 0.55, volume: 0.9 });
+      stunCrowd(ctx, r.position.clone(), 1.9, 0.6);   // the landing knocks the ones it lands among off their feet
+      ctx.setHud({ banner: hitSet.size ? `BODY THROW ×${hitSet.size}` : 'BODY THROW' }); setTimeout(() => ctx.setHud({ banner: '' }), 800);
+      if (enemies.includes(e)) { e.hp = 0; ko(ctx, e); }   // a body used as a weapon is done
+    });
+    if (striking) tween(0.28, () => {}, () => { if (strikeMove === MOVES.heavy && !carry) endSwing(); });
+  }
+  /** Hands open: the carried body drops where it is (a hit taken, a dodge). */
+  function dropCarried(ctx: ModeContext): void {
+    if (!carry) return;
+    const e = carry.e; carry = null;
+    const r = e.mob.char.root; r.rotation.x = 0; r.rotation.z = 0; r.position.y = 0; clampDisc(r.position);
+    e.carried = false;
+    ctx.groundLock?.track(r, e.mob.char.skeleton);
+    staggerEnemy(e, 0.6, 0, 0, 0);
   }
 
   /**
@@ -591,7 +840,14 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     ctx.feel?.impact?.(launch ? 0.55 : 0.35);
     EffectsKit.burst(ctx.scene, t.mob.char.root.position.add(new Vector3(0, 1.1, 0)), 'sparks');
     if (launch) EffectsKit.burst(ctx.scene, t.mob.char.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
+    t.hitAt = gameSec;
     if (t.hp <= 0) { ko(ctx, t); return; }
+    // THE-HUNDRED: a connect STAGGERS — the wind-up it was in is gone, it slides back off the hit. Before this a body
+    // took a jab mid-wind-up and hit you anyway (landHit never touched the brain).
+    const ox = t.mob.char.root.position.x - player.root.position.x, oz = t.mob.char.root.position.z - player.root.position.z, ol = Math.hypot(ox, oz) || 1;
+    const k = weight === 'light' ? 1 : weight === 'medium' ? 1.3 : 1.7;
+    staggerEnemy(t, FLINCH_SEC * k * (launch ? 1.6 : 1), (launch ? 0.7 : 0.22) * k, ox / ol, oz / ol);
+    dyn.flinches++;
     // still standing: the bar is the feedback that the hit counted
     SoundKit.play('impact', { pitch: 1.15, volume: 0.35 });
     updateBar(ctx, t);
@@ -644,6 +900,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
 
   function ko(ctx: ModeContext, e: Enemy): void {
+    if (carry?.e === e) carry = null;
     e.bar?.dispose(); e.bar = null;
     enemies = enemies.filter((x) => x !== e);
     kos++; totalKos++;
@@ -690,7 +947,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
   function tickAgents(ctx: ModeContext, dt: number): void {
     // the pack fans out (separate()) — a horde, not a conga line; only the chasers move for it
-    const chasers = enemies.filter((e) => e.brain.phase === 'pursue' && e.orbitUntil === 0);
+    // THE-HUNDRED: a stagger that ran out puts the body straight back on the chase
+    for (const e of enemies) if (e.stunUntil > 0 && !e.carried && gameSec >= e.stunUntil) { e.stunUntil = 0; e.mob.resume(); }
+    const chasers = enemies.filter((e) => e.brain.phase === 'pursue' && e.orbitUntil === 0 && !e.carried);
     if (chasers.length > 1) {
       const off = separate(chasers.map((e) => ({ x: e.mob.char.root.position.x, z: e.mob.char.root.position.z })), SEPARATION_M);
       const k = Math.min(1, 6 * dt);
@@ -699,7 +958,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     for (const e of enemies) {
       const root = e.mob.char.root;
       const busy = e.brain.phase !== 'pursue' || e.orbitUntil > 0;
-      if (!busy) continue;
+      if (!busy || e.carried) continue;
       // a squared-up agent tracks you (the wind-up faces where you ARE — the read is honest)
       if (e.brain.phase !== 'strike') {
         const to = player.root.position.subtract(root.position);
@@ -743,7 +1002,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     }
     const outcome = vitals.takeHit(enemyHitDamage(wave, e.brain.strike), { blocking, blockChipMult: style.blockChipMult });
     if (outcome === 'iframe') return;                          // still reeling from the last one — no double-tap
-    lastHurtAt = clockSec; combo.reset(); landed = [];   // a route dies when you do
+    lastHurtAt = clockSec; book.reset(); queue.clear(); landed = [];   // a route dies when you do
     if (outcome === 'blocked') {
       // the guard ABSORBS — a shove, a sliver of chip, pressure not a beating
       stats.blocked++;
@@ -760,7 +1019,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     if (!striking || e.brain.strike === 'kick') {
       hitWeight = e.brain.strike === 'kick' ? 'medium' : 'light'; hitUntil = now() + REACT_SEC * 1000;
       meTree.clearBeat('react_light', 'react_medium');
-      striking = false; myStrike = null;                        // the hit interrupts the swing
+      endSwing();                                               // the hit interrupts the swing
+      dropCarried(ctx);                                         // and opens the hands
     } else stats.traded++;
     gainChi(ctx, 4);
     ctx.feel?.impact?.(e.brain.strike === 'kick' ? 0.55 : 0.4);
@@ -777,8 +1037,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     tween(0.14, (k) => { if (!dodging) player.root.position = Vector3.Lerp(from, to, k); });
   }
   function downPlayer(ctx: ModeContext): void {
-    vitals.hp = 0; publishHp(ctx); stats.downs++; combo.reset(); landed = []; hitUntil = 0;   // the knockdown, not a flinch first
-    striking = false; myStrike = null; blocking = false;
+    vitals.hp = 0; publishHp(ctx); stats.downs++; book.reset(); queue.clear(); landed = []; hitUntil = 0;   // the knockdown, not a flinch first
+    dropCarried(ctx); endSwing(); blocking = false;
     if (!partnerDown.downed) {
       // Phase 8 co-op rule kept: DOWN (not out) while the partner stands — they can revive you
       myDown.down(clockSec);
@@ -802,6 +1062,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       speed01: blocking || myDown.downed ? 0 : mySpeed01, dashing: false, hasWeapon: false,
       speedMps: blocking || myDown.downed ? 0 : myMps,   // STRIDE MATCHING: real ground speed
       striking: myStrike?.weight ?? null, strikeClip: myStrike?.clip,
+      strikeSpeed: myStrike && strikeMove ? strikeMove.speed : undefined, strikeSeq,   // THE-HUNDRED: the de-lagged rate; a cancelled link replays
       blocking, dodging, dodgeClip, airborne: meAir.airborne, parryFlash: false, guardImpactFlash: t < impactUntil,
       hitBy: t < hitUntil ? hitWeight : null, down: myDown.downed, out: outFlag, ulting: false,
     };
@@ -822,13 +1083,17 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
 
   function tryDodge(ctx: ModeContext): void {
-    if (dodging || striking || myDown.downed || shopOpen) return;
+    if (dodging || myDown.downed || shopOpen) return;
+    if (carry?.swinging) return;
+    if (striking && !swingCancelable()) return;
+    if (striking) { dyn.cancels++; endSwing(); }        // THE-HUNDRED: dodge-cancel — the beat-em-up's signature move
+    dropCarried(ctx); queue.clear();
     dodging = true;
     iframeSec = DODGE_IFRAME_SEC + perks.iframeBonus;
     // A dodge breaks the LIGHT chain (ComboTracker's own rule) but deliberately NOT a route: dodge-cancelling
     // into the next link is the signature move of every beat-em-up worth playing, and a route that a dodge
     // killed would punish the exact thing the mode should reward.
-    combo.reset();
+    book.reset();
     const steered = Math.hypot(stickX, stickY) > 0.2;
     const dir = steered
       ? ctx.camDirector.stickWorldLatched(stickX, stickY).normalize()
@@ -860,6 +1125,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       pp: mePosture?.layer.get() ?? null, ppAlly: partnerPosture?.layer.get() ?? null, bio: { ...meBio },   // BIOMECH-WAVE2 probes
       aim: (() => { const n = nearest(player.root.position); return n ? { x: n.mob.char.root.position.x, y: n.mob.char.root.position.y + 1.32, z: n.mob.char.root.position.z } : null; })(),
       ...stats,
+      dyn: { ...dyn, string: book.history.join(''), queued: queue.pending, carrying: !!carry, stunnedNow: enemies.filter((e) => e.stunUntil > gameSec).length, strikeSeq },
+      nearestM: (() => { const n = nearest(player.root.position); return n ? +Math.hypot(n.mob.char.root.position.x - player.root.position.x, n.mob.char.root.position.z - player.root.position.z).toFixed(2) : -1; })(),
+      heroYaw: +((player.root.rotation.y * 180) / Math.PI).toFixed(1),
     };
   }
 
@@ -921,10 +1189,11 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       faceTarget = null;
       meTree.onSettle = (st) => {
         if (!st.startsWith('strike_')) return;
-        striking = false; myStrike = null;
-        // a press inside the swing is not eaten: the harness buffers every button-down (gameFeel) — the next strike
-        // fires on the settle, so jab-jab-jab chains into the finisher at the clip's own cadence
-        for (const k of ['A', 'B', 'Y'] as const) if (ctx.feel?.buffer?.consume(k)) { strike(ctx, k); break; }
+        if (carry?.swinging) return;                     // the body swing owns the turn until its tween ends
+        endSwing();
+        // THE-HUNDRED: a press made inside the swing waits in the StrikeQueue (0.4 s) and fires at the cancel point in
+        // update() — this used to consume the harness's 140 ms buffer here, at the clip's END, which ate 9 of 12 presses
+        const q = queue.take(gameSec); if (q) strike(ctx, q.btn);
       };
       partnerTree.onSettle = (st) => { if (st.startsWith('strike_')) pStrike = null; };
       myStrike = null; pStrike = null; impactUntil = 0; outFlag = false; hitUntil = 0;
@@ -956,14 +1225,14 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         }
       }
       perks = shop.state(); vitals.setMax(perks.maxHp, true); vitals.iframeSec = 0; hpShown = -1; lastHurtAt = -1e9;
-      combo.reset(); landed = []; shopOpen = false;
+      book.reset(); queue.clear(); carry = null; gameSec = 0; strikeSeq = 0; strikeMove = null; strikeHitDone = true; landed = []; shopOpen = false;
       striking = false; blocking = false; dodging = false; xHoldSec = -1; iframeSec = 0; endSlowMo(ctx);
       ctx.camDirector.snapTo(player.root.position, player.root.position.add(facingVec()));
       karateVenue?.hidePlaceholders();  // M74
       SoundKit.startAmbient('dojo');
       await spawnWave(ctx);
       publishHp(ctx, true);
-      ctx.setHud({ chi, coins: shards, hint: 'Agents wind up before they swing — tap BLOCK at the last instant for BULLET TIME · hold BLOCK to guard · JAB ×3 = FINISHER · R1 = CHI BURST · walk over the drops' });
+      ctx.setHud({ chi, coins: shards, hint: 'Strings: A A A · A A B WHIRLWIND · A B Y HAMMER · B B Y TYPHOON · stick AT a body + Y = RUSH · pull back + B = SPIN BACK KICK · L1 on a staggered body = GRAB (A swing · Y throw) · tap BLOCK late = BULLET TIME · R1 = CHI BURST' });
     },
 
     onInput(ctx, e: FelInput) {
@@ -988,7 +1257,11 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         if (e.btn === 'R1') chiBurst(ctx);
         // L1 JUMPS. R1 is the chi burst in this mode and A/B/Y are the strikes, so the shoulder that is
         // free here is the opposite one to the duels' -- the verb is the same, the button is what was left.
-        if (e.btn === 'L1' && !myDown.downed && meAir.jump()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });
+        // THE-HUNDRED: L1 is the GRAB when a staggered body is in reach (and the THROW while carrying one) — the jump
+        // otherwise, so the verb only exists where it can do something.
+        if (e.btn === 'L1' && carry) throwCarried(ctx);
+        else if (e.btn === 'L1' && striking && !strikeHitDone && !myDown.downed) { grabQueuedAt = gameSec; queue.clear(); }
+        else if (e.btn === 'L1' && !myDown.downed && !tryGrab(ctx) && !striking && meAir.jump()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });
       }
       if (e.t === 'button' && !e.pressed && e.btn === 'X') {
         const held = xHoldSec;
@@ -1040,6 +1313,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       slowmo.tick(dtReal);
       if (wasSlow && !slowmo.active) ctx.scene.animationTimeScale = 1;
       const dt = dtReal * slowmo.scale;
+      gameSec += dt;
       // the shop: the horde is down, the clock runs out into the next wave
       if (shopOpen && now() >= shopUntil) closeShop(ctx);
 
@@ -1059,6 +1333,11 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         tweens = keep;
       }
 
+      tickShock(dt);
+      // THE-HUNDRED: a queued press fires the frame its swing's cancel point opens (or the moment the swing is over)
+      if (queue.pending && swingCancelable() && !dodging && !blocking) { const q = queue.take(gameSec); if (q) strike(ctx, q.btn); }
+      if (grabQueuedAt > -Infinity && (strikeHitDone || !striking)) { const fresh = gameSec - grabQueuedAt <= QUEUE_SEC; grabQueuedAt = -Infinity; if (fresh) tryGrab(ctx); }
+
       playerSlot.poll(dt);
       partnerSlot.poll(dt);
       net?.tick(playerSlot.intent);   // no-op without ?net=
@@ -1068,7 +1347,11 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // ran screen-LEFT once the camera had swung). Up = the camera's flat forward, right = screen right; no axis flipped.
       // The basis LATCHES while the stick is held (the over-shoulder camera swings behind every turn — a live basis
       // spun the fighter on the spot on a held stick-right: 0.26 m/s net, measured); a push runs straight.
-      const vel = ctx.camDirector.stickWorldLatched(stickX, stickY).scaleInPlace(3 * perks.speedMult * prqSpeed);
+      const vel = ctx.camDirector.stickWorldLatched(stickX, stickY).scaleInPlace(MOVE_SPEED * perks.speedMult * prqSpeed * (carry ? 0.7 : 1));
+      // THE-HUNDRED: a held stick cuts a swing's recovery (past its cancel point + a hair, so the strike still reads) —
+      // no more standing in the last third of a jab while the horde walks round you
+      if (striking && strikeMove && !carry?.swinging && !queue.pending && vel.lengthSquared() > 0.05 && swingCancelable()
+        && gameSec - strikeStartedAt >= cancelSec(strikeMove) + MOVE_CANCEL_EXTRA_SEC) { dyn.cancels++; endSwing(); }
       // the posture tracker: resolved in the fighter's own frame, so circling a body reads as a bank and backing off
       // a swing reads as sitting back
       // the bars ride their bodies: built on first damage, moved every frame after
@@ -1077,7 +1360,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       player.root.position.y = meAir.height;   // the arc is EvadeMoves'; nothing here integrates gravity
       meMotion.update(vel.x, vel.z, player.root.rotation.y, dt);
       myMps = Math.hypot(vel.x, vel.z);
-      let mySpeed01 = Math.min(1, vel.length() / (3 * perks.speedMult * prqSpeed));   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
+      let mySpeed01 = Math.min(1, vel.length() / (MOVE_SPEED * perks.speedMult * prqSpeed));   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
       if (!striking && !blocking && !dodging && !myDown.downed && vel.lengthSquared() > 0.05) {   // the shop never freezes the feet: the ring is empty, the drops are yours to walk over
         const before = player.root.position.clone();
         player.root.position.addInPlace(vel.scale(dt));
@@ -1093,8 +1376,13 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // G1: a committed strike TURNS onto its target across the startup (it used to arrive in one frame)
       if (faceTarget !== null) {
         player.root.rotation.y = slewYaw(player.root.rotation.y, faceTarget, faceRate, dtReal);
-        if (Math.abs(wrapYaw(faceTarget - player.root.rotation.y)) < 1e-3) faceTarget = null;
+        if (Math.abs(wrapYaw(faceTarget - player.root.rotation.y)) < 1e-3) {
+          faceTarget = null;
+          if (turnClock) { dyn.lastRedirect = `${turnClock.deg}deg in ${Math.round(now() - turnClock.at)}ms`; turnClock = null; }
+        }
       }
+
+      holdCarried(ctx);
 
       // partner movement/attacks
       const pIntent = partnerSlot.intent;
@@ -1113,7 +1401,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       const contacts = pool.update(dt, player.root.position, vel, ENEMY_ATTACK.engageRange);
       for (const mob of contacts) {
         const idx = enemies.findIndex((e) => e.mob === mob);
-        if (idx >= 0 && enemies[idx].brain.phase === 'pursue' && enemies[idx].orbitUntil === 0) agentContact(ctx, enemies[idx], idx);
+        if (idx >= 0 && enemies[idx].brain.phase === 'pursue' && enemies[idx].orbitUntil === 0 && !enemies[idx].carried && enemies[idx].stunUntil === 0) agentContact(ctx, enemies[idx], idx);
       }
       tickAgents(ctx, dt);
       tickPickups(ctx, dt);
@@ -1142,7 +1430,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       net?.dispose(); net = null;
       if (sceneRef) { sceneRef.animationTimeScale = 1; sceneRef = null; }
       for (const p of pickups) { p.mesh.material?.dispose(); p.mesh.dispose(); }
-      pickups = []; tweens = [];
+      for (const r of shockRings) { r.mesh.material?.dispose(); r.mesh.dispose(); }
+      pickups = []; tweens = []; shockRings = []; carry = null; queue.clear();
       mePosture?.dispose(); mePosture = null; partnerPosture?.dispose(); partnerPosture = null;
       crowd?.dispose(); crowd = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient();
     },
