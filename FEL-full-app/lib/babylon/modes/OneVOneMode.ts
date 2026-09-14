@@ -97,8 +97,8 @@ import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';              // the miss meets the iron it earned
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
 import {
-  CHAIN_IDLE, BASELINE_HANDLE, canChain, pushChain, tickChain, chainTier, ankleBreakOdds, isHardBreak,
-  hasMove, tightness, moveFromContext, gathersIntoShot, type ChainState, type HandleMove,
+  CHAIN_IDLE, BASELINE_HANDLE, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot,
+  resolveHandleMove, SHAKE_RANGE, type ChainState, type HandleMove,
 } from '../core/HandleSystem';   // Street chains x 2K brakes, gated on the handle the PRQ scan earned
 import {
   THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
@@ -1904,28 +1904,29 @@ export const OneVOneMode: ModeDefinition = (() => {
    * crossover should rarely break anyone and a three-deep chain at a real handle should look inevitable.
    */
   function doMove(ctx: ModeContext, move: HandleMove): void {
-    if (!hasMove(move, handle)) return;              // not in my hands yet — the gate IS the upgrade
-    if (!canChain(move, chain, handle)) {
-      if (process.env.NODE_ENV === 'development') console.info(`[1V1-HANDLE] ${move} refused (last ${chain.last} since ${chain.since.toFixed(2)}s) — new chain`);
-      chain = pushChain(move, { ...CHAIN_IDLE }, handle);
+    // THE DECISION IS SHARED (HandleSystem.resolveHandleMove); what stays here is the RENDERING — this
+    // mode's clips, banners and defender. 3v3 renders the same outcome its own way, so a tuning change to
+    // the chain or the odds lands in both games instead of one.
+    const outcome = resolveHandleMove(move, chain, handle, {
+      present: foeStunSec <= 0 && !foeFloored,
+      closing: foeVelLast.length() > 1.4 && facingCos(foe.root.rotation.y, foe.root.position, me.root.position) > 0,
+      set: foeVelLast.length() < 0.6,
+      within: distXZ(me.root.position, foe.root.position) < SHAKE_RANGE,
+    }, roll);
+    if (!outcome.owned) return;                      // not in my hands yet — the gate IS the upgrade
+    chain = outcome.chain;
+    if (outcome.restarted) {
+      if (process.env.NODE_ENV === 'development') console.info(`[1V1-HANDLE] ${move} out of window — new chain`);
       return;
     }
-    chain = pushChain(move, chain, handle);
-    const tier = chainTier(chain.length);
+    const tier = outcome.tier;
     if (process.env.NODE_ENV === 'development') console.info(`[1V1-HANDLE] move ${move} chain ${chain.length} (${tier})`);
     if (tier !== 'single') {
       SoundKit.play('whoosh', { pitch: 1.1 + chain.length * 0.12, volume: 0.35 });
       ctx.feel?.impact?.(0.08 * chain.length);
     }
-    if (foeStunSec > 0 || foeFloored) return;        // already cooked; nothing left to break
-
-    const closing = foeVelLast.length() > 1.4 && facingCos(foe.root.rotation.y, foe.root.position, me.root.position) > 0;
-    const set = foeVelLast.length() < 0.6;
-    const within = distXZ(me.root.position, foe.root.position) < 2.6;
-    if (!within) return;                            // you cannot break a man you are nowhere near
-
-    const odds = ankleBreakOdds({ chainLength: chain.length, handle, defenderClosing: closing, defenderSet: set });
-    if (roll() >= odds) return;
+    if (outcome.broke === 'none') return;
+    const odds = outcome.odds;
 
     swing('ankle_break');
     SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
@@ -1933,7 +1934,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     EffectsKit.burst(ctx.scene, foe.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
     ctx.setHud({ momentum });
 
-    if (isHardBreak(chain.length, handle)) {
+    if (outcome.broke === 'hard') {
       // "ankle breakers" — he goes DOWN, and has to get up. The same floored state the poster dunk uses,
       // so there is one way a body ends up on this floor and one way it comes back.
       foeFloored = true;

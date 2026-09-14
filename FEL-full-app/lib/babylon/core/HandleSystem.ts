@@ -262,3 +262,81 @@ export function moveFromContext(read: MoveRead, handle: number): HandleMove {
   // everything I own is the move I just did; return it and let canChain refuse the repeat
   return 'crossover';
 }
+
+// ── THE WHOLE MOVE, DECIDED IN ONE PLACE (2026-09-13) ────────────────────────────────────────────────────
+//
+// The pieces above — canChain, pushChain, chainTier, ankleBreakOdds, isHardBreak — were assembled into a
+// 60-line `doMove` inside 1v1 and nowhere else. 3v3 had the ball-handling module imported and never grew the
+// vocabulary: its crossover only switched hands, so a chain could not exist there, the ankles could never
+// break, and the moves the owner commissioned lived in exactly one of the two modes that should have them.
+//
+// Copying those 60 lines into 3v3 is what put 3v3 behind in the first place. So the DECISION is here, pure
+// and tested, and each mode renders the outcome its own way (its own clips, its own banners, its own
+// defender). A tuning change now lands in both games at once, which is the entire point.
+
+/** Everything the decision needs to know about the man being broken. */
+export interface DefenderRead {
+  /** There is a live defender at all — not stunned, not already on the floor. */
+  present: boolean;
+  /** He is moving at you. Easier to break. */
+  closing: boolean;
+  /** He is planted. Harder. */
+  set: boolean;
+  /** Close enough that the move happens TO him. */
+  within: boolean;
+}
+
+export type BreakResult = 'none' | 'shook' | 'hard';
+
+export interface MoveOutcome {
+  /** False when the move is not in your hands yet — the gate IS the upgrade. */
+  owned: boolean;
+  /** The chain after this move. Always returned, including when the chain restarted. */
+  chain: ChainState;
+  tier: ChainTier;
+  /** The move was outside the window or a repeat, so it began a fresh chain instead of extending one. */
+  restarted: boolean;
+  /** What happened to the defender. */
+  broke: BreakResult;
+  /** The odds that were rolled against, for the log. 0 when nothing was rolled. */
+  odds: number;
+}
+
+/** Inside this a move is happening TO the defender; outside it you are shaking nobody. */
+export const SHAKE_RANGE = 2.6;
+
+/**
+ * One move, start to finish.
+ *
+ * `roll` is injected so the ankle-break dice are testable — the odds curve is the interesting part and it
+ * should not need a running game to prove.
+ */
+export function resolveHandleMove(
+  move: HandleMove,
+  chain: ChainState,
+  handle: number,
+  def: DefenderRead,
+  roll: () => number = Math.random,
+): MoveOutcome {
+  if (!hasMove(move, handle)) {
+    return { owned: false, chain, tier: chainTier(chain.length), restarted: false, broke: 'none', odds: 0 };
+  }
+  if (!canChain(move, chain, handle)) {
+    // out of the window, or a repeat: this is a new chain rather than a refusal, so the input is never eaten
+    const fresh = pushChain(move, { ...CHAIN_IDLE }, handle);
+    return { owned: true, chain: fresh, tier: chainTier(fresh.length), restarted: true, broke: 'none', odds: 0 };
+  }
+
+  const next = pushChain(move, chain, handle);
+  const tier = chainTier(next.length);
+  const base = { owned: true as const, chain: next, tier, restarted: false };
+
+  // already cooked, or nowhere near him: the chain still counts, the ankles do not
+  if (!def.present || !def.within) return { ...base, broke: 'none', odds: 0 };
+
+  const odds = ankleBreakOdds({
+    chainLength: next.length, handle, defenderClosing: def.closing, defenderSet: def.set,
+  });
+  if (roll() >= odds) return { ...base, broke: 'none', odds };
+  return { ...base, broke: isHardBreak(next.length, handle) ? 'hard' : 'shook', odds };
+}

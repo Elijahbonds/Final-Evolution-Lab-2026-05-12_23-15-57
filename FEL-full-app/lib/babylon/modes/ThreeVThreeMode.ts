@@ -96,6 +96,10 @@ import { HAND_UP_SEC, handUpContest, distXZ, rivalShotPct, proximityContest01, L
 import { boardWinner, BOX_OUT_RANGE, jobObjective, type BoardBody } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O1–O3
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';                               // the miss meets the iron it earned
 import { judge, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
+import {
+  CHAIN_IDLE, BASELINE_HANDLE, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
+  type ChainState, type HandleMove,
+} from '../core/HandleSystem';   // the vocabulary 1v1 had and this mode did not
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and six bodies contest it
 import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
@@ -208,6 +212,9 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let gather: { plan: GatherPlan; t: number } | null = null;                         // M1: the jumper's gather before the rise
   let finish: { plan: FinishPlan; t: number; released: boolean } | null = null;      // M3: a layup / floater in flight
   // ── HOOPS-MOVE-KIT-B: the post kit (M4–M6) ──
+  /** The handle drives the vocabulary and the chain window (HandleSystem) — 3v3 never had either. */
+  let handle = BASELINE_HANDLE;
+  let chain: ChainState = { ...CHAIN_IDLE };
   let posting = false;                                                               // the seal I hold (the path into the fade / the hook / the quick spin)
   let spin: { plan: SpinPlan; t: number; beat: boolean } | null = null;              // M6: the pivot in flight
   let spinCooldown = 0, spinArmed = 0;   // M6: a body I meet ARMS the spin; the stick swung across throws it
@@ -423,6 +430,12 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: juice-only ring + net, material clones — no meshy_hoop_* transform is touched
       if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }
       SoundKit.startAmbient('stadium');
+      // `?handle=` — the same probe override 1v1 carries. Chain depth is only reachable at a real handle,
+      // so without this the 3v3 vocabulary could be shipped and never actually driven past depth 1.
+      if (typeof window !== 'undefined') {
+        const q = Number(new URLSearchParams(window.location.search).get('handle'));
+        if (Number.isFinite(q) && q > 0) { handle = Math.max(0, Math.min(100, q)); console.info(`[3V3-HANDLE] handle ${handle} (override)`); }
+      }
 
       myScore = 0; foeScore = 0; assists = 0; timeLeft = POSSESSION_SEC; ended = false;
       shotContest = 0; foeCloseMem = foes.map(() => 0);
@@ -604,7 +617,20 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       meSpeed01 = drib.speed01; me.speed01 = drib.speed01;
       // HOOPS-MOVE-KIT-A: never inside a shot / finish — the hand swap moved the finishing hand's ball to the other palm mid-hop
       // (measured on a right-hand layup: the ball to the left hand at +207 ms; 1v1 had this line under its guard)
-      if (drib.crossover && !shooting && !dunking && !finish && !gather && !posting && !spin) carries.get(me)?.switchHand();
+      if (drib.crossover && !shooting && !dunking && !finish && !gather && !posting && !spin) {
+        carries.get(me)?.switchHand();
+        // A CROSSOVER IS A CHAIN LINK, not just a hand swap. In 3v3 it only ever switched hands, so the
+        // chain could not exist here, the ankles could never break, and the move vocabulary the owner
+        // commissioned lived in 1v1 alone. Same read, same resolver, this mode's clips.
+        const toRimFlat = RIM_FLOOR.subtract(me.char.root.position); toRimFlat.y = 0;
+        const nf = nearestLiveFoe();
+        doMove(ctx, moveFromContext({
+          speed01: drib.speed01,
+          retreating: Vector3.Dot(me.drib.vel, toRimFlat) < -0.2,
+          pressured: !!nf && distXZ(me.char.root.position, nf.char.root.position) < 2.0,
+          last: chain.last,
+        }, handle));
+      }
       const nearestFoeDist = foes.reduce((best, f) => f.stunSec > 0 ? best : Math.min(best, Vector3.Distance(f.char.root.position, me.char.root.position)), Infinity);
       if (shooting) {   // BIOMECH-HOOPS-WAVE1 G1: the shooter squares to the rim through the meter
         me.char.root.rotation.y = slewYaw(me.char.root.rotation.y, yawTo(me.char.root.position, RIM), FACE_RIM_RATE, dt); me.drib.setFacing(me.char.root.rotation.y);
@@ -623,6 +649,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       if (finish) stepFinish(dt);
       // HOOPS-MOVE-KIT-B: M6 the pivot owns the body while it turns; otherwise the POST-UP seal (M4–M6's path)
       spinCooldown = Math.max(0, spinCooldown - dt);
+      chain = tickChain(chain, dt, handle);   // the chain expires on its own; a late crossover starts a new one
       spinArmed = Math.max(0, spinArmed - dt);
       const postDef = nearestLiveFoe();
       if (spin) stepSpin(ctx, dt);
@@ -1604,6 +1631,53 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     const b = foes.reduce<Body | null>((best, f) => f.floored ? best : !best || distXZ(f.char.root.position, me.char.root.position) < distXZ(best.char.root.position, me.char.root.position) ? f : best, null);
     return b ? b.char.root.position : null;
   }
+  /**
+   * One handle move, rendered.
+   *
+   * The DECISION is shared with 1v1 (HandleSystem.resolveHandleMove) — the chain, the window, the odds and
+   * the hard-break threshold all live there. What is here is 3v3's own rendering: its nearest defender out
+   * of three rather than one man, its clips, its banners.
+   */
+  function doMove(ctx: ModeContext, move: HandleMove): void {
+    const foe = nearestLiveFoe();
+    const outcome = resolveHandleMove(move, chain, handle, {
+      present: !!foe,
+      closing: !!foe && foe.char.root.position.subtract(me.char.root.position).length() > 0
+        && facingCos(foe.char.root.rotation.y, foe.char.root.position, me.char.root.position) > 0,
+      set: !!foe && foe.speed01 < 0.1,
+      within: !!foe && distXZ(me.char.root.position, foe.char.root.position) < SHAKE_RANGE,
+    });
+    if (!outcome.owned) return;                      // not in my hands yet — the gate IS the upgrade
+    chain = outcome.chain;
+    if (outcome.restarted) return;
+    if (outcome.tier !== 'single') {
+      SoundKit.play('whoosh', { pitch: 1.1 + chain.length * 0.12, volume: 0.35 });
+      ctx.feel?.impact?.(0.08 * chain.length);
+    }
+    if (outcome.broke === 'none' || !foe) return;
+
+    SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
+    SoundKit.play('crowdCheer', { volume: 0.55 });
+    EffectsKit.burst(ctx.scene, foe.char.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
+    if (outcome.broke === 'hard') {
+      // the same knockdown + floor hold every other body-down in this mode uses — one way down, one way up
+      foe.floored = true;
+      foe.stunSec = ANKLE_BREAK_STUN_SEC * 1.8;
+      foe.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      ctx.feel?.impact?.(0.55);
+      ctx.juice.shake(0.09, 140);
+      ctx.setHud({ banner: 'ANKLES — HE IS DOWN!' });
+      setTimeout(() => ctx.setHud({ banner: '' }), 1100);
+    } else {
+      foe.stunSec = ANKLE_BREAK_STUN_SEC;
+      foe.tree.beat(SPORT_CLIP.karateHitReact);
+      ctx.feel?.impact?.(0.35);
+      ctx.setHud({ banner: outcome.tier === 'highlight' ? 'ANKLES!' : 'SHOOK HIM!' });
+      setTimeout(() => ctx.setHud({ banner: '' }), 800);
+    }
+    console.info(`[3V3-HANDLE] ${move} chain ${chain.length} ${outcome.broke} odds ${outcome.odds.toFixed(2)}`);
+  }
+
   function nearestLiveFoe(): Body | null {
     return foes.reduce<Body | null>((best, f) => f.stunSec > 0 || f.floored ? best : !best || distXZ(f.char.root.position, me.char.root.position) < distXZ(best.char.root.position, me.char.root.position) ? f : best, null);
   }

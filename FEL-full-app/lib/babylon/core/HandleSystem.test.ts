@@ -12,7 +12,8 @@ import {
   canChain, pushChain, tickChain, chainTier, ankleBreakOdds, isHardBreak, gathersIntoShot,
   moveFromContext, MAX_CHAIN, chainSpent,
   type ChainState,
-} from './HandleSystem';
+  resolveHandleMove,
+  type DefenderRead} from './HandleSystem';
 
 const MAX = 100;
 
@@ -283,5 +284,105 @@ describe('a chain is spent eventually — a combo, not a treadmill', () => {
   it('a spent chain starts over rather than sticking at the cap', () => {
     const after = pushChain('crossover', { ...runToCap(), since: 0.05 }, MAX);
     expect(after.length).toBe(1);
+  });
+});
+
+// ── ONE DECISION, TWO MODES (2026-09-13) ─────────────────────────────────────────────────────────────────
+//
+// `resolveHandleMove` exists because the 60 lines that assembled these primitives lived inside 1v1 and
+// nowhere else — 3v3's crossover only switched hands, so a chain could not exist there and the ankles could
+// never break. The decision is shared now and each mode renders it. These tests are what stop the two
+// modes drifting apart again.
+
+describe('resolveHandleMove', () => {
+  const ON_HIM: DefenderRead = { present: true, closing: true, set: false, within: true };
+  const never = () => 1;      // the roll never beats the odds
+  const always = () => 0;     // the roll always beats them
+
+  it('a move you do not own does nothing and does not touch the chain', () => {
+    const r = resolveHandleMove('shammgod', { ...CHAIN_IDLE }, BASELINE_HANDLE, ON_HIM, always);
+    expect(r.owned).toBe(false);
+    expect(r.chain.length).toBe(0);
+    expect(r.broke).toBe('none');
+  });
+
+  it('a move you DO own extends the chain', () => {
+    const r = resolveHandleMove('crossover', { ...CHAIN_IDLE }, BASELINE_HANDLE, ON_HIM, never);
+    expect(r.owned).toBe(true);
+    expect(r.chain.length).toBe(1);
+    expect(r.restarted).toBe(false);
+  });
+
+  it('A REPEAT RESTARTS RATHER THAN BEING EATEN — the input always does something', () => {
+    const first = resolveHandleMove('crossover', { ...CHAIN_IDLE }, 90, ON_HIM, never);
+    const again = resolveHandleMove('crossover', first.chain, 90, ON_HIM, never);
+    expect(again.owned).toBe(true);
+    expect(again.restarted).toBe(true);
+    expect(again.chain.length).toBe(1);       // a new chain, not a refusal and not a deepening
+  });
+
+  it('depth is the skill: a chain builds toward the tiers', () => {
+    let c = { ...CHAIN_IDLE };
+    const tiers: string[] = [];
+    for (const m of ['crossover', 'between_legs', 'behind_back'] as const) {
+      const r = resolveHandleMove(m, c, 90, ON_HIM, never);
+      c = r.chain; tiers.push(r.tier);
+    }
+    expect(tiers[0]).toBe('single');
+    expect(tiers[tiers.length - 1]).not.toBe('single');
+  });
+
+  it('YOU CANNOT BREAK A MAN YOU ARE NOWHERE NEAR, however deep the chain', () => {
+    const far = { ...ON_HIM, within: false };
+    let c = { ...CHAIN_IDLE };
+    for (const m of ['crossover', 'between_legs', 'behind_back'] as const) {
+      const r = resolveHandleMove(m, c, 95, far, always);
+      c = r.chain;
+      expect(r.broke).toBe('none');
+      expect(r.odds).toBe(0);
+    }
+    expect(c.length).toBe(3);                 // the chain still counted
+  });
+
+  it('nor one who is already down', () => {
+    const cooked = { ...ON_HIM, present: false };
+    const r = resolveHandleMove('crossover', { ...CHAIN_IDLE }, 95, cooked, always);
+    expect(r.broke).toBe('none');
+    expect(r.chain.length).toBe(1);
+  });
+
+  it('a lucky roll on a single crossover shakes him; it takes DEPTH to put him down', () => {
+    const single = resolveHandleMove('crossover', { ...CHAIN_IDLE }, 95, ON_HIM, always);
+    expect(single.broke).toBe('shook');
+
+    let c = { ...CHAIN_IDLE };
+    let last = single;
+    for (const m of ['crossover', 'between_legs', 'behind_back', 'spin'] as const) {
+      last = resolveHandleMove(m, c, 95, ON_HIM, always); c = last.chain;
+    }
+    expect(last.broke).toBe('hard');
+  });
+
+  it('a closing defender is easier to break than a set one', () => {
+    const closing = resolveHandleMove('crossover', { ...CHAIN_IDLE }, 90, { present: true, closing: true, set: false, within: true }, never);
+    const planted = resolveHandleMove('crossover', { ...CHAIN_IDLE }, 90, { present: true, closing: false, set: true, within: true }, never);
+    expect(closing.odds).toBeGreaterThan(planted.odds);
+  });
+
+  it('the odds are always a probability, never a certainty and never negative', () => {
+    for (const h of [0, 50, 75, 100]) {
+      let c = { ...CHAIN_IDLE };
+      for (const m of ['crossover', 'between_legs', 'behind_back', 'spin'] as const) {
+        const r = resolveHandleMove(m, c, h, ON_HIM, never); c = r.chain;
+        expect(r.odds, `handle ${h} ${m}`).toBeGreaterThanOrEqual(0);
+        expect(r.odds, `handle ${h} ${m}`).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it('THE GATE IS THE UPGRADE: a low handle simply cannot reach the deep moves', () => {
+    for (const m of ['double_cross', 'snatch_back', 'shammgod'] as const) {
+      expect(resolveHandleMove(m, { ...CHAIN_IDLE }, BASELINE_HANDLE, ON_HIM, always).owned, m).toBe(false);
+    }
   });
 });
