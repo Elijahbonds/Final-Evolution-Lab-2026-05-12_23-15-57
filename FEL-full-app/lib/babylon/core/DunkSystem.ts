@@ -131,6 +131,47 @@ export const DUNK_CUES: Record<string, DunkCue> = {
   cradle:      { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // the circle needs most of the flight
   clutch:      { fire: 'hang', last: 'preSlam', facing: 'faceRim' },                 // the clutch reads at the APEX, not on the way up
 };
+// ── THE TIMING READOUT (2026-09-14) ──────────────────────────────────────────────────────────────────────
+//
+// From the review: the game computes exactly what a player needs to improve and then does not tell them.
+// A made dunk logged `buffered press @0.99 fired at the window (117 ms early, execution 0.29)` to
+// console.info — the player saw a number between 30 and 50 and no idea which of difficulty, execution or
+// style they had just lost.
+//
+// The execution CURVE is not the problem and is not touched here: it is deliberate, and the source already
+// records why a flat floor for buffered presses was tried and rejected (it put a cliff on the window's
+// opening edge where pressing one frame earlier scored better). What was missing is the sentence.
+//
+// Pure so the phrasing lives in one place — a mode that wrote its own would drift from the number.
+
+/** How far off the perfect beat still reads as "on time" rather than early or late. */
+export const SLAM_ONTIME_MS = 45;
+
+export interface SlamReadout {
+  /** Signed milliseconds from the perfect beat: negative early, positive late. */
+  offsetMs: number;
+  /** 0..1, the execution the judges will actually score. */
+  execution01: number;
+  /** The one line the bezel prints. */
+  label: string;
+}
+
+/**
+ * What the player's finger did, in words.
+ *
+ * `at` and `center` are clip seconds — the same units the window is defined in — because the mode already
+ * has both and converting to wall-clock here would make the number disagree with the scoring.
+ */
+export function slamReadout(at: number, center: number, execution01: number): SlamReadout {
+  const offsetMs = Math.round((at - center) * 1000);
+  const exec = Math.max(0, Math.min(1, Number.isFinite(execution01) ? execution01 : 0));
+  const pct = Math.round(exec * 100);
+  const when = Math.abs(offsetMs) <= SLAM_ONTIME_MS
+    ? 'ON TIME'
+    : `${Math.abs(offsetMs)} ms ${offsetMs < 0 ? 'EARLY' : 'LATE'}`;
+  return { offsetMs, execution01: exec, label: `${when} · EXECUTION ${pct}%` };
+}
+
 export type CueVerdict = 'early' | 'fire' | 'late';
 export const cueOf = (trick: DunkTrick): DunkCue => DUNK_CUES[trick.id] ?? { fire: 'rise', last: 'preSlam', facing: 'faceRim' };
 export const cueFireAt = (trick: DunkTrick): number => CUE_BEAT_T[cueOf(trick).fire];

@@ -213,6 +213,22 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           grew straight down through the banner at top-[38%], which is exactly
           where a FIFTY! lands. Cards across, one voice line at a time, and a
           running total that climbs as they flip — the number everyone watches. */}
+      {/* THE TIMING VERDICT (review F1, 2026-09-14). The mode computed "117 ms early, execution 29%" and
+          sent it to console.info; a player saw a number between 30 and 50 and could not tell whether they
+          lost it on difficulty, execution or style. Both lines are now on screen, under the judges. */}
+      {typeof hud.slamTiming === 'string' && hud.slamTiming && phase === 'playing' && (
+        <div className="pointer-events-none absolute inset-x-0 top-[22%] text-center">
+          <span className="fel-panel px-3 py-1 font-mono text-[12px] tracking-wide text-[var(--fel-cyan)]">
+            {hud.slamTiming}
+          </span>
+          {typeof hud.breakdown === 'string' && hud.breakdown ? (
+            <div className="mt-1">
+              <span className="fel-panel px-2.5 py-0.5 font-mono text-[10px] text-white/60">{hud.breakdown}</span>
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {Array.isArray(hud.judgeReveal) && (hud.judgeReveal as HudScoreCard[]).length > 0 && (
         <div className="pointer-events-none absolute inset-x-0 top-[20%] flex flex-col items-center gap-2">
           <div className="flex items-end justify-center gap-1.5">

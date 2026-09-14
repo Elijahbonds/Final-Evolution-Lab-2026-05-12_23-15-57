@@ -64,7 +64,7 @@ import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, DOUBLE_UP_WINDOW_M, DOUBLE_UP_MIN_SPEED, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind } from '../core/DunkObstacles';
-import { runwayTrickById, DUNK_TRICKS } from '../core/DunkSystem';
+import { runwayTrickById, DUNK_TRICKS, slamReadout, type SlamReadout } from '../core/DunkSystem';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
@@ -591,7 +591,8 @@ export const DunkMode: ModeDefinition = (() => {
       ctx.setHud({
         round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`, nightCard: null, nightNum: night,
         score: playerTotal, rivalScore: rivalTotal, style: STYLE_LABEL[style], prop: PROP_LABEL[prop], hype: 0, chain: 0,
-        hint: 'Pick your PROP (X / d-pad) · STYLE to cycle · L1 CALLS your dunk · RUN-UP SPEED buys your air · HOLD to run — then tap jump',
+        // F4 (review): this was a 130-character run-on naming six controls. The first run needs two.
+        hint: 'HOLD to run · tap JUMP at the line — then SLAM at the top',
         // one line, phrased by the module: a mode must not invent its own wording for somebody's track
         walkOutNow: walkOutLine(walkCue),
         attempt: stakesLabel(stakes, calledLabel()),
@@ -941,6 +942,14 @@ export const DunkMode: ModeDefinition = (() => {
         if (!slamCueOn && !qteWindowOpen && (wasCue || wasOpen)) ctx.setHud({ slamPulse: false });
         // a press the buffer was holding fires on the frame the window opens — its execution is scored from where the finger was
         if (qteWindowOpen && !wasOpen && slamBufferAt >= 0 && !lob.live && clipTime - slamBufferAt <= SLAM_BUFFER_SEC) slamNow(ctx, slamBufferAt);   // resolveDunk moves the phase; the resolve block below picks the jam up on this same frame
+        // A PRESS TOO EARLY EVEN FOR THE BUFFER USED TO VANISH. The review measured three attempts out of
+        // six that scored nothing and explained nothing, and this is the purest case: the finger moved, the
+        // buffer could not hold it that long, and the game said nothing at all. It says so now. The press is
+        // still let go — this is feedback, not a second chance.
+        else if (qteWindowOpen && !wasOpen && slamBufferAt >= 0 && !lob.live) {
+          refuse(ctx, `TOO EARLY — ${Math.round((clipTime - slamBufferAt) * 1000)} ms BEFORE THE WINDOW`);
+          slamBufferAt = -1;
+        }
         if (clipTime >= closeAt) { if (lob.live) lostLob(ctx); else resolveDunk(ctx); }   // the hand never met the toss — a miss, the ball bounces away
       }
 
@@ -1214,6 +1223,8 @@ export const DunkMode: ModeDefinition = (() => {
   function apexPredicted(): number { return (1.05 + Math.max(charge, chargeAtLaunch) * 0.55) * (0.85 + Math.min(1, Math.max(runUpPeak, holdRunSpeed) / 7) * 0.3) + (doubleUp ? 0.15 : 0); }
   let launchZ = CFG.gatherZ;                  // where the flight left the floor (the carry is measured from here)
   let obstacleOver = false, obstacleCleared = false, obstacleMargin = Infinity;   // the clear, once per attempt
+  /** The last slam's timing verdict, shown on the card. Null until a slam is pressed this attempt. */
+  let slamTiming: SlamReadout | null = null;
   let clipFloorY = 0, clipBackZ = 0;          // where a clipped dunker comes down (the top he caught, or the floor before the side he hit)
 
   /** DUNK-BODY-MID: the SLAM lands. Called on the press inside the window, and from the window's opening frame for a
@@ -1232,6 +1243,9 @@ export const DunkMode: ModeDefinition = (() => {
     const half = window / 2, d = at - center;
     qteAccuracy = Math.max(0, 1 - (d < 0 ? -d / (half + SLAM_BUFFER_SEC) : d / half));
     const early = Math.max(0, (center - half) - at);   // how far in front of the window the finger actually was
+    // AND NOW THE PLAYER IS TOLD. This exact information went to console.info and nowhere else, which is the
+    // single loudest complaint in the review: three attempts out of six scored nothing and explained nothing.
+    slamTiming = slamReadout(at, center, qteAccuracy);
     if (early > 0) console.info(`[DUNK-SLAM] buffered press @${at.toFixed(2)} fired at the window (${(early * 1000).toFixed(0)} ms early, execution ${qteAccuracy.toFixed(2)})`);
     // DUNK-POSTURE S3: the slam resolves ON THE PRESS. It used to wait for the window to close (clip 1.41 — the body
     // 0.3 m off the floor on the way down), so the ball left a hand at chest height and lerped 2.7 m up into the iron on
@@ -2113,7 +2127,10 @@ export const DunkMode: ModeDefinition = (() => {
       revealed = [];
       // DUNK-SOFTS-NAMED: one honest line — the miss under its name and what the panel gave it, so the score line's jump is
       // explained; no card flip for the one-beat miss (the reveal's CONFER hint used to stack under the banner)
-      flash(ctx, `${missWhy()} — MISSED · JUDGES ${missTotal}`);
+      // a MISS is where the silence hurt most: three of six measured attempts scored nothing and said
+      // nothing. If the finger moved at all, say what it did.
+      flash(ctx, slamTiming ? `${missWhy()} — MISSED · ${slamTiming.label}` : `${missWhy()} — MISSED · JUDGES ${missTotal}`);
+      ctx.setHud({ slamTiming: slamTiming?.label ?? '' });
       ctx.setHud({ judgeReveal: [], hint: '', score: playerTotal, chain, hype: Math.round(hype) });
       landingClip = SPORT_CLIP.dunkLandCrouch; landNow();   // A+ P8 H5: normally landed at feet-down already (~0.1 s after the release); this is the floor
       setPhase('judging');
@@ -2158,6 +2175,14 @@ export const DunkMode: ModeDefinition = (() => {
     // THE BUILDING IS PART OF THE PANEL. Momentum reached the score only as hype into the NEXT attempt's
     // style term; the judges themselves never heard the room, in the one mode on the platform that has
     // judges. `CROWD_SWAY` is sized to move the marginal card and nothing else.
+    // THE THREE NUMBERS THE JUDGES ACTUALLY USED. A player got a total between 30 and 50 and no way to know
+    // whether they lost it on difficulty, execution or style -- so they could not know what to change. The
+    // panel already weights these three; showing them costs nothing and is the difference between a score
+    // and a lesson.
+    ctx.setHud({
+      slamTiming: slamTiming?.label ?? '',
+      breakdown: `DIFF ${difficulty.toFixed(1)} · EXEC ${execution.toFixed(1)} · STYLE ${styleScore.toFixed(1)}`,
+    });
     const scores = judgeDunk(difficulty, execution, styleScore, momentum.score01);
     lastScores = scores;
     // THE STAKES SCALE THE PANEL, they do not replace it: the judges still judge the dunk, and then what
@@ -2285,7 +2310,7 @@ export const DunkMode: ModeDefinition = (() => {
     playClip(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     jamSec = -1; jamContact = false; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
-    styleTaps = 0; hangSec = 0; revealed = [];
+    styleTaps = 0; hangSec = 0; revealed = []; slamTiming = null;
     runUpPeak = 0; obstacleClipped = false; toppling = false;
     resetLob(); resetRunway(); ballSim.stop(); dribble?.update(0, 0, false); gatherLatched = false; gatherK = 0; finishRelease = -1; attachBallToHand(ball, player.skeleton, 'RightHand'); ebState.inLeftHand = false; setWin('run');
     settleLatch = false; settleArmed = false; fovRelease(); setTrail('soft');   // juice soft: back to the runway
@@ -2300,10 +2325,13 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.setHud({
       dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`,
       attempt: stakesLabel(stakes, calledLabel()),
+      // the LAST attempt's verdict must not hang over this one: measured on the probe, the readout from
+      // attempt 1 was still on screen through attempt 2 because only a resolve ever wrote the field.
+      slamTiming: '', breakdown: '',
       need: need > 0 ? need : 0,
       hint: need > 0
         ? `FINAL ROUND — you need big numbers (${deficit > 0 ? `down ${deficit}` : `up ${-deficit}`})`
-        : 'Pick your PROP (X / d-pad) · STYLE to cycle · HOLD to run — then tap jump · HOLD SLAM to hang',
+        : 'HOLD to run · tap JUMP at the line — then SLAM at the top',   // F4 (review): six controls in one line taught none of them
       charge: 0, slamPulse: false,
     });
   }
