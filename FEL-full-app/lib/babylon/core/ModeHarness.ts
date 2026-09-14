@@ -38,6 +38,7 @@ import { reportDiag, setDiagMode } from './diag';
 import type { PrqGrade } from '../../prq';
 type PrqBand = PrqGrade['key'];
 import { emit as emitCreator } from '@/lib/creator/CreatorRecord';   // the ONE canonical record
+import { isWakeInput, WakeLatch } from './StartWake';   // SHARED-START-UNSTICK: any press/push/pull → playing
 
 /** M37 mutable slot a mode fills right after spawn (hero root / live objective). */
 export interface MutableRef<T> { current: T | null; }
@@ -399,10 +400,11 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     },
     control: agentHooks.control,     // M69: present only if a mode opted in during load()
     getScore: agentHooks.getScore,
-    start: () => { if (phase === 'ready') startCountdown(); },
+    start: () => { if (phase === 'ready') wake(); },
   });
 
   input.start();
+  const wakeLatch = new WakeLatch();
   unsub = input.on((e) => {
     // M43: browsers block audio until a user gesture — unlock on the very first
     // input event of the session (safe to call repeatedly; no-ops after unlock).
@@ -415,35 +417,35 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     }
     // Error phase: any press retries the load (the UI shows a RETRY button too)
     if (phase === 'error' && e.t === 'button' && e.pressed) { void attemptLoad(); return; }
-    // READY gate: only the first press starts; gameplay input ignored until GO
-    if (phase === 'ready' && e.t === 'button' && e.pressed) { startCountdown(); return; }
+    // READY gate (SHARED-START-UNSTICK): the first press, stick push, d-pad press or trigger pull starts play NOW.
+    // A waking button is not a gameplay press (dropped, and so is its release — see StartWake); a waking stick or
+    // trigger is state, so it falls through and the hero is already moving on the first playing frame.
+    if (phase === 'ready' && isWakeInput(e)) {
+      wake();
+      if (!wakeLatch.wake(e, performance.now())) return;
+    }
     if (phase === 'playing' && e.t === 'button' && e.btn === 'START' && e.pressed) { setPhase('paused'); return; }
     if (phase === 'paused' && e.t === 'button' && e.pressed) { setPhase('playing'); return; }
     if (phase === 'playing' && e.t === 'button' && e.btn === 'SELECT' && e.pressed) { camDirector.toggle(); return; }
     if (phase === 'playing') {
+      if (!wakeLatch.pass(e, performance.now())) return;
       if (e.t === 'button' && e.pressed) buffer.press(e.btn);   // M37 input-buffer
       def.onInput(ctx, e);
     }
   });
 
-  function startCountdown(): void {
-    setPhase('countdown', 3);
-    let n = 3;
-    const tick = setInterval(() => {
-      n--;
-      if (n <= 0) {
-        clearInterval(tick);
-        startedAt = performance.now();
-        setPhase('playing');
-        // CREATOR CARD (2026-09-13): one canonical record, one writer. Every mode's session is recorded HERE
-        // rather than in each mode, which is the mission's rule ("No mode may persist its own parallel
-        // profile") enforced by there being exactly one call site. A discipline id is the mode id — nothing
-        // finer, because a richer stream would be more useful to us and worse for the person it is about.
-        emitCreator({ kind: 'session', discipline: def.modeId });
-      } else {
-        opts.onPhase?.('countdown', n);
-      }
-    }, 800);
+  // SHARED-START-UNSTICK (2026-09-14): READY → 'playing' in the same event. This was a 3-2-1 on an 800 ms interval —
+  // 2.4 s from the press to the first update(), the hero standing still throughout, and a stick or d-pad never
+  // started it at all. The 'countdown' phase stays in ModePhase (hosts still type against it) but nothing enters it.
+  function wake(): void {
+    if (phase !== 'ready') return;
+    startedAt = performance.now();
+    setPhase('playing');
+    // CREATOR CARD (2026-09-13): one canonical record, one writer. Every mode's session is recorded HERE
+    // rather than in each mode, which is the mission's rule ("No mode may persist its own parallel
+    // profile") enforced by there being exactly one call site. A discipline id is the mode id — nothing
+    // finer, because a richer stream would be more useful to us and worse for the person it is about.
+    emitCreator({ kind: 'session', discipline: def.modeId });
   }
 
   engine.runRenderLoop(() => {

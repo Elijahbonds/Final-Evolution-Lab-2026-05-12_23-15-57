@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/components/games/game-shell';
 import { SessionRecorder } from '@/lib/game-systems';
+import { useStartWake } from '@/components/games/use-start-wake';
 
 const W = 960;
 const H = 540;
@@ -24,6 +25,8 @@ export default function TrainingGame({ grade, prq, onEnd, gamepad }: GameProps) 
   onEndRef.current = onEnd;
   const gradeRef = useRef(grade);
   gradeRef.current = grade;
+  // SHARED-START-UNSTICK: any key, pad button, stick or tap on the card chalks up — not only a click on the pill.
+  const wake = useStartWake(!started, () => setStarted(true));
 
   useEffect(() => {
     if (!started) return;
@@ -131,6 +134,8 @@ export default function TrainingGame({ grade, prq, onEnd, gamepad }: GameProps) 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     (canvas as any).felTrain = { start: startHold, end: endHold };
+    // Woke the card by HOLDING the lift key and still holding it: that hold is the first rep, not a press to repeat.
+    if (wake.heldKey.current === 'Space') startHold();
 
     let raf = 0;
     let last = performance.now();
@@ -280,7 +285,7 @@ export default function TrainingGame({ grade, prq, onEnd, gamepad }: GameProps) 
       <div className="relative w-full overflow-hidden rounded-xl border border-white/10 bg-[#1A1008]" style={{ aspectRatio: '16/9' }}>
         <canvas ref={canvasRef} width={W} height={H} className="h-full w-full" />
         {!started && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
+          <div onPointerDown={wake.onPointerDown} className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
             <h2 className="fel-heading text-4xl text-white">IRON PARADISE</h2>
             <p className="max-w-md text-sm text-gray-300">
               60 seconds at Muscle Beach. <span className="text-[#FFD700]">HOLD SPACE</span> to build lift power, release inside the green zone for a clean rep. Center of the zone = PERFECT. Exercises get harder as you go. Score {WIN_SCORE}+ to win.
@@ -291,6 +296,7 @@ export default function TrainingGame({ grade, prq, onEnd, gamepad }: GameProps) 
             >
               CHALK UP
             </button>
+            <p className="font-mono text-[11px] tracking-widest text-white/50">ANY KEY · ANY BUTTON · TAP</p>
           </div>
         )}
       </div>

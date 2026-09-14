@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/components/games/game-shell';
 import { SessionRecorder } from '@/lib/game-systems';
+import { useStartWake } from '@/components/games/use-start-wake';
 
 const W = 960;
 const H = 540;
@@ -18,6 +19,8 @@ export default function TiebreakGame({ grade, prq, onEnd, gamepad }: GameProps) 
   onEndRef.current = onEnd;
   const gradeRef = useRef(grade);
   gradeRef.current = grade;
+  // SHARED-START-UNSTICK: any key, pad button, stick or tap on the card serves — not only a click on the pill.
+  const wake = useStartWake(!started, () => setStarted(true));
 
   useEffect(() => {
     if (!started) return;
@@ -45,7 +48,8 @@ export default function TiebreakGame({ grade, prq, onEnd, gamepad }: GameProps) 
     let ballT = 0;
     let ballLen = 1.3;
     let awaiting = false; // waiting for player return
-    let gap = 1.0;
+    // The first ball is in the air inside half a second of the wake (was 1.0 s of an empty court after the card left).
+    let gap = 0.3;
     let msg = '';
     let msgColor = '#FFF';
     let msgTimer = 0;
@@ -189,12 +193,13 @@ export default function TiebreakGame({ grade, prq, onEnd, gamepad }: GameProps) 
       <div className="relative w-full overflow-hidden rounded-xl border border-white/10 bg-[#0B1F14]" style={{ aspectRatio: '16/9' }}>
         <canvas ref={canvasRef} width={W} height={H} className="h-full w-full" />
         {!started && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
+          <div onPointerDown={wake.onPointerDown} className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
             <h2 className="fel-heading text-4xl text-white">TIEBREAK BLITZ</h2>
             <p className="max-w-md text-sm text-gray-300">
               Sudden-death tiebreak to {TARGET}. Balls fire left or right — swing with <span className="text-[#00FF9D]">← / →</span> when the green ring appears. Long rallies force AI errors. Wrong side or early swing = point lost.
             </p>
             <button onClick={() => setStarted(true)} className="rounded-lg bg-[#00FF9D] px-8 py-3 font-bold text-black transition hover:bg-[#00d986]">FIRST SERVE</button>
+            <p className="font-mono text-[11px] tracking-widest text-white/50">ANY KEY · ANY BUTTON · TAP</p>
           </div>
         )}
       </div>

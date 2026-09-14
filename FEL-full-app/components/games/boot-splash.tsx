@@ -191,7 +191,14 @@ export function BootSplash(props: {
 
   return (
     <div className="absolute inset-0 z-40 overflow-hidden"
-      style={{ background: '#05060a', fontFamily: 'var(--fel-font-display, ui-monospace)' }}>
+      // SHARED-START-UNSTICK: on READY the whole card is the start button. A press that misses the pill (a thumb on
+      // the art, a click in the corner) used to do nothing, and a player reads a card that ignores them as a hang.
+      // The pickers are buttons and keep their own clicks; everything else starts on pointer DOWN, so a hold starts too.
+      onPointerDown={props.phase === 'ready' ? (e) => {
+        if (!e.isPrimary || (e.target as HTMLElement).closest('button, a, input, select, label')) return;
+        props.onStart();
+      } : undefined}
+      style={{ background: '#05060a', fontFamily: 'var(--fel-font-display, ui-monospace)', cursor: props.phase === 'ready' ? 'pointer' : undefined }}>
       {/* cartridge-insert wipe */}
       <div className="absolute inset-0 transition-transform duration-500 ease-out"
         style={{

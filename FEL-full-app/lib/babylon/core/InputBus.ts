@@ -11,6 +11,7 @@ export type FelInput =
   | { t: 'trigger'; side: 'L' | 'R'; value: number };
 
 import { HAPTIC } from '../premium/Haptics';
+import { KEY_SPACE_DOWN } from './StartWake';   // the space-down marker the READY gate wakes on
 // Input & Presence Phase A: the pad is read through a PROFILE now. Everything below keeps its FelInput
 // contract exactly — no mode file and no existing test changes — but the indices it reads are the profile's
 // rather than a hardcoded Standard Gamepad table, and the stick deadzone is radial instead of per-axis.
@@ -151,7 +152,7 @@ export class InputBus {
       return;
     }
     if (key === ' ') {
-      if (down) { this.spaceDownAt = performance.now(); this.emit({ t: 'trigger', side: 'R', value: 0.01 }); }
+      if (down) { this.spaceDownAt = performance.now(); this.emit({ t: 'trigger', side: 'R', value: KEY_SPACE_DOWN }); }
       else { this.emit({ t: 'trigger', side: 'R', value: 0 }); this.emit({ t: 'button', btn: 'A', pressed: true }); }
       return;
     }
