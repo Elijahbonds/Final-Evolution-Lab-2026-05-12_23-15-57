@@ -911,3 +911,20 @@ export function rivalShotPct(distToRim: number, contest01: number, style: 'layup
 export function handUpContest(contest01: number, jumpAgeSec: number): number {
   return jumpAgeSec <= HAND_UP_SEC ? Math.min(1, contest01 + HAND_UP_CONTEST) : contest01;
 }
+
+/** Past this the nearest defender is not contesting the shot at all. */
+export const CONTEST_RANGE = 3;
+
+/**
+ * How contested a shot is, from the distance to the nearest defender alone — 0 at CONTEST_RANGE, 1 in his chest.
+ *
+ * Extracted because three shooters were each computing `clamp01(1 - nearest/3)` inline and a fourth (the 3v3
+ * teammate) was not computing it at all. A contest formula that lives in three places is a contest formula
+ * that will mean three things after the next tuning pass.
+ *
+ * `Infinity` for "there is nobody to contest" reads as wide open, which is what an empty defender list means.
+ */
+export function proximityContest01(nearestDefenderDist: number): number {
+  if (!Number.isFinite(nearestDefenderDist)) return 0;
+  return Math.min(1, Math.max(0, 1 - nearestDefenderDist / CONTEST_RANGE));
+}

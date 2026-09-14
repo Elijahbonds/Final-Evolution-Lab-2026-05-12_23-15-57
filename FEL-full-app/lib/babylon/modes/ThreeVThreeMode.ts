@@ -92,7 +92,7 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package 
   groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, contestedPct, alteredApex, aiHandsUp, facingCos,
   AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE, BUMP_STRIP_WINDOW_SEC,
 } from '../core/HoopsDefense';
-import { HAND_UP_SEC, handUpContest, distXZ } from '../core/BasketballCore';
+import { HAND_UP_SEC, handUpContest, distXZ, rivalShotPct, proximityContest01, LAYUP_RANGE } from '../core/BasketballCore';
 import { boardWinner, BOX_OUT_RANGE, jobObjective, type BoardBody } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O1–O3
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';                               // the miss meets the iron it earned
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and six bodies contest it
@@ -928,15 +928,40 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     shooting = true;
     const dist = Vector3.Distance(body.char.root.position, RIM);
     const points = finish === 'alleyoop' ? 2 : isThree(body.char.root.position, RIM) ? 3 : 2;
-    // a lob caught at the rim is a high-percentage finish — the read was made on the pass
-    const made = Math.random() < (finish === 'alleyoop' ? 0.82 : 0.55);
+    // THE ONE SHOOTER ON THE FLOOR WHO WAS STILL ROLLING DICE.
+    //
+    // My teammate's shot was `Math.random() < 0.55` regardless of where he stood or who was on him — a
+    // wide-open layup and a contested three were the same coin. `dist` was already being computed on the
+    // line above and thrown away. The hero reads his own timing and the opponents read `defenseFactor`;
+    // this is the last body using a constant, so it now goes through the same `rivalShotPct` the rival
+    // uses, against the nearest defender to HIM rather than to me.
+    const mateContest = proximityContest01(
+      Math.min(...foes.map((f) => distXZ(f.char.root.position, body.char.root.position))),   // Infinity when nobody is on him
+    );
+    // ...and at the rim it is a LAYUP, not a jumper. Calling everything a jumper made a teammate standing
+    // under the basket shoot 0.52 when the same shot from the rival shoots 0.74 — the same class of bug as
+    // classifyShot's, which is why LAYUP_RANGE is shared rather than a local number.
+    const mateStyle: 'layup' | 'jumper' = dist < LAYUP_RANGE ? 'layup' : 'jumper';
+    // a lob caught at the rim is a high-percentage finish — the read was made on the pass, so a contest
+    // on the catch matters much less than it does on a jumper
+    const made = finish === 'alleyoop'
+      ? Math.random() < Math.max(0.55, 0.82 - mateContest * 0.2)
+      : Math.random() < rivalShotPct(dist, mateContest, mateStyle);
     releaseBall(ball);
     // BIOMECH-HOOPS-WAVE1: the tree owns the beat; a jumper flows into the held follow-through (G5); the ball FLIES (G6)
     if (finish === 'alleyoop') body.tree.beat(SPORT_CLIP.dunkFinishTomahawk);
     else body.tree.beat('jumpshot', { onSettle: () => body.tree.beat('bball_follow_through', { fadeSec: 0.1 }) });
     body.shotWin = 'release'; body.shotSec = 0;
-    // my teammate's miss is readable too, and it is MY team's board to go and get
-    mateMiss = { from: ball.getAbsolutePosition().clone(), team: 'me', quality01: 0.6, short: 0.2, lateral: (Math.random() - 0.5) * 0.8 };
+    // My teammate's miss is readable too, and it is MY team's board to go and get. It used to be three
+    // constants, so every teammate miss came off the iron the same way and my team always knew where to
+    // stand — the same failure the rival's profile fixed in 1v1. It now reads the contest and the range:
+    // a hand in his face or a shot past his limit is short off the front, an open look sprays.
+    mateMiss = {
+      from: ball.getAbsolutePosition().clone(), team: 'me',
+      quality01: Math.max(0.15, 0.85 - mateContest * 0.5 - Math.max(0, dist - 6) * 0.05),
+      short: mateContest * 0.8 + Math.max(0, dist - 7) * 0.12,
+      lateral: (Math.random() - 0.5) * 0.9,
+    };
     mateArc.start(ball.getAbsolutePosition(), RIM, made, finish === 'alleyoop' ? 'layup' : 'jumper');
     if (finish === 'alleyoop') { ctx.juice.shake(0.12, 120); ctx.feel?.impact?.(0.5); }
     if (made) {
@@ -1804,7 +1829,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     const nearestD = Math.min(...allyPositions().map((p) => Vector3.Distance(p, shooter.char.root.position)));
     // D3: my grounded hand-up inside range, facing him, contests on top of the distance
     const ground = groundContest(distXZ(me.char.root.position, shooter.char.root.position), facingCos(me.char.root.rotation.y, me.char.root.position, shooter.char.root.position), meHandUp);
-    const defenseFactor = Math.min(1, Math.max(0, Math.min(1, 1 - nearestD / 3)) + ground);
+    const defenseFactor = Math.min(1, proximityContest01(nearestD) + ground);
     const made = Math.random() < contestedPct(0.5 - Math.min(0.5, defenseFactor * 0.3), ground);
     console.info(`[3V3-DEF] rival release jumper contest ${defenseFactor.toFixed(2)} handUp ${ground > 0}`);
     if (ground > 0) { ctx.setHud({ banner: 'CONTESTED — HAND UP!' }); }
