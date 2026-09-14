@@ -204,7 +204,16 @@ export function checkAnkleBreak(crossover: boolean, handler: Vector3, defender: 
 export type ShotQuality = 'perfect' | 'good' | 'early' | 'late' | 'brick';
 export type ShotStyle = 'layup' | 'floater' | 'jumper' | 'fadeaway' | 'hook' | 'reverse';   // HOOPS-MOVE-KIT-B M5 the jump hook, M11 the reverse layup
 
-export interface ShotContext { style: ShotStyle; label: string; pctMod: number }
+/**
+ * Which way the body is going across as it rises. 'none' is straight back or planted.
+ *
+ * The direction is the shot, not decoration: a fade drifting across the baseline turns the shoulders away
+ * from the rim and is a harder shot than the same fade going straight back, and the body has to actually
+ * drift that way for it to read.
+ */
+export type ShotDrift = 'left' | 'right' | 'none';
+
+export interface ShotContext { style: ShotStyle; label: string; pctMod: number; drift: ShotDrift }
 
 /** A floater is a paint shot: inside this floor distance of the rim (the old 4.5 m band, planar, made a 1-dribble pull-up
  *  from the elbow a floater). */
@@ -215,6 +224,27 @@ export const FLOATER_RANGE = 3.4;
 export type PostShot = 'none' | 'fade' | 'hook' | 'reverse' | 'floater';
 /** Type the attempt from real context. `moveVel` is the shooter's current
  *  velocity; moving away from the hoop under a tight contest = fadeaway. */
+/** Below this the body is not drifting, it is standing still with a wobble. */
+export const FADE_SPEED = 1.2;
+/**
+ * How much of the drift has to be sideways before a fade is a BASELINE fade.
+ *
+ * A fraction of the away-component, so it scales: a body drifting hard away and slightly across is still a
+ * straight fade, and one sliding across the baseline while giving a little ground is the Kobe shot.
+ */
+export const BASELINE_FADE_RATIO = 0.6;
+
+/** Which way `vel` is going across, seen by a shooter facing `toHoop`. */
+export function driftOf(moveVel: Vector3, toHoop: Vector3, awaySpeed: number): ShotDrift {
+  const flat = new Vector3(toHoop.x, 0, toHoop.z);
+  if (flat.lengthSquared() < 1e-6) return 'none';
+  flat.normalize();
+  // the repo's convention: for a facing (fx, fz), the shooter's right is (fz, -fx)
+  const lateral = moveVel.x * flat.z - moveVel.z * flat.x;
+  if (Math.abs(lateral) < Math.max(0.35, awaySpeed * BASELINE_FADE_RATIO)) return 'none';
+  return lateral > 0 ? 'right' : 'left';
+}
+
 export function classifyShot(shooter: Vector3, moveVel: Vector3, hoop: Vector3, contest01: number, post: PostShot = 'none'): ShotContext {
   // HOOPS-MOVE-KIT-A (2026-09-08): PLANAR. This was Vector3.Distance against a rim 3.05 m up, so a floor-bound shooter was
   // never inside the 2.2 m layup band (√(2.2² − 3.05²) is imaginary) — every shot at the rim classified as a FLOATER and
@@ -222,19 +252,45 @@ export function classifyShot(shooter: Vector3, moveVel: Vector3, hoop: Vector3, 
   const dist = distXZ(shooter, hoop);
   const toHoop = hoop.subtract(shooter); toHoop.y = 0;
   const speed = moveVel.length();
-  const movingAway = speed > 1.2 && Vector3.Dot(moveVel, toHoop) < -0.3 * speed * toHoop.length();
+  const toHoopLen = toHoop.length() || 1;
+  /** Metres per second the body is giving ground. Negative means driving in. */
+  const awaySpeed = -Vector3.Dot(moveVel, toHoop) / toHoopLen;
+  const movingAway = speed > FADE_SPEED && awaySpeed > 0.3 * speed;
+  const drift = movingAway ? driftOf(moveVel, toHoop, awaySpeed) : 'none';
 
   // HOOPS-MOVE-KIT-B: the post's own two shots come first — a body with its back to the basket is not taking a layup
-  if (post === 'fade') return { style: 'fadeaway', label: 'FADEAWAY', pctMod: 0.86 };   // the lean costs a little; the separation is what you paid for
-  if (post === 'hook') return { style: 'hook', label: 'JUMP HOOK', pctMod: 1.06 };      // quick, shielded, from the block
+  if (post === 'fade') return { style: 'fadeaway', label: 'FADEAWAY', pctMod: 0.86, drift };   // the lean costs a little; the separation is what you paid for
+  if (post === 'hook') return { style: 'hook', label: 'JUMP HOOK', pctMod: 1.06, drift: 'none' };      // quick, shielded, from the block
   // M11 the drive that goes UNDER the rim finishes on the far side, off the glass; M10 a protected rim is a floater over
   // the length rather than a layup into a chest
-  if (post === 'reverse') return { style: 'reverse', label: 'REVERSE', pctMod: 1.1 };
-  if (post === 'floater') return { style: 'floater', label: 'FLOATER', pctMod: 1.0 };
-  if (movingAway && contest01 > 0.25) return { style: 'fadeaway', label: 'FADEAWAY', pctMod: 0.82 };
-  if (dist < 2.2) return { style: 'layup', label: 'LAYUP', pctMod: 1.18 };
-  if (dist < FLOATER_RANGE) return { style: 'floater', label: 'FLOATER', pctMod: 1.0 };
-  return { style: 'jumper', label: 'JUMPER', pctMod: 0.95 };
+  if (post === 'reverse') return { style: 'reverse', label: 'REVERSE', pctMod: 1.1, drift: 'none' };
+  if (post === 'floater') return { style: 'floater', label: 'FLOATER', pctMod: 1.0, drift: 'none' };
+
+  // THE RUNNING FADEAWAY, EITHER DIRECTION, FROM ANYWHERE (owner, 2026-09-13).
+  //
+  // This used to require `contest01 > 0.25`, so a fade only existed when somebody was already on you — you
+  // could not simply rise and fade off the dribble, which is the shot the owner asked for by name. The
+  // separation is the POINT of the shot, so demanding a defender before allowing it had it backwards: you
+  // fade to create the space, not because the space is gone.
+  //
+  // It is now purely a movement read (giving ground at speed), it works at any range, and it carries the
+  // direction. Drifting across rather than straight back turns the shoulders away from the rim and is the
+  // harder shot — that is the baseline fade, and it costs more than the straight one.
+  if (movingAway) {
+    if (drift !== 'none') {
+      return {
+        style: 'fadeaway',
+        label: `BASELINE FADE — ${drift === 'right' ? 'RIGHT' : 'LEFT'}`,
+        pctMod: 0.78,
+        drift,
+      };
+    }
+    return { style: 'fadeaway', label: 'FADEAWAY', pctMod: 0.84, drift: 'none' };
+  }
+
+  if (dist < 2.2) return { style: 'layup', label: 'LAYUP', pctMod: 1.18, drift: 'none' };
+  if (dist < FLOATER_RANGE) return { style: 'floater', label: 'FLOATER', pctMod: 1.0, drift: 'none' };
+  return { style: 'jumper', label: 'JUMPER', pctMod: 0.95, drift: 'none' };
 }
 
 export class ShotMeter {

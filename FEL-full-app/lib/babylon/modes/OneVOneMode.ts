@@ -1512,7 +1512,9 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (preSec <= 0) shotMeter.start(style === 'hook' ? hookShield(contest) : contest, style);   // a footwork gather already started it
     // M4: the fade's escape line — off the defender when he is on me, straight off the rim otherwise
     const plan = planFinish(style, side, shotMeter.durationSec, shotMeter.greenCenter01,
-      style === 'fadeaway' ? postFadeAway(me.root.position, RIM_FLOOR, defenderPos) : undefined, preSec);
+      // the DIRECTION of the fade reaches the body here: without it a "BASELINE FADE — LEFT" drifted straight
+      // back like every other fade and the two shots were one shot with different HUD text
+      style === 'fadeaway' ? postFadeAway(me.root.position, RIM_FLOOR, defenderPos, currentShot?.drift ?? 'none') : undefined, preSec);
     finish = { plan, t: 0, released: false };
     posting = false;
     meShotWin = style === 'fadeaway' ? 'fade' : style === 'hook' ? 'hook' : 'gather'; meShotSec = 0;
@@ -1589,7 +1591,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     pumpWindow = 0;
     meCarry?.update(0, 0, false);
     if (!ball.parent) attachBallToHand(ball, me.skeleton, 'RightHand');
-    currentShot = plan.then === 'rise' ? classifyShot(me.root.position, meDribble.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : 1.18 };
+    currentShot = plan.then === 'rise' ? classifyShot(me.root.position, meDribble.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : 1.18, drift: 'none' };
     shotMeter.start(contest, currentShot.style, plan.sec);
     gather = { plan, t: 0 };
     meShotWin = 'footwork'; meShotSec = 0;

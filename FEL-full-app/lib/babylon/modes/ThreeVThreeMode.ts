@@ -1227,7 +1227,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     if (preSec <= 0) shotMeter.start(style === 'hook' ? hookShield(contest) : contest, style);
     // M4: the fade's escape line — off the defender when he is on me, straight off the rim otherwise
     const plan = planFinish(style, side, shotMeter.durationSec, shotMeter.greenCenter01,
-      style === 'fadeaway' ? postFadeAway(me.char.root.position, RIM_FLOOR, defenderPos) : undefined, preSec);
+      // the DIRECTION of the fade reaches the body here (see 1v1) — a baseline fade slides across, not back
+      style === 'fadeaway' ? postFadeAway(me.char.root.position, RIM_FLOOR, defenderPos, currentShot?.drift ?? 'none') : undefined, preSec);
     finish = { plan, t: 0, released: false };
     posting = false;
     if (style === 'reverse') banked = bankPoint(me.char.root.position, RIM, BOARD_NORMAL);   // M11/M12: a reverse is laid off the glass
@@ -1299,7 +1300,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     pumpWindow = 0;
     carries.get(me)?.update(0, 0, false);
     if (!ball.parent) attachBallToHand(ball, me.char.skeleton, 'RightHand');
-    currentShot = plan.then === 'rise' ? classifyShot(me.char.root.position, me.drib.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : 1.18 };
+    currentShot = plan.then === 'rise' ? classifyShot(me.char.root.position, me.drib.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : 1.18, drift: 'none' };
     shotMeter.start(contest, currentShot.style, plan.sec);
     gather = { plan, t: 0 };
     me.shotWin = 'footwork'; me.shotSec = 0;

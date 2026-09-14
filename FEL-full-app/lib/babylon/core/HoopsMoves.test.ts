@@ -550,3 +550,111 @@ describe('M14 — the euro step', () => {
     expect(euroSell(0, -1, PI)).toBeNull();
   });
 });
+
+// ── THE RUNNING FADEAWAY, EITHER DIRECTION, FROM ANYWHERE (owner, 2026-09-13) ─────────────────────────────
+//
+// "Running shots like Kobe's baseline jumper fadeaways either direction from anywhere." Three things had to
+// change: a fade required a defender (so you could not rise and fade to CREATE separation, which is the
+// point of the shot), it had no direction, and — the part that would have made the whole thing cosmetic —
+// the body drifted straight back regardless of what the HUD said.
+
+describe('a fade is a movement read, not a contest read', () => {
+  const rim = new Vector3(0, 3.05, -0.6);
+  const at = (x: number, z: number) => new Vector3(x, 0, z);
+
+  it('FADES WITH NOBODY ON YOU — the separation is the point of the shot', () => {
+    // this returned 'jumper' before: `movingAway && contest01 > 0.25` demanded a defender first
+    const c = classifyShot(at(0, 6), new Vector3(0, 0, 3), rim, 0);
+    expect(c.style).toBe('fadeaway');
+  });
+
+  it('from anywhere: the deep fade and the mid fade are both fades', () => {
+    for (const z of [3, 6, 9, 12]) {
+      expect(classifyShot(at(0, z), new Vector3(0, 0, 3), rim, 0).style, `${z}m`).toBe('fadeaway');
+    }
+  });
+
+  it('but standing still is still a jumper — it is the drift that makes it a fade', () => {
+    expect(classifyShot(at(0, 6), new Vector3(0, 0, 0), rim, 0).style).toBe('jumper');
+    expect(classifyShot(at(0, 6), new Vector3(0, 0, 0.4), rim, 0).style).toBe('jumper');   // a wobble, not a drift
+  });
+
+  it('and driving IN is never a fade, however fast', () => {
+    expect(classifyShot(at(0, 6), new Vector3(0, 0, -6), rim, 0).style).not.toBe('fadeaway');
+  });
+});
+
+describe('either direction', () => {
+  const rim = new Vector3(0, 3.05, -0.6);
+  const at = (x: number, z: number) => new Vector3(x, 0, z);
+
+  // HANDEDNESS, because this is exactly the sign that gets flipped and never noticed. Babylon is
+  // LEFT-handed: a shooter at +z facing a rim at -z is facing -z, and cross(up, forward) puts their right
+  // at -x. So drifting toward +x is the shooter's LEFT. I asserted the opposite on the first run and the
+  // test caught it; the convention matches `shotDirection`'s right = (fz, -fx) elsewhere in this file.
+  it('drifting across reads as a BASELINE fade, and names the side', () => {
+    const toMinusX = classifyShot(at(0, 6), new Vector3(-3, 0, 1), rim, 0);
+    const toPlusX = classifyShot(at(0, 6), new Vector3(3, 0, 1), rim, 0);
+    expect(toMinusX.drift).toBe('right');
+    expect(toPlusX.drift).toBe('left');
+    expect(toMinusX.label).toMatch(/BASELINE FADE — RIGHT/);
+    expect(toPlusX.label).toMatch(/BASELINE FADE — LEFT/);
+  });
+
+  it('the two directions are mirror images, not one favoured side', () => {
+    const right = classifyShot(at(0, 6), new Vector3(3, 0, 1), rim, 0);
+    const left = classifyShot(at(0, 6), new Vector3(-3, 0, 1), rim, 0);
+    expect(right.pctMod).toBe(left.pctMod);
+  });
+
+  it('straight back is not a baseline fade', () => {
+    const c = classifyShot(at(0, 6), new Vector3(0, 0, 4), rim, 0);
+    expect(c.drift).toBe('none');
+    expect(c.label).toBe('FADEAWAY');
+  });
+
+  it('A BASELINE FADE IS HARDER THAN A STRAIGHT ONE — the shoulders turn away from the rim', () => {
+    const across = classifyShot(at(0, 6), new Vector3(3, 0, 1), rim, 0);
+    const back = classifyShot(at(0, 6), new Vector3(0, 0, 4), rim, 0);
+    expect(across.pctMod).toBeLessThan(back.pctMod);
+  });
+});
+
+describe('THE DIRECTION REACHES THE BODY, or it is only a label', () => {
+  const rimFloor = new Vector3(0, 0, -0.6);
+  const shooter = new Vector3(0, 0, 6);
+
+  it('a straight fade drifts away from the rim', () => {
+    const away = postFadeAway(shooter, rimFloor, null, 'none');
+    expect(away.z).toBeGreaterThan(0.9);          // straight back
+    expect(Math.abs(away.x)).toBeLessThan(0.1);
+  });
+
+  it('a baseline fade actually goes ACROSS — this is what made it a real shot', () => {
+    const right = postFadeAway(shooter, rimFloor, null, 'right');
+    const left = postFadeAway(shooter, rimFloor, null, 'left');
+    // left-handed: facing -z, the shooter's right is -x (see the handedness note above)
+    expect(Math.abs(right.x)).toBeGreaterThan(0.4);
+    expect(right.x).toBeLessThan(0);
+    expect(left.x).toBeGreaterThan(0);
+    // and still gives some ground, or it is a drive rather than a fade
+    expect(right.z).toBeGreaterThan(0);
+  });
+
+  it('the two directions mirror exactly', () => {
+    const right = postFadeAway(shooter, rimFloor, null, 'right');
+    const left = postFadeAway(shooter, rimFloor, null, 'left');
+    expect(right.x).toBeCloseTo(-left.x, 6);
+    expect(right.z).toBeCloseTo(left.z, 6);
+  });
+
+  it('every drift direction returns a unit vector', () => {
+    for (const d of ['none', 'left', 'right'] as const) {
+      expect(postFadeAway(shooter, rimFloor, null, d).length()).toBeCloseTo(1, 6);
+    }
+  });
+
+  it('and it still defaults to the old behaviour when no direction is given', () => {
+    expect(postFadeAway(shooter, rimFloor, null).equalsWithEpsilon(postFadeAway(shooter, rimFloor, null, 'none'), 1e-6)).toBe(true);
+  });
+});

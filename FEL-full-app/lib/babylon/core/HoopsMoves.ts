@@ -25,7 +25,7 @@
 //      thresholds, so a sprint into a set defender costs speed and reads as a hit.
 import { Vector3 } from '@babylonjs/core';
 import { classifyContact, type ContactSeverity } from './ContactSystem';
-import { DUNK_PCT, STEPBACK_SEC, STEPBACK_SPEED, LAYUP_STRIDE_SPEED, type ShotStyle } from './BasketballCore';
+import { DUNK_PCT, STEPBACK_SEC, STEPBACK_SPEED, LAYUP_STRIDE_SPEED, type ShotStyle, type ShotDrift } from './BasketballCore';
 
 // ── M1: the gather ──────────────────────────────────────────────────────────
 export type GatherKind = 'set' | 'pullup' | 'stepback'
@@ -376,16 +376,41 @@ export const FADE_SEPARATION_MIN = 0.4;
 export const POST_FADE_STICK_MIN = 0.35;
 
 /** Which way the fade jumps: away from the defender when he is on me, otherwise straight away from the rim. Planar unit. */
-export function postFadeAway(shooter: Vector3, rimFloor: Vector3, defender: Vector3 | null): Vector3 {
+export function postFadeAway(
+  shooter: Vector3, rimFloor: Vector3, defender: Vector3 | null, drift: ShotDrift = 'none',
+): Vector3 {
+  let away: Vector3 | null = null;
   if (defender) {
-    const away = new Vector3(shooter.x - defender.x, 0, shooter.z - defender.z);
-    const d = away.length();
-    if (d > 1e-4 && d <= FADE_DEFENDER_RANGE) return away.scale(1 / d);
+    const v = new Vector3(shooter.x - defender.x, 0, shooter.z - defender.z);
+    const d = v.length();
+    if (d > 1e-4 && d <= FADE_DEFENDER_RANGE) away = v.scale(1 / d);
   }
-  const off = new Vector3(shooter.x - rimFloor.x, 0, shooter.z - rimFloor.z);
-  const d = off.length();
-  return d > 1e-4 ? off.scale(1 / d) : new Vector3(0, 0, 1);
+  if (!away) {
+    const off = new Vector3(shooter.x - rimFloor.x, 0, shooter.z - rimFloor.z);
+    const d = off.length();
+    away = d > 1e-4 ? off.scale(1 / d) : new Vector3(0, 0, 1);
+  }
+  if (drift === 'none') return away;
+
+  // A BASELINE FADE GOES ACROSS, NOT BACKWARDS (owner, 2026-09-13).
+  //
+  // Without this the direction was only a label: `classifyShot` said "BASELINE FADE — LEFT" and the body
+  // then drifted straight away from the rim exactly like every other fade, so the two shots were the same
+  // shot with different text on the HUD. The away vector is blended toward the drift side so the body
+  // actually slides along the baseline and the separation is bought sideways.
+  const toRim = new Vector3(rimFloor.x - shooter.x, 0, rimFloor.z - shooter.z);
+  const len = toRim.length();
+  if (len < 1e-4) return away;
+  toRim.scaleInPlace(1 / len);
+  // the repo's convention: for a facing (fx, fz), the shooter's right is (fz, -fx)
+  const side = new Vector3(toRim.z, 0, -toRim.x).scale(drift === 'right' ? 1 : -1);
+  const blended = away.scale(1 - BASELINE_FADE_ACROSS).add(side.scale(BASELINE_FADE_ACROSS));
+  const bl = blended.length();
+  return bl > 1e-4 ? blended.scale(1 / bl) : away;
 }
+
+/** How much of a baseline fade's drift is sideways rather than backwards. */
+export const BASELINE_FADE_ACROSS = 0.6;
 
 // ── M5: the hook ────────────────────────────────────────────────────────────
 /** How much of the contest the shielding shoulder takes off a hook (the reason the shot exists). */
