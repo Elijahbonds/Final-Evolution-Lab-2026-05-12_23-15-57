@@ -653,7 +653,9 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   const lip = MeshBuilder.CreateCylinder('waveLip', { diameter: 0.7, height: (HALF + 12) * 2, tessellation: 10 }, scene);
   lip.rotation.z = Math.PI / 2;
   lip.parent = waveRoot;
-  lip.position.set(0, WAVE_HEIGHT * 0.78, 0.2);
+  // the venue's own wave: the reef stands up taller than the point does
+  const vH = waveHeightAt(venue);
+  lip.position.set(0, vH * 0.78, 0.2);
   const lipM = mat(scene, 'lipM', mixHex(P.line, '#ffffff', 0.7)); lipM.alpha = 0.8; lipM.twoSidedLighting = true;
   lip.material = lipM;
   lip.isPickable = false;
@@ -727,7 +729,7 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   };
   const BARREL_ON = 8, BARREL_CYCLE = 18;
   const barrelActive = (tSec: number): boolean => (tSec % BARREL_CYCLE) < BARREL_ON;
-  const lipWorld = new Vector3(0, WAVE_HEIGHT * 0.78, -50);
+  const lipWorld = new Vector3(0, vH * 0.78, -50);
   let lastRebuild = -1;
   const waveLipAt = (tSec: number): Vector3 => {
     const z = -50 + ((tSec * WAVE_SPEED) % WAVE_LAP);
@@ -738,7 +740,7 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
       for (const st of strips) MeshBuilder.CreateRibbon(st.mesh.name, { pathArray: pathsFor(st.rows, tSec, st.lift), instance: st.mesh });
       face.refreshBoundingInfo();
     }
-    lip.position.y = WAVE_HEIGHT * 0.78 + Math.sin(tSec * 2.2) * 0.08;
+    lip.position.y = vH * 0.78 + Math.sin(tSec * 2.2) * 0.08;
     // the funnel breathes with the barrel cycle
     const active = barrelActive(tSec);
     tubeM.alpha += ((active ? 0.35 : 0.05) - tubeM.alpha) * 0.06;

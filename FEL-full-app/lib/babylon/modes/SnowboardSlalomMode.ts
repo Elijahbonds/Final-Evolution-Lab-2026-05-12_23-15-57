@@ -22,7 +22,7 @@ import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
 import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out
 import { buildSlopeRun, SLOPE_PITCH, SLALOM_START, SLALOM_GATES, SLALOM_SPACING, type RideWorld } from './rideWorlds';
-import { readBoardVenue } from '../nexus/boardVenues';   // three mountains, not three tints of one
+import { readBoardVenue, tuneForVenue } from '../nexus/boardVenues';   // three mountains, not three tints of one
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -97,7 +97,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     ctx.juice.flash('#fff6dd', 100);
     console.info('[SNOW-JUICE] finish punch');
   }
-  const move = new BoardMovement(SNOW_TUNING);   // Phase 12: carve weight + slope energy
+  const move = new BoardMovement(tuneForVenue(SNOW_TUNING, readBoardVenue('snow')));   // Phase 12: carve weight + slope energy
   const mbus = new MomentumBus();
   let boost = 0;                                  // SSX boost meter 0..100
   let boosting = false;

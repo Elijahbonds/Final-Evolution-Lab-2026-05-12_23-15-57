@@ -17,7 +17,7 @@ import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, landsSwitch, TRICKS, type BoardRig } from './boardCore';
 import { trickFor, bestFitting, basePts as trickPts, heldTrickDir, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { buildSkatepark, PARK_BOUND, type RideWorld } from './rideWorlds';
-import { readBoardVenue } from '../nexus/boardVenues';   // different places to ride
+import { readBoardVenue, tuneForVenue } from '../nexus/boardVenues';   // different places to ride
 import { assertSpawned } from '../core/FrameGuard';
 import { SPORT_CLIP } from '../anim/clipRegistry';
 import { FlickStick } from '../core/FlickStick';
@@ -97,7 +97,7 @@ export const SkateRunMode: ModeDefinition = (() => {
     setTimeout(() => ctx.setHud({ banner: '' }), ms);
   }
   // ── Mode 3 shared stack (P2-P9) ──
-  const move = new BoardMovement(SKATE_TUNING);
+  const move = new BoardMovement(tuneForVenue(SKATE_TUNING, readBoardVenue('skate')));
   const air = new AirControl();
   const combo = new ComboChain();
   const mbus = new MomentumBus();
