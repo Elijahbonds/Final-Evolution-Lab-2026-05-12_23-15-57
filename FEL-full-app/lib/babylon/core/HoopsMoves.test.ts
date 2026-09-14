@@ -16,7 +16,14 @@ import {
   rimProtected, isReverseFinish, reverseSide, REVERSE_RANGE,
   inBankBand, bankPoint, BANK_MIN_DEG, BANK_MAX_DEG, BANK_UP,
   planHopStep, HOP_TRAVEL_MAX, HOP_SEC, planEuro, euroSell, euroAvailable, EURO_A_SEC, EURO_B_SEC,
-} from './HoopsMoves';
+  isPassFake,
+  passFakeBite,
+  passFakeShiftTo,
+  PASS_FAKE_MAX_SEC,
+  PASS_FAKE_BITE_RANGE,
+  PASS_FAKE_SHIFT,
+  PASS_FAKE_STUN,
+  PUMP_BITE_STUN} from './HoopsMoves';
 import { DUNK_PCT, STEPBACK_SEC, STEPBACK_SPEED, ShotMeter, classifyShot } from './BasketballCore';
 import { aiBlockChance, AI_BLOCK_BASE } from './HoopsDefense';
 import { FOUL_CLOSING_SPEED, HARD_CONTACT_SPEED } from './ContactSystem';
@@ -656,5 +663,78 @@ describe('THE DIRECTION REACHES THE BODY, or it is only a label', () => {
 
   it('and it still defaults to the old behaviour when no direction is given', () => {
     expect(postFadeAway(shooter, rimFloor, null).equalsWithEpsilon(postFadeAway(shooter, rimFloor, null, 'none'), 1e-6)).toBe(true);
+  });
+});
+
+// ── THE PASS FAKE (owner, 2026-09-13) ────────────────────────────────────────────────────────────────────
+//
+// The test that matters is the one separating this from the pump fake: a pump freezes a man where he is, a
+// pass fake MOVES him, and the lane that opens is the opposite of the one he bit on. A pass fake that only
+// stunned would be a pump fake with a different banner.
+
+describe('the pass fake', () => {
+  const always = () => 0;
+  const never = () => 1;
+  const passer = new Vector3(0, 0, 6);
+  const target = new Vector3(5, 0, 6);         // a team-mate out to the +x side
+
+  it('a quick release is a fake; holding it is a pass', () => {
+    expect(isPassFake(0.1)).toBe(true);
+    expect(isPassFake(PASS_FAKE_MAX_SEC + 0.01)).toBe(false);
+  });
+
+  it('a defender in the lane bites', () => {
+    const b = passFakeBite({ passer, target, defender: new Vector3(2, 0, 6) }, always);
+    expect(b.bit).toBe(true);
+  });
+
+  it('HE COMMITS TOWARD THE FAKE and the lane opens the OTHER WAY — this is the whole move', () => {
+    const b = passFakeBite({ passer, target, defender: new Vector3(2, 0, 6) }, always);
+    expect(b.shift.x).toBeGreaterThan(0.9);     // toward the team-mate I showed him
+    expect(b.lane.x).toBeLessThan(-0.9);        // and the lane is behind his hip, the other way
+    expect(b.shift.length()).toBeCloseTo(1, 6);
+    expect(b.lane.length()).toBeCloseTo(1, 6);
+  });
+
+  it('and he actually MOVES — a defender who bit and did not move has been paused, not faked', () => {
+    const at = new Vector3(2, 0, 6);
+    const b = passFakeBite({ passer, target, defender: at }, always);
+    const to = passFakeShiftTo(at, b);
+    expect(to.x).toBeGreaterThan(at.x);
+    expect(Vector3.Distance(at, to)).toBeCloseTo(PASS_FAKE_SHIFT, 6);
+  });
+
+  it('A MAN WHO IS NOT IN THAT LANE CANNOT BE FAKED BY IT', () => {
+    // showing a pass to somebody he is not guarding is not a fake, it is a pass he ignores
+    const behind = passFakeBite({ passer, target, defender: new Vector3(-3, 0, 6) }, always);
+    expect(behind.bit).toBe(false);
+    expect(behind.shift.length()).toBe(0);
+  });
+
+  it('nor one too far away to be covering anything', () => {
+    const far = passFakeBite({ passer, target, defender: new Vector3(PASS_FAKE_BITE_RANGE + 2, 0, 6) }, always);
+    expect(far.bit).toBe(false);
+  });
+
+  it('a bad roll means he simply does not buy it', () => {
+    expect(passFakeBite({ passer, target, defender: new Vector3(2, 0, 6) }, never).bit).toBe(false);
+  });
+
+  it('no bite leaves the defender exactly where he was', () => {
+    const at = new Vector3(2, 0, 6);
+    const to = passFakeShiftTo(at, passFakeBite({ passer, target, defender: at }, never));
+    expect(to.equalsWithEpsilon(at, 1e-9)).toBe(true);
+  });
+
+  it('degenerate geometry never produces NaN', () => {
+    for (const d of [passer.clone(), new Vector3(0, 0, 6)]) {
+      const b = passFakeBite({ passer, target: passer.clone(), defender: d }, always);
+      expect(Number.isNaN(b.shift.x)).toBe(false);
+      expect(Number.isNaN(b.lane.z)).toBe(false);
+    }
+  });
+
+  it('the fake commits him for LESS time than a pump — he stepped, he did not land', () => {
+    expect(PASS_FAKE_STUN).toBeLessThan(PUMP_BITE_STUN);
   });
 });

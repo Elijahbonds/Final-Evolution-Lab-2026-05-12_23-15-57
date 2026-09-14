@@ -28,6 +28,14 @@ export interface Intent {
   contest?: boolean;
   /** HOOPS-MOVE-KIT-B M12: R1 held — use the GLASS (an intentional bank inside the band). */
   glass?: boolean;
+  /**
+   * The pass button HELD past a tap — sell the pass without throwing it (owner, 2026-09-13).
+   *
+   * Mirrors `contest`, which is the same idea on the steal button: a tap is the thing, a hold is the other
+   * thing. It also happens to be what a pass fake physically IS — you wind the pass up and do not release
+   * it — so the input and the move agree, which is worth more than saving a button.
+   */
+  passFake?: boolean;
 }
 
 const NEUTRAL: Intent = { moveX: 0, moveY: 0, sprint: false, action: false, actionHeld: 0, pass: false, steal: false };
@@ -42,6 +50,8 @@ export interface ControlSource {
 //    `onInput(ctx, e)` callback (every mode this project ships uses this
 //    pattern) — LocalInputSource plugs into that exact seam via feed(e),
 //    rather than inventing a separate subscription API on InputBus. ──────
+/** B held this long sells a pass fake instead of throwing the pass. */
+export const PASS_FAKE_HOLD_MS = 180;
 /** X held this long is a hand-up contest (D3), not a poke. */
 export const CONTEST_HOLD_MS = 150;
 
@@ -56,6 +66,7 @@ export class LocalInputSource implements ControlSource {
   private braceTrigger = false; private braceButton = false;
   private glassHeld = false;   // HOOPS-MOVE-KIT-B M12: R1 held = call glass
   private stealDownAt = -1;   // D3: X held past CONTEST_HOLD_MS = the hand-up contest (a tap stays the poke)
+  private passDownAt = -1;    // B held past PASS_FAKE_HOLD_MS = the pass fake (a tap stays the pass)
 
   /** Call from the mode's onInput(ctx, e) for every event. */
   feed(e: FelInput): void {
@@ -91,7 +102,8 @@ export class LocalInputSource implements ControlSource {
     if (e.t === 'trigger' && e.side === 'L') this.braceTrigger = e.value > 0.4;
     if (e.t === 'button' && e.btn === 'L1') this.braceButton = e.pressed;
     if (e.t === 'button' && e.btn === 'R1') this.glassHeld = e.pressed;
-    if (e.t === 'button' && e.pressed && e.btn === 'B') this.passEdge = true;
+    if (e.t === 'button' && e.pressed && e.btn === 'B') { this.passEdge = true; this.passDownAt = performance.now(); }
+    if (e.t === 'button' && !e.pressed && e.btn === 'B') this.passDownAt = -1;
     if (e.t === 'button' && e.pressed && e.btn === 'X') { this.stealEdge = true; this.stealDownAt = performance.now(); }
     if (e.t === 'button' && !e.pressed && e.btn === 'X') this.stealDownAt = -1;
   }
@@ -105,6 +117,7 @@ export class LocalInputSource implements ControlSource {
       brace: this.braceTrigger || this.braceButton,
       glass: this.glassHeld,
       contest: this.stealDownAt >= 0 && performance.now() - this.stealDownAt >= CONTEST_HOLD_MS,
+      passFake: this.passDownAt >= 0 && performance.now() - this.passDownAt >= PASS_FAKE_HOLD_MS,
     };
     this.actionEdge = false; this.passEdge = false; this.stealEdge = false;
     return out;

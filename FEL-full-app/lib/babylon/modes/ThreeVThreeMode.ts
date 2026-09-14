@@ -81,6 +81,7 @@ import {   // HOOPS-MOVE-KIT-A
   canPostUp, postYaw, postWish, postFadeAway, POST_FADE_STICK_MIN, fadeDrift,   // HOOPS-MOVE-KIT-B (2026-09-08): M4 the fade
   pickHookSide, hookShield,                                                      // M5 the hook
   planSpin, spinYaw, spinPos, spinOffContact, postSpinSide, SPIN_ARM_SEC, SPIN_BEAT_K, SPIN_EXIT_SPEED, SPIN_STUN_SEC, SPIN_TRIGGER_RANGE, SPIN_COOLDOWN_SEC, type SpinPlan,   // M6 the spin
+  passFakeBite, passFakeShiftTo, PASS_FAKE_STUN,   // the pass fake (owner, 2026-09-13)
   runningHook, HOOK_ON_ME, isPumpFake, planStepThrough, STEP_THROUGH_SEC, PUMP_BITE_RANGE, PUMP_BITE_CHANCE, PUMP_BITE_STUN,   // wave 2: M7 / M8
   pivotFrom, planPivot, PIVOT_MAX_SPEED, rimProtected, isReverseFinish, reverseSide,                               // M9 / M10 / M11
   inBankBand, bankPoint, BANK_PCT_BONUS, planHopStep, HOP_RANGE, planEuro, euroSell, euroAvailable, gatherTravel,  // M12 / M13 / M14
@@ -218,6 +219,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let posting = false;                                                               // the seal I hold (the path into the fade / the hook / the quick spin)
   let spin: { plan: SpinPlan; t: number; beat: boolean } | null = null;              // M6: the pivot in flight
   let spinCooldown = 0, spinArmed = 0;   // M6: a body I meet ARMS the spin; the stick swung across throws it
+  // One fake per wind-up: the button is HELD, so without this it re-fires every frame.
+  // There is deliberately no separate "lane is open" timer — the defender has been physically moved and
+  // frozen, so the opening is the geometry itself. A second timer nothing reads is dead state.
+  let passFakeCooldown = 0;
   let spinClip = 'bball_spin';           // M9: the same machinery turns a PIVOT (a shorter sweep, no travel)
   let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
@@ -331,7 +336,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     foes.forEach((f, i) => f.char.root.position.set((i - 1) * 3, 0, 2));
     shooting = false; currentShot = null;
     if (gather || finish || spin || posting) me.tree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
-    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; me.char.root.position.y = 0;
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; me.char.root.position.y = 0;
     clearDefense();
     // BIOMECH-HOOPS-WAVE1: the possession's clocks; a held shot is lifted, a floored body gets up
     driver = null; driveK = 0; dunkFlight = null; dunkFlush = null; mateArc.active = false;
@@ -650,6 +655,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       // HOOPS-MOVE-KIT-B: M6 the pivot owns the body while it turns; otherwise the POST-UP seal (M4–M6's path)
       spinCooldown = Math.max(0, spinCooldown - dt);
       chain = tickChain(chain, dt, handle);   // the chain expires on its own; a late crossover starts a new one
+      passFakeCooldown = Math.max(0, passFakeCooldown - dt);
       spinArmed = Math.max(0, spinArmed - dt);
       const postDef = nearestLiveFoe();
       if (spin) stepSpin(ctx, dt);
@@ -844,7 +850,32 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       // stays a chest pass — the assist no longer saves you from a read you
       // made yourself — and a defender standing in that lane PICKS IT. The
       // unaimed open-man pass keeps the auto-bounce (the assist's job).
-      if (iAmCarrier && !shooting && !dunking && meIntent.pass && !passFlight.active) {
+      // THE PASS FAKE — B held rather than tapped. It has to come BEFORE the real pass block, or the press
+      // that begins the wind-up throws the ball on its own edge and there is nothing left to fake with.
+      if (iAmCarrier && !shooting && !dunking && !passFlight.active && meIntent.passFake && passFakeCooldown <= 0) {
+        passFakeCooldown = 0.6;
+        const targets = mates.map((m, i) => ({ id: i === 0 ? 'mate0' : 'mate1', pos: m.char.root.position }));
+        const shown = lockTarget(me.char.root.position, meIntent.moveX, meIntent.moveY, targets, foePositions())
+          ?? targets[0];
+        const nf = nearestLiveFoe();
+        SoundKit.play('uiTick', { pitch: 1.5, volume: 0.5 });
+        me.tree.beat('jumpshot', { fadeSec: 0.08 });   // the wind-up, not the throw
+        if (shown && nf) {
+          const bite = passFakeBite({ passer: me.char.root.position, target: shown.pos, defender: nf.char.root.position });
+          if (bite.bit) {
+            // he COMMITS toward the lane he was shown — the move is the shift, not the freeze
+            nf.char.root.position.copyFrom(passFakeShiftTo(nf.char.root.position, bite));
+            nf.stunSec = Math.max(nf.stunSec, PASS_FAKE_STUN);
+            ctx.feel?.impact?.(0.2);
+            ctx.setHud({ banner: 'HE BIT IT!' });
+            setTimeout(() => ctx.setHud({ banner: '' }), 700);
+            console.info(`[3V3-FAKE] pass fake bit — lane opens ${bite.lane.x.toFixed(2)},${bite.lane.z.toFixed(2)}`);
+          } else {
+            console.info('[3V3-FAKE] pass fake — he did not buy it');
+          }
+        }
+      }
+      if (iAmCarrier && !shooting && !dunking && meIntent.pass && !meIntent.passFake && !passFlight.active) {
         const targets = mates.map((m, i) => ({ id: i === 0 ? 'mate0' : 'mate1', pos: m.char.root.position }));
         const locked = lockTarget(me.char.root.position, meIntent.moveX, meIntent.moveY, targets, foePositions());
         if (locked) {

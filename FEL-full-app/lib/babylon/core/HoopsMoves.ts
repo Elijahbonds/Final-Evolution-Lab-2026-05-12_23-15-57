@@ -785,3 +785,80 @@ export function euroSell(wishX: number, wishZ: number, yaw: number): FinishSide 
   if (Math.abs(lat) < 0.3) return null;
   return lat > 0 ? 'right' : 'left';
 }
+
+// ── THE PASS FAKE (owner, 2026-09-13) ────────────────────────────────────────────────────────────────────
+//
+// Sibling of the pump fake above, and deliberately NOT a copy of it. A pump fake sells a shot: the defender
+// leaves his feet and is frozen where he stands, and the payoff is the step-through past a body that cannot
+// move. If a pass fake only did that, it would be a pump fake with a different banner.
+//
+// A pass fake sells the BALL GOING SOMEWHERE. The defender does not jump — he COMMITS, laterally, toward the
+// lane you showed him. So the payoff is directional and it is the opposite of what he bit on: you show him
+// the kick-out, he slides to cover it, and the lane you actually wanted opens behind his hip.
+//
+// That is why `passFakeBite` returns a SHIFT rather than a stun, and why the mode moves him before it freezes
+// him. A defender who bit a pass fake and did not move has not been faked, he has been paused.
+
+/** A pass squeezed and released inside this is a fake, not a pass. Matches the pump's feel. */
+export const PASS_FAKE_MAX_SEC = 0.22;
+/** A defender this far away can still be moved by a pass fake — further than a shot contest, it is a lane read. */
+export const PASS_FAKE_BITE_RANGE = 4.5;
+/** How often a defender who can see the lane bites it. */
+export const PASS_FAKE_BITE_CHANCE = 0.6;
+/** He is committed this long — shorter than a pump, because he is stepping rather than landing. */
+export const PASS_FAKE_STUN = 0.45;
+/** How far he slides toward the lane he bit on. */
+export const PASS_FAKE_SHIFT = 0.9;
+/** The window in which the lane the fake opened is still there. */
+export const PASS_FAKE_LANE_SEC = 0.9;
+
+/** Was that a pass fake? — the pass button came up before the ball ever left. */
+export function isPassFake(heldSec: number): boolean { return heldSec < PASS_FAKE_MAX_SEC; }
+
+export interface PassFakeRead {
+  passer: Vector3;
+  /** Where the fake was aimed — the team-mate you showed him. */
+  target: Vector3;
+  defender: Vector3;
+}
+
+export interface PassFakeBite {
+  /** He bought it. */
+  bit: boolean;
+  /** Unit direction he commits in — toward the lane he was shown. Zero when he did not bite. */
+  shift: Vector3;
+  /** Unit direction that OPENED as a result: away from where he just went. Zero when he did not bite. */
+  lane: Vector3;
+}
+
+const NO_BITE: PassFakeBite = { bit: false, shift: new Vector3(0, 0, 0), lane: new Vector3(0, 0, 0) };
+
+/**
+ * Does he bite, and what opens if he does?
+ *
+ * `roll` is injected so the odds are testable without a running game. A defender who is not between you and
+ * the target has nothing to cover and cannot be faked by this — showing a pass to a man he is not guarding
+ * is not a fake, it is a pass he ignores.
+ */
+export function passFakeBite(read: PassFakeRead, roll: () => number = Math.random): PassFakeBite {
+  const toTarget = new Vector3(read.target.x - read.passer.x, 0, read.target.z - read.passer.z);
+  const toDef = new Vector3(read.defender.x - read.passer.x, 0, read.defender.z - read.passer.z);
+  const tLen = toTarget.length(), dLen = toDef.length();
+  if (tLen < 1e-4 || dLen < 1e-4 || dLen > PASS_FAKE_BITE_RANGE) return NO_BITE;
+
+  // he has to be somewhere between me and the man I showed him, or there is no lane to jump
+  const cos = (toTarget.x * toDef.x + toTarget.z * toDef.z) / (tLen * dLen);
+  if (cos < 0.2) return NO_BITE;
+  if (roll() >= PASS_FAKE_BITE_CHANCE) return NO_BITE;
+
+  const shift = toTarget.scale(1 / tLen);
+  return { bit: true, shift, lane: shift.scale(-1) };
+}
+
+/** Where he ends up after biting — the mode moves him here, then freezes him for PASS_FAKE_STUN. */
+export function passFakeShiftTo(defender: Vector3, bite: PassFakeBite): Vector3 {
+  if (!bite.bit) return defender.clone();
+  return new Vector3(
+    defender.x + bite.shift.x * PASS_FAKE_SHIFT, defender.y, defender.z + bite.shift.z * PASS_FAKE_SHIFT,
+  );
+}
