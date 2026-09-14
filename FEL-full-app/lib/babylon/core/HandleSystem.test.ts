@@ -18,7 +18,8 @@ import {
   offTheHeadOdds,
   offTheHeadLoose,
   OFF_THE_HEAD_RANGE,
-  type MoveRead} from './HandleSystem';
+  type MoveRead,
+  moveDanger} from './HandleSystem';
 
 const MAX = 100;
 
@@ -518,5 +519,67 @@ describe('OFF THE HEAD is the only move that can cost you the ball', () => {
     // it is the most expensive move in the table AND the only one with a failure mode
     expect(MOVE_HANDLE.off_the_head).toBeGreaterThanOrEqual(Math.max(...Object.values(MOVE_HANDLE)));
     expect(offTheHeadOdds(close)).toBeLessThan(1);
+  });
+});
+
+// ── WHICH MOVE YOU THREW HAS TO MATTER (2026-09-13) ──────────────────────────────────────────────────────
+//
+// `ankleBreakOdds` took no move. A yo-yo and a shammgod at the same chain depth broke ankles identically,
+// so past the gate the whole vocabulary was cosmetic: earning handle 88 bought a move that did exactly what
+// the free one did. Danger is derived from MOVE_HANDLE so a move's cost and its payoff cannot disagree.
+
+describe('moveDanger', () => {
+  it('a plain crossover is the baseline', () => {
+    expect(moveDanger('crossover')).toBe(1);
+  });
+
+  it('and everything you have to earn is worth more than it', () => {
+    for (const m of Object.keys(MOVE_HANDLE) as HandleMove[]) {
+      if (MOVE_HANDLE[m] === 0) continue;
+      expect(moveDanger(m), m).toBeGreaterThan(moveDanger('crossover'));
+    }
+  });
+
+  it('DANGER TRACKS PRICE EXACTLY — one number, not two opinions', () => {
+    const moves = (Object.keys(MOVE_HANDLE) as HandleMove[]).sort((a, b) => MOVE_HANDLE[a] - MOVE_HANDLE[b]);
+    for (let i = 1; i < moves.length; i++) {
+      const cheaper = moves[i - 1], dearer = moves[i];
+      if (MOVE_HANDLE[cheaper] === MOVE_HANDLE[dearer]) continue;
+      expect(moveDanger(dearer), `${dearer} vs ${cheaper}`).toBeGreaterThan(moveDanger(cheaper));
+    }
+  });
+
+  it('an unnamed move is a plain one — old callers keep the odds they had', () => {
+    expect(moveDanger(undefined)).toBe(1);
+  });
+});
+
+describe('the odds respect the move', () => {
+  const read = { chainLength: 2, handle: 95, defenderClosing: true, defenderSet: false };
+
+  it('a shammgod is more dangerous than a crossover from the same spot', () => {
+    expect(ankleBreakOdds({ ...read, move: 'shammgod' }))
+      .toBeGreaterThan(ankleBreakOdds({ ...read, move: 'crossover' }));
+  });
+
+  it('but a SET defender is still barely breakable, whatever you throw', () => {
+    const set = { ...read, defenderSet: true };
+    expect(ankleBreakOdds({ ...set, move: 'shammgod' })).toBe(ankleBreakOdds({ ...set, move: 'crossover' }));
+    expect(ankleBreakOdds({ ...set, move: 'shammgod' })).toBeLessThan(0.1);
+  });
+
+  it('and nothing is ever a certainty', () => {
+    for (const m of Object.keys(MOVE_HANDLE) as HandleMove[]) {
+      const o = ankleBreakOdds({ chainLength: 4, handle: 100, defenderClosing: true, defenderSet: false, move: m });
+      expect(o, m).toBeLessThanOrEqual(0.92);
+      expect(o, m).toBeGreaterThan(0);
+    }
+  });
+
+  it('the resolver passes the move through, so this is live and not just a helper', () => {
+    const on = { present: true, closing: true, set: false, within: true };
+    const cheap = resolveHandleMove('crossover', { ...CHAIN_IDLE }, 100, on, () => 1);
+    const dear = resolveHandleMove('snatch_back', { ...CHAIN_IDLE }, 100, on, () => 1);
+    expect(dear.odds).toBeGreaterThan(cheap.odds);
   });
 });

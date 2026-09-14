@@ -196,6 +196,8 @@ export interface AnkleBreakRead {
   defenderClosing: boolean;
   /** The defender is SET and low. Hard to break, and correctly so. */
   defenderSet: boolean;
+  /** WHICH move — a shammgod is not a crossover. Optional so old callers keep the plain-move odds. */
+  move?: HandleMove;
 }
 
 /**
@@ -211,7 +213,25 @@ export function ankleBreakOdds(read: AnkleBreakRead): number {
   const base = 0.10 + (depth - 1) * 0.22;               // 0.10 / 0.32 / 0.54
   const skill = (Math.max(0, read.handle - BASELINE_HANDLE) / 50) * 0.22;
   const closing = read.defenderClosing ? 0.14 : 0;
-  return Math.max(0, Math.min(0.92, base + skill + closing));
+  return Math.max(0, Math.min(0.92, (base + skill + closing) * moveDanger(read.move)));
+}
+
+/**
+ * How dangerous THIS move is, relative to a plain crossover.
+ *
+ * Until now the odds took no move at all: a yo-yo and a shammgod at the same chain depth broke ankles
+ * identically, so beyond the gate the whole vocabulary was cosmetic. Earning handle 88 bought a move that
+ * did exactly what the free one did.
+ *
+ * DERIVED FROM THE PRICE rather than a second table, deliberately. `MOVE_HANDLE` already encodes how hard a
+ * move is to own; a separate danger table would be a second opinion about the same question and the two
+ * would drift the first time somebody retuned one of them. A move's danger and its cost are now the same
+ * number seen twice.
+ */
+export const MOVE_DANGER_SPAN = 0.6;
+export function moveDanger(move: HandleMove | undefined): number {
+  if (!move) return 1;                                  // an unnamed move is a plain one
+  return 1 + (MOVE_HANDLE[move] / 100) * MOVE_DANGER_SPAN;
 }
 
 /**
@@ -379,7 +399,7 @@ export function resolveHandleMove(
   if (!def.present || !def.within) return { ...base, broke: 'none', odds: 0 };
 
   const odds = ankleBreakOdds({
-    chainLength: next.length, handle, defenderClosing: def.closing, defenderSet: def.set,
+    chainLength: next.length, handle, defenderClosing: def.closing, defenderSet: def.set, move,
   });
   if (roll() >= odds) return { ...base, broke: 'none', odds };
   return { ...base, broke: isHardBreak(next.length, handle) ? 'hard' : 'shook', odds };
