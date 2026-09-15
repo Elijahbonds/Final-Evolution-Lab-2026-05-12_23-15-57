@@ -41,6 +41,7 @@ import { registerMirroredClips } from '../anim/mirrored-clips';
 import { GOLF_CONTACT_SEC } from '../anim/authored/golf';
 import { batLineAt, batRightSign, BAT_SWING_SEC, BAT_RECOVER_SEC } from '../anim/authored/baseball';
 import { SoundKit } from '../audio/SoundKit';
+import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -550,6 +551,10 @@ export const GolfMode: ModeDefinition = (() => {
         SoundKit.play('uiTick', { pitch: 1.1 });
         const toPin = Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos);
         ctx.setHud({ club: GOLF_CLUBS[club].id, pin: `${toPin.toFixed(0)}m` });
+        ctx.juice.callout(`${GOLF_CLUBS[club].id.toUpperCase()} · PIN ${toPin.toFixed(0)} m`, '#8fe0a0');   // the change is SAID, not only a HUD field
+      } else if (e.t === 'button' && e.btn === 'B' && e.pressed) {
+        // MECHANICS PASS (2026-09-15): CLUB was silent 13 of 14 presses — it only works while aiming off the green
+        refuse(ctx, onGreen() ? 'PUTTER ON THE GREEN' : phase === 'aim' ? 'CLUB' : 'CHOOSE A CLUB WHILE AIMING');
       }
     },
 

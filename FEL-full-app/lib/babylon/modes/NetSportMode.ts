@@ -20,6 +20,7 @@ import { installSafePlay } from '../anim/clipRegistry';
 import { NetAnimTree, TENNIS_CLIPS, VOLLEYBALL_CLIPS, NET_CONTACT_SEC, type NetClipSet } from '../anim/netTree';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { SoundKit } from '../audio/SoundKit';
+import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
 import { mountPostureLayer } from '../anim/PostureLayer';
@@ -592,7 +593,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
   /** The human's swing. Called on the action edge. */
   function humanSwing(ctx: ModeContext): void {
-    if (!shot || !awaitingHuman) return;
+    // MECHANICS PASS (2026-09-15): tennis X was silent 5 of 7 and volleyball 29 % of hits — a swing with no ball coming, or
+    // one too early / out of reach, returned without a word. The rally game's whole read is timing, so timing is SAID.
+    if (!shot || !awaitingHuman) { refuse(ctx, 'WAIT FOR THE BALL'); return; }
     // dt vs the ideal contact moment, which is the end of the flight
     const dt = (flightT - 1) * shot.duration;
     const timing = gradeSwing(dt);
@@ -604,7 +607,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     lastReach = reachOf(foot.x, ball.position.x);
     const q = gradeAfterStretch(timing as 'perfect' | 'good' | 'early' | 'late' | 'miss', lastReach);
 
-    if (q === 'miss') return;                       // early flail, or never got there; not a fault yet
+    if (q === 'miss') { refuse(ctx, lastReach > MAX_REACH_M ? 'OUT OF REACH' : dt < 0 ? 'TOO EARLY' : 'TOO LATE'); return; }   // early flail, or never got there; not a fault yet
     if (timing !== q) {
       ctx.setHud({ shotType: lastReach > NET_REACH_M ? 'STRETCHED' : 'REACHING' });
       setTimeout(() => ctx.setHud({ shotType: '' }), 450);

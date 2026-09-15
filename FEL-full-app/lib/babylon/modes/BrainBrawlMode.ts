@@ -10,6 +10,7 @@
 import { Vector3, MeshBuilder, StandardMaterial, Color3, TransformNode, type Mesh, type Scene } from '@babylonjs/core';
 import type { HudValue, ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { SoundKit } from '../audio/SoundKit';
 import { Contestants, podiums } from '../party/Contestants';
@@ -208,8 +209,16 @@ export const BrainBrawlMode: ModeDefinition = (() => {
         else if (e.t === 'button' && e.pressed && FACE.includes(e.btn as 'A')) begin(ctx, S);
         return;
       }
-      if (S.phase !== 'answer') return;
-      if (e.t === 'button' && e.pressed) { const i = FACE.indexOf(e.btn as 'A' | 'B' | 'X' | 'Y'); if (i >= 0) answer(ctx, S, 0, i); }
+      if (S.phase !== 'answer') {
+        // MECHANICS PASS: an answer button between questions was silently dropped (64 % of presses) — say what is happening
+        if (e.t === 'button' && e.pressed && FACE.includes(e.btn as 'A')) refuse(ctx, S.phase === 'expose' ? 'MEMORISE…' : S.phase === 'spin' ? 'SPINNING…' : 'NEXT QUESTION…');
+        return;
+      }
+      if (e.t === 'button' && e.pressed) {
+        const i = FACE.indexOf(e.btn as 'A' | 'B' | 'X' | 'Y');
+        if (i >= 0 && S.answers[0] !== null) refuse(ctx, 'LOCKED IN');
+        else if (i >= 0) answer(ctx, S, 0, i);
+      }
       else if (e.t === 'dpad' && e.pressed && S.players > 1) { const i = DPAD.indexOf(e.dir); if (i >= 0) answer(ctx, S, 1, i); }
     },
 

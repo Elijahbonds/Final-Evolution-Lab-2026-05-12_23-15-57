@@ -55,6 +55,7 @@ import { POSTURE, posturePose, chestAimCorrection, hipYawStrip, easePose, cloneP
 import type { PlayOpts } from '../anim/CharacterAnimator';
 import { DunkReplayRecorder } from '../scene/DunkReplayCam';
 import { SoundKit } from '../audio/SoundKit';
+import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { EffectsKit } from '../visual/EffectsKit';
@@ -278,7 +279,8 @@ export const DunkMode: ModeDefinition = (() => {
   let rivalClipToken = 0;                     // soft-OPEN #3: the rival's clip chains carry the same token guard as the player's
   let rimCamCut = false;                     // broadcast cut latch (per attempt)
   let verdictCamSet = false;                 // the portrait for the confer, placed once per attempt
-  let rivalCamCut = false;                   // the rival's own broadcast cut, once per his turn
+  let rivalCamCut = false;
+  let runPressWas = false;                   // MECHANICS PASS: the RUN hold's press edge (a held trigger streams values)                   // the rival's own broadcast cut, once per his turn
   let hangSlowMoLatch = false;               // JuiceKit.slowMo once per attempt (hang only)
   let contactLatch = false;                  // contactPunch once per attempt (the make's flush frame)
   // ── DUNK-BODY-MID (2026-09-09): the SLAM input contract ──────────────────────────────────────────────────────────
@@ -739,6 +741,12 @@ export const DunkMode: ModeDefinition = (() => {
       if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y') && !qteWindowOpen) airButton(ctx, e);
 
       if (e.t === 'trigger' && e.side === 'R') {
+        // MECHANICS PASS (2026-09-15): RUN (RT) was silent 6 of 6 when held outside the runway — through the judges, the
+        // replay, the rival's turn. The first press of a hold is answered with what the contest is doing.
+        if (e.value > 0.5 && !runPressWas && phase !== 'approach' && phase !== 'charge' && phase !== 'cinematic') {
+          refuse(ctx, phase === 'rivalTurn' ? "RIVAL'S TURN" : phase === 'judging' || phase === 'resolve' ? 'THE JUDGES ARE SCORING' : 'WAIT');
+        }
+        runPressWas = e.value > 0.5;
         if (phase === 'approach' && e.value > 0.02) {
           // Venice DualShock pad: HOLD = RUN. The hold drives the runway toward the rim (stick steers), the jump
           // loads while you run, and the launch fires at the gather line — or on release, from wherever you are.

@@ -103,6 +103,24 @@ export class JuiceKit {
     setTimeout(() => el.remove(), ms + 300);
   }
 
+  /** A small, quick line under the action — the answer to a press that cannot act ("WAIT FOR THE QUESTION", "NO BALL").
+   *  Deliberately quieter than banner(): a refusal informs, it does not celebrate. One at a time. */
+  private calloutEl: HTMLDivElement | null = null;
+  callout(text: string, color = '#cbd5e1', ms = 700): void {
+    this.calloutEl?.remove();
+    const el = document.createElement('div');
+    el.textContent = text;
+    el.style.cssText =
+      'position:absolute;left:50%;top:68%;transform:translate(-50%,-50%);padding:4px 12px;border-radius:999px;' +
+      `background:rgba(5,6,10,.62);font:800 clamp(12px,1.8vw,16px) var(--fel-font-display,ui-monospace);color:${color};` +
+      'letter-spacing:.12em;opacity:0;transition:opacity .12s ease-out;pointer-events:none;';
+    this.overlay.appendChild(el);
+    this.calloutEl = el;
+    requestAnimationFrame(() => { el.style.opacity = '1'; });
+    setTimeout(() => { el.style.opacity = '0'; }, ms);
+    setTimeout(() => { el.remove(); if (this.calloutEl === el) this.calloutEl = null; }, ms + 200);
+  }
+
   /** Composite signature moment: slam/KO/hole-in-one. One call in mode code. */
   impact(worldPos: Vector3, points: string, opts?: { color?: string; slow?: boolean }): void {
     this.hitStop(80);

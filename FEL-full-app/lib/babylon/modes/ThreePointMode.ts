@@ -44,7 +44,8 @@ import { armChain, reachArm, type ArmChain } from '../anim/HandIK';
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, yawOfVel } from '../core/Biomech';
 import { RELEASE_FRAME_01 } from '../core/BallHandling';
-import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
+import { releaseFrameOf } from '../anim/opponentMotion';
+import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -672,7 +673,11 @@ export const ThreePointMode: ModeDefinition = {
     // A press is the release: keyboard Space, touch SHOOT, or a phone flick all
     // arrive here identically because they all normalise to FelInput.
     if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B')) {
-      fire(ctx, S.charge > 0.02 ? S.charge : undefined);
+      // MECHANICS PASS (2026-09-15): 43 % of SHOOT presses were silent — pressed while the ball was in the air or the next
+      // one was still coming off the rack. Answered now, with where the ball is.
+      if (S.phase === 'shoot' && S.fired) refuse(ctx, "BALL'S IN THE AIR");
+      else if (S.phase !== 'shoot') refuse(ctx, 'NEXT BALL…');
+      else fire(ctx, S.charge > 0.02 ? S.charge : undefined);
     }
   },
 

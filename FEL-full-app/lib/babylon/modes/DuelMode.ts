@@ -34,6 +34,7 @@ import { DefenseController, applyDefenseOutcome } from '../core/DefenseSystem';
 import { CombatMovement } from '../core/CombatMovement';
 import { CombatAnimTree } from '../anim/combatTree';
 import { SoundKit } from '../audio/SoundKit';
+import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { EffectsKit } from '../visual/EffectsKit';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -375,6 +376,7 @@ export const DuelMode: ModeDefinition = (() => {
       const whooshPitch = { fists: 1.2, blade: 1.5, staff: 0.8 }[myWeapon];
       const trySwing = (id: string) => {
         if (meStrike.request(id, now())) SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 });
+        else refuse(ctx, 'RECOVERING');   // MECHANICS PASS: a swing refused mid-recovery is said, not swallowed
       };
       if (e.btn === 'A') trySwing(moveIds[0]);
       if (e.btn === 'B') trySwing(moveIds[1]);
@@ -385,6 +387,9 @@ export const DuelMode: ModeDefinition = (() => {
         const flick = (w.x * to.x + w.z * to.z) > 0.3;
         meDef.pressBlock(now(), flick);
         meState.pressBlock(now());
+        // MECHANICS PASS: the guard was silent 6 of 7 presses — raising it is heard, and a flick at the rival names the attempt
+        SoundKit.play('impact', { pitch: flick ? 1.6 : 1.3, volume: 0.18 });
+        if (flick) ctx.juice.callout('GUARD IMPACT…', '#ffd75e', 450);
       }
     },
 

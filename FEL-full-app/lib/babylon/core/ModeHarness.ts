@@ -253,7 +253,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   let qaRestore: (() => void) | null = null;
   if (qa) {
     const j = juice as unknown as Record<string, (...a: unknown[]) => unknown>;
-    for (const m of ['hitStop', 'shake', 'slowMo', 'flash', 'scorePop', 'banner', 'impact']) {
+    for (const m of ['hitStop', 'shake', 'slowMo', 'flash', 'scorePop', 'banner', 'callout', 'impact']) {
       const orig = j[m]?.bind(juice);
       if (orig) j[m] = (...a: unknown[]) => { qa.juice(m); return orig(...a); };
     }

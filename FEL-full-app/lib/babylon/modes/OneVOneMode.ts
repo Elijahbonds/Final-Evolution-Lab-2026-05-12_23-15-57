@@ -130,6 +130,7 @@ import {
 } from '../core/BasketballCore';
 import { DribbleStateMachine, syncedShotSpeed, RELEASE_FRAME_01 } from '../core/BallHandling';
 import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
+import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import {   // HOOPS-MOVE-KIT-A (2026-09-08): the gather, the finish kit, the drive contest
   planGather, gatherWish, gatherLabel, gatherTravel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
@@ -240,6 +241,17 @@ export const OneVOneMode: ModeDefinition = (() => {
   let wasPlanting = false;
   let shotMeter: ShotMeter;
   let turbo: TurboMeter;
+  // MECHANICS PASS (2026-09-15): TURBO (RT) was silent half the time — held while standing still or with an empty tank, the
+  // body simply did not sprint. The press edge is answered with why.
+  let sprintWas = false;
+  function answerSprint(ctx: ModeContext, sprint: boolean, moving: boolean): void {
+    if (sprint && !sprintWas) {
+      if (turbo.t01 < 0.05) refuse(ctx, 'TURBO EMPTY');
+      else if (!moving) refuse(ctx, 'TURBO NEEDS A DIRECTION');
+      else SoundKit.play('whoosh', { pitch: 1.3, volume: 0.25 });
+    }
+    sprintWas = sprint;
+  }
   let arc: ShotArc;
   let arcPoints = 0, arcLabel = '';
   let myScore = 0, foeScore = 0, momentum = 0;
@@ -781,6 +793,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         const moving = Math.hypot(intent.moveX, intent.moveY) > 0.1;
         const sprintOk = turbo.gate(dt, intent.sprint, moving);
         ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
+        answerSprint(ctx, intent.sprint, moving);
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
         const [mx, my] = camRel(ctx, intent.moveX, intent.moveY);
         const drib = meDribble.update(dt, mx, my, sprintOk);
@@ -1120,6 +1133,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         const moving = Math.hypot(intent.moveX, intent.moveY) > 0.1;
         const sprintOk = turbo.gate(dt, intent.sprint, moving);
         ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
+        answerSprint(ctx, intent.sprint, moving);
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
         const [mxRaw, myRaw] = camRel(ctx, intent.moveX, intent.moveY);
         // THE STANCE COSTS AND PAYS (DefensiveStance). The slide clips were already playing here and did

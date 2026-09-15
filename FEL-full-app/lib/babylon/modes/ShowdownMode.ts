@@ -406,6 +406,8 @@ export const ShowdownMode: ModeDefinition = (() => {
         const flick = (w.x * to.x + w.z * to.z) > 0.3;
         meDef.pressBlock(now(), flick);
         meState.pressBlock(now());
+        SoundKit.play('impact', { pitch: flick ? 1.6 : 1.3, volume: 0.18 });   // MECHANICS PASS: the guard going up is heard
+        if (flick) ctx.juice.callout('GUARD IMPACT…', '#ffd75e', 450);
       }
       if (!e.pressed && e.btn === 'X') { meDef.releaseBlock(); meState.releaseBlock(); }
     },

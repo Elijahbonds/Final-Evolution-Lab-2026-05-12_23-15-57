@@ -17,6 +17,7 @@ import { BuzzMatch, buildRounds, MAX_PLAYERS, type Resolution } from '../core/Sc
 import { WHO_SCENE_IT_PACK } from '../content/quizPacks';
 import { SoundKit } from '../audio/SoundKit';
 import { Contestants, podiums } from '../party/Contestants';
+import { refuse } from '../core/Refusal';
 
 const REVEAL_S = 1.5;            // how long the answer card stays up before the next venue mounts
 const BOARD_S = 3.2;             // the between-rounds scoreboard
@@ -245,10 +246,14 @@ export function makeWhoSceneItMode(): ModeDefinition {
         } else if (e.t === 'button' && e.pressed && FACE.includes(e.btn as 'A')) begin(ctx);
         return;
       }
-      if (phase !== 'play') return;
+      if (phase !== 'play') {
+        if (e.t === 'button' && e.pressed && FACE.includes(e.btn as 'A')) refuse(ctx, phase === 'board' ? 'NEXT SCENE…' : 'WAIT…');   // MECHANICS PASS
+        return;
+      }
       if (e.t === 'button' && e.pressed) {
         const i = FACE.indexOf(e.btn as 'A' | 'B' | 'X' | 'Y');
-        if (i >= 0) answer(ctx, 0, i);
+        if (i >= 0 && revealT > 0) refuse(ctx, 'NEXT SCENE…');
+        else if (i >= 0) answer(ctx, 0, i);
       } else if (e.t === 'dpad' && e.pressed && players > 1) {
         const i = DPAD.indexOf(e.dir);
         if (i >= 0) answer(ctx, 1, i);
