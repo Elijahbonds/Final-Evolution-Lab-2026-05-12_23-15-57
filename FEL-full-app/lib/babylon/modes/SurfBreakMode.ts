@@ -75,6 +75,9 @@ export const SurfBreakMode: ModeDefinition = (() => {
   /** A surf air off the lip is short — this is the hang a pop actually buys. */
   const AIR_BUDGET_SEC = 0.7;
   let stickX = 0, stickY = 0, carve = 0;
+  /** Seconds inside the current barrel with the stick or R2 working; the share that makes a barrel RIDDEN. */
+  let barrelWorked = 0;
+  const BARREL_WORK_SHARE = 0.35;
   /** wave-relative forward drift (m/s): forward speed = WAVE_SPEED + rel (ARENA-10PHASE P3) */
   let rel = 0;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
@@ -182,7 +185,17 @@ export const SurfBreakMode: ModeDefinition = (() => {
   }
 
   function bankBarrel(ctx: ModeContext): void {
-    if (barrelSec < BARREL_HOLD_SEC) { barrelSec = 0; inBarrel = false; return; }
+    if (barrelSec < BARREL_HOLD_SEC) { barrelSec = 0; inBarrel = false; barrelWorked = 0; return; }
+    // MECHANICS PASS (2026-09-15): the board trims itself into the pocket hands-off, so the barrel paid 250 to a rider with the
+    // pad down (idle probe, run 2). A barrel is RIDDEN: it banks only when the rider worked the tube — trimmed with the stick
+    // or drove with R2 for a real share of the time inside. Otherwise it is said, and pays nothing.
+    const worked = barrelWorked / Math.max(0.001, barrelSec);
+    if (worked < BARREL_WORK_SHARE) {
+      barrelSec = 0; inBarrel = false; barrelWorked = 0;
+      refuse(ctx, 'RIDE THE TUBE — TRIM OR DRIVE IN IT');
+      return;
+    }
+    barrelWorked = 0;
     barrels++;
     tricks.score += BARREL_BONUS;
     SoundKit.play('score', { pitch: 1.3 });
@@ -431,6 +444,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
           // drip is what scored 921 for a rider who never touched the pad, with no cue for any of it (19 unexplained scores).
           if (hollow) {
             barrelSec += dt;
+            if (Math.hypot(stickX, stickY) > 0.3 || carve > 0.2) barrelWorked += dt;
             if (!inBarrel && barrelSec > 0.3) {
               inBarrel = true;
               SoundKit.play('powerUp', { pitch: 1.2, volume: 0.35 });
