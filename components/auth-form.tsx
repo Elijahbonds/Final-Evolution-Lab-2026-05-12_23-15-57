@@ -8,6 +8,7 @@ import { signIn } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import { Zap, Loader2, Check } from 'lucide-react';
 import { CURRENT_POLICY_VERSION } from '@/lib/policies';
+import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/db-health';
 import { toast } from 'sonner';
 
 // M8.6 — landing hook: marquee sports so the pre-auth page actually shows what
@@ -83,7 +84,15 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
       }
       const result = await signIn('credentials', { email, password, redirect: false });
       if (result?.error) {
-        toast.error('Invalid email or password');
+        // Only claim the credentials are wrong when they actually are. A
+        // backend that cannot reach its database also fails sign-in, and
+        // telling the athlete to check their password sends them chasing a
+        // problem they cannot fix.
+        toast.error(
+          result.error.includes(AUTH_SERVICE_UNAVAILABLE)
+            ? "Sign-in is temporarily unavailable — the server can't reach its database. This is on our end, not your password."
+            : 'Invalid email or password'
+        );
         setLoading(false);
         return;
       }
