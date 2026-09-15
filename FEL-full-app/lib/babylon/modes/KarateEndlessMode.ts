@@ -108,6 +108,7 @@ import {
 } from '../core/HordeDynamics';
 import { readBlend, blendTraits, blendName, SCHOOLS } from '../combat/schools';
 import { hordeStyle, type HordeStyle } from '../combat/loadout';
+import { Freeflow, type FlowEvent, type FlowBroken } from '../core/Freeflow';   // THE HUNDRED: Arkham freeflow — the count means something
 
 /**
  * Half-extent of the playable floor, INSET from the 24x24 mat.
@@ -156,6 +157,8 @@ const MOVE_CANCEL_EXTRA_SEC = 0.1;
 const SHOCK_SEC = 0.32;
 /** The running hit count decays after this long without a hit (the Musou number). */
 const HIT_CHAIN_MS = 1400;
+/** A takedown reaches the nearest body this close (metres). */
+const TAKEDOWN_REACH = 2.8;
 
 // horde sizing — deliberately bigger/faster than the old wave-survival pace
 // A+ identity P0 (PM brief 2026-09-06): ONE SOLID STRIKE DROPS A BODY. No enemy HP pool, no chip — the wave escalates
@@ -313,6 +316,66 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   let meTree: CombatAnimTree, partnerTree: CombatAnimTree;
   let myStrike: Strike = null, pStrike: Strike = null, impactUntil = 0, outFlag = false;
   let hitCount = 0, lastHitAt = 0;                 // the Musou number
+  // FREEFLOW (owner 2026-09-15): the flow is kept by landing and reading, lost by whiffing near a body or getting hit. A
+  // multiplier every 5, a meter the hits fill, a TAKEDOWN at 8 (L1). `hitCount` stays as the flow's mirror for the HUD's HITS.
+  const flow = new Freeflow();
+  const flowStats = { takedowns: 0, counters: 0, whiffBreaks: 0, hurtBreaks: 0, drops: 0, milestones: 0, clips: [] as string[] };
+  /** The flow event → what a player sees and hears: the count, milestones with a camera beat, the takedown call. */
+  function onFlow(ctx: ModeContext, fe: FlowEvent, label?: string): void {
+    hitCount = fe.count; lastHitAt = now();
+    pushFlowHud(ctx);
+    if (fe.milestone) {
+      flowStats.milestones++;
+      ctx.camDirector.pulse?.(fe.milestone >= 20 ? 0.7 : 0.45, 0.28);
+      SoundKit.play('powerUp', { pitch: 1 + Math.min(0.6, fe.milestone / 100), volume: 0.5 });
+      flowBanner(ctx, `FREEFLOW ×${fe.milestone}${fe.mult > 1 ? ` · ${fe.mult}× POINTS` : ''}`, 900);
+    } else if (fe.takedownUnlocked) {
+      SoundKit.play('uiTick', { pitch: 1.5, volume: 0.6 });
+      flowBanner(ctx, 'TAKEDOWN READY — L1', 1100);
+    } else if (label) flowBanner(ctx, label, 650);
+  }
+  function onFlowBroken(ctx: ModeContext, br: FlowBroken | null): void {
+    if (br) { if (br.reason === 'whiff') flowStats.whiffBreaks++; else if (br.reason === 'hurt') flowStats.hurtBreaks++; else flowStats.drops++; }
+    hitCount = 0;
+    pushFlowHud(ctx);
+    if (!br || br.lost < 3) return;
+    SoundKit.play('miss', { pitch: 0.8, volume: 0.45 });
+    flowBanner(ctx, `COMBO ${br.reason === 'whiff' ? 'MISSED' : br.reason === 'hurt' ? 'BROKEN' : 'DROPPED'} ×${br.lost}`, 900);
+  }
+  let flowBannerUntil = 0;
+  function flowBanner(ctx: ModeContext, text: string, ms: number): void {
+    ctx.setHud({ banner: text }); flowBannerUntil = now() + ms;
+    setTimeout(() => { if (now() >= flowBannerUntil - 5) ctx.setHud({ banner: '' }); }, ms);
+  }
+  function pushFlowHud(ctx: ModeContext): void {
+    ctx.setHud({ hits: flow.count, flowMult: flow.mult(), flowMeter: Math.round(flow.meter * 100), flowReady: flow.takedownReady, flowBest: flow.best });
+  }
+  /** TAKEDOWN — the flow cashed in on the nearest body in reach: it ends outright, the hero throws the hammer fist, the
+   *  crowd around staggers, and the whole beat is a slow-motion camera punch. Returns false when there was nothing to take. */
+  function takedown(ctx: ModeContext): boolean {
+    if (!flow.takedownReady || carry || myDown.downed) return false;
+    const origin = player.root.position;
+    let best: Enemy | null = null, bd = TAKEDOWN_REACH;
+    for (const e of liveBodies()) { const d = Math.hypot(e.mob.char.root.position.x - origin.x, e.mob.char.root.position.z - origin.z); if (d < bd) { bd = d; best = e; } }
+    if (!best) return false;
+    const fe = flow.takedown(gameSec); if (!fe) return false;
+    const tp = best.mob.char.root.position;
+    faceTarget = Math.atan2(tp.x - origin.x, tp.z - origin.z); faceRate = 40;
+    striking = true; strikeSeq++; strikeMove = MOVES.hammer; strikeStartedAt = gameSec; strikeHitDone = true;
+    myStrike = { weight: 'finisher', clip: MOVES.hammer.clip, until: now() + STRIKE_MAX_SEC * 1000 };
+    book.reset(); queue.clear();
+    matrix(ctx, 'finisher');
+    ctx.camDirector.pulse?.(0.9, 0.4);
+    ctx.juice.hitStop(110); ctx.juice.shake(0.16, 260);
+    SoundKit.play('impact', { pitch: 0.55, volume: 0.9 });
+    best.hp = 0;
+    landHit(ctx, best, true, 'finisher');
+    stunCrowd(ctx, origin, 2.6, 0.8);
+    stats.finishers++; flowStats.takedowns++;
+    onFlow(ctx, fe);
+    flowBanner(ctx, `TAKEDOWN ×${fe.count}`, 1000);
+    return true;
+  }
   let camCrowd = false;                             // H8: surrounded → the crowd preset
   let xHoldSec = -1, iframeSec = 0;
   let stickX = 0, stickY = 0;
@@ -588,6 +651,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     striking = true; strikeSeq++; strikeStartedAt = gameSec; strikeMove = move; strikeHitDone = false;
     const tok = strikeSeq;
     myStrike = { weight: move.weight, clip: move.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it (strikeSeq replays a same-weight link)
+    if (!flowStats.clips.includes(move.clip)) flowStats.clips.push(move.clip);
     dyn.swings++; dyn.lastMove = move.id; dyn.lastString = [...book.history].join('') || key;
     SoundKit.play('whoosh', move.ender ? { pitch: 0.8, volume: 0.7 } : { pitch: 1 + book.history.length * 0.08 });
     if (move.ender || move.id === 'rush' || move.id === 'backSpin') { ctx.setHud({ banner: move.label }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
@@ -611,14 +675,20 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     // everyone in the arc, not the nearest one
     const origin = player.root.position;
     const hit = liveBodies().filter((e) => inArc(origin, player.root.rotation.y, e.mob.char.root.position, reach, arc));
-    if (!hit.length) { if (now() - lastHitAt > HIT_CHAIN_MS) { hitCount = 0; ctx.setHud({ hits: 0 }); } return; }
+    if (!hit.length) {
+      // FREEFLOW: a swing that reached nobody while a body stood within a step of its reach is a MISS — the flow breaks.
+      // With nobody near (between waves) it is shadow-boxing, and costs nothing.
+      const near = liveBodies().some((e) => Vector3.Distance(origin, e.mob.char.root.position) <= reach + 1.2);
+      const br = flow.whiff(near);
+      if (br) onFlowBroken(ctx, br);
+      return;
+    }
 
     // the swing connected, so the sequence advances
     landed = seq.slice(-6);
     lastLandAt = clockSec;
 
     const t = now();
-    if (t - lastHitAt > HIT_CHAIN_MS) hitCount = 0;
     if ((move.launch && move.ender) || route) matrix(ctx, 'finisher');
     else if (move.launch) matrix(ctx, 'heavyKo');
     const launches = move.launch || (route ? route.ender !== 'stun' : false);
@@ -626,8 +696,11 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     // SOUL CALIBUR WEIGHT: the connect holds for a beat that grows with the weight (hit-stop is the harness's, not a slow-mo)
     ctx.juice.hitStop(move.weight === 'light' ? 28 : move.weight === 'medium' ? 45 : 70);
     for (const e of [...hit]) landHit(ctx, e, launches, move.weight);   // the arc still reaches every body; each takes damage rather than dropping
-    hitCount += hit.length; lastHitAt = t;
-    ctx.setHud({ hits: hitCount });
+    // FREEFLOW: every body the arc reached extends the flow (the ender's own banner already names the move)
+    const fe = flow.hit(hit.length, move.weight, gameSec);
+    onFlow(ctx, fe);
+    // a CINEMATIC ENDER: a string's last link landing inside a real flow gets the camera punch and a longer hold
+    if (move.ender && fe.count >= 5) { ctx.camDirector.pulse?.(0.6, 0.3); ctx.juice.hitStop(80); }
     if (hit.length >= 3) ctx.feel?.impact?.(0.55);
     // CROWD STUN: an ender (or the heavy) that connects staggers the whole pack around you, not only the arc
     if (move.stunRadius > 0) stunCrowd(ctx, origin, move.stunRadius * perks.reach, move.stunSec);
@@ -995,8 +1068,18 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       if (iframeSec > DODGE_IFRAME_SEC + perks.iframeBonus - PERFECT_WINDOW_SEC && matrix(ctx, 'perfectDodge')) {
         stats.perfect++;
         gainChi(ctx, 12);
-        ctx.setHud({ banner: 'BULLET TIME' });
-        setTimeout(() => ctx.setHud({ banner: '' }), 800);
+        // FREEFLOW COUNTER: the perfect read strikes back. The attacker in reach takes a cross it walked into, the flow
+        // extends and the meter fills faster than a hit would — reading beats mashing.
+        const d = Vector3.Distance(player.root.position, e.mob.char.root.position);
+        if (d <= 2.6 && !carry) {
+          const tp = e.mob.char.root.position, op = player.root.position;
+          faceTarget = Math.atan2(tp.x - op.x, tp.z - op.z); faceRate = 30;
+          striking = true; strikeSeq++; strikeMove = MOVES.cross; strikeStartedAt = gameSec; strikeHitDone = true;
+          myStrike = { weight: 'medium', clip: MOVES.cross.clip, until: now() + STRIKE_MAX_SEC * 1000 };
+          landHit(ctx, e, false, 'medium');
+          flowStats.counters++;
+          onFlow(ctx, flow.counter(gameSec), 'COUNTER');
+        } else flowBanner(ctx, 'BULLET TIME', 800);
       } else gainChi(ctx, 5);
       return;
     }
@@ -1016,6 +1099,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     // a CLEAN hit: the pool takes it, the body reels, the horde waits out the stagger. NEO ARMOUR: a jab never
     // interrupts a swing in flight (the fighter trades through it — the pool pays, the punch lands); a kick does.
     stats.hitsTaken++;
+    onFlowBroken(ctx, flow.hurt());                             // FREEFLOW: a clean hit taken breaks the flow (a block does not)
     if (!striking || e.brain.strike === 'kick') {
       hitWeight = e.brain.strike === 'kick' ? 'medium' : 'light'; hitUntil = now() + REACT_SEC * 1000;
       meTree.clearBeat('react_light', 'react_medium');
@@ -1048,7 +1132,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       SoundKit.play('crowdGroan');
       outFlag = true; animate(0, 0);   // KO: the tree's knockdown → floor
       endSlowMo(ctx);
-      ctx.end(`WAVE_${wave}`, totalKos * 100 + wave * 50, { wave, kos: totalKos });
+      ctx.end(`WAVE_${wave}`, totalKos * 100 + wave * 50 + Math.round(flow.points), { wave, kos: totalKos, bestFlow: flow.best });
     }
   }
 
@@ -1125,6 +1209,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       pp: mePosture?.layer.get() ?? null, ppAlly: partnerPosture?.layer.get() ?? null, bio: { ...meBio },   // BIOMECH-WAVE2 probes
       aim: (() => { const n = nearest(player.root.position); return n ? { x: n.mob.char.root.position.x, y: n.mob.char.root.position.y + 1.32, z: n.mob.char.root.position.z } : null; })(),
       ...stats,
+      flow: { count: flow.count, best: flow.best, mult: flow.mult(), meter: +flow.meter.toFixed(2), points: Math.round(flow.points), ready: flow.takedownReady, ...flowStats, lastClip: myStrike?.clip ?? '' },
       dyn: { ...dyn, string: book.history.join(''), queued: queue.pending, carrying: !!carry, stunnedNow: enemies.filter((e) => e.stunUntil > gameSec).length, strikeSeq },
       nearestM: (() => { const n = nearest(player.root.position); return n ? +Math.hypot(n.mob.char.root.position.x - player.root.position.x, n.mob.char.root.position.z - player.root.position.z).toFixed(2) : -1; })(),
       heroYaw: +((player.root.rotation.y * 180) / Math.PI).toFixed(1),
@@ -1225,6 +1310,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         }
       }
       perks = shop.state(); vitals.setMax(perks.maxHp, true); vitals.iframeSec = 0; hpShown = -1; lastHurtAt = -1e9;
+      flow.reset(); hitCount = 0;
       book.reset(); queue.clear(); carry = null; gameSec = 0; strikeSeq = 0; strikeMove = null; strikeHitDone = true; landed = []; shopOpen = false;
       striking = false; blocking = false; dodging = false; xHoldSec = -1; iframeSec = 0; endSlowMo(ctx);
       ctx.camDirector.snapTo(player.root.position, player.root.position.add(facingVec()));
@@ -1232,7 +1318,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       SoundKit.startAmbient('dojo');
       await spawnWave(ctx);
       publishHp(ctx, true);
-      ctx.setHud({ chi, coins: shards, hint: 'Strings: A A A · A A B WHIRLWIND · A B Y HAMMER · B B Y TYPHOON · stick AT a body + Y = RUSH · pull back + B = SPIN BACK KICK · L1 on a staggered body = GRAB (A swing · Y throw) · tap BLOCK late = BULLET TIME · R1 = CHI BURST' });
+      ctx.setHud({ chi, coins: shards, hint: 'Strings: A A A · A A B WHIRLWIND · A B Y HAMMER · B B Y TYPHOON · stick AT a body + Y = RUSH · pull back + B = SPIN BACK KICK · L1 on a staggered body = GRAB (A swing · Y throw) · tap BLOCK late on a wind-up = COUNTER · land 8 = TAKEDOWN (L1) · a miss or a hit taken breaks the flow · R1 = CHI BURST' });
     },
 
     onInput(ctx, e: FelInput) {
@@ -1259,7 +1345,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         // free here is the opposite one to the duels' -- the verb is the same, the button is what was left.
         // THE-HUNDRED: L1 is the GRAB when a staggered body is in reach (and the THROW while carrying one) — the jump
         // otherwise, so the verb only exists where it can do something.
-        if (e.btn === 'L1' && carry) throwCarried(ctx);
+        if (e.btn === 'L1' && !carry && flow.takedownReady && takedown(ctx)) { /* FREEFLOW: the takedown is L1's first meaning when it is ready */ }
+        else if (e.btn === 'L1' && carry) throwCarried(ctx);
         else if (e.btn === 'L1' && striking && !strikeHitDone && !myDown.downed) { grabQueuedAt = gameSec; queue.clear(); }
         else if (e.btn === 'L1' && !myDown.downed && !tryGrab(ctx) && !striking && meAir.jump()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });
       }
@@ -1273,7 +1360,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
     update(ctx, dtReal) {
       clockSec += dtReal;
-      if (hitCount > 0 && now() - lastHitAt > HIT_CHAIN_MS) { hitCount = 0; ctx.setHud({ hits: 0 }); }
+      { const br = flow.update(gameSec); if (br) onFlowBroken(ctx, br); else if (flow.count > 0) ctx.setHud({ flowDrop: Math.round(flow.drop01(gameSec) * 100) }); }
       // Phase 8: down/revive tick
       if (myDown.downed) {
         const near = Vector3.Distance(partner.root.position, player.root.position) <= REVIVE_RANGE;
@@ -1287,7 +1374,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         } else ctx.setHud({ revive: near ? `PARTNER REVIVING ${Math.round(myDown.channelSec / 3 * 100)}%` : '' });
         if (myDown.bledOut(clockSec)) {
           endSlowMo(ctx);
-          return ctx.end(`WAVE_${wave}`, totalKos * 100 + wave * 50, { wave, kos: totalKos });
+          return ctx.end(`WAVE_${wave}`, totalKos * 100 + wave * 50 + Math.round(flow.points), { wave, kos: totalKos, bestFlow: flow.best });
         }
       }
       if (partnerDown.downed) {

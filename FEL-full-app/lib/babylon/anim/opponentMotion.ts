@@ -46,7 +46,9 @@ type Tagged = CharacterAnimator & { __opponentMotion?: string[] };
 // Owner decisions: one shared hoops motion set, you and the AI, every body, every hoops mode. So the hero installs the
 // same captures, limited to the hoops set (the fight, football and board captures stay the opponents' until their own
 // passes), and every timing the modes read off a clip — its duration, its release frame — follows the clip that PLAYS.
-export const HERO_CAPTURE = (name: string): boolean => name.startsWith('bball_mc_');
+export const HERO_CAPTURE = (name: string): boolean => name.startsWith('bball_mc_') || name.startsWith('karate_mc_');
+// THE HUNDRED (owner 2026-09-15, "mocap on disk… onto the HERO too"): the fighter's strikes, reactions and get-up are the
+// captures as well, so a string you throw looks like a person throwing it — and like the partner and the horde beside you.
 
 /** Where the ball leaves the hand, as a fraction of each shot clip. The authored `jumpshot` releases at 0.45
  *  (BallHandling.RELEASE_FRAME_01). The CMU 06_15 window (2.20–3.10 s) sets at the chin, dips 2.30–2.55, rises, and

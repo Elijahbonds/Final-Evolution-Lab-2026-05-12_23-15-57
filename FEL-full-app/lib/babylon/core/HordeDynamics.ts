@@ -74,18 +74,23 @@ export const canCancel = (weight: StrikeWeightKey, startedAt: number, now: numbe
 
 // ── the string book ─────────────────────────────────────────────────────────
 const M = (m: Omit<HordeMove, 'ender'> & { ender?: boolean }): HordeMove => ({ ender: false, ...m });
+// THE HUNDRED — A DISTINCT MOVE PER STRING (owner 2026-09-15: "combos, get in your bag, chain combos together"; Arkham
+// freeflow). Eleven named moves used to share five authored swings — HAMMER FIST, TYPHOON and HEAVY all played the same
+// uppercut, so a string read as the same punch with a different banner. Every move now names its own clip, each a CMU
+// capture (135 karate, 143 punching / jumping twists, 80 boxing: see scripts/mocap/opponent-clips.json), with a family
+// alias under it (clipAliases) so a rig that cannot build the capture still swings the right kind of strike.
 export const MOVES = {
   jab:       M({ id: 'jab', label: 'JAB', clip: 'jab', weight: 'light', speed: 1.45, range: 1.55, arcDeg: 100, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.2 }),
-  cross:     M({ id: 'cross', label: 'CROSS', clip: 'hook', weight: 'light', speed: 1.5, range: 1.6, arcDeg: 120, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.2 }),
+  cross:     M({ id: 'cross', label: 'CROSS', clip: 'karate_cross', weight: 'light', speed: 1.5, range: 1.6, arcDeg: 120, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.2 }),
   uppercut:  M({ id: 'uppercut', label: 'RISING DRAGON', clip: 'uppercut', weight: 'finisher', speed: 1.25, range: 1.7, arcDeg: 130, launch: true, stunRadius: 2.4, stunSec: 0.9, lunge: 1.4, ender: true }),
   kick:      M({ id: 'kick', label: 'HIGH KICK', clip: 'high_kick', weight: 'medium', speed: 1.3, range: 1.9, arcDeg: 150, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.4 }),
-  whirl:     M({ id: 'whirl', label: 'WHIRLWIND', clip: 'roundhouse', weight: 'medium', speed: 1.3, range: 2.2, arcDeg: 360, launch: false, stunRadius: 2.6, stunSec: 0.8, lunge: 0.6, ender: true }),
+  whirl:     M({ id: 'whirl', label: 'WHIRLWIND', clip: 'karate_whirl', weight: 'medium', speed: 1.3, range: 2.2, arcDeg: 360, launch: false, stunRadius: 2.6, stunSec: 0.8, lunge: 0.6, ender: true }),
   roundhouse:M({ id: 'roundhouse', label: 'ROUNDHOUSE', clip: 'roundhouse', weight: 'medium', speed: 1.35, range: 2.0, arcDeg: 200, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.2 }),
-  typhoon:   M({ id: 'typhoon', label: 'TYPHOON', clip: 'uppercut', weight: 'finisher', speed: 1.15, range: 2.4, arcDeg: 360, launch: true, stunRadius: 3.2, stunSec: 1.1, lunge: 0.8, ender: true }),
-  heavy:     M({ id: 'heavy', label: 'HEAVY', clip: 'uppercut', weight: 'heavy', speed: 1.25, range: 1.65, arcDeg: 100, launch: true, stunRadius: 1.8, stunSec: 0.6, lunge: 1.4 }),
-  hammer:    M({ id: 'hammer', label: 'HAMMER FIST', clip: 'hook', weight: 'finisher', speed: 1.1, range: 1.9, arcDeg: 180, launch: true, stunRadius: 3.4, stunSec: 1.2, lunge: 1.4, ender: true }),
-  rush:      M({ id: 'rush', label: 'RUSH', clip: 'jab', weight: 'heavy', speed: 1.2, range: 1.7, arcDeg: 110, launch: true, stunRadius: 2.0, stunSec: 0.7, lunge: 3.4 }),
-  backSpin:  M({ id: 'backSpin', label: 'SPIN BACK KICK', clip: 'roundhouse', weight: 'medium', speed: 1.4, range: 2.1, arcDeg: 260, launch: false, stunRadius: 2.0, stunSec: 0.6, lunge: 0.4 }),
+  typhoon:   M({ id: 'typhoon', label: 'TYPHOON', clip: 'karate_typhoon', weight: 'finisher', speed: 1.15, range: 2.4, arcDeg: 360, launch: true, stunRadius: 3.2, stunSec: 1.1, lunge: 0.8, ender: true }),
+  heavy:     M({ id: 'heavy', label: 'HEAVY', clip: 'karate_heavy', weight: 'heavy', speed: 1.25, range: 1.65, arcDeg: 100, launch: true, stunRadius: 1.8, stunSec: 0.6, lunge: 1.4 }),
+  hammer:    M({ id: 'hammer', label: 'HAMMER FIST', clip: 'karate_hammer', weight: 'finisher', speed: 1.1, range: 1.9, arcDeg: 180, launch: true, stunRadius: 3.4, stunSec: 1.2, lunge: 1.4, ender: true }),
+  rush:      M({ id: 'rush', label: 'RUSH', clip: 'karate_rush', weight: 'heavy', speed: 1.2, range: 1.7, arcDeg: 110, launch: true, stunRadius: 2.0, stunSec: 0.7, lunge: 3.4 }),
+  backSpin:  M({ id: 'backSpin', label: 'SPIN BACK KICK', clip: 'karate_backspin', weight: 'medium', speed: 1.4, range: 2.1, arcDeg: 260, launch: false, stunRadius: 2.0, stunSec: 0.6, lunge: 0.4 }),
 } as const satisfies Record<string, HordeMove>;
 export type MoveId = keyof typeof MOVES;
 

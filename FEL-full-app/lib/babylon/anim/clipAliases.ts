@@ -35,6 +35,15 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   karate_punch_light: ['jab', 1.1],
   karate_punch_heavy: ['hook', 0.95],
   karate_kick_roundhouse: ['roundhouse', 1.0],
+  // THE HUNDRED distinct moves (2026-09-15): each string has its own captured motion (karate_mc_* in authored/mocapOpponents).
+  // These aliases are the fallback when a rig could not build the capture — the move still reads as its family of swing.
+  karate_cross: ['hook', 1.0],
+  karate_whirl: ['roundhouse', 1.0],
+  karate_backspin: ['roundhouse', 1.0],
+  karate_typhoon: ['uppercut', 1.0],
+  karate_hammer: ['hook', 1.0],
+  karate_heavy: ['uppercut', 1.0],
+  karate_rush: ['jab', 1.0],
   karate_counter_throw: ['uppercut', 0.9],
   karate_dodge_roll: ['guard', 1.3],
   karate_hit_react: ['guard', 2.0],

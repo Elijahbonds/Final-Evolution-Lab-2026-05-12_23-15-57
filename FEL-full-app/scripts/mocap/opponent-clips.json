@@ -325,6 +325,86 @@
    "duration": 0.7,
    "mirror": true,
    "note": "the layup capture mirrored: the left-hand finish"
+  },
+  {
+   "name": "karate_mc_cross",
+   "replaces": "karate_cross",
+   "source": "cmu",
+   "file": "cmu/143/143_23.bvh",
+   "from": 1.02,
+   "to": 1.5,
+   "note": "THE HUNDRED distinct moves (2026-09-15): Punching: the RIGHT straight after the left, reach 0.58 m peak 1.17 (find-strikes) — CROSS",
+   "duration": 0.48
+  },
+  {
+   "name": "karate_mc_uppercut",
+   "replaces": "uppercut",
+   "source": "cmu",
+   "file": "cmu/80/80_10.bvh",
+   "from": 0.97,
+   "to": 1.45,
+   "note": "THE HUNDRED distinct moves (2026-09-15): boxing: the RIGHT hand rising 0.45 m to the chin in front, peak 1.17 (find-uppercut) — RISING DRAGON / the base uppercut",
+   "duration": 0.48
+  },
+  {
+   "name": "karate_mc_whirl",
+   "replaces": "karate_whirl",
+   "source": "cmu",
+   "file": "cmu/135/135_11.bvh",
+   "from": 2.66,
+   "to": 3.3,
+   "note": "THE HUNDRED distinct moves (2026-09-15): Yokogeri: right side kick, the foot to 1.19 m at 2.90 — WHIRLWIND",
+   "duration": 0.64
+  },
+  {
+   "name": "karate_mc_backspin",
+   "replaces": "karate_backspin",
+   "source": "cmu",
+   "file": "cmu/135/135_11.bvh",
+   "from": 10.7,
+   "to": 11.34,
+   "note": "THE HUNDRED distinct moves (2026-09-15): Yokogeri: LEFT side kick, foot 1.02 m at 10.94 — SPIN BACK KICK (pull back + B)",
+   "duration": 0.64
+  },
+  {
+   "name": "karate_mc_typhoon",
+   "replaces": "karate_typhoon",
+   "source": "cmu",
+   "file": "cmu/143/143_08.bvh",
+   "from": 0.5,
+   "to": 1.25,
+   "note": "THE HUNDRED distinct moves (2026-09-15): Jumping Twists: the load (hips −0.28 at 0.6) and a jump turning ~180° by 1.0 — TYPHOON, the airborne ender",
+   "duration": 0.75
+  },
+  {
+   "name": "karate_mc_hammer",
+   "replaces": "karate_hammer",
+   "source": "cmu",
+   "file": "cmu/135/135_05.bvh",
+   "from": 0.7,
+   "to": 1.3,
+   "note": "THE HUNDRED distinct moves (2026-09-15): Gedanbarai: the right arm lifts to 1.47 m (1.0) and sweeps down and forward as the body steps in — HAMMER FIST",
+   "duration": 0.6
+  },
+  {
+   "name": "karate_mc_heavy",
+   "replaces": "karate_heavy",
+   "source": "cmu",
+   "file": "cmu/135/135_09.bvh",
+   "from": 2.3,
+   "to": 2.9,
+   "note": "THE HUNDRED distinct moves (2026-09-15): Oiduki: a planted right lunge punch, reach 0.53 m at 2.54 — HEAVY",
+   "duration": 0.6
+  },
+  {
+   "name": "karate_mc_rush",
+   "replaces": "karate_rush",
+   "source": "cmu",
+   "file": "cmu/135/135_05.bvh",
+   "from": 0.55,
+   "to": 1.45,
+   "note": "THE HUNDRED distinct moves (2026-09-15): Gedanbarai: a full step in (hips travel ~1 leg length 0.6–1.4) behind the strike — RUSH (push at + Y)",
+   "duration": 0.9
   }
  ]
 }

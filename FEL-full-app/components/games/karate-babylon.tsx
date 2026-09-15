@@ -125,10 +125,28 @@ export default function KarateBabylon({ onEnd }: GameProps) {
         </div>
         <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">
           WAVE {hnode(hud.wave, 1)} · {hnode(hud.kos, 0)} KO
-          {Number(hud.hits) > 1 && <> · <span className="text-[#00E5FF]">{hnode(hud.hits, 0)} HITS</span></>}
           {hud.coins != null && <> · <span className="text-white">{hnode(hud.coins, 0)}c</span></>}
         </span>
       </div>
+
+      {/* FREEFLOW (THE HUNDRED, 2026-09-15): the flow count, its multiplier, the drop clock draining under it, the meter a
+          takedown spends, and the call when one is ready. A number that breaks on a miss has to be seen to be played. */}
+      {Number(hud.hits) > 1 && (
+        <div className="pointer-events-none absolute right-4 top-14 flex flex-col items-end gap-1 font-mono" data-testid="freeflow">
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-[#00E5FF] drop-shadow">{hnode(hud.hits, 0)}</span>
+            <span className="text-xs font-black tracking-widest text-white/80">FLOW</span>
+            {Number(hud.flowMult) > 1 && <span className="rounded bg-[var(--fel-gold)] px-1.5 text-xs font-black text-black">×{String(hud.flowMult)}</span>}
+          </div>
+          <div className="h-1 w-28 overflow-hidden rounded-full bg-black/50">
+            <div className="h-full bg-white/80" style={{ width: `${Math.max(0, Math.min(100, Number(hud.flowDrop ?? 100)))}%` }} />
+          </div>
+          <div className="h-1.5 w-28 overflow-hidden rounded-full bg-black/50">
+            <div className="h-full bg-[#A855F7]" style={{ width: `${Math.max(0, Math.min(100, Number(hud.flowMeter ?? 0)))}%` }} />
+          </div>
+          {hud.flowReady === true && <span className="animate-pulse text-[11px] font-black tracking-widest text-[#A855F7]">TAKEDOWN · L1</span>}
+        </div>
+      )}
 
       {/* ALLY. The mode publishes partnerHp every frame and this bezel rendered
           hp, chi, wave, kos and banner only — so in a down-and-revive co-op mode

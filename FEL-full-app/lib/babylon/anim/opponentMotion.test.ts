@@ -34,15 +34,25 @@ describe('opponentMotion — an opponent plays the capture that replaces the aut
     expect(scopeAllows(board, 'bball_mc_crossover_left')).toBe(false);
   });
 
-  it('HOOPS MOVEMENT: the hero takes exactly the hoops captures, and a shot paces off the release of the clip that plays', () => {
+  it('HOOPS MOVEMENT + THE HUNDRED: the hero takes the hoops and fight captures, and a shot paces off the release of the clip that plays', () => {
     const hero = MOCAP_OPPONENT_CLIPS.filter((c) => HERO_CAPTURE(c.name)).map((c) => c.name);
     expect(hero.length).toBeGreaterThanOrEqual(18);   // 14 from the opponents' pass + pump fake, step-through, pivot, left layup
-    expect(hero.every((n) => n.startsWith('bball_mc_'))).toBe(true);
-    expect(HERO_CAPTURE('karate_mc_jab')).toBe(false);                   // the fight captures stay the opponents' for now
+    expect(hero.every((n) => n.startsWith('bball_mc_') || n.startsWith('karate_mc_'))).toBe(true);
+    expect(HERO_CAPTURE('karate_mc_jab')).toBe(true);                    // THE HUNDRED: the fighter's strikes are captures too
+    expect(HERO_CAPTURE('football_mc_run')).toBe(false);                 // football and boards stay the opponents' for now
     for (const n of Object.keys(CAPTURE_RELEASE_01)) expect(MOCAP_OPPONENT_CLIPS.some((c) => c.name === n), n).toBe(true);
     const withCapture = { clipNames: new Set(['jumpshot', 'bball_mc_jumpshot']) } as never;
     const authoredOnly = { clipNames: new Set(['jumpshot']) } as never;
     expect(releaseFrameOf(withCapture, 'jumpshot', 0.45)).toBe(CAPTURE_RELEASE_01.bball_mc_jumpshot);
     expect(releaseFrameOf(authoredOnly, 'jumpshot', 0.45)).toBe(0.45);
+  });
+
+  it('THE HUNDRED: every named move plays its OWN motion — no two strings share a clip, and each has a capture', async () => {
+    const { MOVES } = await import('../core/HordeDynamics');
+    const clips = Object.values(MOVES).map((m) => m.clip);
+    // the one intended share: jab and cross are different clips, the uppercut ender is its own capture
+    expect(new Set(clips).size).toBe(clips.length);
+    const owned = new Set(MOCAP_OPPONENT_CLIPS.map((c) => c.name));
+    for (const m of Object.values(MOVES)) expect(variantFor(m.clip, owned), `${m.id} → ${m.clip}`).toMatch(/^karate_mc_/);
   });
 });
