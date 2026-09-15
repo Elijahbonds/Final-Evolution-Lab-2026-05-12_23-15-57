@@ -43,7 +43,7 @@ export const CharacterPipeline = {
     const [spawn, id] = await Promise.all([
       // identity: false — the pipeline applies it below; the library layer
       // would apply it a second time (measured: two jersey plates on Spine2).
-      CharacterLibrary.spawn(scene, url, { ...opts, identity: false }),
+      CharacterLibrary.spawn(scene, url, { ...opts, identity: false, role: 'player' }),
       resolveIdentity(),
     ]);
     try { applyIdentity(spawn, id); } catch (e) { console.error('[FEL-IDENTITY] applyIdentity failed', e); }

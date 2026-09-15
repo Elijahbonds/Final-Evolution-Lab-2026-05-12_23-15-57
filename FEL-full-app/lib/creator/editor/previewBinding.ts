@@ -24,6 +24,7 @@ import { BODY } from '../schema/body';
 import { VITALS } from '../schema/vitals';
 import { GEAR, ACCESSORIES, wearableIdFor } from '../schema/gear';
 import { defaultValueFor, type RowValue } from './rowState';
+import { bodyTypeOf, type BodyType } from '../../babylon/core/heroBody';
 
 export type ValueMap = Record<string, RowValue> | undefined;
 
@@ -34,6 +35,8 @@ export interface PreviewBinding {
   jersey: JerseyConfig;
   wardrobe: Record<string, string | null>;
   proportions: AvatarSpec;
+  /** The kit body the draft wears (Body → Body Type). The preview respawns when it changes. */
+  bodyType: BodyType;
 }
 
 /** A row's value, or the default the screen is already showing for it. */
@@ -119,5 +122,6 @@ export function bindPreview(values: Record<string, ValueMap>, plate = ''): Previ
     jersey: sanitizeJersey({ number: num(valueOf(VITALS, values.vitals, 'jerseyNumber'), 0), name: plate }),
     wardrobe: bindWardrobe(values.gear, values.accessories),
     proportions: bindProportions(values.vitals, values.body, face, palette),
+    bodyType: bodyTypeOf(valueOf(BODY, values.body, 'bodyType')),
   };
 }

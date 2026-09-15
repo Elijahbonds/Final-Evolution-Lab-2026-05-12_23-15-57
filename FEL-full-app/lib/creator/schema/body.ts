@@ -19,6 +19,7 @@
 
 import type { SlotRow, SectionTable } from './types';
 import { DEFAULT_AVATAR } from '../../babylon/types/avatar';
+import { BODY_TYPES, DEFAULT_BODY_TYPE } from '../../babylon/core/heroBody';
 
 /** The three shipped bodies. Raw values, because these strings ARE `BodyArchetype`. */
 export const ARCHETYPES = ['lean', 'athletic', 'powerful'] as const;
@@ -34,6 +35,11 @@ export const BODY: SectionTable<SlotRow> = {
   section: 'body',
   title: 'Body',
   rows: [
+    // EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14): the base body every mode spawns for this player — the male or female
+    // kit body (lib/babylon/core/heroBody.ts). It rides in AthleteBuild.build.frame like the rows below, so it needed
+    // no schema change; /api/v1/hero-body reads it back at spawn.
+    row('bodyType', 'Body Type', BODY_TYPES, DEFAULT_BODY_TYPE,
+      'The base body you play in every mode. Height, build and reach in Vitals shape it from there, and your gear and hair are fitted to it.'),
     row('archetype', 'Build', ARCHETYPES, DEFAULT_AVATAR.archetype,
       'Which of the three shipped bodies you wear. They are separate meshes rather than a slider, so this is a real swap: lean carries less, powerful holds ground through contact.'),
     row('stance', 'Stance', STANCES, 'athletic',

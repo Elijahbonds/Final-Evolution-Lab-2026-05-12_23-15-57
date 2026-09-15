@@ -23,7 +23,7 @@ const FULL: Values = {
   hotZones: { cornerThreeR: 'BURNING', paint: 'COLD' },
   mechanics: { jsBase: 'Loaded Hinge' },
   vitals: { heightScale: 106, buildScale: 97, reachScale: 103, jerseyNumber: 23 },
-  body: { archetype: 'powerful', stance: 'tall' },
+  body: { bodyType: 'female', archetype: 'powerful', stance: 'tall' },
   appearance: { hairStyle: 'Locs', skinTone: '#6F4321', jawOpen: 40 },
   gear: { tops: 'Bonds Signature Jersey', shoes: 'Evolution Hi-Tops', headwear: null, paletteJersey: '#FFD700' },
   accessories: { accessory: 'Shard Chain' },
@@ -68,7 +68,7 @@ describe('the round trip loses nothing', () => {
     expect(back.hotZones).toEqual(FULL.hotZones);
     expect(back.mechanics).toEqual(FULL.mechanics);
     expect(back.vitals).toMatchObject({ heightScale: 106, buildScale: 97, reachScale: 103, jerseyNumber: 23 });
-    expect(back.body).toEqual({ archetype: 'powerful', stance: 'tall' });
+    expect(back.body).toEqual({ bodyType: 'female', archetype: 'powerful', stance: 'tall' });
     expect(back.appearance!.hairStyle).toBe('Locs');
     expect(back.appearance!.skinTone).toBe('#6F4321');
     expect(back.gear!.tops).toBe('Bonds Signature Jersey');

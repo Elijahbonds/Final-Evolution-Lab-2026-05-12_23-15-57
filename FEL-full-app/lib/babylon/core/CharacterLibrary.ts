@@ -23,10 +23,13 @@ import { snapToGround } from './groundSnap';                // M69: feet-on-cour
 import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
 import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL } from './athleteRoster';
+import { urlForHeroBody, KIT_BODY_URL } from './heroBody';
+import { installOpponentMotion } from '../anim/opponentMotion';
 import { applySkinShading } from './skinShading';
 import { applyKit } from './kit';
 import { attachContactShadow } from '../visual/contactShadow';
 import { applyHairStyle, DEFAULT_HAIR_STYLE, HAIR_KEY_TO_STYLE } from './hairStyles';
+import { defaultFace } from '../../closet/wearable-catalog';
 import { mountSecondaryMotion, type SecondaryMotionHandle } from '../anim/SecondaryMotion';
 import { mountFootPlanting } from '../anim/FootPlanting';
 import type { QualityTier } from '../scene/QualityTier';
@@ -58,6 +61,32 @@ export interface SpawnOpts {
   startClip?: string;       // default 'idle_stand'
   modeId?: string;          // M42: tags [FEL-ANIM] MISSING CLIP warnings with the calling mode
   identity?: boolean;       // default true — set false when the CALLER applies identity (CharacterPipeline.spawnPlayer), or everything skins twice
+  /** EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14): who this body is. Omit and the library decides (see decideRole): a
+   *  tinted spawn is an opponent; an untinted hero spawn is the PLAYER unless the scene already has a live, enabled
+   *  player — then it is an opponent. Pass it only where that rule cannot see the intent (a preview that spawns the
+   *  next body before disposing the last). */
+  role?: 'player' | 'opponent';
+}
+
+// ── WHO IS THE PLAYER (EVERYONE-BODY-MOCAP-OPPONENTS, 2026-09-14) ───────────────────────────────────────────────────
+// The owner saw two of himself in a dunk duel: P2 spawned untinted on the hero URL and got the hero's own file. The rule
+// used to live in each mode (pass a tint or get a clone); it lives here now. Per scene, the live player bodies; a body
+// that is disposed, or hidden (the carnival hides its hub host while an event spawns its own player), no longer counts.
+const livePlayers = new WeakMap<Scene, Set<TransformNode>>();
+const opponentSeq = new WeakMap<Scene, number>();
+/** Count `root` as a live player body in `scene` until it is disposed or hidden. */
+export function trackPlayerBody(scene: Scene, root: TransformNode): void {
+  let set = livePlayers.get(scene); if (!set) { set = new Set(); livePlayers.set(scene, set); } set.add(root);
+}
+function hasLivePlayer(scene: Scene): boolean {
+  const set = livePlayers.get(scene); if (!set) return false;
+  for (const r of set) { if (r.isDisposed()) { set.delete(r); continue; } if (r.isEnabled()) return true; }
+  return false;
+}
+export function decideRole(scene: Scene, heroRequest: boolean, opts: Pick<SpawnOpts, 'role' | 'tint'>): 'player' | 'opponent' {
+  if (opts.role) return opts.role;
+  if (opts.tint) return 'opponent';
+  return heroRequest && hasLivePlayer(scene) ? 'opponent' : 'player';
 }
 
 // M30 fix: instantiateModelsToScene's rename suffixes AnimationGroup names too
@@ -153,9 +182,17 @@ export const CharacterLibrary = {
   /** Instantiate a character with its own animator + authored clips. */
   async spawn(scene: Scene, url: string, opts: SpawnOpts = {}): Promise<SpawnedCharacter> {
     url = normalizeHeroUrl(url);
+    const heroRequest = url === DEFAULT_HERO_URL;
+    const role = decideRole(scene, heroRequest, opts);
     // Ship pass 3 rollout flag: the dev harness and the Closet can point the DEFAULT hero at a candidate body.
     const override = (scene.metadata as { felHeroOverride?: string } | undefined)?.felHeroOverride;
-    if (override && url === DEFAULT_HERO_URL) url = override;
+    if (override && heroRequest && role === 'player') url = override;
+    else if (heroRequest && role === 'player') {
+      // THE PLAYER'S BODY: the scan for the owner's account, otherwise the kit body their creator chose (heroBody.ts).
+      // The server decides; a guest or a failed request plays the male kit body — never the owner's scan.
+      const id = await resolveIdentity().catch(() => null);
+      url = urlForHeroBody(id?.body ?? 'kit-male');
+    }
     // M105 (Path A): the Meshy hero GLB is visually broken. When
     // PROCEDURAL_CHARACTERS is on, bypass the GLB entirely and spawn a clean,
     // assetless, cel-shaded procedural athlete satisfying the same contract.
@@ -183,7 +220,14 @@ export const CharacterLibrary = {
     // from the athlete roster. Kit color is baked into the roster GLB, so the
     // runtime tint is skipped when a swap happens. Any roster load failure
     // falls back to the requested URL; the roster can never brick a spawn.
-    const rosterUrl = rosterUrlFor(url, opts.tint);
+    // An untinted OPPONENT on the hero URL seeds the roster pick by its order in the scene, so a dunk duel's P2 and a
+    // three-point field of rivals are distinct bodies — and none of them is the player's.
+    let rosterSeed = opts.tint;
+    if (!rosterSeed && role === 'opponent' && heroRequest) {
+      const n = opponentSeq.get(scene) ?? 0; opponentSeq.set(scene, n + 1);
+      rosterSeed = `opponent-${n}`;
+    }
+    const rosterUrl = role === 'opponent' ? rosterUrlFor(heroRequest ? DEFAULT_HERO_URL : url, rosterSeed) : null;
     let effectiveUrl = url;
     let rosterPicked = false;
     let container: AssetContainer;
@@ -193,7 +237,8 @@ export const CharacterLibrary = {
         effectiveUrl = rosterUrl;
         rosterPicked = true;
       } catch {
-        ({ container, url: effectiveUrl } = await loadHero(scene, url));
+        // a roster file that will not load must not hand an opponent the player's body: the kit body, tinted below
+        ({ container, url: effectiveUrl } = await loadHero(scene, heroRequest ? KIT_BODY_URL.male : url));
       }
     } else {
       ({ container, url: effectiveUrl } = await loadHero(scene, url));
@@ -226,6 +271,7 @@ export const CharacterLibrary = {
     root.scaling.setAll(opts.scale ?? 1);
 
     if (opts.tint && !rosterPicked) applyTint(meshes, opts.tint);
+    else if (!rosterPicked && role === 'opponent' && heroRequest) applyTint(meshes, '#8b1e2d');
 
     const animator = new CharacterAnimator(scene, inst.animationGroups);
     registerAuthoredClips(animator, scene, skeleton);
@@ -240,6 +286,9 @@ export const CharacterLibrary = {
     // truly-unknown clip name is ever requested (delegates to resolver-backed
     // play so the CLIP_ALIASES table still works for known sport names).
     installSafePlay(animator, opts.modeId ?? effectiveUrl);
+    // AN OPPONENT MOVES LIKE A CAPTURED PERSON (EVERYONE-BODY-MOCAP-OPPONENTS): the mode's in-scope captures replace the
+    // authored clips it asks for. The outermost play wrapper, so modes that re-call neverBindPose/installSafePlay are no-ops.
+    if (role === 'opponent') installOpponentMotion(animator, scene, skeleton);
 
     // M69 (E25 complete): write a measured arms-down pose onto the SKELETON so
     // it is the resting state for EVERY character in EVERY state — not only the
@@ -275,10 +324,12 @@ export const CharacterLibrary = {
       ? mountFootPlanting(scene, skinned, skeleton, { root, intensity: tier === 'mobile' ? 0.6 : 1 })
       : null;
 
+    if (role === 'player') trackPlayerBody(scene, root);
     const spawned: SpawnedCharacter = {
       id: `char_${spawnCounter}`,
       root, meshes, skeleton, animator, secondary,
       dispose() {
+        livePlayers.get(scene)?.delete(root);
         planting?.dispose();
         secondary.dispose();
         animator.dispose();
@@ -291,10 +342,13 @@ export const CharacterLibrary = {
     // materials skin/jersey/shorts/shoes/hair precisely so applyIdentity's
     // name-matched slots find them. Roster athletes carry their own baked
     // colorway and are never over-painted.
-    if (!rosterPicked && opts.tint == null && opts.skinTone == null && opts.identity !== false) {
+    if (!rosterPicked && role === 'player' && opts.tint == null && opts.skinTone == null && opts.identity !== false) {
       try {
         const id = await resolveIdentity();
         if (id.custom) applyIdentity(spawned, id);
+        // A guest on the kit body wears the Closet's OWN default look, not the library's hair fallback ('Straight' → the
+        // cap node, which read as a woman's bun on the male kit body in the first guest frames, 2026-09-14).
+        else applyHairStyle(meshes, defaultFace().hairStyle);
       } catch (e) { console.error('[FEL-IDENTITY] GLB hero identity failed', e); }
     }
 

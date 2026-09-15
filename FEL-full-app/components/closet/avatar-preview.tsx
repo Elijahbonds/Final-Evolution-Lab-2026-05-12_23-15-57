@@ -49,7 +49,12 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe }: Avata
       // ship pass 3 rollout flag (dev only): ?hero=/models/candidates/<file>.glb previews a candidate body
       const heroParam = process.env.NODE_ENV === 'development' ? new URLSearchParams(window.location.search).get('hero') : null;
       if (heroParam) (scene.metadata ??= {}).felHeroOverride = heroParam;
-      const spawned = await CharacterLibrary.spawn(scene, '/models/fel-hero.glb', { identity: false });
+      // EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14): the Closet dresses the body this player actually plays — the scan
+      // for the owner's account, otherwise their kit body (heroBody.ts). A dev ?hero= override still wins.
+      const { resolveIdentity } = await import('@/lib/babylon/core/playerIdentity');
+      const { urlForHeroBody } = await import('@/lib/babylon/core/heroBody');
+      const bodyKind = (await resolveIdentity().catch(() => null))?.body ?? 'kit-male';
+      const spawned = await CharacterLibrary.spawn(scene, heroParam ? '/models/fel-hero.glb' : urlForHeroBody(bodyKind), { identity: false, role: 'player' });
       if (disposed) { spawned.dispose(); engine.dispose(); return; }
       // dev-only probe hook (scripts/_closet-scene-probe.mts): the preview is the
       // one place the identity pipe and the spawn layers meet without a login
@@ -65,6 +70,7 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe }: Avata
           jersey: p.jersey,
           wardrobe: p.wardrobe ?? {},
           custom: true,
+          body: bodyKind,
         });
       };
       applyRef.current({ face, palette, jersey, wardrobe });

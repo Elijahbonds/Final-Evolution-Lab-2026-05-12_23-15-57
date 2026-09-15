@@ -102,7 +102,10 @@ describe('what the player changes is what the preview shows', () => {
 
   it('hands the identity pipe the exact shape it takes', () => {
     const b = bindPreview({ body: { stance: 'tall' } });
-    expect(Object.keys(b).sort()).toEqual(['face', 'jersey', 'palette', 'proportions', 'wardrobe']);
+    // bodyType (EVERYONE-BODY-MOCAP-OPPONENTS): which kit body the preview spawns — male or female are different meshes
+    expect(Object.keys(b).sort()).toEqual(['bodyType', 'face', 'jersey', 'palette', 'proportions', 'wardrobe']);
+    expect(b.bodyType).toBe('male');
+    expect(bindPreview({ body: { bodyType: 'female' } }).bodyType).toBe('female');
     expect(b.proportions.stance).toBe('tall');
     expect(b.proportions.palette.skin).toBe(b.face.skinTone);
     expect(bindProportions(undefined, { stance: 'compact' }, b.face, b.palette).stance).toBe('compact');

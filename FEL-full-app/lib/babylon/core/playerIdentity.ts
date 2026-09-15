@@ -30,6 +30,7 @@ export function cloneForTint(m: TintMat, name: string): TintMat | null {
 }
 import type { SpawnedCharacter } from './CharacterLibrary';
 import type { AvatarSpec } from '../../workout/avatar-builder';
+import { proportionsFromFrame, type HeroBodyKind } from './heroBody';
 import { boneNode } from '../anim/boneLookup';
 import {
   defaultFace, defaultJersey, sanitizeJersey, getWearable,
@@ -48,6 +49,9 @@ export interface PlayerIdentity {
   /** True when a logged-in player's closet answered — guests/dev get defaults
    *  visually UNCHANGED (identity only applies when this is true). */
   custom: boolean;
+  /** EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14): which body this player wears — the server's decision
+   *  (/api/v1/hero-body). 'kit-male' for a guest or when the server could not be asked. */
+  body: HeroBodyKind;
 }
 
 const FALLBACK_PALETTE = { jersey: '#00E5FF', shorts: '#0b1220', shoes: '#A855F7', accent: '#FFD700' };
@@ -57,9 +61,12 @@ let cached: PlayerIdentity | null = null;
 /** Fetch + merge the user's identity once per session. Fail soft to defaults. */
 export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
   if (cached && !force) return cached;
-  const [closet, scan] = await Promise.all([
+  const dev = devBodyOverride();
+  if (dev) { cached = dev; return dev; }
+  const [closet, scan, heroBody] = await Promise.all([
     fetch('/api/v1/closet').then((r) => (r.ok ? r.json() : null)).catch(() => null),
     fetch('/api/v1/workout/scan').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    fetch('/api/v1/hero-body').then((r) => (r.ok ? r.json() : null)).catch(() => null) as Promise<{ body?: HeroBodyKind; frame?: Record<string, unknown> | null } | null>,
   ]);
 
   const face: FaceConfig = { ...defaultFace(), ...(closet?.look?.face ?? {}) };
@@ -79,13 +86,43 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
     accent: cardAccent || accentOf('accessory', FALLBACK_PALETTE.accent),
   };
 
-  const proportions: AvatarSpec | null = scan?.scans?.[0]?.avatarSpec ?? null;
+  // A measured body scan wins; without one, the creator frame's height / build / reach (a kit-body player who never
+  // scanned still plays the proportions they built).
+  const frame = heroBody?.frame ?? null;
+  const frameScales = proportionsFromFrame(frame);
+  const proportions: AvatarSpec | null = scan?.scans?.[0]?.avatarSpec ?? (frameScales ? {
+    ...frameScales,
+    palette: { skin: face.skinTone, primary: palette.jersey, accent: palette.accent },
+    stance: (frame?.stance === 'tall' || frame?.stance === 'compact' ? frame.stance : 'athletic') as AvatarSpec['stance'],
+  } : null);
   const jerseyRaw = closet?.look?.jersey;
   const jersey = jerseyRaw ? sanitizeJersey(jerseyRaw) : null;
 
   const wardrobe: Wardrobe = { tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null };
-  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) };
+  const body: HeroBodyKind = heroBody?.body === 'scan' || heroBody?.body === 'kit-female' ? heroBody.body : 'kit-male';
+  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) || Boolean(frame), body };
   return cached;
+}
+
+/**
+ * DEV ONLY — the body matrix (EVERYONE-BODY-MOCAP-OPPONENTS, 2026-09-14). `/dev/mode/<key>?body=female&height=90&build=112&reach=100`
+ * plays a guest as that body without a login or a database row, so the owner's proof bar ("male/female × short/tall ×
+ * slim/heavy, per mode family") can be walked by a probe. Percent scales like the creator's Vitals rows. Never in a
+ * production build.
+ */
+function devBodyOverride(): PlayerIdentity | null {
+  if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return null;
+  const q = new URLSearchParams(window.location.search);
+  const b = q.get('body');
+  if (b !== 'male' && b !== 'female' && b !== 'scan') return null;
+  const pct = (k: string) => { const v = Number(q.get(k)); return Number.isFinite(v) && v > 0 ? v / 100 : 1; };
+  const face = defaultFace();
+  const palette = { ...FALLBACK_PALETTE };
+  return {
+    proportions: { heightScale: pct('height'), buildScale: pct('build'), reachScale: pct('reach'), palette: { skin: face.skinTone, primary: palette.jersey, accent: palette.accent }, stance: 'athletic' },
+    face, palette, jersey: null, wardrobe: { tops: null, shorts: null, shoes: null },
+    custom: true, body: b === 'scan' ? 'scan' : b === 'female' ? 'kit-female' : 'kit-male',
+  };
 }
 
 /** Call on Closet save / new scan so the next spawn picks up changes. */
@@ -93,10 +130,33 @@ export function invalidateIdentity(): void { cached = null; }
 
 // ── Application layers ──────────────────────────────────────────────────
 
-// Exported so a LIVE editor can drive the same bones this file scales, instead of keeping a second list
-// of which bones "build" and "reach" mean. Nothing about how they are applied here changes.
-export const TORSO_BONES = ['Spine', 'Spine1', 'Spine2', 'Chest'];
-export const ARM_BONES = ['LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm'];
+// PROPORTIONS (EVERYONE-BODY-MOCAP-OPPONENTS, 2026-09-14). This used to set a uniform scale on Spine, Spine1, Spine2
+// and Chest for BUILD and on the upper arm AND forearm for REACH. Bone scale is inherited, so it compounded down the
+// chain: a 112% build was ~1.4× everything above the hips — head, shoulders, arms — and a "heavy" short body stood 0.22 m
+// taller than a "slim" one (the body matrix measured the head at 1.47 m vs 1.25 m). Reach squared on the forearm and
+// hand. Now:
+//   height — the root, uniformly (unchanged);
+//   build  — the root's GIRTH (x/z) only. (b, 1, b) commutes with any yaw, so there is no shear and no height change;
+//   reach  — the elbow and wrist JOINTS move out along the bone (Mixamo rigs: a child sits on its parent's local +Y),
+//            which lengthens the arm without scaling any bone, so a bent elbow cannot shear the mesh. Clips key
+//            rotations only (imported position tracks are stripped), so the offsets hold through every animation, and
+//            the two-bone solver already fits hands to the arm length it finds.
+// Absolute from the spawn's own base, so a live editor can re-apply per keypress without the old cumulative drift.
+const REACH_JOINTS = ['LeftForeArm', 'LeftHand', 'RightForeArm', 'RightHand'];
+
+export interface ProportionScales { heightScale?: number; buildScale?: number; reachScale?: number }
+
+export function applyProportions(spawn: Pick<SpawnedCharacter, 'root' | 'skeleton'>, p: ProportionScales, base?: Vector3): void {
+  const h = p.heightScale || 1, b = p.buildScale || 1, r = p.reachScale || 1;
+  const s0 = base ?? spawn.root.scaling.clone();
+  spawn.root.scaling.set(s0.x * h * b, s0.y * h, s0.z * h * b);
+  for (const name of REACH_JOINTS) {
+    const n = boneNode(spawn.skeleton, name); if (!n) continue;
+    const md = (n.metadata ??= {}) as { felBindPos?: Vector3 };
+    md.felBindPos ??= n.position.clone();
+    n.position.copyFrom(md.felBindPos).scaleInPlace(r);
+  }
+}
 
 export function applyIdentity(
   spawn: SpawnedCharacter,
@@ -108,10 +168,7 @@ export function applyIdentity(
 ): void {
   // 1) Proportions (scan AvatarSpec) — height on root, build on torso, reach on arms.
   if (id.proportions) {
-    const p = id.proportions;
-    spawn.root.scaling.scaleInPlace(p.heightScale || 1);
-    scaleBones(spawn, TORSO_BONES, p.buildScale || 1);
-    scaleBones(spawn, ARM_BONES, p.reachScale || 1);
+    applyProportions(spawn, id.proportions);
   }
   // 2) Face — skin tone on skin materials (the model has no blendshapes today;
   //    the flat FaceConfig preset variety is handled by the Closet preview rig).
@@ -223,12 +280,6 @@ function attachJerseyPlate(spawn: SpawnedCharacter, jersey: JerseyConfig, accent
   spawn.meshes.push(plate);
 }
 
-function scaleBones(spawn: SpawnedCharacter, names: string[], s: number): void {
-  if (s === 1) return;
-  for (const n of names) {
-    boneNode(spawn.skeleton, n)?.scaling.setAll(s);
-  }
-}
 function matColor(m: TintMat): Color3 | undefined {
   return m.albedoColor ?? m.diffuseColor;
 }
