@@ -888,15 +888,19 @@ export const SkateRunMode: ModeDefinition = (() => {
       rig.char.root.position.z = Math.max(-world.bound, Math.min(world.bound, rig.char.root.position.z));
       const hitX = rig.char.root.position.x !== beforeX, hitZ = rig.char.root.position.z !== beforeZ;
       if (hitX || hitZ) {
-        // kill the speed INTO the fence and keep whatever runs along it, so a rider scrubs along the edge rather than
-        // sticking to it — and the momentum model and the world agree about what is happening again
-        if (hitX) { move.vel.x = 0; rig.rider.vel.x = 0; }
-        if (hitZ) { move.vel.z = 0; rig.rider.vel.z = 0; }
-        if (!fenceHit) {
+        // THE FENCE TURNS THE BOARD (WALLS + SPEED, 2026-09-15). Zeroing only the speed into the fence still pinned the
+        // rider: the board stayed pointed at it, the momentum model re-aimed the speed into it every frame and the rider
+        // bled to a stop against the edge (measured: 0.03 m in 1.5 s, holding forward). BoardMovement.wall swings the
+        // nose along the fence on a glancing hit and bounces it back off on a head-on one; the root follows the heading.
+        const nx = hitX ? -Math.sign(rig.char.root.position.x) : 0, nz = hitZ ? -Math.sign(rig.char.root.position.z) : 0;
+        const kind = move.wall(nx, nz);
+        if (!rig.rider.grinding && rig.rider.grounded) rig.char.root.rotation.y = move.yaw + (move.stance === 'switch' ? Math.PI : 0);
+        rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
+        if (!fenceHit && kind) {
           fenceHit = true;
-          SoundKit.play('impact', { pitch: 0.9, volume: 0.3 });
-          ctx.feel?.impact?.(0.2);
-          bannerFlash(ctx, 'EDGE OF THE PARK — TURN IT AROUND', 900);
+          SoundKit.play('impact', { pitch: kind === 'bounce' ? 0.8 : 1.1, volume: kind === 'bounce' ? 0.4 : 0.22 });
+          ctx.feel?.impact?.(kind === 'bounce' ? 0.3 : 0.12);
+          if (kind === 'bounce') bannerFlash(ctx, 'EDGE OF THE PARK', 700);
         }
       } else fenceHit = false;
       ctx.setHud({ time: Math.ceil(timeLeft) });

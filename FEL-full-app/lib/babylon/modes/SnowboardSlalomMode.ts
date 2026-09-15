@@ -449,7 +449,13 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // constant here was the bug the skate fence already had: a wide venue
       // clamped the rider to a narrow corridor over visibly wider snow.
       const edge = world.bound - 1;
-      rig.char.root.position.x = Math.max(-edge, Math.min(edge, rig.char.root.position.x));
+      if (Math.abs(rig.char.root.position.x) > edge) {
+        rig.char.root.position.x = Math.sign(rig.char.root.position.x) * edge;
+        // WALLS + SPEED (2026-09-15): the edge turns the board back onto the run. Clamping the position alone left the
+        // board pointed off-piste, so the momentum model drove it into the edge every frame and the rider stuck there.
+        if (move.wall(-Math.sign(rig.char.root.position.x), 0) && !rig.rider.grinding) rig.char.root.rotation.y = move.yaw;
+        rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
+      }
 
       if (nextGate >= world.markers.length) {
         ended = true;

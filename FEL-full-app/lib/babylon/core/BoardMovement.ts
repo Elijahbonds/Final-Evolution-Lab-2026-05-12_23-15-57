@@ -51,22 +51,31 @@ export interface BoardMoveTuning {
 // whole park in eight. Cruise and top speed come down about a quarter, the push gives less per kick and fades harder
 // so speed is earned over several strokes, and a touch more roll resistance means letting off actually costs you.
 // The venues grew at the same time, so a run is now a line through a place instead of a dash across one.
+//
+// FASTER (owner, 2026-09-15: "make the normal movement speed faster on board sports" — ~35%, skate + snow + surf). The
+// weight stays: the push still fades with speed and a coasting board still rolls to rest. What moves is the pace a
+// board settles at — the THPS cruise — and the ceiling above it, so the boost (+40% on top) still reads as a surge.
+export const BOARD_PACE = 1.35;
 export const SKATE_TUNING: BoardMoveTuning = {
-  pushAccel: 3.1, pushCooldownSec: 0.6, pumpGain: 1.6, cruiseSpeed: 5.6,
-  maxSpeed: 10.5, carveTurnRate: 2.4, carveHold: 1.0, scrubRate: 0.9, drag: 0.26,
+  pushAccel: 3.1 * BOARD_PACE, pushCooldownSec: 0.6, pumpGain: 1.6 * BOARD_PACE, cruiseSpeed: 5.6 * BOARD_PACE,
+  maxSpeed: 10.5 * BOARD_PACE, carveTurnRate: 2.4, carveHold: 1.0, scrubRate: 0.9, drag: 0.26,
   // SKATE-MOVE: the stroke is the board_push clip's 0.42 s; hold forward = push to cruise then roll; back = foot drag.
   strokeSec: 0.42, pushFade: 0.72, autoPushUntil: 0.8, rollResist: 0.4, brakeDecel: 7, scrubPerSec: true,
 };
 // Snow keeps more of its speed than skate — gravity is doing the work and a slope should feel fast — but the same
 // quarter comes off the top so a rider is not outrunning the run.
 export const SNOW_TUNING: BoardMoveTuning = {
-  pushAccel: 0, pushCooldownSec: 1, pumpGain: 2.2, cruiseSpeed: 8.4,
-  maxSpeed: 17, carveTurnRate: 1.9, carveHold: 1.02, scrubRate: 0.7, drag: 0.12,
+  pushAccel: 0, pushCooldownSec: 1, pumpGain: 2.2 * BOARD_PACE, cruiseSpeed: 8.4 * BOARD_PACE,
+  maxSpeed: 17 * BOARD_PACE, carveTurnRate: 1.9, carveHold: 1.02, scrubRate: 0.7, drag: 0.12,
+  // WALLS + SPEED (2026-09-15): the carve scrub is PER SECOND, as skate's has been since SKATE-MOVE. Per frame, a gentle
+  // 0.35 steer cost 11% of the speed every frame (0.886^60 per second) — measured: a held-forward run with light carves
+  // crawled at 2 m/s down a hill it descends at 12–16 m/s straight. A carve still costs speed; it no longer stops you.
+  scrubPerSec: true,
 };
 // A surfboard is the heaviest of the three: the wave supplies the speed and the rider trades it for turns.
 export const SURF_TUNING: BoardMoveTuning = {
-  pushAccel: 0, pushCooldownSec: 1, pumpGain: 2.6, cruiseSpeed: 6.2,
-  maxSpeed: 12, carveTurnRate: 2.8, carveHold: 1.03, scrubRate: 0.6, drag: 0.19,
+  pushAccel: 0, pushCooldownSec: 1, pumpGain: 2.6 * BOARD_PACE, cruiseSpeed: 6.2 * BOARD_PACE,
+  maxSpeed: 12 * BOARD_PACE, carveTurnRate: 2.8, carveHold: 1.03, scrubRate: 0.6, drag: 0.19, scrubPerSec: true,
 };
 
 export class BoardMovement {
@@ -109,6 +118,37 @@ export class BoardMovement {
     return true;
   }
 
+  /**
+   * A WALL (WALLS + SPEED, 2026-09-15: "fix the glitch where you get stuck to walls"). `nx, nz` is the wall's normal,
+   * pointing back into the play area. Speed here always follows the facing, so a mode that only zeroed the velocity
+   * into a wall left the board still POINTED at it: the next frame re-aimed the speed into the wall, it was zeroed again,
+   * and the rider bled to a stop, pinned (measured on the skate fence: 0.03 m moved in 1.5 s holding forward). The wall
+   * has to turn the board:
+   *   · a glancing hit swings the nose along the wall (a touch off it) and keeps most of the speed — you scrape along;
+   *   · a head-on hit (within ~37°) bounces the nose back off the wall and keeps a third — you are knocked away, never stuck.
+   * Returns what happened, or null when the board is already leaving the wall.
+   */
+  wall(nx: number, nz: number): 'glance' | 'bounce' | null {
+    const l = Math.hypot(nx, nz); if (!(l > 0)) return null;
+    nx /= l; nz /= l;
+    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+    const into = -(fx * nx + fz * nz);                 // 1 = straight at the wall, 0 = along it
+    if (into <= 0.02) return null;
+    const speed = this.speed;
+    let dx: number, dz: number, keep: number, kind: 'glance' | 'bounce';
+    if (into > 0.8) {
+      dx = fx + 2 * into * nx; dz = fz + 2 * into * nz;   // mirror the heading off the wall
+      keep = Math.max(1.5, speed * 0.35); kind = 'bounce';
+    } else {
+      dx = fx + into * nx + 0.2 * nx; dz = fz + into * nz + 0.2 * nz;   // along the wall, nudged off it
+      keep = speed * (1 - 0.45 * into); kind = 'glance';
+    }
+    this.yaw = Math.atan2(dx, dz);
+    this.strokeLeft = kind === 'bounce' ? 0 : this.strokeLeft;
+    this.vel.set(Math.sin(this.yaw) * keep, 0, Math.cos(this.yaw) * keep);
+    return kind;
+  }
+
   /** Stance switch: instant, small speed tax (switch riding is harder). */
   switchStance(): void {
     this.stance = this.stance === 'regular' ? 'switch' : 'regular';
@@ -136,6 +176,7 @@ export class BoardMovement {
 
     // ── terrain: gravity along slope builds/bleeds speed ──
     let slopeAccel = 0;
+    let fall: { yaw: number; accel: number } | null = null;
     // the stroke in flight delivers its Δv evenly across the window
     if (this.strokeLeft > 0 && t.strokeSec) {
       const step = Math.min(dt, this.strokeLeft);
@@ -150,6 +191,7 @@ export class BoardMovement {
     if (scene && pos && ground?.length) {
       const s = sampleSlope(scene, pos, this.yaw, ground);
       slopeAccel += s.gravityAlongSlope;   // += : the stroke above must survive the terrain sample
+      if (s.groundGap < 0.35 && s.fallAccel > 0.4) fall = { yaw: s.fallYaw, accel: s.fallAccel };
       // pumping converts slope + transition into extra speed
       if (pump > 0.1) {
         slopeAccel += pump * t.pumpGain * (0.5 + s.steepness01 * 2);
@@ -166,6 +208,21 @@ export class BoardMovement {
     this.balance.update(dt, lean, this.speed01);
     const carveCommit = Math.abs(lean);
     this.yaw += steer * t.carveTurnRate * stanceMult * dt * (0.4 + 0.6 * Math.min(1, this.speed / 4));
+
+    // ── THE HILL TAKES A STALLED BOARD (WALLS + SPEED, 2026-09-15) ──
+    // Speed here follows the facing, and gravity only fed the component ALONG the facing — so a board turned across the
+    // fall line lost its speed, and one that came to rest facing across or up the hill stayed there forever: zero speed,
+    // zero pull, a 0.4× turn rate. Measured: a snowboard run held forward for 60 s travelled 53 m with 29 stalls. On real
+    // snow a stopped board slides and swings its nose downhill; so a board that has nearly stopped on a slope is turned
+    // toward the fall line and pulled down it. Only when SLOW: a board carrying speed up a quarter pipe or across the
+    // hill is riding a line on purpose, and it reaches this rule on its own at the top of the transition.
+    if (fall && this.speed < 2.5) {
+      let d = fall.yaw - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
+      const hold = 1 - 0.6 * Math.min(1, Math.abs(steer));          // a rider holding an edge resists (never fully)
+      const rate = 2.2 * Math.min(1, fall.accel / 2) * hold;
+      this.yaw += Math.sign(d) * Math.min(Math.abs(d), rate * dt);
+      slopeAccel = Math.max(slopeAccel, fall.accel * Math.max(0.25, Math.cos(d)));
+    }
 
     const fwd = new Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
     // Steering re-aligns velocity toward facing (committed carves hold

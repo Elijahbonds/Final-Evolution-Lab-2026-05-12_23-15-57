@@ -28,6 +28,8 @@ export interface RiderCfgOverrides {
   /** Forward accel the Rider adds on its own every frame (m/s², × 0.55–1 with pump). Skate's momentum model owns the
    *  velocity outright and passes 0 — the default 9 was a frame-rate-dependent creep under it (SKATE-MOVE). */
   carveAccel?: number;
+  /** Horizontal speed ceiling (m/s, default 16). Surf lifts it with the shared board pace (WALLS + SPEED, 2026-09-15). */
+  maxSpeed?: number;
   /** Top speed ALONG a rail (m/s). A grind scrubs — riding a 4 m rail at 8 m/s is over in 0.5 s and reads as a bump,
    *  not a trick (VENICE-SKATE-THPS). Omit for the historic behaviour (the run's own speed, floored at 6). */
   grindSpeed?: number;

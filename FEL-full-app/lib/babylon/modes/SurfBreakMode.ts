@@ -34,6 +34,7 @@ import { Onlookers } from '../visual/Onlookers';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 import { refuse } from '../core/Refusal';            // MECHANICS PASS: a press that cannot act is answered
+import { BOARD_PACE } from '../core/BoardMovement';   // WALLS + SPEED (2026-09-15): the shared +35% board pace
 import { REPEAT_DECAY } from '../core/ComboChain';   // the same THPS repeat decay the skate and free-run chains use
 import { SurfSpray } from '../premium/SurfSpray';   // SURF OCEAN: crest mist, rail spray, splashes
 
@@ -44,7 +45,8 @@ const CUTBACK_RATE = 6;
 let baseFov: number | null = null;
 
 export const POCKET = { min: 2, max: 9 };
-export const MAX_FORWARD_SPEED = 9;
+/** WALLS + SPEED (2026-09-15): +35% with the other boards (was 9) — the ceiling the surge and the lens normalise against. */
+export const MAX_FORWARD_SPEED = 12;
 /** How far past the bottom of the face the rider may drift before the rail holds them (m) — the wave catches up anyway. */
 export const FLAT_LEASH = 8;
 /** Wave-relative drift (m/s): stalled on the flat the wave gains this much on you; the face's slide under the lip; the
@@ -247,7 +249,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       // ARENA-10PHASE P3: spawn IN the pocket (the lip starts at z −50; was z −22 = 28 m out on the flat with nothing under
       // the board for the first 6 s), and glue the rider to the face on the way down it (the wave face falls away faster
       // than one frame of gravity, exactly like the pitched piste — see RiderCfgOverrides.stickDown).
-      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -50 + POCKET.min + 3), 0, world.ground, '#ffd75e', 'surfboard', { stickDown: 0.9, rayLength: 8 });
+      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -50 + POCKET.min + 3), 0, world.ground, '#ffd75e', 'surfboard', { stickDown: 0.9, rayLength: 8, carveAccel: 9 * BOARD_PACE, maxSpeed: 16 * BOARD_PACE });   // WALLS + SPEED: +35% across the face
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { momentum: trickMomentum, anim: 'external', onBeat: (b) => { if (b === 'land') { landBeatT = LAND_BEAT_SEC; spray?.splash(rig.char.root.position, 0.5); } else { bailBeatT = BAIL_BEAT_SEC; spray?.splash(rig.char.root.position, 1); } } });
       animTree = new BoardAnimTree(rig.char.animator);
       posture?.dispose();
@@ -471,7 +473,15 @@ export const SurfBreakMode: ModeDefinition = (() => {
         // Clamp AT the water's edge, not 5m inside it. The rider used to stop
         // against nothing while the ocean visibly continued past him.
         const edge = world.bound - 1;   // the break's own width, so the clamp and the water's edge are one number
-        rig.char.root.position.x = Math.max(-edge, Math.min(edge, rig.char.root.position.x));
+        if (Math.abs(rig.char.root.position.x) > edge) {
+          const side = Math.sign(rig.char.root.position.x);
+          rig.char.root.position.x = side * edge;
+          // WALLS + SPEED (2026-09-15): the edge of the break turns the board back along the wave — a clamp alone left the
+          // surfer aimed at the edge, carving into it every frame and stuck there
+          if (rig.rider.vel.x * side > 0) rig.rider.vel.x = -rig.rider.vel.x * 0.35;
+          const r = rig.char.root.rotation.y;
+          if (Math.sin(r) * side > 0) { yawTarget = r - 2 * Math.atan2(Math.sin(r), Math.cos(r)); cutbackUntil = t + 0.4; }   // mirror the heading, same winding
+        }
       }
 
       driveAnim(dt);   // every frame, wiped out or not — the tree is the one owner of the rider's clips

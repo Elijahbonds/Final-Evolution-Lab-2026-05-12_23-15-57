@@ -31,6 +31,12 @@ export interface SlopeInfo {
   /** signed downhill acceleration along current facing (m/s²) */
   gravityAlongSlope: number;
   steepness01: number;         // 0 = flat, 1 = vertical
+  /** Heading straight down the hill (yaw, radians) and how hard gravity pulls along the plane there (m/s², 0 on the flat).
+   *  A board facing across or up the slope still slides this way (WALLS + SPEED, 2026-09-15). */
+  fallYaw: number;
+  fallAccel: number;
+  /** Metres from the feet down to the sampled surface (∞ with no hit) — an airborne rider must not be steered by the ground. */
+  groundGap: number;
 }
 
 /** Sample the ground under the rider: normal + slope response for the
@@ -51,7 +57,11 @@ export function sampleSlope(
   const g = new Vector3(0, -9.81, 0);
   const alongPlane = g.subtract(n.scale(Vector3.Dot(g, n)));
   const fwd = new Vector3(Math.sin(facingYaw), 0, Math.cos(facingYaw));
-  return { normal: n, gravityAlongSlope: Vector3.Dot(alongPlane, fwd), steepness01: steep };
+  return {
+    normal: n, gravityAlongSlope: Vector3.Dot(alongPlane, fwd), steepness01: steep,
+    fallYaw: Math.atan2(alongPlane.x, alongPlane.z), fallAccel: Math.hypot(alongPlane.x, alongPlane.z),
+    groundGap: hit?.hit ? Math.max(0, hit.distance - 1.2) : Infinity,
+  };
 }
 
 // ── Balance model ──────────────────────────────────────────────────────────
