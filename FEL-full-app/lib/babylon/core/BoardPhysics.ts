@@ -81,13 +81,38 @@ export class BalanceModel {
 /** Derives the board prop's local pose from the rider root every frame.
  *  The board can NEVER drift from the rider: its world transform is a pure
  *  function of the root + the ride pose (carve lean, grab tweaks). */
+// ── The deck under the feet (ANIM-RESIDUAL, 2026-09-14) ─────────────────────
+// The deck is parked at the root: right on the ground, where the root IS the contact patch, and wrong in the air, where
+// the body keeps moving over it. A grab draws the knees up and walks both ankles 0.15–0.27 m across the deck (measured
+// live, /dev/mode/skateboard) while the deck stays at the root — the rider floats beside a board hanging between his
+// calves, the eye's "midair melt/detach". In the air the deck follows the feet instead: it keeps the offset from the
+// feet it has on the ground (so the ride stance looks exactly as it did), and moves with them when the pose moves them.
+export const DECK_LIFT_MAX = 0.55;   // metres the deck may rise to meet tucked feet (a grab's knees-to-chest)
+export const DECK_SHIFT_MAX = 0.3;   // metres across / along the deck the feet may carry it
+export const DECK_DROP_MAX = 0.05;   // the deck never sinks under the root: the root is where the wheels will land
+
+export interface V3Like { x: number; y: number; z: number }
+
+/** Where the deck sits (root-local offset from its parked spot) for this frame's feet: the feet's midpoint minus where
+ *  that midpoint sits when the rider is on the ground, clamped; zero on the ground. Pure, for the unit test. */
+export function deckUnderFeet(feetNow: V3Like, feetGround: V3Like, airborne: boolean): V3Like {
+  if (!airborne) return { x: 0, y: 0, z: 0 };
+  const c = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Number.isFinite(v) ? v : 0));
+  return {
+    x: c(feetNow.x - feetGround.x, -DECK_SHIFT_MAX, DECK_SHIFT_MAX),
+    y: c(feetNow.y - feetGround.y, -DECK_DROP_MAX, DECK_LIFT_MAX),
+    z: c(feetNow.z - feetGround.z, -DECK_SHIFT_MAX, DECK_SHIFT_MAX),
+  };
+}
+
 export class BoardSync {
   constructor(private board: TransformNode, private riderRoot: TransformNode) {}
 
   /** `pitch` (VENICE-SKATE-THPS, 2026-09-09): the deck's nose angle in radians — a manual rides the back trucks with
-   *  the nose in the air, and the deck has to show it or the trick is invisible. 0 for every other window. */
-  update(lean: number, airborne: boolean, pitch = 0): void {
-    this.board.position.set(0, 0.03, 0);
+   *  the nose in the air, and the deck has to show it or the trick is invisible. 0 for every other window.
+   *  `under` (ANIM-RESIDUAL): the root-local offset that keeps the deck under the feet in the air (deckUnderFeet). */
+  update(lean: number, airborne: boolean, pitch = 0, under: V3Like | null = null): void {
+    this.board.position.set(under?.x ?? 0, 0.03 + (under?.y ?? 0), under?.z ?? 0);
     this.board.rotation.set(pitch, 0, -lean * 0.22);
     // parent is the rider root — position is local, so the pair is synced
     // by construction. This guard exists so a future refactor that re-

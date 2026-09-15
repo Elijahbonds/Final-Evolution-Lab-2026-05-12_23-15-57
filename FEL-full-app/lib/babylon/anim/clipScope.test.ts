@@ -21,7 +21,7 @@ const MODES_DIR = path.join(ROOT, 'lib/babylon/modes');
 
 // Files that NAME clips without playing them: the clip tables themselves, the importer's list of authored names, the
 // dunk trick catalogue (read for scoring labels by modes that import the judge), and the retired TimingSport configs.
-const DATA_TABLES = /anim\/authored\/|anim\/clipAliases\.ts$|anim\/clipRegistry\.ts$|anim\/clipScope\.ts$|anim\/mirrored-clips\.ts$|anim\/danceClips\.ts$|anim\/importSanitizer\.ts$|core\/DunkSystem\.ts$|modes\/modeConfigs\.ts$/;
+const DATA_TABLES = /anim\/authored\/|anim\/clipAliases\.ts$|anim\/clipRegistry\.ts$|anim\/clipScope\.ts$|anim\/mirrored-clips\.ts$|anim\/danceClips\.ts$|anim\/importSanitizer\.ts$|characters\/proceduralClips\.ts$|core\/DunkSystem\.ts$|modes\/modeConfigs\.ts$/;
 
 function resolveImport(from: string, spec: string): string | null {
   let base: string;
@@ -129,6 +129,11 @@ describe('clipScope — no cross-mode clip bleed', () => {
     const derby = scopeForMode('baseball')!;
     for (const n of ['dunk_launch', 'karate_hit_react', 'tennis_swing', 'golf_swing_full']) expect(scopeAllows(derby, n), n).toBe(false);
     expect(scopeAllows(scopeForMode('tennis'), 'baseball_swing')).toBe(false);   // the bat stays in the batter's box
+    // ANIM-RESIDUAL: the fighter's base clips are core by name, and a batter owns none of them
+    for (const m of ['baseball', 'derby']) for (const n of ['guard', 'jab', 'hook', 'uppercut', 'roundhouse', 'high_kick']) expect(scopeAllows(scopeForMode(m), n), `${m} ${n}`).toBe(false);
+    for (const n of ['idle_stand', 'run', 'walk', 'jump_up', 'baseball_stance']) expect(scopeAllows(derby, n), n).toBe(true);
+    expect(scopeAllows(scopeForMode('karate'), 'guard')).toBe(true);
+    expect(scopeAllows(skate, 'guard')).toBe(true);   // omit is per mode, not a new global rule
   });
 });
 

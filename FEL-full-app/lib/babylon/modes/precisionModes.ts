@@ -39,7 +39,7 @@ import { SPORT_CLIP } from '../anim/clipRegistry';
 import { BeatOwner } from '../anim/beatOwner';
 import { registerMirroredClips } from '../anim/mirrored-clips';
 import { GOLF_CONTACT_SEC } from '../anim/authored/golf';
-import { batLineAt, BAT_SWING_SEC, BAT_RECOVER_SEC } from '../anim/authored/baseball';
+import { batLineAt, batRightSign, BAT_SWING_SEC, BAT_RECOVER_SEC } from '../anim/authored/baseball';
 import { SoundKit } from '../audio/SoundKit';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
@@ -861,6 +861,10 @@ export const DerbyMode: ModeDefinition = (() => {
       {
         const lh = boneNode(me.skeleton, 'LeftHand'), rh = boneNode(me.skeleton, 'RightHand');
         const lf = boneNode(me.skeleton, 'LeftForeArm'), rf = boneNode(me.skeleton, 'RightForeArm');
+        const lsh = boneNode(me.skeleton, 'LeftArm'), rsh = boneNode(me.skeleton, 'RightArm');
+        /** ANIM-RESIDUAL (2026-09-14): which way the batter's RIGHT really lies along the root's +x — +1 or −1, latched from
+         *  the shoulders on the stance before any swing turns them; 0 until it reads. See the root → world line below. */
+        let rightSign = 0;
         if (lh && rh) {
           bat = MeshBuilder.CreateCylinder('derby_bat', { height: BAT_LEN, diameterTop: 0.065, diameterBottom: 0.03, tessellation: 12 }, ctx.scene);
           const bm = new StandardMaterial('derby_bat_m', ctx.scene);
@@ -883,8 +887,19 @@ export const DerbyMode: ModeDefinition = (() => {
             const grip = fL.add(fR).scaleInPlace(0.5);
             const d = batLineAt(batSwingSec);
             const yaw = meRef.root.rotationQuaternion ? meRef.root.rotationQuaternion.toEulerAngles().y : meRef.root.rotation.y;
-            // root → world: +x right = (cos, 0, -sin), +z forward = (sin, 0, cos) — the axes the hand targets are authored in
-            const dir = new Vector3(d[0] * Math.cos(yaw) + d[2] * Math.sin(yaw), d[1], -d[0] * Math.sin(yaw) + d[2] * Math.cos(yaw));
+            // root → world: +x = (cos, 0, -sin), +z forward = (sin, 0, cos) — the axes the hand targets are authored in.
+            // ANIM-RESIDUAL: +x is NOT the batter's right on the runtime rig. Measured on dev :3061 (/dev/mode/derby, kit body):
+            // RightArm at −0.20 and LeftArm at +0.13 along this +x, both fists at −0.23 by the right shoulder (the clip's
+            // mirroring put them there), and the barrel laid off toward +x — up from the right-shoulder hands, ACROSS the
+            // face: 2 cm from the head's centre on the median stance frame, inside 9 cm of the spine on 874 of 918 (the eye's
+            // "batBleed, bat through the torso/shoulder"). The side is read off the body, not assumed.
+            if (rightSign === 0 && lsh && rsh && batSwingSec == null) {
+              const across = rsh.getAbsolutePosition().subtract(lsh.getAbsolutePosition());
+              rightSign = batRightSign(across.x, across.z, yaw);
+              if (rightSign !== 0) console.info(`[DERBY-BAT] batter's right is ${rightSign > 0 ? '+' : '−'}x on this rig`);
+            }
+            const dx = d[0] * (rightSign || 1);
+            const dir = new Vector3(dx * Math.cos(yaw) + d[2] * Math.sin(yaw), d[1], -dx * Math.sin(yaw) + d[2] * Math.cos(yaw));
             // Hands that come apart through the swing lie ON the handle, so the line between the fists pulls the handle
             // onto it (signed along the authored line). Measured on the first cut: fists 6 cm off the axis at the swing
             // median, 29 of 66 swing frames past 8 cm. A full pull fixed the grip but let a stacked pair of fists tip the

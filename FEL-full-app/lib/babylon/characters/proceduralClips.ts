@@ -15,6 +15,7 @@
 import { buildClip, type BoneKeys, type HipsYKeys } from '../anim/clipBuilder';
 import type { CharacterAnimator } from '../anim/CharacterAnimator';
 import type { Scene, Skeleton } from '@babylonjs/core';
+import { scopeAllows, scopeForScene } from '../anim/clipScope';
 
 interface ClipDef { name: string; dur: number; bones: BoneKeys; hipsY?: HipsYKeys }
 
@@ -134,7 +135,11 @@ const CLIPS: ClipDef[] = [
 export function registerProceduralClips(
   animator: CharacterAnimator, scene: Scene, skeleton: Skeleton,
 ): void {
+  // ANIM-RESIDUAL (2026-09-14): the base names are core, but a mode's scope may omit some (the derby owns no fighter guard or
+  // strikes). The procedural body honours it the way registerAuthoredClips does — an omitted clip is never built.
+  const scope = scopeForScene(scene);
   for (const def of CLIPS) {
+    if (!scopeAllows(scope, def.name)) continue;
     const g = buildClip(scene, skeleton, def.name, def.dur, def.bones, def.hipsY);
     if (g) animator.register(g);
     else console.warn(`[FEL-PROC] clip "${def.name}" produced no targets`);

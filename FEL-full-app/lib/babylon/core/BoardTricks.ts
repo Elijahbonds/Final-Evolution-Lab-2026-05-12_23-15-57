@@ -156,6 +156,23 @@ export function bestFitting(discipline: BoardDiscipline, btn: BoardTrick['btn'],
 }
 
 /**
+ * The trick a button throws IN THE AIR: the held direction's air trick when this air can hold it, else the hardest air
+ * trick on that button that fits, else nothing.
+ *
+ * ANIM-RESIDUAL (2026-09-14): the air branch used `trickFor` + `bestFitting`, which search the WHOLE list — ground links
+ * included. Stick forward + A is the skate NOSE MANUAL (airSec 0, so it always "fits"), and it is also exactly what a
+ * player holds to push into an ollie: every forward ollie flashed NOSE MANUAL mid-air and, because the manual carries a
+ * nose grab, froze the body in the grab for the whole flight. A manual, a grind or a revert is never thrown in the air.
+ */
+export function airTrickFor(discipline: BoardDiscipline, dir: BoardTrick['dir'], btn: BoardTrick['btn'], airSec: number): BoardTrick | null {
+  const airs = TRICKS_BY_DISCIPLINE[discipline].filter((t) => t.kind === 'air' && t.btn === btn);
+  const want = airs.find((t) => t.dir === dir) ?? airs.find((t) => t.dir === null);
+  if (want && fitsAir(want, airSec)) return want;
+  const fits = airs.filter((t) => fitsAir(t, airSec));
+  return fits.length ? fits.reduce((best, t) => (t.difficulty > best.difficulty ? t : best)) : null;
+}
+
+/**
  * Score a landed trick.
  *
  * `landed01` is how much of the spin the rider actually completed — a trick rotated 80% of the way is a sketchy land

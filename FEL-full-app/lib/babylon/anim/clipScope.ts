@@ -50,6 +50,8 @@ export interface ClipScope {
   suites: readonly ClipSuite[];
   /** Single clips from another suite this mode plays on purpose. */
   borrow: readonly string[];
+  /** Core clips this mode's bodies must NOT own (ANIM-RESIDUAL): never built, refused onto the resting loop. */
+  omit?: readonly string[];
 }
 
 // The contact reactions a ball sport borrows from the fighter / the carrier: knocked down, on the floor, back up.
@@ -59,9 +61,15 @@ const COMBAT = { suites: ['combat'], borrow: ['football_tackled_fall', 'dunk_cel
 const BOARD = { suites: ['board'], borrow: [] } as const;
 const NET = { suites: ['tennis', 'volleyball'], borrow: [] } as const;   // netTree drives both rackets and the net
 const PARTY = { suites: [], borrow: ['karate_hit_react', 'dunk_celebrate_big'] } as const;
+// ANIM-RESIDUAL (2026-09-14): the fighter's base clips are CORE by name (no sport prefix — guard is the MISSING-clip safe
+// default and the alias base under half the table), so every scoped body still registered a playable guard, jab, hook,
+// uppercut, roundhouse and high kick. A batter owns none of them: the derby's own bat clips replaced every alias that
+// used to land there (SHARED-ANIM-BUS), and a request that still reaches one is a bleed — it lands on the bat stance now.
+const FIGHTER_BASE = ['guard', 'jab', 'hook', 'uppercut', 'roundhouse', 'high_kick'] as const;
+const DERBY = { suites: ['baseball'], borrow: [], omit: FIGHTER_BASE } as const;
 
 /** Keyed by the harness's `def.modeId` (what ModeHarness stamps on `scene.metadata.felModeId`). */
-export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; borrow: readonly string[] }> = {
+export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; borrow: readonly string[]; omit?: readonly string[] }> = {
   dunk: { suites: ['dunk'], borrow: [] },
   dunkduel: { suites: ['dunk'], borrow: [] },
   onevone: HOOPS,
@@ -77,7 +85,7 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   dance: { suites: [], borrow: ['karate_hit_react'] },
   tennis: NET, volleyball: NET,
   golf: { suites: ['golf'], borrow: [] },
-  baseball: { suites: ['baseball'], borrow: [] }, derby: { suites: ['baseball'], borrow: [] },
+  baseball: DERBY, derby: DERBY,
   soccer: { suites: ['soccer'], borrow: ['football_juke_left'] }, penalty: { suites: ['soccer'], borrow: ['football_juke_left'] },
   velocitykart: { suites: [], borrow: [] }, aeroaces: { suites: [], borrow: [] },
   who_scene_it: PARTY, brainbrawl: PARTY,
@@ -87,7 +95,7 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
 export function scopeForMode(modeId: string | undefined | null): ClipScope | null {
   if (!modeId) return null;
   const s = MODE_CLIP_SCOPES[modeId];
-  return s ? { modeId, suites: s.suites, borrow: s.borrow } : null;
+  return s ? { modeId, suites: s.suites, borrow: s.borrow, ...(s.omit ? { omit: s.omit } : {}) } : null;
 }
 
 export function scopeForScene(scene: Scene | null | undefined): ClipScope | null {
@@ -97,6 +105,7 @@ export function scopeForScene(scene: Scene | null | undefined): ClipScope | null
 /** May a body in this scope own/play `name`? Core always; a suite the mode names; a clip the mode borrows. */
 export function scopeAllows(scope: ClipScope | null, name: string): boolean {
   if (!scope) return true;
+  if (scope.omit?.includes(name.replace(/\.M$/, ''))) return false;
   const suite = suiteOfClip(name);
   if (suite === 'core' || scope.suites.includes(suite) || scope.borrow.includes(name.replace(/\.M$/, ''))) return true;
   // EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14): a captured opponent clip (`karate_mc_hit_react`) is in scope wherever the

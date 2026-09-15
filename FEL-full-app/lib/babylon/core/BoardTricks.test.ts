@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   SKATE_TRICKS, SNOW_TRICKS, SURF_TRICKS, TRICKS_BY_DISCIPLINE,
-  allBoardTricks, trickFor, fitsAir, bestFitting, scoreTrick, basePts, needsRail,
+  allBoardTricks, trickFor, fitsAir, bestFitting, airTrickFor, scoreTrick, basePts, needsRail,
   type BoardDiscipline,
 } from './BoardTricks';
 
@@ -156,5 +156,33 @@ describe('scoring comes off difficulty, so the table cannot drift from the feel'
 
   it('every trick is worth something', () => {
     for (const t of allBoardTricks()) expect(basePts(t)).toBeGreaterThan(0);
+  });
+});
+
+// ANIM-RESIDUAL (2026-09-14): stick forward + A mid-air flashed NOSE MANUAL and froze the rider in its nose grab.
+describe('a mid-air press only ever throws an AIR trick', () => {
+  it('no discipline, direction, button or air budget resolves to a manual, a grind or a revert', () => {
+    const dirs = [null, 'up', 'down', 'left', 'right'] as const;
+    for (const d of ['skate', 'snow', 'surf'] as BoardDiscipline[]) for (const dir of dirs) for (const btn of ['A', 'B', 'X', 'Y'] as const) {
+      for (const air of [0, 0.25, 0.5, 1.5]) {
+        const t2 = airTrickFor(d, dir, btn, air);
+        if (t2) expect(t2.kind, `${d} ${dir}+${btn} @${air}`).toBe('air');
+      }
+    }
+  });
+  it('up + A in the air is not the nose manual; a bare A is the ollie; a kickflip still needs its direction', () => {
+    expect(trickFor('skate', 'up', 'A')?.id).toBe('nosemanual');          // the GROUND link keeps its input
+    expect(airTrickFor('skate', 'up', 'A', 0.5)?.id).toBe('ollie');
+    expect(airTrickFor('skate', 'left', 'A', 0.5)?.id).toBe('kickflip');
+    expect(airTrickFor('skate', 'up', 'X', 0.9)).toBeNull();                // no rail slide over open air
+  });
+  it('a held direction the air cannot hold falls back to the best air that fits', () => {
+    const t2 = airTrickFor('snow', 'left', 'Y', 0.6);
+    expect(t2 === null || t2.airSec <= 0.6).toBe(true);
+  });
+  it('the press that pops the ollie is spent on the pop (SkateRunMode source)', () => {
+    const src = fs.readFileSync(path.join(ROOT, 'lib/babylon/modes/SkateRunMode.ts'), 'utf8');
+    expect(src).toMatch(/if \(!rig\.rider\.grounded && !popped\)/);
+    expect(src).not.toMatch(/bestFitting\('skate'/);
   });
 });

@@ -175,7 +175,11 @@ export function registerAuthoredClips(
   // The nine base clips (run, walk, guard, strikes, jumpshot) the forge bakes into
   // fel-hero.glb, built here on the live skeleton too so a body without baked
   // animations (the MPFB2 candidate) plays them — one source of truth.
-  for (const g of buildBaseClips(scene, skeleton)) { animator.register(g); registered.push(g.name); }
+  // ANIM-RESIDUAL: a scope may omit core base clips (the derby owns no fighter guard or strikes) — skipped like a foreign suite
+  for (const g of buildBaseClips(scene, skeleton)) {
+    if (!scopeAllows(scope, g.name)) { skipped++; g.dispose(); continue; }
+    animator.register(g); registered.push(g.name);
+  }
   animator.setScope(scope);
   const ledger = ledgerFor(scene);
   ledger.scope = scope;

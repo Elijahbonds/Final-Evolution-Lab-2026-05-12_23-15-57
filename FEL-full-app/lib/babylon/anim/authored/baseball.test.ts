@@ -4,7 +4,7 @@ import { FreeCamera, NullEngine, Quaternion, Scene, SceneLoader, Vector3 } from 
 import type { AnimationGroup, Skeleton, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { boneNode } from '../boneLookup';
-import { buildBatStance, buildBatSwing, buildPitchOver, buildPitchSide, batLineAt, BAT_LINE, BAT_SWING_SEC, BAT_RECOVER_SEC } from './baseball';
+import { buildBatStance, buildBatSwing, buildPitchOver, buildPitchSide, batLineAt, batRightSign, BAT_LINE, BAT_SWING_SEC, BAT_RECOVER_SEC } from './baseball';
 
 let scene: Scene; let sk: Skeleton;
 const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>();
@@ -79,5 +79,19 @@ describe('the bat line', () => {
       const a = BAT_LINE[i - 1][1], b = BAT_LINE[i][1];
       expect(dot(a, b) / (Math.hypot(...a) * Math.hypot(...b))).toBeGreaterThan(Math.cos(120 * Math.PI / 180));
     }
+  });
+});
+
+// ANIM-RESIDUAL (2026-09-14): the barrel is laid off toward the batter's RIGHT as the body really has it, not as +x assumes.
+describe('the bat reads which side the batter\'s right is on', () => {
+  it('a mirrored rig (right shoulder on −x) flips the authored line; an unmirrored one keeps it', () => {
+    // yaw π/2: root +x is world (0, 0, −1). The live derby rig measured RightArm − LeftArm ≈ (0, 0, +0.33) there.
+    expect(batRightSign(0, 0.33, Math.PI / 2)).toBe(-1);
+    expect(batRightSign(0, -0.33, Math.PI / 2)).toBe(1);
+    expect(batRightSign(0.33, 0, 0)).toBe(1);
+    expect(batRightSign(-0.33, 0, 0)).toBe(-1);
+  });
+  it('shoulders square to the axis give no answer rather than a guess', () => {
+    expect(batRightSign(0.05, 0.3, 0)).toBe(0);
   });
 });

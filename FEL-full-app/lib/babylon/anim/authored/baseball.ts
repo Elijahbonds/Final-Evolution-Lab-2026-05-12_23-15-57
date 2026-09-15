@@ -70,6 +70,15 @@ export const BAT_LINE: ReadonlyArray<readonly [number, V3]> = [
 /** Seconds the finished barrel takes to come back up into the load once the swing has settled into the stance. */
 export const BAT_RECOVER_SEC = 0.35;
 
+/** ANIM-RESIDUAL (2026-09-14): which way the batter's RIGHT lies along the root's +x axis — the axis BAT_LINE is authored
+ *  in, (cos yaw, 0, −sin yaw) in world space. On the runtime rig it is the NEGATIVE side (the rig is mirrored against the
+ *  node), so a barrel laid off along +x crossed the batter's face. `across` is RightArm − LeftArm in world space, read on
+ *  the stance; returns ±1, or 0 while the shoulders are too square-on to tell (|along| ≤ 0.12 m). */
+export function batRightSign(acrossX: number, acrossZ: number, yaw: number): -1 | 0 | 1 {
+  const along = acrossX * Math.cos(yaw) - acrossZ * Math.sin(yaw);
+  return Math.abs(along) > 0.12 ? (along > 0 ? 1 : -1) : 0;
+}
+
 const nrm = (v: V3): V3 => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
 const mix = (a: V3, b: V3, k: number): V3 => nrm([a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]);
 

@@ -12,12 +12,12 @@
 
 import { Coyote } from '../core/gameFeel';
 import { stepSpeedFov } from '../core/SpeedFov';
-import { Vector3 } from '@babylonjs/core';
+import { Vector3, type TransformNode } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, landsSwitch, TRICKS, type BoardRig } from './boardCore';
-import { trickFor, bestFitting, basePts as trickPts, heldTrickDir, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
+import { airTrickFor, basePts as trickPts, heldTrickDir, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { buildSkatepark, PARK_BOUND, type RideWorld } from './rideWorlds';
 import { readBoardVenue, tuneForVenue } from '../nexus/boardVenues';   // different places to ride
 import { assertSpawned } from '../core/FrameGuard';
@@ -47,7 +47,8 @@ import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
 import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out of it
 import { MomentumBus } from '../core/MomentumBus';
-import { BoardSync } from '../core/BoardPhysics';
+import { BoardSync, deckUnderFeet, type V3Like } from '../core/BoardPhysics';
+import { boneNode } from '../anim/boneLookup';
 import { GoalTracker, MovingRail, SKATE_GOALS, VENICE_PATROL_RAIL } from '../core/ParkGoals';
 import { Onlookers } from '../visual/Onlookers';
 import { SoundKit } from '../audio/SoundKit';
@@ -163,6 +164,19 @@ export const SkateRunMode: ModeDefinition = (() => {
   const groundUnder = (): number => lastGroundY;
   /** Eased deck pitch (radians): a manual rides the tail with the nose up, everything else is flat. */
   let boardPitch = 0;
+  /** ANIM-RESIDUAL: the deck's eased root-local offset (under the feet in the air), the feet midpoint the stance holds on
+   *  the ground, and the two ankle nodes it is read from. */
+  const deckLift = { x: 0, y: 0, z: 0 };
+  let feetGround: V3Like | null = null;
+  let feet: [TransformNode, TransformNode] | null = null;
+  const feetMidLocal = (): V3Like | null => {
+    if (!feet) return null;
+    const inv = rig.char.root.getWorldMatrix().clone().invert();
+    const a = Vector3.TransformCoordinates(feet[0].getAbsolutePosition(), inv);
+    const b = Vector3.TransformCoordinates(feet[1].getAbsolutePosition(), inv);
+    const m = { x: (a.x + b.x) / 2, y: Math.min(a.y, b.y), z: (a.z + b.z) / 2 };   // the LOWER ankle: the deck meets the first foot
+    return Number.isFinite(m.x) && Number.isFinite(m.y) && Number.isFinite(m.z) ? m : null;
+  };
   /** THE NaN TRAP (VENICE-SKATE-THPS). The last frame whose position and heading were real numbers, and how many times
    *  the run has had to be put back there. */
   let lastGoodPos: Vector3 | null = null, lastGoodYaw = 0, nanReports = 0;
@@ -281,7 +295,7 @@ export const SkateRunMode: ModeDefinition = (() => {
           drive: -stickY, steer: stickX, grounded: rig.rider.grounded, airtime: air.state.airtime,
           grinding: rig.rider.grinding !== null, grindNeedle: grindCh?.needle ?? null, grindHeld: grindCh?.heldSec ?? null,
           manual: manualCh?.active ?? false, manualNeedle: manualCh?.needle ?? null, manualHeld: manualCh?.heldSec ?? null,
-          railD: railDistance(), slow: slowT, slows: slowCount, pop: popBeatT > 0, boardPitch,
+          railD: railDistance(), slow: slowT, slows: slowCount, pop: popBeatT > 0, boardPitch, deck: { ...deckLift }, grab: air.state.grabHeld ?? null,
           // the golden goal rail, live: a probe has to be able to LINE UP with it, and a rail that patrols is
           // somewhere different every second
           patrol: { a: { ...patrolRail.line.a }, b: { ...patrolRail.line.b } },
@@ -291,6 +305,11 @@ export const SkateRunMode: ModeDefinition = (() => {
         });
       }
       boardSync = new BoardSync(rig.board, rig.char.root);
+      {
+        const lf = boneNode(rig.char.skeleton, 'LeftFoot'), rf = boneNode(rig.char.skeleton, 'RightFoot');
+        feet = lf && rf ? [lf, rf] : null;
+        feetGround = null; deckLift.x = 0; deckLift.y = 0; deckLift.z = 0;
+      }
       mbus.reset();
       goals = new GoalTracker(SKATE_GOALS);
       // the gimmick: a rail that patrols the plaza — grind it in motion. ANIM-SURGICAL: down the opening line, patrolling
@@ -399,6 +418,11 @@ export const SkateRunMode: ModeDefinition = (() => {
         pump = e.value;
       }
       if (e.t === 'button' && e.pressed) {
+        // ANIM-RESIDUAL (2026-09-14): the press that POPS is spent on the pop. `rider.jump()` clears `grounded` inside this
+        // handler, so the air-trick branch below used to read the SAME press as a mid-air trick — with the stick held
+        // forward to push, that was NOSE MANUAL (a ground link), a nose grab held for the whole flight, and the body frozen
+        // in board_grab around a deck parked at the root: the eye's "midair melt/detach" and "false NOSE MANUAL" frames.
+        let popped = false;
         if (e.btn === 'X' && rig.rider.grounded && !grindCh && !manualCh) {
           if (move.push()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });   // the push beat is move.stroking (below)
         }
@@ -409,6 +433,7 @@ export const SkateRunMode: ModeDefinition = (() => {
             air.launch();
             popBeatT = POP_BEAT_SEC;   // VENICE-SKATE-THPS: the pop is a BODY beat now (plant -> pop -> hang)
             apexDone = false; lastVy = rig.rider.vel.y;
+            popped = true;
             SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 });
           }
           // VENICE-SKATE-THPS: the press only ASKS for the rail — it never catches one itself. A raw `tryGrind` here
@@ -426,23 +451,27 @@ export const SkateRunMode: ModeDefinition = (() => {
         // overlay has a right stick -- skate was unscoreable for every player
         // not holding a gamepad. Route them through the same air chain the
         // flick path uses, so the landing grades and banks them.
-        if (!rig.rider.grounded) {
+        if (!rig.rider.grounded && !popped) {
           // THE NAMED VOCABULARY. Three buttons used to mean three fixed tricks; now the HELD DIRECTION picks which
           // trick a button throws — the dunk's own grammar (DunkSystem.runwayTrickFor reads dir+btn the same way) — so
           // fifteen skate tricks are reachable from the same three buttons instead of three.
           //
           // And the AIR BUDGET decides what is legal: a 360 flip off a kerb used to be thrown, fail to rotate and get
-          // graded as a bail the player did not cause. bestFitting() asks for the hardest version this air can hold,
+          // graded as a bail the player did not cause. airTrickFor() asks for the hardest version this air can hold,
           // so the budget is the skill rather than a trap.
           const held = heldTrickDir(stickX, stickY);   // shared, so every board discipline reads a held stick alike
-          const want = trickFor('skate', held, e.btn as BoardTrick['btn']);
           // AirControl tracks the airtime ALREADY SPENT, so what is left is the pop's budget minus that. No Rider API
           // exposes a remaining-air figure, and inventing one would have been a silent `undefined`.
           const air01 = Math.max(0.25, AIR_BUDGET_SEC - air.state.airtime);
-          const fits = want && want.airSec <= Math.max(air01, 0.25) ? want : bestFitting('skate', e.btn as BoardTrick['btn'], Math.max(air01, 0.25));
+          // air tricks only (ANIM-RESIDUAL): the whole-list search handed a mid-air press the NOSE MANUAL and the slides
+          const fits = airTrickFor('skate', held, e.btn as BoardTrick['btn'], air01);
           if (fits) {
-            airTrick(ctx, fits.id, fits.label, fits.kind === 'grind' ? 'grab' : fits.grab !== 'none' ? 'grab' : fits.flipDeg !== 0 ? 'flip' : 'spin',
+            airTrick(ctx, fits.id, fits.label, fits.grab !== 'none' ? 'grab' : fits.flipDeg !== 0 ? 'flip' : 'spin',
               trickPts(fits), Math.max(1, Math.round(fits.difficulty)));
+          } else if (e.btn === 'X') {
+            // X is the GRAB hold in the air (its release banks it, below). Skate has no named X air, and the whole-list
+            // search used to label the hold with a rail slide — "BOARDSLIDE" over open air. Name it what it is.
+            airTrick(ctx, 'grab', TRICKS.grab.name, 'grab', TRICKS.grab.pts, 1);
           }
         }
       }
@@ -698,7 +727,20 @@ export const SkateRunMode: ModeDefinition = (() => {
       // the deck rides its back trucks through a manual — nose up, and it eases in and out so the link reads as a beat
       const wantPitch = manualCh?.active ? (manualCh.kind === 'nosemanual' ? 0.30 : -0.30) : 0;
       boardPitch += (wantPitch - boardPitch) * Math.min(1, 9 * dt);
-      boardSync.update(move.balance.lean, !rig.rider.grounded, boardPitch);
+      // ANIM-RESIDUAL: the deck under the feet. Read off the last rendered frame (the root's and the feet's world matrices
+      // are from the same frame, so the root-local midpoint is consistent); the ground reading is the stance's own.
+      {
+        const feetNow = feetMidLocal();
+        const airborneBody = !rig.rider.grounded && bailBeatT <= 0;
+        if (feetNow && rig.rider.grounded && bailBeatT <= 0 && !rig.rider.grinding && !manualCh?.active) {
+          if (!feetGround) feetGround = { ...feetNow };
+          else { const k = Math.min(1, 4 * dt); feetGround.x += (feetNow.x - feetGround.x) * k; feetGround.y += (feetNow.y - feetGround.y) * k; feetGround.z += (feetNow.z - feetGround.z) * k; }
+        }
+        const want = feetNow && feetGround ? deckUnderFeet(feetNow, feetGround, airborneBody) : { x: 0, y: 0, z: 0 };
+        const k = Math.min(1, 14 * dt);
+        deckLift.x += (want.x - deckLift.x) * k; deckLift.y += (want.y - deckLift.y) * k; deckLift.z += (want.z - deckLift.z) * k;
+      }
+      boardSync.update(move.balance.lean, !rig.rider.grounded, boardPitch, deckLift);
       // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
 
       // ── the spectacle beats (H4) ──
