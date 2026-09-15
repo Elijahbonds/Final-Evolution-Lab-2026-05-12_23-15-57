@@ -1,0 +1,220 @@
+{
+ "_comment": "EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14). Each clip is a window of a real capture, retargeted by lib/babylon/anim/mocapRetarget.ts into lib/babylon/anim/authored/mocapOpponents.ts (npx tsx scripts/mocap/gen-opponent-clips.mts). `replaces` is the authored clip an OPPONENT plays this instead of (lib/babylon/anim/opponentMotion.ts). A beat keeps the duration of the clip it replaces so mode timing (the release, the settle) does not move; a loop keeps real time. Files are relative to ~/Downloads/fel-mocap-sources. Windows were read off scripts/mocap/stream-sheet.mts sheets and hand/foot signal tables.",
+ "clips": [
+  {
+   "name": "bball_mc_dribble_idle",
+   "replaces": "bball_dribble_idle",
+   "source": "cmu",
+   "file": "cmu/06/06_12.bvh",
+   "from": 6.72,
+   "to": 7.52,
+   "loop": true,
+   "refineLoop": [
+    0.6,
+    0.95
+   ],
+   "note": "right-hand dribble, one bounce cycle (hand peaks 6.75 \u2192 7.50)"
+  },
+  {
+   "name": "bball_mc_crossover_right",
+   "replaces": "bball_crossover_right",
+   "source": "cmu",
+   "file": "cmu/06/06_13.bvh",
+   "from": 6.2,
+   "to": 6.68,
+   "duration": 0.45,
+   "note": "low freestyle: the LEFT hand carries across to the right hip (going right)"
+  },
+  {
+   "name": "bball_mc_crossover_left",
+   "replaces": "bball_crossover_left",
+   "source": "cmu",
+   "file": "cmu/06/06_13.bvh",
+   "from": 6.2,
+   "to": 6.68,
+   "duration": 0.45,
+   "mirror": true,
+   "note": "the same capture mirrored"
+  },
+  {
+   "name": "bball_mc_hesi",
+   "replaces": "bball_hesi",
+   "source": "cmu",
+   "file": "cmu/06/06_12.bvh",
+   "from": 2.55,
+   "to": 3.1,
+   "duration": 0.55,
+   "note": "a hard low dribble: the ball hand drops to 1.16 torso, hips dip, then back up"
+  },
+  {
+   "name": "bball_mc_jumpshot",
+   "replaces": "jumpshot",
+   "source": "cmu",
+   "file": "cmu/06/06_15.bvh",
+   "from": 2.2,
+   "to": 3.1,
+   "duration": 0.9,
+   "note": "set at the chest, dip (2.30\u20132.55), rise, release at the top (2.85\u20132.95)"
+  },
+  {
+   "name": "bball_mc_follow_through",
+   "replaces": "bball_follow_through",
+   "source": "cmu",
+   "file": "cmu/06/06_15.bvh",
+   "from": 2.95,
+   "to": 3.65,
+   "duration": 0.7,
+   "note": "the release held through the fall and the landing"
+  },
+  {
+   "name": "karate_mc_hit_react",
+   "replaces": "karate_hit_react",
+   "source": "ual",
+   "file": "ual2/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+   "anim": "Hit_Knockback",
+   "from": 0.0,
+   "to": 0.3,
+   "duration": 0.3,
+   "note": "the first 0.3 s of the knockback: the flinch"
+  },
+  {
+   "name": "karate_mc_knockdown",
+   "replaces": "karate_knockdown",
+   "source": "ual",
+   "file": "ual2/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+   "anim": "Hit_Knockback",
+   "from": 0.0,
+   "to": 0.83,
+   "duration": 0.7,
+   "hipsYRange": [
+    -0.9,
+    0
+   ],
+   "note": "hit, knocked off the feet onto the back"
+  },
+  {
+   "name": "karate_mc_get_up",
+   "replaces": "karate_get_up",
+   "source": "ual",
+   "file": "ual2/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+   "anim": "LayToIdle",
+   "from": 0.0,
+   "to": 1.53,
+   "duration": 1.05,
+   "hipsYRange": [
+    -0.9,
+    0
+   ],
+   "note": "from the back to standing"
+  },
+  {
+   "name": "dunk_mc_celebrate_big",
+   "replaces": "dunk_celebrate_big",
+   "source": "deepmotion",
+   "file": "/Users/elijahbonds/Downloads/9_-_Finalize_Evolution_Lab_Game/Uploads/My Movie 197_customModel_ucoj55mFKU8zNnT6izbssr.bvh",
+   "from": 2.87,
+   "to": 3.67,
+   "duration": 0.9,
+   "note": "the owner's own take: hands come up from the chest to both arms overhead (a rival's win / a big make)"
+  },
+  {
+   "name": "bball_mc_defend_slide_right",
+   "replaces": "bball_defend_slide_right",
+   "source": "cmu",
+   "file": "cmu/78/78_30.bvh",
+   "from": 0.3,
+   "to": 1.05,
+   "duration": 0.5,
+   "loop": true,
+   "refineLoop": [
+    0.6,
+    0.85
+   ],
+   "note": "DefensiveMoveSideToSide: low wide stance, arms out, one push-and-gather step to the RIGHT (hips travel +2.6 torso)"
+  },
+  {
+   "name": "bball_mc_defend_slide_left",
+   "replaces": "bball_defend_slide_left",
+   "source": "cmu",
+   "file": "cmu/78/78_30.bvh",
+   "from": 1.6,
+   "to": 2.3,
+   "duration": 0.5,
+   "loop": true,
+   "refineLoop": [
+    0.6,
+    0.85
+   ],
+   "note": "the same drill back to the LEFT"
+  },
+  {
+   "name": "bball_mc_spin",
+   "replaces": "bball_spin",
+   "source": "cmu",
+   "file": "cmu/78/78_13.bvh",
+   "from": 0.15,
+   "to": 0.9,
+   "duration": 0.6,
+   "note": "OffensiveMoveSpinLeft: plant, reverse pivot and spin off the defender"
+  },
+  {
+   "name": "bball_mc_run",
+   "replaces": "run",
+   "source": "cmu",
+   "file": "cmu/78/78_12.bvh",
+   "from": 0.08,
+   "to": 0.7,
+   "duration": 0.6,
+   "loop": true,
+   "refineLoop": [
+    0.55,
+    0.72
+   ],
+   "note": "RunningNoBall: one full stride cycle, arms free (a body without the ball)"
+  },
+  {
+   "name": "bball_mc_dribble_run",
+   "replaces": "bball_dribble_run",
+   "source": "cmu",
+   "file": "cmu/78/78_06.bvh",
+   "from": 0.08,
+   "to": 0.75,
+   "duration": 0.6,
+   "loop": true,
+   "refineLoop": [
+    0.55,
+    0.8
+   ],
+   "note": "RunningStraight: a stride cycle dribbling on the run (the ball hand works low)"
+  },
+  {
+   "name": "bball_mc_drive",
+   "replaces": "run_forward",
+   "source": "cmu",
+   "file": "cmu/78/78_06.bvh",
+   "from": 0.08,
+   "to": 0.75,
+   "duration": 0.6,
+   "loop": true,
+   "refineLoop": [
+    0.55,
+    0.8
+   ],
+   "note": "the drive (run_forward) is the same dribbling stride"
+  },
+  {
+   "name": "bball_mc_defend_stance",
+   "replaces": "bball_defend_stance",
+   "source": "cmu",
+   "file": "cmu/78/78_30.bvh",
+   "from": 2.4,
+   "to": 2.85,
+   "loop": true,
+   "refineLoop": [
+    0.35,
+    0.55
+   ],
+   "note": "the low wide stance held between slides, arms out"
+  }
+ ]
+}

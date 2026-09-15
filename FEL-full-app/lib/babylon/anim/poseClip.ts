@@ -45,6 +45,8 @@ export interface PoseKey {
 }
 /** Hips height the targets were authored against (the forge hero). */
 export const REF_HIPS_Y = 0.96;
+/** The forge hero's hip JOINTS (mean UpLeg height) at bind — the span a body is sized by (rig-measured 0.910). */
+export const REF_HIP_JOINT_Y = 0.91;
 /** Limb lengths the targets were authored against (the forge hero, measured 2026-09-03):
  *  shoulder→elbow→wrist 0.54 m, hip→knee→ankle 0.82 m. A body with shorter arms
  *  gets every hand target pulled toward its shoulder by the ratio, so the arm
@@ -79,7 +81,15 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   // every clip over-scaled: the dancer stands on a 0.7 m podium and every hand target came out 1.73× — the idle's hanging
   // hands sat at its face for the whole routine (ANIM-READABILITY creative, 2026-09-07). Identical for a body at y = 0.
   const rootY = root ? root.getAbsolutePosition().y : 0;
-  const scale = (hips.getAbsolutePosition().y - rootY) / REF_HIPS_Y || 1;
+  // EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14): the body is sized by its HIP JOINTS (the UpLeg bones the legs hang from),
+  // not the Hips bone. The female kit body — and nova / ember / frost / sage, baked from it — puts the Hips bone 8 cm lower
+  // than the male's over IDENTICAL legs (Hips 0.878 vs 0.958, UpLegs 0.910 on both, leg 0.844 on both; rig-measured),
+  // so every clip on a female body was built at 0.915× and its crouch landed the ankles 9 cm under the floor. On the
+  // forge hero, the male kit and the scan the two measures agree (0.910 / 0.910 = 0.958 / 0.96 within 0.2%).
+  const upLegs = ['LeftUpLeg', 'RightUpLeg'].map((n) => nodes.get(n)).filter((n): n is TransformNode => !!n);
+  const scale = upLegs.length
+    ? (upLegs.reduce((a, n) => a + n.getAbsolutePosition().y, 0) / upLegs.length - rootY) / REF_HIP_JOINT_Y || 1
+    : (hips.getAbsolutePosition().y - rootY) / REF_HIPS_Y || 1;
   // Targets are WORLD-AXIS offsets from the root's position — the same frame the
   // rig tests and the arm-solver tool always measured in (+x = the hero's right
   // at bind). The root's import matrix carries a handedness mirror, so pushing

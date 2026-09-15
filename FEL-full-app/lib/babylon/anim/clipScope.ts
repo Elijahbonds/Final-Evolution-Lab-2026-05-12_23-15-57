@@ -98,7 +98,10 @@ export function scopeForScene(scene: Scene | null | undefined): ClipScope | null
 export function scopeAllows(scope: ClipScope | null, name: string): boolean {
   if (!scope) return true;
   const suite = suiteOfClip(name);
-  return suite === 'core' || scope.suites.includes(suite) || scope.borrow.includes(name.replace(/\.M$/, ''));
+  if (suite === 'core' || scope.suites.includes(suite) || scope.borrow.includes(name.replace(/\.M$/, ''))) return true;
+  // EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14): a captured opponent clip (`karate_mc_hit_react`) is in scope wherever the
+  // clip it stands in for (`karate_hit_react`) is — a hoops foe who borrows the fighter's flinch gets the captured one.
+  return name.includes('_mc_') && scopeAllows(scope, name.replace('_mc_', '_'));
 }
 
 /** A request is in scope when its NAME is, and — for an alias the rig does not own under its own name — the clip the
