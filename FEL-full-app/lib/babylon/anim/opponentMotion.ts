@@ -20,15 +20,22 @@ import { CLIP_ALIASES } from './clipAliases';
 import { scopeAllows, scopeForScene, type ClipScope } from './clipScope';
 import { MOCAP_OPPONENT_CLIPS, buildMocapOpponentClip } from './authored/mocapOpponents';
 
-/** authored clip name → captured clip name. */
-export const OPPONENT_VARIANTS: ReadonlyMap<string, string> = new Map(MOCAP_OPPONENT_CLIPS.map((c) => [c.replaces, c.name]));
+/** authored clip name → the captured clips that stand in for it, one per sport (a hoops rig builds `bball_mc_run`, a
+ *  football rig `football_mc_run`; each plays whichever its scope built). */
+export const OPPONENT_VARIANTS: ReadonlyMap<string, readonly string[]> = (() => {
+  const m = new Map<string, string[]>();
+  for (const c of MOCAP_OPPONENT_CLIPS) (m.get(c.replaces) ?? m.set(c.replaces, []).get(c.replaces)!).push(c.name);
+  return m;
+})();
 
 /** The name an opponent should really play for a request, given what its rig owns. Pure. */
 export function variantFor(requested: string, owned: Set<string>): string {
   // the request itself, or the clip its ALIAS names — never the resolver's fuzzy fallback, which hands an unknown
   // name whatever the rig owns (measured: `idle_stand` on a rig without it swapped to a captured crossover)
-  const v = OPPONENT_VARIANTS.get(requested) ?? OPPONENT_VARIANTS.get(CLIP_ALIASES[requested]?.[0] ?? '');
-  return v && owned.has(v) ? v : requested;
+  // — and an alias only when the rig does NOT own the requested clip itself: idle_stand, jump_land and fall_loop all alias to
+  // `guard`, and a captured guard must not replace an idle the rig really has
+  const pick = (name: string | undefined) => (name ? OPPONENT_VARIANTS.get(name)?.find((v) => owned.has(v)) : undefined);
+  return pick(requested) ?? (owned.has(requested) ? undefined : pick(CLIP_ALIASES[requested]?.[0])) ?? requested;
 }
 
 type Tagged = CharacterAnimator & { __opponentMotion?: string[] };

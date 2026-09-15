@@ -70,6 +70,17 @@ describe('mocapRetarget — any capture becomes body-local pose keys in the rig\
     expect(Math.abs(r.keys[0].bones!.Hips![1])).toBeLessThan(3);
   });
 
+  it('aim: a strike thrown off to the side of the hips is re-framed so it lands straight ahead', () => {
+    // hips square to +z, the right hand reaching out at 70° to the right: the kick/punch direction becomes the front
+    const b = body({ rightHand: [60 * Math.sin(1.22), 140, 60 * Math.cos(1.22)] });
+    const plain = retargetToPoseKeys(stream(hold(b)), { from: 0, to: 0.6, smoothSec: 0 });
+    const aimed = retargetToPoseKeys(stream(hold(b)), { from: 0, to: 0.6, smoothSec: 0, aim: 'hand' });
+    expect(plain.keys[2].hands!.Right![0]).toBeGreaterThan(0.3);                  // un-aimed: out to the right
+    expect(Math.abs(aimed.keys[2].hands!.Right![0])).toBeLessThan(0.1);           // aimed: straight ahead…
+    expect(aimed.keys[2].hands!.Right![2]).toBeGreaterThan(0.35);                 // …and forward
+    expect(aimed.keys[2].bones!.Hips![1]).toBeGreaterThan(40);                    // the hips carry the turn
+  });
+
   it('mirror swaps the sides and negates x and yaw; a loop ends on its first key', () => {
     const r = retargetToPoseKeys(stream(hold(body({ rightHand: [60, 140, 30] }))), { from: 0, to: 0.6, smoothSec: 0 });
     const m = mirrorKey(r.keys[0]);

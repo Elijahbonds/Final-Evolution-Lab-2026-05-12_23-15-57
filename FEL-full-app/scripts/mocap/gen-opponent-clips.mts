@@ -11,7 +11,7 @@ const RT = ((rtNs as unknown as { default?: typeof rtNs }).default ?? rtNs) as t
 
 interface Entry {
   name: string; replaces: string; source: SourceKind; file: string; anim?: string; from: number; to: number;
-  duration?: number; loop?: boolean; mirror?: boolean; refineLoop?: [number, number]; hipsYRange?: [number, number]; note?: string;
+  duration?: number; loop?: boolean; mirror?: boolean; refineLoop?: [number, number]; hipsYRange?: [number, number]; aim?: 'hand' | 'foot'; note?: string;
 }
 const ROOT = join(process.env.HOME ?? '', 'Downloads/fel-mocap-sources');
 const rootFor = (e: Entry) => (e.source === 'meshy' ? join(process.env.HOME ?? '', 'Downloads/FEL_hero_upload') : ROOT);
@@ -54,7 +54,7 @@ for (const e of manifest.clips) {
   }
   let [from, to] = [e.from, e.to];
   if (e.loop && e.refineLoop) [from, to] = refineLoop(s, from, to, e.refineLoop);
-  const r = RT.retargetToPoseKeys(s, { from, to, duration: e.duration, loop: e.loop, mirror: e.mirror, hipsYRange: e.hipsYRange });
+  const r = RT.retargetToPoseKeys(s, { from, to, duration: e.duration, loop: e.loop, mirror: e.mirror, hipsYRange: e.hipsYRange, aim: e.aim });
   const hands = r.keys.map((k) => Math.max(k.hands!.Left![1], k.hands!.Right![1]));
   console.log(`${e.name.padEnd(28)} ${from.toFixed(2)}–${to.toFixed(2)}s → ${r.duration}s ${r.keys.length} keys  scale ${r.scale}  facing ${r.baseYawDeg}°  front ${r.frontSign > 0 ? '+' : '−'}  hands ${Math.min(...hands).toFixed(2)}..${Math.max(...hands).toFixed(2)} m`);
   out.push(`  {

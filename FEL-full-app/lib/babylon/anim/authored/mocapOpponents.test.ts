@@ -117,6 +117,32 @@ for (const body of Object.keys(BODIES)) {
       }
     });
 
+    it('the captured strikes LAND IN FRONT: the jab reaches forward, the kicks lift a foot to hip height ahead of the body', () => {
+      const rig = rigs.get(body)!;
+      // the rig's own front: the toes' side of the hip line at bind (NullEngine: the importer's mirrored root)
+      const fwdOf = (p: (b: string) => Vector3) => Vector3.Cross(Vector3.Up(), p('RightUpLeg').subtract(p('LeftUpLeg'))).normalize();
+      const jab = clip('karate_mc_jab');
+      let bestReach = -Infinity;
+      for (let u = 0.2; u <= 0.8; u += 0.05) {
+        const p = at(rig, jab.name, u * jab.duration);
+        const f = fwdOf(p), hips = p('Hips');
+        // |reach| per hand: cross(up, hip line) is the front OR the back depending on the importer's mirror
+        const reach = Math.max(Math.abs(Vector3.Dot(p('LeftHand').subtract(hips), f)), Math.abs(Vector3.Dot(p('RightHand').subtract(hips), f)));
+        bestReach = Math.max(bestReach, reach);
+      }
+      expect(bestReach, 'jab reach from the hips').toBeGreaterThan(0.35);
+      for (const name of ['karate_mc_roundhouse', 'karate_mc_high_kick']) {
+        const c = clip(name);
+        let bestLift = -Infinity;
+        for (let u = 0.2; u <= 0.8; u += 0.05) {
+          const p = at(rig, name, u * c.duration);
+          const hipJ = (p('LeftUpLeg').y + p('RightUpLeg').y) / 2;
+          bestLift = Math.max(bestLift, Math.max(p('LeftFoot').y, p('RightFoot').y) - hipJ);
+        }
+        expect(bestLift, `${name}: foot vs hip joints at the top of the kick`).toBeGreaterThan(-0.15);
+      }
+    });
+
     it('the celebration (the owner\'s own take) ends with both hands over the head', () => {
       const rig = rigs.get(body)!, c = clip('dunk_mc_celebrate_big');
       const p0 = at(rig, c.name, 0.02), start = Math.max(p0('LeftHand').y, p0('RightHand').y) - p0('Head').y;

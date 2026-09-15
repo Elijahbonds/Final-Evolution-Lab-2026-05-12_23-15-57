@@ -215,6 +215,75 @@
     0.55
    ],
    "note": "the low wide stance held between slides, arms out"
+  },
+  {
+   "name": "karate_mc_jab",
+   "replaces": "jab",
+   "source": "cmu",
+   "file": "cmu/80/80_10.bvh",
+   "from": 2.84,
+   "to": 3.29,
+   "duration": 0.45,
+   "note": "boxing: the LEFT jab of a combo, reach peaks 0.51 m at 3.04 (find-strikes.mts)",
+   "aim": "hand"
+  },
+  {
+   "name": "karate_mc_hook",
+   "replaces": "hook",
+   "source": "cmu",
+   "file": "cmu/80/80_10.bvh",
+   "from": 3.08,
+   "to": 3.71,
+   "duration": 0.63,
+   "note": "boxing: the RIGHT hand that follows the jab, reach peak 3.30",
+   "aim": "hand"
+  },
+  {
+   "name": "karate_mc_roundhouse",
+   "replaces": "roundhouse",
+   "source": "cmu",
+   "file": "cmu/135/135_07.bvh",
+   "from": 0.55,
+   "to": 1.4,
+   "duration": 0.8,
+   "note": "karate Mawashigeri: right roundhouse, the foot peaks at 1.35 m at 1.00",
+   "aim": "foot"
+  },
+  {
+   "name": "karate_mc_high_kick",
+   "replaces": "high_kick",
+   "source": "cmu",
+   "file": "cmu/135/135_04.bvh",
+   "from": 2.78,
+   "to": 3.53,
+   "duration": 0.7,
+   "note": "karate front kick: right leg, the foot peaks at 1.00 m at 3.13",
+   "aim": "foot"
+  },
+  {
+   "name": "bball_mc_layup_gather",
+   "replaces": "bball_layup_gather",
+   "source": "cmu",
+   "file": "cmu/124/124_06.bvh",
+   "from": 2.4,
+   "to": 3.35,
+   "duration": 0.7,
+   "note": "basketball lay up: the gather low (2.2\u20132.9) into the rise, both hands carrying the ball up to 1.9 m"
+  },
+  {
+   "name": "football_mc_run",
+   "replaces": "run",
+   "source": "cmu",
+   "file": "cmu/78/78_12.bvh",
+   "from": 0.08,
+   "to": 0.7,
+   "duration": 0.6,
+   "loop": true,
+   "refineLoop": [
+    0.55,
+    0.72
+   ],
+   "note": "a defender's pursuit stride: CMU 78 RunningNoBall (the same cycle as bball_mc_run, in the football scope)"
   }
  ]
 }

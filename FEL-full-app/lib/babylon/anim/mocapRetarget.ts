@@ -52,6 +52,10 @@ export interface RetargetOpts {
   mirror?: boolean;
   /** Keep the crouch within these bounds (metres, reference body). */
   hipsYRange?: [number, number];
+  /** A STRIKE's front is where it lands, not where the hips point: rotate the baseline so the peak hand reach ('hand') or
+   *  the highest kick ('foot') points straight ahead. A roundhouse turns the hips ~90° through the kick, so the median hip
+   *  facing put the kick 76° off to the side (measured on CMU 135_07). */
+  aim?: 'hand' | 'foot';
 }
 
 const REF_LEG = 0.82;      // poseClip REF_LEG_LEN: forge hero hip→knee→ankle, metres
@@ -137,6 +141,24 @@ export function retargetToPoseKeys(stream: JointStream, o: RetargetOpts): Retarg
     right: norm(sub(scl(refAx.right, Math.cos(baseYaw)), scl(refAx.front, Math.sin(baseYaw)))),
     up,
   };
+  if (o.aim) {
+    let best: V3 | null = null, bestScore = -Infinity;
+    for (let f = f0; f <= f1; f++) {
+      const fr = s.frames[f];
+      for (const side of ['Left', 'Right'] as const) {
+        const j = o.aim === 'hand' ? fr[`${side}Hand`] : fr[`${side}Foot`];
+        const d = sub(j, fr.Hips), flat = sub(d, scl(up, dot(d, up)));
+        const score = o.aim === 'hand' ? len(flat) : dot(j, up);
+        if (score > bestScore && len(flat) > 1e-6) { bestScore = score; best = norm(flat); }
+      }
+    }
+    if (best) {
+      const th = Math.atan2(dot(best, base.right), dot(best, base.front));
+      const f2 = norm(add(scl(base.front, Math.cos(th)), scl(base.right, Math.sin(th))));
+      const r2 = norm(sub(scl(base.right, Math.cos(th)), scl(base.front, Math.sin(th))));
+      base.front = f2; base.right = r2;
+    }
+  }
   const local = (v: V3): V3 => [dot(v, base.right), dot(v, up), dot(v, base.front)];
 
   // SCALE — the source LEG (hip→knee→ankle) to the reference hero's 0.82 m (poseClip REF_LEG_LEN), over the whole stream.
@@ -190,7 +212,7 @@ export function retargetToPoseKeys(stream: JointStream, o: RetargetOpts): Retarg
     if (pl) poles.Left = pl; if (pr) poles.Right = pr;
     return {
       t: R2(t),
-      bones: { Hips: [0, Math.round(Math.max(-60, Math.min(60, hipYaw))), 0], Spine: [Math.round(Math.max(-90, Math.min(60, pitch))), Math.round(Math.max(-40, Math.min(40, spineYaw))), 0] },
+      bones: { Hips: [0, Math.round(Math.max(-110, Math.min(110, hipYaw))), 0], Spine: [Math.round(Math.max(-90, Math.min(60, pitch))), Math.round(Math.max(-40, Math.min(40, spineYaw))), 0] },
       hands: { Left: P('LeftHand'), Right: P('RightHand') },
       poles,
       feet: { Left: P('LeftFoot'), Right: P('RightFoot') },
