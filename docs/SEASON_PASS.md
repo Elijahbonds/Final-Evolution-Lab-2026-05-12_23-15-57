@@ -48,13 +48,42 @@ The webhook (`/api/v1/wallet/stripe-webhook`) must receive
 3. `unlockProLane()` sets `hasPro` and **back-fills** every PRO reward for tiers
    already climbed — buy at tier 20, collect tiers 1-20 immediately. Back-fill
    runs through the same dedupeKeys, so a redelivered webhook grants nothing new.
-4. `charge.refunded` closes the lane (`revokeProLane`). Cosmetics already booked
-   stay in the append-only grant log; they are cosmetic-only, so no gameplay
-   advantage is bought or unbought. Re-purchasing simply re-opens the lane.
+4. `charge.refunded` closes the lane (`revokeProLane`) **and withdraws the PRO
+   cosmetics it delivered** — see Delivery below for why. FREE-lane items are
+   untouched. The grant rows stay as the audit trail, and re-purchasing re-opens
+   the lane and hands the items back.
 
 **The PRO lane is cosmetic-only. It must never grant a stat, PRQ point, or any
 gameplay edge** (Blueprint Pillar 7). LC is the one non-cosmetic reward and it
 sits on the FREE lane too.
+
+## Delivery: how a cosmetic becomes wearable
+
+A reward is not delivered by being logged. The closet equips out of
+`OwnedWearable`, so a cosmetic that exists only as a `PassGrant` row is a
+receipt for nothing — the pass shipped that way, with all 50 tiers of cosmetics
+unwearable, until this was bridged.
+
+- Season cosmetics are authored **with their slot** in `lib/season/golden-hour.ts`
+  and registered as the reward table is built, so the rewards and the wearables
+  cannot drift apart. One authoring pass, two views of the same data.
+- `getWearable()` resolves them so they can be equipped and rendered.
+  `wearablesForSlot()` (the store listing) does **not** include them, and
+  `/api/v1/closet/buy` refuses them with `403 not_for_sale`. They are earned,
+  never sold, at any coin price.
+- Booking a cosmetic grant writes its `OwnedWearable` row in the same
+  transaction.
+
+**Entitlement is not the ledger.** `PassGrant` is append-only and single-write —
+its dedupeKey is what stops LC being paid twice. Ownership is *state*: a refund
+withdraws it, a re-purchase restores it. That is why unlocking and collecting
+re-assert ownership on their own path instead of going through the grant log,
+which would hit the existing row and silently deliver nothing.
+
+**Refunds take the PRO cosmetics back.** Unlocking back-fills every earned tier
+at once, so otherwise a player could buy at tier 40, collect four legendaries,
+refund, and keep the product. FREE-lane items are never withdrawn — those were
+earned by playing. The grant rows stay either way, as the audit trail.
 
 ## Collecting
 
@@ -76,7 +105,9 @@ streak: the streak bonus pays LC, not pass XP.
 
 `scripts/season-pass-core-tests.ts` (registered in `scripts/standing-suite.ts`)
 covers the curve, tier-up events, reward shape, the tier cap, rehydration,
-collection idempotency, and the PRO back-fill:
+collection idempotency, the PRO back-fill, and the delivery invariants (every
+granted cosmetic resolves to a real wearable in a real slot; season items are
+never purchasable; ids are unique and disjoint from the store):
 
 ```
 yarn tsx scripts/season-pass-core-tests.ts
@@ -121,6 +152,9 @@ What to look for:
   (FREE lane: every 3rd and every 5th). Clicking it clears the badge.
 - **LC actually moves** on every 5th tier — check the credit balance before and
   after tier 5. That is the fix; it used to log the reward and pay nothing.
+- **The cosmetic is wearable.** Cross tier 3, then open The Closet: "Sunset
+  Chalk Dust" is owned and can be equipped. That is the delivery fix — before
+  it, the reward existed only as a log row and no item ever appeared.
 - **PRO LANE** shows `UNLOCK PRO LANE` with `SEASON_PASS_PURCHASE=1`, or
   `COMING SOON` without it. Without `STRIPE_SECRET_KEY` the button's request
   answers `503 not_configured` and the lane stays shut — by design, it will not

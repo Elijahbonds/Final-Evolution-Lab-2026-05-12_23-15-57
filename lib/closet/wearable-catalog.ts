@@ -4,7 +4,13 @@
  * PURE catalog for The Closet. Inclusive face-option ranges are a hard product
  * requirement. Wearables are cosmetic only (no pay-to-win) and bought with
  * COINS. Creator-card skins are applied here but never *bought* here.
+ *
+ * Season pass cosmetics live in lib/season and are RESOLVED (never listed)
+ * here, so an earned item can be equipped and rendered without ever showing up
+ * in the coin store.
  */
+
+import { ALL_SEASON_WEARABLES, getSeasonWearable } from '@/lib/season/golden-hour';
 
 export interface FaceConfig {
   skinTone: string;      // hex
@@ -63,11 +69,36 @@ export const WEARABLES: Wearable[] = [
 
 export const SLOTS: WearableSlot[] = ['headwear', 'tops', 'shorts', 'shoes', 'accessory'];
 
-export function getWearable(itemId: string): Wearable | null {
-  return WEARABLES.find((w) => w.itemId === itemId) ?? null;
+/**
+ * Season pass cosmetics are real wearables, but they are EARNED, never sold.
+ * They resolve here so a granted item can be equipped and rendered, while the
+ * store listing and the buy route stay coins-only. The `coinPrice: 0` below is
+ * not a price — `isPurchasableWearable` decides, and it says no for these.
+ */
+function seasonAsWearable(w: { itemId: string; slot: WearableSlot; name: string; accent: string }): Wearable {
+  return { itemId: w.itemId, slot: w.slot, name: w.name, coinPrice: 0, accent: w.accent };
 }
+
+export function getWearable(itemId: string): Wearable | null {
+  const store = WEARABLES.find((w) => w.itemId === itemId);
+  if (store) return store;
+  const season = getSeasonWearable(itemId);
+  return season ? seasonAsWearable(season) : null;
+}
+
+/** Can this be bought with coins? False for anything earned on the season pass. */
+export function isPurchasableWearable(itemId: string): boolean {
+  return WEARABLES.some((w) => w.itemId === itemId);
+}
+
+/** Store listing — coins-only, so season items never show up for sale. */
 export function wearablesForSlot(slot: WearableSlot): Wearable[] {
   return WEARABLES.filter((w) => w.slot === slot);
+}
+
+/** Everything wearable in a slot, earned items included (closet rendering). */
+export function allWearablesForSlot(slot: WearableSlot): Wearable[] {
+  return [...WEARABLES, ...ALL_SEASON_WEARABLES.map(seasonAsWearable)].filter((w) => w.slot === slot);
 }
 export function defaultEquipped(): Record<WearableSlot, string | null> {
   return { headwear: null, tops: 'top_lab', shorts: 'shorts_court', shoes: 'shoes_flight', accessory: null };

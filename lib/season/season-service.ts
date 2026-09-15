@@ -129,6 +129,20 @@ async function bookGrant(input: {
         },
       });
 
+      // DELIVERY: a cosmetic reward becomes a wearable the athlete actually
+      // owns. Without this the grant row is a receipt for nothing — the closet
+      // equips out of OwnedWearable, so an unbridged cosmetic can never be worn.
+      // upsert, not create: the grant row above is the idempotency gate, and
+      // an item already owned (re-earned, or re-granted by a back-fill) must
+      // not fail the transaction.
+      if (input.reward.kind === 'cosmetic' && input.reward.id) {
+        await tx.ownedWearable.upsert({
+          where: { userId_itemId: { userId: input.userId, itemId: input.reward.id } },
+          update: {},
+          create: { userId: input.userId, itemId: input.reward.id },
+        });
+      }
+
       const amt = Number(input.reward.amt ?? 0);
       if (input.reward.kind === 'lc' && amt > 0) {
         // Authoritative balance + ledger stay in lockstep (see lib/arena.ts).
@@ -155,6 +169,34 @@ async function bookGrant(input: {
     }
     return false;
   }
+}
+
+/**
+ * Re-assert ownership of cosmetics the athlete is entitled to.
+ *
+ * Entitlement is NOT the same thing as the grant log. The log is append-only
+ * and single-write (its dedupeKey is what stops LC being paid twice), but
+ * ownership is state that can legitimately be withdrawn and restored — a
+ * refund takes the PRO items back, and re-purchasing must hand them over
+ * again. Routing that through bookGrant would fail on the existing grant row
+ * and silently deliver nothing, so entitlement gets its own idempotent path.
+ */
+async function ensureCosmeticsOwned(userId: string, itemIds: string[]): Promise<number> {
+  let restored = 0;
+  for (const itemId of itemIds) {
+    const existing = await prisma.ownedWearable.findUnique({
+      where: { userId_itemId: { userId, itemId } },
+    });
+    if (existing) continue;
+    await prisma.ownedWearable.create({ data: { userId, itemId } });
+    restored++;
+  }
+  return restored;
+}
+
+/** The cosmetic item ids on a set of rewards. */
+function cosmeticIds(rewards: SeasonReward[]): string[] {
+  return rewards.filter((r) => r.kind === 'cosmetic' && r.id).map((r) => r.id!);
 }
 
 /** Book every reward a tier-up produced, across both lanes. */
@@ -337,6 +379,10 @@ export async function claimSeasonRewards(
           dedupeKey: `${userId}:${season.id}:${tier}:${lane}:${i}`,
         });
       }
+      // Entitlement too, not just the ledger row: collecting is the moment the
+      // athlete expects to have the thing, so re-assert ownership of anything
+      // an earlier failure left undelivered.
+      await ensureCosmeticsOwned(userId, cosmeticIds(rewards));
       claimed.push({ tier, lane, rewards });
     }
   }
@@ -380,7 +426,7 @@ export async function unlockProLane(input: {
   userId: string;
   seasonId?: string;
   stripeEventId?: string;
-}): Promise<{ seasonKey: string; tier: number; backfilled: number } | null> {
+}): Promise<{ seasonKey: string; tier: number; backfilled: number; delivered: number } | null> {
   const season = input.seasonId
     ? await prisma.season.findUnique({ where: { id: input.seasonId } })
     : await getActiveSeason();
@@ -403,8 +449,10 @@ export async function unlockProLane(input: {
   });
 
   let backfilled = 0;
+  const entitled: string[] = [];
   for (let tier = 1; tier <= core.state.tier; tier++) {
     const rewards = core.rewardsAt(tier).pro;
+    entitled.push(...cosmeticIds(rewards));
     for (let i = 0; i < rewards.length; i++) {
       const booked = await bookGrant({
         userId: input.userId,
@@ -419,20 +467,42 @@ export async function unlockProLane(input: {
     }
   }
 
+  // Buying entitles you to the items, whether or not the grant log already
+  // carries them. This is what makes a re-purchase after a refund actually
+  // hand the cosmetics back: bookGrant alone would hit the existing row and
+  // deliver nothing.
+  const restored = await ensureCosmeticsOwned(input.userId, entitled);
+
   await recordServerEvent({
     name: 'season_pro_unlocked',
     userId: input.userId,
-    props: { seasonKey: season.key, tier: core.state.tier, backfilled, stripeEventId: input.stripeEventId ?? null },
+    props: {
+      seasonKey: season.key,
+      tier: core.state.tier,
+      backfilled,
+      wearablesDelivered: restored,
+      stripeEventId: input.stripeEventId ?? null,
+    },
   });
 
-  return { seasonKey: season.key, tier: core.state.tier, backfilled };
+  return { seasonKey: season.key, tier: core.state.tier, backfilled, delivered: restored };
 }
 
 /**
- * Reverse a PRO purchase (refund/chargeback). Closes the lane so no FURTHER PRO
- * rewards are booked. Cosmetics already booked stay in the grant log: it is an
- * append-only ledger, and they are cosmetic-only, so nothing about gameplay
- * balance can be bought back. Re-purchasing simply re-opens the lane.
+ * Reverse a PRO purchase (refund/chargeback). Closes the lane so no further PRO
+ * rewards are booked, AND takes back the PRO cosmetics the purchase delivered.
+ *
+ * Taking the items back matters: unlocking back-fills every earned tier at
+ * once, so without this a player could buy at tier 40, collect forty PRO
+ * cosmetics including four legendaries, refund, and keep the entire product.
+ * "Cosmetic-only" is not a reason to let that stand here — the cosmetics ARE
+ * the product.
+ *
+ * The PassGrant rows stay: that log is the append-only audit trail of what was
+ * granted and when. Entitlement lives in OwnedWearable, which is state, so that
+ * is what is withdrawn. FREE-lane items are untouched — they were earned by
+ * playing, not bought. Re-purchasing re-books through the same dedupeKeys and
+ * restores ownership.
  */
 export async function revokeProLane(input: {
   userId: string;
@@ -453,10 +523,35 @@ export async function revokeProLane(input: {
     where: { userId_seasonId: { userId: input.userId, seasonId: season.id } },
     data: { hasPro: false, updatedAt: new Date() },
   });
+
+  // Withdraw exactly what the PRO lane delivered for THIS season: the cosmetic
+  // ids on its pro-lane grants. An item the athlete also owns from the free
+  // lane or the coin store keeps its own row, because ids never overlap across
+  // those sources (asserted in the season suite).
+  const proGrants = await prisma.passGrant.findMany({
+    where: { userId: input.userId, seasonId: season.id, lane: 'pro' },
+    select: { reward: true },
+  });
+  const itemIds = proGrants
+    .map((g) => (g.reward as any)?.id)
+    .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
+
+  let removed = 0;
+  if (itemIds.length > 0) {
+    const res = await prisma.ownedWearable.deleteMany({
+      where: { userId: input.userId, itemId: { in: itemIds } },
+    });
+    removed = res.count;
+  }
+
   await recordServerEvent({
     name: 'season_pro_revoked',
     userId: input.userId,
-    props: { seasonKey: season.key, stripeEventId: input.stripeEventId ?? null },
+    props: {
+      seasonKey: season.key,
+      stripeEventId: input.stripeEventId ?? null,
+      wearablesWithdrawn: removed,
+    },
   });
   return true;
 }
