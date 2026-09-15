@@ -163,11 +163,14 @@ export function buildBetweenLegs(scene: Scene, sk: Skeleton): AnimationGroup | n
  * a bone rotation, because the arm's shape through it is the trick and a wrist spin would not read.
  */
 export function buildCradle(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  // RECOGNISABLE ON SIGHT (2026-09-15): the first circle hugged the head and photographed as a windmill from the rim camera.
+  // The cradle's read is a BIG ring around the head at shoulder height on a bent arm, with the trunk turning to follow it:
+  // far out to the side, round behind the head, across to the far shoulder, then hammered down.
   return buildPoseClip(scene, sk, 'dunk_cradle', CRADLE_SEC, [
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR_LEGS }, hands: { Right: [0.28, 1.58, 0.28], Left: [-0.30, 1.30, 0.14] } },
-    { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], Neck: [-6, 0, 0], ...AIR_LEGS }, hands: { Right: [0.46, 1.86, 0.16], Left: [-0.34, 1.34, 0.10] }, poles: { Right: [0.9, 0.2, -0.2] } },   // out and up, to the side of the head
-    { t: CRADLE_ROUND, bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [8, 0, 0], ...AIR_LEGS }, hands: { Right: [0.12, 1.94, -0.26], Left: [-0.34, 1.34, 0.08] }, poles: { Right: [0.7, 0.3, -0.5] } },   // BEHIND the head — the top of the circle
-    { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [2, 0, 0], ...AIR_LEGS }, hands: { Right: [-0.20, 1.80, 0.10], Left: [-0.36, 1.32, 0.06] }, poles: { Right: [-0.2, 0.3, -0.6] } },   // across to the far side: the circle closes
+    { t: 0.16, bones: { Hips: [0, -10, 0], Spine: [-6, -14, 4], Neck: [-4, 8, 0], ...AIR_LEGS }, hands: { Right: [0.72, 1.62, 0.02], Left: [-0.34, 1.32, 0.10] }, poles: { Right: [0.6, -0.6, -0.3] } },   // far out to the side at the shoulder
+    { t: CRADLE_ROUND, bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], Neck: [12, 0, 0], ...AIR_LEGS }, hands: { Right: [0.08, 2.00, -0.40], Left: [-0.34, 1.34, 0.08] }, poles: { Right: [0.7, 0.4, -0.5] } },   // round BEHIND the head — the top of the ring
+    { t: 0.5,  bones: { Hips: [0, 12, 0], Spine: [-6, 16, -4], Neck: [2, -10, 0], ...AIR_LEGS }, hands: { Right: [-0.52, 1.72, -0.02], Left: [-0.40, 1.24, 0.10] }, poles: { Right: [-0.3, 0.5, -0.6] } },   // across to the far shoulder: the ring closes
     { t: 0.62, bones: { Hips: [2, 0, 0], Spine: [2, 0, 0], Neck: [-10, 0, 0], ...AIR_LEGS }, hands: { Right: [0.10, 1.62, 0.34], Left: [-0.34, 1.36, 0.12] } },   // back in front, loaded
     { t: CRADLE_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], LeftUpLeg: [-22, 0, 4], LeftLeg: [26, 0, 0], RightUpLeg: [-12, 0, -4], RightLeg: [16, 0, 0] }, hands: { Right: [0.16, 2.02, 0.28], Left: [-0.34, 1.44, 0.06] }, poles: UP },   // hammered down through the rim
   ]);
@@ -181,11 +184,15 @@ export function buildCradle(scene: Scene, sk: Skeleton): AnimationGroup | null {
  * dunk; the depth is the trick.
  */
 export function buildDoubleClutch(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  // RECOGNISABLE ON SIGHT (2026-09-15): the clutch kicked the legs BACK (thighs +42°) and from the rim camera it was a
+  // scorpion without the arch. A double clutch is a body folded FORWARD around the ball: knees up to the chest, the ball
+  // pulled all the way down between them, then the whole body opens long and the ball goes back up.
+  const FOLD: Record<string, Deg3> = { LeftUpLeg: [-78, 0, 10], LeftLeg: [104, 0, 0], RightUpLeg: [-78, 0, -10], RightLeg: [104, 0, 0] };
   return buildPoseClip(scene, sk, 'dunk_double_clutch', CLUTCH_SEC, [
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], Neck: [-6, 0, 0], ...AIR_LEGS }, hands: { Right: [0.20, 1.88, 0.26], Left: [-0.24, 1.80, 0.24] }, poles: UP },   // both hands already high
-    { t: 0.22, bones: { Hips: [16, 0, 0], Spine: [22, 0, 0], Neck: [-18, 0, 0], LeftUpLeg: [42, 0, 8], LeftLeg: [96, 0, 0], RightUpLeg: [42, 0, -8], RightLeg: [96, 0, 0] }, hands: { Right: [0.22, 1.06, 0.34], Left: [-0.24, 1.06, 0.34] }, hipsY: 0.06 },   // ALL the way down to the waist, knees folding up to meet it
-    { t: 0.34, bones: { Hips: [18, 0, 0], Spine: [24, 0, 0], Neck: [-20, 0, 0], LeftUpLeg: [46, 0, 8], LeftLeg: [100, 0, 0], RightUpLeg: [46, 0, -8], RightLeg: [100, 0, 0] }, hands: { Right: [0.20, 1.00, 0.36], Left: [-0.22, 1.00, 0.36] }, hipsY: 0.07 },   // the clutch: held at the bottom
-    { t: 0.52, bones: { Hips: [2, 0, 0], Spine: [-4, 0, 0], Neck: [-14, 0, 0], ...AIR_LEGS }, hands: { Right: [0.18, 1.70, 0.30], Left: [-0.22, 1.58, 0.28] } },   // driven back up
+    { t: 0.22, bones: { Hips: [-10, 0, 0], Spine: [26, 0, 0], Neck: [-20, 0, 0], ...FOLD }, hands: { Right: [0.16, 0.96, 0.40], Left: [-0.18, 0.96, 0.40] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] }, hipsY: 0.12 },   // folded: knees to the chest, the ball down between them
+    { t: 0.34, bones: { Hips: [-12, 0, 0], Spine: [30, 0, 0], Neck: [-22, 0, 0], ...FOLD }, hands: { Right: [0.14, 0.90, 0.42], Left: [-0.16, 0.90, 0.42] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] }, hipsY: 0.13 },   // the clutch: held at the bottom
+    { t: 0.52, bones: { Hips: [2, 0, 0], Spine: [-4, 0, 0], Neck: [-14, 0, 0], ...AIR_LEGS }, hands: { Right: [0.18, 1.70, 0.30], Left: [-0.22, 1.58, 0.28] } },   // opened long, driven back up
     { t: CLUTCH_SEC, bones: { Hips: [-6, 0, 0], Spine: [-14, 0, 0], Neck: [-16, 0, 0], LeftUpLeg: [-22, 0, 4], LeftLeg: [26, 0, 0], RightUpLeg: [-12, 0, -4], RightLeg: [16, 0, 0] }, hands: { Right: [0.14, 2.06, 0.26], Left: [-0.28, 1.72, 0.20] }, poles: UP },   // the flush, higher than it started
   ]);
 }
