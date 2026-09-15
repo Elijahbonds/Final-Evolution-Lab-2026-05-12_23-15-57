@@ -48,9 +48,10 @@ The webhook (`/api/v1/wallet/stripe-webhook`) must receive
 3. `unlockProLane()` sets `hasPro` and **back-fills** every PRO reward for tiers
    already climbed — buy at tier 20, collect tiers 1-20 immediately. Back-fill
    runs through the same dedupeKeys, so a redelivered webhook grants nothing new.
-4. `charge.refunded` closes the lane (`revokeProLane`). Cosmetics already booked
-   stay in the append-only grant log; they are cosmetic-only, so no gameplay
-   advantage is bought or unbought. Re-purchasing simply re-opens the lane.
+4. `charge.refunded` closes the lane (`revokeProLane`) **and withdraws the PRO
+   cosmetics it delivered** — see Delivery below for why. FREE-lane items are
+   untouched. The grant rows stay as the audit trail, and re-purchasing re-opens
+   the lane and hands the items back.
 
 **The PRO lane is cosmetic-only. It must never grant a stat, PRQ point, or any
 gameplay edge** (Blueprint Pillar 7). LC is the one non-cosmetic reward and it
@@ -104,7 +105,9 @@ streak: the streak bonus pays LC, not pass XP.
 
 `scripts/season-pass-core-tests.ts` (registered in `scripts/standing-suite.ts`)
 covers the curve, tier-up events, reward shape, the tier cap, rehydration,
-collection idempotency, and the PRO back-fill:
+collection idempotency, the PRO back-fill, and the delivery invariants (every
+granted cosmetic resolves to a real wearable in a real slot; season items are
+never purchasable; ids are unique and disjoint from the store):
 
 ```
 yarn tsx scripts/season-pass-core-tests.ts
@@ -149,6 +152,9 @@ What to look for:
   (FREE lane: every 3rd and every 5th). Clicking it clears the badge.
 - **LC actually moves** on every 5th tier — check the credit balance before and
   after tier 5. That is the fix; it used to log the reward and pay nothing.
+- **The cosmetic is wearable.** Cross tier 3, then open The Closet: "Sunset
+  Chalk Dust" is owned and can be equipped. That is the delivery fix — before
+  it, the reward existed only as a log row and no item ever appeared.
 - **PRO LANE** shows `UNLOCK PRO LANE` with `SEASON_PASS_PURCHASE=1`, or
   `COMING SOON` without it. Without `STRIPE_SECRET_KEY` the button's request
   answers `503 not_configured` and the lane stays shut — by design, it will not
