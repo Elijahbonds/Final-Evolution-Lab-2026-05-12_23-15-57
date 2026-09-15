@@ -9,11 +9,11 @@
 // is overwritten a moment later. update() only records the frame; the ball
 // placement and the arm reach happen in onAfterAnimationsObservable, on top
 // of the final pose (same slot foot planting uses).
-import { Quaternion, Vector3 } from '@babylonjs/core';
+import { Matrix, Quaternion, Space, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { attachBallToHand } from './ballRig';
 import { DEFAULT_DRIBBLE, advancePhase, dribbleAt, type DribbleParams } from './Dribble';
-import { armChain, reachArm, type ArmChain } from './HandIK';
+import { armChain, reachArm, shapeReach, type ArmChain } from './HandIK';
 
 export interface BallCarryOpts {
   scene: Scene;
@@ -40,6 +40,58 @@ export interface BallCarry {
 
 /** The old arm's let-go on a hand switch. */
 const SWITCH_FADE_SEC = 0.12;
+/** How far the elbow's twist may leave the clip's side at full weight (the dunk's REACH_POLE_CAP). */
+const REACH_POLE_CAP = Math.PI / 2;
+/** The fastest the carrying arm's elbow may swing round the shoulder→hand line between two drawn frames (deg per second). */
+export const ELBOW_SWING_RATE_DEG = 720;
+
+/**
+ * CLOTHING-SOFT-RESIDUAL C4 (2026-09-15): THE DRIBBLE WHIPPED THE ARM AT EVERY CATCH. As the ball comes back up, the hand target
+ * rises from past the arm's reach (a straight arm) to the top of the ball (a bent one) within a frame or two, and the two-bone
+ * solve is not continuous there: its pole twist fades in with the elbow's bend over a narrow band, so the elbow jumped to the
+ * other side of the shoulder→hand line in one frame — the upper arm rolled 68° in and 64° back three frames later on every
+ * bounce (dunk runway, kit male, 60 fps; 98–124° in the node rig with the clip resetting the arm each frame) while the hand held
+ * its line: the QA eye's "body-side arm snap". Neither the target nor the pole was the cause (a pole pinned to the clip's own
+ * elbow still stepped 150°, a reach held short of straight still stepped 50°), a per-bone slerp limit left the palm 11 cm off the
+ * ball, and the solver is shared with the feet. So the carry limits the one motion that popped: the elbow's swing ROUND the
+ * shoulder→hand line, at most ELBOW_SWING_RATE_DEG from where this arm's elbow was drawn last frame (measured in the shoulder's
+ * parent frame, so the body's own turn is not a swing). A rotation about that line leaves the hand exactly where the solve put it.
+ * The weight also lives in the target now (the dunk reach's DUNK-SOFTS-NAMED shape), not in a partial-weight slerp.
+ */
+type ArmMemo = { side: Vector3; stamp: number };
+const armMemo = new WeakMap<TransformNode, ArmMemo>();
+function reachShaped(arm: ArmChain, target: Vector3, pole: Vector3, weight: number, dt: number, stamp: number): void {
+  if (!(weight > 1e-3)) { armMemo.delete(arm.shoulder); return; }
+  arm.shoulder.computeWorldMatrix(true); arm.elbow.computeWorldMatrix(true); arm.hand.computeWorldMatrix(true);
+  const sh = arm.shoulder.getAbsolutePosition(), el = arm.elbow.getAbsolutePosition(), hd = arm.hand.getAbsolutePosition();
+  const want = hd.add(target.subtract(hd).scale(Math.min(1, weight)));
+  const shaped = shapeReach(sh, el, hd, want, pole, undefined, REACH_POLE_CAP * Math.min(1, weight));
+  reachArm(arm, shaped.target, shaped.pole, 1);
+  arm.elbow.computeWorldMatrix(true); arm.hand.computeWorldMatrix(true);
+  const parent = arm.shoulder.parent as TransformNode | null;
+  const toParent = parent ? parent.getWorldMatrix().clone().invert() : null;
+  const inP = (v: Vector3) => (toParent ? Vector3.TransformCoordinates(v, toParent) : v.clone());
+  const S = inP(arm.shoulder.getAbsolutePosition()), E = inP(arm.elbow.getAbsolutePosition()), H = inP(arm.hand.getAbsolutePosition());
+  const axis = H.subtract(S), al = axis.length();
+  if (al < 1e-5) { armMemo.delete(arm.shoulder); return; }
+  axis.scaleInPlace(1 / al);
+  const perp = (v: Vector3) => { const p = v.subtract(axis.scale(Vector3.Dot(v, axis))); return p.lengthSquared() > 1e-10 ? p.normalize() : null; };
+  let side = perp(E.subtract(S));
+  if (!side) { armMemo.delete(arm.shoulder); return; }
+  const memo = armMemo.get(arm.shoulder), prev = memo && memo.stamp === stamp - 1 && dt > 0 ? perp(memo.side) : null;
+  if (prev) {
+    const ang = Math.atan2(Vector3.Dot(Vector3.Cross(prev, side), axis), Vector3.Dot(prev, side));
+    const maxRad = ELBOW_SWING_RATE_DEG * Math.PI / 180 * dt;
+    if (Math.abs(ang) > maxRad) {
+      const back = -(ang - Math.sign(ang) * maxRad);
+      const worldAxis = parent ? Vector3.TransformNormal(axis, parent.getWorldMatrix()).normalize() : axis;
+      arm.shoulder.rotate(worldAxis, back, Space.WORLD);   // about the line through the shoulder and the hand: the hand stays put
+      arm.shoulder.computeWorldMatrix(true); arm.elbow.computeWorldMatrix(true); arm.hand.computeWorldMatrix(true);
+      side = Vector3.TransformNormal(side, Matrix.RotationAxis(axis, back));
+    }
+  }
+  armMemo.set(arm.shoulder, { side, stamp });
+}
 
 export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   const p = opts.params ?? DEFAULT_DRIBBLE;
@@ -54,6 +106,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   let active = false;
   let phase = 0;
   let pending = false;   // a frame was recorded since the last after-animations pass
+  let frameDt = 0, stamp = 0;   // the recorded frame's dt, and a counter of drawn frames (the arm memo's continuity)
   const local = new Vector3(), world = new Vector3(), handT = new Vector3(), pole = new Vector3();
 
   const toWorld = (x: number, y: number, z: number, out: Vector3): Vector3 => {
@@ -65,6 +118,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   };
 
   const apply = () => {
+    stamp++;
     if (!active || !pending) return;
     pending = false;
     const s = dribbleAt(phase, p);
@@ -76,8 +130,8 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       // elbow out to the side and back, never into the ribs
       toWorld(sx * 0.7, s.hand.y - 0.2, -0.5, pole).subtractInPlace(opts.root.getAbsolutePosition());
       const k = switchLeft > 0 ? 1 - switchLeft / SWITCH_FADE_SEC : 1;
-      reachArm(arm, handT, pole, s.handWeight * armW * k);
-      if (prevArm && k < 1) reachArm(prevArm, prevHandT, prevPole, s.handWeight * armW * (1 - k));
+      reachShaped(arm, handT, pole, s.handWeight * armW * k, frameDt, stamp);
+      if (prevArm && k < 1) reachShaped(prevArm, prevHandT, prevPole, s.handWeight * armW * (1 - k), frameDt, stamp);
     }
   };
   const obs = opts.scene.onAfterAnimationsObservable.add(apply);
@@ -105,6 +159,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       switchLeft = Math.max(0, switchLeft - dt);
       if (!active) return;
       phase = advancePhase(phase, dt, speed01, p);
+      frameDt = dt;
       pending = true;
     },
     dispose() { opts.scene.onAfterAnimationsObservable.remove(obs); },

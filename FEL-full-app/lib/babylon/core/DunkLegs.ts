@@ -75,6 +75,22 @@ export function arcK(t: number, durationSec: number, plantSec = PLANT_SEC): numb
   const tf = Math.max(0, t - plantSec);
   return Math.min(1, tf / Math.max(1e-3, durationSec - plantSec));
 }
+/** How much of the jump's height still reads as "the top": a parabola is flat up there — 98 % of the peak spans ±0.1 s. */
+export const ARC_TOP_FRAC = 0.98;
+/** The flight clock second the jump reaches the TOP (ARC_TOP_FRAC of its height, on the way up; frac 1 = the apex itself,
+ *  where the height 4k(1−k) peaks at k = ½). */
+export function arcApexT(durationSec: number, plantSec = PLANT_SEC, frac = 1): number {
+  const k = (1 - Math.sqrt(Math.max(0, 1 - frac))) / 2;
+  return plantSec + (durationSec - plantSec) * k;
+}
+/** How long before the SLAM window opens a press is still held for it (CLOTHING-SOFT-RESIDUAL R2, 2026-09-15): never less
+ *  than `minSec`, and always back to the top of the arc. The runway teaches "SLAM at the top", and the window is centred on
+ *  the extension (clip 1.25) — on the way DOWN. The arc tops out at clip 0.80, the window opened at 1.11 and the buffer
+ *  reached back only to 0.89, so a press at the top of the jump was refused "TOO EARLY — 233 ms BEFORE THE WINDOW" (the
+ *  QA eye's ontime-p2) and the dunk fell as a hang/miss. A press on the RISE (before the top) is still too early. */
+export function slamBufferSec(openAt: number, apexT: number, minSec: number): number {
+  return Math.max(minSec, openAt - apexT);
+}
 /** The forward carry fraction at flight clock `t` (0 at the plant, 1 at the extension beat). */
 export function carryU(t: number, extendSec: number, plantSec = PLANT_SEC): number {
   const tf = Math.max(0, t - plantSec);

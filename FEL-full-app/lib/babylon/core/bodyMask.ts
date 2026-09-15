@@ -16,14 +16,15 @@
 // behind that surface or poking out through it facing the same way) and is at least the slot's margin from the garment's
 // open edge (hem, armhole, waist — where skin can slide out from under a garment) is hidden; a body triangle whose three
 // vertices are all hidden is dropped from this body's index buffer. The inner arm hanging beside the tank faces INTO it
-// and is kept. Shoes hide only the foot (Foot / ToeBase skin), never the shin, so no ankle can open.
+// and is kept. Shoes hide the foot (Foot / ToeBase skin) and shin skin at least SHOE_RIM_DEPTH below the collar rim, so no
+// ankle can open. Open edges the skin comes out of are flared off it first (EDGE_FLARE, part 2).
 //
 // The computation is pure (arrays in, indices out) and measured in ONE pose for body and garments (whatever pose the
 // skeleton holds when it runs), so the pose itself does not matter. It runs after the first rendered frame (the skeleton
 // is prepared and the shoe's late fold has landed) and again whenever applyKit changes what is shown. The GLB and the
 // container's geometry are untouched: the body takes a unique geometry once, and its loaded indices are kept on the mesh
 // so every re-mask starts from the full body.
-import { BoundingInfo } from '@babylonjs/core';
+import { BoundingInfo, Matrix, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, IndicesArray, Mesh } from '@babylonjs/core';
 
 /** How far under a garment (from its open edge, metres) the skin must be before it is hidden. Tops and shorts leave a
@@ -38,6 +39,25 @@ const SLOT_BONES: Record<string, { re: RegExp; min: number }> = { shoes: { re: /
  *  no shoe triangle under them) are hidden too — skin mostly on ToeBase, within this reach of the shoe. The ankle carries no
  *  ToeBase weight, so no gap can open above a collar. */
 const TOE_RULE = { re: /ToeBase$/, min: 0.5, reach: 0.08 };
+/** Shin skin DEEP inside a shoe is hidden too (CLOTHING-ALONE part 2): at least this far (m) below the shoe's collar rim over it.
+ *  The rule above kept all Leg skin because a folded collar used to swing with the thigh and could open an ankle hole; since
+ *  01b8c86 the collar rides the shin's own weights, and the drawn Achilles/shin skin inside the boot showed through its back in
+ *  every GPU closeup (a 2–3.5k px strip at 1.2 mm/px, both feet, every beat). Skin within this of the rim stays drawn (3 cm left the
+ *  strip showing; 1.2 cm halved it and the collar still reads closed in closeups). */
+export const SHOE_RIM_DEPTH = 0.012;
+
+/** The top rim of a shoe: surface points with nothing of the shoe higher (by > 5 mm) within 6 cm horizontally. Pure. */
+export function shoeRimPoints(surfaces: MaskSurface[]): number[] {
+  const pts: number[] = [];
+  for (const sf of surfaces) for (let v = 0; v < sf.P.length / 3; v++) pts.push(sf.P[v * 3], sf.P[v * 3 + 1], sf.P[v * 3 + 2]);
+  const out: number[] = [];
+  for (let i = 0; i < pts.length; i += 3) {
+    let top = true;
+    for (let j = 0; j < pts.length && top; j += 3) if (pts[j + 1] > pts[i + 1] + 0.005 && Math.hypot(pts[j] - pts[i], pts[j + 2] - pts[i + 2]) < 0.06) top = false;
+    if (top) out.push(pts[i], pts[i + 1], pts[i + 2]);
+  }
+  return out;
+}
 
 export interface MaskSurface { P: ArrayLike<number>; N: ArrayLike<number>; ind: ArrayLike<number> }
 export interface MaskSlot { slot: string; surfaces: MaskSurface[]; margin?: number }
@@ -119,6 +139,7 @@ export function computeBodyMask(input: MaskInput): MaskResult {
       }
     });
     const edges = margin > 0 ? openEdgePoints(sl.surfaces) : [];
+    const rim = boneRe ? shoeRimPoints(sl.surfaces) : [];
     const EC = Math.max(margin, 0.01);
     const edgeGrid = new Map<string, number[]>();
     for (let e = 0; e < edges.length / 3; e++) { const kk = key(Math.floor(edges[e * 3] / EC), Math.floor(edges[e * 3 + 1] / EC), Math.floor(edges[e * 3 + 2] / EC)); let a = edgeGrid.get(kk); if (!a) edgeGrid.set(kk, a = []); a.push(e); }
@@ -126,8 +147,14 @@ export function computeBodyMask(input: MaskInput): MaskResult {
     for (let v = 0; v < nb; v++) {
       if (hidden[v]) continue;
       const why = input.why; const no = (k: string) => { if (why) why[`${sl.slot}.${k}`] = (why[`${sl.slot}.${k}`] ?? 0) + 1; };
-      if (boneRe && (!input.bodyBoneWeight || input.bodyBoneWeight(v, boneRe.re) < boneRe.min)) continue;
+      if (boneRe && !input.bodyBoneWeight) continue;   // a shoe cannot tell the foot from the shin without the bone reader
+      const shin = !!boneRe && input.bodyBoneWeight!(v, boneRe.re) < boneRe.min;
       const x = bodyP[v * 3], y = bodyP[v * 3 + 1], z = bodyP[v * 3 + 2];
+      if (shin) {
+        let rimY = -Infinity, rd = 0.08;
+        for (let r = 0; r < rim.length; r += 3) { const h = Math.hypot(rim[r] - x, rim[r + 2] - z); if (h < rd) { rd = h; rimY = rim[r + 1]; } }
+        if (!(rimY - y >= SHOE_RIM_DEPTH)) { no('shinNearRim'); continue; }
+      }
       const cell = grid.get(key(Math.floor(x / TC), Math.floor(y / TC), Math.floor(z / TC)));
       if (!cell) { no('noCell'); continue; }
       let best: { d: number; s: number; facing: number; inside: boolean } | null = null;
@@ -148,7 +175,7 @@ export function computeBodyMask(input: MaskInput): MaskResult {
         if (fx * vx + fy * vy + fz * vz < 0) { fx = -fx; fy = -fy; fz = -fz; }   // outward = the garment's own vertex normals
         best = { d, s: dx * fx + dy * fy + dz * fz, facing: bodyN[v * 3] * fx + bodyN[v * 3 + 1] * fy + bodyN[v * 3 + 2] * fz, inside: true };
       }
-      const toeOut = !!boneRe && nearAny <= TOE_RULE.reach && !!input.bodyBoneWeight && input.bodyBoneWeight(v, TOE_RULE.re) >= TOE_RULE.min;
+      const toeOut = !!boneRe && !shin && nearAny <= TOE_RULE.reach && !!input.bodyBoneWeight && input.bodyBoneWeight(v, TOE_RULE.re) >= TOE_RULE.min;
       if (!toeOut) {
         if (!best) { no('noTriangleProjects'); continue; }
         if (best.d > MASK_REACH) { no('beyondReach'); continue; }
@@ -171,12 +198,337 @@ export function computeBodyMask(input: MaskInput): MaskResult {
   return { indices, hidden, hiddenBySlot, trisBefore: Math.floor(bodyInd.length / 3), trisAfter: indices.length / 3 };
 }
 
+/**
+ * OPEN-EDGE FLARE (CLOTHING-ALONE part 2, 2026-09-14). The mask leaves skin within MASK_MARGIN of a garment's open edge
+ * drawn (so a hem that rides up never opens a hole), and there the ink hull still won: the GPU closeups at 01b8c86 showed
+ * jagged skin along the Court Shorts' leg openings standing, the thigh through them in a tuck, shin skin over every shoe
+ * collar (the unfolded trainer too) and a wedge of chest skin at the tank's armhole, on all five bodies (worst blobs
+ * 800–2300 px at 1.2–1.6 mm/px). So the edges the skin comes out of stand further off it: each garment vertex moves out
+ * by `out` METRES at the edge (converted through each vertex's own skin — see flareGarmentEdges), easing to 0 at `band` metres
+ * from it. The tank's armhole wedge with the arms overhead is NOT cured by this (its strap rides Arm weights into the chest;
+ * handing the top the skin's weights cleared it but tore the Lab tee's sleeve into a fin, so that stays open). Only edges skin exits:
+ * shorts flare their leg openings (not the waistband, which sits under a top), shoes their collar (not the cut where the
+ * sole was split off), tops every opening (hem, armholes, neck).
+ */
+export const EDGE_FLARE: Record<string, { out: number; band: number }> = {
+  tops: { out: 0.012, band: 0.05 },
+  shorts: { out: 0.018, band: 0.05 },
+  shoes: { out: 0.02, band: 0.05 },
+};
+
+/** Per-vertex flare weight 0..1 of a garment measured in one pose (world P, y up): smoothstep from 1 at a flared open edge to
+ *  0 at `band`. Vertices are welded by position first (UV seams split them). Pure. */
+export function edgeFlareWeights(P: ArrayLike<number>, ind: ArrayLike<number>, slot: string, band: number): Float32Array {
+  const n = P.length / 3;
+  const wid = new Int32Array(n); const idOf = new Map<string, number>();
+  for (let v = 0; v < n; v++) { const k = key(Math.round(P[v * 3] / 5e-4), Math.round(P[v * 3 + 1] / 5e-4), Math.round(P[v * 3 + 2] / 5e-4)); let id = idOf.get(k); if (id === undefined) { id = idOf.size; idOf.set(k, id); } wid[v] = id; }
+  const count = new Map<string, number>();
+  for (let t = 0; t + 2 < ind.length; t += 3) {
+    const w = [wid[ind[t]], wid[ind[t + 1]], wid[ind[t + 2]]];
+    for (const [a, b] of [[w[0], w[1]], [w[1], w[2]], [w[2], w[0]]]) { if (a === b) continue; const k = a < b ? `${a}:${b}` : `${b}:${a}`; count.set(k, (count.get(k) ?? 0) + 1); }
+  }
+  const onEdge = new Set<number>();
+  for (const [k, c] of count) if (c === 1) for (const s of k.split(':')) onEdge.add(+s);
+  let lo = Infinity, hi = -Infinity;
+  for (let v = 0; v < n; v++) { lo = Math.min(lo, P[v * 3 + 1]); hi = Math.max(hi, P[v * 3 + 1]); }
+  const keep = (y: number) => slot === 'shorts' ? y < lo + 0.5 * (hi - lo) : slot === 'shoes' ? y > lo + 0.6 * (hi - lo) : true;
+  const grid = new Map<string, number[]>();
+  for (let v = 0; v < n; v++) {
+    if (!onEdge.has(wid[v]) || !keep(P[v * 3 + 1])) continue;
+    const kk = key(Math.floor(P[v * 3] / band), Math.floor(P[v * 3 + 1] / band), Math.floor(P[v * 3 + 2] / band)); let a = grid.get(kk); if (!a) grid.set(kk, a = []); a.push(v);
+  }
+  const out = new Float32Array(n);
+  // A LINED shoe (the evo boot) is closed at its collar — the outer shell turns over into the lining — so it has no open
+  // edge up there at all: its collar is its top rim, and that is what flares (the lining moves in toward the shin, unseen).
+  if (slot === 'shoes' && grid.size === 0) {
+    for (let v = 0; v < n; v++) { const w = Math.max(0, Math.min(1, 1 - (hi - P[v * 3 + 1]) / band)); out[v] = w * w * (3 - 2 * w); }
+    return out;
+  }
+  for (let v = 0; v < n; v++) {
+    const x = P[v * 3], y = P[v * 3 + 1], z = P[v * 3 + 2];
+    let d = Infinity; const ci = Math.floor(x / band), cj = Math.floor(y / band), ck = Math.floor(z / band);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) { const a = grid.get(key(ci + i, cj + j, ck + k)); if (a) for (const e of a) d = Math.min(d, Math.hypot(P[e * 3] - x, P[e * 3 + 1] - y, P[e * 3 + 2] - z)); }
+    const w = Math.max(0, 1 - d / band); out[v] = w * w * (3 - 2 * w);
+  }
+  return out;
+}
+
+/**
+ * THE WAISTBAND UNDER A TOP (CLOTHING-SOFT-RESIDUAL, 2026-09-15). Two faults at the same seam, measured on /dev/mode/dunk
+ * with the Closet starters (Lab tee + Court Shorts):
+ *   · FEMALE: the tee's hem ends 0.5–2.4 cm ABOVE the shorts' waistband (sides worst), so real midriff skin showed through
+ *     the notches of the tee's zigzag hem — the QA eye's "shredded shorts hem" / "female stand flecks" at every beat.
+ *   · MALE: the tee laps 4–9 cm over the shorts, and since 01b8c86 the short was CUT (triangles under the tee dropped). The
+ *     cut edge is a jagged triangle line under the hem; in the tuck the short (Hips / UpLeg) and the tee (Spine) slide apart,
+ *     and the cut's teeth poked out through the tee (GPU: 85–190 px of short drawn over the tee at the tuck) — the eye's
+ *     "waist fleck" and "hem/hip jagged on tuck/CONTACT/hang". Both garments stand ~3 mm off the skin, so where they overlap
+ *     they fight for the same depth.
+ * So the short stays WHOLE and goes under the top: its waistband is lifted along the skin until it reaches WAIST_FIT.overlap
+ * over the top's hem (never more than `liftMax` — a crop top keeps its midriff), and wherever the top covers it the short
+ * sinks `sink` metres toward the skin, easing in over `ramp` from the hem, so the tee is always the outer surface. Pure:
+ * world positions in, world deltas out (the glue converts them through each vertex's skin).
+ */
+export const WAIST_FIT = { overlap: 0.025, liftMax: 0.06, band: 0.08, sink: 0.015, ramp: 0.01, minOff: 0.003 };
+
+export interface WaistFitInput {
+  shortsP: ArrayLike<number>; shortsN: ArrayLike<number>; shortsInd: ArrayLike<number>;
+  top: MaskSurface;
+  bodyP: ArrayLike<number>; bodyN: ArrayLike<number>; bodyInd: ArrayLike<number>;
+}
+export interface WaistFitResult {
+  delta: Float32Array;
+  /** per vertex 0..1: how far into the fitted band it is — its skin weights blend this far toward `donor`'s (the body vertex under it) */
+  blend: Float32Array; donor: Int32Array;
+  liftedVerts: number; sunkVerts: number; maxLift: number; gapBefore: number; gapAfter: number }
+
+/** Closest point on the body's skin (triangles) to p, with the interpolated outward normal. */
+function skinProjector(P: ArrayLike<number>, N: ArrayLike<number>, ind: ArrayLike<number>, near: (x: number, y: number, z: number) => boolean) {
+  const grid = new Map<string, number[]>();
+  for (let t = 0; t + 2 < ind.length; t += 3) {
+    const a = ind[t]; if (!near(P[a * 3], P[a * 3 + 1], P[a * 3 + 2])) continue;
+    const kk = key(Math.floor(P[a * 3] / TC), Math.floor(P[a * 3 + 1] / TC), Math.floor(P[a * 3 + 2] / TC)); let l = grid.get(kk); if (!l) grid.set(kk, l = []); l.push(t);
+  }
+  return (x: number, y: number, z: number): { q: [number, number, number]; n: [number, number, number]; v: number } | null => {
+    let best: ReturnType<typeof closest> | null = null, bt = -1, bd = Infinity;
+    const ci = Math.floor(x / TC), cj = Math.floor(y / TC), ck = Math.floor(z / TC);
+    for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) for (let k = -2; k <= 2; k++) {
+      const l = grid.get(key(ci + i, cj + j, ck + k)); if (!l) continue;
+      for (const t of l) { const q = closest(x, y, z, P, ind[t], ind[t + 1], ind[t + 2]); const d = Math.hypot(x - q[0], y - q[1], z - q[2]); if (d < bd) { bd = d; best = q; bt = t; } }
+    }
+    if (!best) return null;
+    const a = ind[bt], b = ind[bt + 1], c = ind[bt + 2];
+    let nx = N[a * 3] * best[3] + N[b * 3] * best[4] + N[c * 3] * best[5], ny = N[a * 3 + 1] * best[3] + N[b * 3 + 1] * best[4] + N[c * 3 + 1] * best[5], nz = N[a * 3 + 2] * best[3] + N[b * 3 + 2] * best[4] + N[c * 3 + 2] * best[5];
+    const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    const v = best[3] >= best[4] && best[3] >= best[5] ? a : best[4] >= best[5] ? b : c;
+    return { q: [best[0], best[1], best[2]], n: [nx, ny, nz], v };
+  };
+}
+
+/** The waistband fit. Pure. */
+export function fitWaistband(input: WaistFitInput, cfg = WAIST_FIT): WaistFitResult {
+  const { shortsP: S, shortsN: SN, shortsInd } = input;
+  const n = S.length / 3, delta = new Float32Array(n * 3), blend = new Float32Array(n), donor = new Int32Array(n).fill(-1);
+  let lo = Infinity, hi = -Infinity, cx = 0, cz = 0;
+  for (let v = 0; v < n; v++) { lo = Math.min(lo, S[v * 3 + 1]); hi = Math.max(hi, S[v * 3 + 1]); cx += S[v * 3]; cz += S[v * 3 + 2]; }
+  cx /= n || 1; cz /= n || 1;
+  const none: WaistFitResult = { delta, blend, donor, liftedVerts: 0, sunkVerts: 0, maxLift: 0, gapBefore: 0, gapAfter: 0 };
+  if (!n || !(hi > lo)) return none;
+  const az = (x: number, z: number) => Math.atan2(z - cz, x - cx);
+  const adiff = (a: number, b: number) => { let d = Math.abs(a - b) % (2 * Math.PI); return d > Math.PI ? 2 * Math.PI - d : d; };
+  // the waistband: the short's open edge in its upper half
+  const ringPts = openEdgePoints([{ P: S, N: SN, ind: shortsInd }]);
+  const ring: { a: number; y: number; r: number }[] = [];
+  for (let i = 0; i < ringPts.length; i += 3) if (ringPts[i + 1] > lo + 0.5 * (hi - lo)) ring.push({ a: az(ringPts[i], ringPts[i + 2]), y: ringPts[i + 1], r: Math.hypot(ringPts[i] - cx, ringPts[i + 2] - cz) });
+  if (ring.length < 6) return none;
+  let ringLo = Infinity, ringHi = -Infinity, ringR = 0;
+  for (const p of ring) { ringLo = Math.min(ringLo, p.y); ringHi = Math.max(ringHi, p.y); ringR = Math.max(ringR, p.r); }
+  // the top's hem: its open edge around the waist (not the armholes or the sleeves — too high, or out past the torso)
+  const hem: { a: number; y: number }[] = [];
+  const topEdge = openEdgePoints([input.top]);
+  for (let i = 0; i < topEdge.length; i += 3) {
+    const y = topEdge[i + 1]; if (y < ringLo - 0.12 || y > ringHi + 0.12) continue;
+    if (Math.hypot(topEdge[i] - cx, topEdge[i + 2] - cz) > ringR * 1.4) continue;
+    hem.push({ a: az(topEdge[i], topEdge[i + 2]), y });
+  }
+  if (hem.length < 6) return none;
+  // how far the waistband must rise at an azimuth: to the top of the hem's notches nearby, plus the overlap
+  const hemTop = (a: number) => { let m = -Infinity; for (const h of hem) if (adiff(h.a, a) <= Math.PI / 12) m = Math.max(m, h.y); return m; };
+  const ringY = (a: number) => { let bd = Infinity, y = ringHi; for (const p of ring) { const d = adiff(p.a, a); if (d < bd) { bd = d; y = p.y; } } return y; };
+  const SECT = 36, need = new Float32Array(SECT);
+  let gapBefore = -Infinity;
+  for (let s = 0; s < SECT; s++) {
+    const a = -Math.PI + (s + 0.5) * 2 * Math.PI / SECT, ht = hemTop(a);
+    if (!Number.isFinite(ht)) continue;
+    const gap = ht - ringY(a); gapBefore = Math.max(gapBefore, gap);
+    need[s] = Math.max(0, Math.min(cfg.liftMax, gap + cfg.overlap));
+  }
+  const liftAt = (a: number) => {   // smoothed over ±2 sectors, never below the sector's own need
+    const s = Math.min(SECT - 1, Math.floor((a + Math.PI) / (2 * Math.PI) * SECT));
+    let sum = 0, mx = 0; for (let k = -2; k <= 2; k++) { const q = need[(s + k + SECT) % SECT]; sum += q; mx = Math.max(mx, q); }
+    return Math.max(need[s], Math.min(mx, sum / 5));
+  };
+  const project = skinProjector(input.bodyP, input.bodyN, input.bodyInd, (_x, y) => y > ringLo - cfg.band - 0.1 && y < ringHi + cfg.liftMax + 0.1);
+  const out = new Float32Array(n * 3);
+  for (let v = 0; v < n; v++) { out[v * 3] = S[v * 3]; out[v * 3 + 1] = S[v * 3 + 1]; out[v * 3 + 2] = S[v * 3 + 2]; }
+  let liftedVerts = 0, maxLift = 0;
+  for (let v = 0; v < n; v++) {
+    const x = S[v * 3], y = S[v * 3 + 1], z = S[v * 3 + 2], a = az(x, z);
+    const below = ringY(a) - y; if (below > cfg.band) continue;
+    const lift = liftAt(a); if (!(lift > 1e-4)) continue;
+    const t = Math.max(0, Math.min(1, 1 - below / cfg.band)), w = t * t * (3 - 2 * t), dy = lift * w;
+    if (!(dy > 1e-4)) continue;
+    // up along the body: the lifted point keeps the vertex's own offset off the skin (the waist narrows above the hips)
+    const here = project(x, y, z), there = project(x, y + dy, z);
+    blend[v] = w;
+    if (!here || !there) { out[v * 3 + 1] = y + dy; liftedVerts++; maxLift = Math.max(maxLift, dy); continue; }
+    donor[v] = there.v;
+    const off = Math.max(cfg.minOff, (x - here.q[0]) * here.n[0] + (y - here.q[1]) * here.n[1] + (z - here.q[2]) * here.n[2]);
+    out[v * 3] = there.q[0] + there.n[0] * off; out[v * 3 + 1] = there.q[1] + there.n[1] * off; out[v * 3 + 2] = there.q[2] + there.n[2] * off;
+    liftedVerts++; maxLift = Math.max(maxLift, dy);
+  }
+  // under the top: the short sinks toward the skin, easing in from the hem
+  const covered = computeBodyMask({ bodyP: out, bodyN: SN, bodyInd: shortsInd, slots: [{ slot: 'tops', surfaces: [input.top], margin: 0.0001 }] }).hidden;
+  let sunkVerts = 0;
+  for (let v = 0; v < n; v++) {
+    if (!covered[v]) continue;
+    const x = out[v * 3], y = out[v * 3 + 1], z = out[v * 3 + 2];
+    let dEdge = Infinity; for (let i = 0; i < topEdge.length; i += 3) dEdge = Math.min(dEdge, Math.hypot(topEdge[i] - x, topEdge[i + 1] - y, topEdge[i + 2] - z));
+    const t = Math.max(0, Math.min(1, dEdge / cfg.ramp)), w = t * t * (3 - 2 * t);
+    if (!(w > 1e-3)) continue;
+    const sk = project(x, y, z);
+    const nx = sk ? sk.n[0] : SN[v * 3], ny = sk ? sk.n[1] : SN[v * 3 + 1], nz = sk ? sk.n[2] : SN[v * 3 + 2];
+    out[v * 3] -= nx * cfg.sink * w; out[v * 3 + 1] -= ny * cfg.sink * w; out[v * 3 + 2] -= nz * cfg.sink * w;
+    blend[v] = Math.max(blend[v], w); if (sk) donor[v] = sk.v;
+    sunkVerts++;
+  }
+  // the gap left: how far the hem's notch tops still stand over the fitted waistband (≤ −overlap when closed, liftMax allowing)
+  let gapAfter = -Infinity;
+  const fitted: { a: number; y: number }[] = ring.map((p) => ({ a: p.a, y: p.y + liftAt(p.a) }));
+  for (let s = 0; s < SECT; s++) { const a = -Math.PI + (s + 0.5) * 2 * Math.PI / SECT, ht = hemTop(a); if (!Number.isFinite(ht)) continue; let bd = Infinity, y = 0; for (const p of fitted) { const d = adiff(p.a, a); if (d < bd) { bd = d; y = p.y; } } gapAfter = Math.max(gapAfter, ht - y); }
+  for (let v = 0; v < n * 3; v++) delta[v] = out[v] - S[v];
+  // a vertex in the band keeps a donor even where it barely moved, so its weights (and the skin under it) stay one
+  for (let v = 0; v < n; v++) if (blend[v] > 0 && donor[v] < 0) { const sk = project(out[v * 3], out[v * 3 + 1], out[v * 3 + 2]); if (sk) donor[v] = sk.v; else blend[v] = 0; }
+  return { delta, blend, donor, liftedVerts, sunkVerts, maxLift, gapBefore: Number.isFinite(gapBefore) ? gapBefore : 0, gapAfter: Number.isFinite(gapAfter) ? gapAfter : 0 };
+}
+
 // ── Babylon glue ────────────────────────────────────────────────────────
 
+const flared = new WeakSet<AbstractMesh>();
+/** Flare a shown garment's open edges once (measured in the pose the skeleton holds, applied in bind space along bind normals). */
+function flareGarmentEdges(mesh: Mesh, slot: string): void {
+  if (flared.has(mesh)) return;
+  const cfg = EDGE_FLARE[slot]; if (!cfg) return;
+  const sw = skinnedWorld(mesh);
+  const md = mesh.metadata as { felGarmentIndices0?: number[]; felGarmentFix?: string } | null;
+  if (slot === 'shoes' && /deferred/.test(md?.felGarmentFix ?? '') && !/late:/.test(md?.felGarmentFix ?? '')) return;   // the fold has not landed yet
+  const ind = md?.felGarmentIndices0 ?? mesh.getIndices();
+  const pos = mesh.getVerticesData('position'), nrm = mesh.getVerticesData('normal');
+  if (!sw || !ind || !pos || !nrm || pos.length !== nrm.length) return;
+  flared.add(mesh);
+  const w = edgeFlareWeights(sw.P, ind, slot, cfg.band);
+  // The garments' bind space is NOT metres: one bind unit along a garment normal skins to 0.17 m on the Court Shorts,
+  // 0.25 m on the boot and 0.20–0.25 m on the tank (0.91 on the body; measured through Σ wᵢMᵢ and the mesh world matrix,
+  // 2026-09-14). A metre value added in bind space moves the cloth a sixth of that, so each vertex converts the world flare
+  // through its own skin: out / |world image of the unit bind normal|.
+  const M = mesh.skeleton!.getTransformMatrices(mesh), mi = mesh.getVerticesData('matricesIndices'), mw = mesh.getVerticesData('matricesWeights');
+  const Wm = mesh.computeWorldMatrix(true).m;
+  if (!M || !mi || !mw) return;
+  const worldPerBind = (v: number) => {
+    const nx = nrm[v * 3], ny = nrm[v * 3 + 1], nz = nrm[v * 3 + 2]; let lx = 0, ly = 0, lz = 0;
+    for (let k = 0; k < 4; k++) { const wk = mw[v * 4 + k]; if (!(wk > 0)) continue; const b = mi[v * 4 + k] * 16; lx += wk * (M[b] * nx + M[b + 4] * ny + M[b + 8] * nz); ly += wk * (M[b + 1] * nx + M[b + 5] * ny + M[b + 9] * nz); lz += wk * (M[b + 2] * nx + M[b + 6] * ny + M[b + 10] * nz); }
+    return Math.hypot(lx * Wm[0] + ly * Wm[4] + lz * Wm[8], lx * Wm[1] + ly * Wm[5] + lz * Wm[9], lx * Wm[2] + ly * Wm[6] + lz * Wm[10]) / (Math.hypot(nx, ny, nz) || 1);
+  };
+  let moved = 0;
+  const out = new Float32Array(pos.length);
+  for (let v = 0; v < pos.length / 3; v++) {
+    const s = w[v] > 0 ? worldPerBind(v) : 0;
+    const d = s > 1e-4 ? cfg.out * w[v] / s : 0; if (d > 0 && cfg.out * w[v] > 1e-4) moved++;
+    for (let k = 0; k < 3; k++) out[v * 3 + k] = pos[v * 3 + k] + nrm[v * 3 + k] * d;
+  }
+  if (!moved) return;
+  if ((mesh.geometry?.meshes.length ?? 1) > 1) mesh.makeGeometryUnique();   // never move a container's (or a sibling clone's) vertices
+  (mesh as { __felFlare0?: Float32Array }).__felFlare0 ??= new Float32Array(pos);   // the mask measures the garment un-flared
+  const flareD = new Float32Array(pos.length); for (let i = 0; i < pos.length; i++) flareD[i] = out[i] - pos[i];
+  (mesh as { __felFlareD?: Float32Array }).__felFlareD = flareD;   // kept as a delta: the waistband fit re-bases a short under it
+  mesh.setVerticesData('position', out, false);
+  mesh.metadata = { ...(mesh.metadata ?? {}), felEdgeFlare: moved };
+}
+
+type SkinData = { mi: Float32Array; mw: Float32Array; mie: Float32Array | null; mwe: Float32Array | null };
+type FitMesh = Mesh & { __felWaist0?: Float32Array; __felWaistSkin0?: SkinData; __felFlare0?: Float32Array; __felFlareD?: Float32Array; __felWaistTop?: number | null };
+/**
+ * A shown short goes under the shown top (fitWaistband), re-based from its pristine bind positions on every mask — a Closet
+ * swap refits, a hidden top restores the short. 01b8c86 CUT the short under a top (triangles dropped); a short it left cut
+ * gets its whole index buffer back here.
+ */
+function fitShortsUnderTop(body: Mesh, bodySkin: { P: Float32Array; N: Float32Array }, bodyInd: ArrayLike<number>, meshes: AbstractMesh[]): void {
+  const top = meshes.find((m) => maskSlotOf(m.name) === 'tops' && m.isVisible && !m.isDisposed() && (m as Mesh).skeleton) as FitMesh | undefined;
+  for (const m of meshes) {
+    if (maskSlotOf(m.name) !== 'shorts' || m.isDisposed() || !(m as Mesh).skeleton) continue;
+    const g = m as FitMesh;
+    const gmd = (g.metadata ?? {}) as { felGarmentIndices0?: number[]; felGarmentMasked?: boolean };
+    if (gmd.felGarmentMasked && gmd.felGarmentIndices0) { g.setIndices(gmd.felGarmentIndices0, null, false); g.metadata = { ...gmd, felGarmentMasked: false }; }
+    const want = m.isVisible && top ? top.uniqueId : null;
+    if ((g.__felWaistTop ?? null) === want) continue;
+    const src = g.__felWaist0 ?? g.__felFlare0 ?? g.getVerticesData('position'); if (!src) continue;
+    const skin0 = g.__felWaistSkin0 ?? readSkin(g); if (!skin0) continue;
+    g.__felWaistSkin0 = skin0;
+    if ((g.geometry?.meshes.length ?? 1) > 1) g.makeGeometryUnique();
+    writeSkin(g, skin0);   // re-based: the pristine weights too
+    const base: Float32Array = (g.__felWaist0 ??= new Float32Array(src));
+    const bind = new Float32Array(base.length); bind.set(base);
+    let stats: Omit<WaistFitResult, 'delta'> | null = null;
+    const ind = g.getIndices(), tInd = top?.getIndices();
+    if (want !== null && top && ind && tInd) {
+      const sw = skinnedWorld(g, base), tw = skinnedWorld(top, top.__felFlare0);
+      if (sw && tw) {
+        const res = fitWaistband({ shortsP: sw.P, shortsN: sw.N, shortsInd: ind, top: { P: tw.P, N: tw.N, ind: tInd }, bodyP: bodySkin.P, bodyN: bodySkin.N, bodyInd });
+        const { delta, ...rest } = res; stats = rest;
+        for (let i = 0; i < delta.length; i++) sw.P[i] += delta[i];
+        fitToBind(g, body, sw.P, delta, res.blend, res.donor, skin0, bind);
+      }
+    }
+    const out = new Float32Array(bind); const fd = g.__felFlareD;
+    if (fd && fd.length === out.length) for (let i = 0; i < out.length; i++) out[i] += fd[i];
+    g.setVerticesData('position', out, false);
+    g.__felFlare0 = bind;   // what the mask (and a later flare) measures: the fitted short, un-flared
+    g.__felWaistTop = want;
+    g.metadata = { ...(g.metadata ?? {}), felWaistFit: stats ? { lifted: stats.liftedVerts, sunk: stats.sunkVerts, maxLift: +stats.maxLift.toFixed(3), gapBefore: +stats.gapBefore.toFixed(3), gapAfter: +stats.gapAfter.toFixed(3) } : null };
+  }
+}
+
+function readSkin(mesh: Mesh): SkinData | null {
+  const mi = mesh.getVerticesData('matricesIndices'), mw = mesh.getVerticesData('matricesWeights'); if (!mi || !mw) return null;
+  const mie = mesh.getVerticesData('matricesIndicesExtra'), mwe = mesh.getVerticesData('matricesWeightsExtra');
+  return { mi: new Float32Array(mi), mw: new Float32Array(mw), mie: mie ? new Float32Array(mie) : null, mwe: mwe ? new Float32Array(mwe) : null };
+}
+function writeSkin(mesh: Mesh, sk: SkinData): void {
+  mesh.setVerticesData('matricesIndices', new Float32Array(sk.mi), false, 4);
+  mesh.setVerticesData('matricesWeights', new Float32Array(sk.mw), false, 4);
+  if (sk.mie && sk.mwe) { mesh.setVerticesData('matricesIndicesExtra', new Float32Array(sk.mie), false, 4); mesh.setVerticesData('matricesWeightsExtra', new Float32Array(sk.mwe), false, 4); }
+}
+
+/**
+ * The fitted short in bind space. A vertex in the fitted band blends its skin weights `blend` of the way toward the body
+ * vertex under it (matched by bone NAME — the garment's skeleton need not order its bones like the body's): at the waist the
+ * skin and the tee ride the spine, and a band left on the short's own Hips / UpLeg weights stood still while the torso folded
+ * over it and came out through the tee (GPU, female tuck: 687 px of short over the tee after a lift on the old weights). Then
+ * each vertex's world target goes back through the inverse of the mesh world matrix and its NEW Σ wᵢMᵢ (the fold's math in
+ * garmentFixes).
+ */
+function fitToBind(mesh: Mesh, body: Mesh, target: Float32Array, delta: Float32Array, blend: Float32Array, donor: Int32Array, skin0: SkinData, bind: Float32Array): void {
+  const sk = mesh.skeleton!, M = sk.getTransformMatrices(mesh);
+  const bmi = body.getVerticesData('matricesIndices'), bmw = body.getVerticesData('matricesWeights');
+  if (!M || !bmi || !bmw) return;
+  const byName = new Map<string, number>(); sk.bones.forEach((b, i) => byName.set(b.name, i));
+  const bodyBones = body.skeleton!.bones;
+  const mi = new Float32Array(skin0.mi), mw = new Float32Array(skin0.mw), mie = skin0.mie ? new Float32Array(skin0.mie) : null, mwe = skin0.mwe ? new Float32Array(skin0.mwe) : null;
+  const Winv = mesh.computeWorldMatrix(true).clone(); Winv.invert();
+  const S = new Matrix(), Sinv = new Matrix(), p = new Vector3(), sums = new Float32Array(16);
+  for (let v = 0; v < bind.length / 3; v++) {
+    const moved = Math.abs(delta[v * 3]) + Math.abs(delta[v * 3 + 1]) + Math.abs(delta[v * 3 + 2]) > 1e-7;
+    const a = donor[v] >= 0 ? blend[v] : 0; if (!(a > 0) && !moved) continue;
+    const w = new Map<number, number>();
+    for (let k = 0; k < 8; k++) { const wk = k < 4 ? skin0.mw[v * 4 + k] : skin0.mwe ? skin0.mwe[v * 4 + k - 4] : 0; if (!(wk > 0)) continue; const bi = k < 4 ? skin0.mi[v * 4 + k] : skin0.mie![v * 4 + k - 4]; w.set(bi, (w.get(bi) ?? 0) + (1 - a) * wk); }
+    for (let k = 0; k < 4; k++) { const wk = bmw[donor[v] * 4 + k]; if (!(wk > 0)) continue; const bi = byName.get(bodyBones[bmi[donor[v] * 4 + k]]?.name ?? ''); if (bi === undefined) continue; w.set(bi, (w.get(bi) ?? 0) + a * wk); }
+    const top4 = [...w].filter(([, x]) => x > 1e-4).sort((x, y) => y[1] - x[1]).slice(0, 4); const tot = top4.reduce((t, [, x]) => t + x, 0);
+    if (!(tot > 0)) continue;
+    for (let k = 0; k < 4; k++) { mi[v * 4 + k] = top4[k]?.[0] ?? 0; mw[v * 4 + k] = top4[k] ? top4[k][1] / tot : 0; if (mie && mwe) { mie[v * 4 + k] = 0; mwe[v * 4 + k] = 0; } }
+    sums.fill(0);
+    for (let k = 0; k < 4; k++) { const wk = mw[v * 4 + k]; if (!(wk > 0)) continue; const b = mi[v * 4 + k] * 16; for (let j = 0; j < 16; j++) sums[j] += wk * M[b + j]; }
+    Matrix.FromArrayToRef(sums, 0, S); S.invertToRef(Sinv);
+    p.set(target[v * 3], target[v * 3 + 1], target[v * 3 + 2]);
+    Vector3.TransformCoordinatesToRef(p, Winv, p);   // world → skinned local
+    Vector3.TransformCoordinatesToRef(p, Sinv, p);   // skinned local → bind, through the new weights
+    bind[v * 3] = p.x; bind[v * 3 + 1] = p.y; bind[v * 3 + 2] = p.z;
+  }
+  writeSkin(mesh, { mi, mw, mie, mwe });
+}
+
 /** World positions and normals of a skinned mesh in the pose its skeleton holds now (the vertex shader's math). */
-export function skinnedWorld(mesh: Mesh): { P: Float32Array; N: Float32Array } | null {
+export function skinnedWorld(mesh: Mesh, positions?: ArrayLike<number>): { P: Float32Array; N: Float32Array } | null {
   const sk = mesh.skeleton;
-  const pos = mesh.getVerticesData('position'), nrm = mesh.getVerticesData('normal'), mi = mesh.getVerticesData('matricesIndices'), mw = mesh.getVerticesData('matricesWeights');
+  const pos = positions ?? mesh.getVerticesData('position'), nrm = mesh.getVerticesData('normal'), mi = mesh.getVerticesData('matricesIndices'), mw = mesh.getVerticesData('matricesWeights');
   if (!sk || !pos || !nrm || !mi || !mw) return null;
   const mie = mesh.getVerticesData('matricesIndicesExtra'), mwe = mesh.getVerticesData('matricesWeightsExtra');
   const M = sk.getTransformMatrices(mesh);
@@ -235,10 +587,17 @@ export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<str
   const meta = body.metadata as typeof md;
   const bodySkin = skinnedWorld(body); if (!bodySkin) return null;
   meshes = withSiblings(body, meshes);
+  try { fitShortsUnderTop(body, bodySkin, meta.felBodyIndices0!, meshes); } catch (e) { console.warn(`[FEL-KIT] waistband fit skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
   const bySlot = new Map<string, MaskSurface[]>();
   for (const m of meshes) {
     const slot = maskSlotOf(m.name); if (!slot || !m.isVisible || m.isDisposed() || !(m as Mesh).skeleton) continue;
-    const s = skinnedWorld(m as Mesh); const ind = (m as Mesh).getIndices(); if (!s || !ind) continue;
+    if (!/^KitSole_/.test(m.name)) { try { flareGarmentEdges(m as Mesh, slot); } catch (e) { console.warn(`[FEL-KIT] edge flare skipped on ${m.name}: ${String((e as Error)?.message ?? e).slice(0, 120)}`); } }
+    // Tops and shorts are measured UN-flared: the flare is for drawing — a flared armhole edge "covered" arm skin, the mask hid it,
+    // and it could slide out past the edge as the arm moved (CPU probe: arm skin exposed past the tank 23 → 46 vertices with the
+    // flare in the mask). A shoe is measured AS flared: the shin under its collar is only hidden deep below the rim, so nothing
+    // can slide out, and the flared collar is what closes the Achilles strip (GPU: the male boot's back view 936 px flared vs
+    // 1757 px un-flared at the hang).
+    const s = skinnedWorld(m as Mesh, slot === 'shoes' ? undefined : (m as { __felFlare0?: Float32Array }).__felFlare0); const ind = (m as Mesh).getIndices(); if (!s || !ind) continue;
     (bySlot.get(slot) ?? bySlot.set(slot, []).get(slot)!).push({ P: s.P, N: s.N, ind });
   }
   const mi = body.getVerticesData('matricesIndices'), mw = body.getVerticesData('matricesWeights');
@@ -248,24 +607,6 @@ export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<str
   shareBodyBounds(body, meshes);   // after the shoe's late fold, which refreshed its own box
   if (!meta.felBodyMask) body.makeGeometryUnique();   // this body only — the container's geometry keeps the whole skin
   body.setIndices(res.indices, null, false);
-  // GARMENT UNDER GARMENT: the short's waistband under a shown top. The short is inflated 2 cm off the skin and the tops
-  // 1.3 cm, so where a long top (the Lab tee) laps over the waistband the short stands OUTSIDE the tee's hem and its black
-  // showed through in teeth along the hem (and its own ink hull beat the tee's depth the same way the skin's did). The
-  // short is masked against the top exactly as the skin is — same rule, the top's hem margin — so it shows below the hem only.
-  const tops = bySlot.get('tops');
-  for (const m of meshes) {
-    if (maskSlotOf(m.name) !== 'shorts' || m.isDisposed() || !(m as Mesh).skeleton) continue;
-    const mesh = m as Mesh;
-    const gmd = (mesh.metadata ??= {}) as { felGarmentIndices0?: number[]; felGarmentMasked?: boolean };
-    if (!gmd.felGarmentIndices0) { const ind = mesh.getIndices(); if (!ind) continue; mesh.metadata = { ...gmd, felGarmentIndices0: Array.from(ind) }; }
-    const g = mesh.metadata as typeof gmd;
-    if (!m.isVisible || !tops) { if (g.felGarmentMasked) { mesh.setIndices(g.felGarmentIndices0!, null, false); mesh.metadata = { ...g, felGarmentMasked: false }; } continue; }
-    const sw = skinnedWorld(mesh); if (!sw) continue;
-    const r = computeBodyMask({ bodyP: sw.P, bodyN: sw.N, bodyInd: g.felGarmentIndices0!, slots: [{ slot: 'tops', surfaces: tops }] });
-    if (!g.felGarmentMasked) mesh.makeGeometryUnique();
-    mesh.setIndices(r.indices, null, false);
-    mesh.metadata = { ...g, felGarmentMasked: true };
-  }
   const yRange = (P: ArrayLike<number>) => { let lo = Infinity, hi = -Infinity; for (let i = 1; i < P.length; i += 3) { lo = Math.min(lo, P[i]); hi = Math.max(hi, P[i]); } return [+lo.toFixed(3), +hi.toFixed(3)]; };
   body.metadata = { ...meta, felBodyMask: { hidden: res.hidden, hiddenBySlot: res.hiddenBySlot, trisBefore: res.trisBefore, trisAfter: res.trisAfter,
     // what the mask measured (probe diagnostics): the skinned height range of the body and of each slot's surfaces
