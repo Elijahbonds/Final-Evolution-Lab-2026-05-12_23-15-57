@@ -764,6 +764,8 @@ export const DunkMode: ModeDefinition = (() => {
 
       // SLAM needs the ball: a lob still in the air cannot be flushed (the catch is what puts it in the hand)
       if (e.t === 'button' && e.btn === 'A' && e.pressed && qteWindowOpen && !lob.live) slamNow(ctx, clipTime);
+      // PHONE CONTROLS (2026-09-15): SLAM tapped on the runway did nothing and said nothing (the phone check: SLAM SILENT)
+      else if (e.t === 'button' && e.btn === 'A' && e.pressed && (phase === 'approach' || phase === 'charge')) refuse(ctx, 'SLAM AT THE TOP OF THE JUMP');
       // RIM HANG — hold SLAM through the flush to hang on the iron
       if (e.t === 'button' && e.btn === 'A') aHeld = e.pressed;
     },

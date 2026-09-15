@@ -131,6 +131,19 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
             <>
               <div className="fel-heading fel-panel px-6 py-3 text-3xl font-black text-white">{hud.banner}</div>
               {typeof hud.hint === 'string' && hud.hint && <div className="fel-panel px-3 py-1 font-mono text-xs text-white/70">{hud.hint}</div>}
+              {/* PHONE CONTROLS (FINISH-RELEASE, 2026-09-15): the player-count screen said "any face button starts" and a phone
+                  has no face buttons — the only way in was waiting out the pick timer, and a second player could never be added.
+                  The pad's own verbs, as taps: ◀ ▶ change the count (the d-pad), PLAY is the A button. */}
+              {hud.banner.startsWith('PLAYERS') && (
+                <div className="pointer-events-auto mt-1 flex items-center gap-3">
+                  <button type="button" aria-label="fewer players" onPointerDown={(e) => { e.preventDefault(); emit({ t: 'dpad', dir: 'left', pressed: true }); }} onPointerUp={() => emit({ t: 'dpad', dir: 'left', pressed: false })}
+                    className="fel-panel h-12 w-12 rounded-full text-xl font-black text-white">◀</button>
+                  <button type="button" onPointerDown={(e) => { e.preventDefault(); emit({ t: 'button', btn: 'A', pressed: true }); }} onPointerUp={() => emit({ t: 'button', btn: 'A', pressed: false })}
+                    className="rounded-2xl bg-[var(--fel-cyan)] px-8 py-3 text-lg font-black text-black">PLAY</button>
+                  <button type="button" aria-label="more players" onPointerDown={(e) => { e.preventDefault(); emit({ t: 'dpad', dir: 'right', pressed: true }); }} onPointerUp={() => emit({ t: 'dpad', dir: 'right', pressed: false })}
+                    className="fel-panel h-12 w-12 rounded-full text-xl font-black text-white">▶</button>
+                </div>
+              )}
             </>
           ) : null}
         </div>

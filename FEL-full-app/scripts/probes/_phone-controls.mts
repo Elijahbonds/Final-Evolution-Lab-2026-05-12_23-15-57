@@ -47,6 +47,25 @@ for (const [slug, path] of run) {
     if (await start.count()) await start.first().tap(); else await p.tap('canvas');
     await p.waitForTimeout(1200);
     row.playing = (await p.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '')) === 'playing';
+    if (slug === 'who_scene_it') {
+      // the quiz draws its own touch controls (no stick, no diamond): PLAY on the player-count screen, then four answer cards
+      const play = p.getByRole('button', { name: /^PLAY$/ });
+      row.stick = await play.count() > 0;
+      if (row.stick) await play.first().tap();
+      let card = p.locator('button:has(span.rounded-full)');
+      for (let i = 0; i < 30 && !(await card.count()); i++) { await p.waitForTimeout(500); card = p.locator('button:has(span.rounded-full)'); }
+      const results: Record<string, string> = {};
+      if (await card.count()) {
+        const from = await p.evaluate(() => (window as any).__FEL_QA__?.now() ?? 0);
+        await card.first().tap(); await p.waitForTimeout(600);
+        const sum = await p.evaluate((f) => (window as any).__FEL_QA__?.summary(900, f), from);
+        results.ANSWER = !sum ? 'no QA' : sum.presses === 0 ? 'NO PRESS' : sum.answered > 0 ? 'ok' : 'SILENT';
+      } else results.ANSWER = 'MISSING';
+      row.verbs = results;
+      await p.screenshot({ path: `${OUT}/${slug}.png` });
+      row.pass = !!row.playing && !!row.stick && Object.values(results).every((r) => r === 'ok') && errs.length === 0;
+      throw Object.assign(new Error('done'), { done: true });
+    }
     const cfg = MODE_VERBS[slug] ?? MODE_VERBS.default;
     const live = cfg.buttons.filter((x: any) => x.emit && x.label);
     row.stick = await p.getByText('MOVE', { exact: true }).count() > 0;
@@ -72,7 +91,7 @@ for (const [slug, path] of run) {
     await p.screenshot({ path: `${OUT}/${slug}.png` });
     const bad = Object.values(results).filter((r) => r !== 'ok');
     row.pass = !!row.playing && !!row.stick && bad.length === 0 && errs.length === 0;
-  } catch (e) { if (!row.note) row.note = String((e as Error).message).slice(0, 120); row.pass = false; }
+  } catch (e) { if (!(e as { done?: boolean }).done) { if (!row.note) row.note = String((e as Error).message).slice(0, 120); row.pass = false; } }
   row.errors = errs.slice(0, 3);
   rows.push(row); console.log(JSON.stringify(row));
   await p.close();

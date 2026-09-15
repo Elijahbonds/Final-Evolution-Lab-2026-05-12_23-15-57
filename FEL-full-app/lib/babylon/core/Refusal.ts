@@ -12,7 +12,7 @@ import type { ModeContext } from './ModeHarness';
 import { SoundKit } from '../audio/SoundKit';
 
 const REFUSAL_COLOR = '#94a3b8';
-export const REFUSAL_THROTTLE_MS = 800;
+export const REFUSAL_THROTTLE_MS = 450;   // long enough to swallow a held / mashed button, short enough that two deliberate taps are each answered
 const lastSaid = new WeakMap<ModeContext, Map<string, number>>();
 
 /** Answer a press that cannot act right now. Returns false when the same line was said within the throttle. */

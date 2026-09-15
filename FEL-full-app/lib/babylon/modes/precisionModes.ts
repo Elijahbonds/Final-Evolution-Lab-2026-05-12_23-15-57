@@ -1348,6 +1348,7 @@ export const PenaltyMode: ModeDefinition = (() => {
         // one dive per kick: d-pad or a decisive stick flick picks the side
         const side: DiveSign = e.t === 'dpad' && e.pressed ? (e.dir === 'left' ? -1 : e.dir === 'right' ? 1 : 0)
           : e.t === 'stick' && e.side === 'L' && Math.abs(e.x) > 0.6 ? (e.x < 0 ? -1 : 1) : 0;
+        if (e.t === 'button' && e.pressed && e.btn === 'A') refuse(ctx, 'DIVE WITH ◀ ▶');   // PHONE CONTROLS: STRIKE in the keeper round
         if (side !== 0 && keepDiveAt == null) {
           keepDive = side; keepDiveAt = performance.now();
           dive(meAnim, side); meDove = true; meDiveSign = side;
@@ -1357,7 +1358,8 @@ export const PenaltyMode: ModeDefinition = (() => {
       }
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; detectFeint(ctx, e.x); }
       if (e.t === 'button' && e.btn === 'A' && e.pressed) {
-        if (phase === 'aim') { phase = 'power'; meter.start(); ctx.setHud({ hint: 'KICK at the top of the wave' }); }
+        if (phase === 'aim') { phase = 'power'; meter.start(); ctx.setHud({ hint: 'KICK at the top of the wave' }); SoundKit.play('uiTick', { pitch: 1.1 }); ctx.juice.callout('POWER — KICK AT THE TOP', '#8fe0a0', 800); }   // PHONE CONTROLS: the run-up is SAID
+        else if (phase !== 'power') refuse(ctx, 'BALL IN PLAY');
         else if (phase === 'power') {
           const p = meter.stop();
           phase = 'flight';

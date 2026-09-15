@@ -35,6 +35,7 @@ import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { freeRunWindow, runPose, FREERUN_INPUT_IDLE, RUNNER_TURN_RATE, type FreeRunPostureInput } from '../core/RunPosture';
 import { slewYaw, settleAngle, wrapYaw } from '../core/Biomech';
 import { SoundKit } from '../audio/SoundKit';
+import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { EffectsKit } from '../visual/EffectsKit';
 import { assertSpawned } from '../core/FrameGuard';
 import { initPhysics } from '../core/Physics';
@@ -423,8 +424,11 @@ export const FreeRunMode: ModeDefinition = (() => {
         }
       } else if (e.btn === 'B') {
         if (S.state === 'ground' && verbs.includes('SLIDE')) { S.state = 'slide'; S.slideSec = SLIDE_SEC; S.combo.add('SLIDE', 35, 'manual'); flash(ctx, 'SLIDE'); SoundKit.play('whoosh', { pitch: 0.8 }); }
-        else if (S.state === 'air') { S.rollAt = S.clock; }                    // the roll is timed against touchdown
+        else if (S.state === 'air') { S.rollAt = S.clock; ctx.juice.callout('ROLL ON LANDING', '#cbd5e1', 400); }   // the roll is timed against touchdown
+        else refuse(ctx, 'SLIDE WHILE RUNNING');   // PHONE CONTROLS: a SLIDE with no run under it
       } else if (e.btn === 'X' || e.btn === 'Y') {
+        if (S.state !== 'air') refuse(ctx, e.btn === 'X' ? 'FLIP IN THE AIR' : 'TWIST IN THE AIR');   // PHONE CONTROLS: FLIP / TWIST on the ground
+        else if (S.trick) refuse(ctx, 'ONE TRICK PER JUMP');
         if (S.state === 'air' && !S.trick) {
           if (e.btn === 'Y' && verbs.includes('CAT LEAP')) {
             // catch the ledge: snap up onto it and keep running the high line

@@ -501,7 +501,7 @@ return {
     if (e.t === 'trigger' && e.side === 'L') S.input.yaw = -e.value;      // rudder left
     // BOOST is the shared held R1 (RB · Shift · the BOOST pill).
     if (e.t === 'button' && e.btn === 'R1') S.boostHeld = e.pressed;
-    if (e.t === 'button' && e.btn === 'B' && e.pressed) S.input.yaw = 0;
+    if (e.t === 'button' && e.btn === 'B' && e.pressed) { S.input.yaw = 0; S.rolling = false; say('WINGS LEVEL', 0.6); SoundKit.play('uiTick', { pitch: 1.2, volume: 0.4 }); }   // PHONE CONTROLS: LEVEL was silent
   },
 
   update(ctx: ModeContext, dt: number): void {

@@ -344,7 +344,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
             setTimeout(() => ctx.setHud({ banner: '' }), 560);
           }
         }
-        if (e.btn === 'X') tricks.start(TRICKS.grab);
+        if (e.btn === 'X') { if (rig.rider.grounded) refuse(ctx, 'GRAB IN THE AIR'); else tricks.start(TRICKS.grab); }   // PHONE CONTROLS: a grab on the face was silent
       }
       if (e.t === 'button' && !e.pressed && e.btn === 'X') tricks.endGrab();
     },

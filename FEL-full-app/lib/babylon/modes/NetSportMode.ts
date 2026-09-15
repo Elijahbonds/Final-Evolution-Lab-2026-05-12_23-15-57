@@ -200,6 +200,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   const camSubject = new Vector3();
   /** How much of the player's lateral travel the camera takes. The rest is pan. */
   const CAM_PAN_FRAC = 0.35;
+  const camAim = new Vector3();   // the aim point: the ball, drawn toward a player who has strayed from the pan
   /** And it never leaves this box, whatever the player does — the scenery starts just past the sidelines. */
   const CAM_PAN_M = 2.6;
 
@@ -869,7 +870,13 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         const camX = Math.max(-CAM_PAN_M, Math.min(CAM_PAN_M, foot.x * CAM_PAN_FRAC));
         camSubject.set(camX, me.root.position.y, me.root.position.z);
         camVel.set(foot.vx * CAM_PAN_FRAC, 0, 0);
-        ctx.camDirector.update(camSubject, camVel, ball ? ball.position : null);
+        // …and the AIM keeps the player in it. The pan is damped (0.35 of the run, ±2.6 m) and the aim follows the ball, so a
+        // player sprinting wide while the ball sat on the far side left the frame off its bottom corner — FrameGuard's
+        // "hero off-screen (off BOTTOM)" on the rc7 gauntlet (hero x 5.5, subject x 1.9). The further the body strays from
+        // the pan, the more of the aim point is pulled from the ball back toward the body (up to 60 %).
+        const stray = Math.abs(foot.x - camX);
+        if (ball) camAim.copyFrom(ball.position).scaleInPlace(1 - Math.min(0.6, Math.max(0, (stray - 1.5) / 3))).addInPlace(me.root.position.scale(Math.min(0.6, Math.max(0, (stray - 1.5) / 3))));
+        ctx.camDirector.update(camSubject, camVel, ball ? camAim : null);
         const bodyRightX = Math.cos(me.root.rotation.y);
         // the tree owns the clips: the shuffle INTENT in the body frame, plus the beat latches — fed every frame, every phase
         meTree.update({ move: step ? (step * bodyRightX > 0 ? 1 : -1) : 0, swing: meSwing, serve: meServe, block: meBlock });
