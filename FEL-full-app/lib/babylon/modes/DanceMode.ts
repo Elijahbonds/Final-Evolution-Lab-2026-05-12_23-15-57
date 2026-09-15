@@ -174,12 +174,24 @@ export const DanceMode: ModeDefinition = (() => {
       me.animator.setSpeed(currentClip, clipSpeed() * spd);
     }
 
+    // SCORECARD FEEL (2026-09-15): a hit on the beat was a banner word and a tick — the capture counted 0 juice beats a
+    // minute in a rhythm game. The hit POPS at the dancer in its grade's colour, a PERFECT kicks the frame, a streak is
+    // called, and an instrument joining the mix flashes the stage.
+    const popAt = me.root.position.add(new Vector3(0, 2.1, 0));
     if (label === 'PERFECT') {
       EffectsKit.burst(ctx.scene, me.root.position.add(new Vector3(0, 1.4, 0)), 'sparks');
       SoundKit.play('uiTick', { pitch: 1.6, volume: 0.35 });
+      ctx.juice.scorePop(popAt, 'PERFECT', '#fde047');
+      ctx.juice.shake(0.035, 90);
+    } else if (label === 'GREAT') {
+      ctx.juice.scorePop(popAt, 'GREAT', '#86efac');
+    } else if (label === 'GOOD') {
+      ctx.juice.scorePop(popAt, 'GOOD', '#93c5fd');
     } else if (label === 'MISS') {
       SoundKit.play('miss', { volume: 0.25 });
     }
+    if (label !== 'MISS' && combo > 0 && combo % 8 === 0) ctx.juice.callout(`${combo} ON THE BEAT`, '#f0abfc', 700);
+    if (joinBanner) ctx.juice.flash('#f0abfc', 110);
     setTimeout(() => ctx.setHud({ banner: '' }), joinBanner ? 1000 : 380);
   }
 

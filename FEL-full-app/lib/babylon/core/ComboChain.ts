@@ -17,8 +17,9 @@ export interface ComboLink { label: string; pts: number; kind: 'air' | 'grind' |
 // REPEAT DECAY (MECHANICS PASS, 2026-09-15). THPS's own answer to the button masher: the same trick again in the same combo
 // pays less — 100 %, 75 %, 50 %, 25 %, then 10 % — and from its fourth appearance it stops raising the multiplier. The
 // probe measured Free Run's masher at ~10× a deliberate run (1,610 vs 165): spamming the one move in reach (a slide, a
-// vault) paid full points at a growing multiplier every time. Variety is the skill now, which is what a line IS.
-export const REPEAT_DECAY = [1, 0.75, 0.5, 0.25, 0.1] as const;
+// vault) paid full points at a growing multiplier every time. Variety is the skill now, which is what a line IS. Past the
+// end of the table a repeat pays nothing and does not extend the chain (see add()).
+export const REPEAT_DECAY = [1, 0.75, 0.5, 0.25, 0.1, 0] as const;
 /** From this many earlier appearances, a repeat no longer raises the multiplier. */
 export const REPEAT_NO_MULT = 3;
 /** Which links decay: every link, only airs (a mode whose grinds / manuals tick over time), or none. */
@@ -45,6 +46,10 @@ export class ComboChain {
     const key = moveKey(label);
     const repeat = decays ? this.links.filter((l) => moveKey(l.label) === key).length : 0;
     const paid = Math.round(pts * REPEAT_DECAY[Math.min(repeat, REPEAT_DECAY.length - 1)]);
+    // ANTI-MASH (2026-09-15): the table bottomed out at 10 %, so the SAME move over and over still paid and still kept the
+    // chain alive — free run's masher held a slide loop for a 4 717-point run against an intent line's 806. A move
+    // repeated past the table pays NOTHING and is not a link at all: the chain has to be fed something new.
+    if (decays && paid <= 0 && pts > 0) return 0;
     this.links.push({ label, pts: paid, kind, repeat });
     this.active = true;
     const before = this.pot;
@@ -53,6 +58,24 @@ export class ComboChain {
     if (this.multiplier === 5) this.momentum?.report({ kind: 'big_make' });
     if (this.multiplier >= 8) this.momentum?.report({ kind: 'highlight_dunk', weight: Math.min(30, this.multiplier * 2) });
     return this.pot - before;
+  }
+
+  /**
+   * Points that accrue INSIDE the link already open (a grind or a manual pays for every frame it is held): the pot grows
+   * at the multiplier the chain has, and the chain does NOT get longer.
+   *
+   * ANTI-MASH (2026-09-15): skate called add() every frame a manual or grind was held, so each FRAME was a link and the
+   * multiplier was a frame counter — a masher that fell into a revert-manual rode it to 81x and 7 000 points in a second
+   * and a half (measured). A held move is one link.
+   */
+  accrue(label: string, pts: number, kind: ComboLink['kind']): number {
+    const last = this.links[this.links.length - 1];
+    if (!last || moveKey(last.label) !== moveKey(label)) return this.add(label, pts, kind);
+    const paid = Math.round(pts);
+    if (paid <= 0) return 0;
+    last.pts += paid;
+    this.pot += paid * Math.max(1, this.multiplier);
+    return paid * Math.max(1, this.multiplier);
   }
 
   /** The move's repeat count in this combo so far (0 = fresh) — for a HUD that says REPEAT. */

@@ -187,30 +187,49 @@ export const FootballRushMode: ModeDefinition = (() => {
     }
   }
 
+  /**
+   * THE FRONT IS POOLED (SCORECARD PERF, 2026-09-15). Every down used to dispose the defenders and CharacterLibrary.spawn
+   * three to six fresh bodies — each one a body clone plus its whole clip library built again (the authored pose clips,
+   * the captured opponent set, IK-fitted per key). That was the stall the scorecard measured: fps p10 4 at a p50 of 60,
+   * multi-second hitches at every SET. The six bodies are built once, in load, and each down re-places the ones it needs.
+   */
+  const DEFENDER_POOL = 6;
+  let defenderBodies: SpawnedCharacter[] = [];
+  async function buildDefenderBodies(ctx: ModeContext): Promise<void> {
+    defenderBodies = await Promise.all(Array.from({ length: DEFENDER_POOL }, (_, i) => CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
+      position: new Vector3(0, -50, -50 - i * 3), yawRad: Math.PI,
+      tint: i % 2 ? '#8b1e2d' : '#5a1220',
+      startClip: SPORT_CLIP.idle,
+    })));
+    for (const char of defenderBodies) {
+      neverBindPose(char.animator, SPORT_CLIP.idle);
+      installSafePlay(char.animator, 'football-defender');
+      ctx.groundLock?.track(char.root, char.skeleton);
+      char.root.setEnabled(false);
+    }
+  }
+
   async function spawnDefense(ctx: ModeContext): Promise<void> {
-    for (const mob of defenders) mob.char.dispose();
     defenders = [];
     pool = new MobPool();
+    for (const char of defenderBodies) char.root.setEnabled(false);
 
     const progress = Math.max(0, runner.root.position.z);
-    const count = Math.min(3 + Math.floor(progress / (FIELD_LENGTH / 3)), 6);
+    const count = Math.min(3 + Math.floor(progress / (FIELD_LENGTH / 3)), DEFENDER_POOL, defenderBodies.length);
     const remaining = Math.max(6, FIELD_LENGTH - progress);
     for (let i = 0; i < count; i++) {
       const lane = ((i * 2 + down) % 5) - 2;
       const rawDepth = 6 + i * 5 + (i % 2) * 3;
       const depth = Math.min(rawDepth, DEFENDER_MAX_DEPTH, remaining * 0.85);
-      const char = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
-        // MAP-SIZE FIX: was *3.4, tuned for the old 22m-wide field — spread
-        // to *8 so defenders use the width of the new 44m field instead of
-        // bunching into its center third.
-        position: new Vector3(lane * 8, 0, runner.root.position.z + depth),
-        yawRad: Math.PI,
-        tint: i % 2 ? '#8b1e2d' : '#5a1220',
-        startClip: SPORT_CLIP.idle,
-      });
-      neverBindPose(char.animator, SPORT_CLIP.idle);
-      installSafePlay(char.animator, 'football-defender');
-      ctx.groundLock?.track(char.root, char.skeleton);
+      const char = defenderBodies[i];
+      // MAP-SIZE FIX: was *3.4, tuned for the old 22m-wide field — spread
+      // to *8 so defenders use the width of the new 44m field instead of
+      // bunching into its center third.
+      char.root.position.set(lane * 8, 0, runner.root.position.z + depth);
+      char.root.rotationQuaternion = null;
+      char.root.rotation.set(0, Math.PI, 0);   // a trucked or tackled body is set back upright, facing the offense
+      char.root.setEnabled(true);
+      char.animator.play(SPORT_CLIP.idle, { loop: true, fadeSec: 0, restart: true });
       const archetype = i % 3 === 2 ? 'flanker' : 'defender';
       const mob = new Mob(char, STEERING_PRESETS[archetype]);
       // NO pursuit yet — defenders stand in their alignment until the snap
@@ -344,6 +363,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         if (dev) dev.runPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), tree: () => animTree?.state ?? null, aim: () => { const t = lineAhead(); return { x: t.x, y: t.y, z: t.z }; }, eyes: () => { const t = threat() ?? lineAhead(); return { x: t.x, y: t.y, z: t.z }; } };   // BIOMECH-WAVE2 probes
       }
       defenders = []; pool = new MobPool();
+      await buildDefenderBodies(ctx);   // the pooled front (see spawnDefense)
       score = 0; evades = 0; trucks = 0; ended = false; iframeSec = 0; dodging = false; downed = false; drive = 1;
       driveEvades = 0; breakawaySec = 0; truckSec = 0; truckCooldown = 0;
       truckLatch = false; tackleLatch = false; tdLatch = false;
@@ -595,8 +615,8 @@ export const FootballRushMode: ModeDefinition = (() => {
       rushVenue?.dispose?.(); rushVenue = null;
       gallery?.dispose(); gallery = null;
       runner?.dispose();
-      for (const mob of defenders) mob.char.dispose();
-      defenders = [];
+      for (const char of defenderBodies) char.dispose();
+      defenderBodies = []; defenders = [];
       coins?.dispose();
       SoundKit.stopAmbient();
     },

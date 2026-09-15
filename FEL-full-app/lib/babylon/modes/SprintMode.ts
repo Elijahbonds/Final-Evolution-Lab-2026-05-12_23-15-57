@@ -56,12 +56,14 @@ const S = {
   banner: '',
   bannerT: 0,
   lastSide: null as 'L' | 'R' | null,
+  /** Clean alternating strides in a row (the rhythm streak). */
+  streak: 0,
   lookX: 0, lookY: 0,   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
 };
 
 const reset = (): void => {
   S.done = false; S.stumbles = 0; S.rivalDist = 0; S.graceLeft = null;
-  S.banner = ''; S.bannerT = 0; S.lastSide = null;
+  S.banner = ''; S.bannerT = 0; S.lastSide = null; S.streak = 0;
   finishLatch = false;
 };
 
@@ -188,15 +190,23 @@ return {
       say('FALSE START!', 1.1);
       SoundKit.play('miss');
       ctx.feel.impact(0.2);   // A+ P0: light feel only (was 0.5)
-      S.lastSide = null;
+      S.lastSide = null; S.streak = 0;
       return;
     }
     // A same-side tap is a stumble in the core; surface it so the rhythm is
     // learnable rather than mysterious.
     if (side === S.lastSide && core.state.speed < beforeSpeed) {
-      S.stumbles += 1;
+      S.stumbles += 1; S.streak = 0;
       say('STUMBLE', 0.7);
       ctx.feel.impact(0.15);   // A+ P0: light feel only
+    } else if (S.lastSide !== null && side !== S.lastSide) {
+      // SCORECARD FEEL (2026-09-15): a clean stride was answered only by a HUD number and the run cycle speeding up — 15 %
+      // of presses had anything you could hear. Every clean stride is a spike on the track now, brighter as the speed
+      // builds, and every tenth in a row is a beat of its own.
+      const speed01 = Math.min(1, core.state.speed / 11);
+      SoundKit.play('uiTick', { pitch: 0.8 + speed01 * 0.9, volume: 0.22 + speed01 * 0.18 });
+      S.streak += 1;
+      if (S.streak % 10 === 0) { ctx.juice.callout(`RHYTHM ×${S.streak}`, '#fde047', 600); ctx.juice.shake(0.03, 90); }
     }
     S.lastSide = side;
   },

@@ -10,7 +10,8 @@
 //   scorecard/scorecard-visual.json  the frame review: { [slug]: { checks: [hero, venue, light, defects, hud] (0..2 each), notes } }
 // Writes scorecard/SCORECARD-<TAG>.md and scorecard/scorecard-<TAG>.json.
 import fs from 'node:fs';
-import { wrongMoves } from '../../lib/babylon/anim/recognisable';
+// tsx loads the .ts module as CJS from an .mts script, so its named exports arrive on `default`
+const RC: any = await import('../../lib/babylon/anim/recognisable'); const wrongMoves = (RC.wrongMoves ?? RC.default.wrongMoves) as typeof import('../../lib/babylon/anim/recognisable').wrongMoves;
 import { SCORE_ROUTES } from './_scorecard-routes.mts';
 
 const H = `${process.env.HOME}/Claude/outbox/finish-release`;

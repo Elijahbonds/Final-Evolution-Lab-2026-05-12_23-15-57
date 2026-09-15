@@ -24,6 +24,7 @@ import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 import { Onlookers } from '../visual/Onlookers';
+import { refuse } from '../core/Refusal';
 import { SoundKit } from '../audio/SoundKit';
 import type { AirSessionCore } from '../../feel/cores/air-session-core';
 import type { TrickGrade, CadenceSide } from '../../feel';
@@ -253,21 +254,24 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       if (e.t === 'dpad' && e.pressed && (e.dir === 'left' || e.dir === 'right')) {
         // In the air the same keys pick the spin direction (big air D4):
         // left = backside, right = frontside. Before the first trick tap only.
-        if (phase === 'Air') { core.setSpinDir(e.dir === 'left' ? -1 : 1); return; }
-        if (phase !== 'Run') return;
+        // SCORECARD CONTROLS (2026-09-15): the answers were banner text, and the same word twice (GOOD, GOOD) is no change a
+        // player sees — half the stride and spin presses read as dead. Every press now has its own sound.
+        if (phase === 'Air') { core.setSpinDir(e.dir === 'left' ? -1 : 1); SoundKit.play('swish', { pitch: e.dir === 'left' ? 0.9 : 1.1, volume: 0.3 }); return; }
+        if (phase !== 'Run') { refuse(ctx, 'WAIT FOR THE RUN-UP'); return; }
         const side: CadenceSide = e.dir === 'left' ? 'L' : 'R';
         const q = core.runTap(side);
         S.nextFoot = side === 'L' ? 'R' : 'L';
-        if (q === 'perfect') say('PERFECT STRIDE', 0.5);
-        else if (q === 'good' || q === 'first') say('GOOD', 0.4);
-        else if (q === 'fault') say('STUMBLE!', 0.6);
-        else say('OFF-BEAT', 0.4);
+        if (q === 'perfect') { say('PERFECT STRIDE', 0.5); SoundKit.play('uiTick', { pitch: 1.5, volume: 0.4 }); }
+        else if (q === 'good' || q === 'first') { say('GOOD', 0.4); SoundKit.play('uiTick', { pitch: 1.15, volume: 0.3 }); }
+        else if (q === 'fault') { say('STUMBLE!', 0.6); SoundKit.play('thud', { pitch: 0.8, volume: 0.4 }); }
+        else { say('OFF-BEAT', 0.4); SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 }); }
         return;
       }
 
       if (e.t === 'button' && e.pressed) {
-        if (e.btn === 'A' && phase === 'Air') core.trick();
-        else if (e.btn === 'B' && phase === 'Air') core.stick();
+        if (e.btn === 'A' && phase === 'Air') { core.trick(); SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 }); }
+        else if (e.btn === 'B' && phase === 'Air') { core.stick(); SoundKit.play('thud', { pitch: 1.1, volume: 0.35 }); }
+        else if ((e.btn === 'A' || e.btn === 'B') && phase !== 'Run') refuse(ctx, 'WAIT FOR THE RUN-UP');
         // MECHANICS PASS (2026-09-15): SPIN and STOMP are air verbs, and on the run-up they did nothing and said nothing
         // (the probe: 67% of deliberate presses silent). A press out of its phase is answered with where it belongs.
         else if ((e.btn === 'A' || e.btn === 'B') && phase === 'Run') { say(e.btn === 'A' ? 'SPIN IN THE AIR' : 'STOMP THE LANDING', 0.6); SoundKit.play('uiTick', { pitch: 0.7, volume: 0.5 }); }

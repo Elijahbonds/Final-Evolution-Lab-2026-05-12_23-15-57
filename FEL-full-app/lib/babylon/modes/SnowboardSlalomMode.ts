@@ -67,7 +67,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let crowd: Onlookers;
   // deep runs light the building here too, not only on a skateboard (boardCore.TrickMachine)
   let trickMomentum = new MomentumBus();
-  let nextGate = 0, gatesHit = 0, elapsed = 0;
+  let nextGate = 0, gatesHit = 0, elapsed = 0, gateStreak = 0;
   let hudSec = -1;   // ARENA-10PHASE P9 soft: the run clock the HUD shows (it never published `time` — the chip sat on "0s" all run)
   /** A full snowboard air's hang, for judging which trick the rider can finish. */
   const AIR_BUDGET_SEC = 1.2;
@@ -207,7 +207,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       trickLayer = new BoardTrickLayer(ctx.scene, rig.char.skeleton, rig.char.root, rig.board);   // after the posture layer: the grab hand is the last word
       bailBeatT = 0; landBeatT = 0; airT = 0;
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 20, modeId: 'snowboard' });
-      nextGate = 0; gatesHit = 0; elapsed = 0; hudSec = -1; ended = false; stickX = 0; stickY = 0; tuck = 0;
+      nextGate = 0; gatesHit = 0; elapsed = 0; gateStreak = 0; hudSec = -1; ended = false; stickX = 0; stickY = 0; tuck = 0;
       stumbleIframe = 0; yeti = null; yetiPool = null; yetiSec = 0; yetiDone = false;
       wipeLatchUntil = 0; finishLatch = false;
       ctx.objectiveRef.current = world.markers[nextGate] ?? null;
@@ -400,10 +400,16 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             ctx.feel?.impact?.(0.15);
             SoundKit.play('score', { pitch: 1.4, volume: 0.35 });
             EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'sparks');
+            // SCORECARD FEEL (2026-09-15): the gate is the slalom's beat — a +100 pop at the rider and a gate-streak callout, so a
+            // clean line reads as a line (the run measured 1.5 juice beats a minute)
+            gateStreak++;
+            ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2, 0)), gateStreak >= 3 ? `+100 · ${gateStreak} IN A ROW` : '+100', '#7dd3fc');
             ctx.setHud({ banner: 'GATE ✓', score: tricks.score });
             crowd?.cheer(0.5);
           } else {
             SoundKit.play('miss', { volume: 0.3 });
+            if (gateStreak >= 3) ctx.juice.callout(`STREAK OVER — ${gateStreak}`, '#94a3b8', 700);
+            gateStreak = 0;
             ctx.setHud({ banner: 'MISSED GATE' });
           }
           setTimeout(() => ctx.setHud({ banner: '' }), 700);

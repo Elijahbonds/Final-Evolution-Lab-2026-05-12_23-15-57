@@ -383,11 +383,14 @@ export const ShowdownMode: ModeDefinition = (() => {
       if (phase !== 'fighting' || !meState.controllable) return;
       if (e.t !== 'button') return;
 
-      if (e.pressed && e.btn === 'A') meStrike.request('jab', now());
-      if (e.pressed && e.btn === 'B') meStrike.request('kick', now());
+      // SCORECARD FEEL (2026-09-15): a thrown strike was a clip and nothing you heard until it landed (38 % of presses had a
+      // sound or a beat) — the swing is heard as it leaves, and a press buffered behind a swing says so with a tick
+      const swingSfx = (ok: boolean, pitch: number): void => { SoundKit.play(ok ? 'whoosh' : 'uiTick', ok ? { pitch, volume: 0.35 } : { pitch: 0.8, volume: 0.25 }); };
+      if (e.pressed && e.btn === 'A') swingSfx(meStrike.request('jab', now()), 1.5);
+      if (e.pressed && e.btn === 'B') swingSfx(meStrike.request('kick', now()), 1.1);
       if (e.pressed && e.btn === 'Y') {
         if (chakra.full) tryUltimate(ctx);
-        else meStrike.request('heavy', now());
+        else swingSfx(meStrike.request('heavy', now()), 0.85);
       }
       if (e.pressed && e.btn === 'L1') {
         const w = wish(ctx);

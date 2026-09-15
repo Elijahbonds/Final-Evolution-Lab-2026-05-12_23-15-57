@@ -16,6 +16,7 @@
 import { chromium, type Page } from 'playwright-core';
 import fs from 'node:fs';
 import { chromiumExe } from './_chromium.mts';
+import { INTENT_DRIVERS } from './_intent-drivers.mts';
 import type { ModeVerbConfig } from '../../lib/babylon/ui/modeVerbs';
 // tsx loads the .ts table as CJS from an .mts probe, so named exports arrive on `default`
 const MV: any = await import('../../lib/babylon/ui/modeVerbs');
@@ -92,7 +93,7 @@ const scoreOf = (hud: Record<string, string> | null): number | null => {
   return null;
 };
 
-async function session(m: Spec, driver: 'idle' | 'deliberate' | 'masher') {
+async function session(m: Spec, driver: 'idle' | 'deliberate' | 'masher' | 'intent') {
   const p = await bctx.newPage();
   const errors: string[] = [];
   p.on('console', (msg) => { if (msg.type() === 'error' && !/status of 40[14]|favicon/.test(msg.text())) errors.push(msg.text().slice(0, 160)); });
@@ -117,6 +118,7 @@ async function session(m: Spec, driver: 'idle' | 'deliberate' | 'masher') {
       const state = await p.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => '');
       if (state === 'ended') break;
       if (driver === 'idle') { await p.waitForTimeout(500); continue; }
+      if (driver === 'intent') { if (k++ === 0) await p.evaluate(INTENT_DRIVERS[m.slug]); await p.waitForTimeout(500); continue; }
       if (driver === 'deliberate') {
         // move with purpose while acting: forward on the left stick with a slow weave, so a movement mode is being
         // PLAYED (a deliberate driver standing still would lose to a masher's random stick for the wrong reason)
@@ -154,16 +156,18 @@ for (const m of MODES) {
   const idle = await session(m, 'idle');
   const del = await session(m, 'deliberate');
   const mash = await session(m, 'masher');
+  const intent = process.env.INTENT === '1' && INTENT_DRIVERS[m.slug] ? await session(m, 'intent') : null;
   const verdict: string[] = [];
   if (typeof del.silentPct === 'number' && del.silentPct > 25) verdict.push(`SILENT ${del.silentPct}% of deliberate presses`);
   const silentBtns = Object.entries((del.byBtn ?? {}) as Record<string, any>).filter(([, r]) => r.presses >= 2 && r.silent / r.presses > 0.5).map(([b]) => b);
   if (silentBtns.length) verdict.push(`silent buttons: ${silentBtns.join(' ')}`);
   if (Number(del.unexplainedScores) > 0 || Number(mash.unexplainedScores) > 0) verdict.push(`unexplained scores: ${del.unexplainedScores}/${mash.unexplainedScores}`);
   if (typeof idle.score === 'number' && idle.score > 0) verdict.push(`IDLE scores ${idle.score}`);
-  if (typeof mash.score === 'number' && typeof del.score === 'number' && mash.score > del.score * 1.5 && mash.score > 0) verdict.push(`MASH ${mash.score} beats deliberate ${del.score}`);
-  const row = { slug: m.slug, verdict: verdict.length ? verdict : ['ok'], idle, deliberate: del, masher: mash };
+  const best = Math.max(Number(del.score) || 0, Number(intent?.score) || 0);
+  if (typeof mash.score === 'number' && mash.score > best * 1.5 && mash.score > 0) verdict.push(`MASH ${mash.score} beats ${intent ? 'intent ' + intent.score + ' / ' : ''}deliberate ${del.score}`);
+  const row = { slug: m.slug, verdict: verdict.length ? verdict : ['ok'], idle, deliberate: del, masher: mash, ...(intent ? { intent } : {}) };
   rows.push(row);
-  console.log(JSON.stringify({ slug: m.slug, verdict: row.verdict, idleScore: idle.score, delScore: del.score, mashScore: mash.score, silent: del.silentPct, byBtn: del.byBtn }));
+  console.log(JSON.stringify({ slug: m.slug, verdict: row.verdict, idleScore: idle.score, delScore: del.score, mashScore: mash.score, intentScore: intent?.score, silent: del.silentPct, byBtn: del.byBtn }));
   fs.writeFileSync(`${OUT}/mechanics${process.env.TAG ? '-' + process.env.TAG : ''}.json`, JSON.stringify(rows, null, 1));
 }
 console.log('\nSUMMARY');

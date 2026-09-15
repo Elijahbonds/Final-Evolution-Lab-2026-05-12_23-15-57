@@ -337,8 +337,9 @@ export function makeAeroAcesMode(): ModeDefinition {
         S.input.climb = e.y;          // pull BACK to climb — how a plane works
         return;
       }
-      if (e.t === 'trigger' && e.side === 'R') { S.input.gas = e.value; return; }
-      if (e.t === 'trigger' && e.side === 'L') { S.input.brake = e.value; return; }
+      // SCORECARD CONTROLS (2026-09-15): the engine answers the gas, the air brake answers the brake (both were silent presses)
+      if (e.t === 'trigger' && e.side === 'R') { if (S.input.gas < 0.5 && e.value >= 0.5) SoundKit.play('whoosh', { pitch: 0.7, volume: 0.3 }); S.input.gas = e.value; return; }
+      if (e.t === 'trigger' && e.side === 'L') { if (S.input.brake < 0.5 && e.value >= 0.5) SoundKit.play('swish', { pitch: 0.55, volume: 0.35 }); S.input.brake = e.value; return; }
       if (e.t !== 'button') return;
       if (e.btn === 'R1') { S.boostHeld = e.pressed; return; }
       if (!e.pressed) return;

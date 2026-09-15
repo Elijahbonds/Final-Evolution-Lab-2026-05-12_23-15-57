@@ -129,7 +129,7 @@ for (const [slug, path] of MODES) {
       }
       lat.sort((a, b) => a - b);
             const juice = ev.filter((e: any) => e.kind === 'juice' || e.kind === 'impact').length;
-      return { presses: sum.presses, silentPct: sum.silentPct, unexplainedScores: sum.unexplainedScores, latMedian: lat.length ? lat[Math.floor(lat.length / 2)] : null, rich: answered ? rich / answered : 0, juicePerMin: juice / playMin };
+      return { presses: sum.presses, silentPct: sum.silentPct, silentBy: Object.fromEntries(Object.entries(sum.byBtn as Record<string, { presses: number; answered: number }>).map(([k, r]) => [k, `${r.presses - r.answered}/${r.presses}`])), unexplainedScores: sum.unexplainedScores, latMedian: lat.length ? lat[Math.floor(lat.length / 2)] : null, rich: answered ? rich / answered : 0, juicePerMin: juice / playMin };
     }, [from, playMin] as [number, number]);
     row.qa = qa;
     row.feltFrame = frames.length;

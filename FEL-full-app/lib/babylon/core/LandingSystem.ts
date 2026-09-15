@@ -59,11 +59,13 @@ export class BalanceSave {
   update(dt: number, stickX: number): void {
     if (!this.active || this.failed || this.saved) return;
     this.t += dt;
-    this.wobblePhase += dt * 6;
+    // ANTI-MASH (2026-09-15): the wobble ran at ~1 Hz and feeding it cost less than countering it saved, so a stick moved at
+    // random saved sketchy landings on average — a masher never bailed. The wobble is slower (readable, holdable) and
+    // riding WITH it costs more than countering saves, so a save is a read and noise washes out.
+    this.wobblePhase += dt * 4.2;
     this.wobble = Math.sin(this.wobblePhase) * 0.8;
-    // countering reduces instability; riding WITH the wobble feeds it
     const counter = -Math.sign(this.wobble) === Math.sign(stickX) && Math.abs(stickX) > 0.4;
-    this.balance.instability += (counter ? -1.4 : 0.9) * dt;
+    this.balance.instability += (counter ? -1.4 : 1.7) * dt;
     if (this.balance.instability <= 0.02) { this.saved = true; this.active = false; }
     if (this.balance.instability >= 1 || this.t >= RECOVER_SEC) {
       this.failed = this.balance.instability >= 0.35;

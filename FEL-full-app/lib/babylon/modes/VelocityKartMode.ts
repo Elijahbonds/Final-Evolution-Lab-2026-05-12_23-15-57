@@ -37,7 +37,7 @@ import {
   KART_COURSES, readCourse, startRace, stepRace, toNextGate, medalFor, onTrack, TRACK_HALF_WIDTH,
   type Course, type RaceProgress,
 } from '../core/RaceCourse';
-import { buildCourseVenue } from '../racing/venueForCourse';
+import { buildCourseVenue, buildWorldGround } from '../racing/venueForCourse';
 import { buildTrackside, type TracksideHandle } from '../racing/trackside';   // the world that follows the racing line
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import { taperedPlank, taperedSection, roadWheel } from '../racing/shapes';
@@ -65,6 +65,7 @@ let driver: SpawnedCharacter | null = null;
 let seated: AnimationGroup | null = null;
 let steerWheel: Mesh | null = null;
 let venueRoot: TransformNode | null = null;
+let worldGround: Mesh | null = null;
 let trackside: TracksideHandle | null = null;
 let crowd: Onlookers | null = null;
 let roadTex: DynamicTexture | null = null;
@@ -440,6 +441,7 @@ return {
     race = startRace();
 
     venueRoot = buildCourseVenue(ctx.scene, course);
+    worldGround?.dispose(); worldGround = buildWorldGround(ctx.scene, course);   // no void past the road (see buildWorldGround)
     // THE VENUE IS COURT-SIZED AND THE COURSE IS HUNDREDS OF METRES, so the world was a small island near
     // the start and the rest of the lap ran off into nothing (step-0 audit: this mode was one of the two
     // worst frames in the project). Trackside dresses the PATH instead, at whatever scale the course is.
@@ -519,6 +521,10 @@ return {
 
     ctx.heroRef.current = kart;
     ctx.objectiveRef.current = null;
+    // THE CAMERA'S BOX IS THE PLAY BOX (SCORECARD VISUALS, 2026-09-15). With no explicit bounds the director derived them
+    // from the venue's shell meshes — the court-sized park at the start — and clamped the chase camera inside it while the
+    // kart drove 200 m away: the rc10 late frame was the kart as a speck from the park. The course's wall is ±260 m.
+    ctx.camDirector.setBounds({ minX: -262, maxX: 262, minZ: -262, maxZ: 262, minY: -0.1 });
     ctx.camDirector.snapTo(state.pos, null);
     tintMarks();
     say(`${course.name} — ${course.sub}`, 2.2);
@@ -530,9 +536,12 @@ return {
     if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }
     if (S.done) return;
     if (e.t === 'stick' && e.side === 'L') { S.input.steer = e.x; return; }
-    if (e.t === 'trigger' && e.side === 'R') S.input.throttle = e.value;
-    if (e.t === 'trigger' && e.side === 'L') S.input.brake = e.value;
-    if (e.t === 'button' && e.btn === 'X') S.input.drift = e.pressed;
+    // SCORECARD CONTROLS (2026-09-15): gas, brake and drift changed a number and nothing a player hears (76 % of presses
+    // silent). A kart answers the pedal: the engine revs as the throttle goes down, the tyres squeal on the brake, the
+    // drift hisses as it hooks up.
+    if (e.t === 'trigger' && e.side === 'R') { if (S.input.throttle < 0.5 && e.value >= 0.5) SoundKit.play('whoosh', { pitch: 0.55, volume: 0.32 }); S.input.throttle = e.value; }
+    if (e.t === 'trigger' && e.side === 'L') { if (S.input.brake < 0.5 && e.value >= 0.5) SoundKit.play('squeak', { pitch: 0.9, volume: 0.35 }); S.input.brake = e.value; }
+    if (e.t === 'button' && e.btn === 'X') { if (e.pressed && !S.input.drift) SoundKit.play('swish', { pitch: 0.7, volume: 0.4 }); S.input.drift = e.pressed; }
     // BOOST is the shared held R1 (RB · Shift · the BOOST pill); A no longer dumps the meter.
     if (e.t === 'button' && e.btn === 'R1') S.boostHeld = e.pressed;
   },
@@ -562,7 +571,10 @@ return {
     // places during a scrap would be constant.
     if (rivals.length) {
       const place = playerPosition(playerDist, rivals);
-      if (lastPlace > 0 && place < lastPlace) { ctx.momentum.report({ kind: 'overtake', weight: 13 * (lastPlace - place) }); boost.earn('nearMiss', lastPlace - place); }
+      // SCORECARD FEEL (2026-09-15): an overtake, a lost place and a checkpoint moved a HUD number and a banner — the race
+      // counted 0 juice beats a minute. The race is told in beats now: a pass pops over the kart, a lost place is called.
+      if (lastPlace > 0 && place < lastPlace) { ctx.momentum.report({ kind: 'overtake', weight: 13 * (lastPlace - place) }); boost.earn('nearMiss', lastPlace - place); ctx.juice.scorePop(kart.position.add(new Vector3(0, 1.6, 0)), `P${place}`, '#86efac'); SoundKit.play('swish', { pitch: 1.3, volume: 0.4 }); }
+      else if (lastPlace > 0 && place > lastPlace) ctx.juice.callout(`DOWN TO P${place}`, '#fca5a5', 600);
       lastPlace = place;
     }
     if (line) {
@@ -624,6 +636,7 @@ return {
       SoundKit.play('score', { pitch: res.lap ? 1.2 : 1 });
       ctx.feel.impact(0.22);
       say(res.lap ? `LAP ${Math.min(race.lap, course.laps)}` : 'CHECKPOINT', 0.7);
+      if (res.lap) { ctx.juice.flash('#fde68a', 90); ctx.juice.shake(0.04, 110); } else ctx.juice.scorePop(kart.position.add(new Vector3(0, 1.6, 0)), 'CHECKPOINT', '#7dd3fc');
       tintMarks();
     }
     if (res.finished || S.graceLeft === 0) { finish(ctx); return; }
@@ -652,7 +665,7 @@ return {
     seated?.stop(); seated?.dispose(); seated = null;
     driver?.dispose(); driver = null;
     steerWheel = null;
-    venueRoot?.dispose(); venueRoot = null; trackside?.dispose(); trackside = null;
+    venueRoot?.dispose(); venueRoot = null; worldGround?.dispose(); worldGround = null; trackside?.dispose(); trackside = null;
     roadTex?.dispose(); roadTex = null;
     for (const rk of rivalKarts) rk.dispose();
     rivalKarts = []; rivals = []; line = null;

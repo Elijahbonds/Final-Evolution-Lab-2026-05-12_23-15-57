@@ -249,6 +249,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   // every answer a player can perceive (HUD news, a juice beat, an impact, a sound, the hero's clip changing) goes on
   // one timeline, published as `window.__FEL_QA__` for the mechanics probe. See QaTrace.ts. Off in play: `qa` is null.
   const qa = agentEnabled() ? new QaTrace() : null;
+  const qaRawHud: Record<string, unknown> = {};
   let qaResult: { outcome: string; score: number; card?: boolean } | null = null;
   let qaRestore: (() => void) | null = null;
   if (qa) {
@@ -260,16 +261,26 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     const sk = SoundKit as unknown as { play: (n: string, o?: unknown) => void };
     const origPlay = sk.play;
     sk.play = function (this: unknown, n: string, o?: unknown) { qa.sfx(n); return origPlay.call(SoundKit, n, o); };
-    qaRestore = () => { sk.play = origPlay; };
-    (window as unknown as { __FEL_QA__?: unknown }).__FEL_QA__ = {
+    const qaHandle: Record<string, unknown> = {};
+    qaRestore = () => {
+      sk.play = origPlay;
+      const w = window as unknown as { __FEL_QA__?: unknown };
+      if (w.__FEL_QA__ === qaHandle) delete w.__FEL_QA__;   // an unmounted scene is not held by the QA handle
+    };
+    (window as unknown as { __FEL_QA__?: unknown }).__FEL_QA__ = Object.assign(qaHandle, {
       modeId: def.modeId,
       now: () => performance.now(),
       summary: (windowMs?: number, from?: number) => qa.summary(windowMs, from),
       events: (n = 400) => qa.events.slice(-n),
       hud: () => qa.snapshot(),
+      /** Every HUD key's latest value, the continuous ones too (a meter, a phase) — what an INTENT driver plays from. */
+      rawHud: () => ({ ...qaRawHud }),
       result: () => qaResult,
       reset: () => qa.reset(),
-    };
+      /** The live scene for an INTENT driver (the ball in flight, a pitch on its way): QA sessions only (`?agent=1`). */
+      scene: () => (scene.isDisposed ? null : scene),
+      hero: () => heroRef.current,
+    });
   }
 
   // M35/M37 shared-core services: floor clamp, screen shake, input buffer.
@@ -337,7 +348,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       const result: SessionResult = buildResult(def.modeId, outcome, score, stats, startedAt, detail);
       void opts.cardSink?.(result);
     },
-    setHud(update) { qa?.hud(update); opts.onHud?.(update); },
+    setHud(update) { if (qa) { qa.hud(update); Object.assign(qaRawHud, update); } opts.onHud?.(update); },
   };
 
   // M37: hero-framing watchdog — recenters the camera if the hero leaves frame.

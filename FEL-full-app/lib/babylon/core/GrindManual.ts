@@ -57,7 +57,12 @@ export class BalanceChannel {
     if (Math.sin(this.driftSeed + this.heldSec * 0.9) > 0.92) this.driftDir *= -1;
     const drift = (BALANCE_DRIFT_RATE + speed01 * 0.45)
       * this.driftDir * (0.75 + 0.25 * Math.sin(this.driftSeed + this.heldSec * 3));
-    this.needle += (drift - stickX * 4.2) * dt;
+    // ANTI-MASH (2026-09-15): the stick's authority was SYMMETRIC, so a random stick was a damped random walk that mostly
+    // stayed inside the edge — a masher rode manuals and reverts for as long as it liked (measured: mash 25 305 vs an
+    // intent line's 157). Pushing the WRONG way now costs more than pushing the right way saves, so noise falls off the
+    // board and a player who reads the needle still holds it.
+    const counters = Math.sign(stickX) === Math.sign(this.needle) || this.needle === 0;
+    this.needle += (drift - stickX * (counters ? 4.2 : 6.6)) * dt;
     const damping = Math.sign(stickX) === -Math.sign(this.needle) ? 4.2 : 0;
     this.needle -= this.needle * damping * dt;
     const centering = 0.9;                            // weak — no free ride

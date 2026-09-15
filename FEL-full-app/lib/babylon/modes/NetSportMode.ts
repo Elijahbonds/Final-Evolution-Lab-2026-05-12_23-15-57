@@ -13,7 +13,7 @@ import { nerve, standingOf, SKILL_FLOOR, SKILL_CEIL, type Standing } from '../co
 import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, Vector3 } from '@babylonjs/core';
 import { answerFor, tellFor, rallyPace, SHOT_FACE } from '../core/tennisHud';
 import { ballKindFor, dressBall } from '../visual/meshyProps';
-import type { AbstractMesh, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Mesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
@@ -89,14 +89,14 @@ function buildBeach(scene: Scene): { dispose(): void } {
   sand.position.y = -0.02; sand.isPickable = false; sand.receiveShadows = true;
   const tex = new DynamicTexture('beach_sand_tex', { width: 1024, height: 1024 }, scene, false);
   const g = tex.getContext() as unknown as CanvasRenderingContext2D;
-  g.fillStyle = '#d9c28d'; g.fillRect(0, 0, 1024, 1024);
+  g.fillStyle = '#c7ab76'; g.fillRect(0, 0, 1024, 1024);   // SCORECARD VISUALS: a shade down — the goldenHour sand washed the frame out
   g.strokeStyle = 'rgba(255,255,255,0.10)'; g.lineWidth = 3;
   for (let i = 0; i < 70; i++) { const y = (i / 70) * 1024; g.beginPath(); g.moveTo(0, y); for (let x = 0; x <= 1024; x += 24) g.lineTo(x, y + Math.sin(x * 0.02 + i * 0.9) * 6); g.stroke(); }
   g.fillStyle = 'rgba(120,95,60,0.14)';
   for (let i = 0; i < 900; i++) g.fillRect(Math.random() * 1024, Math.random() * 1024, 2, 2);
   tex.update(); tex.uScale = 7; tex.vScale = 7;
   const sandM = new PBRMaterial('beach_sand_mat', scene);
-  sandM.albedoTexture = tex; sandM.metallic = 0; sandM.roughness = 0.95; sandM.emissiveColor = Color3.FromHexString('#d9c28d').scale(0.06);
+  sandM.albedoTexture = tex; sandM.metallic = 0; sandM.roughness = 0.95; sandM.environmentIntensity = 0.6;
   sand.material = sandM;
   const sea = MeshBuilder.CreateGround('beach_sea', { width: 220, height: 140 }, scene);
   sea.position.set(0, 0.01, -118); sea.isPickable = false;
@@ -111,11 +111,38 @@ function buildBeach(scene: Scene): { dispose(): void } {
   return { dispose() { sand.dispose(); sea.dispose(); foam.dispose(); tex.dispose(); sandM.dispose(); seaM.dispose(); foamM.dispose(); } };
 }
 
+/**
+ * A NET YOU CAN SEE (SCORECARD VISUALS, 2026-09-15). The venue's `net` prop is a translucent white panel, and on bright
+ * sand it vanished: the rc10 frame review could barely find the net the whole rally is played over. Two posts, a dark
+ * mesh band hanging under a white tape at the height RallyCore plays to, spanning the court and a little past it.
+ */
+function buildReadableNet(scene: Scene, cfg: { halfWidth: number; netHeight: number }): { dispose(): void } {
+  const span = cfg.halfWidth * 2 + 1.6, top = cfg.netHeight, band = Math.min(1, top * 0.42);
+  const post = new PBRMaterial('rally_net_post_mat', scene);
+  post.albedoColor = Color3.FromHexString('#e8e2d0'); post.metallic = 0.6; post.roughness = 0.35;
+  const mesh = new PBRMaterial('rally_net_band_mat', scene);
+  mesh.albedoColor = Color3.FromHexString('#1b2433'); mesh.metallic = 0; mesh.roughness = 0.9; mesh.alpha = 0.82;
+  const tape = new PBRMaterial('rally_net_tape_mat', scene);
+  tape.albedoColor = Color3.White(); tape.emissiveColor = Color3.White().scale(0.25); tape.metallic = 0; tape.roughness = 0.6;
+  const made: Mesh[] = [];
+  for (const sx of [-1, 1]) {
+    const p = MeshBuilder.CreateCylinder('rally_net_post', { diameter: 0.1, height: top + 0.15, tessellation: 12 }, scene);
+    p.position.set(sx * span / 2, (top + 0.15) / 2, 0); p.material = post; made.push(p);
+  }
+  const b = MeshBuilder.CreateBox('rally_net_band', { width: span, height: band, depth: 0.02 }, scene);
+  b.position.set(0, top - band / 2, 0); b.material = mesh; made.push(b);
+  const t = MeshBuilder.CreateBox('rally_net_tape', { width: span, height: 0.07, depth: 0.03 }, scene);
+  t.position.set(0, top - 0.035, 0); t.material = tape; made.push(t);
+  for (const m of made) { m.isPickable = false; m.receiveShadows = true; m.freezeWorldMatrix(); }
+  return { dispose() { for (const m of made) m.dispose(); post.dispose(); mesh.dispose(); tape.dispose(); } };
+}
+
 export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let me: SpawnedCharacter, foe: SpawnedCharacter;
   let ball: AbstractMesh;
   let venue: VenueHandle | null = null;
   let beach: { dispose(): void } | null = null;      // P5
+  let readableNet: { dispose(): void } | null = null;
   let crowdEnds: Onlookers | null = null;            // P5
 
   let rally: RallyState;
@@ -506,13 +533,12 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
    */
   function humanBlock(ctx: ModeContext): void {
     if (o.cfg.touchesPerSide <= 1) return;          // tennis has no such thing
-    if (!shot || !awaitingHuman || blockSpent) return;
-    if (blockCooldown > 0) {
-      ctx.setHud({ shotType: 'NOT SET AT THE NET' });
-      setTimeout(() => ctx.setHud({ shotType: '' }), 450);
-      return;
-    }
-    if (incomingTouch !== 'spike') return;          // you cannot block a dig
+    // SCORECARD CONTROLS (2026-09-15): three of these exits said nothing (a block with no ball coming, a second block on the
+    // same attack, a block against a dig) — and the cooldown's HUD line repeated the same text, which reads as no change
+    if (!shot || !awaitingHuman) { refuse(ctx, 'WAIT FOR THEIR ATTACK'); return; }
+    if (blockSpent) { refuse(ctx, 'ALREADY BLOCKED'); return; }
+    if (blockCooldown > 0) { refuse(ctx, 'NOT SET AT THE NET'); return; }
+    if (incomingTouch !== 'spike') { refuse(ctx, 'BLOCK THE SPIKE, NOT THE DIG'); return; }          // you cannot block a dig
     blockSpent = true;
     blockCooldown = BLOCK_COOLDOWN_SEC;
 
@@ -709,6 +735,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     async load(ctx: ModeContext) {
       venue = mountVenue(ctx, o.venueId, { keepGameplayCamera: true });   // M104 gap: tennis and volleyball rendered through the venue orbit camera — the hero sat at 44 px, cut off at the frame's bottom
       if (o.beach) beach = buildBeach(ctx.scene);   // P5: sand to the horizon, the sea past the far baseline
+      if (o.cfg.touchesPerSide > 1) readableNet = buildReadableNet(ctx.scene, o.cfg);   // volleyball: a net you can see
 
       me = await CharacterLibrary.spawn(ctx.scene, o.heroUrl, {
         position: new Vector3(0, 0, o.cfg.halfLength * 0.85), yawRad: Math.PI, startClip: clips.ready });
@@ -951,7 +978,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
     dispose() {
       crowd?.dispose(); crowd = null;
-      crowdEnds?.dispose(); crowdEnds = null; beach?.dispose(); beach = null;   // P5
+      crowdEnds?.dispose(); crowdEnds = null; beach?.dispose(); beach = null; readableNet?.dispose(); readableNet = null;   // P5
       venue?.dispose(); venue = null;
       posture?.dispose(); posture = null;
       recoverMark?.dispose(); recoverMark = null;

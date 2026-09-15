@@ -122,6 +122,9 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     S.clock = S.challenge.timeLimitSec;
     S.exposeT = S.challenge.exposureSec;
     S.phase = S.exposeT > 0 ? 'expose' : 'answer';
+    // QA INTENT (2026-09-15): the answer key on the scene's metadata, read only by the mechanics probe's intent driver through the
+    // agent-only __FEL_QA__.scene() — a player who KNOWS the answer is the bar a random masher must lose to
+    ((ctx.scene.metadata ??= {}) as { qaAnswer?: number }).qaAnswer = S.challenge.answer;
     SoundKit.play('uiTick', { pitch: 1.2 });
     hud(ctx, S, { banner: `${cat} · TIER ${S.tier}`, hint: S.exposeT > 0 ? 'memorise…' : (S.players > 1 ? 'P1: A B X Y · P2: ▲ ▶ ▼ ◀' : 'A B X Y answer') });
     setTimeout(() => { if (S.phase === 'expose' || S.phase === 'answer') ctx.setHud({ banner: '' }); }, 900);

@@ -285,7 +285,7 @@ const R_STICK: Record<string, string | null> = {
   golf: null, derby: null, penalty: null,                // fixed shots (setFixedBehind) — no orbit to give
   carnival: null,                                        // the hub's bursts cut between fixed and follow shots
   dance: null, who_scene_it: null,                       // no follow camera
-  freerun: null,                                         // the run's camera is the FrameGuard recentre, not a follow
+  freerun: null,                                         // the runner cam follows the heading (b8f97fb) but has no look orbit wired
   brainbrawl: null,
 };
 /** The speed modes that spend the shared boost (lib/babylon/core/BoostKit.ts) on a held R1. */

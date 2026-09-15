@@ -58,7 +58,7 @@ import { prqGrade } from '../../prq';
 import { mookMaxHp, damageMook, mookHp01, mookBarHex } from '../core/MookHealth';
 import { EvadeMoves } from '../core/EvadeMoves';
 import { HORDE_WINDOW_SEC } from '../core/DodgeRead';
-import { Color3, Mesh, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the gauntlet (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Two findings:
@@ -275,6 +275,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   /** The body in the hero's hands. `swinging` while the 360 sweep runs. */
   let carry: { e: Enemy; since: number; swinging: boolean } | null = null;
   let shockRings: { mesh: Mesh; t: number; r: number }[] = [];
+  /** SCORECARD VISUALS (2026-09-15): WHICH ONE IS ME. The frame review could not find the hero inside a mob of identical
+   *  bodies — a ring on the floor under the player, the one thing a beat-em-em-up crowd cannot cover. */
+  let youRing: Mesh | null = null;
   let turnClock: { at: number; deg: number } | null = null;
   /** L1 pressed inside a swing before its hit: the grab waits for the hit (QUEUE_SEC), like a queued strike. */
   let grabQueuedAt = -Infinity;
@@ -1336,6 +1339,15 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       installSafePlay(player.animator, 'agent-player');
       ctx.groundLock?.track(player.root, player.skeleton);
       ctx.heroRef.current = player.root;
+      youRing?.dispose();
+      youRing = MeshBuilder.CreateTorus('karate_you_ring', { diameter: 1.15, thickness: 0.075, tessellation: 28 }, ctx.scene);
+      {
+        // unlit PBR (the StandardMaterial ratchet): the ring is a marker, not a surface the venue's light plays on
+        const m = new PBRMaterial('karate_you_ring_mat', ctx.scene);
+        m.unlit = true; m.albedoColor = Color3.FromHexString('#38bdf8'); m.emissiveColor = Color3.FromHexString('#38bdf8');
+        m.alpha = 0.85;
+        youRing.material = m; youRing.isPickable = false; youRing.renderingGroupId = 0;
+      }
 
       partner = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(1.6, 0, 0.8), tint: '#22d3ee', startClip: IDLE_CLIP });
       neverBindPose(partner.animator, IDLE_CLIP);
@@ -1445,6 +1457,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     update(ctx, dtReal) {
       if (spinApplied) { player.root.rotation.y -= spinApplied; spinApplied = 0; }   // the spin layer: back to the real facing first
       clockSec += dtReal;
+      if (youRing) { const p = player.root.position; youRing.position.set(p.x, 0.035, p.z); youRing.isVisible = !myDown.downed; }
       { const br = flow.update(gameSec); if (br) onFlowBroken(ctx, br); else if (flow.count > 0) ctx.setHud({ flowDrop: Math.round(flow.drop01(gameSec) * 100) }); }
       // Phase 8: down/revive tick
       if (myDown.downed) {
@@ -1612,6 +1625,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       for (const r of shockRings) { r.mesh.material?.dispose(); r.mesh.dispose(); }
       pickups = []; tweens = []; shockRings = []; carry = null; queue.clear();
       mePosture?.dispose(); mePosture = null; partnerPosture?.dispose(); partnerPosture = null;
+      youRing?.material?.dispose(); youRing?.dispose(); youRing = null;
       crowd?.dispose(); crowd = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient();
     },
   };

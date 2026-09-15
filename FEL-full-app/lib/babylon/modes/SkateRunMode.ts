@@ -556,7 +556,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         // the fail-out: a slipped grind drops you off the rail AND holds the magnet off, so a rail you just fell from
         // does not immediately catch you again on the way down (VENICE-SKATE-THPS)
         if (r.slipped) { grindCh = null; rig.rider.dismount(); relockUntil = performance.now() + RELOCK_MS; console.info('[SKATE-GRIND] slipped off'); bannerFlash(ctx, 'SLIPPED OFF', 600); }
-        else if (r.pts > 0) combo.add('GRIND', Math.round(r.pts), 'grind');
+        else if (r.pts > 0) combo.accrue('GRIND', Math.round(r.pts), 'grind');   // ANTI-MASH: a held grind is ONE link that pays while it is held
       }
       // ── the manual link (VENICE-SKATE-THPS) ──
       // THE INPUT IS READ BEFORE THE BALANCE IS STEPPED. With the channel updated first, a revert flick that lands on
@@ -581,7 +581,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       if (manualCh?.active) {
         const r = manualCh.update(dt, stickX, move.speed01);
         if (r.slipped) { manualCh = null; console.info('[SKATE-MANUAL] lost it'); combo.bail(); bannerFlash(ctx, 'LOST THE MANUAL', 600); }
-        else if (r.pts > 0) combo.add('MANUAL', Math.round(r.pts), 'manual');
+        else if (r.pts > 0) combo.accrue('MANUAL', Math.round(r.pts), 'manual');   // ANTI-MASH: one link, not one per frame
       }
       if (manualCh?.active && (!rig.rider.grounded || move.speed01 < 0.05)) {
         manualCh.stop(); manualCh = null; console.info('[SKATE-MANUAL] out (rolled out)');
