@@ -9,7 +9,7 @@ env, changeable without a deploy.
 The FREE lane is fully live the moment a season row is active. No flag needed.
 
 - Season XP flows from **every mode** through `/api/sessions` → `addSeasonXp()`.
-- 50 tiers, 8-week season. Curve: `TIER_XP(tier) = 800 + tier * 120`
+- 50 tiers, 8-week season. Curve: `TIER_XP(tier) = 450 + tier * 68`
   (`lib/season/season-pass-core.ts`). It is the single source of truth — never
   re-derive the curve anywhere else.
 - Clearing a tier **books** its rewards immediately, server-side, keyed by a
@@ -21,6 +21,33 @@ The FREE lane is fully live the moment a season row is active. No flag needed.
 
 Seed an active season with the existing seeder (`prisma/seed` →
 `scripts/seed.ts`), which upserts S1 as active for 8 weeks.
+
+## Pacing (TUNE(elijah))
+
+The whole track costs **105,800 XP** across 56 days. Measured against three
+play profiles, which the pacing checks in `scripts/season-pass-core-tests.ts`
+hold in place:
+
+| Profile | Per day | Outcome |
+|---|---|---|
+| casual — 2 sessions, 2 modes, 50% wins | ~980 XP | ~tier 34 at season end |
+| committed — 4 sessions, 3 modes, 60% wins | ~1,930 XP | finishes ~day 55 |
+| dedicated — 6 sessions, 4 modes, 70% wins | ~2,880 XP | finishes ~day 37 |
+
+Casual deliberately does **not** finish — the track is meant to be an
+achievement. The first shipped curve (`800 + 120t`, 187,000 XP) required about
+seven capped wins a day for eight straight weeks, so nobody reached tier 50 and
+the legendary the PRO lane is sold on was unreachable.
+
+**Re-tuning mid-season is safe but not silent.** Stored `xp` and `tier` are
+untouched, so nobody loses a tier; a lowered curve just means banked XP clears
+more tiers on the athlete's next session, paying out every reward it crosses.
+Observed on a live row: an athlete sitting at tier 7 with 1,600 banked XP rolled
+to tier 9 on one session, with both tier-ups booked and delivered. Until that
+next session the HUD bar reads full (it clamps at 100%).
+
+If the quest track ships, `questsDone` (200 XP each) adds a lever on top of this
+and the curve should be re-measured against the same three profiles.
 
 ## Turning the PRO lane on
 
