@@ -426,7 +426,7 @@ export const DunkMode: ModeDefinition = (() => {
   let tvFactor = 1;
   function slamWindowBase(): number { return CFG.qteWindowSec * tvFactor; }
 
-  function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
+  function setPhase(p: Phase): void { phase = p; phaseSec = 0; if (typeof window !== 'undefined' && (window as { __FEL_QA__?: unknown }).__FEL_QA__) console.info(`[DUNK-PHASE] ${p}`); }   // QA trace only (agent bridge on)
   function setWin(w: Win): void { if (win === w) return; win = w; console.info(`[DUNK-WIN] ${w}`); }
   // DUNK-SOFTS-NAMED (2026-09-08): ONE banner channel. Every banner used to be `setHud({ banner }) + setTimeout(clear)`, so
   // a stale timeout from an earlier flash blanked whatever came after it (measured: LOST THE SELF-LOB's 1.2 s clear landed

@@ -159,6 +159,8 @@ const SHOCK_SEC = 0.32;
 const HIT_CHAIN_MS = 1400;
 /** A takedown reaches the nearest body this close (metres). */
 const TAKEDOWN_REACH = 2.8;
+/** The partner revives this many knockdowns in a run; the next one is out. */
+const MAX_REVIVES = 2;
 /** A launched body is helpless for the knockdown and the get-up (the two captures, 0.7 s + 1.05 s, less the blend). */
 const LAUNCH_FLOOR_SEC = 1.6;
 
@@ -1163,11 +1165,15 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   function downPlayer(ctx: ModeContext): void {
     vitals.hp = 0; publishHp(ctx); stats.downs++; book.reset(); queue.clear(); landed = []; hitUntil = 0;   // the knockdown, not a flinch first
     dropCarried(ctx); endSwing(); blocking = false;
-    if (!partnerDown.downed) {
+    // THE RUN ENDS (MECHANICS PASS, 2026-09-15). The partner revived every knockdown, so a fighter who stopped fighting sat in
+    // an endless run that could never end (the release gauntlet: 90 s mashing + 60 s hands-off, no card). Arcade lives: the
+    // partner can pick you up MAX_REVIVES times; the knockdown after that is the end of the run, and the HUD says how many are left.
+    if (!partnerDown.downed && stats.downs <= MAX_REVIVES) {
       // Phase 8 co-op rule kept: DOWN (not out) while the partner stands — they can revive you
       myDown.down(clockSec);
       SoundKit.play('crowdGroan');   // the tree: knockdown → the floor until the revive, then the get-up
-      ctx.setHud({ banner: 'YOU ARE DOWN — PARTNER CAN REVIVE YOU' });
+      const left = MAX_REVIVES - stats.downs;
+      ctx.setHud({ banner: left > 0 ? `YOU ARE DOWN — PARTNER CAN REVIVE YOU (${left} MORE)` : 'YOU ARE DOWN — LAST REVIVE' });
     } else {
       SoundKit.play('crowdGroan');
       outFlag = true; animate(0, 0);   // KO: the tree's knockdown → floor

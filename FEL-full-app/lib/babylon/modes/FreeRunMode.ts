@@ -46,6 +46,8 @@ import {
 import { coursePieces, courseLength, checkpoints, respawnFor, overGap, routeAt, type Piece } from './freeRunCourse';
 
 const CAPSULE_H = 1.7, CAPSULE_R = 0.32;
+/** Seconds at the start line before the clock runs on its own; the run is called at this many times the course par. */
+const START_GRACE_SEC = 4, RUN_CAP_PAR = 3;
 const JUMP_V = 6.4, VAULT_V = 4.6, WALLRUN_SEC = 1.1, WALLKICK_V = 6.8, WALLKICK_PUSH = 5.2, SLIDE_SEC = 0.7, DOWN_SEC = 1.3;
 const BANK_AFTER_SEC = 0.6;          // Skate's revert window: roll clean this long and the pot banks
 const JUMP_BEAT_SEC = 0.42;          // jump_up is 0.45 s: the take-off clip, then the tree holds the air pose
@@ -67,7 +69,7 @@ interface St {
   airStartY: number; airSec: number; launch: Launch; trick: FreeRunTrick | null; trickSpun: number;
   wallSec: number; wallNormal: Vector3; slideSec: number; downSec: number; groundSec: number;
   rollAt: number | null; clock: number;
-  combo: ComboChain; started: boolean; runSec: number; finished: boolean;
+  combo: ComboChain; started: boolean; runSec: number; finished: boolean; /** seconds stood at the start before moving */ waitSec: number;
   checkpoint: number; highTouched: boolean; bails: number; barsCleared: Set<number>;
   env: Env;
   /** ANIM-READABILITY (creative, 2026-09-07): the ONE OWNER of the runner's clips. The mode never calls animator.play;
@@ -274,6 +276,20 @@ export const FreeRunMode: ModeDefinition = (() => {
     flash(ctx, lost > 0 ? `FELL — ${lost} lost · back to the checkpoint` : 'FELL — back to the checkpoint', 1000);
   }
 
+  /** The run was called: what is banked stands (the pot in hand banks too — you did not bail), no time or route bonus. */
+  function outOfTime(ctx: ModeContext, S: St): void {
+    if (S.finished) return;
+    S.finished = true; S.phase = 'done';
+    S.combo.bank();
+    const total = S.combo.banked;
+    SoundKit.play('whistle'); SoundKit.play('miss');
+    hud(ctx, S, { banner: `OUT OF TIME · ${total}` });
+    setTimeout(() => ctx.end('timeout', total, {
+      timeSec: Math.round(S.runSec * 10) / 10, tricks: S.combo.banked, timeBonus: 0, routeBonus: 0, bestCombo: S.combo.bestCombo,
+      tier: S.tier.id, bails: S.bails, highLine: S.highTouched ? 1 : 0,
+    }), 1400);
+  }
+
   function finish(ctx: ModeContext, S: St): void {
     if (S.finished) return;
     S.finished = true; S.phase = 'done';
@@ -318,7 +334,7 @@ export const FreeRunMode: ModeDefinition = (() => {
         hero: null, cc: null, state: 'ground', speed: 0, heading: new Vector3(0, 0, 1), stick: new Vector3(),
         airStartY: 0, airSec: 0, launch: 'ground', trick: null, trickSpun: 0,
         wallSec: 0, wallNormal: new Vector3(1, 0, 0), slideSec: 0, downSec: 0, groundSec: 0, rollAt: null, clock: 0,
-        combo: new ComboChain(undefined, 'all'), started: false, runSec: 0, finished: false,
+        combo: new ComboChain(undefined, 'all'), started: false, runSec: 0, finished: false, waitSec: 0,
         checkpoint: 0, highTouched: false, bails: 0, barsCleared: new Set(),
         env: { vaultAhead: false, wallAhead: false, ledgeAhead: false, barAhead: false }, vy: 0,
         tree: null, jumpAt: -9, landAt: -9, landing: 'none',
@@ -515,7 +531,18 @@ export const FreeRunMode: ModeDefinition = (() => {
         if (p.kind === 'checkpoint' && (p.index ?? 0) > S.checkpoint && root.position.z > p.z) { S.checkpoint = p.index ?? 0; SoundKit.play('uiTick', { pitch: 1.3 }); flash(ctx, `CHECKPOINT ${S.checkpoint}`, 600); }
       }
       if (!S.started && root.position.z > 1.5) { S.started = true; flash(ctx, 'GO', 500); }
-      if (S.started && !S.finished) S.runSec += dt;
+      // THE RUN ENDS (MECHANICS PASS, 2026-09-15). The clock only started once you crossed z 1.5 and the run only ended at the
+      // course's end, so a player who stood still (or got lost) sat in a run that could never finish — the release gauntlet
+      // capped out on it. The clock now starts on its own after a few seconds at the line, and the run is called at
+      // RUN_CAP_PAR × par: what you banked stands, with no time bonus, and the last ten seconds are counted out loud.
+      if (!S.started) { S.waitSec += dt; if (S.waitSec >= START_GRACE_SEC) { S.started = true; flash(ctx, 'GO — THE CLOCK IS RUNNING', 900); } }
+      if (S.started && !S.finished) {
+        const cap = S.tier.parSec * RUN_CAP_PAR, before = cap - S.runSec;
+        S.runSec += dt;
+        const left = cap - S.runSec;
+        if (Math.ceil(left) !== Math.ceil(before) && left > 0 && left <= 10) { flash(ctx, `${Math.ceil(left)}s LEFT`, 600); SoundKit.play('uiTick', { pitch: 1 + (10 - left) * 0.04 }); }
+        if (left <= 0) { outOfTime(ctx, S); return; }
+      }
       if (routeAt(root.position.x, root.position.y) === 'high') S.highTouched = true;
       coyote.update(S.state === 'ground');   // one feed per frame, from the state the jump branch reads
       if (!S.finished && root.position.z >= courseLength(S.pieces)) finish(ctx, S);

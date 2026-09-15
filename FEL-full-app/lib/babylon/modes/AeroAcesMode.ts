@@ -95,6 +95,9 @@ let boostFx: BoostFx | null = null;
 let boostRings: BoostPads | null = null;
 /** Below this height over the floor, flying fast is a LOW PASS and pays into the boost. */
 const LOW_PASS_M = 22;
+/** One scrape per this long while in contact with the world's edge. */
+const SCRAPE_COOLDOWN_SEC = 1.2;
+let scrapeCooldown = 0;
 
 const say = (t: string, sec = 1.1): void => { S.banner = t; S.bannerT = sec; };
 
@@ -390,7 +393,7 @@ return {
     // and must not inherit last race's finishing place (which would read as an overtake on frame one).
     baseFov = null;
     lastPlace = 0;
-    S.done = false; S.crashes = 0; S.banner = ''; S.bannerT = 0; S.graceLeft = null;
+    S.done = false; S.crashes = 0; S.banner = ''; S.bannerT = 0; scrapeCooldown = 0; S.graceLeft = null;
     S.input = { pitch: 0, roll: 0, yaw: 0, throttle: 0.75, boost: false, boostK: 0 };
     S.boostHeld = false; boost = new BoostKit(0.25);   // a quarter tank on the grid, so the first straight can use it
 
@@ -536,7 +539,18 @@ return {
     if (!S.rolling) levelOut(flight, dt);    // hands off, the wings come level
 
     // the world has edges, and hitting one is a crash that costs speed rather than ending the run
-    if (clampFlight(flight, FLOOR, CEILING, HALF_WORLD)) {
+    // A SCRAPE IS ONE EVENT, AND YOU COME OFF IT (MECHANICS PASS, 2026-09-15). This block ran EVERY frame the aircraft sat on
+    // the floor: a stalled plane that settled there took the speed cut, a shake and a feel.impact (a hit-stop) sixty times a
+    // second — game time all but froze (measured: 0.7 s of race per 5 s of wall at qaSpeed 8) and the race could never end.
+    // Contact now costs once per SCRAPE_COOLDOWN_SEC, and the floor throws the nose up with enough speed to fly off it.
+    scrapeCooldown = Math.max(0, scrapeCooldown - dt);
+    const touching = clampFlight(flight, FLOOR, CEILING, HALF_WORLD);
+    if (touching && flight.pos.y <= FLOOR + 0.01) {
+      flight.pitch = Math.max(flight.pitch, 0.22);
+      flight.speed = Math.max(flight.speed, FRAME.cruise * 0.55);
+    }
+    if (touching && scrapeCooldown <= 0) {
+      scrapeCooldown = SCRAPE_COOLDOWN_SEC;
       S.crashes += 1;
       ctx.momentum.report({ kind: 'blunder', weight: -14 });   // scraping the world costs the run its heat
       flight.speed *= 0.45;
