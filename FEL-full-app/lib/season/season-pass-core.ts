@@ -18,8 +18,25 @@
  * in the M13 export.
  */
 
-/** XP required to clear a given tier (0-indexed). TUNE(elijah). */
-export const TIER_XP = (tier: number): number => 800 + tier * 120;
+/**
+ * XP required to clear a given tier (0-indexed). TUNE(elijah).
+ *
+ * Paced so the 50-tier track is actually finishable inside the 8-week season.
+ * The original 800 + 120t put the whole track at 187,000 XP — about seven
+ * capped wins a day for 56 straight days — so nobody reached tier 50 and the
+ * legendary the PRO lane is sold on was unreachable by design. At 450 + 68t the
+ * track costs 105,800 XP and lands like this (see the pacing checks in
+ * scripts/season-pass-core-tests.ts, which hold this shape):
+ *
+ *   casual    2 sessions/day, 2 modes, 50% wins -> ~tier 34 by season end
+ *   committed 4 sessions/day, 3 modes, 60% wins -> finishes around day 55
+ *   dedicated 6 sessions/day, 4 modes, 70% wins -> finishes around day 37
+ *
+ * Casual still does not finish: the track is meant to be an achievement. If
+ * the quest track ever ships, questsDone (200 XP each) adds a lever on top of
+ * this and the curve should be re-checked against these same profiles.
+ */
+export const TIER_XP = (tier: number): number => 450 + tier * 68;
 
 export type RewardKind = 'lc' | 'cosmetic';
 export type RewardRarity = 'common' | 'rare' | 'legendary';

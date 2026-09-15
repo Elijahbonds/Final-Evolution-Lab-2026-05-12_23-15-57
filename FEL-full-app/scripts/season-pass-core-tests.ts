@@ -17,6 +17,8 @@
  *   12-15. DELIVERY: every granted cosmetic resolves to a real wearable, season
  *      items are never purchasable, ids are unique and store-disjoint, and the
  *      coin store never lists them.
+ *   16-18. PACING: the track is finishable by committed play inside the season,
+ *      finishes early for dedicated play, and is NOT finishable casually.
  *
  * Run: yarn tsx scripts/season-pass-core-tests.ts
  */
@@ -209,6 +211,54 @@ check('the store never lists season items, the closet always can wear them', () 
   for (const s of WEARABLES) {
     assert.ok(wearableEverywhere.includes(s.itemId), `${s.itemId} must stay wearable`);
   }
+});
+
+// 16-18. PACING. The curve is a product decision, so the intent is asserted
+// here rather than left in a comment: the pass shipped costing 187,000 XP over
+// a 56-day season \u2014 roughly seven capped wins a day \u2014 so tier 50 and the
+// legendary the PRO lane sells were unreachable. These checks hold the shape.
+const SEASON_DAYS = 56;
+
+/** XP a profile earns in a day. First-of-day bonus applies once PER MODE. */
+function dailyXp(sessions: number, modes: number, winRate: number): number {
+  let xp = 0;
+  for (let i = 0; i < sessions; i++) {
+    xp += SeasonPassCore.sessionXp({
+      score: 400,
+      won: i / sessions < winRate,
+      firstOfDayMode: i < modes,
+    });
+  }
+  return xp;
+}
+
+/** Play a whole season at a fixed daily rate; returns the tier reached. */
+function playSeason(perDay: number): { tier: number; finishedOn: number | null } {
+  const core = new SeasonPassCore();
+  let finishedOn: number | null = null;
+  for (let day = 1; day <= SEASON_DAYS; day++) {
+    core.addXp(perDay);
+    if (core.state.tier >= 50 && finishedOn === null) finishedOn = day;
+  }
+  return { tier: core.state.tier, finishedOn };
+}
+
+check('a committed athlete can finish the track inside the season', () => {
+  const { tier, finishedOn } = playSeason(dailyXp(4, 3, 0.6));
+  assert.strictEqual(tier, 50, `committed play must reach tier 50, reached ${tier}`);
+  assert.ok(finishedOn !== null && finishedOn <= SEASON_DAYS, 'must finish within the season');
+});
+
+check('a dedicated athlete finishes with room to spare', () => {
+  const { finishedOn } = playSeason(dailyXp(6, 4, 0.7));
+  assert.ok(finishedOn !== null, 'dedicated play must finish');
+  assert.ok(finishedOn! <= 45, `should finish well before the end, finished day ${finishedOn}`);
+});
+
+check('the track still means something: casual play does not finish it', () => {
+  const { tier } = playSeason(dailyXp(2, 2, 0.5));
+  assert.ok(tier < 50, `casual play must not complete the track, reached ${tier}`);
+  assert.ok(tier >= 25, `casual play should still see most of the track, reached ${tier}`);
 });
 
 console.log(`\n\u2705 season-pass-core: ${passed} checks passed`);
