@@ -5,6 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import type { ModePhase } from '@/lib/babylon';
 import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
+import { CardSlot } from './card-slot';
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
@@ -448,6 +449,10 @@ export function BootSplash(props: {
             </p>
           </div>
         )}
+
+        {/* CARD SLOT (FINISH-RELEASE, 2026-09-15): the creator card beside the setting and the items, on every mode —
+            and the button map it carries, so a player can read what every press does before the first one. */}
+        {(props.phase === 'ready' || props.phase === 'loading') && <CardSlot modeId={props.modeId} />}
 
         {props.phase === 'countdown' && (
           <div key={String(props.detail)} className="fel-count text-8xl font-black text-white">
