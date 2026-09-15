@@ -12,12 +12,26 @@
  *   5. Tier cap: XP beyond the final tier never exceeds `tiers`.
  *   6. Rehydration: constructing from a persisted snapshot resumes state.
  *   7. Feedback parity: every tier crossed yields exactly one event.
+ *   8-11. Collection: claimable is earned-and-carries-a-reward only, marking is
+ *      idempotent, claimed state rehydrates, PRO unlock back-fills.
+ *   12-15. DELIVERY: every granted cosmetic resolves to a real wearable, season
+ *      items are never purchasable, ids are unique and store-disjoint, and the
+ *      coin store never lists them.
  *
  * Run: yarn tsx scripts/season-pass-core-tests.ts
  */
 
 import assert from 'node:assert';
 import { SeasonPassCore, TIER_XP } from '../lib/season/season-pass-core';
+import { GOLDEN_HOUR_REWARDS, ALL_SEASON_WEARABLES } from '../lib/season/golden-hour';
+import {
+  getWearable,
+  isPurchasableWearable,
+  wearablesForSlot,
+  allWearablesForSlot,
+  WEARABLES,
+  SLOTS,
+} from '../lib/closet/wearable-catalog';
 
 let passed = 0;
 function check(name: string, fn: () => void) {
@@ -144,6 +158,57 @@ check('pro unlock back-fills earned tiers', () => {
     [{ kind: 'cosmetic', rarity: 'legendary' }],
     'tier 10 back-fills the legendary',
   );
+});
+
+// 12-15. DELIVERY invariants. The pass shipped with 50 tiers of cosmetics that
+// resolved to nothing wearable: the ids lived only on grant rows, while the
+// closet equips out of its catalog. These are the checks that would have caught
+// it, and that keep a future season from authoring an unwearable reward.
+check('every cosmetic the season grants resolves to a wearable', () => {
+  let cosmetics = 0;
+  for (const tier of GOLDEN_HOUR_REWARDS) {
+    for (const r of [...tier.free, ...tier.pro]) {
+      if (r.kind !== 'cosmetic') continue;
+      cosmetics++;
+      assert.ok(r.id, 'every cosmetic reward carries an id');
+      const w = getWearable(r.id!);
+      assert.ok(w, `granted cosmetic ${r.id} must resolve in the closet catalog`);
+      assert.ok(SLOTS.includes(w!.slot), `${r.id} must sit in a real slot`);
+      assert.strictEqual(w!.name, r.name, `${r.id} name must match the reward`);
+    }
+  }
+  assert.ok(cosmetics > 50, `expected a full season of cosmetics, saw ${cosmetics}`);
+});
+
+check('season cosmetics are never for sale', () => {
+  for (const w of ALL_SEASON_WEARABLES) {
+    assert.strictEqual(isPurchasableWearable(w.itemId), false, `${w.itemId} must not be buyable`);
+  }
+  assert.strictEqual(isPurchasableWearable('top_lab'), true, 'store items stay buyable');
+});
+
+check('season item ids are unique and never collide with store ids', () => {
+  const seen = new Set<string>();
+  for (const w of ALL_SEASON_WEARABLES) {
+    assert.ok(!seen.has(w.itemId), `duplicate season item id ${w.itemId}`);
+    seen.add(w.itemId);
+    assert.ok(!WEARABLES.some((s) => s.itemId === w.itemId), `${w.itemId} collides with a store item`);
+  }
+});
+
+check('the store never lists season items, the closet always can wear them', () => {
+  for (const slot of SLOTS) {
+    for (const w of wearablesForSlot(slot)) {
+      assert.ok(isPurchasableWearable(w.itemId), `${w.itemId} is listed for sale but is not purchasable`);
+    }
+  }
+  const wearableEverywhere = SLOTS.flatMap((s) => allWearablesForSlot(s).map((w) => w.itemId));
+  for (const w of ALL_SEASON_WEARABLES) {
+    assert.ok(wearableEverywhere.includes(w.itemId), `${w.itemId} must be wearable in some slot`);
+  }
+  for (const s of WEARABLES) {
+    assert.ok(wearableEverywhere.includes(s.itemId), `${s.itemId} must stay wearable`);
+  }
 });
 
 console.log(`\n\u2705 season-pass-core: ${passed} checks passed`);
