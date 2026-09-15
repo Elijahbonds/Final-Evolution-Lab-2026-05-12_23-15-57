@@ -81,3 +81,52 @@ collection idempotency, and the PRO back-fill:
 ```
 yarn tsx scripts/season-pass-core-tests.ts
 ```
+
+## Running it locally
+
+These are the exact steps used to exercise the pass against a real Postgres.
+If `scripts/dev-setup.sh` is present on your branch it automates steps 1-3.
+
+```bash
+# 1. a database (any local Postgres; Docker works too)
+createdb fel
+
+# 2. .env — the PRO lane needs the last two lines; the FREE lane does not
+cat > .env <<'ENV'
+DATABASE_URL="postgresql://USER:PASS@127.0.0.1:5432/fel?schema=public"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="local-dev-only"
+SEASON_PASS_PURCHASE=1
+SEASON_PASS_PRO_PRICE_USD_CENTS=999
+ENV
+
+# 3. deps, schema, seed (the seeder upserts Season 1 "Golden Hour" as active)
+yarn install
+yarn prisma generate && yarn prisma db push
+yarn tsx --require dotenv/config scripts/seed.ts
+
+# 4. run it
+yarn dev
+```
+
+Sign in as `john@doe.com` / `johndoe123`. The pass track sits on the HUB
+(`app/page.tsx`). A fresh account starts at tier 0 with nothing to collect —
+play any mode a few times to climb, since season XP comes off the shared
+`/api/sessions` pipeline.
+
+What to look for:
+
+- **Tier bar** fills toward `TIER_XP(tier)`, and `T{n}` climbs.
+- **COLLECT n REWARDS** appears once you cross a tier that carries one
+  (FREE lane: every 3rd and every 5th). Clicking it clears the badge.
+- **LC actually moves** on every 5th tier — check the credit balance before and
+  after tier 5. That is the fix; it used to log the reward and pay nothing.
+- **PRO LANE** shows `UNLOCK PRO LANE` with `SEASON_PASS_PURCHASE=1`, or
+  `COMING SOON` without it. Without `STRIPE_SECRET_KEY` the button's request
+  answers `503 not_configured` and the lane stays shut — by design, it will not
+  sell at a price nobody set.
+
+To test a real purchase you need Stripe test keys (`STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`) and `stripe listen --forward-to
+localhost:3000/api/v1/wallet/stripe-webhook`, since the lane only opens in the
+signature-verified webhook — never in the browser.
