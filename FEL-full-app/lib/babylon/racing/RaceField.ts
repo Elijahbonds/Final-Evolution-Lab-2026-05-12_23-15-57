@@ -103,8 +103,8 @@ export interface Rival {
   phase: number;
 }
 
-export const RIVAL_NAMES = ['VOSS', 'KEELE', 'ARIN', 'MOTA', 'SABRE', 'HOLT'] as const;
-export const RIVAL_TINTS = ['#4cc9f0', '#ffd75e', '#8fe0a0', '#c99bf7', '#ff7b54', '#e0604a'] as const;
+export const RIVAL_NAMES = ['VOSS', 'KEELE', 'ARIN', 'MOTA', 'SABRE', 'HOLT', 'JUNO'] as const;   // JUNO: the eighth racer an Aero Aces circuit grids (2026-09-15)
+export const RIVAL_TINTS = ['#4cc9f0', '#ffd75e', '#8fe0a0', '#c99bf7', '#ff7b54', '#e0604a', '#7ae582'] as const;
 
 /** Line up a field. Skills are spread, not clustered, and the grid is behind the player. */
 export function makeField(count: number, topSpeed: number, difficulty = 0.5): Rival[] {

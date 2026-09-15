@@ -22,6 +22,9 @@ import { hnode } from './hud-format';
 
 type Hud = Record<string, HudValue>;
 
+/** The balloon colours (AeroItems.BALLOON_COLOR), for the item box. */
+const ITEM_COLOR: Record<string, string> = { missile: '#ff4b4b', boost: '#3aa0ff', shield: '#ffd75e', mine: '#4fdc6a' };
+
 export default function AeroAcesBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
@@ -42,11 +45,12 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      const t = Number(r.stats?.timeSec ?? r.stats?.time ?? 0);
+      const t = Number(r.stats?.seconds ?? r.stats?.timeSec ?? 0);
+      const place = Number(r.stats?.place ?? 0);
       onEnd({
         score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: 0,
-        won: r.outcome === 'win', duration: r.durationSec,
-        headline: t > 0 ? `COURSE CLEAR · ${t.toFixed(1)}s` : 'FLIGHT COMPLETE',
+        won: r.outcome === 'WIN', duration: r.durationSec,
+        headline: place > 0 ? `${place === 1 ? '1ST' : place === 2 ? '2ND' : place === 3 ? '3RD' : `${place}TH`} PLACE${t > 0 ? ` · ${t.toFixed(1)}s` : ''}` : 'FLIGHT COMPLETE',
       } satisfies GameResult);
     };
 
@@ -75,15 +79,31 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* AERO ACES like Diddy Kong Racing (2026-09-15): PLACE and LAP are the race; the ITEM slot and BANANAS are what you
+          carry into it. The item box takes the balloon's colour so a glance says what FIRE will do. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between px-4 py-3 font-mono">
         <div className="fel-panel px-3 py-1.5">
-          <div className="text-[10px] tracking-wider text-white/60">GATE</div>
-          <div className="fel-stat text-2xl text-[var(--fel-gold)]">{hnode(hud.gate, '—')}</div>
+          <div className="text-[10px] tracking-wider text-white/60">PLACE</div>
+          <div className="fel-stat text-3xl text-[var(--fel-gold)]">{hnode(hud.pos, '—')}</div>
         </div>
-        <span className="fel-panel px-4 py-1.5 fel-stat text-2xl text-white">{Number(hud.time ?? 0).toFixed(1)}s</span>
-        <div className="fel-panel px-3 py-1.5 text-right">
-          <div className="text-[10px] tracking-wider text-white/60">LAP</div>
-          <div className="text-sm font-bold text-white/85">{hnode(hud.lap, '—')}</div>
+        <div className="flex flex-col items-center gap-1">
+          <span className="fel-panel px-4 py-1.5 fel-stat text-xl text-white">{Number(hud.time ?? 0).toFixed(1)}s</span>
+          <span className="fel-panel px-3 py-0.5 text-xs font-bold text-white/85">LAP {hnode(hud.lap, '—')}</span>
+        </div>
+        <div className="flex items-start gap-2">
+          <div className="fel-panel px-3 py-1.5 text-center">
+            <div className="text-[10px] tracking-wider text-white/60">BANANAS</div>
+            <div className="fel-stat text-2xl text-[#ffd83a]">{Number(hud.bananas ?? 0)}<span className="text-sm text-white/50">/10</span></div>
+          </div>
+          <div
+            className="fel-panel flex h-[60px] w-[88px] flex-col items-center justify-center rounded-lg border-2 px-2 text-center"
+            style={{ borderColor: ITEM_COLOR[String(hud.itemKind ?? '')] ?? 'rgba(255,255,255,0.15)' }}
+          >
+            <div className="text-[10px] tracking-wider text-white/60">ITEM</div>
+            <div className="text-sm font-bold" style={{ color: ITEM_COLOR[String(hud.itemKind ?? '')] ?? 'rgba(255,255,255,0.35)' }}>
+              {hud.item ? String(hud.item) : 'NONE'}
+            </div>
+          </div>
         </div>
       </div>
 

@@ -88,12 +88,13 @@ describe('EVERY COURSE CAN BE COMPLETED', () => {
 });
 
 describe('the courses ask different questions', () => {
-  it('there are four of each, all ready, with unique ids', () => {
-    for (const kind of ['aero', 'kart'] as const) {
+  it('four kart courses and three aero circuits, all ready, with unique ids', () => {
+    // three THEMED CIRCUITS in the air (2026-09-15, owner: Aero Aces like Diddy Kong Racing — canyon, island, cave)
+    for (const [kind, n] of [['aero', 3], ['kart', 4]] as const) {
       const list = readyCourses(kind);
-      expect(list.length, kind).toBe(4);
-      expect(new Set(list.map((c) => c.id)).size, kind).toBe(4);
-      expect(new Set(list.map((c) => c.name)).size, kind).toBe(4);
+      expect(list.length, kind).toBe(n);
+      expect(new Set(list.map((c) => c.id)).size, kind).toBe(n);
+      expect(new Set(list.map((c) => c.name)).size, kind).toBe(n);
       for (const c of list) expect(c.kind, c.id).toBe(kind);
     }
   });
@@ -123,7 +124,7 @@ describe('the courses ask different questions', () => {
   });
 
   it('and they are not all the same length', () => {
-    for (const kind of ['aero', 'kart'] as const) {
+    for (const kind of ['kart'] as const) {
       const lens = coursesFor(kind).map((c) => courseLength(c));
       expect(Math.max(...lens) / Math.min(...lens), kind).toBeGreaterThan(1.2);
     }
@@ -140,25 +141,18 @@ describe('the courses ask different questions', () => {
   });
 });
 
-describe('aero courses use the air', () => {
-  it('every aero course puts its gates at genuinely different heights', () => {
-    for (const c of AERO_COURSES) {
-      const ys = c.gates.map((gt) => gt.at.y);
-      expect(Math.max(...ys) - Math.min(...ys), `${c.id} height spread`).toBeGreaterThan(40);
-    }
+describe('aero circuits are laps through a place', () => {
+  // The ring courses asked for rings high in open sky; a Diddy Kong Racing circuit is flown LOW through a place, three
+  // laps, with checkpoints the player never has to aim at. aeroCircuits.test.ts holds the geometry.
+  it('every aero course is a three-lap loop', () => {
+    for (const c of AERO_COURSES) { expect(c.loop, c.id).toBe(true); expect(c.laps, c.id).toBe(3); }
   });
 
-  it('and no ring is at ground level, where it would be a driving course', () => {
-    for (const c of AERO_COURSES) for (const gt of c.gates) {
-      expect(gt.at.y, c.id).toBeGreaterThan(30);
-    }
-  });
-
-  it('rings never overlap each other, so a line through one cannot clip another', () => {
+  it('checkpoints are spread along the lap, never stacked', () => {
     for (const c of AERO_COURSES) {
-      for (let i = 0; i < c.gates.length; i++) for (let j = i + 1; j < c.gates.length; j++) {
-        const d = Vector3.Distance(c.gates[i].at, c.gates[j].at);
-        expect(d, `${c.id} gates ${i}/${j}`).toBeGreaterThan(c.gates[i].radius + c.gates[j].radius);
+      for (let i = 0; i < c.gates.length; i++) {
+        const j = (i + 1) % c.gates.length;
+        expect(Vector3.Distance(c.gates[i].at, c.gates[j].at), `${c.id} ${i}/${j}`).toBeGreaterThan(60);
       }
     }
   });

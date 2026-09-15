@@ -142,6 +142,9 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   duel: { distance: 5.4, height: 2.2, minHeight: 1.5, pitchFloorDeg: 8, pitchCapDeg: 16, targetHeight: 1.2, lag: 0.13, lookAhead: 0.5, fitTwo: true },
   // SNOW DESCENT — wider and higher than 'board', opens up for big airs;
   // longer lookAhead reads the fall line.
+  // FLYER — Aero Aces as a kart-racer plane (2026-09-15): a close, low chase that sits a little above the toy plane so the
+  // pilot in the open cockpit and the course ahead share the frame; enough look-ahead to read the next turn at 30 m/s.
+  flyer: { distance: 13.5, height: 4.6, minHeight: 2.6, pitchFloorDeg: 6, pitchCapDeg: 24, targetHeight: 1.6, lag: 0.09, lookAhead: 9.0 },
   descent: { distance: 9.0, height: 3.6, minHeight: 2.2, pitchFloorDeg: 12, pitchCapDeg: 26, targetHeight: 1.2, lag: 0.08, lookAhead: 4.5 },
   // SURF — wave-following: low and close behind the rider so the face fills
   // frame; barrel treatment = tightest (set via pulse when in the tube).

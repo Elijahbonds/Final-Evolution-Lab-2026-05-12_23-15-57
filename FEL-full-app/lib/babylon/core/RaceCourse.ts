@@ -15,6 +15,7 @@
 // Pure maths. The courses below are DATA, so a new map is a list of gates rather than a code change.
 
 import { Vector3 } from '@babylonjs/core';
+import { aeroCircuits } from '../racing/aeroCircuits';
 
 export interface Gate {
   /** Centre of the ring, or the middle of the checkpoint line. */
@@ -33,7 +34,7 @@ export interface Gate {
  * in the racing modes), which is also the seam that lets a course pick a mood the mode does not hard-code —
  * `mood` on a ModeDefinition may be a GETTER, read at mount, after the course has been picked.
  */
-export type CourseVenue = 'park' | 'slope' | 'pitch' | 'street' | 'orbit';
+export type CourseVenue = 'park' | 'slope' | 'pitch' | 'street' | 'orbit' | 'canyon' | 'island' | 'glacier';
 
 export interface Course {
   id: string;
@@ -117,68 +118,16 @@ function startBefore(gates: readonly Gate[], frac = 0.45): { at: Vector3; headin
  * means diving for the speed and pulling out. The gates are deliberately at different HEIGHTS, because a
  * flying course that is flat is just a driving course.
  */
-const ALPINE_GATE_RINGS = withFacings([
-  g(-90, 130, -140, 16),
-  g(110, 190, -30, 15),
-  g(150, 110, 170, 15),
-  g(-40, 165, 250, 16),
-  g(-190, 105, 90, 15),
-], true);
 
-export const AERO_COURSES: readonly Course[] = [
-  {
-    id: 'bay-circuit', name: 'BAY CIRCUIT', sub: 'Four rings, two heights. Dive for the speed.',
-    kind: 'aero', venue: 'park', mood: 'goldenHour', tint: '#ffb36b', ready: true,
-    loop: true, laps: 2, gold: 95,
-    start: { at: new Vector3(0, 140, -360), heading: 0 },
-    gates: withFacings([
-      g(0, 150, -120, 26),
-      g(260, 230, 140, 24),
-      g(0, 90, 330, 22),
-      g(-260, 200, 120, 24),
-    ], true),
-  },
-  {
-    id: 'canyon-run', name: 'CANYON RUN', sub: 'Point to point, low and fast. No second chances.',
-    kind: 'aero', venue: 'slope', mood: 'daylight', tint: '#e0a06a', ready: true,
-    loop: false, laps: 1, gold: 62,
-    start: { at: new Vector3(-420, 70, -420), heading: Math.PI * 0.25 },
-    gates: withFacings([
-      g(-240, 60, -240, 20),
-      g(-60, 48, -60, 18),
-      g(120, 60, 120, 18),
-      g(300, 90, 300, 20),
-      g(440, 130, 440, 24),
-    ], false),
-  },
-  {
-    id: 'alpine-gates', name: 'ALPINE GATES', sub: 'Tight rings between the peaks. The turner’s course.',
-    kind: 'aero', venue: 'slope', mood: 'alpine', tint: '#cfe8ff', ready: true,
-    loop: true, laps: 2, gold: 104,
-    // the start is DERIVED, not authored: the hand-placed one sat past gate 0's plane and the first ring
-    // could never be passed — the same failure Boardwalk Loop shipped with, caught here by the test rather
-    // than by a player. On a loop there is no reason to author a start at all.
-    // SMALL RADII AND SHORT LEGS, on purpose: this is the course the KESTREL is built for and the DARTER has
-    // to fly conservatively. A garage of trade-offs is only real if the maps ask different questions, so one
-    // course rewards the turn rate and another (canyon-run's long diagonal) rewards outright pace.
-    start: startBefore(ALPINE_GATE_RINGS),
-    gates: ALPINE_GATE_RINGS,
-  },
-  {
-    id: 'orbit-ring', name: 'ORBIT RING', sub: 'Night rings over the water. Nothing to judge height against.',
-    kind: 'aero', venue: 'orbit', mood: 'nightGame', tint: '#9db4ff', ready: true,
-    loop: true, laps: 2, gold: 88,
-    // the rings sit at WILDLY different heights and the venue gives almost no ground reference, so the read
-    // is the gate marker and your own instrument — which is the one thing none of the other three ask for
-    start: { at: new Vector3(0, 200, -340), heading: 0 },
-    gates: withFacings([
-      g(0, 240, -120, 24),
-      g(230, 120, 120, 22),
-      g(-30, 300, 300, 24),
-      g(-240, 140, 90, 22),
-    ], true),
-  },
-];
+/**
+ * THE AERO COURSES ARE THE THEMED CIRCUITS (2026-09-15, owner: Aero Aces "like diddy Kong flyers" — three laps through
+ * canyons, islands and caves with a full field, instead of the point-to-point ring race). The four ring courses that
+ * lived here (bay circuit, canyon run, alpine gates, orbit ring) were a time trial through hoops in open sky; each
+ * circuit is now DERIVED from one racing line in racing/aeroCircuits.ts, and its gates are the invisible lap
+ * checkpoints along it. A circuit is data plus its ground and ceiling functions, which is why it lives with the world
+ * builder rather than here.
+ */
+export const AERO_COURSES: readonly Course[] = aeroCircuits().map((c) => c.course);
 
 /**
  * The kart maps.

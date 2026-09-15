@@ -7,7 +7,8 @@ import { describe, it, expect } from 'vitest';
 import { pathSamples, courseBounds, furnitureFor, MARKER_SPACING, MAX_PER_SIDE, VERGE_OFFSET, AERO_FLOOR_MIN_SPAN, DOME_MARGIN, BACKDROP_DOME_RADIUS} from './trackside';
 import { AERO_COURSES, KART_COURSES, TRACK_HALF_WIDTH, type Course } from '../core/RaceCourse';
 
-const ALL = [...AERO_COURSES, ...KART_COURSES];
+// Aero Aces flies themed circuits with their own worlds now (racing/aeroWorlds.ts, 2026-09-15); trackside dresses the karts.
+const ALL = [...KART_COURSES];
 
 describe('path sampling', () => {
   it('every shipping course produces samples', () => {

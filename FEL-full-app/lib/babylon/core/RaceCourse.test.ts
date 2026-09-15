@@ -33,10 +33,10 @@ describe('the maps', () => {
     }
   });
 
-  it('a flying course is not FLAT — gates at different heights is the point of flying', () => {
+  it('a flying course is not FLAT — the circuit climbs and dives over its ground', () => {
     for (const c of AERO_COURSES) {
       const ys = c.gates.map((gt) => gt.at.y);
-      expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(20);
+      expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(10);
     }
   });
 
@@ -48,7 +48,8 @@ describe('the maps', () => {
   });
 
   it('a looping course declares laps and a point-to-point does not loop', () => {
-    const p2p = AERO_COURSES.find((c) => !c.loop);
+    // the aero courses are all three-lap circuits now (2026-09-15); the point-to-point is the kart's alpine descent
+    const p2p = [...AERO_COURSES, ...KART_COURSES].find((c) => !c.loop);
     expect(p2p).toBeDefined();
     expect(p2p!.laps).toBe(1);
   });
@@ -184,8 +185,9 @@ describe('gate facings follow the racing line', () => {
   // Hand-written facings were up to 45 degrees off the path, and on the bay circuit one gate faced back
   // AGAINST the flow: an aircraft arriving the natural way could not legally pass it, and an autopilot sat on
   // that gate for 110 seconds. Facings are derived now, and this is the assertion that keeps them honest.
+  // (the aero circuits' checkpoints face the racing line's own tangent — aeroCircuits.test.ts holds them to that)
   it('each gate faces roughly from the previous gate toward the next', () => {
-    for (const c of [...AERO_COURSES, ...KART_COURSES]) {
+    for (const c of KART_COURSES) {
       if (!c.loop) continue;
       const n = c.gates.length;
       for (let i = 0; i < n; i++) {

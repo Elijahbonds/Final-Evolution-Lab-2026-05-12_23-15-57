@@ -184,15 +184,13 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
     X: { label: 'BLOCK', emit: A('X') },
     Y: { label: 'HEAVY', emit: A('Y') },
   }),
-  // AERO ACES (new mode, owner ask 2026-09-12). A flying mode's verbs are not buttons-as-strikes: the THROTTLE
-  // is the verb you hold most of the time, so it is a HOLD on the right trigger, and BOOST is the one tap that
-  // matters. Without an entry here touch falls through to MODE_VERBS.default — one generic ACTION button — and
-  // a phone player would have had no throttle at all, which is the karate_vs bug repeated.
-  // A was BOOST; boost is the shared held R1 now (the BOOST pill), so A no longer shows a second boost control.
+  // AERO ACES as a kart racer with wings (2026-09-15, owner: "like diddy Kong flyers"): GAS and BRAKE are holds, FIRE
+  // spends the balloon item, STUNT is a barrel roll (the stick picks the side; pulled back it loops).
   aeroaces: verbs({
-    Y: { label: 'THROTTLE', emit: RT(1), hold: true },
-    X: { label: 'RUDDER', emit: LT(1), hold: true },
-    B: { label: 'LEVEL', emit: A('B') },
+    A: { label: 'FIRE', emit: A('A') },
+    B: { label: 'STUNT', emit: A('B') },
+    X: { label: 'BRAKE', emit: LT(1), hold: true },
+    Y: { label: 'GAS', emit: RT(1), hold: true },
   }),
   // VELOCITY KART (new mode, owner ask 2026-09-12). The THROTTLE is held, DRIFT is held into a corner, and
   // BOOST is the tap that spends what the drift banked — so two of the three verbs are holds, which is what a
