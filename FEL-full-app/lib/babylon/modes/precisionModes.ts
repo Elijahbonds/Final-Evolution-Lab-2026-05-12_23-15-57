@@ -779,6 +779,21 @@ export const DerbyMode: ModeDefinition = (() => {
   let homerLatch = false;              // A+ P0 juice: the homer's ONE punch per pitch
   const lastOut = (): boolean => tally.outs === OUTS_CAP - 1;
 
+  // THE BATTING CAMERA LOOKS OUT TO THE OUTFIELD (owner, 2026-09-15: "face outfield so we can see the pitcher and our
+  // player from over the shoulder so we can time the pitch"). setFixedBehind(batter, π) parked the lens at z +4.2 —
+  // BETWEEN the batter and the mound, looking back at the plate — so the pitcher was behind the camera and the pitch
+  // arrived from off-screen: the one thing a hitter times off was the one thing you could not see. The lens now sits
+  // behind the plate, off the batter's back shoulder (the batter stands at x −0.7 facing +x, so his back is −x), low
+  // enough to read the release point, and aims down the pitch line: the batter frames the left of the shot, the
+  // pitcher and the whole flight of the ball sit in the middle. The aim point is steady (PITCHER_VIEW) rather than the
+  // moving ball — the 0.4 lerp onto a 17 m/s pitch is what used to drag the batter out of frame.
+  const BATTING_CAM = new Vector3(-1.75, 1.85, -3.4);
+  const PITCHER_VIEW = new Vector3(0, 1.45, 18);
+  function battingCam(ctx: ModeContext, snap: boolean): void {
+    ctx.camDirector.setFixed(BATTING_CAM, 1.25, snap);
+    if (snap) ctx.camera.setTarget(Vector3.Lerp(me.root.position.add(new Vector3(0, 1.25, 0)), PITCHER_VIEW, 0.4));
+  }
+
   function pitch(ctx: ModeContext): void {
     round++;
     swung = false; incoming = true;
@@ -788,7 +803,7 @@ export const DerbyMode: ModeDefinition = (() => {
     // and easing back spent ~2s with the batter off-frame (the residual
     // FEL-FRAME). snap=true is a hard cut to the swing camera's fixed spot;
     // snapTo() can't reproduce it (it computes its own behind-vector).
-    ctx.camDirector.setFixedBehind(me.root.position, Math.PI, 'swing', true);
+    battingCam(ctx, true);
     // EVERY PITCH USED TO ARRIVE AT THE SAME SPOT — same origin, same velocity —
     // so there was nothing to read and nothing for a PCI to cover. Location now
     // varies across the zone, and the pitch is aimed AT that location so the
@@ -929,7 +944,7 @@ export const DerbyMode: ModeDefinition = (() => {
       ball = MeshBuilder.CreateSphere('bball', { diameter: 0.12 }, ctx.scene);
       flight = new Flight(ball, -6);
       ctx.objectiveRef.current = ball.position;
-      ctx.camDirector.setFixedBehind(me.root.position, Math.PI, 'swing');
+      battingCam(ctx, true);
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 5, modeId: 'baseball' });
 
       // THE BODY (2026-09-13). Derby mounted no posture layer at all, so a batter waited on a 14 m/s pitch
@@ -1088,7 +1103,7 @@ export const DerbyMode: ModeDefinition = (() => {
       // the zone; the ball comes to it. After contact the follow cam owns
       // the ball (see the contact branch) and this objective is moot.
       gallery?.update(dt);
-      ctx.camDirector.update(me.root.position, Vector3.Zero(), incoming ? pitchAt : ball.position);
+      ctx.camDirector.update(me.root.position, Vector3.Zero(), flying && !incoming ? ball.position : PITCHER_VIEW);   // a hit ball is followed; a pitch is watched from the plate
     },
 
     dispose() { batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
