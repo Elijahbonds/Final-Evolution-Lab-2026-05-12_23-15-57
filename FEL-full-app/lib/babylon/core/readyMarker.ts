@@ -10,7 +10,9 @@
 // running and accepting input). A smoke test that passes on "loaded" will
 // happily green-light a mode that never starts.
 
-export type ReadyState = 'loading' | 'loaded' | 'playing' | 'failed';
+// 'ended' (FINISH-RELEASE, 2026-09-14): the harness reached its end card. The agent bridge already listed it as a
+// lifecycle state, but nothing published it, so no smoke test could tell "played to the end" from "still playing".
+export type ReadyState = 'loading' | 'loaded' | 'playing' | 'ended' | 'failed';
 
 const NODE_ID = 'fel-ready';
 
@@ -50,7 +52,7 @@ export function setReady(modeId: string, state: ReadyState, error?: string): voi
 
   const perModeId = `${modeId}-ready`;
   const existing = document.getElementById(perModeId);
-  if (state === 'loaded' || state === 'playing') {
+  if (state === 'loaded' || state === 'playing' || state === 'ended') {
     if (!existing) {
       const marker = document.createElement('div');
       marker.id = perModeId;

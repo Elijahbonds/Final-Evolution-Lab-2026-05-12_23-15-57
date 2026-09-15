@@ -23,7 +23,8 @@ import {
   kickImpactFrame, decayImpactFrame, impactGrade, IMPACT_FRAME_IDLE,
   type ImpactFrameState, type Grade,
 } from './ImpactFrame';
-import { SoundKit } from '../audio/SoundKit';   // M43: unlock audio on first user gesture
+import { SoundKit } from '../audio/SoundKit';
+import { QaTrace } from './QaTrace';   // MECHANICS PASS: press → perceivable answer, agent-only   // M43: unlock audio on first user gesture
 import { autoInk } from '../visual/AnimeInk';    // M59: anime ink outlines
 import { mountBackdrop, MOOD_TO_FAMILY } from '../visual/Backdrops'; // M61: painted backdrops
 import type { BackdropFamily } from '../visual/Backdrops';
@@ -31,7 +32,7 @@ import { FrameGuard, assertSpawned } from './FrameGuard';
 import { applyCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
-import { installAgentBridge, agentBridge } from './AgentBridge';  // M69: agent control plane
+import { installAgentBridge, agentBridge, agentEnabled } from './AgentBridge';  // M69: agent control plane
 import { AGENT_MODES } from './agentModes';
 import type { AgentControlSource } from './AgentControlSource';  // M69: per-mode intent play
 import { reportDiag, setDiagMode } from './diag';
@@ -237,11 +238,39 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     if (p === 'loading') setReady(def.modeId, 'loading');
     else if (p === 'ready') setReady(def.modeId, 'loaded');
     else if (p === 'playing') setReady(def.modeId, 'playing');
+    else if (p === 'ended') setReady(def.modeId, 'ended');
     else if (p === 'error') setReady(def.modeId, 'failed', typeof detail === 'string' ? detail : undefined);
     opts.onPhase?.(p, detail);
   };
 
   const juice = new JuiceKit(scene, camera, opts.canvas.parentElement ?? document.body);
+
+  // MECHANICS PASS (2026-09-15): CAUSE → EFFECT, measured. Under `?agent=1` only, every press the mode receives and
+  // every answer a player can perceive (HUD news, a juice beat, an impact, a sound, the hero's clip changing) goes on
+  // one timeline, published as `window.__FEL_QA__` for the mechanics probe. See QaTrace.ts. Off in play: `qa` is null.
+  const qa = agentEnabled() ? new QaTrace() : null;
+  let qaResult: { outcome: string; score: number; card?: boolean } | null = null;
+  let qaRestore: (() => void) | null = null;
+  if (qa) {
+    const j = juice as unknown as Record<string, (...a: unknown[]) => unknown>;
+    for (const m of ['hitStop', 'shake', 'slowMo', 'flash', 'scorePop', 'banner', 'impact']) {
+      const orig = j[m]?.bind(juice);
+      if (orig) j[m] = (...a: unknown[]) => { qa.juice(m); return orig(...a); };
+    }
+    const sk = SoundKit as unknown as { play: (n: string, o?: unknown) => void };
+    const origPlay = sk.play;
+    sk.play = function (this: unknown, n: string, o?: unknown) { qa.sfx(n); return origPlay.call(SoundKit, n, o); };
+    qaRestore = () => { sk.play = origPlay; };
+    (window as unknown as { __FEL_QA__?: unknown }).__FEL_QA__ = {
+      modeId: def.modeId,
+      now: () => performance.now(),
+      summary: (windowMs?: number, from?: number) => qa.summary(windowMs, from),
+      events: (n = 400) => qa.events.slice(-n),
+      hud: () => qa.snapshot(),
+      result: () => qaResult,
+      reset: () => qa.reset(),
+    };
+  }
 
   // M35/M37 shared-core services: floor clamp, screen shake, input buffer.
   const groundLock = new GroundLock(scene);
@@ -265,7 +294,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   let framePainted = false;
   const feel: ModeFeel = {
     shaker, buffer,
-    impact: (s: number) => { feelImpact(shaker, s); frame = kickImpactFrame(frame, s); },
+    impact: (s: number) => { qa?.impact(); feelImpact(shaker, s); frame = kickImpactFrame(frame, s); },
   };
   // MOMENTUM IS HEARD, NOT DISPLAYED. `momentum:` in setHud only draws in hosts that happen to render it,
   // and there are twenty-one separate host components. The crowd bed and the tier sting need no host at
@@ -292,6 +321,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     phase: () => phase,
     end(outcome, score, stats, detail) {
       if (phase === 'ended') return;
+      if (qa) qaResult = { outcome, score };
       setPhase('ended');
       const result: SessionResult = buildResult(def.modeId, outcome, score, stats, startedAt, detail);
       // a run that REACHED ITS END is a completion; the time is whatever it actually took. Both go to the
@@ -303,10 +333,11 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     continuous: opts.continuous === true,
     card(outcome, score, stats, detail) {
       if (phase === 'ended') return;
+      if (qa) qaResult = { outcome, score, card: true };
       const result: SessionResult = buildResult(def.modeId, outcome, score, stats, startedAt, detail);
       void opts.cardSink?.(result);
     },
-    setHud(update) { opts.onHud?.(update); },
+    setHud(update) { qa?.hud(update); opts.onHud?.(update); },
   };
 
   // M37: hero-framing watchdog — recenters the camera if the hero leaves frame.
@@ -416,6 +447,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
 
   input.start();
   const wakeLatch = new WakeLatch();
+  const qaTrig = { L: 0, R: 0 };
   unsub = input.on((e) => {
     // M43: browsers block audio until a user gesture — unlock on the very first
     // input event of the session (safe to call repeatedly; no-ops after unlock).
@@ -441,6 +473,11 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     if (phase === 'playing') {
       if (!wakeLatch.pass(e, performance.now())) return;
       if (e.t === 'button' && e.pressed) buffer.press(e.btn);   // M37 input-buffer
+      if (qa) {
+        if (e.t === 'button' && e.pressed) qa.press(e.btn);
+        else if (e.t === 'dpad' && e.pressed) qa.press(`DPAD_${e.dir.toUpperCase()}`);
+        else if (e.t === 'trigger') { const was = qaTrig[e.side]; qaTrig[e.side] = e.value; if (was < 0.5 && e.value >= 0.5) qa.press(`${e.side}T`); }
+      }
       def.onInput(ctx, e);
     }
   });
@@ -459,11 +496,36 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     emitCreator({ kind: 'session', discipline: def.modeId });
   }
 
+  const qaSteps = qaSpeedParam();
+  // the hero's DOMINANT clip, sampled every 100 ms: a new top clip is a body answering a press
+  let qaAnimAt = 0, qaTop = '', qaRoot: TransformNode | null = null, qaTargets: Set<unknown> | null = null;
+  function qaSampleAnim(): void {
+    const now = performance.now(); if (now - qaAnimAt < 100) return; qaAnimAt = now;
+    const root = heroRef.current; if (!root || !qa) return;
+    if (root !== qaRoot) {
+      qaRoot = root;
+      const under = new Set<unknown>(root.getDescendants(false));
+      const sk = scene.skeletons.find((k) => k.bones.some((b) => under.has(b.getTransformNode())));
+      qaTargets = sk ? new Set<unknown>(sk.bones.map((b) => b.getTransformNode()).filter(Boolean)) : null;
+    }
+    if (!qaTargets) return;
+    let best = '', bw = 0.3;
+    for (const g of scene.animationGroups) {
+      if (!g.isPlaying) continue;
+      const w = g.weight === undefined || g.weight < 0 ? 1 : g.weight;
+      if (w > bw && g.targetedAnimations.some((t) => qaTargets!.has(t.target))) { bw = w; best = g.name; }
+    }
+    if (best && best !== qaTop) { qaTop = best; qa.anim(best); }
+  }
   engine.runRenderLoop(() => {
     const dt = engine.getDeltaTime() / 1000;
     // M37 hit-stop: dt scales to 0 during an impact freeze, then eases back.
     if (phase === 'playing') {
+      if (qa) qaSampleAnim();
       def.update(ctx, dt * timeScale());
+      // RELEASE GAUNTLET fast-forward (?agent=1&qaSpeed=N only): N-1 extra updates a frame, so a QA run reaches the
+      // mode's OWN end card — its clock, its attempts, its ctx.end — in a fraction of the wall time. Never on in play.
+      for (let i = 1; i < qaSteps && phase === 'playing'; i++) def.update(ctx, dt * timeScale());
       // the meter cools on REAL time, so a hit-stop cannot be used to bank momentum
       momentum.update(dt);
       if (!def.ownsCrowd) SoundKit.setAmbientLevel(crowdLevel(momentum.score01));
@@ -492,6 +554,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     input.stop();
     SoundKit.stopAmbient();   // M43: silence the ambient bed on teardown
     juice.dispose();
+    qaRestore?.();
     shaker.dispose();
     groundLock.dispose();
     def.dispose?.();
@@ -515,4 +578,13 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     // the dev handle held the disposed scene (and through it every mesh and texture) until the next mount
     if (devWindow.__FEL_DEV__ === probeHandle) delete devWindow.__FEL_DEV__;
   };
+}
+
+/** `?qaSpeed=N` (1..8), honoured only under the agent bridge (`?agent=1`). 1 = normal play. */
+function qaSpeedParam(): number {
+  if (!agentEnabled()) return 1;
+  try {
+    const n = Number(new URLSearchParams(window.location.search).get('qaSpeed'));
+    return Number.isFinite(n) && n >= 1 ? Math.min(8, Math.floor(n)) : 1;
+  } catch { return 1; }
 }

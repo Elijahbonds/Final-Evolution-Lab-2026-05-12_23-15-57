@@ -2592,10 +2592,15 @@ export const DunkMode: ModeDefinition = (() => {
       // eruption celebrates like one, and one that blew it does not
       rivalClip(rivalBlew ? SPORT_CLIP.dunkFinishBlown : pickLanding(rTotal));   // soft-OPEN #3: the verdict clip plays out, then idle
       ctx.setHud({ rivalScore: rivalTotal }); flash(ctx, rivalBlew ? `RIVAL BLOWS IT — ${rTotal}` : `RIVAL SCORES ${rTotal}`);
-      rival.root.position.set(3.2, 0, CFG.rimZ + 3);
-      rival.root.rotation.y = 0;   // back at the bench spot, facing the court as it spawned
+      // The verdict plays out WHERE HE LANDED. He used to be teleported to the bench spot for this beat — which is
+      // behind the under-basket cut's lens — so the celebration was never seen and FrameGuard logged the rival round
+      // as a lost hero on every dunk (FINISH-RELEASE gauntlet: `hero off-screen 2x (BEHIND camera)` on /play/dunk
+      // and /try). Back to the bench only as the next run-up starts, or as the turn hands back to the player.
+      rival.root.position.y = 0;
       await new Promise((r) => setTimeout(r, 1200));
       if (phase !== 'rivalTurn') return;   // soft-OPEN #3: same — never a second advance from this loop
+      rival.root.position.set(3.2, 0, CFG.rimZ + 3);
+      rival.root.rotation.y = 0;   // back at the bench spot, facing the court as it spawned
     }
     clearBanner(ctx);
     await advanceAfterRivalTurn(ctx);
