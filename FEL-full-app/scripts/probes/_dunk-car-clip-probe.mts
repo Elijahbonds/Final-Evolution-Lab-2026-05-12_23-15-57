@@ -29,6 +29,7 @@ const S: Scenario[] = [
   { name: 'CAR LATE press (clip 1.33)', prop: 'car', slamAt: 1.33 },
   { name: 'PLAIN make (slam at clip 1.22)', prop: 'none', slamAt: 1.22 },
   { name: 'PLAIN EARLY buffered press (clip 0.93)', prop: 'none', slamAt: 0.93 },
+  { name: 'PLAIN TOP-OF-THE-JUMP press (clip 0.80)', prop: 'none', slamAt: 0.80 },   // CLOTHING-SOFT-RESIDUAL R2: "SLAM at the top" was refused TOO EARLY
 ];
 
 const PAD_INIT = `(() => {

@@ -4,13 +4,14 @@ import { DEFAULT_DRIBBLE as P } from './Dribble';
 import { mountBallCarry } from './ballCarry';
 import { attachBallToHand, releaseBall } from './ballRig';
 
-/** A root with a right arm whose bones are linked to TransformNodes, like the glTF hero. */
-function rig(scene: Scene) {
+/** A root with a right arm whose bones are linked to TransformNodes, like the glTF hero (`mirror`: the arm on the other side, as the
+ *  dunk hero's runtime rig is). */
+function rig(scene: Scene, mirror = false) {
   const root = new TransformNode('root', scene);
   root.rotationQuaternion = Quaternion.RotationAxis(Vector3.Up(), Math.PI);   // facing the rim
   const spine = new TransformNode('Spine2', scene); spine.parent = root; spine.position.set(0, 1.35, 0);
-  const shoulder = new TransformNode('RightArm', scene); shoulder.parent = spine; shoulder.position.set(0.18, 0.1, 0);
-  shoulder.rotationQuaternion = Quaternion.RotationAxis(new Vector3(0, 0, 1), -0.2);
+  const shoulder = new TransformNode('RightArm', scene); shoulder.parent = spine; shoulder.position.set(mirror ? -0.18 : 0.18, 0.1, 0);
+  shoulder.rotationQuaternion = Quaternion.RotationAxis(new Vector3(0, 0, 1), mirror ? 0.2 : -0.2);
   const elbow = new TransformNode('RightForeArm', scene); elbow.parent = shoulder; elbow.position.set(0.02, -0.28, 0);
   elbow.rotationQuaternion = Quaternion.RotationAxis(Vector3.Right(), 0.4);
   const hand = new TransformNode('RightHand', scene); hand.parent = elbow; hand.position.set(0, -0.26, 0);
@@ -25,7 +26,7 @@ function rig(scene: Scene) {
   }
   for (const n of [root, spine, shoulder, elbow, hand]) n.computeWorldMatrix(true);
   const ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, scene);
-  return { root, hand, sk, ball };
+  return { root, shoulder, elbow, hand, sk, ball };
 }
 
 describe('ballCarry', () => {
@@ -94,5 +95,27 @@ describe('ballCarry', () => {
     // and the next possession clears the mark
     attachBallToHand(r.ball, r.sk, 'RightHand');
     expect(r.ball.metadata?.felReleased).toBe(false);
+  });
+  it('never whips the arm at the catch (CLOTHING-SOFT-RESIDUAL C4): the elbow cannot jump round the hand line, the palm still meets the ball', () => {
+    for (const mirror of [false, true]) {
+      const scene = new Scene(new NullEngine());
+      const r = rig(scene, mirror);
+      const s0 = r.shoulder.rotationQuaternion!.clone(), e0 = r.elbow.rotationQuaternion!.clone();
+      const params = { ...P, side: (mirror ? -1 : 1) * P.side, hzIdle: 1.8, hzFast: 2.8 };   // the ball on the arm's own side (the dunk runway's)
+      const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, params });
+      let prev: Quaternion | null = null, worst = 0, miss = 0, n = 0;
+      for (let f = 0; f < 150; f++) {
+        r.shoulder.rotationQuaternion = s0.clone(); r.elbow.rotationQuaternion = e0.clone();   // the clip poses the arm every frame
+        for (const nd of [r.root, r.shoulder, r.elbow, r.hand]) nd.computeWorldMatrix(true);
+        carry.update(1 / 60, 0, true); scene.onAfterAnimationsObservable.notifyObservers(scene);
+        const q = r.shoulder.rotationQuaternion!.clone();
+        if (prev) worst = Math.max(worst, 2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(prev, q)))) * 180 / Math.PI);
+        prev = q;
+        if (carry.phase > 0.9 || carry.phase < 0.1) { r.hand.computeWorldMatrix(true); r.ball.computeWorldMatrix(true); miss += Vector3.Distance(r.hand.getAbsolutePosition(), r.ball.getAbsolutePosition().add(new Vector3(0, P.ballR, 0))); n++; }
+      }
+      expect(worst, `mirror ${mirror}`).toBeLessThan(45);     // was 98–124° in one 60 fps frame at the catch
+      expect(miss / n, `mirror ${mirror}`).toBeLessThan(0.06); // the palm on top of the ball as before (4.4–4.6 cm mean)
+      carry.dispose();
+    }
   });
 });

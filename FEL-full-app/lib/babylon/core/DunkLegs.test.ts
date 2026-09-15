@@ -1,7 +1,7 @@
 // DUNK-POSTURE-LEGS (2026-09-08): the feet table, the plant re-timing and the gather / release constants — pure logic the
 // dunk mode writes onto the foot bones and the flight clock.
 import { describe, it, expect } from 'vitest';
-import { LEGS, TRICK_LEGS, legPose, easeLegPose, arcK, carryU, PLANT_SEC, WINDMILL_RELEASE_T, atPalm, GATHER_PHASE } from './DunkLegs';
+import { LEGS, TRICK_LEGS, legPose, easeLegPose, arcK, carryU, arcApexT, slamBufferSec, ARC_TOP_FRAC, PLANT_SEC, WINDMILL_RELEASE_T, atPalm, GATHER_PHASE } from './DunkLegs';
 import { EASTBAY_TIMING as T } from '../anim/authored/timing';
 
 describe('the feet table', () => {
@@ -42,6 +42,37 @@ describe('the plant re-timing', () => {
   it('with no plant the arc is the old one', () => {
     expect(arcK(0.5, 1.5, 0)).toBeCloseTo(1 / 3, 6);
     expect(carryU(0.625, 1.25, 0)).toBeCloseTo(0.5, 6);
+  });
+});
+
+describe('the SLAM buffer reaches the top of the jump (CLOTHING-SOFT-RESIDUAL R2)', () => {
+  // the dunk mode's window: CFG.qteWindowSec 0.28 centred on the extension, the least buffer 0.22
+  const WINDOW = 0.28, MIN = 0.22, openAt = T.extend - WINDOW / 2;
+  const apex = arcApexT(T.duration), top = arcApexT(T.duration, PLANT_SEC, ARC_TOP_FRAC);
+  const held = (press: number, buffer = slamBufferSec(openAt, top, MIN)) => openAt - press <= buffer + 1e-6;
+  it('the apex is where the height 4k(1−k) peaks', () => {
+    expect(arcK(apex, T.duration)).toBeCloseTo(0.5, 9);
+    expect(apex).toBeCloseTo(0.8, 9);
+    const h = (t: number) => { const k = arcK(t, T.duration); return 4 * k * (1 - k); };
+    expect(h(apex)).toBeGreaterThan(h(apex - 0.02)); expect(h(apex)).toBeGreaterThan(h(apex + 0.02));
+    // the TOP starts where the jump first reaches 98 % of its height — about a tenth of a second before the apex
+    expect(h(top)).toBeCloseTo(ARC_TOP_FRAC, 6); expect(top).toBeLessThan(apex); expect(apex - top).toBeCloseTo(0.099, 2);
+  });
+  it('a press at the top of the jump is held for the window (the runway says "SLAM at the top") — it was refused TOO EARLY', () => {
+    expect(openAt - apex).toBeGreaterThan(MIN);                 // the bug: the top sat outside the old 0.22 s buffer
+    expect(held(apex, MIN)).toBe(false);                        // ontime-p2: 233 ms before the window, refused
+    expect(held(openAt - 0.233)).toBe(true);                    // …and now held
+    expect(held(apex)).toBe(true);
+    expect(held(apex + 0.0096)).toBe(true);                    // the live miss: pressed @0.81, refused 316 ms early on the frame after the edge
+    expect(held(top)).toBe(true);
+  });
+  it('a press on the rise is still too early; a short flight keeps the least buffer', () => {
+    expect(held(openAt - 0.583)).toBe(false);                   // ontime-p0: 583 ms early, on the way up
+    expect(held(top - 0.05)).toBe(false);                      // still rising
+    expect(slamBufferSec(top + 0.1, top, MIN)).toBe(MIN);     // a window opening near the top never shrinks the buffer
+    // two style taps halve the window: it opens later, and the buffer still reaches back to the same top
+    const tapped = T.extend - WINDOW * 0.5 / 2;
+    expect(tapped - slamBufferSec(tapped, top, MIN)).toBeCloseTo(top, 9);
   });
 });
 

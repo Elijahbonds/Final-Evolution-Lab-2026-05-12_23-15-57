@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeBodyMask, EDGE_FLARE, edgeFlareWeights, isBodyMesh, maskSlotOf, openEdgePoints, SHOE_RIM_DEPTH, shoeRimPoints, type MaskSurface } from './bodyMask';
+import { computeBodyMask, fitWaistband, WAIST_FIT, EDGE_FLARE, edgeFlareWeights, isBodyMesh, maskSlotOf, openEdgePoints, SHOE_RIM_DEPTH, shoeRimPoints, type MaskSurface } from './bodyMask';
 
 /** An open tube along y: `rings` rings of `seg` vertices from y0 to y1, radius r, outward normals. Optional seam split:
  *  the first column is duplicated (a UV seam), the way the MPFB garments arrive. */
@@ -134,5 +134,56 @@ describe('bodyMask', () => {
     const res = computeBodyMask({ bodyP: P, bodyN: N, bodyInd: [0, 1, 2], slots: [{ slot: 'tops', surfaces: [sleeve], margin: 0.05 }] });
     expect([...res.hidden]).toEqual([1, 1, 0]);
     expect(res.indices).toEqual([0, 1, 2]);
+  });
+});
+
+describe('the waistband under a top (CLOTHING-SOFT-RESIDUAL)', () => {
+  // a torso tube (skin), a short from hips down, a tee from the chest down to a hem
+  const skin = tube(0.14, -0.4, 0.6, 41, 24);
+  const short = (top: number) => { const t = tube(0.143, -0.3, top, 15, 24, true); return { P: t.P, N: t.N, ind: t.ind }; };
+  const tee = (hem: number) => tube(0.146, hem, 0.45, 13, 24, true);
+  const ringTop = (P: ArrayLike<number>, d: Float32Array) => { let hi = -Infinity; for (let v = 0; v < P.length / 3; v++) hi = Math.max(hi, P[v * 3 + 1] + d[v * 3 + 1]); return hi; };
+  const radius = (P: ArrayLike<number>, d: Float32Array, v: number) => Math.hypot(P[v * 3] + d[v * 3], P[v * 3 + 2] + d[v * 3 + 2]);
+
+  it('a tee that ends ABOVE the shorts (the female Lab tee): the waistband rises to lap under the hem, along the skin', () => {
+    const sh = short(0.05), t = tee(0.07);   // a 2 cm midriff gap
+    const r = fitWaistband({ shortsP: sh.P, shortsN: sh.N, shortsInd: sh.ind, top: t, bodyP: skin.P, bodyN: skin.N, bodyInd: skin.ind });
+    expect(r.gapBefore).toBeCloseTo(0.02, 3);
+    expect(r.gapAfter).toBeLessThanOrEqual(-WAIST_FIT.overlap + 1e-3);   // closed, with the overlap under the hem
+    expect(ringTop(sh.P, r.delta)).toBeCloseTo(0.07 + WAIST_FIT.overlap, 3);
+    expect(r.liftedVerts).toBeGreaterThan(0);
+    for (let v = 0; v < sh.P.length / 3; v++) {   // the band carries its skin donor; the legs keep their own weights
+      if (r.blend[v] > 0) { expect(r.donor[v]).toBeGreaterThanOrEqual(0); expect(r.blend[v]).toBeLessThanOrEqual(1); }
+      if (sh.P[v * 3 + 1] < 0.05 - WAIST_FIT.band - 1e-9) expect(r.blend[v]).toBe(0);
+    }
+    expect(Math.max(...r.blend)).toBeCloseTo(1, 6);
+    for (let v = 0; v < sh.P.length / 3; v++) {
+      if (sh.P[v * 3 + 1] < 0.05 - WAIST_FIT.band - 1e-9) expect(Math.hypot(r.delta[v * 3], r.delta[v * 3 + 1], r.delta[v * 3 + 2])).toBeLessThan(1e-6);   // the legs never move
+      expect(radius(sh.P, r.delta, v)).toBeGreaterThan(0.14 - WAIST_FIT.sink - 1e-3);   // never further in than the sink
+      expect(radius(sh.P, r.delta, v)).toBeLessThan(0.143 + 1e-3);                     // never out past where it was
+    }
+  });
+
+  it('a tee that laps over the shorts (the male Lab tee): no lift, and the covered short sinks under the tee, easing from the hem', () => {
+    const sh = short(0.07), t = tee(0.0);
+    const r = fitWaistband({ shortsP: sh.P, shortsN: sh.N, shortsInd: sh.ind, top: t, bodyP: skin.P, bodyN: skin.N, bodyInd: skin.ind });
+    expect(r.gapBefore).toBeLessThan(0); expect(r.maxLift).toBe(0);
+    expect(r.sunkVerts).toBeGreaterThan(0);
+    for (let v = 0; v < sh.P.length / 3; v++) {
+      const y = sh.P[v * 3 + 1], rr = radius(sh.P, r.delta, v);
+      if (y >= WAIST_FIT.ramp + 0.01) expect(rr).toBeCloseTo(0.143 - WAIST_FIT.sink, 3);   // deep under the tee: fully sunk, inside the tee (0.146)
+      if (y < -0.001) expect(rr).toBeCloseTo(0.143, 6);                                  // below the hem: untouched
+    }
+  });
+
+  it('a crop top keeps its midriff past liftMax; no top edge near the waist changes nothing', () => {
+    const sh = short(0.0), crop = tee(0.2);
+    const r = fitWaistband({ shortsP: sh.P, shortsN: sh.N, shortsInd: sh.ind, top: crop, bodyP: skin.P, bodyN: skin.N, bodyInd: skin.ind });
+    expect(r.gapBefore).toBe(0);   // the hem is beyond the waist window: not this short's business
+    expect(r.liftedVerts).toBe(0); expect(r.sunkVerts).toBe(0);
+    const mid = tee(0.09);          // a 9 cm gap: lifted the cap, and no further
+    const r2 = fitWaistband({ shortsP: sh.P, shortsN: sh.N, shortsInd: sh.ind, top: mid, bodyP: skin.P, bodyN: skin.N, bodyInd: skin.ind });
+    expect(r2.maxLift).toBeCloseTo(WAIST_FIT.liftMax, 6);
+    expect(ringTop(sh.P, r2.delta)).toBeCloseTo(WAIST_FIT.liftMax, 3);
   });
 });

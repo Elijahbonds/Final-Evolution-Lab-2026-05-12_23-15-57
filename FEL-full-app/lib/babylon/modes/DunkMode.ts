@@ -42,7 +42,7 @@ import { Matrix, Quaternion } from '@babylonjs/core';
 import { bindFrame, type BindFrame } from '../anim/bindFrame';
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { DEFAULT_DRIBBLE } from '../anim/Dribble';
-import { LEGS, legPose, easeLegPose, cloneLegPose, arcK, carryU, PLANT_SEC, WINDMILL_RELEASE_T, GATHER_LEAD_SEC, FOOT_PITCH_CAP, atPalm, type LegPose } from '../core/DunkLegs';
+import { LEGS, legPose, easeLegPose, cloneLegPose, arcK, carryU, arcApexT, slamBufferSec, ARC_TOP_FRAC, PLANT_SEC, WINDMILL_RELEASE_T, GATHER_LEAD_SEC, FOOT_PITCH_CAP, atPalm, type LegPose } from '../core/DunkLegs';
 import { EASTBAY_TIMING as EB } from '../anim/authored/timing';
 import { EASTBAY_TIMING } from '../anim/authored/timing';
 import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';   // A+ P8 H1: the hang wrist reach
@@ -291,7 +291,8 @@ export const DunkMode: ModeDefinition = (() => {
   // The trick had landed. The slam was never seen. Now: the SLAM CUE opens a buffer's width before the window, a press
   // inside it is HELD and fires on the frame the window opens (scored as the early press it was), and a press that
   // resolves to a trick which cannot fire falls through to that buffer instead of a banner.
-  const SLAM_BUFFER_SEC = 0.22;              // how early a SLAM press still counts (clip seconds)
+  const SLAM_BUFFER_SEC = 0.22;              // how early a SLAM press still counts (clip seconds) — the least; slamBufferSec reaches back to the top of the arc
+  const SLAM_APEX_T = arcApexT(EASTBAY_TIMING.duration, PLANT_SEC, ARC_TOP_FRAC);   // clip 0.70: the top of the jump the runway hint names (98 % of the height; the apex is 0.80)
   let slamBufferAt = -1;                     // clip second of a SLAM press waiting for the window (−1 = none)
   let slamSeen = false;                      // an A press reached the flight at all (the miss banner names WHAT missed)
   let slamCueOn = false;                     // the SLAM read is up: the buffer's edge through the window's close
@@ -993,17 +994,19 @@ export const DunkMode: ModeDefinition = (() => {
         // DUNK-BODY-MID: the SLAM READ and the accepted input are the same thing. The window is ~14 rendered frames wide;
         // the call used to appear on its opening frame, so the honest reaction — press when you see it — arrived after the
         // press that would have worked. The cue lifts a buffer's width early and every press from there is taken.
-        slamCueOn = !lob.live && clipTime >= openAt - SLAM_BUFFER_SEC && clipTime <= closeAt;
+        // CLOTHING-SOFT-RESIDUAL R2: the buffer (and the SLAM! read with it) reaches back to the top of the arc — "SLAM at the top"
+        const holdSec = slamBufferSec(openAt, SLAM_APEX_T, SLAM_BUFFER_SEC);
+        slamCueOn = !lob.live && clipTime >= openAt - holdSec && clipTime <= closeAt;
         if ((slamCueOn || (qteWindowOpen && lob.live)) && !(wasCue || wasOpen)) ctx.setHud({ hint: lob.live ? 'CATCH IT!' : 'SLAM!', slamPulse: true });
         if (!slamCueOn && !qteWindowOpen && (wasCue || wasOpen)) ctx.setHud({ slamPulse: false });
         // a press the buffer was holding fires on the frame the window opens — its execution is scored from where the finger was
-        if (qteWindowOpen && !wasOpen && slamBufferAt >= 0 && !lob.live && clipTime - slamBufferAt <= SLAM_BUFFER_SEC) slamNow(ctx, slamBufferAt);   // resolveDunk moves the phase; the resolve block below picks the jam up on this same frame
+        if (qteWindowOpen && !wasOpen && slamBufferAt >= 0 && !lob.live && openAt - slamBufferAt <= holdSec + 1e-6) slamNow(ctx, slamBufferAt);   // resolveDunk moves the phase; the resolve block below picks the jam up on this same frame. The hold is measured from the window's EDGE, not the frame that crossed it (a press at the top missed by one frame's overshoot, 316 ms against 310)
         // A PRESS TOO EARLY EVEN FOR THE BUFFER USED TO VANISH. The review measured three attempts out of
         // six that scored nothing and explained nothing, and this is the purest case: the finger moved, the
         // buffer could not hold it that long, and the game said nothing at all. It says so now. The press is
         // still let go — this is feedback, not a second chance.
         else if (qteWindowOpen && !wasOpen && slamBufferAt >= 0 && !lob.live) {
-          refuse(ctx, `TOO EARLY — ${Math.round((clipTime - slamBufferAt) * 1000)} ms BEFORE THE WINDOW`);
+          refuse(ctx, `TOO EARLY — ${Math.round((openAt - slamBufferAt) * 1000)} ms BEFORE THE WINDOW`);
           slamBufferAt = -1;
         }
         if (clipTime >= closeAt) { if (lob.live) lostLob(ctx); else resolveDunk(ctx); }   // the hand never met the toss — a miss, the ball bounces away
