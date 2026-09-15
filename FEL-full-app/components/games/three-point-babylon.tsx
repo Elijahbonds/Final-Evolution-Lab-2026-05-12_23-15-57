@@ -174,6 +174,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           onPeers={onPeers}
           onPadInput={onPhonePad}
           collapsed={phase === 'playing'}
+          bus={busRef.current}
         />
       )}
       {busReady && busRef.current && <PadChips bus={busRef.current} className="left-4 top-4" />}

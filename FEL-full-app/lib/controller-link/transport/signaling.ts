@@ -5,12 +5,44 @@ const POLL_MS = 250;
 
 export interface SignalMessage { seq: number; from: string; to: string; data: unknown }
 
+/** Back-off before each retry of a room create (CONTROLLER-USB-QR-HELP) — the same 0.5 / 1 / 2 s Babylon uses for assets. */
+export const CREATE_RETRY_MS = [500, 1000, 2000] as const;
+
+/**
+ * A fetch that survives a blip. A network failure (fetch REJECTS: "Failed to fetch") or a 5xx is retried after each
+ * delay; a 4xx is the server's real answer and comes straight back. The eye's "Controller link unavailable — Failed to
+ * fetch" was one POST made while the server restarted: a single rejected fetch ended the link for the page view.
+ */
+export async function fetchWithRetry(
+  doFetch: () => Promise<Response>,
+  delays: readonly number[] = CREATE_RETRY_MS,
+  wait: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+): Promise<Response> {
+  for (let i = 0; ; i++) {
+    try {
+      const res = await doFetch();
+      if (res.status < 500 || i >= delays.length) return res;
+    } catch (e) {
+      if (i >= delays.length) throw e;
+    }
+    await wait(delays[i]);
+  }
+}
+
+/** Plain words for a room that could not be opened — never a raw "Failed to fetch". */
+export function linkErrorText(e: unknown): string {
+  const msg = String((e as { message?: unknown })?.message ?? e);
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(msg)) return "Can't reach the game server";
+  const status = /createRoom failed: (\d+)/.exec(msg);
+  return status ? `The game server refused the room (${status[1]})` : msg;
+}
+
 export async function createRoom(modeId: string, hostId: string): Promise<string> {
-  const res = await fetch('/api/controller-link/rooms', {
+  const res = await fetchWithRetry(() => fetch('/api/controller-link/rooms', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ modeId, hostId }),
-  });
+  }));
   if (!res.ok) throw new Error(`createRoom failed: ${res.status}`);
   return (await res.json()).code as string;
 }

@@ -18,6 +18,8 @@ import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { HostPresence, presenceSummary, type PresenceReport } from '@/lib/controller-link/presence';
 import { readDisplaySetting, writeDisplaySetting, displayBanner, MIRROR_FACTOR, type DisplaySetting } from '@/lib/controller-link/tvMode';
 import { LinkDebugOverlay } from './link-debug-overlay';
+import { linkErrorText } from '@/lib/controller-link/transport/signaling';
+import { PHONE_STEPS, typeInstead } from '@/lib/controller-link/connectHelp';
 import type { LobbyPeer } from '@/lib/controller-link/types';
 
 export function HostStage({ modeId }: { modeId: string }) {
@@ -30,6 +32,7 @@ export function HostStage({ modeId }: { modeId: string }) {
   const [display, setDisplay] = useState<DisplaySetting>({ mode: 'direct', factor: 1, chosen: false });
   const [showDebug, setShowDebug] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);   // a failed room retries on a tap, not a reload
   const sessionRef = useRef<HostSession | null>(null);
   const presenceRef = useRef(new HostPresence());
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -54,9 +57,9 @@ export function HostStage({ modeId }: { modeId: string }) {
       onLobby: setPeers,
     });
     sessionRef.current = session;
-    session.start().then((c) => { if (!disposed) setCode(c); }).catch((e) => { if (!disposed) setError(String(e?.message ?? e)); });
+    session.start().then((c) => { if (!disposed) setCode(c); }).catch((e) => { if (!disposed) setError(linkErrorText(e)); });
     return () => { disposed = true; session.dispose(); sessionRef.current = null; };
-  }, [started, config]);
+  }, [started, config, attempt]);
 
   useEffect(() => {
     if (!code) return;
@@ -113,10 +116,19 @@ export function HostStage({ modeId }: { modeId: string }) {
         <div style={{ display: 'grid', gap: 18, justifyItems: 'center' }}>
           <div style={{ ...panel, display: 'grid', gap: 12, justifyItems: 'center' }}>
             <h2 style={{ margin: 0, font: '700 20px system-ui', letterSpacing: 1 }}>JOIN ON YOUR PHONE</h2>
-            {qr && <img src={qr} alt="Join code" width={260} height={260} style={{ borderRadius: 10, background: '#fff', padding: 8 }} />}
+            {qr && <img src={qr} data-testid="host-stage-qr" alt={`QR code to join — scan with your phone camera (code ${code})`} width={260} height={260} style={{ borderRadius: 10, background: '#fff', padding: 8 }} />}
             <p style={{ margin: 0, font: '700 34px ui-monospace, monospace', letterSpacing: 8 }}>{code || '······'}</p>
-            <p style={{ margin: 0, color: '#8A94A6', font: '400 13px system-ui' }}>{joinUrl(code || 'XXXXXX')}</p>
-            {error && <p style={{ margin: 0, color: '#ffd75e', font: '400 13px system-ui' }}>{error}</p>}
+            <ol data-testid="qr-connect-help" style={{ margin: 0, padding: '0 0 0 20px', color: '#cfd6e4', font: '400 14px/1.6 system-ui', textAlign: 'left' }}>
+              {PHONE_STEPS.map((s) => <li key={s}>{s}</li>)}
+            </ol>
+            <p style={{ margin: 0, color: '#8A94A6', font: '400 13px system-ui' }}>{code ? typeInstead(joinUrl(code)) : joinUrl('XXXXXX')}</p>
+            {error && (
+              <p style={{ margin: 0, color: '#ffd75e', font: '400 13px system-ui' }}>
+                Phone link offline — {error}.{' '}
+                <button onClick={() => { setError(null); setCode(''); setQr(null); setAttempt((a) => a + 1); }}
+                  style={{ marginLeft: 6, padding: '4px 10px', borderRadius: 8, border: '1px solid #ffd75e88', background: 'transparent', color: '#ffd75e', cursor: 'pointer', font: '700 12px system-ui' }}>RETRY</button>
+              </p>
+            )}
           </div>
 
           <div style={{ ...panel, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>

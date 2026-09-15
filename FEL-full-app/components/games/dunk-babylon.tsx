@@ -364,7 +364,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
       {/* CONTROLLER-UNIVERSAL-MULTI: phones join as pads (lazy — no room until the badge is tapped), TV MODE lives in its
           panel, and every local controller gets a named chip (bottom-left: a connected pad hides the touch deck that lives there). */}
       {controllerConfig && bus && (
-        <HostLobby config={controllerConfig} onInput={onControllerInput} onPadInput={onPhonePad} collapsed={phase === 'playing'} lazy anchor="left-4 top-14" />
+        <HostLobby config={controllerConfig} onInput={onControllerInput} onPadInput={onPhonePad} collapsed={phase === 'playing'} lazy anchor="left-4 top-14" bus={bus} />
       )}
       {bus && <PadChips bus={bus} className="left-4 bottom-4" />}
 
