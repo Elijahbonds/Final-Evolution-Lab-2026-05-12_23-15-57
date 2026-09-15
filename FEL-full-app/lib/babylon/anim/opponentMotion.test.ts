@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { OPPONENT_VARIANTS, variantFor } from './opponentMotion';
+import { OPPONENT_VARIANTS, variantFor, HERO_CAPTURE, CAPTURE_RELEASE_01, releaseFrameOf } from './opponentMotion';
 import { MOCAP_OPPONENT_CLIPS } from './authored/mocapOpponents';
 import { scopeAllows, scopeForMode } from './clipScope';
 
@@ -32,5 +32,17 @@ describe('opponentMotion — an opponent plays the capture that replaces the aut
     expect(scopeAllows(hoops, 'karate_mc_hit_react')).toBe(true);
     expect(scopeAllows(hoops, 'karate_mc_guard_step')).toBe(false);    // not borrowed → its capture is not either
     expect(scopeAllows(board, 'bball_mc_crossover_left')).toBe(false);
+  });
+
+  it('HOOPS MOVEMENT: the hero takes exactly the hoops captures, and a shot paces off the release of the clip that plays', () => {
+    const hero = MOCAP_OPPONENT_CLIPS.filter((c) => HERO_CAPTURE(c.name)).map((c) => c.name);
+    expect(hero.length).toBeGreaterThanOrEqual(18);   // 14 from the opponents' pass + pump fake, step-through, pivot, left layup
+    expect(hero.every((n) => n.startsWith('bball_mc_'))).toBe(true);
+    expect(HERO_CAPTURE('karate_mc_jab')).toBe(false);                   // the fight captures stay the opponents' for now
+    for (const n of Object.keys(CAPTURE_RELEASE_01)) expect(MOCAP_OPPONENT_CLIPS.some((c) => c.name === n), n).toBe(true);
+    const withCapture = { clipNames: new Set(['jumpshot', 'bball_mc_jumpshot']) } as never;
+    const authoredOnly = { clipNames: new Set(['jumpshot']) } as never;
+    expect(releaseFrameOf(withCapture, 'jumpshot', 0.45)).toBe(CAPTURE_RELEASE_01.bball_mc_jumpshot);
+    expect(releaseFrameOf(authoredOnly, 'jumpshot', 0.45)).toBe(0.45);
   });
 });

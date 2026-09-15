@@ -40,17 +40,36 @@ export function variantFor(requested: string, owned: Set<string>): string {
 
 type Tagged = CharacterAnimator & { __opponentMotion?: string[] };
 
+// THE PLAYER MOVES LIKE A CAPTURED PERSON TOO (HOOPS MOVEMENT, owner 2026-09-15: "real basketball like movements and
+// animations happening consistently" · "the arm movement isn't natural"). The hero's hoops clips were three-key authored
+// poses while the rival right beside him ran CMU captures — the two bodies on one court moved like two different games.
+// Owner decisions: one shared hoops motion set, you and the AI, every body, every hoops mode. So the hero installs the
+// same captures, limited to the hoops set (the fight, football and board captures stay the opponents' until their own
+// passes), and every timing the modes read off a clip — its duration, its release frame — follows the clip that PLAYS.
+export const HERO_CAPTURE = (name: string): boolean => name.startsWith('bball_mc_');
+
+/** Where the ball leaves the hand, as a fraction of each shot clip. The authored `jumpshot` releases at 0.45
+ *  (BallHandling.RELEASE_FRAME_01). The CMU 06_15 window (2.20–3.10 s) sets at the chin, dips 2.30–2.55, rises, and
+ *  the shooting hand extends forward 2.80–2.95 (hoops-timeline.mts): the release is 0.68 s in, 0.75 of the clip. */
+export const CAPTURE_RELEASE_01: Readonly<Record<string, number>> = { bball_mc_jumpshot: 0.75 };
+
+/** The release fraction of whatever clip a request for `name` really plays on this animator. */
+export function releaseFrameOf(animator: CharacterAnimator, name: string, fallback: number): number {
+  const played = variantFor(name, animator.clipNames);
+  return CAPTURE_RELEASE_01[played] ?? fallback;
+}
+
 /**
  * Build this scope's captured clips onto an opponent's rig and route its plays through them. Idempotent. Returns the
  * clip names installed. Call AFTER registerAuthoredClips / neverBindPose / installSafePlay so the swap is the outermost
  * wrapper (the name the inner wrappers see is already the captured one).
  */
-export function installOpponentMotion(animator: CharacterAnimator, scene: Scene, skeleton: Skeleton, scope: ClipScope | null = scopeForScene(scene)): string[] {
+export function installOpponentMotion(animator: CharacterAnimator, scene: Scene, skeleton: Skeleton, scope: ClipScope | null = scopeForScene(scene), only: (name: string) => boolean = () => true): string[] {
   const a = animator as Tagged;
   if (a.__opponentMotion) return a.__opponentMotion;
   const installed: string[] = [];
   for (const clip of MOCAP_OPPONENT_CLIPS) {
-    if (!scopeAllows(scope, clip.name)) continue;
+    if (!only(clip.name) || !scopeAllows(scope, clip.name)) continue;
     try {
       const g = buildMocapOpponentClip(scene, skeleton, clip);
       if (g) { animator.register(g); installed.push(clip.name); }
@@ -63,8 +82,11 @@ export function installOpponentMotion(animator: CharacterAnimator, scene: Scene,
   if (!installed.length) return installed;
   const rawPlay = animator.play.bind(animator);
   const rawScale = animator.setPlaybackScale.bind(animator);
+  const rawDur = animator.durationOf.bind(animator);
   animator.play = (name: string, opts: PlayOpts = {}) => rawPlay(variantFor(name, animator.clipNames), opts);
   animator.setPlaybackScale = (name: string, scale: number) => rawScale(variantFor(name, animator.clipNames), scale);
+  // a mode paces a shot off `durationOf('jumpshot')` — it must read the clip that will actually play
+  animator.durationOf = (name: string) => rawDur(variantFor(name, animator.clipNames));
   console.info(`[FEL-ANIM] opponent captures: ${installed.join(', ')}`);
   return installed;
 }

@@ -13,7 +13,7 @@
     0.6,
     0.95
    ],
-   "note": "right-hand dribble, one bounce cycle (hand peaks 6.75 \u2192 7.50)"
+   "note": "right-hand dribble, one bounce cycle (hand peaks 6.75 → 7.50)"
   },
   {
    "name": "bball_mc_crossover_right",
@@ -54,7 +54,7 @@
    "from": 2.2,
    "to": 3.1,
    "duration": 0.9,
-   "note": "set at the chest, dip (2.30\u20132.55), rise, release at the top (2.85\u20132.95)"
+   "note": "set at the chest, dip (2.30–2.55), rise, release at the top (2.85–2.95)"
   },
   {
    "name": "bball_mc_follow_through",
@@ -268,7 +268,7 @@
    "from": 2.4,
    "to": 3.35,
    "duration": 0.7,
-   "note": "basketball lay up: the gather low (2.2\u20132.9) into the rise, both hands carrying the ball up to 1.9 m"
+   "note": "basketball lay up: the gather low (2.2–2.9) into the rise, both hands carrying the ball up to 1.9 m"
   },
   {
    "name": "football_mc_run",
@@ -284,6 +284,47 @@
     0.72
    ],
    "note": "a defender's pursuit stride: CMU 78 RunningNoBall (the same cycle as bball_mc_run, in the football scope)"
+  },
+  {
+   "name": "bball_mc_pump_fake",
+   "replaces": "bball_pump_fake",
+   "source": "cmu",
+   "file": "cmu/78/78_22.bvh",
+   "from": 1.5,
+   "to": 2.85,
+   "duration": 0.7,
+   "note": "FakeShotBreakRight: from triple threat the ball rises to the set point (1.77 m at 2.1) and comes back down to the pocket — the fake, played at 0.7 s (HOOPS MOVEMENT 2026-09-15, hoops-timeline.mts)"
+  },
+  {
+   "name": "bball_mc_step_through",
+   "replaces": "bball_step_through",
+   "source": "cmu",
+   "file": "cmu/78/78_22.bvh",
+   "from": 3.25,
+   "to": 4.15,
+   "duration": 0.5,
+   "note": "FakeShotBreakRight: after the fake, the low load (hips −0.36 at 3.4) and the break past the defender — the step-through — played in 0.5 s, the step-through leg is 0.3 s (HoopsMoves.STEP_THROUGH_SEC_LEG)"
+  },
+  {
+   "name": "bball_mc_pivot",
+   "replaces": "bball_pivot",
+   "source": "cmu",
+   "file": "cmu/78/78_31.bvh",
+   "from": 0.2,
+   "to": 1.3,
+   "duration": 0.55,
+   "note": "Pivoting: the ball held at the chest (1.2–1.35 m), a reverse pivot swinging the hips ~110° on the planted foot — played in 0.55 s (the authored pivot was 0.42)"
+  },
+  {
+   "name": "bball_mc_layup_gather_left",
+   "replaces": "bball_layup_gather_left",
+   "source": "cmu",
+   "file": "cmu/124/124_06.bvh",
+   "from": 2.4,
+   "to": 3.35,
+   "duration": 0.7,
+   "mirror": true,
+   "note": "the layup capture mirrored: the left-hand finish"
   }
  ]
 }

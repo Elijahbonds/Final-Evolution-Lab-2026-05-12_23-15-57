@@ -44,6 +44,7 @@ import { armChain, reachArm, type ArmChain } from '../anim/HandIK';
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, yawOfVel } from '../core/Biomech';
 import { RELEASE_FRAME_01 } from '../core/BallHandling';
+import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -368,7 +369,7 @@ function fire(ctx: ModeContext, power?: number): void {
   // release frame into the authored FOLLOW-THROUGH (update → flight: the ball leaves the hand there) — chained after the
   // clip's END it crossfaded from arms-down into the overhead first key, through a T (8–10 T frames a ball, measured).
   player.animator.play('jumpshot', { speedRatio: SHOT_CLIP_SPEED, onEnd: () => { /* cut at the release; a late end holds */ } });
-  releaseIn = RELEASE_FRAME_01 * (player.animator.durationOf('jumpshot') ?? 0.9) / SHOT_CLIP_SPEED;
+  releaseIn = releaseFrameOf(player.animator, 'jumpshot', RELEASE_FRAME_01) * (player.animator.durationOf('jumpshot') ?? 0.9) / SHOT_CLIP_SPEED;
   pendingMade = made;
   S.phase = 'flight';
 

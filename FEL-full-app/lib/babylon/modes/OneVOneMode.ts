@@ -128,7 +128,8 @@ import {
   STEAL_EXPOSURE_MIN, AttackerBrain, RIVAL_DRIVE_SPEED, rivalShotPct, handUpContest, distXZ, HAND_UP_SEC,
   SHOT_QUALITY_PCT, type ShotQuality, type ShotContext, type PostShot, type ShotStyle,
 } from '../core/BasketballCore';
-import { DribbleStateMachine, syncedShotSpeed } from '../core/BallHandling';
+import { DribbleStateMachine, syncedShotSpeed, RELEASE_FRAME_01 } from '../core/BallHandling';
+import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import {   // HOOPS-MOVE-KIT-A (2026-09-08): the gather, the finish kit, the drive contest
   planGather, gatherWish, gatherLabel, gatherTravel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
@@ -1558,7 +1559,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     meShotWin = 'load'; meShotSec = 0;   // BIOMECH-HOOPS-WAVE1: the shot's posture clock
     const clipSec = me.animator.durationOf('jumpshot') ?? 1.0;
     const greenInRise01 = (shotMeter.greenCenter01 * shotMeter.durationSec - shotMeter.gatherSec) / shotMeter.riseSec;
-    meAnimTree.hold('jumpshot', { speedRatio: syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01), fadeSec: 0.08 });
+    meAnimTree.hold('jumpshot', { speedRatio: syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, releaseFrameOf(me.animator, 'jumpshot', RELEASE_FRAME_01)), fadeSec: 0.08 });
   }
   /** M3: a layup / floater. The ball into the finishing hand (the side the drive comes from, or away from the defender),
    *  the finish clip paced so its release key (the top of the hop) is the green, the body strides the last step and hops. */

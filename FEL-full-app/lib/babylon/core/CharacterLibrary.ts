@@ -24,7 +24,7 @@ import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
 import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL } from './athleteRoster';
 import { urlForHeroBody, KIT_BODY_URL } from './heroBody';
-import { installOpponentMotion } from '../anim/opponentMotion';
+import { installOpponentMotion, HERO_CAPTURE } from '../anim/opponentMotion';
 import { applySkinShading } from './skinShading';
 import { applyKit } from './kit';
 import { attachContactShadow } from '../visual/contactShadow';
@@ -289,6 +289,8 @@ export const CharacterLibrary = {
     // AN OPPONENT MOVES LIKE A CAPTURED PERSON (EVERYONE-BODY-MOCAP-OPPONENTS): the mode's in-scope captures replace the
     // authored clips it asks for. The outermost play wrapper, so modes that re-call neverBindPose/installSafePlay are no-ops.
     if (role === 'opponent') installOpponentMotion(animator, scene, skeleton);
+    // HOOPS MOVEMENT (owner 2026-09-15): the player plays the same hoops captures — one motion set for both bodies on a court
+    else if (!heroCaptureOff()) installOpponentMotion(animator, scene, skeleton, undefined, HERO_CAPTURE);
 
     // M69 (E25 complete): write a measured arms-down pose onto the SKELETON so
     // it is the resting state for EVERY character in EVERY state — not only the
@@ -398,4 +400,9 @@ function applyTint(meshes: AbstractMesh[], hex: string): void {
     else (cloned as StandardMaterial).diffuseColor = tint;
     mesh.material = cloned;
   }
+}
+
+/** `?heroMocap=0` plays the hero's authored hoops clips instead of the captures — the A/B a movement probe measures against. */
+function heroCaptureOff(): boolean {
+  try { return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('heroMocap') === '0'; } catch { return false; }
 }

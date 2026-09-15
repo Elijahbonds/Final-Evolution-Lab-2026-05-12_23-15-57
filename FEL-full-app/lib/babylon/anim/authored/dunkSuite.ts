@@ -24,6 +24,12 @@ export function buildLaunch(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = D.launchSec;
   return buildPoseClip(scene, sk, 'dunk_launch', T, [
     { t: 0, bones: { Hips: [0, 0, 0], Spine: [30, 0, 0],  ...legs(-55, 80, 8) }, hands: { Left: [-0.28, 0.85, -0.30], Right: [0.28, 0.85, -0.30] }, poles: { Left: [-0.6, 0.4, -0.6], Right: [0.6, 0.4, -0.6] }, hipsY: -0.22 },
+    // HOOPS MOVEMENT (2026-09-15): the arms swing UP THE FRONT. Two keys (loaded low-behind → overhead) left the path to the
+    // solver and the crossfade, and the shortest way from a hand behind the hip to one over the head passes out to the SIDE:
+    // _hoops-biomech-probe measured a T — hands 1.25 m apart at shoulder height, elbows 178° — for ~100 ms of every 1v1 drive
+    // dunk launch (the owner: "the arm movement isn't natural"). The mid key carries both hands forward past the chest with
+    // the elbows down and in, the way a jumper actually throws the arms, so there is no side to pass through.
+    { t: T * 0.45, bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], ...legs(-40, 56, 6) }, hands: { Left: [-0.2, 1.3, 0.42], Right: [0.2, 1.3, 0.42] }, poles: { Left: [-0.5, -0.8, 0.2], Right: [0.5, -0.8, 0.2] }, hipsY: -0.08 },
     { t: T, bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], ...legs(-26, 34) },    hands: { Left: [-0.18, 1.98, 0.12], Right: [0.18, 1.98, 0.12] }, poles: UP, hipsY: 0.05 },   // both hands thrown overhead, the knees soft (DUNK-POSTURE-LEGS: straight legs read as a stiff hang)
   ]);
 }

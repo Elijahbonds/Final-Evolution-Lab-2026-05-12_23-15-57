@@ -57,7 +57,8 @@ import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body 
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
 import { flushThroughRim, clankOffRim } from '../anim/ballRig';
-import { syncedShotSpeed } from '../core/BallHandling';
+import { syncedShotSpeed, RELEASE_FRAME_01 } from '../core/BallHandling';
+import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
@@ -1392,7 +1393,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     me.shotWin = 'load'; me.shotSec = 0;
     const clipSec = me.char.animator.durationOf('jumpshot') ?? 1.0;
     const greenInRise01 = (shotMeter.greenCenter01 * shotMeter.durationSec - shotMeter.gatherSec) / shotMeter.riseSec;
-    me.tree.hold('jumpshot', { speedRatio: syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01), fadeSec: 0.08 });
+    me.tree.hold('jumpshot', { speedRatio: syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, releaseFrameOf(me.char.animator, 'jumpshot', RELEASE_FRAME_01)), fadeSec: 0.08 });
   }
   /** M3: a layup / floater — the ball into the finishing hand, the finish clip paced to the green, the stride and the hop. */
   function startFinish(ctx: ModeContext, style: FinishStyle, contest: number, defenderPos: Vector3 | null, sideIn?: 'left' | 'right', preSec = 0): void {

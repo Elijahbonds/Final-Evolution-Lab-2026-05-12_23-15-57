@@ -194,9 +194,9 @@ export const RELEASE_FRAME_01 = 0.45;
  * Solve so they're equal: speedRatio = RELEASE_FRAME_01 * clip / (green * meter).
  */
 export function syncedShotSpeed(
-  clipDurationSec: number, meterDurationSec: number, greenCenter01: number,
+  clipDurationSec: number, meterDurationSec: number, greenCenter01: number, releaseFrame01: number = RELEASE_FRAME_01,
 ): number {
   const target = greenCenter01 * meterDurationSec;
   if (target <= 0 || clipDurationSec <= 0) return 1;
-  return (RELEASE_FRAME_01 * clipDurationSec) / target;
+  return (releaseFrame01 * clipDurationSec) / target;
 }
