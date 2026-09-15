@@ -9,8 +9,13 @@ await ctx.addInitScript({ content: 'window.__name = window.__name || function (f
 await ctx.addInitScript(`(() => { const pad = { id: 'Xbox Wireless Controller (STANDARD GAMEPAD)', index: 0, connected: true, mapping: 'standard', timestamp: 0, axes: [0,0,0,0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })) }; window.__PAD = pad; navigator.getGamepads = () => [pad]; })()`);
 const p = await ctx.newPage();
 const trail: string[] = [];
-p.on('console', (m) => { const t = m.text(); if (/\[DUNK-PHASE\]|FEL-FRAME/.test(t)) trail.push(`${(performance.now() / 1000).toFixed(1)} ${t.slice(0, 260)}`); });
-await p.goto(`${BASE}/dev/mode/dunk?agent=1&qaSpeed=${QA}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
+p.on('console', (m) => { const t = m.text(); if (/\[DUNK-PHASE\]|FEL-FRAME|DUNK-WIN/.test(t)) trail.push(`${(performance.now() / 1000).toFixed(1)} ${t.slice(0, 260)}`); });
+const ROUTE = process.env.ROUTE ?? '/dev/mode/dunk';
+if (!ROUTE.startsWith('/dev')) {   // the shipping route needs a session
+  await p.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 120000 }); await p.waitForTimeout(800);
+  if (/\/login/.test(p.url())) { await p.fill('input[type="email"]', 'playtest@fel.local'); await p.fill('input[type="password"]', 'playtest-local-only'); await p.click('button[type="submit"]'); const t1 = Date.now(); while (Date.now() - t1 < 30000 && /\/login/.test(p.url())) await p.waitForTimeout(300); }
+}
+await p.goto(`${BASE}${ROUTE}?agent=1&qaSpeed=${QA}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
 const t0 = Date.now();
 while (Date.now() - t0 < 240000) { const s = await p.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => ''); if (s === 'loaded') break; await p.waitForTimeout(500); }
 await p.waitForTimeout(1000); await p.keyboard.press('Space');

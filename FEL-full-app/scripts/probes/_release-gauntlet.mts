@@ -90,10 +90,13 @@ const rows: Record<string, unknown>[] = [];
 for (const m of MODES) {
   const p = await ctx.newPage();
   const errors: string[] = [];
+  const t0 = Date.now();
   p.on('console', (msg) => { if (msg.type() === 'error') { const t = msg.text(); if (!/status of 401|favicon|Failed to load resource: the server responded with a status of 404/.test(t)) errors.push(t.slice(0, 220)); } });
   p.on('pageerror', (e) => errors.push('pageerror ' + String(e.message).slice(0, 220)));
+  // TRAIL=<regex>: keep matching console lines (a mode's phase trace) with a timestamp, for a failure's context
+  const trail: string[] = []; const TRAIL = process.env.TRAIL ? new RegExp(process.env.TRAIL) : null;
+  if (TRAIL) p.on('console', (msg) => { const t = msg.text(); if (TRAIL.test(t)) trail.push(`${((Date.now() - t0) / 1000).toFixed(1)} ${t.slice(0, 240)}`); });
   const row: Record<string, unknown> = { slug: m.slug, path: m.path };
-  const t0 = Date.now();
   try {
     await p.goto(`${BASE}${m.path}${m.path.includes('?') ? '&' : '?'}agent=1&qaSpeed=${QA}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     if (m.kind === 'page') {
@@ -157,6 +160,7 @@ for (const m of MODES) {
     }
   } catch (e) { row.pass = false; row.note = 'exception ' + String((e as Error).message).slice(0, 200); }
   row.errors = [...new Set(errors)].slice(0, 6); row.errorCount = errors.length;
+  if (TRAIL) row.trail = trail.slice(-30);
   rows.push(row);
   console.log(JSON.stringify(row));
   await p.close();

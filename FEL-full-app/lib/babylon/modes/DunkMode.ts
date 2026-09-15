@@ -2620,6 +2620,13 @@ export const DunkMode: ModeDefinition = (() => {
   async function advanceAfterRivalTurn(ctx: ModeContext): Promise<void> {
     if (phase !== 'rivalTurn' || ended) return;
     ctx.heroRef.current = player.root;          // the player is the hero again (on the watchdog path too)
+    // …and the CAMERA comes back with him, as a cut. The rival's under-basket shot is a FIXED camera; the next-round path
+    // re-snaps in resetForNextAttempt, but the contest-over path did not, so the night card opened on the rival's rim shot
+    // aimed at a player standing behind its right shoulder — FrameGuard's intermittent "hero off-screen (off RIGHT)" on the
+    // production gauntlet (rc4, rc5: identical camera 2.08, 1.49, -4.77 each time).
+    rivalCamCut = false;
+    ctx.camDirector.mode = 'follow';
+    ctx.camDirector.snapTo(player.root.position, rim);
     rivalClip(SPORT_CLIP.idle, { loop: true });
     if (round < TOTAL_ROUNDS) {
       round++;
