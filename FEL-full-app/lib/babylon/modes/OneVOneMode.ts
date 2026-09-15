@@ -616,6 +616,11 @@ export const OneVOneMode: ModeDefinition = (() => {
         SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
         // BIOMECH-HOOPS-WAVE1 G4: a jump outside the gather is a wasted one — say so (the whiffed reach already does)
         if (attacker.phase !== 'gather') bannerFlash(ctx, 'JUMPED EARLY — WAIT FOR THE GATHER', 600);
+      } else if (e.t === 'button' && e.pressed && e.btn === 'L1') {
+        // PHONE CONTROLS (rc8 check): BOX OUT / the planted foot is a held STANCE, and a tap of it had no answer unless a
+        // rebound happened to be live. The stance going down is heard and named, once per press.
+        SoundKit.play('uiTick', { pitch: 0.75, volume: 0.35 });
+        ctx.juice.callout(possession === 'mine' ? 'FOOT PLANTED' : 'BOXING OUT', '#cbd5e1', 380);
       } else if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'X')) {
         // MECHANICS PASS (2026-09-15): BLOCK and STEAL are defense verbs, and on offense (or mid-jump, or stunned) they did
         // nothing and said nothing — 41 % of deliberate presses on the run-2 probe. Each is answered with why.
