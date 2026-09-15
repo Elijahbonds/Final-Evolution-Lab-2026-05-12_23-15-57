@@ -36,6 +36,7 @@ import { BoardMovement, SNOW_TUNING } from '../core/BoardMovement';
 import { MomentumBus } from '../core/MomentumBus';
 import { assertSpawned } from '../core/FrameGuard';
 import { SoundKit } from '../audio/SoundKit';
+import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
@@ -257,7 +258,11 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         // kickflip on a SNOWBOARD, which is not even a snowboard trick. The held direction now picks which of the
         // twelve snow tricks a button throws, and the air the rider actually has decides what is legal: a cork 720
         // needs over a second of hang and must not be thrown off a roller.
-        if (e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') {
+        if ((e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') && rig.rider.grounded && !rig.rider.grinding) {
+          // MECHANICS PASS (2026-09-15): the air budget floor (0.3 s) let an air trick START on the snow, so mashing B / X / Y
+          // down the run landed a stream of straight airs and grabs (mash 936 vs deliberate 440). Air tricks are thrown in the air.
+          refuse(ctx, 'IN THE AIR');
+        } else if (e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') {
           const held = heldTrickDir(stickX, stickY);
           const air = Math.max(0.3, rig.rider.grounded ? 0 : AIR_BUDGET_SEC);
           const want = trickFor('snow', held, e.btn as BoardTrick['btn']);
