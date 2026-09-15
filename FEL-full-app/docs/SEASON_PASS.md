@@ -80,6 +80,19 @@ withdraws it, a re-purchase restores it. That is why unlocking and collecting
 re-assert ownership on their own path instead of going through the grant log,
 which would hit the existing row and silently deliver nothing.
 
+**Databases that ran the pass before this fix owe their players items.** Those
+cosmetics have grant rows and no ownership, and nothing re-delivers them on its
+own once the tier is collected. Run the one-shot reconciliation, which only ever
+adds a missing row and is safe to re-run:
+
+```
+yarn tsx --require dotenv/config scripts/season-backfill-wearables.ts          # dry run
+yarn tsx --require dotenv/config scripts/season-backfill-wearables.ts --apply
+```
+
+It skips PRO grants whose purchase was refunded (those are withdrawn on
+purpose), ids that do not resolve, and grants left behind by deleted accounts.
+
 **Refunds take the PRO cosmetics back.** Unlocking back-fills every earned tier
 at once, so otherwise a player could buy at tier 40, collect four legendaries,
 refund, and keep the product. FREE-lane items are never withdrawn — those were
