@@ -48,7 +48,7 @@ import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInp
 import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out of it
 import { MomentumBus } from '../core/MomentumBus';
 import { BoardSync } from '../core/BoardPhysics';
-import { GoalTracker, MovingRail, SKATE_GOALS } from '../core/ParkGoals';
+import { GoalTracker, MovingRail, SKATE_GOALS, VENICE_PATROL_RAIL } from '../core/ParkGoals';
 import { Onlookers } from '../visual/Onlookers';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -248,7 +248,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       _validateChar.dispose(); // Clean up validation placeholder
       // carveAccel 0: the momentum model below owns the velocity; the Rider's own 4.95 m/s² forward creep was the only
       // thing that moved a stick-held rider (0.33 m in 4 s on the baseline probe) and it scaled with frame time
-      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -16), 0, world.ground, '#22d3ee', 'skateboard', { carveAccel: 0, grindSpeed: 6.5 });
+      rig = await buildRig(ctx, CFG.heroUrl, VENICE_PATROL_RAIL.spawn.clone(), 0, world.ground, '#22d3ee', 'skateboard', { carveAccel: 0, grindSpeed: 6.5 });
       rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true });
       animTree = new BoardAnimTree(rig.char.animator);
       posture?.dispose();
@@ -266,11 +266,14 @@ export const SkateRunMode: ModeDefinition = (() => {
         const at = new Vector3(la.x, la.y, la.z);
         return { pose: angled, legs, aim: at, eyes: at, window };
       }, 'SKATE-PP');
-      if (process.env.NODE_ENV === 'development') {
+      {
         const dev = (window as unknown as { __FEL_DEV__?: { boardPosture?: unknown; skate?: unknown } }).__FEL_DEV__;
-        if (dev) dev.boardPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), aim: () => { const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5); return la; } };   // BIOMECH-WAVE2 probes
+        if (dev && process.env.NODE_ENV === 'development') dev.boardPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), aim: () => { const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5); return la; } };   // BIOMECH-WAVE2 probes
         // VENICE-SKATE-THPS (2026-09-09): the ride state the probe grades — speed, the push cadence, the air, the rail
-        // latch, the manual channel and the two roll writers. Dev only; nothing here changes what the mode does.
+        // latch, the manual channel and the two roll writers. Nothing here changes what the mode does.
+        // ANIM-SURGICAL (2026-09-14): published on `next start` too, beside the harness's anim() readout. The eye grades
+        // skate H3 on production and its grind hunt pops only when `skate().railD` says a rail is near — dev-only, so on
+        // prod it read null, never popped, and graded "grindHeld 0". Read-only; ModeHarness drops the handle on dispose.
         if (dev) dev.skate = () => ({
           pos: { x: rig.char.root.position.x, y: rig.char.root.position.y, z: rig.char.root.position.z },
           rot: { x: rig.char.root.rotation.x, y: rig.char.root.rotation.y, z: rig.char.root.rotation.z },
@@ -290,11 +293,10 @@ export const SkateRunMode: ModeDefinition = (() => {
       boardSync = new BoardSync(rig.board, rig.char.root);
       mbus.reset();
       goals = new GoalTracker(SKATE_GOALS);
-      // the gimmick: a rail that patrols the plaza — grind it in motion
-      patrolRail = new MovingRail(
-        new Vector3(-2, 0.5, 0), new Vector3(2, 0.5, 0),
-        new Vector3(0, 0, -8), new Vector3(0, 0, 8), 0.18,
-      );
+      // the gimmick: a rail that patrols the plaza — grind it in motion. ANIM-SURGICAL: down the opening line, patrolling
+      // across it (it lay across the line and could not catch a skater riding at it — see VENICE_PATROL_RAIL)
+      const PR = VENICE_PATROL_RAIL;
+      patrolRail = new MovingRail(PR.a.clone(), PR.b.clone(), PR.from.clone(), PR.to.clone(), PR.speed);
       patrolRail.mount(ctx.scene);      // L2: the goal object has to be visible
       // L4: a Venice plaza is not empty. The venue owns where people stand.
       crowd = new Onlookers(ctx.scene, world.crowdSpots);

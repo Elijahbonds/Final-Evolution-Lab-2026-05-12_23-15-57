@@ -65,6 +65,8 @@ const TRUCK_COOLDOWN_SEC = 2.5;
 /** MODE-STICK-FACE: the runner's yaw slews onto his line at this rate (rad/s) — a cut turns the body, not a snap. */
 const TURN_RATE = 10;
 const TRUCK_PTS = 30;
+/** A contact puff leaves the turf at the players' feet, never their torso (ANIM-SURGICAL — the "BODY melt"). */
+const TURF_Y = 0.05;
 const STYLE_CHAIN_PTS = 25;                    // per NEW evade type in a drive
 const DODGES = {
   X: { gesture: 'footballJukeLeft' as const,  dx: -3.2, iframes: 0.45, pts: 15 },
@@ -480,7 +482,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           mob.onContactResolved();
           mob.char.animator.play(SPORT_CLIP.footballTackled, {});
           truckPunch(ctx);   // A+ P0: hit-stop + shake + ONE low thud, once per window (replaces feel.impact + a second impact SFX)
-          EffectsKit.burst(ctx.scene, mob.char.root.position.add(new Vector3(0, 0.8, 0)), 'dust');
+          EffectsKit.burst(ctx.scene, mob.char.root.position.add(new Vector3(0, TURF_Y, 0)), 'dust');   // turf at his feet (ANIM-SURGICAL)
           ctx.setHud({ score, banner: 'TRUCKED!' });
           gallery?.cheer(0.6);
           setTimeout(() => ctx.setHud({ banner: '' }), 600);
@@ -513,7 +515,11 @@ export const FootballRushMode: ModeDefinition = (() => {
           continue;
         }
         tackleWeight(ctx);   // A+ P0: the heavy feel hit + shake + groan (its one thud comes with feel.impact; the extra impact SFX is gone)
-        EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, 0.6, 0)), 'dust');
+        // ANIM-SURGICAL (2026-09-14): the eye's "purple BODY melt" mid-play (TACKLED — DOWN 2) was THIS puff. Fired at 0.6 m it
+        // opened 26 soft grey dots across the runner's chest and hips, alpha-blended over the purple jacket for the whole
+        // 0.7 s they lived — the torso read as melting through them, no mesh or clip involved. A tackle kicks up turf at
+        // the feet: the same puff, from the ground, rises to the knees.
+        EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, TURF_Y, 0)), 'dust');
         downed = true; move = null; cutSec = 0;
         animTree?.clearBeat('tackled');   // a second tackle in a session re-fires the fall from the top
         driveEvades = 0; breakawaySec = 0;

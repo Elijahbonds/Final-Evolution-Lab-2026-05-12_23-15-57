@@ -202,12 +202,16 @@ describe('dance pack', () => {
 });
 
 describe('board suite', () => {
-  it('ride idle: low, feet across the deck, arms out as a counterweight, eyes forward', () => {
+  it('ride idle: low, feet across the deck, arms hanging loose (never the winged T), eyes forward', () => {
     at(fresh(() => buildBoardRideIdle(scene, sk)!), 1.2);
     const lf = pos('LeftFoot'), rf = pos('RightFoot');
     expect(Math.abs(lf.z - rf.z)).toBeGreaterThan(0.25);   // one foot ahead of the other along the board
     expect(hipsY()).toBeLessThan(0.75 * (pos('Head').y - hipsY()) + hipsY() - 0.0);   // sanity: head above hips
-    expect(Math.abs(pos('LeftHand').x - pos('RightHand').x) + Math.abs(pos('LeftHand').z - pos('RightHand').z)).toBeGreaterThan(0.7);
+    // ANIM-SURGICAL (2026-09-14): this held the hands > 0.7 m apart — the "counterweight" that read as the stiff T on the chase
+    // cam (eye skate H1). A cruising rider's arms hang: apart by the hips, below the shoulders, not spread wide.
+    const spread = Math.abs(pos('LeftHand').x - pos('RightHand').x) + Math.abs(pos('LeftHand').z - pos('RightHand').z);
+    expect(spread).toBeGreaterThan(0.3); expect(spread).toBeLessThan(0.7);
+    expect(pos('LeftHand').y).toBeLessThan(pos('LeftArm').y - 0.3); expect(pos('RightHand').y).toBeLessThan(pos('RightArm').y - 0.3);
     expect(Math.abs(pos('Head').x)).toBeLessThan(0.25);
   });
   it('tuck is a HELD fold — lower than the ride idle from its first frame, and its loop wraps seamlessly', () => {

@@ -97,6 +97,15 @@ describe('the authored clips keep their arms inside the bus limits (forge rig)',
     expect(judge(buildBoardRideIdle(scene, sk)!, [0, 0.6, 1.2, 1.8, 2.4], 'ride')).toEqual([]);
     expect(judge(buildBoardPush(scene, sk)!, [0, 0.1, 0.2, 0.3, 0.42], 'ride')).toEqual([]);
   });
+  it('skate: from the chase cam the cruise and the push hang — no wrist winged outboard of its shoulder (ANIM-SURGICAL)', () => {
+    // the chest-frame limits passed while the wrists sat 0.27 m outboard each, 0.80 m apart across a 0.26 m shoulder line:
+    // the chase cam looks down the travel (+z), so the T it sees is WORLD x off the shoulder, with the elbows winged
+    const outboard = (s: 'Left' | 'Right') => (pos(`${s}Hand`).x - pos(`${s}Arm`).x) * (s === 'Left' ? -1 : 1);
+    const idle = buildBoardRideIdle(scene, sk)!;
+    for (const t of [0, 1.2]) { at(idle, t); expect(outboard('Left')).toBeLessThan(0.15); expect(outboard('Right')).toBeLessThan(0.15); expect(elbow('Left')).toBeGreaterThan(130); expect(elbow('Right')).toBeGreaterThan(130); }
+    const push = buildBoardPush(scene, sk)!;
+    for (const t of [0, 0.1, 0.25, 0.35]) { at(push, t); expect(outboard('Left')).toBeLessThan(0.2); expect(outboard('Right')).toBeLessThan(0.2); expect(elbow('Left')).toBeLessThan(160); }
+  });
   it('football: the carry, the hit brace and the TD spike never lock out wide or high (the scan-body melt)', () => {
     expect(judge(buildCarryRun(scene, sk)!, [0, 0.15, 0.3, 0.45, 0.6], 'carry')).toEqual([]);
     expect(judge(buildTackledFall(scene, sk)!, [0, 0.12, 0.25], 'carry')).toEqual([]);   // the hit; the ground phase reaches back for the turf

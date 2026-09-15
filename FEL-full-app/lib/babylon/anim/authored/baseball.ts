@@ -44,6 +44,47 @@ export function buildBatSwing(scene: Scene, sk: Skeleton): AnimationGroup | null
   ]);
 }
 
+// ── THE BAT'S LINE (ANIM-SURGICAL, 2026-09-14) ──────────────────────────────────────────────────────────────────────────
+// The derby bat was a child of the RightHand bone with ONE grip solved from that bone's world rotation after 8 stance
+// frames. Two things broke it, measured on dev :3061 and in the eye's prod frames: the rig root is x-mirrored against the
+// node, so the hand's decomposed world rotation is not the rotation the barrel should be solved in (the bat hung DOWN
+// through the fists on the kit body), and a fixed hand-local grip turns with the right wrist alone — the lead hand was
+// nowhere near the handle on the scan body, and the swing carried the barrel wherever the wrist bone's axes pointed.
+// A two-handed bat is not a hand prop. Its handle runs through BOTH fists and its barrel points where the swing says,
+// so the mode places it every frame from the two hand positions and this track. Root frame, the same axes the hand
+// targets above use: +x the batter's right (the catcher's side), +y up, +z toward the plate.
+export const BAT_SWING_SEC = 0.55;
+/** [t, direction knob→barrel]: loaded up and back over the rear shoulder, laid back as the hips fire, round behind the
+ *  hands, flat through the zone at contact (perpendicular to the pitch, over the plate), wrapped round to the pitcher's
+ *  side and finished behind the back over the lead shoulder. The in-betweens keep neighbouring keys < 120° apart so a
+ *  normalised blend never folds through zero. */
+export const BAT_LINE: ReadonlyArray<readonly [number, V3]> = [
+  [0, [0.38, 0.86, -0.34]],
+  [0.15, [0.80, 0.45, -0.40]],
+  [0.22, [0.70, 0.10, 0.70]],
+  [0.30, [0.0, -0.05, 1.0]],
+  [0.42, [-0.95, 0.10, 0.25]],
+  [0.49, [-0.55, 0.05, -0.83]],
+  [BAT_SWING_SEC, [0.35, -0.15, -0.92]],
+];
+/** Seconds the finished barrel takes to come back up into the load once the swing has settled into the stance. */
+export const BAT_RECOVER_SEC = 0.35;
+
+const nrm = (v: V3): V3 => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+const mix = (a: V3, b: V3, k: number): V3 => nrm([a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]);
+
+/** The barrel's direction (unit, root frame) `sec` seconds after the swing started; null = no swing (the load). Past the
+ *  follow-through the barrel recovers into the load over BAT_RECOVER_SEC. */
+export function batLineAt(sec: number | null): V3 {
+  if (sec == null || sec <= 0) return nrm(BAT_LINE[0][1] as V3);
+  if (sec >= BAT_SWING_SEC) return mix(BAT_LINE[BAT_LINE.length - 1][1] as V3, BAT_LINE[0][1] as V3, Math.min(1, (sec - BAT_SWING_SEC) / BAT_RECOVER_SEC));
+  for (let i = 1; i < BAT_LINE.length; i++) {
+    const [t1, d1] = BAT_LINE[i];
+    if (sec <= t1) { const [t0, d0] = BAT_LINE[i - 1]; return mix(d0 as V3, d1 as V3, (sec - t0) / (t1 - t0)); }
+  }
+  return nrm(BAT_LINE[BAT_LINE.length - 1][1] as V3);
+}
+
 const PITCH_LEGS = {
   set:  { LeftUpLeg: [-10, 0, 6] as Deg3, LeftLeg: [12, 0, 0] as Deg3, RightUpLeg: [-8, 0, -6] as Deg3, RightLeg: [10, 0, 0] as Deg3 },
   lift: { LeftUpLeg: [-80, 0, 8] as Deg3, LeftLeg: [70, 0, 0] as Deg3, RightUpLeg: [-12, 0, -6] as Deg3, RightLeg: [16, 0, 0] as Deg3 },

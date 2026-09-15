@@ -65,6 +65,25 @@ export class GoalTracker {
 // ── The moving rail gimmick ────────────────────────────────────────────────
 /** Patrols between two points; its grind line endpoints follow, so the
  *  shared grind system can lock onto it in motion. */
+/**
+ * Where the Venice plaza's golden patrol rail lives (ANIM-SURGICAL, 2026-09-14 — the eye's skate H3 "grind still
+ * unlocked", GOALS 0/4). It lay along X and patrolled along Z, straight across the line every run starts on: the skater
+ * spawns at (0, 0, −16) rolling +z, so riding AT the goal rail crossed it, and the rail magnet refuses a run that points
+ * across a rail by design (RailMagnet `across`, |cos| < 0.34 — crossing a rail still crosses it). VENICE-SKATE-THPS proved
+ * a lock only from the rail's own axis and wrote down that head-on was a layout change. This is that change, the THPS
+ * one: the goal rail lies DOWN the natural line, between the spawn and the first funbox, and it is the rail that moves —
+ * patrolling across the line, so the skill is still timing the pop onto a moving bar.
+ */
+export const VENICE_PATROL_RAIL = {
+  /** The skater's spawn and its opening run (SkateRunMode.buildRig). */
+  spawn: new Vector3(0, 0, -16), run: new Vector3(0, 0, 1),
+  /** The bar, local: 5 m down +z at 0.5 m. */
+  a: new Vector3(0, 0.5, -2.5), b: new Vector3(0, 0.5, 2.5),
+  /** The patrol, across the line and inside the 2 m magnet at both ends: 6.5 m in front of the spawn (clear of the funbox at z −5.4). */
+  from: new Vector3(-1.6, 0, -9.5), to: new Vector3(1.6, 0, -9.5),
+  speed: 0.18,
+} as const;
+
 export class MovingRail {
   t = 0;
   dir = 1;

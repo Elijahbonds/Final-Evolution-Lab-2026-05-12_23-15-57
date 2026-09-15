@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
 import { qualifyRail, pickRail, nearestOnSegment } from './RailMagnet';
-import { MovingRail } from './ParkGoals';
+import { MovingRail, VENICE_PATROL_RAIL } from './ParkGoals';
 
 const V = (x: number, y: number, z: number) => new Vector3(x, y, z);
 // a 12 m rail down +z at bar height, the shape the Venice plaza actually has
@@ -94,5 +94,29 @@ describe('the patrol rail keeps one identity', () => {
     void r.line;                       // the mode re-reads it every frame
     expect(live.a.z).not.toBeCloseTo(z0, 3);
     expect(live.b.z - live.a.z).toBeCloseTo(0, 5);   // the rail did not stretch
+  });
+});
+
+// ANIM-SURGICAL (2026-09-14): the eye's skate H3 "grind still unlocked, GOALS 0/4". The golden rail lay ACROSS the line
+// every run starts on, so a skater riding at it was refused as `across` whatever the timing.
+describe('the Venice patrol rail lies down the opening line', () => {
+  const PR = VENICE_PATROL_RAIL;
+  const run = PR.run.scale(6);                                   // rolling out of the spawn at 6 m/s
+  it('a pop onto it from the opening run catches, at every point of its patrol', () => {
+    const r = new MovingRail(PR.a.clone(), PR.b.clone(), PR.from.clone(), PR.to.clone(), PR.speed);
+    for (let i = 0; i <= 10; i++) {
+      r.t = i / 10;
+      const l = r.line;
+      // falling onto the middle of the bar from the spawn line (x = 0), wherever the patrol has carried it
+      const feet = new Vector3(PR.spawn.x, 0.6, (l.a.z + l.b.z) / 2);
+      expect(qualifyRail(l.a, l.b, feet, run, WIN)).toMatchObject({ ok: true });
+    }
+  });
+  it('sits in front of the spawn, not under it, and the old across-the-line layout is refused head-on', () => {
+    const r = new MovingRail(PR.a.clone(), PR.b.clone(), PR.from.clone(), PR.to.clone(), PR.speed);
+    expect(nearestOnSegment(r.line.a, r.line.b, PR.spawn).d).toBeGreaterThan(3.5);   // the eye's hunt pops under 3.5 m
+    const old = new MovingRail(V(-2, 0.5, 0), V(2, 0.5, 0), V(0, 0, -8), V(0, 0, 8), 0.18);
+    old.t = 0.5;
+    expect(qualifyRail(old.line.a, old.line.b, V(0, 0.6, 0), run, WIN)).toMatchObject({ ok: false, why: 'across' });
   });
 });

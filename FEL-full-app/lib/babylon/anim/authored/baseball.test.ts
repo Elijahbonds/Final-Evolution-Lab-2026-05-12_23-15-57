@@ -4,7 +4,7 @@ import { FreeCamera, NullEngine, Quaternion, Scene, SceneLoader, Vector3 } from 
 import type { AnimationGroup, Skeleton, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { boneNode } from '../boneLookup';
-import { buildBatStance, buildBatSwing, buildPitchOver, buildPitchSide } from './baseball';
+import { buildBatStance, buildBatSwing, buildPitchOver, buildPitchSide, batLineAt, BAT_LINE, BAT_SWING_SEC, BAT_RECOVER_SEC } from './baseball';
 
 let scene: Scene; let sk: Skeleton;
 const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>();
@@ -51,5 +51,33 @@ describe('baseball packages on the forge rig', () => {
     at(side, 0.42); const lo = pos('RightHand').y;
     expect(lo).toBeLessThan(hi - 0.15);
     expect(lo).toBeGreaterThan(1.2);                          // still an arm-up throw, not a lob
+  });
+});
+
+// ANIM-SURGICAL (2026-09-14): the bat is placed from both fists along this line every frame (it hung down through the
+// hands when it was a RightHand child with a grip solved off a mirrored rig's world rotation).
+describe('the bat line', () => {
+  const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  it('loads up and back, is flat over the plate at contact, and comes back to the load after the finish', () => {
+    const load = batLineAt(null);
+    expect(load[1]).toBeGreaterThan(0.7);                          // barrel up
+    expect(load[2]).toBeLessThan(0);                               // behind the hands, away from the plate
+    const contact = batLineAt(0.30);
+    expect(Math.abs(contact[1])).toBeLessThan(0.1);                // flat through the zone
+    expect(contact[2]).toBeGreaterThan(0.95);                      // out over the plate
+    expect(dot(batLineAt(BAT_SWING_SEC + BAT_RECOVER_SEC), load)).toBeGreaterThan(0.999);
+  });
+  it('never folds: every sample is a unit vector and 10 ms apart never turns more than 25°', () => {
+    let prev = batLineAt(0);
+    for (let t = 0.01; t <= BAT_SWING_SEC + BAT_RECOVER_SEC + 0.05; t += 0.01) {
+      const d = batLineAt(t);
+      expect(Math.hypot(d[0], d[1], d[2])).toBeCloseTo(1, 5);
+      expect(Math.acos(Math.min(1, dot(prev, d))) * 180 / Math.PI).toBeLessThan(25);
+      prev = d;
+    }
+    for (let i = 1; i < BAT_LINE.length; i++) {
+      const a = BAT_LINE[i - 1][1], b = BAT_LINE[i][1];
+      expect(dot(a, b) / (Math.hypot(...a) * Math.hypot(...b))).toBeGreaterThan(Math.cos(120 * Math.PI / 180));
+    }
   });
 });

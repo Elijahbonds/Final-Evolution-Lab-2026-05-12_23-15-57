@@ -23,11 +23,11 @@ import { kickPips, type KickResult } from '../core/penaltyHud';
 import { freshDerby, bankSwing, distanceLine, OUTS_CAP, type DerbyTally } from '../core/derbyHud';
 import { rivalProgress } from '../core/CarnivalNight';
 import { holeName, cardString, windBearingDeg, windWord, holeBoard, ACCURACY_CENTER as GH_ACC_CENTER, ACCURACY_HALF as GH_ACC_HALF, type HoleResult } from '../core/golfHud';
-import { Color3, MeshBuilder, Quaternion, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, Matrix, MeshBuilder, Quaternion, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import { boneNode } from '../anim/boneLookup';
 import { planRivalKick, gradeDive, resolveSave, type DiveSign, type RivalKickPlan } from '../core/KeeperCore';
-import type { AbstractMesh } from '@babylonjs/core';
+import type { AbstractMesh, Mesh, Observer, Scene } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import type { SpawnedCharacter } from '../core/CharacterLibrary';
@@ -39,6 +39,7 @@ import { SPORT_CLIP } from '../anim/clipRegistry';
 import { BeatOwner } from '../anim/beatOwner';
 import { registerMirroredClips } from '../anim/mirrored-clips';
 import { GOLF_CONTACT_SEC } from '../anim/authored/golf';
+import { batLineAt, BAT_SWING_SEC, BAT_RECOVER_SEC } from '../anim/authored/baseball';
 import { SoundKit } from '../audio/SoundKit';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
@@ -736,12 +737,22 @@ export function pitchSpec(round: number): PitchSpec {
   };
 }
 
+/** The derby bat: length, the knob's overhang past the fists, and wrist → fist along the forearm (ANIM-SURGICAL). */
+const BAT_LEN = 0.86, BAT_KNOB_M = 0.08, BAT_PALM_M = 0.07;
+/** Fists closer than this are one grip (the line between them is noise); further apart, they set the handle's line. */
+const BAT_SPLIT_M = 0.05;
+/** At most this share of the barrel's line comes from the fists; the rest is the swing's authored line. */
+const BAT_HANDS_PULL = 0.7;
+
 export const DerbyMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, pitcher: SpawnedCharacter;
   let meAnim: BeatOwner, pitcherAnim: BeatOwner;
   /** The pitch is a beat: the ball leaves the hand on the release key, not at the wind-up. */
   let throwIn = 0; let pendingThrow: (() => void) | null = null;
   let bat: AbstractMesh | null = null;
+  /** ANIM-SURGICAL: seconds since the swing started (null = loaded), and the per-frame bat placement. */
+  let batSwingSec: number | null = null;
+  let batObs: Observer<Scene> | null = null;
   let furniture: AbstractMesh[] = [];
   let ball: AbstractMesh, flight: Flight;
   let round = 0, pts = 0, stickX = 0, stickY = 0;
@@ -840,40 +851,54 @@ export const DerbyMode: ModeDefinition = (() => {
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.7, 0, 0), Math.PI / 2, SPORT_CLIP.derbyStance);
       meAnim = new BeatOwner(me.animator); meAnim.loop(SPORT_CLIP.derbyStance);
       // The bat (Phase 6, 2026-09-03): the stance and swing are real now; the
-      // hands were empty. A hand-parented prop, the way mixed combat's staff is.
+      // hands were empty.
+      // ANIM-SURGICAL (2026-09-14): NOT a hand prop any more. It was a RightHand child with one grip solved after 8 stance
+      // frames from that bone's world rotation — which on the x-mirrored runtime rig is not the rotation to solve in (the
+      // barrel hung DOWN through the fists on the kit body, dev :3061), and a grip fixed to one wrist left the lead hand off
+      // the handle on the scan body and swung the barrel along the wrist bone's own axes (the eye's "bat detach / mis-grip").
+      // A two-handed bat is placed every frame instead: the handle through BOTH fists, the barrel along the swing's authored
+      // line (anim/authored/baseball BAT_LINE) in the batter's root frame. After the clips and the posture layer have run.
       {
-        const hand = boneNode(me.skeleton, 'RightHand');
-        if (hand) {
-          bat = MeshBuilder.CreateCylinder('derby_bat', { height: 0.86, diameterTop: 0.065, diameterBottom: 0.03, tessellation: 12 }, ctx.scene);
+        const lh = boneNode(me.skeleton, 'LeftHand'), rh = boneNode(me.skeleton, 'RightHand');
+        const lf = boneNode(me.skeleton, 'LeftForeArm'), rf = boneNode(me.skeleton, 'RightForeArm');
+        if (lh && rh) {
+          bat = MeshBuilder.CreateCylinder('derby_bat', { height: BAT_LEN, diameterTop: 0.065, diameterBottom: 0.03, tessellation: 12 }, ctx.scene);
           const bm = new StandardMaterial('derby_bat_m', ctx.scene);
           bm.diffuseColor = Color3.FromHexString('#c9a06a'); bm.specularColor = Color3.Black();
-          bat.material = bm; bat.parent = hand;
-          bat.position.set(0, 0.36, 0.02);      // knob in the fist, barrel up along the forearm line
-          bat.rotation.set(0.35, 0, 0);
-          // SHARED-ANIM-BUS (2026-09-14): the grip is CALIBRATED on the live stance, not guessed in the hand bone's axes.
-          // The fixed (0.35, 0, 0) only read as "bat up" while the stance dragged the arms straight back behind the chest;
-          // with the hands brought in front (anim/authored/baseball BAT_LOAD) the same hand-local offset laid the bat flat
-          // behind him. A hand bone's local frame differs per body (scan, forge, roster), so the grip is solved once the
-          // stance has settled: whatever the hand's world rotation is, the barrel rises up and back over the rear shoulder.
+          bat.material = bm;
+          bat.rotationQuaternion = new Quaternion();
           const batRef = bat, meRef = me;
-          let settle = 8;
-          const grip = ctx.scene.onAfterRenderObservable.add(() => {
-            if (--settle > 0) return;
-            ctx.scene.onAfterRenderObservable.remove(grip);
-            if (batRef.isDisposed() || !meRef) return;
-            const hw = hand.computeWorldMatrix(true);
-            const scl = new Vector3(), rot = new Quaternion(), tr = new Vector3();
-            hw.decompose(scl, rot, tr);
-            // root space: +x the batter's right (the catcher's side for a righty), +y up, +z toward the plate
-            const yaw = meRef.root.rotation.y;
-            const want = new Vector3(0.38, 0.86, -0.34).normalize();
-            const dirW = new Vector3(want.x * Math.cos(yaw) + want.z * Math.sin(yaw), want.y, -want.x * Math.sin(yaw) + want.z * Math.cos(yaw));
-            const inv = Quaternion.Inverse(rot);
-            const localDir = dirW.applyRotationQuaternion(inv).normalize();
-            const q = new Quaternion(); Quaternion.FromUnitVectorsToRef(Vector3.Up(), localDir, q);
-            batRef.rotation.setAll(0); batRef.rotationQuaternion = q;
-            // the cylinder is centred on its origin: knob in the fist, the barrel's half-length along the grip line
-            batRef.position.copyFrom(localDir.scale(0.36 / Math.max(1e-4, (scl.x + scl.y + scl.z) / 3)));
+          /** The fist, not the wrist: a hand bone's origin is the wrist, the handle sits a palm further along the forearm line. */
+          const fist = (hand: typeof lh, fore: typeof lf): Vector3 => {
+            hand.computeWorldMatrix(true);
+            const h = hand.getAbsolutePosition().clone();
+            if (!fore) return h;
+            fore.computeWorldMatrix(true);
+            const along = h.subtract(fore.getAbsolutePosition());
+            return along.lengthSquared() > 1e-8 ? h.addInPlace(along.normalize().scaleInPlace(BAT_PALM_M)) : h;
+          };
+          batObs = ctx.scene.onBeforeRenderObservable.add(() => {
+            if (batRef.isDisposed()) return;
+            const fL = fist(lh, lf), fR = fist(rh, rf);
+            const grip = fL.add(fR).scaleInPlace(0.5);
+            const d = batLineAt(batSwingSec);
+            const yaw = meRef.root.rotationQuaternion ? meRef.root.rotationQuaternion.toEulerAngles().y : meRef.root.rotation.y;
+            // root → world: +x right = (cos, 0, -sin), +z forward = (sin, 0, cos) — the axes the hand targets are authored in
+            const dir = new Vector3(d[0] * Math.cos(yaw) + d[2] * Math.sin(yaw), d[1], -d[0] * Math.sin(yaw) + d[2] * Math.cos(yaw));
+            // Hands that come apart through the swing lie ON the handle, so the line between the fists pulls the handle
+            // onto it (signed along the authored line). Measured on the first cut: fists 6 cm off the axis at the swing
+            // median, 29 of 66 swing frames past 8 cm. A full pull fixed the grip but let a stacked pair of fists tip the
+            // barrel into the dirt (14 swing frames below −0.3); at 0.7 the fists stay on the handle (2.9 cm median, none past
+            // 8 cm) and the barrel only dips ≤ 27° at the launch and through the zone, the way a real swing's does.
+            const span = fR.subtract(fL); const sep = span.length();
+            if (sep > BAT_SPLIT_M) {
+              span.scaleInPlace((Vector3.Dot(span, dir) < 0 ? -1 : 1) / sep);
+              const k = BAT_HANDS_PULL * Math.min(1, (sep - BAT_SPLIT_M) / 0.08);
+              dir.scaleInPlace(1 - k).addInPlace(span.scaleInPlace(k)).normalize();
+            }
+            Quaternion.FromUnitVectorsToRef(Vector3.Up(), dir, batRef.rotationQuaternion!);
+            // the cylinder is centred on its origin: the knob just past the fists, the barrel out along the line
+            batRef.position.copyFrom(grip.addInPlace(dir.scaleInPlace(BAT_LEN / 2 - BAT_KNOB_M)));
           });
         }
       }
@@ -881,6 +906,10 @@ export const DerbyMode: ModeDefinition = (() => {
       pitcherAnim = new BeatOwner(pitcher.animator); pitcherAnim.loop(SPORT_CLIP.idle);
       throwIn = 0; pendingThrow = null;
       pci = new Reticle(ctx.scene, new Vector3(0, 1.1, 0.2), { x: ZONE_HALF.x, y: ZONE_HALF.y });
+      // ANIM-SURGICAL: the PCI ring is a torus built flat (XZ) under a billboard, which turns its PLANE edge-on to the camera —
+      // behind the batter it drew as a glowing cyan stick beside the fists, a second 'bat' (the eye's bat-detach frames).
+      // Stood up once in its own vertices, the billboard shows the ring it was meant to be. (Shared Reticle: follow-up.)
+      (pci.mesh as Mesh).bakeTransformIntoVertices(Matrix.RotationX(Math.PI / 2));
       ctx.heroRef.current = me.root;
       ball = MeshBuilder.CreateSphere('bball', { diameter: 0.12 }, ctx.scene);
       flight = new Flight(ball, -6);
@@ -925,6 +954,7 @@ export const DerbyMode: ModeDefinition = (() => {
         swung = true;
         SoundKit.play('whoosh');
         meAnim.beat(SPORT_CLIP.derbySwing, { fadeSec: 0.06 });
+        batSwingSec = 0;   // ANIM-SURGICAL: the bat's line runs on the swing's own clock
         // time against THIS pitch's speed — the window conversion divides by
         // speed, and a hardcoded 14 mistimed every fastball and change-up
         const timing = swingQuality(ball.position.z, 0.3, pitchSpeed, 0.3);
@@ -982,6 +1012,7 @@ export const DerbyMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
+      if (batSwingSec != null) { batSwingSec += dt; if (batSwingSec > BAT_SWING_SEC + BAT_RECOVER_SEC) batSwingSec = null; }
       if (ended) return;
       if (throwIn > 0) {
         // the wind-up: the ball leaves the hand on the release key
@@ -1045,7 +1076,7 @@ export const DerbyMode: ModeDefinition = (() => {
       ctx.camDirector.update(me.root.position, Vector3.Zero(), incoming ? pitchAt : ball.position);
     },
 
-    dispose() { batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 

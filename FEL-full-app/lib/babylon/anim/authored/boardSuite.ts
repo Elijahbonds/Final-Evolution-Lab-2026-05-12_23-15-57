@@ -101,9 +101,13 @@ function rideLegs(depth: number): Bones {
 // Cruising counterweight arms (SHARED-ANIM-BUS, 2026-09-14): LOW and a little out. These were [∓0.40, -0.14, …] — 0.14 m
 // under the shoulder, so both wrists rode at shoulder height (measured live: front hand 0.03 m under its shoulder, back
 // hand 0.33 m out, on 503/503 ride frames) and the rider cruised in the stiff-T the eye flagged. The balance acts
-// (grind, manual) keep their arms out on purpose; the cruise and the push do not. |rel| still ≈ 0.46 (elbows ~117°).
-const CRUISE_L: [number, number, number] = [-0.30, -0.34, 0.14];
-const CRUISE_R: [number, number, number] = [0.30, -0.34, 0.06];
+// (grind, manual) keep their arms out on purpose; the cruise and the push do not.
+// ANIM-SURGICAL (2026-09-14): still a T from the chase cam. [∓0.30, -0.34, …] lowered the wrists but kept each one 0.27 m
+// OUTBOARD of its shoulder, so from behind the hands sat 0.80 m apart across a 0.26 m shoulder line with both elbows
+// winged out (forge rig, world x off the hips; live 1v1 of the eye's mid-push / mid-drive frames). A cruising rider's
+// arms HANG: wrists by the hips, a hand's width off the body, soft elbows. Now 0.37 m apart, elbows 146° / 140°.
+const CRUISE_L: [number, number, number] = [-0.08, -0.50, 0.10];
+const CRUISE_R: [number, number, number] = [0.08, -0.50, 0.02];
 
 /** Knees bent, arms low, spine twisted toward the nose. The base of everything. */
 export function buildBoardRideIdle(scene: Scene, sk: Skeleton): AnimationGroup | null {
@@ -111,7 +115,7 @@ export function buildBoardRideIdle(scene: Scene, sk: Skeleton): AnimationGroup |
   const torso = (x: number): Bones => ({ Spine: [x, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] });
   return buildPoseClip(scene, sk, 'board_ride_idle', T, [
     key(0, { ...rideLegs(0), ...torso(14) }, CRUISE_L, CRUISE_R, -0.26),
-    key(T / 2, { ...rideLegs(6), ...torso(17) }, [-0.29, -0.36, 0.16], [0.29, -0.36, 0.08], -0.29),
+    key(T / 2, { ...rideLegs(6), ...torso(17) }, [-0.07, -0.51, 0.12], [0.07, -0.51, 0.04], -0.29),
     key(T, { ...rideLegs(0), ...torso(14) }, CRUISE_L, CRUISE_R, -0.26),
   ]);
 }
@@ -173,10 +177,12 @@ export function buildBoardPush(scene: Scene, sk: Skeleton): AnimationGroup | nul
       CRUISE_L, CRUISE_R, -0.26),
     // back leg off the deck, straight down to the ground
     key(T * 0.25, { ...front(4), RightUpLeg: [-8, 0, -14], RightLeg: [14, 0, 0], Spine: [20, 0, -3], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
-      [-0.28, -0.36, 0.22], [0.32, -0.30, -0.10], -0.20),
-    // the shove: the foot drives behind, the front arm reaches forward with it (low — a swing, not a wing)
+      [-0.07, -0.49, 0.14], [0.10, -0.48, -0.02], -0.20),
+    // the shove: the foot drives behind, the arms answer it with a small swing (low — a swing, not a wing. ANIM-SURGICAL:
+    // handsRel is measured in the HIPS frame, and the stance has yawed the hips 74°, so its z is SIDEWAYS on the chase
+    // cam — the old 0.28 m 'reach forward' threw the front hand 0.26 m outboard on a locked 166° elbow every push)
     key(T * 0.6, { ...front(6), RightUpLeg: [24, 0, -14], RightLeg: [8, 0, 0], Spine: [22, 0, -4], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
-      [-0.26, -0.36, 0.28], [0.32, -0.28, -0.18], -0.22),
+      [-0.06, -0.48, 0.17], [0.11, -0.47, -0.05], -0.22),
     key(T, { ...front(0), RightUpLeg: [-40, 0, -10], RightLeg: [68, 0, 0], Spine: [14, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
       CRUISE_L, CRUISE_R, -0.26),
   ]);
