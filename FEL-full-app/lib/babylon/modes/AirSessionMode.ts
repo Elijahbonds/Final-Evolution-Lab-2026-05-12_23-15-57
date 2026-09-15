@@ -211,7 +211,8 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         if (grade === 'stuck' || grade === 'clean') { boost.earn('landingClean', grade === 'stuck' ? 1.5 : 1); if (Math.abs(rotations) >= 0.5) boost.earn(Math.abs(rotations) >= 1.5 ? 'trickBig' : 'trickSmall'); }
         if (S.best === null || GRADE_RANK[grade] > GRADE_RANK[S.best]) S.best = grade;
         const turns = Math.abs(rotations);
-        say(`${GRADE_LABEL[grade]}${turns >= 1 ? `  ${turns.toFixed(1)} ROT ${rotations < 0 ? 'BS' : 'FS'}` : ''}`, 1.6);
+        // a landing with no spin scores nothing now (pointsNeedTrick) — so it says so, rather than a CLEAN over a zero
+        say(turns < 0.5 && grade !== 'crash' ? `${GRADE_LABEL[grade]} — NO TRICK, NO POINTS` : `${GRADE_LABEL[grade]}${turns >= 1 ? `  ${turns.toFixed(1)} ROT ${rotations < 0 ? 'BS' : 'FS'}` : ''}`, 1.6);
         gallery?.cheer(grade === 'stuck' ? 1 : grade === 'clean' ? 0.6 : grade === 'sketchy' ? 0.3 : 0.15);
         SoundKit.play(grade === 'crash' ? 'miss' : 'score');
         ctx.juice.scorePop(
@@ -267,6 +268,9 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       if (e.t === 'button' && e.pressed) {
         if (e.btn === 'A' && phase === 'Air') core.trick();
         else if (e.btn === 'B' && phase === 'Air') core.stick();
+        // MECHANICS PASS (2026-09-15): SPIN and STOMP are air verbs, and on the run-up they did nothing and said nothing
+        // (the probe: 67% of deliberate presses silent). A press out of its phase is answered with where it belongs.
+        else if ((e.btn === 'A' || e.btn === 'B') && phase === 'Run') { say(e.btn === 'A' ? 'SPIN IN THE AIR' : 'STOMP THE LANDING', 0.6); SoundKit.play('uiTick', { pitch: 0.7, volume: 0.5 }); }
       }
     },
 

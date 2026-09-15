@@ -242,7 +242,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     if (S.trick && !trickCompletes(S.trick, S.airSec)) landing = 'bail';
     if (S.trick) {
       const pts = trickPoints(S.trick, S.launch, landing);
-      if (pts > 0) { S.combo.add(`${S.trick.name}${S.launch !== 'ground' ? ` OFF ${S.launch.toUpperCase()}` : ''}`, pts, 'air'); flash(ctx, `${S.trick.name} ${landing === 'sketchy' ? '· SKETCHY' : ''} +${pts}`); }
+      if (pts > 0) { const label = `${S.trick.name}${S.launch !== 'ground' ? ` OFF ${S.launch.toUpperCase()}` : ''}`; const rep = S.combo.repeatsOf(label); const paid = S.combo.add(label, pts, 'air'); flash(ctx, `${S.trick.name} ${landing === 'sketchy' ? '· SKETCHY ' : ''}${rep ? `· REPEAT ×${rep + 1} ` : ''}+${paid}`); }
     } else if (landing === 'clean' && drop >= 2.4) { S.combo.add('ROLL', 30, 'revert'); flash(ctx, 'ROLL +30'); }
     // G3/G5: the flip's residual is NOT written to 0 here — it settles upright over the next few frames (see update).
     S.speed = speedAfterLanding(S.speed, landing);
@@ -318,7 +318,7 @@ export const FreeRunMode: ModeDefinition = (() => {
         hero: null, cc: null, state: 'ground', speed: 0, heading: new Vector3(0, 0, 1), stick: new Vector3(),
         airStartY: 0, airSec: 0, launch: 'ground', trick: null, trickSpun: 0,
         wallSec: 0, wallNormal: new Vector3(1, 0, 0), slideSec: 0, downSec: 0, groundSec: 0, rollAt: null, clock: 0,
-        combo: new ComboChain(), started: false, runSec: 0, finished: false,
+        combo: new ComboChain(undefined, 'all'), started: false, runSec: 0, finished: false,
         checkpoint: 0, highTouched: false, bails: 0, barsCleared: new Set(),
         env: { vaultAhead: false, wallAhead: false, ledgeAhead: false, barAhead: false }, vy: 0,
         tree: null, jumpAt: -9, landAt: -9, landing: 'none',

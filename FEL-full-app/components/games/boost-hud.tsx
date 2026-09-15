@@ -11,14 +11,15 @@ export function BoostGauge({ hud, className = '' }: { hud: Record<string, HudVal
   const pct = Math.max(0, Math.min(100, Number(hud.boost)));
   const burning = hud.boosting === true;
   const full = hud.boostFull === true;
+  const denied = hud.boostDenied === true && !burning;
   return (
     <div className={`pointer-events-none flex flex-col items-center gap-1 ${className}`} data-testid="boost-gauge">
       <style>{`@keyframes felBoostFlash { 0%,100% { box-shadow: 0 0 6px #22d3ee88 } 50% { box-shadow: 0 0 26px #22d3ee, 0 0 4px #fff inset } }`}</style>
       <div className="flex items-baseline gap-2">
         <span className={`font-mono text-[11px] font-black tracking-[0.3em] ${burning ? 'text-white' : 'text-[#22d3ee]'}`}>
-          {burning ? 'BOOSTING' : full ? 'BOOST READY' : 'BOOST'}
+          {burning ? 'BOOSTING' : full ? 'BOOST READY' : denied ? 'BOOST EMPTY' : 'BOOST'}
         </span>
-        <span className="font-mono text-[10px] text-white/50">HOLD RB · SHIFT</span>
+        <span className={`font-mono text-[10px] ${denied ? 'text-[#ff6b3d]' : 'text-white/50'}`}>{denied ? 'EARN IT: TRICKS · DRIFTS · PADS' : 'HOLD RB · SHIFT'}</span>
       </div>
       <div className="h-2.5 w-44 overflow-hidden rounded-full border border-[#22d3ee]/60 bg-black/50"
         style={{ animation: full && !burning ? 'felBoostFlash 0.7s ease-in-out infinite' : undefined }}>

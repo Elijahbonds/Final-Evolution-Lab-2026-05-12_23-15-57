@@ -34,6 +34,7 @@ export const BIG_AIR_TUNING: AirSessionTuning = {
   airForwardMin: 6.0, // TUNE(elijah) — you keep flying forward off a big kicker
   airForwardFactor: 0.85, // TUNE(elijah)
   basePoints: 100, // TUNE(elijah)
+  pointsNeedTrick: true, // MECHANICS PASS: a straight air off the kicker scores nothing — throw a spin
   pointsPerRotation: 140, // TUNE(elijah) — big spins score big
   gradePoints: {
     stuck: 2.0, // TUNE(elijah)

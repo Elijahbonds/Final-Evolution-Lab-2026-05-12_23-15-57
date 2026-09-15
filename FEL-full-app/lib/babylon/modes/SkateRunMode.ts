@@ -114,7 +114,7 @@ export const SkateRunMode: ModeDefinition = (() => {
   const air = new AirControl();
   /** Grace window on the ollie: the wheels have left, the press still counts (gameFeel.Coyote). */
   const coyote = new Coyote();
-  const combo = new ComboChain();
+  const combo = new ComboChain(undefined, 'air');   // MECHANICS PASS: the same air again in one combo pays less (THPS repeat decay)
   let mbus = new MomentumBus();
   let animTree: InstanceType<typeof BoardAnimTree>;
   let posture: { layer: PostureLayer; dispose(): void } | null = null;

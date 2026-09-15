@@ -25,6 +25,11 @@ export const JUDGE_WINDOWS: { label: Judgement; maxDelta: number; points: number
 
 /** Beyond this a tap is a miss and a queued step expires. */
 export const MISS_AFTER = 0.20;
+// MECHANICS PASS (2026-09-15): mashing out-scored dancing (the probe: 8 taps a second 1,450 vs one deliberate tap a beat 520),
+// because a tap on no step only reset the combo — every window still caught one of the spam taps. A wild tap now COSTS, and
+// a step caught right after one is capped at GOOD: the grade is for timing, and spam has no timing.
+export const WILD_TAP_COST = 20;
+export const SPAM_LOCK_SEC = 0.25;
 
 export interface DanceStep {
   clipId: string;
@@ -177,6 +182,7 @@ export class DancePerformance {
     this.pending = [];
     this.score = 0; this.combo = 0; this.maxCombo = 0;
     this.counts = { PERFECT: 0, GREAT: 0, GOOD: 0, MISS: 0 };
+    this.lastWildAt = -Infinity;
     this.running = true;
   }
 
@@ -208,9 +214,11 @@ export class DancePerformance {
     }
   }
 
-  private registerMiss(step?: DanceStep, deltaMs?: number): void {
+  private lastWildAt = -Infinity;
+  private registerMiss(step?: DanceStep, deltaMs?: number, now?: number): void {
     this.combo = 0;
     this.counts.MISS++;
+    if (!step) { this.score = Math.max(0, this.score - WILD_TAP_COST); if (now !== undefined) this.lastWildAt = now; }
     this.onJudged?.('MISS', 0, 0, step, deltaMs);
   }
 
@@ -262,7 +270,7 @@ export class DancePerformance {
         const earlyBy = t - now;                        // + = the step is ahead
         if (earlyBy > 0 && earlyBy <= MISS_AFTER) {
           this.nextIdx++;                               // consumed early — never fires
-          const { label, points } = judgeDelta(earlyBy);
+          const { label, points } = this.capAfterSpam(judgeDelta(earlyBy), now);
           this.combo++;
           if (this.combo > this.maxCombo) this.maxCombo = this.combo;
           this.score += points + this.combo * 5;
@@ -272,17 +280,23 @@ export class DancePerformance {
           return label;
         }
       }
-      this.registerMiss(undefined, bestIdx === -1 ? undefined : bestSigned * 1000);
+      this.registerMiss(undefined, bestIdx === -1 ? undefined : bestSigned * 1000, now);
       return 'MISS';
     }
     const [hitStep] = this.pending.splice(bestIdx, 1);
-    const { label, points } = judgeDelta(best);
+    const { label, points } = this.capAfterSpam(judgeDelta(best), now);
     this.combo++;
     if (this.combo > this.maxCombo) this.maxCombo = this.combo;
     this.score += points + this.combo * 5;
     this.counts[label]++;
     this.onJudged?.(label, points, this.combo, hitStep.step, bestSigned * 1000);
     return label;
+  }
+
+  private capAfterSpam(j: { label: Judgement; points: number }, now: number): { label: Judgement; points: number } {
+    if (now - this.lastWildAt > SPAM_LOCK_SEC || j.label === 'GOOD') return j;
+    const good = JUDGE_WINDOWS.find((w) => w.label === 'GOOD');
+    return good ? { label: 'GOOD', points: good.points } : j;
   }
 
   /** Steps that were never presented, e.g. the player quit early. */

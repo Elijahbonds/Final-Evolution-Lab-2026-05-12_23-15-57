@@ -31,6 +31,7 @@ export const BOOST_RAMP_IN = 0.12;      // seconds (time constant) for the kick 
 export const BOOST_RAMP_OUT = 0.35;     // …and to bleed off after release
 export const BOOST_PAD_FILL = 0.35;     // a pad is a third of a meter
 export const BOOST_FULL_EXIT = 0.9;
+export const BOOST_DENIED_HUD_SEC = 0.9;
 
 /** What a mode can pay into the meter for. The amounts live here so every mode pays the same for the same thing. */
 export const BOOST_EARN = {
@@ -45,7 +46,9 @@ export const BOOST_EARN = {
 } as const;
 export type BoostEarn = keyof typeof BOOST_EARN;
 
-export interface BoostEvents { started: boolean; ended: boolean; full: boolean; empty: boolean }
+export interface BoostEvents { started: boolean; ended: boolean; full: boolean; empty: boolean;
+  /** The control went down with too little in the tank to light (MECHANICS PASS: a press is always answered). */
+  denied: boolean }
 
 export class BoostKit {
   meter = 0;
@@ -53,7 +56,10 @@ export class BoostKit {
   /** 0..1 — how much of the boost is being felt right now (speed, lens, trail all follow it). */
   k = 0;
   private fullLatched = false;
-  private events: BoostEvents = { started: false, ended: false, full: false, empty: false };
+  private events: BoostEvents = { started: false, ended: false, full: false, empty: false, denied: false };
+  private prevWant = false;
+  /** Seconds the HUD keeps showing a denied press. */
+  private deniedT = 0;
 
   constructor(start = 0) { this.meter = clamp01(start); }
 
@@ -75,6 +81,11 @@ export class BoostKit {
     const ev = this.events;
     const want = held && allowed;
     if (!this.burning && want && this.meter >= BOOST_MIN_START) { this.burning = true; ev.started = true; }
+    // MECHANICS PASS (2026-09-15): the probe found BOOST silent in the kart — the meter starts empty, so the first press did
+    // nothing and said nothing. A press that cannot light is DENIED: one event on the press, and the HUD says why.
+    else if (want && !this.prevWant && !this.burning) { ev.denied = true; this.deniedT = BOOST_DENIED_HUD_SEC; }
+    this.prevWant = want;
+    this.deniedT = Math.max(0, this.deniedT - Math.max(0, dt));
     if (this.burning) {
       if (!want) { this.burning = false; ev.ended = true; }
       else {
@@ -87,7 +98,7 @@ export class BoostKit {
     const tau = target > this.k ? BOOST_RAMP_IN : BOOST_RAMP_OUT;
     this.k += (target - this.k) * (1 - Math.exp(-Math.max(0, dt) / tau));
     if (Math.abs(target - this.k) < 0.005) this.k = target;   // half a percent of the kick: below anything a lens or a trail shows
-    this.events = { started: false, ended: false, full: false, empty: false };
+    this.events = { started: false, ended: false, full: false, empty: false, denied: false };
     return ev;
   }
 
@@ -95,18 +106,18 @@ export class BoostKit {
   speedMult(top = BOOST_TOP_SPEED): number { return 1 + (top - 1) * this.k; }
   get full(): boolean { return this.fullLatched; }
   /** The HUD's numbers: meter 0..100, and the two flags a host styles on. */
-  hud(): { boost: number; boosting: boolean; boostFull: boolean } {
-    return { boost: Math.round(this.meter * 100), boosting: this.burning, boostFull: this.fullLatched };
+  hud(): { boost: number; boosting: boolean; boostFull: boolean; boostDenied: boolean } {
+    return { boost: Math.round(this.meter * 100), boosting: this.burning, boostFull: this.fullLatched, boostDenied: this.deniedT > 0 };
   }
   private lastHudKey = '';
   /** The HUD fields only when they CHANGED since the last call (a whole-number meter, a flag) — for a mode that would
    *  otherwise push a React re-render every frame just to repeat the same three values. */
-  hudIfChanged(): { boost: number; boosting: boolean; boostFull: boolean } | null {
-    const h = this.hud(), key = `${h.boost}|${h.boosting}|${h.boostFull}`;
+  hudIfChanged(): { boost: number; boosting: boolean; boostFull: boolean; boostDenied: boolean } | null {
+    const h = this.hud(), key = `${h.boost}|${h.boosting}|${h.boostFull}|${h.boostDenied}`;
     if (key === this.lastHudKey) return null;
     this.lastHudKey = key; return h;
   }
-  reset(meter = 0): void { this.meter = clamp01(meter); this.burning = false; this.k = 0; this.fullLatched = this.meter >= 1; }
+  reset(meter = 0): void { this.meter = clamp01(meter); this.burning = false; this.k = 0; this.fullLatched = this.meter >= 1; this.prevWant = false; this.deniedT = 0; }
 }
 
 function clamp01(v: number): number { return v < 0 ? 0 : v > 1 ? 1 : v; }

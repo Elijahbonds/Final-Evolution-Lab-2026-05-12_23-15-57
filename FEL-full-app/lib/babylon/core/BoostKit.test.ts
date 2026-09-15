@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { BoostKit, BOOST_BURN_SEC, BOOST_MIN_START, BOOST_TOP_SPEED, BOOST_EARN, BOOST_PAD_FILL } from './BoostKit';
 
-const run = (b: BoostKit, sec: number, held: boolean, dt = 1 / 60) => { const out = { started: 0, ended: 0, full: 0, empty: 0 }; for (let t = 0; t < sec; t += dt) { const e = b.update(dt, held); for (const k of Object.keys(out) as (keyof typeof out)[]) if (e[k]) out[k]++; } return out; };
+const run = (b: BoostKit, sec: number, held: boolean, dt = 1 / 60) => { const out = { started: 0, ended: 0, full: 0, empty: 0, denied: 0 }; for (let t = 0; t < sec; t += dt) { const e = b.update(dt, held); for (const k of Object.keys(out) as (keyof typeof out)[]) if (e[k]) out[k]++; } return out; };
 
 describe('BoostKit — one boost for every speed mode', () => {
   it('skill and pads fill it; the same event pays the same everywhere; it never overfills', () => {
@@ -57,7 +57,7 @@ describe('BoostKit — one boost for every speed mode', () => {
     b.add(0.1);
     expect(run(b, 0.1, false).full).toBe(1);
     b.add(0.01); expect(run(b, 0.1, false).full).toBe(0);    // topping a full meter does not re-flash
-    expect(b.hud()).toEqual({ boost: 100, boosting: false, boostFull: true });
+    expect(b.hud()).toEqual({ boost: 100, boosting: false, boostFull: true, boostDenied: false });
     run(b, 0.5, true);
     expect(b.hud().boostFull).toBe(false);                   // burned below the exit line
     b.add(1); expect(run(b, 0.05, false).full).toBe(1);      // a second fill flashes again
@@ -65,7 +65,7 @@ describe('BoostKit — one boost for every speed mode', () => {
 
   it('hudIfChanged only reports a change', () => {
     const b = new BoostKit(0.5);
-    expect(b.hudIfChanged()).toEqual({ boost: 50, boosting: false, boostFull: false });
+    expect(b.hudIfChanged()).toEqual({ boost: 50, boosting: false, boostFull: false, boostDenied: false });
     expect(b.hudIfChanged()).toBeNull();
     b.add(0.2); expect(b.hudIfChanged()?.boost).toBe(70);
   });
@@ -74,5 +74,15 @@ describe('BoostKit — one boost for every speed mode', () => {
     const b = new BoostKit(0.6);
     for (let i = 0; i < 30; i++) b.update(1 / 60, true, false);
     expect(b.burning).toBe(false); expect(b.meter).toBeCloseTo(0.6, 5);
+  });
+
+  it('MECHANICS: a press with an empty tank is DENIED once, and the HUD says so for a moment', () => {
+    const b = new BoostKit(0);
+    const e = run(b, 0.5, true);
+    expect(e.denied).toBe(1); expect(e.started).toBe(0);          // one event for the press, not one per held frame
+    expect(b.hud().boostDenied).toBe(true);
+    run(b, 1.0, false);
+    expect(b.hud().boostDenied).toBe(false);
+    b.add(0.5); expect(run(b, 0.2, true).denied).toBe(0);         // with fuel, the press lights instead
   });
 });

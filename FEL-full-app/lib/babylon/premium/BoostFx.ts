@@ -93,6 +93,7 @@ export class BoostFx {
       navigator.vibrate?.(35);
     }
     if (ev.full) { SoundKit.play('powerUp', { volume: 0.7 }); padRumble(0.4, 90); }
+    if (ev.denied) SoundKit.play('uiTick', { pitch: 0.55, volume: 0.6 });   // a dry click: the press was heard, the tank is empty
     if (boost.burning) {
       this.pulseT -= dt;
       if (this.pulseT <= 0) { padRumble(0.25, 60); this.pulseT = 0.25; }

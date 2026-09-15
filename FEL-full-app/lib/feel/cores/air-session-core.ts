@@ -88,6 +88,9 @@ export interface AirSessionTuning {
   airForwardFactor: number;
   /** Scoring. */
   basePoints: number;
+  /** MECHANICS PASS (2026-09-15): no points without a trick. Big Air paid a clean straight air 100 — the idle probe scored
+   *  200 in 15 s with the pad down (the slope carries you off the kicker). Optional so the vault skin keeps its own rule. */
+  pointsNeedTrick?: boolean;
   pointsPerRotation: number;
   gradePoints: GradePoints;
   /** Attempts before the round ends. */
@@ -313,9 +316,10 @@ export class AirSessionCore {
     s.vy = 0;
     const judge = this.airTrick.land();
     s.spinTurns = 0;
-    const pts = Math.round(
+    const tricked = !t.pointsNeedTrick || Math.abs(judge.rotations) >= 0.5;
+    const pts = tricked ? Math.round(
       (t.basePoints + judge.rotations * t.pointsPerRotation) * t.gradePoints[judge.grade],
-    );
+    ) : 0;
     s.score += pts;
     s.lastGrade = judge.grade;
     s.lastRotations = judge.rotations;
