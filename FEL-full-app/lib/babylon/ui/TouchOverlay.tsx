@@ -196,11 +196,18 @@ function Verb({ bus, def, slot }: { bus: InputBus; def: VerbButton; slot: 'A' | 
     if (inert) return;
     safeCapture(e.target as Element, e.pointerId);
     navigator.vibrate?.(10);
-    if (def.hold) {
+    // PHONE CONTROLS (FINISH-RELEASE, 2026-09-15): a HOLD verb used to stream the RIGHT trigger whatever it was bound to — so
+    // the kart's BRAKE (LT) and DRIFT (the X button, held) both drove the throttle on a phone, and aero's rudder did too.
+    // A held TRIGGER verb streams ITS trigger; a held BUTTON verb is simply pressed down and released.
+    if (def.hold && def.emit!.t === 'button') {
+      bus.emit(def.emit!);
+      setHoldV(1);
+    } else if (def.hold) {
+      const side = def.emit!.t === 'trigger' ? def.emit!.side : 'R';
       downAt.current = performance.now();
       const stream = () => {
         const v = Math.min(1, (performance.now() - downAt.current) / 1100);
-        bus.emit({ t: 'trigger', side: 'R', value: Math.max(0.01, v) });
+        bus.emit({ t: 'trigger', side, value: Math.max(0.01, v) });
         setHoldV(v);
         holdRaf.current = requestAnimationFrame(stream);
       };
@@ -212,10 +219,13 @@ function Verb({ bus, def, slot }: { bus: InputBus; def: VerbButton; slot: 'A' | 
 
   const release = () => {
     if (inert) return;
-    if (def.hold) {
+    if (def.hold && def.emit!.t === 'button') {
+      setHoldV(0);
+      bus.emit({ ...def.emit!, pressed: false });
+    } else if (def.hold) {
       cancelAnimationFrame(holdRaf.current);
       setHoldV(0);
-      bus.emit({ t: 'trigger', side: 'R', value: 0 });   // release = launch
+      bus.emit({ t: 'trigger', side: def.emit!.t === 'trigger' ? def.emit!.side : 'R', value: 0 });   // release = launch
     } else if (def.emit!.t === 'button' || def.emit!.t === 'dpad') {
       bus.emit({ ...def.emit!, pressed: false });
     }
