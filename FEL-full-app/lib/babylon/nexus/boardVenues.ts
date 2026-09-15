@@ -179,24 +179,26 @@ export const SNOW_VENUES: readonly BoardVenue[] = [
 ];
 
 // ── SURF ─────────────────────────────────────────────────────────────────────────────────────────────────
+// SURF OCEAN (owner 2026-09-15, "expand the map"): each break is ~40 % wider to ride (70/78/64 → 100/110/92 half-width) — the wave
+// ribbon, the collider and the clamp all read `bound`, and the living sea runs to the horizon around it (visual/OceanSurface).
 export const SURF_VENUES: readonly BoardVenue[] = [
   {
     id: 'the-break', name: 'THE BREAK', sub: 'Green water, a pier down the line, afternoon glass.',
-    discipline: 'surf', bound: 70, mood: 'daylight', sky: 'ocean', crowd: 6, ready: true,
+    discipline: 'surf', bound: 100, mood: 'daylight', sky: 'ocean', crowd: 6, ready: true,
     palette: { ground: '#2f8f8a', line: '#bfeee9', structure: '#1f6f6b', accent: '#ffd75e', edge: '#134f4c', backdrop: '#8fd6cf' },
     // the reference wave: afternoon glass, honest and mid-sized
     ride: { },
   },
   {
     id: 'sunset-point', name: 'SUNSET POINT', sub: 'Gold on the face, long walls, nobody out.',
-    discipline: 'surf', bound: 78, mood: 'goldenHour', sky: 'ocean', crowd: 3, ready: true,
+    discipline: 'surf', bound: 110, mood: 'goldenHour', sky: 'ocean', crowd: 3, ready: true,
     palette: { ground: '#2b6f86', line: '#ffd9a8', structure: '#1d5468', accent: '#ff8a3d', edge: '#123a48', backdrop: '#f0a675' },
     // "long walls": a slower, longer wave — more room to work, less punch
     ride: { waveHeight: 0.88, wavePeriod: 0.85, speed: 0.95, carve: 1.08, hazard: 0.8 },
   },
   {
     id: 'reef', name: 'THE REEF', sub: 'Dark water over coral. It breaks hard and it breaks shallow.',
-    discipline: 'surf', bound: 64, mood: 'overcast', sky: 'ocean', crowd: 2, ready: true,
+    discipline: 'surf', bound: 92, mood: 'overcast', sky: 'ocean', crowd: 2, ready: true,
     palette: { ground: '#1f5d70', line: '#9fd6e8', structure: '#164654', accent: '#b07cf5', edge: '#0d2f39', backdrop: '#6f9db0' },
     // "it breaks hard and it breaks shallow" — the biggest, fastest wave and the worst place to fall
     ride: { waveHeight: 1.35, wavePeriod: 1.25, speed: 1.15, grip: 0.9, carve: 0.94, hazard: 1.6 },

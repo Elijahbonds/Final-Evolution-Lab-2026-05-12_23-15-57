@@ -17,7 +17,8 @@
 
 import { VenueKit } from '../visual/VenueKit';
 import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, TransformNode, Vector3, Matrix, Material } from '@babylonjs/core';
-import type { AbstractMesh, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Camera, Scene } from '@babylonjs/core';
+import { mountOcean, oceanShade } from '../visual/OceanSurface';   // SURF OCEAN: the living sea
 import type { GrindLine } from '../core/GroundRide';
 import { SKATE_VENUES, SNOW_VENUES, SURF_VENUES, rideOf, type BoardVenue } from '../nexus/boardVenues';
 import { applyFloorDetailToMesh } from '../visual/groundTextures';
@@ -673,6 +674,10 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   barrelActive(tSec: number): boolean;
   /** Face height at world (x, z) for the wave at `tSec` — the mode pitches the board with it. */
   faceHeightAt(x: number, z: number, tSec: number): number;
+  /** SURF OCEAN: advance the sea and follow the camera, every frame. */
+  updateSea(dt: number, camera: Camera): void;
+  /** The swell's height at a world point (for spray and anything that floats). */
+  seaHeightAt(x: number, z: number): number;
 } {
   const all: AbstractMesh[] = [];
   const P = venue.palette;
@@ -697,25 +702,10 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   water.position.z = (WATER_BACK + WATER_FRONT) / 2;
   water.checkCollisions = true;
   water.isPickable = true;
-  water.material = paintGround(scene, WATER_W, WATER_L, (g, W, H) => {
-    // Depth gradient: the venue's structure colour is the deep water out the back, its ground colour the water you
-    // ride, lifted toward its own foam at the shore. Three breaks, three seas — the reef's dark coral water and the
-    // break's green glass are this one gradient with a different family.
-    const grad = g.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, mixHex(P.structure, '#000000', 0.25));
-    grad.addColorStop(0.5, P.structure);
-    grad.addColorStop(1, P.ground);
-    g.fillStyle = grad; g.fillRect(0, 0, W, H);
-    g.strokeStyle = 'rgba(255,255,255,0.12)'; g.lineWidth = 3;
-    for (let i = 0; i < 60; i++) {
-      g.beginPath(); g.moveTo(Math.random() * W, Math.random() * H);
-      g.bezierCurveTo(Math.random() * W, Math.random() * H, Math.random() * W, Math.random() * H, Math.random() * W, Math.random() * H);
-      g.stroke();
-    }
-    // swell lines toward the horizon
-    g.strokeStyle = 'rgba(255,255,255,0.07)'; g.lineWidth = 6;
-    for (let i = 0; i < 14; i++) { const y = (i / 14) * H * 0.45; g.beginPath(); g.moveTo(0, y); for (let x = 0; x <= W; x += 24) g.lineTo(x, y + Math.sin(x * 0.03 + i) * 5); g.stroke(); }
-  });
+  // SURF OCEAN (2026-09-15): this ground is the rider's COLLIDER now, and draws nothing — the living sea is visual/OceanSurface
+  // (a PBR plugin: Gerstner swell, chop, crest foam, a horizon fade), mounted below. The painted 1024² canvas it replaces is
+  // kept out of the build entirely: `visibility 0` keeps the mesh pickable and colliding without a texture to rasterise.
+  water.visibility = 0;
   all.push(water);
 
   // THE WAVE — one transform the whole set rides on; waveLipAt() moves it down the lap
@@ -750,7 +740,7 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   face.isPickable = true;
   face.checkCollisions = true;
   strip('waveFoam', [0.9, 0.4, 0, -0.4, -0.9], mixHex(P.line, '#ffffff', 0.55), 1, 0.05, 0.9);
-  strip('waveWhitewater', [-0.9, -1.6, -2.4, -3.4], P.line, 0.8, 0.03, 0.9);
+  const whitewater = strip('waveWhitewater', [-0.9, -1.6, -2.4, -3.4], P.line, 0.5, 0.03, 0.9);   // SURF OCEAN: translucent, over the new sea
   strip('wavePocket', [pocket.max, (pocket.min + pocket.max) / 2, pocket.min], P.accent, 0.35, 0.03, 0.9);
   // the lip line — a foam roll along the crest; the barrel hood hangs off it (as before) so the two breathe together
   const lip = MeshBuilder.CreateCylinder('waveLip', { diameter: 0.7, height: (HALF + 12) * 2, tessellation: 10 }, scene);
@@ -787,15 +777,7 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   tube.isPickable = false;
   all.push(tube);
 
-  // distant swell lines purely for depth/scale cues
-  for (const [z, d] of [[-72, 1.4], [-112, 1.0], [-150, 0.8]] as const) {
-    const farSwell = MeshBuilder.CreateCylinder(`farSwell_${z}`, { diameter: d, height: WATER_W, tessellation: 8 }, scene);
-    farSwell.rotation.z = Math.PI / 2;
-    farSwell.position.set(0, d * 0.3, z);
-    const farM = mat(scene, `farSwellM_${z}`, '#e8f6ff'); farM.alpha = 0.45;
-    farSwell.material = farM; farSwell.isPickable = false;
-    all.push(farSwell);
-  }
+  // (the distant swell BARS — three pale cylinders out the back — are gone: the sea's own Gerstner swell reads as the sets now)
 
   // THE SHORE — past the lap's furthest reach (lip 90 + face 9 + the flat clamp), so the wave runs AT the beach and never
   // aground. It is the LAST ground down the line: nothing is drawn beyond it, and the painted backdrop takes over there.
@@ -902,10 +884,43 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     all.push(piling);
   }
 
+  // THE SEA — everything around the wave, to the horizon (visual/OceanSurface). The face strip borrows its shading.
+  const oceanOpts = {
+    deep: mixHex(P.ground, P.structure, 0.55), foam: mixHex(P.line, '#ffffff', 0.6), horizon: mixHex(P.backdrop, '#dfe9ee', 0.35),
+    shoreZ: SHORE_Z - SHORE_DEPTH / 2 + SHORE_OVERLAP, swell: (venue.ride?.waveHeight ?? 1),
+  };
+  const ocean = mountOcean(scene, oceanOpts);
+  all.push(ocean.near, ocean.far);
+  // the face is the same water as the sea: its deep colour (it was a pale mint slab against the new sea), the chop in its
+  // reflections, a glassier finish; the whitewater down the back borrows the chop too so it reads as moving foam
+  const faceM = face.material as PBRMaterial;
+  faceM.albedoColor = Color3.FromHexString(mixHex(oceanOpts.deep, P.line, 0.12));
+  faceM.emissiveColor = faceM.albedoColor.scale(0.07);
+  faceM.roughness = 0.16; faceM.environmentIntensity = 0.45; faceM.directIntensity = 0.7;   // grazing sky reflection had washed it pale
+  const faceShade = oceanShade(faceM, oceanOpts);
+  const foamShade = oceanShade(whitewater.material as PBRMaterial, oceanOpts);
+  // THE BARREL IS WATER. The hood was a pale 35 %-alpha cylinder: from inside the tube (where the camera is while you are
+  // barreled) it filled the frame as a white pipe over the rider. It is the sea's own colour now — glassy, translucent,
+  // lit through, with the chop — and the lip roll above it is lighter foam rather than a solid white bar.
+  tubeM.albedoColor = Color3.FromHexString(mixHex(oceanOpts.deep, P.line, 0.3));
+  tubeM.emissiveColor = tubeM.albedoColor.scale(0.25);
+  tubeM.roughness = 0.12; tubeM.environmentIntensity = 0.9;
+  const tubeShade = oceanShade(tubeM, oceanOpts);
+  lipM.alpha = 0.62; lipM.roughness = 1;
   const world: RideWorld = {
     ground: [face, water], grindLines: [], markers: [], obstacles, crowdSpots, bound: HALF,
-    dispose: () => { all.forEach((m) => m.dispose()); waveRoot.dispose(); },
+    dispose: () => { all.forEach((m) => m.dispose()); waveRoot.dispose(); ocean.dispose(); },
   };
+  let oceanT = 0;
+  /** Every frame: the swell moves and follows the camera; the face's chop stays in step with it. */
+  // the pocket band is a hint drawn ON the water, not a sheet over it (35 % alpha washed the whole face out, measured by multiPick)
+  (scene.getMaterialByName('wavePocketM') as PBRMaterial | null)?.alpha !== undefined && ((scene.getMaterialByName('wavePocketM') as PBRMaterial).alpha = 0.16);
+  const updateSea = (dt: number, camera: Camera): void => {
+    // the lip roll fades as the lens comes up to it: barreled, the camera sits ~1.8 m from the crest and the roll filled the
+    // frame as a white bar over the rider (multiPick: waveLip d1.8). Distance to the crest LINE (it runs along x).
+    const dLip = Math.hypot(camera.position.y - lip.position.y, camera.position.z - (waveRoot.position.z + lip.position.z));
+    lipM.alpha = 0.62 * Math.max(0, Math.min(1, (dLip - 2) / 5));
+    ocean.update(dt, camera); oceanT += Math.max(0, Math.min(0.1, dt)); faceShade.setTime(oceanT); foamShade.setTime(oceanT); tubeShade.setTime(oceanT); };
   const BARREL_ON = 8, BARREL_CYCLE = 18;
   const barrelActive = (tSec: number): boolean => (tSec % BARREL_CYCLE) < BARREL_ON;
   const lipWorld = new Vector3(0, vH * 0.78, -50);
@@ -922,10 +937,10 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     lip.position.y = vH * 0.78 + Math.sin(tSec * 2.2) * 0.08;
     // the funnel breathes with the barrel cycle
     const active = barrelActive(tSec);
-    tubeM.alpha += ((active ? 0.35 : 0.05) - tubeM.alpha) * 0.06;
+    tubeM.alpha += ((active ? 0.3 : 0.04) - tubeM.alpha) * 0.06;
     lipWorld.set(0, lip.position.y, z);
     return lipWorld;
   };
   const faceHeightAt = (x: number, z: number, tSec: number): number => waveProfile(z - waveRoot.position.z, crestHeightAt(x, tSec));
-  return { world, waveLipAt, barrelActive, faceHeightAt };
+  return { world, waveLipAt, barrelActive, faceHeightAt, updateSea, seaHeightAt: ocean.heightAt };
 }

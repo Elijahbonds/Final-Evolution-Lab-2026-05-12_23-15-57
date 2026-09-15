@@ -35,6 +35,7 @@ import { RIDE_CONFIG as CFG } from './modeConfigs';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 import { refuse } from '../core/Refusal';            // MECHANICS PASS: a press that cannot act is answered
 import { REPEAT_DECAY } from '../core/ComboChain';   // the same THPS repeat decay the skate and free-run chains use
+import { SurfSpray } from '../premium/SurfSpray';   // SURF OCEAN: crest mist, rail spray, splashes
 
 const RUN_SEC = 90;
 /** How fast a cutback comes around. ~0.4s to complete the turn. */
@@ -118,6 +119,10 @@ export const SurfBreakMode: ModeDefinition = (() => {
   /** The lean the tree and the body BOTH ride (the stick, or the cutback coming around). */
   let rideLean = 0;
   let bailBeatT = 0, landBeatT = 0, airT = 0, cutbackUntil = 0;
+  // SURF OCEAN (2026-09-15): the living sea's per-frame step, and the water answering the rider
+  let updateSea: (dt: number, camera: ModeContext['camera']) => void = () => {};
+  let spray: SurfSpray | null = null;
+  let lastYaw = 0;
   const BAIL_BEAT_SEC = 1.55, LAND_BEAT_SEC = 0.4;   // the wipe resets the rider at 1.6 s
   const CUTBACK_LEAN_SEC = 0.5;                      // the board leans into a cutback for as long as it comes around
   function driveAnim(dt: number): void {
@@ -149,6 +154,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
 
   function wipeout(ctx: ModeContext, why: string, lipZ: number): void {
     waveMoveRepeats.clear();   // a new wave, a fresh list
+    spray?.splash(rig.char.root.position, 1.2);   // SURF OCEAN: the fall throws the water
     console.info(`[SURF-WIPE] call: ${why}${wipedOut ? ' (already down — ignored)' : ''}`);   // A+ P0 probe: punches are checked against accepted calls
     if (wipedOut) return;
     wipedOut = true;
@@ -216,6 +222,8 @@ export const SurfBreakMode: ModeDefinition = (() => {
       const built = buildSurfBreak(ctx.scene, POCKET, venue);
       ctx.setHud({ banner: `${venue.name} · ${venue.sub}` });
       world = built.world; waveLipAt = built.waveLipAt; barrelActive = built.barrelActive; faceHeightAt = built.faceHeightAt;
+      updateSea = built.updateSea;
+      spray?.dispose(); spray = new SurfSpray(ctx.scene);
       propsGone = false; void mountVenueProps(ctx.scene, 'surf-break').then((h) => { if (propsGone) h?.dispose(); else props = h; });
       // Gate 0: Validate skeletal rig by spawning placeholder to check skeleton
       const _validateChar = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, -1000, 0) });
@@ -227,7 +235,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       // the board for the first 6 s), and glue the rider to the face on the way down it (the wave face falls away faster
       // than one frame of gravity, exactly like the pitched piste — see RiderCfgOverrides.stickDown).
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -50 + POCKET.min + 3), 0, world.ground, '#ffd75e', 'surfboard', { stickDown: 0.9, rayLength: 8 });
-      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { momentum: trickMomentum, anim: 'external', onBeat: (b) => { if (b === 'land') landBeatT = LAND_BEAT_SEC; else bailBeatT = BAIL_BEAT_SEC; } });
+      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { momentum: trickMomentum, anim: 'external', onBeat: (b) => { if (b === 'land') { landBeatT = LAND_BEAT_SEC; spray?.splash(rig.char.root.position, 0.5); } else { bailBeatT = BAIL_BEAT_SEC; spray?.splash(rig.char.root.position, 1); } } });
       animTree = new BoardAnimTree(rig.char.animator);
       posture?.dispose();
       posture = mountPostureLayer(ctx.scene, rig.char.skeleton, rig.char.root, () => {
@@ -332,6 +340,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       if (ended) return;
       t += dt; timeLeft -= dt;
       const lip = waveLipAt(t);
+      updateSea(dt, ctx.camera);   // SURF OCEAN: the swell moves and follows the lens, wiped out or not
 
       const lap = Math.floor((t * WAVE_SPEED) / WAVE_LAP);
       if (lap > lapsSeen) {
@@ -464,6 +473,15 @@ export const SurfBreakMode: ModeDefinition = (() => {
       }
 
       crowd.update(dt);
+      if (spray) {
+        const yaw = rig.char.root.rotation.y, yawRate = dt > 0 ? Math.abs(yaw - lastYaw) / dt : 0; lastYaw = yaw;
+        const carving = t < cutbackUntil;
+        spray.update({
+          lip, rider: rig.char.root.position, speed: rig.rider.vel.length(),
+          carve: carving ? 1 : Math.min(1, yawRate / 2.2 + Math.abs(rideLean) * 0.5),
+          carveSide: -Math.sign(yaw - lastYaw || rideLean || 1), hollow: barrelActive(t), grounded: rig.rider.grounded && !wipedOut,
+        });
+      }
       ctx.setHud({ time: Math.ceil(timeLeft), ...boostKit.hud() });
       const vel = rig.rider.vel;
       const leadVel = vel.lengthSquared() > 0.01 ? vel.scale(1.6) : vel;
@@ -476,7 +494,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boostKit) ?? 1), Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
     },
 
-    dispose() { boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { spray?.dispose(); spray = null; updateSea = () => {}; boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 
