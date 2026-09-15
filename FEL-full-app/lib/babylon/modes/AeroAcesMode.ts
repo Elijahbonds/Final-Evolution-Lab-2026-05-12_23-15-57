@@ -15,6 +15,9 @@
 // ramp is a box in rideWorlds for the same reason. If a plane asset lands later, only buildPlane changes.
 
 import { stepSpeedFov } from '../core/SpeedFov';
+import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the shared boost (rings, low passes, overtakes fill it)
+import { BoostFx } from '../premium/BoostFx';
+import { BoostPads } from '../visual/BoostPads';
 import { Color3, MeshBuilder, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import type { Mesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -38,7 +41,7 @@ import { buildCourseVenue } from '../racing/venueForCourse';
 import { buildTrackside, type TracksideHandle } from '../racing/trackside';   // the world that follows the racing line
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import {
-  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal,
+  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace,
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readPlane } from '../racing/garage';
@@ -83,7 +86,15 @@ const S = {
   done: false,
   crashes: 0,
   lookX: 0, lookY: 0,
+  boostHeld: false,
+  /** THE FINISH CLOCK (MECHANICS PASS): seconds left to the line once the field's leader is home; null = not running. */
+  graceLeft: null as number | null,
 };
+let boost = new BoostKit();
+let boostFx: BoostFx | null = null;
+let boostRings: BoostPads | null = null;
+/** Below this height over the floor, flying fast is a LOW PASS and pays into the boost. */
+const LOW_PASS_M = 22;
 
 const say = (t: string, sec = 1.1): void => { S.banner = t; S.bannerT = sec; };
 
@@ -342,7 +353,8 @@ function pushHud(ctx: ModeContext): void {
     toGate: Math.round(dist),
     pos: rivals.length ? `${ordinal(playerPosition(playerDist, rivals))} / ${rivals.length + 1}` : '',
     banner: S.banner,
-    hint: 'STICK to fly · RT throttle · A boost · roll INTO the turn',
+    hint: 'STICK to fly · RT throttle · roll INTO the turn · hold RB / Shift to BOOST',
+    ...boost.hud(),
   };
   if (flight.stalled) hud.banner = 'STALL — NOSE DOWN';
   ctx.setHud(hud);
@@ -352,14 +364,17 @@ function finish(ctx: ModeContext): void {
   if (S.done) return;
   S.done = true;
   const medal = medalFor(course, race.time, race.finished);
+  const place = rivals.length ? playerPosition(playerDist, rivals) : 1;
   SoundKit.play(medal === 'none' ? 'miss' : 'score');
   ctx.juice.hitStop(90);
-  say(medal === 'none' ? `FINISHED ${race.time.toFixed(1)}s` : `${medal.toUpperCase()} — ${race.time.toFixed(1)}s`, 2.4);
+  // the result says WHERE you placed as well as the clock's medal, and a race you did not finish says so
+  const placeTag = rivals.length ? `${ordinal(place)} · ` : '';
+  say(!race.finished ? `OUT OF TIME — ${placeTag}DNF` : medal === 'none' ? `${placeTag}FINISHED ${race.time.toFixed(1)}s` : `${placeTag}${medal.toUpperCase()} — ${race.time.toFixed(1)}s`, 2.4);
   pushHud(ctx);
   // stats are numbers only (ModeContext.end takes Record<string, number>), so the medal rides the OUTCOME
   ctx.end(race.finished ? `COMPLETE_${medal.toUpperCase()}` : 'OUT',
     Math.round(Math.max(0, course.gold * 2 - race.time) * 10), {
-      seconds: Number(race.time.toFixed(2)), gates: race.passed, crashes: S.crashes, laps: race.lap,
+      seconds: Number(race.time.toFixed(2)), gates: race.passed, place, field: rivals.length + 1, crashes: S.crashes, laps: race.lap,
     });
 }
 
@@ -375,8 +390,9 @@ return {
     // and must not inherit last race's finishing place (which would read as an overtake on frame one).
     baseFov = null;
     lastPlace = 0;
-    S.done = false; S.crashes = 0; S.banner = ''; S.bannerT = 0;
-    S.input = { pitch: 0, roll: 0, yaw: 0, throttle: 0.75, boost: false };
+    S.done = false; S.crashes = 0; S.banner = ''; S.bannerT = 0; S.graceLeft = null;
+    S.input = { pitch: 0, roll: 0, yaw: 0, throttle: 0.75, boost: false, boostK: 0 };
+    S.boostHeld = false; boost = new BoostKit(0.25);   // a quarter tank on the grid, so the first straight can use it
 
     // the course is DATA, so a map is a pick rather than a code path — and so is the aircraft
     course = readCourse('aero');
@@ -421,6 +437,19 @@ return {
     prevPos.copyFrom(flight.pos);
     plane.position.copyFrom(flight.pos);
 
+    // BOOST (FINISH-RELEASE): the trail streams off the airframe; a gold boost ring hangs halfway between every other
+    // pair of gates, at the height of the line, so taking it is part of flying the course well.
+    boostFx?.dispose(); boostFx = new BoostFx(ctx.scene, ctx.camera, { trailFrom: plane, trailWidth: 1.6, color: '#ffd75e' });
+    boostRings?.dispose();
+    {
+      const spots = [];
+      for (let i = 1; i < course.gates.length; i += 2) {
+        const a = course.gates[i - 1], b = course.gates[i];
+        const at = a.at.add(b.at.subtract(a.at).scale(0.5));
+        spots.push({ pos: at, yaw: Math.atan2(b.at.x - a.at.x, b.at.z - a.at.z), kind: 'ring' as const, radius: 9 });
+      }
+      boostRings = new BoostPads(ctx.scene, spots, '#ffd75e');
+    }
     ctx.heroRef.current = plane;
     ctx.objectiveRef.current = null;          // a chase cam has no second subject to frame
     ctx.camDirector.snapTo(flight.pos, null);
@@ -467,7 +496,8 @@ return {
     }
     if (e.t === 'trigger' && e.side === 'R') S.input.throttle = Math.max(0.15, e.value);
     if (e.t === 'trigger' && e.side === 'L') S.input.yaw = -e.value;      // rudder left
-    if (e.t === 'button' && e.btn === 'A') S.input.boost = e.pressed;
+    // BOOST is the shared held R1 (RB · Shift · the BOOST pill).
+    if (e.t === 'button' && e.btn === 'R1') S.boostHeld = e.pressed;
     if (e.t === 'button' && e.btn === 'B' && e.pressed) S.input.yaw = 0;
   },
 
@@ -475,6 +505,8 @@ return {
     if (!flight || !plane || S.done) return;
 
     prevPos.copyFrom(flight.pos);
+    const bev = boost.update(dt, S.boostHeld, !flight.stalled);
+    S.input.boostK = boost.k;
     stepFlight(flight, S.input, dt, FRAME);
     // the propeller turns with the throttle — a still prop on a flying aircraft reads as a model on a stick
     if (propHub) propHub.rotation.z += PROP_RPM * (0.35 + S.input.throttle * 0.65) * dt;
@@ -490,7 +522,7 @@ return {
     // places during a scrap would be constant.
     if (rivals.length) {
       const place = playerPosition(playerDist, rivals);
-      if (lastPlace > 0 && place < lastPlace) ctx.momentum.report({ kind: 'overtake', weight: 13 * (lastPlace - place) });
+      if (lastPlace > 0 && place < lastPlace) { ctx.momentum.report({ kind: 'overtake', weight: 13 * (lastPlace - place) }); boost.earn('nearMiss', lastPlace - place); }
       lastPlace = place;
     }
     if (line) {
@@ -517,18 +549,34 @@ return {
 
     plane.position.copyFrom(flight.pos);
     plane.rotation.set(-flight.pitch, flight.heading, -flight.roll);
+    // a fast LOW PASS pays into the boost, a little every second you hold it
+    if (flight.pos.y < FLOOR + LOW_PASS_M && flight.speed > FRAME.cruise * 0.8) boost.earnOver('nearMiss', dt, 3);
+    if (boostRings && boostRings.update(dt, flight.pos, boost) > 0) say('BOOST RING', 0.5);
+    boostFx?.update(dt, boost, bev);
+    if (bev.started) { ctx.feel.impact(0.3); say('BOOST!', 0.6); }
+    if (bev.full) say('BOOST READY', 0.8);
 
     // THE GATES. Fed the travel segment, not the position, because at 100 m/s an aircraft crosses a 26 m ring
     // inside a single frame and a point test would miss nearly all of them.
+    // THE RACE ENDS FOR EVERYONE — see RaceField.stepFinishGrace. Checked before the player's own gates so a player
+    // crossing the line on the clock's last frame still finishes rather than being called out.
+    if (line && rivals.length) {
+      const leader = S.graceLeft === null ? fieldLeaderDone(rivals, line, course.laps) : null;
+      const g = stepFinishGrace(S.graceLeft, dt, !!leader);
+      S.graceLeft = g.left;
+      if (g.started && leader) { SoundKit.play('whistle'); say(`${leader.name} FINISHED — ${Math.ceil(g.left ?? 0)}s TO THE LINE`, 1.8); }
+      else if (g.tick !== null && g.tick > 0 && g.tick <= 5) { SoundKit.play('uiTick', { pitch: 1 + (5 - g.tick) * 0.08 }); say(`FINISH IN ${g.tick}`, 0.9); }
+    }
     const res = stepRace(race, course, prevPos, flight.pos, dt);
     if (res.gate) {
       SoundKit.play('score', { pitch: res.lap ? 1.2 : 1 });
       ctx.feel.impact(0.25);
       EffectsKit.burst(ctx.scene, flight.pos.clone(), 'sparks');
       say(res.lap ? `LAP ${Math.min(race.lap, course.laps)}` : 'GATE', 0.7);
+      boost.earn('ring');
       tintRings();
     }
-    if (res.finished) { finish(ctx); return; }
+    if (res.finished || S.graceLeft === 0) { finish(ctx); return; }
 
     if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
 
@@ -539,11 +587,12 @@ return {
     // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
     // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
     baseFov ??= ctx.camera.fov;
-    ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov, flight.speed, FRAME.vMax, dt);
+    ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), flight.speed, FRAME.vMax, dt);
     pushHud(ctx);
   },
 
   dispose(): void {
+    boostFx?.dispose(); boostFx = null; boostRings?.dispose(); boostRings = null;
     plane?.dispose(); plane = null;
     seated?.dispose(); seated = null;
     pilot?.dispose(); pilot = null;

@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { BoostGauge } from './boost-hud';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -86,6 +87,7 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
         </div>
       </div>
 
+      <BoostGauge hud={hud} className="absolute inset-x-0 bottom-28" />
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
         <div className="pointer-events-none absolute inset-x-0 bottom-16 text-center">
           <span className="fel-panel px-3 py-1 font-mono text-[10px] text-white/70">{hud.hint}</span>

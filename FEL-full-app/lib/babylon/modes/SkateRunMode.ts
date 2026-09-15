@@ -12,6 +12,9 @@
 
 import { Coyote } from '../core/gameFeel';
 import { stepSpeedFov } from '../core/SpeedFov';
+import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the shared boost (landings and grinds fill it, RB/Shift burns it)
+import { BoostFx } from '../premium/BoostFx';
+import { BoostPads } from '../visual/BoostPads';
 import { Vector3, type TransformNode } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -84,6 +87,10 @@ export const SkateRunMode: ModeDefinition = (() => {
   /** A point 8 m ahead along the rider's facing — the snap's objective, so "behind" means behind the rider. */
   const aheadOfRider = (): Vector3 => rig.char.root.position.add(new Vector3(Math.sin(rig.char.root.rotation.y), 0, Math.cos(rig.char.root.rotation.y)).scale(8));
   let coins: CoinField;
+  let boost = new BoostKit();
+  let boostFx: BoostFx | null = null;
+  let boostPads: BoostPads | null = null;
+  let boostHeld = false;
   let timeLeft = RUN_SEC;
   /** How long a full-pop air lasts, for judging which trick the rider can finish. Measured against the ollie's own
    *  hang rather than guessed: a kerb ollie is a quarter-second, a ramp air most of a second. */
@@ -319,6 +326,14 @@ export const SkateRunMode: ModeDefinition = (() => {
       patrolRail.mount(ctx.scene);      // L2: the goal object has to be visible
       // L4: a Venice plaza is not empty. The venue owns where people stand.
       crowd = new Onlookers(ctx.scene, world.crowdSpots);
+      // BOOST (FINISH-RELEASE): three pads on the park's two diagonal lines and the centre — the lines the coins already
+      // teach — so a pad is a line you choose, not a scatter
+      boost = new BoostKit(0.2); boostHeld = false;
+      boostFx?.dispose(); boostFx = new BoostFx(ctx.scene, ctx.camera, { trailFrom: rig.char.root, trailWidth: 0.4 });
+      boostPads?.dispose();
+      boostPads = new BoostPads(ctx.scene, [
+        { pos: new Vector3(-9, 0, -9), yaw: Math.PI / 4 }, { pos: new Vector3(9, 0, 9), yaw: Math.PI / 4 + Math.PI }, { pos: new Vector3(9, 0, -9), yaw: -Math.PI / 4 },
+      ]);
       world.grindLines.push(patrolRail.line);
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 4, modeId: 'skateboard' });
       // Phase 3 requires snapTo() at load and update() every frame. All three
@@ -349,11 +364,12 @@ export const SkateRunMode: ModeDefinition = (() => {
       coins.line(new Vector3(20, 2.6, -19), new Vector3(20, 0.6, 8), 8);
       // ...and an air arc over the bowl rim
       coins.arc(new Vector3(-22, 1.6, 14), new Vector3(-10, 1.6, 14), 2.6, 6);
-      ctx.setHud({ score: 0, combo: '', coins: 0, time: RUN_SEC, goals: `0/${SKATE_GOALS.length}`, hint: 'HOLD FORWARD to push · POP to ollie · ride over a rail to GRIND · tap BACK then FORWARD for a MANUAL' });
+      ctx.setHud({ score: 0, combo: '', coins: 0, time: RUN_SEC, goals: `0/${SKATE_GOALS.length}`, hint: 'HOLD FORWARD to push · POP to ollie · GRIND the rails · hold RB / Shift to BOOST' });
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
+      if (e.t === 'button' && e.btn === 'R1') { boostHeld = e.pressed; return; }   // BOOST: the shared held R1
       if (e.t === 'stick' && e.side === 'L') {
         // THE MANUAL LINK (VENICE-SKATE-THPS). There was no manual input at all: the only door into the channel was
         // tryRevert, which needs a transition landing AND |stickX| > 0.8 AND a low pump in the same frame — measured
@@ -586,6 +602,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         console.info(`[SKATE-LAND] touchdown ${res.grade} (${res.chain.length} tricks)`);   // A+ P0 probe: the punch counts are checked against this
         if (res.grade === 'clean') {
           if (chainPts > 0) combo.add(res.chain.map((t) => t.label).join(' → '), chainPts, 'air');
+          boost.earn('landingClean'); if (res.chain.length) boost.earn(res.chain.length >= 2 ? 'trickBig' : 'trickSmall');
           lastLanding = 'clean'; landingBeatT = 0.35;
           SoundKit.play('uiTick', { pitch: 1.4, volume: 0.4 });
           ctx.feel?.impact?.(0.25);
@@ -683,6 +700,13 @@ export const SkateRunMode: ModeDefinition = (() => {
       let drive = grounded && !bailing && !rig.rider.grinding && !manualCh?.active ? -stickY : 0;   // no kick from inside a manual
       if (drive < 0 && performance.now() < brakeMuteUntil) drive = 0;   // the manual link's own back-tap must not drag the line to a stop
       const steer = grounded && !bailing ? stickX : 0;
+      const bev = boost.update(dt, boostHeld, grounded && !bailing);
+      move.boostK = boost.k;
+      if (rig.rider.grinding) boost.earnOver('grindPerSec', dt);
+      boostPads?.update(dt, rig.char.root.position, boost);
+      boostFx?.update(dt, boost, bev);
+      if (bev.started) { SoundKit.play('whoosh', { pitch: 1.1, volume: 0.4 }); }
+      if (bev.full) bannerFlash(ctx, 'BOOST READY', 700);
       const v = move.update(dt, steer, pump, ctx.scene, rig.char.root.position, world.ground, drive);
       // ── THE NaN TRAP (VENICE-SKATE-THPS, 2026-09-09) ──
       // A run that goes non-finite never comes back on its own: every frame after it multiplies NaN into the position,
@@ -853,7 +877,7 @@ export const SkateRunMode: ModeDefinition = (() => {
 
       // combo HUD
       const hud = combo.hud;
-      ctx.setHud({ combo: hud.combo, pot: hud.pot, score: hud.banked, momentum: Math.round(mbus.score01 * 100) });
+      ctx.setHud({ combo: hud.combo, pot: hud.pot, score: hud.banked, momentum: Math.round(mbus.score01 * 100), ...boost.hud() });
       // THE FENCE HAS TO TAKE YOUR SPEED. This clamped the POSITION and left the velocity alone, so a rider who rode
       // into the boundary was pinned there while the movement model still reported 6-8 m/s — measured: position frozen
       // at z 33 from t8s to the end of a 60 s run, speed never below 6.1. The board kept rolling, the push kept
@@ -889,9 +913,9 @@ export const SkateRunMode: ModeDefinition = (() => {
       // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
       // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
       baseFov ??= ctx.camera.fov;
-      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov, Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
+      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
     },
 
-    dispose() { posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },
   };
 })();

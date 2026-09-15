@@ -208,9 +208,10 @@ export class AirSessionCore {
     if (this.fsm.current !== 'Run') return null;
     const q = this.cadence.tap(side);
     const t = this.t;
-    if (q === 'perfect') this.state.speed = clamp(this.state.speed + t.perfectImpulse, 0, t.maxRunSpeed);
-    else if (q === 'good' || q === 'first') this.state.speed = clamp(this.state.speed + t.goodImpulse, 0, t.maxRunSpeed);
-    else if (q === 'fault') this.state.speed = clamp(this.state.speed * t.faultSpeedMult, 0, t.maxRunSpeed);
+    const cap = this._runCap();
+    if (q === 'perfect') this.state.speed = clamp(this.state.speed + t.perfectImpulse, 0, cap);
+    else if (q === 'good' || q === 'first') this.state.speed = clamp(this.state.speed + t.goodImpulse, 0, cap);
+    else if (q === 'fault') this.state.speed = clamp(this.state.speed * t.faultSpeedMult, 0, cap);
     return q;
   }
 
@@ -243,6 +244,10 @@ export class AirSessionCore {
   // keep today's behavior (dt drives both), so this is backward-compatible.
   // Without this split, a clamped dt under rAF throttling (backgrounded
   // tab, low-power mode) can leave the FSM stuck in 'Land' forever.
+  /** 0..1 — the shared BoostKit's ramped burn, set by the mode each frame. Only the run-up reads it. */
+  boostK = 0;
+  private _runCap(): number { return this.t.maxRunSpeed * (1 + 0.4 * clamp(this.boostK, 0, 1)); }
+
   step(dt: number, wallDt: number = dt): AirSessionState {
     this._nowMs += dt * 1000;
     const s = this.state;
@@ -253,7 +258,11 @@ export class AirSessionCore {
     switch (this.fsm.current as AirPhase) {
       case 'Run': {
         // Passive drift: negative runDrag accelerates (slope); positive drags.
-        s.speed = clamp(s.speed - t.runDrag * dt, 0, t.maxRunSpeed);
+        // BOOST (FINISH-RELEASE): a burn pushes on top of the slope and lifts the cap up to +40%; off the burn the
+        // speed bleeds back to the cap at the same push rate instead of snapping to it.
+        const cap = this._runCap();
+        s.speed += t.maxRunSpeed * 1.2 * this.boostK * dt;
+        s.speed = s.speed > cap ? Math.max(cap, s.speed - t.maxRunSpeed * 1.2 * dt) : clamp(s.speed - t.runDrag * dt, 0, cap);
         s.pos.z -= s.speed * dt;
         if (s.pos.z <= t.launchZ) this._launch();
         break;

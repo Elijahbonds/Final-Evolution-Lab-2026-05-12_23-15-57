@@ -25,6 +25,9 @@ export type ModeVerbConfig = {
   /** The R stick's label on the touch rig — 'LOOK' where the mode feeds CameraDirector.look(), 'FLICK' where the
    *  stick is the trick input (skate), null where nothing reads it (drawn as a hollow socket, same as an inert verb). */
   rStick: string | null;
+  /** BOOST (FINISH-RELEASE, 2026-09-14): the mode spends the shared BoostKit meter on a HELD R1. TouchOverlay draws a
+   *  BOOST pill for it above the face diamond — one boost control in every speed mode, on every input. */
+  boost: boolean;
 };
 
 const A = (btn: 'A' | 'B' | 'X' | 'Y'): FelInput => ({ t: 'button', btn, pressed: true });
@@ -42,13 +45,13 @@ const SLOT_COLOR = { A: '#22d3ee', B: '#ff6b3d', X: '#a78bfa', Y: '#ffd75e' } as
 const inert = (): VerbButton => ({ label: '', color: '#4b5563', emit: null });
 /** Build a 4-slot config from up to 4 {slot, label, emit, hold} entries; any
  *  slot not supplied comes back inert (drawn hollow, not pressable). */
-function verbs(defs: Partial<Record<'A' | 'B' | 'X' | 'Y', { label: string; emit: FelInput; hold?: boolean }>>): Omit<ModeVerbConfig, 'rStick'> {
+function verbs(defs: Partial<Record<'A' | 'B' | 'X' | 'Y', { label: string; emit: FelInput; hold?: boolean }>>): Omit<ModeVerbConfig, 'rStick' | 'boost'> {
   const slot = (k: 'A' | 'B' | 'X' | 'Y'): VerbButton =>
     defs[k] ? { label: defs[k]!.label, color: SLOT_COLOR[k], emit: defs[k]!.emit, hold: defs[k]!.hold } : inert();
   return { buttons: [slot('A'), slot('B'), slot('X'), slot('Y')] };
 }
 
-const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick'>> = {
+const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   dunk: verbs({
     A: { label: 'SLAM', emit: A('A') },
     B: { label: 'STYLE', emit: A('B') },
@@ -185,9 +188,9 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick'>> = {
   // is the verb you hold most of the time, so it is a HOLD on the right trigger, and BOOST is the one tap that
   // matters. Without an entry here touch falls through to MODE_VERBS.default — one generic ACTION button — and
   // a phone player would have had no throttle at all, which is the karate_vs bug repeated.
+  // A was BOOST; boost is the shared held R1 now (the BOOST pill), so A no longer shows a second boost control.
   aeroaces: verbs({
     Y: { label: 'THROTTLE', emit: RT(1), hold: true },
-    A: { label: 'BOOST', emit: A('A') },
     X: { label: 'RUDDER', emit: LT(1), hold: true },
     B: { label: 'LEVEL', emit: A('B') },
   }),
@@ -197,7 +200,6 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick'>> = {
   velocitykart: verbs({
     Y: { label: 'GAS', emit: RT(1), hold: true },
     X: { label: 'DRIFT', emit: A('X'), hold: true },
-    A: { label: 'BOOST', emit: A('A') },
     B: { label: 'BRAKE', emit: LT(1), hold: true },
   }),
   mixedcombat: verbs({
@@ -288,6 +290,8 @@ const R_STICK: Record<string, string | null> = {
   freerun: null,                                         // the run's camera is the FrameGuard recentre, not a follow
   brainbrawl: null,
 };
+/** The speed modes that spend the shared boost (lib/babylon/core/BoostKit.ts) on a held R1. */
+export const BOOST_MODES: ReadonlySet<string> = new Set(['velocitykart', 'aeroaces', 'skateboard', 'snowboard_slalom', 'surf', 'bigair']);
 export const MODE_VERBS: Record<string, ModeVerbConfig> = Object.fromEntries(
-  Object.entries(VERBS).map(([k, v]) => [k, { ...v, rStick: R_STICK[k] === undefined ? 'LOOK' : R_STICK[k] }]),
+  Object.entries(VERBS).map(([k, v]) => [k, { ...v, rStick: R_STICK[k] === undefined ? 'LOOK' : R_STICK[k], boost: BOOST_MODES.has(k) }]),
 );

@@ -79,6 +79,10 @@ export class BoardMovement {
   private strokeLeft = 0;
   private strokeDv = 0;
 
+  /** The SHARED boost's ramp, 0..1 (BoostKit — FINISH-RELEASE, 2026-09-14). While it is up the board is driven forward and
+   *  the speed ceiling lifts to +40%, so a boost is a real surge, not flat out reached sooner. Set by the mode each frame. */
+  boostK = 0;
+
   constructor(private tune: BoardMoveTuning = SKATE_TUNING) {}
 
   get speed(): number { return this.vel.length(); }
@@ -118,6 +122,10 @@ export class BoardMovement {
    * foot-drags (brakeDecel). Modes that do not pass it (snow) are unchanged.
    */
   update(dt: number, steer: number, pump: number, scene?: Scene, pos?: Vector3, ground?: AbstractMesh[], drive = 0): Vector3 {
+    // A ZERO-dt FRAME (a slow-mo beat, a tab resume) must be a no-op. The stroke below divides `step / dt`, and with a
+    // stroke in flight that is 0 / 0 = NaN — the [SKATE-NAN] trap's recorded frames were all dt 0 (release gauntlet,
+    // 2026-09-14: two NaN reports in the first 100 s of a production skate run).
+    if (!(dt > 0)) return this.vel;
     this.pushCooldown = Math.max(0, this.pushCooldown - dt);
     const t = this.tune;
     const stanceMult = this.stance === 'switch' ? 0.92 : 1;   // switch = slightly duller
@@ -179,9 +187,13 @@ export class BoardMovement {
       this.vel.setAll(0);
     }
 
+    // BOOST: drive forward along the facing and lift the ceiling, both scaled by the ramp
+    const bk = Math.max(0, Math.min(1, this.boostK));
+    if (bk > 0) this.vel.addInPlace(new Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw)).scale(t.maxSpeed * 1.6 * bk * dt));
     // drag + clamp
     this.vel.scaleInPlace(Math.max(0, 1 - t.drag * dt));
-    if (this.speed > t.maxSpeed) this.vel.scaleInPlace(t.maxSpeed / this.speed);
+    const cap = t.maxSpeed * (1 + 0.4 * bk);
+    if (this.speed > cap) this.vel.scaleInPlace(cap / this.speed);
     return this.vel;
   }
 }

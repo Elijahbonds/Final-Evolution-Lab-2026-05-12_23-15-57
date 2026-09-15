@@ -93,6 +93,10 @@ export interface KartInput {
   drift?: boolean;
   /** Spend the banked boost. */
   fire?: boolean;
+  /** The SHARED boost's ramp, 0..1 (lib/babylon/core/BoostKit.ts — FINISH-RELEASE, 2026-09-14). A mode that owns a
+   *  BoostKit passes its `k` here instead of using `fire`: top speed and push scale with it, so the burn arrives and
+   *  bleeds off exactly as the lens and the trail do. */
+  boostK?: number;
 }
 
 export const KART_NEUTRAL: KartInput = { steer: 0, throttle: 0, brake: 0 };
@@ -125,7 +129,8 @@ export function kartNose(s: KartState): Vector3 {
  */
 export function stepKart(s: KartState, input: KartInput, dt: number, onTrack: boolean, spec: KartSpec = KART_STARTER): KartState {
   const grip = spec.grip * (onTrack ? 1 : spec.offTrack);
-  const vMax = spec.vMax * (onTrack ? 1 : spec.offTrack) + (s.boosting > 0 ? spec.boostSpeed : 0);
+  const boostK = Math.max(s.boosting > 0 ? 1 : 0, Math.max(0, Math.min(1, input.boostK ?? 0)));
+  const vMax = spec.vMax * (onTrack ? 1 : spec.offTrack) + spec.boostSpeed * boostK;
 
   // FIRE THE BOOST. Spending is a decision: it empties the bank.
   if (input.fire && s.boost > 0.15 && s.boosting <= 0) {
@@ -135,7 +140,7 @@ export function stepKart(s: KartState, input: KartInput, dt: number, onTrack: bo
   s.boosting = Math.max(0, s.boosting - dt);
 
   // SPEED.
-  const push = spec.accel * Math.max(0, Math.min(1, input.throttle)) * (s.boosting > 0 ? 1.6 : 1);
+  const push = spec.accel * Math.max(0, Math.min(1, input.throttle)) * (1 + 0.6 * boostK);
   const stop = spec.brake * Math.max(0, Math.min(1, input.brake));
   const roll = spec.drag * s.speed * s.speed;
   s.speed = Math.max(0, Math.min(vMax, s.speed + (push - stop - roll) * dt));

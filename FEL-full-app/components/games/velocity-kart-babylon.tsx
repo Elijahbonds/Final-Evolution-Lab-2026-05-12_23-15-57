@@ -10,6 +10,7 @@
 // The HUD is a kart's: speed in km/h (m/s reads wrong on a vehicle), the boost you are holding, the drift
 // you are banking, the lap and the clock.
 
+import { BoostGauge } from '@/components/games/boost-hud';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
@@ -84,10 +85,10 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
         <span className="fel-panel px-4 py-1.5 fel-stat text-2xl text-white">{Number(hud.time ?? 0).toFixed(1)}s</span>
         <div className="fel-panel px-3 py-1.5 text-right">
           <div className="text-[10px] tracking-wider text-white/60">LAP {hnode(hud.lap, '—')}</div>
-          <div className={`text-sm font-bold ${Number(hud.boost) > 0 ? 'text-[#ff6a00]' : 'text-white/60'}`}>BOOST {hnode(hud.boost, 0)}%</div>
         </div>
       </div>
 
+      <BoostGauge hud={hud} className="absolute inset-x-0 bottom-28" />
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
         <div className="pointer-events-none absolute inset-x-0 bottom-16 text-center">
           <span className="fel-panel px-3 py-1 font-mono text-[10px] text-white/70">{hud.hint}</span>

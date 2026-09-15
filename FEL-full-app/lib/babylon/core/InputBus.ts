@@ -66,6 +66,8 @@ const KEYMAP: Record<string, FelInput> = {
   i: { t: 'button', btn: 'Y', pressed: true },
   q: { t: 'button', btn: 'L1', pressed: true },
   e: { t: 'button', btn: 'R1', pressed: true },
+  // BOOST (FINISH-RELEASE, 2026-09-14): Shift is the keyboard's boost — the shared held R1 every speed mode burns on.
+  shift: { t: 'button', btn: 'R1', pressed: true },
   c: { t: 'button', btn: 'SELECT', pressed: true },
   escape: { t: 'button', btn: 'START', pressed: true },
 };

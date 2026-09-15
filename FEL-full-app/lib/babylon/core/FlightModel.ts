@@ -98,6 +98,9 @@ export interface FlightInput {
   throttle: number;
   /** Boost held. */
   boost?: boolean;
+  /** The SHARED boost's ramp, 0..1 (BoostKit — FINISH-RELEASE, 2026-09-14). When given it replaces `boost`: thrust scales
+   *  up to BOOST_THRUST and the airframe's top speed lifts up to +40%, so a boost is actually faster than flat out. */
+  boostK?: number;
 }
 
 export const NEUTRAL_INPUT: FlightInput = { pitch: 0, roll: 0, yaw: 0, throttle: 0.7 };
@@ -145,11 +148,14 @@ export function stepFlight(s: FlightState, input: FlightInput, dt: number, frame
   s.heading = wrapAngle(s.heading + turn * dt);
 
   // SPEED. Throttle pushes, drag pulls, the nose trades height for speed either way, and a turn costs.
-  const thrust = frame.thrust * Math.max(0, Math.min(1, input.throttle)) * (input.boost ? BOOST_THRUST : 1);
+  const bk = input.boostK != null ? Math.max(0, Math.min(1, input.boostK)) : (input.boost ? 1 : 0);
+  const thrust = frame.thrust * Math.max(0, Math.min(1, input.throttle)) * (1 + (BOOST_THRUST - 1) * bk);
   const gravityAlongNose = -Math.sin(s.pitch) * G;      // nose down (negative pitch) accelerates
   const dragDecel = frame.drag * s.speed * s.speed;
   const turnCost = Math.abs(turn) * frame.turnDrag;
-  s.speed = Math.max(0, Math.min(frame.vMax, s.speed + (thrust + gravityAlongNose - dragDecel - turnCost) * dt));
+  // a boost lifts the ceiling as well as the push — capped at vMax it could only ever reach normal flat out faster
+  const vCap = frame.vMax * (input.boostK != null ? 1 + 0.4 * bk : 1);
+  s.speed = Math.max(0, Math.min(vCap, s.speed + (thrust + gravityAlongNose - dragDecel - turnCost) * dt));
 
   // STALL, with hysteresis: it begins below vStall and does not end until the speed is comfortably back
   // above it, so recovering is a thing the pilot DOES — point down, build speed, fly again.

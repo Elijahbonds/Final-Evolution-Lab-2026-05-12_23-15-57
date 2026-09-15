@@ -21,6 +21,7 @@ import type { SprintCore } from '../../feel/cores/sprint-core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { locoPick } from '../anim/LocoBus';   // SHARED-ANIM-BUS: one loco pick + stride rate for every on-foot body
+import { stepFinishGrace } from '../racing/RaceField';   // MECHANICS PASS: the race ends for everyone
 
 const RACE_DIST = SPRINT_TUNING.raceDistanceM;   // core-owned (100m)
 const WIN_TIME = 13.0;                            //TUNE(elijah) sub-13 is the bar
@@ -50,6 +51,8 @@ const S = {
   done: false,
   stumbles: 0,
   rivalDist: 0,
+  /** Seconds left to the tape once the rival has breasted it; null = not running. */
+  graceLeft: null as number | null,
   banner: '',
   bannerT: 0,
   lastSide: null as 'L' | 'R' | null,
@@ -57,7 +60,7 @@ const S = {
 };
 
 const reset = (): void => {
-  S.done = false; S.stumbles = 0; S.rivalDist = 0;
+  S.done = false; S.stumbles = 0; S.rivalDist = 0; S.graceLeft = null;
   S.banner = ''; S.bannerT = 0; S.lastSide = null;
   finishLatch = false;
 };
@@ -87,6 +90,9 @@ function pushHud(ctx: ModeContext): void {
     hint: 'Alternate D-PAD ←/→ in rhythm. Do NOT tap before GO.',
   });
 }
+
+/** A 100 m race is short: the tape waits a few seconds, not a kart race's fifteen. */
+const RIVAL_GRACE_SEC = 5;
 
 function finish(ctx: ModeContext, timeS: number): void {
   if (S.done) return;
@@ -215,6 +221,20 @@ return {
       const rivalLoco = locoPick({ speed: RIVAL_SPEED });
       rival.animator.play(rivalLoco.clip, { loop: true });
       rival.animator.setPlaybackScale(rivalLoco.clip, rivalLoco.rate);
+      // THE RACE ENDS FOR EVERYONE (MECHANICS PASS, 2026-09-15). The sprint only ended on the PLAYER's tape, so a runner
+      // who never found the rhythm stood on a straight that could not finish. The rival breasting the tape now starts a
+      // short visible clock; when it runs out the race is called and you did not finish.
+      const g = stepFinishGrace(S.graceLeft, dt, S.rivalDist >= RACE_DIST, RIVAL_GRACE_SEC);
+      S.graceLeft = g.left;
+      if (g.started) { SoundKit.play('whistle'); say(`RIVAL WINS — ${RIVAL_GRACE_SEC}s TO THE TAPE`, 1.4); }
+      else if (g.tick !== null && g.tick > 0) say(`FINISH IN ${g.tick}`, 0.9);
+      if (g.expired) {
+        S.done = true; finishBeat(ctx, false); SoundKit.play('miss');
+        say('DID NOT FINISH', 2);
+        pushHud(ctx);
+        ctx.end('dnf', 0, { timeS: Number(st.timeS.toFixed(2)), stumbles: S.stumbles, topSpeed: st.topSpeed, distanceM: Number(st.distanceM.toFixed(1)) });
+        return;
+      }
     }
 
     if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }

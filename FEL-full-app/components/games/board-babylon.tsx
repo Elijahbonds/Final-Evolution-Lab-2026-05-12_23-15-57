@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { BoostGauge } from './boost-hud';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -180,10 +181,12 @@ export function makeBoardHost(opts: BoardHostOpts) {
           </div>
         )}
 
+        {/* BOOST (FINISH-RELEASE): the shared gauge, bottom centre — the same one the kart and the plane show. */}
+        <BoostGauge hud={hud} className="absolute inset-x-0 bottom-24" />
+
         {/* Meters. Each appears only if its mode publishes it. */}
         <div className="pointer-events-none absolute right-4 top-24 flex flex-col items-end gap-1.5">
           {hud.flow != null && <Meter label="FLOW" value={Number(hud.flow)} max={200} color="var(--fel-cyan)" />}
-          {hud.boost != null && <Meter label="BOOST" value={Number(hud.boost)} max={100} color="var(--fel-gold)" />}
           {hud.momentum != null && <Meter label="MOMENTUM" value={Number(hud.momentum)} max={100} color="var(--fel-red)" />}
         </div>
 

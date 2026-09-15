@@ -13,6 +13,9 @@
 // and the no-placeholder rule here is about BODIES, not vehicles.
 
 import { stepSpeedFov } from '../core/SpeedFov';
+import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the shared boost (drift fills it, RB/Shift burns it)
+import { BoostFx } from '../premium/BoostFx';
+import { BoostPads } from '../visual/BoostPads';
 import { Onlookers } from '../visual/Onlookers';
 import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, Texture, TransformNode, Vector3, Vector4 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -39,7 +42,7 @@ import { buildTrackside, type TracksideHandle } from '../racing/trackside';   //
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import { taperedPlank, taperedSection, roadWheel } from '../racing/shapes';
 import {
-  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldFor,
+  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, fieldFor,
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readKart } from '../racing/garage';
@@ -88,7 +91,13 @@ const S = {
   bestDrift: 0,
   offRoadSec: 0,
   lookX: 0, lookY: 0,
+  boostHeld: false,
+  /** THE FINISH CLOCK (MECHANICS PASS): seconds left to the line once the field's leader is home; null = not running. */
+  graceLeft: null as number | null,
 };
+let boost = new BoostKit();
+let boostFx: BoostFx | null = null;
+let boostPads: BoostPads | null = null;
 
 const say = (t: string, sec = 1.0): void => { S.banner = t; S.bannerT = sec; };
 
@@ -380,14 +389,14 @@ function pushHud(ctx: ModeContext): void {
   const { dist } = toNextGate(race, course, state.pos);
   ctx.setHud({
     speed: Math.round(state.speed * 3.6),                 // km/h reads better than m/s on a kart
-    boost: Math.round(state.boost * 100),
+    ...boost.hud(),
     lap: `${Math.min(race.lap, course.laps)}/${course.laps}`,
     time: race.time.toFixed(1),
     toGate: Math.round(dist),
     drift: state.drifting ? Math.round(driftQuality(state) * 100) : 0,
     pos: rivals.length ? `${ordinal(playerPosition(playerDist, rivals))} / ${rivals.length + 1}` : '',
     banner: S.banner,
-    hint: 'RT throttle · X drift into the corner · A spend the boost',
+    hint: 'RT throttle · X drift to fill BOOST · hold RB / Shift to burn it',
   } satisfies Record<string, HudValue>);
 }
 
@@ -395,13 +404,16 @@ function finish(ctx: ModeContext): void {
   if (S.done) return;
   S.done = true;
   const medal = medalFor(course, race.time, race.finished);
+  const place = rivals.length ? playerPosition(playerDist, rivals) : 1;
   SoundKit.play(medal === 'none' ? 'miss' : 'score');
   ctx.juice.hitStop(90);
-  say(medal === 'none' ? `FINISHED ${race.time.toFixed(1)}s` : `${medal.toUpperCase()} — ${race.time.toFixed(1)}s`, 2.4);
+  // the result says WHERE you placed as well as the clock's medal, and a race you did not finish says so
+  const placeTag = rivals.length ? `${ordinal(place)} · ` : '';
+  say(!race.finished ? `OUT OF TIME — ${placeTag}DNF` : medal === 'none' ? `${placeTag}FINISHED ${race.time.toFixed(1)}s` : `${placeTag}${medal.toUpperCase()} — ${race.time.toFixed(1)}s`, 2.4);
   pushHud(ctx);
   ctx.end(race.finished ? `COMPLETE_${medal.toUpperCase()}` : 'OUT',
     Math.round(Math.max(0, course.gold * 2 - race.time) * 10), {
-      seconds: Number(race.time.toFixed(2)), gates: race.passed, laps: race.lap,
+      seconds: Number(race.time.toFixed(2)), gates: race.passed, place, field: rivals.length + 1, laps: race.lap,
       bestDrift: Math.round(S.bestDrift * 100), offRoad: Number(S.offRoadSec.toFixed(1)),
     });
 }
@@ -416,8 +428,9 @@ return {
   async load(ctx: ModeContext): Promise<void> {
     // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
     baseFov = null;
-    S.done = false; S.banner = ''; S.bannerT = 0; S.bestDrift = 0; S.offRoadSec = 0;
-    S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false };
+    S.done = false; S.banner = ''; S.bannerT = 0; S.bestDrift = 0; S.offRoadSec = 0; S.graceLeft = null;
+    S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false, boostK: 0 };
+    S.boostHeld = false; boost = new BoostKit();
     lastPlace = 0;   // a remount must not inherit last race's place (it would read as an overtake on frame one)
 
     // THE MAP AND THE KART ARE BOTH PICKS (2026-09-13). Read once, here, at mount — the world is built from
@@ -489,6 +502,21 @@ return {
     rivalKarts = rivals.map((r) => buildRivalKart(ctx, r.name, r.tint));
     playerDist = 0;
 
+    // BOOST (FINISH-RELEASE): the trail streams off the kart; a pad sits on the straight into every other gate, 40% of
+    // the way from the gate before, pointing along the line — a pad is a racing-line choice, not a scatter.
+    boostFx?.dispose(); boostFx = new BoostFx(ctx.scene, ctx.camera, { trailFrom: kart, trailWidth: 0.9, color: '#ff8a1f' });
+    boostPads?.dispose();
+    {
+      const pts = [course.start.at, ...course.gates.map((gt) => gt.at)];
+      const spots = [];
+      for (let i = 1; i < pts.length; i += 2) {
+        const a = pts[i - 1], b = pts[i];
+        const at = a.add(b.subtract(a).scale(0.4)); at.y = 0;
+        spots.push({ pos: at, yaw: Math.atan2(b.x - a.x, b.z - a.z), kind: 'pad' as const, radius: 3 });
+      }
+      boostPads = new BoostPads(ctx.scene, spots, '#ff8a1f');
+    }
+
     ctx.heroRef.current = kart;
     ctx.objectiveRef.current = null;
     ctx.camDirector.snapTo(state.pos, null);
@@ -505,7 +533,8 @@ return {
     if (e.t === 'trigger' && e.side === 'R') S.input.throttle = e.value;
     if (e.t === 'trigger' && e.side === 'L') S.input.brake = e.value;
     if (e.t === 'button' && e.btn === 'X') S.input.drift = e.pressed;
-    if (e.t === 'button' && e.btn === 'A') S.input.fire = e.pressed;
+    // BOOST is the shared held R1 (RB · Shift · the BOOST pill); A no longer dumps the meter.
+    if (e.t === 'button' && e.btn === 'R1') S.boostHeld = e.pressed;
   },
 
   update(ctx: ModeContext, dt: number): void {
@@ -515,7 +544,8 @@ return {
     prevPos.copyFrom(state.pos);
     const on = onTrack(state.pos, course);
     if (!on) S.offRoadSec += dt;
-    const wasBoosting = state.boosting > 0;
+    const bev = boost.update(dt, S.boostHeld, true);
+    S.input.boostK = boost.k;
     stepKart(state, S.input, dt, on, kartSpec);
 
     // the kart rides the road; y is cosmetic here because the track is flat
@@ -532,7 +562,7 @@ return {
     // places during a scrap would be constant.
     if (rivals.length) {
       const place = playerPosition(playerDist, rivals);
-      if (lastPlace > 0 && place < lastPlace) ctx.momentum.report({ kind: 'overtake', weight: 13 * (lastPlace - place) });
+      if (lastPlace > 0 && place < lastPlace) { ctx.momentum.report({ kind: 'overtake', weight: 13 * (lastPlace - place) }); boost.earn('nearMiss', lastPlace - place); }
       lastPlace = place;
     }
     if (line) {
@@ -560,13 +590,13 @@ return {
 
     if (state.drifting) {
       S.bestDrift = Math.max(S.bestDrift, driftQuality(state));
+      boost.earnOver('drift', dt, driftQuality(state));   // a CLEAN slide fills the shared meter (the kart's own bank is retired)
       if (Math.random() < 0.25) EffectsKit.burst(ctx.scene, state.pos.clone(), 'dust');
     }
-    if (!wasBoosting && state.boosting > 0) {
-      SoundKit.play('whoosh', { pitch: 1.3, volume: 0.5 });
-      ctx.feel.impact(0.3);
-      say('BOOST!', 0.6);
-    }
+    if (boostPads && boostPads.update(dt, state.pos, boost) > 0) say('BOOST PAD', 0.5);
+    boostFx?.update(dt, boost, bev);
+    if (bev.started) { ctx.feel.impact(0.3); say('BOOST!', 0.6); }
+    if (bev.full) say('BOOST READY', 0.8);
 
     // the edge of the world: a wall you hit rather than an invisible stop
     if (Math.abs(state.pos.x) > 260 || Math.abs(state.pos.z) > 260) {
@@ -580,6 +610,15 @@ return {
       }
     }
 
+    // THE RACE ENDS FOR EVERYONE — see RaceField.stepFinishGrace. Checked before the player's own gates so a player
+    // crossing the line on the clock's last frame still finishes rather than being called out.
+    if (line && rivals.length) {
+      const leader = S.graceLeft === null ? fieldLeaderDone(rivals, line, course.laps) : null;
+      const g = stepFinishGrace(S.graceLeft, dt, !!leader);
+      S.graceLeft = g.left;
+      if (g.started && leader) { SoundKit.play('whistle'); say(`${leader.name} FINISHED — ${Math.ceil(g.left ?? 0)}s TO THE LINE`, 1.8); }
+      else if (g.tick !== null && g.tick > 0 && g.tick <= 5) { SoundKit.play('uiTick', { pitch: 1 + (5 - g.tick) * 0.08 }); say(`FINISH IN ${g.tick}`, 0.9); }
+    }
     const res = stepRace(race, course, prevPos, state.pos, dt);
     if (res.gate) {
       SoundKit.play('score', { pitch: res.lap ? 1.2 : 1 });
@@ -587,7 +626,7 @@ return {
       say(res.lap ? `LAP ${Math.min(race.lap, course.laps)}` : 'CHECKPOINT', 0.7);
       tintMarks();
     }
-    if (res.finished) { finish(ctx); return; }
+    if (res.finished || S.graceLeft === 0) { finish(ctx); return; }
 
     if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
 
@@ -597,11 +636,12 @@ return {
     // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
     // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
     baseFov ??= ctx.camera.fov;
-    ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov, state.speed, kartSpec.vMax, dt);
+    ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), state.speed, kartSpec.vMax, dt);
     pushHud(ctx);
   },
 
   dispose(): void {
+    boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null;
     crowd?.dispose?.(); crowd = null;
     kart?.dispose(); kart = null;
     for (const m of marks) m.dispose();

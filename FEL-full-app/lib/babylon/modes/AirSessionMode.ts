@@ -31,6 +31,10 @@ import type { VenueMood } from '../scene/moods';
 import { makeBigAirSession, BIG_AIR_TUNING } from '../../feel/cores/big-air-skin';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the shared boost (landings + pads fill it, RB/Shift burns it on the run-in)
+import { BoostFx } from '../premium/BoostFx';
+import { BoostPads } from '../visual/BoostPads';
+import { stepSpeedFov } from '../core/SpeedFov';
 import { locoPick } from '../anim/LocoBus';   // SHARED-ANIM-BUS: the run-up's loop + stride rate
 
 export interface AirSessionModeOpts {
@@ -72,6 +76,11 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   /** A+ P0 juice (PM brief CARNIVAL-A-PLUS-P0, 2026-09-07): one crash punch per landing, one finish punch per session. */
   let crashAt = 0;
   let finishLatch = false;
+  let boost = new BoostKit();
+  let boostFx: BoostFx | null = null;
+  let boostPads: BoostPads | null = null;
+  let boostHeld = false;
+  let baseFov: number | null = null;
 
   /** A clean / stuck landing: a soft shake on top of the scorePop + light feel hit that stay. */
   const landBeat = (ctx: ModeContext, grade: TrickGrade): void => { ctx.juice.shake(0.06, 120); console.info(`[AIR-JUICE] clean land (${grade})`); };
@@ -120,7 +129,8 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       best: S.best ? GRADE_LABEL[S.best] : null,
       nextFoot: S.nextFoot,
       banner: S.banner || null,
-      hint: 'D-PAD ←/→ alternate strides · in the air ←/→ picks backside/frontside · A starts the spin, A again plants it — land on a half turn · B stick the landing',
+      ...boost.hud(),
+      hint: 'D-PAD ←/→ alternate strides · HOLD RB/SHIFT boost the run-in (bigger pop) · in the air ←/→ picks backside/frontside · A starts the spin, A again plants it — land on a half turn · B stick the landing',
     });
   };
 
@@ -198,6 +208,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
 
       core = opts.makeSession((grade, rotations) => {
         if (grade === 'stuck' || grade === 'clean') S.combo += 1; else S.combo = 0;
+        if (grade === 'stuck' || grade === 'clean') { boost.earn('landingClean', grade === 'stuck' ? 1.5 : 1); if (Math.abs(rotations) >= 0.5) boost.earn(Math.abs(rotations) >= 1.5 ? 'trickBig' : 'trickSmall'); }
         if (S.best === null || GRADE_RANK[grade] > GRADE_RANK[S.best]) S.best = grade;
         const turns = Math.abs(rotations);
         say(`${GRADE_LABEL[grade]}${turns >= 1 ? `  ${turns.toFixed(1)} ROT ${rotations < 0 ? 'BS' : 'FS'}` : ''}`, 1.6);
@@ -214,6 +225,12 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       });
 
       ctx.camDirector.snapTo(athlete.root.position, launchPad.position);
+      boost = new BoostKit(0.25); boostHeld = false; baseFov = null;
+      boostFx?.dispose(); boostFx = new BoostFx(ctx.scene, ctx.camera, { trailFrom: athlete.root, trailWidth: 0.45 });
+      boostPads?.dispose();
+      boostPads = new BoostPads(ctx.scene, [   // on the run-in, before the slope has you at terminal speed
+        { pos: new Vector3(0, 0, -18) }, { pos: new Vector3(0, 0, -36) },
+      ].map((p) => ({ ...p, yaw: Math.PI, radius: 2.8 })));
       // L4 — a judged performance is watched. The gallery flanks the runway
       // (the athlete runs -z into the launch at z=-12): two banks at |x|=4,
       // outside the run line, in the runner cam's frame edges. Instanced,
@@ -227,6 +244,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
 
     onInput(ctx: ModeContext, e: FelInput): void {
       if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }   // MODE-STICK-FACE: R stick → the director's look orbit
+      if (e.t === 'button' && e.btn === 'R1') { boostHeld = e.pressed; return; }   // BOOST: the shared held R1
       if (S.done || !core) return;
       const phase = core.state.phase;
 
@@ -255,6 +273,8 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     update(ctx: ModeContext, dt: number): void {
       if (S.done || !core || !athlete || !launchPad) return;
 
+      const bev = boost.update(dt, boostHeld, core.state.phase === 'Run');
+      core.boostK = boost.k;
       const st = core.step(dt, dt);
 
       // Drive the athlete straight from the core's own 3D position.
@@ -288,8 +308,13 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
 
       gallery?.update(dt);
+      boostPads?.update(dt, athlete.root.position, boost);
+      boostFx?.update(dt, boost, bev);
+      if (bev.started) say('BOOST!', 0.5);
       ctx.camDirector.look(S.lookX, S.lookY, dt);
       ctx.camDirector.update(athlete.root.position, new Vector3(0, 0, -st.speed), launchPad.position);
+      baseFov ??= ctx.camera.fov;
+      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), st.phase === 'Run' ? st.speed : 0, BIG_AIR_TUNING.maxRunSpeed, dt);
       pushHud(ctx);
     },
 
@@ -304,6 +329,8 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       posture?.dispose(); posture = null;
       launchPad?.dispose(); launchPad = null;
       gallery?.dispose(); gallery = null;
+      boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null;
+      baseFov = null;
       core = null;
     },
   };

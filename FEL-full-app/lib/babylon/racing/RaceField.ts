@@ -185,6 +185,30 @@ export function standings(playerDist: number, rivals: readonly Rival[], playerNa
   return all.sort((a, b) => b.dist - a.dist);
 }
 
+// THE RACE ENDS FOR EVERYONE (MECHANICS PASS, 2026-09-15). A race only ever ended when the PLAYER crossed the line:
+// a player who stalled, got lost or put the pad down sat in a race that could never finish, with the field circling
+// forever — the release gauntlet's kart and aero runs hit the cap with no result at all. The arcade rule every kart
+// game teaches: when the field's LEADER finishes, the rest get a short, visible clock to the line; when it runs out,
+// the race is over and you place where you are. Cause → effect: the banner says who finished and how long you have.
+export const FINISH_GRACE_SEC = 15;
+
+/** The first rival to have run every lap, or null. `dist` keeps counting past a lap, so this is a plain distance test. */
+export function fieldLeaderDone(rivals: readonly Rival[], line: RaceLine, laps: number): Rival | null {
+  const total = line.lapLength * Math.max(1, laps);
+  let best: Rival | null = null;
+  for (const r of rivals) if (r.dist >= total && (!best || r.dist > best.dist)) best = r;
+  return best;
+}
+
+/** One frame of the finish clock. `left` null = not running. Returns the new value, whether it just started, and
+ *  whether it just ran out. Whole-second ticks are reported so a host can count the last seconds down. */
+export function stepFinishGrace(left: number | null, dt: number, leaderDone: boolean, grace = FINISH_GRACE_SEC): { left: number | null; started: boolean; expired: boolean; tick: number | null } {
+  if (left === null) return leaderDone ? { left: grace, started: true, expired: false, tick: Math.ceil(grace) } : { left: null, started: false, expired: false, tick: null };
+  const next = left - Math.max(0, dt);
+  const tick = Math.ceil(next) !== Math.ceil(left) ? Math.max(0, Math.ceil(next)) : null;
+  return next <= 0 ? { left: 0, started: false, expired: true, tick: 0 } : { left: next, started: false, expired: false, tick };
+}
+
 /** The player's position, 1-based. */
 export function playerPosition(playerDist: number, rivals: readonly Rival[]): number {
   return 1 + rivals.reduce((n, r) => n + (r.dist > playerDist ? 1 : 0), 0);

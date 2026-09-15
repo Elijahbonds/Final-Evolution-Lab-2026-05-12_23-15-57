@@ -56,6 +56,7 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
         <AnalogStick bus={props.bus} side="L" label="MOVE" />
       </div>
       <div className="pointer-events-auto absolute bottom-3 right-3 flex flex-col items-center gap-2" style={SAFE_RIGHT}>
+        {cfg.boost && <BoostPill bus={props.bus} />}
         <ButtonDiamond bus={props.bus} buttons={cfg.buttons} />
         {cfg.rStick === null ? <HollowStick /> : <AnalogStick bus={props.bus} side="R" label={cfg.rStick} />}
       </div>
@@ -129,6 +130,21 @@ function DPad({ bus }: { bus: InputBus }) {
       >▶</button>
       <div className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-sm bg-white/5" />
     </div>
+  );
+}
+
+// BOOST (FINISH-RELEASE, 2026-09-14): one held control in every speed mode. Emits R1 down on press and R1 up on release,
+// exactly what RB on a pad and Shift on a keyboard send, so the mode reads one input for all three.
+function BoostPill({ bus }: { bus: InputBus }) {
+  const [held, setHeld] = useState(false);
+  const down = (e: React.PointerEvent) => { safeCapture(e.target as Element, e.pointerId); navigator.vibrate?.(12); setHeld(true); bus.emit({ t: 'button', btn: 'R1', pressed: true }); };
+  const up = () => { if (!held) return; setHeld(false); bus.emit({ t: 'button', btn: 'R1', pressed: false }); };
+  return (
+    <button onPointerDown={down} onPointerUp={up} onPointerCancel={up} onPointerLeave={up}
+      className="h-[46px] w-[148px] touch-none select-none rounded-full border-2 text-[12px] font-black tracking-[0.25em] text-white transition-transform duration-75 active:scale-95"
+      style={{ borderColor: '#22d3ee', background: held ? '#22d3eecc' : '#22d3ee26', boxShadow: held ? '0 0 26px #22d3ee' : '0 0 14px #22d3ee55' }}>
+      BOOST
+    </button>
   );
 }
 

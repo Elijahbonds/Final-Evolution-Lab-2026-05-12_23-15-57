@@ -14,6 +14,9 @@
 // Everything from M44 kept: gates, tricks, tuck, gate/miss audio language.
 
 import { stepSpeedFov } from '../core/SpeedFov';
+import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the shared boost replaces the tuck-spent meter
+import { BoostFx } from '../premium/BoostFx';
+import { BoostPads } from '../visual/BoostPads';
 import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -105,8 +108,13 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   }
   const move = new BoardMovement(tuneForVenue(SNOW_TUNING, readBoardVenue('snow')));   // Phase 12: carve weight + slope energy
   let mbus = new MomentumBus();
-  let boost = 0;                                  // SSX boost meter 0..100
-  let boosting = false;
+  // BOOST (FINISH-RELEASE, 2026-09-14): the shared BoostKit. The mode's own 0..100 meter was spent by TUCKING past 0.85
+  // — a boost you could not choose to hold back, on the same trigger as the speed tuck. Spins, gates and grinds pay it
+  // now; the held R1 (RB · Shift · BOOST pill) burns it, exactly as in the kart, the plane and the other boards.
+  let boostKit = new BoostKit();
+  let boostFx: BoostFx | null = null;
+  let boostPads: BoostPads | null = null;
+  let boostHeld = false;
 
   async function spawnYeti(ctx: ModeContext): Promise<void> {
     if (yetiDone || yeti) return;
@@ -207,7 +215,16 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       ctx.camDirector.snapTo(rig.char.root.position, world.markers[nextGate] ?? null);
       SoundKit.startAmbient('wind');           // Phase 18: descent wind bed
       EffectsKit.ambient(ctx.scene, 'slope');  // snowfall
-      ctx.setHud({ score: 0, boost: 0, gates: `0/${world.markers.length}`, hint: 'Gates for points · JUMP rocks · grind the rails · watch the treeline…' });
+      // BOOST: a pad on the fall line halfway to every other gate, pointing down the hill
+      boostKit = new BoostKit(0.2); boostHeld = false;
+      boostFx?.dispose(); boostFx = new BoostFx(ctx.scene, ctx.camera, { trailFrom: rig.char.root, trailWidth: 0.5, color: '#9be7ff' });
+      boostPads?.dispose();
+      boostPads = new BoostPads(ctx.scene, world.markers.filter((_, i) => i % 2 === 1).map((gm, j) => {
+        const prev = world.markers[j * 2] ?? rig.char.root.position;
+        const at = prev.add(gm.subtract(prev).scale(0.5));
+        return { pos: at, yaw: Math.atan2(gm.x - prev.x, gm.z - prev.z), radius: 2.6 };
+      }), '#9be7ff');
+      ctx.setHud({ score: 0, ...boostKit.hud(), gates: `0/${world.markers.length}`, hint: 'Gates for points · JUMP rocks · grind the rails · hold RB / Shift to BOOST' });
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -250,14 +267,11 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             ctx.setHud({ banner: fits.label });
             setTimeout(() => ctx.setHud({ banner: '' }), 520);
             // the boost still fills off a SPIN, which is what it always rewarded — now it scales with the rotation
-            if (fits.spinDeg > 0) {
-              boost = Math.min(BOOST_MAX, boost + BOOST_PER_SPIN * (fits.spinDeg / 360));
-              ctx.setHud({ boost: Math.round(boost) });   // the meter has to move as it FILLS, not only as it drains
-            }
+            if (fits.spinDeg > 0) boostKit.earn(fits.spinDeg >= 540 ? 'trickBig' : 'trickSmall', Math.max(1, fits.spinDeg / 360));
           }
         }
-        if (e.btn === 'R1') boosting = boost > 10;
       }
+      if (e.t === 'button' && e.btn === 'R1') boostHeld = e.pressed;   // BOOST: the shared held R1 (press AND release)
       if (e.t === 'button' && !e.pressed && e.btn === 'X') tricks.endGrab();
     },
 
@@ -277,6 +291,13 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // against 7.2m across it, roughly 0.75 m/s of descent on a course 205m
       // long. That is the whole reason a 90-second run scored 1 gate out of 12
       // -- the rider only ever physically reached the first one.
+      const bev = boostKit.update(dt, boostHeld, stumbleIframe === 0);
+      move.boostK = boostKit.k;
+      if (rig.rider.grinding) boostKit.earnOver('grindPerSec', dt);
+      boostPads?.update(dt, rig.char.root.position, boostKit);
+      boostFx?.update(dt, boostKit, bev);
+      if (bev.started) { ctx.setHud({ banner: 'BOOST' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+      if (bev.full) { ctx.setHud({ banner: 'BOOST READY' }); setTimeout(() => ctx.setHud({ banner: '' }), 700); }
       const v = move.update(dt, stickX, tuck, ctx.scene, rig.char.root.position, world.ground);
       rig.rider.vel.x = v.x; rig.rider.vel.z = v.z;
       rig.rider.update(dt, stickX, tuck);
@@ -299,20 +320,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // Same commitment idiom surf uses for its flow meter, deliberately: one
       // benchmark, one economy. Bury the tuck and you spend the meter; ease off
       // and you keep what is left.
-      if (!boosting && tuck >= BOOST_TUCK && boost > 1) {
-        boosting = true;
-        SoundKit.play('powerUp', { pitch: 0.9, volume: 0.5 });
-        ctx.setHud({ banner: 'BOOST' });
-        setTimeout(() => ctx.setHud({ banner: '' }), 700);
-      } else if (boosting && tuck < BOOST_TUCK * 0.6) {
-        boosting = false;
-      }
-      if (boosting) {
-        rig.rider.vel.scaleInPlace(1 + 0.9 * dt);
-        boost = Math.max(0, boost - BOOST_DRAIN * dt);
-        if (boost === 0) boosting = false;
-        ctx.setHud({ boost: Math.round(boost) });
-      }
+      // (the tuck-spent meter that lived here is the shared BoostKit now — see the top of update)
+      { const bh = boostKit.hudIfChanged(); if (bh) ctx.setHud(bh); }
       // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
 
       // ROCKS — grounded contact is a stumble; airborne clears clean
@@ -376,6 +385,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
           if (Math.abs(p.x - gate.x) <= 2.0) {
             gatesHit++;
             tricks.score += 100;
+            boostKit.earn('trickSmall');   // a clean gate pays the boost — the slalom line is the fast line
             ctx.feel?.impact?.(0.15);
             SoundKit.play('score', { pitch: 1.4, volume: 0.35 });
             EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'sparks');
@@ -449,10 +459,11 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
       // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
       baseFov ??= ctx.camera.fov;
-      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov, Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
+      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boostKit) ?? 1), Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
     },
 
     dispose() {
+      boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null;
       posture?.dispose(); posture = null;
       yeti?.char.dispose(); yeti = null; yetiPool = null;
       crowd?.dispose();

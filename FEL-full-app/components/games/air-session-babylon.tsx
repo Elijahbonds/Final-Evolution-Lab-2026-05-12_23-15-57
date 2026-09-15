@@ -10,6 +10,7 @@ import { BootSplash } from './boot-splash';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
+import { BoostGauge } from './boost-hud';
 
 // Which harness currently owns a given canvas. React mounts effects twice in
 // dev: effect A starts an async runMode(), its cleanup fires before A has even
@@ -96,6 +97,7 @@ export function makeAirHost(modeKey: string, title: string) {
     return (
       <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
+        {phase === 'playing' && <BoostGauge hud={hud} className="absolute inset-x-0 bottom-24 z-20" />}
 
         {phase === 'playing' && (
           <div className="pointer-events-none absolute left-4 top-4 z-20 font-mono text-xs text-white">

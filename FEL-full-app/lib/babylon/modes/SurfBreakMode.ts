@@ -11,6 +11,9 @@
 // rider/wave lockstep wrap (E24's fix).
 
 import { stepSpeedFov } from '../core/SpeedFov';
+import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the shared boost is the surge now
+import { BoostFx } from '../premium/BoostFx';
+import { BoostPads } from '../visual/BoostPads';
 import { MomentumBus } from '../core/MomentumBus';
 import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -78,6 +81,16 @@ export const SurfBreakMode: ModeDefinition = (() => {
   let lapsSeen = 0;
   let barrelSec = 0, inBarrel = false, barrels = 0;
   let surging = false;
+  // BOOST (FINISH-RELEASE, 2026-09-14): the surge used to fire by burying the carve past SURGE_CARVE and burning FLOW —
+  // a boost you could not hold back, on the carve trigger. It is the shared BoostKit now: riding the pocket and landing
+  // wave tricks fill it, the held R1 (RB · Shift · BOOST pill) burns it, and FLOW goes back to being the score meter.
+  let boostKit = new BoostKit();
+  let boostFx: BoostFx | null = null;
+  let boostPads: BoostPads | null = null;
+  let boostHeld = false;
+  /** Surf's pads ride the wave: across the face at these x, this far into the pocket. */
+  const PAD_XS = [-14, 0, 14];
+  const PAD_POCKET_U = 5.5;
   // ANIM-READABILITY (2026-09-07): ONE owner of the rider's clips. The per-frame play(...) here cut every one-shot a
   // frame later (grab 0.13 s, landing 0.13 s; the air one-shot ran out mid-flight and flashed the idle; steering had no
   // lean at all). The BoardAnimTree holds beats and settles one-shots; the mode feeds it state — stick = lean, a
@@ -243,7 +256,10 @@ export const SurfBreakMode: ModeDefinition = (() => {
       ctx.camDirector.snapTo(rig.char.root.position, waveLipAt(t));
       SoundKit.startAmbient('ocean');
       EffectsKit.ambient(ctx.scene, 'venice');
-      ctx.setHud({ score: 0, flow: 0, time: RUN_SEC, hint: 'Ride the pocket under the lip · pull BACK to climb the face, push to drop in · R2 drives · ride the open TUBE for barrels · miss the buoys' });
+      boostKit = new BoostKit(0.2); boostHeld = false;
+      boostFx?.dispose(); boostFx = new BoostFx(ctx.scene, ctx.camera, { trailFrom: rig.char.root, trailWidth: 0.5, color: '#bff4ff' });
+      boostPads?.dispose(); boostPads = new BoostPads(ctx.scene, PAD_XS.map((x) => ({ pos: new Vector3(x, 0, 0), radius: 2.8 })), '#bff4ff');
+      ctx.setHud({ score: 0, flow: 0, ...boostKit.hud(), time: RUN_SEC, hint: 'Ride the pocket under the lip · pull BACK to climb, push to drop in · R2 drives · hold RB / Shift to BOOST · miss the buoys' });
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -251,6 +267,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }   // P3: y = trim (back climbs the face, forward drops in)
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (e.t === 'trigger' && e.side === 'R') carve = e.value;
+      if (e.t === 'button' && e.btn === 'R1') boostHeld = e.pressed;   // BOOST: the shared held R1
       if (e.t === 'button' && e.pressed && !wipedOut) {
         if (e.btn === 'A') {
           if (rig.rider.grounded) { rig.rider.jump(0.5 + flow / 200); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); }   // the tree reads the air
@@ -271,6 +288,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
             cutbackUntil = t + CUTBACK_LEAN_SEC;
           }
           tricks.score += trickPts(wave) + Math.round(flow / 4);
+          boostKit.earn(wave.difficulty >= 3 ? 'trickBig' : 'trickSmall');
           ctx.feel?.impact?.(wave.difficulty >= 3 ? 0.2 : 0.12);
           SoundKit.play('whoosh', { pitch: 1.5, volume: 0.35 });
           ctx.setHud({ score: tricks.score, banner: wave.label });
@@ -321,16 +339,15 @@ export const SurfBreakMode: ModeDefinition = (() => {
         // the only way to outrun a section closing ahead of you. Bank it for
         // the score trickle or spend it to make the wave; that trade is the
         // decision the meter was missing.
-        const wantSurge = carve >= SURGE_CARVE && flow > 1;
-        if (wantSurge && !surging) {
-          surging = true;
-          SoundKit.play('whoosh', { pitch: 0.75, volume: 0.5 });
-          ctx.setHud({ banner: 'SURGE' });
-          setTimeout(() => ctx.setHud({ banner: '' }), 600);
-        } else if (!wantSurge) {
-          surging = false;
+        const bev = boostKit.update(dt, boostHeld, true);
+        surging = boostKit.burning;
+        if (bev.started) { ctx.setHud({ banner: 'BOOST' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+        if (bev.full) { ctx.setHud({ banner: 'BOOST READY' }); setTimeout(() => ctx.setHud({ banner: '' }), 700); }
+        boostFx?.update(dt, boostKit, bev);
+        if (boostPads) {
+          PAD_XS.forEach((x, i) => { const z = lip.z + PAD_POCKET_U; boostPads!.place(i, new Vector3(x, faceHeightAt(x, z, t), z)); });
+          boostPads.update(dt, rig.char.root.position, boostKit);
         }
-        if (surging) flow = Math.max(0, flow - SURGE_DRAIN * dt);
 
         // ── WAVE-RELATIVE DRIVE (ARENA-10PHASE P3 / SURF-WAVES-BOUNDS, 2026-09-07) ──
         // The Rider is a flat-park model: its own forward accel (9 m/s² × 0.55 with no pump) ran the surfer up to 14 m/s
@@ -347,8 +364,10 @@ export const SurfBreakMode: ModeDefinition = (() => {
         let relTarget = u >= WAVE_FACE_LEN ? DRIFT.flat : DRIFT.slide * slope - DRIFT.trim;
         if (stickY > 0.2) relTarget -= DRIFT.climb * stickY;
         else if (stickY < -0.2) relTarget += DRIFT.drop * -stickY;
-        relTarget += carve * DRIFT.rail + (surging ? SURGE_SPEED_BONUS : 0);
-        relTarget = Math.min(relTarget, MAX_FORWARD_SPEED - WAVE_SPEED + (surging ? SURGE_SPEED_BONUS : 0));
+        // the boost drives above the normal ceiling (scaled by its ramp, so the surge arrives and bleeds off smoothly)
+        const surge = SURGE_SPEED_BONUS * 1.5 * boostKit.k;
+        relTarget += carve * DRIFT.rail + surge;
+        relTarget = Math.min(relTarget, MAX_FORWARD_SPEED - WAVE_SPEED + surge);
         rel += (relTarget - rel) * Math.min(1, dt * 3.2);
         rig.rider.vel.z = WAVE_SPEED + rel;
         rig.rider.update(dt, stickX, carve);
@@ -381,6 +400,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
           // pocket riding — doubled while the tube is open over you
           const mult = hollow ? 2 : 1;
           flow = Math.min(FLOW_MAX, flow + dt * FLOW_FILL_PER_SEC * mult);
+          boostKit.earnOver('pocketPerSec', dt, mult);
           tricks.score += Math.round(dt * (10 + flow / 10) * mult);
           if (hollow) {
             barrelSec += dt;
@@ -426,7 +446,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       }
 
       crowd.update(dt);
-      ctx.setHud({ time: Math.ceil(timeLeft) });
+      ctx.setHud({ time: Math.ceil(timeLeft), ...boostKit.hud() });
       const vel = rig.rider.vel;
       const leadVel = vel.lengthSquared() > 0.01 ? vel.scale(1.6) : vel;
       ctx.camDirector.look(lookX, lookY, dt);
@@ -435,10 +455,10 @@ export const SurfBreakMode: ModeDefinition = (() => {
       // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
       // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
       baseFov ??= ctx.camera.fov;
-      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov, Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
+      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boostKit) ?? 1), Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
     },
 
-    dispose() { posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 
