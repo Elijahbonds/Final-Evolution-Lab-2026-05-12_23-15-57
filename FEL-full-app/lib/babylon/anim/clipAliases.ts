@@ -44,6 +44,7 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   karate_hammer: ['hook', 1.0],
   karate_heavy: ['uppercut', 1.0],
   karate_rush: ['jab', 1.0],
+  karate_stagger: ['karate_hit_react', 0.7],   // REACTIVE ENEMIES: the reel falls back to a slow flinch
   karate_counter_throw: ['uppercut', 0.9],
   karate_dodge_roll: ['guard', 1.3],
   karate_hit_react: ['guard', 2.0],

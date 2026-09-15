@@ -700,6 +700,28 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
       {t: 0.9,bones: {Hips: [0,21,0],Spine: [3,5,0]},hands: {Left: [-0.09,1.18,0.01],Right: [0.14,1.26,0.48]},poles: {Left: [0.03,-0.37,-0.93],Right: [0.69,-0.7,-0.16]},feet: {Left: [-0.11,0.39,-0.46],Right: [0.19,0.37,0.33]},hipsY: -0.3},
     ],
   },
+  {
+    name: 'karate_mc_stagger', replaces: 'karate_stagger', duration: 0.75, loop: false,
+    source: 'ual:UAL2_Standard.glb#Idle_Shield_Break 0.00–0.90s', license: "Quaternius Universal Animation Library 2 — CC0 1.0",
+    keys: [
+      {t: 0,bones: {Hips: [0,-1,0],Spine: [3,-23,0]},hands: {Left: [-0.06,1.33,0.42],Right: [0.32,1.01,-0.13]},poles: {Left: [-0.92,-0.32,0.22],Right: [-0.36,-0.04,-0.93]},feet: {Left: [-0.23,0.21,0.19],Right: [0.2,0.21,-0.12]},hipsY: -0.14},
+      {t: 0.05,bones: {Hips: [0,2,0],Spine: [-9,-8,0]},hands: {Left: [-0.27,1.37,0.25],Right: [0.37,1.04,-0.02]},poles: {Left: [-0.82,-0.55,-0.16],Right: [-0.06,-0.21,-0.98]},feet: {Left: [-0.23,0.24,0.24],Right: [0.2,0.24,-0.07]},hipsY: -0.17},
+      {t: 0.1,bones: {Hips: [0,5,0],Spine: [-21,21,0]},hands: {Left: [-0.47,1.34,-0.05],Right: [0.33,1.17,0.2]},poles: {Left: [-0.35,-0.84,-0.41],Right: [0.65,-0.47,-0.61]},feet: {Left: [-0.24,0.27,0.28],Right: [0.2,0.27,-0.03]},hipsY: -0.2},
+      {t: 0.15,bones: {Hips: [0,5,0],Spine: [-23,32,0]},hands: {Left: [-0.53,1.29,-0.19],Right: [0.24,1.27,0.29]},poles: {Left: [-0.05,-0.91,-0.4],Right: [0.75,-0.56,-0.36]},feet: {Left: [-0.24,0.27,0.29],Right: [0.2,0.28,-0.02]},hipsY: -0.2},
+      {t: 0.2,bones: {Hips: [0,4,0],Spine: [-21,32,0]},hands: {Left: [-0.56,1.27,-0.19],Right: [0.23,1.28,0.29]},poles: {Left: [0.04,-0.92,-0.38],Right: [0.72,-0.56,-0.4]},feet: {Left: [-0.24,0.27,0.3],Right: [0.2,0.28,-0.01]},hipsY: -0.2},
+      {t: 0.25,bones: {Hips: [0,3,0],Spine: [-18,30,0]},hands: {Left: [-0.57,1.28,-0.16],Right: [0.27,1.24,0.26]},poles: {Left: [0.06,-0.91,-0.41],Right: [0.66,-0.51,-0.55]},feet: {Left: [-0.24,0.27,0.3],Right: [0.2,0.28,-0.01]},hipsY: -0.2},
+      {t: 0.3,bones: {Hips: [0,2,0],Spine: [-14,26,0]},hands: {Left: [-0.58,1.29,-0.1],Right: [0.32,1.18,0.21]},poles: {Left: [0.02,-0.88,-0.47],Right: [0.55,-0.41,-0.73]},feet: {Left: [-0.24,0.27,0.3],Right: [0.2,0.27,-0.01]},hipsY: -0.2},
+      {t: 0.35,bones: {Hips: [0,1,0],Spine: [-10,22,0]},hands: {Left: [-0.58,1.31,-0.01],Right: [0.37,1.12,0.13]},poles: {Left: [-0.06,-0.84,-0.55],Right: [0.39,-0.26,-0.88]},feet: {Left: [-0.24,0.26,0.28],Right: [0.2,0.26,-0.03]},hipsY: -0.19},
+      {t: 0.4,bones: {Hips: [0,0,0],Spine: [-5,18,0]},hands: {Left: [-0.56,1.32,0.08],Right: [0.4,1.07,0.01]},poles: {Left: [-0.18,-0.77,-0.61],Right: [0.21,-0.05,-0.98]},feet: {Left: [-0.24,0.25,0.26],Right: [0.2,0.25,-0.05]},hipsY: -0.18},
+      {t: 0.45,bones: {Hips: [0,-1,0],Spine: [-2,12,0]},hands: {Left: [-0.52,1.33,0.19],Right: [0.4,1.05,-0.11]},poles: {Left: [-0.36,-0.7,-0.62],Right: [0.04,0.16,-0.99]},feet: {Left: [-0.23,0.23,0.23],Right: [0.2,0.24,-0.08]},hipsY: -0.16},
+      {t: 0.5,bones: {Hips: [0,-1,0],Spine: [2,7,0]},hands: {Left: [-0.45,1.34,0.3],Right: [0.37,1.04,-0.2]},poles: {Left: [-0.56,-0.61,-0.57],Right: [-0.07,0.32,-0.95]},feet: {Left: [-0.23,0.22,0.21],Right: [0.2,0.22,-0.1]},hipsY: -0.15},
+      {t: 0.55,bones: {Hips: [0,-2,0],Spine: [4,1,0]},hands: {Left: [-0.36,1.34,0.38],Right: [0.34,1.04,-0.24]},poles: {Left: [-0.74,-0.52,-0.43],Right: [-0.15,0.37,-0.92]},feet: {Left: [-0.23,0.21,0.19],Right: [0.2,0.21,-0.12]},hipsY: -0.14},
+      {t: 0.6,bones: {Hips: [0,-2,0],Spine: [5,-5,0]},hands: {Left: [-0.26,1.33,0.43],Right: [0.31,1.03,-0.25]},poles: {Left: [-0.87,-0.44,-0.23],Right: [-0.21,0.35,-0.91]},feet: {Left: [-0.23,0.2,0.18],Right: [0.2,0.21,-0.13]},hipsY: -0.13},
+      {t: 0.65,bones: {Hips: [0,-2,0],Spine: [6,-10,0]},hands: {Left: [-0.16,1.33,0.45],Right: [0.29,1.02,-0.24]},poles: {Left: [-0.93,-0.37,-0.02],Right: [-0.27,0.3,-0.92]},feet: {Left: [-0.23,0.2,0.17],Right: [0.2,0.2,-0.14]},hipsY: -0.13},
+      {t: 0.7,bones: {Hips: [0,-2,0],Spine: [6,-15,0]},hands: {Left: [-0.08,1.32,0.45],Right: [0.28,1.01,-0.22]},poles: {Left: [-0.93,-0.32,0.16],Right: [-0.32,0.23,-0.92]},feet: {Left: [-0.23,0.2,0.17],Right: [0.2,0.2,-0.14]},hipsY: -0.13},
+      {t: 0.75,bones: {Hips: [0,-2,0],Spine: [7,-19,0]},hands: {Left: [-0.02,1.31,0.44],Right: [0.28,1,-0.19]},poles: {Left: [-0.91,-0.29,0.3],Right: [-0.36,0.15,-0.92]},feet: {Left: [-0.23,0.2,0.17],Right: [0.2,0.2,-0.14]},hipsY: -0.13},
+    ],
+  },
 ];
 
 export function buildMocapOpponentClip(scene: Scene, sk: Skeleton, clip: MocapOpponentClip): AnimationGroup | null {

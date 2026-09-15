@@ -159,6 +159,8 @@ const SHOCK_SEC = 0.32;
 const HIT_CHAIN_MS = 1400;
 /** A takedown reaches the nearest body this close (metres). */
 const TAKEDOWN_REACH = 2.8;
+/** A launched body is helpless for the knockdown and the get-up (the two captures, 0.7 s + 1.05 s, less the blend). */
+const LAUNCH_FLOOR_SEC = 1.6;
 
 // horde sizing — deliberately bigger/faster than the old wave-survival pace
 // A+ identity P0 (PM brief 2026-09-06): ONE SOLID STRIKE DROPS A BODY. No enemy HP pool, no chip — the wave escalates
@@ -273,7 +275,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   let turnClock: { at: number; deg: number } | null = null;
   /** L1 pressed inside a swing before its hit: the grab waits for the hit (QUEUE_SEC), like a queued strike. */
   let grabQueuedAt = -Infinity;
-  const dyn = { swings: 0, cancels: 0, queued: 0, eatenPresses: 0, redirects: 0, maxTurnDeg: 0, lunges: 0, stuns: 0, stunnedMax: 0, flinches: 0, grabs: 0, weaponSwings: 0, throws: 0, weaponHits: 0, lastMove: '', lastString: '', lastRedirect: '', lastGrabMiss: '' };
+  const dyn = { swings: 0, cancels: 0, queued: 0, eatenPresses: 0, redirects: 0, maxTurnDeg: 0, lunges: 0, stuns: 0, stunnedMax: 0, flinches: 0, grabs: 0, weaponSwings: 0, throws: 0, weaponHits: 0, lastMove: '', lastString: '', lastRedirect: '', lastGrabMiss: '', bowled: 0 };
   /** DYNAMIC POSTURE for the hero's footwork. A horde mode is ALL circling — you are always moving around bodies —
    *  so a flat, unbanked body is most of what the mode looks like. Exertion comes off the vitals: a fighter deep in a
    *  wave on low health carries himself like it. */
@@ -724,17 +726,55 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     }
   }
 
-  /** A body takes a stagger: whatever it was doing is cancelled, the steering holds, it flinches and slides out. */
-  function staggerEnemy(e: Enemy, sec: number, push: number, dx: number, dz: number): void {
+  /**
+   * A body takes a stagger: whatever it was doing is cancelled, the steering holds, it reacts and slides out.
+   *
+   * REACTIVE ENEMIES (THE HUNDRED, owner 2026-09-15). Every hit used to play the same flinch whatever landed — a jab and
+   * a hammer fist read identically on the body that took them. The reaction now reads the WEIGHT of the blow:
+   *   flinch  a light hit: the captured flinch (karate_mc_hit_react), a short slide
+   *   reel    a medium / heavy hit or a crowd stun: the guard broken, the body reels back on its feet (karate_mc_stagger)
+   *   launch  a launcher, a throw, a big stun push: knocked off the feet (karate_mc_knockdown) and back up (karate_mc_get_up),
+   *           helpless for the whole fall — and a launched body BOWLS whoever it slides into (they reel, and the flow counts them)
+   * The body turns to the blow first, so the reaction plays toward the hit instead of whichever way it was walking.
+   */
+  function staggerEnemy(e: Enemy, sec: number, push: number, dx: number, dz: number, ctx?: ModeContext): void {
     if (e.carried) return;
     e.brain.interrupt(); e.orbitUntil = 0; e.mob.hold();
-    e.stunUntil = Math.max(e.stunUntil, gameSec + sec);
-    e.anim.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.05 });   // beat BEFORE loop (a loop set first plays for a frame)
+    const kind = push >= 0.6 ? 'launch' : sec >= FLINCH_SEC * 1.25 ? 'reel' : 'flinch';
+    const root = e.mob.char.root;
+    if (Math.hypot(dx, dz) > 1e-3) root.rotation.y = Math.atan2(-dx, -dz);   // face the blow (dx,dz points away from the hitter)
+    if (kind === 'launch') {
+      e.stunUntil = Math.max(e.stunUntil, gameSec + Math.max(sec, LAUNCH_FLOOR_SEC));
+      e.airUntil = Math.max(e.airUntil, now() + 450);
+      e.anim.beat(SPORT_CLIP.karateKnockdown, { fadeSec: 0.05, onSettle: () => { if (enemies.includes(e) && !e.carried) e.anim.beat('karate_get_up', { fadeSec: 0.12 }); } });
+    } else {
+      e.stunUntil = Math.max(e.stunUntil, gameSec + sec);
+      e.anim.beat(kind === 'reel' ? 'karate_stagger' : SPORT_CLIP.karateHitReact, { fadeSec: 0.05 });   // beat BEFORE loop (a loop set first plays for a frame)
+    }
     e.anim.loop(STANCE, { fadeSec: 0.15 });
     if (push > 0.01) {
-      const root = e.mob.char.root; const from = root.position.clone();
+      const from = root.position.clone();
       const to = from.add(new Vector3(dx, 0, dz).scale(push)); clampDisc(to);
-      tween(0.18, (k) => { if (!e.carried) { const q = 1 - (1 - k) * (1 - k); root.position.x = from.x + (to.x - from.x) * q; root.position.z = from.z + (to.z - from.z) * q; } });
+      const bowled = new Set<Enemy>([e]);
+      tween(kind === 'launch' ? 0.3 : 0.18, (k) => {
+        if (e.carried) return;
+        const q = 1 - (1 - k) * (1 - k);
+        const px = root.position.x, pz = root.position.z;
+        root.position.x = from.x + (to.x - from.x) * q; root.position.z = from.z + (to.z - from.z) * q;
+        if (kind !== 'launch' || !ctx) return;
+        // BOWLING: a flying body knocks down the path — each body it passes reels off it once
+        const others = liveBodies().filter((o) => !bowled.has(o));
+        const hits = pathHits({ x: px, z: pz }, { x: root.position.x, z: root.position.z }, others.map(xz), 0.6);
+        if (!hits.length) return;
+        for (const i of hits) {
+          const o = others[i]; bowled.add(o);
+          staggerEnemy(o, FLINCH_SEC * 1.6, 0.4, dx, dz);
+          EffectsKit.burst(ctx.scene, o.mob.char.root.position.add(new Vector3(0, 1, 0)), 'sparks');
+        }
+        dyn.bowled += hits.length;
+        onFlow(ctx, flow.hit(hits.length, 'light', gameSec), bowled.size >= 3 ? `BOWLED ×${bowled.size - 1}` : undefined);
+        SoundKit.play('impact', { pitch: 0.9, volume: 0.5 });
+      });
     }
   }
 
@@ -744,7 +784,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const hits = crowdStun({ x: origin.x, z: origin.z }, bodies.map((e) => ({ x: e.mob.char.root.position.x, z: e.mob.char.root.position.z })), radius, sec);
     shockRing(ctx, origin, radius);
     if (!hits.length) return 0;
-    for (const h of hits) staggerEnemy(bodies[h.index], h.sec, h.push, h.dx, h.dz);
+    for (const h of hits) staggerEnemy(bodies[h.index], h.sec, h.push, h.dx, h.dz, ctx);
     dyn.stuns++; dyn.stunnedMax = Math.max(dyn.stunnedMax, hits.length);
     ctx.juice.hitStop(hits.length >= 3 ? 90 : 60);
     ctx.juice.shake(0.1 + 0.03 * Math.min(6, hits.length), 240);
@@ -919,7 +959,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     // took a jab mid-wind-up and hit you anyway (landHit never touched the brain).
     const ox = t.mob.char.root.position.x - player.root.position.x, oz = t.mob.char.root.position.z - player.root.position.z, ol = Math.hypot(ox, oz) || 1;
     const k = weight === 'light' ? 1 : weight === 'medium' ? 1.3 : 1.7;
-    staggerEnemy(t, FLINCH_SEC * k * (launch ? 1.6 : 1), (launch ? 0.7 : 0.22) * k, ox / ol, oz / ol);
+    staggerEnemy(t, FLINCH_SEC * k * (launch ? 1.6 : 1), (launch ? 0.7 : 0.22) * k, ox / ol, oz / ol, ctx);
     dyn.flinches++;
     // still standing: the bar is the feedback that the hit counted
     SoundKit.play('impact', { pitch: 1.15, volume: 0.35 });

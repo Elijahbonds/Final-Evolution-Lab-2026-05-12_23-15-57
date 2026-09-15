@@ -405,6 +405,17 @@
    "to": 1.45,
    "note": "THE HUNDRED distinct moves (2026-09-15): Gedanbarai: a full step in (hips travel ~1 leg length 0.6–1.4) behind the strike — RUSH (push at + Y)",
    "duration": 0.9
+  },
+  {
+   "name": "karate_mc_stagger",
+   "replaces": "karate_stagger",
+   "source": "ual",
+   "file": "ual2/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+   "anim": "Idle_Shield_Break",
+   "from": 0.0,
+   "to": 0.9,
+   "duration": 0.75,
+   "note": "THE HUNDRED reactive enemies (2026-09-15): the guard broken — the body reels back off a medium / heavy hit without leaving its feet (the light flinch stays karate_mc_hit_react, a launch is the knockdown)"
   }
  ]
 }
