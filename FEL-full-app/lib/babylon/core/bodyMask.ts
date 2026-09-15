@@ -16,7 +16,8 @@
 // behind that surface or poking out through it facing the same way) and is at least the slot's margin from the garment's
 // open edge (hem, armhole, waist — where skin can slide out from under a garment) is hidden; a body triangle whose three
 // vertices are all hidden is dropped from this body's index buffer. The inner arm hanging beside the tank faces INTO it
-// and is kept. Shoes hide only the foot (Foot / ToeBase skin), never the shin, so no ankle can open.
+// and is kept. Shoes hide the foot (Foot / ToeBase skin) and shin skin at least SHOE_RIM_DEPTH below the collar rim, so no
+// ankle can open. Open edges the skin comes out of are flared off it first (EDGE_FLARE, part 2).
 //
 // The computation is pure (arrays in, indices out) and measured in ONE pose for body and garments (whatever pose the
 // skeleton holds when it runs), so the pose itself does not matter. It runs after the first rendered frame (the skeleton
@@ -38,6 +39,25 @@ const SLOT_BONES: Record<string, { re: RegExp; min: number }> = { shoes: { re: /
  *  no shoe triangle under them) are hidden too — skin mostly on ToeBase, within this reach of the shoe. The ankle carries no
  *  ToeBase weight, so no gap can open above a collar. */
 const TOE_RULE = { re: /ToeBase$/, min: 0.5, reach: 0.08 };
+/** Shin skin DEEP inside a shoe is hidden too (CLOTHING-ALONE part 2): at least this far (m) below the shoe's collar rim over it.
+ *  The rule above kept all Leg skin because a folded collar used to swing with the thigh and could open an ankle hole; since
+ *  01b8c86 the collar rides the shin's own weights, and the drawn Achilles/shin skin inside the boot showed through its back in
+ *  every GPU closeup (a 2–3.5k px strip at 1.2 mm/px, both feet, every beat). Skin within this of the rim stays drawn (3 cm left the
+ *  strip showing; 1.2 cm halved it and the collar still reads closed in closeups). */
+export const SHOE_RIM_DEPTH = 0.012;
+
+/** The top rim of a shoe: surface points with nothing of the shoe higher (by > 5 mm) within 6 cm horizontally. Pure. */
+export function shoeRimPoints(surfaces: MaskSurface[]): number[] {
+  const pts: number[] = [];
+  for (const sf of surfaces) for (let v = 0; v < sf.P.length / 3; v++) pts.push(sf.P[v * 3], sf.P[v * 3 + 1], sf.P[v * 3 + 2]);
+  const out: number[] = [];
+  for (let i = 0; i < pts.length; i += 3) {
+    let top = true;
+    for (let j = 0; j < pts.length && top; j += 3) if (pts[j + 1] > pts[i + 1] + 0.005 && Math.hypot(pts[j] - pts[i], pts[j + 2] - pts[i + 2]) < 0.06) top = false;
+    if (top) out.push(pts[i], pts[i + 1], pts[i + 2]);
+  }
+  return out;
+}
 
 export interface MaskSurface { P: ArrayLike<number>; N: ArrayLike<number>; ind: ArrayLike<number> }
 export interface MaskSlot { slot: string; surfaces: MaskSurface[]; margin?: number }
@@ -119,6 +139,7 @@ export function computeBodyMask(input: MaskInput): MaskResult {
       }
     });
     const edges = margin > 0 ? openEdgePoints(sl.surfaces) : [];
+    const rim = boneRe ? shoeRimPoints(sl.surfaces) : [];
     const EC = Math.max(margin, 0.01);
     const edgeGrid = new Map<string, number[]>();
     for (let e = 0; e < edges.length / 3; e++) { const kk = key(Math.floor(edges[e * 3] / EC), Math.floor(edges[e * 3 + 1] / EC), Math.floor(edges[e * 3 + 2] / EC)); let a = edgeGrid.get(kk); if (!a) edgeGrid.set(kk, a = []); a.push(e); }
@@ -126,8 +147,14 @@ export function computeBodyMask(input: MaskInput): MaskResult {
     for (let v = 0; v < nb; v++) {
       if (hidden[v]) continue;
       const why = input.why; const no = (k: string) => { if (why) why[`${sl.slot}.${k}`] = (why[`${sl.slot}.${k}`] ?? 0) + 1; };
-      if (boneRe && (!input.bodyBoneWeight || input.bodyBoneWeight(v, boneRe.re) < boneRe.min)) continue;
+      if (boneRe && !input.bodyBoneWeight) continue;   // a shoe cannot tell the foot from the shin without the bone reader
+      const shin = !!boneRe && input.bodyBoneWeight!(v, boneRe.re) < boneRe.min;
       const x = bodyP[v * 3], y = bodyP[v * 3 + 1], z = bodyP[v * 3 + 2];
+      if (shin) {
+        let rimY = -Infinity, rd = 0.08;
+        for (let r = 0; r < rim.length; r += 3) { const h = Math.hypot(rim[r] - x, rim[r + 2] - z); if (h < rd) { rd = h; rimY = rim[r + 1]; } }
+        if (!(rimY - y >= SHOE_RIM_DEPTH)) { no('shinNearRim'); continue; }
+      }
       const cell = grid.get(key(Math.floor(x / TC), Math.floor(y / TC), Math.floor(z / TC)));
       if (!cell) { no('noCell'); continue; }
       let best: { d: number; s: number; facing: number; inside: boolean } | null = null;
@@ -148,7 +175,7 @@ export function computeBodyMask(input: MaskInput): MaskResult {
         if (fx * vx + fy * vy + fz * vz < 0) { fx = -fx; fy = -fy; fz = -fz; }   // outward = the garment's own vertex normals
         best = { d, s: dx * fx + dy * fy + dz * fz, facing: bodyN[v * 3] * fx + bodyN[v * 3 + 1] * fy + bodyN[v * 3 + 2] * fz, inside: true };
       }
-      const toeOut = !!boneRe && nearAny <= TOE_RULE.reach && !!input.bodyBoneWeight && input.bodyBoneWeight(v, TOE_RULE.re) >= TOE_RULE.min;
+      const toeOut = !!boneRe && !shin && nearAny <= TOE_RULE.reach && !!input.bodyBoneWeight && input.bodyBoneWeight(v, TOE_RULE.re) >= TOE_RULE.min;
       if (!toeOut) {
         if (!best) { no('noTriangleProjects'); continue; }
         if (best.d > MASK_REACH) { no('beyondReach'); continue; }
@@ -171,12 +198,106 @@ export function computeBodyMask(input: MaskInput): MaskResult {
   return { indices, hidden, hiddenBySlot, trisBefore: Math.floor(bodyInd.length / 3), trisAfter: indices.length / 3 };
 }
 
+/**
+ * OPEN-EDGE FLARE (CLOTHING-ALONE part 2, 2026-09-14). The mask leaves skin within MASK_MARGIN of a garment's open edge
+ * drawn (so a hem that rides up never opens a hole), and there the ink hull still won: the GPU closeups at 01b8c86 showed
+ * jagged skin along the Court Shorts' leg openings standing, the thigh through them in a tuck, shin skin over every shoe
+ * collar (the unfolded trainer too) and a wedge of chest skin at the tank's armhole, on all five bodies (worst blobs
+ * 800–2300 px at 1.2–1.6 mm/px). So the edges the skin comes out of stand further off it: each garment vertex moves out
+ * by `out` METRES at the edge (converted through each vertex's own skin — see flareGarmentEdges), easing to 0 at `band` metres
+ * from it. The tank's armhole wedge with the arms overhead is NOT cured by this (its strap rides Arm weights into the chest;
+ * handing the top the skin's weights cleared it but tore the Lab tee's sleeve into a fin, so that stays open). Only edges skin exits:
+ * shorts flare their leg openings (not the waistband, which sits under a top), shoes their collar (not the cut where the
+ * sole was split off), tops every opening (hem, armholes, neck).
+ */
+export const EDGE_FLARE: Record<string, { out: number; band: number }> = {
+  tops: { out: 0.012, band: 0.05 },
+  shorts: { out: 0.018, band: 0.05 },
+  shoes: { out: 0.02, band: 0.05 },
+};
+
+/** Per-vertex flare weight 0..1 of a garment measured in one pose (world P, y up): smoothstep from 1 at a flared open edge to
+ *  0 at `band`. Vertices are welded by position first (UV seams split them). Pure. */
+export function edgeFlareWeights(P: ArrayLike<number>, ind: ArrayLike<number>, slot: string, band: number): Float32Array {
+  const n = P.length / 3;
+  const wid = new Int32Array(n); const idOf = new Map<string, number>();
+  for (let v = 0; v < n; v++) { const k = key(Math.round(P[v * 3] / 5e-4), Math.round(P[v * 3 + 1] / 5e-4), Math.round(P[v * 3 + 2] / 5e-4)); let id = idOf.get(k); if (id === undefined) { id = idOf.size; idOf.set(k, id); } wid[v] = id; }
+  const count = new Map<string, number>();
+  for (let t = 0; t + 2 < ind.length; t += 3) {
+    const w = [wid[ind[t]], wid[ind[t + 1]], wid[ind[t + 2]]];
+    for (const [a, b] of [[w[0], w[1]], [w[1], w[2]], [w[2], w[0]]]) { if (a === b) continue; const k = a < b ? `${a}:${b}` : `${b}:${a}`; count.set(k, (count.get(k) ?? 0) + 1); }
+  }
+  const onEdge = new Set<number>();
+  for (const [k, c] of count) if (c === 1) for (const s of k.split(':')) onEdge.add(+s);
+  let lo = Infinity, hi = -Infinity;
+  for (let v = 0; v < n; v++) { lo = Math.min(lo, P[v * 3 + 1]); hi = Math.max(hi, P[v * 3 + 1]); }
+  const keep = (y: number) => slot === 'shorts' ? y < lo + 0.5 * (hi - lo) : slot === 'shoes' ? y > lo + 0.6 * (hi - lo) : true;
+  const grid = new Map<string, number[]>();
+  for (let v = 0; v < n; v++) {
+    if (!onEdge.has(wid[v]) || !keep(P[v * 3 + 1])) continue;
+    const kk = key(Math.floor(P[v * 3] / band), Math.floor(P[v * 3 + 1] / band), Math.floor(P[v * 3 + 2] / band)); let a = grid.get(kk); if (!a) grid.set(kk, a = []); a.push(v);
+  }
+  const out = new Float32Array(n);
+  // A LINED shoe (the evo boot) is closed at its collar — the outer shell turns over into the lining — so it has no open
+  // edge up there at all: its collar is its top rim, and that is what flares (the lining moves in toward the shin, unseen).
+  if (slot === 'shoes' && grid.size === 0) {
+    for (let v = 0; v < n; v++) { const w = Math.max(0, Math.min(1, 1 - (hi - P[v * 3 + 1]) / band)); out[v] = w * w * (3 - 2 * w); }
+    return out;
+  }
+  for (let v = 0; v < n; v++) {
+    const x = P[v * 3], y = P[v * 3 + 1], z = P[v * 3 + 2];
+    let d = Infinity; const ci = Math.floor(x / band), cj = Math.floor(y / band), ck = Math.floor(z / band);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) { const a = grid.get(key(ci + i, cj + j, ck + k)); if (a) for (const e of a) d = Math.min(d, Math.hypot(P[e * 3] - x, P[e * 3 + 1] - y, P[e * 3 + 2] - z)); }
+    const w = Math.max(0, 1 - d / band); out[v] = w * w * (3 - 2 * w);
+  }
+  return out;
+}
+
 // ── Babylon glue ────────────────────────────────────────────────────────
 
+const flared = new WeakSet<AbstractMesh>();
+/** Flare a shown garment's open edges once (measured in the pose the skeleton holds, applied in bind space along bind normals). */
+function flareGarmentEdges(mesh: Mesh, slot: string): void {
+  if (flared.has(mesh)) return;
+  const cfg = EDGE_FLARE[slot]; if (!cfg) return;
+  const sw = skinnedWorld(mesh);
+  const md = mesh.metadata as { felGarmentIndices0?: number[]; felGarmentFix?: string } | null;
+  if (slot === 'shoes' && /deferred/.test(md?.felGarmentFix ?? '') && !/late:/.test(md?.felGarmentFix ?? '')) return;   // the fold has not landed yet
+  const ind = md?.felGarmentIndices0 ?? mesh.getIndices();
+  const pos = mesh.getVerticesData('position'), nrm = mesh.getVerticesData('normal');
+  if (!sw || !ind || !pos || !nrm || pos.length !== nrm.length) return;
+  flared.add(mesh);
+  const w = edgeFlareWeights(sw.P, ind, slot, cfg.band);
+  // The garments' bind space is NOT metres: one bind unit along a garment normal skins to 0.17 m on the Court Shorts,
+  // 0.25 m on the boot and 0.20–0.25 m on the tank (0.91 on the body; measured through Σ wᵢMᵢ and the mesh world matrix,
+  // 2026-09-14). A metre value added in bind space moves the cloth a sixth of that, so each vertex converts the world flare
+  // through its own skin: out / |world image of the unit bind normal|.
+  const M = mesh.skeleton!.getTransformMatrices(mesh), mi = mesh.getVerticesData('matricesIndices'), mw = mesh.getVerticesData('matricesWeights');
+  const Wm = mesh.computeWorldMatrix(true).m;
+  if (!M || !mi || !mw) return;
+  const worldPerBind = (v: number) => {
+    const nx = nrm[v * 3], ny = nrm[v * 3 + 1], nz = nrm[v * 3 + 2]; let lx = 0, ly = 0, lz = 0;
+    for (let k = 0; k < 4; k++) { const wk = mw[v * 4 + k]; if (!(wk > 0)) continue; const b = mi[v * 4 + k] * 16; lx += wk * (M[b] * nx + M[b + 4] * ny + M[b + 8] * nz); ly += wk * (M[b + 1] * nx + M[b + 5] * ny + M[b + 9] * nz); lz += wk * (M[b + 2] * nx + M[b + 6] * ny + M[b + 10] * nz); }
+    return Math.hypot(lx * Wm[0] + ly * Wm[4] + lz * Wm[8], lx * Wm[1] + ly * Wm[5] + lz * Wm[9], lx * Wm[2] + ly * Wm[6] + lz * Wm[10]) / (Math.hypot(nx, ny, nz) || 1);
+  };
+  let moved = 0;
+  const out = new Float32Array(pos.length);
+  for (let v = 0; v < pos.length / 3; v++) {
+    const s = w[v] > 0 ? worldPerBind(v) : 0;
+    const d = s > 1e-4 ? cfg.out * w[v] / s : 0; if (d > 0 && cfg.out * w[v] > 1e-4) moved++;
+    for (let k = 0; k < 3; k++) out[v * 3 + k] = pos[v * 3 + k] + nrm[v * 3 + k] * d;
+  }
+  if (!moved) return;
+  if ((mesh.geometry?.meshes.length ?? 1) > 1) mesh.makeGeometryUnique();   // never move a container's (or a sibling clone's) vertices
+  (mesh as { __felFlare0?: Float32Array }).__felFlare0 ??= new Float32Array(pos);   // the mask measures the garment un-flared
+  mesh.setVerticesData('position', out, false);
+  mesh.metadata = { ...(mesh.metadata ?? {}), felEdgeFlare: moved };
+}
+
 /** World positions and normals of a skinned mesh in the pose its skeleton holds now (the vertex shader's math). */
-export function skinnedWorld(mesh: Mesh): { P: Float32Array; N: Float32Array } | null {
+export function skinnedWorld(mesh: Mesh, positions?: ArrayLike<number>): { P: Float32Array; N: Float32Array } | null {
   const sk = mesh.skeleton;
-  const pos = mesh.getVerticesData('position'), nrm = mesh.getVerticesData('normal'), mi = mesh.getVerticesData('matricesIndices'), mw = mesh.getVerticesData('matricesWeights');
+  const pos = positions ?? mesh.getVerticesData('position'), nrm = mesh.getVerticesData('normal'), mi = mesh.getVerticesData('matricesIndices'), mw = mesh.getVerticesData('matricesWeights');
   if (!sk || !pos || !nrm || !mi || !mw) return null;
   const mie = mesh.getVerticesData('matricesIndicesExtra'), mwe = mesh.getVerticesData('matricesWeightsExtra');
   const M = sk.getTransformMatrices(mesh);
@@ -238,7 +359,13 @@ export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<str
   const bySlot = new Map<string, MaskSurface[]>();
   for (const m of meshes) {
     const slot = maskSlotOf(m.name); if (!slot || !m.isVisible || m.isDisposed() || !(m as Mesh).skeleton) continue;
-    const s = skinnedWorld(m as Mesh); const ind = (m as Mesh).getIndices(); if (!s || !ind) continue;
+    if (!/^KitSole_/.test(m.name)) { try { flareGarmentEdges(m as Mesh, slot); } catch (e) { console.warn(`[FEL-KIT] edge flare skipped on ${m.name}: ${String((e as Error)?.message ?? e).slice(0, 120)}`); } }
+    // Tops and shorts are measured UN-flared: the flare is for drawing — a flared armhole edge "covered" arm skin, the mask hid it,
+    // and it could slide out past the edge as the arm moved (CPU probe: arm skin exposed past the tank 23 → 46 vertices with the
+    // flare in the mask). A shoe is measured AS flared: the shin under its collar is only hidden deep below the rim, so nothing
+    // can slide out, and the flared collar is what closes the Achilles strip (GPU: the male boot's back view 936 px flared vs
+    // 1757 px un-flared at the hang).
+    const s = skinnedWorld(m as Mesh, slot === 'shoes' ? undefined : (m as { __felFlare0?: Float32Array }).__felFlare0); const ind = (m as Mesh).getIndices(); if (!s || !ind) continue;
     (bySlot.get(slot) ?? bySlot.set(slot, []).get(slot)!).push({ P: s.P, N: s.N, ind });
   }
   const mi = body.getVerticesData('matricesIndices'), mw = body.getVerticesData('matricesWeights');

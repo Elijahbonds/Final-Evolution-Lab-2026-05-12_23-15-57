@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeBodyMask, isBodyMesh, maskSlotOf, openEdgePoints, type MaskSurface } from './bodyMask';
+import { computeBodyMask, EDGE_FLARE, edgeFlareWeights, isBodyMesh, maskSlotOf, openEdgePoints, SHOE_RIM_DEPTH, shoeRimPoints, type MaskSurface } from './bodyMask';
 
 /** An open tube along y: `rings` rings of `seg` vertices from y0 to y1, radius r, outward normals. Optional seam split:
  *  the first column is duplicated (a UV seam), the way the MPFB garments arrive. */
@@ -64,15 +64,17 @@ describe('bodyMask', () => {
     expect(computeBodyMask({ bodyP: far.P, bodyN: far.N, bodyInd: far.ind, slots: [{ slot: 'tops', surfaces: [sleeve], margin: 0.05 }] }).hidden[0]).toBe(0);
   });
 
-  it('a shoe hides only skin that rides the foot, never the shin inside its collar', () => {
+  it('a shoe hides skin that rides the foot, and shin skin only when it is deep below the collar rim', () => {
     const body = tube(0.05, 0, 0.3, 13, 12);
     const shoe = tube(0.065, -0.02, 0.2, 12, 12, true);
     // foot weight 1 below 8 cm, a 0.3 ankle blend to 12 cm, the shin (none) above
     const footW = (v: number) => (ringOf(body, v) < 0.08 ? 1 : ringOf(body, v) < 0.12 ? 0.3 : 0);
     const res = computeBodyMask({ bodyP: body.P, bodyN: body.N, bodyInd: body.ind, bodyBoneWeight: (v, re) => (re.test('LeftFoot') ? footW(v) : 0), slots: [{ slot: 'shoes', surfaces: [shoe] }] });
     for (let v = 0; v < body.P.length / 3; v++) {
-      if (footW(v) === 0) expect(res.hidden[v]).toBe(0);
-      else expect(res.hidden[v]).toBe(1);   // the foot and the ankle blend inside the boot both go
+      const y = ringOf(body, v);
+      if (footW(v) > 0) expect(res.hidden[v]).toBe(1);             // the foot and the ankle blend inside the boot both go
+      else if (y > 0.2 - SHOE_RIM_DEPTH + 1e-6) expect(res.hidden[v]).toBe(0);   // the shin at or above the collar band stays
+      else expect(res.hidden[v]).toBe(1);                            // shin deep inside the shoe goes (the collar rides the shin)
     }
     expect(res.hiddenBySlot.shoes).toBeGreaterThan(0);
     // without the bone reader a shoe hides nothing (it cannot tell the foot from the shin)
@@ -87,6 +89,42 @@ describe('bodyMask', () => {
     const w = (v: number, re: RegExp) => (v === 0 ? (re.test('LeftToeBase') ? 1 : 0) : (re.test('LeftFoot') ? 0.3 : 0));
     const res = computeBodyMask({ bodyP: P, bodyN: N, bodyInd: [0, 1, 1], bodyBoneWeight: w, slots: [{ slot: 'shoes', surfaces: [shoe] }] });
     expect([...res.hidden]).toEqual([1, 0]);
+  });
+
+  it('flares only the open edges skin comes out of: tops every opening, shorts the leg openings, shoes the collar', () => {
+    const t = tube(0.12, 0, 0.3, 7, 16, true);   // rings every 5 cm, a UV seam
+    const wAt = (w: Float32Array, y: number) => { let m = 0; for (let v = 0; v < w.length; v++) if (Math.abs(ringOf(t, v) - y) < 1e-6) m = Math.max(m, w[v]); return m; };
+    const tops = edgeFlareWeights(t.P, t.ind, 'tops', 0.05);
+    expect(wAt(tops, 0)).toBeCloseTo(1); expect(wAt(tops, 0.3)).toBeCloseTo(1);
+    expect(wAt(tops, 0.15)).toBe(0);   // 10+ cm from either edge
+    expect(wAt(tops, 0.05)).toBeLessThan(1e-9);   // exactly one band away (float rounding)
+    const shorts = edgeFlareWeights(t.P, t.ind, 'shorts', 0.05);
+    expect(wAt(shorts, 0)).toBeCloseTo(1); expect(wAt(shorts, 0.3)).toBe(0);   // leg opening yes, waistband no
+    const shoes = edgeFlareWeights(t.P, t.ind, 'shoes', 0.05);
+    expect(wAt(shoes, 0.3)).toBeCloseTo(1); expect(wAt(shoes, 0)).toBe(0);    // collar yes, the sole cut no
+    // welded: the seam column is not an edge, so a mid ring stays unflared all the way round
+    for (let v = 0; v < tops.length; v++) if (Math.abs(ringOf(t, v) - 0.15) < 1e-6) expect(tops[v]).toBe(0);
+    expect(EDGE_FLARE.shorts.out).toBeGreaterThan(EDGE_FLARE.tops.out);
+  });
+
+  it('a shoe rim is its top: nothing of the shoe higher within 6 cm', () => {
+    const shoe = tube(0.065, -0.02, 0.2, 12, 12, true);
+    const rim = shoeRimPoints([shoe]);
+    for (let i = 1; i < rim.length; i += 3) expect(rim[i]).toBeCloseTo(0.2);
+    expect(rim.length / 3).toBe(13);
+  });
+
+  it('a lined shoe (closed at the collar, open only where the sole was cut) flares its top rim', () => {
+    const t = tube(0.05, 0, 0.2, 5, 12, true);
+    const P = [...t.P, 0, 0.2, 0], ind = [...t.ind];
+    const top = P.length / 3 - 1, cols = 13, ring = 4 * cols;
+    for (let j = 0; j < 12; j++) ind.push(ring + j, top, ring + j + 1);   // cap the collar: no open edge up there
+    const w = edgeFlareWeights(P, ind, 'shoes', 0.05);
+    for (let v = 0; v < t.P.length / 3; v++) {
+      const y = t.P[v * 3 + 1];
+      if (y > 0.199) expect(w[v]).toBeCloseTo(1);
+      if (y < 0.15 + 1e-9) expect(w[v]).toBeLessThan(1e-9);   // a band below the rim, and the sole cut, stay put
+    }
   });
 
   it('drops a triangle only when all three of its vertices are hidden', () => {
