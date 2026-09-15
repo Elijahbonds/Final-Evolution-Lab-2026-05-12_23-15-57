@@ -23,6 +23,7 @@ import type { FelInput } from '../core/InputBus';
 import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
 import { trickFor, bestFitting, asTrickDef, heldTrickDir, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { BoardTrickLayer } from '../anim/BoardTrickLayer';   // TRICK POSE (2026-09-15): tricks recognisable on sight
 import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
 import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out
 import { buildSlopeRun, SLOPE_PITCH, SLALOM_START, SLALOM_GATES, SLALOM_SPACING, type RideWorld } from './rideWorlds';
@@ -88,6 +89,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   // never got it, so none of the body work — the authored ride stances, the grab shapes, the eyes on the line, the
   // angulation — could reach a snowboarder. It reads the same BoardPosture table the other two do.
   let posture: { layer: PostureLayer; dispose(): void } | null = null;
+  let trickLayer: BoardTrickLayer | null = null;
   const bio: BoardPostureInput = { ...BOARD_INPUT_IDLE };
   let bailBeatT = 0, landBeatT = 0, airT = 0;
   const BAIL_BEAT_SEC = 0.9, LAND_BEAT_SEC = 0.4;
@@ -201,6 +203,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         const at = new Vector3(la.x, la.y, la.z);
         return { pose: angled, legs, aim: at, eyes: at, window };
       }, 'SNOW-PP');
+      trickLayer?.dispose();
+      trickLayer = new BoardTrickLayer(ctx.scene, rig.char.skeleton, rig.char.root, rig.board);   // after the posture layer: the grab hand is the last word
       bailBeatT = 0; landBeatT = 0; airT = 0;
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 20, modeId: 'snowboard' });
       nextGate = 0; gatesHit = 0; elapsed = 0; hudSec = -1; ended = false; stickX = 0; stickY = 0; tuck = 0;
@@ -269,6 +273,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
           const fits = want && want.airSec <= air ? want : bestFitting('snow', e.btn as BoardTrick['btn'], air);
           if (fits) {
             tricks.start(asTrickDef(fits));
+            trickLayer?.start(fits);
             ctx.setHud({ banner: fits.label });
             setTimeout(() => ctx.setHud({ banner: '' }), 520);
             // the boost still fills off a SPIN, which is what it always rewarded — now it scales with the rotation
@@ -277,11 +282,12 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         }
       }
       if (e.t === 'button' && e.btn === 'R1') boostHeld = e.pressed;   // BOOST: the shared held R1 (press AND release)
-      if (e.t === 'button' && !e.pressed && e.btn === 'X') tricks.endGrab();
+      if (e.t === 'button' && !e.pressed && e.btn === 'X') { tricks.endGrab(); trickLayer?.release(); }
     },
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
+      trickLayer?.begin();   // TRICK POSE: take back last frame's trick offsets before this frame's writes
       elapsed += dt;
       if (Math.floor(elapsed) !== hudSec) { hudSec = Math.floor(elapsed); ctx.setHud({ time: hudSec }); }   // P9 soft: the clock runs
       stumbleIframe = Math.max(0, stumbleIframe - dt);
@@ -443,6 +449,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         const wantRoll = boardBank(move.balance.lean, move.speed01);
         rig.char.root.rotation.z += (wantRoll - rig.char.root.rotation.z) * Math.min(1, 10 * dt);
       }
+      trickLayer?.apply(dt, !rig.rider.grounded);   // TRICK POSE: the spin, the cork, the grab — after the mode's own root writes
+      ctx.camDirector.setAir(!rig.rider.grounded && !rig.rider.grinding ? 1 : 0);   // the AIR CAM: the trick in the picture
       // Clamp at the edge of the snow, from the WORLD the venue built — the same
       // one-number rule skate's fence and surf's water edge now follow, so the
       // edge a player feels is always an edge they can see. Reading the module
@@ -474,6 +482,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      trickLayer?.dispose(); trickLayer = null;
       boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null;
       posture?.dispose(); posture = null;
       yeti?.char.dispose(); yeti = null; yetiPool = null;

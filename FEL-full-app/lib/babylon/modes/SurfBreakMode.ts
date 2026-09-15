@@ -25,6 +25,7 @@ import { readBoardVenue } from '../nexus/boardVenues';   // three breaks, three 
 import { assertSpawned } from '../core/FrameGuard';
 import { BoardAnimTree } from '../anim/boardTree';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { BoardTrickLayer } from '../anim/BoardTrickLayer';   // TRICK POSE (2026-09-15): tricks recognisable on sight
 import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
 import { trickFor, bestFitting, asTrickDef, heldTrickDir, basePts as trickPts, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out of it
@@ -47,6 +48,8 @@ let baseFov: number | null = null;
 export const POCKET = { min: 2, max: 9 };
 /** WALLS + SPEED (2026-09-15): +35% with the other boards (was 9) — the ceiling the surge and the lens normalise against. */
 export const MAX_FORWARD_SPEED = 12;
+/** The plain X grab on a wave, as a named shape for the trick layer: an indy on a surfboard (TRICK POSE). */
+const SURF_GRAB: BoardTrick = { id: 'surf_grab', label: 'GRAB', discipline: 'surf', kind: 'air', dir: null, btn: 'X', spinDeg: 0, flipDeg: 0, grab: 'indy', difficulty: 1.4, airSec: 0.3, clip: 'board_grab' };
 /** How far past the bottom of the face the rider may drift before the rail holds them (m) — the wave catches up anyway. */
 export const FLAT_LEASH = 8;
 /** Wave-relative drift (m/s): stalled on the flat the wave gains this much on you; the face's slide under the lip; the
@@ -120,6 +123,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
   //          them before and 7/145 after. The roll reads the same lean the clip does now, scaled by speed
   //          (BoardPosture.boardBank).
   let posture: { layer: PostureLayer; dispose(): void } | null = null;
+  let trickLayer: BoardTrickLayer | null = null;
   const bio: BoardPostureInput = { ...BOARD_INPUT_IDLE };
   /** The lean the tree and the body BOTH ride (the stick, or the cutback coming around). */
   let rideLean = 0;
@@ -266,6 +270,8 @@ export const SurfBreakMode: ModeDefinition = (() => {
         const at = new Vector3(la.x, la.y, la.z);
         return { pose: angled, legs, aim: at, eyes: at, window };
       }, 'SURF-PP');
+      trickLayer?.dispose();
+      trickLayer = new BoardTrickLayer(ctx.scene, rig.char.skeleton, rig.char.root, rig.board);   // after the posture layer: the grab hand is the last word
       if (process.env.NODE_ENV === 'development') {
         const dev = (window as unknown as { __FEL_DEV__?: { boardPosture?: unknown } }).__FEL_DEV__;
         if (dev) dev.boardPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), aim: () => { const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5); return la; } };   // BIOMECH-WAVE2 probes
@@ -342,17 +348,19 @@ export const SurfBreakMode: ModeDefinition = (() => {
           const fits = want && want.airSec <= air ? want : bestFitting('surf', 'Y', air);
           if (fits) {
             tricks.start(asTrickDef(fits));
+            trickLayer?.start(fits);
             ctx.setHud({ banner: fits.label });
             setTimeout(() => ctx.setHud({ banner: '' }), 560);
           }
         }
-        if (e.btn === 'X') { if (rig.rider.grounded) refuse(ctx, 'GRAB IN THE AIR'); else tricks.start(TRICKS.grab); }   // PHONE CONTROLS: a grab on the face was silent
+        if (e.btn === 'X') { if (rig.rider.grounded) refuse(ctx, 'GRAB IN THE AIR'); else { tricks.start(TRICKS.grab); trickLayer?.start(SURF_GRAB); } }   // PHONE CONTROLS: a grab on the face was silent
       }
-      if (e.t === 'button' && !e.pressed && e.btn === 'X') tricks.endGrab();
+      if (e.t === 'button' && !e.pressed && e.btn === 'X') { tricks.endGrab(); trickLayer?.release(); }
     },
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
+      trickLayer?.begin();   // TRICK POSE: take back last frame's trick offsets before this frame's writes
       t += dt; timeLeft -= dt;
       const lip = waveLipAt(t);
       updateSea(dt, ctx.camera);   // SURF OCEAN: the swell moves and follows the lens, wiped out or not
@@ -495,6 +503,8 @@ export const SurfBreakMode: ModeDefinition = (() => {
         const want = boardBank(rideLean, Math.min(1, rig.rider.vel.length() / MAX_FORWARD_SPEED));
         rig.char.root.rotation.z += (want - rig.char.root.rotation.z) * Math.min(1, 10 * dt);
       }
+      trickLayer?.apply(dt, !rig.rider.grounded);   // TRICK POSE: the spin, the cork, the grab — after the mode's own root writes
+      ctx.camDirector.setAir(!rig.rider.grounded && !rig.rider.grinding ? 1 : 0);   // the AIR CAM: the trick in the picture
 
       crowd.update(dt);
       if (spray) {
@@ -518,7 +528,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boostKit) ?? 1), Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
     },
 
-    dispose() { spray?.dispose(); spray = null; updateSea = () => {}; boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { trickLayer?.dispose(); trickLayer = null; spray?.dispose(); spray = null; updateSea = () => {}; boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 

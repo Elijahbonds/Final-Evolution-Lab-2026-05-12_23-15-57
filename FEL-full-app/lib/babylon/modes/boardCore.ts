@@ -48,7 +48,9 @@ export async function buildRig(
 }
 
 // ── Trick machine ──────────────────────────────────────────────────────────
-export interface TrickDef { name: string; pts: number; spinAxis: 'y' | 'z' | 'x'; turns: number; clip?: string }
+/** `sec`: how long the trick's motion takes (TrickPose.trickSeconds) — the spin is graded against the same clock the rider is
+ *  shown turning on. Omitted, the historic 2.2 turns a second. */
+export interface TrickDef { name: string; pts: number; spinAxis: 'y' | 'z' | 'x'; turns: number; clip?: string; sec?: number }
 
 export const TRICKS: Record<string, TrickDef> = {
   pop:   { name: 'OLLIE',     pts: 50,  spinAxis: 'y', turns: 0 },
@@ -136,11 +138,13 @@ export class TrickMachine {
     const r = this.rig.rider;
     if (this.active && !r.grounded) {
       const t = this.active;
-      const rate = 2 * Math.PI * 2.2 * dt * (t.turns >= 0 ? 1 : -1);
+      const turnsPerSec = t.sec ? Math.abs(t.turns) / t.sec : 2.2;
+      const rate = 2 * Math.PI * turnsPerSec * dt * (t.turns >= 0 ? 1 : -1);
       if (t.turns !== 0) {
-        this.spun += Math.abs(rate);
-        if (t.spinAxis === 'y') this.rig.char.root.rotation.y += rate;
-        if (t.spinAxis === 'z') this.rig.char.root.rotation.z += rate;
+        // TRICK POSE (2026-09-15): this used to add the spin to the root here, and the modes overwrite (snow) or ease
+        // (surf) the root's yaw every frame — a 720 showed as a one-frame twitch. The rider is turned by BoardTrickLayer
+        // now; this only grades how much of the turn the air held, on the same clock.
+        this.spun = Math.min(this.spun + Math.abs(rate), Math.abs(t.turns) * 2 * Math.PI);
       }
       if (this.grabbing) { this.spun += dt * 4; }        // grab scores with hold time
       return null;

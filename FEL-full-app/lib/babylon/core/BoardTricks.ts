@@ -23,6 +23,8 @@
 // plus a spin, plus a grab shape, plus a flip, plus a difficulty. A 360 kickflip indy is a different trick from a
 // kickflip because the spin, the grab and the score all differ — and every one of them rides a clip that exists.
 
+import { trickSeconds } from './TrickPose';
+
 export type BoardDiscipline = 'skate' | 'snow' | 'surf';
 
 /** Which kind of ComboChain link this trick lands as. */
@@ -193,7 +195,7 @@ export function needsRail(t: BoardTrick): boolean { return t.kind === 'grind'; }
 // into the modes layer).
 
 export interface TrickMachineDef {
-  name: string; pts: number; spinAxis: 'y' | 'z' | 'x'; turns: number; clip?: string;
+  name: string; pts: number; spinAxis: 'y' | 'z' | 'x'; turns: number; clip?: string; sec?: number;
 }
 
 /**
@@ -206,7 +208,7 @@ export interface TrickMachineDef {
 export function asTrickDef(t: BoardTrick): TrickMachineDef {
   const spinAxis: 'y' | 'z' | 'x' = t.spinDeg !== 0 ? 'y' : t.flipDeg !== 0 ? 'z' : 'x';
   const turns = spinAxis === 'y' ? t.spinDeg / 360 : spinAxis === 'z' ? t.flipDeg / 360 : 0;
-  return { name: t.label, pts: basePts(t), spinAxis, turns, clip: t.clip };
+  return { name: t.label, pts: basePts(t), spinAxis, turns, clip: t.clip, sec: trickSeconds(t) };
 }
 
 /**

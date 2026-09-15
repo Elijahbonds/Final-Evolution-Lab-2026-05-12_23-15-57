@@ -21,6 +21,13 @@ export interface AirTrick {
   family: 'flip' | 'grab' | 'spin';
   basePts: number;
   difficulty: number;          // 1..5 — raises landing strictness
+  /** TRICK POSE (2026-09-15): a board flip is CAUGHT at this roll (radians, signed — kick +, heel −) over `flipSec`, so
+   *  the landing grade and the deck the player sees agree. Without it a flip free-spins at FLICK_TO_ANGVEL until touchdown. */
+  flipTarget?: number;
+  flipSec?: number;
+  /** A named SPIN caught at its angle (radians, signed) over `spinSec` — a 540 grab turns 540 and stops there. */
+  spinTarget?: number;
+  spinSec?: number;
 }
 
 export interface AirState {
@@ -31,6 +38,11 @@ export interface AirState {
   grabTime: number;
   chain: AirTrick[];           // tricks thrown this air
   airtime: number;
+  /** The roll a caught flip is heading for, and how fast it gets there (rad/s). */
+  flipTarget: number;
+  flipRate: number;
+  spinTarget: number;
+  spinRate: number;
 }
 
 export const SPIN_DAMPING = 0.06;        // per second — barely bleeds
@@ -42,14 +54,14 @@ export const GRAB_PTS_PER_SEC = 40;
 export class AirControl {
   state: AirState = {
     airborne: false, angularVel: Vector3.Zero(), rotation: Vector3.Zero(),
-    grabHeld: null, grabTime: 0, chain: [], airtime: 0,
+    grabHeld: null, grabTime: 0, chain: [], airtime: 0, flipTarget: 0, flipRate: 0, spinTarget: 0, spinRate: 0,
   };
 
   /** Leaving the ground (jump, lip, drop-in). */
   launch(): void {
     this.state = {
       airborne: true, angularVel: Vector3.Zero(), rotation: Vector3.Zero(),
-      grabHeld: null, grabTime: 0, chain: [], airtime: 0,
+      grabHeld: null, grabTime: 0, chain: [], airtime: 0, flipTarget: 0, flipRate: 0, spinTarget: 0, spinRate: 0,
     };
   }
 
@@ -57,10 +69,22 @@ export class AirControl {
   applyTrick(trick: AirTrick, flickPower01 = 1): void {
     const s = this.state;
     if (!s.airborne) return;
-    if (trick.family === 'spin') {
+    if (trick.spinTarget) {
+      s.spinTarget += trick.spinTarget;
+      s.spinRate = Math.abs(s.spinTarget - s.rotation.y) / Math.max(0.1, trick.spinSec ?? 0.6);
+    }
+    if (trick.family === 'spin' && trick.spinTarget) {
+      // caught: nothing free-spinning to add
+    } else if (trick.family === 'spin') {
       s.angularVel.y += FLICK_TO_ANGVEL * flickPower01 * (trick.id === 'bs360' ? -1 : 1);
     } else if (trick.family === 'flip') {
-      s.angularVel.z += FLICK_TO_ANGVEL * flickPower01 * (trick.id === 'heelflip' ? -1 : 1);
+      if (trick.flipTarget !== undefined) {
+        // caught: the deck turns exactly the trick's roll (0 for a board-only shuv) in the trick's own time
+        s.flipTarget += trick.flipTarget;
+        s.flipRate = trick.flipTarget ? Math.abs(s.flipTarget - s.rotation.z) / Math.max(0.1, trick.flipSec ?? 0.38) : s.flipRate;
+      } else {
+        s.angularVel.z += FLICK_TO_ANGVEL * flickPower01 * (trick.id === 'heelflip' ? -1 : 1);
+      }
     } else {
       s.grabHeld = trick.id;
       s.grabTime = 0;
@@ -86,6 +110,16 @@ export class AirControl {
     s.angularVel.y += stickX * AXIS_NUDGE_RATE * dt;    // spin control
     s.angularVel.scaleInPlace(1 - SPIN_DAMPING * dt);
     s.rotation.addInPlace(s.angularVel.scale(dt));
+    if (s.spinRate > 0) {
+      const d = s.spinTarget - s.rotation.y;
+      s.rotation.y += Math.sign(d) * Math.min(Math.abs(d), s.spinRate * dt);
+      if (Math.abs(s.spinTarget - s.rotation.y) < 1e-4) s.spinRate = 0;
+    }
+    if (s.flipRate > 0) {
+      const d = s.flipTarget - s.rotation.z;
+      s.rotation.z += Math.sign(d) * Math.min(Math.abs(d), s.flipRate * dt);
+      if (Math.abs(s.flipTarget - s.rotation.z) < 1e-4) s.flipRate = 0;
+    }
     if (s.grabHeld) s.grabTime += dt;
   }
 

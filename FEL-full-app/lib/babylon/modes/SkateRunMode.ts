@@ -20,7 +20,7 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, landsSwitch, TRICKS, type BoardRig } from './boardCore';
-import { airTrickFor, basePts as trickPts, heldTrickDir, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
+import { airTrickFor, basePts as trickPts, heldTrickDir, SKATE_TRICKS, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { buildSkatepark, PARK_BOUND, type RideWorld } from './rideWorlds';
 import { readBoardVenue, tuneForVenue } from '../nexus/boardVenues';   // different places to ride
 import { assertSpawned } from '../core/FrameGuard';
@@ -47,6 +47,8 @@ import { BoardAnimTree } from '../anim/boardTree';
 //          the body and the clip can no longer disagree. Surf, whose cutback had no stick under it at all, is where
 //          the number moves (25/146 → 7/145) — see SurfBreakMode.
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
+import { BoardTrickLayer } from '../anim/BoardTrickLayer';   // TRICK POSE (2026-09-15): tricks recognisable on sight
+import { trickSeconds, BOARD_ONLY_SPINS } from '../core/TrickPose';
 import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
 import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out of it
 import { MomentumBus } from '../core/MomentumBus';
@@ -118,6 +120,7 @@ export const SkateRunMode: ModeDefinition = (() => {
   let mbus = new MomentumBus();
   let animTree: InstanceType<typeof BoardAnimTree>;
   let posture: { layer: PostureLayer; dispose(): void } | null = null;
+  let trickLayer: BoardTrickLayer | null = null;
   const bio: BoardPostureInput = { ...BOARD_INPUT_IDLE };
   let boardSync: BoardSync;
   let grindCh: BalanceChannel | null = null;
@@ -199,7 +202,17 @@ export const SkateRunMode: ModeDefinition = (() => {
     ctx: ModeContext, id: string, label: string,
     family: 'flip' | 'grab' | 'spin', basePts: number, difficulty: number,
   ): void => {
-    air.applyTrick({ id, label, family, basePts, difficulty });
+    // TRICK POSE: the named trick's shape goes on the rig (the deck flips, a shuv turns the deck not the rider, a grab puts
+    // the right hand on the right edge), and a flip is caught at the table's roll so the grade and the picture agree
+    const named = SKATE_TRICKS.find((t) => t.id === id) ?? (family === 'grab' ? SKATE_TRICKS.find((t) => t.id === 'indy') : null);
+    const boardOnly = named ? BOARD_ONLY_SPINS.has(named.id) : false;
+    air.applyTrick({
+      id, label, family: boardOnly ? 'flip' : family, basePts, difficulty,
+      ...(named && (named.flipDeg !== 0 || boardOnly) ? { flipTarget: named.flipDeg * Math.PI / 180, flipSec: trickSeconds(named) } : {}),
+      // a body spin (fs 360, bs 180, the 540 indy) is caught at the table's angle — frontside one way, backside the other
+      ...(named && named.spinDeg !== 0 && !boardOnly ? { spinTarget: (named.id.startsWith('bs') ? -1 : 1) * named.spinDeg * Math.PI / 180, spinSec: trickSeconds(named) } : {}),
+    });
+    if (named) trickLayer?.start(named);
     ctx.setHud({ banner: label });
     setTimeout(() => ctx.setHud({ banner: '' }), 500);
     SoundKit.play('whoosh', { pitch: 1 + difficulty * 0.15, volume: 0.4 });
@@ -287,6 +300,8 @@ export const SkateRunMode: ModeDefinition = (() => {
         const at = new Vector3(la.x, la.y, la.z);
         return { pose: angled, legs, aim: at, eyes: at, window };
       }, 'SKATE-PP');
+      trickLayer?.dispose();
+      trickLayer = new BoardTrickLayer(ctx.scene, rig.char.skeleton, rig.char.root, rig.board, { bodySpin: false });   // after the posture layer: the grab hand is the last word
       {
         const dev = (window as unknown as { __FEL_DEV__?: { boardPosture?: unknown; skate?: unknown } }).__FEL_DEV__;
         if (dev && process.env.NODE_ENV === 'development') dev.boardPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), aim: () => { const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5); return la; } };   // BIOMECH-WAVE2 probes
@@ -411,12 +426,10 @@ export const SkateRunMode: ModeDefinition = (() => {
           SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
         } else if (g && !rig.rider.grounded) {
           // mid-air: real rotation physics + combo chain entry
-          air.applyTrick({ id: g.id, label: g.label, family: g.family, basePts: TRICKS[g.trickKey].pts, difficulty: g.difficulty });
-          ctx.setHud({ banner: g.label });
-          setTimeout(() => ctx.setHud({ banner: '' }), 500);
-          SoundKit.play('whoosh', { pitch: 1 + g.difficulty * 0.15, volume: 0.4 });
+          airTrick(ctx, g.id, g.label, g.family, TRICKS[g.trickKey].pts, g.difficulty);
         }
         if (!flick.heldGrab && air.state.grabHeld) {
+          trickLayer?.release();
           const pts = air.releaseGrab();
           if (pts > 0) combo.add('GRAB', pts, 'air');
         }
@@ -493,6 +506,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       }
       // releasing GRAB banks the hold, exactly as the flick path does
       if (e.t === 'button' && !e.pressed && e.btn === 'X' && air.state.grabHeld) {
+        trickLayer?.release();
         const pts = air.releaseGrab();
         if (pts > 0) combo.add('GRAB', pts, 'air');
       }
@@ -505,6 +519,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       slowCool = Math.max(0, slowCool - dtRaw);
       if (slowT > 0) slowT = Math.max(0, slowT - dtRaw);
       const dt = slowT > 0 ? dtRaw * SLOW_SCALE : dtRaw;
+      trickLayer?.begin();   // TRICK POSE: take back last frame's trick offsets before this frame's writes
       timeLeft -= dtRaw;
       if (timeLeft <= 0) {
         ended = true;
@@ -765,6 +780,10 @@ export const SkateRunMode: ModeDefinition = (() => {
         deckLift.x += (want.x - deckLift.x) * k; deckLift.y += (want.y - deckLift.y) * k; deckLift.z += (want.z - deckLift.z) * k;
       }
       boardSync.update(move.balance.lean, !rig.rider.grounded, boardPitch, deckLift);
+      trickLayer?.apply(dt, air.state.airborne && !rig.rider.grounded);   // TRICK POSE: the deck's flip / shuv / grab tweak
+      // the AIR CAM: up, back and round to three-quarters while a real air is on (not a kerb flicker), so the trick under
+      // the rider is in the picture
+      ctx.camDirector.setAir(air.state.airborne && air.state.airtime > 0.12 ? 1 : 0);
       // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
 
       // ── the spectacle beats (H4) ──
@@ -920,6 +939,6 @@ export const SkateRunMode: ModeDefinition = (() => {
       ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
     },
 
-    dispose() { boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { trickLayer?.dispose(); trickLayer = null; boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },
   };
 })();

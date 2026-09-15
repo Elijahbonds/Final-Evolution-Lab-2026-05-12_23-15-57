@@ -81,6 +81,9 @@ export interface FollowConfig {
   fovAtSpeed?: number;
 }
 
+/** The air cam's full offset (setAir(1)): metres further back, up, and round to the side for a three-quarter view. */
+export const AIR_CAM = { back: 2.2, up: 1.3, side: 2.4 };
+
 export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   court:  { distance: 8.0, height: 2.6, minHeight: 1.5, pitchFloorDeg: 6,  pitchCapDeg: 16, targetHeight: 1.35, lag: 0.10, lookAhead: 1.0, fitTwo: true, fovGain: 0.10, fovAtSpeed: 6.4 },
   runner: { distance: 7.5, height: 3.2, minHeight: 2.0, pitchFloorDeg: 10, pitchCapDeg: 22, targetHeight: 1.2,  lag: 0.08, lookAhead: 3.0 },
@@ -280,6 +283,15 @@ export class CameraDirector {
     this.beatDur = durationSec;
     this.beatStrength = Math.max(0, Math.min(1, strength));
   }
+
+  // ── AIR CAM (TRICK POSE, 2026-09-15: "the animations need to be recognizable on sight") ──
+  // A board trick happens UNDER the rider: from the ride camera's low, straight-behind seat the body hides the deck, so a
+  // kickflip, a shuv and a melon all photographed as the same back view. THPS pulls the camera up, back and round to a
+  // three-quarter view the moment the wheels leave the ground. `setAir(1)` asks for that framing, `setAir(0)` releases it;
+  // the director eases both ways so a small kerb hop never whips the view.
+  private airWant = 0; private airK = 0;
+  setAir(k01: number): void { this.airWant = Math.max(0, Math.min(1, k01)); }
+  get air01(): number { return this.airK; }
 
   /** Current beat scale on the follow distance (1 = no beat). */
   get beatScale(): number {
@@ -498,11 +510,14 @@ export class CameraDirector {
     const separation = cfg.fitTwo && objective ? Vector3.Distance(subject, objective) : 0;
     // E26: cap the separation pull-back — uncapped, a full-court 3v3
     // possession pushed the 'team' preset clean through the back wall.
-    const dist = (cfg.distance + Math.min(4.5, Math.max(0, separation - 3) * 0.55)) * this.beatScale;
+    const stepAir = Math.min(0.1, this.scene.getEngine().getDeltaTime() / 1000);
+    this.airK += (this.airWant - this.airK) * Math.min(1, (this.airWant > this.airK ? 5 : 2.5) * stepAir);
+    const dist = (cfg.distance + Math.min(4.5, Math.max(0, separation - 3) * 0.55) + AIR_CAM.back * this.airK) * this.beatScale;
 
-    let desired = subject.add(back.scale(dist)).add(new Vector3(0, cfg.height, 0));
+    let desired = subject.add(back.scale(dist)).add(new Vector3(0, cfg.height + AIR_CAM.up * this.airK, 0));
     desired.y = Math.max(desired.y, subject.y + cfg.minHeight);
     if (cfg.shoulderOffset) desired = desired.add(this.rightOf(back).scale(cfg.shoulderOffset));
+    if (this.airK > 0.001) desired = desired.add(this.rightOf(back).scale(AIR_CAM.side * this.airK));
 
     // M69: enforceStandoff is the FINAL link in the chain — nothing can undo the
     // safe distance after it (fixes the karate dojo camera collapsing onto the hero).
