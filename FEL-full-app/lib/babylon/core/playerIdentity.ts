@@ -120,7 +120,8 @@ function devBodyOverride(): PlayerIdentity | null {
   const palette = { ...FALLBACK_PALETTE };
   return {
     proportions: { heightScale: pct('height'), buildScale: pct('build'), reachScale: pct('reach'), palette: { skin: face.skinTone, primary: palette.jersey, accent: palette.accent }, stance: 'athletic' },
-    face, palette, jersey: null, wardrobe: { tops: null, shorts: null, shoes: null },
+    // CLOTHING-ALONE (2026-09-14): `&tops=top_lab&shorts=shorts_court&shoes=shoes_flight` dresses the guest like a Closet save
+    face, palette, jersey: null, wardrobe: { tops: q.get('tops'), shorts: q.get('shorts'), shoes: q.get('shoes') },
     custom: true, body: b === 'scan' ? 'scan' : b === 'female' ? 'kit-female' : 'kit-male',
   };
 }

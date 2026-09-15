@@ -109,8 +109,9 @@ function fixShoeGeometry(mesh: Mesh, itemId: string, skeleton: Skeleton, positio
 
   // ── 2. fold a boot shaft to a hi-top collar
   let newPositions: Float32Array | null = null;
+  let newSkin: { mi: Float32Array; mw: Float32Array } | null = null;
   if (height > BOOT_HEIGHT) {
-    newPositions = foldShaft(mesh, skeleton, positions, world, sums, minY + HI_TOP_CUT, maxY);
+    ({ positions: newPositions, skin: newSkin } = foldShaft(mesh, skeleton, positions, world, sums, minY + HI_TOP_CUT, maxY));
     notes.push(`folded to ${(HI_TOP_CUT + COLLAR_HEIGHT).toFixed(3)}`);
   }
 
@@ -127,6 +128,7 @@ function fixShoeGeometry(mesh: Mesh, itemId: string, skeleton: Skeleton, positio
   if (!newPositions && !splitSole) return notes.join('+');
   mesh.makeGeometryUnique();   // this clone only — the container's source geometry stays as loaded
   if (newPositions) mesh.setVerticesData(VertexBuffer.PositionKind, newPositions, false);
+  if (newSkin) { mesh.setVerticesData(VertexBuffer.MatricesIndicesKind, newSkin.mi, false); mesh.setVerticesData(VertexBuffer.MatricesWeightsKind, newSkin.mw, false); }
   if (splitSole) {
     const suffix = /_c\d+$/.exec(mesh.name)?.[0] ?? '';
     const short = itemId.replace(/^shoes_/, '');
@@ -210,10 +212,11 @@ function skinnedRest(mesh: Mesh, skeleton: Skeleton, positions: FloatArray): { w
  * the radius tightens from the calf to the shaft's radius at the cut, so the folded shaft does not flare. The new
  * rest-pose world position is mapped back to bind space through the inverse of that vertex's Σ wᵢMᵢ.
  */
-function foldShaft(mesh: Mesh, skeleton: Skeleton, positions: FloatArray, world: Float32Array, sums: Float32Array, cut: number, top: number): Float32Array {
+function foldShaft(mesh: Mesh, skeleton: Skeleton, positions: FloatArray, world: Float32Array, sums: Float32Array, cut: number, top: number): { positions: Float32Array; skin: { mi: Float32Array; mw: Float32Array } | null } {
   const n = positions.length / 3;
   const mi = mesh.getVerticesData(VertexBuffer.MatricesIndicesKind)!;
   const mw = mesh.getVerticesData(VertexBuffer.MatricesWeightsKind)!;
+  const mats = skeleton.getTransformMatrices(mesh);
   // which foot: the dominant bone's side
   const side = new Uint8Array(n);
   for (let v = 0; v < n; v++) {
@@ -228,6 +231,15 @@ function foldShaft(mesh: Mesh, skeleton: Skeleton, positions: FloatArray, world:
   for (let v = 0; v < n; v++) { const y = world[v * 3 + 1]; if (Math.abs(y - cut) < 0.02) { const b = band[side[v]]; b.r += Math.hypot(world[v * 3] - b.x, world[v * 3 + 2] - b.z); } }
   for (const b of band) if (b.c) b.r /= b.c;
 
+  // CLOTHING-ALONE (2026-09-14): a folded vertex takes the skin weights of the shaft AT THE CUT (the nearest vertex around the
+  // collar ring, same foot). The knee boot's upper shaft is weighted to UpLeg; folded to the ankle it kept the thigh, so every
+  // knee bend swung the collar with the thigh — on a dunk's tuck the collar stood 13 cm off the shin (p95) and its edges
+  // stretched 19 cm into a fin behind the heel (measured on the live rig, /dev/mode/dunk).
+  const ring: number[][] = [[], []];
+  for (let v = 0; v < n; v++) { const y = world[v * 3 + 1]; if (y <= cut && y > cut - 0.03) ring[side[v]].push(v); }
+  const newMi = mats && (ring[0].length || ring[1].length) ? new Float32Array(mi) : null;
+  const newMw = newMi ? new Float32Array(mw) : null;
+
   const out = new Float32Array(positions.length);
   for (let i = 0; i < positions.length; i++) out[i] = positions[i];
   const Winv = mesh.computeWorldMatrix(true).clone(); Winv.invert();
@@ -237,6 +249,17 @@ function foldShaft(mesh: Mesh, skeleton: Skeleton, positions: FloatArray, world:
     const y = world[v * 3 + 1];
     if (y <= cut) continue;
     const b = band[side[v]];
+    if (newMi && newMw && mats && ring[side[v]].length) {
+      const a0 = Math.atan2(world[v * 3 + 2] - b.z, world[v * 3] - b.x);
+      let donor = -1, bestD = Infinity;
+      for (const u of ring[side[v]]) { let d = Math.abs(Math.atan2(world[u * 3 + 2] - b.z, world[u * 3] - b.x) - a0); if (d > Math.PI) d = 2 * Math.PI - d; if (d < bestD) { bestD = d; donor = u; } }
+      if (donor >= 0) {
+        for (let k = 0; k < 4; k++) { newMi[v * 4 + k] = mi[donor * 4 + k]; newMw[v * 4 + k] = mw[donor * 4 + k]; }
+        // the new weights' Σ wᵢMᵢ is what the fold inverts through
+        for (let k = 0; k < 16; k++) sums[v * 16 + k] = 0;
+        for (let k = 0; k < 4; k++) { const w = newMw[v * 4 + k]; if (!(w > 0)) continue; const bb = newMi[v * 4 + k] * 16; for (let j = 0; j < 16; j++) sums[v * 16 + j] += w * mats[bb + j]; }
+      }
+    }
     const t = (y - cut) / Math.max(1e-6, top - cut);
     let x = world[v * 3], z = world[v * 3 + 2];
     if (b.c) {
@@ -250,7 +273,7 @@ function foldShaft(mesh: Mesh, skeleton: Skeleton, positions: FloatArray, world:
     Vector3.TransformCoordinatesToRef(p, Sinv, p);        // skinned local → bind
     out[v * 3] = p.x; out[v * 3 + 1] = p.y; out[v * 3 + 2] = p.z;
   }
-  return out;
+  return { positions: out, skin: newMi && newMw ? { mi: newMi, mw: newMw } : null };
 }
 
 /**

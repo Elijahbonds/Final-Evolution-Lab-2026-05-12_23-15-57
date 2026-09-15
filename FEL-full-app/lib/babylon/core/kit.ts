@@ -11,6 +11,7 @@ import type { AbstractMesh, AssetContainer, Mesh, Scene, Skeleton } from '@babyl
 import '@babylonjs/loaders/glTF';
 import { sportKitDefault } from './sportKitDefaults';
 import { fixGarment, syncGarmentVisibility } from './garmentFixes';
+import { scheduleBodyMask, shareBodyBounds, isBodyMesh } from './bodyMask';
 
 export type KitSlot = 'tops' | 'shorts' | 'shoes';
 export const KIT_SLOTS: readonly KitSlot[] = ['tops', 'shorts', 'shoes'];
@@ -59,6 +60,9 @@ export function applyKit(meshes: AbstractMesh[], wardrobe: Wardrobe | null | und
     // fetch it, bind it to this body's skeleton, and swap it in when it lands
     if (want && !byId(want) && KIT_PACKS[want]) void attachKitPack(list[0], slot, want, list);
   }
+  // CLOTHING-ALONE (2026-09-14): garments cull with the body, and the skin under a shown garment is not drawn (bodyMask.ts)
+  const body = meshes.find((m) => isBodyMesh(m.name));
+  if (body) { shareBodyBounds(body, meshes); scheduleBodyMask(meshes); }
   return found;
 }
 
@@ -154,5 +158,7 @@ async function attachKitPack(sibling: AbstractMesh, slot: KitSlot, itemId: strin
   // pack garments are fitted with ease in Blender (fit-garment.py) — the runtime inflate is a 15k-vertex CPU rewrite per spawn,
   // and football spawns defenders all game (measured 44–50 fps with it, 2026-09-05); shoes still take their fold
   if (slot === 'shoes') fixGarment(mesh, slot, itemId);
+  // the garment under the skin changed after applyKit's mask was scheduled: cull with the body and re-mask on the pack
+  if (sibling.parent) { const all = sibling.parent.getChildMeshes(true); const body = all.find((m) => isBodyMesh(m.name)); if (body) { shareBodyBounds(body, all); scheduleBodyMask(all); } }
   console.info(`[FEL-KIT] pack ${itemId} attached to ${sibling.parent?.name ?? 'body'}`);
 }
