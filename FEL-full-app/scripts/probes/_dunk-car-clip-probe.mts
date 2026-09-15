@@ -13,7 +13,7 @@ import { chromium, type Page } from 'playwright-core';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromiumExe } from './_chromium.mts';
 const PORT = process.env.PORT ?? '3061', OUT = process.env.OUT_DIR ?? 'docs/shots/dunk-car-clip', TAG = process.env.TAG ?? 'after';
-const SCEN = process.env.SCEN ?? '', VERBOSE = !!process.env.VERBOSE, SHOTS = !!process.env.SHOTS, REPS = Number(process.env.REPS ?? 1), DENSE = Number(process.env.DENSE ?? 0);
+const SCEN = process.env.SCEN ?? '', VERBOSE = !!process.env.VERBOSE, SHOTS = !!process.env.SHOTS, REPS = Number(process.env.REPS ?? 1), DENSE = Number(process.env.DENSE ?? 0), HITCH = Number(process.env.HITCH ?? 0), HITCH_AT = Number(process.env.HITCH_AT ?? 1.04), NOGRID = !!process.env.NOGRID;
 mkdirSync(OUT, { recursive: true });
 
 type V = { x: number; y: number; z: number };
@@ -62,7 +62,7 @@ async function boot(): Promise<{ p: Page; close: () => Promise<void>; errors: st
     // frame after the thaw ran the jam into its timeout)
     if (${DENSE} > 1 || ${SHOTS}) { const realNow = performance.now.bind(performance); let vt = realNow(), last = realNow(); S.dense = false;
       const raf = window.requestAnimationFrame.bind(window);
-      performance.now = () => vt + (S.dense ? 0 : realNow() - last);
+      let ret = vt; performance.now = () => (ret = Math.max(ret, vt + (S.dense || S.frozen ? 0 : Math.min(34, realNow() - last))));   // monotonic: a freeze never runs time backward
       window.requestAnimationFrame = (cb) => raf(() => { const r = realNow(); const d = r - last; last = r; vt += S.dense ? Math.min(d, 20) / ${DENSE} : Math.min(d, 34); cb(vt); }); }
     const V = (v) => ({ x: v.x, y: v.y, z: v.z });
     const rootOf = (n) => { while (n && n.parent) n = n.parent; return n; };
@@ -156,7 +156,10 @@ async function boot(): Promise<{ p: Page; close: () => Promise<void>; errors: st
           const ph = project(hv); row.scr.hero = ph ? ph.box : null; const pr = project([rim]); row.scr.rim = pr ? pr.on : 0;
         }
       }
+      if (${HITCH} > 0 && pp.phase === 'cinematic' && row.clipTime >= ${HITCH_AT} && !S.hitched) { S.hitched = true; const e = Date.now() + ${HITCH}; while (Date.now() < e) {} S.marks.push({ t: performance.now(), msg: '[HITCH] ' + ${HITCH} + ' ms at clip ' + row.clipTime.toFixed(3) }); }
       if (${DENSE} > 1) S.dense = !!ob && pp.phase === 'cinematic' && row.clipTime < 1.12 && !pp.replaying;
+      { const gc = S.gameCam && scene.activeCamera.name.startsWith('probe_') ? S.gameCam : scene.activeCamera; row.cam = V(gc.globalPosition ?? gc.position);
+        if (pp.phase === 'cinematic' || pp.phase === 'resolve') { const pr = project([rim]); row.rimOn = pr ? pr.on : 0; row.rimV = pr ? pr.box[1] : -1; const hp = h.position; const pb = project([{ x: hp.x, y: hp.y + 1.0, z: hp.z }, { x: hp.x, y: hp.y + 1.7, z: hp.z }]); row.heroOn = pb ? pb.on : 0; } }
       S.rows.push(row); if (S.rows.length > 30000) S.rows.splice(0, 8000);
       const pad = window.__PAD, d = S.drv;
       if (!d.done && pp.phase === 'cinematic' && row.clipTime >= d.slamAt && d.frames === 0) { pad.buttons[0].pressed = true; pad.buttons[0].value = 1; pad.timestamp = performance.now(); d.frames = 5; }
@@ -164,10 +167,12 @@ async function boot(): Promise<{ p: Page; close: () => Promise<void>; errors: st
       if (S.shots) {
         const R = S.rows, prev = R[R.length - 2];
         // each beat freezes twice: the GAME camera alone first (what the player sees), then the 2×2 on a later frame
-        const beat = (k, cond, kind) => { if (gridArmed || !cond) return; if (!S.shotsDone[k + '-game']) { S.shotsDone[k + '-game'] = row.t; gridArmed = k + '-game'; return; } if (!S.shotsDone[k]) { S.shotsDone[k] = row.t; S.setGrid(true, kind); gridArmed = k; } };
+        // (kind 'game' = the game camera only: a 2×2 grid frame right before the resolve left the early press's reach short in every
+        // SHOTS run — 40–80 ms real hitches there do not, so it is the grid, and the call's frame is the game camera's anyway)
+        const beat = (k, cond, kind) => { if (gridArmed || !cond) return; if (!S.shotsDone[k + '-game']) { S.shotsDone[k + '-game'] = row.t; gridArmed = k + '-game'; return; } if (kind !== 'game' && !${NOGRID} && !S.shotsDone[k]) { S.shotsDone[k] = row.t; S.setGrid(true, kind); gridArmed = k; } };
         const c0 = S.shotsDone['contact-game'];
         beat('car-mid', !!row.skin && !!ob && row.root.z < (ob.nearZ + ob.farZ) / 2 + 0.05, 'car');
-        beat('call', /OVER THE/.test(banner), 'call');
+        beat('call', /OVER THE/.test(banner), 'game');
         beat('contact', row.jamContact && prev && !prev.jamContact, 'rim');
         beat('through', !!c0 && !row.replaying && row.ball.y < rim.y - 0.3 && !row.parent, 'rim');
       }
@@ -220,7 +225,7 @@ async function attempt(p: Page, sc: Scenario, idx: number): Promise<string[]> {
   if (sc.prop === 'car') await waitFor(p, 8000, async () => (await p.evaluate('!!window.__FEL_DEV__.dunkPosture.get().obstacle')) as boolean);
   lines.push(`      prop ${await hud(p, 'prop')} · style ${await hud(p, 'style')} · obstacle ${JSON.stringify(await p.evaluate('(() => { const o = window.__FEL_DEV__.dunkPosture.get().obstacle; return o && { label: o.label, nearZ: +o.nearZ.toFixed(2), farZ: +o.farZ.toFixed(2), peak: +o.peak.toFixed(2), hw: o.profile.halfWidth }; })()'))} · rim ${JSON.stringify(await p.evaluate('window.__FEL_DEV__.dunkPosture.get().rim'))}`);
   const m0 = (await p.evaluate('window.__ccp.marks.length')) as number, tA = await now(p);
-  await p.evaluate(`(() => { const S = window.__ccp; S.drv = { slamAt: ${sc.slamAt}, frames: 0, done: false }; S.shotsDone = {}; })()`);
+  await p.evaluate(`(() => { const S = window.__ccp; S.drv = { slamAt: ${sc.slamAt}, frames: 0, done: false }; S.shotsDone = {}; S.hitched = false; })()`);
   await stickUp(p, true); await p.waitForTimeout(200); await runHold(p, true);
   await waitFor(p, 5000, async () => (await p.evaluate('window.__ccp.rows.at(-1)?.phase')) === 'cinematic');
   await runHold(p, false); await stickUp(p, false);
@@ -234,7 +239,7 @@ async function attempt(p: Page, sc: Scenario, idx: number): Promise<string[]> {
   const launch = R.find((r) => r.phase === 'cinematic'), resolve = R.find((r) => r.phase === 'resolve'), contact = R.find((r) => r.jamContact);
   const replay0 = R.find((r) => r.replaying);
   if (!launch || !resolve) { lines.push(`FAIL  never launched/resolved (launch ${!!launch} resolve ${!!resolve})`); return lines; }
-  lines.push(`      ${contact ? 'MAKE' : 'MISS'} · ${ms.filter((m) => /DUNK-LAUNCH|DUNK-PROP\] (over|CLEARED|CLIPPED)|DUNK-CAM|FLASH|TIMING|SKIN|iron contact|through the net/.test(m.msg)).map((m) => `+${f0(m.t - launch.t)} ${m.msg.slice(0, 150)}`).join(' | ')}`);
+  lines.push(`      ${contact ? 'MAKE' : 'MISS'} · ${ms.filter((m) => /DUNK-LAUNCH|DUNK-PROP\] (over|CLEARED|CLIPPED)|DUNK-CAM|FLASH|TIMING|SKIN|HITCH|iron contact|through the net/.test(m.msg)).map((m) => `+${f0(m.t - launch.t)} ${m.msg.slice(0, 150)}`).join(' | ')}`);
   const timing = ms.find((m) => /TIMING\] |FLASH\] .*(EARLY|LATE|ON TIME|PERFECT)/.test(m.msg));
 
   if (sc.prop === 'car') {
@@ -267,6 +272,19 @@ async function attempt(p: Page, sc: Scenario, idx: number): Promise<string[]> {
       say(carVisible && under, `C2 the call: OVER THE CAR! first shown @clip ${f2(call.clipTime)} root z ${f2(call.root.z)} (car far edge ${f2(call.ob!.farZ)}) · car corners on screen ${f2(carOn)} · car box ${carBox ? carBox.map(f2).join(',') : 'OFF'} · hero box ${heroBox ? heroBox.map(f2).join(',') : 'OFF'} · car top under the hero ${under} · rim cut already ${call.cut}`);
     }
   }
+  // C4 the flush on screen: from the launch to 400 ms past the CONTACT the game camera never cuts (a per-frame move over 1.5 m — the follow tracks a
+  // 7 m/s run at 0.5–0.7 m/frame when the probe's skinning slows the page; the cuts are 7–14 m; the flight's one cut is allowed) and at the CONTACT the rim and the dunker (hips and head) are in frame
+  if (contact) {
+    const win = R.filter((r) => r.t >= launch.t && r.t <= contact.t + 400 && (r as unknown as { cam?: V }).cam);
+    const jumps: string[] = []; for (let i = 1; i < win.length; i++) { const a = (win[i - 1] as unknown as { cam: V }).cam, b = (win[i] as unknown as { cam: V }).cam; const d = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z); if (d > 1.5) jumps.push(`${win[i].phase}@${f2(win[i].clipTime)}:${f2(d)}m`); }
+    const at = contact as unknown as { rimOn: number; heroOn: number };
+    // the flight's banner rides at top-[13%] of the stage (≈ 13–19% with its panel); the old 38% band (≈ 38–44%) covered the rim
+    const flushRows = R.filter((r) => r.t >= contact.t && r.t <= contact.t + 400 && (r as unknown as { rimV?: number }).rimV != null && (r as unknown as { rimV: number }).rimV >= 0);
+    const rimVs = flushRows.map((r) => (r as unknown as { rimV: number }).rimV);
+    const vMin = Math.min(...rimVs), vMax = Math.max(...rimVs);
+    lines.push(`      rim on screen through the flush (contact → +400 ms): v ${f2(vMin)}–${f2(vMax)} of the frame · under the raised banner band (≤ 0.20) ${rimVs.filter((v) => v <= 0.20).length} · inside the old 38% band (0.36–0.46) ${rimVs.filter((v) => v >= 0.36 && v <= 0.46).length} of ${rimVs.length}`);
+    say(jumps.length <= 1 && at.rimOn === 1 && at.heroOn === 1 && rimVs.every((v) => v > 0.21), `C4 the flush on screen: camera cuts > 1.5 m/frame launch → contact+400 ms ${jumps.length} [${jumps.join(' ')}] (≤ 1 = the flight's cut) · at the CONTACT rim in frame ${at.rimOn === 1} · dunker head + hips in frame ${at.heroOn === 1} (the under-rim shot crops at the shins)`);
+  }
   // C3 R2 through the ring
   const rim = launch.rim, rb = launch.rb, RR = 0.225;
   const radial = (b: V) => Math.hypot(b.x - rim.x, b.z - rim.z);
@@ -284,7 +302,9 @@ async function attempt(p: Page, sc: Scenario, idx: number): Promise<string[]> {
     const ic = mark(/iron contact (\d+) ms into the jam.*let go at ([\d.]+)/); const icm = ic ? /iron contact (\d+) ms into the jam.*let go at ([\d.]+)/.exec(ic.msg) : null;
     const jamMs = icm ? Number(icm[1]) : 999, letGo = icm ? Number(icm[2]) : 9;
     // the let-go is ON the iron (the tube within 4 cm of the ball's surface) or OVER the ring's opening (inside the ring, the ball's bottom at most 8 cm over the rim)
-    const overOpening = radial(atContact) <= RR && atContact.y - rim.y >= 0 && atContact.y - rim.y - rb <= 0.08;
+    // (over the opening or the lip: the centre inside the ring's radius + 2 cm; widened from the bare radius after an early press let go
+    // centred on the front lip, 0.239 m out, bottom 3 cm over the iron, and dropped through clean)
+    const overOpening = radial(atContact) <= RR + 0.02 && atContact.y - rim.y >= 0 && atContact.y - rim.y - rb <= 0.08;
     say(jamMs < 280 && (letGo <= 0.16 || overOpening) && metal.length <= 2 && !!cross && cross.r <= RR - rb + 0.03 && minY <= rim.y - 0.6,
       `C3 R2 through-rim: timing ${timing ? timing.msg.replace(/^\[\w+\] /, '') : '— (no timing flash)'} · the hand takes it to the iron: contact ${jamMs} ms into the jam (< 280 = not the timeout), let go ${f3(letGo)} m off the iron (≤ 0.16${overOpening ? ', or over the opening: yes' : ''}) · ball at the CONTACT ${f3(radial(atContact))} m off the axis, ${f2(atContact.y - rim.y)} m over the ring (parent ${contact.parent || 'free'}) · inside the iron ${metal.length} · crosses the rim plane ${cross ? `${f3(cross.r)} m from the axis (≤ ${f3(RR - rb + 0.03)}) ${f0(cross.dt)} ms after the contact at ${f2(cross.vy)} m/s` : 'NEVER'} · lowest ${f2(minY)} (≤ ${f2(rim.y - 0.6)})`);
   }

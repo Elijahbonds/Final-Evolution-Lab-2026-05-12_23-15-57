@@ -1456,6 +1456,7 @@ export const DunkMode: ModeDefinition = (() => {
     jamSec = -1; jamContact = false; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
     console.info('[JUICE-SOFT] launch');
     ctx.camDirector.resetLook();   // the takeoff → rimCamCut framing never inherits a look orbit
+    ctx.setHud({ bannerHigh: true });   // DUNK-CAR-CLIP R2: the flight's banners ride at the top of the frame, clear of the rim (finishAttempt puts them back)
     launchSpeed01 = Math.min(1, runUpPeak / 7);
     console.info(`[DUNK-LAUNCH] charge ${charge.toFixed(2)} run ${runUpPeak.toFixed(1)} apex ${apexFor().toFixed(2)} from z ${launchZ.toFixed(2)} to line ${gatherLine().toFixed(2)}${doubleUp ? ' DOUBLE-UP' : ''}${lob.live ? ' lob live' : ''}`);
     // The run-up, not the stick at the release instant: during the charge the
@@ -1523,8 +1524,13 @@ export const DunkMode: ModeDefinition = (() => {
     setPhase('resolve');
     sinceRelease = 0;
     qteWindowOpen = false;
+    // DUNK-CAR-CLIP R2: the flush is filmed from the flight's cut. This used to snapTo the behind-the-back follow on the resolve —
+    // one frame before the CONTACT — while the director stayed in 'fixed' and eased straight back to the cut over ~0.5 s: a whip
+    // away and back at the money shot, and the frame at the iron was a head-height shot from behind with the grass behind the rim,
+    // where the dunker reads as STANDING on the court (the QA eye's "early windmill on court"). A resolve with no cut (a clip
+    // before it) is still in the follow and keeps the snap.
+    if (!rimCamCut) ctx.camDirector.snapTo(player.root.position, rim);
     rimCamCut = false;
-    ctx.camDirector.snapTo(player.root.position, rim);   // back to the follow after the cut
     ctx.setHud({ slamPulse: false, hint: '' });   // DUNK-SOFTS-NAMED: no SLAM! / CATCH IT! left standing under the verdict
     releasePos.copyFrom(ball.getAbsolutePosition());
     aerialClip = pickAerialFinish(qteHit, qteAccuracy, ebState.inLeftHand); resolveRealMs = performance.now(); clipTimeAtResolve = clipTime;
@@ -2214,6 +2220,7 @@ export const DunkMode: ModeDefinition = (() => {
   async function finishAttempt(ctx: ModeContext, made: boolean): Promise<void> {
     if (finishing) return;
     finishing = true;
+    ctx.setHud({ bannerHigh: false });   // the flush is through: the replay and the judges' banners sit back in the middle
 
     if (!made) {
       // A+ P2: the clank is the miss's one hit — no buzzer on the same beat; the crowd groans a breath later, quietly
@@ -2452,6 +2459,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
 
   function resetForNextAttempt(ctx: ModeContext): void {
+    ctx.setHud({ bannerHigh: false });
     player.root.position.set(0, 0, CFG.startZ);
     player.root.rotation.y = Math.PI;
     player.root.rotation.z = 0; airLean = 0; holdRunSpeed = 0;

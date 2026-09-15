@@ -268,9 +268,11 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         </div>
       )}
 
-      {/* banner */}
+      {/* banner — DUNK-CAR-CLIP R2: while the dunker is in the air (hud.bannerHigh) it rides at the top of the frame. At 38% it
+          sat exactly where both flight cameras put the rim, so "OVER THE CAR!" / "WINDMILL!" covered the ball going through the
+          ring on every flush the eye filmed. It comes back down for the replay and the judges. */}
       {typeof hud.banner === 'string' && hud.banner && (
-        <div className="pointer-events-none absolute inset-x-0 top-[38%] text-center">
+        <div className={`pointer-events-none absolute inset-x-0 ${hud.bannerHigh === true ? 'top-[13%]' : 'top-[38%]'} text-center`}>
           <span className="fel-heading fel-panel px-4 py-2 text-2xl font-bold text-[var(--fel-cyan)]">{hud.banner}</span>
         </div>
       )}
