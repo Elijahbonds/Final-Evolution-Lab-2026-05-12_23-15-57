@@ -27,7 +27,7 @@ await p.addInitScript(`(() => {
     buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })) };
   window.__PAD = pad; navigator.getGamepads = () => [pad];
 })()`);
-await p.goto(`${BASE}/dev/mode/${MODE}`, { waitUntil: 'domcontentloaded' });
+await p.goto(`${BASE}/dev/mode/${MODE}${process.env.QS ? '?' + process.env.QS : ''}`, { waitUntil: 'domcontentloaded' });
 await p.waitForSelector('canvas', { timeout: 240000 });
 await p.waitForTimeout(9000);
 const start = p.locator('text=/^START$/').first();

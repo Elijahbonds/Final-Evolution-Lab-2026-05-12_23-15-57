@@ -17,7 +17,7 @@ import { Vector3 } from '@babylonjs/core';
 import type { Mesh, Observer, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { plantLeg } from './FootPlanting';
 import type { CharacterAnimator } from './CharacterAnimator';
-import { rateFor, StrideRateFilter } from '../core/StrideMatch';
+import { rateFor, StrideRateFilter, strideRef } from '../core/StrideMatch';
 import { boneNode, findBone } from './boneLookup';
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
@@ -143,6 +143,8 @@ export class BasketballAnimTree {
   private strideFilter = new StrideRateFilter();
   private strideClip: string | null = null;
   constructor(private animator: Pick<CharacterAnimator, 'play' | 'setPlaybackScale'>) {}
+  /** The stride references for THIS rig: a body running the CMU loops paces against their stride, not the authored one. */
+  private get ref() { return strideRef(!!(this.animator as { clipNames?: Set<string> }).clipNames?.has('bball_mc_run')); }
 
   update(input: AnimTreeInput): BasketballAnimState {
     this.last = input;
@@ -159,7 +161,7 @@ export class BasketballAnimTree {
       if (c.loop) {
         this.token++; this.override = null;
         // adopt the new state's stride rate rather than sliding from the old one
-        const r0 = rateFor(c.state, input.speedMps ?? 0);
+        const r0 = rateFor(c.state, input.speedMps ?? 0, this.ref);
         this.strideClip = c.loop ? c.clip : null;
         if (r0 !== null) this.strideFilter.set(r0);
         this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec, speedRatio: r0 ?? 1 });
@@ -169,7 +171,7 @@ export class BasketballAnimTree {
     // so the rate has to be set on the RUNNING animation instead, or a per-frame play() would restart the clip every
     // frame. Only locomotion states have a rate; a shot or a knockdown returns null and is left alone.
     if (this.strideClip && !this.override && input.speedMps !== undefined) {
-      const want = rateFor(c.state, input.speedMps);
+      const want = rateFor(c.state, input.speedMps, this.ref);
       if (want !== null) this.animator.setPlaybackScale(this.strideClip, this.strideFilter.step(want, 1 / 60));
     }
     return c.state;

@@ -48,6 +48,28 @@ export interface StrideRef {
 export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0 };
 
 /**
+ * The same references for the CAPTURED hoops loops (HOOPS MOVEMENT, 2026-09-15) — the hero and the AI both run CMU 78
+ * strides now, and a capture's stride is its own: bball_mc_run covers 3.9 leg lengths in its 0.65 s window, played in
+ * 0.6 s, where the authored run was keyed for 3.6 m/s. Calibrated with scripts/probes/_footplant-probe.mts (see the
+ * sweep in the HOOPS-MOVEMENT commit), `?strideRun=` / `?strideSlide=` override both tables for that sweep.
+ */
+export const HOOPS_STRIDE_CAPTURE: StrideRef = { run: 3.6, slide: 2.0 };
+
+/** `?strideRun=4.8&strideSlide=2.4` — the calibration sweep's knob. Read once. */
+const STRIDE_OVERRIDE: Partial<StrideRef> = (() => {
+  try {
+    if (typeof window === 'undefined') return {};
+    const q = new URLSearchParams(window.location.search);
+    const num = (k: string) => { const v = Number(q.get(k)); return q.get(k) !== null && v > 0 ? v : undefined; };
+    return { run: num('strideRun'), slide: num('strideSlide') };
+  } catch { return {}; }
+})();
+export function strideRef(captured: boolean): StrideRef {
+  const base = captured ? HOOPS_STRIDE_CAPTURE : HOOPS_STRIDE;
+  return { run: STRIDE_OVERRIDE.run ?? base.run, slide: STRIDE_OVERRIDE.slide ?? base.slide };
+}
+
+/**
  * Rate limits.
  *
  * A clip pushed past these stops reading as running and starts reading as a cartoon, so the planter absorbs the
