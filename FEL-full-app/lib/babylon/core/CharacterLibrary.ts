@@ -25,6 +25,10 @@ import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
 import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL } from './athleteRoster';
 import { urlForHeroBody, KIT_BODY_URL } from './heroBody';
 import { installOpponentMotion, HERO_CAPTURE } from '../anim/opponentMotion';
+import { installStyleMotion } from '../anim/styleMotion';
+import { pickedVocab } from '../combat/styleVocab';
+/** The modes a picked fighting style's moves play in (The Hundred + the versus fights). */
+const STYLE_FIGHT_MODES: ReadonlySet<string> = new Set(['karate', 'karate_vs', 'mixedcombat', 'duel', 'showdown']);
 import { applySkinShading } from './skinShading';
 import { applyKit } from './kit';
 import { attachContactShadow } from '../visual/contactShadow';
@@ -291,6 +295,14 @@ export const CharacterLibrary = {
     if (role === 'opponent') installOpponentMotion(animator, scene, skeleton);
     // HOOPS MOVEMENT (owner 2026-09-15): the player plays the same hoops captures — one motion set for both bodies on a court
     else if (!heroCaptureOff()) installOpponentMotion(animator, scene, skeleton, undefined, HERO_CAPTURE);
+    // THE STYLE'S OWN MOVES (2026-09-15, owner: capoeira / breaking, taekwondo / tricking, parkour): in a fight mode the
+    // player's picked school brings its vocabulary; The Hundred and Free Run also get the parkour set. Outermost wrapper.
+    if (role !== 'opponent') {
+      const modeId = (scene.metadata as { felModeId?: string } | undefined)?.felModeId ?? opts.modeId ?? '';
+      const fight = STYLE_FIGHT_MODES.has(modeId);
+      const parkour = modeId === 'karate' || modeId === 'freerun';
+      if (fight || parkour) installStyleMotion(animator, scene, skeleton, root, fight ? pickedVocab() : null, { parkour });
+    }
 
     // M69 (E25 complete): write a measured arms-down pose onto the SKELETON so
     // it is the resting state for EVERY character in EVERY state — not only the

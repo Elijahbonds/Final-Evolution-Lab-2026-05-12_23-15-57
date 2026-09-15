@@ -37,6 +37,11 @@ export interface FreeRunAnimInput {
   /** Bailed: fall, then the floor until it drops. */
   down: boolean;
   celebrating?: boolean;
+  /** PARKOUR (2026-09-15): a captured move for this beat, when the rig owns one — the speed vault for a vault take-off,
+   *  the dive roll for a rolled landing, the underbar for a slide under a bar. Omitted = the base clip. */
+  takeoffClip?: string | null;
+  landClip?: string | null;
+  slideClip?: string | null;
 }
 
 export interface FreeRunClipChoice { state: FreeRunAnimState; clip: string; loop: boolean; fadeSec: number }
@@ -71,7 +76,11 @@ export function chooseFreeRunClip(i: FreeRunAnimInput): FreeRunClipChoice {
   else if (i.speed01 > 0.5) state = 'run';
   else if (i.speed01 > 0.06) state = 'walk';
   else state = 'idle';
-  return pick(state);
+  const c = pick(state);
+  if (state === 'jump' && i.takeoffClip) c.clip = i.takeoffClip;
+  if (state === 'land_clean' && i.landClip) c.clip = i.landClip;
+  if (state === 'slide' && i.slideClip) { c.clip = i.slideClip; c.loop = false; }
+  return c;
 }
 
 export const FLOOR_FAMILY: ReadonlySet<FreeRunAnimState> = new Set<FreeRunAnimState>(['bail', 'floor', 'get_up']);

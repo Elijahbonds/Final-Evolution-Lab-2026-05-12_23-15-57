@@ -108,6 +108,7 @@ import {
 } from '../core/HordeDynamics';
 import { readBlend, blendTraits, blendName, SCHOOLS } from '../combat/schools';
 import { hordeStyle, type HordeStyle } from '../combat/loadout';
+import { styleVariant, styleLabel, hasRootTrack, styleMotionOf } from '../anim/styleMotion';   // the picked style's own moves (2026-09-15)
 import { Freeflow, type FlowEvent, type FlowBroken } from '../core/Freeflow';   // THE HUNDRED: Arkham freeflow — the count means something
 
 /**
@@ -657,13 +658,16 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       }
     }
     striking = true; strikeSeq++; strikeStartedAt = gameSec; strikeMove = move; strikeHitDone = false;
-    spinMove = move.spinDeg ? { deg: (move.spinDeg * Math.PI) / 180, sec: move.spinSec ?? 0.45, at: gameSec } : null;
+    // a picked STYLE's move may be a captured flip / spin with its own root track: it turns itself, so the spin layer stands down
+    const played = styleVariant(move.clip, styleMotionOf(player.animator)?.vocab ?? null, player.animator.clipNames);
+    const styleName = styleLabel(played);
+    spinMove = move.spinDeg && !hasRootTrack(played) ? { deg: (move.spinDeg * Math.PI) / 180, sec: move.spinSec ?? 0.45, at: gameSec } : null;
     const tok = strikeSeq;
     myStrike = { weight: move.weight, clip: move.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it (strikeSeq replays a same-weight link)
     if (!flowStats.clips.includes(move.clip)) flowStats.clips.push(move.clip);
     dyn.swings++; dyn.lastMove = move.id; dyn.lastString = [...book.history].join('') || key;
     SoundKit.play('whoosh', move.ender ? { pitch: 0.8, volume: 0.7 } : { pitch: 1 + book.history.length * 0.08 });
-    if (move.ender || move.id === 'rush' || move.id === 'backSpin') { ctx.setHud({ banner: move.label }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+    if (move.ender || move.id === 'rush' || move.id === 'backSpin' || styleName) { ctx.setHud({ banner: styleName ?? move.label }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
     tween(STRIKE_TIMING[move.weight].hitAt * style.startupMult, () => {}, () => resolveHit(ctx, key, move, tok));
   }
 
@@ -1236,9 +1240,38 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     dodgeClip = steered ? DODGE_SLIP : LEAN_DODGE;
     SoundKit.play('whoosh', { pitch: 1.5, volume: 0.4 });
     const from = player.root.position.clone();
-    const to = from.add(dir.scale(DODGE_DISTANCE * perks.dodgeMult)); clampDisc(to);
+    let to = from.add(dir.scale(DODGE_DISTANCE * perks.dodgeMult)); clampDisc(to);
+    let slideSec = DODGE_SLIDE_SEC;
+    // PARKOUR IN THE HUNDRED (2026-09-15, owner decision): the dodge reads the ring. Steered OUT at the edge it is a WALL
+    // FLIP back into the fight; steered AT a staggered or downed body close in front it is a VAULT over it. Both are the
+    // captured moves (pk_*), with the dodge's i-frames held for the whole move.
+    const owned = player.animator.clipNames;
+    if (steered) {
+      const pos = player.root.position, r = Math.hypot(pos.x, pos.z);
+      const outward = r > 1e-3 ? (dir.x * pos.x + dir.z * pos.z) / r : 0;
+      const over = liveBodies().find((e) => {
+        const p = e.mob.char.root.position, dx = p.x - pos.x, dz = p.z - pos.z, d = Math.hypot(dx, dz);
+        return d > 0.4 && d < 2.4 && (e.stunUntil > gameSec || e.airUntil > gameSec) && (dx * dir.x + dz * dir.z) / d > 0.8;
+      });
+      if (r > ARENA_RADIUS - 1.3 && outward > 0.6 && owned.has('pk_backflip')) {
+        dodgeClip = 'pk_backflip';
+        to = from.subtract(dir.scale(2.2)); clampDisc(to);
+        slideSec = Math.max(DODGE_SLIDE_SEC, (player.animator.durationOf('pk_backflip') ?? 0.85) * 0.85);
+        ctx.setHud({ banner: 'WALL FLIP' }); setTimeout(() => ctx.setHud({ banner: '' }), 600);
+      } else if (over && owned.has('pk_vault')) {
+        dodgeClip = 'pk_vault';
+        const p = over.mob.char.root.position;
+        to = new Vector3(p.x + dir.x * 1.6, from.y, p.z + dir.z * 1.6); clampDisc(to);
+        slideSec = Math.max(DODGE_SLIDE_SEC, (player.animator.durationOf('pk_vault') ?? 1) * 0.7);
+        ctx.setHud({ banner: 'VAULT' }); setTimeout(() => ctx.setHud({ banner: '' }), 600);
+      }
+    }
+    // a picked style's evade (a side flip, the esquiva) is a whole captured move: the dodge lasts as long as it does
+    const playedDodge = styleVariant(dodgeClip, styleMotionOf(player.animator)?.vocab ?? null, owned);
+    if (hasRootTrack(playedDodge)) slideSec = Math.max(slideSec, (player.animator.durationOf(dodgeClip) ?? 0.8) * 0.85);
+    iframeSec = Math.max(iframeSec, slideSec);
     // on the GAME clock: a perfect read's slow-mo stretches the slide with the lean
-    tween(DODGE_SLIDE_SEC, (k) => { player.root.position = Vector3.Lerp(from, to, 1 - (1 - k) * (1 - k)); }, () => { dodging = false; });   // the tree's dodge settles on its own
+    tween(slideSec, (k) => { player.root.position = Vector3.Lerp(from, to, 1 - (1 - k) * (1 - k)); }, () => { dodging = false; });   // the tree's dodge settles on its own
   }
 
   const nextLandIn = (): number => {

@@ -76,6 +76,8 @@ interface St {
   /** ANIM-READABILITY (creative, 2026-09-07): the ONE OWNER of the runner's clips. The mode never calls animator.play;
    *  it latches wall-clock beats (take-off, landing) and feeds the tree once per frame. */
   tree: FreeRunAnimTree | null; jumpAt: number; landAt: number; landing: 'none' | 'clean' | 'sketchy';
+  /** PARKOUR captures for the current beats (null = the base clip), and how long the landing beat holds. */
+  takeoffClip: string | null; landClip: string | null; slideClip: string | null; landBeatSec: number;
   /** BIOMECH-WAVE2: the Posture Poses layer and the body it is fed. */
   posture: { layer: PostureLayer; dispose(): void } | null; bio: FreeRunPostureInput;
   /** Vertical velocity, owned here: the controller integrates the velocity it is handed, so gravity is ours to apply. */
@@ -182,7 +184,12 @@ export const FreeRunMode: ModeDefinition = (() => {
 
   /** A take-off / a touchdown: latch the beat for the tree (re-fires on a new beat of the same kind). */
   function jumpBeat(S: St): void { S.jumpAt = S.clock; S.tree?.clearBeat('jump'); }
-  function landBeat(S: St, landing: 'clean' | 'sketchy'): void { S.landAt = S.clock; S.landing = landing; S.tree?.clearBeat('land_clean', 'land_sketchy'); }
+  function landBeat(S: St, landing: 'clean' | 'sketchy', rolled = false): void {
+    // PARKOUR: a timed roll out of a real drop lands in the captured dive roll, and the beat holds for it
+    S.landClip = rolled && landing === 'clean' && S.hero?.animator.clipNames.has('pk_dive_roll') ? 'pk_dive_roll' : null;
+    S.landBeatSec = S.landClip ? Math.max(LAND_BEAT_SEC, (S.hero!.animator.durationOf('pk_dive_roll') ?? 1.1) * 0.8) : LAND_BEAT_SEC;
+    S.landAt = S.clock; S.landing = landing; S.tree?.clearBeat('land_clean', 'land_sketchy');
+  }
 
   /** The tree is fed once per frame, every phase, from the run's context — the movement INTENT included (S.speed is the
    *  speed the runner keeps through a landing, so a landing under a held stick settles onto the run, not an idle flash). */
@@ -204,7 +211,8 @@ export const FreeRunMode: ModeDefinition = (() => {
       tricking: airborne && !!S.trick,
       wallrun: S.state === 'wallrun',
       sliding: S.state === 'slide',
-      landing: !airborne && S.clock - S.landAt < LAND_BEAT_SEC ? S.landing : 'none',
+      landing: !airborne && S.clock - S.landAt < S.landBeatSec ? S.landing : 'none',
+      takeoffClip: S.takeoffClip, landClip: S.landClip, slideClip: S.slideClip,
       down: S.state === 'down' && S.downSec > RISE_SEC,   // the last RISE_SEC of DOWN_SEC is the get-up
       celebrating: S.finished,
     });
@@ -220,7 +228,9 @@ export const FreeRunMode: ModeDefinition = (() => {
     };
     const knee = cast(p.add(new Vector3(0, 0.6, 0)), fwd, 1.7, ['vault']);
     const chest = cast(p.add(new Vector3(0, 1.3, 0)), fwd, 1.4, ['wall']);
-    const head = cast(p.add(new Vector3(0, 1.45, 0)), fwd, 1.9, ['bar']);
+    // the bar ray runs at the height a bar you must duck actually sits (the course's bar spans 1.10–1.40 m): at 1.45 it
+    // passed over the bar's top edge, SLIDE was never offered, and every run "CLIPPED THE BAR" (2026-09-15, parkour probe)
+    const head = cast(p.add(new Vector3(0, 1.25, 0)), fwd, 1.9, ['bar']);
     const ledge = cast(p.add(new Vector3(0, 4.2, 0)).add(fwd.scale(2.2)), new Vector3(0, -1, 0), 2.6, ['ledge', 'roof']);
     S.env = { vaultAhead: knee.hit, wallAhead: chest.hit, ledgeAhead: ledge.hit && !!ledge.point && ledge.point.y > p.y + 1.2, barAhead: head.hit };
     if (chest.hit && chest.normal) S.wallNormal.copyFrom(chest.normal);
@@ -234,6 +244,8 @@ export const FreeRunMode: ModeDefinition = (() => {
     S.vy = vy;
     S.cc!.setVelocity(new Vector3(S.heading.x * S.speed, vy, S.heading.z * S.speed));
     S.state = 'air'; S.airStartY = S.hero!.root.position.y; S.airSec = 0; S.launch = launch; S.trick = null; S.trickSpun = 0; S.rollAt = null;
+    // PARKOUR (2026-09-15): a vault takes off in the captured speed vault
+    S.takeoffClip = launch === 'vault' && S.hero!.animator.clipNames.has('pk_vault') ? 'pk_vault' : null;
     jumpBeat(S);
   }
 
@@ -256,7 +268,7 @@ export const FreeRunMode: ModeDefinition = (() => {
       flash(ctx, lost > 0 ? `BAILED — ${lost} lost` : 'BAILED', 900);
     } else {
       S.state = 'ground'; S.groundSec = 0;
-      landBeat(S, landing);
+      landBeat(S, landing, rolledWithin !== null && rolledWithin <= ROLL_WINDOW_S && drop >= 1.2);
       ctx.feel?.impact?.(landing === 'sketchy' ? 0.45 : 0.2);
       if (S.trick || drop >= 2.4) softBeat(ctx, S.trick ? 'trick land' : 'big land');   // A+ P0: a big land answers softly
       if (landing === 'sketchy') flash(ctx, 'HARD LANDING — roll next time', 700);
@@ -270,6 +282,8 @@ export const FreeRunMode: ModeDefinition = (() => {
     const r = respawnFor(S.pieces, S.checkpoint);
     S.cc!.setPosition(new Vector3(r.x, r.y + CAPSULE_H / 2 + 0.05, r.z));
     S.cc!.setVelocity(Vector3.Zero());
+    S.heading.set(0, 0, 1);   // back at the checkpoint facing down the course, and the camera cut behind it (it follows now)
+    behindRunner(ctx, S, new Vector3(r.x, r.y, r.z));
     const lost = S.combo.bail(); S.bails++;
     S.speed = 0; S.state = 'ground'; S.trick = null; S.hero!.root.rotation.set(0, S.hero!.root.rotation.y, 0);
     landBeat(S, 'sketchy');   // put back down hard at the checkpoint (the tree read the teleport as an idle flash)
@@ -314,10 +328,20 @@ export const FreeRunMode: ModeDefinition = (() => {
     ctx.setHud({ banner: `COURSE   ◀  ${S.tier.name}  ▶`, hint: `${S.tier.gaps} gaps · par ${S.tier.parSec}s · high line +${S.tier.routeBonus}  ·  any face button starts`, tier: S.tier.name, verbs: '', time: 0 });
   }
 
+  /** Cut the camera behind the runner, looking down the course, and let the stick take a fresh basis from that view.
+   *  Whatever held the camera before (the pick screen, the intro, a fall) is not what the first push should be read
+   *  against: a basis latched off a side-on camera ran a held stick-forward straight off the side of the start slab. */
+  function behindRunner(ctx: ModeContext, S: St, at?: Vector3): void {
+    const p = at ?? S.hero!.root.position;
+    ctx.camDirector.snapTo(p, p.add(new Vector3(0, 0, 8)));
+    ctx.camDirector.stickWorldLatched(0, 0);   // a centred read releases the latch; the next held frame latches off this view
+  }
+
   async function begin(ctx: ModeContext, S: St): Promise<void> {
     if (S.phase !== 'pick') return;
     S.phase = 'run';
     buildCourse(ctx, S);
+    behindRunner(ctx, S);
     ctx.setHud({ banner: '', hint: 'stick RUNS · A JUMP / VAULT / WALL RUN · B SLIDE / ROLL · X FLIP (stick picks) · Y TWIST / CAT LEAP' });
     hud(ctx, S);
   }
@@ -338,7 +362,7 @@ export const FreeRunMode: ModeDefinition = (() => {
         combo: new ComboChain(undefined, 'all'), started: false, runSec: 0, finished: false, waitSec: 0,
         checkpoint: 0, highTouched: false, bails: 0, barsCleared: new Set(),
         env: { vaultAhead: false, wallAhead: false, ledgeAhead: false, barAhead: false }, vy: 0,
-        tree: null, jumpAt: -9, landAt: -9, landing: 'none',
+        tree: null, jumpAt: -9, landAt: -9, landing: 'none', takeoffClip: null, landClip: null, slideClip: null, landBeatSec: LAND_BEAT_SEC,
         posture: null, bio: { ...FREERUN_INPUT_IDLE },
         bailAt: 0, finishLatch: false,
       };
@@ -423,7 +447,7 @@ export const FreeRunMode: ModeDefinition = (() => {
           SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 });
         }
       } else if (e.btn === 'B') {
-        if (S.state === 'ground' && verbs.includes('SLIDE')) { S.state = 'slide'; S.slideSec = SLIDE_SEC; S.combo.add('SLIDE', 35, 'manual'); flash(ctx, 'SLIDE'); SoundKit.play('whoosh', { pitch: 0.8 }); }
+        if (S.state === 'ground' && verbs.includes('SLIDE')) { S.state = 'slide'; S.slideSec = SLIDE_SEC; S.slideClip = S.env.barAhead && S.hero.animator.clipNames.has('pk_duck') ? 'pk_duck' : null; S.combo.add('SLIDE', 35, 'manual'); flash(ctx, 'SLIDE'); SoundKit.play('whoosh', { pitch: 0.8 }); }   // PARKOUR: under a bar, the captured underbar
         else if (S.state === 'air') { S.rollAt = S.clock; ctx.juice.callout('ROLL ON LANDING', '#cbd5e1', 400); }   // the roll is timed against touchdown
         else refuse(ctx, 'SLIDE WHILE RUNNING');   // PHONE CONTROLS: a SLIDE with no run under it
       } else if (e.btn === 'X' || e.btn === 'Y') {
@@ -456,13 +480,13 @@ export const FreeRunMode: ModeDefinition = (() => {
       if (S.phase !== 'run') return;
 
       const cc = S.cc, root = S.hero.root;
-      // heading follows the stick in camera space; the run keeps its heading with no input
-      const cam = ctx.camera;
-      const fwd = cam.getForwardRay().direction; fwd.y = 0; if (fwd.lengthSquared() < 0.01) fwd.set(0, 0, 1); fwd.normalize();
-      const right = new Vector3(fwd.z, 0, -fwd.x);
+      // heading follows the stick in camera space; the run keeps its heading with no input. The basis is LATCHED the frame the
+      // stick leaves the deadzone (CameraDirector.stickWorldLatched): the camera follows the run now, and a live basis under
+      // a follow camera turns a held stick-right into a circle as the camera swings in behind.
       const wishLen = Math.min(1, Math.hypot(S.stick.x, S.stick.z));
-      if (wishLen > 0.15 && S.state !== 'down') {
-        const w = fwd.scale(S.stick.z).addInPlace(right.scale(S.stick.x)).normalize();
+      const wishW = ctx.camDirector.stickWorldLatched(S.stick.x, -S.stick.z);
+      if (wishLen > 0.15 && S.state !== 'down' && wishW.lengthSquared() > 1e-6) {
+        const w = wishW.normalize();
         if (S.state === 'ground' || S.state === 'slide') S.heading.copyFrom(w);
         else S.heading = Vector3.Lerp(S.heading, w, 0.04).normalize();          // faint air control
       }
@@ -558,6 +582,14 @@ export const FreeRunMode: ModeDefinition = (() => {
       // stopped a fast enough run from widening the lens into a fisheye, and the hard-coded 0.8 ignored
       // whatever fov the camera preset was actually tuned at. Same effect, bounded, and eased on a time
       // constant so it settles identically at 30 fps and 144.
+      // THE CAMERA FOLLOWS THE RUN (2026-09-15). Since the scaffold the mode snapped the director once at spawn and never
+      // called update, so the camera stayed at the start line while the runner left it: every vault, flip and roll was a
+      // few pixels tall 20 m away (the rc9 scorecard frame shows an empty course). The runner preset now chases the heading,
+      // and a real air (not a hop) swings to the three-quarter air cam so a flip reads side-on — only on the move: standing
+      // still the director has no velocity to be behind, takes "behind" from where it already is, and the side offset then
+      // compounds frame on frame into an orbit (measured: a standing jump carried the camera round to the runner's side).
+      ctx.camDirector.setAir(S.state === 'air' && S.airSec > 0.25 && S.speed > 3 ? 1 : 0);
+      ctx.camDirector.update(root.position, new Vector3(S.heading.x * S.speed, 0, S.heading.z * S.speed), null);
       const c = ctx.scene.activeCamera;
       if (c) { baseFov ??= c.fov; c.fov = stepSpeedFov(c.fov, baseFov, S.speed, RUN_MAX, dt); }
       if (Math.floor(S.clock * 6) !== Math.floor((S.clock - dt) * 6)) hud(ctx, S);   // six HUD frames a second is plenty for numbers

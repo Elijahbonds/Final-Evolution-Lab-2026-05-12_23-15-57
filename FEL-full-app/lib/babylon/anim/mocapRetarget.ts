@@ -56,7 +56,19 @@ export interface RetargetOpts {
    *  the highest kick ('foot') points straight ahead. A roundhouse turns the hips ~90° through the kick, so the median hip
    *  facing put the kick 76° off to the side (measured on CMU 135_07). */
   aim?: 'hand' | 'foot';
+  /**
+   * THE ROOT TRACK (2026-09-15, owner: capoeira, breakdance, tricking, parkour). A body frame with a ±110° hip key and a
+   * −90…60° spine cannot hold a cartwheel, a backflip or a windmill: the body goes upside down. With `rootTrack` the whole
+   * PELVIS orientation (hip line + the spine's own up) and the hips' height over the floor come out as a separate track
+   * (RootKey: a quaternion in the window's baseline frame + a height), and the pose keys are taken INSIDE the pelvis frame
+   * — an upright body the root layer turns over. See anim/MoveRootLayer.ts.
+   */
+  rootTrack?: boolean;
 }
+
+/** One sample of a root track: t (s), the pelvis orientation as a quaternion [x, y, z, w] in the rig's axes (+x right,
+ *  +y up, +z front), and h — the hips' height offset from standing (m, reference body). */
+export type RootKey = [number, number, number, number, number, number];
 
 const REF_LEG = 0.82;      // poseClip REF_LEG_LEN: forge hero hip→knee→ankle, metres
 const REF_HIPS = 0.96;     // poseClip REF_HIPS_Y
@@ -117,7 +129,7 @@ export function frontSignOf(s: JointStream, f0: number, f1: number): number {
   return median(votes) >= 0 ? 1 : -1;
 }
 
-export interface RetargetReport { keys: PoseKey[]; duration: number; scale: number; baseYawDeg: number; frontSign: number }
+export interface RetargetReport { keys: PoseKey[]; duration: number; scale: number; baseYawDeg: number; frontSign: number; root?: RootKey[] }
 
 export function retargetToPoseKeys(stream: JointStream, o: RetargetOpts): RetargetReport {
   const s = smoothStream(stream, o.smoothSec ?? 0.035);
@@ -186,7 +198,46 @@ export function retargetToPoseKeys(stream: JointStream, o: RetargetOpts): Retarg
     for (const j of CANON) out[j] = add(scl(s.frames[a][j], 1 - t), scl(s.frames[b][j], t));
     return out;
   };
+  // the floor for a root track: the lowest the capture's feet (or hands, on a handstand) go over the whole window
+  const floorOf = () => {
+    let lo = Infinity;
+    for (let f = f0; f <= f1; f++) { const fr = s.frames[f]; for (const j of ['LeftFoot', 'RightFoot', 'LeftHand', 'RightHand', 'Head'] as Canon[]) lo = Math.min(lo, dot(fr[j], up)); }
+    return lo;
+  };
+  const floorY = o.rootTrack ? floorOf() : 0;
+  const rootKeys: RootKey[] = [];
+  const rootKeyOf = (fr: Record<Canon, V3>, t: number): PoseKey => {
+    const px = pelvisAxes(fr, up, frontSign);
+    // the pelvis frame in the baseline's axes → a quaternion (columns right / up / front)
+    const R = (v: V3): V3 => [dot(v, base.right), dot(v, up), dot(v, base.front)];
+    const q = quatFromAxes(R(px.right), R(px.up), R(px.front));
+    const h = (dot(fr.Hips, up) - floorY) * S + REF_ANKLE - REF_HIPS;
+    rootKeys.push([R2(t), +q[0].toFixed(4), +q[1].toFixed(4), +q[2].toFixed(4), +q[3].toFixed(4), R2(h)]);
+    // the body inside the pelvis frame: hips at bind, no yaw key, the spine's pitch against the pelvis's own up
+    const L = (v: V3): V3 => [dot(v, px.right), dot(v, px.up), dot(v, px.front)];
+    const P = (j: Canon): V3 => { const v = L(sub(fr[j], fr.Hips)); return [R2(v[0] * S), R2(REF_HIPS + v[1] * S), R2(v[2] * S)]; };
+    const neckRel = L(sub(fr.Neck, fr.Hips));
+    const pitch = Math.atan2(neckRel[2], neckRel[1]) * DEG;
+    const shoulder = L(sub(fr.RightArm, fr.LeftArm));
+    const spineYaw = -Math.atan2(-shoulder[2], shoulder[0]) * DEG;
+    const pole = (sh: Canon, el: Canon, wr: Canon): V3 | undefined => {
+      const mid = scl(add(fr[sh], fr[wr]), 0.5), d = sub(fr[el], mid);
+      if (len(d) < 0.02 * (1 / S)) return undefined;
+      const v = norm(L(d)); return [R2(v[0]), R2(v[1]), R2(v[2])];
+    };
+    const poles: PoseKey['poles'] = {};
+    const pl = pole('LeftArm', 'LeftForeArm', 'LeftHand'), pr = pole('RightArm', 'RightForeArm', 'RightHand');
+    if (pl) poles.Left = pl; if (pr) poles.Right = pr;
+    return {
+      t: R2(t),
+      bones: { Hips: [0, 0, 0], Spine: [Math.round(Math.max(-90, Math.min(60, pitch))), Math.round(Math.max(-40, Math.min(40, spineYaw))), 0] },
+      hands: { Left: P('LeftHand'), Right: P('RightHand') }, poles,
+      feet: { Left: P('LeftFoot'), Right: P('RightFoot') },
+      hipsY: 0,
+    };
+  };
   const keyOf = (fr: Record<Canon, V3>, t: number): PoseKey => {
+    if (o.rootTrack) return rootKeyOf(fr, t);
     const ax = bodyAxes(fr, up, frontSign);
     // the rig's yaw convention (basketball.ts, measured): +yaw turns the RIGHT shoulder forward, i.e. the front toward
     // the body's LEFT — so a front that has turned toward +right is a NEGATIVE yaw
@@ -222,7 +273,45 @@ export function retargetToPoseKeys(stream: JointStream, o: RetargetOpts): Retarg
   let keys = Array.from({ length: nKeys }, (_, k) => keyOf(sampleAt(k / (nKeys - 1)), (k / (nKeys - 1)) * dur));
   if (o.loop) keys = closeLoop(keys);
   if (o.mirror) keys = keys.map(mirrorKey);
-  return { keys, duration: R2(dur), scale: +S.toFixed(3), baseYawDeg: Math.round(baseYaw * DEG), frontSign };
+  let root = o.rootTrack ? unwindQuats(rootKeys) : undefined;
+  if (root && o.mirror) root = root.map(([t, x, y, z, w, h]) => [t, x, -y, -z, w, h] as RootKey);   // mirror across x: negate the y and z parts
+  return { keys, duration: R2(dur), scale: +S.toFixed(3), baseYawDeg: Math.round(baseYaw * DEG), frontSign, ...(root ? { root } : {}) };
+}
+
+/** The pelvis's anatomical frame: right along the hip line, up along the spine (hips → chest), front out of the belly. */
+function pelvisAxes(fr: Record<Canon, V3>, worldUp: V3, frontSign: number): { right: V3; up: V3; front: V3 } {
+  const spine = norm(sub(fr.Chest, fr.Hips));
+  let right = sub(fr.RightUpLeg, fr.LeftUpLeg);
+  right = norm(sub(right, scl(spine, dot(right, spine))));
+  const front = scl(norm(cross(right, spine)), frontSign);
+  void worldUp;
+  return { right, up: spine, front };
+}
+
+/** A rotation matrix given by its columns (the local x / y / z axes, in the parent's axes) as a quaternion [x, y, z, w]. */
+export function quatFromAxes(xAxis: V3, yAxis: V3, zAxis: V3): [number, number, number, number] {
+  const m00 = xAxis[0], m10 = xAxis[1], m20 = xAxis[2];
+  const m01 = yAxis[0], m11 = yAxis[1], m21 = yAxis[2];
+  const m02 = zAxis[0], m12 = zAxis[1], m22 = zAxis[2];
+  const tr = m00 + m11 + m22;
+  let x: number, y: number, z: number, w: number;
+  if (tr > 0) { const k = 0.5 / Math.sqrt(tr + 1); w = 0.25 / k; x = (m21 - m12) * k; y = (m02 - m20) * k; z = (m10 - m01) * k; }
+  else if (m00 > m11 && m00 > m22) { const k = 2 * Math.sqrt(1 + m00 - m11 - m22); x = 0.25 * k; y = (m10 + m01) / k; z = (m02 + m20) / k; w = (m21 - m12) / k; }
+  else if (m11 > m22) { const k = 2 * Math.sqrt(1 + m11 - m00 - m22); y = 0.25 * k; x = (m10 + m01) / k; z = (m21 + m12) / k; w = (m02 - m20) / k; }
+  else { const k = 2 * Math.sqrt(1 + m22 - m00 - m11); z = 0.25 * k; x = (m02 + m20) / k; y = (m21 + m12) / k; w = (m10 - m01) / k; }
+  const l = Math.hypot(x, y, z, w) || 1;
+  return [x / l, y / l, z / l, w / l];
+}
+
+/** Keep consecutive quaternions in the same hemisphere so a slerp between keys never takes the long way round. */
+function unwindQuats(keys: RootKey[]): RootKey[] {
+  const out: RootKey[] = [];
+  for (const k of keys) {
+    const prev = out[out.length - 1];
+    if (prev && prev[1] * k[1] + prev[2] * k[2] + prev[3] * k[3] + prev[4] * k[4] < 0) out.push([k[0], -k[1], -k[2], -k[3], -k[4], k[5]]);
+    else out.push(k);
+  }
+  return out;
 }
 
 const lerp3 = (a: V3, b: V3, u: number): V3 => [R2(a[0] + (b[0] - a[0]) * u), R2(a[1] + (b[1] - a[1]) * u), R2(a[2] + (b[2] - a[2]) * u)];

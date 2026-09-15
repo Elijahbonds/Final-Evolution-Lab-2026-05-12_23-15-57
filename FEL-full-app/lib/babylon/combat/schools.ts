@@ -61,6 +61,12 @@ export interface School {
   /** The strike this school throws most naturally — a small route bonus, never a gate. */
   favours: RouteStrike;
   ready: boolean;
+  /**
+   * THE MOVES (2026-09-15, owner: capoeira / breaking, taekwondo / tricking). A school with a vocabulary does not only
+   * scale the numbers — it throws different strikes: its captured moves stand in for the base moves in every fight mode
+   * (anim/styleMotion.ts). Only the PRIMARY school's vocabulary plays; the blend still mixes the traits.
+   */
+  vocab?: 'capoeira' | 'tricking';
 }
 
 /**
@@ -101,7 +107,23 @@ export const SCHOOLS: readonly School[] = [
     tint: '#ffd75e', favours: 'jab', ready: true,
     traits: { speed: 1.15, power: 0.85, reach: 0.85, guard: 0.95, chi: 1.00, flow: 1.20 },
   },
+  // THE MOVEMENT STYLES (2026-09-15). Same budget, and they bring their own moves (vocab).
+  {
+    id: 'capoeira', name: 'CAPOEIRA / BREAKER', sub: 'Crescents, au, windmills and a helicopter sweep. Never stands still to block.',
+    tint: '#3ad17a', favours: 'kick', ready: true, vocab: 'capoeira',
+    traits: { speed: 1.05, power: 0.90, reach: 1.15, guard: 0.80, chi: 1.00, flow: 1.10 },
+  },
+  {
+    id: 'tricking', name: 'TAEKWONDO / TRICKING', sub: '360 hooks, butterfly, 540, the flash kick. Everything big, nothing cheap.',
+    tint: '#ff4fa3', favours: 'kick', ready: true, vocab: 'tricking',
+    traits: { speed: 1.00, power: 1.15, reach: 1.10, guard: 0.80, chi: 1.05, flow: 0.90 },
+  },
 ];
+
+/** The moves a blend throws: its PRIMARY school's vocabulary (null = the base strikes). */
+export function vocabFor(blend: StyleBlend): 'capoeira' | 'tricking' | null {
+  return schoolById(blend.primary).vocab ?? null;
+}
 
 export function schoolById(id: string): School {
   return SCHOOLS.find((s) => s.id === id) ?? SCHOOLS[0];

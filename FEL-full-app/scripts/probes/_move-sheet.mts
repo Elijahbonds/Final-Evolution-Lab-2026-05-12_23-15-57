@@ -21,7 +21,7 @@ for (const mode of MODES) {
   const ctx = await b.newContext({ viewport: { width: 520, height: 620 } });
   await ctx.addInitScript({ content: 'window.__name = window.__name || function (f) { return f; };' });
   const p = await ctx.newPage();
-  await p.goto(`${BASE}/dev/mode/${mode}?agent=1`, { waitUntil: 'domcontentloaded', timeout: 240000 });
+  await p.goto(`${BASE}/dev/mode/${mode}?agent=1${process.env.QS ? "&" + process.env.QS : ""}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
   const t0 = Date.now();
   while (Date.now() - t0 < 240000) { const s = await p.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => ''); if (s === 'loaded' || s === 'failed') break; await p.waitForTimeout(500); }
   await p.waitForTimeout(2500);

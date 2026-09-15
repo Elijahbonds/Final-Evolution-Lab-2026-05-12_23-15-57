@@ -122,9 +122,9 @@ describe('a style is how you fight, never what you are allowed to do', () => {
 });
 
 describe('the blend as the picker sees and stores it', () => {
-  it('offers six schools, all ready, each naming its cost', () => {
+  it('offers eight schools (six trait schools + the two movement styles), all ready, each naming its cost', () => {
     const list = readySchools();
-    expect(list.length).toBe(6);
+    expect(list.length).toBe(8);
     for (const s of list) expect(s.sub.length, s.id).toBeGreaterThan(20);
   });
 
@@ -160,5 +160,14 @@ describe('the blend as the picker sees and stores it', () => {
     expect(SCHOOLS[0].id).toBe('straight');
     const t = SCHOOLS[0].traits;
     for (const k of STYLE_TRAIT_KEYS) expect(Math.abs(t[k] - 1), `${k}`).toBeLessThanOrEqual(0.05 + 1e-9);
+  });
+});
+
+describe('the movement styles', () => {
+  it('styleVocab knows exactly the schools that carry a vocabulary, under the same remembered key', async () => {
+    const { VOCAB_SCHOOLS } = await import('./styleVocab');
+    const { SCHOOLS, BLEND_KEY } = await import('./schools');
+    expect(Object.fromEntries(SCHOOLS.filter((s) => s.vocab).map((s) => [s.id, s.vocab]))).toEqual(VOCAB_SCHOOLS);
+    expect(BLEND_KEY).toBe('fel-combat-style');
   });
 });
