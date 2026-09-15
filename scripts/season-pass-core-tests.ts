@@ -17,6 +17,8 @@
  *   12-15. DELIVERY: every granted cosmetic resolves to a real wearable, season
  *      items are never purchasable, ids are unique and store-disjoint, and the
  *      coin store never lists them.
+ *   16-18. PACING: the track is finishable by committed play inside the season,
+ *      finishes early for dedicated play, and is NOT finishable casually.
  *
  * Run: yarn tsx scripts/season-pass-core-tests.ts
  */
