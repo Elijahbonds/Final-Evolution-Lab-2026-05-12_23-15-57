@@ -39,6 +39,11 @@ export interface HordeMove {
   lunge: number;
   /** a finisher-class beat (the string's last link: hit-stop, shake, the banner) */
   ender: boolean;
+  /** RECOGNISABLE ON SIGHT (2026-09-15): a SPINNING move turns the whole body this many degrees over `spinSec`. The
+   *  captures carry the spin, but a retarget keys the hips' turn inside ±110°, so a 326° jumping spin kick arrived as a
+   *  shuffle; the turn is the move's silhouette, so the mode layers it on the root (see KarateEndlessMode's spin layer). */
+  spinDeg?: number;
+  spinSec?: number;
 }
 
 // ── cancel + buffer ─────────────────────────────────────────────────────────
@@ -84,13 +89,13 @@ export const MOVES = {
   cross:     M({ id: 'cross', label: 'CROSS', clip: 'karate_cross', weight: 'light', speed: 1.5, range: 1.6, arcDeg: 120, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.2 }),
   uppercut:  M({ id: 'uppercut', label: 'RISING DRAGON', clip: 'uppercut', weight: 'finisher', speed: 1.25, range: 1.7, arcDeg: 130, launch: true, stunRadius: 2.4, stunSec: 0.9, lunge: 1.4, ender: true }),
   kick:      M({ id: 'kick', label: 'HIGH KICK', clip: 'high_kick', weight: 'medium', speed: 1.3, range: 1.9, arcDeg: 150, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.4 }),
-  whirl:     M({ id: 'whirl', label: 'WHIRLWIND', clip: 'karate_whirl', weight: 'medium', speed: 1.3, range: 2.2, arcDeg: 360, launch: false, stunRadius: 2.6, stunSec: 0.8, lunge: 0.6, ender: true }),
+  whirl:     M({ id: 'whirl', label: 'WHIRLWIND', clip: 'karate_whirl', weight: 'medium', speed: 1.3, range: 2.2, arcDeg: 360, launch: false, stunRadius: 2.6, stunSec: 0.8, lunge: 0.6, ender: true, spinDeg: 360, spinSec: 0.42 }),
   roundhouse:M({ id: 'roundhouse', label: 'ROUNDHOUSE', clip: 'roundhouse', weight: 'medium', speed: 1.35, range: 2.0, arcDeg: 200, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.2 }),
-  typhoon:   M({ id: 'typhoon', label: 'TYPHOON', clip: 'karate_typhoon', weight: 'finisher', speed: 1.15, range: 2.4, arcDeg: 360, launch: true, stunRadius: 3.2, stunSec: 1.1, lunge: 0.8, ender: true }),
+  typhoon:   M({ id: 'typhoon', label: 'TYPHOON', clip: 'karate_typhoon', weight: 'finisher', speed: 1.15, range: 2.4, arcDeg: 360, launch: true, stunRadius: 3.2, stunSec: 1.1, lunge: 0.8, ender: true, spinDeg: 360, spinSec: 0.5 }),
   heavy:     M({ id: 'heavy', label: 'HEAVY', clip: 'karate_heavy', weight: 'heavy', speed: 1.25, range: 1.65, arcDeg: 100, launch: true, stunRadius: 1.8, stunSec: 0.6, lunge: 1.4 }),
   hammer:    M({ id: 'hammer', label: 'HAMMER FIST', clip: 'karate_hammer', weight: 'finisher', speed: 1.1, range: 1.9, arcDeg: 180, launch: true, stunRadius: 3.4, stunSec: 1.2, lunge: 1.4, ender: true }),
   rush:      M({ id: 'rush', label: 'RUSH', clip: 'karate_rush', weight: 'heavy', speed: 1.2, range: 1.7, arcDeg: 110, launch: true, stunRadius: 2.0, stunSec: 0.7, lunge: 3.4 }),
-  backSpin:  M({ id: 'backSpin', label: 'SPIN BACK KICK', clip: 'karate_backspin', weight: 'medium', speed: 1.4, range: 2.1, arcDeg: 260, launch: false, stunRadius: 2.0, stunSec: 0.6, lunge: 0.4 }),
+  backSpin:  M({ id: 'backSpin', label: 'SPIN BACK KICK', clip: 'karate_backspin', weight: 'medium', speed: 1.4, range: 2.1, arcDeg: 260, launch: false, stunRadius: 2.0, stunSec: 0.6, lunge: 0.4, spinDeg: 360, spinSec: 0.36 }),
 } as const satisfies Record<string, HordeMove>;
 export type MoveId = keyof typeof MOVES;
 

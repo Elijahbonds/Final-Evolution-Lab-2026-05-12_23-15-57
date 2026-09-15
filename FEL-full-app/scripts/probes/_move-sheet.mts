@@ -34,6 +34,8 @@ for (const mode of MODES) {
     const targets = new Set(sk.bones.map((b) => b.getTransformNode()).filter(Boolean));
     const groups = s.animationGroups.filter((g) => g.targetedAnimations.some((t) => targets.has(t.target)));
     W.__SHEET = { s, hero, sk, groups };
+    // only the hero in the picture: every other skinned body (partners, crowds, rivals) hidden for the sheet
+    for (const m of s.meshes) { if (m.skeleton && !under.has(m)) m.isVisible = false; }
     // the sheet camera: a side view on the hips
     const B = s.activeCamera.constructor; // any camera class works for position/target via ArcRotate below
     return [...new Set(groups.map((g) => g.name))];
@@ -61,10 +63,11 @@ for (const mode of MODES) {
         const cam = s.activeCamera;
         const m = hero.computeWorldMatrix(true).m;
         const fwd = { x: m[8], z: m[10] }; const l = Math.hypot(fwd.x, fwd.z) || 1;
-        // SIDE view: the camera stands off the hero's right, 4.6 m out, a little above the hips
-        const side = ${process.env.SIDE === '0' ? 0 : 1};
-        const rx = side ? fwd.z / l : -fwd.x / l, rz = side ? -fwd.x / l : -fwd.z / l;
-        cam.position.set(c.x + rx * 4.6, c.y + 0.6, c.z + rz * 4.6);
+        // ANG: degrees round from the hero's front (0 = facing it, 90 = its right side, 45 = front three-quarter); DIST metres
+        const ang = ${Number(process.env.ANG ?? 90)} * Math.PI / 180, dist = ${Number(process.env.DIST ?? 4.6)};
+        const fx = fwd.x / l, fz = fwd.z / l, rx0 = fz, rz0 = -fx;
+        const dx = fx * Math.cos(ang) + rx0 * Math.sin(ang), dz = fz * Math.cos(ang) + rz0 * Math.sin(ang);
+        cam.position.set(c.x + dx * dist, c.y + 0.5, c.z + dz * dist);
         if (cam.setTarget) cam.setTarget(c.clone ? c.clone() : c);
         W.__SHEET_FREEZE = true;
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));

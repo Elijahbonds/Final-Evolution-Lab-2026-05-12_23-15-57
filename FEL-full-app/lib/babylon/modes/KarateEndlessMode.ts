@@ -386,6 +386,10 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   /** BIOMECH-WAVE2 G1: the yaw a committed strike is turning ONTO, and the rate that gets it there inside the startup. */
   let faceTarget: number | null = null, faceRate = 0;
+  // THE SPIN LAYER (RECOGNISABLE ON SIGHT, 2026-09-15): a spinning move's whole-body turn, added AFTER the facing is written
+  // and taken back before it is written again, so re-aiming and travel never see it and a 360 always comes back to the aim.
+  let spinApplied = 0;
+  let spinMove: { deg: number; sec: number; at: number } | null = null;
   /** BIOMECH-WAVE2 G5: the Posture Poses layer on the hero and the ally, and the bodies it is fed. */
   let mePosture: { layer: PostureLayer; dispose(): void } | null = null, partnerPosture: { layer: PostureLayer; dispose(): void } | null = null;
   const meBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE }, pBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE };
@@ -653,6 +657,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       }
     }
     striking = true; strikeSeq++; strikeStartedAt = gameSec; strikeMove = move; strikeHitDone = false;
+    spinMove = move.spinDeg ? { deg: (move.spinDeg * Math.PI) / 180, sec: move.spinSec ?? 0.45, at: gameSec } : null;
     const tok = strikeSeq;
     myStrike = { weight: move.weight, clip: move.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it (strikeSeq replays a same-weight link)
     if (!flowStats.clips.includes(move.clip)) flowStats.clips.push(move.clip);
@@ -1405,6 +1410,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     },
 
     update(ctx, dtReal) {
+      if (spinApplied) { player.root.rotation.y -= spinApplied; spinApplied = 0; }   // the spin layer: back to the real facing first
       clockSec += dtReal;
       { const br = flow.update(gameSec); if (br) onFlowBroken(ctx, br); else if (flow.count > 0) ctx.setHud({ flowDrop: Math.round(flow.drop01(gameSec) * 100) }); }
       // Phase 8: down/revive tick
@@ -1513,6 +1519,13 @@ export const KarateEndlessMode: ModeDefinition = (() => {
           faceTarget = null;
           if (turnClock) { dyn.lastRedirect = `${turnClock.deg}deg in ${Math.round(now() - turnClock.at)}ms`; turnClock = null; }
         }
+      if (spinMove) {
+        const k = Math.min(1, (gameSec - spinMove.at) / spinMove.sec);
+        const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        spinApplied = spinMove.deg * e;
+        player.root.rotation.y += spinApplied;
+        if (k >= 1) { player.root.rotation.y -= spinApplied; spinApplied = 0; spinMove = null; }
+      }
       }
 
       holdCarried(ctx);

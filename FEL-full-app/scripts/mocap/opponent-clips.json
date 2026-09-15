@@ -253,11 +253,11 @@
    "name": "karate_mc_high_kick",
    "replaces": "high_kick",
    "source": "cmu",
-   "file": "cmu/135/135_04.bvh",
-   "from": 2.78,
-   "to": 3.53,
-   "duration": 0.7,
-   "note": "karate front kick: right leg, the foot peaks at 1.00 m at 3.13",
+   "file": "cmu/135/135_07.bvh",
+   "from": 6.03,
+   "to": 6.73,
+   "duration": 0.66,
+   "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): the RIGHT front kick with the foot to 2.00 m, 0.49 m in front — HIGH KICK (was a kick peaking at 1.00 m, knee height)",
    "aim": "foot"
   },
   {
@@ -330,31 +330,34 @@
    "name": "karate_mc_cross",
    "replaces": "karate_cross",
    "source": "cmu",
-   "file": "cmu/143/143_23.bvh",
-   "from": 1.02,
-   "to": 1.5,
-   "note": "THE HUNDRED distinct moves (2026-09-15): Punching: the RIGHT straight after the left, reach 0.58 m peak 1.17 (find-strikes) — CROSS",
-   "duration": 0.48
+   "file": "cmu/80/80_72.bvh",
+   "from": 3.6,
+   "to": 4.12,
+   "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): the RIGHT straight driven 0.69 m in front at shoulder height (1.41 m) — CROSS (a shoulder-height boxing straight; the karate head-height punch photographed as a rising arm)",
+   "duration": 0.48,
+   "aim": "hand"
   },
   {
    "name": "karate_mc_uppercut",
    "replaces": "uppercut",
    "source": "cmu",
-   "file": "cmu/80/80_10.bvh",
-   "from": 0.97,
-   "to": 1.45,
-   "note": "THE HUNDRED distinct moves (2026-09-15): boxing: the RIGHT hand rising 0.45 m to the chin in front, peak 1.17 (find-uppercut) — RISING DRAGON / the base uppercut",
-   "duration": 0.48
+   "file": "cmu/141/141_24.bvh",
+   "from": 0.61,
+   "to": 1.13,
+   "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): the RIGHT fist rising 0.74 m to 1.64 m, 0.32 m in front — UPPERCUT / RISING DRAGON (was a 0.45 m rise that stayed at the chin)",
+   "duration": 0.5,
+   "aim": "hand"
   },
   {
    "name": "karate_mc_whirl",
    "replaces": "karate_whirl",
    "source": "cmu",
-   "file": "cmu/135/135_11.bvh",
-   "from": 2.66,
-   "to": 3.3,
-   "note": "THE HUNDRED distinct moves (2026-09-15): Yokogeri: right side kick, the foot to 1.19 m at 2.90 — WHIRLWIND",
-   "duration": 0.64
+   "file": "cmu/135/135_01.bvh",
+   "from": 30.55,
+   "to": 31.8,
+   "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): a turning kick — the body comes round 178° and the foot rises to 1.41 m — WHIRLWIND (was a straight side kick with no turn)",
+   "duration": 0.85,
+   "aim": "foot"
   },
   {
    "name": "karate_mc_backspin",
@@ -370,21 +373,23 @@
    "name": "karate_mc_typhoon",
    "replaces": "karate_typhoon",
    "source": "cmu",
-   "file": "cmu/143/143_08.bvh",
-   "from": 0.5,
-   "to": 1.25,
-   "note": "THE HUNDRED distinct moves (2026-09-15): Jumping Twists: the load (hips −0.28 at 0.6) and a jump turning ~180° by 1.0 — TYPHOON, the airborne ender",
-   "duration": 0.75
+   "file": "cmu/135/135_02.bvh",
+   "from": 36.2,
+   "to": 37.5,
+   "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): the jumping spin kick — 326° of turn with both feet 0.9 m off the floor and the kick at 1.10 m — TYPHOON, the airborne ender (was a 180° jumping twist with no kick)",
+   "duration": 1.0,
+   "aim": "foot"
   },
   {
    "name": "karate_mc_hammer",
    "replaces": "karate_hammer",
    "source": "cmu",
-   "file": "cmu/135/135_05.bvh",
-   "from": 0.7,
-   "to": 1.3,
-   "note": "THE HUNDRED distinct moves (2026-09-15): Gedanbarai: the right arm lifts to 1.47 m (1.0) and sweeps down and forward as the body steps in — HAMMER FIST",
-   "duration": 0.6
+   "file": "cmu/80/80_53.bvh",
+   "from": 10.83,
+   "to": 11.63,
+   "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): the RIGHT fist from above the head (1.80 m) driven down to 1.16 m, 0.71 m in front, in 0.30 s — HAMMER FIST (was gedan-barai, a low sweeping block)",
+   "duration": 0.62,
+   "aim": "hand"
   },
   {
    "name": "karate_mc_heavy",
