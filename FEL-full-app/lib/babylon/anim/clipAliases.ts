@@ -51,7 +51,7 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   football_juke_right: ['walk', 1.8],
   football_spin_move: ['roundhouse', 1.2],
   football_stiff_arm: ['jab', 0.8],
-  football_touchdown_spike: ['uppercut', 0.9],
+  football_touchdown_spike: ['football_td_spike', 1.0],   // SHARED-ANIM-BUS: was the karate uppercut
   football_tackled_fall: ['guard', 1.2],
   // soccer
   soccer_dribble_jog: ['run', 0.85],
@@ -65,9 +65,11 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   golf_swing_full: ['hook', 0.7],
   golf_putt_stroke: ['jab', 0.5],
   golf_fist_pump: ['uppercut', 0.9],
-  baseball_bat_stance: ['guard', 0.6],
-  baseball_swing_full: ['hook', 0.85],
-  baseball_contact_drive: ['hook', 1.1],
+  // SHARED-ANIM-BUS (2026-09-14): the bat names play the BAT clips (anim/authored/baseball) — they were the karate guard
+  // and the karate hook, so any caller still using the old names swung a boxer's hook with a bat in its hand.
+  baseball_bat_stance: ['baseball_stance', 1.0],
+  baseball_swing_full: ['baseball_swing', 1.0],
+  baseball_contact_drive: ['baseball_swing', 1.1],
   baseball_homer_trot: ['run', 0.7],
   // board sports
   skate_idle_cruise: ['guard', 0.5],
@@ -91,9 +93,9 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   tennis_forehand: ['hook', 0.9],
   golf_address: ['guard', 0.5],
   golf_drive_swing: ['hook', 0.7],
-  derby_bat_stance: ['guard', 0.6],
-  derby_swing: ['hook', 0.85],
-  derby_pitch: ['jab', 0.9],
+  derby_bat_stance: ['baseball_stance', 1.0],
+  derby_swing: ['baseball_swing', 1.0],
+  derby_pitch: ['baseball_pitch_over', 1.0],
   penalty_strike: ['high_kick', 1.0],
   keeper_dive_left: ['roundhouse', 1.1],
   keeper_dive_right: ['roundhouse', 1.1],

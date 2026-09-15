@@ -62,9 +62,9 @@ const CLIP_FOR: Record<FootballAnimState, { clip: string; loop: boolean; fadeSec
   catch_clean:     { clip: 'jump_up', loop: false, fadeSec: 0.08 },
   catch_contested: { clip: 'jump_up', loop: false, fadeSec: 0.05 },
   tackled:         { clip: 'football_tackled_fall', loop: false, fadeSec: 0.05 },
-  block:           { clip: 'bball_defend_stance', loop: true, fadeSec: 0.15 },
+  block:           { clip: 'idle_stand', loop: true, fadeSec: 0.15 },   // SHARED-ANIM-BUS: was the hoops defend stance (no football block clip is authored; the rush never blocks)
   rush:            { clip: 'run_forward', loop: true, fadeSec: 0.1 },
-  celebrate:       { clip: 'football_touchdown_spike', loop: false, fadeSec: 0.12 },
+  celebrate:       { clip: 'football_td_spike', loop: false, fadeSec: 0.12 },   // SHARED-ANIM-BUS: the authored spike (the old name aliased onto the karate uppercut)
   dejected:        { clip: 'football_tackled_fall', loop: false, fadeSec: 0.2 },
 };
 

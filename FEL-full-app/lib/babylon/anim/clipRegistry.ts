@@ -37,7 +37,7 @@ export const REAL_CLIPS = new Set<string>([
   'dunk_charge_gather', 'dunk_launch', 'dunk_mocap', 'dunk_360_eastbay', 'dunk_score_hang', 'dunk_land_crouch',
   'dunk_finish_windmill', 'dunk_finish_tomahawk', 'dunk_finish_blown', 'dunk_celebrate_big',
   'dunk_self_lob', 'dunk_bounce_throw', 'dunk_kick_up', 'dunk_cartwheel', 'dunk_double_up', 'dunk_scorpion', 'dunk_lost_found', 'dunk_hide_seek', 'dunk_360_spin', 'dunk_between_legs', 'dunk_cradle', 'dunk_double_clutch',   // DUNK-CONTROL-JUICE (2026-09-08): the named dunks
-  'football_juke_left', 'football_juke_right', 'football_spin_move', 'football_tackled_fall',
+  'football_juke_left', 'football_juke_right', 'football_spin_move', 'football_tackled_fall', 'football_td_spike',
   'karate_hit_react', 'karate_knockdown', 'karate_guard_step',   // the guard step (MODE-STICK-FACE) was authored + registered but never listed here
   'karate_block', 'karate_guard_impact', 'karate_parry', 'karate_floor_hold', 'karate_get_up',   // ANIM-READABILITY (combat, 2026-09-07)
   'karate_windup_hold', 'freerun_air_hold', 'freerun_tuck', 'freerun_slide',   // ANIM-READABILITY (creative, 2026-09-07)
@@ -66,7 +66,7 @@ export const REAL_CLIPS = new Set<string>([
   // board suite — skate / surf / snowboard share these (anim/authored/boardSuite)
   'board_ride_idle', 'board_carve_left', 'board_carve_right', 'board_tuck',
   'board_grab', 'board_air', 'board_grind', 'board_land', 'board_push',
-  'skate_kickflip', 'skate_bail',
+  'skate_kickflip', 'skate_bail', 'board_manual', 'skate_ollie',
 ]);
 
 // NOTE ON THIS LIST. isResolvable() — and therefore installSafePlay's gate —

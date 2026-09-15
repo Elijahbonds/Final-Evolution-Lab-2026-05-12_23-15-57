@@ -1,8 +1,13 @@
-// registerAuthoredClips — build every authored clip against the live skeleton
-// and register into the CharacterAnimator. Registry-name hits beat aliases.
+// registerAuthoredClips — build the authored clips a body's MODE owns against the live skeleton and register them
+// into the CharacterAnimator. Registry-name hits beat aliases.
+//
+// SHARED-ANIM-BUS (2026-09-14): scoped. Every entry below is [clip name, builder]; a spawn builds core + the suites and
+// borrows its mode names in clipScope.ts (read off `scene.metadata.felModeId`) and skips the rest — a skateboarder's rig
+// no longer carries, logs or can play the dunk suite. An unscoped scene (no mode) still builds everything.
 
-import type { Scene, Skeleton } from '@babylonjs/core';
+import type { AnimationGroup, Scene, Skeleton } from '@babylonjs/core';
 import type { CharacterAnimator } from '../CharacterAnimator';
+import { ledgerFor, scopeAllows, scopeForScene, suiteOfClip, type ClipScope } from '../clipScope';
 import { buildEastbay } from './eastbay';
 import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from './dunkSuite';
 import { buildMocapDunk } from './mocapDunk';
@@ -10,7 +15,7 @@ import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebr
 import { buildSelfLob, buildBounceThrow, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch } from './dunkTricks';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
-import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
+import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdownSpike } from './football';
 import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge, buildCombatRoll, buildCombatJump } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
@@ -33,140 +38,152 @@ import {
 
 export function registerAuthoredClips(
   animator: CharacterAnimator, scene: Scene, skeleton: Skeleton,
+  scope: ClipScope | null = scopeForScene(scene),
 ): string[] {
-  const builders = [
-    () => buildIdleStand(scene, skeleton),
-    () => buildStrafe(scene, skeleton, 'left'),
-    () => buildStrafe(scene, skeleton, 'right'),
-    () => buildJumpUp(scene, skeleton),
-    () => buildJumpLand(scene, skeleton),
-    () => buildChargeGather(scene, skeleton),
-    () => buildLaunch(scene, skeleton),
-    () => buildMocapDunk(scene, skeleton),
-    () => buildEastbay(scene, skeleton),
-    () => buildScoreHang(scene, skeleton),
-    () => buildLandCrouch(scene, skeleton),
-    () => buildFinishWindmill(scene, skeleton),
-    () => buildFinishTomahawk(scene, skeleton),
-    () => buildFinishBlown(scene, skeleton),
-    () => buildCelebrateBig(scene, skeleton),
+  const builders: [string, () => AnimationGroup | null][] = [
+    ['idle_stand', () => buildIdleStand(scene, skeleton)],
+    ['strafe_left', () => buildStrafe(scene, skeleton, 'left')],
+    ['strafe_right', () => buildStrafe(scene, skeleton, 'right')],
+    ['jump_up', () => buildJumpUp(scene, skeleton)],
+    ['jump_land', () => buildJumpLand(scene, skeleton)],
+    ['dunk_charge_gather', () => buildChargeGather(scene, skeleton)],
+    ['dunk_launch', () => buildLaunch(scene, skeleton)],
+    ['dunk_mocap', () => buildMocapDunk(scene, skeleton)],
+    ['dunk_360_eastbay', () => buildEastbay(scene, skeleton)],
+    ['dunk_score_hang', () => buildScoreHang(scene, skeleton)],
+    ['dunk_land_crouch', () => buildLandCrouch(scene, skeleton)],
+    ['dunk_finish_windmill', () => buildFinishWindmill(scene, skeleton)],
+    ['dunk_finish_tomahawk', () => buildFinishTomahawk(scene, skeleton)],
+    ['dunk_finish_blown', () => buildFinishBlown(scene, skeleton)],
+    ['dunk_celebrate_big', () => buildCelebrateBig(scene, skeleton)],
     // DUNK-CONTROL-JUICE (2026-09-08): the named dunks — runway beats (self-lob, kick-up, cartwheel, double-up) and air shapes
-    () => buildSelfLob(scene, skeleton),
-    () => buildBounceThrow(scene, skeleton),   // DUNK-GLASS-BOUNCE: the bounce lob's two-hand throw down
-    () => buildKickUp(scene, skeleton),
-    () => buildCartwheel(scene, skeleton),
-    () => buildDoubleUp(scene, skeleton),
-    () => buildScorpion(scene, skeleton),
-    () => buildLostFound(scene, skeleton),
-    () => buildHideSeek(scene, skeleton),
-    () => buildBetweenLegs(scene, skeleton),   // the hardest trick finally has its own body (it shared the eastbay's)
-    () => buildCradle(scene, skeleton),
-    () => buildDoubleClutch(scene, skeleton),
-    () => buildSpin360(scene, skeleton),
-    () => buildJuke(scene, skeleton, 'left'),
-    () => buildJuke(scene, skeleton, 'right'),
-    () => buildSpinMove(scene, skeleton),
-    () => buildTackledFall(scene, skeleton),
-    () => buildHitReact(scene, skeleton),
-    () => buildKnockdown(scene, skeleton),
+    ['dunk_self_lob', () => buildSelfLob(scene, skeleton)],
+    ['dunk_bounce_throw', () => buildBounceThrow(scene, skeleton)],   // DUNK-GLASS-BOUNCE: the bounce lob's two-hand throw down
+    ['dunk_kick_up', () => buildKickUp(scene, skeleton)],
+    ['dunk_cartwheel', () => buildCartwheel(scene, skeleton)],
+    ['dunk_double_up', () => buildDoubleUp(scene, skeleton)],
+    ['dunk_scorpion', () => buildScorpion(scene, skeleton)],
+    ['dunk_lost_found', () => buildLostFound(scene, skeleton)],
+    ['dunk_hide_seek', () => buildHideSeek(scene, skeleton)],
+    ['dunk_between_legs', () => buildBetweenLegs(scene, skeleton)],   // the hardest trick finally has its own body (it shared the eastbay's)
+    ['dunk_cradle', () => buildCradle(scene, skeleton)],
+    ['dunk_double_clutch', () => buildDoubleClutch(scene, skeleton)],
+    ['dunk_360_spin', () => buildSpin360(scene, skeleton)],
+    ['football_juke_left', () => buildJuke(scene, skeleton, 'left')],
+    ['football_juke_right', () => buildJuke(scene, skeleton, 'right')],
+    ['football_spin_move', () => buildSpinMove(scene, skeleton)],
+    ['football_tackled_fall', () => buildTackledFall(scene, skeleton)],
+    ['football_td_spike', () => buildTouchdownSpike(scene, skeleton)],   // SHARED-ANIM-BUS: the spike (was an alias onto the karate uppercut)
+    ['karate_hit_react', () => buildHitReact(scene, skeleton)],
+    ['karate_knockdown', () => buildKnockdown(scene, skeleton)],
     // MODE-STICK-FACE family (2026-09-07): sport-correct loco — the carrier's tucked-ball run, the fighter's guard step
-    () => buildCarryRun(scene, skeleton),
-    () => buildGuardStep(scene, skeleton),
-    () => buildShuffle(scene, skeleton, 'left'),    // BIOMECH-WAVE2 (2026-09-09) G2: a lock-on fighter travels SIDEWAYS — the forward guard step was the only loco either duel had
-    () => buildShuffle(scene, skeleton, 'right'),
-    () => buildCombatRoll(scene, skeleton),    // 2026-09-14: combat had no roll and no jump at all
-    () => buildCombatJump(scene, skeleton),
-    () => buildBlockHold(scene, skeleton),     // ANIM-READABILITY (combat, 2026-09-07): the guard verbs and the floor
-    () => buildGuardImpact(scene, skeleton),
-    () => buildParry(scene, skeleton),
-    () => buildFloorHold(scene, skeleton),
-    () => buildGetUp(scene, skeleton),
-    () => buildWindupHold(scene, skeleton),   // ANIM-READABILITY (creative, 2026-09-07): the counter-strike rival's telegraph
-    () => buildLeanDodge(scene, skeleton),    // KARATE-NEO-COOP (2026-09-07): the bullet-time lean (the endless dodge with no stick held)
-    () => buildEvade(scene, skeleton),        // KARATE-NEO-COOP (2026-09-07): the fighter's slip — the dodge was the football juke
-    () => buildFreeRunAirHold(scene, skeleton),   // ANIM-READABILITY (creative): the runner's air hold, tuck and slide
-    () => buildFreeRunTuck(scene, skeleton),
-    () => buildFreeRunSlide(scene, skeleton),
+    ['football_carry_run', () => buildCarryRun(scene, skeleton)],
+    ['karate_guard_step', () => buildGuardStep(scene, skeleton)],
+    ['karate_shuffle_left', () => buildShuffle(scene, skeleton, 'left')],    // BIOMECH-WAVE2 (2026-09-09) G2: a lock-on fighter travels SIDEWAYS — the forward guard step was the only loco either duel had
+    ['karate_shuffle_right', () => buildShuffle(scene, skeleton, 'right')],
+    ['karate_roll', () => buildCombatRoll(scene, skeleton)],    // 2026-09-14: combat had no roll and no jump at all
+    ['karate_jump', () => buildCombatJump(scene, skeleton)],
+    ['karate_block', () => buildBlockHold(scene, skeleton)],     // ANIM-READABILITY (combat, 2026-09-07): the guard verbs and the floor
+    ['karate_guard_impact', () => buildGuardImpact(scene, skeleton)],
+    ['karate_parry', () => buildParry(scene, skeleton)],
+    ['karate_floor_hold', () => buildFloorHold(scene, skeleton)],
+    ['karate_get_up', () => buildGetUp(scene, skeleton)],
+    ['karate_windup_hold', () => buildWindupHold(scene, skeleton)],   // ANIM-READABILITY (creative, 2026-09-07): the counter-strike rival's telegraph
+    ['karate_lean_dodge', () => buildLeanDodge(scene, skeleton)],    // KARATE-NEO-COOP (2026-09-07): the bullet-time lean (the endless dodge with no stick held)
+    ['karate_evade', () => buildEvade(scene, skeleton)],        // KARATE-NEO-COOP (2026-09-07): the fighter's slip — the dodge was the football juke
+    ['freerun_air_hold', () => buildFreeRunAirHold(scene, skeleton)],   // ANIM-READABILITY (creative): the runner's air hold, tuck and slide
+    ['freerun_tuck', () => buildFreeRunTuck(scene, skeleton)],
+    ['freerun_slide', () => buildFreeRunSlide(scene, skeleton)],
     // Board suite — skate / surf / snowboard all ride on these. Without them
     // every board clip fell through the alias table onto a karate stance.
     // Phase 3 (2026-09-03): the racket, club, net and keeper sports stop borrowing karate
-    () => buildGolfAddress(scene, skeleton),
-    () => buildGolfSwing(scene, skeleton),
-    () => buildTennisReady(scene, skeleton),
-    () => buildTennisSwing(scene, skeleton),
-    () => buildTennisServe(scene, skeleton),
-    () => buildVolleyReady(scene, skeleton),
-    () => buildVolleySpike(scene, skeleton),
-    () => buildVolleyBlock(scene, skeleton),
-    () => buildSoccerKick(scene, skeleton),
-    () => buildKeeperSet(scene, skeleton),
-    () => buildKeeperDive(scene, skeleton),
+    ['golf_address_idle', () => buildGolfAddress(scene, skeleton)],
+    ['golf_swing_full', () => buildGolfSwing(scene, skeleton)],
+    ['tennis_ready', () => buildTennisReady(scene, skeleton)],
+    ['tennis_swing', () => buildTennisSwing(scene, skeleton)],
+    ['tennis_serve', () => buildTennisServe(scene, skeleton)],
+    ['volleyball_ready', () => buildVolleyReady(scene, skeleton)],
+    ['volleyball_spike', () => buildVolleySpike(scene, skeleton)],
+    ['volleyball_block', () => buildVolleyBlock(scene, skeleton)],
+    ['soccer_kick_shoot', () => buildSoccerKick(scene, skeleton)],
+    ['keeper_set', () => buildKeeperSet(scene, skeleton)],
+    ['keeper_dive', () => buildKeeperDive(scene, skeleton)],
     // ANIM-READABILITY (net / precision, 2026-09-07): the putt, the ready shuffles, the keeper's held stretch and rise
-    () => buildGolfPutt(scene, skeleton),
-    () => buildGolfFinishHold(scene, skeleton),
-    () => buildTennisShuffle(scene, skeleton, 'left'),
-    () => buildTennisShuffle(scene, skeleton, 'right'),
-    () => buildVolleyShuffle(scene, skeleton, 'left'),
-    () => buildVolleyShuffle(scene, skeleton, 'right'),
-    () => buildKeeperDiveHold(scene, skeleton),
-    () => buildKeeperRise(scene, skeleton),
-    () => buildBoardRideIdle(scene, skeleton),
-    () => buildBoardCarveLeft(scene, skeleton),
-    () => buildBoardCarveRight(scene, skeleton),
-    () => buildBoardTuck(scene, skeleton),
-    () => buildBoardGrab(scene, skeleton),
-    () => buildBoardAir(scene, skeleton),
-    () => buildBoardGrind(scene, skeleton),
-    () => buildBoardLand(scene, skeleton),
-    () => buildBoardPush(scene, skeleton),   // ANIM-READABILITY (2026-09-07): the skate push, replacing the walk alias
-    () => buildSkateKickflip(scene, skeleton),
-    () => buildSkateBail(scene, skeleton),
-    () => buildBoardManual(scene, skeleton),   // VENICE-SKATE-THPS: the back-truck balance act (the tree pointed 'manual' at the ride idle)
-    () => buildSkateOllie(scene, skeleton),    // VENICE-SKATE-THPS: plant -> pop -> hang, the sticky beat under the pop
+    ['golf_putt', () => buildGolfPutt(scene, skeleton)],
+    ['golf_finish_hold', () => buildGolfFinishHold(scene, skeleton)],
+    ['tennis_shuffle_left', () => buildTennisShuffle(scene, skeleton, 'left')],
+    ['tennis_shuffle_right', () => buildTennisShuffle(scene, skeleton, 'right')],
+    ['volleyball_shuffle_left', () => buildVolleyShuffle(scene, skeleton, 'left')],
+    ['volleyball_shuffle_right', () => buildVolleyShuffle(scene, skeleton, 'right')],
+    ['keeper_dive_hold', () => buildKeeperDiveHold(scene, skeleton)],
+    ['keeper_rise', () => buildKeeperRise(scene, skeleton)],
+    ['board_ride_idle', () => buildBoardRideIdle(scene, skeleton)],
+    ['board_carve_left', () => buildBoardCarveLeft(scene, skeleton)],
+    ['board_carve_right', () => buildBoardCarveRight(scene, skeleton)],
+    ['board_tuck', () => buildBoardTuck(scene, skeleton)],
+    ['board_grab', () => buildBoardGrab(scene, skeleton)],
+    ['board_air', () => buildBoardAir(scene, skeleton)],
+    ['board_grind', () => buildBoardGrind(scene, skeleton)],
+    ['board_land', () => buildBoardLand(scene, skeleton)],
+    ['board_push', () => buildBoardPush(scene, skeleton)],   // ANIM-READABILITY (2026-09-07): the skate push, replacing the walk alias
+    ['skate_kickflip', () => buildSkateKickflip(scene, skeleton)],
+    ['skate_bail', () => buildSkateBail(scene, skeleton)],
+    ['board_manual', () => buildBoardManual(scene, skeleton)],   // VENICE-SKATE-THPS: the back-truck balance act (the tree pointed 'manual' at the ride idle)
+    ['skate_ollie', () => buildSkateOllie(scene, skeleton)],    // VENICE-SKATE-THPS: plant -> pop -> hang, the sticky beat under the pop
     // Basketball packages (Phase 4, 2026-09-03) — size-ups, gather, slide,
     // block and steal used to alias onto run/guard/jumpshot.
-    () => buildDribbleIdle(scene, skeleton),
-    () => buildCrossover(scene, skeleton, 'left'),
-    () => buildCrossover(scene, skeleton, 'right'),
-    () => buildHesi(scene, skeleton),
-    () => buildLayupGather(scene, skeleton),
-    () => buildDefendSlide(scene, skeleton, 'left'),
-    () => buildDefendSlide(scene, skeleton, 'right'),
-    () => buildBlockReach(scene, skeleton),
-    () => buildStealReach(scene, skeleton),
-    () => buildFollowThrough(scene, skeleton),   // BIOMECH-HOOPS-WAVE1 (2026-09-08): the shot's follow-through (G5)
-    () => buildLayupGather(scene, skeleton, 'left'),   // HOOPS-MOVE-KIT-A (2026-09-08): the left-hand finish (M3)
-    () => buildPullupGather(scene, skeleton),          // HOOPS-MOVE-KIT-A: the player's pull-up gather (M1)
-    () => buildFloater(scene, skeleton),               // HOOPS-MOVE-KIT-A: the floater (M3)
-    () => buildHandUp(scene, skeleton),                // HOOPS-MOVE-KIT-A: the grounded hand-up contest (D3)
-    () => buildScreenSet(scene, skeleton),             // HOOPS-MOVE-KIT-A: the planted screen (O1)
-    () => buildPostUp(scene, skeleton),                // HOOPS-MOVE-KIT-B (2026-09-08): the post-up seal (the path into M4–M6)
-    () => buildFadeaway(scene, skeleton),              // HOOPS-MOVE-KIT-B: the fadeaway's lean (M4)
-    () => buildHook(scene, skeleton),                  // HOOPS-MOVE-KIT-B: the jump hook (M5)
-    () => buildHook(scene, skeleton, 'left'),
-    () => buildSpin(scene, skeleton),                  // HOOPS-MOVE-KIT-B: the spin's body (M6)
-    () => buildPumpFake(scene, skeleton),              // HOOPS-MOVE-KIT-B wave 2 (2026-09-08): the pump fake (M8)
-    () => buildStepThrough(scene, skeleton),           // the step past his shoulder (M8)
-    () => buildPivot(scene, skeleton),                 // the turn on a planted foot (M9)
-    () => buildReverseLayup(scene, skeleton),          // the far side, off the glass (M11)
-    () => buildReverseLayup(scene, skeleton, 'left'),
-    () => buildHopStep(scene, skeleton),               // the two-foot gather (M13)
-    () => buildEuroStep(scene, skeleton),              // sell, cross (M14)
+    ['bball_dribble_idle', () => buildDribbleIdle(scene, skeleton)],
+    ['bball_crossover_left', () => buildCrossover(scene, skeleton, 'left')],
+    ['bball_crossover_right', () => buildCrossover(scene, skeleton, 'right')],
+    ['bball_hesi', () => buildHesi(scene, skeleton)],
+    ['bball_layup_gather', () => buildLayupGather(scene, skeleton)],
+    ['bball_defend_slide_left', () => buildDefendSlide(scene, skeleton, 'left')],
+    ['bball_defend_slide_right', () => buildDefendSlide(scene, skeleton, 'right')],
+    ['bball_block_reach', () => buildBlockReach(scene, skeleton)],
+    ['bball_steal_reach', () => buildStealReach(scene, skeleton)],
+    ['bball_follow_through', () => buildFollowThrough(scene, skeleton)],   // BIOMECH-HOOPS-WAVE1 (2026-09-08): the shot's follow-through (G5)
+    ['bball_layup_gather_left', () => buildLayupGather(scene, skeleton, 'left')],   // HOOPS-MOVE-KIT-A (2026-09-08): the left-hand finish (M3)
+    ['bball_pullup_gather', () => buildPullupGather(scene, skeleton)],          // HOOPS-MOVE-KIT-A: the player's pull-up gather (M1)
+    ['bball_floater', () => buildFloater(scene, skeleton)],               // HOOPS-MOVE-KIT-A: the floater (M3)
+    ['bball_hand_up', () => buildHandUp(scene, skeleton)],                // HOOPS-MOVE-KIT-A: the grounded hand-up contest (D3)
+    ['bball_screen_set', () => buildScreenSet(scene, skeleton)],             // HOOPS-MOVE-KIT-A: the planted screen (O1)
+    ['bball_post_up', () => buildPostUp(scene, skeleton)],                // HOOPS-MOVE-KIT-B (2026-09-08): the post-up seal (the path into M4–M6)
+    ['bball_fadeaway', () => buildFadeaway(scene, skeleton)],              // HOOPS-MOVE-KIT-B: the fadeaway's lean (M4)
+    ['bball_hook', () => buildHook(scene, skeleton)],                  // HOOPS-MOVE-KIT-B: the jump hook (M5)
+    ['bball_hook_left', () => buildHook(scene, skeleton, 'left')],
+    ['bball_spin', () => buildSpin(scene, skeleton)],                  // HOOPS-MOVE-KIT-B: the spin's body (M6)
+    ['bball_pump_fake', () => buildPumpFake(scene, skeleton)],              // HOOPS-MOVE-KIT-B wave 2 (2026-09-08): the pump fake (M8)
+    ['bball_step_through', () => buildStepThrough(scene, skeleton)],           // the step past his shoulder (M8)
+    ['bball_pivot', () => buildPivot(scene, skeleton)],                 // the turn on a planted foot (M9)
+    ['bball_layup_reverse', () => buildReverseLayup(scene, skeleton)],          // the far side, off the glass (M11)
+    ['bball_layup_reverse_left', () => buildReverseLayup(scene, skeleton, 'left')],
+    ['bball_hop_step', () => buildHopStep(scene, skeleton)],               // the two-foot gather (M13)
+    ['bball_euro_step', () => buildEuroStep(scene, skeleton)],              // sell, cross (M14)
     // Baseball packages (Phase 6, 2026-09-03) — the derby borrowed karate clips.
-    () => buildBatStance(scene, skeleton),
-    () => buildBatSwing(scene, skeleton),
-    () => buildPitchOver(scene, skeleton),
-    () => buildPitchSide(scene, skeleton),
+    ['baseball_stance', () => buildBatStance(scene, skeleton)],
+    ['baseball_swing', () => buildBatSwing(scene, skeleton)],
+    ['baseball_pitch_over', () => buildPitchOver(scene, skeleton)],
+    ['baseball_pitch_side', () => buildPitchSide(scene, skeleton)],
   ];
   const registered: string[] = [];
-  for (const b of builders) {
-    const g = b();
+  let skipped = 0;
+  for (const [name, build] of builders) {
+    if (!scopeAllows(scope, name)) { skipped++; continue; }   // another sport's clip: never built, never playable here
+    const g = build();
     if (g) { animator.register(g); registered.push(g.name); }
   }
   // The nine base clips (run, walk, guard, strikes, jumpshot) the forge bakes into
   // fel-hero.glb, built here on the live skeleton too so a body without baked
   // animations (the MPFB2 candidate) plays them — one source of truth.
   for (const g of buildBaseClips(scene, skeleton)) { animator.register(g); registered.push(g.name); }
-  console.info(`[FEL-ANIM] authored clips registered: ${registered.join(', ')}`);
+  animator.setScope(scope);
+  const ledger = ledgerFor(scene);
+  ledger.scope = scope;
+  for (const n of registered) ledger.registered.add(n);
+  // The mode's own suites lead the line: a console reader (or a truncated capture) sees what the body IS first.
+  const core = (n: string) => (suiteOfClip(n) === 'core' ? 1 : 0);
+  const line = [...registered].sort((a, b) => core(a) - core(b));
+  const tag = scope ? `${scope.modeId} · core+${scope.suites.join('+') || '-'}${scope.borrow.length ? ` · borrow ${scope.borrow.join('+')}` : ''} · ${skipped} out-of-scope skipped` : 'unscoped';
+  console.info(`[FEL-ANIM] authored clips registered (${tag}): ${line.join(', ')}`);
   return registered;
 }

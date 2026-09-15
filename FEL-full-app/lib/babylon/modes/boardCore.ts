@@ -177,7 +177,7 @@ export class TrickMachine {
     this.active = null; this.grabbing = false;
     this.comboPts = 0; this.combo = 0;
     this.rig.rider.vel.scaleInPlace(0.25);
-    this.playClip('football_tackled_fall');   // reuse the fall (self anim only — the tree plays the board bail)
+    this.playClip('skate_bail');   // SHARED-ANIM-BUS: the board's own bail (this borrowed the football tackle fall)
     this.opts.onBeat?.('bail');
     this.onHud({ combo: '' });
   }

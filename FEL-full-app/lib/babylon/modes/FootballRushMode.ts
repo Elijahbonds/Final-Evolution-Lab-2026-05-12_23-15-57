@@ -45,6 +45,7 @@ import { Onlookers } from '../visual/Onlookers';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { FOOTBALL_CONFIG as CFG } from './modeConfigs';
+import { stepYaw } from '../anim/LocoBus';   // SHARED-ANIM-BUS: the shared facing slew
 
 let rushVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 
@@ -449,9 +450,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         // MODE-STICK-FACE (2026-09-07): the runner FACES his line — yaw from the ground velocity, slewed. It was HALF
         // the angle: a 42° cut ran at 21°, the body sliding sideways across the field. (The stick itself was never
         // mirrored here: the runner camera looks up the field, +z, where screen-right IS world +x.)
-        const want = Math.atan2(vel.x, vel.z);
-        const d = Math.atan2(Math.sin(want - runner.root.rotation.y), Math.cos(want - runner.root.rotation.y));
-        runner.root.rotation.y += Math.sign(d) * Math.min(Math.abs(d), TURN_RATE * dt);
+        runner.root.rotation.y = stepYaw(runner.root.rotation.y, Math.atan2(vel.x, vel.z), dt, TURN_RATE);
       }
 
       if (!downed) yards = Math.max(yards, Math.floor((runner.root.position.z - lineOfScrimmage) / 0.9144));

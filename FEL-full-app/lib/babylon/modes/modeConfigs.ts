@@ -126,7 +126,7 @@ export const TENNIS_CONFIG: TimingSportConfig = {
   modeId: 'tennis', mood: 'daylight', heroUrl: HERO_URL, rounds: 7,
   athletePos: new Vector3(0, 0, 10), athleteYaw: Math.PI,
   cameraPos: new Vector3(0, 4.5, 16),
-  idleClip: 'bball_defend_stance', swingClip: 'baseball_swing_full',
+  idleClip: 'tennis_ready', swingClip: 'tennis_swing',   // SHARED-ANIM-BUS: a racket, not a hoops stance and a bat swing
   ballFrom: new Vector3(0, 1.2, -10), ballApex: 1.6, ballSpread: 5, ballDiameter: 0.11,
   contactPoint: new Vector3(0.5, 1.1, 9.4), contactRadius: 0.55,   // racket head zone
   target: new Vector3(0, 0.4, -8), aimRange: 4.5, returnApex: 1.8,

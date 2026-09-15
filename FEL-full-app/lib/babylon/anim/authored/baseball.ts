@@ -17,7 +17,11 @@ import { buildPoseClip, type Deg3 } from '../poseClip';
 export const BASEBALL_CLIPS = ['baseball_stance', 'baseball_swing', 'baseball_pitch_over', 'baseball_pitch_side'] as const;
 type V3 = [number, number, number];
 
-const BAT_LOAD: V3 = [0.30, 1.45, -0.25];           // both hands up by the back shoulder
+// Both hands up by the back shoulder, IN FRONT of the chest. SHARED-ANIM-BUS (2026-09-14): this was [0.30, 1.45, -0.25] —
+// behind the root and wide of the back shoulder, so the lead arm had to reach 0.47 m across the chest and locked straight
+// (178°) with both hands 0.13–0.15 m behind the chest plane on every stance frame (the eye's "arms locked behind"). Now
+// 0.19 m in front, lead elbow ~93°, rear ~47° (tucked, the way a batter's back elbow is): LocoBus ARM_LIMITS.stance.
+const BAT_LOAD: V3 = [0.28, 1.32, 0.18];
 const LOADED_LEGS: Record<string, Deg3> = { LeftUpLeg: [-24, 0, 12], RightUpLeg: [-24, 0, -12], LeftLeg: [36, 0, 0], RightLeg: [36, 0, 0] };
 const BACK_POLES = { Right: [0.8, -0.2, -0.6] as V3, Left: [0.2, -0.6, -0.8] as V3 };
 

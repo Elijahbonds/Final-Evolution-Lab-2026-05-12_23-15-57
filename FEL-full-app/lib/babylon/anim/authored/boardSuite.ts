@@ -98,14 +98,21 @@ function rideLegs(depth: number): Bones {
   };
 }
 
-/** Knees bent, arms out, spine twisted toward the nose. The base of everything. */
+// Cruising counterweight arms (SHARED-ANIM-BUS, 2026-09-14): LOW and a little out. These were [∓0.40, -0.14, …] — 0.14 m
+// under the shoulder, so both wrists rode at shoulder height (measured live: front hand 0.03 m under its shoulder, back
+// hand 0.33 m out, on 503/503 ride frames) and the rider cruised in the stiff-T the eye flagged. The balance acts
+// (grind, manual) keep their arms out on purpose; the cruise and the push do not. |rel| still ≈ 0.46 (elbows ~117°).
+const CRUISE_L: [number, number, number] = [-0.30, -0.34, 0.14];
+const CRUISE_R: [number, number, number] = [0.30, -0.34, 0.06];
+
+/** Knees bent, arms low, spine twisted toward the nose. The base of everything. */
 export function buildBoardRideIdle(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 2.4;                                  // slow breathing loop
   const torso = (x: number): Bones => ({ Spine: [x, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] });
   return buildPoseClip(scene, sk, 'board_ride_idle', T, [
-    key(0, { ...rideLegs(0), ...torso(14) }, [-0.40, -0.14, 0.16], [0.40, -0.16, 0.10], -0.26),
-    key(T / 2, { ...rideLegs(6), ...torso(17) }, [-0.38, -0.18, 0.19], [0.39, -0.20, 0.12], -0.29),
-    key(T, { ...rideLegs(0), ...torso(14) }, [-0.40, -0.14, 0.16], [0.40, -0.16, 0.10], -0.26),
+    key(0, { ...rideLegs(0), ...torso(14) }, CRUISE_L, CRUISE_R, -0.26),
+    key(T / 2, { ...rideLegs(6), ...torso(17) }, [-0.29, -0.36, 0.16], [0.29, -0.36, 0.08], -0.29),
+    key(T, { ...rideLegs(0), ...torso(14) }, CRUISE_L, CRUISE_R, -0.26),
   ]);
 }
 
@@ -163,15 +170,15 @@ export function buildBoardPush(scene: Scene, sk: Skeleton): AnimationGroup | nul
   const front = (d: number): Bones => ({ LeftUpLeg: [-44 - d, 0, 8], LeftLeg: [72 + d * 1.4, 0, 0] });
   return buildPoseClip(scene, sk, 'board_push', T, [
     key(0, { ...front(0), RightUpLeg: [-40, 0, -10], RightLeg: [68, 0, 0], Spine: [14, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
-      [-0.40, -0.14, 0.16], [0.40, -0.16, 0.10], -0.26),
+      CRUISE_L, CRUISE_R, -0.26),
     // back leg off the deck, straight down to the ground
     key(T * 0.25, { ...front(4), RightUpLeg: [-8, 0, -14], RightLeg: [14, 0, 0], Spine: [20, 0, -3], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
-      [-0.36, -0.20, 0.24], [0.40, -0.10, -0.10], -0.20),
-    // the shove: the foot drives behind, the front arm reaches forward with it
+      [-0.28, -0.36, 0.22], [0.32, -0.30, -0.10], -0.20),
+    // the shove: the foot drives behind, the front arm reaches forward with it (low — a swing, not a wing)
     key(T * 0.6, { ...front(6), RightUpLeg: [24, 0, -14], RightLeg: [8, 0, 0], Spine: [22, 0, -4], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
-      [-0.32, -0.22, 0.30], [0.40, -0.06, -0.20], -0.22),
+      [-0.26, -0.36, 0.28], [0.32, -0.28, -0.18], -0.22),
     key(T, { ...front(0), RightUpLeg: [-40, 0, -10], RightLeg: [68, 0, 0], Spine: [14, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
-      [-0.40, -0.14, 0.16], [0.40, -0.16, 0.10], -0.26),
+      CRUISE_L, CRUISE_R, -0.26),
   ]);
 }
 

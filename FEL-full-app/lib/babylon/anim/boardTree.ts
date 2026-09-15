@@ -57,7 +57,7 @@ const CLIP_FOR: Record<BoardAnimState, { clip: string; loop: boolean; fadeSec: n
   land_sketchy:  { clip: 'board_land', loop: false, fadeSec: 0.08 },
   bail:          { clip: 'skate_bail', loop: false, fadeSec: 0.05 },
   idle:          { clip: 'board_ride_idle', loop: true, fadeSec: 0.2 },
-  celebrate:     { clip: 'bball_score_celebrate', loop: false, fadeSec: 0.15 },
+  celebrate:     { clip: 'board_land', loop: false, fadeSec: 0.15 },   // SHARED-ANIM-BUS: was the hoops score celebrate (→ karate uppercut) on a board; a rider stomps the landing
 };
 
 /** Carve hysteresis: enter above 0.4, leave below 0.3 — a lean hovering on one threshold used to flip the state every

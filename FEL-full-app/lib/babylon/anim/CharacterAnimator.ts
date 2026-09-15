@@ -17,6 +17,7 @@
 
 import type { AnimationGroup, Scene, Observer } from '@babylonjs/core';
 import { resolveClip } from './clipResolver';
+import { ledgerFor, requestAllowed, scopeFallback, suiteOfClip, type ClipScope } from './clipScope';
 
 export interface PlayOpts {
   loop?: boolean;
@@ -38,6 +39,9 @@ export class CharacterAnimator {
    *  crossFade(). */
   private fadingOut: AnimationGroup | null = null;
   private endObs = new Map<AnimationGroup, Observer<AnimationGroup>>();
+  /** SHARED-ANIM-BUS: the mode's clip scope (clipScope.ts). null = unscoped (every suite). */
+  private scope: ClipScope | null = null;
+  private refusedOnce = new Set<string>();
 
   constructor(private scene: Scene, groups: AnimationGroup[]) {
     for (const g of groups) this.register(g);
@@ -65,7 +69,22 @@ export class CharacterAnimator {
     return Number.isFinite(f) ? f : 0;
   }
 
+  /** Scope this body to its mode's suites — set once by registerAuthoredClips. */
+  setScope(scope: ClipScope | null): void { this.scope = scope; }
+
   play(name: string, opts: PlayOpts = {}): AnimationGroup | null {
+    // SHARED-ANIM-BUS (2026-09-14): another sport's clip is REFUSED, not aliased. Before this a board bail asked for the
+    // football fall and got it, and a TD spike asked for a name whose alias was the karate uppercut and got that. The
+    // body lands on its own scope's resting loop instead; the refusal is logged once per name and counted for probes.
+    if (this.scope && !requestAllowed(this.scope, name, this.groups)) {
+      const ledger = ledgerFor(this.scene);
+      ledger.refused.set(name, (ledger.refused.get(name) ?? 0) + 1);
+      if (!this.refusedOnce.has(name)) {
+        this.refusedOnce.add(name);
+        console.error(`[FEL-ANIM] REFUSED cross-mode clip "${name}" (${suiteOfClip(name)}) in "${this.scope.modeId}" — scope core+${this.scope.suites.join('+') || '-'}; playing "${scopeFallback(this.scope)}"`);
+      }
+      name = scopeFallback(this.scope);
+    }
     const r = resolveClip(name, this.clipNames);
     const next = this.groups.get(r.clip);
     if (!next) return null;                      // only possible with an empty library

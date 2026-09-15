@@ -20,6 +20,7 @@ import { makeSprintRace, SPRINT_TUNING } from '../../feel/cores/sprint-skin';
 import type { SprintCore } from '../../feel/cores/sprint-core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+import { locoPick } from '../anim/LocoBus';   // SHARED-ANIM-BUS: one loco pick + stride rate for every on-foot body
 
 const RACE_DIST = SPRINT_TUNING.raceDistanceM;   // core-owned (100m)
 const WIN_TIME = 13.0;                            //TUNE(elijah) sub-13 is the bar
@@ -201,13 +202,19 @@ return {
     const st = core.state;
 
     runner.root.position.z = -st.distanceM;
-    runner.animator.play(st.speed > 4 ? 'run' : st.speed > 0.6 ? 'walk' : 'idle_stand', { loop: true });
+    // SHARED-ANIM-BUS (2026-09-14): the loop off the bus, at the stride rate — the run cycle played at one cadence from a
+    // jog to a 10 m/s finish, so the feet skated early and paddled late
+    const loco = locoPick({ speed: st.speed });
+    runner.animator.play(loco.clip, { loop: true });
+    runner.animator.setPlaybackScale(loco.clip, loco.rate);
 
     // The rival only runs once the gun has gone.
     if (st.phase === 'Run' || st.phase === 'Finish') {
       S.rivalDist = Math.min(RACE_DIST, S.rivalDist + RIVAL_SPEED * dt);
       rival.root.position.z = -S.rivalDist;
-      rival.animator.play('run', { loop: true });
+      const rivalLoco = locoPick({ speed: RIVAL_SPEED });
+      rival.animator.play(rivalLoco.clip, { loop: true });
+      rival.animator.setPlaybackScale(rivalLoco.clip, rivalLoco.rate);
     }
 
     if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }

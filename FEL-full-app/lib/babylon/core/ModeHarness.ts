@@ -35,6 +35,7 @@ import { installAgentBridge, agentBridge } from './AgentBridge';  // M69: agent 
 import { AGENT_MODES } from './agentModes';
 import type { AgentControlSource } from './AgentControlSource';  // M69: per-mode intent play
 import { reportDiag, setDiagMode } from './diag';
+import { makeAnimProbe } from '../anim/animProbe';   // SHARED-ANIM-BUS: the production body readout
 import type { PrqGrade } from '../../prq';
 type PrqBand = PrqGrade['key'];
 import { emit as emitCreator } from '@/lib/creator/CreatorRecord';   // the ONE canonical record
@@ -315,6 +316,10 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   // locomotion Phase 3 gate ("animation pass <= 4 ms") had to be reported unjudgeable. Handing the
   // constructor out here costs nothing: the whole devHandle is development-only, and instrumentation
   // is not constructed unless a probe asks for it.
+  // SHARED-ANIM-BUS (2026-09-14): the body readout — clip scope, registered / refused clips, the hero's playing clips and
+  // hands in the chest frame with the LocoBus arms verdict. Published in PRODUCTION too: the eye grades skate H1 and the
+  // derby / football arms on `next start`, where there is no scene handle to read bones through. Holds the scene weakly.
+  const animProbe = makeAnimProbe(scene, () => heroRef.current);
   const devHandle = {
     scene, modeId: def.modeId, hero: () => heroRef.current,   // hero for the framing probe (phase 6)   // dev probes (ship pass 4)
     instrument: () => new SceneInstrumentation(scene),
@@ -326,12 +331,13 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     // bed and a sting -- neither of which a probe can hear -- so without this the only way to check that a
     // mode reports at all is to read its source and hope.
     momentum: () => ({ score01: momentum.score01, tier: momentum.tier }),
+    anim: animProbe,
   };
   // CONTROLLER-STICK-LIVE (2026-09-14): a QA eye on the production server (`next start`, /try) waited 120 s for
   // `__FEL_DEV__.input`, which only a dev build published — so it read an empty roster and zero slot events under
   // four live chips, and its reload timed out. Production now publishes the INPUT seam alone: no scene, no hero,
   // nothing that retains a disposed mount. The full handle stays development-only.
-  const probeHandle = process.env.NODE_ENV === 'development' ? devHandle : { modeId: def.modeId, input };
+  const probeHandle = process.env.NODE_ENV === 'development' ? devHandle : { modeId: def.modeId, input, anim: animProbe };
   const devWindow = window as unknown as { __FEL_DEV__?: unknown };
   devWindow.__FEL_DEV__ = probeHandle;
   setDiagMode(def.modeId);

@@ -195,7 +195,8 @@ describe('the couch wiring stays mounted (source scan)', () => {
   });
   it('production publishes the input seam on __FEL_DEV__ (the full dev handle stays development-only)', () => {
     const h = read('lib/babylon/core/ModeHarness.ts');
-    expect(h).toMatch(/const probeHandle = process\.env\.NODE_ENV === 'development' \? devHandle : \{ modeId: def\.modeId, input \};/);
+    // SHARED-ANIM-BUS (2026-09-14) adds the body readout beside the input seam
+    expect(h).toMatch(/const probeHandle = process\.env\.NODE_ENV === 'development' \? devHandle : \{ modeId: def\.modeId, input, anim: animProbe \};/);
     expect(h).toMatch(/\n  devWindow\.__FEL_DEV__ = probeHandle;/);
     expect(h).toMatch(/if \(devWindow\.__FEL_DEV__ === probeHandle\) delete devWindow\.__FEL_DEV__;/);
   });

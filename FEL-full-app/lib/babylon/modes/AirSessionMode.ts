@@ -31,6 +31,7 @@ import type { VenueMood } from '../scene/moods';
 import { makeBigAirSession, BIG_AIR_TUNING } from '../../feel/cores/big-air-skin';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+import { locoPick } from '../anim/LocoBus';   // SHARED-ANIM-BUS: the run-up's loop + stride rate
 
 export interface AirSessionModeOpts {
   modeId: string;
@@ -265,10 +266,12 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         0,
       );
 
-      const clip = st.phase === 'Run' ? (st.speed > 1.5 ? 'run' : 'walk')
+      const loco = st.phase === 'Run' ? locoPick({ speed: Math.max(st.speed, 0.61) }) : null;   // the run-up never idles mid-approach
+      const clip = loco ? loco.clip
         : st.phase === 'Air' ? 'jump_up'
         : 'idle_stand';
       athlete.animator.play(clip, { loop: true });
+      if (loco) athlete.animator.setPlaybackScale(clip, loco.rate);
 
       // The core owns score/attempt/finished — mirroring them here rather than
       // re-deriving them keeps the HUD honest and the end condition single-sourced.

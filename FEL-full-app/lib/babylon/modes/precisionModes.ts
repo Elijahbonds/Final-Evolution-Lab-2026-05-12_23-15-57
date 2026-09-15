@@ -23,7 +23,7 @@ import { kickPips, type KickResult } from '../core/penaltyHud';
 import { freshDerby, bankSwing, distanceLine, OUTS_CAP, type DerbyTally } from '../core/derbyHud';
 import { rivalProgress } from '../core/CarnivalNight';
 import { holeName, cardString, windBearingDeg, windWord, holeBoard, ACCURACY_CENTER as GH_ACC_CENTER, ACCURACY_HALF as GH_ACC_HALF, type HoleResult } from '../core/golfHud';
-import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, MeshBuilder, Quaternion, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import { boneNode } from '../anim/boneLookup';
 import { planRivalKick, gradeDive, resolveSave, type DiveSign, type RivalKickPlan } from '../core/KeeperCore';
@@ -850,6 +850,31 @@ export const DerbyMode: ModeDefinition = (() => {
           bat.material = bm; bat.parent = hand;
           bat.position.set(0, 0.36, 0.02);      // knob in the fist, barrel up along the forearm line
           bat.rotation.set(0.35, 0, 0);
+          // SHARED-ANIM-BUS (2026-09-14): the grip is CALIBRATED on the live stance, not guessed in the hand bone's axes.
+          // The fixed (0.35, 0, 0) only read as "bat up" while the stance dragged the arms straight back behind the chest;
+          // with the hands brought in front (anim/authored/baseball BAT_LOAD) the same hand-local offset laid the bat flat
+          // behind him. A hand bone's local frame differs per body (scan, forge, roster), so the grip is solved once the
+          // stance has settled: whatever the hand's world rotation is, the barrel rises up and back over the rear shoulder.
+          const batRef = bat, meRef = me;
+          let settle = 8;
+          const grip = ctx.scene.onAfterRenderObservable.add(() => {
+            if (--settle > 0) return;
+            ctx.scene.onAfterRenderObservable.remove(grip);
+            if (batRef.isDisposed() || !meRef) return;
+            const hw = hand.computeWorldMatrix(true);
+            const scl = new Vector3(), rot = new Quaternion(), tr = new Vector3();
+            hw.decompose(scl, rot, tr);
+            // root space: +x the batter's right (the catcher's side for a righty), +y up, +z toward the plate
+            const yaw = meRef.root.rotation.y;
+            const want = new Vector3(0.38, 0.86, -0.34).normalize();
+            const dirW = new Vector3(want.x * Math.cos(yaw) + want.z * Math.sin(yaw), want.y, -want.x * Math.sin(yaw) + want.z * Math.cos(yaw));
+            const inv = Quaternion.Inverse(rot);
+            const localDir = dirW.applyRotationQuaternion(inv).normalize();
+            const q = new Quaternion(); Quaternion.FromUnitVectorsToRef(Vector3.Up(), localDir, q);
+            batRef.rotation.setAll(0); batRef.rotationQuaternion = q;
+            // the cylinder is centred on its origin: knob in the fist, the barrel's half-length along the grip line
+            batRef.position.copyFrom(localDir.scale(0.36 / Math.max(1e-4, (scl.x + scl.y + scl.z) / 3)));
+          });
         }
       }
       pitcher = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0.35, 18), Math.PI, SPORT_CLIP.idle);
