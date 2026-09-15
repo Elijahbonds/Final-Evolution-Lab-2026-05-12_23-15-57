@@ -60,6 +60,12 @@ async function run() {
   await test('balanced transaction posts and derives balances', async () => {
     await inRollback(async (tx) => {
       const userId = U();
+      // USER_WALLET is per-user and starts empty, but EXTERNAL is the shared house
+      // counter-account: every other suite that posts LC moves it too. Asserting its
+      // ABSOLUTE value made this test pass alone and fail in a parallel run — a red
+      // that depends on run order teaches everyone to ignore the suite. Measure the
+      // DELTA this transaction causes; that is the invariant double-entry promises.
+      const extBefore = await getBalance(tx, { type: 'EXTERNAL', currency: 'LC' });
       const res = await postTransaction(tx, {
         kind: 'TEST_EARN',
         idempotencyKey: `t:${userId}:1`,
@@ -73,7 +79,7 @@ async function run() {
       const wallet = await getBalance(tx, { type: 'USER_WALLET', currency: 'LC', userId });
       const ext = await getBalance(tx, { type: 'EXTERNAL', currency: 'LC' });
       assert.equal(wallet, 100, 'wallet should be 100');
-      assert.equal(wallet + ext, 0, 'wallet + external must net to zero');
+      assert.equal(wallet + (ext - extBefore), 0, 'this transaction must net to zero across its accounts');
     });
   });
 

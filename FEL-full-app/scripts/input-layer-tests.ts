@@ -150,7 +150,12 @@ check('physical poller wires shoulders + right stick through the shared map', ()
   assert.ok(/from '\.\/input\/controller-map'/.test(bridge), 'poller imports the controller map');
   assert.ok(/resolveShoulders\(/.test(bridge), 'poller maps the shoulder array');
   assert.ok(/SHOULDER_PAD_INDEX/.test(bridge), 'poller uses per-slot button indices');
-  assert.ok(/resolveLook\(/.test(bridge) && /AXIS_INDEX\.rightX/.test(bridge), 'poller reads the right stick');
+  // The right stick is read through readPad's canonical profile (c.rx/c.ry), not by
+  // indexing axes by hand — AXIS_INDEX is controller-map's business now. Asserting the
+  // old literal made this red while the wiring was correct, which is worse than no check.
+  assert.ok(/resolveLook\(/.test(bridge), 'poller resolves the look binding');
+  assert.ok(/readPad\(/.test(bridge), 'poller reads through the canonical pad profile');
+  assert.ok(/stickToDirs\(\s*c\.rx\s*,\s*c\.ry\s*\)/.test(bridge), 'poller reads the right stick');
 });
 
 check('VirtualController renders shoulders + dormant look stick via the shared map', () => {

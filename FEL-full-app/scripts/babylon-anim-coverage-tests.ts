@@ -15,6 +15,8 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
 import { CLIP_ALIASES, FALLBACK_CLIP } from '../lib/babylon/anim/clipAliases';
 import { resolveClip } from '../lib/babylon/anim/clipResolver';
 
@@ -32,15 +34,19 @@ const BAKED = new Set<string>([
   'roundhouse', 'run', 'uppercut', 'walk',
 ]);
 
-// Clips authored at runtime by registerAuthoredClips() — these register under
-// their REGISTRY name against the live skeleton, so they are always available.
-const AUTHORED = new Set<string>([
-  'idle_stand', 'strafe_left', 'strafe_right', 'jump_up', 'jump_land',
-  'dunk_charge_gather', 'dunk_launch', 'dunk_360_eastbay', 'dunk_score_hang',
-  'dunk_land_crouch', 'football_juke_left', 'football_juke_right',
-  'football_spin_move', 'football_tackled_fall', 'karate_hit_react',
-  'karate_knockdown',
-]);
+// Clips authored at runtime by registerAuthoredClips(). READ FROM THE REGISTRY, not
+// copied: this list was last hand-maintained at 16 entries while the real builder table
+// had grown to >100, so the set the test reasoned about had almost no relationship to
+// what a character can actually play. A hardcoded copy of a growing table is a test that
+// reports on the past.
+const AUTHORED_SRC = fs.readFileSync(
+  path.join(__dirname, '..', 'lib', 'babylon', 'anim', 'authored', 'index.ts'),
+  'utf8',
+);
+const AUTHORED = new Set<string>(
+  [...AUTHORED_SRC.matchAll(/\[\s*'([a-z0-9_]+)'\s*,\s*\(\)\s*=>/g)].map((m) => m[1]),
+);
+assert.ok(AUTHORED.size > 50, `expected the authored registry to be read (got ${AUTHORED.size})`);
 
 // What a spawned character actually exposes: baked GLB groups + authored clips.
 const AVAILABLE = new Set<string>([...BAKED, ...AUTHORED]);
@@ -72,11 +78,16 @@ function isCovered(name: string): boolean {
   return !!alias && AVAILABLE.has(alias[0]);          // alias to a real clip
 }
 
-check('every alias target exists in the baked GLB', () => {
+check('every alias target exists on a spawned character', () => {
   for (const [name, [target]] of Object.entries(CLIP_ALIASES)) {
+    // AVAILABLE, not BAKED. registerAuthoredClips() builds its clips against the live
+    // skeleton and registers them under their registry name, so an authored target is
+    // every bit as playable as a baked one. Requiring BAKED here failed on
+    // `idle -> idle_stand` — the universal fallback idle — while it was genuinely
+    // available at runtime, and that red was old enough to be read as furniture.
     assert.ok(
-      BAKED.has(target),
-      `alias "${name}" points to "${target}" which is NOT a baked clip`,
+      AVAILABLE.has(target),
+      `alias "${name}" points to "${target}" which is neither baked nor authored`,
     );
   }
 });

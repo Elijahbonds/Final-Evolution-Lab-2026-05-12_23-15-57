@@ -9,6 +9,7 @@
 // we say so plainly rather than scoring silence as zero.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { GameProps } from '@/components/games/game-shell';
 import Link from 'next/link';
 import { ArrowLeft, Mic, MicOff, Play, RotateCcw, Star } from 'lucide-react';
 import { ACTING_SCENES } from '@/lib/babylon/content/actingScenes';
@@ -44,7 +45,10 @@ function supportsMic(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof AudioContext !== 'undefined';
 }
 
-export default function ActingGame() {
+// Mounted through GameShell, which supplies the gamepad poller, the touch deck and
+// the end-of-run recap. It used to mount bare, so a performance this file had already
+// scored paid no XP, shards or credits, moved no PRQ and showed no card.
+export default function ActingGame({ onEnd }: GameProps) {
   const [phase, setPhase] = useState<Phase>('menu');
   const [scene, setScene] = useState<Scene>(ACTING_SCENES[0]);
   const [elapsed, setElapsed] = useState(0);
@@ -52,6 +56,9 @@ export default function ActingGame() {
   const [holding, setHolding] = useState(false);
   const [liveLevel, setLiveLevel] = useState(0);
   const [result, setResult] = useState<PerformanceResult | null>(null);
+  const elapsedRef = useRef(0);
+
+  useEffect(() => { elapsedRef.current = elapsed; }, [elapsed]);
 
   // Audio graph refs.
   const streamRef = useRef<MediaStream | null>(null);
@@ -166,7 +173,17 @@ export default function ActingGame() {
     setResult(res);
     cleanupAudio();
     setPhase('results');
-  }, [scene, cleanupAudio]);
+    // The run was always scored; it was never reported. Without this the mode
+    // pays no XP/shards/credits, moves no PRQ and shows no recap card.
+    onEnd({
+      score: Math.round(res.average * 100),
+      won: res.stars >= 3,
+      duration: elapsedRef.current,
+      headline: `${res.stars}-star delivery`,
+      stats: { stars: res.stars, lines: res.perLine.length, average: Math.round(res.average * 100) },
+      outcome: res.stars >= 3 ? 'nailed it' : 'needs another take',
+    });
+  }, [scene, cleanupAudio, onEnd]);
 
   // Auto-finish once every line has been delivered.
   useEffect(() => {

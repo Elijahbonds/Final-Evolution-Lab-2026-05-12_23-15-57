@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
+import { GameShell } from '@/components/games/game-shell';
 
 const spinner = () => (
   <div className="flex h-[80vh] items-center justify-center bg-[#050505]">
@@ -12,5 +13,8 @@ const spinner = () => (
 const ActingGame = dynamic(() => import('@/components/games/acting-game'), { ssr: false, loading: spinner });
 
 export function ActingLoader() {
-  return <ActingGame />;
+  // Acting was mounting bare: no gamepad poller, no touch deck, no session post
+  // and no recap, so a scored performance paid nothing. `ownControls` because
+  // the surface draws its own mic/delivery UI.
+  return <GameShell mode="acting" title="THE READ" venue="Soundstage" Game={ActingGame} ownControls />;
 }
