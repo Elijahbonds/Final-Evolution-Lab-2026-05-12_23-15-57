@@ -33,6 +33,8 @@ import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
+import { refuse } from '../core/Refusal';            // MECHANICS PASS: a press that cannot act is answered
+import { REPEAT_DECAY } from '../core/ComboChain';   // the same THPS repeat decay the skate and free-run chains use
 
 const RUN_SEC = 90;
 /** How fast a cutback comes around. ~0.4s to complete the turn. */
@@ -77,6 +79,10 @@ export const SurfBreakMode: ModeDefinition = (() => {
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   /** Where the board is turning TO. A cutback is a carve, not a pivot. */
   let yawTarget = 0;
+  /** MECHANICS PASS: one wave move at a time (the carve finishes first), and repeats on this wave pay less. */
+  let waveMoveUntil = 0;
+  const waveMoveRepeats = new Map<string, number>();
+  const WAVE_MOVE_LOCK_SEC = 0.55;
   let ended = false, wipedOut = false;
   let lapsSeen = 0;
   let barrelSec = 0, inBarrel = false, barrels = 0;
@@ -142,6 +148,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
   }
 
   function wipeout(ctx: ModeContext, why: string, lipZ: number): void {
+    waveMoveRepeats.clear();   // a new wave, a fresh list
     console.info(`[SURF-WIPE] call: ${why}${wipedOut ? ' (already down — ignored)' : ''}`);   // A+ P0 probe: punches are checked against accepted calls
     if (wipedOut) return;
     wipedOut = true;
@@ -282,16 +289,26 @@ export const SurfBreakMode: ModeDefinition = (() => {
           // surf's remaining [FEL-FRAME] lines came from. So the turn is still AIMED here and carved in update().
           const held = heldTrickDir(stickX, stickY);
           const wave = trickFor('surf', held, 'B') ?? trickFor('surf', null, 'B')!;
+          // MECHANICS PASS (2026-09-15): the worst row on the scorecard — every B paid full points with no condition, so
+          // mashing it out-scored surfing 9 to 1 (14,213 vs 1,530). A wave move is now a MOVE: on the face, one at a time
+          // (the carve has to finish), and the same move again on this wave pays less (THPS repeat decay).
+          if (!rig.rider.grounded) { refuse(ctx, 'ON THE FACE'); return; }
+          if (t < waveMoveUntil) { refuse(ctx, 'MID-TURN'); return; }
+          const rep = waveMoveRepeats.get(wave.id) ?? 0;
+          waveMoveRepeats.set(wave.id, rep + 1);
+          waveMoveUntil = t + WAVE_MOVE_LOCK_SEC;
           // only the reverts swing the board round; a floater or a tube ride holds the line
           if (wave.kind === 'revert') {
             yawTarget += Math.PI * 0.5 * (stickX >= 0 ? 1 : -1);
             cutbackUntil = t + CUTBACK_LEAN_SEC;
           }
-          tricks.score += trickPts(wave) + Math.round(flow / 4);
-          boostKit.earn(wave.difficulty >= 3 ? 'trickBig' : 'trickSmall');
+          const paid = Math.round((trickPts(wave) + Math.round(flow / 4)) * REPEAT_DECAY[Math.min(rep, REPEAT_DECAY.length - 1)]);
+          tricks.score += paid;
+          if (rep < 2) boostKit.earn(wave.difficulty >= 3 ? 'trickBig' : 'trickSmall');
           ctx.feel?.impact?.(wave.difficulty >= 3 ? 0.2 : 0.12);
           SoundKit.play('whoosh', { pitch: 1.5, volume: 0.35 });
-          ctx.setHud({ score: tricks.score, banner: wave.label });
+          ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2, 0)), `+${paid}`, rep ? '#94a3b8' : '#ffd75e');
+          ctx.setHud({ score: tricks.score, banner: rep ? `${wave.label} · REPEAT ×${rep + 1}` : wave.label });
           setTimeout(() => ctx.setHud({ banner: '' }), 600);
         }
         if (e.btn === 'Y') {
@@ -401,7 +418,8 @@ export const SurfBreakMode: ModeDefinition = (() => {
           const mult = hollow ? 2 : 1;
           flow = Math.min(FLOW_MAX, flow + dt * FLOW_FILL_PER_SEC * mult);
           boostKit.earnOver('pocketPerSec', dt, mult);
-          tricks.score += Math.round(dt * (10 + flow / 10) * mult);
+          // MECHANICS PASS: the pocket fills FLOW (which every move and the barrel multiply) — it no longer drips points. The
+          // drip is what scored 921 for a rider who never touched the pad, with no cue for any of it (19 unexplained scores).
           if (hollow) {
             barrelSec += dt;
             if (!inBarrel && barrelSec > 0.3) {
@@ -415,7 +433,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
           } else if (inBarrel) {
             bankBarrel(ctx);                       // the tube closed while you were in it — pay out
           }
-          ctx.setHud({ score: tricks.score, flow: Math.round(flow) });
+          ctx.setHud({ flow: Math.round(flow) });
         } else {
           if (inBarrel) bankBarrel(ctx);           // drifted out of the pocket — pay out if earned
           flow = Math.max(0, flow - dt * 30);
