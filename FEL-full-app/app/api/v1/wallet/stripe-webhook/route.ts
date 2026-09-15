@@ -6,6 +6,7 @@ import { getStripe } from '@/lib/stripe';
 import { prisma } from '@/lib/db';
 import { grantCoinPurchase, refundCoins, grantShardPurchase, refundShards } from '@/lib/wallet/wallet-service';
 import { coinPackForPrice } from '@/lib/wallet/catalog';
+import { unlockProLane, revokeProLane } from '@/lib/season/season-service';
 
 /**
  * POST /api/v1/wallet/stripe-webhook
@@ -81,6 +82,24 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true, granted_shards: shards, entry_id: res.entry_id });
       }
 
+      // M13: season pass PRO lane — opens the cosmetic-only paid lane for the
+      // season the checkout was started in (seasonId travels in metadata so a
+      // late-landing payment can't unlock the wrong season). Back-fill of
+      // already-earned PRO tiers is idempotent on the same PassGrant dedupeKeys,
+      // so a redelivered event grants nothing twice.
+      if (meta.product === 'SEASON_PASS_PRO') {
+        const res = await unlockProLane({
+          userId: playerId,
+          seasonId: typeof meta.seasonId === 'string' ? meta.seasonId : undefined,
+          stripeEventId: event.id,
+        });
+        if (!res) {
+          console.warn('[v1/wallet/stripe-webhook] SEASON_PASS_PRO for unknown season; ignoring');
+          return NextResponse.json({ received: true, ignored: 'no_season' });
+        }
+        return NextResponse.json({ received: true, pro_unlocked: res.seasonKey, backfilled: res.backfilled });
+      }
+
       // LEGACY path: resolve a mapped coin pack from the purchased price id.
       const line = await stripe.checkout.sessions.listLineItems(cs.id, { limit: 1 });
       const priceId = line.data[0]?.price?.id ?? null;
@@ -103,6 +122,18 @@ export async function POST(req: NextRequest) {
       const charge = event.data.object as Stripe.Charge;
       const md = (charge.metadata as any) || {};
       const playerId = md.playerId as string | undefined;
+
+      // M13: season pass PRO refund — close the lane so no further PRO rewards
+      // are booked. Cosmetics already booked stay in the append-only grant log;
+      // they are cosmetic-only, so nothing about balance is bought back.
+      if (playerId && md.product === 'SEASON_PASS_PRO') {
+        const revoked = await revokeProLane({
+          userId: playerId,
+          seasonId: typeof md.seasonId === 'string' ? md.seasonId : undefined,
+          stripeEventId: event.id,
+        });
+        return NextResponse.json({ received: true, pro_revoked: revoked });
+      }
 
       // M25: shard-pack refund — debit unspent shards (clamped at 0 so a player
       // who already spent some can never go negative).

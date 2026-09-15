@@ -23,6 +23,7 @@ interface PassState {
   need?: number;
   hasPro?: boolean;
   grants?: Grant[];
+  claimable?: { free: number[]; pro: number[] };
 }
 
 function daysLeft(iso?: string): number | null {
@@ -33,6 +34,7 @@ function daysLeft(iso?: string): number | null {
 
 export function SeasonPassTrack() {
   const [state, setState] = useState<PassState | null>(null);
+  const [busy, setBusy] = useState<null | 'claim' | 'buy'>(null);
 
   useEffect(() => {
     let live = true;
@@ -43,12 +45,51 @@ export function SeasonPassTrack() {
     return () => { live = false; };
   }, []);
 
+  /** Collect every earned reward, then refresh from the server (it owns truth). */
+  async function claimAll() {
+    if (busy) return;
+    setBusy('claim');
+    try {
+      await fetch('/api/season/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const fresh = await fetch('/api/season').then((r) => (r.ok ? r.json() : null));
+      if (fresh) setState(fresh);
+    } catch {
+      // Non-fatal: the rewards are already banked server-side, so a failed
+      // collect just leaves the badge up for the next try.
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** Start Stripe Checkout for the PRO lane and hand off to the hosted page. */
+  async function buyPro() {
+    if (busy) return;
+    setBusy('buy');
+    try {
+      const res = await fetch('/api/season/checkout', { method: 'POST' });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.url) {
+        window.location.href = json.url as string;
+        return; // navigating away; keep the button disabled
+      }
+      console.warn('[season] pro checkout unavailable:', json?.error ?? res.status);
+    } catch {
+      // swallow — the button re-enables below and the lane stays closed
+    }
+    setBusy(null);
+  }
+
   if (!state || !state.active || !state.season) return null;
 
   const pct = Math.min(100, Math.round(((state.into ?? 0) / Math.max(1, state.need ?? 1)) * 100));
   const dleft = daysLeft(state.season.endsAt);
   const freeCount = (state.grants ?? []).filter((g) => g.lane === 'free').length;
   const proCount = (state.grants ?? []).filter((g) => g.lane === 'pro').length;
+  const readyCount = (state.claimable?.free.length ?? 0) + (state.claimable?.pro.length ?? 0);
 
   return (
     <motion.section
@@ -64,6 +105,19 @@ export function SeasonPassTrack() {
           <span className="ml-auto font-mono text-[11px] text-white/40">{dleft} days left</span>
         )}
       </div>
+
+      {readyCount > 0 && (
+        <button
+          onClick={claimAll}
+          disabled={busy !== null}
+          className="fel-heading mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-gradient-to-r from-[#FFD700] to-[#FF3366] py-2.5 text-sm font-bold text-black transition-opacity hover:opacity-90 disabled:opacity-60"
+        >
+          <Gift className="h-4 w-4" />
+          {busy === 'claim'
+            ? 'COLLECTING…'
+            : `COLLECT ${readyCount} REWARD${readyCount === 1 ? '' : 'S'}`}
+        </button>
+      )}
 
       <div className="mt-4 flex items-center gap-3">
         <span className="fel-heading text-lg font-bold text-[#FFD700]">T{state.tier ?? 0}</span>
@@ -97,12 +151,17 @@ export function SeasonPassTrack() {
           </div>
           <p className="mt-2 text-xs text-white/50">
             Rare + legendary cosmetics each tier. Purely cosmetic — never pay-to-win.
+            {!state.hasPro && ' Unlocking back-fills every tier you have already climbed.'}
           </p>
           {!state.hasPro && (
             <div className="mt-3">
               {state.proPurchasable ? (
-                <button className="fel-heading w-full rounded-md bg-[#A855F7] py-2 text-xs font-bold text-white transition-colors hover:bg-[#A855F7]/85">
-                  UNLOCK PRO LANE
+                <button
+                  onClick={buyPro}
+                  disabled={busy !== null}
+                  className="fel-heading w-full rounded-md bg-[#A855F7] py-2 text-xs font-bold text-white transition-colors hover:bg-[#A855F7]/85 disabled:opacity-60"
+                >
+                  {busy === 'buy' ? 'OPENING CHECKOUT…' : 'UNLOCK PRO LANE'}
                 </button>
               ) : (
                 <span className="flex items-center justify-center gap-1.5 rounded-md border border-white/15 py-2 text-xs font-bold text-white/50">

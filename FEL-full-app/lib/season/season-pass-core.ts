@@ -55,8 +55,18 @@ export interface SessionXpInput {
   score?: number;
   won?: boolean;
   firstOfDayMode?: boolean;
+  /**
+   * Quests cleared alongside this session. Part of the verified reference port
+   * and kept so the math stays faithful, but FEL ships no quest system yet —
+   * nothing feeds this today and the server never passes it. When a daily-quest
+   * track lands, pass the count here and season XP picks it up with no other
+   * change. Do NOT repurpose it for streaks: the streak bonus is LC, not pass XP.
+   */
   questsDone?: number;
 }
+
+/** The two reward lanes. PRO is the paid, cosmetic-only upgrade. */
+export type Lane = 'free' | 'pro';
 
 export interface PassState {
   xp: number;
@@ -151,6 +161,41 @@ export class SeasonPassCore {
         : [{ kind: 'cosmetic', rarity: 'rare' }]
       : [];
     return { free, pro };
+  }
+
+  // --- Collection (claim) state ------------------------------------------
+  // Grants are BOOKED by the server the moment a tier is cleared (see
+  // season-service) — claiming never mints anything and can never double-pay.
+  // These helpers track which earned tiers the athlete has actually collected
+  // so the HUB can show a "rewards ready" badge and a satisfying COLLECT beat.
+
+  /** Has this lane's reward for `tier` already been collected? */
+  isClaimed(tier: number, lane: Lane): boolean {
+    return this.state.claimed[lane].includes(tier);
+  }
+
+  /** Mark a tier's lane reward collected. Returns false when it was already. */
+  markClaimed(tier: number, lane: Lane): boolean {
+    if (this.isClaimed(tier, lane)) return false;
+    this.state.claimed[lane].push(tier);
+    this.state.claimed[lane].sort((a, b) => a - b);
+    return true;
+  }
+
+  /**
+   * Earned-but-uncollected tiers for a lane, ascending. A tier only counts
+   * when it is cleared AND actually carries a reward in that lane — the FREE
+   * lane is sparse (LC every 5th, common cosmetic every 3rd), and the PRO lane
+   * resolves empty entirely while `hasPro` is false, so an athlete without the
+   * PRO lane never sees phantom claimables.
+   */
+  claimable(lane: Lane): number[] {
+    const out: number[] = [];
+    for (let tier = 1; tier <= this.state.tier; tier++) {
+      if (this.isClaimed(tier, lane)) continue;
+      if (this.rewardsAt(tier)[lane].length > 0) out.push(tier);
+    }
+    return out;
   }
 }
 

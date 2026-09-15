@@ -103,4 +103,47 @@ check('one event per tier crossed (feedback parity)', () => {
   assert.strictEqual(totalEvents, totalTiers, 'every tier crossing emitted exactly one event');
 });
 
+// 8. collection: only EARNED tiers that carry a reward are claimable
+check('claimable lists only earned tiers that carry a reward', () => {
+  const c = new SeasonPassCore();
+  assert.deepStrictEqual(c.claimable('free'), [], 'nothing claimable at tier 0');
+  // Climb to tier 6. FREE rewards are sparse: 3 and 6 (common cosmetic, every
+  // 3rd) and 5 (LC, every 5th). Tiers 1, 2, 4 carry nothing and never appear.
+  c.addXp(TIER_XP(0) + TIER_XP(1) + TIER_XP(2) + TIER_XP(3) + TIER_XP(4) + TIER_XP(5));
+  assert.strictEqual(c.state.tier, 6, 'climbed to tier 6');
+  assert.deepStrictEqual(c.claimable('free'), [3, 5, 6], 'sparse free lane');
+  assert.deepStrictEqual(c.claimable('pro'), [], 'pro lane silent without pro');
+});
+
+// 9. collection is idempotent and never re-offers a collected tier
+check('markClaimed is idempotent', () => {
+  const c = new SeasonPassCore({ state: { tier: 6 } });
+  assert.strictEqual(c.markClaimed(3, 'free'), true, 'first claim takes');
+  assert.strictEqual(c.markClaimed(3, 'free'), false, 'second claim is a no-op');
+  assert.strictEqual(c.isClaimed(3, 'free'), true);
+  assert.deepStrictEqual(c.claimable('free'), [5, 6], 'collected tier drops out');
+  assert.strictEqual(c.isClaimed(3, 'pro'), false, 'lanes are independent');
+});
+
+// 10. claimed state survives rehydration (server persists the arrays)
+check('claimed state rehydrates from a snapshot', () => {
+  const c = new SeasonPassCore({ state: { tier: 10, claimed: { free: [3, 5], pro: [] } } });
+  assert.strictEqual(c.isClaimed(5, 'free'), true);
+  assert.deepStrictEqual(c.claimable('free'), [6, 9, 10], 'only uncollected earned tiers');
+});
+
+// 11. buying PRO mid-season exposes every already-earned PRO tier (back-fill)
+check('pro unlock back-fills earned tiers', () => {
+  const snapshot = { tier: 12, claimed: { free: [], pro: [] } };
+  const before = new SeasonPassCore({ hasPro: false, state: snapshot });
+  assert.deepStrictEqual(before.claimable('pro'), [], 'nothing while locked');
+  const after = new SeasonPassCore({ hasPro: true, state: snapshot });
+  assert.strictEqual(after.claimable('pro').length, 12, 'all 12 earned tiers open up');
+  assert.deepStrictEqual(
+    after.rewardsAt(10).pro,
+    [{ kind: 'cosmetic', rarity: 'legendary' }],
+    'tier 10 back-fills the legendary',
+  );
+});
+
 console.log(`\n\u2705 season-pass-core: ${passed} checks passed`);
