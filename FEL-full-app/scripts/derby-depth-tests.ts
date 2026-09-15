@@ -72,8 +72,9 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
     'the timing window divides by THIS pitch\'s speed (was hardcoded 14 — a changeup timed on fastball math)');
   ok(src.includes('ctx.heroRef.current = ball'), 'the hit ball becomes the camera subject after contact');
   ok(src.includes("camDirector.mode = 'follow'"), 'the hit ball gets the follow camera');
-  ok(src.includes("setFixedBehind(me.root.position, Math.PI, 'swing', true)"), 'the pitch cut SNAPS back to the swing spot');
-  ok(src.includes('incoming ? pitchAt : ball.position'), 'during the pitch the camera aims at the zone, not the moving ball');
+  // DERBY-CAM (42de001, owner 2026-09-15): the batting camera looks OUT to the pitcher over the batter's shoulder
+  ok(src.includes('battingCam(ctx, true)') && src.includes('ctx.camDirector.setFixed(BATTING_CAM, 1.25, snap)'), 'the pitch cut SNAPS back to the batting camera behind the plate');
+  ok(src.includes('flying && !incoming ? ball.position : PITCHER_VIEW'), 'during the pitch the camera aims down the pitch line (a steady point), not the moving ball');
   ok(src.includes('buildBallparkOutfield'), 'the outfield wall is built');
 }
 
