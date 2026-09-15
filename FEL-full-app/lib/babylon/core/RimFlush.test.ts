@@ -1,6 +1,6 @@
 // DUNK-BALL-ARMS-RIM (2026-09-14): the made dunk's ball goes over the lip, down the ring's axis, out of the net, to the floor.
 import { describe, it, expect } from 'vitest';
-import { startFlush, stepFlush, sweptTouch, ringDistance, ringClearance, NET_DEPTH_M, RING_TUBE_M, type V3 } from './RimFlush';
+import { startFlush, stepFlush, sweptTouch, clearOfIron, ringDistance, ringClearance, NET_DEPTH_M, RING_TUBE_M, type V3 } from './RimFlush';
 
 const rim = { x: 0, y: 3.05, z: -10.28 }, RR = 0.225, BR = 0.12;
 /** Run a flush at 60 fps and keep every frame. */
@@ -51,6 +51,19 @@ describe('RimFlush — a make goes through the ring, not the iron', () => {
     // and a flush from the touch never enters the iron at all
     const { frames } = run(t);
     for (const f of frames) expect(ringDistance(f.pos, rim, RR)).toBeGreaterThanOrEqual(ringClearance(BR) - 2e-3);
+  });
+  it('clearOfIron takes a release that is already in the metal out to the clearance, and the flush from it never re-enters', () => {
+    // the self-lob contact measured on 59518ab: 0.32 m out, 3 cm under the plane, 8.1 cm from the ring's circle (clearance 12)
+    const inMetal = { x: 0, y: 3.05 - 0.03, z: -10.28 + 0.296 };
+    expect(ringDistance(inMetal, rim, RR)).toBeLessThan(ringClearance(BR) - 0.02);
+    const out = clearOfIron(inMetal, rim, RR, BR);
+    expect(ringDistance(out, rim, RR)).toBeCloseTo(ringClearance(BR), 6);
+    expect(Math.hypot(out.x - inMetal.x, out.y - inMetal.y, out.z - inMetal.z)).toBeLessThan(0.06);   // a nudge under the hit-stop, not a teleport
+    const { frames } = run(out);
+    for (const f of frames) expect(ringDistance(f.pos, rim, RR)).toBeGreaterThanOrEqual(ringClearance(BR) - 2e-3);
+    // a clear ball is untouched
+    const clear = { x: 0, y: 3.2, z: -10.28 };
+    expect(clearOfIron(clear, rim, RR, BR)).toEqual(clear);
   });
   it('takes a Babylon-style vector (x/y/z on accessors) without losing its fields', () => {
     class Acc { constructor(private _x: number, private _y: number, private _z: number) {} get x() { return this._x; } get y() { return this._y; } get z() { return this._z; } }

@@ -65,6 +65,22 @@ export function sweptTouch(prev: V3, cur: V3, rim: V3, ringR: number, ballR: num
   return at(lo);
 }
 
+/** The release, out of the iron. `sweptTouch` can only rewind to a touch when the ball was clear a frame ago; a ball that met
+ *  the ring low and in front (a self-lob caught under the rim, measured on 59518ab: 8.8 cm → 8.1 cm from the ring's circle over
+ *  the last two frames, 3 cm under the plane) is already 4 cm into the metal on both, and the flush then rode it there through the
+ *  CONTACT hit-stop — six frames of a ball in the iron. This moves it out along the ring's normal to the clearance (a clear
+ *  ball is returned as it is). */
+export function clearOfIron(p: V3, rim: V3, ringR: number, ballR: number): V3 {
+  const c = ringClearance(ballR), dx = p.x - rim.x, dz = p.z - rim.z, radial = Math.hypot(dx, dz);
+  const nr = radial - ringR, ny = p.y - rim.y, d = Math.hypot(nr, ny);
+  if (d >= c) return { x: p.x, y: p.y, z: p.z };
+  const ux = radial > 1e-4 ? dx / radial : 0, uz = radial > 1e-4 ? dz / radial : 1;
+  // on the circle's centreline itself there is no normal: out over the top (the dunk's side)
+  const kr = d > 1e-5 ? nr / d : 0, ky = d > 1e-5 ? ny / d : 1;
+  const r = ringR + kr * c;
+  return { x: rim.x + ux * r, y: rim.y + ky * c, z: rim.z + uz * r };
+}
+
 export function startFlush(release: V3, rim: V3, ringR: number, ballR: number): FlushState {
   const dx = release.x - rim.x, dz = release.z - rim.z, r0 = Math.hypot(dx, dz);
   const ux = r0 > 1e-4 ? dx / r0 : 0, uz = r0 > 1e-4 ? dz / r0 : 1;   // no offset: the court side (+z)

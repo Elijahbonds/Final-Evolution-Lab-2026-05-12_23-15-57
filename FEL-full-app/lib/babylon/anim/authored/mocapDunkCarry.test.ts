@@ -42,12 +42,17 @@ describe('dunk_mocap — the ball hand carries, it does not whip through the bod
       rows.push({ t, rh, lh, fwdR: Vector3.Dot(rh.subtract(ra), fwd), inTorsoR: inTorso(rh), inTorsoL: inTorso(lh) });
     }
     const win = rows.filter((x) => x.t >= 0.6 && x.t <= 1.1);
-    let vMax = 0, vAt = 0;
-    for (let i = 1; i < win.length; i++) { const v = Vector3.Distance(win[i].rh, win[i - 1].rh) * FPS; if (v > vMax) { vMax = v; vAt = win[i].t; } }
+    const peak = (hand: 'rh' | 'lh') => { let v = 0, at = 0; for (let i = 1; i < win.length; i++) { const s = Vector3.Distance(win[i][hand], win[i - 1][hand]) * FPS; if (s > v) { v = s; at = win[i].t; } } return { v, at }; };
+    const { v: vMax, at: vAt } = peak('rh'), off = peak('lh');
     const minFwd = Math.min(...win.map((x) => x.fwdR)), torso = win.filter((x) => x.inTorsoR);
     console.info(`[mocap carry] ball hand: peak ${vMax.toFixed(1)} m/s @${vAt.toFixed(2)} s · furthest behind the shoulder ${(-minFwd).toFixed(2)} m · inside the torso ${torso.length} frames`);
     expect(vMax).toBeLessThan(9);          // a pro's dunk arm at the top of the throw-down; the live whip was ~20 m/s
     expect(minFwd).toBeGreaterThan(-0.15); // the ball is carried, not cocked back behind the body
     expect(torso.length).toBe(0);
+    // the OFF hand rises into the reach with the body, not in one 50 ms step: the capture's 0.9 → 0.95 key climbs 0.62 m, and
+    // live (self-lob make, 59518ab) the left palm moved 0.34 m in one frame at clip 0.94 — a probe R3 pop
+    console.info(`[mocap carry] off hand: peak ${off.v.toFixed(1)} m/s @${off.at.toFixed(2)} s · inside the torso ${win.filter((x) => x.inTorsoL).length} frames`);
+    expect(off.v).toBeLessThan(9);
+    expect(win.filter((x) => x.inTorsoL).length).toBe(0);
   }, 120000);
 });

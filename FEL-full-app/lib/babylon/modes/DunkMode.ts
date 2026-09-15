@@ -47,7 +47,7 @@ import { EASTBAY_TIMING as EB } from '../anim/authored/timing';
 import { EASTBAY_TIMING } from '../anim/authored/timing';
 import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';   // A+ P8 H1: the hang wrist reach
 import { lagToward, jamWeight, ironContact, hangHold, WRIST_LAG_TAU, HANG_MAX_SEC } from '../core/DunkHands';
-import { startFlush, stepFlush, sweptTouch, ringDistance, ringClearance, type FlushState } from '../core/RimFlush';   // DUNK-BALL-ARMS-RIM: the made ball over the lip, down the ring, out of the net   // DUNK-HANDS-RIM: the wrist lag, the jam, the iron contact, the hang
+import { startFlush, stepFlush, sweptTouch, clearOfIron, ringDistance, ringClearance, type FlushState } from '../core/RimFlush';   // DUNK-BALL-ARMS-RIM: the made ball over the lip, down the ring, out of the net   // DUNK-HANDS-RIM: the wrist lag, the jam, the iron contact, the hang
 import { hitStop as feelHitStop } from '../core/gameFeel';   // DUNK-HANDS-RIM H3: the mode's own clock stops on the iron too (the harness scales dt by it)
 import { chainRotation, frameAbove } from '../anim/TwoBoneIK';
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the runway answers its MOTION
@@ -1031,7 +1031,8 @@ export const DunkMode: ModeDefinition = (() => {
             const bp = ball.getAbsolutePosition();
             if (ironContact({ ball: bp, rim, rimRadius: RIM_RADIUS, ballRadius: ballSim.radius, sincePress: jamSec })) {
               // DUNK-BALL-ARMS-RIM: let go where the ball TOUCHED the iron on this frame's travel, not where the frame left it (in the metal)
-              const touch = jamPrevLive ? sweptTouch(jamPrevBall, bp, rim, RIM_RADIUS, ballSim.radius) : bp;
+              // …and out of the metal when it was already in it a frame ago (a low catch under the front rim: no clear frame to rewind to)
+              const touch = clearOfIron(jamPrevLive ? sweptTouch(jamPrevBall, bp, rim, RIM_RADIUS, ballSim.radius) : bp, rim, RIM_RADIUS, ballSim.radius);
               releaseBall(ball); ball.position.set(touch.x, touch.y, touch.z);
               jamContact = true; releasePos.copyFrom(ball.position); sinceRelease = 0; flush = startFlush(ball.position, rim, RIM_RADIUS, ballSim.radius);
               console.info(`[HANDS] iron contact ${(jamSec * 1000).toFixed(0)} ms into the jam: ball ${Vector3.Distance(bp, rim).toFixed(2)} m from the rim centre (${bp.y.toFixed(2)} m) · iron ${ringDistance(bp, rim, RIM_RADIUS).toFixed(3)} m (last frame ${jamPrevLive ? ringDistance(jamPrevBall, rim, RIM_RADIUS).toFixed(3) : '—'}) → let go at ${ringDistance(touch, rim, RIM_RADIUS).toFixed(3)}`);
