@@ -69,11 +69,14 @@ export interface IronContactInput {
 export function ironContact(i: IronContactInput): boolean {
   const timeout = i.timeout ?? IRON_CONTACT_TIMEOUT_SEC;
   if (i.sincePress >= timeout) return true;
-  const dx = i.ball.x - i.rim.x, dz = i.ball.z - i.rim.z;
-  const inRing = Math.hypot(dx, dz) <= i.rimRadius + i.ballRadius * 0.5;
+  const dx = i.ball.x - i.rim.x, dz = i.ball.z - i.rim.z, radial = Math.hypot(dx, dz);
+  const inRing = radial <= i.rimRadius + i.ballRadius * 0.5;
   const dy = i.ball.y - i.rim.y;
   const atHeight = dy >= -0.03 && dy <= i.ballRadius + 0.08;
-  return inRing && atHeight;
+  // DUNK-BALL-ARMS-RIM: the ball TOUCHING the iron is the contact too — a hand that brings it in from the front at the ring's
+  // height used to be let go only once the ball's centre was 0.2–0.28 m out, 5–8 cm INSIDE the metal (measured on 8586f1e)
+  const touching = Math.hypot(radial - i.rimRadius, dy) <= i.ballRadius + 0.02;
+  return (inRing || touching) && atHeight;
 }
 
 /** Whether a rim hang keeps holding: SLAM still held and under the cap. */

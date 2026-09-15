@@ -2,7 +2,7 @@
 // replays the FLIGHT at 0.5× from two angles (low baseline → rim-side) after a made dunk.
 // Recorded transforms, not video. Tap/space skips.
 
-import { Quaternion, Vector3 } from '@babylonjs/core';
+import { Matrix, Quaternion, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, TargetCamera, TransformNode, Observer } from '@babylonjs/core';
 
 const WINDOW_S = 4, RATE_HZ = 30, SPEED = 0.5;
@@ -10,19 +10,38 @@ const WINDOW_S = 4, RATE_HZ = 30, SPEED = 0.5;
 /** cq is recorded only when the root actually carries a rotationQuaternion; otherwise cy (Euler yaw) is what plays back.
  *  Before (play tip 2026-09-07): `rotationQuaternion ?? Identity` — the dunk root yaws by Euler, so every replay wrote
  *  Identity and the hero faced +z (the camera) for the whole 8 s replay; measured yaw 180° → 0° on the make. */
-interface Sample { t: number; cp: Vector3; cq: Quaternion | null; cy: number; bp: Vector3 }
+interface Sample { t: number; cp: Vector3; cq: Quaternion | null; cy: number; bp: Vector3; anchor: TransformNode | null; bl: Vector3 | null }
+
+/** DUNK-BALL-ARMS-RIM (2026-09-14): the ball rides what it rode live. The recorder kept only the ball's WORLD position, and the
+ *  replay re-flies the root with its own clips at its own rate — so the replayed hands were never where the live hands had
+ *  been: measured 197–243 replay frames with the ball 5–60 cm off the palm (median 0.25–0.33 m), a ball floating in front of
+ *  the chest while the hand went up empty. A sample now keeps the node the ball rode (the hand it was in, the root while it
+ *  dribbled) and the ball's position in that node's frame; the replay puts it back in the replayed node. A change of rider
+ *  (the release at the iron, a catch) eases out of the old place over ~0.1 s instead of popping. */
+export type BallAnchorFn = () => TransformNode | null;
+const _inv = new Matrix();
+/** A node's world matrix computed down its whole parent chain (the bones' cached matrices are last frame's until render). */
+function freshWorld(node: TransformNode): Matrix {
+  const chain: TransformNode[] = [];
+  for (let n: TransformNode | null = node; n; n = n.parent as TransformNode | null) chain.push(n);
+  for (let i = chain.length - 1; i >= 0; i--) chain[i].computeWorldMatrix(true);
+  return node.getWorldMatrix();
+}
 
 export class DunkReplayRecorder {
   private buf: Sample[] = [];
   private acc = 0;
   private obs: Observer<Scene> | null = null;
   private finishActive: (() => void) | null = null;
+  /** The node the replayed ball rides this frame ('' when it flies free) and its position in that node's frame — probes read it. */
+  riderName = ''; readonly riderLocal = new Vector3();
 
   constructor(
     private scene: Scene,
     private character: TransformNode,
     private ball: AbstractMesh,
     private camera: TargetCamera,
+    private anchorOf: BallAnchorFn | null = null,
   ) {
     this.obs = scene.onBeforeRenderObservable.add(() => this.tick());
   }
@@ -37,8 +56,17 @@ export class DunkReplayRecorder {
       cp: this.character.getAbsolutePosition().clone(),
       cq: this.character.rotationQuaternion?.clone() ?? null, cy: this.character.rotation.y,
       bp: this.ball.getAbsolutePosition().clone(),
+      ...this.anchorSample(),
     });
     while (this.buf.length && this.buf[0].t < now - WINDOW_S) this.buf.shift();
+  }
+
+  private anchorSample(): { anchor: TransformNode | null; bl: Vector3 | null } {
+    const anchor = this.anchorOf?.() ?? null;
+    if (!anchor) return { anchor: null, bl: null };
+    freshWorld(anchor).invertToRef(_inv);
+    this.ball.computeWorldMatrix(true);
+    return { anchor, bl: Vector3.TransformCoordinates(this.ball.getAbsolutePosition(), _inv) };
   }
 
   /** Play the replay; resolves when done or skipped. Caller pauses gameplay. */
@@ -66,6 +94,7 @@ export class DunkReplayRecorder {
 
     return new Promise<void>((resolve) => {
       let rt = 0;
+      let rider: TransformNode | null | undefined, lastBall: Vector3 | null = null; const blend = new Vector3();
       const skip = () => finish();
       window.addEventListener('pointerdown', skip);
       const onKey = (e: KeyboardEvent) => { if (e.key === ' ') skip(); };
@@ -80,10 +109,21 @@ export class DunkReplayRecorder {
         const k = b.t === a.t ? 0 : (t - a.t) / (b.t - a.t);
 
         const cp = Vector3.Lerp(a.cp, b.cp, k);
-        const bp = Vector3.Lerp(a.bp, b.bp, k);
+        let bp = Vector3.Lerp(a.bp, b.bp, k);
         this.character.setAbsolutePosition(cp);
         if (a.cq && b.cq) this.character.rotationQuaternion = Quaternion.Slerp(a.cq, b.cq, k);
         else { const d = Math.atan2(Math.sin(b.cy - a.cy), Math.cos(b.cy - a.cy)); this.character.rotation.y = a.cy + d * k; }   // shortest arc
+        // the ball in the node it rode (this runs after the frame's clips and reach, before the render) — see Sample
+        const ride = k < 0.5 ? a : b;
+        if (ride.anchor && ride.bl) {
+          const both = a.anchor === b.anchor && a.bl && b.bl;
+          bp = Vector3.TransformCoordinates(both ? Vector3.Lerp(a.bl!, b.bl!, k) : ride.bl, freshWorld(ride.anchor));
+        }
+        this.riderName = ride.anchor?.name ?? ''; if (ride.bl) this.riderLocal.copyFrom(ride.bl);
+        if (ride.anchor !== rider) { if (lastBall) blend.copyFrom(lastBall.subtract(bp)); rider = ride.anchor; }
+        blend.scaleInPlace(Math.exp(-this.scene.getEngine().getDeltaTime() / 1000 / 0.05));
+        bp.addInPlace(blend);
+        (lastBall ??= new Vector3()).copyFrom(bp);
         this.ball.setAbsolutePosition(bp);
 
         if (rt < dur / 2) {
@@ -103,6 +143,7 @@ export class DunkReplayRecorder {
       });
 
       const finish = () => {
+        this.riderName = '';
         this.scene.onBeforeRenderObservable.remove(obs);
         window.removeEventListener('pointerdown', skip);
         window.removeEventListener('keydown', onKey);

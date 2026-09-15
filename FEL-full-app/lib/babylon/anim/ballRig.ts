@@ -14,6 +14,16 @@ import { boneNode, findBone } from './boneLookup';
 const PALM_OFFSET = new Vector3(0.12, -0.04, -0.08);
 /** The palm offset for callers that settle a caught ball into the hand (read-only: copy it). */
 export const PALM_OFFSET_READONLY: Readonly<Vector3> = PALM_OFFSET;
+// DUNK-BALL-ARMS-RIM (2026-09-14): PALM_OFFSET was measured on the RIGHT hand. The live rig's LeftHand frame is the right's
+// mirror across its local x (forearm at (+0.215, 0.049, −0.083) in LeftHand space vs (−0.197, 0.059, −0.116) in RightHand
+// space), so the same offset put a left-hand ball 13 cm BACK toward the forearm — its centre 4.5–7.7 cm from the wrist line,
+// the ball through the wrist for the whole eastbay carry (45–49 frames measured). A ball opts in with `metadata.felPalmMirrorLeft`
+// (the dunk's does); other modes keep their tuned left-hand carries until they are re-eyed.
+const PALM_OFFSET_LEFT = new Vector3(-PALM_OFFSET.x, PALM_OFFSET.y, PALM_OFFSET.z);
+/** The ball's centre in `hand`'s frame for this ball (the mirrored left palm when the ball opted in). */
+export function palmOffsetOf(ball: AbstractMesh, hand: 'LeftHand' | 'RightHand' | string): Readonly<Vector3> {
+  return ball.metadata?.felPalmMirrorLeft && /Left/.test(hand) ? PALM_OFFSET_LEFT : PALM_OFFSET;
+}
 
 function handNode(skeleton: Skeleton, hand: 'LeftHand' | 'RightHand'): TransformNode | null {
   return boneNode(skeleton, hand);
@@ -27,7 +37,7 @@ export function attachBallToHand(
   if (!node) { console.warn(`[FEL-BALL] no ${hand} bone`); return false; }
   ball.setParent(node);
   (ball.metadata ??= {}).felReleased = false;
-  ball.position.copyFrom(PALM_OFFSET);
+  ball.position.copyFrom(palmOffsetOf(ball, hand));
   ball.rotationQuaternion = null;
   return true;
 }
@@ -54,9 +64,9 @@ export function handOffK(t: number, spec: HandOffSpec): number {
 
 const _palmA = new Vector3(), _palmB = new Vector3(), _inv = Matrix.Identity();
 /** Where a hand's palm is in world space this frame. */
-function palmWorld(node: TransformNode, out: Vector3): Vector3 {
+function palmWorld(node: TransformNode, offset: Readonly<Vector3>, out: Vector3): Vector3 {
   node.computeWorldMatrix(true);
-  return Vector3.TransformCoordinatesToRef(PALM_OFFSET, node.getWorldMatrix(), out);
+  return Vector3.TransformCoordinatesToRef(offset, node.getWorldMatrix(), out);
 }
 
 /** A hand-off, per frame with clip-local time (DUNK-CONTROL-JUICE, 2026-09-08). The ball used to re-parent on the
@@ -78,10 +88,10 @@ export function runHandOffPath(
     return false;
   }
   if (state.inLeftHand !== toLeft || ball.parent !== takeNode) { attachBallToHand(ball, skeleton, spec.to); state.inLeftHand = toLeft; swapped = true; }
-  if (t >= spec.at + blend) { ball.position.copyFrom(PALM_OFFSET); return swapped; }
+  if (t >= spec.at + blend) { ball.position.copyFrom(palmOffsetOf(ball, spec.to)); return swapped; }
   // inside the blend: world ease from the giving palm to the receiving palm, expressed in the receiving hand's frame
   const k0 = (t - (spec.at - blend)) / (2 * blend), k = k0 * k0 * (3 - 2 * k0);
-  palmWorld(giveNode, _palmA); palmWorld(takeNode, _palmB);
+  palmWorld(giveNode, palmOffsetOf(ball, spec.from), _palmA); palmWorld(takeNode, palmOffsetOf(ball, spec.to), _palmB);
   Vector3.LerpToRef(_palmA, _palmB, k, _palmA);
   takeNode.getWorldMatrix().invertToRef(_inv);
   Vector3.TransformCoordinatesToRef(_palmA, _inv, ball.position);

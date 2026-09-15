@@ -144,12 +144,16 @@ export class CharacterAnimator {
       return;
     }
     this.fadingOut = prev && prev !== next ? prev : null;
+    // DUNK-BALL-ARMS-RIM (2026-09-14): the outgoing clip fades from the weight it HAS. A clip superseded while it was still fading
+    // in (a finish on the frame after the hang took over) used to restart at full weight — the half-blended pose snapped onto
+    // that clip in one frame (the dunker's hands 0.47–0.61 m in a frame, measured). A clip at full weight fades exactly as before.
+    const w0 = prev && prev !== next ? CharacterAnimator.weightOf(prev) : 1;
     let t = 0;
     this.fadeObs = this.scene.onBeforeRenderObservable.add(() => {
       t += this.scene.getEngine().getDeltaTime() / 1000;
       const k = Math.min(1, t / fadeSec);
       next.setWeightForAllAnimatables(k);
-      if (prev && prev !== next) prev.setWeightForAllAnimatables(1 - k);
+      if (prev && prev !== next) prev.setWeightForAllAnimatables(w0 * (1 - k));
       if (k >= 1) {
         if (prev && prev !== next) prev.stop();
         this.fadingOut = null;
@@ -157,6 +161,12 @@ export class CharacterAnimator {
         this.fadeObs = null;
       }
     });
+  }
+
+  /** A playing group's blend weight (its animatables carry it; −1 = never set = full). */
+  static weightOf(g: AnimationGroup): number {
+    const w = (g as unknown as { animatables?: { weight: number }[] }).animatables?.[0]?.weight;
+    return w == null || w < 0 ? 1 : Math.max(0, Math.min(1, w));
   }
 
   /** Wall-clock duration of a clip (seconds) at speedRatio 1 — used by

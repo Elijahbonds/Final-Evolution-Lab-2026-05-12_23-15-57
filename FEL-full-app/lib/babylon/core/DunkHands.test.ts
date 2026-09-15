@@ -43,6 +43,12 @@ describe('H3 the iron contact', () => {
     expect(ironContact({ ball: { x: 0, y: 3.05 - 0.15, z: -10.28 }, rim, rimRadius: 0.225, ballRadius: 0.12, sincePress: 0.05 })).toBe(false); // 0.15 m UNDER the iron (measured on a late press: 2.77 m) is not a dunk
     expect(ironContact({ ball: { x: 0.5, y: 3.05, z: -10.28 }, rim, rimRadius: 0.225, ballRadius: 0.12, sincePress: 0.05 })).toBe(false); // beside the ring
   });
+  it('fires on the TOUCH — a ball brought in from the front at the ring height is let go on the iron, not inside it', () => {
+    // 0.34 m out (outside the old in-ring radius 0.285), 5 cm over: its surface is on the ring
+    expect(ironContact({ ball: { x: 0, y: 3.10, z: -10.28 + 0.34 }, rim, rimRadius: 0.225, ballRadius: 0.12, sincePress: 0.05 })).toBe(true);
+    // 0.40 m out at the same height: 4 cm of daylight — not yet
+    expect(ironContact({ ball: { x: 0, y: 3.10, z: -10.28 + 0.40 }, rim, rimRadius: 0.225, ballRadius: 0.12, sincePress: 0.05 })).toBe(false);
+  });
   it('resolves on the timeout whatever the hand did', () => {
     expect(ironContact({ ball: { x: 0, y: 2.5, z: -9.5 }, rim, rimRadius: 0.225, ballRadius: 0.12, sincePress: IRON_CONTACT_TIMEOUT_SEC })).toBe(true);
     expect(ironContact({ ball: { x: 0, y: 2.5, z: -9.5 }, rim, rimRadius: 0.225, ballRadius: 0.12, sincePress: 0.1, timeout: 0.05 })).toBe(true);
