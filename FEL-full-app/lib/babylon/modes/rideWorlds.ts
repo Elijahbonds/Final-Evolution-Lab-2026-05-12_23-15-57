@@ -21,6 +21,8 @@ import type { AbstractMesh, Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
 import { SKATE_VENUES, SNOW_VENUES, SURF_VENUES, rideOf, type BoardVenue } from '../nexus/boardVenues';
 import { applyFloorDetailToMesh } from '../visual/groundTextures';
+import { VertexData, Texture } from '@babylonjs/core';
+import { readableFloorHex, separatedHex, paintGraffitiWall, buildGraffitiStage } from '../visual/PlacePack';
 
 export interface RideObstacle { pos: Vector3; radius: number }
 
@@ -81,6 +83,30 @@ function makeRail(scene: Scene, all: AbstractMesh[], lines: GrindLine[], a: Vect
   lines.push({ a, b, bonus });
 }
 
+/**
+ * The solid under a tilted ramp slab, as a triangular prism: `width` along x, `depth` along z, rising from 0 at one
+ * z end to `height` at the other. SHARED-PLACE-FLOOR: a bank was a 0.6 m slab tilted into the floor, so from any
+ * side angle it read as a sliver melting into the concrete. The prism is what a ramp IS; it is scenery only (never
+ * in the ride list, never pickable), so the slab the rider raycasts is exactly the slab it always was.
+ */
+function rampWedge(scene: Scene, name: string, width: number, depth: number, height: number, highAtPlusZ: boolean): Mesh {
+  const hz = depth / 2, hx = width / 2, hi = highAtPlusZ ? hz : -hz, lo = -hi;
+  // two triangle ends (x = ±hx) and the two quads that show: the vertical back and the floor
+  const p = [
+    -hx, 0, lo, -hx, 0, hi, -hx, height, hi,
+    hx, 0, lo, hx, height, hi, hx, 0, hi,
+    -hx, 0, hi, hx, 0, hi, hx, height, hi, -hx, height, hi,
+  ];
+  const idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 6, 8, 9];
+  const vd = new VertexData();
+  vd.positions = p; vd.indices = idx;
+  const normals: number[] = []; VertexData.ComputeNormals(p, idx, normals); vd.normals = normals;
+  const m = new Mesh(name, scene);
+  vd.applyToMesh(m);
+  m.isPickable = false;
+  return m;
+}
+
 /** Half-width of the skatepark's playable area. The rider clamps here AND the
  *  fence is built here — one constant so a player never hits an invisible wall. */
 export const PARK_BOUND = 33;
@@ -108,37 +134,60 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   /** Place a feature at a fraction of the bound, so every venue keeps its proportions. */
   const f = (frac: number): number => frac * B;
 
+  // SHARED-PLACE-FLOOR: the palette's floor and structure go through the PLACE value rules. Venice's #b8a48c floor
+  // lit to a white field and its #8d7f6d ramps sat one value step off it — "melted featureless Venice field".
+  const floorHex = readableFloorHex(P.ground);
+  const structHex = separatedHex(P.structure, floorHex, 0.13);
   const ground = MeshBuilder.CreateGround('park_floor', { width: B * 2 + 8, height: B * 2 + 8 }, scene);
   ground.checkCollisions = true;
   ground.isPickable = true;
   ground.material = paintGround(scene, B * 2 + 8, B * 2 + 8, (g, W, H) => {
-    g.fillStyle = P.ground; g.fillRect(0, 0, W, H);
+    g.fillStyle = floorHex; g.fillRect(0, 0, W, H);
     // slab joints, and a few of them stained — a flat grid reads as graph paper, not concrete
-    g.strokeStyle = P.line; g.globalAlpha = 0.10; g.lineWidth = 3;
+    // (dark joints: a light joint on a mid floor is what vanished into the glare)
+    g.strokeStyle = P.edge; g.globalAlpha = 0.22; g.lineWidth = 3;
     for (let i = 1; i < 16; i++) {
       g.beginPath(); g.moveTo((i / 16) * W, 0); g.lineTo((i / 16) * W, H); g.stroke();
       g.beginPath(); g.moveTo(0, (i / 16) * H); g.lineTo(W, (i / 16) * H); g.stroke();
     }
-    g.globalAlpha = 0.06; g.fillStyle = P.edge;
+    g.globalAlpha = 0.14; g.fillStyle = P.edge;
     for (let i = 0; i < 90; i++) {
       const x = Math.random() * W, y = Math.random() * H, r = 12 + Math.random() * 46;
       g.beginPath(); g.ellipse(x, y, r, r * 0.6, Math.random() * Math.PI, 0, Math.PI * 2); g.fill();
     }
     // painted lines: a place people marked, which is most of what makes concrete read as a park
-    g.globalAlpha = 0.5; g.strokeStyle = P.accent; g.lineWidth = 8;
+    g.globalAlpha = 0.8; g.strokeStyle = P.accent; g.lineWidth = 10;
     g.beginPath(); g.arc(W * 0.31, H * 0.63, W * 0.11, 0, Math.PI * 2); g.stroke();
     g.beginPath(); g.moveTo(W * 0.62, H * 0.18); g.lineTo(W * 0.62, H * 0.82); g.stroke();
-    g.globalAlpha = 0.42; g.fillStyle = P.accent; g.font = `bold ${Math.round(W * 0.07)}px sans-serif`;
+    g.globalAlpha = 0.7; g.fillStyle = P.accent; g.font = `bold ${Math.round(W * 0.07)}px sans-serif`;
     g.fillText('FEL', W * 0.44, H * 0.53);
     g.globalAlpha = 1;
   });
-  applyFloorDetailToMesh(scene, ground, { kind: 'asphalt', blend: 0.55 }, [B * 2 + 8, B * 2 + 8]);
+  applyFloorDetailToMesh(scene, ground, { kind: 'concrete', blend: 0.7 }, [B * 2 + 8, B * 2 + 8]);
   all.push(ground); rideable.push(ground);
 
-  const rampM = mat(scene, `rampM_${venue.id}`, P.structure);
-  const bankM = mat(scene, `bowlM_${venue.id}`, P.structure);
-  const laneM = mat(scene, `laneM_${venue.id}`, P.structure);
-  const boxM = mat(scene, `funM_${venue.id}`, P.structure);
+  const rampM = mat(scene, `rampM_${venue.id}`, structHex);
+  const bankM = mat(scene, `bowlM_${venue.id}`, mixHex(structHex, P.edge, 0.2));
+  const laneM = mat(scene, `laneM_${venue.id}`, structHex);
+  const boxM = mat(scene, `funM_${venue.id}`, structHex);
+  // the prism under every bank, a shade darker than the riding face so the face reads as the lit side
+  const wedgeM = mat(scene, `wedgeM_${venue.id}`, mixHex(structHex, P.edge, 0.45)); wedgeM.backFaceCulling = false;
+  // steel coping on every lip: the edge line that separates a ramp from the sky and the floor behind it
+  const copeM = new PBRMaterial(`copeM_${venue.id}`, scene); copeM.albedoColor = Color3.FromHexString('#c9ced6'); copeM.metallic = 0.6; copeM.roughness = 0.35;
+  const dressing: Mesh[] = [];   // visual-only pieces, merged per material at the end
+  const cope = (parent: Mesh, len: number, y: number, z: number): void => {
+    const c = MeshBuilder.CreateCylinder('park_coping', { diameter: 0.14, height: len, tessellation: 8 }, scene);
+    c.parent = parent; c.rotation.z = Math.PI / 2; c.position.set(0, y, z); c.material = copeM; c.isPickable = false;
+    dressing.push(c);
+  };
+  // funboxes and ledges are TAGGED — a park is somewhere people paint
+  const tagM = (seed: number): PBRMaterial => {
+    const tex = new DynamicTexture(`funTag_${seed}`, { width: 512, height: 128 }, scene, true);
+    paintGraffitiWall(tex.getContext() as unknown as CanvasRenderingContext2D, 512, 128, seed, structHex);
+    tex.update(true);
+    const m = new PBRMaterial(`funTagM_${seed}`, scene); m.albedoTexture = tex; m.metallic = 0; m.roughness = 0.9;
+    return m;
+  };
   const accentM = mat(scene, `accentM_${venue.id}`, P.accent);
 
   // BANKS around the outside, laid out on the bound so the far ones are reachable rather than decorative
@@ -152,6 +201,10 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     ramp.material = rampM;
     ramp.checkCollisions = true;
     all.push(ramp); rideable.push(ramp);
+    // the slab's +z end is its lip (rotation.x −0.42 lifts +z): coping on the lip, the prism under the face
+    cope(ramp, 10, 0.34, 2.95);
+    const w = rampWedge(scene, 'park_rampbody', 9.9, 5.4, 2.5, true);
+    w.position.set(f(fx), 0, f(fz)); w.rotation.y = ry; w.material = wedgeM; dressing.push(w);
   }
 
   // THE BOWL — an octagon of inward-tilted banks around a sunken centre
@@ -164,6 +217,10 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     bank.material = bankM;
     bank.checkCollisions = true;
     all.push(bank); rideable.push(bank);
+    // rotation.x +0.5 lifts the −z end: that is the bowl's rim
+    cope(bank, 5.4, 0.28, -1.75);
+    const w = rampWedge(scene, 'park_bowlbody', 5.3, 3.1, 1.7, false);
+    w.position.set(bank.position.x, 0, bank.position.z); w.rotation.y = a + Math.PI; w.material = wedgeM; dressing.push(w);
   }
 
   // THE DOWNHILL STRAIGHT — longer in a longer park, which is the point of a longer park
@@ -176,10 +233,13 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   all.push(lane); rideable.push(lane);
 
   // FUNBOXES and a STAIR SET — something to ollie down rather than only things to ride up
+  let tagSeed = 3;
   for (const [fx, fz] of [[0, -0.06], [-0.24, -0.36], [0.3, 0.68], [-0.6, -0.6]] as const) {
     const box = MeshBuilder.CreateBox('funbox', { width: 6, height: 1.1, depth: 4 }, scene);
     box.position.set(f(fx), 0.55, f(fz));
-    box.material = boxM;
+    box.material = tagM(tagSeed++);
+    // steel edges along the two long top edges: the line you grind and the line you read
+    cope(box, 6, 0.55, 2); cope(box, 6, 0.55, -2);
     box.checkCollisions = true;
     all.push(box); rideable.push(box);
   }
@@ -192,7 +252,15 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   }
 
   // L3 BOUNDARY — the fence reads the venue's bound, so the thing you can see and the thing that stops you agree
-  const fenceM = mat(scene, `fenceM_${venue.id}`, P.edge);
+  // the fence is a painted wall now: a tagged strip tiled along its length (one texture, uScale by the span)
+  const fenceM = (() => {
+    const tex = new DynamicTexture(`fenceTag_${venue.id}`, { width: 1024, height: 160 }, scene, true);
+    paintGraffitiWall(tex.getContext() as unknown as CanvasRenderingContext2D, 1024, 160, 97, mixHex(P.edge, '#ffffff', 0.35));
+    tex.update(true);
+    tex.wrapU = Texture.WRAP_ADDRESSMODE; tex.uScale = Math.max(1, Math.round((B * 2) / 14));
+    const m = new PBRMaterial(`fenceM_${venue.id}`, scene); m.albedoTexture = tex; m.metallic = 0; m.roughness = 0.92;
+    return m;
+  })();
   for (const [dx, dz] of [[0, 1], [0, -1], [1, 0], [-1, 0]] as const) {
     const span = MeshBuilder.CreateBox('wall_fence', {
       width: dx === 0 ? B * 2 : 0.25, height: 1.9, depth: dz === 0 ? B * 2 : 0.25,
@@ -212,6 +280,37 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   // the HANDRAIL down the stair set — the one every skater looks for
   makeRail(scene, all, grindLines, new Vector3(f(0.12) + 5, 1.5, f(-0.62)), new Vector3(f(0.12) + 5, 0.5, f(-0.62) + 4.4), 340);
 
+  // GRAFFITI STAGES (SHARED-PLACE-FLOOR, eye HARD #10: "no park geometry/graffiti"). Venice's art walls, as the MID
+  // layer: six painted walls standing just OUTSIDE the fence, tall enough to read over it, two per long side and one
+  // per short side, each turned to face the park. Outside the bound, so no rider can ride into a wall that does not
+  // collide; scenery only.
+  const stages: TransformNode[] = [];
+  for (const [sx, sz, seed] of [[-0.5, 1, 1], [0.45, 1, 2], [-0.45, -1, 3], [0.5, -1, 4], [1, -0.1, 5], [-1, 0.35, 6]] as const) {
+    const onX = Math.abs(sx) === 1;
+    const st = buildGraffitiStage(scene, null, `park_stage_${seed}`, { width: 13, height: 4.2, seed: seed * 7 + venue.id.length, base: mixHex(P.structure, '#ffffff', 0.25) });
+    st.position.set(onX ? sx * (B + 3.2) : f(sx), 0, onX ? f(sz) : sz * (B + 3.2));
+    st.rotation.y = Math.atan2(st.position.x, st.position.z);   // local −z (the first painted face) points at the park centre
+    stages.push(st);
+  }
+  // THE SURROUND: past the slab the world kept going as nothing, so the props the venue set authors out there (palms,
+  // tents, the bus) stood over the void. A darker apron under everything, 3 cm down so it never fights the slab.
+  const apron = MeshBuilder.CreateGround('park_surround', { width: B * 2 + 150, height: B * 2 + 150 }, scene);
+  apron.position.y = -0.03; apron.isPickable = false; apron.receiveShadows = true;
+  const apronM = new PBRMaterial(`apronM_${venue.id}`, scene);
+  apronM.albedoColor = Color3.FromHexString(readableFloorHex(mixHex(floorHex, P.edge, 0.35)));
+  apronM.metallic = 0; apronM.roughness = 1;
+  apron.material = apronM;
+  applyFloorDetailToMesh(scene, apron, { kind: 'asphalt', blend: 0.6 }, [B * 2 + 150, B * 2 + 150]);
+  all.push(apron);
+  // merge the dressing per material: 30-odd copings and prisms become two draws
+  const merged: Mesh[] = [];
+  for (const m of [copeM, wedgeM]) {
+    const parts = dressing.filter((d) => d.material === m);
+    for (const p of parts) p.computeWorldMatrix(true);
+    const one = parts.length ? Mesh.MergeMeshes(parts, true, true) : null;
+    if (one) { one.name = m === copeM ? 'park_coping' : 'park_rampbody'; one.isPickable = false; one.material = m; merged.push(one); }
+  }
+
   // one accent object so the eye has somewhere to land — the thing a place is known by
   const totem = MeshBuilder.CreateCylinder('park_totem', { diameter: 0.9, height: 5.2, tessellation: 8 }, scene);
   totem.position.set(f(-0.78), 2.6, f(0.78));
@@ -226,7 +325,10 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     new Vector3(f(-0.29), 0, f(0.54)), new Vector3(f(-0.22), 0, f(0.58)),
     new Vector3(f(0.78), 0, f(-0.42)), new Vector3(f(0.83), 0, f(-0.35)),
   ].slice(0, Math.max(2, venue.crowd));
-  return { ground: rideable, grindLines, markers: [], obstacles: [], crowdSpots, bound: B, dispose: () => all.forEach((m) => m.dispose()) };
+  return {
+    ground: rideable, grindLines, markers: [], obstacles: [], crowdSpots, bound: B,
+    dispose: () => { all.forEach((m) => m.dispose()); merged.forEach((m) => m.dispose()); stages.forEach((t) => t.dispose(false, true)); },
+  };
 }
 
 // ── SLOPE v2 — rocks, rails, kickers, the ski-lift grind, the yeti den ─────

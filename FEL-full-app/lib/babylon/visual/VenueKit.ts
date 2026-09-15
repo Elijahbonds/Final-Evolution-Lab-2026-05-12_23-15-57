@@ -3,11 +3,12 @@
 // textures, so scenes are FULL today; GLB venue pieces can replace parts later.
 
 import {
-  Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, TransformNode, Vector3,
+  Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, Texture, TransformNode, Vector3,
 } from '@babylonjs/core';
 import type { Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
 import { applyFloorDetailToMesh, floorDetailFor } from './groundTextures';
+import { paintCrowdStand, paintTurf, paintTrack } from './PlacePack';
 
 /** Venue props are PBR now (Phase 1, 2026-09-03): they take the procedural IBL
  *  and the tier's shadows like the hero does. Matte by default; the emissive
@@ -29,12 +30,14 @@ export const GLOW_MAX_M = 80;
 function paintedGround(
   scene: Scene, w: number, l: number, base: string,
   paint: (ctx: CanvasRenderingContext2D, W: number, H: number) => void,
+  texSize: [number, number] = [1024, 1024],
 ): Mesh {
   const ground = MeshBuilder.CreateGround('venue_ground', { width: w, height: l }, scene);
-  const tex = new DynamicTexture('venue_ground_tex', { width: 1024, height: 1024 }, scene, false);
+  const [TW, TH] = texSize;
+  const tex = new DynamicTexture('venue_ground_tex', { width: TW, height: TH }, scene, texSize[0] !== 1024 || texSize[1] !== 1024);
   const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
-  ctx.fillStyle = base; ctx.fillRect(0, 0, 1024, 1024);
-  paint(ctx, 1024, 1024);
+  ctx.fillStyle = base; ctx.fillRect(0, 0, TW, TH);
+  paint(ctx, TW, TH);
   tex.update();
   // THE CENTRE GLOW FADES OUT ON BIG GROUND, and that is the whole golf fix.
   //
@@ -52,11 +55,11 @@ function paintedGround(
   const span = Math.max(w, l);
   const glowK = Math.max(0, Math.min(1, (GLOW_MAX_M - span) / (GLOW_MAX_M - GLOW_FULL_M)));
   if (glowK > 0) {
-    const glow = ctx.createRadialGradient(512, 512, 60, 512, 512, 640);
+    const glow = ctx.createRadialGradient(TW / 2, TH / 2, 60, TW / 2, TH / 2, 640);
     glow.addColorStop(0, `rgba(255,255,255,${(0.10 * glowK).toFixed(3)})`);
     glow.addColorStop(1, `rgba(0,0,0,${(0.12 * glowK).toFixed(3)})`);
     ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, 1024, 1024);
+    ctx.fillRect(0, 0, TW, TH);
     tex.update();
   }
   const m = new PBRMaterial('venue_ground_mat', scene);
@@ -97,7 +100,7 @@ function wallJuice(ctx: CanvasRenderingContext2D, W: number, H: number): void {
 /** 4-wall venue box with per-wall art painter (M22 §6). */
 function venueBox(
   scene: Scene, w: number, l: number, h: number,
-  painters: Array<(ctx: CanvasRenderingContext2D, W: number, H: number) => void>,
+  painters: Array<WallPainter>,
 ): TransformNode {
   const root = new TransformNode('venue_box', scene);
   const defs = [
@@ -109,11 +112,16 @@ function venueBox(
   defs.forEach((d, i) => {
     const wall = MeshBuilder.CreatePlane(`wall_${d.name}`, { width: d.width, height: h }, scene);
     wall.position = d.pos; wall.rotation.y = d.rotY; wall.parent = root;
-    const tex = new DynamicTexture(`wall_tex_${d.name}`, { width: 1024, height: 256 }, scene, false);
+    const painter = painters[i % painters.length];
+    // a TILED painter draws one tile of `tileM` metres; the texture keeps the tile's own aspect so what it paints is
+    // not stretched, and repeats along the wall (SHARED-PLACE-FLOOR: a 94 m wall of 6 px dots was the "dot crowd")
+    const texH = painter.tileM ? Math.round(1024 * h / painter.tileM) : 256;
+    const tex = new DynamicTexture(`wall_tex_${d.name}`, { width: 1024, height: texH }, scene, true);
     const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
-    (painters[i % painters.length])(ctx, 1024, 256);
-    wallJuice(ctx, 1024, 256);          // every venue gets the finish
-    tex.update();
+    painter(ctx, 1024, texH);
+    wallJuice(ctx, 1024, texH);          // every venue gets the finish
+    tex.update(true);
+    if (painter.tileM) { tex.wrapU = Texture.WRAP_ADDRESSMODE; tex.uScale = Math.max(1, Math.round(d.width / painter.tileM)); }
     const m = new PBRMaterial(`wall_mat_${d.name}`, scene);
     m.albedoTexture = tex; m.emissiveTexture = tex; m.emissiveColor = new Color3(0.35, 0.35, 0.35);
     m.metallic = 0; m.roughness = 0.9;
@@ -124,16 +132,20 @@ function venueBox(
 }
 
 // ── Wall painters (reused across venues) ────────────────────────────────────
-const paintBleachers = (crowd: string[]) => (ctx: CanvasRenderingContext2D, W: number, H: number) => {
-  ctx.fillStyle = '#1a2028'; ctx.fillRect(0, 0, W, H);
-  for (let row = 0; row < 5; row++) {
-    ctx.fillStyle = '#242c36'; ctx.fillRect(0, H - (row + 1) * 44, W, 10);
-    for (let x = 8; x < W; x += 18) {
-      ctx.fillStyle = crowd[(x / 18 + row) % crowd.length | 0];
-      ctx.beginPath(); ctx.arc(x, H - (row + 1) * 44 - 8, 6, 0, Math.PI * 2); ctx.fill();
-    }
-  }
-};
+/** A wall painter; `tileM` (metres) makes venueBox repeat one painted tile along the wall instead of stretching it. */
+type WallPainter = ((ctx: CanvasRenderingContext2D, W: number, H: number) => void) & { tileM?: number };
+
+/**
+ * The stand behind a venue box. SHARED-PLACE-FLOOR: this was five rows of 6 px circles stretched along a 94 m wall
+ * (the eye's "dot-crowd"). It is the shared PlacePack crowd now — seated silhouettes in stepped rows, a 14 m tile
+ * repeated, so a person is ~0.6 m wide wherever the wall is.
+ */
+const paintBleachers = (crowd: string[]): WallPainter => Object.assign(
+  (ctx: CanvasRenderingContext2D, W: number, H: number) => paintCrowdStand(ctx, W, H, {
+    rows: 6, perRow: 24, accent: crowd[crowd.length - 1] ?? '#ffd60a', bg: '#232733', seed: crowd.length * 97,
+  }),
+  { tileM: 14 },
+);
 const paintOcean = (ctx: CanvasRenderingContext2D, W: number, H: number) => {
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#ffb36b'); g.addColorStop(0.55, '#ff8f5e'); g.addColorStop(0.56, '#2a6f97'); g.addColorStop(1, '#1b4965');
@@ -270,16 +282,67 @@ export const VenueKit = {
     // every run/pursuit angle into a narrow corridor. 44m brings it in line
     // with the real sideline-to-sideline width; length was already close to
     // regulation so it's untouched.
-    paintedGround(scene, 44, 90, '#1e4d2b', (ctx, W, H) => {
-      ctx.strokeStyle = '#eaf2ea'; ctx.lineWidth = 4;
-      for (let i = 1; i < 9; i++) {                                     // yard lines
-        const y = (H / 9) * i;
-        ctx.beginPath(); ctx.moveTo(W * 0.08, y); ctx.lineTo(W * 0.92, y); ctx.stroke();
-        ctx.font = 'bold 34px monospace'; ctx.fillStyle = '#eaf2ea';
-        ctx.fillText(String((i < 5 ? i : 9 - i) * 10), W * 0.12, y - 8);
+    // SHARED-PLACE-FLOOR: STREET TURF. The eye's P0 bar was NFL Street, and this was one flat #1e4d2b with 4 px lines —
+    // "flat untextured green". A street field is loud and legible: mown 5-yard bands, fat chalk lines, big yard
+    // numbers, a painted midfield badge, a filled end zone with its name on it, and the wear where the plays happen.
+    // The texture is 1024 × 2048 over 44 × 90 m, so a painted metre is square (the old 1024² stretched every number 2×).
+    const FIELD_W = 44, FIELD_L = 90, YD = 0.9144;
+    const field = paintedGround(scene, FIELD_W, FIELD_L, '#2f7d3a', (ctx, W, H) => {
+      const pxm = W / FIELD_W;                                     // pixels per metre (square)
+      const yAt = (z: number) => (FIELD_L / 2 - z) * pxm;          // canvas top is the far (+z) end the runner attacks
+      const xAt = (x: number) => (x + FIELD_W / 2) * pxm;
+      paintTurf(ctx, W, H, { base: '#2f7d3a', stripes: Math.round(FIELD_L / (5 * YD)), stripeDepth: 0.14, wear: 10, seed: 44 });
+      // scrimmage wear down the middle of the field, where every snap happens
+      const wear = ctx.createLinearGradient(xAt(-6), 0, xAt(6), 0);
+      wear.addColorStop(0, 'rgba(130,104,66,0)'); wear.addColorStop(0.5, 'rgba(130,104,66,0.22)'); wear.addColorStop(1, 'rgba(130,104,66,0)');
+      ctx.fillStyle = wear; ctx.fillRect(xAt(-6), yAt(38), xAt(6) - xAt(-6), yAt(-38) - yAt(38));
+      // END ZONES: the one the runner attacks (z 40..45) and the one behind (−45..−40)
+      for (const [z0, z1, name] of [[40, 45, 'STREET'], [-45, -40, 'FEL']] as const) {
+        ctx.fillStyle = z0 > 0 ? '#c1121f' : '#1d3557'; ctx.fillRect(0, yAt(z1), W, yAt(z0) - yAt(z1));
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 10;
+        for (let x = -W; x < W * 2; x += 60) { ctx.beginPath(); ctx.moveTo(x, yAt(z1)); ctx.lineTo(x + (yAt(z0) - yAt(z1)), yAt(z0)); ctx.stroke(); }
+        ctx.save(); ctx.translate(W / 2, (yAt(z0) + yAt(z1)) / 2);
+        if (z0 < 0) ctx.rotate(Math.PI);                           // each end zone's word reads from its own goal line
+        ctx.font = `900 ${Math.round(3.4 * pxm)}px Impact, "Arial Black", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.lineWidth = 0.35 * pxm; ctx.strokeStyle = '#111'; ctx.strokeText(name, 0, 0);
+        ctx.fillStyle = '#fdf0d5'; ctx.fillText(name, 0, 0);
+        ctx.restore();
       }
-      ctx.fillStyle = 'rgba(255,61,94,0.35)'; ctx.fillRect(0, 0, W, H / 12);   // end zone
+      // chalk: sidelines, goal lines, every 5 yards, and the hashes
+      ctx.fillStyle = '#f4f7f2';
+      const band = (z: number, thick: number) => ctx.fillRect(xAt(-FIELD_W / 2 + 1.2), yAt(z) - thick * pxm / 2, (FIELD_W - 2.4) * pxm, thick * pxm);
+      for (const sx of [-FIELD_W / 2 + 1.2, FIELD_W / 2 - 1.2]) ctx.fillRect(xAt(sx) - 0.25 * pxm, 0, 0.5 * pxm, H);
+      band(40, 0.45); band(-40, 0.45);
+      ctx.font = `900 ${Math.round(2.2 * pxm)}px Impact, "Arial Black", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      for (let k = -8; k <= 8; k++) {
+        const z = k * 5 * YD * (40 / (8 * 5 * YD));               // eight 5-yard bands between z 0 and each goal line
+        if (k === -8 || k === 8) continue;
+        band(z, k % 2 === 0 ? 0.32 : 0.2);
+        for (let h = 1; h < 5; h++) {                               // hash marks, a yard apart
+          const hz = z + h * (40 / 40) * YD;
+          if (Math.abs(hz) >= 40) continue;
+          for (const hx of [-FIELD_W / 2 + 2.2, -3, 3, FIELD_W / 2 - 2.2]) ctx.fillRect(xAt(hx) - 0.45 * pxm, yAt(hz) - 0.06 * pxm, 0.9 * pxm, 0.12 * pxm);
+        }
+        if (k % 2 === 0 && k !== 0) {                               // numbers every 10 yards, on both sides, facing their sideline
+          const label = String((8 - Math.abs(k)) * 5);
+          for (const [nx, rot] of [[-FIELD_W / 2 + 5, Math.PI / 2], [FIELD_W / 2 - 5, -Math.PI / 2]] as const) {
+            ctx.save(); ctx.translate(xAt(nx), yAt(z)); ctx.rotate(rot); ctx.fillText(label, 0, 0); ctx.restore();
+          }
+        }
+      }
+      // the midfield badge
+      ctx.save(); ctx.translate(W / 2, yAt(0));
+      ctx.fillStyle = 'rgba(193,18,31,0.85)'; ctx.beginPath(); ctx.arc(0, 0, 4.2 * pxm, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 0.4 * pxm; ctx.strokeStyle = '#fdf0d5'; ctx.stroke();
+      ctx.fillStyle = '#fdf0d5'; ctx.font = `900 ${Math.round(2.6 * pxm)}px Impact, "Arial Black", sans-serif`; ctx.fillText('FEL', 0, 0);
+      ctx.restore();
+    }, [1024, 2048]);
+    applyFloorDetailToMesh(scene, field, { kind: 'grass', blend: 0.3 }, [FIELD_W, FIELD_L]);
+    // round the field off: a dark cinder track past the sidelines, so the chalk has a frame instead of meeting the wall
+    const apron = paintedGround(scene, 48, 94, '#3b3530', (ctx, W, H) => {
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; for (let i = 0; i < 1400; i++) ctx.fillRect(Math.random() * W, Math.random() * H, 2, 2);
     });
+    apron.name = 'venue_apron'; apron.position.y = -0.02; apron.isPickable = false;
     venueBox(scene, 48, 94, 8, [paintBleachers(CROWD)]);
     for (const z of [-30, 0, 30]) for (const x of [-19, 19]) {          // floodlights
       const glow = MeshBuilder.CreatePlane(`flood_${x}_${z}`, { width: 2.4, height: 1.2 }, scene);
@@ -287,6 +350,26 @@ export const VenueKit = {
       const gm = mat(scene, 'flood', '#ffffff', 0); gm.emissiveColor = new Color3(0.9, 0.95, 1);
       glow.material = gm;
     }
+  },
+
+  /**
+   * THE SPRINT STRAIGHT (SHARED-PLACE-FLOOR, 2026-09-14). Sprint ran on buildPark — a 40 × 160 grey slab between graffiti
+   * walls, the eye's grey void — for a Track & Field race. This is a track: a tartan straight with lanes where the two
+   * runners actually stand (x −0.7 and +0.9: edges every 1.6 m), infield grass either side, and a stand down both sides.
+   */
+  buildTrack(scene: Scene, raceDist = 100): void {
+    const edges = [-4.7, -3.1, -1.5, 0.1, 1.7, 3.3, 4.9];
+    const len = raceDist + 38, cz = -(raceDist / 2), width = 10.6, cx = 0.1;
+    const grass = paintedGround(scene, 44, len + 30, '#3f7f3a', (ctx, W, H) => paintTurf(ctx, W, H, { base: '#3f7f3a', stripes: 16, stripeDepth: 0.1, seed: 5 }));
+    grass.name = 'venue_infield'; grass.position.set(0, -0.02, cz); grass.isPickable = false;
+    applyFloorDetailToMesh(scene, grass, { kind: 'grass', blend: 0.35 }, [44, len + 30]);
+    const tw = 256, th = Math.round(256 * len / width);   // ~24 px a metre: lane lines and numbers stay crisp down a 138 m strip
+    const track = paintedGround(scene, width, len, '#a8432f', (ctx, W, H) => paintTrack(ctx, W, H, {
+      size: [width, len], center: [cx, cz], laneEdges: edges, startZ: 0, finishZ: -raceDist,
+    }), [tw, th]);
+    track.position.set(cx, 0, cz);
+    const box = venueBox(scene, 44, len + 30, 7, [paintBleachers(CROWD)]);
+    box.position.z = cz;
   },
 
   buildPark(scene: Scene, rails: GrindLine[] = []): void {
@@ -409,12 +492,9 @@ export const VenueKit = {
         // reads as paper". A links has no lines to paint, so the thing that makes turf look like a golf
         // course is the MOW: alternating cut directions leave alternating light and dark bands, and that
         // one detail is what the eye uses to read distance down a fairway.
-        const BANDS = 14;
-        for (let i = 0; i < BANDS; i++) {
-          if (i % 2 === 0) continue;                       // every other band is the against-the-grain cut
-          ctx.fillStyle = 'rgba(255,255,255,0.055)';
-          ctx.fillRect(0, (i / BANDS) * H, W, H / BANDS);
-        }
+        // SHARED-PLACE-FLOOR: the shared turf painter — the mow bands at a depth that survives the alpine light (a 5.5 %
+        // white band did not: the eye still read the fairway as flat bright green), plus mottle and a little wear.
+        paintTurf(ctx, W, H, { base: bases.golf, stripes: 14, stripeDepth: 0.16, wear: 3, seed: 90 });
         // NO PAINTED GREEN. The hole has a real `green` mesh of its own (picked it at 8 m), so painting a
         // second one into the turf gives the course two greens that do not line up — my first cut drew a
         // 174 px ellipse on a 1024 texture stretched over 90 m and put a pale blob across the tee. The mow

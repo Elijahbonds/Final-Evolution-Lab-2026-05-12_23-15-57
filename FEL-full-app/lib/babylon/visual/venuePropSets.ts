@@ -112,10 +112,13 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     { kit: 'racing', model: 'grandStand', at: [-30, 0, -8], yaw: Math.PI / 2, scale: 3 }, { kit: 'racing', model: 'grandStand', at: [30, 0, -8], yaw: -Math.PI / 2, scale: 3 },
     ...line('nature', 'tree_tall', [-36, 40], [36, 40], 8, 0, 6.0), ...line('nature', 'tree_default', [-40, -30], [40, -30], 6, 0, 5.4),
   ],
+  // SHARED-PLACE-FLOOR: the start gantry (z −6) and a barrier run (z −4) stood between the runner camera (z −7.5) and
+  // the runner — the white slab and grey box across the bottom of every football frame. The gantry is over the end
+  // zone now and the barriers line the sidelines, inside the stand, where the camera sees them.
   'gridiron': [
     { kit: 'racing', model: 'grandStandCovered', at: [-31, 0, 20], yaw: Math.PI / 2, scale: 3 }, { kit: 'racing', model: 'grandStandCovered', at: [31, 0, 20], yaw: -Math.PI / 2, scale: 3 },
-    { kit: 'racing', model: 'overheadLights', at: [0, 0, -6], scale: 3 }, { kit: 'racing', model: 'lightPostLarge', at: [-27, 0, 0], scale: 3 }, { kit: 'racing', model: 'lightPostLarge', at: [27, 0, 0], scale: 3 }, { kit: 'racing', model: 'lightPostLarge', at: [-27, 0, 40], scale: 3 }, { kit: 'racing', model: 'lightPostLarge', at: [27, 0, 40], scale: 3 },
-    ...line('racing', 'barrierWall', [-24, -4], [24, -4], 9, 0, 2), { kit: 'racing', model: 'flagCheckers', at: [-25, 0, 44], scale: 2.5 }, { kit: 'racing', model: 'bannerTowerRed', at: [25, 0, 44], scale: 2.5 },
+    { kit: 'racing', model: 'overheadLights', at: [0, 0, 46], scale: 3 }, { kit: 'racing', model: 'lightPostLarge', at: [-27, 0, 0], scale: 3 }, { kit: 'racing', model: 'lightPostLarge', at: [27, 0, 0], scale: 3 }, { kit: 'racing', model: 'lightPostLarge', at: [-27, 0, 40], scale: 3 }, { kit: 'racing', model: 'lightPostLarge', at: [27, 0, 40], scale: 3 },
+    ...line('racing', 'barrierWall', [-23, 0], [-23, 42], 8, Math.PI / 2, 2), ...line('racing', 'barrierWall', [23, 0], [23, 42], 8, -Math.PI / 2, 2), { kit: 'racing', model: 'flagCheckers', at: [-25, 0, 44], scale: 2.5 }, { kit: 'racing', model: 'bannerTowerRed', at: [25, 0, 44], scale: 2.5 },
     // props+depth pass 2026-09-05 — NEAR: team tents and sideline flags · MID: more masts · FAR: a tree line past the end zone
     { kit: 'racing', model: 'tent', at: [-28, 0, 10], yaw: Math.PI / 2, scale: 2.4 }, { kit: 'racing', model: 'tent', at: [28, 0, 10], yaw: -Math.PI / 2, scale: 2.4 }, ...line('racing', 'flagRed', [-29, -2], [-29, 30], 4, 0, 2.2),
     { kit: 'racing', model: 'lightPostLarge', at: [-27, 0, 36], scale: 3 }, { kit: 'racing', model: 'lightPostLarge', at: [27, 0, 36], scale: 3 },

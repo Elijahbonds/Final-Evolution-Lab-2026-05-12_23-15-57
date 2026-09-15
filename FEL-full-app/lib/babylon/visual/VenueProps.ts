@@ -66,6 +66,14 @@ export interface MountPropsOptions {
    * re-authoring three sets, and a placement ON the centre line (x 0: the start flag) stays there.
    */
   lateralShift?: number;
+  /**
+   * SHARED-PLACE-FLOOR (2026-09-14): scale every placement's x AND z by this factor (model scale untouched).
+   *
+   * The 'skatepark' set was composed around the old fixed 33 m park. Board venues made the park 48–62 m, and the set
+   * never moved: its fence lines and barrier run stood 20 m INSIDE Venice's fence, across the riding area, and its
+   * tents sat on the slab. A park that grew keeps its composition when the dressing grows with it.
+   */
+  spread?: number;
 }
 
 /** Mount the prop set for `venueKey` under a fresh root. Resolves after every model loaded (failures skip the prop). */
@@ -94,9 +102,11 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
     const holder = new TransformNode(`prop_${p.model}_${i}`, scene);
     holder.parent = root;
     const shift = opts.lateralShift ?? 0;
-    const px = p.at[0] === 0 ? 0 : p.at[0] + Math.sign(p.at[0]) * shift;
-    holder.position.set(px, p.at[1], p.at[2]);
-    if (opts.snapToGround) { const gy = groundYAt(px, p.at[2]); if (gy !== null) { holder.position.y = gy + p.at[1]; snapped++; } else missed++; }
+    const k = opts.spread ?? 1;
+    const px = (p.at[0] === 0 ? 0 : p.at[0] + Math.sign(p.at[0]) * shift) * k;
+    const pz = p.at[2] * k;
+    holder.position.set(px, p.at[1], pz);
+    if (opts.snapToGround) { const gy = groundYAt(px, pz); if (gy !== null) { holder.position.y = gy + p.at[1]; snapped++; } else missed++; }
     holder.rotation.y = p.yaw ?? 0;
     const s = p.scale ?? 1; holder.scaling.set(s, s, s);
     for (const src of meshes) {

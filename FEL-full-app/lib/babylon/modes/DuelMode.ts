@@ -251,7 +251,8 @@ export const DuelMode: ModeDefinition = (() => {
 
   function startRound(ctx: ModeContext): void {
     meState.resetRound(); foeState.resetRound();
-    player.root.position.set(0, 0, 2.4); rival.root.position.set(0, 0, -2.4);
+    // SHARED-PLACE-FLOOR (feet on floor): the round reset put both fighters at y 0 — 12 cm INSIDE the raised disc they spawn on
+    player.root.position.set(0, DISC_LIFT, 2.4); rival.root.position.set(0, DISC_LIFT, -2.4);
     player.root.rotation.y = Math.PI; rival.root.rotation.y = 0;
     meMove.vel.setAll(0); foeMove.vel.setAll(0);
     setPhase('fighting');

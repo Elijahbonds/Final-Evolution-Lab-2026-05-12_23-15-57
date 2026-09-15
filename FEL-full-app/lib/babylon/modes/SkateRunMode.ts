@@ -239,7 +239,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       const venue = readBoardVenue('skate');
       world = buildSkatepark(ctx.scene, venue);
       console.info(`[SKATE-VENUE] ${venue.name} · bound ${venue.bound} · ${venue.mood}`);
-      propsGone = false; void mountVenueProps(ctx.scene, 'skatepark').then((h) => { if (propsGone) h?.dispose(); else props = h; });
+      propsGone = false; void mountVenueProps(ctx.scene, 'skatepark', undefined, { spread: world.bound / 36 }).then((h) => { if (propsGone) h?.dispose(); else props = h; });
       // Gate 0: Validate skeletal rig by spawning placeholder to check skeleton
       const _validateChar = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, -1000, 0) });
       if (_validateChar.skeleton?.bones.length === 65) {

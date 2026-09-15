@@ -58,6 +58,19 @@ describe('venuePropSets', () => {
     expect(inside).toEqual([]);
   });
 
+  it('keeps the chase camera\'s own corridor clear — nothing between the camera and the player at the snap', () => {
+    // SHARED-PLACE-FLOOR: football's runner camera sits at (0, 3.2, −7.5) behind a runner at the origin; a gantry at
+    // z −6 and a barrier line at z −4 were the white slab across the bottom of every frame, and the play-area check
+    // above could not see it because the camera stands outside the play area by design.
+    const CAM: Record<string, { hx: number; z: [number, number] }> = { gridiron: { hx: 6, z: [-10, 0] } };
+    const blocking: string[] = [];
+    for (const [venue, c] of Object.entries(CAM)) for (const p of VENUE_PROP_SETS[venue]) {
+      const [x, , z] = p.at;
+      if (Math.abs(x) < c.hx && z > c.z[0] && z < c.z[1]) blocking.push(`${venue}: ${p.model} at ${x},${z}`);
+    }
+    expect(blocking).toEqual([]);
+  });
+
   it('covers every venue a mode mounts props for', () => {
     for (const k of ['venice-court', 'dojo', 'links', 'ballpark', 'stadium', 'gridiron', 'skatepark', 'slope', 'surf-break', 'gym']) {
       expect(VENUE_PROP_SETS[k]?.length, k).toBeGreaterThan(0);

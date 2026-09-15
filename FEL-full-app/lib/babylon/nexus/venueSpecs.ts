@@ -455,7 +455,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   derby: {
     modeId: 'derby', name: 'Derby', venue: 'Pro Diamond',
     environment: dusk('#8ED0F0', '#123A1E', '#1E5230', '#FFF0B8', 0.85),
-    ground: { kind: 'diamond', size: [70, 90], color: '#2F7A42', lineColor: '#E8D5A8', markings: 'none' },
+    ground: { kind: 'diamond', size: [70, 90], color: '#2F7A42', lineColor: '#E8D5A8', markings: 'diamond' },
     props: [
       { kind: 'crowdTier', position: [0, 0, 44], rotationY: Math.PI }, { kind: 'crowdTier', position: [-30, 0, 30], rotationY: Math.PI * 0.75 }, { kind: 'crowdTier', position: [30, 0, 30], rotationY: -Math.PI * 0.75 },
       { kind: 'lamp', position: [-28, 0, -20] }, { kind: 'lamp', position: [28, 0, -20] },
@@ -468,9 +468,9 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     modeId: 'penalty', name: 'Penalty', venue: 'Global Pitch',
     environment: dusk('#5BC0EB', '#0B3D2E', '#12513C', '#FFF6C8', 0.8),
     // the spot is the origin and the goal line sits at z 10.4 (the mode builds the goal)
-    ground: { kind: 'pitch', size: [50, 70], color: '#2E7D46', lineColor: '#FFFFFF', markings: 'none' },
+    ground: { kind: 'pitch', size: [50, 70], color: '#2E7D46', lineColor: '#FFFFFF', markings: 'penalty' },
     props: [
-      { kind: 'crowdTier', position: [0, 0, 24] }, { kind: 'crowdTier', position: [-26, 0, 6], rotationY: Math.PI / 2 }, { kind: 'crowdTier', position: [26, 0, 6], rotationY: -Math.PI / 2 },
+      { kind: 'crowdTier', position: [0, 0, 24], rotationY: Math.PI }, { kind: 'crowdTier', position: [-26, 0, 6], rotationY: Math.PI / 2 }, { kind: 'crowdTier', position: [26, 0, 6], rotationY: -Math.PI / 2 },
       { kind: 'lamp', position: [-22, 0, 16] }, { kind: 'lamp', position: [22, 0, 16] },
     ],
     actors: [],
@@ -565,7 +565,11 @@ const VENUE_MAP_KEYS: Record<string, string> = {
   // tennis: 'tennis-court',
   soccer: 'soccer-stadium',
   baseball: 'baseball-park',
-  golf: 'coastal-links', derby: 'baseball-park', penalty: 'soccer-stadium',   // golf_loop: no map — coastal-links is a ±15 m island, the course runs to z 39
+  // derby: NO map (SHARED-PLACE-FLOOR, 2026-09-14). The 'baseball-park' scan is a 22 m ballpark whose field is triangle
+  // soup with its texture smeared across it — the eye's "melted diamond" HARD — and it does not fit the game at all: the
+  // mode's batter stands at the origin, which is the scan's MOUND, and pitches come from z 18, off the scan entirely,
+  // across its home-plate stands. The same call tennis and karate made: the spec's own 70 × 90 field, painted as a diamond.
+  golf: 'coastal-links', penalty: 'soccer-stadium',   // golf_loop: no map — coastal-links is a ±15 m island, the course runs to z 39
   // karate: NO map (owner's Luma reference 2026-09-06, Shimogamo Jinja) — the baked dojo pavilion sat over the mat and roofed the
   // fight; the mat is open gravel now with the Meshy shrine standing behind it (prop set 'dojo').
   gymnastics: 'dojo',

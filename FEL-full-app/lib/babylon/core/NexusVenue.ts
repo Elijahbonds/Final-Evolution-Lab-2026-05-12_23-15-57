@@ -30,6 +30,7 @@ import { specFor } from '../nexus/venueSpecs';
 import { applyFloorDetail, applyFloorDetailToMesh } from '../visual/groundTextures';
 import { flattenMapBoxes, type FlattenBox } from '../visual/mapSurgery';
 import { applyLocation, COURT_LOCATIONS, isCourtLocationId } from '../nexus/courtLocations';
+import { fieldMaterial } from '../visual/PlacePack';
 
 export interface VenueHandle {
   /** Ship pass 4, phase 3: the walkable-area navmesh baked from this venue's map (null until loaded, or when the venue has no map). */
@@ -182,8 +183,19 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   //    white goal frame stands alone.
   //  · the venice courts need no box: their scan carries no mesh at all now (map-data meshDisabled) — its two 5.7 m walls
   //    of sideline clutter were the black slab on the right of the court, and its floor is painted over.
+  //  · SHARED-PLACE-FLOOR (2026-09-14): the scan's whole PITCH is the eye's "melted field" — triangle soup with the grass
+  //    texture smeared across it. The interior inside its stands (x ±8, z −9.3…11.5, measured top-down) goes under the
+  //    floor, and SCAN_FIELD_PAINT below lays a real pitch where it was. The goal blocks sit inside the same box.
   const MAP_FLATTEN: Record<string, FlattenBox[]> = {
-    penalty: [{ x: [-4.6, 4.6], z: [6.8, 12.0] }, { x: [-4.6, 4.6], z: [-12.0, -6.8] }],
+    penalty: [
+      { x: [-4.6, 4.6], z: [6.8, 12.0] }, { x: [-4.6, 4.6], z: [-12.0, -6.8] },
+      { x: [-8.1, 8.1], z: [-9.4, 11.6], yAbove: -3, floorY: -0.3 },
+    ],
+  };
+  // The painted field that replaces a flattened scan pitch: [width, depth] and centre in world metres, inside the scan's
+  // stands so it never slices a bottom row. Feet stand on it at y 0 (the scan floor measured −0.01 at the spot).
+  const SCAN_FIELD_PAINT: Record<string, { size: [number, number]; center: [number, number] }> = {
+    penalty: { size: [16.2, 21.0], center: [0, 1.1] },
   };
   const scanShiftZ = !location && spec.mapKey ? (MAP_SLIDE_Z[modeId] ?? 0) : 0;
   const flatten = !location && spec.mapKey ? MAP_FLATTEN[modeId] : undefined;
@@ -201,10 +213,33 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
     };
     settle();
   }
+  const fieldPaint = !location && spec.mapKey ? SCAN_FIELD_PAINT[modeId] : undefined;
+  if (fieldPaint) {
+    const plane = MeshBuilder.CreateGround('venue_field_paint', { width: fieldPaint.size[0], height: fieldPaint.size[1] }, ctx.scene);
+    plane.position.set(fieldPaint.center[0], 0, fieldPaint.center[1]);
+    plane.parent = built.root; plane.isPickable = true; plane.receiveShadows = true;
+    plane.material = fieldMaterial(ctx.scene, 'venue_field_paint_m', {
+      size: fieldPaint.size, center: fieldPaint.center, base: spec.ground.color,
+      marks: spec.ground.markings === 'diamond' || spec.ground.markings === 'penalty' ? spec.ground.markings : 'none',
+    });
+    applyFloorDetailToMesh(ctx.scene, plane, { kind: 'grass', blend: 0.35 }, fieldPaint.size);
+  }
   if (!location && /^basketball_/.test(modeId)) decorateVeniceBoardwalk(ctx.scene, built.root, scanShiftZ);   // owner 2026-09-05: the concept photo rebuilt as scenery
   void dressHoop(ctx.scene, built.root);   // owner 2026-09-05: the scanned Venice hoop stands in for the procedural one, every court, every location
   let props: VenuePropsHandle | null = null; let propsGone = false;
-  if (propSet) void mountVenueProps(ctx.scene, propSet, built.root).then((h) => { if (propsGone) h?.dispose(); else props = h; });
+  // HIDE THE STUBS WHEN THE KIT IS ON (SHARED-PLACE-FLOOR). A spec's 'palm' is a cylinder under a six-sided cone and its
+  // plain 'lamp' is a pole with a glowing ball; both were placeholders for exactly what the CC0 set stands around the same
+  // venue (real palms, real light masts), so a venue with a set drew both — a cone tree beside a palm. Only once the set
+  // has actually loaded, so a failed kit still leaves the venue its stubs. A COLOURED lamp is a stage light, not a stub.
+  const stubNodes = (): TransformNode[] => spec.props
+    .filter((p) => p.kind === 'palm' || (p.kind === 'lamp' && !p.color))
+    .map((p) => built.root.getChildTransformNodes(true).find((n) => n.name === `prop_${p.kind}_${p.position[0]}_${p.position[2]}`))
+    .filter((n): n is TransformNode => !!n);
+  if (propSet) void mountVenueProps(ctx.scene, propSet, built.root).then((h) => {
+    if (propsGone) { h?.dispose(); return; }
+    props = h;
+    if (h && h.count > 0) { const stubs = stubNodes(); for (const n of stubs) n.setEnabled(false); if (stubs.length) console.info(`[NEXUS] ${modeId}: ${stubs.length} placeholder palms/lamps hidden under the "${propSet}" kit`); }
+  });
 
   // M104: hand the shot back to the mode's follow-cam. The venue's ArcRotate
   // camera stays in the scene (its scenery is unaffected by which camera

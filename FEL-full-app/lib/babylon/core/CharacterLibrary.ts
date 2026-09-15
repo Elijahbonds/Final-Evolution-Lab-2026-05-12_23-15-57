@@ -310,8 +310,12 @@ export const CharacterLibrary = {
 
     // M69: sit the character ON the court — measure its true world-space lowest
     // point (skeleton-applied bounds) and lift the root by the difference.
-    // LAST step: the rest pose above affects the measured bounds. courtY = 0.
-    snapToGround(root, meshes, 0);
+    // LAST step: the rest pose above affects the measured bounds.
+    // SHARED-PLACE-FLOOR (feet on floor): the floor is WHERE THE MODE PUT THE BODY, not y 0. This snapped to 0 for every
+    // spawn, so a body placed on something raised was pulled down into it: the dancer spawned on the stage deck at 0.7
+    // stood 0.69 m inside the podium (the PLACE eye measured it), the derby pitcher sank into his mound (0.35), and both
+    // duelists stood in their 0.12 m disc. A court spawn passes y 0 and snaps exactly as before.
+    snapToGround(root, meshes, opts.position?.y ?? 0);
 
     attachContactShadow(scene, root);   // Pass 7 phase 8: a soft disc grounds the feet where the shadow map does not reach
     return spawned;

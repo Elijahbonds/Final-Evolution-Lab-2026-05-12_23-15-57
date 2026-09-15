@@ -105,16 +105,14 @@ return {
   async load(ctx: ModeContext): Promise<void> {
     reset();
 
-    VenueKit.buildPark(ctx.scene);
+    VenueKit.buildTrack(ctx.scene, RACE_DIST);   // SHARED-PLACE-FLOOR: a tartan straight, not the grey park slab
 
     // Lane markings down the straight so speed reads as motion rather than a
     // number changing in the corner.
     for (let m = 10; m < RACE_DIST; m += 10) {
       const tick = MeshBuilder.CreateBox(`lane_${m}`, { width: 3.2, height: 0.02, depth: 0.12 }, ctx.scene);
       tick.position.set(0, 0.011, -m);
-      const tm = new StandardMaterial(`laneMat_${m}`, ctx.scene);
-      tm.diffuseColor = Color3.FromHexString('#f4f1de');
-      tick.material = tm;
+      tick.material = VenueKit.paint(ctx.scene, `laneMat_${m}`, '#f4f1de', 0.1);   // PBR: a StandardMaterial tick clipped to white
     }
 
     finishLine = MeshBuilder.CreateBox('finish', { width: 4, height: 0.04, depth: 0.35 }, ctx.scene);

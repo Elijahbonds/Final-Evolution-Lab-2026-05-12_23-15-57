@@ -31,7 +31,7 @@ const KNOWN: Record<string, number> = {
   'BrainBrawlMode.ts': 3,
   'precisionModes.ts': 2,
   'aimSwingCore.ts': 2,
-  'SprintMode.ts': 2,
+  'SprintMode.ts': 1,
   'AeroAcesMode.ts': 2,
   'boardCore.ts': 1,
   'ShowdownMode.ts': 1,

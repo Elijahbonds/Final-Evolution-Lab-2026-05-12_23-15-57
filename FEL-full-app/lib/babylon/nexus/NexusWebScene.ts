@@ -30,6 +30,7 @@ import {
 } from '@babylonjs/core';
 import { PREMIUM_DRESSING } from './dressingFlags';   // M108 broadcast dressing (rollback flag)
 import { mountVenueMap } from '../visual/VenueMaps';
+import { buildCrowdStand, fieldMaterial } from '../visual/PlacePack';
 
 // ── spec ──────────────────────────────────────────────────────────────────
 
@@ -95,7 +96,7 @@ export interface GroundSpec {
   color: string;
   lineColor?: string;
   /** Painted into a DynamicTexture — no image files. */
-  markings?: 'basketball' | 'halfcourt' | 'tennis' | 'soccer' | 'volleyball' | 'ring' | 'none';
+  markings?: 'basketball' | 'halfcourt' | 'tennis' | 'soccer' | 'volleyball' | 'ring' | 'diamond' | 'penalty' | 'none';
   /**
    * [x, z] offset for the playing surface. Grounds are centred on the origin,
    * which assumes a mode plays symmetrically around it — and a HALF-court game
@@ -508,6 +509,17 @@ function buildGround(scene: Scene, g: GroundSpec, root: TransformNode): Mesh {
   // shell even though it carries no collision flag.
   mesh.isPickable = true;
 
+  // SHARED-PLACE-FLOOR: grass fields (pitch / diamond / green) are painted TURF — mown bands, mottle, wear — with their
+  // real markings in world metres. They were one flat colour plus a grain, which is what every greybox field read as.
+  const fieldKind = g.kind === 'pitch' || g.kind === 'diamond' || g.kind === 'green';
+  if (PREMIUM_DRESSING && fieldKind && (!g.markings || g.markings === 'none' || g.markings === 'diamond' || g.markings === 'penalty')) {
+    const fm = fieldMaterial(scene, 'nexus_groundMat', {
+      size: g.size, center: g.offset, base: g.color, marks: g.markings === 'diamond' || g.markings === 'penalty' ? g.markings : 'none',
+    });
+    fm.albedoTexture!.wrapU = Texture.CLAMP_ADDRESSMODE; fm.albedoTexture!.wrapV = Texture.CLAMP_ADDRESSMODE;
+    mesh.material = fm;
+    return mesh;
+  }
   const mat = surface(scene, 'nexus_groundMat', g.color, g.kind === 'water' ? 0.25 : 0.85);
   if (g.markings && g.markings !== 'none') {
     mat.albedoTexture = paintMarkings(scene, g.markings, g.color, g.lineColor ?? '#FFFFFF', g.size);
@@ -630,6 +642,13 @@ function buildProp(scene: Scene, p: PropSpec, root: TransformNode, shadows: Shad
       break;
     }
     case 'crowdTier': {
+      // SHARED-PLACE-FLOOR (2026-09-14): the shared PlacePack grandstand — one crowd texture across stepped rows of
+      // seated silhouettes. The three blocks below each repeated a 7-row dab texture on a 0.9 m face, which is why
+      // every spec stand (tennis, golf, derby, penalty, football, dance) read as a strip of static from the field.
+      if (PREMIUM_DRESSING) {
+        buildCrowdStand(scene, node, `stand_${at.x}_${at.z}`, { width: 22 * s, rows: 5, accent: p.color ?? '#ffd60a', seed: Math.round(at.x * 13 + at.z * 7) });
+        break;
+      }
       // Three stepped rows of blocks. Cheap, and at distance it reads as a
       // stand full of people far better than a flat painted plane does.
       const crowdTex = PREMIUM_DRESSING ? paintCrowd(scene, p.color ?? '#00E5FF') : null;
