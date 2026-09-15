@@ -246,9 +246,9 @@ export const OneVOneMode: ModeDefinition = (() => {
   let sprintWas = false;
   function answerSprint(ctx: ModeContext, sprint: boolean, moving: boolean): void {
     if (sprint && !sprintWas) {
+      // (sprint is the stick pushed past 0.85 — PlayerSlot — so the edge is a full push, not a button; only the empty tank needs words)
       if (turbo.t01 < 0.05) refuse(ctx, 'TURBO EMPTY');
       else if (!moving) refuse(ctx, 'TURBO NEEDS A DIRECTION');
-      else SoundKit.play('whoosh', { pitch: 1.3, volume: 0.25 });
     }
     sprintWas = sprint;
   }
@@ -616,6 +616,13 @@ export const OneVOneMode: ModeDefinition = (() => {
         SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
         // BIOMECH-HOOPS-WAVE1 G4: a jump outside the gather is a wasted one — say so (the whiffed reach already does)
         if (attacker.phase !== 'gather') bannerFlash(ctx, 'JUMPED EARLY — WAIT FOR THE GATHER', 600);
+      } else if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'X')) {
+        // MECHANICS PASS (2026-09-15): BLOCK and STEAL are defense verbs, and on offense (or mid-jump, or stunned) they did
+        // nothing and said nothing — 41 % of deliberate presses on the run-2 probe. Each is answered with why.
+        if (possession !== 'defense') refuse(ctx, e.btn === 'A' ? 'BLOCK IS FOR DEFENSE' : 'STEAL IS FOR DEFENSE');
+        else if (meStunSec > 0) refuse(ctx, 'STUNNED');
+        else if (e.btn === 'A' && myJumpAge !== Infinity) refuse(ctx, 'ALREADY UP');
+        else if (e.btn === 'X' && reachCooldown > 0) refuse(ctx, 'RECOVERING');
       }
     },
 

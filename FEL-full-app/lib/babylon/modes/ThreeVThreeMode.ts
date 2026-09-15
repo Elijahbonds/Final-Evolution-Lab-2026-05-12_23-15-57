@@ -59,6 +59,7 @@ import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biom
 import { flushThroughRim, clankOffRim } from '../anim/ballRig';
 import { syncedShotSpeed, RELEASE_FRAME_01 } from '../core/BallHandling';
 import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
+import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
@@ -267,6 +268,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   /** Bumped on every possession change; every timer that changes possession checks it (the 1v1's rule) — a stale
    *  setTimeout(resetPossession) from the rival's possession fired INTO my next one and teleported me mid-meter (measured). */
   let possessionToken = 0;
+  let shootPressWas = false;   // MECHANICS PASS: the SHOOT trigger's press edge
   // ── the DEFENSE contest package (D1–D3) ──
   let bumpAge = Infinity;                                  // D2: seconds since the last hard contact with the handler
   let meHandUp = false;                                    // D3: my grounded hand-up (X held)
@@ -508,7 +510,12 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         me.tree.beat('bball_block_reach');   // BIOMECH-HOOPS-WAVE1: the block reach (was jump_up → idle, two owners on the rig)
         SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
         if (driveK < 0.6) ctx.setHud({ banner: 'JUMPED EARLY — WAIT FOR THE RELEASE' }), setTimeout(() => ctx.setHud({ banner: '' }), 600);   // G4: a wasted jump says so
+      } else if (e.t === 'button' && e.btn === 'A' && e.pressed) {
+        refuse(ctx, carrierId !== 'foeTeam' ? 'BLOCK IS FOR DEFENSE' : 'ALREADY UP');   // MECHANICS PASS: the press is answered
+      } else if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5 && !shootPressWas && carrierId === 'foeTeam') {
+        refuse(ctx, 'SHOOT ON OFFENSE');
       }
+      if (e.t === 'trigger' && e.side === 'R') shootPressWas = e.value > 0.5;
     },
 
     update(ctx: ModeContext, dt: number) {
