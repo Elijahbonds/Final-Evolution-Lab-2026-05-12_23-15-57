@@ -1,6 +1,6 @@
 // DUNK-HANDS-RIM (2026-09-08): the pure hand + rim helpers the dunk mode writes onto the wrist reach, the ball and the hoop.
 import { describe, it, expect } from 'vitest';
-import { lagK, lagToward, lagArrivalSec, jamWeight, ironContact, hangHold, rimSpring, netSway, WRIST_LAG_TAU, JAM_RAMP_SEC, IRON_CONTACT_TIMEOUT_SEC, HANG_MAX_SEC, RIM_DIP_M, RIM_SPRING_SEC, NET_SQUASH, NET_SQUASH_SEC, NET_SWAY_SEC, NET_SWAY_RAD } from './DunkHands';
+import { lagK, lagToward, lagArrivalSec, jamWeight, jamRootStep, jamFollowExtra, JAM_IN_RADIAL, JAM_FOLLOW_EXTRA_MAX, ironContact, hangHold, rimSpring, netSway, WRIST_LAG_TAU, JAM_RAMP_SEC, IRON_CONTACT_TIMEOUT_SEC, HANG_MAX_SEC, RIM_DIP_M, RIM_SPRING_SEC, NET_SQUASH, NET_SQUASH_SEC, NET_SWAY_SEC, NET_SWAY_RAD } from './DunkHands';
 
 describe('H1 the wrist lag', () => {
   it('closes 63% of the gap in one τ, is frame-rate independent, and never overshoots', () => {
@@ -88,5 +88,24 @@ describe('RIM the net', () => {
     expect(Math.abs(netSway(NET_SQUASH_SEC + 0.1).sway)).toBeGreaterThan(0);   // still swaying after the squash is done
     expect(netSway(NET_SWAY_SEC)).toEqual({ squash: 1, sway: 0 }); expect(netSway(-1)).toEqual({ squash: 1, sway: 0 });
     expect(NET_SWAY_SEC).toBeGreaterThan(NET_SQUASH_SEC);
+  });
+  // DUNK-CAR-CLIP R2 (2026-09-14): an early buffered press resolves at the top of the arc; the jam brings the body DOWN onto the iron too
+  it('jamRootStep pulls a low body up and brings a high one down, the drop slower than the lift, never past the jam height', () => {
+    const dt = 1 / 60;
+    expect(jamRootStep(1.0, 1.15, dt, 0.08, 0.1)).toBeGreaterThan(1.0);
+    expect(jamRootStep(1.44, 1.15, dt, 0.08, 0.1)).toBeLessThan(1.44);
+    expect(jamRootStep(1.15, 1.15, dt, 0.08, 0.1)).toBe(1.15);
+    expect(1.15 - jamRootStep(1.0, 1.15, dt, 0.08, 0.1)).toBeLessThan(jamRootStep(1.30, 1.15, dt, 0.08, 0.1) - 1.15);   // same gap: the lift closes more of it
+    expect(jamRootStep(1.44, 1.15, 1, 0.08, 0.1)).toBe(1.15); expect(jamRootStep(0.5, 1.15, 1, 0.08, 0.1)).toBe(1.15);   // a long frame lands on it, not past
+    // the early press measured live: root 1.44 at the resolve; by the contact 0.07 s in, most of the 0.29 m drop is done
+    let y = 1.44; for (let t = 0; t < 0.07; t += dt) y = jamRootStep(y, 1.15, dt, 0.08, 0.1);
+    expect(y).toBeLessThan(1.35); expect(y).toBeGreaterThan(1.15);
+  });
+  it('jamFollowExtra carries the body in only by how far the ball is still outside the front lip, capped', () => {
+    expect(jamFollowExtra(0.20)).toBe(0); expect(jamFollowExtra(JAM_IN_RADIAL)).toBe(0);        // over the ring already: nothing changes
+    expect(JAM_IN_RADIAL).toBeGreaterThan(0.225); expect(JAM_IN_RADIAL).toBeLessThan(0.31);     // outside the ring, inside an on-time carry
+    expect(jamFollowExtra(0.36)).toBeCloseTo(0.09, 5);                                          // the late press measured live
+    expect(jamFollowExtra(1.5)).toBe(JAM_FOLLOW_EXTRA_MAX);                                     // nowhere near: never into the net
+    expect(JAM_FOLLOW_EXTRA_MAX).toBeLessThanOrEqual(0.12);
   });
 });

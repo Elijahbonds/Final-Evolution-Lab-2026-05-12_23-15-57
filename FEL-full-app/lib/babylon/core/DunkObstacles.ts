@@ -35,7 +35,9 @@ export interface ObstacleSpec {
 }
 
 export const OBSTACLE_SPECS: Record<ObstacleKind, ObstacleSpec> = {
-  car: { kind: 'car', label: 'CAR', source: { meshy: 'sedan' }, scale: 1, yaw: 0, zFromRim: 2.5, takeoffFromRim: 4.3, bonus: 3, topples: false, nominalHeight: 1.46, clearance: 0.1 },
+  // DUNK-CAR-CLIP: the car parks 2.4 m out, not 2.5 — the swing leg's toe grazed the near door by up to 7 mm for 3 frames at the
+  // takeoff (skinned mesh against the car mesh, probed at 4× time density); the run-up and the takeoff line are unchanged
+  car: { kind: 'car', label: 'CAR', source: { meshy: 'sedan' }, scale: 1, yaw: 0, zFromRim: 2.4, takeoffFromRim: 4.3, bonus: 3, topples: false, nominalHeight: 1.46, clearance: 0.1 },
   barrier: { kind: 'barrier', label: 'BARRIER', source: { kit: 'racing', model: 'barrierWhite' }, scale: 6, yaw: Math.PI / 2, zFromRim: 1.5, takeoffFromRim: 2.78, bonus: 1, topples: true, nominalHeight: 0.78, clearance: 0 },
   // the Kenney block is a 1 × 0.5 × 1 slab (measured): 1.2 wide × 2.4 tall makes the 1.2 m crate (a 2.4 cube caught the feet on its far face)
   crate: { kind: 'crate', label: 'CRATE', source: { kit: 'mini-arena', model: 'block' }, scale: 1.2, scaleY: 2.4, yaw: 0, zFromRim: 1.55, takeoffFromRim: 3.4, bonus: 2, topples: true, nominalHeight: 1.2, clearance: 0.05 },
@@ -70,6 +72,24 @@ export function clipsObstacle(profile: HeightProfile, feetY: number, x: number, 
 /** A box profile — the fallback when the model failed to load (the hitbox still matches what stands in for it). */
 export function boxProfile(centerZ: number, halfDepth: number, height: number, halfWidth: number): HeightProfile {
   return { z: [centerZ + halfDepth, centerZ + halfDepth * 0.999, centerZ - halfDepth * 0.999, centerZ - halfDepth], h: [0, height, height, 0], halfWidth };
+}
+
+/** DUNK-CAR-CLIP (2026-09-14): the side-on shot of a jump over an obstacle. Metres off the runway (negative = the −x side —
+ *  the rival waits at x +3.2, a metre off the car's bumper, and stood in the foreground of a +x shot), the lens height (under
+ *  the car's roof line, so the shoes clear it against the sky), where along the obstacle-middle → rim span it stands, the aim's
+ *  height over the dunker's root (low, so the car stays in the bottom of the frame as the body rises to the iron), and how far
+ *  before the near edge (runway side) it cuts. */
+export const PROP_CAM = { side: -8.0, y: 1.25, towardRim: 0.2, aimH: 0.4, lead: 0.6 } as const;
+
+/** Where the prop cam stands for an obstacle spanning `nearZ … farZ` in front of the rim. */
+export function propCamSpot(o: { nearZ: number; farZ: number }, rim: { x: number; z: number }, cam: typeof PROP_CAM = PROP_CAM): { x: number; y: number; z: number } {
+  const zc = (o.nearZ + o.farZ) / 2;
+  return { x: rim.x + cam.side, y: cam.y, z: zc + (rim.z - zc) * cam.towardRim };
+}
+
+/** The prop cam cuts in as the body comes within `lead` of the obstacle's near (runway-side) edge — before any of it is over. */
+export function propCutDue(rootZ: number, nearZ: number, lead: number = PROP_CAM.lead): boolean {
+  return rootZ <= nearZ + lead;
 }
 
 /** The next obstacle in the d-pad cycle. */

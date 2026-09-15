@@ -79,6 +79,25 @@ export function ironContact(i: IronContactInput): boolean {
   return (inRing || touching) && atHeight;
 }
 
+/** The body's height through the JAM, one frame: a root under `jamY` is pulled up onto the iron at `liftTau`; a root still ABOVE
+ *  it comes down onto the iron at `dropTau` (DUNK-CAR-CLIP R2: an early press the buffer fires at the window's open edge resolves
+ *  at the top of the arc, root 1.44 against 1.15 on time, and an up-only pull held the ball 0.33 m over the ring until the timeout
+ *  let it go 0.35 m off the iron). The same first-order step the mode always used, `min(1, dt / tau)` of the gap. */
+export function jamRootStep(y: number, jamY: number, dt: number, liftTau: number, dropTau: number): number {
+  const tau = y < jamY ? liftTau : dropTau;
+  return y + (jamY - y) * Math.min(1, tau > 0 ? dt / tau : 1);
+}
+
+/** How much further in (m) the jam's follow-through carries the body when the ball in the palm is still further out from the rim's
+ *  axis than `inRadial` (the ring's front lip, where a carry touches the iron). DUNK-CAR-CLIP R2: a LATE press's finish holds the
+ *  ball ~5 cm further out than an on-time one (0.36 m against 0.31) with the root on the same spot, missed the touch and let go on
+ *  the timeout with 6 cm of daylight to the iron; aimed at the on-time 0.31 the pull only crept toward it (0.33 at the timeout).
+ *  Capped, so a ball that is nowhere near never drags the body into the net. */
+export const JAM_IN_RADIAL = 0.27, JAM_FOLLOW_EXTRA_MAX = 0.12;
+export function jamFollowExtra(ballRadial: number, inRadial = JAM_IN_RADIAL, max = JAM_FOLLOW_EXTRA_MAX): number {
+  return Math.max(0, Math.min(max, ballRadial - inRadial));
+}
+
 /** Whether a rim hang keeps holding: SLAM still held and under the cap. */
 export function hangHold(slamHeld: boolean, hangSec: number, max = HANG_MAX_SEC): boolean {
   return slamHeld && hangSec < max;

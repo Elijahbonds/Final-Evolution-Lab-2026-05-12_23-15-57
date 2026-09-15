@@ -46,7 +46,7 @@ import { LEGS, legPose, easeLegPose, cloneLegPose, arcK, carryU, PLANT_SEC, WIND
 import { EASTBAY_TIMING as EB } from '../anim/authored/timing';
 import { EASTBAY_TIMING } from '../anim/authored/timing';
 import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';   // A+ P8 H1: the hang wrist reach
-import { lagToward, jamWeight, ironContact, hangHold, WRIST_LAG_TAU, HANG_MAX_SEC } from '../core/DunkHands';
+import { lagToward, jamWeight, ironContact, hangHold, jamRootStep, jamFollowExtra, WRIST_LAG_TAU, HANG_MAX_SEC } from '../core/DunkHands';
 import { startFlush, stepFlush, sweptTouch, clearOfIron, ringDistance, ringClearance, type FlushState } from '../core/RimFlush';   // DUNK-BALL-ARMS-RIM: the made ball over the lip, down the ring, out of the net   // DUNK-HANDS-RIM: the wrist lag, the jam, the iron contact, the hang
 import { hitStop as feelHitStop } from '../core/gameFeel';   // DUNK-HANDS-RIM H3: the mode's own clock stops on the iron too (the harness scales dt by it)
 import { chainRotation, frameAbove } from '../anim/TwoBoneIK';
@@ -65,7 +65,7 @@ import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
 import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, DOUBLE_UP_WINDOW_M, DOUBLE_UP_MIN_SPEED, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
-import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind } from '../core/DunkObstacles';
+import { OBSTACLE_SPECS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, type ObstacleKind } from '../core/DunkObstacles';
 import { runwayTrickById, DUNK_TRICKS, slamReadout, type SlamReadout } from '../core/DunkSystem';
 import { missBeat } from '../core/MissFlavour';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
@@ -324,7 +324,7 @@ export const DunkMode: ModeDefinition = (() => {
   // The follow-through + the pull-up: measured after the first pass (JAM_FOLLOW 0.2, no lift) the hand still stopped 0.33 m off
   // the iron at a full reach and a late press met the ring from 0.28 m UNDER it (root y 0.95). A dunker pulls himself up on the
   // iron: the root eases to JAM_Y (only ever up) and 0.3 m further in over the jam — from there the arm reaches the ring.
-  const JAM_FOLLOW_M = 0.3, JAM_FOLLOW_TAU = 0.07, JAM_Y = 1.15, JAM_LIFT_TAU = 0.08, JAM_Y_LEFT_EXTRA = 0.15;
+  const JAM_FOLLOW_M = 0.3, JAM_FOLLOW_TAU = 0.07, JAM_Y = 1.15, JAM_LIFT_TAU = 0.08, JAM_DROP_TAU = 0.1, JAM_Y_LEFT_EXTRA = 0.15;
   const RIM_RADIUS = 0.225;
   let airHeld = false;                        // H5: an aerial clip (finish / trick) holds its last frame until feet-down
   let landingClip: string = SPORT_CLIP.dunkLandCrouch;   // H5: the land clip feet-down plays (a make picks it from the score)
@@ -942,7 +942,22 @@ export const DunkMode: ModeDefinition = (() => {
         // snapTo, latched; the normal follow resumes on resolve.
         // DUNK-SOFTS-NAMED: a named air trick pulls the cut forward to its own first frame — the scorpion / hide & seek /
         // lost & found played their whole shape under the follow camera from behind and the cut arrived for the flush only
-        if (!rimCamCut && (clipTime >= EASTBAY_TIMING.extend * 0.55 || airTrick)) {
+        // DUNK-CAR-CLIP (2026-09-14): OVER AN OBSTACLE THE CUT IS A SIDE-ON PROP CAM, AND IT COMES AT THE NEAR EDGE.
+        //
+        // The rim cut below lands at clip 0.69; a car is a 4.3 m jump and the body is still over its roof then (measured:
+        // root z −7.92 against the car's −6.74 … −8.82). From the cut on, the car had 0 of 8 box corners on screen, and the
+        // clear call fires past the far edge at clip ~1.0 — so "OVER THE CAR!" always played over a shot of the rim with no
+        // car in it (the eye's HARD: the call with no car under the body). The rim cam also sat 0.5 m off the car's bumper.
+        // A car jump reads from the SIDE: the roof, the daylight under the shoes, the rim beyond. One fixed shot (PROP_CAM),
+        // cut as the body reaches the near edge, held through the flush (the aim tracks the dunker, pulled toward the rim).
+        if (!rimCamCut && obstacle && !obstacleClipped && propCutDue(player.root.position.z, obstacle.nearZ)) {
+          rimCamCut = true;
+          const spot = propCamSpot(obstacle, rim), at = new Vector3(spot.x, spot.y, spot.z);
+          console.info(`[DUNK-CAM] prop cut @${clipTime.toFixed(2)} (z ${player.root.position.z.toFixed(2)}, ${obstacle.spec.label} ${obstacle.nearZ.toFixed(2)} … ${obstacle.farZ.toFixed(2)}) from (${at.x.toFixed(1)}, ${at.y.toFixed(1)}, ${at.z.toFixed(1)})`);
+          ctx.camDirector.setFixed(at, PROP_CAM.aimH, true);
+          ctx.camDirector.update(player.root.position, Vector3.Zero(), rim);   // aim on the cut frame, not the next
+        }
+        if (!rimCamCut && !obstacle && (clipTime >= EASTBAY_TIMING.extend * 0.55 || airTrick)) {
           rimCamCut = true; console.info(`[DUNK-CAM] rim cut @${clipTime.toFixed(2)}`);
           // REVIEW F2 (2026-09-14): THE CUT HELD A POINT AND LET THE DUNKER LEAVE THE FRAME.
           //
@@ -1021,11 +1036,19 @@ export const DunkMode: ModeDefinition = (() => {
           if (jamSec >= 0 && !jamContact && !obstacleClipped) {
             jamSec += dt;
             if (!replaying) {
-              player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU);
+              // DUNK-CAR-CLIP R2: a ball still further out than an on-time carry (a late press's finish) carries the body that much further in
+              ball.computeWorldMatrix(true);
+              const jamExtra = jamFollowExtra(Math.hypot(ball.getAbsolutePosition().x - rim.x, ball.getAbsolutePosition().z - rim.z));
+              player.root.position.z += (rim.z + FLUSH_Z_AHEAD - JAM_FOLLOW_M - jamExtra - player.root.position.z) * Math.min(1, dt / JAM_FOLLOW_TAU);
               // the pull-up on the iron (never down); the LEFT-hand carry (the eastbay after its pass) pulls up further — the pass leaves
               // that palm facing down with the ball riding UNDER the wrist, 0.15 m lower than the right hand's palm-out carry
               const jamY = JAM_Y + (ebState.inLeftHand ? JAM_Y_LEFT_EXTRA : 0);
-              if (player.root.position.y < jamY) player.root.position.y += (jamY - player.root.position.y) * Math.min(1, dt / JAM_LIFT_TAU);
+              // DUNK-CAR-CLIP R2: …and a body still ABOVE the jam height comes DOWN onto the iron. An early press the buffer fired at
+              // the window's open edge (clip 1.11) resolves at the top of the arc — root 1.44 against 1.15 on time — and "never down"
+              // held the ball 0.33 m over the ring until the 0.28 s timeout let it go 0.35 m off the iron and the flush floated it in
+              // (the QA eye's "early windmill ≠ rim"). A slam comes down on the rim; the drop eases slower than the pull-up so it
+              // reads as the body dropping onto the iron, not a snap.
+              player.root.position.y = jamRootStep(player.root.position.y, jamY, dt, JAM_LIFT_TAU, JAM_DROP_TAU);
             }
             ball.computeWorldMatrix(true);
             const bp = ball.getAbsolutePosition();
@@ -1791,7 +1814,8 @@ export const DunkMode: ModeDefinition = (() => {
   }
   /** Dev probes (`__FEL_DEV__.dunkPosture`): the live window / stance / corrections, and an override to force a stance. */
   const postureDevHandle = {
-    get: () => ({ rim: { x: rim.x, y: rim.y, z: rim.z }, ballRadius: ballSim?.radius ?? 0.12, replayRider: replay?.riderName ?? '', replayRiderLocal: replay ? { x: replay.riderLocal.x, y: replay.riderLocal.y, z: replay.riderLocal.z } : null, handOff: !!activeHandOff, window: ppWindow, trick: ppTrick, pose: ppPose, legs: llPose, phase, clipTime, replaying, lob: { ...lob }, prop, glass: { ...glass }, dribble: dribble ? { active: dribble.active, phase: dribble.phase } : null, gather: gatherLatched, gatherK, finishRelease, jamSec, jamContact, hangOn, hangSec, handIkT, aimDeg: ppAim * 180 / Math.PI, chestYawDeg: ppChestYaw * 180 / Math.PI, clipHipYawDeg: ppClipHipYaw * 180 / Math.PI, headYawDeg: ppHeadYaw * 180 / Math.PI, headPitchDeg: ppHeadPitch * 180 / Math.PI, sign: ppSign, off: POSTURE_OFF }),
+    get: () => ({ rim: { x: rim.x, y: rim.y, z: rim.z }, ballRadius: ballSim?.radius ?? 0.12, replayRider: replay?.riderName ?? '', replayRiderLocal: replay ? { x: replay.riderLocal.x, y: replay.riderLocal.y, z: replay.riderLocal.z } : null, handOff: !!activeHandOff, window: ppWindow, trick: ppTrick, pose: ppPose, legs: llPose, phase, clipTime, replaying, lob: { ...lob }, prop, glass: { ...glass }, dribble: dribble ? { active: dribble.active, phase: dribble.phase } : null, gather: gatherLatched, gatherK, finishRelease, jamSec, jamContact, hangOn, hangSec, handIkT, aimDeg: ppAim * 180 / Math.PI, chestYawDeg: ppChestYaw * 180 / Math.PI, clipHipYawDeg: ppClipHipYaw * 180 / Math.PI, headYawDeg: ppHeadYaw * 180 / Math.PI, headPitchDeg: ppHeadPitch * 180 / Math.PI, sign: ppSign, off: POSTURE_OFF,
+      obstacle: obstacle ? { label: obstacle.spec.label, clearance: obstacle.spec.clearance, nearZ: obstacle.nearZ, farZ: obstacle.farZ, peak: obstacle.peak, profile: obstacle.profile } : null, obstacleOver, obstacleCleared, obstacleClipped, obstacleMargin: Number.isFinite(obstacleMargin) ? obstacleMargin : null, rimCamCut }),
     set override(p: PosturePose | null) { ppOverride = p; },
     get override(): PosturePose | null { return ppOverride; },
   };
