@@ -27,6 +27,7 @@ Source: the capture, sampling `__FEL_DEV__.anim()` (production-safe) at 10 Hz on
 - − T-arms: **1** per % of frames with both hands out wide at shoulder height
 - − awkward arms: **0.08** per % of frames the arms verdict fails its window (behind the body, over the head where the clip says they should not be)
 - − clip jitter: `max(0, top-clip changes per second − 2)`
+- − **wrong moves (recognisable)**: **1.5** per distinct request the session played with another sport's motion, capped at 4. The animator records every request an alias or the fallback answered (`stoodIn`, "requested→played") and `anim/recognisable.ts` judges it: a fighter strike (jab, hook, uppercut, roundhouse, high kick) outside a fight, a basketball jump shot outside hoops or a jump, or a resting loop (guard, walk, run) standing in for an action. The frame review's move sheets (`_move-sheet.mts`) are the eye half: a reviewer names each signature move from its stills.
 
 ### 4. Visuals: does it look good?
 Source: frame review of three captured frames per game (opening, mid-play, action). A reviewer scores five checks at 2 points each and records them in `scorecard-visual.json` with a one-line reason each:

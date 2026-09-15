@@ -35,7 +35,8 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { BeatOwner } from '../anim/beatOwner';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
-import { registerDanceClips, resolveDanceClip } from '../anim/danceClips';
+import { registerDanceClips, resolveDanceClip, danceRootTracks } from '../anim/danceClips';
+import { MoveRootLayer } from '../anim/MoveRootLayer';
 import { registerMirroredClips } from '../anim/mirrored-clips';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -311,6 +312,9 @@ export const DanceMode: ModeDefinition = (() => {
       // no longer depends on the alias chain — which silently shipped zero
       // mirrored groups until the _pN bone-suffix fix in boneLookup.ts.)
       registerMirroredClips(me.animator, ctx.scene, me.skeleton, [...registered]);
+      // the captured floor steps (windmill, six-step) turn the whole body over: their root tracks play on the hero root
+      const rootLayer = new MoveRootLayer(ctx.scene, me.root, me.skeleton, danceRootTracks(registered));
+      ctx.scene.onDisposeObservable.addOnce(() => rootLayer.dispose());
 
       ended = false; phase = 'pick'; pickSec = 0; stickLatch = false; currentClip = null; resultLatch = false;
 

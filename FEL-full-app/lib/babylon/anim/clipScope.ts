@@ -74,7 +74,7 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   dunkduel: { suites: ['dunk'], borrow: [] },
   onevone: HOOPS,
   threevthree: HOOPS,
-  threepoint: { suites: ['hoops'], borrow: ['karate_hit_react', 'football_juke_left'] },
+  threepoint: { suites: ['hoops'], borrow: ['karate_hit_react', 'football_juke_left', 'dunk_celebrate_big'] },   // the make's celebration
   carnival: { suites: ['hoops', 'dunk', 'board', 'combat', 'soccer'], borrow: [] },   // the hub rotates four sports' bursts
   karate: COMBAT, 'karate-vs': COMBAT, mixedcombat: COMBAT, showdown: COMBAT, duel: COMBAT,
   football: { suites: ['football'], borrow: ['karate_knockdown'] },   // a trucked defender goes down on the fighter's knockdown
@@ -140,12 +140,17 @@ export function scopeFallback(scope: ClipScope | null): string {
 // bodies), and every refused request. ModeHarness hands a read of it to the production probe handle, because the QA eye
 // runs on `next start` and the H1 grade was otherwise read off a truncated console line.
 
-export interface AnimLedgerEntry { scope: ClipScope | null; registered: Set<string>; refused: Map<string, number> }
+export interface AnimLedgerEntry {
+  scope: ClipScope | null; registered: Set<string>; refused: Map<string, number>;
+  /** RECOGNISABLE check (2026-09-15): every request a DIFFERENT clip played, as "requested→played" — a football stiff arm
+   *  played by the boxer's jab, a hoops celebration by the karate uppercut. The scorecard lists them per mode. */
+  stoodIn: Map<string, number>;
+}
 const ledgers = new WeakMap<Scene, AnimLedgerEntry>();
 
 export function ledgerFor(scene: Scene): AnimLedgerEntry {
   let e = ledgers.get(scene);
-  if (!e) { e = { scope: scopeForScene(scene), registered: new Set(), refused: new Map() }; ledgers.set(scene, e); }
+  if (!e) { e = { scope: scopeForScene(scene), registered: new Set(), refused: new Map(), stoodIn: new Map() }; ledgers.set(scene, e); }
   return e;
 }
 
@@ -157,6 +162,8 @@ export interface AnimReadout {
   /** Registered names outside core + the mode's suites + borrows. Must be []. */
   outOfScope: string[];
   refused: Record<string, number>;
+  /** "requested→played" for every request an alias (or the fallback) answered with another clip. */
+  stoodIn: Record<string, number>;
 }
 
 export function animReadout(scene: Scene): AnimReadout {
@@ -169,5 +176,6 @@ export function animReadout(scene: Scene): AnimReadout {
     registered,
     outOfScope: registered.filter((n) => !scopeAllows(e.scope, n)),
     refused: Object.fromEntries(e.refused),
+    stoodIn: Object.fromEntries(e.stoodIn),
   };
 }

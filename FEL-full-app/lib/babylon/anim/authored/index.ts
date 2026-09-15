@@ -15,7 +15,7 @@ import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebr
 import { buildSelfLob, buildBounceThrow, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch } from './dunkTricks';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
-import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdownSpike } from './football';
+import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdownSpike, buildStiffArm, buildQbThrow } from './football';
 import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge, buildCombatRoll, buildCombatJump } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
@@ -74,6 +74,8 @@ export function registerAuthoredClips(
     ['football_spin_move', () => buildSpinMove(scene, skeleton)],
     ['football_tackled_fall', () => buildTackledFall(scene, skeleton)],
     ['football_td_spike', () => buildTouchdownSpike(scene, skeleton)],   // SHARED-ANIM-BUS: the spike (was an alias onto the karate uppercut)
+    ['football_stiff_arm', () => buildStiffArm(scene, skeleton)],   // RECOGNISABLE: the locked shove (was an alias onto the jab)
+    ['football_throw', () => buildQbThrow(scene, skeleton)],        // RECOGNISABLE: the pass (the tree's throw played the jab)
     ['karate_hit_react', () => buildHitReact(scene, skeleton)],
     ['karate_knockdown', () => buildKnockdown(scene, skeleton)],
     // MODE-STICK-FACE family (2026-09-07): sport-correct loco — the carrier's tucked-ball run, the fighter's guard step

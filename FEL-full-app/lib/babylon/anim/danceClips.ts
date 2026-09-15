@@ -29,6 +29,9 @@
 
 import type { AnimationGroup, Scene, Skeleton } from '@babylonjs/core';
 import { buildPoseClip, type Deg3, type PoseKey } from './poseClip';
+import { MOCAP_STYLE_CLIPS } from './authored/mocapStyles';
+import { sampleRootTrack, type RootTrack } from './MoveRootLayer';
+import type { RootKey } from './mocapRetarget';
 type V3 = [number, number, number];
 
 /** If a procedural clip cannot be built, fall back to motion that definitely
@@ -182,6 +185,93 @@ const BUILDERS: Record<string, { keys: () => PoseKey[]; beats: number }> = {
   dance_bounce_shoulder: { keys: shoulderBop, beats: 4 },
 };
 
+/**
+ * CAPTURED STEPS (RECOGNISABLE, 2026-09-15). The power move and the six-step are floor work no pose-key set reads as:
+ * the procedural windmill was a crouch that turned its hips. The breaker vocabulary built for the capoeira style
+ * (authored/mocapStyles: CMU 90_34 windmill, 85_04 fancy footwork) plays them instead — the body keys ride inside the
+ * pelvis frame and the ROOT TRACK turns the whole body over (MoveRootLayer, which DanceMode mounts with
+ * `danceRootTracks`). A step whose capture cannot build still falls back to its procedural keys.
+ */
+export const DANCE_CAPTURES: Readonly<Record<string, string>> = {
+  dance_power_windmill: 'brk_windmill',
+  dance_footwork_six: 'brk_footwork',
+};
+
+/**
+ * The closed CYCLE inside a capture: the sub-window [i, j] (at least `minSec` long) whose end pose best matches its start —
+ * hands, feet, pelvis orientation and height — so the step can repeat with no snap at the seam. Pure.
+ */
+export function closedCycle(keys: readonly PoseKey[], root: readonly RootKey[], minSec = 0.5): { from: number; to: number; err: number } {
+  const track: RootTrack = { name: '', duration: 0, keys: root as RootKey[] };
+  const pt = (k: PoseKey): number[] => ['Left', 'Right'].flatMap((sd) => [...((k.hands as Record<string, V3> | undefined)?.[sd] ?? [0, 0, 0]), ...((k.feet as Record<string, V3> | undefined)?.[sd] ?? [0, 0, 0])]);
+  const rs = keys.map((k) => sampleRootTrack(track, k.t));
+  let best = { from: 0, to: keys.length - 1, err: Infinity };
+  for (let i = 0; i < keys.length; i++) {
+    const a = pt(keys[i]);
+    for (let j = i + 1; j < keys.length; j++) {
+      if (keys[j].t - keys[i].t < minSec) continue;
+      const b = pt(keys[j]);
+      let e = 0; for (let n = 0; n < a.length; n++) e += Math.abs(a[n] - b[n]);
+      const dot = Math.min(1, Math.abs(rs[i].q.x * rs[j].q.x + rs[i].q.y * rs[j].q.y + rs[i].q.z * rs[j].q.z + rs[i].q.w * rs[j].q.w));
+      e += 2 * Math.acos(dot) + Math.abs(rs[i].h - rs[j].h) * 2;
+      if (e < best.err) best = { from: i, to: j, err: e };
+    }
+  }
+  return best;
+}
+
+/**
+ * A captured step as the dance contract wants it: STANDING at 0, the capture's closed cycle dropped in over ¾ beat and
+ * repeated to fill the step (evenly re-timed, never more than a few percent), and back up to STANDING over the last
+ * beat — so a step that overruns its slot wraps on the standing groove like every procedural step. Body keys and the
+ * root track come out on one timeline. Pure.
+ */
+export function composeCapturedStep(id: string): { keys: PoseKey[]; root: RootKey[]; duration: number } | null {
+  const def = BUILDERS[id];
+  const cap = MOCAP_STYLE_CLIPS.find((x) => x.name === DANCE_CAPTURES[id]);
+  if (!def || !cap?.root?.length) return null;
+  const T = beats(def.beats), tIn = beats(0.75), tOut = T - beats(1);
+  const cyc = closedCycle(cap.keys, cap.root);
+  const src = cap.keys.slice(cyc.from, cyc.to + 1);
+  const t0 = src[0].t, len = src[src.length - 1].t - t0;
+  // the generated captures are time-compressed against their source (`source: 'cmu:90_34.bvh 2.35–4.45s'` in 1.1 s): repeat
+  // the cycle as often as fits the step at the CAPTURE'S REAL SPEED, so a windmill turns at a breaker's pace, not double time
+  const span = /([\d.]+)[–-]([\d.]+)s/.exec(cap.source);
+  const real = span ? (Number(span[2]) - Number(span[1])) / cap.duration : 1;
+  const reps = Math.max(1, Math.round((tOut - tIn) / (len * real)));
+  const scale = (tOut - tIn) / (reps * len);
+  const track: RootTrack = { name: id, duration: cap.duration, keys: cap.root };
+  const keys: PoseKey[] = [key(0, STAND)];
+  const root: RootKey[] = [[0, 0, 0, 0, 1, 0]];
+  for (let r = 0; r < reps; r++) {
+    src.forEach((k, n) => {
+      if (r > 0 && n === 0) return;                                   // the seam key is the previous cycle's last
+      const last = n === src.length - 1;
+      const base = last ? src[0] : k;                                // the cycle closes EXACTLY on its first pose
+      const t = tIn + (r * len + (k.t - t0)) * scale;
+      keys.push({ ...base, t });
+      const q = sampleRootTrack(track, base.t);
+      root.push([t, q.q.x, q.q.y, q.q.z, q.q.w, q.h]);
+    });
+  }
+  keys.push(key(T, STAND));
+  root.push([T, 0, 0, 0, 1, 0]);
+  return { keys, root, duration: T };
+}
+
+/** The root tracks for the captured steps registered on a rig, the mirrored `.M` step included (a sagittal reflection
+ *  of the pelvis orientation: x, −y, −z, w — the same reflection registerMirroredClips applies to the bones). */
+export function danceRootTracks(registeredIds: Iterable<string>): RootTrack[] {
+  const out: RootTrack[] = [];
+  for (const id of registeredIds) {
+    const c = composeCapturedStep(id);
+    if (!c) continue;
+    out.push({ name: id, duration: c.duration, keys: c.root });
+    out.push({ name: `${id}.M`, duration: c.duration, keys: c.root.map(([t, x, y, z, w, h]) => [t, x, -y, -z, w, h] as RootKey) });
+  }
+  return out;
+}
+
 /** The ids this file builds (the mode registers exactly these). */
 export const DANCE_CLIP_IDS = Object.keys(BUILDERS);
 
@@ -189,6 +279,15 @@ export const DANCE_CLIP_IDS = Object.keys(BUILDERS);
 export function buildDanceClip(scene: Scene, skeleton: Skeleton, id: string): AnimationGroup | null {
   const def = BUILDERS[id];
   if (!def) return null;
+  if (DANCE_CAPTURES[id]) {
+    try {
+      const c = composeCapturedStep(id);
+      const g = c ? buildPoseClip(scene, skeleton, id, c.duration, c.keys) : null;
+      if (g) return g;
+    } catch (e) {
+      console.warn(`[FEL-ANIM] danceClips: capture for "${id}" failed (${String(e).slice(0, 120)}) — procedural keys instead`);
+    }
+  }
   return buildPoseClip(scene, skeleton, id, beats(def.beats), def.keys());
 }
 

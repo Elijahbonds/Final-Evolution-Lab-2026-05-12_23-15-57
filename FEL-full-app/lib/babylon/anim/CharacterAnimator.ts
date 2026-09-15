@@ -88,6 +88,10 @@ export class CharacterAnimator {
     const r = resolveClip(name, this.clipNames);
     const next = this.groups.get(r.clip);
     if (!next) return null;                      // only possible with an empty library
+    if (!r.exact && r.clip.replace(/_c\d+$/, '') !== name) {   // an alias / the fallback answered: the recognisable ledger
+      const st = ledgerFor(this.scene).stoodIn, key = `${name}→${r.clip}`;
+      st.set(key, (st.get(key) ?? 0) + 1);
+    }
 
     const { loop = false, speedRatio = 1, fadeSec = 0.15, onEnd, restart = false } = opts;
     const finalSpeed = speedRatio * r.speedRatio;

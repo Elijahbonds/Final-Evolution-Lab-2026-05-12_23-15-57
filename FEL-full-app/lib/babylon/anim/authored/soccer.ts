@@ -40,22 +40,27 @@ export function buildKeeperSet(scene: Scene, sk: Skeleton): AnimationGroup | nul
   return buildPoseClip(scene, sk, 'keeper_set', D, [key(0, 30, -36, 50, -0.14), key(D / 2, 32, -40, 56, -0.17), key(D, 30, -36, 50, -0.14)]);
 }
 
-/** Dive to the keeper's right: full stretch, both hands out past the shoulder. */
+/** Dive to the keeper's right: OFF THE GROUND and FLAT OUT, both hands past the head, landing on the side.
+ *  RECOGNISABLE (2026-09-15): the first cut rolled the hips 55° with the feet still planted — a keeper leaning over, not
+ *  diving (the move sheet's stills). A dive is read by the body going HORIZONTAL in the air: the push leg drives, the
+ *  hips roll past 80° and lift, the arms reach beyond the head along the line, and the body comes down on its side. */
 export function buildKeeperDive(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'keeper_dive', 0.6, [
     { t: 0,    bones: { Hips: [0, 0, 0],  Spine: [30, 0, 0],  ...SET_LEGS(-36, 50) }, hands: SET_HANDS, hipsY: -0.14 },
-    // the body tips to the right (roll) and folds toward the ball
-    { t: 0.25, bones: { Hips: [0, 0, 25], Spine: [15, 0, 20], LeftUpLeg: [-60, 0, 10], RightUpLeg: [-10, 0, -10], LeftLeg: [60, 0, 0], RightLeg: [10, 0, 0] }, hands: { Right: [0.50, 1.15, 0.25], Left: [0.05, 1.20, 0.25] }, poles: { Left: [0.2, 0.6, -0.6] }, hipsY: -0.10 },
-    { t: 0.6,  bones: { Hips: [0, 0, 55], Spine: [5, 0, 30],  LeftUpLeg: [-20, 0, 0],  RightUpLeg: [0, 0, -6],    LeftLeg: [10, 0, 0], RightLeg: [4, 0, 0] },  hands: { Right: [0.62, 1.37, 0.21], Left: [0.38, 1.56, 0.26] }, poles: { Right: [0.3, -0.8, -0.4], Left: [0.2, 0.7, -0.6] }, hipsY: -0.30 },
+    // the push: the far (left) leg drives, the body starts over, the arms swing up toward the ball
+    { t: 0.14, bones: { Hips: [0, 0, 30], Spine: [12, 0, 18], LeftUpLeg: [-30, 0, 18], RightUpLeg: [-20, 0, -14], LeftLeg: [30, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.62, 1.40, 0.24], Left: [0.30, 1.52, 0.26] }, poles: { Right: [0.3, -0.8, -0.4], Left: [0.2, 0.7, -0.6] }, hipsY: -0.10 },
+    // FLIGHT: flat out in the air, hands past the head along the dive line, legs long
+    { t: 0.32, bones: { Hips: [0, 0, 84], Spine: [4, 0, 8],   LeftUpLeg: [-8, 0, 6],   RightUpLeg: [-14, 0, -4], LeftLeg: [12, 0, 0], RightLeg: [22, 0, 0] }, hands: { Right: [1.30, 0.98, 0.22], Left: [1.24, 1.12, 0.30] }, poles: { Right: [0.3, -0.9, -0.3], Left: [0.3, 0.9, -0.4] }, hipsY: -0.08 },
+    { t: 0.6,  ...STRETCH },   // (declared below; read when the clip is built)
   ]);
 }
 
-/** The dive's END pose — the keys the dive lands on, shared by the hold and the rise. */
+/** The dive's END pose — down on the side, flat, arms still reaching — shared by the hold and the rise. */
 const STRETCH = {
-  bones: { Hips: [0, 0, 55] as Deg3, Spine: [5, 0, 30] as Deg3, LeftUpLeg: [-20, 0, 0] as Deg3, RightUpLeg: [0, 0, -6] as Deg3, LeftLeg: [10, 0, 0] as Deg3, RightLeg: [4, 0, 0] as Deg3 },
-  hands: { Right: [0.62, 1.37, 0.21] as V3, Left: [0.38, 1.56, 0.26] as V3 },
-  poles: { Right: [0.3, -0.8, -0.4] as V3, Left: [0.2, 0.7, -0.6] as V3 },
-  hipsY: -0.30,
+  bones: { Hips: [0, 0, 86] as Deg3, Spine: [6, 0, 10] as Deg3, LeftUpLeg: [-14, 0, 6] as Deg3, RightUpLeg: [-26, 0, -4] as Deg3, LeftLeg: [18, 0, 0] as Deg3, RightLeg: [36, 0, 0] as Deg3 },
+  hands: { Right: [1.20, 0.18, 0.24] as V3, Left: [1.14, 0.32, 0.34] as V3 },
+  poles: { Right: [0.3, -0.9, -0.3] as V3, Left: [0.3, 0.9, -0.4] as V3 },
+  hipsY: -0.84,
 };
 
 /** The stretch HELD (ANIM-READABILITY net / precision, 2026-09-07): the dive used to run out 0.6 s after the press and
@@ -65,7 +70,7 @@ export function buildKeeperDiveHold(scene: Scene, sk: Skeleton): AnimationGroup 
   const T = 1.0;
   return buildPoseClip(scene, sk, 'keeper_dive_hold', T, [
     { t: 0, ...STRETCH },
-    { t: T / 2, ...STRETCH, bones: { ...STRETCH.bones, Spine: [7, 0, 32] }, hands: { Right: [0.63, 1.35, 0.22], Left: [0.39, 1.54, 0.27] }, hipsY: -0.31 },
+    { t: T / 2, ...STRETCH, bones: { ...STRETCH.bones, Spine: [8, 0, 12] }, hands: { Right: [1.21, 0.20, 0.25], Left: [1.15, 0.34, 0.35] }, hipsY: -0.83 },
     { t: T, ...STRETCH },
   ]);
 }
@@ -74,7 +79,7 @@ export function buildKeeperDiveHold(scene: Scene, sk: Skeleton): AnimationGroup 
 export function buildKeeperRise(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'keeper_rise', 0.5, [
     { t: 0, ...STRETCH },
-    { t: 0.28, bones: { Hips: [0, 0, 25], Spine: [15, 0, 20], LeftUpLeg: [-60, 0, 10], RightUpLeg: [-10, 0, -10], LeftLeg: [60, 0, 0], RightLeg: [10, 0, 0] }, hands: { Right: [0.50, 1.15, 0.25], Left: [0.05, 1.20, 0.25] }, poles: { Left: [0.2, 0.6, -0.6] }, hipsY: -0.10 },
+    { t: 0.28, bones: { Hips: [0, 0, 35], Spine: [24, 0, 16], LeftUpLeg: [-70, 0, 10], RightUpLeg: [-20, 0, -10], LeftLeg: [80, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.46, 0.70, 0.30], Left: [0.10, 0.96, 0.30] }, poles: { Left: [0.2, 0.6, -0.6] }, hipsY: -0.36 },   // pushed up off the ground onto a knee
     { t: 0.5, bones: { Hips: [0, 0, 0], Spine: [30, 0, 0], ...SET_LEGS(-36, 50) }, hands: SET_HANDS, hipsY: -0.14 },
   ]);
 }

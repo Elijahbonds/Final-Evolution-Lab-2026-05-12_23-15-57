@@ -87,3 +87,42 @@ export function buildTouchdownSpike(scene: Scene, sk: Skeleton): AnimationGroup 
     { t: 1.0,  bones: { Hips: [0, 0, 0],   Spine: [2, 0, 0],    Neck: [-4, 0, 0], ...legs(0) }, hands: { Right: [0.24, 0.96, 0.14], Left: [-0.22, 1.02, 0.12] }, hipsY: 0 },
   ]);
 }
+
+/**
+ * The STIFF ARM (RECOGNISABLE, 2026-09-15). `football_stiff_arm` only ever existed as an alias onto the fighter's `jab`, at
+ * 0.8×: a boxer's quick straight punch that came back to the chin. A stiff arm is the OFF arm driven out and LOCKED —
+ * palm into the tackler's chest, held — while the ball stays tucked and the carrier leans into the shove with the
+ * shoulder dipped. The hand's target sits past arm's reach so the solver straightens the elbow.
+ */
+export function buildStiffArm(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const lean = (k: number): Record<string, Deg3> => ({
+    Hips: [0, -8 * k, 0], Spine: [4 + 12 * k, -14 * k, -4 * k], Neck: [-4 - 6 * k, 8 * k, 0],
+    LeftUpLeg: [-14 - 16 * k, 0, 4], RightUpLeg: [-8 + 14 * k, 0, -4], LeftLeg: [16 + 14 * k, 0, 0], RightLeg: [12, 0, 0],
+  });
+  const shove = { Right: CARRY.Right, Left: [-0.30, 1.36, 0.60] as V3 };   // out past reach: the elbow locks
+  return buildPoseClip(scene, sk, 'football_stiff_arm', 0.55, [
+    { t: 0,    bones: lean(0),   hands: CARRY, hipsY: 0 },
+    { t: 0.12, bones: lean(1),   hands: shove, poles: { Left: [-0.8, -0.3, 0.1] }, hipsY: -0.06 },
+    { t: 0.38, bones: lean(1),   hands: { Right: CARRY.Right, Left: [-0.28, 1.34, 0.64] }, poles: { Left: [-0.8, -0.3, 0.1] }, hipsY: -0.06 },   // held into the tackler
+    { t: 0.55, bones: lean(0),   hands: CARRY, hipsY: 0 },
+  ]);
+}
+
+/**
+ * The QUARTERBACK THROW (RECOGNISABLE, 2026-09-15). The football tree's `throw` played the stiff arm — i.e. the jab. A pass
+ * is read by three shapes: the ball cocked BEHIND the ear with the front arm pointing downfield, the arm coming OVER THE
+ * TOP as the hips open, and the follow-through down across the body with the back foot trailing.
+ */
+export function buildQbThrow(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'football_throw', 0.8, [
+    // set: ball in both hands at the chest
+    { t: 0,    bones: { Hips: [0, 0, 0],   Spine: [6, 0, 0],    Neck: [-4, 0, 0], LeftUpLeg: [-10, 0, 4], RightUpLeg: [-10, 0, -4] }, hands: { Right: [0.10, 1.20, 0.26], Left: [-0.06, 1.18, 0.26] }, hipsY: 0 },
+    // cock: body closed (turned to the throwing side), ball back past the ear, the front arm points at the target
+    { t: 0.26, bones: { Hips: [0, 30, 0],  Spine: [-8, 24, 0],  Neck: [-6, -28, 0], LeftUpLeg: [-24, 0, 4], RightUpLeg: [8, 0, -4], LeftLeg: [10, 0, 0], RightLeg: [14, 0, 0] }, hands: { Right: [0.30, 1.56, -0.22], Left: [-0.30, 1.36, 0.46] }, poles: { Right: [0.9, -0.4, -0.2] }, hipsY: -0.04 },
+    // release: hips open through, the arm high over the top in front
+    { t: 0.42, bones: { Hips: [0, -18, 0], Spine: [12, -20, 0], Neck: [-8, 12, 0],  LeftUpLeg: [-32, 0, 4], RightUpLeg: [14, 0, -4], LeftLeg: [18, 0, 0], RightLeg: [10, 0, 0] }, hands: { Right: [0.16, 1.66, 0.46], Left: [-0.30, 1.02, 0.08] }, poles: { Right: [0.8, 0.2, -0.3] }, hipsY: -0.06 },
+    // follow-through: the throwing hand finishes down across to the opposite hip, chest over the front knee
+    { t: 0.62, bones: { Hips: [0, -30, 0], Spine: [26, -28, 0], Neck: [-14, 16, 0], LeftUpLeg: [-34, 0, 4], RightUpLeg: [22, 0, -4], LeftLeg: [22, 0, 0], RightLeg: [26, 0, 0] }, hands: { Right: [-0.14, 0.98, 0.36], Left: [-0.32, 0.96, -0.04] }, hipsY: -0.08 },
+    { t: 0.8,  bones: { Hips: [0, -10, 0], Spine: [8, -8, 0],   Neck: [-6, 4, 0],   LeftUpLeg: [-14, 0, 4], RightUpLeg: [2, 0, -4] }, hands: { Right: [0.18, 1.02, 0.20], Left: [-0.20, 1.02, 0.18] }, hipsY: 0 },
+  ]);
+}

@@ -27,15 +27,20 @@ export function buildTennisReady(scene: Scene, sk: Skeleton): AnimationGroup | n
   return buildPoseClip(scene, sk, 'tennis_ready', D, [key(0, 14, 34, -0.06), key(D / 2, 16, 40, -0.09), key(D, 14, 34, -0.06)]);
 }
 
-/** Forehand. */
+/** Forehand. RECOGNISABLE (2026-09-15): the stills showed a hand that hardly left the hip — the take-back sat at the
+ *  hip line and the finish at the chin. A forehand reads by the UNIT TURN (shoulders sideways, racket back past the
+ *  body, free arm across pointing at the ball), contact out in front at the waist, and a finish WRAPPED high over the
+ *  opposite shoulder with the chest facing the net and the back heel up. */
 export function buildTennisSwing(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'tennis_swing', 0.6, [
-    // take-back: racket behind the right hip, free arm pointing at the ball
-    { t: 0,   bones: { Hips: [0, -35, 0],  Spine: [12, -25, 0],  LeftUpLeg: [-18, 0, 12], RightUpLeg: [-24, 0, -12] }, hands: { Right: [0.40, 1.08, -0.29], Left: [0.10, 1.22, 0.42] }, poles: { Right: [0.8, -0.4, -0.4] }, hipsY: -0.06 },
-    // contact out front
-    { t: 0.3, bones: { Hips: [0, 10, 0], Spine: [14, 10, 0], LeftUpLeg: [-15, 0, 10], RightUpLeg: [-22, 0, -9] },  hands: { Right: [0.39, 1.12, 0.35], Left: [0.05, 1.05, 0.30] }, poles: { Right: [0.8, -0.5, 0.2] }, hipsY: -0.07 },
-    // wrap over the left shoulder, free hand tucked
-    { t: 0.6, bones: { Hips: [0, 45, 0], Spine: [10, 35, 0], LeftUpLeg: [-12, 0, 8],  RightUpLeg: [-20, 0, -6] },  hands: { Right: [-0.27, 1.56, 0.14], Left: [-0.05, 1.05, 0.25] }, poles: { Right: [-0.5, -0.6, -0.6] }, hipsY: -0.03 },
+    // unit turn: racket back past the right hip and up, free arm across the body pointing at the ball
+    { t: 0,    bones: { Hips: [0, -45, 0], Spine: [10, -35, 0], Neck: [0, 30, 0], LeftUpLeg: [-18, 0, 12], RightUpLeg: [-26, 0, -12], LeftLeg: [18, 0, 0], RightLeg: [30, 0, 0] }, hands: { Right: [0.46, 1.22, -0.46], Left: [0.26, 1.24, 0.46] }, poles: { Right: [0.8, -0.4, -0.4] }, hipsY: -0.08 },
+    // drop: the racket dips below the ball as the hips start round
+    { t: 0.18, bones: { Hips: [0, -20, 0], Spine: [14, -18, 0], Neck: [0, 16, 0], LeftUpLeg: [-18, 0, 12], RightUpLeg: [-24, 0, -10], LeftLeg: [20, 0, 0], RightLeg: [28, 0, 0] }, hands: { Right: [0.50, 0.90, -0.20], Left: [0.10, 1.14, 0.40] }, poles: { Right: [0.8, -0.5, -0.2] }, hipsY: -0.09 },
+    // contact out front at the waist
+    { t: 0.3,  bones: { Hips: [0, 14, 0], Spine: [14, 14, 0], Neck: [0, -8, 0], LeftUpLeg: [-15, 0, 10], RightUpLeg: [-18, 0, -9], LeftLeg: [16, 0, 0], RightLeg: [24, 0, 0] },  hands: { Right: [0.36, 1.06, 0.50], Left: [-0.06, 1.04, 0.30] }, poles: { Right: [0.8, -0.5, 0.2] }, hipsY: -0.07 },
+    // the wrap: racket high over the left shoulder, chest square to the net, back heel up
+    { t: 0.6,  bones: { Hips: [0, 50, 0], Spine: [8, 40, 0], Neck: [0, -20, 0], LeftUpLeg: [-12, 0, 8], RightUpLeg: [-8, 0, -6], LeftLeg: [10, 0, 0], RightLeg: [36, 0, 0], RightFoot: [-30, 0, 0] }, hands: { Right: [-0.34, 1.66, 0.04], Left: [-0.10, 1.10, 0.18] }, poles: { Right: [-0.5, -0.6, -0.6] }, hipsY: -0.03 },
   ]);
 }
 

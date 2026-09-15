@@ -52,7 +52,7 @@ const CLIP_FOR: Record<FootballAnimState, { clip: string; loop: boolean; fadeSec
   presnap_idle:    { clip: 'idle_stand', loop: true, fadeSec: 0.25 },
   snap:            { clip: 'idle_stand', loop: false, fadeSec: 0.1 },
   dropback:        { clip: 'walk_forward', loop: true, fadeSec: 0.15 },
-  throw:           { clip: 'football_stiff_arm', loop: false, fadeSec: 0.06 },
+  throw:           { clip: 'football_throw', loop: false, fadeSec: 0.06 },   // RECOGNISABLE: the pass (was the stiff arm = the jab)
   route_run:       { clip: 'football_carry_run', loop: true, fadeSec: 0.12 },   // BIOMECH-WAVE2 G2: the tucked-ball carry, not the free-arm sprint
   carry:           { clip: 'football_carry_run', loop: true, fadeSec: 0.1 },
   juke:            { clip: 'football_juke_left', loop: false, fadeSec: 0.06 },

@@ -45,6 +45,7 @@ export const REAL_CLIPS = new Set<string>([
   'karate_evade',   // KARATE-NEO-COOP (2026-09-07): the fighter's slip (the endless dodge)
   'karate_shuffle_left', 'karate_shuffle_right',   // BIOMECH-WAVE2 (2026-09-09): the lock-on strafe
   'karate_roll', 'karate_jump',   // 2026-09-14: combat had no roll and no jump in ANY of its four modes
+  'football_stiff_arm', 'football_throw',   // RECOGNISABLE (2026-09-15): authored (the stiff arm and the pass both played the jab)
   'football_carry_run',   // BIOMECH-WAVE2: authored (MODE-STICK-FACE) and registered on the animator, never listed — the football tree resolves it (same case as bball_follow_through)
   // the racket / club / net / keeper sports (anim/authored/{tennis,volleyball,golf,soccer}) — Phase 3, 2026-09-03; never
   // listed here (installSafePlay's clipNames check carried them). ANIM-READABILITY (net / precision, 2026-09-07) adds
@@ -116,7 +117,8 @@ export const SPORT_CLIP = {
   dunkFinishTomahawk: 'dunk_finish_tomahawk',
   dunkFinishBlown: 'dunk_finish_blown',
   dunkCelebrateBig: 'dunk_celebrate_big',
-  scoreCelebrate: 'uppercut',
+  scoreCelebrate: 'dunk_celebrate_big',   // RECOGNISABLE (2026-09-15): arms up for a make — was the karate uppercut (3PT, carnival)
+  buzzerSlap: 'uppercut',               // the quiz podium's buzz: a hand driven straight up IS the move there (party/Contestants)
   // M47 alley-oop prop — teammate toss/catch beat (mapped to real clips)
   teammateToss: 'jumpshot',            // arm-raise reads as a lob release
   teammateIdle: 'idle_stand',

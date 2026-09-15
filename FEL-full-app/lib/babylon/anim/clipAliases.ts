@@ -14,7 +14,7 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   sprint_forward: ['run', 1.4],
   jump_up: ['jumpshot', 1.1],
   jump_land: ['guard', 1.6],
-  fall_loop: ['guard', 0.6],
+  fall_loop: ['freerun_air_hold', 1.0],   // RECOGNISABLE (2026-09-15): a body in the air, not the karate guard
   strafe_left: ['walk', 1.1],
   strafe_right: ['walk', 1.1],
   // dunk
@@ -46,35 +46,35 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   karate_rush: ['jab', 1.0],
   karate_stagger: ['karate_hit_react', 0.7],   // REACTIVE ENEMIES: the reel falls back to a slow flinch
   karate_counter_throw: ['uppercut', 0.9],
-  karate_dodge_roll: ['guard', 1.3],
+  karate_dodge_roll: ['karate_roll', 1.0],   // RECOGNISABLE: the authored roll (was the guard)
   karate_hit_react: ['guard', 2.0],
   karate_knockdown: ['guard', 0.8],
   karate_victory_pose: ['dunk_celebrate_big', 1.0],   // ANIM-READABILITY (combat): arms overhead, not a slow uppercut
   // basketball
   bball_dribble_run: ['run', 0.9],
   bball_shoot_jumper: ['jumpshot', 1.0],
-  bball_score_celebrate: ['uppercut', 0.8],
+  bball_score_celebrate: ['dunk_celebrate_big', 1.0],   // RECOGNISABLE: arms up for a make (was the karate uppercut)
   bball_defend_stance: ['bball_defend_slide_left', 0.45],   // low, wide, slow sway
   // football
   football_sprint_return: ['run', 1.35],
   football_juke_left: ['walk', 1.8],
   football_juke_right: ['walk', 1.8],
   football_spin_move: ['roundhouse', 1.2],
-  football_stiff_arm: ['jab', 0.8],
+  // football_stiff_arm: authored (anim/authored/football) — was ['jab', 0.8]
   football_touchdown_spike: ['football_td_spike', 1.0],   // SHARED-ANIM-BUS: was the karate uppercut
   football_tackled_fall: ['guard', 1.2],
   // soccer
   soccer_dribble_jog: ['run', 0.85],
   soccer_kick_shoot: ['high_kick', 1.0],
-  soccer_kick_pass: ['high_kick', 1.3],
-  soccer_tackle_slide: ['guard', 1.2],
-  soccer_goal_celebrate: ['uppercut', 0.8],
-  soccer_header_jump: ['jumpshot', 1.1],
+  soccer_kick_pass: ['soccer_kick_shoot', 1.25],   // RECOGNISABLE: a kick through a ball (was the karate high kick)
+  soccer_tackle_slide: ['freerun_slide', 1.0],   // RECOGNISABLE: down on the hip (was the guard)
+  soccer_goal_celebrate: ['dunk_celebrate_big', 1.0],
+  soccer_header_jump: ['jump_up', 1.1],
   // golf / baseball
   golf_address_idle: ['guard', 0.5],
   golf_swing_full: ['hook', 0.7],
-  golf_putt_stroke: ['jab', 0.5],
-  golf_fist_pump: ['uppercut', 0.9],
+  golf_putt_stroke: ['golf_putt', 1.0],
+  golf_fist_pump: ['dunk_celebrate_big', 1.0],
   // SHARED-ANIM-BUS (2026-09-14): the bat names play the BAT clips (anim/authored/baseball) — they were the karate guard
   // and the karate hook, so any caller still using the old names swung a boxer's hook with a bat in its hand.
   baseball_bat_stance: ['baseball_stance', 1.0],
@@ -84,14 +84,14 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   // board sports
   skate_idle_cruise: ['guard', 0.5],
   skate_kickflip: ['high_kick', 1.2],
-  skate_heelflip: ['high_kick', 1.1],
-  skate_treflip: ['roundhouse', 1.1],
+  skate_heelflip: ['skate_kickflip', 1.0],   // RECOGNISABLE: the flip clip (the deck's direction is TrickPose's)
+  skate_treflip: ['skate_kickflip', 0.9],
   skate_bail: ['guard', 1.5],
   snow_carve_loop: ['guard', 0.5],
-  snow_jump: ['jumpshot', 1.0],
-  snow_grab: ['high_kick', 0.8],
+  snow_jump: ['board_air', 1.0],
+  snow_grab: ['board_grab', 1.0],
   surf_carve_loop: ['guard', 0.5],
-  surf_aerial: ['jumpshot', 0.9],
+  surf_aerial: ['board_air', 1.0],
   surf_tube_loop: ['guard', 0.4],
   // M39 shared board-core clips (skate/snowboard/surf ride on these five)
   board_ride_idle: ['guard', 0.6],
@@ -100,15 +100,15 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   board_grab: ['jumpshot', 0.4],
   board_grind: ['guard', 1.0],
   // M40 precision-sports clips (tennis / golf / baseball / soccer)
-  tennis_forehand: ['hook', 0.9],
+  tennis_forehand: ['tennis_swing', 1.0],   // RECOGNISABLE: the racket swing (was the boxer's hook)
   golf_address: ['guard', 0.5],
-  golf_drive_swing: ['hook', 0.7],
+  golf_drive_swing: ['golf_swing_full', 1.0],
   derby_bat_stance: ['baseball_stance', 1.0],
   derby_swing: ['baseball_swing', 1.0],
   derby_pitch: ['baseball_pitch_over', 1.0],
-  penalty_strike: ['high_kick', 1.0],
-  keeper_dive_left: ['roundhouse', 1.1],
-  keeper_dive_right: ['roundhouse', 1.1],
+  penalty_strike: ['soccer_kick_shoot', 1.0],
+  keeper_dive_left: ['keeper_dive.M', 1.0],   // RECOGNISABLE: the keeper's dive, the authored right dive mirrored (was a roundhouse kick)
+  keeper_dive_right: ['keeper_dive', 1.0],
 };
 
 export const FALLBACK_CLIP: [string, number] = ['guard', 0.6];

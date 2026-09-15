@@ -10,6 +10,7 @@
 //   scorecard/scorecard-visual.json  the frame review: { [slug]: { checks: [hero, venue, light, defects, hud] (0..2 each), notes } }
 // Writes scorecard/SCORECARD-<TAG>.md and scorecard/scorecard-<TAG>.json.
 import fs from 'node:fs';
+import { wrongMoves } from '../../lib/babylon/anim/recognisable';
 import { SCORE_ROUTES } from './_scorecard-routes.mts';
 
 const H = `${process.env.HOME}/Claude/outbox/finish-release`;
@@ -75,6 +76,12 @@ export function scoreGame(slug: string) {
     const tee = pc(b.tee); s -= tee; why.push(`${r1(tee)}% T-arms (−${r1(tee)})`);
     const awk = 0.08 * pc(b.awkward); s -= awk; why.push(`${r1(pc(b.awkward))}% awkward arms (−${r1(awk)})`);
     const perSec = b.clipChanges / Math.max(1, n / 10); const jit = Math.max(0, perSec - 2); s -= jit; why.push(`${r1(perSec)} clip changes/s (−${r1(jit)})`);
+    // RECOGNISABLE (owner 2026-09-15): a move played by another sport's motion (a throw by the jab, a dive by a roundhouse)
+    if (cap?.stoodIn) {
+      const wrong = wrongMoves(cap.stoodIn);
+      const pen = Math.min(4, 1.5 * wrong.length); s -= pen;
+      why.push(wrong.length ? `wrong moves: ${wrong.map((w) => `${w.requested}→${w.played}`).join(', ')} (−${r1(pen)})` : 'every move plays its own motion');
+    } else why.push('no stood-in ledger (capture predates the recognisable check)');
     out.body = { score: clamp(s), why };
   }
 

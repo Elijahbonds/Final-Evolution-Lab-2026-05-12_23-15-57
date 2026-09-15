@@ -11,7 +11,9 @@ import { boneNode } from '../boneLookup';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildHitReact, buildKnockdown, buildGuardStep, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
-import { buildDanceClip, DANCE_CLIP_IDS } from '../danceClips';
+import { buildDanceClip, DANCE_CLIP_IDS, DANCE_CAPTURES, danceRootTracks, closedCycle } from '../danceClips';
+import { sampleRootTrack } from '../MoveRootLayer';
+import { MOCAP_STYLE_CLIPS } from './mocapStyles';
 import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, buildBoardCarveRight } from './boardSuite';
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
@@ -192,12 +194,42 @@ describe('dance pack', () => {
   it('six-step, freeze and windmill drop to the floor with the hands planted, and rise before the wrap', () => {
     const stand = fresh(() => buildIdleStand(scene, sk)!); at(stand, 0); const standHips = hipsY();
     for (const [id, mid] of [['dance_footwork_six', 2.0], ['dance_freeze_baby', 0.5], ['dance_power_windmill', 2.0]] as const) {
+      if (DANCE_CAPTURES[id]) continue;   // a captured step carries its drop on the root track (next test)
       const g = build(id);
       at(g, mid); expect(hipsY(), `${id} low`).toBeLessThan(standHips - 0.4); expect(Math.min(pos('LeftHand').y, pos('RightHand').y), `${id} hands planted`).toBeLessThan(hipsY() - 0.2);
       at(g, g.to / 30 - 0.05); expect(hipsY(), `${id} rises before the wrap`).toBeGreaterThan(standHips - 0.2);
     }
-    const w = build('dance_power_windmill'); at(w, 1.1); const hx = pos('Head').x; at(w, 2.0); expect(Math.abs(pos('Head').x - hx) + Math.abs(pos('Head').z)).toBeGreaterThan(0.1);   // the hips turned
+    if (!DANCE_CAPTURES.dance_power_windmill) { const w = build('dance_power_windmill'); at(w, 1.1); const hx = pos('Head').x; at(w, 2.0); expect(Math.abs(pos('Head').x - hx) + Math.abs(pos('Head').z)).toBeGreaterThan(0.1); }   // the hips turned
     const f = build('dance_freeze_baby'); at(f, 0.5); expect(pos('LeftLeg').y).toBeGreaterThan(pos('RightLeg').y + 0.15);   // the left knee is the one driven up
+  });
+});
+
+describe('dance pack: captured steps (RECOGNISABLE, 2026-09-15)', () => {
+  it('each captured step loops a CLOSED cycle of its capture (the seam pose matches)', () => {
+    for (const [id, name] of Object.entries(DANCE_CAPTURES)) {
+      const cap = MOCAP_STYLE_CLIPS.find((c) => c.name === name)!;
+      const c = closedCycle(cap.keys, cap.root!);
+      expect(cap.keys[c.to].t - cap.keys[c.from].t, `${id} cycle length`).toBeGreaterThanOrEqual(0.5);
+      // hands + feet (12 coordinates, metres) + pelvis angle: under 2 is a pose a crossfade-free seam carries (the composer
+      // also forces the cycle's last key onto its first)
+      expect(c.err, `${id} seam error`).toBeLessThan(2);
+    }
+  });
+  it('the root track stands at both ends, goes down to the floor and turns the body over in between, mirrored for .M', () => {
+    const tracks = danceRootTracks(Object.keys(DANCE_CAPTURES));
+    for (const id of Object.keys(DANCE_CAPTURES)) {
+      const tr = tracks.find((x) => x.name === id)!, trM = tracks.find((x) => x.name === `${id}.M`)!;
+      expect(tr && trM, id).toBeTruthy();
+      const a = sampleRootTrack(tr, 0), z = sampleRootTrack(tr, tr.duration);
+      expect(Math.abs(a.h) + Math.abs(z.h), `${id} stands at the ends`).toBeLessThan(1e-6);
+      expect(a.q.w, `${id} upright at 0`).toBeCloseTo(1, 5);
+      let low = 0, tilt = 0;
+      for (let t = 0; t <= tr.duration; t += 0.05) { const r = sampleRootTrack(tr, t); low = Math.min(low, r.h); tilt = Math.max(tilt, 2 * Math.acos(Math.min(1, Math.abs(r.q.w))) * 180 / Math.PI); }
+      expect(low, `${id} goes down`).toBeLessThan(-0.3);
+      expect(tilt, `${id} turns over`).toBeGreaterThan(60);
+      const m = sampleRootTrack(trM, tr.duration / 2), o = sampleRootTrack(tr, tr.duration / 2);
+      expect(m.q.x).toBeCloseTo(o.q.x, 5); expect(m.q.y).toBeCloseTo(-o.q.y, 5); expect(m.h).toBeCloseTo(o.h, 5);
+    }
   });
 });
 

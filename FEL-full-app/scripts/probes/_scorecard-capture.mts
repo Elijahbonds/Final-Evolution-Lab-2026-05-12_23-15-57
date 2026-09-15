@@ -110,6 +110,8 @@ for (const [slug, path] of MODES) {
     if (!fs.existsSync(`${OUT}/${slug}-3-late.png`)) await p.screenshot({ path: `${OUT}/${slug}-3-late.png` });
     const body = await p.evaluate(() => { clearInterval((window as any).__BODYI); return (window as any).__BODY; });
     row.body = body;
+    // RECOGNISABLE: every request another clip answered this session ("requested→played"), scored by anim/recognisable
+    row.stoodIn = await p.evaluate(() => { const d = (window as any).__FEL_DEV__; const r = d && d.anim ? d.anim() : null; return r?.stoodIn ?? null; }).catch(() => null);
     const fps = (await p.evaluate(() => (window as any).__FPS)) as number[];
     const sorted = [...fps.slice(2)].sort((a, b) => a - b);
     row.fpsP50 = sorted.length ? sorted[Math.floor(sorted.length / 2)] : null; row.fpsP10 = sorted.length ? sorted[Math.floor(sorted.length * 0.1)] : null;

@@ -14,7 +14,7 @@
 // these two want exactly the same thing: one or two contestants at podiums, facing the stage, who react.
 //
 // THE CLIP VOCABULARY IS THE ONE THAT ALREADY EXISTS — no new authored animation:
-//   buzz    -> SPORT_CLIP.scoreCelebrate, which aliases `uppercut`: a hand that shoots straight up, which is
+//   buzz    -> SPORT_CLIP.buzzerSlap, the `uppercut`: a hand that shoots straight up, which is
 //              what slapping a buzzer looks like. This is a genuine fit rather than a stand-in.
 //   correct -> dunk_celebrate_big
 //   wrong   -> karate_hit_react, the flinch
@@ -101,7 +101,7 @@ export class Contestants {
    * a buzz-in game gave a spectator no way to see who buzzed.
    */
   buzz(i: number): void {
-    this.play(i, SPORT_CLIP.scoreCelebrate);
+    this.play(i, SPORT_CLIP.buzzerSlap);
   }
 
   /** The verdict on player `i`'s answer. */
