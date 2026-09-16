@@ -353,6 +353,20 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     if (body) attachBallToHand(ball, body.char.skeleton, 'RightHand');
   }
 
+  /**
+   * LEAVE THE FLOOR TO CONTEST. Returns true if the jump happened. One body, two callers: the raw A press and the
+   * slot's `jump` edge — see the note on `PlayerSlot.Intent.jump` for why the block needed a wire of its own.
+   */
+  function contestJump(ctx: ModeContext): boolean {
+    if (carrierId !== 'foeTeam' || myJumpAge !== Infinity) return false;
+    myJumpAge = 0;
+    me.tree.beat('bball_block_reach');   // BIOMECH-HOOPS-WAVE1: the block reach (was jump_up → idle, two owners on the rig)
+    SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
+    // G4: a wasted jump says so
+    if (driveK < 0.6) { ctx.setHud({ banner: 'JUMPED EARLY — WAIT FOR THE RELEASE' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+    return true;
+  }
+
   /** A possession-changing timer: only fires if the possession it was scheduled in is still the live one. */
   function later(ms: number, fn: () => void): void {
     const tok = possessionToken;
@@ -504,12 +518,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       SoundKit.unlock();
       localSource.feed(e);
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
-      // BLOCK jump while defending an opponent possession
-      if (carrierId === 'foeTeam' && e.t === 'button' && e.btn === 'A' && e.pressed && myJumpAge === Infinity) {
-        myJumpAge = 0;
-        me.tree.beat('bball_block_reach');   // BIOMECH-HOOPS-WAVE1: the block reach (was jump_up → idle, two owners on the rig)
-        SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
-        if (driveK < 0.6) ctx.setHud({ banner: 'JUMPED EARLY — WAIT FOR THE RELEASE' }), setTimeout(() => ctx.setHud({ banner: '' }), 600);   // G4: a wasted jump says so
+      // BLOCK jump while defending an opponent possession. The body lives in contestJump() so the slot can reach it
+      // too — 1v1 carries the same split, and the reason is written out there.
+      if (e.t === 'button' && e.btn === 'A' && e.pressed && contestJump(ctx)) {
+        /* jumped */
       } else if (e.t === 'button' && e.btn === 'A' && e.pressed) {
         refuse(ctx, carrierId !== 'foeTeam' ? 'BLOCK IS FOR DEFENSE' : 'ALREADY UP');   // MECHANICS PASS: the press is answered
       } else if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5 && !shootPressWas && carrierId === 'foeTeam') {
@@ -566,6 +578,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       }
       // D3: X HELD on defense = the grounded hand-up (verticality); D2: X pressed inside reach of the driver = the poke
       if (carrierId === 'foeTeam') {
+        if (me.slot.intent.jump) contestJump(ctx);   // the block on the same wire as the hand-up and the poke
         const wantHandUp = !!me.slot.intent.contest && myJumpAge === Infinity && !meFloored && meStunSec === 0;
         if (wantHandUp !== meHandUp) { meHandUp = wantHandUp; if (meHandUp) console.info('[3V3-DEF] hand up (me)'); else me.tree.releaseHold(); }
         if (meHandUp && !me.tree.busy) me.tree.hold('bball_hand_up', { fadeSec: 0.1 });
@@ -2241,7 +2254,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       later(1000, () => resetPossession(true));
       return;
     }
-    const nearestD = Math.min(...allyPositions().map((p) => Vector3.Distance(p, shooter.char.root.position)));
+    // distXZ: this is the contest that sets their make%, and the shooter is off the floor while it is read — a 3-D
+    // distance counted his rise as separation and quietly handed him an easier shot the higher he got (same fault as
+    // checkBlock, same fix).
+    const nearestD = Math.min(...allyPositions().map((p) => distXZ(p, shooter.char.root.position)));
     // D3: my grounded hand-up inside range, facing him, contests on top of the distance
     const ground = groundContest(distXZ(me.char.root.position, shooter.char.root.position), facingCos(me.char.root.rotation.y, me.char.root.position, shooter.char.root.position), meHandUp);
     const defenseFactor = Math.min(1, proximityContest01(nearestD) + ground);

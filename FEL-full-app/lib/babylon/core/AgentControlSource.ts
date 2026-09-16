@@ -80,7 +80,7 @@ export class AgentControlSource implements ControlSource {
     out.contest = src.contest ?? false;   // HOOPS-MOVE-KIT-A D3: the held hand-up contest
 
     // Edge fields: delivered on exactly one frame, matching LocalInputSource.
-    for (const key of ['action', 'pass', 'steal'] as const) {
+    for (const key of ['action', 'pass', 'steal', 'jump'] as const) {
       if (src[key] && !this.firedEdges.has(key)) { out[key] = true; this.firedEdges.add(key); }
     }
     if (src.strike && !this.firedEdges.has('strike')) {

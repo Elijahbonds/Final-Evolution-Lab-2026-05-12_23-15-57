@@ -609,15 +609,10 @@ export const OneVOneMode: ModeDefinition = (() => {
       SoundKit.unlock();
       localSource.feed(e);
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
-      // BLOCK / contest jump on defense: A leaves the floor. Time it on their GATHER and it erases the shot; jump at
-      // nothing and they drive past you while you land.
-      if (possession === 'defense' && e.t === 'button' && e.btn === 'A' && e.pressed && myJumpAge === Infinity && meStunSec === 0 && defPhase !== 'over') {
-        myJumpAge = 0;
-        meAnimTree.beat('bball_block_reach');
-        if (contact?.isReady) contact.hop('me', JUMP_VY);
-        SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
-        // BIOMECH-HOOPS-WAVE1 G4: a jump outside the gather is a wasted one — say so (the whiffed reach already does)
-        if (attacker.phase !== 'gather') bannerFlash(ctx, 'JUMPED EARLY — WAIT FOR THE GATHER', 600);
+      // BLOCK / contest jump on defense: A leaves the floor. The BODY of it now lives in contestJump(), because the
+      // same press also has to be reachable from the slot — see that function.
+      if (e.t === 'button' && e.btn === 'A' && e.pressed && contestJump(ctx)) {
+        /* jumped */
       } else if (e.t === 'button' && e.pressed && e.btn === 'L1') {
         // PHONE CONTROLS (rc8 check): BOX OUT / the planted foot is a held STANCE, and a tap of it had no answer unless a
         // rebound happened to be live. The stance going down is heard and named, once per press.
@@ -1190,6 +1185,9 @@ export const OneVOneMode: ModeDefinition = (() => {
         });
         const dist = Vector3.Distance(me.root.position, foe.root.position);
         // D3: X HELD = the grounded hand-up (verticality) — a hold the tree never interrupts; re-held after a reach beat
+        // …and the JUMP is the same read, one line down: the slot carries it now, so a pad, a phone, a network peer
+        // and the agent bridge all reach the block through one wire (PlayerSlot.Intent.jump).
+        if (intent.jump) contestJump(ctx);
         const wantHandUp = !!intent.contest && myJumpAge === Infinity && meStunSec === 0 && !meFloored && defPhase !== 'over';
         if (wantHandUp !== meHandUp) { meHandUp = wantHandUp; if (meHandUp) console.info('[1V1-DEF] hand up (me)'); else meAnimTree.releaseHold(); }
         if (meHandUp && !meAnimTree.busy) meAnimTree.hold('bball_hand_up', { fadeSec: 0.1 });
@@ -1343,6 +1341,29 @@ export const OneVOneMode: ModeDefinition = (() => {
     },
   };
 
+  /**
+   * LEAVE THE FLOOR TO CONTEST. Returns true if the jump actually happened.
+   *
+   * One body, two callers, and that is the whole point. It was inline in `onInput` reading the raw button stream,
+   * which meant the block was the ONE defensive verb that did not travel the slot — the slide, the stance, the
+   * box-out, the hand-up and the poke all read `meSlot.intent`. Invisible on a pad, because the pad feeds both
+   * paths; fatal to anything else, because this mode builds its slot as `agentCtl ?? localSource` and therefore
+   * bypasses local input entirely under the agent bridge. Measured before this existed: five defensive
+   * possessions, five buckets conceded, zero stops.
+   *
+   * Calling it twice in a frame is harmless — the `myJumpAge === Infinity` gate is the latch.
+   */
+  function contestJump(ctx: ModeContext): boolean {
+    if (possession !== 'defense' || myJumpAge !== Infinity || meStunSec > 0 || defPhase === 'over') return false;
+    myJumpAge = 0;
+    meAnimTree.beat('bball_block_reach');
+    if (contact?.isReady) contact.hop('me', JUMP_VY);
+    SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
+    // BIOMECH-HOOPS-WAVE1 G4: a jump outside the gather is a wasted one — say so (the whiffed reach already does)
+    if (attacker.phase !== 'gather') bannerFlash(ctx, 'JUMPED EARLY — WAIT FOR THE GATHER', 600);
+    return true;
+  }
+
   /** THEIR possession: the check. The rival checks up beyond the arc, I set inside him, the drive starts after
    *  CHECK_HOLD_SEC. No timer decides the release — the AttackerBrain reads my body. */
   function startDefense(ctx: ModeContext, banner: string): void {
@@ -1382,7 +1403,9 @@ export const OneVOneMode: ModeDefinition = (() => {
     // BLOCK check — a timed jump in range erases it. A jumper needs the blocker INSIDE the step-back (1.2 m — from further
     // out a hand up is a contest, below); a layup at the rim can be chased down from BLOCK_RANGE.
     const blockRange = style === 'jumper' ? 1.2 : BLOCK_RANGE;
-    if (checkBlock(me.root.position, foe.root.position, myJumpAge) && Vector3.Distance(me.root.position, foe.root.position) <= blockRange) {
+    // distXZ, not Vector3.Distance: a blocker is in the AIR by definition here, and counting his height as distance
+    // from the shooter is what made a well-timed jumper block fail (see checkBlock).
+    if (checkBlock(me.root.position, foe.root.position, myJumpAge) && distXZ(me.root.position, foe.root.position) <= blockRange) {
       SoundKit.play('impact', { pitch: 0.7, volume: 0.6 });
       SoundKit.play('crowdCheer', { volume: 0.6 });
       ctx.feel?.impact?.(0.5);

@@ -771,11 +771,17 @@ export const DUNK_MIN_TURBO = 0.25;
 /** Attacking the rim at speed with turbo converts the attempt to a dunk;
  *  a defender parked inside the drive line makes it a posterize attempt. */
 export function checkDriveDunk(shooter: Vector3, vel: Vector3, hoop: Vector3, turbo01: number, defender: Vector3 | null): DriveDunkKind {
-  const dist = Vector3.Distance(shooter, hoop);
+  // PLANAR, like classifyShot above, and for the same reason. This measured a 3-D distance, which made the gate
+  // depend on how high off the floor the two points were: hand a caller a real rim (y 3.05) and 2.8 m of range is
+  // imaginary, so the dunk could never fire — the bug A+ P0 worked around by passing RIM_FLOOR from both modes
+  // instead of fixing it here. That left the same trap armed for the next caller, and it ALSO cost the live modes a
+  // dunk at the worst moment: the shooter's own y climbs as he gathers, so a drive that qualified on the floor could
+  // fall out of range in the air, which is exactly when the gate is read.
+  const dist = distXZ(shooter, hoop);
   if (dist > DUNK_RANGE || vel.length() < DUNK_MIN_SPEED || turbo01 < DUNK_MIN_TURBO) return 'none';
   const toHoop = hoop.subtract(shooter); toHoop.y = 0;
   if (Vector3.Dot(vel, toHoop) <= 0) return 'none';                 // must be attacking, not retreating
-  if (defender && Vector3.Distance(defender, shooter) < 1.5) return 'poster';
+  if (defender && distXZ(defender, shooter) < 1.5) return 'poster';
   return 'dunk';
 }
 export const DUNK_PCT: Record<Exclude<DriveDunkKind, 'none'>, number> = { dunk: 0.92, poster: 0.78 };
@@ -787,7 +793,11 @@ export const BLOCK_WINDOW_SEC = 0.4;
  *  within the window before the release. `jumpAgeSec` = time since the
  *  blocker left the floor (Infinity = never jumped). */
 export function checkBlock(blocker: Vector3, shooter: Vector3, jumpAgeSec: number): boolean {
-  return jumpAgeSec <= BLOCK_WINDOW_SEC && Vector3.Distance(blocker, shooter) <= BLOCK_RANGE;
+  // PLANAR, and this one was not merely latent — it was self-defeating. Both roots are physics bodies, so a blocker
+  // who LEAVES THE FLOOR (which is the only way to satisfy `jumpAgeSec`) rises most of a metre, and a 3-D distance
+  // counted that rise as separation: at 1.2 m of floor gap and 0.7 m of height the check measured 1.39 m and refused
+  // a block the player had timed correctly. Jumping made you worse at blocking. Only the floor gap is the contest.
+  return jumpAgeSec <= BLOCK_WINDOW_SEC && distXZ(blocker, shooter) <= BLOCK_RANGE;
 }
 
 // ── Depth pass: the steal is a read, not a dice roll ─────────────────────

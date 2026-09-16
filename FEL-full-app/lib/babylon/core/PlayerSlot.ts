@@ -29,6 +29,24 @@ export interface Intent {
   /** HOOPS-MOVE-KIT-B M12: R1 held — use the GLASS (an intentional bank inside the band). */
   glass?: boolean;
   /**
+   * A LEAVES THE FLOOR — the contest jump / block. Edge-detected, like `steal`.
+   *
+   * Added in the 1v1 + 3v3 ten-phase pass (2026-09-16), and the reason is worth keeping. EVERY other thing a
+   * defender does in those two modes reads this Intent: the slide, the stance, the box-out, the hand-up, the
+   * poke. The block alone was read straight off the raw button stream inside each mode's `onInput`. That is
+   * invisible to a human, because the pad feeds both paths — but the slot is the seam every NON-pad driver
+   * arrives on, and those modes build their slot as
+   *
+   *     meSlot = new PlayerSlot('me', agentCtl ?? localSource, true);
+   *
+   * so under the agent bridge local input is bypassed BY DESIGN and the block was unreachable. Measured on the
+   * bridge-driven lab before this field existed: five defensive possessions, five scores conceded, ZERO stops —
+   * not because the defence is hard, but because its only shot-stopping verb had no wire to pull.
+   *
+   * Optional: a mode with no jump simply never reads it.
+   */
+  jump?: boolean;
+  /**
    * The pass button HELD past a tap — sell the pass without throwing it (owner, 2026-09-13).
    *
    * Mirrors `contest`, which is the same idea on the steal button: a tap is the thing, a hold is the other
@@ -58,7 +76,7 @@ export const CONTEST_HOLD_MS = 150;
 export class LocalInputSource implements ControlSource {
   private moveX = 0; private moveY = 0;
   private actionDown = false; private actionEdge = false; private held = 0;
-  private passEdge = false; private stealEdge = false;
+  private passEdge = false; private stealEdge = false; private jumpEdge = false;
   // HOOPS-MOVE-KIT-B (2026-09-08): the two sources of BRACE are latched SEPARATELY. InputBus emits the L trigger's value
   // every frame while a pad is adopted (a resting trigger is a real 0), and L1 is emitted only on its transitions — so one
   // shared `braceHeld` meant the trigger's per-frame 0 wiped the held L1 on the very next frame. On a pad, holding L1 did
@@ -104,6 +122,7 @@ export class LocalInputSource implements ControlSource {
     if (e.t === 'button' && e.btn === 'R1') this.glassHeld = e.pressed;
     if (e.t === 'button' && e.pressed && e.btn === 'B') { this.passEdge = true; this.passDownAt = performance.now(); }
     if (e.t === 'button' && !e.pressed && e.btn === 'B') this.passDownAt = -1;
+    if (e.t === 'button' && e.pressed && e.btn === 'A') this.jumpEdge = true;   // the contest jump / block
     if (e.t === 'button' && e.pressed && e.btn === 'X') { this.stealEdge = true; this.stealDownAt = performance.now(); }
     if (e.t === 'button' && !e.pressed && e.btn === 'X') this.stealDownAt = -1;
   }
@@ -113,13 +132,13 @@ export class LocalInputSource implements ControlSource {
       moveX: this.moveX, moveY: this.moveY,
       sprint: Math.hypot(this.moveX, this.moveY) > 0.85,
       action: this.actionEdge, actionHeld: this.held,
-      pass: this.passEdge, steal: this.stealEdge,
+      pass: this.passEdge, steal: this.stealEdge, jump: this.jumpEdge,
       brace: this.braceTrigger || this.braceButton,
       glass: this.glassHeld,
       contest: this.stealDownAt >= 0 && performance.now() - this.stealDownAt >= CONTEST_HOLD_MS,
       passFake: this.passDownAt >= 0 && performance.now() - this.passDownAt >= PASS_FAKE_HOLD_MS,
     };
-    this.actionEdge = false; this.passEdge = false; this.stealEdge = false;
+    this.actionEdge = false; this.passEdge = false; this.stealEdge = false; this.jumpEdge = false;
     return out;
   }
 }

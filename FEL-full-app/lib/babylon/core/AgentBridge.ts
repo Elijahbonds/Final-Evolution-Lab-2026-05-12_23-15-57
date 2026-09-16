@@ -130,6 +130,8 @@ class Bridge {
         { name: 'dunk',   args: '{ms?}',                   description: 'Drive + slam. Needs turbo and rim proximity.' },
         { name: 'pass',   args: '{}',                      description: 'Pass to the open teammate.' },
         { name: 'steal',  args: '{}',                      description: 'Defensive poke.' },
+        { name: 'block',  args: '{}',                      description: 'Leave the floor to contest. Time it on their gather.' },
+        { name: 'contest', args: '{ms?}',                  description: 'Grounded hand-up — verticality, no jump.' },
         { name: 'strike', args: '{which:jab|hook|uppercut|high_kick|roundhouse}', description: 'Karate attack.' },
         { name: 'guard',  args: '{ms?}',                   description: 'Hold the karate guard stance.' },
         { name: 'idle',   args: '{ms?}',                   description: 'Neutral — release every input.' },
@@ -247,6 +249,11 @@ class Bridge {
         return true;
       case 'pass':  await this.act({ pass: true }, 80); return true;
       case 'steal': await this.act({ steal: true }, 80); return true;
+      // THE TWO WAYS TO CONTEST A SHOT, which an agent had no way to express until the slot carried `jump`
+      // (PlayerSlot.Intent). `block` leaves the floor and is timed on the attacker's gather; `contest` is the
+      // grounded hand-up, held, and costs nothing if you are wrong.
+      case 'block': await this.act({ jump: true }, 80); return true;
+      case 'contest': await this.act({ contest: true }, ms); return true;
       case 'guard': await this.act({ guard: true }, ms); return true;
       case 'strike': await this.act({ strike: String(opts.which ?? 'jab') }, 120); return true;
       default:
