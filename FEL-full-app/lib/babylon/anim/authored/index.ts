@@ -12,6 +12,7 @@ import { buildEastbay } from './eastbay';
 import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from './dunkSuite';
 import { buildMocapDunk } from './mocapDunk';
 import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig } from './dunkFinishes';
+import { buildStackBase, buildStackRider } from './stackProp';
 import { buildSelfLob, buildBounceThrow, buildKickUp, buildBackHandspring, buildBackflip, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch } from './dunkTricks';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
@@ -62,6 +63,8 @@ export function registerAuthoredClips(
     ['dunk_kick_up', () => buildKickUp(scene, skeleton)],
     ['dunk_back_handspring', () => buildBackHandspring(scene, skeleton)],
     ['dunk_backflip', () => buildBackflip(scene, skeleton)],
+    ['prop_stack_base', () => buildStackBase(scene, skeleton)],
+    ['prop_stack_rider', () => buildStackRider(scene, skeleton)],
     ['dunk_double_up', () => buildDoubleUp(scene, skeleton)],
     ['dunk_scorpion', () => buildScorpion(scene, skeleton)],
     ['dunk_lost_found', () => buildLostFound(scene, skeleton)],

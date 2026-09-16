@@ -8,14 +8,15 @@
 // The car parks sideways under the rim's shadow, so the runway crosses its width; the takeoff line moves back for it
 // (a real over-the-car dunk is a long jump) and the flight's forward carry lands the dunker past the far door.
 
-export type ObstacleKind = 'car' | 'barrier' | 'crate';
-export const OBSTACLE_KINDS: ObstacleKind[] = ['car', 'barrier', 'crate'];
+export type ObstacleKind = 'car' | 'barrier' | 'crate' | 'tetris';
+export const OBSTACLE_KINDS: ObstacleKind[] = ['car', 'barrier', 'crate', 'tetris'];
 
 export interface ObstacleSpec {
   kind: ObstacleKind;
   label: string;
-  /** Where the model comes from: the owner's Meshy bakes or a Kenney kit (public/models/props/<kit>/<model>.glb). */
-  source: { meshy: 'sedan' } | { kit: string; model: string };
+  /** Where the model comes from: the owner's Meshy bakes, a Kenney kit (public/models/props/<kit>/<model>.glb), or
+   *  BODIES — two of the game's own characters, stacked (the TETRIS). */
+  source: { meshy: 'sedan' } | { kit: string; model: string } | { bodies: 'stack' };
   scale: number;
   /** A vertical scale on top of `scale` (the Kenney block is a 1 × 0.5 × 1 slab — 2.4 makes it a 1.2 m crate). */
   scaleY?: number;
@@ -41,6 +42,15 @@ export const OBSTACLE_SPECS: Record<ObstacleKind, ObstacleSpec> = {
   barrier: { kind: 'barrier', label: 'BARRIER', source: { kit: 'racing', model: 'barrierWhite' }, scale: 6, yaw: Math.PI / 2, zFromRim: 1.5, takeoffFromRim: 2.78, bonus: 1, topples: true, nominalHeight: 0.78, clearance: 0 },
   // the Kenney block is a 1 × 0.5 × 1 slab (measured): 1.2 wide × 2.4 tall makes the 1.2 m crate (a 2.4 cube caught the feet on its far face)
   crate: { kind: 'crate', label: 'CRATE', source: { kit: 'mini-arena', model: 'block' }, scale: 1.2, scaleY: 2.4, yaw: 0, zFromRim: 1.55, takeoffFromRim: 3.4, bonus: 2, topples: true, nominalHeight: 1.2, clearance: 0.05 },
+  // THE TETRIS (owner, 2026-09-16: "jumping over 2 people stacked sitting on the others shoulders"). Two of the game's
+  // own bodies, the rider seated on the base's shoulders — the pieces stacked, which is where the name comes from.
+  //
+  // THE HITBOX IS THEIR LAP, NOT THEIR HEADS, and it has to be: the rider's head is 2.3 m up and the dunker's apex is
+  // 1.84 off a full charge, so a hitbox at the top of the stack is a dunk nobody in the game can do. A real one goes
+  // over the seated man's legs while he leans away from you — so the profile tops out at 1.75 (the highest thing the
+  // feet must actually clear) and the rider DUCKS as you come, which is both the truth and the reason it is clearable.
+  // The hardest obstacle on the card: the longest take-off and the biggest bonus.
+  tetris: { kind: 'tetris', label: 'THE TETRIS', source: { bodies: 'stack' }, scale: 1, yaw: 0, zFromRim: 2.0, takeoffFromRim: 3.8, bonus: 4, topples: true, nominalHeight: 1.75, clearance: 0.05 },
 };
 
 /** A height profile along the runway: `z` in world metres (descending toward the rim), `h` the mesh's top at that z. */

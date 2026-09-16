@@ -7,6 +7,11 @@ import { Color3, PBRMaterial, Ray, SceneLoader, TransformNode, Vector3 } from '@
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { spawnMeshyProp } from '../visual/meshyProps';
+import { CharacterPipeline } from '../core/characterPipeline';
+import { neverBindPose } from '../anim/importSanitizer';
+import { DEFAULT_HERO_URL } from '../core/athleteRoster';
+/** Where the rider's own root sits so his hips land on the base's shoulders (the base's shoulder ≈ 1.42, hips ≈ 0.96). */
+export const STACK_SEAT_Y = 0.46;
 import { OBSTACLE_SPECS, boxProfile, type HeightProfile, type ObstacleKind, type ObstacleSpec } from '../core/DunkObstacles';
 
 export interface DunkObstacle {
@@ -80,13 +85,34 @@ function sampleProfile(scene: Scene, root: TransformNode, halfWidth: number, fal
 
 /** Build the obstacle for `kind` at the rim's runway. Resolves with the loaded mesh, or a box stand-in (still a matching
  *  hitbox) when the file cannot load — never an invisible hitbox. */
-export async function spawnDunkObstacle(scene: Scene, kind: ObstacleKind, rim: { x: number; z: number }, name = 'dunk_obstacle'): Promise<DunkObstacle> {
+export async function spawnDunkObstacle(scene: Scene, kind: ObstacleKind, rim: { x: number; z: number }, name = 'dunk_obstacle', heroUrl = DEFAULT_HERO_URL): Promise<DunkObstacle> {
   const spec = OBSTACLE_SPECS[kind];
   const centerZ = rim.z + spec.zFromRim;
   const holder = new TransformNode(name, scene);
   holder.position.set(rim.x, 0, centerZ);
   let model: TransformNode | null = null;
-  if ('meshy' in spec.source) model = await spawnMeshyProp(scene, spec.source.meshy, holder, `${name}_${spec.source.meshy}`);
+  /** THE TETRIS is two of the game's own bodies rather than a prop file — spawned, posed and stacked here. */
+  const bodies: { dispose(): void }[] = [];
+  if ('bodies' in spec.source) {
+    const base = await CharacterPipeline.spawnNpc(scene, heroUrl, {
+      position: new Vector3(rim.x, 0, centerZ), tint: '#f4a261', startClip: 'prop_stack_base',
+    });
+    if (scene.isDisposed) { base.dispose(); holder.dispose(); throw new Error('scene disposed'); }
+    const rider = await CharacterPipeline.spawnNpc(scene, heroUrl, {
+      position: new Vector3(rim.x, STACK_SEAT_Y, centerZ - 0.06), tint: '#e76f51', startClip: 'prop_stack_rider',
+    });
+    if (scene.isDisposed) { base.dispose(); rider.dispose(); holder.dispose(); throw new Error('scene disposed'); }
+    // both face the runway — the dunker comes at them from +z, and a stack that reads from behind is a stack nobody
+    // understands until they are already in the air
+    for (const b of [base, rider]) { b.root.parent = holder; b.root.rotation.y = Math.PI; }
+    base.root.position.set(0, 0, 0);
+    rider.root.position.set(0, STACK_SEAT_Y, -0.06);   // hips at the base's shoulders, weight a touch behind his neck
+    neverBindPose(base.animator, 'prop_stack_base');
+    neverBindPose(rider.animator, 'prop_stack_rider');
+    base.animator.play('prop_stack_base', { loop: true });
+    rider.animator.play('prop_stack_rider', { loop: true });
+    bodies.push(base, rider);
+  } else if ('meshy' in spec.source) model = await spawnMeshyProp(scene, spec.source.meshy, holder, `${name}_${spec.source.meshy}`);
   else model = await loadKit(scene, spec.source.kit, spec.source.model, `${name}_${spec.source.model}`);
   if (scene.isDisposed) { holder.dispose(); throw new Error('scene disposed'); }
   let rock = 0, toppleT = -1;
@@ -108,6 +134,11 @@ export async function spawnDunkObstacle(scene: Scene, kind: ObstacleKind, rim: {
       model.computeWorldMatrix(true); for (const m of meshes) m.computeWorldMatrix(true);
     }
     profile = sampleProfile(scene, model, 0.6, boxProfile(centerZ, 0.5, spec.nominalHeight, 0.6));
+  } else if (bodies.length) {
+    // THE HITBOX IS THEIR LAP. The rider's head is 2.3 m up and the dunker's apex is 1.84 — a hitbox at the top of the
+    // stack is a dunk nobody in the game can do. `nominalHeight` (1.75) is the highest thing the feet must clear, and
+    // the rider ducks under the line as they come over (anim/authored/stackProp).
+    profile = boxProfile(centerZ, 0.45, spec.nominalHeight, 0.55);
   } else {
     // the file failed: a visible box the size of the nominal object (never an invisible hitbox)
     const { MeshBuilder } = await import('@babylonjs/core');
@@ -137,6 +168,7 @@ export async function spawnDunkObstacle(scene: Scene, kind: ObstacleKind, rim: {
       }
     },
     hit() { if (spec.topples) toppleT = 0; else rock = 1; },
-    dispose() { holder.dispose(false, true); },
+    dispose() {
+      for (const b of bodies) b.dispose(); holder.dispose(false, true); },
   };
 }

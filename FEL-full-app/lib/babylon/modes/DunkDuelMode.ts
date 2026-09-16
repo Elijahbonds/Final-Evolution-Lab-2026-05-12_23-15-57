@@ -82,8 +82,8 @@ const DUNKS_EACH = 2;
 // DUNK-CONTROL-JUICE (2026-09-08): the chair box is gone — the duel dunks over the same car / barrier / crate as the contest
 // (dunkObstacleProps: real meshes, hitboxes sampled off them, the feet against the top). X and d-pad down cycle them.
 type Prop = 'none' | ObstacleKind;
-const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', car: OBSTACLE_SPECS.car.label, barrier: OBSTACLE_SPECS.barrier.label, crate: OBSTACLE_SPECS.crate.label };
-const PROP_BONUS: Record<Prop, number> = { none: 0, car: OBSTACLE_SPECS.car.bonus, barrier: OBSTACLE_SPECS.barrier.bonus, crate: OBSTACLE_SPECS.crate.bonus };
+const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', car: OBSTACLE_SPECS.car.label, barrier: OBSTACLE_SPECS.barrier.label, crate: OBSTACLE_SPECS.crate.label, tetris: OBSTACLE_SPECS.tetris.label };
+const PROP_BONUS: Record<Prop, number> = { none: 0, car: OBSTACLE_SPECS.car.bonus, barrier: OBSTACLE_SPECS.barrier.bonus, crate: OBSTACLE_SPECS.crate.bonus, tetris: OBSTACLE_SPECS.tetris.bonus };
 const FLUSH_Z_AHEAD = 0.6;
 const EASTBAY_HANDOFF: HandOffSpec = { at: EASTBAY_TIMING.handOff, from: 'RightHand', to: 'LeftHand' };
 const APPROACH_SPEED = 6, FACE_RIM_RATE = 6;   // Dunk play tip (2026-09-07): the dunk mirror's stick speed / rim-facing ease

@@ -2,15 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { OBSTACLE_KINDS, OBSTACLE_SPECS, PROP_CAM, boxProfile, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue } from './DunkObstacles';
 
 describe('DunkObstacles — cars and other objects', () => {
-  it('three readable objects, the car the hardest, each with a mesh source', () => {
-    expect(OBSTACLE_KINDS).toEqual(['car', 'barrier', 'crate']);
+  it('four readable objects, each with a source, the ladder ordered by what it costs to clear', () => {
+    expect(OBSTACLE_KINDS).toEqual(['car', 'barrier', 'crate', 'tetris']);
     expect(OBSTACLE_SPECS.car.source).toEqual({ meshy: 'sedan' });
+    expect(OBSTACLE_SPECS.tetris.source).toEqual({ bodies: 'stack' });   // two of the game's own bodies, not a prop file
+    expect(OBSTACLE_SPECS.tetris.bonus).toBeGreaterThan(OBSTACLE_SPECS.car.bonus);
     expect(OBSTACLE_SPECS.car.bonus).toBeGreaterThan(OBSTACLE_SPECS.crate.bonus);
     expect(OBSTACLE_SPECS.crate.bonus).toBeGreaterThan(OBSTACLE_SPECS.barrier.bonus);
     expect(OBSTACLE_SPECS.car.takeoffFromRim).toBeGreaterThan(OBSTACLE_SPECS.car.zFromRim + 1);   // a long jump: the takeoff sits well before the near door
   });
-  it('the d-pad cycles car → barrier → crate → car', () => {
-    expect(nextObstacle(null)).toBe('car'); expect(nextObstacle('car')).toBe('barrier'); expect(nextObstacle('barrier')).toBe('crate'); expect(nextObstacle('crate')).toBe('car');
+  it('THE TETRIS is clearable: the hitbox is their lap, not the rider\'s head', () => {
+    // the rider's head is ~2.3 m up and the dunker's apex off a full charge is 1.84 — a hitbox at the top of the stack
+    // is a dunk nobody in the game can do, so the profile tops out at what the feet actually have to clear
+    expect(OBSTACLE_SPECS.tetris.nominalHeight).toBeLessThan(1.84);
+    expect(OBSTACLE_SPECS.tetris.nominalHeight).toBeGreaterThan(OBSTACLE_SPECS.car.nominalHeight);   // still the tallest thing on the card
+    expect(OBSTACLE_SPECS.tetris.takeoffFromRim).toBeGreaterThan(OBSTACLE_SPECS.crate.takeoffFromRim);
+  });
+  it('the d-pad cycles car → barrier → crate → tetris → car', () => {
+    expect(nextObstacle(null)).toBe('car'); expect(nextObstacle('car')).toBe('barrier'); expect(nextObstacle('barrier')).toBe('crate');
+    expect(nextObstacle('crate')).toBe('tetris'); expect(nextObstacle('tetris')).toBe('car');
   });
   it('the height profile reads the mesh top under the runway and nothing outside its footprint', () => {
     const p = { z: [-7, -7.5, -8, -8.5, -9], h: [0.5, 1.0, 1.46, 1.4, 0.6], halfWidth: 2.4 };

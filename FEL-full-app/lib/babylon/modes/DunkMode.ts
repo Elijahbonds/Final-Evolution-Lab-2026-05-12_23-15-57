@@ -106,9 +106,9 @@ type Style = (typeof STYLES)[number];
 // DUNK-GLASS-BOUNCE (2026-09-08): two more self-lobs on the ring — OFF THE GLASS (the toss goes at the backboard and comes
 // back off it to the hand: WDA "Off The Backboard") and the BOUNCE LOB (thrown down into the floor, up to the hand: WDA
 // "Bounce Ball"; from standing it is the bounce-BOUNCE with a RUN cue). d-pad left cycles the lob family.
-const PROPS = ['none', 'alleyoop', 'selflob', 'offglass', 'bounce', 'car', 'barrier', 'crate'] as const;
+const PROPS = ['none', 'alleyoop', 'selflob', 'offglass', 'bounce', 'car', 'barrier', 'crate', 'tetris'] as const;
 type Prop = (typeof PROPS)[number];
-const obstacleKindOf = (p: Prop): ObstacleKind | null => (p === 'car' || p === 'barrier' || p === 'crate' ? p : null);
+const obstacleKindOf = (p: Prop): ObstacleKind | null => (p === 'car' || p === 'barrier' || p === 'crate' || p === 'tetris' ? p : null);
 const LOB_PROPS = ['selflob', 'offglass', 'bounce'] as const;
 type LobProp = (typeof LOB_PROPS)[number];
 const lobPropOf = (p: Prop): LobProp | null => (p === 'selflob' || p === 'offglass' || p === 'bounce' ? p : null);
@@ -124,9 +124,9 @@ const STYLE_CLIP: Record<Style, string> = {
   flashy: SPORT_CLIP.dunkLaunchPower, sig: SPORT_CLIP.dunkLaunchSig,
 };
 const STYLE_LABEL: Record<Style, string> = { power: 'POWER', flashy: 'FLASHY', sig: 'SIGNATURE' };
-const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', alleyoop: 'ALLEY-OOP', selflob: 'SELF-LOB', offglass: 'OFF THE GLASS', bounce: 'BOUNCE LOB', car: OBSTACLE_SPECS.car.label, barrier: OBSTACLE_SPECS.barrier.label, crate: OBSTACLE_SPECS.crate.label };
+const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', alleyoop: 'ALLEY-OOP', selflob: 'SELF-LOB', offglass: 'OFF THE GLASS', bounce: 'BOUNCE LOB', car: OBSTACLE_SPECS.car.label, barrier: OBSTACLE_SPECS.barrier.label, crate: OBSTACLE_SPECS.crate.label, tetris: OBSTACLE_SPECS.tetris.label };
 const STYLE_TIER: Record<Style, number> = { power: 3, flashy: 5.5, sig: 8 };
-const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, selflob: 1.5, offglass: 2.5, bounce: 2.5, car: OBSTACLE_SPECS.car.bonus, barrier: OBSTACLE_SPECS.barrier.bonus, crate: OBSTACLE_SPECS.crate.bonus };
+const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, selflob: 1.5, offglass: 2.5, bounce: 2.5, car: OBSTACLE_SPECS.car.bonus, barrier: OBSTACLE_SPECS.barrier.bonus, crate: OBSTACLE_SPECS.crate.bonus, tetris: OBSTACLE_SPECS.tetris.bonus };
 /** Where the ball hand is at the lob's catch beat (LOB_CATCH_CLIP_T), relative to the root, per launch clip — measured on the
  *  live rig with the reach off through the rise (DUNK-SOFTS-NAMED probe, hand − root at clip 0.62): the mocap POWER gather
  *  holds both hands overhead and a touch behind; the authored FLASHY takeoff has them up and level; the SIG eastbay's ball
@@ -503,7 +503,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (kind) {
       const token = ++obstacleToken;
       try {
-        const o = await spawnDunkObstacle(ctx.scene, kind, rim);
+        const o = await spawnDunkObstacle(ctx.scene, kind, rim, 'dunk_obstacle', CFG.heroUrl);   // the TETRIS stack uses the game's own bodies
         if (token !== obstacleToken || ctx.scene.isDisposed) { o.dispose(); return; }   // the prop changed under the load
         obstacle = o;
       } catch { /* scene gone */ }
