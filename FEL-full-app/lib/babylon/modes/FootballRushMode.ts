@@ -19,6 +19,14 @@ import { Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { CoinField } from '../core/Pickups';
+// HIT-CAM. This logic was written, unit-tested (scripts/football-cam-tests.ts) and then
+// wired ONLY into components/games/football-3d.tsx — the three.js fallback. Football has
+// been served from Babylon since rollout wave 1 (flags.ts: football: true), so the cut has
+// not fired for anyone in a long time. Same module, no re-derivation: it is pure geometry
+// and a small state machine, with no renderer in it.
+import {
+  countConverging, makeBroadcastCutState, updateBroadcastCut, broadcastBlend, CONVERGE_RADIUS_YD,
+} from '../../feel/football-cam';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { readProfile, profileFor, blunders, DEFAULT_TIER } from '../core/Difficulty';
@@ -79,6 +87,7 @@ export const FootballRushMode: ModeDefinition = (() => {
   let runner: SpawnedCharacter;
   let pool = new MobPool();
   let defenders: Mob[] = [];
+  const hitCut = makeBroadcastCutState();
   let coins: CoinField | null = null;
   let down = 1, toGo = 10, lineOfScrimmage = 0, yards = 0, score = 0, evades = 0;
   // Owner decision (2026-09-05): a session is THREE drives. Each ends on a touchdown or a turnover on downs; the
@@ -291,6 +300,9 @@ export const FootballRushMode: ModeDefinition = (() => {
     styleTypes = new Set();
     truckSec = 0; truckCooldown = 0;
     truckLatch = false; tackleLatch = false; tdLatch = false;   // A+ P0: a new drive gets its own beats
+    // …and its own camera: a cut still holding (or a cooldown still draining) from the last
+    // play would either frame the snap from the broadcast height or swallow the first hit.
+    hitCut.active = false; hitCut.timer = 0; hitCut.cooldown = 0;
     preSnap = true; preSnapT = 0; downed = false;
     runner.root.position.set(0, 0, 0);
     runner.root.rotation.y = 0;
@@ -410,6 +422,23 @@ export const FootballRushMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
+
+      // HIT-CAM: when a stack closes on the runner, pull up and back for half a second so
+      // the hit reads as a hit rather than something that happened behind the shoulder.
+      // `downed` is the module's `cleared`: a trucked defender is on the floor and is no
+      // longer converging on anything. Radius is metres here, the same unit as the
+      // positions — the module compares against whatever unit it is handed.
+      const conv = countConverging(
+        defenders.map((m) => ({
+          yd: -m.char.root.position.z,
+          x: m.char.root.position.x,
+          cleared: m.state === 'downed',
+        })),
+        { x: runner.root.position.x, z: runner.root.position.z },
+        CONVERGE_RADIUS_YD * YARD,
+      );
+      updateBroadcastCut(hitCut, conv, dt);
+      ctx.camDirector.broadcast = broadcastBlend(hitCut);
       // SET AT THE LINE — nobody moves until the snap (the player calls it,
       // or the auto-snap so an idle phone never stalls)
       if (preSnap) {
