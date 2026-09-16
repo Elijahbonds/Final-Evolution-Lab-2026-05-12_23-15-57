@@ -54,6 +54,10 @@ function proveItFlow(slug: string): Record<string, Cat> | null {
     controls: { score: clamp(s), why: ['camera flow (no pad on this game)', ...why] },
     logic: { score: clamp(s), why: ['camera flow (no masher on this game)', ...why] },
     body: na('a camera contest has no rig on screen'),
+    // FEEL is press → answer latency and juice per minute, both counted off the pad trace. There is no pad here, and
+    // the thing that actually has to feel good — the verdict landing after a real dunk — needs a person in front of a
+    // real camera. docs/SCORECARD.md says so, and this says it on the card rather than reading as a missing measurement.
+    feel: na('judged by a person in front of a real camera (no pad trace to time)'),
   };
 }
 
