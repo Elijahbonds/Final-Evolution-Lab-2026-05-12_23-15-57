@@ -728,7 +728,10 @@ export const DunkMode: ModeDefinition = (() => {
         // DUNK-GLASS-BOUNCE: Y with the d-pad HELD up = off the glass, down = the bounce lob (pad / touch; the keyboard's arrows
         // are the stick); a bare Y throws the variant the PROP ring picked, or the plain self-lob
         const held = heldDpad && !heldDpadKey && (heldDpad === 'up' || heldDpad === 'down') ? heldDpad : null;
-        const variant = e.btn === 'Y' ? (held ?? (prop === 'offglass' ? 'up' : prop === 'bounce' ? 'down' : null)) : null;
+        // Y + up/down picks the lob variant (off the glass, off the bounce); B + up is the BACKFLIP (owner, 2026-09-16).
+        // Every other button ignores the direction, so a held stick-hand never turns a kick-up into something else.
+        const variant = e.btn === 'Y' ? (held ?? (prop === 'offglass' ? 'up' : prop === 'bounce' ? 'down' : null))
+          : e.btn === 'B' && held === 'up' ? 'up' : null;
         if (held && dpadPick && dpadPick.dir === held) dpadPick.fired = true;   // the d-pad was the variant, not a prop pick
         const rt = runwayTrickFor(e.btn, variant);
         if (rt && rt.id === 'doubleup') {

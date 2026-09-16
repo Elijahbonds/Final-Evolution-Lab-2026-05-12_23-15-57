@@ -12,7 +12,7 @@ import { buildEastbay } from './eastbay';
 import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from './dunkSuite';
 import { buildMocapDunk } from './mocapDunk';
 import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig } from './dunkFinishes';
-import { buildSelfLob, buildBounceThrow, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch } from './dunkTricks';
+import { buildSelfLob, buildBounceThrow, buildKickUp, buildBackHandspring, buildBackflip, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch } from './dunkTricks';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdownSpike, buildStiffArm, buildQbThrow } from './football';
@@ -60,7 +60,8 @@ export function registerAuthoredClips(
     ['dunk_self_lob', () => buildSelfLob(scene, skeleton)],
     ['dunk_bounce_throw', () => buildBounceThrow(scene, skeleton)],   // DUNK-GLASS-BOUNCE: the bounce lob's two-hand throw down
     ['dunk_kick_up', () => buildKickUp(scene, skeleton)],
-    ['dunk_cartwheel', () => buildCartwheel(scene, skeleton)],
+    ['dunk_back_handspring', () => buildBackHandspring(scene, skeleton)],
+    ['dunk_backflip', () => buildBackflip(scene, skeleton)],
     ['dunk_double_up', () => buildDoubleUp(scene, skeleton)],
     ['dunk_scorpion', () => buildScorpion(scene, skeleton)],
     ['dunk_lost_found', () => buildLostFound(scene, skeleton)],

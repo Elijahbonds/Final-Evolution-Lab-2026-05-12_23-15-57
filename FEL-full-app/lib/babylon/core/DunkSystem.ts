@@ -63,7 +63,7 @@ export const DUNK_TRICK_ID_BY_CLIP: Record<string, string> = Object.fromEntries(
 // cartwheel tosses the lob itself and rolls under it, the double-up is the two-foot hop gather into the takeoff.
 // None of them spend the air budget — they are judged as difficulty on top of the flight's own tricks.
 export interface RunwayTrick {
-  id: 'selflob' | 'kickup' | 'cartwheel' | 'doubleup' | 'offglass' | 'bounce';
+  id: 'selflob' | 'kickup' | 'cartwheel' | 'doubleup' | 'offglass' | 'bounce' | 'backflip';
   label: string;
   btn: 'A' | 'B' | 'X' | 'Y';
   /** DUNK-GLASS-BOUNCE: a d-pad direction HELD with the button picks a variant (up + Y = off the glass, down + Y = the
@@ -81,10 +81,13 @@ export interface RunwayTrick {
 export const RUNWAY_TRICKS: RunwayTrick[] = [
   { id: 'selflob', label: 'SELF-LOB', btn: 'Y', clip: 'dunk_self_lob', sec: 0.5, difficulty: 1.6, releaseAt: 0.3, runScale: 0.85 },
   { id: 'kickup', label: 'KICK-UP', btn: 'B', clip: 'dunk_kick_up', sec: 0.55, difficulty: 2.2, releaseAt: 0.32, runScale: 0.55 },
-  { id: 'cartwheel', label: 'CARTWHEEL', btn: 'X', clip: 'dunk_cartwheel', sec: 0.8, difficulty: 2.8, releaseAt: 0.05, runScale: 0.7 },
+  { id: 'cartwheel', label: 'BACK HANDSPRING', btn: 'X', clip: 'dunk_back_handspring', sec: 0.8, difficulty: 2.8, releaseAt: 0.05, runScale: 0.7 },
   { id: 'doubleup', label: 'DOUBLE-UP', btn: 'A', clip: 'dunk_double_up', sec: 0.5, difficulty: 1.5, runScale: 0.6 },
   // DUNK-GLASS-BOUNCE (2026-09-08): the same two-hand toss thrown AT THE GLASS (the ball comes back off the board to the
   // hand), and a two-hand throw DOWN into the floor that bounces up to the hand once or twice (WDA "Bounce Ball")
+  // THE BACKFLIP (owner, 2026-09-16). B is the kick-up; B with UP held is the flip — the ball goes up ahead of you, you
+  // turn over under it, land running and take it to the rim. Hardest thing on the runway, and it costs the most speed.
+  { id: 'backflip', label: 'BACKFLIP', btn: 'B', dir: 'up', clip: 'dunk_backflip', sec: 0.9, difficulty: 3.4, releaseAt: 0.06, runScale: 0.45 },
   { id: 'offglass', label: 'OFF-GLASS LOB', btn: 'Y', dir: 'up', clip: 'dunk_self_lob', sec: 0.5, difficulty: 2.4, releaseAt: 0.3, runScale: 0.85 },
   { id: 'bounce', label: 'BOUNCE LOB', btn: 'Y', dir: 'down', clip: 'dunk_bounce_throw', sec: 0.5, difficulty: 2.4, releaseAt: 0.3, runScale: 0.85 },
 ];

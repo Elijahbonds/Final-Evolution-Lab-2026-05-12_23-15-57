@@ -18,7 +18,7 @@ import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, bui
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
-import { buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildCartwheel, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
+import { buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildBackHandspring, buildBackflip, BACKFLIP_SEC, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
 import { DUNK_TRICKS } from '../../core/DunkSystem';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
 import { buildBaseClips } from './baseClips';
@@ -342,14 +342,34 @@ describe('dunk tricks', () => {
     at(g, 0); expect(pos('RightHand').y).toBeLessThan(hipsY() - 0.1);
     at(g, KICK_UP_CONTACT); expect(pos('RightFoot').y).toBeGreaterThan(pos('LeftFoot').y + 0.45); expect(pos('RightFoot').z).toBeGreaterThan(pos('Hips').z + 0.2);
   });
-  it('cartwheel: inverted at the half turn with the hands at the floor, the head below the hips; a full turn ends upright', () => {
-    const g = fresh(() => buildCartwheel(scene, sk)!);
-    at(g, 0); const headUp = pos('Head').y;
-    at(g, 0.2); const headSide = Math.sign(pos('Head').x - pos('Hips').x); expect(Math.abs(pos('Head').x - pos('Hips').x)).toBeGreaterThan(0.3);
-    expect(Math.sign(pos('RightHand').x - pos('Hips').x)).toBe(headSide);   // the hands go the way the head goes
-    at(g, 0.4); expect(pos('Head').y).toBeLessThan(pos('Hips').y - 0.3); expect(pos('RightHand').y).toBeLessThan(0.35); expect(pos('LeftHand').y).toBeLessThan(0.35);
-    expect(Math.abs(pos('LeftFoot').x - pos('RightFoot').x)).toBeGreaterThan(0.5);   // straddled
-    at(g, 0.8); expect(pos('Head').y).toBeCloseTo(headUp, 1);
+  // BACK HANDSPRING (owner, 2026-09-16) — it goes over BACKWARDS, not sideways. The cartwheel it replaced rolled about
+  // the forward axis, which is a gymnastic move nobody has ever put in front of a dunk; a handspring lands you facing
+  // the rim, still running at it, which is the only reason it belongs on a runway.
+  it('back handspring: the head goes BACK not sideways, plants on the hands inverted, and lands facing the same way', () => {
+    const g = fresh(() => buildBackHandspring(scene, sk)!);
+    at(g, 0); const headUp = pos('Head').y, headZ0 = pos('Head').z - pos('Hips').z;
+    at(g, 0.18);
+    expect(pos('Head').z - pos('Hips').z, 'the head reaches BACK').toBeLessThan(headZ0 - 0.15);
+    expect(Math.abs(pos('Head').x - pos('Hips').x), 'and not sideways — that was the cartwheel').toBeLessThan(0.25);
+    at(g, 0.36);
+    expect(pos('Head').y, 'inverted over the hands').toBeLessThan(pos('Hips').y);
+    expect(Math.min(pos('RightHand').y, pos('LeftHand').y), 'hands planted low').toBeLessThan(pos('Hips').y);
+    at(g, 0.8);
+    expect(pos('Head').y, 'back on his feet').toBeCloseTo(headUp, 1);
+    expect(pos('Head').z - pos('Hips').z, 'still facing the way he was running').toBeCloseTo(headZ0, 1);
+  });
+  // THE BACKFLIP (owner, 2026-09-16) — thrown on the approach: the ball goes up ahead, he turns over under it, and
+  // lands running at the rim. No hands in it, so the TUCK is what gets him round.
+  it('backflip: tucks tight, goes fully inverted with no hand on the floor, and lands facing the rim', () => {
+    const g = fresh(() => buildBackflip(scene, sk)!);
+    at(g, 0); const headZ0 = pos('Head').z - pos('Hips').z, headUp = pos('Head').y;
+    at(g, 0.38);
+    expect(pos('Head').y, 'inverted at the top').toBeLessThan(pos('Hips').y);
+    expect(pos('LeftLeg').y, 'knees to the chest').toBeGreaterThan(pos('Hips').y - 0.25);
+    expect(Math.min(pos('RightHand').y, pos('LeftHand').y), 'arms pulled in, never planted').toBeGreaterThan(0.35);
+    at(g, BACKFLIP_SEC);
+    expect(pos('Head').y, 'on his feet').toBeCloseTo(headUp, 1);
+    expect(pos('Head').z - pos('Hips').z, 'still facing the rim').toBeCloseTo(headZ0, 1);
   });
   it('double-up: feet together on the load, a hop, and the loaded landing crouch', () => {
     const g = fresh(() => buildDoubleUp(scene, sk)!);

@@ -85,20 +85,81 @@ export function buildKickUp(scene: Scene, sk: Skeleton): AnimationGroup | null {
   ]);
 }
 
-/** A straddled cartwheel about the hips: the body rolls a full turn over its forward axis; the hands trace the roll so
- *  they reach the floor at the inverted beat, and the hips rise through it (a real cartwheel pivots over the hands). */
-export function buildCartwheel(scene: Scene, sk: Skeleton): AnimationGroup | null {
+/**
+ * THE BACK HANDSPRING (owner, 2026-09-16: "make the cartwheel more of a back handspring").
+ *
+ * It was a straddled CARTWHEEL — a roll about the body's FORWARD axis, the wheel turning sideways toward the rim, which
+ * is a gymnastic move nobody has ever put in front of a dunk. A handspring goes over BACKWARDS: the chest opens, the
+ * hands reach back over the head and plant, the hips drive up over the hands, the legs whip over the top, and the feet
+ * come down under a body that never stopped facing the rim. That last part is why it belongs on a dunk runway and the
+ * cartwheel never did — you land looking at the basket, still running at it.
+ *
+ * So the rotation is a PITCH about the body's right axis (Hips x), keyed in quarter turns so each interpolation is
+ * unambiguous, and the hands trace that pitch: overhead at the arch, down behind the head at the plant, pushing off as
+ * the legs come over. The legs stay long through the whip — a tucked handspring is a back tuck, a different move.
+ */
+export function buildBackHandspring(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const hipsAt = 0.96;   // REF_HIPS_Y — the targets are authored for the forge hero and scaled per body by the builder
+  /** A hand carried around the BACKWARD pitch: overhead at 0, behind and down at the plant, under the body at 180. */
   const hand = (side: -1 | 1, deg: number): V3 => {
-    const r = (deg * Math.PI) / 180, x = side * 0.30, y = 0.95;   // overhead, a little spread, relative to the hips (an arm's reach)
-    return [x * Math.cos(r) + y * Math.sin(r), hipsAt - x * Math.sin(r) + y * Math.cos(r), 0.05];   // the rig rolls +z toward +x (measured)
+    const r = (deg * Math.PI) / 180, x = side * 0.26, y = 0.92, z = 0.06;
+    // pitching backwards about +x carries the reach from overhead (+y) toward BEHIND (−z) and then under (−y)
+    return [x, hipsAt + y * Math.cos(r) - z * Math.sin(r), -(y * Math.sin(r) + z * Math.cos(r)) + z];
   };
-  const key = (t: number, roll: number, hipsY: number) => ({
-    t, bones: { Hips: [0, 0, roll] as Deg3, Spine: [-4, 0, 0] as Deg3, Neck: [0, 0, 0] as Deg3, LeftUpLeg: [-6, 0, 48] as Deg3, LeftLeg: [6, 0, 0] as Deg3, RightUpLeg: [-6, 0, -48] as Deg3, RightLeg: [6, 0, 0] as Deg3 },
-    hands: { Left: hand(-1, roll), Right: hand(1, roll) }, hipsY,
+  const key = (t: number, pitch: number, hipsY: number, legWhip: number) => ({
+    t,
+    bones: {
+      Hips: [-pitch, 0, 0] as Deg3,                       // negative x = the chest opening backwards on this rig
+      Spine: [-14, 0, 0] as Deg3, Neck: [-16, 0, 0] as Deg3,   // the head leads the arch, eyes back for the floor
+      LeftUpLeg: [-4 + legWhip, 0, 7] as Deg3, LeftLeg: [10, 0, 0] as Deg3,
+      RightUpLeg: [-4 + legWhip, 0, -7] as Deg3, RightLeg: [10, 0, 0] as Deg3,
+    },
+    hands: { Left: hand(-1, pitch), Right: hand(1, pitch) }, hipsY,
   });
-  return buildPoseClip(scene, sk, 'dunk_cartwheel', CARTWHEEL_SEC, [
-    key(0, 0, 0), key(0.2, 90, 0.14), key(0.4, 180, 0.25), key(0.6, 270, 0.14), key(CARTWHEEL_SEC, 360, 0),
+  return buildPoseClip(scene, sk, 'dunk_back_handspring', CARTWHEEL_SEC, [
+    key(0, 0, 0, 0),              // stand tall, chest opening
+    key(0.18, 70, 0.06, -18),     // the reach back — hands going for the floor behind, hips leading
+    key(0.36, 165, 0.30, -34),    // the plant: inverted over the hands, legs long overhead
+    key(0.56, 255, 0.26, 26),     // the whip: legs come over the top, the push off the hands
+    key(CARTWHEEL_SEC, 360, 0, 0),   // feet down, still facing the rim, still running at it
+  ]);
+}
+
+/**
+ * THE BACKFLIP (owner, 2026-09-16: "add back flip dunks").
+ *
+ * The real ones are thrown on the APPROACH, not over the rim: the ball goes up ahead of you, you flip under it, land
+ * running, catch it and go. So this is the handspring's rotation with the hands taken OUT of it — nothing to plant on,
+ * so the tuck is what gets you round: knees to the chest, arms pulled in tight, the whole body a smaller wheel that
+ * turns faster. The hips carry a real arc (up through the rotation, down onto the landing) because a flip that spins on
+ * the spot at a constant height reads as a cartoon.
+ *
+ * Landing FACING THE RIM matters as much as it does for the handspring — the flight that follows is a run-up, and a
+ * dunker who lands backwards has thrown the ball away.
+ */
+export const BACKFLIP_SEC = 0.9;
+export function buildBackflip(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  /** Arms pulled in through the tuck: at the chest, a little forward, riding the rotation. */
+  const hand = (side: -1 | 1, deg: number): V3 => {
+    const r = (deg * Math.PI) / 180, x = side * 0.20, y = 0.42, z = 0.26;
+    return [x, 0.96 + y * Math.cos(r) - z * Math.sin(r), -(y * Math.sin(r) + z * Math.cos(r)) + z];
+  };
+  const key = (t: number, pitch: number, hipsY: number, tuck: number) => ({
+    t,
+    bones: {
+      Hips: [-pitch, 0, 0] as Deg3, Spine: [-8 - tuck * 0.3, 0, 0] as Deg3, Neck: [-14, 0, 0] as Deg3,
+      LeftUpLeg: [-tuck, 0, 6] as Deg3, LeftLeg: [tuck * 1.25, 0, 0] as Deg3,
+      RightUpLeg: [-tuck, 0, -6] as Deg3, RightLeg: [tuck * 1.25, 0, 0] as Deg3,
+    },
+    hands: { Left: hand(-1, pitch), Right: hand(1, pitch) }, hipsY,
+  });
+  return buildPoseClip(scene, sk, 'dunk_backflip', BACKFLIP_SEC, [
+    key(0, 0, -0.12, 18),              // the load: a dip, the ball already leaving
+    key(0.16, 55, 0.22, 74),           // drive: hips up, knees snapping to the chest
+    key(0.38, 170, 0.34, 96),          // inverted, tucked tight — the top of the flip
+    key(0.60, 280, 0.20, 78),          // coming round, the tuck starting to open
+    key(0.78, 340, 0.02, 34),          // legs reaching for the floor
+    key(BACKFLIP_SEC, 360, -0.10, 22), // landed, knees soft, running at the rim again
   ]);
 }
 
