@@ -185,6 +185,20 @@ describe('dance pack', () => {
     const b = build('dance_bounce_two_step'); at(b, 0); const up = hipsY(); at(b, 0.25); expect(hipsY()).toBeLessThan(up - 0.04);
     const s = build('dance_bounce_shoulder'); at(s, 0.5); expect(pos('LeftHand').y).toBeLessThan(pos('LeftArm').y - 0.35);
   });
+  it('the MISS is an overbalance: the weight drops off the line, the arms catch it WIDE, and it comes back up', () => {
+    const g = build('dance_stumble');
+    const T = g.to / 30;
+    const stand0 = fresh(() => { const s2 = buildIdleStand(scene, sk)!; at(s2, 0); return hipsY(); });
+    at(g, T / 3);
+    expect(hipsY(), 'the weight drops').toBeLessThan(stand0 - 0.05);
+    // the whole point of the re-author: the arms CATCH, each on its own side. The old miss played a fighter's flinch
+    // over the step and the review read crossed limbs, so this is the assertion that matters.
+    const l = pos('LeftHand'), r = pos('RightHand');
+    expect(r.x - l.x, 'the hands never cross').toBeGreaterThan(0.4);
+    expect(l.y, 'and they are up, catching, not hanging').toBeGreaterThan(pos('Hips').y);
+    expect(r.y, 'both of them').toBeGreaterThan(pos('Hips').y);
+    at(g, T); expect(Math.abs(hipsY() - stand0), 'back on the groove by the wrap').toBeLessThan(0.03);
+  });
   it('the arm wave travels: the right hand peaks first, then the left; the spin turns the hips a full circle', () => {
     const g = build('dance_wave_arm');
     at(g, 0.25); expect(pos('RightHand').y).toBeGreaterThan(pos('LeftHand').y + 0.2); expect(Math.abs(pos('RightHand').x)).toBeGreaterThan(0.4);

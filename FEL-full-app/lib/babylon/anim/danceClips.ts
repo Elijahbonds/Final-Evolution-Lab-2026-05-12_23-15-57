@@ -46,6 +46,7 @@ export const DANCE_ALIASES: Record<string, string> = {
   dance_power_windmill: 'roundhouse',
   dance_trans_spin: 'strafe_left',
   dance_bounce_shoulder: 'idle_stand',
+  dance_stumble: 'karate_hit_react',   // the net if the pose clip cannot build on a rig: what the mode played before
 };
 
 /** beats → seconds at a reference 120 BPM. Clips are authored at this tempo
@@ -174,7 +175,38 @@ function shoulderBop(): PoseKey[] {
   return [key(0, bop(1)), key(beats(1), bop(-1)), key(beats(2), bop(1)), key(beats(3), bop(-1)), key(beats(4), bop(1))];
 }
 
+/**
+ * THE MISS (SCORECARD VISUALS, 2026-09-15). A missed step used to play `karate_hit_react` over the running step: a
+ * fighter's flinch blended into a dance loop, which is what the frame review called "the MISS stumble crosses the
+ * limbs" — and it is also the wrong move, a hit taken in a game where nobody is hitting you. A dancer who misses
+ * OVERBALANCES: the weight falls past the leading foot, the trailing leg swings out to catch it, both arms fly wide,
+ * and the body comes back up onto the groove. One beat, standing at both ends like every step in this pack.
+ */
+function stumble(): PoseKey[] {
+  const fall: Omit<PoseKey, 't'> = {
+    bones: {
+      Hips: [6, -14, 8], Spine: [16, 10, -10], Neck: [-6, 8, 4],
+      LeftUpLeg: [-34, 0, 16], LeftLeg: [46, 0, 0],      // the leading leg takes it all
+      RightUpLeg: [10, 0, -26], RightLeg: [30, 0, 0],    // the trailing leg swings out wide to catch the weight
+    },
+    hands: { Left: [-0.56, 1.14, 0.18], Right: [0.54, 1.06, -0.14] },   // arms out, not crossed: the catch is wide
+    poles: { Left: [-0.9, -0.2, -0.3] as V3, Right: [0.9, -0.2, -0.3] as V3 }, hipsY: -0.14,
+  };
+  const catchIt: Omit<PoseKey, 't'> = {
+    bones: {
+      Hips: [2, -6, 3], Spine: [10, 4, -4], Neck: [-2, 3, 0],
+      LeftUpLeg: [-18, 0, 8], LeftLeg: [28, 0, 0], RightUpLeg: [-2, 0, -14], RightLeg: [22, 0, 0],
+    },
+    hands: { Left: [-0.40, 1.00, 0.16], Right: [0.38, 0.96, 0.02] }, poles: HANG_POLES, hipsY: -0.07,
+  };
+  // thirds of the beat, not 0.3/0.7: a pose clip's keys are laid on 30 fps frames, and a key at 4.5 frames is a key
+  // nobody ever sees in full — the catch read half as wide as it is authored because every sample blended it with the
+  // standing pose on either side.
+  return [key(0, STAND), key(beats(1 / 3), fall), key(beats(2 / 3), catchIt), key(beats(1), STAND)];
+}
+
 const BUILDERS: Record<string, { keys: () => PoseKey[]; beats: number }> = {
+  dance_stumble: { keys: stumble, beats: 1 },
   dance_toprock_basic: { keys: toprock, beats: 4 },
   dance_bounce_two_step: { keys: twoStep, beats: 4 },
   dance_wave_arm: { keys: armWave, beats: 2 },

@@ -172,7 +172,10 @@ export const DanceMode: ModeDefinition = (() => {
     beatUntil = performance.now() + STAGE_BEAT_SEC * 1000;
     const spd = bodySpeedFor(label);
     if (label === 'MISS') {
-      if (step) body?.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.08, speedRatio: 1.15 });   // the stumble settles back into the running step
+      // A DANCER'S MISS IS AN OVERBALANCE, not a hit taken (2026-09-15). This played karate_hit_react — a fighter's
+      // flinch blended over the running step, which the frame review read as crossed limbs — and nobody is throwing
+      // punches in a cypher. `dance_stumble` (danceClips) catches the weight wide and comes back up on the groove.
+      if (step) body?.beat('dance_stumble', { fadeSec: 0.08, speedRatio: 1.15 });   // the stumble settles back into the running step
     } else if (currentClip && spd < 1) {
       me.animator.setSpeed(currentClip, clipSpeed() * spd);
     }
