@@ -6,10 +6,7 @@
 // degrades to "show the score", which is exactly what players had before cards existed.
 
 import { describe, it, expect } from 'vitest';
-import {
-  DUNK_CARD_VERSION, MAX_ATTEMPTS, emptyCard, addAttempt, parseCard, attemptLine, cardHeadline,
-  duelSummary, forWire, type DunkAttempt,
-} from './dunkCard';
+import { DUNK_CARD_VERSION, MAX_ATTEMPTS, emptyCard, addAttempt, parseCard, attemptLine, cardHeadline, duelSummary, forWire, type DunkAttempt, nightReport } from './dunkCard';
 
 const att = (over: Partial<DunkAttempt> = {}): DunkAttempt => ({
   round: 1, style: 'POWER', prop: 'standing', finish: 'dunk_finish_windmill', label: 'WINDMILL',
@@ -141,5 +138,47 @@ describe('what a player reads', () => {
     const a = cardOf(att({ total: 30 }));
     const b = cardOf(att({ total: 30 }));
     expect(duelSummary(a, b)).toBe('Dead level on 30.');
+  });
+});
+
+// ── THE NIGHT SAYS WHAT IT WAS (P9, 2026-09-16) ────────────────────────────────────────────────────────
+describe('nightReport', () => {
+  const att = (o: Partial<DunkAttempt>): DunkAttempt => ({
+    round: 1, style: 'FLASHY', prop: 'NO PROP', finish: 'dunk_score_hang', label: 'WINDMILL',
+    judges: [8, 8, 8, 8, 8], total: 40, made: true, diff: 7, exec: 8, look: 5, ...o,
+  });
+  const cardOf = (as: DunkAttempt[]) => as.reduce((c, a) => addAttempt(c, a), emptyCard());
+
+  it('names the best dunk of the night', () => {
+    const r = nightReport(cardOf([att({ total: 38 }), att({ total: 46, label: 'EASTBAY' }), att({ total: 41 })]));
+    expect(r.headline).toContain('BEST 46');
+    expect(r.lines[0]).toContain('EASTBAY');
+  });
+
+  it('a night lost on the beat is told so, with the number', () => {
+    const r = nightReport(cardOf([att({ exec: 3.5, total: 36 }), att({ exec: 4, total: 37 })]));
+    expect(r.advice).toContain('beat');
+    expect(r.advice).toContain('3.8');
+  });
+
+  it('a clean night of easy dunks is told to call a harder one', () => {
+    const r = nightReport(cardOf([att({ diff: 2, exec: 9.5, look: 6 }), att({ diff: 2.4, exec: 9, look: 6 })]));
+    expect(r.advice).toContain('harder');
+  });
+
+  it('a night thrown at the iron is named as that first', () => {
+    const r = nightReport(cardOf([att({ made: false, exec: 0, total: 31 }), att({ made: false, exec: 0, total: 30 }), att({ total: 40 })]));
+    expect(r.advice).toContain('before you get there');
+  });
+
+  it('a big clean night is left alone', () => {
+    const r = nightReport(cardOf([att({ diff: 9, exec: 9.4, look: 8, total: 47 }), att({ diff: 8.6, exec: 9, look: 7.5, total: 46 })]));
+    expect(r.advice).toContain('Nothing to fix');
+  });
+
+  it('an old card with no numbers on it does not invent any', () => {
+    const r = nightReport(cardOf([att({ diff: undefined, exec: undefined, look: undefined })]));
+    expect(r.lines.some((l) => l.includes('EXECUTION'))).toBe(false);
+    expect(r.advice).toBeTruthy();
   });
 });

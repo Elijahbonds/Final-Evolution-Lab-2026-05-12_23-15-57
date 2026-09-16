@@ -40,6 +40,11 @@ export interface DunkAttempt {
   total: number;
   /** Did the slam connect at all? */
   made: boolean;
+  /** The three numbers the panel actually used, 0..10 (P9, 2026-09-16). Optional: a card written before this
+   *  existed has none, and `nightReport` says so rather than inventing them. */
+  diff?: number;
+  exec?: number;
+  look?: number;
 }
 
 export interface DunkCard {
@@ -98,6 +103,9 @@ export function parseCard(raw: unknown): DunkCard | null {
       judges,
       total: num(a.total),
       made: a.made === true,
+      ...(a.diff !== undefined ? { diff: num(a.diff) } : {}),
+      ...(a.exec !== undefined ? { exec: num(a.exec) } : {}),
+      ...(a.look !== undefined ? { look: num(a.look) } : {}),
     });
   }
   if (!attempts.length) return null;
@@ -172,4 +180,49 @@ export function forWire(card: DunkCard): DunkCard {
     misses: card.misses,
     attempts: card.attempts.map((a) => ({ ...a, judges: a.judges.slice(0, 3) })),
   };
+}
+
+// ── WHAT THE NIGHT WAS (P9, 2026-09-16) ───────────────────────────────────────────────────────────────
+//
+// The contest ends on a number and a WON / OVER. A player who just lost by four has no way to know whether
+// they lost it on the beat, on ambition, or on the two they threw at the iron early — and that is the one
+// thing that decides whether the next night goes better. The panel already publishes the three numbers per
+// attempt; the card now carries them, and this reads the night back in a sentence.
+//
+// Pure, and deliberately opinionated: it names ONE thing to change, because a list of five is a list nobody
+// reads at 1 a.m. with the pad still in their hands.
+
+export interface NightReport {
+  /** The one-line summary the mode prints on the end card. */
+  headline: string;
+  /** The supporting numbers, longest-lever first. */
+  lines: string[];
+  /** The single thing to change next night. */
+  advice: string;
+}
+
+const avg = (xs: number[]): number => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+
+export function nightReport(card: DunkCard): NightReport {
+  const made = card.attempts.filter((a) => a.made);
+  const best = card.attempts.reduce<DunkAttempt | null>((m, a) => (!m || a.total > m.total ? a : m), null);
+  const scored = card.attempts.filter((a) => a.exec !== undefined);
+  const exec = avg(scored.map((a) => a.exec ?? 0));
+  const diff = avg(scored.map((a) => a.diff ?? 0));
+  const look = avg(scored.map((a) => a.look ?? 0));
+  const lines: string[] = [];
+  if (best) lines.push(`BEST ${best.total} — ${best.label || best.style}${best.prop && best.prop !== 'NO PROP' ? ` · ${best.prop}` : ''}`);
+  lines.push(`${card.makes} down, ${card.misses} off the iron`);
+  if (scored.length) lines.push(`DIFFICULTY ${diff.toFixed(1)} · EXECUTION ${exec.toFixed(1)} · STYLE ${look.toFixed(1)}`);
+
+  // The advice is whichever number is furthest from where it could be — the longest lever, not the lowest score:
+  // a night of plain dunks landed perfectly has nothing wrong with its execution, and saying so would be noise.
+  let advice = 'Nothing to fix — that was the night.';
+  if (!scored.length) advice = card.misses > card.makes ? 'Wait for the beat; you are throwing it early.' : 'Go again.';
+  else if (card.misses >= Math.max(2, card.attempts.length / 2)) advice = 'You are throwing it at the iron before you get there — wait for the beat.';
+  else if (exec < 6) advice = `The beat is costing you: ${exec.toFixed(1)} of 10 on execution. Let the cue go by and slam on NOW!`;
+  else if (diff < 5) advice = 'Clean night, easy dunks. Call a harder one — the panel pays for what you try.';
+  else if (look < 5) advice = 'Big dunks, quiet ones. Call your style on the runway and hang on the rim.';
+  const headline = best ? `YOUR NIGHT: ${card.total} · BEST ${best.total}` : `YOUR NIGHT: ${card.total}`;
+  return { headline, lines, advice };
 }

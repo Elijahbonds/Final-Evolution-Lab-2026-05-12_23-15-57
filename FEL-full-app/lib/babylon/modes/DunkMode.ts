@@ -74,7 +74,7 @@ import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
 import { approachAngle, approachBonus, takeoffFor } from '../core/DunkApproach';
-import { emptyCard, addAttempt, forWire } from '@/lib/mp/dunkCard';
+import { emptyCard, addAttempt, forWire, nightReport } from '@/lib/mp/dunkCard';
 import {
   judgeDunk, ScoreReveal, CrowdEnergy, REVEAL_DURATION_SEC, BAND_TOTAL, JUDGE_COUNT,
   PERFECT_TOTAL, perJudgeAvg, type JudgeScore,
@@ -2323,11 +2323,9 @@ export const DunkMode: ModeDefinition = (() => {
       // (measured: plain clank 31, a missed 360 32, a missed 360 over the car ~35; at the old ×0.30 every miss rounded to 31)
       const propSeen = obstacleKindOf(prop) ? (obstacleCleared ? PROP_BONUS[prop] : 0) : (prop === 'none' || lob.caught ? PROP_BONUS[prop] : 0);
       const seen = flight.attempt.tricks.reduce((a, t) => a + t.difficulty, 0) + runwayDifficulty + (obstacleCleared ? 1 : 0);
-      const missScores = judgeDunk(
-        Math.max(0, (STYLE_TIER[style] + propSeen + seen) * 0.60),   // they saw the attempt
-        0,                                                            // and they saw it fail
-        Math.max(0, STYLE_TIER[style] * 0.22 + styleTaps * 0.4),
-      );
+      const missDiff = Math.max(0, (STYLE_TIER[style] + propSeen + seen) * 0.60);   // they saw the attempt
+      const missStyle = Math.max(0, STYLE_TIER[style] * 0.22 + styleTaps * 0.4);
+      const missScores = judgeDunk(missDiff, 0, missStyle);                          // and they saw it fail
       // A RETRY IS NOT SCORED. In a real contest only the attempt you finish on is judged, which is what
       // makes burning one cost something without costing everything. The miss is judged only when there is
       // nothing left to try.
@@ -2349,6 +2347,7 @@ export const DunkMode: ModeDefinition = (() => {
         round, style: STYLE_LABEL[style], prop: PROP_LABEL[prop],
         finish: SPORT_CLIP.dunkFinishBlown, label: 'BLOWN',
         judges: missScores.map((j) => j.score), total: missTotal, made: false,
+        diff: missDiff, exec: 0, look: missStyle,   // P9: a miss is part of the night's numbers too
       });
       lastScores = missScores;
       crowd.onScore(missTotal);
@@ -2461,6 +2460,7 @@ export const DunkMode: ModeDefinition = (() => {
       round, style: STYLE_LABEL[style], prop: PROP_LABEL[prop],
       finish: aerialClip, label: finishBanner(true, qteAccuracy, ebState.inLeftHand, calledAirTrick()).replace('!', '') || STYLE_LABEL[style],
       judges: scores.map((j) => j.score), total: dunkTotal, made: true,
+      diff: difficulty, exec: execution, look: styleScore,   // P9: the night's report reads these back
     });
     // Hype is fed by the QUALITY of the dunk, not the raw total — the total's
     // range moved with the ceiling and `dunkTotal * 2` would now fill the meter
@@ -2762,6 +2762,13 @@ export const DunkMode: ModeDefinition = (() => {
       walkOut: walkCue ? musicCredential(walkOut, StudioLibrary.list().length).label : '',
       judgeReveal: null, hint: '', charge: 0, slamPulse: false, need: 0,
     });
+    // P9 (2026-09-16): THE NIGHT SAYS WHAT IT WAS. The contest used to end on a number and a WON / OVER, and a player
+    // who lost by four had no way to know whether it went on the beat, on ambition, or on the two they threw at the
+    // iron early — which is the one thing that decides whether the next night goes better. The panel already publishes
+    // the three numbers per attempt; the card carries them now, and the report names ONE thing to change.
+    const report = nightReport(card);
+    console.info(`[DUNK-NIGHT] ${report.headline} · ${report.lines.join(' · ')} · ${report.advice}`);
+    setTimeout(() => { if (phase === 'contestOver') flash(ctx, `${report.headline} — ${report.advice}`); }, 1400);
   }
 
   /** GO AGAIN — the whole contest resets INSIDE the mode. Nothing is disposed and
