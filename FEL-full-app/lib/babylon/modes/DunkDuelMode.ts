@@ -42,7 +42,7 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { MOCAP_DUNK } from '../nexus/dressingFlags';
 import { attachBallToHand, releaseBall, runEastbayPath, runHandOffPath, handOffK, flushThroughRim, clankOffRim, type HandOffSpec } from '../anim/ballRig';
-import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind } from '../core/DunkObstacles';
+import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind, OBSTACLE_KINDS } from '../core/DunkObstacles';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { boneNode } from '../anim/boneLookup';
 import { EASTBAY_TIMING } from '../anim/authored/timing';
@@ -82,8 +82,10 @@ const DUNKS_EACH = 2;
 // DUNK-CONTROL-JUICE (2026-09-08): the chair box is gone — the duel dunks over the same car / barrier / crate as the contest
 // (dunkObstacleProps: real meshes, hitboxes sampled off them, the feet against the top). X and d-pad down cycle them.
 type Prop = 'none' | ObstacleKind;
-const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', car: OBSTACLE_SPECS.car.label, barrier: OBSTACLE_SPECS.barrier.label, crate: OBSTACLE_SPECS.crate.label, tetris: OBSTACLE_SPECS.tetris.label };
-const PROP_BONUS: Record<Prop, number> = { none: 0, car: OBSTACLE_SPECS.car.bonus, barrier: OBSTACLE_SPECS.barrier.bonus, crate: OBSTACLE_SPECS.crate.bonus, tetris: OBSTACLE_SPECS.tetris.bonus };
+// off the SPEC TABLE, so PROVE IT gets a new prop the moment the contest does (these were written out kind by kind and
+// went stale the first time the table grew — the typechecker is what said so)
+const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', ...Object.fromEntries(OBSTACLE_KINDS.map((k) => [k, OBSTACLE_SPECS[k].label])) } as Record<Prop, string>;
+const PROP_BONUS: Record<Prop, number> = { none: 0, ...Object.fromEntries(OBSTACLE_KINDS.map((k) => [k, OBSTACLE_SPECS[k].bonus])) } as Record<Prop, number>;
 const FLUSH_Z_AHEAD = 0.6;
 const EASTBAY_HANDOFF: HandOffSpec = { at: EASTBAY_TIMING.handOff, from: 'RightHand', to: 'LeftHand' };
 const APPROACH_SPEED = 6, FACE_RIM_RATE = 6;   // Dunk play tip (2026-09-07): the dunk mirror's stick speed / rim-facing ease

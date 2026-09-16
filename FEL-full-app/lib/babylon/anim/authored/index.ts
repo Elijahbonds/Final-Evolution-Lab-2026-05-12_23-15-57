@@ -12,7 +12,7 @@ import { buildEastbay } from './eastbay';
 import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from './dunkSuite';
 import { buildMocapDunk } from './mocapDunk';
 import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig } from './dunkFinishes';
-import { buildStackBase, buildStackRider } from './stackProp';
+import { buildStackBase, buildStackRider, buildRowStand, buildRowCrouch, buildBikeRider, buildSkateRider } from './stackProp';
 import { buildSelfLob, buildBounceThrow, buildKickUp, buildBackHandspring, buildBackflip, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildWindmill360, buildFakeEastbay, buildTap } from './dunkTricks';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
@@ -57,6 +57,10 @@ export function registerAuthoredClips(
     ['dunk_360_windmill', () => buildWindmill360(scene, skeleton)],
     ['dunk_fake_eastbay', () => buildFakeEastbay(scene, skeleton)],
     ['dunk_tap', () => buildTap(scene, skeleton)],
+    ['prop_row_stand', () => buildRowStand(scene, skeleton)],
+    ['prop_row_crouch', () => buildRowCrouch(scene, skeleton)],
+    ['prop_bike_rider', () => buildBikeRider(scene, skeleton)],
+    ['prop_skate_rider', () => buildSkateRider(scene, skeleton)],
     ['dunk_score_hang', () => buildScoreHang(scene, skeleton)],
     ['dunk_land_crouch', () => buildLandCrouch(scene, skeleton)],
     ['dunk_finish_windmill', () => buildFinishWindmill(scene, skeleton)],

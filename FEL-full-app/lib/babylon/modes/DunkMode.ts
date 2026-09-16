@@ -66,7 +66,7 @@ import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
 import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, doubleUpFits, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
-import { OBSTACLE_SPECS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, type ObstacleKind } from '../core/DunkObstacles';
+import { OBSTACLE_SPECS, OBSTACLE_KINDS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, type ObstacleKind } from '../core/DunkObstacles';
 import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, signatureFor, landingDustScale, netSplashScale, NET_SPLASH_DROP, type SlamReadout } from '../core/DunkSystem';
 import { dunkCard, slamIsClean } from '../core/DunkCard';
 import { missBeat } from '../core/MissFlavour';
@@ -106,9 +106,17 @@ type Style = (typeof STYLES)[number];
 // DUNK-GLASS-BOUNCE (2026-09-08): two more self-lobs on the ring — OFF THE GLASS (the toss goes at the backboard and comes
 // back off it to the hand: WDA "Off The Backboard") and the BOUNCE LOB (thrown down into the floor, up to the hand: WDA
 // "Bounce Ball"; from standing it is the bounce-BOUNCE with a RUN cue). d-pad left cycles the lob family.
-const PROPS = ['none', 'alleyoop', 'selflob', 'offglass', 'bounce', 'car', 'barrier', 'crate', 'tetris'] as const;
+const PROPS = ['none', 'alleyoop', 'oopglass', 'oopbounce', 'selflob', 'offglass', 'bounce', 'car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall'] as const;
 type Prop = (typeof PROPS)[number];
-const obstacleKindOf = (p: Prop): ObstacleKind | null => (p === 'car' || p === 'barrier' || p === 'crate' || p === 'tetris' ? p : null);
+const OBSTACLE_PROPS = new Set<string>(OBSTACLE_KINDS);
+const obstacleKindOf = (p: Prop): ObstacleKind | null => (OBSTACLE_PROPS.has(p) ? (p as ObstacleKind) : null);
+// FLASHY ALLEY-OOPS (owner, 2026-09-16: "add flashy alley oops"). The oop was one thing — a teammate throws it straight
+// up and you catch it. The passer can do everything the SELF-lob can: off the glass, or down off the floor. Three oops
+// on the d-pad's right now, and they are worth what they cost to catch.
+const OOP_PROPS = ['alleyoop', 'oopglass', 'oopbounce'] as const;
+type OopProp = (typeof OOP_PROPS)[number];
+const isOop = (p: Prop): p is OopProp => (OOP_PROPS as readonly string[]).includes(p);
+const nextOop = (p: Prop): OopProp => (isOop(p) ? OOP_PROPS[(OOP_PROPS.indexOf(p) + 1) % OOP_PROPS.length] : 'alleyoop');
 const LOB_PROPS = ['selflob', 'offglass', 'bounce'] as const;
 type LobProp = (typeof LOB_PROPS)[number];
 const lobPropOf = (p: Prop): LobProp | null => (p === 'selflob' || p === 'offglass' || p === 'bounce' ? p : null);
@@ -124,9 +132,12 @@ const STYLE_CLIP: Record<Style, string> = {
   flashy: SPORT_CLIP.dunkLaunchPower, sig: SPORT_CLIP.dunkLaunchSig,
 };
 const STYLE_LABEL: Record<Style, string> = { power: 'POWER', flashy: 'FLASHY', sig: 'SIGNATURE' };
-const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', alleyoop: 'ALLEY-OOP', selflob: 'SELF-LOB', offglass: 'OFF THE GLASS', bounce: 'BOUNCE LOB', car: OBSTACLE_SPECS.car.label, barrier: OBSTACLE_SPECS.barrier.label, crate: OBSTACLE_SPECS.crate.label, tetris: OBSTACLE_SPECS.tetris.label };
+// the obstacle labels and bonuses come from the SPEC TABLE, so a new prop is one entry there and not four (2026-09-16)
+const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', alleyoop: 'ALLEY-OOP', oopglass: 'OOP OFF THE GLASS', oopbounce: 'BOUNCE OOP', selflob: 'SELF-LOB', offglass: 'OFF THE GLASS', bounce: 'BOUNCE LOB',
+  ...Object.fromEntries(OBSTACLE_KINDS.map((k) => [k, OBSTACLE_SPECS[k].label])) } as Record<Prop, string>;
 const STYLE_TIER: Record<Style, number> = { power: 3, flashy: 5.5, sig: 8 };
-const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, selflob: 1.5, offglass: 2.5, bounce: 2.5, car: OBSTACLE_SPECS.car.bonus, barrier: OBSTACLE_SPECS.barrier.bonus, crate: OBSTACLE_SPECS.crate.bonus, tetris: OBSTACLE_SPECS.tetris.bonus };
+const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, oopglass: 3.2, oopbounce: 3.6, selflob: 1.5, offglass: 2.5, bounce: 2.5,
+  ...Object.fromEntries(OBSTACLE_KINDS.map((k) => [k, OBSTACLE_SPECS[k].bonus])) } as Record<Prop, number>;
 /** Where the ball hand is at the lob's catch beat (LOB_CATCH_CLIP_T), relative to the root, per launch clip — measured on the
  *  live rig with the reach off through the rise (DUNK-SOFTS-NAMED probe, hand − root at clip 0.62): the mocap POWER gather
  *  holds both hands overhead and a touch behind; the authored FLASHY takeoff has them up and level; the SIG eastbay's ball
@@ -511,7 +522,7 @@ export const DunkMode: ModeDefinition = (() => {
       } catch { /* scene gone */ }
       return;
     }
-    if (prop === 'alleyoop') {
+    if (isOop(prop)) {   // every oop variant needs the passer standing there
       const token = ++obstacleToken;
       const npc = await CharacterPipeline.spawnNpc(ctx.scene, CFG.heroUrl, {
         position: new Vector3(-3.4, 0, CFG.rimZ + 1.6), tint: '#22d3ee', startClip: SPORT_CLIP.teammateIdle,
@@ -717,7 +728,7 @@ export const DunkMode: ModeDefinition = (() => {
       if (e.t === 'dpad' && !e.pressed && e.src !== 'key' && dpadPick && dpadPick.dir === e.dir) {
         const pick = dpadPick; dpadPick = null;
         if (!pick.fired && phase === 'approach') {
-          prop = e.dir === 'up' ? 'none' : e.dir === 'right' ? 'alleyoop' : e.dir === 'left' ? nextLobProp(prop) : nextObstacle(obstacleKindOf(prop));   // left cycles SELF-LOB → OFF THE GLASS → BOUNCE LOB
+          prop = e.dir === 'up' ? 'none' : e.dir === 'right' ? nextOop(prop) : e.dir === 'left' ? nextLobProp(prop) : nextObstacle(obstacleKindOf(prop));   // left cycles SELF-LOB → OFF THE GLASS → BOUNCE LOB
           ctx.setHud({ prop: PROP_LABEL[prop] });
           SoundKit.play('uiTick', { pitch: 1.3 });
           void setupProp(ctx);
@@ -742,7 +753,7 @@ export const DunkMode: ModeDefinition = (() => {
           else if (!runwayBeat) launchDunk(ctx);   // tap to jump — from wherever you are
         } else if (rt && !runwayBeat) {
           // DUNK-SOFTS-NAMED: a runway trick that cannot happen says so (it used to be a silent nothing)
-          if (prop === 'alleyoop') refuse(ctx, `${rt.label} — THE PASSER HAS THE BALL`);
+          if (isOop(prop)) refuse(ctx, `${rt.label} — THE PASSER HAS THE BALL`);
           else if (lob.thrown) refuse(ctx, `${rt.label} — THE BALL IS ALREADY UP · CATCH IT`);
           else if (rt.id === 'bounce' && phase === 'charge' && !bounceFits()) refuse(ctx, 'BOUNCE LOB — TOO CLOSE TO THE LINE · THROW IT STANDING');   // a bounce needs ~1 s of air: on the run it has to leave as the run starts
           else startRunwayBeat(ctx, rt);
@@ -779,6 +790,7 @@ export const DunkMode: ModeDefinition = (() => {
           // Venice DualShock pad: HOLD = RUN. The hold drives the runway toward the rim (stick steers), the jump
           // loads while you run, and the launch fires at the gather line — or on release, from wherever you are.
           setPhase('charge');
+          obstacle?.start();   // a rolling prop comes when you commit to the run (owner, 2026-09-16)
           holdRunSpeed = Math.max(2, runUpPeak);
           playClip(SPORT_CLIP.moveLoop, { loop: true });
           ctx.setHud({ hint: 'HOLD — running to the rim · steer with the stick · LOOK orbits the camera · release early to jump from here' });
@@ -886,7 +898,7 @@ export const DunkMode: ModeDefinition = (() => {
       // takeoff owns it from there. A stick run that never holds RUN dribbles on the spot / down the runway the same way.
       if (dribble) {
         const onRunway = phase === 'approach' || phase === 'charge';
-        const ballOurs = !lob.live && !lob.thrown && prop !== 'alleyoop' && !runwayBeat && !launchQueued;
+        const ballOurs = !lob.live && !lob.thrown && !isOop(prop) && !runwayBeat && !launchQueued;
         const distToLine = player.root.position.z - gatherLine();
         const speed01 = phase === 'charge' ? Math.min(1, holdRunSpeed / HOLD_RUN_MAX) : Math.min(1, Math.hypot(vel.x, vel.z) / APPROACH_SPEED);
         if (onRunway && ballOurs && !gatherLatched && phase === 'charge' && distToLine <= Math.max(1.0, holdRunSpeed * GATHER_LEAD_SEC) && (!dribble.active || atPalm(dribble.phase))) { gatherLatched = true; console.info(`[DUNK-LL] gather at ${distToLine.toFixed(2)} m (phase ${dribble.phase.toFixed(2)})`); }
@@ -1026,9 +1038,18 @@ export const DunkMode: ModeDefinition = (() => {
         // cannot desync, cannot stall.
         // DUNK-CONTROL-JUICE: the alley-oop is a real pass now — the teammate's toss arcs to the catch point in clip time and
         // the dunker's hand has to meet it (it used to LERP head-high and parent itself to the palm on a timer)
-        if (prop === 'alleyoop' && teammate && !lob.thrown) {
+        if (isOop(prop) && teammate && !lob.thrown) {
           if (clipTime >= 0.02) teammate.animator.play(SPORT_CLIP.teammateToss, {});   // the passer winds up as the dunker leaves the floor
-          if (clipTime >= EASTBAY_TIMING.rise * 0.9) throwLob(ctx, ball.getAbsolutePosition().clone(), 'ALLEY-OOP', Math.max(0.35, LOB_CATCH_CLIP_T - clipTime));   // from the palm the ball is in
+          if (clipTime >= EASTBAY_TIMING.rise * 0.9) {
+            // the passer can throw everything the self-lob can, and the SAME solvers run it — a lob off the glass is a
+            // lob off the glass whoever let go of it
+            const from = ball.getAbsolutePosition().clone();
+            const t = Math.max(0.35, LOB_CATCH_CLIP_T - clipTime);
+            const out = Math.max(0.5, from.z - rim.z);
+            if (prop === 'oopglass') throwGlassLob(ctx, from, t + GLASS_CATCH_CLIP_T, true, out);
+            else if (prop === 'oopbounce') throwBounceLob(ctx, from, t + LOB_CATCH_CLIP_T, true, out);
+            else throwLob(ctx, from, 'ALLEY-OOP', t);
+          }
         }
 
         const wasOpen = qteWindowOpen, wasCue = slamCueOn;
@@ -1402,10 +1423,12 @@ export const DunkMode: ModeDefinition = (() => {
   }
 
   /** The jump's height this attempt: the charge and the run-up buy it (the duel's factor), the double-up hop adds to it. */
-  function apexFor(): number { return (1.05 + charge * 0.55) * (0.85 + launchSpeed01 * 0.3) + (doubleUp ? 0.15 : 0); }
+  /** An obstacle that needs a bigger jump gets one — the take-off line already moves back for it, and the arc moves with it. */
+  function apexLift(): number { const k = obstacleKindOf(prop); return k ? (OBSTACLE_SPECS[k].apexLift ?? 0) : 0; }
+  function apexFor(): number { return (1.05 + charge * 0.55) * (0.85 + launchSpeed01 * 0.3) + (doubleUp ? 0.15 : 0) + apexLift(); }
   /** The jump a toss on the runway is aimed at: the charge the hold will have reached by the takeoff, the run-up so far. */
   let chargeAtLaunch = 0;
-  function apexPredicted(): number { return (1.05 + Math.max(charge, chargeAtLaunch) * 0.55) * (0.85 + Math.min(1, Math.max(runUpPeak, holdRunSpeed) / 7) * 0.3) + (doubleUp ? 0.15 : 0); }
+  function apexPredicted(): number { return (1.05 + Math.max(charge, chargeAtLaunch) * 0.55) * (0.85 + Math.min(1, Math.max(runUpPeak, holdRunSpeed) / 7) * 0.3) + (doubleUp ? 0.15 : 0) + apexLift(); }
   let launchZ = CFG.gatherZ;                  // where the flight left the floor (the carry is measured from here)
   let obstacleOver = false, obstacleCleared = false, obstacleMargin = Infinity;   // the clear, once per attempt
   /** The last slam's timing verdict, shown on the card. Null until a slam is pressed this attempt. */
@@ -1579,7 +1602,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (launchSpeed01 < 0.3 && charge > 0.4) flash(ctx, 'WALK-UP — short air', 900);
     else if (approach.difficulty > 0) flash(ctx, `${approach.label}${approach.angleDeg >= 10 ? ` · ${approach.angleDeg}°` : ''}`, 900);
     dribble?.update(0, 0, false); gatherLatched = false; finishRelease = -1;   // DUNK-POSTURE-LEGS: the dribble is parked (the ball back in the palm) before the takeoff takes it
-    if (prop === 'alleyoop') { if (teammate) attachBallToHand(ball, teammate.skeleton, 'RightHand'); else releaseBall(ball); }   // the ball rides the passer's palm until the toss (it used to wait at his idle hand and teleport 0.87 m up on the throw)
+    if (isOop(prop)) { if (teammate) attachBallToHand(ball, teammate.skeleton, 'RightHand'); else releaseBall(ball); }   // the ball rides the passer's palm until the toss (it used to wait at his idle hand and teleport 0.87 m up on the throw)
     else if (!lob.live) attachBallToHand(ball, player.skeleton, 'RightHand');   // a lob already in the air stays there — the catch is the hand's job
     // the track plays you OUT; it does not play under the dunk. The crowd owns the flight.
     stopWalkOut();

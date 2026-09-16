@@ -37,7 +37,7 @@ const AIR: Record<string, { dir: string; btn: number }> = {
 };
 const trick = AIR[TRICK];
 if (!trick) throw new Error(`no such trick: ${TRICK} (have ${Object.keys(AIR).join(', ')})`);
-const OBSTACLE_RING = ['car', 'barrier', 'crate', 'tetris'];
+const OBSTACLE_RING = ['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall'];
 
 const browser = await chromium.launch({ executablePath: chromiumExe(), headless: false, args: ['--window-size=1280,860', '--use-angle=metal', '--autoplay-policy=no-user-gesture-required'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });

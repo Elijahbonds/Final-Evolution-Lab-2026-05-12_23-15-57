@@ -73,3 +73,110 @@ export function buildStackRider(scene: Scene, sk: Skeleton): AnimationGroup | nu
     key(STACK_SEC, 78, 62, 0, 6, [0.26, 0.72, 0.34], 0),
   ]);
 }
+
+/**
+ * THE ROW — one of the people you go over, standing shoulder to shoulder (owner, 2026-09-16: "over a # of people in a
+ * row").
+ *
+ * Same contract as the TETRIS rider: they stand at their full height, and they DUCK as the dunker comes over, because
+ * the hitbox is set at 1.75 m and the dunker's apex is 1.84 — a line of bodies that stood to attention through the jump
+ * would be a dunk nobody in this game could land, and it would look like it too.
+ *
+ * What a person in that line actually does: arms folded or braced in front, weight back, chin down, and a flinch at the
+ * moment of the jump. It is the flinch that sells it — a row of people holding perfectly still is a row of mannequins.
+ */
+export function buildRowStand(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const legs = (bend: number): Record<string, Deg3> => ({
+    LeftUpLeg: [-bend, 0, 5], LeftLeg: [bend * 1.6, 0, 0],
+    RightUpLeg: [-bend, 0, -5], RightLeg: [bend * 1.6, 0, 0],
+  });
+  const key = (t: number, bend: number, lean: number, neck: number, y: number, hipsY: number) => ({
+    t,
+    bones: { Hips: [-lean * 0.4, 0, 0] as Deg3, Spine: [-lean * 0.6, 0, 0] as Deg3, Neck: [neck, 0, 0] as Deg3, ...legs(bend) },
+    // arms folded in front of the chest: hands crossed toward the far side, elbows down
+    // arms: folded in front at rest, thrown WIDE and high on the pose (y drives both, so one number does the whole arm)
+    hands: { Left: [-(y - 1.0) * 1.9 - 0.10, y, 0.24 - (y - 1.0) * 0.5] as V3, Right: [(y - 1.0) * 1.9 + 0.10, y, 0.24 - (y - 1.0) * 0.5] as V3 },
+    poles: { Left: [-0.45, -0.9, -0.2] as V3, Right: [0.45, -0.9, -0.2] as V3 }, hipsY,
+  });
+  return buildPoseClip(scene, sk, 'prop_row_stand', STACK_SEC, [
+    // THEY HIT A POSE (owner, 2026-09-16: "yes it can, hit a pose"). Nobody in that line flinches — they stand up
+    // straight and throw their arms out as the dunker goes over, which is the whole reason anybody volunteers for it.
+    key(0, 6, 0, 4, 1.16, 0),
+    key(STACK_DUCK_T, 2, -8, -10, 1.62, 0.02),   // chest out, chin up, arms thrown wide
+    key(STACK_SEC, 6, 0, 4, 1.16, 0),
+  ]);
+}
+
+/**
+ * THE LINE — bent over, head down, in a row running away down the runway (owner: "5 in a row longitudinal, straight").
+ *
+ * (Kept for anything that wants a bent-over line. The ROW does not use it any more — the owner's people stand up and
+ * hit a pose, and the jump rises to them instead.)
+ */
+export function buildRowCrouch(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const legs = (bend: number): Record<string, Deg3> => ({
+    LeftUpLeg: [-bend, 0, 6], LeftLeg: [bend * 1.5, 0, 0],
+    RightUpLeg: [-bend, 0, -6], RightLeg: [bend * 1.5, 0, 0],
+  });
+  const key = (t: number, fold: number, bend: number, neck: number, y: number, hipsY: number) => ({
+    t,
+    bones: { Hips: [fold, 0, 0] as Deg3, Spine: [fold * 0.7, 0, 0] as Deg3, Neck: [neck, 0, 0] as Deg3, ...legs(bend) },
+    hands: { Left: [-0.22, y, 0.26] as V3, Right: [0.22, y, 0.26] as V3 },   // hands on the knees
+    poles: { Left: [-0.5, -0.8, -0.2] as V3, Right: [0.5, -0.8, -0.2] as V3 }, hipsY,
+  });
+  return buildPoseClip(scene, sk, 'prop_row_crouch', STACK_SEC, [
+    key(0, 52, 26, 22, 0.86, -0.12),
+    key(STACK_DUCK_T, 64, 38, 30, 0.74, -0.22),   // lower as the feet come over
+    key(STACK_SEC, 52, 26, 22, 0.86, -0.12),
+  ]);
+}
+
+/**
+ * ON THE BIKE — a cyclist, leaning over the bars (owner: "have someone on the bike").
+ *
+ * Seated, hands forward and down on the handlebars, one knee up and one down because pedals do not stop for anybody,
+ * chest low over the front wheel. The lean is what keeps the head under 1.5 m: a cyclist sitting bolt upright would be
+ * taller than the dunker's apex, and this has to be a dunk somebody can land.
+ */
+export function buildBikeRider(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const key = (t: number, lead: boolean, lean: number, hipsY: number) => ({
+    t,
+    bones: {
+      Hips: [lean, 0, 0] as Deg3, Spine: [lean * 0.8, 0, 0] as Deg3, Neck: [-lean * 0.9, 0, 0] as Deg3,
+      LeftUpLeg: [lead ? -78 : -34, 0, 8] as Deg3, LeftLeg: [lead ? 84 : 44, 0, 0] as Deg3,
+      RightUpLeg: [lead ? -34 : -78, 0, -8] as Deg3, RightLeg: [lead ? 44 : 84, 0, 0] as Deg3,
+    },
+    hands: { Left: [-0.26, 1.02, 0.40] as V3, Right: [0.26, 1.02, 0.40] as V3 },   // out and down on the bars
+    poles: { Left: [-0.6, -0.7, -0.2] as V3, Right: [0.6, -0.7, -0.2] as V3 }, hipsY,
+  });
+  return buildPoseClip(scene, sk, 'prop_bike_rider', STACK_SEC, [
+    key(0, true, 26, -0.30),
+    key(STACK_SEC / 2, false, 30, -0.32),          // the pedals go round
+    key(STACK_SEC, true, 26, -0.30),
+  ]);
+}
+
+/**
+ * ON THE BOARD — a skater in a crouch (owner: "do the same thing for a skateboard").
+ *
+ * Feet across the deck, knees deep, arms out for balance, weight low. Low is the point: a skater standing up straight
+ * is 1.85 m and the dunker's apex is 1.84, so the crouch is both what a skater rolling under a dunk actually does and
+ * the reason the dunk exists.
+ */
+export function buildSkateRider(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const key = (t: number, bend: number, twist: number, arms: number, hipsY: number) => ({
+    t,
+    bones: {
+      Hips: [12, twist, 0] as Deg3, Spine: [16, twist * 0.6, 0] as Deg3, Neck: [-18, -twist, 0] as Deg3,
+      LeftUpLeg: [-bend, 0, 16] as Deg3, LeftLeg: [bend * 1.7, 0, 0] as Deg3,
+      RightUpLeg: [-bend, 0, -16] as Deg3, RightLeg: [bend * 1.7, 0, 0] as Deg3,
+    },
+    hands: { Left: [-arms, 1.06, 0.10] as V3, Right: [arms, 1.02, -0.14] as V3 },   // out for balance, one lead one trail
+    poles: { Left: [-0.9, -0.3, -0.2] as V3, Right: [0.9, -0.3, -0.2] as V3 }, hipsY,
+  });
+  return buildPoseClip(scene, sk, 'prop_skate_rider', STACK_SEC, [
+    key(0, 48, 10, 0.54, -0.26),
+    key(STACK_DUCK_T, 62, 16, 0.60, -0.36),        // deeper as the feet come over
+    key(STACK_SEC, 48, 10, 0.54, -0.26),
+  ]);
+}

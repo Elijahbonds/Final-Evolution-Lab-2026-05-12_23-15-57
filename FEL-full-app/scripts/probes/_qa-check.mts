@@ -14,7 +14,17 @@ for (const path of (process.env.PATHS ?? '/try,/play/carnival').split(',')) {
   const btns = await p.evaluate(() => [...document.querySelectorAll('button')].map((b) => (b.textContent ?? '').trim()).filter(Boolean).slice(0, 12));
   for (const label of ['START THE NIGHT', 'TAP TO START', 'START', 'PLAY']) { const l = p.getByRole('button', { name: new RegExp(`^${label}$`, 'i') }); if (await l.count()) { await l.first().click().catch(() => {}); break; } }
   await p.waitForTimeout(2500);
-  const qa = await p.evaluate(() => { const q = (window as any).__FEL_QA__; return q ? { modeId: q.modeId, presses: q.summary(450, 0)?.presses ?? null } : null; });
+  await p.waitForTimeout(6000);
+  const qa = await p.evaluate(() => {
+    const w = window as any;
+    return {
+      qa: w.__FEL_QA__ ? { modeId: w.__FEL_QA__.modeId, presses: w.__FEL_QA__.summary(450, 0)?.presses ?? null } : null,
+      dev: w.__FEL_DEV__ ? { modeId: w.__FEL_DEV__.modeId, hasAnim: !!w.__FEL_DEV__.anim } : null,
+      agentFlag: (() => { try { return window.sessionStorage.getItem('NEXUS_AGENT'); } catch { return 'ERR'; } })(),
+      search: window.location.search,
+      canvases: document.querySelectorAll('canvas').length,
+    };
+  });
   const phase = await p.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '');
   console.log(path, 'ready', JSON.stringify(st), 'phase', JSON.stringify(phase), 'qa', JSON.stringify(qa), 'buttons', JSON.stringify(btns).slice(0, 200));
   await p.close();

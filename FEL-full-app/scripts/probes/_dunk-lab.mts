@@ -61,7 +61,7 @@ if (RUNWAY_TRICK && !(RUNWAY_TRICK in RUNWAY)) throw new Error(`no such runway t
 /** How long into the hold-run the runway trick is thrown (the double-up wants the last stretch before the line). */
 const RUNWAY_AT_MS = Number(process.env.RUNWAY_AT_MS ?? 700);
 /** The PROP ring: d-pad DOWN in the approach cycles the obstacle (car → barrier → crate → THE TETRIS). OBSTACLE=tetris. */
-const OBSTACLE_RING = ['car', 'barrier', 'crate', 'tetris'];
+const OBSTACLE_RING = ['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall'];
 const OBSTACLE = process.env.OBSTACLE ?? '';
 /** STYLE=flashy|sig — B in the approach cycles POWER -> FLASHY -> SIGNATURE, and the style called buys air (a triple needs it). */
 const STYLE_RING = ['power', 'flashy', 'sig'];

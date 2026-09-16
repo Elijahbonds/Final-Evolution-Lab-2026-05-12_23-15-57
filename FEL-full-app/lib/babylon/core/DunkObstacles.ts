@@ -8,15 +8,36 @@
 // The car parks sideways under the rim's shadow, so the runway crosses its width; the takeoff line moves back for it
 // (a real over-the-car dunk is a long jump) and the flight's forward carry lands the dunker past the far door.
 
-export type ObstacleKind = 'car' | 'barrier' | 'crate' | 'tetris';
-export const OBSTACLE_KINDS: ObstacleKind[] = ['car', 'barrier', 'crate', 'tetris'];
+export type ObstacleKind = 'car' | 'barrier' | 'crate' | 'tetris' | 'ladder' | 'bike' | 'bikeroll' | 'skate' | 'skateroll' | 'row3' | 'row5' | 'wall';
+export const OBSTACLE_KINDS: ObstacleKind[] = ['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall'];
 
 export interface ObstacleSpec {
   kind: ObstacleKind;
   label: string;
   /** Where the model comes from: the owner's Meshy bakes, a Kenney kit (public/models/props/<kit>/<model>.glb), or
    *  BODIES — two of the game's own characters, stacked (the TETRIS). */
-  source: { meshy: 'sedan' } | { kit: string; model: string } | { bodies: 'stack' };
+  source: { meshy: 'sedan' | 'skateboard' } | { kit: string; model: string } | { bodies: 'stack' | 'row' | 'wall' } | { built: 'ladder' | 'bike' };
+  /** For a BODIES row or wall: how many of them. */
+  bodyCount?: number;
+  /** Somebody is ON it — a cyclist on the bike, a skater on the board. They ride the prop and duck as you come. */
+  rider?: 'bike' | 'skate';
+  /** Metres per second ACROSS the runway. A moving prop is a timing problem: it is only in your way some of the time,
+   *  and the hitbox travels with it (HeightProfile.centerX). 0 / undefined = it stands still. */
+  speed?: number;
+  /** How far either side of its parked spot a moving prop runs before it turns around. */
+  travel?: number;
+  /** Which way it travels: ACROSS the runway ('x', the default) or ALONG it — 'z' is a prop coming straight at you. */
+  axis?: 'x' | 'z';
+  /**
+   * Extra apex, metres, for an obstacle that needs a bigger jump than the flat runway does.
+   *
+   * The owner's correction, and he is right: you CAN go over a row of people standing up. What that takes is a bigger
+   * jump, and the mode already accepts that the take-off line moves back for a deep prop — the arc should move with it.
+   * A plain flight tops out at 1.84 m, which holds the feet above 1.75 m for only ~0.9 m of floor; two metres of
+   * standing people needs ~2.35 m of apex, and that is what this buys. It is the run-up doing it: you do not get this
+   * arc by ambling at a line of five people.
+   */
+  apexLift?: number;
   scale: number;
   /** A vertical scale on top of `scale` (the Kenney block is a 1 × 0.5 × 1 slab — 2.4 makes it a 1.2 m crate). */
   scaleY?: number;
@@ -51,15 +72,73 @@ export const OBSTACLE_SPECS: Record<ObstacleKind, ObstacleSpec> = {
   // feet must actually clear) and the rider DUCKS as you come, which is both the truth and the reason it is clearable.
   // The hardest obstacle on the card: the longest take-off and the biggest bonus.
   tetris: { kind: 'tetris', label: 'TETRIS', source: { bodies: 'stack' }, scale: 1, yaw: 0, zFromRim: 2.0, takeoffFromRim: 3.8, bonus: 4, topples: true, nominalHeight: 1.75, clearance: 0.05 },
+
+  // MORE PROPS (owner, 2026-09-16: "add more prop dunks, ladder, bike, over a # of people in a row").
+  //
+  // There is no ladder and no bicycle in any kit here — the props that exist are the owner's Meshy bakes and the Kenney
+  // sets, and neither has one. The rule this file already keeps ("no CreateBox stand-in survives a load") is about not
+  // shipping a grey box that is pretending to be a car; a ladder is two rails and five rungs and a bike is two wheels
+  // and a frame, so these are BUILT out of the shapes they are actually made of rather than stood in for.
+  ladder: { kind: 'ladder', label: 'STEP LADDER', source: { built: 'ladder' }, scale: 1, yaw: 0, zFromRim: 1.7, takeoffFromRim: 3.5, bonus: 3, topples: true, nominalHeight: 1.5, clearance: 0.05 },
+  // BROADSIDE, or it is invisible. Built nose-on to the runway the bike is a 10 cm silhouette — caught on the runway
+  // frame, where the only thing showing above the dunker's head was the red line of the handlebars. A bike you dunk
+  // over is always side on: the length goes ACROSS the runway, so you see the whole thing, and what you clear is the
+  // width of the wheels.
+  // SOMEBODY IS ON IT, AND IT CAN BE MOVING (owner, 2026-09-16: "have someone on the bike, have the option to have it
+  // moving, do the same thing for a skateboard"). A parked bike is an object; a bike with a rider on it is a dare, and
+  // one rolling across the runway is a timing problem — it is only in your way some of the time, so the run-up has to
+  // be read as well as run. The rider leans over the bars (and the skater crouches) so the hitbox stays under the
+  // 1.84 m apex, the same rule the TETRIS and the WALL keep.
+  bike: { kind: 'bike', label: 'BIKE', source: { built: 'bike' }, rider: 'bike', scale: 1.1, yaw: Math.PI / 2, zFromRim: 1.9, takeoffFromRim: 3.7, bonus: 3.5, topples: true, nominalHeight: 1.5, clearance: 0.05 },
+  bikeroll: { kind: 'bikeroll', label: 'ROLLING BIKE', source: { built: 'bike' }, rider: 'bike', speed: 2.4, travel: 3.0, axis: 'z', scale: 1.1, yaw: 0, zFromRim: 1.9, takeoffFromRim: 3.7, bonus: 5, topples: true, nominalHeight: 1.5, clearance: 0.05 },
+  skate: { kind: 'skate', label: 'SKATER', source: { meshy: 'skateboard' }, rider: 'skate', scale: 1, yaw: Math.PI / 2, zFromRim: 1.85, takeoffFromRim: 3.6, bonus: 3, topples: true, nominalHeight: 1.45, clearance: 0.05 },
+  skateroll: { kind: 'skateroll', label: 'ROLLING SKATER', source: { meshy: 'skateboard' }, rider: 'skate', speed: 2.8, travel: 3.2, axis: 'x', scale: 1, yaw: Math.PI / 2, zFromRim: 1.85, takeoffFromRim: 3.6, bonus: 4.5, topples: true, nominalHeight: 1.45, clearance: 0.05 },
+
+  // OVER A ROW OF PEOPLE — LONGITUDINAL (owner, 2026-09-16: "it's supposed to be 5 in a row longitudinal, straight").
+  //
+  // The line runs AWAY from you down the runway, so what you clear is its LENGTH, and they STAND UP (owner, 2026-09-16:
+  // "the people can stand up").
+  //
+  // THEY STAND AT FULL HEIGHT AND THEY HIT A POSE (owner: "the people can stand up" / "yes it can, hit a pose").
+  //
+  // I had this the wrong way round first. The lab blew the dunk twice out of two into a line of standing people, and I
+  // lowered the people — which is the coward's fix and not what happens in real life, where the dunker simply jumps
+  // higher. A plain flight tops out at 1.84 m and holds the feet above 1.75 for about 0.9 m of floor; two metres of
+  // standing people needs ~2.35 m of apex, so that is what the run-up over this prop buys (`apexLift`). The people
+  // stand up straight, arms out, and the jump rises to them.
+  row3: { kind: 'row3', label: 'THREE IN A ROW', source: { bodies: 'row' }, bodyCount: 3, scale: 1, yaw: 0, zFromRim: 1.8, takeoffFromRim: 3.6, bonus: 4.5, topples: true, nominalHeight: 1.75, clearance: 0.05, apexLift: 0.32 },
+  // row5's far edge sat 0.12 m from the flush point, so the dunker never got PAST it before the flight resolved and the
+  // clear never registered (measured on rc42: the dunk landed, the bonus did not). The line stands further out.
+  row5: { kind: 'row5', label: 'FIVE IN A ROW', source: { bodies: 'row' }, bodyCount: 5, scale: 1, yaw: 0, zFromRim: 2.25, takeoffFromRim: 4.35, bonus: 6, topples: true, nominalHeight: 1.75, clearance: 0.05, apexLift: 0.72 },
+
+  // THE WALL (owner: "keep that too for a set up, that's good for jclark's, Jonathan's wall"). The first row I built was
+  // shoulder to shoulder ACROSS the runway, which is the wrong shape for "five in a row" and exactly the right one for
+  // this: a wall of people standing at full height, cleared all at once. Jonathan Clark's. They stand — so the hitbox
+  // is the 1.75 m the TETRIS proved clearable, and like the tetris rider they duck as the feet come over, because the
+  // dunker's apex is 1.84 m and a hitbox at the top of a standing head is a dunk nobody in this game can do.
+  wall: { kind: 'wall', label: 'WALL', source: { bodies: 'wall' }, bodyCount: 5, scale: 1, yaw: 0, zFromRim: 1.9, takeoffFromRim: 3.6, bonus: 5.5, topples: true, nominalHeight: 1.75, clearance: 0.05 },
 };
 
+/** How far apart the bodies stand (metres) — shoulder to shoulder in the wall, nose to tail down the row. */
+export const ROW_SPACING_M = 0.62;
+/** The longitudinal row packs tighter than the wall: nose to tail down the line, shoulder to shoulder across it. */
+export const ROW_ALONG_SPACING_M = 0.46;
+
 /** A height profile along the runway: `z` in world metres (descending toward the rim), `h` the mesh's top at that z. */
-export interface HeightProfile { z: number[]; h: number[]; halfWidth: number }
+export interface HeightProfile {
+  z: number[]; h: number[]; halfWidth: number;
+  /** Where the footprint sits across the runway. A MOVING prop rides this — the obstacle's tick writes it every frame,
+   *  so the hitbox goes where the thing actually is instead of staying parked on the centreline. Default 0. */
+  centerX?: number;
+  /** And how far it has slid ALONG the runway, for a prop coming at you rather than across you. Default 0. */
+  zShift?: number;
+}
 
 /** The obstacle's height under a point on the runway (linear between samples; 0 outside its footprint). */
 export function heightAt(profile: HeightProfile, x: number, z: number): number {
-  if (Math.abs(x) > profile.halfWidth) return 0;
+  if (Math.abs(x - (profile.centerX ?? 0)) > profile.halfWidth) return 0;
   const zs = profile.z; if (!zs.length) return 0;
+  z -= profile.zShift ?? 0;
   const zMax = Math.max(zs[0], zs[zs.length - 1]), zMin = Math.min(zs[0], zs[zs.length - 1]);
   if (z > zMax || z < zMin) return 0;
   for (let i = 0; i < zs.length - 1; i++) {
