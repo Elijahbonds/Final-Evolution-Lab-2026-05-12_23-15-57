@@ -25,7 +25,10 @@ const browser = await chromium.launch({
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, permissions: ['camera'] });
 const errors: string[] = [];
 const page = await ctx.newPage();
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 160)); });
+// the pose runtime logs its own start-up at error level ("INFO: Created TensorFlow Lite XNNPACK delegate for CPU.") —
+// a log LEVEL is not a fault, and counting it cost the game two points for loading correctly
+const benign = (t: string) => /^(INFO|WARNING|W\d{4}|I\d{4}):/.test(t.trim()) || /XNNPACK delegate/.test(t);
+page.on('console', (m) => { if (m.type() === 'error' && !benign(m.text())) errors.push(m.text().slice(0, 160)); });
 page.on('pageerror', (e) => errors.push(String(e.message).slice(0, 160)));
 
 // login (the play routes are behind auth on a production build)
