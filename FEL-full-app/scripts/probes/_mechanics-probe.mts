@@ -155,12 +155,28 @@ async function session(m: Spec, driver: 'idle' | 'deliberate' | 'masher' | 'inte
   return row;
 }
 
+/**
+ * A session that hangs takes the WHOLE RUN with it (2026-09-15): the rc19 pass stopped dead after seven modes with a
+ * live node process and no browser, and the twenty-two modes behind it were never measured. Each session gets its own
+ * clock — generous, since a cold mode load on a production build can take a minute — and a mode that overruns is
+ * recorded as a miss and the run carries on.
+ */
+const SESSION_BUDGET_MS = Number(process.env.SESSION_BUDGET_MS ?? 180000);
+async function timedSession(m: typeof MODES[number], driver: Parameters<typeof session>[1]): Promise<Record<string, unknown>> {
+  let timer: NodeJS.Timeout | undefined;
+  const bail = new Promise<Record<string, unknown>>((res) => {
+    timer = setTimeout(() => res({ slug: m.slug, driver, note: `timed out after ${SESSION_BUDGET_MS / 1000} s`, score: null }), SESSION_BUDGET_MS);
+  });
+  try { return await Promise.race([session(m, driver), bail]); }
+  finally { if (timer) clearTimeout(timer); }
+}
+
 const rows: Record<string, unknown>[] = [];
 for (const m of MODES) {
-  const idle = await session(m, 'idle');
-  const del = await session(m, 'deliberate');
-  const mash = await session(m, 'masher');
-  const intent = process.env.INTENT === '1' && INTENT_DRIVERS[m.slug] ? await session(m, 'intent') : null;
+  const idle = await timedSession(m, 'idle');
+  const del = await timedSession(m, 'deliberate');
+  const mash = await timedSession(m, 'masher');
+  const intent = process.env.INTENT === '1' && INTENT_DRIVERS[m.slug] ? await timedSession(m, 'intent') : null;
   const verdict: string[] = [];
   if (typeof del.silentPct === 'number' && del.silentPct > 25) verdict.push(`SILENT ${del.silentPct}% of deliberate presses`);
   const silentBtns = Object.entries((del.byBtn ?? {}) as Record<string, any>).filter(([, r]) => r.presses >= 2 && r.silent / r.presses > 0.5).map(([b]) => b);
