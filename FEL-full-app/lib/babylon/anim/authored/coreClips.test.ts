@@ -104,9 +104,15 @@ describe('karate fills', () => {
 
 // ANIM-READABILITY (creative, 2026-09-07): the runner's holds, the counter-strike wind-up, the dance pack
 describe('freerun fills', () => {
-  it('air hold: arms overhead like the take-off, held (frame T matches frame 0); the tuck folds the knees to the chest', () => {
+  it('air hold: the arms REACH forward, never overhead or out wide (the scorecard read that flight as a T); held, and the tuck folds the knees to the chest', () => {
     const g = fresh(() => buildFreeRunAirHold(scene, sk)!);
-    at(g, 0); const l0 = pos('LeftHand').clone(); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y); expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y);
+    at(g, 0); const l0 = pos('LeftHand').clone();
+    // forward of the chest, at or under the shoulders, and inside the shoulder line: a hand reaching for the next ledge
+    for (const side of ['Left', 'Right'] as const) {
+      expect(pos(`${side}Hand`).z, `${side} reaches forward`).toBeGreaterThan(pos('Hips').z + 0.25);
+      expect(pos(`${side}Hand`).y, `${side} is not overhead`).toBeLessThan(pos('Head').y);
+      expect(Math.abs(pos(`${side}Hand`).x), `${side} is not out wide`).toBeLessThan(Math.abs(pos(`${side}Arm`).x) + 0.1);
+    }
     at(g, 0.8); expect(Vector3.Distance(pos('LeftHand'), l0)).toBeLessThan(0.02);
     const t = fresh(() => buildFreeRunTuck(scene, sk)!);
     at(t, 0); expect(pos('LeftLeg').y).toBeGreaterThan(hipsY() - 0.15);   // knees up by the hips

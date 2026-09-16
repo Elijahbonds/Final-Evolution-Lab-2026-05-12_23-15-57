@@ -8,17 +8,26 @@ import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
 import { buildPoseClip, type Deg3 } from '../poseClip';
 type V3 = [number, number, number];
 
-/** In the air after the take-off: arms up and slightly out (the jump_up take-off pose, held), knees drawn up a little. */
+/**
+ * In the air after the take-off: the arms REACH for where he is going, knees drawn up a little.
+ *
+ * They used to be held overhead and a little out (hands at y 1.86, the take-off pose frozen), and the scorecard's body
+ * sampler read the flight as a T on 9 frames of 404 and as arms-too-high on 3 more — 2.2 %, the whole of free run's
+ * Body deduction (rc20: 6.7). Overhead is also the wrong shape: a runner who jumps a gap does not hold his arms up like
+ * a goalpost, he throws them FORWARD at the thing he is jumping to and pulls his knees under him. Shoulder height, in
+ * front of the chest, and narrower than the shoulders — which is what a hand reaching for a ledge looks like, and what
+ * the loco arm window has always asked for.
+ */
 const AIR = {
-  bones: { Hips: [0, 0, 0] as Deg3, Spine: [-4, 0, 0] as Deg3, LeftUpLeg: [-25, 0, 4] as Deg3, LeftLeg: [30, 0, 0] as Deg3, RightUpLeg: [-25, 0, -4] as Deg3, RightLeg: [30, 0, 0] as Deg3 },
-  hands: { Left: [-0.24, 1.86, 0.16] as V3, Right: [0.24, 1.86, 0.16] as V3 },
-  poles: { Left: [-0.9, 0.1, -0.3] as V3, Right: [0.9, 0.1, -0.3] as V3 },
+  bones: { Hips: [0, 0, 0] as Deg3, Spine: [6, 0, 0] as Deg3, LeftUpLeg: [-25, 0, 4] as Deg3, LeftLeg: [30, 0, 0] as Deg3, RightUpLeg: [-25, 0, -4] as Deg3, RightLeg: [30, 0, 0] as Deg3 },
+  hands: { Left: [-0.20, 1.34, 0.44] as V3, Right: [0.21, 1.30, 0.46] as V3 },
+  poles: { Left: [-0.8, -0.4, -0.2] as V3, Right: [0.8, -0.4, -0.2] as V3 },
 };
 export function buildFreeRunAirHold(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 0.8;
   return buildPoseClip(scene, sk, 'freerun_air_hold', T, [
     { t: 0, ...AIR, hipsY: 0 },
-    { t: T / 2, bones: { ...AIR.bones, LeftUpLeg: [-30, 0, 4], RightUpLeg: [-30, 0, -4], LeftLeg: [36, 0, 0], RightLeg: [36, 0, 0] }, hands: { Left: [-0.26, 1.84, 0.18], Right: [0.26, 1.84, 0.18] }, poles: AIR.poles, hipsY: 0 },
+    { t: T / 2, bones: { ...AIR.bones, LeftUpLeg: [-30, 0, 4], RightUpLeg: [-30, 0, -4], LeftLeg: [36, 0, 0], RightLeg: [36, 0, 0] }, hands: { Left: [-0.19, 1.38, 0.46], Right: [0.22, 1.27, 0.44] }, poles: AIR.poles, hipsY: 0 },
     { t: T, ...AIR, hipsY: 0 },
   ]);
 }
