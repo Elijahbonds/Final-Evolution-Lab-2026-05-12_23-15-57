@@ -437,6 +437,11 @@ export const SkateRunMode: ModeDefinition = (() => {
         } else if (g && !rig.rider.grounded) {
           // mid-air: real rotation physics + combo chain entry
           airTrick(ctx, g.id, g.label, g.family, TRICKS[g.trickKey].pts, g.difficulty);
+        } else if (g && rig.rider.grounded) {
+          // SCORECARD FEEL (2026-09-15): a flip asked for with the wheels down answered with nothing but whatever clip
+          // happened to be playing — 47 % of skate's answered presses carried no sound or pop, the thinnest FEEL row on
+          // the card. A flip is an AIR trick, and that rule is worth one line and a tick.
+          refuse(ctx, `${g.label} — POP FIRST`);
         }
         if (!flick.heldGrab && air.state.grabHeld) {
           trickLayer?.release();
@@ -445,7 +450,8 @@ export const SkateRunMode: ModeDefinition = (() => {
         }
       }
       if (e.t === 'trigger' && e.side === 'R') {
-        if (e.value > 0 && pump <= 0) crouchAt = performance.now();
+        // the crouch is a real action with a real payoff (it scales the pop), and it used to be heard as nothing at all
+        if (e.value > 0 && pump <= 0) { crouchAt = performance.now(); SoundKit.play('uiTick', { pitch: 0.65, volume: 0.3 }); ctx.feel?.impact?.(0.06); }
         if (e.value < pump) {
           // VENICE-SKATE-THPS: CROUCH SCALES POP on a keyboard too. Space emits `trigger 0.01` down and `trigger 0` up
           // (InputBus), so every keyboard ollie charged 0.01 and popped at the floor of the curve — the pop was the
