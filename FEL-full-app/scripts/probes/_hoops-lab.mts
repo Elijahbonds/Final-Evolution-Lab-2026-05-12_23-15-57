@@ -88,6 +88,11 @@ await page.evaluate(`(() => {
   window.__dev = () => { const q = window.__FEL_QA__; const s = q && q.scene ? q.scene() : null; return (s && s.metadata && s.metadata[MODE]) || null; };
   window.__meter = { peak: 0, frames: 0 };
   window.__def = { jumps: 0, gathers: 0, lastPhase: '' };
+  // ONE QUEUE, ONE DRIVER. AgentControlSource is a SERIAL queue: every push waits its turn. The page-side defensive
+  // brain pushing a 130 ms move every 120 ms therefore sits in front of whatever the node side asks for next, so an
+  // offence play's squeeze arrived seconds late (or behind a possession change) and read as "the layup did nothing".
+  // The brain only runs when this run is measuring DEFENCE.
+  window.__brain = false;
   setInterval(() => {
     const m = window.__hudNow().shotMeterT;
     if (typeof m === 'number' && m > 0) { window.__meter.frames++; if (m > window.__meter.peak) window.__meter.peak = m; }
@@ -99,7 +104,7 @@ await page.evaluate(`(() => {
   const d = window.__def;
   setInterval(() => {
     const dev = window.__dev(); const a = window.__NEXUS_AGENT__;
-    if (!dev || !a) return;
+    if (!window.__brain || !dev || !a) return;
     const onD = MODE === 'onevone' ? dev.possession && dev.possession() === 'defense' : dev.carrier && dev.carrier() === 'foeTeam';
     if (!onD) { d.lastPhase = ''; return; }
     const phase = dev.attackPhase ? dev.attackPhase() : '';
@@ -107,34 +112,46 @@ await page.evaluate(`(() => {
     d.lastPhase = phase;
   }, 16);
 
+  // ONE STEERING HELPER FOR BOTH SIDES. The mode runs every stick through camRel, so a world direction has to be
+  // resolved in the ACTIVE CAMERA's floor basis — this is the inverse of what the mode does, and it is the only way
+  // a probe can say "go there" rather than "push forward and hope the camera agrees".
+  window.__steer = (tx, tz, ms) => {
+    const q = window.__FEL_QA__; const a = window.__NEXUS_AGENT__;
+    const scene = q && q.scene ? q.scene() : null; const cam = scene && scene.activeCamera;
+    // hero() hands back the ROOT NODE, not a point — reading .x off it gives undefined, every wish comes out NaN,
+    // (and no backtick in this comment: it lives inside a template literal, which one would end — a trap this repo
+    // has now sprung three times)
+    // and AgentControlSource's clamp turns a NaN stick into 0. That is a probe that steers perfectly and never moves:
+    // both drive plays shot a JUMPER from the spawn while reporting a clean run.
+    const hn = q && q.hero ? q.hero() : null;
+    const me = hn && (hn.position || hn);
+    if (!cam || !me || !a || typeof me.x !== 'number') return false;
+    const wx = tx - me.x, wz = tz - me.z;
+    const wl = Math.hypot(wx, wz);
+    if (wl < 0.2) return false;
+    const f = cam.getForwardRay ? cam.getForwardRay().direction : null;
+    if (!f) return false;
+    const fl = Math.hypot(f.x, f.z) || 1; const fx = f.x / fl, fz = f.z / fl;
+    a.do('move', { x: (wx * fz - wz * fx) / wl, y: (wx * fx + wz * fz) / wl, ms: ms || 130 });
+    return true;
+  };
+
   // STAY IN FRONT. Without this the brain only jumped, and a block also needs to be WITHIN RANGE (1.2 m on a jumper,
   // BLOCK_RANGE on a layup) — eight jumps on eight gathers converted two, mostly because nobody was near him. The
   // wish is "the point a metre off him on the rim side"; the stick is camera-relative (the mode runs every stick
   // through camRel), so the world wish is resolved in the ACTIVE CAMERA's basis — the inverse of what the mode does.
   setInterval(() => {
-    const dev = window.__dev(); const a = window.__NEXUS_AGENT__; const q = window.__FEL_QA__;
-    if (!dev || !a || !q || !dev.foeRoot) return;
+    const dev = window.__dev();
+    if (!window.__brain || !dev || !dev.foeRoot) return;
     const onD = MODE === 'onevone' ? dev.possession && dev.possession() === 'defense' : dev.carrier && dev.carrier() === 'foeTeam';
     if (!onD) return;
-    const scene = q.scene ? q.scene() : null; const cam = scene && scene.activeCamera;
-    const me = q.hero ? q.hero() : null;
-    if (!cam || !me) return;
     const him = dev.foeRoot.position;
-    // the rim's floor point: z ≈ 0 end of the half court, which both modes spawn toward
-    const rim = { x: 0, z: 0 };
-    const toRim = { x: rim.x - him.x, z: rim.z - him.z };
-    const len = Math.hypot(toRim.x, toRim.z) || 1;
-    const spot = { x: him.x + (toRim.x / len) * 1.0, z: him.z + (toRim.z / len) * 1.0 };
-    const wish = { x: spot.x - me.x, z: spot.z - me.z };
-    const wl = Math.hypot(wish.x, wish.z);
-    if (wl < 0.25) return;                       // already there; standing still is a stance, not a failure
-    const f = cam.getForwardRay ? cam.getForwardRay().direction : null;
-    if (!f) return;
-    const fl = Math.hypot(f.x, f.z) || 1;
-    const fx = f.x / fl, fz = f.z / fl;          // camera forward on the floor
-    const y = (wish.x * fx + wish.z * fz) / wl;  // …and its right is (fz, -fx)
-    const x = (wish.x * fz - wish.z * fx) / wl;
-    a.do('move', { x: Math.max(-1, Math.min(1, x)), y: Math.max(-1, Math.min(1, y)), ms: 130 });
+    // the point a metre off him on the rim side: stay in FRONT, which is also the only way to be inside the block's
+    // range (1.2 m on a jumper) when his gather comes
+    const tx = him.x - him.x * 0, tz = him.z;
+    const dx = 0 - him.x, dz = -0.6 - him.z;
+    const dl = Math.hypot(dx, dz) || 1;
+    window.__steer(tx + (dx / dl) * 1.0, tz + (dz / dl) * 1.0, 130);
   }, 120);
 })()`);
 
@@ -160,14 +177,34 @@ const PLAYS = ['jumper', 'layup', 'dunk'];
 // for exactly this (they exist "so a probe can reach either possession deterministically"), so the lab uses them and
 // the SIDE under test is chosen by PLAY rather than by who happens to be winning.
 const wantDefence = PLAY === 'defence';
+await page.evaluate(`(() => { window.__brain = ${wantDefence}; })()`);
 
-/** Drive straight at the rim until it is `stop` metres away (or 2.5 s go by). RIM_FLOOR is (0, 0, -0.6) in both modes. */
+/**
+ * Drive at the rim until it is `stop` metres away (or 2.5 s go by), going AROUND the defender.
+ *
+ * Driving straight down the middle is how the first version of this lost the ball on most of its layup
+ * possessions: the mode strips a carrier who comes within 1.6 m of a defender with his hands live, which is correct
+ * basketball and a bad probe. So when he is inside 2.2 m the target slides to whichever side of the rim I am
+ * already on — a drive with an angle on it, which is what a player does.
+ */
 async function driveToRim(stop: number): Promise<void> {
   const t0 = Date.now();
   while (Date.now() - t0 < 2500) {
-    const d = await page.evaluate(`(() => { const q = window.__FEL_QA__; const h = q && q.hero ? q.hero() : null; return h ? Math.hypot(h.x - 0, h.z - (-0.6)) : -1; })()`) as number;
-    if (d < 0 || d <= stop) return;
-    await agent(`a.do('move', { x: 0, y: 1, ms: 140 })`);
+    const done = await page.evaluate(`(() => {
+      const q = window.__FEL_QA__; const d = window.__dev();
+      const hn = q && q.hero ? q.hero() : null;
+      const me = hn && (hn.position || hn);
+      if (!me || typeof me.x !== 'number') return true;
+      const RX = 0, RZ = -0.6;
+      if (Math.hypot(me.x - RX, me.z - RZ) <= ${stop}) return true;
+      let tx = RX, tz = RZ;
+      const him = d && d.foeRoot ? d.foeRoot.position : null;
+      if (him && Math.hypot(me.x - him.x, me.z - him.z) < 2.2) tx = RX + (me.x >= him.x ? 1.3 : -1.3);
+      window.__steer(tx, tz, 140);
+      return false;
+    })()`);
+    if (done) return;
+    await page.waitForTimeout(130);
   }
 }
 for (let n = 0; n < POSSESSIONS; n++) {
@@ -190,7 +227,7 @@ for (let n = 0; n < POSSESSIONS; n++) {
     // THE THREE FINISHES, aimed rather than hoped for. Distance is bought with drive time: classifyShot's layup band
     // is 2.2 m planar, the floater band runs to FLOATER_RANGE, and checkDriveDunk additionally wants speed and turbo —
     // which is what `sprint` buys, and why the dunk play never releases the stick before the squeeze.
-    if (play === 'jumper') { /* shoot from the reset spot */ }
+    if (play === 'jumper') await agent(`a.do('shoot', { charge: ${CHARGE} })`);   // from the reset spot, no drive
     else if (play === 'dunk') {
       // THE STICK IS STILL DOWN WHEN THE TRIGGER GOES. `do('sprint')` then `do('shoot')` is TWO queued intents, and
       // the second one lets go of the stick — so by the squeeze the sprint is over, `sprintOk` is false and the
@@ -212,7 +249,7 @@ for (let n = 0; n < POSSESSIONS; n++) {
       await agent(`a.act({ moveX: 0, moveY: 0.45, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
       await agent(`a.act({ moveX: 0, moveY: 0.45, actionHeld: 0, action: true }, 80)`);
     }
-    else await agent(`a.do('shoot', { charge: ${CHARGE} })`);
+
     // WHAT DID THE SQUEEZE ACTUALLY DO? A possession that reports "meter 0.00, no beats, no points" is not evidence of
     // a bad layup — it is the absence of a shot, and the mode's own seam says which. Sampled to feet-down.
     trace = await page.evaluate(`(async () => {
