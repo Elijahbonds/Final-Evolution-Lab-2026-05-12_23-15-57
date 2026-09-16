@@ -212,6 +212,10 @@ const MY_SPAWN = new Vector3(0, 0, 5), FOE_SPAWN = new Vector3(0, 0, 2);
 const CHECK_FOE = new Vector3(0, 0, 9.2), CHECK_ME = new Vector3(0, 0, 7.2);
 /** A poke's reach. Body collision holds two players ~1.1 m apart; 1.2 sat ON the standoff and flickered. */
 const STEAL_RANGE = 1.6;
+/** How long the feet have to be planted before a charge can be drawn — a charge is arriving early, not colliding. */
+const CHARGE_SET_SEC = 0.18;
+/** Inside a stride of a planted defender is contact; past it he went round you. */
+const CHARGE_RANGE = 1.15;
 const REACH_COOLDOWN_SEC = 0.4;          // a reach is a commitment, not a mash
 const REACH_WHIFF_STUN_SEC = 0.45;       // a whiffed reach costs your feet
 const JUMP_SEC = 0.75;                   // the contest jump's clock (physics lands the body)
@@ -222,8 +226,8 @@ const FACE_RATE = 10, FACE_RIM_RATE = 6;
 const DEFEND_FACE_RANGE = 6;
 // "SPRINT in to DUNK, ease off to LAY IT IN" is the one line this hint was missing, and the fix that made the layup
 // reachable (see the checkDriveDunk call) is worth nothing if nobody is told the choice exists.
-const HINT_OFFENCE = 'SPRINT into the rim to DUNK · ease off the stick to LAY IT IN · snap the stick for ankles · pull BACK for a HESI · hold L1/LT near the block to POST UP (back to the rim: shoot for a HOOK, pull off the rim for a FADEAWAY, swing the stick across to SPIN) · drive into a body to SPIN off him';
-const HINT_DEFENCE = 'STAY IN FRONT — they sidestep, you slide · X: STEAL as the ball crosses over · A: JUMP on the gather to BLOCK · hold L1/LT: BOX OUT';
+const HINT_OFFENCE = 'HOLD R2 + a direction to SPRINT · R2 + SQUARE at the rim = DUNK, SQUARE alone = LAY IT IN · SQUARE: hold, release in the green · L2: POST UP · snap the stick for ankles · pull BACK for a HESI · hold L1/LT near the block to POST UP (back to the rim: shoot for a HOOK, pull off the rim for a FADEAWAY, swing the stick across to SPIN) · drive into a body to SPIN off him';
+const HINT_DEFENCE = 'STAY IN FRONT — they sidestep, you slide · HOLD L2: SIT DOWN and slide faster · SQUARE: STEAL as the ball crosses over (hold it for a HAND UP) · TRIANGLE: jump on the gather to BLOCK · HOLD CIRCLE: plant and TAKE THE CHARGE · L1: BOX OUT';
 
 type Possession = 'mine' | 'defense';
 /** Their possession: the check, the drive (incl. sidestep / blow-by / gather), the shot in the air, over. */
@@ -306,11 +310,12 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** Push the scoreboard into the rival's shot selection. Called wherever a possession starts. */
   const nerveTheAttacker = (): void => { attacker.patience = 1 / Math.max(0.5, nerve(rivalStanding()).aggression); };
   let gatherShown = false, stepbackShown = false;
-  let myJumpAge = Infinity;                 // seconds since my contest jump left the floor
+  let myJumpAge = Infinity;
+  let takingCharge = false;      // Circle held on defence — planted, waiting to wear it
+  let chargeSetSec = 0;          // how long the feet have been down (a charge is arriving early, not colliding)                 // seconds since my contest jump left the floor
   let meStunSec = 0;                        // whiffed reach costs you your feet
   let reachCooldown = 0;
   /** The shot trigger's last state — the gather sound fires on the way down, once. */
-  let shotTrigWas = false;
   let contact: ContactSystem | null = null;      // Phase 4: Havok bodies when ready
   let hoopJuice: HoopJuice | null = null;        // A+ P0 CONTACT-lite: rim spring / net squash / hoop flash on a make
   let contactLatch = false;                      // A+ P0: the dunk's ONE punch per attempt — never re-fired by the banner or the stun
@@ -613,31 +618,31 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       // BLOCK / contest jump on defense: A leaves the floor. The BODY of it now lives in contestJump(), because the
       // same press also has to be reachable from the slot — see that function.
-      if (e.t === 'button' && e.btn === 'A' && e.pressed && contestJump(ctx)) {
+      if (e.t === 'button' && e.btn === 'Y' && e.pressed && contestJump(ctx)) {   // Triangle = BLOCK (2K map)
         /* jumped */
       } else if (e.t === 'button' && e.pressed && e.btn === 'L1') {
         // PHONE CONTROLS (rc8 check): BOX OUT / the planted foot is a held STANCE, and a tap of it had no answer unless a
         // rebound happened to be live. The stance going down is heard and named, once per press.
         SoundKit.play('uiTick', { pitch: 0.75, volume: 0.35 });
         ctx.juice.callout(possession === 'mine' ? 'FOOT PLANTED' : 'BOXING OUT', '#cbd5e1', 380);
-      } else if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'X')) {
+      } else if (e.t === 'button' && e.pressed && (e.btn === 'Y' || e.btn === 'X')) {
         // MECHANICS PASS (2026-09-15): BLOCK and STEAL are defense verbs, and on offense (or mid-jump, or stunned) they did
         // nothing and said nothing — 41 % of deliberate presses on the run-2 probe. Each is answered with why.
-        if (possession !== 'defense') refuse(ctx, e.btn === 'A' ? 'BLOCK IS FOR DEFENSE' : 'STEAL IS FOR DEFENSE');
+        // 2K map: Triangle blocks, Square steals — and Square is the SHOT on offence, so only the block is refused there.
+        if (possession !== 'defense') { if (e.btn === 'Y') refuse(ctx, 'BLOCK IS FOR DEFENSE'); }
         else if (meStunSec > 0) refuse(ctx, 'STUNNED');
-        else if (e.btn === 'A' && myJumpAge !== Infinity) refuse(ctx, 'ALREADY UP');
+        else if (e.btn === 'Y' && myJumpAge !== Infinity) refuse(ctx, 'ALREADY UP');
         else if (e.btn === 'X' && reachCooldown > 0) refuse(ctx, 'RECOVERING');
         // SCORECARD CONTROLS (2026-09-15): a steal thrown from out of range reached for nothing and said nothing (5 of 7
         // presses silent in the rc11 capture) — the reach is a commitment, so the distance is the answer
         else if (e.btn === 'X' && Vector3.Distance(me.root.position, foe.root.position) > 1.7) refuse(ctx, 'TOO FAR TO REACH');
+      } else if (e.t === 'button' && e.pressed && e.btn === 'B' && possession === 'mine') {
+        refuse(ctx, 'NO TEAMMATE TO SCREEN');   // Circle calls a screen in 3v3; one-on-one there is nobody to call
       }
-      // the SHOT's gather is heard as the trigger goes down (the meter it starts is a number, which reads as nothing), and
-      // a shot pulled on DEFENSE — 4 of 6 trigger presses in the rc14 capture — says why it cannot happen
-      if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5 && !shotTrigWas) {
-        if (possession === 'mine') SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
-        else refuse(ctx, 'SHOOT ON OFFENSE');
-      }
-      if (e.t === 'trigger' && e.side === 'R') shotTrigWas = e.value > 0.5;
+      // The SHOT's gather is heard as SQUARE goes down (the meter it starts is a number, which reads as nothing).
+      // There is no "SHOOT ON OFFENSE" refusal on this button any more: under the 2K map Square is the STEAL when
+      // you do not have the ball, so refusing it on defence would have refused every poke in the game.
+      if (e.t === 'button' && e.btn === 'X' && e.pressed && possession === 'mine') SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
     },
 
     update(ctx: ModeContext, dt: number) {
@@ -1172,15 +1177,19 @@ export const OneVOneMode: ModeDefinition = (() => {
         // THE STANCE COSTS AND PAYS (DefensiveStance). The slide clips were already playing here and did
         // nothing to the body — a crouched defender covered ground exactly like an upright one. In a stance
         // you slide faster and go forward slower; upright it inverts, which is what makes a crossover work.
+        const sitting = !!intent.intense;   // L2 HELD — 2K's intense D: sit down on him deliberately
+        // the latch comes BEFORE the movement, because planting your feet has to actually take them away from you
+        takingCharge = !!intent.takeCharge && meStunSec === 0 && !meFloored && myJumpAge === Infinity && defPhase !== 'over';
         const engagedStance = inStance({
           onDefense: true,
           distToMan: distXZ(me.root.position, foe.root.position),
           speed01: meSpeed01,   // last frame's push: the stance reads what the body is already doing
           disabled: meStunSec > 0 || meFloored,
+          intense: sitting,
         });
-        const scaled = stanceWish(new Vector3(mxRaw, 0, myRaw), me.root.rotation.y, engagedStance);
+        const scaled = stanceWish(new Vector3(mxRaw, 0, myRaw), me.root.rotation.y, engagedStance, sitting);
         const mx = scaled.x, my = scaled.z;
-        const drib = meStunSec > 0
+        const drib = meStunSec > 0 || takingCharge   // planted: a charge is taken standing still, or it is a block
           ? meDribble.update(dt, 0, 0, false)
           : meDribble.update(dt, mx, my, sprintOk);
         meSpeed01 = drib.speed01;
@@ -1202,6 +1211,28 @@ export const OneVOneMode: ModeDefinition = (() => {
         // …and the JUMP is the same read, one line down: the slot carries it now, so a pad, a phone, a network peer
         // and the agent bridge all reach the block through one wire (PlayerSlot.Intent.jump).
         if (intent.jump) contestJump(ctx);
+        // TAKE THE CHARGE (Circle held). The charge was a one-way call: sprint through a SET defender on MY
+        // possession and it was an offensive foul, but with the ball the other way the rival drove through a
+        // standing player for free — there was no way to plant and nothing read it if you had. Holding it stops you
+        // dead (that is the price: you are not sliding any more, and if he goes round you he is gone), and a
+        // foul-speed body arriving inside a stride of a planted defender is their turnover.
+        if (takingCharge) {
+          chargeSetSec += dt;
+          const closing = foeVelLast.length();
+          if (chargeSetSec >= CHARGE_SET_SEC && distXZ(me.root.position, foe.root.position) <= CHARGE_RANGE && closing >= FOUL_CLOSING_SPEED) {
+            SoundKit.play('whistle');
+            swing('steal');
+            ctx.setHud({ momentum });
+            EffectsKit.burst(ctx.scene, me.root.position.add(new Vector3(0, 1.0, 0)), 'dust');
+            ctx.feel?.impact?.(0.45);
+            meAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+            foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+            bannerFlash(ctx, 'CHARGE — YOUR BALL!', 1100);
+            console.info(`[1V1-CONTACT] charge taken at ${closing.toFixed(1)} m/s (set ${chargeSetSec.toFixed(2)}s)`);
+            defPhase = 'over';
+            later(800, () => resetPositions());
+          }
+        } else chargeSetSec = 0;
         const wantHandUp = !!intent.contest && myJumpAge === Infinity && meStunSec === 0 && !meFloored && defPhase !== 'over';
         if (wantHandUp !== meHandUp) { meHandUp = wantHandUp; if (meHandUp) console.info('[1V1-DEF] hand up (me)'); else meAnimTree.releaseHold(); }
         if (meHandUp && !meAnimTree.busy) meAnimTree.hold('bball_hand_up', { fadeSec: 0.1 });

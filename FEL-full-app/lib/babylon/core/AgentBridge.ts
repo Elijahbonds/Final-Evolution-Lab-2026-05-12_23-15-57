@@ -132,6 +132,11 @@ class Bridge {
         { name: 'steal',  args: '{}',                      description: 'Defensive poke.' },
         { name: 'block',  args: '{}',                      description: 'Leave the floor to contest. Time it on their gather.' },
         { name: 'contest', args: '{ms?}',                  description: 'Grounded hand-up — verticality, no jump.' },
+        { name: 'turbo',  args: '{x,y,ms?}',               description: 'R2 + a direction: the sprint. Hold it into the rim to DUNK.' },
+        { name: 'intense', args: '{ms?}',                  description: 'L2 on defence: sit down, slide faster.' },
+        { name: 'postup', args: '{ms?}',                   description: 'L2 on offence: back him down.' },
+        { name: 'screen', args: '{}',                      description: 'Circle: call for a screen.' },
+        { name: 'charge', args: '{ms?}',                   description: 'Circle held on defence: plant and take the charge.' },
         { name: 'strike', args: '{which:jab|hook|uppercut|high_kick|roundhouse}', description: 'Karate attack.' },
         { name: 'guard',  args: '{ms?}',                   description: 'Hold the karate guard stance.' },
         { name: 'idle',   args: '{ms?}',                   description: 'Neutral — release every input.' },
@@ -254,6 +259,13 @@ class Bridge {
       // grounded hand-up, held, and costs nothing if you are wrong.
       case 'block': await this.act({ jump: true }, 80); return true;
       case 'contest': await this.act({ contest: true }, ms); return true;
+      // THE 2K MAP's held modifiers. `turbo` is the one the dunk gate reads, so a driver that wants a dunk holds it
+      // through the squeeze rather than letting go of the stick to shoot — which is what a thumb does anyway.
+      case 'turbo': await this.act({ moveX: Number(opts.x ?? 0), moveY: Number(opts.y ?? 1), sprint: true, turbo: true }, ms); return true;
+      case 'intense': await this.act({ intense: true }, ms); return true;
+      case 'postup': await this.act({ brace: true }, ms); return true;
+      case 'screen': await this.act({ screen: true }, 80); return true;
+      case 'charge': await this.act({ takeCharge: true }, ms); return true;
       case 'guard': await this.act({ guard: true }, ms); return true;
       case 'strike': await this.act({ strike: String(opts.which ?? 'jab') }, 120); return true;
       default:

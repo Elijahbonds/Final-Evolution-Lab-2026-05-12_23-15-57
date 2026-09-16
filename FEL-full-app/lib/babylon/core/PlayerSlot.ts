@@ -29,6 +29,33 @@ export interface Intent {
   /** HOOPS-MOVE-KIT-B M12: R1 held — use the GLASS (an intentional bank inside the band). */
   glass?: boolean;
   /**
+   * R2 HELD — the turbo (owner's 2K map, 2026-09-16: "R2 + direction = sprint, that plus square = dunk").
+   *
+   * `sprint` used to BE this, inferred from how far the stick was pushed, which made "go fast" and "go up strong"
+   * the same gesture — and left a keyboard, which can only report a full-magnitude direction, sprinting on every
+   * single step and therefore unable to take a layup at all. Turbo is now a button on both devices; `sprint` is
+   * this AND a direction, and the dunk gate reads it.
+   */
+  turbo?: boolean;
+  /** Circle, tapped on offence — CALL FOR A SCREEN. Edge-detected; a mode with no teammate refuses it out loud. */
+  screen?: boolean;
+  /**
+   * Circle HELD on defence — TAKE THE CHARGE: plant your feet and wear it.
+   *
+   * The charge existed in one direction only. A handler who sprinted through a SET defender was called for an
+   * offensive foul, but with the possessions the other way round the rival drove through a standing player for
+   * free — there was no way to plant, and nothing read it if you had. Holding this stops you dead (that is the
+   * price) and turns a foul-speed collision into their turnover.
+   */
+  takeCharge?: boolean;
+  /**
+   * L2 HELD ON DEFENCE — intense D: sit down, slide faster, give up your forward speed for it.
+   *
+   * The same hold posts you up on offence (`brace`), which is 2K's own logic: the possession decides what the
+   * button means. See DefensiveStance.inStance / stanceWish.
+   */
+  intense?: boolean;
+  /**
    * A LEAVES THE FLOOR — the contest jump / block. Edge-detected, like `steal`.
    *
    * Added in the 1v1 + 3v3 ten-phase pass (2026-09-16), and the reason is worth keeping. EVERY other thing a
@@ -70,7 +97,7 @@ export interface ControlSource {
 //    rather than inventing a separate subscription API on InputBus. ──────
 /** B held this long sells a pass fake instead of throwing the pass. */
 export const PASS_FAKE_HOLD_MS = 180;
-/** X held this long is a hand-up contest (D3), not a poke. */
+/** The steal button (Square) held this long is a hand-up contest (D3), not a poke. */
 export const CONTEST_HOLD_MS = 150;
 
 export class LocalInputSource implements ControlSource {
@@ -82,6 +109,9 @@ export class LocalInputSource implements ControlSource {
   // shared `braceHeld` meant the trigger's per-frame 0 wiped the held L1 on the very next frame. On a pad, holding L1 did
   // nothing at all: no box-out (KIT-A O2), and no post-up (measured on the KIT-B probe: brace false with the button down).
   private braceTrigger = false; private braceButton = false;
+  private screenEdge = false; private chargeHeld = false;   // Circle — call the screen / plant and take the charge
+  private turboHeld = false; private turboSeen = false;   // R2 held — the turbo, and whether a trigger has ever reported
+  private intenseHeld = false;                            // L2 held — sit down (defence); the same hold posts up on offence
   private glassHeld = false;   // HOOPS-MOVE-KIT-B M12: R1 held = call glass
   private stealDownAt = -1;   // D3: X held past CONTEST_HOLD_MS = the hand-up contest (a tap stays the poke)
   private passDownAt = -1;    // B held past PASS_FAKE_HOLD_MS = the pass fake (a tap stays the pass)
@@ -112,33 +142,67 @@ export class LocalInputSource implements ControlSource {
       // inverted the same way and nobody had noticed.
       this.moveY = -e.y;
     }
-    if (e.t === 'trigger' && e.side === 'R') {
-      this.held = e.value;
-      if (e.value === 0 && this.actionDown) { this.actionEdge = true; this.actionDown = false; }
-      if (e.value > 0.02) this.actionDown = true;
-    }
-    if (e.t === 'trigger' && e.side === 'L') this.braceTrigger = e.value > 0.4;
+    // ── THE 2K MAP (owner, 2026-09-16) ────────────────────────────────────────────────────────────────────────
+    // "R2 + direction = sprint, that plus square = dunk", "bottom button to pass", "L2 is a post up" and, on
+    // defence, "L2 has them get low to sit and slide faster". Those are 2K's bindings, so the rest of the scheme
+    // follows 2K's logic too — including the part that matters most, which is that a BUTTON'S MEANING IS DECIDED BY
+    // THE POSSESSION. Square shoots when you have the ball and blocks when you do not; L2 posts up on offence and
+    // sits you down on defence. One finger, two verbs, no mode switch.
+    //
+    //   R2  (R trigger)   TURBO, held. With a direction that is the sprint; with Square at the rim it is the dunk.
+    //   Square  (FEL X)   SHOOT — held, released in the green.  ON DEFENCE: STEAL on a tap, the grounded hand-up
+    //                     CONTEST on a hold. One button, and which verb you get is which side of the ball you are on.
+    //   Triangle (FEL Y)  BLOCK — the contest jump (2K puts the swat on Triangle, the steal on Square).
+    //   Bottom  (FEL A)   PASS on a tap, PASS FAKE on a hold.
+    //   Circle  (FEL B)   CALL FOR A SCREEN on offence; TAKE CHARGE — plant your feet — on defence.
+    //   L2  (L trigger)   POST UP on offence, INTENSE D on defence.    L1 keeps the plant/box-out it was taught on.
+    //   R1                call GLASS (no 2K equivalent; this game's own).
+    //
+    // TURBO USED TO BE A GUESS. `sprint` was `hypot(moveX, moveY) > 0.85` — inferred from how hard the stick was
+    // pushed — so "go fast" and "go up strong" were the same gesture and a KEYBOARD, which can only ever report a
+    // full-magnitude direction, was sprinting on every step: it could never take a layup, because the dunk gate
+    // reads the turbo. Now turbo is a button on both devices and the stick magnitude is only a fallback for a pad
+    // with no trigger reading yet.
+    if (e.t === 'trigger' && e.side === 'R') { this.turboHeld = e.value > 0.35; this.turboSeen = true; }
+    if (e.t === 'trigger' && e.side === 'L') { this.braceTrigger = e.value > 0.4; this.intenseHeld = e.value > 0.4; }
     if (e.t === 'button' && e.btn === 'L1') this.braceButton = e.pressed;
     if (e.t === 'button' && e.btn === 'R1') this.glassHeld = e.pressed;
-    if (e.t === 'button' && e.pressed && e.btn === 'B') { this.passEdge = true; this.passDownAt = performance.now(); }
-    if (e.t === 'button' && !e.pressed && e.btn === 'B') this.passDownAt = -1;
-    if (e.t === 'button' && e.pressed && e.btn === 'A') this.jumpEdge = true;   // the contest jump / block
-    if (e.t === 'button' && e.pressed && e.btn === 'X') { this.stealEdge = true; this.stealDownAt = performance.now(); }
-    if (e.t === 'button' && !e.pressed && e.btn === 'X') this.stealDownAt = -1;
+    // SQUARE — the shot meter is a HELD button now, not a held analog trigger. Nothing downstream reads the analog
+    // value: every consumer compares `actionHeld` against 0.02, and the meter itself runs on dt.
+    if (e.t === 'button' && e.btn === 'X') {
+      if (e.pressed) {
+        this.held = 1; this.actionDown = true;                                  // offence: the meter starts
+        this.stealEdge = true; this.stealDownAt = performance.now();            // defence: the poke, and the hold behind it
+      } else {
+        this.held = 0; this.stealDownAt = -1;
+        if (this.actionDown) { this.actionEdge = true; this.actionDown = false; }
+      }
+    }
+    if (e.t === 'button' && e.pressed && e.btn === 'Y') this.jumpEdge = true;   // Triangle — leave the floor to block
+    // Circle: a screen is a CALL (an edge, once), taking a charge is a COMMITMENT (held — you are standing there
+    // hoping he runs into you, and you are not going anywhere while you do it).
+    if (e.t === 'button' && e.btn === 'B') { if (e.pressed) this.screenEdge = true; this.chargeHeld = e.pressed; }
+    if (e.t === 'button' && e.pressed && e.btn === 'A') { this.passEdge = true; this.passDownAt = performance.now(); }
+    if (e.t === 'button' && !e.pressed && e.btn === 'A') this.passDownAt = -1;
   }
 
   poll(): Intent {
     const out: Intent = {
       moveX: this.moveX, moveY: this.moveY,
-      sprint: Math.hypot(this.moveX, this.moveY) > 0.85,
+      // R2 AND a direction. The magnitude fallback survives only until a trigger has reported once, so a pad whose
+      // triggers have not been touched yet still moves the way it always did rather than refusing to run.
+      sprint: this.turboHeld || (!this.turboSeen && Math.hypot(this.moveX, this.moveY) > 0.85),
+      turbo: this.turboHeld,
       action: this.actionEdge, actionHeld: this.held,
       pass: this.passEdge, steal: this.stealEdge, jump: this.jumpEdge,
       brace: this.braceTrigger || this.braceButton,
+      intense: this.intenseHeld,
+      screen: this.screenEdge, takeCharge: this.chargeHeld,
       glass: this.glassHeld,
       contest: this.stealDownAt >= 0 && performance.now() - this.stealDownAt >= CONTEST_HOLD_MS,
       passFake: this.passDownAt >= 0 && performance.now() - this.passDownAt >= PASS_FAKE_HOLD_MS,
     };
-    this.actionEdge = false; this.passEdge = false; this.stealEdge = false; this.jumpEdge = false;
+    this.actionEdge = false; this.passEdge = false; this.stealEdge = false; this.jumpEdge = false; this.screenEdge = false;
     return out;
   }
 }

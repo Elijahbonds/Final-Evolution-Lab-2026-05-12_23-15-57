@@ -78,9 +78,14 @@ export class AgentControlSource implements ControlSource {
     out.sprint = src.sprint ?? Math.hypot(out.moveX, out.moveY) > 0.85;
     out.guard = src.guard ?? false;
     out.contest = src.contest ?? false;   // HOOPS-MOVE-KIT-A D3: the held hand-up contest
+    // the 2K map's held modifiers: R2 turbo, L2 (post up / intense D), Circle held (take the charge)
+    out.turbo = src.turbo ?? false;
+    out.intense = src.intense ?? false;
+    out.brace = src.brace ?? false;
+    out.takeCharge = src.takeCharge ?? false;
 
     // Edge fields: delivered on exactly one frame, matching LocalInputSource.
-    for (const key of ['action', 'pass', 'steal', 'jump'] as const) {
+    for (const key of ['action', 'pass', 'steal', 'jump', 'screen'] as const) {
       if (src[key] && !this.firedEdges.has(key)) { out[key] = true; this.firedEdges.add(key); }
     }
     if (src.strike && !this.firedEdges.has('strike')) {

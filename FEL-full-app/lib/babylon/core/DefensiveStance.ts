@@ -34,6 +34,15 @@ export const STANCE_FORWARD_PENALTY = 0.76;
 /** Sideways, standing upright. Crossing your feet over is slow, which is why the crossover works. */
 export const UPRIGHT_LATERAL_PENALTY = 0.72;
 
+// INTENSE D — L2 HELD (owner, 2026-09-16): "L2 on defense has them get low to sit and slide faster, better
+// perimeter defense". 2K's intense defence, and the stance above already had the right shape for it — what it did
+// not have was a way for the player to ASK. Auto-engagement reads the situation (near your man, not sprinting);
+// sitting down is a decision you make early, before he has moved, and it costs you more if he goes by.
+/** Sideways, sitting down on him. This is the reward for committing. */
+export const INTENSE_LATERAL_GAIN = 1.42;
+/** Forwards/backwards, sitting down. Steeper than the ordinary stance — a deep sit is hard to stand up out of. */
+export const INTENSE_FORWARD_PENALTY = 0.62;
+
 export interface StanceRead {
   /** My team does not have the ball. */
   onDefense: boolean;
@@ -43,11 +52,17 @@ export interface StanceRead {
   speed01: number;
   /** A stunned or floored body is not in any stance. */
   disabled?: boolean;
+  /** L2 held — sit down on him deliberately. Engages the stance at ANY range, not just inside STANCE_RANGE. */
+  intense?: boolean;
 }
 
 /** Am I actually in a stance right now? */
 export function inStance(read: StanceRead): boolean {
   if (!read.onDefense || read.disabled) return false;
+  // Sitting down is a CHOICE, so asking for it beats the proximity read — you can set before he arrives, which is
+  // the whole point of picking a man up early. Sprinting still stands you up: that part is not negotiable, it is
+  // what makes the stance cost something.
+  if (read.intense) return read.speed01 <= STANCE_SPRINT_MAX;
   if (!Number.isFinite(read.distToMan) || read.distToMan > STANCE_RANGE) return false;
   return read.speed01 <= STANCE_SPRINT_MAX;
 }
@@ -62,15 +77,16 @@ export function inStance(read: StanceRead): boolean {
  * Returns a new vector; the input is never mutated (a mode passing its own velocity in would otherwise
  * compound the scale every frame — the same trap the jab burst has a comment about).
  */
-export function stanceWish(wish: Vector3, yaw: number, engaged: boolean): Vector3 {
+export function stanceWish(wish: Vector3, yaw: number, engaged: boolean, intense = false): Vector3 {
   // the repo's convention: facing (sin yaw, cos yaw), right = (fz, -fx) = (cos yaw, -sin yaw)
   const fx = Math.sin(yaw), fz = Math.cos(yaw);
   const rx = fz, rz = -fx;
   const forward = wish.x * fx + wish.z * fz;
   const lateral = wish.x * rx + wish.z * rz;
 
-  const f = forward * (engaged ? STANCE_FORWARD_PENALTY : 1);
-  const l = lateral * (engaged ? STANCE_LATERAL_GAIN : UPRIGHT_LATERAL_PENALTY);
+  const sitting = engaged && intense;
+  const f = forward * (sitting ? INTENSE_FORWARD_PENALTY : engaged ? STANCE_FORWARD_PENALTY : 1);
+  const l = lateral * (sitting ? INTENSE_LATERAL_GAIN : engaged ? STANCE_LATERAL_GAIN : UPRIGHT_LATERAL_PENALTY);
 
   return new Vector3(f * fx + l * rx, wish.y, f * fz + l * rz);
 }

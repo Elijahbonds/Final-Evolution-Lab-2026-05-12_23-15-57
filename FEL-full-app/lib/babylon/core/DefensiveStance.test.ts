@@ -99,4 +99,45 @@ describe('the maths behaves', () => {
     expect(lateralAuthority(true)).toBeGreaterThan(lateralAuthority(false));
     expect(lateralAuthority(true)).toBe(1);
   });
+
+  // ── INTENSE D: L2 held (owner, 2026-09-16) ───────────────────────────────────────────────────────────────────
+  describe('intense D', () => {
+    const D = { onDefense: true, distToMan: 1.2, speed01: 0.3 };
+
+    it('sitting down engages the stance BEYOND the range you would pick a man up at', () => {
+      const far = { ...D, distToMan: STANCE_RANGE + 4 };
+      expect(inStance(far)).toBe(false);                      // too far to be guarding anyone
+      expect(inStance({ ...far, intense: true })).toBe(true);  // …unless you chose to set early
+    });
+
+    it('sprinting still stands you up, asked for or not — the stance has to cost something', () => {
+      expect(inStance({ ...D, speed01: 1, intense: true })).toBe(false);
+    });
+
+    it('a stunned body sits down for nobody', () => {
+      expect(inStance({ ...D, disabled: true, intense: true })).toBe(false);
+    });
+
+    it('you slide faster sitting down than in an ordinary stance, and faster than upright', () => {
+      const across = () => new Vector3(1, 0, 0);   // yaw 0 faces +z, so +x is pure lateral
+      const sit = stanceWish(across(), 0, true, true).length();
+      const stance = stanceWish(across(), 0, true, false).length();
+      const upright = stanceWish(across(), 0, false, false).length();
+      expect(sit).toBeGreaterThan(stance);
+      expect(stance).toBeGreaterThan(upright);
+    });
+
+    it('and you pay for it going forward — steeper than the ordinary stance', () => {
+      const ahead = () => new Vector3(0, 0, 1);
+      const sit = stanceWish(ahead(), 0, true, true).length();
+      const stance = stanceWish(ahead(), 0, true, false).length();
+      expect(sit).toBeLessThan(stance);
+    });
+
+    it('intense is inert when the stance is not engaged at all', () => {
+      const ahead = new Vector3(0, 0, 1);
+      expect(stanceWish(ahead.clone(), 0, false, true).length())
+        .toBeCloseTo(stanceWish(ahead.clone(), 0, false, false).length(), 9);
+    });
+  });
 });

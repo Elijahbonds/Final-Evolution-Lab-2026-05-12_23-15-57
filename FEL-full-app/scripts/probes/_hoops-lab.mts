@@ -21,7 +21,7 @@
 //
 //   jumper   shoot from where the reset puts me (outside the floater band)
 //   layup    drive in, release inside 2.2 m — classifyShot's layup band
-//   dunk     drive in WITH SPRINT so turbo, speed and range satisfy checkDriveDunk
+//   dunk     drive in holding TURBO (R2) so speed, range and the turbo gate all agree — the 2K dunk
 //   defence  mirror the driver, hand up, and BLOCK ON HIS GATHER — the mode's own `attackPhase()` says when
 //
 // The defensive brain runs IN THE PAGE, on a 16 ms interval, because a block has to be thrown inside the gather and a
@@ -234,8 +234,8 @@ for (let n = 0; n < POSSESSIONS; n++) {
       // gate (correctly, now) reads a layup. A thumb does not work that way: it holds the drive AND squeezes. So
       // this play holds moveY/sprint through both halves of the shot, which is the only way to ask for a dunk.
       await driveToRim(2.4);
-      await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
-      await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, actionHeld: 0, action: true }, 80)`);
+      await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
+      await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: 0, action: true }, 80)`);
     }
     else if (play === 'layup') {
       // DRIVE, THEN GATHER. A full-stick drive is a SPRINT — AgentControlSource derives sprint from the stick

@@ -67,6 +67,9 @@ const KEYMAP: Record<string, FelInput> = {
   q: { t: 'button', btn: 'L1', pressed: true },
   e: { t: 'button', btn: 'R1', pressed: true },
   // BOOST (FINISH-RELEASE, 2026-09-14): Shift is the keyboard's boost — the shared held R1 every speed mode burns on.
+  // It is ALSO the keyboard's R2 (see onKey): the 2K map makes turbo a held trigger, and "shift to run" is the one
+  // keyboard convention every player already has. Emitted as both, because the speed modes read R1 and the hoops
+  // slot reads the trigger.
   shift: { t: 'button', btn: 'R1', pressed: true },
   c: { t: 'button', btn: 'SELECT', pressed: true },
   escape: { t: 'button', btn: 'START', pressed: true },
@@ -210,6 +213,13 @@ export class InputBus {
       if (arrow) this.emit({ t: 'dpad', dir: arrow, pressed: down, src: 'key' });
       return;
     }
+    // THE KEYBOARD'S TWO TRIGGERS (2K map, 2026-09-16). A keyboard has no analog triggers, so the two verbs that
+    // live on them need keys of their own or the scheme only exists on a pad — which is exactly how the keyboard
+    // ended up unable to choose between a dunk and a layup: turbo was inferred from stick magnitude, and a key is
+    // always full magnitude, so every keyboard drive was a sprint.
+    //   SHIFT = R2, the turbo.        F = L2, the post-up (and, on defence, intense D).
+    if (key === 'shift') this.emit({ t: 'trigger', side: 'R', value: down ? 1 : 0 });
+    if (key === 'f') { this.emit({ t: 'trigger', side: 'L', value: down ? 1 : 0 }); return; }
     if (key === ' ') {
       if (down) { this.spaceDownAt = performance.now(); this.emit({ t: 'trigger', side: 'R', value: KEY_SPACE_DOWN }); }
       else { this.emit({ t: 'trigger', side: 'R', value: 0 }); this.emit({ t: 'button', btn: 'A', pressed: true }); }

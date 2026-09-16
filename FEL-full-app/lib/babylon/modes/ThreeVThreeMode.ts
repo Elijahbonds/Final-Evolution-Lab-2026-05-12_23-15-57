@@ -225,6 +225,12 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   // ── BIOMECH-HOOPS-WAVE1 ──
   let driver: Body | null = null;                // the rival driving on their possession (its tree carries the ball, it faces the rim, the AI drive skips it)
   let driveK = 0;                                // the rival drive's clock 0..1 (the block window is its end)
+  let takingCharge = false;                      // Circle held on defence — planted, waiting to wear it
+  let chargeSetSec = 0;                          // how long the feet have been down
+/** How long the feet have to be planted before a charge can be drawn. */
+const CHARGE_SET_SEC = 0.18;
+/** Inside a stride of a planted defender is contact; past it he went round you. */
+const CHARGE_RANGE = 1.15;
   let dunkFlight: { k: number; made: boolean | null } | null = null;
   let dunkFlush: { releasePos: Vector3; since: number } | null = null;
   // ── HOOPS-MOVE-KIT-A ──
@@ -510,7 +516,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           jobs: () => everyBody().map((b, i) => { const mb = mateBrain(b), db = foeBrain(b); const obj = b === me ? (carrierId === 'me' ? RIM : (driver?.char.root.position ?? ballWorld())) : objectiveFor(b); const p = bodyPos(b); const yaw = b.char.root.rotation.y; const v = b === me ? me.drib.vel : b.vel; return { id: b === me ? 'me' : isFoe(b) ? `foe${foes.indexOf(b)}` : `mate${mates.indexOf(b)}`, i, job: jobOf(b), phase: mb?.screen.phase ?? (db ? (db.fightingOver === null ? '' : db.fightingOver ? 'over' : 'under') : ''), x: p.x, z: p.z, y: p.y, speed: Math.hypot(v.x, v.z), facing: facingCos(yaw, p, obj), objX: obj.x, objZ: obj.z, boxing: !!(mb?.boxing || db?.boxing), root: b.char.root }; }), get foeRoot() { return driver ? driver.char.root : (foes[0]?.char.root ?? null); }, /* the man to guard is whoever is DRIVING */ nearestFoeRoot: () => foes.reduce<Body | null>((b, f) => !b || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(b.char.root.position, me.char.root.position) ? f : b, null)?.char.root ?? null }; if (dev) dev.hoopsPosture = seam; (ctx.scene.metadata ??= {}).threevthree = seam; }   // BIOMECH-HOOPS-WAVE1 probes
       ctx.setHud({
         score: myScore, foeScore, target: TARGET_SCORE, time: timeLeft, ast: assists,
-        hint: 'Work the court · PASS to the open man · SPRINT into the rim to DUNK, ease off to LAY IT IN · snap the stick to break ankles · HOLD SHOOT, release in the green · hold L1/LT on the block to POST UP (shoot = HOOK, pull off the rim = FADEAWAY, stick across = SPIN)',
+        hint: 'HOLD R2 + a direction to SPRINT · R2 + SQUARE at the rim = DUNK, SQUARE alone = LAY IT IN · SQUARE: hold, release in the green · BOTTOM BUTTON: PASS (hold to FAKE) · CIRCLE: call a SCREEN · L2: POST UP (shoot = HOOK, pull off the rim = FADEAWAY, stick across = SPIN) · snap the stick to break ankles',
       });
     },
 
@@ -520,26 +526,26 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       // BLOCK jump while defending an opponent possession. The body lives in contestJump() so the slot can reach it
       // too — 1v1 carries the same split, and the reason is written out there.
-      if (e.t === 'button' && e.btn === 'A' && e.pressed && contestJump(ctx)) {
+      if (e.t === 'button' && e.btn === 'Y' && e.pressed && contestJump(ctx)) {   // Triangle = BLOCK (2K map)
         /* jumped */
-      } else if (e.t === 'button' && e.btn === 'A' && e.pressed) {
+      } else if (e.t === 'button' && e.btn === 'Y' && e.pressed) {
         refuse(ctx, carrierId !== 'foeTeam' ? 'BLOCK IS FOR DEFENSE' : 'ALREADY UP');   // MECHANICS PASS: the press is answered
-      } else if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5 && !shootPressWas && carrierId === 'foeTeam') {
-        refuse(ctx, 'SHOOT ON OFFENSE');
-      } else if (e.t === 'button' && e.btn === 'B' && e.pressed && carrierId === 'me') {
+      } else if (e.t === 'button' && e.btn === 'A' && e.pressed && carrierId === 'me') {
         // THE WIND-UP IS HEARD ON THE PRESS (2026-09-15). B is a tap-or-hold verb: a tap passes, a hold sells the fake,
         // and the hold's own answer cannot arrive until PASS_FAKE_HOLD_MS has gone by — which is past the window a
         // press is judged in, so a HELD pass read as a dead button on the capture (4 of 11). A passer's hands move the
         // instant the button goes down; the tick says so, and the pass or the fake still lands on its own beat.
         SoundKit.play('uiTick', { pitch: 1.15, volume: 0.3 });
-      } else if (e.t === 'button' && e.btn === 'B' && e.pressed) {
+      } else if (e.t === 'button' && e.btn === 'A' && e.pressed) {
         refuse(ctx, carrierId === 'foeTeam' ? 'NO BALL TO PASS' : 'YOUR TEAMMATE HAS IT');   // SCORECARD CONTROLS (2026-09-15)
+      } else if (e.t === 'button' && e.btn === 'B' && e.pressed && carrierId === 'foeTeam') {
+        refuse(ctx, 'NOBODY TO SCREEN FOR ON D');   // Circle is the screen call; on defence it is the charge, held
       } else if (e.t === 'dpad' && e.pressed) {
         refuse(ctx, 'MOVE WITH THE STICK');   // the d-pad is not a verb here, and a dead direction reads as a dead pad
       }
-      // the SHOT's gather is heard as the trigger goes down (the meter it starts is a number, which reads as nothing)
-      if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5 && !shootPressWas && carrierId === 'me') SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
-      if (e.t === 'trigger' && e.side === 'R') shootPressWas = e.value > 0.5;
+      // the SHOT's gather is heard as SQUARE goes down (the meter it starts is a number, which reads as nothing).
+      // No 'SHOOT ON OFFENSE' refusal here: under the 2K map Square is the STEAL without the ball.
+      if (e.t === 'button' && e.btn === 'X' && e.pressed && carrierId === 'me') SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
     },
 
     update(ctx: ModeContext, dt: number) {
@@ -579,6 +585,24 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       // D3: X HELD on defense = the grounded hand-up (verticality); D2: X pressed inside reach of the driver = the poke
       if (carrierId === 'foeTeam') {
         if (me.slot.intent.jump) contestJump(ctx);   // the block on the same wire as the hand-up and the poke
+        // TAKE THE CHARGE (Circle held) — plant and wear it. Same trade as 1v1: you stop dead, and a driver who
+        // arrives at foul speed inside a stride of your planted feet has given the ball back.
+        takingCharge = !!me.slot.intent.takeCharge && meStunSec === 0 && !meFloored && myJumpAge === Infinity;
+        if (takingCharge && driver) {
+          chargeSetSec += dt;
+          const closing = driver.vel.length();
+          if (chargeSetSec >= CHARGE_SET_SEC && distXZ(me.char.root.position, driver.char.root.position) <= CHARGE_RANGE && closing >= FOUL_CLOSING_SPEED) {
+            SoundKit.play('whistle');
+            swing('steal');
+            ctx.setHud({ momentum, banner: 'CHARGE — YOUR BALL!' });
+            setTimeout(() => ctx.setHud({ banner: '' }), 1100);
+            me.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+            driver.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+            console.info(`[3V3-DEF] charge taken at ${closing.toFixed(1)} m/s`);
+            driveStolen = true;
+            later(800, () => resetPossession(true));
+          }
+        } else if (!takingCharge) chargeSetSec = 0;
         const wantHandUp = !!me.slot.intent.contest && myJumpAge === Infinity && !meFloored && meStunSec === 0;
         if (wantHandUp !== meHandUp) { meHandUp = wantHandUp; if (meHandUp) console.info('[3V3-DEF] hand up (me)'); else me.tree.releaseHold(); }
         if (meHandUp && !me.tree.busy) me.tree.hold('bball_hand_up', { fadeSec: 0.1 });
@@ -682,6 +706,21 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
 
       const iAmCarrier = carrierId === 'me';
       const meIntent = me.slot.intent;
+      // CIRCLE — CALL FOR A SCREEN (owner's 2K map). The screen system was already here and already good; what was
+      // missing is that it was assigned FOR you, one mate per possession on an alternating turn, so a pick was
+      // something that happened near you rather than something you asked for. A call re-tasks the mate who is not
+      // carrying: he comes and sets it now.
+      if (meIntent.screen && carrierId === 'me' && !ended) {
+        const helper = mates.find((m) => mateBrain(m)?.job !== 'screen') ?? mates[0];
+        const hb = helper && mateBrain(helper);
+        if (hb) {
+          hb.setJob('screen');
+          mates.filter((m) => m !== helper).forEach((m) => mateBrain(m)?.setJob('space'));
+          SoundKit.play('uiTick', { pitch: 0.9, volume: 0.35 });
+          ctx.juice.callout('SCREEN COMING', '#fcd34d', 520);
+          console.info('[3V3-OFF] screen called');
+        }
+      }
       const moving = Math.hypot(meIntent.moveX, meIntent.moveY) > 0.1;
       const sprintOk = turbo.gate(dt, meIntent.sprint, moving);
       ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
@@ -695,13 +734,15 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       // go forward slower; upright it is the other way round, which is what makes the crossover work.
       {
         const man = carrierId === 'foeTeam' ? (driver ?? nearestLiveFoe()) : null;
+        const sitting = !!meIntent.intense;   // L2 HELD — 2K's intense D
         const engaged = inStance({
           onDefense: carrierId === 'foeTeam',
           distToMan: man ? distXZ(me.char.root.position, man.char.root.position) : Infinity,
           speed01: meSpeed01,
           disabled: meStunSec > 0,
+          intense: sitting,
         });
-        if (carrierId === 'foeTeam') wish = stanceWish(wish, me.char.root.rotation.y, engaged);
+        if (carrierId === 'foeTeam') wish = stanceWish(wish, me.char.root.rotation.y, engaged, sitting);
       }
       const drib = me.drib.update(dt, wish.x, -wish.z, sprintOk);
       meSpeed01 = drib.speed01; me.speed01 = drib.speed01;
@@ -2100,12 +2141,12 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           contactPunch(ctx);
           EffectsKit.burst(ctx.scene, RIM, 'net');
           ctx.setHud({ foeScore, banner: inLane ? 'POSTERIZED — THEY THREW IT DOWN ON YOU' : 'THEY THREW IT DOWN' });
-          setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · PASS to the open man · HOLD SHOOT, release in the green' }), 1000);
+          setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON passes · CIRCLE calls a screen · HOLD SQUARE, release in the green' }), 1000);
           if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('LOSS', myScore, { foeScore, assists }); done(); return; }
           later(meFloored ? 1600 : 1000, () => resetPossession(true));
         } else {
           if (!swatted) { SoundKit.play('miss'); ctx.setHud({ banner: 'THEY RATTLED IT OUT' }); }
-          setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · PASS to the open man · HOLD SHOOT, release in the green' }), 900);
+          setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON passes · CIRCLE calls a screen · HOLD SQUARE, release in the green' }), 900);
           later(900, () => boardAfterMiss(ctx));
         }
         done();
@@ -2225,7 +2266,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       shooter.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.08 });
       SoundKit.play('impact', { pitch: 1.3, volume: 0.4 }); SoundKit.play('crowdCheer', { volume: 0.5 });
       ctx.setHud({ banner: bumpAge <= BUMP_STRIP_WINDOW_SEC ? 'STRIPPED ON THE BUMP!' : 'PICKED THEIR POCKET!' });
-      setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · PASS to the open man · HOLD SHOOT, release in the green' }), 900);
+      setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON passes · CIRCLE calls a screen · HOLD SQUARE, release in the green' }), 900);
       driver = null;
       later(750, () => resetPossession(true));
       return;
@@ -2253,7 +2294,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       shooter.tree.beat(SPORT_CLIP.karateHitReact);
       releaseBall(ball); ballSim.launch(ball.getAbsolutePosition(), new Vector3((Math.random() - 0.5) * 4, 2, 3));   // BIOMECH-HOOPS-WAVE1 G6: a blocked ball goes loose
       ctx.setHud({ banner: 'REJECTED!' });
-      setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · PASS to the open man · HOLD SHOOT, release in the green' }), 900);
+      setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON passes · CIRCLE calls a screen · HOLD SQUARE, release in the green' }), 900);
       later(1000, () => resetPossession(true));
       return;
     }
@@ -2293,7 +2334,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
       ctx.setHud({ banner: 'STOP!' });
       ctx.feel?.impact?.(0.2);
     }
-    setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · PASS to the open man · HOLD SHOOT, release in the green' }), 800);
+    setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON passes · CIRCLE calls a screen · HOLD SQUARE, release in the green' }), 800);
     if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('LOSS', myScore, { foeScore, assists }); return; }
     if (made) later(900, () => resetPossession(true)); else later(900, () => boardAfterMiss(ctx));   // O2: their miss is a board too
   }
