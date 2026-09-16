@@ -369,6 +369,9 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       // 15-second format has room for.
       const v = S.current.verbs;
       if (v && e.t === 'button' && e.pressed && !v.buttons.includes(e.btn ?? '')) { refuse(ctx, v.says); return; }
+      // no carnival event reads the d-pad — every one of them steers with the stick — so a direction tapped on it was
+      // the last silent press in the mode (9 % of the rc20 capture, all of them d-pad)
+      if (e.t === 'dpad' && e.pressed) { refuse(ctx, v ? v.says : 'MOVE WITH THE STICK'); return; }
       S.current.onInput(ctx, e);
     },
 
