@@ -137,6 +137,9 @@ export class Mob {
 }
 
 /** Staggered updater: spreads N mobs across frames (¼ per frame at 4+ mobs). */
+/** Two shoulders' width: closer than this and the bodies are inside each other on screen. */
+export const BODY_SPACING = 0.82;
+
 export class MobPool {
   private mobs: Mob[] = [];
   private cursor = 0;
@@ -150,7 +153,34 @@ export class MobPool {
       if (m && m.update(dt * Math.min(4, this.mobs.length), targetPos, targetVel, contactRadius)) contacts.push(m);
     }
     this.cursor = (this.cursor + slice) % Math.max(this.mobs.length, 1);
+    this.separate();
     return contacts;
+  }
+
+  /**
+   * PERSONAL SPACE (2026-09-15). Every mob steers at the same point — the player — and nothing ever looked at another
+   * mob, so a wave converged into one clump of bodies drawn through each other: the scorecard's frame review has
+   * charged The Hundred for "bodies pile up" since rc10, and the rc19 mid frame is six fighters inside one silhouette.
+   * A pair closer than two shoulders is pushed apart by half the overlap each, which is enough to hold a ring around
+   * the player without fighting the steering (it is a position correction, not a force, so it cannot oscillate).
+   * A downed body is left where it fell — stepping over someone on the floor is not a defect.
+   */
+  private separate(): void {
+    const n = this.mobs.length;
+    for (let i = 0; i < n; i++) {
+      const a = this.mobs[i]; if (!a || a.state === 'downed' || !a.char.root.isEnabled()) continue;
+      for (let j = i + 1; j < n; j++) {
+        const b = this.mobs[j]; if (!b || b.state === 'downed' || !b.char.root.isEnabled()) continue;
+        const pa = a.char.root.position, pb = b.char.root.position;
+        let dx = pb.x - pa.x, dz = pb.z - pa.z;
+        let d2 = dx * dx + dz * dz;
+        if (d2 >= BODY_SPACING * BODY_SPACING) continue;
+        if (d2 < 1e-6) { dx = (i % 2 ? 1 : -1) * 0.02; dz = (j % 2 ? 1 : -1) * 0.02; d2 = dx * dx + dz * dz; }   // exactly co-located: any direction beats none
+        const d = Math.sqrt(d2), push = (BODY_SPACING - d) * 0.5, ux = dx / d, uz = dz / d;
+        pa.x -= ux * push; pa.z -= uz * push;
+        pb.x += ux * push; pb.z += uz * push;
+      }
+    }
   }
   dispose(): void { this.mobs.forEach((m) => m.char.dispose()); this.mobs = []; }
   disposeAll(): void { this.mobs.forEach((m) => m.char.dispose()); this.mobs = []; this.cursor = 0; }
