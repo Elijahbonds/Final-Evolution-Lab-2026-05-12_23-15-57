@@ -626,7 +626,7 @@ export const DunkMode: ModeDefinition = (() => {
         round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`, nightCard: null, nightNum: night,
         score: playerTotal, rivalScore: rivalTotal, style: STYLE_LABEL[style], prop: PROP_LABEL[prop], hype: 0, chain: 0,
         // F4 (review): this was a 130-character run-on naming six controls. The first run needs two.
-        hint: 'HOLD to run · tap JUMP at the line — then SLAM at the top',
+        hint: 'HOLD to run · tap JUMP at the line — then SLAM on NOW!',
         // one line, phrased by the module: a mode must not invent its own wording for somebody's track
         walkOutNow: walkOutLine(walkCue),
         attempt: stakesLabel(stakes, calledLabel()),
@@ -2576,7 +2576,7 @@ export const DunkMode: ModeDefinition = (() => {
       need: need > 0 ? need : 0,
       hint: need > 0
         ? `FINAL ROUND — you need big numbers (${deficit > 0 ? `down ${deficit}` : `up ${-deficit}`})`
-        : 'HOLD to run · tap JUMP at the line — then SLAM at the top',   // F4 (review): six controls in one line taught none of them
+        : 'HOLD to run · tap JUMP at the line — then SLAM on NOW!',   // F4 (review): six controls in one line taught none of them
       charge: 0, slamPulse: false,
     });
   }
