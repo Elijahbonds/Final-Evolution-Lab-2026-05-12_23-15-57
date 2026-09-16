@@ -38,6 +38,8 @@ const AIR: { id: string; dir: string; btn: number }[] = [
   { id: 'spin360', dir: 'right', btn: 1 }, { id: 'scorpion', dir: 'right', btn: 3 }, { id: 'cradle', dir: 'right', btn: 0 },
   { id: 'eastbay', dir: 'down', btn: 3 }, { id: 'betweenlegs', dir: 'down', btn: 1 }, { id: 'clutch', dir: 'down', btn: 0 },
   { id: 'lostfound', dir: 'left', btn: 1 }, { id: 'hideseek', dir: 'left', btn: 0 },
+  // the chain pieces (2026-09-16) — X is button 2, and it reads in the air now
+  { id: 'behindback', dir: 'left', btn: 3 }, { id: 'fakeback', dir: 'left', btn: 2 }, { id: 'doubleeastbay', dir: 'down', btn: 2 },
 ];
 // TRICK=windmill · TRICK=all · TRICK=windmill+spin360 (a COMBO: both calls in one flight, the second on the hang)
 const spec = process.env.TRICK ?? 'all';
@@ -61,6 +63,10 @@ const RUNWAY_AT_MS = Number(process.env.RUNWAY_AT_MS ?? 700);
 /** The PROP ring: d-pad DOWN in the approach cycles the obstacle (car → barrier → crate → THE TETRIS). OBSTACLE=tetris. */
 const OBSTACLE_RING = ['car', 'barrier', 'crate', 'tetris'];
 const OBSTACLE = process.env.OBSTACLE ?? '';
+/** STYLE=flashy|sig — B in the approach cycles POWER -> FLASHY -> SIGNATURE, and the style called buys air (a triple needs it). */
+const STYLE_RING = ['power', 'flashy', 'sig'];
+const STYLE = process.env.STYLE ?? '';
+if (STYLE && !STYLE_RING.includes(STYLE)) throw new Error(`no such style: ${STYLE} (have ${STYLE_RING.join(', ')})`);
 /** SHOT_AT_MS=900 — a frame of the RUNWAY itself (what the dunker is about to jump over), not just the verdict. */
 const SHOT_AT_MS = Number(process.env.SHOT_AT_MS ?? 0);
 if (OBSTACLE && !OBSTACLE_RING.includes(OBSTACLE)) throw new Error(`no such obstacle: ${OBSTACLE} (have ${OBSTACLE_RING.join(', ')})`);
@@ -162,6 +168,7 @@ for (let n = 0; n < ATTEMPTS; n++) {
   const mark = Date.now();
   const a: Attempt = { n: n + 1, trick: trick.id, cue: [], banners: [] };
 
+  for (let i = 0; i < STYLE_RING.indexOf(STYLE) + 1 && STYLE; i++) { await press(1, 60); await page.waitForTimeout(120); }   // B cycles the style on the runway
   // THE PROP RING: d-pad DOWN in the approach steps through the obstacles, so the lab can put a car — or two people
   // stacked on each other's shoulders — between the dunker and the rim.
   for (let i = 0; OBSTACLE && i <= OBSTACLE_RING.indexOf(OBSTACLE); i++) {
@@ -204,16 +211,18 @@ for (let n = 0; n < ATTEMPTS; n++) {
   await page.waitForTimeout(60);
   await hold(DPAD[trick.dir], false);
   if (combo) {
-    // the second call of the chain: a real run-up buys two tricks (DunkFlight.trickCapacity), the cue table decides
-    // when the second one may fire, and the mode arms a press thrown before its beat
-    const b = combo[1];
-    a.trick = `${combo[0].id}+${b.id}`;
-    await page.waitForTimeout(COMBO_GAP_MS);
-    await hold(DPAD[b.dir], true);
-    await page.waitForTimeout(90);
-    await press(b.btn, 60);
-    await page.waitForTimeout(60);
-    await hold(DPAD[b.dir], false);
+    // THE REST OF THE CHAIN. A real run-up buys two tricks and a maximum one buys three (DunkFlight.trickCapacity);
+    // the cue table decides when each may fire, and the mode arms a press thrown before its beat. This used to fire
+    // only combo[1], so a three-piece like 360+eastbay+scorpion could never be driven at all.
+    a.trick = combo.map((t) => t.id).join('+');
+    for (const b of combo.slice(1)) {
+      await page.waitForTimeout(COMBO_GAP_MS);
+      await hold(DPAD[b.dir], true);
+      await page.waitForTimeout(90);
+      await press(b.btn, 60);
+      await page.waitForTimeout(60);
+      await hold(DPAD[b.dir], false);
+    }
   }
 
   // THE SLAM: armed in the page so the press lands on the frame it means to.

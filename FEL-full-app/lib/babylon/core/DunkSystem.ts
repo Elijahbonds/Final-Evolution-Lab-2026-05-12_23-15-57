@@ -29,7 +29,7 @@ export interface DunkTrick {
   id: string;
   label: string;
   dir: 'up' | 'down' | 'left' | 'right';
-  btn: 'A' | 'B' | 'Y';       // X is reserved (inert) on the touch deck for tricks
+  btn: 'A' | 'B' | 'X' | 'Y';   // X was reserved and inert; the chain pieces (2026-09-16) are what finally use it
   clip: string;              // resolver-backed dunk animation
   difficulty: number;        // added to the attempt's difficulty
   windowCost: number;        // fraction of remaining air window consumed
@@ -53,6 +53,14 @@ export const DUNK_TRICKS: DunkTrick[] = [
   // different in kind from the transfers above, so the vocabulary grows in shape and not just in count.
   { id: 'cradle', label: 'ROCK THE CRADLE', dir: 'right', btn: 'A', clip: 'dunk_cradle', difficulty: 2.6, windowCost: 0.32 },
   { id: 'clutch', label: 'DOUBLE CLUTCH', dir: 'down', btn: 'A', clip: 'dunk_double_clutch', difficulty: 3.0, windowCost: 0.36 },
+  // THE CHAIN PIECES (owner, 2026-09-16: "add combinations of dunks you can chain together"). The combos he named —
+  // behind-the-back between-the-legs, 360 double eastbay, (fake) behind-the-back scorpion, 360 eastbay scorpion — all
+  // need parts the vocabulary did not have. X was never read in the air, so four slots were sitting unused: the plain
+  // BEHIND THE BACK (ours only had it welded to a 360, inside LOST & FOUND), the FAKE of it, and the DOUBLE EASTBAY —
+  // two passes through the legs in one jump, the Team Flight Brothers staple.
+  { id: 'behindback', label: 'BEHIND THE BACK', dir: 'left', btn: 'Y', clip: 'dunk_behind_back', difficulty: 3.0, windowCost: 0.34 },
+  { id: 'fakeback', label: 'FAKE BEHIND THE BACK', dir: 'left', btn: 'X', clip: 'dunk_fake_back', difficulty: 2.6, windowCost: 0.30 },
+  { id: 'doubleeastbay', label: 'DOUBLE EASTBAY', dir: 'down', btn: 'X', clip: 'dunk_double_eastbay', difficulty: 4.4, windowCost: 0.50 },
 ];
 
 /** Trick id by its clip (the replay re-fires clips; the posture layer wants the trick). */
@@ -167,6 +175,9 @@ export const DUNK_CUES: Record<string, DunkCue> = {
   hideseek:    { fire: 'rise', last: 'preSlam', facing: 'faceRim' },
   cradle:      { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // the circle needs most of the flight
   clutch:      { fire: 'hang', last: 'preSlam', facing: 'faceRim' },                 // the clutch reads at the APEX, not on the way up
+  behindback:  { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // the ball has to go round the back and come back out before the carry-up
+  fakeback:    { fire: 'rise', last: 'preSlam', facing: 'faceRim' },                 // a fake is fast: it can be thrown late and still read
+  doubleeastbay: { fire: 'rise', last: 'hang',  facing: 'faceRim' },                 // two passes need the whole flight
 };
 // ── THE TIMING READOUT (2026-09-14) ──────────────────────────────────────────────────────────────────────
 //
@@ -322,6 +333,26 @@ export class DunkSpin {
  *  input wearing a banner. The run-up buys HOW MANY tricks fit, the cue table decides WHEN each may fire, and the
  *  refusal — when there is one — is knowable before the first trick is ever thrown. */
 export const COMBO_AIR_SEC = 1.32;
+/**
+ * THREE IN ONE FLIGHT (owner, 2026-09-16: "360 eastbay scorpion").
+ *
+ * A third trick is not a third of the same thing — it is the top of the mode, and it should cost the run-up everything.
+ * THE RUN-UP OWNS HOW MANY FIT — that is this mode's own rule, and the triple obeys it rather than inventing a second
+ * one. The budget is `0.85 + approachSpeed01 * 0.55 + styleTier * 0.05` (1.8 max), and 1.55 is exactly a FULL-SPEED
+ * attack: attack the rim properly and you have three, amble in and you do not. Calling a style above POWER buys a
+ * little slack on the speed, which is the right shape — it should reward the call, not require it.
+ *
+ * I set this at 1.72 first (SIGNATURE *and* near-perfect speed) and then 1.66, and measured both in the lab as a flat
+ * "TWO TRICKS A FLIGHT" on a full-speed signature run: a chain the owner had asked for that nothing could throw. The
+ * window still pays for it — three tricks take roughly half the slam window between them — and the cue table still has
+ * to let all three fire, which at a real cadence is the hard part.
+ *
+ * And NOT 1.55, which is what a full-speed POWER attack "equals": `0.85 + 1 * 0.55 + 3 * 0.05` evaluates to
+ * 1.5499999999999998, so the bar it was supposed to sit exactly on refused it every time. A threshold placed on the
+ * exact value of a float sum is a coin toss decided by the last bit; 1.50 leaves it room (~92 % speed at POWER, less
+ * with a style called).
+ */
+export const TRIPLE_AIR_SEC = 1.50;
 
 // ── NAMED DUNKS (2026-09-16) ──────────────────────────────────────────────────────────────────────────
 //
@@ -347,6 +378,14 @@ export interface SignatureDunk {
 }
 export const SIGNATURE_DUNKS: readonly SignatureDunk[] = [
   { id: 'kickup_eastbay', runway: 'kickup', air: ['eastbay'], name: 'THE KICK-UP EASTBAY', by: 'Elijah Bonds', nod: 1.2 },
+  // THE CHAINS (owner, 2026-09-16). Named combinations, in the order they have to be thrown — a signature is a
+  // sequence, not a set, so throwing the same two the other way round is a combo but not THIS combo.
+  { id: 'btb_btl', air: ['behindback', 'betweenlegs'], name: 'BEHIND THE BACK BETWEEN THE LEGS', by: 'Team Flight Brothers', nod: 1.4 },
+  { id: 'btb_scorpion', air: ['behindback', 'scorpion'], name: 'BEHIND THE BACK SCORPION', by: 'Jordan Kilganon', nod: 1.6 },
+  { id: 'fake_btb_scorpion', air: ['fakeback', 'scorpion'], name: 'FAKE BEHIND THE BACK SCORPION', by: 'Jordan Kilganon', nod: 1.5 },
+  { id: '360_double_eastbay', air: ['spin360', 'doubleeastbay'], name: '360 DOUBLE EASTBAY', by: 'Guy Dupuy', nod: 1.8 },
+  // the three-piece: the whole air budget, and the top of the mode
+  { id: '360_eastbay_scorpion', air: ['spin360', 'eastbay', 'scorpion'], name: '360 EASTBAY SCORPION', by: 'Team Flight Brothers', nod: 2.2 },
 ] as const;
 
 /** The signature this attempt threw, if it threw one. Order matters: a signature is a sequence, not a set. */
@@ -389,20 +428,22 @@ export class GestureRecognizer {
       else if (this.heldDir === e.dir) { this.heldDir = null; this.spent = false; }
       return null;
     }
-    if (e.t === 'button' && e.pressed && this.heldDir && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y')) {
-      const dir = this.heldDir;
-      return DUNK_TRICKS.find((t) => t.dir === dir && t.btn === e.btn) ?? null;
-    }
-    return null;
+    return this.peek(e);
   }
 
-  /** The trick a button press WOULD throw with the direction held now — no state change (the cue arms it for its beat). */
+  /**
+   * The trick a button press WOULD throw with the direction held now — no state change (the cue arms it for its beat).
+   *
+   * THE TABLE IS THE AUTHORITY. This used to carry its own list of buttons — `A || B || Y`, written out twice — beside
+   * the lookup that already knew which buttons exist. So when the chain pieces arrived on X (2026-09-16) the table said
+   * `left + X = FAKE BEHIND THE BACK` and the recognizer silently disagreed: the press went to the showboat tap and the
+   * trick could not be thrown at all. Measured in the lab, the chain just... didn't happen, with no refusal and no log.
+   * A filter that duplicates a table is a filter that will drift from it.
+   */
   peek(e: FelInput): DunkTrick | null {
-    if (e.t === 'button' && e.pressed && this.heldDir && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y')) {
-      const dir = this.heldDir;
-      return DUNK_TRICKS.find((t) => t.dir === dir && t.btn === e.btn) ?? null;
-    }
-    return null;
+    if (e.t !== 'button' || !e.pressed || !this.heldDir) return null;
+    const dir = this.heldDir;
+    return DUNK_TRICKS.find((t) => t.dir === dir && t.btn === e.btn) ?? null;
   }
 
   reset(): void { this.heldDir = null; this.spent = false; }
@@ -460,7 +501,9 @@ export class DunkFlight {
   peek(e: FelInput): DunkTrick | null { return this.recognizer.peek(e); }
   /** How many tricks THIS flight can hold: the run-up bought it at the takeoff (COMBO_AIR_SEC), and it does not move
    *  while the player is in the air. A walk-up gets one, a real run-up gets two. */
-  get trickCapacity(): number { return this.airTotal >= COMBO_AIR_SEC ? 2 : 1; }
+  get trickCapacity(): number { return this.airTotal >= TRIPLE_AIR_SEC ? 3 : this.airTotal >= COMBO_AIR_SEC ? 2 : 1; }
+  /** What this flight bought, for a refusal that can say what would have bought more. */
+  get capacity(): number { return this.trickCapacity; }
   /** Whether a trick could be taken on this frame — the mode asks BEFORE it turns a press into a refusal banner. */
   canTake(): boolean {
     if (this.phase !== 'airborne' && this.phase !== 'slamWindow') return false;
@@ -478,7 +521,7 @@ export class DunkFlight {
     // baseline's own combo scenario `refused windmill @0.49: air` at 0.41 against a 0.42 bar. The cue table owns WHEN a
     // trick may fire; the run-up owns HOW MANY fit; nothing owns "not this one, not now, no reason you could have known".
     if (this.tricks.length >= this.trickCapacity) {
-      if (this.tricks.length >= 2) this.refusal = 'limit';                  // DUNK-BIOMECH: a third trick is refused OUT LOUD
+      if (this.tricks.length >= 2) this.refusal = 'limit';                  // DUNK-BIOMECH: one past what this flight bought is refused OUT LOUD
       else { this.rejectedForAir = true; this.refusal = 'air'; }            // a walk-up never had the air for a second one
       return null;
     }

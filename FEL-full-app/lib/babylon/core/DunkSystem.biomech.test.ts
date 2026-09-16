@@ -100,7 +100,7 @@ describe('DunkFlight.take / peek', () => {
     expect(f.take(DUNK_TRICKS[1])).toBeNull(); expect(f.rejectedForAir).toBe(true); expect(f.refusal).toBe('air');
   });
   it('a real run-up buys the combo the walk-up could not have', () => {
-    const f = new DunkFlight(); f.launch(1, 3);   // airTotal 1.55 s
+    const f = new DunkFlight(); f.launch(0.7, 3);   // airTotal 1.385 s — a real run-up, short of the full-speed attack a TRIPLE needs
     expect(f.trickCapacity).toBe(2);
     const spin = DUNK_TRICKS.find((x) => x.id === 'spin360')!, mill = DUNK_TRICKS.find((x) => x.id === 'windmill')!;
     expect(f.take(spin)?.id).toBe('spin360');
@@ -120,11 +120,40 @@ describe('DunkFlight.take / peek', () => {
     f.recognizer.feed({ t: 'dpad', dir: 'up', pressed: true });
     expect(f.recognizer.dirSpent).toBe(false);         // let go and press again and the direction speaks for a trick once more
   });
-  it('a third trick is refused for the limit, out loud', () => {
-    const f = new DunkFlight(); f.launch(1, 8);
+  // THE RUN-UP BUYS THE CHAIN (2026-09-16). It used to buy at most two, full stop. The owner's "360 eastbay scorpion"
+  // is three, so there is a third tier — but only at the very top of the budget (a full-speed attack with a SIGNATURE
+  // called is 1.80 s against a 1.72 s bar), and one past whatever this flight bought is still refused OUT LOUD.
+  it('a walk-up gets one, and the second is refused for the AIR', () => {
+    const f = new DunkFlight(); f.launch(0.2, 3);
+    const [a, b] = DUNK_TRICKS;
+    expect(f.take(a)).not.toBeNull();
+    expect(f.take(b)).toBeNull(); expect(f.refusal).toBe('air'); expect(f.rejectedForAir).toBe(true);
+  });
+  it('a real run-up gets two, and the third is refused for the LIMIT', () => {
+    const f = new DunkFlight(); f.launch(0.7, 3);
     const [a, b, c] = DUNK_TRICKS;
     expect(f.take(a)).not.toBeNull(); expect(f.take(b)).not.toBeNull();
     expect(f.take(c)).toBeNull(); expect(f.refusal).toBe('limit'); expect(f.rejectedForAir).toBe(false);
+  });
+  it('a FULL-SPEED attack buys THREE, and the fourth is refused', () => {
+    const f = new DunkFlight(); f.launch(1, 3);
+    const [a, b, c, d] = DUNK_TRICKS;
+    expect(f.take(a)).not.toBeNull(); expect(f.take(b)).not.toBeNull(); expect(f.take(c)).not.toBeNull();
+    expect(f.take(d)).toBeNull(); expect(f.refusal).toBe('limit'); expect(f.rejectedForAir).toBe(false);
+  });
+  it('calling a bigger style buys slack on the speed, rather than being required for a triple', () => {
+    const cap = (speed: number, tier: number) => { const f = new DunkFlight(); f.launch(speed, tier); return f.capacity; };
+    expect(cap(0.75, 8)).toBe(3);   // signature: three-quarter speed still gets it
+    expect(cap(0.75, 3)).toBe(2);   // power at the same speed does not
+    // and the bar is not sitting on the exact value of a float sum: a full-speed POWER attack "is" 1.55 and evaluates
+    // to 1.5499999999999998, which is how the first two attempts at this constant refused the dunk they were sized for
+    expect(cap(1, 3)).toBe(3);
+  });
+  it('and a triple costs most of the slam window — it should be the hardest thing in the mode', () => {
+    const one = new DunkFlight(); one.launch(1, 8); one.take(DUNK_TRICKS[0]);
+    const three = new DunkFlight(); three.launch(1, 8);
+    for (const t of DUNK_TRICKS.slice(0, 3)) three.take(t);
+    expect(three.slamWindow).toBeLessThan(one.slamWindow * 0.75);
   });
 });
 

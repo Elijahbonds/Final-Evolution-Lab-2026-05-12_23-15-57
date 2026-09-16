@@ -18,7 +18,7 @@ import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, bui
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildFinishWindmill, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
-import { SCORPION_SEC, HIDE_SEEK_SEC, LOST_FOUND_SEC, SPIN_SEC, buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildBackHandspring, buildBackflip, BACKFLIP_SEC, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
+import { SCORPION_SEC, HIDE_SEEK_SEC, LOST_FOUND_SEC, SPIN_SEC, BEHIND_BACK_SEC, BEHIND_BACK_SWAP, FAKE_BACK_SEC, DOUBLE_EASTBAY_SEC, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildBackHandspring, buildBackflip, BACKFLIP_SEC, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
 import { DUNK_TRICKS } from '../../core/DunkSystem';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
 import { buildBaseClips } from './baseClips';
@@ -160,6 +160,54 @@ describe('the named dunks move', () => {
       const shots = feetOverFlight(build, sec);
       const worst = Math.max(...shots.map((s) => Math.abs(s.l.y - s.r.y) + Math.abs(s.l.z - s.r.z)));
       expect(worst, `${name}: both legs do the same thing the whole way`).toBeGreaterThan(0.08);
+    }
+  });
+});
+
+// THE CHAIN PIECES (owner, 2026-09-16). Three bodies the vocabulary needed before the named combinations could be
+// built out of it: the plain behind-the-back (ours only existed welded to a 360 inside LOST & FOUND), the FAKE of it,
+// and the double eastbay — two passes through the legs in one jump.
+describe('the chain pieces', () => {
+  it('behind the back: round the hip, both hands meet behind, out the far side and up', () => {
+    const g = fresh(() => buildBehindBack(scene, sk)!);
+    at(g, 0.18); expect(pos('RightHand').z).toBeLessThan(pos('Hips').z - 0.15);                     // round the hip, behind the body
+    at(g, BEHIND_BACK_SWAP); expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.35);   // they meet
+    at(g, BEHIND_BACK_SEC); expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y + 0.2);         // the FAR hand finishes it
+  });
+
+  // The whole trick is the lie, so the first third has to be the real one's shape and the end has to betray it.
+  it('the fake: the same path in, and then the SAME hand takes it up', () => {
+    const real = fresh(() => buildBehindBack(scene, sk)!);
+    at(real, 0.16); const realDepth = pos('RightHand').z - pos('Hips').z;
+    const g = fresh(() => buildFakeBack(scene, sk)!);
+    at(g, 0.16);
+    expect(pos('RightHand').z - pos('Hips').z).toBeLessThan(realDepth + 0.12);                      // it goes as deep as the real one
+    at(g, 0.26); expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.45);    // the far hand comes to meet it…
+    at(g, FAKE_BACK_SEC);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.2);                                // …and never gets it
+    expect(pos('RightHand').y).toBeGreaterThan(pos('LeftHand').y + 0.3);
+  });
+
+  it('double eastbay: two passes, the legs SWAP between them, and it ends in the hand it started in', () => {
+    const g = fresh(() => buildDoubleEastbay(scene, sk)!);
+    at(g, DOUBLE_EASTBAY_FIRST);
+    // the KNEE, not the foot: a leg kicked BACK raises the foot too (bent shin), so feet cannot tell you which thigh
+    // is driving. The knee is where the thigh actually points.
+    expect(pos('LeftLeg').y - pos('RightLeg').y).toBeGreaterThan(0.1);                               // left thigh up for pass one
+    expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.35);                  // the hand-off, down in the gap
+    expect(pos('RightHand').y).toBeLessThan(hipsY() + 0.2);
+    at(g, DOUBLE_EASTBAY_SECOND);
+    expect(pos('RightLeg').y - pos('LeftLeg').y).toBeGreaterThan(0.1);                               // the OTHER thigh up for pass two
+    expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.35);
+    at(g, DOUBLE_EASTBAY_SEC);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.2);                                 // finished right-handed, where it began
+  });
+
+  it('all three finish long, like everything else in the contest', () => {
+    for (const [build, sec] of [[buildBehindBack, BEHIND_BACK_SEC], [buildFakeBack, FAKE_BACK_SEC], [buildDoubleEastbay, DOUBLE_EASTBAY_SEC]] as const) {
+      const g = fresh(() => build(scene, sk)!);
+      at(g, sec);
+      for (const s of ['Left', 'Right']) expect(pos(`${s}Foot`).y).toBeLessThan(pos('Hips').y - 0.55);
     }
   });
 });

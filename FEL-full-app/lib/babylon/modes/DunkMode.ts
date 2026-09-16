@@ -766,7 +766,7 @@ export const DunkMode: ModeDefinition = (() => {
       // for the rise and fires there — the trick the player asked for, at the beat it belongs to.
       if (phase === 'cinematic' && e.t === 'dpad') flight.recognizer.feed(e);
       // DUNK-BIOMECH: every trick has a cue window — early = ARMED (fires on its beat), late = refused with a banner
-      if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y') && !qteWindowOpen) airButton(ctx, e);
+      if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') && !qteWindowOpen) airButton(ctx, e);   // X reads in the air now: it carries the chain pieces (2026-09-16)
 
       if (e.t === 'trigger' && e.side === 'R') {
         // MECHANICS PASS (2026-09-15): RUN (RT) was silent 6 of 6 when held outside the runway — through the judges, the
@@ -1495,7 +1495,9 @@ export const DunkMode: ModeDefinition = (() => {
     const got = flight.take(trick);
     if (!got) {
       // the run-up didn't buy the air that trick needs (or two are already in the air) — SAY so, or it reads as a dropped input
-      if (flight.refusal === 'limit') refuse(ctx, 'TWO TRICKS A FLIGHT — SLAM IT');
+      // SAY WHAT WOULD HAVE BOUGHT IT (2026-09-16). "TWO TRICKS A FLIGHT" is a rule; a player who has just been refused
+      // a third wants to know what buys one. The budget is the run-up and the style called, so name both.
+      if (flight.refusal === 'limit') refuse(ctx, flight.capacity < 3 ? 'TWO TRICKS A FLIGHT — MORE RUN-UP AND A BIGGER STYLE BUYS A THIRD' : 'THREE TRICKS A FLIGHT — SLAM IT');
       else if (flight.rejectedForAir) { flight.rejectedForAir = false; refuse(ctx, 'NOT ENOUGH AIR — come in faster'); }
       console.info(`[DUNK-CUE] refused ${trick.id} @${clipTime.toFixed(2)}: ${flight.refusal ?? 'phase'}`);
       return;

@@ -74,6 +74,12 @@ export const TRICK_POSTURE: Record<string, Partial<PosturePose>> = {
   // its own, or two different tricks read as the same body from the waist up however different their arms are.
   cradle:      { spine1: [-4, 0, 0], spine2: [-12, 0, 0], neck: [2, 0, 0],   head: [4, 0, 0],   shrug: 14, forward: -4, chestAim: 0.6 },   // the circle opens the near shoulder; the head follows the ball round
   clutch:      { spine1: [10, 0, 0], spine2: [14, 0, 0],  neck: [-18, 0, 0], head: [-12, 0, 0], shrug: 4,  forward: 8,  chestAim: 0.75 },  // folded over the ball at the bottom, eyes up at the rim it is going back to
+  // THE CHAIN PIECES (2026-09-16). The two behind-the-back moves have to read differently from the waist up or the fake
+  // is not a fake: the real one COMMITS (the trailing shoulder drops right back and the head goes with it), the fake
+  // only leans (a small shrug, the head already coming back to the rim — that is the tell, and it should be missable).
+  behindback:  { spine1: [8, 0, 0],  spine2: [10, 0, 0],  neck: [-8, 0, 0],  head: [-6, 0, 0],  shrug: 16, forward: 6,  chestAim: 0.55 },
+  fakeback:    { spine1: [4, 0, 0],  spine2: [5, 0, 0],   neck: [-14, 0, 0], head: [-10, 0, 0], shrug: 8,  forward: 3,  chestAim: 0.8 },
+  doubleeastbay: { spine1: [16, 0, 0], spine2: [20, 0, 0], neck: [-14, 0, 0], head: [-8, 0, 0], shrug: 6,  forward: 12, chestAim: 0.7 },   // folded deep over two passes, eyes up between them
 };
 
 // ── Limits and rates ───────────────────────────────────────────────────────

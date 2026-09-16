@@ -82,6 +82,10 @@ export const BETWEEN_LEGS_SEC = 0.8;
 export const CRADLE_SEC = 0.75;
 /** Double clutch: the ball is brought all the way down to the waist at the apex and thrown back up. */
 export const CLUTCH_SEC = 0.7;
+/** The chain pieces (owner, 2026-09-16). The double eastbay is the long one: two passes have to fit inside it. */
+export const BEHIND_BACK_SEC = 0.7, FAKE_BACK_SEC = 0.5, DOUBLE_EASTBAY_SEC = 0.95;
+/** The clip second each hand-off lands on — the ball rig swaps hands here, as it does for the eastbay. */
+export const BEHIND_BACK_SWAP = 0.34, DOUBLE_EASTBAY_FIRST = 0.30, DOUBLE_EASTBAY_SECOND = 0.62;
 /** Clip-local second the cradle's ball passes closest to the head — the rig keeps it in the one hand. */
 export const CRADLE_ROUND = 0.34;
 /** Clip-local second the ball changes hands under the thigh (DunkMode reparents it here, as it does for lost & found). */
@@ -344,5 +348,65 @@ export function buildSpin360(scene: Scene, sk: Skeleton): AnimationGroup | null 
     { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [-4, 0, 0], ...TUCK },  hands: { Right: [0.18, 1.62, 0.26], Left: [-0.24, 1.50, 0.18] }, poles: UP },   // coming out of the turn: the ball rises
     { t: 0.68, bones: { Hips: [-2, 0, 0], Spine: [-8, 0, 0], Neck: [-8, 0, 0], ...AIR.kickOut }, hands: { Right: [0.18, 1.82, 0.28], Left: [-0.30, 1.56, 0.14] }, poles: UP },   // THE SNAP: the tuck is thrown open and that is what kills the spin
     { t: SPIN_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.long }, hands: { Right: [0.16, 2.00, 0.28], Left: [-0.28, 1.60, 0.12] }, poles: UP },   // extended to the rim — and the TUCK OPENS, which is both what stops the turn and what the flush looks like (it used to finish still tucked, so the whole trick travelled 0.12 m of leg)
+  ]);
+}
+
+/**
+ * BEHIND THE BACK — the plain one (owner, 2026-09-16: "behind the back scorpion", "behind the back between the legs").
+ *
+ * The vocabulary had this motion only welded to a 360 inside LOST & FOUND, so neither chain the owner asked for could
+ * be built out of it. On its own it is the simplest of the transfers and the one every other behind-the-back dunk is
+ * made of: the ball hand takes it round the hip, both hands meet in the small of the back, the far hand comes out the
+ * other side with it and carries it up. No turn — the body stays square to the rim, which is exactly what makes it
+ * chainable: whatever comes next starts facing the right way.
+ */
+export function buildBehindBack(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'dunk_behind_back', BEHIND_BACK_SEC, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.26, 1.60, 0.30], Left: [-0.30, 1.32, 0.16] } },
+    { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0], Neck: [6, 0, 0], ...AIR.kickBack }, hands: { Right: [0.34, 1.02, -0.30], Left: [-0.36, 1.18, 0.04] }, poles: { Right: [0.9, -0.2, -0.3] } },   // round the hip
+    { t: BEHIND_BACK_SWAP, bones: { Hips: [2, 0, 0], Spine: [8, 0, 0], Neck: [4, 0, 0], ...AIR.kickBack }, hands: { Right: [0.08, 1.00, -0.38], Left: [-0.10, 1.00, -0.38] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] } },   // both hands meet in the small of the back
+    { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], Neck: [-6, 0, 0], ...AIR.spread }, hands: { Left: [-0.50, 1.34, 0.02], Right: [0.42, 1.16, -0.08] }, poles: { Left: [-0.9, -0.2, -0.4] } },   // out the far side, legs opening under it
+    { t: BEHIND_BACK_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.long }, hands: { Left: [-0.14, 2.02, 0.26], Right: [0.36, 1.42, -0.06] }, poles: { Left: UP.Left } },   // carried up, left-handed
+  ]);
+}
+
+/**
+ * FAKE BEHIND THE BACK — the ball goes round and comes straight back to the same hand.
+ *
+ * The whole trick is the LIE, so it has to be shaped like the real one for the first third and then betray it: the ball
+ * takes the identical path round the hip to the same depth the real swap reaches, the free hand comes to meet it — and
+ * then never takes it. The ball hand whips it back out the way it went in and goes up alone. Short, because a fake that
+ * dwells is not a fake.
+ */
+export function buildFakeBack(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'dunk_fake_back', FAKE_BACK_SEC, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.26, 1.60, 0.30], Left: [-0.30, 1.32, 0.16] } },
+    { t: 0.16, bones: { Hips: [0, 0, 0], Spine: [8, 0, 0], Neck: [8, 0, 0], ...AIR.kickBack }, hands: { Right: [0.30, 1.00, -0.34], Left: [-0.26, 1.06, -0.22] }, poles: { Right: [0.9, -0.2, -0.3], Left: [-0.9, -0.2, -0.3] } },   // the lie: the same path, the far hand coming to meet it
+    { t: 0.26, bones: { Hips: [0, 0, 0], Spine: [4, 0, 0], Neck: [4, 0, 0], ...AIR.kickBack }, hands: { Right: [0.22, 1.06, -0.30], Left: [-0.16, 1.04, -0.30] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] } },   // close enough to look like the swap
+    { t: 0.36, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [-8, 0, 0], ...AIR.kickOut }, hands: { Right: [0.44, 1.40, 0.10], Left: [-0.44, 1.20, 0.10] }, poles: { Right: [0.9, -0.1, -0.4] } },   // …and it never happened: back out the way it went in
+    { t: FAKE_BACK_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-12, 0, 0], ...AIR.long }, hands: { Right: [0.16, 2.02, 0.26], Left: [-0.34, 1.46, 0.06] }, poles: { Right: UP.Right } },   // up alone, SAME hand it started in
+  ]);
+}
+
+/**
+ * DOUBLE EASTBAY — two passes through the legs in one jump.
+ *
+ * The Team Flight Brothers staple, and the piece the owner's "360 double eastbay" needs. It is not the eastbay played
+ * twice: there is only one jump's worth of air, so each pass is faster and tighter than a single, and the split has to
+ * re-open for the second one having just closed. Right hand down through the gap to the left, and immediately left back
+ * through to the right — the ball crosses the body twice and finishes in the hand it started in, which is the tell that
+ * it was two passes and not one.
+ */
+export function buildDoubleEastbay(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const SPLIT: Record<string, Deg3> = { LeftUpLeg: [-92, 0, 12], LeftLeg: [52, 0, 0], RightUpLeg: [38, 0, -10], RightLeg: [70, 0, 0] };
+  const SPLIT2: Record<string, Deg3> = { LeftUpLeg: [40, 0, 10], LeftLeg: [72, 0, 0], RightUpLeg: [-92, 0, -12], RightLeg: [52, 0, 0] };   // the legs SWAP for the second pass
+  return buildPoseClip(scene, sk, 'dunk_double_eastbay', DOUBLE_EASTBAY_SEC, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.26, 1.62, 0.30], Left: [-0.30, 1.32, 0.14] } },
+    { t: 0.18, bones: { Hips: [10, 0, 0], Spine: [22, 0, 0], Neck: [18, 0, 0], ...SPLIT }, hands: { Right: [0.10, 0.92, 0.34], Left: [-0.28, 1.16, 0.22] }, poles: { Right: [0.9, -0.3, 0.3] } },   // first gap open, ball driven down into it
+    { t: DOUBLE_EASTBAY_FIRST, bones: { Hips: [10, 0, 0], Spine: [24, 0, 0], Neck: [20, 0, 0], ...SPLIT }, hands: { Right: [-0.04, 0.86, 0.36], Left: [-0.12, 0.86, 0.36] }, poles: { Right: [0.9, -0.3, 0.3], Left: [-0.9, -0.3, 0.3] } },   // PASS ONE: right to left under the lead thigh
+    { t: 0.46, bones: { Hips: [4, 0, 0], Spine: [10, 0, 0], Neck: [8, 0, 0], ...AIR.kickOut }, hands: { Left: [-0.36, 1.22, 0.24], Right: [0.34, 1.20, 0.12] } },   // the legs close and swap — the only moment between the two passes
+    { t: DOUBLE_EASTBAY_SECOND, bones: { Hips: [10, 0, 0], Spine: [24, 0, 0], Neck: [20, 0, 0], ...SPLIT2 }, hands: { Left: [0.04, 0.86, 0.36], Right: [0.12, 0.86, 0.36] }, poles: { Left: [-0.9, -0.3, 0.3], Right: [0.9, -0.3, 0.3] } },   // PASS TWO: left back to right, the other leg up
+    { t: 0.78, bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], Neck: [-6, 0, 0], ...AIR.spread }, hands: { Right: [0.42, 1.46, 0.16], Left: [-0.44, 1.26, 0.10] } },   // out of the second gap, legs thrown open
+    { t: DOUBLE_EASTBAY_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.long }, hands: { Right: [0.16, 2.04, 0.26], Left: [-0.34, 1.46, 0.04] }, poles: { Right: UP.Right } },   // finished in the hand it started in
   ]);
 }

@@ -5,7 +5,7 @@
 // one in the table is the owner's own: the KICK-UP EASTBAY, kicked up to yourself off your own foot on the runway and
 // taken between the legs in the air.
 import { describe, expect, it } from 'vitest';
-import { SIGNATURE_DUNKS, signatureFor, RUNWAY_TRICKS, DUNK_TRICKS } from './DunkSystem';
+import { SIGNATURE_DUNKS, signatureFor, RUNWAY_TRICKS, DUNK_TRICKS, GestureRecognizer } from './DunkSystem';
 
 describe('signature dunks', () => {
   it('the kick-up eastbay is a named dunk, credited', () => {
@@ -30,5 +30,84 @@ describe('signature dunks', () => {
       for (const id of sig.air) expect(air.has(id), `${sig.name}: ${id}`).toBe(true);
       expect(sig.by.length, `${sig.name} has an author`).toBeGreaterThan(0);
     }
+  });
+});
+
+// THE CHAINS (owner, 2026-09-16: "add combinations of dunks you can chain together, behind the back between the legs,
+// 360 double eastbay, fake behind the back scorpion, behind the back scorpion", then "360 eastbay scorpion").
+describe('the named chains', () => {
+  const chains: [string[], string][] = [
+    [['behindback', 'betweenlegs'], 'BEHIND THE BACK BETWEEN THE LEGS'],
+    [['behindback', 'scorpion'], 'BEHIND THE BACK SCORPION'],
+    [['fakeback', 'scorpion'], 'FAKE BEHIND THE BACK SCORPION'],
+    [['spin360', 'doubleeastbay'], '360 DOUBLE EASTBAY'],
+    [['spin360', 'eastbay', 'scorpion'], '360 EASTBAY SCORPION'],
+  ];
+
+  it('every one the owner named is in the table, credited, and reachable by throwing its parts', () => {
+    for (const [air, name] of chains) {
+      const sig = signatureFor([], air);
+      expect(sig?.name, air.join(' + ')).toBe(name);
+      expect(sig!.by.length, name).toBeGreaterThan(0);
+      expect(sig!.nod, name).toBeGreaterThan(0);
+    }
+  });
+
+  it('every part of every chain is a trick you can actually throw', () => {
+    const ids = new Set(DUNK_TRICKS.map((t) => t.id));
+    for (const sig of SIGNATURE_DUNKS) {
+      for (const id of sig.air) expect(ids.has(id), `${sig.name} wants ${id}`).toBe(true);
+      if (sig.runway) expect(RUNWAY_TRICKS.some((r) => r.id === sig.runway), sig.name).toBe(true);
+    }
+  });
+
+  it('the ORDER is the dunk: the same parts the other way round is not the same thing', () => {
+    expect(signatureFor([], ['scorpion', 'behindback'])).toBeNull();
+    expect(signatureFor([], ['betweenlegs', 'behindback'])).toBeNull();
+    expect(signatureFor([], ['scorpion', 'eastbay', 'spin360'])).toBeNull();
+  });
+
+  it('a chain pays more than its parts, and the harder chain pays more than the easier one', () => {
+    const nod = (air: string[]) => signatureFor([], air)!.nod;
+    expect(nod(['spin360', 'eastbay', 'scorpion'])).toBeGreaterThan(nod(['behindback', 'betweenlegs']));
+    expect(nod(['spin360', 'doubleeastbay'])).toBeGreaterThan(nod(['fakeback', 'scorpion']));
+  });
+
+  it('the fake is worth LESS than the real behind-the-back, because it is less to do', () => {
+    const t = (id: string) => DUNK_TRICKS.find((x) => x.id === id)!;
+    expect(t('fakeback').difficulty).toBeLessThan(t('behindback').difficulty);
+    expect(signatureFor([], ['fakeback', 'scorpion'])!.nod).toBeLessThan(signatureFor([], ['behindback', 'scorpion'])!.nod);
+  });
+
+  it('the double eastbay is the hardest single trick in the vocabulary — it is two of the hardest', () => {
+    const d = DUNK_TRICKS.find((t) => t.id === 'doubleeastbay')!;
+    for (const other of DUNK_TRICKS) if (other.id !== 'doubleeastbay') expect(d.difficulty, other.id).toBeGreaterThan(other.difficulty);
+    expect(d.windowCost).toBeGreaterThan(DUNK_TRICKS.find((t) => t.id === 'eastbay')!.windowCost);
+  });
+
+  it('no two tricks share a direction and a button — every chain piece is reachable', () => {
+    const seen = new Set<string>();
+    for (const t of DUNK_TRICKS) {
+      const slot = `${t.dir}+${t.btn}`;
+      expect(seen.has(slot), `${t.id} collides on ${slot}`).toBe(false);
+      seen.add(slot);
+    }
+  });
+});
+
+// THE RECOGNIZER MUST AGREE WITH THE TABLE (2026-09-16). It carried its own button list, written out twice, beside the
+// lookup that already knew — so the two chain pieces that landed on X were unreachable: the table said the trick
+// existed, the recognizer dropped the press, and the dunk simply did not happen (no banner, no refusal, no log).
+describe('every trick in the table can actually be thrown', () => {
+  it('a held direction plus its button returns that trick — for all of them', () => {
+    for (const t of DUNK_TRICKS) {
+      const r = new GestureRecognizer();
+      r.feed({ t: 'dpad', dir: t.dir, pressed: true } as never);
+      expect(r.peek({ t: 'button', btn: t.btn, pressed: true } as never)?.id, `${t.id} (${t.dir}+${t.btn})`).toBe(t.id);
+    }
+  });
+  it('and a bare button with no direction held is still the showboat tap, not a trick', () => {
+    const r = new GestureRecognizer();
+    for (const t of DUNK_TRICKS) expect(r.peek({ t: 'button', btn: t.btn, pressed: true } as never)).toBeNull();
   });
 });
