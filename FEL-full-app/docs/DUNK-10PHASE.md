@@ -93,3 +93,40 @@ pass costs less than the baseline it replaced.
 at 3.22 m with the let-go at 0.175 m of clearance, through the net 304 ms after. About a third longer in the air than a
 person manages — deliberately, because the trick vocabulary does not fit in a human 0.9 s hang — and internally
 consistent, so it stays.
+
+---
+
+## The vocabulary audit and the chains (2026-09-16)
+
+Owner: "make sure they are performing each dunk as dynamically as they could, it's a dunk contest… cross reference each
+one with something you can find on YouTube", then five named chains.
+
+**THE LEGS NEVER MOVED.** `AIR_LEGS` — one symmetric tuck, both thighs −30°, both knees 45° — was on every key of the
+windmill, the tomahawk, the cradle, the lost & found and the hide & seek. Five of the ten named dunks flew from take-off
+to flush with legs that never moved and were mirror-identical: a one-foot take-off is asymmetric by construction, and
+nobody holds a shape for a second in the air. There is a leg vocabulary now (drive / spread / kickBack / kickOut /
+cross / tuckTight / long) and three tests across the whole vocabulary — not one flies with frozen legs, every one
+finishes LONG, and somewhere in every dunk the two legs are doing different things. They caught the 360 (finished still
+tucked; 0.12 m of leg travel in the whole trick) and the double clutch on top of the five.
+
+**The audit, against the real dunks.**
+
+| dunk | verdict |
+| --- | --- |
+| EASTBAY | ✓ Rider's East Bay Funk Dunk is a between-the-legs with a one-handed finish — ours is that |
+| BETWEEN THE LEGS | ✓ same family, different execution (the plain transfer) |
+| HIDE & SEEK | ✓ hidden behind the head, revealed late |
+| LOST & FOUND | fixed earlier this day — it is a behind-the-back self-oop **with a 360** |
+| **SCORPION** | **wrong** — Kilganon's is a NO-LOOK, BEHIND-THE-BACK jam: he watches the floor and brings the ball behind him. Ours had the arch (which is what names it) and then his head UP and the ball out FRONT. Its own test asserted the opposite of the real dunk on both counts. |
+| TOMAHAWK | shape was wrong: it is a SPREAD EAGLE, and ours flew tucked |
+| WINDMILL / CRADLE / 360 / DOUBLE CLUTCH | motion correct, legs static — fixed above |
+
+**THE CHAINS.** Five named combinations in `SIGNATURE_DUNKS`, credited, order-sensitive. Four needed pieces the
+vocabulary lacked: the plain BEHIND THE BACK, its FAKE, and the DOUBLE EASTBAY (two passes through the legs in one
+jump). X had never been read in the air, so the slots were free. `trickCapacity` gained a third tier — a full-speed
+attack buys three, obeying the mode's own rule that the run-up owns how many fit.
+
+Two faults that only driving it could find: the **recognizer carried its own button list** (`A || B || Y`, twice)
+beside the table lookup, so an X trick was silently undroppable — no banner, no refusal, no log; and a **threshold
+placed on the exact value of a float sum** (full-speed POWER "is" 1.55 and evaluates to 1.5499999999999998) refused the
+dunk it was sized for, through two builds.
