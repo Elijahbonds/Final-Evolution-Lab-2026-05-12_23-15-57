@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { spend, readWallet, WalletError } from '@/lib/wallet/wallet-service';
-import { getWearable } from '@/lib/closet/wearable-catalog';
+import { getWearable, isPurchasableWearable } from '@/lib/closet/wearable-catalog';
 
 /** POST /api/v1/closet/buy — buy a cosmetic wearable with COINS. */
 export async function POST(req: NextRequest) {
@@ -19,6 +19,11 @@ export async function POST(req: NextRequest) {
   const idempotencyKey = typeof body?.idempotency_key === 'string' ? body.idempotency_key : '';
   const w = getWearable(itemId);
   if (!w) return NextResponse.json({ error: 'unknown_item' }, { status: 404 });
+  // Season pass cosmetics resolve through getWearable so they can be WORN, but
+  // they are earned on the track — never for sale, at any coin price.
+  if (!isPurchasableWearable(itemId)) {
+    return NextResponse.json({ error: 'not_for_sale' }, { status: 403 });
+  }
   if (!idempotencyKey) return NextResponse.json({ error: 'missing_idempotency_key' }, { status: 400 });
 
   const already = await prisma.ownedWearable.findUnique({ where: { userId_itemId: { userId, itemId } } });
