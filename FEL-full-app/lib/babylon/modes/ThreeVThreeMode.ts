@@ -1006,9 +1006,17 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
             setTimeout(() => ctx.setHud({ banner: '' }), 700);
             console.info(`[3V3-FAKE] pass fake bit — lane opens ${bite.lane.x.toFixed(2)},${bite.lane.z.toFixed(2)}`);
           } else {
+            // SCORECARD CONTROLS (2026-09-15): a fake nobody buys was a console line and nothing else. It is still a
+            // fake — the body sells it — so it reads as one, and the defender's answer is the news.
+            ctx.juice.callout("HE DIDN'T BUY IT", '#94a3b8', 420);
             console.info('[3V3-FAKE] pass fake — he did not buy it');
           }
         }
+      }
+      // …and a fake thrown inside the last one's cooldown did nothing at all: 6 of 11 PASS presses in the rc20 capture
+      // were silent, and this is the half of them the lane check never saw.
+      else if (iAmCarrier && !shooting && !dunking && !passFlight.active && meIntent.passFake && passFakeCooldown > 0) {
+        refuse(ctx, 'ONE FAKE AT A TIME');
       }
       if (iAmCarrier && !shooting && !dunking && meIntent.pass && !meIntent.passFake && !passFlight.active) {
         const targets = mates.map((m, i) => ({ id: i === 0 ? 'mate0' : 'mate1', pos: m.char.root.position }));
