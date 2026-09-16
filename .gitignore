@@ -109,3 +109,9 @@ node_modules/
 .next/
 tsconfig.tsbuildinfo
 .env
+
+# ai-pc local state
+ai-pc/.env
+ai-pc/**/__pycache__/
+ai-pc/**/*.pyc
+ai-pc/state/

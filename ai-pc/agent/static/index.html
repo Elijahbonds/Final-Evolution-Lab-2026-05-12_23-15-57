@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Personal Computer</title>
+<style>
+  :root {
+    --bg:        #0d1117;
+    --panel:     #161b22;
+    --panel-2:   #1c2129;
+    --line:      #2a313c;
+    --text:      #d7dde5;
+    --muted:     #8b95a4;
+    --accent:    #4ea1ff;
+    --ok:        #3fb950;
+    --warn:      #d29922;
+    --bad:       #f85149;
+    --tool:      #a371f7;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.55 var(--mono);
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header h1 { font-size: 14px; font-weight: 600; margin: 0; letter-spacing: .02em; }
+  header .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  header .dot.up { background: var(--ok); }
+  header .dot.down { background: var(--bad); }
+  header .spacer { flex: 1; }
+  header .meta { color: var(--muted); font-size: 12px; }
+
+  main { flex: 1; overflow-y: auto; padding: 16px; }
+  #transcript { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+
+  .entry { border: 1px solid var(--line); border-left-width: 3px; border-radius: 6px;
+           background: var(--panel); padding: 8px 12px; }
+  .entry .head { display: flex; gap: 10px; align-items: baseline; color: var(--muted); font-size: 12px; }
+  .entry .tag { font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  .entry pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word;
+               font-size: 13px; color: var(--text); }
+
+  .entry.step      { border-left-color: var(--muted); }
+  .entry.model     { border-left-color: var(--accent); }
+  .entry.tool_call { border-left-color: var(--tool); }
+  .entry.tool_result { border-left-color: var(--line); background: var(--panel-2); }
+  .entry.finish    { border-left-color: var(--ok); }
+  .entry.warning   { border-left-color: var(--warn); }
+  .entry.error     { border-left-color: var(--bad); }
+
+  .entry.step .tag      { color: var(--muted); }
+  .entry.model .tag     { color: var(--accent); }
+  .entry.tool_call .tag { color: var(--tool); }
+  .entry.finish .tag    { color: var(--ok); }
+  .entry.warning .tag   { color: var(--warn); }
+  .entry.error .tag     { color: var(--bad); }
+
+  footer { border-top: 1px solid var(--line); background: var(--panel); padding: 12px 16px; }
+  .composer { max-width: 1100px; margin: 0 auto; display: flex; gap: 8px; align-items: stretch; }
+  textarea, input, select, button {
+    font: inherit; color: var(--text); background: var(--panel-2);
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+  }
+  textarea { flex: 1; resize: vertical; min-height: 44px; max-height: 200px; }
+  button { cursor: pointer; background: var(--accent); border-color: var(--accent); color: #06121f;
+           font-weight: 600; padding: 8px 18px; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--muted); border-color: var(--line); font-weight: 400; }
+  .hint { max-width: 1100px; margin: 6px auto 0; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="statusDot"></span>
+  <h1>AI Personal Computer</h1>
+  <span class="spacer"></span>
+  <span class="meta" id="modelMeta">—</span>
+  <button class="ghost" id="tokenBtn" type="button">token</button>
+  <button class="ghost" id="clearBtn" type="button">clear</button>
+</header>
+
+<main><div id="transcript"></div></main>
+
+<footer>
+  <form class="composer" id="composer">
+    <textarea id="task" placeholder="Describe the task. Shift+Enter for a newline." autofocus></textarea>
+    <button id="runBtn" type="submit">Run</button>
+  </form>
+  <div class="hint" id="hint">Idle.</div>
+</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const transcript = $('transcript');
+let running = false;
+
+function token() {
+  let t = sessionStorage.getItem('agentToken');
+  if (!t) {
+    t = window.prompt('Agent bearer token');
+    if (t) sessionStorage.setItem('agentToken', t.trim());
+  }
+  return t ? t.trim() : '';
+}
+
+function add(kind, label, body) {
+  const el = document.createElement('div');
+  el.className = 'entry ' + kind;
+  const head = document.createElement('div');
+  head.className = 'head';
+  const tag = document.createElement('span');
+  tag.className = 'tag';
+  tag.textContent = kind.replace('_', ' ');
+  head.appendChild(tag);
+  if (label) {
+    const lab = document.createElement('span');
+    lab.textContent = label;
+    head.appendChild(lab);
+  }
+  el.appendChild(head);
+  if (body) {
+    const pre = document.createElement('pre');
+    pre.textContent = body;
+    el.appendChild(pre);
+  }
+  transcript.appendChild(el);
+  el.scrollIntoView({ block: 'end' });
+  return el;
+}
+
+function renderEvent(ev) {
+  switch (ev.kind) {
+    case 'step':
+      if (ev.phase === 'start') add('step', 'task', ev.task);
+      else add('step', `step ${ev.step} · ${ev.elapsed_s}s`, '');
+      break;
+    case 'model':
+      add('model', `step ${ev.step}`, ev.content);
+      break;
+    case 'tool_call':
+      add('tool_call', ev.tool, JSON.stringify(ev.args, null, 2));
+      break;
+    case 'tool_result':
+      add('tool_result', ev.tool, ev.result);
+      break;
+    case 'finish':
+      add('finish', `${ev.status || ''} ${ev.subject || ''}`.trim(), ev.summary || '');
+      break;
+    case 'warning':
+      add('warning', ev.tool || '', ev.message);
+      break;
+    case 'error':
+      add('error', ev.reason || '', ev.message);
+      break;
+  }
+}
+
+async function health() {
+  try {
+    const r = await fetch('/health');
+    const j = await r.json();
+    $('statusDot').className = 'dot up';
+    $('modelMeta').textContent = j.model || '';
+  } catch {
+    $('statusDot').className = 'dot down';
+  }
+}
+
+async function run(task) {
+  const t = token();
+  if (!t) { $('hint').textContent = 'No token set.'; return; }
+
+  running = true;
+  $('runBtn').disabled = true;
+  $('hint').textContent = 'Running…';
+
+  let resp;
+  try {
+    resp = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + t },
+      body: JSON.stringify({ task }),
+    });
+  } catch (e) {
+    add('error', 'network', String(e));
+    running = false; $('runBtn').disabled = false; $('hint').textContent = 'Failed.';
+    return;
+  }
+
+  if (!resp.ok) {
+    add('error', 'http ' + resp.status, await resp.text());
+    if (resp.status === 401) sessionStorage.removeItem('agentToken');
+    running = false; $('runBtn').disabled = false; $('hint').textContent = 'Failed.';
+    return;
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split('\n\n');
+    buffer = chunks.pop();
+    for (const chunk of chunks) {
+      const line = chunk.split('\n').find((l) => l.startsWith('data: '));
+      if (!line) continue;
+      try { renderEvent(JSON.parse(line.slice(6))); } catch {}
+    }
+  }
+
+  running = false;
+  $('runBtn').disabled = false;
+  $('hint').textContent = 'Idle.';
+}
+
+$('composer').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const task = $('task').value.trim();
+  if (!task || running) return;
+  $('task').value = '';
+  run(task);
+});
+
+$('task').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    $('composer').requestSubmit();
+  }
+});
+
+$('tokenBtn').addEventListener('click', () => {
+  sessionStorage.removeItem('agentToken');
+  token();
+});
+$('clearBtn').addEventListener('click', () => { transcript.innerHTML = ''; });
+
+health();
+setInterval(health, 30000);
+</script>
+</body>
+</html>

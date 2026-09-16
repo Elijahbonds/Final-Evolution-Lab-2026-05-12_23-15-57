@@ -1,0 +1,129 @@
+# AI Personal Computer — self-hosted agent stack.
+#
+#   ollama      local model server (Qwen by default)
+#   model-init  one-shot: pulls the model named in OLLAMA_MODEL, then exits
+#   sandbox     the only container that executes model-chosen actions
+#   agent       the loop + HTTP API + web console
+#   cloudflared optional public tunnel to the agent
+#
+# The containment boundary is the sandbox: the agent never runs a shell or a
+# browser itself, it asks the sandbox over HTTP on a private network.
+
+name: ai-pc
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai-pc-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama-models:/root/.ollama
+    networks: [ai-pc]
+    # Uncomment to use an NVIDIA GPU.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  model-init:
+    image: ollama/ollama:latest
+    container_name: ai-pc-model-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:14b-instruct-q4_K_M}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "model-init: ensuring $$OLLAMA_MODEL is present"
+        if ollama list | awk '{print $$1}' | grep -qx "$$OLLAMA_MODEL"; then
+          echo "model-init: already pulled, nothing to do"
+        else
+          ollama pull "$$OLLAMA_MODEL"
+        fi
+        echo "model-init: done"
+    networks: [ai-pc]
+    restart: "no"
+
+  sandbox:
+    build:
+      context: ./sandbox
+    container_name: ai-pc-sandbox
+    restart: unless-stopped
+    environment:
+      WORKSPACE_ROOT: /workspace
+      BASH_TIMEOUT_SECONDS: ${BASH_TIMEOUT_SECONDS:-120}
+      BROWSE_TIMEOUT_SECONDS: ${BROWSE_TIMEOUT_SECONDS:-45}
+      MAX_OUTPUT_CHARS: ${MAX_OUTPUT_CHARS:-20000}
+    volumes:
+      - workspace:/workspace
+    networks: [ai-pc]
+    # No ports published: only the agent, on the private network, can reach it.
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8080/health').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  agent:
+    build:
+      context: ./agent
+    container_name: ai-pc-agent
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+      sandbox:
+        condition: service_healthy
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:14b-instruct-q4_K_M}
+      SANDBOX_URL: http://sandbox:8080
+      AGENT_TOKEN: ${AGENT_TOKEN:?set AGENT_TOKEN in .env}
+      STATE_DIR: /state
+      WORKSPACE_ROOT: /workspace
+      MAX_STEPS: ${MAX_STEPS:-24}
+      WALL_CLOCK_SECONDS: ${WALL_CLOCK_SECONDS:-900}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      FRONTIER_MODEL: ${FRONTIER_MODEL:-claude-sonnet-4-6}
+    volumes:
+      - workspace:/workspace
+      - agent-state:/state
+    ports:
+      - "${AGENT_PORT:-8001}:8000"
+    networks: [ai-pc]
+    security_opt:
+      - no-new-privileges:true
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ai-pc-tunnel
+    restart: unless-stopped
+    depends_on: [agent]
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks: [ai-pc]
+
+networks:
+  ai-pc:
+    driver: bridge
+
+volumes:
+  ollama-models:
+  workspace:
+  agent-state:
