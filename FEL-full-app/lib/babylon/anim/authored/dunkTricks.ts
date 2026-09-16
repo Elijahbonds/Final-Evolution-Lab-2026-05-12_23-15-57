@@ -18,6 +18,38 @@ type V3 = [number, number, number];
 
 const UP = { Left: [-0.9, 0.1, -0.3] as V3, Right: [0.9, 0.1, -0.3] as V3 };
 const AIR_LEGS: Record<string, Deg3> = { LeftUpLeg: [-30, 0, 6], LeftLeg: [45, 0, 0], RightUpLeg: [-30, 0, -6], RightLeg: [45, 0, 0] };
+
+/**
+ * AIR LEGS ARE HALF THE DUNK (dynamics pass, 2026-09-16).
+ *
+ * Owner: "make sure they are performing each dunk as dynamically as they could, it's a dunk contest." The audit that
+ * found it: `AIR_LEGS` above — one symmetric tuck, both thighs −30°, both knees 45° — was spread across EVERY key of
+ * the windmill, the tomahawk, the cradle, the lost & found and the hide & seek. Five of the ten named dunks flew from
+ * takeoff to flush with legs that never moved and were mirror-identical, which is two things no dunker has ever done:
+ * a one-foot take-off is asymmetric by construction (one knee drives, the other trails), and nobody holds a shape for
+ * a second in the air — the legs are the loudest thing in a dunk photograph.
+ *
+ * So the legs get a vocabulary, and every named dunk gets legs that ACT: a shape at the take-off, a shape through the
+ * trick that belongs to that trick, and the long body every dunk ends in. The names are what a dunker would call them.
+ */
+const AIR = {
+  /** One-foot take-off: the lead knee drives up hard, the trail leg hangs behind. Nothing symmetric about it. */
+  drive: (leadLeft = true): Record<string, Deg3> => leadLeft
+    ? { LeftUpLeg: [-74, 0, 8], LeftLeg: [46, 0, 0], RightUpLeg: [16, 0, -6], RightLeg: [62, 0, 0] }
+    : { LeftUpLeg: [16, 0, 6], LeftLeg: [62, 0, 0], RightUpLeg: [-74, 0, -8], RightLeg: [46, 0, 0] },
+  /** THE SPREAD EAGLE: legs thrown wide and open. The shape of every tomahawk photograph ever taken. */
+  spread: { LeftUpLeg: [-34, 0, 26], LeftLeg: [30, 0, 0], RightUpLeg: [-34, 0, -26], RightLeg: [30, 0, 0] } as Record<string, Deg3>,
+  /** The trail leg kicked back and out — a windmill's counterweight to the arm coming over the top. */
+  kickBack: { LeftUpLeg: [-52, 0, 14], LeftLeg: [40, 0, 0], RightUpLeg: [30, 0, -12], RightLeg: [86, 0, 0] } as Record<string, Deg3>,
+  /** Both legs thrown forward and straight — the jackknife a double-clutch and a reveal open out of. */
+  kickOut: { LeftUpLeg: [-62, 0, 10], LeftLeg: [14, 0, 0], RightUpLeg: [-58, 0, -10], RightLeg: [18, 0, 0] } as Record<string, Deg3>,
+  /** Small: knees up and ankles crossed in. A body hiding something makes itself small. */
+  cross: { LeftUpLeg: [-58, 0, -10], LeftLeg: [92, 0, 0], RightUpLeg: [-62, 0, 8], RightLeg: [88, 0, 0] } as Record<string, Deg3>,
+  /** Tight through a turn: feet pulled in, because a spinning body tucks (and over a car the feet are what clears it). */
+  tuckTight: { LeftUpLeg: [-55, 0, 6], LeftLeg: [80, 0, 0], RightUpLeg: [-55, 0, -6], RightLeg: [80, 0, 0] } as Record<string, Deg3>,
+  /** THE FLUSH: the body a line under the arm, toes down, and still not symmetric. */
+  long: { LeftUpLeg: [-16, 0, 5], LeftLeg: [14, 0, 0], RightUpLeg: [-6, 0, -5], RightLeg: [22, 0, 0] } as Record<string, Deg3>,
+} as const;
 /** A running stride: one thigh forward, one back. */
 const stride = (leftForward: boolean): Record<string, Deg3> => leftForward
   ? { LeftUpLeg: [-38, 0, 4], LeftLeg: [42, 0, 0], RightUpLeg: [24, 0, -4], RightLeg: [34, 0, 0] }
@@ -174,13 +206,24 @@ export function buildDoubleUp(scene: Scene, sk: Skeleton): AnimationGroup | null
   ]);
 }
 
-/** Scorpion: chest down, head up, both legs kicked back over the body, the ball hand out to the rim. */
+/**
+ * SCORPION — and it is a NO-LOOK, BEHIND-THE-BACK jam (audit, 2026-09-16).
+ *
+ * Kilganon describes his own: he sets someone up under the rim, and as he goes over them he looks at the GROUND — never
+ * at the basket — brings the ball behind him rather than over the shoulder, and ducks so that he is dunking it behind
+ * his own back. The arch that gives the dunk its name (both legs whipped up over the body, like the tail) was the only
+ * part ours had. Ours also had his head UP and the ball carried out in FRONT, which is the one thing the dunk is famous
+ * for not doing.
+ *
+ * So: chin down through the arch (the no-look), the ball swung BEHIND the head, and the flush reaching back over the
+ * top rather than punched forward.
+ */
 export function buildScorpion(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'dunk_scorpion', SCORPION_SEC, [
-    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], Neck: [0, 0, 0], ...AIR_LEGS }, hands: { Right: [0.20, 1.90, 0.15], Left: [-0.22, 1.82, 0.15] }, poles: UP },
-    { t: 0.35, bones: { Hips: [18, 0, 0], Spine: [32, 0, 0], Neck: [-30, 0, 0], LeftUpLeg: [58, 0, 8], LeftLeg: [112, 0, 0], RightUpLeg: [58, 0, -8], RightLeg: [112, 0, 0] }, hands: { Right: [0.18, 1.96, 0.42], Left: [-0.46, 1.30, -0.10] }, poles: { Right: UP.Right, Left: [-0.9, -0.2, -0.5] }, hipsY: 0.1 },   // the scorpion
-    { t: 0.5,  bones: { Hips: [16, 0, 0], Spine: [28, 0, 0], Neck: [-26, 0, 0], LeftUpLeg: [52, 0, 8], LeftLeg: [108, 0, 0], RightUpLeg: [52, 0, -8], RightLeg: [108, 0, 0] }, hands: { Right: [0.16, 1.98, 0.40], Left: [-0.44, 1.32, -0.08] }, poles: { Right: UP.Right, Left: [-0.9, -0.2, -0.5] }, hipsY: 0.08 },
-    { t: SCORPION_SEC, bones: { Hips: [4, 0, 0], Spine: [6, 0, 0], Neck: [-8, 0, 0], LeftUpLeg: [10, 0, 4], LeftLeg: [40, 0, 0], RightUpLeg: [10, 0, -4], RightLeg: [40, 0, 0] }, hands: { Right: [0.15, 1.92, 0.36], Left: [-0.30, 1.50, 0.10] }, poles: UP },   // the flush
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], Neck: [0, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.20, 1.90, 0.15], Left: [-0.22, 1.82, 0.15] }, poles: UP },   // off one foot — the arch that follows is symmetric, the take-off never is
+    { t: 0.35, bones: { Hips: [18, 0, 0], Spine: [32, 0, 0], Neck: [26, 0, 0], LeftUpLeg: [58, 0, 8], LeftLeg: [112, 0, 0], RightUpLeg: [58, 0, -8], RightLeg: [112, 0, 0] }, hands: { Right: [0.22, 1.88, -0.34], Left: [-0.46, 1.26, -0.16] }, poles: { Right: [0.8, 0.3, -0.6], Left: [-0.9, -0.2, -0.5] }, hipsY: 0.1 },   // THE SCORPION: the tail goes up, the chin goes DOWN (he is looking at the floor), the ball swings BEHIND the head
+    { t: 0.5,  bones: { Hips: [16, 0, 0], Spine: [28, 0, 0], Neck: [22, 0, 0], LeftUpLeg: [52, 0, 8], LeftLeg: [108, 0, 0], RightUpLeg: [52, 0, -8], RightLeg: [108, 0, 0] }, hands: { Right: [0.18, 1.94, -0.28], Left: [-0.44, 1.28, -0.14] }, poles: { Right: [0.8, 0.3, -0.6], Left: [-0.9, -0.2, -0.5] }, hipsY: 0.08 },   // still no-look, the ball behind him
+    { t: SCORPION_SEC, bones: { Hips: [4, 0, 0], Spine: [6, 0, 0], Neck: [8, 0, 0], LeftUpLeg: [10, 0, 4], LeftLeg: [40, 0, 0], RightUpLeg: [10, 0, -4], RightLeg: [40, 0, 0] }, hands: { Right: [0.15, 2.00, 0.10], Left: [-0.30, 1.50, 0.10] }, poles: UP },   // the flush, reached back over the top — chin still down, because he never looks
   ]);
 }
 
@@ -201,11 +244,11 @@ export function buildScorpion(scene: Scene, sk: Skeleton): AnimationGroup | null
  */
 export function buildLostFound(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'dunk_lost_found', LOST_FOUND_SEC, [
-    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], ...AIR_LEGS }, hands: { Right: [0.26, 1.60, 0.30], Left: [-0.30, 1.30, 0.15] } },
-    { t: 0.2,  bones: { Hips: [0, 0, 0], Spine: [4, 0, 0], ...AIR_LEGS }, hands: { Right: [0.26, 0.90, -0.34], Left: [-0.34, 1.10, -0.05] }, poles: { Right: [0.9, -0.2, -0.3] } },   // lost: the ball goes behind the back as the turn starts
-    { t: LOST_FOUND_HANDOFF, bones: { Hips: [2, 0, 0], Spine: [6, 0, 0], ...AIR_LEGS }, hands: { Right: [0.10, 0.92, -0.36], Left: [-0.08, 0.92, -0.36] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] } },   // found: both hands meet behind the back, back to the rim
-    { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], ...AIR_LEGS }, hands: { Left: [-0.52, 1.30, 0.05], Right: [0.40, 1.15, -0.10] }, poles: { Left: [-0.9, -0.2, -0.4] } },   // coming round with it
-    { t: LOST_FOUND_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], LeftUpLeg: [-26, 0, 4], LeftLeg: [30, 0, 0], RightUpLeg: [-14, 0, -4], RightLeg: [18, 0, 0] }, hands: { Left: [-0.14, 2.02, 0.26], Right: [0.36, 1.42, -0.10] }, poles: { Left: UP.Left } },   // extended to the rim, left-handed
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.26, 1.60, 0.30], Left: [-0.30, 1.30, 0.15] } },   // off one foot
+    { t: 0.2,  bones: { Hips: [0, 0, 0], Spine: [4, 0, 0], ...AIR.tuckTight }, hands: { Right: [0.26, 0.90, -0.34], Left: [-0.34, 1.10, -0.05] }, poles: { Right: [0.9, -0.2, -0.3] } },   // lost: the ball goes behind the back as the turn starts — and the feet come in, because a spinning body tucks
+    { t: LOST_FOUND_HANDOFF, bones: { Hips: [2, 0, 0], Spine: [6, 0, 0], ...AIR.tuckTight }, hands: { Right: [0.10, 0.92, -0.36], Left: [-0.08, 0.92, -0.36] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] } },   // found: both hands meet behind the back, back to the rim, still tucked
+    { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], ...AIR.kickOut }, hands: { Left: [-0.52, 1.30, 0.05], Right: [0.40, 1.15, -0.10] }, poles: { Left: [-0.9, -0.2, -0.4] } },   // coming round with it: the tuck opens, which is what stops the turn
+    { t: LOST_FOUND_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.long }, hands: { Left: [-0.14, 2.02, 0.26], Right: [0.36, 1.42, -0.10] }, poles: { Left: UP.Left } },   // extended to the rim, left-handed, body long
   ]);
 }
 
@@ -242,12 +285,12 @@ export function buildCradle(scene: Scene, sk: Skeleton): AnimationGroup | null {
   // The cradle's read is a BIG ring around the head at shoulder height on a bent arm, with the trunk turning to follow it:
   // far out to the side, round behind the head, across to the far shoulder, then hammered down.
   return buildPoseClip(scene, sk, 'dunk_cradle', CRADLE_SEC, [
-    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR_LEGS }, hands: { Right: [0.28, 1.58, 0.28], Left: [-0.30, 1.30, 0.14] } },
-    { t: 0.16, bones: { Hips: [0, -10, 0], Spine: [-6, -14, 4], Neck: [-4, 8, 0], ...AIR_LEGS }, hands: { Right: [0.72, 1.62, 0.02], Left: [-0.34, 1.32, 0.10] }, poles: { Right: [0.6, -0.6, -0.3] } },   // far out to the side at the shoulder
-    { t: CRADLE_ROUND, bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], Neck: [12, 0, 0], ...AIR_LEGS }, hands: { Right: [0.08, 2.00, -0.40], Left: [-0.34, 1.34, 0.08] }, poles: { Right: [0.7, 0.4, -0.5] } },   // round BEHIND the head — the top of the ring
-    { t: 0.5,  bones: { Hips: [0, 12, 0], Spine: [-6, 16, -4], Neck: [2, -10, 0], ...AIR_LEGS }, hands: { Right: [-0.52, 1.72, -0.02], Left: [-0.40, 1.24, 0.10] }, poles: { Right: [-0.3, 0.5, -0.6] } },   // across to the far shoulder: the ring closes
-    { t: 0.62, bones: { Hips: [2, 0, 0], Spine: [2, 0, 0], Neck: [-10, 0, 0], ...AIR_LEGS }, hands: { Right: [0.10, 1.62, 0.34], Left: [-0.34, 1.36, 0.12] } },   // back in front, loaded
-    { t: CRADLE_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], LeftUpLeg: [-22, 0, 4], LeftLeg: [26, 0, 0], RightUpLeg: [-12, 0, -4], RightLeg: [16, 0, 0] }, hands: { Right: [0.16, 2.02, 0.28], Left: [-0.34, 1.44, 0.06] }, poles: UP },   // hammered down through the rim
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.28, 1.58, 0.28], Left: [-0.30, 1.30, 0.14] } },   // off one foot: the lead knee is still up
+    { t: 0.16, bones: { Hips: [0, -10, 0], Spine: [-6, -14, 4], Neck: [-4, 8, 0], ...AIR.kickBack }, hands: { Right: [0.72, 1.62, 0.02], Left: [-0.44, 1.18, -0.10] }, poles: { Right: [0.6, -0.6, -0.3] } },   // far out to the side at the shoulder, trail leg swinging back under it
+    { t: CRADLE_ROUND, bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], Neck: [12, 0, 0], ...AIR.kickBack }, hands: { Right: [0.08, 2.00, -0.40], Left: [-0.50, 1.26, -0.04] }, poles: { Right: [0.7, 0.4, -0.5] } },   // round BEHIND the head — the top of the ring, the free arm counterweighting
+    { t: 0.5,  bones: { Hips: [0, 12, 0], Spine: [-6, 16, -4], Neck: [2, -10, 0], ...AIR.spread }, hands: { Right: [-0.52, 1.72, -0.02], Left: [-0.46, 1.30, 0.06] }, poles: { Right: [-0.3, 0.5, -0.6] } },   // across to the far shoulder: the ring closes and the legs open out under it
+    { t: 0.62, bones: { Hips: [2, 0, 0], Spine: [2, 0, 0], Neck: [-10, 0, 0], ...AIR.kickOut }, hands: { Right: [0.10, 1.62, 0.34], Left: [-0.38, 1.40, 0.16] } },   // back in front, loaded, legs thrown forward
+    { t: CRADLE_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.long }, hands: { Right: [0.16, 2.02, 0.28], Left: [-0.34, 1.44, 0.06] }, poles: UP },   // hammered down through the rim, body long
   ]);
 }
 
@@ -264,22 +307,24 @@ export function buildDoubleClutch(scene: Scene, sk: Skeleton): AnimationGroup | 
   // pulled all the way down between them, then the whole body opens long and the ball goes back up.
   const FOLD: Record<string, Deg3> = { LeftUpLeg: [-78, 0, 10], LeftLeg: [104, 0, 0], RightUpLeg: [-78, 0, -10], RightLeg: [104, 0, 0] };
   return buildPoseClip(scene, sk, 'dunk_double_clutch', CLUTCH_SEC, [
-    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], Neck: [-6, 0, 0], ...AIR_LEGS }, hands: { Right: [0.20, 1.88, 0.26], Left: [-0.24, 1.80, 0.24] }, poles: UP },   // both hands already high
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], Neck: [-6, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.20, 1.88, 0.26], Left: [-0.24, 1.80, 0.24] }, poles: UP },   // both hands already high, off one foot
     { t: 0.22, bones: { Hips: [-10, 0, 0], Spine: [26, 0, 0], Neck: [-20, 0, 0], ...FOLD }, hands: { Right: [0.16, 0.96, 0.40], Left: [-0.18, 0.96, 0.40] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] }, hipsY: 0.12 },   // folded: knees to the chest, the ball down between them
     { t: 0.34, bones: { Hips: [-12, 0, 0], Spine: [30, 0, 0], Neck: [-22, 0, 0], ...FOLD }, hands: { Right: [0.14, 0.90, 0.42], Left: [-0.16, 0.90, 0.42] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] }, hipsY: 0.13 },   // the clutch: held at the bottom
     { t: 0.52, bones: { Hips: [2, 0, 0], Spine: [-4, 0, 0], Neck: [-14, 0, 0], ...AIR_LEGS }, hands: { Right: [0.18, 1.70, 0.30], Left: [-0.22, 1.58, 0.28] } },   // opened long, driven back up
-    { t: CLUTCH_SEC, bones: { Hips: [-6, 0, 0], Spine: [-14, 0, 0], Neck: [-16, 0, 0], LeftUpLeg: [-22, 0, 4], LeftLeg: [26, 0, 0], RightUpLeg: [-12, 0, -4], RightLeg: [16, 0, 0] }, hands: { Right: [0.14, 2.06, 0.26], Left: [-0.28, 1.72, 0.20] }, poles: UP },   // the flush, higher than it started
+    { t: CLUTCH_SEC, bones: { Hips: [-6, 0, 0], Spine: [-14, 0, 0], Neck: [-16, 0, 0], ...AIR.long }, hands: { Right: [0.14, 2.06, 0.26], Left: [-0.28, 1.72, 0.20] }, poles: UP },   // the flush, higher than it started, body long
   ]);
 }
 
 /** Hide & seek: both hands hide the ball behind the head, a hip fake, the ball hand snaps it overhead for the flush. */
 export function buildHideSeek(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'dunk_hide_seek', HIDE_SEEK_SEC, [
-    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR_LEGS }, hands: { Right: [0.26, 1.60, 0.30], Left: [-0.30, 1.30, 0.15] } },
-    { t: 0.25, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [16, 0, 0], ...AIR_LEGS }, hands: { Right: [0.10, 1.66, -0.30], Left: [-0.10, 1.64, -0.32] }, poles: { Right: [0.9, 0.2, -0.3], Left: [-0.9, 0.2, -0.3] } },   // hidden behind the head
-    { t: 0.45, bones: { Hips: [0, 26, 0], Spine: [-4, 8, 0], Neck: [14, -10, 0], ...AIR_LEGS }, hands: { Right: [0.08, 1.66, -0.32], Left: [-0.12, 1.64, -0.30] }, poles: { Right: [0.9, 0.2, -0.3], Left: [-0.9, 0.2, -0.3] } },   // the fake: hips turn, the ball stays hidden
-    { t: 0.65, bones: { Hips: [-4, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR_LEGS }, hands: { Right: [0.18, 2.00, 0.12], Left: [-0.42, 1.40, 0.00] }, poles: { Right: UP.Right } },   // the reveal: snapped overhead
-    { t: HIDE_SEEK_SEC, bones: { Hips: [-4, 0, 0], Spine: [-10, 0, 0], Neck: [-12, 0, 0], LeftUpLeg: [-20, 0, 4], LeftLeg: [26, 0, 0], RightUpLeg: [-14, 0, -4], RightLeg: [18, 0, 0] }, hands: { Right: [0.14, 2.02, 0.30], Left: [-0.34, 1.45, 0.05] }, poles: { Right: UP.Right } },
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.26, 1.60, 0.30], Left: [-0.30, 1.30, 0.15] } },   // off one foot
+    // THE LEGS SELL THE HIDE. A body concealing something makes itself SMALL — knees up, ankles crossed in — and then
+    // the reveal is the whole body opening at once. Held in one tuck the trick was a pair of arms moving on a statue.
+    { t: 0.25, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [16, 0, 0], ...AIR.cross }, hands: { Right: [0.10, 1.66, -0.30], Left: [-0.10, 1.64, -0.32] }, poles: { Right: [0.9, 0.2, -0.3], Left: [-0.9, 0.2, -0.3] } },   // hidden behind the head, body small
+    { t: 0.45, bones: { Hips: [0, 26, 0], Spine: [-4, 8, 0], Neck: [14, -10, 0], ...AIR.cross }, hands: { Right: [0.08, 1.66, -0.32], Left: [-0.12, 1.64, -0.30] }, poles: { Right: [0.9, 0.2, -0.3], Left: [-0.9, 0.2, -0.3] } },   // the fake: hips turn, the ball stays hidden
+    { t: 0.65, bones: { Hips: [-4, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.spread }, hands: { Right: [0.18, 2.00, 0.12], Left: [-0.52, 1.36, -0.06] }, poles: { Right: UP.Right } },   // THE REVEAL: ball snapped overhead and the legs burst open with it
+    { t: HIDE_SEEK_SEC, bones: { Hips: [-4, 0, 0], Spine: [-10, 0, 0], Neck: [-12, 0, 0], ...AIR.long }, hands: { Right: [0.14, 2.02, 0.30], Left: [-0.34, 1.45, 0.05] }, poles: { Right: UP.Right } },
   ]);
 }
 
@@ -297,6 +342,7 @@ export function buildSpin360(scene: Scene, sk: Skeleton): AnimationGroup | null 
     { t: 0,    bones: { Hips: [-4, 0, 0], Spine: [-8, 0, 0], Neck: [-6, 0, 0], ...TUCK_IN },  hands: { Right: [0.20, 1.92, 0.12], Left: [-0.26, 1.72, 0.10] }, poles: UP },
     { t: 0.3,  bones: { Hips: [2, 0, 0], Spine: [6, 0, 0], Neck: [4, 0, 0], ...TUCK },    hands: { Right: [0.16, 1.28, 0.30], Left: [-0.16, 1.28, 0.30] }, poles: { Left: [-0.8, -0.3, -0.5], Right: [0.8, -0.3, -0.5] } },   // the ball gathered to the chest through the turn
     { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [-4, 0, 0], ...TUCK },  hands: { Right: [0.18, 1.62, 0.26], Left: [-0.24, 1.50, 0.18] }, poles: UP },   // coming out of the turn: the ball rises
-    { t: SPIN_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR_LEGS }, hands: { Right: [0.16, 2.00, 0.28], Left: [-0.28, 1.60, 0.12] }, poles: UP },   // extended to the rim
+    { t: 0.68, bones: { Hips: [-2, 0, 0], Spine: [-8, 0, 0], Neck: [-8, 0, 0], ...AIR.kickOut }, hands: { Right: [0.18, 1.82, 0.28], Left: [-0.30, 1.56, 0.14] }, poles: UP },   // THE SNAP: the tuck is thrown open and that is what kills the spin
+    { t: SPIN_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.long }, hands: { Right: [0.16, 2.00, 0.28], Left: [-0.28, 1.60, 0.12] }, poles: UP },   // extended to the rim — and the TUCK OPENS, which is both what stops the turn and what the flush looks like (it used to finish still tucked, so the whole trick travelled 0.12 m of leg)
   ]);
 }

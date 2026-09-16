@@ -15,18 +15,32 @@ import { buildPoseClip, type Deg3 } from '../poseClip';
 type V3 = [number, number, number];
 
 const UP = { Left: [-0.9, 0.1, -0.3] as V3, Right: [0.9, 0.1, -0.3] as V3 };
-const AIR_LEGS: Record<string, Deg3> = { LeftUpLeg: [-30, 0, 6], LeftLeg: [45, 0, 0], RightUpLeg: [-30, 0, -6], RightLeg: [45, 0, 0] };
 const SETTLE_LEGS: Record<string, Deg3> = { LeftUpLeg: [-12, 0, 4], LeftLeg: [16, 0, 0], RightUpLeg: [-12, 0, -4], RightLeg: [16, 0, 0] };
+
+/**
+ * THE LEGS OF THE TWO BIG FINISHES (dynamics pass, 2026-09-16).
+ *
+ * The windmill and the tomahawk both flew with `AIR_LEGS` — one symmetric tuck, both thighs −30°, both knees 45° — held
+ * from the cock-back to the slam. Which is to say the two most photographed dunks in the sport were performed with the
+ * legs of someone sitting on a chair. A tomahawk's whole silhouette is the SPREAD: arms back over the head, legs thrown
+ * open, the body a giant X. A windmill's is the counterweight: the trail leg kicks back and out as the arm comes over
+ * the top, because that is what a body does to keep the shoulder line under a swinging arm.
+ */
+const TAKEOFF_LEGS: Record<string, Deg3> = { LeftUpLeg: [-72, 0, 8], LeftLeg: [44, 0, 0], RightUpLeg: [14, 0, -6], RightLeg: [60, 0, 0] };
+const SPREAD_LEGS: Record<string, Deg3> = { LeftUpLeg: [-34, 0, 26], LeftLeg: [30, 0, 0], RightUpLeg: [-34, 0, -26], RightLeg: [30, 0, 0] };
+const KICKBACK_LEGS: Record<string, Deg3> = { LeftUpLeg: [-52, 0, 14], LeftLeg: [40, 0, 0], RightUpLeg: [28, 0, -12], RightLeg: [84, 0, 0] };
+/** The flush: long under the arm, and still not mirror-symmetric — nobody lands a dunk in a diagram. */
+const LONG_LEGS: Record<string, Deg3> = { LeftUpLeg: [-16, 0, 5], LeftLeg: [14, 0, 0], RightUpLeg: [-6, 0, -5], RightLeg: [22, 0, 0] };
 
 // PERFECT timing → the crowd-popper. Right arm sweeps a full circle: cocked
 // back-and-down, out and up over the top, then down to slam. Left arm rides high.
 export function buildFinishWindmill(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 0.85;
   return buildPoseClip(scene, sk, 'dunk_finish_windmill', T, [
-    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, -8, 0],  LeftUpLeg: [-35, 0, 6], LeftLeg: [55, 0, 0], RightUpLeg: [-22, 0, -6], RightLeg: [40, 0, 0] }, hands: { Right: [0.30, 0.80, -0.30], Left: [-0.20, 1.85, 0.15] }, poles: { Right: [0.8, 0.2, -0.5], Left: UP.Left } },
-    { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0],  ...AIR_LEGS }, hands: { Right: [0.62, 1.40, -0.15], Left: [-0.20, 1.90, 0.15] }, poles: { Right: [0.4, -0.3, -0.9], Left: UP.Left } },   // out to the side
-    { t: 0.55, bones: { Hips: [0, 0, 0], Spine: [-12, 6, 0],  ...AIR_LEGS }, hands: { Right: [0.15, 2.02, 0.05], Left: [-0.22, 1.85, 0.18] }, poles: { Right: UP.Right, Left: UP.Left } },   // over the top
-    { t: T,    bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],    ...SETTLE_LEGS }, hands: { Right: [0.12, 1.90, 0.35], Left: [-0.22, 1.60, 0.25] }, poles: { Right: UP.Right } },   // slam, forward and down
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, -8, 0],  ...TAKEOFF_LEGS }, hands: { Right: [0.30, 0.80, -0.30], Left: [-0.20, 1.85, 0.15] }, poles: { Right: [0.8, 0.2, -0.5], Left: UP.Left } },   // off one foot, lead knee still driving
+    { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0],  ...KICKBACK_LEGS }, hands: { Right: [0.62, 1.40, -0.15], Left: [-0.20, 1.90, 0.15] }, poles: { Right: [0.4, -0.3, -0.9], Left: UP.Left } },   // out to the side — the trail leg kicks back to counterweight the arm
+    { t: 0.55, bones: { Hips: [0, 0, 0], Spine: [-12, 6, 0],  ...SPREAD_LEGS }, hands: { Right: [0.15, 2.02, 0.05], Left: [-0.22, 1.85, 0.18] }, poles: { Right: UP.Right, Left: UP.Left } },   // over the top, legs open under it
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],    ...LONG_LEGS }, hands: { Right: [0.12, 1.90, 0.35], Left: [-0.22, 1.60, 0.25] }, poles: { Right: UP.Right } },   // slam, forward and down, body long
   ]);
 }
 
@@ -34,9 +48,9 @@ export function buildFinishWindmill(scene: Scene, sk: Skeleton): AnimationGroup 
 export function buildFinishTomahawk(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 0.75;
   return buildPoseClip(scene, sk, 'dunk_finish_tomahawk', T, [
-    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-14, 0, 0], LeftUpLeg: [-30, 0, 6], LeftLeg: [45, 0, 0], RightUpLeg: [-30, 0, -6], RightLeg: [45, 0, 0] }, hands: { Left: [-0.20, 1.92, -0.05], Right: [0.20, 1.92, -0.05] }, poles: UP },
-    { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [-20, 0, 0], ...AIR_LEGS }, hands: { Left: [-0.18, 1.98, -0.22], Right: [0.18, 1.98, -0.22] }, poles: UP },   // cocked back overhead
-    { t: T,    bones: { Hips: [0, 0, 0], Spine: [10, 0, 0],  ...SETTLE_LEGS }, hands: { Left: [-0.16, 1.75, 0.40], Right: [0.16, 1.75, 0.40] }, poles: UP },   // crunched down and through
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-14, 0, 0], ...TAKEOFF_LEGS }, hands: { Left: [-0.20, 1.92, -0.05], Right: [0.20, 1.92, -0.05] }, poles: UP },   // off one foot
+    { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [-20, 0, 0], ...SPREAD_LEGS }, hands: { Left: [-0.18, 1.98, -0.22], Right: [0.18, 1.98, -0.22] }, poles: UP },   // cocked back overhead — THE SPREAD EAGLE, the shape the dunk is famous for
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [10, 0, 0],  ...LONG_LEGS }, hands: { Left: [-0.16, 1.75, 0.40], Right: [0.16, 1.75, 0.40] }, poles: UP },   // crunched down and through, body long
   ]);
 }
 

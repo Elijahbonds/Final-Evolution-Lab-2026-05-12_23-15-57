@@ -16,9 +16,9 @@ import { sampleRootTrack } from '../MoveRootLayer';
 import { MOCAP_STYLE_CLIPS } from './mocapStyles';
 import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, buildBoardCarveRight } from './boardSuite';
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
-import { buildFinishTomahawk, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
+import { buildFinishTomahawk, buildFinishWindmill, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
-import { buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildBackHandspring, buildBackflip, BACKFLIP_SEC, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
+import { SCORPION_SEC, HIDE_SEEK_SEC, LOST_FOUND_SEC, SPIN_SEC, buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildBackHandspring, buildBackflip, BACKFLIP_SEC, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
 import { DUNK_TRICKS } from '../../core/DunkSystem';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
 import { buildBaseClips } from './baseClips';
@@ -98,6 +98,68 @@ describe('the tetris stack', () => {
       at(g, 0); const start = pos('Head').clone();
       at(g, STACK_SEC);
       expect(Vector3.Distance(pos('Head'), start)).toBeLessThan(0.05);
+    }
+  });
+});
+
+// THE VOCABULARY HAS TO MOVE — IT IS A DUNK CONTEST (owner, 2026-09-16: "make sure they are performing each dunk as
+// dynamically as they could ... add some flavor, style").
+//
+// The audit that produced these: `AIR_LEGS` — a single symmetric tuck, both thighs -30 and both knees 45 — was spread
+// across EVERY key of the windmill, the tomahawk, the cradle, the lost & found and the hide & seek. Five of the ten
+// named dunks flew from take-off to flush with legs that never moved and were mirror-identical to each other, which is
+// two things no dunker has ever done. Nothing failed, because nothing asked. This asks.
+describe('the named dunks move', () => {
+  const named: { name: string; build: () => AnimationGroup; sec: number }[] = [
+    { name: 'windmill', build: () => buildFinishWindmill(scene, sk)!, sec: 0.85 },
+    { name: 'tomahawk', build: () => buildFinishTomahawk(scene, sk)!, sec: 0.75 },
+    { name: 'eastbay', build: () => buildEastbay(scene, sk)!, sec: 1.2 },
+    { name: 'between the legs', build: () => buildBetweenLegs(scene, sk)!, sec: BETWEEN_LEGS_SEC },
+    { name: 'scorpion', build: () => buildScorpion(scene, sk)!, sec: SCORPION_SEC },
+    { name: 'lost & found', build: () => buildLostFound(scene, sk)!, sec: LOST_FOUND_SEC },
+    { name: 'hide & seek', build: () => buildHideSeek(scene, sk)!, sec: HIDE_SEEK_SEC },
+    { name: 'cradle', build: () => buildCradle(scene, sk)!, sec: CRADLE_SEC },
+    { name: 'double clutch', build: () => buildDoubleClutch(scene, sk)!, sec: CLUTCH_SEC },
+    { name: '360', build: () => buildSpin360(scene, sk)!, sec: SPIN_SEC },
+  ];
+
+  /** Where the feet are RELATIVE TO THE HIPS, so a clip that only rises does not read as leg action. */
+  function feetOverFlight(build: () => AnimationGroup, sec: number): { l: Vector3; r: Vector3 }[] {
+    const g = fresh(build);
+    return [0.1, 0.3, 0.5, 0.7, 0.92].map((f) => {
+      at(g, sec * f);
+      const h = pos('Hips');
+      return { l: pos('LeftFoot').subtract(h), r: pos('RightFoot').subtract(h) };
+    });
+  }
+
+  it('NOT ONE of them flies with frozen legs', () => {
+    for (const { name, build, sec } of named) {
+      const shots = feetOverFlight(build, sec);
+      let travel = 0;
+      for (const a of shots) for (const b of shots) travel = Math.max(travel, Vector3.Distance(a.l, b.l), Vector3.Distance(a.r, b.r));
+      expect(travel, `${name}: the legs barely move`).toBeGreaterThan(0.25);
+    }
+  });
+
+  it('every one of them finishes LONG — the body under the arm, not sat in a chair', () => {
+    for (const { name, build, sec } of named) {
+      const g = fresh(build);
+      at(g, sec);
+      for (const s of ['Left', 'Right']) {
+        expect(pos(`${s}Foot`).y, `${name}: ${s} foot is not extended at the flush`).toBeLessThan(pos('Hips').y - 0.55);
+      }
+    }
+  });
+
+  it('somewhere in every dunk the two legs are doing DIFFERENT things', () => {
+    // A person jumping off one foot is asymmetric by construction, and a dunk that is mirror-perfect from first frame
+    // to last is a diagram. Scorpion/360/clutch are deliberately symmetric at their signature beat — so this asks only
+    // that the two legs disagree at SOME point in the flight, which every real dunk does at the take-off.
+    for (const { name, build, sec } of named) {
+      const shots = feetOverFlight(build, sec);
+      const worst = Math.max(...shots.map((s) => Math.abs(s.l.y - s.r.y) + Math.abs(s.l.z - s.r.z)));
+      expect(worst, `${name}: both legs do the same thing the whole way`).toBeGreaterThan(0.08);
     }
   });
 });
@@ -440,10 +502,15 @@ describe('dunk tricks', () => {
     at(g, 0.3); expect(hipsY()).toBeGreaterThan(load + 0.3);
     at(g, 0.5); expect(hipsY()).toBeLessThan(load + 0.05); expect(pos('RightLeg').z).toBeGreaterThan(pos('RightUpLeg').z + 0.1);   // knees forward of the hips: loaded
   });
-  it('scorpion: both feet kicked back over the body, head up, the ball hand out front and high', () => {
+  // AUDIT (2026-09-16): Kilganon's scorpion is a NO-LOOK, BEHIND-THE-BACK jam — he watches the floor the whole way and
+  // brings the ball behind him, not over the shoulder. This test used to assert the opposite of the real dunk on both
+  // counts ("head up, the ball hand out front"), which is how a wrong body passed for a year.
+  it('scorpion: feet whipped up over the body, chin DOWN (he never looks), the ball BEHIND him', () => {
     at(fresh(() => buildScorpion(scene, sk)!), 0.35);
     for (const s of ['Left', 'Right']) { expect(pos(`${s}Foot`).z).toBeLessThan(pos('Hips').z - 0.25); expect(pos(`${s}Foot`).y).toBeGreaterThan(pos(`${s}UpLeg`).y - 0.15); }
-    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.1); expect(pos('RightHand').z).toBeGreaterThan(pos('Hips').z + 0.3);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);                 // still high — it is going in
+    expect(pos('RightHand').z).toBeLessThan(pos('Hips').z);                    // …from BEHIND, not out front
+    expect(pos('Head').z).toBeLessThan(pos('Neck').z + 0.12);                  // chin tucked toward the floor, not craned up at the rim
   });
   it('lost & found: the ball hand goes behind the back, both hands meet there, the other hand ends at the rim', () => {
     const g = fresh(() => buildLostFound(scene, sk)!);
