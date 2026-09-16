@@ -132,6 +132,7 @@ import { DribbleStateMachine, syncedShotSpeed, RELEASE_FRAME_01 } from '../core/
 import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
+import { pickHoopsDunk, dunkSpeedRatio } from '../core/HoopsDunks';
 import {   // HOOPS-MOVE-KIT-A (2026-09-08): the gather, the finish kit, the drive contest
   planGather, gatherWish, gatherLabel, gatherTravel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
   pickLayupSide, planFinish, finishHopY, finishStride, FINISH_LABEL, type FinishPlan, type FinishStyle,
@@ -311,6 +312,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   const nerveTheAttacker = (): void => { attacker.patience = 1 / Math.max(0.5, nerve(rivalStanding()).aggression); };
   let gatherShown = false, stepbackShown = false;
   let myJumpAge = Infinity;
+  let dunkLabel = '';            // which dunk the drive earned (HoopsDunks) — the banner names it when it lands
   let takingCharge = false;      // Circle held on defence — planted, waiting to wear it
   let chargeSetSec = 0;          // how long the feet have been down (a charge is arriving early, not colliding)                 // seconds since my contest jump left the floor
   let meStunSec = 0;                        // whiffed reach costs you your feet
@@ -606,7 +608,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       ctx.setHud({ score: myScore, foeScore, target: TARGET_SCORE, momentum: 0, turbo: 100, hint: HINT_OFFENCE });
       // dev probes (ONEVONE-DEFENSE-LOGIC): the possession machine, readable without the HUD
       if (process.env.NODE_ENV === 'development') {
-        (ctx.scene.metadata ??= {}).onevone = { possession: () => possession, defPhase: () => defPhase, attackPhase: () => attacker.phase, foeRoot: foe.root, myJumpAge: () => myJumpAge, contacts: () => devContacts.slice(), luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: foeHandUp }), ended: () => ended, post: () => ({ posting, spinning: !!spin, brace: !!meSlot.intent.brace, can: canPostUp(me.root.position, RIM_FLOOR, foeStunSec > 0 || foeFloored ? null : foe.root.position), carrying, shooting, finish: !!finish, gather: !!gather, foeStun: foeStunSec, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: meAnimTree.held ?? '' }), foeJob: () => (foeBrain?.boxing ? 'boxout' : foeBrain?.job ?? ''), foeBoxing: () => !!foeBrain?.boxing, defend: () => { if (!ended && possession === 'mine') startDefense(ctx, 'PROBE — DEFEND!'); }, offense: () => { if (!ended) resetPositions(); }, poster: () => { if (ended) return false; /* A poster needs three things at once: my possession, a run-up, and a defender ON HIS FEET inside 1.5 m    between me and the ring. A driver cannot arrange that — bumping him on the way in keeps him STUNNED,    and 1v1 passes a null defender while he is stunned, so contestDrive returns its no-defender sentinel    (t NaN lateral NaN) and the contact dunk can never be read. This seam sets the geometry up exactly    once, the same way defend()/offense() exist so a probe can reach either possession deterministically. */ if (possession !== 'mine') resetPositions(); foeStunSec = 0; foeFloored = false; posterVictim = null; const toRim = RIM_FLOOR.subtract(me.root.position); toRim.y = 0; if (toRim.lengthSquared() < 1e-4) return false; toRim.normalize(); /* far enough out for a real run-up: the dribble controller integrates its own velocity from the stick    and discards a direct write, so the drive-dunk speed minimum is only met by actually accelerating. */ me.root.position.set(RIM_FLOOR.x - toRim.x * 5.2, 0, RIM_FLOOR.z - toRim.z * 5.2); foe.root.position.set(RIM_FLOOR.x - toRim.x * 1.3, 0, RIM_FLOOR.z - toRim.z * 1.3); face(foe.root, yawTo(foe.root.position, me.root.position)); meDribble.setFacing(yawTo(me.root.position, RIM_FLOOR)); meDribble.vel.copyFrom(toRim.scale(6.2)); turbo.t01 = 1; console.info('[1V1-CONTACT] probe poster geometry set'); return true; } };   // BIOMECH-HOOPS-WAVE1: `defend()` / `offense()` let a probe reach either possession deterministically
+        (ctx.scene.metadata ??= {}).onevone = { possession: () => possession, defPhase: () => defPhase, attackPhase: () => attacker.phase, foeRoot: foe.root, myJumpAge: () => myJumpAge, driveSpeed: () => foeVelLast.length(), takingCharge: () => takingCharge, contacts: () => devContacts.slice(), luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: foeHandUp }), ended: () => ended, post: () => ({ posting, spinning: !!spin, brace: !!meSlot.intent.brace, can: canPostUp(me.root.position, RIM_FLOOR, foeStunSec > 0 || foeFloored ? null : foe.root.position), carrying, shooting, finish: !!finish, gather: !!gather, foeStun: foeStunSec, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: meAnimTree.held ?? '' }), foeJob: () => (foeBrain?.boxing ? 'boxout' : foeBrain?.job ?? ''), foeBoxing: () => !!foeBrain?.boxing, defend: () => { if (!ended && possession === 'mine') startDefense(ctx, 'PROBE — DEFEND!'); }, offense: () => { if (!ended) resetPositions(); }, poster: () => { if (ended) return false; /* A poster needs three things at once: my possession, a run-up, and a defender ON HIS FEET inside 1.5 m    between me and the ring. A driver cannot arrange that — bumping him on the way in keeps him STUNNED,    and 1v1 passes a null defender while he is stunned, so contestDrive returns its no-defender sentinel    (t NaN lateral NaN) and the contact dunk can never be read. This seam sets the geometry up exactly    once, the same way defend()/offense() exist so a probe can reach either possession deterministically. */ if (possession !== 'mine') resetPositions(); foeStunSec = 0; foeFloored = false; posterVictim = null; const toRim = RIM_FLOOR.subtract(me.root.position); toRim.y = 0; if (toRim.lengthSquared() < 1e-4) return false; toRim.normalize(); /* far enough out for a real run-up: the dribble controller integrates its own velocity from the stick    and discards a direct write, so the drive-dunk speed minimum is only met by actually accelerating. */ me.root.position.set(RIM_FLOOR.x - toRim.x * 5.2, 0, RIM_FLOOR.z - toRim.z * 5.2); foe.root.position.set(RIM_FLOOR.x - toRim.x * 1.3, 0, RIM_FLOOR.z - toRim.z * 1.3); face(foe.root, yawTo(foe.root.position, me.root.position)); meDribble.setFacing(yawTo(me.root.position, RIM_FLOOR)); meDribble.vel.copyFrom(toRim.scale(6.2)); turbo.t01 = 1; console.info('[1V1-CONTACT] probe poster geometry set'); return true; } };   // BIOMECH-HOOPS-WAVE1: `defend()` / `offense()` let a probe reach either possession deterministically
         const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__;
         if (dev) dev.hoopsPosture = { me: () => mePosture?.layer.get() ?? null, foe: () => foePosture?.layer.get() ?? null, bio: () => ({ me: { ...meBio }, foe: { ...foeBio } }) };   // BIOMECH-HOOPS-WAVE1 probes
       }
@@ -1094,7 +1096,25 @@ export const OneVOneMode: ModeDefinition = (() => {
         for (const c of contact.drainContacts()) {
           if (process.env.NODE_ENV === 'development') { devContacts.push({ t: performance.now(), severity: c.severity, closing: c.closingSpeed, attacker: c.attacker, victim: c.victim, attackerSpeed: c.attackerSpeed }); if (devContacts.length > 40) devContacts.shift(); }
           if (c.severity === 'foul') {
-            if (possession === 'mine' && (dunking || finish) && c.victim === 'me') {
+            // THE CHARGE, ON THE COLLISION CHANNEL. Every branch in this drain was `possession === 'mine'`, so on
+            // DEFENCE every contact the physics reported was dropped on the floor — which is why a planted defender
+            // could be run through at 5.0 m/s and nothing was called. A charge IS a collision; polling the distance
+            // from the update loop could never be as good, because the driver steers around a spot and arrives at a
+            // body. The distance read below stays as a fallback for the no-Havok path.
+            if (possession === 'defense' && takingCharge && c.attacker === 'foe' && c.victim === 'me'
+              && c.attackerSpeed >= FOUL_CLOSING_SPEED && chargeSetSec >= CHARGE_SET_SEC && defPhase !== 'over') {
+              SoundKit.play('whistle');
+              swing('steal');
+              ctx.setHud({ momentum });
+              EffectsKit.burst(ctx.scene, me.root.position.add(new Vector3(0, 1.0, 0)), 'dust');
+              ctx.feel?.impact?.(0.45);
+              meAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+              foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+              bannerFlash(ctx, 'CHARGE — YOUR BALL!', 1100);
+              console.info(`[1V1-CONTACT] charge taken on contact at ${c.attackerSpeed.toFixed(1)} m/s (set ${chargeSetSec.toFixed(2)}s)`);
+              defPhase = 'over';
+              later(800, () => resetPositions());
+            } else if (possession === 'mine' && (dunking || finish) && c.victim === 'me') {
               // HOOPS-MOVE-KIT-A M2: fouled IN THE AIR — the attempt plays out (it used to reset the possession mid-flight, with
               // the flight observer still flying the body): a make is an AND-ONE, a miss is the ball back
               if (!finishFoul) { finishFoul = true; SoundKit.play('whistle'); bannerFlash(ctx, 'FOUL!', 400); console.info(`[1V1-CONTACT] foul in the air (${c.closingSpeed.toFixed(1)} m/s) — and-one pending`); }
@@ -1245,6 +1265,9 @@ export const OneVOneMode: ModeDefinition = (() => {
           foeSpeed01 = Math.min(1, sp / RIVAL_DRIVE_SPEED);
           if (dec.phase === 'gather' || dec.phase === 'stepback') { if (foeShotWin === 'none') foeShotWin = 'load'; }   // BIOMECH-HOOPS-WAVE1: the telegraph is the load
           driveBody('foe', foe.root, dec.wish, dt);
+          foeVelLast.copyFrom(dec.wish);   // …on THEIR possession too: the charge and every set-vs-moving read below
+                                           // were looking at a vector only ever written while I had the ball, so a
+                                           // driver measured 0.0 m/s all the way to the rim (probe: driver peak 0.0).
           // a driver faces the rim through a sidestep (a crossover, not a run sideways); a blow-by runs its line
           face(foe.root, dec.phase === 'blowby' && sp > 0.5 ? Math.atan2(dec.wish.x, dec.wish.z) : Math.atan2(RIM.x - foe.root.position.x, RIM.z - foe.root.position.z));
           // the gather / step-back are mode-owned beats — the tree's loop choice must not race them (a 'protect'
@@ -1531,7 +1554,31 @@ export const OneVOneMode: ModeDefinition = (() => {
     // whole flight); the launch's last frame is HELD to feet-down (the 0.35 s clip ran out mid-air into the run loop)
     meCarry?.update(0, 0, false);
     if (!ball.parent) attachBallToHand(ball, me.skeleton, 'RightHand');
-    meAnimTree.beat(SPORT_CLIP.dunkLaunchPower, { holdEnd: true });
+    // WHICH DUNK THIS DRIVE EARNED (owner, 2026-09-16). Every dunk in this mode played `dunk_launch` — the same two
+    // clips off a jog down the middle and off a full-speed baseline drive through a set body — while the whole
+    // authored dunk vocabulary was ALREADY on the rig: ClipScope gives `onevone` the suites ['hoops', 'dunk'], so
+    // the windmill, the tomahawk, the cradle, the double clutch, the 360 and the eastbay were registered and never
+    // asked for. HoopsDunks reads what the drive already knows and picks; nothing here is newly authored.
+    const toRimNow2 = RIM_FLOOR.subtract(from); toRimNow2.y = 0;
+    const driveDir = meDribble.vel.clone(); driveDir.y = 0;
+    const speedNow = driveDir.length();
+    // how much of the approach is ACROSS the ring's face rather than at it — the angle the wind-up dunks want
+    const lateral01 = speedNow > 0.1 && toRimNow2.lengthSquared() > 1e-4
+      ? Math.min(1, Math.abs(driveDir.x * toRimNow2.normalize().z - driveDir.z * toRimNow2.x) / speedNow)
+      : 0;
+    const picked = pickHoopsDunk({
+      speed: speedNow,
+      lateral01,
+      contest01: c.contested ? Math.min(1, Math.max(0, 1 - Math.abs(c.lateral))) : 0,
+      poster: kind === 'poster',
+      momentum01: mbus.score01,
+      roll,
+    });
+    dunkLabel = picked.label;
+    meAnimTree.beat(picked.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked, DRIVE_DUNK.flightMs / 1000) });
+    ctx.setHud({ shotType: picked.label });
+    if (picked.flashy) ctx.camDirector.pulse(0.35, 0.4);
+    console.info(`[1V1-DUNK] ${picked.label} (${picked.clip}) speed ${speedNow.toFixed(1)} lateral ${lateral01.toFixed(2)} contest ${(c.contested ? 1 : 0)} momentum ${mbus.score01.toFixed(2)}`);
     contact?.setAirborne('me', true);
     // the flight's own clock: real time, FROZEN for the bump's hit-stop and slowed for BUMP_SLOW_SEC after it (the velocity kill)
     let flightMs = 0, last = performance.now(), bumped = false, freezeMs = 0, slowMs = 0;

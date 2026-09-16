@@ -29,7 +29,7 @@
 // only exists under `next dev` — hence BASE pointing at the dev server for this pass.
 //
 //   BASE=http://127.0.0.1:3098 MODE=onevone POSSESSIONS=8 PLAY=mix CHARGE=0.8 npx tsx scripts/probes/_hoops-lab.mts
-//   PLAY=jumper|layup|dunk|mix    CHARGE=0.45|0.8|1.0 (early / green / late)    MODE=onevone|threevthree
+//   PLAY=jumper|layup|dunk|mix|defence|charge|screen    CHARGE=0.45|0.8|1.0 (early / green / late)    MODE=onevone|threevthree
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 import { chromiumExe } from './_chromium.mts';
@@ -87,7 +87,7 @@ await page.evaluate(`(() => {
   window.__hudNow = () => { const q = window.__FEL_QA__; return q && q.rawHud ? q.rawHud() : {}; };
   window.__dev = () => { const q = window.__FEL_QA__; const s = q && q.scene ? q.scene() : null; return (s && s.metadata && s.metadata[MODE]) || null; };
   window.__meter = { peak: 0, frames: 0 };
-  window.__def = { jumps: 0, gathers: 0, lastPhase: '' };
+  window.__def = { jumps: 0, gathers: 0, lastPhase: '', block: true, charge: false, driverPeak: 0 };
   // ONE QUEUE, ONE DRIVER. AgentControlSource is a SERIAL queue: every push waits its turn. The page-side defensive
   // brain pushing a 130 ms move every 120 ms therefore sits in front of whatever the node side asks for next, so an
   // offence play's squeeze arrived seconds late (or behind a possession change) and read as "the layup did nothing".
@@ -108,7 +108,10 @@ await page.evaluate(`(() => {
     const onD = MODE === 'onevone' ? dev.possession && dev.possession() === 'defense' : dev.carrier && dev.carrier() === 'foeTeam';
     if (!onD) { d.lastPhase = ''; return; }
     const phase = dev.attackPhase ? dev.attackPhase() : '';
-    if (phase === 'gather' && d.lastPhase !== 'gather') { d.gathers++; d.jumps++; a.do('block'); }
+    // A JUMP CANCELS A PLANT — you cannot be in the air and taking a charge at once, and the mode says so
+    // (takingCharge requires myJumpAge === Infinity). With the block always armed, the charge play could never
+    // hold: six gathers, six jumps, zero charges. The block is off for the charge run.
+    if (phase === 'gather' && d.lastPhase !== 'gather') { d.gathers++; if (d.block) { d.jumps++; a.do('block'); } }
     d.lastPhase = phase;
   }, 16);
 
@@ -146,6 +149,17 @@ await page.evaluate(`(() => {
     const onD = MODE === 'onevone' ? dev.possession && dev.possession() === 'defense' : dev.carrier && dev.carrier() === 'foeTeam';
     if (!onD) return;
     const him = dev.foeRoot.position;
+    if (typeof dev.driveSpeed === 'function') { const v = dev.driveSpeed(); if (v > window.__def.driverPeak) window.__def.driverPeak = v; }
+    // TAKING A CHARGE IS A PLACE, NOT A BUTTON. Planting early just means he drives round the spot: the node side
+    // held it for 2.2 s from the start of the possession and drew nothing in six tries, with the driver hitting
+    // 5.0 m/s past a body that was no longer in the way. The decision belongs where the positions are — plant only
+    // once he is close AND still coming, which is the read a player makes.
+    if (window.__def.charge) {
+      const hn2 = window.__FEL_QA__.hero(); const meP = hn2 && (hn2.position || hn2);
+      const gap = meP ? Math.hypot(meP.x - him.x, meP.z - him.z) : 99;
+      const v = typeof dev.driveSpeed === 'function' ? dev.driveSpeed() : 0;
+      if (gap <= 2.6 && v >= 3.0) { window.__NEXUS_AGENT__.do('charge', { ms: 420 }); return; }
+    }
     // the point a metre off him on the rim side: stay in FRONT, which is also the only way to be inside the block's
     // range (1.2 m on a jumper) when his gather comes
     const tx = him.x - him.x * 0, tz = him.z;
@@ -176,8 +190,9 @@ const PLAYS = ['jumper', 'layup', 'dunk'];
 // the ball back — 1 shot per game is not a sample. Both modes already expose `offense()` / `defend()` on the dev seam
 // for exactly this (they exist "so a probe can reach either possession deterministically"), so the lab uses them and
 // the SIDE under test is chosen by PLAY rather than by who happens to be winning.
-const wantDefence = PLAY === 'defence';
-await page.evaluate(`(() => { window.__brain = ${wantDefence}; })()`);
+// CHARGE is a defensive possession too — you are standing in his way waiting to wear it.
+const wantDefence = PLAY === 'defence' || PLAY === 'charge';
+await page.evaluate(`(() => { window.__brain = ${wantDefence}; window.__def.block = ${PLAY !== 'charge'}; window.__def.charge = ${PLAY === 'charge'}; })()`);
 
 /**
  * Drive at the rim until it is `stop` metres away (or 2.5 s go by), going AROUND the defender.
@@ -227,7 +242,15 @@ for (let n = 0; n < POSSESSIONS; n++) {
     // THE THREE FINISHES, aimed rather than hoped for. Distance is bought with drive time: classifyShot's layup band
     // is 2.2 m planar, the floater band runs to FLOATER_RANGE, and checkDriveDunk additionally wants speed and turbo —
     // which is what `sprint` buys, and why the dunk play never releases the stick before the squeeze.
-    if (play === 'jumper') await agent(`a.do('shoot', { charge: ${CHARGE} })`);   // from the reset spot, no drive
+    if (play === 'screen') {
+      // CALL FOR A SCREEN, then drive off it. 3v3 only — 1v1 answers the press with NO TEAMMATE TO SCREEN, which is
+      // itself the thing worth seeing.
+      await agent(`a.do('screen')`);
+      await page.waitForTimeout(400);
+      await driveToRim(3.2);
+      await agent(`a.do('shoot', { charge: ${CHARGE} })`);
+    }
+    else if (play === 'jumper') await agent(`a.do('shoot', { charge: ${CHARGE} })`);   // from the reset spot, no drive
     else if (play === 'dunk') {
       // THE STICK IS STILL DOWN WHEN THE TRIGGER GOES. `do('sprint')` then `do('shoot')` is TWO queued intents, and
       // the second one lets go of the stick — so by the squeeze the sprint is over, `sprintOk` is false and the
@@ -264,6 +287,9 @@ for (let n = 0; n < POSSESSIONS; n++) {
       }
       return seen.slice(0, 12);
     })()`) as string[];
+  } else if (play === 'charge') {
+    // the page brain plants the feet when he is actually coming (see __def.charge); here we just let it happen
+    await page.waitForTimeout(1600);
   } else {
     // the brain above is already mirroring and blocking; hold the grounded hand-up under it
     await agent(`a.do('contest', { ms: 1400 })`);
@@ -291,7 +317,9 @@ for (let n = 0; n < POSSESSIONS; n++) {
   if (n < 3) await page.screenshot({ path: `${OUT}/${TAG}-p${p.n}.png` });
 }
 
-const def = await page.evaluate('window.__def') as { jumps: number; gathers: number };
+const def = await page.evaluate('window.__def') as { jumps: number; gathers: number; driverPeak: number };
+const chargesTaken = log.filter((l) => /charge taken/.test(l)).length;
+const screensCalled = log.filter((l) => /screen called/.test(l)).length;
 const off = rows.filter((r) => r.possession === 'offence');
 const made = off.filter((r) => r.scored > 0).length;
 const defence = rows.filter((r) => r.possession === 'defence');
@@ -305,11 +333,12 @@ const out = {
   byPlay,
   defence: defence.length, stops, stopPct: defence.length ? Math.round((stops / defence.length) * 100) : null,
   blockJumps: def?.jumps ?? 0, gathersSeen: def?.gathers ?? 0,
+  chargesTaken, screensCalled, driverPeakSpeed: +(def?.driverPeak ?? 0).toFixed(2),
   finalScore: [final.score ?? null, final.foeScore ?? null], target: final.target ?? null,
   rows, log: log.slice(-200),
 };
 fs.writeFileSync(`${OUT}/hoops-lab-${TAG}.json`, JSON.stringify(out, null, 1));
 console.log(`\n${MODE} charge ${CHARGE} · offence ${made}/${off.length}${out.makePct !== null ? ` (${out.makePct}%)` : ''} · ${byPlay.map((b) => `${b.play} ${b.made}/${b.n}`).join(' · ')}`);
-console.log(`defence: stops ${stops}/${defence.length} · block jumps ${out.blockJumps} on ${out.gathersSeen} gathers · score ${String(final.score)}-${String(final.foeScore)} to ${String(final.target)}`);
+console.log(`defence: stops ${stops}/${defence.length} · block jumps ${out.blockJumps} on ${out.gathersSeen} gathers · charges ${chargesTaken} (driver peak ${(def?.driverPeak ?? 0).toFixed(1)} m/s vs 4.2 needed) · screens ${screensCalled} · score ${String(final.score)}-${String(final.foeScore)} to ${String(final.target)}`);
 console.log(`→ ${OUT}/hoops-lab-${TAG}.json`);
 await browser.close();

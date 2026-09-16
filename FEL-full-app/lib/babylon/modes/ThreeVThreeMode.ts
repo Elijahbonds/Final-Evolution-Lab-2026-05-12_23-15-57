@@ -120,6 +120,7 @@ import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
+import { pickHoopsDunk, dunkSpeedRatio } from '../core/HoopsDunks';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -1365,7 +1366,23 @@ const CHARGE_RANGE = 1.15;
     // BIOMECH-HOOPS-WAVE1 G6: the dribble parked, the ball in the palm through the flight; the launch's last frame HELD to feet-down (the 1v1's)
     carries.get(me)?.update(0, 0, false);
     if (!ball.parent) attachBallToHand(ball, me.char.skeleton, 'RightHand');
-    me.tree.beat(SPORT_CLIP.dunkLaunchPower, { holdEnd: true });
+    // WHICH DUNK THIS DRIVE EARNED — the same read 1v1 makes, off the same already-registered vocabulary (ClipScope
+    // gives this mode the 'dunk' suite too). One clip for every dunk in the game was the fault; see HoopsDunks.
+    const toRimNow3 = RIM_FLOOR.subtract(from); toRimNow3.y = 0;
+    const driveDir3 = me.drib.vel.clone(); driveDir3.y = 0;
+    const speed3 = driveDir3.length();
+    const lateral3 = speed3 > 0.1 && toRimNow3.lengthSquared() > 1e-4
+      ? Math.min(1, Math.abs(driveDir3.x * toRimNow3.normalize().z - driveDir3.z * toRimNow3.x) / speed3)
+      : 0;
+    const picked3 = pickHoopsDunk({
+      speed: speed3, lateral01: lateral3,
+      contest01: c.contested ? Math.min(1, Math.max(0, 1 - Math.abs(c.lateral))) : 0,
+      poster: kind === 'poster', momentum01: mbus.score01, roll,
+    });
+    me.tree.beat(picked3.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked3, DRIVE_DUNK.flightMs / 1000) });
+    ctx.setHud({ shotType: picked3.label });
+    if (picked3.flashy) ctx.camDirector.pulse(0.35, 0.4);
+    console.info(`[3V3-DUNK] ${picked3.label} (${picked3.clip}) speed ${speed3.toFixed(1)} lateral ${lateral3.toFixed(2)} momentum ${mbus.score01.toFixed(2)}`);
     startBoxOut('mine');   // O2
     // the flight's own clock: real time, FROZEN for the bump's hit-stop and slowed for BUMP_SLOW_SEC after it (the velocity kill)
     let flightMs = 0, last = performance.now(), bumped = false, freezeMs = 0, slowMs = 0;
@@ -2085,7 +2102,21 @@ const CHARGE_RANGE = 1.15;
       const contest = Math.min(1, contestLevel(shooter.char.root.position, me.char.root.position) * 0.5 + ground + (myJumpAge <= HAND_UP_SEC ? 0.3 : 0));
       let made = Math.random() < contestedPct(c.pct, contest);
       let swatted = false, bumped = false, resolved = false;
-      shooter.tree.beat(SPORT_CLIP.dunkLaunchPower, { holdEnd: true });
+      // the rival dunks out of the same book. His showtime gate is the INVERSE of my momentum: when the game is
+      // getting away from me is exactly when he starts throwing 360s, which is what a run feels like from the
+      // wrong end of it.
+      const theirDir = shooter.vel.clone(); theirDir.y = 0;
+      const theirSpeed = theirDir.length();
+      const toRimT = RIM_FLOOR.subtract(shooter.char.root.position); toRimT.y = 0;
+      const theirLateral = theirSpeed > 0.1 && toRimT.lengthSquared() > 1e-4
+        ? Math.min(1, Math.abs(theirDir.x * toRimT.normalize().z - theirDir.z * toRimT.x) / theirSpeed)
+        : 0;
+      const theirDunk = pickHoopsDunk({
+        speed: theirSpeed, lateral01: theirLateral, contest01: contest,
+        poster: inLane, momentum01: 1 - mbus.score01, roll,
+      });
+      shooter.tree.beat(theirDunk.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(theirDunk, DRIVE_DUNK.flightMs / 1000) });
+      console.info(`[3V3-DUNK] rival ${theirDunk.label} (${theirDunk.clip}) speed ${theirSpeed.toFixed(1)}`);
       startBoxOut('theirs');
       SoundKit.play('whoosh', { pitch: 0.85 });
       console.info(`[3V3-DEF] rival dunk ${inLane ? 'poster' : 'open'} contest ${contest.toFixed(2)} pct ${contestedPct(c.pct, contest).toFixed(2)} bumpK ${c.bumpK === null ? 'none' : c.bumpK.toFixed(2)}`);
