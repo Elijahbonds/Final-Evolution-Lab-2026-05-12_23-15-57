@@ -22,6 +22,16 @@ export interface LightRigHandle {
   dispose(): void;
 }
 
+/**
+ * Depth bias for the cascaded (outdoor) shadow map.
+ *
+ * `bias` moves the comparison along the light ray and `normalBias` moves the sample along the surface normal; the
+ * second is the one that fixes a grazing sun, because the error it corrects grows with the angle between the surface
+ * and the light. Kept modest: push either too far and the shadow detaches from the feet that cast it (peter-panning),
+ * which looks worse than the acne did.
+ */
+export const CSM_BIAS = 0.002, CSM_NORMAL_BIAS = 0.022;
+
 /** Names that read as ground/floor — auto-receivers, never auto-casters (M44). */
 const RECEIVER_HINTS = /floor|ground|piste|water|court|pitch|green|plate|mound|shore|park_floor|tatami|snow|sky|horizon|swell/i;
 
@@ -64,6 +74,12 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     csm.usePercentageCloserFiltering = true;
     csm.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
     csm.darkness = 0.35;
+    // SHADOW ACNE AT A GRAZING SUN (dunk visuals pass, 2026-09-16). Caught under the dunker's feet on the Venice court:
+    // not a body shadow but four hard black WEDGES radiating out of her shoes, the shape a shadow map makes when a
+    // surface shadows itself. Every outdoor mood here puts the sun low (it is a sunset look), and a low sun is the worst
+    // case for it — the depth slope across one texel is enormous, so a bias that is fine at noon is nothing at dusk.
+    // Babylon ships bias 0.00005 and normalBias 0, i.e. essentially none of either.
+    csm.bias = CSM_BIAS; csm.normalBias = CSM_NORMAL_BIAS;
     shadows = csm;
   } else {
     shadows = new ShadowGenerator(T.shadowMapSize, sun);

@@ -229,46 +229,49 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           grew straight down through the banner at top-[38%], which is exactly
           where a FIFTY! lands. Cards across, one voice line at a time, and a
           running total that climbs as they flip — the number everyone watches. */}
-      {/* THE TIMING VERDICT (review F1, 2026-09-14). The mode computed "117 ms early, execution 29%" and
-          sent it to console.info; a player saw a number between 30 and 50 and could not tell whether they
-          lost it on difficulty, execution or style. Both lines are now on screen, under the judges. */}
-      {typeof hud.slamTiming === 'string' && hud.slamTiming && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 top-[22%] text-center">
-          <span className="fel-panel px-3 py-1 font-mono text-[12px] tracking-wide text-[var(--fel-cyan)]">
-            {hud.slamTiming}
-          </span>
-          {typeof hud.breakdown === 'string' && hud.breakdown ? (
-            <div className="mt-1">
-              <span className="fel-panel px-2.5 py-0.5 font-mono text-[10px] text-white/60">{hud.breakdown}</span>
-            </div>
-          ) : null}
-        </div>
-      )}
-
-      {Array.isArray(hud.judgeReveal) && (hud.judgeReveal as HudScoreCard[]).length > 0 && (
+      {/* THE JUDGES' COLUMN — the cards, then how the dunk was actually landed.
+          The timing verdict (review F1, 2026-09-14) and the judge cards were two separate absolutely-positioned
+          blocks at top-[22%] and top-[20%], which is to say two things two percent apart on the same spot: caught on
+          the verdict frame with "105 ms EARLY - EXECUTION 75%" showing through the gaps BETWEEN the judge chips,
+          stray letters and all. Percent offsets cannot express "under" — a column can, so they share one now and the
+          order is the order they are read in. */}
+      {(Array.isArray(hud.judgeReveal) && (hud.judgeReveal as HudScoreCard[]).length > 0) ||
+      (typeof hud.slamTiming === 'string' && hud.slamTiming && phase === 'playing') ? (
         <div className="pointer-events-none absolute inset-x-0 top-[20%] flex flex-col items-center gap-2">
-          <div className="flex items-end justify-center gap-1.5">
-            {(hud.judgeReveal as HudScoreCard[]).map((j) => (
-              <div key={j.name} className="fel-panel flex flex-col items-center px-2.5 py-1">
-                <span className="font-mono text-[9px] uppercase tracking-wider text-[var(--fel-cyan)]">{j.name}</span>
-                <span className="text-2xl font-black leading-none text-[var(--fel-gold)]">{j.score}</span>
+          {Array.isArray(hud.judgeReveal) && (hud.judgeReveal as HudScoreCard[]).length > 0 && (
+            <>
+              <div className="flex items-end justify-center gap-1.5">
+                {(hud.judgeReveal as HudScoreCard[]).map((j) => (
+                  <div key={j.name} className="fel-panel flex flex-col items-center px-2.5 py-1">
+                    <span className="font-mono text-[9px] uppercase tracking-wider text-[var(--fel-cyan)]">{j.name}</span>
+                    <span className="text-2xl font-black leading-none text-[var(--fel-gold)]">{j.score}</span>
+                  </div>
+                ))}
+                <div className="fel-panel ml-1 flex flex-col items-center border-[var(--fel-gold)]/40 px-3 py-1">
+                  <span className="font-mono text-[9px] uppercase tracking-wider text-white/50">total</span>
+                  <span className="text-2xl font-black leading-none text-white">
+                    {(hud.judgeReveal as HudScoreCard[]).reduce((s, j) => s + Number(j.score), 0)}
+                  </span>
+                </div>
               </div>
-            ))}
-            <div className="fel-panel ml-1 flex flex-col items-center border-[var(--fel-gold)]/40 px-3 py-1">
-              <span className="font-mono text-[9px] uppercase tracking-wider text-white/50">total</span>
-              <span className="text-2xl font-black leading-none text-white">
-                {(hud.judgeReveal as HudScoreCard[]).reduce((s, j) => s + Number(j.score), 0)}
+              {/* the card that just flipped gets to speak */}
+              <span className="fel-panel max-w-[85%] truncate px-3 py-1 font-mono text-[11px] text-white/70">
+                {(hud.judgeReveal as HudScoreCard[])[(hud.judgeReveal as HudScoreCard[]).length - 1].line}
               </span>
+            </>
+          )}
+          {typeof hud.slamTiming === 'string' && hud.slamTiming && phase === 'playing' && (
+            <div className="flex flex-col items-center gap-1">
+              <span className="fel-panel px-3 py-1 font-mono text-[12px] tracking-wide text-[var(--fel-cyan)]">
+                {hud.slamTiming}
+              </span>
+              {typeof hud.breakdown === 'string' && hud.breakdown ? (
+                <span className="fel-panel px-2.5 py-0.5 font-mono text-[10px] text-white/60">{hud.breakdown}</span>
+              ) : null}
             </div>
-          </div>
-          {/* the card that just flipped gets to speak */}
-          <span className="fel-panel max-w-[85%] truncate px-3 py-1 font-mono text-[11px] text-white/70">
-            {(hud.judgeReveal as HudScoreCard[])[(hud.judgeReveal as HudScoreCard[]).length - 1].line}
-          </span>
+          )}
         </div>
-      )}
-
-      {/* banner — DUNK-CAR-CLIP R2: while the dunker is in the air (hud.bannerHigh) it rides at the top of the frame. At 38% it
+      ) : null}  {/* banner — DUNK-CAR-CLIP R2: while the dunker is in the air (hud.bannerHigh) it rides at the top of the frame. At 38% it
           sat exactly where both flight cameras put the rim, so "OVER THE CAR!" / "WINDMILL!" covered the ball going through the
           ring on every flush the eye filmed. It comes back down for the replay and the judges. */}
       {typeof hud.banner === 'string' && hud.banner && (

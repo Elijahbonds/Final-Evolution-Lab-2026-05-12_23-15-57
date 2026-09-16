@@ -67,7 +67,7 @@ import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE:
 import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, doubleUpFits, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, type ObstacleKind } from '../core/DunkObstacles';
-import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, signatureFor, type SlamReadout } from '../core/DunkSystem';
+import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, signatureFor, landingDustScale, netSplashScale, NET_SPLASH_DROP, type SlamReadout } from '../core/DunkSystem';
 import { dunkCard, slamIsClean } from '../core/DunkCard';
 import { missBeat } from '../core/MissFlavour';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
@@ -2261,9 +2261,10 @@ export const DunkMode: ModeDefinition = (() => {
     if (settleLatch) return;
     settleLatch = true;
     fovRelease();   // A+ P5: a miss restores the fov at the land
-    ctx.juice.shake(0.05, 110);
-    EffectsKit.burst(ctx.scene, player.root.position.clone(), 'dust');
-    console.info('[JUICE-SOFT] land settle');
+    const dust = landingDustScale(apexFor());
+    ctx.juice.shake(0.03 + dust * 0.03, 110);
+    EffectsKit.burst(ctx.scene, player.root.position.clone(), 'dust', dust);
+    console.info(`[JUICE-SOFT] land settle (apex ${apexFor().toFixed(2)} → dust x${dust.toFixed(2)})`);
   }
   /** #4 FOV gather: the active camera's fov eases −10% over the gather into the hang and back on CONTACT or land. Only
    *  the fov moves — rimCamCut, the hang target locks and the follow distance beat are untouched. */
@@ -2306,6 +2307,10 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.juice.flash('#fff6dd', 120);
     ctx.camDirector.pulse(0.9, 0.32);   // DUNK-BODY-MID: the CONTACT is a camera beat too — a short hard push onto the iron under the hit-stop, so the punch reads from behind (the flight had a push-in at the hang rise and nothing at the rim)
     SoundKit.play('impact', { pitch: 0.7, volume: 0.8 }); console.info('[JUICE-SFX] impact slam');   // A+ P2: the ONE slam thud of the attempt
+    // THE NET SPLASH BELONGS TO THE FLUSH. It used to fire in the judges' scoring step, seconds later, with the camera
+    // on the player: a net effect at a rim nobody was looking at. It goes off under the ring, on the frame the ball is
+    // through it, at the size the jam earned.
+    EffectsKit.burst(ctx.scene, rim.add(new Vector3(0, -NET_SPLASH_DROP, 0)), 'net', netSplashScale(qteAccuracy));
     fovRelease(); trailFlash();   // juice soft #4, #5: CONTACT restores the fov and cuts the trail with a flash
     armSettle();                  // A+ P4: the settle fires at feet-down, not on this frame
     hoopJuice?.punch();           // juice LOOK #1–#3: the hoop answers the make (never on a miss — this is the flush frame)
@@ -2490,7 +2495,6 @@ export const DunkMode: ModeDefinition = (() => {
 
     ctx.feel?.impact?.(0.2 + execution / 15);
     SoundKit.play('score', { pitch: 1 + Math.min(1, hype / 100) });
-    EffectsKit.burst(ctx.scene, rim, 'net');
     const named = [...runwayLabels, ...trickLabels];
     if (named.length) {   // P1: the card juice scales with the named dunk — the banner names it, the building answers it
       ctx.camDirector.pulse(Math.min(1.2, 0.5 + named.length * 0.25), 0.5);

@@ -530,3 +530,25 @@ export class DunkFlight {
     this.recognizer.reset();
   }
 }
+
+// ── What the contact and the landing LOOK like (visuals pass P5, 2026-09-16) ───────────────────────────────────────
+//
+// Both effects already existed and both were in the wrong place. The NET SPLASH fired during the judges' scoring step,
+// seconds after the ball was through and with the camera on the player — a net effect nobody ever saw at the rim. And
+// the LANDING DUST fired at a flat scale 1 for every landing, though `EffectsKit.burst` takes a scale precisely so
+// that a drop off a 1.9 m jump and a hop off a 1.05 m one are the same puff at two sizes. Firing the identical effect
+// for every intensity is what makes particle work read as canned.
+
+/** A landing is as hard as the fall that made it: v = sqrt(2gh) off the jump's own apex. */
+export const DUST_MIN = 0.55, DUST_MAX = 1.7;
+export function landingDustScale(apexM: number): number {
+  const v = Math.sqrt(2 * 9.81 * Math.max(0, apexM));
+  return Math.max(DUST_MIN, Math.min(DUST_MAX, DUST_MIN + (v - 4.2) * 0.42));
+}
+
+/** How far under the ring the net splash sits — the ball is through the net here, not on the iron. */
+export const NET_SPLASH_DROP = 0.34;
+/** A jam put through clean moves more net than one that scrapes in on the buzzer. */
+export function netSplashScale(execution01: number): number {
+  return 0.7 + Math.max(0, Math.min(1, execution01)) * 0.8;
+}
