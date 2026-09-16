@@ -161,6 +161,32 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "dispatch",
+            "description": (
+                "Hand the next piece of work to exactly one role, then stop. Only the PM "
+                "has this. You are not sending a message — the role you name will read the "
+                "ledger itself, so state the task, not the backstory."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "role": {"type": "string", "description": "The role to run next. It cannot be yourself."},
+                    "task": {
+                        "type": "string",
+                        "description": "One concrete objective, scoped to finish in that role's step budget.",
+                    },
+                    "rationale": {
+                        "type": "string",
+                        "description": "Why this, now — one line, read off the ledger state.",
+                    },
+                },
+                "required": ["role", "task"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "finish",
             "description": (
                 "End your run and report the result. Call this exactly once, when the task "
@@ -202,11 +228,15 @@ MUTATING_TOOLS: set[str] = {"write_file", "execute_bash"}
 # The ledger lives beside the loop, not behind the containment boundary — it is
 # append-only and schema-checked, so it does not need the sandbox's protection,
 # and routing it through would let a role reach the ledger with raw file writes.
-LOCAL_TOOLS: set[str] = {"read_ledger", "write_ledger", "finish"}
+LOCAL_TOOLS: set[str] = {"read_ledger", "write_ledger", "dispatch", "finish"}
 
 # Every role gets these. A role that cannot read the ledger is blind, one that
 # cannot write to it is invisible, and one that cannot finish burns its budget.
 ALWAYS_AVAILABLE: set[str] = {"read_ledger", "write_ledger", "finish"}
+
+# Calling either of these ends the run. `dispatch` is the PM's way out:
+# it hands work to one role instead of reporting a result.
+TERMINAL_TOOLS: set[str] = {"finish", "dispatch"}
 
 
 def schemas_for(names: Iterable[str]) -> list[dict[str, Any]]:
