@@ -1342,7 +1342,19 @@ export const DunkMode: ModeDefinition = (() => {
   // Aerial finish is chosen by QTE TIMING (how well the slam was timed); landing
   // is chosen by PERFORMANCE (the 3-judge total). Gated by DUNK_FINISH_VARIETY —
   // set NEXT_PUBLIC_DUNK_FINISH_VARIETY=false to instantly restore prior behavior.
-  function pickAerialFinish(hit: boolean, acc: number, leftHand = false): string {
+  /**
+   * THE FINISH BELONGS TO THE DUNK YOU CALLED (P4, 2026-09-16).
+   *
+   * This used to choose a NAMED DUNK from the slam's accuracy alone: call a SCORPION, time it well, and the flush
+   * played `dunk_finish_tomahawk` and the banner shouted TOMAHAWK! — at the exact moment the camera is closest to the
+   * body. Measured in the lab: `scorpion → dunk_scorpion → dunk_finish_tomahawk`. The project already has a rule
+   * against a move playing another move's motion (anim/recognisable); naming the other move out loud is worse.
+   *
+   * A called trick keeps its own shape through the flush. The accuracy-picked flourish is still there for a PLAIN
+   * dunk — earning a windmill by timing a bare dunk perfectly is a reward, and it lies about nothing, because the
+   * player called nothing. Quality on a called dunk lives where it belongs now: the card, the rim hang, the room.
+   */
+  function pickAerialFinish(hit: boolean, acc: number, leftHand = false, called: string | null = null): string {
     if (!DUNK_FINISH_VARIETY) return hit ? SPORT_CLIP.dunkScoreHang : SPORT_CLIP.jumpLand;
     if (!hit) return SPORT_CLIP.dunkFinishBlown;      // mistimed / whiffed slam
     if (FINISH_FORCE) return FINISH_FORCE === 'windmill' ? SPORT_CLIP.dunkFinishWindmill : FINISH_FORCE === 'tomahawk' ? SPORT_CLIP.dunkFinishTomahawk : SPORT_CLIP.dunkScoreHang;
@@ -1351,16 +1363,22 @@ export const DunkMode: ModeDefinition = (() => {
     // by the anti-flip shaping from the finish's own pose (measured: the ball 0.16 m under the ring on the timeout). The
     // left-hand carry finishes on the two-hand hang, which its jam carries to the iron.
     if (leftHand) return SPORT_CLIP.dunkScoreHang;
-    if (acc >= 0.85) return SPORT_CLIP.dunkFinishWindmill;  // perfect timing
+    if (called === 'windmill') return SPORT_CLIP.dunkFinishWindmill;    // the dunk that was called, finished as itself
+    if (called === 'tomahawk') return SPORT_CLIP.dunkFinishTomahawk;
+    if (called) return SPORT_CLIP.dunkScoreHang;                        // every other named dunk jams two-handed out of its own shape
+    if (acc >= 0.85) return SPORT_CLIP.dunkFinishWindmill;  // a PLAIN dunk, perfectly timed: the flourish is earned
     if (acc >= 0.55) return SPORT_CLIP.dunkFinishTomahawk;  // good timing
     return SPORT_CLIP.dunkScoreHang;                        // clean but late/early
   }
-  function finishBanner(hit: boolean, acc: number, leftHand = false): string {
+  function finishBanner(hit: boolean, acc: number, leftHand = false, called: string | null = null): string {
     if (!DUNK_FINISH_VARIETY || !hit || leftHand) return '';
+    if (called) return '';                                  // the trick's own banner already named it; never rename a dunk
     if (acc >= 0.85) return 'WINDMILL!';
     if (acc >= 0.55) return 'TOMAHAWK!';
     return '';
   }
+  /** The last named air trick of this flight — the dunk the player actually called. */
+  const calledAirTrick = (): string | null => flight.attempt.tricks.length ? flight.attempt.tricks[flight.attempt.tricks.length - 1].id : null;
   function pickLanding(total: number): string {
     if (!DUNK_FINISH_VARIETY) return SPORT_CLIP.dunkLandCrouch;
     return total >= BAND_TOTAL.eruption ? SPORT_CLIP.dunkCelebrateBig : SPORT_CLIP.dunkLandCrouch;
@@ -1589,7 +1607,7 @@ export const DunkMode: ModeDefinition = (() => {
     rimCamCut = false;
     ctx.setHud({ slamPulse: false, hint: '' });   // DUNK-SOFTS-NAMED: no SLAM! / CATCH IT! left standing under the verdict
     releasePos.copyFrom(ball.getAbsolutePosition());
-    aerialClip = pickAerialFinish(qteHit, qteAccuracy, ebState.inLeftHand); resolveRealMs = performance.now(); clipTimeAtResolve = clipTime;
+    aerialClip = pickAerialFinish(qteHit, qteAccuracy, ebState.inLeftHand, calledAirTrick()); resolveRealMs = performance.now(); clipTimeAtResolve = clipTime;
     // DUNK-POSTURE-LEGS (L3a): the PERFECT windmill keeps the ball in the hand through the cock-back and the sweep and lets go at
     // the top of it (WINDMILL_RELEASE_T into the finish); every other finish releases on the press as before
     finishRelease = qteHit && !lob.live && aerialClip === SPORT_CLIP.dunkFinishWindmill ? WINDMILL_RELEASE_T : -1; finishT = 0;
@@ -1605,7 +1623,7 @@ export const DunkMode: ModeDefinition = (() => {
     // the line holds until the panel's number replaces it (the three miss paths used to flash three different banners whose
     // clears raced the verdict, with 1.2 s of nothing on a plain clank)
     if (!qteHit) flash(ctx, `${missWhy()} — MISSED`);
-    else { const banner = finishBanner(qteHit, qteAccuracy, ebState.inLeftHand); if (banner) flash(ctx, banner); }
+    else { const banner = finishBanner(qteHit, qteAccuracy, ebState.inLeftHand, calledAirTrick()); if (banner) flash(ctx, banner); }
     playAir(aerialClip, finishRate);   // A+ P8 H5: holds its last frame in the air; the land clip is feet-down's, the idle loop is the land's
   }
 
@@ -2436,7 +2454,7 @@ export const DunkMode: ModeDefinition = (() => {
     // same values, so the card is enough to re-perform the attempt if a replay is ever built
     card = addAttempt(card, {
       round, style: STYLE_LABEL[style], prop: PROP_LABEL[prop],
-      finish: aerialClip, label: finishBanner(true, qteAccuracy).replace('!', '') || STYLE_LABEL[style],
+      finish: aerialClip, label: finishBanner(true, qteAccuracy, ebState.inLeftHand, calledAirTrick()).replace('!', '') || STYLE_LABEL[style],
       judges: scores.map((j) => j.score), total: dunkTotal, made: true,
     });
     // Hype is fed by the QUALITY of the dunk, not the raw total — the total's
@@ -2453,7 +2471,7 @@ export const DunkMode: ModeDefinition = (() => {
       ctx.camDirector.pulse(Math.min(1.2, 0.5 + named.length * 0.25), 0.5);
       SoundKit.play('crowdCheer', { volume: Math.min(0.9, 0.4 + difficulty * 0.05) });
     }
-    flash(ctx, [named.length ? `${named.join(' → ')} DUNK!` : finishBanner(qteHit, qteAccuracy, ebState.inLeftHand), ...verdictParts].filter(Boolean).join(' · '));
+    flash(ctx, [named.length ? `${named.join(' → ')} DUNK!` : finishBanner(qteHit, qteAccuracy, ebState.inLeftHand, calledAirTrick()), ...verdictParts].filter(Boolean).join(' · '));
     if (dunkTotal >= BAND_TOTAL.eruption) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'confetti'); }
     landingClip = pickLanding(dunkTotal);   // A+ P8 H5: plays at feet-down after the replay hands the root back, not on the flush frame
 
