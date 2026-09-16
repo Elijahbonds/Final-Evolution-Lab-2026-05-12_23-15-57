@@ -27,6 +27,8 @@ const ATTEMPTS = Number(process.env.ATTEMPTS ?? 8);
 const TAG = process.env.TAG ?? 'lab';
 const SLAM_OFFSET_MS = Number(process.env.SLAM_OFFSET_MS ?? 0);
 const RUN_MS = Number(process.env.RUN_MS ?? 1500);          // how long RUN is held before the gather line
+/** 'cue' = press the instant the read lifts (answering the prompt) · 'beat' = press on the window's own tell (NOW!). */
+const SLAM_WHEN = (process.env.SLAM_WHEN ?? 'beat') as 'cue' | 'beat';
 const OUT = `${process.env.HOME}/Claude/outbox/finish-release/dunk`;
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -68,6 +70,40 @@ await page.evaluate(`(() => {
   const pad = { index: 0, id: 'fake', connected: true, mapping: 'standard', axes: [0, 0, 0, 0], timestamp: 0, buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })) };
   window.__PAD = pad; navigator.getGamepads = () => [pad];
   window.dispatchEvent(new Event('gamepadconnected'));
+  // P4: the BODY through the flight — the top clip on the rig at 20 Hz, so "does a TOMAHAWK look like a TOMAHAWK" is a
+  // measurement and not an opinion. Production publishes __FEL_DEV__.anim (SHARED-ANIM-BUS).
+  window.__CLIPS = [];
+  setInterval(() => {
+    const d = window.__FEL_DEV__; const r = d && d.anim ? d.anim() : null; const h = r && r.hero;
+    if (!h || !h.playing || !h.playing.length) return;
+    const top = h.playing.slice().sort((a, b) => b.weight - a.weight)[0];
+    const last = window.__CLIPS[window.__CLIPS.length - 1];
+    if (!last || last.clip !== top.clip) window.__CLIPS.push({ t: Date.now(), clip: top.clip });
+  }, 50);
+  // THE SLAM IS PRESSED IN THE PAGE, not over the bridge. A poll from node costs 30-50 ms a round trip, which is a
+  // third of the window: the same scripted player scored a perfect windmill on one attempt and clanked on the next.
+  // __armSlam(when, offsetMs) watches the HUD every frame and presses A itself, recording the moment it did.
+  //   when 'cue'  — the instant the read lifts (what a player answering the prompt does)
+  //   when 'beat' — the window's own tell (hint NOW!), i.e. a player who has learned the beat
+  window.__slamAt = null;
+  window.__armSlam = (when, offsetMs) => {
+    window.__slamAt = null;
+    const t0 = performance.now();
+    const tick = () => {
+      if (performance.now() - t0 > 4000) return;
+      const h = window.__hudNow();
+      const ready = when === 'beat' ? h.hint === 'NOW!' : !!h.slamPulse;
+      if (!ready) { requestAnimationFrame(tick); return; }
+      const fire = () => {
+        const b = window.__PAD.buttons[0];
+        b.pressed = true; b.value = 1; window.__PAD.timestamp = Date.now();
+        window.__slamAt = Date.now();
+        setTimeout(() => { b.pressed = false; b.value = 0; window.__PAD.timestamp = Date.now(); }, 60);
+      };
+      if (offsetMs > 0) setTimeout(fire, offsetMs); else fire();
+    };
+    requestAnimationFrame(tick);
+  };
   window.__HUD = []; let last = '';
   window.__hudNow = () => { const q = window.__FEL_QA__; return q && q.rawHud ? q.rawHud() : {}; };
   setInterval(() => {
@@ -90,7 +126,7 @@ const hold = async (i: number, on: boolean) => page.evaluate(`(() => { const b =
 const trigger = async (v: number) => page.evaluate(`(() => { const b = window.__PAD.buttons[7]; b.pressed = ${v > 0.5}; b.value = ${v}; window.__PAD.timestamp = Date.now(); })()`);
 const hud = async () => page.evaluate('window.__hudNow()') as Promise<Record<string, unknown>>;
 
-interface Attempt { n: number; trick: string; launch?: string; cue: string[]; slamTiming?: string; breakdown?: string; cards?: unknown; total?: number; banners: string[]; note?: string }
+interface Attempt { n: number; trick: string; launch?: string; cue: string[]; slamTiming?: string; breakdown?: string; cards?: unknown; total?: number; banners: string[]; clips?: string[]; note?: string }
 const attempts: Attempt[] = [];
 let logMark = 0;
 
@@ -120,19 +156,14 @@ for (let n = 0; n < ATTEMPTS; n++) {
   await page.waitForTimeout(60);
   await hold(DPAD[trick.dir], false);
 
-  // THE SLAM: the HUD raises slamPulse when the window opens. Offset is deliberate, for the execution curve.
+  // THE SLAM: armed in the page so the press lands on the frame it means to.
+  await page.evaluate(`window.__armSlam(${JSON.stringify(SLAM_WHEN)}, ${SLAM_OFFSET_MS})`);
   let slammed = false;
-  while (Date.now() - airT0 < 3500) {
-    const h = await hud();
-    if (h.slamPulse) {
-      if (SLAM_OFFSET_MS > 0) await page.waitForTimeout(SLAM_OFFSET_MS);
-      await press(0, 60);
-      slammed = true;
-      break;
-    }
-    await page.waitForTimeout(16);
+  while (Date.now() - airT0 < 4000) {
+    if (await page.evaluate('window.__slamAt !== null')) { slammed = true; break; }
+    await page.waitForTimeout(40);
   }
-  if (!slammed) a.note = 'the slam window never opened';
+  if (!slammed) a.note = 'the slam read never lifted';
 
   // the aftermath: replay, the judges' reveal, the total
   await page.waitForTimeout(9000);
@@ -144,15 +175,17 @@ for (let n = 0; n < ATTEMPTS; n++) {
   const cards = mine.map((r) => r.cards).filter((c) => Array.isArray(c) && (c as unknown[]).length) as unknown[][];
   a.cards = cards.pop() ?? null;
   a.total = mine.map((r) => r.score).filter((s): s is number => typeof s === 'number').pop();
+  const clipRows = await page.evaluate('window.__CLIPS') as { t: number; clip: string }[];
+  a.clips = clipRows.filter((c) => c.t >= mark).map((c) => c.clip);
   const fresh = log.slice(logMark); logMark = log.length;
   a.launch = fresh.find((l) => /\[DUNK-LAUNCH\]/.test(l))?.replace(/^\d+ /, '');
   a.cue = fresh.filter((l) => /\[DUNK-(CUE|TRICK|SLAM|WIN)\]/.test(l)).map((l) => l.replace(/^\d+ /, ''));
   attempts.push(a);
-  console.log(`#${a.n} ${a.trick.padEnd(12)} ${(a.slamTiming || '—').padEnd(34)} ${(a.breakdown || '').slice(0, 52)}`);
+  console.log(`#${a.n} ${a.trick.padEnd(12)} ${(a.slamTiming || '—').padEnd(38)} ${(a.breakdown || '').slice(0, 40).padEnd(42)} ${(a.clips ?? []).slice(0, 4).join(' → ')}`);
   if (n < 3) await page.screenshot({ path: `${OUT}/${TAG}-attempt${a.n}-${a.trick}.png` });
 }
 
-const out = { tag: TAG, base: BASE, attempts, slamOffsetMs: SLAM_OFFSET_MS, log: log.slice(-200) };
+const out = { tag: TAG, base: BASE, slamWhen: SLAM_WHEN, slamOffsetMs: SLAM_OFFSET_MS, attempts, log: log.slice(-200) };
 fs.writeFileSync(`${OUT}/dunk-lab-${TAG}.json`, JSON.stringify(out, null, 1));
 await browser.close();
 const fired = attempts.filter((a) => a.cue.some((l) => /\[DUNK-TRICK\] air/.test(l))).length;
