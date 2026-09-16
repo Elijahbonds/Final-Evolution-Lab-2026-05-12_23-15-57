@@ -105,9 +105,17 @@ def test_no_blockers_exits_zero(ledger, monkeypatch, capsys):
 
 # --------------------------------------------------------------- preflight
 
-def test_run_fails_with_instructions_when_the_stack_is_unreachable(capsys):
-    """From the host these hostnames do not resolve; the message has to say
-    what to do instead of printing a connection error."""
+def test_run_fails_with_instructions_when_the_stack_is_unreachable(capsys, monkeypatch):
+    """From the host these do not resolve; the message has to say what to do
+    instead of printing a connection error.
+
+    The URLs are pinned rather than left to the ambient environment — a shell
+    that happens to export SANDBOX_URL would otherwise make this pass or fail
+    for reasons that have nothing to do with the code.
+    """
+    monkeypatch.setenv("SANDBOX_URL", "http://127.0.0.1:9")   # discard port
+    monkeypatch.setenv("OLLAMA_URL", "http://127.0.0.1:9")
+
     with pytest.raises(SystemExit) as exc:
         run(["run", "ops", "report disk usage"])
     assert exc.value.code == 2
