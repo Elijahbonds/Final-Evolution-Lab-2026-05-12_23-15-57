@@ -30,7 +30,18 @@ ok('pushes build speed, cooldown paces them, drag bleeds', () => {
   for (let i = 0; i < 40; i++) m.update(DT, 0, 0);
   assert.ok(m.push(), 'cooled down');
   for (let i = 0; i < 90; i++) m.update(DT, 0, 0);
-  assert.ok(m.speed > 4 && m.speed < SKATE_TUNING.cruiseSpeed, `cruising at ${m.speed.toFixed(1)}`);
+  // RELATIVE TO CRUISE, not a literal. This bar was written as `> 4` when cruise was
+  // 7.5 (f77c644) — i.e. 53% of cruise, and it passed at 0.609. The weight pass
+  // (252d8ed) deliberately dropped cruise to 5.6, which turned the same literal into a
+  // 71% bar overnight; the economy itself barely moved (0.609 -> 0.576 of cruise). The
+  // test was reporting a retune as a regression, and the red was then waved through as
+  // "pre-existing" — so express the invariant the way it was always meant: two pushes
+  // leave you cruising, not crawling, and never at max.
+  const ratio = m.speed / SKATE_TUNING.cruiseSpeed;
+  assert.ok(
+    ratio > 0.5 && m.speed < SKATE_TUNING.cruiseSpeed,
+    `two pushes should leave you above half cruise and below it — got ${m.speed.toFixed(2)} m/s (${(ratio * 100).toFixed(0)}% of ${SKATE_TUNING.cruiseSpeed})`,
+  );
 });
 ok('flat-ground pump approaches cruise but never max', () => {
   const m = new BoardMovement();
