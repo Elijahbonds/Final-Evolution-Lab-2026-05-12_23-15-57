@@ -68,6 +68,7 @@ import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cue
 import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, type ObstacleKind } from '../core/DunkObstacles';
 import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, type SlamReadout } from '../core/DunkSystem';
+import { dunkCard, slamIsClean } from '../core/DunkCard';
 import { missBeat } from '../core/MissFlavour';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF } from '../anim/authored/dunkTricks';
@@ -1382,7 +1383,6 @@ export const DunkMode: ModeDefinition = (() => {
   function slamNow(ctx: ModeContext, at: number): void {
     if (phase !== 'cinematic' || lob.live) return;
     slamBufferAt = -1; slamSeen = true;
-    qteHit = true;
     const center = EASTBAY_TIMING.extend;
     const window = slamWindowBase() * (1 - styleTaps * 0.25) * flight.slamWindowScale;
     // The execution curve is ONE curve over the whole accepted press — late of centre it falls across the window's own
@@ -1396,6 +1396,10 @@ export const DunkMode: ModeDefinition = (() => {
     const openAt = center - half;
     const reach = slamBufferSec(openAt, SLAM_APEX_T, SLAM_BUFFER_SEC);
     qteAccuracy = slamExecution(at, center, half, reach);
+    // P3: THE RIM IS HONEST. Every accepted press used to flush, so the only miss in the mode was never pressing, and
+    // the card carried the entire difference between a great dunk and a flinch. A jam thrown at the iron before you
+    // have got there hits iron — only the earliest sliver of the buffer (execution under RIM_CLEAN) does.
+    qteHit = slamIsClean(qteAccuracy);
     const early = Math.max(0, openAt - at);   // how far in front of the window the finger actually was
     // AND NOW THE PLAYER IS TOLD. This exact information went to console.info and nowhere else, which is the
     // single loudest complaint in the review: three attempts out of six scored nothing and explained nothing.
@@ -1568,7 +1572,7 @@ export const DunkMode: ModeDefinition = (() => {
     // Every press inside the accepted window (the buffer's edge through the close) is a MAKE, so a miss with a press on
     // the record is a press that came in front of it — say that, not "off the iron": it is the one thing the player can fix.
     const named = namedTricks();
-    const why = slamSeen ? 'TOO EARLY ON THE SLAM' : 'NO SLAM';
+    const why = slamSeen ? 'THREW IT AT THE IRON TOO EARLY' : 'NO SLAM';
     return named ? `${named} · ${why}` : why;
   }
   function resolveDunk(ctx: ModeContext): void {
@@ -2348,8 +2352,6 @@ export const DunkMode: ModeDefinition = (() => {
     const combo = `${style}_${prop}_${[...runwayLabels, ...trickLabels].join('+') || 'plain'}`;
     const isRepeat = usedCombos.has(combo);
     usedCombos.add(combo);
-    const varietyMod = isRepeat ? 0.8 : 1;
-    const varietyBonus = isRepeat ? 0 : 0.5;
     // DUNK-SOFTS-NAMED: the make's verdict is ONE line (the dunk's name first, then the calls) held through the replay and the
     // confer until the panel's total — five banners used to overwrite each other in one tick and clear each other's timeouts
     const verdictParts: string[] = [];
@@ -2369,11 +2371,15 @@ export const DunkMode: ModeDefinition = (() => {
     const trickDifficulty = flight.attempt.difficulty - STYLE_TIER[style];
     // DUNK-CONTROL-JUICE: the runway tricks (a toss, a kick, a cartwheel, the hop) and a caught lob are judged on top; an
     // obstacle pays only CLEARED (a clip never reaches this path)
-    const difficulty = Math.max(0, Math.min(10,
-      (STYLE_TIER[style] + trickDifficulty + runwayDifficulty + PROP_BONUS[prop] + charge * 2 + launchSpeed01 * 1.0
-        + styleTaps * 1.2 + varietyBonus) * varietyMod));
-    const execution = Math.max(0, Math.min(10, qteAccuracy * 10));
-    const styleScore = Math.max(0, Math.min(10, STYLE_TIER[style] * 0.6 + Math.min(2, hype / 50) + styleTaps * 0.8 + hangBonus));
+    // P3 (2026-09-16): the three numbers are computed in one pure place (core/DunkCard) and they mean what their names
+    // say. DIFFICULTY is WHAT YOU TRIED — the vocabulary carries it, the run-up is a qualifier worth about a point —
+    // and the STYLE TIER moved to STYLE, where calling your signature belongs. Measured before: every attempt in the
+    // lab scored DIFF 10.0, the cap, so a WINDMILL and a BETWEEN THE LEGS off a self-lob were the same dunk.
+    const { difficulty, execution, style: styleScore } = dunkCard({
+      trickDifficulty, runwayDifficulty, propBonus: PROP_BONUS[prop],
+      charge, launchSpeed01, styleTier: STYLE_TIER[style], styleTaps,
+      hype, hang: hangBonus > 0, repeat: isRepeat, execution01: qteAccuracy,
+    });
 
     // THE BUILDING IS PART OF THE PANEL. Momentum reached the score only as hype into the NEXT attempt's
     // style term; the judges themselves never heard the room, in the one mode on the platform that has

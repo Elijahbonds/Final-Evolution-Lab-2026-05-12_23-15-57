@@ -44,11 +44,15 @@ export interface JudgeScore { name: string; score: number; line: string }
  * PEOPLE rather than one formula sampled five times.
  */
 export const JUDGES = [
-  { id: 'silk',  name: 'Silk',  w: { difficulty: 0.2,  execution: 0.3,  style: 0.5  }, bias: 0    },
-  { id: 'doc',   name: 'Doc',   w: { difficulty: 0.3,  execution: 0.5,  style: 0.2  }, bias: 0    },
-  { id: 'mac',   name: 'Mac',   w: { difficulty: 0.34, execution: 0.33, style: 0.33 }, bias: 0.3  },
-  { id: 'reign', name: 'Reign', w: { difficulty: 0.4,  execution: 0.4,  style: 0.2  }, bias: -0.4 },
-  { id: 'prime', name: 'Prime', w: { difficulty: 0.5,  execution: 0.3,  style: 0.2  }, bias: 0    },
+  // P3 (2026-09-16): every lens leans harder on EXECUTION than it did. Each judge keeps their character — Silk still
+  // scores the look, Prime still scores the ambition — but a dunk contest panel scores the FINISH, and the lab measured
+  // the whole range of slam timing moving a card by five points out of fifty. A dunk you do not finish cleanly is not
+  // a dunk; the panel now says so. (Weights sum to 1 per judge, which the tests hold.)
+  { id: 'silk',  name: 'Silk',  w: { difficulty: 0.15, execution: 0.35, style: 0.50 }, bias: 0    },
+  { id: 'doc',   name: 'Doc',   w: { difficulty: 0.20, execution: 0.60, style: 0.20 }, bias: 0    },
+  { id: 'mac',   name: 'Mac',   w: { difficulty: 0.30, execution: 0.40, style: 0.30 }, bias: 0.3  },
+  { id: 'reign', name: 'Reign', w: { difficulty: 0.35, execution: 0.45, style: 0.20 }, bias: -0.4 },
+  { id: 'prime', name: 'Prime', w: { difficulty: 0.40, execution: 0.40, style: 0.20 }, bias: 0    },
 ] as const;
 
 /** Panel size. Everything below derives from this — never hardcode 5. */
@@ -128,7 +132,10 @@ export function judgeDunk(difficulty: number, execution: number, style: number, 
     const raw = difficulty * j.w.difficulty + execution * j.w.execution + style * j.w.style;
     // Bias is small enough that a genuinely perfect dunk still reads 10 on
     // every card — a 50 must remain reachable, or the ceiling is decorative.
-    const base = 6 + raw * 0.4 + j.bias;
+    // P3: a wider slope over the same 6–10 card. The panel's range is five whole numbers and five judges, so the
+    // rounding is the real compressor: at 6 + raw*0.4 a dunk's entire timing range fit inside one card step. 50 is
+    // still exactly reachable (raw 10 → 10.0) and a nothing attempt still floors at 6.
+    const base = 5.2 + raw * 0.48 + j.bias;
     // THE SWAY FADES OUT AT THE EXTREMES, and it has to. My first version applied it flat, and the tests
     // immediately caught the two things this must never do: a silent gym took a perfect dunk to 49, and a
     // hot one lifted a nothing dunk off the floor to 31. A room can talk a judge out of an 8 and into a 9;
