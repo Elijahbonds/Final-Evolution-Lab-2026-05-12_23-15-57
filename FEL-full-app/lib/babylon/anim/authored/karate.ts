@@ -22,8 +22,8 @@ export function buildHitReact(scene: Scene, sk: Skeleton): AnimationGroup | null
 export function buildKnockdown(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'karate_knockdown', 0.7, [
     { t: 0,   bones: { Hips: [0, 0, 0], Spine: [0, 0, 0],     Neck: [0, 0, 0],   LeftUpLeg: [-12, 0, 4],  RightUpLeg: [-12, 0, -4] },  hands: GUARD, hipsY: 0 },
-    { t: 0.3, bones: { Hips: [0, 0, 0], Spine: [-40, 10, 8],  Neck: [-18, 0, 0], LeftUpLeg: [-20, 0, 8],  RightUpLeg: [-16, 0, -6] },  hands: { Left: [-0.40, 1.30, -0.10], Right: [0.42, 1.28, -0.12] }, hipsY: -0.30 },   // arms fly out and back
-    { t: 0.7, bones: { Hips: [0, 0, 0], Spine: [-85, 12, 10], Neck: [-10, 0, 0], LeftUpLeg: [-35, 0, 12], RightUpLeg: [-25, 0, -10] }, hands: { Left: [-0.55, 0.30, -0.35], Right: [0.55, 0.30, -0.40] }, poles: { Left: [-0.3, 0.8, -0.4], Right: [0.3, 0.8, -0.4] }, hipsY: -0.9 },   // on the floor, arms out
+    { t: 0.3, ...FALL_MID },   // arms fly out and back, pelvis already going over
+    { t: 0.7, ...FLOOR_KEY },   // on the floor, arms out — the same key the hold and the get-up use
   ]);
 }
 
@@ -179,12 +179,47 @@ export function buildParry(scene: Scene, sk: Skeleton): AnimationGroup | null {
   ]);
 }
 
-/** The knockdown's floor key — the HELD loop a downed fighter stays in (a breath in the chest), and the get-up's start. */
+/**
+ * The knockdown's floor key — the HELD loop a downed fighter stays in (a breath in the chest),
+ * and the get-up's start.
+ *
+ * LIE THE PELVIS, NOT THE SPINE (SKATE-LEGS sweep, 2026-09-16). This used to read
+ * `Hips: [0,0,0]` with `Spine: [-85,…]`, which is not a body on the floor — it is a BACKBEND.
+ * The pelvis stayed vertical, so the legs went on hanging from an upright hip socket, and
+ * `hipsY: -0.9` then drove them straight down through the mat: measured on a fresh rig, the
+ * lowest ankle sat at -0.775 with the hips at 0.071. Nothing clamped it, because karate does
+ * not foot-plant (only the basketball and board trees call plantLeg), so a KO — the money
+ * shot of the mode — put a shin through the floor for the whole held loop and the get-up.
+ *
+ * Rotating the HIPS lays the whole chain down, which is what "on your back" actually is; the
+ * spine then only needs the small curl a fighter keeps, and the knees fall where a downed
+ * body's knees fall. Measured after: lowest ankle above the mat, hips still on it.
+ */
+/**
+ * The halfway pose of the fall — and of the get-up, which is the same pose travelled the
+ * other way, so they share it rather than drifting apart. The pelvis is already going over
+ * here (the old keys held it bolt upright at hipsY -0.30, which is what left a foot under
+ * the floor mid-fall even after the floor key itself was fixed).
+ */
+const FALL_MID = {
+  bones: {
+    Hips: [-34, 2, 2] as V3, Spine: [-18, 8, 6] as V3, Neck: [-4, 0, 0] as V3,
+    LeftUpLeg: [-26, 0, 9] as V3, RightUpLeg: [-20, 0, -7] as V3,
+    LeftLeg: [46, 0, 0] as V3, RightLeg: [42, 0, 0] as V3,
+  },
+  hands: { Left: [-0.40, 1.30, -0.10] as V3, Right: [0.42, 1.28, -0.12] as V3 },
+  hipsY: -0.23,
+};
+
 const FLOOR_KEY = {
-  bones: { Hips: [0, 0, 0] as V3, Spine: [-85, 12, 10] as V3, Neck: [-10, 0, 0] as V3, LeftUpLeg: [-35, 0, 12] as V3, RightUpLeg: [-25, 0, -10] as V3 },
+  bones: {
+    Hips: [-82, 6, 4] as V3, Spine: [-8, 8, 6] as V3, Neck: [16, 0, 0] as V3,
+    LeftUpLeg: [-16, 0, 10] as V3, RightUpLeg: [-10, 0, -8] as V3,
+    LeftLeg: [34, 0, 0] as V3, RightLeg: [28, 0, 0] as V3,
+  },
   hands: { Left: [-0.55, 0.30, -0.35] as V3, Right: [0.55, 0.30, -0.40] as V3 },
   poles: { Left: [-0.3, 0.8, -0.4] as V3, Right: [0.3, 0.8, -0.4] as V3 },
-  hipsY: -0.9,
+  hipsY: -0.78,
 };
 export function buildFloorHold(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 1.4;
@@ -199,7 +234,7 @@ export function buildFloorHold(scene: Scene, sk: Skeleton): AnimationGroup | nul
 export function buildGetUp(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'karate_get_up', 0.45, [
     { t: 0, ...FLOOR_KEY },
-    { t: 0.22, bones: { Hips: [0, 0, 0], Spine: [-40, 10, 8], Neck: [-18, 0, 0], LeftUpLeg: [-20, 0, 8], RightUpLeg: [-16, 0, -6] }, hands: { Left: [-0.40, 1.30, -0.10], Right: [0.42, 1.28, -0.12] }, hipsY: -0.30 },
+    { t: 0.22, ...FALL_MID },   // the fall's halfway pose, travelled the other way
     { t: 0.45, bones: { Hips: [0, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0], LeftUpLeg: [-12, 0, 4], RightUpLeg: [-12, 0, -4] }, hands: GUARD, hipsY: 0 },
   ]);
 }
@@ -229,7 +264,7 @@ export function buildEvade(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const SLIP = { Hips: [0, 18, 0] as V3, Spine: [-24, 12, -10] as V3, Neck: [-8, 0, 0] as V3, LeftUpLeg: [-34, 0, 12] as V3, RightUpLeg: [-28, 0, -12] as V3, LeftLeg: [50, 0, 0] as V3, RightLeg: [46, 0, 0] as V3 };
   return buildPoseClip(scene, sk, 'karate_evade', 0.36, [
     { t: 0,    bones: STAND, hands: GUARD, hipsY: 0 },
-    { t: 0.14, bones: SLIP,  hands: { Left: [-0.24, 1.30, 0.16], Right: [0.22, 1.26, 0.06] }, hipsY: -0.26 },   // low, back, guard still up (hand targets ride the hips offset: 1.30 − 0.26 ≈ 1.04 m)
+    { t: 0.14, bones: SLIP,  hands: { Left: [-0.24, 1.30, 0.16], Right: [0.22, 1.26, 0.06] }, hipsY: -0.17 },   // low, back, guard still up (hand targets ride the hips offset). -0.26 dropped further than the 50/46 knee fold paid for and put both ankles under the mat.
     { t: 0.36, bones: STAND, hands: GUARD, hipsY: 0 },
   ]);
 }
@@ -248,7 +283,7 @@ export function buildLeanDodge(scene: Scene, sk: Skeleton): AnimationGroup | nul
   const OUT_POLES = { Left: [-0.9, 0.4, -0.6] as V3, Right: [0.9, 0.4, -0.6] as V3 };
   return buildPoseClip(scene, sk, 'karate_lean_dodge', T, [
     { t: 0,    bones: STAND, hands: GUARD, hipsY: 0 },
-    { t: 0.13, bones: LEAN, hands: OUT, poles: OUT_POLES, hipsY: -0.22 },   // the fold: fast in
+    { t: 0.13, bones: LEAN, hands: OUT, poles: OUT_POLES, hipsY: -0.08 },   // the fold: fast in (-0.22 sank the ankles; the 46/40 knees only pay for this much)
     { t: 0.24, bones: { ...LEAN, Spine: [-54, 0, 6] }, hands: { Left: [-0.60, 1.05, -0.32], Right: [0.58, 1.03, -0.38] }, poles: OUT_POLES, hipsY: -0.21 },   // held a beat at the bottom
     { t: T,    bones: STAND, hands: GUARD, hipsY: 0 },
   ]);
