@@ -78,17 +78,28 @@ export const INTENT_DRIVERS: Record<string, string> = {
     }, 16);
   `),
 
-  // SKATE: a clean line — push, POP, a flip with a fresh direction, a grab with another, land it. No manual: the sketchy
-  // save's wobble is not drawn anywhere, so a player cannot read it either (noted 2026-09-15) and neither does this.
+  // SKATE: a real line — ride at speed, POP THE MOMENT YOU LAND, two tricks an air (spaced, the way the board needs), link
+  // the landing into a manual, and play the two balance mechanics off what the mode now shows (`saveDir` names the side to
+  // lean on a sketchy landing, `balance` is the manual's needle). Before those were published nobody could read them.
   skateboard: loop(`
-    const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1], [-0.7, -0.7], [0.7, -0.7]]; let k = 0, t = 0;
-    stick(0, -0.9);
+    const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1], [-0.7, -0.7], [0.7, -0.7]]; let k = 0, manualT = 0, popAt = -9999, air = false;
+    stick(0, -1); hold(5, true);   // R1: the shared boost, held
     setInterval(() => {
-      t += 16;
-      const phase = t % 1900;
-      if (phase < 16) btn(A, 90);                                             // POP
-      else if (phase >= 190 && phase < 206) { const d = dirs[k++ % dirs.length]; stick(d[0], d[1]); btn(B, 60); setTimeout(() => stick(0, -0.9), 110); }   // FLIP
-      else if (phase >= 430 && phase < 446) { const d = dirs[k++ % dirs.length]; stick(d[0], d[1]); btn(X, 60); setTimeout(() => stick(0, -0.9), 110); }   // GRAB
+      const now = performance.now(), h = Q.rawHud();
+      // a sketchy landing: lean the way it says until it is saved
+      if (h.saveDir === 'LEFT' || h.saveDir === 'RIGHT') { stick(h.saveDir === 'LEFT' ? -0.9 : 0.9, -0.4); popAt = now; return; }
+      // riding a manual: hold the needle at centre — push back the way it is falling
+      const n = typeof h.balance === 'number' ? h.balance / 100 : null;
+      if (manualT > now && n !== null) { stick(clamp(n * 2.4, 0.9), -0.6); return; }
+      const hero = Q.hero && Q.hero();
+      let y = 0; if (hero) { let r = hero; while (r.parent) r = r.parent; y = r.getAbsolutePosition().y; }
+      const grounded = y < 0.25;
+      const since = now - popAt;
+      if (grounded && since > 700) { btn(A, 90); popAt = now; air = true; return; }        // POP on the ground, every time
+      if (air && since > 220 && since < 260) { const d = dirs[k++ % dirs.length]; stick(d[0], d[1]); btn(B, 60); setTimeout(() => stick(0, -1), 90); return; }   // FLIP
+      if (air && since > 430 && since < 470) { const d = dirs[k++ % dirs.length]; stick(d[0], d[1]); btn(X, 60); setTimeout(() => stick(0, -1), 90); return; }   // GRAB (spaced past the cadence)
+      if (air && grounded && since > 600) { air = false; stick(0, 1); setTimeout(() => stick(0, -1), 70); manualT = now + 1800; return; }   // land → flick back-forward: MANUAL
+      if (manualT <= now) stick(0, -1);
     }, 16);
   `),
 

@@ -43,9 +43,13 @@ function verbsFor(slug: string): { label: string; idx: number; holdMs: number }[
   return out;
 }
 
-const browser = await chromium.launch({ executablePath: chromiumExe(), headless: false, args: ['--window-size=1280,860', '--autoplay-policy=no-user-gesture-required', '--use-angle=metal', '--ignore-gpu-blocklist'] });
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+const browser = await chromium.launch({ executablePath: chromiumExe(), headless: false, args: ['--window-size=1280,860', '--autoplay-policy=no-user-gesture-required', '--use-angle=metal', '--ignore-gpu-blocklist', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, permissions: ['camera'] });   // PROVE IT (/play/dunkduel) is a CAMERA contest: a fake device lets the headless session reach its flow
 await ctx.addInitScript({ content: 'window.__name = window.__name || function (f) { return f; };' });
+// THE PROBE DECLARES ITSELF. `?agent=1` is remembered in sessionStorage, which is per TAB — and every route here opens
+// its own tab, so a route that strips the query (/try lands clean, the carnival rewrites to ?carnival=1) mounted
+// uninstrumented and scored 'no presses at all'. Setting the same flag the URL would set makes every tab a QA session.
+await ctx.addInitScript({ content: "try { window.sessionStorage.setItem('NEXUS_AGENT', '1'); } catch {}" });
 await ctx.addInitScript(`(() => {
   const pad = { id: 'Xbox Wireless Controller (STANDARD GAMEPAD)', index: 0, connected: true, mapping: 'standard', timestamp: 0, axes: [0,0,0,0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })) };
   window.__PAD = pad; navigator.getGamepads = () => [pad, null, null, null];

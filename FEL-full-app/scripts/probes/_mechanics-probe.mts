@@ -61,7 +61,11 @@ function verbsFor(slug: string): Verb[] {
 
 const browser = await chromium.launch({ executablePath: chromiumExe(), headless: false, args: ['--window-size=1280,860', '--autoplay-policy=no-user-gesture-required', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 const bctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-await bctx.addInitScript('globalThis.__name = (f) => f;');
+await bctx.addInitScript('globalThis.__name = (f) => f;')
+// THE PROBE DECLARES ITSELF. `?agent=1` is remembered in sessionStorage, which is per TAB — and every route here opens
+// its own tab, so a route that strips the query (/try lands clean, the carnival rewrites to ?carnival=1) mounted
+// uninstrumented and scored 'no presses at all'. Setting the same flag the URL would set makes every tab a QA session.
+await bctx.addInitScript("try { window.sessionStorage.setItem('NEXUS_AGENT', '1'); } catch {}");;
 await bctx.addInitScript(() => {
   const pad = { id: 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)', index: 0, connected: true, mapping: 'standard', timestamp: Date.now(), axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })) };
   (window as any).__PAD = pad;

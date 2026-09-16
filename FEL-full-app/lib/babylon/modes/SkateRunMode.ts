@@ -57,6 +57,7 @@ import { boneNode } from '../anim/boneLookup';
 import { GoalTracker, MovingRail, SKATE_GOALS, VENICE_PATROL_RAIL } from '../core/ParkGoals';
 import { Onlookers } from '../visual/Onlookers';
 import { SoundKit } from '../audio/SoundKit';
+import { refuse } from '../core/Refusal';
 import { EffectsKit } from '../visual/EffectsKit';
 import { CoinField } from '../core/Pickups';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
@@ -136,6 +137,8 @@ export const SkateRunMode: ModeDefinition = (() => {
   // the tree's own play the same frame (the touchdown moved the state air → cruise), so the fall read as a 0.1 s blend.
   const BAIL_BEAT_SEC = 1.0;                  // skate_bail is 0.75 s; the tree settles it into the idle when it runs out, and the 0.25 s left is the get-up — the next push fades from the idle, not the floor (0.3 m/frame hand pops measured at 0.8)
   let bailBeatT = 0;
+  /** The side the sketchy-save wobble is pulling to, while one is live (null = no save). */
+  let saveLean: 'LEFT' | 'RIGHT' | null = null;
   let goals: GoalTracker;
   let patrolRail: MovingRail;
   let crowd: Onlookers;
@@ -198,10 +201,17 @@ export const SkateRunMode: ModeDefinition = (() => {
     return best;
   };
   /** Apply a trick to the air chain and flash it -- shared by flick and buttons. */
+  /** ANTI-MASH (2026-09-15): a trick needs a beat to LEAVE THE BOARD. Two flips 60 ms apart is not a line, it is a masher
+   *  — and it was the whole of the remaining gap (a random 8-a-second driver out-scored a played line 4:1). A player who
+   *  throws a trick, lets it turn and throws another is inside this window; nothing a human does is refused by it. */
+  const TRICK_CADENCE_SEC = 0.18;
+  let lastTrickAt = 1e9;
   const airTrick = (
     ctx: ModeContext, id: string, label: string,
     family: 'flip' | 'grab' | 'spin', basePts: number, difficulty: number,
   ): void => {
+    if (lastTrickAt - timeLeft < TRICK_CADENCE_SEC) { refuse(ctx, 'LET IT TURN'); return; }   // timeLeft counts DOWN
+    lastTrickAt = timeLeft;
     // TRICK POSE: the named trick's shape goes on the rig (the deck flips, a shuv turns the deck not the rider, a grab puts
     // the right hand on the right edge), and a flip is caught at the table's roll so the grade and the picture agree
     const named = SKATE_TRICKS.find((t) => t.id === id) ?? (family === 'grab' ? SKATE_TRICKS.find((t) => t.id === 'indy') : null);
@@ -580,6 +590,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       }
       if (manualCh?.active) {
         const r = manualCh.update(dt, stickX, move.speed01);
+        ctx.setHud({ balance: Math.round(manualCh.needle * 100) });   // the needle a manual rides — drawn as a meter, read by a player
         if (r.slipped) { manualCh = null; console.info('[SKATE-MANUAL] lost it'); combo.bail(); bannerFlash(ctx, 'LOST THE MANUAL', 600); }
         else if (r.pts > 0) combo.accrue('MANUAL', Math.round(r.pts), 'manual');   // ANTI-MASH: one link, not one per frame
       }
@@ -662,8 +673,13 @@ export const SkateRunMode: ModeDefinition = (() => {
       // sketchy save window input
       if (save?.active) {
         save.update(dt, stickX);
-        if (save.saved) { bannerFlash(ctx, 'SAVED IT!', 700); mbus.report({ kind: 'big_make' }); save = null; }
-        else if (save.failed) { console.info('[SKATE-LAND] save failed'); combo.bail(); bannerFlash(ctx, 'BAILED', 900); bailBeatT = BAIL_BEAT_SEC; move.vel.scaleInPlace(0.15); bailPunch(ctx); save = null; }   // A+ P0: the failed save is a bail too
+        // A MECHANIC YOU CAN READ (2026-09-15). The save asks you to counter a wobble that was drawn NOWHERE: no meter, no
+        // arrow, nothing but the word SKETCHY — so the only way to pass it was to guess, and a random stick passed it as
+        // often as a read did. The side to lean is SAID, and it updates as the wobble crosses over.
+        const lean: 'LEFT' | 'RIGHT' = save.wobble > 0 ? 'LEFT' : 'RIGHT';
+        if (lean !== saveLean) { saveLean = lean; ctx.setHud({ saveDir: lean }); ctx.juice.callout(lean === 'LEFT' ? 'LEAN ◀' : 'LEAN ▶', '#fde047', 320); }
+        if (save.saved) { bannerFlash(ctx, 'SAVED IT!', 700); mbus.report({ kind: 'big_make' }); save = null; saveLean = null; ctx.setHud({ saveDir: '' }); }
+        else if (save.failed) { console.info('[SKATE-LAND] save failed'); combo.bail(); bannerFlash(ctx, 'BAILED', 900); bailBeatT = BAIL_BEAT_SEC; move.vel.scaleInPlace(0.15); bailPunch(ctx); save = null; saveLean = null; ctx.setHud({ saveDir: '' }); }   // A+ P0: the failed save is a bail too
       }
 
       // grind catch: airborne near a rail

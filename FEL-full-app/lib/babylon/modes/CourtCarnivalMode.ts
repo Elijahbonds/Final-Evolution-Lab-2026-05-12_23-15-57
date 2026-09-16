@@ -27,6 +27,7 @@ import { BeatOwner } from '../anim/beatOwner';
 // other, and the result windows finally read as a body (chest open and chin up / shoulders in and chin down).
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { stagePose, STAGE_INPUT_IDLE, type StagePostureInput } from '../core/StagePosture';
+import { refuse } from '../core/Refusal';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
@@ -185,6 +186,9 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     showHub(ctx, S, true);
     hud(ctx, S, { banner: `NEXT UP: ${S.current.title}`, blurb: BLURB[S.current.id] ?? '', board: null, boardTitle: '', hint: '' });
     SoundKit.play('powerUp');
+    // SCORECARD FEEL: the night is four events, and the turn of one is the biggest beat the hub has (3 juice beats a minute)
+    ctx.juice.flash('#ffd75e', 110);
+    ctx.juice.callout(S.current.title, '#ffd75e', 900);
     await new Promise((r) => setTimeout(r, REVEAL_S * 1000));
     if (S.ended || S.scene.isDisposed) return;
     await runAttempt(ctx, S);
@@ -346,7 +350,19 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
         } else if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X' || e.btn === 'Y')) begin(ctx, S);
         return;
       }
-      if (S.phase === 'playing' && S.current) S.current.onInput(ctx, e);
+      // SCORECARD CONTROLS (2026-09-15): between events — the reveal, the hand-off, the board — every press fell through to
+      // nothing (21 % of the session's presses once the carnival could be measured at all). Each waiting phase says what
+      // it is waiting for.
+      if (S.phase !== 'playing' || !S.current) {
+        if ((e.t === 'button' || e.t === 'dpad') && e.pressed) {
+          refuse(ctx, S.phase === 'eventOver' ? 'NEXT EVENT COMING UP'
+            : S.phase === 'handoff' ? 'PASS THE PAD'
+            : S.phase === 'reveal' ? 'HERE COMES THE EVENT'
+            : 'THE NIGHT IS OVER');
+        }
+        return;
+      }
+      S.current.onInput(ctx, e);
     },
 
     update(ctx: ModeContext, dt: number) {
