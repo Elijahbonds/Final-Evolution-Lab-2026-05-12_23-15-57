@@ -122,7 +122,15 @@ const PITCH_LEGS = {
   land: { LeftUpLeg: [-30, 0, 10] as Deg3, LeftLeg: [20, 0, 0] as Deg3, RightUpLeg: [-6, 0, -6] as Deg3, RightLeg: [8, 0, 0] as Deg3 },
   done: { LeftUpLeg: [-20, 0, 10] as Deg3, LeftLeg: [20, 0, 0] as Deg3, RightUpLeg: [-4, 0, -6] as Deg3, RightLeg: [6, 0, 0] as Deg3 },
 };
-const GLOVE = { set: [-0.20, 1.05, 0.15] as V3, lift: [-0.15, 1.35, 0.12] as V3, land: [-0.25, 1.10, 0.30] as V3, done: [-0.20, 1.00, 0.20] as V3 };
+/**
+ * The glove hand, OUT IN FRONT OF THE CHEST (joint sweep, 2026-09-16). These targets used to sit
+ * 0.12-0.15 m in front of the body at shoulder height — which is on top of the shoulder itself,
+ * about 0.16 m from the joint, far inside the arm. `hands` is absolute-from-the-root, so the
+ * solver can only reach it by folding the elbow shut: measured, the left elbow closed to 11 deg
+ * on the side-arm and 16 deg over the top, which is the forearm passing through the bicep. A
+ * pitcher's glove rides out in front, not tucked into the armpit.
+ */
+const GLOVE = { set: [-0.22, 1.08, 0.32] as V3, lift: [-0.24, 1.30, 0.34] as V3, land: [-0.30, 1.12, 0.40] as V3, done: [-0.26, 1.02, 0.30] as V3 };
 const OVER_POLE: V3 = [0.9, 0.1, -0.3];
 
 /** Over-the-top delivery: the arm goes high behind, then whips over and forward. */
