@@ -1264,6 +1264,14 @@ export const DunkMode: ModeDefinition = (() => {
           );
         }
         ctx.camDirector.update(player.root.position, Vector3.Zero(), null);
+      } else if (phase === 'resolve') {
+        // THE LANDING IS NOT THE FLIGHT (2026-09-15). The rim cut is a FIXED camera under the basket aimed at the iron,
+        // and 'resolve' fell through to the generic branch below — which only re-AIMS a fixed camera, so the verdict
+        // beat was filmed from the rim with the dunker on the floor cropped at the bottom edge. Every capture's mid
+        // frame since rc10 is that shot, and the Visuals review has charged it as "hero cropped at the frame edge".
+        // The judging beat already learned this; the beat before it needs the same release.
+        if (rimCamCut) { rimCamCut = false; ctx.camDirector.mode = 'follow'; }
+        ctx.camDirector.update(player.root.position, Vector3.Zero(), null);
       } else if (phase === 'contestOver') {
         // TRY-ONBOARD G1: the night card sits on a LIVE shot. The camera used to be
         // left undriven in this phase — which was harmless when the phase was the last
