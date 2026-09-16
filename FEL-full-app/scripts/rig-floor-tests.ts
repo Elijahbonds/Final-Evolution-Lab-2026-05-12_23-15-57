@@ -29,11 +29,15 @@ const FLOOR_TOLERANCE = -0.10;
 /**
  * Clips measured below tolerance in the authored pose but CLAMPED at runtime, with the thing
  * that clamps them named. Anything not on this list has to stand on its own.
+ *
+ * EMPTY, AND IT SHOULD STAY THAT WAY. It briefly held dunk_mocap on the claim that
+ * basketballTree "plants the dunk legs" — which was read off an import rather than measured.
+ * That plant pins the ankle's X and Z and explicitly KEEPS THE CLIP'S HEIGHT
+ * (`target.set(pin.x, ankle.getAbsolutePosition().y, pin.z)`), so it corrects nothing
+ * vertically and the dunk's opening frame really did put a boot through the court. Fixed at
+ * its generator instead. An exemption here needs a measurement, not an import.
  */
-const RUNTIME_PLANTED: Record<string, string> = {
-  // basketballTree calls plantLeg() on the dunk family, so the authored dip never renders.
-  dunk_mocap: 'lib/babylon/anim/basketballTree.ts plants the dunk legs',
-};
+const RUNTIME_PLANTED: Record<string, string> = {};
 
 const scene = new Scene(new NullEngine());
 new FreeCamera('cam', new Vector3(0, 0, -5), scene);
@@ -83,7 +87,7 @@ console.log(`  measured ${measured} clips, tolerance ${FLOOR_TOLERANCE}`);
 assert.ok(measured > 100, `the whole library should be swept (got ${measured})`);
 assert.deepEqual(offenders, [], `clips with a foot through the floor:\n   ${offenders.join('\n   ')}`);
 console.log(`  ✓ no clip puts a foot more than ${Math.abs(FLOOR_TOLERANCE) * 100}cm under the floor`);
-console.log(`  ✓ ${Object.keys(RUNTIME_PLANTED).length} clip(s) exempt, each naming what plants it`);
+console.log(`  ✓ ${Object.keys(RUNTIME_PLANTED).length} clip(s) exempt — the list is empty, every clip stands on its own`);
 
 scene.dispose();
 console.log(`\n✅ rig-floor-tests: the library stands on the ground`);
