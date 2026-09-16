@@ -124,6 +124,36 @@ export const INTENT_DRIVERS: Record<string, string> = {
     }, 16);
   `),
 
+  // SURF: ride the face, and treat the wave moves as MOVES. The mechanics probe measured a masher at 2836 against a
+  // deliberate 587 — but per scoring event the two were identical (123 vs 117 points); the masher simply got 23 events
+  // to the deliberate driver's 5, because a 1-press-a-second driver cycling every verb spends most of its presses on
+  // things that do not score. A surfer holds trim, carves the face, and puts a move on it as often as the wave lets
+  // them: B is locked for 0.55 s after each one and the SAME move again on this wave decays, so the honest baseline
+  // rotates the held direction and comes back every 0.7 s. Airs go off the lip, which from a driver's seat is "when
+  // the board leaves the water".
+  surf: loop(`
+    const dirs = [[0, -1], [-1, 0], [1, 0], [0, 1], [-0.7, -0.7], [0.7, -0.7]]; let k = 0, t = 0, lastMove = 0, lastAir = 0;
+    setInterval(() => {
+      t += 16;
+      const h = Q.hero && Q.hero(); if (!h) return;
+      let r = h; while (r.parent) r = r.parent;
+      const d = Q.rawHud ? Q.rawHud() : {};
+      // carve the face: a slow weave keeps the rider in the pocket instead of running straight off the shoulder
+      const weave = Math.sin(t / 900) * 0.55;
+      stick(weave, -0.45);
+      hold(RT, true);                                   // trim held: speed is what every move is paid out of
+      const airborne = !!(d && (d.air || d.airborne));
+      if (airborne && t - lastAir > 1200) { lastAir = t; btn(Y, 70); }
+      else if (!airborne && t - lastMove > 700) {
+        lastMove = t;
+        const dir = dirs[k++ % dirs.length];
+        stick(dir[0], dir[1]);
+        btn(B, 70);
+        setTimeout(() => stick(weave, -0.45), 140);     // back on the face; the carve itself is drawn out in update()
+      }
+    }, 16);
+  `),
+
   // FREE RUN: the low line — steer onto the boxes, VAULT at a box, JUMP each gap edge, SLIDE the bar, a FLIP or TWIST
   // in every real air (the course runs along +z; gaps are where one ground slab ends short of the next)
   freerun: loop(`
