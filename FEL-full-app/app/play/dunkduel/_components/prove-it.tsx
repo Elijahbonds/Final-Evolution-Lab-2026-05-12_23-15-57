@@ -11,6 +11,7 @@
 // the computed metrics exist, and they stay in the page.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { setReady } from '@/lib/babylon/core/readyMarker';
 import { Camera, CameraOff, RotateCcw, Users, Trophy } from 'lucide-react';
 import { MediaPipePoseAdapter } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import { DunkTracker, scoreIrlDunk, type DunkMetrics } from '@/lib/irl/dunkTracker';
@@ -52,6 +53,17 @@ export default function ProveIt() {
       if (typeof j?.prq === 'number') setPrq(Math.round(j.prq));
     }).catch(() => {});
   }, []);
+
+  // THE READY MARKER (SCORECARD, 2026-09-15). Every Babylon mode publishes #fel-ready, and the scorecard capture waits
+  // on it; this page is React and published nothing, so 150 seconds of waiting produced "not ready ()" and PROVE IT
+  // scored N/A on all six categories for four release candidates. The contest is a camera flow, not a pad — but its
+  // frames, its errors and its load time are measurable like anything else, and they only get measured if the page
+  // says when it is up. 'playing' follows the stage into the contest itself.
+  useEffect(() => { setReady('dunkduel', 'loaded'); return () => setReady('dunkduel', 'loading'); }, []);
+  useEffect(() => {
+    if (stage === 'arm' || stage === 'watching' || stage === 'judged' || stage === 'handoff') setReady('dunkduel', 'playing');
+    else if (stage === 'final') setReady('dunkduel', 'ended');
+  }, [stage]);
 
   const stopAll = useCallback(() => {
     liveRef.current = false;

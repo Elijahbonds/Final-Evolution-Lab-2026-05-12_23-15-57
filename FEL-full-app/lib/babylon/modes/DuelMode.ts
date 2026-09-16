@@ -362,7 +362,7 @@ export const DuelMode: ModeDefinition = (() => {
         if (e.btn === 'A') myWeapon = 'fists';
         else if (e.btn === 'B') myWeapon = 'blade';
         else if (e.btn === 'Y') myWeapon = 'staff';
-        else return;
+        else { refuse(ctx, 'PICK A WEAPON — A FISTS · B BLADE · Y STAFF'); return; }
         meStrike.swapMoveset(styled(myWeapon));
         showWeapons(ctx);
         banner(ctx, `${WEAPON_TAG[myWeapon]} — ROUND 1`, 1200);
@@ -370,7 +370,13 @@ export const DuelMode: ModeDefinition = (() => {
         setTimeout(() => startRound(ctx), 900);
         return;
       }
-      if (phase !== 'fighting' || !meState.controllable) return;
+      // SCORECARD CONTROLS (2026-09-15): 5 of 40 presses were swallowed here — a swing or a guard thrown between rounds,
+      // through the verdict, or while the body is still not yours. The recovery case below already says RECOVERING;
+      // these two are the same rule at a bigger scale, so they say it too.
+      if (phase !== 'fighting' || !meState.controllable) {
+        refuse(ctx, phase !== 'fighting' ? 'BETWEEN ROUNDS' : 'NOT YOUR BODY YET');
+        return;
+      }
 
       const moveIds = Object.keys(styled(myWeapon));
       const whooshPitch = { fists: 1.2, blade: 1.5, staff: 0.8 }[myWeapon];
