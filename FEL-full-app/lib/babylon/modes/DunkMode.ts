@@ -64,7 +64,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
-import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, DOUBLE_UP_WINDOW_M, DOUBLE_UP_MIN_SPEED, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
+import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, doubleUpFits, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, type ObstacleKind } from '../core/DunkObstacles';
 import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, signatureFor, type SlamReadout } from '../core/DunkSystem';
@@ -231,6 +231,7 @@ export const DunkMode: ModeDefinition = (() => {
   // ── runway tricks (thrown during the hold-run) ──
   let runwayBeat: RunwayTrick | null = null, runwayT = 0, runwayReleased = false, runwayToken = 0;
   let runwayLabels: string[] = [], runwayDifficulty = 0, doubleUp = false, launchQueued = false;
+  let teachHint = '';   // the runway's move list, pushed to the HUD only when it changes
   let runwayIds: string[] = [];                  // what was thrown, for the signature table (labels are for people)
   let airTrick: { trick: DunkTrick; t0: number } | null = null;   // the mid-air trick in flight (its own hand-off clock)
   let catchBlend = 1; const catchFrom = new Vector3(), catchWorld = new Vector3(), _invHand = Matrix.Identity();   // a caught ball eases from where the hand met it into the palm (80 ms), no snap
@@ -737,7 +738,7 @@ export const DunkMode: ModeDefinition = (() => {
         const rt = runwayTrickFor(e.btn, variant);
         if (rt && rt.id === 'doubleup') {
           const dist = player.root.position.z - gatherLine();
-          if (dist <= DOUBLE_UP_WINDOW_M && holdRunSpeed >= DOUBLE_UP_MIN_SPEED && !runwayBeat) startRunwayBeat(ctx, rt);
+          if (doubleUpFits(dist, holdRunSpeed) && !runwayBeat) startRunwayBeat(ctx, rt);
           else if (!runwayBeat) launchDunk(ctx);   // tap to jump — from wherever you are
         } else if (rt && !runwayBeat) {
           // DUNK-SOFTS-NAMED: a runway trick that cannot happen says so (it used to be a silent nothing)
@@ -857,6 +858,14 @@ export const DunkMode: ModeDefinition = (() => {
         runMotion.update(steer, -runNow, player.root.rotation.y, dt);
         runUpPeak = Math.max(runUpPeak, Math.hypot(steer, holdRunSpeed));
         if (!runwayBeat) setWin('run');
+        // THE RUNWAY TEACHES ITS MOVES (owner, 2026-09-16). Everything a player can throw on the run is a bare face
+        // button under a held trigger — undiscoverable — and this pass added three more. The hold-run hint is the move
+        // list now, and it turns into DOUBLE-UP the moment the double-up is actually on. Only pushed on CHANGE: a HUD
+        // write every frame is a React render every frame.
+        if (!runwayBeat) {
+          const line = runwayTeachLine({ distToLine: player.root.position.z - gatherLine(), speed: holdRunSpeed, ballThrown: lob.thrown });
+          if (line !== teachHint) { teachHint = line; ctx.setHud({ hint: line }); }
+        }
         // the SELF-LOB prop tosses itself ahead of the takeoff when the runner has not thrown it by hand
         if (prop === 'selflob' && !lob.thrown && !runwayBeat && player.root.position.z <= gatherLine() + AUTO_LOB_AHEAD_M) startRunwayBeat(ctx, runwayTrickFor('Y')!);
         // DUNK-GLASS-BOUNCE: the off-glass prop throws where the geometry says (AUTO_GLASS_AHEAD_M); the bounce prop throws as the
@@ -1958,7 +1967,7 @@ export const DunkMode: ModeDefinition = (() => {
 
   // ── DUNK-CONTROL-JUICE (2026-09-08): runway tricks, the lob, the catch ──────────────────────────────────────────
   function resetLob(): void { lob.live = false; lob.thrown = false; lob.caught = false; lob.lost = false; lob.label = ''; lob.kind = 'plain'; lob.glass = false; lob.over = false; lob.bounces = 0; lob.wantBounces = 0; lob.env = ''; lob.clanked = false; lob.t = 0; lob.runCueAt = -1; lob.runCued = false; }
-  function resetRunway(): void { pendingBeat = null; runwayBeat = null; runwayT = 0; runwayReleased = false; runwayLabels = []; runwayDifficulty = 0; doubleUp = false; launchQueued = false; airTrick = null; runwayToken++; }
+  function resetRunway(): void { teachHint = ''; pendingBeat = null; runwayBeat = null; runwayT = 0; runwayReleased = false; runwayLabels = []; runwayDifficulty = 0; doubleUp = false; launchQueued = false; airTrick = null; runwayToken++; }
   /** A runway beat owns the body until it ends (the per-frame run / idle loops stand aside); the run keeps going under it. */
   function startRunwayBeat(ctx: ModeContext, rt: RunwayTrick): void {
     // DUNK-POSTURE-LEGS: a beat's clip takes the ball from the PALM — mid-bounce it waits for the ball to come back up (a snap from

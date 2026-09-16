@@ -78,17 +78,19 @@ export interface RunwayTrick {
   releaseAt?: number;
   /** The run keeps going under the beat at this fraction of the hold-run speed. */
   runScale: number;
+  /** Short name for the runway teaching line. Undefined = a PROP throws this one, so there is nothing to teach. */
+  teach?: string;
 }
 export const RUNWAY_TRICKS: RunwayTrick[] = [
-  { id: 'selflob', label: 'SELF-LOB', btn: 'Y', clip: 'dunk_self_lob', sec: 0.5, difficulty: 1.6, releaseAt: 0.3, runScale: 0.85 },
-  { id: 'kickup', label: 'KICK-UP', btn: 'B', clip: 'dunk_kick_up', sec: 0.55, difficulty: 2.2, releaseAt: 0.32, runScale: 0.55 },
-  { id: 'cartwheel', label: 'BACK HANDSPRING', btn: 'X', clip: 'dunk_back_handspring', sec: 0.8, difficulty: 2.8, releaseAt: 0.05, runScale: 0.7 },
-  { id: 'doubleup', label: 'DOUBLE-UP', btn: 'A', clip: 'dunk_double_up', sec: 0.5, difficulty: 1.5, runScale: 0.6 },
+  { id: 'selflob', label: 'SELF-LOB', btn: 'Y', clip: 'dunk_self_lob', sec: 0.5, difficulty: 1.6, releaseAt: 0.3, runScale: 0.85, teach: 'LOB' },
+  { id: 'kickup', label: 'KICK-UP', btn: 'B', clip: 'dunk_kick_up', sec: 0.55, difficulty: 2.2, releaseAt: 0.32, runScale: 0.55, teach: 'KICK-UP' },
+  { id: 'cartwheel', label: 'BACK HANDSPRING', btn: 'X', clip: 'dunk_back_handspring', sec: 0.8, difficulty: 2.8, releaseAt: 0.05, runScale: 0.7, teach: 'HANDSPRING' },
+  { id: 'doubleup', label: 'DOUBLE-UP', btn: 'A', clip: 'dunk_double_up', sec: 0.5, difficulty: 1.5, runScale: 0.6, teach: 'DOUBLE-UP' },
   // DUNK-GLASS-BOUNCE (2026-09-08): the same two-hand toss thrown AT THE GLASS (the ball comes back off the board to the
   // hand), and a two-hand throw DOWN into the floor that bounces up to the hand once or twice (WDA "Bounce Ball")
   // THE BACKFLIP (owner, 2026-09-16). B is the kick-up; B with UP held is the flip — the ball goes up ahead of you, you
   // turn over under it, land running and take it to the rim. Hardest thing on the runway, and it costs the most speed.
-  { id: 'backflip', label: 'BACKFLIP', btn: 'B', dir: 'up', clip: 'dunk_backflip', sec: 0.9, difficulty: 3.4, releaseAt: 0.06, runScale: 0.45 },
+  { id: 'backflip', label: 'BACKFLIP', btn: 'B', dir: 'up', clip: 'dunk_backflip', sec: 0.9, difficulty: 3.4, releaseAt: 0.06, runScale: 0.45, teach: 'FLIP' },
   { id: 'offglass', label: 'OFF-GLASS LOB', btn: 'Y', dir: 'up', clip: 'dunk_self_lob', sec: 0.5, difficulty: 2.4, releaseAt: 0.3, runScale: 0.85 },
   { id: 'bounce', label: 'BOUNCE LOB', btn: 'Y', dir: 'down', clip: 'dunk_bounce_throw', sec: 0.5, difficulty: 2.4, releaseAt: 0.3, runScale: 0.85 },
 ];
@@ -97,8 +99,37 @@ export function runwayTrickFor(btn: string, dir: 'up' | 'down' | 'left' | 'right
   return (dir ? RUNWAY_TRICKS.find((t) => t.btn === btn && t.dir === dir) : null) ?? RUNWAY_TRICKS.find((t) => t.btn === btn && !t.dir) ?? null;
 }
 export function runwayTrickById(id: RunwayTrick['id']): RunwayTrick { return RUNWAY_TRICKS.find((t) => t.id === id)!; }
-/** The double-up is only a double-up inside the last stretch before the takeoff line (metres) at a real run (m/s). */
-export const DOUBLE_UP_WINDOW_M = 1.8, DOUBLE_UP_MIN_SPEED = 4;
+// THE DOUBLE-UP WINDOW IS FORGIVING (owner, 2026-09-16: "the double-up window made forgiving").
+//
+// A is the jump. A on the run inside this window is the two-foot GATHER into the jump instead — which means a press one
+// stride too early does not read as a double-up, it TAKES OFF, and the player never learns the move exists. At 1.8 m
+// and 4 m/s the window was ~0.26 s wide at a full run: an expert input for a move nothing teaches. 3.2 m at 3 m/s is
+// about half a second, still unmistakably "as you gather", and the runway now says DOUBLE-UP out loud while you are in
+// it (runwayTeachLine).
+export const DOUBLE_UP_WINDOW_M = 3.2, DOUBLE_UP_MIN_SPEED = 3;
+/** Is a double-up on, here, at this speed? */
+export function doubleUpFits(distToLine: number, speed: number): boolean {
+  return distToLine <= DOUBLE_UP_WINDOW_M && speed >= DOUBLE_UP_MIN_SPEED;
+}
+
+/**
+ * THE RUNWAY TEACHES ITS OWN MOVES (owner, 2026-09-16: "teach them on the runway").
+ *
+ * Every runway trick is a bare face button thrown while RUN is held, which is not a thing a player discovers — and the
+ * pass added three more of them (the back handspring, the backflip, the kick-up). So the hold-run hint IS the move list,
+ * built from RUNWAY_TRICKS itself: add a trick with a `teach` name and the runway starts teaching it, with no second
+ * place to update and forget. The prop-thrown variants (off-glass, bounce) carry no `teach` — the prop throws those.
+ *
+ * The double-up is the one that changes: it is only a double-up in the window, so it is only offered in the window, and
+ * when you are in it, it is the whole line.
+ */
+export function runwayTeachLine(s: { distToLine: number; speed: number; ballThrown: boolean }): string {
+  if (s.ballThrown) return 'CATCH IT — take it to the rim';
+  if (doubleUpFits(s.distToLine, s.speed)) return 'DOUBLE-UP — tap A · or release to jump';
+  const moves = RUNWAY_TRICKS.filter((t) => t.teach && t.id !== 'doubleup')
+    .map((t) => `${t.btn}${t.dir === 'up' ? '+UP' : ''} ${t.teach}`);
+  return `${moves.join(' · ')} — then release to jump`;
+}
 /** A dunk that catches its own toss (or a passer's) is judged on top of the flight. */
 export const CATCH_DIFFICULTY = 1.2;
 
