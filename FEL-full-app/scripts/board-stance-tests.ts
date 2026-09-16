@@ -93,6 +93,32 @@ console.log(`  stance width: ${alongBoard.toFixed(3)}m along the deck, ${acrossB
 ok(alongBoard >= 0.3, `feet are spread along the deck (got ${alongBoard.toFixed(3)}m, want >=0.30)`);
 ok(alongBoard > acrossBoard, `feet are spread ALONG the board, not across it (${alongBoard.toFixed(3)} vs ${acrossBoard.toFixed(3)})`);
 
+// FEET ON THE DECK (SKATE-LEGS). The stance was authored against the floor, but the deck
+// sits at root-local y=0.03 (BoardSync) while GroundRide snaps the root to the ground —
+// so "standing" put both ankles at -0.01..-0.04, through the board and into the dirt, on
+// all four board sports at once. Nothing caught it because every check here was about
+// YAW: which way the rider faces, never what height they ride at.
+//
+// The reference is the rest of the game: every other grounded stance puts an ankle at
+// +0.03..+0.08 above the root (idle_stand 0.07, guard 0.03, golf 0.06, tennis 0.06). On a
+// deck 0.03-0.04 up, a riding ankle belongs above that, never below it.
+const rootNode = rig.skeleton.bones[0].getTransformNode()?.parent as unknown as { getAbsolutePosition?: () => Vector3; computeWorldMatrix?: (f: boolean) => void } | null;
+function ankleY(side: 'Left' | 'Right'): number {
+  const n = boneNode(rig.skeleton, `${side}Foot`);
+  if (!n || !rootNode?.getAbsolutePosition) return NaN;
+  n.computeWorldMatrix(true);
+  rootNode.computeWorldMatrix?.(true);
+  return n.getAbsolutePosition().y - rootNode.getAbsolutePosition().y;
+}
+const DECK_TOP = 0.03;   // BoardSync parks the deck here, root-local
+for (const clip of ['board_ride_idle', 'board_carve_left', 'board_carve_right', 'board_tuck', 'board_grind']) {
+  if (!pose(clip, 0.5)) { ok(false, `${clip}: clip missing`); continue; }
+  const lo = Math.min(ankleY('Left'), ankleY('Right'));
+  console.log(`  ${clip.padEnd(18)} lowest ankle ${lo.toFixed(3)} (deck top ${DECK_TOP})`);
+  ok(lo > DECK_TOP, `${clip}: the rider stands ON the deck, not through it (ankle ${lo.toFixed(3)} vs deck ${DECK_TOP})`);
+  ok(lo < 0.30, `${clip}: and not hovering above it (ankle ${lo.toFixed(3)})`);
+}
+
 // The bail must BREAK the stance -- holding a textbook ride pose through a
 // crash is what makes a fall read as choreography.
 pose('skate_bail', 1);

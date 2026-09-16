@@ -85,9 +85,25 @@ const POLE_L: [number, number, number] = [-0.62, -0.52, -0.58];
 const POLE_R: [number, number, number] = [0.62, -0.52, -0.58];
 const POLES = { Left: POLE_L, Right: POLE_R };
 
+/**
+ * FEET ON THE DECK (SKATE-LEGS). Every hipsY below was authored against the FLOOR, but a
+ * board rider does not stand on the floor — BoardSync parks the deck at root-local y=0.03
+ * and GroundRide snaps the root to the ground, so the deck surface is what the feet have
+ * to meet. Measured on the live rig before this lift, the grounded ride clips put both
+ * ankles at -0.01..-0.04 root-local, while EVERY other grounded stance in the game puts
+ * them at +0.03..+0.08 (idle_stand 0.07, guard 0.03, golf 0.06, tennis 0.06). The rider
+ * was standing through the board and into the ground, on all four board sports at once,
+ * because all four share this suite.
+ *
+ * One constant rather than 40 hand-edited keys: the whole suite is lifted together, the
+ * relative shapes the stance notes describe are untouched, and there is a single number
+ * to move if the deck ever changes thickness.
+ */
+export const DECK_STANCE_LIFT = 0.13;
+
 /** One key: torso/leg degrees, both wrists as shoulder-relative targets, and the hips' ride height. */
 function key(t: number, bones: Bones, L: [number, number, number], R: [number, number, number], hipsY: number, open = 1): PoseKey {
-  return { t, bones: stanced(bones, open), handsRel: { Left: L, Right: R }, poles: POLES, hipsY };
+  return { t, bones: stanced(bones, open), handsRel: { Left: L, Right: R }, poles: POLES, hipsY: hipsY + DECK_STANCE_LIFT };
 }
 
 /** The legs every ground ride shares: knees bent, weight forward, the front knee carrying more. */
