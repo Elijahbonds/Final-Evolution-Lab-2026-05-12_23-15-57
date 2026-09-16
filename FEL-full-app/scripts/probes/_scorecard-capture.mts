@@ -88,14 +88,17 @@ for (const [slug, path] of MODES) {
     const play = p.getByRole('button', { name: /^PLAY$/ }); if (await play.count()) await play.first().click().catch(() => {});
     const from = await p.evaluate(() => (window as any).__FEL_QA__?.now() ?? 0);
     // 10 Hz body sampler in the page
-    await p.evaluate(`(() => { window.__BODY = { n: 0, noClip: 0, tee: 0, awkward: 0, noHero: 0, clipChanges: 0, last: '' };
+    // WHICH CLIP (2026-09-15): the tallies alone say "1.5% T-arms" and leave the next hour to guessing. Every fault
+    // frame now also names the clip that was on top of the blend, so a deduction points at a file.
+    await p.evaluate(`(() => { window.__BODY = { n: 0, noClip: 0, tee: 0, awkward: 0, noHero: 0, clipChanges: 0, last: '', teeBy: {}, awkBy: {}, churnBy: {} };
       window.__BODYI = setInterval(() => { const d = window.__FEL_DEV__; const r = d && d.anim ? d.anim() : null; const B = window.__BODY; B.n++;
         const h = r && r.hero; if (!h) { B.noHero++; return; }
         if (!h.playing.length) B.noClip++;
-        if (h.arms && h.arms.tee) B.tee++;
-        if (h.arms && !h.arms.ok && !h.arms.tee) B.awkward++;
         const top = h.playing.length ? h.playing.slice().sort((a, b) => b.weight - a.weight)[0].clip : '';
-        if (top !== B.last) { B.clipChanges++; B.last = top; } }, 100); })()`);
+        const bump = (m, k) => { m[k] = (m[k] || 0) + 1; };
+        if (h.arms && h.arms.tee) { B.tee++; bump(B.teeBy, top || '(no clip)'); }
+        if (h.arms && !h.arms.ok && !h.arms.tee) { B.awkward++; bump(B.awkBy, top || '(no clip)'); }
+        if (top !== B.last) { B.clipChanges++; bump(B.churnBy, (B.last || '(none)') + '→' + (top || '(none)')); B.last = top; } }, 100); })()`);
     const verbs = verbsFor(slug);
     const tPlay = Date.now(); let k = 0;
     while ((Date.now() - tPlay) / 1000 < SEC) {

@@ -64,17 +64,29 @@ const CLIP_FOR: Record<FreeRunAnimState, { clip: string; loop: boolean; fadeSec:
 };
 const pick = (state: FreeRunAnimState): FreeRunClipChoice => ({ state, ...CLIP_FOR[state] });
 
-/** The single decision: run context in, clip choice out. Pure. */
-export function chooseFreeRunClip(i: FreeRunAnimInput): FreeRunClipChoice {
+/**
+ * The ground gaits hold across their own edge (2026-09-15). `speed01 > 0.5` and `> 0.06` are hard edges, and a runner
+ * whose speed rides one of them — cornering, brushing a wall, easing off the stick — re-chose every frame: measured on
+ * the scorecard capture, free run changed clip 3 times a SECOND, which the Body rubric charges a point for and which
+ * looks from outside like a runner who cannot decide whether he is running. The entry speeds stay where they were; a
+ * gait already playing keeps playing until the speed drops well under it. Nothing else in the tree is speed-driven, so
+ * this is the whole of the churn.
+ */
+const GAIT_DROP = { run: 0.40, walk: 0.035 };
+
+/** The single decision: run context in, clip choice out. Pure. `prev` is the gait already playing, for its hold band. */
+export function chooseFreeRunClip(i: FreeRunAnimInput, prev?: FreeRunAnimState | null): FreeRunClipChoice {
   let state: FreeRunAnimState;
+  const runFloor = prev === 'run' ? GAIT_DROP.run : 0.5;
+  const walkFloor = prev === 'walk' || prev === 'run' ? GAIT_DROP.walk : 0.06;
   if (i.down) state = 'bail';
   else if (i.celebrating) state = 'celebrate';
   else if (i.landing !== 'none' && !i.airborne) state = i.landing === 'sketchy' ? 'land_sketchy' : 'land_clean';
   else if (i.wallrun) state = 'wallrun';
   else if (i.airborne) state = i.tricking ? 'tuck' : i.jumpBeat ? 'jump' : 'air';
   else if (i.sliding) state = 'slide';
-  else if (i.speed01 > 0.5) state = 'run';
-  else if (i.speed01 > 0.06) state = 'walk';
+  else if (i.speed01 > runFloor) state = 'run';
+  else if (i.speed01 > walkFloor) state = 'walk';
   else state = 'idle';
   const c = pick(state);
   if (state === 'jump' && i.takeoffClip) c.clip = i.takeoffClip;
@@ -88,19 +100,21 @@ const isOneShot = (s: FreeRunAnimState): boolean => !CLIP_FOR[s].loop;
 
 /** Where a finished one-shot settles: the bail holds the floor; every other one-shot re-chooses from the context with its
  *  OWN trigger cleared (a take-off that ran out mid-air holds the air pose; a landing under a held stick lands on the run). */
-export function settleAfter(st: FreeRunAnimState, i: FreeRunAnimInput): FreeRunClipChoice {
+export function settleAfter(st: FreeRunAnimState, i: FreeRunAnimInput, prev?: FreeRunAnimState | null): FreeRunClipChoice {
   switch (st) {
     case 'bail': return pick('floor');
-    case 'jump': return chooseFreeRunClip({ ...i, jumpBeat: false });
-    case 'land_clean': case 'land_sketchy': return chooseFreeRunClip({ ...i, landing: 'none' });
-    case 'celebrate': return chooseFreeRunClip({ ...i, celebrating: false });
-    default: return chooseFreeRunClip(i);
+    case 'jump': return chooseFreeRunClip({ ...i, jumpBeat: false }, prev);
+    case 'land_clean': case 'land_sketchy': return chooseFreeRunClip({ ...i, landing: 'none' }, prev);
+    case 'celebrate': return chooseFreeRunClip({ ...i, celebrating: false }, prev);
+    default: return chooseFreeRunClip(i, prev);
   }
 }
 
 /** The one owner of the runner's clips (per-frame safe). */
 export class FreeRunAnimTree {
   private current: FreeRunAnimState | null = null;
+  /** The last ground gait played — the hold band is measured against it, not against whatever one-shot is in front. */
+  private gait: FreeRunAnimState | null = null;
   /** A one-shot that ran out while its trigger still holds; re-armed when the trigger drops or the beat is cleared. */
   private spent: FreeRunAnimState | null = null;
   private token = 0;
@@ -111,9 +125,9 @@ export class FreeRunAnimTree {
   get state(): FreeRunAnimState | null { return this.current; }
   update(input: FreeRunAnimInput): FreeRunAnimState {
     this.lastInput = input;
-    let c = chooseFreeRunClip(input);
+    let c = chooseFreeRunClip(input, this.gait);
     if (this.spent && c.state !== this.spent) this.spent = null;
-    if (this.spent && c.state === this.spent) c = settleAfter(this.spent, input);
+    if (this.spent && c.state === this.spent) c = settleAfter(this.spent, input, this.gait);
     const cur = this.current;
     if (cur === 'get_up' && c.state !== 'bail') return cur;                                          // the get-up finishes before any standing state
     if (cur && FLOOR_FAMILY.has(cur) && cur !== 'get_up' && !FLOOR_FAMILY.has(c.state)) c = pick('get_up');   // the floor is left through the get-up
@@ -129,17 +143,18 @@ export class FreeRunAnimTree {
       if (this.current !== st || this.token !== tok) return;
       this.spent = st;
       this.onSettle?.(st);
-      this.enter(settleAfter(st, this.lastInput ?? EMPTY_INPUT));
+      this.enter(settleAfter(st, this.lastInput ?? EMPTY_INPUT, this.gait));
     } : undefined;
     this.animator.play(c.clip, onEnd ? { loop: c.loop, fadeSec: c.fadeSec, onEnd } : { loop: c.loop, fadeSec: c.fadeSec });
     this.current = st;
+    if (st === 'run' || st === 'walk' || st === 'idle') this.gait = st;
   }
   /** One-beat states must be re-playable: call when the beat window closes or a NEW beat of the same kind lands. */
   clearBeat(...states: FreeRunAnimState[]): void {
     if (this.current && states.includes(this.current)) this.current = null;
     if (this.spent && states.includes(this.spent)) this.spent = null;
   }
-  reset(): void { this.current = null; this.spent = null; this.lastInput = null; }
+  reset(): void { this.current = null; this.spent = null; this.gait = null; this.lastInput = null; }
 }
 
 const EMPTY_INPUT: FreeRunAnimInput = { speed01: 0, airborne: false, jumpBeat: false, tricking: false, wallrun: false, sliding: false, landing: 'none', down: false };
