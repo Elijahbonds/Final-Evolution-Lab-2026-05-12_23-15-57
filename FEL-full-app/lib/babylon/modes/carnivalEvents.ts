@@ -283,7 +283,13 @@ export function coinStorm(): CarnivalEvent {
     id: 'coin_storm', title: 'COIN STORM', durationSec: 15, pointsPerUnit: 6, rivalRange: [8, 16],
     verbs: { buttons: [], says: 'RUN IT WITH THE STICK' },
     async build(ctx) {
+      // THE SEAM (SCORECARD VISUALS, 2026-09-15): the event lays its own court over the carnival hub's lawn and both
+      // sit at y 0, so the boundary z-fought — the rc20 late frame is a sawtooth of grass and asphalt chewing along the
+      // court's edge. The court is the thing that arrived second, so it is the thing that steps up; a centimetre is
+      // daylight to the depth buffer and nothing to a runner.
+      const groundsBefore = new Set(ctx.scene.meshes.filter((m) => m.name === 'venue_ground'));
       VenueKit.buildCourt(ctx.scene, 'street');
+      for (const g of ctx.scene.meshes) if (g.name === 'venue_ground' && !groundsBefore.has(g)) g.position.y += 0.012;
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 0), startClip: SPORT_CLIP.idle });
       neverBindPose(player.animator, SPORT_CLIP.idle); installSafePlay(player.animator, 'carnival-coins');
       body = new BeatOwner(player.animator); body.loop(SPORT_CLIP.idle);
