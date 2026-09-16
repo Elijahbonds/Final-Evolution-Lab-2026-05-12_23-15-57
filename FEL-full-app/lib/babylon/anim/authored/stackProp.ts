@@ -28,16 +28,20 @@ export function buildStackBase(scene: Scene, sk: Skeleton): AnimationGroup | nul
     LeftUpLeg: [-bend, 0, 7], LeftLeg: [bend * 1.7, 0, 0],
     RightUpLeg: [-bend, 0, -7], RightLeg: [bend * 1.7, 0, 0],
   });
-  // hands up at head height, a little out — where a pair of shins would be
-  const grip = (y: number): { Left: V3; Right: V3 } => ({ Left: [-0.30, y, 0.16], Right: [0.30, y, 0.16] });
+  // THE GRIP IS LOW AND IN FRONT (rc28 eye, 2026-09-16). Hands out at ±0.30 with the poles winged gave the base two
+  // elbows level with the rider's shoulders, and from the runway — where the base's own head and body are hidden behind
+  // the rider and the dunker — those elbows read as the RIDER'S arms, flexed in a bodybuilder's double biceps. (Which
+  // body they belonged to was settled by moving the rider's arms and watching these not move.) A person carrying
+  // another holds the shins DOWN against his own chest: hands close together, forearms vertical, elbows at the ribs.
+  const grip = (y: number): { Left: V3; Right: V3 } => ({ Left: [-0.17, y, 0.30], Right: [0.17, y, 0.30] });
   const key = (t: number, bend: number, spine: number, y: number, hipsY: number) => ({
     t, bones: { Hips: [0, 0, 0] as Deg3, Spine: [spine, 0, 0] as Deg3, Neck: [10, 0, 0] as Deg3, ...legs(bend) },
-    hands: grip(y), poles: { Left: [-0.8, -0.3, -0.3] as V3, Right: [0.8, -0.3, -0.3] as V3 }, hipsY,
+    hands: grip(y), poles: { Left: [-0.35, -0.9, -0.25] as V3, Right: [0.35, -0.9, -0.25] as V3 }, hipsY,   // elbows DOWN at the ribs
   });
   return buildPoseClip(scene, sk, 'prop_stack_base', STACK_SEC, [
-    key(0, 12, 6, 1.52, -0.04),
-    key(STACK_DUCK_T, 20, 10, 1.46, -0.09),   // he takes the weight as the rider leans
-    key(STACK_SEC, 12, 6, 1.52, -0.04),
+    key(0, 12, 6, 1.24, -0.04),
+    key(STACK_DUCK_T, 20, 10, 1.18, -0.09),   // he takes the weight as the rider leans
+    key(STACK_SEC, 12, 6, 1.24, -0.04),
   ]);
 }
 
@@ -56,13 +60,16 @@ export function buildStackRider(scene: Scene, sk: Skeleton): AnimationGroup | nu
     t,
     bones: { Hips: [-lean, 0, 0] as Deg3, Spine: [-lean * 0.6, 0, 0] as Deg3, Neck: [neck, 0, 0] as Deg3, ...seat(fold, hang) },
     hands: { Left: [-arms[0], arms[1], arms[2]] as V3, Right: arms },
-    poles: { Left: [-0.8, -0.2, -0.4] as V3, Right: [0.8, -0.2, -0.4] as V3 }, hipsY,
+    poles: { Left: [-0.5, -0.9, -0.3] as V3, Right: [0.5, -0.9, -0.3] as V3 }, hipsY,   // elbows DOWN, not winged out
   });
+  // STRAIGHT ARMS, DOWN TO THE HEAD. A rider holds the head he is sitting on, and an arm reaching down and out to it is
+  // nearly straight — which is worth having for its own sake: a hand tucked up by the shoulder leaves the elbow free to
+  // go wherever the IK pole is not, and at runway distance a winged elbow is the whole silhouette. (Moving these is
+  // also what proved the winged elbows in the rc26/27 frames belonged to the BASE: these moved, those did not.)
   return buildPoseClip(scene, sk, 'prop_stack_rider', STACK_SEC, [
-    // sitting up, hands resting on the base's head
-    key(0, 78, 62, 0, 6, [0.22, 1.18, 0.20], 0),
-    // THE DUCK: leans back off the line of the feet, chin tucked, arms in — the jump goes over his lap
-    key(STACK_DUCK_T, 66, 74, 34, 26, [0.26, 1.02, -0.18], -0.06),
-    key(STACK_SEC, 78, 62, 0, 6, [0.22, 1.18, 0.20], 0),
+    key(0, 78, 62, 0, 6, [0.26, 0.72, 0.34], 0),
+    // THE DUCK: leans back off the line of the feet, chin tucked, hands ride down onto the head — the jump goes over his lap
+    key(STACK_DUCK_T, 66, 74, 34, 26, [0.30, 0.62, 0.18], -0.06),
+    key(STACK_SEC, 78, 62, 0, 6, [0.26, 0.72, 0.34], 0),
   ]);
 }

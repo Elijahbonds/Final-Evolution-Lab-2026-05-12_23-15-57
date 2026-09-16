@@ -61,6 +61,8 @@ const RUNWAY_AT_MS = Number(process.env.RUNWAY_AT_MS ?? 700);
 /** The PROP ring: d-pad DOWN in the approach cycles the obstacle (car → barrier → crate → THE TETRIS). OBSTACLE=tetris. */
 const OBSTACLE_RING = ['car', 'barrier', 'crate', 'tetris'];
 const OBSTACLE = process.env.OBSTACLE ?? '';
+/** SHOT_AT_MS=900 — a frame of the RUNWAY itself (what the dunker is about to jump over), not just the verdict. */
+const SHOT_AT_MS = Number(process.env.SHOT_AT_MS ?? 0);
 if (OBSTACLE && !OBSTACLE_RING.includes(OBSTACLE)) throw new Error(`no such obstacle: ${OBSTACLE} (have ${OBSTACLE_RING.join(', ')})`);
 
 const browser = await chromium.launch({ executablePath: chromiumExe(), headless: false, args: ['--window-size=1280,860', '--use-angle=metal', '--autoplay-policy=no-user-gesture-required'] });
@@ -171,6 +173,7 @@ for (let n = 0; n < ATTEMPTS; n++) {
   const runT0 = Date.now();
   let launched = false;
   let threwRunway = !RUNWAY_TRICK;
+  let shotRunway = false;
   while (Date.now() - runT0 < RUN_MS + 2500) {
     // a RUNWAY trick is a bare face button under the hold — the stick steers, so there is no direction to hold
     if (!threwRunway && Date.now() - runT0 >= RUNWAY_AT_MS) {
@@ -180,6 +183,10 @@ for (let n = 0; n < ATTEMPTS; n++) {
       await press(rw.btn, 60);
       if (rw.dir) { await page.waitForTimeout(60); await hold(DPAD[rw.dir], false); }
       a.trick = `${RUNWAY_TRICK}+${a.trick}`;
+    }
+    if (SHOT_AT_MS > 0 && !shotRunway && Date.now() - runT0 >= SHOT_AT_MS) {
+      shotRunway = true;
+      await page.screenshot({ path: `${OUT}/${TAG}-runway${a.n}.png` });   // the run-up itself: is the thing you are jumping over actually there
     }
     const fresh = log.slice(logMark);
     if (fresh.some((l) => /\[DUNK-LAUNCH\]/.test(l))) { launched = true; break; }

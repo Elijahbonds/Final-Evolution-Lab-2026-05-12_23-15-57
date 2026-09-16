@@ -22,6 +22,7 @@ import { buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buil
 import { DUNK_TRICKS } from '../../core/DunkSystem';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
 import { buildBaseClips } from './baseClips';
+import { buildStackBase, buildStackRider, STACK_SEC, STACK_DUCK_T } from './stackProp';
 
 let scene: Scene; let sk: Skeleton;
 const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>();
@@ -38,6 +39,68 @@ function fresh<T>(f: () => T): T { reset(); return f(); }
 function at(g: AnimationGroup, sec: number): void { reset(); g.start(false, 1, g.from, g.to, false); g.goToFrame(sec * 30); scene.render(); }
 function pos(name: string): Vector3 { const n = boneNode(sk, name)!; n.computeWorldMatrix(true); return n.getAbsolutePosition(); }
 const hipsY = () => pos('Hips').y;
+
+// THE TETRIS — two people stacked, and you go over their lap (owner, 2026-09-16). These are the only bodies in the game
+// that are PROPS, and they are read at a run from ten metres, so what they have to sell is unmistakable at a glance:
+// one person carrying another, and the rider getting out of the way as the dunker comes over.
+describe('the tetris stack', () => {
+  // rc28, measured by eye: the base's hands up at head height with the poles winged put two elbows level with the
+  // rider's shoulders — and since the base's own head and body are hidden behind the rider and the dunker on the
+  // runway, they read as the RIDER'S arms flexed in a double biceps. A carry holds the shins DOWN against the chest.
+  it('the base is CARRYING something: knees soft, shins held low and tight against the chest', () => {
+    const g = fresh(() => buildStackBase(scene, sk)!);
+    at(g, STACK_DUCK_T);
+    for (const s of ['Left', 'Right']) {
+      expect(pos(`${s}Hand`).y).toBeGreaterThan(pos('Hips').y + 0.15);          // up at the load, not hanging
+      expect(pos(`${s}Hand`).y).toBeLessThan(pos(`${s}Arm`).y);                 // …but below the shoulder: a carry, not a reach
+      expect(Math.abs(pos(`${s}Hand`).x)).toBeLessThan(Math.abs(pos(`${s}Arm`).x));   // close together in front, elbows at the ribs
+      expect(pos(`${s}Hand`).z).toBeGreaterThan(pos(`${s}Arm`).z + 0.1);        // forward, around the shins
+      expect(pos(`${s}Leg`).z).toBeGreaterThan(pos(`${s}UpLeg`).z + 0.03);      // knees forward: under the weight
+    }
+  });
+
+  it('the rider is SITTING: thighs up and forward, shins hanging down the front', () => {
+    const g = fresh(() => buildStackRider(scene, sk)!);
+    at(g, 0);
+    for (const s of ['Left', 'Right']) {
+      expect(pos(`${s}Leg`).z).toBeGreaterThan(pos('Hips').z + 0.15);           // knees out front of the seat
+      expect(pos(`${s}Foot`).y).toBeLessThan(pos(`${s}Leg`).y);                 // shins hang
+    }
+  });
+
+  // rc26, measured by eye: hands at y 1.18 with the poles winged out read as a BODYBUILDER'S DOUBLE BICEPS from the
+  // runway — the one pose a person riding someone's shoulders never strikes.
+  it('the rider HOLDS ON — hands forward and low, elbows down, never flexed up', () => {
+    const g = fresh(() => buildStackRider(scene, sk)!);
+    at(g, 0);
+    for (const s of ['Left', 'Right']) {
+      expect(pos(`${s}Hand`).y).toBeLessThan(pos(`${s}Arm`).y);                 // below the shoulder
+      expect(pos(`${s}Hand`).z).toBeGreaterThan(pos(`${s}Arm`).z + 0.1);        // out in front, on the head
+      expect(pos(`${s}ForeArm`).y).toBeLessThan(pos(`${s}Arm`).y);              // elbow below the shoulder, not winged
+      // and the arm is nearly STRAIGHT: a hand tucked up by the shoulder leaves the elbow free to go anywhere the IK
+      // pole is not, which is exactly how the double-biceps happened. A straight arm has no elbow to get wrong.
+      expect(Vector3.Distance(pos(`${s}Hand`), pos(`${s}Arm`))).toBeGreaterThan(0.45);
+    }
+  });
+
+  it('THE DUCK is a real duck: the head drops and goes back, off the line of the feet', () => {
+    const g = fresh(() => buildStackRider(scene, sk)!);
+    at(g, 0); const upright = pos('Head').clone();
+    at(g, STACK_DUCK_T);
+    expect(pos('Head').y).toBeLessThan(upright.y - 0.12);
+    expect(pos('Head').z).toBeLessThan(upright.z - 0.1);                        // leaning back, away from the rim
+    expect(pos('Head').y).toBeLessThan(pos('LeftLeg').y + 0.75);                // down toward the lap the jump clears
+  });
+
+  it('both bodies come back up: a prop that ends ducked is a prop that stays ducked', () => {
+    for (const build of [buildStackBase, buildStackRider]) {
+      const g = fresh(() => build(scene, sk)!);
+      at(g, 0); const start = pos('Head').clone();
+      at(g, STACK_SEC);
+      expect(Vector3.Distance(pos('Head'), start)).toBeLessThan(0.05);
+    }
+  });
+});
 
 describe('locomotion', () => {
   it('idle stand: arms hang down, not out in a T', () => {
