@@ -53,6 +53,26 @@ describe('basketball packages on the forge rig', () => {
     expect(pos('LeftHand').y).toBeGreaterThan(head.y + 0.25);
     expect(pos('RightHand').y).toBeGreaterThan(head.y + 0.25);
   });
+  // owner, 2026-09-16: "fix the legs when you jump for a block, they shouldn't go in the air". The clip keyed the hips,
+  // one spine and the hands and nothing else, so the legs kept whatever the previous clip left them in — and the clip
+  // before a block is almost always the defensive slide, which sits at thighs −28 with the knees at 40. Lift the root
+  // under that and the man goes up with his knees tucked in front of him.
+  it('block reach hangs the legs LONG underneath — a contest is not a tuck', () => {
+    const g = buildBlockReach(scene, sk)!;
+    at(g, 0);
+    // the KNEE JOINT barely changes height between a bent leg and a straight one — it sits at the end of the thigh
+    // either way. What a tuck does is bring it FORWARD of the hips, so that is what this measures.
+    const loadedKnee = pos('LeftLeg').z - pos('Hips').z;     // the gather: knees forward, under the chest
+    for (const t of [0.25, 0.5]) {
+      at(g, t);
+      for (const s of ['Left', 'Right']) {
+        // the feet hang well below the hips, and the knee is nearly under the hip rather than lifted in front of it
+        expect(pos(`${s}Foot`).y, `${s} foot at ${t}`).toBeLessThan(pos('Hips').y - 0.55);
+        expect(pos(`${s}Leg`).z - pos('Hips').z, `${s} knee at ${t}`).toBeLessThan(loadedKnee - 0.04);
+        expect(pos(`${s}Foot`).z, `${s} foot at ${t}`).toBeLessThan(pos('Hips').z + 0.32);   // under, not out in front
+      }
+    }
+  });
   it('layup gather drives the inside knee up and the ball hand high', () => {
     at(buildLayupGather(scene, sk)!, 0.3);
     expect(pos('RightLeg').y).toBeGreaterThan(pos('LeftLeg').y + 0.3);   // knee well above the other knee

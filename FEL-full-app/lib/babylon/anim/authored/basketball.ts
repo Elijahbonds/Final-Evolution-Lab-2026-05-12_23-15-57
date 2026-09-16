@@ -122,13 +122,29 @@ export function buildDefendSlide(scene: Scene, sk: Skeleton, dir: 'left' | 'righ
   ]);
 }
 
-/** Block reach: both arms straight overhead. One-shot; the mode owns the jump. */
+/**
+ * Block reach: both arms straight overhead. One-shot; the mode owns the jump.
+ *
+ * THE LEGS ARE KEYED, AND THEY HAVE TO BE (owner, 2026-09-16: "fix the legs when you jump for a block, they shouldn't
+ * go in the air"). This clip used to key the Hips, one Spine and the hands and NOTHING ELSE, so the legs kept whatever
+ * the clip before it had left them in — and the clip before a block is almost always `bball_defend_slide`, which sits
+ * at thighs −28 with the knees at 40. Lift the root off the floor under that pose and the man rises with his knees
+ * tucked up in front of him, which is what the owner saw.
+ *
+ * A contest is the opposite shape: you go up through your toes and the legs hang STRAIGHT and together underneath,
+ * because everything you have is going into the hand. So the legs gather at the take-off and then extend and stay
+ * extended — the same rule the dunk vocabulary now keeps, for the same reason.
+ */
 export function buildBlockReach(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const up = { Right: [0.20, 2.00, 0.05] as V3, Left: [-0.20, 2.00, 0.05] as V3 };
+  /** The gather: knees bent, feet under you, about to leave the floor. */
+  const LOAD: Record<string, Deg3> = { LeftUpLeg: [-26, 0, 5], LeftLeg: [42, 0, 0], RightUpLeg: [-26, 0, -5], RightLeg: [42, 0, 0] };
+  /** In the air: long and trailing, toes down. Not mirror-perfect — nobody leaves the floor square. */
+  const LONG: Record<string, Deg3> = { LeftUpLeg: [-9, 0, 4], LeftLeg: [11, 0, 0], RightUpLeg: [-3, 0, -4], RightLeg: [16, 0, 0] };
   return buildPoseClip(scene, sk, 'bball_block_reach', 0.5, [
-    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [8, 0, 0] },  hands: { Right: [0.25, 1.00, 0.25], Left: mirror([0.25, 1.00, 0.25]) } },
-    { t: 0.25, bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0] }, hands: up, poles: { Right: UP_R, Left: UP_L } },
-    { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0] }, hands: { Right: [0.22, 1.98, 0.08], Left: [-0.22, 1.98, 0.08] }, poles: { Right: UP_R, Left: UP_L } },
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [8, 0, 0], ...LOAD },  hands: { Right: [0.25, 1.00, 0.25], Left: mirror([0.25, 1.00, 0.25]) } },
+    { t: 0.25, bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], ...LONG }, hands: up, poles: { Right: UP_R, Left: UP_L } },
+    { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], ...LONG }, hands: { Right: [0.22, 1.98, 0.08], Left: [-0.22, 1.98, 0.08] }, poles: { Right: UP_R, Left: UP_L } },
   ]);
 }
 

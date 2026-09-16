@@ -35,6 +35,8 @@ const BASE = process.env.BASE ?? 'http://127.0.0.1:3096';
 const MODE = process.env.MODE ?? 'onevone';
 const POSSESSIONS = Number(process.env.POSSESSIONS ?? 6);
 const RELEASE = (process.env.RELEASE ?? 'green') as 'green' | 'early' | 'late';
+/** How long to try to earn a stop before giving the possession up as lost. */
+const DEFEND_MS = Number(process.env.DEFEND_MS ?? 30000);
 const TAG = process.env.TAG ?? `hoops-${MODE}`;
 const OUT = `${process.env.HOME}/Claude/outbox/finish-release/hoops`;
 fs.mkdirSync(OUT, { recursive: true });
@@ -96,6 +98,88 @@ await page.evaluate(`(() => {
     requestAnimationFrame(tick);
   };
 })()`);
+// ── THE DEFENDER ──────────────────────────────────────────────────────────────────────────────────────────────────
+//
+// The mode's own probe seam is dev-only, so on a production build a possession has to be EARNED. The mode also tells
+// you exactly how, in the defence hint it puts on screen: "STAY IN FRONT — they sidestep, you slide · X: STEAL as the
+// ball crosses over · A: JUMP on the gather to BLOCK · hold L1/LT: BOX OUT". This does that, on a rAF loop in the page
+// because defence is a per-frame job and a 40 ms round trip from node is half a crossover.
+//
+// STAY IN FRONT means between the man and the rim — not next to him. Each frame it aims for the point one stride up
+// the line from the attacker toward the basket, and steers there in CAMERA space, because that is the space the stick
+// is read in (the codebase's own rule: up on the stick is −y, and the run follows the camera's right).
+await page.evaluate(`(() => {
+  const RIM = { x: 0, z: -0.6 };
+  const flat = (v) => { const l = Math.hypot(v.x, v.z) || 1; return { x: v.x / l, z: v.z / l }; };
+  window.__DEF = { on: false, stops: 0, contests: 0, steals: 0, lastHint: '', diag: null, frames: 0 };
+
+  const bodies = () => {
+    const q = window.__FEL_QA__; const scene = q && q.scene ? q.scene() : null;
+    if (!scene) return null;
+    const mine = q.hero ? q.hero() : null;
+    let myRoot = mine; while (myRoot && myRoot.parent) myRoot = myRoot.parent;
+    // the character roots are the parents of the skinned meshes; in 1v1 there are two of them
+    const roots = [];
+    for (const m of scene.meshes) {
+      if (!m.skeleton) continue;
+      let r = m; while (r.parent) r = r.parent;
+      if (!roots.includes(r)) roots.push(r);
+    }
+    const foe = roots.find((r) => r !== myRoot) || null;
+    return { scene, me: myRoot, foe, count: roots.length };
+  };
+
+  window.__defenceOn = () => {
+    if (window.__DEF.on) return true;
+    const b = bodies(); if (!b || !b.me || !b.foe) return false;
+    window.__DEF.on = true;
+    const pad = window.__PAD;
+    const setStick = (x, y) => { pad.axes[0] = x; pad.axes[1] = y; pad.timestamp = Date.now(); };
+    const tap = (i, ms) => { const btn = pad.buttons[i]; btn.pressed = true; btn.value = 1; pad.timestamp = Date.now();
+      setTimeout(() => { btn.pressed = false; btn.value = 0; pad.timestamp = Date.now(); }, ms || 70); };
+    let lastContest = 0, lastSteal = 0;
+    const tick = () => {
+      if (!window.__DEF.on) { setStick(0, 0); return; }
+      const bb = bodies();
+      const h = window.__hudNow();
+      window.__DEF.lastHint = h.hint || '';
+      window.__DEF.frames++;
+      if (!bb || !bb.me || !bb.foe) { window.__DEF.diag = { err: 'no bodies', me: !!(bb && bb.me), foe: !!(bb && bb.foe), roots: bb ? bb.count : -1 }; requestAnimationFrame(tick); return; }
+      const me = bb.me.position, foe = bb.foe.position;
+      // the spot one stride up the line from the attacker to the rim: in front of him, not beside him
+      const toRim = flat({ x: RIM.x - foe.x, z: RIM.z - foe.z });
+      const want = { x: foe.x + toRim.x * 1.15, z: foe.z + toRim.z * 1.15 };
+      const d = flat({ x: want.x - me.x, z: want.z - me.z });
+      const dist = Math.hypot(want.x - me.x, want.z - me.z);
+      const cam = bb.scene.activeCamera;
+      if (cam && dist > 0.12) {
+        // the camera's basis, flattened, straight off its world matrix (no Vector3 constructor needed in the page)
+        const m = cam.getWorldMatrix().m;
+        const right = flat({ x: m[0], z: m[2] });
+        const fwd = flat({ x: m[8], z: m[10] });
+        const sx = d.x * right.x + d.z * right.z;
+        const sy = d.x * fwd.x + d.z * fwd.z;
+        setStick(Math.max(-1, Math.min(1, sx)), Math.max(-1, Math.min(1, -sy)));
+      } else setStick(0, 0);
+
+      const now = performance.now();
+      const foeToRim = Math.hypot(RIM.x - foe.x, RIM.z - foe.z);
+      const gap = Math.hypot(foe.x - me.x, foe.z - me.z);
+      window.__DEF.diag = { gap: +gap.toFixed(2), foeToRim: +foeToRim.toFixed(2), dist: +dist.toFixed(2),
+        me: [+me.x.toFixed(2), +me.z.toFixed(2)], foe: [+foe.x.toFixed(2), +foe.z.toFixed(2)],
+        stick: [+pad.axes[0].toFixed(2), +pad.axes[1].toFixed(2)] };
+      // A: jump on the gather — he is at the rim and I am close enough for it to be a contest, not a foul from behind
+      if (foeToRim < 2.8 && gap < 1.9 && now - lastContest > 1400) { lastContest = now; window.__DEF.contests++; tap(0, 90); }
+      // X: reach as he works — the mode refuses it beyond 1.7 m, so only inside that
+      else if (gap < 1.55 && now - lastSteal > 900) { lastSteal = now; window.__DEF.steals++; tap(2, 70); }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    return true;
+  };
+  window.__defenceOff = () => { window.__DEF.on = false; const p = window.__PAD; p.axes[0] = 0; p.axes[1] = 0; p.timestamp = Date.now(); };
+})()`);
+
 const startBtn = page.locator('text=/^(TAP TO START|START|PLAY)$/').first();
 if (await startBtn.count()) await startBtn.first().click().catch(() => {});
 await page.waitForTimeout(2500);
@@ -107,7 +191,7 @@ const press = async (i: number, ms = 70) => {
   await page.evaluate(`(() => { const b = window.__PAD.buttons[${i}]; b.pressed = false; b.value = 0; window.__PAD.timestamp = Date.now(); })()`);
 };
 
-interface Poss { n: number; meter?: number; shotType?: string; made?: boolean; scored?: number; score?: number; foeScore?: number; banners: string[]; beats: string[]; note?: string }
+interface Poss { n: number; defence?: { sec: number; contests: number; steals: number; earned: boolean }; meter?: number; shotType?: string; made?: boolean; scored?: number; score?: number; foeScore?: number; banners: string[]; beats: string[]; note?: string }
 const rows: Poss[] = [];
 let logMark = 0;
 
@@ -121,16 +205,26 @@ for (let n = 0; n < POSSESSIONS; n++) {
   // concedes for ever and never touches the ball, which is correct and is worth knowing on its own. The mode already
   // exposes `scene.metadata.onevone.defend()` / `.offense()` for exactly this — "so a probe can reach either
   // possession deterministically".
+  // EARN THE POSSESSION. The hint is the possession readout: the defence one starts "STAY IN FRONT", the offence one
+  // "Drive fast at the rim". Play defence until it flips.
   const beforeScore = await page.evaluate('(window.__hudNow().score ?? 0)') as number;
-  const onOffense = await page.evaluate(`(() => {
-    const q = window.__FEL_QA__; const scene = q && q.scene ? q.scene() : null;
-    const seam = scene && scene.metadata && (scene.metadata.onevone || scene.metadata.threevthree);
-    if (!seam || !seam.offense) return false;
-    seam.offense();
-    return true;
-  })()`) as boolean;
-  if (!onOffense) p.note = 'no probe seam in a production build (it is dev-gated) — could not take a possession';
-  await page.waitForTimeout(700);
+  const beforeFoe = await page.evaluate('(window.__hudNow().foeScore ?? 0)') as number;
+  let onOffense = await page.evaluate(`/^Drive fast/.test(window.__hudNow().hint || '')`) as boolean;
+  if (!onOffense) {
+    await page.evaluate('window.__defenceOn && window.__defenceOn()');
+    const t0 = Date.now();
+    while (Date.now() - t0 < DEFEND_MS) {
+      if (await page.evaluate(`/^Drive fast/.test(window.__hudNow().hint || '')`)) { onOffense = true; break; }
+      await page.waitForTimeout(150);
+    }
+    const def = await page.evaluate('window.__DEF') as { contests: number; steals: number; frames: number; diag: unknown };
+    if (def) p.beats.push(`def diag ${def.frames} frames :: ${JSON.stringify(def.diag)}`);
+    await page.evaluate('window.__defenceOff && window.__defenceOff()');
+    p.defence = { sec: +((Date.now() - t0) / 1000).toFixed(1), contests: def?.contests ?? 0, steals: def?.steals ?? 0, earned: onOffense };
+    p.beats.push(`defence ${p.defence.sec}s · ${p.defence.contests} contests · ${p.defence.steals} reaches · ${onOffense ? 'STOP EARNED' : 'no stop'}`);
+  }
+  if (!onOffense) p.note = 'could not earn a stop';
+  await page.waitForTimeout(400);
 
   // CARRY IT AT THE RIM. Up-court is −y on the stick; a couple of seconds of drive puts a shot inside the arc.
   await stick(0, -1);
