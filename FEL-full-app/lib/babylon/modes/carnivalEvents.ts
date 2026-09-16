@@ -38,6 +38,15 @@ export interface CarnivalEvent {
   rivalRange: [number, number];  // plausible raw-score range for the simulated rival
   build(ctx: ModeContext): Promise<void>;
   onInput(ctx: ModeContext, e: FelInput): void;
+  /**
+   * The buttons THIS event reads, and one line naming what it wants instead (SCORECARD FEEL, 2026-09-15).
+   *
+   * An event is fifteen seconds of one verb, and the other three buttons on the deck did nothing at all: measured on
+   * the rc19 capture, only 42 % of answered presses carried a sound or a pop, because more than half the session's
+   * presses were the wrong button for the event on screen and fell into the floor. The router answers those now — the
+   * press is heard, and the answer is the verb that would have worked.
+   */
+  verbs?: { buttons: readonly string[]; says: string };
   /** advance the event; return the current raw score. */
   tick(ctx: ModeContext, dt: number): number;
   teardown(): void;
@@ -53,6 +62,7 @@ export function slamRush(): CarnivalEvent {
 
   return {
     id: 'slam_rush', title: 'SLAM RUSH', durationSec: 20, pointsPerUnit: 12, rivalRange: [4, 9],
+    verbs: { buttons: [], says: 'HOLD CHARGE — RELEASE AT THE TOP' },
     async build(ctx) {
       VenueKit.buildCourt(ctx.scene, 'venice');
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 2.2), yawRad: Math.PI, startClip: SPORT_CLIP.idle });
@@ -97,6 +107,7 @@ export function strikeStorm(): CarnivalEvent {
 
   return {
     id: 'strike_storm', title: 'STRIKE STORM', durationSec: 15, pointsPerUnit: 8, rivalRange: [10, 22],
+    verbs: { buttons: ['A', 'B', 'Y'], says: 'MASH GO · TRICK · POWER' },
     async build(ctx) {
       VenueKit.buildDojo(ctx.scene);
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 1.4), startClip: SPORT_CLIP.karateStance });
@@ -137,6 +148,7 @@ export function trickGauntlet(): CarnivalEvent {
 
   return {
     id: 'trick_gauntlet', title: 'TRICK GAUNTLET', durationSec: 20, pointsPerUnit: 0.4, rivalRange: [300, 900],
+    verbs: { buttons: ['A', 'B', 'Y', 'X'], says: 'GO POPS · TRICK SPINS' },
     async build(ctx) {
       world = buildSkatepark(ctx.scene);
       rig = await buildRig(ctx, cfg.heroUrl, new Vector3(0, 0, -6), 0, world.ground, '#ffd75e');
@@ -197,6 +209,7 @@ export function hotShot(): CarnivalEvent {
 
   return {
     id: 'hot_shot', title: 'HOT SHOT', durationSec: 15, pointsPerUnit: 15, rivalRange: [3, 7],
+    verbs: { buttons: ['A'], says: 'GO — POWER, THEN SHOOT' },
     async build(ctx) {
       VenueKit.buildField(ctx.scene, 'pitch');
       goal = buildGoal(ctx.scene);
@@ -268,6 +281,7 @@ export function coinStorm(): CarnivalEvent {
 
   return {
     id: 'coin_storm', title: 'COIN STORM', durationSec: 15, pointsPerUnit: 6, rivalRange: [8, 16],
+    verbs: { buttons: [], says: 'RUN IT WITH THE STICK' },
     async build(ctx) {
       VenueKit.buildCourt(ctx.scene, 'street');
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 0), startClip: SPORT_CLIP.idle });
@@ -321,6 +335,7 @@ export function counterStrike(): CarnivalEvent {
 
   return {
     id: 'counter_strike', title: 'COUNTER STRIKE', durationSec: 15, pointsPerUnit: 14, rivalRange: [4, 8],
+    verbs: { buttons: ['A'], says: 'GO — ON THE WIND-UP' },
     async build(ctx) {
       VenueKit.buildDojo(ctx.scene);
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 1.2), startClip: SPORT_CLIP.karateStance });

@@ -53,14 +53,20 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     root.position.set(0, 2.6, -4.5);
     root.rotation.x = Math.PI / 2 * 0.15;
     const disc = MeshBuilder.CreateCylinder('bb_wheel_disc', { diameter: 3.2, height: 0.12, tessellation: 40 }, ctx.scene);
-    const dm = new StandardMaterial('bb_wheel_mat', ctx.scene); dm.diffuseColor = Color3.FromHexString('#1B1330'); dm.emissiveColor = Color3.FromHexString('#2A1E4A'); disc.material = dm;
+    // SCORECARD VISUALS (2026-09-15): #1B1330 on a #171034 stage under a 0.45 ambient is a black disc in a black room —
+    // the frame review has called this "a dark void with a blue slab" since rc10, and the rc19 mid frame is a wheel you
+    // cannot see turning. The face carries its own value now, so the thing the whole mode is named for reads.
+    const dm = new StandardMaterial('bb_wheel_mat', ctx.scene); dm.diffuseColor = Color3.FromHexString('#2E2358'); dm.emissiveColor = Color3.FromHexString('#4A3A86'); disc.material = dm;
     disc.parent = root; disc.rotation.x = Math.PI / 2;
     CATEGORIES.forEach((cat, i) => {
       const a = (i + 0.5) / CATEGORIES.length * Math.PI * 2;
       const wedge: Mesh = MeshBuilder.CreateBox(`bb_wedge_${cat}`, { width: 0.7, height: 0.7, depth: 0.1 }, ctx.scene);
-      wedge.parent = root; wedge.position.set(Math.sin(a) * 1.05, Math.cos(a) * 1.05, -0.1); wedge.rotation.z = -a;
+      // AND THE FIVE CATEGORIES WERE BEHIND IT. The wedges sat at z −0.1 in the wheel's frame — the far side of a solid
+      // 3.2 m disc from the camera — so every spin showed a blank circle and the category you landed on was a HUD word
+      // with nothing on the wheel to match it. They belong on the face, proud of it.
+      wedge.parent = root; wedge.position.set(Math.sin(a) * 1.05, Math.cos(a) * 1.05, 0.11); wedge.rotation.z = -a;
       const m = new StandardMaterial(`bb_wedge_mat_${cat}`, ctx.scene);
-      m.diffuseColor = Color3.FromHexString(CATEGORY_COLOR[cat]); m.emissiveColor = Color3.FromHexString(CATEGORY_COLOR[cat]).scale(0.45); wedge.material = m;
+      m.diffuseColor = Color3.FromHexString(CATEGORY_COLOR[cat]); m.emissiveColor = Color3.FromHexString(CATEGORY_COLOR[cat]).scale(0.8); wedge.material = m;
     });
     const pin = MeshBuilder.CreateBox('bb_wheel_pin', { width: 0.16, height: 0.5, depth: 0.16 }, ctx.scene);
     pin.position.set(0, 2.6 + 1.85, -4.5); const pm = new StandardMaterial('bb_pin_mat', ctx.scene); pm.emissiveColor = Color3.White(); pin.material = pm;

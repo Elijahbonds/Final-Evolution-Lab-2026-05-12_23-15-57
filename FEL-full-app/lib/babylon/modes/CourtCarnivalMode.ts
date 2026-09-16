@@ -362,6 +362,13 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
         }
         return;
       }
+      // THE WRONG BUTTON IS STILL A PRESS (SCORECARD FEEL, 2026-09-15). Each event is one verb, and the rest of the deck
+      // used to fall into the floor — only 42 % of answered presses in the rc19 capture carried a sound or a pop, because
+      // most presses were simply the wrong button for the event on screen. The event declares what it reads; anything
+      // else is answered with the verb that would have worked, which is both a feel fix and the only teaching this
+      // 15-second format has room for.
+      const v = S.current.verbs;
+      if (v && e.t === 'button' && e.pressed && !v.buttons.includes(e.btn ?? '')) { refuse(ctx, v.says); return; }
       S.current.onInput(ctx, e);
     },
 
