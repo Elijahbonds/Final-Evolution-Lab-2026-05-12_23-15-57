@@ -62,3 +62,34 @@ move list (`runwayTeachLine`, built from `RUNWAY_TRICKS` itself), which turns in
 2. Two winged elbows on the stack that read as the rider flexing — they were the **base's** arms, his own head hidden
    behind the rider. Settled by moving the rider's arms and watching these not move; the carry holds the shins down
    against the chest now.
+
+---
+
+## The physics / aesthetics / visuals / effects pass (2026-09-16)
+
+Owner: a 10-phase pass on physics, aesthetics and visuals — "effects?". Decisions: full effects pass, feel-first
+physics measured rather than re-solved, **60 fps p10 as a gate**, commit only.
+
+**P0 — the instrument.** `scripts/probes/_dunk-look.mts`. A frame at each beat the mode itself announces, and the cost
+of the whole attempt split by beat (fps p50/p10/p1, worst frame, active meshes, particle systems, live particles).
+Screenshots corrupt a frame record, so `SHOTS=1` and the cost run are separate.
+
+| phase | the fault, as seen in a frame | where it lived |
+| --- | --- | --- |
+| P1 | the flash **hid the dunk** — opacity 0.85 over the whole viewport | `JuiceKit`, 20+ callers in 10 modes |
+| P2 | the ball trail was a **pile of orbs**, not a trail | `EffectsKit.ballTrail` + the mode's levels |
+| P3 | the runway **taught mid-flight** ("DOUBLE-UP — tap A" in the air) | `DunkMode.launchDunk` |
+| P4 | the gulls were **white rectangles** flying through the play | `EffectsKit.ambient` |
+| P5 | the **net splash** fired in the judges' step, seconds late | `DunkMode.contactPunch` |
+| P6 | **every landing** raised the same puff | `DunkMode.landSettle` |
+| P7 | the shadow was **four black spikes** (acne at a grazing sun) | `LightRig` cascaded shadows |
+| P8 | the verdict **overlapped itself** — two blocks 2% apart | `components/games/dunk-babylon.tsx` |
+| P9 | the gate | measured on rc31 |
+
+**The gate, measured:** fps p10 **54.1 → 59.2**, p1 53.5 → 56.5, worst frame 20 ms, peak particles **129 → 99**. The
+pass costs less than the baseline it replaced.
+
+**The physics, measured rather than assumed:** a true parabola, 1.84 m of rise, the ball crests at 3.35 m, iron contact
+at 3.22 m with the let-go at 0.175 m of clearance, through the net 304 ms after. About a third longer in the air than a
+person manages — deliberately, because the trick vocabulary does not fit in a human 0.9 s hang — and internally
+consistent, so it stays.
