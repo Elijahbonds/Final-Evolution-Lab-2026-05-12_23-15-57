@@ -514,7 +514,13 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         refuse(ctx, carrierId !== 'foeTeam' ? 'BLOCK IS FOR DEFENSE' : 'ALREADY UP');   // MECHANICS PASS: the press is answered
       } else if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5 && !shootPressWas && carrierId === 'foeTeam') {
         refuse(ctx, 'SHOOT ON OFFENSE');
+      } else if (e.t === 'button' && e.btn === 'B' && e.pressed && carrierId !== 'me') {
+        refuse(ctx, carrierId === 'foeTeam' ? 'NO BALL TO PASS' : 'YOUR TEAMMATE HAS IT');   // SCORECARD CONTROLS (2026-09-15)
+      } else if (e.t === 'dpad' && e.pressed) {
+        refuse(ctx, 'MOVE WITH THE STICK');   // the d-pad is not a verb here, and a dead direction reads as a dead pad
       }
+      // the SHOT's gather is heard as the trigger goes down (the meter it starts is a number, which reads as nothing)
+      if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5 && !shootPressWas && carrierId === 'me') SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
       if (e.t === 'trigger' && e.side === 'R') shootPressWas = e.value > 0.5;
     },
 

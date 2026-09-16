@@ -92,18 +92,24 @@ export const INTENT_DRIVERS: Record<string, string> = {
     }, 16);
   `),
 
-  // SNOWBOARD: carve the gates with a weave, JUMP, SPIN with a direction, GRAB, TUCK on the straights
+  // SNOWBOARD: the LINE is the score — steer through each gate (the mode publishes the next one for QA), tricks between them
   snowboard_slalom: loop(`
-    const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]]; let k = 0, t = 0;
+    const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]]; let k = 0, t = 0, sgn = 1, lastX = null, lastCmd = 0, airT = 0;
     setInterval(() => {
       t += 16;
-      const weave = 0.55 * Math.sin(t / 700);
-      const phase = t % 2200;
-      if (phase < 16) { hold(RT, false); btn(A, 90); }
-      else if (phase >= 200 && phase < 216) { const d = dirs[k++ % dirs.length]; stick(d[0], d[1]); btn(B, 60); setTimeout(() => stick(weave, -0.7), 90); }
-      else if (phase >= 460 && phase < 476) { const d = dirs[k++ % dirs.length]; stick(d[0], d[1]); btn(X, 60); setTimeout(() => stick(weave, -0.7), 90); }
-      else if (phase >= 1200 && phase < 1216) hold(RT, true);
-      else if (phase > 700 && (phase % 96) < 16) stick(weave, -0.7);
+      const h = Q.hero && Q.hero(); const s = Q.scene && Q.scene(); if (!h) return;
+      let r = h; while (r.parent) r = r.parent; const q = r.getAbsolutePosition();
+      const g = s && s.metadata ? s.metadata.qaNextGate : null;
+      const want = g ? clamp((g.x - q.x) * 0.6, 0.9) : 0;
+      if (lastX !== null && Math.abs(lastCmd) > 0.25 && Math.abs(q.x - lastX) > 0.01 && Math.sign(q.x - lastX) !== Math.sign(lastCmd * sgn)) sgn = -sgn;
+      lastCmd = want; lastX = q.x;
+      stick(want * sgn, -0.75);
+      // a trick between gates: jump, then spin or grab in the air, and tuck on the straights
+      const dz = g ? Math.abs(g.z - q.z) : 99;
+      if (dz > 22 && t % 2600 < 16) { airT = t; btn(A, 90); }
+      else if (airT && t - airT > 220 && t - airT < 236) { const d = dirs[k++ % dirs.length]; stick(d[0], d[1]); btn(B, 60); setTimeout(() => stick(want * sgn, -0.75), 110); }
+      else if (airT && t - airT > 460 && t - airT < 476) { const d = dirs[k++ % dirs.length]; stick(d[0], d[1]); btn(X, 60); setTimeout(() => stick(want * sgn, -0.75), 110); airT = 0; }
+      hold(RT, dz > 30);
     }, 16);
   `),
 
@@ -122,6 +128,10 @@ export const INTENT_DRIVERS: Record<string, string> = {
       if (lastX !== null && Math.abs(lastCmd) > 0.2 && Math.abs(q.x - lastX) > 0.004 && Math.sign(q.x - lastX) !== Math.sign(lastCmd * sgn)) sgn = -sgn;
       lastCmd = clamp((tx - q.x) * 0.5, 0.6); stick(lastCmd * sgn, -1); lastX = q.x;
       if (now - lastPress < 350) return;
+      // a line is TRICKS ALONG THE ROUTE: between obstacles, jump and throw one (the run's own clock pays the route home)
+      if (q.y < 0.2 && now - lastPress > 1200 && !P0.some((pc) => pc.kind === 'vault' && pc.z - q.z > 0 && pc.z - q.z < 4)) {
+        btn(A); lastPress = now; setTimeout(() => btn((flip++ % 2) ? Y : X, 60), 200); return;
+      }
       for (const pc of P0) {
         const dz = pc.z - pc.d / 2 - q.z, inX = Math.abs(q.x - pc.x) < pc.w / 2 - 0.2;
         const gapEdge = pc.kind === 'ground' && !P0.some((g) => g.kind === 'ground' && Math.abs(g.z - g.d / 2 - (pc.z + pc.d / 2)) < 0.05) && (pc.z + pc.d / 2 - q.z) > 0 && (pc.z + pc.d / 2 - q.z) < 0.9;

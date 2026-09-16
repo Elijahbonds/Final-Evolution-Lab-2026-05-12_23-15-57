@@ -250,6 +250,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   // one timeline, published as `window.__FEL_QA__` for the mechanics probe. See QaTrace.ts. Off in play: `qa` is null.
   const qa = agentEnabled() ? new QaTrace() : null;
   const qaRawHud: Record<string, unknown> = {};
+  const qaTrigAt: Record<'L' | 'R', number> = { L: -1e9, R: -1e9 };
   let qaResult: { outcome: string; score: number; card?: boolean } | null = null;
   let qaRestore: (() => void) | null = null;
   if (qa) {
@@ -487,7 +488,13 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       if (qa) {
         if (e.t === 'button' && e.pressed) qa.press(e.btn);
         else if (e.t === 'dpad' && e.pressed) qa.press(`DPAD_${e.dir.toUpperCase()}`);
-        else if (e.t === 'trigger') { const was = qaTrig[e.side]; qaTrig[e.side] = e.value; if (was < 0.5 && e.value >= 0.5) qa.press(`${e.side}T`); }
+        else if (e.t === 'trigger') {
+          // a crossing is a PRESS only once per pull: a trigger that flickers (two emitters, a noisy pad) must not read as
+          // a burst of presses — it has to come back under half for a beat before the next one counts
+          const was = qaTrig[e.side]; qaTrig[e.side] = e.value;
+          const t = performance.now();
+          if (was < 0.5 && e.value >= 0.5 && t - qaTrigAt[e.side] > 120) { qaTrigAt[e.side] = t; qa.press(`${e.side}T`); }
+        }
       }
       def.onInput(ctx, e);
     }

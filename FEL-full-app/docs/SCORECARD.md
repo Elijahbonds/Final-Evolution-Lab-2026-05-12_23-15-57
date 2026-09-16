@@ -14,7 +14,9 @@ Source: the capture session (deliberate driver: every live verb, moving with pur
 - − phone: **2** if the route fails the phone-controls check
 
 ### 2. Logic: does playing well beat noise, and does the game end?
-Source: the release gauntlet plus the mechanics probe (idle / deliberate / masher; per-family intent drivers where they exist).
+Source: the release gauntlet plus the mechanics probe (idle / deliberate / masher / **intent**).
+
+**Intent drivers** (`scripts/probes/_intent-drivers.mts`, run with `INTENT=1`) are the "playing well" baseline: they play the mode the way someone who understands it does — the PCI on the ball and the swing on the plate, the golf meter clicked at the top and inside the band, the answer you know, a trick line, the free-run course. They read only the agent-only `window.__FEL_QA__` (`rawHud()`, `scene()`, `hero()`) and drive the same fake pad. Without one, a timing or trick mode scores near zero on the generic deliberate driver and ANY masher "beats" it — the penalty then measures the driver, not the game. `best` is the better of intent and deliberate.
 - start at **10**; **capped at 5** if the gauntlet does not reach the end card
 - − **1.5** if idle play scores
 - − noise wins: `min(4, (mash ÷ best-of-intent-or-deliberate − 1.2) × 1.5)` when the ratio is above 1.2
@@ -54,4 +56,5 @@ Source: the capture (in-page rAF fps, console errors, load time).
 ## Rules
 - Measured on a **production build** (`next start`), logged in, shipping routes.
 - A category that cannot be measured for a game (e.g. body on a quiz with no hero) is reported **N/A with the reason**, never scored 10 by default.
+- **`/play/dunkduel` is PROVE IT**, the IRL camera dunk contest (real footage, on-device pose tracking), not a Babylon mode — the headless capture cannot play it and it scores N/A here. The Babylon duel it replaced still runs at `/dev/mode/dunkduel`. It needs its own review with a camera.
 - A score only moves on evidence: fix, rebuild, re-capture, re-score. The report keeps every run.

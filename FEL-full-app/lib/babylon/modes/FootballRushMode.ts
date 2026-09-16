@@ -205,6 +205,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       neverBindPose(char.animator, SPORT_CLIP.idle);
       installSafePlay(char.animator, 'football-defender');
       ctx.groundLock?.track(char.root, char.skeleton);
+      char.animator.park();   // a parked body runs NO clip: a disabled root whose clip still advances trips the skinning-stall watch
       char.root.setEnabled(false);
     }
   }
@@ -212,7 +213,7 @@ export const FootballRushMode: ModeDefinition = (() => {
   async function spawnDefense(ctx: ModeContext): Promise<void> {
     defenders = [];
     pool = new MobPool();
-    for (const char of defenderBodies) char.root.setEnabled(false);
+    for (const char of defenderBodies) { char.animator.park(); char.root.setEnabled(false); }   // parked: no clip advancing off-screen
 
     const progress = Math.max(0, runner.root.position.z);
     const count = Math.min(3 + Math.floor(progress / (FIELD_LENGTH / 3)), DEFENDER_POOL, defenderBodies.length);

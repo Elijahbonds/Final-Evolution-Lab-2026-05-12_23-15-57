@@ -132,6 +132,8 @@ for (const [slug, path] of MODES) {
       return { presses: sum.presses, silentPct: sum.silentPct, silentBy: Object.fromEntries(Object.entries(sum.byBtn as Record<string, { presses: number; answered: number }>).map(([k, r]) => [k, `${r.presses - r.answered}/${r.presses}`])), unexplainedScores: sum.unexplainedScores, latMedian: lat.length ? lat[Math.floor(lat.length / 2)] : null, rich: answered ? rich / answered : 0, juicePerMin: juice / playMin };
     }, [from, playMin] as [number, number]);
     row.qa = qa;
+    // what the session actually reached (score, gates, laps): the evidence behind a low juice or feel number
+    row.hud = await p.evaluate(() => { const q = (window as any).__FEL_QA__; return q?.rawHud ? q.rawHud() : null; }).catch(() => null);
     row.feltFrame = frames.length;
   } catch (e) { if (!row.note) row.note = String((e as Error).message).slice(0, 160); }
   row.errors = [...new Set(errors)].slice(0, 5); row.errorCount = errors.length;

@@ -191,7 +191,13 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // under the run's lowest point and the stick-down glue keep the rider on the snow (owner sign-off 2026-09-07).
       const pisteBottomY = -Math.sin(SLOPE_PITCH) * (SLALOM_START + SLALOM_GATES * SLALOM_SPACING + 40);
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0.2, 4), 0, world.ground, '#ff6b3d', 'snowboard', { hardFloorY: pisteBottomY - 5, rayLength: 80, stickDown: 0.6 });
-      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { momentum: trickMomentum, anim: 'external', onBeat: (b) => { if (b === 'land') landBeatT = LAND_BEAT_SEC; else bailBeatT = BAIL_BEAT_SEC; } });
+      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { momentum: trickMomentum, anim: 'external', onBeat: (b) => {
+        if (b === 'land') {
+          landBeatT = LAND_BEAT_SEC;
+          // SCORECARD FEEL (2026-09-15): a landed trick pops at the rider — the run measured 4.5 juice beats a minute
+          ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2.1, 0)), 'STOMPED', '#a7f3d0');
+        } else bailBeatT = BAIL_BEAT_SEC;
+      } });
       animTree = new BoardAnimTree(rig.char.animator);
       posture?.dispose();
       posture = mountPostureLayer(ctx.scene, rig.char.skeleton, rig.char.root, () => {
@@ -390,6 +396,9 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       }
 
       const gate = world.markers[nextGate];
+      // QA INTENT (2026-09-15): the next gate for the mechanics probe's intent driver (gates are thin instances, not meshes it
+      // can find) — read through the agent-only __FEL_QA__.scene(), never by the game itself
+      ((ctx.scene.metadata ??= {}) as { qaNextGate?: { x: number; z: number } | null }).qaNextGate = gate ? { x: gate.x, z: gate.z } : null;
       if (gate) {
         const p = rig.char.root.position;
         if (p.z >= gate.z - 0.3) {

@@ -92,6 +92,10 @@ export class InputBus {
   public gamepadActive = false;
 
   start(): void {
+    // IDEMPOTENT (2026-09-15). A second start() on the same bus left the FIRST pollPads chain running: two poll loops, two
+    // emits a frame, and — measured on football — a HELD trigger arriving as 1, 0, 1, 0 at ~17 Hz, which downstream reads
+    // as seventeen presses a second (35 "presses" from one 2 s hold). Stop whatever is already running first.
+    this.stop();
     window.addEventListener('keydown', this.onKey);
     window.addEventListener('keyup', this.onKey);
     window.addEventListener('gamepadconnected', this.onPad);

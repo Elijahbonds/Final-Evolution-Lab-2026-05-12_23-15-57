@@ -307,6 +307,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   let myJumpAge = Infinity;                 // seconds since my contest jump left the floor
   let meStunSec = 0;                        // whiffed reach costs you your feet
   let reachCooldown = 0;
+  /** The shot trigger's last state — the gather sound fires on the way down, once. */
+  let shotTrigWas = false;
   let contact: ContactSystem | null = null;      // Phase 4: Havok bodies when ready
   let hoopJuice: HoopJuice | null = null;        // A+ P0 CONTACT-lite: rim spring / net squash / hoop flash on a make
   let contactLatch = false;                      // A+ P0: the dunk's ONE punch per attempt — never re-fired by the banner or the stun
@@ -628,7 +630,15 @@ export const OneVOneMode: ModeDefinition = (() => {
         else if (meStunSec > 0) refuse(ctx, 'STUNNED');
         else if (e.btn === 'A' && myJumpAge !== Infinity) refuse(ctx, 'ALREADY UP');
         else if (e.btn === 'X' && reachCooldown > 0) refuse(ctx, 'RECOVERING');
+        // SCORECARD CONTROLS (2026-09-15): a steal thrown from out of range reached for nothing and said nothing (5 of 7
+        // presses silent in the rc11 capture) — the reach is a commitment, so the distance is the answer
+        else if (e.btn === 'X' && Vector3.Distance(me.root.position, foe.root.position) > 1.7) refuse(ctx, 'TOO FAR TO REACH');
       }
+      // the SHOT's gather is heard as the trigger goes down (the meter it starts is a number, which reads as nothing)
+      if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5 && !shotTrigWas && possession === 'mine') {
+        SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
+      }
+      if (e.t === 'trigger' && e.side === 'R') shotTrigWas = e.value > 0.5;
     },
 
     update(ctx: ModeContext, dt: number) {

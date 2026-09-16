@@ -54,6 +54,7 @@ const DRIVER_SCALE = 0.92;
 let baseFov: number | null = null;
 /** Last frame's finishing place, so an OVERTAKE can be detected as a change rather than a state. */
 let lastPlace = 0;
+let driftCallT = 0;
 
 export function makeVelocityKartMode(): ModeDefinition {
 let kart: TransformNode | null = null;
@@ -432,7 +433,7 @@ return {
     S.done = false; S.banner = ''; S.bannerT = 0; S.bestDrift = 0; S.offRoadSec = 0; S.graceLeft = null;
     S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false, boostK: 0 };
     S.boostHeld = false; boost = new BoostKit();
-    lastPlace = 0;   // a remount must not inherit last race's place (it would read as an overtake on frame one)
+    lastPlace = 0; driftCallT = 0;   // a remount must not inherit last race's place (it would read as an overtake on frame one)
 
     // THE MAP AND THE KART ARE BOTH PICKS (2026-09-13). Read once, here, at mount — the world is built from
     // the course and the handling comes from the vehicle, and neither can be swapped under a running scene.
@@ -604,8 +605,12 @@ return {
       S.bestDrift = Math.max(S.bestDrift, driftQuality(state));
       boost.earnOver('drift', dt, driftQuality(state));   // a CLEAN slide fills the shared meter (the kart's own bank is retired)
       if (Math.random() < 0.25) EffectsKit.burst(ctx.scene, state.pos.clone(), 'dust');
-    }
-    if (boostPads && boostPads.update(dt, state.pos, boost) > 0) say('BOOST PAD', 0.5);
+      // SCORECARD FEEL (2026-09-15): a slide that HOOKS UP is the kart's best moment and it was silent past the dust —
+      // it calls itself while it holds (the race measured 1.5 juice beats a minute)
+      driftCallT -= dt;
+      if (driftQuality(state) > 0.55 && driftCallT <= 0) { driftCallT = 0.9; ctx.juice.callout('DRIFT', '#fbbf24', 420); SoundKit.play('squeak', { pitch: 1.1, volume: 0.25 }); }
+    } else driftCallT = 0;
+    if (boostPads && boostPads.update(dt, state.pos, boost) > 0) { say('BOOST PAD', 0.5); ctx.juice.scorePop(kart.position.add(new Vector3(0, 1.4, 0)), 'BOOST PAD', '#38bdf8'); }
     boostFx?.update(dt, boost, bev);
     if (bev.started) { ctx.feel.impact(0.3); say('BOOST!', 0.6); }
     if (bev.full) say('BOOST READY', 0.8);

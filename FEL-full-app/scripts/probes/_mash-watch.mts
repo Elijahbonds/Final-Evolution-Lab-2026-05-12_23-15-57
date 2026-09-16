@@ -8,13 +8,26 @@ import { chromium } from 'playwright-core';
 import { chromiumExe } from './_chromium.mts';
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3098';
 const MODE = process.env.MODE ?? 'skateboard';
+// a production build has no /dev/mode routes (next start): pass the shipping route instead
+const PATHNAME = process.env.PATHNAME ?? `/dev/mode/${MODE}?agent=1`;
 const SEC = Number(process.env.SEC ?? 25);
-const b = await chromium.launch({ executablePath: chromiumExe(), headless: false, args: ['--use-gl=angle'] });
-const p = await b.newPage({ viewport: { width: 1000, height: 640 } });
+const b0 = null; const b = await chromium.launch({ executablePath: chromiumExe(), headless: false, args: ['--use-gl=angle'] });
+const bctx = await b.newContext({ viewport: { width: 1000, height: 640 } });
+const p = await bctx.newPage();
 await p.addInitScript({ content: 'window.__name = window.__name || function (f) { return f; };' });
 const logs: string[] = [];
 p.on('console', (m) => { const t = m.text(); if (/SKATE|BAIL|LAND|MANUAL|GRIND|COMBO|FREERUN|RUN-/i.test(t)) logs.push(t.slice(0, 120)); });
-await p.goto(`${BASE}/dev/mode/${MODE}?agent=1`, { waitUntil: 'domcontentloaded', timeout: 240000 });
+if (process.env.LOGIN === '1') {
+  const lp = await bctx.newPage();
+  await lp.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 120000 }); await lp.waitForTimeout(800);
+  if (/\/login/.test(lp.url())) {
+    await lp.fill('input[type="email"]', 'playtest@fel.local'); await lp.fill('input[type="password"]', 'playtest-local-only');
+    await lp.click('button[type="submit"]');
+    const t = Date.now(); while (Date.now() - t < 30000 && /\/login/.test(lp.url())) await lp.waitForTimeout(300);
+  }
+  await lp.close();
+}
+await p.goto(`${BASE}${PATHNAME}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
 const t0 = Date.now();
 while (Date.now() - t0 < 240000) { const s = await p.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => ''); if (s === 'loaded') break; await p.waitForTimeout(500); }
 await p.evaluate(`(() => {
