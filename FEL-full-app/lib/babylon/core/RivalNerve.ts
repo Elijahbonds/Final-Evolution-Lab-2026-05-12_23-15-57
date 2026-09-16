@@ -26,6 +26,16 @@ export interface RivalSituation {
   isFinalRound: boolean;
   /** Dunks the rival has left, this one included. Zero is treated as one. */
   attemptsLeft: number;
+  /**
+   * The standard the PLAYER is setting: their average card so far tonight, or 0 before they have posted one.
+   *
+   * P8 (2026-09-16). Nerve read the SCOREBOARD and nothing else, so a rival could be level on points against a player
+   * posting 46s and feel no pressure at all — he was level, so he played his neutral band of 2.6–6.0 and got outscored
+   * on every exchange until the deficit arrived. A dunker in a contest does not wait for the scoreboard to tell him the
+   * other guy is going big; he watches the dunk. (And the invariant holds: reaching for the player's standard costs the
+   * same cleanliness as reaching for any other reason.)
+   */
+  playerPace?: number;
 }
 
 /** What the rival is going to try. The mode rolls inside these. */
@@ -66,37 +76,57 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
  *   · PROTECTING— comfortably ahead with dunks in hand. Takes the safe one; it does not need a 50.
  *   · NEUTRAL   — everything else. The old numbers exactly.
  */
+/** A card at or under this needs no answer; at or over PACE_HOT the rival has to go get it. */
+export const PACE_COLD = 34, PACE_HOT = 46;
+/** How far the player's standard can push the rival's band, and what that reaching costs him. */
+export const PACE_REACH = 2.6, PACE_RISK = 0.07;
+
+/** 0..1: how hard the player's own standard is pushing the rival tonight. */
+export function pacePressure(playerPace = 0): number {
+  if (!playerPace) return 0;
+  return Math.max(0, Math.min(1, (playerPace - PACE_COLD) / (PACE_HOT - PACE_COLD)));
+}
+
 export function rivalNerve(sit: RivalSituation): RivalPlan {
   const left = Math.max(1, sit.attemptsLeft);
   const trailing = sit.deficit < 0;
   const behindBy = -sit.deficit;
+  // The player's standard raises the floor the rival plans from, before the scoreboard is consulted at all.
+  const pace = pacePressure(sit.playerPace);
+  const lift = (p: RivalPlan): RivalPlan => (pace <= 0 ? p : {
+    ...p,
+    diffMin: clamp(p.diffMin + PACE_REACH * pace * 0.6, 0, 10),
+    diffMax: clamp(p.diffMax + PACE_REACH * pace, 0, 10),
+    blownChance: clamp(p.blownChance + PACE_RISK * pace, MIN_BLOWN, MAX_BLOWN),
+    label: p.label || (pace > 0.5 ? 'ANSWERING YOU' : ''),
+  });
 
   // running out of road: behind by a lot with little left to fix it
   if (trailing && behindBy >= DESPERATE_MARGIN && left <= 2) {
-    return {
+    return lift({
       diffMin: BASE_DIFF_MIN + 1.6,
       diffMax: clamp(BASE_DIFF_MAX + 2.2, 0, 10),
       blownChance: clamp(BASE_BLOWN + 0.2, MIN_BLOWN, MAX_BLOWN),
       label: 'GOING FOR IT',
-    };
+    });
   }
   if (trailing || sit.isFinalRound) {
-    return {
+    return lift({
       diffMin: BASE_DIFF_MIN + 0.7,
       diffMax: clamp(BASE_DIFF_MAX + 1.0, 0, 10),
       blownChance: clamp(BASE_BLOWN + 0.08, MIN_BLOWN, MAX_BLOWN),
       label: sit.isFinalRound && !trailing ? 'CLOSING IT OUT' : 'REACHING',
-    };
+    });
   }
   if (sit.deficit >= COMFORTABLE_MARGIN && left >= 2) {
-    return {
+    return lift({
       diffMin: Math.max(0, BASE_DIFF_MIN - 0.6),
       diffMax: Math.max(0, BASE_DIFF_MAX - 1.4),
       blownChance: clamp(BASE_BLOWN - 0.08, MIN_BLOWN, MAX_BLOWN),
       label: 'PLAYING IT SAFE',
-    };
+    });
   }
-  return { diffMin: BASE_DIFF_MIN, diffMax: BASE_DIFF_MAX, blownChance: BASE_BLOWN, label: '' };
+  return lift({ diffMin: BASE_DIFF_MIN, diffMax: BASE_DIFF_MAX, blownChance: BASE_BLOWN, label: '' });
 }
 
 /**

@@ -9,10 +9,7 @@
 // builds a lead is punished for it. Difficulty and risk have to move together, everywhere, always.
 
 import { describe, it, expect } from 'vitest';
-import {
-  rivalNerve, rivalExecution, BASE_DIFF_MIN, BASE_DIFF_MAX, BASE_BLOWN,
-  DESPERATE_MARGIN, COMFORTABLE_MARGIN, MIN_BLOWN, MAX_BLOWN,
-} from './RivalNerve';
+import { rivalNerve, rivalExecution, BASE_DIFF_MIN, BASE_DIFF_MAX, BASE_BLOWN, DESPERATE_MARGIN, COMFORTABLE_MARGIN, MIN_BLOWN, MAX_BLOWN, pacePressure } from './RivalNerve';
 
 const sit = (deficit: number, isFinalRound = false, attemptsLeft = 2) => ({ deficit, isFinalRound, attemptsLeft });
 
@@ -119,5 +116,47 @@ describe('reaching costs cleanliness', () => {
       expect(e.min).toBeGreaterThanOrEqual(0);
       expect(e.max).toBeGreaterThan(e.min);
     }
+  });
+});
+
+// ── THE RIVAL WATCHES THE DUNKS, NOT ONLY THE SCOREBOARD (P8, 2026-09-16) ──────────────────────────────
+//
+// Nerve read `deficit` and nothing else, so a rival level on points against a player posting 46s felt no pressure at
+// all: he played his neutral 2.6–6.0 band and got outscored on every exchange until the deficit finally arrived.
+describe('the player\'s standard', () => {
+  const level = { deficit: 0, isFinalRound: false, attemptsLeft: 3 };
+
+  it('a cold night leaves the rival exactly as he was', () => {
+    expect(rivalNerve({ ...level, playerPace: 30 })).toEqual(rivalNerve(level));
+    expect(pacePressure(0)).toBe(0);
+  });
+
+  it('a player posting big cards makes him reach, even level on points', () => {
+    const calm = rivalNerve(level);
+    const answering = rivalNerve({ ...level, playerPace: 46 });
+    expect(answering.diffMax).toBeGreaterThan(calm.diffMax + 2);
+    expect(answering.label).toBe('ANSWERING YOU');
+  });
+
+  it('and reaching costs him the same cleanliness it always does — the invariant holds', () => {
+    const calm = rivalNerve(level);
+    const answering = rivalNerve({ ...level, playerPace: 48 });
+    expect(answering.blownChance).toBeGreaterThan(calm.blownChance);
+    // …in every situation, not just the level one
+    for (const sit of [
+      { deficit: -20, isFinalRound: false, attemptsLeft: 1 },
+      { deficit: -4, isFinalRound: true, attemptsLeft: 2 },
+      { deficit: 18, isFinalRound: false, attemptsLeft: 3 },
+    ]) {
+      const a = rivalNerve(sit), b = rivalNerve({ ...sit, playerPace: 47 });
+      expect(b.diffMax).toBeGreaterThanOrEqual(a.diffMax);
+      expect(b.blownChance).toBeGreaterThanOrEqual(a.blownChance);
+    }
+  });
+
+  it('never past the ceilings the file exists to hold', () => {
+    const wild = rivalNerve({ deficit: -30, isFinalRound: true, attemptsLeft: 1, playerPace: 50 });
+    expect(wild.diffMax).toBeLessThanOrEqual(10);
+    expect(wild.blownChance).toBeLessThanOrEqual(MAX_BLOWN);
   });
 });

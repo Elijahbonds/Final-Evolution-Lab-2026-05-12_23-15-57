@@ -274,6 +274,10 @@ export const DunkMode: ModeDefinition = (() => {
   // is the description of each attempt, small enough to ride in the JSON payload MatchEvent already has.
   let card = emptyCard();
   let makes = 0, misses = 0, bestChain = 0;   // PACK #3: the proof card's make/miss line
+  /** Every card the player has posted tonight — P8: the standard the rival is watching, not just the scoreboard. */
+  const playerCards: number[] = [];
+  /** The player's average card so far (0 before the first one). */
+  const playerPace = (): number => (playerCards.length ? playerCards.reduce((a, c) => a + c, 0) / playerCards.length : 0);
   let lastScores: JudgeScore[] = [];
   let finishing = false;
   let ended = false;                          // soft-OPEN #3: ctx.end / resultSink once — the watchdog and rivalRound's own end can both reach advanceAfterRivalTurn
@@ -2340,7 +2344,7 @@ export const DunkMode: ModeDefinition = (() => {
       }
       const missTotal = Math.round(missScores.reduce((a, j) => a + j.score, 0)
         * stakesScale(stakes, flight.attempt.tricks.map((t) => t.id), false));
-      playerTotal += missTotal; misses++;
+      playerTotal += missTotal; misses++; playerCards.push(missTotal);   // a miss is part of the standard too
       card = addAttempt(card, {
         round, style: STYLE_LABEL[style], prop: PROP_LABEL[prop],
         finish: SPORT_CLIP.dunkFinishBlown, label: 'BLOWN',
@@ -2450,7 +2454,7 @@ export const DunkMode: ModeDefinition = (() => {
       chain = 0;
     }
 
-    playerTotal += dunkTotal; makes++; bestChain = Math.max(bestChain, chain);
+    playerTotal += dunkTotal; makes++; bestChain = Math.max(bestChain, chain); playerCards.push(dunkTotal);
     // the FINISH CLIP goes in, not only a label: the body's finish is picked deterministically from these
     // same values, so the card is enough to re-perform the attempt if a replay is ever built
     card = addAttempt(card, {
@@ -2550,6 +2554,12 @@ export const DunkMode: ModeDefinition = (() => {
     resetLob(); resetRunway(); ballSim.stop(); looseBall = false; flush = null; jamPrevLive = false; punchPending = false; dribble?.update(0, 0, false); gatherLatched = false; gatherK = 0; finishRelease = -1; attachBallToHand(ball, player.skeleton, 'RightHand'); ebState.inLeftHand = false; setWin('run');
     settleLatch = false; settleArmed = false; fovRelease(); setTrail('soft');   // juice soft: back to the runway
     void setupProp(ctx);
+    // P7 (2026-09-16): THE RUNWAY GETS ITS CAMERA BACK. `snapTo` places and aims the camera but never touches the
+    // director's MODE, and the verdict portrait is a FIXED camera — so the whole next run-up was filmed from the spot
+    // the last dunk was judged from, and the dunker drifted to the edge of frame as he walked back to the top of the
+    // runway. Measured in the lab: an attempt's opening frame is the hero half out of shot at the left edge with the
+    // rim not in the picture at all. (The rival-round path already knew to do this; the player's own did not.)
+    ctx.camDirector.mode = 'follow';
     ctx.camDirector.snapTo(player.root.position, rim);
     setPhase('approach');
     // THE NEED — final-round pressure number: what this dunk must average
@@ -2605,6 +2615,9 @@ export const DunkMode: ModeDefinition = (() => {
         deficit: rivalTotal - playerTotal,
         isFinalRound: round === TOTAL_ROUNDS,
         attemptsLeft: DUNKS_PER_ROUND - i + (TOTAL_ROUNDS - round) * DUNKS_PER_ROUND,
+        // P8: the standard the player is setting tonight. A rival level on points against a player posting 46s used to
+        // feel nothing at all — he was level, so he played his neutral band and got outscored on every exchange.
+        playerPace: playerPace(),
       });
       const rExecBand = rivalExecution(nerve);
       // THE OPPONENT'S OWN TEMPERAMENT, on top of the situation. `reach` and `risk` move together across the
