@@ -48,7 +48,15 @@ await page.screenshot({ path: `${OUT}/dunkduel-1-open.png` });
 const start = page.locator('button', { hasText: /start|camera|allow|begin|prove/i }).first();
 const sawConsent = await start.count() > 0;
 if (sawConsent) await start.click().catch(() => {});
-await page.waitForTimeout(4000);
+// walk as deep as a synthetic camera can go: consent → the tracker downloads → "prop the phone" → armed. Each gate is
+// one CTA, so clicking whatever CTA is on screen (a few times, slowly) is the whole flow.
+const walked: string[] = [];
+for (let i = 0; i < 3; i++) {
+  await page.waitForTimeout(5000);
+  const cta = page.locator('button', { hasText: /start|attempt|player|again|try/i }).first();
+  if (await cta.count()) { walked.push(((await cta.textContent()) ?? '').trim().slice(0, 40)); await cta.click().catch(() => {}); }
+}
+await page.waitForTimeout(2000);
 
 const live = await page.evaluate(() => {
   const v = document.querySelector('video') as HTMLVideoElement | null;
@@ -67,7 +75,7 @@ await page.screenshot({ path: `${OUT}/dunkduel-3-late.png` });
 
 const res = {
   slug: 'dunkduel', path: '/play/dunkduel', tag: TAG,
-  readyMs, readyState: ready, sawConsent, ...live,
+  readyMs, readyState: ready, sawConsent, walked, ...live,
   errors: errors.slice(0, 5), errorCount: errors.length,
   note: 'chromium fake camera: a synthetic pattern, so no pose is ever found and no dunk is judged — the flow is measured to "armed and tracking"',
 };
