@@ -30,6 +30,33 @@ const na = (why: string): Cat => ({ score: null, why: [why] });
 /** Slugs the phone check / mechanics probe name differently. */
 const alias = (slug: string) => (slug === 'try' ? 'dunk' : slug);
 
+/**
+ * PROVE IT IS NOT A PAD GAME (2026-09-15). /play/dunkduel is a real-camera contest judged by on-device pose tracking:
+ * Controls measures pad latency, Logic measures a masher against intent, and Body measures a rig's clips, and it has
+ * none of the three. Scoring it N/A on all six is neither a pass nor a judgement, so its flow is measured instead
+ * (_proveit-flow.mts: does the page come up, does consent reach the camera, does the tracker start, any errors) and
+ * that stands in for Controls and Logic. Visuals, Feel and Performance are read from the same frames and the same
+ * fps as every other game. Body stays N/A and says why — a camera contest has no rig on screen.
+ */
+function proveItFlow(slug: string): Record<string, Cat> | null {
+  if (slug !== 'dunkduel') return null;
+  const fl = read(`${H}/scorecard/${TAG}/dunkduel-flow.json`);
+  if (!fl) return null;
+  const why: string[] = [];
+  let s = 10;
+  if (!fl.readyState) { s -= 5; why.push('the page never published #fel-ready (−5)'); } else why.push(`ready in ${(fl.readyMs / 1000).toFixed(1)} s`);
+  if (!fl.sawConsent) { s -= 2; why.push('no consent control found (−2)'); }
+  if (!fl.hasVideo) { s -= 3; why.push('no video element after consent (−3)'); }
+  if (!fl.streaming) { s -= 2; why.push('the camera track never went live (−2)'); } else why.push(`camera live ${fl.w}×${fl.h}`);
+  if (fl.errorCount) { s -= Math.min(4, fl.errorCount * 2); why.push(`${fl.errorCount} console errors (−${Math.min(4, fl.errorCount * 2)}): ${(fl.errors ?? [])[0] ?? ''}`); }
+  why.push(fl.note ?? '');
+  return {
+    controls: { score: clamp(s), why: ['camera flow (no pad on this game)', ...why] },
+    logic: { score: clamp(s), why: ['camera flow (no masher on this game)', ...why] },
+    body: na('a camera contest has no rig on screen'),
+  };
+}
+
 export function scoreGame(slug: string) {
   const cap = read(`${H}/scorecard/${TAG}/${slug}.json`);
   const g = gauntlet.get(slug);
@@ -111,10 +138,14 @@ export function scoreGame(slug: string) {
     out.performance = { score: clamp(s), why };
   }
 
+  // the camera contest's own three categories replace the pad-shaped ones
+  const flow = proveItFlow(slug);
+  if (flow) for (const [k, v] of Object.entries(flow)) out[k] = v;
+
   const scored = Object.values(out).filter((c) => c.score != null).map((c) => c.score!);
   const min = scored.length ? Math.min(...scored) : 0;
   const mean = scored.length ? scored.reduce((a, c) => a + c, 0) / scored.length : 0;
-  const pending = Object.values(out).some((c) => c.score == null && /pending|no capture|no body samples|no fps/.test(c.why[0]));
+  const pending = Object.values(out).some((c) => c.score == null && /pending|no capture|no body samples|no fps/.test(c.why[0]));   // a category N/A for a REASON (a quiz has no body; a camera game has no rig) is not pending
   return { slug, cats: out, min: r1(min), mean: r1(mean), pass: !pending && min >= 7.5 };
 }
 
