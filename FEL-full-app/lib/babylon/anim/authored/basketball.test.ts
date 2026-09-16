@@ -12,6 +12,7 @@ import {
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,
   buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // wave 2: the footwork (M8–M14)
+  buildMikan, buildUpAndUnder,   // 2026-09-16: the layup vocabulary
 } from './basketball';
 
 let scene: Scene; let sk: Skeleton;
@@ -304,6 +305,42 @@ describe('basketball packages on the forge rig', () => {
     expect(Math.abs(pos('LeftFoot').y - pos('RightFoot').y)).toBeLessThan(0.08);  // both feet land together
     expect(pos('LeftLeg').y).toBeLessThan(pos('Hips').y);                         // square and loaded
   });
+  // ── the layup vocabulary (owner, 2026-09-16) ──────────────────────────────────────────────────────────────
+  it('the MIKAN puts the ball up beside the ear, not out in front — that is the whole shot', () => {
+    rest(); const g = buildMikan(scene, sk)!;
+    at(g, 0.22);                                                                 // the release key
+    const hand = pos('RightHand'), head = pos('Head');
+    expect(hand.y).toBeGreaterThan(head.y);                                      // up, above the head
+    expect(Vector3.Distance(new Vector3(hand.x, 0, hand.z), new Vector3(head.x, 0, head.z))).toBeLessThan(0.34);   // and CLOSE
+    expect(pos('LeftLeg').y).toBeGreaterThan(pos('RightLeg').y + 0.15);          // the knee drives on the off side
+  });
+
+  it('…and it barely leaves the floor, because under the ring the defence is TIME', () => {
+    rest(); const g = buildMikan(scene, sk)!;
+    at(g, 0); const down = pos('Hips').y;
+    at(g, 0.22);
+    expect(pos('Hips').y - down).toBeLessThan(0.2);                              // a flick, not a leap
+    at(g, 0.34);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);                   // the hand STAYS up — you are going again
+  });
+
+  it('the UP AND UNDER sells the shot first: ball and chin UP with the feet still under you', () => {
+    rest(); const g = buildUpAndUnder(scene, sk)!;
+    at(g, 0); const ball0 = pos('RightHand').y, hip0 = pos('Hips').y;
+    at(g, 0.16);
+    expect(pos('RightHand').y).toBeGreaterThan(ball0 + 0.5);                     // the ball drives up — this is the lie
+    expect(pos('Hips').y).toBeGreaterThan(hip0);                                 // and the body rises with it
+  });
+
+  it('…then DUCKS: the hips drop below where they started and the body turns through', () => {
+    rest(); const g = buildUpAndUnder(scene, sk)!;
+    at(g, 0.16); const hipUp = pos('Hips').y;
+    at(g, 0.38);
+    expect(pos('Hips').y).toBeLessThan(hipUp - 0.1);                             // under the arm that just went up
+    at(g, 0.46);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);                   // the finish, extended
+  });
+
   it('M14 the EURO steps to ONE side then crosses to the OTHER, with the ball going with it', () => {
     rest(); const g = buildEuroStep(scene, sk)!;
     at(g, 0.22);

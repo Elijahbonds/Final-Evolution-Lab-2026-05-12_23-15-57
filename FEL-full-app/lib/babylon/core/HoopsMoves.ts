@@ -120,17 +120,19 @@ export function stickBack01(wishX: number, wishZ: number, toRim: Vector3): numbe
 export type FinishSide = 'left' | 'right';
 /** HOOPS-MOVE-KIT-B: the hook (M5) and the fadeaway (M4) join the finish family — every one of them is a metered shot
  *  released from its OWN clip at the top of its own hop, not a label on the jumpshot. */
-export type FinishStyle = Extract<ShotStyle, 'layup' | 'floater' | 'hook' | 'fadeaway' | 'reverse'>;
+export type FinishStyle = Extract<ShotStyle, 'layup' | 'floater' | 'hook' | 'fadeaway' | 'reverse' | 'mikan' | 'upAndUnder'>;
 /** Lateral offset (body frame, metres) from the rim's line past which the drive is on a side. */
 export const LAYUP_SIDE_MIN = 0.35;
 /** A defender inside this on the strong side sends the finish to the off hand. */
 export const LAYUP_PROTECT_RANGE = 1.5;
 /** The hop apex (metres) of each finish: a layup's two-foot hop, a floater's runner. */
-export const FINISH_HOP_APEX: Record<FinishStyle, number> = { layup: 0.28, floater: 0.22, hook: 0.3, fadeaway: 0.34, reverse: 0.3 };
+// the Mikan barely leaves the floor (that is the shot) and the up-and-under's hop comes AFTER the fake, off one foot
+export const FINISH_HOP_APEX: Record<FinishStyle, number> = { layup: 0.28, floater: 0.22, hook: 0.3, fadeaway: 0.34, reverse: 0.3, mikan: 0.16, upAndUnder: 0.26 };
 /** The stride the finish carries toward the rim (the rival's LAYUP_STRIDE_SPEED) while further than the stop range. A hook
  *  takes ONE step into the middle; a fadeaway goes the other way entirely (fadeDrift). */
-export const FINISH_STRIDE_SPEED: Record<FinishStyle, number> = { layup: LAYUP_STRIDE_SPEED, floater: 1.6, hook: 1.1, fadeaway: 0, reverse: 1.5 };
-export const FINISH_STRIDE_STOP: Record<FinishStyle, number> = { layup: 0.9, floater: 2.0, hook: 1.5, fadeaway: 0, reverse: 0.55 };   // M11: the reverse carries THROUGH the rim to the far side
+export const FINISH_STRIDE_SPEED: Record<FinishStyle, number> = { layup: LAYUP_STRIDE_SPEED, floater: 1.6, hook: 1.1, fadeaway: 0, reverse: 1.5, mikan: 0, upAndUnder: 0.9 };
+// the Mikan does not travel at all — you are already under it; the up-and-under steps THROUGH him and finishes past the rim
+export const FINISH_STRIDE_STOP: Record<FinishStyle, number> = { layup: 0.9, floater: 2.0, hook: 1.5, fadeaway: 0, reverse: 0.55, mikan: 0, upAndUnder: 0.5 };   // M11: the reverse carries THROUGH the rim to the far side
 /** The authored finish clips and where in them the ball leaves the hand (the top of the hop) and the feet come down. */
 export const FINISH_CLIP: Record<FinishStyle, Record<FinishSide, string>> = {
   layup: { right: 'bball_layup_gather', left: 'bball_layup_gather_left' },
@@ -138,9 +140,12 @@ export const FINISH_CLIP: Record<FinishStyle, Record<FinishSide, string>> = {
   hook: { right: 'bball_hook', left: 'bball_hook_left' },                     // M5: the sweep over the shielding shoulder
   fadeaway: { right: 'bball_fadeaway', left: 'bball_fadeaway' },              // M4: the lean is the same either way
   reverse: { right: 'bball_layup_reverse', left: 'bball_layup_reverse_left' },   // M11: the far side, the ball laid back over the rim
+  mikan: { right: 'bball_mikan', left: 'bball_mikan_left' },                    // under the ring: knee up, ball up the middle, land and go again
+  upAndUnder: { right: 'bball_up_and_under', left: 'bball_up_and_under_left' },  // the fake, then through UNDER the arm that bit
 };
-export const FINISH_RELEASE_KEY_SEC: Record<FinishStyle, number> = { layup: 0.3, floater: 0.35, hook: 0.34, fadeaway: 0.38, reverse: 0.34 };
-export const FINISH_LAND_KEY_SEC: Record<FinishStyle, number> = { layup: 0.7, floater: 0.7, hook: 0.72, fadeaway: 0.8, reverse: 0.74 };
+// the Mikan is the quickest release in the game and the up-and-under the slowest — 0.30 s of it is the LIE
+export const FINISH_RELEASE_KEY_SEC: Record<FinishStyle, number> = { layup: 0.3, floater: 0.35, hook: 0.34, fadeaway: 0.38, reverse: 0.34, mikan: 0.22, upAndUnder: 0.46 };
+export const FINISH_LAND_KEY_SEC: Record<FinishStyle, number> = { layup: 0.7, floater: 0.7, hook: 0.72, fadeaway: 0.8, reverse: 0.74, mikan: 0.5, upAndUnder: 0.85 };
 
 /** Body-right for a yaw (measured, MODE-STICK-FACE): (cos yaw, 0, −sin yaw). */
 export function bodyRight(yaw: number): Vector3 { return new Vector3(Math.cos(yaw), 0, -Math.sin(yaw)); }
@@ -207,6 +212,8 @@ export const FINISH_LABEL: Record<FinishStyle, Record<FinishSide, string>> = {
   hook: { right: 'JUMP HOOK — RIGHT', left: 'JUMP HOOK — LEFT' },
   fadeaway: { right: 'FADEAWAY', left: 'FADEAWAY' },
   reverse: { right: 'REVERSE — RIGHT', left: 'REVERSE — LEFT' },
+  mikan: { right: 'MIKAN', left: 'MIKAN' },                      // under the ring; the side is the hand, not a different shot
+  upAndUnder: { right: 'UP AND UNDER', left: 'UP AND UNDER' },
 };
 
 // ── M2: the drive contest ───────────────────────────────────────────────────
@@ -626,7 +633,11 @@ export function planStepThrough(shooter: Vector3, rimFloor: Vector3, yaw: number
   // the step goes at the rim AND around him: half toward the rim, half across
   const dir = new Vector3(toRim.x * 0.72 + right.x * 0.7 * sign, 0, toRim.z * 0.72 + right.z * 0.7 * sign);
   const n = dir.length() || 1;
-  return { kind: 'stepthrough', sec: STEP_THROUGH_SEC_LEG, v0: new Vector3(0, 0, 0), toRim, then: 'layup', side,
+  // …and the shot at the end of it is an UP AND UNDER (2026-09-16), which is what a pump-fake step-through has
+  // always physically been: you sold the shot, he left the floor, you stepped THROUGH under the arm he raised.
+  // It resolved to a plain layup before, so the move's whole point — the finish that goes under a man in the air —
+  // was played with the clip for a man running at an empty rim.
+  return { kind: 'stepthrough', sec: STEP_THROUGH_SEC_LEG, v0: new Vector3(0, 0, 0), toRim, then: 'upAndUnder', side,
     legs: [{ dir: dir.scale(1 / n), sec: STEP_THROUGH_SEC_LEG, speed: STEP_THROUGH_SPEED }] };
 }
 

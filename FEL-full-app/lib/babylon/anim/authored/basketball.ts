@@ -25,6 +25,7 @@ export const BASKETBALL_CLIPS = [
   // HOOPS-MOVE-KIT-B wave 2 (2026-09-08): the footwork — M8 the pump + the step-through, M9 the pivot, M11 the reverse,
   // M13 the hop step, M14 the euro
   'bball_pump_fake', 'bball_step_through', 'bball_pivot', 'bball_layup_reverse', 'bball_layup_reverse_left',
+  'bball_mikan', 'bball_mikan_left', 'bball_up_and_under', 'bball_up_and_under_left',
   'bball_hop_step', 'bball_euro_step',
 ] as const;
 type V3 = [number, number, number];
@@ -305,6 +306,52 @@ const REVERSE_KEYS = [
 export function buildReverseLayup(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_layup_reverse', 0.74, REVERSE_KEYS);
   return buildPoseClip(scene, sk, 'bball_layup_reverse_left', 0.74, REVERSE_KEYS.map(mirrorKey));
+}
+
+/** The MIKAN, right-handed (owner, 2026-09-16: "add more layup animations, up and unders, reverse layup, mikans").
+ *
+ * The shot from directly under the ring, and the one shape on this list that is defined by what it does NOT do: no
+ * stride, no extension, no hang. The knee drives, the ball goes straight up the middle off the glass from beside the
+ * ear, and you land ready to do it again on the other foot — which is why it is a drill before it is a shot. The
+ * tell is the hand: high and CLOSE, a hand's width off the shoulder line, never out in front.
+ *
+ * Release at 0.22 s, feet down at 0.5 — the quickest finish in the game, because under the ring the only thing that
+ * beats you is time.
+ */
+const MIKAN_KEYS = [
+  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-20, 0, 6], RightUpLeg: [-20, 0, -6], LeftLeg: [32, 0, 0], RightLeg: [32, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.18, 1.10, 0.18] as V3, Left: [-0.18, 1.10, 0.18] as V3 }, hipsY: -0.05 },
+  { t: 0.12, bones: { Hips: [0, 0, 0], Spine: [4, 0, 0],  Neck: [-14, 0, 0], LeftUpLeg: [-74, 0, 8], RightUpLeg: [-10, 0, -6], LeftLeg: [70, 0, 0], RightLeg: [14, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.20, 1.56, 0.10] as V3, Left: [-0.14, 1.44, 0.14] as V3 }, hipsY: 0.03 },   // the knee drives, the ball up the middle
+  { t: 0.22, bones: { Hips: [0, 0, 0], Spine: [0, 0, 0],  Neck: [-18, 0, 0], LeftUpLeg: [-80, 0, 8], RightUpLeg: [-6, 0, -6],  LeftLeg: [74, 0, 0], RightLeg: [10, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.22, 2.02, 0.06] as V3, Left: [-0.12, 1.50, 0.12] as V3 }, poles: { Right: UP_R }, hipsY: 0.07 },   // RELEASE: high and CLOSE, off the square
+  { t: 0.34, bones: { Hips: [0, 0, 0], Spine: [4, 0, 0],  Neck: [-12, 0, 0], LeftUpLeg: [-52, 0, 8], RightUpLeg: [-14, 0, -6], LeftLeg: [56, 0, 0], RightLeg: [18, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.22, 1.86, 0.08] as V3, Left: [-0.14, 1.40, 0.14] as V3 }, poles: { Right: UP_R }, hipsY: 0.04 },   // the hand stays up — you are going again
+  { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-22, 0, 6], RightUpLeg: [-22, 0, -6], LeftLeg: [34, 0, 0], RightLeg: [34, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.18, 1.14, 0.18] as V3, Left: [-0.18, 1.12, 0.18] as V3 }, hipsY: -0.05 },
+];
+export function buildMikan(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
+  if (side === 'right') return buildPoseClip(scene, sk, 'bball_mikan', 0.5, MIKAN_KEYS);
+  return buildPoseClip(scene, sk, 'bball_mikan_left', 0.5, MIKAN_KEYS.map(mirrorKey));
+}
+
+/** The UP AND UNDER, right-handed: two moves in one clip, and the clip only works if the first one is a LIE.
+ *
+ * The ball and the shoulders drive up hard enough to be a shot — heels off the floor, chin up, eyes at the rim —
+ * and then, at the moment he leaves the floor, the hips DROP and the body steps through UNDER the arm that just
+ * went up. The finish is extended on the far side, laid up under him rather than over him.
+ *
+ * It needs the length the other finishes do not: the sell is 0.30 s of the clip before the duck even starts, so
+ * the release key is 0.46 and the feet come down at 0.85. That length IS the risk — a defender who does not bite
+ * has all of it to recover.
+ */
+const UP_UNDER_KEYS = [
+  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0],  Neck: [-4, 0, 0],  LeftUpLeg: [-26, 0, 8], RightUpLeg: [-26, 0, -8], LeftLeg: [40, 0, 0], RightLeg: [40, 0, 0] } as Record<string, Deg3>, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.08 },
+  { t: 0.16, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0],  Neck: [-16, 0, 0], LeftUpLeg: [-12, 0, 6], RightUpLeg: [-12, 0, -6], LeftLeg: [16, 0, 0], RightLeg: [16, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.22, 1.80, 0.16] as V3, Left: [-0.18, 1.74, 0.18] as V3 }, poles: { Right: UP_R, Left: UP_L }, hipsY: 0.01 },   // THE SELL: ball and shoulders up, chin up, heels light
+  { t: 0.30, bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0],  Neck: [-16, 0, 0], LeftUpLeg: [-14, 0, 6], RightUpLeg: [-14, 0, -6], LeftLeg: [18, 0, 0], RightLeg: [18, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.22, 1.84, 0.16] as V3, Left: [-0.18, 1.78, 0.18] as V3 }, poles: { Right: UP_R, Left: UP_L }, hipsY: 0.02 },   // held — he is in the air now
+  { t: 0.38, bones: { Hips: [0, 14, 0], Spine: [20, -10, 0], Neck: [-4, 8, 0], LeftUpLeg: [-64, 0, 14], RightUpLeg: [-16, 0, -8], LeftLeg: [52, 0, 0], RightLeg: [28, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.34, 1.10, 0.34] as V3, Left: [-0.06, 1.24, 0.30] as V3 }, hipsY: -0.14 },   // THE DUCK: hips drop, the lead leg steps through under his arm
+  { t: 0.46, bones: { Hips: [0, 22, 0], Spine: [8, -14, 0], Neck: [-8, 10, 0], LeftUpLeg: [-72, 0, 12], RightUpLeg: [-10, 0, -8], LeftLeg: [46, 0, 0], RightLeg: [16, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.40, 1.92, 0.26] as V3, Left: [-0.04, 1.30, 0.28] as V3 }, poles: { Right: UP_R }, hipsY: 0.01 },   // RELEASE: extended on the FAR side, under him
+  { t: 0.62, bones: { Hips: [0, 20, 0], Spine: [10, -12, 0], Neck: [-6, 8, 0], LeftUpLeg: [-48, 0, 12], RightUpLeg: [-14, 0, -8], LeftLeg: [40, 0, 0], RightLeg: [22, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.38, 1.78, 0.28] as V3, Left: [-0.08, 1.26, 0.28] as V3 }, poles: { Right: UP_R }, hipsY: -0.02 },
+  { t: 0.85, bones: { Hips: [0, 10, 0], Spine: [12, -6, 0], Neck: [-4, 4, 0], LeftUpLeg: [-22, 0, 8], RightUpLeg: [-22, 0, -8], LeftLeg: [32, 0, 0], RightLeg: [32, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.26, 1.12, 0.28] as V3, Left: [-0.22, 1.08, 0.26] as V3 }, hipsY: -0.07 },
+];
+export function buildUpAndUnder(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
+  if (side === 'right') return buildPoseClip(scene, sk, 'bball_up_and_under', 0.85, UP_UNDER_KEYS);
+  return buildPoseClip(scene, sk, 'bball_up_and_under_left', 0.85, UP_UNDER_KEYS.map(mirrorKey));
 }
 
 /** The HOP STEP (M13): off the drive the ball is gathered into BOTH hands as the body hops — both knees come up together,

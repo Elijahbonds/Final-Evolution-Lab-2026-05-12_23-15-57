@@ -1570,7 +1570,14 @@ export const OneVOneMode: ModeDefinition = (() => {
       speed: speedNow,
       lateral01,
       contest01: c.contested ? Math.min(1, Math.max(0, 1 - Math.abs(c.lateral))) : 0,
-      poster: kind === 'poster',
+      // A POSTER IS A SET BODY IN THE WAY, NOT MERELY A BODY NEARBY. checkDriveDunk says 'poster' for any defender
+      // inside 1.5 m — and in a one-on-one the defender is ALWAYS near the rim when you drive it, so every drive
+      // came back a poster, the picker's first branch won every time, and the vocabulary collapsed back to one
+      // dunk: ten angled drives at 6.4 m/s with lateral 0.50 (a windmill by every other measure) all came out
+      // TOMAHAWK. contestDrive already draws the distinction the animation needs — a body that is CONTESTED and
+      // SET is one you go over; a late-sliding one is a shoulder you went through, and that is a windmill with
+      // somebody in the frame.
+      poster: kind === 'poster' && c.contested && c.set,
       momentum01: mbus.score01,
       roll,
     });

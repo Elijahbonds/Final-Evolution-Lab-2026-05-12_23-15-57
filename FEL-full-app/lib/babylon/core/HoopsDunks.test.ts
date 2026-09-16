@@ -56,6 +56,18 @@ describe('pickHoopsDunk', () => {
     expect(at(0.8)).toBe(TOMAHAWK);
   });
 
+  // THE COLLAPSE THIS TABLE EXISTS TO PREVENT, pinned. checkDriveDunk answers 'poster' for ANY defender inside
+  // 1.5 m, and in a one-on-one the defender is always near the rim when you drive it — so a caller passing that
+  // straight through makes every drive a poster, the first branch wins every time, and the whole vocabulary
+  // collapses back to the single clip this module was written to replace. Measured before the callers were fixed:
+  // ten angled drives at 6.4 m/s with lateral 0.50 — a windmill by every other measure — all came out TOMAHAWK.
+  // The modes now pass `kind === 'poster' && c.contested && c.set`; this is the picker's half of that contract.
+  it('a body merely NEARBY is not a poster — the angled drive past one is still a windmill', () => {
+    const angledFast = { ...PLAIN, speed: 6.4, lateral01: 0.5, contest01: 0.2 };
+    expect(pickHoopsDunk({ ...angledFast, poster: false })).toBe(WINDMILL);
+    expect(pickHoopsDunk({ ...angledFast, poster: true })).toBe(TOMAHAWK);
+  });
+
   it('every dunk in the vocabulary names a clip and a label, and the flashy ones are the showy ones', () => {
     for (const d of [POWER, TOMAHAWK, WINDMILL, CRADLE, DOUBLE_CLUTCH, SPIN_360, EASTBAY]) {
       expect(d.clip).toMatch(/^dunk_/);

@@ -202,7 +202,7 @@ export function checkAnkleBreak(crossover: boolean, handler: Vector3, defender: 
 
 // ── Shooting ─────────────────────────────────────────────────────────────
 export type ShotQuality = 'perfect' | 'good' | 'early' | 'late' | 'brick';
-export type ShotStyle = 'layup' | 'floater' | 'jumper' | 'fadeaway' | 'hook' | 'reverse';   // HOOPS-MOVE-KIT-B M5 the jump hook, M11 the reverse layup
+export type ShotStyle = 'layup' | 'floater' | 'jumper' | 'fadeaway' | 'hook' | 'reverse' | 'mikan' | 'upAndUnder';   // M5 the jump hook, M11 the reverse layup, 2026-09-16 the Mikan and the up-and-under
 
 /**
  * Which way the body is going across as it rises. 'none' is straight back or planted.
@@ -224,6 +224,8 @@ export const FLOATER_RANGE = 3.4;
 export type PostShot = 'none' | 'fade' | 'hook' | 'reverse' | 'floater';
 /** Type the attempt from real context. `moveVel` is the shooter's current
  *  velocity; moving away from the hoop under a tight contest = fadeaway. */
+/** Inside this the drive has arrived: no stride left to take and no angle to create, just the square. */
+export const MIKAN_RANGE = 1.15;
 /** Below this the body is not drifting, it is standing still with a wobble. */
 export const FADE_SPEED = 1.2;
 /**
@@ -288,6 +290,10 @@ export function classifyShot(shooter: Vector3, moveVel: Vector3, hoop: Vector3, 
     return { style: 'fadeaway', label: 'FADEAWAY', pctMod: 0.84, drift: 'none' };
   }
 
+  // UNDER THE RING IS ITS OWN SHOT (2026-09-16). Inside MIKAN_RANGE there is no stride left to take and no angle to
+  // create: the knee goes up, the ball goes up the middle off the square, and you land ready to go again. It is the
+  // highest-percentage shot in the game and the easiest to block, which is the trade — see AI_BLOCK_BASE.
+  if (dist < MIKAN_RANGE) return { style: 'mikan', label: 'MIKAN', pctMod: 1.26, drift: 'none' };
   if (dist < 2.2) return { style: 'layup', label: 'LAYUP', pctMod: 1.18, drift: 'none' };
   if (dist < FLOATER_RANGE) return { style: 'floater', label: 'FLOATER', pctMod: 1.0, drift: 'none' };
   return { style: 'jumper', label: 'JUMPER', pctMod: 0.95, drift: 'none' };
@@ -319,6 +325,11 @@ export class ShotMeter {
     // HOOPS-MOVE-KIT-B M5: the jump hook is a QUICK release off the block — short, and no harder than a jumper to time
     if (style === 'hook') { half = Math.max(0.05, half) * 1.25; rise = 0.52 - contestLevel01 * 0.08; }
     if (style === 'reverse') { half = Math.max(0.05, half) * 1.4; rise = 0.58 - contestLevel01 * 0.1; }   // M11: a layup's forgiveness, a beat longer under the rim
+    // the Mikan is a flick under the ring — quick and forgiving, because the defence it beats is time, not a hand
+    if (style === 'mikan') { half = Math.max(0.055, half) * 1.6; rise = 0.42 - contestLevel01 * 0.06; }
+    // the up-and-under is the LONGEST bar in the game and a third of it is the fake. That length is the risk: a
+    // defender who does not bite has all of it to recover, which is why the reward (AI_BLOCK_BASE 0.04) is what it is.
+    if (style === 'upAndUnder') { half = Math.max(0.05, half) * 1.15; rise = 0.86 - contestLevel01 * 0.1; }
     if (style === 'fadeaway') { half *= 0.75; rise -= 0.06; }
     const g = Math.max(0, gatherSec);
     this.rise = rise; this.gather = g;

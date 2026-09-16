@@ -20,7 +20,7 @@ import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdo
 import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge, buildCombatRoll, buildCombatJump } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
-  buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
+  buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildMikan, buildUpAndUnder, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,   // HOOPS-MOVE-KIT-A
   buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // HOOPS-MOVE-KIT-B wave 2: the footwork (M8–M14)
@@ -153,6 +153,11 @@ export function registerAuthoredClips(
     ['bball_crossover_right', () => buildCrossover(scene, skeleton, 'right')],
     ['bball_hesi', () => buildHesi(scene, skeleton)],
     ['bball_layup_gather', () => buildLayupGather(scene, skeleton)],
+    // the layup vocabulary (owner, 2026-09-16): the shot from under the ring, and the one that beats a jumper
+    ['bball_mikan', () => buildMikan(scene, skeleton)],
+    ['bball_mikan_left', () => buildMikan(scene, skeleton, 'left')],
+    ['bball_up_and_under', () => buildUpAndUnder(scene, skeleton)],
+    ['bball_up_and_under_left', () => buildUpAndUnder(scene, skeleton, 'left')],
     ['bball_defend_slide_left', () => buildDefendSlide(scene, skeleton, 'left')],
     ['bball_defend_slide_right', () => buildDefendSlide(scene, skeleton, 'right')],
     ['bball_block_reach', () => buildBlockReach(scene, skeleton)],
