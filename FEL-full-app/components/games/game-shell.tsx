@@ -9,6 +9,7 @@ import { ArrowLeft, RotateCcw, Home, Loader2, Trophy, Sparkles, Gem, Coins, Tren
 import type { PrqGrade } from '@/lib/prq';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
 import { getScheme } from '@/lib/input-schemes';
+import { isBabylon } from '@/components/three/flags';
 import { VirtualController } from './virtual-controller';
 import type { SessionTallies } from '@/lib/game-systems';
 import { reportEarn } from '@/lib/wallet/client';
@@ -133,11 +134,19 @@ function GameShellInner({
   const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
   const scheme = getScheme(mode);
 
+  // ONE INPUT OWNER PER GAME (ported from elijahbonds-fel-upgrade-pass, 2026-09-12; measured here 2026-09-15).
+  //
+  // A Babylon host owns its own input: InputBus polls the pads directly and TouchOverlay draws the touch deck. Running
+  // the shell's poller on top delivered every pad press TWICE — once as the real pad, once as a synthetic key — and on a
+  // HELD trigger the two disagreed frame by frame: football's 2 s truck hold arrived as 35 separate presses, 60 of which
+  // the cause-and-effect probe then scored silent. The shell bridge stays the only input path for the legacy DOM games.
+  const babylonOwnsInput = isBabylon(mode) || !!ownControls;
+
   // A single physical-gamepad poller translates controller input into the same
   // synthetic keyboard events the on-screen VirtualController emits, so physical
   // and virtual pads drive every mode identically.
   useEffect(() => {
-    if (!scheme) return;
+    if (!scheme || babylonOwnsInput) return;
     const poller = new PhysicalGamepadPoller();
     poller.setScheme(scheme);
     let active = true;
@@ -145,7 +154,7 @@ function GameShellInner({
     const tick = () => { if (!active) return; poller.poll(); raf = requestAnimationFrame(tick); };
     raf = requestAnimationFrame(tick);
     return () => { active = false; cancelAnimationFrame(raf); poller.setScheme(null); };
-  }, [scheme, gameKey]);
+  }, [scheme, gameKey, babylonOwnsInput]);
 
   useEffect(() => { runLive.current = result === null; }, [result]);
   useEffect(() => {

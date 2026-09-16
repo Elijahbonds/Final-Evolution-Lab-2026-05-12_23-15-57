@@ -11,6 +11,7 @@ import { Vector3, MeshBuilder, StandardMaterial, Color3, TransformNode, type Mes
 import type { HudValue, ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
+import { Onlookers } from '../visual/Onlookers';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { SoundKit } from '../audio/SoundKit';
 import { Contestants, podiums } from '../party/Contestants';
@@ -29,7 +30,9 @@ interface St {
   scene: Scene; phase: Phase; pickSec: number; autoBegin: boolean; players: number;
   rnd: () => number; seen: Set<string>; claims: Record<Category, number | null>; played: Set<Category>;
   scores: number[]; round: number; tier: Tier;
-  venue: VenueHandle | null; anchor: TransformNode | null; wheel: TransformNode | null;
+  venue: VenueHandle | null;
+  /** SCORECARD VISUALS (2026-09-15): an audience arc in front of the stage — the frame review read the room as a void. */
+  crowd: Onlookers | null; anchor: TransformNode | null; wheel: TransformNode | null;
   spinT: number; spinTurns: number; spinFrom: number; category: Category | null;
   challenge: Challenge | null; clock: number; exposeT: number; answers: (number | null)[]; answerTimes: number[]; resultT: number;
   best: number;
@@ -191,11 +194,15 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       const S: St = {
         scene: ctx.scene, phase: 'pick', pickSec: 0, autoBegin: !!q, players: Math.max(1, Math.min(2, Number(q ?? 1) || 1)),
         rnd: mulberry32(Date.now() % 1000003), seen: new Set(), claims: freshClaims(), played: new Set(), scores: [0], round: 0, tier: 1,
-        venue: null, anchor: null, wheel: null, cast: null, spinT: 0, spinTurns: 0, spinFrom: 0, category: null,
+        venue: null, crowd: null, anchor: null, wheel: null, cast: null, spinT: 0, spinTurns: 0, spinFrom: 0, category: null,
         challenge: null, clock: 0, exposeT: 0, answers: [null], answerTimes: [0], resultT: 0, best: loadBest(),
       };
       states.set(ctx.scene, S); live.add(S);
       S.venue = mountVenue(ctx, 'brain_brawl', { keepGameplayCamera: true }); S.venue?.hidePlaceholders();
+      S.crowd = new Onlookers(ctx.scene, Array.from({ length: 12 }, (_, i) => {
+        const a = -0.9 + (i / 11) * 1.8;   // an arc across the front of the stage, facing the wheel
+        return new Vector3(Math.sin(a) * 7.5, 0, 4.2 + Math.cos(a) * 2.2);
+      }), '#7c3aed', new Vector3(0, 1.4, -1.5));
       buildWheel(ctx, S);
       S.anchor = new TransformNode('bb_anchor', ctx.scene); S.anchor.position.set(0, 1.4, -1.5);
       ctx.heroRef.current = S.anchor; ctx.objectiveRef.current = new Vector3(0, 2.6, -4.5);
@@ -226,7 +233,9 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
-      const S = st(ctx); if (!S || S.phase === 'done') return;
+      const S = st(ctx); if (!S) return;
+      S.crowd?.update(dt);
+      if (S.phase === 'done') return;
       if (S.phase === 'pick') { S.pickSec += dt; if (S.autoBegin || S.pickSec >= PICK_TIMEOUT_S) begin(ctx, S); return; }
       if (S.phase === 'spin') {
         S.spinT += dt;
@@ -247,7 +256,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
 
     dispose() {
       setTimeout(() => {
-        for (const S of live) if (S.scene.isDisposed) { S.cast?.dispose(); S.cast = null; live.delete(S); }
+        for (const S of live) if (S.scene.isDisposed) { S.cast?.dispose(); S.cast = null; S.crowd?.dispose(); S.crowd = null; live.delete(S); }
         if (live.size === 0) SoundKit.stopAmbient();
       }, 0);
     },

@@ -96,8 +96,13 @@ export class InputBus {
     // emits a frame, and — measured on football — a HELD trigger arriving as 1, 0, 1, 0 at ~17 Hz, which downstream reads
     // as seventeen presses a second (35 "presses" from one 2 s hold). Stop whatever is already running first.
     this.stop();
+    // A fresh start never inherits held state: a key or button held across a stop / start would otherwise stay logically
+    // down forever (ported from elijahbonds-fel-upgrade-pass "one input owner per game", 2026-09-12).
+    this.held.clear();
+    this.spaceDownAt = 0;
     window.addEventListener('keydown', this.onKey);
     window.addEventListener('keyup', this.onKey);
+    window.addEventListener('blur', this.onBlur);
     window.addEventListener('gamepadconnected', this.onPad);
     window.addEventListener('gamepaddisconnected', this.onPadOff);
     this.syncPads(this.readPads());   // a pad plugged in BEFORE this page loaded never fires gamepadconnected — take it now
@@ -106,10 +111,37 @@ export class InputBus {
   stop(): void {
     window.removeEventListener('keydown', this.onKey);
     window.removeEventListener('keyup', this.onKey);
+    window.removeEventListener('blur', this.onBlur);
     window.removeEventListener('gamepadconnected', this.onPad);
     window.removeEventListener('gamepaddisconnected', this.onPadOff);
     cancelAnimationFrame(this.raf);
+    this.releaseAll();
   }
+
+  /**
+   * Let go of EVERYTHING that is logically held.
+   *
+   * A window that has lost focus is delivered no keyup, and a pad that is unplugged delivers no falling edge — so
+   * without this a held key or button stays down forever and the next session inherits it. (Ported from the upgrade
+   * pass's "no stuck inputs"; adapted to this bus's merged pad + slot streams.)
+   */
+  private releaseAll(): void {
+    const held = [...this.held];
+    if (!held.length) return;
+    if (held.some((k) => WASD.has(k))) this.emit({ t: 'stick', side: 'L', x: 0, y: 0 });
+    if (held.includes(' ')) this.emit({ t: 'trigger', side: 'R', value: 0 });   // zero the charge; never fire it
+    for (const key of held) {
+      if (key.startsWith('pad_dpad_')) { this.emit({ t: 'dpad', dir: key.slice(9) as 'up' | 'down' | 'left' | 'right', pressed: false }); continue; }
+      if (key.startsWith('pad_')) { this.emit({ t: 'button', btn: key.slice(4) as FelButton, pressed: false }); continue; }
+      const mapped = KEYMAP[key];
+      if (mapped && mapped.t === 'button') this.emit({ ...mapped, pressed: false });
+      else if (mapped && mapped.t === 'dpad') this.emit({ ...mapped, pressed: false });
+    }
+    this.held.clear();
+    this.spaceDownAt = 0;
+  }
+
+  private onBlur = (): void => { this.releaseAll(); };
 
   on(fn: Listener): () => void {
     this.listeners.add(fn);

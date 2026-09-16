@@ -85,6 +85,10 @@ export interface FollowConfig {
 export const AIR_CAM = { back: 2.2, up: 1.3, side: 2.4 };
 
 export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
+  // SCORECARD VISUALS (2026-09-15): golf played on 'court', which is a fitTwo preset — with the PIN as the second subject
+  // (up to 90 m away) the separation pull-back put the camera 12.5 m off a 1.8 m golfer, and the frame review could
+  // barely find the player. A links shot is framed on the PLAYER, down the line: one subject, close, no pull-back.
+  links:  { distance: 5.4, height: 2.0, minHeight: 1.4, pitchFloorDeg: 6,  pitchCapDeg: 18, targetHeight: 1.2,  lag: 0.10, lookAhead: 2.0 },
   court:  { distance: 8.0, height: 2.6, minHeight: 1.5, pitchFloorDeg: 6,  pitchCapDeg: 16, targetHeight: 1.35, lag: 0.10, lookAhead: 1.0, fitTwo: true, fovGain: 0.10, fovAtSpeed: 6.4 },
   runner: { distance: 7.5, height: 3.2, minHeight: 2.0, pitchFloorDeg: 10, pitchCapDeg: 22, targetHeight: 1.2,  lag: 0.08, lookAhead: 3.0 },
   board:  { distance: 6.5, height: 2.4, minHeight: 1.6, pitchFloorDeg: 10, pitchCapDeg: 24, targetHeight: 1.1,  lag: 0.12, lookAhead: 4.0 },

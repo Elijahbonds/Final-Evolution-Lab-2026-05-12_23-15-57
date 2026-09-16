@@ -40,6 +40,7 @@ import { MoveRootLayer } from '../anim/MoveRootLayer';
 import { registerMirroredClips } from '../anim/mirrored-clips';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
+import { Onlookers } from '../visual/Onlookers';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -96,6 +97,8 @@ export const DanceMode: ModeDefinition = (() => {
    *  owner settles back into the running step. */
   let body: BeatOwner | null = null;
   let posture: { layer: PostureLayer; dispose(): void } | null = null;
+  /** The ring around the floor — a cypher is people watching (SCORECARD VISUALS, 2026-09-15). */
+  let crowd: Onlookers | null = null;
   const bio: StagePostureInput = { ...STAGE_INPUT_IDLE };
   /** The judgement beat's wall clock (short: the next step must be able to take the body back). */
   let beatUntil = 0;
@@ -288,6 +291,13 @@ export const DanceMode: ModeDefinition = (() => {
 
     async load(ctx: ModeContext) {
       venue = mountVenue(ctx, 'dance', { keepGameplayCamera: true });   // M104 gap: keep the over-shoulder follow camera, not the venue orbit
+      // SCORECARD VISUALS (2026-09-15): a cypher IS the circle of people around the dancer, and the frame review found a
+      // lone body on a lit disc in a dark room. The ring watches the floor (the same Onlookers the dojo and the courts use).
+      crowd?.dispose(); crowd = null;
+      crowd = new Onlookers(ctx.scene, Array.from({ length: 16 }, (_, i) => {
+        const a = (i / 16) * Math.PI * 2 + 0.18;
+        return new Vector3(Math.sin(a) * 4.6, 0, Math.cos(a) * 4.6);
+      }), '#d946ef', new Vector3(0, 1.2, 0));
 
       me = await CharacterLibrary.spawn(ctx.scene, SHARED_CFG.heroUrl, {
         // Stand on the stage deck, not in it — podium scale 1.4 -> surface y 0.7.
@@ -374,6 +384,7 @@ export const DanceMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
+      crowd?.update(dt);
       if (ended) return;
 
       if (phase === 'pick') {
@@ -438,6 +449,7 @@ export const DanceMode: ModeDefinition = (() => {
 
     dispose() {
       perf?.stop();
+      crowd?.dispose(); crowd = null;
       posture?.dispose(); posture = null;
       band?.dispose(); band = null;
       kit?.dispose(); kit = null;

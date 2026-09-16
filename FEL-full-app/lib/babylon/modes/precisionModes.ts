@@ -475,7 +475,7 @@ export const GolfMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'golf', mood: 'alpine', camPreset: 'court',
+    modeId: 'golf', mood: 'alpine', camPreset: 'links',
 
     async load(ctx: ModeContext) {
       golfVenue = mountVenue(ctx, 'golf_loop', { keepGameplayCamera: true });

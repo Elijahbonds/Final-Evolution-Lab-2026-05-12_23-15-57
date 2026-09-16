@@ -74,6 +74,13 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   karateVersus: true,
   mixedcombat: true,
   dunkduel: true,
+  // These four mount Babylon unconditionally from their own loaders (all pass `ownControls`), so the flag was simply
+  // untrue for them — and anything that asks "is this a Babylon mode?" (the shell's input owner, above) read the wrong
+  // answer. Ported from elijahbonds-fel-upgrade-pass, 2026-09-12.
+  volleyball: true,
+  dance: true,
+  aeroAces: true,
+  velocityKart: true,
 };
 
 export function isBabylon(mode: string): boolean {
