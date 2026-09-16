@@ -648,6 +648,11 @@ export const DunkMode: ModeDefinition = (() => {
         return;
       }
 
+      // SCORECARD CONTROLS (2026-09-15): the STYLE and PROP pickers belong to the runway; pressed anywhere else they did
+      // nothing and said nothing (2 of 9 presses each in the rc14 capture)
+      if (e.t === 'button' && (e.btn === 'B' || e.btn === 'X') && e.pressed && phase !== 'approach' && phase !== 'cinematic' && !qteWindowOpen) {
+        refuse(ctx, e.btn === 'B' ? 'PICK THE STYLE ON THE RUNWAY' : 'PICK THE PROP ON THE RUNWAY');
+      }
       if (e.t === 'button' && e.btn === 'B' && e.pressed && phase === 'approach') {
         style = STYLES[(STYLES.indexOf(style) + 1) % STYLES.length];
         ctx.setHud({ style: STYLE_LABEL[style] });

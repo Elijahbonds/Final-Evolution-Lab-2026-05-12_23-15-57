@@ -265,8 +265,12 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     const qaHandle: Record<string, unknown> = {};
     qaRestore = () => {
       sk.play = origPlay;
-      const w = window as unknown as { __FEL_QA__?: unknown };
-      if (w.__FEL_QA__ === qaHandle) delete w.__FEL_QA__;   // an unmounted scene is not held by the QA handle
+      // The handle OUTLIVES the mount, minus its scene. A probe reads the session's numbers after the mode has ended (the
+      // onboarding card, the carnival's event rotation, any end screen) and deleting the handle outright made those
+      // sessions read as "no presses at all". What must not survive is the SCENE: those getters go null here, so nothing
+      // retains a disposed mount.
+      qaHandle.scene = () => null;
+      qaHandle.hero = () => null;
     };
     (window as unknown as { __FEL_QA__?: unknown }).__FEL_QA__ = Object.assign(qaHandle, {
       modeId: def.modeId,

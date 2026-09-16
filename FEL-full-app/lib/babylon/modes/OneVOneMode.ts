@@ -634,9 +634,11 @@ export const OneVOneMode: ModeDefinition = (() => {
         // presses silent in the rc11 capture) — the reach is a commitment, so the distance is the answer
         else if (e.btn === 'X' && Vector3.Distance(me.root.position, foe.root.position) > 1.7) refuse(ctx, 'TOO FAR TO REACH');
       }
-      // the SHOT's gather is heard as the trigger goes down (the meter it starts is a number, which reads as nothing)
-      if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5 && !shotTrigWas && possession === 'mine') {
-        SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
+      // the SHOT's gather is heard as the trigger goes down (the meter it starts is a number, which reads as nothing), and
+      // a shot pulled on DEFENSE — 4 of 6 trigger presses in the rc14 capture — says why it cannot happen
+      if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5 && !shotTrigWas) {
+        if (possession === 'mine') SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
+        else refuse(ctx, 'SHOOT ON OFFENSE');
       }
       if (e.t === 'trigger' && e.side === 'R') shotTrigWas = e.value > 0.5;
     },
