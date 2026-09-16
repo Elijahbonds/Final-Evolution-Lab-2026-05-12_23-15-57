@@ -184,13 +184,27 @@ export function buildScorpion(scene: Scene, sk: Skeleton): AnimationGroup | null
   ]);
 }
 
-/** Lost & found: the ball hand takes it down behind the back, the other hand finds it there and carries it up to the rim. */
+/**
+ * LOST & FOUND — and it is a 360 (audit, 2026-09-16).
+ *
+ * Kilganon's own, and the thing that makes it the dunk it is: he throws the ball behind his own back — a self-oop to
+ * nowhere — turns a full 360 under it, finds it on the way round and jams it. ESPN's description when he debuted it in
+ * 2015 is "a self-alley-oop behind his own back with a 360 spin".
+ *
+ * Ours had the behind-the-back part and neither of the others: no turn, and the clip keyed its own little hip yaw
+ * (18°, 30°, −8°) which is exactly what a spinThrough trick must NOT do — the mode drives whole turns as a yaw LAYER on
+ * the hips (DunkSpin) so a crossfade can never cut a turn half-way, and a clip that also yaws fights it. Hips yaw is 0
+ * on every key here now; the layer owns the 360, the arms own the lost-and-found.
+ *
+ * The hand-off is timed to the turn: the ball goes behind the back as the body starts round, both hands meet at
+ * LOST_FOUND_HANDOFF with the back to the rim, and it comes out overhead on the far side as the turn resolves.
+ */
 export function buildLostFound(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'dunk_lost_found', LOST_FOUND_SEC, [
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], ...AIR_LEGS }, hands: { Right: [0.26, 1.60, 0.30], Left: [-0.30, 1.30, 0.15] } },
-    { t: 0.2,  bones: { Hips: [0, 18, 0], Spine: [4, 14, 0], ...AIR_LEGS }, hands: { Right: [0.26, 0.90, -0.32], Left: [-0.34, 1.10, -0.05] }, poles: { Right: [0.9, -0.2, -0.3] } },   // lost: the ball swings down behind the hip
-    { t: LOST_FOUND_HANDOFF, bones: { Hips: [2, 30, 0], Spine: [6, 22, 0], ...AIR_LEGS }, hands: { Right: [0.10, 0.92, -0.34], Left: [-0.08, 0.92, -0.34] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] } },   // found: both hands meet behind the back
-    { t: 0.5,  bones: { Hips: [0, -8, 0], Spine: [-4, -10, 0], ...AIR_LEGS }, hands: { Left: [-0.52, 1.30, 0.05], Right: [0.40, 1.15, -0.10] }, poles: { Left: [-0.9, -0.2, -0.4] } },   // the other hand carries it out and up
+    { t: 0.2,  bones: { Hips: [0, 0, 0], Spine: [4, 0, 0], ...AIR_LEGS }, hands: { Right: [0.26, 0.90, -0.34], Left: [-0.34, 1.10, -0.05] }, poles: { Right: [0.9, -0.2, -0.3] } },   // lost: the ball goes behind the back as the turn starts
+    { t: LOST_FOUND_HANDOFF, bones: { Hips: [2, 0, 0], Spine: [6, 0, 0], ...AIR_LEGS }, hands: { Right: [0.10, 0.92, -0.36], Left: [-0.08, 0.92, -0.36] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] } },   // found: both hands meet behind the back, back to the rim
+    { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], ...AIR_LEGS }, hands: { Left: [-0.52, 1.30, 0.05], Right: [0.40, 1.15, -0.10] }, poles: { Left: [-0.9, -0.2, -0.4] } },   // coming round with it
     { t: LOST_FOUND_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], LeftUpLeg: [-26, 0, 4], LeftLeg: [30, 0, 0], RightUpLeg: [-14, 0, -4], RightLeg: [18, 0, 0] }, hands: { Left: [-0.14, 2.02, 0.26], Right: [0.36, 1.42, -0.10] }, poles: { Left: UP.Left } },   // extended to the rim, left-handed
   ]);
 }

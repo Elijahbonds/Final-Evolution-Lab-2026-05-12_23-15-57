@@ -388,6 +388,17 @@ describe('dunk tricks', () => {
     at(g, LOST_FOUND_HANDOFF); expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.35);
     at(g, 0.8); expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y + 0.2);
   });
+  // AND IT IS A 360 (audit, 2026-09-16). The dunk is a self-oop behind the back with a full turn under it, and in this
+  // engine a whole turn is a hips-yaw LAYER (DunkSpin) so a crossfade can never strand a body half-way round. A clip
+  // that yaws its own hips fights that layer — ours used to, by 18/30/-8 degrees, which is how it shipped as a dunk
+  // with a wiggle in it instead of a spin. The turn belongs to the cue table; the arms belong here.
+  it('lost & found: the shoulders stay square through it — the 360 is the spin layer, not the clip', () => {
+    const g = fresh(() => buildLostFound(scene, sk)!);
+    for (const t of [0, 0.2, LOST_FOUND_HANDOFF, 0.5, 0.8]) {
+      at(g, t);
+      expect(Math.abs(pos('LeftArm').z - pos('RightArm').z)).toBeLessThan(0.08);   // 18 deg of yaw is already ~0.11
+    }
+  });
   // THE GAP IS THE TRICK. Until 2026-09-14 `betweenlegs` pointed at `dunk_360_fake_eastbay`, which aliases
   // to the EASTBAY's clip: two tricks, two names, two difficulties, one body. A player throwing the hardest
   // dunk in the list watched an animation they had already seen. These assertions are the ones that would

@@ -45,7 +45,8 @@ export const DUNK_TRICKS: DunkTrick[] = [
   { id: 'betweenlegs', label: 'BETWEEN THE LEGS', dir: 'down', btn: 'B', clip: 'dunk_between_legs', difficulty: 3.8, windowCost: 0.46 },
   // DUNK-CONTROL-JUICE (2026-09-08): the named air dunks — same grammar (hold a direction, tap a button), authored bodies
   { id: 'scorpion', label: 'SCORPION', dir: 'right', btn: 'Y', clip: 'dunk_scorpion', difficulty: 3.2, windowCost: 0.36 },
-  { id: 'lostfound', label: 'LOST & FOUND', dir: 'left', btn: 'B', clip: 'dunk_lost_found', difficulty: 3.6, windowCost: 0.42 },
+  // a behind-the-back self-oop AND a 360: the hardest thing in the list, and the audit's reason for the bump
+  { id: 'lostfound', label: 'LOST & FOUND', dir: 'left', btn: 'B', clip: 'dunk_lost_found', difficulty: 4.0, windowCost: 0.46 },
   { id: 'hideseek', label: 'HIDE & SEEK', dir: 'left', btn: 'A', clip: 'dunk_hide_seek', difficulty: 3.0, windowCost: 0.38 },
   // 2026-09-14: four of the twelve direction+button slots were unused, and two iconic bodies were missing.
   // A CARRY (one hand the whole way) and a VERTICAL (the ball travels, the body barely does) -- deliberately
@@ -129,7 +130,9 @@ export const DUNK_CUES: Record<string, DunkCue> = {
   tomahawk:    { fire: 'hang', last: 'preSlam', facing: 'faceRim' },
   betweenlegs: { fire: 'rise', last: 'hang',    facing: 'faceRim' },
   scorpion:    { fire: 'hang', last: 'preSlam', facing: 'faceRim' },
-  lostfound:   { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // the behind-the-back hand-off is at 0.32 of its 0.8
+  // LOST & FOUND is a 360 (audit, 2026-09-16): Kilganon throws it behind his own back and turns a full revolution under
+  // it. The turn is the layer's, never the clip's — see anim/authored/dunkTricks.buildLostFound.
+  lostfound:   { fire: 'rise', last: 'hang',    facing: 'spinThrough', turns: 1 },   // the behind-the-back hand-off is at 0.32 of its 0.8
   hideseek:    { fire: 'rise', last: 'preSlam', facing: 'faceRim' },
   cradle:      { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // the circle needs most of the flight
   clutch:      { fire: 'hang', last: 'preSlam', facing: 'faceRim' },                 // the clutch reads at the APEX, not on the way up
