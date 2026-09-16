@@ -27,9 +27,11 @@ import type { ModeContext } from '../core/ModeHarness';
  * Tracked down the slow way — the disc was non-pickable, so every ray through it reported the ground behind
  * and I spent two fixes on the wrong mesh before naming this one.
  */
-const mat = (scene: Scene, hex: string, alpha = 1): PBRMaterial => {
-  const m = VenueKit.paint(scene, `m_${hex}_${alpha}`, hex, 0.05, 0.85);
+const mat = (scene: Scene, hex: string, alpha = 1, lit = 1): PBRMaterial => {
+  const m = VenueKit.paint(scene, `m_${hex}_${alpha}_${lit}`, hex, 0.05, 0.85);
   m.alpha = alpha;
+  // `lit` divides a picked colour back down by the rig's exposure — see buildGolfGreen for the measurement
+  if (lit !== 1) m.albedoColor = m.albedoColor.scale(lit);
   return m;
 };
 
@@ -139,21 +141,33 @@ export function buildTennisNet(scene: Scene): AbstractMesh[] {
   return [net, tape, ...posts];
 }
 
+/**
+ * THE GREEN STILL WASHED OUT AFTER THE PBR FIX (2026-09-15), and it was never the material model.
+ *
+ * `#35a352` is (0.21, 0.64, 0.32) as albedo, and this venue lights at hemispheric 0.85 plus a directional 2.60: the
+ * green channel alone comes out at 1.66 and clips, so the disc renders (0.54, 1.00, 0.84) — the pale mint the rc19
+ * frame shows sitting in the middle of a perfectly good fairway. FreeRunMode hit exactly this and named the remedy
+ * PBR_ALBEDO_SCALE: a palette picked in a colour picker has to be divided back down by the rig's exposure before it
+ * becomes albedo. The hole, the pole and the flag are the same arithmetic, so the whole green is pulled together.
+ * (The normals are fine — measured on a NullEngine disc, rotation.x +π/2 puts the face's normal at world +Y.)
+ */
+const LIT = 0.42;   // the same divisor Freerun settled on for this lighting rig
+
 export function buildGolfGreen(scene: Scene, holePos: Vector3): AbstractMesh[] {
   const green = MeshBuilder.CreateDisc('green', { radius: 6 }, scene);
   green.rotation.x = Math.PI / 2;
   green.position.set(holePos.x, 0.015, holePos.z);
-  green.material = mat(scene, '#35a352');
+  green.material = mat(scene, '#35a352', 1, LIT);
   const hole = MeshBuilder.CreateDisc('hole', { radius: 0.16 }, scene);
   hole.rotation.x = Math.PI / 2;
   hole.position.set(holePos.x, 0.03, holePos.z);
   hole.material = mat(scene, '#0a0f0a');
   const pole = MeshBuilder.CreateCylinder('flagpole', { diameter: 0.05, height: 2.2 }, scene);
   pole.position.set(holePos.x, 1.1, holePos.z);
-  pole.material = mat(scene, '#e8e8e8');
+  pole.material = mat(scene, '#e8e8e8', 1, 0.7);   // a white pole is allowed to be bright; not 2.6× bright
   const flag = MeshBuilder.CreatePlane('flag', { width: 0.7, height: 0.45 }, scene);
   flag.position.set(holePos.x + 0.36, 1.9, holePos.z);
-  flag.material = mat(scene, '#e23c50');
+  flag.material = mat(scene, '#e23c50', 1, LIT);
   return [green, hole, pole, flag];
 }
 
