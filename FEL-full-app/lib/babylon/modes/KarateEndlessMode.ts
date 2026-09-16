@@ -81,6 +81,7 @@ import type { ControlSource, Intent } from '../core/PlayerSlot';
 import { PlayerSlot, LocalInputSource } from '../core/PlayerSlot';
 import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-in co-op: ?net=<room>
 import { SoundKit } from '../audio/SoundKit';
+import { refuse } from '../core/Refusal';   // SCORECARD CONTROLS: a press a rule forbids is answered, not swallowed
 import {
   BASELINE_RATINGS, ratingsFrom, routeFor, routeHitStopMs, routeShake, cancelWindowSec, hasFightMove,
   type FightRatings, type RouteStrike,
@@ -628,7 +629,13 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   /** A strike button. Carrying a body: the weapon verbs. Mid-swing before the cancel point: QUEUED (fires the frame it
    *  opens). Otherwise the string book names the move, the redirect picks its target, and the swing starts NOW. */
   function strike(ctx: ModeContext, key: StrikeBtn): void {
-    if (blocking || dodging || myDown.downed || shopOpen) return;   // a downed fighter cannot swing (the tree holds the floor)
+    if (blocking || dodging || myDown.downed || shopOpen) {
+      // A swing thrown from the floor, out of a block, or mid-dodge is a RULE, and the rule used to be enforced in
+      // silence (1 of 9 X and 2 of 9 Y presses in the rc19 capture answered nothing). Refusal throttles the line, so
+      // a mashed button stays one callout.
+      if (!shopOpen) refuse(ctx, myDown.downed ? 'GET UP FIRST' : blocking ? 'BLOCKING — LET GO TO SWING' : 'IN THE DODGE');
+      return;   // a downed fighter cannot swing (the tree holds the floor)
+    }
     if (carry) { if (key === 'Y') throwCarried(ctx); else swingCarried(ctx); return; }
     if (striking && !swingCancelable()) { queue.push(key, 'n', gameSec); grabQueuedAt = -Infinity; dyn.queued++; return; }
     if (striking) dyn.cancels++;

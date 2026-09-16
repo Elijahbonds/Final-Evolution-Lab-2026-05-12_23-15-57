@@ -421,6 +421,11 @@ export const FootballRushMode: ModeDefinition = (() => {
         setTimeout(() => ctx.setHud({ banner: '' }), 400);
       }
 
+      // An evade thrown ON TOP of the one still playing, or from the floor, used to vanish (1 of 6 JUKE and 1 of 5
+      // HURDLE presses in the rc19 capture). A move you cannot cancel is a rule, and a rule has to be audible.
+      if (e.t === 'button' && e.pressed && !ended && (dodging || downed) && DODGES[e.btn as keyof typeof DODGES]) {
+        refuse(ctx, downed ? 'DOWN — WAIT FOR THE SNAP' : 'ONE MOVE AT A TIME');
+      }
       if (e.t === 'button' && e.pressed && !dodging && !downed && !ended) {
         const d = DODGES[e.btn as keyof typeof DODGES];
         if (!d) return;

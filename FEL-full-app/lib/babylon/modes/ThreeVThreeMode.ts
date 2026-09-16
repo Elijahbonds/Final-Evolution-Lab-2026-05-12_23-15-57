@@ -1030,7 +1030,16 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           SoundKit.play('uiTick', { pitch: type === 'bounce' ? 1.0 : type === 'lob' ? 0.8 : 1.3 });
           if (type === 'lob') { ctx.setHud({ banner: 'LOB!' }); setTimeout(() => ctx.setHud({ banner: '' }), 500); }
           EffectsKit.burst(ctx.scene, me.char.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
+        } else {
+          // NO LANE (2026-09-15). `lockTarget` refuses a pass into a covered lane, and it refused it in silence — 3 of
+          // 11 PASS presses in the rc19 capture did nothing at all, which is indistinguishable from a dropped input.
+          // The lane is the rule, so the lane is what it says; Refusal throttles it, so a held button is one line.
+          refuse(ctx, 'NO LANE — LEAN THE STICK AT A MATE');
         }
+      }
+      // PASS pressed with the ball but mid-shot, mid-dunk, or with one already in the air: the same silence, same fix.
+      else if (iAmCarrier && meIntent.pass && !meIntent.passFake && (shooting || dunking || passFlight.active)) {
+        refuse(ctx, passFlight.active ? 'ONE PASS AT A TIME' : dunking ? 'IN THE DUNK' : 'IN THE SHOT');
       }
       if (passFlight.active) {
         // a chest pass through a defender's reach is THEIRS, not a dice roll:

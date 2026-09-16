@@ -2526,6 +2526,14 @@ export const DunkMode: ModeDefinition = (() => {
 
   async function rivalRound(ctx: ModeContext): Promise<void> {
     setPhase('rivalTurn');
+    // THE PLAYER WATCHES FROM THE SIDE (2026-09-15). The comment below says he "is standing off-camera by design", and
+    // nothing ever moved him: he stayed wherever his last dunk ended — under the rim — and the rival landed his own
+    // verdict in the same half-metre. Every rc capture's late frame is the two bodies drawn through each other (the
+    // Visuals review has charged it since rc10). He takes the bench opposite the rival's, facing the ring, in the idle.
+    player.root.position.set(-3.2, 0, CFG.rimZ + 3);
+    player.root.rotation.y = Math.atan2(rim.x - -3.2, rim.z - (CFG.rimZ + 3));
+    player.root.rotation.z = 0; player.root.rotationQuaternion = null;
+    playClip(SPORT_CLIP.idle, { loop: true });
     // The camera follows the rival for this stretch, so the rival IS the hero
     // on screen. FrameGuard watches heroRef and would otherwise spend the whole
     // rival round reporting the player — who is standing off-camera by design —
