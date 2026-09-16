@@ -81,6 +81,18 @@ export interface MountVenueOptions {
    * static orbit camera (dance, net sports) are unchanged.
    */
   keepGameplayCamera?: boolean;
+  /**
+   * THE SCENE WAS BEING LIT TWICE (appearance pass, 2026-09-16).
+   *
+   * `mountLightRig` builds `fel_hemi` + `fel_sun` and a cascaded shadow map; `buildNexusScene` then builds ANOTHER
+   * hemi + sun + shadow map of its own (`nexus_fill`, `nexus_sun`). Measured on the live dunk scene, the four of them
+   * came to 3.66 of directional and 1.35 of hemispheric — roughly double what the materials are balanced against —
+   * and everything in the mode reads pale and flat because of it. It is the same class of bug the flag above fixes:
+   * the venue quietly taking over something the mode already owns.
+   *
+   * Opt-in and default-off, so no mode changes until it asks.
+   */
+  keepModeLights?: boolean;
 }
 
 /**
@@ -120,6 +132,17 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   const gameplayCam = ctx.scene.activeCamera;
 
   const built = buildNexusScene(ctx.scene, spec, ctx.canvas);
+  // A mode that lit its own scene keeps its own lighting: drop the venue's pair (and the shadow map hanging off its
+  // sun) rather than stacking a second rig on top of the first.
+  if (options.keepModeLights) {
+    for (const name of ['nexus_fill', 'nexus_sun']) {
+      const light = ctx.scene.getLightByName(name);
+      if (!light) continue;
+      for (const gen of light.getShadowGenerators()?.values() ?? []) gen.dispose();
+      light.dispose();
+      console.info(`[NEXUS] mountVenue: kept the mode's own lights, dropped ${name}`);
+    }
+  }
   // Ship Pass 6 phase 5: under a scanned map the procedural court plane must not render — it z-fought the scan and mirrored the
   // dusk dome as an orange slab (threes, three-point). It stays in the scene for bounds and camera logic.
   if (spec.mapKey) { for (const m of built.root.getChildMeshes()) if (m.name === 'venue_ground') m.isVisible = false; }

@@ -364,6 +364,18 @@ function applyHair(spawn: SpawnedCharacter, hex: string, bald: boolean): void {
     if (clone) { matColor(clone)?.copyFrom(tone); mesh.material = clone; }
   }
 }
+/** The garment-slot keys the tinter matches on, so a caller dressing a body uses the same names the Closet does. */
+export const SLOT_KEYS = {
+  jersey: ['jersey', 'top', 'shirt', 'tee'],
+  shorts: ['shorts', 'pants', 'bottom'],
+  shoes: ['shoe', 'sneaker', 'boot'],
+} as const;
+
+/** Tint one garment slot on a spawned body. Exported so an outfit can dress a body the same way the Closet does. */
+export function tintGarmentSlot(spawn: Pick<SpawnedCharacter, 'meshes'>, keys: readonly string[], hex: string): void {
+  tintSlot(spawn as SpawnedCharacter, [...keys], hex);
+}
+
 function tintSlot(spawn: SpawnedCharacter, keys: string[], hex: string): void {
   const tint = Color3.FromHexString(hex);
   for (const mesh of spawn.meshes) {

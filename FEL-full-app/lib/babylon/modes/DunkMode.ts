@@ -554,7 +554,7 @@ export const DunkMode: ModeDefinition = (() => {
       walkOut = readWalkOut(); walkCounted = false;
       walkCue = resolveWalkOut(walkOut, walkOut ? StudioLibrary.get(walkOut.songId) : null);
       // M74: try Nexus venue first; fallback to VenueKit if no spec
-      dunkVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true, location: ctx.location });
+      dunkVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true, keepModeLights: true, location: ctx.location });
       if (!dunkVenue) { VenueKit.buildCourt(ctx.scene); applyOceanCourt(ctx.scene, 'venice'); }
       findGlass(ctx.scene);
       // spawnPlayer, not CharacterLibrary.spawn — this is the route that applies

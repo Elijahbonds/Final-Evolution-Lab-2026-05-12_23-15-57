@@ -31,6 +31,7 @@ import { pickedVocab } from '../combat/styleVocab';
 const STYLE_FIGHT_MODES: ReadonlySet<string> = new Set(['karate', 'karate_vs', 'mixedcombat', 'duel', 'showdown']);
 import { applySkinShading } from './skinShading';
 import { attachAccessories, lookFor, type AccessorySet } from './accessories';
+import { fitForName, wearFit } from './fits';
 import { applyKit } from './kit';
 import { attachContactShadow } from '../visual/contactShadow';
 import { applyHairStyle, DEFAULT_HAIR_STYLE, HAIR_KEY_TO_STYLE } from './hairStyles';
@@ -331,15 +332,22 @@ export const CharacterLibrary = {
     // so a named rival keeps his signature and a re-spawned NPC comes back wearing what it had on. That part works and
     // is tested.
     //
-    // What does NOT work yet is how they LOOK on a body, measured on rc46 with five of them on court: the sizes and
-    // offsets here were read off the kit body, and the anti-clone rule spawns NPCs on ROSTER bodies whose bones are
-    // scaled differently — so a headband sits high and thick, and a chain floats off the chest entirely. And every
-    // accessory rendered pale blue-white whatever accent it was dealt, which is a material being overridden somewhere
-    // after this runs and is not yet found. Broken rings floating on every NPC in the game is worse than no rings, so
-    // nothing gets them until a caller asks: pass `look`, or `accessories: true`.
+    // Placement is rig-derived now (body frame for the torso and head, joint-to-joint for limbs, sizes off the
+    // shoulder span), so they land on the kit body and the roster bodies alike. `accessories: false` opts a spawn out.
+    // THE FIT (owner, 2026-09-16: "put the models in more stylish outfits"). A non-player body used to take ONE tint
+    // sprayed at every garment slot — a person dressed head to toe in a single flat colour, which nobody is. A fit is
+    // a colourway chosen as a SET: a jersey, a short that answers it, shoes that pick up one of the two, and an accent
+    // that ties the accessories in. Dealt from the same key as the accessories so the two agree, and the PLAYER is
+    // left alone, because their Closet choice is theirs.
+    const fit = opts.tint || opts.name ? fitForName(String(opts.name ?? opts.tint)) : null;
+    if (fit) wearFit({ meshes }, fit);
+
     const wantsAccessories = opts.accessories !== false;
     const accDispose = wantsAccessories
-      ? attachAccessories(scene, skeleton, root, opts.look ?? lookFor(opts.name ?? opts.tint ?? `char_${spawnCounter}`), `acc_${spawnCounter}`)
+      ? attachAccessories(scene, skeleton, root, opts.look ?? {
+          ...lookFor(opts.name ?? opts.tint ?? `char_${spawnCounter}`),
+          ...(fit ? { accent: Color3.FromHexString(fit.accent) } : {}),   // the accessories wear the fit's accent
+        }, `acc_${spawnCounter}`)
       : null;
     // ship pass 4: a kit body carries every garment; show one per slot even with no identity
     // (anonymous dev captures, guests, rivals) — the identity pipe re-applies the player's own choice below
