@@ -220,7 +220,9 @@ const JUMP_VY = 3.0;                     // m/s — ~0.46 m apex, 0.6 s of air
 const FACE_RATE = 10, FACE_RIM_RATE = 6;
 /** A defender inside this range of the handler keeps his chest on him (beyond it he runs to his spot, facing the travel). */
 const DEFEND_FACE_RANGE = 6;
-const HINT_OFFENCE = 'Drive fast at the rim to DUNK · snap the stick for ankles · pull BACK for a HESI · hold L1/LT near the block to POST UP (back to the rim: shoot for a HOOK, pull off the rim for a FADEAWAY, swing the stick across to SPIN) · drive into a body to SPIN off him';
+// "SPRINT in to DUNK, ease off to LAY IT IN" is the one line this hint was missing, and the fix that made the layup
+// reachable (see the checkDriveDunk call) is worth nothing if nobody is told the choice exists.
+const HINT_OFFENCE = 'SPRINT into the rim to DUNK · ease off the stick to LAY IT IN · snap the stick for ankles · pull BACK for a HESI · hold L1/LT near the block to POST UP (back to the rim: shoot for a HOOK, pull off the rim for a FADEAWAY, swing the stick across to SPIN) · drive into a body to SPIN off him';
 const HINT_DEFENCE = 'STAY IN FRONT — they sidestep, you slide · X: STEAL as the ball crosses over · A: JUMP on the gather to BLOCK · hold L1/LT: BOX OUT';
 
 type Possession = 'mine' | 'defense';
@@ -1034,7 +1036,19 @@ export const OneVOneMode: ModeDefinition = (() => {
           // the rim asks for the FADEAWAY, anything else is the JUMP HOOK. (A sealed body is never fast enough to dunk.)
           const toRimNow = RIM_FLOOR.subtract(me.root.position); toRimNow.y = 0; toRimNow.normalize();
           const post: PostShot = posting ? (stickBack01(mx, -my, toRimNow) >= POST_FADE_STICK_MIN ? 'fade' : 'hook') : 'none';
-          const kind = posting ? 'none' : checkDriveDunk(me.root.position, meDribble.vel, RIM_FLOOR, turbo.t01, defenderPos);
+          // THE DUNK IS THE SPRINT FINISH, AND THE LAYUP IS THE ONE OFF THE GAS — which is what this gate was always
+          // meant to say and did not. It was handed `turbo.t01`, the TANK, so "attacking the rim with turbo" was
+          // satisfied by anyone who simply had fuel: at DUNK_MIN_TURBO 0.25 a player who has never once pressed sprint
+          // sits at a full 1.0, and DUNK_MIN_SPEED 3.4 is half of the 6.4 top speed — a jog. So EVERY drive that
+          // arrived at the rim converted to a dunk, and the layup, which is the highest-percentage shot in
+          // classifyShot (pctMod 1.18) and carries the whole finish system behind it (pickLayupSide, the euro, the
+          // step-through, the reverse), could not be reached in normal play at all. Measured on the lab: four drives
+          // at full stick, four possessions with no shot meter and no `[1V1-MOVE] finish` in the log; the same drive
+          // with the stick eased to 0.45 produced a finish on the first attempt.
+          //
+          // `sprintOk` is the turbo gate's own answer for this frame — sprint HELD, moving, and fuel in the tank — so
+          // the read becomes the one the player can feel: hold it in and go up strong, ease off it and lay it in.
+          const kind = posting ? 'none' : checkDriveDunk(me.root.position, meDribble.vel, RIM_FLOOR, sprintOk ? turbo.t01 : 0, defenderPos);
           if (kind !== 'none') { startDunk(ctx, kind); }
           // the FOOTWORK reads the body even when he is frozen: a defender who has just BITTEN a pump is exactly the man you
           // step through, and passing null there killed every step-through the fake had earned (measured: 0 of 1).

@@ -510,7 +510,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
           jobs: () => everyBody().map((b, i) => { const mb = mateBrain(b), db = foeBrain(b); const obj = b === me ? (carrierId === 'me' ? RIM : (driver?.char.root.position ?? ballWorld())) : objectiveFor(b); const p = bodyPos(b); const yaw = b.char.root.rotation.y; const v = b === me ? me.drib.vel : b.vel; return { id: b === me ? 'me' : isFoe(b) ? `foe${foes.indexOf(b)}` : `mate${mates.indexOf(b)}`, i, job: jobOf(b), phase: mb?.screen.phase ?? (db ? (db.fightingOver === null ? '' : db.fightingOver ? 'over' : 'under') : ''), x: p.x, z: p.z, y: p.y, speed: Math.hypot(v.x, v.z), facing: facingCos(yaw, p, obj), objX: obj.x, objZ: obj.z, boxing: !!(mb?.boxing || db?.boxing), root: b.char.root }; }), foeRoot: foes[0]?.char.root ?? null, nearestFoeRoot: () => foes.reduce<Body | null>((b, f) => !b || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(b.char.root.position, me.char.root.position) ? f : b, null)?.char.root ?? null }; }   // BIOMECH-HOOPS-WAVE1 probes
       ctx.setHud({
         score: myScore, foeScore, target: TARGET_SCORE, time: timeLeft, ast: assists,
-        hint: 'Work the court · PASS to the open man · snap the stick to break ankles · HOLD SHOOT, release in the green · hold L1/LT on the block to POST UP (shoot = HOOK, pull off the rim = FADEAWAY, stick across = SPIN)',
+        hint: 'Work the court · PASS to the open man · SPRINT into the rim to DUNK, ease off to LAY IT IN · snap the stick to break ankles · HOLD SHOOT, release in the green · hold L1/LT on the block to POST UP (shoot = HOOK, pull off the rim = FADEAWAY, stick across = SPIN)',
       });
     },
 
@@ -1120,7 +1120,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
         // rim asks for the FADEAWAY, anything else is the JUMP HOOK. (A sealed body is never fast enough to dunk.)
         const toRimNow = RIM_FLOOR.subtract(me.char.root.position); toRimNow.y = 0; toRimNow.normalize();
         const post: PostShot = posting ? (stickBack01(wish.x, wish.z, toRimNow) >= POST_FADE_STICK_MIN ? 'fade' : 'hook') : 'none';
-        const kind = posting ? 'none' : checkDriveDunk(me.char.root.position, me.drib.vel, RIM_FLOOR, turbo.t01, nearestFoePos);
+        // `sprintOk ? turbo.t01 : 0` — the dunk is the SPRINT finish and the layup is the one off the gas. Handed the
+        // raw tank, this gate read "has fuel" rather than "is attacking", and every drive that reached the rim became
+        // a dunk while the layup went unreachable. Same fix, same reasoning, as the 1v1 call site.
+        const kind = posting ? 'none' : checkDriveDunk(me.char.root.position, me.drib.vel, RIM_FLOOR, sprintOk ? turbo.t01 : 0, nearestFoePos);
         if (kind !== 'none') {
           startDunk(ctx, kind, nearestFoePos);
         // the FOOTWORK reads a frozen body too: a defender who has just BITTEN a pump is the man you step through
