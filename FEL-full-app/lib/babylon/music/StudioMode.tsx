@@ -304,6 +304,17 @@ export default function StudioMode({
     toast: { position: 'sticky', bottom: 8, marginTop: 12, padding: '8px 12px', borderRadius: 8, background: '#7a5c9e', color: '#fff', width: 'fit-content' },
   };
 
+  // ONE WAY INTO PERFORM. The set clock starts here and nowhere else — when this was
+  // only stamped on the splash's READY tap, a player who built for ten minutes and then
+  // tapped PERFORM reported the whole ten minutes as their set. That is the "both" path,
+  // and it is the normal one: the stage pick chooses where you land, not where you stay.
+  const enterPerform = useCallback(() => {
+    setMode('perform');
+    setScore(0);
+    setCombo(0);
+    setStartedAt.current = Date.now();
+  }, []);
+
   // The scored half's finish line. Reports the set to the shell, which posts the
   // session and shows the card — the same path every other mode ends on. Back to the
   // BUILD floor afterwards so the room is still there to keep working in.
@@ -340,9 +351,12 @@ export default function StudioMode({
             // Re-read the pick at the tap, not at mount: the player may have just
             // changed it on this very screen.
             const picked = readMusicStage();
-            setMode(picked === 'perform' ? 'perform' : 'build');
-            if (picked === 'perform') { setScore(0); setCombo(0); }
-            setStartedAt.current = Date.now();
+            if (picked === 'perform') {
+              enterPerform();
+            } else {
+              setMode('build');
+              setStartedAt.current = 0;   // no set is running on the studio floor
+            }
             setStarted(true);
           }}
           onRetry={() => setStarted(false)}
@@ -447,7 +461,7 @@ export default function StudioMode({
 
           <div style={S.row}>
             <button style={{ ...S.tab, ...(mode === 'build' ? S.tabOn : {}) }} onClick={() => setMode('build')}>BUILD</button>
-            <button style={{ ...S.tab, ...(mode === 'perform' ? S.tabOn : {}) }} onClick={() => { setMode('perform'); setScore(0); setCombo(0); }}>PERFORM</button>
+            <button style={{ ...S.tab, ...(mode === 'perform' ? S.tabOn : {}) }} onClick={enterPerform}>PERFORM</button>
             {mode === 'perform' && (
               <>
                 <button style={S.btn} onClick={performTap}>TAP</button>
