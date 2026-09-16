@@ -13,6 +13,7 @@
 import { Color3, DynamicTexture, PBRMaterial } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import type { QualityTier } from '../scene/QualityTier';
+import { applyFabric } from './fabric';
 
 const PORE_TEX_KEY = '__felSkinPoreNormal';
 const PORE_SIZE = 256;
@@ -112,18 +113,19 @@ export function applySkinShading(meshes: AbstractMesh[], scene: Scene, tier: Qua
       }
       out.skin++;
     } else if (name.startsWith('jersey') || name.startsWith('shorts')) {
-      // Cloth: matte with a soft sheen at grazing angles (mesh fabric).
-      mat.metallic = 0;
-      mat.roughness = 0.88;
-      mat.sheen.isEnabled = true;
-      mat.sheen.intensity = 0.35;
-      mat.sheen.roughness = 0.6;
+      // CLOTH GETS A WEAVE (appearance pass, 2026-09-16). It used to get this sheen and nothing else, and a matte
+      // surface with no normal is a silhouette filled in with a colour — which is what a close crop of the dunker
+      // showed: a flat pink tee and a flat dark block of shorts. `applyFabric` keeps the sheen and adds the generated
+      // weave map, at the tiling that fabric wants.
+      applyFabric(mat, name.startsWith('jersey') ? 'jersey' : 'shorts');
+      out.cloth++;
+    } else if (name.startsWith('sock')) {
+      applyFabric(mat, 'sock');
       out.cloth++;
     } else if (name.startsWith('shoes')) {
       // Was near-white albedo at roughness 0.85 — read as a glowing block
-      // under the IBL. Darker, glossier: a sneaker, not a lamp.
-      mat.roughness = 0.45;
-      mat.metallic = 0;
+      // under the IBL. Darker, glossier: a sneaker, not a lamp. The canvas weave came later.
+      applyFabric(mat, 'shoes');
       mat.albedoColor = mat.albedoColor.scale(0.82);
       out.other++;
     } else if (name.startsWith('hair')) {

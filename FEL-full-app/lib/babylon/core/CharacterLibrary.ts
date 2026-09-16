@@ -30,6 +30,7 @@ import { pickedVocab } from '../combat/styleVocab';
 /** The modes a picked fighting style's moves play in (The Hundred + the versus fights). */
 const STYLE_FIGHT_MODES: ReadonlySet<string> = new Set(['karate', 'karate_vs', 'mixedcombat', 'duel', 'showdown']);
 import { applySkinShading } from './skinShading';
+import { attachAccessories, lookFor, type AccessorySet } from './accessories';
 import { applyKit } from './kit';
 import { attachContactShadow } from '../visual/contactShadow';
 import { applyHairStyle, DEFAULT_HAIR_STYLE, HAIR_KEY_TO_STYLE } from './hairStyles';
@@ -57,6 +58,12 @@ export interface SpawnOpts {
   position?: Vector3;
   yawRad?: number;
   tint?: string;            // hex — mob/team variety
+  /** Who this is, for the accessory deal: a rival's name gets their signature, anything else gets a look it keeps. */
+  name?: string;
+  /** An explicit accessory set (implies accessories on). */
+  look?: AccessorySet;
+  /** Opt IN to the accessory layer. Off by default until its rig-relative sizing lands — see the note at the call. */
+  accessories?: boolean;
   accent?: string;          // M110 — override kit accent (procedural path)
   skinTone?: string;        // M110 — override skin tone (procedural path)
   hairColor?: string;       // M110 — override hair colour (procedural path)
@@ -317,6 +324,23 @@ export const CharacterLibrary = {
     // lacks them, and mobile gets the cheaper variants.
     const tier = tierOf(scene);
     applySkinShading(meshes, scene, tier);
+    // ACCESSORIES (appearance pass, 2026-09-16) — OPT-IN, and here is why.
+    //
+    // The wardrobe is two tops, one short and two shoes, so without something every character in the game is the same
+    // person in a different colour. These hang on bones, follow the animation for free, and are dealt deterministically
+    // so a named rival keeps his signature and a re-spawned NPC comes back wearing what it had on. That part works and
+    // is tested.
+    //
+    // What does NOT work yet is how they LOOK on a body, measured on rc46 with five of them on court: the sizes and
+    // offsets here were read off the kit body, and the anti-clone rule spawns NPCs on ROSTER bodies whose bones are
+    // scaled differently — so a headband sits high and thick, and a chain floats off the chest entirely. And every
+    // accessory rendered pale blue-white whatever accent it was dealt, which is a material being overridden somewhere
+    // after this runs and is not yet found. Broken rings floating on every NPC in the game is worse than no rings, so
+    // nothing gets them until a caller asks: pass `look`, or `accessories: true`.
+    const wantsAccessories = opts.accessories === true || opts.look != null;
+    const accDispose = wantsAccessories
+      ? attachAccessories(scene, skeleton, opts.look ?? lookFor(opts.name ?? opts.tint ?? `char_${spawnCounter}`), `acc_${spawnCounter}`)
+      : null;
     // ship pass 4: a kit body carries every garment; show one per slot even with no identity
     // (anonymous dev captures, guests, rivals) — the identity pipe re-applies the player's own choice below
     applyKit(meshes, null);
@@ -344,6 +368,7 @@ export const CharacterLibrary = {
       root, meshes, skeleton, animator, secondary,
       dispose() {
         livePlayers.get(scene)?.delete(root);
+        accDispose?.();   // an accessory that outlives its body is a torus floating over the court
         planting?.dispose();
         secondary.dispose();
         animator.dispose();

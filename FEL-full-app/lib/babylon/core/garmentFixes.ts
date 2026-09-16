@@ -38,8 +38,17 @@ export const HI_TOP_CUT = 0.16;
 /** …and the folded shaft becomes a collar this tall. */
 const COLLAR_HEIGHT = 0.035;
 /** The bottom of the shoe that becomes the light sole. */
-const SOLE_THICKNESS = 0.03;
-const SOLE_COLOR = '#E9E5DD';
+/**
+ * THE SOLE IS THE ONLY THING THAT READS (appearance pass, 2026-09-16).
+ *
+ * A shoe is about twelve pixels tall at the distance these cameras sit at, and a 3 cm sole inside that is two of them:
+ * cropped close on the dunker, both shoes were small red blobs with no sole visible at all, which is also how they
+ * looked in motion. A real basketball shoe's midsole is 3–4 cm, but what makes a shoe legible from ten metres is the
+ * LIGHT BAND under a dark upper — so the split runs up to where a midsole actually ends (5 cm) and the sole is a
+ * proper off-white rather than a bone tint that disappears into a tanned ankle.
+ */
+const SOLE_THICKNESS = 0.05;
+const SOLE_COLOR = '#F4F2EC';
 /** A skinned shoe shorter than this has not been posed yet (a parked rival's skeleton at spawn, measured 0.16 m
  *  for a 0.5 m boot); its geometry pass waits for the first render. */
 const MIN_POSED_SHOE_HEIGHT = 0.19;
