@@ -302,13 +302,15 @@ export class ShotMeter {
   /** HOOPS-MOVE-KIT-A: the gather's share of the meter (seconds) and the rise's own duration (what the clip is paced to). */
   private gather = 0;
   private rise = 0.72;
+  /** What kind of shot this bar belongs to — the auto-release at the end is graded differently for a FINISH. */
+  private style: ShotStyle = 'jumper';
 
   /** A tight defender narrows the window and speeds the rise; shot style tunes it further (layups quick and forgiving,
    *  floaters between, fadeaways demanding). `gatherSec` (HOOPS-MOVE-KIT-A M1) puts the player's gather INSIDE the meter:
    *  the bar runs from the squeeze, the green sits at the rise's 0.62 AFTER the gather (the same width in seconds), so a
    *  pull-up's release frame — the clip paced to `riseSec` and started when the gather ends — is where the green is. */
   start(contestLevel01: number, style: ShotStyle = 'jumper', gatherSec = 0): void {
-    this.active = true; this.t = 0;
+    this.active = true; this.t = 0; this.style = style;
     let rise = 0.72 - contestLevel01 * 0.22;
     let half = Math.max(0.035, 0.09 - contestLevel01 * 0.05);
     // a layup is a quick finish off the stride (it used to run 0.8 s — longer than a jumper — on the jumpshot's meter)
@@ -346,7 +348,17 @@ export class ShotMeter {
     if (Math.abs(d) <= this.greenHalfWidth * 0.35) return 'perfect';
     if (Math.abs(d) <= this.greenHalfWidth) return 'good';
     if (d < 0) return 'early';
-    if (this.t >= 1) return 'brick';
+    // YOU CANNOT HOLD A LAYUP. A meter that runs all the way out is a shot the player never released, and for a
+    // jumper that is exactly a brick — you stood there with the ball over your head. A FINISH is not that shape: the
+    // body is already in the air off a clip whose release key IS the green (see startFinish), the hand passes the rim
+    // whether or not the trigger comes up, and the bar itself is 0.45–0.55 s against a jumper's 0.72 — the shortest
+    // in the game, entered automatically by classifyShot, with no cue that it just got a third shorter.
+    //
+    // Graded as a brick that was a 4 % shot, so holding a hair too long at the rim was a guaranteed miss: measured
+    // 0 for 4 on layups that all peaked at 0.99–1.00, every one of them a LAYUP — LEFT/RIGHT that reached the iron.
+    // A late layup is a bad shot, not an impossible one; 'late' is 0.3, and the 1.18 layup modifier carries it to
+    // about a third. The demanding shots keep the brick, because standing up out of a fadeaway IS a thrown-away ball.
+    if (this.t >= 1) return this.style === 'jumper' || this.style === 'fadeaway' ? 'brick' : 'late';
     return 'late';
   }
 }
