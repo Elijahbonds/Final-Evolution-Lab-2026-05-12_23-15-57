@@ -152,6 +152,8 @@ export interface SlamReadout {
   offsetMs: number;
   /** 0..1, the execution the judges will actually score. */
   execution01: number;
+  /** Where the finger was: on the cue (before the window opened), inside it, or late. */
+  zone: 'cue' | 'early' | 'ontime' | 'late';
   /** The one line the bezel prints. */
   label: string;
 }
@@ -162,14 +164,54 @@ export interface SlamReadout {
  * `at` and `center` are clip seconds — the same units the window is defined in — because the mode already
  * has both and converting to wall-clock here would make the number disagree with the scoring.
  */
-export function slamReadout(at: number, center: number, execution01: number): SlamReadout {
+export function slamReadout(at: number, center: number, execution01: number, half = 0): SlamReadout {
   const offsetMs = Math.round((at - center) * 1000);
   const exec = Math.max(0, Math.min(1, Number.isFinite(execution01) ? execution01 : 0));
   const pct = Math.round(exec * 100);
-  const when = Math.abs(offsetMs) <= SLAM_ONTIME_MS
-    ? 'ON TIME'
+  // A press the BUFFER caught is not the same mistake as a press inside the window, and the player cannot learn from
+  // "540 ms EARLY" alone — that press was made when the game said SLAM. Naming the cue names the lesson: you were
+  // answering the read, and the beat is later than the read.
+  const zone: SlamReadout['zone'] = Math.abs(offsetMs) <= SLAM_ONTIME_MS ? 'ontime'   // the band comes first: 20 ms late is ON TIME, not late
+    : offsetMs > 0 ? 'late'
+    : half > 0 && -offsetMs / 1000 > half ? 'cue' : 'early';
+  const when = zone === 'ontime' ? 'ON TIME'
+    : zone === 'cue' ? `ON THE CUE — ${Math.abs(offsetMs)} ms BEFORE THE BEAT`
     : `${Math.abs(offsetMs)} ms ${offsetMs < 0 ? 'EARLY' : 'LATE'}`;
-  return { offsetMs, execution01: exec, label: `${when} · EXECUTION ${pct}%` };
+  return { offsetMs, execution01: exec, zone, label: `${when} · EXECUTION ${pct}%` };
+}
+
+// ── THE EXECUTION CURVE (dunk 10-phase pass P2, 2026-09-16) ────────────────────────────────────────────
+//
+// The flight INVITES a press from the top of the arc — the SLAM read lifts there, the buffer holds the press and fires
+// it on the frame the window opens, and the dunk goes down. The execution curve did not agree with that invitation: it
+// fell to zero a fixed 0.22 s before the window, while the buffer reaches back as far as the apex (0.43 s on the
+// measured flight). So the game said SLAM, took the press, flushed the dunk — and scored the player 0 %.
+//
+// Measured on rc22 with scripts/probes/_dunk-lab.mts: pressing on the game's own prompt scored EXECUTION 0 % and a
+// 37 card; pressing near the window scored 68 % and a 42. A prompt that costs you everything for obeying it is not a
+// difficulty curve, it is a trap.
+//
+// One continuous curve, monotone from the earliest accepted press to the latest, with no cliff at the window's edge
+// (the old two-branch attempt put one there — pressing a frame EARLIER scored better, which is worse than the trap):
+//
+//   at the centre of the window ............ 1.00   the perfect beat
+//   at the window's opening edge ........... EDGE   still a good dunk
+//   at the earliest the buffer reaches ..... CUE    made, and paid like a flinch
+//   later than the window's close .......... 0      (the window is over; this is a miss, scored elsewhere)
+//
+// `reachSec` is how far in front of the window's EDGE a press is still taken — the mode's own buffer, so the curve and
+// the acceptance can never drift apart again.
+export const SLAM_EDGE_EXEC = 0.72;
+export const SLAM_CUE_EXEC = 0.25;
+export function slamExecution(at: number, center: number, half: number, reachSec: number): number {
+  const h = Math.max(1e-4, half);
+  const d = at - center;
+  if (d >= 0) return Math.max(0, 1 - d / h);                                  // late of the beat: across the window's own half
+  const early = -d;
+  if (early <= h) return 1 - (1 - SLAM_EDGE_EXEC) * (early / h);              // inside the window, before the beat
+  const reach = Math.max(1e-4, reachSec);
+  const intoBuffer = Math.min(1, (early - h) / reach);                        // in the buffer the cue invited
+  return Math.max(0, SLAM_EDGE_EXEC - (SLAM_EDGE_EXEC - SLAM_CUE_EXEC) * intoBuffer);
 }
 
 export type CueVerdict = 'early' | 'fire' | 'late';

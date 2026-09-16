@@ -67,7 +67,7 @@ import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE:
 import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, DOUBLE_UP_WINDOW_M, DOUBLE_UP_MIN_SPEED, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, type ObstacleKind } from '../core/DunkObstacles';
-import { runwayTrickById, DUNK_TRICKS, slamReadout, type SlamReadout } from '../core/DunkSystem';
+import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, type SlamReadout } from '../core/DunkSystem';
 import { missBeat } from '../core/MissFlavour';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF } from '../anim/authored/dunkTricks';
@@ -1024,7 +1024,16 @@ export const DunkMode: ModeDefinition = (() => {
         // CLOTHING-SOFT-RESIDUAL R2: the buffer (and the SLAM! read with it) reaches back to the top of the arc — "SLAM at the top"
         const holdSec = slamBufferSec(openAt, SLAM_APEX_T, SLAM_BUFFER_SEC);
         slamCueOn = !lob.live && clipTime >= openAt - holdSec && clipTime <= closeAt;
-        if ((slamCueOn || (qteWindowOpen && lob.live)) && !(wasCue || wasOpen)) ctx.setHud({ hint: lob.live ? 'CATCH IT!' : 'SLAM!', slamPulse: true });
+        if ((slamCueOn || (qteWindowOpen && lob.live)) && !(wasCue || wasOpen)) ctx.setHud({ hint: lob.live ? 'CATCH IT!' : 'SLAM — OR WAIT FOR THE BEAT', slamPulse: true });
+        // P2 (2026-09-16): THE BEAT ITSELF IS AUDIBLE. The read lifts at the top of the arc and every press from there
+        // is taken, which is right — a 14-frame window is not a reaction test. But a player who only ever sees one
+        // signal can never learn where the perfect beat is: they press on the read, take their 25-40 %, and have no way
+        // to find the other 60. The window's own opening now has a tell of its own — a word and a tick — so the beat
+        // can be learned by ear the way a rhythm game teaches one.
+        if (qteWindowOpen && !wasOpen && !lob.live) {
+          ctx.setHud({ hint: 'NOW!' });
+          SoundKit.play('uiTick', { pitch: 1.8, volume: 0.5 });
+        }
         if (!slamCueOn && !qteWindowOpen && (wasCue || wasOpen)) ctx.setHud({ slamPulse: false });
         // a press the buffer was holding fires on the frame the window opens — its execution is scored from where the finger was
         if (qteWindowOpen && !wasOpen && slamBufferAt >= 0 && !lob.live && openAt - slamBufferAt <= holdSec + 1e-6) slamNow(ctx, slamBufferAt);   // resolveDunk moves the phase; the resolve block below picks the jam up on this same frame. The hold is measured from the window's EDGE, not the frame that crossed it (a press at the top missed by one frame's overshoot, 316 ms against 310)
@@ -1380,12 +1389,17 @@ export const DunkMode: ModeDefinition = (() => {
     // half, early of centre across that half PLUS the buffer. A press is scored by how far it was from the perfect
     // beat, and being earlier is always worth less than being later-but-still-early; a two-branch version (a flat floor
     // for a buffered press) put a cliff on the window's opening edge where pressing one frame EARLIER scored better.
-    const half = window / 2, d = at - center;
-    qteAccuracy = Math.max(0, 1 - (d < 0 ? -d / (half + SLAM_BUFFER_SEC) : d / half));
-    const early = Math.max(0, (center - half) - at);   // how far in front of the window the finger actually was
+    // P2 (2026-09-16): the curve's early reach is the BUFFER'S OWN reach, so the invitation and the scoring can never
+    // disagree again. It used to fall to zero a fixed SLAM_BUFFER_SEC before the window while the buffer reached all
+    // the way back to the top of the arc — so the game raised SLAM, took the press, flushed the dunk, and paid 0 %.
+    const half = window / 2;
+    const openAt = center - half;
+    const reach = slamBufferSec(openAt, SLAM_APEX_T, SLAM_BUFFER_SEC);
+    qteAccuracy = slamExecution(at, center, half, reach);
+    const early = Math.max(0, openAt - at);   // how far in front of the window the finger actually was
     // AND NOW THE PLAYER IS TOLD. This exact information went to console.info and nowhere else, which is the
     // single loudest complaint in the review: three attempts out of six scored nothing and explained nothing.
-    slamTiming = slamReadout(at, center, qteAccuracy);
+    slamTiming = slamReadout(at, center, qteAccuracy, half);
     if (early > 0) console.info(`[DUNK-SLAM] buffered press @${at.toFixed(2)} fired at the window (${(early * 1000).toFixed(0)} ms early, execution ${qteAccuracy.toFixed(2)})`);
     // DUNK-POSTURE S3: the slam resolves ON THE PRESS. It used to wait for the window to close (clip 1.41 — the body
     // 0.3 m off the floor on the way down), so the ball left a hand at chest height and lerped 2.7 m up into the iron on
