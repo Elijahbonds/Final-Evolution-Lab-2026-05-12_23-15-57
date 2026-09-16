@@ -8,7 +8,21 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    # The headless suites include ten that talk to Postgres through lib/db. They have no
+    # internal env gate — without DATABASE_URL they throw on client construction — so CI
+    # gives them a real database rather than letting ci-suite skip them.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
     defaults:
       run:
         working-directory: FEL-full-app
@@ -25,6 +39,21 @@ jobs:
         run: npx tsc --noEmit
       - name: unit tests
         run: npx vitest run
+      # THE HEADLESS SUITES. Until 2026-09-16 these ran nowhere: CI was tsc + vitest +
+      # build, so 186 mode gates and regression nets in scripts/ only ever ran when a
+      # human remembered. That is how four assertions rotted red and were then waved
+      # through as "pre-existing". ci-suite DISCOVERS them rather than listing them, so a
+      # suite cannot be added and silently never run, and --require-db makes a skipped
+      # database suite fatal here rather than quietly green.
+      - name: headless suites
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+          NEXTAUTH_SECRET: ci-only-not-a-secret
+          NEXTAUTH_URL: http://localhost:3000
+        run: |
+          npx prisma db push --schema=prisma/schema.prisma --skip-generate
+          npx tsx scripts/ci-suite.ts --require-db
       - name: production build
         env:
           NEXT_DIST_DIR: .next-verify
