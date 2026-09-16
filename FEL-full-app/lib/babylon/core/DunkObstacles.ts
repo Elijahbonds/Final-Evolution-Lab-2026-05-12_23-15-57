@@ -50,7 +50,7 @@ export const OBSTACLE_SPECS: Record<ObstacleKind, ObstacleSpec> = {
   // over the seated man's legs while he leans away from you — so the profile tops out at 1.75 (the highest thing the
   // feet must actually clear) and the rider DUCKS as you come, which is both the truth and the reason it is clearable.
   // The hardest obstacle on the card: the longest take-off and the biggest bonus.
-  tetris: { kind: 'tetris', label: 'THE TETRIS', source: { bodies: 'stack' }, scale: 1, yaw: 0, zFromRim: 2.0, takeoffFromRim: 3.8, bonus: 4, topples: true, nominalHeight: 1.75, clearance: 0.05 },
+  tetris: { kind: 'tetris', label: 'TETRIS', source: { bodies: 'stack' }, scale: 1, yaw: 0, zFromRim: 2.0, takeoffFromRim: 3.8, bonus: 4, topples: true, nominalHeight: 1.75, clearance: 0.05 },
 };
 
 /** A height profile along the runway: `z` in world metres (descending toward the rim), `h` the mesh's top at that z. */

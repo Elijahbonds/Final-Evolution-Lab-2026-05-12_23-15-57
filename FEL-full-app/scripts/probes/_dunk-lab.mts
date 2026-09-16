@@ -47,6 +47,21 @@ const want = combo ? [combo[0]] : spec !== 'all' ? AIR.filter((t) => t.id === sp
 if (!want.length) throw new Error(`no such trick: ${spec} (have ${AIR.map((t) => t.id).join(', ')})`);
 /** The second call of a combo lands on the HANG beat — the mode arms an early press and fires it there. */
 const COMBO_GAP_MS = Number(process.env.COMBO_GAP_MS ?? 340);
+/**
+ * A RUNWAY trick: a bare face button while RUN is held. Y self-lob · B kick-up · X back handspring · A double-up ·
+ * B with UP HELD = the backflip (owner's move, 2026-09-16), the one runway trick that takes a direction.
+ */
+const RUNWAY: Record<string, { btn: number; dir?: string }> = {
+  selflob: { btn: 3 }, kickup: { btn: 1 }, cartwheel: { btn: 2 }, doubleup: { btn: 0 }, backflip: { btn: 1, dir: 'up' },
+};
+const RUNWAY_TRICK = process.env.RUNWAY ?? '';
+if (RUNWAY_TRICK && !(RUNWAY_TRICK in RUNWAY)) throw new Error(`no such runway trick: ${RUNWAY_TRICK} (have ${Object.keys(RUNWAY).join(', ')})`);
+/** How long into the hold-run the runway trick is thrown (the double-up wants the last stretch before the line). */
+const RUNWAY_AT_MS = Number(process.env.RUNWAY_AT_MS ?? 700);
+/** The PROP ring: d-pad DOWN in the approach cycles the obstacle (car → barrier → crate → THE TETRIS). OBSTACLE=tetris. */
+const OBSTACLE_RING = ['car', 'barrier', 'crate', 'tetris'];
+const OBSTACLE = process.env.OBSTACLE ?? '';
+if (OBSTACLE && !OBSTACLE_RING.includes(OBSTACLE)) throw new Error(`no such obstacle: ${OBSTACLE} (have ${OBSTACLE_RING.join(', ')})`);
 
 const browser = await chromium.launch({ executablePath: chromiumExe(), headless: false, args: ['--window-size=1280,860', '--use-angle=metal', '--autoplay-policy=no-user-gesture-required'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -84,7 +99,11 @@ await page.evaluate(`(() => {
     if (!h || !h.playing || !h.playing.length) return;
     const top = h.playing.slice().sort((a, b) => b.weight - a.weight)[0];
     const last = window.__CLIPS[window.__CLIPS.length - 1];
-    if (!last || last.clip !== top.clip) window.__CLIPS.push({ t: Date.now(), clip: top.clip });
+    // P6: the HEIGHT the clip is playing at. "idle_stand" is a fine clip and a disaster two metres off the floor.
+    let y = null;
+    try { const q = window.__FEL_QA__; const h = q && q.hero && q.hero(); if (h) { let r = h; while (r.parent) r = r.parent; y = +r.getAbsolutePosition().y.toFixed(2); } } catch {}
+    if (!last || last.clip !== top.clip) window.__CLIPS.push({ t: Date.now(), clip: top.clip, y });
+    else if (y !== null && (last.yMax === undefined || y > last.yMax)) last.yMax = y;
   }, 50);
   // THE SLAM IS PRESSED IN THE PAGE, not over the bridge. A poll from node costs 30-50 ms a round trip, which is a
   // third of the window: the same scripted player scored a perfect windmill on one attempt and clanked on the next.
@@ -141,11 +160,27 @@ for (let n = 0; n < ATTEMPTS; n++) {
   const mark = Date.now();
   const a: Attempt = { n: n + 1, trick: trick.id, cue: [], banners: [] };
 
+  // THE PROP RING: d-pad DOWN in the approach steps through the obstacles, so the lab can put a car — or two people
+  // stacked on each other's shoulders — between the dunker and the rim.
+  for (let i = 0; OBSTACLE && i <= OBSTACLE_RING.indexOf(OBSTACLE); i++) {
+    await hold(DPAD.down, true); await page.waitForTimeout(70); await hold(DPAD.down, false); await page.waitForTimeout(140);
+  }
+
   // RUN: the hold drives the runway; the launch fires at the gather line
   await trigger(1);
   const runT0 = Date.now();
   let launched = false;
+  let threwRunway = !RUNWAY_TRICK;
   while (Date.now() - runT0 < RUN_MS + 2500) {
+    // a RUNWAY trick is a bare face button under the hold — the stick steers, so there is no direction to hold
+    if (!threwRunway && Date.now() - runT0 >= RUNWAY_AT_MS) {
+      threwRunway = true;
+      const rw = RUNWAY[RUNWAY_TRICK];
+      if (rw.dir) { await hold(DPAD[rw.dir], true); await page.waitForTimeout(80); }
+      await press(rw.btn, 60);
+      if (rw.dir) { await page.waitForTimeout(60); await hold(DPAD[rw.dir], false); }
+      a.trick = `${RUNWAY_TRICK}+${a.trick}`;
+    }
     const fresh = log.slice(logMark);
     if (fresh.some((l) => /\[DUNK-LAUNCH\]/.test(l))) { launched = true; break; }
     await page.waitForTimeout(30);
@@ -194,10 +229,10 @@ for (let n = 0; n < ATTEMPTS; n++) {
   a.cards = cards.pop() ?? null;
   a.total = mine.map((r) => r.score).filter((s): s is number => typeof s === 'number').pop();
   const clipRows = await page.evaluate('window.__CLIPS') as { t: number; clip: string }[];
-  a.clips = clipRows.filter((c) => c.t >= mark).map((c) => c.clip);
+  a.clips = clipRows.filter((c) => c.t >= mark).map((c) => `${c.clip}@${c.y ?? '?'}`);
   const fresh = log.slice(logMark); logMark = log.length;
   a.launch = fresh.find((l) => /\[DUNK-LAUNCH\]/.test(l))?.replace(/^\d+ /, '');
-  a.cue = fresh.filter((l) => /\[DUNK-(CUE|TRICK|SLAM|WIN)\]/.test(l)).map((l) => l.replace(/^\d+ /, ''));
+  a.cue = fresh.filter((l) => /\[DUNK-(CUE|TRICK|SLAM|WIN|RUNWAY|LOB)\]/.test(l)).map((l) => l.replace(/^\d+ /, ''));
   attempts.push(a);
   console.log(`#${a.n} ${a.trick.padEnd(12)} ${(a.slamTiming || '—').padEnd(38)} ${(a.breakdown || '').slice(0, 40).padEnd(42)} ${(a.clips ?? []).slice(0, 4).join(' → ')}`);
   if (n < 3) await page.screenshot({ path: `${OUT}/${TAG}-attempt${a.n}-${a.trick}.png` });

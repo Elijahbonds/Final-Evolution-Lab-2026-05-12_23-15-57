@@ -11,6 +11,11 @@ describe('DunkObstacles — cars and other objects', () => {
     expect(OBSTACLE_SPECS.crate.bonus).toBeGreaterThan(OBSTACLE_SPECS.barrier.bonus);
     expect(OBSTACLE_SPECS.car.takeoffFromRim).toBeGreaterThan(OBSTACLE_SPECS.car.zFromRim + 1);   // a long jump: the takeoff sits well before the near door
   });
+  // The clear banner is `OVER THE ${label}!`, so the label must not bring its own article — measured on rc26, where
+  // THE TETRIS read "OVER THE THE TETRIS!".
+  it('no label carries its own article: the banner supplies it', () => {
+    for (const s of Object.values(OBSTACLE_SPECS)) expect(s.label.startsWith('THE ')).toBe(false);
+  });
   it('THE TETRIS is clearable: the hitbox is their lap, not the rider\'s head', () => {
     // the rider's head is ~2.3 m up and the dunker's apex off a full charge is 1.84 — a hitbox at the top of the stack
     // is a dunk nobody in the game can do, so the profile tops out at what the feet actually have to clear
