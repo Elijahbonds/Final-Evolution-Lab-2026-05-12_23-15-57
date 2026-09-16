@@ -77,7 +77,7 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   threepoint: { suites: ['hoops'], borrow: ['karate_hit_react', 'football_juke_left', 'dunk_celebrate_big'] },   // the make's celebration
   carnival: { suites: ['hoops', 'dunk', 'board', 'combat', 'soccer'], borrow: [] },   // the hub rotates four sports' bursts
   karate: COMBAT, 'karate-vs': COMBAT, mixedcombat: COMBAT, showdown: COMBAT, duel: COMBAT,
-  football: { suites: ['football'], borrow: ['karate_knockdown'] },   // a trucked defender goes down on the fighter's knockdown
+  football: { suites: ['football'], borrow: ['karate_knockdown', 'karate_floor_hold'] },   // a trucked defender goes down on the fighter's knockdown; the carrier holds the turf until the reset
   skateboard: BOARD, surf: BOARD, bigair: BOARD,
   snowboard: { suites: ['board'], borrow: ['karate_knockdown'] },
   freerun: { suites: ['freerun'], borrow: ['karate_floor_hold', 'karate_get_up', 'football_tackled_fall', 'dunk_celebrate_big'] },

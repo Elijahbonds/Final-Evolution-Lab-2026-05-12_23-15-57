@@ -90,7 +90,9 @@ const live = new Set<St>();
 
 /** How far the StandardMaterial-era palette is pulled down to sit correctly as PBR albedo. */
 const PBR_ALBEDO_SCALE = 0.42;
-const MAT: Record<string, string> = { ground: '#8E8A84', vault: '#C9A15A', wall: '#B8735A', ledge: '#3FB8B0', roof: '#3FB8B0', bar: '#E0C060', start: '#3DDC97', finish: '#F4C542', checkpoint: '#4FD1E8', gap: '#000000' };
+// SCORECARD VISUALS (2026-09-15): the course read as one grey-blue mass — the ground drops away from the things you USE,
+// so the vault box, the wall and the bar each own a colour against it.
+const MAT: Record<string, string> = { ground: '#6E6A66', vault: '#D99A3C', wall: '#C4603F', ledge: '#3FB8B0', roof: '#3FB8B0', bar: '#F2C230', start: '#3DDC97', finish: '#F4C542', checkpoint: '#4FD1E8', gap: '#000000' };
 
 /** The camera preset's resting fov, captured on the first frame after load. */
 let baseFov: number | null = null;
@@ -139,7 +141,9 @@ export const FreeRunMode: ModeDefinition = (() => {
       box.position.set(p.x, p.y, p.z);
       box.material = matFor(p.kind);
       box.metadata = { freerun: p.kind, pieceIndex: i };
-      if (isGate) { box.visibility = 0.35; box.isPickable = false; }
+      // SCORECARD VISUALS (2026-09-15): at 0.35 the start gate's slab washed over the whole course in the opening frame —
+      // a gate is a MARKER you run through, not a pane of fog
+      if (isGate) { box.visibility = 0.18; box.isPickable = false; }
       else if (p.kind === 'bar') { box.isPickable = true; }             // a gate you slide under; not a collider (the capsule cannot crouch)
       else S.aggs.push(new PhysicsAggregate(box, PhysicsShapeType.BOX, { mass: 0, friction: 0.9 }, ctx.scene));
       S.meshes.push(box);

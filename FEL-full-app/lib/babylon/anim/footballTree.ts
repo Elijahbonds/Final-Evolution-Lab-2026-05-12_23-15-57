@@ -25,7 +25,7 @@ export type FootballAnimState =
   | 'presnap_idle' | 'snap' | 'dropback' | 'throw'
   | 'route_run' | 'carry' | 'juke' | 'spin' | 'stiff_arm' | 'truck'
   | 'catch_clean' | 'catch_contested' | 'tackled' | 'block' | 'rush'
-  | 'celebrate' | 'dejected';
+  | 'celebrate' | 'dejected' | 'floor_hold';
 
 export interface FootballAnimInput {
   presnap: boolean;
@@ -66,6 +66,9 @@ const CLIP_FOR: Record<FootballAnimState, { clip: string; loop: boolean; fadeSec
   rush:            { clip: 'run_forward', loop: true, fadeSec: 0.1 },
   celebrate:       { clip: 'football_td_spike', loop: false, fadeSec: 0.12 },   // SHARED-ANIM-BUS: the authored spike (the old name aliased onto the karate uppercut)
   dejected:        { clip: 'football_tackled_fall', loop: false, fadeSec: 0.2 },
+  // SCORECARD BODY (2026-09-15): the fall is a ONE-SHOT, and when it ended the runner had NO clip until the next snap
+  // (measured: 4.6 % of the session's samples with nothing playing). It settles into the authored floor hold instead.
+  floor_hold:      { clip: 'karate_floor_hold', loop: true, fadeSec: 0.12 },
 };
 
 export function chooseFootballClip(i: FootballAnimInput): FootballClipChoice {
@@ -95,7 +98,8 @@ export function chooseFootballClip(i: FootballAnimInput): FootballClipChoice {
 const isOneShot = (s: FootballAnimState): boolean => !CLIP_FOR[s].loop;
 export function settleAfter(st: FootballAnimState, i: FootballAnimInput): FootballClipChoice {
   switch (st) {
-    case 'tackled': case 'dejected': return { state: st, ...CLIP_FOR[st] };   // held: the reset lets him up
+    case 'tackled': case 'dejected': return { state: 'floor_hold', ...CLIP_FOR.floor_hold };   // down on the turf until the reset lets him up
+    case 'floor_hold': return { state: 'floor_hold', ...CLIP_FOR.floor_hold };
     case 'celebrate': return chooseFootballClip({ ...i, celebrating: false });
     case 'juke': case 'spin': case 'stiff_arm': return chooseFootballClip({ ...i, move: null });
     case 'catch_clean': case 'catch_contested': return chooseFootballClip({ ...i, catching: 'none' });

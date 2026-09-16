@@ -646,7 +646,12 @@ export const MixedCombatMode: ModeDefinition = (() => {
         if (e.btn === 'A') swing(ctx, true, 'jab');
         if (e.btn === 'B') swing(ctx, true, 'kick');
         if (e.btn === 'Y') swing(ctx, true, 'heavy');
-        if (e.btn === 'X') meState.pressBlock(now());   // the tree shows the block (blockHeld → block_hold)
+        if (e.btn === 'X') {
+          meState.pressBlock(now());   // the tree shows the block (blockHeld → block_hold)
+          // SCORECARD CONTROLS (2026-09-15): the guard going up moved a pose and nothing else — 4 of 10 X presses had no
+          // answer a player could see or hear. It is heard, the way the duel's guard is.
+          SoundKit.play('uiTick', { pitch: 1.35, volume: 0.22 });
+        }
         // L1 ROLLS, R1 JUMPS -- the four faces are spoken for. A neutral stick rolls BACKWARDS: the panic
         // input should be the defensive one.
         //

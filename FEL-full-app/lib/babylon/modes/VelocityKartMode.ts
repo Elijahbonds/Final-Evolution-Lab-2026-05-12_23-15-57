@@ -55,6 +55,8 @@ let baseFov: number | null = null;
 /** Last frame's finishing place, so an OVERTAKE can be detected as a change rather than a state. */
 let lastPlace = 0;
 let driftCallT = 0;
+let offRoadTick = 0;
+let offRoadSaid = false;
 
 export function makeVelocityKartMode(): ModeDefinition {
 let kart: TransformNode | null = null;
@@ -433,7 +435,7 @@ return {
     S.done = false; S.banner = ''; S.bannerT = 0; S.bestDrift = 0; S.offRoadSec = 0; S.graceLeft = null;
     S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false, boostK: 0 };
     S.boostHeld = false; boost = new BoostKit();
-    lastPlace = 0; driftCallT = 0;   // a remount must not inherit last race's place (it would read as an overtake on frame one)
+    lastPlace = 0; driftCallT = 0; offRoadTick = 0; offRoadSaid = false;   // a remount must not inherit last race's place (it would read as an overtake on frame one)
 
     // THE MAP AND THE KART ARE BOTH PICKS (2026-09-13). Read once, here, at mount — the world is built from
     // the course and the handling comes from the vehicle, and neither can be swapped under a running scene.
@@ -553,7 +555,14 @@ return {
 
     prevPos.copyFrom(state.pos);
     const on = onTrack(state.pos, course);
-    if (!on) S.offRoadSec += dt;
+    if (!on) {
+      S.offRoadSec += dt;
+      // SCORECARD FEEL (2026-09-15): OFF THE ROAD was a number on the HUD and nothing else — the grass is a penalty you
+      // should feel and hear, and it is most of what a driver who leaves the line experiences
+      offRoadTick -= dt;
+      if (offRoadTick <= 0) { offRoadTick = 0.45; ctx.feel.impact(0.12); SoundKit.play('rattle', { pitch: 0.8, volume: 0.22 }); EffectsKit.burst(ctx.scene, state.pos.clone(), 'dust'); }
+      if (!offRoadSaid) { offRoadSaid = true; ctx.juice.callout('OFF THE ROAD', '#fca5a5', 600); }
+    } else { offRoadTick = 0; offRoadSaid = false; }
     const bev = boost.update(dt, S.boostHeld, true);
     S.input.boostK = boost.k;
     stepKart(state, S.input, dt, on, kartSpec);
