@@ -451,7 +451,9 @@ return {
         const at = a.at.add(b.at.subtract(a.at).scale(0.5));
         spots.push({ pos: at, yaw: Math.atan2(b.at.x - a.at.x, b.at.z - a.at.z), kind: 'ring' as const, radius: 9 });
       }
-      boostRings = new BoostPads(ctx.scene, spots, '#ffd75e');
+      // SHARD-PICKUP: no per-mode tint. This passed the COIN gold, which is what made the aero
+      // pickup read as currency hanging in the sky. One cyan shard everywhere now.
+      boostRings = new BoostPads(ctx.scene, spots);
     }
     ctx.heroRef.current = plane;
     ctx.objectiveRef.current = null;          // a chase cam has no second subject to frame
