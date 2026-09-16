@@ -1,0 +1,47 @@
+CELL ENGINE AUDIT
+generated: 2026-09-16T11:26:29.387Z
+
+PATH 1 — cell-engine.getModelForRole (flat map, used by callLLM/completeText):
+  architect   -> claude-fable-5
+  builder     -> gpt-5.4-mini
+  critic      -> claude-sonnet-5
+  summarizer  -> gpt-5.4-mini
+
+PATH 2 — cell-models.resolveModel (tier ladder, used by cell-build.runLLM):
+  architect   ladder [frontier] -> claude-fable-5 (abacus, $3/$15 per MTok)
+  builder     ladder [cheap -> mid -> frontier] -> gpt-5.4-mini (abacus, $0.15/$0.6 per MTok)
+  critic      ladder [mid -> frontier] -> claude-sonnet-5 (abacus, $3/$15 per MTok)
+  summarizer  ladder [cheap] -> gpt-5.4-mini (abacus, $0.15/$0.6 per MTok)
+
+roles where the two paths disagree (no user keys): none
+
+With direct provider keys configured (BYOK), resolveModel leaves Abacus
+and picks from MODELS[]:
+  architect   path1=claude-fable-5   path2=gpt-4.1
+  builder     path1=gpt-5.4-mini     path2=gemini-1.5-flash
+  critic      path1=claude-sonnet-5  path2=gemini-1.5-pro
+  summarizer  path1=gpt-5.4-mini     path2=gemini-1.5-flash
+roles where the two paths disagree (BYOK): architect, builder, critic, summarizer
+
+COST ACCOUNTING
+  cell-build.runLLM        -> resolveModel + costOf + overBudget   [tracked]
+  cell-engine.callLLM      -> direct fetch to Abacus, no usage log [UNTRACKED]
+  cell-engine.completeText -> direct fetch to Abacus, no usage log [UNTRACKED]
+  callers on the untracked path:
+    app/api/cell/chat/route.ts:90            (interactive chat, streaming)
+    app/api/cell/projects/[id]/files/route.ts:60  (per-file builder)
+
+FRONTIER PRICE ESTIMATE
+  routed frontier model : claude-fable-5
+  table estimate        : $3 in / $15 out per MTok
+  Anthropic list price  : $10 in / $50 out per MTok
+  1M in + 1M out        : estimated $18.00 vs actual $60.00  (under by 3.3x)
+
+catalogue (MODELS[]) entries: 8 — gpt-4o-mini, claude-3-5-haiku-20241022, gemini-1.5-flash, gpt-4o, claude-3-5-sonnet-20241022, gemini-1.5-pro, claude-3-7-sonnet-20250219, gpt-4.1
+  note: the three current-generation ids are reached via the unexported
+  ABACUS_TIER fallback, not via MODELS[]. They are routable, not orphaned.
+
+acceptance-check types documented in the architect prompt: 4/4
+critic verdict vocabulary: pass | revise
+
+RESULT: two live model-resolution paths; only one accounts for spend.

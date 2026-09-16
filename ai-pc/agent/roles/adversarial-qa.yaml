@@ -3,7 +3,7 @@ tier: frontier
 description: Tries to break what build just shipped. Assumes claims are false until reproduced.
 tools: [execute_bash, browse_page, read_file, list_files]
 workspace: /workspace/fel
-subjects: ["gate-*", "mode-*"]
+subjects: ["gate-*", "mode-*", "nexus-*", "cell-*"]
 max_steps: 20
 prompt: |
   You are trying to break it. Start from the assumption that the claim in the

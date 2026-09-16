@@ -155,9 +155,9 @@ def test_always_available_tools_are_added(roles_dir: Path):
 
 # ------------------------------------------------- the ten shipped roles
 
-def test_shipped_registry_has_ten_roles():
+def test_shipped_registry_has_twelve_roles():
     registry = Registry.load()
-    assert len(registry) == 10
+    assert len(registry) == 12
 
 
 def test_shipped_tiers_are_as_designed():
@@ -166,17 +166,44 @@ def test_shipped_tiers_are_as_designed():
         "pm", "adversarial-qa", "vision-guardian", "cyber-security"
     }
     assert {r.name for r in registry.by_tier("local")} == {
-        "build", "playtest", "benchmark", "asset-pipeline", "content", "ops"
+        "build", "playtest", "benchmark", "asset-pipeline", "content", "ops",
+        "nexus-engine", "cell-engine",
     }
 
 
-def test_build_is_the_only_writer_in_the_repo_workspace():
+def test_repo_writers_are_the_three_engineering_roles():
+    """build is generic; nexus-engine and cell-engine own a subsystem each.
+
+    They share /workspace/fel deliberately — both subsystems typecheck against
+    one root tsconfig, so giving them separate workspaces would break the very
+    command that produces their evidence. What separates them is their
+    refusals, not their directory.
+    """
     registry = Registry.load()
-    repo_writers = [
+    repo_writers = sorted(
         r.name for r in registry.all()
         if "write_file" in r.tools and r.workspace == "/workspace/fel"
-    ]
-    assert repo_writers == ["build"]
+    )
+    assert repo_writers == ["build", "cell-engine", "nexus-engine"]
+
+
+def test_the_subsystem_roles_carry_their_invariants_as_refusals():
+    """The point of a dedicated role is the thing it will not do."""
+    registry = Registry.load()
+
+    nexus = registry.get("nexus-engine").prompt
+    assert "external asset" in nexus and "CDN" in nexus
+
+    cell = registry.get("cell-engine").prompt
+    assert "bypasses cost accounting" in cell
+    assert "decrypted key" in cell
+
+
+def test_subsystem_subjects_reach_the_roles_that_review_them():
+    registry = Registry.load()
+    assert "cell-*" in registry.get("cyber-security").subjects   # cell-crypto
+    assert "nexus-*" in registry.get("vision-guardian").subjects  # scope drift
+    assert "cell-*" in registry.get("adversarial-qa").subjects
 
 
 def test_qa_cannot_edit_what_it_audits():

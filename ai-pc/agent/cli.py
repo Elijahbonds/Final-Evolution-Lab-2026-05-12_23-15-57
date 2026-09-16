@@ -25,6 +25,7 @@ import argparse
 import json
 import os
 import shlex
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -33,6 +34,8 @@ from typing import Any, Iterable
 import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+DEFAULT_SEED = Path(__file__).resolve().parent.parent / "seed" / "ledger.seed.jsonl"
 
 from agent import Agent, AgentConfig, AgentEvent  # noqa: E402
 from ledger import Ledger, LedgerEntry, Status  # noqa: E402
@@ -335,6 +338,80 @@ def cmd_ledger(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_seed(args: argparse.Namespace) -> int:
+    """Load a seed file into the ledger so the org starts from real state.
+
+    The seed is not trusted. Every line is validated and appended through
+    ledger.append() exactly like a model's own entry, so a seeded PASS whose
+    artifact is not on disk is recorded as SOFT_CLEAR with the reason. A seed
+    file that overstates what was verified therefore cannot lie its way in.
+    """
+    seed_path = Path(args.file) if args.file else DEFAULT_SEED
+    if not seed_path.exists():
+        print(paint(f"\nNo seed file at {seed_path}\n", "red"), file=sys.stderr)
+        return 2
+
+    ledger = make_ledger(args)
+    reports = Path(args.workspace or make_config(args).workspace)
+
+    # Copy the seed's artifacts into the workspace first, or every PASS in it
+    # downgrades on arrival — correctly, but uselessly.
+    source_reports = seed_path.parent / "reports"
+    if source_reports.is_dir() and not args.no_artifacts:
+        target = reports / "fel" / "reports"
+        target.mkdir(parents=True, exist_ok=True)
+        copied = 0
+        for artifact in sorted(source_reports.glob("*")):
+            if artifact.is_file():
+                shutil.copy2(artifact, target / artifact.name)
+                copied += 1
+        print(paint(f"\ncopied {copied} artifact(s) to {target}", "grey"))
+
+    existing = set(ledger.state())
+    written, downgraded, skipped = 0, 0, 0
+
+    print(paint(f"\nseeding from {seed_path}\n", "bold"))
+    for lineno, raw in enumerate(seed_path.read_text(encoding="utf-8").splitlines(), 1):
+        raw = raw.strip()
+        if not raw or raw.startswith("#"):
+            continue
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            print(paint(f"  line {lineno}: not JSON ({exc})", "red"), file=sys.stderr)
+            return 2
+
+        subject = payload.get("subject", "")
+        if subject in existing and not args.force:
+            print(f"  {paint('skip', 'grey')}       {subject} "
+                  f"{paint('(already in the ledger)', 'grey')}")
+            skipped += 1
+            continue
+
+        try:
+            entry = LedgerEntry(run_id=f"seed-{lineno}", **payload)
+        except Exception as exc:
+            print(paint(f"  line {lineno}: rejected: {exc}", "red"), file=sys.stderr)
+            return 2
+
+        result = ledger.append(entry)
+        if result.status is not entry.status:
+            downgraded += 1
+            print(f"  {status_text(result.status)}{subject} "
+                  f"{paint(f'(seed claimed {entry.status.value})', 'yellow')}")
+        else:
+            print(f"  {status_text(result.status)}{subject}")
+        written += 1
+
+    summary = f"\n{written} entry(s) written"
+    if downgraded:
+        summary += f", {downgraded} downgraded"
+    if skipped:
+        summary += f", {skipped} skipped"
+    print(paint(summary + "\n", "bold"))
+    return 0
+
+
 def cmd_blockers(args: argparse.Namespace) -> int:
     ledger = make_ledger(args)
     blockers = ledger.open_blockers()
@@ -390,6 +467,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_ledger.add_argument("--limit", type=int, default=20, help="History rows. Default: 20")
     p_ledger.add_argument("--status", nargs="+", help="Filter current state by status.")
     p_ledger.set_defaults(func=cmd_ledger)
+
+    p_seed = sub.add_parser(
+        "seed", help="Load a seed file into the ledger, validated like any entry.")
+    p_seed.add_argument("--file", help=f"Seed JSONL. Default: {DEFAULT_SEED}")
+    p_seed.add_argument("--force", action="store_true",
+                        help="Append even for subjects already in the ledger.")
+    p_seed.add_argument("--no-artifacts", action="store_true",
+                        help="Do not copy the seed's evidence files into the workspace.")
+    p_seed.set_defaults(func=cmd_seed)
 
     p_blockers = sub.add_parser("blockers", help="Everything BLOCKED or REFUSED.")
     p_blockers.set_defaults(func=cmd_blockers)

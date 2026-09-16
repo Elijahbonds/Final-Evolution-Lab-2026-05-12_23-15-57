@@ -1,0 +1,13 @@
+NEXUS ZERO-ASSET INVARIANT — external references in the scene layer
+captured: 2026-09-16T11:28:17Z
+
+The NexusWebScene header states the constraint as: 'no downloads, no CDN,
+nothing to 404'. These are the references that contradict it:
+
+lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter.ts:14:const WASM_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm';
+lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter.ts:16:  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+
+scene layer proper (NexusWebScene, venueSpecs, NexusVenue):
+  0 external references — invariant holds here
+
+neuro-mirror subsystem: 2 external references — invariant does not hold

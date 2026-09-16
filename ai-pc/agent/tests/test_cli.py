@@ -33,12 +33,13 @@ def run(argv: list[str]) -> int:
 
 # ------------------------------------------------------------------- roles
 
-def test_roles_lists_ten_roles_with_tiers(capsys):
+def test_roles_lists_every_role_with_tiers(capsys):
     assert run(["roles"]) == 0
     out = capsys.readouterr().out
 
-    assert "10 roles (4 frontier, 6 local)" in out
-    for name in ("pm", "adversarial-qa", "build", "ops", "content"):
+    assert "12 roles (4 frontier, 8 local)" in out
+    for name in ("pm", "adversarial-qa", "build", "ops", "content",
+                 "nexus-engine", "cell-engine"):
         assert name in out
     assert "/workspace/content" in out
 
@@ -146,3 +147,92 @@ def test_age_is_human_readable():
     assert cli._age(now - 120) == "2m"
     assert cli._age(now - 7200) == "2h"
     assert cli._age(now - 200000) == "2d"
+
+
+# ---------------------------------------------------------------------- seed
+
+SEED_DIR = Path(__file__).resolve().parent.parent.parent / "seed"
+
+
+def test_shipped_seed_is_valid_and_every_line_parses():
+    import json
+    from ledger import LedgerEntry
+
+    lines = [l for l in (SEED_DIR / "ledger.seed.jsonl").read_text().splitlines() if l.strip()]
+    assert lines, "the shipped seed is empty"
+    for lineno, raw in enumerate(lines, 1):
+        LedgerEntry(**json.loads(raw))  # raises on an unknown status or field
+
+
+def test_every_shipped_seed_artifact_exists_and_is_not_empty():
+    """An empty evidence file passes the exists() check but proves nothing."""
+    import json
+
+    for raw in (SEED_DIR / "ledger.seed.jsonl").read_text().splitlines():
+        if not raw.strip():
+            continue
+        evidence = json.loads(raw).get("evidence")
+        if not evidence:
+            continue
+        artifact = SEED_DIR / Path(evidence).name if "/" not in evidence else \
+            SEED_DIR / "reports" / Path(evidence).name
+        assert artifact.exists(), f"{evidence} is cited but not shipped"
+        assert artifact.stat().st_size > 0, f"{evidence} is empty"
+
+
+def test_seed_loads_and_keeps_a_backed_pass(ledger, workspace, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "make_ledger", lambda _args: ledger)
+    assert run(["--workspace", str(workspace), "seed"]) == 0
+
+    out = capsys.readouterr().out
+    assert "PASS" in out
+    assert ledger.state()["fel-typecheck"].status is Status.PASS
+
+
+def test_seed_is_not_trusted_when_its_artifacts_are_missing(
+    ledger, workspace, monkeypatch, capsys
+):
+    """The seed goes through append() like any model entry, so a PASS it
+    cannot back is recorded as SOFT_CLEAR rather than taken on faith."""
+    monkeypatch.setattr(cli, "make_ledger", lambda _args: ledger)
+    assert run(["--workspace", str(workspace), "seed", "--no-artifacts"]) == 0
+
+    assert ledger.state()["fel-typecheck"].status is Status.SOFT_CLEAR
+    assert "downgraded" in capsys.readouterr().out
+
+
+def test_seed_skips_subjects_already_recorded(ledger, workspace, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "make_ledger", lambda _args: ledger)
+    run(["--workspace", str(workspace), "seed"])
+    capsys.readouterr()
+
+    assert run(["--workspace", str(workspace), "seed"]) == 0
+    out = capsys.readouterr().out
+    assert "already in the ledger" in out
+    assert "0 entry(s) written" in out
+
+
+def test_seed_force_appends_again(ledger, workspace, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "make_ledger", lambda _args: ledger)
+    run(["--workspace", str(workspace), "seed"])
+    capsys.readouterr()
+
+    assert run(["--workspace", str(workspace), "seed", "--force"]) == 0
+    assert len(ledger.history("fel-typecheck")) == 2
+
+
+def test_seed_reports_a_missing_file_cleanly(ledger, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "make_ledger", lambda _args: ledger)
+    assert run(["seed", "--file", "/nonexistent/seed.jsonl"]) == 2
+    assert "No seed file" in capsys.readouterr().err
+
+
+def test_seed_rejects_a_bad_status_rather_than_recording_it(
+    ledger, workspace, tmp_path, monkeypatch, capsys
+):
+    bad = tmp_path / "bad.jsonl"
+    bad.write_text('{"role":"ops","subject":"x","status":"LOOKS_FINE","note":"n"}\n')
+    monkeypatch.setattr(cli, "make_ledger", lambda _args: ledger)
+
+    assert run(["--workspace", str(workspace), "seed", "--file", str(bad)]) == 2
+    assert ledger.state() == {}

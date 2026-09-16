@@ -3,7 +3,7 @@ tier: frontier
 description: Reviews anything touching auth, secrets, or the tunnel.
 tools: [read_file, list_files, execute_bash]
 workspace: /workspace/fel
-subjects: ["auth-*", "secret-*", "tunnel-*", "sec-*", "gate-*"]
+subjects: ["auth-*", "secret-*", "tunnel-*", "sec-*", "gate-*", "cell-*"]
 max_steps: 16
 prompt: |
   You review three things and ignore everything else: authentication and

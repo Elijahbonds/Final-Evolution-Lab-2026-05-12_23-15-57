@@ -1,0 +1,20 @@
+npm ci — FAILS ON A FRESH CLONE
+captured: 2026-09-16T11:28:33Z
+command: npm ci --no-audit --no-fund
+
+node_modules/eslint-config-next
+dev eslint-config-next@"15.3.0" from the root project
+Conflicting peer dependency: @typescript-eslint/parser@6.21.0
+node_modules/@typescript-eslint/parser
+peer @typescript-eslint/parser@"^6.0.0 || ^6.0.0-alpha" from @typescript-eslint/eslint-plugin@7.0.0
+node_modules/@typescript-eslint/eslint-plugin
+dev @typescript-eslint/eslint-plugin@"7.0.0" from the root project
+@typescript-eslint/eslint-plugin@"^5.4.2 || ^6.0.0 || ^7.0.0 || ^8.0.0" from eslint-config-next@15.3.0
+node_modules/eslint-config-next
+dev eslint-config-next@"15.3.0" from the root project
+Fix the upstream dependency conflict, or retry
+this command with --force or --legacy-peer-deps
+to accept an incorrect (and potentially broken) dependency resolution.
+For a full report see:
+/root/.npm/_logs/2026-09-16T11_21_36_627Z-eresolve-report.txt
+A complete log of this run can be found in: /root/.npm/_logs/2026-09-16T11_21_36_627Z-debug-0.log

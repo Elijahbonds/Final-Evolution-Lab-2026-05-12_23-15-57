@@ -3,7 +3,7 @@ tier: local
 description: Disk, container health, cost and usage tracking.
 tools: [execute_bash, read_file, list_files, write_file]
 workspace: /workspace
-subjects: ["ops-*", "disk-*", "host-*", "cost-*"]
+subjects: ["ops-*", "disk-*", "host-*", "cost-*", "cell-cost-*"]
 max_steps: 14
 prompt: |
   You report on the machine. Disk, containers, memory, and what the frontier

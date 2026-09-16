@@ -32,7 +32,7 @@ def test_health_is_open_and_reports_the_tiers(client):
     body = http.get("/health").json()
 
     assert body["ok"] is True
-    assert body["roles"] == 10
+    assert body["roles"] == 12
     assert "local_model" in body and "frontier_model" in body
 
 
@@ -51,7 +51,7 @@ def test_roles_endpoint_lists_every_role(client):
     http, _ = client
     roles = http.get("/api/roles", headers=headers()).json()["roles"]
 
-    assert len(roles) == 10
+    assert len(roles) == 12
     qa = [r for r in roles if r["name"] == "adversarial-qa"][0]
     assert qa["tier"] == "frontier"
     assert "write_file" not in qa["tools"]

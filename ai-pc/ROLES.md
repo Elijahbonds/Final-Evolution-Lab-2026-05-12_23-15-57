@@ -53,7 +53,9 @@ provider and nothing else changes.
 
 | Role | Job | Notably cannot |
 |---|---|---|
-| `build` | Writes and runs code. The only role with `write_file` in the repo workspace. | Claim `PASS` without an artifact. |
+| `build` | Writes and runs code across the repo. | Claim `PASS` without an artifact. |
+| `nexus-engine` | Owns the Nexus scene layer: venues, procedural art, the zero-asset constraint. | Add an external asset, CDN reference or runtime download; move the venue specs out of TypeScript. |
+| `cell-engine` | Owns CELL: the role router, build orchestrator, cost engine and key handling. | Add a provider call that bypasses cost accounting; log or echo a decrypted key; weaken an acceptance check to go green. |
 | `playtest` | Runs modes headless, captures screenshots, reports what it saw. | Write files. Diagnose causes. |
 | `benchmark` | Researches reference titles, records measurable comparison criteria. | Judge our build against them. |
 | `asset-pipeline` | Model/texture/audio conversion and validation. | Report success on an exit code alone. |
@@ -63,6 +65,19 @@ provider and nothing else changes.
 Without `ANTHROPIC_API_KEY`, frontier roles fall back to the local model and
 log one warning at startup. Nothing crashes; the judgment-heavy roles just get
 noticeably weaker.
+
+### Why the two subsystem roles share a workspace
+
+`build`, `nexus-engine` and `cell-engine` all run in `/workspace/fel`. Giving
+the subsystem roles their own directories would look tidier and would break
+them: both subsystems typecheck against one root `tsconfig.json`, so a role
+confined to `lib/babylon/nexus` could not run the command that produces its
+own evidence.
+
+What separates them is their refusals, not their path. `nexus-engine` will not
+add a download; `cell-engine` will not add a model call that skips cost
+accounting. Those are the invariants a generic `build` role breaks cheerfully,
+because breaking them looks like doing a good job.
 
 ### What "cannot write" actually means
 
@@ -115,6 +130,35 @@ the description does. What the role must not do is the part a model gets
 wrong; what it should do it will mostly infer. A test asserts every shipped
 role has one.
 
+## Starting from real state
+
+An empty ledger makes the PM spend its first rounds rediscovering where things
+stand. `agent/cli.py seed` loads `seed/ledger.seed.jsonl` — findings from an
+audit of this repo, each citing an artifact in `seed/reports/`.
+
+```bash
+python agent/cli.py seed          # copies the artifacts, then appends
+python agent/cli.py blockers      # six open, with file and line
+```
+
+The seed gets no more trust than a model does. Every line is appended through
+`ledger.append()`, so a seeded `PASS` whose artifact is not on disk is recorded
+as `SOFT_CLEAR` with the reason — try `seed --no-artifacts` and watch both
+`PASS` entries downgrade. A seed that overstates what was verified cannot lie
+its way in.
+
+Subjects already in the ledger are skipped unless you pass `--force`, so
+re-running it is safe.
+
+### One known rough edge
+
+`brief()` never filters open blockers by the role's subjects, on the grounds
+that a role which does not know what is blocked will redo blocked work. With
+two unrelated subsystems in the ledger that means `nexus-engine` opens its
+brief to five CELL blockers it cannot act on. The char cap keeps it bounded and
+blockers are the right thing to prioritise, but if the ledger grows past a few
+dozen open blockers this is the first thing that will need scoping.
+
 ## Driving it
 
 ```bash
@@ -125,6 +169,7 @@ python agent/cli.py run ops "report disk usage"  # one role, one task
 python agent/cli.py mission "get Gate 0 to PASS with evidence"
 python agent/cli.py ledger                       # current state per subject
 python agent/cli.py ledger --subject gate-0      # that subject's history
+python agent/cli.py seed                         # load the audited starting state
 python agent/cli.py blockers                     # exits non-zero if any
 ```
 

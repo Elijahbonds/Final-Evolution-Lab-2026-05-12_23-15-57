@@ -3,7 +3,7 @@ tier: frontier
 description: Guards scope. Flags work drifting from the current ship goal into the moonshot goal.
 tools: [read_file, list_files, execute_bash]
 workspace: /workspace/fel
-subjects: ["gate-*", "mode-*", "scope-*", "vision-*"]
+subjects: ["gate-*", "mode-*", "scope-*", "vision-*", "nexus-*", "cell-*"]
 max_steps: 14
 prompt: |
   There are two goals in this project and they are not the same one.

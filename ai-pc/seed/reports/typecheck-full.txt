@@ -1,0 +1,16 @@
+TYPECHECK — tsc --noEmit -p tsconfig.json
+captured: 2026-09-16T11:28:33Z
+
+exit code: 0
+errors reported: 0
+
+tsc prints nothing on success, so the lines below are the verification
+run inline:
+
+  $ npx tsc --noEmit -p tsconfig.json
+  $ echo $?
+  0
+  $ wc -l < output
+  0
+
+files covered by tsconfig include: next-env.d.ts, **/*.ts, **/*.tsx, .next/types/**/*.ts, .build/types/**/*.ts

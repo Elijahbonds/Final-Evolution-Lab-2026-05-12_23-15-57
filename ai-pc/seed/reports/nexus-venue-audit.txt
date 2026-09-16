@@ -1,0 +1,32 @@
+NEXUS SCENE LAYER AUDIT
+generated: 2026-09-16T11:24:33.296Z
+
+venues defined: 21
+mode ids: basketball_h2h, basketball_dunk, basketball_3v3, basketball_irl, court_carnival, karate_h2h, karate_endless, soccer, football, baseball, tennis, volleyball, golf, skateboarding, snowboarding, surfing, gymnastics, brain_brawl, who_scene_it, market_browse, dance
+
+  basketball_h2h   props= 7 actors= 2 ground=court camera=yes
+  basketball_dunk  props= 9 actors= 1 ground=court camera=yes
+  basketball_3v3   props= 6 actors= 6 ground=court camera=yes
+  basketball_irl   props= 2 actors= 1 ground=court camera=yes
+  court_carnival   props= 6 actors= 2 ground=court camera=yes
+  karate_h2h       props= 5 actors= 2 ground=mat camera=yes
+  karate_endless   props= 4 actors= 4 ground=mat camera=yes
+  soccer           props= 4 actors= 2 ground=pitch camera=yes
+  football         props= 4 actors= 2 ground=pitch camera=yes
+  baseball         props= 4 actors= 2 ground=diamond camera=yes
+  tennis           props= 3 actors= 2 ground=hardcourt camera=yes
+  volleyball       props= 3 actors= 2 ground=sand camera=yes
+  golf             props= 4 actors= 1 ground=green camera=yes
+  skateboarding    props= 5 actors= 1 ground=street camera=yes
+  snowboarding     props= 3 actors= 1 ground=snow camera=yes
+  surfing          props= 2 actors= 1 ground=water camera=yes
+  gymnastics       props= 5 actors= 1 ground=mat camera=yes
+  brain_brawl      props= 6 actors= 2 ground=stage camera=yes
+  who_scene_it     props= 6 actors= 2 ground=stage camera=yes
+  market_browse    props= 7 actors= 0 ground=stage camera=yes
+  dance            props= 8 actors= 3 ground=stage camera=yes
+
+totals: 103 props, 40 actors across 21 venues
+venues missing a camera: 0
+
+RESULT: every venue is structurally complete.
