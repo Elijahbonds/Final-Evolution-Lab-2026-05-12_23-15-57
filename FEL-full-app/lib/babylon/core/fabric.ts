@@ -44,11 +44,23 @@ export interface FabricLook {
  * woven poly. A sneaker upper is canvas or knit over foam: coarser than a short, and glossier, because a shoe is the
  * one garment with a finish on it.
  */
-export const FABRICS: Readonly<Record<'jersey' | 'shorts' | 'shoes' | 'sock', FabricLook>> = {
+export const FABRICS: Readonly<Record<'jersey' | 'shorts' | 'shoes' | 'sock' | 'band', FabricLook>> = {
   jersey: { tile: 26, level: 0.55, roughness: 0.88, sheen: 0.35 },
   shorts: { tile: 34, level: 0.45, roughness: 0.86, sheen: 0.30 },
   shoes: { tile: 18, level: 0.70, roughness: 0.52, sheen: 0.18 },
-  sock: { tile: 40, level: 0.60, roughness: 0.92, sheen: 0.22 },
+  sock: { tile: 8, level: 0.40, roughness: 0.92, sheen: 0.18 },
+  /**
+   * A BAND GETS NO WEAVE AT ALL (`tile: 0` means no map).
+   *
+   * Chased through three builds. A navy `#1D3557` headband photographed as a pale blue-grey ring, and the albedo was
+   * navy the whole time — I read it off the live material to be sure. It is not a colour override and it is not the
+   * sheen: it is the WEAVE. A normal map tiled 46 times across a 3 cm torus gives every texel an essentially random
+   * normal, the surface scatters a bright sky in all directions, and the average of that is pale and desaturated. The
+   * same map that gives a jersey its cloth destroys anything small.
+   *
+   * So: no map under about a hand's width, and the socks and sleeves tile eight times rather than forty.
+   */
+  band: { tile: 0, level: 0, roughness: 0.95, sheen: 0.06 },
 };
 
 /**
@@ -138,6 +150,7 @@ export function applyFabric(mat: PBRMaterial, kind: keyof typeof FABRICS): void 
   try {
     const scene = mat.getScene();
     if (!scene) return;
+    if (look.tile <= 0) { mat.bumpTexture = null; return; }   // too small for a weave: see the `band` note above
     // ONE TEXTURE PER FABRIC, NEVER A CLONE. Tiling lives on the texture, not the material, so each fabric needs its
     // own — and the obvious way to get one, `weave.clone()`, is a trap this repo has now hit twice: a CLONED
     // DynamicTexture never becomes ready, every material holding one stays never-ready, and a never-ready material

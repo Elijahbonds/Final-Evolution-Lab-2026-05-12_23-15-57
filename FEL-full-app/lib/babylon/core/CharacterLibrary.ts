@@ -337,9 +337,9 @@ export const CharacterLibrary = {
     // accessory rendered pale blue-white whatever accent it was dealt, which is a material being overridden somewhere
     // after this runs and is not yet found. Broken rings floating on every NPC in the game is worse than no rings, so
     // nothing gets them until a caller asks: pass `look`, or `accessories: true`.
-    const wantsAccessories = opts.accessories === true || opts.look != null;
+    const wantsAccessories = opts.accessories !== false;
     const accDispose = wantsAccessories
-      ? attachAccessories(scene, skeleton, opts.look ?? lookFor(opts.name ?? opts.tint ?? `char_${spawnCounter}`), `acc_${spawnCounter}`)
+      ? attachAccessories(scene, skeleton, root, opts.look ?? lookFor(opts.name ?? opts.tint ?? `char_${spawnCounter}`), `acc_${spawnCounter}`)
       : null;
     // ship pass 4: a kit body carries every garment; show one per slot even with no identity
     // (anonymous dev captures, guests, rivals) — the identity pipe re-applies the player's own choice below
