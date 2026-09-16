@@ -17,6 +17,7 @@ import os
 import time
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Iterator
 
 import httpx
@@ -27,6 +28,7 @@ from qwen_protocol import (
     parse_tool_calls,
     render_tool_catalogue,
 )
+from ledger import Ledger, LedgerEntry, Status
 from tools import TOOL_SCHEMAS, SandboxClient, ToolError
 
 log = logging.getLogger("ai-pc.agent")
@@ -69,9 +71,13 @@ class AgentEvent:
 
 
 class Agent:
-    def __init__(self, config: AgentConfig | None = None):
+    def __init__(self, config: AgentConfig | None = None, ledger: Ledger | None = None):
         self.config = config or AgentConfig()
         self._http = httpx.Client(timeout=self.config.request_timeout)
+        self.ledger = ledger or Ledger(
+            path=Path(self.config.state_dir) / "ledger.jsonl",
+            evidence_root=Path(self.config.workspace),
+        )
 
     def close(self) -> None:
         self._http.close()
@@ -169,6 +175,22 @@ class Agent:
                         })
                         return
 
+                    if name in ("read_ledger", "write_ledger"):
+                        result, ledger_event = self._ledger_tool(name, args, role="agent",
+                                                                 run_id=run_id)
+                        if ledger_event is not None:
+                            yield ledger_event
+                        yield AgentEvent("tool_result", {
+                            "run_id": run_id, "step": step, "tool": name, "result": result
+                        })
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": call.get("id", name),
+                            "name": name,
+                            "content": result,
+                        })
+                        continue
+
                     try:
                         result = sandbox.call(name, args)
                     except ToolError as exc:
@@ -189,6 +211,59 @@ class Agent:
                     })
         finally:
             sandbox.close()
+
+    # --------------------------------------------------------------- ledger
+
+    def _ledger_tool(
+        self,
+        name: str,
+        args: dict[str, Any],
+        role: str,
+        run_id: str,
+    ) -> tuple[str, AgentEvent | None]:
+        """Handle read_ledger / write_ledger in-process.
+
+        Returns the string the model sees and, for a write, an event so the
+        console can render the entry as it lands.
+        """
+        if name == "read_ledger":
+            subject = args.get("subject")
+            if subject:
+                rows = self.ledger.history(str(subject))
+                if not rows:
+                    return f"No ledger entries for {subject!r}.", None
+                body = "\n".join(
+                    f"{time.strftime('%m-%d %H:%M', time.gmtime(r.ts))}  {r.line()}" for r in rows
+                )
+                return f"History for {subject} ({len(rows)} entries, oldest first):\n{body}", None
+            return self.ledger.brief(role, subjects=None), None
+
+        # write_ledger
+        try:
+            entry = LedgerEntry(
+                run_id=run_id,
+                role=role,
+                subject=str(args.get("subject", "")).strip(),
+                status=Status(str(args.get("status", ""))),
+                evidence=args.get("evidence") or None,
+                note=str(args.get("note", "")),
+                blocks=args.get("blocks") or [],
+            )
+        except Exception as exc:
+            return f"LEDGER REJECTED YOUR ENTRY: {exc}", None
+
+        written = self.ledger.append(entry)
+        event = AgentEvent("ledger", {
+            "run_id": run_id,
+            **written.model_dump(mode="json"),
+            "downgraded": written.status is not entry.status,
+        })
+        if written.status is not entry.status:
+            return (
+                f"Recorded, but DOWNGRADED: you claimed {entry.status.value}, "
+                f"the ledger wrote {written.status.value}. {written.note}"
+            ), event
+        return f"Recorded: {written.line()}", event
 
     # ---------------------------------------------------------------- model
 

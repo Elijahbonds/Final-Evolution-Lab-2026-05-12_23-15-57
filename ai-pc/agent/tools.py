@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, Iterable
 
 import httpx
 
@@ -110,6 +110,57 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "read_ledger",
+            "description": (
+                "Read the shared record. With no subject you get current state plus open "
+                "blockers; with a subject you get that subject's history. This is how you "
+                "find out what other roles did — there is no inbox and nobody will message you."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subject": {
+                        "type": "string",
+                        "description": "Omit for current state. Give one to read its history.",
+                    }
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "write_ledger",
+            "description": (
+                "Append one entry to the shared record. Use it to record a finding mid-run "
+                "that other roles need even if your own run later fails. Entries are "
+                "permanent — nothing you write can be edited or removed, by you or anyone."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subject": {"type": "string", "description": "What this is about: a gate id, a mode name, a file path."},
+                    "status": {
+                        "type": "string",
+                        "enum": ["PASS", "SOFT_CLEAR", "BLOCKED", "REFUSED", "LIVE", "PARKED"],
+                        "description": "PASS is checked against the evidence file and downgraded to SOFT_CLEAR if it is missing.",
+                    },
+                    "note": {"type": "string", "description": "One line, <= 280 chars."},
+                    "evidence": {"type": "string", "description": "Workspace path to the artifact proving the claim."},
+                    "blocks": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Subjects this entry blocks, if any.",
+                    },
+                },
+                "required": ["subject", "status", "note"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "finish",
             "description": (
                 "End your run and report the result. Call this exactly once, when the task "
@@ -147,13 +198,24 @@ TOOL_NAMES: set[str] = {s["function"]["name"] for s in TOOL_SCHEMAS}
 # Tools that mutate the workspace. Used by the registry to sanity-check roles.
 MUTATING_TOOLS: set[str] = {"write_file", "execute_bash"}
 
+# Tools the agent handles in-process rather than forwarding to the sandbox.
+# The ledger lives beside the loop, not behind the containment boundary — it is
+# append-only and schema-checked, so it does not need the sandbox's protection,
+# and routing it through would let a role reach the ledger with raw file writes.
+LOCAL_TOOLS: set[str] = {"read_ledger", "write_ledger", "finish"}
 
-def schemas_for(names: list[str]) -> list[dict[str, Any]]:
+# Every role gets these. A role that cannot read the ledger is blind, one that
+# cannot write to it is invisible, and one that cannot finish burns its budget.
+ALWAYS_AVAILABLE: set[str] = {"read_ledger", "write_ledger", "finish"}
+
+
+def schemas_for(names: Iterable[str]) -> list[dict[str, Any]]:
     """Filter the catalogue down to `names`, preserving catalogue order.
 
-    `finish` is forced in: a role that cannot finish cannot report a result.
+    ALWAYS_AVAILABLE is forced in — read_ledger, write_ledger and finish are
+    how a role participates at all, so no role config can drop them.
     """
-    wanted = set(names) | {"finish"}
+    wanted = set(names) | ALWAYS_AVAILABLE
     return [s for s in TOOL_SCHEMAS if s["function"]["name"] in wanted]
 
 
