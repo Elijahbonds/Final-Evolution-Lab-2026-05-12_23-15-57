@@ -289,6 +289,43 @@ export class DunkSpin {
  *  refusal — when there is one — is knowable before the first trick is ever thrown. */
 export const COMBO_AIR_SEC = 1.32;
 
+// ── NAMED DUNKS (2026-09-16) ──────────────────────────────────────────────────────────────────────────
+//
+// Some combinations are not a combo, they are a DUNK, with a name and somebody's name on it. The vocabulary already
+// carries other people's — SCORPION, LOST & FOUND and HIDE & SEEK are Jordan Kilganon's, the EASTBAY is the East Bay
+// Funk Dunk — and the first one in here is the owner's own: the KICK-UP EASTBAY, kicking the ball up to yourself off
+// your own foot on the runway and taking it between the legs in the air.
+//
+// A signature is recognised from what was actually thrown (the runway trick and the air tricks, in order), pays a
+// small nod on top of its parts, and is announced by its name instead of the generic "X → Y DUNK!". Adding one is a
+// row in this table — deliberately, because the owner invents these faster than a code path can be designed for each.
+export interface SignatureDunk {
+  id: string;
+  /** The runway trick it opens with, if any. */
+  runway?: RunwayTrick['id'];
+  /** The air tricks, in the order they must be thrown. */
+  air: readonly string[];
+  name: string;
+  /** Whose dunk it is. Printed with the name — credit is the point. */
+  by: string;
+  /** Difficulty nod on top of the parts, for doing the whole thing. */
+  nod: number;
+}
+export const SIGNATURE_DUNKS: readonly SignatureDunk[] = [
+  { id: 'kickup_eastbay', runway: 'kickup', air: ['eastbay'], name: 'THE KICK-UP EASTBAY', by: 'Elijah Bonds', nod: 1.2 },
+] as const;
+
+/** The signature this attempt threw, if it threw one. Order matters: a signature is a sequence, not a set. */
+export function signatureFor(runway: readonly string[], air: readonly string[]): SignatureDunk | null {
+  for (const sig of SIGNATURE_DUNKS) {
+    if (sig.runway && !runway.includes(sig.runway)) continue;
+    if (sig.air.length !== air.length) continue;
+    if (sig.air.some((id, i) => air[i] !== id)) continue;
+    return sig;
+  }
+  return null;
+}
+
 /** Combo bonus multiplier for chaining a second trick before the slam. */
 export const COMBO_CHAIN_BONUS = 1.35;
 /** Extra difficulty nod for a combo the judges haven't seen this contest. */

@@ -67,7 +67,7 @@ import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE:
 import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, DOUBLE_UP_WINDOW_M, DOUBLE_UP_MIN_SPEED, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, type ObstacleKind } from '../core/DunkObstacles';
-import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, type SlamReadout } from '../core/DunkSystem';
+import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, signatureFor, type SlamReadout } from '../core/DunkSystem';
 import { dunkCard, slamIsClean } from '../core/DunkCard';
 import { missBeat } from '../core/MissFlavour';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
@@ -231,6 +231,7 @@ export const DunkMode: ModeDefinition = (() => {
   // ── runway tricks (thrown during the hold-run) ──
   let runwayBeat: RunwayTrick | null = null, runwayT = 0, runwayReleased = false, runwayToken = 0;
   let runwayLabels: string[] = [], runwayDifficulty = 0, doubleUp = false, launchQueued = false;
+  let runwayIds: string[] = [];                  // what was thrown, for the signature table (labels are for people)
   let airTrick: { trick: DunkTrick; t0: number } | null = null;   // the mid-air trick in flight (its own hand-off clock)
   let catchBlend = 1; const catchFrom = new Vector3(), catchWorld = new Vector3(), _invHand = Matrix.Identity();   // a caught ball eases from where the hand met it into the palm (80 ms), no snap
   let catchPending = false;   // DUNK-SOFTS-NAMED: the hand-local start is solved after this frame's animation + reach (update() sees last frame's hand — 0.3 m stale mid wind-up)
@@ -1972,7 +1973,7 @@ export const DunkMode: ModeDefinition = (() => {
     playClip(rt.clip, { fadeSec: 0.08, onEnd: () => { if (token === runwayToken) endRunwayBeat(); } });
     if (rt.id === 'doubleup') doubleUp = true;
     flash(ctx, rt.id === 'doubleup' ? 'DOUBLE-UP' : rt.label, 650);
-    runwayLabels.push(rt.label); runwayDifficulty += rt.difficulty;
+    runwayLabels.push(rt.label); runwayIds.push(rt.id); runwayDifficulty += rt.difficulty;
     SoundKit.play('whoosh', { pitch: rt.id === 'cartwheel' ? 0.8 : 1.2, volume: 0.4 });
     ctx.camDirector.pulse(0.3, 0.35);
     // the kick-up drops the ball to the foot: it leaves the hand at once, the kick launches it from wherever it fell
@@ -2392,6 +2393,10 @@ export const DunkMode: ModeDefinition = (() => {
     // inside flight.attempt.difficulty; combo chains get their 1.35x there).
     // The run-up is judged too: a full-speed runway attack reads harder than
     // a walk-up, exactly as the real panel reads it.
+    // A NAMED DUNK (2026-09-16): some combinations are not a combo, they are somebody's dunk. The first is the owner's
+    // own — the KICK-UP EASTBAY — announced by its name and its author instead of "KICK-UP → EASTBAY DUNK!", and worth
+    // a nod on top of its parts for doing the whole thing.
+    const signature = signatureFor(runwayIds, flight.attempt.tricks.map((t) => t.id));
     const trickDifficulty = flight.attempt.difficulty - STYLE_TIER[style];
     // DUNK-CONTROL-JUICE: the runway tricks (a toss, a kick, a cartwheel, the hop) and a caught lob are judged on top; an
     // obstacle pays only CLEARED (a clip never reaches this path)
@@ -2400,7 +2405,7 @@ export const DunkMode: ModeDefinition = (() => {
     // and the STYLE TIER moved to STYLE, where calling your signature belongs. Measured before: every attempt in the
     // lab scored DIFF 10.0, the cap, so a WINDMILL and a BETWEEN THE LEGS off a self-lob were the same dunk.
     const { difficulty, execution, style: styleScore } = dunkCard({
-      trickDifficulty, runwayDifficulty, propBonus: PROP_BONUS[prop],
+      trickDifficulty, runwayDifficulty: runwayDifficulty + (signature?.nod ?? 0), propBonus: PROP_BONUS[prop],
       charge, launchSpeed01, styleTier: STYLE_TIER[style], styleTaps,
       hype, hang: hangBonus > 0, repeat: isRepeat, execution01: qteAccuracy,
       chainTricks: Math.max(0, flight.attempt.tricks.length - 1),
@@ -2479,7 +2484,8 @@ export const DunkMode: ModeDefinition = (() => {
       ctx.camDirector.pulse(Math.min(1.2, 0.5 + named.length * 0.25), 0.5);
       SoundKit.play('crowdCheer', { volume: Math.min(0.9, 0.4 + difficulty * 0.05) });
     }
-    flash(ctx, [named.length ? `${named.join(' → ')} DUNK!` : finishBanner(qteHit, qteAccuracy, ebState.inLeftHand, calledAirTrick()), ...verdictParts].filter(Boolean).join(' · '));
+    flash(ctx, [signature ? `${signature.name} — ${signature.by.toUpperCase()}`
+      : named.length ? `${named.join(' → ')} DUNK!` : finishBanner(qteHit, qteAccuracy, ebState.inLeftHand, calledAirTrick()), ...verdictParts].filter(Boolean).join(' · '));
     if (dunkTotal >= BAND_TOTAL.eruption) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'confetti'); }
     landingClip = pickLanding(dunkTotal);   // A+ P8 H5: plays at feet-down after the replay hands the root back, not on the flush frame
 
@@ -2553,7 +2559,7 @@ export const DunkMode: ModeDefinition = (() => {
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     jamSec = -1; jamContact = false; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
     styleTaps = 0; hangSec = 0; revealed = []; slamTiming = null;
-    runUpPeak = 0; obstacleClipped = false; toppling = false;
+    runUpPeak = 0; obstacleClipped = false; toppling = false; runwayIds = [];
     resetLob(); resetRunway(); ballSim.stop(); looseBall = false; flush = null; jamPrevLive = false; punchPending = false; dribble?.update(0, 0, false); gatherLatched = false; gatherK = 0; finishRelease = -1; attachBallToHand(ball, player.skeleton, 'RightHand'); ebState.inLeftHand = false; setWin('run');
     settleLatch = false; settleArmed = false; fovRelease(); setTrail('soft');   // juice soft: back to the runway
     void setupProp(ctx);
