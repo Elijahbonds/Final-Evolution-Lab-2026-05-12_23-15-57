@@ -87,10 +87,13 @@ export interface MountVenueOptions {
    * `mountLightRig` builds `fel_hemi` + `fel_sun` and a cascaded shadow map; `buildNexusScene` then builds ANOTHER
    * hemi + sun + shadow map of its own (`nexus_fill`, `nexus_sun`). Measured on the live dunk scene, the four of them
    * came to 3.66 of directional and 1.35 of hemispheric — roughly double what the materials are balanced against —
-   * and everything in the mode reads pale and flat because of it. It is the same class of bug the flag above fixes:
-   * the venue quietly taking over something the mode already owns.
+   * and everything in the mode reads pale and flat because of it. It is the same class of bug the flag above it
+   * fixes: the venue quietly taking over something the mode already owns.
    *
-   * Opt-in and default-off, so no mode changes until it asks.
+   * **This is not a flag any mode should have to pass.** Sixteen mode files mount a venue and every one of them that
+   * also mounts a light rig had the same bug, so the DEFAULT is now the answer: if the scene already carries
+   * `fel_sun` / `fel_hemi` when the venue mounts, the venue does not add a second pair. Set it explicitly only to
+   * override that — `true` to drop the venue's lights even without a mode rig, `false` to keep both on purpose.
    */
   keepModeLights?: boolean;
 }
@@ -131,10 +134,14 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   // scene.activeCamera to the venue's static orbit camera.
   const gameplayCam = ctx.scene.activeCamera;
 
+  // DOES THIS SCENE ALREADY HAVE A LIGHT RIG? Asked BEFORE the venue builds, because the answer decides whether the
+  // venue's own lights are a second rig or the only one. `mountLightRig` names its pair `fel_hemi` / `fel_sun`.
+  const hadModeLights = !!(ctx.scene.getLightByName('fel_sun') ?? ctx.scene.getLightByName('fel_hemi'));
+
   const built = buildNexusScene(ctx.scene, spec, ctx.canvas);
   // A mode that lit its own scene keeps its own lighting: drop the venue's pair (and the shadow map hanging off its
   // sun) rather than stacking a second rig on top of the first.
-  if (options.keepModeLights) {
+  if (options.keepModeLights ?? hadModeLights) {
     for (const name of ['nexus_fill', 'nexus_sun']) {
       const light = ctx.scene.getLightByName(name);
       if (!light) continue;
