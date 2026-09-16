@@ -21,6 +21,33 @@ function dotTexture(scene: Scene): Texture {
   return tex;
 }
 
+/**
+ * A GULL, not a white rectangle (dunk visuals pass, 2026-09-16).
+ *
+ * Caught in the dunk's replay frame: three pale BOXES hanging over Venice beach. The ambient gulls were untextured
+ * emissive planes — a plane with no alpha is a rectangle, and a white rectangle in a sunset sky is the single most
+ * obviously-wrong thing in the picture. This paints the silhouette (two swept wings) once per scene, with alpha, so the
+ * flap that was already there has something gull-shaped to flap.
+ */
+function gullTexture(scene: Scene): Texture {
+  const existing = scene.getTextureByName('fx_gull');
+  if (existing) return existing as Texture;
+  const W = 64, H = 32;
+  const tex = new DynamicTexture('fx_gull', { width: W, height: H }, scene, false);
+  const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(255,255,255,1)';
+  ctx.lineWidth = 3.2; ctx.lineCap = 'round';
+  ctx.beginPath();                       // the shallow M every gull at distance is
+  ctx.moveTo(6, 20);
+  ctx.quadraticCurveTo(18, 7, 32, 17);
+  ctx.quadraticCurveTo(46, 7, 58, 20);
+  ctx.stroke();
+  tex.update();
+  tex.hasAlpha = true;
+  return tex;
+}
+
 function baseSystem(scene: Scene, name: string, capacity: number): ParticleSystem {
   const ps = new ParticleSystem(name, capacity, scene);
   ps.particleTexture = dotTexture(scene);
@@ -29,6 +56,46 @@ function baseSystem(scene: Scene, name: string, capacity: number): ParticleSyste
 }
 
 export type VenueFamily = 'venice' | 'dojo' | 'slope' | 'gridiron' | 'park';
+
+/**
+ * THE BALL TRAIL, AND WHY IT WAS A CLOUD (dunk visuals pass, 2026-09-16).
+ *
+ * Caught on the dunk's hang frame: a dozen loose orange ORBS scattered across the sky, reading as confetti rather than
+ * as anything attached to the ball. The numbers said why — at the hang the dunk mode pushed the system to 170/s at
+ * 0.2 m with a 0.25–0.4 s life and no taper, so ~55 fat dots sat in the air at a beat where the ball itself barely
+ * moves (a windmill winds the arm, not the ball). Big, long-lived, same-size-to-the-end particles do not read as a
+ * streak at any rate; they read as a pile.
+ *
+ * A trail is the PATH: small, brief, tapering to nothing. The look lives here rather than in the mode so the four
+ * levels are one table that can be argued with in a test.
+ */
+export type TrailLevel = 'off' | 'soft' | 'hang' | 'flash';
+export const TRAIL_LOOK: Record<TrailLevel, { rate: number; head: number; life: [number, number]; alpha: number }> = {
+  off:   { rate: 0,   head: 0.06,  life: [0.10, 0.18], alpha: 0 },
+  soft:  { rate: 55,  head: 0.07,  life: [0.10, 0.18], alpha: 0.55 },   // the run-up: present, never the subject
+  hang:  { rate: 95,  head: 0.10,  life: [0.12, 0.22], alpha: 0.90 },   // the flight: the ball is the subject
+  flash: { rate: 150, head: 0.13,  life: [0.09, 0.15], alpha: 1.00 },   // the flush: one bright wipe, then nothing
+};
+
+/** Point a trail system at one of the four looks. Safe to call every beat; the taper is rebuilt with it. */
+export function applyTrail(ps: ParticleSystem, level: TrailLevel, hex = '#ffb36b'): void {
+  const look = TRAIL_LOOK[level];
+  const c = Color3.FromHexString(hex);
+  ps.color1 = new Color4(c.r, c.g, c.b, look.alpha);
+  ps.color2 = new Color4(c.r, c.g, c.b, 0);
+  ps.minLifeTime = look.life[0]; ps.maxLifeTime = look.life[1];
+  ps.emitRate = look.rate;
+  // THE TAPER is what makes it a trail. Size gradients override min/maxSize in Babylon, so they are the size now —
+  // and they are rebuilt on every call because a stale gradient would pin the head width of whichever level ran first.
+  for (const g of [0, 0.55, 1]) { try { ps.removeSizeGradient(g); } catch { /* none yet */ } }
+  ps.addSizeGradient(0, look.head, look.head);
+  ps.addSizeGradient(0.55, look.head * 0.45, look.head * 0.45);
+  ps.addSizeGradient(1, 0, 0);
+  ps.minSize = 0; ps.maxSize = look.head;   // kept in step for anything that reads them
+}
+
+/** How far out the ambient gulls circle, and how high — far enough to be sky, not traffic over the rim. */
+export const GULL_RADIUS = 17, GULL_Y = 10.5;
 
 export const EffectsKit = {
   /** Ambient motion per venue — mount once in load(). */
@@ -55,17 +122,23 @@ export const EffectsKit = {
       ps.gravity = new Vector3(0.3, -1.4, 0);
       ps.start();
     }
-    if (family === 'venice' || family === 'park') {        // gulls + heat shimmer dots
+    if (family === 'venice' || family === 'park') {        // gulls
+      const tex = gullTexture(scene);
       for (let i = 0; i < 4; i++) {
-        const gull = MeshBuilder.CreatePlane(`gull_${i}`, { width: 0.5, height: 0.18 }, scene);
+        const gull = MeshBuilder.CreatePlane(`gull_${i}`, { width: 0.9, height: 0.45 }, scene);
         gull.billboardMode = Mesh.BILLBOARDMODE_ALL;
+        gull.isPickable = false;
         const m = new StandardMaterial(`gull_m_${i}`, scene);
-        m.emissiveColor = new Color3(0.95, 0.95, 0.98); m.disableLighting = true;
+        m.diffuseTexture = tex; m.opacityTexture = tex; m.useAlphaFromDiffuseTexture = true;
+        m.emissiveColor = new Color3(0.93, 0.93, 0.96); m.disableLighting = true;
+        m.diffuseColor = Color3.Black(); m.backFaceCulling = false;
         gull.material = m;
-        const phase = i * 1.7, r = 8 + i * 3;
+        // GULLS BELONG IN THE BACKGROUND. At r 8–17 and y 6.5 they flew through the play — over the rim, across the
+        // dunker — which is where the eye is. Pushed out and up, they are weather instead of traffic.
+        const phase = i * 1.7, r = GULL_RADIUS + i * 4;
         scene.onBeforeRenderObservable.add(() => {
           const t = performance.now() / 1000 + phase;
-          gull.position.set(Math.sin(t * 0.25) * r, 6.5 + Math.sin(t * 0.9) * 0.4, Math.cos(t * 0.25) * r - 6);
+          gull.position.set(Math.sin(t * 0.18) * r, GULL_Y + i * 0.8 + Math.sin(t * 0.9) * 0.4, Math.cos(t * 0.18) * r - 6);
           gull.scaling.y = 0.7 + Math.abs(Math.sin(t * 6)) * 0.5;   // wing flap
         });
       }
@@ -86,12 +159,8 @@ export const EffectsKit = {
   ballTrail(scene: Scene, ball: AbstractMesh, hex = '#ffb36b'): ParticleSystem {
     const ps = baseSystem(scene, 'fx_ball_trail', 120);
     ps.emitter = ball;
-    const c = Color3.FromHexString(hex);
-    ps.color1 = new Color4(c.r, c.g, c.b, 0.8);
-    ps.color2 = new Color4(c.r, c.g, c.b, 0.0);
-    ps.minSize = 0.05; ps.maxSize = 0.14;
-    ps.minLifeTime = 0.25; ps.maxLifeTime = 0.4;
-    ps.emitRate = 90;
+    ps.minEmitPower = 0; ps.maxEmitPower = 0;    // a trail is the PATH the ball took: the particles stay where they were laid
+    applyTrail(ps, 'soft', hex);
     ps.start();
     return ps;
   },

@@ -6,6 +6,35 @@ import { Matrix, Vector3 } from '@babylonjs/core';
 import type { Scene, TargetCamera } from '@babylonjs/core';
 import { vibrate } from './Haptics';
 
+/** Alpha at the frame's edge, where light spills in. */
+export const FLASH_EDGE = 0.46;
+/** Alpha through the middle of the frame, where the thing being celebrated is. */
+export const FLASH_CORE = 0.09;
+/** The clear middle runs out to this fraction of the radius before the edge ramp starts. */
+export const FLASH_CORE_STOP = 0.3;
+
+/** '#rrggbb' (or '#rgb') → 'rgba(r,g,b,a)'. Anything else is passed through with the alpha dropped. */
+export function rgba(hex: string, alpha: number): string {
+  const h = hex.trim().replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return hex;
+  const n = parseInt(full, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${Math.round(alpha * 1000) / 1000})`;
+}
+
+/**
+ * The flash as a vignette: clear through the middle, bright at the edge.
+ *
+ * `strength` scales both stops and is clamped — a caller passing 0 would allocate an invisible overlay and one passing
+ * 10 would put the whiteout back.
+ */
+export function flashBackground(color: string, strength = 1): string {
+  const k = Math.max(0.2, Math.min(2, strength));
+  const core = Math.min(0.35, FLASH_CORE * k);
+  const edge = Math.min(0.8, FLASH_EDGE * k);
+  return `radial-gradient(ellipse at center, ${rgba(color, core)} 0%, ${rgba(color, core)} ${FLASH_CORE_STOP * 100}%, ${rgba(color, edge)} 100%)`;
+}
+
 export class JuiceKit {
   private overlay: HTMLDivElement;
   private shakeT = 0; private shakeAmp = 0; private shakeDir = 1;
@@ -39,11 +68,22 @@ export class JuiceKit {
     setTimeout(() => { this.scene.animationTimeScale = this.baseTimeScale; }, Math.min(ms, 500));
   }
 
-  /** Full-screen flash tinted to the moment (make = white-gold, KO = crimson). */
-  flash(color = '#fff6dd', ms = 140): void {
+  /**
+   * Full-screen flash tinted to the moment (make = white-gold, KO = crimson).
+   *
+   * THE FLASH USED TO HIDE THE THING IT CELEBRATED (dunk visuals pass, 2026-09-16). It painted the whole frame at
+   * **opacity 0.85** and eased out over 120–260 ms, which means the first two or three frames after every make, every
+   * KO and every checkpoint in this game were a near-solid sheet of cream. Caught on the dunk's flush frame: the ball
+   * on the ring, the hand on the ball, the net — all of it behind a veil. Twenty-odd callers across ten modes had it.
+   *
+   * A flash is supposed to read as light spilling into the frame, and light spills from the EDGES. So it is a vignette
+   * now: `FLASH_EDGE` at the border, `FLASH_CORE` through the middle where the action is, which keeps the punch and
+   * lets you see what you just did. `strength` (default 1) is for the rare moment that really is bigger than a make.
+   */
+  flash(color = '#fff6dd', ms = 140, strength = 1): void {
     const f = document.createElement('div');
     f.style.cssText =
-      `position:absolute;inset:0;background:${color};opacity:0.85;` +
+      `position:absolute;inset:0;background:${flashBackground(color, strength)};opacity:1;` +
       `transition:opacity ${ms}ms ease-out;`;
     this.overlay.appendChild(f);
     requestAnimationFrame(() => { f.style.opacity = '0'; });

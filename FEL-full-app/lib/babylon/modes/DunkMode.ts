@@ -58,7 +58,7 @@ import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
-import { EffectsKit } from '../visual/EffectsKit';
+import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { HoopJuice } from '../visual/HoopJuice';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
@@ -1533,6 +1533,10 @@ export const DunkMode: ModeDefinition = (() => {
     if (phase === 'cinematic') return;
     if (runwayBeat && runwayBeat.id !== 'doubleup') endRunwayBeat(true);   // a toss / kick / cartwheel still running gives the body to the takeoff (no run loop in between — the launch clip crossfades out of the beat)
     runwayBeat = null; launchQueued = false;
+    // THE RUNWAY'S TEACHING LINE ENDS AT THE RUNWAY (caught in the hang frame, 2026-09-16): "DOUBLE-UP — tap A" was
+    // still sitting under the dunker in mid-air, offering a move that is no longer available and standing where the
+    // flight's own read is about to appear. The runway teaches; the air reads.
+    teachHint = ''; ctx.setHud({ hint: '' });
     setPhase('cinematic'); setWin('takeoff');
     { const f = readDisplaySetting().factor; if (f !== tvFactor) console.info(`[DUNK] TV MODE slam window x${f.toFixed(2)}`); tvFactor = f; }
     launchZ = player.root.position.z; airTrick = null; obstacleOver = false; obstacleCleared = false; obstacleMargin = Infinity;
@@ -2279,19 +2283,18 @@ export const DunkMode: ModeDefinition = (() => {
     if (!fovOn && fovT === 0) { fovCam.fov = fovBase; fovCam = null; }
   }
   /** #5 trail ramp: soft on the runway, bright in the hang, a white flash cut on the make, dead on a miss or a clipped air. */
-  function setTrail(level: 'soft' | 'hang' | 'off'): void {
+  // THE TRAIL'S LOOK LIVES IN EffectsKit (visuals pass, 2026-09-16) — four levels, one table, taper included. The old
+  // numbers here (170/s at 0.2 m, no taper) were what put a dozen fat orange orbs in the sky at the hang.
+  function setTrail(level: TrailLevel): void {
     if (!trail) return;
     console.info(`[JUICE-SOFT] trail ${level}`);
-    if (level === 'off') { trail.emitRate = 0; return; }
-    const hang = level === 'hang'; const c = Color3.FromHexString('#ffb36b');
-    trail.emitRate = hang ? 170 : 45; trail.maxSize = hang ? 0.2 : 0.1; trail.minSize = hang ? 0.07 : 0.04;
-    trail.color1 = new Color4(c.r, c.g, c.b, hang ? 0.95 : 0.5);
+    applyTrail(trail, level);
   }
   function trailFlash(): void {
     if (!trail) return;
     console.info('[JUICE-SOFT] trail flash');
-    trail.color1 = new Color4(1, 1, 1, 1); trail.emitRate = 260; trail.maxSize = 0.3;
-    setTimeout(() => { if (trail) trail.emitRate = 0; }, 130);
+    applyTrail(trail, 'flash', '#ffffff');
+    setTimeout(() => setTrail('off'), 130);
   }
 
   function contactPunch(ctx: ModeContext): void {
