@@ -51,19 +51,42 @@ await page.addInitScript({ content: 'window.__name = window.__name || function (
 const log: string[] = [];
 page.on('console', (m) => { const t = m.text(); if (/\[1V1|\[3V3|\[HOOPS|\[REF|\[BOARD/.test(t)) log.push(`${Date.now()} ${t.slice(0, 190)}`); });
 
-{ // login
+{ // LOGIN, AND CHECK IT TOOK.
+  //
+  // On a DEV server the form is submitted before the page has hydrated, so the click does nothing, no POST is ever
+  // made, and every /play route answers 307 for the rest of the run — which reads downstream as "the mode never
+  // loaded" and wastes the whole session. Wait for the control, then verify against /api/auth/session rather than
+  // trusting the URL.
   const lp = await ctx.newPage();
-  await lp.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  if (/\/login/.test(lp.url())) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await lp.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+    const already = await lp.evaluate(`fetch('/api/auth/session').then((r) => r.json()).then((j) => !!(j && j.user)).catch(() => false)`) as boolean;
+    if (already) break;
+    await lp.waitForSelector('input[type="email"]', { timeout: 120000 });
+    await lp.waitForSelector('button[type="submit"]', { timeout: 120000 });
+    await lp.waitForTimeout(800);   // hydration: a click on a button React has not wired yet is a click on nothing
     await lp.fill('input[type="email"]', process.env.PLAYTEST_EMAIL ?? 'playtest@fel.local');
     await lp.fill('input[type="password"]', process.env.PLAYTEST_PASSWORD ?? 'playtest-local-only');
-    await lp.click('button[type="submit"]');
-    const t = Date.now(); while (Date.now() - t < 30000 && /\/login/.test(lp.url())) await lp.waitForTimeout(300);
+    await Promise.all([
+      lp.waitForResponse((r) => /\/api\/auth\/(callback|signin)/.test(r.url()), { timeout: 60000 }).catch(() => null),
+      lp.click('button[type="submit"]'),
+    ]);
+    const t = Date.now();
+    while (Date.now() - t < 45000) {
+      const ok = await lp.evaluate(`fetch('/api/auth/session').then((r) => r.json()).then((j) => !!(j && j.user)).catch(() => false)`) as boolean;
+      if (ok) break;
+      await lp.waitForTimeout(400);
+    }
+    const signedIn = await lp.evaluate(`fetch('/api/auth/session').then((r) => r.json()).then((j) => !!(j && j.user)).catch(() => false)`) as boolean;
+    if (signedIn) { console.log('[LAB] signed in'); break; }
+    console.log(`[LAB] login attempt ${attempt + 1} did not take`);
   }
   await lp.close();
 }
 await page.goto(`${BASE}/play/${MODE}?agent=1`, { waitUntil: 'domcontentloaded', timeout: 180000 });
-{ const t = Date.now(); while (Date.now() - t < 180000) { const s = await page.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => ''); if (s === 'loaded' || s === 'playing') break; await page.waitForTimeout(400); } }
+{ const t = Date.now(); let st = '';
+  while (Date.now() - t < 300000) { st = await page.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => '') as string; if (st === 'loaded' || st === 'playing') break; await page.waitForTimeout(500); }
+  if (st !== 'loaded' && st !== 'playing') console.log(`[LAB] the mode never became ready (state "${st}", url ${page.url()})`); }
 
 // THE PAD, AND THE RELEASE ARMED IN THE PAGE. A shot meter is a number that moves every frame; polling it from node
 // costs 30–50 ms a round trip, which is most of a green window. The release is decided in the page, on the frame it
@@ -238,12 +261,21 @@ for (let n = 0; n < POSSESSIONS; n++) {
   // concedes for ever and never touches the ball, which is correct and is worth knowing on its own. The mode already
   // exposes `scene.metadata.onevone.defend()` / `.offense()` for exactly this — "so a probe can reach either
   // possession deterministically".
-  // EARN THE POSSESSION. The hint is the possession readout: the defence one starts "STAY IN FRONT", the offence one
-  // "Drive fast at the rim". Play defence until it flips.
+  // TAKE THE POSSESSION. The mode builds a seam for exactly this — `scene.metadata.onevone.offense()` / `.defend()`,
+  // "so a probe can reach either possession deterministically" — but it is inside a NODE_ENV check, so it exists on a
+  // dev server and not in a production build. Use it when it is there; earn the ball by defending when it is not.
   const beforeScore = await page.evaluate('(window.__hudNow().score ?? 0)') as number;
   const beforeFoe = await page.evaluate('(window.__hudNow().foeScore ?? 0)') as number;
+  const seamTook = await page.evaluate(`(() => {
+    const q = window.__FEL_QA__; const scene = q && q.scene ? q.scene() : null;
+    const seam = scene && scene.metadata && (scene.metadata.onevone || scene.metadata.threevthree);
+    if (!seam || !seam.offense) return false;
+    seam.offense();
+    return true;
+  })()`) as boolean;
+  if (seamTook) { await page.waitForTimeout(600); p.beats.push('possession taken through the mode seam'); }
   let onOffense = await page.evaluate(`/^Drive fast/.test(window.__hudNow().hint || '')`) as boolean;
-  if (!onOffense) {
+  if (!onOffense && !seamTook) {
     await page.evaluate('window.__defenceOn && window.__defenceOn()');
     const t0 = Date.now();
     while (Date.now() - t0 < DEFEND_MS) {
