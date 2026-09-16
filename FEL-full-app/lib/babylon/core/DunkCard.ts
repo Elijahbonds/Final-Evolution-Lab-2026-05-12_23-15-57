@@ -40,6 +40,8 @@ export interface DunkAttemptFacts {
   repeat: boolean;
   /** 0..1 from the slam curve. */
   execution01: number;
+  /** Air tricks BEYOND the first in this flight. A chain is worth something even when difficulty has saturated. */
+  chainTricks?: number;
 }
 
 export interface DunkCardScores { difficulty: number; execution: number; style: number }
@@ -59,7 +61,13 @@ export function dunkCard(f: DunkAttemptFacts): DunkCardScores {
   const approach = Math.min(APPROACH_MAX, f.charge * 0.7 + f.launchSpeed01 * 0.5);
   const difficulty = clamp10((f.trickDifficulty * TRICK_WEIGHT + f.runwayDifficulty + f.propBonus + approach) * varietyMod + varietyBonus);
   const execution = clamp10(f.execution01 * 10);
-  const style = clamp10(f.styleTier * 0.85 + Math.min(2, f.hype / 50) + f.styleTaps * 0.8 + (f.hang ? 1 : 0));
+  // A CHAIN PAYS STYLE TOO (P5, 2026-09-16). COMBO_CHAIN_BONUS multiplies difficulty, and a real combo — a full run-up,
+  // two named dunks, a lob caught on the way — saturates difficulty at 10 before the multiplier is applied, so the
+  // second trick's marginal value was zero: measured in the lab, WINDMILL → 360 read DIFF 10.0, exactly as the single
+  // windmill over a prop did. Two tricks in one flight is how a dunk LOOKS as much as how hard it is, so the chain
+  // also lands where nothing else has saturated.
+  const chain = Math.max(0, f.chainTricks ?? 0);
+  const style = clamp10(f.styleTier * 0.85 + Math.min(2, f.hype / 50) + f.styleTaps * 0.8 + (f.hang ? 1 : 0) + Math.min(2.4, chain * 1.2));
   return { difficulty, execution, style };
 }
 

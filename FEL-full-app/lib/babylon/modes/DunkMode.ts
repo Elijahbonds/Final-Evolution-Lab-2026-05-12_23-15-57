@@ -2397,6 +2397,7 @@ export const DunkMode: ModeDefinition = (() => {
       trickDifficulty, runwayDifficulty, propBonus: PROP_BONUS[prop],
       charge, launchSpeed01, styleTier: STYLE_TIER[style], styleTaps,
       hype, hang: hangBonus > 0, repeat: isRepeat, execution01: qteAccuracy,
+      chainTricks: Math.max(0, flight.attempt.tricks.length - 1),
     });
 
     // THE BUILDING IS PART OF THE PANEL. Momentum reached the score only as hype into the NEXT attempt's

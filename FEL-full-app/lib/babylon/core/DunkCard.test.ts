@@ -50,6 +50,18 @@ describe('the style number', () => {
   });
 });
 
+describe('a chain', () => {
+  it('is worth something even when difficulty has already saturated', () => {
+    const maxed = { trickDifficulty: 3.8, runwayDifficulty: 2.2, propBonus: 2.5, styleTier: 5.5 };
+    expect(card({ ...maxed }).difficulty).toBe(10);
+    expect(card({ ...maxed, chainTricks: 1 }).difficulty).toBe(10);          // the cap eats it here…
+    expect(card({ ...maxed, chainTricks: 1 }).style).toBeGreaterThan(card(maxed).style + 1);   // …so it lands here
+  });
+  it('does not become a second scoring system: two extra tricks is the most it pays', () => {
+    expect(card({ chainTricks: 5 }).style - card({}).style).toBeCloseTo(2.4, 2);
+  });
+});
+
 describe('what the panel does with them', () => {
   it('a plain dunk, perfectly finished, is a solid card — not a great one', () => {
     const t = total({});

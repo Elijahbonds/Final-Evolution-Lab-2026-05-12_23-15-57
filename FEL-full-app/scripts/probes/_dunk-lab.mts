@@ -39,8 +39,14 @@ const AIR: { id: string; dir: string; btn: number }[] = [
   { id: 'eastbay', dir: 'down', btn: 3 }, { id: 'betweenlegs', dir: 'down', btn: 1 }, { id: 'clutch', dir: 'down', btn: 0 },
   { id: 'lostfound', dir: 'left', btn: 1 }, { id: 'hideseek', dir: 'left', btn: 0 },
 ];
-const want = process.env.TRICK && process.env.TRICK !== 'all' ? AIR.filter((t) => t.id === process.env.TRICK) : AIR;
-if (!want.length) throw new Error(`no such trick: ${process.env.TRICK} (have ${AIR.map((t) => t.id).join(', ')})`);
+// TRICK=windmill · TRICK=all · TRICK=windmill+spin360 (a COMBO: both calls in one flight, the second on the hang)
+const spec = process.env.TRICK ?? 'all';
+const combo = spec.includes('+') ? spec.split('+').map((id) => AIR.find((t) => t.id === id.trim())!) : null;
+if (combo?.some((t) => !t)) throw new Error(`no such trick in ${spec} (have ${AIR.map((t) => t.id).join(', ')})`);
+const want = combo ? [combo[0]] : spec !== 'all' ? AIR.filter((t) => t.id === spec) : AIR;
+if (!want.length) throw new Error(`no such trick: ${spec} (have ${AIR.map((t) => t.id).join(', ')})`);
+/** The second call of a combo lands on the HANG beat — the mode arms an early press and fires it there. */
+const COMBO_GAP_MS = Number(process.env.COMBO_GAP_MS ?? 340);
 
 const browser = await chromium.launch({ executablePath: chromiumExe(), headless: false, args: ['--window-size=1280,860', '--use-angle=metal', '--autoplay-policy=no-user-gesture-required'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -155,6 +161,18 @@ for (let n = 0; n < ATTEMPTS; n++) {
   await press(trick.btn, 60);
   await page.waitForTimeout(60);
   await hold(DPAD[trick.dir], false);
+  if (combo) {
+    // the second call of the chain: a real run-up buys two tricks (DunkFlight.trickCapacity), the cue table decides
+    // when the second one may fire, and the mode arms a press thrown before its beat
+    const b = combo[1];
+    a.trick = `${combo[0].id}+${b.id}`;
+    await page.waitForTimeout(COMBO_GAP_MS);
+    await hold(DPAD[b.dir], true);
+    await page.waitForTimeout(90);
+    await press(b.btn, 60);
+    await page.waitForTimeout(60);
+    await hold(DPAD[b.dir], false);
+  }
 
   // THE SLAM: armed in the page so the press lands on the frame it means to.
   await page.evaluate(`window.__armSlam(${JSON.stringify(SLAM_WHEN)}, ${SLAM_OFFSET_MS})`);
