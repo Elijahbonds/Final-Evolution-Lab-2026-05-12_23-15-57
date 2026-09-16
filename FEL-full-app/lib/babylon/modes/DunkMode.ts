@@ -648,6 +648,18 @@ export const DunkMode: ModeDefinition = (() => {
         return;
       }
 
+      // SCORECARD CONTROLS, ROUND 2 (2026-09-15). The contest's OWN waiting phases answered nothing: SLAM and a trick
+      // direction pressed while the judges scored, through the replay, or on the rival's turn went into the floor — 4 of
+      // 18 SLAM presses and 3 of 8 d-pad presses silent in the rc13 capture, and nothing on screen tells the player the
+      // contest simply is not his right now. RUN already said this (the trigger path below); now every input does.
+      if ((e.t === 'button' || e.t === 'dpad') && e.pressed && (phase === 'rivalTurn' || phase === 'judging' || phase === 'resolve')) {
+        refuse(ctx, phase === 'rivalTurn' ? "RIVAL'S TURN" : 'THE JUDGES ARE SCORING');
+        return;
+      }
+      // A trick direction belongs to the FLIGHT; on the runway the d-pad is the prop picker, and it fires on the release.
+      // Tapped during the run-up it can pick nothing, so it says where tricks live instead of going quiet.
+      if (e.t === 'dpad' && e.pressed && phase === 'charge') refuse(ctx, 'TRICKS IN THE AIR — PICK THE PROP BEFORE THE RUN');
+
       // SCORECARD CONTROLS (2026-09-15): the STYLE and PROP pickers belong to the runway; pressed anywhere else they did
       // nothing and said nothing (2 of 9 presses each in the rc14 capture)
       if (e.t === 'button' && (e.btn === 'B' || e.btn === 'X') && e.pressed && phase !== 'approach' && phase !== 'cinematic' && !qteWindowOpen) {

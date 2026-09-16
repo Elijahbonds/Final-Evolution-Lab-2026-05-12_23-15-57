@@ -37,6 +37,7 @@ import { FootballAnimTree, type FootballAnimInput } from '../anim/footballTree';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { footballWindow, runPose, FOOTBALL_INPUT_IDLE, type FootballPostureInput } from '../core/RunPosture';
 import { assertSpawned } from '../core/FrameGuard';
+import { refuse } from '../core/Refusal';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { VenueKit } from '../visual/VenueKit';
@@ -109,6 +110,7 @@ export const FootballRushMode: ModeDefinition = (() => {
    *  frame later) and then jogged ON THE SPOT at the line through the whole pre-snap read (left foot 5 m in 1.4 s, root 0). */
   let downed = false;
   let truckSec = 0, truckCooldown = 0, trucks = 0;
+  let truckHeldWas = false;   // the trigger's own edge: a HOLD is one pull, so only its first frame is answered
   // A+ P0 juice (PM brief FOOTBALL-A-PLUS-P0, 2026-09-06): the three Street beats each get ONE punch —
   // latched per truck window / per play / per drive so a second body in the same beat never re-fires it.
   let truckLatch = false, tackleLatch = false, tdLatch = false;
@@ -396,7 +398,19 @@ export const FootballRushMode: ModeDefinition = (() => {
         if (snapCall) snap(ctx);
       }
 
-      // TRUCK — trigger hold, windowed + cooldown
+      // TRUCK — trigger hold, windowed + cooldown.
+      // SCORECARD CONTROLS (2026-09-15): 7 of 29 TRUCK pulls were silent, every one thrown while the last truck was
+      // still cooling, mid-dodge or on the floor. A cooldown the player cannot see is indistinguishable from a dead
+      // button, so the pull now says which it is. The truck itself is unchanged, and only the FIRST frame of a hold
+      // speaks — a held trigger is one pull, not sixty.
+      if (e.t === 'trigger' && e.side === 'R') {
+        const down = e.value > 0.5;
+        if (down && !truckHeldWas && !ended && (truckCooldown > 0 || truckSec > 0 || dodging || downed)) {
+          refuse(ctx, downed ? 'DOWN — WAIT FOR THE SNAP' : dodging ? 'IN THE DODGE' : truckSec > 0 ? 'ALREADY TRUCKING'
+            : `TRUCK COOLING — ${truckCooldown.toFixed(1)}s`);
+        }
+        truckHeldWas = down;
+      }
       if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5 && !ended
           && truckCooldown === 0 && truckSec === 0 && !dodging && !downed) {
         truckSec = TRUCK_WINDOW_SEC;
