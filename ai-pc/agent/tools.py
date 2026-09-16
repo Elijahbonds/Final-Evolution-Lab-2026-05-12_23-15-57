@@ -221,7 +221,13 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
 
 TOOL_NAMES: set[str] = {s["function"]["name"] for s in TOOL_SCHEMAS}
 
-# Tools that mutate the workspace. Used by the registry to sanity-check roles.
+# Tools that can change the workspace.
+#
+# `execute_bash` belongs here, and that matters: withholding `write_file` from
+# a review role stops it reaching for the edit, but a shell can still write.
+# Tool scoping is a guardrail against drift, not a containment boundary — the
+# boundary is the sandbox. A role that must not touch the code at all is one
+# with no shell (see `content`), not one with a shell and no write_file.
 MUTATING_TOOLS: set[str] = {"write_file", "execute_bash"}
 
 # Tools the agent handles in-process rather than forwarding to the sandbox.
@@ -233,10 +239,6 @@ LOCAL_TOOLS: set[str] = {"read_ledger", "write_ledger", "dispatch", "finish"}
 # Every role gets these. A role that cannot read the ledger is blind, one that
 # cannot write to it is invisible, and one that cannot finish burns its budget.
 ALWAYS_AVAILABLE: set[str] = {"read_ledger", "write_ledger", "finish"}
-
-# Calling either of these ends the run. `dispatch` is the PM's way out:
-# it hands work to one role instead of reporting a result.
-TERMINAL_TOOLS: set[str] = {"finish", "dispatch"}
 
 
 def schemas_for(names: Iterable[str]) -> list[dict[str, Any]]:

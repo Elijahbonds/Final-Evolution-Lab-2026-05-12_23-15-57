@@ -84,7 +84,17 @@ class RoleSpec(BaseModel):
 
     @property
     def can_mutate(self) -> bool:
+        """Whether this role can change its workspace at all.
+
+        True for a shell, not just for write_file — see MUTATING_TOOLS.
+        """
         return bool(set(self.tools) & MUTATING_TOOLS)
+
+    @property
+    def writes_files(self) -> bool:
+        """Whether the role was *given* the edit tool, as opposed to being
+        able to write anyway through a shell."""
+        return "write_file" in self.tools
 
     def schemas(self) -> list[dict[str, Any]]:
         return schemas_for(self.tools)
@@ -144,11 +154,16 @@ class Registry:
                 "role registry failed to load:\n  - " + "\n  - ".join(problems)
             )
 
+        writers = sorted(r.name for r in roles.values() if r.writes_files)
+        read_only = sorted(r.name for r in roles.values() if not r.can_mutate)
         log.info(
-            "registry: %d roles (%d frontier, %d local)",
+            "registry: %d roles (%d frontier, %d local); write_file: %s; "
+            "no way to write at all: %s",
             len(roles),
             sum(1 for r in roles.values() if r.tier == "frontier"),
             sum(1 for r in roles.values() if r.tier == "local"),
+            ", ".join(writers) or "none",
+            ", ".join(read_only) or "none",
         )
         return cls(roles)
 

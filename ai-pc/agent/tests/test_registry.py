@@ -217,3 +217,25 @@ def test_role_spec_rejects_a_duplicate_tool():
     with pytest.raises(ValueError):
         RoleSpec(name="x", tier="local", description="d",
                  tools=["read_file", "read_file"], prompt="p")
+
+
+def test_only_the_pm_has_no_way_to_write_at_all():
+    """Withholding write_file is a guardrail, not a boundary: a shell can
+    still write. This pins which roles actually have no route to the disk."""
+    registry = Registry.load()
+    assert [r.name for r in registry.all() if not r.can_mutate] == ["pm"]
+
+
+def test_review_roles_are_not_given_the_edit_tool():
+    registry = Registry.load()
+    for name in ("adversarial-qa", "vision-guardian", "cyber-security", "playtest"):
+        assert not registry.get(name).writes_files, name
+
+
+def test_review_prompts_do_not_claim_they_cannot_write():
+    """They have a shell. A prompt the model can disprove by trying is worse
+    than no prompt — it teaches the model the rules are decorative."""
+    registry = Registry.load()
+    for name in ("adversarial-qa", "vision-guardian", "cyber-security", "playtest"):
+        prompt = registry.get(name).prompt
+        assert "You cannot write files" not in prompt, name

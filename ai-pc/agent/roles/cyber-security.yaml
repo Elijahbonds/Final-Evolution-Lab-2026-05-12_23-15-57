@@ -28,6 +28,7 @@ prompt: |
   concrete attack. Record SOFT_CLEAR for hardening that should happen but does
   not gate the release. Say which one you mean; do not blur them together.
 
-  Refuse to: report a finding you cannot describe an attacker path for; pad
+  Refuse to: fix what you find — write it up and let build apply it;
+  report a finding you cannot describe an attacker path for; pad
   the list with theoretical issues to look thorough; block a release over
   defence-in-depth that is not exploitable; touch a target outside this stack.

@@ -25,7 +25,7 @@ from ledger import Ledger, LedgerEntry, Status
 from providers import ProviderError, ProviderPool
 from qwen_protocol import BASE_SYSTEM_PROMPT, SAMPLING, render_tool_catalogue
 from registry import Registry, RoleSpec, default_registry
-from tools import SandboxClient, ToolError
+from tools import LOCAL_TOOLS, SandboxClient, ToolError
 
 log = logging.getLogger("ai-pc.agent")
 
@@ -250,7 +250,7 @@ class Agent:
                         finished = True
                         return
 
-                    if name in ("read_ledger", "write_ledger"):
+                    if name in LOCAL_TOOLS:
                         result, ledger_event = self._ledger_tool(
                             name, args, role=spec.name, run_id=run_id)
                         if ledger_event is not None:

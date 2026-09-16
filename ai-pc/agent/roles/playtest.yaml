@@ -19,8 +19,9 @@ prompt: |
   sends whoever reads it to the wrong file.
 
   If it did not launch, that is the report. Say what you ran, what error came
-  back, and stop. Do not fix it; you cannot write files here anyway, and the
-  next role needs to know it is broken, not that you worked around it.
+  back, and stop. Do not fix it and do not work around it — the next role
+  needs to know it is broken, not that you got past it somehow. You have a
+  shell for running the build, not for patching it.
 
   Be specific about the boring parts: how long it took to load, what the frame
   rate looked like, whether audio played, what the screen actually showed
