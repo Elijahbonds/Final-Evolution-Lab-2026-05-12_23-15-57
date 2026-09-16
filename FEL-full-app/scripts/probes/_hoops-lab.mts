@@ -87,7 +87,7 @@ await page.evaluate(`(() => {
   window.__hudNow = () => { const q = window.__FEL_QA__; return q && q.rawHud ? q.rawHud() : {}; };
   window.__dev = () => { const q = window.__FEL_QA__; const s = q && q.scene ? q.scene() : null; return (s && s.metadata && s.metadata[MODE]) || null; };
   window.__meter = { peak: 0, frames: 0 };
-  window.__def = { jumps: 0, gathers: 0, lastPhase: '', block: true, charge: false, driverPeak: 0 };
+  window.__def = { jumps: 0, gathers: 0, lastPhase: '', block: true, charge: false, driverPeak: 0, plantedMs: 0, closestWhilePlanted: 99 };
   // ONE QUEUE, ONE DRIVER. AgentControlSource is a SERIAL queue: every push waits its turn. The page-side defensive
   // brain pushing a 130 ms move every 120 ms therefore sits in front of whatever the node side asks for next, so an
   // offence play's squeeze arrived seconds late (or behind a possession change) and read as "the layup did nothing".
@@ -96,6 +96,15 @@ await page.evaluate(`(() => {
   setInterval(() => {
     const m = window.__hudNow().shotMeterT;
     if (typeof m === 'number' && m > 0) { window.__meter.frames++; if (m > window.__meter.peak) window.__meter.peak = m; }
+    // DID THE PLANT EVER GO DOWN, AND HOW CLOSE DID HE COME TO IT? "charges 0" on its own cannot tell a probe that
+    // never planted from a mode that will not call one — these two numbers do.
+    const dv = window.__dev();
+    if (dv && typeof dv.takingCharge === 'function' && dv.takingCharge()) {
+      window.__def.plantedMs += 16;
+      const hn3 = window.__FEL_QA__.hero(); const mp = hn3 && (hn3.position || hn3);
+      const hp = dv.foeRoot && dv.foeRoot.position;
+      if (mp && hp) { const g = Math.hypot(mp.x - hp.x, mp.z - hp.z); if (g < window.__def.closestWhilePlanted) window.__def.closestWhilePlanted = g; }
+    }
   }, 16);
 
   // THE DEFENSIVE BRAIN, in the page because a block lives inside the gather (GATHER_SEC 0.32) and a round trip to
@@ -256,6 +265,19 @@ for (let n = 0; n < POSSESSIONS; n++) {
       // the second one lets go of the stick — so by the squeeze the sprint is over, `sprintOk` is false and the
       // gate (correctly, now) reads a layup. A thumb does not work that way: it holds the drive AND squeezes. So
       // this play holds moveY/sprint through both halves of the shot, which is the only way to ask for a dunk.
+      // ANGLE THE DRIVE on alternate trips. Straight down the middle into the defender is the poster/tomahawk
+      // branch every single time — ten dunks, three logged, all TOMAHAWK, all correct for a drive shape the probe
+      // never varied. A dunk vocabulary you only ever see one page of is not measured, so half the trips swing out
+      // to the wing first and attack ACROSS the face of the rim, which is the windmill's shape.
+      if (n % 2 === 1) {
+        const side = n % 4 === 1 ? 3.0 : -3.0;
+        const t0 = Date.now();
+        while (Date.now() - t0 < 1400) {
+          const there = await page.evaluate(`window.__steer(${side}, 2.4, 140) === false`);
+          if (there) break;
+          await page.waitForTimeout(130);
+        }
+      }
       await driveToRim(2.4);
       await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
       await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: 0, action: true }, 80)`);
@@ -317,7 +339,7 @@ for (let n = 0; n < POSSESSIONS; n++) {
   if (n < 3) await page.screenshot({ path: `${OUT}/${TAG}-p${p.n}.png` });
 }
 
-const def = await page.evaluate('window.__def') as { jumps: number; gathers: number; driverPeak: number };
+const def = await page.evaluate('window.__def') as { jumps: number; gathers: number; driverPeak: number; plantedMs: number; closestWhilePlanted: number };
 const chargesTaken = log.filter((l) => /charge taken/.test(l)).length;
 const screensCalled = log.filter((l) => /screen called/.test(l)).length;
 const off = rows.filter((r) => r.possession === 'offence');
@@ -334,11 +356,12 @@ const out = {
   defence: defence.length, stops, stopPct: defence.length ? Math.round((stops / defence.length) * 100) : null,
   blockJumps: def?.jumps ?? 0, gathersSeen: def?.gathers ?? 0,
   chargesTaken, screensCalled, driverPeakSpeed: +(def?.driverPeak ?? 0).toFixed(2),
+  plantedMs: def?.plantedMs ?? 0, closestWhilePlanted: +(def?.closestWhilePlanted ?? 99).toFixed(2),
   finalScore: [final.score ?? null, final.foeScore ?? null], target: final.target ?? null,
   rows, log: log.slice(-200),
 };
 fs.writeFileSync(`${OUT}/hoops-lab-${TAG}.json`, JSON.stringify(out, null, 1));
 console.log(`\n${MODE} charge ${CHARGE} · offence ${made}/${off.length}${out.makePct !== null ? ` (${out.makePct}%)` : ''} · ${byPlay.map((b) => `${b.play} ${b.made}/${b.n}`).join(' · ')}`);
-console.log(`defence: stops ${stops}/${defence.length} · block jumps ${out.blockJumps} on ${out.gathersSeen} gathers · charges ${chargesTaken} (driver peak ${(def?.driverPeak ?? 0).toFixed(1)} m/s vs 4.2 needed) · screens ${screensCalled} · score ${String(final.score)}-${String(final.foeScore)} to ${String(final.target)}`);
+console.log(`defence: stops ${stops}/${defence.length} · block jumps ${out.blockJumps} on ${out.gathersSeen} gathers · charges ${chargesTaken} (driver peak ${(def?.driverPeak ?? 0).toFixed(1)} m/s vs 4.2 needed) · planted ${((def?.plantedMs ?? 0) / 1000).toFixed(1)}s, closest ${(def?.closestWhilePlanted ?? 99).toFixed(2)}m (needs 1.15) · screens ${screensCalled} · score ${String(final.score)}-${String(final.foeScore)} to ${String(final.target)}`);
 console.log(`→ ${OUT}/hoops-lab-${TAG}.json`);
 await browser.close();
