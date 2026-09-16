@@ -37,6 +37,8 @@ const POSSESSIONS = Number(process.env.POSSESSIONS ?? 6);
 const RELEASE = (process.env.RELEASE ?? 'green') as 'green' | 'early' | 'late';
 /** How long to try to earn a stop before giving the possession up as lost. */
 const DEFEND_MS = Number(process.env.DEFEND_MS ?? 30000);
+/** How long to carry at the rim under the gather. The ball does not keep: the AI strips at about two seconds. */
+const DRIVE_MS = Number(process.env.DRIVE_MS ?? 700);
 const TAG = process.env.TAG ?? `hoops-${MODE}`;
 const OUT = `${process.env.HOME}/Claude/outbox/finish-release/hoops`;
 fs.mkdirSync(OUT, { recursive: true });
@@ -88,10 +90,16 @@ await page.evaluate(`(() => {
     const setTrig = (v) => { const b = trig(); b.pressed = v > 0.5; b.value = v; window.__PAD.timestamp = Date.now(); };
     setTrig(1);
     const want = where === 'green' ? 0.82 : where === 'early' ? 0.45 : 0.98;
+    // WHAT DOES THE METER ACTUALLY DO? Waiting for a value the meter never reaches means the trigger is held for the
+    // whole timeout and no shot is ever taken — and the probe reports "miss", which is a lie about the game. Record
+    // the peak and the shape so a release point can be chosen from evidence rather than from a guess.
+    window.__meterPeak = 0; window.__meterSeen = 0;
     const tick = () => {
-      if (performance.now() - t0 > 3500) { setTrig(0); return; }
       const h = window.__hudNow();
       const m = typeof h.shotMeterT === 'number' ? h.shotMeterT : 0;
+      if (m > 0) window.__meterSeen++;
+      if (m > window.__meterPeak) window.__meterPeak = m;
+      if (performance.now() - t0 > 3500) { setTrig(0); return; }
       if (m >= want) { window.__shotAt = { meter: +m.toFixed(3), type: h.shotType || '' }; setTrig(0); return; }
       requestAnimationFrame(tick);
     };
@@ -113,20 +121,45 @@ await page.evaluate(`(() => {
   const flat = (v) => { const l = Math.hypot(v.x, v.z) || 1; return { x: v.x / l, z: v.z / l }; };
   window.__DEF = { on: false, stops: 0, contests: 0, steals: 0, lastHint: '', diag: null, frames: 0 };
 
+  /**
+   * WHERE THE TWO BODIES ACTUALLY ARE.
+   *
+   * Two traps here, both measured. (1) Walking up a mesh's parent chain lands on the loader's synthetic root, which is
+   * NOT the node the mode moves — it read [0, 7.2] for 2400 frames while the game was plainly moving. World positions off
+   * the SKINNED MESH are what the body is doing. (2) "the skinned root that is not mine" picked a SPECTATOR: this
+   * scene is full of onlookers with skeletons, and the one it chose stood 10 m off court. The opponent is the nearest
+   * other body, and anything beyond the court's half-width is a bystander.
+   */
+  /**
+   * WHERE THE TWO BODIES ACTUALLY ARE. Three traps, all measured on this mode:
+   *
+   *   1. Walking a mesh's parent chain lands on the loader's synthetic root, which is not the node the mode moves —
+   *      it read [0, 7.2] for 2400 frames while the game was plainly moving.
+   *   2. A SKINNED MESH DOES NOT MOVE ITS NODE. The bones move; getAbsolutePosition on the mesh gives you the spawn
+   *      origin. Every skinned mesh in this scene reported the same handful of coordinates.
+   *   3. "the skinned body that is not mine" picks a SPECTATOR — this scene is full of onlookers with skeletons.
+   *
+   * What the mode actually moves is each character's root TransformNode, and QA hands out mine (hero() returns a node,
+   * not a mesh). So: the character roots are the transform nodes hero() is one of, the opponent is the nearest other
+   * one, and anything outside the court's radius is a bystander.
+   */
   const bodies = () => {
     const q = window.__FEL_QA__; const scene = q && q.scene ? q.scene() : null;
     if (!scene) return null;
     const mine = q.hero ? q.hero() : null;
-    let myRoot = mine; while (myRoot && myRoot.parent) myRoot = myRoot.parent;
-    // the character roots are the parents of the skinned meshes; in 1v1 there are two of them
-    const roots = [];
-    for (const m of scene.meshes) {
-      if (!m.skeleton) continue;
-      let r = m; while (r.parent) r = r.parent;
-      if (!roots.includes(r)) roots.push(r);
+    if (!mine) return null;
+    const mePos = mine.getAbsolutePosition();
+    const roots = (scene.transformNodes || []).filter((n) => /^__root__/.test(n.name));
+    let best = null, bestD = Infinity, considered = 0;
+    for (const n of roots) {
+      if (n === mine) continue;
+      const p = n.getAbsolutePosition();
+      if (Math.hypot(p.x, p.z) > 9) continue;                        // off the court: a spectator
+      considered++;
+      const d = Math.hypot(p.x - mePos.x, p.z - mePos.z);
+      if (d > 0.05 && d < bestD) { bestD = d; best = n; }
     }
-    const foe = roots.find((r) => r !== myRoot) || null;
-    return { scene, me: myRoot, foe, count: roots.length };
+    return { scene, me: mine, foe: best, count: considered, roots: roots.length, mePos, foePos: best ? best.getAbsolutePosition() : null };
   };
 
   window.__defenceOn = () => {
@@ -144,8 +177,8 @@ await page.evaluate(`(() => {
       const h = window.__hudNow();
       window.__DEF.lastHint = h.hint || '';
       window.__DEF.frames++;
-      if (!bb || !bb.me || !bb.foe) { window.__DEF.diag = { err: 'no bodies', me: !!(bb && bb.me), foe: !!(bb && bb.foe), roots: bb ? bb.count : -1 }; requestAnimationFrame(tick); return; }
-      const me = bb.me.position, foe = bb.foe.position;
+      if (!bb || !bb.me || !bb.foe) { window.__DEF.diag = { err: 'no bodies', me: !!(bb && bb.me), foe: !!(bb && bb.foe), onCourt: bb ? bb.count : -1, roots: bb ? bb.roots : -1 }; requestAnimationFrame(tick); return; }
+      const me = bb.mePos, foe = bb.foePos;
       // the spot one stride up the line from the attacker to the rim: in front of him, not beside him
       const toRim = flat({ x: RIM.x - foe.x, z: RIM.z - foe.z });
       const want = { x: foe.x + toRim.x * 1.15, z: foe.z + toRim.z * 1.15 };
@@ -226,14 +259,18 @@ for (let n = 0; n < POSSESSIONS; n++) {
   if (!onOffense) p.note = 'could not earn a stop';
   await page.waitForTimeout(400);
 
-  // CARRY IT AT THE RIM. Up-court is −y on the stick; a couple of seconds of drive puts a shot inside the arc.
-  await stick(0, -1);
-  await page.waitForTimeout(1600);
-  await stick(0, 0);
-
+  // GO EARLY, BECAUSE THE BALL DOES NOT KEEP. Measured: the AI strips the player about two seconds into a possession
+  // ([1V1-DEF] strip by the ai), so a probe that drives for 1.6 s and then reaches for the trigger is on DEFENCE by the
+  // time it pulls it — which is why every earlier run measured a meter that never moved. The gather goes up first and
+  // the drive happens under it.
   await page.evaluate(`window.__armRelease(${JSON.stringify(RELEASE)})`);
+  await stick(0, -1);
+  await page.waitForTimeout(DRIVE_MS);
+  await stick(0, 0);
   { const t = Date.now(); while (Date.now() - t < 4000) { if (await page.evaluate('window.__shotAt !== null')) break; await page.waitForTimeout(40); } }
   const shot = await page.evaluate('window.__shotAt') as { meter: number; type: string } | null;
+  const peak = await page.evaluate('({ peak: window.__meterPeak ?? -1, frames: window.__meterSeen ?? -1 })') as { peak: number; frames: number };
+  p.beats.push(`meter peak ${peak.peak.toFixed(3)} over ${peak.frames} frames`);
   if (shot) { p.meter = shot.meter; p.shotType = shot.type; }
   else p.note = p.note ?? 'the meter never reached the release point';
 
@@ -245,7 +282,9 @@ for (let n = 0; n < POSSESSIONS; n++) {
   p.score = mine.map((r) => r.score).filter((s): s is number => typeof s === 'number').pop();
   p.foeScore = mine.map((r) => r.foeScore).filter((s): s is number => typeof s === 'number').pop();
   const fresh = log.slice(logMark); logMark = log.length;
-  p.beats = fresh.map((l) => l.replace(/^\d+ /, '')).slice(0, 12);
+  // APPEND — the defence diagnostics were pushed into this array before the console lines were collected, and
+  // assigning here threw them away, which is why the first diagnostic run reported nothing at all.
+  p.beats = [...p.beats, ...fresh.map((l) => l.replace(/^\d+ /, '')).slice(0, 10)];
   // MADE means MY score went up. The first run of this matched the banner "THEY SCORE — LEFT WIDE OPEN" and reported
   // the opponent's buckets as the player's.
   const afterScore = await page.evaluate('(window.__hudNow().score ?? 0)') as number;
