@@ -30,22 +30,37 @@ from tools import SandboxClient, ToolError
 log = logging.getLogger("ai-pc.agent")
 
 
+def _env(name: str, default: str) -> Any:
+    """Read the environment at instantiation, not at import.
+
+    A dataclass field default is evaluated once, when the class is created, so
+    plain `os.environ.get(...)` defaults freeze whatever was set at import
+    time. Anything that configures the environment after importing this module
+    — a test, an embedding process — would be silently ignored.
+    """
+    return lambda: os.environ.get(name) or default
+
+
 @dataclass
 class AgentConfig:
-    ollama_url: str = os.environ.get("OLLAMA_URL", "http://ollama:11434")
-    sandbox_url: str = os.environ.get("SANDBOX_URL", "http://sandbox:8080")
-    workspace: str = os.environ.get("WORKSPACE_ROOT", "/workspace")
-    state_dir: str = os.environ.get("STATE_DIR", "/state")
+    ollama_url: str = field(default_factory=_env("OLLAMA_URL", "http://ollama:11434"))
+    sandbox_url: str = field(default_factory=_env("SANDBOX_URL", "http://sandbox:8080"))
+    workspace: str = field(default_factory=_env("WORKSPACE_ROOT", "/workspace"))
+    state_dir: str = field(default_factory=_env("STATE_DIR", "/state"))
 
     # Tiering. Mechanical high-volume roles run local; judgment-heavy roles
     # run frontier. An unset frontier key is a warning, never a crash.
-    local_model: str = os.environ.get("OLLAMA_MODEL", "qwen2.5:14b-instruct-q4_K_M")
-    frontier_model: str = os.environ.get("FRONTIER_MODEL", "claude-sonnet-4-6")
-    frontier_api_key: str | None = os.environ.get("ANTHROPIC_API_KEY") or None
+    local_model: str = field(
+        default_factory=_env("OLLAMA_MODEL", "qwen2.5:14b-instruct-q4_K_M"))
+    frontier_model: str = field(default_factory=_env("FRONTIER_MODEL", "claude-sonnet-4-6"))
+    frontier_api_key: str | None = field(
+        default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY") or None)
 
-    max_steps: int = int(os.environ.get("MAX_STEPS", "24"))
-    wall_clock_seconds: float = float(os.environ.get("WALL_CLOCK_SECONDS", "900"))
-    request_timeout: float = float(os.environ.get("REQUEST_TIMEOUT", "300"))
+    max_steps: int = field(default_factory=lambda: int(os.environ.get("MAX_STEPS") or 24))
+    wall_clock_seconds: float = field(
+        default_factory=lambda: float(os.environ.get("WALL_CLOCK_SECONDS") or 900))
+    request_timeout: float = field(
+        default_factory=lambda: float(os.environ.get("REQUEST_TIMEOUT") or 300))
 
     # Trim the transcript when it gets long. Keep the system message and the
     # first user turn (the task) always — a model that forgets the task will

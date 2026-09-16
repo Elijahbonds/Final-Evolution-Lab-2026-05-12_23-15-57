@@ -14,12 +14,15 @@ import uuid
 from pathlib import Path
 from typing import Any, Iterator
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from agent import Agent, AgentConfig
+from ledger import Ledger
+from orchestrator import Orchestrator
+from registry import RoleError, default_registry
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"),
                     format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -33,6 +36,12 @@ STATIC_DIR = Path(__file__).parent / "static"
 app = FastAPI(title="AI Personal Computer", docs_url=None, redoc_url=None)
 bearer = HTTPBearer(auto_error=False)
 config = AgentConfig()
+
+# Loaded once at import. A bad role file should stop the server at boot, not
+# surface as a 500 halfway through someone's run.
+registry = default_registry()
+ledger = Ledger(path=Path(config.state_dir) / "ledger.jsonl",
+                evidence_root=Path(config.workspace))
 
 
 def require_token(
@@ -72,6 +81,13 @@ def load_session(session_id: str) -> dict[str, Any]:
 
 class RunRequest(BaseModel):
     task: str
+    role: str = "build"
+    session_id: str | None = None
+
+
+class MissionRequest(BaseModel):
+    objective: str
+    rounds: int = 8
     session_id: str | None = None
 
 
@@ -79,7 +95,42 @@ class RunRequest(BaseModel):
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "model": config.model, "sandbox": config.sandbox_url}
+    return {
+        "ok": True,
+        "local_model": config.local_model,
+        "frontier_model": config.frontier_model,
+        "frontier_available": bool(config.frontier_api_key),
+        "roles": len(registry),
+        "sandbox": config.sandbox_url,
+    }
+
+
+@app.get("/api/roles", dependencies=[Depends(require_token)])
+def list_roles() -> dict[str, Any]:
+    return {"roles": [
+        {
+            "name": spec.name,
+            "tier": spec.tier,
+            "description": spec.description,
+            "tools": spec.effective_tools,
+            "workspace": spec.workspace,
+            "subjects": spec.subjects,
+            "max_steps": spec.max_steps,
+        }
+        for spec in registry.all()
+    ]}
+
+
+@app.get("/api/ledger", dependencies=[Depends(require_token)])
+def read_ledger(subject: str | None = None, limit: int = 20) -> dict[str, Any]:
+    if subject:
+        rows = ledger.history(subject, limit=limit)
+        return {"subject": subject, "entries": [e.model_dump(mode="json") for e in rows]}
+    state = sorted(ledger.state().values(), key=lambda e: e.ts, reverse=True)
+    return {
+        "entries": [e.model_dump(mode="json") for e in state],
+        "blockers": [e.model_dump(mode="json") for e in ledger.open_blockers()],
+    }
 
 
 @app.get("/")
@@ -111,26 +162,59 @@ def get_session(session_id: str) -> dict[str, Any]:
 
 
 @app.post("/api/run", dependencies=[Depends(require_token)])
-def run(req: RunRequest, request: Request) -> StreamingResponse:
-    session_id = req.session_id or uuid.uuid4().hex[:12]
+def run(req: RunRequest) -> StreamingResponse:
+    try:
+        registry.get(req.role)
+    except RoleError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+
+    return _stream(
+        session_id=req.session_id or uuid.uuid4().hex[:12],
+        label=f"{req.role}: {req.task}",
+        make_events=lambda agent, sid: agent.run(req.task, role=req.role, run_id=sid),
+    )
+
+
+@app.post("/api/mission", dependencies=[Depends(require_token)])
+def mission(req: MissionRequest) -> StreamingResponse:
+    def events(agent: Agent, _sid: str):
+        return Orchestrator(agent=agent).run_mission(req.objective, max_rounds=req.rounds)
+
+    return _stream(
+        session_id=req.session_id or uuid.uuid4().hex[:12],
+        label=f"mission: {req.objective}",
+        make_events=events,
+    )
+
+
+def _stream(session_id: str, label: str, make_events) -> StreamingResponse:
+    """Run something that yields AgentEvents and stream it as SSE.
+
+    The session record is written in `finally`, so a crashed or disconnected
+    run still leaves the transcript on disk.
+    """
     record: dict[str, Any] = {
         "session_id": session_id,
-        "task": req.task,
+        "task": label,
         "started": time.time(),
         "events": [],
     }
 
-    def stream() -> Iterator[str]:
-        agent = Agent(config)
+    def generate() -> Iterator[str]:
+        agent = Agent(config, ledger=ledger, registry=registry)
         try:
-            for event in agent.run(req.task, run_id=session_id):
-                record["events"].append({"kind": event.kind, "ts": event.ts, **event.data})
-                yield f"data: {event.to_json()}\n\n"
+            for event in make_events(agent, session_id):
+                payload = {"kind": event.kind, "ts": event.ts, **event.data}
+                # MissionResult is a dataclass; the transcript only needs its text.
+                if "result" in payload:
+                    payload["result"] = payload["result"].summary()
+                record["events"].append(payload)
+                yield f"data: {json.dumps(payload, default=str)}\n\n"
         except Exception as exc:  # a crash should still reach the console
             log.exception("run failed")
-            payload = json.dumps({"kind": "error", "message": str(exc)})
-            record["events"].append(json.loads(payload))
-            yield f"data: {payload}\n\n"
+            payload = {"kind": "error", "reason": "server_error", "message": str(exc)}
+            record["events"].append(payload)
+            yield f"data: {json.dumps(payload)}\n\n"
         finally:
             agent.close()
             record["finished"] = time.time()
@@ -138,7 +222,7 @@ def run(req: RunRequest, request: Request) -> StreamingResponse:
             yield f"data: {json.dumps({'kind': 'done', 'session_id': session_id})}\n\n"
 
     return StreamingResponse(
-        stream(),
+        generate(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

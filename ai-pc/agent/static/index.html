@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Personal Computer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230d1117'/%3E%3Ccircle cx='8' cy='8' r='3.5' fill='%234ea1ff'/%3E%3C/svg%3E">
 <style>
   :root {
     --bg:        #0d1117;
@@ -17,6 +18,15 @@
     --warn:      #d29922;
     --bad:       #f85149;
     --tool:      #a371f7;
+
+    /* Ledger statuses. Same six the enum defines, and nothing else. */
+    --st-pass:       #3fb950;
+    --st-soft-clear: #39c5cf;
+    --st-blocked:    #d29922;
+    --st-refused:    #f85149;
+    --st-live:       #4ea1ff;
+    --st-parked:     #8b95a4;
+
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
@@ -54,6 +64,8 @@
   .entry.finish    { border-left-color: var(--ok); }
   .entry.warning   { border-left-color: var(--warn); }
   .entry.error     { border-left-color: var(--bad); }
+  .entry.dispatch  { border-left-color: var(--tool); background: var(--panel-2); }
+  .entry.mission   { border-left-color: var(--accent); background: var(--panel-2); }
 
   .entry.step .tag      { color: var(--muted); }
   .entry.model .tag     { color: var(--accent); }
@@ -61,6 +73,34 @@
   .entry.finish .tag    { color: var(--ok); }
   .entry.warning .tag   { color: var(--warn); }
   .entry.error .tag     { color: var(--bad); }
+  .entry.dispatch .tag  { color: var(--tool); }
+  .entry.mission .tag   { color: var(--accent); }
+
+  /* Ledger entries are the record, so they read differently from chatter. */
+  .entry.ledger { border-left-color: var(--st-parked); }
+  .entry.ledger .tag { color: var(--muted); }
+  .entry.ledger[data-status="PASS"]       { border-left-color: var(--st-pass); }
+  .entry.ledger[data-status="SOFT_CLEAR"] { border-left-color: var(--st-soft-clear); }
+  .entry.ledger[data-status="BLOCKED"]    { border-left-color: var(--st-blocked); }
+  .entry.ledger[data-status="REFUSED"]    { border-left-color: var(--st-refused); }
+  .entry.ledger[data-status="LIVE"]       { border-left-color: var(--st-live); }
+  .entry.ledger[data-status="PARKED"]     { border-left-color: var(--st-parked); }
+
+  .pill {
+    display: inline-block; padding: 1px 7px; border-radius: 10px;
+    font-size: 11px; font-weight: 700; letter-spacing: .04em;
+    border: 1px solid currentColor;
+  }
+  .pill[data-status="PASS"]       { color: var(--st-pass); }
+  .pill[data-status="SOFT_CLEAR"] { color: var(--st-soft-clear); }
+  .pill[data-status="BLOCKED"]    { color: var(--st-blocked); }
+  .pill[data-status="REFUSED"]    { color: var(--st-refused); }
+  .pill[data-status="LIVE"]       { color: var(--st-live); }
+  .pill[data-status="PARKED"]     { color: var(--st-parked); }
+
+  .subject { color: var(--text); font-weight: 600; }
+  .downgrade { color: var(--warn); }
+  .evidence { color: var(--muted); }
 
   footer { border-top: 1px solid var(--line); background: var(--panel); padding: 12px 16px; }
   .composer { max-width: 1100px; margin: 0 auto; display: flex; gap: 8px; align-items: stretch; }
@@ -68,6 +108,8 @@
     font: inherit; color: var(--text); background: var(--panel-2);
     border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
   }
+  select { min-width: 190px; cursor: pointer; }
+  select optgroup { color: var(--muted); }
   textarea { flex: 1; resize: vertical; min-height: 44px; max-height: 200px; }
   button { cursor: pointer; background: var(--accent); border-color: var(--accent); color: #06121f;
            font-weight: 600; padding: 8px 18px; }
@@ -82,6 +124,7 @@
   <h1>AI Personal Computer</h1>
   <span class="spacer"></span>
   <span class="meta" id="modelMeta">—</span>
+  <button class="ghost" id="ledgerBtn" type="button">ledger</button>
   <button class="ghost" id="tokenBtn" type="button">token</button>
   <button class="ghost" id="clearBtn" type="button">clear</button>
 </header>
@@ -90,6 +133,7 @@
 
 <footer>
   <form class="composer" id="composer">
+    <select id="role" title="Which role runs this"></select>
     <textarea id="task" placeholder="Describe the task. Shift+Enter for a newline." autofocus></textarea>
     <button id="runBtn" type="submit">Run</button>
   </form>
@@ -100,6 +144,7 @@
 const $ = (id) => document.getElementById(id);
 const transcript = $('transcript');
 let running = false;
+let roles = [];
 
 function token() {
   let t = sessionStorage.getItem('agentToken');
@@ -110,39 +155,69 @@ function token() {
   return t ? t.trim() : '';
 }
 
+function auth() {
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token() };
+}
+
+// ---------------------------------------------------------------- rendering
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
 function add(kind, label, body) {
-  const el = document.createElement('div');
-  el.className = 'entry ' + kind;
-  const head = document.createElement('div');
-  head.className = 'head';
-  const tag = document.createElement('span');
-  tag.className = 'tag';
-  tag.textContent = kind.replace('_', ' ');
-  head.appendChild(tag);
-  if (label) {
-    const lab = document.createElement('span');
-    lab.textContent = label;
-    head.appendChild(lab);
+  const entry = el('div', 'entry ' + kind);
+  const head = el('div', 'head');
+  head.appendChild(el('span', 'tag', kind.replace('_', ' ')));
+  if (label) head.appendChild(el('span', null, label));
+  entry.appendChild(head);
+  if (body) entry.appendChild(el('pre', null, body));
+  transcript.appendChild(entry);
+  entry.scrollIntoView({ block: 'end' });
+  return entry;
+}
+
+// A ledger entry is the permanent record, not commentary, so it gets its own
+// shape: the status as a coloured pill, then the subject, then the note.
+function addLedger(ev) {
+  const entry = el('div', 'entry ledger');
+  entry.dataset.status = ev.status;
+
+  const head = el('div', 'head');
+  head.appendChild(el('span', 'tag', 'ledger'));
+
+  const pill = el('span', 'pill', ev.status);
+  pill.dataset.status = ev.status;
+  head.appendChild(pill);
+
+  head.appendChild(el('span', 'subject', ev.subject || ''));
+  if (ev.role) head.appendChild(el('span', null, ev.role));
+  if (ev.downgraded) head.appendChild(el('span', 'downgrade', '↓ downgraded'));
+  entry.appendChild(head);
+
+  if (ev.note) entry.appendChild(el('pre', null, ev.note));
+  if (ev.evidence) entry.appendChild(el('pre', 'evidence', 'evidence: ' + ev.evidence));
+  if (ev.blocks && ev.blocks.length) {
+    entry.appendChild(el('pre', 'evidence', 'blocks: ' + ev.blocks.join(', ')));
   }
-  el.appendChild(head);
-  if (body) {
-    const pre = document.createElement('pre');
-    pre.textContent = body;
-    el.appendChild(pre);
-  }
-  transcript.appendChild(el);
-  el.scrollIntoView({ block: 'end' });
-  return el;
+
+  transcript.appendChild(entry);
+  entry.scrollIntoView({ block: 'end' });
+  return entry;
 }
 
 function renderEvent(ev) {
   switch (ev.kind) {
     case 'step':
-      if (ev.phase === 'start') add('step', 'task', ev.task);
-      else add('step', `step ${ev.step} · ${ev.elapsed_s}s`, '');
+      if (ev.phase === 'start') {
+        add('step', `${ev.role} · ${ev.tier} · ${ev.model} · ${ev.tools.length} tools`, ev.task);
+      }
       break;
     case 'model':
-      add('model', `step ${ev.step}`, ev.content);
+      add('model', `${ev.role} step ${ev.step}`, ev.content);
       break;
     case 'tool_call':
       add('tool_call', ev.tool, JSON.stringify(ev.args, null, 2));
@@ -150,9 +225,21 @@ function renderEvent(ev) {
     case 'tool_result':
       add('tool_result', ev.tool, ev.result);
       break;
-    case 'finish':
-      add('finish', `${ev.status || ''} ${ev.subject || ''}`.trim(), ev.summary || '');
+    case 'ledger':
+      addLedger(ev);
       break;
+    case 'dispatch':
+      add('dispatch', `→ ${ev.target_role}`, [ev.task, ev.rationale].filter(Boolean).join('\n\n'));
+      break;
+    case 'mission':
+      renderMission(ev);
+      break;
+    case 'finish': {
+      const claimed = ev.claimed_status && ev.claimed_status !== ev.status
+        ? ` (claimed ${ev.claimed_status})` : '';
+      add('finish', `${ev.role} · ${ev.status}${claimed} · ${ev.subject || ''}`, ev.summary || '');
+      break;
+    }
     case 'warning':
       add('warning', ev.tool || '', ev.message);
       break;
@@ -162,42 +249,93 @@ function renderEvent(ev) {
   }
 }
 
+function renderMission(ev) {
+  if (ev.phase === 'start') {
+    add('mission', `mission ${ev.mission_id} · max ${ev.max_rounds} rounds`, ev.objective);
+  } else if (ev.phase === 'dispatch') {
+    add('mission', `round ${ev.round} → ${ev.role}`, ev.task);
+  } else if (ev.phase === 'rejected') {
+    add('warning', `rejected dispatch to ${ev.target_role}`, ev.reason);
+  } else if (ev.phase === 'end') {
+    add('mission', `${ev.outcome} after ${ev.rounds} round(s)`, ev.detail || '');
+    (ev.open_blockers || []).forEach((b) => addLedger({ ...b, downgraded: false }));
+  }
+}
+
+// ------------------------------------------------------------------- wiring
+
+async function loadRoles() {
+  const select = $('role');
+  select.innerHTML = '';
+
+  const mission = el('option', null, '★ mission (PM drives)');
+  mission.value = '__mission__';
+  select.appendChild(mission);
+
+  try {
+    const resp = await fetch('/api/roles', { headers: auth() });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    roles = (await resp.json()).roles;
+  } catch (e) {
+    $('hint').textContent = 'Could not load roles: ' + e.message;
+    return;
+  }
+
+  for (const tier of ['frontier', 'local']) {
+    const group = document.createElement('optgroup');
+    group.label = tier;
+    roles.filter((r) => r.tier === tier).forEach((r) => {
+      const option = el('option', null, `${r.name} (${r.tools.length} tools)`);
+      option.value = r.name;
+      option.title = r.description;
+      group.appendChild(option);
+    });
+    select.appendChild(group);
+  }
+  select.value = 'build';
+}
+
+async function showLedger() {
+  try {
+    const resp = await fetch('/api/ledger', { headers: auth() });
+    const data = await resp.json();
+    if (!data.entries.length) { add('step', 'ledger', 'Empty.'); return; }
+    add('step', 'ledger', `${data.entries.length} subject(s), ${data.blockers.length} open blocker(s)`);
+    data.entries.forEach((e) => addLedger({ ...e, downgraded: false }));
+  } catch (e) {
+    add('error', 'ledger', String(e));
+  }
+}
+
 async function health() {
   try {
-    const r = await fetch('/health');
-    const j = await r.json();
+    const j = await (await fetch('/health')).json();
     $('statusDot').className = 'dot up';
-    $('modelMeta').textContent = j.model || '';
+    const frontier = j.frontier_available ? j.frontier_model : j.local_model + ' (no frontier key)';
+    $('modelMeta').textContent = `${j.roles} roles · ${j.local_model} / ${frontier}`;
   } catch {
     $('statusDot').className = 'dot down';
   }
 }
 
-async function run(task) {
-  const t = token();
-  if (!t) { $('hint').textContent = 'No token set.'; return; }
-
+async function stream(url, body) {
   running = true;
   $('runBtn').disabled = true;
   $('hint').textContent = 'Running…';
 
   let resp;
   try {
-    resp = await fetch('/api/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + t },
-      body: JSON.stringify({ task }),
-    });
+    resp = await fetch(url, { method: 'POST', headers: auth(), body: JSON.stringify(body) });
   } catch (e) {
     add('error', 'network', String(e));
-    running = false; $('runBtn').disabled = false; $('hint').textContent = 'Failed.';
+    done('Failed.');
     return;
   }
 
   if (!resp.ok) {
     add('error', 'http ' + resp.status, await resp.text());
     if (resp.status === 401) sessionStorage.removeItem('agentToken');
-    running = false; $('runBtn').disabled = false; $('hint').textContent = 'Failed.';
+    done('Failed.');
     return;
   }
 
@@ -206,8 +344,8 @@ async function run(task) {
   let buffer = '';
 
   while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
+    const { value, done: finished } = await reader.read();
+    if (finished) break;
     buffer += decoder.decode(value, { stream: true });
     const chunks = buffer.split('\n\n');
     buffer = chunks.pop();
@@ -217,18 +355,24 @@ async function run(task) {
       try { renderEvent(JSON.parse(line.slice(6))); } catch {}
     }
   }
+  done('Idle.');
+}
 
+function done(message) {
   running = false;
   $('runBtn').disabled = false;
-  $('hint').textContent = 'Idle.';
+  $('hint').textContent = message;
 }
 
 $('composer').addEventListener('submit', (e) => {
   e.preventDefault();
   const task = $('task').value.trim();
   if (!task || running) return;
+  const role = $('role').value;
   $('task').value = '';
-  run(task);
+
+  if (role === '__mission__') stream('/api/mission', { objective: task });
+  else stream('/api/run', { task, role });
 });
 
 $('task').addEventListener('keydown', (e) => {
@@ -238,13 +382,23 @@ $('task').addEventListener('keydown', (e) => {
   }
 });
 
+$('role').addEventListener('change', () => {
+  const role = roles.find((r) => r.name === $('role').value);
+  $('hint').textContent = role
+    ? `${role.description}  ·  ${role.workspace}  ·  ${role.tools.join(', ')}`
+    : 'The PM reads the ledger and dispatches one role per round.';
+});
+
+$('ledgerBtn').addEventListener('click', showLedger);
 $('tokenBtn').addEventListener('click', () => {
   sessionStorage.removeItem('agentToken');
   token();
+  loadRoles();
 });
 $('clearBtn').addEventListener('click', () => { transcript.innerHTML = ''; });
 
 health();
+loadRoles();
 setInterval(health, 30000);
 </script>
 </body>
