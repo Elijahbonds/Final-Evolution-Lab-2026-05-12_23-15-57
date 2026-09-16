@@ -85,9 +85,82 @@ const POLE_L: [number, number, number] = [-0.62, -0.52, -0.58];
 const POLE_R: [number, number, number] = [0.62, -0.52, -0.58];
 const POLES = { Left: POLE_L, Right: POLE_R };
 
-/** One key: torso/leg degrees, both wrists as shoulder-relative targets, and the hips' ride height. */
-function key(t: number, bones: Bones, L: [number, number, number], R: [number, number, number], hipsY: number, open = 1): PoseKey {
-  return { t, bones: stanced(bones, open), handsRel: { Left: L, Right: R }, poles: POLES, hipsY };
+/**
+ * THE FEET WERE NEVER KEYED (owner, 2026-09-15: "fix the glitched out legs … in skateboarding").
+ *
+ * Every key in this suite drove the thigh and the shin and stopped there, so each ankle kept its BIND rotation under a
+ * shin the key had just pitched 28°, and the foot pointed at the floor like a ballet point. Measured live on the Venice
+ * rider in board_ride_idle: ankles at y 0.01–0.03, but the body's lowest point at −0.12 — the toes hung 15 cm BELOW the
+ * ankle and a quarter metre under the deck they were supposed to be standing on. That is the second half of the frame
+ * the owner flagged; the first half was the board itself (see visual/deckMesh.ts).
+ *
+ * The rig binds standing, soles flat, and these keys rotate a bone about its PARENT's bind axes — so a foot's pitch in
+ * the world is the sum of the chain's X keys. Cancel that sum on the ankle and the sole comes back level at any crouch
+ * depth, for free. A key that wants a pointed toe names `LeftFoot` / `RightFoot` itself: an explicit key wins.
+ */
+function flatFeet(bones: Bones): Bones {
+  const out: Bones = { ...bones };
+  for (const side of ['Left', 'Right'] as const) {
+    const thigh = bones[`${side}UpLeg`], shin = bones[`${side}Leg`];
+    if (!thigh || !shin || bones[`${side}Foot`]) continue;
+    out[`${side}Foot`] = [-(thigh[0] + shin[0]), 0, 0];
+  }
+  return out;
+}
+
+/**
+ * How far the whole suite rides ABOVE where it was authored (metres, on the hips).
+ *
+ * These clips were written for a rider standing on the GROUND. He stands on a deck whose top face is 6 cm above the
+ * board box's underside, and the crouch dropped the hips further than the knee bend lifted the feet — so the soles
+ * ended up under the floor with the deck floating around his shins (measured: sole 0.21 m below the deck's top face on
+ * the cruise). One constant, added to every key, buys the ride height back while keeping every authored relative depth:
+ * the tuck deeper than the cruise, the ollie's load deeper still. For a key with planted feet it is purely the CROUCH —
+ * the feet are pinned in the world, so the hips coming up is the knees straightening.
+ */
+const DECK_LIFT = 0.06;
+
+/**
+ * WHERE THE FEET GO ON THE DECK (2026-09-15). The thigh/shin degrees alone cannot say: they are keyed in the HIPS'
+ * frame, and the stance has already yawed the hips 74°, so "both thighs forward" put the two feet side by side ACROSS a
+ * 0.26 m deck — measured live, the back foot hung off the toe edge onto the ground while the front foot stood on the
+ * board. A rider's feet sit OVER THE TRUCKS, a shoulder-and-a-half apart along the deck's length, which is a statement
+ * about the board and therefore belongs in root-frame metres: ±0.22 m fore and aft, on the board's centre line, at the
+ * deck's top face. Regular stance, so the LEFT foot is the front one (which is also the foot the push keys keep down).
+ */
+const DECK_ANKLE = 0.125;   // deck top (board box centre +0.03, box bottom on the trucks) plus the ankle's own height
+const FOOT_FRONT: [number, number, number] = [0.01, DECK_ANKLE, 0.21];
+const FOOT_BACK: [number, number, number] = [-0.01, DECK_ANKLE, -0.21];
+const ON_DECK = { Left: FOOT_FRONT, Right: FOOT_BACK };
+/** The manual's feet: the front foot pulls the nose up off its truck, the back foot stays loaded over the tail. */
+const NOSE_UP = (lift: number) => ({ Left: [FOOT_FRONT[0], FOOT_FRONT[1] + 0.06 + lift, FOOT_FRONT[2]] as [number, number, number], Right: FOOT_BACK });
+
+/**
+ * One key: torso/leg degrees, both wrists as shoulder-relative targets, the hips' ride height, and — for a key that
+ * rides — where each foot is planted.
+ *
+ * THE FOOT TARGETS ARE PRE-COMPENSATED FOR `hipsY`. A pose clip solves its IK with the skeleton at BIND height and
+ * carries the hips' drop as a separate translation track (poseClip.ts), so whatever the solver plants is then carried
+ * down by that track at playback — a foot pinned to the deck rode 0.135 m below it, straight through the board, with
+ * the legs nearly straight because the solver thought it was reaching for the floor. Authoring in deck metres and
+ * subtracting the hips' own drop here is what makes `FOOT_FRONT`'s y mean the height it says, and it also hands the
+ * crouch to the solver: hips down against planted feet IS knee bend, so the legs now fold by geometry.
+ */
+function key(
+  t: number, bones: Bones, L: [number, number, number], R: [number, number, number], hipsY: number, open = 1,
+  feet?: PoseKey['feet'],
+): PoseKey {
+  const hips = hipsY + DECK_LIFT;
+  const lift = (v?: [number, number, number]) => (v ? [v[0], v[1] - hips, v[2]] as [number, number, number] : undefined);
+  return {
+    t, bones: stanced(flatFeet(bones), open), handsRel: { Left: L, Right: R }, poles: POLES, hipsY: hips,
+    feet: feet ? { Left: lift(feet.Left), Right: lift(feet.Right) } : undefined,
+  };
+}
+
+/** A key whose feet are planted on the deck — every clip the rider spends riding. */
+function deckKey(t: number, bones: Bones, L: [number, number, number], R: [number, number, number], hipsY: number): PoseKey {
+  return key(t, bones, L, R, hipsY, 1, ON_DECK);
 }
 
 /** The legs every ground ride shares: knees bent, weight forward, the front knee carrying more. */
@@ -114,9 +187,9 @@ export function buildBoardRideIdle(scene: Scene, sk: Skeleton): AnimationGroup |
   const T = 2.4;                                  // slow breathing loop
   const torso = (x: number): Bones => ({ Spine: [x, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] });
   return buildPoseClip(scene, sk, 'board_ride_idle', T, [
-    key(0, { ...rideLegs(0), ...torso(14) }, CRUISE_L, CRUISE_R, -0.26),
-    key(T / 2, { ...rideLegs(6), ...torso(17) }, [-0.07, -0.51, 0.12], [0.07, -0.51, 0.04], -0.29),
-    key(T, { ...rideLegs(0), ...torso(14) }, CRUISE_L, CRUISE_R, -0.26),
+    deckKey(0, { ...rideLegs(0), ...torso(14) }, CRUISE_L, CRUISE_R, -0.26),
+    deckKey(T / 2, { ...rideLegs(6), ...torso(17) }, [-0.07, -0.51, 0.12], [0.07, -0.51, 0.04], -0.29),
+    deckKey(T, { ...rideLegs(0), ...torso(14) }, CRUISE_L, CRUISE_R, -0.26),
   ]);
 }
 
@@ -140,9 +213,9 @@ function carve(scene: Scene, sk: Skeleton, name: string, sign: number): Animatio
   const trail: [number, number, number] = sign > 0 ? [0.36, -0.28, -0.12] : [0.30, -0.02, 0.34];
   const dip = (v: [number, number, number], k: number): [number, number, number] => [v[0], v[1] - k, v[2] + k * 0.4];
   return buildPoseClip(scene, sk, name, T, [
-    key(0, { ...legs(0), ...torso(16, roll) }, lead, trail, -0.32),
-    key(T / 2, { ...legs(4), ...torso(18, roll * 1.15) }, dip(lead, 0.03), dip(trail, 0.03), -0.34),
-    key(T, { ...legs(0), ...torso(16, roll) }, lead, trail, -0.32),
+    deckKey(0, { ...legs(0), ...torso(16, roll) }, lead, trail, -0.32),
+    deckKey(T / 2, { ...legs(4), ...torso(18, roll * 1.15) }, dip(lead, 0.03), dip(trail, 0.03), -0.34),
+    deckKey(T, { ...legs(0), ...torso(16, roll) }, lead, trail, -0.32),
   ]);
 }
 export const buildBoardCarveLeft = (s: Scene, k: Skeleton) => carve(s, k, 'board_carve_left', -1);
@@ -157,9 +230,9 @@ export function buildBoardTuck(scene: Scene, sk: Skeleton): AnimationGroup | nul
   });
   const torso = (x: number): Bones => ({ Spine: [x, 0, 0], Spine1: [16, 0, 0], Neck: [-26, 0, 0] });
   return buildPoseClip(scene, sk, 'board_tuck', T, [
-    key(0, { ...legs(0), ...torso(46) }, [-0.22, -0.34, -0.14], [0.22, -0.34, -0.14], -0.34),
-    key(T / 2, { ...legs(4), ...torso(49) }, [-0.20, -0.36, -0.16], [0.20, -0.36, -0.16], -0.37),
-    key(T, { ...legs(0), ...torso(46) }, [-0.22, -0.34, -0.14], [0.22, -0.34, -0.14], -0.34),
+    deckKey(0, { ...legs(0), ...torso(46) }, [-0.22, -0.34, -0.14], [0.22, -0.34, -0.14], -0.34),
+    deckKey(T / 2, { ...legs(4), ...torso(49) }, [-0.20, -0.36, -0.16], [0.20, -0.36, -0.16], -0.37),
+    deckKey(T, { ...legs(0), ...torso(46) }, [-0.22, -0.34, -0.14], [0.22, -0.34, -0.14], -0.34),
   ]);
 }
 
@@ -173,17 +246,17 @@ export function buildBoardPush(scene: Scene, sk: Skeleton): AnimationGroup | nul
   const T = 0.42;
   const front = (d: number): Bones => ({ LeftUpLeg: [-44 - d, 0, 8], LeftLeg: [72 + d * 1.4, 0, 0] });
   return buildPoseClip(scene, sk, 'board_push', T, [
-    key(0, { ...front(0), RightUpLeg: [-40, 0, -10], RightLeg: [68, 0, 0], Spine: [14, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
+    deckKey(0, { ...front(0), RightUpLeg: [-40, 0, -10], RightLeg: [68, 0, 0], Spine: [14, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
       CRUISE_L, CRUISE_R, -0.26),
     // back leg off the deck, straight down to the ground
     key(T * 0.25, { ...front(4), RightUpLeg: [-8, 0, -14], RightLeg: [14, 0, 0], Spine: [20, 0, -3], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
-      [-0.07, -0.49, 0.14], [0.10, -0.48, -0.02], -0.20),
+      [-0.07, -0.49, 0.14], [0.10, -0.48, -0.02], -0.20, 1, { Left: FOOT_FRONT, Right: [-0.18, 0.02, -0.16] }),
     // the shove: the foot drives behind, the arms answer it with a small swing (low — a swing, not a wing. ANIM-SURGICAL:
     // handsRel is measured in the HIPS frame, and the stance has yawed the hips 74°, so its z is SIDEWAYS on the chase
     // cam — the old 0.28 m 'reach forward' threw the front hand 0.26 m outboard on a locked 166° elbow every push)
     key(T * 0.6, { ...front(6), RightUpLeg: [24, 0, -14], RightLeg: [8, 0, 0], Spine: [22, 0, -4], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
-      [-0.06, -0.48, 0.17], [0.11, -0.47, -0.05], -0.22),
-    key(T, { ...front(0), RightUpLeg: [-40, 0, -10], RightLeg: [68, 0, 0], Spine: [14, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
+      [-0.06, -0.48, 0.17], [0.11, -0.47, -0.05], -0.22, 1, { Left: FOOT_FRONT, Right: [-0.20, 0.02, -0.42] }),
+    deckKey(T, { ...front(0), RightUpLeg: [-40, 0, -10], RightLeg: [68, 0, 0], Spine: [14, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
       CRUISE_L, CRUISE_R, -0.26),
   ]);
 }
@@ -223,11 +296,11 @@ export function buildBoardGrind(scene: Scene, sk: Skeleton): AnimationGroup | nu
   const T = 1.0;
   const legs: Bones = { LeftUpLeg: [-24, 0, 8], RightUpLeg: [-20, 0, -10] };
   return buildPoseClip(scene, sk, 'board_grind', T, [
-    key(0, { ...legs, LeftLeg: [46, 0, 0], RightLeg: [42, 0, 0], Spine: [10, 0, 4], Spine1: [4, 0, 2], Neck: [-4, 0, 0] },
+    deckKey(0, { ...legs, LeftLeg: [46, 0, 0], RightLeg: [42, 0, 0], Spine: [10, 0, 4], Spine1: [4, 0, 2], Neck: [-4, 0, 0] },
       [-0.38, 0.16, 0.14], [0.36, -0.06, -0.24], -0.18),
-    key(T / 2, { ...legs, LeftLeg: [52, 0, 0], RightLeg: [48, 0, 0], Spine: [12, 0, -4], Spine1: [4, 0, -2], Neck: [-4, 0, 0] },
+    deckKey(T / 2, { ...legs, LeftLeg: [52, 0, 0], RightLeg: [48, 0, 0], Spine: [12, 0, -4], Spine1: [4, 0, -2], Neck: [-4, 0, 0] },
       [-0.34, -0.06, 0.24], [0.38, 0.16, -0.14], -0.18),
-    key(T, { ...legs, LeftLeg: [46, 0, 0], RightLeg: [42, 0, 0], Spine: [10, 0, 4], Spine1: [4, 0, 2], Neck: [-4, 0, 0] },
+    deckKey(T, { ...legs, LeftLeg: [46, 0, 0], RightLeg: [42, 0, 0], Spine: [10, 0, 4], Spine1: [4, 0, 2], Neck: [-4, 0, 0] },
       [-0.38, 0.16, 0.14], [0.36, -0.06, -0.24], -0.18),
   ]);
 }
@@ -247,9 +320,9 @@ export function buildBoardManual(scene: Scene, sk: Skeleton): AnimationGroup | n
   });
   const torso = (x: number, r: number): Bones => ({ Spine: [x, 0, r], Spine1: [-4, 0, r * 0.4], Neck: [-10, 0, 0] });
   return buildPoseClip(scene, sk, 'board_manual', T, [
-    key(0, { ...legs(0), ...torso(-8, 3) }, [-0.42, -0.10, 0.10], [0.42, -0.12, 0.06], -0.30),
-    key(T / 2, { ...legs(5), ...torso(-11, -4) }, [-0.40, 0.02, 0.16], [0.41, -0.20, -0.02], -0.32),
-    key(T, { ...legs(0), ...torso(-8, 3) }, [-0.42, -0.10, 0.10], [0.42, -0.12, 0.06], -0.30),
+    key(0, { ...legs(0), ...torso(-8, 3) }, [-0.42, -0.10, 0.10], [0.42, -0.12, 0.06], -0.30, 1, NOSE_UP(0)),
+    key(T / 2, { ...legs(5), ...torso(-11, -4) }, [-0.40, 0.02, 0.16], [0.41, -0.20, -0.02], -0.32, 1, NOSE_UP(0.03)),
+    key(T, { ...legs(0), ...torso(-8, 3) }, [-0.42, -0.10, 0.10], [0.42, -0.12, 0.06], -0.30, 1, NOSE_UP(0)),
   ]);
 }
 
@@ -279,11 +352,11 @@ export function buildSkateOllie(scene: Scene, sk: Skeleton): AnimationGroup | nu
 export function buildBoardLand(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 0.42;
   return buildPoseClip(scene, sk, 'board_land', T, [
-    key(0, { LeftUpLeg: [-34, 0, 7], LeftLeg: [52, 0, 0], RightUpLeg: [-30, 0, -9], RightLeg: [48, 0, 0], Spine: [22, 0, 0], Spine1: [6, 0, 0], Neck: [-6, 0, 0] },
+    deckKey(0, { LeftUpLeg: [-34, 0, 7], LeftLeg: [52, 0, 0], RightUpLeg: [-30, 0, -9], RightLeg: [48, 0, 0], Spine: [22, 0, 0], Spine1: [6, 0, 0], Neck: [-6, 0, 0] },
       [-0.42, 0.06, 0.10], [0.42, 0.04, -0.06], -0.14),
-    key(T * 0.35, { LeftUpLeg: [-66, 0, 7], LeftLeg: [98, 0, 0], RightUpLeg: [-62, 0, -9], RightLeg: [94, 0, 0], Spine: [40, 0, 0], Spine1: [12, 0, 0], Neck: [-16, 0, 0] },
+    deckKey(T * 0.35, { LeftUpLeg: [-66, 0, 7], LeftLeg: [98, 0, 0], RightUpLeg: [-62, 0, -9], RightLeg: [94, 0, 0], Spine: [40, 0, 0], Spine1: [12, 0, 0], Neck: [-16, 0, 0] },
       [-0.28, -0.30, 0.24], [0.30, -0.28, 0.18], -0.40),
-    key(T, { LeftUpLeg: [-26, 0, 7], LeftLeg: [42, 0, 0], RightUpLeg: [-22, 0, -9], RightLeg: [38, 0, 0], Spine: [14, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
+    deckKey(T, { LeftUpLeg: [-26, 0, 7], LeftLeg: [42, 0, 0], RightUpLeg: [-22, 0, -9], RightLeg: [38, 0, 0], Spine: [14, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
       [-0.38, -0.16, 0.16], [0.39, -0.18, 0.10], -0.16),
   ]);
 }

@@ -7,6 +7,7 @@
 import { MomentumBus } from '../core/MomentumBus';
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { dressBoard, type BoardKind } from '../visual/meshyProps';
+import { buildSkateDeck } from '../visual/deckMesh';
 import type { AbstractMesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { Rider, type RiderCfgOverrides, type GrindLine } from '../core/GroundRide';
@@ -39,7 +40,12 @@ export async function buildRig(
   board.material = mat;
   // the deck's DISCIPLINE decides which skin list the pick comes from — a skate graphic on a surfboard is not a feature
   const deckDisc = boardKind === 'snowboard' ? 'snow' : boardKind === 'surfboard' ? 'surf' : 'skate';
-  if (boardKind) void dressBoard(board, boardKind, deckDisc);   // owner 2026-09-05: the Meshy deck rides the box (visual only)
+  // THE SKATE DECK IS BUILT, NOT SCANNED (owner, 2026-09-15: "fix the glitched out legs … in skateboarding"). The baked
+  // skateboard scan measures 0.31 m tall — a deck on a display stand — and dressBoard seats a scan by its BOTTOM, so
+  // the game stood that stand up between the rider's shins and he straddled it. deckMesh.ts carries the measurements.
+  // Snow and surf keep the scan: a snowboard plate with bindings on top is shaped like what its box wants.
+  if (boardKind === 'snowboard' || boardKind === 'surfboard') void dressBoard(board, boardKind, deckDisc);
+  else buildSkateDeck(board, boardColor);
   const rider = new Rider(ctx.scene, char.root, ground, riderCfg);
   ctx.heroRef.current = char.root;
   ctx.camDirector.setPreset('board');
