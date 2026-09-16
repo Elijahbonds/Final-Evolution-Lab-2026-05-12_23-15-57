@@ -61,6 +61,15 @@ export const DUNK_TRICKS: DunkTrick[] = [
   { id: 'behindback', label: 'BEHIND THE BACK', dir: 'left', btn: 'Y', clip: 'dunk_behind_back', difficulty: 3.0, windowCost: 0.34 },
   { id: 'fakeback', label: 'FAKE BEHIND THE BACK', dir: 'left', btn: 'X', clip: 'dunk_fake_back', difficulty: 2.6, windowCost: 0.30 },
   { id: 'doubleeastbay', label: 'DOUBLE EASTBAY', dir: 'down', btn: 'X', clip: 'dunk_double_eastbay', difficulty: 4.4, windowCost: 0.50 },
+  // MORE OF THE VOCABULARY (owner, 2026-09-16: "360 fake eastbay … whirlwind dunk … tap dunk", then "whirlwind is a 360
+  // tap dunk, add 360 windmills too"). I had the whirlwind wrong first time — I built it as a 360 windmill on the press
+  // reports of Aaron Gordon's. The owner's is the right one, and it is a CHAIN (spin360 + tap, see SIGNATURE_DUNKS), so
+  // the body I had written is what it always actually was: a 360 WINDMILL, which is worth its own press.
+  // The FAKE EASTBAY is the between-the-legs that never goes through (there was a dead `dunk_360_fake_eastbay` alias in
+  // the clip table for a dunk that had never been authored). THE TAP is the one dunk in the list with no grip in it.
+  { id: 'windmill360', label: '360 WINDMILL', dir: 'up', btn: 'X', clip: 'dunk_360_windmill', difficulty: 3.6, windowCost: 0.42 },
+  { id: 'fakeeastbay', label: 'FAKE EASTBAY', dir: 'right', btn: 'X', clip: 'dunk_fake_eastbay', difficulty: 3.0, windowCost: 0.34 },
+  { id: 'tap', label: 'THE TAP', dir: 'up', btn: 'B', clip: 'dunk_tap', difficulty: 2.8, windowCost: 0.26 },
 ];
 
 /** Trick id by its clip (the replay re-fires clips; the posture layer wants the trick). */
@@ -178,6 +187,9 @@ export const DUNK_CUES: Record<string, DunkCue> = {
   behindback:  { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // the ball has to go round the back and come back out before the carry-up
   fakeback:    { fire: 'rise', last: 'preSlam', facing: 'faceRim' },                 // a fake is fast: it can be thrown late and still read
   doubleeastbay: { fire: 'rise', last: 'hang',  facing: 'faceRim' },                 // two passes need the whole flight
+  windmill360: { fire: 'rise', last: 'hang',    facing: 'spinThrough', turns: 1 },   // a windmill turned all the way round — the layer owns the turn, the arm owns the circle
+  fakeeastbay: { fire: 'rise', last: 'preSlam', facing: 'faceRim' },                 // a fake is quick, so it can be thrown late
+  tap:         { fire: 'hang', last: 'preSlam', facing: 'faceRim' },                 // the tap happens AT the rim or not at all
 };
 // ── THE TIMING READOUT (2026-09-14) ──────────────────────────────────────────────────────────────────────
 //
@@ -386,6 +398,22 @@ export const SIGNATURE_DUNKS: readonly SignatureDunk[] = [
   { id: '360_double_eastbay', air: ['spin360', 'doubleeastbay'], name: '360 DOUBLE EASTBAY', by: 'Guy Dupuy', nod: 1.8 },
   // the three-piece: the whole air budget, and the top of the mode
   { id: '360_eastbay_scorpion', air: ['spin360', 'eastbay', 'scorpion'], name: '360 EASTBAY SCORPION', by: 'Team Flight Brothers', nod: 2.2 },
+  // MORE CHAINS (owner, 2026-09-16). `by` is a CREDIT, so it only ever names a person or crew when the dunk is
+  // genuinely theirs; a combination this contest made up says so instead of borrowing somebody's name for it.
+  { id: '360_fake_eastbay', air: ['spin360', 'fakeeastbay'], name: '360 FAKE EASTBAY', by: 'FLIGHT NIGHT', nod: 1.5 },
+  { id: 'btb_double_eastbay', air: ['behindback', 'doubleeastbay'], name: 'BEHIND THE BACK DOUBLE EASTBAY', by: 'FLIGHT NIGHT', nod: 1.9 },
+  { id: 'fake_btb_btl', air: ['fakeback', 'betweenlegs'], name: 'FAKE BEHIND THE BACK BETWEEN THE LEGS', by: 'FLIGHT NIGHT', nod: 1.5 },
+  // THE WHIRLWIND is a 360 TAP (owner, 2026-09-16) — a full turn and then no grip at all, which is why it is a chain
+  // and not a body: the turn is the 360's, the tap is the tap's, and doing both in one flight is the whole dunk.
+  { id: 'whirlwind', air: ['spin360', 'tap'], name: 'THE WHIRLWIND', by: 'FLIGHT NIGHT', nod: 1.7 },
+  { id: 'windmill360_scorpion', air: ['windmill360', 'scorpion'], name: '360 WINDMILL SCORPION', by: 'FLIGHT NIGHT', nod: 1.9 },
+  { id: 'windmill360_btl', air: ['windmill360', 'betweenlegs'], name: '360 WINDMILL BETWEEN THE LEGS', by: 'FLIGHT NIGHT', nod: 1.9 },
+  { id: 'lob_tap', runway: 'selflob', air: ['tap'], name: 'THE TAP DUNK', by: 'FLIGHT NIGHT', nod: 1.3 },
+  { id: 'kickup_tap', runway: 'kickup', air: ['tap'], name: 'THE KICK-UP TAP', by: 'FLIGHT NIGHT', nod: 1.5 },
+  // three-pieces: a full-speed attack and nothing left over
+  { id: 'btb_eastbay_scorpion', air: ['behindback', 'eastbay', 'scorpion'], name: 'BEHIND THE BACK EASTBAY SCORPION', by: 'FLIGHT NIGHT', nod: 2.3 },
+  { id: '360_btl_tap', air: ['spin360', 'betweenlegs', 'tap'], name: '360 BETWEEN THE LEGS TAP', by: 'FLIGHT NIGHT', nod: 2.4 },
+  { id: 'btb_windmill360', air: ['behindback', 'windmill360'], name: 'BEHIND THE BACK 360 WINDMILL', by: 'FLIGHT NIGHT', nod: 2.0 },
 ] as const;
 
 /** The signature this attempt threw, if it threw one. Order matters: a signature is a sequence, not a set. */

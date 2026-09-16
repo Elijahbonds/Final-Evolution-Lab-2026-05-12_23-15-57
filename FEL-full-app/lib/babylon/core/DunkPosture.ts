@@ -80,6 +80,9 @@ export const TRICK_POSTURE: Record<string, Partial<PosturePose>> = {
   behindback:  { spine1: [8, 0, 0],  spine2: [10, 0, 0],  neck: [-8, 0, 0],  head: [-6, 0, 0],  shrug: 16, forward: 6,  chestAim: 0.55 },
   fakeback:    { spine1: [4, 0, 0],  spine2: [5, 0, 0],   neck: [-14, 0, 0], head: [-10, 0, 0], shrug: 8,  forward: 3,  chestAim: 0.8 },
   doubleeastbay: { spine1: [16, 0, 0], spine2: [20, 0, 0], neck: [-14, 0, 0], head: [-8, 0, 0], shrug: 6,  forward: 12, chestAim: 0.7 },   // folded deep over two passes, eyes up between them
+  windmill360: { spine1: [-8, 0, 0], spine2: [-14, 0, 0], neck: [-10, 0, 0], head: [-8, 0, 0], shrug: 20, forward: -6, chestAim: 0.45 },  // the biggest shoulder in the list: the arm is going all the way round while the body turns
+  fakeeastbay: { spine1: [12, 0, 0], spine2: [14, 0, 0],  neck: [-16, 0, 0], head: [-10, 0, 0], shrug: 5, forward: 8,  chestAim: 0.8 },   // it starts like the eastbay and the chest comes back up early — that IS the fake
+  tap:         { spine1: [-12, 0, 0], spine2: [-16, 0, 0], neck: [-20, 0, 0], head: [-14, 0, 0], shrug: 12, forward: -10, chestAim: 0.95 },  // reaching UP at the ball, eyes locked on it: a tap is all timing
 };
 
 // ── Limits and rates ───────────────────────────────────────────────────────

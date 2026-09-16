@@ -18,7 +18,7 @@ import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, bui
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildFinishWindmill, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
-import { SCORPION_SEC, HIDE_SEEK_SEC, LOST_FOUND_SEC, SPIN_SEC, BEHIND_BACK_SEC, BEHIND_BACK_SWAP, FAKE_BACK_SEC, DOUBLE_EASTBAY_SEC, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildBackHandspring, buildBackflip, BACKFLIP_SEC, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
+import { SCORPION_SEC, HIDE_SEEK_SEC, LOST_FOUND_SEC, SPIN_SEC, BEHIND_BACK_SEC, BEHIND_BACK_SWAP, FAKE_BACK_SEC, DOUBLE_EASTBAY_SEC, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, BEHIND_BACK_SEC as _BB, WINDMILL_360_SEC, FAKE_EASTBAY_SEC, TAP_SEC, TAP_STRIKE, buildWindmill360, buildFakeEastbay, buildTap, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildBackHandspring, buildBackflip, BACKFLIP_SEC, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
 import { DUNK_TRICKS } from '../../core/DunkSystem';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
 import { buildBaseClips } from './baseClips';
@@ -209,6 +209,51 @@ describe('the chain pieces', () => {
       at(g, sec);
       for (const s of ['Left', 'Right']) expect(pos(`${s}Foot`).y).toBeLessThan(pos('Hips').y - 0.55);
     }
+  });
+});
+
+// 360 WINDMILL · FAKE EASTBAY · THE TAP (owner, 2026-09-16).
+describe('the 360 windmill, the fake eastbay and the tap', () => {
+  it('360 windmill: a full arm circle — low and behind, out to the side, over the top, down the far side', () => {
+    const g = fresh(() => buildWindmill360(scene, sk)!);
+    at(g, 0); const start = pos('RightHand');
+    expect(start.y).toBeLessThan(hipsY() + 0.25); expect(start.z).toBeLessThan(pos('RightArm').z);      // cocked low and BEHIND
+    at(g, 0.22); expect(pos('RightHand').x).toBeGreaterThan(pos('RightArm').x + 0.15);                  // out to the side
+    at(g, 0.44); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);                             // over the top
+    at(g, 0.66); expect(pos('RightHand').x).toBeLessThan(pos('Head').x);                                // down the FAR side: it went all the way round
+    at(g, WINDMILL_360_SEC); expect(pos('RightHand').z).toBeGreaterThan(pos('RightArm').z);             // slammed forward
+  });
+
+  // the turn belongs to the spin layer, exactly as it does for the 360 and the lost & found
+  it('360 windmill: the clip does not yaw its own hips — the layer owns the turn', () => {
+    const g = fresh(() => buildWindmill360(scene, sk)!);
+    for (const t of [0, 0.22, 0.44, 0.66, WINDMILL_360_SEC]) {
+      at(g, t);
+      expect(Math.abs(pos('LeftArm').z - pos('RightArm').z)).toBeLessThan(0.12);
+    }
+  });
+
+  it('fake eastbay: the gap opens and the ball dives at it — and then comes back the NEAR side', () => {
+    const real = fresh(() => buildBetweenLegs(scene, sk)!);
+    at(real, BETWEEN_LEGS_HANDOFF); const realGap = pos('LeftLeg').y - pos('RightLeg').y;
+    const g = fresh(() => buildFakeEastbay(scene, sk)!);
+    at(g, 0.16);
+    expect(pos('LeftLeg').y - pos('RightLeg').y).toBeGreaterThan(realGap * 0.6);      // a real-looking split
+    expect(pos('RightHand').y).toBeLessThan(hipsY() + 0.25);                          // and the ball really does dive at it
+    at(g, FAKE_EASTBAY_SEC);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.2);                  // finished in the hand it started in
+    expect(pos('RightHand').y).toBeGreaterThan(pos('LeftHand').y + 0.3);
+  });
+
+  it('the tap has NO gather: the arm is up before it starts and the whole trick is one wrist', () => {
+    const g = fresh(() => buildTap(scene, sk)!);
+    at(g, 0);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);                        // already up — nothing to wind
+    at(g, 0.12); const reach = pos('RightHand').clone();
+    at(g, TAP_STRIKE);
+    expect(pos('RightHand').z).toBeGreaterThan(reach.z + 0.1);                        // the strike is forward, through the ring
+    expect(pos('RightHand').y).toBeLessThan(reach.y);                                 // and down
+    expect(TAP_SEC).toBeLessThan(0.5);                                                // a tap that dwells is a carry
   });
 });
 

@@ -84,6 +84,10 @@ export const CRADLE_SEC = 0.75;
 export const CLUTCH_SEC = 0.7;
 /** The chain pieces (owner, 2026-09-16). The double eastbay is the long one: two passes have to fit inside it. */
 export const BEHIND_BACK_SEC = 0.7, FAKE_BACK_SEC = 0.5, DOUBLE_EASTBAY_SEC = 0.95;
+/** The whirlwind is the long one (a full arm circle under a full turn); the tap is the shortest thing in the mode. */
+export const WINDMILL_360_SEC = 0.9, FAKE_EASTBAY_SEC = 0.55, TAP_SEC = 0.4;
+/** The clip second the tap actually strikes the ball — the one frame the whole trick is about. */
+export const TAP_STRIKE = 0.22;
 /** The clip second each hand-off lands on — the ball rig swaps hands here, as it does for the eastbay. */
 export const BEHIND_BACK_SWAP = 0.34, DOUBLE_EASTBAY_FIRST = 0.30, DOUBLE_EASTBAY_SECOND = 0.62;
 /** Clip-local second the cradle's ball passes closest to the head — the rig keeps it in the one hand. */
@@ -408,5 +412,65 @@ export function buildDoubleEastbay(scene: Scene, sk: Skeleton): AnimationGroup |
     { t: DOUBLE_EASTBAY_SECOND, bones: { Hips: [10, 0, 0], Spine: [24, 0, 0], Neck: [20, 0, 0], ...SPLIT2 }, hands: { Left: [0.04, 0.86, 0.36], Right: [0.12, 0.86, 0.36] }, poles: { Left: [-0.9, -0.3, 0.3], Right: [0.9, -0.3, 0.3] } },   // PASS TWO: left back to right, the other leg up
     { t: 0.78, bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], Neck: [-6, 0, 0], ...AIR.spread }, hands: { Right: [0.42, 1.46, 0.16], Left: [-0.44, 1.26, 0.10] } },   // out of the second gap, legs thrown open
     { t: DOUBLE_EASTBAY_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.long }, hands: { Right: [0.16, 2.04, 0.26], Left: [-0.34, 1.46, 0.04] }, poles: { Right: UP.Right } },   // finished in the hand it started in
+  ]);
+}
+
+/**
+ * 360 WINDMILL — a windmill turned all the way round.
+ *
+ * (I first built this believing it was the WHIRLWIND, off press write-ups of Aaron Gordon's spinning dunk. The owner
+ * corrected it: the whirlwind is a 360 TAP, which lives in SIGNATURE_DUNKS as a chain. This body was never a whirlwind
+ * — it was always this, and a 360 windmill is worth its own press.)
+ *
+ * The arm sweeps its full circle WHILE the body turns, so
+ * the ball is travelling one way round the shoulder and the shoulder is travelling the other way round the floor. The
+ * turn is the spin layer's (facing `spinThrough`, and so hips yaw is 0 on every key here, like the 360 and the lost &
+ * found); this clip owns the circle and the counterweight — the trail leg kicks back under the arm exactly as it does
+ * in the plain windmill, because that is what keeps the shoulder line under a swinging arm.
+ */
+export function buildWindmill360(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'dunk_360_windmill', WINDMILL_360_SEC, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.30, 0.82, -0.28], Left: [-0.22, 1.84, 0.14] }, poles: { Right: [0.8, 0.2, -0.5], Left: UP.Left } },   // cocked low and behind
+    { t: 0.22, bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], Neck: [-4, 0, 0], ...AIR.kickBack }, hands: { Right: [0.66, 1.34, -0.14], Left: [-0.26, 1.88, 0.14] }, poles: { Right: [0.4, -0.3, -0.9], Left: UP.Left } },   // out to the side
+    { t: 0.44, bones: { Hips: [0, 0, 0], Spine: [-14, 0, 0], Neck: [-10, 0, 0], ...AIR.tuckTight }, hands: { Right: [0.16, 2.06, -0.02], Left: [-0.24, 1.86, 0.16] }, poles: { Right: UP.Right, Left: UP.Left } },   // over the top, feet in: the body is turning under it
+    { t: 0.66, bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [-4, 0, 0], ...AIR.kickOut }, hands: { Right: [-0.24, 1.66, 0.22], Left: [-0.34, 1.60, 0.18] }, poles: { Right: [-0.2, 0.4, -0.7] } },   // down the far side, the tuck opening as the turn resolves
+    { t: WINDMILL_360_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.long }, hands: { Right: [0.14, 2.02, 0.32], Left: [-0.30, 1.52, 0.10] }, poles: UP },   // slammed forward and down, square again
+  ]);
+}
+
+/**
+ * FAKE EASTBAY — the between-the-legs that never goes through.
+ *
+ * There was a `dunk_360_fake_eastbay` entry in the clip alias table pointing at the real eastbay's clip: a name for a
+ * dunk that had never been authored. This is it. Everything about the first half is the eastbay — the lead knee drives
+ * up, the gap opens, the ball dives at it, the far hand comes under the thigh to take it — and then it does not go
+ * through. The ball hand pulls it back out the near side and takes it up alone, and the legs snap shut early, which is
+ * the tell: a real eastbay holds the split until the ball is out the far side.
+ */
+export function buildFakeEastbay(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const SPLIT: Record<string, Deg3> = { LeftUpLeg: [-88, 0, 12], LeftLeg: [56, 0, 0], RightUpLeg: [34, 0, -8], RightLeg: [66, 0, 0] };
+  return buildPoseClip(scene, sk, 'dunk_fake_eastbay', FAKE_EASTBAY_SEC, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.26, 1.62, 0.30], Left: [-0.30, 1.32, 0.14] } },
+    { t: 0.16, bones: { Hips: [10, 0, 0], Spine: [22, 0, 0], Neck: [16, 0, 0], ...SPLIT }, hands: { Right: [0.12, 0.94, 0.34], Left: [-0.26, 1.10, 0.28] }, poles: { Right: [0.9, -0.3, 0.3] } },   // the lie: the gap opens and the ball dives at it
+    { t: 0.26, bones: { Hips: [10, 0, 0], Spine: [22, 0, 0], Neck: [16, 0, 0], ...SPLIT }, hands: { Right: [0.04, 0.88, 0.36], Left: [-0.14, 0.94, 0.34] }, poles: { Right: [0.9, -0.3, 0.3], Left: [-0.9, -0.3, 0.3] } },   // the far hand comes under the thigh for it
+    { t: 0.36, bones: { Hips: [2, 0, 0], Spine: [2, 0, 0], Neck: [-6, 0, 0], ...AIR.kickOut }, hands: { Right: [0.36, 1.32, 0.18], Left: [-0.42, 1.24, 0.12] }, poles: { Right: [0.9, -0.1, -0.4] } },   // …and it comes back out the NEAR side, legs shutting early
+    { t: FAKE_EASTBAY_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.long }, hands: { Right: [0.16, 2.02, 0.28], Left: [-0.32, 1.48, 0.06] }, poles: { Right: UP.Right } },   // up alone, same hand
+  ]);
+}
+
+/**
+ * THE TAP — the only dunk in the list with no grip in it.
+ *
+ * A tap is not a carry: the hand meets the ball above the ring and puts it through with one strike, palm open, and is
+ * past it before the arm has finished travelling. So the shape is the opposite of every other trick here — there is no
+ * gather and no cock-back, the arm goes UP early and waits, and the whole trick is one wrist. It is the shortest clip
+ * in the mode for the same reason; a tap that dwells is a carry.
+ */
+export function buildTap(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'dunk_tap', TAP_SEC, [
+    { t: 0,    bones: { Hips: [-4, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.kickOut }, hands: { Right: [0.20, 1.96, 0.18], Left: [-0.30, 1.70, 0.12] }, poles: UP },   // the arm is ALREADY up: no gather, nothing to wind
+    { t: 0.12, bones: { Hips: [-8, 0, 0], Spine: [-16, 0, 0], Neck: [-18, 0, 0], ...AIR.spread }, hands: { Right: [0.18, 2.12, 0.10], Left: [-0.32, 1.78, 0.10] }, poles: UP },   // reaching at the ball, eyes on it, body opening
+    { t: TAP_STRIKE, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.spread }, hands: { Right: [0.16, 2.06, 0.30], Left: [-0.32, 1.74, 0.12] }, poles: UP },   // THE STRIKE: one wrist, forward and down through the ring
+    { t: TAP_SEC, bones: { Hips: [-4, 0, 0], Spine: [-8, 0, 0], Neck: [-10, 0, 0], ...AIR.long }, hands: { Right: [0.16, 1.88, 0.36], Left: [-0.30, 1.58, 0.14] }, poles: UP },   // past it already
   ]);
 }

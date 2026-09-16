@@ -42,6 +42,17 @@ describe('the named chains', () => {
     [['fakeback', 'scorpion'], 'FAKE BEHIND THE BACK SCORPION'],
     [['spin360', 'doubleeastbay'], '360 DOUBLE EASTBAY'],
     [['spin360', 'eastbay', 'scorpion'], '360 EASTBAY SCORPION'],
+    // owner, later the same day: "360 fake eastbay … whirlwind dunk … tap dunk … add 360 windmills too",
+    // and the correction that matters — "whirlwind is a 360 tap dunk"
+    [['spin360', 'fakeeastbay'], '360 FAKE EASTBAY'],
+    [['spin360', 'tap'], 'THE WHIRLWIND'],
+    [['windmill360', 'scorpion'], '360 WINDMILL SCORPION'],
+    [['windmill360', 'betweenlegs'], '360 WINDMILL BETWEEN THE LEGS'],
+    [['behindback', 'doubleeastbay'], 'BEHIND THE BACK DOUBLE EASTBAY'],
+    [['behindback', 'windmill360'], 'BEHIND THE BACK 360 WINDMILL'],
+    [['fakeback', 'betweenlegs'], 'FAKE BEHIND THE BACK BETWEEN THE LEGS'],
+    [['behindback', 'eastbay', 'scorpion'], 'BEHIND THE BACK EASTBAY SCORPION'],
+    [['spin360', 'betweenlegs', 'tap'], '360 BETWEEN THE LEGS TAP'],
   ];
 
   it('every one the owner named is in the table, credited, and reachable by throwing its parts', () => {
@@ -109,5 +120,24 @@ describe('every trick in the table can actually be thrown', () => {
   it('and a bare button with no direction held is still the showboat tap, not a trick', () => {
     const r = new GestureRecognizer();
     for (const t of DUNK_TRICKS) expect(r.peek({ t: 'button', btn: t.btn, pressed: true } as never)).toBeNull();
+  });
+});
+
+describe('credit means credit', () => {
+  it('a real person is named only where the dunk is really theirs; this contest owns the rest', () => {
+    const people = ['Elijah Bonds', 'Jordan Kilganon', 'Guy Dupuy', 'Team Flight Brothers'];
+    for (const sig of SIGNATURE_DUNKS) {
+      expect(sig.by.length, sig.name).toBeGreaterThan(0);
+      if (!people.includes(sig.by)) expect(sig.by, sig.name).toBe('FLIGHT NIGHT');
+    }
+  });
+  it('the whirlwind is a 360 TAP — not a 360 windmill, which is its own press', () => {
+    expect(signatureFor([], ['spin360', 'tap'])?.name).toBe('THE WHIRLWIND');
+    expect(DUNK_TRICKS.some((t) => t.id === 'windmill360' && t.label === '360 WINDMILL')).toBe(true);
+    expect(signatureFor([], ['spin360', 'windmill'])).toBeNull();   // the 360 windmill is one press, not a chain
+  });
+  it('a runway trick can open a chain too: the lob and the kick-up both set up the tap', () => {
+    expect(signatureFor(['selflob'], ['tap'])?.name).toBe('THE TAP DUNK');
+    expect(signatureFor(['kickup'], ['tap'])?.name).toBe('THE KICK-UP TAP');
   });
 });
