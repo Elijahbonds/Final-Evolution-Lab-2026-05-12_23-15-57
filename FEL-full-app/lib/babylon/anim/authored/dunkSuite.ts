@@ -38,8 +38,9 @@ export function buildScoreHang(scene: Scene, sk: Skeleton): AnimationGroup | nul
   const T = D.hangSec;
   return buildPoseClip(scene, sk, 'dunk_score_hang', T, [
     // DUNK-POSTURE-LEGS: the knees are keyed too (a soft bend easing out) — un-keyed they held whatever the launch left, a locked leg on the flashy launch
-    { t: 0,     bones: { Hips: [0, 0, 0], Spine: [-12, 0, 0], LeftUpLeg: [-25, 0, 4], RightUpLeg: [-25, 0, -4], LeftLeg: [36, 0, 0], RightLeg: [36, 0, 0] }, hands: { Left: [-0.12, 2.02, 0.25], Right: [0.30, 1.25, 0.10] }, poles: { Left: UP.Left } },   // left hand on the rim
-    { t: T / 2, bones: { Hips: [0, 0, 0], Spine: [-5, 0, 0],  LeftUpLeg: [-18, 0, 3], RightUpLeg: [-18, 0, -3], LeftLeg: [30, 0, 0], RightLeg: [30, 0, 0] }, hands: { Left: [-0.10, 1.95, 0.28], Right: [0.34, 1.35, 0.05] }, poles: { Left: UP.Left } },
+    // DUNK-JOINTS (2026-09-17): and they come UP under a man hanging on the iron — the side frames showed a pole at the contact
+    { t: 0,     bones: { Hips: [4, 0, 0], Spine: [-12, 0, 0], LeftUpLeg: [-42, 0, 6], RightUpLeg: [-34, 0, -6], LeftLeg: [58, 0, 0], RightLeg: [50, 0, 0] }, hands: { Left: [-0.12, 2.02, 0.25], Right: [0.30, 1.25, 0.10] }, poles: { Left: UP.Left } },   // left hand on the rim
+    { t: T / 2, bones: { Hips: [2, 0, 0], Spine: [-5, 0, 0],  LeftUpLeg: [-26, 0, 4], RightUpLeg: [-22, 0, -4], LeftLeg: [40, 0, 0], RightLeg: [36, 0, 0] }, hands: { Left: [-0.10, 1.95, 0.28], Right: [0.34, 1.35, 0.05] }, poles: { Left: UP.Left } },
     // DUNK-POSTURE-LEGS (L3): the old "letting go" key put both hands straight out FRONT at shoulder height — the pose the rim hang
     // held for a second after every clean slam read as a forward T. The ball hand stays up near the iron (elbow bent), the off
     // hand settles to the chest: a rim hang, and a shape the land crouch's overhead first key blends from without a sweep.
