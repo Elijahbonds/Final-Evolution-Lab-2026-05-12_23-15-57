@@ -57,6 +57,8 @@ import { dressBall as dressMeshyBall } from '../visual/meshyProps';   // suite p
 import { cloneForTint } from '../core/playerIdentity';
 import { netExitVelocity, netExitMph } from '../core/NetExit';
 import { boneNode } from '../anim/boneLookup';   // POLISH: the rack pick aims at the hand   // NET EXIT (2026-09-17): the swish leaves with pace and bounces off the floor before the next ball
+import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
+import { readPlayerIcon } from '../visual/playerIcon';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { ShotArc } from '../core/BasketballCore';
@@ -170,7 +172,8 @@ let shotErr = 0;
 let ballMat: StandardMaterial | null = null;   // the plain sphere until the Meshy skin lands (and if it never does)
 let trail: ParticleSystem | null = null; let trailLevel: TrailLevel = 'off';
 /** POLISH (2026-09-17): the next ball comes off the RACK into the hand over PICK_SEC (it teleported 4–9 m from wherever the last one landed — measured: a 6 m ball jump on every ball). */
-let pick: { from: Vector3; t: number; mesh: Mesh } | null = null;   // `mesh` = the rack ball that travels; the live ball is hidden until the hand
+let pick: { from: Vector3; t: number; mesh: Mesh } | null = null;
+let ring: PlayerRingHandle | null = null;   // PLAYER RING (no turbo here: the ring stays full, the glyph says who you are)   // `mesh` = the rack ball that travels; the live ball is hidden until the hand
 const PICK_SEC = 0.24;   // the ball's trail: lit for the flight of a hot hand, a white cut on the money ball
 function setTrail(level: TrailLevel, hex?: string): void { if (!trail || level === trailLevel) return; trailLevel = level; applyTrail(trail, level, hex); }
 /** The live ball's skin meshes with their leather and their money-ball gold, swapped per shot. */
@@ -635,6 +638,7 @@ export const ThreePointMode: ModeDefinition = {
     });
     neverBindPose(player.animator, 'idle_stand');
     installSafePlay(player.animator, 'threepoint');
+    ring?.dispose(); ring = mountPlayerRing(ctx.scene, player.root, { color: '#22d3ee', icon: readPlayerIcon() });   // PLAYER RING
     ctx.groundLock.track(player.root, player.skeleton);
     ctx.heroRef.current = player.root;
     // the field waits along the left sideline, facing the rim, one body per rival card
@@ -887,6 +891,7 @@ export const ThreePointMode: ModeDefinition = {
     hoopJuice?.dispose(); hoopJuice = null;   // A+ P0: restores any hoop material the punch swapped
     posture?.dispose(); posture = null;        // BIOMECH-HOOPS-WAVE1
     if (carryScene && carryObs) carryScene.onAfterAnimationsObservable.remove(carryObs); carryObs = null; carryScene = null; arms = null;
+    ring?.dispose(); ring = null;
     player?.dispose(); player = null;
     for (const b of rivalBodies) b.dispose(); rivalBodies = [];
     trail?.dispose(); trail = null; trailLevel = 'off';

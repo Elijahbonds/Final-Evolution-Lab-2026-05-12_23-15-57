@@ -34,6 +34,7 @@
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 import { chromiumExe } from './_chromium.mts';
+import { analyseBallPath, printVerdicts, type Outcome } from './_ballpath.mts';
 
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3098';
 const MODE = process.env.MODE ?? 'onevone';
@@ -48,8 +49,10 @@ const browser = await chromium.launch({ executablePath: chromiumExe(), headless:
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 await ctx.addInitScript({ content: "try { window.sessionStorage.setItem('NEXUS_AGENT', '1'); } catch {}" });
 const page = await ctx.newPage();
-const log: string[] = [];
-page.on('console', (m) => { const t = m.text(); if (/\[1V1|\[3V3|\[REF|\[LAB/.test(t)) log.push(`${Date.now()} ${t.slice(0, 200)}`); });
+const log: string[] = []; const outcomes: Outcome[] = []; let recT0 = 0;
+page.on('console', (m) => { const t = m.text(); if (/\[1V1|\[3V3|\[REF|\[LAB/.test(t)) log.push(`${Date.now()} ${t.slice(0, 200)}`);
+  const now = Date.now() - recT0; if (recT0 && /-RIM\] /.test(t)) outcomes.push({ t: now, kind: 'miss', label: t.replace(/^.*-RIM\] /, '').slice(0, 26) });
+  if (recT0 && /-NET\] /.test(t)) outcomes.push({ t: now, kind: 'make', label: t.replace(/^.*-NET\] /, '').slice(0, 26) }); });
 
 { // LOGIN, AND CHECK IT TOOK (a click before hydration makes no POST and every /play answers 307 for the whole run)
   const lp = await ctx.newPage();
@@ -215,6 +218,7 @@ if (EYE) await page.evaluate(`(() => { const q = window.__FEL_QA__; const s = q 
 // ball, the clips playing — so a pop (a hand that moved 0.3 m in one frame), a teleport, a camera cut or a clip that
 // flip-flops can be counted and located instead of felt.
 const SMOOTH = process.env.SMOOTH === '1';
+if (SMOOTH) recT0 = Date.now();
 if (SMOOTH) await page.evaluate(`(() => { const q = window.__FEL_QA__; const s = q && q.scene ? q.scene() : null; if (!s) return 'no scene';
   const MODE = ${JSON.stringify(MODE)};
   const skOf = (n) => { const st = [n]; while (st.length) { const x = st.pop(); if (x.skeleton) return x.skeleton; for (const c of (x.getChildren ? x.getChildren() : [])) st.push(c); } return null; };
@@ -224,6 +228,7 @@ if (SMOOTH) await page.evaluate(`(() => { const q = window.__FEL_QA__; const s =
   const P = (n) => { if (!n) return null; const p = n.getAbsolutePosition ? n.getAbsolutePosition() : n.position; return [+p.x.toFixed(3), +p.y.toFixed(3), +p.z.toFixed(3)]; };
   const hero = rig(q.hero());
   let foe = null;
+  const bodies = () => s.meshes.filter((m) => m.name.startsWith('__root__') && m !== hero.root && skOf(m)).map((m) => m.position);
   const rows = []; window.__smooth = rows; const t0 = performance.now();
   s.onAfterRenderObservable.add(() => {
     if (!foe) { const d = s.metadata && s.metadata[MODE]; const fr = d && (typeof d.driverRoot === 'function' ? d.driverRoot() : d.foeRoot); if (fr) foe = rig(fr); }
@@ -231,7 +236,7 @@ if (SMOOTH) await page.evaluate(`(() => { const q = window.__FEL_QA__; const s =
     const clips = (s.animationGroups || []).filter((g) => g.isPlaying).map((g) => g.name);
     // BEHIND THE BACK: a hand in the body frame with z < -0.22 (behind the hips' plane) between the waist and the head
     const behind = (r) => { if (!r || !r.root) return ''; const m = r.root.getWorldMatrix().clone().invert(); const out = []; for (const [k, n] of [['rh', r.rh], ['lh', r.lh]]) { if (!n) continue; const w = n.getAbsolutePosition(); const l = w.constructor.TransformCoordinates(w, m); const z = Math.abs(l.z) > 20 ? l.z / 100 : l.z; if (z < -0.22 && l.y > 0.6 && l.y < 1.6) out.push(k); } return out.join('+'); };
-    rows.push({ t: Math.round(performance.now() - t0), h: [P(hero.root), P(hero.rh), P(hero.lh), P(hero.head)], f: foe ? [P(foe.root), P(foe.rh), P(foe.lh), P(foe.head)] : null, cam: P(cam), ball: ball && ball.isEnabled() ? P(ball) : null, clips, hc: clipsOf(hero), fc: foe ? clipsOf(foe) : [], hb: behind(hero), fb: behind(foe) });
+    rows.push({ t: Math.round(performance.now() - t0), h: [P(hero.root), P(hero.rh), P(hero.lh), P(hero.head)], f: foe ? [P(foe.root), P(foe.rh), P(foe.lh), P(foe.head)] : null, cam: P(cam), ball: ball && ball.isEnabled() ? P(ball) : null, clips, hc: clipsOf(hero), fc: foe ? clipsOf(foe) : [], hb: behind(hero), fb: behind(foe), gap: +Math.min(99, ...bodies().map((b) => Math.hypot(b.x - hero.root.position.x, b.z - hero.root.position.z))).toFixed(2) });
   });
   return 'recording'; })()`).then((r) => console.log('[LAB] smooth', r));
 const started = await agent('a.start(30000)');
@@ -484,7 +489,7 @@ const tricks = log.filter((l) => /trick \w+ (green|early|late)/.test(l));
 // full log and show nothing at all when the saved slice was read back. Anything a summary counts must be saved
 // beside the count, not left to a window that may have scrolled past it.
 if (SMOOTH) {
-  const rows = await page.evaluate('window.__smooth || []') as { t: number; h: (number[] | null)[]; f: (number[] | null)[] | null; cam: number[] | null; ball: number[] | null; clips: string[]; hc: string[]; fc: string[]; hb: string; fb: string }[];
+  const rows = await page.evaluate('window.__smooth || []') as { t: number; h: (number[] | null)[]; f: (number[] | null)[] | null; cam: number[] | null; ball: number[] | null; clips: string[]; hc: string[]; fc: string[]; hb: string; fb: string; gap: number }[];
   const dist = (a: number[] | null, b: number[] | null) => (a && b ? Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) : 0);
   const stat = (name: string, pick: (r: typeof rows[number]) => (number[] | null)[] | null) => {
     const pops: { t: number; part: string; d: number; clips: string[]; prev: string[] }[] = []; let maxD = 0; let teleports = 0; let ySnaps = 0;
@@ -524,6 +529,13 @@ if (SMOOTH) {
   for (const c of camCutAt) console.log(`  cam cut ${c.d} m @${c.t}ms ${c.clips.join('+')}`);
   for (const f of flipAt) console.log(`  clip flip ${f}`);
   for (const b of ballPopAt.slice(0, 8)) console.log(`  ball pop ${b.d} m @${b.t}ms y ${b.y} ${b.clips.join('+')}`);
+  printVerdicts(TAG, analyseBallPath(rows, outcomes));
+  // BODY OVERLAP: frames with another body's root inside OVERLAP_M of the hero's (two 0.55 m bodies cannot be closer than 1.1 m without passing through each other)
+  const OVERLAP_M = 0.7; const over = rows.filter((r) => typeof r.gap === 'number' && r.gap < OVERLAP_M); const minGap = Math.min(...rows.map((r) => (typeof r.gap === 'number' ? r.gap : 99)));
+  const overEp: { t: number; n: number; gap: number; clips: string }[] = []; let run: { t: number; n: number; gap: number; clips: string } | null = null;
+  for (const r of rows) { if (typeof r.gap === 'number' && r.gap < OVERLAP_M) { if (run) { run.n++; run.gap = Math.min(run.gap, r.gap); } else run = { t: r.t, n: 1, gap: r.gap, clips: r.hc.filter((c) => !/idle_stand|^run$|^walk$/.test(c)).join('+') }; } else if (run) { overEp.push(run); run = null; } }
+  if (run) overEp.push(run);
+  console.log(`  body overlap: ${over.length} frames under ${OVERLAP_M} m (closest ${minGap.toFixed(2)} m), ${overEp.length} episodes`); for (const e of overEp.sort((a, b) => b.n - a.n).slice(0, 6)) console.log(`  overlap ${e.n} frames from @${e.t}ms closest ${e.gap.toFixed(2)} m ${e.clips || '-'}`);
   console.log(`  behind-the-back episodes ${behindEp.length}`); for (const e of summary.behindEp) console.log(`  behind ${e.who} ${e.part} ${e.frames} frames @${e.t}ms ${e.clips || '-'}`);
 }
 const refCalls = log.filter((l) => /-REF\]/.test(l)).map((l) => l.replace(/^\d+ /, ''));

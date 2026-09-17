@@ -6,6 +6,7 @@
 import { chromium, type Page } from 'playwright-core';
 import fs from 'node:fs';
 import { chromiumExe } from './_chromium.mts';
+import { analyseBallPath, printVerdicts, type Outcome } from './_ballpath.mts';
 
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3098';
 const MODE = process.env.MODE ?? 'dunk';
@@ -17,8 +18,10 @@ fs.mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch({ executablePath: chromiumExe(), headless: false, args: ['--window-size=1280,860', '--use-angle=metal', '--autoplay-policy=no-user-gesture-required'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const p = await ctx.newPage();
-const logs: string[] = [];
-p.on('console', (m) => { const t = m.text(); if (/MISSING|DUNK-|3PT|FEL-READY/.test(t)) logs.push(t.slice(0, 160)); });
+const logs: string[] = []; const outcomes: Outcome[] = []; let recT0 = 0;
+p.on('console', (m) => { const t = m.text(); if (/MISSING|DUNK-|3PT|FEL-READY/.test(t)) logs.push(t.slice(0, 160));
+  const now = Date.now() - recT0; if (recT0 && /-RIM\] /.test(t)) outcomes.push({ t: now, kind: 'miss', label: t.replace(/^.*-RIM\] /, '').slice(0, 26) });
+  if (recT0 && /-NET\] /.test(t)) outcomes.push({ t: now, kind: 'make', label: t.replace(/^.*-NET\] /, '').slice(0, 26) }); });
 await p.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 90000 });
 await p.waitForTimeout(700);
 if (/\/login/.test(p.url())) {
@@ -45,6 +48,7 @@ if (MODE === 'dunk') {
   await p.mouse.click(640, 400); await p.keyboard.press('Enter'); await p.waitForTimeout(600);
 }
 // the recorder (the lab's, with the rival found through the dev seams the two modes offer)
+recT0 = Date.now();
 console.log('[SMOOTH] rec', await p.evaluate(`(() => { const dev = window.__FEL_DEV__; const q = window.__FEL_QA__; const s = (dev && dev.scene) || (q && q.scene && q.scene()); const heroNode = (dev && dev.hero && dev.hero()) || (q && q.hero && q.hero()); if (!s || !heroNode) return 'no scene/hero';
   const skOf = (n) => { const st = [n]; while (st.length) { const x = st.pop(); if (x.skeleton) return x.skeleton; for (const c of (x.getChildren ? x.getChildren() : [])) st.push(c); } return null; };
   const bone = (sk, name) => { const b = sk ? sk.bones.find((b) => b.name.indexOf(name) === 0) : null; return b && b.getTransformNode ? b.getTransformNode() : null; };
@@ -95,4 +99,5 @@ for (const c of camCutAt) console.log(`  cam cut ${c.d} m @${c.t}ms`);
 for (const f of flipAt) console.log(`  clip flip ${f}`);
 for (const b of ballPopAt.slice(0, 8)) console.log(`  ball pop ${b.d} m @${b.t}ms y ${b.y} ${b.clips.join('+')}`);
 console.log(logs.filter((l) => /MISSING/.test(l)).slice(0, 4).join('\n'));
+printVerdicts(TAG, analyseBallPath(rows, outcomes));
 await browser.close();

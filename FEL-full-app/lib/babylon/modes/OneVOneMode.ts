@@ -116,7 +116,10 @@ import {
   dunkKindFor, isContactDunk, posterPlant, posterFall, contactBanner, contactHitStopMs, POSTER_RELEASE_K,
 } from '../core/ContactDunk';   // dunked ON, not dunked beside
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
-import { attachBallToHand, releaseBall, flushThroughRim, clankOffRim } from '../anim/ballRig';
+import { attachBallToHand, releaseBall, clankOffRim } from '../anim/ballRig';
+import { startFlush, stepFlush, type FlushState } from '../core/RimFlush';   // DUNK-FANATIC (2026-09-17): the contest's flush — over the lip, down the axis, out of the net — on the game's dunks
+import { RIM_RADIUS } from '../core/RimPhysics';
+import { NET_EXIT_MPS, NET_DROP_NUDGE } from '../core/NetExit';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the dunk's Posture Poses, shared
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
@@ -165,6 +168,8 @@ import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-LOOK (2026-09-17)
+import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
+import { readPlayerIcon } from '../visual/playerIcon';
 import { netExitVelocity, netExitKindOf, netExitMph, type NetExitKind } from '../core/NetExit';   // NET EXIT (2026-09-17)
 import { showtimeAsked, pickShowtime, judgeShowtime, showtimeMeterT, posterRide, SHOWTIME_FLIGHT_MS, SHOWTIME_HANG_FROM, SHOWTIME_HANG_TO, SHOWTIME_HANG_SCALE, SHOWTIME_DEADLINE_K, SHOWTIME_PCT, POSTER_RIDE_SHARE } from '../core/ShowtimeDunk';   // SHOWTIME (2026-09-17)
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
@@ -355,7 +360,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let meLandSec = 0, meCelebrateSec = 0, meSpeed01 = 0, foeSpeed01 = 0;
   let scuff: ScuffState = { ...SCUFF_IDLE };
   let dunkFlight: { k: number; made: boolean | null } | null = null;                 // the drive dunk's flight clock (the posture windows ride it)
-  let dunkFlush: { releasePos: Vector3; since: number; kind: NetExitKind } | null = null;               // the make's ball through the iron (G6)
+  let dunkFlush: { releasePos: Vector3; since: number; kind: NetExitKind; st?: FlushState } | null = null;               // the make's ball through the iron (G6)
   // ── HOOPS-MOVE-KIT-A ──
   let gather: { plan: GatherPlan; t: number } | null = null;                         // M1: the jumper's gather before the rise (the body still moves)
   // HOOPS-MOVE-KIT-B: the post kit's live state — the seal I hold (M4–M6's path) and the pivot in flight (M6)
@@ -381,7 +386,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** A body planted chest-to-chest for a contact dunk, waiting to go down at the flush. */
   let posterVictim: { kind: ReturnType<typeof dunkKindFor>; released: boolean; plant?: Vector3; fall?: Vector3; reacted?: boolean } | null = null;   // SHOWTIME: the plant and the fall line, so he rides the flight
   let showtimePress = false, showtimeCam = false;
-  let camSnapPending = false;   // POLISH: a reset asks the camera to cut, not chase   // SHOWTIME: SQUARE in the air (raw, so a pad, a key and a probe all reach it), and whether the side camera is on
+  let camSnapPending = false;   // POLISH: a reset asks the camera to cut, not chase
+  let ring: PlayerRingHandle | null = null;   // PLAYER RING: who you are, and how much turbo is left   // SHOWTIME: SQUARE in the air (raw, so a pad, a key and a probe all reach it), and whether the side camera is on
   let spinClip = 'bball_spin';           // M9: the same machinery turns a PIVOT (a shorter sweep, no travel)
   let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
@@ -548,6 +554,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       onevoneVenue = mountVenue(ctx, 'basketball_h2h', { keepGameplayCamera: true, location: ctx.location });
       if (!onevoneVenue) { VenueKit.buildCourt(ctx.scene, 'venice'); applyOceanCourt(ctx.scene, 'venice'); }
       me = await CharacterPipeline.spawnPlayer(ctx.scene, cfg.heroUrl, { position: MY_SPAWN.clone(), yawRad: Math.PI, startClip: SPORT_CLIP.idle });
+      ring?.dispose(); ring = mountPlayerRing(ctx.scene, me.root, { color: '#22d3ee', icon: readPlayerIcon() });   // PLAYER RING
       me.secondary?.setLookTarget(() => ball?.position ?? null);    // Phase 2: eyes on the ball
       neverBindPose(me.animator, SPORT_CLIP.idle); installSafePlay(me.animator, 'onevone-me');
       ctx.groundLock?.track(me.root, me.skeleton);
@@ -869,7 +876,11 @@ export const OneVOneMode: ModeDefinition = (() => {
       // BIOMECH-HOOPS-WAVE1 G6: the drive dunk's make flushes THROUGH the iron from the release, then drops out of the net
       if (dunkFlush) {
         dunkFlush.since += dt;
-        if (flushThroughRim(ball, RIM, dunkFlush.releasePos, dunkFlush.since)) { const v = netExitVelocity(dunkFlush.kind); launchLoose(ball.position.clone(), new Vector3(v.x, v.y, v.z)); console.info(`[1V1-NET] ${dunkFlush.kind} exit ${netExitMph(dunkFlush.kind)} mph`); dunkFlush = null; }
+        // DUNK-FANATIC: the ball goes OVER the lip and DOWN through the ring (RimFlush), never carried in flat from a metre out
+        // (measured: every game dunk's ball reached rim height 1.0 m in front of the ring, then slid in)
+        if (!dunkFlush.st) dunkFlush.st = startFlush(dunkFlush.releasePos, RIM, RIM_RADIUS, 0.12, NET_EXIT_MPS[dunkFlush.kind] + NET_DROP_NUDGE, NET_EXIT_MPS[dunkFlush.kind] + NET_DROP_NUDGE);
+        const st = stepFlush(dunkFlush.st, RIM, RIM_RADIUS, 0.12, dt); ball.position.set(st.pos.x, st.pos.y, st.pos.z);
+        if (st.phase === 'free') { const v = netExitVelocity(dunkFlush.kind); launchLoose(ball.position.clone(), new Vector3(v.x, v.y, v.z)); console.info(`[1V1-NET] ${dunkFlush.kind} exit ${netExitMph(dunkFlush.kind)} mph`); dunkFlush = null; }
       }
 
       // ══ MY POSSESSION ══
@@ -877,7 +888,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         const intent = meSlot.intent;
         const moving = Math.hypot(intent.moveX, intent.moveY) > 0.1;
         const sprintOk = turbo.gate(dt, intent.sprint, moving);
-        ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
+        ctx.setHud({ turbo: Math.round(turbo.t01 * 100) }); ring?.set(turbo.t01);
         answerSprint(ctx, intent.sprint, moving);
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
         const [mx, my] = camRel(ctx, intent.moveX, intent.moveY);
@@ -1021,7 +1032,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             doMove(ctx, 'hesi');   // the pull-back is a link: hesi into cross is the oldest combo there is
             turbo.t01 = Math.max(0, turbo.t01 - 0.05);
             SoundKit.play('whoosh', { pitch: 0.8, volume: 0.3 });
-            ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
+            ctx.setHud({ turbo: Math.round(turbo.t01 * 100) }); ring?.set(turbo.t01);
             // 2.4m: the defender's settle point on a stationary handler is
             // ~2m out (deny lever 0.35), so 1.9m put the bite permanently
             // one step out of reach — measured live, it could never trigger.
@@ -1298,7 +1309,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         const intent = meSlot.intent;
         const moving = Math.hypot(intent.moveX, intent.moveY) > 0.1;
         const sprintOk = turbo.gate(dt, intent.sprint, moving);
-        ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
+        ctx.setHud({ turbo: Math.round(turbo.t01 * 100) }); ring?.set(turbo.t01);
         answerSprint(ctx, intent.sprint, moving);
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
         const [mxRaw, myRaw] = camRel(ctx, intent.moveX, intent.moveY);
@@ -1527,6 +1538,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       meCarry?.dispose(); foeCarry?.dispose(); meCarry = null; foeCarry = null;
       contact?.dispose(); contact = null;
       shotTrail?.dispose(); shotTrail = null;
+      ring?.dispose(); ring = null;
       me?.dispose(); foe?.dispose(); ball?.dispose();
       meSlot?.dispose(); foeSlot?.dispose();
       SoundKit.stopAmbient();

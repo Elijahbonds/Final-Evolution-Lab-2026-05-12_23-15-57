@@ -56,7 +56,10 @@ import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
-import { flushThroughRim, clankOffRim } from '../anim/ballRig';
+import { clankOffRim } from '../anim/ballRig';
+import { startFlush, stepFlush, type FlushState } from '../core/RimFlush';   // DUNK-FANATIC (2026-09-17): the contest's flush on the game's dunks
+import { RIM_RADIUS } from '../core/RimPhysics';
+import { NET_EXIT_MPS, NET_DROP_NUDGE } from '../core/NetExit';
 import { syncedShotSpeed, RELEASE_FRAME_01 } from '../core/BallHandling';
 import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
@@ -121,6 +124,8 @@ import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-LOOK (2026-09-17)
+import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
+import { readPlayerIcon } from '../visual/playerIcon';
 import { netExitVelocity, netExitKindOf, netExitMph, type NetExitKind } from '../core/NetExit';   // NET EXIT (2026-09-17)
 import { showtimeAsked, pickShowtime, judgeShowtime, showtimeMeterT, posterRide, SHOWTIME_FLIGHT_MS, SHOWTIME_HANG_FROM, SHOWTIME_HANG_TO, SHOWTIME_HANG_SCALE, SHOWTIME_DEADLINE_K, SHOWTIME_PCT, POSTER_RIDE_SHARE } from '../core/ShowtimeDunk';   // SHOWTIME (2026-09-17)
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
@@ -267,7 +272,7 @@ const CHARGE_SET_SEC = 0.18;
  */
 const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let dunkFlight: { k: number; made: boolean | null } | null = null;
-  let dunkFlush: { releasePos: Vector3; since: number; kind: NetExitKind } | null = null;
+  let dunkFlush: { releasePos: Vector3; since: number; kind: NetExitKind; st?: FlushState } | null = null;
   // ── HOOPS-MOVE-KIT-A ──
   let gather: { plan: GatherPlan; t: number } | null = null;                         // M1: the jumper's gather before the rise
   let finish: { plan: FinishPlan; t: number; released: boolean } | null = null;      // M3: a layup / floater in flight
@@ -303,6 +308,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   /** The man being dunked ON — held chest to chest through the flight, dropped at the flush. */
   let posterVictim: { body: Body; kind: ContactDunkKind; released: boolean; plant?: Vector3; fall?: Vector3; reacted?: boolean } | null = null;   // SHOWTIME: the plant and the fall line
   let showtimePress = false, showtimeCam = false;   // SHOWTIME: SQUARE in the air (raw), and the side camera
+  let ring: PlayerRingHandle | null = null;   // PLAYER RING
   /** What the contact made this dunk. Captured AT THE BUMP because `driveContest` is cleared on
    *  feet-down, before the score is awarded — so reading it there narrowed to `never`. */
   let lastDunkKind: ContactDunkKind = 'clean';
@@ -532,6 +538,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       agentCtl = agentBridge() ? new AgentControlSource() : null;
       if (agentCtl) { ctx.agent.control = agentCtl; ctx.agent.getScore = () => myScore; }
       me = await spawnBody(new Vector3(0, 0, 6), undefined, false, 'teammate');
+      ring?.dispose(); ring = mountPlayerRing(ctx.scene, me.char.root, { color: TEAM_JERSEY.mine, icon: readPlayerIcon() });   // PLAYER RING: the one you steer, in your team's colour
       mates = [
         await spawnBody(new Vector3(-3.5, 0, 4), '#22d3ee', true, 'teammate', Math.PI * 0.25),
         await spawnBody(new Vector3(3.5, 0, 4), '#22d3ee', true, 'teammate', -Math.PI * 0.25),
@@ -722,7 +729,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           mateMiss = null;
         } else if (r === 'made') { const nk = netExitKindOf(mateArc.shotStyle); const v = netExitVelocity(nk); ballSim.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); console.info(`[3V3-NET] ${nk} exit ${netExitMph(nk)} mph`); }   // NET EXIT
       }
-      else if (dunkFlush) { dunkFlush.since += dt; if (flushThroughRim(ball, RIM, dunkFlush.releasePos, dunkFlush.since)) { const v = netExitVelocity(dunkFlush.kind); ballSim.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); console.info(`[3V3-NET] ${dunkFlush.kind} exit ${netExitMph(dunkFlush.kind)} mph`); dunkFlush = null; } }
+      else if (dunkFlush) {   // DUNK-FANATIC: over the lip and down through the ring (RimFlush), never carried in flat from a metre out
+        dunkFlush.since += dt;
+        if (!dunkFlush.st) dunkFlush.st = startFlush(dunkFlush.releasePos, RIM, RIM_RADIUS, 0.12, NET_EXIT_MPS[dunkFlush.kind] + NET_DROP_NUDGE, NET_EXIT_MPS[dunkFlush.kind] + NET_DROP_NUDGE);
+        const st = stepFlush(dunkFlush.st, RIM, RIM_RADIUS, 0.12, dt); ball.position.set(st.pos.x, st.pos.y, st.pos.z);
+        if (st.phase === 'free') { const v = netExitVelocity(dunkFlush.kind); ballSim.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); console.info(`[3V3-NET] ${dunkFlush.kind} exit ${netExitMph(dunkFlush.kind)} mph`); dunkFlush = null; }
+      }
       else if (!ball.parent && !arc.active && !passFlight.active && !dunking) ballSim.step(dt);
       if (board && !arc.active && !mateArc.active) liveBoard(ctx, dt);
       // THREE SECONDS. Without it the strongest play in a half-court game is to stand under the ring and wait,
@@ -875,7 +887,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       }
       const moving = Math.hypot(meIntent.moveX, meIntent.moveY) > 0.1;
       const sprintOk = turbo.gate(dt, meIntent.sprint, moving);
-      ctx.setHud({ turbo: Math.round(turbo.t01 * 100) });
+      ctx.setHud({ turbo: Math.round(turbo.t01 * 100) }); ring?.set(turbo.t01);
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
       // MODE-STICK-FACE (2026-09-07): CAMERA-relative — the team camera looks at the rim (−z) from behind me, and in a
       // left-handed world a raw +x intent is SCREEN-LEFT (measured: stick-right Δscreen −5.6 m). Up = the camera's flat
@@ -1419,6 +1431,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       threeVenue?.dispose(); threeVenue = null;  // M74
       me?.char.dispose(); mates.forEach((m) => m.char.dispose()); foes.forEach((f) => f.char.dispose());
       shotTrail?.dispose(); shotTrail = null;
+      ring?.dispose(); ring = null;
       ball?.dispose(); SoundKit.stopAmbient();
       hoopJuice?.dispose(); hoopJuice = null;        // A+ P0: restores any hoop material the punch swapped
     },

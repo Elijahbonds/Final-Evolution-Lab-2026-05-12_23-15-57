@@ -57,6 +57,8 @@ import { DunkReplayRecorder } from '../scene/DunkReplayCam';
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { VenueKit } from '../visual/VenueKit';
+import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
+import { readPlayerIcon } from '../visual/playerIcon';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { HoopJuice } from '../visual/HoopJuice';
@@ -265,6 +267,7 @@ export const DunkMode: ModeDefinition = (() => {
   let style: Style = 'power';
   let prop: Prop = 'none';
   let charge = 0, clipTime = 0, qteHit = false, qteWindowOpen = false, qteAccuracy = 0;
+  let ring: PlayerRingHandle | null = null;   // PLAYER RING
   const NET_THROW_MIN = 4, NET_THROW_MAX = 12;   // NET EXIT (2026-09-17): m/s down the net — a loose slam drops it, a perfect one fires it (and it bounces off the floor and away)
   let sinceRelease = 0, releasePos = new Vector3();
   // DUNK-POSTURE-LEGS: the PERFECT windmill keeps the ball through the sweep — finish-clip seconds to the release (−1 = released on the press)
@@ -575,6 +578,7 @@ export const DunkMode: ModeDefinition = (() => {
       });
       neverBindPose(player.animator, SPORT_CLIP.idle);
       installSafePlay(player.animator, 'dunk-player');
+      ring?.dispose(); ring = mountPlayerRing(ctx.scene, player.root, { color: '#ffd75e', icon: readPlayerIcon() });   // PLAYER RING: the contest's gold
       ctx.groundLock?.track(player.root, player.skeleton);
       // A+ P8 H1: the arm chains once (the eastbay's left hand carries the ball after the hand-off); the reach is applied
       // AFTER the clips evaluate, on top of the frame's pose — the slot the dribble's HandIK and foot planting use
@@ -1353,6 +1357,7 @@ export const DunkMode: ModeDefinition = (() => {
       dribble?.dispose(); dribble = null;
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
       handIkObs = null; ikScene = null; handIkT = 0;
+      ring?.dispose(); ring = null;
       player?.dispose(); rival?.dispose(); replay?.dispose(); ball?.dispose();
       stopWalkOut(); walkAudio = null; walkCue = null; walkOut = null;
       clearProps(); SoundKit.stopAmbient(); feet = { L: null, R: null };
