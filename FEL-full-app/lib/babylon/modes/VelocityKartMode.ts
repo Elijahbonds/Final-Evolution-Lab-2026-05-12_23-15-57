@@ -30,7 +30,7 @@ import { EffectsKit } from '../visual/EffectsKit';
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import {
-  KART_STARTER, spawnKart, stepKart, travelOf, driftQuality, kartHitWall,
+  KART_STARTER, MAX_SLIP, spawnKart, stepKart, travelOf, driftQuality, kartHitWall,
   type KartInput, type KartState, type KartSpec,
 } from '../core/KartModel';
 import {
@@ -40,6 +40,10 @@ import {
 import { buildCourseVenue, buildWorldGround } from '../racing/venueForCourse';
 import { kartCircuitById, type KartCircuit, type KartRamp } from '../racing/kartCircuits';
 import { locate } from '../racing/racingLine';
+import {
+  buildKerbs, buildObstacles, obstacleContact, placeObstacles, stillTouching,
+  type PlacedObstacle,
+} from '../racing/kartDressing';
 import { refuse } from '../core/Refusal';
 import {
   boostEarnFor, crossedLip, idleAir, launch, startTrick, stepAir, type KartAirState,
@@ -110,6 +114,8 @@ const S = {
   air: idleAir() as KartAirState,
   /** Distance along the racing line last frame, for spotting a ramp lip being crossed. */
   lastDist: null as number | null,
+  /** The solid we are currently resting against, so one clip is not sixty scrubs a second. */
+  touching: null as PlacedObstacle | null,
   /** THE FINISH CLOCK (MECHANICS PASS): seconds left to the line once the field's leader is home; null = not running. */
   graceLeft: null as number | null,
 };
@@ -117,6 +123,9 @@ let boost = new BoostKit();
 let boostFx: BoostFx | null = null;
 let boostPads: BoostPads | null = null;
 let ramps: Mesh[] = [];
+let kerbRoot: TransformNode | null = null;
+let obstacleRoot: TransformNode | null = null;
+let placedObstacles: PlacedObstacle[] = [];
 
 const say = (t: string, sec = 1.0): void => { S.banner = t; S.bannerT = sec; };
 
@@ -555,6 +564,11 @@ return {
     trackside?.dispose();
     trackside = buildTrackside(ctx.scene, course);
     ramps = buildRamps(ctx);
+    if (circuit) {
+      placedObstacles = placeObstacles(circuit);
+      kerbRoot = buildKerbs(ctx.scene, circuit);
+      obstacleRoot = buildObstacles(ctx.scene, placedObstacles, circuit.course.id);
+    }
     console.info(`[RACE-VENUE] ${course.id}: ${trackside.count} trackside instances`);
     // RACING WAS THE LAST FAMILY WITH NOBODY WATCHING. The board modes have had Onlookers since it landed;
     // both racing modes had an empty circuit, which reads as a test track rather than an event. The spots
@@ -738,6 +752,28 @@ return {
         }
       }
 
+      // ── OBSTACLES, only while the wheels are down ────────────────────────────────────────────────────
+      if (!S.air.airborne && placedObstacles.length) {
+        if (!stillTouching(S.touching, state.pos)) S.touching = null;
+        const contact = obstacleContact(placedObstacles, state.pos, 1.1, S.touching);
+        if (contact.hit) {
+          // the cost is the TIME you lose, not a respawn: a race that stops for a cone is not a race
+          state.speed *= contact.impact;
+          state.slip = Math.min(MAX_SLIP, state.slip + (1 - contact.impact) * 0.8);
+          S.touching = contact.hit;
+          say(contact.hit.kind.toUpperCase(), 0.6);
+          SoundKit.play('thud', { pitch: 0.8, volume: 0.45 });
+          ctx.juice.shake?.(0.18 * (1 - contact.impact) * 4);
+          ctx.momentum.report({ kind: 'blunder', weight: 6 * (1 - contact.impact) });
+        }
+        // a surface patch does not hit you, it just stops the road holding you — a corner taken through gravel
+        // slides whether you asked for it or not, which is the one place the grip floor is meant to give
+        if (contact.grip < 1) {
+          state.slip = Math.min(MAX_SLIP, state.slip + (1 - contact.grip) * dt * 2.2);
+          if (S.offRoadSec === 0) say(contact.grip < 0.5 ? 'GRAVEL' : 'WET', 0.5);
+        }
+      }
+
       state.pos.y = roadY + S.air.height;
       S.lastDist = at.dist;
     }
@@ -860,6 +896,10 @@ return {
     rivalKarts = []; rivals = []; line = null;
     ramps.forEach((m) => m.dispose());
     ramps = [];
+    kerbRoot?.dispose(); kerbRoot = null;
+    obstacleRoot?.dispose(); obstacleRoot = null;
+    placedObstacles = [];
+    S.touching = null;
     S.air = idleAir();
     S.lastDist = null;
     state = null;
