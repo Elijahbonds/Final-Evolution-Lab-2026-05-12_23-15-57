@@ -25,6 +25,7 @@ import { applyFloorDetailToMesh } from '../visual/groundTextures';
 import { VertexData, Texture } from '@babylonjs/core';
 import { readableFloorHex, separatedHex, paintGraffitiWall, buildGraffitiStage } from '../visual/PlacePack';
 import { plazaMarkers, plazaRails, plazaSolids } from './skatePlaza';
+import { SNOW_SLOPE } from './snowSlope';
 
 export interface RideObstacle { pos: Vector3; radius: number }
 
@@ -656,6 +657,43 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
     const [side, dist] = spots[i];
     crowdSpots.push(onPiste(side * (HALF - 6) + side * Math.random() * 1.5, dist));
   }
+  // ── THE SNOW PARK (BOARD-10PHASE P3) ──────────────────────────────────────────────────────────────────────
+  //
+  // Phase 1 measured snow at ONE grind line, and it was the ski-lift cable — so snow had nothing to grind and
+  // nothing to jump but the terrain. Eleven features now sit down the run, out toward the piste edges so the
+  // middle stays the racing line and no feature fouls a slalom gate. The layout is modes/snowSlope.ts, as data,
+  // for the reason skatePlaza is: this builder makes a DynamicTexture before it places anything, so nothing
+  // authored inline here can be reached by a headless test.
+  const snowFeatM = mat(scene, `snowFeat_${venue.id}`, mixHex(P.structure, '#ffffff', 0.18));
+  const snowRailM = mat(scene, `snowRail_${venue.id}`, '#d8dce2');
+  for (const feat of SNOW_SLOPE) {
+    const at = onPiste(feat.lateral * HALF, feat.dist + feat.length / 2);
+    if (feat.kind === 'kicker' || feat.kind === 'roller') {
+      const w = rampWedge(scene, `snow_${feat.kind}`, feat.width, feat.length, feat.height, true);
+      w.position.copyFrom(onPiste(feat.lateral * HALF, feat.dist));
+      w.rotation.x = -PITCH;                       // the piste is pitched; a kicker sits ON it, not level with the world
+      w.material = snowFeatM;
+      w.checkCollisions = true;
+      all.push(w); rideable.push(w);
+      continue;
+    }
+    const body = MeshBuilder.CreateBox(`snow_${feat.kind}`, {
+      width: feat.width, height: feat.height, depth: feat.length,
+    }, scene);
+    body.position.copyFrom(at);
+    body.position.y += feat.height / 2;
+    body.rotation.x = -PITCH;
+    body.material = feat.kind === 'rail' ? snowRailM : snowFeatM;
+    body.checkCollisions = true;
+    all.push(body); rideable.push(body);
+    if (feat.bonus > 0) {
+      const a = onPiste(feat.lateral * HALF, feat.dist);
+      const b = onPiste(feat.lateral * HALF, feat.dist + feat.length);
+      a.y += feat.height; b.y += feat.height;
+      makeRail(scene, all, grindLines, a, b, feat.bonus);
+    }
+  }
+
   return { ground: rideable, grindLines, markers, obstacles, crowdSpots, bound: HALF, dispose: () => all.forEach((m) => m.dispose()) };
 }
 

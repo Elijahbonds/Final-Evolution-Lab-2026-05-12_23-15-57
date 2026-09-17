@@ -11,11 +11,16 @@ computed from the tuning constants — nothing in this document is an impression
 | **grind lines** | **14** | **1** | **0** |
 | boxes / cylinders / wedges | 12 / 4 / 3 | 2 / 5 / 0 | 1 / 4 / 0 |
 | markers (objectives) | 6 | gates, generated | **0** |
-| obstacles (hazards) | 0, by design | rocks, generated | 1 |
+| obstacles (hazards) | 0, by design | rocks, generated | buoys, generated |
 | tricks in the table | **15** | 12 | **8** |
 | trick kinds | 11 air, 3 grind, 1 manual | 10 air, 1 grind, 1 manual | 3 air, 3 manual, 2 revert |
 | venues | 3 (bounds 48–62) | 3 (bounds **20–34**) | 3 (bounds 92–110) |
 | mode size | 997 lines | 509 | 536 |
+
+*Correction, made in Phase 3:* the counts above are **push sites in source**, not runtime counts — snow's
+rocks and surf's buoys are each one `push` inside a loop, so both produce many. Surf's hazard layer is
+therefore fine; its deficit is the wave itself, which is Phase 4. The grind-line and marker counts are
+literal and stand.
 
 Read across that table and the pass writes itself. **Surf has no grind lines, no markers and one hazard** —
 it is the emptiest world in the project. **Snow has a single rail** against skate's fourteen. And the snow

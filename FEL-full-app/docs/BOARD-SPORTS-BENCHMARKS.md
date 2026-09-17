@@ -42,8 +42,12 @@ These are the criteria phases 3–8 are graded against. Every one is a number a 
   ≥ 30%. *Unmeasured for board; the aero chain already does this. Phase 8.*
 
 ### Snow → SSX
-- **Descent.** SSX runs are long and steep. Target: a run drops ≥ 60 m over ≥ 400 m of travel. *Venue bounds
-  are 20–34, so the whole world is 40–68 m across. **FAILS.** Phase 3.*
+- **Descent.** SSX runs are long and steep. Target: a run drops ≥ 60 m over ≥ 400 m of travel.
+  *CORRECTED after Phase 3 measured it properly: `venue.bound` is the piste WIDTH, not its length. The run is
+  `SLALOM_START + SLALOM_GATES × SLALOM_SPACING + 60` = **318 m** at `SLOPE_PITCH` 0.22 rad — a 22% grade
+  dropping **69 m**. So the drop is MET and only the length is short. My first reading of this criterion
+  reasoned from `bound` and called it a failure; that was wrong, and the error is left visible here rather
+  than quietly edited out.*
 - **Features per descent.** Target: ≥ 8 kickers/rails/boxes on the line. *Now: 1 rail, and it is a ski-lift
   cable. **FAILS.** Phase 3.*
 - **Air time band.** SSX air is enormous. Target: 1.0–2.0 s off a real kicker. *Now: 1.11–1.50 s. Met.*
