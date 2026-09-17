@@ -44,6 +44,8 @@ export interface AnimTreeInput {
    *  of them — played the left-handed clip and the body went the opposite way to the ball. Optional and defaulting
    *  to left, exactly like `slideDir` below, so a mode that has not been wired yet behaves as it always did. */
   crossoverDir?: 'left' | 'right';
+  /** MOVE PACE: the playback rate for the tree's own crossover state (the turbo's 1.35×); the beats take it in their opts. */
+  moveRate?: number;
   nearestDefender: number;
   hasBall: boolean;
   shooting: boolean;
@@ -207,7 +209,7 @@ export class BasketballAnimTree {
         this.strideClip = c.loop ? c.clip : null;
         if (r0 !== null) this.strideFilter.set(r0);
         this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec, speedRatio: r0 ?? 1 });
-      } else { this.strideClip = null; this.playBeat(c.clip, { fadeSec: c.fadeSec }, c.state); }
+      } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? c.fadeSec * 0.6 : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE
     }
     // STRIDE MATCHING, every frame. The loop is only (re)played on a STATE CHANGE — which is what keeps it stable —
     // so the rate has to be set on the RUNNING animation instead, or a per-frame play() would restart the clip every

@@ -109,6 +109,7 @@ import {
   CHAIN_IDLE, BASELINE_HANDLE, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
   moveClip, ANKLE_STUMBLE_CLIP,
   OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, moveImpulse, type ChainState, type HandleMove,
+  moveRate, moveFadeSec,   // MOVE PACE
 } from '../core/HandleSystem';   // the vocabulary 1v1 had and this mode did not
 import {
   THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
@@ -1110,7 +1111,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (!dunking) me.tree.update({   // the flight's held launch + the land crouch are mode-owned beats
         // STRIDE MATCHING: real ground speed, because speed01 is normalised and cannot pace a stride
         speedMps: Math.hypot(me.drib.vel.x, me.drib.vel.z),
-        speed01: drib.speed01, crossover: drib.crossover && iAmCarrier, crossoverDir: wish.x >= 0 ? 'right' : 'left', nearestDefender: nearestFoeDist, hasBall: iAmCarrier && !passFlight.active,
+        speed01: drib.speed01, crossover: drib.crossover && iAmCarrier, crossoverDir: wish.x >= 0 ? 'right' : 'left', moveRate: moveRate(sprintOk), nearestDefender: nearestFoeDist, hasBall: iAmCarrier && !passFlight.active,
         shooting, dunking, driving: iAmCarrier && sprintOk && drib.speed01 > 0.6 && Vector3.Dot(me.drib.vel, RIM.subtract(me.char.root.position)) > 0,
         defending: carrierId === 'foeTeam', bracing: meBoxing, staggered: false, slideDir: slideDirFor(me.char.root.rotation.y, me.drib.vel),
         retreat: retreatFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null), closeout: closeoutFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null, me.speed01), intense: !!me.slot.intent.intense,   // DEFENSE-LOOK
@@ -2260,7 +2261,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       const toHim = foe.char.root.position.subtract(me.char.root.position);
       const right = bodyRight(me.char.root.rotation.y);
       const clip = moveClip(move, (toHim.x * right.x + toHim.z * right.z) > 0 ? 'left' : 'right');
-      if (clip) me.tree.beat(clip, { fadeSec: 0.07 });
+      const turboMove = !!me.slot.intent.sprint;   // MOVE PACE: on the turbo the move SNAPS
+      if (clip) me.tree.beat(clip, { fadeSec: moveFadeSec(turboMove), speedRatio: moveRate(turboMove) });
     }
 
     // OFF THE HEAD resolves here, not through the ankle-break roll: it is the one move where the ball

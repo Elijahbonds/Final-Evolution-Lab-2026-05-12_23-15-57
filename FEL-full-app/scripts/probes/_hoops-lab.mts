@@ -325,10 +325,13 @@ for (let n = 0; n < POSSESSIONS; n++) {
       // DribbleController.REVERSAL_WINDOW_SEC, 0.25 s) as a crossover and a pull-BACK as a hesi, and
       // `moveFromContext` picks which move of the twelve that reversal becomes from the situation. So the probe
       // does what a thumb does: shove one way, snap the other, and let the mode decide what it was.
+      // MOVE PACE: HANDLE_TURBO=1 throws the moves on the turbo (R2 held). The bridge's `move` still infers sprint above magnitude
+      // 0.85 (the slot itself reads R2), so the OFF-turbo shove is 0.8 — past the crossover's 0.6 commit, under the bridge's sprint.
+      const verb = process.env.HANDLE_TURBO ? 'turbo' : 'move'; const amp = process.env.HANDLE_TURBO ? 1 : 0.8;
       for (let i = 0; i < 5; i++) {
-        const sx = i % 2 === 0 ? 1 : -1;
-        await agent(`a.do('move', { x: ${sx}, y: 0.15, ms: 170 })`);
-        await agent(`a.do('move', { x: ${-sx}, y: 0.15, ms: 170 })`);   // the reversal — this is the crossover
+        const sx = i % 2 === 0 ? amp : -amp;
+        await agent(`a.do('${verb}', { x: ${sx}, y: 0.15, ms: 170 })`);
+        await agent(`a.do('${verb}', { x: ${-sx}, y: 0.15, ms: 170 })`);   // the reversal — this is the crossover
         if (i === 2) { await agent(`a.do('move', { x: 0, y: -1, ms: 200 })`); }   // …and a pull-back for the hesi
       }
     }

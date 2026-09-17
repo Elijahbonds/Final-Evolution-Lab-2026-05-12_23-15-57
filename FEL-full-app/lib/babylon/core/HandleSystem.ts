@@ -547,3 +547,10 @@ export function movesTheBody(move: HandleMove): boolean {
   const i = moveImpulse(move);
   return i.forward !== 0 || i.lateral !== 0;
 }
+
+/** MOVE PACE (owner, 2026-09-17: "make the crossover and hesi look faster with the turbo"). The clip's playback rate for a
+ *  handle move: on the turbo the cross / hesi / in-and-out snap (1.35×, a shorter fade); off it they play at the capture's
+ *  own pace. Pure — the modes hand it to the tree's beat and to the tree's crossover state. */
+export const MOVE_RATE_TURBO = 1.35, MOVE_RATE_BASE = 1.0;
+export function moveRate(turbo: boolean): number { return turbo ? MOVE_RATE_TURBO : MOVE_RATE_BASE; }
+export function moveFadeSec(turbo: boolean): number { return turbo ? 0.045 : 0.07; }

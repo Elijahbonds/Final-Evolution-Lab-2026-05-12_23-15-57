@@ -102,7 +102,7 @@ import { resolveRim, forcedMissProfile } from '../core/RimPhysics';             
 import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
 import { judge, rule, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
 import {
-  CHAIN_IDLE, BASELINE_HANDLE, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot,
+  CHAIN_IDLE, BASELINE_HANDLE, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot, moveRate, moveFadeSec,
   resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, moveImpulse,
   moveClip, ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP,
   // bodyRight lives in HoopsMoves with the rest of the body-frame helpers
@@ -953,7 +953,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             const bought = live && roll() < odds;
             threat = throwJab(threat, bought);
             burstArmed = bought;
-            meAnimTree.beat('bball_hesi', { fadeSec: 0.05 });   // the sharpest authored weight-shift: the jab
+            meAnimTree.beat('bball_hesi', { fadeSec: moveFadeSec(!!meSlot.intent.sprint), speedRatio: moveRate(!!meSlot.intent.sprint) });   // the sharpest authored weight-shift: the jab (MOVE PACE: snaps on the turbo)
             SoundKit.play('whoosh', { pitch: 1.25, volume: 0.28 });
             if (bought) {
               foeStunSec = Math.max(foeStunSec, 0.3);
@@ -990,7 +990,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           meAnimTree.update({
             // STRIDE MATCHING needs real ground speed: speed01 is normalised and cannot pace a stride
             speedMps: Math.hypot(meDribble.vel.x, meDribble.vel.z),
-            speed01: drib.speed01, crossover: drib.crossover, crossoverDir: mx >= 0 ? 'right' : 'left', nearestDefender: nearestDef,
+            speed01: drib.speed01, crossover: drib.crossover, crossoverDir: mx >= 0 ? 'right' : 'left', moveRate: moveRate(sprintOk), nearestDefender: nearestDef,
             hasBall: carrying, shooting, dunking,
             driving: sprintOk && drib.speed01 > 0.6
               && Vector3.Dot(meDribble.vel, RIM.subtract(me.root.position)) > 0,
@@ -2404,8 +2404,9 @@ export const OneVOneMode: ModeDefinition = (() => {
     const right = bodyRight(me.root.rotation.y);
     const moveDir: 'left' | 'right' = (toHim.x * right.x + toHim.z * right.z) > 0 ? 'left' : 'right';
     const clip = moveClip(move, moveDir);
-    if (clip) meAnimTree.beat(clip, { fadeSec: 0.07 });
-    console.info(`[1V1-HANDLE] move ${move} ${moveDir} → ${clip ?? 'mode-owned'} (chain ${chain.length}, handle ${handle})`);
+    const turboMove = !!meSlot.intent.sprint;   // MOVE PACE: on the turbo the move SNAPS (1.35×, a shorter fade)
+    if (clip) meAnimTree.beat(clip, { fadeSec: moveFadeSec(turboMove), speedRatio: moveRate(turboMove) });
+    console.info(`[1V1-HANDLE] move ${move} ${moveDir} → ${clip ?? 'mode-owned'} rate ${moveRate(turboMove).toFixed(2)} (chain ${chain.length}, handle ${handle})`);
 
     // OFF THE HEAD is the only move where the ball leaves your hands, so it resolves HERE rather than
     // through the ankle-break roll below. Everything else in this vocabulary is a decision about a chain;

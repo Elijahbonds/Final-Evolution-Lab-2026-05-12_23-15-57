@@ -676,3 +676,12 @@ describe('MOVE_CLIP', () => {
     expect(ANKLE_SLIP_CLIP).toMatch(/^bball_/);      // and karate_knockdown
   });
 });
+
+import { moveRate, moveFadeSec, MOVE_RATE_TURBO, MOVE_RATE_BASE } from './HandleSystem';
+describe('move pace on the turbo', () => {
+  it('a move on the turbo plays faster with a shorter fade; off it, the capture\'s own pace', () => {
+    expect(moveRate(true)).toBe(MOVE_RATE_TURBO); expect(moveRate(false)).toBe(MOVE_RATE_BASE);
+    expect(MOVE_RATE_TURBO).toBeGreaterThan(1.2); expect(MOVE_RATE_BASE).toBe(1);
+    expect(moveFadeSec(true)).toBeLessThan(moveFadeSec(false));
+  });
+});
