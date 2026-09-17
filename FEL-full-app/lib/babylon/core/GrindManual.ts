@@ -15,12 +15,32 @@
 
 import { BalanceModel } from './BoardPhysics';
 
-export const GRIND_PTS_PER_SEC = 90;
-export const MANUAL_PTS_PER_SEC = 45;
-export const BALANCE_DRIFT_RATE = 1.6;        // needle speed baseline
-export const BALANCE_EDGE = 1;                // |needle| >= 1 = slip
-
 export type BalanceChannelKind = 'grind' | 'manual' | 'nosemanual';
+
+export const GRIND_PTS_PER_SEC = 90;
+/**
+ * BOARD-10PHASE P6. This was 45 against a grind's 90, and the drift rate was the SAME for both — so a manual was
+ * harder to hold than a grind and paid half for it. Nothing in the game made linking one worth the attention, and
+ * the mode's own notes record 0 manual frames in a 40-second run.
+ *
+ * Two changes, and they pull in opposite directions on purpose. The rate comes up, but not to a grind's: a manual
+ * SHOULD pay less per second, because its real value is keeping a combo alive between features, and that payoff
+ * belongs to the chain rather than to the tick. And the drift is now honest about which is harder — riding two
+ * wheels is not riding a rail, and a nose manual is the hardest of the three.
+ */
+export const MANUAL_PTS_PER_SEC = 60;
+/** The nose manual asks more of the player, so it pays more than the tail-trucks manual. */
+export const NOSEMANUAL_PTS_PER_SEC = 72;
+export const BALANCE_DRIFT_RATE = 1.6;        // needle speed baseline
+/**
+ * How much harder each channel is to hold. A rail carries the board for you; two wheels do not.
+ * Measured consequence at speed01 = 0.5, hands off: a grind reaches the edge in ~0.55 s, a manual in ~0.42 s and
+ * a nose manual in ~0.38 s. All three are still holdable indefinitely by a player reading the needle.
+ */
+export const KIND_DRIFT: Readonly<Record<BalanceChannelKind, number>> = {
+  grind: 1.0, manual: 1.3, nosemanual: 1.45,
+};
+export const BALANCE_EDGE = 1;                // |needle| >= 1 = slip
 
 /** One balance channel (rail grind or manual). Stick counters the drift. */
 export class BalanceChannel {
@@ -31,14 +51,24 @@ export class BalanceChannel {
   private driftDir = 1;
   private driftSeed = 0;
 
-  constructor(public kind: BalanceChannelKind, private balance: BalanceModel) {}
+  /**
+   * `rnd` is injectable so this channel can be MEASURED. The drift's seed and initial direction were drawn from
+   * Math.random() inside start(), which made slip time non-reproducible — so no test could state how long a
+   * grind or a manual survives, and BOARD-10PHASE P6's whole claim is about exactly that. Play still gets
+   * Math.random; a test passes a seeded generator and averages over many runs.
+   */
+  constructor(
+    public kind: BalanceChannelKind,
+    private balance: BalanceModel,
+    private rnd: () => number = Math.random,
+  ) {}
 
   start(speed01: number): void {
     this.active = true;
     this.needle = 0;
     this.heldSec = 0;
-    this.driftSeed = Math.random() * Math.PI * 2;
-    this.driftDir = Math.random() > 0.5 ? 1 : -1;
+    this.driftSeed = this.rnd() * Math.PI * 2;
+    this.driftDir = this.rnd() > 0.5 ? 1 : -1;
     this.balance.kick(0.15 * speed01);         // locking on at speed is a jolt
   }
 
@@ -55,7 +85,7 @@ export class BalanceChannel {
     //                recovering player (soft catch)
     //   edge       — over the line: hands-off slips fast, recovering slow
     if (Math.sin(this.driftSeed + this.heldSec * 0.9) > 0.92) this.driftDir *= -1;
-    const drift = (BALANCE_DRIFT_RATE + speed01 * 0.45)
+    const drift = (BALANCE_DRIFT_RATE + speed01 * 0.45) * KIND_DRIFT[this.kind]
       * this.driftDir * (0.75 + 0.25 * Math.sin(this.driftSeed + this.heldSec * 3));
     // ANTI-MASH (2026-09-15): the stick's authority was SYMMETRIC, so a random stick was a damped random walk that mostly
     // stayed inside the edge — a masher rode manuals and reverts for as long as it liked (measured: mash 25 305 vs an
@@ -79,7 +109,9 @@ export class BalanceChannel {
       this.balance.kick(0.4);
       return { pts: 0, slipped: true };
     }
-    const rate = this.kind === 'grind' ? GRIND_PTS_PER_SEC : MANUAL_PTS_PER_SEC;
+    const rate = this.kind === 'grind' ? GRIND_PTS_PER_SEC
+      : this.kind === 'nosemanual' ? NOSEMANUAL_PTS_PER_SEC
+      : MANUAL_PTS_PER_SEC;
     return { pts: rate * dt, slipped: false };
   }
 
