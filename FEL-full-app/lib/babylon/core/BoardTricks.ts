@@ -27,6 +27,14 @@ import { trickSeconds } from './TrickPose';
 
 export type BoardDiscipline = 'skate' | 'snow' | 'surf';
 
+/**
+ * Who a trick belongs to. WIDER than BoardDiscipline on purpose: the kart borrows this whole vocabulary — the
+ * shape of a trick, fitsAir, basePts, scoreTrick, heldTrickDir — for its air off a ramp, but it is not a board
+ * discipline and must not appear in the board registries. Every `Record<BoardDiscipline, ...>` in the codebase
+ * (TRICKS_BY_DISCIPLINE, VENUES_BY_DISCIPLINE, LEGACY_BOUND) therefore stays exactly as exhaustive as it was.
+ */
+export type TrickDiscipline = BoardDiscipline | 'kart';
+
 /** Which kind of ComboChain link this trick lands as. */
 export type TrickKind = 'air' | 'grind' | 'manual' | 'revert';
 
@@ -36,7 +44,7 @@ export type GrabShape = 'none' | 'indy' | 'melon' | 'method' | 'stalefish' | 'no
 export interface BoardTrick {
   id: string;
   label: string;
-  discipline: BoardDiscipline;
+  discipline: TrickDiscipline;
   kind: TrickKind;
   /** The held direction, matching the dunk's grammar. null = no direction (a bare button). */
   dir: 'up' | 'down' | 'left' | 'right' | null;
