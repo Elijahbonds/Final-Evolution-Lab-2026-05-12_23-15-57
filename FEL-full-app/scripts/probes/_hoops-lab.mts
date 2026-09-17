@@ -267,24 +267,35 @@ for (let n = 0; n < POSSESSIONS; n++) {
       }
     }
     else if (play === 'trick') {
-      // THE TRICK STICK. Drive in holding turbo so the squeeze becomes a dunk, then flick the RIGHT stick in the
-      // air. The window is on the flight clock (0.30-0.50 of a 550 ms flight for a clean dunk), so the flick goes
-      // in about 190 ms after the take-off — which is what a player is being asked to feel.
+      // THE FLICK IS TIMED IN THE PAGE, off the mode's own flight clock. Timed from node it landed at k 0.88-0.93
+      // every single attempt — the flight is 550 ms and a page.evaluate round trip under a loaded headed browser is
+      // most of it, so "wait 190 ms then flick" measured the round trip, not the player. Same lesson as the block,
+      // which had to move in-page for the same reason: a window this short cannot be hit across a socket.
+      //
+      // THE RIGHT STICK IS NOT ON THE SLOT either — the mode reads look/trick off the RAW stream, so the agent
+      // bridge cannot reach it. No new seam needed: InputBus.emit is public (the touch overlay calls it) and
+      // ModeHarness publishes the bus on `__FEL_DEV__.input`, so this is the real path a thumb uses.
+      await page.evaluate(`(() => {
+        const bus = window.__FEL_DEV__ && window.__FEL_DEV__.input;
+        const dev = window.__dev();
+        if (!bus || !dev || typeof dev.flightK !== 'function') return 'no seam';
+        const AIM = ${Number(process.env.FLICK_AT ?? 0.4)};   // where in the flight to throw it
+        const id = setInterval(() => {
+          const k = dev.flightK();
+          if (k < 0) return;                       // not airborne
+          if (k >= AIM) {
+            clearInterval(id);
+            bus.emit({ t: 'stick', side: 'R', x: 0, y: -1 });   // UP = tomahawk
+            setTimeout(() => bus.emit({ t: 'stick', side: 'R', x: 0, y: 0 }), 100);
+          }
+        }, 8);
+        setTimeout(() => clearInterval(id), 3000);
+        return 'armed';
+      })()`);
+      // …and only THEN the dunk, so the watcher is already polling when the feet leave.
       await driveToRim(2.4);
       await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
       await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: 0, action: true }, 60)`);
-      await page.waitForTimeout(Number(process.env.FLICK_MS ?? 190));
-      // THE RIGHT STICK IS NOT ON THE SLOT. The mode reads look/trick off the RAW input stream, so the agent
-      // bridge cannot reach it — the same "no wire" shape as the block, and here it does not need a new seam:
-      // InputBus.emit is public (the touch overlay calls it directly) and `__FEL_DEV__.input` publishes the bus.
-      // So the probe flicks the real stick, through the real path a thumb uses.
-      await page.evaluate(`(() => {
-        const bus = window.__FEL_DEV__ && window.__FEL_DEV__.input;
-        if (!bus) return 'no input seam';
-        bus.emit({ t: 'stick', side: 'R', x: 0, y: -1 });      // UP = tomahawk
-        setTimeout(() => bus.emit({ t: 'stick', side: 'R', x: 0, y: 0 }), 120);
-        return 'flicked';
-      })()`);
     }
     else if (play === 'screen') {
       // CALL FOR A SCREEN, then drive off it. 3v3 only — 1v1 answers the press with NO TEAMMATE TO SCREEN, which is
