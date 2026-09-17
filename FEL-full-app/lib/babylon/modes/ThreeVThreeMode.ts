@@ -225,9 +225,16 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   // ── BIOMECH-HOOPS-WAVE1 ──
   let driver: Body | null = null;                // the rival driving on their possession (its tree carries the ball, it faces the rim, the AI drive skips it)
   let driveK = 0;                                // the rival drive's clock 0..1 (the block window is its end)
+  let oobSec = 0;                                // how long the carrier has been ON the line, still pushing at it
   let takingCharge = false;                      // Circle held on defence — planted, waiting to wear it
   let chargeSetSec = 0;                          // how long the feet have been down
 /** How long the feet have to be planted before a charge can be drawn. */
+/** The lines themselves — the box clampToHalfCourt holds bodies inside (8 x 15 here, wider than 1v1's half). */
+const COURT_HALF_WIDTH = 8, COURT_DEPTH = 15;
+/** How close to the line counts as ON it, and how long you must keep pushing at it before it is a call. */
+const OOB_EPSILON = 0.08, OOB_GRACE_SEC = 0.35;
+/** A reach that ARRIVES on the handler at this speed is a foul; slower than this it is a whiff at thin air. */
+const REACH_FOUL_SPEED = 1.6;
 const CHARGE_SET_SEC = 0.18;
 /**
  * Inside this of a planted defender is CONTACT; past it he went round you.
@@ -599,15 +606,18 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           chargeSetSec += dt;
           const closing = driver.vel.length();
           if (chargeSetSec >= CHARGE_SET_SEC && distXZ(me.char.root.position, driver.char.root.position) <= CHARGE_RANGE && closing >= FOUL_CLOSING_SPEED) {
-            SoundKit.play('whistle');
+            // THE REF OWNS THE CONSEQUENCE — the same refactor 1v1 got. The handbook says a charge is the
+            // DEFENCE's ball; the mode reports the fact and carries out the call instead of asserting one.
+            const call = judge('charge', { offense: 'foeTeam' === carrierId ? 'foe' : 'me', fouled: 'me' });
+            if (call.whistle) SoundKit.play('whistle');
             swing('steal');
-            ctx.setHud({ momentum, banner: 'CHARGE — YOUR BALL!' });
+            ctx.setHud({ momentum, banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}!` });
             setTimeout(() => ctx.setHud({ banner: '' }), 1100);
-            me.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
-            driver.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
-            console.info(`[3V3-DEF] charge taken at ${closing.toFixed(1)} m/s`);
+            me.tree.beat(ANKLE_STUMBLE_CLIP, { fadeSec: 0.06 });        // he ran into you; nobody punched either of you
+            driver.tree.beat(ANKLE_STUMBLE_CLIP, { fadeSec: 0.06 });
+            console.info(`[3V3-REF] ${call.id} at ${closing.toFixed(1)} m/s (set ${chargeSetSec.toFixed(2)}s) → ${call.ball}`);
             driveStolen = true;
-            later(800, () => resetPossession(true));
+            later(800, () => (call.ball === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
           }
         } else if (!takingCharge) chargeSetSec = 0;
         const wantHandUp = !!me.slot.intent.contest && myJumpAge === Infinity && !meFloored && meStunSec === 0;
@@ -617,7 +627,22 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           me.tree.beat('bball_steal_reach');
           const exposure = bumpExposure(0.3, bumpAge);
           if (exposure >= 0.5 || roll() < 0.3) { driveStolen = true; swing('steal'); ctx.setHud({ momentum }); console.info(`[3V3-DEF] strip by me ${bumpAge <= BUMP_STRIP_WINDOW_SEC ? 'on the bump' : 'on the roll'} bumpAge ${bumpAge.toFixed(2)}`); }
-          else { meStunSec = 0.35; ctx.setHud({ banner: 'REACH — THEY GO BY' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+          else {
+            meStunSec = 0.35;
+            // A REACH THROUGH THE BODY IS A FOUL, and `reach_in` has been in the handbook the whole time with
+            // nothing calling it. Only when you actually arrive on him at speed: a reach at thin air is just a
+            // whiff, and it keeps the old "they go by" answer.
+            const onHim = distXZ(me.char.root.position, driver.char.root.position) <= BODY_STANDOFF + 0.25;
+            if (onHim && me.drib.vel.length() >= REACH_FOUL_SPEED) {
+              const call = judge('reach_in', { offense: 'foe', fouled: 'foe' });
+              if (call.whistle) SoundKit.play('whistle');
+              ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
+              setTimeout(() => ctx.setHud({ banner: '' }), 900);
+              console.info(`[3V3-REF] ${call.id} → ${call.ball}`);
+              driveStolen = true;
+              later(700, () => (call.ball === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
+            } else { ctx.setHud({ banner: 'REACH — THEY GO BY' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+          }
         }
       } else if (meHandUp) { meHandUp = false; me.tree.releaseHold(); }
 
@@ -867,6 +892,27 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (!shooting && !dunking && !spin) {
         if (!finish && !posting) me.char.root.position.addInPlace(me.drib.vel.scale(dt));
         if (!threeVenue?.constrain(me.char.root.position)) clampToHalfCourt(me.char.root.position, 8, 15);   // phase 3: navmesh first
+        // OUT OF BOUNDS OFF THE CARRIER — the same rule 1v1 was missing. The clamp above holds every body inside
+        // the lines, so carrying into the sideline was an invisible wall you slid along for free: the only way to
+        // lose it by leaving the floor was a LOOSE ball. The clamp stays (a body half off the court looks broken);
+        // the line is now a line. A grace window keeps a bump into it from being a turnover.
+        if (iAmCarrier && !shooting && !dunking && !finish) {
+          const p = me.char.root.position;
+          const outX = Math.abs(p.x) >= COURT_HALF_WIDTH - OOB_EPSILON;
+          const outZ = p.z >= COURT_DEPTH - OOB_EPSILON;
+          const pushingOut = (outX && Math.sign(wish.x) === Math.sign(p.x) && Math.abs(wish.x) > 0.3) || (outZ && wish.z > 0.3);
+          oobSec = outX || outZ ? oobSec + dt : 0;
+          if (pushingOut && oobSec >= OOB_GRACE_SEC) {
+            oobSec = 0;
+            const call = judge('out_of_bounds', { offense: 'me', shooter: 'me' });
+            if (call.whistle) SoundKit.play('whistle');
+            console.info(`[3V3-REF] ${call.id} off the carrier at x ${p.x.toFixed(2)} z ${p.z.toFixed(2)} → ${call.ball}`);
+            ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
+            setTimeout(() => ctx.setHud({ banner: '' }), 900);
+            if (call.ball === 'me') resetPossession(true); else void opponentPossession(ctx);
+            return;
+          }
+        } else oobSec = 0;
         // BIOMECH-HOOPS-WAVE1 G1: on defense my chest stays on the driver (the slides move me sideways); on offense I face my travel
         if (carrierId === 'foeTeam') me.drib.setFacing(facePlay(me.char.root, me.drib.vel, driver ? driver.char.root.position : null, DEFEND_FACE_RANGE, dt));
         else if (!posting) me.char.root.rotation.y = drib.facingRad;

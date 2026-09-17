@@ -221,6 +221,8 @@ const OOB_EPSILON = 0.08;
 const OOB_GRACE_SEC = 0.35;
 const STEAL_RANGE = 1.6;
 /** How long the feet have to be planted before a charge can be drawn — a charge is arriving early, not colliding. */
+/** A reach that ARRIVES on the handler at this speed is a foul; slower than this it is a whiff at thin air. */
+const REACH_FOUL_SPEED = 1.6;
 const CHARGE_SET_SEC = 0.18;
 /**
  * Inside this of a planted defender is CONTACT; past it he went round you.
@@ -710,8 +712,11 @@ export const OneVOneMode: ModeDefinition = (() => {
             console.info('[1V1-JUICE] jumper make');
             // the WHY was named at release (GREEN/EARLY/LATE + contest); the
             // resolution just confirms the result and the points
-            ctx.setHud({ score: myScore, momentum, banner: finishFoul ? `${arcLabel} +${arcPoints} — AND ONE!` : `${arcLabel} +${arcPoints}` });   // HOOPS-MOVE-KIT-A M2: fouled on the finish
-            if (finishFoul) { finishFoul = false; SoundKit.play('crowdCheer', { volume: 0.5 }); }
+            // PARITY THE OTHER WAY: 3v3 already asks the ref for this one and 1v1 asserted its own banner. It is
+            // the same rule; only one of them should be writing it down.
+            const andOne = finishFoul ? judge('and_one', { offense: 'me', shooter: 'me', fouled: 'me' }) : null;
+            ctx.setHud({ score: myScore, momentum, banner: andOne ? `${arcLabel} +${arcPoints} — ${andOne.banner}` : `${arcLabel} +${arcPoints}` });   // HOOPS-MOVE-KIT-A M2: fouled on the finish
+            if (andOne) { finishFoul = false; SoundKit.play('crowdCheer', { volume: 0.5 }); console.info(`[1V1-REF] ${andOne.id} → ${andOne.ball} (${andOne.shots} shot)`); }
             carrying = true;
             if (checkGameOver(ctx)) return;
             later(700, () => { ctx.setHud({ banner: '' }); resetPositions(); });   // make it, take it
@@ -756,7 +761,14 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (possession === 'mine') bannerFlash(ctx, rim.label, 850);
           console.info(`[1V1-RIM] ${rim.kind} — ${rim.label}`);
           // HOOPS-MOVE-KIT-A M2: fouled in the air on a finish that missed — the ball back, no board race
-          if (finishFoul && possession === 'mine') { finishFoul = false; bannerFlash(ctx, 'FOULED ON THE FINISH — BALL BACK', 1000); later(900, () => resetPositions()); return; }
+          if (finishFoul && possession === 'mine') {
+            finishFoul = false;
+            const call = judge('shooting_foul', { offense: 'me', shooter: 'me', fouled: 'me' });
+            console.info(`[1V1-REF] ${call.id} on a miss → ${call.ball}`);
+            bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'BALL BACK' : 'THEIR BALL'}`, 1000);
+            later(900, () => (call.ball === 'me' ? resetPositions() : startDefense(ctx, 'THEIR BALL — DEFEND!')));
+            return;
+          }
           // THE BOARD IS A CONTEST, and BOX OUT is how you win it — on BOTH ends.
           //
           // This was a bare distance comparison, which made it deterministic —
@@ -1134,6 +1146,20 @@ export const OneVOneMode: ModeDefinition = (() => {
         for (const c of contact.drainContacts()) {
           if (process.env.NODE_ENV === 'development') { devContacts.push({ t: performance.now(), severity: c.severity, closing: c.closingSpeed, attacker: c.attacker, victim: c.victim, attackerSpeed: c.attackerSpeed }); if (devContacts.length > 40) devContacts.shift(); }
           if (c.severity === 'foul') {
+            // A SCRAMBLE IS NOT A POSSESSION. Every branch below asks whose ball it is, so a foul-speed collision
+            // while the ball is LOOSE — the one moment neither team is on offence — had nowhere to land and was
+            // dropped. `loose_ball_foul` has been in the handbook the whole time, awarding it to whoever was
+            // fouled, which is exactly the case the possession-shaped branches cannot express.
+            if (loose && !dunking && c.closingSpeed >= FOUL_CLOSING_SPEED) {
+              const victim: 'me' | 'foe' = c.victim === 'me' ? 'me' : 'foe';
+              const call = judge('loose_ball_foul', { offense: possession === 'mine' ? 'me' : 'foe', fouled: victim });
+              if (call.whistle) SoundKit.play('whistle');
+              console.info(`[1V1-REF] ${call.id} ${c.closingSpeed.toFixed(1)} m/s on ${victim} → ${call.ball}`);
+              bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}`, 900);
+              board = null; ballSim.stop(); loose = false;
+              if (call.ball === 'me') resetPositions(); else startDefense(ctx, `${call.banner} — DEFEND!`);
+              return;
+            }
             // THE CHARGE, ON THE COLLISION CHANNEL. Every branch in this drain was `possession === 'mine'`, so on
             // DEFENCE every contact the physics reported was dropped on the floor — which is why a planted defender
             // could be run through at 5.0 m/s and nothing was called. A charge IS a collision; polling the distance
@@ -1375,6 +1401,18 @@ export const OneVOneMode: ModeDefinition = (() => {
             meStunSec = REACH_WHIFF_STUN_SEC;
             if (dist < 2.4) attacker.blowBy();
             SoundKit.play('whoosh', { pitch: 0.7, volume: 0.3 });
+            // A REACH THROUGH THE BODY IS A FOUL — `reach_in` has been in the handbook the whole time with nothing
+            // calling it. Only when you actually arrive on him at speed; a reach at thin air is a whiff, and keeps
+            // the answer it always had.
+            if (dist <= BODY_STANDOFF + 0.25 && meDribble.vel.length() >= REACH_FOUL_SPEED) {
+              const call = judge('reach_in', { offense: 'foe', fouled: 'foe' });
+              if (call.whistle) SoundKit.play('whistle');
+              console.info(`[1V1-REF] ${call.id} at ${dist.toFixed(2)} m → ${call.ball}`);
+              bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}`, 900);
+              defPhase = 'over';
+              later(700, () => (call.ball === 'me' ? resetPositions() : startDefense(ctx, 'THEIR BALL — DEFEND!')));
+              return;
+            }
             bannerFlash(ctx, 'REACH — THEY GO BY', 700);
           }
 
