@@ -230,7 +230,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let meIntensity01 = 0, meGear = 'stop';   // DRIBBLE PACE
   let scuff: ScuffState = { ...SCUFF_IDLE };
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
-  const rStick = new StickHandleReader(); let stickGestures: StickGesture[] = []; let pausedDribble = false;   // STICK HANDLE
+  const rStick = new StickHandleReader(); let stickGestures: StickGesture[] = []; let pausedDribble = false;
+  let postStick = { x: 0, y: 0 }; let stickShot: { side: 'left' | 'right'; shimmy: boolean; started: boolean; shimmied: boolean } | null = null; let shimmyLeft = 0;   // POST HOOK (2K20): in the post the R stick up-left / up-right IS the hook (R2: the shimmy first)   // STICK HANDLE
   let passTargetId: 'mate0' | 'mate1' = 'mate0';
   let passType: PassType = 'chest';
   /** Each teammate's velocity this frame — the lob needs to know who is CUTTING (D7). */
@@ -462,7 +463,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     ctx0?.camDirector.snapTo(me.char.root.position, RIM);   // POLISH: the bodies moved metres — the camera cuts to them, it does not chase
     shooting = false; currentShot = null;
     if (gather || finish || spin || posting) me.tree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
-    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; rStick.reset(); if (pausedDribble) { pausedDribble = false; me.drib.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; jabEligible = false; burstArmed = false; me.char.root.position.y = 0;
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; me.drib.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; jabEligible = false; burstArmed = false; me.char.root.position.y = 0;
     clearDefense();
     // BIOMECH-HOOPS-WAVE1: the possession's clocks; a held shot is lifted, a floored body gets up
     driver = null; driveK = 0; dunkFlight = null; dunkFlush = null; mateArc.active = false; posterVictim = null; victimSlide = null; lastDunkKind = 'clean';
@@ -602,9 +603,15 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       SoundKit.unlock();
       localSource.feed(e);
       if (e.t === 'stick' && e.side === 'R') {   // MODE-STICK-FACE: R stick → the look orbit — except on the floor with the ball: the DRIBBLE STICK (2K)
+        if (posting && carrierId === 'me' && !shooting && !dunking) {   // POST HOOK (2K20): with the post held the stick is the SHOT stick
+          postStick = { x: e.x, y: e.y };
+          if (!stickShot && e.y < -0.5 && Math.abs(e.x) > 0.3) { stickShot = { side: e.x > 0 ? 'right' : 'left', shimmy: !!me.slot.intent.sprint, started: false, shimmied: false }; shimmyLeft = stickShot.shimmy ? 0.22 : 0; }
+          rStick.reset(); lookX = 0; lookY = 0;
+        } else {
         const onFloor = carrierId === 'me' && !shooting && !dunking && !finish && !gather && !spin;
         if (onFloor) { stickGestures.push(...rStick.feed(e.x, e.y, performance.now() / 1000)); lookX = 0; lookY = 0; }
         else { rStick.reset(); lookX = e.x; lookY = e.y; }
+        }
       }
       if (dunking && e.t === 'button' && e.btn === 'X' && e.pressed) showtimePress = true;   // SHOWTIME: the timed flush
       // BLOCK jump while defending an opponent possession. The body lives in contestJump() so the slot can reach it
@@ -953,7 +960,19 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           else if (pick.move === 'momentum_btb') me.drib.momentumBtb(pick.side ?? 'right', sprintOk);
           else if (pick.move === 'hesi') me.drib.hesitate();
           else if (pick.move === 'steezo_roll') {
-              if (pausinWanted({ sprint: sprintOk, dist: distXZ(me.char.root.position, RIM_FLOOR), speed: me.drib.vel.length(), turbo01: turbo.t01 })) { console.info("[3V3-STICK] PAUSIN' — the spin thrown into the takeoff"); startDunk(ctx, foeDistS < 2.2 && foeLiveS ? 'poster' : 'dunk', nfS ? nfS.char.root.position : null, PAUSIN_DUNK); continue; }   // PAUSIN' (2K21): the spin dunk
+              if (sprintOk && turbo.t01 >= 0.08 && distXZ(me.char.root.position, RIM_FLOOR) <= 6.5) {
+                // THE DROP STEP (owner): the sweep with the turbo takes one hard momentum step at the rim first — the body is PULLED
+                // toward the iron — and 0.26 s later, inside range, the spin becomes the takeoff (PAUSIN'); out of range it is the roll
+                const toRimD = RIM_FLOOR.subtract(me.char.root.position); toRimD.y = 0; toRimD.normalize(); const sideD = pick.side ?? 'right';
+                me.drib.dropStep(toRimD.x, toRimD.z, sprintOk); doMove(ctx, 'momentum_cross', sideD); SoundKit.play('whoosh', { pitch: 1.2, volume: 0.45 });
+                console.info(`[3V3-STICK] drop step toward the rim at ${me.drib.vel.length().toFixed(1)} m/s (${distXZ(me.char.root.position, RIM_FLOOR).toFixed(1)} m out)`);
+                later(260, () => {
+                  if (!(carrierId === 'me') || shooting || dunking || spin || finish) return;
+                  if (pausinWanted({ sprint: true, dist: distXZ(me.char.root.position, RIM_FLOOR), speed: me.drib.vel.length(), turbo01: Math.max(turbo.t01, 0.1) })) { console.info("[3V3-STICK] PAUSIN' — the spin thrown into the takeoff"); startDunk(ctx, (() => { const nfP = nearestLiveFoe(); return nfP && distXZ(me.char.root.position, nfP.char.root.position) < 2.2 ? 'poster' : 'dunk'; })(), nearestLiveFoe()?.char.root.position ?? null, PAUSIN_DUNK); }
+                  else { me.drib.momentumBtb(sideD, true); later(180, () => { if ((carrierId === 'me') && !spin && !shooting && !dunking) { spinCooldown = 0; startSpin(ctx, (nearestLiveFoe()?.char.root.position ?? null), sideD); } }); }
+                });
+                continue;
+              }
               me.drib.momentumBtb(pick.side ?? 'right', sprintOk); const sideS = pick.side ?? undefined; later(180, () => { if (iAmCarrier && !spin && !shooting && !dunking) { spinCooldown = 0; startSpin(ctx, (nearestLiveFoe()?.char.root.position ?? null), sideS); } }); }
           doMove(ctx, pick.move, pick.side ?? undefined);
           SoundKit.play('whoosh', { pitch: pick.move === 'momentum_cross' ? 1.45 : 1.3, volume: 0.4 }); ctx.feel?.impact?.(0.1);
@@ -1375,7 +1394,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // HOOPS-MOVE-KIT-A: the ball must be OURS (not released — the live dribble keeps it un-parented, so `ball.parent` is no
       // test): a trigger still held past the meter's end restarted a shot with the ball in the air (a second gather on top of
       // the arc, measured)
-      if (iAmCarrier && !shooting && !dunking && !finish && !spin && !arc.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased && meIntent.actionHeld > 0.02) {
+      if (stickShot && !stickShot.started) {   // POST HOOK: the shimmy beat before the hook; a tap let go before the shot is nothing
+          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; me.tree.beat('bball_hesi', { fadeSec: 0.05, speedRatio: 1.5 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 }); { const nfB = nearestLiveFoe(); if (nfB && distXZ(me.char.root.position, nfB.char.root.position) < 2.0 && roll() < 0.45) { nfB.stunSec = 0.4; nfB.tree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); } } }
+          shimmyLeft = Math.max(0, shimmyLeft - dt);
+          if (Math.hypot(postStick.x, postStick.y) < 0.35 && shimmyLeft <= 0) stickShot = null;
+        }
+        if (iAmCarrier && !shooting && !dunking && !finish && !spin && !arc.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased && (meIntent.actionHeld > 0.02 || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0))) {   // POST HOOK (2K20)
         const nearestFoePos = foes.reduce<Vector3 | null>((best, f) =>
           !best || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(best, me.char.root.position)
             ? f.char.root.position : best, null);
@@ -1385,7 +1409,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // HOOPS-MOVE-KIT-B M4/M5: with my back to the basket the squeeze is the POST's own shot — the stick pulled off the
         // rim asks for the FADEAWAY, anything else is the JUMP HOOK. (A sealed body is never fast enough to dunk.)
         const toRimNow = RIM_FLOOR.subtract(me.char.root.position); toRimNow.y = 0; toRimNow.normalize();
-        const post: PostShot = posting ? (stickBack01(wish.x, wish.z, toRimNow) >= POST_FADE_STICK_MIN ? 'fade' : 'hook') : 'none';
+        const post: PostShot = posting ? (stickShot ? 'hook' : stickBack01(wish.x, wish.z, toRimNow) >= POST_FADE_STICK_MIN ? 'fade' : 'hook') : 'none';   // POST HOOK
         // `sprintOk ? turbo.t01 : 0` — the dunk is the SPRINT finish and the layup is the one off the gas. Handed the
         // raw tank, this gate read "has fuel" rather than "is attacking", and every drive that reached the rim became
         // a dunk while the layup went unreachable. Same fix, same reasoning, as the 1v1 call site.
@@ -1404,7 +1428,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           console.info(`[3V3-SHOT] gather ${currentShot.style} rim ${distXZ(me.char.root.position, RIM_FLOOR).toFixed(2)} speed ${Math.hypot(me.drib.vel.x, me.drib.vel.z).toFixed(1)} contest ${contest.toFixed(2)}`);
           // HOOPS-MOVE-KIT-A: a layup / floater is a FINISH (M3); a jumper GATHERS first (M1) — a set body rises at once.
           // HOOPS-MOVE-KIT-B: the hook (M5) and the fadeaway (M4) are finishes too — their own clip, their own hop.
-          if (currentShot.style === 'layup' || currentShot.style === 'floater' || currentShot.style === 'hook' || currentShot.style === 'fadeaway' || currentShot.style === 'reverse') startFinish(ctx, currentShot.style, contest, nearestFoePos);
+          if (currentShot.style === 'layup' || currentShot.style === 'floater' || currentShot.style === 'hook' || currentShot.style === 'fadeaway' || currentShot.style === 'reverse') startFinish(ctx, currentShot.style, stickShot?.shimmy ? contest * 0.55 : contest, nearestFoePos, stickShot?.side); if (stickShot) { stickShot.started = true; console.info(`[3V3-STICK] post hook ${stickShot.side}${stickShot.shimmy ? ' (shimmy)' : ''}`); }
           else startRise(ctx, contest, wish.x, -wish.z);
           aiContestLoad();   // D1/D3: the nearest defender puts a hand up on the load, or times a block jump to the green
         }
@@ -1414,7 +1438,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         ctx.setHud({ shotMeterT: t });
         // HOOPS-MOVE-KIT-B M8: let go this early and it is a PUMP FAKE, not a 0.35-pct brick — and he can bite it
         if (meIntent.action && isPumpFake(t * shotMeter.durationSec) && !finish) pumpFake(ctx, nearestLiveFoe());
-        else if (meIntent.action || t >= 1) {
+        else if (meIntent.action || t >= 1 || (stickShot?.started && Math.hypot(postStick.x, postStick.y) < 0.35)) {   // POST HOOK: the stick let go = the release
+          stickShot = null;
           const quality = shotMeter.release();
           void resolveMyShot(ctx, quality);
         }

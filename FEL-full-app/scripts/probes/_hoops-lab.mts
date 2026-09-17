@@ -260,7 +260,7 @@ const PLAYS = ['jumper', 'layup', 'dunk'];
 // the SIDE under test is chosen by PLAY rather than by who happens to be winning.
 // CHARGE is a defensive possession too — you are standing in his way waiting to wear it.
 const wantDefence = PLAY === 'defence' || PLAY === 'charge';
-const PLAYS_ALL = ['jumper', 'layup', 'dunk', 'handle', 'trick', 'screen', 'pace', 'rstick'];   // what PLAY can name
+const PLAYS_ALL = ['jumper', 'layup', 'dunk', 'handle', 'trick', 'screen', 'pace', 'rstick', 'posthook', 'pausin'];   // what PLAY can name
 await page.evaluate(`(() => { window.__brain = ${wantDefence}; window.__def.block = ${PLAY !== 'charge'}; window.__def.charge = ${PLAY === 'charge'}; })()`);
 
 /**
@@ -389,6 +389,22 @@ for (let n = 0; n < POSSESSIONS; n++) {
       await agent(`a.act({ moveX: 0, moveY: 0.6 }, 1700)`);
       await mark('end');
       await agent(`a.do('shoot', { charge: ${CHARGE} })`);
+    }
+    else if (play === 'posthook') {
+      // POST HOOK (2K20): drive in, post up (L2 via the bridge's postup), then the R stick up-right HELD in-page and let go
+      await driveToRim(3.4);
+      await page.evaluate(`(() => { const bus = window.__FEL_DEV__ && window.__FEL_DEV__.input; if (!bus) return; const R = (x, y) => bus.emit({ t: 'stick', side: 'R', x, y });
+        setTimeout(() => R(0.7, -0.7), 500); setTimeout(() => R(0.72, -0.7), 700); setTimeout(() => R(0.72, -0.7), 900); setTimeout(() => R(0, 0), 1150); })()`);
+      await agent(`a.do('postup', { ms: 1600 })`);
+      await page.waitForTimeout(600);
+    }
+    else if (play === 'pausin') {
+      // PAUSIN' (2K21): the drive with the turbo, the sweep thrown in-page at ~5 m — the drop step, then the spin into the dunk
+      await driveToRim(6.0);
+      await page.evaluate(`(() => { const bus = window.__FEL_DEV__ && window.__FEL_DEV__.input; if (!bus) return; const R = (x, y) => bus.emit({ t: 'stick', side: 'R', x, y });
+        for (let i = 0; i <= 8; i++) { const a = -Math.PI / 2 + (i / 8) * Math.PI; setTimeout(() => R(Math.cos(a) * 0.95, Math.sin(a) * 0.95), 260 + i * 26); } setTimeout(() => R(0, 0), 520); })()`);
+      await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true }, 1400)`);
+      await page.waitForTimeout(900);
     }
     else if (play === 'pace') {
       // DRIBBLE PACE: walk, jog, stop (−x), then jog, turbo, let off, press again (the change of pace), stop (+x) — the speed

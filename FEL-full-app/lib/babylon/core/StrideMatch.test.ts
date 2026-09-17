@@ -55,7 +55,7 @@ describe('one stride covers the ground the body covers', () => {
 
 describe('ONLY locomotion is rate-scaled', () => {
   it('running states are', () => {
-    for (const s of ['drive', 'speed_dribble', 'run', 'crossover']) expect(strideKindFor(s)).toBe('run');
+    for (const s of ['drive', 'sprint_dribble', 'run', 'crossover']) expect(strideKindFor(s)).toBe('run');
   });
 
   it('the defensive slides are, against their own reference', () => {
@@ -191,5 +191,16 @@ describe('combat strides, and the backwards-step trap', () => {
 
   it('an unknown combat state is refused, not scaled by default', () => {
     expect(combatRateFor('some_state_added_next_year', 3)).toBeNull();
+  });
+});
+
+describe('DRIBBLE GEARS (2026-09-17)', () => {
+  it('the walk and the jog dribble loops pace against their own references; the sprint against the run', async () => {
+    const m = await import('./StrideMatch');
+    expect(m.strideKindFor('walk_dribble')).toBe('walk');
+    expect(m.strideKindFor('speed_dribble')).toBe('jog');
+    expect(m.strideKindFor('sprint_dribble')).toBe('run');
+    expect(m.rateFor('walk_dribble', 1.6)!).toBeCloseTo(Math.min(m.RATE_MAX, 1.6 / 0.72), 6);
+    expect(m.rateFor('speed_dribble', 4.2)!).toBeCloseTo(4.2 / 2.8, 6);
   });
 });

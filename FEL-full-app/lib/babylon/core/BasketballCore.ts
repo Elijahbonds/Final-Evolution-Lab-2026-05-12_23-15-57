@@ -138,6 +138,13 @@ export class DribbleController {
     this.cutTo(fx * (1 - a) + rx * sgn * a, fz * (1 - a) + rz * sgn * a, speed);
     this.movement.launchFor(0.4); this.movement.noteBurst(0.4);
   }
+  /** THE DROP STEP (owner: "a drop step so the pausin move actually gets triggered and the character gets pulled toward the rim with
+   *  momentum"): one hard step along `dir` (world XZ, toward the rim) at no less than DROP_STEP_SPEED, the launch boosted. */
+  static readonly DROP_STEP_SPEED = 4.6;
+  dropStep(dx: number, dz: number, sprint: boolean): void {
+    const speed = Math.min(DEFAULT_MOVEMENT.maxSpeed * 1.1, Math.max(DribbleController.DROP_STEP_SPEED, this.movement.vel.length()) + (sprint ? 0.8 : 0.4));
+    this.cutTo(dx, dz, speed); this.movement.launchFor(0.5); this.movement.noteBurst(0.5);
+  }
   /** PAUSIN': the dribble frozen — the body stops on a dime and the stick is ignored until `pause(false)`, which arms the explode. */
   pause(on: boolean): void {
     this.movement.pause(on);

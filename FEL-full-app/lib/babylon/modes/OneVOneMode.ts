@@ -324,7 +324,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** The rival is on the floor (posterized) — held there by the tree until the stun ends. */
   let foeFloored = false;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
-  const rStick = new StickHandleReader(); let stickGestures: StickGesture[] = []; let pausedDribble = false;   // STICK HANDLE: the dribble stick on the floor
+  const rStick = new StickHandleReader(); let stickGestures: StickGesture[] = []; let pausedDribble = false;
+  let postStick = { x: 0, y: 0 }; let stickShot: { side: 'left' | 'right'; shimmy: boolean; started: boolean; shimmied: boolean } | null = null; let shimmyLeft = 0;   // POST HOOK (2K20): in the post the R stick up-left / up-right IS the hook (R2: the shimmy first)   // STICK HANDLE: the dribble stick on the floor
   let currentShot: ShotContext | null = null;
   /** Contest level at shot start — kept so the RESULT banner can say why. */
   let shotContest = 0;
@@ -514,7 +515,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
-    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; rStick.reset(); if (pausedDribble) { pausedDribble = false; meDribble.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; meDribble.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
     clearDefense();
     place('me', me.root, MY_SPAWN, Math.PI);
     place('foe', foe.root, FOE_SPAWN, 0);
@@ -668,9 +669,15 @@ export const OneVOneMode: ModeDefinition = (() => {
       SoundKit.unlock();
       localSource.feed(e);
       if (e.t === 'stick' && e.side === 'R') {   // MODE-STICK-FACE: R stick → the director's look orbit — except on the floor with the ball, where it is the DRIBBLE STICK (2K)
+        if (posting && carrying && !shooting && !dunking) {   // POST HOOK (2K20): with the post held the stick is the SHOT stick
+          postStick = { x: e.x, y: e.y };
+          if (!stickShot && e.y < -0.5 && Math.abs(e.x) > 0.3) { stickShot = { side: e.x > 0 ? 'right' : 'left', shimmy: !!meSlot.intent.sprint, started: false, shimmied: false }; shimmyLeft = stickShot.shimmy ? 0.22 : 0; }
+          rStick.reset(); lookX = 0; lookY = 0;
+        } else {
         const onFloor = carrying && possession === 'mine' && !shooting && !dunking && !finish && !gather && !spin;
         if (onFloor) { stickGestures.push(...rStick.feed(e.x, e.y, performance.now() / 1000)); lookX = 0; lookY = 0; }
         else { rStick.reset(); lookX = e.x; lookY = e.y; }
+        }
       }
       if (dunking && e.t === 'button' && e.btn === 'X' && e.pressed) showtimePress = true;   // SHOWTIME: the timed flush
       // BLOCK / contest jump on defense: A leaves the floor. The BODY of it now lives in contestJump(), because the
@@ -1027,7 +1034,19 @@ export const OneVOneMode: ModeDefinition = (() => {
             else if (pick.move === 'momentum_btb') meDribble.momentumBtb(pick.side ?? 'right', sprintOk);
             else if (pick.move === 'hesi') meDribble.hesitate();
             else if (pick.move === 'steezo_roll') {
-              if (pausinWanted({ sprint: sprintOk, dist: distXZ(me.root.position, RIM_FLOOR), speed: meDribble.vel.length(), turbo01: turbo.t01 })) { console.info("[1V1-STICK] PAUSIN' — the spin thrown into the takeoff"); startDunk(ctx, foeDistS < 2.2 && foeLiveS ? 'poster' : 'dunk', PAUSIN_DUNK); continue; }   // PAUSIN' (2K21): the spin dunk
+              if (sprintOk && turbo.t01 >= 0.08 && distXZ(me.root.position, RIM_FLOOR) <= 6.5) {
+                // THE DROP STEP (owner): the sweep with the turbo takes one hard momentum step at the rim first — the body is PULLED
+                // toward the iron — and 0.26 s later, inside range, the spin becomes the takeoff (PAUSIN'); out of range it is the roll
+                const toRimD = RIM_FLOOR.subtract(me.root.position); toRimD.y = 0; toRimD.normalize(); const sideD = pick.side ?? 'right';
+                meDribble.dropStep(toRimD.x, toRimD.z, sprintOk); doMove(ctx, 'momentum_cross', sideD); SoundKit.play('whoosh', { pitch: 1.2, volume: 0.45 });
+                console.info(`[1V1-STICK] drop step toward the rim at ${meDribble.vel.length().toFixed(1)} m/s (${distXZ(me.root.position, RIM_FLOOR).toFixed(1)} m out)`);
+                later(260, () => {
+                  if (!(carrying) || shooting || dunking || spin || finish) return;
+                  if (pausinWanted({ sprint: true, dist: distXZ(me.root.position, RIM_FLOOR), speed: meDribble.vel.length(), turbo01: Math.max(turbo.t01, 0.1) })) { console.info("[1V1-STICK] PAUSIN' — the spin thrown into the takeoff"); startDunk(ctx, distXZ(me.root.position, foe.root.position) < 2.2 && foeStunSec === 0 && !foeFloored ? 'poster' : 'dunk', PAUSIN_DUNK); }
+                  else { meDribble.momentumBtb(sideD, true); later(180, () => { if ((carrying) && !spin && !shooting && !dunking) { spinCooldown = 0; startSpin(ctx, foeStunSec > 0 ? null : foe.root.position, sideD); } }); }
+                });
+                continue;
+              }
               meDribble.momentumBtb(pick.side ?? 'right', sprintOk); const sideS = pick.side ?? undefined; later(180, () => { if (carrying && !spin && !shooting && !dunking) { spinCooldown = 0; startSpin(ctx, foeStunSec > 0 ? null : foe.root.position, sideS); } }); }
             doMove(ctx, pick.move, pick.side ?? undefined);
             SoundKit.play('whoosh', { pitch: pick.move === 'momentum_cross' ? 1.45 : 1.3, volume: 0.4 }); ctx.feel?.impact?.(0.1);
@@ -1160,7 +1179,12 @@ export const OneVOneMode: ModeDefinition = (() => {
         }
 
         // shot start — drive context first: a hot drive DUNKS instead of metering
-        if (!shooting && !dunking && !spin && carrying && meSlot.intent.actionHeld > 0.02) {
+        if (stickShot && !stickShot.started) {   // POST HOOK: the shimmy beat before the hook; a tap let go before the shot is nothing
+          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; meAnimTree.beat('bball_hesi', { fadeSec: 0.05, speedRatio: 1.5 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 }); if (foeStunSec === 0 && !foeFloored && distXZ(me.root.position, foe.root.position) < 2.0 && roll() < 0.45) { foeStunSec = 0.4; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); } }
+          shimmyLeft = Math.max(0, shimmyLeft - dt);
+          if (Math.hypot(postStick.x, postStick.y) < 0.35 && shimmyLeft <= 0) stickShot = null;
+        }
+        if (!shooting && !dunking && !spin && carrying && (meSlot.intent.actionHeld > 0.02 || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0))) {   // POST HOOK (2K20): the stick starts it too
           const defenderPos = foeStunSec > 0 ? null : foe.root.position;
           // A+ P0: the gate measures a 3-D distance and the rim sits 3.05 m up — against RIM itself a floor-bound body can
           // NEVER be inside DUNK_RANGE (2.8 m), so the drive dunk had never fired in play (measured: every squeeze at speed
@@ -1168,7 +1192,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           // HOOPS-MOVE-KIT-B M4/M5: with my back to the basket the squeeze is the POST's own shot — the stick pulled off
           // the rim asks for the FADEAWAY, anything else is the JUMP HOOK. (A sealed body is never fast enough to dunk.)
           const toRimNow = RIM_FLOOR.subtract(me.root.position); toRimNow.y = 0; toRimNow.normalize();
-          const post: PostShot = posting ? (stickBack01(mx, -my, toRimNow) >= POST_FADE_STICK_MIN ? 'fade' : 'hook') : 'none';
+          const post: PostShot = posting ? (stickShot ? 'hook' : stickBack01(mx, -my, toRimNow) >= POST_FADE_STICK_MIN ? 'fade' : 'hook') : 'none';   // POST HOOK: the stick up-side is the hook, always
           // THE DUNK IS THE SPRINT FINISH, AND THE LAYUP IS THE ONE OFF THE GAS — which is what this gate was always
           // meant to say and did not. It was handed `turbo.t01`, the TANK, so "attacking the rim with turbo" was
           // satisfied by anyone who simply had fuel: at DUNK_MIN_TURBO 0.25 a player who has never once pressed sprint
@@ -1200,7 +1224,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             console.info(`[1V1-SHOT] gather ${currentShot.style} rim ${distXZ(me.root.position, RIM_FLOOR).toFixed(2)} speed ${Math.hypot(meDribble.vel.x, meDribble.vel.z).toFixed(1)} contest ${contest.toFixed(2)}`);
             // HOOPS-MOVE-KIT-A: a layup / floater is a FINISH (M3); a jumper GATHERS first (M1) — a set body rises at once.
             // HOOPS-MOVE-KIT-B: the hook (M5) and the fadeaway (M4) are finishes too — their own clip, their own hop.
-            if (currentShot.style === 'layup' || currentShot.style === 'floater' || currentShot.style === 'hook' || currentShot.style === 'fadeaway' || currentShot.style === 'reverse') startFinish(ctx, currentShot.style, contest, defenderPos);
+            if (currentShot.style === 'layup' || currentShot.style === 'floater' || currentShot.style === 'hook' || currentShot.style === 'fadeaway' || currentShot.style === 'reverse') startFinish(ctx, currentShot.style, stickShot?.shimmy ? contest * 0.55 : contest, defenderPos, stickShot?.side); if (stickShot) { stickShot.started = true; console.info(`[1V1-STICK] post hook ${stickShot.side}${stickShot.shimmy ? ' (shimmy)' : ''}`); }
             else startRise(ctx, contest, mx, my);
             aiContestLoad(ctx);   // D1/D3: the AI puts a hand up on the load, or times a block jump to the green
           }
@@ -1210,7 +1234,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           ctx.setHud({ shotMeterT: t });
           // HOOPS-MOVE-KIT-B M8: let go this early and it is a PUMP FAKE, not a 0.35-pct brick — and he can bite it
           if (meSlot.intent.action && isPumpFake(t * shotMeter.durationSec) && !finish) { pumpFake(ctx, defPos); }
-          else if (meSlot.intent.action || t >= 1) releaseJumper(ctx, shotMeter.release());
+          else if (meSlot.intent.action || t >= 1 || (stickShot?.started && Math.hypot(postStick.x, postStick.y) < 0.35)) { stickShot = null; releaseJumper(ctx, shotMeter.release()); }   // POST HOOK: the stick let go = the release
         }
         pumpWindow = Math.max(0, pumpWindow - dt);
 
@@ -1617,7 +1641,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
-    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; rStick.reset(); if (pausedDribble) { pausedDribble = false; meDribble.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; meDribble.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
     clearDefense();
     place('foe', foe.root, CHECK_FOE, Math.PI);
     place('me', me.root, CHECK_ME, 0);

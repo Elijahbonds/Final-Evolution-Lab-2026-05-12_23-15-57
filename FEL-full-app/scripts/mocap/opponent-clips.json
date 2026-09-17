@@ -595,6 +595,36 @@
       "duration": 0.55,
       "mirror": true,
       "note": "the feint mirrored"
+    },
+    {
+      "name": "bball_mc_dribble_walk",
+      "replaces": "bball_dribble_walk",
+      "source": "cmu",
+      "file": "cmu/06/06_01.bvh",
+      "from": 2.7,
+      "to": 3.9,
+      "duration": 1.2,
+      "loop": true,
+      "refineLoop": [
+        0.9,
+        1.3
+      ],
+      "note": "DRIBBLE GEARS (2026-09-17): a walking dribble, ~1.2 leg/s — one bounce per stride (the right hand dips 2.7 → 3.9)"
+    },
+    {
+      "name": "bball_mc_dribble_jog",
+      "replaces": "bball_dribble_jog",
+      "source": "cmu",
+      "file": "cmu/78/78_10.bvh",
+      "from": 0.3,
+      "to": 1.1,
+      "duration": 0.8,
+      "loop": true,
+      "refineLoop": [
+        0.6,
+        0.9
+      ],
+      "note": "DRIBBLE GEARS: a jogging dribble, ~4.5 leg/s, hands low — between the walk and the 78_06 sprint"
     }
   ]
 }

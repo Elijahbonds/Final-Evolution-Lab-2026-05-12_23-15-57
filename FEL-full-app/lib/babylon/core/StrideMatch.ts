@@ -27,6 +27,10 @@ export interface StrideRef {
   run: number;
   /** Authored speed of a defensive shuffle, which is much slower than a run. */
   slide: number;
+  /** DRIBBLE GEARS (2026-09-17): the walking dribble (06_01, ~1.2 leg/s) and the jogging dribble (78_10, ~4.5 leg/s), scaled by the
+   *  same calibration as `run` (3.6 for a 5.9 leg/s capture → 0.61 m/s per leg/s). */
+  walk?: number;
+  jog?: number;
 }
 
 /**
@@ -45,7 +49,7 @@ export interface StrideRef {
  * better than this — but it was disobeying an authoring decision about how the run should look to win a metric.
  * Honouring the alias and calibrating on top of it is the correct trade, and it costs about 1.5 points.
  */
-export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0 };
+export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 2.8 };
 
 /**
  * The same references for the CAPTURED hoops loops (HOOPS MOVEMENT, 2026-09-15) — the hero and the AI both run CMU 78
@@ -53,7 +57,7 @@ export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0 };
  * 0.6 s, where the authored run was keyed for 3.6 m/s. Calibrated with scripts/probes/_footplant-probe.mts (see the
  * sweep in the HOOPS-MOVEMENT commit), `?strideRun=` / `?strideSlide=` override both tables for that sweep.
  */
-export const HOOPS_STRIDE_CAPTURE: StrideRef = { run: 3.6, slide: 2.0 };
+export const HOOPS_STRIDE_CAPTURE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 2.8 };
 
 /** `?strideRun=4.8&strideSlide=2.4` — the calibration sweep's knob. Read once. */
 const STRIDE_OVERRIDE: Partial<StrideRef> = (() => {
@@ -66,7 +70,7 @@ const STRIDE_OVERRIDE: Partial<StrideRef> = (() => {
 })();
 export function strideRef(captured: boolean): StrideRef {
   const base = captured ? HOOPS_STRIDE_CAPTURE : HOOPS_STRIDE;
-  return { run: STRIDE_OVERRIDE.run ?? base.run, slide: STRIDE_OVERRIDE.slide ?? base.slide };
+  return { run: STRIDE_OVERRIDE.run ?? base.run, slide: STRIDE_OVERRIDE.slide ?? base.slide, walk: base.walk, jog: base.jog };
 }
 
 /**
@@ -90,7 +94,7 @@ export function strideRate(speed: number, ref: number): number {
 }
 
 /** Which reference a locomotion state is measured against. */
-export type StrideKind = 'run' | 'slide' | 'none';
+export type StrideKind = 'run' | 'slide' | 'walk' | 'jog' | 'none';
 
 /**
  * Is this state LOCOMOTION, and against which reference?
@@ -100,8 +104,10 @@ export type StrideKind = 'run' | 'slide' | 'none';
  */
 export function strideKindFor(state: string): StrideKind {
   switch (state) {
-    case 'drive': case 'speed_dribble': case 'run': case 'crossover':
+    case 'drive': case 'sprint_dribble': case 'run': case 'crossover':
       return 'run';
+    case 'speed_dribble': return 'jog';        // DRIBBLE GEARS: the jog loop is its own capture now
+    case 'walk_dribble': return 'walk';
     case 'defend_slide': case 'defend_slide_right':
       return 'slide';
     default:
@@ -113,7 +119,7 @@ export function strideKindFor(state: string): StrideKind {
 export function rateFor(state: string, speed: number, ref: StrideRef = HOOPS_STRIDE): number | null {
   const kind = strideKindFor(state);
   if (kind === 'none') return null;
-  return strideRate(speed, kind === 'run' ? ref.run : ref.slide);
+  return strideRate(speed, kind === 'run' ? ref.run : kind === 'slide' ? ref.slide : kind === 'walk' ? (ref.walk ?? ref.run * 0.2) : (ref.jog ?? ref.run * 0.78));
 }
 
 /**

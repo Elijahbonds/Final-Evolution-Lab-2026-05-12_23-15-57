@@ -22,7 +22,7 @@ import { boneNode, findBone } from './boneLookup';
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
 export type BasketballAnimState =
-  | 'idle_dribble' | 'speed_dribble' | 'crossover' | 'crossover_right' | 'protect'
+  | 'idle_dribble' | 'speed_dribble' | 'walk_dribble' | 'sprint_dribble' | 'crossover' | 'crossover_right' | 'protect'   // DRIBBLE GEARS (2026-09-17): walk / jog / sprint loops
   | 'drive' | 'gather' | 'shot_release' | 'layup' | 'dunk'
   | 'contact_stagger' | 'defend_slide' | 'defend_slide_right' | 'defend_idle' | 'box_out'
   | 'defend_backpedal' | 'closeout' | 'defend_slide_hard' | 'defend_slide_hard_right'   // DEFENSE-LOOK (2026-09-17): the retreat, the closeout, the sat-down slide
@@ -72,7 +72,9 @@ export interface AnimChoice { state: BasketballAnimState; clip: string; loop: bo
 
 const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeSec: number }> = {
   idle_dribble:    { clip: 'bball_dribble_idle', loop: true, fadeSec: 0.18 },
-  speed_dribble:   { clip: 'bball_dribble_run', loop: true, fadeSec: 0.14 },
+  speed_dribble:   { clip: 'bball_dribble_jog', loop: true, fadeSec: 0.14 },    // DRIBBLE GEARS: the jog (78_10), paced by the jog reference
+  walk_dribble:    { clip: 'bball_dribble_walk', loop: true, fadeSec: 0.16 },   // the walking dribble (06_01) — a slowed run used to play here
+  sprint_dribble:  { clip: 'bball_dribble_run', loop: true, fadeSec: 0.12 },    // the sprint (78_06), its own pace
   crossover:       { clip: 'bball_crossover_left', loop: false, fadeSec: 0.08 },
   crossover_right: { clip: 'bball_crossover_right', loop: false, fadeSec: 0.08 },
   protect:         { clip: 'bball_defend_stance', loop: true, fadeSec: 0.2 },
@@ -122,7 +124,7 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
         : 'defend_idle';
   } else if (i.crossover) state = i.crossoverDir === 'right' ? 'crossover_right' : 'crossover';
   else if (i.driving && i.hasBall) state = 'drive';
-  else if (i.speed01 > 0.15) state = i.hasBall ? 'speed_dribble' : 'drive';
+  else if (i.speed01 > 0.15) state = i.hasBall ? (i.speed01 < 0.42 ? 'walk_dribble' : i.speed01 > 0.74 ? 'sprint_dribble' : 'speed_dribble') : 'drive';   // DRIBBLE GEARS: the loop follows the gear (walk 1.6 / jog 4.2 / sprint 6.4 m/s of 6.4)
   else if (i.nearestDefender < 1.4 && i.hasBall) state = 'protect';
   else state = i.hasBall ? 'idle_dribble' : 'watch';
   return { state, ...CLIP_FOR[state] };
@@ -183,7 +185,7 @@ export class BasketballAnimTree {
   private static readonly DWELL_SEC = 0.22;
   private static readonly DWELL_GROUPS: ReadonlyArray<ReadonlySet<BasketballAnimState>> = [
     new Set(['defend_idle', 'defend_slide', 'defend_slide_right', 'defend_slide_hard', 'defend_slide_hard_right', 'defend_backpedal', 'closeout', 'box_out']),
-    new Set(['idle_dribble', 'protect', 'speed_dribble', 'drive', 'watch']),
+    new Set(['idle_dribble', 'protect', 'speed_dribble', 'walk_dribble', 'sprint_dribble', 'drive', 'watch']),
   ];
   private sameGroup(a: BasketballAnimState | null, b: BasketballAnimState): boolean {
     return !!a && BasketballAnimTree.DWELL_GROUPS.some((g) => g.has(a) && g.has(b));
