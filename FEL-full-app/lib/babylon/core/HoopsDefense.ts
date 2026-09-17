@@ -81,8 +81,13 @@ export function aiBumpStrips(set: boolean, facingCos: number, rng: () => number)
 /** The player's jump swats a dunker in the air: the jump is fresh (inside the block window), the dunker is inside range and
  *  between the takeoff and the resolve on his flight clock. */
 export function jumpSwats(k: number, jumpAgeSec: number, dist: number): boolean {
-  return k >= SWAT_K_FROM && k <= SWAT_K_TO && jumpAgeSec <= BLOCK_WINDOW_SEC + 0.15 && dist <= AI_BLOCK_RANGE;
+  return k >= SWAT_K_FROM && k <= SWAT_K_TO && jumpAgeSec <= SWAT_JUMP_MAX_SEC && dist <= AI_BLOCK_RANGE;
 }
+/** How old the blocker's jump may be and still swat: the whole rise and the hang, not only the block window's 0.55 s.
+ *  Measured (2026-09-17): a jump timed on the rival's gather tell is 0.31–0.35 s old when his flight STARTS and 0.6 s
+ *  old when the flight reaches the man under the rim — the window closed 0.05 s before the ball got there, in every one
+ *  of ten timed jumps. A 0.75 s jump (JUMP_SEC) is still in the air, hand up, at 0.62. */
+export const SWAT_JUMP_MAX_SEC = 0.62;
 
 /** The make chance under a contest: a hand in the shot costs up to CONTEST_PCT_BITE of it. */
 export function contestedPct(pct: number, contest01: number): number {

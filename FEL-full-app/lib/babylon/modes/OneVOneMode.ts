@@ -1127,6 +1127,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             const contest = contestLevel(me.root.position, defenderPos);
             shotContest = contest;
             currentShot = classifyShot(me.root.position, meDribble.vel, RIM, contest, posting ? post : faceUpRead(defenderPos));
+            console.info(`[1V1-SHOT] gather ${currentShot.style} rim ${distXZ(me.root.position, RIM_FLOOR).toFixed(2)} speed ${Math.hypot(meDribble.vel.x, meDribble.vel.z).toFixed(1)} contest ${contest.toFixed(2)}`);
             // HOOPS-MOVE-KIT-A: a layup / floater is a FINISH (M3); a jumper GATHERS first (M1) — a set body rises at once.
             // HOOPS-MOVE-KIT-B: the hook (M5) and the fadeaway (M4) are finishes too — their own clip, their own hop.
             if (currentShot.style === 'layup' || currentShot.style === 'floater' || currentShot.style === 'hook' || currentShot.style === 'fadeaway' || currentShot.style === 'reverse') startFinish(ctx, currentShot.style, contest, defenderPos);
@@ -2197,7 +2198,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     const made = Math.random() < Math.min(0.98, pct);
     // D1: the AI's block at the release — a hand up (or a jump) inside range; the ball is knocked LOOSE from the hand
     const blockChance = foeStunSec > 0 || foeFloored ? 0 : aiBlockChance(currentShot?.style ?? 'jumper', foeDist, foeUp, foeVelLast.length() < 1.0);
-    console.info(`[1V1-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} handUp ${foeHandUp} jump ${foeBlockJumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)}`);
+    console.info(`[1V1-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} handUp ${foeHandUp} jump ${foeBlockJumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)} rim ${distXZ(me.root.position, RIM_FLOOR).toFixed(2)}`);
     if (blockChance > 0 && roll() < blockChance) { blockedShot(ctx); return; }
     releaseBall(ball);
     // BIOMECH-HOOPS-WAVE1: release → follow-through until the arc resolves. HOOPS-MOVE-KIT-B: a fade / a hook keeps its
@@ -2631,7 +2632,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       face(foe.root, slewYaw(foe.root.rotation.y, yawTo(foe.root.position, RIM), FACE_RIM_RATE, fdt));
       foeDunkFlight = { k, made: resolved ? made && !swatted : null };
       // the SWAT: my fresh jump inside range while he is between the takeoff and the resolve
-      if (!swatted && !resolved && jumpSwats(k, myJumpAge, distXZ(me.root.position, foe.root.position))) {
+      if (!swatted && !resolved && jumpSwats(k, myJumpAge, Math.min(distXZ(me.root.position, foe.root.position), distXZ(me.root.position, ball.getAbsolutePosition())))) {
         swatted = true; made = false;
         const at = ballWorld().clone(); releaseBall(ball);
         const away = foe.root.position.subtract(me.root.position); away.y = 0; away.normalize();

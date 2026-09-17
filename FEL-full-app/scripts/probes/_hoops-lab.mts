@@ -188,7 +188,9 @@ await page.evaluate(`(() => {
     // on ten gathers, ten open dunks at contest 0.00, zero stops. A defender who is beaten to the middle does what a
     // real one does — drops to the rim and meets the flight there. The spot is a metre off the iron on his side.
     const ph = typeof dev.attackPhase === 'function' ? dev.attackPhase() : '';
-    if (MODE === 'threevthree' && ph !== 'check' && ph !== '') {
+    // …and in 3v3 he plays DROP COVERAGE from the start of the possession (2026-09-17): the drive is 0.8 s, and a
+    // defender who only starts dropping when it begins arrives 4–6 m late (measured). Sit at the spot, let it come.
+    if (MODE === 'threevthree' && ph !== '') {
       const rl = Math.hypot(him.x - 0, him.z + 0.6) || 1;
       window.__steer(0 + ((him.x - 0) / rl) * 1.0, -0.6 + ((him.z + 0.6) / rl) * 1.0, 130);
       return;
@@ -431,7 +433,7 @@ const out = {
   plantedMs: def?.plantedMs ?? 0, closestWhilePlanted: +(def?.closestWhilePlanted ?? 99).toFixed(2),
   finalScore: [final.score ?? null, final.foeScore ?? null], target: final.target ?? null,
   rows, log: log.slice(-200),
-  defLog: log.filter((l) => /-DEF\]|-DUNK\]|-REF\]/.test(l)).map((l) => l.replace(/^\d+ /, '')),   // suite pass: the release diagnostics, unsliced
+  defLog: log.filter((l) => /-DEF\]|-DUNK\]|-REF\]|-SHOT\]|-MOVE\]/.test(l)).map((l) => l.replace(/^\d+ /, '')),   // suite pass: the release diagnostics, unsliced
 };
 fs.writeFileSync(`${OUT}/hoops-lab-${TAG}.json`, JSON.stringify(out, null, 1));
 console.log(`\n${MODE} charge ${CHARGE} · offence ${made}/${off.length}${out.makePct !== null ? ` (${out.makePct}%)` : ''} · ${byPlay.map((b) => `${b.play} ${b.made}/${b.n}`).join(' · ')}`);

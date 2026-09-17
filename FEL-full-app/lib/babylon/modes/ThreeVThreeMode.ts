@@ -166,6 +166,8 @@ interface Body {
   vel: Vector3;
   /** D1: an AI defender's contest jump clock (Infinity on the floor) — kinematic, the body has no Havok capsule here. */
   jumpAge: number;
+  /** 2026-09-17: an AI defender's reach is a commitment — this long before he can reach again. */
+  reachCooldown: number;
   /** O1–O3: the AI brain (its job / screen / box-out readouts); null for the hero. */
   brain: TeammateBrain | DefenderBrain | null;
   /** O1: the screen clip is held on this body. */
@@ -318,6 +320,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   const JUMP_SEC = 0.75, JUMP_APEX = 0.46;
   const DRIVE_MPS = 5.4;            // the rival's sprint drive (suite pass): the clock is distance / this. Past HoopsDunks' WINDUP_SPEED (5.0) on a full-length drive, so the vocabulary opens; a short drive stays a power dunk
   const TEAM_JERSEY = { mine: '#22d3ee', theirs: '#ff2d78' } as const;   // the slot colours the HUD already speaks (cyan = us, pink = them)
+  const AI_REACH_COOLDOWN_SEC = 1.2, AI_STEAL_CHANCE = 0.22, AI_STEAL_ON_BUMP = 0.6, AI_REACH_GATE = 0.5;   // measured at 0.6 s: ten reaches and four reach-in fouls in nine possessions — a foul every other trip   // the AI defender's reach: its cadence and its odds (open / on the bump)
   const DUNK_SHARE = 0.55;          // of the OPEN lanes, the share the rival throws down (the rest are layups); nerve tilts it
   const GATHER_TELL_SEC = 0.35;     // the last stretch of the drive reads as the GATHER — the block's window, on the seam and the hint
   // ── the OFF-BALL package (O1–O3) ──
@@ -499,7 +502,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // BIOMECH-HOOPS-WAVE1: one animation owner per rig, and the Posture Poses layer (mounted here, BEFORE the carries —
         // the dribble arm solves against the posed shoulders); the layer owns the eyes
         char.secondary?.setLookTarget(() => null);
-        const body: Body = { char, slot, drib: new DribbleController(), stunSec: 0, vel: new Vector3(), jumpAge: Infinity, brain, screenHeld: false, tree: new BasketballAnimTree(char.animator), posture: null, bio: { ...HOOPS_INPUT_IDLE }, floored: false, shotWin: 'none', shotSec: 0, landSec: 0, celebrateSec: 0, speed01: 0, motion: new BodyMotion() };
+        const body: Body = { char, slot, drib: new DribbleController(), stunSec: 0, vel: new Vector3(), jumpAge: Infinity, reachCooldown: 0, brain, screenHeld: false, tree: new BasketballAnimTree(char.animator), posture: null, bio: { ...HOOPS_INPUT_IDLE }, floored: false, shotWin: 'none', shotSec: 0, landSec: 0, celebrateSec: 0, speed01: 0, motion: new BodyMotion() };
         body.posture = mountPostureLayer(ctx.scene, char.skeleton, char.root, () => feedFor(body), `3V3-PP-${ai ? aiKind : 'me'}`);
         return body;
       };
@@ -618,6 +621,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       net?.tick(me.slot.intent);   // no-op without ?net=
       for (const b of everyBody()) { b.slot.poll(dt); b.stunSec = Math.max(0, b.stunSec - dt); if (b.jumpAge !== Infinity) { b.jumpAge += dt; b.char.root.position.y = jumpY(b.jumpAge); if (b.jumpAge >= JUMP_SEC) { b.jumpAge = Infinity; b.char.root.position.y = 0; } } }
       if (myJumpAge !== Infinity) myJumpAge += dt;
+      for (const f of foes) f.reachCooldown = Math.max(0, f.reachCooldown - dt);
       // D1–D3 clocks
       bumpAge += dt; meStunSec = Math.max(0, meStunSec - dt);
       if (meFloored && meStunSec === 0) { meFloored = false; me.tree.beat('karate_get_up'); }
@@ -1321,6 +1325,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           const contest = contestLevel(me.char.root.position, nearestFoePos);
           shotContest = contest;
           currentShot = classifyShot(me.char.root.position, me.drib.vel, RIM, contest, posting ? post : faceUpRead(nearestFoePos));
+          console.info(`[3V3-SHOT] gather ${currentShot.style} rim ${distXZ(me.char.root.position, RIM_FLOOR).toFixed(2)} speed ${Math.hypot(me.drib.vel.x, me.drib.vel.z).toFixed(1)} contest ${contest.toFixed(2)}`);
           // HOOPS-MOVE-KIT-A: a layup / floater is a FINISH (M3); a jumper GATHERS first (M1) — a set body rises at once.
           // HOOPS-MOVE-KIT-B: the hook (M5) and the fadeaway (M4) are finishes too — their own clip, their own hop.
           if (currentShot.style === 'layup' || currentShot.style === 'floater' || currentShot.style === 'hook' || currentShot.style === 'fadeaway' || currentShot.style === 'reverse') startFinish(ctx, currentShot.style, contest, nearestFoePos);
@@ -1349,8 +1354,27 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           // HOOPS-MOVE-KIT-B: a SEALED post man cannot be poked from behind (the body is between him and the ball) — front
           // him and the poke is live again
           const sealed = carrier === me && posting && facingCos(me.char.root.rotation.y, me.char.root.position, f.char.root.position) < 0.2;
-          if (f.stunSec === 0 && f.slot.intent.steal && !finish && !gather && !dunking && !sealed && Vector3.Distance(f.char.root.position, carrier.char.root.position) < 1.6) {
-            stripBall(ctx, f, 'STOLEN!');   // D2: the ball goes LOOSE from the hand (it used to warp to the rival's possession)
+          // THE AI REACH IS A READ WITH A COST (2026-09-17). It was a guaranteed strip: the brain rolls `steal` about once a
+          // second inside 1.1 m, and every roll inside 1.6 m took the ball — ten STOLEN! in six of my drives (measured), no
+          // exposure read, no cooldown, no foul risk, while my own reach on their drive has all three. Now theirs is mine
+          // mirrored: a reach every AI_REACH_COOLDOWN_SEC at most, it takes the ball on a roll (more on the bump, when the
+          // ball is out of the hand), a miss stuns the reacher, and a reach through a moving body is the reach-in foul.
+          if (f.stunSec === 0 && f.reachCooldown === 0 && f.slot.intent.steal && roll() < AI_REACH_GATE && !finish && !gather && !dunking && !sealed && distXZ(f.char.root.position, carrier.char.root.position) < 1.6) {
+            f.reachCooldown = AI_REACH_COOLDOWN_SEC;
+            f.tree.beat('bball_steal_reach');
+            const carrierSpeed = carrier === me ? me.drib.vel.length() : carrier.vel.length();
+            const exposed = carrier === me && bumpAge <= BUMP_STRIP_WINDOW_SEC;
+            if (roll() < (exposed ? AI_STEAL_ON_BUMP : AI_STEAL_CHANCE)) { stripBall(ctx, f, 'STOLEN!'); break; }   // D2: the ball goes LOOSE from the hand
+            f.stunSec = 0.35;
+            const onHim = distXZ(f.char.root.position, carrier.char.root.position) <= BODY_STANDOFF + 0.25;
+            if (onHim && carrierSpeed >= REACH_FOUL_SPEED) {
+              const call = judge('reach_in', { offense: 'me', fouled: 'me' });
+              if (call.whistle) SoundKit.play('whistle');
+              ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
+              setTimeout(() => ctx.setHud({ banner: '' }), 900);
+              console.info(`[3V3-REF] ${call.id} (their reach on ${carrier === me ? 'me' : 'my mate'}) → ${call.ball}`);
+              later(700, () => (call.ball === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
+            } else console.info('[3V3-DEF] their reach misses');
             break;
           }
         }
@@ -1460,7 +1484,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     arcMade = Math.random() < Math.min(0.98, pct);
     // D1: the AI's block at the release (a hand up or a jump inside range) — the ball knocked LOOSE from my hand
     const blockChance = near ? aiBlockChance(currentShot?.style ?? 'jumper', nearDist, nearUp, near.vel.length() < 1.0) : 0;
-    console.info(`[3V3-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} handUp ${foeHandUp === near && !!near} jump ${!!near && near.jumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)}`);
+    console.info(`[3V3-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} handUp ${foeHandUp === near && !!near} jump ${!!near && near.jumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)} rim ${distXZ(me.char.root.position, RIM_FLOOR).toFixed(2)} q ${quality} mod ${pctMod.toFixed(2)} pct ${pct.toFixed(2)} made ${arcMade}`);
     if (blockChance > 0 && roll() < blockChance) { blockedShot(ctx, near!); return; }
     releaseBall(ball);
     gather = null;   // HOOPS-MOVE-KIT-A M1: a release inside the gather is a rushed shot
@@ -2305,7 +2329,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         shooter.char.root.position.y = driveDunkY(k);
         shooter.char.root.rotation.y = slewYaw(shooter.char.root.rotation.y, yawTo(shooter.char.root.position, RIM), FACE_RIM_RATE, fdt);
         foeDunkFlight = { k, made: resolved ? made && !swatted : null };
-        if (!swatted && !resolved && jumpSwats(k, myJumpAge, distXZ(me.char.root.position, shooter.char.root.position))) {
+        if (!swatted && !resolved && jumpSwats(k, myJumpAge, Math.min(distXZ(me.char.root.position, shooter.char.root.position), distXZ(me.char.root.position, ball.getAbsolutePosition())))) {
           swatted = true; made = false;
           const at = ball.getAbsolutePosition().clone(); releaseBall(ball);
           const away = shooter.char.root.position.subtract(me.char.root.position); away.y = 0; away.normalize();
@@ -2459,6 +2483,28 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const intent = driveIntent({ defenderSet: meSet || takingCharge, aggression: nerve(foeStanding()).aggression, roll });
     let drivePlanted = takingCharge;   // was he SET when the driver committed? that is what the call turns on
     let contactDone = false;
+    // THE OTHER TEAM FEELS THE SCORE NOW, and the two halves of Nerve go on two different mechanisms
+    // because that is the only way the invariant survives contact with a game (see core/Nerve.ts).
+    //   aggression -> the lane they will take it up in. Down and late they attack the rim on a lane they
+    //                 would normally pass up; protecting a lead they wait for a clean one.
+    //   mistake    -> the jumper they settle for instead goes in less often.
+    const foeNrv = nerve(foeStanding());
+    // THE FINISH MIX (suite pass, 2026-09-16). An open lane was ALWAYS a dunk — ten drives, ten slams (measured) — and a
+    // rival who only ever dunks is a highlight reel, not a basketball player. Open: a dunk or a layup, on a roll the
+    // showtime nerve tilts; contested at the rim: a layup; further out: the jumper.
+    const decideFinish = (): 'dunk' | 'layup' | 'jumper' => {
+      const nearestAlly = Math.min(...allyPositions().map((p) => distXZ(p, shooter.char.root.position)));
+      const lane = 1.6 / Math.max(0.6, foeNrv.aggression);        // pressing takes it up in traffic
+      const openLane = nearestAlly > lane || (nearestAlly > lane * 0.69 && roll() < 0.5);
+      if (openLane && roll() < DUNK_SHARE * Math.max(0.6, foeNrv.aggression)) return 'dunk';
+      const atRim = distXZ(shooter.char.root.position, RIM_FLOOR) < 2.4;
+      return openLane || atRim ? 'layup' : 'jumper';
+    };
+    // THE TELL (2026-09-17). The finish used to be decided and its clip started AT the release, so the man guarding
+    // him had nothing to read — the seam said 'gather' for the lab, the screen showed a dribble run to the end. Now the
+    // finish is decided GATHER_TELL_SEC before the release and its wind-up plays from there: the dunk's charge gather,
+    // the layup's gather stride, the jumper's rise. That is the block's window, and now you can see it.
+    let tellPlan: 'dunk' | 'layup' | 'jumper' | null = null;
     // THE DRIVE TAKES AS LONG AS THE DISTANCE (suite pass, 2026-09-16). It was a fixed 1100 ms whatever the start —
     // 6 m in 1.1 s is a 5.5 m/s teleport nobody can drop back on, 2 m in 1.1 s a jog — so the defender's read was
     // decided by where the rival happened to catch it. A sprint drive is DRIVE_MPS, and the clock is the distance.
@@ -2470,6 +2516,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (driveStolen || possessionToken !== tok) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); return; }   // D2: the poke took it / the possession moved on
         const k = Math.min(1, (performance.now() - t0) / (driveSec * 1000));
         driveK = k;
+        if (!tellPlan && k >= 1 - GATHER_TELL_SEC / driveSec) {
+          tellPlan = decideFinish();
+          const side: 'right' | 'left' = shooter.char.root.position.x < RIM.x ? 'left' : 'right';
+          shooter.tree.beat(tellPlan === 'dunk' ? 'dunk_charge_gather' : tellPlan === 'layup' ? FINISH_CLIP.layup[side] : 'jumpshot', { fadeSec: 0.08, holdEnd: tellPlan !== 'jumper' });
+          console.info(`[3V3-DEF] rival gather ${tellPlan} at k ${k.toFixed(2)} (${(driveSec * (1 - k)).toFixed(2)} s to the release)`);
+        }
         // drive AT the rim, not 5m short of it (was x*0.6, z to RIM.z+2.2 —
         // the same short drive 1v1 shipped; a drive that never arrives makes
         // your positioning irrelevant and the block dance unreachable)
@@ -2524,26 +2576,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       later(750, () => resetPossession(true));
       return;
     }
-    // THE OTHER TEAM FEELS THE SCORE NOW, and the two halves of Nerve go on two different mechanisms
-    // because that is the only way the invariant survives contact with a game (see core/Nerve.ts).
-    //
-    //   aggression -> the lane they will take it up in. Down and late they attack the rim on a lane they
-    //                 would normally pass up; protecting a lead they wait for a clean one.
-    //   mistake    -> the jumper they settle for instead goes in less often.
-    //
-    // Together: chasing the game they go at the rim more and shoot worse, which is what chasing looks like.
-    const foeNrv = nerve(foeStanding());
-    // D1: an OPEN lane at the rim is a DUNK — a real flight I can swat
-    const nearestAlly = Math.min(...allyPositions().map((p) => distXZ(p, shooter.char.root.position)));
-    const lane = 1.6 / Math.max(0.6, foeNrv.aggression);        // pressing takes it up in traffic
-    // THE FINISH MIX (suite pass, 2026-09-16). An open lane was ALWAYS a dunk — ten drives, ten slams (measured) — and a
-    // rival who only ever dunks is a highlight reel, not a basketball player. Open: a dunk or a layup, on a roll the
-    // showtime nerve tilts; contested at the rim: a layup; further out: the jumper. The layup is a real finish — it
-    // rides the same block check and arc as the jumper, with the layup's style and clip — and the AI's swat book knows it.
-    const openLane = nearestAlly > lane || (nearestAlly > lane * 0.69 && roll() < 0.5);
-    if (openLane && roll() < DUNK_SHARE * Math.max(0.6, foeNrv.aggression)) { await driverDunk(ctx, shooter); return; }
-    const atRim = distXZ(shooter.char.root.position, RIM_FLOOR) < 2.4;
-    const finishStyle: 'layup' | 'jumper' = openLane || atRim ? 'layup' : 'jumper';
+    const plan = tellPlan ?? decideFinish();   // a drive too short for a tell decides here
+    if (plan === 'dunk') { await driverDunk(ctx, shooter); return; }
+    const finishStyle: 'layup' | 'jumper' = plan;
     // THE BLOCK — a timed jump in range at this exact release moment
     if (checkBlock(me.char.root.position, shooter.char.root.position, myJumpAge)) {
       foeShotBlocked = true;
@@ -2572,9 +2607,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     releaseBall(ball);                                          // the shot leaves the hand
     // BIOMECH-HOOPS-WAVE1: the rival's jumper flows into the held follow-through (G5) and the ball FLIES (G6)
     if (finishStyle === 'layup') {
-      const side: 'right' | 'left' = shooter.char.root.position.x < RIM.x ? 'left' : 'right';   // the hand away from the middle
-      shooter.tree.beat(FINISH_CLIP.layup[side], { fadeSec: 0.08, holdEnd: true });
-    } else shooter.tree.beat('jumpshot', { onSettle: () => shooter.tree.beat('bball_follow_through', { fadeSec: 0.1 }) });
+      if (!tellPlan) { const side: 'right' | 'left' = shooter.char.root.position.x < RIM.x ? 'left' : 'right'; shooter.tree.beat(FINISH_CLIP.layup[side], { fadeSec: 0.08, holdEnd: true }); }   // the tell already started it
+    } else if (tellPlan) shooter.tree.beat('bball_follow_through', { fadeSec: 0.1 });   // the rise played from the tell; this is the release
+    else shooter.tree.beat('jumpshot', { onSettle: () => shooter.tree.beat('bball_follow_through', { fadeSec: 0.1 }) });
     shooter.shotWin = 'release'; shooter.shotSec = 0;
     // the contest my team put on him decides how he misses: a hand in his face is short off the front
     mateMiss = {

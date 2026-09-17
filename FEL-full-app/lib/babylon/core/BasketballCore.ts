@@ -212,7 +212,11 @@ export function checkAnkleBreak(crossover: boolean, handler: Vector3, defender: 
 }
 
 // ── Shooting ─────────────────────────────────────────────────────────────
-export type ShotQuality = 'perfect' | 'good' | 'early' | 'late' | 'brick';
+/** `held` (2026-09-17): a FINISH whose button was still down at the clip's release frame — the layup goes up anyway, and
+ *  it is not a mistimed jumper. It graded 'late' (0.30), so the most natural layup input in the game — press, hold, let
+ *  the body lay it in — was the most punished: six held layups, six misses, in both court modes. A held finish is a
+ *  no-timing finish: below a timed 'good', well above a mistime. */
+export type ShotQuality = 'perfect' | 'good' | 'early' | 'late' | 'brick' | 'held';
 export type ShotStyle = 'layup' | 'floater' | 'jumper' | 'fadeaway' | 'hook' | 'reverse' | 'mikan' | 'upAndUnder' | 'fingerRoll';   // M5 the jump hook, M11 the reverse layup, 2026-09-16 the Mikan and the up-and-under
 
 /**
@@ -392,12 +396,16 @@ export class ShotMeter {
     // 0 for 4 on layups that all peaked at 0.99–1.00, every one of them a LAYUP — LEFT/RIGHT that reached the iron.
     // A late layup is a bad shot, not an impossible one; 'late' is 0.3, and the 1.18 layup modifier carries it to
     // about a third. The demanding shots keep the brick, because standing up out of a fadeaway IS a thrown-away ball.
-    if (this.t >= 1) return this.style === 'jumper' || this.style === 'fadeaway' ? 'brick' : 'late';
-    return 'late';
+    // A FINISH past its green is UNTIMED, not mistimed: the layup goes up off the gather stride whether the button came
+    // up a beat late or never came up at all, and 'late' (0.30) for a beat late while a hold-through scored 'held'
+    // (0.62) made letting go the worse input. A jumper past its green is still a late jumper, and at the end a brick.
+    const finish = this.style !== 'jumper' && this.style !== 'fadeaway';
+    if (finish) return 'held';
+    return this.t >= 1 ? 'brick' : 'late';
   }
 }
 export const SHOT_QUALITY_PCT: Record<ShotQuality, number> = {
-  perfect: 0.97, good: 0.8, early: 0.35, late: 0.3, brick: 0.04,
+  perfect: 0.97, good: 0.8, early: 0.35, late: 0.3, brick: 0.04, held: 0.62,
 };
 
 // ── AI: defender ─────────────────────────────────────────────────────────
