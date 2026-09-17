@@ -98,7 +98,7 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package 
 import { HAND_UP_SEC, handUpContest, distXZ, rivalShotPct, proximityContest01, LAYUP_RANGE } from '../core/BasketballCore';
 import { boardWinner, BOX_OUT_RANGE, jobObjective, type BoardBody } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O1–O3
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';                               // the miss meets the iron it earned
-import { judge, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
+import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
   moveClip, ANKLE_STUMBLE_CLIP,
@@ -226,6 +226,9 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   // ── BIOMECH-HOOPS-WAVE1 ──
   let driver: Body | null = null;                // the rival driving on their possession (its tree carries the ball, it faces the rim, the AI drive skips it)
   let driveK = 0;                                // the rival drive's clock 0..1 (the block window is its end)
+  let paintSec = 0, paintWarned = false;          // the three-second clock, and whether the ref has warned yet
+  let goaltendCalled = false;                    // one call per shot
+  let prevBallY = 0;                             // for the ball's vertical rate (goaltending reads it falling)
   let chargeLastGap = -1;                        // last frame's gap to the driver, for the closing RATE
   let oobSec = 0;                                // how long the carrier has been ON the line, still pushing at it
   let takingCharge = false;                      // Circle held on defence — planted, waiting to wear it
@@ -237,6 +240,8 @@ const COURT_HALF_WIDTH = 8, COURT_DEPTH = 15;
 const OOB_EPSILON = 0.08, OOB_GRACE_SEC = 0.35;
 /** A reach that ARRIVES on the handler at this speed is a foul; slower than this it is a whiff at thin air. */
 const REACH_FOUL_SPEED = 1.6;
+/** The paint, measured from the rim's floor point — the same radius 1v1 uses. */
+const PAINT_RADIUS = 3.6;
 /** How far into the drive contact starts counting — before this the bodies are just where the reset left them. */
 const CONTACT_MIN_K = 0.18;
 const CHARGE_SET_SEC = 0.18;
@@ -398,6 +403,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   }
   function resetPossession(toMe = true): void {
     possessionToken++;
+    goaltendCalled = false; paintSec = 0; paintWarned = false;   // one goaltend per shot, and the paint clock is per possession
     // every body is about to be teleported; a reset is not an acceleration
     for (const b of everyBody()) b.motion.reset();
     me.char.root.position.set(0, 0, 6);
@@ -672,6 +678,56 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       else if (dunkFlush) { dunkFlush.since += dt; if (flushThroughRim(ball, RIM, dunkFlush.releasePos, dunkFlush.since)) { ballSim.launch(ball.position.clone(), new Vector3(0, -0.5, 0.6)); dunkFlush = null; } }
       else if (!ball.parent && !arc.active && !passFlight.active && !dunking) ballSim.step(dt);
       if (board && !arc.active && !mateArc.active) liveBoard(ctx, dt);
+      // THREE SECONDS. Without it the strongest play in a half-court game is to stand under the ring and wait,
+      // which is exactly why the rule exists — and 3v3, with two team-mates to pass you the ball while you camp,
+      // wanted it more than 1v1 did. The clock resets the instant you leave: cutting through is free, camping is
+      // what gets called.
+      if (carrierId === 'me' && !dunking && !ended) {
+        paintSec = paintClock(paintSec, distXZ(me.char.root.position, RIM_FLOOR) < PAINT_RADIUS, dt);
+        if (paintSec === 0) paintWarned = false;
+        if (paintSec >= THREE_SECOND_LIMIT) {
+          paintSec = 0;
+          const call = judge('three_seconds', { offense: 'me' });
+          console.info(`[3V3-REF] ${call.id} → ${call.ball}`);
+          if (call.whistle) SoundKit.play('whistle');
+          swing('turnover');
+          ctx.setHud({ momentum, banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
+          setTimeout(() => ctx.setHud({ banner: '' }), 1000);
+          later(900, () => (call.ball === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
+        } else if (paintSec > THREE_SECOND_LIMIT - 1) {
+          ctx.setHud({ hint: 'GET OUT OF THE PAINT' });   // the ref warns before he calls it
+          if (process.env.NODE_ENV === 'development' && !paintWarned) {
+            paintWarned = true;
+            console.info(`[3V3-REF] paint clock ${paintSec.toFixed(2)}s — warning`);
+          }
+        }
+      } else { paintSec = 0; paintWarned = false; }
+      // GOALTENDING (2026-09-16). 1v1 has had this since the ref existed and 3v3 never did, so the one defensive
+      // play that should be punished — jumping late and swatting the ball on its way DOWN into the ring — was the
+      // best thing you could do here. Same read as 1v1's: their shot in the air, me off the floor near the rim,
+      // ball above the ring and falling.
+      const ballVelYNow = dt > 1e-5 ? (ball.position.y - prevBallY) / dt : 0;
+      prevBallY = ball.position.y;
+      // …and it is THEIR shot specifically. `arc` is MY shot and `mateArc` carries both a team-mate's and the
+      // rival's, so `arc.active || carrierId !== 'me'` would have let me goaltend my own attempt — and awarded
+      // the other team two for it. Their possession, their arc.
+      if (mateArc.active && carrierId === 'foeTeam' && myJumpAge !== Infinity && !goaltendCalled
+          && distXZ(me.char.root.position, RIM_FLOOR) < 1.5
+          && isGoaltending(ballVelYNow, ball.position.y, RIM.y)) {
+        goaltendCalled = true;
+        const call = judge('goaltending', { offense: 'foe', shooter: 'foe' });
+        console.info(`[3V3-REF] ${call.id} (ball y ${ball.position.y.toFixed(2)} falling ${ballVelYNow.toFixed(1)}) → ${call.ball}`);
+        if (call.whistle) SoundKit.play('whistle');
+        mateArc.active = false;
+        foeScore += 2;   // the basket counts, which is the whole point of the call
+        ctx.setHud({ foeScore, banner: call.banner });
+        setTimeout(() => ctx.setHud({ banner: '' }), 900);
+        // 3v3 has no checkGameOver helper — it inlines the target check everywhere, so this matches that idiom
+        later(900, () => {
+          if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('LOSS', myScore, { foeScore, assists }); return; }
+          resetPossession(true);
+        });
+      }
       if (arc.active) {
         const res = arc.step(dt, ball.position);
         if (res === 'made') {
@@ -2343,6 +2399,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   async function opponentPossession(ctx: ModeContext): Promise<void> {
     if (ended) return;
     possessionToken++;
+    goaltendCalled = false;   // …and again for theirs: the latch is per SHOT, not per game
     carrierId = 'foeTeam';
     myJumpAge = Infinity; foeShotBlocked = false;
     ctx.setHud({ hint: 'DEFEND — stay tight · time a jump (A) at the release to BLOCK' });
