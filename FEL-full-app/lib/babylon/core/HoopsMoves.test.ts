@@ -416,10 +416,14 @@ describe('M8 — the pump fake and the step-through', () => {
     expect(isPumpFake(PUMP_MAX_SEC + 0.01)).toBe(false);
     expect(PUMP_MAX_SEC).toBeLessThan(0.35);   // well before any green: nothing shootable is lost
   });
-  it('the step goes PAST the shoulder he is NOT on, and ends in a layup on that hand', () => {
+  it('the step goes PAST the shoulder he is NOT on, and ends in an UP AND UNDER on that hand', () => {
     const onMyRight = planStepThrough(V(0, 3), RIM, PI, V(-0.7, 3));   // body-right at yaw π is −x
     expect(onMyRight.kind).toBe('stepthrough');
-    expect(onMyRight.then).toBe('layup');
+    // …an UP AND UNDER, not a layup (2026-09-16). This is the move the mode runs when he BIT a pump fake, which is
+    // physically the up-and-under: you sold the shot, he left the floor, you stepped through under the raised arm.
+    // It resolved to a plain layup, so the finish that goes under a man in the air played the clip for a man
+    // running at an empty rim.
+    expect(onMyRight.then).toBe('upAndUnder');
     expect(onMyRight.side).toBe('left');
     const w = walk(onMyRight);
     expect(w.travel).toBeGreaterThan(0.5); expect(w.travel).toBeLessThan(0.85);   // one step, not a drive

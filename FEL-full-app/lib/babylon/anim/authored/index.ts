@@ -20,7 +20,7 @@ import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdo
 import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge, buildCombatRoll, buildCombatJump } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
-  buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildMikan, buildUpAndUnder, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
+  buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildMikan, buildUpAndUnder, buildFingerRoll, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,   // HOOPS-MOVE-KIT-A
   buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // HOOPS-MOVE-KIT-B wave 2: the footwork (M8–M14)
@@ -158,6 +158,10 @@ export function registerAuthoredClips(
     ['bball_mikan_left', () => buildMikan(scene, skeleton, 'left')],
     ['bball_up_and_under', () => buildUpAndUnder(scene, skeleton)],
     ['bball_up_and_under_left', () => buildUpAndUnder(scene, skeleton, 'left')],
+    ['bball_finger_roll', () => buildFingerRoll(scene, skeleton)],
+    ['bball_finger_roll_left', () => buildFingerRoll(scene, skeleton, 'left')],
+    ['bball_floater_left', () => buildFloater(scene, skeleton, 'left')],           // the runner going the other way
+    ['bball_euro_step_left', () => buildEuroStep(scene, skeleton, 'left')],        // a euro that sells LEFT
     ['bball_defend_slide_left', () => buildDefendSlide(scene, skeleton, 'left')],
     ['bball_defend_slide_right', () => buildDefendSlide(scene, skeleton, 'right')],
     ['bball_block_reach', () => buildBlockReach(scene, skeleton)],

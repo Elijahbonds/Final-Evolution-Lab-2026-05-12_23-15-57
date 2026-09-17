@@ -12,7 +12,7 @@ import {
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,
   buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // wave 2: the footwork (M8–M14)
-  buildMikan, buildUpAndUnder,   // 2026-09-16: the layup vocabulary
+  buildMikan, buildUpAndUnder, buildFingerRoll,   // 2026-09-16: the layup vocabulary
 } from './basketball';
 
 let scene: Scene; let sk: Skeleton;
@@ -339,6 +339,47 @@ describe('basketball packages on the forge rig', () => {
     expect(pos('Hips').y).toBeLessThan(hipUp - 0.1);                             // under the arm that just went up
     at(g, 0.46);
     expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);                   // the finish, extended
+  });
+
+  it('the FINGER ROLL reaches: the arm goes STRAIGHT and the ball ends up in FRONT of the head, not beside it', () => {
+    rest(); const g = buildFingerRoll(scene, sk)!;
+    at(g, 0.38);                                                                 // the release key
+    const hand = pos('RightHand'), head = pos('Head'), shoulder = pos('RightArm'), elbow = pos('RightForeArm');
+    expect(hand.y).toBeGreaterThan(head.y + 0.15);                               // high
+    // straight arm: shoulder→hand is nearly the sum of its two segments (a folded layup arm is much shorter)
+    const span = Vector3.Distance(shoulder, hand);
+    const segs = Vector3.Distance(shoulder, elbow) + Vector3.Distance(elbow, hand);
+    expect(span).toBeGreaterThan(segs * 0.9);
+  });
+
+  it('…and that is what tells it apart from a LAYUP, which folds the arm and keeps the ball close', () => {
+    rest(); const roll = buildFingerRoll(scene, sk)!;
+    at(roll, 0.38);
+    const rollReach = Vector3.Distance(pos('RightArm'), pos('RightHand'));
+    rest(); const lay = buildLayupGather(scene, sk)!;
+    at(lay, 0.3);
+    const layReach = Vector3.Distance(pos('RightArm'), pos('RightHand'));
+    expect(rollReach).toBeGreaterThan(layReach);                                 // the reach IS the shot
+  });
+
+  it('the FLOATER has a left hand now — it used to push the ball up with the right one going either way', () => {
+    rest(); const r = buildFloater(scene, sk, 'right')!;
+    at(r, 0.35);
+    const rx = pos('RightHand').x, rUp = pos('RightHand').y;
+    rest(); const l = buildFloater(scene, sk, 'left')!;
+    at(l, 0.35);
+    expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y);                    // the LEFT hand is the one pushing it
+    expect(pos('LeftHand').x).toBeLessThan(0);                                   // …on the left side of the body
+    expect(rUp).toBeGreaterThan(pos('Head').y); expect(rx).toBeGreaterThan(0);   // and the right-handed one is unchanged
+  });
+
+  it('the EURO sells to the side it is asked to — the left variant plants the other leg first', () => {
+    rest(); const r = buildEuroStep(scene, sk, 'right')!;
+    at(r, 0.22);
+    expect(pos('RightHand').x).toBeGreaterThan(0.3);                             // sell RIGHT: the ball swung over that hip
+    rest(); const l = buildEuroStep(scene, sk, 'left')!;
+    at(l, 0.22);
+    expect(pos('LeftHand').x).toBeLessThan(-0.3);                                // sell LEFT: mirrored
   });
 
   it('M14 the EURO steps to ONE side then crosses to the OTHER, with the ball going with it', () => {

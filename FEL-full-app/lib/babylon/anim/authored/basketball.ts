@@ -9,7 +9,7 @@
 // by basketball.test.ts on the shipped hero and the candidate body.
 // Yaw convention (measured 2026-09-03): +yaw turns the RIGHT shoulder FORWARD (+z).
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
-import { buildPoseClip, type Deg3 } from '../poseClip';
+import { buildPoseClip, type Deg3, type PoseKey } from '../poseClip';
 
 export const BASKETBALL_CLIPS = [
   'bball_dribble_idle', 'bball_crossover_left', 'bball_crossover_right', 'bball_hesi',
@@ -26,6 +26,7 @@ export const BASKETBALL_CLIPS = [
   // M13 the hop step, M14 the euro
   'bball_pump_fake', 'bball_step_through', 'bball_pivot', 'bball_layup_reverse', 'bball_layup_reverse_left',
   'bball_mikan', 'bball_mikan_left', 'bball_up_and_under', 'bball_up_and_under_left',
+  'bball_finger_roll', 'bball_finger_roll_left', 'bball_floater_left', 'bball_euro_step_left',
   'bball_hop_step', 'bball_euro_step',
 ] as const;
 type V3 = [number, number, number];
@@ -103,14 +104,19 @@ export function buildPullupGather(scene: Scene, sk: Skeleton): AnimationGroup | 
 /** The FLOATER (HOOPS-MOVE-KIT-A M3): a runner off the stride — the knee comes up, the ball to the chest, then a one-hand
  *  push from the forehead, the arm high and in front, the off hand at the chest; the legs come down under the body. The
  *  release is the 0.35 s key (the top of the hop); the modes pace it to the meter and hold the 0.7 s landing key. */
-export function buildFloater(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  return buildPoseClip(scene, sk, 'bball_floater', 0.7, [
+// THE RUNNER, either hand (2026-09-16). The shape was always right; what it did not have was a LEFT, and
+// FINISH_CLIP.floater pointed both sides at this one clip — so a floater taken going left pushed the ball up with
+// the right hand, across the body, in front of the help it was supposed to be getting over.
+const FLOATER_KEYS: PoseKey[] = [
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [0, 0, 0],  LeftUpLeg: [-20, 0, 6], RightUpLeg: [-20, 0, -6], LeftLeg: [30, 0, 0], RightLeg: [30, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
     { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [4, 0, 0],  Neck: [-6, 0, 0], LeftUpLeg: [-6, 0, 4],  RightUpLeg: [-50, 0, -4], LeftLeg: [10, 0, 0], RightLeg: [56, 0, 0] }, hands: { Right: [0.12, 1.32, 0.30], Left: [-0.14, 1.28, 0.30] }, hipsY: 0 },   // the gather off the stride, the ball to the chest
     { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [-8, 0, 0], LeftUpLeg: [-2, 0, 4],  RightUpLeg: [-72, 0, -4], LeftLeg: [6, 0, 0],  RightLeg: [70, 0, 0] }, hands: { Right: [0.12, 2.05, 0.30], Left: [-0.25, 1.35, 0.20] }, poles: { Right: UP_R }, hipsY: 0.04 },   // the push: the ball arm high and in front, the runner's knee up (measured: −56° lifted the knee 0.21 m, −82° 0.42)
     { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [0, 0, 0],  Neck: [-6, 0, 0], LeftUpLeg: [-12, 0, 4], RightUpLeg: [-30, 0, -4], LeftLeg: [16, 0, 0], RightLeg: [36, 0, 0] }, hands: { Right: [0.16, 1.90, 0.35], Left: [-0.24, 1.30, 0.22] }, poles: { Right: UP_R }, hipsY: 0.02 },   // the follow: the arm stays up, the knee comes down
     { t: 0.7,  bones: { Hips: [0, 0, 0], Spine: [8, 0, 0],  Neck: [-4, 0, 0], LeftUpLeg: [-16, 0, 6], RightUpLeg: [-16, 0, -6], LeftLeg: [24, 0, 0], RightLeg: [24, 0, 0] }, hands: { Right: [0.24, 1.12, 0.30], Left: [-0.24, 1.08, 0.28] }, hipsY: -0.04 },   // feet-down, the arm down the front
-  ]);
+];
+export function buildFloater(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
+  if (side === 'right') return buildPoseClip(scene, sk, 'bball_floater', 0.7, FLOATER_KEYS);
+  return buildPoseClip(scene, sk, 'bball_floater_left', 0.7, FLOATER_KEYS.map(mirrorKey));
 }
 
 /** Defensive slide: wide, low, arms out and low in front. Loops. */
@@ -308,6 +314,29 @@ export function buildReverseLayup(scene: Scene, sk: Skeleton, side: 'left' | 'ri
   return buildPoseClip(scene, sk, 'bball_layup_reverse_left', 0.74, REVERSE_KEYS.map(mirrorKey));
 }
 
+/** The FINGER ROLL, right-handed (owner, 2026-09-16).
+ *
+ * The finish for a lane nobody is protecting, and the one shape here defined by EXTENSION rather than by a trick:
+ * the arm goes out long and high and the ball is not laid against anything — it rolls off the fingertips and takes
+ * the softest possible route over the front of the iron. Two tells separate it from a layup at a glance: the arm
+ * is STRAIGHT (a layup's is folded) and the ball is carried out IN FRONT of the head rather than up beside it,
+ * because you are reaching past the rim, not shielding the ball from anybody.
+ *
+ * Release at 0.38 s, feet down at 0.78 — a touch longer than a layup, which is the price of the reach. It is the
+ * highest-percentage finish in the game after the Mikan, and it only ever appears when nobody is home.
+ */
+const FINGER_ROLL_KEYS: PoseKey[] = [
+  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-24, 0, 6], RightUpLeg: [-24, 0, -6], LeftLeg: [36, 0, 0], RightLeg: [36, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.07 },
+  { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],  Neck: [-8, 0, 0],  LeftUpLeg: [-66, 0, 8], RightUpLeg: [-14, 0, -6], LeftLeg: [62, 0, 0], RightLeg: [20, 0, 0] }, hands: { Right: [0.26, 1.48, 0.40], Left: [-0.18, 1.30, 0.26] }, hipsY: 0.04 },   // the gather off the stride, the knee driving, the ball going OUT not up
+  { t: 0.38, bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [-10, 0, 0], LeftUpLeg: [-78, 0, 8], RightUpLeg: [-8, 0, -6],  LeftLeg: [70, 0, 0], RightLeg: [12, 0, 0] }, hands: { Right: [0.28, 2.12, 0.62], Left: [-0.22, 1.36, 0.22] }, poles: { Right: UP_R }, hipsY: 0.10 },   // RELEASE: the arm STRAIGHT and the ball out IN FRONT — rolled, not laid
+  { t: 0.54, bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], Neck: [-8, 0, 0],  LeftUpLeg: [-50, 0, 8], RightUpLeg: [-12, 0, -6], LeftLeg: [52, 0, 0], RightLeg: [16, 0, 0] }, hands: { Right: [0.28, 2.00, 0.58], Left: [-0.22, 1.32, 0.24] }, poles: { Right: UP_R }, hipsY: 0.05 },   // the hand hangs there after it — the follow IS the shot
+  { t: 0.78, bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-20, 0, 6], RightUpLeg: [-20, 0, -6], LeftLeg: [30, 0, 0], RightLeg: [30, 0, 0] }, hands: { Right: [0.26, 1.14, 0.30], Left: [-0.24, 1.08, 0.26] }, hipsY: -0.05 },
+];
+export function buildFingerRoll(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
+  if (side === 'right') return buildPoseClip(scene, sk, 'bball_finger_roll', 0.78, FINGER_ROLL_KEYS);
+  return buildPoseClip(scene, sk, 'bball_finger_roll_left', 0.78, FINGER_ROLL_KEYS.map(mirrorKey));
+}
+
 /** The MIKAN, right-handed (owner, 2026-09-16: "add more layup animations, up and unders, reverse layup, mikans").
  *
  * The shot from directly under the ring, and the one shape on this list that is defined by what it does NOT do: no
@@ -366,11 +395,16 @@ export function buildHopStep(scene: Scene, sk: Skeleton): AnimationGroup | null 
 
 /** The EURO STEP (M14): two steps that go opposite ways — step A plants wide to one side with the ball swung out over
  *  that hip (the sell), step B crosses hard the other way with the ball snatched across the body. 0.48 s (A + B). */
-export function buildEuroStep(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  return buildPoseClip(scene, sk, 'bball_euro_step', 0.48, [
+// …and the EURO sells to a SIDE. planEuro already picks which way to sell (`euroSell` reads the stick) and returns
+// the crossing side with it, but the mode chose the clip by `plan.kind` alone — so a euro that sold LEFT still played
+// the sell-right shape, and the body went one way while the move went the other.
+const EURO_KEYS: PoseKey[] = [
     { t: 0,    bones: { Hips: [0, 0, 0],   Spine: [14, 0, 0],   Neck: [-4, 0, 0], LeftUpLeg: [-28, 0, 8], RightUpLeg: [-28, 0, -8], LeftLeg: [42, 0, 0], RightLeg: [42, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.08 },
     { t: 0.22, bones: { Hips: [0, -14, 0], Spine: [16, 10, 0],  Neck: [-6, -8, 0], LeftUpLeg: [-20, 0, 8], RightUpLeg: [-52, 0, -18], LeftLeg: [30, 0, 0], RightLeg: [50, 0, 0] }, hands: { Right: [0.46, 1.06, 0.22], Left: [0.10, 1.10, 0.26] }, hipsY: -0.05 },   // STEP A: the right leg plants wide, the ball swung out over that hip — the sell
     { t: 0.36, bones: { Hips: [0, 10, 0],  Spine: [16, -8, 0],  Neck: [-6, 6, 0],  LeftUpLeg: [-56, 0, 16], RightUpLeg: [-16, 0, -8], LeftLeg: [52, 0, 0], RightLeg: [26, 0, 0] }, hands: { Right: [-0.10, 1.04, 0.28], Left: [-0.34, 1.06, 0.26] }, hipsY: -0.04 },   // STEP B: snatched across, the left leg crossing the other way
     { t: 0.48, bones: { Hips: [0, 14, 0],  Spine: [14, -10, 0], Neck: [-6, 8, 0],  LeftUpLeg: [-26, 0, 12], RightUpLeg: [-34, 0, -8], LeftLeg: [36, 0, 0], RightLeg: [46, 0, 0] }, hands: { Right: [-0.18, 1.08, 0.30], Left: [-0.36, 1.08, 0.24] }, hipsY: -0.09 },   // planted the other side of him, loaded to finish
-  ]);
+];
+export function buildEuroStep(scene: Scene, sk: Skeleton, sell: 'left' | 'right' = 'right'): AnimationGroup | null {
+  if (sell === 'right') return buildPoseClip(scene, sk, 'bball_euro_step', 0.48, EURO_KEYS);
+  return buildPoseClip(scene, sk, 'bball_euro_step_left', 0.48, EURO_KEYS.map(mirrorKey));
 }

@@ -1819,7 +1819,12 @@ export const OneVOneMode: ModeDefinition = (() => {
     shotMeter.start(contest, currentShot.style, plan.sec);
     gather = { plan, t: 0 };
     meShotWin = 'footwork'; meShotSec = 0;
-    const clip = plan.kind === 'stepthrough' ? 'bball_step_through' : plan.kind === 'hop' ? 'bball_hop_step' : 'bball_euro_step';
+    // THE EURO'S CLIP FOLLOWS THE SIDE IT SELLS. This picked by `plan.kind` alone, so a euro that sold LEFT still
+    // played the sell-right shape and the body went one way while the move went the other. `plan.side` is the
+    // CROSSING hand, so the sell is its opposite.
+    const clip = plan.kind === 'stepthrough' ? 'bball_step_through'
+      : plan.kind === 'hop' ? 'bball_hop_step'
+      : plan.side === 'left' ? 'bball_euro_step' : 'bball_euro_step_left';
     const clipSec = me.animator.durationOf(clip) ?? plan.sec;
     meAnimTree.beat(clip, { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });
     SoundKit.play('whoosh', { pitch: 1.15, volume: 0.3 });
