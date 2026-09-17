@@ -29,7 +29,8 @@
 // only exists under `next dev` — hence BASE pointing at the dev server for this pass.
 //
 //   BASE=http://127.0.0.1:3098 MODE=onevone POSSESSIONS=8 PLAY=mix CHARGE=0.8 npx tsx scripts/probes/_hoops-lab.mts
-//   PLAY=jumper|layup|dunk|mix|defence|charge|screen    CHARGE=0.45|0.8|1.0 (early / green / late)    MODE=onevone|threevthree
+//   HANDLE=100 unlocks the whole dribble vocabulary (the mode reads ?handle=)
+//   PLAY=jumper|layup|dunk|mix|handle|trick|defence|charge|screen    CHARGE=0.45|0.8|1.0 (early / green / late)    MODE=onevone|threevthree
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 import { chromiumExe } from './_chromium.mts';
@@ -76,7 +77,8 @@ page.on('console', (m) => { const t = m.text(); if (/\[1V1|\[3V3|\[REF|\[LAB/.te
   }
   await lp.close();
 }
-await page.goto(`${BASE}/play/${MODE}?agent=1`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+const HANDLE = process.env.HANDLE ? `&handle=${Number(process.env.HANDLE)}` : '';
+await page.goto(`${BASE}/play/${MODE}?agent=1${HANDLE}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
 { const t = Date.now(); let st = '';
   while (Date.now() - t < 300000) { st = await page.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => '') as string; if (st === 'loaded' || st === 'playing') break; await page.waitForTimeout(500); }
   if (st !== 'loaded' && st !== 'playing') console.log(`[LAB] the mode never became ready (state "${st}", url ${page.url()})`); }
@@ -201,6 +203,7 @@ const PLAYS = ['jumper', 'layup', 'dunk'];
 // the SIDE under test is chosen by PLAY rather than by who happens to be winning.
 // CHARGE is a defensive possession too — you are standing in his way waiting to wear it.
 const wantDefence = PLAY === 'defence' || PLAY === 'charge';
+const PLAYS_ALL = ['jumper', 'layup', 'dunk', 'handle', 'trick', 'screen'];   // what PLAY can name
 await page.evaluate(`(() => { window.__brain = ${wantDefence}; window.__def.block = ${PLAY !== 'charge'}; window.__def.charge = ${PLAY === 'charge'}; })()`);
 
 /**
@@ -251,7 +254,39 @@ for (let n = 0; n < POSSESSIONS; n++) {
     // THE THREE FINISHES, aimed rather than hoped for. Distance is bought with drive time: classifyShot's layup band
     // is 2.2 m planar, the floater band runs to FLOATER_RANGE, and checkDriveDunk additionally wants speed and turbo —
     // which is what `sprint` buys, and why the dunk play never releases the stick before the squeeze.
-    if (play === 'screen') {
+    if (play === 'handle') {
+      // THROW THE HANDLE. A dribble move is not a button here — the mode reads a hard stick REVERSAL (within
+      // DribbleController.REVERSAL_WINDOW_SEC, 0.25 s) as a crossover and a pull-BACK as a hesi, and
+      // `moveFromContext` picks which move of the twelve that reversal becomes from the situation. So the probe
+      // does what a thumb does: shove one way, snap the other, and let the mode decide what it was.
+      for (let i = 0; i < 5; i++) {
+        const sx = i % 2 === 0 ? 1 : -1;
+        await agent(`a.do('move', { x: ${sx}, y: 0.15, ms: 170 })`);
+        await agent(`a.do('move', { x: ${-sx}, y: 0.15, ms: 170 })`);   // the reversal — this is the crossover
+        if (i === 2) { await agent(`a.do('move', { x: 0, y: -1, ms: 200 })`); }   // …and a pull-back for the hesi
+      }
+    }
+    else if (play === 'trick') {
+      // THE TRICK STICK. Drive in holding turbo so the squeeze becomes a dunk, then flick the RIGHT stick in the
+      // air. The window is on the flight clock (0.30-0.50 of a 550 ms flight for a clean dunk), so the flick goes
+      // in about 190 ms after the take-off — which is what a player is being asked to feel.
+      await driveToRim(2.4);
+      await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
+      await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: 0, action: true }, 60)`);
+      await page.waitForTimeout(Number(process.env.FLICK_MS ?? 190));
+      // THE RIGHT STICK IS NOT ON THE SLOT. The mode reads look/trick off the RAW input stream, so the agent
+      // bridge cannot reach it — the same "no wire" shape as the block, and here it does not need a new seam:
+      // InputBus.emit is public (the touch overlay calls it directly) and `__FEL_DEV__.input` publishes the bus.
+      // So the probe flicks the real stick, through the real path a thumb uses.
+      await page.evaluate(`(() => {
+        const bus = window.__FEL_DEV__ && window.__FEL_DEV__.input;
+        if (!bus) return 'no input seam';
+        bus.emit({ t: 'stick', side: 'R', x: 0, y: -1 });      // UP = tomahawk
+        setTimeout(() => bus.emit({ t: 'stick', side: 'R', x: 0, y: 0 }), 120);
+        return 'flicked';
+      })()`);
+    }
+    else if (play === 'screen') {
       // CALL FOR A SCREEN, then drive off it. 3v3 only — 1v1 answers the press with NO TEAMMATE TO SCREEN, which is
       // itself the thing worth seeing.
       await agent(`a.do('screen')`);
@@ -341,6 +376,8 @@ for (let n = 0; n < POSSESSIONS; n++) {
 
 const def = await page.evaluate('window.__def') as { jumps: number; gathers: number; driverPeak: number; plantedMs: number; closestWhilePlanted: number };
 const chargesTaken = log.filter((l) => /charge taken/.test(l)).length;
+const handleMoves = log.filter((l) => /HANDLE\] move /.test(l)).map((l) => (l.match(/move (\w+) (\w+) → (\S+)/) ?? []).slice(1).join(' '));
+const tricks = log.filter((l) => /trick \w+ (green|early|late)/.test(l));
 const screensCalled = log.filter((l) => /screen called/.test(l)).length;
 const off = rows.filter((r) => r.possession === 'offence');
 const made = off.filter((r) => r.scored > 0).length;
@@ -355,7 +392,7 @@ const out = {
   byPlay,
   defence: defence.length, stops, stopPct: defence.length ? Math.round((stops / defence.length) * 100) : null,
   blockJumps: def?.jumps ?? 0, gathersSeen: def?.gathers ?? 0,
-  chargesTaken, screensCalled, driverPeakSpeed: +(def?.driverPeak ?? 0).toFixed(2),
+  handleMoves, tricks, chargesTaken, screensCalled, driverPeakSpeed: +(def?.driverPeak ?? 0).toFixed(2),
   plantedMs: def?.plantedMs ?? 0, closestWhilePlanted: +(def?.closestWhilePlanted ?? 99).toFixed(2),
   finalScore: [final.score ?? null, final.foeScore ?? null], target: final.target ?? null,
   rows, log: log.slice(-200),

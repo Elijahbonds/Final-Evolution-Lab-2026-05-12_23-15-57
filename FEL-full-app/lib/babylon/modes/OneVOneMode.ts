@@ -2194,6 +2194,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     const moveDir: 'left' | 'right' = (toHim.x * right.x + toHim.z * right.z) > 0 ? 'left' : 'right';
     const clip = moveClip(move, moveDir);
     if (clip) meAnimTree.beat(clip, { fadeSec: 0.07 });
+    console.info(`[1V1-HANDLE] move ${move} ${moveDir} → ${clip ?? 'mode-owned'} (chain ${chain.length}, handle ${handle})`);
 
     // OFF THE HEAD is the only move where the ball leaves your hands, so it resolves HERE rather than
     // through the ankle-break roll below. Everything else in this vocabulary is a decision about a chain;
