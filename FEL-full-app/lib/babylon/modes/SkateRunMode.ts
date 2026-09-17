@@ -103,8 +103,21 @@ export const SkateRunMode: ModeDefinition = (() => {
   // trigger's release BEFORE the A press, so a keyboard ollie always saw pump 0).
   let pumpReleased = 0, pumpReleasedAt = -1;
   const ollieCharge = (): number => Math.max(pump, performance.now() - pumpReleasedAt < 250 ? pumpReleased : 0);
-  /** Ollie pop: 0.1 → 5.6 m/s (1.1 m), full charge → 8 m/s (2.3 m). Was 0.55–1.0 → 8–10.5 m/s, a 2.3–3.9 m ollie. */
-  const olliePower = (): number => 0.1 + ollieCharge() * 0.55;
+  /**
+   * Ollie pop. GroundRide's gravity is −14 m/s² and `jump(p)` sets `vel.y = 5 + p·5.5`, so height is v²/28:
+   *
+   *   charge    launch        height    hang
+   *   none      6.49 m/s      1.50 m    0.93 s
+   *   half      7.84 m/s      2.20 m    1.12 s
+   *   full      9.18 m/s      3.01 m    1.31 s
+   *
+   * RAISED from 1.10–2.63 m on the owner's call (2026-09-17): the pop read short. Worth knowing what it trades —
+   * hang is what BoardTricks' `airSec` is judged against, and at a 0.93 s floor every skate trick in the table
+   * (the longest is the 360 FLIP at 0.58 s) already fits off a flat-ground ollie, so `fitsAir` no longer gates
+   * anything for skate. That was already true at the old numbers; this widens it. If the trick hierarchy should
+   * mean something again, the hard tricks' `airSec` has to come up with the ollie — that is a separate call.
+   */
+  const olliePower = (): number => 0.27 + ollieCharge() * 0.49;
   let ended = false;
 
   const flick = new FlickStick();
@@ -158,7 +171,7 @@ export const SkateRunMode: ModeDefinition = (() => {
   let crouchAt = -1;
   /** The manual link: a stick flick pair (back->forward = manual, forward->back = nose manual) within this window. */
   let flickSign = 0, flickAt = -1;
-  const FLICK_WINDOW_MS = 420;
+  const FLICK_WINDOW_MS = 620;   // 420 ms asked for a flick pair faster than most players actually flick
   /** Entering a manual costs a moment of the foot drag; do not let the tap brake the line it is linking. */
   let brakeMuteUntil = -1;
   /** A manual request raised by onInput and consumed by update (the channel needs move.balance, which lives there). */
@@ -389,12 +402,19 @@ export const SkateRunMode: ModeDefinition = (() => {
       coins.line(new Vector3(20, 2.6, -19), new Vector3(20, 0.6, 8), 8);
       // ...and an air arc over the bowl rim
       coins.arc(new Vector3(-22, 1.6, 14), new Vector3(-10, 1.6, 14), 2.6, 6);
-      ctx.setHud({ score: 0, combo: '', coins: 0, time: RUN_SEC, goals: `0/${SKATE_GOALS.length}`, hint: 'HOLD FORWARD to push · POP to ollie · GRIND the rails · hold RB / Shift to BOOST' });
+      ctx.setHud({ score: 0, combo: '', coins: 0, time: RUN_SEC, goals: `0/${SKATE_GOALS.length}`, hint: 'HOLD FORWARD to push · POP to ollie · B to MANUAL · GRIND the rails · hold RB / Shift to BOOST' });
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'button' && e.btn === 'R1') { boostHeld = e.pressed; return; }   // BOOST: the shared held R1
+      // MANUAL, DIRECTLY. The flick pair stays (it is the THPS link and it chains beautifully), but it was the ONLY
+      // door in, and a pair of opposite flicks inside one window is a test of the input rather than of the trick.
+      // B is a plain manual, B with the stick forward is a nose manual, and B again is the revert out.
+      if (e.t === 'button' && e.pressed && e.btn === 'B') {
+        manualWanted = stickY < -0.4 ? 'nosemanual' : 'manual';
+        return;
+      }
       if (e.t === 'stick' && e.side === 'L') {
         // THE MANUAL LINK (VENICE-SKATE-THPS). There was no manual input at all: the only door into the channel was
         // tryRevert, which needs a transition landing AND |stickX| > 0.8 AND a low pump in the same frame — measured
@@ -592,6 +612,17 @@ export const SkateRunMode: ModeDefinition = (() => {
           bannerFlash(ctx, kind === 'manual' ? 'MANUAL' : 'NOSE MANUAL', 600);
           SoundKit.play('uiTick', { pitch: 1.2, volume: 0.35 });
           console.info(`[SKATE-MANUAL] ${kind}`);
+        } else {
+          // WHY IT DID NOT START, every time. This branch used to fall through in silence, so a manual that was
+          // refused for being too slow, in the air, or already grinding was indistinguishable from an input the
+          // mode never received — which is exactly what "the manual doesn't trigger reliably" feels like from
+          // the deck. Three gates, three answers.
+          refuse(ctx, !rig.rider.grounded ? 'NOT ON THE GROUND'
+            : grindCh ? 'ALREADY GRINDING'
+            : 'TOO SLOW TO MANUAL');
+          console.info('[SKATE-MANUAL] refused', {
+            grounded: rig.rider.grounded, grinding: !!grindCh, speed01: Number(move.speed01.toFixed(3)),
+          });
         }
       }
       if (manualCh?.active) {
