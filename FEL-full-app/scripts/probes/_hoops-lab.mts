@@ -169,7 +169,9 @@ await page.evaluate(`(() => {
       const hn2 = window.__FEL_QA__.hero(); const meP = hn2 && (hn2.position || hn2);
       const gap = meP ? Math.hypot(meP.x - him.x, meP.z - him.z) : 99;
       const v = typeof dev.driveSpeed === 'function' ? dev.driveSpeed() : 0;
-      if (gap <= 2.6 && v >= 3.0) { window.__NEXUS_AGENT__.do('charge', { ms: 420 }); return; }
+      // the speed gate is per-MODE: 1v1's rival drives at 5.0 m/s and 3v3's clocked drive reports 1.4, so a 3.0
+      // gate meant the probe never even planted in 3v3 and the run reported 'planted 0.0s' as if the mode failed
+      if (gap <= 2.6 && v >= (MODE === 'onevone' ? 3.0 : 0.8)) { window.__NEXUS_AGENT__.do('charge', { ms: 420 }); return; }
     }
     // the point a metre off him on the rim side: stay in FRONT, which is also the only way to be inside the block's
     // range (1.2 m on a jumper) when his gather comes

@@ -225,6 +225,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   // ── BIOMECH-HOOPS-WAVE1 ──
   let driver: Body | null = null;                // the rival driving on their possession (its tree carries the ball, it faces the rim, the AI drive skips it)
   let driveK = 0;                                // the rival drive's clock 0..1 (the block window is its end)
+  let chargeLastGap = -1;                        // last frame's gap to the driver, for the closing RATE
   let oobSec = 0;                                // how long the carrier has been ON the line, still pushing at it
   let takingCharge = false;                      // Circle held on defence — planted, waiting to wear it
   let chargeSetSec = 0;                          // how long the feet have been down
@@ -604,8 +605,15 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         takingCharge = !!me.slot.intent.takeCharge && meStunSec === 0 && !meFloored && myJumpAge === Infinity;
         if (takingCharge && driver) {
           chargeSetSec += dt;
-          const closing = driver.vel.length();
-          if (chargeSetSec >= CHARGE_SET_SEC && distXZ(me.char.root.position, driver.char.root.position) <= CHARGE_RANGE && closing >= FOUL_CLOSING_SPEED) {
+          // CLOSING RATE, NOT SPEED. `driver.vel.length()` peaks at 1.4 m/s here against the 4.2 a foul needs, so
+          // the charge was unreachable in this mode for a completely different reason than 1v1's: the rival's
+          // drive is a CLOCKED animation (driveK walks a path) and its velocity vector is a by-product, not a
+          // physical speed. What a charge actually measures is how fast he arrived AT YOU — the rate the gap is
+          // closing — which is the honest read either way and the one a clocked drive can still answer.
+          const gapNow = distXZ(me.char.root.position, driver.char.root.position);
+          const closing = chargeLastGap < 0 || dt <= 0 ? 0 : Math.max(0, (chargeLastGap - gapNow) / dt);
+          chargeLastGap = gapNow;
+          if (chargeSetSec >= CHARGE_SET_SEC && gapNow <= CHARGE_RANGE && closing >= FOUL_CLOSING_SPEED) {
             // THE REF OWNS THE CONSEQUENCE — the same refactor 1v1 got. The handbook says a charge is the
             // DEFENCE's ball; the mode reports the fact and carries out the call instead of asserting one.
             const call = judge('charge', { offense: 'foeTeam' === carrierId ? 'foe' : 'me', fouled: 'me' });
@@ -619,7 +627,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             driveStolen = true;
             later(800, () => (call.ball === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
           }
-        } else if (!takingCharge) chargeSetSec = 0;
+        } else if (!takingCharge) { chargeSetSec = 0; chargeLastGap = -1; }
         const wantHandUp = !!me.slot.intent.contest && myJumpAge === Infinity && !meFloored && meStunSec === 0;
         if (wantHandUp !== meHandUp) { meHandUp = wantHandUp; if (meHandUp) console.info('[3V3-DEF] hand up (me)'); else me.tree.releaseHold(); }
         if (meHandUp && !me.tree.busy) me.tree.hold('bball_hand_up', { fadeSec: 0.1 });
