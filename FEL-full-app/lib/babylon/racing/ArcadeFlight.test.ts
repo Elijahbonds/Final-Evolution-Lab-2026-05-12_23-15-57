@@ -96,4 +96,69 @@ describe('the garage planes keep their characters', () => {
     expect(tune('darter').top).toBeGreaterThan(tune('trainer').top);
     expect(tune('kestrel').turnRate).toBeGreaterThan(tune('trainer').turnRate);
   });
+
+  describe('the new stunts', () => {
+    const at = (y: number) => spawnArcade(new Vector3(0, y, 0), 0);
+    const run = (st: ReturnType<typeof spawnArcade>) => {
+      for (let i = 0; i < 300 && st.stunt; i++) stepArcade(st, I(), 1 / 60, T, flat, 900);
+    };
+
+    it('a split-s comes out facing back the way it came, LOWER', () => {
+      const s = at(300);
+      const h0 = s.heading, y0 = s.pos.y;
+      expect(startStunt(s, 'split_s')).toBe(true);
+      run(s);
+      expect(s.stunt).toBeNull();
+      // reversed: the new heading points opposite the old one
+      expect(Math.cos(s.heading - h0)).toBeLessThan(-0.85);
+      expect(s.pos.y).toBeLessThan(y0);
+    });
+
+    it('is the loop mirrored — the loop escapes UP, the split-s escapes DOWN', () => {
+      const up = at(300); startStunt(up, 'loop'); run(up);
+      const down = at(300); startStunt(down, 'split_s'); run(down);
+      expect(up.pos.y).toBeGreaterThan(300);
+      expect(down.pos.y).toBeLessThan(300);
+      // and both end up facing home, which is what makes them a choice of ESCAPE rather than of direction
+      expect(Math.cos(up.heading)).toBeLessThan(-0.85);
+      expect(Math.cos(down.heading)).toBeLessThan(-0.85);
+    });
+
+    it('a knife edge holds its heading and costs you line instead', () => {
+      const s = at(200);
+      const h0 = s.heading;
+      expect(startStunt(s, 'knife_edge')).toBe(true);
+      run(s);
+      expect(s.stunt).toBeNull();
+      expect(Math.abs(s.heading - h0)).toBeLessThan(0.2);   // no reversal
+      expect(Math.abs(s.pos.x)).toBeGreaterThan(1);          // it slipped toward the low wing
+    });
+
+    it('only the rolls dodge — never the loop, the split-s or the knife edge', () => {
+      for (const kind of ['loop', 'split_s', 'knife_edge'] as const) {
+        const s = at(300);
+        startStunt(s, kind);
+        stepArcade(s, I(), 0.2, T, flat, 900);
+        expect(dodging(s), kind).toBe(false);
+      }
+      const r = at(300);
+      startStunt(r, 'roll_left');
+      stepArcade(r, I(), 0.2, T, flat, 900);
+      expect(dodging(r)).toBe(true);
+    });
+
+    it('still allows only one stunt at a time', () => {
+      const s = at(300);
+      expect(startStunt(s, 'split_s')).toBe(true);
+      expect(startStunt(s, 'knife_edge')).toBe(false);
+    });
+
+    it('the floor does not fight an arcing stunt mid-manoeuvre', () => {
+      // clampAltitude lifts the nose on contact, which would cancel a split-s halfway down
+      const s = at(60);
+      startStunt(s, 'split_s');
+      stepArcade(s, I(), 0.3, T, flat, 900);
+      expect(s.pitch).toBeLessThan(0);
+    });
+  });
 });

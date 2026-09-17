@@ -47,6 +47,7 @@ import { readPlane } from '../racing/garage';
 import { refuse } from '../core/Refusal';
 import {
   ARCADE_TRAINER, arcadeFrom, spawnArcade, stepArcade, startStunt, dodging, spinOut, wallTurn, forwardOf,
+  type Stunt,
   type ArcadeState, type ArcadeTune, type ArcadeInput,
 } from '../racing/ArcadeFlight';
 import {
@@ -159,7 +160,7 @@ export function makeAeroAcesMode(): ModeDefinition {
       speed: Math.round(flight.speed * 3.6),
       time: race.time.toFixed(1),
       banner: S.banner,
-      hint: 'RT gas · LT brake · A fire · B + stick: roll / loop · RB boost',
+      hint: 'RT gas · LT brake · A fire · B: roll, back=loop, fwd=split-s · Y: loop, +stick=knife edge · RB boost',
       ...boost.hud(),
     };
     ctx.setHud(hud);
@@ -240,12 +241,12 @@ export function makeAeroAcesMode(): ModeDefinition {
     S.held = null;
   }
 
-  function stunt(ctx: ModeContext, kind: 'roll_left' | 'roll_right' | 'loop'): void {
+  function stunt(ctx: ModeContext, kind: Stunt): void {
     if (!flight) return;
     if (flight.spinT > 0) { refuse(ctx, 'SPINNING'); return; }
     if (!startStunt(flight, kind)) { refuse(ctx, 'ALREADY IN A STUNT'); return; }
-    SoundKit.play('whoosh', { pitch: kind === 'loop' ? 0.9 : 1.3, volume: 0.45 });
-    say(kind === 'loop' ? 'LOOP!' : 'BARREL ROLL', 0.6);
+    SoundKit.play('whoosh', { pitch: stuntById(kind)?.reverses ? 0.9 : 1.3, volume: 0.45 });
+    say(stuntById(kind)?.label ?? 'STUNT', 0.6);
     S.stunts++;
   }
 
@@ -353,8 +354,15 @@ export function makeAeroAcesMode(): ModeDefinition {
       if (e.btn === 'R1') { S.boostHeld = e.pressed; return; }
       if (!e.pressed) return;
       if (e.btn === 'A' || e.btn === 'X') firePlayerItem(ctx);
-      else if (e.btn === 'B') stunt(ctx, S.stickY > 0.5 ? 'loop' : S.stickX < -0.3 ? 'roll_left' : S.stickX > 0.3 ? 'roll_right' : (S.stunts % 2 ? 'roll_left' : 'roll_right'));
-      else if (e.btn === 'Y') stunt(ctx, 'loop');
+      else if (e.btn === 'B') {
+        stunt(ctx, S.stickY > 0.5 ? 'loop'
+          : S.stickY < -0.5 ? 'split_s'
+          : S.stickX < -0.3 ? 'roll_left'
+          : S.stickX > 0.3 ? 'roll_right'
+          : (S.stunts % 2 ? 'roll_left' : 'roll_right'));
+      } else if (e.btn === 'Y') {
+        stunt(ctx, Math.abs(S.stickX) > 0.3 ? 'knife_edge' : 'loop');
+      }
     },
 
     update(ctx: ModeContext, dt: number): void {

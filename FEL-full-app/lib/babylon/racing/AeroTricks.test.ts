@@ -6,6 +6,18 @@ import {
 
 describe('aero tricks', () => {
   describe('the catalogue', () => {
+    it('has no duplicate manoeuvre — the shipped loop IS an Immelmann', () => {
+      expect(AERO_STUNTS.map((s) => s.id)).not.toContain('immelmann');
+      expect(AERO_STUNTS).toHaveLength(5);
+    });
+
+    it('pairs the two reversals as mirrors — loop escapes up, split-s escapes down', () => {
+      const loop = stuntById('loop')!, split = stuntById('split_s')!;
+      expect(loop.reverses && split.reverses).toBe(true);
+      // the split-s needs more room because it spends its arc going DOWN
+      expect(split.clearance).toBeGreaterThan(loop.clearance);
+    });
+
     it('is not flat — a loop is not a roll', () => {
       expect(stuntById('loop')!.pts).toBeGreaterThan(stuntById('roll_left')!.pts * 2);
     });
@@ -28,7 +40,7 @@ describe('aero tricks', () => {
     });
 
     it('takes longer the more it is worth', () => {
-      expect(stuntById('immelmann')!.sec).toBeGreaterThan(stuntById('roll_left')!.sec);
+      expect(stuntById('split_s')!.sec).toBeGreaterThan(stuntById('roll_left')!.sec);
     });
   });
 
@@ -107,7 +119,7 @@ describe('aero tricks', () => {
 
   describe('what it pays the shared boost', () => {
     it('pays big for a reversal and small for a roll', () => {
-      expect(boostEarnForStunt('immelmann', 0)?.what).toBe('trickBig');
+      expect(boostEarnForStunt('split_s', 0)?.what).toBe('trickBig');
       expect(boostEarnForStunt('roll_left', 0)?.what).toBe('trickSmall');
     });
 

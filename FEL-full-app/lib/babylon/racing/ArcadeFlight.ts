@@ -71,7 +71,11 @@ export function arcadeFrom(frame: Airframe, base: ArcadeTune = ARCADE_TRAINER): 
   };
 }
 
-export type Stunt = 'roll_left' | 'roll_right' | 'loop';
+export type Stunt = 'roll_left' | 'roll_right' | 'loop' | 'split_s' | 'knife_edge';
+
+/** Stunts that fly their own arc and must not be fought by the altitude clamp. */
+const ARCING: readonly Stunt[] = ['loop', 'split_s'];
+const isArcing = (st: Stunt | null): boolean => !!st && ARCING.includes(st);
 
 export interface ArcadeState {
   pos: Vector3;
@@ -110,6 +114,12 @@ export const LOOP_SEC = 1.15;
 /** How far a barrel roll carries you sideways, metres. */
 export const ROLL_SHIFT = 7;
 export const SPIN_SEC = 1.1;
+/** The SPLIT-S: half a loop DOWNWARD, out reversed and lower. The loop's mirror. */
+export const SPLIT_S_SEC = 1.1;
+/** KNIFE EDGE: held on its side, no reversal — for threading something narrow. */
+export const KNIFE_SEC = 0.7;
+/** How hard a knife edge slides toward the low wing, m/s. It costs you line. */
+export const KNIFE_SLIP = 9;
 
 export function spawnArcade(at: Vector3, heading: number, tune: ArcadeTune = ARCADE_TRAINER): ArcadeState {
   return { pos: at.clone(), heading, pitch: 0, roll: 0, speed: tune.coast, stunt: null, stuntT: 0, stuntHeading: heading, spinT: 0 };
@@ -135,6 +145,8 @@ export function startStunt(s: ArcadeState, stunt: Stunt): boolean {
 
 /** A barrel roll is a dodge: projectiles pass through it for its middle 80%. */
 export function dodging(s: ArcadeState): boolean {
+  // ONLY THE ROLLS DODGE. A loop, a split-s and a knife edge are all slower and more committed, and none of them
+  // is an evasion — being able to dodge inside the biggest-scoring stunt would make every other choice pointless.
   return (s.stunt === 'roll_left' || s.stunt === 'roll_right') && s.stuntT > ROLL_SEC * 0.1 && s.stuntT < ROLL_SEC * 0.9;
 }
 
@@ -172,6 +184,23 @@ export function stepArcade(
     s.speed = Math.max(tune.minSpeed, s.speed - 18 * dt);
     s.roll += 14 * dt;
     s.pitch = ease(s.pitch, 0, 3, dt);
+  } else if (s.stunt === 'split_s') {
+    // ── THE SPLIT-S: half a loop DOWNWARD, out facing back and LOWER. The loop's exact mirror, and the reason
+    // both exist: in a canyon the loop is the escape when you are low and the split-s is the escape when you are
+    // high. It needs ~95 m of clear air beneath it, which is what makes it a commitment rather than a free U-turn.
+    s.stuntT += dt;
+    const k = Math.min(1, s.stuntT / SPLIT_S_SEC);
+    const arc = Math.PI * k;
+    const r = (s.speed * SPLIT_S_SEC) / Math.PI;
+    const fwd = new Vector3(Math.sin(s.stuntHeading), 0, Math.cos(s.stuntHeading));
+    const prevArc = Math.PI * Math.min(1, Math.max(0, s.stuntT - dt) / SPLIT_S_SEC);
+    // mirrored in y against the loop: the centre sits `r` BELOW the entry
+    const d = (a: number) => fwd.scale(Math.sin(a) * r).add(new Vector3(0, -(r - Math.cos(a) * r), 0));
+    s.pos.addInPlace(d(arc).subtract(d(prevArc)));
+    s.pitch = -arc;
+    s.roll = 0;
+    if (k >= 1) { s.stunt = null; s.heading = wrap(s.stuntHeading + Math.PI); s.pitch = 0; s.roll = Math.PI; }
+    return clampAltitude(s, floorAt, ceiling, clearance, tune);
   } else if (s.stunt === 'loop') {
     // ── the Immelmann: half a loop up and over (pitch 0 → π), rolled upright at the top — out facing back ──
     s.stuntT += dt;
@@ -195,7 +224,19 @@ export function stepArcade(
     const turn = tune.turnRate * (input.brake > 0.1 ? tune.brakeTurn : 1);
     s.heading = wrap(s.heading + steer * turn * dt);
     let bankWant = steer * tune.maxBank;
-    if (s.stunt === 'roll_left' || s.stunt === 'roll_right') {
+    if (s.stunt === 'knife_edge') {
+      // ── KNIFE EDGE: hold it on its side. No reversal, no height change — what it buys is a narrow profile, and
+      // what it costs is line: the plane slips toward the low wing the whole time, so threading a gap on its side
+      // means arriving somewhere you did not aim. It deliberately does NOT dodge; a missile still finds you.
+      s.stuntT += dt;
+      const k = Math.min(1, s.stuntT / KNIFE_SEC);
+      const dir = steer >= 0 ? 1 : -1;
+      bankWant = dir * (Math.PI / 2);
+      s.roll = ease(wrap(s.roll), bankWant, 9, dt);
+      const slip = new Vector3(Math.cos(s.heading), 0, -Math.sin(s.heading)).scale(dir);
+      s.pos.addInPlace(slip.scale(KNIFE_SLIP * Math.sin(Math.PI * k) * dt));
+      if (k >= 1) { s.stunt = null; }
+    } else if (s.stunt === 'roll_left' || s.stunt === 'roll_right') {
       s.stuntT += dt;
       const dir = s.stunt === 'roll_right' ? 1 : -1;
       const k = Math.min(1, s.stuntT / ROLL_SEC);
@@ -222,10 +263,10 @@ function clampAltitude(s: ArcadeState, floorAt: (x: number, z: number) => number
   if (s.pos.y < floor) {
     s.pos.y = floor;
     const hit = s.pitch < -0.12;
-    if (s.stunt !== 'loop') s.pitch = Math.max(s.pitch, 0.08);   // the ground lifts the nose
+    if (!isArcing(s.stunt)) s.pitch = Math.max(s.pitch, 0.08);   // the ground lifts the nose
     if (hit) { s.speed = Math.max(tune.minSpeed, s.speed * 0.8); return 'floor'; }
   }
-  if (s.pos.y > ceiling) { s.pos.y = ceiling; if (s.stunt !== 'loop') s.pitch = Math.min(s.pitch, 0); }
+  if (s.pos.y > ceiling) { s.pos.y = ceiling; if (!isArcing(s.stunt)) s.pitch = Math.min(s.pitch, 0); }
   return null;
 }
 

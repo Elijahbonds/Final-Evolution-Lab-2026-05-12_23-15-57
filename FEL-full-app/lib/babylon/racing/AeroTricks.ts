@@ -17,9 +17,14 @@
 //
 // Pure: numbers and names. No scene, no state machine — ArcadeFlight still owns the flying.
 
+// NO IMMELMANN. An earlier draft of this file priced one at 210 alongside the loop, which was a spec error: the
+// stunt ArcadeFlight already ships as 'loop' IS an Immelmann — half a loop up and over, rolled upright at the top,
+// out facing back and higher, and its own test asserts exactly that. Pricing a second entry for it would have paid
+// twice for one manoeuvre and shown the player two names for one input. The catalogue is five stunts, all distinct:
+// two rolls (fast, dodging), a knife edge (narrow, no reversal), and the two reversals that are each other's mirror
+// — LOOP escapes upward, SPLIT-S escapes downward.
 export type AeroStuntId =
-  | 'roll_left' | 'roll_right' | 'loop'
-  | 'immelmann' | 'split_s' | 'knife_edge';
+  | 'roll_left' | 'roll_right' | 'loop' | 'split_s' | 'knife_edge';
 
 export interface AeroStunt {
   id: AeroStuntId;
@@ -41,7 +46,6 @@ export const AERO_STUNTS: readonly AeroStunt[] = [
   { id: 'roll_right', label: 'ROLL RIGHT', sec: 0.55, pts: 60, reverses: false, clearance: 12, dodges: true },
   { id: 'knife_edge', label: 'KNIFE EDGE', sec: 0.7, pts: 110, reverses: false, clearance: 8, dodges: false },
   { id: 'loop', label: 'LOOP', sec: 1.15, pts: 150, reverses: true, clearance: 55, dodges: false },
-  { id: 'immelmann', label: 'IMMELMANN', sec: 1.3, pts: 210, reverses: true, clearance: 70, dodges: false },
   { id: 'split_s', label: 'SPLIT-S', sec: 1.1, pts: 190, reverses: true, clearance: 95, dodges: false },
 ];
 
