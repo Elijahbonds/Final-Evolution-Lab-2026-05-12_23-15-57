@@ -24,6 +24,7 @@ import { SKATE_VENUES, SNOW_VENUES, SURF_VENUES, rideOf, type BoardVenue } from 
 import { applyFloorDetailToMesh } from '../visual/groundTextures';
 import { VertexData, Texture } from '@babylonjs/core';
 import { readableFloorHex, separatedHex, paintGraffitiWall, buildGraffitiStage } from '../visual/PlacePack';
+import { plazaMarkers, plazaRails, plazaSolids } from './skatePlaza';
 
 export interface RideObstacle { pos: Vector3; radius: number }
 
@@ -319,6 +320,99 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   totem.isPickable = false;
   all.push(totem);
 
+  // ── THE PLAZA (2026-09-17, owner: "add more to the stage to bring it to life") ─────────────────────────────
+  //
+  // The park had seven ramps, a bowl, two funboxes, a stair set and six rails, and every one of them was a thing
+  // you ride UP or a thing you grind ALONG. What a plaza has and this did not is street furniture — the things
+  // that are in the way, that you learn to use. A spine to transfer over, a pyramid with a hubba, a gap with a
+  // flat bar across it, a kinked rail, two manual pads, a picnic table, benches and a wallride.
+  //
+  // THE LAYOUT IS DATA, in modes/skatePlaza.ts, and it is there for a reason: this builder makes a DynamicTexture
+  // on its first line, which needs a canvas, so no headless test can ever reach anything authored inline here. A
+  // park nobody can measure is a park where a rail outside the fence, two rails in one place, or a bench on the
+  // spawn point all ship in silence. skatePlaza.test.ts walks the same table this loop does, on every venue.
+  const markers: Vector3[] = plazaMarkers(B).map(([x, y, z]) => new Vector3(x, y, z));
+
+  const binM = mat(scene, `binM_${venue.id}`, mixHex(P.edge, '#2b2f36', 0.45));
+  for (const sol of plazaSolids(B)) {
+    if (sol.wedge) {
+      const w = rampWedge(scene, `plaza_${sol.kind}`, sol.width, sol.depth, sol.height, true);
+      // a bank's own frame rises toward +z, so its yaw is what points it at the middle of the feature
+      w.position.set(sol.x - Math.sin(sol.ry) * sol.depth / 2, 0, sol.z - Math.cos(sol.ry) * sol.depth / 2);
+      w.rotation.y = sol.ry;
+      w.material = wedgeM;
+      if (sol.solid) { w.checkCollisions = true; all.push(w); rideable.push(w); } else dressing.push(w);
+      continue;
+    }
+    if (sol.kind === 'bin') {
+      const bin = MeshBuilder.CreateCylinder(`plaza_bin`, { diameter: sol.width, height: sol.height, tessellation: 10 }, scene);
+      bin.position.set(sol.x, sol.height / 2, sol.z);
+      bin.material = binM;
+      bin.checkCollisions = true;
+      all.push(bin);
+      continue;
+    }
+    const box = MeshBuilder.CreateBox(`plaza_${sol.kind}`, { width: sol.width, height: sol.height, depth: sol.depth }, scene);
+    box.position.set(sol.x, sol.height / 2, sol.z);
+    box.rotation.set(sol.pitch ?? 0, sol.ry, 0);
+    box.material = sol.kind === 'pyramid' || sol.kind === 'wallride' ? tagM(tagSeed++) : boxM;
+    if (sol.solid) { box.checkCollisions = true; all.push(box); rideable.push(box); } else dressing.push(box);
+    // coping where a skater's wheels would actually meet an edge
+    if (sol.kind === 'pyramid' || sol.kind === 'gapLedge') cope(box, sol.width, sol.height / 2, sol.depth / 2);
+    if (sol.kind === 'planter') {
+      const shrub = MeshBuilder.CreateSphere('plaza_shrub', { diameter: 1.7, segments: 6 }, scene);
+      shrub.position.set(sol.x, sol.height + 0.4, sol.z);
+      shrub.material = mat(scene, `shrubM_${venue.id}`, '#3f7a44');
+      dressing.push(shrub);
+    }
+    if (sol.kind === 'table') {
+      for (const side of [-1, 1] as const) {
+        const bench = MeshBuilder.CreateBox('plaza_tablebench', { width: 0.7, height: 0.12, depth: sol.depth }, scene);
+        bench.position.set(sol.x + side * 1.65, 0.46, sol.z);
+        bench.material = boxM; dressing.push(bench);
+      }
+    }
+    if (sol.kind === 'bench') {
+      const back = MeshBuilder.CreateBox('plaza_benchback', { width: 0.12, height: 0.5, depth: sol.depth }, scene);
+      back.position.set(sol.x + Math.cos(sol.ry) * 0.44, sol.height + 0.25, sol.z - Math.sin(sol.ry) * 0.44);
+      back.rotation.y = sol.ry; back.material = copeM; dressing.push(back);
+    }
+  }
+  for (const r of plazaRails(B)) {
+    makeRail(scene, all, grindLines, new Vector3(...r.a), new Vector3(...r.b), r.bonus);
+  }
+
+  // ── AND THE THINGS NOBODY DESIGNED FOR SKATING ────────────────────────────────────────────────────────────
+  // Scenery only, merged into the dressing: a place reads as lived-in through objects that have nothing to do
+  // with the sport. Cones ringing the middle, boards left leaning where their owners are sitting, a boombox, and
+  // banners on the fence line — a flag being the cheapest thing that moves the eye.
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2;
+    const cone = MeshBuilder.CreateCylinder(`plaza_cone_${i}`, { diameterTop: 0.05, diameterBottom: 0.42, height: 0.62, tessellation: 8 }, scene);
+    cone.position.set(f(Math.sin(a) * 0.78), 0.31, f(Math.cos(a) * 0.78));
+    cone.material = mat(scene, `coneM_${venue.id}`, '#ff7a3d');
+    dressing.push(cone);
+  }
+  for (const [bx, bz, ry] of [[f(-0.7), f(0.48), 0.5], [f(-0.74), f(0.62), -0.3]] as const) {
+    const deck = MeshBuilder.CreateBox('plaza_parkedboard', { width: 0.24, height: 0.82, depth: 0.05 }, scene);
+    deck.position.set(bx, 0.42, bz); deck.rotation.set(0.28, ry, 0);
+    deck.material = mat(scene, `deckM_${venue.id}`, P.accent);
+    dressing.push(deck);
+  }
+  {
+    const boom = MeshBuilder.CreateBox('plaza_boombox', { width: 0.7, height: 0.34, depth: 0.26 }, scene);
+    boom.position.set(f(0.72), 0.7, f(0.16));
+    boom.material = mat(scene, `boomM_${venue.id}`, '#22262d');
+    dressing.push(boom);
+  }
+  for (const [sx, sz] of [[-0.55, 1], [0.15, 1], [1, -0.4], [-1, 0.2]] as const) {
+    const onX = Math.abs(sx) === 1;
+    const flag = MeshBuilder.CreateBox('plaza_banner', { width: onX ? 0.08 : 3.4, height: 1.1, depth: onX ? 3.4 : 0.08 }, scene);
+    flag.position.set(onX ? sx * (B - 0.5) : f(sx), 2.6, onX ? f(sz) : sz * (B - 0.5));
+    flag.material = mat(scene, `bannerM_${venue.id}`, P.accent);
+    dressing.push(flag);
+  }
+
   // Where people watch from: the ledges and the bowl rim, clear of every line the player rides, scaled to the venue
   const crowdSpots = [
     new Vector3(f(-0.72), 0, f(-0.12)), new Vector3(f(-0.72), 0, f(-0.04)), new Vector3(f(-0.67), 0, f(0.03)),
@@ -327,7 +421,7 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     new Vector3(f(0.78), 0, f(-0.42)), new Vector3(f(0.83), 0, f(-0.35)),
   ].slice(0, Math.max(2, venue.crowd));
   return {
-    ground: rideable, grindLines, markers: [], obstacles: [], crowdSpots, bound: B,
+    ground: rideable, grindLines, markers, obstacles: [], crowdSpots, bound: B,
     dispose: () => { all.forEach((m) => m.dispose()); merged.forEach((m) => m.dispose()); stages.forEach((t) => t.dispose(false, true)); },
   };
 }
