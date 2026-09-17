@@ -38,7 +38,12 @@ import {
   type Course, type RaceProgress,
 } from '../core/RaceCourse';
 import { buildCourseVenue, buildWorldGround } from '../racing/venueForCourse';
-import { kartCircuitById, type KartCircuit } from '../racing/kartCircuits';
+import { kartCircuitById, type KartCircuit, type KartRamp } from '../racing/kartCircuits';
+import { locate } from '../racing/racingLine';
+import { refuse } from '../core/Refusal';
+import {
+  boostEarnFor, crossedLip, idleAir, launch, startTrick, stepAir, type KartAirState,
+} from '../core/KartAir';
 import { buildTrackside, type TracksideHandle } from '../racing/trackside';   // the world that follows the racing line
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import { taperedPlank, taperedSection, roadWheel } from '../racing/shapes';
@@ -99,14 +104,63 @@ const S = {
   offRoadSec: 0,
   lookX: 0, lookY: 0,
   boostHeld: false,
+  /** The left stick's y, kept because a trick is a stick DIRECTION and steer only carries x. */
+  stickY: 0,
+  /** Air off a ramp: the launch, the trick, the landing. Grounded most of the time. */
+  air: idleAir() as KartAirState,
+  /** Distance along the racing line last frame, for spotting a ramp lip being crossed. */
+  lastDist: null as number | null,
   /** THE FINISH CLOCK (MECHANICS PASS): seconds left to the line once the field's leader is home; null = not running. */
   graceLeft: null as number | null,
 };
 let boost = new BoostKit();
 let boostFx: BoostFx | null = null;
 let boostPads: BoostPads | null = null;
+let ramps: Mesh[] = [];
 
 const say = (t: string, sec = 1.0): void => { S.banner = t; S.bannerT = sec; };
+
+/**
+ * The ramps, placed by distance along the racing line — so a ramp is always ON the road, at the road's own height
+ * and angle, without anybody placing it by hand per course.
+ *
+ * A ramp's mesh IS its physics: the box is `run` long and pitched by the same `pitch` KartAir launches with, so the
+ * take-off you see is the take-off you get. A 'gap' ramp has nothing beyond the lip, which is what makes the two
+ * rooftop gaps a commitment rather than a bump.
+ */
+function buildRamps(ctx: ModeContext): Mesh[] {
+  if (!circuit) return [];
+  const half = circuit.halfWidth;
+  const mat = VenueKit.paint(ctx.scene, 'kart_ramp', '#3b4150', 0.06, 0.78);
+  return circuit.ramps.map((r: KartRamp, i: number) => {
+    const at = pointOn(r.dist);
+    const pitch = (r.pitch * Math.PI) / 180;
+    const m = MeshBuilder.CreateBox(`kart_ramp_${i}`, { width: half * 2, height: 0.22, depth: r.run }, ctx.scene);
+    // sit the low end on the road and let the lip rise, so the wedge reads as a launch and not a speed bump
+    m.position.set(at.pos.x, at.pos.y + Math.sin(pitch) * r.run * 0.5 + 0.11, at.pos.z);
+    m.rotation.set(-pitch, Math.atan2(at.tangent.x, at.tangent.z), 0);
+    m.material = mat;
+    m.receiveShadows = true;
+    return m;
+  });
+}
+
+/** A point on the racing line by distance along it, falling back to the start before a circuit is picked. */
+function pointOn(dist: number): { pos: Vector3; tangent: Vector3 } {
+  if (!circuit) return { pos: course.start.at, tangent: new Vector3(0, 0, 1) };
+  const line = circuit.line;
+  const d = ((dist % line.length) + line.length) % line.length;
+  let lo = 0, hi = line.pts.length - 1;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (line.cum[mid] <= d) lo = mid; else hi = mid - 1; }
+  const a = line.pts[lo], b = line.pts[(lo + 1) % line.pts.length];
+  const seg = (lo + 1 < line.cum.length ? line.cum[lo + 1] : line.length) - line.cum[lo];
+  const t = seg > 1e-6 ? (d - line.cum[lo]) / seg : 0;
+  const tangent = new Vector3(b.x - a.x, 0, b.z - a.z);
+  return {
+    pos: new Vector3(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t),
+    tangent: tangent.length() > 1e-6 ? tangent.normalize() : new Vector3(0, 0, 1),
+  };
+}
 
 // THE COCKPIT (2026-09-13). The kart was one 1.3×0.5×2.2 box with a second box on top of it called
 // `kart_seat`, and the driver had to be perched on the lid of that — which is exactly how it read on screen:
@@ -500,6 +554,7 @@ return {
     // worst frames in the project). Trackside dresses the PATH instead, at whatever scale the course is.
     trackside?.dispose();
     trackside = buildTrackside(ctx.scene, course);
+    ramps = buildRamps(ctx);
     console.info(`[RACE-VENUE] ${course.id}: ${trackside.count} trackside instances`);
     // RACING WAS THE LAST FAMILY WITH NOBODY WATCHING. The board modes have had Onlookers since it landed;
     // both racing modes had an empty circuit, which reads as a test track rather than an event. The spots
@@ -588,7 +643,7 @@ return {
     void ctx;
     if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }
     if (S.done) return;
-    if (e.t === 'stick' && e.side === 'L') { S.input.steer = e.x; return; }
+    if (e.t === 'stick' && e.side === 'L') { S.input.steer = e.x; S.stickY = e.y; return; }
     // SCORECARD CONTROLS (2026-09-15): gas, brake and drift changed a number and nothing a player hears (76 % of presses
     // silent). A kart answers the pedal: the engine revs as the throttle goes down, the tyres squeal on the brake, the
     // drift hisses as it hooks up.
@@ -597,6 +652,16 @@ return {
     if (e.t === 'button' && e.btn === 'X') { if (e.pressed && !S.input.drift) SoundKit.play('swish', { pitch: 0.7, volume: 0.4 }); S.input.drift = e.pressed; }
     // BOOST is the shared held R1 (RB · Shift · the BOOST pill); A no longer dumps the meter.
     if (e.t === 'button' && e.btn === 'R1') S.boostHeld = e.pressed;
+    // TRICKS, only in the air. B and Y with a stick direction, the same binding the board modes use, so the
+    // BUTTONS map on the start screen reads them without a special case. A press that cannot act is answered:
+    // asking for a FULL SPIN off a kicker says so by name rather than quietly handing over something smaller.
+    if (e.t === 'button' && e.pressed && (e.btn === 'B' || e.btn === 'Y')) {
+      if (!S.air.airborne) { refuse(ctx, 'NOT IN THE AIR'); return; }
+      const next = startTrick(S.air, S.input.steer, S.stickY, e.btn);
+      S.air = next;
+      if (next.refusal) refuse(ctx, next.refusal);
+      else if (next.trick) { say(next.trick.label, 0.7); SoundKit.play('swish', { pitch: 1.15, volume: 0.42 }); }
+    }
   },
 
   update(ctx: ModeContext, dt: number): void {
@@ -604,7 +669,9 @@ return {
     if (!state || !kart || S.done) return;
 
     prevPos.copyFrom(state.pos);
-    const on = onTrack(state.pos, course);
+    // AIRBORNE COUNTS AS ON-ROAD. Off-track costs grip and top speed, and a kart over a rooftop gap is off the
+    // polyline by definition — taxing a jump for leaving the road is the opposite of the intent.
+    const on = S.air.airborne || onTrack(state.pos, course);
     if (!on) {
       S.offRoadSec += dt;
       // SCORECARD FEEL (2026-09-15): OFF THE ROAD was a number on the HUD and nothing else — the grass is a penalty you
@@ -616,6 +683,64 @@ return {
     const bev = boost.update(dt, S.boostHeld, true);
     S.input.boostK = boost.k;
     stepKart(state, S.input, dt, on, kartSpec);
+
+    // ── THE ROAD HAS HEIGHT NOW, so something has to put the kart on it ──────────────────────────────────
+    //
+    // stepKart moves x and z and leaves y alone, which was right while every kart course sat flat. On ALPINE
+    // DESCENT's 96 m drop the kart would have held its starting height and flown, then sunk through the road on
+    // the way back up. The line is the road, so the line's height is the kart's height.
+    if (circuit) {
+      const at = locate(circuit.line, state.pos.x, state.pos.z);
+      const roadY = at.point.y;
+      const lineLen = circuit.line.length;
+
+      // A LIP CROSSED IS A LAUNCH. Measured by distance along the line rather than by touching a mesh: the ramp
+      // mesh is cosmetic and a physics contact would miss at 26 m/s between frames.
+      if (!S.air.airborne && S.lastDist !== null && Math.abs(at.lateral) < circuit.halfWidth) {
+        const prev = S.lastDist, now = at.dist;
+        for (const r of circuit.ramps) {
+          const lip = r.dist + r.run * 0.5;
+          if (crossedLip(prev, now, lip, lineLen) && state.speed > 6) {
+            S.air = launch(S.air, { speed: state.speed, pitchDeg: r.pitch, boosting: boost.k > 0.2 });
+            const hint = S.air.airSec >= 0.46 ? 'TRICK!' : 'AIR';
+            say(hint, 0.6);
+            SoundKit.play('whoosh', { pitch: 1.25, volume: 0.5 });
+            break;
+          }
+        }
+      }
+
+      if (S.air.airborne) {
+        const tangentDeg = (Math.atan2(at.tangent.x, at.tangent.z) * 180) / Math.PI;
+        const headingDeg = (state.heading * 180) / Math.PI;
+        let yawErr = ((headingDeg - tangentDeg + 540) % 360) - 180;
+        const next = stepAir(S.air, dt, {
+          groundClearance: S.air.height > 0.02 || S.air.t < dt * 1.5 ? 1 : -1,
+          yawErrorDeg: yawErr,
+        });
+        S.air = next;
+
+        if (next.landed) {
+          const L = next.landed;
+          const earn = boostEarnFor(L);
+          if (earn) boost.earn(earn.what, earn.scale);
+          if (L.trick && L.bailed) {
+            say(`BAILED — ${L.trick.label}`, 1.1);
+            SoundKit.play('squeak', { pitch: 0.7, volume: 0.5 });
+          } else if (L.trick) {
+            say(`${L.trick.label} +${L.pts}`, 1.2);
+            ctx.juice.scorePop(kart.position.add(new Vector3(0, 1.8, 0)), `${L.trick.label} +${L.pts}`, '#fbbf24');
+            ctx.momentum.report({ kind: 'chain', weight: 10 + L.pts * 0.2 });
+            SoundKit.play('swish', { pitch: 1.5, volume: 0.55 });
+          } else if (L.clean01 > 0.7 && L.airSec > 0.4) {
+            SoundKit.play('thud', { pitch: 1.0, volume: 0.35 });
+          }
+        }
+      }
+
+      state.pos.y = roadY + S.air.height;
+      S.lastDist = at.dist;
+    }
 
     // the kart rides the road; y is cosmetic here because the track is flat
     kart.position.set(state.pos.x, KART_RIDE_Y, state.pos.z);
@@ -733,6 +858,10 @@ return {
     roadTex?.dispose(); roadTex = null;
     for (const rk of rivalKarts) rk.dispose();
     rivalKarts = []; rivals = []; line = null;
+    ramps.forEach((m) => m.dispose());
+    ramps = [];
+    S.air = idleAir();
+    S.lastDist = null;
     state = null;
   },
 };

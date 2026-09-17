@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BAIL_BELOW, KART_AIR_G, KART_TRICKS, MIN_TRICK_AIR, biggestFitting, boostEarnFor,
+  BAIL_BELOW, KART_AIR_G, KART_TRICKS, MIN_TRICK_AIR, biggestFitting, boostEarnFor, crossedLip,
   idleAir, kartTrickFor, launch, startTrick, stepAir, type KartAirState,
 } from './KartAir';
 import { basePts } from './BoardTricks';
@@ -190,6 +190,42 @@ describe('kart air', () => {
       const s = fly(launch(idleAir(), { speed: 26, pitchDeg: RAMPS.jump, boosting: false }),
                     { yawErrorDeg: 50 });
       expect(boostEarnFor(s.landed!)).toBeNull();
+    });
+  });
+
+  describe('spotting a ramp lip', () => {
+    const LAP = 1000;
+
+    it('fires on the frame the lip is passed', () => {
+      expect(crossedLip(398, 402, 400, LAP)).toBe(true);
+    });
+
+    it('does not fire before or after', () => {
+      expect(crossedLip(390, 398, 400, LAP)).toBe(false);
+      expect(crossedLip(402, 410, 400, LAP)).toBe(false);
+    });
+
+    it('fires exactly once for a lip landed on precisely', () => {
+      expect(crossedLip(398, 400, 400, LAP)).toBe(true);
+      expect(crossedLip(400, 402, 400, LAP)).toBe(false);
+    });
+
+    it('still fires for a ramp just after the start line', () => {
+      // the frame the kart wraps: prev is nearly a full lap, now is a few metres. A naive prev < lip <= now
+      // stops firing here, which would silently kill every ramp on the second and third laps.
+      expect(crossedLip(998, 4, 2, LAP)).toBe(true);
+    });
+
+    it('and for one just before it', () => {
+      expect(crossedLip(998, 4, 999, LAP)).toBe(true);
+    });
+
+    it('does not fire on a wrap for a lip in the middle of the lap', () => {
+      expect(crossedLip(998, 4, 500, LAP)).toBe(false);
+    });
+
+    it('is not fooled by a lap length of zero', () => {
+      expect(crossedLip(0, 0, 0, 0)).toBe(false);
     });
   });
 

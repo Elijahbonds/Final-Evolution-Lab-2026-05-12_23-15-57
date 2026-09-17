@@ -87,6 +87,20 @@ export function biggestFitting(airSec: number): BoardTrick | null {
   return fits.length ? fits.reduce((a, b) => (basePts(b) > basePts(a) ? b : a)) : null;
 }
 
+/**
+ * Did the kart pass `lip` this frame, measured as distance along the lap?
+ *
+ * Measured along the line rather than by touching the ramp mesh, because at 26 m/s a kart covers 0.43 m a frame
+ * and a contact test misses between frames. The wrap case is the one worth having a test for: on the frame the
+ * kart crosses the start line, `now` is a small number and `prev` is nearly a full lap, so a naive prev < lip <= now
+ * silently stops firing for every ramp on the lap.
+ */
+export function crossedLip(prev: number, now: number, lip: number, lapLength: number): boolean {
+  if (lapLength <= 0) return false;
+  const wrapped = now < prev - lapLength * 0.5;
+  return wrapped ? (prev < lip || lip <= now) : (prev < lip && lip <= now);
+}
+
 export interface KartAirState {
   airborne: boolean;
   /** Seconds since the wheels left. */
