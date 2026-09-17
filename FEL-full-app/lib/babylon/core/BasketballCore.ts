@@ -471,6 +471,7 @@ export class DefenderBrain implements AIBehavior {
   private over = true; private navigating = 0; private prevFoes: Vector3[] = [];
   /** The job this frame, for the mode's stance / facing / probes. */
   job: DefenseJob = 'deny';
+  private closingOut = false;   // DEFENSE-LOOK: the closeout is sticky until he is on the man
   /** The objective the job faces (the handler, the boxed man, the ball). */
   objective: Vector3 | null = null;
   boxOut(mark: Vector3 | null): void { this.boxTarget = mark ? mark.clone() : null; }
@@ -562,7 +563,18 @@ export class DefenderBrain implements AIBehavior {
     // an entire possession and could never be caught closing (which the hesi
     // bite needs). A statue can't bite on a fake; a sliding defender can.
     const anchor = onBall ? ball : mark!;
-    const lever = press ? 0.12 : onBall ? 0.35 + Math.min(1, handlerSpeed / 6) * 0.25 : 0.30;
+    // DEFENSE-LOOK (2026-09-17). Two reads a real defender makes that this one never did:
+    //   BEATEN — the handler is nearer the rim than I am: stop guarding the spot he left, RECOVER toward the rim at a run
+    //            (the deny point drops to the rim side of him) with the chest still on him — the backpedal.
+    //   CLOSEOUT — he has the ball with space and is not moving: the deny point is a run away; sprint it, and the tree
+    //            chops the last two metres under a high hand (the mode reads `job === 'closeout'`).
+    const handlerDist = distXZ(self, ball);
+    const beaten = onBall && distXZ(ball, hoop) < distXZ(self, hoop) - 0.4 && handlerDist > 0.8;
+    // sticky: a closeout that started keeps going until he is on the man (measured without it: closeout ↔ onball flipping
+    // every frame as the distance crossed 2.6 m, and the tree with it)
+    const closingOut = onBall && !beaten && (this.closingOut ? handlerDist > 1.5 : handlerDist > 2.6 && handlerSpeed < 0.9);
+    this.closingOut = closingOut;
+    const lever = beaten ? 0.6 : press ? 0.12 : onBall ? 0.35 + Math.min(1, handlerSpeed / 6) * 0.25 : 0.30;
     let denyPoint = Vector3.Lerp(anchor, hoop, lever);
     if (!onBall) denyPoint = Vector3.Lerp(denyPoint, ball, 0.22);
     if (helping) denyPoint = Vector3.Lerp(hoop, ball, 0.2);   // the low man steps INTO the drive
@@ -576,7 +588,7 @@ export class DefenderBrain implements AIBehavior {
       if (nav) { if (this.navigating <= 0) this.over = Math.random() < 0.6; this.navigating = 0.5; to.addInPlace(nav.scale(1.6)); fighting = true; break; }
     }
     this.navigating = Math.max(0, this.navigating - dt);
-    this.job = fighting ? 'navigate' : helping ? 'help' : onBall ? 'onball' : 'deny';
+    this.job = fighting ? 'navigate' : helping ? 'help' : beaten ? 'recover' : closingOut ? 'closeout' : onBall ? 'onball' : 'deny';
     this.objective = onBall ? (mark ?? ball) : ball;
     // PLANAR distance. Vector3.Distance includes Y, and the deny point's Y
     // is lerped toward the rim (y=3.05) while the defender's feet are at 0 —
@@ -589,7 +601,7 @@ export class DefenderBrain implements AIBehavior {
     // approach 0.6m short of the press point, which parked the defender at
     // ~1.4m — just OUTSIDE poke range (1.1m). Pressure without arrival is a
     // statue with intent. Measured live: never stripped, never stole.
-    const out = steer(to, dist > 3 && !fighting, press ? 0.2 : onBall ? 0.6 : 1.4,
+    const out = steer(to, (dist > 3 || beaten || closingOut) && !fighting, press ? 0.2 : onBall ? 0.6 : 1.4,
       onBall && dist < 1.1 && Math.random() < this.aggression * 0.02);
     if (fighting && this.over) { out.moveX *= 0.7; out.moveY *= 0.7; }   // fighting OVER the screen costs speed (FIGHT_SLOW)
     return out;
@@ -818,10 +830,11 @@ export class ShotArc {
 }
 
 // ── NEW (v3): drive dunks ────────────────────────────────────────────────
-export type DriveDunkKind = 'none' | 'dunk' | 'poster';
+export type DriveDunkKind = 'none' | 'dunk' | 'poster' | 'standing';   // 'standing' (DEFENSE-LOOK, 2026-09-17): R2 + Square under the rim with no run-up
 export const DUNK_RANGE = 2.8;
 export const DUNK_MIN_SPEED = 3.4;
 export const DUNK_MIN_TURBO = 0.25;
+export const STANDING_DUNK_RANGE = 1.6;      // inside this, turbo + shoot with no run-up is a two-foot standing dunk
 /** Attacking the rim at speed with turbo converts the attempt to a dunk;
  *  a defender parked inside the drive line makes it a posterize attempt. */
 export function checkDriveDunk(shooter: Vector3, vel: Vector3, hoop: Vector3, turbo01: number, defender: Vector3 | null): DriveDunkKind {
@@ -832,13 +845,17 @@ export function checkDriveDunk(shooter: Vector3, vel: Vector3, hoop: Vector3, tu
   // dunk at the worst moment: the shooter's own y climbs as he gathers, so a drive that qualified on the floor could
   // fall out of range in the air, which is exactly when the gate is read.
   const dist = distXZ(shooter, hoop);
+  // THE STANDING DUNK (DEFENSE-LOOK, 2026-09-17). Under the rim with turbo held and the shoot button, a body that is NOT
+  // running is asking for a two-foot dunk — the gate demanded DUNK_MIN_SPEED and gave him a layup instead. A defender on
+  // him makes it a poster like any other.
+  if (dist <= STANDING_DUNK_RANGE && turbo01 >= DUNK_MIN_TURBO && vel.length() < DUNK_MIN_SPEED) return defender && distXZ(defender, shooter) < 1.5 ? 'poster' : 'standing';
   if (dist > DUNK_RANGE || vel.length() < DUNK_MIN_SPEED || turbo01 < DUNK_MIN_TURBO) return 'none';
   const toHoop = hoop.subtract(shooter); toHoop.y = 0;
   if (Vector3.Dot(vel, toHoop) <= 0) return 'none';                 // must be attacking, not retreating
   if (defender && distXZ(defender, shooter) < 1.5) return 'poster';
   return 'dunk';
 }
-export const DUNK_PCT: Record<Exclude<DriveDunkKind, 'none'>, number> = { dunk: 0.92, poster: 0.78 };
+export const DUNK_PCT: Record<Exclude<DriveDunkKind, 'none'>, number> = { dunk: 0.92, poster: 0.78, standing: 0.95 };   // a standing flush under the rim is the surest shot there is
 
 // ── NEW (v3): shot blocking ──────────────────────────────────────────────
 export const BLOCK_RANGE = 1.5;

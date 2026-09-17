@@ -560,3 +560,39 @@ export function buildEuroStep(scene: Scene, sk: Skeleton, sell: 'left' | 'right'
   if (sell === 'right') return buildPoseClip(scene, sk, 'bball_euro_step', 0.48, EURO_KEYS);
   return buildPoseClip(scene, sk, 'bball_euro_step_left', 0.48, EURO_KEYS.map(mirrorKey));
 }
+
+// ── DEFENSE-LOOK (2026-09-17): the retreat, the closeout, the sat-down slide ─────────────────────────────────────────
+// Authored fallbacks; opponentMotion swaps in the captures (bball_mc_defend_backpedal — CMU 78_24; the hard slides —
+// CMU 78_26) on every hoops body. The closeout has no capture: it is short chop steps under a high hand, authored.
+
+/** Backpedal: dropping back with the chest still on the man — low, hands out, feet reaching back in short steps. Loops. */
+export function buildDefendBackpedal(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const hands = { Left: [-0.32, 1.02, 0.26] as V3, Right: [0.32, 1.02, 0.26] as V3 };
+  const key = (t: number, lead: Deg3, trail: Deg3, leadKnee: number, trailKnee: number) => ({ t, bones: { Hips: [0, 0, 0] as Deg3, Spine: [24, 0, 0] as Deg3, LeftUpLeg: lead, RightUpLeg: trail, LeftLeg: [leadKnee, 0, 0] as Deg3, RightLeg: [trailKnee, 0, 0] as Deg3 }, hands, hipsY: -0.10 });
+  return buildPoseClip(scene, sk, 'bball_defend_backpedal', 0.6, [
+    key(0,    [-30, 0, 10], [-8, 0, -10], 44, 18),   // left leg under, right foot reaching back
+    key(0.3,  [-8, 0, 10],  [-30, 0, -10], 18, 44),  // …and the other
+    key(0.6,  [-30, 0, 10], [-8, 0, -10], 44, 18),
+  ]);
+}
+
+/** Closeout: the last two metres on a catch — chest up, one hand HIGH at the shooter's release, feet chopping. Loops. */
+export function buildCloseout(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const hands = { Left: [-0.24, 1.50, 0.30] as V3, Right: [0.30, 2.05, 0.24] as V3 };
+  const key = (t: number, lead: Deg3, trail: Deg3, leadKnee: number, trailKnee: number) => ({ t, bones: { Hips: [0, 0, 0] as Deg3, Spine: [10, 0, -3] as Deg3, LeftUpLeg: lead, RightUpLeg: trail, LeftLeg: [leadKnee, 0, 0] as Deg3, RightLeg: [trailKnee, 0, 0] as Deg3 }, hands, hipsY: -0.06 });
+  return buildPoseClip(scene, sk, 'bball_closeout', 0.4, [
+    key(0,   [-26, 0, 8], [-10, 0, -8], 34, 16),
+    key(0.2, [-10, 0, 8], [-26, 0, -8], 16, 34),
+    key(0.4, [-26, 0, 8], [-10, 0, -8], 34, 16),
+  ]);
+}
+
+/** The hard slide: sat down — hips a hand lower than the stance slide, thighs wider, chest tall. Loops. */
+export function buildDefendSlideHard(scene: Scene, sk: Skeleton, dir: 'left' | 'right'): AnimationGroup | null {
+  const s = dir === 'left' ? 1 : -1;
+  const hands = { Left: [-0.42, 0.98, 0.34] as V3, Right: [0.42, 0.98, 0.34] as V3 };
+  const key = (t: number, roll: number, lead: Deg3, trail: Deg3, hipsY: number) => ({ t, bones: { Hips: [0, 0, roll * s] as Deg3, Spine: [26, 0, -5 * s] as Deg3, LeftUpLeg: lead, RightUpLeg: trail, LeftLeg: [52, 0, 0] as Deg3, RightLeg: [52, 0, 0] as Deg3 }, hands, hipsY });
+  return buildPoseClip(scene, sk, `bball_defend_slide_hard_${dir}`, 0.5, [
+    key(0, 5, [-40, 0, 30], [-40, 0, -30], -0.18), key(0.25, 10, [-48, 0, 40], [-32, 0, -18], -0.20), key(0.5, 5, [-40, 0, 30], [-40, 0, -30], -0.18),
+  ]);
+}

@@ -87,3 +87,15 @@ export function buildCelebrateBig(scene: Scene, sk: Skeleton): AnimationGroup | 
     { t: T,   bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], LeftUpLeg: [-10, 0, 4], LeftLeg: [14, 0, 0], RightUpLeg: [-10, 0, -4], RightLeg: [14, 0, 0] }, hands: FLEX, poles: FLEX_POLES, hipsY: 0 },
   ]);
 }
+
+// REVERSE (DEFENSE-LOOK, 2026-09-17) — the baseline dunk. The flight turns the back to the iron (HoopsDunk.reverse), so
+// the ball goes up in front of the chest, over the head, and is flushed BEHIND it: the arch is the shape (Spine −30),
+// both hands, the legs long. Body-local +z is forward, so 'behind the head' is −z.
+export function buildFinishReverse(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.7;
+  return buildPoseClip(scene, sk, 'dunk_finish_reverse', T, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0],  ...TAKEOFF_LEGS }, hands: { Left: [-0.22, 1.80, 0.12], Right: [0.22, 1.80, 0.12] }, poles: UP },   // ball up in front, off one foot
+    { t: 0.4,  bones: { Hips: [0, 0, 0], Spine: [-30, 0, 0], ...SPREAD_LEGS }, hands: { Left: [-0.20, 2.04, -0.28], Right: [0.20, 2.04, -0.28] }, poles: UP },  // the arch: ball over and behind the head
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [-18, 0, 0], ...LONG_LEGS },   hands: { Left: [-0.18, 1.86, -0.44], Right: [0.18, 1.86, -0.44] }, poles: UP },  // flushed behind, body long
+  ]);
+}

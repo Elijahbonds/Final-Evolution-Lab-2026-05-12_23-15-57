@@ -131,7 +131,7 @@ await page.evaluate(`(() => {
   // a probe can say "go there" rather than "push forward and hope the camera agrees".
   window.__steer = (tx, tz, ms) => {
     const q = window.__FEL_QA__; const a = window.__NEXUS_AGENT__;
-    const scene = q && q.scene ? q.scene() : null; const cam = scene && scene.activeCamera;
+    const scene = q && q.scene ? q.scene() : null; const cam = window.__eyeCam ? window.__eyeCam.prev : (scene && scene.activeCamera);   // the mode maps sticks through the DIRECTOR's camera, eye or no eye
     // hero() hands back the ROOT NODE, not a point — reading .x off it gives undefined, every wish comes out NaN,
     // (and no backtick in this comment: it lives inside a template literal, which one would end — a trap this repo
     // has now sprung three times)
@@ -202,6 +202,15 @@ await page.evaluate(`(() => {
 const agent = async (expr: string) => page.evaluate(`(async () => { const a = window.__NEXUS_AGENT__; if (!a) return 'no bridge'; return await (${expr}); })()`);
 const hud = async () => page.evaluate('window.__hudNow()') as Promise<Record<string, unknown>>;
 
+const EYE = process.env.EYE === '1';
+const EYE_TARGET = process.env.EYE_TARGET ?? 'hero';   // 'foe' frames the rival (in 1v1: the defender while I attack)
+const EYE_OUT = `${OUT}/seq`; if (EYE) fs.mkdirSync(EYE_OUT, { recursive: true });
+if (EYE) await page.evaluate(`(() => { const q = window.__FEL_QA__; const s = q && q.scene ? q.scene() : null; const hn = q.hero ? q.hero() : null; const p = hn && (hn.position || hn); if (!s || !p) return 'no scene';
+  const V = p.constructor; const prev = s.activeCamera; const C = prev.constructor; const off = [${process.env.SIDE ?? '3.6,1.3,0.4'}];
+  const cam = new C('eye_cam', new V(p.x + off[0], p.y + off[1], p.z + off[2]), s); cam.minZ = 0.05; cam.fov = prev.fov;
+  const tgt = () => { if (${JSON.stringify(EYE_TARGET)} === 'foe') { const d = window.__dev && window.__dev(); const fr = d && (typeof d.driverRoot === 'function' ? d.driverRoot() : d.foeRoot); if (fr && fr.position) return fr.position; } return hn.position || hn; };
+  const obs = s.onBeforeRenderObservable.add(() => { const pp = tgt(); cam.position.set(pp.x + off[0], pp.y + off[1], pp.z + off[2]); cam.setTarget(new V(pp.x, pp.y + 1.0, pp.z)); });
+  s.activeCamera = cam; window.__eyeCam = { cam, prev, obs }; return 'on'; })()`).then((r) => console.log('[LAB] eye cam', r));
 const started = await agent('a.start(30000)');
 console.log('[LAB] bridge start →', JSON.stringify(started));
 await page.waitForTimeout(1500);
@@ -267,6 +276,15 @@ for (let n = 0; n < POSSESSIONS; n++) {
   await page.evaluate('(() => { window.__meter = { peak: 0, frames: 0 }; })()');
 
   const onOffence = !wantDefence;
+    const eyeP = EYE ? (async () => {   // frames of the sequence, armed BEFORE the play (it polls while the play runs)
+      const t0 = Date.now(); let fired = false;
+      while (Date.now() - t0 < 4500 && !fired) {
+        const go = await page.evaluate(`(() => { const d = window.__dev(); const p = d && d.post ? d.post() : {}; const fk = d && d.flightK ? d.flightK() : -1; const ja = d && d.myJumpAge ? d.myJumpAge() : Infinity; return !!(p.shooting || p.finish || p.gather || fk >= 0 || ja < 0.3); })()`).catch(() => false);
+        if (go) { fired = true; for (let i = 0; i < 8; i++) { const held = await page.evaluate(`(() => { const d = window.__dev(); const p = d && d.post ? d.post() : {}; const h = window.__hudNow(); const hn = window.__FEL_QA__.hero(); const y = hn && (hn.position || hn).y; return (p.held || '-') + ' ' + (h.shotType || '') + ' ' + (h.banner || '') + ' y=' + (typeof y === 'number' ? y.toFixed(2) : '?'); })()`).catch(() => '?'); await page.screenshot({ path: `${EYE_OUT}/${TAG}-p${n}-${i}.png`, clip: { x: 360, y: 90, width: 560, height: 620 } }); console.log(`[EYE] p${n} #${i} ${held}`); await page.waitForTimeout(110); } }
+        else await page.waitForTimeout(50);
+      }
+      if (!fired) console.log(`[EYE] p${n} nothing to frame`);
+    })() : null;
   const play = onOffence ? (PLAY === 'mix' ? PLAYS[n % PLAYS.length] : PLAY) : 'defence';
   let trace: string[] = [];
   if (onOffence) {
@@ -347,6 +365,21 @@ for (let n = 0; n < POSSESSIONS; n++) {
       await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
       await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: 0, action: true }, 80)`);
     }
+    else if (play === 'standing') {   // DEFENSE-LOOK: walk in under the rim, stop, R2 + Square with no run-up
+      await page.evaluate(`(() => { const d = window.__dev(); return d && d.standing ? d.standing() : false; })()`);   // the seam sets the geometry (a steered walk-in got stripped or never arrived)
+      await page.waitForTimeout(350);
+      await agent(`a.act({ moveX: 0, moveY: 0.25, sprint: true, turbo: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
+      await agent(`a.act({ moveX: 0, moveY: 0.25, sprint: true, turbo: true, actionHeld: 0, action: true }, 80)`);
+    }
+    else if (play === 'baseline') {   // DEFENSE-LOOK: to the corner beside the rim, then along the baseline at it
+      const t0 = Date.now();
+      while (Date.now() - t0 < 3200) { const there = await page.evaluate(`window.__steer(4.2, -0.4, 140) === false`); if (there) break; await page.waitForTimeout(130); }
+      await agent(`a.act({ moveX: 0, moveY: 0 }, 200)`);
+      const t1 = Date.now();
+      while (Date.now() - t1 < 1100) { const there = await page.evaluate(`window.__steer(1.4, -0.6, 140) === false`); if (there) break; await page.waitForTimeout(100); }
+      await agent(`a.act({ moveX: -1, moveY: 0, sprint: true, turbo: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
+      await agent(`a.act({ moveX: -1, moveY: 0, sprint: true, turbo: true, actionHeld: 0, action: true }, 80)`);
+    }
     else if (play === 'layup') {
       // DRIVE, THEN GATHER. A full-stick drive is a SPRINT — AgentControlSource derives sprint from the stick
       // magnitude (`hypot > 0.85`), exactly as LocalInputSource does — so arriving at the rim at full speed with
@@ -362,6 +395,7 @@ for (let n = 0; n < POSSESSIONS; n++) {
 
     // WHAT DID THE SQUEEZE ACTUALLY DO? A possession that reports "meter 0.00, no beats, no points" is not evidence of
     // a bad layup — it is the absence of a shot, and the mode's own seam says which. Sampled to feet-down.
+    if (eyeP) await eyeP;
     trace = await page.evaluate(`(async () => {
       const seen = []; const t0 = Date.now();
       while (Date.now() - t0 < 3200) {

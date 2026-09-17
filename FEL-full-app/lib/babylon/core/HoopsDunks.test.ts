@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  pickHoopsDunk, dunkSpeedRatio, POWER, TOMAHAWK, WINDMILL, CRADLE, DOUBLE_CLUTCH, SPIN_360, EASTBAY,
+  pickHoopsDunk, dunkSpeedRatio, POWER, TOMAHAWK, WINDMILL, CRADLE, DOUBLE_CLUTCH, SPIN_360, EASTBAY, REVERSE, STANDING, BASELINE,
   WINDUP_SPEED, ANGLED, CROWDED, SHOWTIME_MOMENTUM, type DunkRead,
 } from './HoopsDunks';
 
@@ -8,6 +8,15 @@ import {
 const PLAIN: DunkRead = { speed: 3.6, lateral01: 0, contest01: 0, poster: false, momentum01: 0.5, roll: () => 0.99 };
 
 describe('pickHoopsDunk', () => {
+  it('DEFENSE-LOOK: a drive along the baseline is the reverse, and it turns the back to the rim', () => {
+    const d = pickHoopsDunk({ ...PLAIN, speed: 5.5, lateral01: BASELINE + 0.05 });
+    expect(d).toBe(REVERSE); expect(d.reverse).toBe(true);
+    expect(pickHoopsDunk({ ...PLAIN, speed: 5.5, lateral01: BASELINE - 0.1 })).toBe(WINDMILL);   // not that steep: the wind-up
+  });
+  it('DEFENSE-LOOK: a standing dunk is the two-hand flush, whatever the angle', () => {
+    expect(pickHoopsDunk({ ...PLAIN, speed: 0.4, lateral01: 0.9, standing: true })).toBe(STANDING);
+    expect(pickHoopsDunk({ ...PLAIN, speed: 0.4, standing: true, poster: true })).toBe(TOMAHAWK);   // …unless there is a body to go over
+  });
   it('the drive nobody contested, at a jog, straight on, is a power dunk — the one both modes used to play always', () => {
     expect(pickHoopsDunk(PLAIN)).toBe(POWER);
   });
@@ -46,7 +55,7 @@ describe('pickHoopsDunk', () => {
   it('and showtime is not EVERY trip — an unlucky roll at full momentum still falls through to the ordinary read', () => {
     const read = { ...PLAIN, speed: 9, momentum01: 1, roll: () => 0.99 };
     expect(pickHoopsDunk(read)).toBe(TOMAHAWK);             // straight on, fast
-    expect(pickHoopsDunk({ ...read, lateral01: 1 })).toBe(WINDMILL);
+    expect(pickHoopsDunk({ ...read, lateral01: 0.6 })).toBe(WINDMILL);   // angled, not baseline-steep (that is the REVERSE now)
   });
 
   it('the 360 sits between the eastbay and the ordinary read', () => {

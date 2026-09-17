@@ -120,6 +120,7 @@ import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPla
 import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
+import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-LOOK (2026-09-17)
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { pickHoopsDunk, dunkSpeedRatio } from '../core/HoopsDunks';
@@ -235,6 +236,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let driveMps = 0;                              // the drive's nominal speed — the dunk picker reads it (a clocked drive's velocity vector is ~0)
   let paintSec = 0, paintWarned = false;          // the three-second clock, and whether the ref has warned yet
   let goaltendCalled = false;                    // one call per shot
+  const lastFoeJobs = new Map<Body, string>();   // DEFENSE-LOOK: job-change log
   let foeShotScored = false;                     // the rival's release already banked its two (a goaltend on it whistles, it does not score again)
   let prevBallY = 0;                             // for the ball's vertical rate (goaltending reads it falling)
   let chargeLastGap = -1;                        // last frame's gap to the driver, for the closing RATE
@@ -318,9 +320,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let defenseLuck: number | null = null;                   // dev: force the AI's rolls (1 = always, 0 = never)
   const roll = (): number => defenseLuck ?? Math.random();   // dev: the roll VALUE forced (0 = every chance lands, 0.99 = none)
   const JUMP_SEC = 0.75, JUMP_APEX = 0.46;
+  const JUMPER_HOP_APEX = 0.30;   // DEFENSE-LOOK: a jump shot leaves the floor
+  let riseHop: { t: number; dur: number } | null = null;
   const DRIVE_MPS = 5.4;            // the rival's sprint drive (suite pass): the clock is distance / this. Past HoopsDunks' WINDUP_SPEED (5.0) on a full-length drive, so the vocabulary opens; a short drive stays a power dunk
   const TEAM_JERSEY = { mine: '#22d3ee', theirs: '#ff2d78' } as const;   // the slot colours the HUD already speaks (cyan = us, pink = them)
   const AI_REACH_COOLDOWN_SEC = 1.2, AI_STEAL_CHANCE = 0.22, AI_STEAL_ON_BUMP = 0.6, AI_REACH_GATE = 0.5;   // measured at 0.6 s: ten reaches and four reach-in fouls in nine possessions — a foul every other trip   // the AI defender's reach: its cadence and its odds (open / on the bump)
+  const STANDING_GATHER_MS = 220;   // DEFENSE-LOOK: the two-foot squat before a standing dunk's flight
   const DUNK_SHARE = 0.55;          // of the OPEN lanes, the share the rival throws down (the rest are layups); nerve tilts it
   const GATHER_TELL_SEC = 0.35;     // the last stretch of the drive reads as the GATHER — the block's window, on the seam and the hint
   // ── the OFF-BALL package (O1–O3) ──
@@ -621,6 +626,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       net?.tick(me.slot.intent);   // no-op without ?net=
       for (const b of everyBody()) { b.slot.poll(dt); b.stunSec = Math.max(0, b.stunSec - dt); if (b.jumpAge !== Infinity) { b.jumpAge += dt; b.char.root.position.y = jumpY(b.jumpAge); if (b.jumpAge >= JUMP_SEC) { b.jumpAge = Infinity; b.char.root.position.y = 0; } } }
       if (myJumpAge !== Infinity) myJumpAge += dt;
+      if (riseHop && !finish && !dunking) {   // DEFENSE-LOOK: the jump shot's hop
+        riseHop.t += dt;
+        me.char.root.position.y = Math.max(0, Math.sin(Math.min(1, riseHop.t / riseHop.dur) * Math.PI) * JUMPER_HOP_APEX);
+        if (riseHop.t >= riseHop.dur) { riseHop = null; me.char.root.position.y = 0; }
+      } else if (riseHop) riseHop = null;
       for (const f of foes) f.reachCooldown = Math.max(0, f.reachCooldown - dt);
       // D1–D3 clocks
       bumpAge += dt; meStunSec = Math.max(0, meStunSec - dt);
@@ -1071,6 +1081,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         speed01: drib.speed01, crossover: drib.crossover && iAmCarrier, crossoverDir: wish.x >= 0 ? 'right' : 'left', nearestDefender: nearestFoeDist, hasBall: iAmCarrier && !passFlight.active,
         shooting, dunking, driving: iAmCarrier && sprintOk && drib.speed01 > 0.6 && Vector3.Dot(me.drib.vel, RIM.subtract(me.char.root.position)) > 0,
         defending: carrierId === 'foeTeam', bracing: meBoxing, staggered: false, slideDir: slideDirFor(me.char.root.rotation.y, me.drib.vel),
+        retreat: retreatFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null), closeout: closeoutFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null, me.speed01), intense: !!me.slot.intent.intense,   // DEFENSE-LOOK
       });
       bioTick(me, dt, carrierId === 'foeTeam' ? 'defense' : 'offense', iAmCarrier && !passFlight.active, nearestFoeDist, me.tree.held === 'bball_block_reach' || meHandUp);
       Object.assign(me.bio, { posting, spinning: !!spin });   // HOOPS-MOVE-KIT-B: the seal turns the chest AWAY from the rim; the pivot owns it through the turn
@@ -1104,6 +1115,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           speedMps: Math.hypot(vel.x, vel.z),
           speed01: body.speed01, crossover: false, nearestDefender: Infinity, hasBall: carrierId === mateId && !passFlight.active, shooting: false, dunking: false, driving: false,
           defending: carrierId === 'foeTeam', bracing: !!mb?.boxing, staggered: false, slideDir: slideDirFor(body.char.root.rotation.y, vel),
+          retreat: retreatFor(body.char.root.position, vel, driver?.char.root.position ?? null),   // DEFENSE-LOOK
         });
         bioTick(body, dt, carrierId === 'foeTeam' ? 'defense' : 'offense', carrierId === mateId && !passFlight.active, Infinity, false);
         if (carrierId === (i === 0 ? 'mate0' : 'mate1') && Vector3.Distance(body.char.root.position, RIM) < 3.5 && Math.random() < 0.01) {
@@ -1157,10 +1169,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (db && db.fightingOver !== null && !f.screenHeld) { f.screenHeld = true; console.info(`[3V3-OFF] navigate ${db.fightingOver ? 'over' : 'under'} (foe${fi})`); }
         else if (db && db.fightingOver === null) f.screenHeld = false;
         f.speed01 = Math.min(1, vel.length() / 3.8);
+          if (db && db.job !== lastFoeJobs.get(f)) { lastFoeJobs.set(f, db.job); if (db.job === 'closeout' || db.job === 'recover') console.info(`[3V3-DEF] ${f.char.root.name} job ${db.job}`); }   // DEFENSE-LOOK
         f.tree.update({
           speedMps: Math.hypot(vel.x, vel.z),
           speed01: f.speed01, crossover: false, nearestDefender: Infinity, hasBall: false, shooting: false, dunking: false, driving: false,
           defending: carrierId !== 'foeTeam', bracing: !!db?.boxing, staggered: false, slideDir: slideDirFor(f.char.root.rotation.y, vel),
+          retreat: retreatFor(f.char.root.position, vel, carrierBody()?.char.root.position ?? null), closeout: db?.job === 'closeout' && distXZ(f.char.root.position, carrierBody()?.char.root.position ?? f.char.root.position) < 2.4, intense: db?.job === 'onball' && distXZ(f.char.root.position, carrierBody()?.char.root.position ?? f.char.root.position) < 2.0,   // DEFENSE-LOOK
         });
         bioTick(f, dt, carrierId === 'foeTeam' ? 'offense' : 'defense', false, Infinity, false);
       }
@@ -1512,7 +1526,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     startBoxOut('mine');   // O2: the shot is up — the defenders seal their men, the offense crashes
   }
 
-  function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster', defenderPos: Vector3 | null): void {
+  function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster' | 'standing', defenderPos: Vector3 | null): void {
     dunking = true; contactLatch = false; finishFoul = false;   // A+ P0: a fresh attempt gets one punch
     me.shotWin = 'none'; dunkFlush = null; let resolved = false; dunkFlight = { k: 0, made: null };   // BIOMECH-HOOPS-WAVE1
     lastDunkKind = 'clean';   // a clean dunk after a poster must not inherit the poster
@@ -1521,7 +1535,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const landing = new Vector3(RIM.x, 0, RIM.z + DRIVE_DUNK.landAheadZ);
     // HOOPS-MOVE-KIT-A M2: the contest is a BODY in the flight's path (the nearest defender; the 1v1's rule)
     const wall = defenderPos ? foes.find((f) => f.char.root.position === defenderPos) ?? null : null;
-    const c = contestDrive(from, landing, wall && wall.stunSec === 0 ? wall.char.root.position : null, wall ? wall.vel : null, kind);
+    const c = contestDrive(from, landing, wall && wall.stunSec === 0 ? wall.char.root.position : null, wall ? wall.vel : null, kind === 'standing' ? 'dunk' : kind);
     driveContest = c;
     console.info(`[3V3-CONTACT] drive contest ${kind} contested ${c.contested} t ${c.t.toFixed(2)} lateral ${c.lateral.toFixed(2)} set ${c.set} pct ${c.pct.toFixed(2)} wall ${wall ? (wall.stunSec > 0 ? 'stunned' : 'live') : 'none'}`);
     let made = Math.random() < c.pct;
@@ -1554,8 +1568,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // SET is one you go over; a late-sliding one is a shoulder you went through, and that is a windmill with
       // somebody in the frame.
       poster: kind === 'poster' && c.contested && c.set, momentum01: mbus.score01, roll,
+      standing: kind === 'standing',
     });
-    me.tree.beat(picked3.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked3, DRIVE_DUNK.flightMs / 1000) });
+    let gatherLeft = kind === 'standing' ? STANDING_GATHER_MS : 0;   // DEFENSE-LOOK: the two-foot squat before a standing dunk's flight
+    if (gatherLeft > 0) me.tree.beat('dunk_charge_gather', { fadeSec: 0.06 });
+    else me.tree.beat(picked3.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked3, DRIVE_DUNK.flightMs / 1000) });
     ctx.setHud({ shotType: picked3.label });
     if (picked3.flashy) ctx.camDirector.pulse(0.35, 0.4);
     console.info(`[3V3-DUNK] ${picked3.label} (${picked3.clip}) speed ${speed3.toFixed(1)} lateral ${lateral3.toFixed(2)} momentum ${mbus.score01.toFixed(2)}`);
@@ -1565,6 +1582,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const obs = ctx.scene.onBeforeRenderObservable.add(() => {
       const nowMs = performance.now(); const realMs = Math.min(50, nowMs - last); last = nowMs;
       const fdt = realMs / 1000;
+      if (gatherLeft > 0) { gatherLeft -= realMs; if (gatherLeft <= 0) me.tree.beat(picked3.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked3, DRIVE_DUNK.flightMs / 1000) }); return; }
       let scale = 1;
       if (freezeMs > 0) { freezeMs -= realMs; scale = 0; }
       else if (slowMs > 0) { slowMs -= realMs; scale = BUMP_SLOW; }
@@ -1575,7 +1593,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       me.char.root.position.y = driveDunkY(k);
       // BIOMECH-HOOPS-WAVE1 G1/G3/G6 (the 1v1's): the chest eases onto the iron through the flight; the slam resolves AT THE
       // IRON — a make flushes through the net, a miss clanks off the front (it used to let go on the feet-down frame)
-      me.char.root.rotation.y = slewYaw(me.char.root.rotation.y, yawTo(me.char.root.position, RIM), FACE_RIM_RATE, fdt);
+      me.char.root.rotation.y = slewYaw(me.char.root.rotation.y, yawTo(me.char.root.position, RIM) + (picked3.reverse ? Math.PI : 0), FACE_RIM_RATE * (picked3.reverse ? 2 : 1), fdt);   // a REVERSE turns its back to the iron
       dunkFlight = { k, made: resolved ? made : null };
       // M2: the bodies meet — the bump
       if (!bumped && c.bumpK !== null && wall && k >= c.bumpK) {
@@ -1677,6 +1695,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   }
   function beginRise(): void {
     me.shotWin = 'load'; me.shotSec = 0;
+    riseHop = { t: 0, dur: shotMeter.riseSec + 0.32 };   // DEFENSE-LOOK: leave the floor with the rise, land a beat after the release
     const clipSec = me.char.animator.durationOf('jumpshot') ?? 1.0;
     const greenInRise01 = (shotMeter.greenCenter01 * shotMeter.durationSec - shotMeter.gatherSec) / shotMeter.riseSec;
     me.tree.hold('jumpshot', { speedRatio: syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, releaseFrameOf(me.char.animator, 'jumpshot', RELEASE_FRAME_01)), fadeSec: 0.08 });
@@ -2327,7 +2346,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         shooter.char.root.position.x = from.x + (RIM.x - from.x) * k;
         shooter.char.root.position.z = from.z + (RIM.z + DRIVE_DUNK.landAheadZ - from.z) * k;
         shooter.char.root.position.y = driveDunkY(k);
-        shooter.char.root.rotation.y = slewYaw(shooter.char.root.rotation.y, yawTo(shooter.char.root.position, RIM), FACE_RIM_RATE, fdt);
+        shooter.char.root.rotation.y = slewYaw(shooter.char.root.rotation.y, yawTo(shooter.char.root.position, RIM) + (theirDunk.reverse ? Math.PI : 0), FACE_RIM_RATE * (theirDunk.reverse ? 2 : 1), fdt);
         foeDunkFlight = { k, made: resolved ? made && !swatted : null };
         if (!swatted && !resolved && jumpSwats(k, myJumpAge, Math.min(distXZ(me.char.root.position, shooter.char.root.position), distXZ(me.char.root.position, ball.getAbsolutePosition())))) {
           swatted = true; made = false;

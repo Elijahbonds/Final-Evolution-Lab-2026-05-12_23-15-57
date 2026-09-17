@@ -11,7 +11,8 @@ import { ledgerFor, scopeAllows, scopeForScene, suiteOfClip, type ClipScope } fr
 import { buildEastbay } from './eastbay';
 import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from './dunkSuite';
 import { buildMocapDunk } from './mocapDunk';
-import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig } from './dunkFinishes';
+import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig, buildFinishReverse } from './dunkFinishes';
+import { buildDefendBackpedal, buildCloseout, buildDefendSlideHard } from './basketball';   // DEFENSE-LOOK (2026-09-17)
 import { buildStackBase, buildStackRider, buildRowStand, buildRowCrouch, buildBikeRider, buildSkateRider } from './stackProp';
 import { buildSelfLob, buildBounceThrow, buildKickUp, buildBackHandspring, buildBackflip, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildWindmill360, buildFakeEastbay, buildTap } from './dunkTricks';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
@@ -66,6 +67,7 @@ export function registerAuthoredClips(
     ['dunk_land_crouch', () => buildLandCrouch(scene, skeleton)],
     ['dunk_finish_windmill', () => buildFinishWindmill(scene, skeleton)],
     ['dunk_finish_tomahawk', () => buildFinishTomahawk(scene, skeleton)],
+    ['dunk_finish_reverse', () => buildFinishReverse(scene, skeleton)],   // DEFENSE-LOOK (2026-09-17): the baseline reverse
     ['dunk_finish_blown', () => buildFinishBlown(scene, skeleton)],
     ['dunk_celebrate_big', () => buildCelebrateBig(scene, skeleton)],
     // DUNK-CONTROL-JUICE (2026-09-08): the named dunks — runway beats (self-lob, kick-up, cartwheel, double-up) and air shapes
@@ -182,6 +184,10 @@ export function registerAuthoredClips(
     ['bball_euro_step_left', () => buildEuroStep(scene, skeleton, 'left')],        // a euro that sells LEFT
     ['bball_defend_slide_left', () => buildDefendSlide(scene, skeleton, 'left')],
     ['bball_defend_slide_right', () => buildDefendSlide(scene, skeleton, 'right')],
+    ['bball_defend_backpedal', () => buildDefendBackpedal(scene, skeleton)],                 // DEFENSE-LOOK (2026-09-17): the retreat
+    ['bball_closeout', () => buildCloseout(scene, skeleton)],                                 // …the closeout
+    ['bball_defend_slide_hard_left', () => buildDefendSlideHard(scene, skeleton, 'left')],   // …and the sat-down slide (intense D)
+    ['bball_defend_slide_hard_right', () => buildDefendSlideHard(scene, skeleton, 'right')],
     ['bball_block_reach', () => buildBlockReach(scene, skeleton)],
     ['bball_steal_reach', () => buildStealReach(scene, skeleton)],
     ['bball_follow_through', () => buildFollowThrough(scene, skeleton)],   // BIOMECH-HOOPS-WAVE1 (2026-09-08): the shot's follow-through (G5)

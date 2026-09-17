@@ -25,6 +25,7 @@ export type BasketballAnimState =
   | 'idle_dribble' | 'speed_dribble' | 'crossover' | 'crossover_right' | 'protect'
   | 'drive' | 'gather' | 'shot_release' | 'layup' | 'dunk'
   | 'contact_stagger' | 'defend_slide' | 'defend_slide_right' | 'defend_idle' | 'box_out'
+  | 'defend_backpedal' | 'closeout' | 'defend_slide_hard' | 'defend_slide_hard_right'   // DEFENSE-LOOK (2026-09-17): the retreat, the closeout, the sat-down slide
   | 'watch'
   | 'floor'
   | 'celebrate' | 'dejected';
@@ -53,6 +54,12 @@ export interface AnimTreeInput {
   staggered: boolean;        // contact/ankle-break stun active
   /** ONEVONE-DEFENSE-LOGIC: which way the defender is sliding (body frame) — picks the slide clip. Default left. */
   slideDir?: 'left' | 'right';
+  /** DEFENSE-LOOK (2026-09-17): moving AWAY from the man while facing him (beaten, dropping back) — the backpedal. */
+  retreat?: boolean;
+  /** Closing the last two metres on a catch — chop steps under a high hand. */
+  closeout?: boolean;
+  /** Sitting down on him (L2 / an AI on the ball inside two metres) — the hard slide. */
+  intense?: boolean;
   /** On the floor (a posterized body) — held until the mode lifts it. */
   floored?: boolean;
   celebrating?: boolean;
@@ -77,6 +84,14 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   defend_slide_right: { clip: 'bball_defend_slide_right', loop: true, fadeSec: 0.16 },
   defend_idle:     { clip: 'bball_defend_stance', loop: true, fadeSec: 0.2 },
   box_out:         { clip: 'bball_defend_stance', loop: true, fadeSec: 0.12 },
+  // DEFENSE-LOOK (2026-09-17). A defender who is BEATEN drops back with his chest still on the man (the backpedal — a
+  // slide loop played backwards was what he did before, which reads as a man moonwalking); a defender CLOSING OUT on a
+  // catch chops his feet under a high hand instead of running at the shooter with his arms down; and INTENSE D (L2, or
+  // an AI sitting on the ball) slides sat down — the hard slide capture — not the ordinary stance loop.
+  defend_backpedal: { clip: 'bball_defend_backpedal', loop: true, fadeSec: 0.14 },
+  closeout:        { clip: 'bball_closeout', loop: true, fadeSec: 0.12 },
+  defend_slide_hard: { clip: 'bball_defend_slide_hard_left', loop: true, fadeSec: 0.14 },
+  defend_slide_hard_right: { clip: 'bball_defend_slide_hard_right', loop: true, fadeSec: 0.14 },
   // BIOMECH-HOOPS-WAVE1 (2026-09-08): a body with no ball that is NOT defending (the shooter watching his arc, the rival
   // after his release) stands and watches — it used to drop into the defensive slide stance (G5: the follow-through's
   // silhouette died into a crouch the moment the hold released).
@@ -96,7 +111,13 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
   else if (i.celebrating) state = 'celebrate';
   else if (i.dejected) state = 'dejected';
   else if (i.defending) {
-    state = i.bracing ? 'box_out' : i.speed01 > 0.2 ? (i.slideDir === 'right' ? 'defend_slide_right' : 'defend_slide') : 'defend_idle';
+    state = i.bracing ? 'box_out'
+      : i.closeout ? 'closeout'
+      : i.speed01 > 0.2
+        ? (i.retreat ? 'defend_backpedal'
+          : i.intense ? (i.slideDir === 'right' ? 'defend_slide_hard_right' : 'defend_slide_hard')
+          : (i.slideDir === 'right' ? 'defend_slide_right' : 'defend_slide'))
+        : 'defend_idle';
   } else if (i.crossover) state = i.crossoverDir === 'right' ? 'crossover_right' : 'crossover';
   else if (i.driving && i.hasBall) state = 'drive';
   else if (i.speed01 > 0.15) state = i.hasBall ? 'speed_dribble' : 'drive';
@@ -285,4 +306,19 @@ export class FootPlant {
 
   get active(): boolean { return this.lock !== null; }
   dispose(): void { this.release(); }
+}
+
+/** DEFENSE-LOOK (2026-09-17): is this body moving AWAY from the man it faces? (planar; a standing body is not retreating) */
+export function retreatFor(pos: { x: number; z: number }, vel: { x: number; z: number }, man: { x: number; z: number } | null): boolean {
+  if (!man) return false;
+  const sp = Math.hypot(vel.x, vel.z); if (sp < 0.4) return false;
+  const dx = man.x - pos.x, dz = man.z - pos.z; const dl = Math.hypot(dx, dz); if (dl < 1e-3) return false;
+  return (vel.x * dx + vel.z * dz) / (sp * dl) < -0.45;
+}
+/** …and is it closing the last stretch ON the man (a closeout: fast, toward him, inside 2.6 m)? */
+export function closeoutFor(pos: { x: number; z: number }, vel: { x: number; z: number }, man: { x: number; z: number } | null, speed01: number): boolean {
+  if (!man || speed01 < 0.45) return false;
+  const dx = man.x - pos.x, dz = man.z - pos.z; const dl = Math.hypot(dx, dz); if (dl < 0.9 || dl > 2.6) return false;
+  const sp = Math.hypot(vel.x, vel.z); if (sp < 0.4) return false;
+  return (vel.x * dx + vel.z * dz) / (sp * dl) > 0.6;
 }

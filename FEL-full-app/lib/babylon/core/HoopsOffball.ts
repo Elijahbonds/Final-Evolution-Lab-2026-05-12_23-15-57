@@ -17,7 +17,7 @@
 import { Vector3 } from '@babylonjs/core';
 
 export type OffenseJob = 'handler' | 'screen' | 'roll' | 'pop' | 'space' | 'cut' | 'crash' | 'boxout' | 'chase';
-export type DefenseJob = 'onball' | 'deny' | 'help' | 'boxout' | 'navigate' | 'chase';
+export type DefenseJob = 'onball' | 'deny' | 'help' | 'boxout' | 'navigate' | 'chase' | 'closeout' | 'recover';   // DEFENSE-LOOK (2026-09-17): closing out on a catch; recovering when beaten
 export type ScreenPhase = 'approach' | 'set' | 'roll' | 'pop' | 'done';
 
 /** The screener plants this long (or until the handler drives past him). */
@@ -168,7 +168,7 @@ export function jobObjective(job: OffenseJob | DefenseJob, ctx: { ball: Vector3;
     case 'screen': return ctx.screened ?? ctx.ball;
     case 'chase': return ctx.ball;   // a loose ball is the job: go and get it
     case 'roll': case 'crash': case 'handler': return ctx.rim;
-    case 'boxout': case 'onball': return ctx.mark ?? ctx.ball;
+    case 'boxout': case 'onball': case 'closeout': case 'recover': return ctx.mark ?? ctx.ball;
     case 'deny': case 'help': case 'navigate': case 'space': case 'cut': case 'pop': default: return ctx.ball;
   }
 }

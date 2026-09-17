@@ -39,7 +39,7 @@ await ctx.addInitScript({ content: "try { window.sessionStorage.setItem('NEXUS_A
 for (const mode of MODES) {
   const page = await ctx.newPage();
   const warns: string[] = [];
-  page.on('console', (m) => { if (process.env.VERBOSE) console.log(`  [${mode}:${m.type()}] ${m.text().slice(0, 220)}`); if (m.type() === 'warning' || m.type() === 'error') warns.push(m.text().slice(0, 160)); });
+  page.on('console', (m) => { if (process.env.VERBOSE) console.log(`  [${mode}:${m.type()}] ${m.text().slice(0, Number(process.env.VERBOSE) > 1 ? Number(process.env.VERBOSE) : 220)}`); if (m.type() === 'warning' || m.type() === 'error') warns.push(m.text().slice(0, 160)); });
   page.on('pageerror', (e) => console.log(`  [${mode}:pageerror] ${String(e).slice(0, 300)}`));
   await page.goto(`${BASE}/play/${mode}?agent=1`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   const t0 = Date.now(); let st = '';

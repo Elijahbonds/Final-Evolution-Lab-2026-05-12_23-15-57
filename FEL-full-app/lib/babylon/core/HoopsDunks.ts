@@ -26,6 +26,8 @@
 export interface HoopsDunk {
   /** The registered clip name (ClipScope 'dunk' suite — already on every hoops body). */
   clip: string;
+  /** The flight turns the back to the rim (a reverse) instead of squaring up to it. */
+  reverse?: boolean;
   /** What the HUD calls it. The dunk contest names its dunks; a game dunk deserves the same. */
   label: string;
   /** The authored length in seconds — a caller fits it to the flight with a speedRatio. */
@@ -47,6 +49,8 @@ export interface DunkRead {
   momentum01: number;
   /** Injectable for tests; defaults to Math.random. */
   roll?: () => number;
+  /** DEFENSE-LOOK (2026-09-17): a STANDING dunk — R2 + Square under the rim with no run-up (checkDriveDunk 'standing'). */
+  standing?: boolean;
 }
 
 // ── the vocabulary ────────────────────────────────────────────────────────────────────────────────────────────
@@ -59,6 +63,13 @@ export const CRADLE: HoopsDunk = { clip: 'dunk_cradle', label: 'CRADLE', sec: 0.
 export const DOUBLE_CLUTCH: HoopsDunk = { clip: 'dunk_double_clutch', label: 'DOUBLE CLUTCH', sec: 0.7, flashy: true };
 export const SPIN_360: HoopsDunk = { clip: 'dunk_360_spin', label: '360', sec: 0.8, flashy: true };
 export const EASTBAY: HoopsDunk = { clip: 'dunk_360_eastbay', label: 'EASTBAY', sec: 0.95, flashy: true };
+/** DEFENSE-LOOK (2026-09-17). The baseline dunk: a drive across the face of the rim steeper than BASELINE turns its back
+ *  to the iron and flushes behind the head — the flight reads `reverse` and faces AWAY from the rim. */
+export const REVERSE: HoopsDunk = { clip: 'dunk_finish_reverse', label: 'REVERSE', sec: 0.7, flashy: true, reverse: true };
+/** The standing dunk: a two-foot gather under the rim and a two-hand flush — no wind-up to earn, nothing to spin. */
+export const STANDING: HoopsDunk = { clip: 'dunk_finish_tomahawk', label: 'TWO-HAND FLUSH', sec: 0.5, flashy: false };   // both hands already overhead at the takeoff: a 550 ms flight off a two-foot squat has no time for the launch clip's wind-up (measured: still crouched at rim height)
+/** Across the rim's face THIS steeply (0 straight at it, 1 along the baseline) is a baseline drive. */
+export const BASELINE = 0.72;
 
 /** Fast enough to wind one up. Below this you are laying your weight into it, not performing. */
 export const WINDUP_SPEED = 5.0;
@@ -81,12 +92,14 @@ export function pickHoopsDunk(read: DunkRead): HoopsDunk {
 
   // THROUGH HIM. A poster is decided by the body, not by the flourish — you go up strong, one hand, and wear it.
   if (read.poster) return TOMAHAWK;
+  if (read.standing) return STANDING;                 // no run-up: nothing to wind
 
   // AROUND HIM. Contested but not a poster: there is a hand up and you have to hang and move the ball. This is
   // what the double clutch IS, and it is the one dunk here that exists because of the defender rather than in
   // spite of him.
   if (read.contest01 >= CROWDED) return DOUBLE_CLUTCH;
 
+  if (read.lateral01 >= BASELINE) return REVERSE;     // along the baseline: the back turns to the iron
   const fast = read.speed >= WINDUP_SPEED;
   const angled = read.lateral01 >= ANGLED;
 
