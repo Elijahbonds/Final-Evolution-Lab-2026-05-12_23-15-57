@@ -119,7 +119,8 @@ import {
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and six bodies contest it
 import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
-import { EffectsKit } from '../visual/EffectsKit';
+import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
+import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { pickHoopsDunk, dunkSpeedRatio } from '../core/HoopsDunks';
 import { driveIntent, driveLateral, bodiesMet } from '../core/DriveLine';
@@ -276,6 +277,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   // never applied and the crowd never escalated — the highlight plays happened and the game did not notice.
   let mbus = new MomentumBus();
   let momentum = 0;
+  let shotTrail: ParticleSystem | null = null; let shotTrailLevel: TrailLevel = 'off';   // suite pass: the hot hand's shot trail
   /** Report a highlight and mirror the bus into the HUD momentum meter (the 1v1's). */
   function swing(kind: Parameters<MomentumBus['report']>[0]['kind']): void {
     mbus.report({ kind });
@@ -526,6 +528,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
       void dressBall(ball, 'basketball');   // Meshy ball skin rides the physics sphere (visual only)
+      shotTrail?.dispose(); shotTrail = EffectsKit.ballTrail(ctx.scene, ball); shotTrailLevel = 'soft'; applyTrail(shotTrail, 'off'); shotTrailLevel = 'off';
       carries.forEach((c) => c.dispose()); carries.clear();
       for (const b of [me, ...mates]) carries.set(b, mountBallCarry({ scene: ctx.scene, ball, root: b.char.root, skeleton: b.char.skeleton }));
       ballSim = new BallSim(ball, 0.12);
@@ -557,7 +560,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           jobs: () => everyBody().map((b, i) => { const mb = mateBrain(b), db = foeBrain(b); const obj = b === me ? (carrierId === 'me' ? RIM : (driver?.char.root.position ?? ballWorld())) : objectiveFor(b); const p = bodyPos(b); const yaw = b.char.root.rotation.y; const v = b === me ? me.drib.vel : b.vel; return { id: b === me ? 'me' : isFoe(b) ? `foe${foes.indexOf(b)}` : `mate${mates.indexOf(b)}`, i, job: jobOf(b), phase: mb?.screen.phase ?? (db ? (db.fightingOver === null ? '' : db.fightingOver ? 'over' : 'under') : ''), x: p.x, z: p.z, y: p.y, speed: Math.hypot(v.x, v.z), facing: facingCos(yaw, p, obj), objX: obj.x, objZ: obj.z, boxing: !!(mb?.boxing || db?.boxing), root: b.char.root }; }), get foeRoot() { return driver ? driver.char.root : (foes[0]?.char.root ?? null); }, /* the man to guard is whoever is DRIVING */ nearestFoeRoot: () => foes.reduce<Body | null>((b, f) => !b || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(b.char.root.position, me.char.root.position) ? f : b, null)?.char.root ?? null }; if (dev) dev.hoopsPosture = seam; (ctx.scene.metadata ??= {}).threevthree = seam; }   // BIOMECH-HOOPS-WAVE1 probes
       ctx.setHud({
         score: myScore, foeScore, target: TARGET_SCORE, time: timeLeft, ast: assists,
-        hint: 'HOLD R2 + a direction to SPRINT · R2 + SQUARE at the rim = DUNK, SQUARE alone = LAY IT IN · SQUARE: hold, release in the green · BOTTOM BUTTON: PASS (hold to FAKE) · CIRCLE: call a SCREEN · L2: POST UP (shoot = HOOK, pull off the rim = FADEAWAY, stick across = SPIN) · snap the stick to break ankles',
+        hint: 'HOLD R2 (SHIFT) + a direction to SPRINT · R2 + SQUARE (SHIFT + L) at the rim = DUNK, SQUARE (L) alone = LAY IT IN · SQUARE (L): hold, release in the green · BOTTOM BUTTON (J): PASS (hold to FAKE) · CIRCLE (K): call a SCREEN · L2 (F): POST UP (shoot = HOOK, pull off the rim = FADEAWAY, stick across = SPIN) · snap the stick to break ankles',
       });
     },
 
@@ -748,6 +751,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           resetPossession(true);
         });
       }
+      // THE HOT HAND'S TRAIL (suite pass): my shot streaks when the momentum meter is up — the dunk contest's ball trail, on the game
+      if (shotTrail) { const want: TrailLevel = arc.active && momentum >= 70 ? 'hang' : 'off'; if (want !== shotTrailLevel) { shotTrailLevel = want; applyTrail(shotTrail, want); } }
       if (arc.active) {
         const res = arc.step(dt, ball.position);
         if (res === 'made') {
@@ -1361,6 +1366,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       for (const b of [me, ...mates, ...foes]) { b?.posture?.dispose(); if (b) b.posture = null; }   // BIOMECH-HOOPS-WAVE1
       threeVenue?.dispose(); threeVenue = null;  // M74
       me?.char.dispose(); mates.forEach((m) => m.char.dispose()); foes.forEach((f) => f.char.dispose());
+      shotTrail?.dispose(); shotTrail = null;
       ball?.dispose(); SoundKit.stopAmbient();
       hoopJuice?.dispose(); hoopJuice = null;        // A+ P0: restores any hoop material the punch swapped
     },
@@ -1943,7 +1949,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       else { const nf = foes.reduce<Body | null>((b, f) => !b || distXZ(f.char.root.position, m.char.root.position) < distXZ(b.char.root.position, m.char.root.position) ? f : b, null); mb.boxOut(nf && distXZ(m.char.root.position, RIM_FLOOR) < BOX_OUT_RANGE ? nf.char.root.position : null); }
     }
     console.info(`[3V3-OFF] box out (${whose === 'mine' ? 'they seal, we crash' : 'we seal, they crash'})`);
-    ctx0?.setHud({ hint: whose === 'theirs' ? 'BOX OUT — hold L1 to seal your man' : 'CRASH THE GLASS · hold L1 to box out' });
+    ctx0?.setHud({ hint: whose === 'theirs' ? 'BOX OUT — hold L1 (Q) to seal your man' : 'CRASH THE GLASS · hold L1 (Q) to box out' });
   }
   /** The ball is someone's again: nobody is chasing it. */
   function endChase(): void {
@@ -2336,12 +2342,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           contactPunch(ctx);
           EffectsKit.burst(ctx.scene, RIM, 'net');
           ctx.setHud({ foeScore, banner: inLane ? 'POSTERIZED — THEY THREW IT DOWN ON YOU' : 'THEY THREW IT DOWN' });
-          setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON passes · CIRCLE calls a screen · HOLD SQUARE, release in the green' }), 1000);
+          setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 1000);
           if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('LOSS', myScore, { foeScore, assists }); done(); return; }
           later(meFloored ? 1600 : 1000, () => resetPossession(true));
         } else {
           if (!swatted) { SoundKit.play('miss'); ctx.setHud({ banner: 'THEY RATTLED IT OUT' }); }
-          setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON passes · CIRCLE calls a screen · HOLD SQUARE, release in the green' }), 900);
+          setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 900);
           later(900, () => boardAfterMiss(ctx));
         }
         done();
@@ -2513,7 +2519,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       shooter.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.08 });
       SoundKit.play('impact', { pitch: 1.3, volume: 0.4 }); SoundKit.play('crowdCheer', { volume: 0.5 });
       ctx.setHud({ banner: bumpAge <= BUMP_STRIP_WINDOW_SEC ? 'STRIPPED ON THE BUMP!' : 'PICKED THEIR POCKET!' });
-      setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON passes · CIRCLE calls a screen · HOLD SQUARE, release in the green' }), 900);
+      setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 900);
       driver = null;
       later(750, () => resetPossession(true));
       return;
@@ -2548,7 +2554,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       shooter.tree.beat(SPORT_CLIP.karateHitReact);
       releaseBall(ball); ballSim.launch(ball.getAbsolutePosition(), new Vector3((Math.random() - 0.5) * 4, 2, 3));   // BIOMECH-HOOPS-WAVE1 G6: a blocked ball goes loose
       ctx.setHud({ banner: 'REJECTED!' });
-      setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON passes · CIRCLE calls a screen · HOLD SQUARE, release in the green' }), 900);
+      setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 900);
       later(1000, () => resetPossession(true));
       return;
     }
@@ -2592,7 +2598,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       ctx.setHud({ banner: 'STOP!' });
       ctx.feel?.impact?.(0.2);
     }
-    setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON passes · CIRCLE calls a screen · HOLD SQUARE, release in the green' }), 800);
+    setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 800);
     if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('LOSS', myScore, { foeScore, assists }); return; }
     if (made) later(900, () => resetPossession(true)); else later(900, () => boardAfterMiss(ctx));   // O2: their miss is a board too
   }

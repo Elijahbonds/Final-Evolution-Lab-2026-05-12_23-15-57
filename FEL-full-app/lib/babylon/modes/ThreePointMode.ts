@@ -37,7 +37,8 @@ import { SPORT_CLIP } from '../anim/clipRegistry';
 import { SHOT_TARGET as HUD_TARGET, PERFECT_BAND as HUD_PERFECT, GOOD_BAND as HUD_GOOD, heatLevel, pointsLeft, FIRE_STREAK } from '../core/shootoutHud';
 import { readDisplaySetting, displayBanner, widen } from '@/lib/controller-link/tvMode';
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, Material, Mesh, Observer, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Material, Mesh, Observer, ParticleSystem, Scene } from '@babylonjs/core';
+import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';   // suite pass: the net's answer and the hot hand's trail (the dunk contest's)
 import { attachBallToHand, releaseBall } from '../anim/ballRig';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1
 import { armChain, reachArm, type ArmChain } from '../anim/HandIK';
@@ -164,6 +165,8 @@ let rimOut = -1;
 /** Signed timing error of the shot in flight: negative = EARLY (short), positive = LATE (long). */
 let shotErr = 0;
 let ballMat: StandardMaterial | null = null;   // the plain sphere until the Meshy skin lands (and if it never does)
+let trail: ParticleSystem | null = null; let trailLevel: TrailLevel = 'off';   // the ball's trail: lit for the flight of a hot hand, a white cut on the money ball
+function setTrail(level: TrailLevel, hex?: string): void { if (!trail || level === trailLevel) return; trailLevel = level; applyTrail(trail, level, hex); }
 /** The live ball's skin meshes with their leather and their money-ball gold, swapped per shot. */
 let ballSkin: { mesh: AbstractMesh; base: Material; money: Material }[] = [];
 /** One gold clone per shared skin material — the rack balls and the live ball all wear the same two. */
@@ -405,6 +408,7 @@ function fire(ctx: ModeContext, power?: number): void {
   releaseIn = releaseFrameOf(player.animator, 'jumpshot', RELEASE_FRAME_01) * (player.animator.durationOf('jumpshot') ?? 0.9) / SHOT_CLIP_SPEED;
   pendingMade = made;
   S.phase = 'flight';
+  if (S.streak >= FIRE_STREAK || isMoneyBall(S.ballIdx)) setTrail('hang', isMoneyBall(S.ballIdx) ? '#ffd75e' : '#ffb36b'); else setTrail('off');   // the hot hand's flight leaves a trail
 
   const money = isMoneyBall(S.ballIdx);
   landing = { perfect, money }; contactLatch = false;   // A+ P0: the landing beat (update → 'made' | 'missed') reads these
@@ -443,6 +447,10 @@ function contactMake(ctx: ModeContext): void {
   ctx.juice.shake(big ? 0.10 : 0.06, 100);
   if (big) ctx.juice.flash(landing.money ? '#ffd75e' : '#fff6dd', 90);
   hoopJuice?.punch();
+  // THE NET ANSWERS (suite pass, 2026-09-16): 1v1, 3v3 and the dunk contest burst the net on a make; the shootout —
+  // the mode that is nothing but makes — did not. Sparks on the money ball and the perfect release.
+  EffectsKit.burst(ctx.scene, RIM, 'net');
+  if (big) { EffectsKit.burst(ctx.scene, RIM, 'sparks'); setTrail('flash', '#ffffff'); }
   console.info(`[3PT-JUICE] make${landing.perfect ? ' perfect' : ''}${landing.money ? ' money' : ''}`);
 }
 /** The miss's landing beat: a light metallic clank with a small feel hit — never the make's answer, never HoopJuice. */
@@ -455,6 +463,7 @@ function missClank(ctx: ModeContext): void {
 }
 
 function advanceBall(ctx: ModeContext): void {
+  setTrail('off');
   S.ballIdx += 1;
   S.fired = false;
   shotWin = 'none';
@@ -647,6 +656,7 @@ export const ThreePointMode: ModeDefinition = {
     // THE MESHY LEATHER (suite pass, 2026-09-16): 1v1, 3v3 and the dunk contest play with the baked ball; the shootout
     // shot a flat orange sphere. The skin rides the sphere; the money ball swaps its materials for gold clones.
     void skinBall(ball, isMoneyBall(S.ballIdx)).then((skin) => { if (ball && !ball.isDisposed()) { ballSkin = skin; dressBall(); } });
+    trail?.dispose(); trail = EffectsKit.ballTrail(ctx.scene, ball); trailLevel = 'soft'; setTrail('off');
     // BIOMECH-HOOPS-WAVE1 G6: the ball rides the shooting hand (it used to float 1.9 m over the root)
     attachBallToHand(ball, player.skeleton, 'RightHand');
     // the Posture Poses layer (chest on the rim, eyes on the iron, feet) — then the jog's two-hand carry, solved after it
@@ -861,6 +871,7 @@ export const ThreePointMode: ModeDefinition = {
     if (carryScene && carryObs) carryScene.onAfterAnimationsObservable.remove(carryObs); carryObs = null; carryScene = null; arms = null;
     player?.dispose(); player = null;
     for (const b of rivalBodies) b.dispose(); rivalBodies = [];
+    trail?.dispose(); trail = null; trailLevel = 'off';
     ball?.dispose(); ball = null;
     ballMat?.dispose(); ballMat = null;
     ballSkin = []; for (const m of moneyMats.values()) m.dispose(); moneyMats.clear();

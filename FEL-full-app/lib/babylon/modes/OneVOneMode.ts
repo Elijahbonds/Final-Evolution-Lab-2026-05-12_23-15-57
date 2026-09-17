@@ -163,7 +163,8 @@ import { MomentumBus } from '../core/MomentumBus';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { SoundKit } from '../audio/SoundKit';
-import { EffectsKit } from '../visual/EffectsKit';
+import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
+import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk; Meshy never scaled)
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -245,8 +246,8 @@ const FACE_RATE = 10, FACE_RIM_RATE = 6;
 const DEFEND_FACE_RANGE = 6;
 // "SPRINT in to DUNK, ease off to LAY IT IN" is the one line this hint was missing, and the fix that made the layup
 // reachable (see the checkDriveDunk call) is worth nothing if nobody is told the choice exists.
-const HINT_OFFENCE = 'HOLD R2 + a direction to SPRINT · R2 + SQUARE at the rim = DUNK, SQUARE alone = LAY IT IN · SQUARE: hold, release in the green · L2: POST UP · snap the stick for ankles · pull BACK for a HESI · hold L1/LT near the block to POST UP (back to the rim: shoot for a HOOK, pull off the rim for a FADEAWAY, swing the stick across to SPIN) · drive into a body to SPIN off him';
-const HINT_DEFENCE = 'STAY IN FRONT — they sidestep, you slide · HOLD L2: SIT DOWN and slide faster · SQUARE: STEAL as the ball crosses over (hold it for a HAND UP) · TRIANGLE: jump on the gather to BLOCK · HOLD CIRCLE: plant and TAKE THE CHARGE · L1: BOX OUT';
+const HINT_OFFENCE = 'HOLD R2 (SHIFT) + a direction to SPRINT · R2 + SQUARE (SHIFT + L) at the rim = DUNK, SQUARE (L) alone = LAY IT IN · SQUARE (L): hold, release in the green · L2 (F): POST UP · snap the stick for ankles · pull BACK for a HESI · hold L1 (Q)/LT near the block to POST UP (back to the rim: shoot for a HOOK, pull off the rim for a FADEAWAY, swing the stick across to SPIN) · drive into a body to SPIN off him';
+const HINT_DEFENCE = 'STAY IN FRONT — they sidestep, you slide · HOLD L2 (F): SIT DOWN and slide faster · SQUARE (L): STEAL as the ball crosses over (hold it for a HAND UP) · TRIANGLE (I): jump on the gather to BLOCK · HOLD CIRCLE (K): plant and TAKE THE CHARGE · L1: BOX OUT';
 
 type Possession = 'mine' | 'defense';
 /** Their possession: the check, the drive (incl. sidestep / blow-by / gather), the shot in the air, over. */
@@ -280,6 +281,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let arc: ShotArc;
   let arcPoints = 0, arcLabel = '';
   let myScore = 0, foeScore = 0, momentum = 0;
+  let shotTrail: ParticleSystem | null = null; let shotTrailLevel: TrailLevel = 'off';   // suite pass: the hot hand's shot trail
   let mbus = new MomentumBus();               // Phase 6: shared Game-Breaker
   /** Report a highlight and mirror the bus into the HUD momentum meter. */
   function swing(kind: Parameters<MomentumBus['report']>[0]['kind']): void {
@@ -544,6 +546,7 @@ export const OneVOneMode: ModeDefinition = (() => {
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
       void dressBall(ball, 'basketball');   // Meshy ball skin rides the physics sphere (visual only)
+      shotTrail?.dispose(); shotTrail = EffectsKit.ballTrail(ctx.scene, ball); shotTrailLevel = 'soft'; applyTrail(shotTrail, 'off'); shotTrailLevel = 'off';
       ballSim = new BallSim(ball, 0.12);
       attachBallToHand(ball, me.skeleton, 'RightHand');
       EffectsKit.ambient(ctx.scene, 'venice');
@@ -693,6 +696,8 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (foeHandUp) { foeHandUpLeft -= dt; if (foeHandUpLeft <= 0) { foeHandUp = false; foeAnimTree.releaseHold(); } }
 
       // ── the ball in flight (either end's shot) ──
+      // THE HOT HAND'S TRAIL (suite pass): my shot streaks when the momentum meter is up — the dunk contest's ball trail, on the game
+      if (shotTrail) { const want: TrailLevel = arc.active && momentum >= 70 ? 'hang' : 'off'; if (want !== shotTrailLevel) { shotTrailLevel = want; applyTrail(shotTrail, want); } }
       if (arc.active) {
         const res = arc.step(dt, ball.position);
         // O2: the seal ends with the ball — but on a MISS the ball is not done, it is live off the iron, and a
@@ -1493,6 +1498,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       mePosture?.dispose(); foePosture?.dispose(); mePosture = null; foePosture = null;   // BIOMECH-HOOPS-WAVE1
       meCarry?.dispose(); foeCarry?.dispose(); meCarry = null; foeCarry = null;
       contact?.dispose(); contact = null;
+      shotTrail?.dispose(); shotTrail = null;
       me?.dispose(); foe?.dispose(); ball?.dispose();
       meSlot?.dispose(); foeSlot?.dispose();
       SoundKit.stopAmbient();
