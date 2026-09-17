@@ -21,7 +21,7 @@ import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlock
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
   buildDribbleIdle, buildCrossover, buildHesi, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble,
-  buildDoubleCross, buildSnatchBack, buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip, buildLayupGather, buildMikan, buildUpAndUnder, buildFingerRoll, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
+  buildDoubleCross, buildSnatchBack, buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip, buildStepbackGather, buildLayupGather, buildMikan, buildUpAndUnder, buildFingerRoll, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,   // HOOPS-MOVE-KIT-A
   buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // HOOPS-MOVE-KIT-B wave 2: the footwork (M8–M14)
@@ -169,6 +169,7 @@ export function registerAuthoredClips(
     // …and the two ways an ankle breaker ends, which were a karate punch and a karate knockdown
     ['bball_ankle_stumble', () => buildAnkleStumble(scene, skeleton)],
     ['bball_ankle_slip', () => buildAnkleSlip(scene, skeleton)],
+    ['bball_stepback_gather', () => buildStepbackGather(scene, skeleton)],   // it played the pull-up's clip
     ['bball_layup_gather', () => buildLayupGather(scene, skeleton)],
     // the layup vocabulary (owner, 2026-09-16): the shot from under the ring, and the one that beats a jumper
     ['bball_mikan', () => buildMikan(scene, skeleton)],

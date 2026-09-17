@@ -135,6 +135,7 @@ import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: th
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import { pickHoopsDunk, dunkSpeedRatio } from '../core/HoopsDunks';
+import { trickFromFlick, trickWindow, judgeFlick, trickPct, STICK_TRICK, CONTACT_TRICK_BONUS } from '../core/DunkTrickStick';
 import {   // HOOPS-MOVE-KIT-A (2026-09-08): the gather, the finish kit, the drive contest
   planGather, gatherWish, gatherLabel, gatherTravel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
   pickLayupSide, planFinish, finishHopY, finishStride, FINISH_LABEL, type FinishPlan, type FinishStyle,
@@ -1088,7 +1089,9 @@ export const OneVOneMode: ModeDefinition = (() => {
         }
         pumpWindow = Math.max(0, pumpWindow - dt);
 
-        ctx.camDirector.look(lookX, lookY, dt);
+        // …but NOT while you are in the air on a dunk: the right stick is the TRICK stick then, and a flick that
+        // threw a windmill must not also swing the camera 90° off the rim at the moment you want to watch it.
+        if (!dunking) ctx.camDirector.look(lookX, lookY, dt);
         ctx.camDirector.update(me.root.position, meDribble.vel, RIM);
       }
 
@@ -1355,7 +1358,9 @@ export const OneVOneMode: ModeDefinition = (() => {
         // (a rim frame put the rival behind the camera at the check).
         const past = RIM_FLOOR.subtract(foe.root.position); past.y = 0;
         const look = past.lengthSquared() > 1e-4 ? foe.root.position.add(past.normalize().scale(1.5)) : foe.root.position;
-        ctx.camDirector.look(lookX, lookY, dt);
+        // …but NOT while you are in the air on a dunk: the right stick is the TRICK stick then, and a flick that
+        // threw a windmill must not also swing the camera 90° off the rim at the moment you want to watch it.
+        if (!dunking) ctx.camDirector.look(lookX, lookY, dt);
         ctx.camDirector.update(me.root.position, meDribble.vel, look);
       }
 
@@ -1525,6 +1530,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster'): void {
     dunking = true; shooting = false; contactLatch = false; finishFoul = false;   // A+ P0: a fresh attempt gets one punch
     meShotWin = 'none'; dunkFlush = null; let resolved = false; dunkFlight = { k: 0, made: null };   // BIOMECH-HOOPS-WAVE1
+    let trickThrown = false;                       // one trick per flight: the stick is a commitment, not a masher
     turbo.t01 = Math.max(0, turbo.t01 - 0.3);           // dunks spend fuel
     const from = me.root.position.clone();
     const landing = new Vector3(RIM.x, 0, RIM.z + DRIVE_DUNK.landAheadZ);
@@ -1589,6 +1595,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     console.info(`[1V1-DUNK] ${picked.label} (${picked.clip}) speed ${speedNow.toFixed(1)} lateral ${lateral01.toFixed(2)} contest ${(c.contested ? 1 : 0)} momentum ${mbus.score01.toFixed(2)}`);
     contact?.setAirborne('me', true);
     // the flight's own clock: real time, FROZEN for the bump's hit-stop and slowed for BUMP_SLOW_SEC after it (the velocity kill)
+    const trickWin = trickWindow(c.bumpK);   // a CONTACT dunk's window rides the bump; a clean one is fixed
     let flightMs = 0, last = performance.now(), bumped = false, freezeMs = 0, slowMs = 0;
     const obs = ctx.scene.onBeforeRenderObservable.add(() => {
       const nowMs = performance.now(); const realMs = Math.min(50, nowMs - last); last = nowMs;
@@ -1605,6 +1612,33 @@ export const OneVOneMode: ModeDefinition = (() => {
       // from a body yawed 40° off the rim); the posture windows ride the flight clock (rise / hang / extend / jam / brace)
       face(me.root, slewYaw(me.root.rotation.y, yawTo(me.root.position, RIM), FACE_RIM_RATE, fdt));
       dunkFlight = { k, made: resolved ? made : null };
+      // THE TRICK STICK (owner, 2026-09-16). Once the feet leave, the right stick stops being the camera orbit and
+      // becomes the trick stick: a flick asks for a trick and WHEN you threw it decides whether you get it. The
+      // window rides the FLIGHT clock, so the hit-stop and the bump's slow motion — which stretch a dunk's real
+      // duration by a third — cannot silently move the target.
+      if (!trickThrown) {
+        const asked = trickFromFlick(lookX, lookY);
+        if (asked) {
+          trickThrown = true;
+          const judge = judgeFlick(k, trickWin);
+          const spec = STICK_TRICK[asked];
+          if (judge === 'green') {
+            const onTheBump = c.bumpK !== null;
+            made = roll() < trickPct(c.pct, asked, judge) + (onTheBump ? CONTACT_TRICK_BONUS : 0);
+            meAnimTree.beat(spec.clip, { holdEnd: true, speedRatio: dunkSpeedRatio({ clip: spec.clip, label: spec.label, sec: 0.7, flashy: true }, DRIVE_DUNK.flightMs / 1000) });
+            ctx.setHud({ shotType: spec.label });
+            ctx.camDirector.pulse(0.4, 0.45);
+            SoundKit.play('whoosh', { pitch: 1.3, volume: 0.45 });
+            bannerFlash(ctx, onTheBump ? `${spec.label} ON HIM!` : spec.label, 900);
+          } else {
+            // a trick you could not land is a decision with a price — that is what makes throwing one mean anything
+            made = roll() < trickPct(c.pct, asked, judge);
+            bannerFlash(ctx, judge === 'early' ? 'TOO EARLY!' : 'TOO LATE!', 700);
+          }
+          resolved = true;
+          console.info(`[1V1-DUNK] trick ${asked} ${judge} at k ${k.toFixed(2)} (window ${trickWin.from.toFixed(2)}-${trickWin.to.toFixed(2)}, bump ${c.bumpK === null ? 'none' : c.bumpK.toFixed(2)}) → ${made ? 'MADE' : 'MISSED'}`);
+        }
+      }
       // M2: the bodies meet — the bump
       if (!bumped && c.bumpK !== null && k >= c.bumpK) {
         bumped = true; freezeMs = 45; slowMs = BUMP_SLOW_SEC * 1000;
@@ -1708,8 +1742,12 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (plan.sec > 0) {
       gather = { plan, t: 0 };
       meShotWin = 'gather'; meShotSec = 0;
-      const clipSec = me.animator.durationOf('bball_pullup_gather') ?? 0.3;
-      meAnimTree.beat('bball_pullup_gather', { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });
+      // A STEP-BACK IS NOT A PULL-UP. Every gather kind played the pull-up's clip, so a step-back — which the mode
+      // drives BACKWARDS at STEPBACK_SPEED — was a body sliding away from the rim in a pull-up's planted pose,
+      // with nothing pushing it. Each kind gets its own gather now.
+      const gatherClip = plan.kind === 'stepback' ? 'bball_stepback_gather' : 'bball_pullup_gather';
+      const clipSec = me.animator.durationOf(gatherClip) ?? 0.3;
+      meAnimTree.beat(gatherClip, { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });
       SoundKit.play('whoosh', { pitch: 1.0, volume: 0.2 });
       console.info(`[1V1-MOVE] gather ${plan.kind} ${plan.sec.toFixed(2)} s from ${plan.v0.length().toFixed(1)} m/s`);
     } else { gather = null; beginRise(); }

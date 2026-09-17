@@ -31,6 +31,7 @@ export const BASKETBALL_CLIPS = [
   'bball_behind_back_left', 'bball_behind_back_right', 'bball_double_cross_left', 'bball_double_cross_right',
   'bball_snatch_back', 'bball_shammgod_left', 'bball_shammgod_right', 'bball_yoyo',
   'bball_ankle_stumble', 'bball_ankle_slip',
+  'bball_stepback_gather',
   'bball_hop_step', 'bball_euro_step',
 ] as const;
 type V3 = [number, number, number];
@@ -102,6 +103,26 @@ export function buildPullupGather(scene: Scene, sk: Skeleton): AnimationGroup | 
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [14, 0, 0], Neck: [0, 0, 0],  ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
     { t: 0.14, bones: { Hips: [0, 0, 0], Spine: [20, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-34, 0, 8], RightUpLeg: [-34, 0, -8], LeftLeg: [48, 0, 0], RightLeg: [48, 0, 0] }, hands: { Right: [0.22, 0.92, 0.28], Left: [0.02, 0.90, 0.30] }, hipsY: -0.12 },   // both hands on the ball at the hip, the knees loaded
     { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [8, 0, 0],  Neck: [-6, 0, 0], LeftUpLeg: [-30, 0, 8], RightUpLeg: [-30, 0, -8], LeftLeg: [42, 0, 0], RightLeg: [42, 0, 0] }, hands: { Right: [0.14, 1.28, 0.26], Left: [-0.10, 1.26, 0.28] }, hipsY: -0.10 },   // set: the ball at the chest, ready to rise
+  ]);
+}
+
+/** The STEP-BACK gather (owner, 2026-09-16), 0.46 s — STEPBACK_SEC of push-off plus GATHER_STEPBACK_TAIL_SEC of set.
+ *
+ * The step-back already existed as a GatherKind: the mode drives the root backwards at STEPBACK_SPEED and the HUD
+ * calls it STEP-BACK. What it did not have was a body — `startRise` plays `bball_pullup_gather` for every gather
+ * kind, so a step-back was a player SLIDING backwards in a pull-up's pose, feet planted, nothing pushing.
+ *
+ * The difference from the pull-up is the whole move: a pull-up stops, a step-back stops and then THROWS ITSELF
+ * AWAY. The lead leg extends hard against the floor, the hips travel out behind the feet, the trail leg swings
+ * back to catch the landing, and the ball is swept back with the body rather than lifted where you stood. The last
+ * key squares up: a step-back you cannot shoot out of is just a retreat.
+ */
+export function buildStepbackGather(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'bball_stepback_gather', 0.46, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [16, 0, 0],  Neck: [-4, 0, 0], ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06 },
+    { t: 0.12, bones: { Hips: [0, 0, 0], Spine: [30, 0, 0],  Neck: [-8, 0, 0], LeftUpLeg: [-52, 0, 10], RightUpLeg: [-18, 0, -10], LeftLeg: [66, 0, 0], RightLeg: [26, 0, 0] }, hands: { Right: [0.28, 0.82, 0.40] as V3, Left: [0.06, 0.86, 0.38] as V3 }, hipsY: -0.18 },   // THE PLANT: weight forward onto the lead leg, deep — this is the push
+    { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0],  Neck: [-2, 0, 0], LeftUpLeg: [10, 0, 10], RightUpLeg: [-40, 0, -10], LeftLeg: [16, 0, 0], RightLeg: [56, 0, 0] }, hands: { Right: [0.20, 1.06, 0.02] as V3, Left: [-0.06, 1.04, 0.04] as V3 }, hipsY: -0.02 },   // THE PUSH-OFF: the lead leg drives straight, the hips go out BEHIND the feet, the ball swept back with them
+    { t: 0.46, bones: { Hips: [0, 0, 0], Spine: [10, 0, 0],  Neck: [-6, 0, 0], LeftUpLeg: [-30, 0, 10], RightUpLeg: [-30, 0, -10], LeftLeg: [44, 0, 0], RightLeg: [44, 0, 0] }, hands: { Right: [0.14, 1.28, 0.24] as V3, Left: [-0.10, 1.26, 0.26] as V3 }, hipsY: -0.11 },   // SET: squared and loaded — a step-back you cannot shoot out of is a retreat
   ]);
 }
 
