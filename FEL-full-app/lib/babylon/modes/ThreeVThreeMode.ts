@@ -120,6 +120,7 @@ import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { pickHoopsDunk, dunkSpeedRatio } from '../core/HoopsDunks';
+import { driveIntent, driveLateral, bodiesMet } from '../core/DriveLine';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -2354,6 +2355,22 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     attachBallToHand(ball, shooter.char.skeleton, 'RightHand');
     driver = shooter; driveK = 0; driveStolen = false; bumpAge = Infinity;   // BIOMECH-HOOPS-WAVE1: the foe loop feeds his tree (the dribble run) and faces him at the rim; the AI drive skips him
     const tok = possessionToken;
+    // THE DRIVE READS THE DEFENDER (owner, 2026-09-16). It used to be a straight lerp from where he started to
+    // the rim, so where you stood changed nothing: measured, a defender who planted and held it for 10.3 s never
+    // saw the driver inside 2.70 m. He was not avoiding you — he had a line and took it, and every rule that
+    // needs the bodies to meet was a coincidence of geometry.
+    //
+    // Now he decides ONCE what to do about you, and the read is the rulebook's own: a SET body is one you go
+    // around (through it is a charge and a turnover); a MOVING body is one you go through (that foul is his).
+    // So planting early finally does something, and it is the thing the handbook says it does.
+    const driveEnd = new Vector3(RIM.x, 0, RIM.z + 0.9);
+    const driveDir = driveEnd.subtract(from); driveDir.y = 0;
+    const driveLen = driveDir.length() || 1; driveDir.scaleInPlace(1 / driveLen);
+    const meSet = me.drib.vel.length() < 0.6 && carrierId === 'foeTeam';
+    const intent = driveIntent({ defenderSet: meSet || takingCharge, aggression: nerve(foeStanding()).aggression, roll });
+    let drivePlanted = takingCharge;   // was he SET when the driver committed? that is what the call turns on
+    let contactDone = false;
+    console.info(`[3V3-DEF] drive intent ${intent} (defender ${meSet || takingCharge ? 'set' : 'moving'})`);
     await new Promise<void>((res) => {
       const obs = ctx.scene.onBeforeRenderObservable.add(() => {
         if (driveStolen || possessionToken !== tok) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); return; }   // D2: the poke took it / the possession moved on
@@ -2362,11 +2379,37 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // drive AT the rim, not 5m short of it (was x*0.6, z to RIM.z+2.2 —
         // the same short drive 1v1 shipped; a drive that never arrives makes
         // your positioning irrelevant and the block dance unreachable)
-        shooter.char.root.position.x = from.x + (RIM.x - from.x) * k;
-        shooter.char.root.position.z = from.z + (RIM.z + 0.9 - from.z) * k;
+        const baseX = from.x + (driveEnd.x - from.x) * k;
+        const baseZ = from.z + (driveEnd.z - from.z) * k;
+        // …and BEND it around the man in the way (or do not, if he chose to go through him)
+        const bend = driveLateral({ at: { x: baseX, z: baseZ }, defender: me.char.root.position, dir: driveDir, k, intent });
+        shooter.char.root.position.x = baseX + driveDir.z * bend;
+        shooter.char.root.position.z = baseZ - driveDir.x * bend;
+        if (takingCharge) drivePlanted = true;   // he got set before the bodies met
+
+        // THE BODIES MEET. This is the moment the charge and the blocking foul have both been waiting for — one
+        // rule for a planted defender, its mirror for one still moving into him.
+        if (!contactDone && intent === 'through' && bodiesMet(shooter.char.root.position, me.char.root.position, BODY_STANDOFF)) {
+          contactDone = true;
+          const id = drivePlanted ? 'charge' : 'blocking_foul';
+          const call = judge(id, { offense: 'foe', fouled: drivePlanted ? 'me' : 'foe' });
+          if (call.whistle) SoundKit.play('whistle');
+          me.tree.beat(ANKLE_STUMBLE_CLIP, { fadeSec: 0.06 });
+          shooter.tree.beat(ANKLE_STUMBLE_CLIP, { fadeSec: 0.06 });
+          ctx.feel?.impact?.(0.4); ctx.juice.shake(0.08, 120);
+          console.info(`[3V3-REF] ${call.id} on the drive at k ${k.toFixed(2)} (defender ${drivePlanted ? 'set' : 'moving'}) → ${call.ball}`);
+          ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
+          setTimeout(() => ctx.setHud({ banner: '' }), 1000);
+          driveStolen = true;   // the drive is over either way; the award decides who restarts
+          ctx.scene.onBeforeRenderObservable.remove(obs);
+          later(700, () => (call.ball === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
+          res();
+          return;
+        }
         if (k >= 1) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); }
       });
     });
+    if (contactDone) return;
     if (possessionToken !== tok) return;
     if (driveStolen) {
       // D2: the ball knocked LOOSE from his hand toward me; the possession follows once it settles
