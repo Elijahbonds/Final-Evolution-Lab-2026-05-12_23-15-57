@@ -43,7 +43,11 @@ export type HandleMove =
   | 'double_cross'
   | 'snatch_back'
   | 'shammgod'
-  | 'off_the_head';
+  | 'off_the_head'
+  // THE 2K17 STICK VOCABULARY (owner, 2026-09-17): momentum moves keep (and add) pace, the pause freezes it, the roll spins out of a behind-the-back
+  | 'momentum_cross'
+  | 'momentum_btb'
+  | 'steezo_roll';
 
 /**
  * The handle a move needs before you have it at all.
@@ -68,6 +72,9 @@ export const MOVE_HANDLE: Readonly<Record<HandleMove, number>> = {
   // disrespectful thing in the vocabulary, so it is the last thing you earn — and mechanically it is the
   // odd one out, because the ball leaves your hands and touches another player to get where it is going.
   off_the_head: 92,
+  momentum_cross: 30,   // the 2K17 momentum crossover: a wide cut that keeps the run — the first stick move you earn
+  momentum_btb: 50,     // momentum behind the back: the ball wrapped at pace without the slow-down
+  steezo_roll: 74,      // the roll: behind the back rolled straight into the spin
 };
 
 /**
@@ -96,6 +103,9 @@ export const MOVE_CLIP: Readonly<Record<HandleMove, ((dir: 'left' | 'right') => 
   snatch_back: () => 'bball_snatch_back',
   shammgod: (d) => `bball_shammgod_${d}`,
   off_the_head: null,     // the ball leaves your hands; the mode owns that one entirely
+  momentum_cross: (d) => `bball_crossover_${d}`,     // the capture's cross, played FAST and wide by the movement
+  momentum_btb: (d) => `bball_behind_back_${d}`,
+  steezo_roll: (d) => `bball_behind_back_${d}`,      // the wrap; the mode's spin follows
 };
 
 /** The clip for a move, or null when the mode renders it another way. */
@@ -199,16 +209,20 @@ export const MAX_CHAIN = 4;
  *   - you must be inside the window;
  *   - you cannot repeat the same move back-to-back, because a spammed crossover is not a combo.
  */
+/** The moves that may repeat back-to-back: the 2K17 momentum spam — a cross into a cross into a cross, each one carrying pace. */
+/** The moves only the RIGHT STICK produces (StickHandle.stickMoveFor) — moveFromContext never names them. */
+export const STICK_ONLY: ReadonlySet<HandleMove> = new Set<HandleMove>(['momentum_cross', 'momentum_btb', 'steezo_roll']);
+export const MOMENTUM_REPEATABLE: ReadonlySet<HandleMove> = new Set<HandleMove>(['momentum_cross']);
 export function canChain(next: HandleMove, state: ChainState, handle: number): boolean {
   if (!hasMove(next, handle)) return false;
   if (state.last === null) return true;                 // opening a chain is always allowed
-  if (state.last === next) return false;                // no double-tapping one move into a "combo"
+  if (state.last === next && !MOMENTUM_REPEATABLE.has(next)) return false;   // no double-tapping one move into a "combo" — except the MOMENTUM SPAM (2K17): the cross chains into itself
   return state.since <= chainWindowSec(handle);
 }
 
 /** Advance the chain. A move outside the window STARTS a new chain rather than extending the old one. */
 export function pushChain(next: HandleMove, state: ChainState, handle: number): ChainState {
-  const continues = state.last !== null && state.last !== next && state.since <= chainWindowSec(handle)
+  const continues = state.last !== null && (state.last !== next || MOMENTUM_REPEATABLE.has(next)) && state.since <= chainWindowSec(handle)
     && state.length < MAX_CHAIN;
   return { last: next, since: 0, length: continues ? state.length + 1 : 1 };
 }

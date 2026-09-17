@@ -430,7 +430,7 @@ describe('every move in the vocabulary can actually happen', () => {
     // Two moves are produced by their OWN input rather than by the situational read: `spin` (the spin
     // machinery) and `hesi` (the pull-back plant, `doMove(ctx, 'hesi')`). Everything else has to be
     // reachable from a read, or it is priced vocabulary a player can never actually use.
-    const expected = (Object.keys(MOVE_HANDLE) as HandleMove[]).filter((m) => m !== 'spin' && m !== 'hesi');
+    const expected = (Object.keys(MOVE_HANDLE) as HandleMove[]).filter((m) => m !== 'spin' && m !== 'hesi').filter((mv) => !STICK_ONLY.has(mv));   // the stick-only moves are produced by StickHandle.stickMoveFor (its own test)
     const missing = expected.filter((m) => !produced.has(m));
     expect(missing, `unreachable: ${missing.join(', ')}`).toEqual([]);
   });
@@ -677,11 +677,21 @@ describe('MOVE_CLIP', () => {
   });
 });
 
-import { moveRate, moveFadeSec, MOVE_RATE_TURBO, MOVE_RATE_BASE } from './HandleSystem';
+import { moveRate, moveFadeSec, MOVE_RATE_TURBO, MOVE_RATE_BASE, STICK_ONLY, canChain, pushChain, MOMENTUM_REPEATABLE } from './HandleSystem';
 describe('move pace on the turbo', () => {
   it('a move on the turbo plays faster with a shorter fade; off it, the capture\'s own pace', () => {
     expect(moveRate(true)).toBe(MOVE_RATE_TURBO); expect(moveRate(false)).toBe(MOVE_RATE_BASE);
     expect(MOVE_RATE_TURBO).toBeGreaterThan(1.2); expect(MOVE_RATE_BASE).toBe(1);
     expect(moveFadeSec(true)).toBeLessThan(moveFadeSec(false));
+  });
+});
+describe('the momentum spam (2K17)', () => {
+  it('a momentum cross chains into itself, and only it does', () => {
+    const st = pushChain('momentum_cross', { last: null, since: Infinity, length: 0 }, 100);
+    expect(canChain('momentum_cross', st, 100)).toBe(true);
+    const st2 = pushChain('momentum_cross', st, 100);
+    expect(st2.length).toBe(2);
+    expect(canChain('crossover', pushChain('crossover', { last: null, since: Infinity, length: 0 }, 100), 100)).toBe(false);
+    expect(MOMENTUM_REPEATABLE.has('momentum_cross')).toBe(true); expect(STICK_ONLY.has('steezo_roll')).toBe(true);
   });
 });

@@ -57,6 +57,8 @@ export interface GearTuning {
   sprintKick: number;      // m/s added on the sprint PRESS while already moving
   kickAbove: number;       // m/s — the kick needs this much run already
 }
+/** The launch after a move: accel caps ×, for this long (owner: "faster launches"). */
+export const LAUNCH_BOOST = 1.7, LAUNCH_SEC = 0.45;
 export const GEARS_HOOPS: GearTuning = {
   walkStick: 0.45, walkFactor: 0.38,
   jogTau: 0.17, sprintTau: 0.15, jogAccel: 15, sprintAccel: 24,
@@ -98,6 +100,13 @@ export class CourtMovement {
   private sprintWas = false;   // gears: the sprint press edge
   private burst01 = 0;         // gears: intensity from a kick / a burst, decaying
   private gearNow: Gear = 'stop';
+  private launchLeft = 0;      // gears: seconds of FASTER LAUNCH after a move (accel caps up, no loaded step)
+  private pausedNow = false;   // gears: PAUSIN' — the stick is ignored, the body stops on a dime
+  /** gears: the next `sec` seconds accelerate at LAUNCH_BOOST× with no loaded first step (the explode after a move). */
+  launchFor(sec: number): void { this.launchLeft = Math.max(this.launchLeft, sec); }
+  /** gears: pausin' — while on, the stick is ignored and the body stops hard; off, movement resumes. */
+  pause(on: boolean): void { this.pausedNow = on; }
+  get paused(): boolean { return this.pausedNow; }
   /** gears: a burst from outside (a crossover, an explode-out) adds to the intensity read. */
   noteBurst(amount01 = 0.35): void { this.burst01 = Math.min(1, this.burst01 + amount01); }
   get gear(): Gear { return this.gearNow; }
@@ -109,7 +118,8 @@ export class CourtMovement {
    *  convention). Returns the state for animation/HUD. */
   update(dt: number, moveX: number, moveY: number, sprint: boolean): MovementState {
     this.plantTimer = Math.max(0, this.plantTimer - dt);
-    const mag = Math.min(1, Math.hypot(moveX, moveY));
+    this.launchLeft = Math.max(0, this.launchLeft - dt);
+    const mag = this.pausedNow ? 0 : Math.min(1, Math.hypot(moveX, moveY));   // pausin': the stick is ignored
     const t = this.tune;
 
     if (mag > 0.05) {
@@ -159,8 +169,9 @@ export class CourtMovement {
           const g = t.gears;
           const err = topSpeed - speed;
           if (err >= 0) {
-            const cap = sprint ? g.sprintAccel : g.jogAccel, tau = sprint ? g.sprintTau : g.jogTau;
-            const load = speed < g.loadBelow ? g.loadScale + (1 - g.loadScale) * (speed / g.loadBelow) : 1;
+            const launching = this.launchLeft > 0;
+            const cap = (sprint ? g.sprintAccel : g.jogAccel) * (launching ? LAUNCH_BOOST : 1), tau = (sprint ? g.sprintTau : g.jogTau) * (launching ? 0.7 : 1);
+            const load = !launching && speed < g.loadBelow ? g.loadScale + (1 - g.loadScale) * (speed / g.loadBelow) : 1;   // a launch out of a move has no loaded step
             newSpeed = Math.min(topSpeed, speed + Math.min(cap * load, err / tau) * dt);
           } else newSpeed = Math.max(topSpeed, speed - g.gearDownDecel * dt);
           if (sprint && !this.sprintWas && speed >= g.kickAbove) { newSpeed = Math.min(t.maxSpeed * this.speedScale, newSpeed + g.sprintKick); this.burst01 = Math.min(1, this.burst01 + 0.3); }
@@ -185,7 +196,7 @@ export class CourtMovement {
       const speed = this.vel.length();
       if (t.gears) this.gearNow = 'stop';
       if (speed > 0) {
-        const decel = t.gears ? t.gears.stopDecelLow + (t.gears.stopDecelHigh - t.gears.stopDecelLow) * Math.min(1, speed / t.maxSpeed) : t.decel;
+        const decel = t.gears ? (this.pausedNow ? t.gears.stopDecelLow * 1.5 : t.gears.stopDecelLow + (t.gears.stopDecelHigh - t.gears.stopDecelLow) * Math.min(1, speed / t.maxSpeed)) : t.decel;   // pausin' stops on a dime
         const newSpeed = Math.max(0, speed - decel * dt);
         this.vel.scaleInPlace(speed > 0.001 ? newSpeed / speed : 0);
       }

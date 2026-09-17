@@ -56,6 +56,8 @@ import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
+import { StickHandleReader, stickMoveFor, pausinWanted, type StickGesture } from '../core/StickHandle';
+import type { HoopsDunk } from '../core/HoopsDunks';   // STICK HANDLE (2026-09-17)
 import { driveDunkKFor, handForward, handShiftTarget, stepShift, driveDunkPos, hangWanted, RIM_HANG, rimProtectorJump, rimProtectorSwats, RIM_PROTECT, chestRide, VICTIM_SLIDE, slideStep, type ShowtimeJudge } from '../core/DriveFlight';   // DUNK-FANATIC (2026-09-17): at the iron by the resolve, the rim hang, the rim protector, the chest ride
 import { clankOffRim } from '../anim/ballRig';
 import { startFlush, stepFlush, type FlushState } from '../core/RimFlush';   // DUNK-FANATIC (2026-09-17): the contest's flush on the game's dunks
@@ -132,7 +134,7 @@ import { netExitVelocity, netExitKindOf, netExitMph, type NetExitKind } from '..
 import { showtimeAsked, pickShowtime, judgeShowtime, showtimeMeterT, posterRide, SHOWTIME_FLIGHT_MS, SHOWTIME_HANG_FROM, SHOWTIME_HANG_TO, SHOWTIME_HANG_SCALE, SHOWTIME_DEADLINE_K, SHOWTIME_PCT } from '../core/ShowtimeDunk';   // SHOWTIME (2026-09-17)
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
-import { pickHoopsDunk, dunkSpeedRatio } from '../core/HoopsDunks';
+import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
 import { driveIntent, driveLateral, bodiesMet } from '../core/DriveLine';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -228,6 +230,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let meIntensity01 = 0, meGear = 'stop';   // DRIBBLE PACE
   let scuff: ScuffState = { ...SCUFF_IDLE };
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
+  const rStick = new StickHandleReader(); let stickGestures: StickGesture[] = []; let pausedDribble = false;   // STICK HANDLE
   let passTargetId: 'mate0' | 'mate1' = 'mate0';
   let passType: PassType = 'chest';
   /** Each teammate's velocity this frame — the lob needs to know who is CUTTING (D7). */
@@ -459,7 +462,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     ctx0?.camDirector.snapTo(me.char.root.position, RIM);   // POLISH: the bodies moved metres — the camera cuts to them, it does not chase
     shooting = false; currentShot = null;
     if (gather || finish || spin || posting) me.tree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
-    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; jabEligible = false; burstArmed = false; me.char.root.position.y = 0;
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; rStick.reset(); if (pausedDribble) { pausedDribble = false; me.drib.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; jabEligible = false; burstArmed = false; me.char.root.position.y = 0;
     clearDefense();
     // BIOMECH-HOOPS-WAVE1: the possession's clocks; a held shot is lifted, a floored body gets up
     driver = null; driveK = 0; dunkFlight = null; dunkFlush = null; mateArc.active = false; posterVictim = null; victimSlide = null; lastDunkKind = 'clean';
@@ -598,7 +601,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       localSource.feed(e);
-      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
+      if (e.t === 'stick' && e.side === 'R') {   // MODE-STICK-FACE: R stick → the look orbit — except on the floor with the ball: the DRIBBLE STICK (2K)
+        const onFloor = carrierId === 'me' && !shooting && !dunking && !finish && !gather && !spin;
+        if (onFloor) { stickGestures.push(...rStick.feed(e.x, e.y, performance.now() / 1000)); lookX = 0; lookY = 0; }
+        else { rStick.reset(); lookX = e.x; lookY = e.y; }
+      }
       if (dunking && e.t === 'button' && e.btn === 'X' && e.pressed) showtimePress = true;   // SHOWTIME: the timed flush
       // BLOCK jump while defending an opponent possession. The body lives in contestJump() so the slot can reach it
       // too — 1v1 carries the same split, and the reason is written out there.
@@ -644,7 +651,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // HOOPS-MOVE-KIT-A: never while the ball is in the air or on a finish — an active carry on the release frame yanked the
       // flying ball to the dribble point (carrierId stays 'me' until the next possession)
       const ballReleased = !!(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased;
-      for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : 0.5, cbNow === b && !shooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased && !(b === me && !!spin));
+      for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : 0.5, cbNow === b && !(b === me && pausedDribble) && !shooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased && !(b === me && !!spin));
 
       // poll every body; tick stagger timers
       net?.tick(me.slot.intent);   // no-op without ?net=
@@ -931,6 +938,28 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       }
       // HOOPS-MOVE-KIT-A: never inside a shot / finish — the hand swap moved the finishing hand's ball to the other palm mid-hop
       // (measured on a right-hand layup: the ball to the left hand at +207 ms; 1v1 had this line under its guard)
+      // STICK HANDLE (2K17, owner 2026-09-17): the right stick's gestures become moves while the ball is on the floor — a
+      // side flick at pace is the MOMENTUM CROSS (a wide cut that keeps the run; chained, the spam escalates), a down
+      // flick the MOMENTUM BEHIND THE BACK (slow: the hesi), a hold is PAUSIN' (frozen, the ball out, the release explodes),
+      // a half-circle sweep the STEEZO ROLL (the wrap rolled into the spin). In the air the same stick is the trick stick.
+      if (stickGestures.length && iAmCarrier && !shooting && !dunking && !finish && !gather && !spin) {
+        const nfS = nearestLiveFoe(); const foeDistS = nfS ? distXZ(me.char.root.position, nfS.char.root.position) : Infinity; const foeLiveS = !!nfS;
+        for (const g of stickGestures) {
+          if (g.kind === 'release') { if (pausedDribble) { pausedDribble = false; me.drib.pause(false); me.tree.releaseHold(); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); console.info('[3V3-STICK] release — the explode out of the pause'); } continue; }
+          const pick = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, sprint: sprintOk });
+          if (!pick) continue;
+          console.info(`[3V3-STICK] ${g.kind}${'dir' in g ? ' ' + g.dir : ''} → ${pick.move}${pick.side ? ' ' + pick.side : ''} at ${me.drib.vel.length().toFixed(1)} m/s`);
+          if (pick.move === 'momentum_cross') me.drib.momentumCross(pick.side ?? 'right', sprintOk);
+          else if (pick.move === 'momentum_btb') me.drib.momentumBtb(pick.side ?? 'right', sprintOk);
+          else if (pick.move === 'hesi') me.drib.hesitate();
+          else if (pick.move === 'steezo_roll') {
+              if (pausinWanted({ sprint: sprintOk, dist: distXZ(me.char.root.position, RIM_FLOOR), speed: me.drib.vel.length(), turbo01: turbo.t01 })) { console.info("[3V3-STICK] PAUSIN' — the spin thrown into the takeoff"); startDunk(ctx, foeDistS < 2.2 && foeLiveS ? 'poster' : 'dunk', nfS ? nfS.char.root.position : null, PAUSIN_DUNK); continue; }   // PAUSIN' (2K21): the spin dunk
+              me.drib.momentumBtb(pick.side ?? 'right', sprintOk); const sideS = pick.side ?? undefined; later(180, () => { if (iAmCarrier && !spin && !shooting && !dunking) { spinCooldown = 0; startSpin(ctx, (nearestLiveFoe()?.char.root.position ?? null), sideS); } }); }
+          doMove(ctx, pick.move, pick.side ?? undefined);
+          SoundKit.play('whoosh', { pitch: pick.move === 'momentum_cross' ? 1.45 : 1.3, volume: 0.4 }); ctx.feel?.impact?.(0.1);
+        }
+        stickGestures = [];
+      } else if (stickGestures.length) stickGestures = [];
       if (drib.crossover && !shooting && !dunking && !finish && !gather && !posting && !spin) {
         carries.get(me)?.switchHand();
         // A CROSSOVER IS A CHAIN LINK, not just a hand swap. In 3v3 it only ever switched hands, so the
@@ -1560,7 +1589,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     startBoxOut('mine');   // O2: the shot is up — the defenders seal their men, the offense crashes
   }
 
-  function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster' | 'standing', defenderPos: Vector3 | null): void {
+  function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster' | 'standing', defenderPos: Vector3 | null, force?: HoopsDunk): void {   // STICK HANDLE: pausin' forces its 360
     dunking = true; contactLatch = false; finishFoul = false;   // A+ P0: a fresh attempt gets one punch
     me.shotWin = 'none'; dunkFlush = null; let resolved = false; dunkFlight = { k: 0, made: null };   // BIOMECH-HOOPS-WAVE1
     lastDunkKind = 'clean';   // a clean dunk after a poster must not inherit the poster
@@ -1603,7 +1632,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const lateral3 = speed3 > 0.1 && toRimNow3.lengthSquared() > 1e-4
       ? Math.min(1, Math.abs(driveDir3.x * toRimNow3.normalize().z - driveDir3.z * toRimNow3.x) / speed3)
       : 0;
-    const picked3 = showtime ? pickShowtime({ roll, contact: kind === 'poster', momentum01: mbus.score01 }) : pickHoopsDunk({
+    const picked3 = force ?? (showtime ? pickShowtime({ roll, contact: kind === 'poster', momentum01: mbus.score01 }) : pickHoopsDunk({
       speed: speed3, lateral01: lateral3,
       contest01: c.contested ? Math.min(1, Math.max(0, 1 - Math.abs(c.lateral))) : 0,
       // A POSTER IS A SET BODY IN THE WAY, NOT MERELY A BODY NEARBY. checkDriveDunk says 'poster' for any defender
@@ -1615,7 +1644,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // somebody in the frame.
       poster: kind === 'poster' && c.contested && c.set, momentum01: mbus.score01, roll,
       standing: kind === 'standing',
-    });
+    }));
     let gatherLeft = kind === 'standing' ? STANDING_GATHER_MS : 0;   // DEFENSE-LOOK: the two-foot squat before a standing dunk's flight
     if (gatherLeft > 0) me.tree.beat('dunk_charge_gather', { fadeSec: 0.06 });
     else me.tree.beat(picked3.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked3, flightTotal / 1000) });
@@ -2243,7 +2272,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    * the hard-break threshold all live there. What is here is 3v3's own rendering: its nearest defender out
    * of three rather than one man, its clips, its banners.
    */
-  function doMove(ctx: ModeContext, move: HandleMove): void {
+  function doMove(ctx: ModeContext, move: HandleMove, dirHint?: 'left' | 'right'): void {   // STICK HANDLE
     const foe = nearestLiveFoe();
     const outcome = resolveHandleMove(move, chain, handle, {
       present: !!foe,
@@ -2260,7 +2289,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (foe) {
       const toHim = foe.char.root.position.subtract(me.char.root.position);
       const right = bodyRight(me.char.root.rotation.y);
-      const clip = moveClip(move, (toHim.x * right.x + toHim.z * right.z) > 0 ? 'left' : 'right');
+      const clip = moveClip(move, dirHint ?? ((toHim.x * right.x + toHim.z * right.z) > 0 ? 'left' : 'right'));
       const turboMove = !!me.slot.intent.sprint;   // MOVE PACE: on the turbo the move SNAPS
       if (clip) me.tree.beat(clip, { fadeSec: moveFadeSec(turboMove), speedRatio: moveRate(turboMove) });
     }

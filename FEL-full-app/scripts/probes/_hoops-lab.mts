@@ -260,7 +260,7 @@ const PLAYS = ['jumper', 'layup', 'dunk'];
 // the SIDE under test is chosen by PLAY rather than by who happens to be winning.
 // CHARGE is a defensive possession too — you are standing in his way waiting to wear it.
 const wantDefence = PLAY === 'defence' || PLAY === 'charge';
-const PLAYS_ALL = ['jumper', 'layup', 'dunk', 'handle', 'trick', 'screen', 'pace'];   // what PLAY can name
+const PLAYS_ALL = ['jumper', 'layup', 'dunk', 'handle', 'trick', 'screen', 'pace', 'rstick'];   // what PLAY can name
 await page.evaluate(`(() => { window.__brain = ${wantDefence}; window.__def.block = ${PLAY !== 'charge'}; window.__def.charge = ${PLAY === 'charge'}; })()`);
 
 /**
@@ -365,6 +365,30 @@ for (let n = 0; n < POSSESSIONS; n++) {
       await driveToRim(2.4);
       await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
       await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: 0, action: true }, 60)`);
+    }
+    else if (play === 'rstick') {
+      // STICK HANDLE (2K17): the right stick thrown IN-PAGE (the mode reads it off the raw stream — the bridge cannot reach it)
+      // while the left stick jogs at the defender: momentum spam (right/left/right/left), a hold (pausin') and its release,
+      // a half-circle sweep (the steezo roll), a down flick (momentum behind the back / hesi). Counted off [X-STICK] / [X-HANDLE].
+      const mark = async (label: string) => { const t = await page.evaluate('performance.now() - (window.__smoothT0 || 0)') as number; paceMarks.push({ t: Math.round(t), label }); };
+      await mark('stick');
+      await page.evaluate(`(() => {
+        const bus = window.__FEL_DEV__ && window.__FEL_DEV__.input; if (!bus) return 'no bus';
+        const R = (x, y) => bus.emit({ t: 'stick', side: 'R', x, y });
+        const flick = (at, x, y) => { setTimeout(() => R(x, y), at); setTimeout(() => R(x * 0.9, y * 0.9), at + 30); setTimeout(() => R(0, 0), at + 90); };
+        flick(350, 1, 0); flick(700, -1, 0); flick(1050, 1, 0); flick(1400, -1, 0);      // the momentum spam
+        setTimeout(() => R(1, 0.1), 1900); setTimeout(() => R(0.95, 0.1), 2000); setTimeout(() => R(0.95, 0.1), 2200); setTimeout(() => R(0, 0), 2450);   // pausin' … release
+        for (let i = 0; i <= 8; i++) { const a = -Math.PI / 2 + (i / 8) * Math.PI; setTimeout(() => R(Math.cos(a) * 0.95, Math.sin(a) * 0.95), 2800 + i * 28); }   // the sweep: the steezo roll
+        setTimeout(() => R(0, 0), 3100);
+        flick(3500, 0.2, 1);                                                              // down: momentum behind the back (hesi when slow)
+        flick(3900, 1, 0); flick(4200, -1, 0);                                            // out of it: two more
+        return 'armed';
+      })()`);
+      await agent(`a.act({ moveX: 0, moveY: 0.6 }, 1500)`);
+      await agent(`a.act({ moveX: 0, moveY: 0.35 }, 1300)`);
+      await agent(`a.act({ moveX: 0, moveY: 0.6 }, 1700)`);
+      await mark('end');
+      await agent(`a.do('shoot', { charge: ${CHARGE} })`);
     }
     else if (play === 'pace') {
       // DRIBBLE PACE: walk, jog, stop (−x), then jog, turbo, let off, press again (the change of pace), stop (+x) — the speed
@@ -549,9 +573,15 @@ if (SMOOTH) {
   for (const f of flipAt) console.log(`  clip flip ${f}`);
   for (const b of ballPopAt.slice(0, 8)) console.log(`  ball pop ${b.d} m @${b.t}ms y ${b.y} ${b.clips.join('+')}`);
   printVerdicts(TAG, analyseBallPath(rows, outcomes));
+  if (paceMarks.some((x) => x.label === 'stick')) {   // STICK HANDLE: the hero's speed through each stick possession, 100 ms bins
+    const sp: { t: number; v: number }[] = [];
+    for (let i = 1; i < rows.length; i++) { const a = rows[i - 1].h?.[0], b = rows[i].h?.[0]; const dt = (rows[i].t - rows[i - 1].t) / 1000; if (!a || !b || dt <= 0 || dt > 0.1) continue; sp.push({ t: rows[i].t, v: Math.hypot(b[0] - a[0], b[2] - a[2]) / dt }); }
+    const starts = paceMarks.filter((x) => x.label === 'stick').map((x) => x.t);
+    for (const t0 of starts.slice(0, 3)) { const line: string[] = []; for (let t = t0; t <= t0 + 4600; t += 100) { const w = sp.filter((s) => Math.abs(s.t - t) <= 50 && s.v < 12).map((s) => s.v).sort((a, b) => a - b); line.push(w.length ? w[w.length >> 1].toFixed(1) : '-'); } console.log(`STICK ${TAG} @${t0}: ${line.join(' ')}`); }
+  }
   // DRIBBLE PACE: the hero's ground speed through the pace play, 50 ms bins, with the step marks — top speeds per gear,
   // time to 95 % of the sprint after the press, the stop's length from the sprint and from the jog
-  if (paceMarks.length) {
+  if (paceMarks.length && paceMarks.some((x) => x.label === 'walk')) {
     const sp: { t: number; v: number }[] = [];
     for (let i = 1; i < rows.length; i++) { const a = rows[i - 1].h?.[0], b = rows[i].h?.[0]; const dt = (rows[i].t - rows[i - 1].t) / 1000; if (!a || !b || dt <= 0 || dt > 0.1) continue; sp.push({ t: rows[i].t, v: Math.hypot(b[0] - a[0], b[2] - a[2]) / dt }); }
     const at = (t: number) => sp.filter((s) => Math.abs(s.t - t) <= 40).map((s) => s.v).sort((a, b) => a - b)[Math.floor(sp.filter((s) => Math.abs(s.t - t) <= 40).length / 2)] ?? NaN;
@@ -591,7 +621,7 @@ const out = {
   plantedMs: def?.plantedMs ?? 0, closestWhilePlanted: +(def?.closestWhilePlanted ?? 99).toFixed(2),
   finalScore: [final.score ?? null, final.foeScore ?? null], target: final.target ?? null,
   rows, log: log.slice(-200),
-  defLog: log.filter((l) => /-DEF\]|-DUNK\]|-REF\]|-SHOT\]|-MOVE\]/.test(l)).map((l) => l.replace(/^\d+ /, '')),   // suite pass: the release diagnostics, unsliced
+  defLog: log.filter((l) => /-DEF\]|-DUNK\]|-REF\]|-SHOT\]|-MOVE\]|-STICK\]|-HANDLE\]|-PACE\]|-CONTACT\]/.test(l)).map((l) => l.replace(/^\d+ /, '')),   // suite pass: the release diagnostics, unsliced
 };
 fs.writeFileSync(`${OUT}/hoops-lab-${TAG}.json`, JSON.stringify(out, null, 1));
 console.log(`\n${MODE} charge ${CHARGE} · offence ${made}/${off.length}${out.makePct !== null ? ` (${out.makePct}%)` : ''} · ${byPlay.map((b) => `${b.play} ${b.made}/${b.n}`).join(' · ')}`);

@@ -77,6 +77,16 @@ export class DribbleController {
   private crossoverBoost: number;
   /** DRIBBLE PACE: letting off the turbo at pace opens a change-of-pace window; the next R2 PRESS inside it explodes. */
   private sprintWas = false; private paceWindowLeft = 0;
+  /** STICK HANDLE (2K17): the momentum streak — crosses inside MOMENTUM_STREAK_SEC of each other escalate (the spam). */
+  private momentumStreak = 0; private momentumAt = -Infinity; private clock = 0;
+  /** THE SMOOTH CUT: a redirect is eased over CUT_BLEND_SEC rather than written into the velocity in one frame. */
+  private pendingCut: { x: number; z: number; speed: number; left: number } | null = null;
+  static readonly CUT_BLEND_SEC = 0.07;
+  static readonly MOMENTUM_STREAK_SEC = 0.55;
+  static readonly MOMENTUM_TOP = 1.2;          // × top speed a momentum streak can reach
+  /** The wide cut: how far ACROSS the momentum cross carries (0 = straight on, 1 = pure sideways). */
+  static readonly MOMENTUM_ACROSS = 0.62;
+  static readonly BTB_ACROSS = 0.4;
   static readonly PACE_WINDOW_SEC = 0.6;
   static readonly PACE_DOWN_MIN_SPEED = 3.4;
 
@@ -88,7 +98,62 @@ export class DribbleController {
    *  a character facing somewhere (all of them) must say so. */
   setFacing(rad: number): void { this.movement.facing = rad; }
 
+  /** Ease a redirect in over CUT_BLEND_SEC (called every frame; a no-op with nothing pending). */
+  private stepCut(dt: number): void {
+    const c = this.pendingCut; if (!c) return;
+    const k = Math.min(1, dt / Math.max(1e-3, c.left));
+    const v = this.movement.vel;
+    v.x += (c.x * c.speed - v.x) * k; v.z += (c.z * c.speed - v.z) * k;
+    c.left -= dt; if (c.left <= 1e-4) { v.x = c.x * c.speed; v.z = c.z * c.speed; this.pendingCut = null; }
+  }
+  private cutTo(dx: number, dz: number, speed: number): void {
+    const n = Math.hypot(dx, dz) || 1;
+    this.pendingCut = { x: dx / n, z: dz / n, speed, left: DribbleController.CUT_BLEND_SEC };
+    this.movement.facing = Math.atan2(dx / n, dz / n);
+  }
+  /** The body's forward / right on the floor from its facing. */
+  private frame(): { fx: number; fz: number; rx: number; rz: number } {
+    const fx = Math.sin(this.movement.facing), fz = Math.cos(this.movement.facing);
+    return { fx, fz, rx: fz, rz: -fx };
+  }
+  /** MOMENTUM CROSS (2K17): a WIDE cut to `side` that keeps the run and adds to it — chained inside the streak window it
+   *  escalates (the spam) up to MOMENTUM_TOP × top speed; the launch out of it is boosted. */
+  momentumCross(side: 'left' | 'right', sprint: boolean): void {
+    const { fx, fz, rx, rz } = this.frame(); const sgn = side === 'right' ? 1 : -1;
+    const top = DEFAULT_MOVEMENT.maxSpeed;
+    this.momentumStreak = this.clock - this.momentumAt <= DribbleController.MOMENTUM_STREAK_SEC ? this.momentumStreak + 1 : 1;
+    this.momentumAt = this.clock;
+    const boost = this.crossoverBoost * (sprint ? 1.3 : 0.9) + 0.35 * Math.min(3, this.momentumStreak - 1);
+    const speed = Math.min(top * DribbleController.MOMENTUM_TOP, Math.max(top * 0.55, this.movement.vel.length()) + boost);
+    const a = DribbleController.MOMENTUM_ACROSS;
+    this.cutTo(fx * (1 - a) + rx * sgn * a, fz * (1 - a) + rz * sgn * a, speed);
+    this.movement.launchFor(0.45); this.movement.noteBurst(sprint ? 0.6 : 0.4);
+  }
+  /** MOMENTUM BEHIND THE BACK: the wrap at pace — a shallower cut than the cross, no slow-down, a little added. */
+  momentumBtb(side: 'left' | 'right', sprint: boolean): void {
+    const { fx, fz, rx, rz } = this.frame(); const sgn = side === 'right' ? 1 : -1;
+    const top = DEFAULT_MOVEMENT.maxSpeed;
+    const speed = Math.min(top * 1.1, Math.max(top * 0.5, this.movement.vel.length()) + (sprint ? 1.2 : 0.8));
+    const a = DribbleController.BTB_ACROSS;
+    this.cutTo(fx * (1 - a) + rx * sgn * a, fz * (1 - a) + rz * sgn * a, speed);
+    this.movement.launchFor(0.4); this.movement.noteBurst(0.4);
+  }
+  /** PAUSIN': the dribble frozen — the body stops on a dime and the stick is ignored until `pause(false)`, which arms the explode. */
+  pause(on: boolean): void {
+    this.movement.pause(on);
+    if (!on) { this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC; this.movement.launchFor(0.5); }
+  }
+  get paused(): boolean { return this.movement.paused; }
+  /** A hesitation thrown from the stick (the L-stick pull-back tap does this on its own): the plant, eased, and the window. */
+  hesitate(): void {
+    const v = this.movement.vel; const n = v.length();
+    if (n > 0.05) this.pendingCut = { x: v.x / n, z: v.z / n, speed: n * 0.12, left: DribbleController.CUT_BLEND_SEC };
+    this.hesiCooldown = DribbleController.HESI_COOLDOWN_SEC; this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC;
+    this.movement.launchFor(0.5); this.movement.noteBurst(0.3);
+  }
   update(dt: number, moveX: number, moveY: number, sprint: boolean): DribbleResult {
+    this.clock += dt;
+    this.stepCut(dt);
     this.crossoverCooldown = Math.max(0, this.crossoverCooldown - dt);
     this.hesiCooldown = Math.max(0, this.hesiCooldown - dt);
     this.hesiBoostLeft = Math.max(0, this.hesiBoostLeft - dt);
@@ -135,7 +200,7 @@ export class DribbleController {
         hesitation = true;
         this.hesiCooldown = DribbleController.HESI_COOLDOWN_SEC;
         this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC;
-        this.movement.vel.scaleInPlace(0.12);
+        { const v = this.movement.vel, n = v.length(); if (n > 0.05) this.pendingCut = { x: v.x / n, z: v.z / n, speed: n * 0.12, left: DribbleController.CUT_BLEND_SEC }; }   // the plant, eased (STICK HANDLE)
         // A flick straight back OUT (pull then push in one motion) explodes
         // on the same frame instead of waiting for the next push.
         if (dir && fwd > 0.3) {
@@ -157,8 +222,8 @@ export class DribbleController {
       this.crossoverCooldown = 0.5;
       // Skilled cut: instant redirect + burst (bypasses plant penalty).
       const top = DEFAULT_MOVEMENT.maxSpeed;
-      this.movement.vel.copyFrom(dir!.scale(Math.min(top * 1.15, this.movement.vel.length() + this.crossoverBoost * (sprint ? 1.3 : 0.85))));   // DRIBBLE PACE: the turbo makes the cut violent
-      this.movement.facing = Math.atan2(dir!.x, dir!.z);
+      this.cutTo(dir!.x, dir!.z, Math.min(top * 1.15, this.movement.vel.length() + this.crossoverBoost * (sprint ? 1.3 : 0.85)));   // DRIBBLE PACE: the turbo makes the cut violent; STICK HANDLE: eased over CUT_BLEND_SEC, not written in one frame
+      this.movement.launchFor(0.4);
     }
 
     // EXPLODE-OUT — the first FORWARD push inside the hesi window gets the
