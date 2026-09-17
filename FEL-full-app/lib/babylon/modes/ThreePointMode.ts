@@ -46,7 +46,8 @@ import { slewYaw, yawTo, yawOfVel } from '../core/Biomech';
 import { RELEASE_FRAME_01 } from '../core/BallHandling';
 import { releaseFrameOf } from '../anim/opponentMotion';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered   // HOOPS MOVEMENT: the release frame of the clip that plays
-import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { type SpawnedCharacter } from '../core/CharacterLibrary';
+import { CharacterPipeline } from '../core/characterPipeline';   // suite pass: the sanctioned spawn paths
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
@@ -606,7 +607,7 @@ export const ThreePointMode: ModeDefinition = {
     if (!modeVenue) VenueKit.buildCourt(ctx.scene, 'venice');
     applyOceanCourt(ctx.scene, 'venice');
 
-    player = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
+    player = await CharacterPipeline.spawnPlayer(ctx.scene, DEFAULT_HERO_URL, {
       position: RACK_POS[0].clone(),
       startClip: 'idle_stand',
       modeId: 'threepoint',
@@ -628,7 +629,7 @@ export const ThreePointMode: ModeDefinition = {
         for (let i = 0; i < RIVAL_NAMES.length; i++) {
           if (!player || ctx.scene.isDisposed) break;
           const z = 4 - i * 1.9;
-          const b = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
+          const b = await CharacterPipeline.spawnNpc(ctx.scene, DEFAULT_HERO_URL, {
             position: new Vector3(-9.2, 0, z), yawRad: Math.atan2(RIM.x - -9.2, RIM.z - z), tint: RIVAL_SEEDS[i % 2], startClip: 'idle_stand', identity: false, modeId: 'threepoint',
           });
           neverBindPose(b.animator, 'idle_stand');

@@ -60,7 +60,9 @@ import { flushThroughRim, clankOffRim } from '../anim/ballRig';
 import { syncedShotSpeed, RELEASE_FRAME_01 } from '../core/BallHandling';
 import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
-import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { type SpawnedCharacter } from '../core/CharacterLibrary';
+import { CharacterPipeline } from '../core/characterPipeline';   // suite pass: the sanctioned spawn paths
+import { tintGarmentSlot, SLOT_KEYS } from '../core/playerIdentity';   // …and the team jerseys
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
@@ -90,7 +92,7 @@ import {   // HOOPS-MOVE-KIT-A
   inBankBand, bankPoint, BANK_PCT_BONUS, planHopStep, HOP_RANGE, planEuro, euroSell, euroAvailable, gatherTravel,  // M12 / M13 / M14
   planGather, gatherWish, gatherLabel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
   pickLayupSide, planFinish, finishHopY, finishStride, FINISH_LABEL, type FinishPlan, type FinishStyle,
-  contestDrive, bumpShove, BUMP_SLOW, BUMP_SLOW_SEC, type DriveContest, resolveBodyContact, bodyRight } from '../core/HoopsMoves';
+  contestDrive, bumpShove, BUMP_SLOW, BUMP_SLOW_SEC, type DriveContest, resolveBodyContact, bodyRight, FINISH_CLIP } from '../core/HoopsMoves';
 import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package (the 1v1's, on the team game)
   groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, contestedPct, alteredApex, aiHandsUp, facingCos,
   AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE, BUMP_STRIP_WINDOW_SEC,
@@ -227,8 +229,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let driver: Body | null = null;                // the rival driving on their possession (its tree carries the ball, it faces the rim, the AI drive skips it)
   let driveK = 0;                                // the rival drive's clock 0..1 (the block window is its end)
   let driveSec = 1.1;                            // …and how long that clock runs: the distance at DRIVE_MPS (suite pass)
+  let driveMps = 0;                              // the drive's nominal speed — the dunk picker reads it (a clocked drive's velocity vector is ~0)
   let paintSec = 0, paintWarned = false;          // the three-second clock, and whether the ref has warned yet
   let goaltendCalled = false;                    // one call per shot
+  let foeShotScored = false;                     // the rival's release already banked its two (a goaltend on it whistles, it does not score again)
   let prevBallY = 0;                             // for the ball's vertical rate (goaltending reads it falling)
   let chargeLastGap = -1;                        // last frame's gap to the driver, for the closing RATE
   let oobSec = 0;                                // how long the carrier has been ON the line, still pushing at it
@@ -310,7 +314,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let defenseLuck: number | null = null;                   // dev: force the AI's rolls (1 = always, 0 = never)
   const roll = (): number => defenseLuck ?? Math.random();   // dev: the roll VALUE forced (0 = every chance lands, 0.99 = none)
   const JUMP_SEC = 0.75, JUMP_APEX = 0.46;
-  const DRIVE_MPS = 4.8;            // the rival's sprint drive (suite pass): the clock is distance / this
+  const DRIVE_MPS = 5.4;            // the rival's sprint drive (suite pass): the clock is distance / this. Past HoopsDunks' WINDUP_SPEED (5.0) on a full-length drive, so the vocabulary opens; a short drive stays a power dunk
+  const TEAM_JERSEY = { mine: '#22d3ee', theirs: '#ff2d78' } as const;   // the slot colours the HUD already speaks (cyan = us, pink = them)
+  const DUNK_SHARE = 0.55;          // of the OPEN lanes, the share the rival throws down (the rest are layups); nerve tilts it
   const GATHER_TELL_SEC = 0.35;     // the last stretch of the drive reads as the GATHER — the block's window, on the seam and the hint
   // ── the OFF-BALL package (O1–O3) ──
   let screenTurn = 0;                                      // O1: which mate screens this possession (alternates)
@@ -407,7 +413,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   }
   function resetPossession(toMe = true): void {
     possessionToken++;
-    goaltendCalled = false; paintSec = 0; paintWarned = false;   // one goaltend per shot, and the paint clock is per possession
+    goaltendCalled = false; foeShotScored = false; paintSec = 0; paintWarned = false;   // one goaltend per shot, and the paint clock is per possession
     // every body is about to be teleported; a reset is not an acceleration
     for (const b of everyBody()) b.motion.reset();
     me.char.root.position.set(0, 0, 6);
@@ -448,7 +454,14 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         pos: Vector3, tint: string | undefined, ai: boolean,
         aiKind: 'teammate' | 'defender', slotAngle = 0, markIndex: number | null = null,
       ): Promise<Body> => {
-        const char = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: pos, tint, startClip: SPORT_CLIP.idle });
+        const char = ai
+          ? await CharacterPipeline.spawnNpc(ctx.scene, cfg.heroUrl, { position: pos, tint, startClip: SPORT_CLIP.idle })
+          : await CharacterPipeline.spawnPlayer(ctx.scene, cfg.heroUrl, { position: pos, startClip: SPORT_CLIP.idle });
+        // TEAM KITS (suite pass, 2026-09-16). Six kit bodies in the roster's own tops read as one pickup crowd — the eye
+        // had no way to tell a teammate from a defender but the hero's purple. The AI bodies wear their team's jersey
+        // (the tint used to be only a roster SEED; the roster's baked kit ignored it); the hero keeps the wardrobe he
+        // chose, because he is the one you steer and that is how you find him.
+        if (ai) tintGarmentSlot(char, SLOT_KEYS.jersey, aiKind === 'teammate' ? TEAM_JERSEY.mine : TEAM_JERSEY.theirs);
         char.secondary?.setLookTarget(() => ball?.position ?? null);   // Phase 2: all six watch the ball
         neverBindPose(char.animator, SPORT_CLIP.idle);
         installSafePlay(char.animator, 'threevthree');
@@ -723,7 +736,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         console.info(`[3V3-REF] ${call.id} (ball y ${ball.position.y.toFixed(2)} falling ${ballVelYNow.toFixed(1)}) → ${call.ball}`);
         if (call.whistle) SoundKit.play('whistle');
         mateArc.active = false;
-        foeScore += 2;   // the basket counts, which is the whole point of the call
+        // THE BASKET COUNTS — ONCE (suite pass, 2026-09-16). The rival's release banks its two the moment the shot is
+        // decided (before the ball flies), so a goaltend on a MADE shot was scoring it twice: measured, a possession
+        // conceding 4. On a miss the call is what makes it a basket; on a make it is only the whistle.
+        if (!foeShotScored) foeScore += 2;
         ctx.setHud({ foeScore, banner: call.banner });
         setTimeout(() => ctx.setHud({ banner: '' }), 900);
         // 3v3 has no checkGameOver helper — it inlines the target check everywhere, so this matches that idiom
@@ -2250,7 +2266,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // getting away from me is exactly when he starts throwing 360s, which is what a run feels like from the
       // wrong end of it.
       const theirDir = shooter.vel.clone(); theirDir.y = 0;
-      const theirSpeed = theirDir.length();
+      // A CLOCKED DRIVE HAS NO VELOCITY VECTOR to speak of (0–1.4 m/s as a by-product), so every rival dunk here was
+      // the picker's standing-start answer — POWER SLAM, ten times in ten (measured). The drive's nominal speed is
+      // what he actually arrived at; the vocabulary opens on it the way it does for the 1v1 rival.
+      const theirSpeed = Math.max(theirDir.length(), driveMps);
+      if (theirDir.lengthSquared() < 1e-4) { const d = RIM_FLOOR.subtract(shooter.char.root.position); d.y = 0; if (d.lengthSquared() > 1e-4) theirDir.copyFrom(d.normalize()); }
       const toRimT = RIM_FLOOR.subtract(shooter.char.root.position); toRimT.y = 0;
       const theirLateral = theirSpeed > 0.1 && toRimT.lengthSquared() > 1e-4
         ? Math.min(1, Math.abs(theirDir.x * toRimT.normalize().z - theirDir.z * toRimT.x) / theirSpeed)
@@ -2403,7 +2423,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   async function opponentPossession(ctx: ModeContext): Promise<void> {
     if (ended) return;
     possessionToken++;
-    goaltendCalled = false;   // …and again for theirs: the latch is per SHOT, not per game
+    goaltendCalled = false; foeShotScored = false;   // …and again for theirs: the latch is per SHOT, not per game
     carrierId = 'foeTeam';
     myJumpAge = Infinity; foeShotBlocked = false;
     ctx.setHud({ hint: 'DEFEND — stay tight · time a jump (A) at the release to BLOCK' });
@@ -2437,6 +2457,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // 6 m in 1.1 s is a 5.5 m/s teleport nobody can drop back on, 2 m in 1.1 s a jog — so the defender's read was
     // decided by where the rival happened to catch it. A sprint drive is DRIVE_MPS, and the clock is the distance.
     driveSec = Math.min(1.6, Math.max(0.8, driveLen / DRIVE_MPS));
+    driveMps = driveLen / driveSec;
     console.info(`[3V3-DEF] drive intent ${intent} (defender ${meSet || takingCharge ? 'set' : 'moving'}) ${driveLen.toFixed(1)} m in ${driveSec.toFixed(2)} s`);
     await new Promise<void>((res) => {
       const obs = ctx.scene.onBeforeRenderObservable.add(() => {
@@ -2509,7 +2530,14 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // D1: an OPEN lane at the rim is a DUNK — a real flight I can swat
     const nearestAlly = Math.min(...allyPositions().map((p) => distXZ(p, shooter.char.root.position)));
     const lane = 1.6 / Math.max(0.6, foeNrv.aggression);        // pressing takes it up in traffic
-    if (nearestAlly > lane || (nearestAlly > lane * 0.69 && roll() < 0.5)) { await driverDunk(ctx, shooter); return; }
+    // THE FINISH MIX (suite pass, 2026-09-16). An open lane was ALWAYS a dunk — ten drives, ten slams (measured) — and a
+    // rival who only ever dunks is a highlight reel, not a basketball player. Open: a dunk or a layup, on a roll the
+    // showtime nerve tilts; contested at the rim: a layup; further out: the jumper. The layup is a real finish — it
+    // rides the same block check and arc as the jumper, with the layup's style and clip — and the AI's swat book knows it.
+    const openLane = nearestAlly > lane || (nearestAlly > lane * 0.69 && roll() < 0.5);
+    if (openLane && roll() < DUNK_SHARE * Math.max(0.6, foeNrv.aggression)) { await driverDunk(ctx, shooter); return; }
+    const atRim = distXZ(shooter.char.root.position, RIM_FLOOR) < 2.4;
+    const finishStyle: 'layup' | 'jumper' = openLane || atRim ? 'layup' : 'jumper';
     // THE BLOCK — a timed jump in range at this exact release moment
     if (checkBlock(me.char.root.position, shooter.char.root.position, myJumpAge)) {
       foeShotBlocked = true;
@@ -2531,12 +2559,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // D3: my grounded hand-up inside range, facing him, contests on top of the distance
     const ground = groundContest(distXZ(me.char.root.position, shooter.char.root.position), facingCos(me.char.root.rotation.y, me.char.root.position, shooter.char.root.position), meHandUp);
     const defenseFactor = Math.min(1, proximityContest01(nearestD) + ground);
-    const made = Math.random() < contestedPct(0.5 - Math.min(0.5, defenseFactor * 0.3), ground) / Math.max(0.5, foeNrv.mistake);
-    console.info(`[3V3-DEF] rival release jumper contest ${defenseFactor.toFixed(2)} handUp ${ground > 0} dist ${distXZ(me.char.root.position, shooter.char.root.position).toFixed(2)} jumpAge ${myJumpAge === Infinity ? 'none' : myJumpAge.toFixed(2)}`);
+    const basePct = finishStyle === 'layup' ? 0.62 : 0.5;   // a layup at the rim goes in more often than a pull-up, contested the same way
+    const made = Math.random() < contestedPct(basePct - Math.min(0.5, defenseFactor * 0.3), ground) / Math.max(0.5, foeNrv.mistake);
+    console.info(`[3V3-DEF] rival release ${finishStyle} contest ${defenseFactor.toFixed(2)} handUp ${ground > 0} dist ${distXZ(me.char.root.position, shooter.char.root.position).toFixed(2)} jumpAge ${myJumpAge === Infinity ? 'none' : myJumpAge.toFixed(2)}`);
     if (ground > 0) { ctx.setHud({ banner: 'CONTESTED — HAND UP!' }); }
     releaseBall(ball);                                          // the shot leaves the hand
     // BIOMECH-HOOPS-WAVE1: the rival's jumper flows into the held follow-through (G5) and the ball FLIES (G6)
-    shooter.tree.beat('jumpshot', { onSettle: () => shooter.tree.beat('bball_follow_through', { fadeSec: 0.1 }) });
+    if (finishStyle === 'layup') {
+      const side: 'right' | 'left' = shooter.char.root.position.x < RIM.x ? 'left' : 'right';   // the hand away from the middle
+      shooter.tree.beat(FINISH_CLIP.layup[side], { fadeSec: 0.08, holdEnd: true });
+    } else shooter.tree.beat('jumpshot', { onSettle: () => shooter.tree.beat('bball_follow_through', { fadeSec: 0.1 }) });
     shooter.shotWin = 'release'; shooter.shotSec = 0;
     // the contest my team put on him decides how he misses: a hand in his face is short off the front
     mateMiss = {
@@ -2544,10 +2576,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       quality01: Math.max(0.15, 0.85 - defenseFactor * 0.5),
       short: defenseFactor * 0.8, lateral: (Math.random() - 0.5) * 0.9,
     };
-    mateArc.start(ball.getAbsolutePosition(), RIM, made, 'jumper', alteredApex(defenseFactor));
+    mateArc.start(ball.getAbsolutePosition(), RIM, made, finishStyle, alteredApex(defenseFactor));
     startBoxOut('theirs');   // O2: my team seals their bodies while the ball is up
     if (made) {
-      foeScore += 2;
+      foeScore += 2; foeShotScored = true;
       SoundKit.play('crowdGroan', { volume: 0.4 });
       // your defence is graded on their makes (same contract as 1v1)
       ctx.setHud({

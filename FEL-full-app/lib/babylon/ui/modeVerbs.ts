@@ -241,7 +241,7 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   // Rhythm dance. No movement stick use — the body IS the game; one TAP verb
   // judged against the beat. B also taps (mode reads A or B).
   // 3PT Shootout: one verb, the release. Timing is the whole mechanic.
-  threepoint: verbs({ A: { label: 'SHOOT', emit: A('A') }, X: { label: 'SHOOT', emit: A('X') } }),   // SQUARE shoots here too (2K map)
+  threepoint: verbs({ A: { label: 'SHOOT', emit: A('A') } }),   // (a pad's SQUARE shoots here too — the mode accepts X — but one SHOOT on the diamond is enough)
 
   // Volleyball had NO entry at all, so touch fell through to MODE_VERBS.default
   // — one generic ACTION button — which is the original karate_vs bug in a mode

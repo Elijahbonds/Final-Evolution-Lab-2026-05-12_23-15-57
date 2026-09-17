@@ -89,7 +89,9 @@ import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } f
 import { MeshBuilder, Quaternion, TransformNode as BABYLON_TransformNode, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, TransformNode } from '@babylonjs/core';
-import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { type SpawnedCharacter } from '../core/CharacterLibrary';
+import { CharacterPipeline } from '../core/characterPipeline';   // suite pass: the sanctioned spawn paths (identity for the player, roster variety for the rival)
+import { tintGarmentSlot, SLOT_KEYS } from '../core/playerIdentity';   // …and the rival's jersey
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
@@ -529,11 +531,12 @@ export const OneVOneMode: ModeDefinition = (() => {
       hud = (u) => ctx.setHud(u);
       onevoneVenue = mountVenue(ctx, 'basketball_h2h', { keepGameplayCamera: true, location: ctx.location });
       if (!onevoneVenue) { VenueKit.buildCourt(ctx.scene, 'venice'); applyOceanCourt(ctx.scene, 'venice'); }
-      me = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: MY_SPAWN.clone(), yawRad: Math.PI, startClip: SPORT_CLIP.idle });
+      me = await CharacterPipeline.spawnPlayer(ctx.scene, cfg.heroUrl, { position: MY_SPAWN.clone(), yawRad: Math.PI, startClip: SPORT_CLIP.idle });
       me.secondary?.setLookTarget(() => ball?.position ?? null);    // Phase 2: eyes on the ball
       neverBindPose(me.animator, SPORT_CLIP.idle); installSafePlay(me.animator, 'onevone-me');
       ctx.groundLock?.track(me.root, me.skeleton);
-      foe = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: FOE_SPAWN.clone(), tint: '#ff2d78', startClip: SPORT_CLIP.idle });
+      foe = await CharacterPipeline.spawnNpc(ctx.scene, cfg.heroUrl, { position: FOE_SPAWN.clone(), tint: '#ff2d78', startClip: SPORT_CLIP.idle });
+      tintGarmentSlot(foe, SLOT_KEYS.jersey, '#ff2d78');   // suite pass: the rival wears the rival's colour (the tint alone was only a roster seed)
       foe.secondary?.setLookTarget(() => ball?.position ?? null);
       neverBindPose(foe.animator, SPORT_CLIP.idle); installSafePlay(foe.animator, 'onevone-foe');
       ctx.groundLock?.track(foe.root, foe.skeleton);
