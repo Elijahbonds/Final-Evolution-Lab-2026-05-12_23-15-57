@@ -380,7 +380,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   let jabEligible = false;
   /** A body planted chest-to-chest for a contact dunk, waiting to go down at the flush. */
   let posterVictim: { kind: ReturnType<typeof dunkKindFor>; released: boolean; plant?: Vector3; fall?: Vector3; reacted?: boolean } | null = null;   // SHOWTIME: the plant and the fall line, so he rides the flight
-  let showtimePress = false, showtimeCam = false;   // SHOWTIME: SQUARE in the air (raw, so a pad, a key and a probe all reach it), and whether the side camera is on
+  let showtimePress = false, showtimeCam = false;
+  let camSnapPending = false;   // POLISH: a reset asks the camera to cut, not chase   // SHOWTIME: SQUARE in the air (raw, so a pad, a key and a probe all reach it), and whether the side camera is on
   let spinClip = 'bball_spin';           // M9: the same machinery turns a PIVOT (a shorter sweep, no travel)
   let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
@@ -511,11 +512,16 @@ export const OneVOneMode: ModeDefinition = (() => {
     meAnimTree.releaseHold();                // a reach / a layup finish in flight plays out; only a held shot is lifted
     if (!foeFloored) foeAnimTree.releaseHold();
     hud({ hint: HINT_OFFENCE, shotType: '', shotMeterT: 0 });
+    camSnapPending = true;   // POLISH: the bodies moved metres — the camera CUTS to them on the next frame (it used to chase at ~60 m/s for ten frames, measured)
   }
 
+  /** Schedule the banner's clear: the latest schedule wins, so an older flash's timeout never wipes a newer banner. */
+  function bannerClearLater(ctx: ModeContext, ms: number): void { const id = ++bannerSeq; setTimeout(() => { if (bannerSeq === id) ctx.setHud({ banner: '' }); }, ms); }
+  let bannerSeq = 0;   // POLISH (2026-09-17): banners race one channel — an older flash's timeout used to wipe a newer banner early
   function bannerFlash(ctx: ModeContext, text: string, ms = 800): void {
+    const id = ++bannerSeq;
     ctx.setHud({ banner: text });
-    setTimeout(() => ctx.setHud({ banner: '' }), ms);
+    setTimeout(() => { if (bannerSeq === id) ctx.setHud({ banner: '' }); }, ms);
   }
 
   function checkGameOver(ctx: ModeContext): boolean {
@@ -1165,6 +1171,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         // …but NOT while you are in the air on a dunk: the right stick is the TRICK stick then, and a flick that
         // threw a windmill must not also swing the camera 90° off the rim at the moment you want to watch it.
         if (!dunking) ctx.camDirector.look(lookX, lookY, dt);
+        if (camSnapPending) { camSnapPending = false; ctx.camDirector.snapTo(me.root.position, RIM); }
         ctx.camDirector.update(me.root.position, meDribble.vel, RIM);
       }
 
@@ -1358,7 +1365,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         } else chargeSetSec = 0;
         const wantHandUp = !!intent.contest && myJumpAge === Infinity && meStunSec === 0 && !meFloored && defPhase !== 'over';
         if (wantHandUp !== meHandUp) { meHandUp = wantHandUp; if (meHandUp) console.info('[1V1-DEF] hand up (me)'); else meAnimTree.releaseHold(); }
-        if (meHandUp && !meAnimTree.busy) meAnimTree.hold('bball_hand_up', { fadeSec: 0.1 });
+        if (meHandUp && !meAnimTree.busy) meAnimTree.hold('bball_hand_up', { fadeSec: 0.14 });
 
         if (defPhase === 'check' || defPhase === 'drive') {
           // the rival attacks — reading ME: contained → sidestep, open → drive, held → pull-up, a jump at nothing → blow-by
@@ -1405,7 +1412,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           // over and it's yours; reach while they're protecting it (or gathering) and you're off your feet while they go by.
           if (intent.steal && reachCooldown === 0 && meStunSec === 0) {
             reachCooldown = REACH_COOLDOWN_SEC;
-            meAnimTree.beat('bball_steal_reach');
+            meAnimTree.beat('bball_steal_reach', { fadeSec: 0.14 });
             // D2: inside the bump window the ball is loose in his hands — the poke connects whatever the crossover read says
             const exposure = bumpExposure(dec.exposure, bumpAge);
             if (dist < STEAL_RANGE && (dec.exposure >= STEAL_EXPOSURE_MIN || exposure >= STEAL_EXPOSURE_MIN) && dec.phase !== 'gather' && dec.phase !== 'check') {
@@ -1472,6 +1479,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         // …but NOT while you are in the air on a dunk: the right stick is the TRICK stick then, and a flick that
         // threw a windmill must not also swing the camera 90° off the rim at the moment you want to watch it.
         if (!dunking) ctx.camDirector.look(lookX, lookY, dt);
+        if (camSnapPending) { camSnapPending = false; ctx.camDirector.snapTo(me.root.position, look); }
         ctx.camDirector.update(me.root.position, meDribble.vel, look);
       }
 
@@ -1670,7 +1678,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     let swatted = false;
     // D1: the AI reads the takeoff — a hand up (or a live contest jump) in the lane can SWAT the dunk at the bump
     if (c.contested && defenderPos && !foeHandUp && foeBlockJumpAge === Infinity && aiHandsUp(distXZ(me.root.position, foe.root.position), facingCos(foe.root.rotation.y, foe.root.position, me.root.position), roll)) {
-      foeHandUp = true; foeHandUpLeft = 1.2; foeAnimTree.hold('bball_hand_up', { fadeSec: 0.08 }); console.info('[1V1-DEF] ai hand up on the takeoff');
+      foeHandUp = true; foeHandUpLeft = 1.2; foeAnimTree.hold('bball_hand_up', { fadeSec: 0.14 }); console.info('[1V1-DEF] ai hand up on the takeoff');
     }
     SoundKit.play('whoosh', { pitch: 0.85 });
     // BIOMECH-HOOPS-WAVE1 G6: the live dribble is PARKED first — the ball comes back to the palm and rides the hand through
@@ -2613,7 +2621,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     SoundKit.play('impact', { pitch: 1.2, volume: 0.35 });
     swing('turnover');
     ctx.setHud({ momentum });
-    foeAnimTree.beat('bball_steal_reach');
+    foeAnimTree.beat('bball_steal_reach', { fadeSec: 0.14 });
     meCarry?.update(0, 0, false);
     const from = ballWorld().clone(); releaseBall(ball);
     const toFoe = foe.root.position.subtract(me.root.position); toFoe.y = 0; toFoe.normalize();
@@ -2633,7 +2641,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       console.info(`[1V1-DEF] ai block jump armed at ${foeBlockAt.toFixed(2)} s`);
     } else if (aiHandsUp(dist, facing, roll)) {
       foeHandUp = true; foeHandUpLeft = shotMeter.durationSec + 0.6;
-      foeAnimTree.hold('bball_hand_up', { fadeSec: 0.1 });
+      foeAnimTree.hold('bball_hand_up', { fadeSec: 0.14 });
       console.info(`[1V1-DEF] ai hand up at ${dist.toFixed(2)} m`);
     }
     void ctx;

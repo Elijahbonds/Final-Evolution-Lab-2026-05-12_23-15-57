@@ -211,6 +211,27 @@ if (EYE) await page.evaluate(`(() => { const q = window.__FEL_QA__; const s = q 
   const tgt = () => { if (${JSON.stringify(EYE_TARGET)} === 'foe') { const d = window.__dev && window.__dev(); const fr = d && (typeof d.driverRoot === 'function' ? d.driverRoot() : d.foeRoot); if (fr && fr.position) return fr.position; } return hn.position || hn; };
   const obs = s.onBeforeRenderObservable.add(() => { const pp = tgt(); cam.position.set(pp.x + off[0], pp.y + off[1], pp.z + off[2]); cam.setTarget(new V(pp.x, pp.y + 1.0, pp.z)); });
   s.activeCamera = cam; window.__eyeCam = { cam, prev, obs }; return 'on'; })()`).then((r) => console.log('[LAB] eye cam', r));
+// SMOOTH=1 (polish pass, 2026-09-17): a per-RENDERED-FRAME recorder — hero and rival root / hands / head, the camera, the
+// ball, the clips playing — so a pop (a hand that moved 0.3 m in one frame), a teleport, a camera cut or a clip that
+// flip-flops can be counted and located instead of felt.
+const SMOOTH = process.env.SMOOTH === '1';
+if (SMOOTH) await page.evaluate(`(() => { const q = window.__FEL_QA__; const s = q && q.scene ? q.scene() : null; if (!s) return 'no scene';
+  const MODE = ${JSON.stringify(MODE)};
+  const skOf = (n) => { const st = [n]; while (st.length) { const x = st.pop(); if (x.skeleton) return x.skeleton; for (const c of (x.getChildren ? x.getChildren() : [])) st.push(c); } return null; };
+  const bone = (sk, name) => { const b = sk ? sk.bones.find((b) => b.name.indexOf(name) === 0) : null; return b && b.getTransformNode ? b.getTransformNode() : null; };
+  const rig = (root) => { const sk = skOf(root); return { root, sk, rh: bone(sk, 'RightHand'), lh: bone(sk, 'LeftHand'), head: bone(sk, 'Head') }; };
+  const clipsOf = (r) => (s.animationGroups || []).filter((g) => g.isPlaying && g.targetedAnimations && g.targetedAnimations.some((ta) => r.sk && r.sk.bones.some((b) => b.getTransformNode && b.getTransformNode() === ta.target))).map((g) => g.name);
+  const P = (n) => { if (!n) return null; const p = n.getAbsolutePosition ? n.getAbsolutePosition() : n.position; return [+p.x.toFixed(3), +p.y.toFixed(3), +p.z.toFixed(3)]; };
+  const hero = rig(q.hero());
+  let foe = null;
+  const rows = []; window.__smooth = rows; const t0 = performance.now();
+  s.onAfterRenderObservable.add(() => {
+    if (!foe) { const d = s.metadata && s.metadata[MODE]; const fr = d && (typeof d.driverRoot === 'function' ? d.driverRoot() : d.foeRoot); if (fr) foe = rig(fr); }
+    const ball = s.getMeshByName('ball'); const cam = s.activeCamera;
+    const clips = (s.animationGroups || []).filter((g) => g.isPlaying).map((g) => g.name);
+    rows.push({ t: Math.round(performance.now() - t0), h: [P(hero.root), P(hero.rh), P(hero.lh), P(hero.head)], f: foe ? [P(foe.root), P(foe.rh), P(foe.lh), P(foe.head)] : null, cam: P(cam), ball: ball ? P(ball) : null, clips, hc: clipsOf(hero), fc: foe ? clipsOf(foe) : [] });
+  });
+  return 'recording'; })()`).then((r) => console.log('[LAB] smooth', r));
 const started = await agent('a.start(30000)');
 console.log('[LAB] bridge start →', JSON.stringify(started));
 await page.waitForTimeout(1500);
@@ -460,6 +481,43 @@ const tricks = log.filter((l) => /trick \w+ (green|early|late)/.test(l));
 // early in a run vanishes from it — which is how a run that drew a charge could report `chargesTaken 1` from the
 // full log and show nothing at all when the saved slice was read back. Anything a summary counts must be saved
 // beside the count, not left to a window that may have scrolled past it.
+if (SMOOTH) {
+  const rows = await page.evaluate('window.__smooth || []') as { t: number; h: (number[] | null)[]; f: (number[] | null)[] | null; cam: number[] | null; ball: number[] | null; clips: string[]; hc: string[]; fc: string[] }[];
+  const dist = (a: number[] | null, b: number[] | null) => (a && b ? Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) : 0);
+  const stat = (name: string, pick: (r: typeof rows[number]) => (number[] | null)[] | null) => {
+    const pops: { t: number; part: string; d: number; clips: string[]; prev: string[] }[] = []; let maxD = 0; let teleports = 0; let ySnaps = 0;
+    for (let i = 1; i < rows.length; i++) {
+      const a = pick(rows[i - 1]), b = pick(rows[i]); if (!a || !b) continue;
+      const dt = Math.max(1, rows[i].t - rows[i - 1].t) / 1000; if (dt > 0.1) continue;   // a stall is not a pop
+      const dRoot = dist(a[0], b[0]); if (dRoot / dt > 14) teleports++;
+      if (a[0] && b[0] && Math.abs(a[0][1] - b[0][1]) > 0.3) ySnaps++;
+      for (const [k, part] of [[1, 'rh'], [2, 'lh'], [3, 'head']] as const) {
+        const d = dist(a[k], b[k]) - dRoot * 0; const rel = Math.abs(d - dRoot);   // the hand's move beyond the body's own travel
+        if (rel > maxD) maxD = rel;
+        if (rel > 0.22) pops.push({ t: rows[i].t, part, d: +rel.toFixed(2), clips: rows[i].clips.filter((c) => !/idle_stand|^run$|^walk$/.test(c)), prev: rows[i - 1].clips.filter((c) => !/idle_stand|^run$|^walk$/.test(c)) });
+      }
+    }
+    return { name, frames: rows.length, pops: pops.length, maxHandJump: +maxD.toFixed(2), teleports, ySnaps, worst: pops.sort((x, y) => y.d - x.d).slice(0, 8) };
+  };
+  const hero = stat('hero', (r) => r.h), foe = stat('foe', (r) => r.f);
+  let camCuts = 0, camMax = 0; const camCutAt: { t: number; d: number; clips: string[] }[] = [];
+  for (let i = 1; i < rows.length; i++) { const d = dist(rows[i - 1].cam, rows[i].cam); const dt = Math.max(1, rows[i].t - rows[i - 1].t) / 1000; if (dt > 0.1) continue; if (d > camMax) camMax = d; if (d > 0.6) { camCuts++; if (camCutAt.length < 6) camCutAt.push({ t: rows[i].t, d: +d.toFixed(2), clips: rows[i].clips.slice(0, 3) }); } }
+  // clip flip-flops: A → B → A within 4 frames
+  let flips = 0; const flipAt: string[] = [];
+  for (const who of ['hc', 'fc'] as const) { const key = (r: typeof rows[number]) => (r[who] || []).filter((c) => !/idle_stand|^run$|^walk$/.test(c)).sort().join('+');
+    for (let i = 4; i < rows.length; i++) { const a = key(rows[i - 4]), b = key(rows[i - 2]), c = key(rows[i]); if (a && b && a !== b && c === a) { flips++; if (flipAt.length < 6) flipAt.push(`${who === 'hc' ? 'hero' : 'foe'} ${rows[i].t}ms ${a} ↔ ${b}`); } } }
+  const ballPopAt: { t: number; d: number; y: number; clips: string[] }[] = [];
+  for (let i = 1; i < rows.length; i++) { const a = rows[i - 1], b = rows[i]; if (a.ball && b.ball && b.t - a.t < 100 && dist(a.ball, b.ball) > 0.9) ballPopAt.push({ t: b.t, d: +dist(a.ball, b.ball).toFixed(2), y: b.ball[1], clips: b.clips.filter((c) => !/idle_stand|^run$|^walk$|defend_stance/.test(c)).slice(0, 4) }); }
+  const ballPops = ballPopAt.length;
+  const summary = { hero, foe, camCuts, camMax: +camMax.toFixed(2), camCutAt, clipFlips: flips, flipAt, ballPops };
+  fs.writeFileSync(`${OUT}/smooth-${TAG}.json`, JSON.stringify({ summary, rows }, null, 0));
+  console.log(`SMOOTH ${TAG}: hero pops ${hero.pops} (max ${hero.maxHandJump} m) teleports ${hero.teleports} ySnaps ${hero.ySnaps} · foe pops ${foe.pops} (max ${foe.maxHandJump}) teleports ${foe.teleports} · cam cuts ${camCuts} (max ${camMax.toFixed(2)} m/frame) · clip flips ${flips} · ball pops ${ballPops} · ${rows.length} frames`);
+  for (const w of hero.worst) console.log(`  hero pop ${w.part} ${w.d} m @${w.t}ms  ${w.prev.join('+') || '-'} → ${w.clips.join('+') || '-'}`);
+  for (const w of foe.worst.slice(0, 4)) console.log(`  foe pop ${w.part} ${w.d} m @${w.t}ms  ${w.prev.join('+') || '-'} → ${w.clips.join('+') || '-'}`);
+  for (const c of camCutAt) console.log(`  cam cut ${c.d} m @${c.t}ms ${c.clips.join('+')}`);
+  for (const f of flipAt) console.log(`  clip flip ${f}`);
+  for (const b of ballPopAt.slice(0, 8)) console.log(`  ball pop ${b.d} m @${b.t}ms y ${b.y} ${b.clips.join('+')}`);
+}
 const refCalls = log.filter((l) => /-REF\]/.test(l)).map((l) => l.replace(/^\d+ /, ''));
 const screensCalled = log.filter((l) => /screen called/.test(l)).length;
 const off = rows.filter((r) => r.possession === 'offence');

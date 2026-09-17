@@ -97,7 +97,7 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   // silhouette died into a crouch the moment the hold released).
   watch:           { clip: 'idle_stand', loop: true, fadeSec: 0.2 },
   floor:           { clip: 'karate_floor_hold', loop: true, fadeSec: 0.12 },
-  celebrate:       { clip: 'bball_score_celebrate', loop: false, fadeSec: 0.15 },
+  celebrate:       { clip: 'bball_score_celebrate', loop: false, fadeSec: 0.26 },   // POLISH: the arms-up first key popped a wrist 0.7 m out of a stance at 0.15
   dejected:        { clip: 'football_tackled_fall', loop: false, fadeSec: 0.2 },
 };
 
@@ -172,6 +172,20 @@ export class BasketballAnimTree {
   /** The stride references for THIS rig: a body running the CMU loops paces against their stride, not the authored one. */
   private get ref() { return strideRef(!!(this.animator as { clipNames?: Set<string> }).clipNames?.has('bball_mc_run')); }
 
+  /** POLISH (2026-09-17): a loop state DWELLS. The choice is pure and per frame, so a defender whose reads sat on a
+   *  threshold flipped closeout ↔ slide ↔ backpedal every other frame (measured: 20 flip-flops in six 3v3 possessions,
+   *  each one a 0.12 s crossfade restarted), and a handler flickered protect ↔ idle at 1.4 m. A sibling loop now has
+   *  to be asked for DWELL_SEC before it replaces the running one; the one-shots (a shot, a dunk, a stagger) still cut in
+   *  at once, and so does leaving the group (defending → not). */
+  private stateSince = 0;
+  private static readonly DWELL_SEC = 0.22;
+  private static readonly DWELL_GROUPS: ReadonlyArray<ReadonlySet<BasketballAnimState>> = [
+    new Set(['defend_idle', 'defend_slide', 'defend_slide_right', 'defend_slide_hard', 'defend_slide_hard_right', 'defend_backpedal', 'closeout', 'box_out']),
+    new Set(['idle_dribble', 'protect', 'speed_dribble', 'drive', 'watch']),
+  ];
+  private sameGroup(a: BasketballAnimState | null, b: BasketballAnimState): boolean {
+    return !!a && BasketballAnimTree.DWELL_GROUPS.some((g) => g.has(a) && g.has(b));
+  }
   update(input: AnimTreeInput): BasketballAnimState {
     this.last = input;
     const raw = chooseBasketballClip(input);
@@ -182,8 +196,10 @@ export class BasketballAnimTree {
       const yields = this.override.kind === 'beat' && PRIORITY.has(c.state) && c.state !== this.override.state;
       if (!yields) return this.override.state ?? this.current ?? c.state;
     }
+    const now = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
+    if (c.state !== this.current && c.loop && this.sameGroup(this.current, c.state) && now - this.stateSince < BasketballAnimTree.DWELL_SEC) return this.current!;   // the dwell
     if (c.state !== this.current) {
-      this.current = c.state;
+      this.current = c.state; this.stateSince = now;
       if (c.loop) {
         this.token++; this.override = null;
         // adopt the new state's stride rate rather than sliding from the old one
@@ -237,7 +253,7 @@ export class BasketballAnimTree {
     const tok = ++this.token;
     this.override = { kind: 'beat', clip, state };
     this.animator.play(clip, {
-      loop: false, fadeSec: opts.fadeSec ?? 0.08, speedRatio: opts.speedRatio ?? 1, restart: true,
+      loop: false, fadeSec: opts.fadeSec ?? 0.1, speedRatio: opts.speedRatio ?? 1, restart: true,   // POLISH: 0.08 → 0.10 — the reach and hand-up beats out of a stance popped a wrist 1 m in a frame
       onEnd: () => {
         if (this.token !== tok) return;   // cut by a newer beat / hold / release / reset
         if (opts.holdEnd) { opts.onSettle?.(); return; }   // the pose holds where the clip left it; the override stands until the next beat / release

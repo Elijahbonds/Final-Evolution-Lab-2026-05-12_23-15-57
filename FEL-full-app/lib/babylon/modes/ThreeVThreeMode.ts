@@ -408,6 +408,14 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    * LEAVE THE FLOOR TO CONTEST. Returns true if the jump happened. One body, two callers: the raw A press and the
    * slot's `jump` edge — see the note on `PlayerSlot.Intent.jump` for why the block needed a wire of its own.
    */
+  /** Schedule the banner's clear: the latest schedule wins, so an older flash's timeout never wipes a newer banner. */
+  function bannerClearLater(ctx: ModeContext, ms: number): void { const id = ++bannerSeq; setTimeout(() => { if (bannerSeq === id) ctx.setHud({ banner: '' }); }, ms); }
+  let bannerSeq = 0;   // POLISH (2026-09-17): banners race one channel — the latest wins, an older timeout never wipes it
+  function bannerFlash(ctx: ModeContext, text: string, ms = 800): void {
+    const id = ++bannerSeq;
+    ctx.setHud({ banner: text });
+    setTimeout(() => { if (bannerSeq === id) ctx.setHud({ banner: '' }); }, ms);
+  }
   function contestJump(ctx: ModeContext): boolean {
     if (carrierId !== 'foeTeam' || myJumpAge !== Infinity) return false;
     myJumpAge = 0;
@@ -415,7 +423,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     me.tree.beat('bball_block_reach');   // BIOMECH-HOOPS-WAVE1: the block reach (was jump_up → idle, two owners on the rig)
     SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
     // G4: a wasted jump says so
-    if (driveK < 1 - (GATHER_TELL_SEC + 0.15) / driveSec) { ctx.setHud({ banner: 'JUMPED EARLY — WAIT FOR THE RELEASE' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+    if (driveK < 1 - (GATHER_TELL_SEC + 0.15) / driveSec) { bannerFlash(ctx, 'JUMPED EARLY — WAIT FOR THE RELEASE', 600); }
     return true;
   }
 
@@ -438,6 +446,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     mates[0].char.root.position.set(-3.5, 0, 4);
     mates[1].char.root.position.set(3.5, 0, 4);
     foes.forEach((f, i) => f.char.root.position.set((i - 1) * 3, 0, 2));
+    ctx0?.camDirector.snapTo(me.char.root.position, RIM);   // POLISH: the bodies moved metres — the camera cuts to them, it does not chase
     shooting = false; currentShot = null;
     if (gather || finish || spin || posting) me.tree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
     gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; jabEligible = false; burstArmed = false; me.char.root.position.y = 0;
@@ -667,7 +676,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             if (call.whistle) SoundKit.play('whistle');
             swing('steal');
             ctx.setHud({ momentum, banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}!` });
-            setTimeout(() => ctx.setHud({ banner: '' }), 1100);
+            bannerClearLater(ctx, 1100);
             me.tree.beat(ANKLE_STUMBLE_CLIP, { fadeSec: 0.06 });        // he ran into you; nobody punched either of you
             driver.tree.beat(ANKLE_STUMBLE_CLIP, { fadeSec: 0.06 });
             console.info(`[3V3-REF] ${call.id} at ${closing.toFixed(1)} m/s (set ${chargeSetSec.toFixed(2)}s) → ${call.ball}`);
@@ -677,9 +686,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         } else if (!takingCharge) { chargeSetSec = 0; chargeLastGap = -1; }
         const wantHandUp = !!me.slot.intent.contest && myJumpAge === Infinity && !meFloored && meStunSec === 0;
         if (wantHandUp !== meHandUp) { meHandUp = wantHandUp; if (meHandUp) console.info('[3V3-DEF] hand up (me)'); else me.tree.releaseHold(); }
-        if (meHandUp && !me.tree.busy) me.tree.hold('bball_hand_up', { fadeSec: 0.1 });
+        if (meHandUp && !me.tree.busy) me.tree.hold('bball_hand_up', { fadeSec: 0.14 });
         if (me.slot.intent.steal && driver && !driveStolen && !foeDunkFlight && meStunSec === 0 && distXZ(me.char.root.position, driver.char.root.position) < 1.6) {
-          me.tree.beat('bball_steal_reach');
+          me.tree.beat('bball_steal_reach', { fadeSec: 0.14 });
           const exposure = bumpExposure(0.3, bumpAge);
           if (exposure >= 0.5 || roll() < 0.3) { driveStolen = true; swing('steal'); ctx.setHud({ momentum }); console.info(`[3V3-DEF] strip by me ${bumpAge <= BUMP_STRIP_WINDOW_SEC ? 'on the bump' : 'on the roll'} bumpAge ${bumpAge.toFixed(2)}`); }
           else {
@@ -692,11 +701,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
               const call = judge('reach_in', { offense: 'foe', fouled: 'foe' });
               if (call.whistle) SoundKit.play('whistle');
               ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
-              setTimeout(() => ctx.setHud({ banner: '' }), 900);
+              bannerClearLater(ctx, 900);
               console.info(`[3V3-REF] ${call.id} → ${call.ball}`);
               driveStolen = true;
               later(700, () => (call.ball === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
-            } else { ctx.setHud({ banner: 'REACH — THEY GO BY' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+            } else { bannerFlash(ctx, 'REACH — THEY GO BY', 600); }
           }
         }
       } else if (meHandUp) { meHandUp = false; me.tree.releaseHold(); }
@@ -730,7 +739,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           if (call.whistle) SoundKit.play('whistle');
           swing('turnover');
           ctx.setHud({ momentum, banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
-          setTimeout(() => ctx.setHud({ banner: '' }), 1000);
+          bannerClearLater(ctx, 1000);
           later(900, () => (call.ball === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
         } else if (paintSec > THREE_SECOND_LIMIT - 1) {
           ctx.setHud({ hint: 'GET OUT OF THE PAINT' });   // the ref warns before he calls it
@@ -762,7 +771,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // conceding 4. On a miss the call is what makes it a basket; on a make it is only the whistle.
         if (!foeShotScored) foeScore += 2;
         ctx.setHud({ foeScore, banner: call.banner });
-        setTimeout(() => ctx.setHud({ banner: '' }), 900);
+        bannerClearLater(ctx, 900);
         // 3v3 has no checkGameOver helper — it inlines the target check everywhere, so this matches that idiom
         later(900, () => {
           if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('LOSS', myScore, { foeScore, assists }); return; }
@@ -808,7 +817,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             banner: andOneCall ? `${arcLabel} — ${andOneCall.banner}`
               : arcQuality === 'perfect' ? `${arcLabel} — SPLASH!` : `${arcLabel} — GOOD!`,
           });
-          setTimeout(() => ctx.setHud({ banner: '' }), 800);
+          bannerClearLater(ctx, 800);
           if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
           if (andOneCall) {
             console.info(`[3V3-REF] ${andOneCall.id} → ${andOneCall.ball} (${foulAward(andOneCall)})`);
@@ -836,12 +845,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             if (call.whistle) SoundKit.play('whistle');
             // no free throws in this format (Ref.FREE_THROWS_IMPLEMENTED) — a foul is answered with the ball
             ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'BALL BACK' : 'THEIR BALL'}` });
-            setTimeout(() => ctx.setHud({ banner: '' }), 900);
+            bannerClearLater(ctx, 900);
             const back = call.ball ?? 'me';
             later(900, () => (back === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
           } else {
             ctx.setHud({ banner: 'RIMS OUT' });
-            setTimeout(() => ctx.setHud({ banner: '' }), 700);
+            bannerClearLater(ctx, 700);
             board = { age: 0, contestedCalled: false, shooter: 'me' };   // O2: the board is LIVE, not a race
           }
         }
@@ -977,7 +986,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
               nf.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.07 });
               ctx.feel?.impact?.(0.2);
               ctx.setHud({ banner: 'HE BIT THE JAB — GO!' });
-              setTimeout(() => ctx.setHud({ banner: '' }), 600);
+              bannerClearLater(ctx, 600);
             }
             console.info(`[3V3-THREAT] jab #${threat.shown} odds ${odds.toFixed(2)} bought ${bought}`);
           }
@@ -1019,7 +1028,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             if (call.whistle) SoundKit.play('whistle');
             console.info(`[3V3-REF] ${call.id} off the carrier at x ${p.x.toFixed(2)} z ${p.z.toFixed(2)} → ${call.ball}`);
             ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
-            setTimeout(() => ctx.setHud({ banner: '' }), 900);
+            bannerClearLater(ctx, 900);
             if (call.ball === 'me') resetPossession(true); else void opponentPossession(ctx);
             return;
           }
@@ -1042,7 +1051,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             EffectsKit.burst(ctx.scene, near.char.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
             near.tree.beat(ANKLE_STUMBLE_CLIP);   // a STUMBLE, not a karate hit react — nobody punched him
             ctx.setHud({ banner: 'ANKLES!' });
-            setTimeout(() => ctx.setHud({ banner: '' }), 800);
+            bannerClearLater(ctx, 800);
           }
         }
 
@@ -1073,7 +1082,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           } else {
             ctx.setHud({ banner: 'HESI…' });
           }
-          setTimeout(() => ctx.setHud({ banner: '' }), 700);
+          bannerClearLater(ctx, 700);
         }
       }
       // BIOMECH-HOOPS-WAVE1 G2: the ONE owner of my rig reads the game every frame (dribble / drive / protect / slides; a
@@ -1106,7 +1115,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const setScreen = !!mb && mb.job === 'screen' && mb.screen.phase === 'set';
         if (setScreen !== body.screenHeld) {
           body.screenHeld = setScreen;
-          if (setScreen) { body.tree.hold('bball_screen_set', { fadeSec: 0.12 }); const side = mb!.screen.side === 1 ? 'RIGHT' : 'LEFT'; ctx.setHud({ banner: `SCREEN ${side} — DRIVE OFF IT` }); setTimeout(() => ctx.setHud({ banner: '' }), 700); console.info(`[3V3-OFF] screen set by mate${i} side ${side}`); }
+          if (setScreen) { body.tree.hold('bball_screen_set', { fadeSec: 0.12 }); const side = mb!.screen.side === 1 ? 'RIGHT' : 'LEFT'; ctx.setHud({ banner: `SCREEN ${side} — DRIVE OFF IT` }); bannerClearLater(ctx, 700); console.info(`[3V3-OFF] screen set by mate${i} side ${side}`); }
           else { body.tree.releaseHold(); console.info(`[3V3-OFF] screen ${mb?.screen.phase ?? 'over'} by mate${i}`); }
         }
         const jobAim = mb?.objective ?? null;
@@ -1136,7 +1145,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const next = scramSwitch(marks, foes.map((f) => f.char.root.position), allyPositions());
         if (next !== marks) {
           marks = next; defenderBrains.forEach((b, i) => b.setMark(marks[i]));
-          if (performance.now() - switchBannerAt > 4000) { switchBannerAt = performance.now(); ctx.setHud({ banner: 'THEY SWITCHED' }); setTimeout(() => ctx.setHud({ banner: '' }), 700); }
+          if (performance.now() - switchBannerAt > 4000) { switchBannerAt = performance.now(); bannerFlash(ctx, 'THEY SWITCHED', 700); }
         }
       }
       // defenders (staggered defenders don't move) — and track each one's
@@ -1231,7 +1240,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             nf.stunSec = Math.max(nf.stunSec, PASS_FAKE_STUN);
             ctx.feel?.impact?.(0.2);
             ctx.setHud({ banner: 'HE BIT IT!' });
-            setTimeout(() => ctx.setHud({ banner: '' }), 700);
+            bannerClearLater(ctx, 700);
             console.info(`[3V3-FAKE] pass fake bit — lane opens ${bite.lane.x.toFixed(2)},${bite.lane.z.toFixed(2)}`);
           } else {
             // SCORECARD CONTROLS (2026-09-15): a fake nobody buys was a console line and nothing else. It is still a
@@ -1264,7 +1273,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           );
           lastPasserWasMe = true;
           SoundKit.play('uiTick', { pitch: type === 'bounce' ? 1.0 : type === 'lob' ? 0.8 : 1.3 });
-          if (type === 'lob') { ctx.setHud({ banner: 'LOB!' }); setTimeout(() => ctx.setHud({ banner: '' }), 500); }
+          if (type === 'lob') { bannerFlash(ctx, 'LOB!', 500); }
           EffectsKit.burst(ctx.scene, me.char.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
         } else {
           // NO LANE (2026-09-15). `lockTarget` refuses a pass into a covered lane, and it refused it in silence — 3 of
@@ -1293,7 +1302,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             SoundKit.play('impact', { pitch: 1.3, volume: 0.4 });
             SoundKit.play('crowdGroan', { volume: 0.35 });
             ctx.setHud({ banner: 'PICKED OFF! — you threw into coverage' });
-            setTimeout(() => ctx.setHud({ banner: '' }), 1100);
+            bannerClearLater(ctx, 1100);
             void opponentPossession(ctx);
           }
         }
@@ -1309,7 +1318,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           giveBallTo(passTargetId);
           if (passType === 'bounce') {
             ctx.setHud({ banner: 'BOUNCE PASS!' });
-            setTimeout(() => ctx.setHud({ banner: '' }), 600);
+            bannerClearLater(ctx, 600);
           }
         }
       }
@@ -1380,7 +1389,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           // ball is out of the hand), a miss stuns the reacher, and a reach through a moving body is the reach-in foul.
           if (f.stunSec === 0 && f.reachCooldown === 0 && f.slot.intent.steal && roll() < AI_REACH_GATE && !finish && !gather && !dunking && !sealed && distXZ(f.char.root.position, carrier.char.root.position) < 1.6) {
             f.reachCooldown = AI_REACH_COOLDOWN_SEC;
-            f.tree.beat('bball_steal_reach');
+            f.tree.beat('bball_steal_reach', { fadeSec: 0.14 });
             const carrierSpeed = carrier === me ? me.drib.vel.length() : carrier.vel.length();
             const exposed = carrier === me && bumpAge <= BUMP_STRIP_WINDOW_SEC;
             if (roll() < (exposed ? AI_STEAL_ON_BUMP : AI_STEAL_CHANCE)) { stripBall(ctx, f, 'STOLEN!'); break; }   // D2: the ball goes LOOSE from the hand
@@ -1390,7 +1399,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
               const call = judge('reach_in', { offense: 'me', fouled: 'me' });
               if (call.whistle) SoundKit.play('whistle');
               ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
-              setTimeout(() => ctx.setHud({ banner: '' }), 900);
+              bannerClearLater(ctx, 900);
               console.info(`[3V3-REF] ${call.id} (their reach on ${carrier === me ? 'me' : 'my mate'}) → ${call.ball}`);
               later(700, () => (call.ball === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
             } else console.info('[3V3-DEF] their reach misses');
@@ -1466,7 +1475,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       ctx.setHud({ banner: 'MISS' });
     }
     lastPasserWasMe = false;
-    setTimeout(() => ctx.setHud({ banner: '' }), 800);
+    bannerClearLater(ctx, 800);
     if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
     // A MISS IS A REBOUND, NOT A HANDOVER. This used to schedule `opponentPossession` on a miss too, 900 ms
     // after the release — while the arc's own miss branch was setting a LIVE board for the same shot. Two
@@ -1588,7 +1597,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       const right = new Vector3(dir.z, 0, -dir.x);
       ctx.camDirector.setFixed(RIM_FLOOR.add(right.scale(3.6)).add(dir.scale(-1.4)).add(new Vector3(0, 1.5, 0)), 1.7, true);
       showtimeCam = true;
-      ctx.setHud({ banner: kind === 'poster' ? 'SHOWTIME — OVER HIM · SQUARE AT THE RIM' : 'SHOWTIME — SQUARE AT THE RIM' }); setTimeout(() => ctx.setHud({ banner: '' }), 900);
+      bannerFlash(ctx, kind === 'poster' ? 'SHOWTIME — OVER HIM · SQUARE AT THE RIM' : 'SHOWTIME — SQUARE AT THE RIM', 900);
       console.info(`[3V3-SHOWTIME] ${picked3.label} (${picked3.clip}) ${kind === 'poster' ? 'over a body' : 'open'} — time the flush`);
     }
     if (picked3.flashy) ctx.camDirector.pulse(0.35, 0.4);
@@ -1635,7 +1644,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           const j = showtimePress ? judgeShowtime(k) : 'none'; showtimePress = false; showtimeK = k;
           made = roll() < SHOWTIME_PCT[j] * (kind === 'poster' ? Math.max(0.6, c.pct) : 1);
           if (j === 'perfect') { ctx.juice.hitStop(70); ctx.camDirector.pulse(0.7, 0.45); SoundKit.play('crowdCheer', { volume: 0.6 }); }
-          ctx.setHud({ banner: j === 'perfect' ? `${picked3.label} — PERFECT!` : j === 'good' ? `${picked3.label}!` : j === 'early' ? 'EARLY — OFF THE FRONT' : j === 'late' ? 'LATE — OFF THE BACK' : picked3.label }); setTimeout(() => ctx.setHud({ banner: '' }), 800);
+          ctx.setHud({ banner: j === 'perfect' ? `${picked3.label} — PERFECT!` : j === 'good' ? `${picked3.label}!` : j === 'early' ? 'EARLY — OFF THE FRONT' : j === 'late' ? 'LATE — OFF THE BACK' : picked3.label }); bannerClearLater(ctx, 800);
           console.info(`[3V3-SHOWTIME] flush ${j} at k ${k.toFixed(2)} made ${made}`);
         }
       }
@@ -1684,7 +1693,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // here meant the hardest finish in the game announced itself as the ordinary one
         const slamCall = posterized ? contactBanner(lastDunkKind) : 'THROWN DOWN!';
         ctx.setHud({ score: myScore, banner: fouled ? `${slamCall.replace(/!+$/, '')} — AND ONE!` : slamCall });
-        setTimeout(() => ctx.setHud({ banner: '' }), 1000);
+        bannerClearLater(ctx, 1000);
         if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
         later(400, () => void opponentPossession(ctx));
       } else {
@@ -1693,15 +1702,15 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // the clank and the loose ball fired at the resolve (k 0.55), off the front of the iron — BIOMECH-HOOPS-WAVE1 G6
         if (fouled) {
           ctx.setHud({ banner: 'FOULED AT THE RIM — BALL BACK' });
-          setTimeout(() => ctx.setHud({ banner: '' }), 900);
+          bannerClearLater(ctx, 900);
           later(900, () => resetPossession(true));
         } else if (swatted) {   // D1: the ball went loose at the bump
           ctx.setHud({ banner: 'SWATTED AT THE RIM!' });
-          setTimeout(() => ctx.setHud({ banner: '' }), 1000);
+          bannerClearLater(ctx, 1000);
           later(900, () => boardAfterMiss(ctx));
         } else {
           ctx.setHud({ banner: kind === 'poster' ? 'STUFFED AT THE RIM!' : 'RATTLED OUT' });
-          setTimeout(() => ctx.setHud({ banner: '' }), 800);
+          bannerClearLater(ctx, 800);
           later(900, () => boardAfterMiss(ctx));
         }
       }
@@ -2112,7 +2121,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       console.info(`[3V3-REF] ${call.id} → ${call.ball}`);
       if (call.whistle) SoundKit.play('whistle');
       ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
-      setTimeout(() => ctx.setHud({ banner: '' }), 800);
+      bannerClearLater(ctx, 800);
       if (call.ball === 'me') resetPossession(true); else void opponentPossession(ctx);
       return;
     }
@@ -2121,7 +2130,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (r.contested && !board.contestedCalled) {
       board.contestedCalled = true;
       ctx.setHud({ banner: 'CONTESTED BOARD!' });
-      setTimeout(() => ctx.setHud({ banner: '' }), 600);
+      bannerClearLater(ctx, 600);
     }
     if (r.winner && r.bobbled) {
       ballSim.vel.copyFrom(bobbleVelocity(ballSim.vel));
@@ -2141,7 +2150,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           ? (putback ? 'OFFENSIVE BOARD — PUT IT BACK!' : r.contested ? 'YOU RIP IT AWAY — YOUR BALL' : 'YOUR BOARD')
           : (putback ? 'THEIR OFFENSIVE BOARD — CONTEST IT!' : 'THEIR BOARD'),
       });
-      setTimeout(() => ctx.setHud({ banner: '' }), 700);
+      bannerClearLater(ctx, 700);
       if (team === 'me') resetPossession(true); else void opponentPossession(ctx);
       return;
     }
@@ -2166,7 +2175,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     endBoxOut();
     console.info(`[3V3-OFF] board → ${winner}`);
     ctx.setHud({ banner: winner === 'me' ? (me.slot.intent.brace ? 'BOXED OUT — YOUR BOARD' : 'YOUR BOARD') : 'THEIR BOARD' });
-    setTimeout(() => ctx.setHud({ banner: '' }), 700);
+    bannerClearLater(ctx, 700);
     if (winner === 'me') resetPossession(true); else void opponentPossession(ctx);
   }
   /** The nearest foe who is still ON HIS FEET — stunned or not (a body you have frozen is still a body to step past). */
@@ -2221,7 +2230,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         ctx.feel?.impact?.(0.5);
         ctx.juice.shake(0.1, 150);
         ctx.setHud({ banner: 'OFF THE HEAD!' });
-        setTimeout(() => ctx.setHud({ banner: '' }), 1100);
+        bannerClearLater(ctx, 1100);
         console.info(`[3V3-HANDLE] off the head — CLEAN (odds ${odds.toFixed(2)})`);
       } else {
         const dir = offTheHeadLoose(me.char.root.position, foe.char.root.position);
@@ -2231,7 +2240,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         board = { age: 0, contestedCalled: false, shooter: 'me' };
         SoundKit.play('miss');
         ctx.setHud({ banner: 'OFF THE HEAD — LOST IT' });
-        setTimeout(() => ctx.setHud({ banner: '' }), 1000);
+        bannerClearLater(ctx, 1000);
         console.info(`[3V3-HANDLE] off the head — MISSED (odds ${odds.toFixed(2)})`);
       }
       return;
@@ -2275,13 +2284,13 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       ctx.feel?.impact?.(0.55);
       ctx.juice.shake(0.09, 140);
       ctx.setHud({ banner: 'ANKLES — HE IS DOWN!' });
-      setTimeout(() => ctx.setHud({ banner: '' }), 1100);
+      bannerClearLater(ctx, 1100);
     } else {
       foe.stunSec = ANKLE_BREAK_STUN_SEC;
       foe.tree.beat(SPORT_CLIP.karateHitReact);
       ctx.feel?.impact?.(0.35);
       ctx.setHud({ banner: outcome.tier === 'highlight' ? 'ANKLES!' : 'SHOOK HIM!' });
-      setTimeout(() => ctx.setHud({ banner: '' }), 800);
+      bannerClearLater(ctx, 800);
     }
     console.info(`[3V3-HANDLE] ${move} chain ${chain.length} ${outcome.broke} odds ${outcome.odds.toFixed(2)}`);
   }
@@ -2315,7 +2324,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     SoundKit.play('impact', { pitch: 0.75, volume: 0.55 }); SoundKit.play('crowdGroan', { volume: 0.4 });
     ctx.feel?.impact?.(0.4); ctx.juice.shake(0.08, 100);
     ctx.setHud({ shotType: '', shotMeterT: 0, banner: by.jumpAge <= HAND_UP_SEC ? 'BLOCKED!' : 'BLOCKED — HAND IN THE SHOT!' });
-    setTimeout(() => ctx.setHud({ banner: '' }), 900);
+    bannerClearLater(ctx, 900);
     console.info('[3V3-DEF] blocked at the release');
     startBoxOut('mine');
     later(900, () => boardAfterMiss(ctx));
@@ -2324,12 +2333,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    *  settles (it used to warp straight to the rival's possession). */
   function stripBall(ctx: ModeContext, by: Body, banner: string): void {
     SoundKit.play('impact', { pitch: 1.2, volume: 0.35 });
-    by.tree.beat('bball_steal_reach');
+    by.tree.beat('bball_steal_reach', { fadeSec: 0.14 });
     parkCarries();
     const from = ball.getAbsolutePosition().clone(); releaseBall(ball);
     const toFoe = by.char.root.position.subtract(me.char.root.position); toFoe.y = 0; toFoe.normalize();
     ballSim.launch(from, toFoe.scale(1.6).add(new Vector3(0, 1.2, 0)));
-    ctx.setHud({ banner }); setTimeout(() => ctx.setHud({ banner: '' }), 900);
+    ctx.setHud({ banner }); bannerClearLater(ctx, 900);
     console.info(`[3V3-DEF] strip by the ai: ${banner}`);
     later(750, () => void opponentPossession(ctx));
   }
@@ -2440,7 +2449,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (severity === 'foul' && victim === me && finish && isFoe(attacker) && !finishFoul) {
       // fouled IN THE AIR on a finish: the attempt plays out — a make is an and-one, a miss the ball back
       finishFoul = true; SoundKit.play('whistle');
-      ctx.setHud({ banner: 'FOUL!' }); setTimeout(() => ctx.setHud({ banner: '' }), 400);
+      bannerFlash(ctx, 'FOUL!', 400);
       console.info(`[3V3-CONTACT] foul in the air (${closing.toFixed(1)} m/s) — and-one pending`);
       return;
     }
@@ -2449,7 +2458,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (severity === 'foul' && onBall && attacker === me && attackerSpeed >= FOUL_CLOSING_SPEED && isFoe(victim) && victim.stunSec === 0 && victim.vel.length() < 1.0) {
       // a sprint THROUGH a set defender is a CHARGE (a foul-speed contact on offense was never read)
       SoundKit.play('whistle');
-      ctx.setHud({ banner: 'CHARGE — THEIR BALL' }); setTimeout(() => ctx.setHud({ banner: '' }), 1000);
+      bannerFlash(ctx, 'CHARGE — THEIR BALL', 1000);
       console.info(`[3V3-CONTACT] charge ${closing.toFixed(1)} m/s into a set body`);
       void opponentPossession(ctx);
       return;
@@ -2471,7 +2480,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (severity === 'foul' && onBall && victim === me && isFoe(attacker) && attackerSpeed >= FOUL_CLOSING_SPEED) {
       // a defender running THROUGH the handler at foul speed — the ball back
       SoundKit.play('whistle');
-      ctx.setHud({ banner: 'FOUL ON THE DEFENDER — BALL BACK' }); setTimeout(() => ctx.setHud({ banner: '' }), 1000);
+      bannerFlash(ctx, 'FOUL ON THE DEFENDER — BALL BACK', 1000);
       console.info(`[3V3-CONTACT] foul ${closing.toFixed(1)} m/s by the defender`);
       later(600, () => resetPossession(true));
       return;
@@ -2605,7 +2614,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           ctx.feel?.impact?.(0.4); ctx.juice.shake(0.08, 120);
           console.info(`[3V3-REF] ${call.id} on the drive at k ${k.toFixed(2)} (defender ${drivePlanted ? 'set' : 'moving'}) → ${call.ball}`);
           ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
-          setTimeout(() => ctx.setHud({ banner: '' }), 1000);
+          bannerClearLater(ctx, 1000);
           driveStolen = true;   // the drive is over either way; the award decides who restarts
           ctx.scene.onBeforeRenderObservable.remove(obs);
           later(700, () => (call.ball === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
