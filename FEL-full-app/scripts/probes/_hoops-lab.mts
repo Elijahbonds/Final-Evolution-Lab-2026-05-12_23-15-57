@@ -169,9 +169,14 @@ await page.evaluate(`(() => {
       const hn2 = window.__FEL_QA__.hero(); const meP = hn2 && (hn2.position || hn2);
       const gap = meP ? Math.hypot(meP.x - him.x, meP.z - him.z) : 99;
       const v = typeof dev.driveSpeed === 'function' ? dev.driveSpeed() : 0;
-      // the speed gate is per-MODE: 1v1's rival drives at 5.0 m/s and 3v3's clocked drive reports 1.4, so a 3.0
-      // gate meant the probe never even planted in 3v3 and the run reported 'planted 0.0s' as if the mode failed
-      if (gap <= 2.6 && v >= (MODE === 'onevone' ? 3.0 : 0.8)) { window.__NEXUS_AGENT__.do('charge', { ms: 420 }); return; }
+      // PLANT ON PROXIMITY, NOT ON A SPEEDOMETER. This gated on driveSpeed (no backticks: this comment lives in a
+      // template literal, and one would end it — the FOURTH time in this session), which is the quantity the
+      // GAME stopped trusting in 3v3 (a clocked drive's velocity vector is a by-product; it hovers 0.8-1.4 m/s) —
+      // so the probe's own gate sat in that noise and two identical runs reported planted 0.4s / charges 1 and
+      // planted 0.0s / charges 0. A defender deciding to plant does not consult a speedometer: he sees a man
+      // coming. The game still judges the CLOSING RATE, which is the half that should be strict.
+      if (gap <= 2.6) { window.__NEXUS_AGENT__.do('charge', { ms: 420 }); return; }
+      void v;
     }
     // the point a metre off him on the rim side: stay in FRONT, which is also the only way to be inside the block's
     // range (1.2 m on a jumper) when his gather comes
