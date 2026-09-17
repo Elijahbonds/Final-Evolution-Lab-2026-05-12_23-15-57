@@ -237,6 +237,8 @@ const COURT_HALF_WIDTH = 8, COURT_DEPTH = 15;
 const OOB_EPSILON = 0.08, OOB_GRACE_SEC = 0.35;
 /** A reach that ARRIVES on the handler at this speed is a foul; slower than this it is a whiff at thin air. */
 const REACH_FOUL_SPEED = 1.6;
+/** How far into the drive contact starts counting — before this the bodies are just where the reset left them. */
+const CONTACT_MIN_K = 0.18;
 const CHARGE_SET_SEC = 0.18;
 /**
  * Inside this of a planted defender is CONTACT; past it he went round you.
@@ -2389,7 +2391,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
 
         // THE BODIES MEET. This is the moment the charge and the blocking foul have both been waiting for — one
         // rule for a planted defender, its mirror for one still moving into him.
-        if (!contactDone && intent === 'through' && bodiesMet(shooter.char.root.position, me.char.root.position, BODY_STANDOFF)) {
+        // …but not on the FIRST FRAME. Measured: three fouls called at k 0.01, 0.02 and 0.65 — the first two are
+        // not collisions at all, they are the possession reset happening to leave the two of us adjacent, and they
+        // fire before a defender could possibly plant, which is why every one of them came out a blocking foul and
+        // a charge stayed impossible. Contact has to happen DURING the drive to be contact.
+        if (!contactDone && k >= CONTACT_MIN_K && intent === 'through' && bodiesMet(shooter.char.root.position, me.char.root.position, BODY_STANDOFF)) {
           contactDone = true;
           const id = drivePlanted ? 'charge' : 'blocking_foul';
           const call = judge(id, { offense: 'foe', fouled: drivePlanted ? 'me' : 'foe' });
