@@ -254,6 +254,8 @@ const FRAMING_MIN_DISTANCE = 2.6;
  * clears this floor by design. A caller that scales its facing vector below
  * this would silently stop being followed -- pass it normalised.
  */
+/** POLISH: the follow's orbit rate cap (rad/s) — ~0.29 m/frame at 8 m, a pan; the fitTwo bearing flip under the rim was 0.9 m/frame. */
+const MAX_BEARING_RATE = 2.2;
 const FOLLOW_VEL_MIN = 0.8;
 /** Clearance kept between the camera and whatever occludes it. */
 const OCCLUSION_MARGIN = 0.6;
@@ -464,10 +466,15 @@ export class CameraDirector {
       : new Vector3(0, 0, 1);
     back.y = 0;
     if (back.lengthSquared() < 0.01) back.set(0, 0, 1); else back.normalize();
-    let desired = subject.add(back.scale(cfg.distance)).add(new Vector3(0, cfg.height, 0));
+    // POLISH (2026-09-17): land where update() would SETTLE. The snap used the bare preset distance while the follow
+    // adds the two-body separation (fitTwo) and floors the height at minHeight — so every snap was followed by a
+    // 4–8 m chase at ~60 m/s for six to ten frames (measured on every possession reset in 1v1, 3v3 and the dunk
+    // contest's resolve): a whip, not a cut.
+    const separation = cfg.fitTwo && objective ? Vector3.Distance(subject, objective) : 0;
+    const dist = (cfg.distance + Math.min(4.5, Math.max(0, separation - 3) * 0.55)) * this.beatScale;
+    let desired = subject.add(back.scale(dist)).add(new Vector3(0, cfg.height, 0));
+    desired.y = Math.max(desired.y, subject.y + cfg.minHeight);
     if (cfg.shoulderOffset) desired = desired.add(this.rightOf(back).scale(cfg.shoulderOffset));
-    // M69: standoff runs AFTER the clamp so a tight venue's bounds cannot undo
-    // the minimum safe distance (gains height instead of distance when boxed in).
     this.camera.position = enforceStandoff(subject, this.clampToBounds(this.resolveOcclusion(subject, desired))).pos;
     this.aim(subject, objective);
   }
@@ -570,6 +577,14 @@ export class CameraDirector {
       const dLen = Math.hypot(dx, dz);
       if (dLen > 1e-3) {
         dx /= dLen; dz /= dLen;
+        // POLISH (2026-09-17): the bearing SLEWS. The lag is a fraction of the remaining swing, so a handler cutting
+        // across the rim (the fitTwo bearing flips through 180° in a few frames) orbited the camera at 8 m radius by
+        // 0.6–0.9 m per frame — measured as a 'cut' on every drive. A rate cap on the orbit (MAX_BEARING_RATE rad/s)
+        // keeps the follow a pan; the position lerp underneath is untouched.
+        const cx = curX / curR, cz = curZ / curR;
+        const swing = Math.atan2(cx * dz - cz * dx, cx * dx + cz * dz);
+        const maxSwing = MAX_BEARING_RATE * Math.min(0.1, this.scene.getEngine().getDeltaTime() / 1000);
+        if (Math.abs(swing) > maxSwing) { const a = Math.sign(swing) * maxSwing; const ca = Math.cos(a), sa = Math.sin(a); dx = cx * ca - cz * sa; dz = cx * sa + cz * ca; }
         const r = curR + (tgtR - curR) * lag;
         next = new Vector3(
           subject.x + dx * r,

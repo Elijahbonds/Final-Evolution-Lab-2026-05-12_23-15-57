@@ -229,7 +229,9 @@ if (SMOOTH) await page.evaluate(`(() => { const q = window.__FEL_QA__; const s =
     if (!foe) { const d = s.metadata && s.metadata[MODE]; const fr = d && (typeof d.driverRoot === 'function' ? d.driverRoot() : d.foeRoot); if (fr) foe = rig(fr); }
     const ball = s.getMeshByName('ball'); const cam = s.activeCamera;
     const clips = (s.animationGroups || []).filter((g) => g.isPlaying).map((g) => g.name);
-    rows.push({ t: Math.round(performance.now() - t0), h: [P(hero.root), P(hero.rh), P(hero.lh), P(hero.head)], f: foe ? [P(foe.root), P(foe.rh), P(foe.lh), P(foe.head)] : null, cam: P(cam), ball: ball ? P(ball) : null, clips, hc: clipsOf(hero), fc: foe ? clipsOf(foe) : [] });
+    // BEHIND THE BACK: a hand in the body frame with z < -0.22 (behind the hips' plane) between the waist and the head
+    const behind = (r) => { if (!r || !r.root) return ''; const m = r.root.getWorldMatrix().clone().invert(); const out = []; for (const [k, n] of [['rh', r.rh], ['lh', r.lh]]) { if (!n) continue; const w = n.getAbsolutePosition(); const l = w.constructor.TransformCoordinates(w, m); const z = Math.abs(l.z) > 20 ? l.z / 100 : l.z; if (z < -0.22 && l.y > 0.6 && l.y < 1.6) out.push(k); } return out.join('+'); };
+    rows.push({ t: Math.round(performance.now() - t0), h: [P(hero.root), P(hero.rh), P(hero.lh), P(hero.head)], f: foe ? [P(foe.root), P(foe.rh), P(foe.lh), P(foe.head)] : null, cam: P(cam), ball: ball && ball.isEnabled() ? P(ball) : null, clips, hc: clipsOf(hero), fc: foe ? clipsOf(foe) : [], hb: behind(hero), fb: behind(foe) });
   });
   return 'recording'; })()`).then((r) => console.log('[LAB] smooth', r));
 const started = await agent('a.start(30000)');
@@ -482,7 +484,7 @@ const tricks = log.filter((l) => /trick \w+ (green|early|late)/.test(l));
 // full log and show nothing at all when the saved slice was read back. Anything a summary counts must be saved
 // beside the count, not left to a window that may have scrolled past it.
 if (SMOOTH) {
-  const rows = await page.evaluate('window.__smooth || []') as { t: number; h: (number[] | null)[]; f: (number[] | null)[] | null; cam: number[] | null; ball: number[] | null; clips: string[]; hc: string[]; fc: string[] }[];
+  const rows = await page.evaluate('window.__smooth || []') as { t: number; h: (number[] | null)[]; f: (number[] | null)[] | null; cam: number[] | null; ball: number[] | null; clips: string[]; hc: string[]; fc: string[]; hb: string; fb: string }[];
   const dist = (a: number[] | null, b: number[] | null) => (a && b ? Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) : 0);
   const stat = (name: string, pick: (r: typeof rows[number]) => (number[] | null)[] | null) => {
     const pops: { t: number; part: string; d: number; clips: string[]; prev: string[] }[] = []; let maxD = 0; let teleports = 0; let ySnaps = 0;
@@ -509,7 +511,12 @@ if (SMOOTH) {
   const ballPopAt: { t: number; d: number; y: number; clips: string[] }[] = [];
   for (let i = 1; i < rows.length; i++) { const a = rows[i - 1], b = rows[i]; if (a.ball && b.ball && b.t - a.t < 100 && dist(a.ball, b.ball) > 0.9) ballPopAt.push({ t: b.t, d: +dist(a.ball, b.ball).toFixed(2), y: b.ball[1], clips: b.clips.filter((c) => !/idle_stand|^run$|^walk$|defend_stance/.test(c)).slice(0, 4) }); }
   const ballPops = ballPopAt.length;
-  const summary = { hero, foe, camCuts, camMax: +camMax.toFixed(2), camCutAt, clipFlips: flips, flipAt, ballPops };
+  // behind-the-back episodes: runs of consecutive frames with a hand behind the plane, with the clips playing
+  const behindEp: { who: string; part: string; t: number; frames: number; clips: string }[] = [];
+  for (const who of ['hb', 'fb'] as const) { let run: { part: string; t: number; n: number; clips: string } | null = null;
+    for (const r of rows) { const v = r[who] || ''; if (v && run && run.part === v) run.n++; else { if (run && run.n >= 3) behindEp.push({ who: who === 'hb' ? 'hero' : 'foe', part: run.part, t: run.t, frames: run.n, clips: run.clips }); run = v ? { part: v, t: r.t, n: 1, clips: (who === 'hb' ? r.hc : r.fc).filter((c) => !/idle_stand|^run$|^walk$|defend_stance/.test(c)).join('+') } : null; } }
+    if (run && run.n >= 3) behindEp.push({ who: who === 'hb' ? 'hero' : 'foe', part: run.part, t: run.t, frames: run.n, clips: run.clips }); }
+  const summary = { hero, foe, camCuts, camMax: +camMax.toFixed(2), camCutAt, clipFlips: flips, flipAt, ballPops, behindEpisodes: behindEp.length, behindEp: behindEp.sort((a, b) => b.frames - a.frames).slice(0, 10) };
   fs.writeFileSync(`${OUT}/smooth-${TAG}.json`, JSON.stringify({ summary, rows }, null, 0));
   console.log(`SMOOTH ${TAG}: hero pops ${hero.pops} (max ${hero.maxHandJump} m) teleports ${hero.teleports} ySnaps ${hero.ySnaps} · foe pops ${foe.pops} (max ${foe.maxHandJump}) teleports ${foe.teleports} · cam cuts ${camCuts} (max ${camMax.toFixed(2)} m/frame) · clip flips ${flips} · ball pops ${ballPops} · ${rows.length} frames`);
   for (const w of hero.worst) console.log(`  hero pop ${w.part} ${w.d} m @${w.t}ms  ${w.prev.join('+') || '-'} → ${w.clips.join('+') || '-'}`);
@@ -517,6 +524,7 @@ if (SMOOTH) {
   for (const c of camCutAt) console.log(`  cam cut ${c.d} m @${c.t}ms ${c.clips.join('+')}`);
   for (const f of flipAt) console.log(`  clip flip ${f}`);
   for (const b of ballPopAt.slice(0, 8)) console.log(`  ball pop ${b.d} m @${b.t}ms y ${b.y} ${b.clips.join('+')}`);
+  console.log(`  behind-the-back episodes ${behindEp.length}`); for (const e of summary.behindEp) console.log(`  behind ${e.who} ${e.part} ${e.frames} frames @${e.t}ms ${e.clips || '-'}`);
 }
 const refCalls = log.filter((l) => /-REF\]/.test(l)).map((l) => l.replace(/^\d+ /, ''));
 const screensCalled = log.filter((l) => /screen called/.test(l)).length;

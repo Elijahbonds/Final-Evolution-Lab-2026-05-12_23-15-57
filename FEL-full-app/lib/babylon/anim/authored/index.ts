@@ -12,7 +12,7 @@ import { buildEastbay } from './eastbay';
 import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from './dunkSuite';
 import { buildMocapDunk } from './mocapDunk';
 import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig, buildFinishReverse, buildFinishPower, buildFinishTwoHand } from './dunkFinishes';
-import { buildDefendBackpedal, buildCloseout, buildDefendSlideHard } from './basketball';   // DEFENSE-LOOK (2026-09-17)
+import { buildDefendBackpedal, buildCloseout, buildDefendSlideHard, buildContactReact } from './basketball';   // DEFENSE-LOOK (2026-09-17)
 import { buildStackBase, buildStackRider, buildRowStand, buildRowCrouch, buildBikeRider, buildSkateRider } from './stackProp';
 import { buildSelfLob, buildBounceThrow, buildKickUp, buildBackHandspring, buildBackflip, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildWindmill360, buildFakeEastbay, buildTap } from './dunkTricks';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
@@ -188,6 +188,7 @@ export function registerAuthoredClips(
     ['bball_defend_slide_right', () => buildDefendSlide(scene, skeleton, 'right')],
     ['bball_defend_backpedal', () => buildDefendBackpedal(scene, skeleton)],                 // DEFENSE-LOOK (2026-09-17): the retreat
     ['bball_closeout', () => buildCloseout(scene, skeleton)],                                 // …the closeout
+    ['bball_contact_react', () => buildContactReact(scene, skeleton)],                      // the bump (2026-09-17): hands in FRONT, never the fighter's flinch
     ['bball_defend_slide_hard_left', () => buildDefendSlideHard(scene, skeleton, 'left')],   // …and the sat-down slide (intense D)
     ['bball_defend_slide_hard_right', () => buildDefendSlideHard(scene, skeleton, 'right')],
     ['bball_block_reach', () => buildBlockReach(scene, skeleton)],

@@ -15,7 +15,7 @@ interface Entry {
   /** LAYUP EXTENSION (2026-09-17): a hand override blended over the TAIL of the capture — from `from01` of the clip the
    *  captured wrist targets ease (smoothstep) to these body-local metres, reaching them at `peak01` and holding. Authored
    *  in the un-mirrored (right-hand) frame; a mirrored clip gets it mirrored. `poles` swap in at half weight. */
-  extend?: { from01: number; peak01: number; Right?: [number, number, number]; Left?: [number, number, number]; polesRight?: [number, number, number]; polesLeft?: [number, number, number] };
+  extend?: { from01: number; peak01: number; release01?: number; Right?: [number, number, number]; Left?: [number, number, number]; polesRight?: [number, number, number]; polesLeft?: [number, number, number] };   // release01: from here the override eases back OUT to the capture by the end
   /** STYLE CLIPS: the vocabulary this clip belongs to, and whether it carries a root track (mocapRetarget.rootTrack). */
   style?: string; rootTrack?: boolean; label?: string;
 }
@@ -69,7 +69,9 @@ for (const e of manifest.clips) {
     const pole = (side: 'Left' | 'Right') => { const src = m ? (side === 'Left' ? ex.polesRight : ex.polesLeft) : (side === 'Left' ? ex.polesLeft : ex.polesRight); return src ? [m ? -src[0] : src[0], src[1], src[2]] as [number, number, number] : null; };
     for (const k of r.keys) {
       const t01 = k.t / r.duration; if (t01 < ex.from01) continue;
-      const w = Math.min(1, (t01 - ex.from01) / Math.max(1e-3, ex.peak01 - ex.from01)); const ws = w * w * (3 - 2 * w);
+      let w = Math.min(1, (t01 - ex.from01) / Math.max(1e-3, ex.peak01 - ex.from01));
+      if (ex.release01 !== undefined && t01 > ex.release01) w *= Math.max(0, 1 - (t01 - ex.release01) / Math.max(1e-3, 1 - ex.release01));
+      const ws = w * w * (3 - 2 * w);
       for (const side of ['Left', 'Right'] as const) {
         const g = tgt(side); const h = k.hands?.[side]; if (!g || !h) continue;
         k.hands![side] = [h[0] + (g[0] - h[0]) * ws, h[1] + (g[1] - h[1]) * ws, h[2] + (g[2] - h[2]) * ws];

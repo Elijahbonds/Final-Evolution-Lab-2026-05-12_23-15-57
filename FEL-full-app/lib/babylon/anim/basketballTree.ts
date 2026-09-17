@@ -79,7 +79,7 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   shot_release:    { clip: 'bball_shoot_jumper', loop: true, fadeSec: 0.06 },
   layup:           { clip: 'bball_layup_gather', loop: false, fadeSec: 0.08 },
   dunk:            { clip: 'dunk_launch', loop: false, fadeSec: 0.06 },
-  contact_stagger: { clip: 'karate_hit_react', loop: false, fadeSec: 0.06 },
+  contact_stagger: { clip: 'bball_contact_react', loop: false, fadeSec: 0.08 },   // 2026-09-17: a basketball bump, not the fighter's flinch (arms behind the back)
   defend_slide:    { clip: 'bball_defend_slide_left', loop: true, fadeSec: 0.16 },
   defend_slide_right: { clip: 'bball_defend_slide_right', loop: true, fadeSec: 0.16 },
   defend_idle:     { clip: 'bball_defend_stance', loop: true, fadeSec: 0.2 },

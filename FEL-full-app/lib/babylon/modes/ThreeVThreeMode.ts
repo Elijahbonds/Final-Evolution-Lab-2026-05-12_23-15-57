@@ -983,7 +983,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             SoundKit.play('whoosh', { pitch: 1.25, volume: 0.28 });
             if (bought && nf) {
               nf.stunSec = Math.max(nf.stunSec, 0.3);
-              nf.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.07 });
+              nf.tree.beat('bball_contact_react', { fadeSec: 0.07 });
               ctx.feel?.impact?.(0.2);
               ctx.setHud({ banner: 'HE BIT THE JAB — GO!' });
               bannerClearLater(ctx, 600);
@@ -1653,7 +1653,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         v.x = posterVictim.plant.x + posterVictim.fall.x * 0.16 * POSTER_RIDE_SHARE * ride.s;
         v.z = posterVictim.plant.z + posterVictim.fall.z * 0.16 * POSTER_RIDE_SHARE * ride.s;
         v.y = ride.lift;
-        if (!posterVictim.reacted && ride.s > 0.35) { posterVictim.reacted = true; posterVictim.body.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.05, holdEnd: true }); }
+        if (!posterVictim.reacted && ride.s > 0.35) { posterVictim.reacted = true; posterVictim.body.tree.beat('bball_contact_react', { fadeSec: 0.05, holdEnd: true }); }
       }
       if (posterVictim && k >= POSTER_RELEASE_K) posterVictimRelease(ctx);
       if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
@@ -1665,7 +1665,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (k < 1) return;
       ctx.scene.onBeforeRenderObservable.remove(obs);
       dunking = false; dunkFlight = null; me.landSec = LAND_SEC; driveContest = null;
-      if (showtimeCam) { showtimeCam = false; ctx.camDirector.toggle(); }   // SHOWTIME: the follow camera comes back
+      if (showtimeCam) { showtimeCam = false; ctx.camDirector.toggle(); ctx.camDirector.snapTo(me.char.root.position, RIM); }   // POLISH: a cut back, not a lerp from the side camera   // SHOWTIME: the follow camera comes back
       if (showtime) ctx.setHud({ shotMeterT: 0 });
       me.tree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });   // G5: feet-down is the land crouch
       me.drib.setFacing(me.char.root.rotation.y);
@@ -1939,7 +1939,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       SoundKit.play('whoosh', { pitch: 0.85, volume: 0.45 });
       const near = nearestLiveFoe();
       const beaten = !!near && distXZ(near.char.root.position, me.char.root.position) <= SPIN_TRIGGER_RANGE + 0.5;
-      if (beaten && near) { near.stunSec = SPIN_STUN_SEC; near.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); }
+      if (beaten && near) { near.stunSec = SPIN_STUN_SEC; near.tree.beat('bball_contact_react', { fadeSec: 0.06 }); }
       ctx.setHud({ banner: beaten ? 'SPIN — BEAT HIM!' : 'SPIN!' });
       setTimeout(() => ctx0?.setHud({ banner: '' }), 500);
       console.info(`[3V3-MOVE] spin shoulder clear beaten ${beaten}`);
@@ -1986,7 +1986,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
       } else if (!wall.floored) {
         wall.stunSec = Math.max(wall.stunSec, 0.35);
-        wall.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+        wall.tree.beat('bball_contact_react', { fadeSec: 0.06 });
       }
       wall.char.root.position.addInPlace(shove.scale(0.16));
       console.info(`[3V3-CONTACT] drive bump ${kind} strength ${c.strength01.toFixed(2)} set ${c.set} floor ${floorHim} shove ${shove.length().toFixed(1)}`);
@@ -2223,7 +2223,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       SoundKit.play('whoosh', { pitch: 1.35, volume: 0.4 });
       if (odds > 0 && Math.random() < odds) {
         foe.stunSec = Math.max(foe.stunSec, 0.8);
-        foe.tree.beat(SPORT_CLIP.karateHitReact);
+        foe.tree.beat('bball_contact_react');
         SoundKit.play('impact', { pitch: 1.2, volume: 0.55 });
         SoundKit.play('crowdCheer', { volume: 0.8 });
         EffectsKit.burst(ctx.scene, foe.char.root.position.add(new Vector3(0, 1.5, 0)), 'sparks');
@@ -2287,7 +2287,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       bannerClearLater(ctx, 1100);
     } else {
       foe.stunSec = ANKLE_BREAK_STUN_SEC;
-      foe.tree.beat(SPORT_CLIP.karateHitReact);
+      foe.tree.beat('bball_contact_react');
       ctx.feel?.impact?.(0.35);
       ctx.setHud({ banner: outcome.tier === 'highlight' ? 'ANKLES!' : 'SHOOK HIM!' });
       bannerClearLater(ctx, 800);
@@ -2410,7 +2410,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           ctx.juice.hitStop(45); ctx.juice.shake(0.08, 110); ctx.feel?.impact?.(0.3);
           SoundKit.play('impact', { pitch: 0.95, volume: 0.55 });
           if (made && inLane) { meStunSec = 1.4; meFloored = true; meHandUp = false; me.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } }); SoundKit.play('thud', { volume: 0.8 }); }
-          else if (!meFloored && meStunSec === 0) { meStunSec = 0.3; meHandUp = false; me.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); }
+          else if (!meFloored && meStunSec === 0) { meStunSec = 0.3; meHandUp = false; me.tree.beat('bball_contact_react', { fadeSec: 0.06 }); }
           me.char.root.position.addInPlace(bumpShove(c).scale(0.16));
           console.info(`[3V3-DEF] rival dunk bump strength ${c.strength01.toFixed(2)} floorMe ${made && inLane}`);
         }
@@ -2488,8 +2488,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // the hit reads on the body that took it; never a floored / stunned one, never a body inside a held beat (a react cut a held
     // follow-through, measured on 1v1), never me while I shoot or finish
     let react = false;
-    if (victim !== me && victim.stunSec === 0 && !victim.floored && !victim.tree.busy) { victim.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); react = true; }
-    else if (victim === me && !shooting && !finish && !dunking && !gather && me.shotWin === 'none' && !me.tree.busy) { me.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); react = true; }
+    if (victim !== me && victim.stunSec === 0 && !victim.floored && !victim.tree.busy) { victim.tree.beat('bball_contact_react', { fadeSec: 0.06 }); react = true; }
+    else if (victim === me && !shooting && !finish && !dunking && !gather && me.shotWin === 'none' && !me.tree.busy) { me.tree.beat('bball_contact_react', { fadeSec: 0.06 }); react = true; }
     if (mine) { SoundKit.play('impact', { pitch: 1.0, volume: 0.3 }); ctx.feel?.impact?.(0.25); ctx.juice.shake(0.05, 80); }
     console.info(`[3V3-CONTACT] hard ${attacker === me ? 'me' : isFoe(attacker) ? 'foe' : 'mate'} → ${victim === me ? 'me' : isFoe(victim) ? 'foe' : 'mate'} ${closing.toFixed(1)} m/s react ${react}`);
   }
@@ -2633,7 +2633,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       const from = ball.getAbsolutePosition().clone(); releaseBall(ball);
       const toMe = me.char.root.position.subtract(shooter.char.root.position); toMe.y = 0; toMe.normalize();
       ballSim.launch(from, toMe.scale(1.8).add(new Vector3(0, 1.0, 0)));
-      shooter.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.08 });
+      shooter.tree.beat('bball_contact_react', { fadeSec: 0.08 });
       SoundKit.play('impact', { pitch: 1.3, volume: 0.4 }); SoundKit.play('crowdCheer', { volume: 0.5 });
       ctx.setHud({ banner: bumpAge <= BUMP_STRIP_WINDOW_SEC ? 'STRIPPED ON THE BUMP!' : 'PICKED THEIR POCKET!' });
       setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 900);
@@ -2651,7 +2651,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       SoundKit.play('crowdCheer', { volume: 0.6 });
       ctx.feel?.impact?.(0.5);
       EffectsKit.burst(ctx.scene, shooter.char.root.position.add(new Vector3(0, 1.6, 0)), 'sparks');
-      shooter.tree.beat(SPORT_CLIP.karateHitReact);
+      shooter.tree.beat('bball_contact_react');
       releaseBall(ball); ballSim.launch(ball.getAbsolutePosition(), new Vector3((Math.random() - 0.5) * 4, 2, 3));   // BIOMECH-HOOPS-WAVE1 G6: a blocked ball goes loose
       ctx.setHud({ banner: 'REJECTED!' });
       setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 900);

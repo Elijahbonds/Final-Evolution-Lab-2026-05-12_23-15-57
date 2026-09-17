@@ -54,7 +54,31 @@
       "from": 2.45,
       "to": 3.62,
       "duration": 0.9,
-      "note": "124_05 Basketball Jump Shot (DEFENSE-LOOK 2026-09-17, was 06_15): the dip (2.45-2.6, hips to -0.28), the rise, the release at 3.35 with the shooting hand extended and the guide hand dropping — 0.77 of the window; the 06_15 window shot two-handed, both wrists at the same height through the release"
+      "note": "124_05 Basketball Jump Shot (DEFENSE-LOOK 2026-09-17, was 06_15): the dip (2.45-2.6, hips to -0.28), the rise, the release at 3.35 with the shooting hand extended and the guide hand dropping — 0.77 of the window; the 06_15 window shot two-handed, both wrists at the same height through the release · FORM (2026-09-17, owner: Ray Allen / Klay, no MKG): from the set the shooting hand rises to full extension straight over the right shoulder (elbow under the ball), the guide hand stops at the set and stays off the ball",
+      "extend": {
+        "from01": 0.42,
+        "peak01": 0.78,
+        "Right": [
+          0.17,
+          2.2,
+          0.3
+        ],
+        "Left": [
+          -0.16,
+          1.62,
+          0.3
+        ],
+        "polesRight": [
+          0.25,
+          -0.85,
+          0.45
+        ],
+        "polesLeft": [
+          -0.7,
+          -0.6,
+          0.3
+        ]
+      }
     },
     {
       "name": "bball_mc_follow_through",
@@ -64,7 +88,32 @@
       "from": 3.35,
       "to": 4.0,
       "duration": 0.65,
-      "note": "124_05: the release held — the right hand stays up and forward, the left drops away (3.7), then the landing"
+      "note": "124_05: the release held — the right hand stays up and forward, the left drops away (3.7), then the landing · FORM: the shooting arm holds its extension (the goose neck), the guide hand comes down",
+      "extend": {
+        "from01": 0.0,
+        "peak01": 0.08,
+        "Right": [
+          0.18,
+          2.14,
+          0.36
+        ],
+        "Left": [
+          -0.14,
+          1.52,
+          0.28
+        ],
+        "polesRight": [
+          0.25,
+          -0.85,
+          0.45
+        ],
+        "polesLeft": [
+          -0.7,
+          -0.6,
+          0.3
+        ],
+        "release01": 0.42
+      }
     },
     {
       "name": "karate_mc_hit_react",

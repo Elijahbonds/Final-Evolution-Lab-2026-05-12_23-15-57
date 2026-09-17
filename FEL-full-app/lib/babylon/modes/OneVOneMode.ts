@@ -940,7 +940,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             SoundKit.play('whoosh', { pitch: 1.25, volume: 0.28 });
             if (bought) {
               foeStunSec = Math.max(foeStunSec, 0.3);
-              foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.07 });
+              foeAnimTree.beat('bball_contact_react', { fadeSec: 0.07 });
               ctx.feel?.impact?.(0.2);
               bannerFlash(ctx, 'HE BIT THE JAB — GO!', 600);
             } else if (threat.shown >= 3) bannerFlash(ctx, 'HE IS NOT BUYING IT', 550);
@@ -1030,7 +1030,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               foeStunSec = 0.45;
               SoundKit.play('impact', { pitch: 1.1, volume: 0.35 });
               ctx.feel?.impact?.(0.2);
-              foeAnimTree.beat(SPORT_CLIP.karateHitReact);
+              foeAnimTree.beat('bball_contact_react');
               bannerFlash(ctx, 'BIT ON THE HESI!');
             } else {
               bannerFlash(ctx, 'HESI…', 500);
@@ -1206,8 +1206,8 @@ export const OneVOneMode: ModeDefinition = (() => {
               ctx.setHud({ momentum });
               EffectsKit.burst(ctx.scene, me.root.position.add(new Vector3(0, 1.0, 0)), 'dust');
               ctx.feel?.impact?.(0.45);
-              meAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
-              foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+              meAnimTree.beat('bball_contact_react', { fadeSec: 0.06 });
+              foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 });
                 // THE REF OWNS THE CONSEQUENCE. This asserted "YOUR BALL" itself, which is the exact thing Ref.ts
               // exists to stop — a rule living in two places will disagree after the next tuning pass. The mode
               // reports the fact (a foul-speed body arrived at a SET defender) and carries out the call.
@@ -1354,8 +1354,8 @@ export const OneVOneMode: ModeDefinition = (() => {
             ctx.setHud({ momentum });
             EffectsKit.burst(ctx.scene, me.root.position.add(new Vector3(0, 1.0, 0)), 'dust');
             ctx.feel?.impact?.(0.45);
-            meAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
-            foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+            meAnimTree.beat('bball_contact_react', { fadeSec: 0.06 });
+            foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 });
             const call = judge('charge', { offense: 'foe', fouled: 'me' });   // the ref, not the mode — see above
             bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}!`, 1100);
             console.info(`[1V1-REF] ${call.id} at ${closing.toFixed(1)} m/s (set ${chargeSetSec.toFixed(2)}s) → ${call.ball}`);
@@ -1427,7 +1427,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               const toMe = me.root.position.subtract(foe.root.position); toMe.y = 0; toMe.normalize();
               launchLoose(from, toMe.scale(1.8).add(new Vector3(0, 1.0, 0)));
               defPhase = 'over';
-              foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.08 });
+              foeAnimTree.beat('bball_contact_react', { fadeSec: 0.08 });
               bannerFlash(ctx, onBump ? 'STRIPPED ON THE BUMP!' : 'PICKED THEIR POCKET!');
               console.info(`[1V1-DEF] strip by me ${onBump ? 'on the bump' : 'on the crossover'} exposure ${exposure.toFixed(2)} bumpAge ${bumpAge.toFixed(2)}`);
               later(750, () => resetPositions());
@@ -1771,7 +1771,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         foe.root.position.x = posterVictim.plant.x + posterVictim.fall.x * 0.16 * POSTER_RIDE_SHARE * ride.s;
         foe.root.position.z = posterVictim.plant.z + posterVictim.fall.z * 0.16 * POSTER_RIDE_SHARE * ride.s;
         if (!contact?.isReady) foe.root.position.y = ride.lift;
-        if (!posterVictim.reacted && ride.s > 0.35) { posterVictim.reacted = true; foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.05, holdEnd: true }); }
+        if (!posterVictim.reacted && ride.s > 0.35) { posterVictim.reacted = true; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.05, holdEnd: true }); }
       }
       if (!trickThrown && !showtime) {
         const asked = trickFromFlick(lookX, lookY);
@@ -1832,7 +1832,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (k < 1) return;
       ctx.scene.onBeforeRenderObservable.remove(obs);
       dunking = false; dunkFlight = null; meLandSec = LAND_SEC; driveContest = null;
-      if (showtimeCam) { showtimeCam = false; ctx.camDirector.toggle(); }   // SHOWTIME: the follow camera comes back at feet-down
+      if (showtimeCam) { showtimeCam = false; ctx.camDirector.toggle(); ctx.camDirector.snapTo(me.root.position, RIM); }   // POLISH: a cut back, not a lerp from the side camera   // SHOWTIME: the follow camera comes back at feet-down
       if (showtime) ctx.setHud({ shotMeterT: 0 });
       contact?.setAirborne('me', false);
       meAnimTree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });   // G5: feet-down is the land crouch, never an idle flash
@@ -2130,7 +2130,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       ctx.feel?.impact?.(0.22); ctx.juice.shake(0.05, 90);
       SoundKit.play('whoosh', { pitch: 0.85, volume: 0.45 });
       const beaten = foeStunSec === 0 && !foeFloored && Vector3.Distance(me.root.position, foe.root.position) <= SPIN_TRIGGER_RANGE + 0.5;
-      if (beaten) { foeStunSec = SPIN_STUN_SEC; foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); }
+      if (beaten) { foeStunSec = SPIN_STUN_SEC; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 }); }
       bannerFlash(ctx, beaten ? 'SPIN — BEAT HIM!' : 'SPIN!', 500);
       console.info(`[1V1-MOVE] spin shoulder clear beaten ${beaten}`);
     }
@@ -2161,8 +2161,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     ctx.feel?.impact?.(0.25);
     if (dunking || closing < HARD_CONTACT_SPEED) return;
     let react = false;
-    if (victim === 'foe' && foeStunSec === 0 && !foeFloored && !foeAnimTree.busy) { foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); react = true; }
-    else if (victim === 'me' && meStunSec === 0 && !shooting && !finish && !gather && meShotWin === 'none' && !meAnimTree.busy) { meAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); react = true; }
+    if (victim === 'foe' && foeStunSec === 0 && !foeFloored && !foeAnimTree.busy) { foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 }); react = true; }
+    else if (victim === 'me' && meStunSec === 0 && !shooting && !finish && !gather && meShotWin === 'none' && !meAnimTree.busy) { meAnimTree.beat('bball_contact_react', { fadeSec: 0.06 }); react = true; }
     ctx.juice.shake(0.05, 80);
     console.info(`[1V1-CONTACT] hard ${attacker} → ${victim} ${closing.toFixed(1)} m/s react ${react}`);
   }
@@ -2200,7 +2200,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
       } else if (!foeFloored) {
         foeStunSec = Math.max(foeStunSec, 0.35);
-        foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
+        foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 });
       }
       if (contact?.isReady) contact.shove('foe', shove); else foe.root.position.addInPlace(shove.scale(0.16));
       console.info(`[1V1-CONTACT] drive bump ${kind} strength ${c.strength01.toFixed(2)} set ${c.set} floor ${floorHim} shove ${shove.length().toFixed(1)}`);
@@ -2370,7 +2370,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (odds > 0 && roll() < odds) {
         // off him and back to me: he is cooked, and the crowd knows
         foeStunSec = Math.max(foeStunSec, 0.8);
-        foeAnimTree.beat(SPORT_CLIP.karateHitReact);
+        foeAnimTree.beat('bball_contact_react');
         SoundKit.play('impact', { pitch: 1.2, volume: 0.55 });
         SoundKit.play('crowdCheer', { volume: 0.8 });
         EffectsKit.burst(ctx.scene, foe.root.position.add(new Vector3(0, 1.5, 0)), 'sparks');
@@ -2718,7 +2718,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         ctx.juice.hitStop(45); ctx.juice.shake(0.08, 110); ctx.feel?.impact?.(0.3);
         SoundKit.play('impact', { pitch: 0.95, volume: 0.55 });
         if (made && inLane) { meStunSec = 1.4; meFloored = true; meHandUp = false; meAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } }); SoundKit.play('thud', { volume: 0.8 }); }
-        else if (!meFloored && meStunSec === 0) { meStunSec = Math.max(meStunSec, 0.3); meAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 }); meHandUp = false; }
+        else if (!meFloored && meStunSec === 0) { meStunSec = Math.max(meStunSec, 0.3); meAnimTree.beat('bball_contact_react', { fadeSec: 0.06 }); meHandUp = false; }
         if (contact?.isReady) contact.shove('me', bumpShove(c)); else me.root.position.addInPlace(bumpShove(c).scale(0.16));
         console.info(`[1V1-DEF] rival dunk bump strength ${c.strength01.toFixed(2)} floorMe ${made && inLane}`);
       }

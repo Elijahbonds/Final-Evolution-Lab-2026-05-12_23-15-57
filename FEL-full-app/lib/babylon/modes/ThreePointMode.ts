@@ -55,7 +55,8 @@ import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
 import { dressBall as dressMeshyBall } from '../visual/meshyProps';   // suite pass: the Meshy leather every other hoops mode plays with
 import { cloneForTint } from '../core/playerIdentity';
-import { netExitVelocity, netExitMph } from '../core/NetExit';   // NET EXIT (2026-09-17): the swish leaves with pace and bounces off the floor before the next ball
+import { netExitVelocity, netExitMph } from '../core/NetExit';
+import { boneNode } from '../anim/boneLookup';   // POLISH: the rack pick aims at the hand   // NET EXIT (2026-09-17): the swish leaves with pace and bounces off the floor before the next ball
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { ShotArc } from '../core/BasketballCore';
@@ -167,7 +168,10 @@ const NET_EXIT_SEC = 0.55;   // NET EXIT: the made ball is live (falling, bounci
 /** Signed timing error of the shot in flight: negative = EARLY (short), positive = LATE (long). */
 let shotErr = 0;
 let ballMat: StandardMaterial | null = null;   // the plain sphere until the Meshy skin lands (and if it never does)
-let trail: ParticleSystem | null = null; let trailLevel: TrailLevel = 'off';   // the ball's trail: lit for the flight of a hot hand, a white cut on the money ball
+let trail: ParticleSystem | null = null; let trailLevel: TrailLevel = 'off';
+/** POLISH (2026-09-17): the next ball comes off the RACK into the hand over PICK_SEC (it teleported 4–9 m from wherever the last one landed — measured: a 6 m ball jump on every ball). */
+let pick: { from: Vector3; t: number; mesh: Mesh } | null = null;   // `mesh` = the rack ball that travels; the live ball is hidden until the hand
+const PICK_SEC = 0.24;   // the ball's trail: lit for the flight of a hot hand, a white cut on the money ball
 function setTrail(level: TrailLevel, hex?: string): void { if (!trail || level === trailLevel) return; trailLevel = level; applyTrail(trail, level, hex); }
 /** The live ball's skin meshes with their leather and their money-ball gold, swapped per shot. */
 let ballSkin: { mesh: AbstractMesh; base: Material; money: Material }[] = [];
@@ -214,7 +218,7 @@ function syncRacks(): void {
       // Racks ahead stay full; the current rack empties left-to-right; racks
       // already finished stay empty.
       const taken = r < S.rack || (r === S.rack && b < S.ballIdx);
-      rackBalls[r][b].setEnabled(!taken);   // setEnabled, not isVisible: the Meshy skin is a child node and isVisible does not cascade
+      if (!(pick && pick.mesh === rackBalls[r][b])) rackBalls[r][b].setEnabled(!taken);   // setEnabled, not isVisible: the Meshy skin is a child node and isVisible does not cascade; the travelling pick keeps its own state
     }
   }
 }
@@ -469,7 +473,13 @@ function advanceBall(ctx: ModeContext): void {
   S.ballIdx += 1;
   S.fired = false;
   shotWin = 'none';
-  if (player && ball) attachBallToHand(ball, player.skeleton, 'RightHand');   // BIOMECH-HOOPS-WAVE1 G6: the next ball is in the hand
+  const rackBall = S.ballIdx < BALLS_PER_RACK ? rackBalls[S.rack]?.[S.ballIdx] : null;
+  if (player && ball && rackBall) {   // the pick: the RACK BALL travels to the hand; the live ball waits, hidden, where it landed
+    if (ball.parent) releaseBall(ball);
+    ball.setEnabled(false);
+    rackBall.setEnabled(true); rackBall.setParent(null);
+    pick = { from: rackBall.getAbsolutePosition().clone(), t: 0, mesh: rackBall };
+  } else if (player && ball) attachBallToHand(ball, player.skeleton, 'RightHand');   // BIOMECH-HOOPS-WAVE1 G6: the next ball is in the hand (a rack change: the jog carries it)
   if (S.ballIdx >= BALLS_PER_RACK) {
     S.ballIdx = 0;
     S.rack += 1;
@@ -745,6 +755,12 @@ export const ThreePointMode: ModeDefinition = {
 
   update(ctx: ModeContext, dt: number): void {
     if (S.phase === 'done' || !player || !ball || !arc) return;
+    if (pick) {   // POLISH: the pick off the rack — eased from the rack to the hand, then attached
+      pick.t = Math.min(1, pick.t + dt / PICK_SEC); const k = pick.t * pick.t * (3 - 2 * pick.t);
+      const hand = boneNode(player.skeleton, 'RightHand'); const to = hand ? hand.getAbsolutePosition() : player.root.position.add(new Vector3(0.3, 1.0, 0.3));
+      pick.mesh.position.copyFrom(Vector3.Lerp(pick.from, to, k));
+      if (pick.t >= 1) { pick.mesh.setEnabled(false); pick = null; ball.setEnabled(true); ball.position.copyFrom(to); attachBallToHand(ball, player.skeleton, 'RightHand'); }
+    }
 
     // Standings: the staged reveal runs first (one card every 0.75s); the
     // readable hold starts only when the last number has landed.
@@ -761,7 +777,7 @@ export const ThreePointMode: ModeDefinition = {
           // A+ mission #4: the body on the sideline ANSWERS its number — a big round celebrates, a poor one flinches.
           // (Lock D4 rules out visible rival shooting; a reaction to the posted score is not a shot.)
           const body = rivalBodies[RIVAL_NAMES.indexOf(f.name)];
-          if (body) body.animator.play(f.score >= 16 ? SPORT_CLIP.scoreCelebrate : SPORT_CLIP.karateHitReact, { onEnd: () => body.animator.play('idle_stand', { loop: true }) });
+          if (body) body.animator.play(f.score >= 16 ? SPORT_CLIP.scoreCelebrate : 'bball_contact_react', { onEnd: () => body.animator.play('idle_stand', { loop: true }) });
           pushHud(ctx);
         }
         return;
@@ -877,6 +893,7 @@ export const ThreePointMode: ModeDefinition = {
     ball?.dispose(); ball = null;
     ballMat?.dispose(); ballMat = null;
     ballSkin = []; for (const m of moneyMats.values()) m.dispose(); moneyMats.clear();
+    pick = null;
     for (const m of rackMeshes) m.dispose();
     rackMeshes = []; rackBalls = [];
     arc = null;
