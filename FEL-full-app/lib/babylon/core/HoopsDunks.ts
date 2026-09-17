@@ -56,7 +56,7 @@ export interface DunkRead {
 // ── the vocabulary ────────────────────────────────────────────────────────────────────────────────────────────
 // Every clip here is one the hoops bodies already register. The seconds are the authored lengths from
 // anim/authored/dunkTricks.ts and the finish clips; a caller scales to the real flight.
-export const POWER: HoopsDunk = { clip: 'dunk_launch', label: 'POWER SLAM', sec: 0.35, flashy: false };
+export const POWER: HoopsDunk = { clip: 'dunk_finish_power', label: 'POWER SLAM', sec: 0.6, flashy: false };   // DUNK-CLIPS (2026-09-17): a flight (hang + hammer), not the 0.35 s launch stretched thin
 export const TOMAHAWK: HoopsDunk = { clip: 'dunk_finish_tomahawk', label: 'TOMAHAWK', sec: 0.5, flashy: false };
 export const WINDMILL: HoopsDunk = { clip: 'dunk_finish_windmill', label: 'WINDMILL', sec: 0.6, flashy: true };
 export const CRADLE: HoopsDunk = { clip: 'dunk_cradle', label: 'CRADLE', sec: 0.75, flashy: true };
@@ -67,7 +67,7 @@ export const EASTBAY: HoopsDunk = { clip: 'dunk_360_eastbay', label: 'EASTBAY', 
  *  to the iron and flushes behind the head — the flight reads `reverse` and faces AWAY from the rim. */
 export const REVERSE: HoopsDunk = { clip: 'dunk_finish_reverse', label: 'REVERSE', sec: 0.7, flashy: true, reverse: true };
 /** The standing dunk: a two-foot gather under the rim and a two-hand flush — no wind-up to earn, nothing to spin. */
-export const STANDING: HoopsDunk = { clip: 'dunk_finish_tomahawk', label: 'TWO-HAND FLUSH', sec: 0.5, flashy: false };   // both hands already overhead at the takeoff: a 550 ms flight off a two-foot squat has no time for the launch clip's wind-up (measured: still crouched at rim height)
+export const STANDING: HoopsDunk = { clip: 'dunk_finish_two_hand', label: 'TWO-HAND FLUSH', sec: 0.55, flashy: false };   // DUNK-CLIPS: a two-foot tuck and a two-hand flush (the launch clip was still crouched at rim height; the tomahawk is one-handed now)
 /** Across the rim's face THIS steeply (0 straight at it, 1 along the baseline) is a baseline drive. */
 export const BASELINE = 0.72;
 

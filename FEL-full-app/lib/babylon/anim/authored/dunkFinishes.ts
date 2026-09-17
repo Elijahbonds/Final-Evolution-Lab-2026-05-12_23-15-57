@@ -46,11 +46,43 @@ export function buildFinishWindmill(scene: Scene, sk: Skeleton): AnimationGroup 
 
 // GOOD timing → both arms cock straight overhead, then crunch down together.
 export function buildFinishTomahawk(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  // ONE HAND (DUNK-CLIPS, 2026-09-17). It was a two-handed cock-back, which is a different dunk; a tomahawk is the ball
+  // in ONE hand cocked behind the head, the off arm thrown out for balance, the legs spread — the X — then the hammer.
   const T = 0.75;
   return buildPoseClip(scene, sk, 'dunk_finish_tomahawk', T, [
-    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-14, 0, 0], ...TAKEOFF_LEGS }, hands: { Left: [-0.20, 1.92, -0.05], Right: [0.20, 1.92, -0.05] }, poles: UP },   // off one foot
-    { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [-20, 0, 0], ...SPREAD_LEGS }, hands: { Left: [-0.18, 1.98, -0.22], Right: [0.18, 1.98, -0.22] }, poles: UP },   // cocked back overhead — THE SPREAD EAGLE, the shape the dunk is famous for
-    { t: T,    bones: { Hips: [0, 0, 0], Spine: [10, 0, 0],  ...LONG_LEGS }, hands: { Left: [-0.16, 1.75, 0.40], Right: [0.16, 1.75, 0.40] }, poles: UP },   // crunched down and through, body long
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], Neck: [-6, 0, 0], ...TAKEOFF_LEGS }, hands: { Right: [0.24, 1.78, 0.22], Left: [-0.30, 1.50, 0.26] }, poles: { Right: [0.8, -0.2, 0.1], Left: [-0.8, -0.4, 0.2] } },   // off one foot, the ball leaving the guide hand
+    { t: 0.36, bones: { Hips: [0, 0, 0], Spine: [-24, 0, 0], Neck: [-12, 0, 0], ...SPREAD_LEGS }, hands: { Right: [0.28, 2.00, -0.38], Left: [-0.58, 1.58, 0.02] }, poles: { Right: [0.9, 0.3, -0.5], Left: [-0.7, -0.6, -0.3] } },   // cocked BEHIND the head, off arm out — the X
+    { t: 0.56, bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0],  Neck: [-4, 0, 0], ...KICKBACK_LEGS }, hands: { Right: [0.22, 2.06, 0.12], Left: [-0.50, 1.50, 0.12] }, poles: { Right: UP.Right, Left: [-0.7, -0.6, -0.3] } },   // over the top
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0],  Neck: [6, 0, 0],  ...LONG_LEGS }, hands: { Right: [0.18, 1.78, 0.44], Left: [-0.40, 1.36, 0.22] }, poles: { Right: UP.Right, Left: [-0.8, -0.5, 0.1] } },   // hammered down and through, body long
+  ]);
+}
+
+/** The knees up under the chest — the hang of a one-foot power dunk (lead knee higher, trail knee following). */
+const TUCK_LEGS: Record<string, Deg3> = { LeftUpLeg: [-62, 0, 8], LeftLeg: [92, 0, 0], RightUpLeg: [-48, 0, -8], RightLeg: [78, 0, 0] };
+/** Both knees up together — a TWO-FOOT jump's tuck. */
+const TUCK2_LEGS: Record<string, Deg3> = { LeftUpLeg: [-56, 0, 8], LeftLeg: [84, 0, 0], RightUpLeg: [-56, 0, -8], RightLeg: [84, 0, 0] };
+
+// POWER SLAM (DUNK-CLIPS, 2026-09-17) — the game's default drive dunk. It played `dunk_launch`, a 0.35 s two-hand LAUNCH
+// (arms thrown overhead, knees soft) stretched over a 550 ms flight: no hang, no hammer. This is the flight: off one
+// foot, the ball in the strong hand, the knees come up under the chest at the top, and the arm comes down THROUGH the
+// iron with the body long.
+export function buildFinishPower(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.6;
+  return buildPoseClip(scene, sk, 'dunk_finish_power', T, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0],  Neck: [-4, 0, 0], ...TAKEOFF_LEGS }, hands: { Right: [0.22, 1.56, 0.30], Left: [-0.22, 1.46, 0.30] }, poles: { Right: [0.8, -0.3, 0.2], Left: [-0.8, -0.3, 0.2] } },   // the ball rising in front, the guide hand still on it
+    { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [-18, 0, 0], Neck: [-10, 0, 0], ...TUCK_LEGS }, hands: { Right: [0.20, 2.08, 0.06], Left: [-0.46, 1.60, 0.02] }, poles: { Right: [0.9, 0.3, -0.4], Left: [-0.8, -0.5, -0.2] } },   // the hang: one hand cocked high, the knees up, the chest open
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0],  Neck: [6, 0, 0],  ...LONG_LEGS }, hands: { Right: [0.16, 1.80, 0.46], Left: [-0.40, 1.40, 0.20] }, poles: { Right: UP.Right, Left: [-0.8, -0.5, 0.1] } },   // hammered down and through
+  ]);
+}
+
+// TWO-HAND FLUSH — the standing dunk (checkDriveDunk 'standing'): a two-foot jump, both knees tucked, the ball carried up
+// in both hands past the face, over and behind the head at the top, and flushed down with both.
+export function buildFinishTwoHand(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.55;
+  return buildPoseClip(scene, sk, 'dunk_finish_two_hand', T, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [2, 0, 0],   Neck: [-6, 0, 0], ...TUCK2_LEGS }, hands: { Right: [0.22, 1.62, 0.34], Left: [-0.22, 1.62, 0.34] }, poles: { Right: [0.8, -0.4, 0.2], Left: [-0.8, -0.4, 0.2] } },   // both hands carrying it up past the face
+    { t: 0.28, bones: { Hips: [0, 0, 0], Spine: [-16, 0, 0], Neck: [-10, 0, 0], ...TUCK2_LEGS }, hands: { Right: [0.20, 2.04, 0.00], Left: [-0.20, 2.04, 0.00] }, poles: UP },   // over the head, knees up
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [10, 0, 0],  Neck: [6, 0, 0],  ...LONG_LEGS }, hands: { Right: [0.18, 1.78, 0.42], Left: [-0.18, 1.78, 0.42] }, poles: UP },   // flushed with both, body long
   ]);
 }
 

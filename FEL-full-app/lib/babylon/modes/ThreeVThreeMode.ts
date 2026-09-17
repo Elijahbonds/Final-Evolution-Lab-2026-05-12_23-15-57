@@ -121,6 +121,7 @@ import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-LOOK (2026-09-17)
+import { showtimeAsked, pickShowtime, judgeShowtime, showtimeMeterT, posterRide, SHOWTIME_FLIGHT_MS, SHOWTIME_HANG_FROM, SHOWTIME_HANG_TO, SHOWTIME_HANG_SCALE, SHOWTIME_DEADLINE_K, SHOWTIME_PCT, POSTER_RIDE_SHARE } from '../core/ShowtimeDunk';   // SHOWTIME (2026-09-17)
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { pickHoopsDunk, dunkSpeedRatio } from '../core/HoopsDunks';
@@ -299,7 +300,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
   let driveContest: DriveContest | null = null;                                      // M2: the body in the dunk's path
   /** The man being dunked ON — held chest to chest through the flight, dropped at the flush. */
-  let posterVictim: { body: Body; kind: ContactDunkKind; released: boolean } | null = null;
+  let posterVictim: { body: Body; kind: ContactDunkKind; released: boolean; plant?: Vector3; fall?: Vector3; reacted?: boolean } | null = null;   // SHOWTIME: the plant and the fall line
+  let showtimePress = false, showtimeCam = false;   // SHOWTIME: SQUARE in the air (raw), and the side camera
   /** What the contact made this dunk. Captured AT THE BUMP because `driveContest` is cleared on
    *  feet-down, before the score is awarded — so reading it there narrowed to `never`. */
   let lastDunkKind: ContactDunkKind = 'clean';
@@ -563,7 +565,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       threeVenue?.hidePlaceholders();  // M74: drop stand-ins now that real chars are in
       assertSpawned(ctx.scene, { hero: me.char.root, minWorldMeshes: 6, modeId: 'threevthree' });
       resetPossession(true);
-      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; const seam = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, defend: () => { if (!ended) { resetPossession(false); void opponentPossession(ctx); } }, /* resetPossession(false) only RESETS: its toMe branch is the only thing that hands the ball out, so on its own it leaves the rock wherever it was and no drive ever starts. opponentPossession() is what a defensive possession actually IS here — the 1v1 seam's defend() calls startDefense() for the same reason. */ attackPhase: () => (driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check'), driveK: () => driveK, driveSpeed: () => (driver ? driver.vel.length() : 0), takingCharge: () => takingCharge, flightK: () => (foeDunkFlight ? 1 : -1), luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: !!foeHandUp }), post: () => { const n = nearestLiveFoe(); return { posting, spinning: !!spin, brace: !!me.slot.intent.brace, can: canPostUp(me.char.root.position, RIM_FLOOR, n ? n.char.root.position : null), carrying: carrierId === 'me', shooting, finish: !!finish, gather: !!gather, foeStun: n ? n.stunSec : -1, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: me.tree.held ?? '' }; }, driverRoot: () => driver?.char.root ?? null, block: () => (ctx0 ? contestJump(ctx0) : false), /* the block with no bridge latency: the lab's jump was landing at driveK 1.00 behind its own steer queue */ ended: () => ended, boxing: () => boxingOut,
+      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; const seam = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, defend: () => { if (!ended) { resetPossession(false); void opponentPossession(ctx); } }, /* resetPossession(false) only RESETS: its toMe branch is the only thing that hands the ball out, so on its own it leaves the rock wherever it was and no drive ever starts. opponentPossession() is what a defensive possession actually IS here — the 1v1 seam's defend() calls startDefense() for the same reason. */ attackPhase: () => (driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check'), driveK: () => driveK, driveSpeed: () => (driver ? driver.vel.length() : 0), takingCharge: () => takingCharge, flightK: () => (dunkFlight ? dunkFlight.k : foeDunkFlight ? foeDunkFlight.k : -1)   /* MY flight's clock first (the showtime press is timed off it), then the rival's */, luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: !!foeHandUp }), post: () => { const n = nearestLiveFoe(); return { posting, spinning: !!spin, brace: !!me.slot.intent.brace, can: canPostUp(me.char.root.position, RIM_FLOOR, n ? n.char.root.position : null), carrying: carrierId === 'me', shooting, finish: !!finish, gather: !!gather, foeStun: n ? n.stunSec : -1, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: me.tree.held ?? '' }; }, driverRoot: () => driver?.char.root ?? null, block: () => (ctx0 ? contestJump(ctx0) : false), /* the block with no bridge latency: the lab's jump was landing at driveK 1.00 behind its own steer queue */ ended: () => ended, boxing: () => boxingOut,
           // O3: every body's job, its objective and how squarely it faces it (the probes' awareness read)
           jobs: () => everyBody().map((b, i) => { const mb = mateBrain(b), db = foeBrain(b); const obj = b === me ? (carrierId === 'me' ? RIM : (driver?.char.root.position ?? ballWorld())) : objectiveFor(b); const p = bodyPos(b); const yaw = b.char.root.rotation.y; const v = b === me ? me.drib.vel : b.vel; return { id: b === me ? 'me' : isFoe(b) ? `foe${foes.indexOf(b)}` : `mate${mates.indexOf(b)}`, i, job: jobOf(b), phase: mb?.screen.phase ?? (db ? (db.fightingOver === null ? '' : db.fightingOver ? 'over' : 'under') : ''), x: p.x, z: p.z, y: p.y, speed: Math.hypot(v.x, v.z), facing: facingCos(yaw, p, obj), objX: obj.x, objZ: obj.z, boxing: !!(mb?.boxing || db?.boxing), root: b.char.root }; }), get foeRoot() { return driver ? driver.char.root : (foes[0]?.char.root ?? null); }, /* the man to guard is whoever is DRIVING */ nearestFoeRoot: () => foes.reduce<Body | null>((b, f) => !b || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(b.char.root.position, me.char.root.position) ? f : b, null)?.char.root ?? null }; if (dev) dev.hoopsPosture = seam; (ctx.scene.metadata ??= {}).threevthree = seam; }   // BIOMECH-HOOPS-WAVE1 probes
       ctx.setHud({
@@ -576,6 +578,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       SoundKit.unlock();
       localSource.feed(e);
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
+      if (dunking && e.t === 'button' && e.btn === 'X' && e.pressed) showtimePress = true;   // SHOWTIME: the timed flush
       // BLOCK jump while defending an opponent possession. The body lives in contestJump() so the slot can reach it
       // too — 1v1 carries the same split, and the reason is written out there.
       if (e.t === 'button' && e.btn === 'Y' && e.pressed && contestJump(ctx)) {   // Triangle = BLOCK (2K map)
@@ -1537,6 +1540,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const wall = defenderPos ? foes.find((f) => f.char.root.position === defenderPos) ?? null : null;
     const c = contestDrive(from, landing, wall && wall.stunSec === 0 ? wall.char.root.position : null, wall ? wall.vel : null, kind === 'standing' ? 'dunk' : kind);
     driveContest = c;
+    // SHOWTIME (owner, 2026-09-17): the stick BACK with R2 on an open lane, or any contact dunk — see ShowtimeDunk.ts
+    const showtime = showtimeAsked(kind, lookY);
+    const flightTotal = showtime ? SHOWTIME_FLIGHT_MS : DRIVE_DUNK.flightMs;
+    let showtimeK: number | null = null; showtimePress = false;
     console.info(`[3V3-CONTACT] drive contest ${kind} contested ${c.contested} t ${c.t.toFixed(2)} lateral ${c.lateral.toFixed(2)} set ${c.set} pct ${c.pct.toFixed(2)} wall ${wall ? (wall.stunSec > 0 ? 'stunned' : 'live') : 'none'}`);
     let made = Math.random() < c.pct;
     let swatted = false;
@@ -1557,7 +1564,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const lateral3 = speed3 > 0.1 && toRimNow3.lengthSquared() > 1e-4
       ? Math.min(1, Math.abs(driveDir3.x * toRimNow3.normalize().z - driveDir3.z * toRimNow3.x) / speed3)
       : 0;
-    const picked3 = pickHoopsDunk({
+    const picked3 = showtime ? pickShowtime({ roll, contact: kind === 'poster', momentum01: mbus.score01 }) : pickHoopsDunk({
       speed: speed3, lateral01: lateral3,
       contest01: c.contested ? Math.min(1, Math.max(0, 1 - Math.abs(c.lateral))) : 0,
       // A POSTER IS A SET BODY IN THE WAY, NOT MERELY A BODY NEARBY. checkDriveDunk says 'poster' for any defender
@@ -1572,8 +1579,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     });
     let gatherLeft = kind === 'standing' ? STANDING_GATHER_MS : 0;   // DEFENSE-LOOK: the two-foot squat before a standing dunk's flight
     if (gatherLeft > 0) me.tree.beat('dunk_charge_gather', { fadeSec: 0.06 });
-    else me.tree.beat(picked3.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked3, DRIVE_DUNK.flightMs / 1000) });
+    else me.tree.beat(picked3.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked3, flightTotal / 1000) });
     ctx.setHud({ shotType: picked3.label });
+    if (showtime) {
+      const dir = RIM_FLOOR.subtract(from); dir.y = 0; if (dir.lengthSquared() < 1e-4) dir.set(0, 0, -1); dir.normalize();
+      const right = new Vector3(dir.z, 0, -dir.x);
+      ctx.camDirector.setFixed(RIM_FLOOR.add(right.scale(3.6)).add(dir.scale(-1.4)).add(new Vector3(0, 1.5, 0)), 1.7, true);
+      showtimeCam = true;
+      ctx.setHud({ banner: kind === 'poster' ? 'SHOWTIME — OVER HIM · SQUARE AT THE RIM' : 'SHOWTIME — SQUARE AT THE RIM' }); setTimeout(() => ctx.setHud({ banner: '' }), 900);
+      console.info(`[3V3-SHOWTIME] ${picked3.label} (${picked3.clip}) ${kind === 'poster' ? 'over a body' : 'open'} — time the flush`);
+    }
     if (picked3.flashy) ctx.camDirector.pulse(0.35, 0.4);
     console.info(`[3V3-DUNK] ${picked3.label} (${picked3.clip}) speed ${speed3.toFixed(1)} lateral ${lateral3.toFixed(2)} momentum ${mbus.score01.toFixed(2)}`);
     startBoxOut('mine');   // O2
@@ -1582,12 +1597,13 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const obs = ctx.scene.onBeforeRenderObservable.add(() => {
       const nowMs = performance.now(); const realMs = Math.min(50, nowMs - last); last = nowMs;
       const fdt = realMs / 1000;
-      if (gatherLeft > 0) { gatherLeft -= realMs; if (gatherLeft <= 0) me.tree.beat(picked3.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked3, DRIVE_DUNK.flightMs / 1000) }); return; }
+      if (gatherLeft > 0) { gatherLeft -= realMs; if (gatherLeft <= 0) me.tree.beat(picked3.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked3, flightTotal / 1000) }); return; }
       let scale = 1;
       if (freezeMs > 0) { freezeMs -= realMs; scale = 0; }
       else if (slowMs > 0) { slowMs -= realMs; scale = BUMP_SLOW; }
+      else if (showtime && flightMs / flightTotal >= SHOWTIME_HANG_FROM && flightMs / flightTotal <= SHOWTIME_HANG_TO) scale = SHOWTIME_HANG_SCALE;   // SHOWTIME: the hang
       flightMs += realMs * scale;
-      const k = Math.min(1, flightMs / DRIVE_DUNK.flightMs);
+      const k = Math.min(1, flightMs / flightTotal);
       me.char.root.position.x = from.x + (RIM.x - from.x) * k;
       me.char.root.position.z = from.z + (RIM.z + DRIVE_DUNK.landAheadZ - from.z) * k;
       me.char.root.position.y = driveDunkY(k);
@@ -1609,7 +1625,24 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           ctx.feel?.impact?.(0.5); ctx.juice.shake(0.1, 120);
           wall.tree.beat('bball_block_reach', { fadeSec: 0.06 });
           console.info(`[3V3-DEF] ai swat at the bump chance ${swatChance.toFixed(2)}`);
-        } else driveBump(ctx, c, wall, made && kind === 'poster', (1 - k) * DRIVE_DUNK.flightMs > 320);
+        } else driveBump(ctx, c, wall, made && kind === 'poster', (1 - k) * flightTotal > 320);
+      }
+      if (showtime) {
+        ctx.setHud({ shotMeterT: showtimeMeterT(k) });
+        if (showtimeK === null && (showtimePress || k >= SHOWTIME_DEADLINE_K)) {
+          const j = showtimePress ? judgeShowtime(k) : 'none'; showtimePress = false; showtimeK = k;
+          made = roll() < SHOWTIME_PCT[j] * (kind === 'poster' ? Math.max(0.6, c.pct) : 1);
+          if (j === 'perfect') { ctx.juice.hitStop(70); ctx.camDirector.pulse(0.7, 0.45); SoundKit.play('crowdCheer', { volume: 0.6 }); }
+          ctx.setHud({ banner: j === 'perfect' ? `${picked3.label} — PERFECT!` : j === 'good' ? `${picked3.label}!` : j === 'early' ? 'EARLY — OFF THE FRONT' : j === 'late' ? 'LATE — OFF THE BACK' : picked3.label }); setTimeout(() => ctx.setHud({ banner: '' }), 800);
+          console.info(`[3V3-SHOWTIME] flush ${j} at k ${k.toFixed(2)} made ${made}`);
+        }
+      }
+      if (posterVictim && !posterVictim.released && posterVictim.plant && posterVictim.fall && c.bumpK !== null && k > c.bumpK) {   // SHOWTIME: the victim rides the flight
+        const ride = posterRide(c.bumpK, POSTER_RELEASE_K, k); const v = posterVictim.body.char.root.position;
+        v.x = posterVictim.plant.x + posterVictim.fall.x * 0.16 * POSTER_RIDE_SHARE * ride.s;
+        v.z = posterVictim.plant.z + posterVictim.fall.z * 0.16 * POSTER_RIDE_SHARE * ride.s;
+        v.y = ride.lift;
+        if (!posterVictim.reacted && ride.s > 0.35) { posterVictim.reacted = true; posterVictim.body.tree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.05, holdEnd: true }); }
       }
       if (posterVictim && k >= POSTER_RELEASE_K) posterVictimRelease(ctx);
       if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
@@ -1621,6 +1654,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (k < 1) return;
       ctx.scene.onBeforeRenderObservable.remove(obs);
       dunking = false; dunkFlight = null; me.landSec = LAND_SEC; driveContest = null;
+      if (showtimeCam) { showtimeCam = false; ctx.camDirector.toggle(); }   // SHOWTIME: the follow camera comes back
+      if (showtime) ctx.setHud({ shotMeterT: 0 });
       me.tree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });   // G5: feet-down is the land crouch
       me.drib.setFacing(me.char.root.rotation.y);
       const fouled = finishFoul; finishFoul = false;
@@ -1930,7 +1965,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       wall.char.root.rotation.y = plant.faceYaw;
       wall.stunSec = Math.max(wall.stunSec, 1.2);
       wall.tree.beat('bball_hand_up', { holdEnd: true, fadeSec: 0.05 });   // he is CONTESTING it, arms up
-      posterVictim = { body: wall, kind, released: false };
+      posterVictim = { body: wall, kind, released: false, plant: plant.spot.clone(), fall: posterFall(RIM_FLOOR, plant.spot, kind), reacted: false };   // SHOWTIME: he rides the flight from here
       console.info(`[3V3-CONTACT] ${kind} — victim planted chest to chest`);
     } else {
       const shove = bumpShove(c);

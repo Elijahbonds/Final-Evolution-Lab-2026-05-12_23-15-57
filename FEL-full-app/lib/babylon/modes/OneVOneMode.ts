@@ -165,6 +165,7 @@ import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-LOOK (2026-09-17)
+import { showtimeAsked, pickShowtime, judgeShowtime, showtimeMeterT, posterRide, SHOWTIME_FLIGHT_MS, SHOWTIME_HANG_FROM, SHOWTIME_HANG_TO, SHOWTIME_HANG_SCALE, SHOWTIME_DEADLINE_K, SHOWTIME_PCT, POSTER_RIDE_SHARE } from '../core/ShowtimeDunk';   // SHOWTIME (2026-09-17)
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk; Meshy never scaled)
 import { assertSpawned } from '../core/FrameGuard';
@@ -377,7 +378,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** Was I in the stance when this push STARTED? The jab is judged on that, not on the release frame. */
   let jabEligible = false;
   /** A body planted chest-to-chest for a contact dunk, waiting to go down at the flush. */
-  let posterVictim: { kind: ReturnType<typeof dunkKindFor>; released: boolean } | null = null;
+  let posterVictim: { kind: ReturnType<typeof dunkKindFor>; released: boolean; plant?: Vector3; fall?: Vector3; reacted?: boolean } | null = null;   // SHOWTIME: the plant and the fall line, so he rides the flight
+  let showtimePress = false, showtimeCam = false;   // SHOWTIME: SQUARE in the air (raw, so a pad, a key and a probe all reach it), and whether the side camera is on
   let spinClip = 'bball_spin';           // M9: the same machinery turns a PIVOT (a shorter sweep, no travel)
   let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
@@ -646,6 +648,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       SoundKit.unlock();
       localSource.feed(e);
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
+      if (dunking && e.t === 'button' && e.btn === 'X' && e.pressed) showtimePress = true;   // SHOWTIME: the timed flush
       // BLOCK / contest jump on defense: A leaves the floor. The BODY of it now lives in contestJump(), because the
       // same press also has to be reachable from the slot — see that function.
       if (e.t === 'button' && e.btn === 'Y' && e.pressed && contestJump(ctx)) {   // Triangle = BLOCK (2K map)
@@ -1646,6 +1649,11 @@ export const OneVOneMode: ModeDefinition = (() => {
     const defenderPos = foeStunSec > 0 ? null : foe.root.position;
     const c = contestDrive(from, landing, defenderPos, defenderPos ? foeVelLast : null, kind === 'standing' ? 'dunk' : kind);
     driveContest = c;
+    // SHOWTIME (owner, 2026-09-17): R2 in, the right stick held BACK on an open lane — or any contact dunk — and the
+    // dunk contest's vocabulary comes to the game: a long flight with a slow hang, a side camera, and a flush you TIME.
+    const showtime = showtimeAsked(kind, lookY);
+    const flightTotal = showtime ? SHOWTIME_FLIGHT_MS : DRIVE_DUNK.flightMs;
+    let showtimeK: number | null = null; showtimePress = false;
     // OFF THE BACKBOARD. The off-glass throw existed only in the dunk contest (DunkLob.glassLobVelocity) even
     // though 1v1 already has the square's geometry — BOARD_NORMAL, bankPoint, inBankBand and the glass button
     // that routes a bank SHOT. So the one thing missing was routing a DUNK through it. Hold the glass button
@@ -1680,7 +1688,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     const lateral01 = speedNow > 0.1 && toRimNow2.lengthSquared() > 1e-4
       ? Math.min(1, Math.abs(driveDir.x * toRimNow2.normalize().z - driveDir.z * toRimNow2.x) / speedNow)
       : 0;
-    const picked = pickHoopsDunk({
+    const picked = showtime ? pickShowtime({ roll, contact: kind === 'poster', momentum01: mbus.score01 }) : pickHoopsDunk({
       speed: speedNow,
       lateral01,
       contest01: c.contested ? Math.min(1, Math.max(0, 1 - Math.abs(c.lateral))) : 0,
@@ -1697,10 +1705,18 @@ export const OneVOneMode: ModeDefinition = (() => {
       standing: kind === 'standing',
     });
     dunkLabel = picked.label;
+    if (showtime) {   // the side camera: low, off the drive's flank, aimed at the iron
+      const dir = RIM_FLOOR.subtract(from); dir.y = 0; if (dir.lengthSquared() < 1e-4) dir.set(0, 0, -1); dir.normalize();
+      const right = new Vector3(dir.z, 0, -dir.x);
+      ctx.camDirector.setFixed(RIM_FLOOR.add(right.scale(3.6)).add(dir.scale(-1.4)).add(new Vector3(0, 1.5, 0)), 1.7, true);
+      showtimeCam = true;
+      bannerFlash(ctx, kind === 'poster' ? 'SHOWTIME — OVER HIM · SQUARE AT THE RIM' : 'SHOWTIME — SQUARE AT THE RIM', 900);
+      console.info(`[1V1-SHOWTIME] ${picked.label} (${picked.clip}) ${kind === 'poster' ? 'over a body' : 'open'} — time the flush`);
+    }
     // THE STANDING DUNK GATHERS FIRST (DEFENSE-LOOK, 2026-09-17): a two-foot squat under the rim, then the flight.
     let gatherLeft = kind === 'standing' ? STANDING_GATHER_MS : 0;
     if (gatherLeft > 0) meAnimTree.beat('dunk_charge_gather', { fadeSec: 0.06 });
-    else meAnimTree.beat(picked.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked, DRIVE_DUNK.flightMs / 1000) });
+    else meAnimTree.beat(picked.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked, flightTotal / 1000) });
     ctx.setHud({ shotType: picked.label });
     if (picked.flashy) ctx.camDirector.pulse(0.35, 0.4);
     console.info(`[1V1-DUNK] ${picked.label} (${picked.clip}) speed ${speedNow.toFixed(1)} lateral ${lateral01.toFixed(2)} contest ${(c.contested ? 1 : 0)} momentum ${mbus.score01.toFixed(2)}`);
@@ -1711,12 +1727,13 @@ export const OneVOneMode: ModeDefinition = (() => {
     const obs = ctx.scene.onBeforeRenderObservable.add(() => {
       const nowMs = performance.now(); const realMs = Math.min(50, nowMs - last); last = nowMs;
       const fdt = realMs / 1000;
-      if (gatherLeft > 0) { gatherLeft -= realMs; if (gatherLeft <= 0) meAnimTree.beat(picked.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked, DRIVE_DUNK.flightMs / 1000) }); return; }   // the squat before the two-foot flight
+      if (gatherLeft > 0) { gatherLeft -= realMs; if (gatherLeft <= 0) meAnimTree.beat(picked.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked, flightTotal / 1000) }); return; }   // the squat before the two-foot flight
       let scale = 1;
       if (freezeMs > 0) { freezeMs -= realMs; scale = 0; }
       else if (slowMs > 0) { slowMs -= realMs; scale = BUMP_SLOW; }
+      else if (showtime && flightMs / flightTotal >= SHOWTIME_HANG_FROM && flightMs / flightTotal <= SHOWTIME_HANG_TO) scale = SHOWTIME_HANG_SCALE;   // SHOWTIME: the hang
       flightMs += realMs * scale;
-      const k = Math.min(1, flightMs / DRIVE_DUNK.flightMs);
+      const k = Math.min(1, flightMs / flightTotal);
       me.root.position.x = from.x + (RIM.x - from.x) * k;
       me.root.position.z = from.z + (RIM.z + DRIVE_DUNK.landAheadZ - from.z) * k;
       me.root.position.y = driveDunkY(k);
@@ -1728,7 +1745,25 @@ export const OneVOneMode: ModeDefinition = (() => {
       // becomes the trick stick: a flick asks for a trick and WHEN you threw it decides whether you get it. The
       // window rides the FLIGHT clock, so the hit-stop and the bump's slow motion — which stretch a dunk's real
       // duration by a third — cannot silently move the target.
-      if (!trickThrown) {
+      if (showtime) {
+        ctx.setHud({ shotMeterT: showtimeMeterT(k) });
+        if (showtimeK === null && (showtimePress || k >= SHOWTIME_DEADLINE_K)) {
+          const j = showtimePress ? judgeShowtime(k) : 'none'; showtimePress = false; showtimeK = k;
+          made = roll() < SHOWTIME_PCT[j] * (kind === 'poster' ? Math.max(0.6, c.pct) : 1);
+          if (j === 'perfect') { ctx.juice.hitStop(70); ctx.camDirector.pulse(0.7, 0.45); SoundKit.play('crowdCheer', { volume: 0.6 }); }
+          bannerFlash(ctx, j === 'perfect' ? `${picked.label} — PERFECT!` : j === 'good' ? `${picked.label}!` : j === 'early' ? 'EARLY — OFF THE FRONT' : j === 'late' ? 'LATE — OFF THE BACK' : picked.label, 800);
+          console.info(`[1V1-SHOWTIME] flush ${j} at k ${k.toFixed(2)} made ${made}`);
+        }
+      }
+      // SHOWTIME: the victim RIDES the flight — bowled back along his fall line from the bump to the release, a little off the floor
+      if (posterVictim && !posterVictim.released && posterVictim.plant && posterVictim.fall && c.bumpK !== null && k > c.bumpK) {
+        const ride = posterRide(c.bumpK, POSTER_RELEASE_K, k);
+        foe.root.position.x = posterVictim.plant.x + posterVictim.fall.x * 0.16 * POSTER_RIDE_SHARE * ride.s;
+        foe.root.position.z = posterVictim.plant.z + posterVictim.fall.z * 0.16 * POSTER_RIDE_SHARE * ride.s;
+        if (!contact?.isReady) foe.root.position.y = ride.lift;
+        if (!posterVictim.reacted && ride.s > 0.35) { posterVictim.reacted = true; foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.05, holdEnd: true }); }
+      }
+      if (!trickThrown && !showtime) {
         const asked = trickFromFlick(lookX, lookY);
         if (asked) {
           trickThrown = true;
@@ -1737,7 +1772,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (judge === 'green') {
             const onTheBump = c.bumpK !== null;
             made = roll() < trickPct(c.pct, asked, judge) + (onTheBump ? CONTACT_TRICK_BONUS : 0);
-            meAnimTree.beat(spec.clip, { holdEnd: true, speedRatio: dunkSpeedRatio({ clip: spec.clip, label: spec.label, sec: 0.7, flashy: true }, DRIVE_DUNK.flightMs / 1000) });
+            meAnimTree.beat(spec.clip, { holdEnd: true, speedRatio: dunkSpeedRatio({ clip: spec.clip, label: spec.label, sec: 0.7, flashy: true }, flightTotal / 1000) });
             ctx.setHud({ shotType: spec.label });
             ctx.camDirector.pulse(0.4, 0.45);
             SoundKit.play('whoosh', { pitch: 1.3, volume: 0.45 });
@@ -1765,7 +1800,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           ctx.feel?.impact?.(0.5); ctx.juice.shake(0.1, 120);
           foeAnimTree.beat('bball_block_reach', { fadeSec: 0.06 });
           console.info(`[1V1-DEF] ai swat at the bump chance ${swatChance.toFixed(2)}`);
-        } else driveBump(ctx, c, made && kind === 'poster', (1 - k) * DRIVE_DUNK.flightMs > 320);
+        } else driveBump(ctx, c, made && kind === 'poster', (1 - k) * flightTotal > 320);
       }
       // the victim goes down once the ball is past him — held through the rise, released at the FLUSH, so the
       // fall lands after the ball is through rather than at the moment of contact
@@ -1787,6 +1822,8 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (k < 1) return;
       ctx.scene.onBeforeRenderObservable.remove(obs);
       dunking = false; dunkFlight = null; meLandSec = LAND_SEC; driveContest = null;
+      if (showtimeCam) { showtimeCam = false; ctx.camDirector.toggle(); }   // SHOWTIME: the follow camera comes back at feet-down
+      if (showtime) ctx.setHud({ shotMeterT: 0 });
       contact?.setAirborne('me', false);
       meAnimTree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });   // G5: feet-down is the land crouch, never an idle flash
       meDribble.setFacing(me.root.rotation.y);
@@ -2143,7 +2180,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       face(foe.root, plant.faceYaw);
       foeStunSec = Math.max(foeStunSec, 1.2);
       foeAnimTree.beat('bball_hand_up', { holdEnd: true, fadeSec: 0.05 });   // he is CONTESTING it, arms up
-      posterVictim = { kind, released: false };
+      posterVictim = { kind, released: false, plant: plant.spot.clone(), fall: posterFall(RIM_FLOOR, plant.spot, kind), reacted: false };   // SHOWTIME: and he rides the flight from here
       console.info(`[1V1-CONTACT] ${kind} — victim planted chest to chest at ${plant.spot.z.toFixed(2)}`);
     } else {
       const shove = bumpShove(c);

@@ -12,6 +12,10 @@ const RT = ((rtNs as unknown as { default?: typeof rtNs }).default ?? rtNs) as t
 interface Entry {
   name: string; replaces: string; source: SourceKind; file: string; anim?: string; from: number; to: number;
   duration?: number; loop?: boolean; mirror?: boolean; refineLoop?: [number, number]; hipsYRange?: [number, number]; aim?: 'hand' | 'foot'; note?: string;
+  /** LAYUP EXTENSION (2026-09-17): a hand override blended over the TAIL of the capture — from `from01` of the clip the
+   *  captured wrist targets ease (smoothstep) to these body-local metres, reaching them at `peak01` and holding. Authored
+   *  in the un-mirrored (right-hand) frame; a mirrored clip gets it mirrored. `poles` swap in at half weight. */
+  extend?: { from01: number; peak01: number; Right?: [number, number, number]; Left?: [number, number, number]; polesRight?: [number, number, number]; polesLeft?: [number, number, number] };
   /** STYLE CLIPS: the vocabulary this clip belongs to, and whether it carries a root track (mocapRetarget.rootTrack). */
   style?: string; rootTrack?: boolean; label?: string;
 }
@@ -59,6 +63,20 @@ for (const e of manifest.clips) {
   let [from, to] = [e.from, e.to];
   if (e.loop && e.refineLoop) [from, to] = refineLoop(s, from, to, e.refineLoop);
   const r = RT.retargetToPoseKeys(s, { from, to, duration: e.duration, loop: e.loop, mirror: e.mirror, hipsYRange: e.hipsYRange, aim: e.aim, rootTrack: e.rootTrack });
+  if (e.extend) {
+    const ex = e.extend; const m = !!e.mirror;
+    const tgt = (side: 'Left' | 'Right') => { const src = m ? (side === 'Left' ? ex.Right : ex.Left) : ex[side]; return src ? [m ? -src[0] : src[0], src[1], src[2]] as [number, number, number] : null; };
+    const pole = (side: 'Left' | 'Right') => { const src = m ? (side === 'Left' ? ex.polesRight : ex.polesLeft) : (side === 'Left' ? ex.polesLeft : ex.polesRight); return src ? [m ? -src[0] : src[0], src[1], src[2]] as [number, number, number] : null; };
+    for (const k of r.keys) {
+      const t01 = k.t / r.duration; if (t01 < ex.from01) continue;
+      const w = Math.min(1, (t01 - ex.from01) / Math.max(1e-3, ex.peak01 - ex.from01)); const ws = w * w * (3 - 2 * w);
+      for (const side of ['Left', 'Right'] as const) {
+        const g = tgt(side); const h = k.hands?.[side]; if (!g || !h) continue;
+        k.hands![side] = [h[0] + (g[0] - h[0]) * ws, h[1] + (g[1] - h[1]) * ws, h[2] + (g[2] - h[2]) * ws];
+        const pl = pole(side); if (pl && ws >= 0.5) { (k.poles ??= {})[side] = pl; }
+      }
+    }
+  }
   const hands = r.keys.map((k) => Math.max(k.hands!.Left![1], k.hands!.Right![1]));
   console.log(`${e.name.padEnd(28)} ${from.toFixed(2)}–${to.toFixed(2)}s → ${r.duration}s ${r.keys.length} keys  scale ${r.scale}  facing ${r.baseYawDeg}°  front ${r.frontSign > 0 ? '+' : '−'}  hands ${Math.min(...hands).toFixed(2)}..${Math.max(...hands).toFixed(2)} m`);
   out.push(`  {

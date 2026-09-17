@@ -11,7 +11,7 @@ import { ledgerFor, scopeAllows, scopeForScene, suiteOfClip, type ClipScope } fr
 import { buildEastbay } from './eastbay';
 import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from './dunkSuite';
 import { buildMocapDunk } from './mocapDunk';
-import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig, buildFinishReverse } from './dunkFinishes';
+import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig, buildFinishReverse, buildFinishPower, buildFinishTwoHand } from './dunkFinishes';
 import { buildDefendBackpedal, buildCloseout, buildDefendSlideHard } from './basketball';   // DEFENSE-LOOK (2026-09-17)
 import { buildStackBase, buildStackRider, buildRowStand, buildRowCrouch, buildBikeRider, buildSkateRider } from './stackProp';
 import { buildSelfLob, buildBounceThrow, buildKickUp, buildBackHandspring, buildBackflip, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildWindmill360, buildFakeEastbay, buildTap } from './dunkTricks';
@@ -68,6 +68,8 @@ export function registerAuthoredClips(
     ['dunk_finish_windmill', () => buildFinishWindmill(scene, skeleton)],
     ['dunk_finish_tomahawk', () => buildFinishTomahawk(scene, skeleton)],
     ['dunk_finish_reverse', () => buildFinishReverse(scene, skeleton)],   // DEFENSE-LOOK (2026-09-17): the baseline reverse
+    ['dunk_finish_power', () => buildFinishPower(scene, skeleton)],       // DUNK-CLIPS (2026-09-17): the one-hand power slam (the game's default)
+    ['dunk_finish_two_hand', () => buildFinishTwoHand(scene, skeleton)],  // …and the standing two-hand flush
     ['dunk_finish_blown', () => buildFinishBlown(scene, skeleton)],
     ['dunk_celebrate_big', () => buildCelebrateBig(scene, skeleton)],
     // DUNK-CONTROL-JUICE (2026-09-08): the named dunks — runway beats (self-lob, kick-up, cartwheel, double-up) and air shapes

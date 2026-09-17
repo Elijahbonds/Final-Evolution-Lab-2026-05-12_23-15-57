@@ -365,6 +365,18 @@ for (let n = 0; n < POSSESSIONS; n++) {
       await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
       await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: 0, action: true }, 80)`);
     }
+    else if (play === 'showtime') {   // SHOWTIME: R2 + the right stick held BACK into the rim, SQUARE timed at the flush (in-page, off flightK)
+      await page.evaluate(`(() => {
+        const dev = window.__dev(); const bus = window.__FEL_DEV__ && window.__FEL_DEV__.input; if (!dev || !bus) return 'no bus';
+        bus.emit({ t: 'stick', side: 'R', x: 0, y: 1 });   // back, and held
+        let pressed = false; const t0 = Date.now();
+        const id = setInterval(() => { const k = dev.flightK(); if (k >= ${Number(process.env.PRESS_K ?? 0.53)} && !pressed) { pressed = true; bus.emit({ t: 'button', btn: 'X', pressed: true }); setTimeout(() => bus.emit({ t: 'button', btn: 'X', pressed: false }), 60); }
+          if (pressed || Date.now() - t0 > 6000) { clearInterval(id); bus.emit({ t: 'stick', side: 'R', x: 0, y: 0 }); } }, 8);
+        return 'armed'; })()`);
+      await driveToRim(2.4);
+      await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
+      await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: 0, action: true }, 80)`);
+    }
     else if (play === 'standing') {   // DEFENSE-LOOK: walk in under the rim, stop, R2 + Square with no run-up
       await page.evaluate(`(() => { const d = window.__dev(); return d && d.standing ? d.standing() : false; })()`);   // the seam sets the geometry (a steered walk-in got stripped or never arrived)
       await page.waitForTimeout(350);
