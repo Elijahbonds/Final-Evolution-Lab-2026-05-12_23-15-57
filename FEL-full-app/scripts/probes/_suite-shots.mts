@@ -45,6 +45,19 @@ for (const mode of MODES) {
   const t0 = Date.now(); let st = '';
   while (Date.now() - t0 < 300000) { st = await page.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => '') as string; if (st === 'loaded' || st === 'playing') break; await page.waitForTimeout(300); }
   await page.evaluate(`(async () => { const a = window.__NEXUS_AGENT__; if (a) await a.start(30000); })()`).catch(() => null);
+  if (process.env.PERF) {   // p10 fps UNDER PLAY: 4 s of sprinting around with the ball while sampling raw frame times in-page
+    const perf = await page.evaluate(`(async () => { const a = window.__NEXUS_AGENT__; const dts = []; let last = performance.now(); let on = true;
+      // sample on the ENGINE's frame (scene.onBeforeRenderObservable), not a page rAF: the dunk / 3PT pages returned zero rAF ticks in 4 s
+      const q0 = window.__FEL_QA__; const sc = q0 && q0.scene ? q0.scene() : null;
+      const tick = () => { const n = performance.now(); dts.push(n - last); last = n; };
+      const obs = sc ? sc.onBeforeRenderObservable.add(tick) : null; if (!sc) { const raf = () => { tick(); if (on) requestAnimationFrame(raf); }; requestAnimationFrame(raf); }
+      const t0 = performance.now(); let i = 0;
+      // a mode with no player slot (3PT, dunk) rejects the verb at once, and a loop that never yields starves the frame: always wait the 300 ms
+      while (performance.now() - t0 < 4000) { const w = new Promise((r) => setTimeout(r, 300)); if (a) await a.do('sprint', { x: Math.sin(i), y: Math.cos(i), ms: 300 }).catch(() => null); await w; i += 1.1; }
+      on = false; if (obs && sc) sc.onBeforeRenderObservable.remove(obs); if (!dts.length) return { frames: 0 }; dts.sort((x, y) => x - y); const q = (k) => dts[Math.min(dts.length - 1, Math.floor(dts.length * k))];
+      return { frames: dts.length, p50ms: +q(0.5).toFixed(1), p90ms: +q(0.9).toFixed(1), p99ms: +q(0.99).toFixed(1), p10fps: +(1000 / q(0.9)).toFixed(0), worstMs: +dts[dts.length - 1].toFixed(1) }; })()`).catch((e) => String(e));
+    console.log(`[PERF] ${mode} ${JSON.stringify(perf)}`);
+  }
   const tStart = Date.now();
   for (const sec of AT) {
     const wait = tStart + sec * 1000 - Date.now(); if (wait > 0) await page.waitForTimeout(wait);
