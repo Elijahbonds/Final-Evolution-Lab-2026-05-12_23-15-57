@@ -75,7 +75,7 @@ function paintGround(scene: Scene, w: number, h: number, painter: (g: CanvasRend
   return m;
 }
 
-function makeRail(scene: Scene, all: AbstractMesh[], lines: GrindLine[], a: Vector3, b: Vector3, bonus: number): void {
+function makeRail(scene: Scene, all: AbstractMesh[], lines: GrindLine[], a: Vector3, b: Vector3, bonus: number, gapId?: string): void {
   const rail = MeshBuilder.CreateCylinder('rail', { diameter: 0.09, height: Vector3.Distance(a, b) }, scene);
   rail.position = Vector3.Center(a, b);
   const d = b.subtract(a);
@@ -83,7 +83,7 @@ function makeRail(scene: Scene, all: AbstractMesh[], lines: GrindLine[], a: Vect
   rail.rotation.y = Math.atan2(d.x, d.z);
   rail.material = mat(scene, 'railM', '#d8dce2');
   all.push(rail);
-  lines.push({ a, b, bonus });
+  lines.push({ a, b, bonus, gapId });
 }
 
 /**
@@ -380,7 +380,10 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     }
   }
   for (const r of plazaRails(B)) {
-    makeRail(scene, all, grindLines, new Vector3(...r.a), new Vector3(...r.b), r.bonus);
+    // P8: the three signature features carry a gapId, which is what makes them goal-capable — ParkGoals already
+    // has a 'gap' kind keyed by exactly this, and GrindLine already had the field. Nothing new was needed but
+    // handing it a name.
+    makeRail(scene, all, grindLines, new Vector3(...r.a), new Vector3(...r.b), r.bonus, r.gapId);
   }
 
   // ── AND THE THINGS NOBODY DESIGNED FOR SKATING ────────────────────────────────────────────────────────────

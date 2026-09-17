@@ -750,8 +750,11 @@ export const SkateRunMode: ModeDefinition = (() => {
         ctx.feel?.impact?.(0.3);
         console.info(`[SKATE-GRIND] locked +${line.bonus}${patrol ? ' (patrol rail)' : ''}`);
         if (line.bonus >= 260) spectacle(ctx, 'grind lock');
-        if (patrol) {
-          for (const g of goals.report({ type: 'gap', gapId: patrolRail.gapId })) {
+        // P8: report whatever rail was caught, not only the patrol one. Every GrindLine already carried a gapId
+        // field and only the moving rail's was ever read, so the plaza's hubba, flat bar and wallride lip were
+        // ungoalable by omission rather than by design.
+        if (line.gapId) {
+          for (const g of goals.report({ type: 'gap', gapId: line.gapId })) {
             bannerFlash(ctx, `GAP: ${g.label}`, 1200);
             SoundKit.play('crowdCheer', { volume: 0.6 });
             crowd.cheer(1);

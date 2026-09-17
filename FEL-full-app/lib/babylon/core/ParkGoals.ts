@@ -165,4 +165,9 @@ export const SKATE_GOALS: Omit<Goal, 'done'>[] = [
   { id: 'combo800', label: 'LAND A 800+ COMBO', kind: 'combo', target: 800 },
   { id: 'gap_moving', label: 'GRIND THE PATROL RAIL', kind: 'gap', target: 1, gapId: 'moving_rail' },
   { id: 'coins10', label: 'COLLECT 10 COINS', kind: 'collect', target: 10 },
+  // BOARD-10PHASE P8: the plaza's three signature features. SKATE-PLAZA built them and nothing pointed at them —
+  // a park with fourteen rails and four goals is a park where ten rails are scenery.
+  { id: 'gap_hubba', label: 'GRIND THE PYRAMID HUBBA', kind: 'gap', target: 1, gapId: 'plaza_hubba' },
+  { id: 'gap_flatbar', label: 'GRIND THE BAR OVER THE GAP', kind: 'gap', target: 1, gapId: 'plaza_gap' },
+  { id: 'gap_wallride', label: 'GRIND THE WALLRIDE LIP', kind: 'gap', target: 1, gapId: 'plaza_wallride' },
 ];

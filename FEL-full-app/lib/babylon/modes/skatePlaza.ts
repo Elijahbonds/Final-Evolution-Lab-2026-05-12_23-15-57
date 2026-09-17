@@ -38,6 +38,11 @@ export interface PlazaSolid {
 }
 
 export interface PlazaRail {
+  /**
+   * Goal id, for the three features worth a goal. ParkGoals' 'gap' kind is keyed by this and GrindLine already
+   * carried the field, so naming a rail is the whole of making it a goal.
+   */
+  gapId?: string;
   /** Endpoints as [fx, y, fz]; y is metres, fx/fz are fractions of the bound. */
   a: [number, number, number];
   b: [number, number, number];
@@ -111,14 +116,14 @@ export const SKATE_PLAZA: PlazaLayout = {
     S('planter', 0.66, -0.86, 2.2, 2.2, 0.7),
   ],
   rails: [
-    { a: [0.54 - 0.11, 1.36, 0.46 - 0.11], b: [0.54 + 0.11, 1.36, 0.46 - 0.11], bonus: 380, of: 'pyramid hubba' },
-    { a: [-0.56, 1.0, -0.1 - 0.1], b: [-0.56, 1.0, -0.1 + 0.1], bonus: 420, of: 'flat bar over the gap' },
+    { a: [0.54 - 0.11, 1.36, 0.46 - 0.11], b: [0.54 + 0.11, 1.36, 0.46 - 0.11], bonus: 380, of: 'pyramid hubba', gapId: 'plaza_hubba' },
+    { a: [-0.56, 1.0, -0.1 - 0.1], b: [-0.56, 1.0, -0.1 + 0.1], bonus: 420, of: 'flat bar over the gap', gapId: 'plaza_gap' },
     { a: [0.06, 1.7, 0.66], b: [0.06 + 0.1, 1.1, 0.66 + 0.09], bonus: 300, of: 'kinked rail, first half' },
     { a: [0.06 + 0.1, 1.1, 0.66 + 0.09], b: [0.06 + 0.2, 0.6, 0.66 + 0.16], bonus: 320, of: 'kinked rail, second half' },
     { a: [0.62, 0.86, -0.3 - 0.07], b: [0.62, 0.86, -0.3 + 0.07], bonus: 240, of: 'picnic table top' },
     { a: [-0.72, 0.6, 0.56 - 0.06], b: [-0.72, 0.6, 0.56 + 0.06], bonus: 200, of: 'bench, west' },
     { a: [0.74 - 0.06, 0.6, 0.1], b: [0.74 + 0.06, 0.6, 0.1], bonus: 200, of: 'bench, east' },
-    { a: [0.2 - 0.16, 3.3, 0.82], b: [0.2 + 0.16, 3.3, 0.82], bonus: 460, of: 'wallride lip' },
+    { a: [0.2 - 0.16, 3.3, 0.82], b: [0.2 + 0.16, 3.3, 0.82], bonus: 460, of: 'wallride lip', gapId: 'plaza_wallride' },
   ],
   markers: [
     [-0.12, 1.9, -0.44], [0.54, 1.3, 0.46], [-0.56, 0.9, -0.1],
@@ -135,14 +140,20 @@ export function plazaSolids(bound: number): (PlazaSolid & { x: number; z: number
 }
 
 /** Every rail's world endpoints. */
-export function plazaRails(bound: number): { a: [number, number, number]; b: [number, number, number]; bonus: number; of: string }[] {
+export function plazaRails(bound: number): {
+  a: [number, number, number]; b: [number, number, number]; bonus: number; of: string; gapId?: string;
+}[] {
   return SKATE_PLAZA.rails.map((r) => ({
     a: [atBound(r.a[0], bound), r.a[1], atBound(r.a[2], bound)] as [number, number, number],
     b: [atBound(r.b[0], bound), r.b[1], atBound(r.b[2], bound)] as [number, number, number],
     bonus: r.bonus,
     of: r.of,
+    gapId: r.gapId,
   }));
 }
+
+/** The features a goal can name. */
+export const plazaGoalRails = (): PlazaRail[] => SKATE_PLAZA.rails.filter((r) => r.gapId);
 
 export function plazaMarkers(bound: number): [number, number, number][] {
   return SKATE_PLAZA.markers.map(([fx, y, fz]) => [atBound(fx, bound), y, atBound(fz, bound)]);
