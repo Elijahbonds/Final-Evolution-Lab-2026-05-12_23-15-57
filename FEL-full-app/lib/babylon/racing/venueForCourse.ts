@@ -70,8 +70,38 @@ export function buildWorldGround(scene: Scene, course: Course, half = 300): Mesh
     orbit: { color: '#2c3a2a', detail: 'grass', rough: 0.95 },
   } as Record<CourseVenue, { color: string; detail: GroundKind | null; rough: number }>;
   const s = surface[course.venue as CourseVenue] ?? surface.park;
-  const ground = MeshBuilder.CreateGround('race_world_ground', { width: half * 2, height: half * 2, subdivisions: 1 }, scene);
+  // A COURSE WITH ELEVATION NEEDS GROUND THAT FOLLOWS IT. One flat plane was right while every kart course sat at
+  // y = 0; ALPINE DESCENT now drops 96 m over its run and the rooftops sit 6-18 m up, so a flat plane would leave
+  // the road hanging over exactly the pink void this function was written to remove. When the course publishes a
+  // path with real relief, the ground is subdivided and lifted to meet it, easing back to the course's low point
+  // away from the road so the horizon stays flat.
+  const path = course.path;
+  const relief = path ? Math.max(...path.map((p) => p.y)) - Math.min(...path.map((p) => p.y)) : 0;
+  const shaped = !!path && relief > 3;
+  const ground = MeshBuilder.CreateGround('race_world_ground',
+    { width: half * 2, height: half * 2, subdivisions: shaped ? 96 : 1 }, scene);
   ground.position.y = -0.03;
+
+  if (shaped && path) {
+    const lowest = Math.min(...path.map((p) => p.y));
+    const pos = ground.getVerticesData(VertexBuffer.PositionKind);
+    if (pos) {
+      for (let i = 0; i < pos.length; i += 3) {
+        const x = pos[i], z = pos[i + 2];
+        let best = Infinity, bestY = lowest;
+        for (const p of path) {
+          const d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z);
+          if (d < best) { best = d; bestY = p.y; }
+        }
+        // hold the road's height for ~40 m either side, then fall away to the low point over the next ~140 m
+        const d = Math.sqrt(best);
+        const t = Math.max(0, Math.min(1, (d - 40) / 140));
+        pos[i + 1] = bestY * (1 - t * t) + lowest * (t * t) - 1.2;
+      }
+      ground.setVerticesData(VertexBuffer.PositionKind, pos, false);
+      ground.createNormals(true);
+    }
+  }
   const mat = VenueKit.paint(scene, `race_world_ground_${course.venue}`, s.color, 0.02, s.rough) as PBRMaterial;
   mat.environmentIntensity = 0.45;
   if (s.detail) {

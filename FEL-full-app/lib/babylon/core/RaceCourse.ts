@@ -16,6 +16,8 @@
 
 import { Vector3 } from '@babylonjs/core';
 import { aeroCircuits } from '../racing/aeroCircuits';
+import { kartCircuits } from '../racing/kartCircuits';
+import { type RacingLine, tightestCorner as lineTightestCorner } from '../racing/racingLine';
 
 export interface Gate {
   /** Centre of the ring, or the middle of the checkpoint line. */
@@ -60,6 +62,13 @@ export interface Course {
   gold: number;
   /** Unready courses are authored but hidden from the picker until their pass lands. */
   ready: boolean;
+  /**
+   * The densely sampled racing line, when the course is derived from one.
+   *
+   * `gates` are lap logic and sit ~110 m apart; `path` is the shape. Anything asking "where is the road" must use
+   * this when it exists, because a polyline through the gates cuts every corner it passes.
+   */
+  path?: readonly Vector3[];
 }
 
 /** A gate before its facing is known — the path decides that. */
@@ -146,106 +155,19 @@ export const AERO_COURSES: readonly Course[] = aeroCircuits().map((c) => c.cours
  *   STADIUM OVAL      two long straights, two big ends — outright top speed, barely a drift on it
  *   ROOFTOP CIRCUIT   every corner inside the limit — you cannot hold it, so the whole lap is the drift
  */
-const BOARDWALK_GATES = withFacings([
-  g(0, 0, 0, 9),
-  g(140, 0, 160, 9),
-  g(0, 0, 320, 9),
-  g(-140, 0, 160, 9),
-], true);
-
 /**
- * The stadium oval, laid as ARCS rather than as a hexagon.
+ * THE KART MAPS ARE NOW DERIVED FROM A RACING LINE (racing/kartCircuits.ts), the same way AERO_COURSES is.
  *
- * A six-gate "oval" is a hexagon, and a hexagon's ends turn through 98 degrees in a single vertex: measured,
- * the first attempt's tightest corner was 54 m — TIGHTER than the tight technical circuit it was supposed to
- * contrast with, and well inside the 61 m the starter kart can hold. Walking the ends as a real radius fixes
- * it (a polygon on a circle of radius R has corner radius ~R), so the ends are an 82 m arc and the straights
- * are 220 m of flat out.
+ * What lived here was four hand-authored gate tables, which doubled as the road: BOARDWALK LOOP had four gates, so
+ * its road was a quadrilateral with four 212 m straight legs. Measured, the four courses were already circuit-sized
+ * (748-1046 m a lap against ~1100-1200 m for a real kart circuit) and already 52-56 s a lap at gold, so the problem
+ * was never length — it was that a lap had four corners.
+ *
+ * The grip floor that every comment in this file is built around now lives with the geometry and is TESTED there:
+ * each course declares the tightest corner it means to have, and kartCircuits.test.ts measures the built line and
+ * fails when a course is tighter than it claims. That is what keeps the drift a choice rather than a tax.
  */
-const OVAL_GATES = withFacings([
-  g(82, 0, 80, 9),            // start / finish, bottom of the right-hand straight
-  g(82, 0, 300, 9),
-  g(58, 0, 358, 9), g(0, 0, 382, 9), g(-58, 0, 358, 9),
-  g(-82, 0, 300, 9),
-  g(-82, 0, 80, 9),
-  g(-58, 0, 22, 9), g(0, 0, -2, 9), g(58, 0, 22, 9),
-], true);
-
-/**
- * The rooftop circuit: eight gates on ALTERNATING radii, which is what makes it a switchback.
- *
- * The outer points turn through 111 degrees over 93 m legs, so the corner radius there is 32 m — half what
- * the starter kart can hold. That is deliberate and the picker says so. Everywhere else in this file a course
- * tighter than grip is the bug the boardwalk loop was scaled to fix; here it is the premise, and the
- * difference between those two is entirely whether the player was told.
- */
-const ROOFTOP_GATES = withFacings([
-  g(130, 0, 0, 9), g(53, 0, 53, 9), g(0, 0, 130, 9), g(-53, 0, 53, 9),
-  g(-130, 0, 0, 9), g(-53, 0, -53, 9), g(0, 0, -130, 9), g(53, 0, -53, 9),
-], true);
-
-/**
- * The kart maps.
- *
- * Every one of them is sized against the SAME measured number, because on a kart the size of a corner is the
- * whole game: grip is m/s^2, so the tightest corner a kart can hold without sliding is v^2/a - about 61 m for
- * the starter kart at its 26 m/s top speed. A course whose corners are all tighter than that breaks traction
- * on its OWN, which is what the first boardwalk loop did (a run with drifting DISABLED still logged 516 drift
- * frames), and a drift you cannot avoid is not a choice.
- *
- * So the four courses below deliberately ask different questions of that number, which is also what makes the
- * garage's trade-offs real:
- *
- *   BOARDWALK LOOP    corners near the limit - the balanced course, and the one everything is tuned against
- *   ALPINE DESCENT    point to point, long sweepers - pace, with no second lap to repair a mistake
- *   STADIUM OVAL      two long straights, two big ends - outright top speed, barely a drift on it
- *   ROOFTOP CIRCUIT   every corner inside the limit - you cannot hold it, so the whole lap is the drift
- */
-export const KART_COURSES: readonly Course[] = [
-  {
-    id: 'boardwalk-loop', name: 'BOARDWALK LOOP', sub: 'One long straight. Bank boost in the hairpin.',
-    kind: 'kart', venue: 'park', mood: 'goldenHour', tint: '#ffb36b', ready: true,
-    loop: true, laps: 2, gold: 110,
-    // SCALED UP from a 60-70 m loop, and the reason is measured rather than aesthetic: the kart's grip is
-    // 11 m/s^2, so at its 26 m/s top speed the tightest corner it can hold is about v^2/a = 61 m. On the
-    // original loop every corner was tighter than that, which meant traction broke on its OWN every time -
-    // the handbrake added nothing and a run with drifting DISABLED still logged 516 drift frames and banked a
-    // full boost meter. A drift you cannot avoid is not a choice, and the choice is the entire mechanic. At
-    // this size a corner can be held on grip, so sliding it is a decision with a cost and a payoff.
-    start: startBefore(BOARDWALK_GATES),
-    gates: BOARDWALK_GATES,
-  },
-  {
-    id: 'alpine-descent', name: 'ALPINE DESCENT', sub: 'One run down the mountain. No lap to fix it on.',
-    kind: 'kart', venue: 'slope', mood: 'alpine', tint: '#cfe8ff', ready: true,
-    loop: false, laps: 1, gold: 54,
-    // POINT TO POINT, and that is the whole character: there is no second lap, so a corner thrown away is
-    // thrown away for good. Long sweepers at or above the holdable radius, so it rewards carrying speed
-    // rather than banking boost - the course where SLIPSTREAM's missing grip costs least.
-    start: { at: new Vector3(-30, 0, -430), heading: 0 },
-    gates: withFacings([
-      g(0, 0, -260, 9),
-      g(125, 0, -75, 9),
-      g(60, 0, 125, 9),
-      g(-120, 0, 295, 9),
-      g(-40, 0, 470, 9),
-    ], false),
-  },
-  {
-    id: 'stadium-oval', name: 'STADIUM OVAL', sub: 'Two straights under the lights. Top speed wins here.',
-    kind: 'kart', venue: 'pitch', mood: 'nightGame', tint: '#9fb7ff', ready: true,
-    loop: true, laps: 2, gold: 112,
-    start: startBefore(OVAL_GATES),
-    gates: OVAL_GATES,
-  },
-  {
-    id: 'rooftop-circuit', name: 'ROOFTOP CIRCUIT', sub: 'Every corner is tighter than grip. Slide the whole lap.',
-    kind: 'kart', venue: 'street', mood: 'overcast', tint: '#b8c4d4', ready: true,
-    loop: true, laps: 2, gold: 104,
-    start: startBefore(ROOFTOP_GATES),
-    gates: ROOFTOP_GATES,
-  },
-];
+export const KART_COURSES: readonly Course[] = kartCircuits().map((c) => c.course);
 
 export function courseById(id: string): Course | null {
   return [...AERO_COURSES, ...KART_COURSES].find((c) => c.id === id) ?? null;
@@ -292,7 +214,25 @@ export function writeCourse(kind: 'aero' | 'kart', id: string): void {
 }
 
 /** Total length of the racing line, metres — one lap. */
+/** A Course's published path as a RacingLine, so length and corners have ONE definition project-wide. */
+function lineFromPath(course: Course): RacingLine | null {
+  const pts = course.path;
+  if (!pts || pts.length < 2) return null;
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
+  }
+  const closing = course.loop
+    ? Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].z - pts[pts.length - 1].z) : 0;
+  return { pts: [...pts], cum, length: cum[cum.length - 1] + closing, loop: course.loop };
+}
+
 export function courseLength(course: Course): number {
+  // A DERIVED COURSE IS AS LONG AS ITS CURVE. Summing the gate legs measures a polygon inscribed in the course
+  // and reads short by however much the corners cut — on BOARDWALK LOOP that is most of a hairpin.
+  const line = lineFromPath(course);
+  if (line) return line.length;
+
   const gs = course.gates;
   let total = Vector3.Distance(course.start.at, gs[0].at);
   for (let i = 0; i < gs.length; i++) {
@@ -311,6 +251,12 @@ export function courseLength(course: Course): number {
  * whether drifting on it is a decision or a fact of life.
  */
 export function tightestCorner(course: Course): number {
+  // MEASURE THE ROAD, NOT THE CHECKPOINTS. Derived gates sit ~110 m apart, so the turn between three of them is a
+  // property of the lap logic rather than of any corner a driver meets: measured that way ROOFTOP CIRCUIT reads
+  // 66 m when its actual tightest corner is 25 m, which would hide the very thing its subtitle promises.
+  const line = lineFromPath(course);
+  if (line) return lineTightestCorner(line).radius;
+
   const gs = course.gates;
   let tightest = Infinity;
   const n = gs.length;
@@ -426,6 +372,19 @@ export function distToSegment(p: { x: number; z: number }, a: Vector3, b: Vector
 
 /** How far off the centre line a point is. */
 export function distToTrack(p: { x: number; z: number }, course: Course): number {
+  // A DERIVED COURSE MEASURES AGAINST ITS LINE. The gates are ~110 m apart, so the polyline through them cuts the
+  // inside of every corner — on a derived course that would put the apex of the pier hairpin off the road and hand
+  // the player a penalty for taking the racing line.
+  const path = course.path;
+  if (path && path.length > 1) {
+    let best = Infinity;
+    const last = course.loop ? path.length : path.length - 1;
+    for (let i = 0; i < last; i++) {
+      best = Math.min(best, distToSegment(p, path[i], path[(i + 1) % path.length]));
+    }
+    return Math.min(best, distToSegment(p, course.start.at, path[0]));
+  }
+
   const n = course.gates.length;
   let best = Infinity;
   for (let i = 0; i < n; i++) {

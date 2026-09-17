@@ -281,6 +281,10 @@ export function buildKartCircuit(spec: KartSpec): KartCircuit {
     id: spec.id, name: spec.name, sub: spec.sub, kind: 'kart',
     venue: spec.venue, mood: spec.mood, tint: spec.tint, ready: true,
     gates, loop: spec.loop, laps: spec.laps,
+    // THE DENSE LINE, published on the course so that everything downstream measures against the curve the
+    // player drives rather than against the checkpoint polyline. The gates are ~110 m apart: a polyline
+    // through them cuts every corner, so onTrack() would have called the apex of a corner off-road.
+    path: line.pts,
     start: {
       at: spec.loop ? start.pos.add(start.tangent.scale(-14)) : start.pos,
       heading: Math.atan2(start.tangent.x, start.tangent.z),

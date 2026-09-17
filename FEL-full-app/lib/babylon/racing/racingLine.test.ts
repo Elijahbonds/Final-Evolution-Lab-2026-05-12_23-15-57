@@ -63,6 +63,17 @@ describe('racingLine', () => {
     expect(pointAlong(open, -50).pos.z).toBeCloseTo(0, 0);
   });
 
+  it('keeps a usable heading at the very end of a point-to-point line', () => {
+    // the finish checkpoint's facing comes from here; a degenerate tangent made it face a fixed axis
+    const line = sampleLine([[0, 0, 0], [0, 100, 0], [0, 200, 0], [0, 300, 0]], { loop: false });
+    const end = pointAlong(line, line.length);
+    expect(end.tangent.z).toBeCloseTo(1, 2);
+    expect(end.tangent.length()).toBeCloseTo(1, 5);
+
+    const west = sampleLine([[0, 0, 0], [-100, 0, 0], [-200, 0, 0], [-300, 0, 0]], { loop: false });
+    expect(pointAlong(west, west.length).tangent.x).toBeCloseTo(-1, 2);
+  });
+
   it('refuses a line too short to spline', () => {
     expect(() => sampleLine([[0, 0, 0], [0, 10, 0], [0, 20, 0]], { loop: true })).toThrow(/at least 4/);
   });

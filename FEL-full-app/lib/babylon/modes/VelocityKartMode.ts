@@ -17,13 +17,13 @@ import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the sha
 import { BoostFx } from '../premium/BoostFx';
 import { BoostPads } from '../visual/BoostPads';
 import { Onlookers } from '../visual/Onlookers';
-import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, Texture, TransformNode, Vector3, Vector4 } from '@babylonjs/core';
+import { Color3, DynamicTexture, Mesh,
+  MeshBuilder, PBRMaterial, Texture, TransformNode, Vector3, Vector4 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { buildPoseClip, REF_HIPS_Y } from '../anim/poseClip';
 import { seatedKeys, driverLean, WHEEL_RADIUS, STEER_LOCK_RAD } from '../anim/authored/seated';
 import type { AnimationGroup } from '@babylonjs/core';
-import type { Mesh } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -38,6 +38,7 @@ import {
   type Course, type RaceProgress,
 } from '../core/RaceCourse';
 import { buildCourseVenue, buildWorldGround } from '../racing/venueForCourse';
+import { kartCircuitById, type KartCircuit } from '../racing/kartCircuits';
 import { buildTrackside, type TracksideHandle } from '../racing/trackside';   // the world that follows the racing line
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import { taperedPlank, taperedSection, roadWheel } from '../racing/shapes';
@@ -63,6 +64,8 @@ let kart: TransformNode | null = null;
 let marks: Mesh[] = [];
 let road: Mesh[] = [];
 let course: Course = KART_COURSES[0];
+/** The circuit the course was derived from: its road width, ramps, obstacles and kerbs. */
+let circuit: KartCircuit | null = kartCircuitById(KART_COURSES[0].id);
 let state: KartState | null = null;
 let driver: SpawnedCharacter | null = null;
 let seated: AnimationGroup | null = null;
@@ -329,9 +332,28 @@ function paintTarmac(scene: ModeContext['scene']): DynamicTexture {
   return tex;
 }
 
-/** The road: a slab per segment of the centre line, so what you SEE is what onTrack() tests. */
+/**
+ * The road: slabs along the RACING LINE, so what you SEE is still exactly what onTrack() tests.
+ *
+ * It used to be a slab per gate-to-gate leg, which was the same thing when the gates WERE the shape. On a derived
+ * course they are lap logic ~110 m apart, and a polyline through them cuts the inside of every corner — the road
+ * would have been painted across the apex of the pier hairpin while onTrack() measured the curve, so the tested
+ * edge and the painted edge would have disagreed by metres. That disagreement is the one thing this function's
+ * previous comment promised would never happen, so the road now walks `course.path`.
+ *
+ * SEGMENT LENGTH is a draw-call trade, and it is settled by merging: ~14 m chords give a corner enough facets to
+ * read as a curve, which is ~75 slabs a lap against the old ~10, and MergeMeshes folds them into a single mesh
+ * afterwards so the geometry is exact and the scene still sees one road.
+ */
+const ROAD_SEG_M = 14;
+
+function roadPath(): Vector3[] {
+  const path = course.path;
+  if (path && path.length > 1) return [...path];
+  return [course.start.at, ...course.gates.map((g) => g.at)];
+}
+
 function buildRoad(ctx: ModeContext): Mesh[] {
-  const out: Mesh[] = [];
   roadTex = paintTarmac(ctx.scene);
   const tarmac = new PBRMaterial('kart_tarmac', ctx.scene);
   tarmac.albedoTexture = roadTex;
@@ -342,34 +364,61 @@ function buildRoad(ctx: ModeContext): Mesh[] {
   // is exactly what was washing the tarmac out
   tarmac.environmentIntensity = 0.35;
   tarmac.specularIntensity = 0.22;
-  const pts = [course.start.at, ...course.gates.map((g) => g.at)];
-  for (let i = 0; i < pts.length; i++) {
-    const a = pts[i], b = pts[(i + 1) % pts.length];
-    if (!course.loop && i === pts.length - 1) break;
-    const dx = b.x - a.x, dz = b.z - a.z;
-    const len = Math.hypot(dx, dz);
-    if (len < 0.5) continue;
-    // ONE material, but the tiling is baked into each slab's UVs at creation — so a 220 m straight and a 60 m
-    // arc carry the same SIZE of dash rather than the same NUMBER of them. Scaling the shared texture instead
-    // would make every slab agree, which is the wrong thing to agree about.
-    const tiles = Math.max(1, Math.round(len / (TRACK_HALF_WIDTH * 2)));
+
+  const half = circuit?.halfWidth ?? TRACK_HALF_WIDTH;
+  const path = roadPath();
+  const n = path.length;
+
+  // walk the line, emitting a slab every ~ROAD_SEG_M of it
+  const slabs: Mesh[] = [];
+  const last = course.loop ? n : n - 1;
+  let i = 0;
+  while (i < last) {
+    const a = path[i % n];
+    let j = i + 1, run = 0;
+    while (j <= last && run < ROAD_SEG_M) {
+      const p0 = path[(j - 1) % n], p1 = path[j % n];
+      run += Math.hypot(p1.x - p0.x, p1.z - p0.z);
+      if (run >= ROAD_SEG_M) break;
+      j++;
+    }
+    const b = path[Math.min(j, last) % n];
+    const dx = b.x - a.x, dz = b.z - a.z, dy = b.y - a.y;
+    const flat = Math.hypot(dx, dz);
+    if (flat < 0.4) { i = j; continue; }
+    const len = Math.hypot(flat, dy);
+
+    // the tiling is baked into each slab's UVs at creation, so a long chord and a short one carry the same SIZE
+    // of dash rather than the same NUMBER of them. Scaling the shared texture would make every slab agree, which
+    // is the wrong thing to agree about.
+    const tiles = Math.max(1, Math.round(len / (half * 2)));
     const faceUV = Array.from({ length: 6 }, () => new Vector4(0, 0, 1, tiles));
     const slab = MeshBuilder.CreateBox(`kart_road_${i}`, {
-      width: TRACK_HALF_WIDTH * 2, height: 0.08, depth: len, faceUV, wrap: true,
+      width: half * 2, height: 0.08, depth: len, faceUV, wrap: true,
     }, ctx.scene);
-    slab.position.set((a.x + b.x) / 2, 0.04, (a.z + b.z) / 2);
-    slab.rotation.y = Math.atan2(dx, dz);
+    slab.position.set((a.x + b.x) / 2, (a.y + b.y) / 2 + 0.04, (a.z + b.z) / 2);
+    // yaw along the chord, then pitch onto the slope — Babylon applies rotation as YXZ, which is the order a road
+    // needs. Without the pitch, ALPINE DESCENT's 96 m drop would be a staircase of level slabs.
+    slab.rotation.set(-Math.atan2(dy, flat), Math.atan2(dx, dz), 0);
     slab.material = tarmac;
-    out.push(slab);
+    slabs.push(slab);
+    i = j;
   }
-  return out;
+
+  const merged = slabs.length > 1 ? Mesh.MergeMeshes(slabs, true, true, undefined, false, true) : slabs[0] ?? null;
+  if (!merged) return [];
+  merged.name = 'kart_road';
+  merged.material = tarmac;
+  merged.receiveShadows = true;
+  merged.isPickable = false;
+  return [merged];
 }
 
 /** A bright slab across the road at each checkpoint, dim once taken. */
 function buildMarks(ctx: ModeContext): Mesh[] {
   return course.gates.map((gate, i) => {
-    const m = MeshBuilder.CreateBox(`kart_mark_${i}`, { width: TRACK_HALF_WIDTH * 2, height: 0.12, depth: 0.7 }, ctx.scene);
-    m.position.set(gate.at.x, 0.1, gate.at.z);
+    const m = MeshBuilder.CreateBox(`kart_mark_${i}`, { width: (circuit?.halfWidth ?? TRACK_HALF_WIDTH) * 2, height: 0.12, depth: 0.7 }, ctx.scene);
+    m.position.set(gate.at.x, gate.at.y + 0.1, gate.at.z);
     m.rotation.y = Math.atan2(gate.through.x, gate.through.z);
     m.material = VenueKit.paint(ctx.scene, `kart_markMat_${i}`, '#2a2f38', 0.05, 0.8);
     return m;
@@ -440,6 +489,7 @@ return {
     // THE MAP AND THE KART ARE BOTH PICKS (2026-09-13). Read once, here, at mount — the world is built from
     // the course and the handling comes from the vehicle, and neither can be swapped under a running scene.
     course = readCourse('kart');
+    circuit = kartCircuitById(course.id);
     kartSpec = readKart().spec;
     race = startRace();
 

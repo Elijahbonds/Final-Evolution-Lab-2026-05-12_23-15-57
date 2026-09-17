@@ -111,7 +111,14 @@ export function pointAlong(line: RacingLine, dist: number): LinePoint {
   const seg = segEnd - cum[lo];
   const t = seg > 1e-6 ? (d - cum[lo]) / seg : 0;
 
-  const tangent = new Vector3(b.x - a.x, 0, b.z - a.z);
+  // AT THE END OF A POINT-TO-POINT LINE there is no next sample, so a == b and the direction is undefined. Fall
+  // back to the last real segment rather than to a fixed axis: the finish checkpoint's facing is derived from this,
+  // and a default of (0,0,1) made ALPINE DESCENT's finish gate face north no matter which way the course ran.
+  let tangent = new Vector3(b.x - a.x, 0, b.z - a.z);
+  if (tangent.length() <= 1e-6 && lo > 0) {
+    const prev = pts[lo - 1];
+    tangent = new Vector3(a.x - prev.x, 0, a.z - prev.z);
+  }
   const tan = tangent.length() > 1e-6 ? tangent.normalize() : new Vector3(0, 0, 1);
   return {
     pos: new Vector3(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t),

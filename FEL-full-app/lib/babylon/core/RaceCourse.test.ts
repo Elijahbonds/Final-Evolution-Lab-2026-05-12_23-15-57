@@ -186,14 +186,40 @@ describe('gate facings follow the racing line', () => {
   // AGAINST the flow: an aircraft arriving the natural way could not legally pass it, and an autopilot sat on
   // that gate for 110 seconds. Facings are derived now, and this is the assertion that keeps them honest.
   // (the aero circuits' checkpoints face the racing line's own tangent — aeroCircuits.test.ts holds them to that)
-  it('each gate faces roughly from the previous gate toward the next', () => {
-    for (const c of KART_COURSES) {
+  it('each hand-authored gate faces roughly from the previous gate toward the next', () => {
+    // Only for courses whose gates ARE the shape. On a course derived from a racing line the gates sit ~110 m
+    // apart, so the chord from the previous gate to the next is a poor description of "the way the course runs"
+    // through a corner — the tangent is the exact one, and that is asserted below instead.
+    for (const c of KART_COURSES.filter((x) => !x.path)) {
       if (!c.loop) continue;
       const n = c.gates.length;
       for (let i = 0; i < n; i++) {
         const prev = c.gates[(i - 1 + n) % n].at, next = c.gates[(i + 1) % n].at;
         const flow = new Vector3(next.x - prev.x, 0, next.z - prev.z).normalize();
         expect(Vector3.Dot(c.gates[i].through, flow)).toBeGreaterThan(0.9);
+      }
+    }
+  });
+
+  it('each derived gate faces the racing line it was taken from', () => {
+    // Stricter than the chord assertion above, not looser: a derived gate's facing IS the line's tangent, so the
+    // dot product should be essentially 1. This is the same guarantee aeroCircuits.test.ts holds the air to.
+    for (const c of KART_COURSES.filter((x) => x.path)) {
+      const path = c.path!;
+      for (const gate of c.gates) {
+        // nearest sample on the dense line, then the direction the line runs there
+        let bi = 0, best = Infinity;
+        for (let i = 0; i < path.length; i++) {
+          const d = (path[i].x - gate.at.x) ** 2 + (path[i].z - gate.at.z) ** 2;
+          if (d < best) { best = d; bi = i; }
+        }
+        // on a point-to-point course there is nothing after the last sample, so step BACK for the direction
+        // instead of wrapping round to the start, which reads the whole course in reverse
+        const atEnd = bi >= path.length - 1;
+        const a = atEnd && !c.loop ? path[bi - 1] : path[bi];
+        const b = atEnd && !c.loop ? path[bi] : path[(bi + 1) % path.length];
+        const tangent = new Vector3(b.x - a.x, 0, b.z - a.z).normalize();
+        expect(Vector3.Dot(gate.through, tangent), `${c.id}`).toBeGreaterThan(0.97);
       }
     }
   });
