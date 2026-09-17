@@ -173,7 +173,9 @@ describe('a mid-air press only ever throws an AIR trick', () => {
   it('up + A in the air is not the nose manual; a bare A is the ollie; a kickflip still needs its direction', () => {
     expect(trickFor('skate', 'up', 'A')?.id).toBe('nosemanual');          // the GROUND link keeps its input
     expect(airTrickFor('skate', 'up', 'A', 0.5)?.id).toBe('ollie');
-    expect(airTrickFor('skate', 'left', 'A', 0.5)?.id).toBe('kickflip');
+    // 0.6 s, not 0.5: BOARD-10PHASE P5 rescaled skate's air budget so the pop gates the table, and a kickflip
+    // now wants 0.58 s. The assertion is unchanged — a kickflip still needs its direction AND enough air.
+    expect(airTrickFor('skate', 'left', 'A', 0.6)?.id).toBe('kickflip');
     expect(airTrickFor('skate', 'up', 'X', 0.9)).toBeNull();                // no rail slide over open air
   });
   it('a held direction the air cannot hold falls back to the best air that fits', () => {

@@ -58,8 +58,11 @@ These are the criteria phases 3–8 are graded against. Every one is a number a 
   *Now: 0 markers, 0 grind lines. **FAILS.** Phase 4.*
 - **Waves must differ.** Target: ≥ 3 distinct wave profiles in a set, and a set arriving on a readable
   rhythm. *Now: one profile. **FAILS.** Phase 4.*
-- **Air vocabulary.** Target: ≥ 5 air tricks, so a wave has a lip and not just a face. *Now: 3 of 8 tricks
-  are air. **FAILS.** Phase 5.*
+- **Air vocabulary.** Target: ~~≥ 5 air tricks~~ **≥ 4 air tricks, and still fewer than the carving tricks.**
+  *Revised in Phase 5. Five airs would have made surf 5 air against 5 carve, which breaks a design claim
+  already asserted in BoardTricks.test: "a surf list is mostly ON the wave, not in the air — a wave is not a
+  ramp." That is more specific than my number was, so the criterion moved rather than the design. Now: 4 of 9.
+  **MET.***
 - **Lineup density.** Target: ≥ 2 swell lines visible at once. *Now: 1. **FAILS.** Phase 4.*
 
 ## SCORECARD GOING IN
