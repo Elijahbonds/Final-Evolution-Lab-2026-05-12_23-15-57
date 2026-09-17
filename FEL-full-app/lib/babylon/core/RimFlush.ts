@@ -23,6 +23,8 @@ const G = -9.81;
 const SQUASH_M = 0.01;                    // the ball may squash this far into the iron on the way over (a centimetre is a touch, not a pass through)
 
 export interface FlushState {
+  /** NET EXIT (2026-09-17): the slam's push down the net's axis and the net's cap on the fall, per flush (the defaults are the constants). */
+  throwV?: number; maxFall?: number;
   phase: 'lip' | 'net' | 'free';
   t: number;
   pos: V3; vel: V3;
@@ -81,7 +83,7 @@ export function clearOfIron(p: V3, rim: V3, ringR: number, ballR: number): V3 {
   return { x: rim.x + ux * r, y: rim.y + ky * c, z: rim.z + uz * r };
 }
 
-export function startFlush(release: V3, rim: V3, ringR: number, ballR: number): FlushState {
+export function startFlush(release: V3, rim: V3, ringR: number, ballR: number, throwV = FLUSH_THROW_V, maxFall = NET_MAX_FALL): FlushState {   // NET EXIT (2026-09-17): a bigger slam throws it harder
   const dx = release.x - rim.x, dz = release.z - rim.z, r0 = Math.hypot(dx, dz);
   const ux = r0 > 1e-4 ? dx / r0 : 0, uz = r0 > 1e-4 ? dz / r0 : 1;   // no offset: the court side (+z)
   const rIn = Math.min(r0, Math.max(0, ringR - ringClearance(ballR) - 0.012));   // inside the ring with daylight
@@ -106,7 +108,7 @@ export function startFlush(release: V3, rim: V3, ringR: number, ballR: number): 
   }
   const peak = Math.max(...lift);
   const lipSec = FLUSH_LIP_SEC * Math.min(1, Math.max(0.4, (r0 - rIn) / 0.2)) + peak * 1.0;
-  return { phase: 'lip', t: 0, pos: { ...from }, vel: { x: 0, y: 0, z: 0 }, ux, uz, lipSec, lift, ...base };
+  return { phase: 'lip', t: 0, pos: { ...from }, vel: { x: 0, y: 0, z: 0 }, ux, uz, lipSec, lift, throwV, maxFall: Math.max(maxFall, throwV), ...base };
 }
 
 /** Advance the flush by `dt` seconds (in place; returns the state). `free` = the caller's ball sim owns the ball now. */
@@ -119,13 +121,13 @@ export function stepFlush(s: FlushState, rim: V3, ringR: number, ballR: number, 
     s.pos = { x: rim.x + s.ux * p.r, y: p.y, z: rim.z + s.uz * p.r };
     // off the lip once the ball is inside the ring with the lift spent (the last of the clock would be a held frame)
     const li = Math.min(HUMP_N, Math.round(tau * HUMP_N));
-    if (tau >= 1 || (tau >= 0.7 && s.lift[li] < 0.004 && p.r <= s.rIn + 0.003)) { s.phase = 'net'; s.vel = { x: 0, y: -FLUSH_THROW_V, z: 0 }; }
+    if (tau >= 1 || (tau >= 0.7 && s.lift[li] < 0.004 && p.r <= s.rIn + 0.003)) { s.phase = 'net'; s.vel = { x: 0, y: -(s.throwV ?? FLUSH_THROW_V), z: 0 }; }
     else s.vel = { x: (s.pos.x - prev.x) / dt, y: (s.pos.y - prev.y) / dt, z: (s.pos.z - prev.z) / dt };
     return s;
   }
   // net: gravity from the throw, the fall capped by the net under the plane, the ball centred on the axis as it goes down
   s.vel.y += G * dt;
-  if (s.pos.y < rim.y) s.vel.y = Math.max(s.vel.y, -NET_MAX_FALL);
+  if (s.pos.y < rim.y) s.vel.y = Math.max(s.vel.y, -(s.maxFall ?? NET_MAX_FALL));
   const centre = 1 - Math.exp(-dt / 0.08);
   s.pos = { x: s.pos.x + (rim.x - s.pos.x) * centre, y: s.pos.y + s.vel.y * dt, z: s.pos.z + (rim.z - s.pos.z) * centre };
   s.vel.x = (s.pos.x - prev.x) / dt; s.vel.z = (s.pos.z - prev.z) / dt;

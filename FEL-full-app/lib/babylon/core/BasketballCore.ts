@@ -774,6 +774,8 @@ export class ShotArc {
   private apex = 1.6;
   active = false;
   private made = false;
+  /** NET EXIT (2026-09-17): the style this arc was started with — the make's exit speed reads it. */
+  shotStyle: ShotStyle = 'jumper';
 
   /** HOOPS-MOVE-KIT-B M12: the glass point the ball is routed through on an intentional BANK — set with `bank`, cleared
    *  on any other shot. A banked ball is a quadratic Bezier from → glass → rim: it goes UP AND OUT to the square, kisses
@@ -781,7 +783,7 @@ export class ShotArc {
   private glass: Vector3 | null = null;
   start(from: Vector3, rim: Vector3, made: boolean, style: ShotStyle, apexAdd = 0, bank: Vector3 | null = null): void {
     this.from.copyFrom(from);
-    this.made = made;
+    this.made = made; this.shotStyle = style;
     this.glass = bank ? bank.clone() : null;
     this.to.copyFrom(rim);
     if (!made) {                       // clang point on the front of the iron

@@ -55,6 +55,7 @@ import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
 import { dressBall as dressMeshyBall } from '../visual/meshyProps';   // suite pass: the Meshy leather every other hoops mode plays with
 import { cloneForTint } from '../core/playerIdentity';
+import { netExitVelocity, netExitMph } from '../core/NetExit';   // NET EXIT (2026-09-17): the swish leaves with pace and bounces off the floor before the next ball
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { ShotArc } from '../core/BasketballCore';
@@ -162,6 +163,7 @@ let arc: ShotArc | null = null;
 let ballSim: BallSim | null = null;
 /** Seconds left of the ball living off the iron after a miss; -1 = not rimming out. */
 let rimOut = -1;
+const NET_EXIT_SEC = 0.55;   // NET EXIT: the made ball is live (falling, bouncing) this long before the next ball is in the hand
 /** Signed timing error of the shot in flight: negative = EARLY (short), positive = LATE (long). */
 let shotErr = 0;
 let ballMat: StandardMaterial | null = null;   // the plain sphere until the Meshy skin lands (and if it never does)
@@ -821,7 +823,7 @@ export const ThreePointMode: ModeDefinition = {
         if (rimOut < 0) { rimOut = -1; advanceBall(ctx); }
       } else {
         const r = arc.step(dt, ball.position);
-        if (r === 'made') { contactMake(ctx); advanceBall(ctx); }   // A+ P0: the hoop answers the make as the ball drops through
+        if (r === 'made') { contactMake(ctx); const v = netExitVelocity('jumper'); ballSim?.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); rimOut = NET_EXIT_SEC; console.info(`[3PT-NET] jumper exit ${netExitMph('jumper')} mph`); }   // A+ P0: the hoop answers the make; NET EXIT: the ball drops through with pace and bounces before the next ball
         else if (r === 'missed') {
           missClank(ctx);                             // A+ P0: the miss has weight — a clank off the iron, never HoopJuice
           // A shootout is nothing but shooting feedback, and the ball used to vanish to the next rack the

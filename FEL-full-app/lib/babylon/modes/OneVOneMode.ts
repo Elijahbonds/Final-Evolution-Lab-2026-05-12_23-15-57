@@ -165,6 +165,7 @@ import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-LOOK (2026-09-17)
+import { netExitVelocity, netExitKindOf, netExitMph, type NetExitKind } from '../core/NetExit';   // NET EXIT (2026-09-17)
 import { showtimeAsked, pickShowtime, judgeShowtime, showtimeMeterT, posterRide, SHOWTIME_FLIGHT_MS, SHOWTIME_HANG_FROM, SHOWTIME_HANG_TO, SHOWTIME_HANG_SCALE, SHOWTIME_DEADLINE_K, SHOWTIME_PCT, POSTER_RIDE_SHARE } from '../core/ShowtimeDunk';   // SHOWTIME (2026-09-17)
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk; Meshy never scaled)
@@ -354,7 +355,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let meLandSec = 0, meCelebrateSec = 0, meSpeed01 = 0, foeSpeed01 = 0;
   let scuff: ScuffState = { ...SCUFF_IDLE };
   let dunkFlight: { k: number; made: boolean | null } | null = null;                 // the drive dunk's flight clock (the posture windows ride it)
-  let dunkFlush: { releasePos: Vector3; since: number } | null = null;               // the make's ball through the iron (G6)
+  let dunkFlush: { releasePos: Vector3; since: number; kind: NetExitKind } | null = null;               // the make's ball through the iron (G6)
   // ── HOOPS-MOVE-KIT-A ──
   let gather: { plan: GatherPlan; t: number } | null = null;                         // M1: the jumper's gather before the rise (the body still moves)
   // HOOPS-MOVE-KIT-B: the post kit's live state — the seal I hold (M4–M6's path) and the pivot in flight (M6)
@@ -722,6 +723,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           SoundKit.play('score', { pitch: 1 });
           SoundKit.play('swish', { volume: 0.7 });   // through the net, which is not an impact at all
           EffectsKit.burst(ctx.scene, RIM, 'net');
+          { const nk = netExitKindOf(arc.shotStyle); const v = netExitVelocity(nk); launchLoose(ball.position.clone(), new Vector3(v.x, v.y, v.z)); console.info(`[1V1-NET] ${nk} exit ${netExitMph(nk)} mph`); }   // NET EXIT: the swish leaves with the shot's own pace, a layup drops
           if (possession === 'mine') {
             myScore += arcPoints;
             swing('big_make');
@@ -861,7 +863,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       // BIOMECH-HOOPS-WAVE1 G6: the drive dunk's make flushes THROUGH the iron from the release, then drops out of the net
       if (dunkFlush) {
         dunkFlush.since += dt;
-        if (flushThroughRim(ball, RIM, dunkFlush.releasePos, dunkFlush.since)) { launchLoose(ball.position.clone(), new Vector3(0, -0.5, 0.6)); dunkFlush = null; }
+        if (flushThroughRim(ball, RIM, dunkFlush.releasePos, dunkFlush.since)) { const v = netExitVelocity(dunkFlush.kind); launchLoose(ball.position.clone(), new Vector3(v.x, v.y, v.z)); console.info(`[1V1-NET] ${dunkFlush.kind} exit ${netExitMph(dunkFlush.kind)} mph`); dunkFlush = null; }
       }
 
       // ══ MY POSSESSION ══
@@ -1816,7 +1818,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         // clanks off the front (it used to let go on the feet-down frame, from a hand at hip height, and float there)
         resolved = true;
         const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
-        if (made) dunkFlush = { releasePos, since: 0 };
+        if (made) dunkFlush = { releasePos, since: 0, kind: kind === 'poster' ? 'poster' : showtime ? 'showtime' : 'dunk' };
         else { missClank(ctx); launchLoose(releasePos, clankOffRim(ball, RIM)); }
       }
       if (k < 1) return;
@@ -2715,7 +2717,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
         resolved = true;
         const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
-        if (made) dunkFlush = { releasePos, since: 0 };
+        if (made) dunkFlush = { releasePos, since: 0, kind: inLane ? 'poster' : 'dunk' };
         else { missClank(ctx); launchLoose(releasePos, clankOffRim(ball, RIM)); }
       }
       if (k < 1) return;

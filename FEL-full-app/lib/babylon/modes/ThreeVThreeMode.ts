@@ -121,6 +121,7 @@ import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-LOOK (2026-09-17)
+import { netExitVelocity, netExitKindOf, netExitMph, type NetExitKind } from '../core/NetExit';   // NET EXIT (2026-09-17)
 import { showtimeAsked, pickShowtime, judgeShowtime, showtimeMeterT, posterRide, SHOWTIME_FLIGHT_MS, SHOWTIME_HANG_FROM, SHOWTIME_HANG_TO, SHOWTIME_HANG_SCALE, SHOWTIME_DEADLINE_K, SHOWTIME_PCT, POSTER_RIDE_SHARE } from '../core/ShowtimeDunk';   // SHOWTIME (2026-09-17)
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
@@ -266,7 +267,7 @@ const CHARGE_SET_SEC = 0.18;
  */
 const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let dunkFlight: { k: number; made: boolean | null } | null = null;
-  let dunkFlush: { releasePos: Vector3; since: number } | null = null;
+  let dunkFlush: { releasePos: Vector3; since: number; kind: NetExitKind } | null = null;
   // ── HOOPS-MOVE-KIT-A ──
   let gather: { plan: GatherPlan; t: number } | null = null;                         // M1: the jumper's gather before the rise
   let finish: { plan: FinishPlan; t: number; released: boolean } | null = null;      // M3: a layup / floater in flight
@@ -710,9 +711,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           deflectMiss(mateMiss?.from ?? ball.position, mateMiss?.quality01 ?? 0.45, mateMiss?.short ?? 0.4, mateMiss?.lateral ?? 0);
           board = { age: 0, contestedCalled: false, shooter: mateMiss?.team ?? 'foe' };
           mateMiss = null;
-        } else if (r === 'made') ballSim.launch(ball.position.clone(), new Vector3(0, -0.5, 0.6));
+        } else if (r === 'made') { const nk = netExitKindOf(mateArc.shotStyle); const v = netExitVelocity(nk); ballSim.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); console.info(`[3V3-NET] ${nk} exit ${netExitMph(nk)} mph`); }   // NET EXIT
       }
-      else if (dunkFlush) { dunkFlush.since += dt; if (flushThroughRim(ball, RIM, dunkFlush.releasePos, dunkFlush.since)) { ballSim.launch(ball.position.clone(), new Vector3(0, -0.5, 0.6)); dunkFlush = null; } }
+      else if (dunkFlush) { dunkFlush.since += dt; if (flushThroughRim(ball, RIM, dunkFlush.releasePos, dunkFlush.since)) { const v = netExitVelocity(dunkFlush.kind); ballSim.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); console.info(`[3V3-NET] ${dunkFlush.kind} exit ${netExitMph(dunkFlush.kind)} mph`); dunkFlush = null; } }
       else if (!ball.parent && !arc.active && !passFlight.active && !dunking) ballSim.step(dt);
       if (board && !arc.active && !mateArc.active) liveBoard(ctx, dt);
       // THREE SECONDS. Without it the strongest play in a half-court game is to stand under the ring and wait,
@@ -774,6 +775,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const res = arc.step(dt, ball.position);
         if (res === 'made') {
           myScore += arcPoints;
+          { const nk = netExitKindOf(arc.shotStyle); const v = netExitVelocity(nk); ballSim.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); console.info(`[3V3-NET] ${nk} exit ${netExitMph(nk)} mph`); }   // NET EXIT
           me.shotWin = 'none'; me.celebrateSec = CELEBRATE_SEC; me.tree.beat('bball_score_celebrate', { fadeSec: 0.15 });   // BIOMECH-HOOPS-WAVE1 G5
           // A THREE is not a routine bucket and must not land like one. The mode
           // had no camera pulse anywhere, so a deep splash and a two-foot layup
@@ -1648,7 +1650,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
         resolved = true;
         const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
-        if (made) dunkFlush = { releasePos, since: 0 };
+        if (made) dunkFlush = { releasePos, since: 0, kind: kind === 'poster' ? 'poster' : showtime ? 'showtime' : 'dunk' };
         else { missClank(ctx); ballSim.launch(releasePos, clankOffRim(ball, RIM)); }
       }
       if (k < 1) return;
@@ -2407,7 +2409,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
           resolved = true;
           const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
-          if (made) dunkFlush = { releasePos, since: 0 };
+          if (made) dunkFlush = { releasePos, since: 0, kind: inLane ? 'poster' : 'dunk' };
           else { missClank(ctx); ballSim.launch(releasePos, clankOffRim(ball, RIM)); }
         }
         if (k < 1) return;
