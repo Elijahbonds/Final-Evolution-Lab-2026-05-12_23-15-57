@@ -50,6 +50,9 @@ import {
   type ArcadeState, type ArcadeTune, type ArcadeInput,
 } from '../racing/ArcadeFlight';
 import {
+  addToChain, boostEarnForStunt, emptyChain, noHug, stepChain, stepHug, stuntById,
+} from '../racing/AeroTricks';
+import {
   collectBalloon, balloonsHit, stepBalloons, useItem, stepMissiles, stepMines, bananasAfterHit, segDist,
   BALLOON_RESPAWN_SEC, BANANA_RADIUS, BANANA_CAP, ITEM_LABEL, ITEM_KINDS,
   type Balloon, type Banana, type HeldItem, type Missile, type Mine, type Target, type ItemKind,
@@ -116,6 +119,12 @@ export function makeAeroAcesMode(): ModeDefinition {
     graceLeft: null as number | null,
     hits: 0, stunts: 0, fired: 0, popped: 0,
     stickX: 0, stickY: 0,
+    /** Stunts linked back to back: different ones multiply, the same one decays. */
+    chain: emptyChain(),
+    /** Seconds spent flying low, and the closest it got. */
+    hug: noHug(),
+    /** Best chain of the run, for the end card. */
+    bestChain: 0,
   };
 
   const say = (t: string, sec = 1.1): void => { S.banner = t; S.bannerT = sec; };
@@ -363,7 +372,37 @@ export function makeAeroAcesMode(): ModeDefinition {
       const ceiling = circuit.ceilingAt(flight.pos.x, flight.pos.z);
       const wasStunt = flight.stunt;
       const touched = stepArcade(flight, S.input, dt, tune, circuit.floorAt, ceiling);
-      if (wasStunt && !flight.stunt) { boost.earn(wasStunt === 'loop' ? 'trickBig' : 'trickSmall'); ctx.momentum.report({ kind: 'clean_hit', weight: 6 }); }
+      // A STUNT LANDED GOES INTO THE CHAIN, and what it pays depends on what came before it.
+      //
+      // This used to be a flat earn: every stunt paid the same, so the twentieth roll paid like the first and the
+      // safest thing a player could do was hold one button in open sky. Different stunts now multiply and the same
+      // one decays to nothing, which is the MECHANICS anti-mash rule applied to the air.
+      if (wasStunt && !flight.stunt) {
+        const added = addToChain(S.chain, wasStunt);
+        S.chain = added.chain;
+        const earn = boostEarnForStunt(wasStunt, added.repeat);
+        if (earn) boost.earn(earn.what, earn.scale);
+        if (added.gained > 0) {
+          const linked = S.chain.ids.length > 1;
+          say(linked ? `${stuntById(wasStunt)?.label} x${S.chain.mult.toFixed(1)} +${added.gained}`
+                     : `${stuntById(wasStunt)?.label} +${added.gained}`, 0.8);
+          ctx.momentum.report({ kind: linked ? 'chain' : 'clean_hit', weight: 6 + added.gained * 0.02 });
+        } else {
+          // mashing the same stunt stops paying, and a press that cannot pay is still answered
+          refuse(ctx, 'SAME TRICK — MIX IT UP');
+        }
+      }
+      {
+        const ticked = stepChain(S.chain, dt);
+        S.chain = ticked.chain;
+        if (ticked.closed && ticked.closed.ids.length > 1) {
+          S.bestChain = Math.max(S.bestChain, ticked.closed.pts);
+          ctx.juice.scorePop(flight.pos.add(new Vector3(0, 6, 0)),
+            `${ticked.closed.ids.length} TRICK CHAIN +${ticked.closed.pts}`, '#fbbf24');
+        } else if (ticked.closed) {
+          S.bestChain = Math.max(S.bestChain, ticked.closed.pts);
+        }
+      }
       S.scrapeCool = Math.max(0, S.scrapeCool - dt);
       if (touched && S.scrapeCool <= 0) {
         S.scrapeCool = 1.2;
@@ -385,9 +424,19 @@ export function makeAeroAcesMode(): ModeDefinition {
           say(circuit.theme === 'island' ? 'EDGE OF THE COVE' : 'OFF THE COURSE', 0.6);
         }
       }
-      // a LOW PASS over the water or the canyon floor at speed pays into the boost
+      // HUGGING THE FLOOR. The audit's complaint about this mode was that there was "no reason to take one line
+      // over another but the next ring". This is that reason: the floor pays, and it pays MORE the closer you are,
+      // so the fast line through a canyon is the frightening one.
+      //
+      // It replaces a binary `gap < 7` check, which paid a flat rate at 6.9 m and nothing at 7.1 m and could be
+      // collected by a single dive through. It now has to arm over half a second, and it scales with closeness.
       const gap = flight.pos.y - circuit.floorAt(flight.pos.x, flight.pos.z);
-      if (gap < 7 && flight.speed > tune.top * 0.85) boost.earnOver('nearMiss', dt, 2);
+      const hugged = stepHug(S.hug, dt, gap);
+      S.hug = hugged.hug;
+      if (hugged.earnPerSec > 0 && flight.speed > tune.top * 0.7) {
+        boost.earnOver('nearMiss', dt, 2 * hugged.earnPerSec);
+        if (hugged.closeness01 > 0.8 && S.bannerT <= 0) say('LOW AND FAST', 0.4);
+      }
 
       // WRONG WAY — pointed back down the line for a beat (a loop is allowed to face back for its own length)
       const fwd = forwardOf(flight);
