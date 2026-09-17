@@ -56,6 +56,7 @@ import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
+import { driveDunkKFor, handForward, handShiftTarget, stepShift, driveDunkPos, hangWanted, RIM_HANG, rimProtectorJump, rimProtectorSwats, RIM_PROTECT, chestRide, VICTIM_SLIDE, slideStep, type ShowtimeJudge } from '../core/DriveFlight';   // DUNK-FANATIC (2026-09-17): at the iron by the resolve, the rim hang, the rim protector, the chest ride
 import { clankOffRim } from '../anim/ballRig';
 import { startFlush, stepFlush, type FlushState } from '../core/RimFlush';   // DUNK-FANATIC (2026-09-17): the contest's flush on the game's dunks
 import { RIM_RADIUS } from '../core/RimPhysics';
@@ -127,7 +128,7 @@ import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-L
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
 import { readPlayerIcon } from '../visual/playerIcon';
 import { netExitVelocity, netExitKindOf, netExitMph, type NetExitKind } from '../core/NetExit';   // NET EXIT (2026-09-17)
-import { showtimeAsked, pickShowtime, judgeShowtime, showtimeMeterT, posterRide, SHOWTIME_FLIGHT_MS, SHOWTIME_HANG_FROM, SHOWTIME_HANG_TO, SHOWTIME_HANG_SCALE, SHOWTIME_DEADLINE_K, SHOWTIME_PCT, POSTER_RIDE_SHARE } from '../core/ShowtimeDunk';   // SHOWTIME (2026-09-17)
+import { showtimeAsked, pickShowtime, judgeShowtime, showtimeMeterT, posterRide, SHOWTIME_FLIGHT_MS, SHOWTIME_HANG_FROM, SHOWTIME_HANG_TO, SHOWTIME_HANG_SCALE, SHOWTIME_DEADLINE_K, SHOWTIME_PCT } from '../core/ShowtimeDunk';   // SHOWTIME (2026-09-17)
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { pickHoopsDunk, dunkSpeedRatio } from '../core/HoopsDunks';
@@ -306,7 +307,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
   let driveContest: DriveContest | null = null;                                      // M2: the body in the dunk's path
   /** The man being dunked ON — held chest to chest through the flight, dropped at the flush. */
-  let posterVictim: { body: Body; kind: ContactDunkKind; released: boolean; plant?: Vector3; fall?: Vector3; reacted?: boolean } | null = null;   // SHOWTIME: the plant and the fall line
+  let posterVictim: { body: Body; kind: ContactDunkKind; released: boolean; plant?: Vector3; fall?: Vector3; reacted?: boolean } | null = null;
+  let victimSlide: { body: Body; dir: Vector3; left: number } | null = null;   // DUNK-FANATIC: the released victim slides clear of the landing   // SHOWTIME: the plant and the fall line
   let showtimePress = false, showtimeCam = false;   // SHOWTIME: SQUARE in the air (raw), and the side camera
   let ring: PlayerRingHandle | null = null;   // PLAYER RING
   /** What the contact made this dunk. Captured AT THE BUMP because `driveContest` is cleared on
@@ -458,7 +460,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; jabEligible = false; burstArmed = false; me.char.root.position.y = 0;
     clearDefense();
     // BIOMECH-HOOPS-WAVE1: the possession's clocks; a held shot is lifted, a floored body gets up
-    driver = null; driveK = 0; dunkFlight = null; dunkFlush = null; mateArc.active = false; posterVictim = null; lastDunkKind = 'clean';
+    driver = null; driveK = 0; dunkFlight = null; dunkFlush = null; mateArc.active = false; posterVictim = null; victimSlide = null; lastDunkKind = 'clean';
     for (const b of everyBody()) { b.shotWin = 'none'; b.landSec = 0; b.celebrateSec = 0; b.tree.releaseHold(); if (b.floored) { b.floored = false; b.stunSec = 0; b.tree.beat('karate_get_up'); } }
     if (toMe) giveBallTo('me');
     // O1/O3: one job each for the possession — one mate SCREENS my defender, the other spaces (alternating)
@@ -646,6 +648,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       net?.tick(me.slot.intent);   // no-op without ?net=
       for (const b of everyBody()) { b.slot.poll(dt); b.stunSec = Math.max(0, b.stunSec - dt); if (b.jumpAge !== Infinity) { b.jumpAge += dt; b.char.root.position.y = jumpY(b.jumpAge); if (b.jumpAge >= JUMP_SEC) { b.jumpAge = Infinity; b.char.root.position.y = 0; } } }
       if (myJumpAge !== Infinity) myJumpAge += dt;
+      if (victimSlide) { const step = slideStep(victimSlide.left, dt); victimSlide.body.char.root.position.addInPlace(victimSlide.dir.scale(step)); victimSlide.left -= step; if (victimSlide.left <= 1e-4) victimSlide = null; }   // DUNK-FANATIC
       if (riseHop && !finish && !dunking) {   // DEFENSE-LOOK: the jump shot's hop
         riseHop.t += dt;
         me.char.root.position.y = Math.max(0, Math.sin(Math.min(1, riseHop.t / riseHop.dur) * Math.PI) * JUMPER_HOP_APEX);
@@ -735,7 +738,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const st = stepFlush(dunkFlush.st, RIM, RIM_RADIUS, 0.12, dt); ball.position.set(st.pos.x, st.pos.y, st.pos.z);
         if (st.phase === 'free') { const v = netExitVelocity(dunkFlush.kind); ballSim.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); console.info(`[3V3-NET] ${dunkFlush.kind} exit ${netExitMph(dunkFlush.kind)} mph`); dunkFlush = null; }
       }
-      else if (!ball.parent && !arc.active && !passFlight.active && !dunking) ballSim.step(dt);
+      else if (!ball.parent && !arc.active && !passFlight.active) ballSim.step(dt);   // DUNK-FANATIC: steps through a rim hang / a mid-flight swat too
       if (board && !arc.active && !mateArc.active) liveBoard(ctx, dt);
       // THREE SECONDS. Without it the strongest play in a half-court game is to stand under the ring and wait,
       // which is exactly why the rule exists — and 3v3, with two team-mates to pass you the ball while you camp,
@@ -1563,6 +1566,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // HOOPS-MOVE-KIT-A M2: the contest is a BODY in the flight's path (the nearest defender; the 1v1's rule)
     const wall = defenderPos ? foes.find((f) => f.char.root.position === defenderPos) ?? null : null;
     const c = contestDrive(from, landing, wall && wall.stunSec === 0 ? wall.char.root.position : null, wall ? wall.vel : null, kind === 'standing' ? 'dunk' : kind);
+    if (c.bumpK !== null) c.bumpK = driveDunkKFor(c.bumpK, from, RIM, landing, DRIVE_DUNK.resolveK);   // DUNK-FANATIC: the bump on the flight's clock (the eased approach reaches his spot early)
     driveContest = c;
     // SHOWTIME (owner, 2026-09-17): the stick BACK with R2 on an open lane, or any contact dunk — see ShowtimeDunk.ts
     const showtime = showtimeAsked(kind, lookY);
@@ -1571,6 +1575,13 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     console.info(`[3V3-CONTACT] drive contest ${kind} contested ${c.contested} t ${c.t.toFixed(2)} lateral ${c.lateral.toFixed(2)} set ${c.set} pct ${c.pct.toFixed(2)} wall ${wall ? (wall.stunSec > 0 ? 'stunned' : 'live') : 'none'}`);
     let made = Math.random() < c.pct;
     let swatted = false;
+    // DUNK-FANATIC (2026-09-17): the rim hang and the RIM PROTECTOR — the nearest live defender to the ring may leave the
+    // floor to MEET me, timed into the flight; at the meeting he swats it or gets dunked on (see DriveFlight.ts)
+    let showtimeJudge: ShowtimeJudge | null = null, hangLeft = 0, hangOn = false;
+    const protector = foes.filter((f) => f.stunSec === 0 && !f.floored && f.jumpAge === Infinity).sort((a, b) => distXZ(a.char.root.position, RIM_FLOOR) - distXZ(b.char.root.position, RIM_FLOOR))[0] ?? null;
+    const protectorK = protector ? rimProtectorJump({ dist: Math.min(distXZ(protector.char.root.position, RIM_FLOOR), wall === protector && c.contested ? c.lateral + 0.3 : Infinity), set: Math.hypot(protector.vel.x, protector.vel.z) < 1.0, stunned: false, kind: kind === 'poster' ? 'poster' : 'dunk', roll }) : null;
+    let protectorUp = false, protectorMet = false;
+    if (protectorK !== null) console.info(`[3V3-DEF] rim protector armed at k ${protectorK.toFixed(2)}`);
     // D1: the wall reads the takeoff — a hand up in the lane can SWAT the dunk at the bump
     if (wall && c.contested && foeHandUp !== wall && wall.jumpAge === Infinity && aiHandsUp(distXZ(me.char.root.position, wall.char.root.position), facingCos(wall.char.root.rotation.y, wall.char.root.position, me.char.root.position), roll)) {
       if (foeHandUp) foeHandUp.tree.releaseHold();
@@ -1617,7 +1628,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     console.info(`[3V3-DUNK] ${picked3.label} (${picked3.clip}) speed ${speed3.toFixed(1)} lateral ${lateral3.toFixed(2)} momentum ${mbus.score01.toFixed(2)}`);
     startBoxOut('mine');   // O2
     // the flight's own clock: real time, FROZEN for the bump's hit-stop and slowed for BUMP_SLOW_SEC after it (the velocity kill)
-    let flightMs = 0, last = performance.now(), bumped = false, freezeMs = 0, slowMs = 0;
+    let flightMs = 0, handShift = 0, last = performance.now(), bumped = false, freezeMs = 0, slowMs = 0;
     const obs = ctx.scene.onBeforeRenderObservable.add(() => {
       const nowMs = performance.now(); const realMs = Math.min(50, nowMs - last); last = nowMs;
       const fdt = realMs / 1000;
@@ -1625,18 +1636,42 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       let scale = 1;
       if (freezeMs > 0) { freezeMs -= realMs; scale = 0; }
       else if (slowMs > 0) { slowMs -= realMs; scale = BUMP_SLOW; }
+      else if (hangLeft > 0 && flightMs / flightTotal >= RIM_HANG.k) { hangLeft -= realMs; scale = 0; if (!hangOn) { hangOn = true; me.tree.beat('dunk_score_hang', { fadeSec: 0.08, holdEnd: true }); console.info(`[3V3-DUNK] rim hang ${hangLeft.toFixed(0)} ms`); } }   // DUNK-FANATIC: the hang on the iron
       else if (showtime && flightMs / flightTotal >= SHOWTIME_HANG_FROM && flightMs / flightTotal <= SHOWTIME_HANG_TO) scale = SHOWTIME_HANG_SCALE;   // SHOWTIME: the hang
       flightMs += realMs * scale;
       const k = Math.min(1, flightMs / flightTotal);
-      me.char.root.position.x = from.x + (RIM.x - from.x) * k;
-      me.char.root.position.z = from.z + (RIM.z + DRIVE_DUNK.landAheadZ - from.z) * k;
+      { if (ball.parent && k <= DRIVE_DUNK.resolveK) handShift = stepShift(handShift, handShiftTarget(handForward(from, RIM, me.char.root.position, ball.getAbsolutePosition()), k, DRIVE_DUNK.resolveK)); const p = driveDunkPos(from, RIM, { x: RIM.x, z: RIM.z + DRIVE_DUNK.landAheadZ }, k, DRIVE_DUNK.resolveK, handShift); me.char.root.position.x = p.x; me.char.root.position.z = p.z; }   // DUNK-FANATIC: at the iron BY the resolve
       me.char.root.position.y = driveDunkY(k);
       // BIOMECH-HOOPS-WAVE1 G1/G3/G6 (the 1v1's): the chest eases onto the iron through the flight; the slam resolves AT THE
       // IRON — a make flushes through the net, a miss clanks off the front (it used to let go on the feet-down frame)
       me.char.root.rotation.y = slewYaw(me.char.root.rotation.y, yawTo(me.char.root.position, RIM) + (picked3.reverse ? Math.PI : 0), FACE_RIM_RATE * (picked3.reverse ? 2 : 1), fdt);   // a REVERSE turns its back to the iron
       dunkFlight = { k, made: resolved ? made : null };
+      // DUNK-FANATIC: the RIM PROTECTOR leaves the floor to meet me — a swat (REJECTED) or a body to go over
+      if (protector && protectorK !== null && !protectorUp && k >= protectorK && protector.stunSec === 0 && !protector.floored && distXZ(protector.char.root.position, me.char.root.position) <= RIM_PROTECT.range) {   // in range WHEN he leaves the floor
+        protectorUp = true; protector.jumpAge = 0; if (foeHandUp === protector) { foeHandUp.tree.releaseHold(); foeHandUp = null; }
+        protector.tree.beat('bball_block_reach'); SoundKit.play('whoosh', { pitch: 1.15, volume: 0.35 });
+        console.info(`[3V3-DEF] rim protector jumps at k ${k.toFixed(2)}`);
+      }
+      if (protector && protectorUp && !protectorMet && !swatted && !resolved && k >= RIM_PROTECT.meetK) {
+        protectorMet = true;
+        const dist = Math.min(distXZ(protector.char.root.position, me.char.root.position), distXZ(protector.char.root.position, ball.getAbsolutePosition()));
+        if (rimProtectorSwats({ k, jumpAge: protector.jumpAge, dist, set: c.contested ? c.set : true, strength01: c.contested ? c.strength01 : 0.7, roll })) {
+          swatted = true; made = false;
+          swing('block'); ctx.setHud({ momentum });
+          const at = ball.getAbsolutePosition().clone(); releaseBall(ball);
+          const away = me.char.root.position.subtract(protector.char.root.position); away.y = 0; if (away.lengthSquared() < 1e-4) away.set(0, 0, 1); away.normalize();
+          ballSim.launch(at, away.scale(3.0).add(new Vector3((Math.random() - 0.5) * 2, 1.6, 0)));
+          ctx.juice.hitStop(60); ctx.juice.shake(0.12, 140); ctx.feel?.impact?.(0.5); EffectsKit.burst(ctx.scene, at, 'sparks');
+          SoundKit.play('impact', { pitch: 0.7, volume: 0.7 }); SoundKit.play('crowdGroan', { volume: 0.6 });
+          bannerFlash(ctx, 'MET AT THE RIM — REJECTED!', 1000);
+          console.info(`[3V3-DEF] rim protector swat at k ${k.toFixed(2)} dist ${dist.toFixed(2)}`);
+        } else {
+          console.info(`[3V3-DEF] rim protector beaten at k ${k.toFixed(2)} dist ${dist.toFixed(2)}`);
+          if ((c.bumpK === null || bumped || wall !== protector) && dist <= 1.3 && !protector.floored) { protector.stunSec = Math.max(protector.stunSec, 1.0); protector.tree.beat('bball_contact_react', { fadeSec: 0.06, holdEnd: true }); bannerFlash(ctx, 'OVER THE TOP!', 700); }
+        }
+      }
       // M2: the bodies meet — the bump
-      if (!bumped && c.bumpK !== null && wall && k >= c.bumpK) {
+      if (!bumped && !swatted && c.bumpK !== null && wall && k >= c.bumpK) {
         bumped = true; freezeMs = 45; slowMs = BUMP_SLOW_SEC * 1000;
         const handUp = foeHandUp === wall || wall.jumpAge <= HAND_UP_SEC;
         const swatChance = aiBlockChance('dunk', 0, handUp, c.set, c.strength01);
@@ -1654,7 +1689,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (showtime) {
         ctx.setHud({ shotMeterT: showtimeMeterT(k) });
         if (showtimeK === null && (showtimePress || k >= SHOWTIME_DEADLINE_K)) {
-          const j = showtimePress ? judgeShowtime(k) : 'none'; showtimePress = false; showtimeK = k;
+          const j = showtimePress ? judgeShowtime(k) : 'none'; showtimePress = false; showtimeK = k; showtimeJudge = j;
           made = roll() < SHOWTIME_PCT[j] * (kind === 'poster' ? Math.max(0.6, c.pct) : 1);
           if (j === 'perfect') { ctx.juice.hitStop(70); ctx.camDirector.pulse(0.7, 0.45); SoundKit.play('crowdCheer', { volume: 0.6 }); }
           ctx.setHud({ banner: j === 'perfect' ? `${picked3.label} — PERFECT!` : j === 'good' ? `${picked3.label}!` : j === 'early' ? 'EARLY — OFF THE FRONT' : j === 'late' ? 'LATE — OFF THE BACK' : picked3.label }); bannerClearLater(ctx, 800);
@@ -1663,17 +1698,17 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       }
       if (posterVictim && !posterVictim.released && posterVictim.plant && posterVictim.fall && c.bumpK !== null && k > c.bumpK) {   // SHOWTIME: the victim rides the flight
         const ride = posterRide(c.bumpK, POSTER_RELEASE_K, k); const v = posterVictim.body.char.root.position;
-        v.x = posterVictim.plant.x + posterVictim.fall.x * 0.16 * POSTER_RIDE_SHARE * ride.s;
-        v.z = posterVictim.plant.z + posterVictim.fall.z * 0.16 * POSTER_RIDE_SHARE * ride.s;
+        { const r = chestRide(posterVictim.plant, me.char.root.position, c.dir, ride.s); v.x = r.x; v.z = r.z; }   // DUNK-FANATIC: ON my chest, bowled back
         v.y = ride.lift;
         if (!posterVictim.reacted && ride.s > 0.35) { posterVictim.reacted = true; posterVictim.body.tree.beat('bball_contact_react', { fadeSec: 0.05, holdEnd: true }); }
       }
-      if (posterVictim && k >= POSTER_RELEASE_K) posterVictimRelease(ctx);
+      if (posterVictim && (k >= POSTER_RELEASE_K || (hangLeft > 0 && k >= RIM_HANG.k))) posterVictimRelease(ctx);   // DUNK-FANATIC: down as the ball goes through, BEFORE the hang
       if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
         resolved = true;
         const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
         if (made) dunkFlush = { releasePos, since: 0, kind: kind === 'poster' ? 'poster' : showtime ? 'showtime' : 'dunk' };
         else { missClank(ctx); ballSim.launch(releasePos, clankOffRim(ball, RIM)); }
+        hangLeft = hangWanted(made, kind, showtimeJudge, picked3.flashy);   // DUNK-FANATIC
       }
       if (k < 1) return;
       ctx.scene.onBeforeRenderObservable.remove(obs);
@@ -2027,6 +2062,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     SoundKit.play('crowdCheer', { volume: 0.7 });
     console.info(`[3V3-CONTACT] ${posterVictim.kind} victim goes down, fall ${fall.length().toFixed(1)}`);
     posterVictim = null;
+    victimSlide = fall.lengthSquared() > 1e-4 ? { body: v, dir: fall.clone().normalize(), left: VICTIM_SLIDE.dist } : null;   // DUNK-FANATIC: he goes down AND clears the landing
   }
   // ── HOOPS-MOVE-KIT-A amendment: the DEFENSE contest package (D1–D3) ────────────────────────────────────────────────
   function clearDefense(): void {
@@ -2366,6 +2402,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       const meDist = distXZ(me.char.root.position, shooter.char.root.position);
       const inLane = meDist < 1.5 && meStunSec === 0 && !meFloored;
       const c = contestDrive(from, landing, meStunSec > 0 || meFloored ? null : me.char.root.position, me.drib.vel, inLane ? 'poster' : 'dunk');
+      if (c.bumpK !== null) c.bumpK = driveDunkKFor(c.bumpK, from, RIM, landing, DRIVE_DUNK.resolveK);   // DUNK-FANATIC: the bump on the flight's clock (the eased approach reaches his spot early)
       const ground = groundContest(meDist, facingCos(me.char.root.rotation.y, me.char.root.position, shooter.char.root.position), meHandUp);
       const contest = Math.min(1, contestLevel(shooter.char.root.position, me.char.root.position) * 0.5 + ground + (myJumpAge <= HAND_UP_SEC ? 0.3 : 0));
       let made = Math.random() < contestedPct(c.pct, contest);
@@ -2392,7 +2429,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       startBoxOut('theirs');
       SoundKit.play('whoosh', { pitch: 0.85 });
       console.info(`[3V3-DEF] rival dunk ${inLane ? 'poster' : 'open'} contest ${contest.toFixed(2)} pct ${contestedPct(c.pct, contest).toFixed(2)} bumpK ${c.bumpK === null ? 'none' : c.bumpK.toFixed(2)} dist ${distXZ(me.char.root.position, shooter.char.root.position).toFixed(2)} jumpAge ${myJumpAge === Infinity ? 'none' : myJumpAge.toFixed(2)}`);   // suite pass: where WAS the defender when the flight started
-      let flightMs = 0, last = performance.now(), freezeMs = 0, slowMs = 0;
+      let flightMs = 0, handShift = 0, last = performance.now(), freezeMs = 0, slowMs = 0;
       const obs = ctx.scene.onBeforeRenderObservable.add(() => {
         if (possessionToken !== tok) { ctx.scene.onBeforeRenderObservable.remove(obs); foeDunkFlight = null; done(); return; }
         const nowMs = performance.now(); const realMs = Math.min(50, nowMs - last); last = nowMs;
@@ -2402,8 +2439,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         else if (slowMs > 0) { slowMs -= realMs; scale = BUMP_SLOW; }
         flightMs += realMs * scale;
         const k = Math.min(1, flightMs / DRIVE_DUNK.flightMs);
-        shooter.char.root.position.x = from.x + (RIM.x - from.x) * k;
-        shooter.char.root.position.z = from.z + (RIM.z + DRIVE_DUNK.landAheadZ - from.z) * k;
+        { if (ball.parent && k <= DRIVE_DUNK.resolveK) handShift = stepShift(handShift, handShiftTarget(handForward(from, RIM, shooter.char.root.position, ball.getAbsolutePosition()), k, DRIVE_DUNK.resolveK)); const p = driveDunkPos(from, RIM, { x: RIM.x, z: RIM.z + DRIVE_DUNK.landAheadZ }, k, DRIVE_DUNK.resolveK, handShift); shooter.char.root.position.x = p.x; shooter.char.root.position.z = p.z; }   // DUNK-FANATIC
         shooter.char.root.position.y = driveDunkY(k);
         shooter.char.root.rotation.y = slewYaw(shooter.char.root.rotation.y, yawTo(shooter.char.root.position, RIM) + (theirDunk.reverse ? Math.PI : 0), FACE_RIM_RATE * (theirDunk.reverse ? 2 : 1), fdt);
         foeDunkFlight = { k, made: resolved ? made && !swatted : null };
@@ -2416,6 +2452,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           ctx.feel?.impact?.(0.5); ctx.juice.hitStop(50); ctx.juice.shake(0.1, 120);
           EffectsKit.burst(ctx.scene, at, 'sparks');
           ctx.setHud({ banner: 'REJECTED AT THE RIM!' });
+          shooter.tree.beat('bball_contact_react', { fadeSec: 0.06, holdEnd: true }); ctx.camDirector.pulse(0.8, 0.5);   // DUNK-FANATIC: he takes the hit in the air
           console.info(`[3V3-DEF] swat at k ${k.toFixed(2)} jumpAge ${myJumpAge.toFixed(2)}`);
         }
         if (!bumped && !swatted && c.bumpK !== null && k >= c.bumpK) {

@@ -11,12 +11,14 @@ export interface ShotVerdict { t: number; outcome: string; path: string; offsetM
 export const RIM = { x: 0, y: 3.05, z: -0.6 };
 const FLIGHT_Y = 2.2, RING_R = 0.225, THROUGH_R = 0.2;
 
+/** The ball within a hand's reach of the hero's palm is IN HAND — a double clutch dips it below the rim plane and back up; that is not a crossing. */
+const inHand = (r: BallRow): boolean => !!r.ball && !!r.h && [1, 2].some((q) => { const p = r.h![q]; return !!p && Math.hypot(p[0] - r.ball![0], p[1] - r.ball![1], p[2] - r.ball![2]) < 0.3; });
 export function analyseBallPath(rows: BallRow[], outcomes: Outcome[], rim = RIM): ShotVerdict[] {
   const out: ShotVerdict[] = [];
   let i = 0;
   while (i < rows.length) {
     // a flight: the ball climbs above FLIGHT_Y…
-    if (!rows[i].ball || rows[i].ball![1] < FLIGHT_Y) { i++; continue; }
+    if (!rows[i].ball || rows[i].ball![1] < FLIGHT_Y || inHand(rows[i])) { i++; continue; }
     const start = i; let maxStep = 0, cross = -1;
     let j = i;
     for (; j < rows.length && rows[j].ball; j++) {
@@ -25,7 +27,7 @@ export function analyseBallPath(rows: BallRow[], outcomes: Outcome[], rim = RIM)
         maxStep = Math.max(maxStep, step); }
       // …and comes back DOWN to the rim's height: the first descending frame at or under rim.y + 3 cm (an arc that ends exactly
       // at the iron touches 3.05 and never goes under it before the bounce)
-      if (cross < 0 && j > start && rows[j].ball![1] <= rim.y + 0.03 && rows[j].ball![1] < rows[j - 1].ball![1]) cross = j;
+      if (cross < 0 && j > start && !inHand(rows[j]) && rows[j].ball![1] <= rim.y + 0.03 && rows[j].ball![1] < rows[j - 1].ball![1]) cross = j;
       if (cross >= 0 && rows[j].t - rows[cross].t > 900) break;
       if (cross < 0 && rows[j].ball![1] < FLIGHT_Y - 0.6 && j > start + 3) break;   // came down without reaching the rim plane going down? (a short miss off the front)
     }

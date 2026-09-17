@@ -3,8 +3,8 @@
 // controller for gamer, dance" (owner, 2026-09-17).
 //
 // A flat ring at the feet whose arc is the stamina (the turbo tank where the mode has one), in the player's colour; a
-// billboard over the head with the creator card's glyph and a chevron pointing down at the body. Both ride the root, so
-// a teleported reset moves them with it; the glyph is drawn once, the arc only when it changes.
+// glyph puck LOW, beside the ring on the camera's right (owner: "put the icon low next to the stamina bar"). The ring rides
+// the root; the puck follows the root each frame at a camera-relative offset; the glyph is drawn once, the arc only when it changes.
 import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, TransformNode, Vector3, type Scene } from '@babylonjs/core';
 
 export type RingIcon = 'basketball' | 'music' | 'camera' | 'controller' | 'dance' | 'art' | 'pen' | 'chef' | 'fashion';
@@ -31,14 +31,20 @@ export function mountPlayerRing(scene: Scene, root: TransformNode, opts: { color
     tex.update(); drawn = v;
   };
   draw(opts.stamina === false ? 1 : 1);
-  // the indicator: a billboard over the head with the glyph and a chevron
-  const tag = MeshBuilder.CreatePlane('player_tag', { width: 0.5, height: 0.62 }, scene);
-  tag.billboardMode = Mesh.BILLBOARDMODE_ALL; tag.parent = root; tag.position = new Vector3(0, 2.25, 0); tag.isPickable = false;
-  const tagTex = new DynamicTexture('player_tag_tex', { width: 256, height: 320 }, scene, false); tagTex.hasAlpha = true;
+  // the indicator: a billboard puck LOW beside the ring, on the camera's right, with the glyph
+  const tag = MeshBuilder.CreatePlane('player_tag', { width: 0.42, height: 0.42 }, scene);
+  tag.billboardMode = Mesh.BILLBOARDMODE_ALL; tag.isPickable = false;
+  const right = new Vector3(1, 0, 0);
+  const follow = scene.onBeforeRenderObservable.add(() => {
+    const cam = scene.activeCamera; if (cam) { cam.getDirectionToRef(Vector3.Right(), right); right.y = 0; if (right.lengthSquared() < 1e-4) right.set(1, 0, 0); right.normalize(); }
+    const at = root.getAbsolutePosition();
+    tag.position.set(at.x + right.x * (R + 0.24), at.y + 0.2, at.z + right.z * (R + 0.24));
+  });
+  const tagTex = new DynamicTexture('player_tag_tex', { width: 256, height: 256 }, scene, false); tagTex.hasAlpha = true;
   const tagMat = new StandardMaterial('player_tag_mat', scene); tagMat.diffuseTexture = tagTex; tagMat.emissiveTexture = tagTex; tagMat.opacityTexture = tagTex; tagMat.disableLighting = true; tagMat.backFaceCulling = false; tagMat.useAlphaFromDiffuseTexture = true;
   tag.material = tagMat;
   const drawTag = (icon: RingIcon) => {
-    const ctx = tagTex.getContext() as CanvasRenderingContext2D; ctx.clearRect(0, 0, 256, 320);
+    const ctx = tagTex.getContext() as CanvasRenderingContext2D; ctx.clearRect(0, 0, 256, 256);
     const hex = color.toHexString();
     ctx.fillStyle = 'rgba(8,10,14,0.72)'; ctx.beginPath(); ctx.arc(128, 128, 96, 0, Math.PI * 2); ctx.fill();   // the puck
     ctx.lineWidth = 10; ctx.strokeStyle = hex; ctx.beginPath(); ctx.arc(128, 128, 96, 0, Math.PI * 2); ctx.stroke();
@@ -50,6 +56,6 @@ export function mountPlayerRing(scene: Scene, root: TransformNode, opts: { color
   return {
     set(v: number) { const q = Math.round(Math.max(0, Math.min(1, v)) * 50) / 50; if (q !== drawn) draw(q); },
     setIcon(icon: RingIcon) { drawTag(icon); },
-    dispose() { ring.dispose(); tag.dispose(); tex.dispose(); tagTex.dispose(); mat.dispose(); tagMat.dispose(); },
+    dispose() { scene.onBeforeRenderObservable.remove(follow); ring.dispose(); tag.dispose(); tex.dispose(); tagTex.dispose(); mat.dispose(); tagMat.dispose(); },
   };
 }
