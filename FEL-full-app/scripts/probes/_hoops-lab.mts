@@ -393,6 +393,11 @@ const def = await page.evaluate('window.__def') as { jumps: number; gathers: num
 const chargesTaken = log.filter((l) => /REF\] charge |charge taken/.test(l)).length;
 const handleMoves = log.filter((l) => /HANDLE\] move /.test(l)).map((l) => (l.match(/move (\w+) (\w+) → (\S+)/) ?? []).slice(1).join(' '));
 const tricks = log.filter((l) => /trick \w+ (green|early|late)/.test(l));
+// EVERY REF CALL, kept out of the `log` tail. `log` is sliced to the last 200 lines in the JSON below, so a call
+// early in a run vanishes from it — which is how a run that drew a charge could report `chargesTaken 1` from the
+// full log and show nothing at all when the saved slice was read back. Anything a summary counts must be saved
+// beside the count, not left to a window that may have scrolled past it.
+const refCalls = log.filter((l) => /-REF\]/.test(l)).map((l) => l.replace(/^\d+ /, ''));
 const screensCalled = log.filter((l) => /screen called/.test(l)).length;
 const off = rows.filter((r) => r.possession === 'offence');
 const made = off.filter((r) => r.scored > 0).length;
@@ -407,7 +412,7 @@ const out = {
   byPlay,
   defence: defence.length, stops, stopPct: defence.length ? Math.round((stops / defence.length) * 100) : null,
   blockJumps: def?.jumps ?? 0, gathersSeen: def?.gathers ?? 0,
-  handleMoves, tricks, chargesTaken, screensCalled, driverPeakSpeed: +(def?.driverPeak ?? 0).toFixed(2),
+  handleMoves, tricks, refCalls, chargesTaken, screensCalled, driverPeakSpeed: +(def?.driverPeak ?? 0).toFixed(2),
   plantedMs: def?.plantedMs ?? 0, closestWhilePlanted: +(def?.closestWhilePlanted ?? 99).toFixed(2),
   finalScore: [final.score ?? null, final.foeScore ?? null], target: final.target ?? null,
   rows, log: log.slice(-200),
