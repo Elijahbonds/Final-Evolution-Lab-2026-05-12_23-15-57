@@ -28,6 +28,15 @@
 // faster kart out of the garage changes what it can throw, for free.
 //
 // Pure: numbers and BoardTrick rows. No scene, no meshes, no input polling.
+//
+// THE CLIPS ARE REGISTERED ONES (BOARD-10PHASE P10). The first cut of this table gave all four rows `clip:
+// 'kart_air'`, which is not a registered clip and never was — BoardTricks' own field comment says never to invent
+// one, because an unregistered name renders the body in BIND POSE. clipScope.test.ts could not catch it either:
+// it only checks names it RECOGNISES against a mode's scope, so an invented name passes straight through. The
+// rows now ride board_tuck (the nose lift is a held pose) and board_air (the rotations, whose angle comes from
+// spinDeg/flipDeg, exactly as the board table's spins do), and velocitykart's clip scope owns the board suite to
+// match. Note that VelocityKartMode currently PARKS the driver's animator, so nothing plays these yet; the point
+// is that the day it stops parking it, the names resolve to real motion instead of a T-pose.
 
 import {
   type BoardTrick, basePts, fitsAir, heldTrickDir, scoreTrick,
@@ -52,13 +61,13 @@ const T = (t: Omit<BoardTrick, 'discipline' | 'kind'>): BoardTrick =>
  */
 export const KART_TRICKS: readonly BoardTrick[] = [
   T({ id: 'kart_nose', label: 'NOSE LIFT', dir: 'up', btn: 'B', spinDeg: 0, flipDeg: 0, grab: 'none',
-      difficulty: 1.2, airSec: 0.46, clip: 'kart_air' }),
+      difficulty: 1.2, airSec: 0.46, clip: 'board_tuck' }),
   T({ id: 'kart_spin180', label: 'HALF SPIN', dir: 'left', btn: 'B', spinDeg: 180, flipDeg: 0, grab: 'none',
-      difficulty: 1.9, airSec: 0.64, clip: 'kart_air' }),
+      difficulty: 1.9, airSec: 0.64, clip: 'board_air' }),
   T({ id: 'kart_spin360', label: 'FULL SPIN', dir: 'right', btn: 'B', spinDeg: 360, flipDeg: 0, grab: 'none',
-      difficulty: 2.8, airSec: 0.86, clip: 'kart_air' }),
+      difficulty: 2.8, airSec: 0.86, clip: 'board_air' }),
   T({ id: 'kart_backflip', label: 'BACK FLIP', dir: 'down', btn: 'Y', spinDeg: 0, flipDeg: 360, grab: 'none',
-      difficulty: 3.6, airSec: 1.02, clip: 'kart_air' }),
+      difficulty: 3.6, airSec: 1.02, clip: 'board_air' }),
 ];
 
 export const kartTrickById = (id: string): BoardTrick | null =>

@@ -87,7 +87,9 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   golf: { suites: ['golf'], borrow: [] },
   baseball: DERBY, derby: DERBY,
   soccer: { suites: ['soccer'], borrow: ['football_juke_left'] }, penalty: { suites: ['soccer'], borrow: ['football_juke_left'] },
-  velocitykart: { suites: [], borrow: [] }, aeroaces: { suites: [], borrow: [] },
+  // The kart driver throws board tricks off a boosted ramp (KartAir reuses the BoardTrick vocabulary and rows), so
+  // the board suite is what the kart's body owns. Aero has no body in the air — the stunt is the aircraft's.
+  velocitykart: { suites: ['board'], borrow: [] }, aeroaces: { suites: [], borrow: [] },
   who_scene_it: PARTY, brainbrawl: PARTY,
 };
 
