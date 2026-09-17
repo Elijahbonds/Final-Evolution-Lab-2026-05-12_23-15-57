@@ -77,8 +77,7 @@ import {
   DribbleController, ShotMeter, DefenderBrain, TeammateBrain, contestLevel, clampToHalfCourt, isThree,
   resolveBodyCollision, checkAnkleBreak, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, DUNK_PCT,
-  SHOT_QUALITY_PCT, type ShotQuality, type ShotContext, type PostShot, type ShotStyle,
-} from '../core/BasketballCore';
+  SHOT_QUALITY_PCT, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF } from '../core/BasketballCore';
 import { lockTarget, choosePassType, PassFlight, type PassType } from '../core/BallHandling';
 import { HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import {   // HOOPS-MOVE-KIT-A
@@ -230,8 +229,15 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let chargeSetSec = 0;                          // how long the feet have been down
 /** How long the feet have to be planted before a charge can be drawn. */
 const CHARGE_SET_SEC = 0.18;
-/** Inside a stride of a planted defender is contact; past it he went round you. */
-const CHARGE_RANGE = 1.15;
+/**
+ * Inside this of a planted defender is CONTACT; past it he went round you.
+ *
+ * Anchored to BODY_STANDOFF rather than picked: two bodies cannot be closer than 1.10 m (resolveBodyCollision
+ * pushes them apart at radius*2), so the old 1.15 asked for a gap the physics forbids — measured live, a plant
+ * held for 7.7 s never saw the driver inside 1.30 m and no charge was ever drawn. "He arrived at the body you
+ * planted" is a chest-to-chest arrival at the standoff, plus room for the frame he arrives on.
+ */
+const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let dunkFlight: { k: number; made: boolean | null } | null = null;
   let dunkFlush: { releasePos: Vector3; since: number } | null = null;
   // ── HOOPS-MOVE-KIT-A ──

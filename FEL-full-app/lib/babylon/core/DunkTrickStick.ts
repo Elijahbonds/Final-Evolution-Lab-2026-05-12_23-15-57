@@ -39,11 +39,27 @@ export interface TrickSpec {
  * the air, so anything that needs a shape (a half-circle, a hold) is a worse input than a shove.
  */
 export const STICK_TRICK: Readonly<Record<StickTrick, TrickSpec>> = {
-  tomahawk:    { clip: 'dunk_finish_tomahawk', label: 'TOMAHAWK!',        pctBonus: 0.06, pctPenalty: 0.22 },
-  windmill:    { clip: 'dunk_finish_windmill', label: 'WINDMILL!',        pctBonus: 0.08, pctPenalty: 0.26 },
-  cradle:      { clip: 'dunk_cradle',          label: 'CRADLE!',          pctBonus: 0.08, pctPenalty: 0.26 },
-  betweenLegs: { clip: 'dunk_between_legs',    label: 'BETWEEN THE LEGS!', pctBonus: 0.14, pctPenalty: 0.34 },
+  tomahawk:    { clip: 'dunk_finish_tomahawk', label: 'TOMAHAWK!',        pctBonus: 0.06, pctPenalty: 0.40 },
+  windmill:    { clip: 'dunk_finish_windmill', label: 'WINDMILL!',        pctBonus: 0.08, pctPenalty: 0.46 },
+  cradle:      { clip: 'dunk_cradle',          label: 'CRADLE!',          pctBonus: 0.08, pctPenalty: 0.46 },
+  betweenLegs: { clip: 'dunk_between_legs',    label: 'BETWEEN THE LEGS!', pctBonus: 0.14, pctPenalty: 0.58 },
 };
+
+/**
+ * THE PENALTIES WERE TOO SMALL TO MEAN ANYTHING, and the measurement said so rather than a feeling.
+ *
+ * A drive dunk's base is DUNK_PCT.dunk = 0.92. At the old −0.22 a MISTIMED tomahawk still made 0.70, and the first
+ * live run bore that out: five late tricks, four of them went in. A mechanic whose failure state converts 70 % of
+ * the time is not a risk, it is a formality — the player never learns the window because missing it barely costs.
+ *
+ * Priced against the alternative instead of against zero: not throwing a trick at all is 0.92, so a mistimed one
+ * has to land clearly below "just dunk it" to be a decision. −0.40 puts a blown tomahawk at 0.52 — worse than a
+ * coin flip, better than hopeless — and the hardest trick in the table at 0.34, which is what a between-the-legs
+ * you could not land should look like.
+ *
+ * `MISTIME_MAX_PCT` is the invariant that keeps this honest if either number is ever retuned.
+ */
+export const MISTIME_MAX_PCT = 0.6;
 
 /** Past this the stick has been pushed, not brushed. Below it nothing is being asked for. */
 export const FLICK_MIN = 0.55;

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   trickFromFlick, trickWindow, judgeFlick, trickPct, STICK_TRICK, FLICK_MIN,
-  CLEAN_WINDOW, CONTACT_HALF_WIDTH, type StickTrick,
+  CLEAN_WINDOW, CONTACT_HALF_WIDTH, MISTIME_MAX_PCT, type StickTrick,
 } from './DunkTrickStick';
 
 describe('trickFromFlick', () => {
@@ -81,6 +81,21 @@ describe('trickPct', () => {
     for (const t of ALL) {
       expect(STICK_TRICK[t].pctPenalty).toBeGreaterThan(STICK_TRICK[t].pctBonus);
     }
+  });
+
+  it('a mistimed trick lands clearly BELOW just dunking it — measured: at the old penalty, 4 of 5 late ones went in', () => {
+    // The number that matters is not the penalty, it is what a blown trick CONVERTS at. A drive dunk's base is
+    // DUNK_PCT.dunk 0.92; at the old -0.22 a late tomahawk still made 0.70, which is a formality rather than a
+    // risk — the player never learns the window because missing it barely costs. Priced against "just dunk it".
+    for (const t of ALL) {
+      for (const judge of ['early', 'late'] as const) {
+        expect(trickPct(0.92, t, judge)).toBeLessThan(MISTIME_MAX_PCT);
+      }
+    }
+  });
+
+  it('…and the harder the trick, the further below it lands', () => {
+    expect(trickPct(0.92, 'betweenLegs', 'late')).toBeLessThan(trickPct(0.92, 'tomahawk', 'late'));
   });
 
   it('the harder the trick, the more it pays and the more it costs', () => {

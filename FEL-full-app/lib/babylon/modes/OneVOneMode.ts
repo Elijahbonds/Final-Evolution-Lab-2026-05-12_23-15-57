@@ -98,7 +98,7 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';              // the miss meets the iron it earned
 import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
-import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
+import { judge, rule, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot,
   resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, moveImpulse,
@@ -128,8 +128,7 @@ import {
   resolveBodyCollision, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, BLOCK_RANGE, DUNK_PCT,
   STEAL_EXPOSURE_MIN, AttackerBrain, RIVAL_DRIVE_SPEED, rivalShotPct, handUpContest, distXZ, HAND_UP_SEC,
-  SHOT_QUALITY_PCT, type ShotQuality, type ShotContext, type PostShot, type ShotStyle,
-} from '../core/BasketballCore';
+  SHOT_QUALITY_PCT, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF } from '../core/BasketballCore';
 import { DribbleStateMachine, syncedShotSpeed, RELEASE_FRAME_01 } from '../core/BallHandling';
 import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
@@ -214,11 +213,24 @@ const MY_SPAWN = new Vector3(0, 0, 5), FOE_SPAWN = new Vector3(0, 0, 2);
 /** Their possession: the CHECK. The rival checks up beyond the arc (top 7.24 m → z 6.64); I set 2 m inside him. */
 const CHECK_FOE = new Vector3(0, 0, 9.2), CHECK_ME = new Vector3(0, 0, 7.2);
 /** A poke's reach. Body collision holds two players ~1.1 m apart; 1.2 sat ON the standoff and flickered. */
+/** The lines themselves — the same box clampToHalfCourt holds bodies inside. */
+const COURT_HALF_WIDTH = 7.2, COURT_DEPTH = 14.5;
+/** How close to the line counts as ON it (the clamp parks you exactly there, so this is a touch of slack). */
+const OOB_EPSILON = 0.08;
+/** …and how long you have to keep pushing at it before it is a call, so a bump into the line is not a turnover. */
+const OOB_GRACE_SEC = 0.35;
 const STEAL_RANGE = 1.6;
 /** How long the feet have to be planted before a charge can be drawn — a charge is arriving early, not colliding. */
 const CHARGE_SET_SEC = 0.18;
-/** Inside a stride of a planted defender is contact; past it he went round you. */
-const CHARGE_RANGE = 1.15;
+/**
+ * Inside this of a planted defender is CONTACT; past it he went round you.
+ *
+ * Anchored to BODY_STANDOFF rather than picked: two bodies cannot be closer than 1.10 m (resolveBodyCollision
+ * pushes them apart at radius*2), so the old 1.15 asked for a gap the physics forbids — measured live, a plant
+ * held for 7.7 s never saw the driver inside 1.30 m and no charge was ever drawn. "He arrived at the body you
+ * planted" is a chest-to-chest arrival at the standoff, plus room for the frame he arrives on.
+ */
+const CHARGE_RANGE = BODY_STANDOFF + 0.5;
 const REACH_COOLDOWN_SEC = 0.4;          // a reach is a commitment, not a mash
 const REACH_WHIFF_STUN_SEC = 0.45;       // a whiffed reach costs your feet
 const JUMP_SEC = 0.75;                   // the contest jump's clock (physics lands the body)
@@ -315,6 +327,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let gatherShown = false, stepbackShown = false;
   let myJumpAge = Infinity;
   let dunkLabel = '';            // which dunk the drive earned (HoopsDunks) — the banner names it when it lands
+  let oobSec = 0;                // how long the carrier has been ON the line, still pushing at it
   let takingCharge = false;      // Circle held on defence — planted, waiting to wear it
   let chargeSetSec = 0;          // how long the feet have been down (a charge is arriving early, not colliding)                 // seconds since my contest jump left the floor
   let meStunSec = 0;                        // whiffed reach costs you your feet
@@ -1015,6 +1028,27 @@ export const OneVOneMode: ModeDefinition = (() => {
         // what the seal is for (the ball is held out on the ball side). Front the post (get on my chest side) and the poke
         // is live again; a bump strip roll always is.
         const sealed = posting && facingCos(me.root.rotation.y, me.root.position, foe.root.position) < 0.2;
+        // OUT OF BOUNDS OFF THE CARRIER — a rule that did not exist. `clampToHalfCourt` keeps every body inside
+        // the lines, so dribbling into the sideline was an invisible wall you slid along for free: the one way to
+        // lose the ball by leaving the floor was a LOOSE ball on a rebound. The clamp still holds the body (a
+        // player half off the court looks broken), but the line is now a line — carry into it and the ref calls it.
+        if (carrying && !shooting && !dunking && !finish && possession === 'mine') {
+          const p = me.root.position;
+          const outX = Math.abs(p.x) >= COURT_HALF_WIDTH - OOB_EPSILON;
+          const outZ = p.z >= COURT_DEPTH - OOB_EPSILON;
+          const pushingOut = (outX && Math.sign(mx) === Math.sign(p.x) && Math.abs(mx) > 0.3) || (outZ && my > 0.3);
+          oobSec = outX || outZ ? oobSec + dt : 0;
+          if (pushingOut && oobSec >= OOB_GRACE_SEC) {
+            oobSec = 0;
+            const call = judge('out_of_bounds', { offense: 'me', shooter: 'me' });
+            if (call.whistle) SoundKit.play('whistle');
+            meCarry?.update(0, 0, false);
+            console.info(`[1V1-REF] ${call.id} off the carrier at x ${p.x.toFixed(2)} z ${p.z.toFixed(2)} → ${call.ball}`);
+            bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}`, 900);
+            if (call.ball === 'me') resetPositions(); else startDefense(ctx, `${call.banner} — DEFEND!`);
+            return;
+          }
+        } else oobSec = 0;
         if (foeStunSec === 0 && carrying && !shooting && !dunking && !finish && !gather && !sealed && foeIntent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.6) {
           stripBall(ctx, 'STRIPPED!');   // D2: the ball goes LOOSE from the hand (it used to warp both bodies to the check)
           return;
@@ -1114,37 +1148,47 @@ export const OneVOneMode: ModeDefinition = (() => {
               ctx.feel?.impact?.(0.45);
               meAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
               foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
-              bannerFlash(ctx, 'CHARGE — YOUR BALL!', 1100);
-              console.info(`[1V1-CONTACT] charge taken on contact at ${c.attackerSpeed.toFixed(1)} m/s (set ${chargeSetSec.toFixed(2)}s)`);
+                // THE REF OWNS THE CONSEQUENCE. This asserted "YOUR BALL" itself, which is the exact thing Ref.ts
+              // exists to stop — a rule living in two places will disagree after the next tuning pass. The mode
+              // reports the fact (a foul-speed body arrived at a SET defender) and carries out the call.
+              const call = judge('charge', { offense: 'foe', fouled: 'me' });
+              bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}!`, 1100);
+              console.info(`[1V1-REF] ${call.id} at ${c.attackerSpeed.toFixed(1)} m/s (set ${chargeSetSec.toFixed(2)}s) → ${call.ball}`);
               defPhase = 'over';
-              later(800, () => resetPositions());
+              later(800, () => (call.ball === 'me' ? resetPositions() : startDefense(ctx, 'THEIR BALL — DEFEND!')));
             } else if (possession === 'mine' && (dunking || finish) && c.victim === 'me') {
               // HOOPS-MOVE-KIT-A M2: fouled IN THE AIR — the attempt plays out (it used to reset the possession mid-flight, with
               // the flight observer still flying the body): a make is an AND-ONE, a miss is the ball back
-              if (!finishFoul) { finishFoul = true; SoundKit.play('whistle'); bannerFlash(ctx, 'FOUL!', 400); console.info(`[1V1-CONTACT] foul in the air (${c.closingSpeed.toFixed(1)} m/s) — and-one pending`); }
+              // FOULED IN THE AIR. Which call this IS depends on whether it goes in, so the ref is asked when the
+              // attempt resolves (the and-one below) — this is the whistle and the flag, not the ruling.
+              if (!finishFoul) { finishFoul = true; SoundKit.play('whistle'); bannerFlash(ctx, rule('shooting_foul').call, 400); console.info(`[1V1-REF] foul in the air (${c.closingSpeed.toFixed(1)} m/s) — and-one pending on the attempt`); }
             } else if (possession === 'mine' && !shooting && !dunking && !finish && carrying && c.attacker === 'me' && c.attackerSpeed >= FOUL_CLOSING_SPEED && foeVelLast.length() < 1.0 && foeStunSec === 0) {
               // HOOPS-MOVE-KIT-A M2: a sprint THROUGH a set defender is a CHARGE (a foul-speed contact on offense was never
               // read — the handler ran through bodies for free); a moving defender who gets hit is just beaten (below)
               SoundKit.play('whistle');
               swing('turnover');
               ctx.setHud({ momentum });
-              bannerFlash(ctx, 'CHARGE — THEIR BALL', 1000);
-              console.info(`[1V1-CONTACT] charge ${c.closingSpeed.toFixed(1)} m/s into a set body`);
-              later(900, () => startDefense(ctx, 'CHECK UP — DEFEND!'));
+              const call = judge('charge', { offense: 'me', fouled: 'foe' });
+              bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}`, 1000);
+              console.info(`[1V1-REF] ${call.id} ${c.closingSpeed.toFixed(1)} m/s into a set body → ${call.ball}`);
+              later(900, () => (call.ball === 'me' ? resetPositions() : startDefense(ctx, 'CHECK UP — DEFEND!')));
             } else if (possession === 'mine' && !shooting && !dunking && !finish && carrying && c.attacker === 'foe' && c.victim === 'me' && c.attackerSpeed >= FOUL_CLOSING_SPEED) {
               // M2: a defender running THROUGH the handler at foul speed — the ball back
               SoundKit.play('whistle');
-              bannerFlash(ctx, 'FOUL ON THE DEFENDER — BALL BACK', 1000);
-              console.info(`[1V1-CONTACT] foul ${c.closingSpeed.toFixed(1)} m/s by the defender`);
-              resetPositions();
+              const call = judge('blocking_foul', { offense: 'me', fouled: 'me' });   // the charge's mirror
+              bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'BALL BACK' : 'THEIR BALL'}`, 1000);
+              console.info(`[1V1-REF] ${call.id} ${c.closingSpeed.toFixed(1)} m/s by the defender → ${call.ball}`);
+              if (call.ball === 'me') resetPositions(); else startDefense(ctx, 'THEIR BALL — DEFEND!');
             } else if (possession === 'mine' && (c.attacker === 'me' || c.attacker === 'foe') && !shooting && !dunking && !finish) {
               hardHit(ctx, c.attacker, c.victim, c.closingSpeed);   // a foul-speed collision with a MOVING defender: a hard hit, no whistle
             } else if (possession === 'mine' && shooting && c.victim === 'me') {
               SoundKit.play('whistle');
               mbus.report({ kind: 'big_make', weight: 8 }); momentum = Math.round(mbus.score01 * 100);
               ctx.setHud({ momentum });
-              bannerFlash(ctx, 'FOUL! — BALL BACK', 1000);
-              resetPositions();
+              const call = judge('shooting_foul', { offense: 'me', fouled: 'me', shooter: 'me' });
+              bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'BALL BACK' : 'THEIR BALL'}`, 1000);
+              console.info(`[1V1-REF] ${call.id} → ${call.ball} (${call.shots} shots in the book)`);
+              if (call.ball === 'me') resetPositions(); else startDefense(ctx, 'THEIR BALL — DEFEND!');
             } else if (possession === 'defense' && defPhase !== 'over' && c.attacker === 'me' && c.attackerSpeed >= FOUL_CLOSING_SPEED) {
               // I ran through them: their ball again, checked up
               SoundKit.play('whistle');
@@ -1251,10 +1295,11 @@ export const OneVOneMode: ModeDefinition = (() => {
             ctx.feel?.impact?.(0.45);
             meAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
             foeAnimTree.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.06 });
-            bannerFlash(ctx, 'CHARGE — YOUR BALL!', 1100);
-            console.info(`[1V1-CONTACT] charge taken at ${closing.toFixed(1)} m/s (set ${chargeSetSec.toFixed(2)}s)`);
+            const call = judge('charge', { offense: 'foe', fouled: 'me' });   // the ref, not the mode — see above
+            bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}!`, 1100);
+            console.info(`[1V1-REF] ${call.id} at ${closing.toFixed(1)} m/s (set ${chargeSetSec.toFixed(2)}s) → ${call.ball}`);
             defPhase = 'over';
-            later(800, () => resetPositions());
+            later(800, () => (call.ball === 'me' ? resetPositions() : startDefense(ctx, 'THEIR BALL — DEFEND!')));
           }
         } else chargeSetSec = 0;
         const wantHandUp = !!intent.contest && myJumpAge === Infinity && meStunSec === 0 && !meFloored && defPhase !== 'over';

@@ -177,6 +177,17 @@ export class DribbleController {
 // ── NEW: body collision ──────────────────────────────────────────────────
 /** Push two bodies apart on XZ if they overlap. Returns true when a push
  *  happened (modes can use it for a bump sound at high closing speed). */
+/**
+ * TWO BODIES CANNOT BE CLOSER THAN THIS, centre to centre — `resolveBodyCollision` pushes them apart at exactly
+ * `radius * 2`, so it is a hard floor on every distance measured between two players, not a tuning value.
+ *
+ * Exported because a rule written as if bodies could overlap is a rule that can never fire, and one had been:
+ * 1v1's CHARGE_RANGE was 1.15 m, five centimetres above this floor. Measured live — a defender who held a plant
+ * for 7.7 s across eight possessions never saw the driver come closer than 1.30 m, so the charge was unreachable
+ * by construction while looking, in code, like a tight-but-fair window.
+ */
+export const BODY_STANDOFF = 1.10;
+
 export function resolveBodyCollision(a: Vector3, b: Vector3, radius = 0.55): boolean {
   const dx = b.x - a.x, dz = b.z - a.z;
   const distSq = dx * dx + dz * dz;
