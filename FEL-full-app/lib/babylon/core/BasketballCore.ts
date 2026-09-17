@@ -20,14 +20,14 @@
 
 import { Vector3 } from '@babylonjs/core';
 import type { AIBehavior, Intent } from './PlayerSlot';
-import { CourtMovement, DEFAULT_MOVEMENT } from './CourtMovement';
+import { CourtMovement, DEFAULT_MOVEMENT, GEARS_HOOPS, type Gear } from './CourtMovement';
 import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop / crash, box-out, navigating a screen)
   screenSpot, pickScreenSide, stepScreen, SCREEN_IDLE, rollLaneOpen, rollTarget, crashSpot, navigateAround, boxOutSpot, SCREEN_MIN_RIM_DIST,
   type OffenseJob, type DefenseJob, type ScreenState,
 } from './HoopsOffball';
 
 // ── Movement ─────────────────────────────────────────────────────────────
-export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean }
+export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean; gear: Gear; intensity01: number; paceChange: boolean }
 
 /** Planar movement now runs on CourtMovement (Phase 2 weight model):
  *  ramped accel, stronger decel, speed-scaled plant-and-cut, turn-rate cap.
@@ -71,10 +71,14 @@ export class DribbleController {
   static readonly HESI_COOLDOWN_SEC = 1.0;
 
   constructor(cfg = { maxSpeed: 6.4, accel: 26, decel: 34, turnRate: 9, crossoverBoost: 2.2 }) {
-    this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed });
+    this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed, gears: GEARS_HOOPS });   // DRIBBLE PACE: the gears are on for the ball handler
     this.crossoverBoost = cfg.crossoverBoost;
   }
   private crossoverBoost: number;
+  /** DRIBBLE PACE: letting off the turbo at pace opens a change-of-pace window; the next R2 PRESS inside it explodes. */
+  private sprintWas = false; private paceWindowLeft = 0;
+  static readonly PACE_WINDOW_SEC = 0.6;
+  static readonly PACE_DOWN_MIN_SPEED = 3.4;
 
   get vel(): Vector3 { return this.movement.vel; }
   get facing(): number { return this.movement.facing; }
@@ -91,6 +95,12 @@ export class DribbleController {
     const mag = Math.hypot(moveX, moveY);
     let crossover = false;
     let hesitation = false;
+    let paceChange = false;
+    this.paceWindowLeft = Math.max(0, this.paceWindowLeft - dt);
+    const speedBefore = this.movement.vel.length();
+    // the gear-down: R2 let go at pace with the stick still in — the body eases off (CourtMovement) and the window arms
+    if (!sprint && this.sprintWas && speedBefore >= DribbleController.PACE_DOWN_MIN_SPEED && mag > 0.5) this.paceWindowLeft = DribbleController.PACE_WINDOW_SEC;
+    const sprintPress = sprint && !this.sprintWas && mag > 0.5;
 
     this.lastDirAge += dt;
     const committed = mag > 0.6;
@@ -147,7 +157,7 @@ export class DribbleController {
       this.crossoverCooldown = 0.5;
       // Skilled cut: instant redirect + burst (bypasses plant penalty).
       const top = DEFAULT_MOVEMENT.maxSpeed;
-      this.movement.vel.copyFrom(dir!.scale(Math.min(top * 1.15, this.movement.vel.length() + this.crossoverBoost)));
+      this.movement.vel.copyFrom(dir!.scale(Math.min(top * 1.15, this.movement.vel.length() + this.crossoverBoost * (sprint ? 1.3 : 0.85))));   // DRIBBLE PACE: the turbo makes the cut violent
       this.movement.facing = Math.atan2(dir!.x, dir!.z);
     }
 
@@ -166,11 +176,24 @@ export class DribbleController {
       }
     }
 
+    // CHANGE OF PACE — the R2 press inside the gear-down window: the explode-out's burst along the stick (the hesi's
+    // separation without the plant), and the sprint's own kick on top. Turbo makes the move: no window without a sprint
+    // to let off, no burst without the press.
+    if (!hesitation && !crossover && this.paceWindowLeft > 0 && sprintPress) {
+      const dir = new Vector3(moveX, 0, -moveY).normalize();
+      const top = DEFAULT_MOVEMENT.maxSpeed;
+      this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, this.movement.vel.length() + this.crossoverBoost)));
+      this.movement.facing = Math.atan2(dir.x, dir.z);
+      this.movement.noteBurst(0.5);
+      this.paceWindowLeft = 0; paceChange = true;
+    }
+    if (crossover || hesitation) this.movement.noteBurst(sprint ? 0.5 : 0.3);   // a move is intensity too — more of it on the turbo
+    this.sprintWas = sprint && mag > 0.05;
     if (committed) {
       this.lastDirX = moveX / mag; this.lastDirY = moveY / mag;
       this.lastDirAge = 0;
     }
-    return { crossover, hesitation, speed01: state.speed01, facingRad: this.movement.facing, planting: state.planting };
+    return { crossover, hesitation, speed01: state.speed01, facingRad: this.movement.facing, planting: state.planting, gear: state.gear ?? 'stop', intensity01: state.intensity01 ?? state.speed01, paceChange };
   }
 }
 

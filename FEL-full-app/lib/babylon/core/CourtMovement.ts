@@ -34,7 +34,37 @@ export interface MovementTuning {
   plantDot: number;        // direction dot below this (≈>110°) = plant-and-cut
   plantBleedSec: number;   // how long a plant bleeds speed before redirect
   turnRateDegAtSpeed: number; // max facing/velocity turn at top speed
+  /** DRIBBLE PACE (owner, 2026-09-17: "a dribble system built for changing speed and direction with smooth start-ups and
+   *  stops … a difference in speed and intensity with the turbo"). Opt-in: with `gears` the speed follows a first-order lag
+   *  to a WALK / JOG / SPRINT target with per-gear accel caps, a loaded first step, a speed-scaled stop, and a kick on the
+   *  sprint press. Without it the old snap model (accel/decel above) runs untouched (combat, tennis, football). */
+  gears?: GearTuning;
 }
+
+export type Gear = 'stop' | 'walk' | 'jog' | 'sprint';
+export interface GearTuning {
+  walkStick: number;       // stick magnitude under this = a walk
+  walkFactor: number;      // walk top = maxSpeed * walkFactor (the jog uses jogFactor)
+  jogTau: number;          // s — the lag to the jog target
+  sprintTau: number;       // s — the lag to the sprint target (shorter: the burst)
+  jogAccel: number;        // m/s² cap toward a jog target
+  sprintAccel: number;     // m/s² cap toward a sprint target
+  loadBelow: number;       // m/s — under this the first step is LOADED (accel scaled from loadScale up to 1)
+  loadScale: number;
+  gearDownDecel: number;   // m/s² toward a LOWER target with the stick still held (letting off the turbo)
+  stopDecelLow: number;    // m/s² at a walk when the stick is released
+  stopDecelHigh: number;   // m/s² at top speed when the stick is released (a sprint slides longer)
+  sprintKick: number;      // m/s added on the sprint PRESS while already moving
+  kickAbove: number;       // m/s — the kick needs this much run already
+}
+export const GEARS_HOOPS: GearTuning = {
+  walkStick: 0.45, walkFactor: 0.38,
+  jogTau: 0.17, sprintTau: 0.15, jogAccel: 15, sprintAccel: 24,
+  loadBelow: 1.2, loadScale: 0.45,
+  gearDownDecel: 9,
+  stopDecelLow: 22, stopDecelHigh: 11,
+  sprintKick: 0.9, kickAbove: 1.5,
+};
 
 export const DEFAULT_MOVEMENT: MovementTuning = {
   maxSpeed: 6.4,
@@ -52,6 +82,8 @@ export interface MovementState {
   speed01: number;
   planting: boolean;
   facingRad: number;
+  gear?: Gear;          // gears only
+  intensity01?: number; // gears only: how hard the body is working (sprint 1 at top speed, a jog ~0.7, kicks/bursts add)
 }
 
 export class CourtMovement {
@@ -63,6 +95,12 @@ export class CourtMovement {
   private plantTimer = 0;
   private plantFloor = 0;
   private cutActive = false;
+  private sprintWas = false;   // gears: the sprint press edge
+  private burst01 = 0;         // gears: intensity from a kick / a burst, decaying
+  private gearNow: Gear = 'stop';
+  /** gears: a burst from outside (a crossover, an explode-out) adds to the intensity read. */
+  noteBurst(amount01 = 0.35): void { this.burst01 = Math.min(1, this.burst01 + amount01); }
+  get gear(): Gear { return this.gearNow; }
 
   constructor(private tune: MovementTuning = DEFAULT_MOVEMENT) {}
 
@@ -76,7 +114,12 @@ export class CourtMovement {
 
     if (mag > 0.05) {
       const wantDir = new Vector3(moveX, 0, -moveY).normalize();
-      const topSpeed = t.maxSpeed * this.speedScale * (sprint ? 1 : t.jogFactor) * mag;
+      // gears: a soft stick is a WALK (its own top), a pushed one a jog, the turbo a sprint — three speeds, not one scaled by the stick
+      const gearTop = t.gears
+        ? (sprint ? t.maxSpeed : mag < t.gears.walkStick ? t.maxSpeed * t.gears.walkFactor * (mag / t.gears.walkStick) : t.maxSpeed * t.jogFactor * (0.85 + 0.15 * (mag - t.gears.walkStick) / (1 - t.gears.walkStick)))
+        : t.maxSpeed * (sprint ? 1 : t.jogFactor) * mag;
+      const topSpeed = gearTop * this.speedScale;
+      if (t.gears) this.gearNow = sprint ? 'sprint' : mag < t.gears.walkStick ? 'walk' : 'jog';
       const speed = this.vel.length();
 
       // Plant-and-cut: hard direction reversal at pace bleeds speed first.
@@ -109,9 +152,23 @@ export class CourtMovement {
           const k = Math.min(1, maxTurn / angle);
           dir = Vector3.Lerp(dir, wantDir, k).normalize();
         }
-        // Burst off the mark, slower cruise ramp when sprinting at pace.
-        const a = speed < 1.2 ? t.accel : (sprint ? t.sprintAccel : t.accel);
-        const newSpeed = Math.min(topSpeed, speed + a * dt);
+        let newSpeed: number;
+        if (t.gears) {
+          // DRIBBLE PACE: a lag to the gear's target, capped per gear, loaded off the mark; a LOWER target (off the turbo,
+          // easing the stick) bleeds at the gear-down rate rather than snapping; the sprint PRESS kicks a moving body.
+          const g = t.gears;
+          const err = topSpeed - speed;
+          if (err >= 0) {
+            const cap = sprint ? g.sprintAccel : g.jogAccel, tau = sprint ? g.sprintTau : g.jogTau;
+            const load = speed < g.loadBelow ? g.loadScale + (1 - g.loadScale) * (speed / g.loadBelow) : 1;
+            newSpeed = Math.min(topSpeed, speed + Math.min(cap * load, err / tau) * dt);
+          } else newSpeed = Math.max(topSpeed, speed - g.gearDownDecel * dt);
+          if (sprint && !this.sprintWas && speed >= g.kickAbove) { newSpeed = Math.min(t.maxSpeed * this.speedScale, newSpeed + g.sprintKick); this.burst01 = Math.min(1, this.burst01 + 0.3); }
+        } else {
+          // Burst off the mark, slower cruise ramp when sprinting at pace.
+          const a = speed < 1.2 ? t.accel : (sprint ? t.sprintAccel : t.accel);
+          newSpeed = Math.min(topSpeed, speed + a * dt);
+        }
         this.vel.copyFrom(dir.scale(newSpeed));
       }
 
@@ -123,19 +180,26 @@ export class CourtMovement {
       const step = 10 * dt;
       this.facing += Math.max(-step, Math.min(step, d));
     } else {
-      // Stick released: plant to a stop, fast but not instant.
+      // Stick released: plant to a stop, fast but not instant. gears: the stop scales with pace — a sprint slides longer
+      // (stopDecelHigh at top speed) than a walk (stopDecelLow), so a full-speed stop is a visible gather, not a wall.
       const speed = this.vel.length();
+      if (t.gears) this.gearNow = 'stop';
       if (speed > 0) {
-        const newSpeed = Math.max(0, speed - t.decel * dt);
+        const decel = t.gears ? t.gears.stopDecelLow + (t.gears.stopDecelHigh - t.gears.stopDecelLow) * Math.min(1, speed / t.maxSpeed) : t.decel;
+        const newSpeed = Math.max(0, speed - decel * dt);
         this.vel.scaleInPlace(speed > 0.001 ? newSpeed / speed : 0);
       }
     }
 
+    this.sprintWas = sprint && mag > 0.05;
+    this.burst01 = Math.max(0, this.burst01 - dt / 0.35);
+    const speed01 = Math.min(1, this.vel.length() / t.maxSpeed);
     return {
       vel: this.vel,
-      speed01: Math.min(1, this.vel.length() / t.maxSpeed),
+      speed01,
       planting: this.plantTimer > 0,
       facingRad: this.facing,
+      ...(t.gears ? { gear: this.gearNow, intensity01: Math.min(1, speed01 * (this.gearNow === 'sprint' ? 1 : 0.72) + this.burst01 * 0.35) } : {}),
     };
   }
 

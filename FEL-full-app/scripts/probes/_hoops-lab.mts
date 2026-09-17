@@ -229,7 +229,7 @@ if (SMOOTH) await page.evaluate(`(() => { const q = window.__FEL_QA__; const s =
   const hero = rig(q.hero());
   let foe = null;
   const bodies = () => s.meshes.filter((m) => m.name.startsWith('__root__') && m !== hero.root && skOf(m)).map((m) => m.position);
-  const rows = []; window.__smooth = rows; const t0 = performance.now();
+  const rows = []; window.__smooth = rows; const t0 = performance.now(); window.__smoothT0 = t0;
   s.onAfterRenderObservable.add(() => {
     if (!foe) { const d = s.metadata && s.metadata[MODE]; const fr = d && (typeof d.driverRoot === 'function' ? d.driverRoot() : d.foeRoot); if (fr) foe = rig(fr); }
     const ball = s.getMeshByName('ball'); const cam = s.activeCamera;
@@ -249,6 +249,7 @@ interface Poss {
   beats: string[]; trace?: string[];
 }
 const rows: Poss[] = [];
+const paceMarks: { t: number; label: string }[] = [];   // DRIBBLE PACE: recorder-clock marks of the pace play's steps
 let logMark = 0;
 const PLAYS = ['jumper', 'layup', 'dunk'];
 
@@ -259,7 +260,7 @@ const PLAYS = ['jumper', 'layup', 'dunk'];
 // the SIDE under test is chosen by PLAY rather than by who happens to be winning.
 // CHARGE is a defensive possession too — you are standing in his way waiting to wear it.
 const wantDefence = PLAY === 'defence' || PLAY === 'charge';
-const PLAYS_ALL = ['jumper', 'layup', 'dunk', 'handle', 'trick', 'screen'];   // what PLAY can name
+const PLAYS_ALL = ['jumper', 'layup', 'dunk', 'handle', 'trick', 'screen', 'pace'];   // what PLAY can name
 await page.evaluate(`(() => { window.__brain = ${wantDefence}; window.__def.block = ${PLAY !== 'charge'}; window.__def.charge = ${PLAY === 'charge'}; })()`);
 
 /**
@@ -361,6 +362,21 @@ for (let n = 0; n < POSSESSIONS; n++) {
       await driveToRim(2.4);
       await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
       await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: 0, action: true }, 60)`);
+    }
+    else if (play === 'pace') {
+      // DRIBBLE PACE: walk, jog, stop (−x), then jog, turbo, let off, press again (the change of pace), stop (+x) — the speed
+      // profile is read off the smoothness recorder's hero root afterwards (paceMarks: recorder-clock ms at each step).
+      // Sideways so the run stays on the court; the bridge's `move` SPRINTS above magnitude 0.85, so the jog is 0.75.
+      const mark = async (label: string) => { const t = await page.evaluate('performance.now() - (window.__smoothT0 || 0)') as number; paceMarks.push({ t: Math.round(t), label }); };
+      await mark('walk');    await agent(`a.do('move', { x: -0.3, y: 0, ms: 800 })`);
+      await mark('jog');     await agent(`a.do('move', { x: -0.75, y: 0, ms: 700 })`);
+      await mark('jogstop'); await agent(`a.do('move', { x: 0, y: 0, ms: 700 })`);
+      await mark('jog2');    await agent(`a.do('move', { x: 0.75, y: 0, ms: 500 })`);
+      await mark('turbo');   await agent(`a.do('turbo', { x: 1, y: 0, ms: 550 })`);
+      await mark('off');     await agent(`a.do('move', { x: 0.75, y: 0, ms: 260 })`);
+      await mark('press');   await agent(`a.do('turbo', { x: 1, y: 0, ms: 400 })`);
+      await mark('stop');    await agent(`a.do('move', { x: 0, y: 0, ms: 800 })`);
+      await mark('end');
     }
     else if (play === 'screen') {
       // CALL FOR A SCREEN, then drive off it. 3v3 only — 1v1 answers the press with NO TEAMMATE TO SCREEN, which is
@@ -530,6 +546,21 @@ if (SMOOTH) {
   for (const f of flipAt) console.log(`  clip flip ${f}`);
   for (const b of ballPopAt.slice(0, 8)) console.log(`  ball pop ${b.d} m @${b.t}ms y ${b.y} ${b.clips.join('+')}`);
   printVerdicts(TAG, analyseBallPath(rows, outcomes));
+  // DRIBBLE PACE: the hero's ground speed through the pace play, 50 ms bins, with the step marks — top speeds per gear,
+  // time to 95 % of the sprint after the press, the stop's length from the sprint and from the jog
+  if (paceMarks.length) {
+    const sp: { t: number; v: number }[] = [];
+    for (let i = 1; i < rows.length; i++) { const a = rows[i - 1].h?.[0], b = rows[i].h?.[0]; const dt = (rows[i].t - rows[i - 1].t) / 1000; if (!a || !b || dt <= 0 || dt > 0.1) continue; sp.push({ t: rows[i].t, v: Math.hypot(b[0] - a[0], b[2] - a[2]) / dt }); }
+    const at = (t: number) => sp.filter((s) => Math.abs(s.t - t) <= 40).map((s) => s.v).sort((a, b) => a - b)[Math.floor(sp.filter((s) => Math.abs(s.t - t) <= 40).length / 2)] ?? NaN;
+    const m = Object.fromEntries(paceMarks.map((x) => [x.label, x.t]));
+    const line: string[] = [];
+    for (let t = m.walk; t <= m.end; t += 50) { const v = at(t); const lab = paceMarks.find((x) => Math.abs(x.t - t) < 25)?.label; line.push(`${lab ? lab + ':' : ''}${Number.isFinite(v) ? v.toFixed(1) : '-'}`); }
+    console.log(`PACE ${TAG}: ${line.join(' ')}`);
+    const peak = (from: number, to: number) => Math.max(0, ...sp.filter((s) => s.t >= from && s.t < to && s.v < 12).map((s) => s.v));   // a reset's teleport is not a speed
+    const reach = (from: number, to: number, target: number) => { const f = sp.find((s) => s.t >= from && s.t < to && s.v >= target); return f ? f.t - from : -1; };
+    const stopLen = (from: number, to: number) => { const f = sp.find((s) => s.t >= from + 60 && s.t < to && s.v < 0.3); return f ? f.t - from : -1; };
+    console.log(`PACE ${TAG}: walk peak ${peak(m.walk, m.jog).toFixed(1)} · jog peak ${peak(m.jog, m.jogstop).toFixed(1)} · stop from jog ${stopLen(m.jogstop, m.jog2)} ms · sprint peak ${peak(m.turbo, m.off).toFixed(1)} (6.0 in ${reach(m.turbo, m.off, 6.0)} ms) · off-the-turbo low ${Math.min(...sp.filter((s) => s.t >= m.off + 100 && s.t < m.press).map((s) => s.v)).toFixed(1)} · press peak ${peak(m.press, m.stop).toFixed(1)} · stop from sprint ${stopLen(m.stop, m.end)} ms`);
+  }
   // BODY OVERLAP: frames with another body's root inside OVERLAP_M of the hero's (two 0.55 m bodies cannot be closer than 1.1 m without passing through each other)
   const OVERLAP_M = 0.7; const over = rows.filter((r) => typeof r.gap === 'number' && r.gap < OVERLAP_M); const minGap = Math.min(...rows.map((r) => (typeof r.gap === 'number' ? r.gap : 99)));
   const overEp: { t: number; n: number; gap: number; clips: string }[] = []; let run: { t: number; n: number; gap: number; clips: string } | null = null;

@@ -359,6 +359,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   const meBio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE }, foeBio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE };
   let meShotWin: ShotWindow = 'none', meShotSec = 0, foeShotWin: ShotWindow = 'none', foeShotSec = 0;   // load (the meter / the gather) → release → follow (until the arc resolves)
   let meLandSec = 0, meCelebrateSec = 0, meSpeed01 = 0, foeSpeed01 = 0;
+  let meIntensity01 = 0, meGear = 'stop';   // DRIBBLE PACE: how hard the body is working (the posture's exertion) and the gear (logged on change)
   let scuff: ScuffState = { ...SCUFF_IDLE };
   let dunkFlight: { k: number; made: boolean | null } | null = null;                 // the drive dunk's flight clock (the posture windows ride it)
   let dunkFlush: { releasePos: Vector3; since: number; kind: NetExitKind; st?: FlushState } | null = null;               // the make's ball through the iron (G6)
@@ -631,7 +632,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       me.secondary?.setLookTarget(() => null); foe.secondary?.setLookTarget(() => null);
       net?.dispose(); net = null;   // NETPLAY: say bye and close the socket with the rest of teardown
       mePosture?.dispose(); foePosture?.dispose();
-      mePosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => feedFor(meBio, possession === 'mine' ? RIM : foe.root.position, possession === 'mine' ? RIM : ballWorld(), meMotion, 1 - turbo.t01, myJumpAge !== Infinity || dunking), '1V1-PP');
+      mePosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => feedFor(meBio, possession === 'mine' ? RIM : foe.root.position, possession === 'mine' ? RIM : ballWorld(), meMotion, Math.max(1 - turbo.t01, meIntensity01 * 0.7), myJumpAge !== Infinity || dunking), '1V1-PP');   // DRIBBLE PACE: a sprint LOOKS like work
       foePosture = mountPostureLayer(ctx.scene, foe.skeleton, foe.root, () => feedFor(foeBio, possession === 'mine' ? me.root.position : RIM, possession === 'mine' ? ballWorld() : RIM, foeMotion, 0, foeBlockJumpAge !== Infinity || !!foeDunkFlight), '1V1-PP-FOE');
       meCarry?.dispose(); foeCarry?.dispose();
       meCarry = mountBallCarry({ scene: ctx.scene, ball, root: me.root, skeleton: me.skeleton });
@@ -897,6 +898,8 @@ export const OneVOneMode: ModeDefinition = (() => {
         const [mx, my] = camRel(ctx, intent.moveX, intent.moveY);
         const drib = meDribble.update(dt, mx, my, sprintOk);
         meSpeed01 = drib.speed01;
+        meIntensity01 = drib.intensity01; if (drib.gear !== meGear) { console.info(`[1V1-PACE] gear ${meGear} → ${drib.gear} at ${meDribble.vel.length().toFixed(1)} m/s`); meGear = drib.gear; }
+        if (drib.paceChange) { SoundKit.play('whoosh', { pitch: 1.25, volume: 0.4 }); ctx.camDirector.pulse(0.2, 0.3); console.info('[1V1-PACE] change of pace — the press inside the gear-down window'); }
         const defPos = foeStunSec > 0 || foeFloored ? null : foe.root.position;   // HOOPS-MOVE-KIT-B: the body the post / the spin read
         if (shooting) {   // BIOMECH-HOOPS-WAVE1 G1: the shooter squares to the rim through the meter (he kept the last dribble heading)
           const yaw = slewYaw(me.root.rotation.y, yawTo(me.root.position, RIM), FACE_RIM_RATE, dt); face(me.root, yaw); meDribble.setFacing(yaw);

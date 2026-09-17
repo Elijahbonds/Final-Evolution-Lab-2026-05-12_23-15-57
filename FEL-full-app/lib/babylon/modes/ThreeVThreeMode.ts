@@ -224,6 +224,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   const passFlight = new PassFlight();
   const carries = new Map<Body, BallCarry>();   // live dribble per body on my team
   let meSpeed01 = 0;
+  let meIntensity01 = 0, meGear = 'stop';   // DRIBBLE PACE
   let scuff: ScuffState = { ...SCUFF_IDLE };
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   let passTargetId: 'mate0' | 'mate1' = 'mate0';
@@ -367,7 +368,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // the authored stance says what the window looks like; the tracker says how hard this body is living in it.
     // Before this, six bodies in the same window were byte-identical however differently they were moving.
     const airborne = b.jumpAge !== Infinity;
-    const dyn = dynamicPose(pose, b.motion.signals(b.speed01, 0, airborne), window);
+    const dyn = dynamicPose(pose, b.motion.signals(b.speed01, b === me ? meIntensity01 * 0.7 : 0, airborne), window);   // DRIBBLE PACE: the sprint reads as work
     return { pose: dyn, legs, aim: objectiveFor(b), eyes: def ? ballWorld() : RIM, window };
   }
   /** Face a body the play's way, slewed: the objective inside range, else the travel, else the heading. */
@@ -913,6 +914,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       }
       const drib = me.drib.update(dt, wish.x, -wish.z, sprintOk);
       meSpeed01 = drib.speed01; me.speed01 = drib.speed01;
+      meIntensity01 = drib.intensity01; if (drib.gear !== meGear) { console.info(`[3V3-PACE] gear ${meGear} → ${drib.gear} at ${me.drib.vel.length().toFixed(1)} m/s`); meGear = drib.gear; }
+      if (drib.paceChange) { SoundKit.play('whoosh', { pitch: 1.25, volume: 0.4 }); ctx.camDirector.pulse(0.2, 0.3); console.info('[3V3-PACE] change of pace'); }
       // THE FLOOR ANSWERS A HARD STOP. Dust existed and ten modes used it — for knockdowns, tackles and
       // landings, never for STOPPING, which is the most violent thing a body does on a court on purpose.
       // `tickScuff` thresholds on DECELERATION rather than a per-frame speed drop, so the same cut puffs at
