@@ -7,7 +7,10 @@ export type FelInput =
    *  means something else on the runway (the dunk's PROP) must skip keyboard d-pad presses — pad buttons 12–15,
    *  the touch d-pad and Controller Link carry no src and stay the real d-pad. */
   | { t: 'dpad'; dir: 'up' | 'down' | 'left' | 'right'; pressed: boolean; src?: 'key' }
-  | { t: 'button'; btn: 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START'; pressed: boolean }
+  /** `src: 'key'` on a BUTTON marks the keyboard's two shoulder keys (SHIFT = R1, F = L1). The hoops slot reads the
+   *  tagged pair as its two TRIGGER verbs (turbo / post-up + intense D) because a keyboard has no analog triggers;
+   *  every other reader sees the plain R1 / L1 it always did. A pad's shoulders carry no src. */
+  | { t: 'button'; btn: 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START'; pressed: boolean; src?: 'key' }
   | { t: 'trigger'; side: 'L' | 'R'; value: number };
 
 import { HAPTIC } from '../premium/Haptics';
@@ -67,10 +70,15 @@ const KEYMAP: Record<string, FelInput> = {
   q: { t: 'button', btn: 'L1', pressed: true },
   e: { t: 'button', btn: 'R1', pressed: true },
   // BOOST (FINISH-RELEASE, 2026-09-14): Shift is the keyboard's boost — the shared held R1 every speed mode burns on.
-  // It is ALSO the keyboard's R2 (see onKey): the 2K map makes turbo a held trigger, and "shift to run" is the one
-  // keyboard convention every player already has. Emitted as both, because the speed modes read R1 and the hoops
-  // slot reads the trigger.
-  shift: { t: 'button', btn: 'R1', pressed: true },
+  // It is ALSO the keyboard's R2: the 2K map makes turbo a held trigger, and "shift to run" is the one keyboard
+  // convention every player already has. It is NOT emitted as a trigger, though (suite pass, 2026-09-16): fifteen mode
+  // files read the raw R trigger for something else entirely — the dunk's run-up, the shootout's wind-up, a board's
+  // crouch, a throw's power — and a Shift that also pulled R2 started all of them. The hoops slot reads the
+  // `src: 'key'` tag on this R1 instead (see PlayerSlot.LocalInputSource), so only the slot sees a turbo.
+  shift: { t: 'button', btn: 'R1', pressed: true, src: 'key' },
+  // F = L2 the same way: post-up on offence, intense D on defence, read off the tag by the hoops slot; a plain L1
+  // (the plant / box-out) everywhere else.
+  f: { t: 'button', btn: 'L1', pressed: true, src: 'key' },
   c: { t: 'button', btn: 'SELECT', pressed: true },
   escape: { t: 'button', btn: 'START', pressed: true },
 };
@@ -213,13 +221,10 @@ export class InputBus {
       if (arrow) this.emit({ t: 'dpad', dir: arrow, pressed: down, src: 'key' });
       return;
     }
-    // THE KEYBOARD'S TWO TRIGGERS (2K map, 2026-09-16). A keyboard has no analog triggers, so the two verbs that
-    // live on them need keys of their own or the scheme only exists on a pad — which is exactly how the keyboard
-    // ended up unable to choose between a dunk and a layup: turbo was inferred from stick magnitude, and a key is
-    // always full magnitude, so every keyboard drive was a sprint.
-    //   SHIFT = R2, the turbo.        F = L2, the post-up (and, on defence, intense D).
-    if (key === 'shift') this.emit({ t: 'trigger', side: 'R', value: down ? 1 : 0 });
-    if (key === 'f') { this.emit({ t: 'trigger', side: 'L', value: down ? 1 : 0 }); return; }
+    // THE KEYBOARD'S TWO TRIGGERS (2K map, 2026-09-16) are SHIFT and F, mapped above as R1 / L1 tagged `src: 'key'`.
+    // A keyboard has no analog triggers, so the two verbs that live on them need keys of their own or the scheme only
+    // exists on a pad — which is exactly how the keyboard ended up unable to choose between a dunk and a layup: turbo
+    // was inferred from stick magnitude, and a key is always full magnitude, so every keyboard drive was a sprint.
     if (key === ' ') {
       if (down) { this.spaceDownAt = performance.now(); this.emit({ t: 'trigger', side: 'R', value: KEY_SPACE_DOWN }); }
       else { this.emit({ t: 'trigger', side: 'R', value: 0 }); this.emit({ t: 'button', btn: 'A', pressed: true }); }

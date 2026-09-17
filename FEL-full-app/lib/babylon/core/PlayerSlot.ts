@@ -156,7 +156,7 @@ export class LocalInputSource implements ControlSource {
     //   Bottom  (FEL A)   PASS on a tap, PASS FAKE on a hold.
     //   Circle  (FEL B)   CALL FOR A SCREEN on offence; TAKE CHARGE — plant your feet — on defence.
     //   L2  (L trigger)   POST UP on offence, INTENSE D on defence.    L1 keeps the plant/box-out it was taught on.
-    //   R1                call GLASS (no 2K equivalent; this game's own).
+    //   R1                call GLASS (no 2K equivalent; this game's own).   KEYBOARD: SHIFT = R2, F = L2 (tagged R1 / L1).
     //
     // TURBO USED TO BE A GUESS. `sprint` was `hypot(moveX, moveY) > 0.85` — inferred from how hard the stick was
     // pushed — so "go fast" and "go up strong" were the same gesture and a KEYBOARD, which can only ever report a
@@ -165,8 +165,15 @@ export class LocalInputSource implements ControlSource {
     // with no trigger reading yet.
     if (e.t === 'trigger' && e.side === 'R') { this.turboHeld = e.value > 0.35; this.turboSeen = true; }
     if (e.t === 'trigger' && e.side === 'L') { this.braceTrigger = e.value > 0.4; this.intenseHeld = e.value > 0.4; }
-    if (e.t === 'button' && e.btn === 'L1') this.braceButton = e.pressed;
-    if (e.t === 'button' && e.btn === 'R1') this.glassHeld = e.pressed;
+    // THE KEYBOARD'S TRIGGERS ARE TAGGED BUTTONS (suite pass, 2026-09-16). SHIFT arrives as R1 `src: 'key'` and F as
+    // L1 `src: 'key'` — InputBus stopped emitting them as triggers because fifteen modes read the raw R trigger for
+    // their own verb (the dunk's run-up, the shootout's wind-up, a board's crouch). A tagged R1 is the TURBO, and it is
+    // NOT a glass call: Shift was also the glass button, so every keyboard sprint drive finished off the glass.
+    if (e.t === 'button' && e.btn === 'L1') { this.braceButton = e.pressed; if (e.src === 'key') this.intenseHeld = e.pressed; }
+    if (e.t === 'button' && e.btn === 'R1') {
+      if (e.src === 'key') { this.turboHeld = e.pressed; this.turboSeen = true; }
+      else this.glassHeld = e.pressed;
+    }
     // SQUARE — the shot meter is a HELD button now, not a held analog trigger. Nothing downstream reads the analog
     // value: every consumer compares `actionHeld` against 0.02, and the meter itself runs on dt.
     if (e.t === 'button' && e.btn === 'X') {
