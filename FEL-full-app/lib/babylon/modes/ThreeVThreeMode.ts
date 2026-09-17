@@ -226,6 +226,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   // ── BIOMECH-HOOPS-WAVE1 ──
   let driver: Body | null = null;                // the rival driving on their possession (its tree carries the ball, it faces the rim, the AI drive skips it)
   let driveK = 0;                                // the rival drive's clock 0..1 (the block window is its end)
+  let driveSec = 1.1;                            // …and how long that clock runs: the distance at DRIVE_MPS (suite pass)
   let paintSec = 0, paintWarned = false;          // the three-second clock, and whether the ref has warned yet
   let goaltendCalled = false;                    // one call per shot
   let prevBallY = 0;                             // for the ball's vertical rate (goaltending reads it falling)
@@ -309,6 +310,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let defenseLuck: number | null = null;                   // dev: force the AI's rolls (1 = always, 0 = never)
   const roll = (): number => defenseLuck ?? Math.random();   // dev: the roll VALUE forced (0 = every chance lands, 0.99 = none)
   const JUMP_SEC = 0.75, JUMP_APEX = 0.46;
+  const DRIVE_MPS = 4.8;            // the rival's sprint drive (suite pass): the clock is distance / this
+  const GATHER_TELL_SEC = 0.35;     // the last stretch of the drive reads as the GATHER — the block's window, on the seam and the hint
   // ── the OFF-BALL package (O1–O3) ──
   let screenTurn = 0;                                      // O1: which mate screens this possession (alternates)
   let boxingOut = false;                                   // O2: a shot is up — the seals / the crash
@@ -389,10 +392,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   function contestJump(ctx: ModeContext): boolean {
     if (carrierId !== 'foeTeam' || myJumpAge !== Infinity) return false;
     myJumpAge = 0;
+    console.info(`[3V3-DEF] my block jump at driveK ${driveK.toFixed(2)}`);
     me.tree.beat('bball_block_reach');   // BIOMECH-HOOPS-WAVE1: the block reach (was jump_up → idle, two owners on the rig)
     SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
     // G4: a wasted jump says so
-    if (driveK < 0.6) { ctx.setHud({ banner: 'JUMPED EARLY — WAIT FOR THE RELEASE' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+    if (driveK < 1 - (GATHER_TELL_SEC + 0.15) / driveSec) { ctx.setHud({ banner: 'JUMPED EARLY — WAIT FOR THE RELEASE' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
     return true;
   }
 
@@ -535,7 +539,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       threeVenue?.hidePlaceholders();  // M74: drop stand-ins now that real chars are in
       assertSpawned(ctx.scene, { hero: me.char.root, minWorldMeshes: 6, modeId: 'threevthree' });
       resetPossession(true);
-      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; const seam = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, defend: () => { if (!ended) { resetPossession(false); void opponentPossession(ctx); } }, /* resetPossession(false) only RESETS: its toMe branch is the only thing that hands the ball out, so on its own it leaves the rock wherever it was and no drive ever starts. opponentPossession() is what a defensive possession actually IS here — the 1v1 seam's defend() calls startDefense() for the same reason. */ attackPhase: () => (driveK >= 0.72 ? 'gather' : driveK > 0 ? 'drive' : 'check'), driveK: () => driveK, driveSpeed: () => (driver ? driver.vel.length() : 0), takingCharge: () => takingCharge, flightK: () => (foeDunkFlight ? 1 : -1), luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: !!foeHandUp }), post: () => { const n = nearestLiveFoe(); return { posting, spinning: !!spin, brace: !!me.slot.intent.brace, can: canPostUp(me.char.root.position, RIM_FLOOR, n ? n.char.root.position : null), carrying: carrierId === 'me', shooting, finish: !!finish, gather: !!gather, foeStun: n ? n.stunSec : -1, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: me.tree.held ?? '' }; }, driverRoot: () => driver?.char.root ?? null, ended: () => ended, boxing: () => boxingOut,
+      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; const seam = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, defend: () => { if (!ended) { resetPossession(false); void opponentPossession(ctx); } }, /* resetPossession(false) only RESETS: its toMe branch is the only thing that hands the ball out, so on its own it leaves the rock wherever it was and no drive ever starts. opponentPossession() is what a defensive possession actually IS here — the 1v1 seam's defend() calls startDefense() for the same reason. */ attackPhase: () => (driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check'), driveK: () => driveK, driveSpeed: () => (driver ? driver.vel.length() : 0), takingCharge: () => takingCharge, flightK: () => (foeDunkFlight ? 1 : -1), luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: !!foeHandUp }), post: () => { const n = nearestLiveFoe(); return { posting, spinning: !!spin, brace: !!me.slot.intent.brace, can: canPostUp(me.char.root.position, RIM_FLOOR, n ? n.char.root.position : null), carrying: carrierId === 'me', shooting, finish: !!finish, gather: !!gather, foeStun: n ? n.stunSec : -1, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: me.tree.held ?? '' }; }, driverRoot: () => driver?.char.root ?? null, block: () => (ctx0 ? contestJump(ctx0) : false), /* the block with no bridge latency: the lab's jump was landing at driveK 1.00 behind its own steer queue */ ended: () => ended, boxing: () => boxingOut,
           // O3: every body's job, its objective and how squarely it faces it (the probes' awareness read)
           jobs: () => everyBody().map((b, i) => { const mb = mateBrain(b), db = foeBrain(b); const obj = b === me ? (carrierId === 'me' ? RIM : (driver?.char.root.position ?? ballWorld())) : objectiveFor(b); const p = bodyPos(b); const yaw = b.char.root.rotation.y; const v = b === me ? me.drib.vel : b.vel; return { id: b === me ? 'me' : isFoe(b) ? `foe${foes.indexOf(b)}` : `mate${mates.indexOf(b)}`, i, job: jobOf(b), phase: mb?.screen.phase ?? (db ? (db.fightingOver === null ? '' : db.fightingOver ? 'over' : 'under') : ''), x: p.x, z: p.z, y: p.y, speed: Math.hypot(v.x, v.z), facing: facingCos(yaw, p, obj), objX: obj.x, objZ: obj.z, boxing: !!(mb?.boxing || db?.boxing), root: b.char.root }; }), get foeRoot() { return driver ? driver.char.root : (foes[0]?.char.root ?? null); }, /* the man to guard is whoever is DRIVING */ nearestFoeRoot: () => foes.reduce<Body | null>((b, f) => !b || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(b.char.root.position, me.char.root.position) ? f : b, null)?.char.root ?? null }; if (dev) dev.hoopsPosture = seam; (ctx.scene.metadata ??= {}).threevthree = seam; }   // BIOMECH-HOOPS-WAVE1 probes
       ctx.setHud({
@@ -2259,7 +2263,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       console.info(`[3V3-DUNK] rival ${theirDunk.label} (${theirDunk.clip}) speed ${theirSpeed.toFixed(1)}`);
       startBoxOut('theirs');
       SoundKit.play('whoosh', { pitch: 0.85 });
-      console.info(`[3V3-DEF] rival dunk ${inLane ? 'poster' : 'open'} contest ${contest.toFixed(2)} pct ${contestedPct(c.pct, contest).toFixed(2)} bumpK ${c.bumpK === null ? 'none' : c.bumpK.toFixed(2)}`);
+      console.info(`[3V3-DEF] rival dunk ${inLane ? 'poster' : 'open'} contest ${contest.toFixed(2)} pct ${contestedPct(c.pct, contest).toFixed(2)} bumpK ${c.bumpK === null ? 'none' : c.bumpK.toFixed(2)} dist ${distXZ(me.char.root.position, shooter.char.root.position).toFixed(2)} jumpAge ${myJumpAge === Infinity ? 'none' : myJumpAge.toFixed(2)}`);   // suite pass: where WAS the defender when the flight started
       let flightMs = 0, last = performance.now(), freezeMs = 0, slowMs = 0;
       const obs = ctx.scene.onBeforeRenderObservable.add(() => {
         if (possessionToken !== tok) { ctx.scene.onBeforeRenderObservable.remove(obs); foeDunkFlight = null; done(); return; }
@@ -2429,11 +2433,15 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const intent = driveIntent({ defenderSet: meSet || takingCharge, aggression: nerve(foeStanding()).aggression, roll });
     let drivePlanted = takingCharge;   // was he SET when the driver committed? that is what the call turns on
     let contactDone = false;
-    console.info(`[3V3-DEF] drive intent ${intent} (defender ${meSet || takingCharge ? 'set' : 'moving'})`);
+    // THE DRIVE TAKES AS LONG AS THE DISTANCE (suite pass, 2026-09-16). It was a fixed 1100 ms whatever the start —
+    // 6 m in 1.1 s is a 5.5 m/s teleport nobody can drop back on, 2 m in 1.1 s a jog — so the defender's read was
+    // decided by where the rival happened to catch it. A sprint drive is DRIVE_MPS, and the clock is the distance.
+    driveSec = Math.min(1.6, Math.max(0.8, driveLen / DRIVE_MPS));
+    console.info(`[3V3-DEF] drive intent ${intent} (defender ${meSet || takingCharge ? 'set' : 'moving'}) ${driveLen.toFixed(1)} m in ${driveSec.toFixed(2)} s`);
     await new Promise<void>((res) => {
       const obs = ctx.scene.onBeforeRenderObservable.add(() => {
         if (driveStolen || possessionToken !== tok) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); return; }   // D2: the poke took it / the possession moved on
-        const k = Math.min(1, (performance.now() - t0) / 1100);
+        const k = Math.min(1, (performance.now() - t0) / (driveSec * 1000));
         driveK = k;
         // drive AT the rim, not 5m short of it (was x*0.6, z to RIM.z+2.2 —
         // the same short drive 1v1 shipped; a drive that never arrives makes
@@ -2524,7 +2532,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const ground = groundContest(distXZ(me.char.root.position, shooter.char.root.position), facingCos(me.char.root.rotation.y, me.char.root.position, shooter.char.root.position), meHandUp);
     const defenseFactor = Math.min(1, proximityContest01(nearestD) + ground);
     const made = Math.random() < contestedPct(0.5 - Math.min(0.5, defenseFactor * 0.3), ground) / Math.max(0.5, foeNrv.mistake);
-    console.info(`[3V3-DEF] rival release jumper contest ${defenseFactor.toFixed(2)} handUp ${ground > 0}`);
+    console.info(`[3V3-DEF] rival release jumper contest ${defenseFactor.toFixed(2)} handUp ${ground > 0} dist ${distXZ(me.char.root.position, shooter.char.root.position).toFixed(2)} jumpAge ${myJumpAge === Infinity ? 'none' : myJumpAge.toFixed(2)}`);
     if (ground > 0) { ctx.setHud({ banner: 'CONTESTED — HAND UP!' }); }
     releaseBall(ball);                                          // the shot leaves the hand
     // BIOMECH-HOOPS-WAVE1: the rival's jumper flows into the held follow-through (G5) and the ball FLIES (G6)

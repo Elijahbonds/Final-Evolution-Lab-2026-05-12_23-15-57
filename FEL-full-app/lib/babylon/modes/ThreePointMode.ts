@@ -37,7 +37,7 @@ import { SPORT_CLIP } from '../anim/clipRegistry';
 import { SHOT_TARGET as HUD_TARGET, PERFECT_BAND as HUD_PERFECT, GOOD_BAND as HUD_GOOD, heatLevel, pointsLeft, FIRE_STREAK } from '../core/shootoutHud';
 import { readDisplaySetting, displayBanner, widen } from '@/lib/controller-link/tvMode';
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
-import type { Mesh, Observer, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Material, Mesh, Observer, Scene } from '@babylonjs/core';
 import { attachBallToHand, releaseBall } from '../anim/ballRig';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1
 import { armChain, reachArm, type ArmChain } from '../anim/HandIK';
@@ -51,6 +51,8 @@ import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
+import { dressBall as dressMeshyBall } from '../visual/meshyProps';   // suite pass: the Meshy leather every other hoops mode plays with
+import { cloneForTint } from '../core/playerIdentity';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { ShotArc } from '../core/BasketballCore';
@@ -160,7 +162,35 @@ let ballSim: BallSim | null = null;
 let rimOut = -1;
 /** Signed timing error of the shot in flight: negative = EARLY (short), positive = LATE (long). */
 let shotErr = 0;
-let ballMat: StandardMaterial | null = null;
+let ballMat: StandardMaterial | null = null;   // the plain sphere until the Meshy skin lands (and if it never does)
+/** The live ball's skin meshes with their leather and their money-ball gold, swapped per shot. */
+let ballSkin: { mesh: AbstractMesh; base: Material; money: Material }[] = [];
+/** One gold clone per shared skin material — the rack balls and the live ball all wear the same two. */
+const moneyMats = new Map<Material, Material>();
+function moneyMatFor(base: Material): Material {
+  let m = moneyMats.get(base);
+  if (!m) {
+    const c = cloneForTint(base as Material & { albedoColor?: Color3; diffuseColor?: Color3 }, `${base.name}_money`) as (Material & { albedoColor?: Color3; diffuseColor?: Color3; emissiveColor?: Color3 }) | null;
+    if (!c) return base;
+    c.albedoColor?.copyFrom(MONEY_COLOR); c.diffuseColor?.copyFrom(MONEY_COLOR);
+    if (c.emissiveColor) c.emissiveColor.copyFrom(MONEY_COLOR.scale(0.35));   // a touch of glow so the money ball reads at distance under the venue grade
+    m = c; moneyMats.set(base, m);
+  }
+  return m;
+}
+/** Dress a ball sphere in the Meshy leather; `money` paints it gold. Resolves with the skin meshes (empty if the skin did not land). */
+async function skinBall(sphere: Mesh, money: boolean): Promise<{ mesh: AbstractMesh; base: Material; money: Material }[]> {
+  const ok = await dressMeshyBall(sphere, 'basketball');
+  if (!ok || sphere.isDisposed()) return [];
+  const out: { mesh: AbstractMesh; base: Material; money: Material }[] = [];
+  for (const mesh of sphere.getChildMeshes()) {
+    if (!mesh.material) continue;
+    const pair = { mesh, base: mesh.material, money: moneyMatFor(mesh.material) };
+    if (money) mesh.material = pair.money;
+    out.push(pair);
+  }
+  return out;
+}
 /** One ball-rack per station: the frame plus its five balls. */
 let rackBalls: Mesh[][] = [];
 let rackMeshes: Mesh[] = [];
@@ -178,7 +208,7 @@ function syncRacks(): void {
       // Racks ahead stay full; the current rack empties left-to-right; racks
       // already finished stay empty.
       const taken = r < S.rack || (r === S.rack && b < S.ballIdx);
-      rackBalls[r][b].isVisible = !taken;
+      rackBalls[r][b].setEnabled(!taken);   // setEnabled, not isVisible: the Meshy skin is a child node and isVisible does not cascade
     }
   }
 }
@@ -186,8 +216,9 @@ function syncRacks(): void {
 /** Recolour the loaded ball for whichever shot is next up. */
 function dressBall(): void {
   syncRacks();
-  if (!ballMat) return;
   const money = isMoneyBall(S.ballIdx);
+  for (const p of ballSkin) p.mesh.material = money ? p.money : p.base;   // the Meshy leather, or its gold
+  if (!ballMat) return;
   ballMat.diffuseColor = money ? MONEY_COLOR : BALL_COLOR;
   // A touch of emissive so the money ball reads at distance under the venue grade.
   ballMat.emissiveColor = money ? MONEY_COLOR.scale(0.35) : Color3.Black();
@@ -585,15 +616,36 @@ export const ThreePointMode: ModeDefinition = {
     ctx.groundLock.track(player.root, player.skeleton);
     ctx.heroRef.current = player.root;
     // the field waits along the left sideline, facing the rim, one body per rival card
-    void Promise.all(RIVAL_NAMES.map((_, i) => CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
-      position: new Vector3(-9.2, 0, 4 - i * 1.9), yawRad: Math.atan2(RIM.x - -9.2, RIM.z - (4 - i * 1.9)), tint: RIVAL_SEEDS[i % RIVAL_SEEDS.length], startClip: 'idle_stand', identity: false, modeId: 'threepoint',
-    }))).then((bodies) => { if (!player) { bodies.forEach((b) => b.dispose()); return; } rivalBodies = bodies; for (const b of bodies) neverBindPose(b.animator, 'idle_stand'); })
-      .catch((e) => console.warn('[FEL-3PT] rival bodies did not spawn', (e as Error)?.message ?? e));
+    // THE FIELD WAITS ON THE SIDELINE — sequentially, on TWO roster bodies (suite pass, 2026-09-16). Five rival cards
+    // used to spawn five DISTINCT roster bodies at once, the moment the mode reported loaded: five GLBs' worth of
+    // skin maps landing on the GPU in the same second the venue kit did, and on the dev server the device reset —
+    // "WebGL context lost … Graphics were reset by the device", every load, the shootout a black canvas until the
+    // harness reloaded it. The cards keep their five names; the bodies behind them alternate two seeds (two shared
+    // containers) and arrive one at a time, after the court is up.
+    void (async () => {
+      const bodies: SpawnedCharacter[] = [];
+      try {
+        for (let i = 0; i < RIVAL_NAMES.length; i++) {
+          if (!player || ctx.scene.isDisposed) break;
+          const z = 4 - i * 1.9;
+          const b = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
+            position: new Vector3(-9.2, 0, z), yawRad: Math.atan2(RIM.x - -9.2, RIM.z - z), tint: RIVAL_SEEDS[i % 2], startClip: 'idle_stand', identity: false, modeId: 'threepoint',
+          });
+          neverBindPose(b.animator, 'idle_stand');
+          bodies.push(b);
+        }
+      } catch (e) { console.warn('[FEL-3PT] rival bodies did not spawn', (e as Error)?.message ?? e); }
+      if (!player || ctx.scene.isDisposed) { bodies.forEach((b) => b.dispose()); return; }
+      rivalBodies = bodies;
+    })();
 
     ball = MeshBuilder.CreateSphere('tp_ball', { diameter: 0.24, segments: 16 }, ctx.scene);
     ballMat = new StandardMaterial('tp_ballMat', ctx.scene);
     ball.material = ballMat;
     dressBall();
+    // THE MESHY LEATHER (suite pass, 2026-09-16): 1v1, 3v3 and the dunk contest play with the baked ball; the shootout
+    // shot a flat orange sphere. The skin rides the sphere; the money ball swaps its materials for gold clones.
+    void skinBall(ball, isMoneyBall(S.ballIdx)).then((skin) => { if (ball && !ball.isDisposed()) { ballSkin = skin; dressBall(); } });
     // BIOMECH-HOOPS-WAVE1 G6: the ball rides the shooting hand (it used to float 1.9 m over the root)
     attachBallToHand(ball, player.skeleton, 'RightHand');
     // the Posture Poses layer (chest on the rim, eyes on the iron, feet) — then the jog's two-hand carry, solved after it
@@ -634,11 +686,8 @@ export const ThreePointMode: ModeDefinition = {
         bm.position.copyFrom(stand.position);
         bm.position.x += (b - (BALLS_PER_RACK - 1) / 2) * 0.21;
         bm.position.y += 0.16;
-        const m = new StandardMaterial(`rack_${r}_ballMat_${b}`, ctx.scene);
         const money = isMoneyBall(b);
-        m.diffuseColor = money ? MONEY_COLOR : BALL_COLOR;
-        if (money) m.emissiveColor = MONEY_COLOR.scale(0.3);
-        bm.material = m;
+        void skinBall(bm, money);   // the rack wears the same leather (the fifth ball gold); the sphere hides under it
         balls.push(bm);
       }
       rackBalls.push(balls);
@@ -672,7 +721,7 @@ export const ThreePointMode: ModeDefinition = {
     }
     // A press is the release: keyboard Space, touch SHOOT, or a phone flick all
     // arrive here identically because they all normalise to FelInput.
-    if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B')) {
+    if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X')) {   // X too: SQUARE shoots in the 2K map every other hoops mode plays by
       // MECHANICS PASS (2026-09-15): 43 % of SHOOT presses were silent — pressed while the ball was in the air or the next
       // one was still coming off the rack. Answered now, with where the ball is.
       if (S.phase === 'shoot' && S.fired) refuse(ctx, "BALL'S IN THE AIR");
@@ -813,6 +862,7 @@ export const ThreePointMode: ModeDefinition = {
     for (const b of rivalBodies) b.dispose(); rivalBodies = [];
     ball?.dispose(); ball = null;
     ballMat?.dispose(); ballMat = null;
+    ballSkin = []; for (const m of moneyMats.values()) m.dispose(); moneyMats.clear();
     for (const m of rackMeshes) m.dispose();
     rackMeshes = []; rackBalls = [];
     arc = null;

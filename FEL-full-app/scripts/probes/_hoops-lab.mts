@@ -122,7 +122,7 @@ await page.evaluate(`(() => {
     // A JUMP CANCELS A PLANT — you cannot be in the air and taking a charge at once, and the mode says so
     // (takingCharge requires myJumpAge === Infinity). With the block always armed, the charge play could never
     // hold: six gathers, six jumps, zero charges. The block is off for the charge run.
-    if (phase === 'gather' && d.lastPhase !== 'gather') { d.gathers++; if (d.block) { d.jumps++; a.do('block'); } }
+    if (phase === 'gather' && d.lastPhase !== 'gather') { d.gathers++; if (d.block) { d.jumps++; if (typeof dev.block === 'function') dev.block(); else a.do('block'); } }   // the seam's block is immediate; the bridge's waits behind the steer queue (measured: jumps landing at driveK 1.00)
     d.lastPhase = phase;
   }, 16);
 
@@ -183,6 +183,16 @@ await page.evaluate(`(() => {
     const tx = him.x - him.x * 0, tz = him.z;
     const dx = 0 - him.x, dz = -0.6 - him.z;
     const dl = Math.hypot(dx, dz) || 1;
+    // PROTECT THE RIM ON A 3v3 DRIVE (suite pass, 2026-09-16). The team game's drive BENDS 1.6 m around whoever is in
+    // front of it (DriveLine), so "a metre off him on the rim side" is a spot he no longer passes through: ten jumps
+    // on ten gathers, ten open dunks at contest 0.00, zero stops. A defender who is beaten to the middle does what a
+    // real one does — drops to the rim and meets the flight there. The spot is a metre off the iron on his side.
+    const ph = typeof dev.attackPhase === 'function' ? dev.attackPhase() : '';
+    if (MODE === 'threevthree' && ph !== 'check' && ph !== '') {
+      const rl = Math.hypot(him.x - 0, him.z + 0.6) || 1;
+      window.__steer(0 + ((him.x - 0) / rl) * 1.0, -0.6 + ((him.z + 0.6) / rl) * 1.0, 130);
+      return;
+    }
     window.__steer(tx + (dx / dl) * 1.0, tz + (dz / dl) * 1.0, 130);
   }, 120);
 })()`);
@@ -421,6 +431,7 @@ const out = {
   plantedMs: def?.plantedMs ?? 0, closestWhilePlanted: +(def?.closestWhilePlanted ?? 99).toFixed(2),
   finalScore: [final.score ?? null, final.foeScore ?? null], target: final.target ?? null,
   rows, log: log.slice(-200),
+  defLog: log.filter((l) => /-DEF\]|-DUNK\]|-REF\]/.test(l)).map((l) => l.replace(/^\d+ /, '')),   // suite pass: the release diagnostics, unsliced
 };
 fs.writeFileSync(`${OUT}/hoops-lab-${TAG}.json`, JSON.stringify(out, null, 1));
 console.log(`\n${MODE} charge ${CHARGE} · offence ${made}/${off.length}${out.makePct !== null ? ` (${out.makePct}%)` : ''} · ${byPlay.map((b) => `${b.play} ${b.made}/${b.n}`).join(' · ')}`);

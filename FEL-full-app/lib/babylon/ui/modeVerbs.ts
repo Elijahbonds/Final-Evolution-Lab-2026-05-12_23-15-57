@@ -125,30 +125,21 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   // Verified 2026-09-05: onInput feeds LocalInputSource, which turns X into
   // intent.steal (read on defense, 1.6 m) and L1 into intent.brace (read for
   // the rebound edge and body contact). Both verbs are live; they stay.
+  // THE 2K MAP (suite pass, 2026-09-16), the same diamond the pad plays: SQUARE (X) shoots on a hold and steals on a
+  // tap, TRIANGLE (Y) is the block, the BOTTOM button passes, CIRCLE (B) calls a screen on offence and plants for the
+  // charge on defence. LocalInputSource decides the verb by the possession, so one label per slot is honest: the
+  // overlay used to draw SHOOT on Y as a held trigger and BLOCK on A, which was neither the pad's map nor the hint's.
   onevone: verbs({
-    Y: { label: 'SHOOT', emit: RT(1), hold: true },
-    A: { label: 'BLOCK', emit: A('A') },
-    X: { label: 'STEAL', emit: A('X') },
-    // BOX OUT was gamepad-only. The mode's own on-screen hint tells you to
-    // "hold L1/LT to BOX OUT" while the touch overlay drew no such button — so
-    // on a phone the instruction named a control that did not exist, and the B
-    // slot sat there inert rendering the bare letter "B". A press/release on a
-    // button slot emits pressed true/false, which is exactly what braceHeld
-    // wants, so the shoulder verb fits the diamond without a new control type.
-    B: { label: 'BOX OUT', emit: L1() },
+    X: { label: 'SHOOT', emit: A('X'), hold: true },
+    Y: { label: 'BLOCK', emit: A('Y') },
+    B: { label: 'CHARGE', emit: A('B'), hold: true },
+    // L1 keeps the box-out it was taught on; it lives on the shoulder, not the diamond.
   }),
-  // 3v3 Streetball: held-trigger shot, PASS (B), BLOCK (A). PASS is live —
-  // LocalInputSource turns B into intent.pass, which the carrier branch reads.
-  // STEAL is NOT: the mode's steal loop reads only the AI defenders'
-  // `slot.intent.steal`, and the human never gets a live-ball defensive
-  // possession (the opponent drive is scripted), so a hero X press is
-  // consumed by LocalInputSource and dropped. Owner decision 2026-09-05
-  // ("hide now, build later"): X renders hollow until a steal window on the
-  // carrier exists in ThreeVThreeMode.
   threevthree: verbs({
-    Y: { label: 'SHOOT', emit: RT(1), hold: true },
-    B: { label: 'PASS', emit: A('B') },
-    A: { label: 'BLOCK', emit: A('A') },
+    X: { label: 'SHOOT', emit: A('X'), hold: true },
+    Y: { label: 'BLOCK', emit: A('Y') },
+    A: { label: 'PASS', emit: A('A') },
+    B: { label: 'SCREEN', emit: A('B') },
   }),
   // Court Carnival: four rotating events share one deck. CHARGE covers Slam
   // Rush's held trigger + Trick Gauntlet's pump; GO is every event's A verb
@@ -250,7 +241,7 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   // Rhythm dance. No movement stick use — the body IS the game; one TAP verb
   // judged against the beat. B also taps (mode reads A or B).
   // 3PT Shootout: one verb, the release. Timing is the whole mechanic.
-  threepoint: verbs({ A: { label: 'SHOOT', emit: A('A') } }),
+  threepoint: verbs({ A: { label: 'SHOOT', emit: A('A') }, X: { label: 'SHOOT', emit: A('X') } }),   // SQUARE shoots here too (2K map)
 
   // Volleyball had NO entry at all, so touch fell through to MODE_VERBS.default
   // — one generic ACTION button — which is the original karate_vs bug in a mode

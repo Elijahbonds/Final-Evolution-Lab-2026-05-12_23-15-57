@@ -85,6 +85,14 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       } satisfies GameResult);
     };
 
+    // DEFER THE BOOT BY A TICK (suite pass, 2026-09-16 — the dunk component's guard, ported). StrictMode runs
+    // effect -> cleanup -> effect, and `stop` is only assigned once the async load resolves, so the phantom mount's
+    // cleanup could cancel nothing: TWO shootouts loaded on the same canvas at once — two venue kits, two heroes, ten
+    // sideline bodies — and on the dev server the device reset ("WebGL context lost … Graphics were reset"), the
+    // canvas black until the harness reloaded it. A zero-delay timer lets the phantom mount be cancelled before it
+    // builds anything.
+    const startTimer = setTimeout(() => {
+    if (disposed) return;
     runMode(MODES.threepoint, {
       canvas,
       location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
@@ -99,8 +107,9 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       resultSink,
     }).then((s) => { if (disposed) s(); else stop = s; })
       .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+    }, 0);
 
-    return () => { disposed = true; stop?.(); };
+    return () => { disposed = true; clearTimeout(startTimer); stop?.(); };
   }, []);   // mount once — see onEndRef above
 
   const emit = useCallback((i: Parameters<InputBus['emit']>[0]) => {
