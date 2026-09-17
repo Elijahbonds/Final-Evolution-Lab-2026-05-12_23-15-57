@@ -13,6 +13,8 @@ import {
   buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // wave 2: the footwork (M8–M14)
   buildMikan, buildUpAndUnder, buildFingerRoll,   // 2026-09-16: the layup vocabulary
+  buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble, buildDoubleCross, buildSnatchBack,
+  buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip,   // 2026-09-16: the handle, and the ankles
 } from './basketball';
 
 let scene: Scene; let sk: Skeleton;
@@ -380,6 +382,99 @@ describe('basketball packages on the forge rig', () => {
     rest(); const l = buildEuroStep(scene, sk, 'left')!;
     at(l, 0.22);
     expect(pos('LeftHand').x).toBeLessThan(-0.3);                                // sell LEFT: mirrored
+  });
+
+  // ── THE HANDLE (owner, 2026-09-16) ────────────────────────────────────────────────────────────────────────
+  // Twelve moves in HandleSystem shared one hardwired crossover clip. Each of these measures the ONE thing that
+  // tells its move apart from the others at dribble distance, because that is all a defender gets.
+  it('BETWEEN THE LEGS gets DOWN to the ball — lower than a crossover, and the stance opens to make room', () => {
+    // Measured against the crossover rather than against an absolute height: the hand target is IK-clamped by what
+    // the arm can reach from the torso it is given (dropping the target 0.22 m moved the hand 5 mm), so what
+    // separates this move from a low crossover is how far the whole BODY sits down to put the ball under itself.
+    rest(); const cross = buildCrossover(scene, sk, 'right')!;
+    at(cross, 0.2);
+    const crossBall = pos('RightHand').y, crossHips = pos('Hips').y;
+    const crossFeet = Math.abs(pos('LeftFoot').x - pos('RightFoot').x);
+    rest(); const g = buildBetweenLegsDribble(scene, sk, 'right')!;
+    at(g, 0.18);
+    expect(pos('RightHand').y).toBeLessThan(crossBall - 0.1);                     // the ball lower than a crossover's
+    expect(pos('Hips').y).toBeLessThan(crossHips - 0.1);                          // because the body went down to it
+    expect(pos('RightHand').y).toBeLessThan(pos('Hips').y);                       // and it IS under him
+    expect(Math.abs(pos('LeftFoot').x - pos('RightFoot').x)).toBeGreaterThan(crossFeet);   // room for it to pass
+  });
+
+  it('BEHIND THE BACK wraps the ball BEHIND the hips — the only move here where it goes backwards', () => {
+    rest(); const g = buildBehindBackDribble(scene, sk, 'right')!;
+    at(g, 0.18);
+    expect(pos('RightHand').z).toBeLessThan(pos('Hips').z);                       // behind the hip line
+  });
+
+  it('IN AND OUT keeps its hand: the off hand never takes the ball, which is what makes it not a crossover', () => {
+    rest(); const g = buildInAndOut(scene, sk, 'right')!;
+    at(g, 0.16); const offOut = pos('LeftHand').clone();
+    at(g, 0.28);
+    expect(Vector3.Distance(pos('LeftHand'), offOut)).toBeLessThan(0.18);         // the off hand stayed put
+  });
+
+  it('the SHAMMGOD pushes the ball away on a long arm, then takes it back with the OTHER hand', () => {
+    rest(); const g = buildShammgod(scene, sk, 'right')!;
+    at(g, 0.2);
+    const push = pos('RightHand');
+    expect(push.z).toBeGreaterThan(pos('Hips').z + 0.4);                          // shoved out in FRONT
+    const offStart = pos('LeftHand').x;
+    at(g, 0.46);
+    // `dir` is the side the ball ENDS on, so a shammgod to the RIGHT finishes with the OFF hand carrying it right.
+    // Asserted as a movement across the body rather than an absolute x: reaching across is the most IK-clamped
+    // thing in this file, and the eye reads the travel, not the coordinate.
+    expect(pos('LeftHand').x).toBeGreaterThan(offStart + 0.3);
+    expect(pos('LeftHand').x).toBeGreaterThan(0);                                 // …and it ended on the right side
+  });
+
+  it('the SNATCH BACK goes forward and then rips the ball BEHIND the hip line', () => {
+    rest(); const g = buildSnatchBack(scene, sk)!;
+    at(g, 0.14); const forward = pos('RightHand').z;
+    at(g, 0.3);
+    expect(pos('RightHand').z).toBeLessThan(forward - 0.4);                       // ripped back, hard
+    expect(pos('RightHand').z).toBeLessThan(pos('Hips').z);
+  });
+
+  it('the DOUBLE CROSS crosses TWICE, and the second one is the lower of the two', () => {
+    rest(); const g = buildDoubleCross(scene, sk, 'right')!;
+    at(g, 0.16); const start = pos('RightHand').x, hip1 = pos('Hips').y;
+    at(g, 0.3);
+    expect(pos('RightHand').x).toBeLessThan(start - 0.4);                         // ONE: across to the other side
+    at(g, 0.44);
+    expect(pos('RightHand').x).toBeGreaterThan(start - 0.2);                      // TWO: and back, which is where it ends
+    expect(pos('Hips').y).toBeLessThan(hip1);                                     // lower: the one that gets him
+  });
+
+  it('the YOYO goes nowhere — the ball moves and the body does not', () => {
+    rest(); const g = buildYoyo(scene, sk)!;
+    at(g, 0.18); const high = pos('RightHand').y, hips = pos('Hips').clone();
+    at(g, 0.36);
+    expect(pos('RightHand').y).toBeLessThan(high - 0.3);                          // the ball snapped down …
+    expect(Math.abs(pos('Hips').x - hips.x)).toBeLessThan(0.1);                   // … and the hips stayed home
+  });
+
+  // ── ANKLE BREAKERS ───────────────────────────────────────────────────────────────────────────────────────
+  it('the STUMBLE crosses his feet and drops him low, and he is STILL UP at the end of it', () => {
+    rest(); const g = buildAnkleStumble(scene, sk)!;
+    at(g, 0); const stance = pos('Hips').y;
+    at(g, 0.32);
+    expect(pos('Hips').y).toBeLessThan(stance - 0.1);                             // right down on it
+    expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeGreaterThan(0.9);   // arms out for balance
+    at(g, 0.62);
+    expect(pos('Hips').y).toBeGreaterThan(stance - 0.06);                         // back up — that is the difference
+  });
+
+  it('the SLIP puts him on the floor and LEAVES him there — and it is a fall, not a knockdown', () => {
+    rest(); const g = buildAnkleSlip(scene, sk)!;
+    at(g, 0); const stance = pos('Hips').y;
+    at(g, 0.5);
+    expect(pos('Hips').y).toBeLessThan(stance - 0.55);                            // down
+    expect(pos('RightHand').y).toBeLessThan(0.4);                                 // the hand reaching the floor behind him
+    at(g, 0.78);
+    expect(pos('Hips').y).toBeLessThan(stance - 0.5);                             // still down, watching you go
   });
 
   it('M14 the EURO steps to ONE side then crosses to the OTHER, with the ball going with it', () => {

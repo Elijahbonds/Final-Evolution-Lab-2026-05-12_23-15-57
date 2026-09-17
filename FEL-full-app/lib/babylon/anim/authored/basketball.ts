@@ -27,6 +27,10 @@ export const BASKETBALL_CLIPS = [
   'bball_pump_fake', 'bball_step_through', 'bball_pivot', 'bball_layup_reverse', 'bball_layup_reverse_left',
   'bball_mikan', 'bball_mikan_left', 'bball_up_and_under', 'bball_up_and_under_left',
   'bball_finger_roll', 'bball_finger_roll_left', 'bball_floater_left', 'bball_euro_step_left',
+  'bball_in_and_out_left', 'bball_in_and_out_right', 'bball_between_legs_left', 'bball_between_legs_right',
+  'bball_behind_back_left', 'bball_behind_back_right', 'bball_double_cross_left', 'bball_double_cross_right',
+  'bball_snatch_back', 'bball_shammgod_left', 'bball_shammgod_right', 'bball_yoyo',
+  'bball_ankle_stumble', 'bball_ankle_slip',
   'bball_hop_step', 'bball_euro_step',
 ] as const;
 type V3 = [number, number, number];
@@ -117,6 +121,133 @@ const FLOATER_KEYS: PoseKey[] = [
 export function buildFloater(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_floater', 0.7, FLOATER_KEYS);
   return buildPoseClip(scene, sk, 'bball_floater_left', 0.7, FLOATER_KEYS.map(mirrorKey));
+}
+
+// ── THE HANDLE (owner, 2026-09-16: "add more dribble moves and crossovers", "ankle breakers") ────────────────
+//
+// HandleSystem has TWELVE moves in it, gated by a handle rating, each with its own odds, chain and banner — and the
+// animation tree had one crossover state hardwired to `bball_crossover_left`. So a between-the-legs, a behind-the-
+// back, an in-and-out, a yoyo, a double cross, a snatch back and a shammgod all resolved, called themselves out on
+// the HUD, and played a left crossover; a crossover going RIGHT played the left clip too. The moves were real and
+// the body was not doing any of them.
+//
+// Each of these keys the same three things the crossover does — where the ball is, which way the hips turn, how
+// low the stance gets — because at dribble distance that is the entire read a defender has.
+
+/** IN AND OUT: the ball is pushed out as if it is going across, and the SAME hand snatches it back. The tell is
+ *  that the off hand never moves — a crossover that keeps its hand. */
+export function buildInAndOut(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'right'): AnimationGroup | null {
+  const s = dir === 'left' ? 1 : -1;
+  const out: V3 = [0.42 * -s, 0.90, 0.36], back: V3 = [0.28 * -s, 0.86, 0.30];
+  return buildPoseClip(scene, sk, `bball_in_and_out_${dir}`, 0.42, [
+    { t: 0,    bones: { Hips: [0, 0, 0],      Spine: [14, 0, 0],      ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+    { t: 0.16, bones: { Hips: [0, 16 * s, 0], Spine: [20, -8 * s, 0], LeftUpLeg: [-32, 0, 16], RightUpLeg: [-32, 0, -16], LeftLeg: [40, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: out, Left: OFF_HAND }, hipsY: -0.09 },   // the lie: the ball goes out that way
+    { t: 0.28, bones: { Hips: [0, -8 * s, 0], Spine: [18, 4 * s, 0],  LeftUpLeg: [-30, 0, 14], RightUpLeg: [-30, 0, -14], LeftLeg: [38, 0, 0], RightLeg: [38, 0, 0] }, hands: { Right: back, Left: OFF_HAND }, hipsY: -0.08 },   // …and the SAME hand takes it back
+    { t: 0.42, bones: { Hips: [0, 0, 0],      Spine: [14, 0, 0],      ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+  ]);
+}
+
+/** BETWEEN THE LEGS: the ball goes under the bridge, hand to hand, and the knees have to make room for it — the
+ *  stance drops lower here than any other move on the list, which is what sells it from the front. */
+export function buildBetweenLegsDribble(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'right'): AnimationGroup | null {
+  const s = dir === 'left' ? 1 : -1;
+  return buildPoseClip(scene, sk, `bball_between_legs_${dir}`, 0.48, [
+    { t: 0,    bones: { Hips: [0, 0, 0],      Spine: [14, 0, 0],      ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+    { t: 0.18, bones: { Hips: [0, 10 * s, 0], Spine: [44, -6 * s, 0], LeftUpLeg: [-72, 0, 30], RightUpLeg: [-72, 0, -30], LeftLeg: [86, 0, 0], RightLeg: [86, 0, 0] }, hands: { Right: [0.10 * -s, 0.26, 0.30] as V3, Left: [-0.30 * s, 0.88, 0.16] as V3 }, hipsY: -0.30 },   // UNDER: measured — at 0.52 the ball was still ABOVE the knee line (knee y 0.51), which is a low crossover, not a between-the-legs
+    { t: 0.3,  bones: { Hips: [0, -6 * s, 0], Spine: [24, 4 * s, 0],  LeftUpLeg: [-40, 0, 22], RightUpLeg: [-40, 0, -22], LeftLeg: [50, 0, 0], RightLeg: [50, 0, 0] }, hands: { Right: [-0.34 * s, 0.86, 0.26] as V3, Left: [0.16 * s, 0.70, 0.28] as V3 }, hipsY: -0.12 },   // caught on the other side
+    { t: 0.48, bones: { Hips: [0, 0, 0],      Spine: [14, 0, 0],      ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+  ]);
+}
+
+/** BEHIND THE BACK: the ball is wrapped round the hip, and the giveaway is the SHOULDER — it turns away from the
+ *  defender to make the room, which is the opposite of every other move here. */
+export function buildBehindBackDribble(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'right'): AnimationGroup | null {
+  const s = dir === 'left' ? 1 : -1;
+  return buildPoseClip(scene, sk, `bball_behind_back_${dir}`, 0.46, [
+    { t: 0,    bones: { Hips: [0, 0, 0],       Spine: [14, 0, 0],        ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+    { t: 0.18, bones: { Hips: [0, -22 * s, 0], Spine: [18, 16 * s, 0],   LeftUpLeg: [-34, 0, 16], RightUpLeg: [-34, 0, -16], LeftLeg: [42, 0, 0], RightLeg: [42, 0, 0] }, hands: { Right: [0.30 * -s, 0.82, -0.26] as V3, Left: OFF_HAND }, hipsY: -0.09 },   // BEHIND: the ball off the hip, the shoulder turned away
+    { t: 0.32, bones: { Hips: [0, 14 * s, 0],  Spine: [16, -10 * s, 0],  LeftUpLeg: [-32, 0, 16], RightUpLeg: [-32, 0, -16], LeftLeg: [40, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.10 * s, 0.86, 0.20] as V3, Left: [0.34 * s, 0.88, 0.22] as V3 }, hipsY: -0.08 },   // and out the far side into the other hand
+    { t: 0.46, bones: { Hips: [0, 0, 0],       Spine: [14, 0, 0],        ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+  ]);
+}
+
+/** DOUBLE CROSS: two crossovers on one beat. The second is the one that gets him, so it is the harder, lower one —
+ *  and the hips have to come back through the middle in between, which is the half-beat the defender has to read. */
+export function buildDoubleCross(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'right'): AnimationGroup | null {
+  const s = dir === 'left' ? 1 : -1;
+  const l: V3 = [-0.46, 0.92, 0.28], r: V3 = [0.46, 0.92, 0.28];
+  return buildPoseClip(scene, sk, `bball_double_cross_${dir}`, 0.6, [
+    { t: 0,    bones: { Hips: [0, 0, 0],       Spine: [14, 0, 0],       ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+    { t: 0.16, bones: { Hips: [0, 24 * s, 0],  Spine: [20, -12 * s, 0], LeftUpLeg: [-32, 0, 16], RightUpLeg: [-32, 0, -16], LeftLeg: [40, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: s > 0 ? l : r, Left: s > 0 ? r : l }, hipsY: -0.09 },   // one
+    { t: 0.3,  bones: { Hips: [0, -10 * s, 0], Spine: [18, 6 * s, 0],   LeftUpLeg: [-34, 0, 16], RightUpLeg: [-34, 0, -16], LeftLeg: [42, 0, 0], RightLeg: [42, 0, 0] }, hands: { Right: s > 0 ? r : l, Left: s > 0 ? l : r }, hipsY: -0.10 },   // back through the middle — the half-beat
+    { t: 0.44, bones: { Hips: [0, 32 * s, 0],  Spine: [24, -18 * s, 0], LeftUpLeg: [-40, 0, 20], RightUpLeg: [-40, 0, -20], LeftLeg: [50, 0, 0], RightLeg: [50, 0, 0] }, hands: { Right: s > 0 ? l : r, Left: s > 0 ? r : l }, hipsY: -0.14 },   // TWO: lower, harder, and gone
+    { t: 0.6,  bones: { Hips: [0, 8 * s, 0],   Spine: [14, 0, 0],       ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06 },
+  ]);
+}
+
+/** SNATCH BACK: you drive AT him, plant, and rip the ball back to where you came from. The body goes backwards
+ *  while the chest stays square — that is what makes it a shot, not a retreat. */
+export function buildSnatchBack(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'bball_snatch_back', 0.5, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [16, 0, 0], Neck: [-4, 0, 0], ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+    { t: 0.14, bones: { Hips: [0, 0, 0], Spine: [26, 0, 0], Neck: [-8, 0, 0], LeftUpLeg: [-44, 0, 10], RightUpLeg: [-20, 0, -10], LeftLeg: [54, 0, 0], RightLeg: [30, 0, 0] }, hands: { Right: [0.30, 0.78, 0.46] as V3, Left: OFF_HAND }, hipsY: -0.13 },   // INTO him: the ball pushed out front, the weight forward
+    { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [2, 0, 0],  Neck: [0, 0, 0],  LeftUpLeg: [-6, 0, 12], RightUpLeg: [-6, 0, -12], LeftLeg: [12, 0, 0], RightLeg: [12, 0, 0] }, hands: { Right: [0.24, 1.02, -0.06] as V3, Left: [-0.22, 1.02, -0.02] as V3 }, hipsY: 0.01 },   // RIPPED back — the ball behind the hip line, the chest still on him
+    { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [14, 0, 0], Neck: [-2, 0, 0], LeftUpLeg: [-26, 0, 10], RightUpLeg: [-26, 0, -10], LeftLeg: [38, 0, 0], RightLeg: [38, 0, 0] }, hands: { Right: [0.26, 0.96, 0.18] as V3, Left: OFF_HAND }, hipsY: -0.07 },   // planted, loaded, in front of nobody
+  ]);
+}
+
+/** THE SHAMMGOD: the ball is PUSHED away with one hand and pulled back across the body with the OTHER. The reach is
+ *  the whole move — the arm goes out nearly straight, which is what makes him commit to it. */
+export function buildShammgod(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'right'): AnimationGroup | null {
+  const s = dir === 'left' ? 1 : -1;
+  return buildPoseClip(scene, sk, `bball_shammgod_${dir}`, 0.58, [
+    { t: 0,    bones: { Hips: [0, 0, 0],       Spine: [14, 0, 0],       ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+    { t: 0.2,  bones: { Hips: [0, 6 * s, 0],   Spine: [30, -4 * s, 0],  LeftUpLeg: [-48, 0, 12], RightUpLeg: [-24, 0, -12], LeftLeg: [56, 0, 0], RightLeg: [34, 0, 0] }, hands: { Right: [0.30, 0.66, 0.62] as V3, Left: OFF_HAND }, hipsY: -0.15 },   // THE PUSH: the ball shoved out in front, the arm long
+    { t: 0.36, bones: { Hips: [0, -18 * s, 0], Spine: [26, 12 * s, 0],  LeftUpLeg: [-40, 0, 14], RightUpLeg: [-28, 0, -14], LeftLeg: [48, 0, 0], RightLeg: [38, 0, 0] }, hands: { Right: [0.18, 0.72, 0.52] as V3, Left: [-0.06, 0.70, 0.56] as V3 }, hipsY: -0.13 },   // the OTHER hand arrives on it
+    { t: 0.46, bones: { Hips: [0, -28 * s, 0], Spine: [22, 18 * s, 0],  LeftUpLeg: [-36, 0, 16], RightUpLeg: [-32, 0, -16], LeftLeg: [44, 0, 0], RightLeg: [44, 0, 0] }, hands: { Right: OFF_HAND, Left: [-0.42 * s, 0.88, 0.22] as V3 }, hipsY: -0.11 },   // …and takes it across, the other way entirely
+    { t: 0.58, bones: { Hips: [0, -8 * s, 0],  Spine: [14, 0, 0],       ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06 },
+  ]);
+}
+
+/** THE YOYO: the ball on a string, sizing him up. No escape in it — it is the move you make while you decide, so it
+ *  stays square, stays tall, and the only thing moving is the ball and the eyes. */
+export function buildYoyo(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'bball_yoyo', 0.66, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [14, 0, 0], Neck: [-2, 0, 0], ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+    { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-4, 0, 0], LeftUpLeg: [-24, 0, 12], RightUpLeg: [-24, 0, -12], LeftLeg: [34, 0, 0], RightLeg: [34, 0, 0] }, hands: { Right: [0.30, 1.16, 0.40] as V3, Left: OFF_HAND }, hipsY: -0.04 },   // high on the string
+    { t: 0.36, bones: { Hips: [0, 0, 0], Spine: [22, 0, 0], Neck: [-2, 0, 0], LeftUpLeg: [-38, 0, 14], RightUpLeg: [-38, 0, -14], LeftLeg: [48, 0, 0], RightLeg: [48, 0, 0] }, hands: { Right: [0.30, 0.62, 0.44] as V3, Left: OFF_HAND }, hipsY: -0.12 },   // …and snapped low
+    { t: 0.52, bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [-4, 0, 0], LeftUpLeg: [-26, 0, 12], RightUpLeg: [-26, 0, -12], LeftLeg: [36, 0, 0], RightLeg: [36, 0, 0] }, hands: { Right: [0.30, 1.10, 0.40] as V3, Left: OFF_HAND }, hipsY: -0.05 },
+    { t: 0.66, bones: { Hips: [0, 0, 0], Spine: [14, 0, 0], Neck: [-2, 0, 0], ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
+  ]);
+}
+
+// ── ANKLE BREAKERS: what it looks like from the other side ────────────────────────────────────────────────────
+// The defender's answer to all of the above was `karate_hit_react` and `karate_knockdown` — a man being PUNCHED.
+// Nobody punched him. He went for a ball that was not there, and the two ways that ends are: you get your feet
+// back under you, or you do not.
+
+/** THE STUMBLE: he bit, his weight went the wrong way, and he caught it. One foot crosses over the other, the arms
+ *  come out for balance, the chest drops — and he is still up, which is the difference between this and the slip. */
+export function buildAnkleStumble(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'bball_ankle_stumble', 0.62, [
+    { t: 0,    bones: { Hips: [0, 0, 0],    Spine: [10, 0, 0],   Neck: [-4, 0, 0], LeftUpLeg: [-26, 0, 14], RightUpLeg: [-26, 0, -14], LeftLeg: [38, 0, 0], RightLeg: [38, 0, 0] }, hands: { Right: [0.34, 1.02, 0.18] as V3, Left: [-0.34, 1.02, 0.18] as V3 }, hipsY: -0.08 },
+    { t: 0.16, bones: { Hips: [0, -20, 0],  Spine: [26, 14, 0],  Neck: [-2, -10, 0], LeftUpLeg: [-58, 0, -16], RightUpLeg: [-12, 0, -18], LeftLeg: [30, 0, 0], RightLeg: [20, 0, 0] }, hands: { Right: [0.54, 1.16, 0.10] as V3, Left: [-0.50, 1.24, -0.06] as V3 }, hipsY: -0.14 },   // the weight goes, the lead leg crosses OVER
+    { t: 0.32, bones: { Hips: [0, -30, 0],  Spine: [34, 20, 0],  Neck: [4, -14, 0],  LeftUpLeg: [-20, 0, -24], RightUpLeg: [-52, 0, -10], LeftLeg: [26, 0, 0], RightLeg: [56, 0, 0] }, hands: { Right: [0.62, 1.04, -0.12] as V3, Left: [-0.56, 1.10, 0.22] as V3 }, hipsY: -0.22 },   // right down on it, arms out — the catch
+    { t: 0.46, bones: { Hips: [0, -14, 0],  Spine: [24, 10, 0],  Neck: [0, -6, 0],   LeftUpLeg: [-34, 0, 10], RightUpLeg: [-34, 0, -16], LeftLeg: [44, 0, 0], RightLeg: [44, 0, 0] }, hands: { Right: [0.44, 1.06, 0.10] as V3, Left: [-0.42, 1.06, 0.12] as V3 }, hipsY: -0.16 },
+    { t: 0.62, bones: { Hips: [0, 0, 0],    Spine: [12, 0, 0],   Neck: [-4, 0, 0], LeftUpLeg: [-28, 0, 14], RightUpLeg: [-28, 0, -14], LeftLeg: [40, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.34, 1.02, 0.18] as V3, Left: [-0.34, 1.02, 0.18] as V3 }, hipsY: -0.09 },   // back in a stance, late
+  ]);
+}
+
+/** THE SLIP: he did not catch it. The feet go out from under him sideways and he lands on a hip and a hand — this
+ *  is the one the crowd stands up for, and it has to be a FALL, not a knockdown: nothing hit him. */
+export function buildAnkleSlip(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'bball_ankle_slip', 0.78, [
+    { t: 0,    bones: { Hips: [0, 0, 0],   Spine: [10, 0, 0],  Neck: [-4, 0, 0],  LeftUpLeg: [-26, 0, 14], RightUpLeg: [-26, 0, -14], LeftLeg: [38, 0, 0], RightLeg: [38, 0, 0] }, hands: { Right: [0.34, 1.02, 0.18] as V3, Left: [-0.34, 1.02, 0.18] as V3 }, hipsY: -0.08 },
+    { t: 0.14, bones: { Hips: [0, -18, 0], Spine: [20, 12, 0], Neck: [2, -8, 0],  LeftUpLeg: [-64, 0, -22], RightUpLeg: [-8, 0, -20], LeftLeg: [22, 0, 0], RightLeg: [14, 0, 0] }, hands: { Right: [0.58, 1.20, 0.04] as V3, Left: [-0.54, 1.26, -0.08] as V3 }, hipsY: -0.16 },   // the foot slides out from under him
+    { t: 0.34, bones: { Hips: [0, -26, 0], Spine: [40, 18, 0], Neck: [10, -12, 0], LeftUpLeg: [-86, 0, -30], RightUpLeg: [-30, 0, -22], LeftLeg: [18, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.66, 0.52, -0.20] as V3, Left: [-0.50, 0.92, 0.26] as V3 }, hipsY: -0.52 },   // going down: the hand reaches for the floor behind him
+    { t: 0.5,  bones: { Hips: [0, -30, 0], Spine: [46, 20, 0], Neck: [14, -12, 0], LeftUpLeg: [-96, 0, -34], RightUpLeg: [-46, 0, -24], LeftLeg: [26, 0, 0], RightLeg: [58, 0, 0] }, hands: { Right: [0.70, 0.14, -0.30] as V3, Left: [-0.44, 0.70, 0.30] as V3 }, hipsY: -0.74 },   // DOWN — on the hip and the hand
+    { t: 0.78, bones: { Hips: [0, -28, 0], Spine: [42, 18, 0], Neck: [10, -10, 0], LeftUpLeg: [-92, 0, -32], RightUpLeg: [-44, 0, -22], LeftLeg: [30, 0, 0], RightLeg: [56, 0, 0] }, hands: { Right: [0.68, 0.16, -0.28] as V3, Left: [-0.46, 0.66, 0.28] as V3 }, hipsY: -0.72 },   // sat there watching you go
+  ]);
 }
 
 /** Defensive slide: wide, low, arms out and low in front. Loops. */

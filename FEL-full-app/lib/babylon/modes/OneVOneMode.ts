@@ -102,6 +102,8 @@ import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterSc
 import {
   CHAIN_IDLE, BASELINE_HANDLE, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot,
   resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, moveImpulse,
+  moveClip, ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP,
+  // bodyRight lives in HoopsMoves with the rest of the body-frame helpers
   type ChainState, type HandleMove,
 } from '../core/HandleSystem';   // Street chains x 2K brakes, gated on the handle the PRQ scan earned
 import {
@@ -136,8 +138,7 @@ import { pickHoopsDunk, dunkSpeedRatio } from '../core/HoopsDunks';
 import {   // HOOPS-MOVE-KIT-A (2026-09-08): the gather, the finish kit, the drive contest
   planGather, gatherWish, gatherLabel, gatherTravel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
   pickLayupSide, planFinish, finishHopY, finishStride, FINISH_LABEL, type FinishPlan, type FinishStyle,
-  contestDrive, bumpShove, BUMP_SLOW, BUMP_SLOW_SEC, type DriveContest,
-} from '../core/HoopsMoves';
+  contestDrive, bumpShove, BUMP_SLOW, BUMP_SLOW_SEC, type DriveContest, bodyRight } from '../core/HoopsMoves';
 import {   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit — M4 the fade, M5 the hook, M6 the spin
   canPostUp, postYaw, postWish, postFadeAway, POST_FADE_STICK_MIN, fadeDrift,
   pickHookSide, hookShield,
@@ -916,7 +917,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           meAnimTree.update({
             // STRIDE MATCHING needs real ground speed: speed01 is normalised and cannot pace a stride
             speedMps: Math.hypot(meDribble.vel.x, meDribble.vel.z),
-            speed01: drib.speed01, crossover: drib.crossover, nearestDefender: nearestDef,
+            speed01: drib.speed01, crossover: drib.crossover, crossoverDir: mx >= 0 ? 'right' : 'left', nearestDefender: nearestDef,
             hasBall: carrying, shooting, dunking,
             driving: sprintOk && drib.speed01 > 0.6
               && Vector3.Dot(meDribble.vel, RIM.subtract(me.root.position)) > 0,
@@ -2147,6 +2148,15 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (!outcome.owned) return;                      // not in my hands yet — the gate IS the upgrade
     chain = outcome.chain;
 
+    // THE MOVE ITSELF. Everything below renders what the move DID — the banner, the defender, the chain — and
+    // nothing rendered the move: the tree's one crossover state (hardwired to `bball_crossover_left`) was the
+    // body for all twelve of them. The ball ends on the side away from him, which is the side the move was for.
+    const toHim = foe.root.position.subtract(me.root.position);
+    const right = bodyRight(me.root.rotation.y);
+    const moveDir: 'left' | 'right' = (toHim.x * right.x + toHim.z * right.z) > 0 ? 'left' : 'right';
+    const clip = moveClip(move, moveDir);
+    if (clip) meAnimTree.beat(clip, { fadeSec: 0.07 });
+
     // OFF THE HEAD is the only move where the ball leaves your hands, so it resolves HERE rather than
     // through the ankle-break roll below. Everything else in this vocabulary is a decision about a chain;
     // this one is a decision about the ball, and it can lose it.
@@ -2224,9 +2234,10 @@ export const OneVOneMode: ModeDefinition = (() => {
       // so there is one way a body ends up on this floor and one way it comes back.
       foeFloored = true;
       foeStunSec = ANKLE_BREAK_STUN_SEC * 1.8;
-      // the SAME knockdown + floor hold the poster dunk uses: one way a body goes down here, one way it
-      // gets up. 'karate_floored' is not a registered clip — beating it would have left him clip-less.
-      foeAnimTree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      // HE SLIPPED, HE WAS NOT PUNCHED. This played the poster dunk's karate knockdown — a man taking a blow —
+      // for a defender whose feet went out from under him going for a ball that was not there. The slip is its
+      // own clip now: the foot slides out, the hand reaches back for the floor, and he sits there watching you go.
+      foeAnimTree.beat(ANKLE_SLIP_CLIP, { settleTo: { clip: 'karate_floor_hold' } });
       SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
       ctx.feel?.impact?.(0.55);
       ctx.juice.shake(0.09, 140);
@@ -2234,7 +2245,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       console.info(`[1V1-HANDLE] HARD ankle break, chain ${chain.length} handle ${handle}`);
     } else {
       foeStunSec = ANKLE_BREAK_STUN_SEC;
-      foeAnimTree.beat(SPORT_CLIP.karateHitReact);
+      foeAnimTree.beat(ANKLE_STUMBLE_CLIP);   // …and the softer one is a STUMBLE, not a hit react: he caught it, late
       ctx.feel?.impact?.(0.35);
       bannerFlash(ctx, tier === 'highlight' ? 'ANKLES!' : 'SHOOK HIM!');
       console.info(`[1V1-HANDLE] ankle break, chain ${chain.length} handle ${handle} odds ${odds.toFixed(2)}`);

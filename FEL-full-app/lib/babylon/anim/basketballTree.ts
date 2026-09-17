@@ -22,7 +22,7 @@ import { boneNode, findBone } from './boneLookup';
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
 export type BasketballAnimState =
-  | 'idle_dribble' | 'speed_dribble' | 'crossover' | 'protect'
+  | 'idle_dribble' | 'speed_dribble' | 'crossover' | 'crossover_right' | 'protect'
   | 'drive' | 'gather' | 'shot_release' | 'layup' | 'dunk'
   | 'contact_stagger' | 'defend_slide' | 'defend_slide_right' | 'defend_idle' | 'box_out'
   | 'watch'
@@ -39,6 +39,10 @@ export interface AnimTreeInput {
    */
   speedMps?: number;
   crossover: boolean;
+  /** WHICH WAY the ball went. The clip was hardwired to `bball_crossover_left`, so a crossover to the RIGHT — half
+   *  of them — played the left-handed clip and the body went the opposite way to the ball. Optional and defaulting
+   *  to left, exactly like `slideDir` below, so a mode that has not been wired yet behaves as it always did. */
+  crossoverDir?: 'left' | 'right';
   nearestDefender: number;
   hasBall: boolean;
   shooting: boolean;
@@ -61,6 +65,7 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   idle_dribble:    { clip: 'bball_dribble_idle', loop: true, fadeSec: 0.18 },
   speed_dribble:   { clip: 'bball_dribble_run', loop: true, fadeSec: 0.14 },
   crossover:       { clip: 'bball_crossover_left', loop: false, fadeSec: 0.08 },
+  crossover_right: { clip: 'bball_crossover_right', loop: false, fadeSec: 0.08 },
   protect:         { clip: 'bball_defend_stance', loop: true, fadeSec: 0.2 },
   drive:           { clip: 'run_forward', loop: true, fadeSec: 0.1 },
   gather:          { clip: 'dunk_charge_gather', loop: true, fadeSec: 0.08 },
@@ -92,7 +97,7 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
   else if (i.dejected) state = 'dejected';
   else if (i.defending) {
     state = i.bracing ? 'box_out' : i.speed01 > 0.2 ? (i.slideDir === 'right' ? 'defend_slide_right' : 'defend_slide') : 'defend_idle';
-  } else if (i.crossover) state = 'crossover';
+  } else if (i.crossover) state = i.crossoverDir === 'right' ? 'crossover_right' : 'crossover';
   else if (i.driving && i.hasBall) state = 'drive';
   else if (i.speed01 > 0.15) state = i.hasBall ? 'speed_dribble' : 'drive';
   else if (i.nearestDefender < 1.4 && i.hasBall) state = 'protect';
@@ -104,7 +109,7 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
 function withoutTrigger(i: AnimTreeInput, state: BasketballAnimState): AnimTreeInput {
   switch (state) {
     case 'contact_stagger': return { ...i, staggered: false };
-    case 'crossover': return { ...i, crossover: false };
+    case 'crossover': case 'crossover_right': return { ...i, crossover: false };
     case 'layup': return { ...i, shooting: false };
     case 'dunk': return { ...i, dunking: false };
     case 'celebrate': return { ...i, celebrating: false };

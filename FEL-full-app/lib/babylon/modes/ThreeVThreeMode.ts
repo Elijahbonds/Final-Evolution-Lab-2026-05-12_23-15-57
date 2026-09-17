@@ -91,8 +91,7 @@ import {   // HOOPS-MOVE-KIT-A
   inBankBand, bankPoint, BANK_PCT_BONUS, planHopStep, HOP_RANGE, planEuro, euroSell, euroAvailable, gatherTravel,  // M12 / M13 / M14
   planGather, gatherWish, gatherLabel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
   pickLayupSide, planFinish, finishHopY, finishStride, FINISH_LABEL, type FinishPlan, type FinishStyle,
-  contestDrive, bumpShove, BUMP_SLOW, BUMP_SLOW_SEC, type DriveContest, resolveBodyContact,
-} from '../core/HoopsMoves';
+  contestDrive, bumpShove, BUMP_SLOW, BUMP_SLOW_SEC, type DriveContest, resolveBodyContact, bodyRight } from '../core/HoopsMoves';
 import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package (the 1v1's, on the team game)
   groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, contestedPct, alteredApex, aiHandsUp, facingCos,
   AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE, BUMP_STRIP_WINDOW_SEC,
@@ -103,6 +102,7 @@ import { resolveRim, forcedMissProfile } from '../core/RimPhysics';             
 import { judge, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
+  moveClip, ANKLE_STUMBLE_CLIP,
   OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, moveImpulse, type ChainState, type HandleMove,
 } from '../core/HandleSystem';   // the vocabulary 1v1 had and this mode did not
 import {
@@ -877,7 +877,7 @@ const CHARGE_RANGE = 1.15;
             SoundKit.play('crowdCheer', { volume: 0.5 });
             ctx.feel?.impact?.(0.35);
             EffectsKit.burst(ctx.scene, near.char.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
-            near.tree.beat(SPORT_CLIP.karateHitReact);   // BIOMECH-HOOPS-WAVE1: the tree owns the react (it was cut to a frame by the per-frame run / idle play)
+            near.tree.beat(ANKLE_STUMBLE_CLIP);   // a STUMBLE, not a karate hit react — nobody punched him
             ctx.setHud({ banner: 'ANKLES!' });
             setTimeout(() => ctx.setHud({ banner: '' }), 800);
           }
@@ -899,7 +899,7 @@ const CHARGE_RANGE = 1.15;
             if (Vector3.Distance(f.char.root.position, me.char.root.position) < 2.4 && (foeCloseMem[fi] ?? 0) > 0.8) {
               f.stunSec = 0.45;
               bit = true;
-              f.tree.beat(SPORT_CLIP.karateHitReact);
+              f.tree.beat(ANKLE_STUMBLE_CLIP);       // he bit the hesi and had to catch himself
               break;                                   // only the man you shook
             }
           }
@@ -920,7 +920,7 @@ const CHARGE_RANGE = 1.15;
       if (!dunking) me.tree.update({   // the flight's held launch + the land crouch are mode-owned beats
         // STRIDE MATCHING: real ground speed, because speed01 is normalised and cannot pace a stride
         speedMps: Math.hypot(me.drib.vel.x, me.drib.vel.z),
-        speed01: drib.speed01, crossover: drib.crossover && iAmCarrier, nearestDefender: nearestFoeDist, hasBall: iAmCarrier && !passFlight.active,
+        speed01: drib.speed01, crossover: drib.crossover && iAmCarrier, crossoverDir: wish.x >= 0 ? 'right' : 'left', nearestDefender: nearestFoeDist, hasBall: iAmCarrier && !passFlight.active,
         shooting, dunking, driving: iAmCarrier && sprintOk && drib.speed01 > 0.6 && Vector3.Dot(me.drib.vel, RIM.subtract(me.char.root.position)) > 0,
         defending: carrierId === 'foeTeam', bracing: meBoxing, staggered: false, slideDir: slideDirFor(me.char.root.rotation.y, me.drib.vel),
       });
@@ -1967,6 +1967,15 @@ const CHARGE_RANGE = 1.15;
     });
     if (!outcome.owned) return;                      // not in my hands yet — the gate IS the upgrade
     chain = outcome.chain;
+
+    // THE MOVE ITSELF — see the note in 1v1's doMove. Twelve moves shared the tree's one crossover state, so
+    // nothing here had a body of its own. The ball ends on the side away from the man guarding you.
+    if (foe) {
+      const toHim = foe.char.root.position.subtract(me.char.root.position);
+      const right = bodyRight(me.char.root.rotation.y);
+      const clip = moveClip(move, (toHim.x * right.x + toHim.z * right.z) > 0 ? 'left' : 'right');
+      if (clip) me.tree.beat(clip, { fadeSec: 0.07 });
+    }
 
     // OFF THE HEAD resolves here, not through the ankle-break roll: it is the one move where the ball
     // leaves your hands, so it is the one move that can lose it. Same rule in 1v1.

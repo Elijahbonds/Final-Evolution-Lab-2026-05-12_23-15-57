@@ -21,7 +21,9 @@ import {
   type MoveRead,
   moveDanger,
   moveImpulse,
-  movesTheBody} from './HandleSystem';
+  movesTheBody,
+  MOVE_CLIP, moveClip, ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP, type HandleMove,
+} from './HandleSystem';
 
 const MAX = 100;
 
@@ -634,5 +636,43 @@ describe('moveImpulse', () => {
       const i = moveImpulse(m);
       expect(Math.hypot(i.forward, i.lateral), m).toBeLessThan(4);
     }
+  });
+});
+
+// ── THE BODY FOR EACH MOVE (2026-09-16) ────────────────────────────────────────────────────────────────────────
+describe('MOVE_CLIP', () => {
+  it('every move in the vocabulary is accounted for — a new one cannot be added and silently left bodiless', () => {
+    // This is the test that would have caught the original fault: twelve moves, three clips, and the tree playing
+    // `bball_crossover_left` for all of them. A move is either given a clip here or explicitly marked null.
+    for (const move of Object.keys(MOVE_HANDLE) as HandleMove[]) {
+      expect(MOVE_CLIP).toHaveProperty(move);
+    }
+  });
+
+  it('the sided moves name a different clip for each side — that was the bug, on the crossover itself', () => {
+    for (const move of ['crossover', 'in_and_out', 'between_legs', 'behind_back', 'double_cross', 'shammgod'] as HandleMove[]) {
+      const l = moveClip(move, 'left'), r = moveClip(move, 'right');
+      expect(l).toBeTruthy(); expect(r).toBeTruthy();
+      expect(l).not.toBe(r);
+    }
+  });
+
+  it('the sideless ones give the same clip either way, and the mode-owned ones give none', () => {
+    for (const move of ['hesi', 'yoyo', 'snatch_back'] as HandleMove[]) {
+      expect(moveClip(move, 'left')).toBe(moveClip(move, 'right'));
+      expect(moveClip(move, 'left')).toBeTruthy();
+    }
+    // a spin turns the whole body and an off-the-head throws the ball at somebody: the modes render those
+    expect(moveClip('spin', 'left')).toBeNull();
+    expect(moveClip('off_the_head', 'left')).toBeNull();
+  });
+
+  it('every clip named here is a basketball clip, not a borrowed karate one', () => {
+    for (const move of Object.keys(MOVE_HANDLE) as HandleMove[]) {
+      const c = moveClip(move, 'right');
+      if (c) expect(c).toMatch(/^bball_/);
+    }
+    expect(ANKLE_STUMBLE_CLIP).toMatch(/^bball_/);   // it was karate_hit_react
+    expect(ANKLE_SLIP_CLIP).toMatch(/^bball_/);      // and karate_knockdown
   });
 });

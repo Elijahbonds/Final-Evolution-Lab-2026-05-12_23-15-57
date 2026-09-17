@@ -20,7 +20,8 @@ import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdo
 import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge, buildCombatRoll, buildCombatJump } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
-  buildDribbleIdle, buildCrossover, buildHesi, buildLayupGather, buildMikan, buildUpAndUnder, buildFingerRoll, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
+  buildDribbleIdle, buildCrossover, buildHesi, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble,
+  buildDoubleCross, buildSnatchBack, buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip, buildLayupGather, buildMikan, buildUpAndUnder, buildFingerRoll, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,   // HOOPS-MOVE-KIT-A
   buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // HOOPS-MOVE-KIT-B wave 2: the footwork (M8–M14)
@@ -152,6 +153,22 @@ export function registerAuthoredClips(
     ['bball_crossover_left', () => buildCrossover(scene, skeleton, 'left')],
     ['bball_crossover_right', () => buildCrossover(scene, skeleton, 'right')],
     ['bball_hesi', () => buildHesi(scene, skeleton)],
+    // THE HANDLE (2026-09-16): HandleSystem's twelve moves had three clips between them
+    ['bball_in_and_out_left', () => buildInAndOut(scene, skeleton, 'left')],
+    ['bball_in_and_out_right', () => buildInAndOut(scene, skeleton, 'right')],
+    ['bball_between_legs_left', () => buildBetweenLegsDribble(scene, skeleton, 'left')],
+    ['bball_between_legs_right', () => buildBetweenLegsDribble(scene, skeleton, 'right')],
+    ['bball_behind_back_left', () => buildBehindBackDribble(scene, skeleton, 'left')],
+    ['bball_behind_back_right', () => buildBehindBackDribble(scene, skeleton, 'right')],
+    ['bball_double_cross_left', () => buildDoubleCross(scene, skeleton, 'left')],
+    ['bball_double_cross_right', () => buildDoubleCross(scene, skeleton, 'right')],
+    ['bball_snatch_back', () => buildSnatchBack(scene, skeleton)],
+    ['bball_shammgod_left', () => buildShammgod(scene, skeleton, 'left')],
+    ['bball_shammgod_right', () => buildShammgod(scene, skeleton, 'right')],
+    ['bball_yoyo', () => buildYoyo(scene, skeleton)],
+    // …and the two ways an ankle breaker ends, which were a karate punch and a karate knockdown
+    ['bball_ankle_stumble', () => buildAnkleStumble(scene, skeleton)],
+    ['bball_ankle_slip', () => buildAnkleSlip(scene, skeleton)],
     ['bball_layup_gather', () => buildLayupGather(scene, skeleton)],
     // the layup vocabulary (owner, 2026-09-16): the shot from under the ring, and the one that beats a jumper
     ['bball_mikan', () => buildMikan(scene, skeleton)],

@@ -70,6 +70,52 @@ export const MOVE_HANDLE: Readonly<Record<HandleMove, number>> = {
   off_the_head: 92,
 };
 
+/**
+ * THE BODY FOR EACH MOVE (2026-09-16).
+ *
+ * This table did not exist, and its absence is why the vocabulary was invisible: the animation tree has ONE
+ * crossover state, hardwired to `bball_crossover_left`, so every move in the list above resolved its odds, took
+ * its chain, flashed its banner — and played a left crossover. A right-handed crossover played the left clip too.
+ * Twelve moves, three clips, and no way for the player to tell any of them apart by looking.
+ *
+ * `dir` is the side the ball ENDS on, which is the only thing a defender can read. The moves with no `_left` /
+ * `_right` pair are the ones with no side to them: a snatch back goes backwards, a yoyo goes nowhere, and a spin
+ * and an off-the-head are rendered by the modes themselves (a spin turns the whole body; off the head throws the
+ * ball at somebody).
+ */
+export const MOVE_CLIP: Readonly<Record<HandleMove, ((dir: 'left' | 'right') => string) | null>> = {
+  crossover: (d) => `bball_crossover_${d}`,
+  hesi: () => 'bball_hesi',
+  in_and_out: (d) => `bball_in_and_out_${d}`,
+  yoyo: () => 'bball_yoyo',
+  between_legs: (d) => `bball_between_legs_${d}`,
+  behind_back: (d) => `bball_behind_back_${d}`,
+  spin: null,             // the mode turns the body; there is no hand shape that says "spin" on its own
+  slip_slide: (d) => `bball_in_and_out_${d}`,   // the slip IS an in-and-out you took past his hip — same hands, mode moves the feet
+  double_cross: (d) => `bball_double_cross_${d}`,
+  snatch_back: () => 'bball_snatch_back',
+  shammgod: (d) => `bball_shammgod_${d}`,
+  off_the_head: null,     // the ball leaves your hands; the mode owns that one entirely
+};
+
+/** The clip for a move, or null when the mode renders it another way. */
+export function moveClip(move: HandleMove, dir: 'left' | 'right'): string | null {
+  const f = MOVE_CLIP[move];
+  return f ? f(dir) : null;
+}
+
+/**
+ * HOW AN ANKLE BREAK LOOKS FROM THE OTHER SIDE.
+ *
+ * The defender's answer to the whole vocabulary above was `karate_hit_react`, and a floored one was
+ * `karate_knockdown` — a man being PUNCHED, twice. Nobody punched him: he went for a ball that was not there, and
+ * there are exactly two ways that ends.
+ */
+export const ANKLE_STUMBLE_CLIP = 'bball_ankle_stumble';
+export const ANKLE_SLIP_CLIP = 'bball_ankle_slip';
+/** Seconds the slip leaves him on the floor before he can get up — it is the longest punishment in the mode. */
+export const ANKLE_SLIP_DOWN_SEC = 1.4;
+
 /** Is this move in my hands? */
 export function hasMove(move: HandleMove, handle: number): boolean {
   return handle >= MOVE_HANDLE[move];
