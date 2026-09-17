@@ -18,8 +18,15 @@ interface Entry {
   extend?: { from01: number; peak01: number; release01?: number; Right?: [number, number, number]; Left?: [number, number, number]; polesRight?: [number, number, number]; polesLeft?: [number, number, number] };   // release01: from here the override eases back OUT to the capture by the end
   /** STYLE CLIPS: the vocabulary this clip belongs to, and whether it carries a root track (mocapRetarget.rootTrack). */
   style?: string; rootTrack?: boolean; label?: string;
+  /** LOWER STANCES ON MOVES (owner, 2026-09-17) — NOT USABLE YET: measured on the kit rig, the UpLeg/Leg keys of a capture do
+   *  not move the feet (the ankle height only followed hipsY, both flexion signs identical), so a crouch here only sinks the
+   *  feet. A lower stance needs the leg solve (planted feet / leg IK) in poseClip. Extra flexion in degrees — the thighs come forward by `crouch`, the knees bend by
+   *  2×crouch (the shins stay near their line) and the hips drop by the leg's shortening (0.9·(1−cos crouch)), so the feet stay
+   *  on the floor. A crouch of 18° lowers the hips ~4.4 cm and reads as a low, set handle. */
+  crouch?: number;
 }
 const ROOT = join(process.env.HOME ?? '', 'Downloads/fel-mocap-sources');
+const CROUCH_DROP_K = Number(process.env.CROUCH_DROP_K ?? 1);   // LOWER STANCES: the drop's calibration against the floor test
 const rootFor = (e: Entry) => (e.source === 'meshy' ? join(process.env.HOME ?? '', 'Downloads/FEL_hero_upload') : ROOT);
 // --styles: the style-clip manifest → authored/mocapStyles.ts (the same retarget, plus the root tracks and the vocabulary)
 const STYLES = process.argv.includes('--styles');
@@ -77,6 +84,17 @@ for (const e of manifest.clips) {
         k.hands![side] = [h[0] + (g[0] - h[0]) * ws, h[1] + (g[1] - h[1]) * ws, h[2] + (g[2] - h[2]) * ws];
         const pl = pole(side); if (pl && ws >= 0.5) { (k.poles ??= {})[side] = pl; }
       }
+    }
+  }
+  if (e.crouch) {   // LOWER STANCES ON MOVES: deeper hips + knees, the hips down by exactly the leg's shortening
+    const d = e.crouch, drop = 0.9 * (1 - Math.cos(d * Math.PI / 180));
+    for (const k of r.keys) {
+      const b = k.bones ?? (k.bones = {});
+      // measured on the kit rig (2026-09-17): +thigh / −knee is the flexion direction of these absolute keys (the first cut, the
+      // other way round, put the feet 6 cm under the floor); CROUCH_DROP_K scales the analytic shortening to the rig's own leg
+      for (const up of ['LeftUpLeg', 'RightUpLeg']) { const v = b[up] ?? [0, 0, 0]; b[up] = [v[0] + d, v[1], v[2]]; }
+      for (const lg of ['LeftLeg', 'RightLeg']) { const v = b[lg] ?? [0, 0, 0]; b[lg] = [v[0] - 2 * d, v[1], v[2]]; }
+      k.hipsY = +(((k.hipsY ?? 0) - drop * CROUCH_DROP_K).toFixed(3));
     }
   }
   const hands = r.keys.map((k) => Math.max(k.hands!.Left![1], k.hands!.Right![1]));
