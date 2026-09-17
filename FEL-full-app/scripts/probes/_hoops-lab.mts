@@ -386,7 +386,9 @@ for (let n = 0; n < POSSESSIONS; n++) {
 }
 
 const def = await page.evaluate('window.__def') as { jumps: number; gathers: number; driverPeak: number; plantedMs: number; closestWhilePlanted: number };
-const chargesTaken = log.filter((l) => /charge taken/.test(l)).length;
+// the ref owns the call now, so the log line is `[1V1-REF] charge ...` — this grepped the mode's old hand-rolled
+// "charge taken" text and reported 0 while five were being called, which is a summary lying about a working game.
+const chargesTaken = log.filter((l) => /REF\] charge |charge taken/.test(l)).length;
 const handleMoves = log.filter((l) => /HANDLE\] move /.test(l)).map((l) => (l.match(/move (\w+) (\w+) → (\S+)/) ?? []).slice(1).join(' '));
 const tricks = log.filter((l) => /trick \w+ (green|early|late)/.test(l));
 const screensCalled = log.filter((l) => /screen called/.test(l)).length;
@@ -410,6 +412,6 @@ const out = {
 };
 fs.writeFileSync(`${OUT}/hoops-lab-${TAG}.json`, JSON.stringify(out, null, 1));
 console.log(`\n${MODE} charge ${CHARGE} · offence ${made}/${off.length}${out.makePct !== null ? ` (${out.makePct}%)` : ''} · ${byPlay.map((b) => `${b.play} ${b.made}/${b.n}`).join(' · ')}`);
-console.log(`defence: stops ${stops}/${defence.length} · block jumps ${out.blockJumps} on ${out.gathersSeen} gathers · charges ${chargesTaken} (driver peak ${(def?.driverPeak ?? 0).toFixed(1)} m/s vs 4.2 needed) · planted ${((def?.plantedMs ?? 0) / 1000).toFixed(1)}s, closest ${(def?.closestWhilePlanted ?? 99).toFixed(2)}m (needs 1.15) · screens ${screensCalled} · score ${String(final.score)}-${String(final.foeScore)} to ${String(final.target)}`);
+console.log(`defence: stops ${stops}/${defence.length} · block jumps ${out.blockJumps} on ${out.gathersSeen} gathers · charges ${chargesTaken} (driver peak ${(def?.driverPeak ?? 0).toFixed(1)} m/s vs 4.2 needed) · planted ${((def?.plantedMs ?? 0) / 1000).toFixed(1)}s, closest ${(def?.closestWhilePlanted ?? 99).toFixed(2)}m (CHARGE_RANGE is BODY_STANDOFF + 0.5) · screens ${screensCalled} · score ${String(final.score)}-${String(final.foeScore)} to ${String(final.target)}`);
 console.log(`→ ${OUT}/hoops-lab-${TAG}.json`);
 await browser.close();
