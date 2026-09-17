@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { EDGE_FRACTION, GATE_CLEAR_M, SNOW_SLOPE, gateDist, gateX, snowRails } from './snowSlope';
+import {
+  CROWD_FEATURE_CLEAR_M, CROWD_INSET_M, EDGE_FRACTION, GATE_CLEAR_M, SNOW_CROWD, SNOW_SLOPE,
+  gateDist, gateX, snowCrowd, snowRails,
+} from './snowSlope';
 import { SLALOM_GATES, SLALOM_SPACING, SLALOM_START, SLOPE_PITCH } from './rideWorlds';
 import { SNOW_VENUES } from '../nexus/boardVenues';
 
@@ -90,5 +93,56 @@ describe('the snow slope', () => {
     const drop = Math.sin(SLOPE_PITCH) * RUN_LEN;
     expect(drop).toBeGreaterThan(60);
     expect(Math.tan(SLOPE_PITCH)).toBeGreaterThan(0.18);
+  });
+});
+
+describe('where the crowd stands on the slope (P9)', () => {
+  it('stands nobody on a park feature, at any snow venue', () => {
+    // The defect this replaces: at night-park (bound 20) the dist-188 kicker spans lateral -15.6 .. -7.6 and a
+    // spectator stood at -14. The margin at alpine-run was 8 cm, and a Math.random() jitter of up to 1.5 m was
+    // free to spend it. Both are gone; this is the assertion that keeps them gone.
+    for (const v of SNOW_VENUES) {
+      for (const c of snowCrowd(v.bound)) {
+        for (const f of SNOW_SLOPE) {
+          const along = Math.max(f.dist - c.dist, c.dist - (f.dist + f.length));
+          if (along > CROWD_FEATURE_CLEAR_M) continue;         // nowhere near it down the fall line
+          const across = Math.abs(c.lateral - f.lateral * v.bound) - f.width / 2;
+          expect(across, `${c.watching} stands on the ${f.kind} at ${f.dist} m on ${v.id}`)
+            .toBeGreaterThan(CROWD_FEATURE_CLEAR_M);
+        }
+      }
+    }
+  });
+
+  it('keeps them off the racing line and inside the piste', () => {
+    for (const v of SNOW_VENUES) {
+      for (const c of snowCrowd(v.bound)) {
+        // outside every feature's lateral band, so outside the gate corridor by a long way
+        expect(Math.abs(c.lateral), `${c.watching} on ${v.id}`).toBeGreaterThan(EDGE_FRACTION * v.bound);
+        expect(Math.abs(c.lateral), `${c.watching} on ${v.id}`).toBeLessThanOrEqual(v.bound);
+      }
+    }
+  });
+
+  it('clears the trees at HALF - 2 and the lift pylons at HALF - 3.5', () => {
+    for (const v of SNOW_VENUES) {
+      for (const c of snowCrowd(v.bound)) {
+        expect(Math.abs(c.lateral), `${c.watching} on ${v.id}`).toBeLessThan(v.bound - 3.5);
+      }
+    }
+  });
+
+  it('places them by table, not by chance — the same venue twice is the same crowd', () => {
+    const a = snowCrowd(20);
+    const b = snowCrowd(20);
+    expect(a).toEqual(b);
+  });
+
+  it('gathers them in clusters rather than lining the whole run', () => {
+    const dists = [...new Set(SNOW_CROWD.map((c) => c.dist))].sort((x, y) => x - y);
+    // three knots of people, not eight evenly spaced ones
+    const gaps = dists.slice(1).map((d, i) => d - dists[i]);
+    expect(gaps.filter((g) => g > 30).length).toBeGreaterThanOrEqual(2);
+    expect(CROWD_INSET_M).toBeGreaterThan(3.5);
   });
 });

@@ -24,8 +24,9 @@ import { SKATE_VENUES, SNOW_VENUES, SURF_VENUES, rideOf, type BoardVenue } from 
 import { applyFloorDetailToMesh } from '../visual/groundTextures';
 import { VertexData, Texture } from '@babylonjs/core';
 import { readableFloorHex, separatedHex, paintGraffitiWall, buildGraffitiStage } from '../visual/PlacePack';
-import { plazaMarkers, plazaRails, plazaSolids } from './skatePlaza';
-import { SNOW_SLOPE } from './snowSlope';
+import { plazaCrowd, plazaMarkers, plazaRails, plazaSolids } from './skatePlaza';
+import { SNOW_SLOPE, snowCrowd } from './snowSlope';
+import { surfCrowd } from './surfLineup';
 
 export interface RideObstacle { pos: Vector3; radius: number }
 
@@ -418,12 +419,12 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   }
 
   // Where people watch from: the ledges and the bowl rim, clear of every line the player rides, scaled to the venue
-  const crowdSpots = [
-    new Vector3(f(-0.72), 0, f(-0.12)), new Vector3(f(-0.72), 0, f(-0.04)), new Vector3(f(-0.67), 0, f(0.03)),
-    new Vector3(f(0.36), 0, f(0.66)), new Vector3(f(0.43), 0, f(0.68)), new Vector3(f(0.48), 0, f(0.64)),
-    new Vector3(f(-0.29), 0, f(0.54)), new Vector3(f(-0.22), 0, f(0.58)),
-    new Vector3(f(0.78), 0, f(-0.42)), new Vector3(f(0.83), 0, f(-0.35)),
-  ].slice(0, Math.max(2, venue.crowd));
+  // P9: onlookers stand where there is something to watch. These were ten points chosen before the plaza
+  // existed, so a crowd could be facing an empty corner with the whole park behind it. Derived from the features
+  // now — modes/skatePlaza.ts names what each group is looking at.
+  const crowdSpots = plazaCrowd(B)
+    .map((c) => new Vector3(c.x, 0, c.z))
+    .slice(0, Math.max(2, venue.crowd));
   return {
     ground: rideable, grindLines, markers, obstacles: [], crowdSpots, bound: B,
     dispose: () => { all.forEach((m) => m.dispose()); merged.forEach((m) => m.dispose()); stages.forEach((t) => t.dispose(false, true)); },
@@ -654,12 +655,11 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   // they never read as an obstacle on the line. Clustered at three points down the course, because a slope's
   // spectators gather at the interesting corners rather than lining the whole run. How MANY is the venue's call —
   // the glacier has three people on it and the alpine run has eight, and that is most of what "a busy place" is.
-  const crowdSpots: Vector3[] = [];
-  const spots = [[-1, 55], [-1, 58], [1, 60], [1, 120], [-1, 124], [1, 127], [-1, 190], [1, 193]] as const;
-  for (let i = 0; i < Math.min(venue.crowd, spots.length); i++) {
-    const [side, dist] = spots[i];
-    crowdSpots.push(onPiste(side * (HALF - 6) + side * Math.random() * 1.5, dist));
-  }
+  // The table is modes/snowSlope.ts (BOARD-10PHASE P9). It used to live here with a Math.random() jitter, which
+  // is why nobody noticed a group standing on the dist-188 kicker at night-park.
+  const crowdSpots: Vector3[] = snowCrowd(HALF)
+    .slice(0, Math.max(2, venue.crowd))
+    .map((c) => onPiste(c.lateral, c.dist));
   // ── THE SNOW PARK (BOARD-10PHASE P3) ──────────────────────────────────────────────────────────────────────
   //
   // Phase 1 measured snow at ONE grind line, and it was the ski-lift cable — so snow had nothing to grind and
@@ -935,13 +935,12 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
 
   // Beachgoers on the sand, watching the break. How many is the venue's: the break has six people on it and the reef
   // has two, which is the difference between a spot and somewhere you paddled out to alone.
-  const crowdSpots: Vector3[] = [];
-  const sandSpots = [[-14, 126], [-11.5, 127.4], [-9, 126.2], [4, 127], [6.5, 128.2],
-                     [9, 126.6], [11.5, 127.8], [22, 128], [-24, 127.2]] as const;
-  for (let i = 0; i < Math.min(venue.crowd, sandSpots.length); i++) {
-    const [x, z] = sandSpots[i];
-    crowdSpots.push(new Vector3(x, 0.03, z));
-  }
+  // The table is modes/surfLineup.ts (BOARD-10PHASE P9), written in metres INLAND FROM THE WATERLINE. It used to
+  // be nine world-z pairs here, and six of them stood at or seaward of WATER_FRONT — in the wash, or under the
+  // water plane, with 26 m of empty sand behind them.
+  const crowdSpots: Vector3[] = surfCrowd(WATER_FRONT)
+    .slice(0, Math.max(2, venue.crowd))
+    .map((c) => new Vector3(c.x, 0.03, c.z));
 
   // THE SEAWARD HORIZON — the direction the player is actually looking.
   //

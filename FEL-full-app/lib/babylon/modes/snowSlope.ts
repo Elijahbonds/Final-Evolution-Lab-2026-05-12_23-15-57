@@ -70,3 +70,56 @@ export const gateX = (i: number): number => (i === 0 ? 0 : (i % 2 === 0 ? -1 : 1
 
 /** Features that carry a grindable edge. */
 export const snowRails = (): SnowFeature[] => SNOW_SLOPE.filter((f) => f.bonus > 0);
+
+/**
+ * WHERE PEOPLE WATCH FROM (BOARD-10PHASE P9).
+ *
+ * The spectators were authored inline in `buildSlopeRun` as eight `[side, dist]` pairs at `side * (HALF - 6)`
+ * plus `side * Math.random() * 1.5`, and that had two faults the builder could never report:
+ *
+ *  1. IT PUT A BODY ON A KICKER. The eleven park features arrived in P3, after these spots were chosen. At
+ *     night-park (bound 20) the kicker at dist 188 is 8 m wide about lateral −11.6, so it spans −15.6 … −7.6 —
+ *     and the spot at dist 190 stood at −14, inside it. At alpine-run (bound 24) the same pair cleared by 8 cm.
+ *  2. IT WAS UNMEASURABLE. `Math.random()` in the placement means no test can state where anyone stands, so the
+ *     8 cm above was not a margin anybody had checked; it was luck, and the jitter could spend it either way.
+ *
+ * So the spots are a table, `side` is chosen per spot to be on the empty side of whatever feature shares its
+ * stretch of the fall line, and the stagger that keeps a cluster from being a straight line is the spot's own
+ * index rather than a random number. Lateral is metres inside the piste edge, not a fraction, because the
+ * standoff that matters is from the edge (the trees sit at HALF − 2 and the lift pylons at HALF − 3.5), and that
+ * distance does not scale with the venue.
+ */
+export interface SnowOnlooker {
+  /** Metres down the fall line. */
+  dist: number;
+  /** Which side of the piste: −1 rider's left, +1 rider's right. */
+  side: -1 | 1;
+  /** What this group came to see, for a log line and for the test. */
+  watching: string;
+}
+
+/** Metres in from the piste edge for the nearest row of spectators. Trees are at HALF − 2, pylons at HALF − 3.5. */
+export const CROWD_INSET_M = 6;
+/** No spectator may stand closer than this to any park feature's footprint. */
+export const CROWD_FEATURE_CLEAR_M = 1;
+
+export const SNOW_CROWD: SnowOnlooker[] = [
+  { dist: 55, side: -1, watching: 'the first rail' },
+  { dist: 58, side: -1, watching: 'the first rail' },
+  { dist: 60, side: 1, watching: 'the first rail' },
+  { dist: 120, side: 1, watching: 'the mid-course gates' },
+  { dist: 125, side: -1, watching: 'the mid-course gates' },
+  { dist: 125, side: 1, watching: 'the long rail' },
+  // side +1 deliberately: the dist-188 kicker is on the left and 8 m wide, and this group used to stand on it.
+  { dist: 190, side: 1, watching: 'the last kicker' },
+  { dist: 193, side: 1, watching: 'the last kicker' },
+];
+
+/** Spectator positions as (lateral metres, distance down the fall line) for the builder's `onPiste`. */
+export function snowCrowd(half: number): { lateral: number; dist: number; watching: string }[] {
+  return SNOW_CROWD.map((c, i) => ({
+    lateral: c.side * (half - CROWD_INSET_M + (i % 3) * 0.7),
+    dist: c.dist,
+    watching: c.watching,
+  }));
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  LULL_SEC, SET_SIZE, SWELLS_VISIBLE, WAVE_GAP_SEC, WAVE_PROFILES,
+  DRY_SAND_M, LULL_SEC, SAND_DEPTH_M, SET_SIZE, SURF_CROWD, SWELLS_VISIBLE, WAVE_GAP_SEC, WAVE_PROFILES,
+  surfCrowd,
   gapAfter, isLastOfSet, nextRideable, profileFor, sectionAt, sectionsOf, startLineup, stepLineup, waveWorth,
 } from './surfLineup';
 
@@ -165,5 +166,48 @@ describe('the surf lineup', () => {
       // the sequence that broke is contiguous and in order
       for (let i = 1; i < seen.length; i++) expect(seen[i]).toBe(seen[i - 1] + 1);
     });
+  });
+});
+
+describe('who is on the beach (P9)', () => {
+  // The builder's own numbers: sand is a 30 m ground centred at z 138 and the water is drawn 4 m over its near
+  // edge, so the waterline — the thing that decides wet from dry — is at z 127, not at the sand's edge of 123.
+  const SHORE_Z = 138, SHORE_DEPTH = 30, SHORE_OVERLAP = 4;
+  const WATERLINE = SHORE_Z - SHORE_DEPTH / 2 + SHORE_OVERLAP;
+
+  it('stands everyone on dry sand, not in the wash', () => {
+    for (const c of SURF_CROWD) {
+      expect(c.inland, `${c.watching} at x ${c.x}`).toBeGreaterThanOrEqual(DRY_SAND_M);
+    }
+  });
+
+  it('keeps everyone on the sand rather than off the back of it', () => {
+    for (const c of SURF_CROWD) {
+      expect(c.inland, `${c.watching} at x ${c.x}`).toBeLessThan(SAND_DEPTH_M);
+    }
+    // and in world terms, inside the ground the builder actually draws
+    for (const c of surfCrowd(WATERLINE)) {
+      expect(c.z).toBeGreaterThan(SHORE_Z - SHORE_DEPTH / 2);
+      expect(c.z).toBeLessThan(SHORE_Z + SHORE_DEPTH / 2);
+    }
+  });
+
+  it('leaves a first-come crowd at the peak, because venue.crowd slices from the front', () => {
+    // the reef venue seats three; those three should be the knot at the peak, not two loners and a stray
+    const three = surfCrowd(WATERLINE).slice(0, 3);
+    expect(three.every((c) => c.watching === 'the peak')).toBe(true);
+  });
+
+  it('spreads them across the line rather than stacking them at one x', () => {
+    expect(SURF_CROWD.some((c) => c.x < -10)).toBe(true);
+    expect(SURF_CROWD.some((c) => c.x > 10)).toBe(true);
+    expect(new Set(SURF_CROWD.map((c) => c.x)).size).toBe(SURF_CROWD.length);
+  });
+
+  it('moves with the shore instead of pinning a world z', () => {
+    const a = surfCrowd(100)[0];
+    const b = surfCrowd(160)[0];
+    expect(b.z - a.z).toBeCloseTo(60, 6);
+    expect(b.x).toBe(a.x);
   });
 });

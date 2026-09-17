@@ -200,3 +200,49 @@ export const nextRideable = (state: LineupState): Swell | null => state.swells[0
 export function waveWorth(p: WaveProfile): number {
   return Math.round(sectionsOf(p).reduce((sum, s) => sum + s.pts, 0) * p.worth);
 }
+
+/**
+ * WHO IS ON THE BEACH (BOARD-10PHASE P9).
+ *
+ * The beachgoers were nine `[x, z]` pairs inline in `buildSurfBreak`, at z 126 … 128.2. The sand is a 30 m ground
+ * centred on z 138, so it runs 123 … 153 — but the water is deliberately drawn 4 m OVER the sand's near edge to
+ * hide the waterline seam, which puts the actual waterline at z 127. Six of the nine stood at z ≤ 127.4: in the
+ * wash, or under the water plane entirely, on a 26 m beach that was empty behind them.
+ *
+ * Nobody could have caught that from the numbers, because the beach's near edge was three local constants inside
+ * an untestable builder and the crowd was a tenth. So the table is here and it is written in METRES INLAND FROM
+ * THE WATERLINE: the one quantity that decides whether a person is standing on sand, and the one the builder can
+ * supply without the table having to know where the shore was moved to.
+ */
+export interface Beachgoer {
+  /** Metres across, 0 is straight down the line from the peak. */
+  x: number;
+  /** Metres inland from the waterline. Positive is up the beach, away from the water. */
+  inland: number;
+  watching: string;
+}
+
+/** Nobody stands closer than this to the water: below it they are in the wash or under the water plane. */
+export const DRY_SAND_M = 2;
+/** Nor further up than this, or they are off the back of the sand and standing on the backdrop. */
+export const SAND_DEPTH_M = 26;
+
+export const SURF_CROWD: Beachgoer[] = [
+  // the knot at the peak — where a beach crowd actually stands, level with the takeoff
+  { x: -13, inland: 4.5, watching: 'the peak' },
+  { x: -10.5, inland: 6.2, watching: 'the peak' },
+  { x: -8, inland: 4.8, watching: 'the peak' },
+  // down the line, following the wall
+  { x: 4, inland: 5.5, watching: 'the wall' },
+  { x: 6.5, inland: 7.4, watching: 'the wall' },
+  { x: 9, inland: 5.1, watching: 'the wall' },
+  { x: 11.5, inland: 8.2, watching: 'the closeout' },
+  // two sitting further up, out of the wash
+  { x: 22, inland: 13.5, watching: 'nothing in particular' },
+  { x: -24, inland: 12.8, watching: 'nothing in particular' },
+];
+
+/** Beachgoer positions given the world z of the waterline (the water's near edge, not the sand's). */
+export function surfCrowd(waterEdgeZ: number): { x: number; z: number; watching: string }[] {
+  return SURF_CROWD.map((c) => ({ x: c.x, z: waterEdgeZ + c.inland, watching: c.watching }));
+}

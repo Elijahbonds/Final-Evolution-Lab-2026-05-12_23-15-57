@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  SKATE_PLAZA, SPAWN_CLEAR_M, plazaMarkers, plazaRails, plazaSolids,
+  PLAZA_CROWD, SKATE_PLAZA, SPAWN_CLEAR_M, plazaCrowd, plazaMarkers, plazaRails, plazaSolids,
 } from './skatePlaza';
 import { SKATE_VENUES } from '../nexus/boardVenues';
 
@@ -119,5 +119,65 @@ describe('the skate plaza', () => {
     for (const s of SKATE_PLAZA.solids.filter((x) => x.kind === 'bin' || x.kind === 'planter')) {
       expect(s.solid).toBe(true);
     }
+  });
+});
+
+describe('where the crowd stands', () => {
+  it('has somewhere for every venue to seat its crowd', () => {
+    for (const [, bound] of VENUES) expect(plazaCrowd(bound).length).toBeGreaterThanOrEqual(10);
+  });
+
+  it('puts every group inside the fence', () => {
+    for (const [id, bound] of VENUES) {
+      for (const c of plazaCrowd(bound)) {
+        expect(Math.abs(c.x), `${c.watching} on ${id}`).toBeLessThan(bound);
+        expect(Math.abs(c.z), `${c.watching} on ${id}`).toBeLessThan(bound);
+      }
+    }
+  });
+
+  it('stands them clear of every solid, because a body on a landing is an obstacle', () => {
+    // A solid is a rotated box, not a disc. Measuring centre-to-centre against max(width, depth)/2 reads a long
+    // thin solid — the 11 m wallride, the 9.5 m manual pad — as overlapping a group standing well beside it, and
+    // reads a group standing on the narrow end of one as clear. So rotate the offset into the solid's own frame
+    // and measure against the real half-extents. Same mistake the snow gate-clearance test made by comparing
+    // only distance down the fall line.
+    for (const [id, bound] of VENUES) {
+      const solids = plazaSolids(bound).filter((s) => s.solid);
+      for (const c of plazaCrowd(bound)) {
+        for (const s of solids) {
+          const dx = c.x - s.x;
+          const dz = c.z - s.z;
+          const cos = Math.cos(-s.ry);
+          const sin = Math.sin(-s.ry);
+          const lx = dx * cos - dz * sin;
+          const lz = dx * sin + dz * cos;
+          const ox = Math.abs(lx) - s.width / 2;
+          const oz = Math.abs(lz) - s.depth / 2;
+          // Outside on either axis means clear by that much; inside both means the body is on the feature.
+          const gap = ox > 0 && oz > 0 ? Math.hypot(ox, oz) : Math.max(ox, oz);
+          expect(gap, `${c.watching} stands on the ${s.kind} at ${id}`).toBeGreaterThan(0.5);
+        }
+      }
+    }
+  });
+
+  it('gives each group something real to look at', () => {
+    const kinds = new Set(SKATE_PLAZA.solids.map((s) => s.kind as string));
+    const named = new Set(PLAZA_CROWD.map((c) => c.watching));
+    // every thing being watched corresponds to a feature that exists, by name or by description
+    for (const w of named) {
+      const ok = [...kinds].some((k) => w.toLowerCase().includes(k.toLowerCase()))
+        || ['the gap', 'west bench', 'east bench', 'picnic table'].includes(w);
+      expect(ok, `nobody should be watching "${w}"`).toBe(true);
+    }
+  });
+
+  it('spreads them around rather than bunching them in one corner', () => {
+    const c = PLAZA_CROWD;
+    expect(c.some((x) => x.fx > 0.3)).toBe(true);
+    expect(c.some((x) => x.fx < -0.3)).toBe(true);
+    expect(c.some((x) => x.fz > 0.3)).toBe(true);
+    expect(c.some((x) => x.fz < -0.3)).toBe(true);
   });
 });

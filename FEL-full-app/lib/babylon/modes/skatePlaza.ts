@@ -131,6 +131,35 @@ export const SKATE_PLAZA: PlazaLayout = {
   ],
 };
 
+/**
+ * WHERE PEOPLE WATCH FROM (BOARD-10PHASE P9).
+ *
+ * The park's onlookers stood at ten hardcoded points chosen before any of this existed, so a crowd could be
+ * facing an empty corner while the whole plaza was on the other side of the slab. A crowd's job is to tell you
+ * where the good stuff is, so these are derived from the features: beside the pyramid, along the gap, under the
+ * wallride, and on the benches — which is where people sit in a real plaza anyway.
+ *
+ * Offsets are deliberately clear of each feature's own footprint: onlookers are scenery, and a body standing on
+ * the landing of the gap is an obstacle the tests in skatePlaza just spent their time keeping off the line.
+ */
+export const PLAZA_CROWD: { fx: number; fz: number; watching: string }[] = [
+  { fx: 0.54, fz: 0.68, watching: 'pyramid' },
+  { fx: 0.62, fz: 0.64, watching: 'pyramid' },
+  { fx: -0.56, fz: 0.12, watching: 'the gap' },
+  { fx: -0.62, fz: 0.08, watching: 'the gap' },
+  { fx: 0.04, fz: 0.72, watching: 'wallride' },
+  { fx: 0.34, fz: 0.76, watching: 'wallride' },
+  { fx: -0.72, fz: 0.46, watching: 'west bench' },
+  { fx: 0.74, fz: 0.2, watching: 'east bench' },
+  // The spine is 8.4 m across and its centre sits at fz -0.49, so fz -0.5 put this group ON it, not beside it.
+  { fx: -0.2, fz: -0.62, watching: 'spine' },
+  { fx: 0.68, fz: -0.36, watching: 'picnic table' },
+];
+
+export function plazaCrowd(bound: number): { x: number; z: number; watching: string }[] {
+  return PLAZA_CROWD.map((c) => ({ x: atBound(c.fx, bound), z: atBound(c.fz, bound), watching: c.watching }));
+}
+
 /** Metres from a fraction of the bound. */
 export const atBound = (fraction: number, bound: number): number => fraction * bound;
 
