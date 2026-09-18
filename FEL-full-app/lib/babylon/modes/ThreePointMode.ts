@@ -64,6 +64,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { ShotArc } from '../core/BasketballCore';
 import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';   // a shootout miss you can READ
+import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPlay } from '../core/RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import { THREE_CORNER_R, THREE_TOP_R, threePointRadius } from '../core/BasketballCore';
 import { SoundKit } from '../audio/SoundKit';
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0 CONTACT-lite: the hoop answers a make (shared with Dunk / 1v1 / 3v3; Meshy never scaled)
@@ -264,6 +265,8 @@ const bio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE, role: 'offense', hasBall: 
 let shotWin: ShotWindow = 'none', shotSec = 0;
 let releaseIn = -1;                        // seconds until the ball leaves the hand (the jumpshot's release frame); −1 = none pending
 let pendingMade = false;
+/** RIM PLAY (2026-09-18): planned at the fire from the timing, started with the arc at the release frame. */
+let pendingPlay: RimPlay | null = null;
 /** The jumpshot's pace on the release: the timing decision is the press, the ball leaves at the clip's release frame
  *  RELEASE_FRAME_01 · 0.9 s / 1.5 ≈ 0.27 s later — the hand, not a point over the head. */
 const SHOT_CLIP_SPEED = 1.5;
@@ -421,6 +424,13 @@ function fire(ctx: ModeContext, power?: number): void {
   player.animator.play('jumpshot', { speedRatio: SHOT_CLIP_SPEED, onEnd: () => { /* cut at the release; a late end holds */ } });
   releaseIn = releaseFrameOf(player.animator, 'jumpshot', RELEASE_FRAME_01) * (player.animator.durationOf('jumpshot') ?? 0.9) / SHOT_CLIP_SPEED;
   pendingMade = made;
+  {   // RIM PLAY: what this timing earned on the iron — early is short, late is long; a make inside the good window can rattle
+    const toShooter = player.root.position.subtract(RIM); toShooter.y = 0;
+    const q01 = perfect ? 0.95 : Math.max(0.15, 1 - err / Math.PI);
+    const bias = { short: signed < 0 ? 0.8 : -0.8 };
+    pendingPlay = planRimPlay(RIM, toShooter, made ? forcedMakeProfile(q01, bias) : maybeAirball(forcedMissProfile(q01, bias), q01), made);
+    console.info(`[3PT-RIM] plan ${pendingPlay.kind}${pendingPlay.duration ? ` ${pendingPlay.duration.toFixed(2)} s` : ''}`);
+  }
   S.phase = 'flight';
   if (S.streak >= FIRE_STREAK || isMoneyBall(S.ballIdx)) setTrail('hang', isMoneyBall(S.ballIdx) ? '#ffd75e' : '#ffb36b'); else setTrail('off');   // the hot hand's flight leaves a trail
 
@@ -462,7 +472,7 @@ function contactMake(ctx: ModeContext): void {
   // hoops detail pass (2026-09-18): the shooter ANSWERS a perfect / money make with arms up (the sideline bodies did; he never did)
   if (big && player) player.animator.play(SPORT_CLIP.scoreCelebrate, { fadeSec: 0.12, onEnd: () => player?.animator.play('idle_stand', { loop: true, fadeSec: 0.2 }) });
   if (big) ctx.juice.flash(landing.money ? '#ffd75e' : '#fff6dd', 90);
-  hoopJuice?.punch();
+  hoopJuice?.punch(true);   // RIM PLAY: escalates over a rattle's graze
   // THE NET ANSWERS (suite pass, 2026-09-16): 1v1, 3v3 and the dunk contest burst the net on a make; the shootout —
   // the mode that is nothing but makes — did not. Sparks on the money ball and the perfect release.
   EffectsKit.burst(ctx.scene, RIM, 'net');
@@ -844,7 +854,7 @@ export const ThreePointMode: ModeDefinition = {
         // hand IS (the arc used to start from a point 1.9 m over the root on the press, arms still at the hips)
         releaseIn -= dt;
         if (releaseIn < 0) {
-          const from = ball.getAbsolutePosition().clone(); releaseBall(ball); arc.start(from, RIM, pendingMade, 'jumper'); shotWin = 'release'; shotSec = 0; releaseIn = -1;
+          const from = ball.getAbsolutePosition().clone(); releaseBall(ball); arc.start(from, RIM, pendingMade, 'jumper', 0, null, pendingPlay); pendingPlay = null; shotWin = 'release'; shotSec = 0; releaseIn = -1;
           player.animator.play('bball_follow_through', { fadeSec: 0.08, onEnd: () => player?.animator.play('idle_stand', { loop: true, fadeSec: 0.2 }) });   // from the release frame: arms overhead → the wrist snap → down the front
         }
       } else if (rimOut >= 0) {
@@ -854,7 +864,11 @@ export const ThreePointMode: ModeDefinition = {
         if (rimOut < 0) { rimOut = -1; advanceBall(ctx); }
       } else {
         const r = arc.step(dt, ball.position, ball);
-        if (r === 'made') { contactMake(ctx); const v = netExitVelocity('jumper'); ballSim?.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); rimOut = NET_EXIT_SEC; console.info(`[3PT-NET] jumper exit ${netExitMph('jumper')} mph`); }   // A+ P0: the hoop answers the make; NET EXIT: the ball drops through with pace and bounces before the next ball
+        for (const t of arc.takeTouches()) {   // RIM PLAY: the iron answers every touch of the dwell
+          if (t.on === 'glass') SoundKit.play('thud', { pitch: 1.5, volume: 0.35 });
+          else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); }
+        }
+        if (r === 'made') { if (arc.play?.label) pushHud(ctx, arc.play.label); contactMake(ctx); const v = netExitVelocity('jumper'); ballSim?.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); rimOut = NET_EXIT_SEC; console.info(`[3PT-NET] jumper exit ${netExitMph('jumper')} mph`); }   // A+ P0: the hoop answers the make; NET EXIT: the ball drops through with pace and bounces before the next ball
         else if (r === 'missed') {
           missClank(ctx);                             // A+ P0: the miss has weight — a clank off the iron, never HoopJuice
           // A shootout is nothing but shooting feedback, and the ball used to vanish to the next rack the
@@ -863,7 +877,9 @@ export const ThreePointMode: ModeDefinition = {
           // front and comes back at me, late is long off the back and runs away.
           const toShooter = player.root.position.subtract(RIM); toShooter.y = 0;
           const q01 = Math.max(0.15, 1 - Math.abs(shotErr) / Math.PI);
-          const hit = resolveRim(RIM, toShooter, forcedMissProfile(q01, { short: shotErr < 0 ? 0.8 : -0.8 }), 0.05);
+          const hit = arc.play   // RIM PLAY: the dwell already showed the miss; the ball leaves from where it left it
+            ? { kind: arc.play.hit, contact: ball.position.clone(), outVel: arc.play.exitVel.clone(), label: arc.play.label }
+            : resolveRim(RIM, toShooter, forcedMissProfile(q01, { short: shotErr < 0 ? 0.8 : -0.8 }), 0.05);
           ballSim?.launch(hit.contact, hit.outVel);
           rimOut = RIM_OUT_SEC;
           pushHud(ctx, hit.label);

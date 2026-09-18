@@ -44,7 +44,7 @@ export interface MissProfile {
 /** How bouncy the iron is. Real rims are damped — a rim shot should not rocket. */
 const RIM_RESTITUTION = 0.45;
 /** Inside this, the ball is through without touching anything. */
-const SWISH_WINDOW = RIM_RADIUS - BALL_RADIUS;      // ~0.109 m of pure daylight
+export const SWISH_WINDOW = RIM_RADIUS - BALL_RADIUS;      // ~0.109 m of pure daylight
 /** Beyond this it never reached the ring at all — an airball, not a rim hit. */
 export const AIRBALL_DISTANCE = RIM_RADIUS + BALL_RADIUS + 0.35;
 

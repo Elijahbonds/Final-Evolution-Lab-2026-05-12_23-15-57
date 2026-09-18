@@ -20,6 +20,7 @@
 
 import { Vector3, type AbstractMesh } from '@babylonjs/core';
 import { spinBackspin } from '../visual/BallSpin';
+import { sampleRimPlay, type RimPlay, type RimTouch } from './RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import type { AIBehavior, Intent } from './PlayerSlot';
 import { CourtMovement, DEFAULT_MOVEMENT, GEARS_HOOPS, type Gear } from './CourtMovement';
 import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop / crash, box-out, navigating a screen)
@@ -914,12 +915,21 @@ export class ShotArc {
    *  on any other shot. A banked ball is a quadratic Bezier from → glass → rim: it goes UP AND OUT to the square, kisses
    *  it and drops, instead of the straight parabola every shot in the game shared. */
   private glass: Vector3 | null = null;
-  start(from: Vector3, rim: Vector3, made: boolean, style: ShotStyle, apexAdd = 0, bank: Vector3 | null = null): void {
+  /** RIM PLAY (2026-09-18): the ball's time ON the iron after the flight arrives — planned at the release from the shot's
+   *  profile (RimPlay.planRimPlay). With a play the flight ends at the play's `arrive` (the first contact), then the
+   *  dwell runs for `duration` and its touches are queued for the mode (`takeTouches`). Without one, the old behaviour. */
+  play: RimPlay | null = null;
+  private playT = 0;
+  private inPlay = false;
+  private touchQ: RimTouch[] = [];
+  private touchN = 0;
+  start(from: Vector3, rim: Vector3, made: boolean, style: ShotStyle, apexAdd = 0, bank: Vector3 | null = null, play: RimPlay | null = null): void {
     this.from.copyFrom(from);
     this.made = made; this.shotStyle = style;
     this.glass = bank ? bank.clone() : null;
-    this.to.copyFrom(rim);
-    if (!made) {                       // clang point on the front of the iron
+    this.play = play; this.playT = 0; this.inPlay = false; this.touchQ.length = 0; this.touchN = 0;
+    this.to.copyFrom(play ? play.arrive : rim);
+    if (!made && !play) {              // clang point on the front of the iron
       this.to.x += (Math.random() - 0.5) * 0.3;
       this.to.z += 0.22;
     }
@@ -935,6 +945,7 @@ export class ShotArc {
   /** `spin`: the ball mesh to turn with BACKSPIN through the flight (BallSpin) — pass the mesh whose `position` is `ball`. */
   step(dt: number, ball: Vector3, spin?: AbstractMesh): 'flying' | 'made' | 'missed' {
     if (!this.active) return 'flying';
+    if (this.inPlay) return this.stepPlay(dt, ball, spin);
     this.t = Math.min(1, this.t + dt / this.duration);
     const k = this.t;
     if (spin) spinBackspin(spin, { x: this.to.x - this.from.x, z: this.to.z - this.from.z }, dt, this.shotStyle === 'jumper' || this.shotStyle === 'fadeaway' || this.shotStyle === 'floater' || this.shotStyle === 'hook' ? 2.2 : 1.2);
@@ -959,10 +970,34 @@ export class ShotArc {
     ball.y = this.from.y + (this.to.y - this.from.y) * k + Math.sin(k * Math.PI) * this.apex;
     }
     if (this.t >= 1) {
+      if (this.play && (this.play.keys.length || this.play.touches.length)) {
+        // arrived ON the iron: the dwell starts (its t 0 touches fire now)
+        this.inPlay = true; this.playT = 0;
+        return this.stepPlay(0, ball, spin);
+      }
       this.active = false;
       return this.made ? 'made' : 'missed';
     }
     return 'flying';
+  }
+
+  private stepPlay(dt: number, ball: Vector3, spin?: AbstractMesh): 'flying' | 'made' | 'missed' {
+    const play = this.play!;
+    this.playT += dt;
+    sampleRimPlay(play, this.playT, ball);
+    while (this.touchN < play.touches.length && play.touches[this.touchN].t <= this.playT) this.touchQ.push(play.touches[this.touchN++]);
+    if (spin && dt > 0) spinBackspin(spin, { x: this.to.x - this.from.x, z: this.to.z - this.from.z }, dt, 0.8);   // the spin scrubs off on the iron
+    if (this.playT >= play.duration) {
+      this.active = false; this.inPlay = false;
+      return this.made ? 'made' : 'missed';
+    }
+    return 'flying';
+  }
+
+  /** The touches that happened since the last call (the iron's rattle, the glass) — drain every frame. */
+  takeTouches(): RimTouch[] {
+    if (!this.touchQ.length) return this.touchQ;
+    const out = this.touchQ.slice(); this.touchQ.length = 0; return out;
   }
 }
 

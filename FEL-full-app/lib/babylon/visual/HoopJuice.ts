@@ -52,8 +52,10 @@ export class HoopJuice {
   }
 
   /** The make's contact beat. Idempotent while a beat is running (the modes latch contactPunch once per attempt anyway). */
-  punch(): void {
-    if (this.t >= 0) return;
+  /** `escalate`: a make that RATTLED first (RIM PLAY, 2026-09-18) arrives with a graze still ringing — the punch restarts over
+   *  it instead of being swallowed by the running beat (a punch over a punch is still ignored). */
+  punch(escalate = false): void {
+    if (this.t >= 0 && !(escalate && !this.flashMats)) return;
     this.t = 0; this.amp = 1;
     this.rimRing.isVisible = true; this.net.isVisible = true;
     this.rimRing.scaling.set(1, 1, 1); this.rimRing.position.copyFrom(this.rim); this.netPivot.scaling.set(1, 1, 1); this.netPivot.rotation.set(0, 0, 0);

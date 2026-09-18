@@ -99,6 +99,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';              // the miss meets the iron it earned
+import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPlay } from '../core/RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
 import { judge, rule, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
 import {
@@ -512,6 +513,22 @@ export const OneVOneMode: ModeDefinition = (() => {
     attachBallToHand(ball, (to === 'me' ? me : foe).skeleton, 'RightHand');
     loose = false;
   }
+  /** RIM PLAY (2026-09-18): the ball's time on the iron, planned at the release from what the shot earned — a make rattles,
+   *  rolls or drops clean; a miss goes in and out, rolls off, kicks off the back, comes off the glass, or airballs. */
+  function rimPlayFor(shooterPos: Vector3, made: boolean, q01: number, short: number, lateral: number): RimPlay {
+    const toShooter = shooterPos.subtract(RIM); toShooter.y = 0;
+    const prof = made ? forcedMakeProfile(q01, { short, lateral }) : maybeAirball(forcedMissProfile(q01, { short, lateral }), q01);
+    const play = planRimPlay(RIM, toShooter, prof, made);
+    console.info(`[1V1-RIM] plan ${play.kind}${play.duration ? ` ${play.duration.toFixed(2)} s` : ''}`);
+    return play;
+  }
+  /** …and the touches while it is there: the iron's rattle and the ring's spring, the glass's thud. */
+  function rimTouches(): void {
+    for (const t of arc.takeTouches()) {
+      if (t.on === 'glass') SoundKit.play('thud', { pitch: 1.5, volume: 0.35 });
+      else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); }
+    }
+  }
   /** The ball leaves a hand for the floor: BallSim owns it until someone picks it up. */
   function launchLoose(from: Vector3, vel: Vector3): void {
     ballSim.launch(from, vel);
@@ -768,6 +785,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (shotTrail) { const want: TrailLevel = arc.active && momentum >= 70 ? 'hang' : 'off'; if (want !== shotTrailLevel) { shotTrailLevel = want; applyTrail(shotTrail, want); } }
       if (arc.active) {
         const res = arc.step(dt, ball.position, ball);
+        rimTouches();   // RIM PLAY: the iron answers every touch of the dwell
         // O2: the seal ends with the ball — but on a MISS the ball is not done, it is live off the iron, and a
         // seal that releases the instant the arc resolves is a seal that never contests the thing it exists for.
         // It now holds until somebody actually comes down with it (liveBoard clears it).
@@ -785,14 +803,14 @@ export const OneVOneMode: ModeDefinition = (() => {
             // no hit-stop latch, no flash, no slam thud (that is the dunk's). The hoop still answers the make.
             ctx.feel.impact(0.4);
             ctx.juice.shake(0.06, 100);
-            hoopJuice?.punch();
-            console.info('[1V1-JUICE] jumper make');
+            hoopJuice?.punch(true);   // escalates over a rattle's graze
+            console.info(`[1V1-JUICE] jumper make${arc.play ? ` (${arc.play.kind})` : ''}`);
             // the WHY was named at release (GREEN/EARLY/LATE + contest); the
             // resolution just confirms the result and the points
             // PARITY THE OTHER WAY: 3v3 already asks the ref for this one and 1v1 asserted its own banner. It is
             // the same rule; only one of them should be writing it down.
             const andOne = finishFoul ? judge('and_one', { offense: 'me', shooter: 'me', fouled: 'me' }) : null;
-            ctx.setHud({ score: myScore, momentum, banner: andOne ? `${arcLabel} +${arcPoints} — ${andOne.banner}` : `${arcLabel} +${arcPoints}` });   // HOOPS-MOVE-KIT-A M2: fouled on the finish
+            ctx.setHud({ score: myScore, momentum, banner: andOne ? `${arcLabel} +${arcPoints} — ${andOne.banner}` : `${arcLabel} +${arcPoints}${rimPlaySuffix(arc.play)}` });   // HOOPS-MOVE-KIT-A M2: fouled on the finish; RIM PLAY: "— RATTLES IN"
             if (andOne) { finishFoul = false; SoundKit.play('crowdCheer', { volume: 0.5 }); console.info(`[1V1-REF] ${andOne.id} → ${andOne.ball} (${andOne.shots} shot)`); }
             carrying = true;
             if (checkGameOver(ctx)) return;
@@ -827,14 +845,20 @@ export const OneVOneMode: ModeDefinition = (() => {
           // off the back and runs AWAY, a contest pushes it short. That is how a shooter reads their stroke.
           const shooterPos = possession === 'mine' ? me.root.position : foe.root.position;
           const toShooter = shooterPos.subtract(RIM); toShooter.y = 0;
-          const rim = resolveRim(RIM, toShooter, forcedMissProfile(
-            shotMiss?.quality01 ?? 0.45,
-            { short: shotMiss?.short ?? 0.4, lateral: shotMiss?.lateral ?? 0 },
-          ), 0.06);
+          // RIM PLAY (2026-09-18): the flight ended ON the iron and the dwell already showed the miss (in and out, a roll
+          // off, the glass) — the ball leaves from wherever the dwell left it, with the play's exit. No play (a bank): the
+          // deflection is resolved here as before.
+          const play = arc.play;
+          const rim = play
+            ? { kind: play.hit, contact: ball.position.clone(), outVel: play.exitVel.clone(), made: false, label: play.label }
+            : resolveRim(RIM, toShooter, forcedMissProfile(
+              shotMiss?.quality01 ?? 0.45,
+              { short: shotMiss?.short ?? 0.4, lateral: shotMiss?.lateral ?? 0 },
+            ), 0.06);
           shotMiss = null;
           launchLoose(rim.contact, rim.outVel);
-          SoundKit.play('rattle', { volume: 0.34 });   // it hit IRON — a rattle, not a generic thump
-          hoopJuice?.punch();
+          if (!play) { SoundKit.play('rattle', { volume: 0.34 }); hoopJuice?.punch(); }   // a play's touches already rang the iron
+          else if (play.kind === 'airball') SoundKit.play('crowdGroan', { volume: 0.3 });
           if (possession === 'mine') bannerFlash(ctx, rim.label, 850);
           console.info(`[1V1-RIM] ${rim.kind} — ${rim.label}`);
           // HOOPS-MOVE-KIT-A M2: fouled in the air on a finish that missed — the ball back, no board race
@@ -1766,7 +1790,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       short: contest * 0.8 + Math.max(0, range - 7) * 0.12,
       lateral: (Math.random() - 0.5) * 0.9,
     };
-    arc.start(ball.getAbsolutePosition(), RIM, made, style, alteredApex(contest));   // a strong contest ALTERS the release
+    arc.start(ball.getAbsolutePosition(), RIM, made, style, alteredApex(contest), null, rimPlayFor(foe.root.position, made, shotMiss.quality01, shotMiss.short, shotMiss.lateral));   // a strong contest ALTERS the release; RIM PLAY
     console.info(`[1V1-DEF] rival release ${style} contest ${contest.toFixed(2)} handUp ${ground > 0} pct ${rivalShotPct(range, contest, style).toFixed(2)}`);
     // the read at the release, before the arc lands — same as the hero's GREEN / CONTESTED tags
     if (contest >= 0.5) bannerFlash(ctx, ground > 0 ? 'CONTESTED — HAND UP!' : 'CONTESTED!', 500);
@@ -2503,7 +2527,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       lateral: quality === 'brick' ? (Math.random() < 0.5 ? -0.7 : 0.7) : 0,
     };
     carrying = false;
-    arc.start(ball.getAbsolutePosition(), RIM, made, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked);   // D3: a strong contest ALTERS the release; M12: the glass
+    arc.start(ball.getAbsolutePosition(), RIM, made, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked, banked ? null : rimPlayFor(me.root.position, made, shotMiss.quality01, shotMiss.short, shotMiss.lateral));   // D3: a strong contest ALTERS the release; M12: the glass; RIM PLAY (a bank keeps its glass leg)
     // O2: the shot is up — the rival SEALS me (the box-out between me and the rim, his chest on me) until the ball comes down
     if (foeStunSec === 0 && !foeFloored && distXZ(foe.root.position, RIM_FLOOR) < BOX_OUT_RANGE) { foeBrain?.boxOut(me.root.position); foeSealing = true; console.info('[1V1-OFF] box out (the rival seals me)'); }
   }
