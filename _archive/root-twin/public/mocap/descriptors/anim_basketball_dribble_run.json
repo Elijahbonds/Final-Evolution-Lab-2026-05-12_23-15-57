@@ -1,0 +1,46 @@
+{
+  "id": "anim_basketball_dribble_run",
+  "name": "Basketball Dribble Run Loop",
+  "category": "animations",
+  "type": "loop_motion",
+  "file": "anim_basketball_dribble_run.fbx",
+  "urls": [
+    "https://static.seeles.ai/data/asset/export/35d8cfbf-796c-462b-bd63-a4b1cbf8d961/448787/unityModel_c53ce88f-dee2-4a49-9b9a-11ea0e28a460.fbx"
+  ],
+  "description": "Looping run cycle with basketball dribbling motion for use in ABP_Basketball locomotion blend space",
+  "tags": [
+    "basketball",
+    "dribble",
+    "run",
+    "loop",
+    "locomotion"
+  ],
+  "keywords": [
+    "dribble run",
+    "basketball locomotion",
+    "sprint dribble",
+    "blend space"
+  ],
+  "compat": [
+    "unity",
+    "unreal"
+  ],
+  "status": "ready",
+  "created_at": "2026-05-23T16:00:00Z",
+  "source_date": "2026-05-23",
+  "source_turn": 22,
+  "version": "1.0",
+  "property_id": "search_489873a75f5a_0",
+  "motion_asset_id": 448787,
+  "fel_abp": "ABP_Basketball",
+  "fel_blend_space": "BS_Basketball_Locomotion",
+  "fel_modes": [
+    "basketball_h2h",
+    "basketball_dunk",
+    "basketball_3v3"
+  ],
+  "local_bundle_file": "anim_basketball_dribble_run.nexusanim.json",
+  "local_bundle_path": "FinalEvolutionLab/Resources/Animations/anim_basketball_dribble_run.nexusanim.json",
+  "runtime_loader": "NexusAnimationLoader",
+  "runtime_format": "nexusanim_json"
+}

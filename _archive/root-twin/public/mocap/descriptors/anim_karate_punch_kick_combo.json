@@ -1,0 +1,46 @@
+{
+  "id": "anim_karate_punch_kick_combo",
+  "name": "Karate Punch and Kick Combo",
+  "category": "animations",
+  "type": "non_loop_motion",
+  "file": "anim_karate_punch_kick_combo.fbx",
+  "urls": [
+    "https://static.seeles.ai/data/asset/export/8e6162b3-f752-425d-aadc-dfd11506adb7/404724/import.fbx"
+  ],
+  "description": "One-shot rapid karate combo sequence with jab punch followed by roundhouse kick",
+  "tags": [
+    "karate",
+    "combo",
+    "punch",
+    "kick",
+    "non-loop",
+    "montage"
+  ],
+  "keywords": [
+    "karate combo",
+    "punch kick",
+    "martial arts attack",
+    "roundhouse"
+  ],
+  "compat": [
+    "unity",
+    "unreal"
+  ],
+  "status": "ready",
+  "created_at": "2026-05-23T16:00:00Z",
+  "source_date": "2026-05-23",
+  "source_turn": 22,
+  "version": "1.0",
+  "property_id": "search_6df6dd250907_0",
+  "motion_asset_id": 404724,
+  "fel_abp": "ABP_Karate",
+  "fel_montage": "AM_Karate_ComboAttack",
+  "fel_modes": [
+    "karate_h2h",
+    "karate_endless"
+  ],
+  "local_bundle_file": "anim_karate_punch_kick_combo.nexusanim.json",
+  "local_bundle_path": "FinalEvolutionLab/Resources/Animations/anim_karate_punch_kick_combo.nexusanim.json",
+  "runtime_loader": "NexusAnimationLoader",
+  "runtime_format": "nexusanim_json"
+}
