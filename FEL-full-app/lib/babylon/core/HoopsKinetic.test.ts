@@ -1,6 +1,6 @@
 // Is a press a parry, a cut a drift, a jump a footstool, a poke a drive-by?
 import { describe, it, expect } from 'vitest';
-import { PARRY, parryVaultRead, vaultAt, driftRead, turnDeg, ankleBreak, footstoolRead, driveByRead } from './HoopsKinetic';
+import { PARRY, parryVaultRead, vaultAt, driftRead, turnDeg, ankleBreak, footstoolRead, driveByRead, SLIPSTREAM, slipstreamRead, slingRead, SYNERGY, SynergyGauge, shockVictims } from './HoopsKinetic';
 
 describe('the parry-vault', () => {
   it('reads a driver arriving inside the window, not a check-up, not a runaway, not a crawl', () => {
@@ -45,5 +45,32 @@ describe('the footstool and the drive-by', () => {
     expect(driveByRead({ x: 0, z: 5 }, { x: 0, z: 0 }, { x: 1, z: 3 })).toBe(false);
     expect(driveByRead({ x: 0, z: 5 }, { x: 0, z: 0 }, { x: 0.1, z: 0.3 })).toBe(false);
     expect(driveByRead({ x: 0, z: 2 }, { x: 0, z: 0 }, { x: 1, z: 0.3 })).toBe(false);
+  });
+});
+
+describe('the 3v3 synergy', () => {
+  it('a slipstream is behind a running mate inside the cone, not beside him, not ahead, not behind a walker', () => {
+    const vel = { x: 0, z: 5 }, mate = { x: 0, z: 0 };
+    expect(slipstreamRead({ x: 0.3, z: -2 }, mate, vel)).toBe(true);
+    expect(slipstreamRead({ x: 2, z: -2 }, mate, vel)).toBe(false);
+    expect(slipstreamRead({ x: 0, z: 2 }, mate, vel)).toBe(false);
+    expect(slipstreamRead({ x: 0, z: -5 }, mate, vel)).toBe(false);
+    expect(slipstreamRead({ x: 0.3, z: -2 }, mate, { x: 0, z: 1 })).toBe(false);
+  });
+  it('a sling needs the turbo and speed', () => {
+    expect(slingRead(true, 5)).toBe(true); expect(slingRead(false, 5)).toBe(false); expect(slingRead(true, 2)).toBe(false);
+  });
+  it('the gauge fills from the team\'s plays, ignites at full, runs 15 s, and takes nothing while it runs', () => {
+    const g = new SynergyGauge();
+    expect(g.add('assist')).toBe(false); expect(g.value).toBe(SYNERGY.assist);
+    expect(g.add('steal')).toBe(false); expect(g.add('drift')).toBe(false); expect(g.add('block')).toBe(false);
+    expect(g.add('dunk')).toBe(true);   // 30+25+15+20+10 = 100
+    expect(g.active).toBe(true); expect(g.value).toBe(0); expect(g.meMult).toBeGreaterThan(1); expect(g.mateMult).toBeGreaterThan(1);
+    expect(g.add('assist')).toBe(false); expect(g.value).toBe(0);
+    g.tick(SYNERGY.overdriveSec + 0.1); expect(g.active).toBe(false); expect(g.meMult).toBe(1);
+    expect(g.add(SLIPSTREAM.gaugePerSec * 2)).toBe(false); expect(g.value).toBeCloseTo(10, 6);
+  });
+  it('the shockwave takes the rivals near the rim and nobody else', () => {
+    expect(shockVictims({ x: 0, z: -12 }, [{ x: 1, z: -11 }, { x: 5, z: -12 }, { x: -2, z: -13.5 }])).toEqual([0, 2]);
   });
 });

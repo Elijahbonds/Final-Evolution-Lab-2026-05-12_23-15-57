@@ -23,6 +23,13 @@ for (let i = 0; i < 160; i++) {
   const start = p.locator('text=/^START$/').first(); if (await start.count()) await start.click().catch(() => {});
   await p.waitForTimeout(1000);
 }
+// THE SEAM APPEARS IN load(), BEFORE THE MODE IS STARTED — the loop above can break with the mode still in READY (update
+// never runs, no slot is polled: measured 2026-09-18, 0 ticks in 3 s). And the on-screen START is the PAD's START (pause),
+// so never click it once the mode is loaded: the bridge's start() is the one honest handshake (it waits for 'playing').
+{
+  const st = await p.evaluate(`(async () => { const a = window.__NEXUS_AGENT__; if (!a) return 'no bridge'; const ok = await a.start(20000); return JSON.stringify({ ok, state: a.state().state }); })()`);
+  console.log('start:', st);
+}
 await p.evaluate(`(() => {
   const pad = { index: 0, id: 'fake-dualshock', connected: true, mapping: 'standard', axes: [0, 0, 0, 0], timestamp: 0,
     buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })) };

@@ -139,6 +139,7 @@ import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot 
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the 2K bar beside the shooter's head
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
+import { PARRY, parryVaultRead, vaultAt, DRIFT, driftRead, ankleBreak, DRIVE_BY, driveByRead, SLIPSTREAM, slipstreamRead, SLING, slingRead, SYNERGY, SynergyGauge, shockVictims } from '../core/HoopsKinetic';   // HOOPS KINETIC 3v3 (owner, 2026-09-18): slipstream / sling / synergy + the 1v1's duel reads
 import { driveIntent, driveLateral, bodiesMet } from '../core/DriveLine';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -210,6 +211,17 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let agentCtl: AgentControlSource | null = null;   // M69: the hero slot's source under ?agent=1; null for human play
   let shotMeter: ShotMeter;
   let turbo: TurboMeter;
+  // HOOPS KINETIC 3v3 (owner, 2026-09-18): the SLIPSTREAM behind a mate carrier, the SLING-PASS at a sprint, the SYNERGY
+  // gauge the team fills together (assists / steals / drifts / blocks / dunks) and its 15 s OVERDRIVE; the 1v1's drift,
+  // parry-vault and drive-by ported onto the driver
+  const synergy = new SynergyGauge();
+  let ltHeld = false, driftCool = 0, slipping = false, slingPass = false, meBurstLeft = 0, synHud = -1, odHud = -1, slipCalloutAt = -1e9;
+  let vault: { from: Vector3; dir: Vector3; t: number } | null = null;
+  const mateBurst = [0, 0];
+  // the rival's drive is a CLOCKED path (his `vel` is zeroed every frame — see the foe loop), so his closing speed on me is
+  // read off his position, the way the charge reads it
+  const driverPrev = new Vector3(), driverVelEst = new Vector3(); let driverPrevFor: Body | null = null;
+  const kin = { drifts: 0, ankles: 0, parries: 0, driveBys: 0, slings: 0, slipSec: 0, ignitions: 0, shocks: 0 };
   let arc: ShotArc;
   let arcMade = false, arcPoints = 0, arcLabel = '', arcQuality: ShotQuality = 'good';
   let myScore = 0, foeScore = 0, assists = 0, timeLeft = POSSESSION_SEC;
@@ -607,7 +619,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       threeVenue?.hidePlaceholders();  // M74: drop stand-ins now that real chars are in
       assertSpawned(ctx.scene, { hero: me.char.root, minWorldMeshes: 6, modeId: 'threevthree' });
       resetPossession(true);
-      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; const seam = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, defend: () => { if (!ended) { resetPossession(false); void opponentPossession(ctx); } }, /* resetPossession(false) only RESETS: its toMe branch is the only thing that hands the ball out, so on its own it leaves the rock wherever it was and no drive ever starts. opponentPossession() is what a defensive possession actually IS here — the 1v1 seam's defend() calls startDefense() for the same reason. */ attackPhase: () => (driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check'), driveK: () => driveK, driveSpeed: () => (driver ? driver.vel.length() : 0), takingCharge: () => takingCharge, flightK: () => (dunkFlight ? dunkFlight.k : foeDunkFlight ? foeDunkFlight.k : -1)   /* MY flight's clock first (the showtime press is timed off it), then the rival's */, luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: !!foeHandUp }), post: () => { const n = nearestLiveFoe(); return { posting, spinning: !!spin, brace: !!me.slot.intent.brace, can: canPostUp(me.char.root.position, RIM_FLOOR, n ? n.char.root.position : null), carrying: carrierId === 'me', shooting, finish: !!finish, gather: !!gather, foeStun: n ? n.stunSec : -1, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: me.tree.held ?? '' }; }, driverRoot: () => driver?.char.root ?? null, block: () => (ctx0 ? contestJump(ctx0) : false), /* the block with no bridge latency: the lab's jump was landing at driveK 1.00 behind its own steer queue */ ended: () => ended, boxing: () => boxingOut,
+      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; const seam = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, defend: () => { if (!ended) { resetPossession(false); void opponentPossession(ctx); } }, /* resetPossession(false) only RESETS: its toMe branch is the only thing that hands the ball out, so on its own it leaves the rock wherever it was and no drive ever starts. opponentPossession() is what a defensive possession actually IS here — the 1v1 seam's defend() calls startDefense() for the same reason. */ attackPhase: () => (driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check'), driveK: () => driveK, driveSpeed: () => (driver ? driver.vel.length() : 0), takingCharge: () => takingCharge, flightK: () => (dunkFlight ? dunkFlight.k : foeDunkFlight ? foeDunkFlight.k : -1)   /* MY flight's clock first (the showtime press is timed off it), then the rival's */, luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: !!foeHandUp }), post: () => { const n = nearestLiveFoe(); return { posting, spinning: !!spin, brace: !!me.slot.intent.brace, can: canPostUp(me.char.root.position, RIM_FLOOR, n ? n.char.root.position : null), carrying: carrierId === 'me', shooting, finish: !!finish, gather: !!gather, foeStun: n ? n.stunSec : -1, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: me.tree.held ?? '' }; }, driverRoot: () => driver?.char.root ?? null, block: () => (ctx0 ? contestJump(ctx0) : false), /* the block with no bridge latency: the lab's jump was landing at driveK 1.00 behind its own steer queue */ ended: () => ended, kinetic: () => { const d = driver; const dv = d ? d.char.root.position.subtract(me.char.root.position) : null; const dist = dv ? Math.hypot(dv.x, dv.z) : -1; return { ...kin, synergy: synergy.value, overdrive: synergy.overdriveLeft, ltHeld, slipping, meSpeed: Math.hypot(me.drib.vel.x, me.drib.vel.z), dist, closing: d && dv && dist > 1e-3 ? -(driverVelEst.x * dv.x + driverVelEst.z * dv.z) / dist : 0, driveK, turbo: turbo.t01, carrier: carrierId, mateBurst: [...mateBurst], intent: { moveX: me.slot.intent.moveX, moveY: me.slot.intent.moveY, sprint: me.slot.intent.sprint }, gates: { paused: me.drib.paused, stun: meStunSec, floored: meFloored, land: me.landSec, celebrate: me.celebrateSec, shooting, dunking, vault: !!vault } }; }, synergyAdd: (n: number) => { if (synergy.add(n) && ctx0) igniteOverdrive(ctx0); }, boxing: () => boxingOut,
           // O3: every body's job, its objective and how squarely it faces it (the probes' awareness read)
           jobs: () => everyBody().map((b, i) => { const mb = mateBrain(b), db = foeBrain(b); const obj = b === me ? (carrierId === 'me' ? RIM : (driver?.char.root.position ?? ballWorld())) : objectiveFor(b); const p = bodyPos(b); const yaw = b.char.root.rotation.y; const v = b === me ? me.drib.vel : b.vel; return { id: b === me ? 'me' : isFoe(b) ? `foe${foes.indexOf(b)}` : `mate${mates.indexOf(b)}`, i, job: jobOf(b), phase: mb?.screen.phase ?? (db ? (db.fightingOver === null ? '' : db.fightingOver ? 'over' : 'under') : ''), x: p.x, z: p.z, y: p.y, speed: Math.hypot(v.x, v.z), facing: facingCos(yaw, p, obj), objX: obj.x, objZ: obj.z, boxing: !!(mb?.boxing || db?.boxing), root: b.char.root }; }), get foeRoot() { return driver ? driver.char.root : (foes[0]?.char.root ?? null); }, /* the man to guard is whoever is DRIVING */ nearestFoeRoot: () => foes.reduce<Body | null>((b, f) => !b || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(b.char.root.position, me.char.root.position) ? f : b, null)?.char.root ?? null }; if (dev) dev.hoopsPosture = seam; (ctx.scene.metadata ??= {}).threevthree = seam; }   // BIOMECH-HOOPS-WAVE1 probes
       ctx.setHud({
@@ -619,6 +631,14 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       localSource.feed(e);
+      if (e.t === 'trigger' && e.side === 'L') ltHeld = e.value > 0.5;   // HOOPS KINETIC: LT is the drift modifier
+      // HOOPS KINETIC: the poke on defense is a PARRY-VAULT when the driver is arriving, a DRIVE-BY when I am running beside him
+      if (e.t === 'button' && e.btn === 'X' && e.pressed && carrierId === 'foeTeam' && driver && !driveStolen && !foeDunkFlight && meStunSec === 0 && !vault && !meFloored && !ended) {
+        const d = driver.char.root.position.subtract(me.char.root.position); d.y = 0; const dist = d.length();
+        const closing = dist > 1e-3 ? -(driverVelEst.x * d.x + driverVelEst.z * d.z) / dist : 0;
+        if (parryVaultRead(dist, closing, driveK > 0 ? 'drive' : 'check')) { parryVault(ctx); return; }
+        if (driveByRead({ x: me.drib.vel.x, z: me.drib.vel.z }, me.char.root.position, driver.char.root.position)) { driveBySteal(ctx); return; }
+      }
       if (e.t === 'stick' && e.side === 'R') {   // MODE-STICK-FACE: R stick → the look orbit — except on the floor with the ball: the DRIBBLE STICK (2K)
         if (posting && carrierId === 'me' && !shooting && !dunking) {   // POST HOOK (2K20): with the post held the stick is the SHOT stick
           postStick = { x: e.x, y: e.y };
@@ -658,6 +678,17 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     update(ctx: ModeContext, dt: number) {
       meter3d?.update(dt); if (!shooting && !dunking && meter3d?.visible()) meter3d.end(null);   // a shot that ended without a release (a block, a strip) drops the bar
       if (ended) return;
+      // HOOPS KINETIC 3v3: the clocks, the vault, the overdrive's infinite turbo, the gauge on the HUD
+      synergy.tick(dt); driftCool = Math.max(0, driftCool - dt); meBurstLeft = Math.max(0, meBurstLeft - dt); mateBurst[0] = Math.max(0, mateBurst[0] - dt); mateBurst[1] = Math.max(0, mateBurst[1] - dt);
+      if (vault) { vault.t += dt; const u = Math.min(1, vault.t / PARRY.sec); const q = vaultAt(vault.from, vault.dir, u); me.char.root.position.set(q.x, q.y, q.z); me.drib.vel.set(0, 0, 0); if (u >= 1) vault = null; }
+      if (synergy.active) turbo.t01 = 1;
+      if (driver && dt > 1e-4) {
+        if (driverPrevFor === driver) { driverVelEst.copyFrom(driver.char.root.position).subtractInPlace(driverPrev).scaleInPlace(1 / dt); if (driverVelEst.length() > 12) driverVelEst.setAll(0); }   // a SNAP (the check spot, a reset) is not a run: 24 m/s read on one frame, measured
+        else driverVelEst.setAll(0);
+        driverPrev.copyFrom(driver.char.root.position); driverPrevFor = driver;
+      }
+      else if (!driver) { driverPrevFor = null; driverVelEst.setAll(0); }
+      { const sv = Math.round(synergy.value), od = Math.ceil(synergy.overdriveLeft); if (sv !== synHud || od !== odHud) { synHud = sv; odHud = od; ctx.setHud({ synergy: sv, overdrive: od }); } }
       timeLeft -= dt;
       if (timeLeft <= 0) {
         ended = true; SoundKit.play('whistle');
@@ -734,7 +765,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (me.slot.intent.steal && driver && !driveStolen && !foeDunkFlight && meStunSec === 0 && distXZ(me.char.root.position, driver.char.root.position) < 1.6) {
           me.tree.beat('bball_steal_reach', { fadeSec: 0.14 });
           const exposure = bumpExposure(0.3, bumpAge);
-          if (exposure >= 0.5 || roll() < 0.3) { driveStolen = true; swing('steal'); ctx.setHud({ momentum }); console.info(`[3V3-DEF] strip by me ${bumpAge <= BUMP_STRIP_WINDOW_SEC ? 'on the bump' : 'on the roll'} bumpAge ${bumpAge.toFixed(2)}`); }
+          if (exposure >= 0.5 || roll() < 0.3) { driveStolen = true; swing('steal'); ctx.setHud({ momentum }); if (synergy.add('steal')) igniteOverdrive(ctx); console.info(`[3V3-DEF] strip by me ${bumpAge <= BUMP_STRIP_WINDOW_SEC ? 'on the bump' : 'on the roll'} bumpAge ${bumpAge.toFixed(2)}`); }
           else {
             meStunSec = 0.35;
             // A REACH THROUGH THE BODY IS A FOUL, and `reach_in` has been in the handbook the whole time with
@@ -947,6 +978,27 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           intense: sitting,
         });
         if (carrierId === 'foeTeam') wish = stanceWish(wish, me.char.root.rotation.y, engaged, sitting);
+      }
+      // HOOPS KINETIC 3v3: the SLIPSTREAM — running in a mate carrier's wake buys top speed and feeds the gauge; the sling
+      // burst and the overdrive stack on it (all on the top speed, not the stick)
+      {
+        const mc = carrierId === 'mate0' ? mates[0] : carrierId === 'mate1' ? mates[1] : null;
+        const slipNow = !!mc && !passFlight.active && slipstreamRead(me.char.root.position, mc.char.root.position, mc.vel);
+        if (slipNow !== slipping) { slipping = slipNow; if (slipNow && performance.now() - slipCalloutAt > 1500) { slipCalloutAt = performance.now(); ctx.juice.callout('SLIPSTREAM', '#22d3ee', 380); console.info('[3V3-KIN] slipstream on'); } }   // the mate brain stutters (runs, stops, runs): one callout per 1.5 s, not one per restart (11 in 6 s, measured)
+        if (slipNow) { kin.slipSec += dt; if (synergy.add(SLIPSTREAM.gaugePerSec * dt)) igniteOverdrive(ctx); }
+        me.drib.speedScale = (slipNow ? SLIPSTREAM.speedMult : 1) * (meBurstLeft > 0 ? SLING.burstMult : 1) * synergy.meMult;
+      }
+      // HOOPS KINETIC: the MOMENTUM DRIFT (LT + the turbo + a hard cut) keeps the speed through the turn; a defender in front of
+      // the old line inside reach is left on the wrong foot. `wish` is already the world wish here; the cut takes world z.
+      if (driftCool <= 0 && iAmCarrier && !shooting && !dunking && !finish && !gather && !spin && !posting && !passFlight.active && driftRead(ltHeld, sprintOk, me.drib.vel, { x: wish.x, z: wish.z })) {
+        const before = me.drib.vel.clone();
+        me.drib.drift(wish.x, wish.z); driftCool = DRIFT.cooldownSec; kin.drifts++;
+        ctx.juice.callout('DRIFT', '#22d3ee', 380); SoundKit.play('swish', { pitch: 0.8, volume: 0.4 }); EffectsKit.burst(ctx.scene, me.char.root.position.clone(), 'dust');
+        console.info(`[3V3-KIN] drift at ${before.length().toFixed(1)} m/s`);
+        let broke = false;
+        for (const f of foes) if (f.stunSec === 0 && !f.floored && ankleBreak(me.char.root.position, before, f.char.root.position)) { f.stunSec = DRIFT.stunSec; f.tree.beat('bball_contact_react', { fadeSec: 0.08 }); broke = true; }
+        if (broke) { kin.ankles++; bannerFlash(ctx, 'ANKLES!', 700); SoundKit.play('crowdCheer', { volume: 0.45 }); ctx.juice.hitStop(45); ctx.feel?.impact?.(0.3); ctx.momentum.report({ kind: 'clean_hit', weight: 14 }); console.info('[3V3-KIN] ankle-breaker'); }
+        if (synergy.add('drift')) igniteOverdrive(ctx);
       }
       const drib = me.drib.update(dt, wish.x, -wish.z, sprintOk);
       meSpeed01 = drib.speed01; me.speed01 = drib.speed01;
@@ -1202,7 +1254,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       for (let i = 0; i < mates.length; i++) {
         const body = mates[i];
         const intent = body.slot.intent;
-        const vel = new Vector3(intent.moveX, 0, -intent.moveY).scale(4.2);
+        const inMyWake = carrierId === 'me' && slipstreamRead(body.char.root.position, me.char.root.position, me.drib.vel);   // HOOPS KINETIC 3v3
+        const vel = new Vector3(intent.moveX, 0, -intent.moveY).scale(4.2 * (mateBurst[i] > 0 ? SLING.burstMult : 1) * synergy.mateMult * (inMyWake ? SLIPSTREAM.speedMult : 1));
         mateVel[i]?.copyFrom(vel); body.vel.copyFrom(vel);
         body.char.root.position.addInPlace(vel.scale(dt));
         if (!threeVenue?.constrain(body.char.root.position)) clampToHalfCourt(body.char.root.position, 8, 15);
@@ -1364,11 +1417,17 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           passType = type;
           passTargetId = locked.id as 'mate0' | 'mate1';
           releaseBall(ball);
+          // HOOPS KINETIC 3v3: a chest pass thrown on the turbo at speed is a SLING — faster ball, and the catch is a burst
+          // any pass but the lob (the alley-oop is its own thing); the turbo HELD at the throw, not the gate — an unaimed pass lets the
+          // stick go the frame it throws (that is how a bounce pass is asked for) and the gate has already dropped on that frame
+          slingPass = type !== 'lob' && slingRead(sprintOk || !!meIntent.sprint, Math.hypot(me.drib.vel.x, me.drib.vel.z));
           passFlight.start(
             ball.getAbsolutePosition(),
             locked.pos.add(new Vector3(0, 1.2, 0)),
             type,
+            slingPass ? SLING.ballMult : 1,
           );
+          if (slingPass) { kin.slings++; ctx.juice.callout('SLING-PASS', '#fbbf24', 420); SoundKit.play('whoosh', { pitch: 1.4, volume: 0.45 }); console.info(`[3V3-KIN] sling-pass at ${Math.hypot(me.drib.vel.x, me.drib.vel.z).toFixed(1)} m/s`); }
           lastPasserWasMe = true;
           SoundKit.play('uiTick', { pitch: type === 'bounce' ? 1.0 : type === 'lob' ? 0.8 : 1.3 });
           if (type === 'lob') { bannerFlash(ctx, 'LOB!', 500); }
@@ -1392,9 +1451,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // silenced the AI poke in the shared brain).
         if (passType === 'chest') {
           const picker = foes.find((f) => f.stunSec === 0
-            && Math.hypot(f.char.root.position.x - ball.position.x, f.char.root.position.z - ball.position.z) < 0.8);
+            && Math.hypot(f.char.root.position.x - ball.position.x, f.char.root.position.z - ball.position.z) < (slingPass ? SLING.pickM : 0.8));   // HOOPS KINETIC 3v3: a SLING is a faster ball — a smaller hand can get on it
           if (picker) {
-            passFlight.active = false;
+            passFlight.active = false; slingPass = false;
             parkCarries();
             attachBallToHand(ball, picker.char.skeleton, 'RightHand');   // the pick reads
             SoundKit.play('impact', { pitch: 1.3, volume: 0.4 });
@@ -1414,6 +1473,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             return;
           }
           giveBallTo(passTargetId);
+          if (slingPass) { slingPass = false; mateBurst[passTargetId === 'mate0' ? 0 : 1] = SLING.burstSec; bannerFlash(ctx, 'SLING — BURST!', 500); console.info('[3V3-KIN] sling burst on the catch'); }
           if (passType === 'bounce') {
             ctx.setHud({ banner: 'BOUNCE PASS!' });
             bannerClearLater(ctx, 600);
@@ -1583,7 +1643,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (finish === 'alleyoop') { ctx.juice.shake(0.12, 120); ctx.feel?.impact?.(0.5); }
     if (made) {
       myScore += points;
-      if (lastPasserWasMe) { assists++; ctx.setHud({ ast: assists }); }
+      if (lastPasserWasMe) { assists++; ctx.setHud({ ast: assists }); if (synergy.add('assist')) igniteOverdrive(ctx); }
       SoundKit.play('score'); EffectsKit.burst(ctx.scene, RIM, 'net');
       ctx.setHud({ score: myScore, banner: finish === 'alleyoop' ? 'ALLEY-OOP!' : 'ASSISTED BUCKET' });
     } else {
@@ -1851,6 +1911,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         EffectsKit.burst(ctx.scene, RIM, 'net');
         // the banner comes from the CONTACT too, so a body bag reads as one — hand-writing 'POSTERIZED!'
         // here meant the hardest finish in the game announced itself as the ordinary one
+        if (synergy.active) shockwave(ctx); else if (synergy.add('dunk')) igniteOverdrive(ctx);   // HOOPS KINETIC 3v3: the overdrive dunk lands a shockwave
         const slamCall = posterized ? contactBanner(lastDunkKind) : 'THROWN DOWN!';
         ctx.setHud({ score: myScore, banner: fouled ? `${slamCall.replace(/!+$/, '')} — AND ONE!` : slamCall });
         bannerClearLater(ctx, 1000);
@@ -2513,6 +2574,50 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       console.info(`[3V3-DEF] ai hand up at ${dist.toFixed(2)} m`);
     }
   }
+  // ── HOOPS KINETIC 3v3 (2026-09-18) ──────────────────────────────────────────────────────────────────────────────
+  /** The defender's press on an arriving driver: over him, the ball stripped on the way, landing running the other way. */
+  function parryVault(ctx: ModeContext): void {
+    const d = driver; if (!d) return;
+    const dir = d.char.root.position.subtract(me.char.root.position); dir.y = 0; dir.normalize();
+    vault = { from: me.char.root.position.clone(), dir, t: 0 }; myJumpAge = 0;
+    me.tree.beat('bball_block_reach');
+    d.stunSec = PARRY.stunSec; d.tree.beat('bball_contact_react', { fadeSec: 0.08 });
+    driveStolen = true; swing('steal'); ctx.setHud({ momentum });
+    const from = ballWorld().clone(); releaseBall(ball);
+    ballSim.launch(from, dir.scale(2.2).add(new Vector3(0, 1.2, 0)));   // ahead of the vault: where I land
+    kin.parries++; if (synergy.add('parry')) igniteOverdrive(ctx);
+    bannerFlash(ctx, 'PARRY-VAULT — STRIPPED!'); SoundKit.play('impact', { pitch: 1.5, volume: 0.5 }); ctx.juice.hitStop(50); ctx.juice.flash('#ffffff', 60); ctx.feel?.impact?.(0.4);
+    console.info('[3V3-KIN] parry-vault');
+  }
+  /** Running parallel to the driver at speed, the poke is a lateral strike: the ball knocked down MY line. */
+  function driveBySteal(ctx: ModeContext): void {
+    const d = driver; if (!d) return;
+    d.stunSec = DRIVE_BY.stunSec; d.tree.beat('bball_contact_react', { fadeSec: 0.08 });
+    me.tree.beat('bball_steal_reach', { fadeSec: 0.1 });
+    driveStolen = true; swing('steal'); ctx.setHud({ momentum });
+    const from = ballWorld().clone(); releaseBall(ball);
+    const along = me.drib.vel.clone(); along.y = 0; if (along.lengthSquared() < 1e-3) along.set(0, 0, 1); along.normalize();
+    ballSim.launch(from, along.scale(DRIVE_BY.knockM).add(new Vector3(0, 1.0, 0)));
+    kin.driveBys++; if (synergy.add('driveBy')) igniteOverdrive(ctx);
+    bannerFlash(ctx, 'DRIVE-BY STEAL!'); SoundKit.play('impact', { pitch: 1.3, volume: 0.45 }); ctx.juice.hitStop(40); ctx.feel?.impact?.(0.35);
+    console.info('[3V3-KIN] drive-by steal');
+  }
+  /** The gauge is full: 15 s of an infinite turbo, faster mates, and a shockwave under every dunk. */
+  function igniteOverdrive(ctx: ModeContext): void {
+    kin.ignitions++;
+    ctx.setHud({ banner: 'SYNERGY OVERDRIVE!', synergy: 0, overdrive: SYNERGY.overdriveSec }); bannerClearLater(ctx, 1100);
+    SoundKit.play('crowdCheer', { volume: 0.6 }); ctx.juice.flash('#fbbf24', 90); ctx.juice.hitStop(60); ctx.feel?.impact?.(0.5); ctx.camDirector.pulse(0.6, 0.5);
+    console.info('[3V3-KIN] synergy overdrive');
+  }
+  /** An overdrive dunk lands a SHOCKWAVE: every rival near the rim is put on the floor. */
+  function shockwave(ctx: ModeContext): void {
+    const hit = shockVictims(RIM_FLOOR, foes.map((f) => f.char.root.position));
+    for (const i of hit) { const f = foes[i]; if (f.floored) continue; f.stunSec = SYNERGY.shockStunSec; f.tree.beat('bball_contact_react', { fadeSec: 0.08 }); }
+    if (!hit.length) return;
+    kin.shocks++; EffectsKit.burst(ctx.scene, RIM_FLOOR.clone(), 'dust'); bannerFlash(ctx, 'SHOCKWAVE!', 700); ctx.juice.shake(0.12, 160);
+    console.info(`[3V3-KIN] shockwave: ${hit.length} down`);
+  }
+
   /** D1: BLOCKED at the release — the ball knocked loose from my hand, low, back the way it came. */
   function blockedShot(ctx: ModeContext, by: Body): void {
     const from = ball.getAbsolutePosition().clone(); releaseBall(ball);
@@ -2601,7 +2706,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           SoundKit.play('impact', { pitch: 0.7, volume: 0.6 }); SoundKit.play('crowdCheer', { volume: 0.7 });
           ctx.feel?.impact?.(0.5); ctx.juice.hitStop(50); ctx.juice.shake(0.1, 120);
           EffectsKit.burst(ctx.scene, at, 'sparks');
-          ctx.setHud({ banner: 'REJECTED AT THE RIM!' });
+          ctx.setHud({ banner: 'REJECTED AT THE RIM!' }); if (synergy.add('block')) igniteOverdrive(ctx);
           shooter.tree.beat('bball_contact_react', { fadeSec: 0.06, holdEnd: true }); ctx.camDirector.pulse(0.8, 0.5);   // DUNK-FANATIC: he takes the hit in the air
           console.info(`[3V3-DEF] swat at k ${k.toFixed(2)} jumpAge ${myJumpAge.toFixed(2)}`);
         }
@@ -2854,7 +2959,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       EffectsKit.burst(ctx.scene, shooter.char.root.position.add(new Vector3(0, 1.6, 0)), 'sparks');
       shooter.tree.beat('bball_contact_react');
       releaseBall(ball); ballSim.launch(ball.getAbsolutePosition(), new Vector3((Math.random() - 0.5) * 4, 2, 3));   // BIOMECH-HOOPS-WAVE1 G6: a blocked ball goes loose
-      ctx.setHud({ banner: 'REJECTED!' });
+      ctx.setHud({ banner: 'REJECTED!' }); if (synergy.add('block')) igniteOverdrive(ctx);
       setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 900);
       later(1000, () => resetPossession(true));
       return;

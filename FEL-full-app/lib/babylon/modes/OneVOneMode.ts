@@ -1015,7 +1015,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         // camRel hands back [x, −z] (the controller's stick space), so the world wish is { x: mx, z: −my } — read against the velocity as such
         if (driftCool <= 0 && carrying && !shooting && !dunking && !finish && !gather && !spin && !posting && driftRead(ltHeld, sprintOk, meDribble.vel, { x: mx, z: -my })) {
           const before = meDribble.vel.clone();
-          meDribble.drift(mx, my); driftCool = DRIFT.cooldownSec; kin.drifts++;
+          meDribble.drift(mx, -my); driftCool = DRIFT.cooldownSec; kin.drifts++;   // the cut takes WORLD z (the stick hands −z)
           ctx.juice.callout('DRIFT', '#22d3ee', 380); SoundKit.play('swish', { pitch: 0.8, volume: 0.4 }); EffectsKit.burst(ctx.scene, me.root.position.clone(), 'dust');
           console.info(`[1V1-KIN] drift ${turnDegLog(before, mx, -my)}° at ${before.length().toFixed(1)} m/s`);
           if (foeStunSec === 0 && !foeFloored && ankleBreak(me.root.position, before, foe.root.position)) {

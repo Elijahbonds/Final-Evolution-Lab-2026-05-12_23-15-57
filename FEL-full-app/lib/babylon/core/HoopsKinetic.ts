@@ -83,3 +83,58 @@ export function driveByRead(myVel: { x: number; z: number }, me: { x: number; z:
   const along = dx * fx + dz * fz, lateral = Math.abs(dx * fz - dz * fx);
   return Math.abs(along) <= DRIVE_BY.alongM && lateral >= DRIVE_BY.lateralMin && lateral <= DRIVE_BY.lateralMax;
 }
+
+// ── 3v3: THE SYNERGY (owner brief, 2026-09-18: "Team Slipstream & Synergy Overdrive") ────────────────────────────────
+//   · THE SLIPSTREAM. Running in a mate carrier's wake — behind him along his line, inside the cone — buys top speed
+//     and trickles into the shared gauge. A mate behind ME when I carry gets the same.
+//   · THE SLING-PASS. A pass thrown at a sprint flies faster, and the catch hands the receiver a burst.
+//   · THE SYNERGY OVERDRIVE. Assists, steals, drifts, blocks and dunks fill one gauge for the team; full, it ignites:
+//     15 s of an infinite turbo, faster mates, and a dunk that lands a SHOCKWAVE on every rival near the rim.
+
+export const SLIPSTREAM = { behindM: 3.4, lateralM: 1.2, minSpeed: 2.8, speedMult: 1.2, gaugePerSec: 5 } as const;
+
+/** Am I in the mate carrier's wake? Behind him along his velocity, inside the cone, while he actually runs. */
+export function slipstreamRead(me: { x: number; z: number }, mate: { x: number; z: number }, mateVel: { x: number; z: number }): boolean {
+  const s = Math.hypot(mateVel.x, mateVel.z);
+  if (s < SLIPSTREAM.minSpeed) return false;
+  const fx = mateVel.x / s, fz = mateVel.z / s;
+  const dx = me.x - mate.x, dz = me.z - mate.z;
+  const behind = -(dx * fx + dz * fz), lateral = Math.abs(dx * fz - dz * fx);
+  return behind > 0.4 && behind <= SLIPSTREAM.behindM && lateral <= SLIPSTREAM.lateralM;
+}
+
+export const SLING = { minSpeed: 3.8, ballMult: 1.3, burstMult: 1.35, burstSec: 0.9, /** the pick reads a rival this close to the ball (0.8 for an ordinary chest pass): a sling is harder to get a hand on */ pickM: 0.45 } as const;
+
+/** A pass thrown on the turbo at speed is a SLING. */
+export function slingRead(sprint: boolean, speed: number): boolean { return sprint && speed >= SLING.minSpeed; }
+
+export const SYNERGY = {
+  full: 100,
+  assist: 30, steal: 25, drift: 15, block: 20, dunk: 10, parry: 20, driveBy: 25,
+  overdriveSec: 15, mateMult: 1.15, meMult: 1.2,
+  shockM: 3, shockStunSec: 1.0,
+} as const;
+export type SynergySource = 'assist' | 'steal' | 'drift' | 'block' | 'dunk' | 'parry' | 'driveBy';
+
+/** The team's shared gauge. `add` returns true the moment it ignites; nothing accrues while the overdrive runs. */
+export class SynergyGauge {
+  value = 0; overdriveLeft = 0; ignitions = 0;
+  get active(): boolean { return this.overdriveLeft > 0; }
+  get meMult(): number { return this.active ? SYNERGY.meMult : 1; }
+  get mateMult(): number { return this.active ? SYNERGY.mateMult : 1; }
+  add(kind: SynergySource | number): boolean {
+    if (this.active) return false;
+    this.value = Math.min(SYNERGY.full, this.value + (typeof kind === 'number' ? kind : SYNERGY[kind]));
+    if (this.value < SYNERGY.full) return false;
+    this.ignite(); return true;
+  }
+  ignite(): void { this.overdriveLeft = SYNERGY.overdriveSec; this.value = 0; this.ignitions++; }
+  tick(dt: number): void { if (this.overdriveLeft > 0) this.overdriveLeft = Math.max(0, this.overdriveLeft - dt); }
+}
+
+/** An overdrive dunk's SHOCKWAVE: the indices of the rivals inside `shockM` of the rim's floor point. */
+export function shockVictims(rim: { x: number; z: number }, foes: readonly { x: number; z: number }[]): number[] {
+  const out: number[] = [];
+  foes.forEach((f, i) => { if (Math.hypot(f.x - rim.x, f.z - rim.z) <= SYNERGY.shockM) out.push(i); });
+  return out;
+}

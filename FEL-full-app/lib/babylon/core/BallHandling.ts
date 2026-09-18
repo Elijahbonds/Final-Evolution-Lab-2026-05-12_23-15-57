@@ -147,11 +147,11 @@ export class PassFlight {
   private from = new Vector3(); private to = new Vector3();
   private t = 0; private duration = 0.3; private type: PassType = 'chest';
 
-  start(from: Vector3, to: Vector3, type: PassType): void {
+  start(from: Vector3, to: Vector3, type: PassType, speedMult = 1): void {   // HOOPS KINETIC 3v3: a SLING-PASS flies faster
     this.from.copyFrom(from); this.to.copyFrom(to);
     this.type = type;
     const dist = Vector3.Distance(from, to);
-    this.duration = Math.max(0.18, dist / (type === 'chest' ? 14 : type === 'lob' ? 9 : 10));
+    this.duration = Math.max(0.14, dist / ((type === 'chest' ? 14 : type === 'lob' ? 9 : 10) * speedMult));
     this.t = 0;
     this.active = true;
   }

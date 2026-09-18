@@ -113,6 +113,9 @@ export class DribbleController {
   }
   /** HOOPS KINETIC (2026-09-18): the MOMENTUM DRIFT — a slide-cut onto a new line with the dribble speed kept. */
   drift(dx: number, dz: number): void { this.cutTo(dx, dz, Math.max(this.movement.vel.length(), 0.1)); }
+  /** HOOPS KINETIC 3v3: the slipstream / sling burst / overdrive scale the TOP SPEED, not the stick. */
+  get speedScale(): number { return this.movement.speedScale; }
+  set speedScale(v: number) { this.movement.speedScale = v; }
   private cutTo(dx: number, dz: number, speed: number): void {
     const n = Math.hypot(dx, dz) || 1;
     this.pendingCut = { x: dx / n, z: dz / n, speed, left: DribbleController.CUT_BLEND_SEC };

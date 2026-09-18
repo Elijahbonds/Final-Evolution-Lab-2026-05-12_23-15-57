@@ -111,6 +111,17 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
         <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-cyan)]">
           AST {hnode(hud.ast, 0)}
         </span>
+        {/* SYNERGY (owner brief 2026-09-18): the team's shared gauge — assists, steals, drifts, blocks, dunks and the slipstream fill it; full, it OVERDRIVES for 15 s */}
+        {typeof hud.synergy === 'number' && (() => {
+          const syn = Math.max(0, Math.min(100, Number(hud.synergy))); const od = Number(hud.overdrive ?? 0);
+          return (
+            <span className="fel-panel flex items-center gap-2 px-3 py-1 font-mono text-xs">
+              <span className="text-[10px] tracking-wider text-white/60">SYN</span>
+              <span className="h-2 w-20 overflow-hidden rounded-full bg-black/50"><span className={`block h-full rounded-full transition-[width] duration-150 ${od > 0 ? 'bg-[#fbbf24]' : syn >= 70 ? 'bg-[#fde68a]/85' : 'bg-[var(--fel-cyan)]/80'}`} style={{ width: `${od > 0 ? 100 : syn}%` }} /></span>
+              {od > 0 ? <span className="text-[10px] font-bold text-[#fbbf24]">OVERDRIVE {od}s</span> : null}
+            </span>
+          );
+        })()}
         <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">
           {typeof hud.time === 'number' ? `${hud.time}s` : 'TO 21'}
         </span>
