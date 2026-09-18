@@ -387,6 +387,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
   let camCrowd = false;                             // H8: surrounded → the crowd preset
   let xHoldSec = -1, iframeSec = 0;
+  let lastXTapSec = -1e9, lastDashSec = -1e9;   // STORM: the double tap, and the rush out of a dash
   let stickX = 0, stickY = 0;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   /** BIOMECH-WAVE2 G1: the yaw a committed strike is turning ONTO, and the rate that gets it there inside the startup. */
@@ -646,7 +647,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const target = ti >= 0 ? bodies[ti] : null;
     // the stick variant reads against the FACING before the turn: pulled back + B is the spin kick that hits behind
     const dir = stickDirTo(stick, player.root.rotation.y);
-    const move = book.press(key, dir, gameSec);
+    const move = book.press(key, dir, gameSec, { afterDash: gameSec - lastDashSec < 0.3 });   // STORM: the first press out of a dash is the RUSH
     const reachMult = perks.reach * style.reachMult;
     // REDIRECT: every press re-aims — onto the target, or down the stick's line when nobody is in its cone. The turn
     // arrives inside the hit beat (never a one-frame pop: G1/G4 still hold, it is just a faster pivot).
@@ -1231,7 +1232,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     });
   }
 
-  function tryDodge(ctx: ModeContext): void {
+  function tryDodge(ctx: ModeContext, kind: 'dash' | 'homing' = 'dash'): void {   // STORM: the dodge IS the dash (i-frames, the perfect read); the chakra dash homes on the target
     if (dodging || myDown.downed || shopOpen) return;
     if (carry?.swinging) return;
     if (striking && !swingCancelable()) return;
@@ -1244,14 +1245,21 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     // killed would punish the exact thing the mode should reward.
     book.reset();
     const steered = Math.hypot(stickX, stickY) > 0.2;
-    const dir = steered
-      ? ctx.camDirector.stickWorldLatched(stickX, stickY).normalize()
-      : facingVec().scale(-1);            // no input = dodge backward: the LEAN
-    dodgeClip = steered ? DODGE_SLIP : LEAN_DODGE;
+    // STORM: the chakra dash homes on the target the stick (or the facing) picks — a rush in, stopping a reach short
+    const bodiesD = liveBodies(); const tiD = kind === 'homing' ? pickTarget({ x: player.root.position.x, z: player.root.position.z }, stickWorld(ctx), bodiesD.map((e) => ({ x: e.mob.char.root.position.x, z: e.mob.char.root.position.z, threat: e.brain.attacking }))) : -1;
+    const homeTo = tiD >= 0 ? bodiesD[tiD].mob.char.root.position : null;
+    const dir = homeTo
+      ? new Vector3(homeTo.x - player.root.position.x, 0, homeTo.z - player.root.position.z).normalize()
+      : steered
+        ? ctx.camDirector.stickWorldLatched(stickX, stickY).normalize()
+        : kind === 'homing' ? facingVec() : facingVec().scale(-1);            // no input = dodge backward: the LEAN (a chakra dash with nobody: forward)
+    dodgeClip = kind === 'homing' ? 'karate_rush' : steered ? DODGE_SLIP : LEAN_DODGE;
+    lastDashSec = gameSec;
     SoundKit.play('whoosh', { pitch: 1.5, volume: 0.4 });
     const from = player.root.position.clone();
-    let to = from.add(dir.scale(DODGE_DISTANCE * perks.dodgeMult)); clampDisc(to);
-    let slideSec = DODGE_SLIDE_SEC;
+    const dashM = homeTo ? Math.max(0.5, Math.min(6.5, Math.hypot(homeTo.x - from.x, homeTo.z - from.z) - 1.4)) : kind === 'homing' ? 6.0 : DODGE_DISTANCE * perks.dodgeMult;   // STORM: the chakra dash covers the gap
+    let to = from.add(dir.scale(dashM)); clampDisc(to);
+    let slideSec = kind === 'homing' ? Math.max(0.22, Math.min(0.5, dashM / 13)) : DODGE_SLIDE_SEC;
     // PARKOUR IN THE HUNDRED (2026-09-15, owner decision): the dodge reads the ring. Steered OUT at the edge it is a WALL
     // FLIP back into the fight; steered AT a staggered or downed body close in front it is a VAULT over it. Both are the
     // captured moves (pk_*), with the dodge's i-frames held for the whole move.
@@ -1415,7 +1423,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       perks = shop.state(); vitals.setMax(perks.maxHp, true); vitals.iframeSec = 0; hpShown = -1; lastHurtAt = -1e9;
       flow.reset(); hitCount = 0;
       book.reset(); queue.clear(); carry = null; gameSec = 0; strikeSeq = 0; strikeMove = null; strikeHitDone = true; landed = []; shopOpen = false;
-      striking = false; blocking = false; dodging = false; xHoldSec = -1; iframeSec = 0; endSlowMo(ctx);
+      striking = false; blocking = false; dodging = false; xHoldSec = -1; iframeSec = 0; lastXTapSec = -1e9; lastDashSec = -1e9; endSlowMo(ctx);
       ctx.camDirector.snapTo(player.root.position, player.root.position.add(facingVec()));
       karateVenue?.hidePlaceholders();  // M74
       SoundKit.startAmbient('dojo');
@@ -1456,7 +1464,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       if (e.t === 'button' && !e.pressed && e.btn === 'X') {
         const held = xHoldSec;
         xHoldSec = -1;
-        if (held >= 0 && held * 1000 < DODGE_TAP_MS) tryDodge(ctx);
+        if (held >= 0 && held * 1000 < DODGE_TAP_MS) { const dbl = gameSec - lastXTapSec < 0.32; lastXTapSec = dbl ? -1e9 : gameSec; tryDodge(ctx, dbl ? 'homing' : 'dash'); }   // STORM: a tap is the DASH, a double tap the CHAKRA DASH at the target
         blocking = false;
       }
     },

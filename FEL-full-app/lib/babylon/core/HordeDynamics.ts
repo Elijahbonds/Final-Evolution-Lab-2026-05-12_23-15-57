@@ -44,6 +44,9 @@ export interface HordeMove {
    *  shuffle; the turn is the move's silhouette, so the mode layers it on the root (see KarateEndlessMode's spin layer). */
   spinDeg?: number;
   spinSec?: number;
+  /** STORM COMBOS (2026-09-17): an AIR link — thrown at a launched body, it keeps him up; a SLAM ends the air string with a knockdown. */
+  air?: boolean;
+  slam?: boolean;
 }
 
 // ── cancel + buffer ─────────────────────────────────────────────────────────
@@ -95,17 +98,38 @@ export const MOVES = {
   heavy:     M({ id: 'heavy', label: 'HEAVY', clip: 'karate_heavy', weight: 'heavy', speed: 1.25, range: 1.65, arcDeg: 100, launch: true, stunRadius: 1.8, stunSec: 0.6, lunge: 1.4 }),
   hammer:    M({ id: 'hammer', label: 'HAMMER FIST', clip: 'karate_hammer', weight: 'finisher', speed: 1.1, range: 1.9, arcDeg: 180, launch: true, stunRadius: 3.4, stunSec: 1.2, lunge: 1.4, ender: true }),
   rush:      M({ id: 'rush', label: 'RUSH', clip: 'karate_rush', weight: 'heavy', speed: 1.2, range: 1.7, arcDeg: 110, launch: true, stunRadius: 2.0, stunSec: 0.7, lunge: 3.4 }),
+  // STORM COMBOS (owner, 2026-09-17: "all button presses lead to different combos — look at how Naruto Storm is played"):
+  // the rest of the captured vocabulary joins the book — the hook as a link, the AIR links thrown at a launched body, the
+  // SPIKE that slams the air string, the SWEEP as the stick-back finisher. Sixteen captures, sixteen moves.
+  hook:      M({ id: 'hook', label: 'HOOK', clip: 'hook', weight: 'light', speed: 1.45, range: 1.6, arcDeg: 130, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.2 }),
+  airJab:    M({ id: 'airJab', label: 'AIR JAB', clip: 'jab', weight: 'light', speed: 1.4, range: 1.7, arcDeg: 120, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.0, air: true }),
+  airHook:   M({ id: 'airHook', label: 'AIR HOOK', clip: 'hook', weight: 'medium', speed: 1.35, range: 1.7, arcDeg: 130, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.0, air: true }),
+  spike:     M({ id: 'spike', label: 'SPIKE', clip: 'karate_hammer', weight: 'finisher', speed: 1.2, range: 1.8, arcDeg: 150, launch: false, stunRadius: 2.4, stunSec: 0.8, lunge: 1.0, ender: true, air: true, slam: true }),
+  sweep:     M({ id: 'sweep', label: 'SWEEP', clip: 'karate_backspin', weight: 'finisher', speed: 1.35, range: 2.0, arcDeg: 240, launch: false, stunRadius: 2.4, stunSec: 0.7, lunge: 0.6, ender: true, slam: true, spinDeg: 200, spinSec: 0.3 }),
   backSpin:  M({ id: 'backSpin', label: 'SPIN BACK KICK', clip: 'karate_backspin', weight: 'medium', speed: 1.4, range: 2.1, arcDeg: 260, launch: false, stunRadius: 2.0, stunSec: 0.6, lunge: 0.4, spinDeg: 360, spinSec: 0.36 }),
 } as const satisfies Record<string, HordeMove>;
 export type MoveId = keyof typeof MOVES;
 
 /** Strings, longest first. A token is a button; the stick variants are resolved before the table (see resolveMove). */
 const STRINGS: { seq: StrikeBtn[]; move: MoveId }[] = [
+  // STORM COMBOS: every three-button sequence resolves to its own finisher, every two-button pair to its own link
+  { seq: ['B', 'B', 'B'], move: 'whirl' },
+  { seq: ['A', 'B', 'A'], move: 'backSpin' },
+  { seq: ['B', 'A', 'Y'], move: 'typhoon' },
+  { seq: ['B', 'B', 'A'], move: 'hook' },
+  { seq: ['B', 'A', 'A'], move: 'uppercut' },
+  { seq: ['A', 'B', 'B'], move: 'roundhouse' },
+  { seq: ['Y', 'A', 'A'], move: 'hammer' },
   { seq: ['A', 'A', 'A'], move: 'uppercut' },
   { seq: ['A', 'A', 'B'], move: 'whirl' },
   { seq: ['A', 'B', 'Y'], move: 'hammer' },
   { seq: ['B', 'B', 'Y'], move: 'typhoon' },
   { seq: ['A', 'A', 'Y'], move: 'hammer' },
+  { seq: ['Y', 'Y'], move: 'hammer' },
+  { seq: ['B', 'Y'], move: 'heavy' },
+  { seq: ['Y', 'A'], move: 'hook' },
+  { seq: ['Y', 'B'], move: 'roundhouse' },
+  { seq: ['B', 'A'], move: 'cross' },
   { seq: ['B', 'B'], move: 'roundhouse' },
   { seq: ['A', 'A'], move: 'cross' },
   { seq: ['A', 'B'], move: 'kick' },
@@ -122,10 +146,10 @@ export class StringBook {
   private hist: StrikeBtn[] = [];
   private lastAt = -Infinity;
   /** Resolve a press into a move and advance the string. */
-  press(btn: StrikeBtn, dir: StickDir, now: number): HordeMove {
+  press(btn: StrikeBtn, dir: StickDir, now: number, opts: MoveOpts = {}): HordeMove {
     if (now - this.lastAt > STRING_WINDOW_SEC) this.hist = [];
     this.lastAt = now;
-    const move = resolveMove([...this.hist, btn], dir);
+    const move = resolveMove([...this.hist, btn], dir, opts);
     this.hist.push(btn);
     if (move.ender || this.hist.length >= STRING_MAX) this.hist = [];
     return move;
@@ -136,8 +160,18 @@ export class StringBook {
 }
 
 /** The move for a button sequence (the last token is the press) and the stick direction on the press. Pure. */
-export function resolveMove(seq: StrikeBtn[], dir: StickDir): HordeMove {
+/** STORM COMBOS: the situation a press is read in — a launched body in front (AIR links), a dash just thrown (the RUSH). */
+export interface MoveOpts { air?: boolean; afterDash?: boolean }
+export const DASH_ATTACK_SEC = 0.3;
+export function resolveMove(seq: StrikeBtn[], dir: StickDir, opts: MoveOpts = {}): HordeMove {
   const press = seq[seq.length - 1];
+  // in the air (a launched body): the air links, and Y spikes him down
+  if (opts.air) return press === 'Y' ? MOVES.spike : press === 'B' ? MOVES.airHook : MOVES.airJab;
+  // out of a dash: the first press is the RUSH (the dash attack)
+  if (opts.afterDash && seq.length === 1) return MOVES.rush;
+  // the stick on a FINISHER: pulled back = the sweep (a knockdown), pushed forward = the rising dragon (a launcher)
+  if (seq.length >= STRING_MAX && dir === 'b') return MOVES.sweep;
+  if (seq.length >= STRING_MAX && dir === 'f') return MOVES.uppercut;
   // stick variants on a string OPENER only — inside a string the table owns the link (a string must be learnable)
   if (seq.length === 1 && dir === 'f' && press === 'Y') return MOVES.rush;
   if (seq.length === 1 && dir === 'b' && press === 'B') return MOVES.backSpin;
@@ -257,4 +291,25 @@ export function pickGrab(hero: { x: number; z: number; yaw: number }, bodies: (B
     bd = d; best = i;
   });
   return best;
+}
+
+/** STORM COMBOS: a FightCore-shaped attack from a horde move — the duel modes (Karate VS, Mixed Combat) read their damage,
+ *  reach and hit-stun off the move so every link of a string is its own attack, scaled from the fighter's base jab. */
+export interface MoveAttack {
+  id: string; label: string; clip: string; dmg: number; range: number; startupMs: number; stunSec: number; knockback: number;
+  chiGain: number; guardDmg: number; line?: 'vertical' | 'horizontal';
+}
+const WEIGHT_DMG: Record<StrikeWeightKey, number> = { light: 1, medium: 1.45, heavy: 2.1, finisher: 2.6 };
+const WEIGHT_STUN: Record<StrikeWeightKey, number> = { light: 0.35, medium: 0.45, heavy: 0.7, finisher: 1.0 };
+export function attackFromMove(m: HordeMove, base: { dmg: number; chiGain: number; guardDmg: number }): MoveAttack {
+  const k = WEIGHT_DMG[m.weight];
+  return {
+    id: m.id, label: m.label, clip: m.clip,
+    dmg: Math.round(base.dmg * k), range: m.range,
+    startupMs: Math.round((STRIKE_TIMING[m.weight].hitAt / m.speed) * 1000) + 40,
+    stunSec: m.launch ? Math.max(WEIGHT_STUN[m.weight], 0.9) : WEIGHT_STUN[m.weight],
+    knockback: m.slam ? 1.4 : m.launch ? 1.6 : m.weight === 'light' ? 0.4 : m.weight === 'medium' ? 0.8 : 1.2,
+    chiGain: Math.round(base.chiGain * (0.8 + 0.3 * k)), guardDmg: Math.round(base.guardDmg * k),
+    line: m.arcDeg >= 150 ? 'horizontal' : 'vertical',
+  };
 }

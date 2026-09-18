@@ -17,18 +17,19 @@ const p = await b.newPage({ viewport: { width: 1100, height: 700 } });
 await p.addInitScript({ content: 'window.__name = window.__name || function (f) { return f; };' });
 const errs: string[] = []; const logs: string[] = [];
 p.on('pageerror', (e) => errs.push(String(e).slice(0, 160)));
-p.on('console', (m) => { const t = m.text(); if (/MISSING CLIP/.test(t) || m.type() === 'error' && !/401|FEL-FRAME/.test(t)) errs.push(t.slice(0, 160)); if (/\[KE-/.test(t)) logs.push(t.slice(0, 160)); });
-await p.goto(`${BASE}/dev/mode/karate${process.env.QS ?? ''}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
+p.on('console', (m) => { const t = m.text(); if (/MISSING CLIP/.test(t) || m.type() === 'error' && !/401|FEL-FRAME/.test(t)) errs.push(t.slice(0, 160)); if (/\[KE-|\[KVS-|\[MC-/.test(t)) logs.push(t.slice(0, 160)); });
+const MODE = process.env.MODE ?? 'karate';   // STORM: the same probe drives karate (Endless), karate_vs and mixedcombat
+await p.goto(`${BASE}/dev/mode/${MODE}${process.env.QS ?? ''}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
 await p.waitForSelector('canvas', { timeout: 240000 });
 for (let i = 0; i < 120; i++) {
-  if (await p.evaluate(() => !!(window as any).__FEL_DEV__?.scene?.metadata?.karateNeo)) break;
+  if (await p.evaluate(() => !!((window as any).__FEL_DEV__?.scene?.metadata?.karateNeo) || (!!(window as any).__FEL_DEV__?.hero && !!(window as any).__FEL_DEV__.hero()))) break;
   const start = p.locator('text=/^START$/').first(); if (await start.count()) await start.click().catch(() => {});
   await p.waitForTimeout(1500);
 }
 // the first load compiles for minutes while the mode already fights — reload once so the run starts on a fresh wave 1
 await p.reload({ waitUntil: 'domcontentloaded' });
 for (let i = 0; i < 120; i++) {
-  if (await p.evaluate(() => !!(window as any).__FEL_DEV__?.scene?.metadata?.karateNeo)) break;
+  if (await p.evaluate(() => !!((window as any).__FEL_DEV__?.scene?.metadata?.karateNeo) || (!!(window as any).__FEL_DEV__?.hero && !!(window as any).__FEL_DEV__.hero()))) break;
   const start = p.locator('text=/^START$/').first(); if (await start.count()) await start.click().catch(() => {});
   await p.waitForTimeout(500);
 }
@@ -114,6 +115,10 @@ for (const m of data.marks.filter((m) => /^L:|^Lset:/.test(m.label))) {
   const turned = rows.find((r) => r.t >= m.t && Math.abs(((r.yaw - y0 + 540) % 360) - 180) >= 150);
   if (turned) console.log(`   ${f(m.t)} ${m.label}: body turned 150° in ${(turned.t - m.t).toFixed(0)} ms`);
 }
+// STORM: the dash — the peak ground speed inside 400 ms of each X press (a tap = the dash, a double = the chakra dash)
+{ const xs = data.marks.filter((m) => m.label === 'press:X'); const out: string[] = [];
+  for (const m of xs) { let peak = 0; const seg = rows.filter((r) => r.t >= m.t && r.t <= m.t + 400); for (let i = 1; i < seg.length; i++) { const dt = (seg[i].t - seg[i - 1].t) / 1000; if (dt > 0) peak = Math.max(peak, Math.hypot(seg[i].x - seg[i - 1].x, seg[i].z - seg[i - 1].z) / dt); } out.push(`${f(m.t)} peak ${peak.toFixed(1)} m/s`); }
+  if (out.length) console.log(`dash (X presses): ${out.join(' · ')}`); }
 const tel = rows.filter((r) => r.tele);
 if (tel.length) {
   const last = tel[tel.length - 1].tele!; const first = tel[0].tele!;

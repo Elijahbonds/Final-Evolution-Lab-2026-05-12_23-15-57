@@ -63,7 +63,7 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   karate: verbs({
     A: { label: 'JAB', emit: A('A') },
     B: { label: 'KICK', emit: A('B') },
-    X: { label: 'BLOCK', emit: A('X') },
+    X: { label: 'DASH', emit: A('X') },   // STORM: a tap dashes (double = chakra dash), a HOLD is the guard
     Y: { label: 'HEAVY', emit: A('Y') },
   }),
   football: verbs({
@@ -172,7 +172,7 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   karate_vs: verbs({
     A: { label: 'JAB', emit: A('A') },
     B: { label: 'KICK', emit: A('B') },
-    X: { label: 'BLOCK', emit: A('X') },
+    X: { label: 'DASH', emit: A('X') },   // STORM: a tap dashes (double = chakra dash), a HOLD is the guard
     Y: { label: 'HEAVY', emit: A('Y') },
   }),
   // AERO ACES as a kart racer with wings (2026-09-15, owner: "like diddy Kong flyers"): GAS and BRAKE are holds, FIRE
@@ -194,7 +194,7 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   mixedcombat: verbs({
     A: { label: 'STRIKE', emit: A('A') },
     B: { label: 'KICK', emit: A('B') },
-    X: { label: 'GUARD', emit: A('X') },
+    X: { label: 'DASH', emit: A('X') },   // STORM: tap = dash, hold = guard
     Y: { label: 'HEAVY', emit: A('Y') },
   }),
   // Soul-Calibur-lane weapon duel (DuelMode.ts). Same A/B/Y buttons do double

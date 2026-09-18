@@ -42,6 +42,8 @@ import {
   KARATE_ATTACKS, STAFF_ATTACKS, SPECIAL_ATTACK, CHI_MAX, GUARD_MAX, PARRY_STAGGER_SEC,
   STEP_CHI_GAIN, type AttackDef,
 } from '../core/FightCore';
+import { StringBook, attackFromMove, STRIKE_TIMING, DASH_ATTACK_SEC, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // STORM COMBOS (2026-09-17): the book of strings
+import { XButtonReader, DASH, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';   // STORM: X = dash / double = chakra dash / hold = guard; launchers put him in the air
 import { SoundKit } from '../audio/SoundKit';
 import {
   BASELINE_RATINGS, ratingsFrom, routeFor, routeHitStopMs, routeShake, damageScale, hasFightMove, cancelWindowSec,
@@ -77,7 +79,7 @@ const REACT_SEC = 0.32, LAUNCH_SEC = 1.0, PARRY_SEC = 0.3, IMPACT_SEC = 0.24, CE
 const REACT_STATES: CombatAnimState[] = ['react_light', 'react_medium', 'react_heavy', 'react_launch'];
 interface FighterAnim {
   tree: CombatAnimTree;
-  strike: { weight: StrikeWeight; clip: string; until: number } | null;
+  strike: { weight: StrikeWeight; clip: string; until: number; speed?: number; cancelFrom?: number } | null;
   hitBy: StrikeWeight | null; hitUntil: number;
   parryUntil: number; impactUntil: number; downUntil: number; celebrateUntil: number;
   out: boolean; falling: boolean;
@@ -146,6 +148,13 @@ export const MixedCombatMode: ModeDefinition = (() => {
   // ROLL, JUMP AND THE DODGE READ (2026-09-14). EvadeMoves rather than CombatMovement: this mode writes
   // its own camera-relative velocity and owns a ring-out check, neither of which survives a migration.
   const meEvade = new EvadeMoves();
+  let ctx0!: ModeContext;   // STORM: the context the stick read needs (set every update)
+  // STORM (2026-09-17): the string book (every press is its own link), the X reader, the dash and the launched body
+  const book = new StringBook(); const xBtn = new XButtonReader();
+  let queuedKey: { key: 'jab' | 'kick' | 'heavy'; at: number } | null = null;   // STORM: the press waiting for the cancel point
+  let lastDashSec = -1e9, meDash: { dir: Vector3; left: number; homing: boolean } | null = null, meDashIframeSec = 0, meDashUntil = 0, foeLaunchedSec = 0;
+  const BTN_OF: Record<'jab' | 'kick' | 'heavy', StrikeBtn> = { jab: 'A', kick: 'B', heavy: 'Y' };
+  const stickDirToFoe = (): StickDir => { if (Math.hypot(stickX, stickY) < 0.35) return 'n'; const w = ctx0.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx0.camDirector.rightFlat().scale(stickX)).normalize(); const to = rival.root.position.subtract(player.root.position); to.y = 0; to.normalize(); const d = w.x * to.x + w.z * to.z; return d > 0.5 ? 'f' : d < -0.5 ? 'b' : 'n'; };
   let meCounter = 0;
   /** When the rival's in-flight strike would connect (game clock); null when nothing is incoming. */
   let foeImpactAt: number | null = null;
@@ -251,6 +260,19 @@ export const MixedCombatMode: ModeDefinition = (() => {
   // ── the tree's inputs (ANIM-READABILITY) ──
   function animOf(mine: boolean): FighterAnim { return mine ? meAnim : foeAnim; }
   /** A fighter's swing is over — naturally (the tree's settle) or interrupted (hit / parried / broken / ring-out / round end). */
+  /** STORM: the DASH — a burst along the stick (or at the rival), i-frames for its first beat, a cancel of a string's recovery;
+   *  the CHAKRA DASH (a double tap) homes on the rival and stops a reach short. */
+  function tryDash(ctx: ModeContext, homing: boolean): void {
+    if (!meState.controllable || meDash || !meEvade.canAct || phase !== 'fighting') return;
+    if (striking) { const st = animOf(true).strike; if (st && st.cancelFrom !== undefined && now() < st.cancelFrom) return; endStrike(true); }
+    const toFoe = rival.root.position.subtract(player.root.position); toFoe.y = 0;
+    const stick = Math.hypot(stickX, stickY) > 0.25 ? ctx.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx.camDirector.rightFlat().scale(stickX)) : null;
+    const dir = homing || !stick ? (toFoe.lengthSquared() > 1e-4 ? toFoe.normalize() : ctx.camDirector.forwardFlat()) : stick.normalize();
+    meDash = { dir, left: homing ? DASH.homingMaxSec : DASH.sec, homing };
+    meDashIframeSec = DASH.iframes; meDashUntil = now() + (homing ? DASH.homingMaxSec : DASH.sec) * 1000; lastDashSec = now() / 1000;
+    SoundKit.play('whoosh', { pitch: homing ? 1.35 : 1.2, volume: 0.45 }); if (homing) ctx.camDirector.pulse(0.25, 0.3);
+    console.info(`[MC-STORM] ${homing ? 'chakra dash' : 'dash'}`);
+  }
   function endStrike(mine: boolean): void { if (mine) striking = false; else foeStriking = false; animOf(mine).strike = null; }
   function beatHit(mine: boolean, weight: StrikeWeight): void {
     const f = animOf(mine); f.hitBy = weight; f.hitUntil = now() + (weight === 'finisher' ? LAUNCH_SEC : REACT_SEC) * 1000;
@@ -276,9 +298,9 @@ export const MixedCombatMode: ModeDefinition = (() => {
     bio.hitBy = t < f.hitUntil ? f.hitBy : null; bio.down = t < f.downUntil; bio.out = f.out || f.falling;
     bio.rising = false; bio.dodging = mine ? meEvade.rolling : false; bio.celebrating = t < f.celebrateUntil; bio.engaged = phase === 'fighting';
     return {
-      speed01: moving, strafe, backing: strafe === 0 && bio.approach < 0, dashing: false, hasWeapon: weapon,
+      speed01: moving, strafe, backing: strafe === 0 && bio.approach < 0, dashing: mine && t < meDashUntil, hasWeapon: weapon,
       rolling: mine ? meEvade.rolling : false, airborne: mine ? meEvade.airborne : false,
-      striking: f.strike?.weight ?? null, strikeClip: f.strike?.clip,
+      striking: f.strike?.weight ?? null, strikeClip: f.strike?.clip, strikeSpeed: f.strike?.speed,
       blocking: s.blockHeld, parryFlash: t < f.parryUntil, guardImpactFlash: t < f.impactUntil,
       hitBy: t < f.hitUntil ? f.hitBy : null, down: t < f.downUntil, out: f.out, falling: f.falling, ulting: false, celebrating: t < f.celebrateUntil,
       speedMps: Math.hypot(vel.x, vel.z),   // STRIDE MATCHING: real ground speed, not the normalised one
@@ -347,12 +369,22 @@ export const MixedCombatMode: ModeDefinition = (() => {
     const defState = mine ? foeState : meState;
     const atkChar = mine ? player : rival;
     const defChar = mine ? rival : player;
-    if (!atkState.controllable || (mine ? striking : foeStriking) || falling) return;
+    if (!atkState.controllable || (!mine && foeStriking) || falling) return;
+    // STORM STRINGS: a press during MY swing is a LINK — past the cancel point it cancels into the next move now, before
+    // it is queued for the cancel point (the Hundred's StrikeQueue rule; a dropped press was the reason a string never chained)
+    if (mine && striking) {
+      const st = animOf(true).strike;
+      if (st && st.cancelFrom !== undefined && now() >= st.cancelFrom) endStrike(true);
+      else { queuedKey = { key, at: now() }; return; }
+    }
 
     const set = mine ? myAttacks() : foeAttacks();
     // the finisher is EARNED as well as charged — full chi is the cost, force is the licence
     const special = key === 'heavy' && atkState.chi >= CHI_MAX && hasFightMove('dragon', mine ? myRatings : foeRatings);
-    const atk: AttackDef = special ? SPECIAL_ATTACK : set[key];
+    const baseAtk = set[key];
+    // STORM COMBOS: MY presses read the book — the sequence, the stick and the situation (a launched body: air links; a dash just thrown: the rush) pick the link
+    const move = mine && !special ? book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { air: foeLaunchedSec > 0, afterDash: now() / 1000 - lastDashSec < DASH_ATTACK_SEC }) : null;
+    const atk: AttackDef = special ? SPECIAL_ATTACK : move ? attackFromMove(move, baseAtk) : baseAtk;
     if (mine) striking = true; else foeStriking = true;
     // Commit to the line at swing start — the impact check measures the
     // defender's offset from THIS facing, not from wherever the mesh has
@@ -365,7 +397,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
       setTimeout(() => ctx.setHud({ banner: '' }), 700);
     }
     SoundKit.play('whoosh', { pitch: special ? 0.8 : 1.05 });
-    animOf(mine).strike = { weight: special ? 'finisher' : WEIGHT_OF[key], clip: atk.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
+    if (move) console.info(`[MC-STORM] link ${move.id} (${move.clip}) weight ${move.weight}${move.air ? ' AIR' : ''}${move.launch ? ' LAUNCH' : ''}${move.slam ? ' SLAM' : ''} string ${book.history.length}`);
+    animOf(mine).strike = { weight: special ? 'finisher' : move ? move.weight : WEIGHT_OF[key], clip: atk.clip, speed: move?.speed, cancelFrom: move ? now() + (STRIKE_TIMING[move.weight].cancelAt / move.speed) * 1000 : undefined, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
 
     // the dodge window is read against when THIS strike would connect -- see DodgeRead
     if (!mine) foeImpactAt = now() + atk.startupMs;
@@ -378,7 +411,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
       // what a sidestep changes.
       const toDef = defChar.root.position.subtract(atkChar.root.position);
       const lateral = Math.abs(toDef.x * -Math.cos(committedYaw) + toDef.z * Math.sin(committedYaw));
-      const outcome = resolveStrike(atk, dist, defState, now(), lateral);
+      let outcome = resolveStrike(atk, dist, defState, now(), lateral);
+      if (!mine && (meDashIframeSec > 0 || meEvade.rollIFrames)) outcome = 'whiff';   // STORM: the dash's / the roll's i-frames
       switch (outcome) {
         case 'whiff': break;
         case 'stepped': {
@@ -433,7 +467,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
           ctx.momentum.report(mine ? { kind: 'clean_hit', weight: special ? 16 : 9 } : { kind: 'blunder', weight: -8 });
           if (special || key === 'heavy') heavyPunch(ctx, special ? 'special' : 'heavy'); else console.info('[MC-JUICE] hit');
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), special ? 'glitch' : 'sparks');
-          beatHit(!mine, special ? 'finisher' : WEIGHT_OF[key]);   // the DRAGON launches (knockdown → floor → get up)
+          beatHit(!mine, mine && move?.slam ? 'finisher' : mine && move?.launch ? 'heavy' : special ? 'finisher' : WEIGHT_OF[key]);
+          if (mine && move?.launch) { foeLaunchedSec = LAUNCH_AIR_SEC; console.info('[MC-STORM] LAUNCHED — air string open'); } else if (mine && move?.air && !move.slam) foeLaunchedSec = Math.max(foeLaunchedSec, 0.5); else if (mine && move?.slam) foeLaunchedSec = 0;   // STORM   // the DRAGON launches (knockdown → floor → get up)
           // THE SAME ROUTES AS KARATE VS. A combo was a counter here too, so jab-jab-jab and jab-kick-heavy
           // were worth the same. Matched on the TAIL of the landed strikes; a quick body holds the window
           // open longer (cancelWindowSec), which is what the quickness rating buys.
@@ -537,7 +572,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
   }
 
   function startRound(ctx: ModeContext): void {
-    meState.resetRound(); foeState.resetRound();
+    meState.resetRound(); foeState.resetRound(); book.reset(); xBtn.reset(); queuedKey = null; meDash = null; meDashIframeSec = 0; meDashUntil = 0; foeLaunchedSec = 0; rival.root.position.y = 0;   // STORM
     applyLoadouts(ctx);
     player.root.rotation.y = Math.atan2(rival.root.position.x - player.root.position.x, rival.root.position.z - player.root.position.z);
     rival.root.rotation.y = wrapYaw(player.root.rotation.y + Math.PI);   // a ROUND START is a cut, not a turn
@@ -647,6 +682,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
         if (e.btn === 'B') swing(ctx, true, 'kick');
         if (e.btn === 'Y') swing(ctx, true, 'heavy');
         if (e.btn === 'X') {
+          xBtn.press(now() / 1000);   // STORM: the tap clock
           meState.pressBlock(now());   // the tree shows the block (blockHeld → block_hold)
           // SCORECARD CONTROLS (2026-09-15): the guard going up moved a pose and nothing else — 4 of 10 X presses had no
           // answer a player could see or hear. It is heard, the way the duel's guard is.
@@ -683,10 +719,11 @@ export const MixedCombatMode: ModeDefinition = (() => {
           if (meEvade.jump()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });
         }
       }
-      if (e.t === 'button' && !e.pressed && e.btn === 'X') meState.releaseBlock();
+      if (e.t === 'button' && !e.pressed && e.btn === 'X') { meState.releaseBlock(); const g = xBtn.release(now() / 1000); if (g === 'tap' || g === 'double') tryDash(ctx, g === 'double'); }   // STORM
     },
 
     update(ctx: ModeContext, dt: number) {
+      ctx0 = ctx;
       phaseSec += dt;
       gallery?.update(dt);
       if (phaseSec > BUDGET_SEC[phase]) {
@@ -725,8 +762,14 @@ export const MixedCombatMode: ModeDefinition = (() => {
       const moveVel = ctx.camDirector.forwardFlat().scale(-stickY * MOVE_SPEED).addInPlace(ctx.camDirector.rightFlat().scale(stickX * MOVE_SPEED));
       const rollVel = meEvade.update(sdt);
       meCounter = tickCounter(meCounter, sdt);
-      const mySpeed01 = rollVel ? 0 : moveVel.length() / MOVE_SPEED;   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
-      if (rollVel) {
+      let mySpeed01 = rollVel ? 0 : moveVel.length() / MOVE_SPEED;   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
+      if (meDash) {   // STORM: the dash owns the body (and takes the ring check — a dash off the edge is a ring-out)
+        if (meDash.homing) { const toFoe = rival.root.position.subtract(player.root.position); toFoe.y = 0; if (toFoe.length() <= DASH.homingStopM) meDash.left = 0; else meDash.dir = toFoe.normalize(); }
+        player.root.position.addInPlace(meDash.dir.scale((meDash.homing ? DASH.homingSpeed : DASH.speed) * sdt));
+        if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
+        meDash.left -= sdt; if (meDash.left <= 0) meDash = null;
+        mySpeed01 = 1;
+      } else if (rollVel) {
         // the roll owns the body AND takes the same ring check the walk does -- see the input branch
         player.root.position.addInPlace(rollVel.scale(sdt));
         if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
@@ -737,6 +780,13 @@ export const MixedCombatMode: ModeDefinition = (() => {
       }
       player.root.position.y = meEvade.height;   // the arc is EvadeMoves'; nothing here integrates gravity
 
+      meDashIframeSec = Math.max(0, meDashIframeSec - sdt);   // STORM ticks
+      if (queuedKey) {   // STORM: the queued link fires at the cancel point (or the settle), and goes stale after 0.4 s
+        const st = animOf(true).strike;
+        if (now() - queuedKey.at > 400) queuedKey = null;
+        else if (!striking || (st && st.cancelFrom !== undefined && now() >= st.cancelFrom)) { const k = queuedKey.key; queuedKey = null; swing(ctx, true, k); }
+      }
+      if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - sdt); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }
       // rival AI (its brain uses its own loadout's ranges); it never
       // voluntarily steps off — clamp ITS walk to the ring, so only
       // knockback can send it over

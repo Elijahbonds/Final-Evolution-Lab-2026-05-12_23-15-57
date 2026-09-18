@@ -49,7 +49,10 @@ describe('opponentMotion — an opponent plays the capture that replaces the aut
 
   it('THE HUNDRED: every named move plays its OWN motion — no two strings share a clip, and each has a capture', async () => {
     const { MOVES } = await import('../core/HordeDynamics');
-    const clips = Object.values(MOVES).map((m) => m.clip);
+    // STORM COMBOS (2026-09-17): the AIR links and the SLAMs are situational variants of a grounded move (the air jab IS the jab
+    // thrown at a launched body; the spike is the hammer coming down) — they share its capture by design and sit out this check
+    const named = Object.values(MOVES).filter((m) => !m.air && !m.slam);
+    const clips = named.map((m) => m.clip);
     // the one intended share: jab and cross are different clips, the uppercut ender is its own capture
     expect(new Set(clips).size).toBe(clips.length);
     const owned = new Set(MOCAP_OPPONENT_CLIPS.map((c) => c.name));
