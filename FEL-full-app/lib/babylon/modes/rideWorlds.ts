@@ -95,19 +95,30 @@ function makeRail(scene: Scene, all: AbstractMesh[], lines: GrindLine[], a: Vect
  */
 function rampWedge(scene: Scene, name: string, width: number, depth: number, height: number, highAtPlusZ: boolean): Mesh {
   const hz = depth / 2, hx = width / 2, hi = highAtPlusZ ? hz : -hz, lo = -hi;
-  // two triangle ends (x = ±hx) and the two quads that show: the vertical back and the floor
+  // THE BANK HAD NO SLOPE (2026-09-18, found chasing lip tricks). This built two triangle ends and the vertical back — and no
+  // sloped face — and marked the mesh unpickable, so the Rider's ground ray (scene.pickWithRay skips unpickable meshes)
+  // never met a bank: measured, the skater crossed the spine's north wedge from z −17.5 to −22 at y 0.00. Every ramp in
+  // every ride world was a hollow prop. The slope and the floor are here now, the winding is checked against the computed
+  // normal, and the mesh is pickable.
   const p = [
     -hx, 0, lo, -hx, 0, hi, -hx, height, hi,
     hx, 0, lo, hx, height, hi, hx, 0, hi,
     -hx, 0, hi, hx, 0, hi, hx, height, hi, -hx, height, hi,
+    -hx, 0, lo, hx, 0, lo, hx, height, hi, -hx, height, hi,   // 10..13 the slope
+    -hx, 0, lo, -hx, 0, hi, hx, 0, hi, hx, 0, lo,             // 14..17 the floor
   ];
-  const idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 6, 8, 9];
+  const idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 6, 8, 9, 10, 11, 12, 10, 12, 13, 14, 15, 16, 14, 16, 17];
   const vd = new VertexData();
   vd.positions = p; vd.indices = idx;
-  const normals: number[] = []; VertexData.ComputeNormals(p, idx, normals); vd.normals = normals;
+  let normals: number[] = []; VertexData.ComputeNormals(p, idx, normals);
+  if (normals[10 * 3 + 1] < 0) {   // the slope must face UP: flip its two triangles if the winding came out underneath
+    idx.splice(12, 6, 10, 12, 11, 10, 13, 12);
+    normals = []; VertexData.ComputeNormals(p, idx, normals);
+  }
+  vd.indices = idx; vd.normals = normals;
   const m = new Mesh(name, scene);
   vd.applyToMesh(m);
-  m.isPickable = false;
+  m.isPickable = true;
   return m;
 }
 

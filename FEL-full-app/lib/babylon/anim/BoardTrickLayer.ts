@@ -34,6 +34,9 @@ export class BoardTrickLayer {
   private releasedFor = 0;
   private pose: TrickPoseOut = NO_TRICK_POSE;
   private applied = { yaw: 0, tilt: 0, bx: 0, by: 0, bz: 0, lift: 0 };
+  /** WALL RIDES + LIP TRICKS (2026-09-18): a pose the MODE holds while the rider is on a wall or a lip — no BoardTrick behind
+   *  it, applied whether or not the rider is airborne, cleared by the mode when the moment ends. */
+  overridePose: { boardRoll?: number; boardPitch?: number; boardYaw?: number; boardLift?: number; bodyTilt?: number } | null = null;
   private arms: { Left: ArmChain | null; Right: ArmChain | null };
   private feet: { Left: TransformNode | null; Right: TransformNode | null };
   private toes: { Left: TransformNode | null; Right: TransformNode | null };
@@ -78,6 +81,13 @@ export class BoardTrickLayer {
 
   /** After the mode's own writes: this frame's trick shape. Landing (airborne false) ends the trick. */
   apply(dt: number, airborne: boolean): TrickPoseOut {
+    if (this.overridePose) {
+      const o = this.overridePose, a = this.applied;
+      a.tilt = o.bodyTilt ?? 0; a.bx = o.boardPitch ?? 0; a.by = o.boardYaw ?? 0; a.bz = o.boardRoll ?? 0; a.lift = o.boardLift ?? 0;
+      this.root.rotation.x += a.tilt;
+      this.board.rotation.x += a.bx; this.board.rotation.y += a.by; this.board.rotation.z += a.bz; this.board.position.y += a.lift;
+      this.pose = NO_TRICK_POSE; return this.pose;
+    }
     if (!this.trick) { this.pose = NO_TRICK_POSE; return this.pose; }
     if (!airborne) { this.clear(); return this.pose; }
     this.elapsed += dt;

@@ -32,6 +32,8 @@ import { resolveLanding, BalanceSave, SKETCHY_SCORE_MULT } from '../core/Landing
 import { BalanceChannel, tryRevert, type BalanceChannelKind } from '../core/GrindManual';
 import { pickRail, nearestOnSegment } from '../core/RailMagnet';   // VENICE-SKATE-THPS: the catch window, testable on its own
 import { ComboChain } from '../core/ComboChain';
+import { WALL_RIDE, canWallRide, startWallRide, stepWallRide, wallSide, wallRideExitVel, wallplantVel, canLipStall, startLipStall, stepLipStall, dropInVel, lipStallPts, type Wall, type Lip, type WallRideState, type LipStallState } from '../core/WallRide';   // WALL RIDES + LIP TRICKS (2026-09-18)
+import { plazaWalls, plazaLips } from './skatePlaza';
 import { BoardAnimTree } from '../anim/boardTree';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the board family (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Measured on
 // 2942860, per rendered frame:
@@ -78,6 +80,13 @@ let baseFov: number | null = null;
 
 export const SkateRunMode: ModeDefinition = (() => {
   let world: RideWorld, rig: BoardRig;
+  // WALL RIDES, WALLPLANTS, LIP TRICKS (owner 2026-09-18): the plaza's rideable faces and lips, and the moment on one
+  let walls: Wall[] = [], lips: Lip[] = [];
+  let wallRide: WallRideState | null = null, lipStall: LipStallState | null = null, xHeld = false;
+  /** The grind button asked for a wall / a lip: the ask is REMEMBERED (the wall's catch window at 7 m/s is ~90 ms — a press
+   *  lands before it; THPS holds the button and the wall catches when reached). */
+  let wallAskedAt = -1;
+  const WALL_ASK_MS = 450;
   let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
   /** Seconds rolling clean on the ground before the pot banks (revert window). */
   let settleT = 0;
@@ -213,6 +222,96 @@ export const SkateRunMode: ModeDefinition = (() => {
     for (const l of world.grindLines) best = Math.min(best, nearestOnSegment(l.a, l.b, rig.char.root.position).d);
     return best;
   };
+  // ── WALL RIDES, WALLPLANTS, LIP TRICKS ────────────────────────────────────────────────────────────────────────────
+  function tryWallRide(ctx: ModeContext): boolean {
+    const pos = rig.char.root.position, v = rig.rider.vel;
+    const w = canWallRide({ x: pos.x, y: pos.y, z: pos.z }, { x: v.x, y: v.y, z: v.z }, walls, !rig.rider.grounded && air.state.airborne && !rig.rider.grinding);
+    if (!w) return false;
+    wallRide = startWallRide(w, { x: pos.x, y: pos.y, z: pos.z }, { x: v.x, y: v.y, z: v.z });
+    trickLayer?.clear();
+    combo.add('WALL RIDE', WALL_RIDE.pts, 'grind');
+    bannerFlash(ctx, 'WALL RIDE', 700);
+    SoundKit.play('powerUp', { volume: 0.4, pitch: 1.15 }); ctx.feel?.impact?.(0.25);
+    console.info(`[SKATE-WALL] ride ${w.label} at y ${pos.y.toFixed(2)} speed ${wallRide.speed.toFixed(1)}`);
+    return true;
+  }
+  function wallplant(ctx: ModeContext): void {
+    if (!wallRide) return;
+    const v = wallplantVel(wallRide);
+    endWallRide();
+    move.yaw = v.yaw; airEntryYaw = v.yaw;
+    move.vel.set(v.x, 0, v.z); rig.rider.vel.set(v.x, v.y, v.z);
+    rig.rider.grounded = false;
+    combo.add('WALLPLANT', WALL_RIDE.plantPts, 'air');
+    bannerFlash(ctx, 'WALLPLANT', 700);
+    SoundKit.play('impact', { pitch: 1.3, volume: 0.45 }); ctx.feel?.impact?.(0.35); spectacle(ctx, 'wallplant');
+    console.info('[SKATE-WALL] wallplant');
+  }
+  function endWallRide(): void {
+    if (!wallRide) return;
+    const ridden = wallRide.t;
+    if (ridden > 0.2) combo.accrue('WALL RIDE', Math.round(WALL_RIDE.ptsPerSec * ridden), 'grind');
+    wallRide = null;
+    if (trickLayer) trickLayer.overridePose = null;
+    rig.char.root.rotation.z = 0;
+  }
+  function tryLipStall(ctx: ModeContext): boolean {
+    const pos = rig.char.root.position, v = rig.rider.vel;
+    const hit = canLipStall({ x: pos.x, y: pos.y, z: pos.z }, { x: v.x, z: v.z }, lips);
+    if (!hit) return false;
+    lipStall = startLipStall(hit, heldTrickDir(stickX, stickY));
+    trickLayer?.clear();
+    if (trickLayer) trickLayer.overridePose = { boardPitch: lipStall.trick.boardPitch, boardRoll: lipStall.trick.boardRoll };
+    bannerFlash(ctx, lipStall.trick.label, 700);
+    SoundKit.play('impact', { pitch: 1.1, volume: 0.3 }); ctx.feel?.impact?.(0.2);
+    console.info(`[SKATE-LIP] ${lipStall.trick.id} on ${hit.lip.label}`);
+    return true;
+  }
+  function dropIn(ctx: ModeContext): void {
+    if (!lipStall) return;
+    const st = lipStall; lipStall = null;
+    if (trickLayer) trickLayer.overridePose = null;
+    const pts = lipStallPts(st);
+    combo.add(st.trick.label, pts, 'grind');
+    const v = dropInVel(st);
+    move.yaw = v.yaw; move.vel.set(v.x, 0, v.z); rig.rider.vel.set(v.x, v.y, v.z);
+    if (st.trick.fakie) move.switchStance();
+    rig.char.root.rotation.y = move.yaw + (move.stance === 'switch' ? Math.PI : 0);
+    bannerFlash(ctx, `${st.trick.label} +${pts}`, 700);
+    SoundKit.play('whoosh', { pitch: 0.95, volume: 0.35 });
+    console.info(`[SKATE-LIP] drop in after ${st.t.toFixed(2)} s +${pts}`);
+  }
+  function tickWalls(ctx: ModeContext, dt: number): void {
+    // the remembered ask: the wall (or the lip) catches the frame it comes into reach while the button is held or was just pressed
+    if (!wallRide && !lipStall && !grindCh && !manualCh && (xHeld || performance.now() - wallAskedAt < WALL_ASK_MS)) {
+      if (tryWallRide(ctx) || tryLipStall(ctx)) wallAskedAt = -1;
+    }
+    if (wallRide && rig.rider.grinding) endWallRide();   // a rail that caught anyway owns the body
+    if (wallRide) {
+      const p = stepWallRide(wallRide, dt);
+      const side = wallSide(wallRide);
+      rig.char.root.position.set(p.x, p.y, p.z);
+      rig.char.root.rotation.y = p.yaw; rig.char.root.rotation.z = -side * 0.3;
+      move.yaw = p.yaw; move.vel.set(Math.sin(p.yaw) * wallRide.speed, 0, Math.cos(p.yaw) * wallRide.speed);
+      rig.rider.vel.set(move.vel.x, wallRide.vy, move.vel.z); rig.rider.grounded = false;
+      if (trickLayer) trickLayer.overridePose = { boardRoll: side * WALL_RIDE.boardRoll };
+      if (p.done) {
+        const v = wallRideExitVel(wallRide);
+        endWallRide();
+        move.vel.set(v.x, 0, v.z); rig.rider.vel.set(v.x, v.y, v.z);
+        console.info('[SKATE-WALL] off the wall');
+      }
+      return;
+    }
+    if (lipStall) {
+      rig.char.root.position.x = lipStall.x; rig.char.root.position.z = lipStall.z; rig.char.root.position.y = lipStall.lip.y + 0.04;
+      rig.rider.vel.setAll(0); move.vel.setAll(0);
+      const yaw = Math.atan2(lipStall.lip.ux, lipStall.lip.uz);
+      rig.char.root.rotation.y = yaw + (move.stance === 'switch' ? Math.PI : 0); move.yaw = yaw;
+      if (stepLipStall(lipStall, dt, xHeld).done) dropIn(ctx);
+    }
+  }
+
   /** Apply a trick to the air chain and flash it -- shared by flick and buttons. */
   /** ANTI-MASH (2026-09-15): a trick needs a beat to LEAVE THE BOARD. Two flips 60 ms apart is not a line, it is a masher
    *  — and it was the whole of the remaining gap (a random 8-a-second driver out-scored a played line 4:1). A player who
@@ -350,6 +449,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         });
       }
       boardSync = new BoardSync(rig.board, rig.char.root);
+      walls = plazaWalls(world.bound); lips = plazaLips(world.bound); wallRide = null; lipStall = null;   // WALL RIDES + LIP TRICKS
       {
         const lf = boneNode(rig.char.skeleton, 'LeftFoot'), rf = boneNode(rig.char.skeleton, 'RightFoot');
         feet = lf && rf ? [lf, rf] : null;
@@ -384,7 +484,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // the side for the first frames and, on a portrait phone (aspect 0.46),
       // lost the rider until the follow swung round (mobile capture, ~1 run in 2)
       ctx.camDirector.snapTo(rig.char.root.position, aheadOfRider());
-      timeLeft = RUN_SEC; ended = false; fenceHit = false; stickX = 0; stickY = 0; pump = 0; pumpReleased = 0; pumpReleasedAt = -1; pushing = false; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
+      timeLeft = RUN_SEC; ended = false; fenceHit = false; wallRide = null; lipStall = null; xHeld = false; stickX = 0; stickY = 0; pump = 0; pumpReleased = 0; pumpReleasedAt = -1; pushing = false; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
       landingBeatT = 0; bailBeatT = 0; bailLatch = false; lastLanding = 'none';
       slowT = 0; slowCool = 0; slowCount = 0; popBeatT = 0; crouchAt = -1; boardPitch = 0; lastGroundY = 0;
       grindAskedAt = -1; relockUntil = -1; lastGoodPos = null; lastGoodYaw = 0; nanReports = 0;
@@ -407,6 +507,7 @@ export const SkateRunMode: ModeDefinition = (() => {
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
+      if (e.t === 'button' && e.btn === 'X') xHeld = e.pressed;   // the grind button held: a lip stall lasts while it is
       if (e.t === 'button' && e.btn === 'R1') { boostHeld = e.pressed; return; }   // BOOST: the shared held R1
       // MANUAL, DIRECTLY. The flick pair stays (it is the THPS link and it chains beautifully), but it was the ONLY
       // door in, and a pair of opposite flicks inside one window is a test of the input rather than of the trick.
@@ -488,6 +589,11 @@ export const SkateRunMode: ModeDefinition = (() => {
         // forward to push, that was NOSE MANUAL (a ground link), a nose grab held for the whole flight, and the body frozen
         // in board_grab around a deck parked at the root: the eye's "midair melt/detach" and "false NOSE MANUAL" frames.
         let popped = false;
+        // WALL RIDES + LIP TRICKS: the grind button at a lip is a stall, in the air against a wall a ride; POP on the wall is the plant
+        if (e.btn === 'X' && !wallRide && !lipStall && !grindCh && !manualCh && tryLipStall(ctx)) return;
+        if (e.btn === 'X' && !wallRide && !lipStall && !grindCh) { if (tryWallRide(ctx)) return; wallAskedAt = performance.now(); }
+        if (e.btn === 'A' && wallRide) { wallplant(ctx); return; }
+        if (e.btn === 'A' && lipStall) { dropIn(ctx); return; }
         if (e.btn === 'X' && rig.rider.grounded && !grindCh && !manualCh) {
           if (move.push()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });   // the push beat is move.stroking (below)
         }
@@ -730,7 +836,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // only while FALLING onto the rail and only when the run actually points down it (|cos| > 0.34), so crossing a
       // rail sideways still crosses it. The press keeps its longer reach for the player who asks early.
       const asked = performance.now() - grindAskedAt < GRIND_ASK_MS;   // POP held toward a rail: reach further, forgive the line
-      if (!rig.rider.grounded && !rig.rider.grinding && rig.rider.vel.y <= 0.6 && performance.now() >= relockUntil) {
+      if (!rig.rider.grounded && !rig.rider.grinding && !wallRide && !lipStall && rig.rider.vel.y <= 0.6 && performance.now() >= relockUntil) {   // WALL RIDES: no rail while on a wall or a lip
         const reach = asked ? GRIND_REACH : GRIND_MAGNET;
         const caught = pickRail(world.grindLines, rig.char.root.position, move.vel,
           { reach, align: asked ? GRIND_ALIGN * 0.6 : GRIND_ALIGN });
@@ -819,6 +925,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         rig.char.root.rotation.y = move.yaw + airSpin + (move.stance === 'switch' ? Math.PI : 0);
       }
       pushing = move.stroking;
+      tickWalls(ctx, dt);   // WALL RIDES + LIP TRICKS: a wall or a lip owns the body while the moment lasts
       if (rig.rider.grounded) lastGroundY = rig.char.root.position.y;
       // the deck rides its back trucks through a manual — nose up, and it eases in and out so the link reads as a beat
       const wantPitch = manualCh?.active ? (manualCh.kind === 'nosemanual' ? 0.30 : -0.30) : 0;
