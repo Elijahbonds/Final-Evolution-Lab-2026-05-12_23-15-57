@@ -771,3 +771,12 @@ describe('THE POST GAME (2026-09-18): the shimmy fade and the drop step', () => 
     expect(stickAtRim01(0.1, 0.05, toRim)).toBe(0);            // inside the dead zone
   });
 });
+
+describe('THE 2K PRO STICK: the L2 step-back dribble', () => {
+  it('a called step-back (stickBack 1) plans the step-back gather with nobody on me; a pulled stick still needs a contest', () => {
+    const rim = new Vector3(0, 0, 0), me = new Vector3(0, 0, 4);
+    expect(planGather(new Vector3(0, 0, -1.5), me, rim, 0, 1).kind).toBe('stepback');
+    expect(planGather(new Vector3(0, 0, -1.5), me, rim, 0, 0.6).kind).not.toBe('stepback');
+    expect(planGather(new Vector3(0, 0, -1.5), me, rim, 0.5, 0.6).kind).toBe('stepback');
+  });
+});

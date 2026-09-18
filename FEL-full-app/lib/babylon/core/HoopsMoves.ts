@@ -72,7 +72,9 @@ export function planGather(vel: Vector3, shooter: Vector3, rim: Vector3, contest
   const toRim = new Vector3(rim.x - shooter.x, 0, rim.z - shooter.z);
   const d = toRim.length();
   if (d > 1e-4) toRim.scaleInPlace(1 / d); else toRim.set(0, 0, -1);
-  if (contest01 >= STEPBACK_CONTEST_MIN && stickBack01 >= STEPBACK_STICK_BACK_MIN) {
+  // THE 2K PRO STICK (2026-09-18): the L2 step-back dribble asks for the step-back by name (stickBack01 forced to 1 inside its
+  // window) — a contest is what the stick-pulled-back read needs, not the called move
+  if ((contest01 >= STEPBACK_CONTEST_MIN || stickBack01 >= 0.99) && stickBack01 >= STEPBACK_STICK_BACK_MIN) {
     return { kind: 'stepback', sec: STEPBACK_SEC + GATHER_STEPBACK_TAIL_SEC, v0, toRim };
   }
   const speed = v0.length();

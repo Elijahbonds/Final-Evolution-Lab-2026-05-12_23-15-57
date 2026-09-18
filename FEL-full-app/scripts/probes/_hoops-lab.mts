@@ -434,7 +434,7 @@ for (let n = 0; n < POSSESSIONS; n++) {
         return 'armed';
       })()`);
       await agent(`a.act({ moveX: 0, moveY: 0.35 }, 3000)`);
-      await agent(`a.act({ moveX: 0, moveY: 0.35, brace: true }, 900)`);   // L2 held over the 3450 ms down flick (in agent mode the slot reads the bridge, not the pad; the act's round trip eats ~100 ms)
+      await agent(`a.act({ moveX: 0, moveY: 0.35, brace: true }, 560)`);   // L2 held over the 3450 ms down flick (560 ms: the shoot lands ~250 ms after the flick, inside STEPBACK_WINDOW_SEC 0.6) (in agent mode the slot reads the bridge, not the pad; the act's round trip eats ~100 ms)
       await agent(`a.do('shoot', { charge: ${CHARGE} })`);   // inside the step-back window: the step-back jumper
     }
     else if (play === 'pausin') {
