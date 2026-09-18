@@ -110,6 +110,16 @@ export default function FootballBabylon({ onEnd }: GameProps) {
         <span className={`rounded px-2 py-0.5 ${hud.truckReady === false ? 'bg-white/10 text-white/30' : 'bg-[#00E5FF]/15 text-[#00E5FF]'}`}>
           TRUCK {hud.truckReady === false ? '…' : 'READY'}
         </span>
+        {/* KICKOFF RETURN (owner brief 2026-09-18): the lane you are in, and the SLINGSHOT gauge drafting behind a blocker fills */}
+        {typeof hud.lane === 'string' && hud.lane && <span className="rounded bg-[#ffd75e]/20 px-2 py-0.5 text-[#ffd75e]">{hud.lane}</span>}
+        {typeof hud.slingshot === 'number' && (
+          <div className="mt-0.5 flex flex-col gap-0.5">
+            <span className={`text-[9px] ${Number(hud.slingshot) >= 100 ? 'text-[#9ad7ff]' : 'text-white/50'}`}>{Number(hud.slingshot) >= 100 ? 'SLINGSHOT READY — L1' : 'DRAFT → SLINGSHOT (L1)'}</span>
+            <div className="relative h-2.5 w-32 overflow-hidden rounded-sm border border-white/25 bg-black/50">
+              <div className={`absolute inset-y-0 left-0 ${Number(hud.slingshot) >= 100 ? 'bg-[#9ad7ff]' : 'bg-[#9ad7ff]/60'}`} style={{ width: `${Math.max(0, Math.min(100, Number(hud.slingshot)))}%` }} />
+            </div>
+          </div>
+        )}
         {/* FOOTBALL UPGRADE: the BREAKAWAY meter — a line per evade toward it, then its own clock draining */}
         {typeof hud.breakawayFill === 'number' && (
           <div className="mt-0.5 flex flex-col gap-0.5">
