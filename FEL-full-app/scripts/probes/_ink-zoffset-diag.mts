@@ -1,0 +1,12 @@
+import { chromium } from 'playwright-core';
+const URL_ = process.env.URL ?? 'http://localhost:3000/dev/mode/karate_vs', OUT = process.env.OUT_DIR ?? 'docs/shots';
+const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'] });
+const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+await p.goto(URL_, { waitUntil: 'domcontentloaded' }); await p.waitForSelector('canvas', { timeout: 60000 }); await p.waitForTimeout(8000);
+await p.getByText(/^START$/).first().click({ force: true }).catch(() => {}); await p.waitForTimeout(1500);
+console.log(await p.evaluate(`(() => { const s = window.__FEL_DEV__.scene; const o = s.getOutlineRenderer(); const body = s.meshes.find((m) => /^Body/.test(m.name)); return JSON.stringify({ zOffset: o.zOffset, zOffsetUnits: o.zOffsetUnits, bodyOutline: body.renderOutline, width: body.outlineWidth, garmentOutline: s.meshes.filter((m) => /^Kit_/.test(m.name)).map((m) => m.renderOutline).slice(0, 3) }); })()`));
+await p.evaluate(`(() => { const s = window.__FEL_DEV__.scene; const o = s.getOutlineRenderer(); o.zOffset = 8; o.zOffsetUnits = 8; })()`);
+await p.waitForTimeout(400); await p.screenshot({ path: `${OUT}/ink-zoffset.png` });
+await p.evaluate(`(() => { const s = window.__FEL_DEV__.scene; const o = s.getOutlineRenderer(); o.zOffset = 1; o.zOffsetUnits = 0; for (const m of s.meshes) if (/^Body/.test(m.name)) m.renderOutline = false; })()`);
+await p.waitForTimeout(400); await p.screenshot({ path: `${OUT}/ink-bodyoff.png` });
+await b.close();
