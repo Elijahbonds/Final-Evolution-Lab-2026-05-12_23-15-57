@@ -21,6 +21,8 @@ import { hnode } from './hud-format';
 
 type Hud = Record<string, HudValue>;
 
+const KART_ITEM_COLOR: Record<string, string> = { missile: '#ff4b4b', boost: '#3aa0ff', shield: '#ffd75e', mine: '#4fdc6a' };
+
 export default function VelocityKartBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
@@ -82,9 +84,14 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
             <div className="mt-0.5 text-sm text-[#22d3ee]">DRIFT {hnode(hud.drift, 0)}%</div>
           )}
         </div>
-        <span className="fel-panel px-4 py-1.5 fel-stat text-2xl text-white">{Number(hud.time ?? 0).toFixed(1)}s</span>
+        <div className="flex flex-col items-center gap-1">
+          <span className="fel-panel px-4 py-1.5 fel-stat text-2xl text-white">{Number(hud.time ?? 0).toFixed(1)}s</span>
+          {hud.pos ? <span className="fel-panel px-3 py-0.5 text-xs font-bold text-[var(--fel-gold)]">{String(hud.pos)}</span> : null}
+        </div>
         <div className="fel-panel px-3 py-1.5 text-right">
           <div className="text-[10px] tracking-wider text-white/60">LAP {hnode(hud.lap, '—')}</div>
+          {/* ITEMS (2026-09-18): what the last balloon gave you; A fires it */}
+          <div className="mt-1 text-sm font-bold" style={{ color: KART_ITEM_COLOR[String(hud.itemKind ?? '')] ?? 'rgba(255,255,255,0.35)' }}>{hud.item ? String(hud.item) : 'NO ITEM'}</div>
         </div>
       </div>
 

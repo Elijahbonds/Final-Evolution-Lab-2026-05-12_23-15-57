@@ -40,6 +40,9 @@ import {
 import { buildCourseVenue, buildWorldGround, worldHeightFn } from '../racing/venueForCourse';
 import { kartCircuitById, type KartCircuit, type KartRamp } from '../racing/kartCircuits';
 import { locate } from '../racing/racingLine';
+import { steerLane, resolveContact, nearMisses, personalityFor, CONTACT } from '../racing/RaceContact';   // RACE CONTACT (2026-09-18): rivals with intent, bumps and punts
+import { collectBalloon, balloonsHit, stepBalloons, useItem, stepMissiles, stepMines, ITEM_KINDS, ITEM_LABEL, type Balloon, type HeldItem, type Missile, type Mine, type ItemKind, type Target } from '../racing/AeroItems';   // the kart's items are the flyers' items on the road
+import { AeroPickups } from '../racing/aeroPickups';
 import {
   buildKerbs, buildObstacles, obstacleContact, placeObstacles, stillTouching,
   type PlacedObstacle, buildChevrons, buildGantry, kartSceneryFor, buildForest, buildEdgeLights } from '../racing/kartDressing';
@@ -93,6 +96,22 @@ let roadTex: DynamicTexture | null = null;
 let line: RaceLine | null = null;
 let rivals: Rival[] = [];
 let rivalKarts: TransformNode[] = [];
+// RACE CONTACT + ITEMS (2026-09-18). A rival's home lane (its personality steers off it), its spin, the per-pair bump
+// cooldown, the near-miss latch, and its item kit — the same kit the Aero Aces field carries.
+let rivalHome: number[] = [];
+let rivalStun: number[] = [];
+let rivalCool: number[] = [];
+let rivalAlongside: boolean[] = [];
+interface RivalKit { item: HeldItem | null; itemAt: number; shieldT: number; zipT: number; nextRow: number; lap: number }
+let rivalKits: RivalKit[] = [];
+let balloons: Balloon[] = [];
+let missiles: Missile[] = [];
+let mines: Mine[] = [];
+let rowDists: number[] = [];
+let pickups: AeroPickups | null = null;
+const PLAYER_ID = 0;
+/** The kart's items sit lower and smaller than the flyers': a balloon is 1.4 m across, not 3.4. */
+const KART_PICKUP_SCALE = 0.42;
 /** The player's own distance along the racing line — what the standings are computed against. */
 let playerDist = 0;
 let tier = profileFor(DEFAULT_TIER);
@@ -123,6 +142,9 @@ const S = {
   touching: null as PlacedObstacle | null,
   /** THE FINISH CLOCK (MECHANICS PASS): seconds left to the line once the field's leader is home; null = not running. */
   graceLeft: null as number | null,
+  // ITEMS + CONTACT (2026-09-18)
+  held: null as HeldItem | null, shieldT: 0, zipT: 0, spinT: 0,
+  events: { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0 },
 };
 let boost = new BoostKit();
 let boostFx: BoostFx | null = null;
@@ -506,6 +528,147 @@ function tintMarks(): void {
   });
 }
 
+/** The nearest racer AHEAD of `dist` within range, for a homing shell. */
+function targetAhead(owner: number, dist: number): number | null {
+  let best: number | null = null, bestGap = Infinity;
+  const consider = (id: number, d: number) => { const gap = d - dist; if (id !== owner && gap > 2 && gap < 160 && gap < bestGap) { best = id; bestGap = gap; } };
+  consider(PLAYER_ID, playerDist);
+  rivals.forEach((r, i) => consider(i + 1, r.dist));
+  return best;
+}
+function racerPos(id: number): Vector3 | null {
+  if (id === PLAYER_ID) return state ? state.pos.add(new Vector3(0, 0.6, 0)) : null;
+  const k = rivalKarts[id - 1];
+  return k ? k.position.add(new Vector3(0, 0.4, 0)) : null;
+}
+function fireItem(ctx: ModeContext): void {
+  if (!state || S.done) return;
+  if (!S.held) { refuse(ctx, 'NO ITEM — DRIVE THROUGH A BALLOON'); return; }
+  if (S.spinT > 0) { refuse(ctx, 'SPINNING'); return; }
+  const fwd = new Vector3(Math.sin(state.heading), 0, Math.cos(state.heading));
+  const out = useItem(S.held, PLAYER_ID, state.pos.add(new Vector3(0, 0.6, 0)), fwd, fwd.scale(-1), targetAhead(PLAYER_ID, playerDist));
+  missiles.push(...out.missiles); mines.push(...out.mines);
+  if (out.boostSec) { S.zipT = Math.max(S.zipT, out.boostSec); SoundKit.play('whoosh', { pitch: 1.2, volume: 0.6 }); ctx.feel.impact(0.3); say('ZIP!', 0.6); }
+  if (out.shieldSec) { S.shieldT = out.shieldSec; SoundKit.play('powerUp', { pitch: 1.1, volume: 0.5 }); say('SHIELD UP', 0.7); }
+  if (out.missiles.length) { SoundKit.play('whoosh', { pitch: 0.8, volume: 0.6 }); say(out.missiles.length > 1 ? 'TRIPLE SHELL' : out.missiles[0].homing ? 'HOMING SHELL' : 'SHELL', 0.6); }
+  if (out.mines.length) { SoundKit.play('uiTick', { pitch: 0.7, volume: 0.5 }); say(out.mines.length > 1 ? 'MINES DROPPED' : 'MINE DROPPED', 0.6); }
+  S.events.fired++; console.info(`[RACE] fired ${S.held.kind} L${S.held.level}`);
+  S.held = null;
+}
+function hitPlayer(ctx: ModeContext, what: string): void {
+  if (!state) return;
+  S.spinT = CONTACT.puntSpinSec; state.speed *= 0.4; state.slip = Math.min(MAX_SLIP, state.slip + 0.5);
+  S.events.hits++;
+  SoundKit.play('impact', { pitch: 0.8, volume: 0.6 }); ctx.juice.shake(0.35, 380); ctx.feel.impact(0.6);
+  EffectsKit.burst(ctx.scene, state.pos.clone(), 'sparks', 2);
+  ctx.momentum.report({ kind: 'blunder', weight: -12 });
+  say(`HIT BY A ${what}`, 1.1); console.info(`[RACE] hit by ${what}`);
+}
+function hitRival(ctx: ModeContext, i: number, what: string, byPlayer: boolean): void {
+  const k = rivalKits[i]; if (!k) return;
+  rivalStun[i] = CONTACT.puntSpinSec; rivals[i].speed *= CONTACT.puntedKeep;
+  const pos = rivalKarts[i]?.position;
+  if (pos) EffectsKit.burst(ctx.scene, pos.clone(), 'sparks', 2);
+  if (byPlayer) {
+    SoundKit.play('crowdCheer', { volume: 0.4 }); ctx.feel.impact(0.35);
+    ctx.momentum.report({ kind: 'big_make', weight: 10 }); boost.earn('trickSmall');
+    say(`${what} — ${rivals[i].name}`, 1);
+  }
+  console.info(`[RACE] ${rivals[i].name} ${what.toLowerCase()}${byPlayer ? ' by you' : ''}`);
+}
+/** One frame of the field: intent, pace, stun, items, placement, then contact with the player. */
+function tickField(ctx: ModeContext, dt: number): void {
+  if (!state || !line || !kart) return;
+  const lapLen = line.lapLength;
+  const pAt = circuit ? locate(circuit.line, state.pos.x, state.pos.z) : null;
+  const pLat = pAt ? pAt.lateral : 0;
+  const halfW = circuit ? circuit.halfWidth : TRACK_HALF_WIDTH;
+  const player = { dist: playerDist, lateral: pLat, speed: state.speed };
+  const others = rivals.map((r) => ({ dist: r.dist, lateral: r.lane, speed: r.speed }));
+  for (const [i, r] of rivals.entries()) {
+    const k = rivalKits[i];
+    const before = r.dist;
+    k.shieldT = Math.max(0, k.shieldT - dt); k.zipT = Math.max(0, k.zipT - dt);
+    // INTENT: the lane the personality wants (a blocker crosses in front of you, a bumper leans on you, a clean one steps round a slower car)
+    if (rivalStun[i] <= 0) r.lane = steerLane({ lane: r.lane, dist: r.dist, speed: r.speed, personality: personalityFor(i), home: rivalHome[i] }, player, others.filter((_, j) => j !== i), halfW, lapLen, dt);
+    stepRival(r, line, dt, playerDist, { topSpeed: kartSpec.vMax * (k.zipT > 0 ? 1.3 : 1) }, race.time);
+    if (rivalStun[i] > 0) { rivalStun[i] = Math.max(0, rivalStun[i] - dt); r.dist = before + (r.dist - before) * 0.25; r.speed *= 0.97; }
+    // a rival crossing an item row picks up an item, and uses it when it makes sense
+    const inLap = ((r.dist % lapLen) + lapLen) % lapLen;
+    const lap = Math.floor(r.dist / lapLen);
+    if (lap !== k.lap) { k.lap = lap; k.nextRow = 0; }
+    if (k.nextRow < rowDists.length && inLap >= rowDists[k.nextRow]) {
+      k.nextRow++;
+      if (!k.item && Math.random() < 0.6) { k.item = { kind: ITEM_KINDS[Math.floor(Math.random() * ITEM_KINDS.length)] as ItemKind, level: Math.random() < 0.3 ? 2 : 1 }; k.itemAt = race.time; }
+    }
+    const rk = rivalKarts[i];
+    if (k.item && rk && race.time - k.itemAt > 1.2 && rivalStun[i] <= 0) {
+      const gapToPlayer = playerDist - r.dist;
+      const heading = rk.rotation.y;
+      const aim = new Vector3(Math.sin(heading), 0, Math.cos(heading));
+      let use = false;
+      if (k.item.kind === 'missile') use = gapToPlayer > 8 && gapToPlayer < 120 && Math.random() < dt * 0.6 * tier.edge * 2;
+      else if (k.item.kind === 'mine') use = gapToPlayer < -6 && gapToPlayer > -80 && Math.random() < dt * 0.5;
+      else use = Math.random() < dt * 0.35;
+      if (use) {
+        const out = useItem(k.item, i + 1, rk.position.add(new Vector3(0, 0.6, 0)), aim, aim.scale(-1), targetAhead(i + 1, r.dist));
+        missiles.push(...out.missiles); mines.push(...out.mines);
+        if (out.boostSec) k.zipT = out.boostSec;
+        if (out.shieldSec) k.shieldT = out.shieldSec;
+        if (out.missiles.length && gapToPlayer > 0 && gapToPlayer < 120) say(`${r.name} FIRED — SWERVE`, 0.9);
+        k.item = null;
+      }
+    }
+    const at = rivalPlacement(r, line);
+    if (rk) { rk.position.set(at.pos.x, at.pos.y + KART_RIDE_Y, at.pos.z); rk.rotation.y = at.heading + (rivalStun[i] > 0 ? rivalStun[i] * 11 : 0); pickups?.shield(i + 1, rk, k.shieldT > 0); }
+  }
+  // CONTACT: a side bump shoves both; closing fast (or with the boost lit) punts the car in front
+  const rposes = rivals.map((r) => ({ dist: r.dist, lateral: r.lane, speed: r.speed }));
+  if (!S.air.airborne && race.time > 3 && state.speed > 4) {   // not off the grid: the field launches through the player's spot in the first seconds
+    const right = new Vector3(Math.cos(state.heading), 0, -Math.sin(state.heading));
+    for (const ev of resolveContact({ ...player, boosting: boost.k > 0.35 || S.zipT > 0 }, rposes, lapLen, rivalCool, dt)) {
+      const r = rivals[ev.i];
+      state.pos.addInPlace(right.scale(ev.playerShove)); r.lane += ev.rivalShove;
+      if (ev.kind === 'punt') { state.speed *= ev.playerKeep; hitRival(ctx, ev.i, 'PUNTED', true); S.events.punts++; ctx.juice.scorePop(kart.position.add(new Vector3(0, 1.6, 0)), 'PUNT!', '#fbbf24'); }
+      else if (ev.kind === 'punted') { r.speed *= ev.rivalKeep; if (S.shieldT > 0) { say('SHIELD HELD', 0.5); } else { hitPlayer(ctx, `${r.name} PUNT`); S.events.punted++; } }
+      else { state.speed *= ev.playerKeep; r.speed *= ev.rivalKeep; S.events.bumps++; SoundKit.play('thud', { pitch: 1.1, volume: 0.45 }); ctx.juice.shake(0.08, 110); ctx.feel.impact(0.2); EffectsKit.burst(ctx.scene, state.pos.add(right.scale(-ev.playerShove)), 'sparks'); say(`BUMPED ${r.name}`, 0.5); console.info(`[RACE] bump ${r.name}`); }
+    }
+    for (const i of nearMisses(player, rposes, lapLen, rivalAlongside)) { S.events.nearMisses++; boost.earn('nearMiss'); ctx.juice.callout('CLOSE PASS', '#86efac', 420); SoundKit.play('swish', { pitch: 1.4, volume: 0.35 }); console.info(`[RACE] near miss ${rivals[i].name}`); }
+  }
+  // ITEMS: balloons taken, shells and mines on the road
+  stepBalloons(balloons, dt);
+  for (const b of balloonsHit(balloons, prevPos, state.pos, 2.4)) {
+    b.respawn = 3;
+    const before = S.held;
+    S.held = collectBalloon(S.held, b.kind); S.events.picked++;
+    SoundKit.play('powerUp', { pitch: 1 + S.held.level * 0.12, volume: 0.55 });
+    EffectsKit.burst(ctx.scene, b.pos.clone(), 'confetti'); ctx.feel.impact(0.15);
+    say(before && before.kind === b.kind ? `${ITEM_LABEL[b.kind] === 'MISSILE' ? 'SHELL' : ITEM_LABEL[b.kind]} LEVEL ${S.held.level}` : (ITEM_LABEL[b.kind] === 'MISSILE' ? 'SHELL' : ITEM_LABEL[b.kind]), 0.8);
+    console.info(`[RACE] picked ${b.kind}`);
+  }
+  const targets: Target[] = [
+    { id: PLAYER_ID, pos: state.pos.add(new Vector3(0, 0.6, 0)), protected: S.shieldT > 0 },
+    ...rivals.map((_, i) => ({ id: i + 1, pos: rivalKarts[i]?.position.add(new Vector3(0, 0.4, 0)) ?? new Vector3(0, -999, 0), protected: rivalKits[i].shieldT > 0 })),
+  ];
+  // whose projectile is about to land: the items core reports hits by target only, so read the owners before the step
+  const nearOwner = (id: number): boolean => { const p = targets[id]?.pos; return !!p && [...missiles, ...mines].some((m) => m.owner === PLAYER_ID && Vector3.Distance(m.pos, p) < 9); };
+  const byPlayer = new Map<number, boolean>(); for (const t of targets) byPlayer.set(t.id, nearOwner(t.id));
+  const mres = stepMissiles(missiles, targets, dt);
+  // a shell runs on the road, not into the sky: pin it to the surface after the step
+  for (const m of missiles) { m.dir.y = 0; if (circuit) m.pos.y = circuit.surfaceAt(m.pos.x, m.pos.z) + 0.6; }
+  const nres = stepMines(mines, targets, dt);
+  for (const id of [...mres.hit, ...nres.hit]) {
+    if (id === PLAYER_ID) hitPlayer(ctx, mres.hit.includes(id) ? 'SHELL' : 'MINE');
+    else hitRival(ctx, id - 1, mres.hit.includes(id) ? 'SHELLED' : 'MINED', byPlayer.get(id) ?? false);
+  }
+  for (const id of [...mres.absorbed, ...nres.absorbed]) {
+    const p = racerPos(id); if (p) EffectsKit.burst(ctx.scene, p.clone(), 'glitch');
+    if (id === PLAYER_ID) { SoundKit.play('clang', { volume: 0.5 }); say('SHIELD BLOCKED IT', 0.8); }
+  }
+  for (const m of mres.spent) if (m.life <= 0) EffectsKit.burst(ctx.scene, m.pos.clone(), 'sparks');
+  pickups?.update(dt, balloons, [], missiles, mines);
+  pickups?.shield(PLAYER_ID, kart, S.shieldT > 0);
+}
 function pushHud(ctx: ModeContext): void {
   if (!state) return;
   const { dist } = toNextGate(race, course, state.pos);
@@ -517,8 +680,10 @@ function pushHud(ctx: ModeContext): void {
     toGate: Math.round(dist),
     drift: state.drifting ? Math.round(driftQuality(state) * 100) : 0,
     pos: rivals.length ? `${ordinal(playerPosition(playerDist, rivals))} / ${rivals.length + 1}` : '',
+    item: S.held ? `${S.held.kind === 'missile' ? 'SHELL' : ITEM_LABEL[S.held.kind]}${S.held.level > 1 ? ` L${S.held.level}` : ''}` : '',
+    itemKind: S.held?.kind ?? '',
     banner: S.banner,
-    hint: 'RT throttle · X drift to fill BOOST · hold RB / Shift to burn it',
+    hint: 'RT throttle · X drift to fill BOOST · hold RB / Shift to burn it · A fires your item',
   } satisfies Record<string, HudValue>);
 }
 
@@ -553,6 +718,8 @@ return {
     S.done = false; S.banner = ''; S.bannerT = 0; S.bestDrift = 0; S.offRoadSec = 0; S.graceLeft = null;
     S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false, boostK: 0 };
     S.boostHeld = false; boost = new BoostKit();
+    S.held = null; S.shieldT = 0; S.zipT = 0; S.spinT = 0; S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0 };
+    missiles = []; mines = []; for (const b of balloons) b.respawn = 0;
     lastPlace = 0; driftCallT = 0; offRoadTick = 0; offRoadSaid = false;   // a remount must not inherit last race's place (it would read as an overtake on frame one)
 
     // THE MAP AND THE KART ARE BOTH PICKS (2026-09-13). Read once, here, at mount — the world is built from
@@ -643,6 +810,29 @@ return {
     rivals = makeField(shape.count, kartSpec.vMax, tier.edge);
     rivalKarts = rivals.map((r) => buildRivalKart(ctx, r.name, r.tint));
     playerDist = 0;
+    rivalHome = rivals.map((r) => r.lane); rivalStun = rivals.map(() => 0); rivalCool = rivals.map(() => 0); rivalAlongside = rivals.map(() => false);
+    rivalKits = rivals.map(() => ({ item: null, itemAt: 0, shieldT: 0, zipT: 0, nextRow: 0, lap: 0 }));
+    // ITEM ROWS: three balloons across the road on every leg, 62% of the way along it (the boost pads sit at 40% of every
+    // other leg), the kinds cycling so a row always offers a choice
+    pickups?.dispose(); pickups = new AeroPickups(ctx.scene, KART_PICKUP_SCALE);
+    balloons = [];
+    if (circuit) {
+      const pts = [course.start.at, ...course.gates.map((gt) => gt.at)];
+      let id = 0;
+      for (let i = 1; i <= pts.length; i++) {
+        const a = pts[i - 1], b = pts[i % pts.length];
+        const mid = a.add(b.subtract(a).scale(0.62));
+        const at = locate(circuit.line, mid.x, mid.z);
+        const right = new Vector3(at.tangent.z, 0, -at.tangent.x);
+        for (const [k, lat] of [-3.2, 0, 3.2].entries()) {
+          const kind = ITEM_KINDS[(i + k) % ITEM_KINDS.length];
+          balloons.push({ id: id++, kind, pos: at.point.add(right.scale(lat)).add(new Vector3(0, 1.3, 0)), respawn: 0 });
+        }
+      }
+    }
+    rowDists = [...new Set(balloons.map((b) => circuit ? Math.round(locate(circuit.line, b.pos.x, b.pos.z).dist) : 0))].sort((p, q) => p - q);
+    pickups.setBalloons(balloons); pickups.setBananas([]);
+    missiles = []; mines = [];
 
     // BOOST (FINISH-RELEASE): the trail streams off the kart; a pad sits on the straight into every other gate, 40% of
     // the way from the gate before, pointing along the line — a pad is a racing-line choice, not a scatter.
@@ -673,6 +863,18 @@ return {
     ctx.camDirector.snapTo(state.pos, null);
     tintMarks();
     say(`${course.name} — ${course.sub}`, 2.2);
+    // THE PROBE SEAM (dev): where the kart is on the line, the field around it, what happened.
+    (ctx.scene.metadata ??= {}).kart = {
+      state: () => {
+        const at = state && circuit ? locate(circuit.line, state.pos.x, state.pos.z) : null;
+        return {
+          along: +playerDist.toFixed(1), lateral: at ? +at.lateral.toFixed(2) : 0, speed: state ? +state.speed.toFixed(1) : 0,
+          heading: state ? +state.heading.toFixed(3) : 0, tangentYaw: at ? +Math.atan2(at.tangent.x, at.tangent.z).toFixed(3) : 0, onRoad: state ? onTrack(state.pos, course) : true,
+          place: rivals.length ? playerPosition(playerDist, rivals) : 1, item: S.held, events: { ...S.events },
+          rivals: rivals.map((r, i) => ({ name: r.name, gap: +(r.dist - playerDist).toFixed(1), lateral: +r.lane.toFixed(2), stun: +rivalStun[i].toFixed(2), personality: personalityFor(i) })),
+        };
+      },
+    };
     pushHud(ctx);
   },
 
@@ -689,6 +891,7 @@ return {
     if (e.t === 'button' && e.btn === 'X') { if (e.pressed && !S.input.drift) SoundKit.play('swish', { pitch: 0.7, volume: 0.4 }); S.input.drift = e.pressed; }
     // BOOST is the shared held R1 (RB · Shift · the BOOST pill); A no longer dumps the meter.
     if (e.t === 'button' && e.btn === 'R1') S.boostHeld = e.pressed;
+    if (e.t === 'button' && e.pressed && e.btn === 'A') { fireItem(ctx); return; }   // ITEMS: A fires what the last balloon gave you
     // TRICKS, only in the air. B and Y with a stick direction, the same binding the board modes use, so the
     // BUTTONS map on the start screen reads them without a special case. A press that cannot act is answered:
     // asking for a FULL SPIN off a kicker says so by name rather than quietly handing over something smaller.
@@ -720,6 +923,10 @@ return {
     const bev = boost.update(dt, S.boostHeld, true);
     ctx.stamina?.(boost.meter);   // PLAYER RING: the ring's arc is the boost tank
     S.input.boostK = boost.k;
+    // ITEMS: a boost balloon's ZIP rides the same ramp the meter does; the shield and a spin count down
+    if (S.zipT > 0) { S.zipT = Math.max(0, S.zipT - dt); S.input.boostK = Math.max(S.input.boostK, 1); }
+    S.shieldT = Math.max(0, S.shieldT - dt); S.spinT = Math.max(0, S.spinT - dt);
+    if (S.spinT > 0) { S.input.throttle *= 0.3; }
     stepKart(state, S.input, dt, on, kartSpec);
 
     // ── THE ROAD HAS HEIGHT NOW, so something has to put the kart on it ──────────────────────────────────
@@ -828,17 +1035,10 @@ return {
       else if (lastPlace > 0 && place > lastPlace) ctx.juice.callout(`DOWN TO P${place}`, '#fca5a5', 600);
       lastPlace = place;
     }
-    if (line) {
-      for (const [i, r] of rivals.entries()) {
-        stepRival(r, line, dt, playerDist, { topSpeed: kartSpec.vMax }, race.time);
-        const at = rivalPlacement(r, line);
-        const rk = rivalKarts[i];
-        if (rk) { rk.position.set(at.pos.x, at.pos.y + KART_RIDE_Y, at.pos.z); rk.rotation.y = at.heading; }
-      }
-    }
+    if (line) tickField(ctx, dt);   // RACE CONTACT + ITEMS: the rivals steer, bump, spin, pick up and fire
     // the BODY points where the nose does while the kart travels at the slip angle — that difference is the
     // drift, and showing it is the whole read
-    kart.rotation.y = state.heading;
+    kart.rotation.y = state.heading + (S.spinT > 0 ? S.spinT * 11 : 0);   // a shell or a punt spins the body; the travel carries on
     // the driver leans into the corner — shoulders following the turn, not a board rider's whole-body bank:
     // a seated body is belted in and cannot lean like that (8° at full lock against the boards' 22°)
     if (driver) {
@@ -924,6 +1124,7 @@ return {
     venueRoot?.dispose(); venueRoot = null; worldGround?.dispose(); worldGround = null; trackside?.dispose(); trackside = null;
     roadTex?.dispose(); roadTex = null;
     for (const rk of rivalKarts) rk.dispose();
+    pickups?.dispose(); pickups = null; missiles = []; mines = []; balloons = [];
     rivalKarts = []; rivals = []; line = null;
     ramps.forEach((m) => m.dispose());
     ramps = [];

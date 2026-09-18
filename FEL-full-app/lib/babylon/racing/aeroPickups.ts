@@ -31,7 +31,8 @@ export class AeroPickups {
   private shields = new Map<number, Mesh>();
   private t = 0;
 
-  constructor(private scene: Scene) {
+  /** `scale` shrinks every item (the kart's balloons are 0.42 of the flyers'). */
+  constructor(private scene: Scene, private scale = 1) {
     this.root = new TransformNode('aero_pickups', scene);
     for (const kind of ITEM_KINDS) {
       const m = MeshBuilder.CreateSphere(`balloon_${kind}`, { diameterX: 3.4, diameterY: 4.0, diameterZ: 3.4, segments: 14 }, scene);
@@ -77,7 +78,7 @@ export class AeroPickups {
     for (const n of this.balloonNodes) n.dispose();
     this.balloonNodes = balloons.map((b) => {
       const inst = this.balloonMasters.get(b.kind)!.createInstance(`balloon_${b.id}`);
-      inst.position.copyFrom(b.pos); inst.parent = this.root; inst.isPickable = false;
+      inst.position.copyFrom(b.pos); inst.parent = this.root; inst.isPickable = false; inst.scaling.setAll(this.scale);
       return inst;
     });
   }
@@ -86,7 +87,7 @@ export class AeroPickups {
     for (const n of this.bananaNodes) n.dispose();
     this.bananaNodes = bananas.map((b, i) => {
       const inst = this.bananaMaster.createInstance(`banana_${i}`);
-      inst.position.copyFrom(b.pos); inst.parent = this.root; inst.isPickable = false;
+      inst.position.copyFrom(b.pos); inst.parent = this.root; inst.isPickable = false; inst.scaling.setAll(this.scale);
       return inst;
     });
   }
@@ -109,7 +110,7 @@ export class AeroPickups {
     for (const [m, node] of this.missileNodes) if (!missiles.includes(m)) { node.dispose(); this.missileNodes.delete(m); }
     for (const m of missiles) {
       let node = this.missileNodes.get(m);
-      if (!node) { node = this.missileMaster.createInstance('missile'); node.parent = this.root; this.missileNodes.set(m, node); }
+      if (!node) { node = this.missileMaster.createInstance('missile'); node.parent = this.root; node.scaling.setAll(this.scale); this.missileNodes.set(m, node); }
       node.position.copyFrom(m.pos);
       node.rotation.set(-Math.asin(Math.max(-1, Math.min(1, m.dir.y))), Math.atan2(m.dir.x, m.dir.z), this.t * 12);
     }
@@ -120,7 +121,7 @@ export class AeroPickups {
       node.position.copyFrom(m.pos);
       node.rotation.y = this.t * 1.5;
       const pulse = 1 + Math.sin(this.t * 8) * (m.armT > 0 ? 0 : 0.08);
-      node.scaling.setAll(pulse);
+      node.scaling.setAll(pulse * this.scale);
     }
   }
 
@@ -128,7 +129,7 @@ export class AeroPickups {
   shield(id: number, parent: TransformNode, on: boolean): void {
     let s = this.shields.get(id);
     if (!s && on) {
-      s = MeshBuilder.CreateSphere(`shield_${id}`, { diameterX: 8, diameterY: 5, diameterZ: 9, segments: 16 }, this.scene);
+      s = MeshBuilder.CreateSphere(`shield_${id}`, { diameterX: 8 * this.scale, diameterY: 5 * this.scale, diameterZ: 9 * this.scale, segments: 16 }, this.scene);
       const m = glow(this.scene, `shield_mat_${id}`, '#ffd75e', 0.6, 0.2);
       m.alpha = 0.22; m.backFaceCulling = false;
       s.material = m; s.isPickable = false; s.parent = parent;

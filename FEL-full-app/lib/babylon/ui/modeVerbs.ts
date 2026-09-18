@@ -187,6 +187,7 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   // BOOST is the tap that spends what the drift banked — so two of the three verbs are holds, which is what a
   // racing mode needs and what MODE_VERBS.default could never have given a phone.
   velocitykart: verbs({
+    A: { label: 'FIRE', emit: A('A') },   // ITEMS (2026-09-18): the balloon item
     Y: { label: 'GAS', emit: RT(1), hold: true },
     X: { label: 'DRIFT', emit: A('X'), hold: true },
     B: { label: 'BRAKE', emit: LT(1), hold: true },

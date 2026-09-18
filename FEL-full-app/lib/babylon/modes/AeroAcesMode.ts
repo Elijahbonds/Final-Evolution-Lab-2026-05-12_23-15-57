@@ -62,6 +62,7 @@ import { aeroCircuits, circuitById, locate, type AeroCircuit } from '../racing/a
 import { buildAeroWorld, type AeroWorld } from '../racing/aeroWorlds';
 import { buildToyPlane, Scarf, brighter, type ToyPlane } from '../racing/toyPlane';
 import { AeroPickups } from '../racing/aeroPickups';
+import { steerLane, resolveContact, nearMisses, personalityFor } from '../racing/RaceContact';   // RACE CONTACT (2026-09-18): rivals with intent, wing-to-wing bumps and punts
 
 /** Racers on the grid: the player and seven rivals. */
 const FIELD = 7;
@@ -75,7 +76,7 @@ const RIVAL_PACE = 1.16;
 /** Racer ids in the item system: 0 is the player, rivals are 1..FIELD. */
 const PLAYER_ID = 0;
 
-interface RivalKit { item: HeldItem | null; itemAt: number; shieldT: number; stunT: number; zipT: number; nextRow: number; lastHeading: number; roll: number; lap: number }
+interface RivalKit { item: HeldItem | null; itemAt: number; shieldT: number; stunT: number; zipT: number; nextRow: number; lastHeading: number; roll: number; lap: number; home: number; cool: number; alongside: boolean }
 
 let baseFov: number | null = null;
 
@@ -113,6 +114,7 @@ export function makeAeroAcesMode(): ModeDefinition {
     boostHeld: false,
     banner: '', bannerT: 0,
     done: false,
+    events: { bumps: 0, punts: 0, punted: 0, nearMisses: 0 },   // RACE CONTACT telemetry
     lookX: 0, lookY: 0,
     lastPlace: 0,
     wrongT: 0,
@@ -170,7 +172,8 @@ export function makeAeroAcesMode(): ModeDefinition {
     rivals = makeField(FIELD, tune.top, tier.edge);
     // planes are wide: spread the lanes, and put the grid behind the player in two staggered rows
     rivals.forEach((r, i) => { r.lane *= 3.2; r.dist = -10 - i * 7; });
-    rivalKits = rivals.map(() => ({ item: null, itemAt: 0, shieldT: 0, stunT: 0, zipT: 0, nextRow: 0, lastHeading: 0, roll: 0, lap: 0 }));
+    rivalKits = rivals.map((r) => ({ item: null, itemAt: 0, shieldT: 0, stunT: 0, zipT: 0, nextRow: 0, lastHeading: 0, roll: 0, lap: 0, home: r.lane, cool: 0, alongside: false }));
+    S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0 };
     rivalPlanes = rivals.map((r) => buildToyPlane(scene, r.name, r.tint, brighter(r.tint, 0.55), { toyPilot: true }));
   }
 
@@ -332,6 +335,7 @@ export function makeAeroAcesMode(): ModeDefinition {
             tangent: at ? { x: at.tangent.x, z: at.tangent.z } : null,
             place: playerPosition(playerDist(), rivals), field: rivals.length + 1,
             item: S.held, bananas: S.bananas, hits: S.hits, stunts: S.stunts, stunt: flight?.stunt ?? null,
+            events: { ...S.events }, rivals: rivals.map((r, i) => ({ name: r.name, gap: +(r.dist - playerDist()).toFixed(1), lateral: +r.lane.toFixed(2), stun: +rivalKits[i].stunT.toFixed(2), personality: personalityFor(i) })),
           };
         },
       };
@@ -488,10 +492,13 @@ export function makeAeroAcesMode(): ModeDefinition {
       // ── the field ──
       const pDist = playerDist();
       const lapLen = line.lapLength;
+      const pLat = at.lateral;
       rivals.forEach((r, i) => {
         const k = rivalKits[i];
         const before = r.dist;
         k.shieldT = Math.max(0, k.shieldT - dt); k.zipT = Math.max(0, k.zipT - dt);
+        // INTENT (RACE CONTACT): a blocker crosses in front of you, a bumper leans on your wing, a clean pilot steps round a slower plane
+        if (k.stunT <= 0) r.lane = steerLane({ lane: r.lane, dist: r.dist, speed: r.speed, personality: personalityFor(i), home: k.home }, { dist: pDist, lateral: pLat, speed: flight!.speed }, rivals.filter((_, j) => j !== i).map((o) => ({ dist: o.dist, lateral: o.lane, speed: o.speed })), circuit.corridor, lapLen, dt);
         stepRival(r, line!, dt, pDist, { topSpeed: tune.top * RIVAL_PACE * (k.zipT > 0 ? 1.35 : 1), cornerBite: 0.3 }, race.time);
         if (k.stunT > 0) { k.stunT = Math.max(0, k.stunT - dt); r.dist = before + (r.dist - before) * 0.25; r.speed *= 0.97; }
         // a rival flying a balloon row picks up an item
@@ -537,6 +544,25 @@ export function makeAeroAcesMode(): ModeDefinition {
           pickups?.shield(i + 1, rp.root, k.shieldT > 0);
         }
       });
+
+      // ── CONTACT (RACE CONTACT, 2026-09-18): wing to wing is a bump; closing fast from behind is a punt ──
+      if (flight.spinT <= 0 && race.time > 3) {   // not off the grid
+        const rposes = rivals.map((r, i) => ({ dist: r.dist, lateral: r.lane + Math.sin(race.time * 0.5 + r.phase) * 3, speed: r.speed + (rivalKits[i].stunT > 0 ? -5 : 0) }));
+        const me = { dist: pDist, lateral: pLat, speed: flight.speed, boosting: boost.k > 0.35 || S.zipT > 0 };
+        const right = new Vector3(at.tangent.z, 0, -at.tangent.x);
+        const cools = rivalKits.map((k) => k.cool);
+        for (const ev of resolveContact(me, rposes, lapLen, cools, dt)) {
+          const r = rivals[ev.i];
+          flight.pos.addInPlace(right.scale(ev.playerShove * 2)); r.lane += ev.rivalShove * 2;
+          if (ev.kind === 'punt') { flight.speed *= ev.playerKeep; hitRival(ctx, ev.i, true); S.events.punts++; say(`PUNTED ${r.name}`, 0.9); }
+          else if (ev.kind === 'punted') { r.speed *= ev.rivalKeep; if (S.shieldT > 0) say('SHIELD HELD', 0.5); else { hitPlayer(ctx, `${r.name} PUNT`); S.events.punted++; } }
+          else { flight.speed *= ev.playerKeep; r.speed *= ev.rivalKeep; S.events.bumps++; SoundKit.play('thud', { pitch: 1.1, volume: 0.45 }); ctx.juice.shake(0.08, 110); ctx.feel.impact(0.2); EffectsKit.burst(ctx.scene, flight.pos.clone(), 'sparks'); say(`BUMPED ${r.name}`, 0.5); console.info(`[RACE] bump ${r.name}`); }
+        }
+        rivalKits.forEach((k, i) => { k.cool = cools[i]; });
+        const was = rivalKits.map((k) => k.alongside);
+        for (const i of nearMisses(me, rposes, lapLen, was)) { S.events.nearMisses++; boost.earn('nearMiss'); ctx.juice.callout('CLOSE PASS', '#86efac', 420); SoundKit.play('swish', { pitch: 1.4, volume: 0.35 }); console.info(`[RACE] near miss ${rivals[i].name}`); }
+        rivalKits.forEach((k, i) => { k.alongside = was[i]; });
+      }
 
       // ── missiles and mines ──
       const targets: Target[] = [
