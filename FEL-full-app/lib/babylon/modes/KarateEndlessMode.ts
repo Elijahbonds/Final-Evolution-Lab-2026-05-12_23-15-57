@@ -53,6 +53,7 @@
 // appear anywhere in this file, consistent with this project's standing
 // original-content-only rule (already enforced for NeuroArena/Who Scene It).
 
+import { tintGarmentSlot, SLOT_KEYS } from '../core/playerIdentity';   // EYE SORES: the agents wear a kit, their skin stays skin
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (owner): who you are, and the gauge at your feet
 import { readPlayerIcon } from '../visual/playerIcon';
 import { prqMaxHp, prqSpeedMult } from '../core/PrqVitals';
@@ -443,10 +444,11 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const pos = new Vector3(Math.sin(angle) * 6, 0, Math.cos(angle) * 6);
     const char = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
       position: pos, yawRad: Math.atan2(-pos.x, -pos.z),
-      tint: i % 2 ? '#1a1f26' : '#0d1117',            // dark suit, no franchise color palette
+      role: 'opponent',   // EYE SORES (2026-09-17): the old dark TINT blackened the SKIN — black bodies whose brown heads and leopard tops floated over the mat; the suit is the KIT now (tintGarmentSlot below)
       scale: 0.95 + ((wave * 7 + i * 13) % 12) / 100,
       startClip: STANCE,
     });
+    tintGarmentSlot(char, SLOT_KEYS.jersey, i % 2 ? '#2b3550' : '#1f2735'); if ((SLOT_KEYS as Record<string, readonly string[]>).shorts) tintGarmentSlot(char, (SLOT_KEYS as Record<string, readonly string[]>).shorts, '#161b24');   // the agents' dark suit: navy / charcoal kit
     neverBindPose(char.animator, STANCE);
     installSafePlay(char.animator, 'agent');
     ctx.groundLock?.track(char.root, char.skeleton);

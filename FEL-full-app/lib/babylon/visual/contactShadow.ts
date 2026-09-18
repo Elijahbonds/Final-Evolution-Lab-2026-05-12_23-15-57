@@ -10,14 +10,15 @@ export type ContactShadowOpts = { diameter?: number; strength?: number };
 
 /** Attach a contact disc to a body root; it disposes with the root. Returns the disc. */
 export function attachContactShadow(scene: Scene, root: TransformNode, opts: ContactShadowOpts = {}): Mesh {
-  const d = opts.diameter ?? 1.2, strength = opts.strength ?? 0.6;
+  // EYE SORES (2026-09-17): at 1.2 m / 0.6 the discs under a crowd of fighters merged into one huge dark smudge — a tighter, lighter, softer disc
+  const d = opts.diameter ?? 0.9, strength = opts.strength ?? 0.38;
   const r = d / 2;
   const disc = MeshBuilder.CreateDisc(`${root.name}_contact`, { radius: r, tessellation: 24, sideOrientation: Mesh.DOUBLESIDE }, scene);
   const pos = disc.getVerticesData(VertexBuffer.PositionKind)!;
   const colors = new Float32Array((pos.length / 3) * 4);
   for (let i = 0; i < pos.length / 3; i++) {
     const dist = Math.hypot(pos[i * 3], pos[i * 3 + 1]) / r;          // the disc lies in XY before the tilt
-    const a = Math.max(0, 1 - dist) ** 0.8;                             // 1 at the centre, 0 at the rim, soft in between
+    const a = Math.max(0, 1 - dist) ** 1.5;                             // 1 at the centre, 0 at the rim, most of the disc already faint
     colors[i * 4] = 0; colors[i * 4 + 1] = 0; colors[i * 4 + 2] = 0; colors[i * 4 + 3] = a;
   }
   disc.setVerticesData(VertexBuffer.ColorKind, colors, false, 4);
@@ -38,7 +39,7 @@ export function attachContactShadow(scene: Scene, root: TransformNode, opts: Con
     disc.position.set(p.x, floorY + 0.02, p.z);
     disc.scaling.setAll(1 + h * 0.35);
     mat.alpha = strength * k * k;
-    disc.isVisible = k > 0.02 && root.isEnabled();
+    disc.isVisible = k > 0.02 && root.isEnabled() && root.scaling.x > 0.25;   // a body still materialising (scaled to nothing) casts nothing — a lone disc read as an eye sore
   });
   root.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(obs); mat.dispose(); disc.dispose(); });
   return disc;

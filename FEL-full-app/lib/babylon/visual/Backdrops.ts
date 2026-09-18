@@ -368,7 +368,11 @@ export function mountBackdrop(scene: Scene, family: BackdropFamily, mood?: Venue
   const baked = BAKED[family];
   let usedBake = false;
   const wash = mood ? MOODS[mood].skyWash : 0;
-  if (baked && wash > 0) {
+  // EYE SORES (owner, 2026-09-17: "the brown things are still there in karate endless"): the dojo bake's top third is a
+  // cherry-blossom canopy and torii beams — at the fight camera's pitch it fills the top of the frame as brown marbling.
+  // The dojo family always goes through the painted path, with a warm sky drawn over the canopy band (rows 0..38 %).
+  const canopySky = family === 'dojo';
+  if (baked && (wash > 0 || canopySky)) {
     // THE MOOD TAKES THE SKY BACK. Tinting the material is not available here: the emissive texture is ADDED to
     // emissiveColor (see below), which can only brighten, and moving it to the diffuse channel renders BLACK
     // because lighting is disabled on this dome — both measured, in that order, on 2026-09-12. So the wash is
@@ -377,7 +381,11 @@ export function mountBackdrop(scene: Scene, family: BackdropFamily, mood?: Venue
     const tinted = new DynamicTexture(`bk_dome_${mood}`, { width: 1024, height: 512 }, scene, false);
     const g = tinted.getContext() as unknown as CanvasRenderingContext2D;
     const paintWash = (): void => {
-      g.globalAlpha = wash; g.fillStyle = MOODS[mood!].sky; g.fillRect(0, 0, 1024, 512); g.globalAlpha = 1;
+      if (canopySky) {   // a sky gradient over the canopy: solid at the top, gone by 38 % — the shrine and the torii keep the horizon
+        const grad = g.createLinearGradient(0, 0, 0, 512 * 0.38); grad.addColorStop(0, 'rgba(214,226,238,1)'); grad.addColorStop(0.55, 'rgba(226,214,208,0.92)'); grad.addColorStop(1, 'rgba(236,206,196,0)');
+        g.fillStyle = grad; g.fillRect(0, 0, 1024, Math.round(512 * 0.38));
+      }
+      if (wash > 0 && mood) { g.globalAlpha = wash; g.fillStyle = MOODS[mood].sky; g.fillRect(0, 0, 1024, 512); g.globalAlpha = 1; }
       tinted.update();
     };
     const img = typeof Image !== 'undefined' ? new Image() : null;

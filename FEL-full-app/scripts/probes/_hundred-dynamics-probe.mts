@@ -81,6 +81,15 @@ for (const a of SCRIPT) {
     }
   }
   else if (k === 'shot') await p.screenshot({ path: `${OUT}/${TAG}-${rest[0]}.png` });
+  else if (k === 'cam') {   // EYE SORES: park the active camera for a close-up — cam:x,y,z:tx,ty,tz (held by a per-frame override until the next cam:off)
+    const [px, py, pz] = rest[0].split(',').map(Number); const [tx, ty, tz] = (rest[1] ?? '0,1,0').split(',').map(Number);
+    await ev(`(() => { const s = window.__FEL_DEV__.scene; if (window.__camObs) s.onBeforeRenderObservable.remove(window.__camObs); if (${rest[0] === 'off'}) return; window.__camObs = s.onBeforeRenderObservable.add(() => { const c = s.activeCamera; if (!c) return; c.position.set(${px}, ${py}, ${pz}); const tg = c.position.clone(); tg.set(${tx}, ${ty}, ${tz}); if (c.target && c.target.set) c.target.set(${tx}, ${ty}, ${tz}); else if (c.setTarget) c.setTarget(tg); }); })()`);
+    await p.waitForTimeout(120);
+  }
+  else if (k === 'dump') {   // EYE SORES: every enabled mesh — name, world centre, size, material + texture names (to name what floats)
+    const dump = await ev(`(() => { const s = window.__FEL_DEV__.scene; const out = []; for (const m of s.meshes) { if (!m.isEnabled() || !m.isVisible || m.getTotalVertices() === 0) continue; const bi = m.getBoundingInfo(); const c = bi.boundingBox.centerWorld, e = bi.boundingBox.extendSizeWorld; const mat = m.material; const tex = mat && mat.getActiveTextures ? mat.getActiveTextures().map((t) => t.name).join('|') : ''; let top = m; while (top.parent) top = top.parent; out.push({ n: m.name, top: top.name, x: +c.x.toFixed(2), y: +c.y.toFixed(2), z: +c.z.toFixed(2), sx: +(e.x * 2).toFixed(2), sy: +(e.y * 2).toFixed(2), sz: +(e.z * 2).toFixed(2), mat: mat ? mat.name : '', tex, skel: !!m.skeleton }); } return JSON.stringify(out); })()`);
+    fs.mkdirSync(OUT, { recursive: true }); fs.writeFileSync(`${OUT}/${TAG}-${rest[0]}.json`, dump as string);
+  }
 }
 type Row = { t: number; x: number; z: number; yaw: number; shots: [string, number, number][]; tele: Record<string, unknown> | null };
 const data = await ev('window.__HD') as { rows: Row[]; marks: { t: number; label: string }[] };

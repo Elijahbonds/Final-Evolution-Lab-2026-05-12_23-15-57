@@ -1103,7 +1103,21 @@ export function buildNexusScene(scene: Scene, spec: NexusWebSpec, canvas?: HTMLC
     // texture above stays as the instant placeholder + offline fallback.
     // The painted version still paints first so there is no pop-in of empty
     // sky while the jpg streams in.
-    if (useBackdrop) {
+    if (useBackdrop && env.backdrop === 'dojo' && typeof Image !== 'undefined') {
+      // EYE SORES (owner, 2026-09-17: "the brown things are still there in karate endless"): the dojo bake's top third is a
+      // cherry-blossom canopy and torii beams; at the fight camera's pitch it fills the top of the frame as brown marbling.
+      // The bake is drawn into the painted sky and a warm sky gradient goes over the canopy band (rows 0..38 %); the shrine
+      // and the torii keep the horizon. (mountBackdrop's outer dome does the same; this inner sphere is the one the camera sees.)
+      const img = new Image(); img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, W, S);
+        const band = Math.round(S * 0.38); const g2 = ctx.createLinearGradient(0, 0, 0, band);
+        g2.addColorStop(0, 'rgba(214,226,238,1)'); g2.addColorStop(0.55, 'rgba(226,214,208,0.92)'); g2.addColorStop(1, 'rgba(236,206,196,0)');
+        ctx.fillStyle = g2; ctx.fillRect(0, 0, W, band);
+        tex.update(false);
+      };
+      img.src = `/backdrops/baked/${env.backdrop}.jpg`;
+    } else if (useBackdrop) {
       const baked = new Texture(
         `/backdrops/baked/${env.backdrop}.jpg`, scene, false, false, Texture.BILINEAR_SAMPLINGMODE,
         () => { m.emissiveTexture = baked; },
@@ -1124,8 +1138,11 @@ export function buildNexusScene(scene: Scene, spec: NexusWebSpec, canvas?: HTMLC
   sun.diffuse = c3(env.sunColor);
 
   const shadows = new ShadowGenerator(1024, sun);
-  shadows.useExponentialShadowMap = true;
-  shadows.darkness = 0.45;
+  // EYE SORES (2026-09-17): the exponential map bled every body into a huge soft brown smudge on the mat; PCF keeps a
+  // body-shaped shadow with a soft edge (a small bias against acne on the flat mats)
+  shadows.usePercentageCloserFiltering = true; shadows.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+  shadows.bias = 0.0006; shadows.normalBias = 0.02;
+  shadows.darkness = 0.4;
 
   const ground = buildGround(scene, spec.ground, root);
   // Baked Meshy venue map (scripts/map/pipeline.mts → visual/VenueMaps.ts):
