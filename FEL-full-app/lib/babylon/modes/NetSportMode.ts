@@ -12,6 +12,14 @@
 import { nerve, standingOf, SKILL_FLOOR, SKILL_CEIL, type Standing } from '../core/Nerve';
 import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, Vector3 } from '@babylonjs/core';
 import { answerFor, tellFor, rallyPace, SHOT_FACE } from '../core/tennisHud';
+// TENNIS UPGRADE (owner, 2026-09-18: "football, tennis and soccer upgrades next"): the Wii read — WHEN you swing bends
+// WHERE it goes, a landing ring on the far court shows the shot you are holding, the timing meter draws its bands, and
+// the weather drifts the flight (shown before you commit).
+import { aimFor, landingFor, windDrift, meterBandsFor } from '../core/TennisAim';
+import { mountRing, type RingHandle } from '../visual/AimArrow';
+import { WeatherKit } from '../core/WeatherKit';
+import { readWeather } from '../nexus/weather';
+import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
 import { ballKindFor, dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, Mesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -186,6 +194,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   /** Is the ball in flight a Zone Shot? It answers differently to everything. */
   let incomingZone = false;
   let aimX = 0;
+  /** WII READ: the landing ring, the weather. */
+  let landing: RingHandle | null = null;
+  let weather: WeatherKit = new WeatherKit(); let weatherFx: WeatherFxHandle | null = null;
   // ANIM-READABILITY (net / precision, 2026-09-07): the tree is the ONE owner of each body's clips. The mode never calls
   // animator.play — it latches beats (swing / serve / block) and feeds the tree once per frame, every phase, with the
   // shuffle INTENT, so a beat that runs out under a held stick settles onto the shuffle (the per-frame shuffle play + the
@@ -251,6 +262,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       callout: label(),
       // A+ mission #6 (Wii readability): the scoreboard chip — both sides' games, the umpire call, the streak
       call: tennisScore ? label() : '', streak: heroStreak, you: 'YOU', them: 'THEM',   // hudLabels are the point-flash strings, not side names
+      weather: weather.describe(),
     });
   }
 
@@ -345,6 +357,11 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     if (!planned) return false;
     // A+ mission #6: the rally speeds up as it grows (tennis only; the three-touch sport keeps its pace)
     if (o.cfg.touchesPerSide === 1) planned.duration *= rallyPace(rally.touches);
+    // WEATHER: a crosswind drifts the flight — the landing moves, and judgeShot below judges the DRIFTED landing, so a
+    // ball aimed at the line in a wind goes wide; the HUD says the wind before every point
+    if (o.cfg.touchesPerSide === 1) { const w = weather.flightWind(); if (Math.hypot(w.x, w.z) >= 0.5) { const d = windDrift(w, planned.duration); planned.to.x += d.x; planned.to.z += d.z; } }
+    // the timing meter's bands for THIS flight (they scale with its duration)
+    if (toSide > 0 && o.cfg.touchesPerSide === 1) { const b = meterBandsFor(planned.duration); _ctx.setHud({ shotMeterBands: `${b.okFrom.toFixed(3)},${b.goodFrom.toFixed(3)},${b.perfectFrom.toFixed(3)}` }); }
     // the tell describes THEIR ball; once ours is away it is stale
     if (toSide < 0 && o.cfg.touchesPerSide === 1) _ctx.setHud({ incomingShot: '', incomingTell: '', answer: '' });
 
@@ -722,7 +739,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ctx.setHud({ energy: Math.round(energy[0]) });
     }
 
-    launch(ctx, swingPos, crosses ? -1 : 1, aimX, q,
+    // WII READ: in tennis WHEN you swing is WHERE it goes — early pulls it across your body, late pushes it the other way
+    launch(ctx, swingPos, crosses ? -1 : 1, isVolley ? aimX : aimFor(aimX, dt), q,
       isVolley ? touchKind : undefined,
       isVolley ? undefined : pendingShot, zone);
   }
@@ -789,6 +807,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ended = false; restSec = 0.8; shot = null; aimX = 0; heroStreak = 0; gameLatch = false;
 
       ctx.heroRef.current = me.root;
+      // WEATHER (the start screen's chip; tennis only — the beach court has no chip yet) and the landing ring
+      weather = WeatherKit.fromPick(o.cfg.touchesPerSide === 1 ? readWeather(o.modeId) : 'natural', 'court', Math.floor(Date.now() / 1000) % 100000);
+      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier });
+      landing?.dispose(); landing = o.cfg.touchesPerSide === 1 ? mountRing(ctx.scene, '#22d3ee', 1.4) : null; landing?.show(false);
       // THE BODY. Neither net sport mounted a posture layer, so between shots the chest, the neck and the head
       // sat wherever the last swing clip left them — no ready position, no split step, and the eyes never on
       // the ball. FieldPosture's net windows are the ready / split / move / load / strike / reach / serve chain.
@@ -867,6 +889,14 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
+      weather.update(dt); weatherFx?.update(dt);
+      // WII READ: the landing ring — where the shot you are holding (the stick's aim, the button's shot, a perfect swing)
+      // would drop on the far court, live while the ball is coming to you
+      if (landing) {
+        const show = !!shot && awaitingHuman && !!ball;
+        landing.show(show);
+        if (show && shot) { const l = landingFor(o.cfg, { x: shot.to.x, y: 1, z: shot.to.z }, -1, aimFor(aimX, 0), pendingShot); if (l) landing.set(l.x, l.z); }
+      }
 
       // Baseline shuffle (MODE-STICK-FACE, 2026-09-07): lateral only (depth is fixed so the player is always in a
       // plausible receiving position), screen-relative (the camera's right), in the strafe clip — idle when the stick
@@ -957,7 +987,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       if (flightT < 1) return;
 
       // The flight has landed.
-      ctx.setHud({ shotMeterT: 0, incoming: '' });
+      ctx.setHud({ shotMeterT: 0, incoming: '', shotMeterBands: '' });
       if (pendingFault) {
         // Whoever last hit it committed the fault.
         const offender: 0 | 1 = awaitingHuman ? 1 : 0;
@@ -982,6 +1012,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       venue?.dispose(); venue = null;
       posture?.dispose(); posture = null;
       recoverMark?.dispose(); recoverMark = null;
+      landing?.dispose(); landing = null; weatherFx?.dispose(); weatherFx = null;
       me?.dispose(); foe?.dispose();
       SoundKit.stopAmbient();
       shot = null; ended = true;

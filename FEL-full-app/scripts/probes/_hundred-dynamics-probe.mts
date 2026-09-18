@@ -129,6 +129,30 @@ for (const a of SCRIPT) {
   else if (k === 'explode') {   // EYE SORES: NaN / huge world matrices, and the POSED vertex extent of skinned meshes (an exploded skin never moves its bounding box)
     console.log('explode: ' + await ev(`(() => { const s = window.__FEL_DEV__.scene; const bad = []; const big = []; for (const m of s.meshes) { if (!m.isEnabled() || !m.isVisible || m.getTotalVertices() === 0) continue; const wm = m.getWorldMatrix().m; let nan = false; for (let i = 0; i < 16; i++) if (!Number.isFinite(wm[i])) nan = true; if (nan) { bad.push(m.name + ' NaN matrix'); continue; } const p = m.getAbsolutePosition(); if (Math.abs(p.x) > 500 || Math.abs(p.y) > 500 || Math.abs(p.z) > 500) bad.push(m.name + ' far ' + p.x.toFixed(0) + ',' + p.y.toFixed(0) + ',' + p.z.toFixed(0)); if (m.skeleton) { const data = m.getPositionData(true, true); if (!data) continue; let maxd = 0, nanv = 0; const n = data.length / 3; const step = Math.max(1, Math.floor(n / 400)); for (let i = 0; i < n; i += step) { const x = data[i * 3], y = data[i * 3 + 1], z = data[i * 3 + 2]; if (!Number.isFinite(x + y + z)) { nanv++; continue; } const d = Math.hypot(x - p.x, y - p.y, z - p.z); if (d > maxd) maxd = d; } if (maxd > 3 || nanv) big.push(m.name + ' posed extent ' + maxd.toFixed(1) + ' m' + (nanv ? ' NaN verts ' + nanv : '')); } } return 'bad[' + bad.join(' ; ') + '] exploded[' + big.join(' ; ') + ']'; })()`));
   }
+  else if (k === 'mesh') {   // any mesh by substring: visibility, world position, scaling, bounding radius, material
+    const out = await ev(`(() => { const s = window.__FEL_DEV__.scene; const f = (v) => v.x.toFixed(2) + ',' + v.y.toFixed(2) + ',' + v.z.toFixed(2);
+      return s.meshes.filter((m) => m.name.includes(${JSON.stringify(rest[0])})).slice(0, 12).map((m) => m.name + ' vis ' + m.isVisible + ' en ' + m.isEnabled() + ' @' + f(m.getAbsolutePosition()) + ' sc ' + f(m.scaling) + ' r' + m.getBoundingInfo().boundingSphere.radiusWorld.toFixed(2) + ' mat ' + (m.material ? m.material.name + ' a' + m.material.alpha : '-') + ' parent ' + (m.parent ? m.parent.name : '-')).join(String.fromCharCode(10)); })()`) as string;
+    console.log('mesh ' + rest[0] + ':' + String.fromCharCode(10) + out);
+  }
+  else if (k === 'particles') {   // every particle system: alive count, emit rate, emitter position, started
+    const out = await ev(`(() => { const s = window.__FEL_DEV__.scene; return s.particleSystems.map((p) => { const e = p.emitter; const at = e && e.position ? e.position.x.toFixed(1) + ',' + e.position.y.toFixed(1) + ',' + e.position.z.toFixed(1) : (e ? e.x.toFixed(1) + ',' + e.y.toFixed(1) + ',' + e.z.toFixed(1) : '-'); return p.name + ' alive ' + p.getActiveCount() + ' rate ' + p.emitRate.toFixed(0) + ' started ' + p.isStarted() + ' emitter@' + at + ' tex ' + (p.particleTexture ? p.particleTexture.name : '-'); }).join(String.fromCharCode(10)); })()`) as string;
+    console.log('particles ' + rest[0] + ':' + String.fromCharCode(10) + out);
+  }
+  else if (k === 'pinfo') {   // particle systems in depth: rendering group, layer mask, readiness, the camera's mask, fog, particlesEnabled
+    const out = await ev(`(() => { const s = window.__FEL_DEV__.scene; const cam = s.activeCamera; const f = (v) => v ? v.x.toFixed(1) + ',' + v.y.toFixed(1) + ',' + v.z.toFixed(1) : '-';
+      const rows = ['particlesEnabled ' + s.particlesEnabled + ' cam ' + (cam ? cam.name + ' mask ' + cam.layerMask.toString(16) + ' @' + f(cam.globalPosition) + ' minZ ' + cam.minZ : '-') + ' fog ' + s.fogMode + '/' + s.fogDensity.toFixed(4)];
+      for (const p of s.particleSystems) rows.push(p.name + ' alive ' + p.getActiveCount() + ' rg ' + p.renderingGroupId + ' mask ' + p.layerMask.toString(16) + ' ready ' + p.isReady() + ' started ' + p.isStarted() + ' blend ' + p.blendMode + ' size ' + p.minSize + '-' + p.maxSize + ' scale ' + p.minScaleX + '-' + p.maxScaleX + ' emitter@' + f(p.emitter && p.emitter.position ? p.emitter.position : p.emitter) + ' box ' + f(p.minEmitBox) + '..' + f(p.maxEmitBox) + ' texReady ' + (p.particleTexture ? p.particleTexture.isReady() : '-'));
+      const g = s.meshes.filter((m) => /ground|gridiron|field|turf/i.test(m.name) && m.isVisible).map((m) => m.name + ' y' + m.getAbsolutePosition().y.toFixed(3) + ' top' + m.getBoundingInfo().boundingBox.maximumWorld.y.toFixed(3));
+      rows.push('grounds: ' + g.join(' | '));
+      const h = window.__FEL_DEV__.hero ? window.__FEL_DEV__.hero() : null; rows.push('hero y ' + (h ? h.getAbsolutePosition().y.toFixed(3) : '-'));
+      return rows.join(String.fromCharCode(10)); })()`) as string;
+    console.log('pinfo ' + rest[0] + ':' + String.fromCharCode(10) + out);
+  }
+  else if (k === 'hudkeys') {   // the dev page's HUD dump, filtered to the keys named (comma list)
+    const keys = rest[0].split('|');
+    const out = await ev(`(() => { const t = document.body.innerText; const m = t.match(/\\{[\\s\\S]*\\}/); if (!m) return 'no hud'; try { const h = JSON.parse(m[0]); return ${JSON.stringify(keys)}.map((k) => k + '=' + JSON.stringify(h[k])).join(' '); } catch (e) { return 'unparsed: ' + m[0].slice(0, 200); } })()`) as string;
+    console.log('hudkeys ' + rest[1] + ': ' + out);
+  }
   else if (k === 'ringinfo') {   // PLAYER RING: where the ring / puck sit against the hero root
     const out = await ev(`(() => { const s = window.__FEL_DEV__.scene; const r = s.getMeshByName('player_ring'), t = s.getMeshByName('player_tag'); const h = window.__FEL_DEV__.hero ? window.__FEL_DEV__.hero() : null; const f = (v) => v ? v.x.toFixed(2) + ',' + v.y.toFixed(2) + ',' + v.z.toFixed(2) : '-';
       const under = h ? s.pickWithRay(new (r ? r.constructor : Object)(), () => false) : null; void under;

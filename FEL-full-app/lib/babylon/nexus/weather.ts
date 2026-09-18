@@ -10,6 +10,9 @@ export type WeatherPick = 'natural' | 'random' | WeatherCondition | TimeOfDay;
 /** Which outdoor family a mode plays in — a mode absent here shows no chip (dojo, arena interiors, dance, quiz). */
 export const WEATHER_FAMILY_OF: Record<string, WeatherFamily> = {
   golf: 'links',
+  soccer: 'course',      // the penalty shootout (registry key `penalty`, modeId 'soccer')
+  tennis: 'court',
+  football: 'gridiron',  // + snow
 };
 /** Game-component mode ids that show the chip on the boot splash (the contract pickerReach enforces). */
 export const WEATHER_MODE_IDS = new Set(Object.keys(WEATHER_FAMILY_OF));

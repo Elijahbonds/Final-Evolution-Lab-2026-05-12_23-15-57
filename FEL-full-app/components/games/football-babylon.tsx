@@ -12,6 +12,8 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+/** FOOTBALL UPGRADE: the breakaway meter's lines arrive as '0.333,0.667'. */
+const ticksOf = (v: unknown): number[] => (typeof v === 'string' && v ? v.split(',').map(Number) : []);
 
 type Hud = Record<string, HudValue>;
 
@@ -108,6 +110,17 @@ export default function FootballBabylon({ onEnd }: GameProps) {
         <span className={`rounded px-2 py-0.5 ${hud.truckReady === false ? 'bg-white/10 text-white/30' : 'bg-[#00E5FF]/15 text-[#00E5FF]'}`}>
           TRUCK {hud.truckReady === false ? '…' : 'READY'}
         </span>
+        {/* FOOTBALL UPGRADE: the BREAKAWAY meter — a line per evade toward it, then its own clock draining */}
+        {typeof hud.breakawayFill === 'number' && (
+          <div className="mt-0.5 flex flex-col gap-0.5">
+            <span className={`text-[9px] ${hud.breakaway === true ? 'text-[#ff2d78]' : 'text-white/50'}`}>{hud.breakaway === true ? 'BREAKAWAY — gone' : 'EVADES → BREAKAWAY'}</span>
+            <div className="relative h-2.5 w-32 overflow-hidden rounded-sm border border-white/25 bg-black/50">
+              <div className={`absolute inset-y-0 left-0 ${hud.breakaway === true ? 'bg-[#ff2d78]' : 'bg-[#00E5FF]/70'}`} style={{ width: `${Math.max(0, Math.min(1, hud.breakawayFill)) * 100}%` }} />
+              {ticksOf(hud.breakawayTicks).map((t, i) => <div key={i} className="absolute inset-y-0 w-px bg-white/70" style={{ left: `${t * 100}%` }} />)}
+            </div>
+          </div>
+        )}
+        {typeof hud.weather === 'string' && hud.weather && <span className="rounded bg-white/10 px-2 py-0.5 text-white/70">{hud.weather}</span>}
       </div>
 
       {/* A+ mission #9 (Tecmo Bowl feel + Madden readability): the field strip — ball, line of scrimmage, first-down line

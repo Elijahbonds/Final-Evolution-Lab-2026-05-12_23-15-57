@@ -12,11 +12,12 @@ describe('WeatherKit', () => {
     expect(new WeatherKit({ condition: 'blizzard', intensity: 1, wetness: 1 }).boardDragMult()).toBeLessThanOrEqual(WEATHER_CAPS.boardDragMultMax);
   });
   it('no venue can roll a forbidden condition (no snow on the beach), over many seeds', () => {
-    for (const family of ['court', 'coast', 'slope', 'links', 'course'] as const) {
+    for (const family of ['court', 'coast', 'slope', 'links', 'course', 'gridiron'] as const) {
       for (let seed = 1; seed < 400; seed++) expect(WEATHER_ALLOWED[family]).toContain(WeatherKit.rollFor(family, seed).condition);
     }
     expect(WeatherKit.rollFor('indoor', 5).condition).toBe('clear');
     expect(WEATHER_ALLOWED.coast).not.toContain('snow');
+    expect(WEATHER_ALLOWED.gridiron).toContain('snow'); expect(WEATHER_ALLOWED.course).not.toContain('snow');
   });
   it('a RANDOM roll is seeded: the same seed gives the same weather', () => {
     const a = WeatherKit.rollFor('links', 42), b = WeatherKit.rollFor('links', 42);

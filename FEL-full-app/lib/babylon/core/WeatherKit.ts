@@ -9,7 +9,7 @@
 export type WeatherCondition = 'clear' | 'rain' | 'storm' | 'snow' | 'blizzard' | 'wind' | 'fog';
 export type TimeOfDay = 'dawn' | 'day' | 'dusk' | 'night';
 /** The venue families of the spec's allowlist table. */
-export type WeatherFamily = 'court' | 'coast' | 'slope' | 'links' | 'course' | 'indoor';
+export type WeatherFamily = 'court' | 'coast' | 'slope' | 'links' | 'course' | 'gridiron' | 'indoor';
 
 export interface WeatherState {
   condition: WeatherCondition;
@@ -37,14 +37,18 @@ export const WEATHER_ALLOWED: Record<WeatherFamily, readonly WeatherCondition[]>
   slope: ['clear', 'snow', 'blizzard', 'wind', 'fog'],
   links: ['clear', 'rain', 'wind', 'fog', 'storm'],
   course: ['clear', 'rain', 'wind', 'fog'],
+  gridiron: ['clear', 'rain', 'wind', 'fog', 'snow'],   // the spec's "+ snow for football"
   indoor: [],
 };
+// NATURAL is "as the venue was authored": timeOfDay 'day' here means "leave the rig alone" (WeatherFx only retunes a
+// non-day pick), whatever hour the venue's own mood paints — the golden-hour court is natural at 'day'.
 export const WEATHER_NATURAL: Record<WeatherFamily, { condition: WeatherCondition; timeOfDay: TimeOfDay }> = {
-  court: { condition: 'clear', timeOfDay: 'dusk' },
+  court: { condition: 'clear', timeOfDay: 'day' },
   coast: { condition: 'clear', timeOfDay: 'day' },
   slope: { condition: 'clear', timeOfDay: 'day' },
   links: { condition: 'clear', timeOfDay: 'day' },
   course: { condition: 'clear', timeOfDay: 'day' },
+  gridiron: { condition: 'clear', timeOfDay: 'day' },
   indoor: { condition: 'clear', timeOfDay: 'day' },
 };
 export const TIMES_OF_DAY: readonly TimeOfDay[] = ['dawn', 'day', 'dusk', 'night'];
@@ -163,7 +167,7 @@ export class WeatherKit {
   }
   /** The HUD line: 'RAIN · 3 m/s' — what the player sees before committing. */
   describe(): string {
-    const s = this.state; const n = Math.hypot(s.wind.x, s.wind.z);
+    const s = this.state; const w = this.flightWind(); const n = Math.hypot(w.x, w.z);   // the wind as APPLIED (capped), not the raw roll
     const cond = s.condition === 'clear' ? (s.timeOfDay === 'day' ? 'CLEAR' : `CLEAR · ${s.timeOfDay.toUpperCase()}`) : s.condition.toUpperCase() + (s.timeOfDay !== 'day' ? ` · ${s.timeOfDay.toUpperCase()}` : '');
     return n >= 0.5 ? `${cond} · WIND ${n.toFixed(0)} m/s` : cond;
   }

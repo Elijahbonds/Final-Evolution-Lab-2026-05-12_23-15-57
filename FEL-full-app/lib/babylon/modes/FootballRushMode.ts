@@ -54,6 +54,15 @@ import { Onlookers } from '../visual/Onlookers';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { FOOTBALL_CONFIG as CFG } from './modeConfigs';
+// FOOTBALL UPGRADE (owner, 2026-09-18: "football, tennis and soccer upgrades next"): the carrier is a body with
+// MOMENTUM (RushRun), the field has WEATHER (rain softens the cut, snow slows the run, all capped in WeatherKit), the
+// BREAKAWAY is a meter with a line per evade, and the read is on the turf: your line, and the ring where the nearest
+// man meets it.
+import { stepRun, cutSlideSec, breakawayMeter, interceptPoint } from '../core/RushRun';
+import { mountAimArrow, mountRing, type AimArrowHandle, type RingHandle } from '../visual/AimArrow';
+import { WeatherKit } from '../core/WeatherKit';
+import { readWeather } from '../nexus/weather';
+import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
 import { stepYaw } from '../anim/LocoBus';   // SHARED-ANIM-BUS: the shared facing slew
 
 let rushVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
@@ -127,6 +136,12 @@ export const FootballRushMode: ModeDefinition = (() => {
   let lastDodgeType = '';                      // which move earned the current iframes
   let stickX = 0, stickY = 0;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
+  /** MOMENTUM: the carrier's velocity the stick chases (RushRun). */
+  let run = { vx: 0, vz: 0 };
+  let lineArrow: AimArrowHandle | null = null, pursuit: RingHandle | null = null;
+  let weather: WeatherKit = new WeatherKit(); let weatherFx: WeatherFxHandle | null = null;
+  /** The nearest defender's closing speed for the pursuit read (the steering presets top out near this). */
+  const DEF_SPEED = 6.4;
   /** L4 — sideline banks. A drive is watched; 2 draws, instanced. */
   let gallery: Onlookers | null = null;
   // PRE-SNAP — every play begins SET: the defense holds its alignment and
@@ -327,7 +342,7 @@ export const FootballRushMode: ModeDefinition = (() => {
     hitCut.active = false; hitCut.timer = 0; hitCut.cooldown = 0;
     preSnap = true; preSnapT = 0; downed = false;
     runner.root.position.set(0, 0, 0);
-    runner.root.rotation.y = 0;
+    runner.root.rotation.y = 0; run = { vx: 0, vz: 0 };
     move = null; moveUntil = 0; cutSec = 0; celebrateUntil = 0; tdPending = false;
     animTree?.reset();   // the tree is the one owner: the pre-snap idle is a WINDOW, not a play() from here
     ctx.camDirector.snapTo(runner.root.position, runner.root.position.add(new Vector3(0, 0, 12)));
@@ -347,6 +362,12 @@ export const FootballRushMode: ModeDefinition = (() => {
       tier = readProfile();
       driveLog = []; driveYards = 0;
       rushVenue = mountVenue(ctx, 'football_rush', { keepGameplayCamera: true });
+      // WEATHER: the start screen's pick — rain softens the cut (grip), snow slows the run (drag), fog / night dress it
+      weather = WeatherKit.fromPick(readWeather('football'), 'gridiron', Math.floor(Date.now() / 1000) % 100000);
+      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier });
+      // the kit gridiron stands at y 0.05: the reads sit just over it
+      lineArrow?.dispose(); lineArrow = mountAimArrow(ctx.scene, '#22d3ee', 0.09); lineArrow.show(false);
+      pursuit?.dispose(); pursuit = mountRing(ctx.scene, '#ff2d78', 1.5, 0.09); pursuit.show(false);
       VenueKit.buildGridiron(ctx.scene);   // the kit field keeps its yard lines and posts under the spec's sky
       // The kit's gridiron stands ON TOP of the spec's ground, so the spec's is hidden — but it kept the NAME
       // `venue_ground`, and two coplanar meshes under one name is not only redundant floor: Physics.ts binds
@@ -393,7 +414,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => new Vector3(21.5, 0, 6 + i * 4)),
       ]);
       newDrive(ctx, 'TAKE THE FIELD');
-      ctx.setHud({ score: 0, yards: 0, evades: 0, hint: 'Juke, spin, hurdle — or HOLD TRUCK and run THROUGH them' });
+      ctx.setHud({ score: 0, yards: 0, evades: 0, hint: 'Juke, spin, hurdle — or HOLD TRUCK and run THROUGH them', weather: weather.describe() });
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -454,7 +475,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           // button went down — the runner arrived a lane over before the juke clip had played a single frame.
           cutFrom = runner.root.position.x;
           cutTo = Math.max(-FIELD_HALF_X, Math.min(FIELD_HALF_X, runner.root.position.x + d.dx));
-          cutT = 0; cutSec = MOVE_SEC * 0.7;
+          cutT = 0; cutSec = cutSlideSec(MOVE_SEC * 0.7, weather.gripMult());   // a wet cut takes longer to bite
         }
         ctx.feel?.impact?.(0.12);
       }
@@ -490,6 +511,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         }
         if (preSnapT >= PRESNAP_AUTOSNAP_SEC) snap(ctx);
         drive3D(0, false);   // the tree runs every phase: SET at the line is a window, not the absence of one
+        weather.update(dt); weatherFx?.update(dt); run = { vx: 0, vz: 0 }; lineArrow?.show(false); pursuit?.show(false);
         ctx.camDirector.look(lookX, lookY, dt);   // read the front from the R stick
         ctx.camDirector.update(runner.root.position, Vector3.Zero(), null);
         return;
@@ -505,9 +527,11 @@ export const FootballRushMode: ModeDefinition = (() => {
       const boost = breakawaySec > 0 ? BREAKAWAY_SPEED_MULT : 1;
       const trucking = truckSec > 0;
       const held = downed || tdPending;   // a scored runner HOLDS the spike; he does not keep running out of the end zone
-      const speed = held ? 0 : (5.5 + Math.max(0, -stickY) * 2.5) * boost * (trucking ? 1.08 : 1);
-      // lowered shoulder = committed line: lateral control drops while trucking
-      const vel = held ? Vector3.Zero() : new Vector3(stickX * (trucking ? 2 : 5) * boost, 0, speed);
+      // MOMENTUM: the stick is an intent the body chases — a heavy body under a light stick (NFL Street). The weather
+      // takes hold here: wet turf answers a cut slower, snow underfoot slows the run.
+      weather.update(dt); weatherFx?.update(dt);
+      run = stepRun(run, { x: stickX, y: stickY }, dt, { boost, trucking, held, grip: weather.gripMult(), drag: weather.boardDragMult() });
+      const vel = new Vector3(run.vx, 0, run.vz);
       runner.root.position.addInPlace(vel.scale(dt));
       // G3: the juke's lateral cut rides its own window (it was a one-frame 3.2 m teleport)
       if (cutSec > 0) {
@@ -532,7 +556,12 @@ export const FootballRushMode: ModeDefinition = (() => {
       for (const m of defenders) { const d = Vector3.Distance(m.char.root.position, runner.root.position); if (d < nd) { nd = d; nearest = m; } }
       const dx = nearest ? nearest.char.root.position.x - runner.root.position.x : 0;
       const target = !nearest || nd > 9 ? '' : Math.abs(dx) < 1.2 ? 'AHEAD — juke or truck' : dx > 0 ? 'RIGHT — cut left' : 'LEFT — cut right';
-      ctx.setHud({ yards, evades, ballOn: Math.max(0, Math.round(runner.root.position.z / YARD)), los: Math.round(lineOfScrimmage / YARD), firstDown: Math.round((lineOfScrimmage + toGo * YARD) / YARD), target });
+      const bm = breakawayMeter(driveEvades, BREAKAWAY_THRESHOLD, breakawaySec, BREAKAWAY_SEC);
+      ctx.setHud({ yards, evades, ballOn: Math.max(0, Math.round(runner.root.position.z / YARD)), los: Math.round(lineOfScrimmage / YARD), firstDown: Math.round((lineOfScrimmage + toGo * YARD) / YARD), target, breakawayFill: Number(bm.fill01.toFixed(3)), breakawayTicks: bm.ticks.map((t) => t.toFixed(3)).join(',') });
+      // THE READ ON THE TURF: your line ahead, and the ring where the nearest man meets it (no ring = he cannot catch you)
+      // the arrow starts a stride AHEAD of the body: from the chase camera a line under the runner's own feet is hidden by him
+      if (lineArrow) { const sp = Math.hypot(vel.x, vel.z); lineArrow.show(!held && sp > 0.5); if (sp > 0.5) { const yaw = Math.atan2(vel.x, vel.z); lineArrow.set(runner.root.position.add(new Vector3(Math.sin(yaw) * 1.4, 0, Math.cos(yaw) * 1.4)), yaw, Math.min(7, 1.5 + sp * 0.6), null); } }
+      if (pursuit) { const ip = nearest && nd < 16 && !held ? interceptPoint({ x: runner.root.position.x, z: runner.root.position.z }, { x: vel.x, z: vel.z }, { x: nearest.char.root.position.x, z: nearest.char.root.position.z }, DEF_SPEED) : null; pursuit.show(!!ip); if (ip) pursuit.set(ip.x, ip.z); }
 
       const gained = coins?.update(dt, runner.root.position) ?? 0;
       if (gained > 0) {
@@ -617,7 +646,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         mob.onContactResolved();
         setTimeout(() => {
           ctx.setHud({ banner: '' });
-          runner.root.position.x = 0;
+          runner.root.position.x = 0; run = { vx: 0, vz: 0 };
           downed = false;   // SET at the line: the tree's pre-snap window, not the carry run jogging on the spot
           // a stopped play is a new SET: the front respawns in its alignment
           // and the next snap is the player's call again
@@ -663,6 +692,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       posture?.dispose(); posture = null; animTree = null;
       rushVenue?.dispose?.(); rushVenue = null;
       gallery?.dispose(); gallery = null;
+      lineArrow?.dispose(); lineArrow = null; pursuit?.dispose(); pursuit = null; weatherFx?.dispose(); weatherFx = null;
       runner?.dispose();
       for (const char of defenderBodies) char.dispose();
       defenderBodies = []; defenders = [];

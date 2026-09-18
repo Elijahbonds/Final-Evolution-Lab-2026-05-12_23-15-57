@@ -60,6 +60,12 @@ import { mountAimArrow, type AimArrowHandle } from '../visual/AimArrow';
 import { WeatherKit } from '../core/WeatherKit';
 import { readWeather } from '../nexus/weather';
 import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
+// SOCCER UPGRADE (owner, 2026-09-18: "football, tennis and soccer upgrades next"): the penalty flies the real ball
+// (SoccerBall: drag, Magnus, bounce) from a PES read — aim on the goal mouth, a power bar with ZONES (over the last one
+// the ball clears the bar), a curled finesse shot and the chip on the stick, the frame as a thing the ball can hit.
+import { SoccerBall, GRASS } from '../core/SoccerBall';
+import { launchKick, frameHit, judgeKick, kickZone, METER_ZONES, GOAL as PEN_GOAL } from '../core/PenaltyKick';
+import { WIND_GAIN } from '../core/GolfBall';
 
 // ship pass 4: the mounted venue specs (golf_loop / derby / penalty), disposed with their modes
 let golfVenue: VenueHandle | null = null, derbyVenue: VenueHandle | null = null, penaltyVenue: VenueHandle | null = null;
@@ -1175,8 +1181,28 @@ export const PenaltyMode: ModeDefinition = (() => {
   const RISE_DELAY_MS = 650;
   let meDiveSign: DiveSign = 0, keeperDiveSign: DiveSign = 0;
   let furniture: AbstractMesh[] = [];
-  let ball: AbstractMesh, flight: Flight, reticle: Reticle, meter: PowerMeter;
+  let ball: AbstractMesh, pball: SoccerBall, reticle: Reticle, meter: PowerMeter;
   let round = 0, goals = 0, stylePts = 0, stickX = 0, stickY = 0;
+  /** The kick's SHAPE, read off the stick at the strike: across = curl, up = the chip. And what the frame said. */
+  let frameKind: 'post' | 'bar' | null = null; let flightSec = 0;
+  const prevBall = new Vector3();
+  let weather: WeatherKit = new WeatherKit(); let weatherFx: WeatherFxHandle | null = null;
+  const KEEPER_REACH = 0.9;
+  /** The physics step every kick shares: wind through the air (the golf gain), the frame, the mesh. */
+  function stepBall(dt: number): void {
+    if (!pball.active) return;
+    const w = weather.flightWind(); const wv = new Vector3(w.x, 0, w.z);
+    const n = Math.max(1, Math.ceil(dt / (1 / 240))); const h = dt / n;
+    for (let i = 0; i < n && pball.active; i++) {
+      prevBall.copyFrom(pball.pos);
+      if (!pball.rolling && wv.lengthSquared() > 0) pball.vel.addInPlace(wv.scale(WIND_GAIN * GRASS.dragK * pball.vel.subtract(wv).length() * h));
+      pball.step(h);
+      const hit = frameHit(prevBall, pball.pos);
+      if (hit && !frameKind) { frameKind = hit.kind; pball.deflect(hit.normal, 0.62); SoundKit.play('clang', { pitch: hit.kind === 'bar' ? 0.9 : 1.1, volume: 0.8 }); }
+    }
+    flightSec += dt;
+    if (flightSec > 5) pball.stop();
+  }
   let goalLatch = false;               // A+ P0 juice: the goal's ONE punch per kick
   let phase: 'aim' | 'power' | 'flight' | 'keep' = 'aim';
   let keeperTargetX = 0, ended = false;
@@ -1236,7 +1262,7 @@ export const PenaltyMode: ModeDefinition = (() => {
         ? 'SUDDEN DEATH — score and the keeper must answer'
         : 'Snap the stick side-to-side to FEINT (max 2) · aim · KICK twice';
     ctx.setHud({
-      round: kickLabel(), feints: 0, ...kicksHud(), dive: '',
+      round: kickLabel(), feints: 0, ...kicksHud(), dive: '', weather: weather.describe(), kickShape: '',
       score: `${goals}–${themGoals}`,
       hint,
     });
@@ -1343,7 +1369,10 @@ export const PenaltyMode: ModeDefinition = (() => {
       ctx.heroRef.current = me.root;
       ball = MeshBuilder.CreateSphere('sball', { diameter: 0.22 }, ctx.scene);
       void dressBall(ball, 'soccer');   // Meshy ball skin rides the sphere (visual only)
-      flight = new Flight(ball, -9.8);
+      pball = new SoccerBall(ball, GRASS);
+      // WEATHER: the start screen's pick — wind bends the flight, rain and fog dress the night
+      weather = WeatherKit.fromPick(readWeather('soccer'), 'course', Math.floor(Date.now() / 1000) % 100000);
+      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier });
       reticle = new Reticle(ctx.scene, new Vector3(0, 1.2, 11), { x: 3.3, y: 1.05 });
       meter = new PowerMeter();
       ctx.objectiveRef.current = new Vector3(0, 1.2, 11);
@@ -1360,7 +1389,7 @@ export const PenaltyMode: ModeDefinition = (() => {
         const w = strikerWindow({
           runup01: phase === 'flight' || phase === 'power' ? 1 : 0,
           planted: phase === 'flight',
-          struck: phase === 'flight' && flight.active,   // the ball is away and travelling
+          struck: phase === 'flight' && pball.active,   // the ball is away and travelling
         });
         const { pose, legs } = fieldPose(w);
         const at = ball ? ball.getAbsolutePosition() : new Vector3(0, 0.3, 0);
@@ -1403,6 +1432,7 @@ export const PenaltyMode: ModeDefinition = (() => {
           const p = meter.stop();
           phase = 'flight';
           goalLatch = false;              // A+ P0: a fresh kick gets one goal punch
+          frameKind = null; flightSec = 0;
           meAnim.beat(SPORT_CLIP.penaltyStrike, { fadeSec: 0.08 });
           kickIn = KICK_CONTACT_SEC;      // the boot meets the ball on the strike-through key; update() launches it
           // feints send the keeper the wrong way more often — and the keeper
@@ -1417,19 +1447,19 @@ export const PenaltyMode: ModeDefinition = (() => {
           // possible, in every game this mode has ever played; the keeper
           // danced over kicks that never arrived. The +1.2 aim lift puts a
           // top-corner aim on the bar and a centre aim chest-high.
-          const to = reticle.pos.subtract(ball.position);
-          to.y += 1.2;
-          const dir = to.normalize();
+          // THE PES READ: the aim on the goal mouth, the power bar's zone (over the top one the ball clears the bar),
+          // and the SHAPE off the stick at the strike — held across = a curled finesse shot, pushed up = the chip
           const wobble = (1 - p) * 0.5 + feints * FEINT_WOBBLE;
-          const vel = dir.scale(22 + p * 8).add(new Vector3((Math.random() - 0.5) * wobble * 4, 0, 0));
+          const curl = Math.abs(stickX) > 0.3 ? stickX : 0; const chip = stickY < -0.5;
+          const { vel, spin } = launchKick({ x: ball.position.x, y: ball.position.y, z: ball.position.z }, { x: reticle.pos.x, y: reticle.pos.y - 0.1 }, p, { curl, chip, wobble, rand: Math.random() });
           pendingKick = () => {
             SoundKit.play('whoosh');
             ctx.feel?.impact?.(0.3 + p * 0.3);   // the contact feel, ON the contact (A+ P0 weight unchanged)
             keeperDiveSign = keeperTargetX > 0 ? 1 : -1;
             dive(keeperAnim, keeperDiveSign); keeperDove = true;   // the keeper commits as the boot lands
-            flight.launch(ball.position, vel);
+            pball.launch(ball.position.clone(), vel, spin);
           };
-          ctx.setHud({ power: Math.round(p * 100), kickPower: null, hint: '' });
+          ctx.setHud({ power: Math.round(p * 100), kickPower: null, hint: '', kickShape: chip ? 'CHIP' : curl ? `CURL ${curl < 0 ? '◀' : '▶'}` : kickZone(p) });
         }
       }
     },
@@ -1437,7 +1467,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
       meter.update(dt);
-      if (phase === 'power') ctx.setHud({ power: Math.round(meter.value * 100), kickPower: Math.round(meter.value * 100) });
+      if (phase === 'power') ctx.setHud({ power: Math.round(meter.value * 100), kickPower: Math.round(meter.value * 100), kickZones: METER_ZONES.map((z) => `${z.to}:${z.label}`).join(','), kickShape: stickY < -0.5 ? 'CHIP' : Math.abs(stickX) > 0.3 ? `CURL ${stickX < 0 ? '◀' : '▶'}` : kickZone(meter.value) });
       if (phase === 'aim') {
         reticle.update(dt, stickX, stickY);
         // the keeper's read is VISIBLE pressure: aim where you keep going and
@@ -1463,19 +1493,20 @@ export const PenaltyMode: ModeDefinition = (() => {
           return;
         }
         keeper.root.position.x += (keeperTargetX - keeper.root.position.x) * 5 * dt;
-        flight.step(dt);
+        stepBall(dt);
         // A scuffed pen can DIE SHORT of the line (weak meter + gravity) —
         // and before the shootout pass that never resolved: the only exit
         // from 'flight' was crossing z 10.9, so an under-hit kick soft-locked
         // the mode with the ball at rest in no man's land. (The depth driver
         // found it in four minutes; the cadence bot never had.)
-        const diedShort = !flight.active && ball.position.z < 10.9;
-        if (ball.position.z >= 10.9 || diedShort) {
-          flight.active = false;
-          const inFrame = !diedShort && Math.abs(ball.position.x) < 3.6 && ball.position.y < 2.4 && ball.position.y > 0;
-          const saved = !diedShort && Math.abs(ball.position.x - keeper.root.position.x) < 0.9 && ball.position.y < 1.9;
+        // …and now a ball off the frame can come back OUT: it is judged where it stops.
+        const diedShort = !pball.active && ball.position.z < PEN_GOAL.z - 0.1;
+        if (ball.position.z >= PEN_GOAL.z - 0.1 || diedShort) {
+          pball.stop();
+          const outcome = judgeKick(ball.position, keeper.root.position.x, KEEPER_REACH, diedShort && !frameKind);
+          const saved = outcome === 'saved';
           if (saved) lastSaveBy = 'them';
-          const scored = inFrame && !saved;
+          const scored = outcome === 'goal';
           shotHistory.push(Math.sign(reticle.pos.x || 0.01));   // the keeper remembers
           if (keeperDove) { keeperDove = false; setTimeout(() => { if (!ended) rise(keeperAnim, keeperDiveSign, SPORT_CLIP.keeperIdle); }, RISE_DELAY_MS); }   // decided: off the ground, a beat later
           myKicks.push(scored ? 'goal' : 'miss');
@@ -1502,8 +1533,8 @@ export const PenaltyMode: ModeDefinition = (() => {
           ctx.setHud({
             score: `${goals}–${themGoals}`, ...kicksHud(),
             banner: scored
-              ? (feints > 0 ? `GOOOAL! +${feints * FEINT_STYLE_PTS} style` : 'GOOOAL!')
-            : diedShort ? 'SCUFFED IT — SHORT' : saved ? 'SAVED' : 'OFF TARGET',
+              ? `${frameKind ? `OFF THE ${frameKind.toUpperCase()} — IN! ` : ''}GOOOAL!${feints > 0 ? ` +${feints * FEINT_STYLE_PTS} style` : ''}`
+            : frameKind ? `OFF THE ${frameKind.toUpperCase()}!` : outcome === 'short' ? 'SCUFFED IT — SHORT' : saved ? 'SAVED' : outcome === 'over' ? 'OVER THE BAR' : 'WIDE',
           });
           // YOUR kick, then THEIR answer — the shootout breathes in
           // alternating beats, and a tied fifth round goes to SUDDEN DEATH.
@@ -1531,8 +1562,9 @@ export const PenaltyMode: ModeDefinition = (() => {
               keepStrikeAt = performance.now();   // the strike instant the dive is graded against = the boot on the ball
               SoundKit.play('whoosh');
               ball.position.set(SPOT.x, 0.11, SPOT.z + 0.3);
-              const to = new Vector3(plan.aimX, plan.aimY + 1.0, 10.9).subtract(ball.position).normalize();
-              flight.launch(ball.position, to.scale(25));
+              frameKind = null; flightSec = 0;
+              const k = launchKick({ x: SPOT.x, y: 0.11, z: SPOT.z + 0.3 }, { x: plan.aimX, y: Math.max(0.3, plan.aimY) }, 0.72, { curl: plan.aimX > 1.5 ? 0.4 : plan.aimX < -1.5 ? -0.4 : 0 });
+              pball.launch(ball.position.clone(), k.vel, k.spin);
             };
           }
         } else if (keepKickIn > 0) {
@@ -1541,12 +1573,12 @@ export const PenaltyMode: ModeDefinition = (() => {
           if (keepDive !== 0) me.root.position.x += (keepDive * 2.4 - me.root.position.x) * 6 * dt;
           if (keepKickIn <= 0 && pendingKeepKick) { pendingKeepKick(); pendingKeepKick = null; }
         } else {
-          flight.step(dt);
+          stepBall(dt);
           // your dive carries you toward the side you chose
           if (keepDive !== 0) me.root.position.x += (keepDive * 2.4 - me.root.position.x) * 6 * dt;
-          const diedShort = !flight.active && ball.position.z < 10.9;
-          if (ball.position.z >= 10.9 || diedShort) {
-            flight.active = false;
+          const diedShort = !pball.active && ball.position.z < PEN_GOAL.z - 0.1;
+          if (ball.position.z >= PEN_GOAL.z - 0.1 || diedShort) {
+            pball.stop();
             const timing = gradeDive(keepDiveAt == null ? null : (keepDiveAt - keepStrikeAt) / 1000);
             const r = diedShort ? { saved: false, why: 'off_target' as const } : resolveSave(keepDive, timing, ball.position.x, ball.position.y);
             const theyScore = !r.saved && r.why !== 'off_target';

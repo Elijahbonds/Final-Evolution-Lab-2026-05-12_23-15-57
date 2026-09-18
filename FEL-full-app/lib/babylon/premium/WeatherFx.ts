@@ -16,9 +16,11 @@ export interface WeatherFxHandle { update(dt: number): void; dispose(): void }
 const GROUND_RE = /venue_ground|venue_rough|^field$|^green$|court|fairway|turf/i;
 
 function streakTexture(scene: Scene, snow: boolean): DynamicTexture {
-  const tex = new DynamicTexture(snow ? 'wx_flake' : 'wx_streak', { width: 16, height: 64 }, scene, false);
-  const ctx = tex.getContext() as CanvasRenderingContext2D; ctx.clearRect(0, 0, 16, 64);
-  if (snow) { const g = ctx.createRadialGradient(8, 32, 1, 8, 32, 7); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, 24, 16, 16); }
+  // a flake fills a SQUARE sprite (the first cut drew a 16 px dot in the middle of a 16 x 64 streak canvas: a 5 cm
+  // dot inside a 25 cm quad, 1.5 px at ten metres — 700 of them alive and none visible)
+  const tex = new DynamicTexture(snow ? 'wx_flake' : 'wx_streak', { width: snow ? 32 : 16, height: snow ? 32 : 64 }, scene, false);
+  const ctx = tex.getContext() as CanvasRenderingContext2D; ctx.clearRect(0, 0, 32, 64);
+  if (snow) { const g = ctx.createRadialGradient(16, 16, 2, 16, 16, 15); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.6, 'rgba(255,255,255,0.8)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 32, 32); }
   else { const g = ctx.createLinearGradient(0, 0, 0, 64); g.addColorStop(0, 'rgba(220,235,255,0)'); g.addColorStop(0.5, 'rgba(220,235,255,0.9)'); g.addColorStop(1, 'rgba(220,235,255,0)'); ctx.fillStyle = g; ctx.fillRect(6, 0, 4, 64); }
   tex.update(); tex.hasAlpha = true; return tex;
 }
@@ -86,7 +88,7 @@ export function mountWeatherFx(scene: Scene, lights: LightRigHandle | null, kit:
     const w = kit.flightWind();
     ps.direction1 = new Vector3(w.x * 0.6, snow ? -1.2 : -14, w.z * 0.6); ps.direction2 = new Vector3(w.x * 0.6 + 0.3, snow ? -2.2 : -18, w.z * 0.6 + 0.3);
     ps.gravity = new Vector3(0, snow ? -0.4 : -6, 0);
-    ps.minScaleX = snow ? 0.14 : 0.08; ps.maxScaleX = snow ? 0.26 : 0.11; ps.minScaleY = snow ? 0.14 : 1.0; ps.maxScaleY = snow ? 0.26 : 1.6;
+    ps.minScaleX = snow ? 0.22 : 0.08; ps.maxScaleX = snow ? 0.4 : 0.11; ps.minScaleY = snow ? 0.22 : 1.0; ps.maxScaleY = snow ? 0.4 : 1.6;
     ps.minLifeTime = snow ? 5 : 0.9; ps.maxLifeTime = snow ? 8 : 1.4;
     ps.color1 = new Color4(1, 1, 1, snow ? 0.9 : 0.7); ps.color2 = new Color4(0.9, 0.95, 1, snow ? 0.7 : 0.5); ps.colorDead = new Color4(1, 1, 1, 0);
     ps.emitRate = (snow ? 160 : 900) * (0.4 + s.intensity) * (tier === 'mobile' ? 0.35 : 1);   // measured: 260/s over a 32 m square was invisible

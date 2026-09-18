@@ -4,6 +4,16 @@
 import { Color3, MeshBuilder, TransformNode, Vector3, type Mesh, type Scene } from '@babylonjs/core';
 import { VenueKit } from './VenueKit';
 
+export interface RingHandle { set(x: number, z: number): void; show(on: boolean): void; dispose(): void }
+/** A flat ring on the ground: a tennis landing point, a football pursuit point. */
+export function mountRing(scene: Scene, hex = '#22d3ee', diameter = 1.6, y = Y): RingHandle {
+  const m = VenueKit.paint(scene, `ring_m_${hex}_${diameter}`, hex, 0.6, 0.9);
+  m.unlit = true; m.emissiveColor = Color3.FromHexString(hex).scale(0.9); m.alpha = 0.85;
+  const ring = MeshBuilder.CreateTorus(`ring_${hex}`, { diameter, thickness: 0.08, tessellation: 40 }, scene);
+  ring.material = m; ring.isPickable = false; ring.position.y = y;
+  return { set(x, z) { ring.position.set(x, y, z); }, show(on) { ring.isVisible = on; }, dispose() { ring.dispose(); m.dispose(); } };
+}
+
 export interface AimArrowHandle {
   /** Draw from `from` along `yaw` for `carryM`, the ring at `landing`, the run-out dots to `rest` (both flat). */
   set(from: Vector3, yaw: number, carryM: number, landing: { x: number; z: number } | null, rest?: { x: number; z: number } | null): void;
@@ -13,7 +23,8 @@ export interface AimArrowHandle {
 
 const Y = 0.035;   // just over the turf (the player ring sits at 0.025)
 
-export function mountAimArrow(scene: Scene, hex = '#22d3ee'): AimArrowHandle {
+/** `y`: the arrow's height — a turf that stands above y 0 (the kit gridiron at 0.05) hides a 12 mm shaft laid at 0.035. */
+export function mountAimArrow(scene: Scene, hex = '#22d3ee', y = Y): AimArrowHandle {
   const root = new TransformNode('aim_arrow', scene);
   const m = VenueKit.paint(scene, 'aim_arrow_m', hex, 0.6, 0.9);
   m.unlit = true; m.emissiveColor = Color3.FromHexString(hex).scale(0.9); m.alpha = 0.85;
@@ -33,12 +44,12 @@ export function mountAimArrow(scene: Scene, hex = '#22d3ee'): AimArrowHandle {
   return {
     set(from, yaw, carryM, landing, rest) {
       const len = Math.max(0.6, carryM);
-      root.position.set(from.x, Y, from.z); root.rotation.y = yaw;
+      root.position.set(from.x, y, from.z); root.rotation.y = yaw;
       shaft.scaling.z = len - 0.4; shaft.position.z = (len - 0.4) / 2;
       head.position.z = len - 0.3; head.rotation.y = 0; head.rotation.z = -Math.PI / 2;   // a triangle disc's first vertex points +x; turned to point down +z
-      if (landing) { ring.position.set(landing.x, Y, landing.z); ring.isVisible = shown; } else ring.isVisible = false;
+      if (landing) { ring.position.set(landing.x, y, landing.z); ring.isVisible = shown; } else ring.isVisible = false;
       if (landing && rest) {
-        for (let i = 0; i < DOTS; i++) { const t = (i + 1) / (DOTS + 1); dots[i].position.set(landing.x + (rest.x - landing.x) * t, Y, landing.z + (rest.z - landing.z) * t); dots[i].isVisible = shown && Math.hypot(rest.x - landing.x, rest.z - landing.z) > 1.5; }
+        for (let i = 0; i < DOTS; i++) { const t = (i + 1) / (DOTS + 1); dots[i].position.set(landing.x + (rest.x - landing.x) * t, y, landing.z + (rest.z - landing.z) * t); dots[i].isVisible = shown && Math.hypot(rest.x - landing.x, rest.z - landing.z) > 1.5; }
       } else for (const d of dots) d.isVisible = false;
     },
     show(on) { shown = on; for (const x of all) x.isVisible = on; if (!on) return; },

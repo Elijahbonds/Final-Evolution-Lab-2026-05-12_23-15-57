@@ -288,11 +288,42 @@ export function makeTimingHost(opts: TimingHostOpts) {
         )}
         {typeof hud.kickPower === 'number' && (
           <div className="pointer-events-none absolute inset-x-0 bottom-28 flex flex-col items-center gap-1 font-mono">
-            <span className="fel-panel px-3 py-0.5 text-[11px] font-bold tracking-widest text-[var(--fel-cyan)]">POWER — KICK again to strike</span>
-            <div className="relative h-5 w-[min(520px,70vw)] overflow-hidden rounded-md border border-white/20 bg-black/55">
-              <div className="absolute inset-y-0 left-[55%] w-[30%] bg-[var(--fel-gold)]/60" />
+            <span className="fel-panel px-3 py-0.5 text-[11px] font-bold tracking-widest text-[var(--fel-cyan)]">POWER — KICK again to strike{typeof hud.kickShape === 'string' && hud.kickShape ? ` · ${hud.kickShape}` : ''}</span>
+            {/* SOCCER UPGRADE (PES bar): ZONES with lines — soft, driven, top bins, and OVER (the ball clears the bar) */}
+            <div className="relative mt-4 h-7 w-[min(520px,70vw)] rounded-md border border-white/20 bg-black/55">
+              {(() => { const zones = typeof hud.kickZones === 'string' && hud.kickZones ? hud.kickZones.split(',').map((z) => { const [to, label] = z.split(':'); return { to: Number(to), label }; }) : [{ to: 0.55, label: '' }, { to: 0.85, label: 'DRIVEN' }, { to: 1, label: '' }];
+                let from = 0; return zones.map((z, i) => { const el = (
+                  <div key={i} className={`absolute inset-y-0 ${z.label === 'OVER' ? 'bg-[#ff2d78]/45' : z.label === 'TOP BINS' ? 'bg-[var(--fel-gold)]/60' : z.label === 'DRIVEN' ? 'bg-[var(--fel-cyan)]/25' : 'bg-white/5'}`} style={{ left: `${from * 100}%`, width: `${(z.to - from) * 100}%` }}>
+                    <span className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold text-white/65">{z.label}</span>
+                    <div className="absolute inset-y-0 right-0 w-px bg-white/70" />
+                  </div>); from = z.to; return el; }); })()}
               <div className="absolute inset-y-0 w-[4px] -translate-x-1/2 bg-white shadow-[0_0_8px_#fff]" style={{ left: `${Math.max(0, Math.min(100, hud.kickPower))}%` }} />
             </div>
+          </div>
+        )}
+        {/* TENNIS UPGRADE (Wii timing): the swing window as a meter with its bands — the mode publishes the ramp (contact at
+            the right edge) and where OK / GOOD / PERFECT begin for this flight. Key-gated on the bands. */}
+        {typeof hud.shotMeterT === 'number' && hud.shotMeterT > 0 && typeof hud.shotMeterBands === 'string' && hud.shotMeterBands && (() => {
+          const [ok, good, perfect] = hud.shotMeterBands.split(',').map(Number); const pc = (v: number) => `${Math.max(0, Math.min(1, v)) * 100}%`;
+          return (
+            <div className="pointer-events-none absolute inset-x-0 bottom-28 flex flex-col items-center gap-1 font-mono">
+              <span className="fel-panel px-3 py-0.5 text-[11px] font-bold tracking-widest text-[var(--fel-cyan)]">SWING — in the gold at the edge</span>
+              <div className="relative h-6 w-[min(520px,70vw)] rounded-md border border-white/20 bg-black/55">
+                <div className="absolute inset-y-0 bg-white/15" style={{ left: pc(ok), right: 0 }} />
+                <div className="absolute inset-y-0 bg-[var(--fel-cyan)]/30" style={{ left: pc(good), right: 0 }} />
+                <div className="absolute inset-y-0 bg-[var(--fel-gold)]/70" style={{ left: pc(perfect), right: 0 }} />
+                {[ok, good, perfect].map((v, i) => <div key={i} className="absolute inset-y-0 w-px bg-white/70" style={{ left: pc(v) }} />)}
+                <span className="absolute -top-4 -translate-x-1/2 text-[9px] font-bold text-white/60" style={{ left: pc(ok) }}>EARLY</span>
+                <span className="absolute -top-4 -translate-x-1/2 text-[9px] font-bold text-[var(--fel-gold)]" style={{ left: pc(perfect) }}>PERFECT</span>
+                <div className="absolute inset-y-0 w-[4px] -translate-x-1/2 bg-white shadow-[0_0_8px_#fff]" style={{ left: pc(hud.shotMeterT) }} />
+              </div>
+            </div>
+          );
+        })()}
+        {/* WEATHER chip for the modes without the golf lie panel (which carries its own) */}
+        {typeof hud.weather === 'string' && hud.weather && !(typeof hud.club === 'string' && hud.club) && (
+          <div className="pointer-events-none absolute right-4 top-14 font-mono">
+            <span className="fel-panel px-3 py-1 text-[11px] font-bold tracking-wider text-white/85">{hud.weather}</span>
           </div>
         )}
         {typeof hud.dive === 'string' && hud.dive && (

@@ -91,7 +91,8 @@ for (let g = 0; g < 4000 && Date.now() < deadline; g++) {
     for (let w = 0; w < 40; w++) {
       await p.waitForTimeout(60);
       const hw = await hud();
-      if (typeof hw.power === 'number' && hw.power >= 88) break;
+      // SOCCER UPGRADE (2026-09-18): the bar has ZONES now and 88 is where OVER begins — a person strikes in TOP BINS
+      if (typeof hw.power === 'number' && hw.power >= 76) break;
     }
     await p.keyboard.press('j');               // KICK — strike
     await p.waitForTimeout(2600);              // the kick + their answer beat

@@ -58,7 +58,7 @@ const STYLE_MODES = new Set(['karate', 'karate-vs', 'duel', 'showdown', 'mixedco
  */
 const TIER_MODES = new Set(['velocitykart', 'aeroaces', 'football']);
 /** WEATHER (docs/SPEC-WEATHER.md): the outdoor modes that read the pick — pickerReach keeps this honest; WEATHER_FAMILY_OF in nexus/weather names the family. */
-const WEATHER_MODES = new Set(['golf']);
+const WEATHER_MODES = new Set(['golf', 'soccer', 'tennis', 'football']);
 // Deliberately SHORT, and it grows as modes are wired rather than ahead of them. The first draft listed
 // eighteen — every mode with an opponent — and sixteen of those read nothing, which is the exact hollow
 // picker the pickerReach guard exists to catch. Dunk, 1v1, 3v3 and the net sports already have their own

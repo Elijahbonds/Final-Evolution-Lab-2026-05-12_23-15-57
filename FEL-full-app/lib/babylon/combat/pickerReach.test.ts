@@ -49,6 +49,9 @@ function modesById(): Map<string, string> {
         out.set(m[1], f);
       }
     }
+    // a net sport is a CONFIG (TennisMode.ts: createNetSportMode({ modeId: 'tennis', … })) — the mode that reads the
+    // picks is NetSportMode.ts, so that is the file a pick is looked for in
+    if (/createNetSportMode\(/.test(src)) for (const m of src.matchAll(/modeId:\s*'([^']+)'/g)) out.set(m[1], 'NetSportMode.ts');
   }
   return out;
 }
