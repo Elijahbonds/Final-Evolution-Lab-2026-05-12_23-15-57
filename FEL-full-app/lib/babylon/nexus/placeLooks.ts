@@ -11,6 +11,7 @@
 import type { BackdropKind, GroundKind, PropKind } from './NexusWebScene';
 import type { VenueMood } from '../scene/moods';
 import type { BackdropFamily } from '../visual/Backdrops';
+import { FREERUN_TRACKS } from './freeRunTracks';
 
 export interface PlaceLook {
   id: string; name: string; sub: string; tint: string;
@@ -95,11 +96,8 @@ export const PLACE_LOOKS: Record<string, PlaceLook[]> = {
     { id: 'beach-dash', name: 'Beach Dash', sub: 'A BLUE TRACK ON THE SAND · THE SEA BESIDE LANE ONE', tint: '#3b6bb5', world: { mood: 'goldenHour', backdrop: 'ocean', colors: { turf: '#cdb47c', track: '#3b6bb5' } } },
     { id: 'night-meet', name: 'Night Meet', sub: 'FLOODLIGHTS · THE STANDS FULL', tint: '#9ad7ff', world: { mood: 'nightGame', backdrop: 'stadium', colors: { turf: '#2f5a30', track: '#7a2e3a' } } },
   ],
-  freerun: [
-    home('Night Rooftops', 'THE COURSE AT NIGHT · MARKERS LIT', '#3FB8B0'),
-    { id: 'dawn-plaza', name: 'Dawn Plaza', sub: 'WARM STONE · THE BOARDWALK BEHIND', tint: '#ffb36b', world: { mood: 'goldenHour', backdrop: 'venice', colors: { ground: '#8a8078', vault: '#c98a4b', wall: '#b56a4a', ledge: '#2f9a94', roof: '#2f9a94' } } },
-    { id: 'overcast-yard', name: 'Overcast Yard', sub: 'GREY CONCRETE · A HIGH FLAT LIGHT', tint: '#9aa3ad', world: { mood: 'overcast', backdrop: 'park', colors: { ground: '#5a5e66', vault: '#9a7a4a', wall: '#6a7078', ledge: '#3fb8b0', roof: '#3fb8b0' } } },
-  ],
+  // FREE RUN: the four tracks (nexus/freeRunTracks.ts) ARE its places — the pick is the course.
+  freerun: FREERUN_TRACKS.map((t) => ({ id: t.id, name: t.name, sub: t.sub, tint: t.tint, world: t.world })),
   showdown: [
     home('Sovereign Dojo', 'THE SHRINE COURTYARD', '#FF2D55'),
     { id: 'night-dojo', name: 'Night Dojo', sub: 'LANTERNS ON THE GRAVEL · THE SHRINE DARK', tint: '#9ad7ff', sky: NIGHT, backdrop: 'dojo', ground: { color: '#8f8a80', line: '#4a4038' }, props: [lamp(-7, 7, '#FFD79A'), lamp(7, 7, '#FFD79A')] },

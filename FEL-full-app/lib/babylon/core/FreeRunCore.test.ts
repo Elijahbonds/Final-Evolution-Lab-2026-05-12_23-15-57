@@ -79,9 +79,10 @@ describe('FreeRun — the course', () => {
       expect(courseLength(p)).toBeGreaterThan(50);
       expect(p.some((q) => q.route === 'high')).toBe(true);
       expect(p.some((q) => q.route === 'low')).toBe(true);
-      expect(p.filter((q) => q.kind === 'gap')).toHaveLength(tier.gaps);
+      expect(p.filter((q) => q.kind === 'gap').length).toBeGreaterThanOrEqual(tier.gaps);   // the tracks (2026-09-18): a gaps section per track carries the tier's gaps
       const cps = checkpoints(p);
-      expect(cps.map((c) => c.index)).toEqual([1, 2]);
+      expect(cps.map((c) => c.index)).toEqual(cps.map((_, i) => i + 1));
+      expect(cps.length).toBeGreaterThanOrEqual(2);
       expect(cps[0].z).toBeLessThan(cps[1].z);
       // every piece except gaps sits at or above the ground; ground slabs tile without a hole between them
       const slabs = p.filter((q) => q.kind === 'ground').sort((a, b) => a.z - b.z);

@@ -13,7 +13,7 @@ export const VAULT_GATE = 2.6;     // vault and slide need this much
 export const ACCEL = 7.5;          // m/s² toward the stick's wish
 export const DECEL = 9.0;          // m/s² with no input
 
-export type RunState = 'ground' | 'air' | 'wallrun' | 'slide' | 'down';
+export type RunState = 'ground' | 'air' | 'wallrun' | 'slide' | 'down' | 'grind' | 'surf' | 'swing';   // FLOW (2026-09-18): the rail grind, the surface surf, the grapple swing
 
 export type Verb = 'JUMP' | 'VAULT' | 'SLIDE' | 'WALL RUN' | 'WALL KICK' | 'CAT LEAP' | 'PRECISION' | 'ROLL';
 

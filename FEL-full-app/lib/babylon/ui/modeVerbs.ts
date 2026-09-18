@@ -223,11 +223,13 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
 
   // FreeRun (A+ mission #10): the stick runs; A jumps / vaults / wall-runs by context, B slides (or rolls a landing),
   // X flips (the stick picks front / back / side), Y twists or cat-leaps a ledge.
+  // FREE RUN as the parkour racer (owner brief 2026-09-18): A jumps / vaults / rebounds, B slides, X flips in the air and
+  // kicks a hazard on the ground, Y is the kinetic overdrive on the ground and the twist in the air.
   freerun: verbs({
     A: { label: 'JUMP', emit: A('A') },
     B: { label: 'SLIDE', emit: A('B') },
-    X: { label: 'FLIP', emit: A('X') },
-    Y: { label: 'TWIST', emit: A('Y') },
+    X: { label: 'FLIP / KICK', emit: A('X') },
+    Y: { label: 'OVERDRIVE', emit: A('Y') },
   }),
   // Snowboard big air (air-session core). The RUN is the d-pad cadence, so the face buttons only carry the two air verbs.
   bigair: verbs({

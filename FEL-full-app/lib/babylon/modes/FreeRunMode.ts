@@ -43,10 +43,14 @@ import { assertSpawned } from '../core/FrameGuard';
 import { initPhysics } from '../core/Physics';
 import { ComboChain } from '../core/ComboChain';
 import {
-  verbsFor, stepSpeed, gradeDrop, speedAfterLanding, trickPoints, trickCompletes, FREERUN_TRICKS, TIERS, tierById,
+  verbsFor, stepSpeed, gradeDrop, speedAfterLanding, trickPoints, trickCompletes, FREERUN_TRICKS, TIERS, tierById, VAULT_GATE,
   timeBonus, runGrade, RUN_MAX, ROLL_WINDOW_S, type RunState, type Env, type FreeRunTrick, type Tier, type Landing, type LAUNCH_MULT,
 } from '../core/FreeRunCore';
-import { coursePieces, courseLength, checkpoints, respawnFor, overGap, routeAt, type Piece } from './freeRunCourse';
+import { trackPieces, courseLength, checkpoints, respawnFor, overGap, routeAt, laneAt, railAt, springAt, gateAhead, hazardAhead, type Piece } from './freeRunCourse';
+// FLOW (owner brief 2026-09-18): the parkour racer's momentum rules — flow and kinetic meters, the vector rebound, the
+// momentum vault, rails, surf, springs, speed gates and the grapple. Pure in core/FreeRunFlow; the tracks in nexus/freeRunTracks.
+import { FLOW, FlowMeter, KINETIC, KineticMeter, vectorRebound, approachDeg, vaultTiming, VAULT, REBOUND, gateOpen, canGrapple, swingAt, GRAPPLE } from '../core/FreeRunFlow';
+import { trackById, type FreeRunTrack } from '../nexus/freeRunTracks';
 
 const CAPSULE_H = 1.7, CAPSULE_R = 0.32;
 /** Seconds at the start line before the clock runs on its own; the run is called at this many times the course par. */
@@ -86,6 +90,13 @@ interface St {
   vy: number;
   /** A+ P0 juice: performance.now() of the last bail punch (one per crash), and the one finish punch. */
   bailAt: number; finishLatch: boolean;
+  // FLOW (2026-09-18)
+  track: FreeRunTrack; flow: FlowMeter; kinetic: KineticMeter;
+  grindRail: Piece | null; grindEndAt: number; surfSec: number; dashSec: number; ltHeld: boolean; rtHeld: boolean;
+  swing: { from: Vector3; anchor: Piece; t: number } | null; anchorNear: Piece | null;
+  wallApproachDeg: number; wallDist: number; vaultDist: number;
+  gateAggs: Map<number, PhysicsAggregate>; pieceMesh: Map<number, Mesh>; springLatch: number; slideEndAt: number; rsTricked: boolean;
+  stats: { rebounds: number; perfectVaults: number; grinds: number; surfs: number; springs: number; gates: number; grapples: number; bursts: number; slams: number; kicks: number; flowBursts: number };
 }
 const states = new WeakMap<Scene, St>();
 const live = new Set<St>();
@@ -94,7 +105,8 @@ const live = new Set<St>();
 const PBR_ALBEDO_SCALE = 0.42;
 // SCORECARD VISUALS (2026-09-15): the course read as one grey-blue mass — the ground drops away from the things you USE,
 // so the vault box, the wall and the bar each own a colour against it.
-const MAT: Record<string, string> = { ground: '#6E6A66', vault: '#D99A3C', wall: '#C4603F', ledge: '#3FB8B0', roof: '#3FB8B0', bar: '#F2C230', start: '#3DDC97', finish: '#F4C542', checkpoint: '#4FD1E8', gap: '#000000' };
+const MAT: Record<string, string> = { ground: '#6E6A66', vault: '#D99A3C', wall: '#C4603F', ledge: '#3FB8B0', roof: '#3FB8B0', bar: '#F2C230', start: '#3DDC97', finish: '#F4C542', checkpoint: '#4FD1E8', gap: '#000000', rail: '#e5e7eb', spring: '#34d399', gate: '#f87171', anchor: '#fde68a', hazard: '#b45309', slope: '#5a5e66' };
+const SPRING_V = 8.8, GRIND_MIN = 4.5, SURF_TOP = 1.6, KICK_M = 1.6;
 
 /** The camera preset's resting fov, captured on the first frame after load. */
 let baseFov: number | null = null;
@@ -104,7 +116,8 @@ export const FreeRunMode: ModeDefinition = (() => {
 
   function buildCourse(ctx: ModeContext, S: St): void {
     for (const m of S.meshes) m.dispose(); S.meshes = []; S.aggs = [];
-    S.pieces = coursePieces(S.tier);
+    S.pieces = trackPieces(S.track, S.tier);
+    S.gateAggs.clear(); S.pieceMesh.clear();
     // EVERY PIECE WAS A StandardMaterial, AND THAT IS WHY THIS MODE LOOKED UNFINISHED.
     //
     // Per-mode visual audit (2026-09-13): Freerun graded C — "untextured white/grey blocks on a white plane"
@@ -118,7 +131,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     // Roughness varies by what the thing IS — concrete ground is matte, a metal bar is not — which is a
     // distinction StandardMaterial could not express here at all.
     const mats = new Map<string, PBRMaterial>();
-    const GLOW = new Set(['ledge', 'roof', 'finish', 'start', 'checkpoint']);
+    const GLOW = new Set(['ledge', 'roof', 'finish', 'start', 'checkpoint', 'rail', 'spring', 'gate', 'anchor']);
     const ROUGH: Record<string, number> = { ground: 0.95, vault: 0.8, wall: 0.85, bar: 0.35 };
     const matFor = (kind: string): PBRMaterial => {
       let m = mats.get(kind);
@@ -141,12 +154,16 @@ export const FreeRunMode: ModeDefinition = (() => {
       const isGate = p.kind === 'start' || p.kind === 'finish' || p.kind === 'checkpoint';
       const box: Mesh = MeshBuilder.CreateBox(`fr_${p.kind}_${i}`, { width: p.w, height: p.h, depth: p.d }, ctx.scene);
       box.position.set(p.x, p.y, p.z);
+      if (p.kind === 'slope' && p.pitch) box.rotation.x = p.pitch;   // the spillway: a tilted slab (the aggregate follows the mesh)
       box.material = matFor(p.kind);
       box.metadata = { freerun: p.kind, pieceIndex: i };
+      S.pieceMesh.set(i, box);
       // SCORECARD VISUALS (2026-09-15): at 0.35 the start gate's slab washed over the whole course in the opening frame —
       // a gate is a MARKER you run through, not a pane of fog
       if (isGate) { box.visibility = 0.18; box.isPickable = false; }
       else if (p.kind === 'bar') { box.isPickable = true; }             // a gate you slide under; not a collider (the capsule cannot crouch)
+      else if (p.kind === 'rail' || p.kind === 'anchor' || p.kind === 'spring') { box.isPickable = false; }   // a rail is ridden by state, not collided with; an anchor is a point; a spring is a pad you run over (a collider stopped the capsule at its edge)
+      else if (p.kind === 'gate') { box.visibility = 0.45; box.isPickable = false; const agg = new PhysicsAggregate(box, PhysicsShapeType.BOX, { mass: 0, friction: 0.9 }, ctx.scene); S.aggs.push(agg); S.gateAggs.set(i, agg); }   // a speed gate: solid until you are fast enough
       else S.aggs.push(new PhysicsAggregate(box, PhysicsShapeType.BOX, { mass: 0, friction: 0.9 }, ctx.scene));
       S.meshes.push(box);
     }
@@ -156,7 +173,8 @@ export const FreeRunMode: ModeDefinition = (() => {
     const h = S.combo.hud;
     ctx.setHud({
       speed: Math.round(S.speed * 10) / 10, speedMax: RUN_MAX,
-      verbs: verbsFor(S.state, S.speed, S.env).join(' · '),
+      verbs: [...verbsFor(S.state, S.speed, S.env), ...(S.state === 'ground' && S.env.wallAhead && S.wallApproachDeg >= REBOUND.minDeg && S.wallApproachDeg <= REBOUND.maxDeg ? ['REBOUND'] : []), ...(S.anchorNear ? ['GRAPPLE'] : []), ...(S.state === 'grind' ? ['GRIND'] : []), ...(S.state === 'surf' ? ['SURF'] : []), ...(S.kinetic.canSlam ? ['SLAM'] : S.kinetic.canBurst ? ['BURST'] : [])].join(' · '),
+      flow: S.flow.tier, flowFrac: Math.round(S.flow.frac * 100), kinetic: Math.round(S.kinetic.value), lane: laneAt(S.hero?.root.position.x ?? 0, S.hero?.root.position.y ?? 0).toUpperCase(), track: S.track.name,
       combo: h.combo, pot: h.pot, banked: h.banked, score: h.banked + h.pot,
       time: Math.round(S.runSec * 10) / 10, checkpoint: `${S.checkpoint}/${checkpoints(S.pieces).length}`,
       tier: S.tier.name, route: S.highTouched ? 'HIGH LINE' : 'LOW LINE', runState: S.state,
@@ -197,13 +215,93 @@ export const FreeRunMode: ModeDefinition = (() => {
     S.landAt = S.clock; S.landing = landing; S.tree?.clearBeat('land_clean', 'land_sketchy');
   }
 
+  // ── FLOW verbs (owner brief 2026-09-18) ──────────────────────────────
+  function say(ctx: ModeContext, text: string, ms = 700): void { flash(ctx, text, ms); console.info(`[FR-FLOW] ${text}`); }
+  /** The VECTOR REBOUND: the heading reflects off the wall, the speed is kept (plus a little when the tap is on the contact). */
+  function rebound(ctx: ModeContext, S: St): boolean {
+    const n = S.wallNormal;
+    const r = vectorRebound({ x: S.heading.x, z: S.heading.z }, { x: n.x, z: n.z });
+    if (!r) return false;
+    const onContact = S.wallDist < 0.9;
+    S.heading.set(r.x, 0, r.z);
+    S.speed = S.speed * REBOUND.keep + (onContact ? REBOUND.bonus : 0);
+    S.flow.add(FLOW.rebound); S.kinetic.add(KINETIC.chain * 0.5); S.stats.rebounds++;
+    S.state = 'air'; S.airStartY = S.hero!.root.position.y; S.airSec = 0; S.launch = 'wallkick'; S.trick = null; S.rollAt = null;
+    S.vy = 3.2; S.cc!.setVelocity(new Vector3(r.x * S.speed, S.vy, r.z * S.speed)); jumpBeat(S);
+    S.combo.add('REBOUND', 70, 'grind');
+    say(ctx, onContact ? 'VECTOR REBOUND · PERFECT' : 'VECTOR REBOUND');
+    SoundKit.play('impact', { pitch: 1.5, volume: 0.45 }); ctx.feel?.impact?.(0.25); ctx.juice.flash('#ffffff', 60);
+    return true;
+  }
+  /** Onto a rail: the grind locks the line and keeps the speed (a slide straight into it pays a mini boost). */
+  function startGrind(ctx: ModeContext, S: St, rail: Piece): void {
+    S.state = 'grind'; S.grindRail = rail; S.speed = Math.max(GRIND_MIN, S.speed); S.trick = null; S.vy = 0;
+    const fromSlide = S.clock - S.slideEndAt < 0.35;
+    if (fromSlide) { S.speed += 1.5; S.flow.add(20); say(ctx, 'SLIDE TO GRIND · BOOST'); } else say(ctx, 'RAIL GRIND');
+    S.stats.grinds++; S.combo.add('GRIND', 40, 'grind'); SoundKit.play('swish', { pitch: 0.9, volume: 0.4 });
+  }
+  function endGrind(S: St, vy: number): void {
+    S.grindRail = null; S.state = 'air'; S.airStartY = S.hero!.root.position.y; S.airSec = 0; S.launch = 'ground'; S.trick = null; S.rollAt = null;
+    S.vy = vy; S.cc!.setVelocity(new Vector3(S.heading.x * S.speed, vy, S.heading.z * S.speed)); jumpBeat(S);
+  }
+  /** A speed gate ahead: fast enough and it opens; too slow and it is a wall. */
+  function tickGates(ctx: ModeContext, S: St): void {
+    const p = S.hero!.root.position;
+    const g = gateAhead(S.pieces, p.x, p.z, 3);
+    if (!g) return;
+    const i = S.pieces.indexOf(g);
+    const agg = S.gateAggs.get(i);
+    if (!agg) return;
+    if (gateOpen(S.speed, g.gateTier ?? 1, RUN_MAX)) {
+      agg.dispose(); S.gateAggs.delete(i);
+      const m = S.pieceMesh.get(i); if (m) { m.visibility = 0.08; (m.material as PBRMaterial).emissiveColor = Color3.FromHexString('#34d399'); }
+      S.speed += 0.5; S.flow.add(15); S.stats.gates++;
+      say(ctx, `GATE OPEN · TIER ${g.gateTier}`); SoundKit.play('clang', { pitch: 1.2, volume: 0.5 }); ctx.juice.flash('#34d399', 70);
+    } else if (g.z - p.z < 0.9 && S.clock - S.springLatch > 0.8) { S.springLatch = S.clock; say(ctx, `LOCKED — TIER ${g.gateTier} SPEED`, 600); }
+  }
+  /** X on a loose hazard: kick it down the course (a weapon against whoever is behind it — the rivals are the next pass). */
+  function kickHazard(ctx: ModeContext, S: St): boolean {
+    const p = S.hero!.root.position;
+    const h = hazardAhead(S.pieces, p.x, p.z, KICK_M);
+    if (!h) return false;
+    const i = S.pieces.indexOf(h);
+    const m = S.pieceMesh.get(i); const agg = S.aggs.find((a) => a.transformNode === m);
+    if (agg) { agg.dispose(); S.aggs = S.aggs.filter((a) => a !== agg); }
+    if (m) { const from = m.position.clone(); const t0 = S.clock; const obs = ctx.scene.onBeforeRenderObservable.add(() => { const u = Math.min(1, (S.clock - t0) / 0.7); m.position.set(from.x, from.y + Math.sin(u * Math.PI) * 1.4, from.z + u * 11); m.rotation.x += 0.3; if (u >= 1) { ctx.scene.onBeforeRenderObservable.remove(obs); m.setEnabled(false); } }); }
+    S.pieces.splice(i, 1, { ...h, kind: 'gap', y: -99, d: 0, w: 0 });   // gone from the readers (a zero-size gap is nothing)
+    S.speed += 0.6; S.kinetic.add(10); S.stats.kicks++;
+    S.combo.add('KICK', 25, 'manual'); say(ctx, 'KICKED IT DOWN THE LINE'); SoundKit.play('impact', { pitch: 1.1, volume: 0.5 }); ctx.feel?.impact?.(0.3);
+    return true;
+  }
+  /** LB near an anchor: the grapple — a swing under it that exits past it, faster. */
+  function grapple(ctx: ModeContext, S: St): boolean {
+    const a = S.anchorNear; if (!a) return false;
+    S.swing = { from: S.hero!.root.position.clone(), anchor: a, t: 0 }; S.state = 'swing'; S.trick = null; S.vy = 0;
+    S.stats.grapples++; S.combo.add('GRAPPLE', 55, 'grind'); say(ctx, 'GRAPPLE'); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.5 });
+    return true;
+  }
+  /** Y: KINETIC OVERDRIVE — a ground slam with a full meter, else a forward burst with half of one. */
+  function overdrive(ctx: ModeContext, S: St): boolean {
+    if (S.state !== 'air' && S.kinetic.spendSlam()) {
+      S.stats.slams++; S.combo.add('SLAM', 90, 'air');
+      EffectsKit.burst(ctx.scene, S.hero!.root.position, 'dust', 3); ctx.juice.shake(0.18, 220); ctx.juice.hitStop(50); ctx.feel?.impact?.(0.6); SoundKit.play('thud', { pitch: 0.6, volume: 0.8 });
+      say(ctx, 'GROUND SLAM'); return true;
+    }
+    if (S.kinetic.spendBurst()) {
+      S.speed += KINETIC.burstSpeed; S.dashSec = KINETIC.burstSec; S.stats.bursts++;
+      ctx.juice.flash('#fde68a', 60); SoundKit.play('whoosh', { pitch: 1.4, volume: 0.6 }); ctx.feel?.impact?.(0.3);
+      say(ctx, 'KINETIC BURST'); return true;
+    }
+    refuse(ctx, 'OVERDRIVE — METER LOW'); return false;
+  }
+
   /** The tree is fed once per frame, every phase, from the run's context — the movement INTENT included (S.speed is the
    *  speed the runner keeps through a landing, so a landing under a held stick settles onto the run, not an idle flash). */
   function feedTree(S: St): void {
     if (!S.tree) return;
-    const airborne = S.state === 'air';
+    const airborne = S.state === 'air' || S.state === 'swing';
     // one read, two consumers (the clip and the body under it)
-    S.bio.state = S.state === 'ground' || S.state === 'air' || S.state === 'wallrun' || S.state === 'slide' || S.state === 'down' ? S.state : 'ground';
+    S.bio.state = S.state === 'ground' || S.state === 'air' || S.state === 'wallrun' || S.state === 'slide' || S.state === 'down' ? S.state : S.state === 'surf' ? 'slide' : S.state === 'swing' ? 'air' : 'ground';
     S.bio.speed01 = S.finished ? 0 : Math.min(1, S.speed / RUN_MAX);
     S.bio.tricking = airborne && !!S.trick;
     S.bio.landing = !airborne && S.clock - S.landAt < LAND_BEAT_SEC;
@@ -216,7 +314,7 @@ export const FreeRunMode: ModeDefinition = (() => {
       jumpBeat: airborne && S.clock - S.jumpAt < JUMP_BEAT_SEC,
       tricking: airborne && !!S.trick,
       wallrun: S.state === 'wallrun',
-      sliding: S.state === 'slide',
+      sliding: S.state === 'slide' || S.state === 'surf',
       landing: !airborne && S.clock - S.landAt < S.landBeatSec ? S.landing : 'none',
       takeoffClip: S.takeoffClip, landClip: S.landClip, slideClip: S.slideClip,
       down: S.state === 'down' && S.downSec > RISE_SEC,   // the last RISE_SEC of DOWN_SEC is the get-up
@@ -240,6 +338,12 @@ export const FreeRunMode: ModeDefinition = (() => {
     const ledge = cast(p.add(new Vector3(0, 4.2, 0)).add(fwd.scale(2.2)), new Vector3(0, -1, 0), 2.6, ['ledge', 'roof']);
     S.env = { vaultAhead: knee.hit, wallAhead: chest.hit, ledgeAhead: ledge.hit && !!ledge.point && ledge.point.y > p.y + 1.2, barAhead: head.hit };
     if (chest.hit && chest.normal) S.wallNormal.copyFrom(chest.normal);
+    // FLOW: how the wall is being approached (a rebound is oblique, a wall run head-on), how far the vault box is (the press is
+    // graded against it), and whether an anchor is in reach
+    S.wallApproachDeg = chest.hit && chest.normal ? 90 - approachDeg({ x: fwd.x, z: fwd.z }, { x: chest.normal.x, z: chest.normal.z }) : 0;
+    S.wallDist = chest.hit && chest.point ? Vector3.Distance(chest.point, p.add(new Vector3(0, 1.3, 0))) : 99;
+    S.vaultDist = knee.hit && knee.point ? Vector3.Distance(knee.point, p.add(new Vector3(0, 0.6, 0))) : 99;
+    S.anchorNear = S.pieces.find((q) => q.kind === 'anchor' && canGrapple({ x: p.x, y: p.y, z: p.z }, q)) ?? null;
   }
 
   // ── the run's beats ──────────────────────────────────────────────────
@@ -267,6 +371,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     } else if (landing === 'clean' && drop >= 2.4) { S.combo.add('ROLL', 30, 'revert'); flash(ctx, 'ROLL +30'); }
     // G3/G5: the flip's residual is NOT written to 0 here — it settles upright over the next few frames (see update).
     S.speed = speedAfterLanding(S.speed, landing);
+    if (landing === 'clean') { S.flow.add(FLOW.cleanLand); S.kinetic.add(KINETIC.cleanLand); if (S.trick) { S.flow.add(FLOW.trick); S.kinetic.add(KINETIC.chain); const b = S.flow.burst(); if (b > 0) { S.speed += b; S.stats.flowBursts++; say(ctx, `FLOW BURST +${b.toFixed(1)}`, 600); ctx.juice.flash('#22d3ee', 50); } } }   // FLOW: a landed trick spends a tier as speed
     if (landing === 'bail') {
       const lost = S.combo.bail(); S.bails++;
       S.state = 'down'; S.downSec = DOWN_SEC;   // the tree: fall → the floor → the get-up inside DOWN_SEC
@@ -348,7 +453,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     S.phase = 'run';
     buildCourse(ctx, S);
     behindRunner(ctx, S);
-    ctx.setHud({ banner: '', hint: 'stick RUNS · A JUMP / VAULT / WALL RUN · B SLIDE / ROLL · X FLIP (stick picks) · Y TWIST / CAT LEAP' });
+    ctx.setHud({ banner: '', hint: 'stick RUNS · RT SPRINT · A JUMP / VAULT / REBOUND / WALL RUN · LT or B SLIDE · X FLIP / KICK · Y OVERDRIVE · LB GRAPPLE · R-stick TRICKS' });
     hud(ctx, S);
   }
 
@@ -362,6 +467,7 @@ export const FreeRunMode: ModeDefinition = (() => {
       // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
       baseFov = null;
       const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tier') : null;
+      const trackQ = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('track') : null;   // FLOW: the track (the place pick, or ?track=)
       const S: St = {
         scene: ctx.scene, phase: 'pick', pickSec: 0, autoBegin: !!q,
         tier: tierById(q ? Number(q) : 1), pieces: [], meshes: [], aggs: [],
@@ -374,6 +480,10 @@ export const FreeRunMode: ModeDefinition = (() => {
         tree: null, jumpAt: -9, landAt: -9, landing: 'none', takeoffClip: null, landClip: null, slideClip: null, landBeatSec: LAND_BEAT_SEC,
         posture: null, bio: { ...FREERUN_INPUT_IDLE },
         bailAt: 0, finishLatch: false,
+        track: trackById(trackQ ?? readPlaceLook('freerun')?.id), flow: new FlowMeter(), kinetic: new KineticMeter(),
+        grindRail: null, grindEndAt: 0, surfSec: 0, dashSec: 0, ltHeld: false, rtHeld: false, swing: null, anchorNear: null,
+        wallApproachDeg: 0, wallDist: 99, vaultDist: 99, gateAggs: new Map(), pieceMesh: new Map(), springLatch: -9, slideEndAt: -9, rsTricked: false,
+        stats: { rebounds: 0, perfectVaults: 0, grinds: 0, surfs: 0, springs: 0, gates: 0, grapples: 0, bursts: 0, slams: 0, kicks: 0, flowBursts: 0 },
       };
       states.set(ctx.scene, S); live.add(S);
 
@@ -406,6 +516,8 @@ export const FreeRunMode: ModeDefinition = (() => {
       ctx.camDirector.setPreset('runner');
       ctx.camDirector.snapTo(S.hero.root.position, S.hero.root.position.add(new Vector3(0, 0, 8)));
       SoundKit.startAmbient('wind');
+      // THE PROBE SEAM (dev): the run's state and meters, and what the flow verbs have done
+      (ctx.scene.metadata ??= {}).freerun = { state: () => ({ x: +S.hero!.root.position.x.toFixed(2), y: +S.hero!.root.position.y.toFixed(2), z: +S.hero!.root.position.z.toFixed(2), speed: +S.speed.toFixed(2), state: S.state, flow: S.flow.tier, flowValue: Math.round(S.flow.value), kinetic: Math.round(S.kinetic.value), lane: laneAt(S.hero!.root.position.x, S.hero!.root.position.y), track: S.track.id, phase: S.phase, verbs: verbsFor(S.state, S.speed, S.env), wallDeg: +S.wallApproachDeg.toFixed(0), wallDist: +S.wallDist.toFixed(2), vaultDist: +S.vaultDist.toFixed(2), anchor: !!S.anchorNear, stats: { ...S.stats }, bails: S.bails, pieces: S.pieces.map((q) => ({ kind: q.kind, x: q.x, y: q.y, z: q.z, w: q.w, d: q.d, route: q.route, face: q.face })) }) };
       assertSpawned(ctx.scene, { hero: S.hero.root, minWorldMeshes: 6, modeId: 'freerun' });
       if (!S.autoBegin) showPick(ctx, S);
     },
@@ -416,6 +528,21 @@ export const FreeRunMode: ModeDefinition = (() => {
       // and the pick branch below used to swallow them — so a player who was already holding forward when the course
       // started stood still until they let go and pushed again (measured on the fake pad: 15 s of a held stick, 0 m).
       if (e.t === 'stick' && e.side === 'L') { S.stick.set(e.x, 0, -e.y); if (S.phase === 'run') return; }
+      // FLOW: RT sprints, LT slides (a hold), the RIGHT STICK throws the air tricks, LB grapples
+      if (S.phase === 'run') {
+        if (e.t === 'trigger' && e.side === 'R') { S.rtHeld = e.value > 0.5; return; }
+        if (e.t === 'trigger' && e.side === 'L') { const was = S.ltHeld; S.ltHeld = e.value > 0.5; if (S.ltHeld && !was && S.state === 'ground' && S.speed >= VAULT_GATE) { S.state = 'slide'; S.slideSec = SLIDE_SEC; S.slideClip = S.env.barAhead && S.hero.animator.clipNames.has('pk_duck') ? 'pk_duck' : null; S.combo.add('SLIDE', 35, 'manual'); flash(ctx, 'SLIDE'); SoundKit.play('whoosh', { pitch: 0.8 }); } return; }
+        if (e.t === 'stick' && e.side === 'R') {
+          const mag = Math.hypot(e.x, e.y);
+          if (mag < 0.7) { S.rsTricked = false; return; }
+          if (S.state === 'air' && !S.trick && !S.rsTricked) {
+            S.rsTricked = true;
+            const t: FreeRunTrick = Math.abs(e.x) > Math.abs(e.y) ? (Math.abs(e.x) > 0.9 ? FREERUN_TRICKS.spin : FREERUN_TRICKS.side) : e.y < 0 ? FREERUN_TRICKS.front : FREERUN_TRICKS.back;
+            S.trick = t; S.trickSpun = 0; SoundKit.play('whoosh', { pitch: 1.2, volume: 0.5 });
+          }
+          return;
+        }
+      }
       if (S.phase === 'pick') {
         if (e.t === 'dpad' && e.pressed && (e.dir === 'left' || e.dir === 'right')) {
           const i = TIERS.findIndex((t) => t.id === S.tier.id);
@@ -427,9 +554,22 @@ export const FreeRunMode: ModeDefinition = (() => {
       if (S.phase !== 'run') return;
       if (e.t !== 'button' || !e.pressed) return;
       const verbs = verbsFor(S.state, S.speed, S.env);
+      if (e.btn === 'L1') { if (!grapple(ctx, S)) refuse(ctx, 'GRAPPLE — NO ANCHOR IN REACH'); return; }
+      if (e.btn === 'R1') { refuse(ctx, 'DRIVE-BY — NO RUNNER BESIDE YOU'); return; }   // the rivals are the next pass
+      if (e.btn === 'A' && S.state === 'grind') { endGrind(S, JUMP_V); S.flow.add(10); say(ctx, 'OFF THE RAIL'); return; }
+      if (e.btn === 'A' && S.state === 'swing') { S.swing = null; S.state = 'air'; S.airSec = 0; S.launch = 'vault'; S.vy = 4.5; S.speed += GRAPPLE.speedBonus; S.cc.setVelocity(new Vector3(S.heading.x * S.speed, S.vy, S.heading.z * S.speed)); jumpBeat(S); say(ctx, 'RELEASE'); return; }
+      if (e.btn === 'A' && S.state === 'surf') { S.state = 'ground'; beginAir(S, 'ground', JUMP_V); say(ctx, 'OFF THE SLOPE'); return; }
       if (e.btn === 'A') {
         if (S.state === 'ground') {
-          if (verbs.includes('WALL RUN')) { S.state = 'wallrun'; S.wallSec = WALLRUN_SEC; S.airStartY = S.hero.root.position.y; S.combo.add('WALL RUN', 45, 'grind'); flash(ctx, 'WALL RUN'); SoundKit.play('whoosh'); }
+          if (S.env.wallAhead && S.wallApproachDeg >= REBOUND.minDeg && S.wallApproachDeg <= REBOUND.maxDeg && S.speed >= VAULT_GATE && rebound(ctx, S)) { /* FLOW: the vector rebound */ }
+          else if (springAt(S.pieces, S.hero.root.position.x, S.hero.root.position.z)) { beginAir(S, 'vault', SPRING_V); S.stats.springs++; S.flow.add(15); S.combo.add('SPRINGBOARD', 30, 'grind'); say(ctx, 'SPRINGBOARD'); SoundKit.play('whoosh', { pitch: 1.4, volume: 0.5 }); }
+          else if (verbs.includes('VAULT')) {
+            // FLOW: the momentum vault — the press is graded against the box; a perfect one is a catapult into an air dash
+            const grade = vaultTiming(S.vaultDist, S.speed);
+            if (grade === 'perfect') { S.speed *= VAULT.catapultMult; S.dashSec = VAULT.dashSec; S.flow.add(FLOW.perfectVault); S.kinetic.add(KINETIC.chain); S.stats.perfectVaults++; beginAir(S, 'vault', VAULT_V * 0.9); S.combo.add('CATAPULT VAULT', 70, 'grind'); say(ctx, 'PERFECT VAULT · CATAPULT'); ctx.juice.flash('#ffffff', 50); ctx.feel?.impact?.(0.3); SoundKit.play('impact', { pitch: 1.6, volume: 0.4 }); }
+            else { if (grade === 'good') S.flow.add(FLOW.goodVault); beginAir(S, 'vault', VAULT_V); S.combo.add('VAULT', 40, 'grind'); flash(ctx, grade === 'good' ? 'VAULT · GOOD' : 'VAULT'); SoundKit.play('whoosh'); }
+          }
+          else if (verbs.includes('WALL RUN')) { S.state = 'wallrun'; S.wallSec = WALLRUN_SEC; S.airStartY = S.hero.root.position.y; S.combo.add('WALL RUN', 45, 'grind'); flash(ctx, 'WALL RUN'); SoundKit.play('whoosh'); }
           else if (verbs.includes('VAULT')) { beginAir(S, 'vault', VAULT_V); S.combo.add('VAULT', 40, 'grind'); flash(ctx, 'VAULT'); SoundKit.play('whoosh'); }
           else { beginAir(S, 'ground', JUMP_V); }
         } else if ((S.state === 'wallrun' || S.state === 'air') && (verbs.includes('WALL KICK'))) {
@@ -460,6 +600,8 @@ export const FreeRunMode: ModeDefinition = (() => {
         else if (S.state === 'air') { S.rollAt = S.clock; ctx.juice.callout('ROLL ON LANDING', '#cbd5e1', 400); }   // the roll is timed against touchdown
         else refuse(ctx, 'SLIDE WHILE RUNNING');   // PHONE CONTROLS: a SLIDE with no run under it
       } else if (e.btn === 'X' || e.btn === 'Y') {
+        if (e.btn === 'X' && S.state !== 'air' && kickHazard(ctx, S)) return;   // FLOW: X kicks a loose hazard down the line
+        if (e.btn === 'Y' && S.state !== 'air') { overdrive(ctx, S); return; }   // FLOW: Y is the kinetic overdrive on the ground
         if (S.state !== 'air') refuse(ctx, e.btn === 'X' ? 'FLIP IN THE AIR' : 'TWIST IN THE AIR');   // PHONE CONTROLS: FLIP / TWIST on the ground
         else if (S.trick) refuse(ctx, 'ONE TRICK PER JUMP');
         if (S.state === 'air' && !S.trick) {
@@ -497,9 +639,17 @@ export const FreeRunMode: ModeDefinition = (() => {
       if (wishLen > 0.15 && S.state !== 'down' && wishW.lengthSquared() > 1e-6) {
         const w = wishW.normalize();
         if (S.state === 'ground' || S.state === 'slide') S.heading.copyFrom(w);
+        else if (S.state === 'surf') S.heading = Vector3.Lerp(S.heading, w, 0.12).normalize();   // FLOW: a surf drifts round the bend
         else S.heading = Vector3.Lerp(S.heading, w, 0.04).normalize();          // faint air control
       }
-      if (S.state === 'ground') S.speed = stepSpeed(S.speed, wishLen * RUN_MAX, dt);
+      // FLOW: the top speed is the base times the flow tier (and a sprint on RT); a dash (a catapult, a burst) holds above it
+      const top = RUN_MAX * S.flow.topSpeedMult() * (S.rtHeld ? 1.1 : 1);
+      if (S.state === 'ground') S.speed = stepSpeed(S.speed, wishLen * top, dt, Math.max(top, S.dashSec > 0 ? S.speed : 0));
+      if (S.dashSec > 0) S.dashSec = Math.max(0, S.dashSec - dt);
+      S.flow.tick(dt, S.state === 'ground' && S.speed < 1);
+      if (S.state === 'wallrun') S.flow.add(FLOW.wallRunPerSec * dt);
+      if (S.state === 'grind') S.flow.add(FLOW.grindPerSec * dt);
+      if (S.state === 'surf') S.flow.add(FLOW.surfPerSec * dt);
       // G1: the body TURNS onto the heading. A traceur turns fast, but never in one frame — and a trick owns the yaw
       // while it is spinning (the mode integrates it below), so the slew stands aside for it.
       if (!(S.state === 'air' && S.trick && S.trick.axis === 'y')) {
@@ -519,7 +669,20 @@ export const FreeRunMode: ModeDefinition = (() => {
       const support = cc.checkSupport(dt, down);
       const supported = support.supportedState === CharacterSupportedState.SUPPORTED;
       let desired: Vector3;
-      if (S.state === 'wallrun') {
+      if (S.state === 'grind' && S.grindRail) {
+        // THE GRIND: locked to the rail's line at the rail's height, carrying the speed; off the end, a hop
+        const r = S.grindRail; const top = r.y + r.h / 2;
+        S.heading.set(0, 0, 1);
+        const z = root.position.z + S.speed * dt;
+        cc.setPosition(new Vector3(r.x, top + CAPSULE_H / 2 + 0.02, z)); cc.setVelocity(new Vector3(0, 0, S.speed));
+        if (z > r.z + r.d / 2) { endGrind(S, 2.2); say(ctx, 'RAIL END', 400); }
+      } else if (S.state === 'swing' && S.swing) {
+        // THE GRAPPLE: an arc under the anchor, out past it faster
+        S.swing.t += dt; const u = Math.min(1, S.swing.t / GRAPPLE.sec);
+        const q = swingAt(S.swing.from, S.swing.anchor, u);
+        cc.setPosition(new Vector3(q.x, q.y + CAPSULE_H / 2 + 0.02, q.z)); cc.setVelocity(Vector3.Zero()); S.heading.set(0, 0, 1);
+        if (u >= 1) { S.swing = null; S.state = 'air'; S.airStartY = root.position.y; S.airSec = 0; S.launch = 'vault'; S.vy = 3.5; S.speed += GRAPPLE.speedBonus; cc.setVelocity(new Vector3(0, S.vy, S.speed)); jumpBeat(S); say(ctx, 'SLUNG', 400); }
+      } else if (S.state === 'wallrun') {
         S.wallSec -= dt;
         const along = S.heading.clone(); along.y = 0;
         S.vy = 2.6 * (S.wallSec / WALLRUN_SEC) - 1.2;
@@ -540,8 +703,15 @@ export const FreeRunMode: ModeDefinition = (() => {
         S.downSec -= dt; S.vy = supported ? 0 : Math.max(-30, S.vy + G * dt); cc.setVelocity(new Vector3(0, S.vy, 0));
         if (S.downSec <= 0) { S.state = 'ground'; S.speed = 0; }
       } else {
-        if (S.state === 'slide') { S.slideSec -= dt; if (S.slideSec <= 0) S.state = 'ground'; }
+        if (S.state === 'slide') { S.slideSec -= dt; if (S.slideSec <= 0 || (!S.ltHeld && S.slideSec < SLIDE_SEC - 0.25 && false)) { S.state = 'ground'; S.slideEndAt = S.clock; } }
         // on the ground the controller follows the surface; off an edge we fall under our own gravity
+        // FLOW: THE SURF — on a slope (the spillway) the run becomes a slide: downhill gathers speed past the top, uphill spends it, and the steering drifts
+        const nrm = support.averageSurfaceNormal;
+        const onSlopePiece = S.pieces.some((q) => q.kind === 'slope' && Math.abs(root.position.x - q.x) <= q.w / 2 && Math.abs(root.position.z - q.z) <= q.d / 2);
+        const onSlope = supported && nrm.y < 0.965 && S.speed > 1.5 && onSlopePiece;
+        if (onSlope && S.state === 'ground') { S.state = 'surf'; S.surfSec = 0; S.stats.surfs++; say(ctx, 'SURF', 500); SoundKit.play('whoosh', { pitch: 0.7, volume: 0.4 }); }
+        else if (!onSlope && S.state === 'surf') { S.state = 'ground'; S.groundSec = 0; if (S.surfSec > 0.6) { S.combo.add('SURF', 45, 'manual'); } }
+        if (S.state === 'surf') { S.surfSec += dt; const downhill = nrm.z; S.speed = Math.max(2, Math.min(RUN_MAX * SURF_TOP, S.speed + downhill * 9 * dt)); }
         if (supported) { S.vy = 0; desired = new Vector3(S.heading.x * S.speed, 0, S.heading.z * S.speed); const moved = cc.calculateMovement(dt, S.heading, support.averageSurfaceNormal, cc.getVelocity(), support.averageSurfaceVelocity, desired, new Vector3(0, 1, 0)); moved.y = Math.min(moved.y, 0.5); cc.setVelocity(moved); }
         else { S.vy = Math.max(-30, S.vy + G * dt); cc.setVelocity(new Vector3(S.heading.x * S.speed, S.vy, S.heading.z * S.speed)); }
         if (S.state === 'ground') {
@@ -556,7 +726,11 @@ export const FreeRunMode: ModeDefinition = (() => {
       root.position.set(pos.x, pos.y - CAPSULE_H / 2 - 0.02, pos.z);
 
       // landings
+      if (S.state === 'air' && S.vy < 0 && S.airSec > 0.1) { const rail = railAt(S.pieces, root.position.x, root.position.y, root.position.z); if (rail) startGrind(ctx, S, rail); }   // FLOW: onto a rail
       if (S.state === 'air' && supported && S.airSec > 0.08 && S.vy <= 0.5) land(ctx, S);
+      // FLOW: gates open to speed; a spring pad launches whoever runs onto it
+      if (S.state === 'ground' || S.state === 'surf') tickGates(ctx, S);
+      if (S.state === 'ground' && S.speed > 2 && S.clock - S.springLatch > 1.2) { const sp = springAt(S.pieces, root.position.x, root.position.z); if (sp) { S.springLatch = S.clock; beginAir(S, 'vault', SPRING_V); S.stats.springs++; S.flow.add(15); S.combo.add('SPRINGBOARD', 30, 'grind'); say(ctx, 'SPRINGBOARD'); SoundKit.play('whoosh', { pitch: 1.4, volume: 0.5 }); } }
 
       // falls, bars, gates
       if (root.position.y < FALL_Y || (root.position.y < -0.4 && overGap(S.pieces, root.position.x, root.position.z))) respawn(ctx, S);

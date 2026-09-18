@@ -75,8 +75,8 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
           <span className="fel-panel px-2 py-0.5 text-[10px] tracking-wider text-white/70">CHECKPOINT {hnode(hud.checkpoint, '0/2')}</span>
         </div>
         <div className="fel-panel px-3 py-1.5 text-right">
-          <div className="text-[10px] tracking-wider text-white/60">{hnode(hud.tier, 'ROOKIE')}</div>
-          <div className={`text-sm font-bold ${hud.route === 'HIGH LINE' ? 'text-[#3FB8B0]' : 'text-white/80'}`}>{hnode(hud.route, 'LOW LINE')}</div>
+          <div className="text-[10px] tracking-wider text-white/60">{hnode(hud.tier, 'ROOKIE')}{hud.track ? ` · ${String(hud.track).toUpperCase()}` : ''}</div>
+          <div className={`text-sm font-bold ${hud.lane === 'HIGH' ? 'text-[#3FB8B0]' : hud.lane === 'LOW' ? 'text-[#f59e0b]' : 'text-white/80'}`}>{hud.lane ? `${String(hud.lane)} LANE` : hnode(hud.route, 'LOW LINE')}</div>
         </div>
       </div>
 
@@ -87,6 +87,21 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
           <div className="h-2 w-40 overflow-hidden rounded-full bg-black/50">
             <div className="h-full rounded-full transition-[width] duration-100" style={{ width: `${Math.min(100, (speed / speedMax) * 100)}%`, background: speed >= 5.2 ? '#ff6a00' : speed >= 2.6 ? '#22d3ee' : '#ffffff80' }} />
           </div>
+          {/* FLOW (owner brief 2026-09-18): the tier pips buy top speed and spend as a landing burst; KINETIC is the overdrive (Y) */}
+          {typeof hud.flow === 'number' && (
+            <div className="mt-1 flex items-center gap-1.5">
+              <span className="text-[10px] tracking-wider text-white/60">FLOW</span>
+              {[1, 2, 3].map((t) => <span key={t} className="inline-block h-2 w-5 rounded-sm" style={{ background: Number(hud.flow) >= t ? ['#22d3ee', '#22d3ee', '#a78bfa', '#fbbf24'][t] : 'rgba(255,255,255,0.15)' }} />)}
+              <span className="h-1.5 w-16 overflow-hidden rounded-full bg-black/50"><span className="block h-full rounded-full bg-[#22d3ee]/70 transition-[width] duration-150" style={{ width: `${Math.max(0, Math.min(100, Number(hud.flowFrac ?? 0)))}%` }} /></span>
+            </div>
+          )}
+          {typeof hud.kinetic === 'number' && (
+            <div className="mt-0.5 flex items-center gap-1.5">
+              <span className="text-[10px] tracking-wider text-white/60">KINETIC</span>
+              <span className="h-2 w-28 overflow-hidden rounded-full bg-black/50"><span className={`block h-full rounded-full transition-[width] duration-150 ${Number(hud.kinetic) >= 100 ? 'bg-[#fbbf24]' : Number(hud.kinetic) >= 50 ? 'bg-[#fde68a]/80' : 'bg-white/40'}`} style={{ width: `${Math.max(0, Math.min(100, Number(hud.kinetic)))}%` }} /></span>
+              {Number(hud.kinetic) >= 100 ? <span className="text-[10px] font-bold text-[#fbbf24]">SLAM READY</span> : Number(hud.kinetic) >= 50 ? <span className="text-[10px] font-bold text-[#fde68a]">BURST</span> : null}
+            </div>
+          )}
           {typeof hud.verbs === 'string' && hud.verbs && (
             <div className="flex flex-wrap gap-1">
               {hud.verbs.split(' · ').map((v) => (
