@@ -1,0 +1,9 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "atlas",
+  "sex": "male",
+  "note": "tall, teal kit",
+  "source": "public/models/candidates/fel-kit-male.glb"
+}

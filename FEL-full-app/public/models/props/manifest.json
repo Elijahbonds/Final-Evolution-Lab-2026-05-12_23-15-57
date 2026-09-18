@@ -1,0 +1,242 @@
+{
+  "generated": "2026-09-04",
+  "licence": "CC0 1.0 — Kenney (kenney.nl), via github.com/shorepine/kenney",
+  "kits": {
+    "nature": [
+      "fence_simple",
+      "grass_large",
+      "plant_bush",
+      "plant_bushLarge",
+      "rock_largeA",
+      "rock_largeB",
+      "rock_largeC",
+      "rock_largeD",
+      "rock_smallFlatA",
+      "rock_smallG",
+      "rock_tallA",
+      "rock_tallB",
+      "tree_default",
+      "tree_detailed",
+      "tree_oak",
+      "tree_palm",
+      "tree_palmBend",
+      "tree_palmDetailedShort",
+      "tree_palmDetailedTall",
+      "tree_palmShort",
+      "tree_palmTall",
+      "tree_pineRoundA",
+      "tree_pineRoundB",
+      "tree_pineSmallA",
+      "tree_pineSmallB",
+      "tree_pineTallA",
+      "tree_pineTallB",
+      "tree_tall"
+    ],
+    "city-suburban": [
+      "fence-1x3",
+      "fence-1x4",
+      "fence-low",
+      "planter"
+    ],
+    "racing": [
+      "bannerTowerGreen",
+      "bannerTowerRed",
+      "barrierWall",
+      "barrierWhite",
+      "fenceStraight",
+      "flagCheckers",
+      "flagGreen",
+      "flagRed",
+      "grandStand",
+      "grandStandCovered",
+      "grandStandCoveredRound",
+      "grandStandRound",
+      "lightPostLarge",
+      "lightPostModern",
+      "overheadLights",
+      "tent",
+      "tentRoof"
+    ],
+    "mini-arena": [
+      "banner",
+      "block",
+      "border-straight",
+      "column",
+      "floor-detail",
+      "statue",
+      "tree",
+      "wall",
+      "wall-gate"
+    ],
+    "minigolf": [
+      "flag-large-red",
+      "flag-red"
+    ],
+    "mini-skate": [
+      "half-pipe",
+      "obstacle-box",
+      "obstacle-end",
+      "obstacle-middle",
+      "rail-curve",
+      "rail-high",
+      "rail-low",
+      "rail-slope"
+    ]
+  },
+  "venues": {
+    "venice-court": {
+      "nature": [
+        "tree_palm",
+        "tree_palmDetailedTall",
+        "tree_palmShort",
+        "tree_palmBend"
+      ],
+      "city-suburban": [
+        "fence-1x3",
+        "fence-low",
+        "planter"
+      ],
+      "racing": [
+        "lightPostModern",
+        "grandStand"
+      ],
+      "mini-arena": [
+        "banner"
+      ]
+    },
+    "dojo": {
+      "mini-arena": [
+        "column",
+        "banner",
+        "statue",
+        "wall",
+        "wall-gate",
+        "tree",
+        "floor-detail"
+      ],
+      "nature": [
+        "tree_pineRoundA",
+        "rock_smallFlatA"
+      ]
+    },
+    "links": {
+      "nature": [
+        "tree_oak",
+        "tree_default",
+        "tree_detailed",
+        "plant_bushLarge",
+        "plant_bush",
+        "rock_largeA",
+        "rock_largeB",
+        "fence_simple",
+        "grass_large"
+      ],
+      "minigolf": [
+        "flag-red",
+        "flag-large-red"
+      ],
+      "racing": [
+        "tent",
+        "flagRed"
+      ]
+    },
+    "ballpark": {
+      "racing": [
+        "grandStandCovered",
+        "grandStand",
+        "lightPostLarge",
+        "barrierWall",
+        "flagRed",
+        "bannerTowerRed"
+      ],
+      "nature": [
+        "tree_default",
+        "tree_tall"
+      ]
+    },
+    "stadium": {
+      "racing": [
+        "grandStandCoveredRound",
+        "grandStandRound",
+        "barrierWhite",
+        "lightPostLarge",
+        "bannerTowerGreen",
+        "flagGreen"
+      ]
+    },
+    "gridiron": {
+      "racing": [
+        "grandStandCovered",
+        "overheadLights",
+        "lightPostLarge",
+        "barrierWall",
+        "flagCheckers",
+        "bannerTowerRed"
+      ]
+    },
+    "skatepark": {
+      "mini-skate": [
+        "half-pipe",
+        "obstacle-box",
+        "obstacle-middle",
+        "obstacle-end",
+        "rail-low",
+        "rail-high",
+        "rail-curve",
+        "rail-slope"
+      ],
+      "city-suburban": [
+        "fence-1x4",
+        "fence-low"
+      ],
+      "nature": [
+        "tree_palm",
+        "tree_palmTall"
+      ],
+      "racing": [
+        "lightPostModern"
+      ]
+    },
+    "slope": {
+      "nature": [
+        "tree_pineTallA",
+        "tree_pineTallB",
+        "tree_pineSmallA",
+        "tree_pineSmallB",
+        "tree_pineRoundB",
+        "rock_tallA",
+        "rock_tallB",
+        "rock_largeD"
+      ],
+      "racing": [
+        "flagRed",
+        "tent",
+        "fenceStraight"
+      ]
+    },
+    "surf-break": {
+      "nature": [
+        "tree_palmBend",
+        "tree_palmDetailedShort",
+        "rock_largeC",
+        "rock_smallG"
+      ],
+      "racing": [
+        "tent",
+        "flagGreen",
+        "tentRoof"
+      ]
+    },
+    "gym": {
+      "mini-arena": [
+        "banner",
+        "block",
+        "border-straight"
+      ],
+      "racing": [
+        "grandStand",
+        "overheadLights"
+      ]
+    }
+  }
+}

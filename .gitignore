@@ -107,5 +107,7 @@ InitTestScene*.unity*
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 node_modules/
 .next/
+.next-prod/
 tsconfig.tsbuildinfo
 .env
+.env*.local

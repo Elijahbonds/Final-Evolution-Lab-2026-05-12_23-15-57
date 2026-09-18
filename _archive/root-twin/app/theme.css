@@ -1,0 +1,120 @@
+/* FEL premium design tokens — one source for the console identity.
+   Replace ad-hoc hex values in HUD/bezel/result markup with these vars.
+   Load app-wide (import once in the root layout). */
+
+:root {
+  /* Type — display for numbers/branding, body for prose */
+  --fel-font-display: 'Chakra Petch', 'JetBrains Mono', ui-monospace, monospace;
+  --fel-font-body: 'Inter', system-ui, sans-serif;
+
+  /* Core palette */
+  --fel-bg: #05060a;
+  --fel-surface: #0d1117;
+  --fel-surface-2: #161d27;
+  --fel-line: #232c38;
+  --fel-text: #f2f5f9;
+  --fel-text-dim: #8b97a5;
+
+  /* Brand accents */
+  --fel-cyan: #22d3ee;      /* primary actions, focus */
+  --fel-gold: #ffd75e;      /* scores, currency, celebration */
+  --fel-ember: #ff6b3d;     /* heat/momentum */
+  --fel-crimson: #ff3d5e;   /* danger, KO, live */
+  --fel-emerald: #34e89e;   /* success, PRQ up */
+  --fel-violet: #a78bfa;    /* nexus, rare */
+
+  /* Rarity ladder (cards, wearables) */
+  --fel-rarity-common: #9aa7b4;
+  --fel-rarity-rare: #4da3ff;
+  --fel-rarity-epic: #b168ff;
+  --fel-rarity-legendary: #ffb52e;
+
+  /* Elevation + glass */
+  --fel-glass: rgba(13, 17, 23, 0.72);
+  --fel-glass-border: rgba(255, 255, 255, 0.08);
+  --fel-shadow-pop: 0 12px 40px rgba(0, 0, 0, 0.55);
+  --fel-glow-cyan: 0 0 24px rgba(34, 211, 238, 0.35);
+  --fel-glow-gold: 0 0 24px rgba(255, 215, 94, 0.35);
+
+  /* Motion — every animated property uses one of these */
+  --fel-ease-pop: cubic-bezier(0.2, 1.4, 0.4, 1);
+  --fel-ease-glide: cubic-bezier(0.16, 0.8, 0.3, 1);
+  --fel-t-fast: 120ms;
+  --fel-t-med: 260ms;
+
+  /* Radii */
+  --fel-r-card: 20px;
+  --fel-r-pill: 999px;
+}
+
+/* ── Building blocks ─────────────────────────────────────────────────────── */
+
+.fel-panel {                 /* glass panel: HUD blocks, sheets, result cards */
+  background: var(--fel-glass);
+  border: 1px solid var(--fel-glass-border);
+  border-radius: var(--fel-r-card);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--fel-shadow-pop);
+}
+
+.fel-cta {                   /* primary action button */
+  font-family: var(--fel-font-display);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #05060a;
+  background: var(--fel-cyan);
+  border-radius: 16px;
+  box-shadow: var(--fel-glow-cyan);
+  transition: transform var(--fel-t-fast) var(--fel-ease-pop),
+              box-shadow var(--fel-t-fast) ease;
+}
+.fel-cta:active { transform: scale(0.95); }
+.fel-cta--gold { background: var(--fel-gold); box-shadow: var(--fel-glow-gold); }
+
+.fel-stat {                  /* big HUD numbers (score, timer, PRQ) */
+  font-family: var(--fel-font-display);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: var(--fel-text);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
+}
+.fel-stat--score { color: var(--fel-gold); }
+.fel-stat--danger { color: var(--fel-crimson); }
+
+.fel-chip {                  /* labels: LIVE, SPONSORED, style names */
+  font-family: var(--fel-font-display);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  padding: 3px 10px;
+  border-radius: var(--fel-r-pill);
+  background: var(--fel-surface-2);
+  color: var(--fel-text-dim);
+}
+.fel-chip--live { background: var(--fel-crimson); color: #fff; }
+.fel-chip--live::before { content: '● '; animation: felpulse 1.2s ease-in-out infinite; }
+
+.fel-bezel {                 /* the console frame around game canvases */
+  border-radius: 24px;
+  border: 1px solid var(--fel-glass-border);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03), var(--fel-shadow-pop);
+  overflow: hidden;
+}
+
+/* Card rarity trims */
+.fel-card--rare { border-color: var(--fel-rarity-rare); box-shadow: 0 0 18px rgba(77,163,255,.25); }
+.fel-card--epic { border-color: var(--fel-rarity-epic); box-shadow: 0 0 18px rgba(177,104,255,.25); }
+.fel-card--legendary { border-color: var(--fel-rarity-legendary); box-shadow: 0 0 22px rgba(255,181,46,.35); }
+
+@keyframes felpulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* Focus ring for d-pad/controller navigation (console home rail) */
+.fel-focus:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--fel-cyan), var(--fel-glow-cyan);
+}
+
+/* Reduced motion: collapse transitions, keep state changes instant */
+@media (prefers-reduced-motion: reduce) {
+  .fel-cta, .fel-count, .fel-boot-bar { transition: none !important; animation: none !important; }
+}

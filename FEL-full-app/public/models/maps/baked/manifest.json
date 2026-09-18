@@ -1,0 +1,182 @@
+{
+  "baseball-park": {
+    "file": "baseball-park.glb",
+    "tris": 59998,
+    "min": [
+      -0.8498,
+      -0.1817,
+      -0.9498
+    ],
+    "max": [
+      0.8463,
+      0.1639,
+      0.9487
+    ],
+    "textures": 1
+  },
+  "coastal-links": {
+    "file": "coastal-links.glb",
+    "tris": 59999,
+    "min": [
+      -0.9474,
+      -0.122,
+      -0.8073
+    ],
+    "max": [
+      0.9476,
+      0.1183,
+      0.8033
+    ],
+    "textures": 1
+  },
+  "dojo": {
+    "file": "dojo.glb",
+    "tris": 49995,
+    "min": [
+      -0.9975,
+      0,
+      -0.8515
+    ],
+    "max": [
+      0.9975,
+      1.2865,
+      0.8515
+    ],
+    "textures": 3
+  },
+  "gymnastics-gym": {
+    "file": "gymnastics-gym.glb",
+    "tris": 59998,
+    "min": [
+      -0.9184,
+      -0.1848,
+      -0.9494
+    ],
+    "max": [
+      0.9223,
+      0.1308,
+      0.9481
+    ],
+    "textures": 1
+  },
+  "mountain-slope": {
+    "file": "mountain-slope.glb",
+    "tris": 59999,
+    "min": [
+      -0.7732,
+      -0.4327,
+      -0.9505
+    ],
+    "max": [
+      0.7728,
+      0.4282,
+      0.9488
+    ],
+    "textures": 1
+  },
+  "shop": {
+    "file": "shop.glb",
+    "tris": 49980,
+    "min": [
+      -0.9953,
+      0,
+      -0.9978
+    ],
+    "max": [
+      0.9954,
+      1.2266,
+      0.9978
+    ],
+    "textures": 3
+  },
+  "soccer-stadium": {
+    "file": "soccer-stadium.glb",
+    "tris": 60000,
+    "min": [
+      -0.8713,
+      -0.2236,
+      -0.9503
+    ],
+    "max": [
+      0.8649,
+      0.2246,
+      0.9491
+    ],
+    "textures": 1
+  },
+  "surf-break": {
+    "file": "surf-break.glb",
+    "tris": 60000,
+    "min": [
+      -0.9257,
+      -0.2378,
+      -0.9489
+    ],
+    "max": [
+      0.931,
+      0.2431,
+      0.9488
+    ],
+    "textures": 1
+  },
+  "tennis-court": {
+    "file": "tennis-court.glb",
+    "tris": 59999,
+    "min": [
+      -0.9409,
+      -0.368,
+      -0.8996
+    ],
+    "max": [
+      0.9432,
+      0.3655,
+      0.8967
+    ],
+    "textures": 1
+  },
+  "venice-blacktop": {
+    "file": "venice-blacktop.glb",
+    "tris": 49955,
+    "min": [
+      -1,
+      0,
+      -0.9999
+    ],
+    "max": [
+      1,
+      0.2414,
+      0.9999
+    ],
+    "textures": 3
+  },
+  "venice-blue-court": {
+    "file": "venice-blue-court.glb",
+    "tris": 50000,
+    "min": [
+      -0.9369,
+      -0.2184,
+      -0.9547
+    ],
+    "max": [
+      0.922,
+      0.2422,
+      0.9504
+    ],
+    "textures": 4
+  },
+  "venice-skatepark": {
+    "file": "venice-skatepark.glb",
+    "tris": 89572,
+    "min": [
+      -0.9387,
+      0,
+      -0.9493
+    ],
+    "max": [
+      0.9387,
+      0.5017,
+      0.9493
+    ],
+    "textures": 3
+  }
+}

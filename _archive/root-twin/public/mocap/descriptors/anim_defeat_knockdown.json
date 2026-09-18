@@ -1,0 +1,54 @@
+{
+  "id": "anim_defeat_knockdown",
+  "name": "Defeat Knockdown Fall",
+  "category": "animations",
+  "type": "non_loop_motion",
+  "file": "anim_defeat_knockdown.fbx",
+  "urls": [
+    "https://static.seeles.ai/data/asset/export/9f1eb44b-86d8-40f8-8c03-4c33a3b34004/475652/import.fbx"
+  ],
+  "description": "One-shot backward fall to ground used as shared defeat/loss-state montage across combat and sport modes",
+  "tags": [
+    "defeat",
+    "knockdown",
+    "fall",
+    "lose",
+    "non-loop",
+    "shared",
+    "montage"
+  ],
+  "keywords": [
+    "fall backward",
+    "defeat animation",
+    "knocked down",
+    "game over loss"
+  ],
+  "compat": [
+    "unity",
+    "unreal"
+  ],
+  "status": "ready",
+  "created_at": "2026-05-23T16:00:00Z",
+  "source_date": "2026-05-23",
+  "source_turn": 22,
+  "version": "1.0",
+  "property_id": "search_53b3972a8ac4_1",
+  "motion_asset_id": 475652,
+  "fel_abp": "ABP_Shared",
+  "fel_montage": "AM_Shared_Defeat",
+  "fel_modes": [
+    "basketball_h2h",
+    "basketball_3v3",
+    "karate_h2h",
+    "karate_endless",
+    "baseball",
+    "football",
+    "soccer",
+    "tennis",
+    "volleyball"
+  ],
+  "local_bundle_file": "anim_defeat_knockdown.nexusanim.json",
+  "local_bundle_path": "FinalEvolutionLab/Resources/Animations/anim_defeat_knockdown.nexusanim.json",
+  "runtime_loader": "NexusAnimationLoader",
+  "runtime_format": "nexusanim_json"
+}
