@@ -29,6 +29,7 @@
 import { Color3, Matrix, Mesh, PBRMaterial, Vector3, VertexBuffer } from '@babylonjs/core';
 import type { AbstractMesh, FloatArray, IndicesArray, Skeleton } from '@babylonjs/core';
 import type { KitSlot } from './kit';
+import { isShrunk } from './bodyMask';
 
 export const SNEAKER_ROUGHNESS = 0.85;
 /** A shoe taller than this (m, sole bottom to top, rest pose) is a boot and gets its shaft folded. */
@@ -52,6 +53,8 @@ const SOLE_COLOR = '#F4F2EC';
 /** A skinned shoe shorter than this has not been posed yet (a parked rival's skeleton at spawn, measured 0.16 m
  *  for a 0.5 m boot); its geometry pass waits for the first render. */
 const MIN_POSED_SHOE_HEIGHT = 0.19;
+/** Frames the late geometry pass keeps waiting for a shrunk / unposed shoe (a materialise tween is ~20). */
+const LATE_WAIT_FRAMES = 180;
 
 const fixed = new WeakSet<AbstractMesh>();
 const soleOf = new WeakMap<AbstractMesh, Mesh>();
@@ -90,12 +93,20 @@ function fixShoe(mesh: Mesh, itemId: string): string {
   const geometry = fixShoeGeometry(mesh, itemId, skeleton, positions, indices);
   if (geometry === null) {
     // not posed yet: once, on the first frame this mesh actually renders (the skeleton is prepared by then)
-    mesh.onBeforeRenderObservable.addOnce(() => {
+    // EYE SORES (2026-09-17): a spawn that materialises from root scale 0.001 (Karate Endless agents) measures a
+    // 0.0002 m shoe on its first frame — 'unposed' for good, and the collar flare that waits on `late:` then ran on the
+    // shrunk body (see bodyMask.isShrunk). So the late pass keeps waiting while the mesh is shrunk or unposed, frame by
+    // frame, up to LATE_WAIT_FRAMES before it settles for 'unposed'.
+    let waited = 0;
+    const late = () => {
       try {
-        const late = fixShoeGeometry(mesh, itemId, skeleton, positions, indices) ?? 'unposed';
-        mesh.metadata = { ...(mesh.metadata ?? {}), felGarmentFix: `${notes.join('+')}+late:${late}` };
+        const shrunk = isShrunk(mesh);
+        const r = shrunk ? null : fixShoeGeometry(mesh, itemId, skeleton, positions, indices);
+        if (r === null && waited++ < LATE_WAIT_FRAMES) { mesh.onBeforeRenderObservable.addOnce(late); return; }
+        mesh.metadata = { ...(mesh.metadata ?? {}), felGarmentFix: `${notes.join('+')}+late:${r ?? (shrunk ? 'shrunk' : 'unposed')}` };
       } catch (e) { console.warn(`[FEL-KIT] late shoe fix skipped on ${mesh.name}: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
-    });
+    };
+    mesh.onBeforeRenderObservable.addOnce(late);
     notes.push('deferred');
     return notes.join('+');
   }

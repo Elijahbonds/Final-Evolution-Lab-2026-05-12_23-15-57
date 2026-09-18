@@ -401,6 +401,7 @@ function flareGarmentEdges(mesh: Mesh, slot: string): void {
   const sw = skinnedWorld(mesh);
   const md = mesh.metadata as { felGarmentIndices0?: number[]; felGarmentFix?: string } | null;
   if (slot === 'shoes' && /deferred/.test(md?.felGarmentFix ?? '') && !/late:/.test(md?.felGarmentFix ?? '')) return;   // the fold has not landed yet
+  if (isShrunk(mesh)) return;   // mid spawn-in: a metre flare through a 0.001 world matrix is a 20 m sheet (see isShrunk); not marked flared, the next mask does it
   const ind = md?.felGarmentIndices0 ?? mesh.getIndices();
   const pos = mesh.getVerticesData('position'), nrm = mesh.getVerticesData('normal');
   if (!sw || !ind || !pos || !nrm || pos.length !== nrm.length) return;
@@ -560,6 +561,20 @@ export function maskSlotOf(name: string): string | null {
 export function isBodyMesh(name: string): boolean { return /^Body(_c\d+)?$/.test(name); }
 
 const pending = new WeakMap<AbstractMesh, AbstractMesh[]>();
+/** A body is at its real size when its world matrix's uniform scale is near 1 — below this it is mid spawn-in. */
+const SHRUNK_SCALE = 0.5;
+/** Frames the mask waits for a shrunk body to grow before running anyway (a materialise tween is ~20 frames). */
+const SHRUNK_WAIT_FRAMES = 180;
+/** The uniform scale of a mesh's world matrix (length of its first column). */
+export function worldScaleOf(mesh: AbstractMesh): number { const W = mesh.computeWorldMatrix(true).m; return Math.hypot(W[0], W[1], W[2]); }
+/**
+ * EYE SORES (2026-09-17, Karate Endless "the brown things are still there"): the wave agents spawn at root scale 0.001 and
+ * tween up over 0.32 s (materialise), and the mask ran on their first frame. Everything below measures in WORLD metres
+ * through the mesh world matrix — the collar flare converts a 2 cm world offset to bind space through that matrix, so at
+ * 0.001 the 2 cm became 20 m and every agent's shoe was a 40 m red sheet the fight camera sat inside (a flat red/black frame
+ * after START; the earlier "brown marbling" was the same sheets seen from the far arc camera). A shrunk body is not measured.
+ */
+export function isShrunk(mesh: AbstractMesh): boolean { return worldScaleOf(mesh) < SHRUNK_SCALE; }
 
 /** Mask `meshes`' body under its shown garments after the next rendered frame (coalesced: the last call's mesh list wins). */
 export function scheduleBodyMask(meshes: AbstractMesh[]): void {
@@ -570,11 +585,15 @@ export function scheduleBodyMask(meshes: AbstractMesh[]): void {
   const first = !pending.has(body);
   pending.set(body, meshes);
   if (!first) return;
-  scene.onAfterRenderObservable.addOnce(() => {
+  let waited = 0;
+  const run = () => {
+    if (body.isDisposed()) { pending.delete(body); return; }
+    if (isShrunk(body) && waited++ < SHRUNK_WAIT_FRAMES) { scene.onAfterRenderObservable.addOnce(run); return; }   // mid spawn-in: wait for its real size
     const list = pending.get(body); pending.delete(body);
-    if (!list || body.isDisposed()) return;
+    if (!list) return;
     try { maskBodyNow(body as Mesh, list); } catch (e) { console.warn(`[FEL-KIT] body mask skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
-  });
+  };
+  scene.onAfterRenderObservable.addOnce(run);
 }
 
 /** Mask now (the skeleton must hold a pose — after a render). Returns the result, or null when nothing could be measured. */
@@ -585,6 +604,7 @@ export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<str
     body.metadata = { ...md, felBodyIndices0: Array.from(ind) };   // a fresh metadata object: the loader's may be shared with the container's mesh
   }
   const meta = body.metadata as typeof md;
+  if (isShrunk(body)) return null;   // mid spawn-in: the margins are world metres and the body is millimetres tall (see isShrunk)
   const bodySkin = skinnedWorld(body); if (!bodySkin) return null;
   meshes = withSiblings(body, meshes);
   try { fitShortsUnderTop(body, bodySkin, meta.felBodyIndices0!, meshes); } catch (e) { console.warn(`[FEL-KIT] waistband fit skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }

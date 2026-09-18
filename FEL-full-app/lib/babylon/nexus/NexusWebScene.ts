@@ -1138,10 +1138,10 @@ export function buildNexusScene(scene: Scene, spec: NexusWebSpec, canvas?: HTMLC
   sun.diffuse = c3(env.sunColor);
 
   const shadows = new ShadowGenerator(1024, sun);
-  // EYE SORES (2026-09-17): the exponential map bled every body into a huge soft brown smudge on the mat; PCF keeps a
-  // body-shaped shadow with a soft edge (a small bias against acne on the flat mats)
-  shadows.usePercentageCloserFiltering = true; shadows.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
-  shadows.bias = 0.0006; shadows.normalBias = 0.02;
+  // EYE SORES (2026-09-17): the "huge soft brown smudge on the mat" was never this map — it was the wave agents' shoes,
+  // flared to 40 m sheets while their roots were still at the materialise scale (bodyMask.isShrunk). PCF was tried on the
+  // wrong diagnosis and reverted; the exponential map stays.
+  shadows.useExponentialShadowMap = true;
   shadows.darkness = 0.4;
 
   const ground = buildGround(scene, spec.ground, root);

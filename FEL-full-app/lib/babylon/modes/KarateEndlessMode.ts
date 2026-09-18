@@ -444,7 +444,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const pos = new Vector3(Math.sin(angle) * 6, 0, Math.cos(angle) * 6);
     const char = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
       position: pos, yawRad: Math.atan2(-pos.x, -pos.z),
-      role: 'opponent',   // EYE SORES (2026-09-17): the old dark TINT blackened the SKIN — black bodies whose brown heads and leopard tops floated over the mat; the suit is the KIT now (tintGarmentSlot below)
+      tint: i % 2 ? '#a67c5b' : '#8d6e52',   // EYE SORES (2026-09-17): the old near-black tint blackened the SKIN — brown heads and leopard tops floated over invisible bodies; a natural tint (a roster seed), the suit is the KIT (tintGarmentSlot below)
       scale: 0.95 + ((wave * 7 + i * 13) % 12) / 100,
       startClip: STANCE,
     });
