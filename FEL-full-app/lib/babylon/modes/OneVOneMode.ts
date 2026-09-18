@@ -174,9 +174,10 @@ import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-L
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
 import { readPlayerIcon } from '../visual/playerIcon';
 import { netExitVelocity, netExitKindOf, netExitMph, type NetExitKind } from '../core/NetExit';   // NET EXIT (2026-09-17)
-import { showtimeAsked, pickShowtime, judgeShowtime, showtimeMeterT, posterRide, SHOWTIME_FLIGHT_MS, SHOWTIME_HANG_FROM, SHOWTIME_HANG_TO, SHOWTIME_HANG_SCALE, SHOWTIME_DEADLINE_K, SHOWTIME_PCT } from '../core/ShowtimeDunk';   // SHOWTIME (2026-09-17)
+import { SHOWTIME_FLUSH_K, SHOWTIME_GOOD_K, showtimeAsked, pickShowtime, judgeShowtime, showtimeMeterT, posterRide, SHOWTIME_FLIGHT_MS, SHOWTIME_HANG_FROM, SHOWTIME_HANG_TO, SHOWTIME_HANG_SCALE, SHOWTIME_DEADLINE_K, SHOWTIME_PCT } from '../core/ShowtimeDunk';   // SHOWTIME (2026-09-17)
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk; Meshy never scaled)
+import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the 2K bar beside the shooter's head
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -355,6 +356,15 @@ export const OneVOneMode: ModeDefinition = (() => {
   let reachCooldown = 0;
   /** The shot trigger's last state — the gather sound fires on the way down, once. */
   let contact: ContactSystem | null = null;      // Phase 4: Havok bodies when ready
+  // THE SHOT METER (owner, 2026-09-18): the world bar beside the shooter's head + the HUD's green window, fed by the
+  // same ShotMeter numbers the release is graded by
+  let meter3d: ShotMeter3DHandle | null = null; let hudGreen = '';
+  const meterStart = (contest: number, style?: Parameters<ShotMeter['start']>[1], gather?: number): void => {
+    shotMeter.start(contest, style ?? 'jumper', gather ?? 0);
+    hudGreen = `${shotMeter.greenCenter01.toFixed(3)},${shotMeter.greenHalfWidth01.toFixed(3)}`;
+    meter3d?.begin({ center: shotMeter.greenCenter01, half: shotMeter.greenHalfWidth01 });
+  };
+  const meterRelease = (): ReturnType<ShotMeter['release']> => { const q = shotMeter.release(); meter3d?.end(q); return q; };
   let hoopJuice: HoopJuice | null = null;        // A+ P0 CONTACT-lite: rim spring / net squash / hoop flash on a make
   let contactLatch = false;                      // A+ P0: the dunk's ONE punch per attempt — never re-fired by the banner or the stun
   let hud: ModeContext['setHud'] = () => {};
@@ -580,6 +590,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'venice');
       EffectsKit.ballTrail(ctx.scene, ball);
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: juice-only ring + net, material clones — no meshy_hoop_* transform is touched
+      meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
       if (typeof window !== 'undefined') {
         const q = Number(new URLSearchParams(window.location.search).get('handle'));
         if (Number.isFinite(q) && q > 0) { handle = Math.max(0, Math.min(100, q)); console.info(`[1V1-HANDLE] handle ${handle} (override)`); }
@@ -710,6 +721,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
+      meter3d?.update(dt); if (!shooting && !dunking && meter3d?.visible()) meter3d.end(null);   // a shot that ended without a release (a block, a strip) drops the bar
       if (ended) return;
       // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
       // this exact curve is now MomentumFx.crowdLevel, applied by the harness for every mode --
@@ -745,7 +757,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       // THE HOT HAND'S TRAIL (suite pass): my shot streaks when the momentum meter is up — the dunk contest's ball trail, on the game
       if (shotTrail) { const want: TrailLevel = arc.active && momentum >= 70 ? 'hang' : 'off'; if (want !== shotTrailLevel) { shotTrailLevel = want; applyTrail(shotTrail, want); } }
       if (arc.active) {
-        const res = arc.step(dt, ball.position);
+        const res = arc.step(dt, ball.position, ball);
         // O2: the seal ends with the ball — but on a MISS the ball is not done, it is live off the iron, and a
         // seal that releases the instant the arc resolves is a seal that never contests the thing it exists for.
         // It now holds until somebody actually comes down with it (liveBoard clears it).
@@ -1231,10 +1243,11 @@ export const OneVOneMode: ModeDefinition = (() => {
         }
         if (shooting) {
           const t = shotMeter.update(dt);
-          ctx.setHud({ shotMeterT: t });
+          ctx.setHud({ shotMeterT: t, shotMeterGreen: hudGreen });
+          meter3d?.set(t, me.root.position.add(new Vector3(0, 1.72, 0)));
           // HOOPS-MOVE-KIT-B M8: let go this early and it is a PUMP FAKE, not a 0.35-pct brick — and he can bite it
           if (meSlot.intent.action && isPumpFake(t * shotMeter.durationSec) && !finish) { pumpFake(ctx, defPos); }
-          else if (meSlot.intent.action || t >= 1 || (stickShot?.started && Math.hypot(postStick.x, postStick.y) < 0.35)) { stickShot = null; releaseJumper(ctx, shotMeter.release()); }   // POST HOOK: the stick let go = the release
+          else if (meSlot.intent.action || t >= 1 || (stickShot?.started && Math.hypot(postStick.x, postStick.y) < 0.35)) { stickShot = null; releaseJumper(ctx, meterRelease()); }   // POST HOOK: the stick let go = the release
         }
         pumpWindow = Math.max(0, pumpWindow - dt);
 
@@ -1602,6 +1615,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       meSlot?.dispose(); foeSlot?.dispose();
       SoundKit.stopAmbient();
       hoopJuice?.dispose(); hoopJuice = null;        // A+ P0: restores any hoop material the punch swapped
+      meter3d?.dispose(); meter3d = null;
       onevoneVenue?.dispose(); onevoneVenue = null;  // M74
     },
   };
@@ -1807,6 +1821,10 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (gatherLeft > 0) meAnimTree.beat('dunk_charge_gather', { fadeSec: 0.06 });
     else meAnimTree.beat(picked.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked, flightTotal / 1000) });
     ctx.setHud({ shotType: picked.label });
+    // THE METER ON A DUNK (owner, 2026-09-18: "make it trigger on layups and dunks"): the bar rides the flight clock —
+    // showtime's green is the timed flush, a plain drive's green is the iron (the flush resolves there on its own)
+    hudGreen = showtime ? `${(SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K).toFixed(3)},${(SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K).toFixed(3)}` : `${DRIVE_DUNK.resolveK.toFixed(3)},0.050`;
+    meter3d?.begin(showtime ? { center: SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K, half: SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K } : { center: DRIVE_DUNK.resolveK, half: 0.05 });
     if (picked.flashy) ctx.camDirector.pulse(0.35, 0.4);
     console.info(`[1V1-DUNK] ${picked.label} (${picked.clip}) speed ${speedNow.toFixed(1)} lateral ${lateral01.toFixed(2)} contest ${(c.contested ? 1 : 0)} momentum ${mbus.score01.toFixed(2)}`);
     contact?.setAirborne('me', true);
@@ -1830,14 +1848,17 @@ export const OneVOneMode: ModeDefinition = (() => {
       // from a body yawed 40° off the rim); the posture windows ride the flight clock (rise / hang / extend / jam / brace)
       face(me.root, slewYaw(me.root.rotation.y, yawTo(me.root.position, RIM) + (picked.reverse ? Math.PI : 0), FACE_RIM_RATE * (picked.reverse ? 2 : 1), fdt));   // a REVERSE turns its back to the iron
       dunkFlight = { k, made: resolved ? made : null };
+      meter3d?.set(showtime ? showtimeMeterT(k) : k, me.root.position.add(new Vector3(0, 1.72, 0)));
+      if (!showtime) ctx.setHud({ shotMeterT: k, shotMeterGreen: hudGreen });
       // THE TRICK STICK (owner, 2026-09-16). Once the feet leave, the right stick stops being the camera orbit and
       // becomes the trick stick: a flick asks for a trick and WHEN you threw it decides whether you get it. The
       // window rides the FLIGHT clock, so the hit-stop and the bump's slow motion — which stretch a dunk's real
       // duration by a third — cannot silently move the target.
       if (showtime) {
-        ctx.setHud({ shotMeterT: showtimeMeterT(k) });
+        ctx.setHud({ shotMeterT: showtimeMeterT(k), shotMeterGreen: hudGreen });
         if (showtimeK === null && (showtimePress || k >= SHOWTIME_DEADLINE_K)) {
           const j = showtimePress ? judgeShowtime(k) : 'none'; showtimePress = false; showtimeK = k; showtimeJudge = j;
+          meter3d?.end(j === 'none' ? 'held' : j);
           made = roll() < SHOWTIME_PCT[j] * (kind === 'poster' ? Math.max(0.6, c.pct) : 1);
           if (j === 'perfect') { ctx.juice.hitStop(70); ctx.camDirector.pulse(0.7, 0.45); SoundKit.play('crowdCheer', { volume: 0.6 }); }
           bannerFlash(ctx, j === 'perfect' ? `${picked.label} — PERFECT!` : j === 'good' ? `${picked.label}!` : j === 'early' ? 'EARLY — OFF THE FRONT' : j === 'late' ? 'LATE — OFF THE BACK' : picked.label, 800);
@@ -1857,6 +1878,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           trickThrown = true;
           const judge = judgeFlick(k, trickWin);
           const spec = STICK_TRICK[asked];
+          meter3d?.end(judge === 'green' ? 'perfect' : judge === 'early' ? 'early' : 'late');
           if (judge === 'green') {
             const onTheBump = c.bumpK !== null;
             made = roll() < trickPct(c.pct, asked, judge) + (onTheBump ? CONTACT_TRICK_BONUS : 0);
@@ -1931,12 +1953,13 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (made) dunkFlush = { releasePos, since: 0, kind: kind === 'poster' ? 'poster' : showtime ? 'showtime' : 'dunk' };
         else { missClank(ctx); launchLoose(releasePos, clankOffRim(ball, RIM)); }
         hangLeft = hangWanted(made, kind, showtimeJudge, picked.flashy);   // DUNK-FANATIC
+        meter3d?.end(made ? 'good' : 'brick');   // (a timed flush / a trick already stamped its own verdict — end() keeps the first)
       }
       if (k < 1) return;
       ctx.scene.onBeforeRenderObservable.remove(obs);
       dunking = false; dunkFlight = null; meLandSec = LAND_SEC; driveContest = null;
       if (showtimeCam) { showtimeCam = false; ctx.camDirector.toggle(); ctx.camDirector.snapTo(me.root.position, RIM); }   // POLISH: a cut back, not a lerp from the side camera   // SHOWTIME: the follow camera comes back at feet-down
-      if (showtime) ctx.setHud({ shotMeterT: 0 });
+      ctx.setHud({ shotMeterT: 0 }); meter3d?.end('brick');   // a swat ends the flight with no verdict of its own
       contact?.setAirborne('me', false);
       meAnimTree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });   // G5: feet-down is the land crouch, never an idle flash
       meDribble.setFacing(me.root.rotation.y);
@@ -1993,14 +2016,14 @@ export const OneVOneMode: ModeDefinition = (() => {
     const gathered = spinGather > 0;
     if (gathered) {
       spinGather = 0;
-      shotMeter.start(contest, currentShot?.style ?? 'jumper', 0);
+      meterStart(contest, currentShot?.style ?? 'jumper', 0);
       gather = null;
       beginRise();
       ctx.setHud({ shotType: `${currentShot?.label ?? 'JUMPER'} — OFF THE SPIN` });
       console.info('[1V1-HANDLE] spin gather consumed — rising at once');
       return;
     }
-    shotMeter.start(contest, currentShot?.style ?? 'jumper', plan.sec);
+    meterStart(contest, currentShot?.style ?? 'jumper', plan.sec);
     if (plan.sec > 0) {
       gather = { plan, t: 0 };
       meShotWin = 'gather'; meShotSec = 0;
@@ -2035,7 +2058,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       : style === 'reverse' ? reverseSide(me.root.position, RIM_FLOOR, me.root.rotation.y, meDribble.vel) : 'right');
     meCarry?.update(0, 0, false);
     attachBallToHand(ball, me.skeleton, side === 'left' ? 'LeftHand' : 'RightHand');
-    if (preSec <= 0) shotMeter.start(style === 'hook' ? hookShield(contest) : contest, style);   // a footwork gather already started it
+    if (preSec <= 0) meterStart(style === 'hook' ? hookShield(contest) : contest, style);   // a footwork gather already started it
     // M4: the fade's escape line — off the defender when he is on me, straight off the rim otherwise
     const plan = planFinish(style, side, shotMeter.durationSec, shotMeter.greenCenter01,
       // the DIRECTION of the fade reaches the body here: without it a "BASELINE FADE — LEFT" drifted straight
@@ -2118,7 +2141,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     meCarry?.update(0, 0, false);
     if (!ball.parent) attachBallToHand(ball, me.skeleton, 'RightHand');
     currentShot = plan.then === 'rise' ? classifyShot(me.root.position, meDribble.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : 1.18, drift: 'none' };
-    shotMeter.start(contest, currentShot.style, plan.sec);
+    meterStart(contest, currentShot.style, plan.sec);
     gather = { plan, t: 0 };
     meShotWin = 'footwork'; meShotSec = 0;
     // THE EURO'S CLIP FOLLOWS THE SIDE IT SELLS. This picked by `plan.kind` alone, so a euro that sold LEFT still
@@ -2344,6 +2367,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
   /** The dunk miss / stuff: a light metallic clank with a small feel hit — never the make's punch, never HoopJuice. */
   function missClank(ctx: ModeContext): void {
+    hoopJuice?.graze();   // hoops detail pass: the miss rattles the iron and the net (no flash)
     ctx.feel.impact(0.4);
     SoundKit.play('impact', { pitch: 1.35, volume: 0.45 });
     console.info('[1V1-JUICE] dunk miss clank');

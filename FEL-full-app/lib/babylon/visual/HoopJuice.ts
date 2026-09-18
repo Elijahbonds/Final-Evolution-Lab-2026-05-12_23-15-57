@@ -54,13 +54,25 @@ export class HoopJuice {
   /** The make's contact beat. Idempotent while a beat is running (the modes latch contactPunch once per attempt anyway). */
   punch(): void {
     if (this.t >= 0) return;
-    this.t = 0;
+    this.t = 0; this.amp = 1;
     this.rimRing.isVisible = true; this.net.isVisible = true;
     this.rimRing.scaling.set(1, 1, 1); this.rimRing.position.copyFrom(this.rim); this.netPivot.scaling.set(1, 1, 1); this.netPivot.rotation.set(0, 0, 0);
     this.flashMats = this.cloneHoopMaterials();   // fresh clones per beat; restoreMaterials() puts the originals back
     console.info(`[JUICE-LOOK] punch: rim spring + net squash + hoop flash on ${this.used.flash.length} material(s)`);
     if (!this.obs) this.obs = this.scene.onBeforeRenderObservable.add(() => this.tick(this.scene.getEngine().getDeltaTime() / 1000));
   }
+
+  /** THE MISS RATTLES THE IRON (hoops detail pass, 2026-09-18): a clank off the front used to leave the ring and the net
+   *  dead still while the ball flew off — the graze is the spring and the sway at half strength with NO flash and no
+   *  material clone (the flash is the make's). Idempotent while a beat runs. */
+  graze(): void {
+    if (this.t >= 0 || this.held) return;
+    this.t = 0; this.amp = 0.5;
+    this.rimRing.isVisible = true; this.net.isVisible = true;
+    this.rimRing.scaling.set(1, 1, 1); this.rimRing.position.copyFrom(this.rim); this.netPivot.scaling.set(1, 1, 1); this.netPivot.rotation.set(0, 0, 0);
+    if (!this.obs) this.obs = this.scene.onBeforeRenderObservable.add(() => this.tick(this.scene.getEngine().getDeltaTime() / 1000));
+  }
+  private amp = 1;   // the beat's amplitude: 1 for the make's punch, 0.5 for a graze
 
   /** DUNK-HANDS-RIM: a rim HANG — on, the ring stays pulled down (RIM_HOLD_DIP_M) and the net stays squashed while SLAM is
    *  held; off, the spring plays from the held dip (a fresh beat — the ring rings back up, the net swings). Make only. */
@@ -104,10 +116,10 @@ export class HoopJuice {
     this.t += dt;
     const t = this.t;
     // #1 the ring: the dip springs back up (damped), the XZ pulse on top
-    if (t < RIM_SPRING_SEC) { const s = rimSpring(t); this.rimRing.position.y = this.rim.y + s.dip; this.rimRing.scaling.set(s.xz, 1, s.xz); }
+    if (t < RIM_SPRING_SEC) { const s = rimSpring(t); this.rimRing.position.y = this.rim.y + s.dip * this.amp; const xz = 1 + (s.xz - 1) * this.amp; this.rimRing.scaling.set(xz, 1, xz); }
     else if (this.rimRing.isVisible) { this.rimRing.scaling.set(1, 1, 1); this.rimRing.position.copyFrom(this.rim); this.rimRing.isVisible = false; }
     // #2 the net: squash, then the sway rings on
-    if (t < NET_SWAY_SEC) { const n = netSway(t); this.netPivot.scaling.y = n.squash; this.netPivot.rotation.z = n.sway; }
+    if (t < NET_SWAY_SEC) { const n = netSway(t); this.netPivot.scaling.y = 1 + (n.squash - 1) * this.amp; this.netPivot.rotation.z = n.sway * this.amp; }
     else if (this.net.isVisible) { this.netPivot.scaling.y = 1; this.netPivot.rotation.z = 0; this.net.isVisible = false; }
     // #3 warm emissive pulse on the cloned hoop material(s)
     this.flashTick(t);

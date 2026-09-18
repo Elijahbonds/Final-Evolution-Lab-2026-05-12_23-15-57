@@ -67,6 +67,7 @@ import { resolveRim, forcedMissProfile } from '../core/RimPhysics';   // a shoot
 import { THREE_CORNER_R, THREE_TOP_R, threePointRadius } from '../core/BasketballCore';
 import { SoundKit } from '../audio/SoundKit';
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0 CONTACT-lite: the hoop answers a make (shared with Dunk / 1v1 / 3v3; Meshy never scaled)
+import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the bar beside the shooter's head
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 
@@ -157,6 +158,9 @@ export function simulateRival(skill: number, round: Round): number {
 }
 
 let player: SpawnedCharacter | null = null;
+let meter3d: ShotMeter3DHandle | null = null;
+/** The bar starts (or restarts) beside the shooter with the sweet spot drawn on it — the same window `fire` grades by. */
+function meterBegin(): void { meter3d?.begin({ center: SHOT_TARGET, half: goodBand() }); }
 /** Owner decision 2026-09-05: the contest's other shooters are ROSTER BODIES waiting behind the arc (idle, never seen
  *  shooting — D4's ruling stands); they replace the venue's capsule placeholders. */
 let rivalBodies: SpawnedCharacter[] = [];
@@ -395,6 +399,7 @@ function fire(ctx: ModeContext, power?: number): void {
   const signed = S.barT - SHOT_TARGET;   // the SIGN is the feedback: early is short, late is long
   shotErr = signed;
   const err = Math.abs(signed);
+  meter3d?.end(err < perfectBand() ? 'perfect' : err < goodBand() ? 'good' : signed < 0 ? 'early' : 'late');
   // A tilt charge nudges the odds but never replaces timing — a phone player and
   // a keyboard player are judged on the same window.
   const powerBonus = typeof power === 'number' ? (1 - Math.abs(power - 0.75)) * 0.05 : 0;
@@ -454,6 +459,8 @@ function contactMake(ctx: ModeContext): void {
   contactLatch = true;
   const big = landing.perfect || landing.money;
   ctx.juice.shake(big ? 0.10 : 0.06, 100);
+  // hoops detail pass (2026-09-18): the shooter ANSWERS a perfect / money make with arms up (the sideline bodies did; he never did)
+  if (big && player) player.animator.play(SPORT_CLIP.scoreCelebrate, { fadeSec: 0.12, onEnd: () => player?.animator.play('idle_stand', { loop: true, fadeSec: 0.2 }) });
   if (big) ctx.juice.flash(landing.money ? '#ffd75e' : '#fff6dd', 90);
   hoopJuice?.punch();
   // THE NET ANSWERS (suite pass, 2026-09-16): 1v1, 3v3 and the dunk contest burst the net on a make; the shootout —
@@ -464,6 +471,7 @@ function contactMake(ctx: ModeContext): void {
 }
 /** The miss's landing beat: a light metallic clank with a small feel hit — never the make's answer, never HoopJuice. */
 function missClank(ctx: ModeContext): void {
+    hoopJuice?.graze();   // hoops detail pass: the miss rattles the iron and the net (no flash)
   if (contactLatch) return;
   contactLatch = true;
   ctx.feel.impact(0.4);
@@ -492,7 +500,7 @@ function advanceBall(ctx: ModeContext): void {
     S.phase = 'move';
     return;
   }
-  S.barT = Math.random() * Math.PI;   // desync the bar so it can't be memorised
+  S.barT = Math.random() * Math.PI; meterBegin();   // desync the bar so it cannot be memorised
   S.phase = 'shoot';
   dressBall();
 }
@@ -723,6 +731,7 @@ export const ThreePointMode: ModeDefinition = {
 
     arc = new ShotArc();
     if (ball) ballSim = new BallSim(ball, 0.12);
+    meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
     hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: once per load, at the rim the arc lands on
     if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }
 
@@ -758,6 +767,7 @@ export const ThreePointMode: ModeDefinition = {
   },
 
   update(ctx: ModeContext, dt: number): void {
+    meter3d?.update(dt);
     if (S.phase === 'done' || !player || !ball || !arc) return;
     if (pick) {   // POLISH: the pick off the rack — eased from the rack to the hand, then attached
       pick.t = Math.min(1, pick.t + dt / PICK_SEC); const k = pick.t * pick.t * (3 - 2 * pick.t);
@@ -816,7 +826,7 @@ export const ThreePointMode: ModeDefinition = {
       if (S.moveT >= 1) {
         S.phase = 'shoot';
         S.fired = false;
-        S.barT = Math.random() * Math.PI;
+        S.barT = Math.random() * Math.PI; meterBegin();
         dressBall();
         pushHud(ctx, `RACK ${S.rack + 1}`);
       }
@@ -824,6 +834,7 @@ export const ThreePointMode: ModeDefinition = {
       // Triangle sweep 0..1..0 — a sine would linger at the extremes and make
       // the sweet spot easier at the top of the arc than the bottom.
       S.barT = (S.barT + dt / BAR_PERIOD) % 1;
+      if (!S.fired) meter3d?.set(S.barT, player.root.position.add(new Vector3(0, 1.72, 0)));
       // Face the rim while loaded — slewed onto it (BIOMECH-HOOPS-WAVE1 G1/G3: a lookAt snap before), the ball in the hand.
       player.root.rotation.y = slewYaw(player.root.rotation.y, yawTo(player.root.position, RIM), FACE_RIM_RATE, dt);
     } else if (S.phase === 'flight') {
@@ -842,7 +853,7 @@ export const ThreePointMode: ModeDefinition = {
         rimOut -= dt;
         if (rimOut < 0) { rimOut = -1; advanceBall(ctx); }
       } else {
-        const r = arc.step(dt, ball.position);
+        const r = arc.step(dt, ball.position, ball);
         if (r === 'made') { contactMake(ctx); const v = netExitVelocity('jumper'); ballSim?.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); rimOut = NET_EXIT_SEC; console.info(`[3PT-NET] jumper exit ${netExitMph('jumper')} mph`); }   // A+ P0: the hoop answers the make; NET EXIT: the ball drops through with pace and bounces before the next ball
         else if (r === 'missed') {
           missClank(ctx);                             // A+ P0: the miss has weight — a clank off the iron, never HoopJuice
@@ -889,6 +900,7 @@ export const ThreePointMode: ModeDefinition = {
     // one and must not touch the live objects.
     if (disposeCount < loadCount) return;
     hoopJuice?.dispose(); hoopJuice = null;   // A+ P0: restores any hoop material the punch swapped
+    meter3d?.dispose(); meter3d = null;
     posture?.dispose(); posture = null;        // BIOMECH-HOOPS-WAVE1
     if (carryScene && carryObs) carryScene.onAfterAnimationsObservable.remove(carryObs); carryObs = null; carryScene = null; arms = null;
     ring?.dispose(); ring = null;

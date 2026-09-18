@@ -62,6 +62,7 @@ import { readPlayerIcon } from '../visual/playerIcon';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { HoopJuice } from '../visual/HoopJuice';
+import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SLAM METER (owner, 2026-09-18)
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
@@ -262,6 +263,12 @@ export const DunkMode: ModeDefinition = (() => {
   let settleLatch = false;                    // juice soft #3
   let settleArmed = false, settleArmAt = 0;   // A+ P4: the settle waits for feet-down, not the flush frame
   let hoopJuice: HoopJuice | null = null;     // juice LOOK: rim spring, net squash, hoop flash on the make
+  // THE SLAM METER (owner, 2026-09-18: "put a shot meter … make it trigger on layups and dunks"): the bar beside the
+  // dunker's head rides the CLIP clock with the slam window drawn green — the same window slamNow grades by. The span
+  // runs a little past the window's close so the green sits near the top the way a jumper's does.
+  let meter3d: ShotMeter3DHandle | null = null; let meterSpan = 1.5;
+  function slamWindowNow(): number { return slamWindowBase() * (1 - styleTaps * 0.25) * flight.slamWindowScale; }
+  function slamGreen(): { center: number; half: number } { return { center: EASTBAY_TIMING.extend / meterSpan, half: slamWindowNow() / 2 / meterSpan }; }
   let phase: Phase = 'approach';
   let phaseSec = 0;
   let style: Style = 'power';
@@ -624,6 +631,7 @@ export const DunkMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'venice');
       trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
+      meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
       if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown; dunkPosture?: unknown } }).__FEL_DEV__; if (dev) { dev.hoopJuiceUsed = hoopJuice.used; dev.dunkPosture = postureDevHandle; } }   // OOM-HYGIENE: the handle is gone once the harness is disposed (a load that resolves after an unmount)
       // Venice LOOK: KEEP/HIDE, palm tip ~10m, golden-haze (no GLB edits).
       // Court locations (docs/SPEC-COURT-LOCATIONS.md): the Venice look (golden sky, surround palms) is Venice's own —
@@ -816,6 +824,7 @@ export const DunkMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
+      meter3d?.update(dt);
       ctx0 = ctx;
       fovTick(dt); settleTick(ctx);
       // A+ P5: the fov pinch starts on the APPROACH — inside 3.6 m (horizontal) of the rim during the run, not at takeoff
@@ -1062,6 +1071,7 @@ export const DunkMode: ModeDefinition = (() => {
         const window = slamWindowBase() * (1 - styleTaps * 0.25) * flight.slamWindowScale;
         const openAt = EASTBAY_TIMING.extend - window / 2, closeAt = EASTBAY_TIMING.extend + window / 2;
         qteWindowOpen = clipTime >= openAt && clipTime <= closeAt;
+        if (meter3d) { meter3d.green(slamGreen()); meter3d.set(clipTime / meterSpan, player.root.position.add(new Vector3(0, 1.72, 0))); }
         // DUNK-BODY-MID: the SLAM READ and the accepted input are the same thing. The window is ~14 rendered frames wide;
         // the call used to appear on its opening frame, so the honest reaction — press when you see it — arrived after the
         // press that would have worked. The cue lifts a buffer's width early and every press from there is taken.
@@ -1089,7 +1099,7 @@ export const DunkMode: ModeDefinition = (() => {
           refuse(ctx, `TOO EARLY — ${Math.round((openAt - slamBufferAt) * 1000)} ms BEFORE THE WINDOW`);
           slamBufferAt = -1;
         }
-        if (clipTime >= closeAt) { if (lob.live) lostLob(ctx); else resolveDunk(ctx); }   // the hand never met the toss — a miss, the ball bounces away
+        if (clipTime >= closeAt) { meter3d?.end(lob.live ? 'brick' : 'late'); if (lob.live) lostLob(ctx); else resolveDunk(ctx); }   // the hand never met the toss — a miss, the ball bounces away
       }
 
       if (phase === 'resolve') {
@@ -1354,6 +1364,7 @@ export const DunkMode: ModeDefinition = (() => {
 
     dispose() {
       hoopJuice?.dispose(); hoopJuice = null;
+      meter3d?.dispose(); meter3d = null;
       dribble?.dispose(); dribble = null;
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
       handIkObs = null; ikScene = null; handIkT = 0;
@@ -1460,6 +1471,7 @@ export const DunkMode: ModeDefinition = (() => {
     const openAt = center - half;
     const reach = slamBufferSec(openAt, SLAM_APEX_T, SLAM_BUFFER_SEC);
     qteAccuracy = slamExecution(at, center, half, reach);
+    meter3d?.end(qteAccuracy >= 0.85 ? 'perfect' : qteAccuracy >= 0.5 ? 'good' : at < center ? 'early' : 'late');
     // P3: THE RIM IS HONEST. Every accepted press used to flush, so the only miss in the mode was never pressing, and
     // the card carried the entire difference between a great dunk and a flinch. A jam thrown at the iron before you
     // have got there hits iron — only the earliest sliver of the buffer (execution under RIM_CLEAN) does.
@@ -1573,6 +1585,7 @@ export const DunkMode: ModeDefinition = (() => {
     launchZ = player.root.position.z; airTrick = null; obstacleOver = false; obstacleCleared = false; obstacleMargin = Infinity;
     activeHandOff = null; ikSideK = 0;
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false;
+    meterSpan = EASTBAY_TIMING.extend + slamWindowNow() / 2 + 0.16; meter3d?.begin(slamGreen());
     // the broadcast cut is per-attempt: hand the follow camera back or the next runway is shot from the rim
     ctx.camDirector.mode = 'follow';
     rimCamCut = false; verdictCamSet = false; rivalCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
@@ -2259,6 +2272,7 @@ export const DunkMode: ModeDefinition = (() => {
   // ── Venice juice soft #2–#5 (PM brief VENICE-JUICE-SOFT, 2026-09-06) ─────────────────────────────────────────────
   /** #2 miss clank weight: a light metallic hit and a small feel impact on the clank — never the make's contactPunch. */
   function missClank(ctx: ModeContext): void {
+    hoopJuice?.graze();   // hoops detail pass: the miss rattles the iron and the net (no flash)
     if (obstacleClipped) { console.info('[JUICE-SFX] clank skipped — the chair thud was the one hit'); return; }   // A+ P2: one hit per miss
     // A MISS TELLS YOU HOW CLOSE YOU WERE NOW (review, 2026-09-14). Every miss used to be one impact sound
     // whether the press was 40 ms out or half a second out, which throws away the best feedback a

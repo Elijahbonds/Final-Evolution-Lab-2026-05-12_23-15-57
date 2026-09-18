@@ -18,7 +18,8 @@
 //     timing window around the shooter's release. Mistimed jumps do
 //     nothing; timed ones erase the shot.
 
-import { Vector3 } from '@babylonjs/core';
+import { Vector3, type AbstractMesh } from '@babylonjs/core';
+import { spinBackspin } from '../visual/BallSpin';
 import type { AIBehavior, Intent } from './PlayerSlot';
 import { CourtMovement, DEFAULT_MOVEMENT, GEARS_HOOPS, type Gear } from './CourtMovement';
 import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop / crash, box-out, navigating a screen)
@@ -900,10 +901,12 @@ export class ShotArc {
     this.active = true;
   }
 
-  step(dt: number, ball: Vector3): 'flying' | 'made' | 'missed' {
+  /** `spin`: the ball mesh to turn with BACKSPIN through the flight (BallSpin) — pass the mesh whose `position` is `ball`. */
+  step(dt: number, ball: Vector3, spin?: AbstractMesh): 'flying' | 'made' | 'missed' {
     if (!this.active) return 'flying';
     this.t = Math.min(1, this.t + dt / this.duration);
     const k = this.t;
+    if (spin) spinBackspin(spin, { x: this.to.x - this.from.x, z: this.to.z - this.from.z }, dt, this.shotStyle === 'layup' || this.shotStyle === 'reverse' ? 1.2 : 2.2);
     if (this.glass) {
       // M12: the ball is thrown AT the square and comes off it — two legs, not one curve that merely leans at the board.
       // (A quadratic Bezier never reaches its control point: measured, the "bank" never got behind the ring at all.)

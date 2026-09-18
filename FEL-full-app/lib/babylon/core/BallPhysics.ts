@@ -4,6 +4,7 @@
 
 import { Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
+import { spinRoll } from '../visual/BallSpin';
 
 const GRAVITY = -9.81;
 
@@ -46,6 +47,7 @@ export class BallSim {
       else this.bounced = true;
     }
     this.mesh.position.copyFrom(this.pos);
+    spinRoll(this.mesh, this.vel, this.radius, dt, this.pos.y - this.radius > groundY + 0.02);   // hoops detail pass: the loose ball rolls / tumbles
   }
 
   /**

@@ -106,13 +106,22 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
       </div>
 
       {/* shot meter */}
-      {meter !== null && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-24 flex justify-center">
-          <div className="h-2 w-40 overflow-hidden rounded-full bg-white/15">
-            <div className="h-full bg-[var(--fel-cyan)]" style={{ width: `${meter * 100}%` }} />
+      {meter !== null && phase === 'playing' && (() => {
+        // THE SHOT METER (owner, 2026-09-18): the bar carries the GREEN release window the mode publishes
+        // (`shotMeterGreen` = "center,half" in 0..1) and a marker on the fill — the 3D bar beside the shooter's head
+        // (visual/ShotMeter3D) shows the same numbers in the world
+        const g = typeof hud.shotMeterGreen === 'string' ? hud.shotMeterGreen.split(',').map(Number) : null;
+        const green = g && g.length === 2 && g.every((v) => Number.isFinite(v)) ? { left: (g[0] - g[1]) * 100, width: g[1] * 200 } : null;
+        return (
+          <div className="pointer-events-none absolute inset-x-0 bottom-24 flex justify-center">
+            <div className="relative h-3 w-64 overflow-hidden rounded-full bg-black/55 ring-1 ring-white/30">
+              {green && <div className="absolute inset-y-0 bg-[#39ff88]/70" style={{ left: `${green.left}%`, width: `${green.width}%` }} />}
+              <div className="h-full bg-[var(--fel-cyan)]/90" style={{ width: `${meter * 100}%` }} />
+              <div className="absolute inset-y-0 w-[3px] -translate-x-1/2 bg-white shadow-[0_0_6px_#fff]" style={{ left: `${meter * 100}%` }} />
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {typeof hud.banner === 'string' && hud.banner && phase === 'playing' && (
         <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
