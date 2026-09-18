@@ -1,0 +1,12 @@
+// One-off: why do kit garments not render in a mode? Dump every Kit_ mesh's state (dev-only __FEL_DEV__ or the Closet's __FEL_PREVIEW__).
+import { chromium } from 'playwright-core';
+const URL_ = process.env.URL ?? 'http://localhost:3000/dev/mode/karate_vs';
+const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'] });
+const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } });
+if (process.env.LOGIN === '1') { const rc = ctx.request; const csrf = (await (await rc.get('http://localhost:3000/api/auth/csrf')).json()).csrfToken as string; await rc.post('http://localhost:3000/api/auth/callback/credentials', { form: { csrfToken: csrf, email: 'playtest@fel.local', password: 'playtest-local-only', json: 'true' } }); }
+const p = await ctx.newPage();
+p.on('console', (m) => { if (/FEL-SKIN|shader|compile|error/i.test(m.text())) console.log('  console:', m.text().slice(0, 160)); });
+await p.goto(URL_, { waitUntil: 'domcontentloaded' }); await p.waitForSelector('canvas', { timeout: 60000 }); await p.waitForTimeout(Number(process.env.WAIT_MS ?? 8000));
+await p.getByText(/^START$/).first().click({ force: true }).catch(() => {}); await p.waitForTimeout(1500);
+console.log(await p.evaluate(`(() => { const s = (window.__FEL_DEV__ && window.__FEL_DEV__.scene) || (window.__FEL_PREVIEW__ && window.__FEL_PREVIEW__.scene); if (!s) return 'no scene'; return s.meshes.filter((m) => /^(Kit|Body)/.test(m.name)).map((m) => { const mat = m.material; return [m.name.replace(/_c\\d+$/, ''), m.isVisible ? 'vis' : 'HID', m.isEnabled() ? 'en' : 'DIS', 'v' + m.getTotalVertices(), mat ? mat.name.slice(0, 22) + ' ' + mat.getClassName().replace('Material', '') + ' tm' + mat.transparencyMode + ' a' + mat.alpha + (mat.albedoTexture ? ' tex' + (mat.albedoTexture.hasAlpha ? 'A' : '') + (mat.albedoTexture.isReady() ? '' : '!') : ' notex') + (mat.needAlphaBlending() ? ' BLEND' : '') + (mat.needAlphaTesting() ? ' TEST' : '') + (mat.isReady(m) ? '' : ' NOTREADY') + (mat.metadata && mat.metadata.felShaded ? ' shaded' : '') : 'nomat', m.visibility !== 1 ? 'vis=' + m.visibility : '', m.renderingGroupId ? 'rg' + m.renderingGroupId : ''].join(' '); }).join('\\n'); })()`));
+await b.close();

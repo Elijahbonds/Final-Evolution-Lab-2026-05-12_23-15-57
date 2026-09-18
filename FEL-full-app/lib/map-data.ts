@@ -1,0 +1,348 @@
+// Authoritative registry of all 3D maps in FEL.
+// Each entry maps to a Meshy-derived GLB, BAKED by scripts/map/pipeline.mts
+// (WebP→PNG/JPEG, Draco decoded) into public/models/maps/baked/. The raw
+// Meshy exports stay one directory up; nothing loads them directly.
+// Scale converts the normalized [-1,1] GLB bounds to real-world metres.
+
+export interface MapConfig {
+  key: string;
+  label: string;
+  glb: string;            // path under public/
+  scale: number;          // uniform scale to apply
+  spawnPos: [number, number, number]; // player start (world coords after scale)
+  spawnYaw: number;       // initial facing (radians, 0=+Z)
+  camOffset: [number, number, number]; // follow-cam offset from player
+  ambientColor: string;   // tint for hemisphere light
+  fogColor: string;       // scene fog colour
+  fogNear: number;
+  fogFar: number;
+  floorY: number;         // ground plane Y in world coords (after scale)
+  ceilingY: number;       // approx ceiling for cam collision
+  boundsMin: [number, number, number]; // navigable AABB min
+  boundsMax: [number, number, number]; // navigable AABB max
+  backdrop?: string;      // photographic sky/environment backdrop shown behind the map
+  mapOffset?: [number, number, number]; // world translation applied to the loaded map mesh (after scale+rotation)
+  mapRotationY?: number;  // Y-axis rotation (radians) applied to the loaded map mesh, e.g. to align a painted hoop under the functional rim
+  matteFloor?: boolean;   // M12.2: treat the surface as matte painted blacktop (kills specular/reflection sheen that made the blue court read as water) and brightens albedo
+  surfaceY?: number;      // MEASURED walking-surface height in world units under the full transform (scripts/map/measure-surface.mts). Consumers drop the map by this so the real court/floor lands on the gameplay invariant floorY=0. Never guess it — re-run the probe after changing scale/offset/rotation.
+  /**
+   * DUNK-VISUAL-POLISH (2026-09-09): keep the entry — its bounds, navmesh key and camera box still describe the venue —
+   * but do NOT put the baked mesh in the scene. For a scan whose art has been replaced by something better (the Venice
+   * court is painted now, visual/CourtSurface.mountStreetCourt) this is the difference between a venue that carries the
+   * old art as dead geometry and one that does not load it at all.
+   */
+  meshDisabled?: boolean;
+}
+
+export const MAPS: Record<string, MapConfig> = {
+  'venice-blacktop': {
+    key: 'venice-blacktop',
+    label: 'Venice Blacktop Court',
+    glb: '/models/maps/baked/venice-blacktop.glb',
+    scale: 14,
+    spawnPos: [0, 0, 6],
+    spawnYaw: Math.PI,
+    camOffset: [-3, 4, 8],
+    ambientColor: '#3a4a5e',
+    fogColor: '#9fc0d8',
+    fogNear: 34,
+    fogFar: 95,
+    floorY: 0,
+    ceilingY: 8,
+    boundsMin: [-13, 0, -13],
+    boundsMax: [13, 8, 13],
+    backdrop: '/backdrops/venice-sky-day.jpg',
+    // NOTE: not mounted in Nexus venues (VENUE_MAP_KEYS) — the scan keeps its
+    // painted court off the play area and no offset candidate measured clean;
+    // the procedural court is the verified baseline. Revisit with a court-
+    // segmentation pass in measure-surface.mts before re-enabling.
+  },
+  'shop': {
+    key: 'shop',
+    label: 'Venice Ball Shop',
+    glb: '/models/maps/baked/shop.glb',
+    scale: 6,
+    spawnPos: [0, 0, 2],
+    spawnYaw: 0,
+    camOffset: [-2, 3, 5],
+    ambientColor: '#1e1412',
+    fogColor: '#0c0808',
+    fogNear: 8,
+    fogFar: 25,
+    floorY: 0,
+    ceilingY: 6,
+    boundsMin: [-5, 0, -5],
+    boundsMax: [5, 6, 5],
+    surfaceY: 0.243, // measured: interior floor (band analysis skips the roof at ~4-5m)
+  },
+  'venice-blue-court': {
+    key: 'venice-blue-court',
+    label: 'Venice Blue Court',
+    glb: '/models/maps/baked/venice-blue-court.glb',
+    scale: 14,
+    spawnPos: [0, 0, 6],
+    spawnYaw: Math.PI,
+    camOffset: [-3, 4, 8],
+    ambientColor: '#3a2c3e',
+    fogColor: '#5a4258',
+    fogNear: 32,
+    fogFar: 90,
+    floorY: 0,
+    ceilingY: 8,
+    boundsMin: [-13, 0, -13],
+    boundsMax: [13, 8, 13],
+    backdrop: '/backdrops/venice-sky-sunset.jpg',
+    // Rotate the scanned court 90deg and slide it +Z so one painted baseline hoop
+    // sits directly under the functional rim at world origin (0, 3.05, 0),
+    // instead of the rim floating over the mid-court centre graphic.
+    mapRotationY: Math.PI / 2,
+    mapOffset: [0, 0, 11],
+    // M12.2(b): the scanned surface is a glossy blue that read as rippling water under
+    // the neon rig. Force a matte, brightened blacktop look so it reads as a painted court.
+    matteFloor: true,
+    surfaceY: -2.34, // measured: scan dips below y=0 — characters floated before this
+    // The scan is not the court any more. Measured 2026-09-09 (scripts/probes/_dunk-visual-scan.mts): 55 329 of its
+    // 65 873 vertices — 84 % — stand ABOVE the floor as two 5.7 m walls of photogrammetry clutter down both sidelines
+    // (every cell above 0.25 m sits at |x| ≥ 8), which is the black slab the owner sees on the right of the court; and
+    // the remaining floor is a 1024² texture over 26 m (39 texels a metre) lit at environmentIntensity 0.02 by the
+    // matteFloor rule above, so it renders as a near-black slick with the scan's own smears reading as oil on water.
+    // The court is painted now and the venue's own dressing carries the sides, so the mesh stays out of the scene. The
+    // entry itself stays: the navmesh, the camera box and the boardwalk's own z-slide are all keyed to it.
+    meshDisabled: true,
+  },
+  'venice-skatepark': {
+    key: 'venice-skatepark',
+    label: 'Venice Beach Skatepark',
+    glb: '/models/maps/baked/venice-skatepark.glb',
+    scale: 14,
+    spawnPos: [0, 0, 10],
+    spawnYaw: Math.PI,
+    camOffset: [-3.5, 4.5, 9],
+    ambientColor: '#3a4a5e',
+    fogColor: '#9fc0d8',
+    fogNear: 34,
+    fogFar: 95,
+    floorY: 0,
+    ceilingY: 9,
+    boundsMin: [-13, 0, -13],
+    boundsMax: [13, 9, 13],
+    backdrop: '/backdrops/venice-sky-day.jpg',
+    surfaceY: 0.76, // measured: park deck at the play centre (ramps vary ±2m — it is a skatepark)
+  },
+  'dojo': {
+    key: 'dojo',
+    label: 'Shimogamo Dojo',
+    glb: '/models/maps/baked/dojo.glb',
+    scale: 8,
+    spawnPos: [0, 0, 3],
+    spawnYaw: Math.PI,
+    camOffset: [-2, 3.5, 6],
+    ambientColor: '#1a1412',
+    fogColor: '#1a1210',
+    fogNear: 16,
+    fogFar: 52,
+    floorY: 0,
+    ceilingY: 10,
+    boundsMin: [-7, 0, -6],
+    boundsMax: [7, 10, 6],
+    backdrop: '/backdrops/karate.jpg',
+    surfaceY: 1.4, // measured: interior tatami platform bands at 1.3-1.5m (band 0.0 is the terrain UNDER the building; roof at ~8-10m)
+  },
+  'tennis-court': {
+    key: 'tennis-court',
+    label: 'Venice Tennis Court',
+    glb: '/models/maps/baked/tennis-court.glb',
+    scale: 10,
+    spawnPos: [0, 0, 4],
+    spawnYaw: Math.PI,
+    camOffset: [-3, 4, 7],
+    ambientColor: '#3a4a5e',
+    fogColor: '#0e1116',
+    fogNear: 20,
+    fogFar: 120,
+    floorY: 0,
+    ceilingY: 8,
+    boundsMin: [-12, 0, -12],
+    boundsMax: [12, 8, 12],
+    backdrop: '/backdrops/venice-sky-day.jpg',
+    surfaceY: -1.025, // measured
+  },
+  'coastal-links': {
+    key: 'coastal-links',
+    label: 'Coastal Links',
+    glb: '/models/maps/baked/coastal-links.glb',
+    scale: 12,
+    spawnPos: [0, 0, 6],
+    spawnYaw: Math.PI,
+    camOffset: [-4, 5, 9],
+    ambientColor: '#4a5e3a',
+    fogColor: '#0e1116',
+    fogNear: 30,
+    fogFar: 160,
+    floorY: 0,
+    ceilingY: 10,
+    boundsMin: [-15, 0, -15],
+    boundsMax: [15, 10, 15],
+    backdrop: '/backdrops/venice-sky-day.jpg',
+    surfaceY: -1.385, // measured
+  },
+  'baseball-park': {
+    key: 'baseball-park',
+    label: 'Catalina Ballpark',
+    glb: '/models/maps/baked/baseball-park.glb',
+    scale: 12,
+    spawnPos: [0, 0, 6],
+    spawnYaw: Math.PI,
+    camOffset: [-4, 5, 9],
+    ambientColor: '#3a4a5e',
+    fogColor: '#0e1116',
+    fogNear: 30,
+    fogFar: 160,
+    floorY: 0,
+    ceilingY: 10,
+    boundsMin: [-15, 0, -15],
+    boundsMax: [15, 10, 15],
+    backdrop: '/backdrops/venice-sky-day.jpg',
+    surfaceY: -1.83, // measured
+  },
+  'gridiron': {
+    key: 'gridiron',
+    label: 'Gridiron Stadium',
+    glb: '/models/maps/baked/gridiron.glb',
+    scale: 14,
+    spawnPos: [0, 0, 6],
+    spawnYaw: Math.PI,
+    camOffset: [-4, 5, 9],
+    ambientColor: '#3a4a5e',
+    fogColor: '#0e1116',
+    fogNear: 30,
+    fogFar: 160,
+    floorY: 0,
+    ceilingY: 10,
+    boundsMin: [-16, 0, -16],
+    boundsMax: [16, 10, 16],
+    backdrop: '/backdrops/venice-sky-sunset.jpg',
+  },
+  'soccer-stadium': {
+    key: 'soccer-stadium',
+    label: 'Coastal FC Stadium',
+    glb: '/models/maps/baked/soccer-stadium.glb',
+    scale: 14,
+    spawnPos: [0, 0, 6],
+    spawnYaw: Math.PI,
+    camOffset: [-4, 5, 9],
+    ambientColor: '#3a4a5e',
+    fogColor: '#0e1116',
+    fogNear: 30,
+    fogFar: 160,
+    floorY: 0,
+    ceilingY: 10,
+    boundsMin: [-16, 0, -16],
+    boundsMax: [16, 10, 16],
+    backdrop: '/backdrops/venice-sky-day.jpg',
+    surfaceY: -2.887, // measured
+  },
+  'sand-court': {
+    key: 'sand-court',
+    label: 'Venice Sand Court',
+    glb: '/models/maps/baked/sand-court.glb',
+    scale: 10,
+    spawnPos: [0, 0, 4],
+    spawnYaw: Math.PI,
+    camOffset: [-3, 4, 7],
+    ambientColor: '#5e4a3a',
+    fogColor: '#0e1116',
+    fogNear: 20,
+    fogFar: 120,
+    floorY: 0,
+    ceilingY: 8,
+    boundsMin: [-10, 0, -10],
+    boundsMax: [10, 8, 10],
+    backdrop: '/backdrops/venice-sky-sunset.jpg',
+  },
+  'surf-break': {
+    key: 'surf-break',
+    label: 'Surf Break',
+    glb: '/models/maps/baked/surf-break.glb',
+    scale: 12,
+    spawnPos: [0, 0, 4],
+    spawnYaw: Math.PI,
+    camOffset: [-3.5, 4.5, 8],
+    ambientColor: '#2a4a5e',
+    fogColor: '#0a1a22',
+    fogNear: 25,
+    fogFar: 140,
+    floorY: 0,
+    ceilingY: 8,
+    boundsMin: [-12, 0, -12],
+    boundsMax: [12, 8, 12],
+    backdrop: '/backdrops/venice-sky-sunset.jpg',
+    surfaceY: -2.653, // measured: water/launch line at the play centre
+  },
+  'mountain-slope': {
+    key: 'mountain-slope',
+    label: 'Mountain Slope',
+    glb: '/models/maps/baked/mountain-slope.glb',
+    scale: 14,
+    spawnPos: [0, 0, 4],
+    spawnYaw: Math.PI,
+    camOffset: [-4, 5, 9],
+    ambientColor: '#8a9ab0',
+    fogColor: '#dfe8f0',
+    fogNear: 25,
+    fogFar: 140,
+    floorY: 0,
+    ceilingY: 12,
+    boundsMin: [-14, 0, -14],
+    boundsMax: [14, 12, 14],
+    backdrop: '/backdrops/venice-sky-day.jpg',
+    // No surfaceY: the play surface is a continuous slope (no band dense
+    // enough to calibrate against; the valley floor at -6m is NOT the slope).
+  },
+  'gymnastics-gym': {
+    key: 'gymnastics-gym',
+    label: 'Pacifica Gymnastics',
+    glb: '/models/maps/baked/gymnastics-gym.glb',
+    scale: 8,
+    spawnPos: [0, 0, 3],
+    spawnYaw: Math.PI,
+    camOffset: [-2, 3.5, 6],
+    ambientColor: '#3a3a5e',
+    fogColor: '#0e1116',
+    fogNear: 15,
+    fogFar: 90,
+    floorY: 0,
+    ceilingY: 8,
+    boundsMin: [-8, 0, -8],
+    boundsMax: [8, 8, 8],
+    backdrop: '/backdrops/venice-sky-day.jpg',
+    surfaceY: -1.398, // measured
+  },
+  'neuro-arena': {
+    key: 'neuro-arena',
+    label: 'NeuroArena',
+    glb: '/models/maps/baked/neuro-arena.glb',
+    scale: 8,
+    spawnPos: [0, 0, 3],
+    spawnYaw: Math.PI,
+    camOffset: [-2, 3.5, 6],
+    ambientColor: '#1a1a3e',
+    fogColor: '#0a0d14',
+    fogNear: 15,
+    fogFar: 90,
+    floorY: 0,
+    ceilingY: 8,
+    boundsMin: [-8, 0, -8],
+    boundsMax: [8, 8, 8],
+    backdrop: '/backdrops/venice-sky-sunset.jpg',
+  },
+};
+
+// Lookup helpers
+export function getMap(key: string): MapConfig | undefined {
+  return MAPS[key];
+}
+
+export function getMapKeys(): string[] {
+  return Object.keys(MAPS);
+}

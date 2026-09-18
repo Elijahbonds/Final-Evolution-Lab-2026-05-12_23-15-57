@@ -1,0 +1,9 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "blitz",
+  "sex": "male",
+  "note": "compact, red kit",
+  "source": "public/models/candidates/fel-kit-male.glb"
+}

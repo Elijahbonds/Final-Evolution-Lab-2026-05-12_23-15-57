@@ -1,0 +1,56 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "es5",
+      "es2020"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".build/types/**/*.ts",
+    ".next-prod/types/**/*.ts",
+    ".next-verify/types/**/*.ts",
+    ".next-rc2/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "lib/babylon/modes/TennisModeV2.ts",
+    "lib/babylon/modes/GolfMode.ts",
+    "lib/babylon/modes/SoccerMode.ts",
+    "lib/babylon/modes/BaseballMode.ts",
+    "lib/babylon/modes/ModeAuditTests.ts",
+    "lib/babylon/modes/ModeAuditRegistry.ts",
+    "lib/babylon/modes/DunkMode.audit.ts",
+    "server/netd/dist",
+    "server/netd/src/index.ts"
+  ]
+}
