@@ -418,6 +418,25 @@ for (let n = 0; n < POSSESSIONS; n++) {
         await agent(`a.act({ moveX: 0, moveY: 0.6, brace: true, actionHeld: 0, action: true }, 80)`);
       }
     }
+    else if (play === 'prostick') {
+      // THE 2K PRO STICK (2026-09-18): the eight ways and the L2 modifiers thrown in-page while jogging at the rim — a hesi
+      // (down), a size-up pair (up-diagonals), a standing behind-the-back (down-diagonal), a cross then the aggressive BTB
+      // (down-diagonal inside AGGRESSIVE_BTB_SEC), then L2 + down (the step-back dribble) and a squeeze inside its window.
+      await page.evaluate(`(() => {
+        const bus = window.__FEL_DEV__ && window.__FEL_DEV__.input; if (!bus) return 'no bus';
+        const R = (x, y) => bus.emit({ t: 'stick', side: 'R', x, y });
+        const flick = (at, x, y) => { setTimeout(() => R(x, y), at); setTimeout(() => R(x * 0.9, y * 0.9), at + 30); setTimeout(() => R(0, 0), at + 90); };
+        flick(400, 0, 1);                       // hesi
+        flick(900, 0.7, -0.7); flick(1300, -0.7, -0.7);   // size-ups
+        flick(1900, 0.7, 0.7);                  // standing behind the back
+        flick(2500, 1, 0); flick(2800, -0.7, 0.7);        // cross, then the aggressive BTB inside the window
+        flick(3450, 0, 1);                      // …with L2 held (the bridge's brace, below): the step-back dribble
+        return 'armed';
+      })()`);
+      await agent(`a.act({ moveX: 0, moveY: 0.35 }, 3000)`);
+      await agent(`a.act({ moveX: 0, moveY: 0.35, brace: true }, 900)`);   // L2 held over the 3450 ms down flick (in agent mode the slot reads the bridge, not the pad; the act's round trip eats ~100 ms)
+      await agent(`a.do('shoot', { charge: ${CHARGE} })`);   // inside the step-back window: the step-back jumper
+    }
     else if (play === 'pausin') {
       // PAUSIN' (2K21): the drive with the turbo, the sweep thrown in-page at ~5 m — the drop step, then the spin into the dunk
       await driveToRim(6.0);

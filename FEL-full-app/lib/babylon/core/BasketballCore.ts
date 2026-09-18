@@ -149,6 +149,14 @@ export class DribbleController {
     const speed = Math.min(DEFAULT_MOVEMENT.maxSpeed * 1.1, Math.max(DribbleController.DROP_STEP_SPEED, this.movement.vel.length()) + (sprint ? 0.8 : 0.4));
     this.cutTo(dx, dz, speed); this.movement.launchFor(0.5); this.movement.noteBurst(0.5);
   }
+  /** THE STEP-BACK DRIBBLE (2K: L2 + the stick down): one hop AWAY from the rim (`tx, tz` = toward the rim) with the dribble
+   *  kept, the launch armed — a squeeze inside its window is the step-back jumper. */
+  static readonly STEPBACK_HOP_SPEED = 3.6;
+  stepBack(tx: number, tz: number, sprint: boolean): void {
+    const n = Math.hypot(tx, tz) || 1;
+    this.cutTo(-tx / n, -tz / n, DribbleController.STEPBACK_HOP_SPEED + (sprint ? 0.4 : 0));
+    this.movement.launchFor(0.35); this.movement.noteBurst(0.35);
+  }
   /** PAUSIN': the dribble frozen — the body stops on a dime and the stick is ignored until `pause(false)`, which arms the explode. */
   pause(on: boolean): void {
     this.movement.pause(on);

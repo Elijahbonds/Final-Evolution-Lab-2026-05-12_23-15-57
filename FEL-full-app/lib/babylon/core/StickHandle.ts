@@ -9,8 +9,12 @@
 //   SWEEP   — a half circle around the ring at speed: the STEEZO ROLL (behind the back rolled into the spin)
 // The mode reads the gestures while the ball is on the floor; in the air the same stick is the trick stick (untouched).
 export type StickDir = 'left' | 'right' | 'up' | 'down';
+/** THE 2K PRO STICK (owner, 2026-09-18: "optimize dribble moves with the right stick … look at 2k controls and dribble
+ *  tutorials"): the flick's EIGHT ways — the diagonals are their own moves (up-diagonals = size-ups, down-diagonals =
+ *  behind the back), not a rounding of the nearest axis. */
+export type StickDir8 = StickDir | 'upleft' | 'upright' | 'downleft' | 'downright';
 export type StickGesture =
-  | { kind: 'flick'; dir: StickDir; x: number; y: number }
+  | { kind: 'flick'; dir: StickDir; dir8: StickDir8; x: number; y: number }
   | { kind: 'hold'; x: number; y: number }
   | { kind: 'release'; heldSec: number }
   | { kind: 'sweep'; sign: 1 | -1 };
@@ -61,7 +65,7 @@ export class StickHandleReader {
       if (!this.flicked && !this.swept && mag >= STICK.flick && now - this.outAt <= STICK.flickSec) {
         this.flicked = true;
         const dir: StickDir = Math.abs(x) >= Math.abs(y) ? (x > 0 ? 'right' : 'left') : (y > 0 ? 'down' : 'up');
-        out.push({ kind: 'flick', dir, x, y });
+        out.push({ kind: 'flick', dir, dir8: dir8Of(x, y), x, y });
       }
       // the hold: parked past the hold ring for a beat (a flick that stays out becomes a hold too — the pause after the cross)
       if (!this.held && !this.swept && mag >= STICK.hold && now - this.outAt >= STICK.holdSec) { this.held = true; out.push({ kind: 'hold', x, y }); }
@@ -72,21 +76,65 @@ export class StickHandleReader {
   reset(): void { this.mag = 0; this.wasHome = true; this.outAt = -1; this.flicked = false; this.held = false; this.swept = false; this.sweepAt = -1; }
 }
 
-/** WHICH MOVE a gesture is, read off the situation (the 2K17 map). */
-export type StickMove = 'momentum_cross' | 'momentum_btb' | 'crossover' | 'hesi' | 'in_and_out' | 'between_legs' | 'behind_back' | 'steezo_roll';
-export interface StickRead { speed01: number; pressured: boolean; sprint: boolean }
+/** The eight ways: a diagonal is anything more than DIAG_MIN off both axes (a flick at 45° ± 22.5°). */
+export const DIAG_MIN = 0.42;
+export function dir8Of(x: number, y: number): StickDir8 {
+  const ax = Math.abs(x), ay = Math.abs(y), m = Math.hypot(x, y) || 1;
+  if (ax / m >= DIAG_MIN && ay / m >= DIAG_MIN) return y < 0 ? (x > 0 ? 'upright' : 'upleft') : (x > 0 ? 'downright' : 'downleft');
+  return ax >= ay ? (x > 0 ? 'right' : 'left') : (y > 0 ? 'down' : 'up');
+}
+
+/** WHICH MOVE a gesture is, read off the situation — THE 2K PRO STICK (2K25's own map, measured against the dribble
+ *  tutorials; the 2K17 momentum moves kept where they were):
+ *    left / right           crossover; at pace (or with the sprint held: the ESCAPE) the momentum cross
+ *    down                   the hesitation — the freeze
+ *    down-left / down-right behind the back, standing; at pace, or thrown right after another move (the "aggressive" BTB
+ *                           the tutorials chain off a hesi / an escape / a cross), the momentum behind the back
+ *    up-left / up-right     a SIZE-UP: a rhythm dribble in place, one animation per flick, no travel
+ *    up                     the in-and-out (standing under pressure: between the legs)
+ *    L2 + any flick         the SPIN, to the flick's side
+ *    L2 + down              the STEP-BACK dribble (a squeeze inside its window is the step-back jumper)
+ *    sweep                  the steezo roll · hold: PAUSIN' (the mode) · release: the explode */
+export type StickMove = 'momentum_cross' | 'momentum_btb' | 'crossover' | 'hesi' | 'in_and_out' | 'between_legs' | 'behind_back' | 'steezo_roll'
+  | 'size_up' | 'stepback' | 'spin';
+export interface StickRead {
+  speed01: number; pressured: boolean; sprint: boolean;
+  /** L2 / LT held (the 2K modifier: spins and step-backs). */
+  brace?: boolean;
+  /** Seconds since the last stick move landed (Infinity when none) — the aggressive behind-the-back needs a move before it. */
+  sinceMoveSec?: number;
+}
 export const MOMENTUM_MIN_SPEED01 = 0.4;
+/** A behind-the-back thrown inside this much of another move is the AGGRESSIVE one (the momentum wrap). */
+export const AGGRESSIVE_BTB_SEC = 0.7;
 export function stickMoveFor(g: StickGesture, r: StickRead): { move: StickMove; side: 'left' | 'right' | null } | null {
   switch (g.kind) {
-    case 'flick':
-      if (g.dir === 'left' || g.dir === 'right') return { move: r.speed01 >= MOMENTUM_MIN_SPEED01 ? 'momentum_cross' : 'crossover', side: g.dir };
-      if (g.dir === 'down') return r.speed01 >= MOMENTUM_MIN_SPEED01 ? { move: 'momentum_btb', side: g.x >= 0 ? 'right' : 'left' } : { move: 'hesi', side: null };
-      return r.speed01 < 0.3 && r.pressured ? { move: 'between_legs', side: g.x >= 0 ? 'right' : 'left' } : { move: 'in_and_out', side: g.x >= 0 ? 'right' : 'left' };
-    case 'hold': return null;   // a parked stick is a size-up, not a move (2K: the moves are flicks and rotations)
+    case 'flick': {
+      const d8 = g.dir8 ?? dir8Of(g.x, g.y);
+      const side: 'left' | 'right' = g.x >= 0 ? 'right' : 'left';
+      if (r.brace) return d8 === 'down' ? { move: 'stepback', side } : { move: 'spin', side };
+      if (d8 === 'left' || d8 === 'right') return { move: r.speed01 >= MOMENTUM_MIN_SPEED01 || r.sprint ? 'momentum_cross' : 'crossover', side: d8 };
+      if (d8 === 'down') return { move: 'hesi', side: null };
+      if (d8 === 'downleft' || d8 === 'downright') {
+        const aggressive = r.speed01 >= MOMENTUM_MIN_SPEED01 || (r.sinceMoveSec ?? Infinity) <= AGGRESSIVE_BTB_SEC;
+        return { move: aggressive ? 'momentum_btb' : 'behind_back', side };
+      }
+      if (d8 === 'upleft' || d8 === 'upright') return { move: 'size_up', side };
+      return r.speed01 < 0.3 && r.pressured ? { move: 'between_legs', side } : { move: 'in_and_out', side };
+    }
+    case 'hold': return null;   // a parked stick is PAUSIN' (the mode freezes the dribble on it)
     case 'sweep': return { move: 'steezo_roll', side: g.sign > 0 ? 'right' : 'left' };
     case 'release': return null;
   }
 }
+/** The size-up cycle: each up-diagonal flick pulls the next animation from the package (2K: "flick repeatedly for
+ *  size-ups"), no travel — the yoyo, the in-and-out, the between-the-legs, then round again. */
+export const SIZE_UP_CYCLE = ['bball_yoyo', 'bball_in_and_out_{side}', 'bball_between_legs_{side}'] as const;
+export function sizeUpClip(n: number, side: 'left' | 'right'): string {
+  return SIZE_UP_CYCLE[((n % SIZE_UP_CYCLE.length) + SIZE_UP_CYCLE.length) % SIZE_UP_CYCLE.length].replace('{side}', side);
+}
+/** A step-back dribble opens this window: a squeeze inside it is the STEP-BACK jumper whatever the left stick says. */
+export const STEPBACK_WINDOW_SEC = 0.6;
 
 /** PAUSIN' (the 2K21 park spin dunk — owner: "a spin move dunk that kinda defies logic and physics"): the sweep (the spin)
  *  thrown with the turbo, inside dunk range, at pace, becomes the takeoff itself — no gather, the body spins THROUGH the

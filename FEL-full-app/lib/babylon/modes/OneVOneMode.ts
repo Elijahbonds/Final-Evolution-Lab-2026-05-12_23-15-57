@@ -126,7 +126,7 @@ import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   /
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
-import { StickHandleReader, stickMoveFor, pausinWanted, type StickGesture } from '../core/StickHandle';
+import { StickHandleReader, stickMoveFor, pausinWanted, sizeUpClip, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
 import type { HoopsDunk } from '../core/HoopsDunks';   // STICK HANDLE (2026-09-17): the right stick is the dribble stick on the floor (2K17 vocabulary)
 import { driveDunkKFor, handForward, handShiftTarget, stepShift, driveDunkPos, hangWanted, RIM_HANG, rimProtectorJump, rimProtectorSwats, RIM_PROTECT, chestRide, VICTIM_SLIDE, slideStep, type ShowtimeJudge } from '../core/DriveFlight';   // DUNK-FANATIC (2026-09-17): at the iron by the resolve, the rim hang, the rim protector, the chest ride
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
@@ -262,7 +262,7 @@ const FACE_RATE = 10, FACE_RIM_RATE = 6;
 const DEFEND_FACE_RANGE = 6;
 // "SPRINT in to DUNK, ease off to LAY IT IN" is the one line this hint was missing, and the fix that made the layup
 // reachable (see the checkDriveDunk call) is worth nothing if nobody is told the choice exists.
-const HINT_OFFENCE = 'HOLD R2 (SHIFT) + a direction to SPRINT · R2 + SQUARE (SHIFT + L) at the rim = DUNK, SQUARE (L) alone = LAY IT IN · SQUARE (L): hold, release in the green · L2 (F): POST UP · snap the stick for ankles · pull BACK for a HESI · hold L2 (F) or L1 (Q) near the block to POST UP (back to the rim: SQUARE = HOOK · stick OFF the rim + SQUARE = FADE, with R2 = SHIMMY FADE · stick AT the rim + SQUARE = DROP STEP · swing the stick across = SPIN · let go early = PUMP FAKE, then SQUARE again = UP AND UNDER) · drive into a body to SPIN off him';
+const HINT_OFFENCE = 'HOLD R2 (SHIFT) + a direction to SPRINT · R2 + SQUARE (SHIFT + L) at the rim = DUNK, SQUARE (L) alone = LAY IT IN · SQUARE (L): hold, release in the green · L2 (F): POST UP · RIGHT STICK (2K): flick LEFT/RIGHT = crossover (with R2 = the escape / momentum cross) · flick DOWN = hesi · DOWN-DIAGONAL = behind the back (after a move = the momentum wrap) · UP-DIAGONAL = size-ups · L2 + flick = SPIN · L2 + DOWN = STEP-BACK (shoot inside it = the step-back jumper) · hold the stick = PAUSIN · sweep a half circle = the STEEZO ROLL · hold L2 (F) or L1 (Q) near the block to POST UP (back to the rim: SQUARE = HOOK · stick OFF the rim + SQUARE = FADE, with R2 = SHIMMY FADE · stick AT the rim + SQUARE = DROP STEP · swing the stick across = SPIN · let go early = PUMP FAKE, then SQUARE again = UP AND UNDER) · drive into a body to SPIN off him';
 const HINT_DEFENCE = 'STAY IN FRONT — they sidestep, you slide · HOLD L2 (F): SIT DOWN and slide faster · SQUARE (L): STEAL as the ball crosses over (hold it for a HAND UP) · TRIANGLE (I): jump on the gather to BLOCK · HOLD CIRCLE (K): plant and TAKE THE CHARGE · L1: BOX OUT';
 
 type Possession = 'mine' | 'defense';
@@ -329,6 +329,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let foeFloored = false;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   const rStick = new StickHandleReader(); let stickGestures: StickGesture[] = []; let pausedDribble = false;
+  let lastStickMoveAt = -Infinity, sizeUpN = 0, stepbackWindow = 0;   // THE 2K PRO STICK (2026-09-18)
   let postStick = { x: 0, y: 0 }; let stickShot: { side: 'left' | 'right'; shimmy: boolean; started: boolean; shimmied: boolean } | null = null; let shimmyLeft = 0;   // POST HOOK (2K20): in the post the R stick up-left / up-right IS the hook (R2: the shimmy first)   // STICK HANDLE: the dribble stick on the floor
   let currentShot: ShotContext | null = null;
   /** Contest level at shot start — kept so the RESULT banner can say why. */
@@ -1007,7 +1008,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           burstArmed = false;
           console.info('[1V1-THREAT] jab burst spent');
         }
-        spinCooldown = Math.max(0, spinCooldown - dt);
+        spinCooldown = Math.max(0, spinCooldown - dt); stepbackWindow = Math.max(0, stepbackWindow - dt);
         spinArmed = Math.max(0, spinArmed - dt);
         if (spin) stepSpin(ctx, dt);
         else if (updatePost(ctx, dt, mx, my, defPos)) { /* the seal owns the stick */ }
@@ -1048,9 +1049,20 @@ export const OneVOneMode: ModeDefinition = (() => {
           const foeDistS = distXZ(me.root.position, foe.root.position); const foeLiveS = foeStunSec === 0 && !foeFloored;
           for (const g of stickGestures) {
             if (g.kind === 'release') { if (pausedDribble) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); console.info('[1V1-STICK] release — the explode out of the pause'); } continue; }
-            const pick = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, sprint: sprintOk });
+            const pick = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, sprint: sprintOk, brace: !!meSlot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
             if (!pick) continue;
-            console.info(`[1V1-STICK] ${g.kind}${'dir' in g ? ' ' + g.dir : ''} → ${pick.move}${pick.side ? ' ' + pick.side : ''} at ${meDribble.vel.length().toFixed(1)} m/s`);
+            if (pick.move !== 'size_up') lastStickMoveAt = performance.now() / 1000;   // a size-up is rhythm, not the move the aggressive BTB chains off
+            console.info(`[1V1-STICK] ${g.kind}${'dir8' in g ? ' ' + g.dir8 : ''} → ${pick.move}${pick.side ? ' ' + pick.side : ''} at ${meDribble.vel.length().toFixed(1)} m/s`);
+            // THE 2K PRO STICK (2026-09-18): the size-up (a package animation in place, no travel), the L2 step-back dribble
+            // (a hop off the rim that arms the step-back jumper), the L2 spin — none of them a chain move
+            if (pick.move === 'size_up') { meAnimTree.beat(sizeUpClip(sizeUpN++, pick.side ?? 'right'), { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 }); continue; }
+            if (pick.move === 'stepback') {
+              const toRimS = RIM_FLOOR.subtract(me.root.position); toRimS.y = 0;
+              meDribble.stepBack(toRimS.x, toRimS.z, sprintOk); stepbackWindow = STEPBACK_WINDOW_SEC;
+              meAnimTree.beat('bball_stepback_gather', { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.35 }); ctx.feel?.impact?.(0.1);
+              continue;
+            }
+            if (pick.move === 'spin') { if (spinCooldown <= 0) startSpin(ctx, foeStunSec > 0 ? null : foe.root.position, pick.side ?? undefined); continue; }
             if (pick.move === 'momentum_cross') meDribble.momentumCross(pick.side ?? 'right', sprintOk);
             else if (pick.move === 'momentum_btb') meDribble.momentumBtb(pick.side ?? 'right', sprintOk);
             else if (pick.move === 'hesi') meDribble.hesitate();
@@ -1248,6 +1260,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             const contest = contestLevel(me.root.position, defenderPos);
             shotContest = contest;
             currentShot = classifyShot(me.root.position, meDribble.vel, RIM, contest, posting ? post : faceUpRead(defenderPos));
+            if (stepbackWindow > 0) currentShot = { style: 'jumper', label: 'STEP-BACK', pctMod: 0.92, drift: 'none' };   // the step-back dribble's squeeze is the step-back jumper, wherever the hop landed
             console.info(`[1V1-SHOT] gather ${currentShot.style} rim ${distXZ(me.root.position, RIM_FLOOR).toFixed(2)} speed ${Math.hypot(meDribble.vel.x, meDribble.vel.z).toFixed(1)} contest ${contest.toFixed(2)}`);
             // HOOPS-MOVE-KIT-A: a layup / floater is a FINISH (M3); a jumper GATHERS first (M1) — a set body rises at once.
             // HOOPS-MOVE-KIT-B: the hook (M5) and the fadeaway (M4) are finishes too — their own clip, their own hop.
@@ -2039,7 +2052,7 @@ export const OneVOneMode: ModeDefinition = (() => {
    *  the rim) on the authored gather clip while the meter runs; a set body rises at once. */
   function startRise(ctx: ModeContext, contest: number, mx: number, my: number): void {
     const toRim = RIM_FLOOR.subtract(me.root.position); toRim.y = 0; toRim.normalize();
-    const plan = planGather(meDribble.vel, me.root.position, RIM_FLOOR, contest, stickBack01(mx, -my, toRim));
+    const plan = planGather(meDribble.vel, me.root.position, RIM_FLOOR, contest, Math.max(stickBack01(mx, -my, toRim), stepbackWindow > 0 ? 1 : 0));   // a squeeze inside the step-back dribble's window is the step-back jumper
     // THE SPIN ALREADY GATHERED. Its exit squares you at the rim with your feet under you, so paying the
     // gather again is charging twice for footwork you have done — and it is what made the spin dead-end
     // into a separate shot input instead of flowing into one. Inside the spin's window the body rises at
@@ -2232,6 +2245,9 @@ export const OneVOneMode: ModeDefinition = (() => {
    *  turned away, slewed), the authored seal HELD, and the stick becomes a slow back-down / a shuffle along the lane
    *  (postWish) instead of a drive. Swing the stick ACROSS the body and it is a quick spin off his shoulder (M6). */
   function updatePost(ctx: ModeContext, dt: number, mx: number, my: number, defPos: Vector3 | null): boolean {
+    // THE 2K PRO STICK: L2 over a step-back dribble is the MODIFIER, not the plant — the plant zeroed the hop every frame and
+    // read the left stick as a pivot (measured: "stepback" then "reverse pivot" on the same L2 hold)
+    if (stepbackWindow > 0) return false;
     const plant = !!meSlot.intent.brace && carrying && !shooting && !dunking && !finish && !gather;
     // HOOPS-MOVE-KIT-B M9: L1 is PLANT YOUR FOOT. With a body to back down inside the band it is the post seal (M4–M6);
     // anywhere else it is TRIPLE THREAT — the feet stop and the stick swung across turns you on the planted foot (a front
