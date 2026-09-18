@@ -179,6 +179,8 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   storyMode: { name: 'The Nexus Initiative', venue: 'The Nexus', href: '/story' },
   football: { name: 'Breakaway', venue: 'The Gridiron', href: '/play/football' },
   mixedcombat: { name: "Ring's Edge", venue: 'The Octagon', href: '/play/mixedcombat' },
+  aeroAces: { name: 'Aero Aces', venue: 'Bay Circuit', href: '/play/aero-aces' },
+  velocityKart: { name: 'Velocity Kart', venue: 'Boardwalk Loop', href: '/play/velocity-kart' },
   // duel + showdown: RETIRED from the v1 roster (owner, 2026-09-01 — combat is
   // Karate VS / Karate Endless / Mixed Combat only; karate-vs is the Storm
   // mode). Routes redirect to /play; mode files stay registered for a future

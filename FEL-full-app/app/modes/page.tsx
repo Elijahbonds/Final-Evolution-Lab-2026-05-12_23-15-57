@@ -9,7 +9,7 @@ import { CARNIVAL_EXTERNAL_POOL } from '@/lib/carnival-run';
 import {
   Swords, CircleDot, Trophy, Brain, ChevronRight, Zap, Users, Target, Crosshair,
   Snowflake, Waves, Flag, Goal, CircleDollarSign, Sparkles, Dumbbell, Mountain,
-  Timer, Footprints, Eye, Shield, BookOpen,
+  Timer, Footprints, Eye, Shield, BookOpen, Plane, Car,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -35,6 +35,8 @@ const META: Record<string, { icon: any; color: string; desc: string }> = {
   bigAir: { icon: Mountain, color: '#00E5FF', desc: 'Five kickers, huge amplitude. Charge the jump, spin the trick prompts, stomp the landing.' },
   tiebreak: { icon: Timer, color: '#00FF9D', desc: 'Sudden-death tennis. Read the serve side and swing in the green window. First to 7.' },
   sprint: { icon: Footprints, color: '#FFD700', desc: '100m beach dash. Alternate steps in rhythm — stumble once and the rival pulls ahead.' },
+  aeroAces: { icon: Plane, color: '#00E5FF', desc: 'Diddy-style flyer racing. Skim the course, pop balloons, chain stunts and fight for the podium.' },
+  velocityKart: { icon: Car, color: '#FFD700', desc: 'Boardwalk kart racing. Gas, drift, bank boost, hit ramps and beat the field to the line.' },
   storyMode: { icon: BookOpen, color: '#A855F7', desc: 'The Nexus Initiative. Train in the Sanctum, grind the rails, face the Glitch Boss.' },
 };
 

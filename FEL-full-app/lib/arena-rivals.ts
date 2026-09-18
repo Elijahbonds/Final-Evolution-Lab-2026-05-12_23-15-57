@@ -174,6 +174,8 @@ export const ARENA_SCORE_BASELINES: Record<string, number> = {
   football: 150,
   carnival: 300,
   mixedcombat: 100,
+  aeroAces: 650,
+  velocityKart: 900,
   dunkduel: 90,
   musicAcademy: 5000,
   dance: 5000,

@@ -18,6 +18,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import { isVelocityKartWin } from '@/lib/babylon/core/raceOutcome';
 
 type Hud = Record<string, HudValue>;
 
@@ -44,7 +45,7 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
       const t = Number(r.stats?.timeSec ?? r.stats?.time ?? 0);
       onEnd({
         score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: 0,
-        won: r.outcome === 'win', duration: r.durationSec,
+        won: isVelocityKartWin(r.outcome), duration: r.durationSec,
         headline: t > 0 ? `RACE OVER · ${t.toFixed(1)}s` : 'RACE COMPLETE',
       } satisfies GameResult);
     };

@@ -85,6 +85,8 @@ export const ARENA_MODES: readonly string[] = [
   'carnival',
   'football',
   'mixedcombat',
+  'aeroAces',
+  'velocityKart',
   // 'duel' + 'showdown' retired from the v1 roster with the combat-family
   // trim (owner, 2026-09-01 — karate-vs is the Storm mode; combat is three
   // modes). A stake on a redirecting route is a trap, same as sprint.
