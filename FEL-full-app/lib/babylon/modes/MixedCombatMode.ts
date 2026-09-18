@@ -21,6 +21,7 @@
 // groundLock (released on a ring-out fall), fight-cam framing.
 
 import { EvadeMoves } from '../core/EvadeMoves';
+import { FOCUS, FocusMeter } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18): bullet time held on the right trigger
 import { dodgeReward, tickCounter, counterMult } from '../core/DodgeRead';
 import { nerve, standingOf } from '../core/Nerve';
 import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
@@ -113,6 +114,22 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let myStyled: Record<'jab' | 'kick' | 'heavy', AttackDef> | null = null;
   let striking = false, foeStriking = false;
   let slowmoSec = 0, falling = false;
+  // MATRIX FOCUS (owner 2026-09-18): held on the right trigger — the rival runs at FOCUS.worldScale (his animator, his brain,
+  // his swing's hit beat via foeTimers) while I keep FOCUS.heroScale; a read refills it, my hits inside it land harder.
+  const focus = new FocusMeter();
+  let focusHeld = false, focusHud = -1, focusHudOn = false;
+  const foeTimers: { left: number; fn: () => void }[] = [];
+  function onFocusStart(ctx: ModeContext): void {
+    ctx.juice.tint('rgba(16, 70, 34, 0.75)'); ctx.camDirector.pulse(0.45, 0.35);
+    SoundKit.play('powerUp', { pitch: 0.55, volume: 0.5 });
+    ctx.setHud({ banner: 'FOCUS' }); setTimeout(() => ctx.setHud({ banner: '' }), 500);
+    console.info(`[MATRIX] mixed focus on at ${Math.round(focus.value)}`);
+  }
+  function onFocusEnd(ctx: ModeContext, dry: boolean): void {
+    ctx.juice.tint(null); SoundKit.play('whoosh', { pitch: 0.6, volume: 0.4 });
+    if (dry) { ctx.setHud({ banner: 'FOCUS DRAINED' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+    console.info(`[MATRIX] mixed focus off (${dry ? 'dry' : 'released'}) after ${focus.heldSec.toFixed(2)} s`);
+  }
   let meAnim: FighterAnim, foeAnim: FighterAnim;
   // BIOMECH-WAVE2 G5: the Posture Poses layer on both fighters (see the header). The staff loadout makes it matter more
   // here than in Karate VS — a bo is held in front of the CHEST, and the chest was wherever the last clip left it.
@@ -411,8 +428,10 @@ export const MixedCombatMode: ModeDefinition = (() => {
     animOf(mine).strike = { weight: special ? 'finisher' : move ? move.weight : WEIGHT_OF[key], clip: atk.clip, speed: move?.speed, cancelFrom: move ? now() + (STRIKE_TIMING[move.weight].cancelAt / move.speed) * 1000 : undefined, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
 
     // the dodge window is read against when THIS strike would connect -- see DodgeRead
-    if (!mine) foeImpactAt = now() + atk.startupMs;
-    setTimeout(() => {
+    // MATRIX FOCUS: the rival's swing lands on the ROOM clock (inside Focus it takes 1/worldScale longer in real time, and the
+    // dodge read is told so); mine stays on the wall clock
+    if (!mine) foeImpactAt = now() + atk.startupMs / focus.worldScale;
+    const onHitBeat = () => {
       if (phase !== 'fighting' || falling) { endStrike(mine); return; }
       const dist = Vector3.Distance(atkChar.root.position, defChar.root.position);
       // The Soul Calibur read: WHERE the defender stands relative to the
@@ -473,6 +492,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
         }
         case 'hit': {
           applyHit(atkState, defState, atk);
+          if (mine && focus.active) defState.hp = Math.max(0, defState.hp - Math.round(atk.dmg * (FOCUS.damageMult - 1)));   // MATRIX: a Focus strike lands harder
+          if (mine) focus.gain(FOCUS.hitGain);
           ctx.feel?.impact?.(special ? 0.6 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
           ctx.momentum.report(mine ? { kind: 'clean_hit', weight: special ? 16 : 9 } : { kind: 'blunder', weight: -8 });
           if (special || key === 'heavy') heavyPunch(ctx, special ? 'special' : 'heavy'); else console.info('[MC-JUICE] hit');
@@ -520,7 +541,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
           break;
         }
       }
-    }, atk.startupMs);
+    };
+    if (mine) setTimeout(onHitBeat, atk.startupMs); else foeTimers.push({ left: atk.startupMs / 1000, fn: onHitBeat });
   }
 
   function endRound(ctx: ModeContext, playerWon: boolean, wasRingOut = false): void {
@@ -660,6 +682,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      if (e.t === 'trigger' && e.side === 'R') focusHeld = e.value > 0.35;   // MATRIX FOCUS
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
 
       if (phase === 'loadout') {
@@ -714,6 +737,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
             const secTo = foeImpactAt === null ? null : (foeImpactAt - now()) / 1000;
             const r = dodgeReward(secTo);
             if (r.perfect) {
+              focus.gain(FOCUS.dodgeGain);   // MATRIX: a read refills Focus
               meCounter = r.counterSec;
               ctx.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000));
               ctx.feel?.impact?.(0.3);
@@ -760,7 +784,15 @@ export const MixedCombatMode: ModeDefinition = (() => {
 
       slowmoSec = Math.max(0, slowmoSec - dt);
       const sdt = slowmoSec > 0 ? dt * SLOWMO_SCALE : dt;
-      meState.tick(sdt); foeState.tick(sdt);
+      // MATRIX FOCUS: the trigger holds bullet time — the rival on the room's clock, me on mine (a clock per rig)
+      const wasFocus = focus.active;
+      if (focusHeld && !focus.active) { if (focus.start()) onFocusStart(ctx); } else if (!focusHeld && focus.active) focus.stop();
+      if (focus.tick(dt)) onFocusEnd(ctx, true); else if (wasFocus && !focus.active) onFocusEnd(ctx, false);
+      if (wasFocus !== focus.active) { rival.animator.setTimeScale(focus.worldScale); player.animator.setTimeScale(focus.heroScale); }
+      { const fv = Math.round(focus.value); if (fv !== focusHud || focus.active !== focusHudOn) { focusHud = fv; focusHudOn = focus.active; ctx.setHud({ focus: fv, focusOn: focus.active }); } }
+      const sdtRoom = sdt * focus.worldScale, sdtHero = sdt * focus.heroScale;
+      for (let i = foeTimers.length - 1; i >= 0; i--) { foeTimers[i].left -= sdtRoom; if (foeTimers[i].left <= 0) { const t = foeTimers.splice(i, 1)[0]; t.fn(); } }
+      meState.tick(sdtHero); foeState.tick(sdtRoom);
       // a route must not complete across two unrelated exchanges
       if (meState.combo === 0 && myLanded.length) myLanded = [];
       if (foeState.combo === 0 && foeLanded.length) foeLanded = [];
@@ -772,38 +804,38 @@ export const MixedCombatMode: ModeDefinition = (() => {
       // (Δscreen −3.4 m toward the camera) and mirrored X whenever the camera had swung. No axis is flipped.
       const moveVel = ctx.camDirector.forwardFlat().scale(-stickY * MOVE_SPEED).addInPlace(ctx.camDirector.rightFlat().scale(stickX * MOVE_SPEED));
       lastMyVel = meDash ? meDash.dir.scale(DASH.speed) : moveVel;   // FREE RUN
-      const rollVel = meEvade.update(sdt);
-      meCounter = tickCounter(meCounter, sdt);
+      const rollVel = meEvade.update(sdtHero);
+      meCounter = tickCounter(meCounter, sdtHero);
       let mySpeed01 = rollVel ? 0 : moveVel.length() / MOVE_SPEED;   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
       if (meDash) {   // STORM: the dash owns the body (and takes the ring check — a dash off the edge is a ring-out)
         if (meDash.homing) { const toFoe = rival.root.position.subtract(player.root.position); toFoe.y = 0; if (toFoe.length() <= DASH.homingStopM) meDash.left = 0; else meDash.dir = toFoe.normalize(); }
-        player.root.position.addInPlace(meDash.dir.scale((meDash.homing ? DASH.homingSpeed : DASH.speed) * sdt));
+        player.root.position.addInPlace(meDash.dir.scale((meDash.homing ? DASH.homingSpeed : DASH.speed) * sdtHero));
         if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
-        meDash.left -= sdt; if (meDash.left <= 0) meDash = null;
+        meDash.left -= sdtHero; if (meDash.left <= 0) meDash = null;
         mySpeed01 = 1;
       } else if (rollVel) {
         // the roll owns the body AND takes the same ring check the walk does -- see the input branch
-        player.root.position.addInPlace(rollVel.scale(sdt));
+        player.root.position.addInPlace(rollVel.scale(sdtHero));
         if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
       } else if (meState.controllable && !striking && !meState.blockHeld) {
         const vel = moveVel;
-        player.root.position.addInPlace(vel.scale(sdt));
+        player.root.position.addInPlace(vel.scale(sdtHero));
         if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
       }
       player.root.position.y = meEvade.height;   // the arc is EvadeMoves'; nothing here integrates gravity
 
       ring?.set(meState.guard / GUARD_MAX);   // PLAYER RING: the guard gauge
-      meDashIframeSec = Math.max(0, meDashIframeSec - sdt);   // STORM ticks
+      meDashIframeSec = Math.max(0, meDashIframeSec - sdtHero);   // STORM ticks
       if (queuedKey) {   // STORM: the queued link fires at the cancel point (or the settle), and goes stale after 0.4 s
         const st = animOf(true).strike;
         if (now() - queuedKey.at > 400) queuedKey = null;
         else if (!striking || (st && st.cancelFrom !== undefined && now() >= st.cancelFrom)) { const k = queuedKey.key; queuedKey = null; swing(ctx, true, k); }
       }
-      if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - sdt); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }
+      if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - sdtRoom); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }
       // rival AI (its brain uses its own loadout's ranges); it never
       // voluntarily steps off — clamp ITS walk to the ring, so only
       // knockback can send it over
-      const action = brain.decide(sdt, rival.root.position, player.root.position, foeState, striking);
+      const action = brain.decide(sdtRoom, rival.root.position, player.root.position, foeState, striking);
       if (action.block && !foeState.blockHeld) foeState.pressBlock(now());
       if (!action.block && foeState.blockHeld) foeState.releaseBlock();
       if (action.attack) swing(ctx, false, action.attack);
@@ -813,13 +845,13 @@ export const MixedCombatMode: ModeDefinition = (() => {
       if (foeState.controllable && !foeStriking && !foeState.blockHeld) {
         const vel = foeVel;
         const before = rival.root.position.clone();
-        rival.root.position.addInPlace(vel.scale(sdt));
+        rival.root.position.addInPlace(vel.scale(sdtRoom));
         const r = Math.hypot(rival.root.position.x, rival.root.position.z);
         if (r > RING_RADIUS - 0.3) {
           const s = (RING_RADIUS - 0.3) / r;
           rival.root.position.x *= s; rival.root.position.z *= s;
         }
-        foeSpeed01 = sdt > 0 && Vector3.Distance(before, rival.root.position) / sdt < 0.3 ? 0 : vel.length() / MOVE_SPEED;   // the step only while the body moves
+        foeSpeed01 = sdtRoom > 0 && Vector3.Distance(before, rival.root.position) / sdtRoom < 0.3 ? 0 : vel.length() / MOVE_SPEED;   // the step only while the body moves
       }
 
       faceEachOther(dt);
