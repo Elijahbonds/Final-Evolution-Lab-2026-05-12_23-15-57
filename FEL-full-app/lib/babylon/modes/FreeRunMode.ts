@@ -49,7 +49,10 @@ import {
 import { trackPieces, courseLength, checkpoints, respawnFor, overGap, routeAt, laneAt, railAt, springAt, gateAhead, hazardAhead, type Piece } from './freeRunCourse';
 // FLOW (owner brief 2026-09-18): the parkour racer's momentum rules — flow and kinetic meters, the vector rebound, the
 // momentum vault, rails, surf, springs, speed gates and the grapple. Pure in core/FreeRunFlow; the tracks in nexus/freeRunTracks.
-import { FLOW, FlowMeter, KINETIC, KineticMeter, vectorRebound, approachDeg, vaultTiming, VAULT, REBOUND, gateOpen, canGrapple, swingAt, GRAPPLE } from '../core/FreeRunFlow';
+import { FLOW, FlowMeter, KINETIC, KineticMeter, vectorRebound, approachDeg, vaultTiming, VAULT, REBOUND, gateOpen, canGrapple, swingAt, GRAPPLE, DRAFT, draftStep, isDrafting } from '../core/FreeRunFlow';
+// RIVALS (owner brief 2026-09-18, pass 2): three runners down the lanes, the draft and the slingshot, the drive-by, the parry-vault,
+// hazards and slams that drop them, a rank on the HUD. Pure in core/FreeRunRivals; the bodies are FreeRunAnimTree rigs.
+import { RIVALS, makeRivals, stepRival, alongside, stumble, hazardVictims, slamVictims, standing, type Rival } from '../core/FreeRunRivals';
 import { trackById, type FreeRunTrack } from '../nexus/freeRunTracks';
 
 const CAPSULE_H = 1.7, CAPSULE_R = 0.32;
@@ -97,6 +100,12 @@ interface St {
   wallApproachDeg: number; wallDist: number; vaultDist: number;
   gateAggs: Map<number, PhysicsAggregate>; pieceMesh: Map<number, Mesh>; springLatch: number; slideEndAt: number; rsTricked: boolean;
   stats: { rebounds: number; perfectVaults: number; grinds: number; surfs: number; springs: number; gates: number; grapples: number; bursts: number; slams: number; kicks: number; flowBursts: number };
+  // RIVALS (pass 2)
+  rivals: Rival[]; rivalRigs: { char: SpawnedCharacter; tree: FreeRunAnimTree }[];
+  draft: number; draftSaid: boolean;
+  /** An incoming lunge: the rival and the clock it lands at (B inside the window parries it). */
+  lunge: { r: Rival; at: number } | null;
+  race: { driveBys: number; parries: number; hitsTaken: number; slingshots: number; hazardHits: number; slamHits: number; place: number; deltaSec: number };
 }
 const states = new WeakMap<Scene, St>();
 const live = new Set<St>();
@@ -174,6 +183,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     ctx.setHud({
       speed: Math.round(S.speed * 10) / 10, speedMax: RUN_MAX,
       verbs: [...verbsFor(S.state, S.speed, S.env), ...(S.state === 'ground' && S.env.wallAhead && S.wallApproachDeg >= REBOUND.minDeg && S.wallApproachDeg <= REBOUND.maxDeg ? ['REBOUND'] : []), ...(S.anchorNear ? ['GRAPPLE'] : []), ...(S.state === 'grind' ? ['GRIND'] : []), ...(S.state === 'surf' ? ['SURF'] : []), ...(S.kinetic.canSlam ? ['SLAM'] : S.kinetic.canBurst ? ['BURST'] : [])].join(' · '),
+      place: `P${S.race.place} / ${S.rivals.length + 1}`, delta: S.race.place > 1 ? `+${S.race.deltaSec.toFixed(1)}s` : 'LEADING', draft: Math.round(S.draft * 100),
       flow: S.flow.tier, flowFrac: Math.round(S.flow.frac * 100), kinetic: Math.round(S.kinetic.value), lane: laneAt(S.hero?.root.position.x ?? 0, S.hero?.root.position.y ?? 0).toUpperCase(), track: S.track.name,
       combo: h.combo, pot: h.pot, banked: h.banked, score: h.banked + h.pot,
       time: Math.round(S.runSec * 10) / 10, checkpoint: `${S.checkpoint}/${checkpoints(S.pieces).length}`,
@@ -269,6 +279,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     if (agg) { agg.dispose(); S.aggs = S.aggs.filter((a) => a !== agg); }
     if (m) { const from = m.position.clone(); const t0 = S.clock; const obs = ctx.scene.onBeforeRenderObservable.add(() => { const u = Math.min(1, (S.clock - t0) / 0.7); m.position.set(from.x, from.y + Math.sin(u * Math.PI) * 1.4, from.z + u * 11); m.rotation.x += 0.3; if (u >= 1) { ctx.scene.onBeforeRenderObservable.remove(obs); m.setEnabled(false); } }); }
     S.pieces.splice(i, 1, { ...h, kind: 'gap', y: -99, d: 0, w: 0 });   // gone from the readers (a zero-size gap is nothing)
+    for (const v of hazardVictims({ x: h.x, z: h.z }, S.rivals)) { stumble(v); S.race.hazardHits++; S.kinetic.add(KINETIC.hit); say(ctx, `DEBRIS HIT ${v.name}`, 600); }
     S.speed += 0.6; S.kinetic.add(10); S.stats.kicks++;
     S.combo.add('KICK', 25, 'manual'); say(ctx, 'KICKED IT DOWN THE LINE'); SoundKit.play('impact', { pitch: 1.1, volume: 0.5 }); ctx.feel?.impact?.(0.3);
     return true;
@@ -285,6 +296,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     if (S.state !== 'air' && S.kinetic.spendSlam()) {
       S.stats.slams++; S.combo.add('SLAM', 90, 'air');
       EffectsKit.burst(ctx.scene, S.hero!.root.position, 'dust', 3); ctx.juice.shake(0.18, 220); ctx.juice.hitStop(50); ctx.feel?.impact?.(0.6); SoundKit.play('thud', { pitch: 0.6, volume: 0.8 });
+      for (const v of slamVictims({ x: S.hero!.root.position.x, z: S.hero!.root.position.z }, S.rivals, KINETIC.slamRadius)) { stumble(v); S.race.slamHits++; say(ctx, `SLAM DROPPED ${v.name}`, 600); }
       say(ctx, 'GROUND SLAM'); return true;
     }
     if (S.kinetic.spendBurst()) {
@@ -293,6 +305,41 @@ export const FreeRunMode: ModeDefinition = (() => {
       say(ctx, 'KINETIC BURST'); return true;
     }
     refuse(ctx, 'OVERDRIVE — METER LOW'); return false;
+  }
+
+  /** RIVALS: one frame of the field — their run, the draft behind them, a lunge landing on you, the rank. */
+  function tickRivals(ctx: ModeContext, S: St, dt: number): void {
+    const p = S.hero!.root.position;
+    const course = {
+      overGap: (x: number, z: number) => overGap(S.pieces, x, z),
+      obstacleAhead: (x: number, z: number, ahead: number) => S.pieces.some((q) => (q.kind === 'vault' || q.kind === 'hazard' || q.kind === 'bar') && Math.abs(q.x - x) <= q.w / 2 + 0.3 && q.z - q.d / 2 - z > -0.2 && q.z - q.d / 2 - z < ahead),
+      finishZ: courseLength(S.pieces),
+    };
+    let drafting = false;
+    for (const [i, r] of S.rivals.entries()) {
+      const out = S.started ? stepRival(r, dt, RUN_MAX, course, { x: p.x, z: p.z }, S.clock) : { lunged: false, telegraphed: false, finished: false };
+      if (out.telegraphed) { S.lunge = { r, at: S.clock + RIVALS.lungeTelegraphSec }; say(ctx, `${r.name} LUNGES — B TO PARRY`, 500); ctx.juice.callout('PARRY!', '#f87171', 450); SoundKit.play('uiTick', { pitch: 0.6, volume: 0.5 }); }
+      if (out.lunged) {
+        if (S.lunge && S.lunge.r === r) S.lunge = null;
+        const inReach = Math.abs(p.z - r.z) < RIVALS.lungeGapM + 0.6 && Math.abs(p.x - r.x) < RIVALS.lungeLateralM && S.state !== 'air' && S.state !== 'swing';
+        if (inReach) { S.speed *= RIVALS.lungeHitKeep; S.race.hitsTaken++; landBeat(S, 'sketchy'); say(ctx, `${r.name} HIT YOU`, 700); SoundKit.play('impact', { pitch: 0.8, volume: 0.5 }); ctx.juice.shake(0.12, 160); ctx.feel?.impact?.(0.4); ctx.momentum.report({ kind: 'blunder', weight: -8 }); }
+        else say(ctx, `${r.name} MISSED`, 400);
+      }
+      if (out.finished) say(ctx, `${r.name} FINISHED`, 700);
+      if (isDrafting({ along: p.z, lateral: p.x }, { along: r.z, lateral: r.x })) drafting = true;
+      const rig = S.rivalRigs[i];
+      if (rig) {
+        rig.char.root.position.set(r.x, r.y, r.z); rig.char.root.rotation.y = 0;
+        rig.tree.update({ speed01: Math.min(1, r.speed / RUN_MAX), airborne: r.air, jumpBeat: false, tricking: false, wallrun: false, sliding: false, landing: 'none', down: r.stumble > 0.45, celebrating: r.finished });
+      }
+    }
+    if (S.lunge && S.clock > S.lunge.at + RIVALS.parryWindowSec) S.lunge = null;
+    S.draft = draftStep(S.draft, drafting && S.state === 'ground', dt);
+    if (S.draft >= 1 && !S.draftSaid) { S.draftSaid = true; say(ctx, 'SLINGSHOT READY — A', 700); SoundKit.play('powerUp', { pitch: 1.3, volume: 0.4 }); }
+    if (S.draft < 1) S.draftSaid = false;
+    const st = standing(p.z, S.speed, S.rivals);
+    if (st.place < S.race.place) { ctx.momentum.report({ kind: 'overtake', weight: 12 }); ctx.juice.scorePop(p.add(new Vector3(0, 2, 0)), `P${st.place}`, '#86efac'); }
+    S.race.place = st.place; S.race.deltaSec = st.deltaSec;
   }
 
   /** The tree is fed once per frame, every phase, from the run's context — the movement INTENT included (S.speed is the
@@ -427,10 +474,10 @@ export const FreeRunMode: ModeDefinition = (() => {
     SoundKit.play('whistle'); SoundKit.play('crowdCheer');
     finishPunch(ctx, S, grade === 'S' || grade === 'A');   // A+ P0: one finish punch
     EffectsKit.burst(ctx.scene, S.hero!.root.position.add(new Vector3(0, 1.8, 0)), 'confetti');
-    hud(ctx, S, { banner: `FINISH · ${S.runSec.toFixed(1)}s · GRADE ${grade}` });
+    hud(ctx, S, { banner: `FINISH · P${S.race.place} · ${S.runSec.toFixed(1)}s · GRADE ${grade}` });
     setTimeout(() => ctx.end(grade === 'S' || grade === 'A' ? 'win' : 'complete', total, {
       timeSec: Math.round(S.runSec * 10) / 10, tricks: S.combo.banked, timeBonus: tb, routeBonus: rb, bestCombo: S.combo.bestCombo,
-      tier: S.tier.id, bails: S.bails, highLine: S.highTouched ? 1 : 0,
+      tier: S.tier.id, bails: S.bails, highLine: S.highTouched ? 1 : 0, place: S.race.place, field: S.rivals.length + 1, driveBys: S.race.driveBys, parries: S.race.parries,
     }), 1400);
   }
 
@@ -484,6 +531,8 @@ export const FreeRunMode: ModeDefinition = (() => {
         grindRail: null, grindEndAt: 0, surfSec: 0, dashSec: 0, ltHeld: false, rtHeld: false, swing: null, anchorNear: null,
         wallApproachDeg: 0, wallDist: 99, vaultDist: 99, gateAggs: new Map(), pieceMesh: new Map(), springLatch: -9, slideEndAt: -9, rsTricked: false,
         stats: { rebounds: 0, perfectVaults: 0, grinds: 0, surfs: 0, springs: 0, gates: 0, grapples: 0, bursts: 0, slams: 0, kicks: 0, flowBursts: 0 },
+        rivals: makeRivals(), rivalRigs: [], draft: 0, draftSaid: false, lunge: null,
+        race: { driveBys: 0, parries: 0, hitsTaken: 0, slingshots: 0, hazardHits: 0, slamHits: 0, place: 1, deltaSec: 0 },
       };
       states.set(ctx.scene, S); live.add(S);
 
@@ -494,6 +543,14 @@ export const FreeRunMode: ModeDefinition = (() => {
       if (S.scene.isDisposed) return;
 
       S.hero = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: new Vector3(0, 0, 3), yawRad: 0, startClip: 'idle_stand', modeId: 'freerun' });
+      // RIVALS: three runners on the grid behind the line, each its own animation tree
+      for (const r of S.rivals) {
+        if (S.scene.isDisposed) return;
+        const char = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: new Vector3(r.x, 0, r.z + 3), yawRad: 0, tint: r.tint, scale: 0.98, startClip: 'idle_stand', modeId: 'freerun-rival' });
+        installSafePlay(char.animator, 'freerun-rival');
+        r.z += 3;   // the grid is measured from the hero's spawn (z 3)
+        S.rivalRigs.push({ char, tree: new FreeRunAnimTree(char.animator) });
+      }
       installSafePlay(S.hero.animator, 'freerun');
       S.tree = new FreeRunAnimTree(S.hero.animator);
       // G1/G5: the body under the clips. There is no objective on a course, so the aim IS the line — 8 m down the
@@ -517,7 +574,7 @@ export const FreeRunMode: ModeDefinition = (() => {
       ctx.camDirector.snapTo(S.hero.root.position, S.hero.root.position.add(new Vector3(0, 0, 8)));
       SoundKit.startAmbient('wind');
       // THE PROBE SEAM (dev): the run's state and meters, and what the flow verbs have done
-      (ctx.scene.metadata ??= {}).freerun = { state: () => ({ x: +S.hero!.root.position.x.toFixed(2), y: +S.hero!.root.position.y.toFixed(2), z: +S.hero!.root.position.z.toFixed(2), speed: +S.speed.toFixed(2), state: S.state, flow: S.flow.tier, flowValue: Math.round(S.flow.value), kinetic: Math.round(S.kinetic.value), lane: laneAt(S.hero!.root.position.x, S.hero!.root.position.y), track: S.track.id, phase: S.phase, verbs: verbsFor(S.state, S.speed, S.env), wallDeg: +S.wallApproachDeg.toFixed(0), wallDist: +S.wallDist.toFixed(2), vaultDist: +S.vaultDist.toFixed(2), anchor: !!S.anchorNear, stats: { ...S.stats }, bails: S.bails, pieces: S.pieces.map((q) => ({ kind: q.kind, x: q.x, y: q.y, z: q.z, w: q.w, d: q.d, route: q.route, face: q.face })) }) };
+      (ctx.scene.metadata ??= {}).freerun = { state: () => ({ x: +S.hero!.root.position.x.toFixed(2), y: +S.hero!.root.position.y.toFixed(2), z: +S.hero!.root.position.z.toFixed(2), speed: +S.speed.toFixed(2), state: S.state, flow: S.flow.tier, flowValue: Math.round(S.flow.value), kinetic: Math.round(S.kinetic.value), lane: laneAt(S.hero!.root.position.x, S.hero!.root.position.y), track: S.track.id, phase: S.phase, verbs: verbsFor(S.state, S.speed, S.env), wallDeg: +S.wallApproachDeg.toFixed(0), wallDist: +S.wallDist.toFixed(2), vaultDist: +S.vaultDist.toFixed(2), anchor: !!S.anchorNear, stats: { ...S.stats }, bails: S.bails, race: { ...S.race, draft: +S.draft.toFixed(2), lunge: S.lunge ? { name: S.lunge.r.name, inSec: +(S.lunge.at - S.clock).toFixed(2) } : null }, rivals: S.rivals.map((r) => ({ name: r.name, x: +r.x.toFixed(1), z: +r.z.toFixed(1), speed: +r.speed.toFixed(1), stumble: +r.stumble.toFixed(2), finished: r.finished })), pieces: S.pieces.map((q) => ({ kind: q.kind, x: q.x, y: q.y, z: q.z, w: q.w, d: q.d, route: q.route, face: q.face })) }) };
       assertSpawned(ctx.scene, { hero: S.hero.root, minWorldMeshes: 6, modeId: 'freerun' });
       if (!S.autoBegin) showPick(ctx, S);
     },
@@ -555,7 +612,27 @@ export const FreeRunMode: ModeDefinition = (() => {
       if (e.t !== 'button' || !e.pressed) return;
       const verbs = verbsFor(S.state, S.speed, S.env);
       if (e.btn === 'L1') { if (!grapple(ctx, S)) refuse(ctx, 'GRAPPLE — NO ANCHOR IN REACH'); return; }
-      if (e.btn === 'R1') { refuse(ctx, 'DRIVE-BY — NO RUNNER BESIDE YOU'); return; }   // the rivals are the next pass
+      if (e.btn === 'R1') {   // RIVALS: the DRIVE-BY — a strike in passing that never stops the run
+        const p = S.hero.root.position;
+        const r = S.rivals.find((q) => !q.finished && q.stumble <= 0 && alongside(q, { x: p.x, z: p.z }));
+        if (!r) { refuse(ctx, 'DRIVE-BY — NO RUNNER BESIDE YOU'); return; }
+        stumble(r); S.speed += RIVALS.driveBySpeedGain; S.kinetic.add(KINETIC.hit); S.race.driveBys++;
+        S.combo.add('DRIVE-BY', 60, 'air'); say(ctx, `DRIVE-BY — ${r.name}`); SoundKit.play('impact', { pitch: 1.2, volume: 0.5 }); ctx.feel?.impact?.(0.35); ctx.juice.hitStop(40);
+        EffectsKit.burst(ctx.scene, S.rivalRigs[S.rivals.indexOf(r)]?.char.root.position.add(new Vector3(0, 1.1, 0)) ?? p, 'sparks');
+        return;
+      }
+      if (e.btn === 'B' && S.lunge && Math.abs(S.clock - S.lunge.at) <= RIVALS.parryWindowSec) {   // RIVALS: the PARRY-VAULT — the attacker becomes the springboard
+        const r = S.lunge.r; S.lunge = null; r.lungeT = 0; r.lungeCool = RIVALS.lungeCooldownSec; stumble(r);
+        S.speed += RIVALS.parrySteal; S.kinetic.add(KINETIC.parry); S.flow.add(30); S.race.parries++;
+        if (S.state !== 'air') beginAir(S, 'vault', RIVALS.parryVaultV); else { S.vy = RIVALS.parryVaultV; S.cc.setVelocity(new Vector3(S.heading.x * S.speed, S.vy, S.heading.z * S.speed)); }
+        S.combo.add('PARRY-VAULT', 110, 'grind'); say(ctx, `PARRY-VAULT — OVER ${r.name}`); SoundKit.play('impact', { pitch: 1.6, volume: 0.5 }); ctx.juice.flash('#ffffff', 60); ctx.juice.hitStop(60); ctx.feel?.impact?.(0.4);
+        return;
+      }
+      if (e.btn === 'A' && S.state === 'ground' && S.draft >= 1) {   // RIVALS: the SLINGSHOT out of a draft
+        S.draft = 0; S.draftSaid = false; S.speed += DRAFT.burst; S.dashSec = 0.45; S.flow.add(FLOW.slingshot); S.race.slingshots++;
+        S.combo.add('SLINGSHOT', 50, 'manual'); say(ctx, 'SLINGSHOT'); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.6 }); ctx.juice.flash('#22d3ee', 50); ctx.feel?.impact?.(0.3);
+        return;
+      }
       if (e.btn === 'A' && S.state === 'grind') { endGrind(S, JUMP_V); S.flow.add(10); say(ctx, 'OFF THE RAIL'); return; }
       if (e.btn === 'A' && S.state === 'swing') { S.swing = null; S.state = 'air'; S.airSec = 0; S.launch = 'vault'; S.vy = 4.5; S.speed += GRAPPLE.speedBonus; S.cc.setVelocity(new Vector3(S.heading.x * S.speed, S.vy, S.heading.z * S.speed)); jumpBeat(S); say(ctx, 'RELEASE'); return; }
       if (e.btn === 'A' && S.state === 'surf') { S.state = 'ground'; beginAir(S, 'ground', JUMP_V); say(ctx, 'OFF THE SLOPE'); return; }
@@ -757,6 +834,7 @@ export const FreeRunMode: ModeDefinition = (() => {
       if (routeAt(root.position.x, root.position.y) === 'high') S.highTouched = true;
       coyote.update(S.state === 'ground');   // one feed per frame, from the state the jump branch reads
       if (!S.finished && root.position.z >= courseLength(S.pieces)) finish(ctx, S);
+      tickRivals(ctx, S, dt);
 
       feedTree(S);
 

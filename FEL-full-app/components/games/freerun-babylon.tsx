@@ -63,6 +63,14 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
 
       {/* top bar: banked + pot on the left, the clock + checkpoint centre, tier + route right */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between px-4 py-3 font-mono">
+        {/* RIVALS (owner brief 2026-09-18): the rank and the gap to the leader, top-left */}
+        {hud.place ? (
+          <div className="fel-panel px-3 py-1.5">
+            <div className="text-[10px] tracking-wider text-white/60">PLACE</div>
+            <div className="fel-stat text-2xl text-[var(--fel-gold)]">{String(hud.place)}</div>
+            <div className={`text-[10px] font-bold ${hud.delta === 'LEADING' ? 'text-[#86efac]' : 'text-white/70'}`}>{String(hud.delta ?? '')}{Number(hud.draft) >= 100 ? ' · SLINGSHOT READY' : Number(hud.draft) > 0 ? ` · DRAFT ${hnode(hud.draft, 0)}%` : ''}</div>
+          </div>
+        ) : null}
         <div className="fel-panel px-3 py-1.5">
           <div className="text-[10px] tracking-wider text-white/60">BANKED</div>
           <div className="fel-stat text-2xl text-[var(--fel-gold)]">{hnode(hud.banked, 0)}</div>

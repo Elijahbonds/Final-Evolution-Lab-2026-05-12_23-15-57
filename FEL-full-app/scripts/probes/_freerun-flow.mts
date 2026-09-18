@@ -84,16 +84,21 @@ while (Date.now() - t0 < SECS * 1000) {
     if (st.kinetic >= 50 && now - lastTap > 300 && !vault && !rail) { await tap(3); lastTap = now; }
   }
   if (st.anchor && (st.state === 'ground' || st.state === 'air') && now - lastTap > 200) { await tap(4); lastTap = now; }   // the grapple: from the ground or mid-jump
+  // RIVALS (pass 2): B inside a lunge window (the parry-vault), RB beside a runner (the drive-by), A when the draft is full (the slingshot)
+  if (st.race && st.race.lunge && Math.abs(st.race.lunge.inSec) <= 0.2 && now - lastTap > 150) { await tap(1); lastTap = now; }
+  const beside = (st.rivals as { x: number; z: number; stumble: number; finished: boolean }[]).find((r) => !r.finished && r.stumble <= 0 && Math.abs(r.z - z) < 2.0 && Math.abs(r.x - x) < 2.4 && Math.abs(r.x - x) > 0.3);
+  if (beside && st.state === 'ground' && now - lastTap > 400) { await tap(5); lastTap = now; }
+  if (st.race && st.race.draft >= 1 && st.state === 'ground' && now - lastTap > 300) { await tap(0); lastTap = now; }
   const nearBar = !!bar && bar.z - z < 2.2 && bar.z - z > -0.6;
   if (nearBar !== ltDown) { ltDown = nearBar; await ev(`(() => { const bt = window.__PAD.buttons[6]; bt.value = ${ltDown ? 1 : 0}; bt.pressed = ${ltDown}; bt.touched = ${ltDown}; })()`); }
   if (st.state === 'air' && now - lastTap > 300 && st.speed > 4 && Math.random() < 0.3) { await ev('(() => { window.__PAD.axes[3] = -1; })()'); await p.waitForTimeout(60); await ev('(() => { window.__PAD.axes[3] = 0; })()'); lastTap = now; }   // a right-stick flick: a front flip
-  const key = JSON.stringify({ ...st.stats, bails: st.bails });
+  const key = JSON.stringify({ ...st.stats, bails: st.bails, ...(st.race ? { P: st.race.place, driveBys: st.race.driveBys, parries: st.race.parries, hits: st.race.hitsTaken, sling: st.race.slingshots, debris: st.race.hazardHits, slamHits: st.race.slamHits } : {}) });
   if (key !== lastStats) { lastStats = key; console.log(`t ${((now - t0) / 1000).toFixed(1)} z ${z} x ${x} y ${st.y} v ${st.speed} ${st.state} flow T${st.flow} ${st.flowValue} kin ${st.kinetic} ${key}`); if (shots < 5) { shots++; await p.screenshot({ path: `${OUT}/${TRACK}-${LANE}-${shots}.png` }); } }
   await p.waitForTimeout(40);
 }
 await btn(7, false); await setL(0, 0);
 const fin = await seam();
-console.log('end:', JSON.stringify({ z: fin.z, x: fin.x, speed: fin.speed, flow: fin.flow, flowValue: fin.flowValue, kinetic: fin.kinetic, lane: fin.lane, stats: fin.stats }));
+console.log('end:', JSON.stringify({ z: fin.z, x: fin.x, speed: fin.speed, flow: fin.flow, flowValue: fin.flowValue, kinetic: fin.kinetic, lane: fin.lane, stats: fin.stats, race: fin.race, rivals: fin.rivals }));
 console.log('logs:\n  ' + logs.join('\n  '));
 await p.screenshot({ path: `${OUT}/${TRACK}-${LANE}-end.png` });
 await b.close();
