@@ -29,6 +29,12 @@ import assert from 'node:assert';
 
 const ROOT = path.resolve(__dirname, '..');
 const PLAY = path.join(ROOT, 'app', 'play');
+const OPEN_ENDED_EXPERIENCE_ROUTES = new Set([
+  // Music Academy is an open-ended creator studio with build/library/listen
+  // flows, not a finite GameProps session. It owns its transport controls until
+  // a deliberate scoring-mode migration gives GameShell a real end condition.
+  'music',
+]);
 
 let passed = 0;
 function check(name: string, fn: () => void) { fn(); passed++; console.log('  \u2713 ' + name); }
@@ -37,6 +43,7 @@ const read = (p: string) => fs.readFileSync(p, 'utf8');
 // ---- 1. every /play/<mode> loader mounts GameShell ----------------------
 const loaders = fs
   .readdirSync(PLAY)
+  .filter((d) => !OPEN_ENDED_EXPERIENCE_ROUTES.has(d))
   .map((d) => path.join(PLAY, d, '_components', 'loader.tsx'))
   .filter((p) => fs.existsSync(p));
 

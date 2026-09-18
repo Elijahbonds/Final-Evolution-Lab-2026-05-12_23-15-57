@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
+import { GameShell } from '@/components/games/game-shell';
 
 const spinner = () => (
   <div className="flex h-[80vh] items-center justify-center bg-[#050505]">
@@ -12,5 +13,5 @@ const spinner = () => (
 const ActingGame = dynamic(() => import('@/components/games/acting-game'), { ssr: false, loading: spinner });
 
 export function ActingLoader() {
-  return <ActingGame />;
+  return <GameShell mode="acting" title="THE READ" venue="Acting Stage" Game={ActingGame} />;
 }

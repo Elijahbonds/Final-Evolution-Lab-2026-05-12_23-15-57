@@ -11,6 +11,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Mic, MicOff, Play, RotateCcw, Star } from 'lucide-react';
+import type { GameProps } from '@/components/games/game-shell';
 import { ACTING_SCENES } from '@/lib/babylon/content/actingScenes';
 import {
   scorePerformance,
@@ -44,7 +45,7 @@ function supportsMic(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof AudioContext !== 'undefined';
 }
 
-export default function ActingGame() {
+export default function ActingGame({ onEnd }: GameProps) {
   const [phase, setPhase] = useState<Phase>('menu');
   const [scene, setScene] = useState<Scene>(ACTING_SCENES[0]);
   const [elapsed, setElapsed] = useState(0);
@@ -59,6 +60,7 @@ export default function ActingGame() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
   const t0Ref = useRef(0);
+  const endedRef = useRef(false);
 
   // Per-line capture state.
   const deliveriesRef = useRef<Record<string, Delivery>>({});
@@ -125,6 +127,7 @@ export default function ActingGame() {
       setResult(null);
       setCurrentIdx(0);
       setHolding(false);
+      endedRef.current = false;
       t0Ref.current = performance.now();
       setPhase('performing');
       rafRef.current = requestAnimationFrame(loop);
@@ -166,7 +169,29 @@ export default function ActingGame() {
     setResult(res);
     cleanupAudio();
     setPhase('results');
-  }, [scene, cleanupAudio]);
+    if (!endedRef.current) {
+      endedRef.current = true;
+      onEnd({
+        score: Math.round(res.average * 1000),
+        won: res.stars >= 3,
+        duration: Math.round((performance.now() - t0Ref.current) / 1000),
+        headline: `${res.stars} STARS - ${scene.title}`,
+        tallies: {
+          hits: res.perLine.filter((line) => line.total >= 0.55).length,
+          misses: Math.max(0, scene.lines.length - res.perLine.filter((line) => line.total >= 0.55).length),
+          dodges: 0,
+          combos: res.stars,
+        },
+        maxCombo: res.stars,
+        stats: {
+          average: res.average,
+          stars: res.stars,
+          lines: res.perLine.length,
+        },
+        outcome: res.stars >= 3 ? 'complete' : 'needs_rehearsal',
+      });
+    }
+  }, [scene, cleanupAudio, onEnd]);
 
   // Auto-finish once every line has been delivered.
   useEffect(() => {

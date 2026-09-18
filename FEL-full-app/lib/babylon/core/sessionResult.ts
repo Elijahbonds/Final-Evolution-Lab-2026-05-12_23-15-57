@@ -21,13 +21,38 @@ export interface SessionResult {
 
 export type ResultSink = (result: SessionResult) => Promise<void>;
 
+function resultHasPlayEvidence(result: SessionResult): boolean {
+  if (result.score > 0) return true;
+  return Object.values(result.stats).some((value) => Number(value) > 0);
+}
+
 /** Default sink posts to the app's existing session endpoint. */
 export const defaultResultSink: ResultSink = async (result) => {
-  await fetch('/api/sessions/result', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(result),
-  }).catch((e) => console.error('[FEL-RESULT] post failed', e));
+  try {
+    const response = await fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: result.modeId,
+        score: result.score,
+        won: /\b(win|won|clear|cleared|complete|success|great)\b/i.test(result.outcome),
+        duration: result.durationSec,
+        tallies: {
+          hits: result.stats.hits,
+          misses: result.stats.misses,
+          dodges: result.stats.dodges,
+          combos: result.stats.combos,
+        },
+        maxCombo: result.stats.maxCombo,
+        played: resultHasPlayEvidence(result),
+      }),
+    });
+    if (!response.ok) {
+      console.error('[FEL-RESULT] post failed', response.status, response.statusText);
+    }
+  } catch (e) {
+    console.error('[FEL-RESULT] post failed', e);
+  }
 };
 
 export function buildResult(

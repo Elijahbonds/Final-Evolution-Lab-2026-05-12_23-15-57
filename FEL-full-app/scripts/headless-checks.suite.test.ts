@@ -19,6 +19,7 @@ import { join } from 'node:path';
 /** Every headless suite, with the subsystem it guards. */
 const SUITES: { script: string; guards: string }[] = [
   { script: 'gate0-rig-tests.ts', guards: 'Gate 0 — Mixamo 65-bone rig standard' },
+  { script: 'input-contract-tests.ts', guards: 'finite play routes mount the shared GameShell input/session pipeline' },
   { script: 'verb-key-alignment-tests.ts', guards: 'touch verb keys resolve for every mode' },
   { script: 'threepoint-contest-tests.ts', guards: '3PT — NBA 2K9 contest format + real arc' },
   { script: 'air-session-tests.ts', guards: 'gymnastics vault + big air on the shared core' },
@@ -69,6 +70,10 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'avatar-pipeline-tests.ts', guards: 'shipped avatar GLBs — spec bones, float32 skins, no draco, meter-scale tracks, manifest coverage' },
   { script: 'perf-budget-tests.ts', guards: 'mobile-tier texture memory stays within 2x the median (textureBudget.json, measured)' },
   { script: 'avatar-pose-tests.ts', guards: 'forged avatar POSE gate — clips are anatomically sane, bind is a T-pose, load state is arms-down' },
+  { script: 'rival-circuit-tests.ts', guards: 'rival circuit beats resolve against the current mode registry' },
+  { script: 'story-progression-tests.ts', guards: 'story progression, unlock costs, and influence mirror stay coherent' },
+  { script: 'm7a-tests.ts', guards: 'motion analysis, clip registry, and synthetic throw/catch contracts' },
+  { script: 'smokeTest.ts', guards: 'play route files, spawn pipeline, and crash boundary smoke checks' },
 ];
 
 const ROOT = process.cwd();
@@ -95,9 +100,13 @@ describe('headless check suites', () => {
         throw new Error(`${script} FAILED:\n${e.stdout ?? ''}${e.stderr ?? ''}`);
       }
 
-      // Each script ends with "<name>: N checks green". Parse it so the count is
-      // reported, and so a script that silently stops asserting is caught.
-      const m = /(\d+)\s+checks green/.exec(output);
+      // Each script reports how many invariants it asserted. Parse the legacy
+      // variants too so older standalone gates can join this suite unchanged.
+      const m = [
+        /(\d+)\s+checks green/,
+        /(\d+)\s+checks passed/,
+        /All\s+(\d+)\s+M7a assertions passed/,
+      ].map((pattern) => pattern.exec(output)).find(Boolean);
       expect(m, `${script} did not report a green check count:\n${output}`).not.toBeNull();
       expect(Number(m![1]), `${script} reported zero checks`).toBeGreaterThan(0);
     });

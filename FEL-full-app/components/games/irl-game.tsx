@@ -11,6 +11,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Smartphone, Activity, RotateCcw, Square } from 'lucide-react';
+import type { GameProps } from '@/components/games/game-shell';
 import {
   detectJumps,
   summarise,
@@ -29,7 +30,7 @@ type Phase = 'gate' | 'unsupported' | 'needs-permission' | 'live' | 'results';
 
 type DME = typeof DeviceMotionEvent & { requestPermission?: () => Promise<'granted' | 'denied'> };
 
-export default function IrlGame() {
+export default function IrlGame({ onEnd }: GameProps) {
   const [phase, setPhase] = useState<Phase>('gate');
   const [jumpCount, setJumpCount] = useState(0);
   const [bestCm, setBestCm] = useState(0);
@@ -39,6 +40,7 @@ export default function IrlGame() {
   const samplesRef = useRef<MotionSample[]>([]);
   const t0Ref = useRef(0);
   const handlerRef = useRef<((e: DeviceMotionEvent) => void) | null>(null);
+  const endedRef = useRef(false);
 
   // Decide the gate on mount (client only).
   useEffect(() => {
@@ -63,6 +65,7 @@ export default function IrlGame() {
     setJumpCount(0);
     setBestCm(0);
     setSession(null);
+    endedRef.current = false;
     const handler = (e: DeviceMotionEvent) => {
       const acc = e.accelerationIncludingGravity;
       if (!acc || acc.x == null || acc.y == null || acc.z == null) return;
@@ -105,9 +108,34 @@ export default function IrlGame() {
   const finish = useCallback(() => {
     stopListening();
     const jumps = detectJumps(samplesRef.current);
-    setSession(summarise(jumps));
+    const summary = summarise(jumps);
+    setSession(summary);
     setPhase('results');
-  }, [stopListening]);
+    if (!endedRef.current) {
+      endedRef.current = true;
+      const bestCm = Math.round(summary.best * 100);
+      const avgCm = Math.round(summary.average * 100);
+      onEnd({
+        score: Math.max(0, bestCm * 10 + summary.total * 25),
+        won: bestCm >= 40,
+        duration: Math.round((performance.now() - t0Ref.current) / 1000),
+        headline: summary.total > 0 ? `${bestCm} CM BEST VERTICAL` : 'NO CLEAN JUMPS DETECTED',
+        tallies: {
+          hits: summary.total,
+          misses: summary.total > 0 ? 0 : 1,
+          dodges: 0,
+          combos: summary.total,
+        },
+        maxCombo: summary.total,
+        stats: {
+          bestCm,
+          avgCm,
+          jumps: summary.total,
+        },
+        outcome: bestCm >= 40 ? 'complete' : 'measured',
+      });
+    }
+  }, [stopListening, onEnd]);
 
   const reset = useCallback(() => {
     stopListening();

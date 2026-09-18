@@ -9,8 +9,9 @@
 // The 3D/audio authoring surfaces are client-only, so this whole page opts out
 // of SSR to avoid touching window/AudioContext on the server.
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import CreativeHub from '@/components/creator/creative-hub';
 import MyCreations from '@/components/creator/my-creations';
@@ -60,10 +61,43 @@ async function uploadBlob(blob: Blob, fileName: string, contentType: string): Pr
 }
 
 export default function CreatePage() {
+  const router = useRouter();
   const [stage, setStage] = useState<Stage>('hub');
   const [sel, setSel] = useState<Selection | null>(null);
   const [busy, setBusy] = useState(false);
   const [galleryKey, setGalleryKey] = useState(0);
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    fetch('/api/auth/session', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((session) => {
+        if (!live) return;
+        if (session?.user) {
+          setAuthReady(true);
+        } else {
+          router.replace('/login');
+        }
+      })
+      .catch(() => {
+        if (live) router.replace('/login');
+      });
+    return () => {
+      live = false;
+    };
+  }, [router]);
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-neutral-950 pb-20">
+        <AppHeader />
+        <main className="mx-auto flex min-h-[60vh] max-w-4xl items-center justify-center px-4 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">
+          Checking session...
+        </main>
+      </div>
+    );
+  }
 
   const enter = (primary: Discipline, secondary: Discipline[], licensed: boolean, sport?: SportDesignation) => {
     setSel({ primary, secondary, licensed, sport });
