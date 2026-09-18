@@ -111,6 +111,8 @@ export class DribbleController {
     v.x += (c.x * c.speed - v.x) * k; v.z += (c.z * c.speed - v.z) * k;
     c.left -= dt; if (c.left <= 1e-4) { v.x = c.x * c.speed; v.z = c.z * c.speed; this.pendingCut = null; }
   }
+  /** HOOPS KINETIC (2026-09-18): the MOMENTUM DRIFT — a slide-cut onto a new line with the dribble speed kept. */
+  drift(dx: number, dz: number): void { this.cutTo(dx, dz, Math.max(this.movement.vel.length(), 0.1)); }
   private cutTo(dx: number, dz: number, speed: number): void {
     const n = Math.hypot(dx, dz) || 1;
     this.pendingCut = { x: dx / n, z: dz / n, speed, left: DribbleController.CUT_BLEND_SEC };

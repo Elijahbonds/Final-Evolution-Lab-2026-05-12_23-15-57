@@ -127,6 +127,8 @@ import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   /
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
+// HOOPS KINETIC (owner brief 2026-09-18): the parry-vault, the momentum drift and its ankle-breaker, the footstool board, the drive-by steal.
+import { PARRY, parryVaultRead, vaultAt, DRIFT, driftRead, ankleBreak, FOOTSTOOL, footstoolRead, DRIVE_BY, driveByRead } from '../core/HoopsKinetic';
 import { StickHandleReader, stickMoveFor, pausinWanted, sizeUpClip, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
 import type { HoopsDunk } from '../core/HoopsDunks';   // STICK HANDLE (2026-09-17): the right stick is the dribble stick on the floor (2K17 vocabulary)
 import { driveDunkKFor, handForward, handShiftTarget, stepShift, driveDunkPos, hangWanted, RIM_HANG, rimProtectorJump, rimProtectorSwats, RIM_PROTECT, chestRide, VICTIM_SLIDE, slideStep, type ShowtimeJudge } from '../core/DriveFlight';   // DUNK-FANATIC (2026-09-17): at the iron by the resolve, the rim hang, the rim protector, the chest ride
@@ -358,6 +360,39 @@ export const OneVOneMode: ModeDefinition = (() => {
   let takingCharge = false;      // Circle held on defence — planted, waiting to wear it
   let chargeSetSec = 0;          // how long the feet have been down (a charge is arriving early, not colliding)                 // seconds since my contest jump left the floor
   let meStunSec = 0;                        // whiffed reach costs you your feet
+  // HOOPS KINETIC state: LT (the drift modifier), the drift cooldown, the footstool's reach window, the parry vault in flight,
+  // my velocity on defense (estimated off the root: the dribble controller only runs my body on offense), the counters
+  let ltHeld = false, driftCool = 0, footstoolUntil = 0, vault: { from: Vector3; dir: Vector3; t: number } | null = null;
+  const mePrevPos = new Vector3(), meVelEst = new Vector3();
+  const kin = { drifts: 0, ankles: 0, parries: 0, footstools: 0, driveBys: 0 };
+  const turnDegLog = (v: Vector3, mx: number, my: number): string => { const a = Math.hypot(v.x, v.z), b = Math.hypot(mx, my); return a < 1e-3 || b < 1e-3 ? '0' : ((Math.acos(Math.max(-1, Math.min(1, (v.x * mx + v.z * my) / (a * b)))) * 180) / Math.PI).toFixed(0); };
+  function parryVault(ctx: ModeContext): void {
+    reachCooldown = REACH_COOLDOWN_SEC; myJumpAge = 0;
+    const dir = foe.root.position.subtract(me.root.position); dir.y = 0; dir.normalize();
+    vault = { from: me.root.position.clone(), dir, t: 0 };
+    meAnimTree.beat('bball_block_reach');
+    foeStunSec = PARRY.stunSec; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.08 });
+    attacker.noteStolen(); swing('steal'); foeCarry?.update(0, 0, false);
+    const from = ballWorld().clone(); releaseBall(ball);
+    launchLoose(from, dir.scale(2.2).add(new Vector3(0, 1.2, 0)));   // ahead of the vault: where I land
+    defPhase = 'over'; kin.parries++;
+    bannerFlash(ctx, 'PARRY-VAULT — STRIPPED!'); SoundKit.play('impact', { pitch: 1.5, volume: 0.5 }); ctx.juice.hitStop(50); ctx.juice.flash('#ffffff', 60); ctx.feel?.impact?.(0.4);
+    console.info('[1V1-KIN] parry-vault');
+    later(750, () => resetPositions());
+  }
+  function driveBySteal(ctx: ModeContext): void {
+    reachCooldown = REACH_COOLDOWN_SEC;
+    foeStunSec = DRIVE_BY.stunSec; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.08 });
+    meAnimTree.beat('bball_steal_reach', { fadeSec: 0.1 });
+    attacker.noteStolen(); swing('steal'); foeCarry?.update(0, 0, false);
+    const from = ballWorld().clone(); releaseBall(ball);
+    const along = meVelEst.clone(); along.y = 0; if (along.lengthSquared() < 1e-3) along.set(0, 0, 1); along.normalize();
+    launchLoose(from, along.scale(DRIVE_BY.knockM).add(new Vector3(0, 1.0, 0)));   // knocked down my line, not his
+    defPhase = 'over'; kin.driveBys++;
+    bannerFlash(ctx, 'DRIVE-BY STEAL!'); SoundKit.play('impact', { pitch: 1.3, volume: 0.45 }); ctx.juice.hitStop(40); ctx.feel?.impact?.(0.35);
+    console.info('[1V1-KIN] drive-by steal');
+    later(750, () => resetPositions());
+  }
   let reachCooldown = 0;
   /** The shot trigger's last state — the gather sound fires on the way down, once. */
   let contact: ContactSystem | null = null;      // Phase 4: Havok bodies when ready
@@ -697,7 +732,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       ctx.setHud({ score: myScore, foeScore, target: TARGET_SCORE, momentum: 0, turbo: 100, hint: HINT_OFFENCE });
       // dev probes (ONEVONE-DEFENSE-LOGIC): the possession machine, readable without the HUD
       if (process.env.NODE_ENV === 'development') {
-        (ctx.scene.metadata ??= {}).onevone = { possession: () => possession, defPhase: () => defPhase, attackPhase: () => attacker.phase, foeRoot: foe.root, myJumpAge: () => myJumpAge, block: () => contestJump(ctx), driveSpeed: () => foeVelLast.length(), takingCharge: () => takingCharge, flightK: () => dunkFlight?.k ?? -1, contacts: () => devContacts.slice(), luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: foeHandUp }), ended: () => ended, post: () => ({ posting, spinning: !!spin, brace: !!meSlot.intent.brace, can: canPostUp(me.root.position, RIM_FLOOR, foeStunSec > 0 || foeFloored ? null : foe.root.position), carrying, shooting, finish: !!finish, gather: !!gather, foeStun: foeStunSec, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: meAnimTree.held ?? '' }), foeJob: () => (foeBrain?.boxing ? 'boxout' : foeBrain?.job ?? ''), foeBoxing: () => !!foeBrain?.boxing, defend: () => { if (!ended && possession === 'mine') startDefense(ctx, 'PROBE — DEFEND!'); }, offense: () => { if (!ended) resetPositions(); }, standing: () => { /* DEFENSE-LOOK probe geometry: me a stride in front of the rim with the ball, the rival stunned, the tank full — the standing dunk's set-up */ if (ended) return false; if (possession !== 'mine') resetPositions(); foeStunSec = 1.6; me.root.position.set(RIM_FLOOR.x + 0.35, 0, RIM_FLOOR.z + 1.15); meDribble.vel.set(0, 0, 0); meDribble.setFacing(yawTo(me.root.position, RIM_FLOOR)); turbo.t01 = 1; console.info('[1V1-CONTACT] probe standing geometry set'); return true; }, poster: () => { if (ended) return false; /* A poster needs three things at once: my possession, a run-up, and a defender ON HIS FEET inside 1.5 m    between me and the ring. A driver cannot arrange that — bumping him on the way in keeps him STUNNED,    and 1v1 passes a null defender while he is stunned, so contestDrive returns its no-defender sentinel    (t NaN lateral NaN) and the contact dunk can never be read. This seam sets the geometry up exactly    once, the same way defend()/offense() exist so a probe can reach either possession deterministically. */ if (possession !== 'mine') resetPositions(); foeStunSec = 0; foeFloored = false; posterVictim = null; victimSlide = null; const toRim = RIM_FLOOR.subtract(me.root.position); toRim.y = 0; if (toRim.lengthSquared() < 1e-4) return false; toRim.normalize(); /* far enough out for a real run-up: the dribble controller integrates its own velocity from the stick    and discards a direct write, so the drive-dunk speed minimum is only met by actually accelerating. */ me.root.position.set(RIM_FLOOR.x - toRim.x * 5.2, 0, RIM_FLOOR.z - toRim.z * 5.2); foe.root.position.set(RIM_FLOOR.x - toRim.x * 1.3, 0, RIM_FLOOR.z - toRim.z * 1.3); face(foe.root, yawTo(foe.root.position, me.root.position)); meDribble.setFacing(yawTo(me.root.position, RIM_FLOOR)); meDribble.vel.copyFrom(toRim.scale(6.2)); turbo.t01 = 1; console.info('[1V1-CONTACT] probe poster geometry set'); return true; } };   // BIOMECH-HOOPS-WAVE1: `defend()` / `offense()` let a probe reach either possession deterministically
+        (ctx.scene.metadata ??= {}).onevone = { possession: () => possession, defPhase: () => defPhase, attackPhase: () => attacker.phase, foeRoot: foe.root, myJumpAge: () => myJumpAge, block: () => contestJump(ctx), driveSpeed: () => foeVelLast.length(), takingCharge: () => takingCharge, flightK: () => dunkFlight?.k ?? -1, contacts: () => devContacts.slice(), luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: foeHandUp }), ended: () => ended, kinetic: () => ({ ...kin, ltHeld, vault: !!vault, dist: distXZ(me.root.position, foe.root.position), closing: (() => { const d = foe.root.position.subtract(me.root.position); d.y = 0; const l = d.length(); return l > 1e-3 ? -(foeVelLast.x * d.x + foeVelLast.z * d.z) / l : 0; })(), loose, meSpeed: meVelEst.length() }), post: () => ({ posting, spinning: !!spin, brace: !!meSlot.intent.brace, can: canPostUp(me.root.position, RIM_FLOOR, foeStunSec > 0 || foeFloored ? null : foe.root.position), carrying, shooting, finish: !!finish, gather: !!gather, foeStun: foeStunSec, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: meAnimTree.held ?? '' }), foeJob: () => (foeBrain?.boxing ? 'boxout' : foeBrain?.job ?? ''), foeBoxing: () => !!foeBrain?.boxing, defend: () => { if (!ended && possession === 'mine') startDefense(ctx, 'PROBE — DEFEND!'); }, offense: () => { if (!ended) resetPositions(); }, standing: () => { /* DEFENSE-LOOK probe geometry: me a stride in front of the rim with the ball, the rival stunned, the tank full — the standing dunk's set-up */ if (ended) return false; if (possession !== 'mine') resetPositions(); foeStunSec = 1.6; me.root.position.set(RIM_FLOOR.x + 0.35, 0, RIM_FLOOR.z + 1.15); meDribble.vel.set(0, 0, 0); meDribble.setFacing(yawTo(me.root.position, RIM_FLOOR)); turbo.t01 = 1; console.info('[1V1-CONTACT] probe standing geometry set'); return true; }, poster: () => { if (ended) return false; /* A poster needs three things at once: my possession, a run-up, and a defender ON HIS FEET inside 1.5 m    between me and the ring. A driver cannot arrange that — bumping him on the way in keeps him STUNNED,    and 1v1 passes a null defender while he is stunned, so contestDrive returns its no-defender sentinel    (t NaN lateral NaN) and the contact dunk can never be read. This seam sets the geometry up exactly    once, the same way defend()/offense() exist so a probe can reach either possession deterministically. */ if (possession !== 'mine') resetPositions(); foeStunSec = 0; foeFloored = false; posterVictim = null; victimSlide = null; const toRim = RIM_FLOOR.subtract(me.root.position); toRim.y = 0; if (toRim.lengthSquared() < 1e-4) return false; toRim.normalize(); /* far enough out for a real run-up: the dribble controller integrates its own velocity from the stick    and discards a direct write, so the drive-dunk speed minimum is only met by actually accelerating. */ me.root.position.set(RIM_FLOOR.x - toRim.x * 5.2, 0, RIM_FLOOR.z - toRim.z * 5.2); foe.root.position.set(RIM_FLOOR.x - toRim.x * 1.3, 0, RIM_FLOOR.z - toRim.z * 1.3); face(foe.root, yawTo(foe.root.position, me.root.position)); meDribble.setFacing(yawTo(me.root.position, RIM_FLOOR)); meDribble.vel.copyFrom(toRim.scale(6.2)); turbo.t01 = 1; console.info('[1V1-CONTACT] probe poster geometry set'); return true; } };   // BIOMECH-HOOPS-WAVE1: `defend()` / `offense()` let a probe reach either possession deterministically
         const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__;
         if (dev) dev.hoopsPosture = { me: () => mePosture?.layer.get() ?? null, foe: () => foePosture?.layer.get() ?? null, bio: () => ({ me: { ...meBio }, foe: { ...foeBio } }) };   // BIOMECH-HOOPS-WAVE1 probes
       }
@@ -716,6 +751,21 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (onFloor) { stickGestures.push(...rStick.feed(e.x, e.y, performance.now() / 1000)); lookX = 0; lookY = 0; }
         else { rStick.reset(); lookX = e.x; lookY = e.y; }
         }
+      }
+      if (e.t === 'trigger' && e.side === 'L') ltHeld = e.value > 0.5;   // HOOPS KINETIC: LT is the drift modifier
+      // HOOPS KINETIC: the FOOTSTOOL — a jump on a loose ball with the rival between me and it goes off his shoulders
+      if (e.t === 'button' && e.btn === 'Y' && e.pressed && loose && myJumpAge === Infinity && meStunSec === 0 && !meFloored && footstoolRead(me.root.position, foe.root.position, ballSim.pos)) {
+        footstoolUntil = performance.now() + FOOTSTOOL.holdSec * 1000; myJumpAge = 0; kin.footstools++;
+        meAnimTree.beat('bball_block_reach'); if (contact?.isReady) contact.hop('me', FOOTSTOOL.hopVy);
+        bannerFlash(ctx, 'FOOTSTOOL!', 600); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); ctx.feel?.impact?.(0.2);
+        console.info('[1V1-KIN] footstool'); return;
+      }
+      // HOOPS KINETIC: the poke on defense is a PARRY-VAULT when the driver is arriving, a DRIVE-BY when I am running beside him
+      if (e.t === 'button' && e.btn === 'X' && e.pressed && possession === 'defense' && meStunSec === 0 && reachCooldown === 0 && !vault && !meFloored && !foeFloored && defPhase !== 'over') {
+        const d = foe.root.position.subtract(me.root.position); d.y = 0; const dist = d.length();
+        const closing = dist > 1e-3 ? -(foeVelLast.x * d.x + foeVelLast.z * d.z) / dist : 0;
+        if (parryVaultRead(dist, closing, attacker.phase)) { parryVault(ctx); return; }
+        if (driveByRead({ x: meVelEst.x, z: meVelEst.z }, me.root.position, foe.root.position)) { driveBySteal(ctx); return; }
       }
       if (dunking && e.t === 'button' && e.btn === 'X' && e.pressed) showtimePress = true;   // SHOWTIME: the timed flush
       // BLOCK / contest jump on defense: A leaves the floor. The BODY of it now lives in contestJump(), because the
@@ -755,6 +805,10 @@ export const OneVOneMode: ModeDefinition = (() => {
       // it was extracted FROM here because this is the mode people have actually played
       meSlot.poll(dt);
       foeSlot.poll(dt);
+      // HOOPS KINETIC: my velocity off the root (defense has no dribble controller under me), the vault's arc, the drift cooldown
+      if (dt > 1e-4) { meVelEst.copyFrom(me.root.position).subtractInPlace(mePrevPos).scaleInPlace(1 / dt); mePrevPos.copyFrom(me.root.position); }
+      driftCool = Math.max(0, driftCool - dt);
+      if (vault) { vault.t += dt; const u = Math.min(1, vault.t / PARRY.sec); const q = vaultAt(vault.from, vault.dir, u); me.root.position.set(q.x, q.y, q.z); meDribble.vel.set(0, 0, 0); if (u >= 1) vault = null; }
       // NETPLAY: publish this player's intent at the tick rate (the session throttles; calling it
       // every rendered frame is correct and cheap). No-op when ?net= was absent.
       net?.tick(meSlot.intent);
@@ -956,6 +1010,20 @@ export const OneVOneMode: ModeDefinition = (() => {
         answerSprint(ctx, intent.sprint, moving);
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
         const [mx, my] = camRel(ctx, intent.moveX, intent.moveY);
+        // HOOPS KINETIC: the MOMENTUM DRIFT — LT on the turbo turns a hard cut into a slide that keeps the speed; a defender in
+        // front of the old line inside reach is left on the wrong foot
+        // camRel hands back [x, −z] (the controller's stick space), so the world wish is { x: mx, z: −my } — read against the velocity as such
+        if (driftCool <= 0 && carrying && !shooting && !dunking && !finish && !gather && !spin && !posting && driftRead(ltHeld, sprintOk, meDribble.vel, { x: mx, z: -my })) {
+          const before = meDribble.vel.clone();
+          meDribble.drift(mx, my); driftCool = DRIFT.cooldownSec; kin.drifts++;
+          ctx.juice.callout('DRIFT', '#22d3ee', 380); SoundKit.play('swish', { pitch: 0.8, volume: 0.4 }); EffectsKit.burst(ctx.scene, me.root.position.clone(), 'dust');
+          console.info(`[1V1-KIN] drift ${turnDegLog(before, mx, -my)}° at ${before.length().toFixed(1)} m/s`);
+          if (foeStunSec === 0 && !foeFloored && ankleBreak(me.root.position, before, foe.root.position)) {
+            foeStunSec = DRIFT.stunSec; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.08 }); kin.ankles++;
+            bannerFlash(ctx, 'ANKLES!', 700); SoundKit.play('crowdCheer', { volume: 0.45 }); ctx.juice.hitStop(45); ctx.feel?.impact?.(0.3); ctx.momentum.report({ kind: 'clean_hit', weight: 14 });
+            console.info('[1V1-KIN] ankle-breaker');
+          }
+        }
         const drib = meDribble.update(dt, mx, my, sprintOk);
         meSpeed01 = drib.speed01;
         meIntensity01 = drib.intensity01; if (drib.gear !== meGear) { console.info(`[1V1-PACE] gear ${meGear} → ${drib.gear} at ${meDribble.vel.length().toFixed(1)} m/s`); meGear = drib.gear; }
@@ -2673,7 +2741,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     return [
       {
         id: 'me', pos: me.root.position, radius: 0.34,
-        reachY: 2.15 + (myJumpAge !== Infinity ? 0.4 : 0),
+        reachY: 2.15 + (myJumpAge !== Infinity ? 0.4 : 0) + (performance.now() < footstoolUntil ? FOOTSTOOL.reachAdd : 0),   // HOOPS KINETIC: the footstool's shoulders
         boxingOut: meSlot.intent.brace ?? false,
         unavailable: meFloored || meStunSec > 0,
       },
