@@ -828,7 +828,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (res === 'made') {
           myScore += arcPoints;
           { const nk = netExitKindOf(arc.shotStyle); const v = netExitVelocity(nk); ballSim.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); console.info(`[3V3-NET] ${nk} exit ${netExitMph(nk)} mph`); }   // NET EXIT
-          me.shotWin = 'none'; me.celebrateSec = CELEBRATE_SEC; me.tree.beat('bball_score_celebrate', { fadeSec: 0.15 });   // BIOMECH-HOOPS-WAVE1 G5
+          me.shotWin = 'none'; me.celebrateSec = CELEBRATE_SEC; me.tree.beat('bball_score_celebrate', { fadeSec: 0.26 });   // BIOMECH-HOOPS-WAVE1 G5
           // A THREE is not a routine bucket and must not land like one. The mode
           // had no camera pulse anywhere, so a deep splash and a two-foot layup
           // produced identical feedback — Phase 7's bar is that the big moment

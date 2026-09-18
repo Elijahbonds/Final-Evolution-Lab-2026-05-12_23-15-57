@@ -40,6 +40,8 @@ export interface BallCarry {
 
 /** The old arm's let-go on a hand switch. */
 const SWITCH_FADE_SEC = 0.12;
+/** The reach's let-go when the carry deactivates (a shot, a pass, a pick-up). */
+const RELEASE_FADE_SEC = 0.14;
 /** How far the elbow's twist may leave the clip's side at full weight (the dunk's REACH_POLE_CAP). */
 const REACH_POLE_CAP = Math.PI / 2;
 /** The fastest the carrying arm's elbow may swing round the shoulder→hand line between two drawn frames (deg per second). */
@@ -108,6 +110,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   let pending = false;   // a frame was recorded since the last after-animations pass
   let frameDt = 0, stamp = 0;   // the recorded frame's dt, and a counter of drawn frames (the arm memo's continuity)
   let lastSpeed01 = 0;
+  let releaseLeft = 0, releaseDt = 1 / 60;   // the let-go fade (see apply)
   let offArm: ArmChain | null = armChain(opts.skeleton, side === 'Right' ? 'Left' : 'Right');
   const offT = new Vector3(), offPole = new Vector3();
   const local = new Vector3(), world = new Vector3(), handT = new Vector3(), pole = new Vector3();
@@ -122,7 +125,14 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
 
   const apply = () => {
     stamp++;
-    if (!active || !pending) return;
+    // ANIM CLEAN-UP (2026-09-18): the LET-GO eases. Deactivation used to drop the arm IK in one frame while the ball
+    // re-parented to the palm — the hand jumped 0.5 m from the bounce to the clip's gather at the top of every shot
+    // (measured: dribble_idle → jumpshot). The reach now fades out over RELEASE_FADE_SEC on top of the incoming clip.
+    if (!active) {
+      if (releaseLeft > 0 && arm && armW > 0) { const k = releaseLeft / RELEASE_FADE_SEC; releaseLeft = Math.max(0, releaseLeft - releaseDt); reachShaped(arm, handT, pole, k * armW, releaseDt, stamp); }
+      return;
+    }
+    if (!pending) return;
     pending = false;
     const s = dribbleAt(phase, p);
     const sx = side === 'Right' ? 1 : -1;
@@ -169,14 +179,17 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     update(dt, speed01, wantActive) {
       if (wantActive !== active) {
         active = wantActive;
-        if (active) { opts.ball.setParent(null); phase = 0; }
-        // Hand the ball back ONLY if it is still ours to hand back: a steal
-        // re-parents it to another hand and a release sets it flying, and
-        // either may land in the same frame as our deactivation.
-        else if (opts.ball.parent === null && !opts.ball.metadata?.felReleased) attachBallToHand(opts.ball, opts.skeleton, `${side}Hand`);
+        if (active) { opts.ball.setParent(null); phase = 0; releaseLeft = 0; }
+        else {
+          releaseLeft = RELEASE_FADE_SEC;
+          // Hand the ball back ONLY if it is still ours to hand back: a steal
+          // re-parents it to another hand and a release sets it flying, and
+          // either may land in the same frame as our deactivation.
+          if (opts.ball.parent === null && !opts.ball.metadata?.felReleased) attachBallToHand(opts.ball, opts.skeleton, `${side}Hand`);
+        }
       }
       switchLeft = Math.max(0, switchLeft - dt);
-      if (!active) return;
+      if (!active) { releaseDt = dt; return; }
       phase = advancePhase(phase, dt, speed01, p);
       frameDt = dt; lastSpeed01 = speed01;
       pending = true;

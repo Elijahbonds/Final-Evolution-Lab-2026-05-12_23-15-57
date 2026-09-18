@@ -773,7 +773,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (possession === 'mine') {
             myScore += arcPoints;
             swing('big_make');
-            meShotWin = 'none'; meCelebrateSec = CELEBRATE_SEC; meAnimTree.beat('bball_score_celebrate', { fadeSec: 0.15 });   // BIOMECH-HOOPS-WAVE1 G5: the make's end pose
+            meShotWin = 'none'; meCelebrateSec = CELEBRATE_SEC; meAnimTree.beat('bball_score_celebrate', { fadeSec: 0.26 });   // BIOMECH-HOOPS-WAVE1 G5: the make's end pose
             // A+ P0 CONTACT-lite, the soft sibling: a jumper drops through with a small feel hit and a short shake —
             // no hit-stop latch, no flash, no slam thud (that is the dunk's). The hoop still answers the make.
             ctx.feel.impact(0.4);
