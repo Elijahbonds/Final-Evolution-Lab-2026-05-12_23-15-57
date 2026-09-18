@@ -27,6 +27,15 @@ const ATTEMPTS = Number(process.env.ATTEMPTS ?? 8);
 const TAG = process.env.TAG ?? 'lab';
 const SLAM_OFFSET_MS = Number(process.env.SLAM_OFFSET_MS ?? 0);
 const RUN_MS = Number(process.env.RUN_MS ?? 1500);          // how long RUN is held before the gather line
+/** GLASS=1 — DUNK PARKOUR: steer hard into the right-hand glass for the first part of the run (a rebound is expected), then back. */
+const GLASS = process.env.GLASS === '1';
+/** L1_AT_MS=<ms after RUN> — DUNK PARKOUR: press L1 in the air for the backboard double-launch. L1_AFTER_LAUNCH_MS=<ms> times it
+ *  from the launch itself (the rise window is 0.12–0.62 s of flight), which is the reliable knob. */
+const L1_AT_MS = process.env.L1_AT_MS ? Number(process.env.L1_AT_MS) : 0;
+const L1_AFTER_LAUNCH_MS = process.env.L1_AFTER_LAUNCH_MS ? Number(process.env.L1_AFTER_LAUNCH_MS) : 0;
+/** SLAM_HOLD_MS=<ms> — hold the slam through the contact (a hang); SWING=1 pushes the stick during the hold (the RIM SWING). */
+const SLAM_HOLD_MS = Number(process.env.SLAM_HOLD_MS ?? 60);
+const SWING = process.env.SWING === '1';
 /** 'cue' = press the instant the read lifts (answering the prompt) · 'beat' = press on the window's own tell (NOW!). */
 const SLAM_WHEN = (process.env.SLAM_WHEN ?? 'beat') as 'cue' | 'beat';
 const OUT = `${process.env.HOME}/Claude/outbox/finish-release/dunk`;
@@ -82,7 +91,7 @@ await ctx.addInitScript({ content: "try { window.sessionStorage.setItem('NEXUS_A
 const page = await ctx.newPage();
 await page.addInitScript({ content: 'window.__name = window.__name || function (f) { return f; };' });
 const log: string[] = [];
-page.on('console', (m) => { const t = m.text(); if (/\[DUNK|\[LOB|\[RIM|\[JUDGE/.test(t)) log.push(`${Date.now()} ${t.slice(0, 180)}`); });
+page.on('console', (m) => { const t = m.text(); if (/\[DUNK|\[LOB|\[RIM|\[JUDGE|\[HANDS\] (rim hang|hang release|contact:)/.test(t)) log.push(`${Date.now()} ${t.slice(0, 180)}`); });
 // the dev overlay's '1 error' badge, named: every console error and page error the run produced (printed at the end)
 const errors: string[] = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 240)); });
@@ -175,7 +184,8 @@ await page.evaluate(`(() => {
         const b = window.__PAD.buttons[0];
         b.pressed = true; b.value = 1; window.__PAD.timestamp = Date.now();
         window.__slamAt = Date.now();
-        setTimeout(() => { b.pressed = false; b.value = 0; window.__PAD.timestamp = Date.now(); }, 60);
+        if (window.__SWING) { const H = window.__SLAM_HOLD_MS; setTimeout(() => { window.__PAD.axes[0] = 1; }, H - 420); setTimeout(() => { window.__PAD.axes[0] = -1; }, H - 200); setTimeout(() => { window.__PAD.axes[0] = 0; }, H + 40); }   // the pushes land in the HANG (the contact is ~1.0 s after the press)
+        setTimeout(() => { b.pressed = false; b.value = 0; window.__PAD.timestamp = Date.now(); }, window.__SLAM_HOLD_MS || 60);
       };
       if (offsetMs > 0) setTimeout(fire, offsetMs); else fire();
     };
@@ -221,13 +231,24 @@ for (let n = 0; n < ATTEMPTS; n++) {
   }
 
   // RUN: the hold drives the runway; the launch fires at the gather line
+  // DUNK PARKOUR: the glass is hit on the APPROACH (the stick alone, before RUN is held): a hold-run's carve toward the rim
+  // wins against a full stick, so the carve into the glass has to come first, then the run
+  if (GLASS) {
+    await page.evaluate('(() => { window.__PAD.axes[0] = 0.85; window.__PAD.axes[1] = -1; })()');   // at the right front corner: the hoopbus
+    await page.waitForTimeout(1400);
+    await page.evaluate('(() => { window.__PAD.axes[0] = -0.35; window.__PAD.axes[1] = -1; })()');
+    await page.waitForTimeout(150);
+  }
   await trigger(1);
   const runT0 = Date.now();
   let launched = false;
+  let glassPhase = 0, l1Done = !L1_AT_MS;
   let threwRunway = !RUNWAY_TRICK;
   let shotRunway = false;
   const shotsDone = new Set<number>();
   while (Date.now() - runT0 < RUN_MS + 2500) {
+    if (glassPhase === 1 && Date.now() - runT0 > 300) { glassPhase = 0; await page.evaluate('(() => { window.__PAD.axes[0] = 0; })()'); }
+    if (!l1Done && Date.now() - runT0 >= L1_AT_MS) { l1Done = true; await press(4, 60); }
     // a RUNWAY trick is a bare face button under the hold — the stick steers, so there is no direction to hold
     if (!threwRunway && Date.now() - runT0 >= RUNWAY_AT_MS) {
       threwRunway = true;
@@ -252,6 +273,7 @@ for (let n = 0; n < ATTEMPTS; n++) {
   }
   if (!launched) { await trigger(0); await page.waitForTimeout(400); }   // release: jump from here
   const airT0 = Date.now();
+  if (L1_AFTER_LAUNCH_MS) { void (async () => { await page.waitForTimeout(L1_AFTER_LAUNCH_MS); await press(4, 60); })(); }   // DUNK PARKOUR: the double-launch, timed from the launch
   // the burst continues into the air (offsets are still from RUN)
   const burstRest = SHOTS_MS.map((ms, si) => ({ ms, si })).filter(({ si }) => !shotsDone.has(si));
   const burstTimer = burstRest.length ? (async () => { for (const { ms, si } of burstRest) { const wait = runT0 + ms - Date.now(); if (wait > 0) await page.waitForTimeout(wait); shotsDone.add(si); await page.screenshot({ path: `${OUT}/${TAG}-a${a.n}-${ms}ms.png` }).catch(() => {}); } })() : null;
@@ -280,7 +302,7 @@ for (let n = 0; n < ATTEMPTS; n++) {
   }
 
   // THE SLAM: armed in the page so the press lands on the frame it means to.
-  await page.evaluate(`window.__armSlam(${JSON.stringify(SLAM_WHEN)}, ${SLAM_OFFSET_MS})`);
+  await page.evaluate(`window.__SLAM_HOLD_MS = ${SLAM_HOLD_MS}; window.__SWING = ${SWING}; window.__armSlam(${JSON.stringify(SLAM_WHEN)}, ${SLAM_OFFSET_MS})`);
   let slammed = false;
   while (Date.now() - airT0 < 4000) {
     if (await page.evaluate('window.__slamAt !== null')) { slammed = true; break; }

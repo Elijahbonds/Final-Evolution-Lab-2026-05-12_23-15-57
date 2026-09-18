@@ -24,8 +24,8 @@ import {
 import { readWalkOut, saveWalkOut, countPlay, musicCredential, type WalkOut } from '../music/WalkOut';
 import { resolveWalkOut, walkOutLine, type WalkOutCue } from '../music/WalkOutCue';
 import { StudioLibrary } from '../music/StudioLibrary';
-import { Color3, Color4, MeshBuilder, Vector3 } from '@babylonjs/core';
-import type { TransformNode } from '@babylonjs/core';
+import { Color3, Color4, MeshBuilder, Vector3, type Mesh } from '@babylonjs/core';
+import { TransformNode } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, Scene } from '@babylonjs/core';
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -71,6 +71,11 @@ import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE:
 import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, doubleUpFits, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, OBSTACLE_KINDS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, type ObstacleKind } from '../core/DunkObstacles';
+// DUNK PARKOUR (owner brief 2026-09-18): the glass rebound on the runway (a vector-transfer launch), the two launches, the
+// backboard double-launch, the overdrive dunk. Pure in core/DunkParkour.
+import { GLASS, launchProfile, doubleLaunchAllowed, DOUBLE_LAUNCH, overdriveDunk, cornerPanes, paneRebound, billboardFor, type GlassPane } from '../core/DunkParkour';
+import { spawnMeshyProp } from '../visual/meshyProps';
+import { SceneLoader, DynamicTexture } from '@babylonjs/core';
 import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, signatureFor, landingDustScale, netSplashScale, NET_SPLASH_DROP, type SlamReadout } from '../core/DunkSystem';
 import { dunkCard, slamIsClean } from '../core/DunkCard';
 import { missBeat } from '../core/MissFlavour';
@@ -304,6 +309,64 @@ export const DunkMode: ModeDefinition = (() => {
   let styleTaps = 0;                          // mid-air showboat taps (max 2)
   let aHeld = false, hangSec = 0;             // rim-hang tracking
   let runUpPeak = 0;                          // fastest approach speed (m/s) this attempt
+  // DUNK PARKOUR: when the run last rebounded off the glass (a launch inside GLASS.carrySec of it is a vector launch), the
+  // backboard double-launch (once a flight) and the apex it adds, the glass panels along the runway
+  // THE CORNER PROPS (owner: no glass on the sidelines — the hoopbus parked across one front corner, an event tent with the
+  // scene's sign across the other; their faces are the rebound / wall-run surfaces the pure panes describe)
+  let vectorAt = -1e9, vectorWallRun = false, doubleLaunched = false, doubleLaunchLift = 0, sideProps: TransformNode[] = [], panes: GlassPane[] = [];
+  // THE RIM SWING (owner: "be able to swing off the rim and off the backboard"): with the SLAM held through the contact the body
+  // hangs; the stick swings it under the rim (a pendulum about the iron), and letting go at the swing's reach is a flourish.
+  // The BACKBOARD SWING is L1 in the hang beat (after the rise's kick): a pivot off the glass for a little more lift.
+  let swingAng = 0, swingVel = 0, swingPeak = 0, hangBase: Vector3 | null = null, boardSwung = false;
+  const vectorLive = () => performance.now() - vectorAt < GLASS.carrySec * 1000;
+  const launchMult = () => launchProfile(takeoffFor(runUpPeak), vectorLive(), vectorWallRun).apexMult;
+  /** The glass: the run reflects off it with the speed kept — the launch that follows is a vector launch. */
+  function tryGlass(ctx: ModeContext, vx: number, vz: number): void {
+    if (performance.now() - vectorAt < 600) return;   // one rebound per contact
+    const r = paneRebound(player.root.position.x, player.root.position.z, vx, vz, panes);
+    if (!r) return;
+    vectorAt = performance.now(); vectorWallRun = r.wallRun;
+    player.root.position.x += r.pane.nx * GLASS.pushM; player.root.position.z += r.pane.nz * GLASS.pushM;
+    stickReboundX = Math.sign(r.v.x);   // the next strides carry the reflected x until the stick says otherwise
+    stickReboundUntil = performance.now() + 380;
+    runUpPeak = Math.max(runUpPeak, Math.hypot(vx, vz));
+    SoundKit.play('impact', { pitch: r.wallRun ? 1.2 : 1.5, volume: 0.45 }); ctx.feel?.impact?.(0.25); ctx.juice.flash('#a5f3fc', 50); ctx.camDirector.pulse(0.35, 0.3);
+    EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(-r.pane.nx * 0.5, 1.2, -r.pane.nz * 0.5)), 'sparks');
+    const what = r.pane.side > 0 ? 'THE HOOPBUS' : 'THE TENT';
+    flash(ctx, r.wallRun ? `WALL RUN ON ${what} — the jump carries it` : `KICKED OFF ${what} — the jump carries it`, 700);
+    console.info(`[DUNK-PARKOUR] ${r.wallRun ? 'wall run' : 'rebound'} off ${what.toLowerCase()} at (${player.root.position.x.toFixed(2)}, ${player.root.position.z.toFixed(2)}) v (${vx.toFixed(1)}, ${vz.toFixed(1)})`);
+  }
+  /** Park a prop across a corner pane: its long side on the pane's line, its body behind it. */
+  function parkOnPane(root: TransformNode, pane: GlassPane, longM: number): void {
+    const { min, max } = root.getHierarchyBoundingVectors(true);
+    const ex = max.x - min.x, ez = max.z - min.z;
+    const longIs = ex >= ez ? 'x' : 'z';
+    const k = longM / Math.max(0.01, longIs === 'x' ? ex : ez);
+    root.scaling.setAll(k);
+    const wide = (longIs === 'x' ? ez : ex) * k;
+    const tx = -pane.nz, tz = pane.nx;
+    root.rotation.y = Math.atan2(tx, tz) + (longIs === 'x' ? Math.PI / 2 : 0);
+    root.position.set(pane.cx - pane.nx * (wide / 2 + 0.05), -min.y * k, pane.cz - pane.nz * (wide / 2 + 0.05));
+  }
+  /** The scene's sign on a banner over the tent (owner: "a billboard and sign, change it for each scene"). */
+  function signBanner(scene: Scene, pane: GlassPane, location: string | undefined): Mesh {
+    const sign = billboardFor(location);
+    const tex = new DynamicTexture('dunk_sign_tex', { width: 1024, height: 320 }, scene, false);
+    const c = tex.getContext() as CanvasRenderingContext2D;
+    c.fillStyle = sign.bg; c.fillRect(0, 0, 1024, 320);
+    c.fillStyle = sign.accent; c.fillRect(0, 0, 1024, 26); c.fillRect(0, 294, 1024, 26);
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = sign.fg; c.font = 'bold 118px Impact, Arial Black, sans-serif'; c.fillText(sign.text, 512, 140);
+    c.fillStyle = sign.accent; c.font = 'bold 44px Arial, sans-serif'; c.fillText(sign.sub, 512, 240);
+    tex.update();
+    const m = MeshBuilder.CreateBox('dunk_sign', { width: 3.4, height: 1.05, depth: 0.08 }, scene);
+    const mat = VenueKit.paint(scene, 'dunk_sign_m', '#ffffff', 0.35, 0.6); mat.albedoTexture = tex; mat.emissiveTexture = tex; mat.emissiveColor = Color3.White().scale(0.35);
+    m.material = mat; m.isPickable = false;
+    m.rotation.y = Math.atan2(pane.nx, pane.nz) + Math.PI;   // a box's +z face turned to face along the pane's normal
+    m.position.set(pane.cx + pane.nx * 0.12, 2.75, pane.cz + pane.nz * 0.12);
+    return m;
+  }
+  let stickReboundX = 0, stickReboundUntil = 0;
   let launchSpeed01 = 0;                      // run-up speed as a 0..1 budget input
   let obstacleClipped = false;                // caught the prop mid-flight — the dunk is dead
   let toppling = false;                       // the prop goes over with you
@@ -589,6 +652,23 @@ export const DunkMode: ModeDefinition = (() => {
       dunkVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true, location: ctx.location });
       if (!dunkVenue) { VenueKit.buildCourt(ctx.scene); applyOceanCourt(ctx.scene, 'venice'); }
       findGlass(ctx.scene);
+      // DUNK PARKOUR: the corner props — the hoopbus across the right front corner, the event tent (with the scene's sign) across
+      // the left; their faces are what the run rebounds off / wall-runs along (the pure panes in core/DunkParkour)
+      for (const p of sideProps) p.dispose(); sideProps = [];
+      panes = cornerPanes(GLASS.halfX, gatherLine());
+      {
+        const scene = ctx.scene; const loc = ctx.location;
+        void spawnMeshyProp(scene, 'hoopbus', null, 'dunk_hoopbus').then((bus) => { if (!bus || scene.isDisposed) return; parkOnPane(bus, panes[0], 6.4); sideProps.push(bus); console.info('[DUNK-PARKOUR] hoopbus parked on the right corner'); });
+        void SceneLoader.ImportMeshAsync('', '/models/props/racing/', 'tent.glb', scene).then((r) => {
+          if (scene.isDisposed) { for (const m of r.meshes) m.dispose(); return; }
+          const root = new TransformNode('dunk_tent', scene);
+          for (const m of r.meshes) if (!m.parent) m.parent = root;
+          for (const m of root.getChildMeshes()) { m.isPickable = false; m.receiveShadows = true; }
+          parkOnPane(root, panes[1], 4.2); sideProps.push(root);
+          const banner = signBanner(scene, panes[1], loc); sideProps.push(banner);
+          console.info(`[DUNK-PARKOUR] tent + sign "${billboardFor(loc).text}" on the left corner`);
+        }).catch((e) => console.warn('[DUNK-PARKOUR] tent did not load', e));
+      }
       // spawnPlayer, not CharacterLibrary.spawn — this is the route that applies
       // the player's own identity: closet wardrobe colours, skin tone, and body
       // proportions from a body scan. Football, BoardRun and TimingSport all used
@@ -664,6 +744,7 @@ export const DunkMode: ModeDefinition = (() => {
       style = 'power'; prop = 'none'; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
+      vectorAt = -1e9; vectorWallRun = false; doubleLaunched = false; doubleLaunchLift = 0; boardSwung = false; hangBase = null; swingAng = 0;
         foe = rivalForNight(night);
     stakes = freshStakes();
       resetLob(); resetRunway(); win = 'run';
@@ -811,7 +892,21 @@ export const DunkMode: ModeDefinition = (() => {
       // for the rise and fires there — the trick the player asked for, at the beat it belongs to.
       if (phase === 'cinematic' && e.t === 'dpad') flight.recognizer.feed(e);
       // DUNK-BIOMECH: every trick has a cue window — early = ARMED (fires on its beat), late = refused with a banner
-      if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') && !qteWindowOpen) airButton(ctx, e);   // X reads in the air now: it carries the chain pieces (2026-09-16)
+      if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') && !qteWindowOpen) airButton(ctx, e);   // X reads in the air
+      if (phase === 'cinematic' && e.t === 'button' && e.pressed && e.btn === 'L1' && !qteWindowOpen) {   // DUNK PARKOUR: the backboard double-launch in the rise
+        if (doubleLaunchAllowed(clipTime, doubleLaunched)) {
+          doubleLaunched = true; doubleLaunchLift = DOUBLE_LAUNCH.apexAdd; hype = Math.min(100, hype + 8);
+          SoundKit.play('impact', { pitch: 1.3, volume: 0.5 }); ctx.feel?.impact?.(0.3); ctx.camDirector.pulse(0.5, 0.4);
+          EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.6, 0)), 'sparks');
+          flash(ctx, 'BACKBOARD KICK — DOUBLE LAUNCH', 700); console.info(`[DUNK-PARKOUR] double-launch @${clipTime.toFixed(2)}`);
+        } else if (!boardSwung && clipTime > DOUBLE_LAUNCH.toT && clipTime < 0.95) {
+          // THE BACKBOARD SWING: past the rise, a pivot off the glass — a little more lift, a roll flourish, a point of difficulty
+          boardSwung = true; doubleLaunchLift += 0.2; hype = Math.min(100, hype + 6); styleTaps = Math.min(2, styleTaps + 1);
+          const t0 = clipTime; const obs = ctx.scene.onBeforeRenderObservable.add(() => { const u = Math.min(1, (clipTime - t0) / 0.35); player.root.rotation.z = Math.sin(u * Math.PI) * 0.45; if (u >= 1 || phase !== 'cinematic') { ctx.scene.onBeforeRenderObservable.remove(obs); player.root.rotation.z = 0; } });
+          SoundKit.play('impact', { pitch: 1.1, volume: 0.45 }); ctx.feel?.impact?.(0.25); ctx.camDirector.pulse(0.4, 0.35);
+          flash(ctx, 'BACKBOARD SWING', 700); console.info(`[DUNK-PARKOUR] backboard swing @${clipTime.toFixed(2)}`);
+        } else refuse(ctx, doubleLaunched && boardSwung ? 'THE BOARD IS SPENT' : doubleLaunched ? 'BACKBOARD SWING IN THE HANG' : 'BACKBOARD KICK IN THE RISE');
+      }   // (X reads in the air now: it carries the chain pieces, 2026-09-16)
 
       if (e.t === 'trigger' && e.side === 'R') {
         // MECHANICS PASS (2026-09-15): RUN (RT) was silent 6 of 6 when held outside the runway — through the judges, the
@@ -873,6 +968,8 @@ export const DunkMode: ModeDefinition = (() => {
         player.root.position.addInPlace(vel.scale(dt));
         player.root.position.z = Math.max(gatherLine(), Math.min(RETREAT_Z, player.root.position.z));   // the runway: takeoff line … a step behind the start
         player.root.position.x = Math.max(-6, Math.min(6, player.root.position.x));
+        if (performance.now() < stickReboundUntil) player.root.position.x += stickReboundX * 3.5 * dt;   // DUNK PARKOUR: the reflected stride
+        tryGlass(ctx, vel.x, vel.z);
         faceVel(vel, dt);
         // THE RUN-UP IS PART OF THE DUNK. Peak approach speed feeds the air
         // budget at launch — a walk-up has less air, and less air means fewer
@@ -908,7 +1005,8 @@ export const DunkMode: ModeDefinition = (() => {
         }
         // stick-right steers screen-right (the camera's right in world x), and the facing follows the run
         const steer = ctx.camDirector.rightFlat().x * stickX * 3 + Math.max(-2, Math.min(2, (rim.x - player.root.position.x) * 0.8));
-        player.root.position.x = Math.max(-6, Math.min(6, player.root.position.x + steer * dt));
+        player.root.position.x = Math.max(-6, Math.min(6, player.root.position.x + steer * dt + (performance.now() < stickReboundUntil ? stickReboundX * 3.5 * dt : 0)));
+        tryGlass(ctx, steer, -holdRunSpeed);   // DUNK PARKOUR: into the glass at an angle on the hold-run
         // a runway beat (a toss, a kick, a cartwheel, the hop) runs under the body at its own pace
         const runNow = holdRunSpeed * (runwayBeat ? runwayBeat.runScale : 1);
         player.root.position.z -= runNow * dt;
@@ -1194,7 +1292,11 @@ export const DunkMode: ModeDefinition = (() => {
               // DUNK-BALL-ARMS-RIM: the CONTACT is the ball ON the iron — a jam that timed out with the ball short of it (a late slam:
               // 9 cm of daylight measured) punches on the flush frame the ball meets the ring, not on the release
               if (ringDistance(ball.position, rim, RIM_RADIUS) <= ringClearance(ballSim.radius) + 0.02) { setWin('contact'); contactPunch(ctx); } else punchPending = true;
-              if (hangHold(aHeld, hangSec)) { hangOn = true; hangHeldSec = 0; hoopJuice?.hold(true); console.info('[HANDS] rim hang'); }   // SLAM still held on the contact = a hang (a tap that overlaps it is a 20 ms pull, released with the tap)
+              // THE HANG'S CAP COUNTS FROM THE CONTACT, not the press (2026-09-18): the jam takes ~1.0 s from the slam to the iron, so a
+              // slam held from the beat arrived at the ring with hangSec already at the 1 s cap and the hang never engaged (measured:
+              // 'slam up 0.95 s after the press' on an ON TIME slam). Held on the contact = a hang; the tick caps it from here.
+              console.info(`[HANDS] contact: slam ${aHeld ? 'held' : 'up'} ${hangSec.toFixed(2)} s after the press`);
+              if (aHeld) { hangOn = true; hangHeldSec = 0; hoopJuice?.hold(true); console.info('[HANDS] rim hang'); }   // SLAM still held on the contact = a hang (a tap that overlaps it is a 20 ms pull, released with the tap)
             } else { jamPrevBall.copyFrom(bp); jamPrevLive = true; }
           }
           if (jamContact) {
@@ -1205,7 +1307,22 @@ export const DunkMode: ModeDefinition = (() => {
               if (st.phase === 'free') { ballSim.launch(ball.position.clone(), new Vector3(st.vel.x, st.vel.y, st.vel.z)); looseBall = true; console.info(`[HANDS] through the net ${(sinceRelease * 1000).toFixed(0)} ms after the contact`); }
             }
             const through = sinceRelease > FLUSH_BEAT_SEC;
-            if (hangOn) { hangHeldSec += dt; if (!hangHold(aHeld, hangHeldSec, HANG_MAX_SEC)) { hangOn = false; hoopJuice?.hold(false); console.info(`[HANDS] hang release after ${hangHeldSec.toFixed(2)} s`); } }
+            if (hangOn) {
+              hangHeldSec += dt;
+              // THE RIM SWING: the stick drives a pendulum under the rim; the body rolls with it and the hips swing out
+              if (!hangBase) { hangBase = player.root.position.clone(); swingAng = 0; swingVel = 0; swingPeak = 0; }
+              swingVel += (stickX * 18 - swingAng * 9 - swingVel * 2.5) * dt;   // the stick wins: a push reaches the swing's clamp inside ~0.2 s
+              swingAng = Math.max(-0.6, Math.min(0.6, swingAng + swingVel * dt));
+              swingPeak = Math.max(swingPeak, Math.abs(swingAng));
+              player.root.rotation.z = -swingAng * 0.8;
+              player.root.position.x = hangBase.x + Math.sin(swingAng) * 0.55; player.root.position.y = hangBase.y - (1 - Math.cos(swingAng)) * 0.55;
+              if (!hangHold(aHeld, hangHeldSec, HANG_MAX_SEC)) {
+                hangOn = false; hoopJuice?.hold(false); console.info(`[HANDS] hang release after ${hangHeldSec.toFixed(2)} s`);
+                console.info(`[DUNK-PARKOUR] rim swing peak ${swingPeak.toFixed(2)} rad`);
+                if (swingPeak > 0.25) { styleTaps = Math.min(2, styleTaps + 1); hype = Math.min(100, hype + 8); flash(ctx, `RIM SWING${swingPeak > 0.5 ? ' · BIG' : ''}`, 700); SoundKit.play('crowdCheer', { volume: 0.4 }); }
+                hangBase = null;
+              }
+            }
             else if (through) void finishAttempt(ctx, true);
           }
         } else {
@@ -1295,7 +1412,10 @@ export const DunkMode: ModeDefinition = (() => {
             // event, and a perfect card sweep that scrolled by as an ordinary
             // eruption would waste the entire point of this change.
             const perfect = beat.total === PERFECT_TOTAL;
-            ctx.setHud({ hint: '', judgeReveal: revealed, banner: perfect ? 'FIFTY!' : '' });
+            // DUNK PARKOUR: a perfect on a hard dunk is an OVERDRIVE — the board goes, the building shakes
+            const overdrive = perfect || overdriveDunk(qteAccuracy, lastScores.length ? lastScores.reduce((a, j) => a + j.score, 0) / lastScores.length * 0.8 : 0);
+            if (overdrive) { for (let i = 0; i < 3; i++) EffectsKit.burst(ctx.scene, new Vector3(rim.x, rim.y + 0.5 + i * 0.3, rim.z - 0.6), 'glitch', 2); ctx.juice.shake(0.22, 300); ctx.juice.flash('#ffffff', 110); console.info('[DUNK-PARKOUR] OVERDRIVE — the board shatters'); }
+            ctx.setHud({ hint: '', judgeReveal: revealed, banner: perfect ? 'FIFTY! · OVERDRIVE' : overdrive ? 'OVERDRIVE DUNK' : '' });
             ctx.camDirector.pulse(perfect ? 1.4 : beat.band === 'eruption' ? 1 : beat.band === 'hush' ? 0.15 : 0.4, 0.6);
             if (perfect) {
               // A 50 has to SOUND like a 50. An eruption already plays a cheer
@@ -1412,6 +1532,7 @@ export const DunkMode: ModeDefinition = (() => {
       stopWalkOut(); walkAudio = null; walkCue = null; walkOut = null;
       clearProps(); SoundKit.stopAmbient(); feet = { L: null, R: null };
       dunkVenue?.dispose(); dunkVenue = null;  // M74
+      for (const p of sideProps) p.dispose(); sideProps = [];
     },
   };
 
@@ -1481,10 +1602,10 @@ export const DunkMode: ModeDefinition = (() => {
   /** The jump's height this attempt: the charge and the run-up buy it (the duel's factor), the double-up hop adds to it. */
   /** An obstacle that needs a bigger jump gets one — the take-off line already moves back for it, and the arc moves with it. */
   function apexLift(): number { const k = obstacleKindOf(prop); return k ? (OBSTACLE_SPECS[k].apexLift ?? 0) : 0; }
-  function apexFor(): number { return (1.05 + charge * 0.55) * (0.85 + launchSpeed01 * 0.3) + (doubleUp ? 0.15 : 0) + apexLift(); }
+  function apexFor(): number { return ((1.05 + charge * 0.55) * (0.85 + launchSpeed01 * 0.3) + (doubleUp ? 0.15 : 0) + apexLift()) * launchMult() + doubleLaunchLift; }   // DUNK PARKOUR: the launch's multiplier and the double-launch's lift
   /** The jump a toss on the runway is aimed at: the charge the hold will have reached by the takeoff, the run-up so far. */
   let chargeAtLaunch = 0;
-  function apexPredicted(): number { return (1.05 + Math.max(charge, chargeAtLaunch) * 0.55) * (0.85 + Math.min(1, Math.max(runUpPeak, holdRunSpeed) / 7) * 0.3) + (doubleUp ? 0.15 : 0) + apexLift(); }
+  function apexPredicted(): number { return ((1.05 + Math.max(charge, chargeAtLaunch) * 0.55) * (0.85 + Math.min(1, Math.max(runUpPeak, holdRunSpeed) / 7) * 0.3) + (doubleUp ? 0.15 : 0) + apexLift()) * launchMult() + doubleLaunchLift; }
   let launchZ = CFG.gatherZ;                  // where the flight left the floor (the carry is measured from here)
   let obstacleOver = false, obstacleCleared = false, obstacleMargin = Infinity;   // the clear, once per attempt
   /** The last slam's timing verdict, shown on the card. Null until a slam is pressed this attempt. */
@@ -1669,11 +1790,13 @@ export const DunkMode: ModeDefinition = (() => {
       takeoffFor(runUpPeak),
       takeoffRange,
     );
-    flight.launch(Math.min(1, charge * 0.5 + launchSpeed01 * 0.5), STYLE_TIER[style], approach.difficulty);
+    const prof = launchProfile(approach.takeoff, vectorLive(), vectorWallRun);   // DUNK PARKOUR: the foot's launch, and the corner prop if it was just used
+    console.info(`[DUNK-PARKOUR] ${prof.label} apex x${prof.apexMult.toFixed(2)} +${prof.difficulty.toFixed(1)} diff`);
+    flight.launch(Math.min(1, charge * 0.5 + launchSpeed01 * 0.5), STYLE_TIER[style], approach.difficulty + prof.difficulty);
     armedAir = null; spin.reset(); liveTricks = []; liveSpin = { turns: 0, from: 0, until: 0 };
     if (heldDpad) flight.recognizer.feed({ t: 'dpad', dir: heldDpad, pressed: true });   // a direction held through the takeoff is still held
     if (launchSpeed01 < 0.3 && charge > 0.4) flash(ctx, 'WALK-UP — short air', 900);
-    else if (approach.difficulty > 0) flash(ctx, `${approach.label}${approach.angleDeg >= 10 ? ` · ${approach.angleDeg}°` : ''}`, 900);
+    else if (approach.difficulty > 0 || vectorLive()) flash(ctx, `${vectorLive() ? (vectorWallRun ? 'OFF THE WALL RUN · ' : 'OFF THE REBOUND · ') : ''}${approach.label}${approach.angleDeg >= 10 ? ` · ${approach.angleDeg}°` : ''}`, 900);
     dribble?.update(0, 0, false); gatherLatched = false; gatherStride = false; finishRelease = -1;   // DUNK-POSTURE-LEGS: the dribble is parked (the ball back in the palm) before the takeoff takes it
     if (isOop(prop)) { if (teammate) attachBallToHand(ball, teammate.skeleton, 'RightHand'); else releaseBall(ball); }   // the ball rides the passer's palm until the toss (it used to wait at his idle hand and teleport 0.87 m up on the throw)
     else if (!lob.live) attachBallToHand(ball, player.skeleton, 'RightHand');   // a lob already in the air stays there — the catch is the hand's job
@@ -2530,7 +2653,7 @@ export const DunkMode: ModeDefinition = (() => {
     // and the STYLE TIER moved to STYLE, where calling your signature belongs. Measured before: every attempt in the
     // lab scored DIFF 10.0, the cap, so a WINDMILL and a BETWEEN THE LEGS off a self-lob were the same dunk.
     const { difficulty, execution, style: styleScore } = dunkCard({
-      trickDifficulty, runwayDifficulty: runwayDifficulty + (signature?.nod ?? 0), propBonus: PROP_BONUS[prop],
+      trickDifficulty, runwayDifficulty: runwayDifficulty + (signature?.nod ?? 0) + (doubleLaunched ? DOUBLE_LAUNCH.difficulty : 0), propBonus: PROP_BONUS[prop],
       charge, launchSpeed01, styleTier: STYLE_TIER[style], styleTaps,
       hype, hang: hangBonus > 0, repeat: isRepeat, execution01: qteAccuracy,
       chainTricks: Math.max(0, flight.attempt.tricks.length - 1),
