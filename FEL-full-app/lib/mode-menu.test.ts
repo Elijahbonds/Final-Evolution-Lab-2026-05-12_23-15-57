@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { MODE_INFO } from './game-data';
 import {
   HIDDEN_FROM_MODE_MENU,
@@ -35,5 +37,16 @@ describe('mode menu contract', () => {
   it('only hides keys that exist in MODE_INFO', () => {
     const unknownHiddenKeys = [...HIDDEN_FROM_MODE_MENU].filter((key) => !(key in MODE_INFO));
     expect(unknownHiddenKeys).toEqual([]);
+  });
+
+  it('links every visible mode tile to a real app route', () => {
+    for (const [key, info] of visibleModeEntries()) {
+      const routePath = info.href.split('?')[0]?.replace(/^\/+/, '');
+      expect(routePath, `${key} has a concrete href`).toBeTruthy();
+      expect(
+        existsSync(join(process.cwd(), 'app', routePath!, 'page.tsx')),
+        `${key} (${info.name}) points at missing route ${info.href}`
+      ).toBe(true);
+    }
   });
 });

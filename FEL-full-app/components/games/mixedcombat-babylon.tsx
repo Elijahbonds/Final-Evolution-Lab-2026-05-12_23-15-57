@@ -86,7 +86,7 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
       if (canvasOwner.get(canvas) === token) stop?.();
       busRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps — onEnd via ref, mount once
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onEnd via ref, mount once
   }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
