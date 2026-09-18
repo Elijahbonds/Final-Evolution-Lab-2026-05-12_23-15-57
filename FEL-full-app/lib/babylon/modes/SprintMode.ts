@@ -15,6 +15,8 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
+import { readPlaceLook } from '../nexus/placeLooks';
+import { MOOD_TO_FAMILY } from '../visual/Backdrops';
 import { SoundKit } from '../audio/SoundKit';
 import { makeSprintRace, SPRINT_TUNING } from '../../feel/cores/sprint-skin';
 import type { SprintCore } from '../../feel/cores/sprint-core';
@@ -108,13 +110,15 @@ function finish(ctx: ModeContext, timeS: number): void {
 
 return {
   modeId: 'sprint',
-  mood: 'daylight',
+  // PLACE LOOKS (2026-09-18): the light and the sky are the place's — getters, because the harness reads both at mount
+  get mood() { return readPlaceLook('sprint')?.world?.mood ?? 'daylight'; },
+  get backdrop() { return readPlaceLook('sprint')?.world?.backdrop ?? MOOD_TO_FAMILY[readPlaceLook('sprint')?.world?.mood ?? 'daylight']; },
   camPreset: 'runner',
 
   async load(ctx: ModeContext): Promise<void> {
     reset();
 
-    VenueKit.buildTrack(ctx.scene, RACE_DIST);   // SHARED-PLACE-FLOOR: a tartan straight, not the grey park slab
+    VenueKit.buildTrack(ctx.scene, RACE_DIST, readPlaceLook('sprint')?.world?.colors ?? {});   // SHARED-PLACE-FLOOR: a tartan straight, not the grey park slab; PLACE: the splash's pick recolours it
 
     // Lane markings down the straight so speed reads as motion rather than a
     // number changing in the corner.

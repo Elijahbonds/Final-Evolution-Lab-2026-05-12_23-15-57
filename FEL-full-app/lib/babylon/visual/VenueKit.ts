@@ -357,15 +357,16 @@ export const VenueKit = {
    * walls, the eye's grey void — for a Track & Field race. This is a track: a tartan straight with lanes where the two
    * runners actually stand (x −0.7 and +0.9: edges every 1.6 m), infield grass either side, and a stand down both sides.
    */
-  buildTrack(scene: Scene, raceDist = 100): void {
+  buildTrack(scene: Scene, raceDist = 100, colors: { turf?: string; track?: string } = {}): void {
     const edges = [-4.7, -3.1, -1.5, 0.1, 1.7, 3.3, 4.9];
     const len = raceDist + 38, cz = -(raceDist / 2), width = 10.6, cx = 0.1;
-    const grass = paintedGround(scene, 44, len + 30, '#3f7f3a', (ctx, W, H) => paintTurf(ctx, W, H, { base: '#3f7f3a', stripes: 16, stripeDepth: 0.1, seed: 5 }));
+    const turf = colors.turf ?? '#3f7f3a', tartan = colors.track ?? '#a8432f';   // PLACE LOOKS (2026-09-18): the sprint's places recolour the straight
+    const grass = paintedGround(scene, 44, len + 30, turf, (ctx, W, H) => paintTurf(ctx, W, H, { base: turf, stripes: 16, stripeDepth: 0.1, seed: 5 }));
     grass.name = 'venue_infield'; grass.position.set(0, -0.02, cz); grass.isPickable = false;
     applyFloorDetailToMesh(scene, grass, { kind: 'grass', blend: 0.35 }, [44, len + 30]);
     const tw = 256, th = Math.round(256 * len / width);   // ~24 px a metre: lane lines and numbers stay crisp down a 138 m strip
-    const track = paintedGround(scene, width, len, '#a8432f', (ctx, W, H) => paintTrack(ctx, W, H, {
-      size: [width, len], center: [cx, cz], laneEdges: edges, startZ: 0, finishZ: -raceDist,
+    const track = paintedGround(scene, width, len, tartan, (ctx, W, H) => paintTrack(ctx, W, H, {
+      size: [width, len], center: [cx, cz], laneEdges: edges, startZ: 0, finishZ: -raceDist, color: tartan,
     }), [tw, th]);
     track.position.set(cx, 0, cz);
     const box = venueBox(scene, 44, len + 30, 7, [paintBleachers(CROWD)]);

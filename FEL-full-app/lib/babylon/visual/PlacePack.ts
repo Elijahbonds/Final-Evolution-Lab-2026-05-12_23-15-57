@@ -400,6 +400,8 @@ export interface TrackPaint {
   laneEdges: number[];
   /** world z of the start line; the race runs toward −z */
   startZ: number;
+  /** the rubber's colour (PLACE LOOKS: the beach track is blue) */
+  color?: string;
   finishZ: number;
 }
 
@@ -410,7 +412,7 @@ export function paintTrack(ctx: Ctx, W: number, H: number, o: TrackPaint): void 
   const X = (x: number) => (x - cx + sw / 2) * pxm;
   const Y = (z: number) => (cz + sd / 2 - z) * pxm;
   const r = placeRng(31);
-  ctx.fillStyle = '#a8432f'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = o.color ?? '#a8432f'; ctx.fillRect(0, 0, W, H);
   for (let i = 0; i < 1800; i++) { ctx.fillStyle = r() < 0.5 ? 'rgba(0,0,0,0.12)' : 'rgba(255,220,200,0.08)'; ctx.fillRect(r() * W, r() * H, 2, 2); }
   // wear down the lane centres where the spikes land
   for (let l = 0; l < o.laneEdges.length - 1; l++) {

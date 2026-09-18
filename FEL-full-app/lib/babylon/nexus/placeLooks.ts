@@ -9,6 +9,8 @@
 // The FIRST look of every list is `home`: no overrides at all, so the default is exactly what shipped before this file.
 
 import type { BackdropKind, GroundKind, PropKind } from './NexusWebScene';
+import type { VenueMood } from '../scene/moods';
+import type { BackdropFamily } from '../visual/Backdrops';
 
 export interface PlaceLook {
   id: string; name: string; sub: string; tint: string;
@@ -21,6 +23,12 @@ export interface PlaceLook {
   propSet?: string | null;
   /** Dressing ADDED to the spec's props (its goals, nets and crowd stay). */
   props?: Array<{ kind: PropKind; position: [number, number, number]; color?: string; scale?: number; rotationY?: number }>;
+  /**
+   * HAND-BUILT WORLDS (sprint, free run) have no venue spec to lay a look over: the mode reads this instead — the light
+   * rig's mood and the painted backdrop (the harness reads both through the mode's getters at mount) and the colours of
+   * the things it builds, keyed the way the mode names them (sprint: turf, track; free run: ground, vault, wall, ledge…).
+   */
+  world?: { mood: VenueMood; backdrop: BackdropFamily; colors: Record<string, string> };
 }
 
 const home = (name: string, sub: string, tint: string): PlaceLook => ({ id: 'home', name, sub, tint });
@@ -82,6 +90,16 @@ export const PLACE_LOOKS: Record<string, PlaceLook[]> = {
     { id: 'studio-day', name: 'Daytime Studio', sub: 'A BRIGHT SET · THE AUDIENCE CAN SEE YOU', tint: '#ffd166', sky: { top: '#dfe7f0', bottom: '#f7f3ea', fog: '#eef0f2', sun: '#ffffff', ambient: 0.95, fogDensity: 0.002 }, backdrop: 'city', ground: { color: '#e8e4dc', line: '#333a4a' }, propSet: null },
     { id: 'arcade-night', name: 'Arcade Night', sub: 'PINK AND CYAN · THE CABINETS HUMMING', tint: '#f472b6', sky: NEON, backdrop: 'neon', ground: { color: '#12082a', line: '#f472b6' }, props: [lamp(-8, -8, '#22d3ee'), lamp(8, -8, '#f472b6'), lamp(-8, 8, '#f472b6'), lamp(8, 8, '#22d3ee')] },
   ],
+  sprint: [
+    home('Stadium Straight', 'THE TARTAN UNDER A CLEAR SKY', '#a8432f'),
+    { id: 'beach-dash', name: 'Beach Dash', sub: 'A BLUE TRACK ON THE SAND · THE SEA BESIDE LANE ONE', tint: '#3b6bb5', world: { mood: 'goldenHour', backdrop: 'ocean', colors: { turf: '#cdb47c', track: '#3b6bb5' } } },
+    { id: 'night-meet', name: 'Night Meet', sub: 'FLOODLIGHTS · THE STANDS FULL', tint: '#9ad7ff', world: { mood: 'nightGame', backdrop: 'stadium', colors: { turf: '#2f5a30', track: '#7a2e3a' } } },
+  ],
+  freerun: [
+    home('Night Rooftops', 'THE COURSE AT NIGHT · MARKERS LIT', '#3FB8B0'),
+    { id: 'dawn-plaza', name: 'Dawn Plaza', sub: 'WARM STONE · THE BOARDWALK BEHIND', tint: '#ffb36b', world: { mood: 'goldenHour', backdrop: 'venice', colors: { ground: '#8a8078', vault: '#c98a4b', wall: '#b56a4a', ledge: '#2f9a94', roof: '#2f9a94' } } },
+    { id: 'overcast-yard', name: 'Overcast Yard', sub: 'GREY CONCRETE · A HIGH FLAT LIGHT', tint: '#9aa3ad', world: { mood: 'overcast', backdrop: 'park', colors: { ground: '#5a5e66', vault: '#9a7a4a', wall: '#6a7078', ledge: '#3fb8b0', roof: '#3fb8b0' } } },
+  ],
   showdown: [
     home('Sovereign Dojo', 'THE SHRINE COURTYARD', '#FF2D55'),
     { id: 'night-dojo', name: 'Night Dojo', sub: 'LANTERNS ON THE GRAVEL · THE SHRINE DARK', tint: '#9ad7ff', sky: NIGHT, backdrop: 'dojo', ground: { color: '#8f8a80', line: '#4a4038' }, props: [lamp(-7, 7, '#FFD79A'), lamp(7, 7, '#FFD79A')] },
@@ -120,5 +138,5 @@ export function writePlaceLook(modeId: string, id: string): void {
 
 /** Does this look change anything? `home` does not. */
 export function isHomeLook(look: PlaceLook | undefined): boolean {
-  return !look || (!look.sky && !look.backdrop && !look.ground && look.propSet === undefined && !look.props?.length);
+  return !look || (!look.sky && !look.backdrop && !look.ground && look.propSet === undefined && !look.props?.length && !look.world);
 }

@@ -15,6 +15,8 @@ import { Coyote } from '../core/gameFeel';
 import { stepSpeedFov } from '../core/SpeedFov';
 import { Vector3, MeshBuilder, Color3, type PBRMaterial, PhysicsAggregate, PhysicsShapeType, PhysicsCharacterController, CharacterSupportedState, Ray, type Mesh, type Scene, type AbstractMesh } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
+import { readPlaceLook } from '../nexus/placeLooks';
+import { MOOD_TO_FAMILY } from '../visual/Backdrops';
 import type { HudValue, ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -121,7 +123,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     const matFor = (kind: string): PBRMaterial => {
       let m = mats.get(kind);
       if (!m) {
-        const hex = MAT[kind] ?? '#888888';
+        const hex = readPlaceLook('freerun')?.world?.colors[kind] ?? MAT[kind] ?? '#888888';   // PLACE: the place's palette over the authored one
         // the gates and ledges read as markers, so they keep a real emissive floor; surfaces do not
         m = VenueKit.paint(ctx.scene, `fr_mat_${kind}`, hex, GLOW.has(kind) ? 0.3 : 0.05, ROUGH[kind] ?? 0.7);
         // AND THE PALETTE ITSELF WAS AUTHORED FOR THE WRONG MATERIAL MODEL. These hexes were picked against
@@ -351,7 +353,10 @@ export const FreeRunMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'freerun', mood: 'nightGame', camPreset: 'runner',
+    modeId: 'freerun', camPreset: 'runner',
+    // PLACE LOOKS (2026-09-18): the light and the sky are the place's — getters, because the harness reads both at mount
+    get mood() { return readPlaceLook('freerun')?.world?.mood ?? 'nightGame'; },
+    get backdrop() { return readPlaceLook('freerun')?.world?.backdrop ?? MOOD_TO_FAMILY[readPlaceLook('freerun')?.world?.mood ?? 'nightGame']; },
 
     async load(ctx: ModeContext) {
       // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.

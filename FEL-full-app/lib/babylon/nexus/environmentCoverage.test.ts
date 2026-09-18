@@ -3,8 +3,8 @@
 // Every enabled mode has to offer at least three places to play, through one of the game's pick systems: the hoops
 // court locations, the board venues, the race courses, the combat arenas, the place looks, or (Who Scene It) a venue
 // that changes every round. This test is the ledger: a mode that loses its picks, or a new mode that ships with one
-// room, fails here. The two named exceptions are the modes whose worlds are built by hand rather than from a venue
-// spec — they are the open work, not a pass.
+// room, fails here. The two hand-built worlds (sprint, free run) have no venue spec; their looks carry a `world` block
+// the mode reads for its mood, its sky and its colours.
 import { describe, it, expect } from 'vitest';
 import { ENABLED_BABYLON_MODES } from '../modes/registry';
 import { BASKETBALL_MODE_IDS, readyCourtLocations } from './courtLocations';
@@ -17,7 +17,7 @@ import { looksFor } from './placeLooks';
 const SPLASH_ID: Record<string, string> = { snowboard_slalom: 'snow', skateboard: 'skate', surf: 'surf', bigair: 'snow', aeroaces: 'aero', velocitykart: 'kart', brainbrawl: 'brainbrawl' };
 const BOARD = new Set(['skate', 'snow', 'surf']);
 const RACE = new Set(['aero', 'kart']);
-/** Worlds built by hand (no venue spec): the open work. */
+/** Worlds built by hand (no venue spec) — they read a place look's `world` block instead. Kept so the ledger names them. */
 const HAND_BUILT = new Set(['sprint', 'freerun']);
 /** The quiz mounts a different venue every round — every venue in the game is its place. */
 const ROTATING = new Set(['who_scene_it']);
@@ -34,10 +34,11 @@ function placesFor(key: string): number {
 
 describe('three places per mode', () => {
   for (const key of ENABLED_BABYLON_MODES) {
-    if (HAND_BUILT.has(key)) continue;
     it(`${key} offers at least three`, () => { expect(placesFor(key), key).toBeGreaterThanOrEqual(3); });
   }
-  it('names the open work exactly', () => { expect([...HAND_BUILT].sort()).toEqual(['freerun', 'sprint']); });
+  it('the hand-built worlds carry a world block on every look but home', () => {
+    for (const key of HAND_BUILT) for (const l of looksFor(key).slice(1)) expect(l.world, `${key} ${l.id}`).toBeTruthy();
+  });
   it('every place look list starts at home and has unique ids', () => {
     for (const [mode, list] of Object.entries({ football: looksFor('football'), tennis: looksFor('tennis'), dance: looksFor('dance') })) {
       expect(list[0].id, mode).toBe('home');
