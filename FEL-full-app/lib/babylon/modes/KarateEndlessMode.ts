@@ -60,7 +60,9 @@ import { prqMaxHp, prqSpeedMult } from '../core/PrqVitals';
 import { prqGrade } from '../../prq';
 import { mookMaxHp, damageMook, mookHp01, mookBarHex } from '../core/MookHealth';
 import { EvadeMoves } from '../core/EvadeMoves';
-import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailable, startWallRun, wallRunAt, startWallKick, wallKickAt, kickHits, type WallRunState, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18)
+import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRunOnAt, wallRunOnSide, startWallKick, wallKickAt, kickHits, type WallRunOn, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18)
+import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, spawnRadius, describeArena, insideBy, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
+import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { HORDE_WINDOW_SEC } from '../core/DodgeRead';
 import { Color3, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -277,7 +279,12 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   // press (or the run's end) is the KICK off it back through the pack. The latch above stays the game's own beats.
   const focus = new FocusMeter();
   let focusHeld = false, focusHud = -1, focusHudOn = false;
-  let wallRun: WallRunState | null = null, wallKick: WallKickState | null = null, wallKickY0 = 0;
+  let wallRun: WallRunOn<ArenaWall> | null = null, wallKick: WallKickState | null = null, wallKickY0 = 0;
+  // THE ARENA (2026-09-18): picked on the splash (combat/arenas.ts) and re-read at load — the factory body runs at SSR. Its
+  // shape is the clamp, its walls are what the wall run takes, its edge decides whether a shove stops, bounces or falls.
+  let arena: CombatArena = arenasFor('karate')[0];
+  let arenaHandle: ArenaHandle | null = null;
+  let hazardTickAt = -1e9;
   const heroVel = new Vector3();
   const matrixStats = { wallRuns: 0, wallKicks: 0, kickHits: 0, focusStrikes: 0 };
   const enemyLastPos = new Map<Enemy, Vector3>(); let roomMps = 0, heroMps = 0; const heroLastPos = new Vector3();   // MATRIX telemetry: who is moving at what speed
@@ -429,7 +436,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   const TRAVEL_TURN_RATE = 22;   // THE-HUNDRED: was 12 (180° in 0.26 s) — 0.14 s now; a crowd fight turns on a dime
   const facingVec = () => new Vector3(Math.sin(player.root.rotation.y), 0, Math.cos(player.root.rotation.y));
   const tween = (dur: number, step: (k: number) => void, done?: () => void) => { tweens.push({ t: 0, dur, step, done }); };
-  const clampDisc = (p: Vector3) => { const r = Math.hypot(p.x, p.z); if (r > ARENA_RADIUS) { const k = ARENA_RADIUS / r; p.x *= k; p.z *= k; } };
+  const clampDisc = (p: Vector3) => { arenaClamp(p, arena); };   // COMBAT ARENAS: the picked arena's shape, walls and pillars (was a bare disc)
 
   /** The Matrix beat. One clock: the latch counts real seconds; the gameplay dt and the scene's animation time both
    *  run at its scale while it holds. Latched once (cooldown in the core); the chi burst always fires. */
@@ -454,7 +461,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
 
   async function spawnEnemy(ctx: ModeContext, angle: number, i: number): Promise<void> {
-    const pos = new Vector3(Math.sin(angle) * 6, 0, Math.cos(angle) * 6);
+    const sr = spawnRadius(arena);
+    const pos = new Vector3(Math.sin(angle) * sr, 0, Math.cos(angle) * sr); arenaClamp(pos, arena, 0.6);
     const char = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
       position: pos, yawRad: Math.atan2(-pos.x, -pos.z),
       tint: i % 2 ? '#a67c5b' : '#8d6e52',   // EYE SORES (2026-09-17): the old near-black tint blackened the SKIN — brown heads and leopard tops floated over invisible bodies; a natural tint (a roster seed), the suit is the KIT (tintGarmentSlot below)
@@ -669,13 +677,16 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   /** L1 inside Focus, running INTO the arena's edge: up onto the wall and along it. */
   function tryWallRun(ctx: ModeContext): boolean {
     const pos = player.root.position;
-    if (!wallRunAvailable({ x: pos.x, z: pos.z }, { x: heroVel.x, z: heroVel.z }, ARENA_RADIUS)) return false;
-    wallRun = startWallRun({ x: pos.x, z: pos.z }, { x: heroVel.x, z: heroVel.z });
+    const fv = facingVec();
+    const hd = Math.hypot(heroVel.x, heroVel.z) >= 0.3 ? { x: heroVel.x, z: heroVel.z } : { x: fv.x, z: fv.z };   // pinned on the wall (hit, blocked): the body still faces it
+    const hit = wallRunAvailableOn({ x: pos.x, z: pos.z }, hd, arena.walls);
+    if (!hit) { if (process.env.NODE_ENV === 'development') console.info(`[MATRIX] wall run refused at (${pos.x.toFixed(2)}, ${pos.z.toFixed(2)}) heading (${hd.x.toFixed(2)}, ${hd.z.toFixed(2)}) vel ${Math.hypot(heroVel.x, heroVel.z).toFixed(2)}`); return false; }
+    wallRun = startWallRunOn(hit, hd);
     matrixStats.wallRuns++;
     SoundKit.play('whoosh', { pitch: 1.1, volume: 0.45 });
     ctx.setHud({ banner: 'WALL RUN' }); setTimeout(() => ctx.setHud({ banner: '' }), 500);
     ctx.momentum.report({ kind: 'near_miss', weight: 10 });
-    console.info(`[MATRIX] wall run at r ${Math.hypot(pos.x, pos.z).toFixed(2)} dir ${wallRun.dir}`);
+    console.info(`[MATRIX] wall run on the ${wallRun.wall.label} dir ${wallRun.dir}`);
     return true;
   }
   /** Off the wall: a flying kick back through the ring at the nearest body (or the middle), dropping whoever it passes. */
@@ -693,13 +704,37 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     ctx.setHud({ banner: 'WALL KICK' }); setTimeout(() => ctx.setHud({ banner: '' }), 600);
     console.info(`[MATRIX] wall kick toward ${n ? 'a body' : 'the middle'}`);
   }
+  /** ARENA HAZARDS: whoever stands in a fire pit burns — the hero on his clock, the room on its own. Ticked at 5 Hz. */
+  function tickHazards(ctx: ModeContext, dtRoom: number, dtH: number): void {
+    hazardTickAt += dtRoom;
+    if (hazardTickAt < 0.2) return;
+    const step = hazardTickAt; hazardTickAt = 0;
+    if (!myDown.downed && !wallRun && !wallKick) {
+      const h = hazardAt(player.root.position, arena);
+      if (h) {
+        vitals.hp = Math.max(0, vitals.hp - h.dps * step * (dtH / Math.max(1e-6, dtRoom)));
+        lastHurtAt = clockSec; publishHp(ctx); ctx.feel?.impact?.(0.15);
+        EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 0.6, 0)), 'sparks');
+        if (vitals.hp <= 0) downPlayer(ctx);
+        console.info(`[ARENA] hero in the ${h.label}`);
+      }
+    }
+    for (const e of [...enemies]) {
+      if (e.carried) continue;
+      const h = hazardAt(e.mob.char.root.position, arena);
+      if (!h) continue;
+      e.hp -= h.dps * step; e.hitAt = gameSec;
+      EffectsKit.burst(ctx.scene, e.mob.char.root.position.add(new Vector3(0, 0.6, 0)), 'sparks');
+      if (e.hp <= 0) { focus.gain(FOCUS.koGain); ko(ctx, e); ctx.setHud({ banner: 'BURNED!' }); setTimeout(() => ctx.setHud({ banner: '' }), 500); console.info(`[ARENA] agent burned in the ${h.label}`); }
+    }
+  }
   function tickMatrix(ctx: ModeContext, dt: number): void {
     if (wallRun) {
       wallRun.t += dt;
-      const p = wallRunAt(wallRun, ARENA_RADIUS, wallRun.t);
+      const p = wallRunOnAt(wallRun, wallRun.t);
       player.root.position.set(p.x, p.y, p.z);
       player.root.rotation.y = p.yaw;
-      player.root.rotation.z = -wallRun.dir * 0.42;   // leaning into the wall
+      player.root.rotation.z = wallRunOnSide(wallRun) * 0.42;   // leaning into the wall
       if (p.done) wallKickOff(ctx);
       return;
     }
@@ -873,7 +908,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     e.anim.loop(STANCE, { fadeSec: 0.15 });
     if (push > 0.01) {
       const from = root.position.clone();
-      const to = from.add(new Vector3(dx, 0, dz).scale(push)); clampDisc(to);
+      const kt = knockTo(from, from.add(new Vector3(dx, 0, dz).scale(push)), arena);
+      const to = new Vector3(kt.x, 0, kt.z);
+      if (kt.rebound) { e.stunUntil = Math.max(e.stunUntil, gameSec + sec + ROPES.stunSec); if (ctx) { ctx.setHud({ banner: 'OFF THE ROPES!' }); setTimeout(() => ctx.setHud({ banner: '' }), 500); } SoundKit.play('impact', { pitch: 1.4, volume: 0.4 }); console.info('[ARENA] off the ropes'); }
       const bowled = new Set<Enemy>([e]);
       tween(kind === 'launch' ? 0.3 : 0.18, (k) => {
         if (e.carried) return;
@@ -1373,7 +1410,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         const p = e.mob.char.root.position, dx = p.x - pos.x, dz = p.z - pos.z, d = Math.hypot(dx, dz);
         return d > 0.4 && d < 2.4 && (e.stunUntil > gameSec || e.airUntil > gameSec) && (dx * dir.x + dz * dir.z) / d > 0.8;
       });
-      if (r > ARENA_RADIUS - 1.3 && outward > 0.6 && owned.has('pk_backflip')) {
+      if (insideBy(pos, arena.shape) < 1.3 && outward > 0.6 && owned.has('pk_backflip')) {
         dodgeClip = 'pk_backflip';
         to = from.subtract(dir.scale(2.2)); clampDisc(to);
         slideSec = Math.max(DODGE_SLIDE_SEC, (player.animator.durationOf('pk_backflip') ?? 0.85) * 0.85);
@@ -1439,7 +1476,10 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       console.info(`[KE-STYLE] ${blendName(readBlend())} reach ${style.reachMult.toFixed(2)} startup ${style.startupMult.toFixed(2)} arc ${style.arcBonusDeg >= 0 ? '+' : ''}${style.arcBonusDeg.toFixed(0)} block ${style.blockChipMult.toFixed(2)} chi ${style.chiMult.toFixed(2)} chain ${style.chainMult.toFixed(2)}`);
       // Build the arena FIRST so the M37 spawn guard sees a populated world
       // (>=8 meshes) and the dojoWarm ambient bed has somewhere to live.
-      karateVenue = mountVenue(ctx, 'karate_endless', { keepGameplayCamera: true });
+      arena = readCombatArena('karate');
+      console.info(`[ARENA] karate · ${describeArena(arena)}`);
+      karateVenue = mountVenue(ctx, 'karate_endless', { keepGameplayCamera: true, arena });
+      arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena);
       // L4 — the Shadow Gauntlet is a gauntlet, and a gauntlet has an audience.
       // Ringed OUTSIDE the fighting disc (radius 7.5) and inside the mat (12),
       // so nobody stands anywhere the fight can reach. Instanced silhouettes,
@@ -1556,6 +1596,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         if (e.btn === 'L1' && !carry && flow.takedownReady && takedown(ctx)) { /* FREEFLOW: the takedown is L1's first meaning when it is ready */ }
         else if (e.btn === 'L1' && wallRun) wallKickOff(ctx);                                      // MATRIX: the kick off the wall
         else if (e.btn === 'L1' && focus.active && !carry && !striking && !wallKick && !myDown.downed && tryWallRun(ctx)) { /* MATRIX: up onto the wall */ }
+        else if (e.btn === 'L1' && focus.active && process.env.NODE_ENV === 'development' && (carry || striking || wallKick || myDown.downed)) { console.info(`[MATRIX] L1 in Focus went elsewhere: carry ${!!carry} striking ${striking} kick ${!!wallKick} down ${myDown.downed}`); if (carry) throwCarried(ctx); else if (striking && !strikeHitDone) { grabQueuedAt = gameSec; queue.clear(); } }
         else if (e.btn === 'L1' && carry) throwCarried(ctx);
         else if (e.btn === 'L1' && striking && !strikeHitDone && !myDown.downed) { grabQueuedAt = gameSec; queue.clear(); }
         else if (e.btn === 'L1' && !myDown.downed && !tryGrab(ctx) && !striking && meAir.jump()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });
@@ -1667,6 +1708,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       meAir.update(dtHero);
       player.root.position.y = meAir.height;
       tickMatrix(ctx, dtHero);   // MATRIX: the wall run and the kick own the root while they last
+      arenaHandle?.tick(dtReal);
+      if (arena.hazards.length) tickHazards(ctx, dt, dtHero);
       if (process.env.NODE_ENV === 'development' && dtReal > 0) {   // MATRIX telemetry: the room's and the hero's real-time speeds
         let sum = 0, n = 0;
         for (const e of enemies) { const r = e.mob.char.root.position; const l = enemyLastPos.get(e); if (l) { sum += Math.hypot(r.x - l.x, r.z - l.z) / dtReal; n++; enemyLastPos.set(e, l.copyFrom(r)); } else enemyLastPos.set(e, r.clone()); }
@@ -1758,7 +1801,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       pickups = []; tweens = []; shockRings = []; carry = null; queue.clear();
       mePosture?.dispose(); mePosture = null; partnerPosture?.dispose(); partnerPosture = null;
       youRing?.material?.dispose(); youRing?.dispose(); youRing = null; ring?.dispose(); ring = null;
-      crowd?.dispose(); crowd = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient();
+      crowd?.dispose(); crowd = null; arenaHandle?.dispose(); arenaHandle = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient();
     },
   };
 })();

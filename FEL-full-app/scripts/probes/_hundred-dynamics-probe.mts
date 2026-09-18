@@ -17,7 +17,7 @@ const p = await b.newPage({ viewport: { width: 1100, height: 700 } });
 await p.addInitScript({ content: 'window.__name = window.__name || function (f) { return f; };' });
 const errs: string[] = []; const logs: string[] = [];
 p.on('pageerror', (e) => errs.push(String(e).slice(0, 160)));
-p.on('console', (m) => { const t = m.text(); if (/MISSING CLIP/.test(t) || m.type() === 'error' && !/401|FEL-FRAME/.test(t)) errs.push(t.slice(0, 160)); if (/\[KE-|\[KVS-|\[MC-|\[MATRIX\]|\[SKATE-/.test(t)) logs.push(t.slice(0, 160)); });
+p.on('console', (m) => { const t = m.text(); if (/MISSING CLIP/.test(t) || m.type() === 'error' && !/401|FEL-FRAME/.test(t)) errs.push(t.slice(0, 160)); if (/\[KE-|\[KVS-|\[MC-|\[MATRIX\]|\[SKATE-|\[ARENA\]|\[NEXUS\]/.test(t)) logs.push(t.slice(0, 160)); });
 const MODE = process.env.MODE ?? 'karate';   // STORM: the same probe drives karate (Endless), karate_vs and mixedcombat
 await p.goto(`${BASE}/dev/mode/${MODE}${process.env.QS ?? ''}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
 await p.waitForSelector('canvas', { timeout: 240000 });
@@ -278,3 +278,4 @@ if (tel.length) {
 }
 { const bl: string[] = []; let lb = ''; for (const r of rows as (Row & { ban?: string })[]) { if (r.ban && r.ban !== lb) bl.push(`${f(r.t)} ${r.ban}`); lb = r.ban ?? ''; } console.log('banners:', bl.join(' · ')); }
 if (logs.length) console.log('logs:', logs.slice(-12).join('\n      '));
+const arenaLogs = logs.filter((l) => /\[MATRIX\]|\[ARENA\]/.test(l)); if (arenaLogs.length) console.log('matrix/arena:', arenaLogs.join('\n      '));

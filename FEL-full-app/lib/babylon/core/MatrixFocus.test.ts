@@ -1,6 +1,6 @@
 // Does Focus behave like a meter you spend, and does the wall take you where a wall should?
 import { describe, it, expect } from 'vitest';
-import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailable, startWallRun, wallRunAt, startWallKick, wallKickAt, kickHits } from './MatrixFocus';
+import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailable, startWallRun, wallRunAt, startWallKick, wallKickAt, kickHits, wallRunAvailableOn, startWallRunOn, wallRunOnAt, wallRunOnSide } from './MatrixFocus';
 
 describe('FocusMeter — bullet time you hold', () => {
   it('slows the room, not the hero, while held; drains; refuses to start on an empty meter', () => {
@@ -61,5 +61,31 @@ describe('the wall run on a round arena', () => {
   it('with no target the kick goes back through the middle of the ring', () => {
     const k = startWallKick({ x: 5, z: 5 }, null);
     expect(k.dx).toBeLessThan(0); expect(k.dz).toBeLessThan(0);
+  });
+});
+
+describe('the wall run on a wall segment', () => {
+  const NORTH = { a: { x: -6, z: 6 }, b: { x: 6, z: 6 }, nx: 0, nz: -1, height: 3 };   // a wall along x at z 6, facing −z
+  const EAST = { a: { x: 6, z: 6 }, b: { x: 6, z: -6 }, nx: -1, nz: 0, height: 3 };
+  it('is available only near a wall and only running INTO it, and picks the nearest', () => {
+    expect(wallRunAvailableOn({ x: 0, z: 5 }, { x: 0.3, z: 1 }, [NORTH, EAST])?.wall).toBe(NORTH);
+    expect(wallRunAvailableOn({ x: 0, z: 5 }, { x: 0, z: -1 }, [NORTH, EAST])).toBeNull();    // running away
+    expect(wallRunAvailableOn({ x: 0, z: 2 }, { x: 0, z: 1 }, [NORTH, EAST])).toBeNull();     // too far
+    expect(wallRunAvailableOn({ x: 0, z: 5 }, { x: 1, z: 0 }, [NORTH, EAST])).toBeNull();     // along it
+    expect(wallRunAvailableOn({ x: 5.2, z: 0 }, { x: 1, z: 0.2 }, [NORTH, EAST])?.wall).toBe(EAST);
+  });
+  it('rides along the wall the way the run leaned, climbs and comes down, and stops at the wall\'s end', () => {
+    const hit = wallRunAvailableOn({ x: 0, z: 5 }, { x: 0.6, z: 1 }, [NORTH])!;
+    const r = startWallRunOn(hit, { x: 0.6, z: 1 });
+    expect(r.dir).toBe(1);
+    const p0 = wallRunOnAt(r, 0), pm = wallRunOnAt(r, WALL_RUN.sec / 2), p1 = wallRunOnAt(r, WALL_RUN.sec);
+    expect(p0.z).toBeCloseTo(6 - WALL_RUN.inset, 6);         // on the wall's face, inside
+    expect(pm.y).toBeGreaterThan(0.5);
+    expect(p1.y).toBeLessThan(0.05);
+    expect(p1.x).toBeGreaterThan(p0.x + 3);                  // travelled +x
+    expect(p1.done).toBe(true);
+    expect(wallRunOnSide(r)).toBe(-1);                       // travelling +x with the wall at +z: on the LEFT
+    const late = startWallRunOn({ wall: NORTH, s: 11 }, { x: 1, z: 0 });
+    expect(wallRunOnAt(late, 0.4).done).toBe(true);          // ran out of wall
   });
 });

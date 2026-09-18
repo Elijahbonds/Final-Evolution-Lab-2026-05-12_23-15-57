@@ -25,7 +25,9 @@
 // fight-preset framing, SoundKit/EffectsKit — all standard since M42.
 
 import { EvadeMoves } from '../core/EvadeMoves';
-import { FOCUS, FocusMeter } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18): bullet time held on the right trigger
+import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRunOnAt, wallRunOnSide, startWallKick, wallKickAt, kickHits, type WallRunOn, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18): bullet time held on the right trigger
+import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeArena, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
+import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { dodgeReward, tickCounter, counterMult } from '../core/DodgeRead';
 import { nerve, standingOf } from '../core/Nerve';
 import { Vector3 } from '@babylonjs/core';
@@ -87,7 +89,6 @@ const MOVE_SPEED = 3.4;
 //
 // 4.5 gives a 9m square to fight in — about the size of a Soul Calibur ring —
 // and keeps a clear 4.5m of room behind either fighter for the camera.
-const ARENA_HALF = 4.5;
 const SLOWMO_SEC = 0.5;
 const SLOWMO_SCALE = 0.3;
 // ANIM-READABILITY (combat, 2026-09-07): the CombatAnimTree is the ONE owner of each fighter's clips. The mode never
@@ -133,6 +134,86 @@ export const KarateVSMode: ModeDefinition = (() => {
   const focus = new FocusMeter();
   let focusHeld = false, focusHud = -1, focusHudOn = false;
   const foeTimers: { left: number; fn: () => void }[] = [];
+  // THE ARENA (2026-09-18): picked on the splash (combat/arenas.ts), re-read at load (the factory runs at SSR). Its walls
+  // take the wall run inside Focus; its edge stops, bounces (ropes) or — never here — drops. `ARENA_HALF` is history.
+  let arena: CombatArena = arenasFor('karate_vs')[0];
+  let arenaHandle: ArenaHandle | null = null;
+  let wallRun: WallRunOn<ArenaWall> | null = null, wallKick: WallKickState | null = null, wallKickY0 = 0, hazardTickAt = 0;
+  const matrixStats = { wallRuns: 0, wallKicks: 0, kickHits: 0 };
+  /** L1 inside Focus, running INTO a wall: up onto it and along it. */
+  function tryWallRun(ctx: ModeContext): boolean {
+    const pos = player.root.position, v = lastMyVel ?? Vector3.Zero();
+    const hd = v.length() >= 0.3 ? { x: v.x, z: v.z } : { x: -Math.sin(player.root.rotation.y), z: -Math.cos(player.root.rotation.y) };   // stopped on the wall with the rival in front: the wall is BEHIND (lock-on faces the rival)
+    const hit = wallRunAvailableOn({ x: pos.x, z: pos.z }, hd, arena.walls);
+    if (!hit) { if (process.env.NODE_ENV === 'development') console.info(`[MATRIX] wall run refused at (${pos.x.toFixed(2)}, ${pos.z.toFixed(2)}) heading (${hd.x.toFixed(2)}, ${hd.z.toFixed(2)}) vel ${v.length().toFixed(2)}`); return false; }
+    wallRun = startWallRunOn(hit, hd); matrixStats.wallRuns++;
+    endStrike(true); meState.releaseBlock();
+    SoundKit.play('whoosh', { pitch: 1.1, volume: 0.45 });
+    ctx.setHud({ banner: 'WALL RUN' }); setTimeout(() => ctx.setHud({ banner: '' }), 500);
+    ctx.momentum.report({ kind: 'near_miss', weight: 10 });
+    console.info(`[MATRIX] vs wall run on the ${wallRun.wall.label} dir ${wallRun.dir}`);
+    return true;
+  }
+  /** Off the wall: a flying kick at the rival. */
+  function wallKickOff(ctx: ModeContext): void {
+    if (!wallRun) return;
+    const pos = player.root.position;
+    wallKick = startWallKick({ x: pos.x, z: pos.z }, { x: rival.root.position.x, z: rival.root.position.z });
+    wallKickY0 = pos.y; wallRun = null; player.root.rotation.z = 0;
+    player.root.rotation.y = Math.atan2(wallKick.dx, wallKick.dz);
+    matrixStats.wallKicks++;
+    meAnim.strike = { weight: 'heavy', clip: myAttacks.kick.clip, until: now() + 900 };   // the tree plays the kick; its settle ends the swing
+    striking = true;
+    SoundKit.play('whoosh', { pitch: 0.8, volume: 0.6 });
+    ctx.setHud({ banner: 'WALL KICK' }); setTimeout(() => ctx.setHud({ banner: '' }), 600);
+    console.info('[MATRIX] vs wall kick');
+  }
+  /** The wall run and the kick own the body while they last. Returns true when they do. */
+  function tickMatrix(ctx: ModeContext, dt: number): boolean {
+    if (wallRun) {
+      wallRun.t += dt;
+      const p = wallRunOnAt(wallRun, wallRun.t);
+      player.root.position.set(p.x, p.y, p.z); player.root.rotation.y = p.yaw; player.root.rotation.z = wallRunOnSide(wallRun) * 0.42;
+      if (p.done) wallKickOff(ctx);
+      return true;
+    }
+    if (wallKick) {
+      const prev = { x: player.root.position.x, z: player.root.position.z };
+      wallKick.t += dt;
+      const p = wallKickAt(wallKick, wallKick.t, wallKickY0);
+      player.root.position.set(p.x, p.y, p.z);
+      const rp = rival.root.position;
+      if (kickHits(prev, { x: p.x, z: p.z }, [{ x: rp.x, z: rp.z }], WALL_RUN.kickHitM, wallKick.hit).length) {
+        wallKick.hit.add(0); matrixStats.kickHits++;
+        foeState.hp = Math.max(0, foeState.hp - WALL_RUN.kickDamage); focus.gain(FOCUS.hitGain);
+        ctx.juice.hitStop(70); ctx.feel?.impact?.(0.6); ctx.juice.shake(0.08, 120);
+        EffectsKit.burst(ctx.scene, rp.add(new Vector3(0, 1.1, 0)), 'sparks');
+        beatDown(false, WALL_RUN.kickStunSec + GET_UP_SEC);
+        knockback(ctx, rival, player.root.position, 1.8);
+        ctx.setHud({ foeHp: foeState.hp, banner: 'WALL KICK!' }); setTimeout(() => ctx.setHud({ banner: '' }), 700);
+        console.info('[MATRIX] vs wall kick hit');
+        if (foeState.hp <= 0) endRound(ctx, true);
+      }
+      if (p.done) { wallKick = null; player.root.position.y = 0; arenaClamp(player.root.position, arena); }
+      return true;
+    }
+    return false;
+  }
+  /** ARENA HAZARDS: whoever stands in a fire pit burns. Ticked at 5 Hz on the room clock. */
+  function tickHazards(ctx: ModeContext, dtRoom: number): void {
+    hazardTickAt += dtRoom; if (hazardTickAt < 0.2) return;
+    const step = hazardTickAt; hazardTickAt = 0;
+    for (const mine of [true, false]) {
+      const c = mine ? player : rival, st = mine ? meState : foeState;
+      if (mine && (wallRun || wallKick)) continue;
+      const h = hazardAt(c.root.position, arena); if (!h) continue;
+      st.hp = Math.max(0, st.hp - h.dps * step);
+      EffectsKit.burst(ctx.scene, c.root.position.add(new Vector3(0, 0.6, 0)), 'sparks');
+      ctx.setHud(mine ? { hp: st.hp } : { foeHp: st.hp });
+      console.info(`[ARENA] ${mine ? 'you' : 'rival'} in the ${h.label}`);
+      if (st.hp <= 0) { ctx.setHud({ banner: mine ? 'BURNED!' : 'RIVAL BURNED!' }); endRound(ctx, !mine); }
+    }
+  }
   function onFocusStart(ctx: ModeContext): void {
     ctx.juice.tint('rgba(16, 70, 34, 0.75)'); ctx.camDirector.pulse(0.45, 0.35);
     SoundKit.play('powerUp', { pitch: 0.55, volume: 0.5 });
@@ -228,8 +309,9 @@ export const KarateVSMode: ModeDefinition = (() => {
     if (dir.lengthSquared() < 1e-4) return;
     dir.normalize();
     const from = char.root.position.clone();
-    const to = from.add(dir.scale(meters));
-    modeVenue?.constrain(to); to.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, to.x)); to.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, to.z));   // phase 3: the floor (navmesh) AND the arena box — the alcoves past ±4.5 box the fight camera in
+    const kt = knockTo(from, from.add(dir.scale(meters)), arena);   // COMBAT ARENAS: the edge stops it, or the ropes throw it back
+    const to = new Vector3(kt.x, from.y, kt.z);
+    if (kt.rebound) { const mine = char === player; beatDown(mine, ROPES.stunSec + GET_UP_SEC); SoundKit.play('impact', { pitch: 1.4, volume: 0.4 }); ctx.setHud({ banner: mine ? 'YOU HIT THE ROPES!' : 'OFF THE ROPES!' }); setTimeout(() => ctx.setHud({ banner: '' }), 500); console.info('[ARENA] vs off the ropes'); }
     const ms = Math.max(80, (Vector3.Distance(from, to) / KNOCKBACK_SPEED) * 1000);
     const t0 = now();
     const obs = ctx.scene.onBeforeRenderObservable.add(() => {
@@ -518,11 +600,15 @@ export const KarateVSMode: ModeDefinition = (() => {
 
     async load(ctx: ModeContext) {
       // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
-      modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true });
+      arena = readCombatArena('karate_vs');
+      console.info(`[ARENA] karate_vs · ${describeArena(arena)}`);
+      modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true, arena });
       if (!modeVenue) VenueKit.buildDojo(ctx.scene);
+      arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena);
+      const crowdR = (arena.shape.kind === 'disc' ? arena.shape.radius : Math.max(arena.shape.halfX, arena.shape.halfZ)) + 2.6;
       crowd = new Onlookers(ctx.scene, Array.from({ length: 14 }, (_, i) => {
         const a = (i / 14) * Math.PI * 2 + 0.22;
-        return new Vector3(Math.sin(a) * 8.8, 0, Math.cos(a) * 8.8);   // off the 14 m mat, on the courtyard gravel
+        return new Vector3(Math.sin(a) * crowdR, 0, Math.cos(a) * crowdR);   // outside the arena's walls
       }), '#3B2A52');
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 2.2), yawRad: Math.PI, startClip: IDLE_CLIP,   // BIOMECH-WAVE2 G1/G3: they SPAWN facing each other — the round start used to be a 180° yaw snap on both bodies
@@ -597,7 +683,9 @@ export const KarateVSMode: ModeDefinition = (() => {
         // the new verbs go on the shoulders rather than overloading a strike -- the same reasoning the dunk
         // contest's CALL went to L1 for. A neutral stick rolls BACKWARDS: the panic input should be the
         // defensive one.
-        if (e.btn === 'L1' && meState.controllable) {
+        if (e.btn === 'L1' && wallRun) wallKickOff(ctx);   // MATRIX: the kick off the wall
+        else if (e.btn === 'L1' && meState.controllable && focus.active && !wallKick && phase === 'fighting' && tryWallRun(ctx)) { /* MATRIX: up onto the wall */ }
+        else if (e.btn === 'L1' && meState.controllable && !wallKick) {
           const dir = Math.hypot(stickX, stickY) > 0.2
             ? ctx.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx.camDirector.rightFlat().scale(stickX))
             : ctx.camDirector.forwardFlat().scale(1);   // neutral: away from the rival the camera is looking at
@@ -672,20 +760,19 @@ export const KarateVSMode: ModeDefinition = (() => {
       if (meDash) {   // STORM: the dash owns the body — a burst, or the chakra dash that homes on the rival and stops a reach short
         if (meDash.homing) { const toFoe = rival.root.position.subtract(player.root.position); toFoe.y = 0; if (toFoe.length() <= DASH.homingStopM) meDash.left = 0; else meDash.dir = toFoe.normalize(); }
         player.root.position.addInPlace(meDash.dir.scale((meDash.homing ? DASH.homingSpeed : DASH.speed) * sdtHero));
-        modeVenue?.constrain(player.root.position); player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z));
+        arenaClamp(player.root.position, arena);
         meDash.left -= sdtHero; if (meDash.left <= 0) meDash = null;
         mySpeed01 = 1;
       } else if (rollVel) {
         player.root.position.addInPlace(rollVel.scale(sdtHero));
         modeVenue?.constrain(player.root.position);
-        player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x));
-        player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z));
+        arenaClamp(player.root.position, arena);
         mySpeed01 = 0;
       } else if (meState.controllable && !striking && !meState.blockHeld) {
         const vel = moveVel;
         const before = player.root.position.clone();
         player.root.position.addInPlace(vel.scale(sdtHero));
-        modeVenue?.constrain(player.root.position); player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z));
+        arenaClamp(player.root.position, arena);
         if (sdtHero > 0 && Vector3.Distance(before, player.root.position) / sdtHero < 0.3) mySpeed01 = 0;   // pinned on the boundary: no stepping on the spot
       }
 
@@ -698,7 +785,8 @@ export const KarateVSMode: ModeDefinition = (() => {
       }
       if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - sdtRoom); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }
       // rival AI
-      player.root.position.y = meEvade.height;   // the arc is EvadeMoves'; nothing here integrates gravity
+      if (!tickMatrix(ctx, sdtHero)) player.root.position.y = meEvade.height;   // the arc is EvadeMoves'; nothing here integrates gravity — unless the wall run / kick owns the body (MATRIX)
+      arenaHandle?.tick(dt); if (arena.hazards.length) tickHazards(ctx, sdtRoom);
       const action = brain.decide(sdtRoom, rival.root.position, player.root.position, foeState, striking);
       if (action.block && !foeState.blockHeld) foeState.pressBlock(now());
       if (!action.block && foeState.blockHeld) foeState.releaseBlock();
@@ -710,8 +798,7 @@ export const KarateVSMode: ModeDefinition = (() => {
         const vel = foeVel;
         const before = rival.root.position.clone();
         rival.root.position.addInPlace(vel.scale(sdtRoom));
-        rival.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.x));
-        rival.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.z));
+        arenaClamp(rival.root.position, arena);
         foeSpeed01 = sdtRoom > 0 && Vector3.Distance(before, rival.root.position) / sdtRoom < 0.3 ? 0 : vel.length() / MOVE_SPEED;   // the step only while the body moves
       }
 
@@ -726,7 +813,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     dispose() {
       mePosture?.dispose(); mePosture = null; foePosture?.dispose(); foePosture = null;
       crowd?.dispose(); crowd = null;
-      modeVenue?.dispose?.(); modeVenue = null;
+      modeVenue?.dispose?.(); modeVenue = null; arenaHandle?.dispose(); arenaHandle = null; wallRun = null; wallKick = null;
       ring?.dispose(); ring = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
     },

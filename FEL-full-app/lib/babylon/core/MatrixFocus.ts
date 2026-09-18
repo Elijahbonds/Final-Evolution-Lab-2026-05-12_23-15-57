@@ -153,3 +153,69 @@ export function kickHits(a: { x: number; z: number }, b: { x: number; z: number 
   }
   return out;
 }
+
+// ── THE WALL RUN, on a wall (2026-09-18) ────────────────────────────────────────────────────────────────────────────
+// The arenas are data now (combat/arenas.ts): a room is a set of wall SEGMENTS with inward normals — a stone ring, a
+// courtyard's four walls, a cage, a billboard at the end of a rooftop. The disc solver above stays for the tests and
+// for any caller still on a bare radius; these take any segment. Same numbers (WALL_RUN), same arc, same kick after.
+
+export interface WallSeg { a: { x: number; z: number }; b: { x: number; z: number }; nx: number; nz: number; height: number }
+export interface WallRunOn<W extends WallSeg = WallSeg> {
+  wall: W;
+  /** Where along the wall (metres from `a`) the run started, its length, and the direction of travel (+1 = a→b). */
+  s0: number; len: number; dir: 1 | -1; t: number;
+}
+
+/** The wall a jump here can take: the nearest segment inside `near` that the body is running INTO. */
+export function wallRunAvailableOn<W extends WallSeg>(pos: { x: number; z: number }, heading: { x: number; z: number }, walls: readonly W[]): { wall: W; s: number } | null {
+  const h = Math.hypot(heading.x, heading.z);
+  if (h < 0.3) return null;
+  let best: { wall: W; s: number; d: number } | null = null;
+  for (const w of walls) {
+    const abx = w.b.x - w.a.x, abz = w.b.z - w.a.z, len = Math.hypot(abx, abz);
+    if (len < 1.2) continue;
+    const s = ((pos.x - w.a.x) * abx + (pos.z - w.a.z) * abz) / len;
+    if (s < -0.25 || s > len + 0.25) continue;   // a body at a corner belongs to both walls; the run starts inside the wall (startWallRunOn)
+    const cx = w.a.x + (abx / len) * s, cz = w.a.z + (abz / len) * s;
+    const d = (pos.x - cx) * w.nx + (pos.z - cz) * w.nz;   // distance inside the wall's face
+    if (d < -0.6 || d > WALL_RUN.near) continue;   // a little past the face is still the face (a chord's sag, a clamp's inset)
+    const into = -(heading.x * w.nx + heading.z * w.nz) / h;   // running against the inward normal = into the wall
+    if (into < WALL_RUN.outwardCos) continue;
+    if (!best || d < best.d) best = { wall: w, s, d };
+  }
+  return best ? { wall: best.wall, s: best.s } : null;
+}
+
+/** Begin a run on `wall` at `s` metres along it, travelling the way the heading leans along the wall. */
+export function startWallRunOn<W extends WallSeg>(hit: { wall: W; s: number }, heading: { x: number; z: number }): WallRunOn<W> {
+  const w = hit.wall;
+  const abx = w.b.x - w.a.x, abz = w.b.z - w.a.z, len = Math.hypot(abx, abz) || 1;
+  const along = (heading.x * abx + heading.z * abz) / len;
+  return { wall: w, s0: Math.max(0.35, Math.min(len - 0.35, hit.s)), len, dir: along >= 0 ? 1 : -1, t: 0 };
+}
+
+/** Where the body is `t` seconds into a run on a wall; the run ends at the wall's end or at WALL_RUN.sec. */
+export function wallRunOnAt(r: WallRunOn, t: number): { x: number; z: number; y: number; yaw: number; done: boolean } {
+  const w = r.wall;
+  const tt = Math.min(WALL_RUN.sec, Math.max(0, t));
+  const abx = w.b.x - w.a.x, abz = w.b.z - w.a.z, len = r.len || 1;
+  const tx = abx / len, tz = abz / len;
+  const sRaw = r.s0 + r.dir * WALL_RUN.speed * tt;
+  const s = Math.max(0.3, Math.min(len - 0.3, sRaw));
+  const atEnd = sRaw !== s;
+  const u = tt / WALL_RUN.sec;
+  const y = Math.min(w.height - 0.2, WALL_RUN.height * Math.sin(u * Math.PI) * (0.55 + 0.45 * (1 - u)));
+  return {
+    x: w.a.x + tx * s + w.nx * WALL_RUN.inset, z: w.a.z + tz * s + w.nz * WALL_RUN.inset, y,
+    yaw: Math.atan2(tx * r.dir, tz * r.dir), done: t >= WALL_RUN.sec || atEnd,
+  };
+}
+
+/** Which way the wall is from a runner on it: −1 when the wall is on the body's LEFT, +1 on its right (for the lean). */
+export function wallRunOnSide(r: WallRunOn): -1 | 1 {
+  const w = r.wall;
+  const abx = w.b.x - w.a.x, abz = w.b.z - w.a.z;
+  // travel × inward-normal: the wall is on the left when the inward normal points to the runner's left
+  const cross = (abx * r.dir) * w.nz - (abz * r.dir) * w.nx;
+  return cross > 0 ? 1 : -1;
+}

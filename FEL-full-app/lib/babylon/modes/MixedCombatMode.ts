@@ -21,7 +21,10 @@
 // groundLock (released on a ring-out fall), fight-cam framing.
 
 import { EvadeMoves } from '../core/EvadeMoves';
-import { FOCUS, FocusMeter } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18): bullet time held on the right trigger
+import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRunOnAt, wallRunOnSide, startWallKick, wallKickAt, kickHits, type WallRunOn, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18): bullet time held on the right trigger
+import { readCombatArena, arenasFor, arenaClamp, knockTo, offEdge, insideBy, hazardAt, describeArena, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
+import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
+import { mountVenue } from '../core/NexusVenue';
 import { dodgeReward, tickCounter, counterMult } from '../core/DodgeRead';
 import { nerve, standingOf } from '../core/Nerve';
 import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
@@ -69,7 +72,6 @@ type Loadout = 'fists' | 'staff';
 const ROUNDS_TO_WIN = 2;
 /** What the rival fights at in a level match. Nerve moves it from here as the rounds go. */
 const BASE_RIVAL_DIFFICULTY = 0.6;
-const RING_RADIUS = 6.2;
 const MOVE_SPEED = 3.3;
 const SLOWMO_SEC = 0.5;
 const SLOWMO_SCALE = 0.3;
@@ -119,6 +121,82 @@ export const MixedCombatMode: ModeDefinition = (() => {
   const focus = new FocusMeter();
   let focusHeld = false, focusHud = -1, focusHudOn = false;
   const foeTimers: { left: number; fn: () => void }[] = [];
+  // THE ARENA (2026-09-18): picked on the splash (combat/arenas.ts), re-read at load. The Pit is the octagon with the drop
+  // this mode was built around; the others have walls to run inside Focus, ropes that throw a shoved body back, or fire.
+  let arena: CombatArena = arenasFor('mixedcombat')[0];
+  let arenaHandle: ArenaHandle | null = null;
+  let wallRun: WallRunOn<ArenaWall> | null = null, wallKick: WallKickState | null = null, wallKickY0 = 0, hazardTickAt = 0;
+  const matrixStats = { wallRuns: 0, wallKicks: 0, kickHits: 0 };
+  function tryWallRun(ctx: ModeContext): boolean {
+    const pos = player.root.position, v = lastMyVel ?? Vector3.Zero();
+    const hd = v.length() >= 0.3 ? { x: v.x, z: v.z } : { x: -Math.sin(player.root.rotation.y), z: -Math.cos(player.root.rotation.y) };   // stopped on the wall with the rival in front: the wall is BEHIND (lock-on faces the rival)
+    const hit = wallRunAvailableOn({ x: pos.x, z: pos.z }, hd, arena.walls);
+    if (!hit) { if (process.env.NODE_ENV === 'development') console.info(`[MATRIX] wall run refused at (${pos.x.toFixed(2)}, ${pos.z.toFixed(2)}) heading (${hd.x.toFixed(2)}, ${hd.z.toFixed(2)}) vel ${v.length().toFixed(2)}`); return false; }
+    wallRun = startWallRunOn(hit, hd); matrixStats.wallRuns++;
+    endStrike(true); meState.releaseBlock();
+    SoundKit.play('whoosh', { pitch: 1.1, volume: 0.45 });
+    ctx.setHud({ banner: 'WALL RUN' }); setTimeout(() => ctx.setHud({ banner: '' }), 500);
+    ctx.momentum.report({ kind: 'near_miss', weight: 10 });
+    console.info(`[MATRIX] mixed wall run on the ${wallRun.wall.label} dir ${wallRun.dir}`);
+    return true;
+  }
+  function wallKickOff(ctx: ModeContext): void {
+    if (!wallRun) return;
+    const pos = player.root.position;
+    wallKick = startWallKick({ x: pos.x, z: pos.z }, { x: rival.root.position.x, z: rival.root.position.z });
+    wallKickY0 = pos.y; wallRun = null; player.root.rotation.z = 0;
+    player.root.rotation.y = Math.atan2(wallKick.dx, wallKick.dz);
+    matrixStats.wallKicks++;
+    meAnim.strike = { weight: 'heavy', clip: myAttacks().kick.clip, until: now() + 900 }; striking = true;
+    SoundKit.play('whoosh', { pitch: 0.8, volume: 0.6 });
+    ctx.setHud({ banner: 'WALL KICK' }); setTimeout(() => ctx.setHud({ banner: '' }), 600);
+    console.info('[MATRIX] mixed wall kick');
+  }
+  /** The wall run and the kick own the body while they last. Returns true when they do. */
+  function tickMatrix(ctx: ModeContext, dt: number): boolean {
+    if (wallRun) {
+      wallRun.t += dt;
+      const p = wallRunOnAt(wallRun, wallRun.t);
+      player.root.position.set(p.x, p.y, p.z); player.root.rotation.y = p.yaw; player.root.rotation.z = wallRunOnSide(wallRun) * 0.42;
+      if (p.done) wallKickOff(ctx);
+      return true;
+    }
+    if (wallKick) {
+      const prev = { x: player.root.position.x, z: player.root.position.z };
+      wallKick.t += dt;
+      const p = wallKickAt(wallKick, wallKick.t, wallKickY0);
+      player.root.position.set(p.x, p.y, p.z);
+      const rp = rival.root.position;
+      if (kickHits(prev, { x: p.x, z: p.z }, [{ x: rp.x, z: rp.z }], WALL_RUN.kickHitM, wallKick.hit).length) {
+        wallKick.hit.add(0); matrixStats.kickHits++;
+        foeState.hp = Math.max(0, foeState.hp - WALL_RUN.kickDamage); focus.gain(FOCUS.hitGain);
+        ctx.juice.hitStop(70); ctx.feel?.impact?.(0.6); ctx.juice.shake(0.08, 120);
+        EffectsKit.burst(ctx.scene, rp.add(new Vector3(0, 1.1, 0)), 'sparks');
+        beatDown(false, WALL_RUN.kickStunSec + GET_UP_SEC);
+        ctx.setHud({ foeHp: foeState.hp, banner: 'WALL KICK!' }); setTimeout(() => ctx.setHud({ banner: '' }), 700);
+        console.info('[MATRIX] mixed wall kick hit');
+        knockback(ctx, rival, player.root.position, 2.4, () => { if (offRing(rival.root.position)) { ringOut(ctx, false); return; } if (foeState.hp <= 0) endRound(ctx, true); });
+      }
+      if (p.done) { wallKick = null; player.root.position.y = 0; arenaClamp(player.root.position, arena); if (offRing(player.root.position)) ringOut(ctx, true); }
+      return true;
+    }
+    return false;
+  }
+  /** ARENA HAZARDS: whoever stands in a fire pit burns. Ticked at 5 Hz on the room clock. */
+  function tickHazards(ctx: ModeContext, dtRoom: number): void {
+    hazardTickAt += dtRoom; if (hazardTickAt < 0.2) return;
+    const step = hazardTickAt; hazardTickAt = 0;
+    for (const mine of [true, false]) {
+      const c = mine ? player : rival, st = mine ? meState : foeState;
+      if (mine && (wallRun || wallKick)) continue;
+      const h = hazardAt(c.root.position, arena); if (!h) continue;
+      st.hp = Math.max(0, st.hp - h.dps * step);
+      EffectsKit.burst(ctx.scene, c.root.position.add(new Vector3(0, 0.6, 0)), 'sparks');
+      ctx.setHud(mine ? { hp: st.hp } : { foeHp: st.hp });
+      console.info(`[ARENA] ${mine ? 'you' : 'rival'} in the ${h.label}`);
+      if (st.hp <= 0) { ctx.setHud({ banner: mine ? 'BURNED!' : 'RIVAL BURNED!' }); endRound(ctx, !mine); }
+    }
+  }
   function onFocusStart(ctx: ModeContext): void {
     ctx.juice.tint('rgba(16, 70, 34, 0.75)'); ctx.camDirector.pulse(0.45, 0.35);
     SoundKit.play('powerUp', { pitch: 0.55, volume: 0.5 });
@@ -191,55 +269,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
   function now(): number { return performance.now(); }
 
-  function buildArena(ctx: ModeContext): void {
-    const scene = ctx.scene;
-    // the octagon ring — top face exactly at y=0 so groundLock just works
-    const ring = MeshBuilder.CreateCylinder('mc_ring', {
-      diameter: RING_RADIUS * 2 + 0.6, height: 1.4, tessellation: 8,
-    }, scene);
-    ring.position.y = -0.7;
-    const ringMat = new StandardMaterial('mc_ring_m', scene);
-    ringMat.diffuseColor = Color3.FromHexString('#8a6d4a');
-    ringMat.specularColor = Color3.Black();
-    ring.material = ringMat;
-    // edge marker — a thin bright rim so the danger zone reads at a glance
-    const rim = MeshBuilder.CreateTorus('mc_rim', { diameter: RING_RADIUS * 2, thickness: 0.09, tessellation: 8 }, scene);
-    rim.position.y = 0.02;
-    const rimMat = new StandardMaterial('mc_rim_m', scene);
-    rimMat.emissiveColor = Color3.FromHexString('#ffb347');
-    rimMat.disableLighting = true;
-    rim.material = rimMat;
-    // the drop — a dark floor far below sells the fall
-    const pit = MeshBuilder.CreateGround('mc_pit', { width: 60, height: 60 }, scene);
-    pit.position.y = -6;
-    const pitMat = new StandardMaterial('mc_pit_m', scene);
-    pitMat.diffuseColor = Color3.FromHexString('#101418');
-    pitMat.specularColor = Color3.Black();
-    pit.material = pitMat;
-    // corner braziers (emissive spheres, off the ring, never between cam and fighters)
-    for (const a of [0.5, 1.5, 2.5, 3.5]) {
-      const x = Math.cos(a * Math.PI / 2) * (RING_RADIUS + 2.5);
-      const z = Math.sin(a * Math.PI / 2) * (RING_RADIUS + 2.5);
-      const post = MeshBuilder.CreateCylinder(`mc_post_${a}`, { height: 2.4, diameter: 0.18 }, scene);
-      post.position.set(x, -0.7, z);
-      post.material = ringMat;
-      const flame = MeshBuilder.CreateSphere(`mc_flame_${a}`, { diameter: 0.45 }, scene);
-      flame.position.set(x, 0.75, z);
-      const fm = new StandardMaterial(`mc_flame_m_${a}`, scene);
-      fm.emissiveColor = Color3.FromHexString('#ff7b3d');
-      fm.disableLighting = true;
-      flame.material = fm;
-    }
-    // the pit-fighter's floor: a broad dark apron around the platform for the
-    // crowd to stand on (the platform occludes its center; the visible ring
-    // reads as the room)
-    const floor = MeshBuilder.CreateCylinder('mc_floor', { diameter: 26, height: 0.2, tessellation: 24 }, scene);
-    floor.position.y = -0.12;
-    const floorMat = new StandardMaterial('mc_floor_m', scene);
-    floorMat.diffuseColor = Color3.FromHexString('#1a1d24');
-    floorMat.specularColor = Color3.Black();
-    floor.material = floorMat;
-  }
+  // The octagon, its rim and the pit under it are the shared arena builder's now (combat/arenaBuild.ts): the Pit is one
+  // of this mode's arenas, and the others are rooms with walls, ropes or fire rather than a drop.
 
   function makeStaff(ctx: ModeContext, char: SpawnedCharacter, name: string): AbstractMesh | null {
     const hand = boneNode(char.skeleton, 'RightHand');
@@ -344,7 +375,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
   function resetAnim(f: FighterAnim): void { f.strike = null; f.hitBy = null; f.hitUntil = 0; f.parryUntil = 0; f.impactUntil = 0; f.downUntil = 0; f.celebrateUntil = 0; f.out = false; f.falling = false; f.tree.reset(); }
 
   function offRing(pos: Vector3): boolean {
-    return Math.hypot(pos.x, pos.z) > RING_RADIUS;
+    return offEdge(pos, arena);   // COMBAT ARENAS: only a DROP edge rings out; walls and ropes hold the body
   }
 
   /** G3: constant SPEED, so the distance sets the duration — a jab's 0.4 m shove and the special's ring-out shove used
@@ -355,7 +386,9 @@ export const MixedCombatMode: ModeDefinition = (() => {
     if (dir.lengthSquared() < 1e-4) { onDone(); return; }
     dir.normalize();
     const from = char.root.position.clone();
-    const to = from.add(dir.scale(meters));       // deliberately NOT clamped — the edge is live
+    const kt = knockTo(from, from.add(dir.scale(meters)), arena);   // a DROP edge is live; a wall stops it; the ROPES throw it back
+    const to = new Vector3(kt.x, from.y, kt.z);
+    if (kt.rebound) { const mine = char === player; beatDown(mine, ROPES.stunSec + GET_UP_SEC); SoundKit.play('impact', { pitch: 1.4, volume: 0.4 }); ctx.setHud({ banner: mine ? 'YOU HIT THE ROPES!' : 'OFF THE ROPES!' }); setTimeout(() => ctx.setHud({ banner: '' }), 500); console.info('[ARENA] mixed off the ropes'); }
     const ms = Math.max(80, (Vector3.Distance(from, to) / KNOCKBACK_SPEED) * 1000);
     const t0 = now();
     const obs = ctx.scene.onBeforeRenderObservable.add(() => {
@@ -622,7 +655,10 @@ export const MixedCombatMode: ModeDefinition = (() => {
     modeId: 'mixedcombat', mood: 'goldenHour', camPreset: 'fight',
 
     async load(ctx: ModeContext) {
-      buildArena(ctx);
+      arena = readCombatArena('mixedcombat');
+      console.info(`[ARENA] mixedcombat · ${describeArena(arena)}`);
+      mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true, arena });
+      arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena);
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 2.2), yawRad: Math.PI, startClip: IDLE_CLIP,   // BIOMECH-WAVE2 G1/G3: spawned facing each other (the round start used to snap both bodies 180°)
       });
@@ -669,7 +705,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
       gallery = new Onlookers(ctx.scene,
         Array.from({ length: 14 }, (_, i) => {
           const a = (i / 14) * Math.PI * 2;
-          return new Vector3(Math.cos(a) * 10.6, 0, Math.sin(a) * 10.6);
+          const gr = (arena.shape.kind === 'disc' ? arena.shape.radius : Math.max(arena.shape.halfX, arena.shape.halfZ)) + 4.2;
+          return new Vector3(Math.cos(a) * gr, 0, Math.sin(a) * gr);
         }));
       ctx.heroRef.current = player.root;
       ctx.objectiveRef.current = rival.root.position;
@@ -729,7 +766,9 @@ export const MixedCombatMode: ModeDefinition = (() => {
         // against the SAME `offRing` the walk is, not exempted from it. That is the point rather than a
         // hazard: 3.2 m of committed travel inside a 6.2 m ring means a panicked roll near the edge kills
         // you, which is exactly the tension a ring-out mode is for.
-        if (e.btn === 'L1' && meState.controllable) {
+        if (e.btn === 'L1' && wallRun) wallKickOff(ctx);   // MATRIX: the kick off the wall
+        else if (e.btn === 'L1' && meState.controllable && focus.active && !wallKick && phase === 'fighting' && tryWallRun(ctx)) { /* MATRIX: up onto the wall */ }
+        else if (e.btn === 'L1' && meState.controllable && !wallKick) {
           const dir = Math.hypot(stickX, stickY) > 0.2
             ? ctx.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx.camDirector.rightFlat().scale(stickX))
             : ctx.camDirector.forwardFlat().scale(1);
@@ -807,22 +846,24 @@ export const MixedCombatMode: ModeDefinition = (() => {
       const rollVel = meEvade.update(sdtHero);
       meCounter = tickCounter(meCounter, sdtHero);
       let mySpeed01 = rollVel ? 0 : moveVel.length() / MOVE_SPEED;   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
-      if (meDash) {   // STORM: the dash owns the body (and takes the ring check — a dash off the edge is a ring-out)
+      if (wallRun || wallKick) { /* MATRIX: the wall owns the body */ }
+      else if (meDash) {   // STORM: the dash owns the body (and takes the ring check — a dash off the edge is a ring-out)
         if (meDash.homing) { const toFoe = rival.root.position.subtract(player.root.position); toFoe.y = 0; if (toFoe.length() <= DASH.homingStopM) meDash.left = 0; else meDash.dir = toFoe.normalize(); }
-        player.root.position.addInPlace(meDash.dir.scale((meDash.homing ? DASH.homingSpeed : DASH.speed) * sdtHero));
+        player.root.position.addInPlace(meDash.dir.scale((meDash.homing ? DASH.homingSpeed : DASH.speed) * sdtHero)); arenaClamp(player.root.position, arena);
         if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
         meDash.left -= sdtHero; if (meDash.left <= 0) meDash = null;
         mySpeed01 = 1;
       } else if (rollVel) {
         // the roll owns the body AND takes the same ring check the walk does -- see the input branch
-        player.root.position.addInPlace(rollVel.scale(sdtHero));
+        player.root.position.addInPlace(rollVel.scale(sdtHero)); arenaClamp(player.root.position, arena);
         if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
       } else if (meState.controllable && !striking && !meState.blockHeld) {
         const vel = moveVel;
-        player.root.position.addInPlace(vel.scale(sdtHero));
+        player.root.position.addInPlace(vel.scale(sdtHero)); arenaClamp(player.root.position, arena);
         if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
       }
-      player.root.position.y = meEvade.height;   // the arc is EvadeMoves'; nothing here integrates gravity
+      if (!tickMatrix(ctx, sdtHero)) player.root.position.y = meEvade.height;   // the arc is EvadeMoves'; nothing here integrates gravity — unless the wall run / kick owns the body (MATRIX)
+      arenaHandle?.tick(dt); if (arena.hazards.length) tickHazards(ctx, sdtRoom);
 
       ring?.set(meState.guard / GUARD_MAX);   // PLAYER RING: the guard gauge
       meDashIframeSec = Math.max(0, meDashIframeSec - sdtHero);   // STORM ticks
@@ -846,11 +887,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
         const vel = foeVel;
         const before = rival.root.position.clone();
         rival.root.position.addInPlace(vel.scale(sdtRoom));
-        const r = Math.hypot(rival.root.position.x, rival.root.position.z);
-        if (r > RING_RADIUS - 0.3) {
-          const s = (RING_RADIUS - 0.3) / r;
-          rival.root.position.x *= s; rival.root.position.z *= s;
-        }
+        arenaClamp(rival.root.position, arena);
+        if (arena.edge === 'drop' && insideBy(rival.root.position, arena.shape) < 0.3) { const q = { x: rival.root.position.x, z: rival.root.position.z }; const inb = insideBy(q, arena.shape); if (arena.shape.kind === 'disc') { const r = Math.hypot(q.x, q.z) || 1; rival.root.position.x *= (arena.shape.radius - 0.3) / r; rival.root.position.z *= (arena.shape.radius - 0.3) / r; } else { rival.root.position.x = Math.max(-(arena.shape.halfX - 0.3), Math.min(arena.shape.halfX - 0.3, q.x)); rival.root.position.z = Math.max(-(arena.shape.halfZ - 0.3), Math.min(arena.shape.halfZ - 0.3, q.z)); } void inb; }   // it never voluntarily steps off — only knockback can send it over
         foeSpeed01 = sdtRoom > 0 && Vector3.Distance(before, rival.root.position) / sdtRoom < 0.3 ? 0 : vel.length() / MOVE_SPEED;   // the step only while the body moves
       }
 
@@ -859,9 +897,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
       // to be READABLE: warn when YOUR back is near the rim, and name the
       // opening when the RIVAL's is. Soul Calibur teaches this with stage
       // design and camera; the bezel is where we can afford it.
-      const myR = Math.hypot(player.root.position.x, player.root.position.z);
-      const foeR = Math.hypot(rival.root.position.x, rival.root.position.z);
-      const edge = myR > RING_RADIUS - 1.6 ? 'EDGE BEHIND YOU' : foeR > RING_RADIUS - 1.6 ? 'RIVAL ON THE EDGE' : null;
+      const myIn = insideBy(player.root.position, arena.shape), foeIn = insideBy(rival.root.position, arena.shape);
+      const edge = arena.edge !== 'drop' ? null : myIn < 1.6 ? 'EDGE BEHIND YOU' : foeIn < 1.6 ? 'RIVAL ON THE EDGE' : null;
       ctx.setHud({ guard: Math.round(meState.guard), foeGuard: Math.round(foeState.guard), edge });
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(player.root.position, moveVel, rival.root.position);
@@ -871,7 +908,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
     dispose() {
       mePosture?.dispose(); mePosture = null; foePosture?.dispose(); foePosture = null;
       myStaff?.dispose(); foeStaff?.dispose();
-      gallery?.dispose(); gallery = null;
+      gallery?.dispose(); gallery = null; arenaHandle?.dispose(); arenaHandle = null; wallRun = null; wallKick = null;
       ring?.dispose(); ring = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
     },

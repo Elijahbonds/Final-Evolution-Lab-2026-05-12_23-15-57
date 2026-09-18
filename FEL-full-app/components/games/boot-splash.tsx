@@ -15,6 +15,7 @@ import { skinsFor, readBoardSkin, writeBoardSkin } from '@/lib/babylon/nexus/boa
 import { readyCourses, readCourse, writeCourse } from '@/lib/babylon/core/RaceCourse';
 import { readyVehicles, readVehicle, writeVehicle, type RaceKind } from '@/lib/babylon/racing/garage';
 import { readyWeapons, readWeapon, writeWeapon } from '@/lib/babylon/combat/arsenal';
+import { arenasFor, readCombatArena, writeCombatArena, COMBAT_MODE_IDS, type CombatModeId } from '@/lib/babylon/combat/arenas';
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
 import {
   readySchools, readBlend, writeBlend, blendName, schoolById, blendTraits, STYLE_TRAIT_KEYS,
@@ -196,6 +197,17 @@ export function BootSplash(props: {
     setBlend({ primary: id, secondary: style.secondary === style.primary ? id : style.secondary, mix: style.mix });
   };
 
+  // THE ARENA (2026-09-18, owner: "an arena/map that has walls to run off of", "3 per mode minimum"). Picked here like the
+  // court and the board venue, and like them it RELOADS: the walls, the floor and the sky are built at load.
+  const arenaMode = (COMBAT_MODE_IDS as readonly string[]).includes(props.modeId) ? (props.modeId as CombatModeId) : null;
+  const [arenaId, setArenaId] = useState<string>('');
+  useEffect(() => { if (arenaMode) setArenaId(readCombatArena(arenaMode).id); }, [arenaMode]);
+  const pickArena = (id: string) => {
+    if (!arenaMode || id === arenaId) return;
+    writeCombatArena(arenaMode, id);
+    const u = new URL(window.location.href); u.searchParams.set('arena', id); window.location.assign(u.toString());
+  };
+
   // DIFFICULTY (2026-09-13). Phase 0 measured four modes with no tiering at all and four more each inventing
   // their own; this is the one picker, reading the one shared ladder.
   const hasTiers = TIER_MODES.has(props.modeId);
@@ -325,6 +337,25 @@ export function BootSplash(props: {
             </div>
             <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
               {readyVenues(disc).find((v) => v.id === venue)?.sub ?? ''}
+            </p>
+          </div>
+        )}
+
+        {arenaMode && (props.phase === 'ready' || props.phase === 'loading') && arenasFor(arenaMode).length > 1 && (
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">ARENA</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {arenasFor(arenaMode).map((a) => (
+                <button key={a.id} type="button" onClick={() => pickArena(a.id)} title={a.sub}
+                  aria-label={`${a.name} — ${a.sub}`} aria-pressed={a.id === arenaId}
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${a.id === arenaId ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={a.id === arenaId ? { background: a.tint, borderColor: a.tint } : { borderColor: `${a.tint}88` }}>
+                  {a.name.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+              {arenasFor(arenaMode).find((a) => a.id === arenaId)?.sub ?? ''}
             </p>
           </div>
         )}

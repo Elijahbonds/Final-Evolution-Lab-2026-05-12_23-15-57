@@ -44,6 +44,8 @@ import { weaponById, readWeapon, equipWeapon } from '../combat/arsenal';
 import type { Mesh } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
+import { readCombatArena, arenasFor, arenaClamp, offEdge, insideBy, describeArena, type CombatArena } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
+import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { readBlend, blendTraits } from '../combat/schools';
 import { styleMoveset } from '../combat/loadout';
 
@@ -74,10 +76,11 @@ const WEAPON_RANGE: Record<DuelWeapon, number> = {
   fists: weaponById('fists').reach, staff: weaponById('staff').reach, blade: weaponById('blade').reach,
 };
 
-const DISC_RADIUS = 6.5;            // ring-out boundary
+// The ring-out boundary is the picked arena's shape now (combat/arenas.ts): the Pit's octagon, the Rooftop's slab, the
+// Cliffside Shrine's half-walled disc. All three DROP; Duel is a ring-out game.
 /** How far the platform stands proud of the venue floor. Non-zero or the two surfaces z-fight. */
 const DISC_LIFT = 0.12;
-const EDGE_WARN = 5.4;
+const EDGE_WARN_IN = 1.1;   // metres inside the edge at which the footing warning shows (was a radius of 5.4 on a 6.5 disc)
 const ROUNDS_TO_WIN = 2;
 
 type Phase = 'intro' | 'weaponSelect' | 'fighting' | 'roundOver' | 'matchOver';
@@ -141,6 +144,8 @@ export const DuelMode: ModeDefinition = (() => {
   let foeHitBy: 'light' | 'medium' | 'heavy' | 'finisher' | null = null;
   let hitT = 0;
   let discMesh: AbstractMesh | null = null;
+  let arena: CombatArena = arenasFor('duel')[0];
+  let arenaHandle: ArenaHandle | null = null;
 
   const setPhase = (p: Phase): void => { phase = p; phaseSec = 0; };
   const now = (): number => performance.now();
@@ -151,10 +156,9 @@ export const DuelMode: ModeDefinition = (() => {
 
   /** Ring-out check — leaving the disc ends the round immediately. */
   function checkRingOut(ctx: ModeContext): boolean {
-    const meR = Math.hypot(player.root.position.x, player.root.position.z);
-    const foeR = Math.hypot(rival.root.position.x, rival.root.position.z);
-    if (foeR > DISC_RADIUS) { endRound(ctx, true, 'RING OUT!'); return true; }
-    if (meR > DISC_RADIUS) { endRound(ctx, false, 'RING OUT — YOU FELL'); return true; }
+    arenaClamp(player.root.position, arena); arenaClamp(rival.root.position, arena);   // the walls and the AC units hold; the drop does not
+    if (offEdge(rival.root.position, arena)) { endRound(ctx, true, 'RING OUT!'); return true; }
+    if (offEdge(player.root.position, arena)) { endRound(ctx, false, 'RING OUT — YOU FELL'); return true; }
     return false;
   }
 
@@ -287,21 +291,25 @@ export const DuelMode: ModeDefinition = (() => {
       // a disc and a rim floating in front of a backdrop. Its two sibling combat modes (Showdown and Karate
       // VS) have always mounted the dojo with a kit fallback; Duel was the one that never got the line. Same
       // spec, same fallback, so the three combat modes are finally the same room.
-      modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true });
+      arena = readCombatArena('duel');
+      console.info(`[ARENA] duel · ${describeArena(arena)}`);
+      modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true, arena });
       if (!modeVenue) VenueKit.buildDojo(ctx.scene);
+      // the platform, its rim, the pit under it, and any walls: the shared arena builder's (combat/arenaBuild.ts)
+      arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena, { lift: DISC_LIFT });
 
-      // raised disc arena (ring-out platform)
-      discMesh = MeshBuilder.CreateCylinder('duel_disc', { diameter: DISC_RADIUS * 2, height: 0.4 }, ctx.scene);
+      // raised disc arena (ring-out platform) — the builder's platform carries it now; this stays as the disc the
+      // camera bounds and the old probes read, hidden under the platform
+      discMesh = MeshBuilder.CreateCylinder('duel_disc', { diameter: (arena.shape.kind === 'disc' ? arena.shape.radius : Math.min(arena.shape.halfX, arena.shape.halfZ)) * 2, height: 0.4 }, ctx.scene);
       // THE DISC IS A RAISED PLATFORM, and it has to be raised for a reason beyond flavour: with the dojo
       // now under it, a disc whose top sat exactly at the venue floor's y = 0 was COPLANAR with it, and the
       // floor photographed covered in purple z-fighting blotches. It is a ring-out arena — standing it proud
       // of the floor fixes the artifact and makes the boundary the fight turns on visible at the same time.
-      discMesh.position.y = -0.2 + DISC_LIFT;
+      discMesh.position.y = -0.2 + DISC_LIFT; discMesh.isVisible = false;
       const dm = new StandardMaterial('discMat', ctx.scene);
       dm.diffuseColor = new Color3(0.16, 0.18, 0.24);
       discMesh.material = dm;
-      const rim = MeshBuilder.CreateTorus('duel_rim', { diameter: DISC_RADIUS * 2, thickness: 0.08 }, ctx.scene);
-      rim.position.y = DISC_LIFT + 0.02;
+
 
       // 'karate_idle_stance' is a deliberate CLIP_ALIASES entry (guard @ 0.8x
       // — a slower, more grounded ready-stance pace than plain SPORT_CLIP.
@@ -459,8 +467,7 @@ export const DuelMode: ModeDefinition = (() => {
       if (checkRingOut(ctx)) return;
 
       // edge warning
-      const meR = Math.hypot(player.root.position.x, player.root.position.z);
-      if (meR > EDGE_WARN) ctx.setHud({ hint: 'EDGE! WATCH YOUR FOOTING' });
+      if (insideBy(player.root.position, arena.shape) < EDGE_WARN_IN) ctx.setHud({ hint: 'EDGE! WATCH YOUR FOOTING' });
 
       // animation
       const w8 = (w: DuelWeapon) => w !== 'fists';
@@ -502,7 +509,7 @@ export const DuelMode: ModeDefinition = (() => {
 
     dispose() {
       modeVenue?.dispose?.(); modeVenue = null;
-      discMesh?.dispose();
+      discMesh?.dispose(); arenaHandle?.dispose(); arenaHandle = null;
       // the props are parented to a hand bone, so disposing the character takes them — but they are also
       // rebuilt on every weapon change, and a stale one left behind would ride the next round's rig
       myProp?.dispose(); myProp = null;

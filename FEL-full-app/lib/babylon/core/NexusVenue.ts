@@ -31,6 +31,7 @@ import { applyFloorDetail, applyFloorDetailToMesh } from '../visual/groundTextur
 import { flattenMapBoxes, type FlattenBox } from '../visual/mapSurgery';
 import { applyLocation, COURT_LOCATIONS, isCourtLocationId } from '../nexus/courtLocations';
 import { fieldMaterial } from '../visual/PlacePack';
+import type { CombatArena } from '../combat/arenas';
 
 export interface VenueHandle {
   /** Ship pass 4, phase 3: the walkable-area navmesh baked from this venue's map (null until loaded, or when the venue has no map). */
@@ -96,6 +97,8 @@ export interface MountVenueOptions {
    * override that — `true` to drop the venue's lights even without a mode rig, `false` to keep both on purpose.
    */
   keepModeLights?: boolean;
+  /** COMBAT ARENAS (2026-09-18): swap the spec's environment, floor and dressing for the picked arena's look (combat/arenas.ts). */
+  arena?: CombatArena;
 }
 
 /**
@@ -112,6 +115,19 @@ export interface MountVenueOptions {
  * these were two independent calculations of the same rectangle, and they
  * disagreed the moment a ground gained an offset.
  */
+
+/** A combat arena's look over a venue spec: its sky and fog, its floor, its lamps and banners; no scanned map. */
+export function applyArena<T extends { environment: { skyTop: string; skyBottom: string; fogColor: string; fogDensity: number; ambient: number; sunColor: string; backdrop?: string }; ground: { kind: string; size: [number, number]; color: string; lineColor?: string; markings?: string }; props: unknown[]; mapKey?: string }>(spec: T, arena: CombatArena): T {
+  const L = arena.look;
+  return {
+    ...spec,
+    environment: { ...spec.environment, skyTop: L.skyTop, skyBottom: L.skyBottom, fogColor: L.fog, sunColor: L.sun, ambient: L.ambient, backdrop: L.backdrop },
+    ground: { ...spec.ground, kind: L.ground.kind, size: [L.floorHalf * 2, L.floorHalf * 2] as [number, number], color: L.ground.color, lineColor: L.ground.line, markings: L.ground.markings, offset: undefined },
+    props: [...L.props],
+    mapKey: undefined,
+  };
+}
+
 export function venueBounds(spec: { ground: { size: [number, number]; offset?: [number, number] } }): {
   minX: number; maxX: number; minZ: number; maxZ: number; minY: number;
 } {
@@ -122,7 +138,7 @@ export function venueBounds(spec: { ground: { size: [number, number]; offset?: [
 
 export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOptions = {}): VenueHandle | null {
   const authored = specFor(modeId);
-  const spec = authored ? applyLocation(authored, options.location) : authored;
+  const spec = authored ? (options.arena ? applyArena(authored, options.arena) : applyLocation(authored, options.location)) : authored;
   const location = isCourtLocationId(options.location) && spec !== authored ? COURT_LOCATIONS[options.location] : null;
   if (!spec) {
     console.warn(`[NEXUS] no venue spec for "${modeId}" — falling back to VenueKit. `
@@ -163,7 +179,7 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   // Phase 3: the navmesh for this venue's map (scripts/venue/navmesh-gen.mts → public/models/navmesh).
   let nav: NavBounds | null = null;
   if (spec.mapKey) void NavBounds.load(spec.mapKey).then((n) => { nav = n; if (n) console.info(`[NEXUS] navmesh "${spec.mapKey}": ${n.data.polys.length} polys`); });
-  const propSet = location && location.propSet !== undefined && location.propSet !== null ? (location.propSet || null) : propSetFor(modeId);
+  const propSet = options.arena ? options.arena.look.propSet : location && location.propSet !== undefined && location.propSet !== null ? (location.propSet || null) : propSetFor(modeId);
 
   // THE SURROUND (2026-09-13). A venue's `ground` is its PLAYING SURFACE — tennis 16 × 34 m, the diamond
   // 46 × 46 — and its props are authored by eye in a much wider ring around it. Nothing ever checked that
