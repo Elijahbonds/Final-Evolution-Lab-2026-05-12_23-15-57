@@ -18,7 +18,7 @@ import { Vector3 } from '@babylonjs/core';
 import type { Course, Gate } from '../core/RaceCourse';
 import type { ItemKind } from './AeroItems';
 
-export type AeroTheme = 'canyon' | 'island' | 'glacier';
+export type AeroTheme = 'canyon' | 'island' | 'glacier' | 'volcano' | 'city';
 
 export interface CircuitLine {
   pts: Vector3[];
@@ -38,6 +38,8 @@ export interface AeroCircuit {
   bananas: Vector3[];
   arches: { dist: number; span: number; height: number }[];
   tunnel: { from: number; to: number; clear: number } | null;
+  /** The city's towers — x, z, half-width, height — for the world to build as lit buildings. Empty elsewhere. */
+  towers: [number, number, number, number][];
 }
 
 interface Spec {
@@ -49,6 +51,8 @@ interface Spec {
   arches: number[];                 // fractions of the lap
   tunnel?: [number, number];        // fractions of the lap
   islands?: [number, number, number, number][];   // x, z, radius, height
+  /** MAP EXPANSION (2026-09-18): the city's TOWERS — x, z, half-width, height. Flat-topped, a smooth skirt, and always off the corridor. */
+  towers?: [number, number, number, number][];
 }
 
 const SPECS: Spec[] = [
@@ -74,6 +78,28 @@ const SPECS: Spec[] = [
       [-130, 280, 26], [-250, 180, 14], [-220, 30, 8], [-260, -110, 30], [-130, -200, 12]],
     arches: [0.08, 0.9],
     tunnel: [0.36, 0.52],
+  },
+  // ── MAP EXPANSION (owner, 2026-09-18: "a map expansion pass and detail pass for the kart and aero ace modes") ──
+  {
+    // THE CALDERA. A ring of black rock round a lava lake: the lap runs the rim, dips across the lake (skim it for
+    // the glow, and the heat), and threads a LAVA TUBE through the far wall. Canyon walls, a darker palette, embers.
+    id: 'ember-caldera', name: 'EMBER CALDERA', sub: 'Round the rim, across the lava lake, through the tube. Mind the heat.', theme: 'volcano',
+    mood: 'dojoWarm', tint: '#ff5a2a', corridor: 32,
+    pts: [[0, -250, 14], [130, -240, 18], [240, -150, 30], [250, -20, 12], [190, 110, 40], [230, 230, 16], [100, 290, 24],
+      [-40, 240, 10], [-160, 280, 20], [-260, 160, 34], [-230, 20, 12], [-140, -100, 18], [-200, -220, 26], [-90, -280, 14]],
+    arches: [0.22, 0.66],
+    tunnel: [0.44, 0.56],
+  },
+  {
+    // THE SKYLINE. Open water under a night city: the line weaves between lit towers at rooftop height, under one
+    // sky bridge. No walls — the towers are the walls, and they are off the corridor, so the fast line is between
+    // them and the slow one is over them.
+    id: 'neon-skyline', name: 'NEON SKYLINE', sub: 'Between the towers at rooftop height. Under the sky bridge, over the bay.', theme: 'city',
+    mood: 'nightGame', tint: '#ff4fd8', corridor: 44,
+    pts: [[0, -240, 20], [160, -220, 30], [280, -100, 26], [240, 60, 40], [130, 150, 22], [220, 270, 34], [60, 310, 20],
+      [-90, 240, 28], [-230, 290, 44], [-300, 130, 24], [-200, 0, 18], [-270, -140, 36], [-130, -230, 22]],
+    arches: [0.5],
+    towers: [[70, 40, 26, 48], [-120, 110, 22, 70], [180, -30, 20, 56], [-30, -110, 18, 36], [330, 190, 30, 64], [-330, -30, 26, 52], [40, -345, 18, 40], [90, 400, 22, 58], [-60, 350, 20, 46], [330, -220, 24, 44]],
   },
 ];
 
@@ -155,6 +181,12 @@ export function buildCircuit(spec: Spec): AeroCircuit {
   // a flat-ish ground first, to lay the line; the walls come from the line afterwards
   const baseGround = (x: number, z: number): number => {
     if (spec.theme === 'island') return islandHeight(spec, x, z);
+    if (spec.theme === 'city') return -6 + towerHeight(spec, x, z);   // the bay: below the water everywhere but the towers
+    if (spec.theme === 'volcano') {
+      // the caldera: a lava lake in the middle (floor below the lava's surface), rising to the rim
+      const r = Math.hypot(x, z);
+      return -4 + 6 * smooth(110, 250, r) + 1.2 * Math.sin(x * 0.03) * Math.cos(z * 0.027);
+    }
     if (spec.theme === 'canyon') return 2 + 1.6 * Math.sin(x * 0.021) * Math.cos(z * 0.017);
     return 1.5 + 1.2 * Math.sin(x * 0.03 + 1) * Math.sin(z * 0.025);
   };
@@ -166,6 +198,13 @@ export function buildCircuit(spec: Spec): AeroCircuit {
   const wallRise = spec.theme === 'canyon' ? 70 : spec.theme === 'glacier' ? 48 : 0;
   const floorAt = (x: number, z: number): number => {
     const g = baseGround(x, z);
+    if (spec.theme === 'volcano') {
+      // THE CALDERA IS OPEN (2026-09-18): 80 m corridor walls made the lava lake a slot canyon in another colour. Low
+      // basalt banks line the corridor so the lake is in view from the line, and the crater RIM rises past the far
+      // side of the whole course — the wall you see from everywhere and never fly into.
+      const d = Math.abs(locate(line, x, z).lateral);
+      return g + smooth(spec.corridor + 2, spec.corridor + 18, d) * 9 + smooth(350, 430, Math.hypot(x, z)) * 90;
+    }
     if (!wallRise) return g;
     const at = locate(line, x, z);
     const d = Math.abs(at.lateral);
@@ -218,7 +257,18 @@ export function buildCircuit(spec: Spec): AeroCircuit {
   return {
     course, theme: spec.theme, line, corridor: spec.corridor, floorAt, ceilingAt, balloons, bananas,
     arches: spec.arches.map((f) => ({ dist: f * L, span: spec.corridor * 2 + 16, height: 26 })), tunnel,
+    towers: spec.towers ?? [],
   };
+}
+
+/** A city tower: a flat top over a smooth skirt, so a line that passes near one rises gently rather than stepping. */
+function towerHeight(spec: Spec, x: number, z: number): number {
+  let h = 0;
+  for (const [cx, cz, hw, top] of spec.towers ?? []) {
+    const d = Math.max(Math.abs(x - cx), Math.abs(z - cz)) - hw;   // square footprint
+    if (d < 5) h = Math.max(h, top * (1 - smooth(0, 5, d)) + 6);    // a 5 m skirt: the building's own box hides it
+  }
+  return h;
 }
 
 function islandHeight(spec: Spec, x: number, z: number): number {

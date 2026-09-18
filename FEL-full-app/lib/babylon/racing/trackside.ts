@@ -215,6 +215,7 @@ export function furnitureFor(course: Course): Furniture {
   switch (course.venue) {
     case 'slope': return pine();
     case 'street': return post(1.1, 0.22);      // bollards
+    case 'harbor': return post(1.1, 0.22);      // mooring bollards along the quay
     case 'pitch': return post(2.4, 0.16);       // floodlight stems
     case 'orbit': return buoy();
     case 'park': default: return post(1.4, 0.2);

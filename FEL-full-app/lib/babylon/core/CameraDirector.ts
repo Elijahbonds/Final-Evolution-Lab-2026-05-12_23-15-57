@@ -268,6 +268,11 @@ const BOUNDS_MARGIN = 1.2;
 
 export interface CamBounds {
   minX: number; maxX: number; minZ: number; maxZ: number; minY: number;
+  /**
+   * The ground under (x, z), for a venue with relief (the mountain kart loops): the camera stays a body's height over
+   * it, so a chase camera behind a kart on a switchback never drops under the leg of road above it.
+   */
+  groundAt?: (x: number, z: number) => number;
 }
 
 export class CameraDirector {
@@ -450,6 +455,7 @@ export class CameraDirector {
     if (b.maxX - b.minX > m * 3) pos.x = Math.max(b.minX + m, Math.min(b.maxX - m, pos.x));
     if (b.maxZ - b.minZ > m * 3) pos.z = Math.max(b.minZ + m, Math.min(b.maxZ - m, pos.z));
     pos.y = Math.max(b.minY + 0.8, pos.y);
+    if (b.groundAt) pos.y = Math.max(b.groundAt(pos.x, pos.z) + 1.6, pos.y);
     return pos;
   }
 
@@ -623,6 +629,11 @@ export class CameraDirector {
     } else {
       next = Vector3.Lerp(this.camera.position, finalPos, lag);
     }
+    // the ground floor is enforced on the RESULT too: the clamp above floors the target, and the lerp toward a target
+    // over a ridge walks the eased camera THROUGH the ridge (measured on the summit's switchbacks: the frame was the
+    // sky dome's trees seen from under the snow)
+    const ground = this.bounds?.groundAt;
+    if (ground) next.y = Math.max(next.y, ground(next.x, next.z) + 1.6);
     this.camera.position = enforceStandoff(subject, next).pos;
     this.aim(subject, objective, velocity);
   }

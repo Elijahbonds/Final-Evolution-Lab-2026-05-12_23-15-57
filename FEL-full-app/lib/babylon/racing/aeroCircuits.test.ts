@@ -6,8 +6,8 @@ import { startRace, stepRace } from '../core/RaceCourse';
 const all = aeroCircuits();
 
 describe('three themed circuits', () => {
-  it('canyon, island and glacier — one each, each ~1–2 km a lap', () => {
-    expect(all.map((c) => c.theme).sort()).toEqual(['canyon', 'glacier', 'island']);
+  it('canyon, island, glacier, volcano and city — one each, each ~1–2 km a lap', () => {
+    expect(all.map((c) => c.theme).sort()).toEqual(['canyon', 'city', 'glacier', 'island', 'volcano']);
     for (const c of all) {
       expect(c.line.length, c.course.id).toBeGreaterThan(1000);
       expect(c.line.length, c.course.id).toBeLessThan(2400);
@@ -21,20 +21,29 @@ describe('three themed circuits', () => {
     }
   });
 
-  it('the canyon and glacier walls rise off the corridor edge; the island is open sea', () => {
+  it('the canyon and glacier walls rise off the corridor edge; the island, the city and the caldera are open beside the line', () => {
     for (const c of all) {
       const { pos, tangent } = pointAlong(c.line, c.line.length * 0.25);
       const right = new Vector3(tangent.z, 0, -tangent.x);
       const out = pos.add(right.scale(c.corridor + 30));
       const rise = c.floorAt(out.x, out.z) - c.floorAt(pos.x, pos.z);
-      if (c.theme === 'island') expect(rise, c.course.id).toBeLessThan(35);
+      if (c.theme === 'island' || c.theme === 'city' || c.theme === 'volcano') expect(rise, c.course.id).toBeLessThan(35);
       else expect(rise, c.course.id).toBeGreaterThan(30);
     }
   });
 
-  it('the glacier has a cave with a roof over the line; the others are open sky', () => {
+  it('the caldera has a crater rim past the whole course, and its towers list is empty; the skyline lists its towers off the corridor', () => {
+    const volcano = all.find((c) => c.theme === 'volcano')!, city = all.find((c) => c.theme === 'city')!;
+    for (const p of volcano.line.pts) expect(Math.hypot(p.x, p.z), 'the line inside the rim').toBeLessThan(345);
+    expect(volcano.floorAt(0, 440) - volcano.floorAt(0, 0)).toBeGreaterThan(60);
+    expect(volcano.towers).toEqual([]);
+    expect(city.towers.length).toBeGreaterThan(5);
+    for (const [x, z, hw] of city.towers) expect(Math.abs(locate(city.line, x, z).lateral), `tower ${x},${z}`).toBeGreaterThan(city.corridor + hw);
+  });
+
+  it('the glacier has a cave and the volcano a lava tube, with a roof over the line; the others are open sky', () => {
     for (const c of all) {
-      if (c.theme === 'glacier') {
+      if (c.theme === 'glacier' || c.theme === 'volcano') {
         const mid = pointAlong(c.line, (c.tunnel!.from + c.tunnel!.to) / 2).pos;
         expect(c.ceilingAt(mid.x, mid.z) - mid.y).toBeCloseTo(c.tunnel!.clear, 0);
       } else expect(c.tunnel).toBeNull();

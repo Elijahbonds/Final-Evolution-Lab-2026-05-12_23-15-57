@@ -5,9 +5,9 @@ import { cornerRadiusAt, tightestCorner } from './racingLine';
 const circuits = kartCircuits();
 
 describe('kart circuits', () => {
-  it('builds all four', () => {
+  it('builds all seven', () => {
     expect(circuits.map((c) => c.course.id)).toEqual(
-      ['boardwalk-loop', 'stadium-oval', 'rooftop-circuit', 'alpine-descent']);
+      ['boardwalk-loop', 'stadium-oval', 'rooftop-circuit', 'alpine-descent', 'harbor-run', 'orbit-station', 'summit-climb']);
   });
 
   /**
@@ -93,13 +93,26 @@ describe('kart circuits', () => {
   });
 
   /** ALPINE DESCENT was authored with y = 0 at every gate, so the mountain run down was flat. */
-  it('makes the alpine descent actually descend', () => {
+  it('makes the alpine descent actually descend — and climb back, now that it is a loop', () => {
     const alpine = circuits.find((c) => c.course.id === 'alpine-descent')!;
     expect(alpine.elevation.drop).toBeGreaterThan(50);
     expect(alpine.elevation.high - alpine.elevation.low).toBeGreaterThan(50);
-    // ~8.5% average, a real mountain road rather than a ski jump
-    expect(alpine.elevation.drop / alpine.line.length).toBeLessThan(0.15);
-    expect(alpine.course.loop).toBe(false);
+    // ~8.5% average on the way down, a real mountain road rather than a ski jump; the climb takes the other side
+    expect(alpine.elevation.drop / (alpine.line.length * 0.6)).toBeLessThan(0.15);
+    expect(alpine.course.loop).toBe(true);
+    expect(alpine.elevation.climb).toBeCloseTo(alpine.elevation.drop, 0);
+  });
+
+  /** Owner, 2026-09-18: "have the courses be closed circuits" — and a course inside the ±260 m wall the mode drives. */
+  it('every course is a closed circuit with more than one lap, and every point sits inside the world', () => {
+    for (const c of circuits) {
+      expect(c.course.loop, c.course.id).toBe(true);
+      expect(c.course.laps, c.course.id).toBeGreaterThan(1);
+      for (const p of c.line.pts) { expect(Math.abs(p.x), c.course.id).toBeLessThan(390); expect(Math.abs(p.z), c.course.id).toBeLessThan(390); }
+    }
+    const summit = circuits.find((c) => c.course.id === 'summit-climb')!;
+    expect(summit.elevation.high - summit.elevation.low).toBeGreaterThan(55);
+    expect(summit.elevation.climb).toBeCloseTo(summit.elevation.drop, 0);
   });
 
   it('gives the rooftops real height differences for the gaps to matter', () => {

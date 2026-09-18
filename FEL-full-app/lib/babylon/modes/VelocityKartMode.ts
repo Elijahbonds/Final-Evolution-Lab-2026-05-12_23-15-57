@@ -37,13 +37,14 @@ import {
   KART_COURSES, readCourse, startRace, stepRace, toNextGate, medalFor, onTrack, TRACK_HALF_WIDTH,
   type Course, type RaceProgress,
 } from '../core/RaceCourse';
-import { buildCourseVenue, buildWorldGround } from '../racing/venueForCourse';
+import { buildCourseVenue, buildWorldGround, worldHeightFn } from '../racing/venueForCourse';
 import { kartCircuitById, type KartCircuit, type KartRamp } from '../racing/kartCircuits';
 import { locate } from '../racing/racingLine';
 import {
   buildKerbs, buildObstacles, obstacleContact, placeObstacles, stillTouching,
-  type PlacedObstacle,
-} from '../racing/kartDressing';
+  type PlacedObstacle, buildChevrons, buildGantry, kartSceneryFor, buildForest, buildEdgeLights } from '../racing/kartDressing';
+import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
+import { VENUE_PROP_SETS } from '../visual/venuePropSets';
 import { refuse } from '../core/Refusal';
 import {
   boostEarnFor, crossedLip, idleAir, launch, startTrick, stepAir, type KartAirState,
@@ -97,6 +98,10 @@ let playerDist = 0;
 let tier = profileFor(DEFAULT_TIER);
 /** The picked kart's handling. Defaults to the starter, so a mode with no pick is byte-identical to before. */
 let kartSpec: KartSpec = KART_STARTER;
+/** The edge of the world the kart can drive to — inside the world ground and outside every course. */
+const WORLD_WALL = 400;
+/** The world ground's relief under (x, z), for the courses that have any — what the kart rides off the road. */
+let worldHeight: ((x: number, z: number) => number) | null = null;
 let race: RaceProgress = startRace();
 const prevPos = new Vector3();
 
@@ -124,6 +129,7 @@ let boostFx: BoostFx | null = null;
 let boostPads: BoostPads | null = null;
 let ramps: Mesh[] = [];
 let kerbRoot: TransformNode | null = null;
+let detailRoot: TransformNode | null = null; let scenery: VenuePropsHandle | null = null; let sceneryGone = false;   // DETAIL PASS
 let obstacleRoot: TransformNode | null = null;
 let placedObstacles: PlacedObstacle[] = [];
 
@@ -557,7 +563,7 @@ return {
     race = startRace();
 
     venueRoot = buildCourseVenue(ctx.scene, course);
-    worldGround?.dispose(); worldGround = buildWorldGround(ctx.scene, course);   // no void past the road (see buildWorldGround)
+    worldGround?.dispose(); worldGround = buildWorldGround(ctx.scene, course, WORLD_WALL + 2);   // no void past the road (see buildWorldGround)
     // THE VENUE IS COURT-SIZED AND THE COURSE IS HUNDREDS OF METRES, so the world was a small island near
     // the start and the rest of the lap ran off into nothing (step-0 audit: this mode was one of the two
     // worst frames in the project). Trackside dresses the PATH instead, at whatever scale the course is.
@@ -568,6 +574,17 @@ return {
       placedObstacles = placeObstacles(circuit);
       kerbRoot = buildKerbs(ctx.scene, circuit);
       obstacleRoot = buildObstacles(ctx.scene, placedObstacles, circuit.course.id);
+      // DETAIL PASS (2026-09-18): chevron boards on the outside of every corner, the start / finish gantry, and the
+      // racing kit round the circuit (grandstands, tents, banner towers, flags, barrier walls, light posts)
+      detailRoot?.dispose(); detailRoot = new TransformNode(`kart_detail_${circuit.course.id}`, ctx.scene);
+      buildChevrons(ctx.scene, circuit).parent = detailRoot; buildGantry(ctx.scene, circuit).parent = detailRoot;
+      // THE SETTING (owner, 2026-09-18): the mountain courses stand in a real forest on the relief; the night courses
+      // read their road by edge lights (the orbit station was a black frame to the render watchdog without them)
+      if (course.venue === 'slope') buildForest(ctx.scene, circuit, worldHeightFn(course), course.mood === 'alpine' ? '#2f5a3e' : '#3b6a4a').parent = detailRoot;
+      if (course.mood === 'nightGame') buildEdgeLights(ctx.scene, circuit).parent = detailRoot;
+      const key = `kart-${circuit.course.id}`; VENUE_PROP_SETS[key] = kartSceneryFor(circuit);
+      sceneryGone = false; scenery?.dispose(); scenery = null;
+      void mountVenueProps(ctx.scene, key, detailRoot, { snapToGround: true }).then((h) => { if (sceneryGone) h?.dispose(); else scenery = h; });
     }
     console.info(`[RACE-VENUE] ${course.id}: ${trackside.count} trackside instances`);
     // RACING WAS THE LAST FAMILY WITH NOBODY WATCHING. The board modes have had Onlookers since it landed;
@@ -584,9 +601,10 @@ return {
     kart = buildKart(ctx);
 
     state = spawnKart(course.start.at, course.start.heading);
+    if (circuit) state.pos.y = circuit.surfaceAt(state.pos.x, state.pos.z);
     prevPos.copyFrom(state.pos);
     kart.position.copyFrom(state.pos);
-    kart.position.y = KART_RIDE_Y;
+    kart.position.y = state.pos.y + KART_RIDE_Y;
 
     // THE DRIVER (2026-09-13). This mode shipped with a kart and NOBODY IN IT — a visible vehicle driving
     // itself, which is both the most unfinished thing a racing mode can show and a straight breach of the
@@ -646,7 +664,12 @@ return {
     // THE CAMERA'S BOX IS THE PLAY BOX (SCORECARD VISUALS, 2026-09-15). With no explicit bounds the director derived them
     // from the venue's shell meshes — the court-sized park at the start — and clamped the chase camera inside it while the
     // kart drove 200 m away: the rc10 late frame was the kart as a speck from the park. The course's wall is ±260 m.
-    ctx.camDirector.setBounds({ minX: -262, maxX: 262, minZ: -262, maxZ: 262, minY: -0.1 });
+    // …and over the ground: the road where there is road, the relief-following world ground everywhere else
+    const groundHeight = worldHeightFn(course); const circ = circuit; worldHeight = groundHeight;
+    ctx.camDirector.setBounds({
+      minX: -402, maxX: 402, minZ: -402, maxZ: 402, minY: -0.1,
+      groundAt: circ ? (x, z) => Math.max(circ.surfaceAt(x, z), groundHeight ? groundHeight(x, z) : -0.03) : undefined,
+    });
     ctx.camDirector.snapTo(state.pos, null);
     tintMarks();
     say(`${course.name} — ${course.sub}`, 2.2);
@@ -775,12 +798,18 @@ return {
         }
       }
 
-      state.pos.y = roadY + S.air.height;
+      // OFF THE ROAD THE KART RIDES THE MOUNTAIN, not the line's height: between two switchback legs the world ground
+      // climbs toward the upper leg while the nearest line point is still the lower one, and the kart tunnelled 7 m
+      // under the snow (measured on the summit's first hairpin) with the camera chasing it down there
+      const groundY = worldHeight ? worldHeight(state.pos.x, state.pos.z) + 0.12 : -Infinity;
+      state.pos.y = Math.max(roadY, groundY) + S.air.height;
       S.lastDist = at.dist;
     }
 
-    // the kart rides the road; y is cosmetic here because the track is flat
-    kart.position.set(state.pos.x, KART_RIDE_Y, state.pos.z);
+    // THE KART RIDES THE ROAD'S HEIGHT (2026-09-18). This was pinned to the flat ride height "because the track is
+    // flat" — the rooftops, the mountain loops and the station platforms are not, so the kart drove at y 0 under a road
+    // 56 m up with the chase camera under the terrain. state.pos.y is the road (or the air over it) every frame.
+    kart.position.set(state.pos.x, state.pos.y + KART_RIDE_Y, state.pos.z);
 
     // THE FIELD MOVES. playerDist is measured as distance TRAVELLED rather than progress along the line, so
     // a player who cuts a corner does not get credited for the metres they skipped — the standings read the
@@ -804,7 +833,7 @@ return {
         stepRival(r, line, dt, playerDist, { topSpeed: kartSpec.vMax }, race.time);
         const at = rivalPlacement(r, line);
         const rk = rivalKarts[i];
-        if (rk) { rk.position.set(at.pos.x, KART_RIDE_Y, at.pos.z); rk.rotation.y = at.heading; }
+        if (rk) { rk.position.set(at.pos.x, at.pos.y + KART_RIDE_Y, at.pos.z); rk.rotation.y = at.heading; }
       }
     }
     // the BODY points where the nose does while the kart travels at the slip angle — that difference is the
@@ -836,10 +865,11 @@ return {
     if (bev.started) { ctx.feel.impact(0.3); say('BOOST!', 0.6); }
     if (bev.full) say('BOOST READY', 0.8);
 
-    // the edge of the world: a wall you hit rather than an invisible stop
-    if (Math.abs(state.pos.x) > 260 || Math.abs(state.pos.z) > 260) {
-      state.pos.x = Math.max(-260, Math.min(260, state.pos.x));
-      state.pos.z = Math.max(-260, Math.min(260, state.pos.z));
+    // the edge of the world: a wall you hit rather than an invisible stop. ±400 (was 260: the stadium oval runs to z 382 and the boardwalk pier
+    // runs out to z 332, so the wall stood ACROSS the road there; the world ground is sized off the same number)
+    if (Math.abs(state.pos.x) > WORLD_WALL || Math.abs(state.pos.z) > WORLD_WALL) {
+      state.pos.x = Math.max(-WORLD_WALL, Math.min(WORLD_WALL, state.pos.x));
+      state.pos.z = Math.max(-WORLD_WALL, Math.min(WORLD_WALL, state.pos.z));
       const lost = kartHitWall(state);
       if (lost > 3) {
         SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
@@ -897,7 +927,7 @@ return {
     rivalKarts = []; rivals = []; line = null;
     ramps.forEach((m) => m.dispose());
     ramps = [];
-    kerbRoot?.dispose(); kerbRoot = null;
+    kerbRoot?.dispose(); sceneryGone = true; scenery?.dispose(); scenery = null; detailRoot?.dispose(); detailRoot = null; kerbRoot = null;
     obstacleRoot?.dispose(); obstacleRoot = null;
     placedObstacles = [];
     S.touching = null;

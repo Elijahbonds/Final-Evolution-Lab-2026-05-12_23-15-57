@@ -71,6 +71,8 @@ const RACE_OF: Record<string, RaceKind> = { velocitykart: 'kart', aeroaces: 'aer
 const RACE_THUMB: Record<string, string> = {
   park: 'skatepark', slope: 'mountain-slope', pitch: 'fc-stadium',
   street: 'venice-court', orbit: 'orbit',
+  volcano: 'default', city: 'night-rooftop',   // MAP EXPANSION: the caldera keeps the cover, the skyline takes the rooftop's night
+  harbor: 'surf-break',                        // the marina shares the coast's card
 };
 
 /** A vehicle's three bars, drawn small enough to sit under a chip. */

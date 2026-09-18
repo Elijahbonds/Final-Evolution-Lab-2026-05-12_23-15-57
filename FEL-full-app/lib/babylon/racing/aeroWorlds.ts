@@ -11,7 +11,7 @@
 //   · SCENERY along both edges of the corridor — Kenney rocks, palms and pines, thin-instanced (VenueProps).
 //   · a HORIZON ring of mesas / peaks so the world does not end at the terrain's edge.
 
-import { Color3, Matrix, Mesh, MeshBuilder, Quaternion, TransformNode, Vector3, VertexData } from '@babylonjs/core';
+import { Color3, Color4, DynamicTexture, HemisphericLight, Matrix, Mesh, MeshBuilder, ParticleSystem, Quaternion, TransformNode, Vector3, VertexData, type AbstractMesh } from '@babylonjs/core';
 import { PBRMaterial } from '@babylonjs/core';
 import type { Camera, Scene } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
@@ -32,6 +32,9 @@ const THEME = {
   canyon: { floor: '#d9a066', low: '#c9602e', high: '#96391d', band: '#e8b27a', top: '#c08050', detail: 'sand' as GroundKind | null },
   island: { floor: '#efdfae', low: '#78c85a', high: '#8a8378', band: '#4f9a3f', top: '#9c958a', detail: 'grass' as GroundKind | null },
   glacier: { floor: '#eef4fb', low: '#b8d6f0', high: '#6fa3d6', band: '#dbeaf7', top: '#ffffff', detail: null },
+  // MAP EXPANSION (2026-09-18): black basalt with glowing cracks and a lava lake; a night bay under lit towers
+  volcano: { floor: '#3a2a26', low: '#2a1f1c', high: '#15100e', band: '#ff6a2a', top: '#4a3a34', detail: null },
+  city: { floor: '#0e1622', low: '#22304a', high: '#141c2a', band: '#ffd27a', top: '#2a3548', detail: 'concrete' as GroundKind | null },
 };
 
 const hex = (h: string): Color3 => Color3.FromHexString(h);
@@ -46,13 +49,14 @@ function buildTerrain(scene: Scene, c: AeroCircuit, root: TransformNode): Mesh {
   const nx = Math.ceil((maxX - minX) / cell), nz = Math.ceil((maxZ - minZ) / cell);
   const pal = THEME[c.theme];
   const cFloor = hex(pal.floor), cLow = hex(pal.low), cHigh = hex(pal.high), cBand = hex(pal.band), cTop = hex(pal.top);
-  const seabed = c.theme === 'island' ? -6 : 0;
+  const seabed = c.theme === 'island' ? -6 : c.theme === 'city' ? -6 : c.theme === 'volcano' ? -4 : 0;
 
   const heights = new Float32Array((nx + 1) * (nz + 1));
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
     const x = minX + i * cell, z = minZ + j * cell;
     let h = c.floorAt(x, z);
     if (c.theme === 'island' && h <= 0.01) h = seabed;          // open water: the seabed sits under the sea
+    if (c.theme === 'city' && h <= -5.9) h = seabed;
     heights[j * (nx + 1) + i] = h;
   }
   const positions: number[] = [], colors: number[] = [], uvs: number[] = [], indices: number[] = [];
@@ -76,6 +80,16 @@ function buildTerrain(scene: Scene, c: AeroCircuit, root: TransformNode): Mesh {
       if (y < 0.6) Color3.LerpToRef(hex('#5a8fa0'), cFloor, Math.max(0, (y + 6) / 6.6), col);        // seabed → wet sand
       else if (y < 2.5) col.copyFrom(cFloor);                                                          // beach
       else Color3.LerpToRef(cLow, cHigh, Math.min(1, steep * 1.4 + Math.max(0, (y - 18) / 14)), col);  // grass → rock
+    } else if (c.theme === 'volcano') {
+      // basalt everywhere; the lake bed glows through where it is low and flat, cracks glow up the walls in bands
+      Color3.LerpToRef(cFloor, cHigh, Math.min(1, steep * 1.5 + Math.max(0, (y - 10) / 60)), col);
+      if (y < -1) Color3.LerpToRef(col, cBand, 0.85, col);
+      else if (y < 3 && steep < 0.25) Color3.LerpToRef(col, cBand, 0.35 * (1 - y / 3), col);
+      if (Math.sin(y * 0.7 + x * 0.05) > 0.86 && steep > 0.4) Color3.LerpToRef(col, cBand, 0.55, col);
+      if (y > 70 && steep < 0.3) Color3.LerpToRef(col, cTop, 0.6, col);
+    } else if (c.theme === 'city') {
+      // the bay is near-black water; the tower plinths are the buildings' own dark (their lit box stands over them)
+      if (y < -3) col.copyFrom(hex('#050a14')); else col.copyFrom(cHigh);
     } else {
       // snow on the valley floor and tops, blue ice where it is steep
       Color3.LerpToRef(cFloor, cHigh, Math.min(1, steep * 1.8), col);
@@ -93,8 +107,11 @@ function buildTerrain(scene: Scene, c: AeroCircuit, root: TransformNode): Mesh {
   const normals: number[] = []; VertexData.ComputeNormals(positions, indices, normals); vd.normals = normals;
   const mesh = new Mesh(`aero_terrain_${c.theme}`, scene);
   vd.applyToMesh(mesh, false);
-  const mat = VenueKit.paint(scene, `aero_terrain_mat_${c.theme}`, '#ffffff', 0.04, c.theme === 'glacier' ? 0.55 : 0.92);
-  mat.environmentIntensity = c.theme === 'glacier' ? 0.7 : 0.5;
+  // NO FLAT EMISSIVE ON THE DARK THEMES (2026-09-18): a 0.22 white emissive was meant to carry the vertex glow, but a
+  // PBR emissive is the material's colour, not the vertex's — it washed the basalt to peach and painted the tower
+  // plinths grey. The lava glows from the lake and an underlight; the towers from their own window textures.
+  const mat = VenueKit.paint(scene, `aero_terrain_mat_${c.theme}`, '#ffffff', 0.03, c.theme === 'glacier' ? 0.55 : c.theme === 'city' ? 0.4 : 0.92);
+  mat.environmentIntensity = c.theme === 'glacier' ? 0.7 : c.theme === 'city' ? 0.35 : 0.5;
   try {
     // snow takes no grain texture: the only candidate with no pattern read as TILES under a white vertex colour
     if (!pal.detail) throw new Error('no detail');
@@ -135,7 +152,9 @@ function buildArch(scene: Scene, c: AeroCircuit, a: AeroCircuit['arches'][number
   }, scene);
   const m = c.theme === 'glacier'
     ? VenueKit.paint(scene, `aero_arch_mat_${i}`, '#a9d3f5', 0.08, 0.3)
-    : VenueKit.paint(scene, `aero_arch_mat_${i}`, c.theme === 'canyon' ? '#a9482a' : '#8a8378', 0.04, 0.95);
+    : c.theme === 'city'
+      ? VenueKit.paint(scene, `aero_arch_mat_${i}`, c.course.tint, 0.9, 0.35)   // the sky bridge is a neon strip
+      : VenueKit.paint(scene, `aero_arch_mat_${i}`, c.theme === 'canyon' ? '#a9482a' : c.theme === 'volcano' ? '#2a1f1c' : '#8a8378', c.theme === 'volcano' ? 0.12 : 0.04, 0.95);
   arch.material = m; arch.parent = root; arch.isPickable = false;
 }
 
@@ -149,10 +168,12 @@ function buildTunnel(scene: Scene, c: AeroCircuit, root: TransformNode): void {
   const tube = MeshBuilder.CreateTube('aero_ice_cave', { path, radius, tessellation: 22, sideOrientation: Mesh.DOUBLESIDE }, scene);
   // DEEP ice, darker than any sky: the first pale blue (#7fb6e6) was the alpine sky's own colour, so from inside the cave
   // the roof read as open air and the icicles hung from nothing (eye frame 2026-09-15)
-  const ice = VenueKit.paint(scene, 'aero_ice_cave_mat', '#1f4f86', 0.1, 0.3);
+  const lava = c.theme === 'volcano';
+  const ice = lava ? VenueKit.paint(scene, 'aero_lava_tube_mat', '#1a100c', 0.35, 0.6) : VenueKit.paint(scene, 'aero_ice_cave_mat', '#1f4f86', 0.1, 0.3);
+  if (lava) ice.emissiveColor = Color3.FromHexString('#7a2a10');   // the tube glows faintly from the rock
   ice.environmentIntensity = 0.55;
   tube.material = ice; tube.parent = root; tube.isPickable = false;
-  const icicle = VenueKit.paint(scene, 'aero_icicle_mat', '#e6f4ff', 0.25, 0.2);
+  const icicle = lava ? VenueKit.paint(scene, 'aero_stalactite_mat', '#2a1c18', 0.08, 0.9) : VenueKit.paint(scene, 'aero_icicle_mat', '#e6f4ff', 0.25, 0.2);
   // ONE icicle mesh, thin-instanced: as separate meshes the cave's ~60 icicles pushed the glacier to 1637 draws (budget 1600)
   const master = MeshBuilder.CreateCylinder('aero_icicle', { height: 1, diameterTop: 1.2, diameterBottom: 0, tessellation: 6 }, scene);
   master.material = icicle; master.isPickable = false;
@@ -200,27 +221,71 @@ function buildStartBanner(scene: Scene, c: AeroCircuit, root: TransformNode): vo
 
 /** The horizon: mesas, island peaks or snow mountains standing well outside the terrain. */
 function buildHorizon(scene: Scene, c: AeroCircuit, root: TransformNode): void {
-  const color = c.theme === 'canyon' ? '#b0603a' : c.theme === 'island' ? '#4d8a55' : '#dfe9f4';
+  const color = c.theme === 'canyon' ? '#b0603a' : c.theme === 'island' ? '#4d8a55' : c.theme === 'volcano' ? '#2c2220' : c.theme === 'city' ? '#111827' : '#dfe9f4';
   const m = VenueKit.paint(scene, `aero_horizon_${c.theme}`, color, 0.1, 0.95);
   m.environmentIntensity = 0.35;
-  const cap = VenueKit.paint(scene, `aero_horizon_cap_${c.theme}`, c.theme === 'glacier' ? '#ffffff' : c.theme === 'canyon' ? '#d69a64' : '#6fa860', 0.12, 0.9);
+  const cap = VenueKit.paint(scene, `aero_horizon_cap_${c.theme}`, c.theme === 'glacier' ? '#ffffff' : c.theme === 'canyon' ? '#d69a64' : c.theme === 'volcano' ? '#ff5a2a' : c.theme === 'city' ? '#ffd27a' : '#6fa860', c.theme === 'volcano' || c.theme === 'city' ? 0.8 : 0.12, 0.9);   // glowing caps: the far volcanoes' craters, the skyline's lit roofs
   const R = 1150;
   for (let i = 0; i < 26; i++) {
     const a = (i / 26) * Math.PI * 2 + (i % 3) * 0.05;
     const r = R + ((i * 97) % 260);
     const h = 60 + ((i * 53) % 110);
     const w = 90 + ((i * 31) % 140);
-    const shape = c.theme === 'canyon'
-      ? MeshBuilder.CreateCylinder(`aero_mesa_${i}`, { height: h, diameterTop: w * 0.85, diameterBottom: w, tessellation: 7 }, scene)
+    const shape = c.theme === 'canyon' || c.theme === 'city'
+      ? MeshBuilder.CreateCylinder(`aero_mesa_${i}`, { height: c.theme === 'city' ? h * 1.9 : h, diameterTop: w * (c.theme === 'city' ? 0.55 : 0.85), diameterBottom: w * (c.theme === 'city' ? 0.55 : 1), tessellation: c.theme === 'city' ? 4 : 7 }, scene)
       : MeshBuilder.CreateCylinder(`aero_peak_${i}`, { height: h * 1.6, diameterTop: c.theme === 'island' ? w * 0.2 : 0, diameterBottom: w * 1.3, tessellation: 8 }, scene);
-    shape.position.set(Math.sin(a) * r, (c.theme === 'canyon' ? h : h * 1.6) / 2 - (c.theme === 'island' ? 12 : 0), Math.cos(a) * r);
+    shape.position.set(Math.sin(a) * r, (c.theme === 'canyon' ? h : c.theme === 'city' ? h * 1.9 : h * 1.6) / 2 - (c.theme === 'island' || c.theme === 'city' ? 12 : 0), Math.cos(a) * r);
     shape.material = m; shape.parent = root; shape.isPickable = false;
     if (c.theme !== 'island') {
-      const top = MeshBuilder.CreateCylinder(`aero_cap_${i}`, { height: c.theme === 'canyon' ? 4 : h * 0.45, diameterTop: c.theme === 'canyon' ? w * 0.86 : 0, diameterBottom: c.theme === 'canyon' ? w * 0.86 : w * 0.45, tessellation: 8 }, scene);
-      top.position.set(shape.position.x, c.theme === 'canyon' ? h + 2 : h * 1.6 - h * 0.22, shape.position.z);
+      const top = MeshBuilder.CreateCylinder(`aero_cap_${i}`, { height: c.theme === 'canyon' ? 4 : c.theme === 'city' ? 3 : h * 0.45, diameterTop: c.theme === 'canyon' ? w * 0.86 : c.theme === 'city' ? w * 0.56 : 0, diameterBottom: c.theme === 'canyon' ? w * 0.86 : c.theme === 'city' ? w * 0.56 : w * 0.45, tessellation: c.theme === 'city' ? 4 : 8 }, scene);
+      top.position.set(shape.position.x, c.theme === 'canyon' ? h + 2 : c.theme === 'city' ? h * 1.9 - 12 + 1.5 : h * 1.6 - h * 0.22, shape.position.z);
       top.material = cap; top.parent = root; top.isPickable = false;
     }
   }
+}
+
+/**
+ * A procedural window grid: dark glass, most windows lit warm, a few cool, a few dark — tiled up a tower. One texture
+ * PER TOWER (never cloned: a cloned DynamicTexture never reports ready and its material never draws — see
+ * fel-aero-dkr), each with its own seed so no two towers light the same.
+ */
+function windowTexture(scene: Scene, seed: number): DynamicTexture {
+  const tex = new DynamicTexture(`aero_windows_${seed}`, { width: 128, height: 256 }, scene, false);
+  const ctx = tex.getContext() as CanvasRenderingContext2D;
+  ctx.fillStyle = '#05080f'; ctx.fillRect(0, 0, 128, 256);
+  let s = 11 + seed * 97; const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+  for (let y = 6; y < 256; y += 14) for (let x = 6; x < 128; x += 12) {
+    const r = rnd();
+    ctx.fillStyle = r < 0.5 ? '#ffd27a' : r < 0.68 ? '#9fd1ff' : r < 0.78 ? '#fff4d6' : '#0a1020';
+    ctx.fillRect(x, y, 7, 9);
+  }
+  tex.update(false);
+  tex.hasAlpha = false;
+  return tex;
+}
+
+/** THE TOWERS (2026-09-18): the city's buildings as lit boxes over their terrain plinths, with roofs and aviation beacons. */
+function buildTowers(scene: Scene, c: AeroCircuit, root: TransformNode): void {
+  if (!c.towers.length) return;
+  const roof = VenueKit.paint(scene, 'aero_tower_roof_m', '#1a2333', 0.02, 0.8);
+  const beacon = VenueKit.paint(scene, 'aero_tower_beacon_m', '#ff3b3b', 1.0, 0.4);
+  c.towers.forEach(([x, z, hw, top], i) => {
+    const w = hw * 2 + 2, h = top + 6.4;
+    const box = MeshBuilder.CreateBox(`aero_tower_${i}`, { width: w, height: h, depth: w }, scene);
+    box.position.set(x, top + 0.4 - h / 2, z);
+    const mat = VenueKit.paint(scene, `aero_tower_glass_m_${i}`, '#0b1220', 0.0, 0.35);
+    const tex = windowTexture(scene, i); tex.uScale = w / 9; tex.vScale = h / 18;
+    mat.emissiveTexture = tex; mat.emissiveColor = Color3.White(); mat.metallic = 0.15;
+    box.material = mat; box.isPickable = false; box.parent = root;
+    const cap = MeshBuilder.CreateBox(`aero_tower_roof_${i}`, { width: w - 3, height: 1.2, depth: w - 3 }, scene);
+    cap.position.set(x, top + 1, z); cap.material = roof; cap.isPickable = false; cap.parent = root;
+    const light = MeshBuilder.CreateSphere(`aero_tower_beacon_${i}`, { diameter: 1.4, segments: 6 }, scene);
+    light.position.set(x, top + 2.4, z); light.material = beacon; light.isPickable = false; light.parent = root;
+    if (i % 3 === 0) {
+      const mast = MeshBuilder.CreateCylinder(`aero_tower_mast_${i}`, { height: 14, diameter: 0.5 }, scene);
+      mast.position.set(x, top + 8, z); mast.material = roof; mast.isPickable = false; mast.parent = root;
+    }
+  });
 }
 
 /** Scenery along both corridor edges, as a VenueProps set registered for this circuit. */
@@ -242,6 +307,12 @@ function sceneryFor(c: AeroCircuit): PropPlacement[] {
       } else if (c.theme === 'island') {
         if (c.floorAt(at.x, at.z) < 1.5) continue;                 // palms stand on land
         out.push({ kit: 'nature', model: pick(d + side, ['tree_palmTall', 'tree_palmBend', 'tree_palmDetailedTall', 'tree_palm']), at: [at.x, 0, at.z], yaw, scale: 5.5 + ((d * 2.3) % 3) });
+      } else if (c.theme === 'volcano') {
+        if (c.floorAt(at.x, at.z) < 0) continue;                   // nothing stands in the lava
+        out.push({ kit: 'nature', model: pick(d + side, ['rock_largeA', 'rock_tallA', 'rock_largeC', 'rock_tallB', 'rock_largeD']), at: [at.x, 0, at.z], yaw, scale: 5 + ((d * 3.1) % 5), tint: '#3a2a26' });
+      } else if (c.theme === 'city') {
+        if (c.floorAt(at.x, at.z) < 0) continue;                   // the bay: lights stand on the towers' skirts only
+        out.push({ kit: 'racing', model: 'lightPostModern', at: [at.x, 0, at.z], yaw, scale: 6 });
       } else {
         out.push({ kit: 'nature', model: pick(d + side, ['tree_pineTallA', 'tree_pineTallB', 'rock_largeB', 'tree_pineRoundA']), at: [at.x, 0, at.z], yaw, scale: 5 + ((d * 2.9) % 4), tint: '#dfeee6' });
       }
@@ -267,10 +338,48 @@ export async function buildAeroWorld(scene: Scene, c: AeroCircuit): Promise<Aero
   buildTunnel(scene, c, root);
   buildStartBanner(scene, c, root);
   buildHorizon(scene, c, root);
+  buildTowers(scene, c, root);
+  // THE LAVA LIGHTS THE UNDERSIDES: a hemispheric light pointed up lights nothing from above and paints every
+  // down-facing surface — wings, the arch soffits, the banks' overhangs — in the lake's orange
+  let underlight: HemisphericLight | null = null;
+  if (c.theme === 'volcano') {
+    underlight = new HemisphericLight('aero_lava_underlight', new Vector3(0, 1, 0), scene);
+    underlight.diffuse = new Color3(0.05, 0.03, 0.02); underlight.groundColor = Color3.FromHexString('#ff6a2a'); underlight.specular = Color3.Black(); underlight.intensity = 0.8;
+  }
 
   let ocean: OceanHandle | null = null;
   if (c.theme === 'island') {
     ocean = mountOcean(scene, { deep: '#0c5a78', foam: '#e8fbff', horizon: '#9fd8ea', shoreZ: 6000, swell: 0.55, fade: [500, 2400] });
+  } else if (c.theme === 'volcano') {
+    // THE LAVA LAKE is the surf break's ocean in another colour: slow, thick, glowing (the caldera floor sits at −4, so
+    // the lake fills the middle and the rim stands out of it)
+    ocean = mountOcean(scene, { deep: '#c8401a', foam: '#ffd070', horizon: '#ff7a3a', shoreZ: 6000, swell: 0.28, fade: [300, 1800] });
+  } else if (c.theme === 'city') {
+    ocean = mountOcean(scene, { deep: '#04080f', foam: '#243a5e', horizon: '#0b1424', shoreZ: 6000, swell: 0.4, fade: [400, 2200] });
+  }
+  // DETAIL: embers rise off the lava round the camera; the skyline hangs neon strips down its corridor edges
+  let embers: ParticleSystem | null = null; let emberEmitter: AbstractMesh | null = null;
+  if (c.theme === 'volcano') {
+    embers = new ParticleSystem('aero_embers', 700, scene);
+    const tex = groundDetailTexture(scene, 'sand'); void tex;
+    emberEmitter = MeshBuilder.CreateBox('aero_ember_emitter', { size: 0.01 }, scene); emberEmitter.isVisible = false; emberEmitter.isPickable = false;
+    embers.emitter = emberEmitter; embers.minEmitBox = new Vector3(-90, -20, -90); embers.maxEmitBox = new Vector3(90, 0, 90);
+    embers.color1 = new Color4(1, 0.55, 0.2, 0.9); embers.color2 = new Color4(1, 0.3, 0.1, 0.7); embers.colorDead = new Color4(0.4, 0.1, 0, 0);
+    embers.minSize = 0.5; embers.maxSize = 1.3; embers.minLifeTime = 2.5; embers.maxLifeTime = 5; embers.emitRate = 120;
+    embers.direction1 = new Vector3(-1, 4, -1); embers.direction2 = new Vector3(1, 9, 1); embers.gravity = new Vector3(0, 0.6, 0);
+    embers.blendMode = ParticleSystem.BLENDMODE_ADD; embers.start();
+  }
+  if (c.theme === 'city') {
+    const strip = MeshBuilder.CreateBox('aero_neon_strip', { width: 1.2, height: 0.5, depth: 18 }, scene);
+    strip.material = VenueKit.paint(scene, 'aero_neon_strip_mat', c.course.tint, 1.0, 0.4); strip.isPickable = false;
+    const mats: Matrix[] = [];
+    for (let d = 0; d < c.line.length; d += 26) {
+      const { pos, tangent } = pointAlong(c.line, d); const right = new Vector3(tangent.z, 0, -tangent.x);
+      const q = Quaternion.FromEulerAngles(0, Math.atan2(tangent.x, tangent.z), 0);
+      for (const s of [-1, 1]) { const at = pos.add(right.scale(s * (c.corridor + 2))); at.y = pos.y - 6; mats.push(Matrix.Compose(Vector3.One(), q, at)); }
+    }
+    const buf = new Float32Array(mats.length * 16); mats.forEach((m, i) => m.copyToArray(buf, i * 16));
+    strip.thinInstanceSetBuffer('matrix', buf, 16, true); strip.parent = root;
   }
 
   const key = `aero-${c.course.id}`;
@@ -294,9 +403,10 @@ export async function buildAeroWorld(scene: Scene, c: AeroCircuit): Promise<Aero
     root, ocean,
     update(dt, camera) {
       ocean?.update(dt, camera);
+      if (emberEmitter) emberEmitter.position.set(camera.position.x, Math.max(-2, Math.min(camera.position.y, 30)) - 6, camera.position.z);
       if (dome) { dome.position.x = camera.position.x; dome.position.z = camera.position.z; }
       if (ring) { ring.position.x = camera.position.x; ring.position.z = camera.position.z; }
     },
-    dispose() { gone = true; props?.dispose(); ocean?.dispose(); root.dispose(false, true); },
+    dispose() { gone = true; props?.dispose(); ocean?.dispose(); embers?.dispose(); emberEmitter?.dispose(); underlight?.dispose(); root.dispose(false, true); },
   };
 }

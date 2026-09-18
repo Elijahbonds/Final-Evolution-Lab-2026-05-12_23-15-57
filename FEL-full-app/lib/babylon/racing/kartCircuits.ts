@@ -55,7 +55,7 @@ export interface KartObstacle {
   dist: number;
   /** Sideways offset from the line, + = right of travel. Never zero: an obstacle ON the line is a wall, not a choice. */
   lateral: number;
-  kind: 'barrel' | 'cone' | 'planter' | 'crate' | 'puddle' | 'gravel';
+  kind: 'barrel' | 'cone' | 'planter' | 'crate' | 'puddle' | 'gravel' | 'tyres' | 'haybale';
 }
 
 export interface KartKerb {
@@ -191,21 +191,105 @@ const SPECS: KartSpec[] = [
     // what makes its long sweepers pay, since gravity does the work the boost meter does elsewhere. Corners stay at
     // or above what the kart can hold: this is the pace course, and the one where SLIPSTREAM's missing grip costs
     // least.
-    id: 'alpine-descent', name: 'ALPINE DESCENT', sub: 'One run down the mountain. No lap to fix it on.',
+    // CLOSED CIRCUIT (owner, 2026-09-18: "have the courses be closed circuits"). The point-to-point run started 430 m
+    // out — past the mode's ±260 m wall, so the kart spawned clamped against the edge of the world with the road
+    // somewhere else. It is a mountain LOOP now: the descent down the east face over the first two thirds of the lap,
+    // then the climb back up the west face to the summit line, so gravity pays on one side and the boost meter on
+    // the other. Sweepers throughout — this is still the pace course.
+    id: 'alpine-descent', name: 'ALPINE DESCENT', sub: 'Down the east face, back up the west. Two laps of the mountain.',
     venue: 'slope', mood: 'alpine', tint: '#cfe8ff',
-    loop: false, laps: 1, halfWidth: 9,
+    loop: true, laps: 2, halfWidth: 9,
     declaredMinRadius: 62,
     pts: [
-      [-30, -430, 96], [-16, -356, 90], [8, -286, 82], [46, -224, 73],
-      [96, -168, 64], [126, -96, 55], [116, -22, 47], [78, 44, 40],
-      [58, 118, 33], [16, 178, 27], [-52, 214, 21], [-113.4, 254.8, 16],
-      [-134, 320, 11], [-104, 386, 7], [-62, 436, 3], [-40, 478, 0],
+      [0, -230, 56], [64, -218, 52], [122, -180, 46], [162, -120, 40],
+      [172, -46, 34], [156, 26, 28], [116, 88, 22], [62, 136, 16],
+      [0, 162, 10], [-70, 152, 5], [-132, 110, 1], [-166, 40, 0],
+      [-170, -40, 5], [-150, -118, 17], [-112, -186, 31], [-58, -226, 45],
     ],
     ramps: [{ at: 0.42, size: 'jump' }, { at: 0.77, size: 'kicker' }],
     obstacles: [
       { at: 0.19, lateral: 7, kind: 'planter' }, { at: 0.35, lateral: -7.5, kind: 'gravel' },
       { at: 0.58, lateral: 7.5, kind: 'gravel' }, { at: 0.66, lateral: -6, kind: 'barrel' },
       { at: 0.88, lateral: 6.5, kind: 'cone' },
+    ],
+  },
+  // ── MAP EXPANSION (owner, 2026-09-18: "a map expansion pass and detail pass for the kart and aero ace modes") ──
+  {
+    // THE MARINA. A quay straight the length of the boardwalk's, then the HUMP BRIDGE over the channel — 7 m up and
+    // down again in 90 m, which is a blind crest with a kicker on it — a chicane through the fish market, and the
+    // marina hairpin round the harbour master's office to come home. Slipstream on the quay, air on the bridge, a
+    // slide at the end: three different asks in one lap.
+    id: 'harbor-run', name: 'HARBOR RUN', sub: 'The quay, the hump bridge, the marina hairpin.',
+    venue: 'harbor', mood: 'daylight', tint: '#3ad1c9',
+    loop: true, laps: 2, halfWidth: 9,
+    declaredMinRadius: 34,
+    slideNote: 'The marina hairpin is tighter than grip. Slide it, and mind the tyre wall.',
+    pts: [
+      [0, 0, 0], [0, 70, 0], [0, 140, 0], [4, 210, 0],
+      [34, 262, 0], [86, 286, 0], [140, 276, 0], [178, 236, 3.5],
+      // the marina hairpin: a 44 m arc whose exit lands ON the start straight, so the lap closes without a corner
+      [190, 190, 7], [178, 144, 3.5], [150, 112, 0], [134, 78, 0],
+      [118, 44, 0], [98, 8, 0], [88, -30, 0], [88, -60, 0],
+      [85, -77, 0], [75, -91, 0], [61, -101, 0], [44, -104, 0],
+      [27, -101, 0], [13, -91, 0], [3, -77, 0], [0, -60, 0], [0, -30, 0],
+    ],
+    ramps: [{ at: 0.41, size: 'kicker' }, { at: 0.86, size: 'jump' }],
+    obstacles: [
+      { at: 0.12, lateral: 7.5, kind: 'puddle' }, { at: 0.24, lateral: -6.5, kind: 'planter' }, { at: 0.26, lateral: 6.5, kind: 'planter' },
+      { at: 0.52, lateral: -6, kind: 'barrel' }, { at: 0.55, lateral: 5, kind: 'crate' },
+      { at: 0.63, lateral: 7, kind: 'haybale' }, { at: 0.66, lateral: -7, kind: 'haybale' },
+      { at: 0.76, lateral: 7, kind: 'tyres' }, { at: 0.94, lateral: -6.5, kind: 'cone' },
+    ],
+  },
+  {
+    // THE STATION. Platforms in orbit, every one at its own height, joined by two GAPS with nothing under them and a
+    // jump between the docking bays — the rooftop's air game under the starfield, with the corners a shade wider so
+    // the platforms can be taken on the throttle. Crates and tyre stacks are the dock's furniture.
+    id: 'orbit-station', name: 'ORBIT STATION', sub: 'Platform to platform across the gaps. Do not look down.',
+    venue: 'orbit', mood: 'nightGame', tint: '#3fd0ff',
+    loop: true, laps: 2, halfWidth: 8.5,
+    declaredMinRadius: 27,
+    slideNote: 'The docking bays turn tighter than grip. Slide them, and land the gaps straight.',
+    pts: [
+      [0, 0, 12], [0, 80, 12], [10, 150, 14], [46, 200, 16],
+      [100, 214, 18], [152, 196, 20], [172, 146, 22], [158, 98, 20],
+      [118, 68, 18], [74, 44, 16], [56, -14, 14], [72, -62, 12],
+      [112, -98, 12], [104, -150, 12], [52, -176, 12], [-4, -150, 12],
+      [-14, -92, 12], [-10, -40, 12],
+    ],
+    ramps: [{ at: 0.33, size: 'gap' }, { at: 0.5, size: 'jump' }, { at: 0.7, size: 'gap' }],
+    obstacles: [
+      { at: 0.1, lateral: 6, kind: 'crate' }, { at: 0.125, lateral: -6, kind: 'crate' },
+      { at: 0.42, lateral: 6.5, kind: 'tyres' }, { at: 0.58, lateral: -6, kind: 'barrel' },
+      { at: 0.62, lateral: 6, kind: 'barrel' }, { at: 0.86, lateral: -6.5, kind: 'tyres' }, { at: 0.94, lateral: 6, kind: 'cone' },
+    ],
+  },
+  {
+    // THE CLIMB. The descent's mirror, and a LOOP like it (owner: closed circuits): up the east face through three
+    // switchbacks the kart cannot hold — so the boost meter has to be filled on the slide and spent on the climbs
+    // between them, where gravity is taking the speed back — a jump over the crest, then the RIDGE ROAD down the
+    // west face to the start, fast and open, to fill the meter for the next climb.
+    id: 'summit-climb', name: 'SUMMIT CLIMB', sub: 'Slide the switchbacks up, run the ridge road down.',
+    venue: 'slope', mood: 'overcast', tint: '#dfe9f4',
+    loop: true, laps: 2, halfWidth: 9,
+    declaredMinRadius: 24,
+    slideNote: 'The switchbacks are tighter than grip. Slide in, boost out.',
+    // each switchback is authored as a 34 m semicircle in five points (entry, two shoulders, apex, exit), because a
+    // hairpin drawn as three points kinks the spline to a 15 m corner no kart could take at any speed
+    pts: [
+      [0, -100, 0], [10, -74, 3], [36, -64, 6], [80, -64, 10], [130, -60, 14],
+      [154, -50, 16], [164, -26, 18], [154, -2, 20], [130, 8, 22], [106, 8, 24],           // switchback one, back west
+      [54, 8, 27], [30, 8, 28], [6, 18, 30], [-4, 42, 32], [6, 66, 34], [30, 76, 36], [54, 76, 38],   // switchback two, back east
+      [100, 80, 42], [128, 98, 46], [136, 128, 50], [116, 152, 54], [70, 162, 56],        // the crest arc
+      [10, 146, 56], [-40, 128, 54],
+      [-86, 94, 48], [-114, 44, 40], [-122, -24, 32], [-116, -96, 22],                    // the ridge road down
+      [-100, -154, 14], [-72, -190, 8], [-32, -184, 3], [-10, -146, 1],
+    ],
+    ramps: [{ at: 0.5, size: 'jump' }, { at: 0.86, size: 'kicker' }],
+    obstacles: [
+      { at: 0.1, lateral: -7, kind: 'haybale' }, { at: 0.2, lateral: 7.5, kind: 'gravel' },
+      { at: 0.33, lateral: -7.5, kind: 'gravel' }, { at: 0.44, lateral: 7, kind: 'crate' },
+      { at: 0.62, lateral: -6.5, kind: 'tyres' }, { at: 0.76, lateral: 7, kind: 'barrel' }, { at: 0.94, lateral: -6.5, kind: 'cone' },
     ],
   },
 ];

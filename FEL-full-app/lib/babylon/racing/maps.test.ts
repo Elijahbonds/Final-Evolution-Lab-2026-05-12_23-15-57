@@ -88,9 +88,9 @@ describe('EVERY COURSE CAN BE COMPLETED', () => {
 });
 
 describe('the courses ask different questions', () => {
-  it('four kart courses and three aero circuits, all ready, with unique ids', () => {
-    // three THEMED CIRCUITS in the air (2026-09-15, owner: Aero Aces like Diddy Kong Racing — canyon, island, cave)
-    for (const [kind, n] of [['aero', 3], ['kart', 4]] as const) {
+  it('seven kart courses and five aero circuits, all ready, with unique ids', () => {
+    // three THEMED CIRCUITS in the air (2026-09-15) + the caldera and the skyline; three more kart courses (MAP EXPANSION, 2026-09-18)
+    for (const [kind, n] of [['aero', 5], ['kart', 7]] as const) {
       const list = readyCourses(kind);
       expect(list.length, kind).toBe(n);
       expect(new Set(list.map((c) => c.id)).size, kind).toBe(n);
@@ -117,9 +117,10 @@ describe('the courses ask different questions', () => {
     expect(corners.some((c) => c.r >= limit * 0.8), JSON.stringify(corners)).toBe(true);
     // and at least one is not — the drift there is the premise, and the picker says so
     expect(corners.some((c) => c.r < limit * 0.6), JSON.stringify(corners)).toBe(true);
-    // the one that cannot be held is the one whose copy promises exactly that
+    // the one that cannot be held is one whose copy promises exactly that (the rooftop, or the summit's switchbacks)
     const tightest = corners.reduce((a, b) => (b.r < a.r ? b : a));
-    expect(tightest.id).toBe('rooftop-circuit');
+    expect(['rooftop-circuit', 'summit-climb']).toContain(tightest.id);
+    expect(courseById(tightest.id)!.sub.toLowerCase()).toContain('slide');
     expect(courseById('rooftop-circuit')!.sub.toLowerCase()).toContain('slide');
   });
 

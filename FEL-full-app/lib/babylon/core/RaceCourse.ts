@@ -36,7 +36,7 @@ export interface Gate {
  * in the racing modes), which is also the seam that lets a course pick a mood the mode does not hard-code —
  * `mood` on a ModeDefinition may be a GETTER, read at mount, after the course has been picked.
  */
-export type CourseVenue = 'park' | 'slope' | 'pitch' | 'street' | 'orbit' | 'canyon' | 'island' | 'glacier';
+export type CourseVenue = 'park' | 'slope' | 'pitch' | 'street' | 'orbit' | 'harbor' | 'canyon' | 'island' | 'glacier' | 'volcano' | 'city';
 
 export interface Course {
   id: string;

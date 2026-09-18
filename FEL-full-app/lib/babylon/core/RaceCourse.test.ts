@@ -47,11 +47,10 @@ describe('the maps', () => {
     expect(courseById('nope')).toBeNull();
   });
 
-  it('a looping course declares laps and a point-to-point does not loop', () => {
-    // the aero courses are all three-lap circuits now (2026-09-15); the point-to-point is the kart's alpine descent
-    const p2p = [...AERO_COURSES, ...KART_COURSES].find((c) => !c.loop);
-    expect(p2p).toBeDefined();
-    expect(p2p!.laps).toBe(1);
+  it('every course is a closed circuit with more than one lap (owner, 2026-09-18: "have the courses be closed circuits")', () => {
+    // the aero courses have been three-lap circuits since 2026-09-15; the kart's alpine descent, the last point-to-point,
+    // became a loop in the map expansion pass
+    for (const c of [...AERO_COURSES, ...KART_COURSES]) { expect(c.loop, c.id).toBe(true); expect(c.laps, c.id).toBeGreaterThan(1); }
   });
 });
 
