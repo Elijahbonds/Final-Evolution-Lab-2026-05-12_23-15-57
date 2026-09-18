@@ -1,0 +1,32 @@
+# MODE IMPLEMENTATION MAPPING
+
+# TIER A - DOM Mockups Needing 3D (TIER A)
+1. tennis → components/games/tennis-game.tsx (309 lines, Canvas 2D)
+2. golf → components/games/golf-game.tsx (332 lines, Canvas 2D)
+3. soccer → components/games/soccer-game.tsx (303 lines, Canvas 2D)
+4. baseball → components/games/baseball-game.tsx (272 lines, Canvas 2D)
+5. football → components/games/football-babylon.tsx (123 lines, Babylon 3D)
+6. gymnastics → components/games/gymnastics-game.tsx (348 lines, Canvas 2D)
+7. dance → app/play/dance/page.tsx (12 lines, TBD)
+8. carnival → components/games/carnival-babylon.tsx (139 lines, Babylon 3D)
+9. who-scene-it → components/games/who-scene-it-game.tsx (265 lines, Canvas 2D)
+
+# TIER B - Orphaned/Divergent Modes
+10. karate (endless) → components/games/karate-game.tsx (22346 lines, Canvas 2D) + timing-babylon.tsx for timing
+11. unreal-arena → UNKNOWN (Not found in app/play)
+12. velocity-kart → UNKNOWN (Not found in app/play)
+13. aero-aces-flyer → UNKNOWN (Not found in app/play)
+
+# TIER C - Polished Shipped 3D Modes
+14. dunk → components/games/dunk-babylon.tsx (188 lines, Babylon 3D + CharacterLibrary)
+15. onevone (1v1 basketball) → components/games/one-v-one-game.tsx (11067 lines, Canvas 2D)
+16. threevthree (3v3) → components/games/three-v-three-babylon.tsx (5322 lines, Babylon 3D)
+17. karate-vs → components/games/karate-vs-babylon.tsx (5075 lines, Babylon 3D)
+18. skateboard → components/games/skateboard-game.tsx (15706 lines, Canvas 2D)
+19. surf → components/games/surf-game.tsx (13503 lines, Canvas 2D)
+20. snowboard → components/games/snowboard-game.tsx (13503 lines, Canvas 2D)
+21. volleyball → app/play/volleyball/page.tsx (12 lines, TBD)
+
+# Additional modes found in directory
+- acting, big-air, brain-brawl, irl, mirror, music, onevone (duplicate), skateboard (rail-grind), sprint, tiebreak, training, threepoint, dunkduel, mixedcombat, karate (vs duplicate)
+

@@ -1,0 +1,105 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fel-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "fel-dev-b8",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NEXT_DIST_DIR=.next-b8",
+        "npx",
+        "next",
+        "dev",
+        "-p",
+        "3020"
+      ],
+      "port": 3020
+    },
+    {
+      "name": "fel-dev-b4",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NEXT_DIST_DIR=.next-b4",
+        "npx",
+        "next",
+        "dev",
+        "-p",
+        "3024"
+      ],
+      "port": 3024
+    },
+    {
+      "name": "fel-dev-cf",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NEXT_DIST_DIR=.next-cf",
+        "npx",
+        "next",
+        "dev",
+        "-p",
+        "3040"
+      ],
+      "port": 3040
+    },
+    {
+      "name": "fel-dev-04",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NEXT_DIST_DIR=.next-04",
+        "npx",
+        "next",
+        "dev",
+        "-p",
+        "3004"
+      ],
+      "port": 3004
+    },
+    {
+      "name": "fel-dev-56",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NEXT_DIST_DIR=.next-56",
+        "npx",
+        "next",
+        "dev",
+        "-p",
+        "3056"
+      ],
+      "port": 3056
+    },
+    {
+      "name": "fel-dev-f9",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NEXT_DIST_DIR=.next-f9",
+        "npx",
+        "next",
+        "dev",
+        "-p",
+        "3009"
+      ],
+      "port": 3009
+    },
+    {
+      "name": "fel-dev-lb",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NEXT_DIST_DIR=.next-lb",
+        "npx",
+        "next",
+        "dev",
+        "-p",
+        "3061"
+      ],
+      "port": 3061
+    }
+  ]
+}

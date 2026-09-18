@@ -1,0 +1,121 @@
+{
+  "generated": "2026-09-04",
+  "size": 2048,
+  "detailNormal": "/models/skins/detail-normal.jpg",
+  "skins": [
+    {
+      "key": "dark-male",
+      "family": "dark",
+      "sex": "male",
+      "age": "middle",
+      "albedo": "/models/skins/dark-male.jpg",
+      "meanRGB": [
+        95,
+        59,
+        42
+      ],
+      "diffuseColor": [
+        1,
+        0.95,
+        0.85
+      ],
+      "source": "mpfb/data/skins/middleage_african_male",
+      "licence": "CC0 (MakeHuman community assets)"
+    },
+    {
+      "key": "dark-female",
+      "family": "dark",
+      "sex": "female",
+      "age": "middle",
+      "albedo": "/models/skins/dark-female.jpg",
+      "meanRGB": [
+        97,
+        56,
+        39
+      ],
+      "diffuseColor": [
+        1,
+        1,
+        1
+      ],
+      "source": "mpfb/data/skins/middleage_african_female",
+      "licence": "CC0 (MakeHuman community assets)"
+    },
+    {
+      "key": "medium-male",
+      "family": "medium",
+      "sex": "male",
+      "age": "middle",
+      "albedo": "/models/skins/medium-male.jpg",
+      "meanRGB": [
+        209,
+        163,
+        134
+      ],
+      "diffuseColor": [
+        1,
+        0.95,
+        0.85
+      ],
+      "source": "mpfb/data/skins/middleage_asian_male",
+      "licence": "CC0 (MakeHuman community assets)"
+    },
+    {
+      "key": "medium-female",
+      "family": "medium",
+      "sex": "female",
+      "age": "middle",
+      "albedo": "/models/skins/medium-female.jpg",
+      "meanRGB": [
+        213,
+        168,
+        138
+      ],
+      "diffuseColor": [
+        1,
+        1,
+        1
+      ],
+      "source": "mpfb/data/skins/middleage_asian_female",
+      "licence": "CC0 (MakeHuman community assets)"
+    },
+    {
+      "key": "light-male",
+      "family": "light",
+      "sex": "male",
+      "age": "middle",
+      "albedo": "/models/skins/light-male.jpg",
+      "meanRGB": [
+        205,
+        160,
+        131
+      ],
+      "diffuseColor": [
+        1,
+        0.95,
+        0.85
+      ],
+      "source": "mpfb/data/skins/middleage_caucasian_male",
+      "licence": "CC0 (MakeHuman community assets)"
+    },
+    {
+      "key": "light-female",
+      "family": "light",
+      "sex": "female",
+      "age": "young",
+      "albedo": "/models/skins/light-female.jpg",
+      "meanRGB": [
+        206,
+        158,
+        131
+      ],
+      "diffuseColor": [
+        1,
+        1,
+        1
+      ],
+      "source": "mpfb/data/skins/young_caucasian_female",
+      "licence": "CC0 (MakeHuman community assets)"
+    }
+  ]
+}

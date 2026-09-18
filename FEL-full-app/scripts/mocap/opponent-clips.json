@@ -1,0 +1,630 @@
+{
+  "_comment": "EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14). Each clip is a window of a real capture, retargeted by lib/babylon/anim/mocapRetarget.ts into lib/babylon/anim/authored/mocapOpponents.ts (npx tsx scripts/mocap/gen-opponent-clips.mts). `replaces` is the authored clip an OPPONENT plays this instead of (lib/babylon/anim/opponentMotion.ts). A beat keeps the duration of the clip it replaces so mode timing (the release, the settle) does not move; a loop keeps real time. Files are relative to ~/Downloads/fel-mocap-sources. Windows were read off scripts/mocap/stream-sheet.mts sheets and hand/foot signal tables.",
+  "clips": [
+    {
+      "name": "bball_mc_dribble_idle",
+      "replaces": "bball_dribble_idle",
+      "source": "cmu",
+      "file": "cmu/06/06_12.bvh",
+      "from": 6.72,
+      "to": 7.52,
+      "loop": true,
+      "refineLoop": [
+        0.6,
+        0.95
+      ],
+      "note": "right-hand dribble, one bounce cycle (hand peaks 6.75 → 7.50)"
+    },
+    {
+      "name": "bball_mc_crossover_right",
+      "replaces": "bball_crossover_right",
+      "source": "cmu",
+      "file": "cmu/06/06_13.bvh",
+      "from": 6.2,
+      "to": 6.68,
+      "duration": 0.45,
+      "note": "low freestyle: the LEFT hand carries across to the right hip (going right)"
+    },
+    {
+      "name": "bball_mc_crossover_left",
+      "replaces": "bball_crossover_left",
+      "source": "cmu",
+      "file": "cmu/06/06_13.bvh",
+      "from": 6.2,
+      "to": 6.68,
+      "duration": 0.45,
+      "mirror": true,
+      "note": "the same capture mirrored"
+    },
+    {
+      "name": "bball_mc_hesi",
+      "replaces": "bball_hesi",
+      "source": "cmu",
+      "file": "cmu/06/06_12.bvh",
+      "from": 2.55,
+      "to": 3.1,
+      "duration": 0.55,
+      "note": "a hard low dribble: the ball hand drops to 1.16 torso, hips dip, then back up"
+    },
+    {
+      "name": "bball_mc_jumpshot",
+      "replaces": "jumpshot",
+      "source": "cmu",
+      "file": "cmu/124/124_05.bvh",
+      "from": 2.45,
+      "to": 3.62,
+      "duration": 0.9,
+      "note": "124_05 Basketball Jump Shot (DEFENSE-LOOK 2026-09-17, was 06_15): the dip (2.45-2.6, hips to -0.28), the rise, the release at 3.35 with the shooting hand extended and the guide hand dropping — 0.77 of the window; the 06_15 window shot two-handed, both wrists at the same height through the release · FORM (2026-09-17, owner: Ray Allen / Klay, no MKG): from the set the shooting hand rises to full extension straight over the right shoulder (elbow under the ball), the guide hand stops at the set and stays off the ball",
+      "extend": {
+        "from01": 0.42,
+        "peak01": 0.78,
+        "Right": [
+          0.17,
+          2.2,
+          0.3
+        ],
+        "Left": [
+          -0.16,
+          1.62,
+          0.3
+        ],
+        "polesRight": [
+          0.25,
+          -0.85,
+          0.45
+        ],
+        "polesLeft": [
+          -0.7,
+          -0.6,
+          0.3
+        ]
+      }
+    },
+    {
+      "name": "bball_mc_follow_through",
+      "replaces": "bball_follow_through",
+      "source": "cmu",
+      "file": "cmu/124/124_05.bvh",
+      "from": 3.35,
+      "to": 4.0,
+      "duration": 0.65,
+      "note": "124_05: the release held — the right hand stays up and forward, the left drops away (3.7), then the landing · FORM: the shooting arm holds its extension (the goose neck), the guide hand comes down",
+      "extend": {
+        "from01": 0.0,
+        "peak01": 0.08,
+        "Right": [
+          0.18,
+          2.14,
+          0.36
+        ],
+        "Left": [
+          -0.14,
+          1.52,
+          0.28
+        ],
+        "polesRight": [
+          0.25,
+          -0.85,
+          0.45
+        ],
+        "polesLeft": [
+          -0.7,
+          -0.6,
+          0.3
+        ],
+        "release01": 0.42
+      }
+    },
+    {
+      "name": "karate_mc_hit_react",
+      "replaces": "karate_hit_react",
+      "source": "ual",
+      "file": "ual2/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "anim": "Hit_Knockback",
+      "from": 0.0,
+      "to": 0.3,
+      "duration": 0.3,
+      "note": "the first 0.3 s of the knockback: the flinch"
+    },
+    {
+      "name": "karate_mc_knockdown",
+      "replaces": "karate_knockdown",
+      "source": "ual",
+      "file": "ual2/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "anim": "Hit_Knockback",
+      "from": 0.0,
+      "to": 0.83,
+      "duration": 0.7,
+      "hipsYRange": [
+        -0.9,
+        0
+      ],
+      "note": "hit, knocked off the feet onto the back"
+    },
+    {
+      "name": "karate_mc_get_up",
+      "replaces": "karate_get_up",
+      "source": "ual",
+      "file": "ual2/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "anim": "LayToIdle",
+      "from": 0.0,
+      "to": 1.53,
+      "duration": 1.05,
+      "hipsYRange": [
+        -0.9,
+        0
+      ],
+      "note": "from the back to standing"
+    },
+    {
+      "name": "dunk_mc_celebrate_big",
+      "replaces": "dunk_celebrate_big",
+      "source": "deepmotion",
+      "file": "/Users/elijahbonds/Downloads/9_-_Finalize_Evolution_Lab_Game/Uploads/My Movie 197_customModel_ucoj55mFKU8zNnT6izbssr.bvh",
+      "from": 2.87,
+      "to": 3.67,
+      "duration": 0.9,
+      "note": "the owner's own take: hands come up from the chest to both arms overhead (a rival's win / a big make)"
+    },
+    {
+      "name": "bball_mc_defend_slide_right",
+      "replaces": "bball_defend_slide_right",
+      "source": "cmu",
+      "file": "cmu/78/78_30.bvh",
+      "from": 0.3,
+      "to": 1.05,
+      "duration": 0.5,
+      "loop": true,
+      "refineLoop": [
+        0.6,
+        0.85
+      ],
+      "note": "DefensiveMoveSideToSide: low wide stance, arms out, one push-and-gather step to the RIGHT (hips travel +2.6 torso)"
+    },
+    {
+      "name": "bball_mc_defend_slide_left",
+      "replaces": "bball_defend_slide_left",
+      "source": "cmu",
+      "file": "cmu/78/78_30.bvh",
+      "from": 1.6,
+      "to": 2.3,
+      "duration": 0.5,
+      "loop": true,
+      "refineLoop": [
+        0.6,
+        0.85
+      ],
+      "note": "the same drill back to the LEFT"
+    },
+    {
+      "name": "bball_mc_spin",
+      "replaces": "bball_spin",
+      "source": "cmu",
+      "file": "cmu/78/78_13.bvh",
+      "from": 0.15,
+      "to": 0.9,
+      "duration": 0.6,
+      "note": "OffensiveMoveSpinLeft: plant, reverse pivot and spin off the defender"
+    },
+    {
+      "name": "bball_mc_run",
+      "replaces": "run",
+      "source": "cmu",
+      "file": "cmu/78/78_12.bvh",
+      "from": 0.08,
+      "to": 0.7,
+      "duration": 0.6,
+      "loop": true,
+      "refineLoop": [
+        0.55,
+        0.72
+      ],
+      "note": "RunningNoBall: one full stride cycle, arms free (a body without the ball)"
+    },
+    {
+      "name": "bball_mc_dribble_run",
+      "replaces": "bball_dribble_run",
+      "source": "cmu",
+      "file": "cmu/78/78_06.bvh",
+      "from": 0.08,
+      "to": 0.75,
+      "duration": 0.6,
+      "loop": true,
+      "refineLoop": [
+        0.55,
+        0.8
+      ],
+      "note": "RunningStraight: a stride cycle dribbling on the run (the ball hand works low)"
+    },
+    {
+      "name": "bball_mc_drive",
+      "replaces": "run_forward",
+      "source": "cmu",
+      "file": "cmu/78/78_06.bvh",
+      "from": 0.08,
+      "to": 0.75,
+      "duration": 0.6,
+      "loop": true,
+      "refineLoop": [
+        0.55,
+        0.8
+      ],
+      "note": "the drive (run_forward) is the same dribbling stride"
+    },
+    {
+      "name": "bball_mc_defend_stance",
+      "replaces": "bball_defend_stance",
+      "source": "cmu",
+      "file": "cmu/78/78_30.bvh",
+      "from": 2.4,
+      "to": 2.85,
+      "loop": true,
+      "refineLoop": [
+        0.35,
+        0.55
+      ],
+      "note": "the low wide stance held between slides, arms out"
+    },
+    {
+      "name": "karate_mc_jab",
+      "replaces": "jab",
+      "source": "cmu",
+      "file": "cmu/80/80_10.bvh",
+      "from": 2.84,
+      "to": 3.29,
+      "duration": 0.45,
+      "note": "boxing: the LEFT jab of a combo, reach peaks 0.51 m at 3.04 (find-strikes.mts)",
+      "aim": "hand"
+    },
+    {
+      "name": "karate_mc_hook",
+      "replaces": "hook",
+      "source": "cmu",
+      "file": "cmu/80/80_10.bvh",
+      "from": 3.08,
+      "to": 3.71,
+      "duration": 0.63,
+      "note": "boxing: the RIGHT hand that follows the jab, reach peak 3.30",
+      "aim": "hand"
+    },
+    {
+      "name": "karate_mc_roundhouse",
+      "replaces": "roundhouse",
+      "source": "cmu",
+      "file": "cmu/135/135_07.bvh",
+      "from": 0.55,
+      "to": 1.4,
+      "duration": 0.8,
+      "note": "karate Mawashigeri: right roundhouse, the foot peaks at 1.35 m at 1.00",
+      "aim": "foot"
+    },
+    {
+      "name": "karate_mc_high_kick",
+      "replaces": "high_kick",
+      "source": "cmu",
+      "file": "cmu/135/135_07.bvh",
+      "from": 6.03,
+      "to": 6.73,
+      "duration": 0.66,
+      "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): the RIGHT front kick with the foot to 2.00 m, 0.49 m in front — HIGH KICK (was a kick peaking at 1.00 m, knee height)",
+      "aim": "foot"
+    },
+    {
+      "name": "bball_mc_layup_gather",
+      "replaces": "bball_layup_gather",
+      "source": "cmu",
+      "file": "cmu/124/124_06.bvh",
+      "from": 2.4,
+      "to": 3.35,
+      "duration": 0.7,
+      "note": "basketball lay up: the gather low (2.2–2.9) into the rise, both hands carrying the ball up to 1.9 m · EXTEND (2026-09-17): the capture lifts two-handed at the rim; from a fifth in, the finishing hand eases up to the iron (2.12 m, forward) and the guide hand drops to the chest — the one-hand extension the release key (0.30 s of 0.7) lands on",
+      "extend": {
+        "from01": 0.2,
+        "peak01": 0.46,
+        "Right": [
+          0.26,
+          2.12,
+          0.4
+        ],
+        "Left": [
+          -0.32,
+          1.3,
+          0.16
+        ],
+        "polesRight": [
+          0.85,
+          0.2,
+          -0.35
+        ],
+        "polesLeft": [
+          -0.8,
+          -0.5,
+          0.1
+        ]
+      }
+    },
+    {
+      "name": "football_mc_run",
+      "replaces": "run",
+      "source": "cmu",
+      "file": "cmu/78/78_12.bvh",
+      "from": 0.08,
+      "to": 0.7,
+      "duration": 0.6,
+      "loop": true,
+      "refineLoop": [
+        0.55,
+        0.72
+      ],
+      "note": "a defender's pursuit stride: CMU 78 RunningNoBall (the same cycle as bball_mc_run, in the football scope)"
+    },
+    {
+      "name": "bball_mc_pump_fake",
+      "replaces": "bball_pump_fake",
+      "source": "cmu",
+      "file": "cmu/78/78_22.bvh",
+      "from": 1.5,
+      "to": 2.85,
+      "duration": 0.7,
+      "note": "FakeShotBreakRight: from triple threat the ball rises to the set point (1.77 m at 2.1) and comes back down to the pocket — the fake, played at 0.7 s (HOOPS MOVEMENT 2026-09-15, hoops-timeline.mts)"
+    },
+    {
+      "name": "bball_mc_step_through",
+      "replaces": "bball_step_through",
+      "source": "cmu",
+      "file": "cmu/78/78_22.bvh",
+      "from": 3.25,
+      "to": 4.15,
+      "duration": 0.5,
+      "note": "FakeShotBreakRight: after the fake, the low load (hips −0.36 at 3.4) and the break past the defender — the step-through — played in 0.5 s, the step-through leg is 0.3 s (HoopsMoves.STEP_THROUGH_SEC_LEG)"
+    },
+    {
+      "name": "bball_mc_pivot",
+      "replaces": "bball_pivot",
+      "source": "cmu",
+      "file": "cmu/78/78_31.bvh",
+      "from": 0.2,
+      "to": 1.3,
+      "duration": 0.55,
+      "note": "Pivoting: the ball held at the chest (1.2–1.35 m), a reverse pivot swinging the hips ~110° on the planted foot — played in 0.55 s (the authored pivot was 0.42)"
+    },
+    {
+      "name": "bball_mc_layup_gather_left",
+      "replaces": "bball_layup_gather_left",
+      "source": "cmu",
+      "file": "cmu/124/124_06.bvh",
+      "from": 2.4,
+      "to": 3.35,
+      "duration": 0.7,
+      "mirror": true,
+      "note": "the layup capture mirrored: the left-hand finish · EXTEND (2026-09-17): the capture lifts two-handed at the rim; from a fifth in, the finishing hand eases up to the iron (2.12 m, forward) and the guide hand drops to the chest — the one-hand extension the release key (0.30 s of 0.7) lands on",
+      "extend": {
+        "from01": 0.2,
+        "peak01": 0.46,
+        "Right": [
+          0.26,
+          2.12,
+          0.4
+        ],
+        "Left": [
+          -0.32,
+          1.3,
+          0.16
+        ],
+        "polesRight": [
+          0.85,
+          0.2,
+          -0.35
+        ],
+        "polesLeft": [
+          -0.8,
+          -0.5,
+          0.1
+        ]
+      }
+    },
+    {
+      "name": "karate_mc_cross",
+      "replaces": "karate_cross",
+      "source": "cmu",
+      "file": "cmu/80/80_72.bvh",
+      "from": 3.6,
+      "to": 4.12,
+      "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): the RIGHT straight driven 0.69 m in front at shoulder height (1.41 m) — CROSS (a shoulder-height boxing straight; the karate head-height punch photographed as a rising arm)",
+      "duration": 0.48,
+      "aim": "hand"
+    },
+    {
+      "name": "karate_mc_uppercut",
+      "replaces": "uppercut",
+      "source": "cmu",
+      "file": "cmu/141/141_24.bvh",
+      "from": 0.61,
+      "to": 1.13,
+      "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): the RIGHT fist rising 0.74 m to 1.64 m, 0.32 m in front — UPPERCUT / RISING DRAGON (was a 0.45 m rise that stayed at the chin)",
+      "duration": 0.5,
+      "aim": "hand"
+    },
+    {
+      "name": "karate_mc_whirl",
+      "replaces": "karate_whirl",
+      "source": "cmu",
+      "file": "cmu/135/135_01.bvh",
+      "from": 30.55,
+      "to": 31.8,
+      "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): a turning kick — the body comes round 178° and the foot rises to 1.41 m — WHIRLWIND (was a straight side kick with no turn)",
+      "duration": 0.85,
+      "aim": "foot"
+    },
+    {
+      "name": "karate_mc_backspin",
+      "replaces": "karate_backspin",
+      "source": "cmu",
+      "file": "cmu/135/135_11.bvh",
+      "from": 10.7,
+      "to": 11.34,
+      "note": "THE HUNDRED distinct moves (2026-09-15): Yokogeri: LEFT side kick, foot 1.02 m at 10.94 — SPIN BACK KICK (pull back + B)",
+      "duration": 0.64
+    },
+    {
+      "name": "karate_mc_typhoon",
+      "replaces": "karate_typhoon",
+      "source": "cmu",
+      "file": "cmu/135/135_02.bvh",
+      "from": 36.2,
+      "to": 37.5,
+      "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): the jumping spin kick — 326° of turn with both feet 0.9 m off the floor and the kick at 1.10 m — TYPHOON, the airborne ender (was a 180° jumping twist with no kick)",
+      "duration": 1.0,
+      "aim": "foot"
+    },
+    {
+      "name": "karate_mc_hammer",
+      "replaces": "karate_hammer",
+      "source": "cmu",
+      "file": "cmu/80/80_53.bvh",
+      "from": 10.83,
+      "to": 11.63,
+      "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): the RIGHT fist from above the head (1.80 m) driven down to 1.16 m, 0.71 m in front, in 0.30 s — HAMMER FIST (was gedan-barai, a low sweeping block)",
+      "duration": 0.62,
+      "aim": "hand"
+    },
+    {
+      "name": "karate_mc_heavy",
+      "replaces": "karate_heavy",
+      "source": "cmu",
+      "file": "cmu/135/135_09.bvh",
+      "from": 2.3,
+      "to": 2.9,
+      "note": "THE HUNDRED distinct moves (2026-09-15): Oiduki: a planted right lunge punch, reach 0.53 m at 2.54 — HEAVY",
+      "duration": 0.6
+    },
+    {
+      "name": "karate_mc_rush",
+      "replaces": "karate_rush",
+      "source": "cmu",
+      "file": "cmu/135/135_05.bvh",
+      "from": 0.55,
+      "to": 1.45,
+      "note": "THE HUNDRED distinct moves (2026-09-15): Gedanbarai: a full step in (hips travel ~1 leg length 0.6–1.4) behind the strike — RUSH (push at + Y)",
+      "duration": 0.9
+    },
+    {
+      "name": "karate_mc_stagger",
+      "replaces": "karate_stagger",
+      "source": "ual",
+      "file": "ual2/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "anim": "Idle_Shield_Break",
+      "from": 0.0,
+      "to": 0.9,
+      "duration": 0.75,
+      "note": "THE HUNDRED reactive enemies (2026-09-15): the guard broken — the body reels back off a medium / heavy hit without leaving its feet (the light flinch stays karate_mc_hit_react, a launch is the knockdown)"
+    },
+    {
+      "name": "bball_mc_pullup_gather",
+      "replaces": "bball_pullup_gather",
+      "source": "cmu",
+      "file": "cmu/06/06_14.bvh",
+      "from": 1.15,
+      "to": 1.6,
+      "duration": 0.35,
+      "note": "crossover dribble, shoot: the pick-up off the last dribble into the dip (the hands come from the hip to the chest) — the pull-up's gather; the jumpshot capture takes it from the dip (2026-09-17)"
+    },
+    {
+      "name": "bball_mc_defend_backpedal",
+      "replaces": "bball_defend_backpedal",
+      "source": "cmu",
+      "file": "cmu/78/78_24.bvh",
+      "from": 1.0,
+      "to": 2.0,
+      "duration": 0.7,
+      "loop": true,
+      "refineLoop": [
+        0.5,
+        0.85
+      ],
+      "note": "DefensiveStraightNoStop: the retreat — hips at -0.3, a fast drop back while the chest stays on the man (2026-09-17)"
+    },
+    {
+      "name": "bball_mc_defend_slide_hard_right",
+      "replaces": "bball_defend_slide_hard_right",
+      "source": "cmu",
+      "file": "cmu/78/78_26.bvh",
+      "from": 0.5,
+      "to": 1.5,
+      "duration": 0.6,
+      "loop": true,
+      "refineLoop": [
+        0.5,
+        0.85
+      ],
+      "note": "DefensiveRightStopToStop: the sat-down slide (hips -0.30..-0.43, four leg-lengths in a second) — intense D (2026-09-17)"
+    },
+    {
+      "name": "bball_mc_defend_slide_hard_left",
+      "replaces": "bball_defend_slide_hard_left",
+      "source": "cmu",
+      "file": "cmu/78/78_26.bvh",
+      "from": 0.5,
+      "to": 1.5,
+      "duration": 0.6,
+      "loop": true,
+      "refineLoop": [
+        0.5,
+        0.85
+      ],
+      "mirror": true,
+      "note": "the hard slide mirrored"
+    },
+    {
+      "name": "bball_mc_feint_right",
+      "replaces": "bball_in_and_out_right",
+      "source": "cmu",
+      "file": "cmu/78/78_20.bvh",
+      "from": 0.35,
+      "to": 1.05,
+      "duration": 0.55,
+      "note": "FeintLeftMoveRight: the body sells left (hips drop to -0.32) and explodes right — the in-and-out's shape, captured (2026-09-17)"
+    },
+    {
+      "name": "bball_mc_feint_left",
+      "replaces": "bball_in_and_out_left",
+      "source": "cmu",
+      "file": "cmu/78/78_20.bvh",
+      "from": 0.35,
+      "to": 1.05,
+      "duration": 0.55,
+      "mirror": true,
+      "note": "the feint mirrored"
+    },
+    {
+      "name": "bball_mc_dribble_walk",
+      "replaces": "bball_dribble_walk",
+      "source": "cmu",
+      "file": "cmu/06/06_01.bvh",
+      "from": 2.7,
+      "to": 3.9,
+      "duration": 1.2,
+      "loop": true,
+      "refineLoop": [
+        0.9,
+        1.3
+      ],
+      "note": "DRIBBLE GEARS (2026-09-17): a walking dribble, ~1.2 leg/s — one bounce per stride (the right hand dips 2.7 → 3.9)"
+    },
+    {
+      "name": "bball_mc_dribble_jog",
+      "replaces": "bball_dribble_jog",
+      "source": "cmu",
+      "file": "cmu/78/78_10.bvh",
+      "from": 0.3,
+      "to": 1.1,
+      "duration": 0.8,
+      "loop": true,
+      "refineLoop": [
+        0.6,
+        0.9
+      ],
+      "note": "DRIBBLE GEARS: a jogging dribble, ~4.5 leg/s, hands low — between the walk and the 78_06 sprint"
+    }
+  ]
+}
