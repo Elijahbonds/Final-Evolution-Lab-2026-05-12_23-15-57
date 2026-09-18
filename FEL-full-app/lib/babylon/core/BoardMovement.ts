@@ -67,10 +67,9 @@ export const SKATE_TUNING: BoardMoveTuning = {
   // board dies when you stop pushing, and it is the only one that costs nothing to move:
   // settle (5.51) and time-to-95%-cruise (1.57 s) are identical at every value of it,
   // because it is a constant decel that applies ONLY while coasting. drag cannot do this
-  // (it taxes cruise too). At 0.22 the two-push economy returns to 0.610 of cruise —
-  // the 0.609 it had before the weight pass — and roll-to-rest goes 5.6 s -> 7.3 s
-  // (avg 0.98 -> 0.75 m/s^2, against ~0.1-0.3 for a real board on flat concrete).
-  strokeSec: 0.42, pushFade: 0.72, autoPushUntil: 0.8, rollResist: 0.22, brakeDecel: 7, scrubPerSec: true,
+  // (it taxes cruise too). At 0.16 the faster board still stops, but the rollout stays
+  // below the "dies under you" feel bar after the pace increase.
+  strokeSec: 0.42, pushFade: 0.72, autoPushUntil: 0.8, rollResist: 0.16, brakeDecel: 7, scrubPerSec: true,
 };
 // Snow keeps more of its speed than skate — gravity is doing the work and a slope should feel fast — but the same
 // quarter comes off the top so a rider is not outrunning the run.

@@ -67,8 +67,9 @@ ok('snap + transition = manual; otherwise nothing', () => {
 
 console.log('\nD. speed scales the skill check');
 ok('faster grinds drift harder', () => {
-  const b1 = new BalanceModel(); const slow = new BalanceChannel('grind', b1); slow.start(0.1);
-  const b2 = new BalanceModel(); const fast = new BalanceChannel('grind', b2); fast.start(0.95);
+  const seed = () => 0.25; // deterministic drift: same skill/path, speed is the only variable.
+  const b1 = new BalanceModel(); const slow = new BalanceChannel('grind', b1, seed); slow.start(0.1);
+  const b2 = new BalanceModel(); const fast = new BalanceChannel('grind', b2, seed); fast.start(0.95);
   // same skill, both speeds: faster must slip sooner
   const run = (g: InstanceType<typeof BalanceChannel>, spd: number) => {
     let frames = 0;

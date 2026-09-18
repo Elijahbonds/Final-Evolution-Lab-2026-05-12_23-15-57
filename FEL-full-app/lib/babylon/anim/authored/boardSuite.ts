@@ -387,6 +387,6 @@ export function buildSkateBail(scene: Scene, sk: Skeleton): AnimationGroup | nul
     key(T * 0.4, { LeftUpLeg: [-76, 0, 34], LeftLeg: [30, 0, 0], RightUpLeg: [-18, 0, -30], RightLeg: [88, 0, 0], Spine: [58, 0, 26], Spine1: [14, 0, 10], Neck: [10, 0, 0] },
       [-0.28, 0.36, -0.16], [0.31, 0.33, -0.20], -0.10, 0.5),
     key(T, { LeftUpLeg: [-40, 0, 44], LeftLeg: [96, 0, 0], RightUpLeg: [-66, 0, -38], RightLeg: [40, 0, 0], Spine: [74, 0, 34], Spine1: [24, 0, 18], Neck: [26, 0, 0] },
-      [-0.40, 0.10, -0.26], [0.42, 0.06, -0.29], -0.62, 0),
+      [-0.40, 0.10, -0.26], [0.42, 0.06, -0.29], -0.56, 0),
   ]);
 }

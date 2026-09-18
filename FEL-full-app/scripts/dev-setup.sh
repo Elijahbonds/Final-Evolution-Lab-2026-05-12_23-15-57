@@ -129,9 +129,9 @@ fi
 say "Database schema"
 export DATABASE_URL="$DB_URL"
 export DIRECT_URL="$DB_URL"   # schema.prisma declares directUrl; db push reads it
-npx prisma generate >/dev/null
+npx prisma generate --schema=prisma/schema.prisma >/dev/null
 ok "Prisma client generated"
-npx prisma db push --skip-generate >/dev/null
+npx prisma db push --schema=prisma/schema.prisma --skip-generate >/dev/null
 ok "schema pushed to '$DB_NAME'"
 
 # CHECK constraints Prisma cannot express in schema.prisma. Idempotent.

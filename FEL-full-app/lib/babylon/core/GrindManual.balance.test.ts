@@ -38,14 +38,12 @@ function slipTime(kind: BalanceChannelKind, speed01 = 0.5, runs = 200): number {
 /**
  * What a player who reads the needle does.
  *
- * Note the SIGN. In this model the correcting input is the SAME sign as the needle: `needle += (drift − stickX·k)`,
- * so reducing a positive needle needs a positive stick. A first version of these tests pushed the opposite way and
- * could not hold ANY channel at ANY gain — including a grind at its unchanged drift — because the anti-mash rule
- * then charged it the 6.6 penalty coefficient instead of the 4.2 counter one. The code was right and the test was
- * inverted, which is worth leaving written down: the asymmetry is load-bearing and easy to read backwards.
+ * Note the SIGN. In this model the correcting input opposes the needle:
+ * `needle += drift + stickX·k`, so reducing a positive needle needs a negative
+ * stick. The asymmetry is load-bearing and easy to read backwards.
  */
 const correct = (needle: number, gain = 3): number =>
-  Math.sign(needle) * Math.min(1, Math.abs(needle) * gain);
+  -Math.sign(needle) * Math.min(1, Math.abs(needle) * gain);
 
 /** Points a channel accrues over `sec` while a player actually reads the needle. */
 function heldPoints(kind: BalanceChannelKind, sec: number, speed01 = 0.5): number {

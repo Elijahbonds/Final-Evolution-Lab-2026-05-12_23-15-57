@@ -107,7 +107,7 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   derby_swing: ['baseball_swing', 1.0],
   derby_pitch: ['baseball_pitch_over', 1.0],
   penalty_strike: ['soccer_kick_shoot', 1.0],
-  keeper_dive_left: ['keeper_dive.M', 1.0],   // RECOGNISABLE: the keeper's dive, the authored right dive mirrored (was a roundhouse kick)
+  keeper_dive_left: ['keeper_dive', 1.0],   // RECOGNISABLE: the keeper's dive; runtime modes register sided mirrors explicitly.
   keeper_dive_right: ['keeper_dive', 1.0],
 };
 

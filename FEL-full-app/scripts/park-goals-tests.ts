@@ -24,6 +24,12 @@ ok('score / combo / gap / collect all complete through their own paths', () => {
   assert.ok(t.goals.find((g) => g.id === 'combo800')!.done);
   t.report({ type: 'gap', gapId: 'moving_rail' });
   assert.ok(t.goals.find((g) => g.id === 'gap_moving')!.done);
+  t.report({ type: 'gap', gapId: 'plaza_hubba' });
+  assert.ok(t.goals.find((g) => g.id === 'gap_hubba')!.done);
+  t.report({ type: 'gap', gapId: 'plaza_gap' });
+  assert.ok(t.goals.find((g) => g.id === 'gap_flatbar')!.done);
+  t.report({ type: 'gap', gapId: 'plaza_wallride' });
+  assert.ok(t.goals.find((g) => g.id === 'gap_wallride')!.done);
   for (let i = 0; i < 10; i++) t.report({ type: 'collect', collectibleId: `c${i}` });
   assert.ok(t.goals.find((g) => g.id === 'coins10')!.done);
   assert.ok(t.allDone);

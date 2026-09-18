@@ -57,6 +57,7 @@ export const REAL_CLIPS = new Set<string>([
   // basketball packages (anim/authored/basketball) — Phase 4, 2026-09-03
   'bball_dribble_idle', 'bball_crossover_left', 'bball_crossover_right', 'bball_hesi',
   'bball_layup_gather', 'bball_defend_slide_left', 'bball_defend_slide_right',
+  'bball_defend_backpedal', 'bball_closeout', 'bball_contact_react', 'bball_defend_slide_hard_left', 'bball_defend_slide_hard_right',
   'bball_block_reach', 'bball_steal_reach',
   'bball_follow_through',   // BIOMECH-HOOPS-WAVE1 (the tree resolves it through the animator; listed so isResolvable agrees)
   'bball_pullup_gather', 'bball_layup_gather_left', 'bball_floater', 'bball_hand_up', 'bball_screen_set',   // HOOPS-MOVE-KIT-A (2026-09-08): M1 gather, M3 left layup + floater, D3 hand-up, O1 screen

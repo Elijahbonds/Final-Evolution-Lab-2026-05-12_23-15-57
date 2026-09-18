@@ -78,8 +78,8 @@ export function buildKeeperDiveHold(scene: Scene, sk: Skeleton): AnimationGroup 
 /** Off the ground and back to the set — the dive's keys in reverse. One-shot, settles into keeper_set. */
 export function buildKeeperRise(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'keeper_rise', 0.5, [
-    { t: 0, ...STRETCH },
-    { t: 0.28, bones: { Hips: [0, 0, 35], Spine: [24, 0, 16], LeftUpLeg: [-70, 0, 10], RightUpLeg: [-20, 0, -10], LeftLeg: [80, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.46, 0.70, 0.30], Left: [0.10, 0.96, 0.30] }, poles: { Left: [0.2, 0.6, -0.6] }, hipsY: -0.36 },   // pushed up off the ground onto a knee
-    { t: 0.5, bones: { Hips: [0, 0, 0], Spine: [30, 0, 0], ...SET_LEGS(-36, 50) }, hands: SET_HANDS, hipsY: -0.14 },
+    { t: 0, ...STRETCH, hipsY: -0.70 },
+    { t: 0.28, bones: { Hips: [0, 0, 35], Spine: [24, 0, 16], LeftUpLeg: [-70, 0, 10], RightUpLeg: [-20, 0, -10], LeftLeg: [80, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.46, 0.70, 0.30], Left: [0.10, 0.96, 0.30] }, poles: { Left: [0.2, 0.6, -0.6] }, hipsY: -0.22 },   // pushed up off the ground onto a knee
+    { t: 0.5, bones: { Hips: [0, 0, 0], Spine: [30, 0, 0], ...SET_LEGS(-36, 50) }, hands: SET_HANDS, hipsY: -0.10 },
   ]);
 }

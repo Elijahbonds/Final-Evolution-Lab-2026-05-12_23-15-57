@@ -85,13 +85,21 @@ ok('no hard cuts (every fadeSec > 0); one-shots never loop', () => {
   assert.equal(chooseBasketballClip({ ...BASE, speed01: 0.8 }).loop, true);
 });
 ok('tree dedupes same-state plays (no per-frame restart)', () => {
-  let plays = 0;
-  const fake = { play: () => { plays++; } } as never;
-  const tree = new BasketballAnimTree(fake);
-  tree.update(BASE); tree.update(BASE); tree.update(BASE);
-  assert.equal(plays, 1);
-  tree.update({ ...BASE, speed01: 0.9 });
-  assert.equal(plays, 2);
+  let nowMs = 0;
+  const originalPerformance = globalThis.performance;
+  Object.defineProperty(globalThis, 'performance', { value: { now: () => nowMs }, configurable: true });
+  try {
+    let plays = 0;
+    const fake = { play: () => { plays++; } } as never;
+    const tree = new BasketballAnimTree(fake);
+    tree.update(BASE); tree.update(BASE); tree.update(BASE);
+    assert.equal(plays, 1);
+    nowMs = 300; // sibling loop dwell has elapsed, so the speed loop may replace idle.
+    tree.update({ ...BASE, speed01: 0.9 });
+    assert.equal(plays, 2);
+  } finally {
+    Object.defineProperty(globalThis, 'performance', { value: originalPerformance, configurable: true });
+  }
 });
 
 console.log('\nD. FootPlant contract');

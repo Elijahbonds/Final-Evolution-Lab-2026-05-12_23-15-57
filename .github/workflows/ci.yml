@@ -34,7 +34,7 @@ jobs:
           cache: npm
           cache-dependency-path: FEL-full-app/package-lock.json
       - run: npm ci
-      - run: npx prisma generate
+      - run: npx prisma generate --schema=prisma/schema.prisma
       - name: type-check
         run: npx tsc --noEmit
       - name: unit tests
