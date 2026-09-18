@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+.dark {
+  --background: 0 0% 2%;
+  --foreground: 0 0% 96%;
+  --card: 240 8% 9.4%;
+  --card-foreground: 0 0% 96%;
+  --popover: 240 12% 6.7%;
+  --popover-foreground: 0 0% 96%;
+  --primary: 186 100% 50%;
+  --primary-foreground: 0 0% 4%;
+  --secondary: 240 12% 6.7%;
+  --secondary-foreground: 0 0% 90%;
+  --muted: 240 6% 14%;
+  --muted-foreground: 0 0% 60%;
+  --accent: 240 6% 14%;
+  --accent-foreground: 186 100% 50%;
+  --destructive: 343 100% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 6% 16%;
+  --input: 240 6% 16%;
+  --ring: 186 100% 50%;
+  --radius: 0.5rem;
+  --chart-1: 186 100% 50%;
+  --chart-2: 271 91% 65%;
+  --chart-3: 157 100% 50%;
+  --chart-4: 51 100% 50%;
+  --chart-5: 343 100% 60%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #050505;
+  color: hsl(var(--foreground));
+  font-feature-settings: 'rlig' 1, 'calt' 1;
+}
+
+[data-hydration-error] {
+  display: none !important;
+}
+
+.fel-heading {
+  font-family: var(--font-display), sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fel-glow-cyan {
+  text-shadow: 0 0 18px rgba(0, 229, 255, 0.65), 0 0 42px rgba(0, 229, 255, 0.3);
+}
+
+.fel-panel {
+  background: #0f0f13;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.fel-card {
+  background: #1a1a20;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e5e5e5;
+}
+
+.fel-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 0.6rem 0.9rem;
+  color: #ffffff;
+  font-size: 0.9rem;
+}
+.fel-input::placeholder { color: rgba(255, 255, 255, 0.3); }
+.fel-input:focus {
+  outline: none;
+  border-color: rgba(168, 85, 247, 0.6);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0f0f13;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a32;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00e5ff66;
+}
+
+@keyframes fel-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.fel-pulse {
+  animation: fel-pulse 2s ease-in-out infinite;
+}
+
+canvas {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* highlight.js token theme (CELL Studio code viewer) */
+.hljs { color: #e5e5e5; background: transparent; }
+.hljs-comment, .hljs-quote { color: #6b7280; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-name { color: #A855F7; }
+.hljs-string, .hljs-attr, .hljs-template-tag, .hljs-addition { color: #00FF9D; }
+.hljs-number, .hljs-symbol, .hljs-bullet, .hljs-meta { color: #FFD700; }
+.hljs-title, .hljs-section, .hljs-function .hljs-title { color: #00E5FF; }
+.hljs-tag { color: #7dd3fc; }
+.hljs-attribute, .hljs-variable, .hljs-property { color: #FF7AA8; }
+.hljs-type, .hljs-built_in, .hljs-builtin-name { color: #38bdf8; }
+.hljs-deletion { color: #FF3366; }

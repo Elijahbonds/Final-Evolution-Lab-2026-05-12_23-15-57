@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Engineering the Move — Content Pipeline</title>
+<style>
+  :root { --bg:#0b0f14; --card:#131a22; --line:#243040; --text:#e6edf3; --dim:#8b98a5; --accent:#22d3ee; --amber:#f5a623; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); padding:24px; max-width:1100px; margin:0 auto; }
+  h1 { font-size:20px; letter-spacing:0.04em; }
+  h1 span { color:var(--accent); }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:0.08em; color:var(--dim); margin:24px 0 8px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:10px; }
+  input, textarea, select { width:100%; background:#0d141b; border:1px solid var(--line); color:var(--text); border-radius:6px; padding:8px 10px; font-size:13px; margin-bottom:8px; }
+  button { background:var(--accent); color:#03232b; border:0; border-radius:6px; padding:8px 14px; font-weight:600; cursor:pointer; font-size:13px; }
+  button.ghost { background:transparent; border:1px solid var(--line); color:var(--text); }
+  button:disabled { opacity:0.5; cursor:default; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:600; text-transform:uppercase; font-size:10px; letter-spacing:0.06em; }
+  .guardrails { border-left:3px solid var(--amber); background:#1a1608; padding:10px 14px; border-radius:0 8px 8px 0; font-size:13px; }
+  .guardrails li { margin:4px 0 4px 18px; }
+  .caution { border-left:3px solid var(--amber); }
+  .caution .flag { color:var(--amber); font-weight:600; }
+  .status { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .s-idea { background:#1c2b3a; color:#7fb4ff; }
+  .s-filmed { background:#2b2410; color:var(--amber); }
+  .s-posted { background:#12301e; color:#3ddc84; }
+  .s-archived { background:#222; color:var(--dim); }
+  .row { display:flex; gap:8px; align-items:center; }
+  .row > * { flex:1; }
+  .muted { color:var(--dim); font-size:12px; }
+  .keyrow { display:flex; gap:8px; }
+  .keyrow input { flex:1; margin:0; }
+</style>
+</head>
+<body>
+<h1>ENGINEERING THE <span>MOVE</span> — content pipeline</h1>
+<p class="muted">Internal tool. Concepts are generated + tracked here; nothing publishes.</p>
+
+<h2>Guardrails (always on)</h2>
+<div class="guardrails"><ul>
+  <li><b>One CTA per piece.</b> Every concept must have a single clear destination.</li>
+  <li><b>Never advertise an unbuilt FEL feature.</b> Concepts with a caution flag stay highlighted until acknowledged.</li>
+  <li><b>This is not a second production pipeline.</b> If it takes more than a sitting, it's over-scoped.</li>
+</ul></div>
+
+<h2>API key (Anthropic — required outside Claude artifacts)</h2>
+<div class="card"><div class="keyrow">
+  <input id="apiKey" type="password" placeholder="sk-ant-... (stored in this browser only)">
+  <button class="ghost" onclick="saveKey()">Save</button>
+</div><p class="muted" id="keyState"></p></div>
+
+<h2>Log a build / event</h2>
+<div class="card">
+  <input id="fTitle" placeholder="Title (e.g. 'Dunk contest trick-gesture system shipped')">
+  <textarea id="fFeature" rows="2" placeholder="FEL feature being built / event details"></textarea>
+  <textarea id="fFootage" rows="2" placeholder="Available footage/assets (links or description)"></textarea>
+  <div class="row">
+    <select id="fFunnel"><option value="FEL waitlist">FEL waitlist</option><option value="book">Book</option><option value="coaching">Coaching</option></select>
+    <select id="fPlatform"><option value="tiktok">TikTok</option><option value="reels">Reels</option><option value="shorts">Shorts</option></select>
+  </div>
+  <button onclick="addEntry()">Log it</button>
+</div>
+
+<h2>Entries</h2>
+<div id="entries"></div>
+
+<h2>Concept pipeline</h2>
+<div class="row" style="margin-bottom:8px">
+  <select id="filterFunnel" onchange="renderConcepts()"><option value="">All funnels</option><option>book</option><option>coaching</option><option>FEL waitlist</option></select>
+  <select id="filterStatus" onchange="renderConcepts()"><option value="">All statuses</option><option>Idea</option><option>Filmed</option><option>Posted</option><option>Archived</option></select>
+</div>
+<div id="concepts"></div>
+
+<script>
+const PROMPT = `You are a content strategist for Final Evolution, a brand built by a NASM-certified
+performance coach and professional dunker who is also building a sports simulation
+game (Final Evolution Lab) and biomechanics book (The Neuro-Mechanic's Blueprint).
+Turn real engineering/building work into short-form ad content using the
+"Engineering the Move" format: pairing a technical build process with real athletic proof.
+
+Given:
+- FEL FEATURE BEING BUILT: {feature}
+- AVAILABLE FOOTAGE/ASSETS: {footage}
+- FUNNEL TARGET: {funnel}
+- PLATFORM: {platform}
+
+Generate 3 content concepts using these formats:
+1. "Engineering the Move" — split-screen/intercut: build process + real Hoopbus/coaching
+ footage applying the same biomechanical principle.
+2. Creator-as-tester reaction — genuine on-camera reaction to early access to a module.
+3. Proof-of-concept teardown — one biomechanics principle explained cautiously
+ (use "may contribute to" language, not causal claims), tied to both coaching
+ practice and the game's PRQ/physics system.
+
+For each: Hook (first 3 sec), Format, Length target, CTA tied to funnel target,
+and a Caution Flag if the concept requires claiming an unbuilt FEL feature.
+
+Return ONLY a JSON array of 3 objects with keys: name, hook, format, length, cta, caution.`;
+
+const LS = { entries: 'cpm_entries', concepts: 'cpm_concepts', key: 'cpm_key' };
+const load = (k) => JSON.parse(localStorage.getItem(k) || '[]');
+const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+let entries = load(LS.entries), concepts = load(LS.concepts);
+
+function saveKey() {
+  localStorage.setItem(LS.key, document.getElementById('apiKey').value.trim());
+  renderKey();
+}
+function renderKey() {
+  const k = localStorage.getItem(LS.key);
+  document.getElementById('keyState').textContent = k ? 'Key saved (stored only in this browser).' : 'No key — generation will fail until one is saved.';
+  document.getElementById('apiKey').value = k || '';
+}
+
+function addEntry() {
+  const e = {
+    id: Date.now(),
+    title: document.getElementById('fTitle').value.trim(),
+    feature: document.getElementById('fFeature').value.trim(),
+    footage: document.getElementById('fFootage').value.trim(),
+    funnel: document.getElementById('fFunnel').value,
+    platform: document.getElementById('fPlatform').value,
+    date: new Date().toISOString().slice(0, 10),
+  };
+  if (!e.title) return;
+  entries.unshift(e); save(LS.entries, entries);
+  ['fTitle','fFeature','fFootage'].forEach(id => document.getElementById(id).value = '');
+  renderEntries();
+}
+
+async function generate(entryId) {
+  const key = localStorage.getItem(LS.key);
+  if (!key) { alert('Save an Anthropic API key first.'); return; }
+  const e = entries.find(x => x.id === entryId);
+  const btn = document.getElementById('gen-' + entryId);
+  btn.disabled = true; btn.textContent = 'Generating…';
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6', max_tokens: 1500,
+        messages: [{ role: 'user', content: PROMPT.replace('{feature}', e.feature).replace('{footage}', e.footage).replace('{funnel}', e.funnel).replace('{platform}', e.platform) }],
+      }),
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text ?? '';
+    const arr = JSON.parse(text.slice(text.indexOf('['), text.lastIndexOf(']') + 1));
+    for (const c of arr.slice(0, 3)) {
+      concepts.unshift({
+        id: Date.now() + Math.random(), entryId, name: c.name, hook: c.hook, format: c.format,
+        length: c.length, cta: c.cta, caution: c.caution || '', funnel: e.funnel,
+        status: 'Idea', cautionCleared: false,
+      });
+    }
+    save(LS.concepts, concepts); renderConcepts();
+  } catch (err) { alert('Generation failed: ' + err.message); }
+  btn.disabled = false; btn.textContent = 'Generate concepts';
+}
+
+function setStatus(id, s) {
+  const c = concepts.find(x => x.id === id);
+  c.status = s; save(LS.concepts, concepts); renderConcepts();
+}
+function clearCaution(id) {
+  const c = concepts.find(x => x.id === id);
+  c.cautionCleared = true; save(LS.concepts, concepts); renderConcepts();
+}
+
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderEntries() {
+  document.getElementById('entries').innerHTML = entries.map(e => `
+    <div class="card">
+      <b>${esc(e.title)}</b> <span class="muted">${esc(e.date)} · ${esc(e.funnel)} · ${esc(e.platform)}</span>
+      <p class="muted" style="margin:6px 0">${esc(e.feature)}</p>
+      <button id="gen-${e.id}" onclick="generate(${e.id})">Generate concepts</button>
+    </div>`).join('') || '<p class="muted">No entries yet.</p>';
+}
+
+function renderConcepts() {
+  const ff = document.getElementById('filterFunnel').value, fs = document.getElementById('filterStatus').value;
+  const list = concepts.filter(c => (!ff || c.funnel === ff) && (!fs || c.status === fs));
+  document.getElementById('concepts').innerHTML = list.map(c => `
+    <div class="card ${c.caution && !c.cautionCleared ? 'caution' : ''}">
+      <div class="row">
+        <b>${esc(c.name)}</b>
+        <span class="status s-${c.status.toLowerCase()}">${c.status}</span>
+      </div>
+      <table><tr><th>Hook</th><th>Format</th><th>Length</th><th>CTA</th><th>Funnel</th></tr>
+      <tr><td>${esc(c.hook)}</td><td>${esc(c.format)}</td><td>${esc(c.length)}</td><td>${esc(c.cta)}</td><td>${esc(c.funnel)}</td></tr></table>
+      ${c.caution && !c.cautionCleared ? `<p class="flag">⚠ ${esc(c.caution)} <button class="ghost" onclick="clearCaution(${JSON.stringify(c.id)})">Acknowledge</button></p>` : ''}
+      <div class="row" style="margin-top:8px">
+        ${['Idea','Filmed','Posted','Archived'].map(s => `<button class="ghost" ${c.status===s?'disabled':''} onclick="setStatus(${JSON.stringify(c.id)},'${s}')">${s}</button>`).join('')}
+      </div>
+    </div>`).join('') || '<p class="muted">No concepts match.</p>';
+}
+
+renderKey(); renderEntries(); renderConcepts();
+</script>
+</body>
+</html>

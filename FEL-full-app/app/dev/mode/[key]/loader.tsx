@@ -1,0 +1,91 @@
+'use client';
+
+// Generic dev runner: mounts ANY registered Babylon mode through the real
+// ModeHarness. Built during the all-modes-to-Babylon pass so each ported mode
+// can actually be run and looked at — every /play route is auth-gated and the
+// local database is down, so the shipped routes cannot be opened here.
+
+import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
+import { useEffect, useRef, useState } from 'react';
+import { runMode, InputBus, type ModePhase, type HudValue } from '@/lib/babylon';
+import { MODES } from '@/lib/babylon/modes/registry';
+import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
+
+export function DevModeRunner({ modeKey }: { modeKey: string }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const busRef = useRef<InputBus | null>(null);
+  const [phase, setPhase] = useState<ModePhase>('loading');
+  const [hud, setHud] = useState<Record<string, HudValue>>({});
+  const [err, setErr] = useState<string | null>(null);
+  // React mounts effects twice in dev. Two runMode() calls on ONE canvas means
+  // two Babylon Engines sharing a single WebGL context, and the second one
+  // clobbers the first — every mode rendered a black frame here, including the
+  // shipped Dunk. This latch keeps exactly one harness per canvas.
+  const mountedRef = useRef(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const def = MODES[modeKey];
+    if (!canvas) return;
+    if (mountedRef.current) return;
+    mountedRef.current = true;
+    if (!def) { setErr(`no registry mode "${modeKey}"`); return; }
+    const bus = new InputBus();
+    busRef.current = bus;
+    let stop: (() => void) | null = null;
+    let disposed = false;
+
+    // Deferred for the same reason every host defers: the phantom StrictMode
+    // mount would otherwise build a second engine on this canvas that its own
+    // cleanup cannot cancel, and the two fight over one WebGL context. The
+    // mountedRef guard above does NOT prevent it — the phantom mount is the one
+    // that sets the ref. Measured on threevthree through this runner: mountVenue
+    // ran twice and the canvas came out empty at 5 meshes while the HUD streamed.
+    const startTimer = setTimeout(() => {
+      if (disposed) return;
+      runMode(def, {
+        heroOverride: process.env.NODE_ENV === 'development' ? new URLSearchParams(window.location.search).get('hero') ?? undefined : undefined,   // ship pass 3 rollout flag
+        canvas,
+        location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
+        input: bus,
+        onPhase: (p, d) => { if (!disposed) { setPhase(p); if (p === 'error') setErr(String(d)); } },
+        onHud: (h) => { if (!disposed) setHud((prev) => ({ ...prev, ...h })); },
+        resultSink: async (r) => console.log('[dev] result', r),
+      }).then((s) => { if (disposed) s(); else stop = s; })
+        .catch((e) => { if (!disposed) setErr(String(e?.message ?? e)); });
+    }, 0);
+
+    return () => { disposed = true; mountedRef.current = false; stop?.(); clearTimeout(startTimer); };
+  }, [modeKey]);
+
+  return (
+    // Fixed full-viewport canvas. An aspect-ratio box inside a scrolling page
+    // let the engine size the canvas while it was partly offscreen, and every
+    // mode — including the shipped Dunk — rendered a black frame.
+    <div className="relative h-screen w-screen overflow-hidden bg-black font-mono text-xs text-white">
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none outline-none" />
+
+      <div className="pointer-events-none absolute left-3 top-3 z-20 max-w-[46%] rounded bg-black/70 p-2">
+        <p className="text-white/50">
+          DEV · <span className="text-[#00E5FF]">{modeKey}</span> · {phase}
+          {err ? <span className="text-red-400"> · {err}</span> : null}
+        </p>
+        <pre className="mt-1 whitespace-pre-wrap text-[10px] text-white/45">{JSON.stringify(hud, null, 1)}</pre>
+      </div>
+
+      <button
+        // Blur: space activates a focused button, and space is the shoot key,
+        // so leaving it focused turns the next shot into a pause.
+        onClick={(e) => {
+          e.currentTarget.blur();
+          busRef.current?.emit({ t: 'button', btn: 'START', pressed: true });
+        }}
+        className="absolute left-3 bottom-3 z-20 rounded bg-[#00E5FF] px-4 py-2 font-bold text-black"
+      >START</button>
+
+      {busRef.current && (phase === 'playing' || phase === 'countdown') && (
+        <TouchOverlay bus={busRef.current} modeId={modeKey} visible />
+      )}
+    </div>
+  );
+}

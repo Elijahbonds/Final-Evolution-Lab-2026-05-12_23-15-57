@@ -1,0 +1,317 @@
+// DanceCore — the rhythm engine behind Dance mode.
+//
+// M28 shipped ChoreographyEngine, which already had the right judging model
+// (beat grid, ±40/90/200 ms windows, combo scoring). Two things kept it from
+// being shippable: it is welded to CharacterAnimator, so none of the timing
+// can be tested without a rig; and nothing ever generated a routine to feed
+// it. This is that engine's arithmetic, extracted so it can be RUN, plus the
+// routine generator it was missing.
+//
+// The judging windows and point values are deliberately IDENTICAL to M28's
+// so behaviour is preserved rather than quietly re-tuned:
+//   PERFECT ≤ 40 ms · 300   GREAT ≤ 90 ms · 200   GOOD ≤ 200 ms · 100
+//   combo adds 5 × combo per hit
+//
+// Babylon-free and animator-free on purpose — same reasoning as RallyCore.
+// The mode owns the rig; this owns the clock.
+
+export type Judgement = 'PERFECT' | 'GREAT' | 'GOOD' | 'MISS';
+
+export const JUDGE_WINDOWS: { label: Judgement; maxDelta: number; points: number }[] = [
+  { label: 'PERFECT', maxDelta: 0.04, points: 300 },
+  { label: 'GREAT', maxDelta: 0.09, points: 200 },
+  { label: 'GOOD', maxDelta: 0.20, points: 100 },
+];
+
+/** Beyond this a tap is a miss and a queued step expires. */
+export const MISS_AFTER = 0.20;
+// MECHANICS PASS (2026-09-15): mashing out-scored dancing (the probe: 8 taps a second 1,450 vs one deliberate tap a beat 520),
+// because a tap on no step only reset the combo — every window still caught one of the spam taps. A wild tap now COSTS, and
+// a step caught right after one is capped at GOOD: the grade is for timing, and spam has no timing.
+export const WILD_TAP_COST = 20;
+export const SPAM_LOCK_SEC = 0.25;
+
+export interface DanceStep {
+  clipId: string;
+  beat: number;
+  holdBeats: number;
+  mirrored: boolean;
+}
+
+export interface DanceClip {
+  id: string;
+  name: string;
+  beats: number;
+  category: 'toprock' | 'footwork' | 'freeze' | 'power' | 'wave' | 'bounce' | 'transition';
+  difficulty: 1 | 2 | 3;
+}
+
+/** Same eight entries M28 defined. Ids resolve through danceClips.ts. */
+export const DANCE_LIBRARY: DanceClip[] = [
+  { id: 'dance_toprock_basic', name: 'Top Rock', beats: 4, category: 'toprock', difficulty: 1 },
+  { id: 'dance_bounce_two_step', name: 'Two Step', beats: 4, category: 'bounce', difficulty: 1 },
+  { id: 'dance_wave_arm', name: 'Arm Wave', beats: 2, category: 'wave', difficulty: 2 },
+  { id: 'dance_footwork_six', name: 'Six Step', beats: 8, category: 'footwork', difficulty: 2 },
+  { id: 'dance_freeze_baby', name: 'Baby Freeze', beats: 2, category: 'freeze', difficulty: 3 },
+  { id: 'dance_power_windmill', name: 'Windmill', beats: 8, category: 'power', difficulty: 3 },
+  { id: 'dance_trans_spin', name: 'Spin', beats: 2, category: 'transition', difficulty: 1 },
+  { id: 'dance_bounce_shoulder', name: 'Shoulder Bop', beats: 4, category: 'bounce', difficulty: 1 },
+];
+
+export const beatDuration = (bpm: number): number => 60 / Math.max(1, bpm);
+
+// ── routine generation ────────────────────────────────────────────────────
+
+export interface RoutineOptions {
+  bars: number;
+  /** 1 = easy (difficulty-1 clips, on-beat), 3 = hard (all clips, syncopation). */
+  difficulty: 1 | 2 | 3;
+  beatsPerBar?: number;
+  /** Deterministic when supplied — the same seed must yield the same routine,
+   *  or a "retry" button silently hands the player a different chart. */
+  seed?: number;
+}
+
+/** Small deterministic PRNG. Math.random() would make routines unrepeatable,
+ *  which breaks retry, breaks sharing a chart, and breaks these tests. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Build a routine that fills `bars` bars without overlapping steps.
+ *
+ * Steps are laid down sequentially and each consumes its own clip length, so
+ * a routine can never ask the dancer to start a windmill halfway through a
+ * six-step. That constraint is why this is generated rather than hand-listed.
+ */
+export function generateRoutine(o: RoutineOptions): DanceStep[] {
+  const beatsPerBar = o.beatsPerBar ?? 4;
+  const totalBeats = o.bars * beatsPerBar;
+  const rnd = mulberry32(o.seed ?? 1);
+
+  const pool = DANCE_LIBRARY.filter((c) => c.difficulty <= o.difficulty);
+  if (pool.length === 0) return [];
+
+  const steps: DanceStep[] = [];
+  let beat = 0;
+  while (beat < totalBeats) {
+    const remaining = totalBeats - beat;
+    const fits = pool.filter((c) => c.beats <= remaining);
+    if (fits.length === 0) break;
+    const clip = fits[Math.floor(rnd() * fits.length)];
+
+    // Off-beat entries only at difficulty 3, and only when there is room.
+    const syncopate = o.difficulty >= 3 && rnd() < 0.25 && remaining > clip.beats;
+    const at = syncopate ? beat + 0.5 : beat;
+
+    steps.push({
+      clipId: clip.id,
+      beat: at,
+      holdBeats: clip.beats,
+      mirrored: rnd() < 0.35,
+    });
+    beat = at + clip.beats;
+  }
+  return steps;
+}
+
+// ── judging ───────────────────────────────────────────────────────────────
+
+export function judgeDelta(delta: number): { label: Judgement; points: number } {
+  const a = Math.abs(delta);
+  for (const w of JUDGE_WINDOWS) {
+    if (a <= w.maxDelta) return { label: w.label, points: w.points };
+  }
+  return { label: 'MISS', points: 0 };
+}
+
+export interface DanceResult {
+  score: number;
+  maxCombo: number;
+  counts: Record<Judgement, number>;
+  /** 0–5. What the results screen shows. */
+  stars: number;
+  accuracy: number;
+}
+
+/**
+ * Scores a performance against a routine.
+ *
+ * Deliberately a class with an explicit clock rather than a `setInterval`:
+ * the mode drives it from the AUDIO clock (`AudioContext.currentTime`), not
+ * the frame clock. Rhythm judged on requestAnimationFrame drifts against the
+ * music on any dropped frame, and players feel that immediately.
+ */
+export class DancePerformance {
+  private steps: DanceStep[] = [];
+  private pending: { step: DanceStep; time: number }[] = [];
+  private nextIdx = 0;
+  private started = 0;
+  private bpm: number;
+
+  score = 0;
+  combo = 0;
+  maxCombo = 0;
+  counts: Record<Judgement, number> = { PERFECT: 0, GREAT: 0, GOOD: 0, MISS: 0 };
+  running = false;
+
+  /** Fired when a step's animation should play. */
+  onStepFired: ((s: DanceStep) => void) | null = null;
+  /** `step` is the step this judgement belongs to (undefined for a wild tap
+   *  with nothing pending). `deltaMs` is SIGNED: negative = the tap was
+   *  early, positive = late (undefined on wild taps). Both optional —
+   *  existing 3-arg callbacks are unaffected. */
+  onJudged: ((label: Judgement, points: number, combo: number, step?: DanceStep, deltaMs?: number) => void) | null = null;
+
+  constructor(bpm: number) { this.bpm = bpm; }
+
+  setRoutine(steps: DanceStep[]): void {
+    this.steps = [...steps].sort((a, b) => a.beat - b.beat);
+  }
+
+  start(now: number): void {
+    this.started = now;
+    this.nextIdx = 0;
+    this.pending = [];
+    this.score = 0; this.combo = 0; this.maxCombo = 0;
+    this.counts = { PERFECT: 0, GREAT: 0, GOOD: 0, MISS: 0 };
+    this.lastWildAt = -Infinity;
+    this.running = true;
+  }
+
+  stop(): void { this.running = false; }
+
+  /** Total beats in the routine, including the last step's hold. */
+  get totalBeats(): number {
+    if (this.steps.length === 0) return 0;
+    const last = this.steps[this.steps.length - 1];
+    return last.beat + last.holdBeats;
+  }
+
+  /** Call every frame with the AUDIO clock. */
+  update(now: number): void {
+    if (!this.running) return;
+    const elapsed = now - this.started;
+    const bd = beatDuration(this.bpm);
+
+    while (this.nextIdx < this.steps.length && elapsed >= this.steps[this.nextIdx].beat * bd) {
+      const s = this.steps[this.nextIdx];
+      this.pending.push({ step: s, time: this.started + s.beat * bd });
+      this.onStepFired?.(s);
+      this.nextIdx++;
+    }
+
+    while (this.pending.length && this.pending[0].time < now - MISS_AFTER) {
+      const expired = this.pending.shift()!;
+      this.registerMiss(expired.step);
+    }
+  }
+
+  private lastWildAt = -Infinity;
+  private registerMiss(step?: DanceStep, deltaMs?: number, now?: number): void {
+    this.combo = 0;
+    this.counts.MISS++;
+    if (!step) { this.score = Math.max(0, this.score - WILD_TAP_COST); if (now !== undefined) this.lastWildAt = now; }
+    this.onJudged?.('MISS', 0, 0, step, deltaMs);
+  }
+
+  /** The next step to be judged and WHEN (audio-clock seconds) — pending
+   *  first, then the next unfired step. A rhythm game that never shows the
+   *  incoming move is unplayable-by-design (measured: a beat-grid bot with
+   *  perfect cadence hit 28% — it was tapping beats with no step on them);
+   *  the cue is what makes the judging fair. */
+  peekNext(now: number): { time: number; step: DanceStep } | null {
+    if (this.pending.length) return this.pending[0];
+    if (!this.started) return null;
+    const s = this.steps[this.nextIdx];
+    if (!s) return null;
+    return { step: s, time: this.started + s.beat * beatDuration(this.bpm) };
+  }
+
+  /** The next `n` steps to be judged with WHEN (audio-clock seconds):
+   *  pending first, then unfired steps in chart order. Feeds the cue lane
+   *  (A+ mission #1) — peekNext is the n=1 case. */
+  upcoming(now: number, n = 4): { time: number; step: DanceStep }[] {
+    void now;
+    const out: { time: number; step: DanceStep }[] = [];
+    for (const p of this.pending) { if (out.length >= n) break; out.push(p); }
+    if (!this.started) return out;
+    const bd = beatDuration(this.bpm);
+    for (let i = this.nextIdx; i < this.steps.length && out.length < n; i++) {
+      const s = this.steps[i];
+      out.push({ step: s, time: this.started + s.beat * bd });
+    }
+    return out;
+  }
+
+  /** Player input on the audio clock. */
+  hit(now: number): Judgement {
+    let bestIdx = -1, best = Infinity, bestSigned = 0;
+    for (let i = 0; i < this.pending.length; i++) {
+      const signed = now - this.pending[i].time;   // + = late, − = early
+      const d = Math.abs(signed);
+      if (d < best) { best = d; bestIdx = i; bestSigned = signed; }
+    }
+    if (bestIdx === -1 || best > MISS_AFTER) {
+      // Rhythm games judge SYMMETRICALLY: an early tap inside the window
+      // hits the UPCOMING step. Without this, taps before the step fires are
+      // "wild" misses — a tap 100ms early on purpose is a play, not an error
+      // (measured: every slightly-early tap scored a wild MISS).
+      if (this.nextIdx < this.steps.length) {
+        const s = this.steps[this.nextIdx];
+        const t = this.started + s.beat * beatDuration(this.bpm);
+        const earlyBy = t - now;                        // + = the step is ahead
+        if (earlyBy > 0 && earlyBy <= MISS_AFTER) {
+          this.nextIdx++;                               // consumed early — never fires
+          const { label, points } = this.capAfterSpam(judgeDelta(earlyBy), now);
+          this.combo++;
+          if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+          this.score += points + this.combo * 5;
+          this.counts[label]++;
+          this.onStepFired?.(s);
+          this.onJudged?.(label, points, this.combo, s, -earlyBy * 1000);
+          return label;
+        }
+      }
+      this.registerMiss(undefined, bestIdx === -1 ? undefined : bestSigned * 1000, now);
+      return 'MISS';
+    }
+    const [hitStep] = this.pending.splice(bestIdx, 1);
+    const { label, points } = this.capAfterSpam(judgeDelta(best), now);
+    this.combo++;
+    if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+    this.score += points + this.combo * 5;
+    this.counts[label]++;
+    this.onJudged?.(label, points, this.combo, hitStep.step, bestSigned * 1000);
+    return label;
+  }
+
+  private capAfterSpam(j: { label: Judgement; points: number }, now: number): { label: Judgement; points: number } {
+    if (now - this.lastWildAt > SPAM_LOCK_SEC || j.label === 'GOOD') return j;
+    const good = JUDGE_WINDOWS.find((w) => w.label === 'GOOD');
+    return good ? { label: 'GOOD', points: good.points } : j;
+  }
+
+  /** Steps that were never presented, e.g. the player quit early. */
+  private get unplayed(): number {
+    return Math.max(0, this.steps.length - (this.nextIdx - this.pending.length));
+  }
+
+  result(): DanceResult {
+    const judged = this.counts.PERFECT + this.counts.GREAT + this.counts.GOOD + this.counts.MISS;
+    const weighted = this.counts.PERFECT * 1 + this.counts.GREAT * 0.75 + this.counts.GOOD * 0.4;
+    const accuracy = judged === 0 ? 0 : weighted / judged;
+    // Stars are on accuracy, NOT raw score: score scales with routine length,
+    // so a long easy chart would out-star a short hard one.
+    const stars = accuracy >= 0.95 ? 5 : accuracy >= 0.85 ? 4 : accuracy >= 0.7 ? 3
+      : accuracy >= 0.5 ? 2 : accuracy > 0 ? 1 : 0;
+    return { score: this.score, maxCombo: this.maxCombo, counts: { ...this.counts }, stars, accuracy };
+  }
+}
