@@ -106,6 +106,8 @@ export default function KarateBabylon({ onEnd }: GameProps) {
   // mode does publish one (the 1v1 modes still do).
   const hp = hud.hp == null ? null : Number(hud.hp);
   const chi = Number(hud.chi ?? 0);
+  const focus = hud.focus == null ? null : Number(hud.focus);   // MATRIX FOCUS: the bullet-time meter (the horde publishes it)
+  const focusOn = !!hud.focusOn;
 
   return (
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
@@ -122,6 +124,11 @@ export default function KarateBabylon({ onEnd }: GameProps) {
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/50">
             <div className="h-full rounded-full bg-[#00E5FF] transition-all" style={{ width: `${Math.max(0, Math.min(100, chi))}%` }} />
           </div>
+          {focus !== null && (
+            <div className={`h-1.5 w-full overflow-hidden rounded-full bg-black/50 ${focusOn ? 'ring-1 ring-[#39FF6A]/80' : ''}`} title="FOCUS — hold R2">
+              <div className={`h-full rounded-full transition-all ${focusOn ? 'bg-[#39FF6A] shadow-[0_0_8px_#39FF6A]' : 'bg-[#2E9E52]'}`} style={{ width: `${Math.max(0, Math.min(100, focus))}%` }} />
+            </div>
+          )}
         </div>
         <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">
           WAVE {hnode(hud.wave, 1)} · {hnode(hud.kos, 0)} KO

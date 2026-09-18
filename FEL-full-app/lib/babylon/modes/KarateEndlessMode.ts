@@ -60,6 +60,7 @@ import { prqMaxHp, prqSpeedMult } from '../core/PrqVitals';
 import { prqGrade } from '../../prq';
 import { mookMaxHp, damageMook, mookHp01, mookBarHex } from '../core/MookHealth';
 import { EvadeMoves } from '../core/EvadeMoves';
+import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailable, startWallRun, wallRunAt, startWallKick, wallKickAt, kickHits, type WallRunState, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18)
 import { HORDE_WINDOW_SEC } from '../core/DodgeRead';
 import { Color3, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -269,6 +270,18 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   /** Movement multiplier from the band, 1 for a guest. Multiplies the perk tree's own, never replaces it. */
   let prqSpeed = 1;
   const slowmo = new SlowMoLatch();
+  // MATRIX FOCUS (owner 2026-09-18, "add enter the matrix physics and combat"): bullet time you HOLD on the right trigger. The
+  // room runs at FOCUS.worldScale on its own clocks (the enemies' and the partner's animators, the game clock) while the
+  // hero moves and swings at his own (dtHero, his animator at heroScale) — the strikes come at you slow enough to step
+  // around, yours land at full pace and LAUNCH. Inside Focus, L1 at the arena's edge is a WALL RUN along it and the next
+  // press (or the run's end) is the KICK off it back through the pack. The latch above stays the game's own beats.
+  const focus = new FocusMeter();
+  let focusHeld = false, focusHud = -1, focusHudOn = false;
+  let wallRun: WallRunState | null = null, wallKick: WallKickState | null = null, wallKickY0 = 0;
+  const heroVel = new Vector3();
+  const matrixStats = { wallRuns: 0, wallKicks: 0, kickHits: 0, focusStrikes: 0 };
+  const enemyLastPos = new Map<Enemy, Vector3>(); let roomMps = 0, heroMps = 0; const heroLastPos = new Vector3();   // MATRIX telemetry: who is moving at what speed
+  const FOCUS_TINT = 'rgba(16, 70, 34, 0.75)';
   // THE-HUNDRED: the string book replaces the jab-only ComboTracker (A A A is still the uppercut finisher, now one of six
   // strings); the queue holds a press made before the swing's cancel point.
   const book = new StringBook();
@@ -462,6 +475,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const preset = STEERING_PRESETS[archetype];
     // ONE owner of this body's clips: the steering reports (idle / move / down), the owner shows it.
     const anim = new BeatOwner(char.animator);
+    char.animator.setTimeScale(focus.worldScale);   // MATRIX: a body spawned inside Focus arrives on the room's clock
     const mob = new Mob(char, preset, (st) => {
       if (st === 'move') anim.loop(AGENT_STEP, { fadeSec: 0.16, speedRatio: Math.max(0.9, Math.min(1.5, preset.maxSpeed / 3)) });
       else if (st === 'idle') anim.loop(STANCE, { fadeSec: 0.2 });
@@ -632,6 +646,83 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   const swingCancelable = () => !striking || (!!strikeMove && strikeHitDone && gameSec - strikeStartedAt >= cancelSec(strikeMove));
   function endSwing(): void { striking = false; myStrike = null; strikeMove = null; strikeHitDone = true; }
 
+  // ── MATRIX FOCUS ─────────────────────────────────────────────────────────────────────────────────────────────────
+  function applyFocusClocks(): void {
+    const room = focus.worldScale;
+    for (const e of enemies) e.mob.char.animator.setTimeScale(room);
+    partner?.animator.setTimeScale(room);
+    player.animator.setTimeScale(focus.heroScale);
+  }
+  function onFocusStart(ctx: ModeContext): void {
+    ctx.juice.tint(FOCUS_TINT);
+    ctx.camDirector.pulse(0.45, 0.35);
+    SoundKit.play('powerUp', { pitch: 0.55, volume: 0.5 });
+    ctx.setHud({ banner: 'FOCUS' }); setTimeout(() => ctx.setHud({ banner: '' }), 500);
+    console.info(`[MATRIX] focus on at ${Math.round(focus.value)}`);
+  }
+  function onFocusEnd(ctx: ModeContext, dry: boolean): void {
+    ctx.juice.tint(null);
+    SoundKit.play('whoosh', { pitch: 0.6, volume: 0.4 });
+    if (dry) { ctx.setHud({ banner: 'FOCUS DRAINED' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+    console.info(`[MATRIX] focus off (${dry ? 'dry' : 'released'}) after ${focus.heldSec.toFixed(2)} s`);
+  }
+  /** L1 inside Focus, running INTO the arena's edge: up onto the wall and along it. */
+  function tryWallRun(ctx: ModeContext): boolean {
+    const pos = player.root.position;
+    if (!wallRunAvailable({ x: pos.x, z: pos.z }, { x: heroVel.x, z: heroVel.z }, ARENA_RADIUS)) return false;
+    wallRun = startWallRun({ x: pos.x, z: pos.z }, { x: heroVel.x, z: heroVel.z });
+    matrixStats.wallRuns++;
+    SoundKit.play('whoosh', { pitch: 1.1, volume: 0.45 });
+    ctx.setHud({ banner: 'WALL RUN' }); setTimeout(() => ctx.setHud({ banner: '' }), 500);
+    ctx.momentum.report({ kind: 'near_miss', weight: 10 });
+    console.info(`[MATRIX] wall run at r ${Math.hypot(pos.x, pos.z).toFixed(2)} dir ${wallRun.dir}`);
+    return true;
+  }
+  /** Off the wall: a flying kick back through the ring at the nearest body (or the middle), dropping whoever it passes. */
+  function wallKickOff(ctx: ModeContext): void {
+    if (!wallRun) return;
+    const pos = player.root.position;
+    const n = nearest(pos);
+    wallKick = startWallKick({ x: pos.x, z: pos.z }, n ? { x: n.mob.char.root.position.x, z: n.mob.char.root.position.z } : null);
+    wallKickY0 = pos.y; wallRun = null; player.root.rotation.z = 0;
+    player.root.rotation.y = Math.atan2(wallKick.dx, wallKick.dz);
+    const clip = player.animator.clipNames.has('trick_jump_spin_kick') ? 'trick_jump_spin_kick' : SPORT_CLIP.karateKick;
+    myStrike = { weight: 'heavy', clip, until: now() + 900 };   // the tree plays the kick; endSwing on its settle
+    matrixStats.wallKicks++;
+    SoundKit.play('whoosh', { pitch: 0.8, volume: 0.6 });
+    ctx.setHud({ banner: 'WALL KICK' }); setTimeout(() => ctx.setHud({ banner: '' }), 600);
+    console.info(`[MATRIX] wall kick toward ${n ? 'a body' : 'the middle'}`);
+  }
+  function tickMatrix(ctx: ModeContext, dt: number): void {
+    if (wallRun) {
+      wallRun.t += dt;
+      const p = wallRunAt(wallRun, ARENA_RADIUS, wallRun.t);
+      player.root.position.set(p.x, p.y, p.z);
+      player.root.rotation.y = p.yaw;
+      player.root.rotation.z = -wallRun.dir * 0.42;   // leaning into the wall
+      if (p.done) wallKickOff(ctx);
+      return;
+    }
+    if (wallKick) {
+      const prev = { x: player.root.position.x, z: player.root.position.z };
+      wallKick.t += dt;
+      const p = wallKickAt(wallKick, wallKick.t, wallKickY0);
+      player.root.position.set(p.x, p.y, p.z);
+      const bodies = liveBodies();
+      for (const i of kickHits(prev, { x: p.x, z: p.z }, bodies.map((e) => ({ x: e.mob.char.root.position.x, z: e.mob.char.root.position.z })), WALL_RUN.kickHitM, wallKick.hit)) {
+        wallKick.hit.add(i);
+        const e = bodies[i];
+        e.hp -= WALL_RUN.kickDamage; e.hitAt = gameSec; matrixStats.kickHits++; focus.gain(FOCUS.hitGain);
+        ctx.juice.hitStop(60); ctx.feel?.impact?.(0.5);
+        EffectsKit.burst(ctx.scene, e.mob.char.root.position.add(new Vector3(0, 1.1, 0)), 'sparks');
+        if (e.hp <= 0) { focus.gain(FOCUS.koGain); ko(ctx, e); }
+        else staggerEnemy(e, WALL_RUN.kickStunSec, WALL_RUN.kickPush01, wallKick.dx, wallKick.dz, ctx);
+        console.info(`[MATRIX] wall kick hit ${i}`);
+      }
+      if (p.done) { wallKick = null; player.root.position.y = 0; }
+    }
+  }
+
   /** A strike button. Carrying a body: the weapon verbs. Mid-swing before the cancel point: QUEUED (fires the frame it
    *  opens). Otherwise the string book names the move, the redirect picks its target, and the swing starts NOW. */
   function strike(ctx: ModeContext, key: StrikeBtn): void {
@@ -721,7 +812,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const t = now();
     if ((move.launch && move.ender) || route) matrix(ctx, 'finisher');
     else if (move.launch) matrix(ctx, 'heavyKo');
-    const launches = move.launch || (route ? route.ender !== 'stun' : false);
+    const launches = move.launch || (route ? route.ender !== 'stun' : false) || focus.active;   // MATRIX: inside Focus every connect LAUNCHES
     if (move.ender) stats.finishers++;
     // SOUL CALIBUR WEIGHT: the connect holds for a beat that grows with the weight (hit-stop is the harness's, not a slow-mo)
     ctx.juice.hitStop(move.weight === 'light' ? 28 : move.weight === 'medium' ? 45 : 70);
@@ -976,13 +1067,16 @@ export const KarateEndlessMode: ModeDefinition = (() => {
    * also take three times as long to charge the burst, or the retune quietly nerfs the special.
    */
   function landHit(ctx: ModeContext, t: Enemy, launch: boolean, weight: 'light' | 'medium' | 'heavy' | 'finisher' = 'light'): void {
+    const hpBefore = t.hp;
     t.hp = damageMook(t.hp, weight, launch || now() < t.airUntil);
+    if (focus.active) { t.hp = Math.max(0, hpBefore - Math.round((hpBefore - t.hp) * FOCUS.damageMult)); matrixStats.focusStrikes++; }   // MATRIX: a Focus strike hits harder
+    focus.gain(FOCUS.hitGain);
     gainChi(ctx, 8);
     ctx.feel?.impact?.(launch ? 0.55 : 0.35);
     EffectsKit.burst(ctx.scene, t.mob.char.root.position.add(new Vector3(0, 1.1, 0)), 'sparks');
     if (launch) EffectsKit.burst(ctx.scene, t.mob.char.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
     t.hitAt = gameSec;
-    if (t.hp <= 0) { ko(ctx, t); return; }
+    if (t.hp <= 0) { focus.gain(FOCUS.koGain); ko(ctx, t); return; }
     // THE-HUNDRED: a connect STAGGERS — the wind-up it was in is gone, it slides back off the hit. Before this a body
     // took a jab mid-wind-up and hit you anyway (landHit never touched the brain).
     const ox = t.mob.char.root.position.x - player.root.position.x, oz = t.mob.char.root.position.z - player.root.position.z, ol = Math.hypot(ox, oz) || 1;
@@ -1132,7 +1226,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   function agentHitsPlayer(ctx: ModeContext, e: Enemy): void {
     if (myDown.downed) return;
     if (iframeSec > 0) {
-      stats.dodged++;
+      stats.dodged++; focus.gain(FOCUS.dodgeGain);   // MATRIX: a dodge refills Focus
       if (iframeSec > DODGE_IFRAME_SEC + perks.iframeBonus - PERFECT_WINDOW_SEC && matrix(ctx, 'perfectDodge')) {
         stats.perfect++;
         gainChi(ctx, 12);
@@ -1313,6 +1407,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     if (process.env.NODE_ENV !== 'development') return;
     const md = (ctx.scene.metadata ??= {}) as Record<string, unknown>;
     md.karateNeo = {
+      focus: { value: Math.round(focus.value), active: focus.active, starts: focus.starts, heldSec: +focus.heldSec.toFixed(2), ...matrixStats, wallRun: !!wallRun, wallKick: !!wallKick, roomClock: enemies[0]?.mob.char.animator.currentTimeScale ?? 1, heroClock: player.animator.currentTimeScale, roomMps: +roomMps.toFixed(2), heroMps: +heroMps.toFixed(2) },   // MATRIX FOCUS
       hp: Math.round(vitals.hp), hpMax: vitals.maxHp, wave, coins: shards, chi: Math.round(chi), slowMo: +slowmo.sec.toFixed(3), slowMoKind: slowmo.kind ?? '', slowMos: slowmo.episodes, timeScale: ctx.scene.animationTimeScale,
       attackers: attackers(), enemies: enemies.length, shop: shopOpen, down: myDown.downed, partnerRoot: partner?.root.name ?? '',
       nextLandIn: +nextLandIn().toFixed(3),   // seconds until the nearest agent's strike lands (−1 = none in flight) — the probe's perfect-dodge driver
@@ -1437,6 +1532,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       SoundKit.unlock();
       localSource.feed(e);
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      if (e.t === 'trigger' && e.side === 'R') focusHeld = e.value > 0.35;   // MATRIX FOCUS: the right trigger holds bullet time
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (shopOpen) {
         // the shop: ◀ ▶ (or ▲ ▼) browse, A buys, B fights now
@@ -1458,6 +1554,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         // THE-HUNDRED: L1 is the GRAB when a staggered body is in reach (and the THROW while carrying one) — the jump
         // otherwise, so the verb only exists where it can do something.
         if (e.btn === 'L1' && !carry && flow.takedownReady && takedown(ctx)) { /* FREEFLOW: the takedown is L1's first meaning when it is ready */ }
+        else if (e.btn === 'L1' && wallRun) wallKickOff(ctx);                                      // MATRIX: the kick off the wall
+        else if (e.btn === 'L1' && focus.active && !carry && !striking && !wallKick && !myDown.downed && tryWallRun(ctx)) { /* MATRIX: up onto the wall */ }
         else if (e.btn === 'L1' && carry) throwCarried(ctx);
         else if (e.btn === 'L1' && striking && !strikeHitDone && !myDown.downed) { grabQueuedAt = gameSec; queue.clear(); }
         else if (e.btn === 'L1' && !myDown.downed && !tryGrab(ctx) && !striking && meAir.jump()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });
@@ -1513,7 +1611,16 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       const wasSlow = slowmo.active;
       slowmo.tick(dtReal);
       if (wasSlow && !slowmo.active) ctx.scene.animationTimeScale = 1;
-      const dt = dtReal * slowmo.scale;
+      // MATRIX FOCUS: the trigger holds bullet time — the room at a third on the game clock, the hero on his own
+      const wasFocus = focus.active;
+      if (focusHeld && !focus.active && !myDown.downed && !shopOpen) { if (focus.start()) onFocusStart(ctx); }
+      else if (!focusHeld && focus.active) focus.stop();
+      if (focus.tick(dtReal)) onFocusEnd(ctx, true);
+      else if (wasFocus && !focus.active) onFocusEnd(ctx, false);
+      if (wasFocus !== focus.active) applyFocusClocks();
+      { const fv = Math.round(focus.value); if (fv !== focusHud || focus.active !== focusHudOn) { focusHud = fv; focusHudOn = focus.active; ctx.setHud({ focus: fv, focusOn: focus.active }); } }
+      const dt = dtReal * slowmo.scale * focus.worldScale;
+      const dtHero = dtReal * slowmo.scale * focus.heroScale;   // the hero's clock: his movement, his air, the tweens that are his swing
       gameSec += dt;
       // the shop: the horde is down, the clock runs out into the next wave
       if (shopOpen && now() >= shopUntil) closeShop(ctx);
@@ -1530,7 +1637,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // game-clock tweens (the dodge slide, the shove, the spawn-in, the burst knockback, the KO sink)
       if (tweens.length) {
         const keep: Tween[] = [];
-        for (const tw of tweens) { tw.t += dt; const k = Math.min(1, tw.t / tw.dur); tw.step(k); if (k >= 1) tw.done?.(); else keep.push(tw); }
+        for (const tw of tweens) { tw.t += dtHero; const k = Math.min(1, tw.t / tw.dur); tw.step(k); if (k >= 1) tw.done?.(); else keep.push(tw); }
         tweens = keep;
       }
 
@@ -1557,14 +1664,23 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // a swing reads as sitting back
       // the bars ride their bodies: built on first damage, moved every frame after
       for (const e of enemies) if (e.bar) updateBar(ctx, e);
-      meAir.update(dt);
-      player.root.position.y = meAir.height;   // the arc is EvadeMoves'; nothing here integrates gravity
+      meAir.update(dtHero);
+      player.root.position.y = meAir.height;
+      tickMatrix(ctx, dtHero);   // MATRIX: the wall run and the kick own the root while they last
+      if (process.env.NODE_ENV === 'development' && dtReal > 0) {   // MATRIX telemetry: the room's and the hero's real-time speeds
+        let sum = 0, n = 0;
+        for (const e of enemies) { const r = e.mob.char.root.position; const l = enemyLastPos.get(e); if (l) { sum += Math.hypot(r.x - l.x, r.z - l.z) / dtReal; n++; enemyLastPos.set(e, l.copyFrom(r)); } else enemyLastPos.set(e, r.clone()); }
+        roomMps = n ? sum / n : 0;
+        heroMps = Math.hypot(player.root.position.x - heroLastPos.x, player.root.position.z - heroLastPos.z) / dtReal; heroLastPos.copyFrom(player.root.position);
+      }   // the arc is EvadeMoves'; nothing here integrates gravity
       meMotion.update(vel.x, vel.z, player.root.rotation.y, dt);
       myMps = Math.hypot(vel.x, vel.z);
-      let mySpeed01 = Math.min(1, vel.length() / (MOVE_SPEED * perks.speedMult * prqSpeed));   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
+      heroVel.copyFrom(vel);
+      let mySpeed01 = Math.min(1, vel.length() / (MOVE_SPEED * perks.speedMult * prqSpeed));
+      if (wallRun) mySpeed01 = 1;   // MATRIX: three strides on the wall   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
       if (!striking && !blocking && !dodging && !myDown.downed && vel.lengthSquared() > 0.05) {   // the shop never freezes the feet: the ring is empty, the drops are yours to walk over
         const before = player.root.position.clone();
-        player.root.position.addInPlace(vel.scale(dt));
+        player.root.position.addInPlace(vel.scale(dtHero));
         // Inset from the mat so the camera always has somewhere to stand behind
         // the player — see ARENA_RADIUS.
         clampDisc(player.root.position);

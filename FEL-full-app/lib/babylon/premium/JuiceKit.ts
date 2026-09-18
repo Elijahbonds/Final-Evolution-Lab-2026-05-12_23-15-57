@@ -62,6 +62,26 @@ export class JuiceKit {
     this.shakeT = ms / 1000;
   }
 
+  private tintEl: HTMLDivElement | null = null;
+  /** MATRIX FOCUS (2026-09-18): a held colour cast at the edges of the frame while bullet time is on — the green of the
+   *  code, a vignette not a wash (the flash lesson: light spills from the edges). Pass null to lift it. */
+  tint(color: string | null, edge = 0.7): void {
+    const canvas = this.scene.getEngine().getRenderingCanvas();
+    if (!color) {
+      if (this.tintEl) { const el = this.tintEl; this.tintEl = null; el.style.opacity = '0'; setTimeout(() => el.remove(), 260); }
+      if (canvas) canvas.style.filter = '';
+      return;
+    }
+    if (this.tintEl) return;
+    const f = document.createElement('div');
+    f.style.cssText = `position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 220ms ease-out;` +
+      `background:radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, ${color} 100%);`;
+    this.overlay.appendChild(f); this.tintEl = f;
+    // the code's green: the frame drains a little colour and gains contrast under the vignette (the canvas takes a filter — no shader pass)
+    if (canvas) canvas.style.filter = 'saturate(0.62) contrast(1.08) sepia(0.12) hue-rotate(50deg)';
+    requestAnimationFrame(() => { f.style.opacity = String(edge); });
+  }
+
   /** 0.3–0.5× for 300–500ms — SIGNATURE moments only. */
   slowMo(scale = 0.4, ms = 400): void {
     this.scene.animationTimeScale = scale;

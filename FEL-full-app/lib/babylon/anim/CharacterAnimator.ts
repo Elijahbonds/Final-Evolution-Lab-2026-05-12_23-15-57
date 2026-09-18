@@ -30,6 +30,11 @@ export interface PlayOpts {
 
 export class CharacterAnimator {
   private groups = new Map<string, AnimationGroup>();
+  /** MATRIX FOCUS (2026-09-18): this rig's own clock. The room's bodies run at Focus's world scale while the player's rig
+   *  keeps its speed — a scene-wide animationTimeScale slows everyone, so the scale is per animator: every group plays at
+   *  its requested speed × this. */
+  private timeScale = 1;
+  private requested = new Map<AnimationGroup, number>();
   private current: AnimationGroup | null = null;
   private currentName = '';
   private currentSpeed = 1;
@@ -110,9 +115,10 @@ export class CharacterAnimator {
       next.stop();
     }
 
-    next.speedRatio = Math.abs(finalSpeed);
+    next.speedRatio = Math.abs(finalSpeed) * this.timeScale;
+    this.requested.set(next, Math.abs(finalSpeed));
     // negative speed = play from end (Babylon supports goToFrame + negative ratio)
-    next.start(loop, Math.abs(finalSpeed), finalSpeed < 0 ? next.to : next.from,
+    next.start(loop, Math.abs(finalSpeed) * this.timeScale, finalSpeed < 0 ? next.to : next.from,
                finalSpeed < 0 ? next.from : next.to, false);
     next.setWeightForAllAnimatables(0);
 
@@ -208,8 +214,17 @@ export class CharacterAnimator {
 
   setSpeed(name: string, speedRatio: number): void {
     const g = this.groups.get(resolveClip(name, this.clipNames).clip);
-    if (g?.isPlaying) g.speedRatio = speedRatio;
+    if (g?.isPlaying) { g.speedRatio = speedRatio * this.timeScale; this.requested.set(g, speedRatio); }
   }
+
+  /** MATRIX FOCUS: this rig's clock (1 = real time). Applies to what is playing now and to every play() after. */
+  setTimeScale(k: number): void {
+    const next = Math.max(0.02, k);
+    if (Math.abs(next - this.timeScale) < 1e-4) return;
+    this.timeScale = next;
+    for (const g of this.groups.values()) { if (!g.isPlaying) continue; const base = this.requested.get(g); if (base !== undefined) g.speedRatio = base * next; }
+  }
+  get currentTimeScale(): number { return this.timeScale; }
 
   /**
    * Scale a playing clip's rate RELATIVE to what the alias authored — for stride matching.
@@ -222,7 +237,7 @@ export class CharacterAnimator {
   setPlaybackScale(name: string, scale: number): void {
     const r = resolveClip(name, this.clipNames);
     const g = this.groups.get(r.clip);
-    if (g?.isPlaying) g.speedRatio = scale * r.speedRatio;
+    if (g?.isPlaying) { g.speedRatio = scale * r.speedRatio * this.timeScale; this.requested.set(g, scale * r.speedRatio); }
   }
 
   stopAll(fadeToIdle = 'idle_stand'): void {
