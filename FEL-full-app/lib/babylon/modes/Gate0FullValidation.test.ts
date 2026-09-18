@@ -57,7 +57,8 @@ describe("PHASE 3 — Gate 0 Full Runtime Validation (All 18 Modes)", () => {
       const hasCharacterLibrary = source.includes("CharacterLibrary");
       const hasSkeletonMarker = source.includes("skeleton") || source.includes("Skeleton");
       const hasMixamoPrefix = source.includes("mixamorig:");
-      const hasCharLibSpawn = source.includes("CharacterLibrary.spawn");
+      // 2026-09-17: the hoops modes spawn through CharacterPipeline (the kit body + identity layer OVER CharacterLibrary) — the same skeletal pipeline, one call up
+      const hasCharLibSpawn = source.includes("CharacterLibrary.spawn") || source.includes("CharacterPipeline.spawn");
 
       const issues: string[] = [];
       const indicators: string[] = [];

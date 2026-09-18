@@ -53,6 +53,8 @@ import {
 } from '../core/FightCore';
 import { StringBook, attackFromMove, STRIKE_TIMING, DASH_ATTACK_SEC, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // STORM COMBOS (2026-09-17): the book of strings
 import { XButtonReader, DASH, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';   // STORM: X = dash / double = chakra dash / hold = guard; launchers put him in the air
+import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (owner): who you are, and the gauge at your feet
+import { readPlayerIcon } from '../visual/playerIcon';
 import { SoundKit } from '../audio/SoundKit';
 import {
   BASELINE_RATINGS, ratingsFrom, routeFor, routeHitStopMs, routeShake, damageScale, hasFightMove, cancelWindowSec,
@@ -170,6 +172,7 @@ export const KarateVSMode: ModeDefinition = (() => {
   let ctx0!: ModeContext;   // STORM: the context the stick read needs (set every update)
   // STORM (2026-09-17): the string book (every press is its own link), the X reader, the dash and the launched body
   const book = new StringBook(); const xBtn = new XButtonReader();
+  let ring: PlayerRingHandle | null = null; const stringLabels: string[] = [];   // PLAYER RING + the combo callout (the string's links, named on the finisher)
   let queuedKey: { key: 'jab' | 'kick' | 'heavy'; at: number } | null = null;   // STORM: the press waiting for the cancel point
   let lastDashSec = -1e9, meDash: { dir: Vector3; left: number; homing: boolean } | null = null, meDashIframeSec = 0, meDashUntil = 0, foeLaunchedSec = 0;
   const BTN_OF: Record<'jab' | 'kick' | 'heavy', StrikeBtn> = { jab: 'A', kick: 'B', heavy: 'Y' };
@@ -221,7 +224,8 @@ export const KarateVSMode: ModeDefinition = (() => {
   /** STORM: the DASH — a burst along the stick (or at the rival), i-frames for its first beat, a cancel of a string's recovery;
    *  the CHAKRA DASH (a double tap) homes on the rival and stops a reach short. */
   function tryDash(ctx: ModeContext, homing: boolean): void {
-    if (!meState.controllable || meDash || !meEvade.canAct || phase !== 'fighting') return;
+    if (!meState.controllable || !meEvade.canAct || phase !== 'fighting') return;
+    if (meDash && !(homing && !meDash.homing)) return;   // a running dash refuses a second tap — unless the tap makes it the CHAKRA dash (the double tap lands mid-burst by definition)
     if (striking) { const st = animOf(true).strike; if (st && st.cancelFrom !== undefined && now() < st.cancelFrom) return; endStrike(true); }   // dash-cancel after the cancel point
     const toFoe = rival.root.position.subtract(player.root.position); toFoe.y = 0;
     const stick = Math.hypot(stickX, stickY) > 0.25 ? ctx.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx.camDirector.rightFlat().scale(stickX)) : null;
@@ -317,6 +321,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     }
     SoundKit.play('whoosh', { pitch: special ? 0.8 : 1.1 });
     if (move) console.info(`[KVS-STORM] link ${move.id} (${move.clip}) weight ${move.weight}${move.air ? ' AIR' : ''}${move.launch ? ' LAUNCH' : ''}${move.slam ? ' SLAM' : ''} string ${book.history.length}`);
+    if (move) { stringLabels.push(move.label); if (move.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels.length = 0; if (call.includes('→')) { ctx.setHud({ banner: `COMBO: ${call}` }); setTimeout(() => ctx.setHud({ banner: '' }), 900); } } }   // STORM: the string is CALLED when it ends — button presses in sequence are a combo you can read
     animOf(mine).strike = { weight: special ? 'finisher' : move ? move.weight : WEIGHT_OF[key], clip: atk.clip, speed: move?.speed, cancelFrom: move ? now() + (STRIKE_TIMING[move.weight].cancelAt / move.speed) * 1000 : undefined, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
 
     // WHAT MAKES A DODGE "WELL TIMED" MEASURABLE. The window is read against the moment this strike would
@@ -495,6 +500,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 2.2), yawRad: Math.PI, startClip: IDLE_CLIP,   // BIOMECH-WAVE2 G1/G3: they SPAWN facing each other — the round start used to be a 180° yaw snap on both bodies
       });
+      ring?.dispose(); ring = mountPlayerRing(ctx.scene, player.root, { color: '#38bdf8', icon: readPlayerIcon() });   // PLAYER RING: the guard gauge at the feet, the creator glyph beside it
       neverBindPose(player.animator, IDLE_CLIP);
       installSafePlay(player.animator, 'karate-vs-player');
       ctx.groundLock?.track(player.root, player.skeleton);
@@ -645,6 +651,7 @@ export const KarateVSMode: ModeDefinition = (() => {
         if (sdt > 0 && Vector3.Distance(before, player.root.position) / sdt < 0.3) mySpeed01 = 0;   // pinned on the boundary: no stepping on the spot
       }
 
+      ring?.set(meState.guard / GUARD_MAX);   // PLAYER RING: the guard gauge
       meDashIframeSec = Math.max(0, meDashIframeSec - sdt);   // STORM ticks
       if (queuedKey) {   // STORM: the queued link fires at the cancel point (or the settle), and goes stale after 0.4 s
         const st = animOf(true).strike;
@@ -681,6 +688,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       mePosture?.dispose(); mePosture = null; foePosture?.dispose(); foePosture = null;
       crowd?.dispose(); crowd = null;
       modeVenue?.dispose?.(); modeVenue = null;
+      ring?.dispose(); ring = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
     },
   };

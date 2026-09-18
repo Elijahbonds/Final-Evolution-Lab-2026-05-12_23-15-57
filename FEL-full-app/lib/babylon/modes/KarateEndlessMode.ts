@@ -53,6 +53,8 @@
 // appear anywhere in this file, consistent with this project's standing
 // original-content-only rule (already enforced for NeuroArena/Who Scene It).
 
+import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (owner): who you are, and the gauge at your feet
+import { readPlayerIcon } from '../visual/playerIcon';
 import { prqMaxHp, prqSpeedMult } from '../core/PrqVitals';
 import { prqGrade } from '../../prq';
 import { mookMaxHp, damageMook, mookHp01, mookBarHex } from '../core/MookHealth';
@@ -279,6 +281,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   /** SCORECARD VISUALS (2026-09-15): WHICH ONE IS ME. The frame review could not find the hero inside a mob of identical
    *  bodies — a ring on the floor under the player, the one thing a beat-em-em-up crowd cannot cover. */
   let youRing: Mesh | null = null;
+  let ring: PlayerRingHandle | null = null;   // PLAYER RING (owner): the hp gauge at the feet + the creator glyph — replaces the bare torus
   let turnClock: { at: number; deg: number } | null = null;
   /** L1 pressed inside a swing before its hit: the grab waits for the hit (QUEUE_SEC), like a queued strike. */
   let grabQueuedAt = -Infinity;
@@ -1233,7 +1236,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
 
   function tryDodge(ctx: ModeContext, kind: 'dash' | 'homing' = 'dash'): void {   // STORM: the dodge IS the dash (i-frames, the perfect read); the chakra dash homes on the target
-    if (dodging || myDown.downed || shopOpen) return;
+    if (myDown.downed || shopOpen) return;
+    if (dodging && kind !== 'homing') return;   // the double tap lands mid-dash by definition: the chakra dash takes the running dash over
+    if (dodging) { dodging = false; dyn.cancels++; }
     if (carry?.swinging) return;
     if (striking && !swingCancelable()) return;
     if (striking) { dyn.cancels++; endSwing(); }        // THE-HUNDRED: dodge-cancel — the beat-em-up's signature move
@@ -1354,15 +1359,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       installSafePlay(player.animator, 'agent-player');
       ctx.groundLock?.track(player.root, player.skeleton);
       ctx.heroRef.current = player.root;
-      youRing?.dispose();
-      youRing = MeshBuilder.CreateTorus('karate_you_ring', { diameter: 1.15, thickness: 0.075, tessellation: 28 }, ctx.scene);
-      {
-        // unlit PBR (the StandardMaterial ratchet): the ring is a marker, not a surface the venue's light plays on
-        const m = new PBRMaterial('karate_you_ring_mat', ctx.scene);
-        m.unlit = true; m.albedoColor = Color3.FromHexString('#38bdf8'); m.emissiveColor = Color3.FromHexString('#38bdf8');
-        m.alpha = 0.85;
-        youRing.material = m; youRing.isPickable = false; youRing.renderingGroupId = 0;
-      }
+      youRing?.dispose(); youRing = null;
+      ring?.dispose(); ring = mountPlayerRing(ctx.scene, player.root, { color: '#38bdf8', icon: readPlayerIcon() });   // PLAYER RING: the hp gauge at the feet, the glyph beside it
 
       partner = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(1.6, 0, 0.8), tint: '#22d3ee', startClip: IDLE_CLIP });
       neverBindPose(partner.animator, IDLE_CLIP);
@@ -1464,7 +1462,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       if (e.t === 'button' && !e.pressed && e.btn === 'X') {
         const held = xHoldSec;
         xHoldSec = -1;
-        if (held >= 0 && held * 1000 < DODGE_TAP_MS) { const dbl = gameSec - lastXTapSec < 0.32; lastXTapSec = dbl ? -1e9 : gameSec; tryDodge(ctx, dbl ? 'homing' : 'dash'); }   // STORM: a tap is the DASH, a double tap the CHAKRA DASH at the target
+        if (held >= 0 && held * 1000 < DODGE_TAP_MS) { const dbl = gameSec - lastXTapSec < 0.32; console.info(`[KE-STORM] x tap held ${(held * 1000).toFixed(0)} ms dbl ${dbl} (since ${(gameSec - lastXTapSec).toFixed(2)} s) dodging ${dodging}`); lastXTapSec = dbl ? -1e9 : gameSec; tryDodge(ctx, dbl ? 'homing' : 'dash'); }   // STORM: a tap is the DASH, a double tap the CHAKRA DASH at the target
         blocking = false;
       }
     },
@@ -1472,7 +1470,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     update(ctx, dtReal) {
       if (spinApplied) { player.root.rotation.y -= spinApplied; spinApplied = 0; }   // the spin layer: back to the real facing first
       clockSec += dtReal;
-      if (youRing) { const p = player.root.position; youRing.position.set(p.x, 0.035, p.z); youRing.isVisible = !myDown.downed; }
+      ring?.set(Math.max(0, Math.min(1, vitals.hp / Math.max(1, vitals.maxHp))));   // PLAYER RING: hp as the gauge
       { const br = flow.update(gameSec); if (br) onFlowBroken(ctx, br); else if (flow.count > 0) ctx.setHud({ flowDrop: Math.round(flow.drop01(gameSec) * 100) }); }
       // Phase 8: down/revive tick
       if (myDown.downed) {
@@ -1640,7 +1638,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       for (const r of shockRings) { r.mesh.material?.dispose(); r.mesh.dispose(); }
       pickups = []; tweens = []; shockRings = []; carry = null; queue.clear();
       mePosture?.dispose(); mePosture = null; partnerPosture?.dispose(); partnerPosture = null;
-      youRing?.material?.dispose(); youRing?.dispose(); youRing = null;
+      youRing?.material?.dispose(); youRing?.dispose(); youRing = null; ring?.dispose(); ring = null;
       crowd?.dispose(); crowd = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient();
     },
   };
