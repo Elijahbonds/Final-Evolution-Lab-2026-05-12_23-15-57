@@ -101,6 +101,19 @@ describe('THE SPLASH ONLY OFFERS WHAT A MODE ACTUALLY READS', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('every mode in WEATHER_MODES reads the weather pick (and the module list agrees with the splash)', () => {
+    const offenders: string[] = [];
+    const listed = setLiteral(splash, 'WEATHER_MODES');
+    for (const id of listed) {
+      const file = byId.get(id);
+      if (!file) { offenders.push(`${id}: no mode file declares this modeId`); continue; }
+      if (!reads(file, /readWeather/)) offenders.push(`${id} (${file}): the splash offers a WEATHER chip, nothing reads it`);
+    }
+    expect(offenders).toEqual([]);
+    const mod = stripComments(fs.readFileSync(path.join(ROOT, 'lib/babylon/nexus/weather.ts'), 'utf8'));
+    for (const id of listed) expect(mod, `${id} has a weather family`).toMatch(new RegExp(`\\b${id}:\\s*'`));
+  });
+
   it('and the racing modes read their map and their vehicle', () => {
     for (const [id, file] of [['velocitykart', 'VelocityKartMode.ts'], ['aeroaces', 'AeroAcesMode.ts']] as const) {
       const src = stripComments(fs.readFileSync(path.join(MODES_DIR, file), 'utf8'));
@@ -116,7 +129,7 @@ describe('THE PICK IS READ AFTER THE PAGE EXISTS, NEVER WHEN THE REGISTRY IS BUI
   // because Mixed Combat derives the foe's loadout as the opposite of the player's. It looks completely
   // correct in the source. The rule is LEXICAL — a reader must not be evaluated while the factory is being
   // evaluated — so that is what is checked, not where the call happens to sit in the file.
-  const READERS = /\b(readBlend|readWeapon|readCourse|readKart|readPlane|readVehicle|readLoadout|readProfile|readTier)\s*\(/;
+  const READERS = /\b(readBlend|readWeapon|readCourse|readKart|readPlane|readVehicle|readLoadout|readProfile|readTier|readWeather)\s*\(/;
 
   it('NO MODE READS A PICK AT FACTORY TOP LEVEL', () => {
     // "before load()" is the wrong rule and my first version of this test used it: it flagged three readers

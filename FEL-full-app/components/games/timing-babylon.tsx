@@ -15,6 +15,8 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
+/** GOLF UPGRADE: the meter's carry lines arrive as '0,6,12,…' (eleven tenths). */
+const ticksOf = (v: unknown): number[] => (typeof v === 'string' && v ? v.split(',').map(Number) : []);
 
 /** The rhythm lane: an array of cue markers (dance publishes it every frame). */
 const isCueLane = (v: unknown): v is HudCue[] =>
@@ -189,8 +191,11 @@ export function makeTimingHost(opts: TimingHostOpts) {
           <div className="pointer-events-none absolute right-4 top-14 flex flex-col items-end gap-1 font-mono">
             <div className="fel-panel px-3 py-1.5 text-right">
               <div className="text-lg font-black text-white">{hud.club}</div>
-              <div className="text-[11px] text-white/70">PIN {hnode(hud.pin, '—')}</div>
+              <div className="text-[11px] text-white/70">PIN {hnode(hud.pin, '—')}{typeof hud.aimCarry === 'number' ? <span> · FULL SWING {hud.aimCarry}m</span> : null}</div>
             </div>
+            {typeof hud.weather === 'string' && hud.weather && (
+              <div className="fel-panel px-3 py-1 text-[11px] font-bold tracking-wider text-white/85">{hud.weather}</div>
+            )}
             <div className="fel-panel flex items-center gap-2 px-3 py-1.5">
               <span
                 className="inline-block text-xl leading-none text-[var(--fel-cyan)]"
@@ -212,12 +217,23 @@ export function makeTimingHost(opts: TimingHostOpts) {
             <span className={`fel-panel px-3 py-0.5 text-[11px] font-bold tracking-widest ${hud.swingPhase === 'accuracy' ? 'text-[var(--fel-gold)]' : 'text-[var(--fel-cyan)]'}`}>
               {hud.swingPhase === 'accuracy' ? 'ACCURACY — strike in the band' : 'POWER — press at the top'}
             </span>
-            <div className="relative h-5 w-[min(520px,70vw)] overflow-hidden rounded-md border border-white/20 bg-black/55">
+            {/* GOLF UPGRADE (Wii Sports meter): LINES every tenth, taller at the quarters, with the CARRY each tenth buys
+                written above them, and the carry at the marker under it — the player gauges "70 %" as "43 m". */}
+            <div className="relative mt-4 h-7 w-[min(520px,70vw)] rounded-md border border-white/20 bg-black/55">
               <div className="absolute inset-y-0 bg-[var(--fel-gold)]/70" style={{ left: `${(GOLF_ACC_CENTER - GOLF_ACC_HALF) * 100}%`, width: `${GOLF_ACC_HALF * 200}%` }} />
+              {Array.from({ length: 11 }, (_, i) => (
+                <div key={i} className={`absolute bottom-0 w-px ${i % 5 === 0 ? 'h-full bg-white/70' : 'h-1/2 bg-white/35'}`} style={{ left: `${i * 10}%` }} />
+              ))}
+              {ticksOf(hud.meterTicks).map((c, i) => (i === 2 || i === 5 || i === 8 || i === 10)
+                ? <span key={`t${i}`} className="absolute -top-4 -translate-x-1/2 text-[9px] font-bold text-white/65" style={{ left: `${i * 10}%` }}>{c}m</span>
+                : null)}
               {typeof hud.powerLock === 'number' && (
                 <div className="absolute inset-y-0 w-[3px] bg-[var(--fel-cyan)]" style={{ left: `${hud.powerLock}%` }} />
               )}
               <div className="absolute inset-y-0 w-[4px] -translate-x-1/2 bg-white shadow-[0_0_8px_#fff]" style={{ left: `${hud.meterT * 100}%` }} />
+              {typeof hud.meterCarry === 'number' && (
+                <span className="absolute -bottom-5 -translate-x-1/2 text-[11px] font-black text-[var(--fel-cyan)]" style={{ left: `${(hud.swingPhase === 'accuracy' && typeof hud.powerLock === 'number' ? hud.powerLock / 100 : hud.meterT) * 100}%` }}>{hud.meterCarry} m</span>
+              )}
             </div>
           </div>
         )}

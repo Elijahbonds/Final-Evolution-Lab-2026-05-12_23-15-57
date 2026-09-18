@@ -9,6 +9,7 @@ import { CardSlot } from './card-slot';
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
+import { readyWeathers, readWeather, writeWeather, WEATHER_FAMILY_OF, type WeatherPick } from '@/lib/babylon/nexus/weather';
 import { readyMusicStages, readMusicStage, writeMusicStage, type MusicStageId } from '@/lib/babylon/music/musicStage';
 import { skinsFor, readBoardSkin, writeBoardSkin } from '@/lib/babylon/nexus/boardSkins';
 import { readyCourses, readCourse, writeCourse } from '@/lib/babylon/core/RaceCourse';
@@ -56,6 +57,8 @@ const STYLE_MODES = new Set(['karate', 'karate-vs', 'duel', 'showdown', 'mixedco
  * nothing reads it is the hollow-picker failure the pickerReach test exists to catch.
  */
 const TIER_MODES = new Set(['velocitykart', 'aeroaces', 'football']);
+/** WEATHER (docs/SPEC-WEATHER.md): the outdoor modes that read the pick — pickerReach keeps this honest; WEATHER_FAMILY_OF in nexus/weather names the family. */
+const WEATHER_MODES = new Set(['golf']);
 // Deliberately SHORT, and it grows as modes are wired rather than ahead of them. The first draft listed
 // eighteen — every mode with an opponent — and sixteen of those read nothing, which is the exact hollow
 // picker the pickerReach guard exists to catch. Dunk, 1v1, 3v3 and the net sports already have their own
@@ -110,6 +113,16 @@ export function BootSplash(props: {
     writeCourtLocation(id);
     // the venue mounts when the mode loads, so a new pick reloads the route with the pick in the URL
     const u = new URL(window.location.href); u.searchParams.set('location', id); window.location.assign(u.toString());
+  };
+  // WEATHER (owner, 2026-09-17): a chip beside the setting / item / card picks, on the outdoor modes that read it. It
+  // reloads the route like a venue pick, because weather dresses the world at load.
+  const wxFamily = WEATHER_MODES.has(props.modeId) ? WEATHER_FAMILY_OF[props.modeId] ?? null : null;
+  const [wx, setWx] = useState<WeatherPick>('natural');
+  useEffect(() => { if (wxFamily) setWx(readWeather(props.modeId)); }, [wxFamily, props.modeId]);
+  const pickWeather = (id: WeatherPick) => {
+    if (id === wx) return;
+    writeWeather(id);
+    const u = new URL(window.location.href); u.searchParams.set('weather', id); window.location.assign(u.toString());
   };
   // The BALL pick lives on THIS screen, beside the map pick — the owner asked for one screen that covers
   // where you are playing and what you are playing with, and a second screen for a cosmetic would be worse
@@ -277,6 +290,21 @@ export function BootSplash(props: {
               ))}
             </div>
             <p className="max-w-[22rem] text-[9px] leading-tight tracking-wide text-white/40">{BALL_SKINS[ball].sub}</p>
+          </div>
+        )}
+
+        {wxFamily && (props.phase === 'ready' || props.phase === 'loading') && readyWeathers(wxFamily).length > 1 && (
+          <div className="mt-2 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">WEATHER</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {readyWeathers(wxFamily).map((w) => (
+                <button key={w.id} type="button" onClick={() => pickWeather(w.id)} aria-pressed={w.id === wx}
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${w.id === wx ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={w.id === wx ? { background: w.tint, borderColor: w.tint } : { borderColor: `${w.tint}88` }}>
+                  {w.name}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
