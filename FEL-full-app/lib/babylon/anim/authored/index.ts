@@ -18,7 +18,7 @@ import { buildSelfLob, buildBounceThrow, buildKickUp, buildBackHandspring, build
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdownSpike, buildStiffArm, buildQbThrow } from './football';
-import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge, buildCombatRoll, buildCombatJump } from './karate';
+import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge, buildCombatRoll, buildCombatJump, buildElbow, buildSpinElbow } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
   buildDribbleIdle, buildCrossover, buildHesi, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble,
@@ -104,6 +104,8 @@ export function registerAuthoredClips(
     ['karate_shuffle_right', () => buildShuffle(scene, skeleton, 'right')],
     ['karate_roll', () => buildCombatRoll(scene, skeleton)],    // 2026-09-14: combat had no roll and no jump at all
     ['karate_jump', () => buildCombatJump(scene, skeleton)],
+    ['karate_elbow', () => buildElbow(scene, skeleton)],          // STORM STRIKES (2026-09-17): the close-range elbow link
+    ['karate_spin_elbow', () => buildSpinElbow(scene, skeleton)],  // …and the spinning back elbow
     ['karate_block', () => buildBlockHold(scene, skeleton)],     // ANIM-READABILITY (combat, 2026-09-07): the guard verbs and the floor
     ['karate_guard_impact', () => buildGuardImpact(scene, skeleton)],
     ['karate_parry', () => buildParry(scene, skeleton)],

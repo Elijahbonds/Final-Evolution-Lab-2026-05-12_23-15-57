@@ -253,3 +253,28 @@ export function buildLeanDodge(scene: Scene, sk: Skeleton): AnimationGroup | nul
     { t: T,    bones: STAND, hands: GUARD, hipsY: 0 },
   ]);
 }
+
+/** STORM STRIKES (owner, 2026-09-17: "add more spinning kicks, elbows, jumping spinning kicks"). The ELBOW: a close-range link —
+ *  off the guard the lead arm folds and the elbow drives ACROSS at chin height on a hip turn (the fist ends by the far ear),
+ *  the rear hand covers the chin; 0.42 s, the hit at ~0.16. */
+export function buildElbow(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'karate_elbow', 0.42, [
+    { t: 0,    bones: { Hips: [4, 8, 0], Spine: [10, 6, 0], LeftUpLeg: [-24, 0, 8], LeftLeg: [40, 0, 0], RightUpLeg: [-24, 0, -8], RightLeg: [40, 0, 0] }, hands: { Left: GUARD.Left, Right: GUARD.Right }, hipsY: -0.06 },
+    { t: 0.16, bones: { Hips: [6, -26, 0], Spine: [12, -18, 4], Neck: [-4, 10, 0], LeftUpLeg: [-28, 0, 8], LeftLeg: [44, 0, 0], RightUpLeg: [-20, 0, -8], RightLeg: [34, 0, 0] }, hands: { Left: [-0.22, 1.30, 0.26], Right: [-0.08, 1.46, 0.34] }, poles: { Right: [0.55, 1.4, 0.55] as V3 }, hipsY: -0.04 },   // the elbow across: the right fist by the left ear, the elbow leading
+    { t: 0.28, bones: { Hips: [6, -30, 0], Spine: [10, -20, 4], Neck: [-4, 12, 0], LeftUpLeg: [-28, 0, 8], LeftLeg: [44, 0, 0], RightUpLeg: [-20, 0, -8], RightLeg: [34, 0, 0] }, hands: { Left: [-0.22, 1.30, 0.26], Right: [-0.16, 1.44, 0.30] }, poles: { Right: [0.5, 1.4, 0.6] as V3 }, hipsY: -0.04 },
+    { t: 0.42, bones: { Hips: [4, 4, 0], Spine: [10, 4, 0], LeftUpLeg: [-24, 0, 8], LeftLeg: [40, 0, 0], RightUpLeg: [-24, 0, -8], RightLeg: [40, 0, 0] }, hands: { Left: GUARD.Left, Right: GUARD.Right }, hipsY: -0.06 },
+  ]);
+}
+
+/** The SPINNING BACK ELBOW: a full turn on the lead foot with the rear elbow whipping round at head height (the hips carry
+ *  the turn in the clip — each key under 180° from the last so the slerp goes the long way round); 0.6 s, the hit at ~0.34. */
+export function buildSpinElbow(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'karate_spin_elbow', 0.6, [
+    { t: 0,    bones: { Hips: [4, 0, 0], Spine: [10, 0, 0], LeftUpLeg: [-24, 0, 8], LeftLeg: [40, 0, 0], RightUpLeg: [-24, 0, -8], RightLeg: [40, 0, 0] }, hands: { Left: GUARD.Left, Right: GUARD.Right }, hipsY: -0.06 },
+    { t: 0.14, bones: { Hips: [6, -110, 0], Spine: [8, -20, 0], Neck: [-4, -30, 0], LeftUpLeg: [-30, 0, 8], LeftLeg: [46, 0, 0], RightUpLeg: [-14, 0, -8], RightLeg: [26, 0, 0] }, hands: { Left: [-0.24, 1.28, 0.20], Right: [0.34, 1.34, -0.30] }, hipsY: -0.05 },   // the wind: the back turns, the elbow loads behind
+    { t: 0.26, bones: { Hips: [6, -230, 0], Spine: [6, -14, 0], Neck: [-4, -20, 0], LeftUpLeg: [-30, 0, 8], LeftLeg: [46, 0, 0], RightUpLeg: [-16, 0, -8], RightLeg: [28, 0, 0] }, hands: { Left: [-0.24, 1.28, 0.20], Right: [0.48, 1.44, 0.10] }, hipsY: -0.05 },
+    { t: 0.34, bones: { Hips: [8, -350, 0], Spine: [4, 6, 6], Neck: [-4, 8, 0], LeftUpLeg: [-32, 0, 8], LeftLeg: [48, 0, 0], RightUpLeg: [-18, 0, -8], RightLeg: [30, 0, 0] }, hands: { Left: [-0.20, 1.30, 0.24], Right: [-0.02, 1.52, 0.40] }, poles: { Right: [0.6, 1.5, 0.6] as V3 }, hipsY: -0.04 },   // the hit: round and through, the elbow at head height
+    { t: 0.46, bones: { Hips: [6, -360, 0], Spine: [8, 2, 2], LeftUpLeg: [-28, 0, 8], LeftLeg: [44, 0, 0], RightUpLeg: [-22, 0, -8], RightLeg: [38, 0, 0] }, hands: { Left: [-0.22, 1.30, 0.24], Right: [0.10, 1.40, 0.34] }, hipsY: -0.05 },
+    { t: 0.6,  bones: { Hips: [4, -360, 0], Spine: [10, 0, 0], LeftUpLeg: [-24, 0, 8], LeftLeg: [40, 0, 0], RightUpLeg: [-24, 0, -8], RightLeg: [40, 0, 0] }, hands: { Left: GUARD.Left, Right: GUARD.Right }, hipsY: -0.06 },
+  ]);
+}

@@ -112,6 +112,7 @@ for (const m of data.marks.filter((m) => /^L:|^Lset:/.test(m.label))) {
   const seg = rows.filter((r) => r.t >= m.t + 250 && r.t <= m.t + 700);
   if (seg.length > 2) { const a = seg[0], z = seg[seg.length - 1]; console.log(`   ${f(m.t)} ${m.label}: ground speed ${(Math.hypot(z.x - a.x, z.z - a.z) / ((z.t - a.t) / 1000)).toFixed(2)} m/s`); }
   const y0 = rows.find((r) => r.t >= m.t)?.yaw; if (y0 === undefined) continue;
+  { const seg = rows.filter((r) => r.t >= m.t && r.t <= m.t + 900); let span = 0; for (const r of seg) span = Math.max(span, Math.abs(((r.yaw - y0 + 540) % 360) - 180)); console.log(`   ${f(m.t)} ${m.label}: yaw turned up to ${span.toFixed(0)}° inside 0.9 s`); }   // FREE RUN: a fighter apart from the rival turns onto his travel
   const turned = rows.find((r) => r.t >= m.t && Math.abs(((r.yaw - y0 + 540) % 360) - 180) >= 150);
   if (turned) console.log(`   ${f(m.t)} ${m.label}: body turned 150° in ${(turned.t - m.t).toFixed(0)} ms`);
 }

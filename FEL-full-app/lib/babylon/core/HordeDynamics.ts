@@ -47,6 +47,9 @@ export interface HordeMove {
   /** STORM COMBOS (2026-09-17): an AIR link — thrown at a launched body, it keeps him up; a SLAM ends the air string with a knockdown. */
   air?: boolean;
   slam?: boolean;
+  /** thrown while I am AIRBORNE (a jump attack: it reuses a grounded capture), / an AUTHORED pose clip (no capture behind it) */
+  aerial?: boolean;
+  authored?: boolean;
 }
 
 // ── cancel + buffer ─────────────────────────────────────────────────────────
@@ -106,6 +109,10 @@ export const MOVES = {
   airHook:   M({ id: 'airHook', label: 'AIR HOOK', clip: 'hook', weight: 'medium', speed: 1.35, range: 1.7, arcDeg: 130, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.0, air: true }),
   spike:     M({ id: 'spike', label: 'SPIKE', clip: 'karate_hammer', weight: 'finisher', speed: 1.2, range: 1.8, arcDeg: 150, launch: false, stunRadius: 2.4, stunSec: 0.8, lunge: 1.0, ender: true, air: true, slam: true }),
   sweep:     M({ id: 'sweep', label: 'SWEEP', clip: 'karate_backspin', weight: 'finisher', speed: 1.35, range: 2.0, arcDeg: 240, launch: false, stunRadius: 2.4, stunSec: 0.7, lunge: 0.6, ender: true, slam: true, spinDeg: 200, spinSec: 0.3 }),
+  elbow:     M({ id: 'elbow', label: 'ELBOW', clip: 'karate_elbow', weight: 'light', speed: 1.3, range: 1.2, arcDeg: 120, launch: false, stunRadius: 0, stunSec: 0, lunge: 0.6, authored: true }),
+  spinElbow: M({ id: 'spinElbow', label: 'SPINNING ELBOW', clip: 'karate_spin_elbow', weight: 'heavy', speed: 1.25, range: 1.5, arcDeg: 200, launch: true, stunRadius: 1.8, stunSec: 0.6, lunge: 0.8, authored: true, spinDeg: 360, spinSec: 0.4 }),
+  jumpKick:  M({ id: 'jumpKick', label: 'JUMP KICK', clip: 'high_kick', weight: 'medium', speed: 1.35, range: 2.1, arcDeg: 140, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.6, aerial: true, slam: true }),
+  jumpSpinKick: M({ id: 'jumpSpinKick', label: 'JUMPING SPIN KICK', clip: 'karate_typhoon', weight: 'finisher', speed: 1.2, range: 2.3, arcDeg: 360, launch: true, stunRadius: 3.0, stunSec: 1.0, lunge: 1.4, ender: true, aerial: true, spinDeg: 320, spinSec: 0.45 }),
   backSpin:  M({ id: 'backSpin', label: 'SPIN BACK KICK', clip: 'karate_backspin', weight: 'medium', speed: 1.4, range: 2.1, arcDeg: 260, launch: false, stunRadius: 2.0, stunSec: 0.6, lunge: 0.4, spinDeg: 360, spinSec: 0.36 }),
 } as const satisfies Record<string, HordeMove>;
 export type MoveId = keyof typeof MOVES;
@@ -113,6 +120,10 @@ export type MoveId = keyof typeof MOVES;
 /** Strings, longest first. A token is a button; the stick variants are resolved before the table (see resolveMove). */
 const STRINGS: { seq: StrikeBtn[]; move: MoveId }[] = [
   // STORM COMBOS: every three-button sequence resolves to its own finisher, every two-button pair to its own link
+  { seq: ['Y', 'B', 'Y'], move: 'spinElbow' },
+  { seq: ['A', 'Y', 'B'], move: 'backSpin' },
+  { seq: ['B', 'Y', 'B'], move: 'typhoon' },
+  { seq: ['A', 'A', 'B'], move: 'whirl' },
   { seq: ['B', 'B', 'B'], move: 'whirl' },
   { seq: ['A', 'B', 'A'], move: 'backSpin' },
   { seq: ['B', 'A', 'Y'], move: 'typhoon' },
@@ -161,12 +172,16 @@ export class StringBook {
 
 /** The move for a button sequence (the last token is the press) and the stick direction on the press. Pure. */
 /** STORM COMBOS: the situation a press is read in — a launched body in front (AIR links), a dash just thrown (the RUSH). */
-export interface MoveOpts { air?: boolean; afterDash?: boolean }
+export interface MoveOpts { air?: boolean; afterDash?: boolean; airborne?: boolean; close?: boolean }
 export const DASH_ATTACK_SEC = 0.3;
 export function resolveMove(seq: StrikeBtn[], dir: StickDir, opts: MoveOpts = {}): HordeMove {
   const press = seq[seq.length - 1];
   // in the air (a launched body): the air links, and Y spikes him down
   if (opts.air) return press === 'Y' ? MOVES.spike : press === 'B' ? MOVES.airHook : MOVES.airJab;
+  // in MY air (a jump attack): A is the jump kick, B / Y the jumping spin kick
+  if (opts.airborne) return press === 'A' ? MOVES.jumpKick : MOVES.jumpSpinKick;
+  // chest to chest, the second punch is the ELBOW
+  if (opts.close && seq.length === 2 && press === 'A' && seq[0] === 'A') return MOVES.elbow;
   // out of a dash: the first press is the RUSH (the dash attack)
   if (opts.afterDash && seq.length === 1) return MOVES.rush;
   // the stick on a FINISHER: pulled back = the sweep (a knockdown), pushed forward = the rising dragon (a launcher)

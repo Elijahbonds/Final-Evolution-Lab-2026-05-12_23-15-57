@@ -43,7 +43,7 @@ import { CombatAnimTree, type CombatAnimInput, type CombatAnimState, type Strike
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { combatPose, COMBAT_INPUT_IDLE, COMBAT_TURN_RATE, combatApproach, type CombatPostureInput } from '../core/CombatPosture';
 import { BodyMotion, dynamicPose, COMBAT_DYNAMIC } from '../core/DynamicPosture';   // footwork answers its MOTION
-import { lockOnYaw, strafeAxis, wrapYaw } from '../core/Biomech';
+import { lockOnYaw, slewYaw, strafeAxis, wrapYaw } from '../core/Biomech';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { Onlookers } from '../visual/Onlookers';
@@ -170,6 +170,8 @@ export const KarateVSMode: ModeDefinition = (() => {
   // was tuned for a reason.
   const meEvade = new EvadeMoves();
   let ctx0!: ModeContext;   // STORM: the context the stick read needs (set every update)
+  let lastMyVel: Vector3 | null = null, lastFoeVel: Vector3 | null = null;   // FREE RUN: last frame's travel, for the facing
+  const FREE_RUN_M = 3.4;
   // STORM (2026-09-17): the string book (every press is its own link), the X reader, the dash and the launched body
   const book = new StringBook(); const xBtn = new XButtonReader();
   let ring: PlayerRingHandle | null = null; const stringLabels: string[] = [];   // PLAYER RING + the combo callout (the string's links, named on the finisher)
@@ -192,8 +194,12 @@ export const KarateVSMode: ModeDefinition = (() => {
    *  a 1.5 m knockback in the one frame it landed. */
   function faceEachOther(dt: number): void {
     const p = player.root.position, r = rival.root.position;
-    if (!meAnim?.out && !downNow(meAnim)) player.root.rotation.y = lockOnYaw(p, r, player.root.rotation.y, COMBAT_TURN_RATE, dt);
-    if (!foeAnim?.out && !downNow(foeAnim)) rival.root.rotation.y = lockOnYaw(r, p, rival.root.rotation.y, COMBAT_TURN_RATE, dt);
+    // FREE RUN (owner, 2026-09-17: "they shouldn't be squared up all the time, they should run to the next spot"): apart and
+    // moving, a fighter turns onto his travel and RUNS (the tree's run loop); the lock-on squares him up again inside FREE_RUN_M
+    const apart = Math.hypot(p.x - r.x, p.z - r.z) > FREE_RUN_M;
+    const meRuns = apart && !!lastMyVel && lastMyVel.length() > 1.2, foeRuns = apart && !!lastFoeVel && lastFoeVel.length() > 1.2;
+    if (!meAnim?.out && !downNow(meAnim)) player.root.rotation.y = meRuns ? slewYaw(player.root.rotation.y, Math.atan2(lastMyVel!.x, lastMyVel!.z), COMBAT_TURN_RATE * 1.5, dt) : lockOnYaw(p, r, player.root.rotation.y, COMBAT_TURN_RATE, dt);
+    if (!foeAnim?.out && !downNow(foeAnim)) rival.root.rotation.y = foeRuns ? slewYaw(rival.root.rotation.y, Math.atan2(lastFoeVel!.x, lastFoeVel!.z), COMBAT_TURN_RATE * 1.5, dt) : lockOnYaw(r, p, rival.root.rotation.y, COMBAT_TURN_RATE, dt);
   }
   const downNow = (f: FighterAnim | undefined): boolean => !!f && now() < f.downUntil;
 
@@ -309,7 +315,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     // pre-game screen buy part of something the scan is supposed to be the only route to.
     const baseAtk = (mine ? myAttacks : KARATE_ATTACKS)[key];
     // STORM COMBOS: MY presses read the book — the sequence, the stick and the situation (a launched body: air links; a dash just thrown: the rush) pick the link
-    const move = mine && !special ? book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { air: foeLaunchedSec > 0, afterDash: now() / 1000 - lastDashSec < DASH_ATTACK_SEC }) : null;
+    const move = mine && !special ? book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { air: foeLaunchedSec > 0, afterDash: now() / 1000 - lastDashSec < DASH_ATTACK_SEC, airborne: meEvade.airborne, close: Vector3.Distance(player.root.position, rival.root.position) < 1.35 }) : null;
     const atk: AttackDef = special ? SPECIAL_ATTACK : move ? attackFromMove(move, baseAtk) : baseAtk;
     if (mine) striking = true; else foeStriking = true;
     if (special) {
@@ -626,6 +632,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       // world-axis read (x, 0, y) was right only while the camera looked exactly down −z; once it had swung round the
       // rival (it does, every exchange) stick-right ran screen-LEFT (measured Δscreen −2.5 m). No axis is flipped.
       const moveVel = ctx.camDirector.forwardFlat().scale(-stickY * MOVE_SPEED).addInPlace(ctx.camDirector.rightFlat().scale(stickX * MOVE_SPEED));
+      lastMyVel = meDash ? meDash.dir.scale(DASH.speed) : moveVel;   // FREE RUN
       // the roll outranks the stick: while it owns the body the stick is ignored entirely, which is the
       // commitment that makes it a read rather than a better walk
       const rollVel = meEvade.update(sdt);
@@ -667,6 +674,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       if (action.attack) swing(ctx, false, action.attack);
       let foeSpeed01 = Math.min(1, Math.hypot(action.moveX, action.moveY));   // the brain's INTENT, striking or not — the strike's settle lands on the step, not a one-frame stance
       const foeVel = new Vector3(action.moveX, 0, -action.moveY).scale(MOVE_SPEED * 0.92);
+      lastFoeVel = foeVel;   // FREE RUN
       if (foeState.controllable && !foeStriking && !foeState.blockHeld) {
         const vel = foeVel;
         const before = rival.root.position.clone();

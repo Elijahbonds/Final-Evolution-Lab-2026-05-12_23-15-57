@@ -650,7 +650,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const target = ti >= 0 ? bodies[ti] : null;
     // the stick variant reads against the FACING before the turn: pulled back + B is the spin kick that hits behind
     const dir = stickDirTo(stick, player.root.rotation.y);
-    const move = book.press(key, dir, gameSec, { afterDash: gameSec - lastDashSec < 0.3 });   // STORM: the first press out of a dash is the RUSH
+    const tpC = target ? target.mob.char.root.position : null;
+    const move = book.press(key, dir, gameSec, { afterDash: gameSec - lastDashSec < 0.3, airborne: meAir.airborne, close: !!tpC && Math.hypot(tpC.x - origin.x, tpC.z - origin.z) < 1.35 });   // STORM: the rush out of a dash, the jump attacks in the air, the elbow chest to chest
     const reachMult = perks.reach * style.reachMult;
     // REDIRECT: every press re-aims — onto the target, or down the stick's line when nobody is in its cone. The turn
     // arrives inside the hit beat (never a one-frame pop: G1/G4 still hold, it is just a faster pivot).

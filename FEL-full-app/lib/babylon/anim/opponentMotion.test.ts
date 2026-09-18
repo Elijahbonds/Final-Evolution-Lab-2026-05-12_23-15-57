@@ -51,11 +51,11 @@ describe('opponentMotion — an opponent plays the capture that replaces the aut
     const { MOVES } = await import('../core/HordeDynamics');
     // STORM COMBOS (2026-09-17): the AIR links and the SLAMs are situational variants of a grounded move (the air jab IS the jab
     // thrown at a launched body; the spike is the hammer coming down) — they share its capture by design and sit out this check
-    const named = Object.values(MOVES).filter((m) => !m.air && !m.slam);
+    const named = Object.values(MOVES).filter((m) => !m.air && !m.slam && !m.aerial && !m.authored);   // jump attacks reuse a grounded capture; the elbows are authored pose clips
     const clips = named.map((m) => m.clip);
     // the one intended share: jab and cross are different clips, the uppercut ender is its own capture
     expect(new Set(clips).size).toBe(clips.length);
     const owned = new Set(MOCAP_OPPONENT_CLIPS.map((c) => c.name));
-    for (const m of Object.values(MOVES)) expect(variantFor(m.clip, owned), `${m.id} → ${m.clip}`).toMatch(/^karate_mc_/);
+    for (const m of Object.values(MOVES)) if (!m.authored) expect(variantFor(m.clip, owned), `${m.id} → ${m.clip}`).toMatch(/^karate_mc_/);
   });
 });

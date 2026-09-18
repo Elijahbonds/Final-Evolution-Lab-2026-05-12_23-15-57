@@ -39,3 +39,14 @@ describe('Storm combos on the book', () => {
     expect(launchHeight(0.5)).toBeCloseTo(0.55, 6); expect(launchHeight(0)).toBe(0); expect(LAUNCH_AIR_SEC).toBeGreaterThan(0.5);
   });
 });
+describe('jump attacks, elbows and the spinning routes', () => {
+  it('a press in MY air is the jump kick (A) or the jumping spin kick (B/Y); chest to chest the second punch is the elbow', () => {
+    expect(resolveMove(['A'], 'n', { airborne: true }).id).toBe('jumpKick');
+    expect(resolveMove(['B'], 'n', { airborne: true }).id).toBe('jumpSpinKick');
+    expect(resolveMove(['A', 'A'], 'n', { close: true }).id).toBe('elbow');
+    expect(resolveMove(['A', 'A'], 'n', {}).id).toBe('cross');
+    expect(resolveMove(['Y', 'B', 'Y'], 'n').id).toBe('spinElbow');
+    expect(resolveMove(['B', 'Y', 'B'], 'n').id).toBe('typhoon');
+    expect(MOVES.spinElbow.spinDeg).toBe(360); expect(MOVES.jumpSpinKick.aerial).toBe(true);
+  });
+});
