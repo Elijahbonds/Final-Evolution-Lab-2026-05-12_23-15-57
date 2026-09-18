@@ -44,7 +44,8 @@ import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { DEFAULT_DRIBBLE } from '../anim/Dribble';
 import { LEGS, legPose, easeLegPose, cloneLegPose, arcK, carryU, arcApexT, slamBufferSec, ARC_TOP_FRAC, PLANT_SEC, WINDMILL_RELEASE_T, GATHER_LEAD_SEC, FOOT_PITCH_CAP, atPalm, type LegPose } from '../core/DunkLegs';
 import { EASTBAY_TIMING as EB } from '../anim/authored/timing';
-import { EASTBAY_TIMING } from '../anim/authored/timing';
+import { EASTBAY_TIMING, DUNK_TIMING } from '../anim/authored/timing';
+import { HOOPS_STRIDE } from '../core/StrideMatch';   // THE GATHER STRIDE (2026-09-18): the runway loop paces to the run
 import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';   // A+ P8 H1: the hang wrist reach
 import { lagToward, jamWeight, ironContact, hangHold, jamRootStep, jamFollowExtra, WRIST_LAG_TAU, HANG_MAX_SEC } from '../core/DunkHands';
 import { startFlush, stepFlush, sweptTouch, clearOfIron, ringDistance, ringClearance, type FlushState } from '../core/RimFlush';   // DUNK-BALL-ARMS-RIM: the made ball over the lip, down the ring, out of the net   // DUNK-HANDS-RIM: the wrist lag, the jam, the iron contact, the hang
@@ -68,7 +69,7 @@ import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
 import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, doubleUpFits, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
-import { lobVelocity, lobFlightTime, runTimeToLine, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
+import { lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, OBSTACLE_KINDS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, type ObstacleKind } from '../core/DunkObstacles';
 import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, signatureFor, landingDustScale, netSplashScale, NET_SPLASH_DROP, type SlamReadout } from '../core/DunkSystem';
 import { dunkCard, slamIsClean } from '../core/DunkCard';
@@ -90,6 +91,16 @@ type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'riva
 const MISS_BEAT_MS = 1400;
 /** HOLD = RUN: the hold ramps the athlete toward the rim at up to the max run (7 m/s) and launches at the gather line. */
 const HOLD_RUN_MAX = 7, HOLD_RUN_RAMP = 6, AIR_LEAN_RAD = 0.32, AIR_DRIFT = 0.8;
+/** THE GATHER STRIDE (owner 2026-09-18, "fix the gathers and the approaches in the dunk mode"). The hold-run sprinted at up to
+ *  7 m/s INTO the takeoff line and the flight then carried at its own ~1.9 m/s from the launch frame — a wall at the line, the
+ *  crouch of the launch clip playing while the root was already rising. The last stride is a GATHER now: inside
+ *  GATHER_STRIDE_SEC of the line (never under GATHER_MIN_M) the run eases (GATHER_EASE_SEC) to the flight's carry speed and
+ *  the charge-gather clip loads the legs ON THE FLOOR, so the launch clip's crouch lands on a body already gathered. */
+const GATHER_STRIDE_SEC = 0.3, GATHER_MIN_M = 1.1, GATHER_EASE_SEC = 0.16;
+/** How far the plant step keeps rolling toward the rim over PLANT_SEC (≈ the carry speed × the plant: no dead stop at the line). */
+const PLANT_DRIFT_M = 0.14;
+/** The runway loop's rate follows the run (the loop ran at one rate from a 2 m/s drift to a 7 m/s sprint: foot slide). */
+const strideRate = (mps: number): number => Math.max(0.7, Math.min(1.6, mps / HOOPS_STRIDE.run));
 // Dunk play tip (2026-09-07): a full stick runs at APPROACH_SPEED (the hold-run ramps past it to HOLD_RUN_MAX); the
 // flight eases the facing onto the rim at FACE_RIM_RATE per second.
 const APPROACH_SPEED = 6, FACE_RIM_RATE = 6;
@@ -176,7 +187,13 @@ type Win = 'run' | 'gather' | 'takeoff' | 'hang' | 'contact' | 'land';
 
 const DUNKS_PER_ROUND = 2;
 const RIVAL_HOP_MS = 1300;                 // the rival's scripted hop bench → rim
-const RIVAL_FLUSH_K = 0.56;                // MOCAP DUNKS: where on the hop the rival's ball leaves the palm for the ring (just past the apex)
+/** The re-aimed lob's shortest flight to the catch (a shorter one would need a cannon). */
+const LOB_REAIM_MIN_SEC = 0.35;
+const RIVAL_AT_RIM_K = 0.62;               // MOCAP DUNKS: the hop reaches the ring by here and hangs (it used to arrive only at the landing — the flush left the palm 1.6 m wide)
+const RIVAL_FLUSH_K_MAX = 0.86;
+/** Where in the captured finish the flush is (the dunk-finder's peak, ~0.53 of the window). */
+const RIVAL_FINISH_KEY_01 = 0.53;            // …and the ball leaves the palm when it is AT the ring's height (the captured finish decides the moment), or here at the latest
+                                           // (measured at a fixed 0.68: the ball let go 2.2–2.7 m up, under the iron, while the hand was still rising)
 /** The run-up before that hop. A dunk that starts from a standing launch is not a dunk anybody runs up to. */
 const RIVAL_RUNUP_MS = 900;
 const TOTAL_ROUNDS = 2;
@@ -282,6 +299,7 @@ export const DunkMode: ModeDefinition = (() => {
   let finishRelease = -1, finishT = 0, finishRate = 1;
   // DUNK-POSTURE-LEGS: the runway dribble (ballCarry) and its gather into the plant; the off hand's reach onto the ball
   let dribble: BallCarry | null = null, gatherLatched = false, gatherK = 0, pendingBeat: RunwayTrick | null = null;
+  let gatherStride = false;   // THE GATHER STRIDE: the last stride into the line is on
   let llPose: LegPose = cloneLegPose(LEGS.stance);   // LL: this frame's feet, eased between windows
   let styleTaps = 0;                          // mid-air showboat taps (max 2)
   let aHeld = false, hangSec = 0;             // rim-hang tracking
@@ -476,6 +494,8 @@ export const DunkMode: ModeDefinition = (() => {
   const namedTricks = (): string => [...runwayLabels, ...trickLabels].join(' → ');
   /** The takeoff line for this attempt: the plain runway's gather line, or the obstacle's own (a car is a long jump). */
   const gatherLine = (): number => { const k = obstacleKindOf(prop); return k ? rim.z + OBSTACLE_SPECS[k].takeoffFromRim : CFG.gatherZ; };
+  /** THE GATHER STRIDE as the lob timing sees it (the run eases to the flight's carry over the last stride). */
+  const gatherStrideSpec = (): GatherStride => ({ strideSec: GATHER_STRIDE_SEC, minM: GATHER_MIN_M, easeSec: GATHER_EASE_SEC, carryMps: Math.abs(rim.z + FLUSH_Z_AHEAD - gatherLine()) / Math.max(0.2, EASTBAY_TIMING.extend - PLANT_SEC) });
   /** Where the flight lands the body at the flush: the rim's front edge. */
   const FLUSH_Z_AHEAD = 0.6;
   const ballHandNode = (): TransformNode | null => boneNode(player.skeleton, ebState.inLeftHand ? 'LeftHand' : 'RightHand');
@@ -522,7 +542,7 @@ export const DunkMode: ModeDefinition = (() => {
 
   async function setupProp(ctx: ModeContext): Promise<void> {
     clearProps();
-    dribble?.update(0, 0, false); gatherLatched = false;
+    dribble?.update(0, 0, false); gatherLatched = false; gatherStride = false;
     if (!lob.live && ball && player) attachBallToHand(ball, player.skeleton, 'RightHand');   // DUNK-SOFTS-NAMED: a prop change hands the ball back (the passer had it)
     const kind = obstacleKindOf(prop);
     if (kind) {
@@ -859,7 +879,7 @@ export const DunkMode: ModeDefinition = (() => {
         // tricks fit before the slam window. Live 08's whole ramp, in one number.
         runUpPeak = Math.max(runUpPeak, Math.hypot(vel.x, vel.z));
         const moving = Math.hypot(vel.x, vel.z) > 0.5;
-        if (!runwayBeat) { playClip(moving ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true }); setWin('run'); }   // a runway beat owns the body until it ends
+        if (!runwayBeat) { playClip(moving ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true }); setWin('run'); if (moving) player.animator.setPlaybackScale(SPORT_CLIP.moveLoop, strideRate(Math.hypot(vel.x, vel.z))); }   // a runway beat owns the body until it ends; the loop paces to the run
         if (player.root.position.z <= gatherLine() + 0.2) {
           ctx.setHud({
             hint: runUpPeak < 3.5
@@ -872,7 +892,20 @@ export const DunkMode: ModeDefinition = (() => {
       if (phase === 'charge') {
         // HOLD = RUN (pad acceptance #2): ramp to the max run, curve toward the rim's x, let the stick steer,
         // and launch the moment the gather line is reached. runUpPeak keeps feeding the air budget.
-        holdRunSpeed = Math.min(HOLD_RUN_MAX, holdRunSpeed + dt * HOLD_RUN_RAMP);
+        {   // THE GATHER STRIDE: ramp until the last stride, then ease to the carry the flight will actually fly at
+          const distNow = player.root.position.z - gatherLine();
+          const carryMps = Math.abs(rim.z + FLUSH_Z_AHEAD - gatherLine()) / Math.max(0.2, EASTBAY_TIMING.extend - PLANT_SEC);
+          if (!gatherStride && !runwayBeat && !launchQueued && distNow <= Math.max(GATHER_MIN_M, holdRunSpeed * GATHER_STRIDE_SEC)) {
+            gatherStride = true; setWin('gather');
+            // paced to the stride: the 0.5 s clip ran out ~0.23 s before the line and the body froze on its last frame (measured), so it
+            // plays at the rate that ends it AT the line — the launch clip's crouch takes over from a body still moving
+            const tToLine = runTimeToLineGather(distNow, holdRunSpeed, HOLD_RUN_MAX, HOLD_RUN_RAMP, gatherStrideSpec());
+            playClip(SPORT_CLIP.dunkChargeGather, { fadeSec: 0.1, speedRatio: Math.max(0.5, Math.min(2, DUNK_TIMING.chargeSec / Math.max(0.25, tToLine))), onEnd: () => {} });
+            console.info(`[DUNK-LL] gather stride at ${distNow.toFixed(2)} m, ${holdRunSpeed.toFixed(1)} m/s → carry ${carryMps.toFixed(1)} m/s`);
+          }
+          if (gatherStride) holdRunSpeed += (carryMps - holdRunSpeed) * Math.min(1, dt / GATHER_EASE_SEC);
+          else holdRunSpeed = Math.min(HOLD_RUN_MAX, holdRunSpeed + dt * HOLD_RUN_RAMP);
+        }
         // stick-right steers screen-right (the camera's right in world x), and the facing follows the run
         const steer = ctx.camDirector.rightFlat().x * stickX * 3 + Math.max(-2, Math.min(2, (rim.x - player.root.position.x) * 0.8));
         player.root.position.x = Math.max(-6, Math.min(6, player.root.position.x + steer * dt));
@@ -884,7 +917,7 @@ export const DunkMode: ModeDefinition = (() => {
         runwayVel.x = steer; runwayVel.z = -runNow;
         runMotion.update(steer, -runNow, player.root.rotation.y, dt);
         runUpPeak = Math.max(runUpPeak, Math.hypot(steer, holdRunSpeed));
-        if (!runwayBeat) setWin('run');
+        if (!runwayBeat && !gatherStride) { setWin('run'); player.animator.setPlaybackScale(SPORT_CLIP.moveLoop, strideRate(holdRunSpeed)); }
         // THE RUNWAY TEACHES ITS MOVES (owner, 2026-09-16). Everything a player can throw on the run is a bare face
         // button under a held trigger — undiscoverable — and this pass added three more. The hold-run hint is the move
         // list now, and it turns into DOUBLE-UP the moment the double-up is actually on. Only pushed on CHANGE: a HUD
@@ -975,7 +1008,12 @@ export const DunkMode: ModeDefinition = (() => {
         // got 86% of the way from one fixed gather line — a car's near door was under the feet 0.2 s after takeoff.
         player.root.position.y = 4 * k * (1 - k) * apexFor();
         const u = carryU(clipTime, EASTBAY_TIMING.extend);
-        player.root.position.z = launchZ + (rim.z + FLUSH_Z_AHEAD - launchZ) * u;
+        // THE PLANT MOVES (2026-09-18): the root used to stand dead still at the line for PLANT_SEC (measured: 2.0 m/s → 0.0 → 1.9 m/s
+        // on consecutive frames — the wall at the takeoff). The gather step keeps rolling through the plant (PLANT_DRIFT_M over the
+        // plant), and the carry runs from where the plant ended to the same rim point on the same beat.
+        const carryDir = Math.sign(rim.z + FLUSH_Z_AHEAD - launchZ) || -1;
+        const plantFrom = launchZ + carryDir * PLANT_DRIFT_M * Math.min(1, clipTime / PLANT_SEC);
+        player.root.position.z = plantFrom + (rim.z + FLUSH_Z_AHEAD - plantFrom) * u;
         player.root.position.x += (rim.x - player.root.position.x) * 1.6 * dt;
         // Pad acceptance #2: the stick is alive in the hang — a body lean and a small drift before contact;
         // the pull to rim.x above (1.6/s) still wins by the flush, so the contact math is untouched.
@@ -1598,6 +1636,21 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.camDirector.resetLook();   // the takeoff → rimCamCut framing never inherits a look orbit
     ctx.setHud({ bannerHigh: true });   // DUNK-CAR-CLIP R2: the flight's banners ride at the top of the frame, clear of the rim (finishAttempt puts them back)
     launchSpeed01 = Math.min(1, runUpPeak / 7);
+    // THE LOB RE-AIMS AT THE LAUNCH (2026-09-18): a runway toss is timed on a PREDICTED launch, and the beat's real end, the gather
+    // stride and the line all move it (measured: the cartwheel's self-lob arrived 0.12 s after the hand on every run — LOST).
+    // Once the flight clock exists the catch point and its beat are exact, so a plain lob still in the air is re-thrown from
+    // where it is to arrive on the catch beat (a ball already close to the catch keeps its arc: nothing to fix).
+    if (lob.live && !lob.caught && !lob.lost && lob.kind === 'plain' && !lob.glass && ballSim.active) {
+      const from = ballSim.pos.clone();
+      const to = catchPointNow(LOB_CATCH_CLIP_T);
+      const tf = Math.max(LOB_REAIM_MIN_SEC, LOB_CATCH_CLIP_T - 0.03);
+      const gap = Vector3.Distance(from, to);
+      if (gap > 0.35) {
+        const v = lobVelocity(from, to, tf);
+        ballSim.launch(from, new Vector3(v.x, v.y, v.z));
+        console.info(`[LOB] re-aimed at the launch: ${gap.toFixed(2)} m to the catch in ${tf.toFixed(2)} s`);
+      }
+    }
     console.info(`[DUNK-LAUNCH] charge ${charge.toFixed(2)} run ${runUpPeak.toFixed(1)} apex ${apexFor().toFixed(2)} from z ${launchZ.toFixed(2)} to line ${gatherLine().toFixed(2)}${doubleUp ? ' DOUBLE-UP' : ''}${lob.live ? ' lob live' : ''}`);
     // The run-up, not the stick at the release instant: during the charge the
     // stick is usually neutral, so the old `hypot(stickX, stickY)` read ~0 and
@@ -1621,7 +1674,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (heldDpad) flight.recognizer.feed({ t: 'dpad', dir: heldDpad, pressed: true });   // a direction held through the takeoff is still held
     if (launchSpeed01 < 0.3 && charge > 0.4) flash(ctx, 'WALK-UP — short air', 900);
     else if (approach.difficulty > 0) flash(ctx, `${approach.label}${approach.angleDeg >= 10 ? ` · ${approach.angleDeg}°` : ''}`, 900);
-    dribble?.update(0, 0, false); gatherLatched = false; finishRelease = -1;   // DUNK-POSTURE-LEGS: the dribble is parked (the ball back in the palm) before the takeoff takes it
+    dribble?.update(0, 0, false); gatherLatched = false; gatherStride = false; finishRelease = -1;   // DUNK-POSTURE-LEGS: the dribble is parked (the ball back in the palm) before the takeoff takes it
     if (isOop(prop)) { if (teammate) attachBallToHand(ball, teammate.skeleton, 'RightHand'); else releaseBall(ball); }   // the ball rides the passer's palm until the toss (it used to wait at his idle hand and teleport 0.87 m up on the throw)
     else if (!lob.live) attachBallToHand(ball, player.skeleton, 'RightHand');   // a lob already in the air stays there — the catch is the hand's job
     // the track plays you OUT; it does not play under the dunk. The crowd owns the flight.
@@ -2023,7 +2076,7 @@ export const DunkMode: ModeDefinition = (() => {
     // the floor to the hand was a 0.53 m ball jump on the self-lob's auto-toss)
     if (dribble?.active && !atPalm(dribble.phase, 0.12)) { pendingBeat = rt; return; }
     pendingBeat = null;
-    dribble?.update(0, 0, false); gatherLatched = false;
+    dribble?.update(0, 0, false); gatherLatched = false; gatherStride = false;
     runwayBeat = rt; runwayT = 0; runwayReleased = false;
     const token = ++runwayToken;
     setWin('gather');
@@ -2047,12 +2100,21 @@ export const DunkMode: ModeDefinition = (() => {
       if (rt.id === 'kickup') { ballSim.stop(); }   // the drop ends at the foot — the kick takes over from where the ball is
       // the toss arrives at the catch beat: the run to the takeoff line (slower under the rest of this beat, and the beat must
       // end before the takeoff), then the flight's own catch beat — real seconds on the runway, clip seconds in the air
-      const beatLeft = rt.sec - runwayT;
+      // the beat ends when its CLIP ends: the back handspring's clip is shorter than the trick's nominal sec (0.63 vs 0.8 measured), so
+      // a toss timed on the nominal beat arrived 0.12 s after the hand — the cartwheel's self-lob LOST on every run
+      const beatLeft = (player.animator.durationOf(rt.clip) ?? rt.sec) - runwayT;
       // DUNK-SOFTS-NAMED: the run to the line on the HOLD-RUN RAMP (2 → 7 m/s at 6 m/s²) — the toss was timed at the speed of the
       // throw frame as if it held, so a RUN pressed from standing (the pad's way: no stick pre-run, speed 3.4 at the throw)
       // reached the line 0.6 s before the ball did — the kick-up was caught at 0.81, the self-lob at 0.91, the cartwheel LOST
       const dist = Math.max(0, player.root.position.z - gatherLine());
-      const runTime = (phase === 'charge' ? runTimeToLine(dist, holdRunSpeed, HOLD_RUN_MAX, HOLD_RUN_RAMP) : lobFlightTime(dist, 6.5, false, 0) + 0.15) + beatLeft * (1 - rt.runScale);   // a standing thrower runs in at the stick's 6 m/s, then the hold ramps past it
+      // THE GATHER STRIDE (2026-09-18): the beat OWNS the body until it ends (no gather under it), so the run under the beat is the ramp
+      // at the beat's runScale, and only the remainder is run with the gather — timing the whole distance on the gather threw the
+      // kick-up 0.37 s long and the cartwheel's self-lob 5 m high (both LOST, measured)
+      const vEnd = Math.min(HOLD_RUN_MAX, holdRunSpeed + HOLD_RUN_RAMP * beatLeft);
+      const dBeat = rt.runScale * (holdRunSpeed * beatLeft + 0.5 * (vEnd - holdRunSpeed) * beatLeft);
+      const runTime = phase === 'charge'
+        ? beatLeft + runTimeToLineGather(Math.max(0, dist - dBeat), vEnd, HOLD_RUN_MAX, HOLD_RUN_RAMP, gatherStrideSpec())
+        : lobFlightTime(dist, 6.5, false, 0) + 0.15 + beatLeft * (1 - rt.runScale);   // a standing thrower runs in at the stick's 6 m/s, then the hold ramps past it
       const tLaunch = Math.max(runTime, beatLeft);
       chargeAtLaunch = Math.max(charge, Math.min(1, (phaseSec + tLaunch) / 1.1));   // the keyboard's hold ramps over 1.1 s; a pad's depth is what it is
       if (rt.id === 'offglass') throwGlassLob(ctx, from, tLaunch + GLASS_CATCH_CLIP_T, phase !== 'charge', dist);
@@ -2115,7 +2177,7 @@ export const DunkMode: ModeDefinition = (() => {
   /** Can a bounce lob thrown NOW (on the run) still bounce once and reach the hand at the catch beat? */
   function bounceFits(): boolean {
     const dist = Math.max(0, player.root.position.z - gatherLine());
-    const tf = runTimeToLine(dist, holdRunSpeed, HOLD_RUN_MAX, HOLD_RUN_RAMP) + LOB_CATCH_CLIP_T;
+    const tf = runTimeToLineGather(dist, holdRunSpeed, HOLD_RUN_MAX, HOLD_RUN_RAMP, gatherStrideSpec()) + LOB_CATCH_CLIP_T;
     const from = ball.getAbsolutePosition(); from.y = Math.max(from.y, 0.7); from.z -= 0.3 * holdRunSpeed * 0.85;
     return bounceLobVelocity(v3(from), v3(catchPointNow()), tf, 1) != null;
   }
@@ -2136,7 +2198,7 @@ export const DunkMode: ModeDefinition = (() => {
   function groundUnderBall(): number { return obstacle ? Math.max(0, heightAt(obstacle.profile, ballSim.pos.x, ballSim.pos.z)) : 0; }
   /** A standing throw: the run cue lands when the hold-run from here + the catch beat fills what is left of the flight. */
   function armRunCue(tf: number, dist: number, catchT = LOB_CATCH_CLIP_T): void {
-    const run = runTimeToLine(dist, 2, HOLD_RUN_MAX, HOLD_RUN_RAMP) + 0.15;   // the pad's ramp from standing, a beat to react
+    const run = runTimeToLineGather(dist, 2, HOLD_RUN_MAX, HOLD_RUN_RAMP, gatherStrideSpec()) + 0.15;   // the pad's ramp from standing, a beat to react
     lob.runCueAt = Math.max(0, tf - catchT - run); lob.runCued = false;
     console.info(`[LOB] RUN cue in ${lob.runCueAt.toFixed(2)} s (flight ${tf.toFixed(2)} s, run ${run.toFixed(2)} s)`);
     ctx0?.setHud({ hint: 'WAIT FOR IT…' });
@@ -2622,7 +2684,7 @@ export const DunkMode: ModeDefinition = (() => {
     jamSec = -1; jamContact = false; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
     styleTaps = 0; hangSec = 0; revealed = []; slamTiming = null;
     runUpPeak = 0; obstacleClipped = false; toppling = false; runwayIds = [];
-    resetLob(); resetRunway(); ballSim.stop(); looseBall = false; flush = null; jamPrevLive = false; punchPending = false; dribble?.update(0, 0, false); gatherLatched = false; gatherK = 0; finishRelease = -1; attachBallToHand(ball, player.skeleton, 'RightHand'); ebState.inLeftHand = false; setWin('run');
+    resetLob(); resetRunway(); ballSim.stop(); looseBall = false; flush = null; jamPrevLive = false; punchPending = false; dribble?.update(0, 0, false); gatherLatched = false; gatherStride = false; gatherK = 0; finishRelease = -1; attachBallToHand(ball, player.skeleton, 'RightHand'); ebState.inLeftHand = false; setWin('run');
     settleLatch = false; settleArmed = false; fovRelease(); setTrail('soft');   // juice soft: back to the runway
     void setupProp(ctx);
     // P7 (2026-09-16): THE RUNWAY GETS ITS CAMERA BACK. `snapTo` places and aims the camera but never touches the
@@ -2733,7 +2795,12 @@ export const DunkMode: ModeDefinition = (() => {
       // The hang is paced to span the rest of the hop (+150 ms so the verdict clip supersedes it, never a held pose): measured
       // at speed 1 it ran out ~130 ms before the landing and the rival flew those frames with no clip at all.
       const hopLeft = RIVAL_HOP_MS / 1000 - (rival.animator.durationOf(SPORT_CLIP.dunkLaunchPower) ?? 0.35) + 0.15;
-      const hangRate = Math.max(0.25, Math.min(1.5, (rival.animator.durationOf(rAerial) ?? hopLeft) / hopLeft));
+      // MOCAP DUNKS (2026-09-18): the finish's FLUSH key (~0.53 of the captured tomahawk / windmill) lands at the TOP of the hop
+      // (k 0.5), the clip's end holds the flush pose to the landing — spread across the whole rest of the hop it was still cocked
+      // back on the way down (measured: the ball let go at 1.8 m on the fallback beat, frames showing the hand at the hip)
+      const aerialDur = rival.animator.durationOf(rAerial) ?? hopLeft;
+      const launchDur = rival.animator.durationOf(SPORT_CLIP.dunkLaunchPower) ?? 0.35;
+      const hangRate = Math.max(0.5, Math.min(1.5, (aerialDur * RIVAL_FINISH_KEY_01) / Math.max(0.15, (RIVAL_HOP_MS / 1000) * 0.5 - launchDur)));
       // launch -> the finish this attempt actually earned, rate-matched to span the rest of the hop so the
       // body is never clip-less in the air (the measured failure this pacing exists for: the hang ran out
       // ~130 ms early and the rival flew those frames with no clip at all)
@@ -2750,19 +2817,23 @@ export const DunkMode: ModeDefinition = (() => {
         const obs = ctx.scene.onBeforeRenderObservable.add(() => {
           const nowMs = performance.now(); const rdt = Math.min(0.05, (nowMs - rivalLastMs) / 1000); rivalLastMs = nowMs;
           const k = Math.min(1, (nowMs - hopT0) / RIVAL_HOP_MS);
-          rival.root.position.x = liftOff.x + (rim.x - liftOff.x) * k;
-          rival.root.position.z = liftOff.z + (rim.z + 0.7 - liftOff.z) * k;
+          // the hop ARRIVES at the ring by the flush beat and hangs there (it used to reach the rim only at the landing, so the
+          // flush left the palm mid-hop, 1.6 m wide of the iron — measured)
+          const ku = Math.min(1, k / RIVAL_AT_RIM_K);
+          rival.root.position.x = liftOff.x + (rim.x - liftOff.x) * ku;
+          rival.root.position.z = liftOff.z + (rim.z + 0.7 - liftOff.z) * ku;
           rival.root.position.y = Math.sin(k * Math.PI) * 1.2;
-          if (rivalBall && !rivalReleased && k >= RIVAL_FLUSH_K) {
+          ball.computeWorldMatrix(true);
+          const bpNow = ball.getAbsolutePosition();
+          if (rivalBall && !rivalReleased && k >= 0.25 && (bpNow.y >= rim.y - 0.06 || k >= RIVAL_FLUSH_K_MAX)) {
             rivalReleased = true;
-            ball.computeWorldMatrix(true);
-            const at = clearOfIron(ball.getAbsolutePosition(), rim, RIM_RADIUS, ballSim.radius);
+            const at = clearOfIron(bpNow, rim, RIM_RADIUS, ballSim.radius);
             releaseBall(ball); ball.position.set(at.x, at.y, at.z);
-            if (rivalBlew) { ballSim.launch(ball.position.clone(), clankOffRim(ball, rim)); looseBall = true; hoopJuice?.graze(); SoundKit.play('rattle', { volume: 0.3 }); console.info('[DUNK-RIVAL] clank off the iron'); }
+            if (rivalBlew) { ballSim.launch(ball.position.clone(), clankOffRim(ball, rim)); looseBall = true; hoopJuice?.graze(); SoundKit.play('rattle', { volume: 0.3 }); console.info(`[DUNK-RIVAL] clank off the iron at k ${k.toFixed(2)} from (${at.x.toFixed(2)}, ${at.y.toFixed(2)}, ${at.z.toFixed(2)})`); }
             else {
               rivalFlush = startFlush(ball.position, rim, RIM_RADIUS, ballSim.radius, NET_THROW_MIN + (NET_THROW_MAX - NET_THROW_MIN) * rAcc);
               hoopJuice?.punch(); SoundKit.play('swish', { volume: 0.5 }); EffectsKit.burst(ctx.scene, rim, 'net');
-              console.info(`[DUNK-RIVAL] flush from (${at.x.toFixed(2)}, ${at.y.toFixed(2)}, ${at.z.toFixed(2)})`);
+              console.info(`[DUNK-RIVAL] flush from (${at.x.toFixed(2)}, ${at.y.toFixed(2)}, ${at.z.toFixed(2)}) at k ${k.toFixed(2)}`);
             }
           }
           if (rivalFlush && rivalFlush.phase !== 'free') {

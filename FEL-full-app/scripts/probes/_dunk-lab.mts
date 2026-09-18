@@ -69,6 +69,11 @@ const STYLE = process.env.STYLE ?? '';
 if (STYLE && !STYLE_RING.includes(STYLE)) throw new Error(`no such style: ${STYLE} (have ${STYLE_RING.join(', ')})`);
 /** SHOT_AT_MS=900 — a frame of the RUNWAY itself (what the dunker is about to jump over), not just the verdict. */
 const SHOT_AT_MS = Number(process.env.SHOT_AT_MS ?? 0);
+/** SHOTS_MS=1400,1600,1800 — frames at these ms after RUN is held (the approach, the gather, the takeoff), named by offset. */
+const SHOTS_MS = (process.env.SHOTS_MS ?? '').split(',').map((x) => Number(x.trim())).filter((x) => x > 0);
+/** TRACE=1 — the hero's root z / y and the top clip EVERY FRAME through the attempt, printed 1.2 s around the launch (the run's
+ *  speed into the line, the plant, the first air frames: a hitch or a gather in the air is a number, not an opinion). */
+const TRACE = process.env.TRACE === '1';
 if (OBSTACLE && !OBSTACLE_RING.includes(OBSTACLE)) throw new Error(`no such obstacle: ${OBSTACLE} (have ${OBSTACLE_RING.join(', ')})`);
 
 const browser = await chromium.launch({ executablePath: chromiumExe(), headless: false, args: ['--window-size=1280,860', '--use-angle=metal', '--autoplay-policy=no-user-gesture-required'] });
@@ -78,6 +83,10 @@ const page = await ctx.newPage();
 await page.addInitScript({ content: 'window.__name = window.__name || function (f) { return f; };' });
 const log: string[] = [];
 page.on('console', (m) => { const t = m.text(); if (/\[DUNK|\[LOB|\[RIM|\[JUDGE/.test(t)) log.push(`${Date.now()} ${t.slice(0, 180)}`); });
+// the dev overlay's '1 error' badge, named: every console error and page error the run produced (printed at the end)
+const errors: string[] = [];
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 240)); });
+page.on('pageerror', (e) => errors.push(`pageerror: ${String(e.message ?? e).slice(0, 200)} :: ${String((e as Error).stack ?? '').split('\n').slice(1, 4).join(' < ').slice(0, 400)}`));
 
 { // login
   const lp = await ctx.newPage();
@@ -105,6 +114,20 @@ await page.evaluate(`(() => {
   // P4: the BODY through the flight — the top clip on the rig at 20 Hz, so "does a TOMAHAWK look like a TOMAHAWK" is a
   // measurement and not an opinion. Production publishes __FEL_DEV__.anim (SHARED-ANIM-BUS).
   window.__CLIPS = [];
+  // TRACE: every rendered frame — root z / y, the top clip and its weight (the gather / launch read)
+  window.__TRACE = [];
+  (function () {
+    const q = window.__FEL_QA__; const s = q && q.scene && q.scene(); if (!s) return;
+    s.onAfterRenderObservable.add(() => {
+      try {
+        const h = q.hero && q.hero(); if (!h) return; let r = h; while (r.parent) r = r.parent;
+        const d = window.__FEL_DEV__; const a = d && d.anim ? d.anim() : null; const pl = a && a.hero && a.hero.playing ? a.hero.playing.slice().sort((x, y) => y.weight - x.weight)[0] : null;
+        const p = r.getAbsolutePosition();
+        window.__TRACE.push({ t: Date.now(), x: +p.x.toFixed(2), y: +p.y.toFixed(3), z: +p.z.toFixed(3), clip: pl ? pl.clip : '', w: pl ? +pl.weight.toFixed(2) : 0 });
+        if (window.__TRACE.length > 6000) window.__TRACE.shift();
+      } catch (e) {}
+    });
+  })();
   setInterval(() => {
     const d = window.__FEL_DEV__; const r = d && d.anim ? d.anim() : null; const h = r && r.hero;
     if (!h || !h.playing || !h.playing.length) return;
@@ -203,6 +226,7 @@ for (let n = 0; n < ATTEMPTS; n++) {
   let launched = false;
   let threwRunway = !RUNWAY_TRICK;
   let shotRunway = false;
+  const shotsDone = new Set<number>();
   while (Date.now() - runT0 < RUN_MS + 2500) {
     // a RUNWAY trick is a bare face button under the hold — the stick steers, so there is no direction to hold
     if (!threwRunway && Date.now() - runT0 >= RUNWAY_AT_MS) {
@@ -212,6 +236,11 @@ for (let n = 0; n < ATTEMPTS; n++) {
       await press(rw.btn, 60);
       if (rw.dir) { await page.waitForTimeout(60); await hold(DPAD[rw.dir], false); }
       a.trick = `${RUNWAY_TRICK}+${a.trick}`;
+    }
+    for (let si = 0; si < SHOTS_MS.length; si++) {
+      if (shotsDone.has(si) || Date.now() - runT0 < SHOTS_MS[si]) continue;
+      shotsDone.add(si);
+      await page.screenshot({ path: `${OUT}/${TAG}-a${a.n}-${SHOTS_MS[si]}ms.png` });
     }
     if (SHOT_AT_MS > 0 && !shotRunway && Date.now() - runT0 >= SHOT_AT_MS) {
       shotRunway = true;
@@ -223,6 +252,9 @@ for (let n = 0; n < ATTEMPTS; n++) {
   }
   if (!launched) { await trigger(0); await page.waitForTimeout(400); }   // release: jump from here
   const airT0 = Date.now();
+  // the burst continues into the air (offsets are still from RUN)
+  const burstRest = SHOTS_MS.map((ms, si) => ({ ms, si })).filter(({ si }) => !shotsDone.has(si));
+  const burstTimer = burstRest.length ? (async () => { for (const { ms, si } of burstRest) { const wait = runT0 + ms - Date.now(); if (wait > 0) await page.waitForTimeout(wait); shotsDone.add(si); await page.screenshot({ path: `${OUT}/${TAG}-a${a.n}-${ms}ms.png` }).catch(() => {}); } })() : null;
   await trigger(0);
 
   // THE CALL: the direction goes down first (a player holds it), the button follows — the mode arms an early press and
@@ -289,8 +321,23 @@ for (let n = 0; n < ATTEMPTS; n++) {
     }
     a.ball = w;
   }
+  if (burstTimer) await burstTimer;
   const fresh = log.slice(logMark); logMark = log.length;
   a.launch = fresh.find((l) => /\[DUNK-LAUNCH\]/.test(l))?.replace(/^\d+ /, '');
+  if (TRACE) {
+    // the launch moment = the [DUNK-LAUNCH] line's stamp; print −0.7 s … +0.6 s around it every 2nd frame
+    const lm = /^(\d+) \[DUNK-LAUNCH\]/.exec(fresh.find((l) => /\[DUNK-LAUNCH\]/.test(l)) ?? '');
+    const rows = (await page.evaluate('window.__TRACE') as { t: number; x: number; y: number; z: number; clip: string; w: number }[]).filter((r) => r.t >= mark);
+    if (lm && rows.length) {
+      const t0 = +lm[1];
+      const win = rows.filter((r) => r.t >= t0 - 700 && r.t <= t0 + 600);
+      console.log(`   trace (launch at 0): t(ms)  z  dz/dt(m/s)  y  clip`);
+      for (let i = 0; i < win.length; i += 2) {
+        const r = win[i], pr = win[Math.max(0, i - 2)]; const dt = (r.t - pr.t) / 1000; const v = dt > 0 ? -(r.z - pr.z) / dt : 0;
+        console.log(`     ${String(r.t - t0).padStart(5)}  ${r.z.toFixed(2).padStart(6)}  ${v.toFixed(1).padStart(5)}  ${r.y.toFixed(2).padStart(5)}  ${r.clip}${r.w < 0.99 ? ' (' + r.w + ')' : ''}`);
+      }
+    }
+  }
   a.cue = fresh.filter((l) => /\[DUNK-(CUE|TRICK|SLAM|WIN|RUNWAY|LOB)\]/.test(l)).map((l) => l.replace(/^\d+ /, ''));
   attempts.push(a);
   console.log(`#${a.n} ${a.trick.padEnd(12)} ${(a.slamTiming || '—').padEnd(38)} ${(a.breakdown || '').slice(0, 40).padEnd(42)} ${(a.clips ?? []).slice(0, 4).join(' → ')}`);
@@ -298,7 +345,8 @@ for (let n = 0; n < ATTEMPTS; n++) {
   if (n < 3) await page.screenshot({ path: `${OUT}/${TAG}-attempt${a.n}-${a.trick}.png` });
 }
 
-const out = { tag: TAG, base: BASE, slamWhen: SLAM_WHEN, slamOffsetMs: SLAM_OFFSET_MS, attempts, log: log.slice(-200) };
+if (errors.length) { console.log(`console errors (${errors.length}):`); for (const e of [...new Set(errors)].slice(0, 8)) console.log('  ', e); }
+const out = { tag: TAG, base: BASE, slamWhen: SLAM_WHEN, slamOffsetMs: SLAM_OFFSET_MS, attempts, errors: [...new Set(errors)].slice(0, 20), log: log.slice(-200) };
 fs.writeFileSync(`${OUT}/dunk-lab-${TAG}.json`, JSON.stringify(out, null, 1));
 await browser.close();
 const fired = attempts.filter((a) => a.cue.some((l) => /\[DUNK-TRICK\] air/.test(l))).length;

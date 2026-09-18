@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GRAVITY, LOB_CATCH_RADIUS, canCatch, lobApex, lobAt, lobFlightTime, lobVelocity, runTimeToLine } from './DunkLob';
+import { GRAVITY, LOB_CATCH_RADIUS, canCatch, lobApex, lobAt, lobFlightTime, lobVelocity, runTimeToLine, runTimeToLineGather } from './DunkLob';
 
 describe('DunkLob — the self-lob arc', () => {
   it('arrives at the catch point at the flight time, exactly', () => {
@@ -177,5 +177,23 @@ describe('rimRing', () => {
     const ring = rimRing({ x: 0, y: 3.05, z: -10.28 }, 0.45);
     expect(ring.length).toBe(12);
     for (const p of ring) { expect(p.y).toBe(3.05); expect(Math.hypot(p.x, p.z + 10.28)).toBeCloseTo(0.45, 6); }
+  });
+});
+
+describe('runTimeToLineGather — the gather stride (2026-09-18)', () => {
+  const G = { strideSec: 0.3, minM: 1.1, easeSec: 0.16, carryMps: 1.9 };
+  it('takes LONGER than the plain ramp: the last stride eases to the carry speed', () => {
+    const plain = runTimeToLine(5, 4, 7, 6), gathered = runTimeToLineGather(5, 4, 7, 6, G);
+    expect(gathered).toBeGreaterThan(plain + 0.1);
+    expect(gathered).toBeLessThan(plain + 0.6);
+  });
+  it('a run already inside the gather distance is all gather: ~ dist / carry', () => {
+    const t = runTimeToLineGather(0.8, 7, 7, 6, G);
+    expect(t).toBeGreaterThan(0.8 / 7);
+    expect(t).toBeLessThan(0.8 / 1.9 + 0.05);
+  });
+  it('is monotonic in distance and zero at the line', () => {
+    expect(runTimeToLineGather(0, 5, 7, 6, G)).toBe(0);
+    let prev = 0; for (const d of [0.5, 1, 2, 3, 5, 8]) { const t = runTimeToLineGather(d, 3, 7, 6, G); expect(t).toBeGreaterThan(prev); prev = t; }
   });
 });

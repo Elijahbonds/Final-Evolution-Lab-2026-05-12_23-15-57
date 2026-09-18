@@ -50,6 +50,28 @@ export function runTimeToLine(dist: number, v0: number, vmax: number, accel: num
   return (top - v) / a + (d - dRamp) / top;
 }
 
+/** THE GATHER STRIDE (2026-09-18): the last stride into the line eases the run toward the flight's carry speed. */
+export interface GatherStride { strideSec: number; minM: number; easeSec: number; carryMps: number }
+/**
+ * The hold-run ramp's time to the line WITH the gather stride: inside max(minM, v · strideSec) of the line the speed eases
+ * (first-order, easeSec) toward carryMps instead of ramping. Integrated at 5 ms — a toss timed on the plain ramp arrived
+ * before the hand once the gather slowed the last stride (measured: the cartwheel's self-lob LOST, dropped at 1.38 s).
+ */
+export function runTimeToLineGather(dist: number, v0: number, vmax: number, accel: number, g: GatherStride): number {
+  let d = Math.max(0, dist), v = Math.max(0.1, Math.min(v0, vmax)), t = 0;
+  const step = 0.005;
+  let gathering = false;
+  for (let i = 0; i < 4000 && d > 0; i++) {
+    if (!gathering && d <= Math.max(g.minM, v * g.strideSec)) gathering = true;
+    if (gathering) v += (g.carryMps - v) * Math.min(1, step / Math.max(1e-3, g.easeSec));
+    else v = Math.min(vmax, v + accel * step);
+    const dz = v * step;
+    if (dz >= d) { t += d / Math.max(0.05, v); d = 0; break; }
+    d -= dz; t += step;
+  }
+  return t;
+}
+
 /** A fair catch: the ball inside the catch radius of the hand. */
 export function canCatch(hand: V3, ball: V3, radius = LOB_CATCH_RADIUS): boolean {
   const dx = hand.x - ball.x, dy = hand.y - ball.y, dz = hand.z - ball.z;
