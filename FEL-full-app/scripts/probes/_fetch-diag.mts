@@ -1,0 +1,10 @@
+import { chromium } from 'playwright-core';
+const BASE = process.env.BASE ?? 'http://localhost:3000';
+setTimeout(() => { console.log('DIAG timed out'); process.exit(2); }, 70000);
+const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', args: ['--use-gl=angle', '--use-angle=metal'] });
+const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+const reqs: string[] = []; p.on('response', (r) => { const u = r.url(); if (/\.(glb|gltf)(\?|$)/.test(u)) reqs.push(`${r.status()} ${u.replace(BASE, '')} ${r.headers()['content-length'] ?? '?'}`); });
+await p.goto(`${BASE}/dev/mode/dunk`, { waitUntil: 'domcontentloaded' }); await p.waitForSelector('canvas', { timeout: 60000 }); await p.waitForTimeout(11000);
+console.log('glb responses:\n  ' + (reqs.join('\n  ') || 'none'));
+console.log(await p.evaluate(`(() => { const s = window.__FEL_DEV__.scene; const m = s.meshes.find(x => x.name === 'Mesh_0' && x.parent?.parent?.name?.startsWith('nexus_venue_map')); if (!m) return 'no venue map mesh'; const mat = m.material; return JSON.stringify({ mat: mat?.name, albedo: mat?.albedoTexture?.name?.slice(0, 80), emissive: mat?.emissiveTexture?.name?.slice(0, 80), verts: m.getTotalVertices() }); })()`));
+await b.close(); process.exit(0);

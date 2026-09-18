@@ -1,0 +1,58 @@
+{
+  "id": "anim_sprint_run_loop",
+  "name": "Sprint Run Loop",
+  "category": "animations",
+  "type": "loop_motion",
+  "file": "anim_sprint_run_loop.fbx",
+  "urls": [
+    "https://static.seeles.ai/data/asset/export/7cfaf968-98ba-4e16-a6a9-b1d22b409bfa/461709/unityModel_24874a4d-4c5f-41c5-bd48-6a52ff532325.fbx"
+  ],
+  "description": "Universal full-speed sprint run cycle shared across all locomotion blend spaces for 14 production modes",
+  "tags": [
+    "run",
+    "sprint",
+    "loop",
+    "locomotion",
+    "shared",
+    "blend space"
+  ],
+  "keywords": [
+    "run cycle",
+    "sprint loop",
+    "locomotion",
+    "movement"
+  ],
+  "compat": [
+    "unity",
+    "unreal"
+  ],
+  "status": "ready",
+  "created_at": "2026-05-23T16:00:00Z",
+  "source_date": "2026-05-23",
+  "source_turn": 22,
+  "version": "1.0",
+  "property_id": "search_f8cf348c2511_0",
+  "motion_asset_id": 461709,
+  "fel_abp": "ABP_Shared",
+  "fel_blend_space": "BS_Shared_Locomotion",
+  "fel_modes": [
+    "basketball_h2h",
+    "basketball_dunk",
+    "basketball_3v3",
+    "karate_h2h",
+    "karate_endless",
+    "baseball",
+    "football",
+    "soccer",
+    "golf",
+    "tennis",
+    "volleyball",
+    "surfing",
+    "gymnastics",
+    "brain_brawl"
+  ],
+  "local_bundle_file": "anim_sprint_run_loop.nexusanim.json",
+  "local_bundle_path": "FinalEvolutionLab/Resources/Animations/anim_sprint_run_loop.nexusanim.json",
+  "runtime_loader": "NexusAnimationLoader",
+  "runtime_format": "nexusanim_json"
+}

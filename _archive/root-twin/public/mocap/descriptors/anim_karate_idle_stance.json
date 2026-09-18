@@ -1,0 +1,44 @@
+{
+  "id": "anim_karate_idle_stance",
+  "name": "Karate Fighting Idle Stance Loop",
+  "category": "animations",
+  "type": "loop_motion",
+  "file": "anim_karate_idle_stance.fbx",
+  "urls": [
+    "https://static.seeles.ai/data/asset/export/9201ff6a-efb0-4c6a-ab25-bdd4a2d4b6cb/391929/unityModel_1d5c92af-0f3a-4644-9825-1c24aa04b93f.fbx"
+  ],
+  "description": "Looping martial arts fighting idle stance with low guard shuffle and weight shift for karate modes",
+  "tags": [
+    "karate",
+    "martial arts",
+    "idle",
+    "stance",
+    "loop"
+  ],
+  "keywords": [
+    "karate idle",
+    "fighting stance",
+    "martial arts loop",
+    "combat ready"
+  ],
+  "compat": [
+    "unity",
+    "unreal"
+  ],
+  "status": "ready",
+  "created_at": "2026-05-23T16:00:00Z",
+  "source_date": "2026-05-23",
+  "source_turn": 22,
+  "version": "1.0",
+  "property_id": "search_449eb2f53682_0",
+  "motion_asset_id": 391929,
+  "fel_abp": "ABP_Karate",
+  "fel_modes": [
+    "karate_h2h",
+    "karate_endless"
+  ],
+  "local_bundle_file": "anim_karate_idle_stance.nexusanim.json",
+  "local_bundle_path": "FinalEvolutionLab/Resources/Animations/anim_karate_idle_stance.nexusanim.json",
+  "runtime_loader": "NexusAnimationLoader",
+  "runtime_format": "nexusanim_json"
+}
