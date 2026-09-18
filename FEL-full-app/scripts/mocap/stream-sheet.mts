@@ -12,15 +12,17 @@ const args = process.argv.slice(2);
 const opt = (k: string, d: string) => args.find((a) => a.startsWith(`${k}=`))?.slice(k.length + 1) ?? d;
 const OUT = opt('OUT', 'shots/stream-sheet').replace(/^~/, process.env.HOME ?? '~');
 const STEP = Number(opt('STEP', '0.25'));
+/** FROM= / TO= (seconds): a WINDOW of the take (dunk-finder, 2026-09-18) — the sheet names it, and the clip window is what you check. */
+const FROM = Number(opt('FROM', '0')), TO = Number(opt('TO', '0'));
 mkdirSync(OUT, { recursive: true });
 const BONES: [string, string][] = [['Hips', 'Chest'], ['Chest', 'Neck'], ['Neck', 'Head'], ['Chest', 'LeftArm'], ['LeftArm', 'LeftForeArm'], ['LeftForeArm', 'LeftHand'], ['Chest', 'RightArm'], ['RightArm', 'RightForeArm'], ['RightForeArm', 'RightHand'], ['Hips', 'LeftUpLeg'], ['LeftUpLeg', 'LeftLeg'], ['LeftLeg', 'LeftFoot'], ['LeftFoot', 'LeftToe'], ['Hips', 'RightUpLeg'], ['RightUpLeg', 'RightLeg'], ['RightLeg', 'RightFoot'], ['RightFoot', 'RightToe']];
 
 function svgOf(s: JointStream, title: string): string {
   const dur = s.frames.length / s.fps, n = Math.max(1, Math.floor(dur / STEP));
-  const cols = 16, cw = 80, ch = 120, rows = Math.ceil(n / cols);
+  const cols = 16, cw = Number(opt('CW', '80')), ch = Number(opt('CH', '120')), rows = Math.ceil(n / cols);   // CW= / CH= (px): a jump + a reach wants a taller cell
   // scale: the first frame's hips→head to 50 px
   const f0 = s.frames[0], torso = Math.hypot(f0.Head[0] - f0.Hips[0], f0.Head[1] - f0.Hips[1], f0.Head[2] - f0.Hips[2]) || 1;
-  const sc = 48 / torso;
+  const sc = Number(opt('PX', '48')) / torso;   // PX= : pixels per torso length
   const floor = Math.min(...s.frames.map((f) => Math.min(f.LeftFoot[1], f.RightFoot[1])));
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${cols * cw}" height="${rows * ch * 2 + 20}" style="background:#0b0f14;font:10px monospace"><text x="4" y="13" fill="#fff">${title} · ${dur.toFixed(2)} s · top FRONT(x) / bottom SIDE(z)</text>`;
   for (let k = 0; k < n; k++) {
@@ -46,8 +48,9 @@ const page = await browser.newPage();
 for (const spec of args.filter((a) => /^(cmu|ual|deepmotion|meshy):/.test(a))) {
   const [kind, rest] = [spec.slice(0, spec.indexOf(':')), spec.slice(spec.indexOf(':') + 1)];
   const [file, anim] = rest.split('#');
-  const s = kind === 'ual' || kind === 'meshy' ? await readGlbStream(file, anim, 30, kind) : readBvhStream(file, kind as 'cmu' | 'deepmotion');
-  const title = `${kind}:${basename(file)}${anim ? '#' + anim : ''}`;
+  let s = kind === 'ual' || kind === 'meshy' ? await readGlbStream(file, anim, 30, kind) : readBvhStream(file, kind as 'cmu' | 'deepmotion');
+  if (TO > FROM) s = { ...s, frames: s.frames.slice(Math.round(FROM * s.fps), Math.round(TO * s.fps)) };
+  const title = `${kind}:${basename(file)}${anim ? '#' + anim : ''}${TO > FROM ? ` ${FROM}-${TO}s` : ''}`;
   const safe = title.replace(/[^A-Za-z0-9_-]+/g, '_');
   await page.setContent(`<body style="margin:0;background:#0b0f14">${svgOf(s, title)}</body>`);
   await (await page.$('svg'))!.screenshot({ path: `${OUT}/${safe}.png` });

@@ -176,6 +176,7 @@ type Win = 'run' | 'gather' | 'takeoff' | 'hang' | 'contact' | 'land';
 
 const DUNKS_PER_ROUND = 2;
 const RIVAL_HOP_MS = 1300;                 // the rival's scripted hop bench → rim
+const RIVAL_FLUSH_K = 0.56;                // MOCAP DUNKS: where on the hop the rival's ball leaves the palm for the ring (just past the apex)
 /** The run-up before that hop. A dunk that starts from a standing launch is not a dunk anybody runs up to. */
 const RIVAL_RUNUP_MS = 900;
 const TOTAL_ROUNDS = 2;
@@ -2736,15 +2737,41 @@ export const DunkMode: ModeDefinition = (() => {
       // launch -> the finish this attempt actually earned, rate-matched to span the rest of the hop so the
       // body is never clip-less in the air (the measured failure this pacing exists for: the hang ran out
       // ~130 ms early and the rival flew those frames with no clip at all)
+      // MOCAP DUNKS (2026-09-18, owner: "animate the rivals dunk to be something impressive … have the ball go through the rim"):
+      // the rival dunks WITH the ball. It rides his right palm up the hop (the captured tomahawk / windmill carries it over the
+      // iron) and at the top it FLUSHES through the ring on the player's own RimFlush — or clanks off the iron when he blows it.
+      // He used to hop empty-handed under the launch clip while the ball sat in the player's hand at the bench.
+      const rivalBall = !!ball && !lob.live;
+      let rivalFlush: FlushState | null = null, rivalReleased = false, rivalLastMs = performance.now();
+      if (rivalBall) { ballSim.stop(); looseBall = false; flush = null; attachBallToHand(ball, rival.skeleton, 'RightHand'); console.info('[DUNK-RIVAL] ball in hand'); }
       rivalClip(SPORT_CLIP.dunkLaunchPower, { onEnd: () => rivalClip(rAerial, { speedRatio: hangRate, onEnd: () => {} }) });
       const hopT0 = performance.now();
       await new Promise<void>((res) => {
         const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-          const k = Math.min(1, (performance.now() - hopT0) / RIVAL_HOP_MS);
+          const nowMs = performance.now(); const rdt = Math.min(0.05, (nowMs - rivalLastMs) / 1000); rivalLastMs = nowMs;
+          const k = Math.min(1, (nowMs - hopT0) / RIVAL_HOP_MS);
           rival.root.position.x = liftOff.x + (rim.x - liftOff.x) * k;
           rival.root.position.z = liftOff.z + (rim.z + 0.7 - liftOff.z) * k;
           rival.root.position.y = Math.sin(k * Math.PI) * 1.2;
-          if (k >= 1) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); }
+          if (rivalBall && !rivalReleased && k >= RIVAL_FLUSH_K) {
+            rivalReleased = true;
+            ball.computeWorldMatrix(true);
+            const at = clearOfIron(ball.getAbsolutePosition(), rim, RIM_RADIUS, ballSim.radius);
+            releaseBall(ball); ball.position.set(at.x, at.y, at.z);
+            if (rivalBlew) { ballSim.launch(ball.position.clone(), clankOffRim(ball, rim)); looseBall = true; hoopJuice?.graze(); SoundKit.play('rattle', { volume: 0.3 }); console.info('[DUNK-RIVAL] clank off the iron'); }
+            else {
+              rivalFlush = startFlush(ball.position, rim, RIM_RADIUS, ballSim.radius, NET_THROW_MIN + (NET_THROW_MAX - NET_THROW_MIN) * rAcc);
+              hoopJuice?.punch(); SoundKit.play('swish', { volume: 0.5 }); EffectsKit.burst(ctx.scene, rim, 'net');
+              console.info(`[DUNK-RIVAL] flush from (${at.x.toFixed(2)}, ${at.y.toFixed(2)}, ${at.z.toFixed(2)})`);
+            }
+          }
+          if (rivalFlush && rivalFlush.phase !== 'free') {
+            const st = stepFlush(rivalFlush, rim, RIM_RADIUS, ballSim.radius, rdt);
+            ball.position.set(st.pos.x, st.pos.y, st.pos.z);
+            if (st.phase === 'free') { ballSim.launch(ball.position.clone(), new Vector3(st.vel.x, st.vel.y, st.vel.z)); looseBall = true; console.info('[DUNK-RIVAL] through the net'); }
+          }
+          if (k >= 1 && (!rivalFlush || rivalFlush.phase === 'free')) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); }
+          else if (k >= 1 && nowMs - hopT0 > RIVAL_HOP_MS + 1500) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); }   // a flush that never frees still ends the hop
         });
       });
       if (phase !== 'rivalTurn') return;   // soft-OPEN #3: the watchdog advanced the contest under this hop — its end owns the rest

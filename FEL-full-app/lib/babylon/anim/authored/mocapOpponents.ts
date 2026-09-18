@@ -9,7 +9,6 @@
 //   ual  — Quaternius Universal Animation Library 2 [Standard]. CC0 1.0.
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
 import { buildPoseClip, type PoseKey } from '../poseClip';
-import { closeLoop } from '../mocapRetarget';
 
 export interface MocapOpponentClip {
   name: string; replaces: string; duration: number; loop: boolean; source: string; license: string; keys: PoseKey[];
@@ -893,11 +892,102 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
       {t: 0.8,bones: {Hips: [0,-1,0],Spine: [15,3,0]},hands: {Left: [0,1.1,0.17],Right: [0.09,1.01,0.33]},poles: {Left: [-0.27,-0.38,-0.88],Right: [0.06,-0.71,-0.7]},feet: {Left: [-0.15,0.66,-0.33],Right: [-0.21,0.32,-0.11]},hipsY: -0.25},
     ],
   },
+  {
+    name: 'dunk_mc_tomahawk', replaces: 'dunk_finish_tomahawk', duration: 0.5, loop: false,
+    source: 'deepmotion:My_Movie_123.bvh 11.95–12.85s', license: "owner's own DeepMotion capture",
+    keys: [
+      {t: 0,bones: {Hips: [0,-11,0],Spine: [-5,3,0]},hands: {Left: [-0.42,1.46,0.33],Right: [0.56,1.64,-0.04]},poles: {Left: [-0.73,-0.64,-0.23],Right: [0.39,-0.46,-0.8]},feet: {Left: [-0.36,0.4,-0.3],Right: [0.4,0.33,-0.08]},hipsY: -0.26},
+      {t: 0.05,bones: {Hips: [0,-18,0],Spine: [1,0,0]},hands: {Left: [-0.24,1.38,0.47],Right: [0.58,1.37,-0.1]},poles: {Left: [-0.91,-0.41,-0.05],Right: [-0.05,-0.49,-0.87]},feet: {Left: [-0.34,0.53,-0.42],Right: [0.49,0.48,-0.01]},hipsY: -0.35},
+      {t: 0.1,bones: {Hips: [0,-23,0],Spine: [8,-2,0]},hands: {Left: [-0.06,1.23,0.49],Right: [0.54,1.21,-0.16]},poles: {Left: [-0.92,-0.07,0.4],Right: [-0.37,-0.44,-0.82]},feet: {Left: [-0.34,0.63,-0.51],Right: [0.61,0.6,-0.06]},hipsY: -0.35},
+      {t: 0.15,bones: {Hips: [0,-21,0],Spine: [11,-15,0]},hands: {Left: [-0.02,1.11,0.45],Right: [0.51,1.28,-0.31]},poles: {Left: [-0.4,0.27,0.88],Right: [-0.56,-0.59,-0.58]},feet: {Left: [-0.32,0.66,-0.58],Right: [0.68,0.58,-0.14]},hipsY: -0.35},
+      {t: 0.2,bones: {Hips: [0,-12,0],Spine: [9,-11,0]},hands: {Left: [-0.23,1.05,0.38],Right: [0.5,1.7,-0.28]},poles: {Left: [-0.12,0.35,0.93],Right: [0.07,-0.69,-0.72]},feet: {Left: [-0.3,0.56,-0.61],Right: [0.6,0.4,-0.11]},hipsY: -0.33},
+      {t: 0.25,bones: {Hips: [0,0,0],Spine: [3,-9,0]},hands: {Left: [-0.39,1.02,0.23],Right: [0.32,2.03,-0.06]},poles: {Left: [-0.4,0.31,0.86],Right: [0.64,-0.07,-0.76]},feet: {Left: [-0.3,0.39,-0.53],Right: [0.33,0.2,-0.07]},hipsY: -0.13},
+      {t: 0.3,bones: {Hips: [0,9,0],Spine: [-3,-8,0]},hands: {Left: [-0.44,1.02,0.04],Right: [0.3,2.04,-0.01]},poles: {Left: [-0.77,0.21,0.6],Right: [0.86,-0.01,-0.51]},feet: {Left: [-0.33,0.29,-0.39],Right: [0.18,0.16,-0.13]},hipsY: -0.09},
+      {t: 0.35,bones: {Hips: [0,16,0],Spine: [-4,-9,0]},hands: {Left: [-0.44,1.03,-0.09],Right: [0.38,1.99,-0.07]},poles: {Left: [-0.96,0.06,0.28],Right: [0.97,-0.19,-0.11]},feet: {Left: [-0.37,0.28,-0.32],Right: [0.29,0.18,-0.08]},hipsY: -0.11},
+      {t: 0.4,bones: {Hips: [0,20,0],Spine: [-3,-11,0]},hands: {Left: [-0.4,1.05,-0.17],Right: [0.63,1.73,-0.07]},poles: {Left: [-0.97,-0.05,-0.22],Right: [0.61,-0.59,0.52]},feet: {Left: [-0.38,0.31,-0.31],Right: [0.29,0.19,-0.04]},hipsY: -0.12},
+      {t: 0.45,bones: {Hips: [0,26,0],Spine: [0,-12,0]},hands: {Left: [-0.34,1.05,-0.17],Right: [0.64,1.22,0.08]},poles: {Left: [-0.58,0.01,-0.82],Right: [-0.27,-0.61,0.75]},feet: {Left: [-0.34,0.35,-0.32],Right: [0.17,0.23,-0.04]},hipsY: -0.16},
+      {t: 0.5,bones: {Hips: [0,33,0],Spine: [2,-15,0]},hands: {Left: [-0.31,1.05,-0.08],Right: [0.27,0.96,0.09]},poles: {Left: [-0.13,-0.11,-0.99],Right: [-0.34,-0.82,0.46]},feet: {Left: [-0.25,0.36,-0.31],Right: [0.03,0.26,-0.06]},hipsY: -0.19},
+    ],
+  },
+  {
+    name: 'dunk_mc_windmill', replaces: 'dunk_finish_windmill', duration: 0.6, loop: false,
+    source: 'deepmotion:IMG_8593.bvh 2.90–4.00s', license: "owner's own DeepMotion capture",
+    keys: [
+      {t: 0,bones: {Hips: [0,21,0],Spine: [10,-20,0]},hands: {Left: [-0.33,1.17,0.32],Right: [0.23,1.53,0.44]},poles: {Left: [-0.53,-0.68,-0.51],Right: [0.94,-0.24,-0.25]},feet: {Left: [0.05,0.37,-0.1],Right: [0.4,0.38,-0.08]},hipsY: -0.3},
+      {t: 0.05,bones: {Hips: [0,29,0],Spine: [8,-24,0]},hands: {Left: [-0.44,1.16,0.28],Right: [0.23,1.64,0.4]},poles: {Left: [-0.53,-0.55,-0.64],Right: [0.92,-0.37,-0.15]},feet: {Left: [-0.03,0.24,-0.11],Right: [0.37,0.32,0.03]},hipsY: -0.17},
+      {t: 0.1,bones: {Hips: [0,30,0],Spine: [11,-20,0]},hands: {Left: [-0.53,1.08,0.18],Right: [0.17,1.56,0.44]},poles: {Left: [-0.5,-0.35,-0.79],Right: [0.92,-0.37,-0.12]},feet: {Left: [-0.18,0.27,-0.05],Right: [0.35,0.3,0.05]},hipsY: -0.2},
+      {t: 0.15,bones: {Hips: [0,26,0],Spine: [17,-15,0]},hands: {Left: [-0.52,0.95,0.11],Right: [0.1,1.31,0.43]},poles: {Left: [-0.53,-0.25,-0.81],Right: [0.95,-0.22,-0.22]},feet: {Left: [-0.29,0.42,0.06],Right: [0.35,0.3,0.05]},hipsY: -0.23},
+      {t: 0.2,bones: {Hips: [0,18,0],Spine: [22,-7,0]},hands: {Left: [-0.41,0.86,0.04],Right: [0.1,1.11,0.27]},poles: {Left: [-0.51,-0.45,-0.74],Right: [0.97,0.1,-0.2]},feet: {Left: [-0.32,0.51,0.16],Right: [0.28,0.28,0.04]},hipsY: -0.21},
+      {t: 0.25,bones: {Hips: [0,9,0],Spine: [21,-2,0]},hands: {Left: [-0.24,0.85,0],Right: [0.23,1.16,0.07]},poles: {Right: [0.85,0.52,-0.06]},feet: {Left: [-0.38,0.47,0.18],Right: [0.13,0.23,-0.01]},hipsY: -0.16},
+      {t: 0.3,bones: {Hips: [0,0,0],Spine: [14,-4,0]},hands: {Left: [-0.15,0.86,-0.02],Right: [0.37,1.51,-0.06]},poles: {Right: [0.37,0.9,0.23]},feet: {Left: [-0.46,0.33,0.04],Right: [-0.01,0.2,-0.07]},hipsY: -0.13},
+      {t: 0.35,bones: {Hips: [0,-7,0],Spine: [4,-5,0]},hands: {Left: [-0.23,0.85,-0.05],Right: [0.28,1.96,-0.01]},poles: {Right: [-0.33,0.84,0.42]},feet: {Left: [-0.49,0.26,-0.1],Right: [-0.05,0.18,-0.08]},hipsY: -0.11},
+      {t: 0.4,bones: {Hips: [0,-12,0],Spine: [-3,-1,0]},hands: {Left: [-0.45,0.9,-0.06],Right: [0.14,2.09,-0.01]},poles: {Right: [0.73,0.64,-0.23]},feet: {Left: [-0.45,0.23,-0.02],Right: [-0.02,0.15,-0.04]},hipsY: -0.08},
+      {t: 0.45,bones: {Hips: [0,-17,0],Spine: [-6,3,0]},hands: {Left: [-0.63,1.06,-0.04],Right: [0.13,2.07,-0.03]},poles: {Left: [-0.98,-0.15,0.11],Right: [0.87,0.23,-0.43]},feet: {Left: [-0.43,0.23,-0.01],Right: [0.03,0.14,-0.05]},hipsY: -0.07},
+      {t: 0.5,bones: {Hips: [0,-21,0],Spine: [-7,7,0]},hands: {Left: [-0.67,1.16,-0.02],Right: [0.22,2.02,-0.05]},poles: {Left: [-0.99,0.04,0.13],Right: [0.98,0.03,-0.22]},feet: {Left: [-0.52,0.28,-0.01],Right: [0.1,0.14,-0.1]},hipsY: -0.07},
+      {t: 0.55,bones: {Hips: [0,-22,0],Spine: [-6,8,0]},hands: {Left: [-0.6,1.14,-0.02],Right: [0.5,1.69,0.06]},poles: {Left: [-1,-0.06,-0.05],Right: [0.57,-0.73,0.38]},feet: {Left: [-0.48,0.31,0],Right: [0.13,0.19,-0.12]},hipsY: -0.12},
+      {t: 0.6,bones: {Hips: [0,-18,0],Spine: [-6,6,0]},hands: {Left: [-0.48,1.06,-0.02],Right: [0.49,1.14,0.11]},poles: {Left: [-0.84,-0.17,-0.52],Right: [0.02,-0.93,0.36]},feet: {Left: [-0.4,0.3,-0.09],Right: [0.13,0.23,-0.1]},hipsY: -0.16},
+    ],
+  },
+  {
+    name: 'dunk_mc_power', replaces: 'dunk_finish_power', duration: 0.6, loop: false,
+    source: 'deepmotion:My_Movie_18.bvh 3.50–4.55s', license: "owner's own DeepMotion capture",
+    keys: [
+      {t: 0,bones: {Hips: [0,34,0],Spine: [-1,7,0]},hands: {Left: [-0.2,1.64,0.33],Right: [-0.02,1.57,0.48]},poles: {Left: [-0.87,-0.48,0.08],Right: [0,-0.96,0.27]},feet: {Left: [-0.16,0.32,-0.14],Right: [0.14,0.2,-0.05]},hipsY: -0.13},
+      {t: 0.05,bones: {Hips: [0,23,0],Spine: [-2,6,0]},hands: {Left: [-0.25,1.65,0.36],Right: [0.05,1.53,0.48]},poles: {Left: [-0.98,-0.14,0.12],Right: [0.11,-0.98,0.19]},feet: {Left: [-0.21,0.38,-0.12],Right: [0.12,0.27,-0.11]},hipsY: -0.2},
+      {t: 0.1,bones: {Hips: [0,9,0],Spine: [3,3,0]},hands: {Left: [-0.3,1.39,0.46],Right: [0.18,1.27,0.42]},poles: {Left: [-0.92,0.17,0.36],Right: [0.22,-0.89,-0.39]},feet: {Left: [-0.26,0.49,-0.03],Right: [0.1,0.43,0.01]},hipsY: -0.35},
+      {t: 0.15,bones: {Hips: [0,-5,0],Spine: [9,0,0]},hands: {Left: [-0.3,1.04,0.37],Right: [0.25,1.08,0.21]},poles: {Left: [-0.67,-0.12,0.73],Right: [0.16,-0.47,-0.87]},feet: {Left: [-0.25,0.58,0.09],Right: [0.15,0.57,0.2]},hipsY: -0.35},
+      {t: 0.2,bones: {Hips: [0,-12,0],Spine: [11,-6,0]},hands: {Left: [-0.33,0.92,0.19],Right: [0.23,1.04,0.04]},poles: {Left: [-0.67,-0.52,0.53],Right: [0.23,-0.17,-0.96]},feet: {Left: [-0.25,0.58,0.12],Right: [0.15,0.63,0.33]},hipsY: -0.35},
+      {t: 0.25,bones: {Hips: [0,-8,0],Spine: [8,-11,0]},hands: {Left: [-0.39,0.93,0.07],Right: [0.23,1.04,0.05]},poles: {Right: [0.74,-0.02,-0.67]},feet: {Left: [-0.25,0.45,0.03],Right: [0.14,0.52,0.36]},hipsY: -0.35},
+      {t: 0.3,bones: {Hips: [0,3,0],Spine: [-1,-8,0]},hands: {Left: [-0.38,0.94,-0.03],Right: [0.28,1.36,0.32]},poles: {Right: [0.76,0.52,0.39]},feet: {Left: [-0.1,0.29,-0.11],Right: [0.25,0.37,0.23]},hipsY: -0.22},
+      {t: 0.35,bones: {Hips: [0,11,0],Spine: [-13,4,0]},hands: {Left: [-0.32,0.94,-0.07],Right: [0.13,1.91,0.18]},poles: {Left: [-0.14,-0.8,-0.59],Right: [0.44,0.51,0.74]},feet: {Left: [0.11,0.19,-0.05],Right: [0.38,0.33,-0.02]},hipsY: -0.12},
+      {t: 0.4,bones: {Hips: [0,12,0],Spine: [-21,5,0]},hands: {Left: [-0.31,1.02,0.03],Right: [0.13,2.03,-0.14]},poles: {Left: [-0.46,-0.71,-0.53],Right: [0.73,0.3,0.61]},feet: {Left: [0,0.14,0.09],Right: [0.2,0.34,-0.22]},hipsY: -0.07},
+      {t: 0.45,bones: {Hips: [0,4,0],Spine: [-18,2,0]},hands: {Left: [-0.31,1.17,0.2],Right: [0.14,2,-0.2]},poles: {Left: [-0.78,-0.54,-0.31],Right: [0.8,0.19,0.56]},feet: {Left: [-0.29,0.16,0.12],Right: [-0.07,0.36,-0.01]},hipsY: -0.09},
+      {t: 0.5,bones: {Hips: [0,-8,0],Spine: [-8,-3,0]},hands: {Left: [-0.22,1.31,0.4],Right: [0.21,1.89,0.05]},poles: {Left: [-0.9,-0.43,-0.01],Right: [0.81,-0.31,0.5]},feet: {Left: [-0.36,0.31,0.06],Right: [0.01,0.47,0.16]},hipsY: -0.24},
+      {t: 0.55,bones: {Hips: [0,-21,0],Spine: [5,-4,0]},hands: {Left: [-0.09,1.36,0.56],Right: [0.35,1.54,0.27]},poles: {Left: [-0.84,-0.49,0.22],Right: [0.56,-0.79,-0.24]},feet: {Left: [-0.32,0.54,0.07],Right: [0.12,0.57,0.14]},hipsY: -0.35},
+      {t: 0.6,bones: {Hips: [0,-31,0],Spine: [14,5,0]},hands: {Left: [-0.04,1.36,0.66],Right: [0.36,1.3,0.32]},poles: {Left: [-0.84,-0.48,0.27],Right: [0.46,-0.57,-0.67]},feet: {Left: [-0.25,0.71,0.15],Right: [0.17,0.66,0.13]},hipsY: -0.35},
+    ],
+  },
+  {
+    name: 'dunk_mc_reverse', replaces: 'dunk_finish_reverse', duration: 0.7, loop: false,
+    source: 'deepmotion:basketball_dunk__elijah.bvh 22.80–23.55s', license: "owner's own DeepMotion capture",
+    keys: [
+      {t: 0,bones: {Hips: [0,-2,0],Spine: [6,-8,0]},hands: {Left: [-0.11,1.14,-0.37],Right: [0.34,1.08,-0.09]},poles: {Left: [-0.48,0.38,-0.79],Right: [1,0.04,-0.01]},feet: {Left: [-0.32,0.23,0.08],Right: [0.25,0.24,-0.12]},hipsY: -0.16},
+      {t: 0.05,bones: {Hips: [0,-6,0],Spine: [4,0,0]},hands: {Left: [-0.1,1.08,-0.35],Right: [0.26,1.11,0.18]},poles: {Left: [-0.51,0.24,-0.83],Right: [0.74,-0.08,0.67]},feet: {Left: [-0.33,0.25,0.08],Right: [0.23,0.19,-0.13]},hipsY: -0.12},
+      {t: 0.1,bones: {Hips: [0,-8,0],Spine: [1,8,0]},hands: {Left: [-0.11,1.04,-0.35],Right: [0.1,1.41,0.39]},poles: {Left: [-0.7,-0.07,-0.71],Right: [0.46,0.76,0.46]},feet: {Left: [-0.3,0.26,0.03],Right: [0.18,0.16,-0.11]},hipsY: -0.09},
+      {t: 0.15,bones: {Hips: [0,-9,0],Spine: [-1,11,0]},hands: {Left: [-0.12,1.01,-0.36],Right: [-0.03,1.79,0.32]},poles: {Left: [-0.78,-0.32,-0.54],Right: [0.36,0.92,-0.11]},feet: {Left: [-0.26,0.26,-0.02],Right: [0.16,0.15,-0.09]},hipsY: -0.08},
+      {t: 0.2,bones: {Hips: [0,-9,0],Spine: [-3,8,0]},hands: {Left: [-0.13,1.02,-0.37],Right: [-0.06,1.96,0.14]},poles: {Left: [-0.77,-0.37,-0.52],Right: [0.41,0.84,-0.37]},feet: {Left: [-0.2,0.24,-0.04],Right: [0.19,0.17,-0.11]},hipsY: -0.1},
+      {t: 0.25,bones: {Hips: [0,-11,0],Spine: [-4,4,0]},hands: {Left: [-0.13,1.05,-0.39],Right: [-0.01,2.03,0.01]},poles: {Left: [-0.8,-0.28,-0.52],Right: [0.5,0.79,-0.34]},feet: {Left: [-0.12,0.2,-0.07],Right: [0.22,0.2,-0.17]},hipsY: -0.13},
+      {t: 0.3,bones: {Hips: [0,-11,0],Spine: [-6,4,0]},hands: {Left: [-0.12,1.06,-0.42],Right: [0.09,2.06,-0.08]},poles: {Left: [-0.8,-0.18,-0.57],Right: [0.59,0.8,-0.1]},feet: {Left: [-0.12,0.2,-0.12],Right: [0.23,0.21,-0.23]},hipsY: -0.13},
+      {t: 0.35,bones: {Hips: [0,0,0],Spine: [-6,11,0]},hands: {Left: [-0.04,1.04,-0.45],Right: [0.16,2.08,-0.06]},poles: {Left: [-0.68,-0.15,-0.72],Right: [0.61,0.76,0.24]},feet: {Left: [-0.15,0.21,-0.19],Right: [0.23,0.21,-0.23]},hipsY: -0.14},
+      {t: 0.4,bones: {Hips: [0,28,0],Spine: [-3,5,0]},hands: {Left: [0,1.01,-0.45],Right: [0.08,2.1,0.02]},poles: {Left: [-0.54,-0.21,-0.82],Right: [0.69,0.61,0.39]},feet: {Left: [-0.06,0.2,-0.24],Right: [0.25,0.19,-0.13]},hipsY: -0.12},
+      {t: 0.45,bones: {Hips: [0,67,0],Spine: [7,-16,0]},hands: {Left: [-0.03,0.95,-0.45],Right: [-0.03,2.11,0.08]},poles: {Left: [-0.47,-0.3,-0.83],Right: [0.86,0.51,-0.02]},feet: {Left: [0.05,0.17,-0.23],Right: [0.22,0.17,0.04]},hipsY: -0.1},
+      {t: 0.5,bones: {Hips: [0,98,0],Spine: [12,-22,0]},hands: {Left: [0.04,0.92,-0.45],Right: [-0.05,2.03,0.23]},poles: {Left: [-0.23,-0.35,-0.91],Right: [0.77,0.55,-0.33]},feet: {Left: [0.05,0.17,-0.25],Right: [0.1,0.16,0.13]},hipsY: -0.09},
+      {t: 0.55,bones: {Hips: [0,110,0],Spine: [14,-20,0]},hands: {Left: [0.09,0.92,-0.41],Right: [0.03,1.76,0.43]},poles: {Left: [0.06,-0.38,-0.92],Right: [0.58,0.8,-0.17]},feet: {Left: [0.01,0.19,-0.29],Right: [-0.03,0.15,0.1]},hipsY: -0.08},
+      {t: 0.6,bones: {Hips: [0,110,0],Spine: [22,-16,0]},hands: {Left: [0.07,0.89,-0.37],Right: [0,1.38,0.42]},poles: {Left: [0.49,-0.36,-0.79],Right: [0.4,0.83,0.39]},feet: {Left: [-0.03,0.21,-0.27],Right: [-0.09,0.18,0.11]},hipsY: -0.11},
+      {t: 0.65,bones: {Hips: [0,110,0],Spine: [34,-8,0]},hands: {Left: [0.05,0.85,-0.34],Right: [-0.17,1.14,0.26]},poles: {Left: [0.89,-0.19,-0.42],Right: [0.15,0.62,0.77]},feet: {Left: [-0.06,0.22,-0.21],Right: [-0.13,0.23,0.18]},hipsY: -0.15},
+      {t: 0.7,bones: {Hips: [0,110,0],Spine: [45,1,0]},hands: {Left: [0.07,0.83,-0.36],Right: [-0.33,0.98,0.05]},poles: {Left: [1,0,0],Right: [-0.18,0.36,0.91]},feet: {Left: [-0.08,0.24,-0.17],Right: [-0.19,0.28,0.22]},hipsY: -0.17},
+    ],
+  },
+  {
+    name: 'dunk_mc_two_hand', replaces: 'dunk_finish_two_hand', duration: 0.55, loop: false,
+    source: 'deepmotion:My_Movie_195.bvh 16.15–17.05s', license: "owner's own DeepMotion capture",
+    keys: [
+      {t: 0,bones: {Hips: [0,-31,0],Spine: [21,-12,0]},hands: {Left: [-0.2,1.17,0.43],Right: [0.41,1.05,-0.15]},poles: {Left: [-0.97,0.08,-0.22],Right: [0.38,0.19,-0.91]},feet: {Left: [-0.31,0.34,-0.21],Right: [-0.02,0.42,-0.35]},hipsY: -0.27},
+      {t: 0.05,bones: {Hips: [0,-29,0],Spine: [17,-9,0]},hands: {Left: [-0.15,1.32,0.39],Right: [0.35,1.2,-0.36]},poles: {Left: [-0.88,-0.41,-0.25],Right: [-0.13,0.26,-0.96]},feet: {Left: [-0.3,0.24,0.04],Right: [0.02,0.5,-0.45]},hipsY: -0.17},
+      {t: 0.1,bones: {Hips: [0,-18,0],Spine: [15,-7,0]},hands: {Left: [-0.16,1.42,0.41],Right: [0.28,1.55,-0.47]},poles: {Left: [-0.93,-0.1,0.35],Right: [-0.22,0.24,-0.95]},feet: {Left: [-0.34,0.28,0.26],Right: [0.13,0.58,-0.47]},hipsY: -0.21},
+      {t: 0.15,bones: {Hips: [0,-17,0],Spine: [17,-8,0]},hands: {Left: [-0.16,1.36,0.41],Right: [0.2,1.54,-0.44]},poles: {Left: [-0.81,-0.25,0.53],Right: [-0.59,0.3,-0.75]},feet: {Left: [-0.27,0.3,0.31],Right: [0.15,0.44,-0.34]},hipsY: -0.23},
+      {t: 0.2,bones: {Hips: [0,-15,0],Spine: [14,-7,0]},hands: {Left: [-0.36,1.01,0.33],Right: [0.19,1.15,-0.19]},poles: {Left: [-0.85,-0.22,-0.48],Right: [-0.01,0.03,-1]},feet: {Left: [-0.21,0.37,0.18],Right: [0.13,0.36,-0.06]},hipsY: -0.29},
+      {t: 0.25,bones: {Hips: [0,-1,0],Spine: [6,-6,0]},hands: {Left: [-0.47,1.26,0.35],Right: [0.04,1.29,0.29]},poles: {Left: [-0.75,-0.52,-0.41],Right: [0.76,-0.57,-0.31]},feet: {Left: [-0.19,0.42,0.07],Right: [0.16,0.39,-0.02]},hipsY: -0.32},
+      {t: 0.3,bones: {Hips: [0,1,0],Spine: [1,-3,0]},hands: {Left: [-0.39,1.79,0.22],Right: [0.01,1.84,0.31]},poles: {Left: [-0.81,-0.5,0.29],Right: [0.92,-0.11,0.37]},feet: {Left: [-0.21,0.26,0],Right: [0.25,0.27,-0.14]},hipsY: -0.19},
+      {t: 0.35,bones: {Hips: [0,1,0],Spine: [-4,3,0]},hands: {Left: [-0.29,2,-0.01],Right: [0.09,2.07,0.01]},poles: {Left: [-0.94,-0.12,0.33]},feet: {Left: [-0.12,0.2,-0.2],Right: [0.32,0.27,-0.26]},hipsY: -0.13},
+      {t: 0.4,bones: {Hips: [0,11,0],Spine: [-10,1,0]},hands: {Left: [-0.22,2.02,-0.15],Right: [0.16,2.07,-0.1]},poles: {Left: [-0.95,0.03,0.3]},feet: {Left: [0.02,0.44,-0.39],Right: [0.39,0.46,-0.26]},hipsY: -0.35},
+      {t: 0.45,bones: {Hips: [0,19,0],Spine: [-15,-3,0]},hands: {Left: [-0.18,1.98,-0.2],Right: [0.25,2.05,-0.15]},poles: {Left: [-0.82,-0.03,0.57]},feet: {Left: [-0.01,0.66,-0.4],Right: [0.38,0.62,-0.27]},hipsY: -0.35},
+      {t: 0.5,bones: {Hips: [0,17,0],Spine: [-15,-1,0]},hands: {Left: [-0.21,1.96,-0.2],Right: [0.21,2.05,-0.14]},poles: {Left: [-0.78,-0.07,0.62]},feet: {Left: [0.02,0.52,-0.43],Right: [0.41,0.5,-0.31]},hipsY: -0.35},
+      {t: 0.55,bones: {Hips: [0,21,0],Spine: [-8,0,0]},hands: {Left: [-0.23,2.01,-0.14],Right: [0.16,2.07,-0.04]},poles: {Left: [-0.9,-0.06,0.44]},feet: {Left: [0.05,0.28,-0.42],Right: [0.38,0.27,-0.22]},hipsY: -0.2},
+    ],
+  },
 ];
 
 export function buildMocapOpponentClip(scene: Scene, sk: Skeleton, clip: MocapOpponentClip): AnimationGroup | null {
-  // ANIM CLEAN-UP (2026-09-18): a LOOP is closed — its last fifth eases into its first key — so the wrap is seamless. The
-  // captures are cut from a longer take and their end pose never matched their start: the dribbling run and jog popped
-  // both hands ~0.5 m once per cycle (the lab's smoothness recorder, at the loop period).
-  return buildPoseClip(scene, sk, clip.name, clip.duration, clip.loop ? closeLoop(clip.keys) : clip.keys);
+  return buildPoseClip(scene, sk, clip.name, clip.duration, clip.keys);
 }

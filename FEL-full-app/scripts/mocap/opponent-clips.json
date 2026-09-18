@@ -86,11 +86,11 @@
       "source": "cmu",
       "file": "cmu/124/124_05.bvh",
       "from": 3.35,
-      "to": 4.0,
+      "to": 4,
       "duration": 0.65,
       "note": "124_05: the release held — the right hand stays up and forward, the left drops away (3.7), then the landing · FORM: the shooting arm holds its extension (the goose neck), the guide hand comes down",
       "extend": {
-        "from01": 0.0,
+        "from01": 0,
         "peak01": 0.08,
         "Right": [
           0.18,
@@ -121,7 +121,7 @@
       "source": "ual",
       "file": "ual2/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
       "anim": "Hit_Knockback",
-      "from": 0.0,
+      "from": 0,
       "to": 0.3,
       "duration": 0.3,
       "note": "the first 0.3 s of the knockback: the flinch"
@@ -132,7 +132,7 @@
       "source": "ual",
       "file": "ual2/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
       "anim": "Hit_Knockback",
-      "from": 0.0,
+      "from": 0,
       "to": 0.83,
       "duration": 0.7,
       "hipsYRange": [
@@ -147,7 +147,7 @@
       "source": "ual",
       "file": "ual2/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
       "anim": "LayToIdle",
-      "from": 0.0,
+      "from": 0,
       "to": 1.53,
       "duration": 1.05,
       "hipsYRange": [
@@ -474,7 +474,7 @@
       "from": 36.2,
       "to": 37.5,
       "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): the jumping spin kick — 326° of turn with both feet 0.9 m off the floor and the kick at 1.10 m — TYPHOON, the airborne ender (was a 180° jumping twist with no kick)",
-      "duration": 1.0,
+      "duration": 1,
       "aim": "foot"
     },
     {
@@ -514,7 +514,7 @@
       "source": "ual",
       "file": "ual2/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
       "anim": "Idle_Shield_Break",
-      "from": 0.0,
+      "from": 0,
       "to": 0.9,
       "duration": 0.75,
       "note": "THE HUNDRED reactive enemies (2026-09-15): the guard broken — the body reels back off a medium / heavy hit without leaving its feet (the light flinch stays karate_mc_hit_react, a launch is the knockdown)"
@@ -534,8 +534,8 @@
       "replaces": "bball_defend_backpedal",
       "source": "cmu",
       "file": "cmu/78/78_24.bvh",
-      "from": 1.0,
-      "to": 2.0,
+      "from": 1,
+      "to": 2,
       "duration": 0.7,
       "loop": true,
       "refineLoop": [
@@ -625,6 +625,76 @@
         0.9
       ],
       "note": "DRIBBLE GEARS: a jogging dribble, ~4.5 leg/s, hands low — between the walk and the 78_06 sprint"
+    },
+    {
+      "name": "dunk_mc_tomahawk",
+      "replaces": "dunk_finish_tomahawk",
+      "source": "deepmotion",
+      "file": "deepmotion/My_Movie_123.bvh",
+      "from": 11.95,
+      "to": 12.85,
+      "duration": 0.5,
+      "hipsYRange": [
+        -0.35,
+        0.05
+      ],
+      "note": "the owner's own DeepMotion take (dunk-finder.mts, 2026-09-18: \"identify what dunk is what\") — TOMAHAWK: the right arm swings out wide and cocks behind the head (12.0–12.3), then over the top to the flush at 12.43; the crouch stays, the rise is the mode's (hipsYRange)"
+    },
+    {
+      "name": "dunk_mc_windmill",
+      "replaces": "dunk_finish_windmill",
+      "source": "deepmotion",
+      "file": "deepmotion/IMG_8593.bvh",
+      "from": 2.9,
+      "to": 4,
+      "duration": 0.6,
+      "hipsYRange": [
+        -0.35,
+        0.05
+      ],
+      "note": "the owner's own DeepMotion take (dunk-finder.mts, 2026-09-18: \"identify what dunk is what\") — WINDMILL: the right arm sweeps out to the side and around (3.2–3.5, 267° about the shoulder), over the top at 3.64, down and the landing"
+    },
+    {
+      "name": "dunk_mc_power",
+      "replaces": "dunk_finish_power",
+      "source": "deepmotion",
+      "file": "deepmotion/My_Movie_18.bvh",
+      "from": 3.5,
+      "to": 4.55,
+      "duration": 0.6,
+      "hipsYRange": [
+        -0.35,
+        0.05
+      ],
+      "note": "the owner's own DeepMotion take (dunk-finder.mts, 2026-09-18: \"identify what dunk is what\") — POWER (one hand): a deep gather (3.7–4.0) and a straight rise with the right hand up to the flush at 4.2"
+    },
+    {
+      "name": "dunk_mc_reverse",
+      "replaces": "dunk_finish_reverse",
+      "source": "deepmotion",
+      "file": "deepmotion/basketball_dunk__elijah.bvh",
+      "from": 22.8,
+      "to": 23.55,
+      "duration": 0.7,
+      "hipsYRange": [
+        -0.35,
+        0.05
+      ],
+      "note": "the owner's own DeepMotion take (dunk-finder.mts, 2026-09-18: \"identify what dunk is what\") — REVERSE: the body turns its back through the rise (yaw 170° across the window; the window starts inside the turn so the mode's own facing does most of it), the right hand up behind the head at 23.25"
+    },
+    {
+      "name": "dunk_mc_two_hand",
+      "replaces": "dunk_finish_two_hand",
+      "source": "deepmotion",
+      "file": "deepmotion/My_Movie_195.bvh",
+      "from": 16.15,
+      "to": 17.05,
+      "duration": 0.55,
+      "hipsYRange": [
+        -0.35,
+        0.05
+      ],
+      "note": "the owner's own DeepMotion take (dunk-finder.mts, 2026-09-18: \"identify what dunk is what\") — TWO-HAND FLUSH: a wide wind-up (16.3–16.4), the crouch, and both hands together straight up to 16.73"
     }
   ]
 }

@@ -82,6 +82,9 @@ page.on('console', (m) => { const t = m.text(); if (/\[DUNK|\[LOB|\[RIM|\[JUDGE/
 { // login
   const lp = await ctx.newPage();
   await lp.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  // the form must be HYDRATED before it is filled (measured: a fresh /login compile took the click as a native GET /login? and the
+  // session never existed — every attempt then ran on the login page)
+  await lp.waitForLoadState('networkidle', { timeout: 60000 }).catch(() => {}); await lp.waitForTimeout(800);
   if (/\/login/.test(lp.url())) {
     await lp.fill('input[type="email"]', process.env.PLAYTEST_EMAIL ?? 'playtest@fel.local');
     await lp.fill('input[type="password"]', process.env.PLAYTEST_PASSWORD ?? 'playtest-local-only');
@@ -112,6 +115,24 @@ await page.evaluate(`(() => {
     try { const q = window.__FEL_QA__; const h = q && q.hero && q.hero(); if (h) { let r = h; while (r.parent) r = r.parent; y = +r.getAbsolutePosition().y.toFixed(2); } } catch {}
     if (!last || last.clip !== top.clip) window.__CLIPS.push({ t: Date.now(), clip: top.clip, y });
     else if (y !== null && (last.yMax === undefined || y > last.yMax)) last.yMax = y;
+  }, 50);
+  // BALL WATCH (2026-09-18, owner: "fix the ball disappearing glitch when attempting certain dunks"): the ball's world
+  // position, parent, visibility and whether the active camera can see it, at 20 Hz — a frame where it is invisible, NaN,
+  // under the floor, far from the dunker while parented, or off camera while live is the glitch, measured per trick.
+  window.__BALL = [];
+  setInterval(() => {
+    try {
+      const q = window.__FEL_QA__; const s = q && q.scene && q.scene(); if (!s) return;
+      // THE contest ball: the sphere carrying the palm-mirror metadata (a venue rack has meshes named 'ball' too — the first one
+      // measured 'invisible' on every sample). It is an invisible physics sphere; the Meshy leather rides it as a child.
+      const b = s.meshes.find((m) => m.name === 'ball' && m.metadata && m.metadata.felPalmMirrorLeft); if (!b) { window.__BALL.push({ t: Date.now(), missing: true }); return; }
+      const skin = b.getChildMeshes().filter((c) => c.isEnabled() && c.isVisible && c.visibility > 0.5);
+      const p = b.getAbsolutePosition();
+      const h = q.hero && q.hero(); let hp = null; if (h) { let r = h; while (r.parent) r = r.parent; hp = r.getAbsolutePosition(); }
+      const cam = s.activeCamera;
+      window.__BALL.push({ t: Date.now(), x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), vis: skin.length > 0 || !!(b.isVisible && b.isEnabled()), parent: b.parent ? b.parent.name : null,
+        far: hp ? +Math.hypot(p.x - hp.x, p.y - hp.y, p.z - hp.z).toFixed(2) : null, fr: cam ? cam.isInFrustum(b) : null, nan: !isFinite(p.x + p.y + p.z), sc: +b.scaling.x.toFixed(2) });
+    } catch (e) {}
   }, 50);
   // THE SLAM IS PRESSED IN THE PAGE, not over the bridge. A poll from node costs 30-50 ms a round trip, which is a
   // third of the window: the same scripted player scored a perfect windmill on one attempt and clanked on the next.
@@ -159,7 +180,8 @@ const hold = async (i: number, on: boolean) => page.evaluate(`(() => { const b =
 const trigger = async (v: number) => page.evaluate(`(() => { const b = window.__PAD.buttons[7]; b.pressed = ${v > 0.5}; b.value = ${v}; window.__PAD.timestamp = Date.now(); })()`);
 const hud = async () => page.evaluate('window.__hudNow()') as Promise<Record<string, unknown>>;
 
-interface Attempt { n: number; trick: string; launch?: string; cue: string[]; slamTiming?: string; breakdown?: string; cards?: unknown; total?: number; banners: string[]; clips?: string[]; note?: string }
+interface BallWatch { samples: number; missing: number; nan: number; invisible: number; under: number; far: number; offCam: number; byPhase: Record<string, number>; firstAt?: string; worst?: string }
+interface Attempt { n: number; trick: string; launch?: string; cue: string[]; slamTiming?: string; breakdown?: string; cards?: unknown; total?: number; banners: string[]; clips?: string[]; ball?: BallWatch; note?: string }
 const attempts: Attempt[] = [];
 let logMark = 0;
 
@@ -246,11 +268,33 @@ for (let n = 0; n < ATTEMPTS; n++) {
   a.total = mine.map((r) => r.score).filter((s): s is number => typeof s === 'number').pop();
   const clipRows = await page.evaluate('window.__CLIPS') as { t: number; clip: string }[];
   a.clips = clipRows.filter((c) => c.t >= mark).map((c) => `${c.clip}@${c.y ?? '?'}`);
+  // BALL WATCH: the anomalies in this attempt's window, with the first one's moment (ms after the mark) and what it was
+  {
+    const rows = (await page.evaluate('window.__BALL') as { t: number; missing?: boolean; x?: number; y?: number; z?: number; vis?: boolean; parent?: string | null; far?: number | null; fr?: boolean | null; nan?: boolean; sc?: number }[]).filter((r) => r.t >= mark);
+    const w: BallWatch = { samples: rows.length, missing: 0, nan: 0, invisible: 0, under: 0, far: 0, offCam: 0, byPhase: {} };
+    // the contest's phase at each sample ([DUNK-PHASE] lines carry a ms stamp): a loose ball off camera in RESOLVE is the net exit
+    // flying off (expected); in APPROACH / CHARGE / CINEMATIC it is the glitch
+    const phases = log.map((l) => { const m = /^(\d+) \[DUNK-PHASE\] (\w+)/.exec(l); return m ? { t: +m[1], p: m[2] } : null; }).filter((x): x is { t: number; p: string } => !!x);
+    const phaseAt = (t: number) => { let p = 'start'; for (const x of phases) { if (x.t <= t) p = x.p; else break; } return p; };
+    let offRun = 0;
+    for (const r of rows) {
+      const bad: string[] = [];
+      if (r.missing) { w.missing++; bad.push('missing'); }
+      if (r.nan) { w.nan++; bad.push('NaN'); }
+      if (r.vis === false) { w.invisible++; bad.push('invisible'); }
+      if (typeof r.y === 'number' && r.y < -0.3) { w.under++; bad.push(`under y ${r.y}`); }
+      if (r.parent && typeof r.far === 'number' && r.far > 2.6) { w.far++; bad.push(`parented to ${r.parent} but ${r.far} m from the dunker`); }
+      if (r.fr === false && typeof r.y === 'number' && r.y > 0.3) { offRun++; if (offRun >= 6) { w.offCam++; bad.push(`off camera at (${r.x}, ${r.y}, ${r.z})`); } } else offRun = 0;
+      if (bad.length) { const ph = phaseAt(r.t); w.byPhase[ph] = (w.byPhase[ph] ?? 0) + 1; if (!w.firstAt) { w.firstAt = `+${r.t - mark} ms (${ph})`; w.worst = bad.join(', ') + (r.parent ? ` [in ${r.parent}]` : ' [loose]'); } }
+    }
+    a.ball = w;
+  }
   const fresh = log.slice(logMark); logMark = log.length;
   a.launch = fresh.find((l) => /\[DUNK-LAUNCH\]/.test(l))?.replace(/^\d+ /, '');
   a.cue = fresh.filter((l) => /\[DUNK-(CUE|TRICK|SLAM|WIN|RUNWAY|LOB)\]/.test(l)).map((l) => l.replace(/^\d+ /, ''));
   attempts.push(a);
   console.log(`#${a.n} ${a.trick.padEnd(12)} ${(a.slamTiming || '—').padEnd(38)} ${(a.breakdown || '').slice(0, 40).padEnd(42)} ${(a.clips ?? []).slice(0, 4).join(' → ')}`);
+  if (a.ball) { const w = a.ball; const bad = w.missing + w.nan + w.invisible + w.under + w.far + w.offCam; console.log(`   ball: ${w.samples} samples${bad ? ` · missing ${w.missing} NaN ${w.nan} invisible ${w.invisible} under ${w.under} far ${w.far} offCam ${w.offCam} · by phase ${JSON.stringify(w.byPhase)} · first ${w.firstAt}: ${w.worst}` : ' · never lost'}`); }
   if (n < 3) await page.screenshot({ path: `${OUT}/${TAG}-attempt${a.n}-${a.trick}.png` });
 }
 

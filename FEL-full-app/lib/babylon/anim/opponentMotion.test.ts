@@ -37,7 +37,9 @@ describe('opponentMotion — an opponent plays the capture that replaces the aut
   it('HOOPS MOVEMENT + THE HUNDRED: the hero takes the hoops and fight captures, and a shot paces off the release of the clip that plays', () => {
     const hero = MOCAP_OPPONENT_CLIPS.filter((c) => HERO_CAPTURE(c.name)).map((c) => c.name);
     expect(hero.length).toBeGreaterThanOrEqual(18);   // 14 from the opponents' pass + pump fake, step-through, pivot, left layup
-    expect(hero.every((n) => n.startsWith('bball_mc_') || n.startsWith('karate_mc_'))).toBe(true);
+    expect(hero.every((n) => n.startsWith('bball_mc_') || n.startsWith('karate_mc_') || n.startsWith('dunk_mc_'))).toBe(true);
+    expect(HERO_CAPTURE('dunk_mc_tomahawk')).toBe(true);                // MOCAP DUNKS (2026-09-18): the captured dunks play on the hero in every hoops mode
+    for (const n of ['dunk_mc_tomahawk', 'dunk_mc_windmill', 'dunk_mc_power', 'dunk_mc_reverse', 'dunk_mc_two_hand']) expect(MOCAP_OPPONENT_CLIPS.some((c) => c.name === n), n).toBe(true);
     expect(HERO_CAPTURE('karate_mc_jab')).toBe(true);                    // THE HUNDRED: the fighter's strikes are captures too
     expect(HERO_CAPTURE('football_mc_run')).toBe(false);                 // football and boards stay the opponents' for now
     for (const n of Object.keys(CAPTURE_RELEASE_01)) expect(MOCAP_OPPONENT_CLIPS.some((c) => c.name === n), n).toBe(true);
