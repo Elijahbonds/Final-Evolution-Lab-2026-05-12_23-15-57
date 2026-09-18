@@ -1,0 +1,50 @@
+{
+  "fps": 30,
+  "clips": [
+    {
+      "name": "guard",
+      "loop": true,
+      "seconds": 1.367
+    },
+    {
+      "name": "high_kick",
+      "loop": false,
+      "seconds": 2.033
+    },
+    {
+      "name": "hook",
+      "loop": false,
+      "seconds": 0.967
+    },
+    {
+      "name": "jab",
+      "loop": false,
+      "seconds": 1.733
+    },
+    {
+      "name": "jumpshot",
+      "loop": false,
+      "seconds": 2.567
+    },
+    {
+      "name": "roundhouse",
+      "loop": false,
+      "seconds": 2.667
+    },
+    {
+      "name": "run",
+      "loop": true,
+      "seconds": 0.633
+    },
+    {
+      "name": "uppercut",
+      "loop": false,
+      "seconds": 1.733
+    },
+    {
+      "name": "walk",
+      "loop": true,
+      "seconds": 1.033
+    }
+  ]
+}

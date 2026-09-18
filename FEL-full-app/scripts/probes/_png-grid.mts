@@ -1,0 +1,10 @@
+import { chromium } from 'playwright-core';
+import fs from 'node:fs';
+import { chromiumExe } from './_chromium.mts';
+const dir = process.argv[2]; const files = process.argv.slice(3);
+const b = await chromium.launch({ executablePath: chromiumExe(), headless: true });
+const p = await b.newPage({ viewport: { width: 1320, height: 900 } });
+const img = (f: string) => `data:image/png;base64,${fs.readFileSync(`${dir}/${f}`).toString('base64')}`;
+await p.setContent(`<body style="margin:0;background:#111;color:#eee;font:14px monospace;display:grid;grid-template-columns:1fr 1fr;gap:4px">${files.map((f) => `<div><img src="${img(f)}" style="width:650px;height:406px;object-fit:cover"><div>${f}</div></div>`).join('')}</body>`);
+await p.screenshot({ path: `${dir}/SHEET.png`, fullPage: true });
+await b.close();

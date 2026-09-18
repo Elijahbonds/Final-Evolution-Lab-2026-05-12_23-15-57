@@ -1,0 +1,254 @@
+// PlayerSlot — the multiplayer-READY abstraction 1v1/3v3 basketball is built
+// on. Every body on the court (you, AI teammates, AI defenders) is driven by
+// a `ControlSource` that produces the same small `Intent` shape every frame.
+// Today only two sources exist: local input and AI. That is a deliberate,
+// honest scope decision — this repo has zero visibility into whatever
+// backend Abacus runs (is there a WebSocket/game-server layer? matchmaking?
+// a room model?), and shipping guessed netcode against unknown
+// infrastructure would be worse than not shipping it. What IS shippable
+// today, and is most of the real engineering work regardless of transport:
+// every piece of basketball game logic (movement, shooting, passing,
+// defense) reads intent from a `ControlSource`, never from the input bus or
+// an AI decision tree directly. Wiring a real second human into a slot is
+// then "implement NetworkInputSource against your transport," not "rewrite
+// the game."
+
+import { Vector3 } from '@babylonjs/core';
+import type { FelInput } from './InputBus';
+
+export interface Intent {
+  moveX: number; moveY: number;        // -1..1, already deadzoned
+  sprint: boolean;
+  action: boolean;                     // shoot/dunk trigger, edge-detected by the caller
+  actionHeld: number;                  // 0..1 — shot-meter charge while held
+  pass: boolean;                       // edge-detected
+  steal: boolean;                      // edge-detected (defensive slot)
+  brace?: boolean;                     // held — box-out/post-up (Phase 4 contact)
+  /** HOOPS-MOVE-KIT-A D3: the steal button HELD (past a tap) — a grounded hand-up contest (verticality). */
+  contest?: boolean;
+  /** HOOPS-MOVE-KIT-B M12: R1 held — use the GLASS (an intentional bank inside the band). */
+  glass?: boolean;
+  /**
+   * R2 HELD — the turbo (owner's 2K map, 2026-09-16: "R2 + direction = sprint, that plus square = dunk").
+   *
+   * `sprint` used to BE this, inferred from how far the stick was pushed, which made "go fast" and "go up strong"
+   * the same gesture — and left a keyboard, which can only report a full-magnitude direction, sprinting on every
+   * single step and therefore unable to take a layup at all. Turbo is now a button on both devices; `sprint` is
+   * this AND a direction, and the dunk gate reads it.
+   */
+  turbo?: boolean;
+  /** Circle, tapped on offence — CALL FOR A SCREEN. Edge-detected; a mode with no teammate refuses it out loud. */
+  screen?: boolean;
+  /**
+   * Circle HELD on defence — TAKE THE CHARGE: plant your feet and wear it.
+   *
+   * The charge existed in one direction only. A handler who sprinted through a SET defender was called for an
+   * offensive foul, but with the possessions the other way round the rival drove through a standing player for
+   * free — there was no way to plant, and nothing read it if you had. Holding this stops you dead (that is the
+   * price) and turns a foul-speed collision into their turnover.
+   */
+  takeCharge?: boolean;
+  /**
+   * L2 HELD ON DEFENCE — intense D: sit down, slide faster, give up your forward speed for it.
+   *
+   * The same hold posts you up on offence (`brace`), which is 2K's own logic: the possession decides what the
+   * button means. See DefensiveStance.inStance / stanceWish.
+   */
+  intense?: boolean;
+  /**
+   * A LEAVES THE FLOOR — the contest jump / block. Edge-detected, like `steal`.
+   *
+   * Added in the 1v1 + 3v3 ten-phase pass (2026-09-16), and the reason is worth keeping. EVERY other thing a
+   * defender does in those two modes reads this Intent: the slide, the stance, the box-out, the hand-up, the
+   * poke. The block alone was read straight off the raw button stream inside each mode's `onInput`. That is
+   * invisible to a human, because the pad feeds both paths — but the slot is the seam every NON-pad driver
+   * arrives on, and those modes build their slot as
+   *
+   *     meSlot = new PlayerSlot('me', agentCtl ?? localSource, true);
+   *
+   * so under the agent bridge local input is bypassed BY DESIGN and the block was unreachable. Measured on the
+   * bridge-driven lab before this field existed: five defensive possessions, five scores conceded, ZERO stops —
+   * not because the defence is hard, but because its only shot-stopping verb had no wire to pull.
+   *
+   * Optional: a mode with no jump simply never reads it.
+   */
+  jump?: boolean;
+  /**
+   * The pass button HELD past a tap — sell the pass without throwing it (owner, 2026-09-13).
+   *
+   * Mirrors `contest`, which is the same idea on the steal button: a tap is the thing, a hold is the other
+   * thing. It also happens to be what a pass fake physically IS — you wind the pass up and do not release
+   * it — so the input and the move agree, which is worth more than saving a button.
+   */
+  passFake?: boolean;
+}
+
+const NEUTRAL: Intent = { moveX: 0, moveY: 0, sprint: false, action: false, actionHeld: 0, pass: false, steal: false };
+
+export interface ControlSource {
+  /** Called once per frame; must return a fresh object (caller may mutate flags to consume edges). */
+  poll(dt: number): Intent;
+  dispose?(): void;
+}
+
+// ── Local human input. Modes already receive input via the harness's
+//    `onInput(ctx, e)` callback (every mode this project ships uses this
+//    pattern) — LocalInputSource plugs into that exact seam via feed(e),
+//    rather than inventing a separate subscription API on InputBus. ──────
+/** B held this long sells a pass fake instead of throwing the pass. */
+export const PASS_FAKE_HOLD_MS = 180;
+/** The steal button (Square) held this long is a hand-up contest (D3), not a poke. */
+export const CONTEST_HOLD_MS = 150;
+
+export class LocalInputSource implements ControlSource {
+  private moveX = 0; private moveY = 0;
+  private actionDown = false; private actionEdge = false; private held = 0;
+  private passEdge = false; private stealEdge = false; private jumpEdge = false;
+  // HOOPS-MOVE-KIT-B (2026-09-08): the two sources of BRACE are latched SEPARATELY. InputBus emits the L trigger's value
+  // every frame while a pad is adopted (a resting trigger is a real 0), and L1 is emitted only on its transitions — so one
+  // shared `braceHeld` meant the trigger's per-frame 0 wiped the held L1 on the very next frame. On a pad, holding L1 did
+  // nothing at all: no box-out (KIT-A O2), and no post-up (measured on the KIT-B probe: brace false with the button down).
+  private braceTrigger = false; private braceButton = false;
+  private screenEdge = false; private chargeHeld = false;   // Circle — call the screen / plant and take the charge
+  private turboHeld = false; private turboSeen = false;   // R2 held — the turbo, and whether a trigger has ever reported
+  private intenseHeld = false;                            // L2 held — sit down (defence); the same hold posts up on offence
+  private glassHeld = false;   // HOOPS-MOVE-KIT-B M12: R1 held = call glass
+  private stealDownAt = -1;   // D3: X held past CONTEST_HOLD_MS = the hand-up contest (a tap stays the poke)
+  private passDownAt = -1;    // B held past PASS_FAKE_HOLD_MS = the pass fake (a tap stays the pass)
+
+  /** Call from the mode's onInput(ctx, e) for every event. */
+  feed(e: FelInput): void {
+    if (e.t === 'stick' && e.side === 'L') {
+      this.moveX = e.x;
+      // STICK-SPACE -> INTENT-SPACE. This is the one place hardware meets the
+      // movement layer, and the two use OPPOSITE signs for Y.
+      //
+      // Hardware reports up as NEGATIVE: the Gamepad API's axes[1] is -1 pushed
+      // up, InputBus maps W to -1 to match it, and the touch stick derives y
+      // from a screen delta so up is negative there too. All three agree.
+      //
+      // The movement layer means the opposite. CourtMovement documents
+      // "+Y = up-stick = forward/away from camera = -Z on court" and implements
+      // it as wantDir = (moveX, 0, -moveY); every world-direction caller feeds
+      // it that way (CombatMovement passes -wish.z, the basketball AI brains
+      // return -dir.z, lockTarget aims with -aimY). That convention is coherent
+      // and widely used — it was simply never bridged to the hardware sign.
+      //
+      // Nothing converted between them, so a HUMAN pressing forward walked
+      // backwards while every AI on the same court moved correctly. It was
+      // patched per-mode in 1v1 and 3v3; those patches are now removed, because
+      // this is the seam where it belongs and one negation here fixes every mode
+      // at once — including the pass-aim stick and Karate Endless, which were
+      // inverted the same way and nobody had noticed.
+      this.moveY = -e.y;
+    }
+    // ── THE 2K MAP (owner, 2026-09-16) ────────────────────────────────────────────────────────────────────────
+    // "R2 + direction = sprint, that plus square = dunk", "bottom button to pass", "L2 is a post up" and, on
+    // defence, "L2 has them get low to sit and slide faster". Those are 2K's bindings, so the rest of the scheme
+    // follows 2K's logic too — including the part that matters most, which is that a BUTTON'S MEANING IS DECIDED BY
+    // THE POSSESSION. Square shoots when you have the ball and blocks when you do not; L2 posts up on offence and
+    // sits you down on defence. One finger, two verbs, no mode switch.
+    //
+    //   R2  (R trigger)   TURBO, held. With a direction that is the sprint; with Square at the rim it is the dunk.
+    //   Square  (FEL X)   SHOOT — held, released in the green.  ON DEFENCE: STEAL on a tap, the grounded hand-up
+    //                     CONTEST on a hold. One button, and which verb you get is which side of the ball you are on.
+    //   Triangle (FEL Y)  BLOCK — the contest jump (2K puts the swat on Triangle, the steal on Square).
+    //   Bottom  (FEL A)   PASS on a tap, PASS FAKE on a hold.
+    //   Circle  (FEL B)   CALL FOR A SCREEN on offence; TAKE CHARGE — plant your feet — on defence.
+    //   L2  (L trigger)   POST UP on offence, INTENSE D on defence.    L1 keeps the plant/box-out it was taught on.
+    //   R1                call GLASS (no 2K equivalent; this game's own).   KEYBOARD: SHIFT = R2, F = L2 (tagged R1 / L1).
+    //
+    // TURBO USED TO BE A GUESS. `sprint` was `hypot(moveX, moveY) > 0.85` — inferred from how hard the stick was
+    // pushed — so "go fast" and "go up strong" were the same gesture and a KEYBOARD, which can only ever report a
+    // full-magnitude direction, was sprinting on every step: it could never take a layup, because the dunk gate
+    // reads the turbo. Now turbo is a button on both devices and the stick magnitude is only a fallback for a pad
+    // with no trigger reading yet.
+    if (e.t === 'trigger' && e.side === 'R') { this.turboHeld = e.value > 0.35; this.turboSeen = true; }
+    if (e.t === 'trigger' && e.side === 'L') { this.braceTrigger = e.value > 0.4; this.intenseHeld = e.value > 0.4; }
+    // THE KEYBOARD'S TRIGGERS ARE TAGGED BUTTONS (suite pass, 2026-09-16). SHIFT arrives as R1 `src: 'key'` and F as
+    // L1 `src: 'key'` — InputBus stopped emitting them as triggers because fifteen modes read the raw R trigger for
+    // their own verb (the dunk's run-up, the shootout's wind-up, a board's crouch). A tagged R1 is the TURBO, and it is
+    // NOT a glass call: Shift was also the glass button, so every keyboard sprint drive finished off the glass.
+    if (e.t === 'button' && e.btn === 'L1') { this.braceButton = e.pressed; if (e.src === 'key') this.intenseHeld = e.pressed; }
+    if (e.t === 'button' && e.btn === 'R1') {
+      if (e.src === 'key') { this.turboHeld = e.pressed; this.turboSeen = true; }
+      else this.glassHeld = e.pressed;
+    }
+    // SQUARE — the shot meter is a HELD button now, not a held analog trigger. Nothing downstream reads the analog
+    // value: every consumer compares `actionHeld` against 0.02, and the meter itself runs on dt.
+    if (e.t === 'button' && e.btn === 'X') {
+      if (e.pressed) {
+        this.held = 1; this.actionDown = true;                                  // offence: the meter starts
+        this.stealEdge = true; this.stealDownAt = performance.now();            // defence: the poke, and the hold behind it
+      } else {
+        this.held = 0; this.stealDownAt = -1;
+        if (this.actionDown) { this.actionEdge = true; this.actionDown = false; }
+      }
+    }
+    if (e.t === 'button' && e.pressed && e.btn === 'Y') this.jumpEdge = true;   // Triangle — leave the floor to block
+    // Circle: a screen is a CALL (an edge, once), taking a charge is a COMMITMENT (held — you are standing there
+    // hoping he runs into you, and you are not going anywhere while you do it).
+    if (e.t === 'button' && e.btn === 'B') { if (e.pressed) this.screenEdge = true; this.chargeHeld = e.pressed; }
+    if (e.t === 'button' && e.pressed && e.btn === 'A') { this.passEdge = true; this.passDownAt = performance.now(); }
+    if (e.t === 'button' && !e.pressed && e.btn === 'A') this.passDownAt = -1;
+  }
+
+  poll(): Intent {
+    const out: Intent = {
+      moveX: this.moveX, moveY: this.moveY,
+      // R2 AND a direction. The magnitude fallback survives only until a trigger has reported once, so a pad whose
+      // triggers have not been touched yet still moves the way it always did rather than refusing to run.
+      sprint: this.turboHeld || (!this.turboSeen && Math.hypot(this.moveX, this.moveY) > 0.85),
+      turbo: this.turboHeld,
+      action: this.actionEdge, actionHeld: this.held,
+      pass: this.passEdge, steal: this.stealEdge, jump: this.jumpEdge,
+      brace: this.braceTrigger || this.braceButton,
+      intense: this.intenseHeld,
+      screen: this.screenEdge, takeCharge: this.chargeHeld,
+      glass: this.glassHeld,
+      contest: this.stealDownAt >= 0 && performance.now() - this.stealDownAt >= CONTEST_HOLD_MS,
+      passFake: this.passDownAt >= 0 && performance.now() - this.passDownAt >= PASS_FAKE_HOLD_MS,
+    };
+    this.actionEdge = false; this.passEdge = false; this.stealEdge = false; this.jumpEdge = false; this.screenEdge = false;
+    return out;
+  }
+}
+
+// ── AI (used for every teammate/defender today; the same interface a real
+//    opponent's network stream would implement) ──────────────────────────
+export interface AIBehavior {
+  decide(dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[], foes: Vector3[]): Intent;
+}
+export class AISource implements ControlSource {
+  constructor(private self: Vector3, private world: {
+    ball: () => Vector3; hoop: () => Vector3; allies: () => Vector3[]; foes: () => Vector3[];
+  }, private brain: AIBehavior) {}
+  poll(dt: number): Intent {
+    return this.brain.decide(dt, this.self, this.world.ball(), this.world.hoop(), this.world.allies(), this.world.foes());
+  }
+}
+
+// ── Network stub — the integration seam. NOT wired to any transport. A real
+//    implementation reads Intent frames off whatever channel Abacus's
+//    backend provides (WebSocket room, WebRTC data channel, polling REST —
+//    the Intent shape above is transport-agnostic on purpose) and should
+//    interpolate/extrapolate between received frames the way any netcode
+//    does. Until that transport exists, this returns neutral input so a
+//    slot assigned to it is inert rather than broken. */
+export class NetworkInputSource implements ControlSource {
+  private latest: Intent = { ...NEUTRAL };
+  /** Call this from your transport's onmessage handler with the peer's Intent. */
+  receive(intent: Intent): void { this.latest = intent; }
+  poll(): Intent { return this.latest; }
+}
+
+/** One court body = one slot: a ControlSource + the character it drives.
+ *  Game logic (DribbleController, ShotMeter, PassSystem) reads slot.intent
+ *  every frame and never cares whether it came from a thumb, an AI, or the
+ *  network. */
+export class PlayerSlot {
+  intent: Intent = { ...NEUTRAL };
+  constructor(public id: string, public source: ControlSource, public isLocalHero: boolean) {}
+  poll(dt: number): void { this.intent = this.source.poll(dt); }
+  dispose(): void { this.source.dispose?.(); }
+}
