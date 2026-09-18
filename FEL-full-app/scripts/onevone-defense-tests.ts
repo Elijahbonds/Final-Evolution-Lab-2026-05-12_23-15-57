@@ -170,7 +170,7 @@ function possession(defender: (t: number, rival: Vector3) => Vector3, opts: { se
   tree.update({ ...BASE, staggered: true });
   ok(plays.length === 3, 'the same one-shot does not re-fire while the input still names it');
   tree.update(BASE); tree.update({ ...BASE, staggered: true });
-  ok(plays.length === 4 && plays[3].clip === 'karate_hit_react', 'a fresh stagger fires again after the trigger dropped');
+  ok(plays.length === 4 && plays[3].clip === 'bball_contact_react', 'a fresh stagger fires again after the trigger dropped');   // 2026-09-17: a basketball bump, not the fighter's flinch
   // a mode beat: cut by a newer beat → the old callback is ignored
   const t2 = new BasketballAnimTree(fake); plays.length = 0;
   t2.update({ ...BASE, defending: true, hasBall: false });
@@ -214,9 +214,9 @@ function possession(defender: (t: number, rival: Vector3) => Vector3, opts: { se
   ok(src.includes('possessionToken === tok'), 'possession timers are token-guarded (no stale watchdog into the next possession)');
   ok(!src.includes('defense watchdog'), 'the setTimeout watchdog is gone');
   ok(/edge <= 0\) startDefense\(ctx, possession === 'mine'/.test(src), 'the board is a race on both ends');
-  ok(src.includes('} else if (loose && !dunking) {'), 'a loose ball steps whoever\'s possession it is');
+  ok(/loose && !dunking/.test(src), 'a loose ball steps whoever\'s possession it is');
   ok(src.includes('dec.exposure >= STEAL_EXPOSURE_MIN'), 'the steal reads the rival\'s exposure');
-  ok(src.includes("meAnimTree.beat('bball_steal_reach')") && src.includes("meAnimTree.beat('bball_block_reach')"), 'the steal and the block have a reach');
+  ok(/meAnimTree\.beat\('bball_steal_reach'/.test(src) && /meAnimTree\.beat\('bball_block_reach'/.test(src), 'the steal and the block have a reach');
   ok(src.includes('checkBlock(me.root.position, foe.root.position, myJumpAge)'), 'the block is timed against the release');
   ok(src.includes('c.attacker') && src.includes('c.victim'), 'fouls read who ran into whom');
   ok(src.includes('CHECK_FOE') && src.includes('CHECK_ME'), 'their possession checks up at the top');

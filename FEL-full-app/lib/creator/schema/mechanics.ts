@@ -48,13 +48,16 @@ const blend: RatedRow = {
  */
 const DRIBBLE_GATES: Array<[string, string, number, string]> = [
   ['dribbleBasic', 'Basic Package', 0, 'Crossover and hesitation. Everybody has these.'],
+  ['dribbleMomentum', 'Momentum Cross Package', 30, 'The 2K17 momentum crossover on the right stick: a wide cut that keeps the run, and the spam.'],
   ['dribbleInOut', 'In-and-Out Package', 40, 'Fake the cross and keep the hand.'],
   ['dribbleBetween', 'Between-the-Legs Package', 45, 'Through the legs, either direction.'],
   ['dribbleYoyo', 'Yo-Yo Package', 52, 'The ball on a string while you size him up.'],
+  ['dribbleMomentumBtb', 'Momentum Behind-the-Back Package', 50, 'The wrap at pace without the slow-down.'],
   ['dribbleBehind', 'Behind-the-Back Package', 58, 'Around the back, changing hands and angle.'],
   ['dribbleSpin', 'Spin Package', 64, 'Turning your back through the move.'],
   ['dribbleSlip', 'Slip-and-Slide Package', 68, 'Past his hip once he has committed.'],
   ['dribbleDouble', 'Double Cross Package', 72, 'Two crosses in one beat.'],
+  ['dribbleSteezo', 'Steezo Roll Package', 74, 'Behind the back rolled straight into the spin.'],
   ['dribbleSnatch', 'Snatch-Back Package', 80, 'Pull it back into your own shot.'],
   ['dribbleShamm', 'Shamm Package', 88, 'Push it out and take it back before he can.'],
   ['dribbleOffHead', 'Off-the-Head Package', 92, 'Off him, round him, and gone. The last thing you earn.'],

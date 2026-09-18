@@ -42,7 +42,8 @@ const btn = (btn: 'A' | 'B' | 'Y') => ({ t: 'button' as const, btn, pressed: tru
   ok(fast.airRemaining01 > 0.30, 'fast flight still has usable air');
 
   // THE RUN-UP BUYS THE MENU, AND IT BUYS IT AT THE TAKEOFF (DUNK-BODY-MID, 2026-09-09)
-  ok(slow.trickCapacity === 1 && fast.trickCapacity === 2, 'a walk-up holds one trick, a runway attack two');
+  const half = new DunkFlight(); half.launch(0.7, 3);   // a real but not full attack: 0.85 + 0.385 + 0.15 = 1.385 — two
+  ok(slow.trickCapacity === 1 && half.trickCapacity === 2 && fast.trickCapacity === 3, `a walk-up holds one trick, a runway attack two, a full-speed attack three (${slow.trickCapacity}/${half.trickCapacity}/${fast.trickCapacity})`);
 
   const rich = new DunkFlight();
   rich.launch(1.0, 3);
@@ -106,7 +107,7 @@ const btn = (btn: 'A' | 'B' | 'Y') => ({ t: 'button' as const, btn, pressed: tru
   const src = readFileSync(new URL('../lib/babylon/modes/DunkMode.ts', import.meta.url), 'utf8');
   ok(src.includes('runUpPeak'), 'peak approach speed is measured');
   ok(src.includes('launchSpeed01'), 'run-up speed reaches the launch');
-  ok(/launchSpeed01 \* 1\.0/.test(src), 'the judges see the run-up (difficulty term)');
+  ok(/flight\.launch\(Math\.min\(1, charge \* 0\.5 \+ launchSpeed01 \* 0\.5\)/.test(src) && /charge, launchSpeed01, styleTier/.test(src), 'the judges see the run-up (the launch budget and the judge payload)');
   ok(!src.includes('Math.hypot(stickX, stickY) * 0.5'), 'the neutral-stick-at-release misread is gone');
   // and the player is TOLD — a refused trick with no feedback is a dropped input
   ok(src.includes('NOT ENOUGH AIR'), 'air refusal is surfaced, not silent');

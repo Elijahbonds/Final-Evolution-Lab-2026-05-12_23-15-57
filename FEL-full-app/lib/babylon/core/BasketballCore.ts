@@ -69,6 +69,9 @@ export class DribbleController {
   static readonly HESI_BOOST_SEC = 0.6;
   /** Seconds before another hesitation can be thrown. */
   static readonly HESI_COOLDOWN_SEC = 1.0;
+  /** The explode-out leaves at no less than this share of top speed: the plant took the run down to ~0.3 m/s, and
+   *  "0.3 + the boost" was 2.3 m/s — a jog, not the separation the move exists to buy (measured, onevone-depth). */
+  static readonly EXPLODE_FLOOR = 0.7;
 
   constructor(cfg = { maxSpeed: 6.4, accel: 26, decel: 34, turnRate: 9, crossoverBoost: 2.2 }) {
     this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed, gears: GEARS_HOOPS });   // DRIBBLE PACE: the gears are on for the ball handler
@@ -212,7 +215,8 @@ export class DribbleController {
         // on the same frame instead of waiting for the next push.
         if (dir && fwd > 0.3) {
           const top = DEFAULT_MOVEMENT.maxSpeed;
-          this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, this.crossoverBoost * 1.5)));
+          this.pendingCut = null;   // the burst is written now — the eased plant must not keep dragging it down
+          this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, Math.max(top * DribbleController.EXPLODE_FLOOR, this.crossoverBoost * 1.5))));
           this.movement.facing = Math.atan2(dir.x, dir.z);
           this.hesiBoostLeft = 0;
         }
@@ -242,7 +246,8 @@ export class DribbleController {
       const fwd = dir.x * Math.sin(this.movement.facing) + dir.z * Math.cos(this.movement.facing);
       if (fwd > 0.3) {
         const top = DEFAULT_MOVEMENT.maxSpeed;
-        this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, this.movement.vel.length() + this.crossoverBoost)));
+        this.pendingCut = null;   // see above
+        this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, Math.max(top * DribbleController.EXPLODE_FLOOR, this.movement.vel.length() + this.crossoverBoost))));
         this.movement.facing = Math.atan2(dir.x, dir.z);
         this.hesiBoostLeft = 0;
       }
@@ -254,6 +259,7 @@ export class DribbleController {
     if (!hesitation && !crossover && this.paceWindowLeft > 0 && sprintPress) {
       const dir = new Vector3(moveX, 0, -moveY).normalize();
       const top = DEFAULT_MOVEMENT.maxSpeed;
+      this.pendingCut = null;
       this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, this.movement.vel.length() + this.crossoverBoost)));
       this.movement.facing = Math.atan2(dir.x, dir.z);
       this.movement.noteBurst(0.5);

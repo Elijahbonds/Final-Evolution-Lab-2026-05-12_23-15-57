@@ -52,6 +52,7 @@ function run(d: DribbleController, frames: [number, number][], sprint = false) {
   const [rel] = run(d, [[0, 0]]);
   ok(rel.hesitation === true, 'releasing a pull-back tap fires the hesitation');
   ok(rel.crossover === false, 'the hesi is NOT a crossover');
+  run(d, Array(5).fill([0, 0]));   // STICK HANDLE: the plant is eased over CUT_BLEND_SEC (70 ms), not written in one frame
   ok(d.vel.length() < preHesiSpeed * 0.25, `the hesi plants you dead — momentum is the cost (${d.vel.length().toFixed(2)} m/s after)`);
 
   // cooldown: an immediate second tap must not re-fire
@@ -91,6 +92,7 @@ function run(d: DribbleController, frames: [number, number][], sprint = false) {
   const [snap] = run(d, [[1, 0.3]]);
   ok(snap.crossover === true, 'hard diagonal snap is still the crossover');
   ok(snap.hesitation === false, 'crossover is NOT a hesitation');
+  run(d, Array(5).fill([1, 0.3]));   // the cut is eased over CUT_BLEND_SEC — the burst has landed after the blend
   ok(d.vel.length() > pre, `crossover keeps the burst (${d.vel.length().toFixed(2)} > ${pre.toFixed(2)})`);
 }
 

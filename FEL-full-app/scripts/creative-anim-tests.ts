@@ -43,7 +43,7 @@ ok('every reachable FreeRun state -> resolvable clip', () => {
 });
 ok('the carnival gestures and the dance aliases resolve', () => {
   for (const n of [SPORT_CLIP.karateWindup, SPORT_CLIP.karateStance, SPORT_CLIP.karateJab, SPORT_CLIP.karateHitReact, SPORT_CLIP.dunkChargeGather, SPORT_CLIP.dunkLaunchPower, SPORT_CLIP.penaltyStrike, SPORT_CLIP.scoreCelebrate]) assert.ok(isResolvable(n), `${n} resolvable`);
-  assert.equal(DANCE_CLIP_IDS.length, 8);
+  assert.ok(DANCE_CLIP_IDS.length >= 8, `the eight dance clips the lock names (got ${DANCE_CLIP_IDS.length})`);   // the board/aero merge (2026-09-17) brought a ninth; every alias below still has to resolve
   for (const id of DANCE_CLIP_IDS) assert.ok(isResolvable(DANCE_ALIASES[id]), `${id} alias "${DANCE_ALIASES[id]}" resolvable`);
 });
 

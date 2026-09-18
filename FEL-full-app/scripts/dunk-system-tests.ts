@@ -61,12 +61,13 @@ ok('direction released before the button press — no trick', () => {
   g.feed(dpad('up', false));
   assert.equal(g.feed(btn('A', true)), null);
 });
-ok('X is reserved (inert) — no combo uses it', () => {
+ok('X throws the fake / 360-windmill family (DUNK-VOCAB-CHAINS: a duplicated button list once made these unthrowable)', () => {
   const g = new GestureRecognizer();
+  const want = { up: 'windmill360', down: 'doubleeastbay', left: 'fakeback', right: 'fakeeastbay' } as const;
   for (const dir of ['up', 'down', 'left', 'right'] as const) {
     g.reset();
     g.feed(dpad(dir, true));
-    assert.equal(g.feed(btn('X', true)), null);
+    assert.equal(g.feed(btn('X', true))?.id, want[dir]);
   }
 });
 

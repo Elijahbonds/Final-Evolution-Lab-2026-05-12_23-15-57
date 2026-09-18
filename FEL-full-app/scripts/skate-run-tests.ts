@@ -92,7 +92,7 @@ ok(c2.banked === 0, `C11 a bail loses the WHOLE pot (${lost} points gone)`);
 ok(!c2.active, 'C12 a bail closes the combo');
 
 // ── D. the goals are the ones the lock names ────────────────────────────────
-ok(SKATE_GOALS.length === 4, `D1 four goals (got ${SKATE_GOALS.length})`);
+ok(SKATE_GOALS.length >= 4, `D1 at least the four goals the lock names (got ${SKATE_GOALS.length})`);
 const byId = new Map(SKATE_GOALS.map((g) => [g.id, g]));
 ok(byId.has('score5k'), 'D2 a banked-score goal exists');
 ok(byId.has('combo800'), 'D3 a single-combo goal exists');

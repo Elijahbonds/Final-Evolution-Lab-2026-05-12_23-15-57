@@ -52,7 +52,7 @@ const host = readFileSync(new URL('../components/games/dunkduel-babylon.tsx', im
 // ── C. the chair is physical ────────────────────────────────────────────────
 {
   // DUNK-CONTROL-JUICE (2026-09-08): the chair box is gone — the duel dunks over the contest's car / barrier / crate (real meshes, sampled hitboxes)
-  ok(mode.includes("spawnDunkObstacle(ctx.scene, p, rim, 'duel_obstacle')") && mode.includes('OBSTACLE_SPECS.car'), 'same obstacles as Dunk Contest (car, barrier, crate meshes)');
+  ok(mode.includes("spawnDunkObstacle(ctx.scene, p, rim, 'duel_obstacle')") && /OBSTACLE_SPECS\[/.test(mode), 'same obstacles as Dunk Contest (the shared OBSTACLE_SPECS table, spawned as real meshes)');   // 2026-09-16: the specs are read per kind (OBSTACLE_KINDS), not as `.car`
   ok(mode.includes('setProp'), 'the chair is armable per attempt');
   ok(mode.includes("e.dir === 'down'"), 'd-pad arms it (couch)');
   ok(mode.includes("e.btn === 'X'"), 'X arms it (phone — its d-pad is the stick)');
