@@ -183,6 +183,29 @@ export class CharacterAnimator {
     return (g.to - g.from) / fps;
   }
 
+  /**
+   * ANIM CLEAN-UP (2026-09-18): FREEZE A CLIP ON ITS LAST FRAME so the next crossfade has something to fade FROM. A
+   * one-shot that ends stops its group, and Babylon normalises a single running animatable to full weight — so the loop
+   * that settled after a beat did not fade in, it SNAPPED (the lab's smoothness recorder: a 0.91 m hand jump in one
+   * frame at the follow-through's end, 0.6 m at every settle). The group is restarted as a loop parked on its final
+   * frame at speed 0 and made current; play() then fades it out like any live clip. No-op if the clip is unknown.
+   */
+  freezeAtEnd(name: string): void {
+    const r = resolveClip(name, this.clipNames);
+    const g = this.groups.get(r.clip);
+    if (!g) return;
+    if (g.isPlaying) g.stop();
+    // NOT speedRatio 0 + goToFrame: a runtime animation's frame is `from + elapsed × speed`, so at speed 0 it evaluates at
+    // FROM — the beat's first pose flashed for a frame before the fade (measured as a two-frame 0.6 / 0.8 m hand pop).
+    // A loop over the clip's last half-frame at 1/2000 speed sits on the end pose for minutes and is still a live blend source.
+    const endA = Math.max(g.from, g.to - 0.5);
+    g.start(true, 0.0005, endA, g.to, false);
+    g.setWeightForAllAnimatables(1);
+    if (this.fadingOut && this.fadingOut !== g) { this.fadingOut.stop(); this.fadingOut = null; }
+    this.fadeObs?.remove(); this.fadeObs = null;
+    this.current = g; this.currentName = r.clip; this.currentSpeed = 0.0005;
+  }
+
   setSpeed(name: string, speedRatio: number): void {
     const g = this.groups.get(resolveClip(name, this.clipNames).clip);
     if (g?.isPlaying) g.speedRatio = speedRatio;

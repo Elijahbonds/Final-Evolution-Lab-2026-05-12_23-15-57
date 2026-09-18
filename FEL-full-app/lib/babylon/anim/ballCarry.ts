@@ -107,6 +107,9 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   let phase = 0;
   let pending = false;   // a frame was recorded since the last after-animations pass
   let frameDt = 0, stamp = 0;   // the recorded frame's dt, and a counter of drawn frames (the arm memo's continuity)
+  let lastSpeed01 = 0;
+  let offArm: ArmChain | null = armChain(opts.skeleton, side === 'Right' ? 'Left' : 'Right');
+  const offT = new Vector3(), offPole = new Vector3();
   const local = new Vector3(), world = new Vector3(), handT = new Vector3(), pole = new Vector3();
 
   const toWorld = (x: number, y: number, z: number, out: Vector3): Vector3 => {
@@ -130,8 +133,23 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       // elbow out to the side and back, never into the ribs
       toWorld(sx * 0.7, s.hand.y - 0.2, -0.5, pole).subtractInPlace(opts.root.getAbsolutePosition());
       const k = switchLeft > 0 ? 1 - switchLeft / SWITCH_FADE_SEC : 1;
-      reachShaped(arm, handT, pole, s.handWeight * armW * k, frameDt, stamp);
-      if (prevArm && k < 1) reachShaped(prevArm, prevHandT, prevPole, s.handWeight * armW * (1 - k), frameDt, stamp);
+      // ANIM CLEAN-UP (2026-09-18): at pace the ball arm STAYS on the ball's line. The hand weight eased to 0.6 while the ball
+      // was down, which at a walk reads as the hand waiting for it — at a sprint the dribbling run clip's own arm swings
+      // 0.5 m per stride, and 40 % of that swing came through as a 0.6 m hand pop every bounce (measured). Faster = heavier.
+      const w = Math.max(s.handWeight, Math.min(1, lastSpeed01 * 1.6));
+      reachShaped(arm, handT, pole, w * armW * k, frameDt, stamp);
+      if (prevArm && k < 1) reachShaped(prevArm, prevHandT, prevPole, w * armW * (1 - k), frameDt, stamp);
+      // THE OFF ARM (owner, 2026-09-18: "fix the off arm while running"). The sprint capture swings its free arm wide and
+      // high — a runner's arm, not a ball handler's. At pace the off hand is held LOW beside the hip and a little forward,
+      // pumping a hand's width with the bounce (the dribble's phase is the stride's), the elbow back. Faded in from a
+      // walk so the idle / walk clips keep their own arms.
+      if (offArm && lastSpeed01 > 0.35) {
+        const ow = Math.min(1, (lastSpeed01 - 0.35) / 0.3) * armW;
+        const pump = Math.sin(phase * Math.PI * 2) * 0.09;
+        toWorld(-sx * 0.30, 0.86 + pump * 0.5, 0.18 + pump, offT);
+        toWorld(-sx * 0.55, 0.85, -0.45, offPole).subtractInPlace(opts.root.getAbsolutePosition());
+        reachShaped(offArm, offT, offPole, ow, frameDt, stamp);
+      }
     }
   };
   const obs = opts.scene.onAfterAnimationsObservable.add(apply);
@@ -144,6 +162,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       if (arm) { prevArm = arm; prevHandT.copyFrom(handT); prevPole.copyFrom(pole); switchLeft = SWITCH_FADE_SEC; }
       side = side === 'Right' ? 'Left' : 'Right';
       arm = armChain(opts.skeleton, side);
+      offArm = armChain(opts.skeleton, side === 'Right' ? 'Left' : 'Right');
       if (!active) attachBallToHand(opts.ball, opts.skeleton, `${side}Hand`);
       phase = 0;   // the ball is at the new palm
     },
@@ -159,7 +178,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       switchLeft = Math.max(0, switchLeft - dt);
       if (!active) return;
       phase = advancePhase(phase, dt, speed01, p);
-      frameDt = dt;
+      frameDt = dt; lastSpeed01 = speed01;
       pending = true;
     },
     dispose() { opts.scene.onAfterAnimationsObservable.remove(obs); },

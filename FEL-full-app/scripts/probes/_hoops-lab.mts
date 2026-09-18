@@ -81,7 +81,7 @@ page.on('console', (m) => { const t = m.text(); if (/\[1V1|\[3V3|\[REF|\[LAB/.te
   await lp.close();
 }
 const HANDLE = process.env.HANDLE ? `&handle=${Number(process.env.HANDLE)}` : '';
-await page.goto(`${BASE}/play/${MODE}?agent=1${HANDLE}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+await page.goto(`${BASE}/play/${MODE}?agent=1${HANDLE}${process.env.QS ?? ''}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
 { const t = Date.now(); let st = '';
   while (Date.now() - t < 300000) { st = await page.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => '') as string; if (st === 'loaded' || st === 'playing') break; await page.waitForTimeout(500); }
   if (st !== 'loaded' && st !== 'playing') console.log(`[LAB] the mode never became ready (state "${st}", url ${page.url()})`); }

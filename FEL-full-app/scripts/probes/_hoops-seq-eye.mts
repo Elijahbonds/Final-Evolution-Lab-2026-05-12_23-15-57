@@ -33,7 +33,7 @@ await ctx.addInitScript({ content: "try { window.sessionStorage.setItem('NEXUS_A
 const page = await ctx.newPage();
 const logs: string[] = [];
 page.on('console', (m) => { const t = m.text(); if (/\[1V1|\[3V3|\[FEL-ANIM\] MISSING/.test(t)) logs.push(t.slice(0, 160)); });
-await page.goto(`${BASE}/play/${MODE}?agent=1${process.env.HANDLE ? `&handle=${Number(process.env.HANDLE)}` : ''}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+await page.goto(`${BASE}/play/${MODE}?agent=1${process.env.HANDLE ? `&handle=${Number(process.env.HANDLE)}` : ''}${process.env.QS ?? ''}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
 { const t = Date.now(); while (Date.now() - t < 300000) { const st = await page.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => '') as string; if (st === 'loaded' || st === 'playing') break; await page.waitForTimeout(300); } }
 await page.evaluate(`(() => {
   const MODE = ${JSON.stringify(MODE)};

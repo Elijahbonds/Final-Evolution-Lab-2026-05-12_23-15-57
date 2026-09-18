@@ -9,6 +9,7 @@
 //   ual  — Quaternius Universal Animation Library 2 [Standard]. CC0 1.0.
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
 import { buildPoseClip, type PoseKey } from '../poseClip';
+import { closeLoop } from '../mocapRetarget';
 
 export interface MocapOpponentClip {
   name: string; replaces: string; duration: number; loop: boolean; source: string; license: string; keys: PoseKey[];
@@ -895,5 +896,8 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
 ];
 
 export function buildMocapOpponentClip(scene: Scene, sk: Skeleton, clip: MocapOpponentClip): AnimationGroup | null {
-  return buildPoseClip(scene, sk, clip.name, clip.duration, clip.keys);
+  // ANIM CLEAN-UP (2026-09-18): a LOOP is closed — its last fifth eases into its first key — so the wrap is seamless. The
+  // captures are cut from a longer take and their end pose never matched their start: the dribbling run and jog popped
+  // both hands ~0.5 m once per cycle (the lab's smoothness recorder, at the loop period).
+  return buildPoseClip(scene, sk, clip.name, clip.duration, clip.loop ? closeLoop(clip.keys) : clip.keys);
 }

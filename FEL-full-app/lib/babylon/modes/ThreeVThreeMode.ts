@@ -1473,7 +1473,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           // exposure read, no cooldown, no foul risk, while my own reach on their drive has all three. Now theirs is mine
           // mirrored: a reach every AI_REACH_COOLDOWN_SEC at most, it takes the ball on a roll (more on the bump, when the
           // ball is out of the hand), a miss stuns the reacher, and a reach through a moving body is the reach-in foul.
-          if (f.stunSec === 0 && f.reachCooldown === 0 && f.slot.intent.steal && roll() < AI_REACH_GATE && !finish && !gather && !dunking && !sealed && distXZ(f.char.root.position, carrier.char.root.position) < 1.6) {
+          if (f.stunSec === 0 && f.reachCooldown === 0 && f.slot.intent.steal && roll() < AI_REACH_GATE && !finish && !gather && !dunking && !sealed && !board && distXZ(f.char.root.position, carrier.char.root.position) < 1.6) {   // `!board`: no reach at a ball still live off the iron / out of the net
             f.reachCooldown = AI_REACH_COOLDOWN_SEC;
             f.tree.beat('bball_steal_reach', { fadeSec: 0.14 });
             const carrierSpeed = carrier === me ? me.drib.vel.length() : carrier.vel.length();
@@ -1539,7 +1539,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     releaseBall(ball);
     // BIOMECH-HOOPS-WAVE1: the tree owns the beat; a jumper flows into the held follow-through (G5); the ball FLIES (G6)
     if (finish === 'alleyoop') body.tree.beat(SPORT_CLIP.dunkFinishTomahawk);
-    else body.tree.beat('jumpshot', { onSettle: () => body.tree.beat('bball_follow_through', { fadeSec: 0.1 }) });
+    else body.tree.beat('jumpshot', { onSettle: () => body.tree.beat('bball_follow_through', { fadeSec: 0.2 }) });
     body.shotWin = 'release'; body.shotSec = 0;
     // My teammate's miss is readable too, and it is MY team's board to go and get. It used to be three
     // constants, so every teammate miss came off the iron the same way and my team always knew where to
@@ -1608,7 +1608,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // arc resolves. HOOPS-MOVE-KIT-A M3: a layup / floater lets go from its OWN clip at the top of the hop and rides it to
     // feet-down (it used to cut to the dunk launch clip — a two-arm sweep through a T)
     if (finish) finish.released = true;
-    else me.tree.beat('bball_follow_through', { fadeSec: 0.1 });
+    else me.tree.beat('bball_follow_through', { fadeSec: 0.2 });
     // HOOPS-MOVE-KIT-B: a fade / a hook keeps its OWN posture window to feet-down (the release stance would stand the lean
     // back up in mid-air, which IS the shot)
     me.shotWin = finish && (finish.plan.style === 'fadeaway' || finish.plan.style === 'hook')
@@ -1724,7 +1724,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       meter3d?.set(showtime ? showtimeMeterT(k) : k, me.char.root.position.add(new Vector3(0, 1.72, 0)));
       if (!showtime) ctx.setHud({ shotMeterT: k, shotMeterGreen: hudGreen });
       // DUNK-FANATIC: the RIM PROTECTOR leaves the floor to meet me — a swat (REJECTED) or a body to go over
-      if (protector && protectorK !== null && !protectorUp && k >= protectorK && protector.stunSec === 0 && !protector.floored && distXZ(protector.char.root.position, me.char.root.position) <= RIM_PROTECT.range) {   // in range WHEN he leaves the floor
+      if (protector && protectorK !== null && !protectorUp && !bumped && k >= protectorK && protector.stunSec === 0 && !protector.floored && distXZ(protector.char.root.position, me.char.root.position) <= RIM_PROTECT.range) {   // in range WHEN he leaves the floor (`!bumped`: the body that took the poster does not also swat it)
         protectorUp = true; protector.jumpAge = 0; if (foeHandUp === protector) { foeHandUp.tree.releaseHold(); foeHandUp = null; }
         protector.tree.beat('bball_block_reach'); SoundKit.play('whoosh', { pitch: 1.15, volume: 0.35 });
         console.info(`[3V3-DEF] rim protector jumps at k ${k.toFixed(2)}`);
@@ -1777,7 +1777,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const ride = posterRide(c.bumpK, POSTER_RELEASE_K, k); const v = posterVictim.body.char.root.position;
         { const r = chestRide(posterVictim.plant, me.char.root.position, c.dir, ride.s); v.x = r.x; v.z = r.z; }   // DUNK-FANATIC: ON my chest, bowled back
         v.y = ride.lift;
-        if (!posterVictim.reacted && ride.s > 0.35) { posterVictim.reacted = true; posterVictim.body.tree.beat('bball_contact_react', { fadeSec: 0.05, holdEnd: true }); }
+        if (!posterVictim.reacted && ride.s > 0.35) { posterVictim.reacted = true; posterVictim.body.tree.beat('bball_contact_react', { fadeSec: 0.14, holdEnd: true }); }
       }
       if (posterVictim && (k >= POSTER_RELEASE_K || (hangLeft > 0 && k >= RIM_HANG.k))) posterVictimRelease(ctx);   // DUNK-FANATIC: down as the ball goes through, BEFORE the hang
       if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
@@ -2448,7 +2448,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const away = me.char.root.position.subtract(by.char.root.position); away.y = 0; away.normalize();
     ballSim.launch(from, away.scale(2.2).add(new Vector3((Math.random() - 0.5) * 1.5, 1.0, 0)));
     gather = null; me.shotWin = 'release'; me.shotSec = 0;
-    if (finish) finish.released = true; else me.tree.beat('bball_follow_through', { fadeSec: 0.1 });
+    if (finish) finish.released = true; else me.tree.beat('bball_follow_through', { fadeSec: 0.2 });
     SoundKit.play('impact', { pitch: 0.75, volume: 0.55 }); SoundKit.play('crowdGroan', { volume: 0.4 });
     ctx.feel?.impact?.(0.4); ctx.juice.shake(0.08, 100);
     ctx.setHud({ shotType: '', shotMeterT: 0, banner: by.jumpAge <= HAND_UP_SEC ? 'BLOCKED!' : 'BLOCKED — HAND IN THE SHOT!' });
@@ -2803,8 +2803,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // BIOMECH-HOOPS-WAVE1: the rival's jumper flows into the held follow-through (G5) and the ball FLIES (G6)
     if (finishStyle === 'layup') {
       if (!tellPlan) { const side: 'right' | 'left' = shooter.char.root.position.x < RIM.x ? 'left' : 'right'; shooter.tree.beat(FINISH_CLIP.layup[side], { fadeSec: 0.08, holdEnd: true }); }   // the tell already started it
-    } else if (tellPlan) shooter.tree.beat('bball_follow_through', { fadeSec: 0.1 });   // the rise played from the tell; this is the release
-    else shooter.tree.beat('jumpshot', { onSettle: () => shooter.tree.beat('bball_follow_through', { fadeSec: 0.1 }) });
+    } else if (tellPlan) shooter.tree.beat('bball_follow_through', { fadeSec: 0.2 });   // the rise played from the tell; this is the release
+    else shooter.tree.beat('jumpshot', { onSettle: () => shooter.tree.beat('bball_follow_through', { fadeSec: 0.2 }) });
     shooter.shotWin = 'release'; shooter.shotSec = 0;
     // the contest my team put on him decides how he misses: a hand in his face is short off the front
     mateMiss = {

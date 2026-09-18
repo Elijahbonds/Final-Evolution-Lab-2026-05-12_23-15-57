@@ -23,7 +23,7 @@ import { boneNode, findBone } from './boneLookup';
 // ── Blend tree ─────────────────────────────────────────────────────────────
 export type BasketballAnimState =
   | 'idle_dribble' | 'speed_dribble' | 'walk_dribble' | 'sprint_dribble' | 'crossover' | 'crossover_right' | 'protect'   // DRIBBLE GEARS (2026-09-17): walk / jog / sprint loops
-  | 'drive' | 'gather' | 'shot_release' | 'layup' | 'dunk'
+  | 'drive' | 'run' | 'gather' | 'shot_release' | 'layup' | 'dunk'   // ANIM CLEAN-UP (2026-09-18): 'run' is the ball-less run; 'drive' is the sprint WITH the ball
   | 'contact_stagger' | 'defend_slide' | 'defend_slide_right' | 'defend_idle' | 'box_out'
   | 'defend_backpedal' | 'closeout' | 'defend_slide_hard' | 'defend_slide_hard_right'   // DEFENSE-LOOK (2026-09-17): the retreat, the closeout, the sat-down slide
   | 'watch'
@@ -78,7 +78,12 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   crossover:       { clip: 'bball_crossover_left', loop: false, fadeSec: 0.08 },
   crossover_right: { clip: 'bball_crossover_right', loop: false, fadeSec: 0.08 },
   protect:         { clip: 'bball_defend_stance', loop: true, fadeSec: 0.2 },
-  drive:           { clip: 'run_forward', loop: true, fadeSec: 0.1 },
+  // ANIM CLEAN-UP (owner, 2026-09-18: "fix the off arm while running"). The DRIVE — a sprint at the rim with the ball —
+  // played the plain run: both arms pumping while the ball-carry IK dragged the ball arm back to the bounce beside the
+  // hip, so the off arm swung like a sprinter's and the ball arm stuck out behind. The dribbling sprint capture (78_06)
+  // already carries a ball: the off arm rides low and balanced, the ball arm's cadence matches the bounce.
+  drive:           { clip: 'bball_dribble_run', loop: true, fadeSec: 0.12 },
+  run:             { clip: 'run_forward', loop: true, fadeSec: 0.1 },
   gather:          { clip: 'dunk_charge_gather', loop: true, fadeSec: 0.08 },
   shot_release:    { clip: 'bball_shoot_jumper', loop: true, fadeSec: 0.06 },
   layup:           { clip: 'bball_layup_gather', loop: false, fadeSec: 0.08 },
@@ -124,7 +129,7 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
         : 'defend_idle';
   } else if (i.crossover) state = i.crossoverDir === 'right' ? 'crossover_right' : 'crossover';
   else if (i.driving && i.hasBall) state = 'drive';
-  else if (i.speed01 > 0.15) state = i.hasBall ? (i.speed01 < 0.42 ? 'walk_dribble' : i.speed01 > 0.74 ? 'sprint_dribble' : 'speed_dribble') : 'drive';   // DRIBBLE GEARS: the loop follows the gear (walk 1.6 / jog 4.2 / sprint 6.4 m/s of 6.4)
+  else if (i.speed01 > 0.15) state = i.hasBall ? (i.speed01 < 0.42 ? 'walk_dribble' : i.speed01 > 0.74 ? 'sprint_dribble' : 'speed_dribble') : 'run';   // DRIBBLE GEARS: the loop follows the gear (walk 1.6 / jog 4.2 / sprint 6.4 m/s of 6.4)
   else if (i.nearestDefender < 1.4 && i.hasBall) state = 'protect';
   else state = i.hasBall ? 'idle_dribble' : 'watch';
   return { state, ...CLIP_FOR[state] };
@@ -172,7 +177,7 @@ export class BasketballAnimTree {
   /** The stride rate for the loop that is running, smoothed so a cadence never stutters. */
   private strideFilter = new StrideRateFilter();
   private strideClip: string | null = null;
-  constructor(private animator: Pick<CharacterAnimator, 'play' | 'setPlaybackScale'>) {}
+  constructor(private animator: Pick<CharacterAnimator, 'play' | 'setPlaybackScale'> & Partial<Pick<CharacterAnimator, 'freezeAtEnd'>>) {}
   /** The stride references for THIS rig: a body running the CMU loops paces against their stride, not the authored one. */
   private get ref() { return strideRef(!!(this.animator as { clipNames?: Set<string> }).clipNames?.has('bball_mc_run')); }
 
@@ -185,7 +190,7 @@ export class BasketballAnimTree {
   private static readonly DWELL_SEC = 0.22;
   private static readonly DWELL_GROUPS: ReadonlyArray<ReadonlySet<BasketballAnimState>> = [
     new Set(['defend_idle', 'defend_slide', 'defend_slide_right', 'defend_slide_hard', 'defend_slide_hard_right', 'defend_backpedal', 'closeout', 'box_out']),
-    new Set(['idle_dribble', 'protect', 'speed_dribble', 'walk_dribble', 'sprint_dribble', 'drive', 'watch']),
+    new Set(['idle_dribble', 'protect', 'speed_dribble', 'walk_dribble', 'sprint_dribble', 'drive', 'run', 'watch']),
   ];
   private sameGroup(a: BasketballAnimState | null, b: BasketballAnimState): boolean {
     return !!a && BasketballAnimTree.DWELL_GROUPS.some((g) => g.has(a) && g.has(b));
@@ -260,6 +265,9 @@ export class BasketballAnimTree {
       loop: false, fadeSec: opts.fadeSec ?? 0.1, speedRatio: opts.speedRatio ?? 1, restart: true,   // POLISH: 0.08 → 0.10 — the reach and hand-up beats out of a stance popped a wrist 1 m in a frame
       onEnd: () => {
         if (this.token !== tok) return;   // cut by a newer beat / hold / release / reset
+        // ANIM CLEAN-UP (2026-09-18): the ended beat is parked on its last frame so whatever follows FADES from it — an
+        // ended group is stopped, and a settle from a stopped group is a one-frame snap (0.6–0.9 m hand jumps, measured)
+        this.animator.freezeAtEnd?.(clip);
         if (opts.holdEnd) { opts.onSettle?.(); return; }   // the pose holds where the clip left it; the override stands until the next beat / release
         this.override = null; this.current = null;
         if (state) this.settledState = state;

@@ -418,10 +418,14 @@ export function classifyShot(shooter: Vector3, moveVel: Vector3, hoop: Vector3, 
   // AN EMPTY LANE IS A DIFFERENT SHOT. Arriving at the rim at speed with nobody home, you do not shield the ball
   // and lay it against the glass — you reach past the iron and roll it off the fingers. Same band as the layup,
   // and the read that separates them is the only one that matters here: whether anybody is there.
-  if (dist < 2.2 && contest01 <= FINGER_ROLL_MAX_CONTEST && speed >= FINGER_ROLL_MIN_SPEED) {
+  // THE RUNNING LAYUP (owner, 2026-09-18: "better layups"): a body DRIVING at the rim gathers from further out — the
+  // stride carries it the last metre — so the band reaches 3.0 m at speed straight in (a standing body still needs 2.2)
+  const drivingIn = speed >= 3 && awaySpeed < -0.6 * speed;
+  const layupBand = drivingIn ? 3.0 : 2.2;
+  if (dist < layupBand && contest01 <= FINGER_ROLL_MAX_CONTEST && speed >= FINGER_ROLL_MIN_SPEED) {
     return { style: 'fingerRoll', label: 'FINGER ROLL', pctMod: 1.22, drift: 'none' };
   }
-  if (dist < 2.2) return { style: 'layup', label: 'LAYUP', pctMod: 1.18, drift: 'none' };
+  if (dist < layupBand) return { style: 'layup', label: 'LAYUP', pctMod: 1.18, drift: 'none' };
   if (dist < FLOATER_RANGE) return { style: 'floater', label: 'FLOATER', pctMod: 1.0, drift: 'none' };
   return { style: 'jumper', label: 'JUMPER', pctMod: 0.95, drift: 'none' };
 }
