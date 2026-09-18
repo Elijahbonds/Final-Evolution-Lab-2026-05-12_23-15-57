@@ -5,7 +5,9 @@
 // liveness probes, GKE/Kubernetes probes, and most uptime monitors all default to /healthz. A liveness
 // endpoint nothing probes is a liveness endpoint that does not exist.
 //
-// It DELEGATES rather than duplicating: two handlers that could disagree about whether the service is up is
-// worse than one, and the failure mode would be the confusing kind — a monitor saying healthy while the real
-// check says otherwise.
-export { GET, dynamic, runtime } from '../api/health/route';
+// It DELEGATES rather than duplicating the handler, but keeps the route segment
+// config local. Next only recognizes these exports when they are string literals.
+export { GET } from '../api/health/route';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';

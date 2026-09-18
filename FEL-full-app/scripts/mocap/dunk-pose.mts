@@ -80,8 +80,8 @@ for (let f = FROM; f <= TO; f += STEP) {
 // first over-the-head key; everything else (the off hand, the torso, the legs) stays the capture's.
 const CARRY = { from: Number(flag('carry-from', '0.65')), to: Number(flag('carry-to', '0.95')) };
 // The OFF hand's rise into the reach: the capture's 0.9 → 0.95 key climbs 0.62 m (12.8 m/s on the hero); live it was a 0.34 m
-// one-frame pop of the left palm at clip 0.94 on a self-lob make. It rises over 0.85 → 1.0 with the body instead.
-const RISE = { from: Number(flag('rise-from', '0.85')), to: Number(flag('rise-to', '1.0')) };
+// one-frame pop of the left palm at clip 0.94 on a self-lob make. It rises over 0.85 → 1.05 with the body instead.
+const RISE = { from: Number(flag('rise-from', '0.85')), to: Number(flag('rise-to', '1.05')) };
 /** A hand straight from the capture's key at `from` to its key at `to` (the keys between are the capture's whip). */
 function span(hand: 'lh' | 'rh', from: number, to: number): void {
   const kFrom = raw.find((k) => k.t >= from - 1e-6), kTo = raw.find((k) => k.t >= to - 1e-6);

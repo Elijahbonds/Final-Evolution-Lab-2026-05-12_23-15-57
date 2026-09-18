@@ -1,4 +1,4 @@
-import { Barlow_Condensed, IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google'
+import type { CSSProperties } from 'react'
 import './globals.css'
 import './theme.css'
 // M95 (Pass 2): mobile canvas fix — on portrait phones the shared 16:10 game
@@ -11,9 +11,11 @@ import { ChunkLoadErrorHandler } from '@/components/chunk-load-error-handler'
 
 export const dynamic = 'force-dynamic'
 
-const barlow = Barlow_Condensed({ subsets: ['latin'], weight: ['500', '600', '700', '800'], variable: '--font-display' })
-const plexSans = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-sans' })
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
+const fontVariables = {
+  '--font-display': '"Arial Narrow", "Roboto Condensed", "Helvetica Neue", sans-serif',
+  '--font-sans': 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  '--font-mono': '"JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace',
+} as CSSProperties
 
 // A shared link is the product's first impression, so the card carries the page's own
 // promise. It used to read "Premium athlete-development game — train, compete, evolve":
@@ -49,7 +51,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`${barlow.variable} ${plexSans.variable} ${jetbrainsMono.variable} font-sans min-h-screen bg-[#050505]`}>
+      <body className="font-sans min-h-screen bg-[#050505]" style={fontVariables}>
         <Providers>
           {children}
           <Toaster theme="dark" position="top-center" />
