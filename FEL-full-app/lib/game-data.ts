@@ -156,6 +156,8 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   dunkContest: { name: 'Flight Night', venue: 'Venice Beach Court', href: '/play/dunk' },
   tennis: { name: 'Match Point', venue: 'Venice Tennis Court', href: '/play/tennis' },
   brainBrawl: { name: 'Brain Brawl', venue: 'NeuroArena', href: '/play/brain-brawl' },
+  aeroAces: { name: 'Aero Aces', venue: 'Gate Run', href: '/play/aero-aces' },
+  velocityKart: { name: 'Velocity Kart', venue: 'The Circuit', href: '/play/velocity-kart' },
   skateboarding: { name: 'Venice Lines', venue: 'Venice Skatepark', href: '/play/skateboard' },
   soccer: { name: 'Twelve Yards', venue: 'Coastal FC Stadium', href: '/play/soccer' },
   baseball: { name: 'Moonshot Derby', venue: 'Catalina Ballpark', href: '/play/baseball' },

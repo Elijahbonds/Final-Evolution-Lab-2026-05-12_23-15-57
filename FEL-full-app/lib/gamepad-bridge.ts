@@ -12,7 +12,6 @@ import {
   resolveShoulders,
   resolveLook,
   SHOULDER_PAD_INDEX,
-  AXIS_INDEX,
   stickToDirs,
   type ShoulderSlot,
 } from './input/controller-map';

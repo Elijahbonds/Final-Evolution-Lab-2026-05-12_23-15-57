@@ -32,6 +32,7 @@ import SongPanel from './SongPanel';   // lane 2 M2–M4 — sections, chain, ta
 import { padFromAction } from './Flip';
 import { HostLobby } from '@/components/controller-link/host-lobby';   // M1b — the phone is the pad controller
 import { MODE_CONTROLLERS } from '@/lib/controller-link/schemas/registry';
+import type { GameProps } from '@/components/games/game-shell';
 
 const STEPS = 16;
 const EXPIRE_S = 0.25;
@@ -81,6 +82,7 @@ type Mode = 'build' | 'perform';
 
 export default function StudioMode({
   onPublish,
+  onEnd,
   profile = { id: 'me', name: 'You' },
   spendShards,
 }: {
@@ -88,10 +90,11 @@ export default function StudioMode({
   profile?: { id: string; name: string };
   /** SHARDS SEAM — wire to the real economy; absent = allowed + logged. */
   spendShards?: (cost: number, reason: string) => Promise<boolean>;
-}) {
+} & GameProps) {
   const engineRef = useRef<AudioEngine | null>(null);
   const modeRef = useRef<Mode>('build');
   const expectedRef = useRef<{ step: number; time: number }[]>([]);
+  const performanceStartedAtRef = useRef<number | null>(null);
   const playerRef = useRef<HTMLAudioElement | null>(null);
   const [ready, setReady] = useState(false);
   const [view, setView] = useState<View>('studio');
@@ -222,6 +225,33 @@ export default function StudioMode({
       setCombo(0);
       setJudgement('EARLY');
     }
+  };
+
+  const completeSession = (): void => {
+    const noteCount = tracks.reduce((sum, track) => sum + track.pattern.filter(Boolean).length, 0);
+    const activeTracks = tracks.filter((track) => track.pattern.some(Boolean)).length;
+    const finalScore = Math.max(0, Math.round(score + combo * 25 + noteCount * 5));
+    const startedAt = performanceStartedAtRef.current;
+    engineRef.current?.stop();
+    setPlaying(false);
+    setPlayhead(-1);
+    setMode('build');
+    onEnd?.({
+      score: finalScore,
+      won: finalScore >= 500,
+      duration: startedAt ? Math.max(1, Math.round((performance.now() - startedAt) / 1000)) : 0,
+      headline: finalScore >= 500 ? 'GROOVE LOCKED' : 'SESSION COMPLETE',
+      maxCombo: combo,
+      stats: {
+        bpm,
+        swing: Number(swing.toFixed(2)),
+        activeTracks,
+        noteCount,
+        kit,
+        polished,
+      },
+      outcome: finalScore >= 500 ? 'performance-ready' : 'practice-take',
+    });
   };
 
   const publishTrack = async (): Promise<void> => {
@@ -394,10 +424,23 @@ export default function StudioMode({
 
           <div style={S.row}>
             <button style={{ ...S.tab, ...(mode === 'build' ? S.tabOn : {}) }} onClick={() => setMode('build')}>BUILD</button>
-            <button style={{ ...S.tab, ...(mode === 'perform' ? S.tabOn : {}) }} onClick={() => { setMode('perform'); setScore(0); setCombo(0); }}>PERFORM</button>
+            <button
+              style={{ ...S.tab, ...(mode === 'perform' ? S.tabOn : {}) }}
+              onClick={() => {
+                performanceStartedAtRef.current = performance.now();
+                expectedRef.current = [];
+                setMode('perform');
+                setScore(0);
+                setCombo(0);
+                setJudgement('');
+              }}
+            >
+              PERFORM
+            </button>
             {mode === 'perform' && (
               <>
                 <button style={S.btn} onClick={performTap}>TAP</button>
+                <button style={S.btnAlt} onClick={completeSession}>COMPLETE SESSION</button>
                 <span style={{ fontSize: 13 }}>score {score} · combo x{combo} · {judgement}</span>
               </>
             )}

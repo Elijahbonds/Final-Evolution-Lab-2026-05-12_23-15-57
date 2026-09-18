@@ -15,6 +15,8 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
 import { CLIP_ALIASES, FALLBACK_CLIP } from '../lib/babylon/anim/clipAliases';
 import { resolveClip } from '../lib/babylon/anim/clipResolver';
 
@@ -33,17 +35,16 @@ const BAKED = new Set<string>([
 ]);
 
 // Clips authored at runtime by registerAuthoredClips() — these register under
-// their REGISTRY name against the live skeleton, so they are always available.
-const AUTHORED = new Set<string>([
-  'idle_stand', 'strafe_left', 'strafe_right', 'jump_up', 'jump_land',
-  'dunk_charge_gather', 'dunk_launch', 'dunk_360_eastbay', 'dunk_score_hang',
-  'dunk_land_crouch', 'football_juke_left', 'football_juke_right',
-  'football_spin_move', 'football_tackled_fall', 'karate_hit_react',
-  'karate_knockdown',
-]);
+// their REGISTRY name against the live skeleton, so they are available to the
+// resolver even when they are not baked into the source GLB.
+const AUTHORED_SOURCE = fs.readFileSync(path.join(__dirname, '../lib/babylon/anim/authored/index.ts'), 'utf8');
+const AUTHORED = new Set<string>(
+  [...AUTHORED_SOURCE.matchAll(/\[\s*'([^']+)'\s*,\s*\(\)\s*=>\s*build/g)].map((m) => m[1]),
+);
+const MIRRORED = new Set<string>(['keeper_dive.M']);
 
 // What a spawned character actually exposes: baked GLB groups + authored clips.
-const AVAILABLE = new Set<string>([...BAKED, ...AUTHORED]);
+const AVAILABLE = new Set<string>([...BAKED, ...AUTHORED, ...MIRRORED]);
 
 // Every clip the shipped Babylon modes request (grepped from lib/babylon/modes/*).
 const REQUESTED: string[] = [
@@ -72,11 +73,11 @@ function isCovered(name: string): boolean {
   return !!alias && AVAILABLE.has(alias[0]);          // alias to a real clip
 }
 
-check('every alias target exists in the baked GLB', () => {
+check('every alias target exists in the runtime clip set', () => {
   for (const [name, [target]] of Object.entries(CLIP_ALIASES)) {
     assert.ok(
-      BAKED.has(target),
-      `alias "${name}" points to "${target}" which is NOT a baked clip`,
+      AVAILABLE.has(target),
+      `alias "${name}" points to "${target}" which is not baked, authored, or mirrored`,
     );
   }
 });

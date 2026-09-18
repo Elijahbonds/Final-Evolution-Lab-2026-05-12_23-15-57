@@ -18,6 +18,7 @@ import {
   type MotionSample,
   type IRLSession,
 } from '@/lib/babylon/core/IRLCore';
+import type { GameProps } from '@/components/games/game-shell';
 
 const BG = '#050505';
 const CYAN = '#00E5FF';
@@ -29,7 +30,7 @@ type Phase = 'gate' | 'unsupported' | 'needs-permission' | 'live' | 'results';
 
 type DME = typeof DeviceMotionEvent & { requestPermission?: () => Promise<'granted' | 'denied'> };
 
-export default function IrlGame() {
+export default function IrlGame({ onEnd }: GameProps) {
   const [phase, setPhase] = useState<Phase>('gate');
   const [jumpCount, setJumpCount] = useState(0);
   const [bestCm, setBestCm] = useState(0);
@@ -105,9 +106,26 @@ export default function IrlGame() {
   const finish = useCallback(() => {
     stopListening();
     const jumps = detectJumps(samplesRef.current);
-    setSession(summarise(jumps));
+    const summary = summarise(jumps);
+    setSession(summary);
     setPhase('results');
-  }, [stopListening]);
+    const duration = samplesRef.current.length
+      ? Math.max(1, Math.round(samplesRef.current[samplesRef.current.length - 1].t))
+      : 0;
+    const bestCm = Math.round(summary.best * 100);
+    onEnd({
+      score: bestCm + summary.total * 10,
+      won: summary.total > 0,
+      duration,
+      headline: summary.total > 0 ? `${bestCm} CM BEST` : 'NO CLEAN JUMPS',
+      stats: {
+        bestCm,
+        averageCm: Math.round(summary.average * 100),
+        jumps: summary.total,
+      },
+      outcome: summary.total > 0 ? 'jump-verified' : 'no-jump-detected',
+    });
+  }, [stopListening, onEnd]);
 
   const reset = useCallback(() => {
     stopListening();

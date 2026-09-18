@@ -490,9 +490,12 @@ export async function applyLc(db: Db, a: ApplyLcArgs): Promise<ApplyLcResult> {
     }
     throw e;
   }
-  // Pass 5 phase 1: the profile column is no longer written — every reader takes the wallet. PlayerProfile.labCredits
-  // stays as a dead column until a schema pass removes it (seeds may still set its default; nothing reads it).
-  // the double-entry house book (CreditLedger + LedgerAccount postings) stays the audit trail
+  // Keep the legacy profile column as a mirror until every reader is retired.
+  await (db as any).playerProfile.updateMany({
+    where: { userId: a.playerId },
+    data: { labCredits: balanceAfter },
+  });
+  // The double-entry house book (CreditLedger + LedgerAccount postings) stays the audit trail.
   await postLc(db as any, { userId: a.playerId, amount: a.delta, reason: a.reasonCode, balanceAfter, dedupeKey: a.idempotencyKey, metadata: (a.metadata ?? {}) as any });
   return { entryId: entry.id, delta: a.delta, balanceAfter, replayed: false };
 }

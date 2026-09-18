@@ -19,6 +19,7 @@ import {
   type PerformanceResult,
   type LineIntensity,
 } from '@/lib/babylon/core/ActingCore';
+import type { GameProps } from '@/components/games/game-shell';
 
 // Palette (design tokens).
 const BG = '#050505';
@@ -44,7 +45,7 @@ function supportsMic(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof AudioContext !== 'undefined';
 }
 
-export default function ActingGame() {
+export default function ActingGame({ onEnd }: GameProps) {
   const [phase, setPhase] = useState<Phase>('menu');
   const [scene, setScene] = useState<Scene>(ACTING_SCENES[0]);
   const [elapsed, setElapsed] = useState(0);
@@ -59,6 +60,7 @@ export default function ActingGame() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
   const t0Ref = useRef(0);
+  const endPostedRef = useRef(false);
 
   // Per-line capture state.
   const deliveriesRef = useRef<Record<string, Delivery>>({});
@@ -122,6 +124,7 @@ export default function ActingGame() {
       deliveriesRef.current = {};
       activeRef.current = null;
       holdingRef.current = false;
+      endPostedRef.current = false;
       setResult(null);
       setCurrentIdx(0);
       setHolding(false);
@@ -162,11 +165,27 @@ export default function ActingGame() {
   }, []);
 
   const finish = useCallback(() => {
+    if (endPostedRef.current) return;
     const res = scorePerformance(scene, deliveriesRef.current);
+    endPostedRef.current = true;
     setResult(res);
     cleanupAudio();
     setPhase('results');
-  }, [scene, cleanupAudio]);
+    const score = Math.round(res.average * 1000);
+    onEnd({
+      score,
+      won: res.stars >= 3,
+      duration: t0Ref.current ? Math.max(1, Math.round((performance.now() - t0Ref.current) / 1000)) : 0,
+      headline: `${res.stars}/5 STARS`,
+      stats: {
+        scene: scene.id,
+        linesDelivered: res.perLine.length,
+        stars: res.stars,
+        average: Number(res.average.toFixed(3)),
+      },
+      outcome: res.stars >= 3 ? 'stage-ready' : 'rehearsal-needed',
+    });
+  }, [scene, cleanupAudio, onEnd]);
 
   // Auto-finish once every line has been delivered.
   useEffect(() => {

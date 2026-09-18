@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MODE_INFO } from './game-data';
+import { MP_MODES, sessionModeFor } from './mp/match-core';
 import {
   HIDDEN_FROM_MODE_MENU,
   MODE_MENU_META,
@@ -30,6 +31,18 @@ describe('mode menu contract', () => {
       expect(meta.desc.trim().length, `${key} description`).toBeGreaterThan(24);
       expect(meta.icon, `${key} icon`).toBeTruthy();
     }
+  });
+
+  it('has mode info for every challengeable session mode', () => {
+    const missing = [...new Set(MP_MODES.map((mode) => sessionModeFor(mode.key)))]
+      .filter((key) => !(key in MODE_INFO));
+    expect(missing).toEqual([]);
+  });
+
+  it('keeps standalone multiplayer routes discoverable from the game-mode grid', () => {
+    const visible = new Set(visibleModeEntries().map(([key]) => key));
+    expect(visible.has('aeroAces')).toBe(true);
+    expect(visible.has('velocityKart')).toBe(true);
   });
 
   it('only hides keys that exist in MODE_INFO', () => {

@@ -150,7 +150,8 @@ check('physical poller wires shoulders + right stick through the shared map', ()
   assert.ok(/from '\.\/input\/controller-map'/.test(bridge), 'poller imports the controller map');
   assert.ok(/resolveShoulders\(/.test(bridge), 'poller maps the shoulder array');
   assert.ok(/SHOULDER_PAD_INDEX/.test(bridge), 'poller uses per-slot button indices');
-  assert.ok(/resolveLook\(/.test(bridge) && /AXIS_INDEX\.rightX/.test(bridge), 'poller reads the right stick');
+  assert.ok(/readPad\(/.test(bridge), 'poller normalizes physical pads through input profiles');
+  assert.ok(/resolveLook\(/.test(bridge) && /stickToDirs\(c\.rx,\s*c\.ry\)/.test(bridge), 'poller reads the normalized right stick');
 });
 
 check('VirtualController renders shoulders + dormant look stick via the shared map', () => {
