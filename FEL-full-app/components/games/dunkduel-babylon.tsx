@@ -82,7 +82,8 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
       if (canvasOwner.get(canvas) === token) stop?.();
       busRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps — onEnd via ref, mount once
+    // onEnd is read through a ref; this stage owns one mount lifecycle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {

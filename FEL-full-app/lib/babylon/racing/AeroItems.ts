@@ -78,7 +78,7 @@ export interface Target { id: number; pos: Vector3; protected: boolean }
  * Fire what you hold. Returns what it made and what the firer gets (a boost zip, a shield) — the caller spends the item.
  * `ahead` is the nearest racer in front (homing target), `aim` is the firer's forward.
  */
-export function useItem(item: HeldItem, owner: number, from: Vector3, aim: Vector3, back: Vector3, ahead: number | null): {
+export function fireItem(item: HeldItem, owner: number, from: Vector3, aim: Vector3, back: Vector3, ahead: number | null): {
   missiles: Missile[]; mines: Mine[]; boostSec: number; shieldSec: number;
 } {
   const out = { missiles: [] as Missile[], mines: [] as Mine[], boostSec: 0, shieldSec: 0 };

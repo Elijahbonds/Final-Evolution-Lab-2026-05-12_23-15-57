@@ -54,7 +54,7 @@ import {
   addToChain, boostEarnForStunt, emptyChain, noHug, stepChain, stepHug, stuntById,
 } from '../racing/AeroTricks';
 import {
-  collectBalloon, balloonsHit, stepBalloons, useItem, stepMissiles, stepMines, bananasAfterHit, segDist,
+  collectBalloon, balloonsHit, stepBalloons, fireItem, stepMissiles, stepMines, bananasAfterHit, segDist,
   BALLOON_RESPAWN_SEC, BANANA_RADIUS, BANANA_CAP, ITEM_LABEL, ITEM_KINDS,
   type Balloon, type Banana, type HeldItem, type Missile, type Mine, type Target, type ItemKind,
 } from '../racing/AeroItems';
@@ -231,7 +231,7 @@ export function makeAeroAcesMode(): ModeDefinition {
     if (!S.held) { refuse(ctx, 'NO ITEM — FLY THROUGH A BALLOON'); return; }
     if (flight.spinT > 0) { refuse(ctx, 'SPINNING'); return; }
     const fwd = forwardOf(flight);
-    const out = useItem(S.held, PLAYER_ID, flight.pos, fwd, fwd.scale(-1), targetAhead(PLAYER_ID, playerDist()));
+    const out = fireItem(S.held, PLAYER_ID, flight.pos, fwd, fwd.scale(-1), targetAhead(PLAYER_ID, playerDist()));
     missiles.push(...out.missiles); mines.push(...out.mines);
     if (out.boostSec) { S.zipT = Math.max(S.zipT, out.boostSec); SoundKit.play('whoosh', { pitch: 1.2, volume: 0.6 }); ctx.feel.impact(0.3); say('ZIP!', 0.6); }
     if (out.shieldSec) { S.shieldT = out.shieldSec; SoundKit.play('powerUp', { pitch: 1.1, volume: 0.5 }); say('SHIELD UP', 0.7); }
@@ -513,7 +513,7 @@ export function makeAeroAcesMode(): ModeDefinition {
           else if (k.item.kind === 'mine') use = gapToPlayer < -8 && gapToPlayer > -90 && Math.random() < dt * 0.5;
           else use = Math.random() < dt * 0.35;
           if (use) {
-            const out = useItem(k.item, i + 1, rp.root.position, aim, aim.scale(-1), targetAhead(i + 1, r.dist));
+            const out = fireItem(k.item, i + 1, rp.root.position, aim, aim.scale(-1), targetAhead(i + 1, r.dist));
             missiles.push(...out.missiles); mines.push(...out.mines);
             if (out.boostSec) k.zipT = out.boostSec;
             if (out.shieldSec) k.shieldT = out.shieldSec;
