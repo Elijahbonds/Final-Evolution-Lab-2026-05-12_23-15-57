@@ -487,9 +487,12 @@ for (let n = 0; n < POSSESSIONS; n++) {
       // gathered stride, so the last beat comes off the gas.
       // …and the drive is measured, not timed: a fixed 1200 ms put me anywhere from the block to past the baseline
       // depending on what the defender did, which is most of the variance between two runs of the same play.
-      await driveToRim(2.6);
-      await agent(`a.act({ moveX: 0, moveY: 0.45, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
-      await agent(`a.act({ moveX: 0, moveY: 0.45, actionHeld: 0, action: true }, 80)`);
+      // ACROBATIC LAYUPS (2026-09-18): the running layup band is 3.0 m AT SPEED (≥ 3 m/s driving in). 0.45 on the stick after
+      // a 130 ms gap let the dribble decay under 3 m/s before the squeeze (decel 34 m/s²), so every "layup" here was a
+      // PULL-UP from 2.6 m. 0.8 keeps the pace under the sprint threshold (0.85 → a dunk) and the press comes at once.
+      await driveToRim(2.9);
+      await agent(`a.act({ moveX: 0, moveY: 0.8, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
+      await agent(`a.act({ moveX: 0, moveY: 0.8, actionHeld: 0, action: true }, 80)`);
     }
 
     // WHAT DID THE SQUEEZE ACTUALLY DO? A possession that reports "meter 0.00, no beats, no points" is not evidence of

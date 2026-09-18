@@ -17,7 +17,7 @@ export const NET_DROP_NUDGE = 0.5;
 
 /** A finish at the rim drops; everything shot at the iron from further out swishes through with its own pace. */
 export function netExitKindOf(style: ShotStyle): NetExitKind {
-  return style === 'layup' || style === 'reverse' || style === 'mikan' || style === 'upAndUnder' || style === 'fingerRoll' ? 'layup' : 'jumper';
+  return style === 'layup' || style === 'reverse' || style === 'mikan' || style === 'upAndUnder' || style === 'fingerRoll' || style === 'scoop' || style === 'spinLayup' || style === 'hangLayup' ? 'layup' : 'jumper';
 }
 /** The ball's velocity as it leaves the net. `forward` is the court's direction from the rim (default +z), planar. */
 export function netExitVelocity(kind: NetExitKind, forward: { x: number; z: number } = { x: 0, z: 1 }): { x: number; y: number; z: number } {

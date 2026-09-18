@@ -76,6 +76,8 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
 import { attachBallToHand, releaseBall } from '../anim/ballRig';
+import { mountRimReach, rimReachWeight, type RimReachHandle } from '../anim/rimReach';   // HAND AND RIM (owner, 2026-09-18)
+import { isFinishStyle } from '../core/HoopsMoves';
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
 import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-in: ?net=<room> seats a human in the first AI slot
@@ -245,6 +247,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   // THE SHOT METER (owner, 2026-09-18): the world bar beside the shooter's head + the HUD's green window, fed by the
   // same ShotMeter numbers the release is graded by
   let meter3d: ShotMeter3DHandle | null = null; let hudGreen = '';
+  let meReach: RimReachHandle | null = null;   // HAND AND RIM: the dunk's hand onto the ring
   const meterStart = (contest: number, style?: Parameters<ShotMeter['start']>[1], gather?: number): void => {
     shotMeter.start(contest, style ?? 'jumper', gather ?? 0);
     hudGreen = `${shotMeter.greenCenter01.toFixed(3)},${shotMeter.greenHalfWidth01.toFixed(3)}`;
@@ -576,6 +579,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       shotTrail?.dispose(); shotTrail = EffectsKit.ballTrail(ctx.scene, ball); shotTrailLevel = 'soft'; applyTrail(shotTrail, 'off'); shotTrailLevel = 'off';
       carries.forEach((c) => c.dispose()); carries.clear();
       for (const b of [me, ...mates]) carries.set(b, mountBallCarry({ scene: ctx.scene, ball, root: b.char.root, skeleton: b.char.skeleton }));
+      meReach?.dispose(); meReach = mountRimReach({ scene: ctx.scene, skeleton: me.char.skeleton, root: me.char.root, ball, rim: RIM, ringR: RIM_RADIUS });
       ballSim = new BallSim(ball, 0.12);
       shotMeter = new ShotMeter();
       turbo = new TurboMeter();
@@ -1440,8 +1444,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           console.info(`[3V3-SHOT] gather ${currentShot.style} rim ${distXZ(me.char.root.position, RIM_FLOOR).toFixed(2)} speed ${Math.hypot(me.drib.vel.x, me.drib.vel.z).toFixed(1)} contest ${contest.toFixed(2)}`);
           // HOOPS-MOVE-KIT-A: a layup / floater is a FINISH (M3); a jumper GATHERS first (M1) — a set body rises at once.
           // HOOPS-MOVE-KIT-B: the hook (M5) and the fadeaway (M4) are finishes too — their own clip, their own hop.
-          if (currentShot.style === 'layup' || currentShot.style === 'floater' || currentShot.style === 'hook' || currentShot.style === 'fadeaway' || currentShot.style === 'reverse') startFinish(ctx, currentShot.style, stickShot?.shimmy ? contest * 0.55 : contest, nearestFoePos, stickShot?.side); if (stickShot) { stickShot.started = true; console.info(`[3V3-STICK] post hook ${stickShot.side}${stickShot.shimmy ? ' (shimmy)' : ''}`); }
+          // THE DANGLING ELSE (2026-09-18, the 1v1's): the else bound to the stick check, so every finish also started the rise
+          if (isFinishStyle(currentShot.style)) startFinish(ctx, currentShot.style, stickShot?.shimmy ? contest * 0.55 : contest, nearestFoePos, stickShot?.side);
           else startRise(ctx, contest, wish.x, -wish.z);
+          if (stickShot) { stickShot.started = true; console.info(`[3V3-STICK] post hook ${stickShot.side}${stickShot.shimmy ? ' (shimmy)' : ''}`); }
           aiContestLoad();   // D1/D3: the nearest defender puts a hand up on the load, or times a block jump to the green
         }
       }
@@ -1501,6 +1507,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     dispose() {
       net?.dispose(); net = null;
       carries.forEach((c) => c.dispose()); carries.clear();
+      meReach?.dispose(); meReach = null;
       for (const b of [me, ...mates, ...foes]) { b?.posture?.dispose(); if (b) b.posture = null; }   // BIOMECH-HOOPS-WAVE1
       threeVenue?.dispose(); threeVenue = null;  // M74
       me?.char.dispose(); mates.forEach((m) => m.char.dispose()); foes.forEach((f) => f.char.dispose());
@@ -1722,6 +1729,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       me.char.root.rotation.y = slewYaw(me.char.root.rotation.y, yawTo(me.char.root.position, RIM) + (picked3.reverse ? Math.PI : 0), FACE_RIM_RATE * (picked3.reverse ? 2 : 1), fdt);   // a REVERSE turns its back to the iron
       dunkFlight = { k, made: resolved ? made : null };
       meter3d?.set(showtime ? showtimeMeterT(k) : k, me.char.root.position.add(new Vector3(0, 1.72, 0)));
+      meReach?.set(rimReachWeight(k, DRIVE_DUNK.resolveK, swatted));   // HAND AND RIM
       if (!showtime) ctx.setHud({ shotMeterT: k, shotMeterGreen: hudGreen });
       // DUNK-FANATIC: the RIM PROTECTOR leaves the floor to meet me — a swat (REJECTED) or a body to go over
       if (protector && protectorK !== null && !protectorUp && !bumped && k >= protectorK && protector.stunSec === 0 && !protector.floored && distXZ(protector.char.root.position, me.char.root.position) <= RIM_PROTECT.range) {   // in range WHEN he leaves the floor (`!bumped`: the body that took the poster does not also swat it)
@@ -1790,7 +1798,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       }
       if (k < 1) return;
       ctx.scene.onBeforeRenderObservable.remove(obs);
-      dunking = false; dunkFlight = null; me.landSec = LAND_SEC; driveContest = null;
+      dunking = false; dunkFlight = null; me.landSec = LAND_SEC; driveContest = null; meReach?.set(0);
       if (showtimeCam) { showtimeCam = false; ctx.camDirector.toggle(); ctx.camDirector.snapTo(me.char.root.position, RIM); }   // POLISH: a cut back, not a lerp from the side camera   // SHOWTIME: the follow camera comes back
       ctx.setHud({ shotMeterT: 0 }); meter3d?.end('brick');   // a swat ends the flight with no verdict of its own
       me.tree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });   // G5: feet-down is the land crouch
@@ -1959,6 +1967,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     carries.get(me)?.update(0, 0, false);
     if (!ball.parent) attachBallToHand(ball, me.char.skeleton, 'RightHand');
     currentShot = plan.then === 'rise' ? classifyShot(me.char.root.position, me.drib.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : 1.18, drift: 'none' };
+    if (plan.then === 'rise' && isFinishStyle(currentShot.style)) plan.then = currentShot.style;   // ACROBATIC LAYUPS (2026-09-18): a hop that classifies as a finish ends IN it (the 1v1's)
     meterStart(contest, currentShot.style, plan.sec);
     gather = { plan, t: 0 };
     me.shotWin = 'footwork'; me.shotSec = 0;

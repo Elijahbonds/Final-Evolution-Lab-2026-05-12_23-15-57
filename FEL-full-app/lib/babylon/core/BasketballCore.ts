@@ -319,7 +319,7 @@ export function checkAnkleBreak(crossover: boolean, handler: Vector3, defender: 
  *  the body lay it in — was the most punished: six held layups, six misses, in both court modes. A held finish is a
  *  no-timing finish: below a timed 'good', well above a mistime. */
 export type ShotQuality = 'perfect' | 'good' | 'early' | 'late' | 'brick' | 'held';
-export type ShotStyle = 'layup' | 'floater' | 'jumper' | 'fadeaway' | 'hook' | 'reverse' | 'mikan' | 'upAndUnder' | 'fingerRoll';   // M5 the jump hook, M11 the reverse layup, 2026-09-16 the Mikan and the up-and-under
+export type ShotStyle = 'layup' | 'floater' | 'jumper' | 'fadeaway' | 'hook' | 'reverse' | 'mikan' | 'upAndUnder' | 'fingerRoll' | 'scoop' | 'spinLayup' | 'hangLayup';   // 2026-09-18: the acrobatic layups (scoop / spin / hang)   // M5 the jump hook, M11 the reverse layup, 2026-09-16 the Mikan and the up-and-under
 
 /**
  * Which way the body is going across as it rises. 'none' is straight back or planted.
@@ -347,6 +347,10 @@ export const MIKAN_RANGE = 1.15;
 export const FINGER_ROLL_MAX_CONTEST = 0.2;
 /** …and a finger roll is taken ON THE MOVE. Standing under the rim, it is a layup or a Mikan. */
 export const FINGER_ROLL_MIN_SPEED = 3.2;
+/** ACROBATIC LAYUPS (2026-09-18): the spin wants pace ACROSS the ring's face; the scoop a body on you; the hang a hand at the ring. */
+export const SPIN_LAYUP_MIN_SPEED = 3.4, SPIN_LAYUP_LATERAL = 0.5;
+export const SCOOP_MIN_CONTEST = 0.3;
+export const HANG_LAYUP_CONTEST = 0.55;
 /** Below this the body is not drifting, it is standing still with a wobble. */
 export const FADE_SPEED = 1.2;
 /**
@@ -422,6 +426,16 @@ export function classifyShot(shooter: Vector3, moveVel: Vector3, hoop: Vector3, 
   // stride carries it the last metre — so the band reaches 3.0 m at speed straight in (a standing body still needs 2.2)
   const drivingIn = speed >= 3 && awaySpeed < -0.6 * speed;
   const layupBand = drivingIn ? 3.0 : 2.2;
+  // ACROBATIC LAYUPS (owner, 2026-09-18). Inside the band, the READ picks the finish the situation asks for:
+  //   across the rim's face at speed with room → the SPIN (the acrobatic one, out of a full turn);
+  //   a body ON you (a contest, but not a wall at the ring) at speed → the SCOOP, underhand past the hand (the contact layup);
+  //   a hand waiting HIGH at the ring → the HANG: up, clutch, back up after the hand has gone by.
+  if (dist < layupBand) {
+    const lateral01 = speed > 0.1 ? Math.min(1, Math.abs(moveVel.x * toHoop.z - moveVel.z * toHoop.x) / (speed * toHoopLen)) : 0;
+    if (speed >= SPIN_LAYUP_MIN_SPEED && lateral01 >= SPIN_LAYUP_LATERAL && contest01 < 0.5) return { style: 'spinLayup', label: 'SPIN LAYUP', pctMod: 1.02, drift: 'none' };
+    if (contest01 >= HANG_LAYUP_CONTEST) return { style: 'hangLayup', label: 'HANG & FINISH', pctMod: 1.04, drift: 'none' };
+    if (contest01 >= SCOOP_MIN_CONTEST && speed >= 3) return { style: 'scoop', label: 'SCOOP', pctMod: 1.1, drift: 'none' };
+  }
   if (dist < layupBand && contest01 <= FINGER_ROLL_MAX_CONTEST && speed >= FINGER_ROLL_MIN_SPEED) {
     return { style: 'fingerRoll', label: 'FINGER ROLL', pctMod: 1.22, drift: 'none' };
   }
@@ -460,6 +474,11 @@ export class ShotMeter {
     if (style === 'mikan') { half = Math.max(0.055, half) * 1.6; rise = 0.42 - contestLevel01 * 0.06; }
     // the roll is a layup's forgiveness with a beat more reach in it
     if (style === 'fingerRoll') { half = Math.max(0.05, half) * 1.45; rise = 0.6 - contestLevel01 * 0.1; }
+    // the acrobatic layups: the scoop is a layup's bar taken through contact; the spin a beat longer for the turn; the hang the
+    // longest finish after the up-and-under, and forgiving late — the release IS late, that is the shot
+    if (style === 'scoop') { half = Math.max(0.05, half) * 1.4; rise = 0.58 - contestLevel01 * 0.08; }
+    if (style === 'spinLayup') { half = Math.max(0.05, half) * 1.3; rise = 0.66 - contestLevel01 * 0.08; }
+    if (style === 'hangLayup') { half = Math.max(0.055, half) * 1.5; rise = 0.8 - contestLevel01 * 0.06; }
     // the up-and-under is the LONGEST bar in the game and a third of it is the fake. That length is the risk: a
     // defender who does not bite has all of it to recover, which is why the reward (AI_BLOCK_BASE 0.04) is what it is.
     if (style === 'upAndUnder') { half = Math.max(0.05, half) * 1.15; rise = 0.86 - contestLevel01 * 0.1; }
@@ -897,10 +916,10 @@ export class ShotArc {
       this.to.z += 0.22;
     }
     const dist = Vector3.Distance(from, rim);
-    this.duration = style === 'layup' || style === 'reverse' ? 0.4 : Math.min(0.9, 0.45 + dist * 0.045);
+    this.duration = style === 'layup' || style === 'reverse' || style === 'scoop' || style === 'spinLayup' || style === 'hangLayup' ? 0.4 : Math.min(0.9, 0.45 + dist * 0.045);
     // HOOPS-MOVE-KIT-B: a hook goes UP and over the shoulder (a high soft arc off the block); a fadeaway is a longer,
     // higher ball because the body is falling away from the rim as it leaves
-    this.apex = (style === 'floater' ? 2.2 : style === 'layup' || style === 'reverse' ? 0.9 : style === 'hook' ? 2.0 : style === 'fadeaway' ? 1.85 : 1.6) + apexAdd;   // HOOPS-MOVE-KIT-A D3: an ALTERED release arcs higher
+    this.apex = (style === 'floater' ? 2.2 : style === 'layup' || style === 'reverse' || style === 'scoop' || style === 'spinLayup' || style === 'hangLayup' ? 0.9 : style === 'hook' ? 2.0 : style === 'fadeaway' ? 1.85 : 1.6) + apexAdd;   // HOOPS-MOVE-KIT-A D3: an ALTERED release arcs higher
     this.t = 0;
     this.active = true;
   }
@@ -910,7 +929,7 @@ export class ShotArc {
     if (!this.active) return 'flying';
     this.t = Math.min(1, this.t + dt / this.duration);
     const k = this.t;
-    if (spin) spinBackspin(spin, { x: this.to.x - this.from.x, z: this.to.z - this.from.z }, dt, this.shotStyle === 'layup' || this.shotStyle === 'reverse' ? 1.2 : 2.2);
+    if (spin) spinBackspin(spin, { x: this.to.x - this.from.x, z: this.to.z - this.from.z }, dt, this.shotStyle === 'jumper' || this.shotStyle === 'fadeaway' || this.shotStyle === 'floater' || this.shotStyle === 'hook' ? 2.2 : 1.2);
     if (this.glass) {
       // M12: the ball is thrown AT the square and comes off it — two legs, not one curve that merely leans at the board.
       // (A quadratic Bezier never reaches its control point: measured, the "bank" never got behind the ring at all.)

@@ -33,6 +33,8 @@ export const BASKETBALL_CLIPS = [
   'bball_ankle_stumble', 'bball_ankle_slip',
   'bball_stepback_gather',
   'bball_hop_step', 'bball_euro_step',
+  // ACROBATIC LAYUPS (2026-09-18): the scoop (contact), the spin, the hang / double clutch
+  'bball_layup_scoop', 'bball_layup_scoop_left', 'bball_layup_spin', 'bball_layup_spin_left', 'bball_layup_hang', 'bball_layup_hang_left',
 ] as const;
 type V3 = [number, number, number];
 
@@ -614,4 +616,58 @@ export function buildContactReact(scene: Scene, sk: Skeleton): AnimationGroup | 
     { t: 0.12, bones: { Hips: [-10, 0, 0] as Deg3, Spine: [-18, 0, 0] as Deg3, Neck: [10, 0, 0] as Deg3, LeftUpLeg: [-30, 0, 8] as Deg3, RightUpLeg: [8, 0, -6] as Deg3,   LeftLeg: [40, 0, 0] as Deg3, RightLeg: [22, 0, 0] as Deg3 }, hands: { Left: [-0.34, 1.36, 0.40] as V3, Right: [0.34, 1.36, 0.40] as V3 }, poles: front, hipsY: -0.04 },   // hit: chest back, hands up in front, a step
     { t: 0.32, bones: { Hips: [-4, 0, 0] as Deg3,  Spine: [-6, 0, 0] as Deg3,  Neck: [2, 0, 0] as Deg3,  LeftUpLeg: [-20, 0, 6] as Deg3, RightUpLeg: [-8, 0, -6] as Deg3,  LeftLeg: [28, 0, 0] as Deg3, RightLeg: [18, 0, 0] as Deg3 }, hands: { Left: [-0.32, 1.18, 0.34] as V3, Right: [0.32, 1.18, 0.34] as V3 }, poles: front },   // settling
   ]);
+}
+
+// ── ACROBATIC LAYUPS (owner, 2026-09-18: "better layups … better contact layups, acrobatic layups") ──────────────────
+// Three finishes the vocabulary did not have, each defined by ONE tell the eye can name at a glance:
+//   SCOOP  — the contact layup: the ball comes from the HIP, underhand, and is rolled up past a hand that is waiting high;
+//            the body leans back under it. The tell is the palm: UP, the arm from below.
+//   SPIN   — the acrobatic layup off a drive across the rim's face: the hips turn a full circle in the air with the ball
+//            tucked at the chest, and the finish comes out of the turn facing the iron. The tell is the turn.
+//   HANG   — the double-clutch layup against a shot blocker: the ball goes up as if to finish, is pulled DOWN to the chest
+//            while the blocker's hand passes, and goes back up late. The tell is the clutch — and the late release.
+// The release key lands on the meter's green through planFinish (FINISH_RELEASE_KEY_SEC); the modes hop the root
+// (FINISH_HOP_APEX) and ride the clip to the landing key.
+const SCOOP_POLE: V3 = [0.8, -0.55, -0.1];   // the underhand elbow: out and DOWN, never up over the ball
+const SCOOP_KEYS: PoseKey[] = [
+  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-22, 0, 6], RightUpLeg: [-22, 0, -6], LeftLeg: [34, 0, 0], RightLeg: [34, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06 },
+  { t: 0.16, bones: { Hips: [0, 0, 0], Spine: [2, 0, 0],  Neck: [-8, 0, 0],  LeftUpLeg: [-62, 0, 8], RightUpLeg: [-6, 0, -6], LeftLeg: [62, 0, 0], RightLeg: [10, 0, 0] }, hands: { Right: [0.22, 0.96, 0.50], Left: [-0.26, 1.30, 0.22] }, poles: { Right: SCOOP_POLE }, hipsY: 0.02 },   // the scoop starts LOW and forward
+  { t: 0.32, bones: { Hips: [0, 0, 0], Spine: [-12, 0, 0], Neck: [-12, 0, 0], LeftUpLeg: [-80, 0, 8], RightUpLeg: [6, 0, -6],  LeftLeg: [74, 0, 0], RightLeg: [8, 0, 0] },  hands: { Right: [0.20, 1.98, 0.52], Left: [-0.28, 1.36, 0.20] }, poles: { Right: SCOOP_POLE }, hipsY: 0.05 },   // the release: palm up, arm from below, leaning back
+  { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [-8, 0, 0],  LeftUpLeg: [-52, 0, 8], RightUpLeg: [-10, 0, -6], LeftLeg: [54, 0, 0], RightLeg: [14, 0, 0] }, hands: { Right: [0.22, 1.90, 0.38], Left: [-0.26, 1.32, 0.22] }, poles: { Right: SCOOP_POLE }, hipsY: 0.02 },
+  { t: 0.72, bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-18, 0, 6], RightUpLeg: [-18, 0, -6], LeftLeg: [28, 0, 0], RightLeg: [28, 0, 0] }, hands: { Right: [0.26, 1.14, 0.30], Left: [-0.24, 1.08, 0.26] }, hipsY: -0.05 },
+];
+export function buildScoopLayup(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
+  if (side === 'right') return buildPoseClip(scene, sk, 'bball_layup_scoop', 0.72, SCOOP_KEYS);
+  return buildPoseClip(scene, sk, 'bball_layup_scoop_left', 0.72, SCOOP_KEYS.map(mirrorKey));
+}
+
+/** The spin: a full turn of the HIPS (the root bone — the whole body turns with it) through the hop, the ball tucked in two
+ *  hands at the chest, out of the turn facing the iron with the ball hand up. Yaw is keyed in 120° steps so the quaternion
+ *  interpolation takes the short way round each time. */
+const SPIN_LAYUP_KEYS: PoseKey[] = [
+  { t: 0,    bones: { Hips: [0, 0, 0],   Spine: [12, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-22, 0, 6], RightUpLeg: [-22, 0, -6], LeftLeg: [34, 0, 0], RightLeg: [34, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06 },
+  { t: 0.12, bones: { Hips: [0, 120, 0], Spine: [6, 0, 0],  Neck: [-6, 0, 0],  LeftUpLeg: [-52, 0, 8], RightUpLeg: [-48, 0, -8], LeftLeg: [68, 0, 0], RightLeg: [64, 0, 0] }, hands: { Right: [0.12, 1.32, 0.22], Left: [-0.12, 1.32, 0.22] }, hipsY: 0.02 },   // tucked, both hands on the ball
+  { t: 0.24, bones: { Hips: [0, 240, 0], Spine: [2, 0, 0],  Neck: [-6, 0, 0],  LeftUpLeg: [-56, 0, 8], RightUpLeg: [-44, 0, -8], LeftLeg: [70, 0, 0], RightLeg: [60, 0, 0] }, hands: { Right: [0.14, 1.52, 0.18], Left: [-0.14, 1.52, 0.18] }, hipsY: 0.04 },
+  { t: 0.34, bones: { Hips: [0, 360, 0], Spine: [-8, 0, 0], Neck: [-10, 0, 0], LeftUpLeg: [-76, 0, 8], RightUpLeg: [-8, 0, -6],  LeftLeg: [70, 0, 0], RightLeg: [12, 0, 0] }, hands: { Right: [0.20, 2.02, 0.18], Left: [-0.26, 1.40, 0.20] }, poles: { Right: UP_R }, hipsY: 0.05 },   // out of the turn: the release
+  { t: 0.54, bones: { Hips: [0, 360, 0], Spine: [-2, 0, 0], Neck: [-6, 0, 0],  LeftUpLeg: [-48, 0, 8], RightUpLeg: [-12, 0, -6], LeftLeg: [50, 0, 0], RightLeg: [16, 0, 0] }, hands: { Right: [0.22, 1.90, 0.14], Left: [-0.26, 1.34, 0.22] }, poles: { Right: UP_R }, hipsY: 0.02 },
+  { t: 0.76, bones: { Hips: [0, 360, 0], Spine: [10, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-18, 0, 6], RightUpLeg: [-18, 0, -6], LeftLeg: [28, 0, 0], RightLeg: [28, 0, 0] }, hands: { Right: [0.26, 1.14, 0.30], Left: [-0.24, 1.08, 0.26] }, hipsY: -0.05 },
+];
+export function buildSpinLayup(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
+  if (side === 'right') return buildPoseClip(scene, sk, 'bball_layup_spin', 0.76, SPIN_LAYUP_KEYS);
+  return buildPoseClip(scene, sk, 'bball_layup_spin_left', 0.76, SPIN_LAYUP_KEYS.map(mirrorKey));
+}
+
+/** The hang / double clutch: up, DOWN to the chest while the blocker's hand passes, back up late. The longest finish
+ *  after the up-and-under (release 0.5, feet down 0.9) — the hang is what it is buying. */
+const HANG_LAYUP_KEYS: PoseKey[] = [
+  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-22, 0, 6], RightUpLeg: [-22, 0, -6], LeftLeg: [34, 0, 0], RightLeg: [34, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06 },
+  { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [-8, 0, 0],  LeftUpLeg: [-72, 0, 8], RightUpLeg: [-6, 0, -6], LeftLeg: [68, 0, 0], RightLeg: [10, 0, 0] }, hands: { Right: [0.22, 1.90, 0.20], Left: [-0.28, 1.34, 0.20] }, poles: { Right: UP_R }, hipsY: 0.03 },   // up, as if to finish
+  { t: 0.32, bones: { Hips: [0, 0, 0], Spine: [-14, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-78, 0, 8], RightUpLeg: [0, 0, -6],  LeftLeg: [72, 0, 0], RightLeg: [8, 0, 0] },  hands: { Right: [0.18, 1.30, 0.28], Left: [-0.10, 1.28, 0.30] }, hipsY: 0.05 },   // THE CLUTCH: pulled down to the chest, both hands, arched back
+  { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], Neck: [-12, 0, 0], LeftUpLeg: [-70, 0, 8], RightUpLeg: [4, 0, -6],  LeftLeg: [66, 0, 0], RightLeg: [10, 0, 0] }, hands: { Right: [0.24, 2.06, 0.18], Left: [-0.28, 1.40, 0.16] }, poles: { Right: UP_R }, hipsY: 0.04 },   // back up, late: the release
+  { t: 0.66, bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], Neck: [-8, 0, 0],  LeftUpLeg: [-46, 0, 8], RightUpLeg: [-12, 0, -6], LeftLeg: [50, 0, 0], RightLeg: [16, 0, 0] }, hands: { Right: [0.24, 1.90, 0.14], Left: [-0.26, 1.34, 0.22] }, poles: { Right: UP_R }, hipsY: 0.01 },
+  { t: 0.9,  bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-18, 0, 6], RightUpLeg: [-18, 0, -6], LeftLeg: [28, 0, 0], RightLeg: [28, 0, 0] }, hands: { Right: [0.26, 1.14, 0.30], Left: [-0.24, 1.08, 0.26] }, hipsY: -0.05 },
+];
+export function buildHangLayup(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
+  if (side === 'right') return buildPoseClip(scene, sk, 'bball_layup_hang', 0.9, HANG_LAYUP_KEYS);
+  return buildPoseClip(scene, sk, 'bball_layup_hang_left', 0.9, HANG_LAYUP_KEYS.map(mirrorKey));
 }

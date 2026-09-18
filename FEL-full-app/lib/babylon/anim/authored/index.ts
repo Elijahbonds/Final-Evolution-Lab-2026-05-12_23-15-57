@@ -13,6 +13,7 @@ import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from 
 import { buildMocapDunk } from './mocapDunk';
 import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig, buildFinishReverse, buildFinishPower, buildFinishTwoHand } from './dunkFinishes';
 import { buildDefendBackpedal, buildCloseout, buildDefendSlideHard, buildContactReact } from './basketball';   // DEFENSE-LOOK (2026-09-17)
+import { buildScoopLayup, buildSpinLayup, buildHangLayup } from './basketball';   // ACROBATIC LAYUPS (2026-09-18)
 import { buildStackBase, buildStackRider, buildRowStand, buildRowCrouch, buildBikeRider, buildSkateRider } from './stackProp';
 import { buildSelfLob, buildBounceThrow, buildKickUp, buildBackHandspring, buildBackflip, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildWindmill360, buildFakeEastbay, buildTap } from './dunkTricks';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
@@ -184,6 +185,10 @@ export function registerAuthoredClips(
     ['bball_up_and_under_left', () => buildUpAndUnder(scene, skeleton, 'left')],
     ['bball_finger_roll', () => buildFingerRoll(scene, skeleton)],
     ['bball_finger_roll_left', () => buildFingerRoll(scene, skeleton, 'left')],
+    // ACROBATIC LAYUPS (owner, 2026-09-18): the scoop (the contact layup), the spin, the hang / double clutch
+    ['bball_layup_scoop', () => buildScoopLayup(scene, skeleton)], ['bball_layup_scoop_left', () => buildScoopLayup(scene, skeleton, 'left')],
+    ['bball_layup_spin', () => buildSpinLayup(scene, skeleton)], ['bball_layup_spin_left', () => buildSpinLayup(scene, skeleton, 'left')],
+    ['bball_layup_hang', () => buildHangLayup(scene, skeleton)], ['bball_layup_hang_left', () => buildHangLayup(scene, skeleton, 'left')],
     ['bball_floater_left', () => buildFloater(scene, skeleton, 'left')],           // the runner going the other way
     ['bball_euro_step_left', () => buildEuroStep(scene, skeleton, 'left')],        // a euro that sells LEFT
     ['bball_defend_slide_left', () => buildDefendSlide(scene, skeleton, 'left')],

@@ -13,6 +13,7 @@ import {
   buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // wave 2: the footwork (M8–M14)
   buildMikan, buildUpAndUnder, buildFingerRoll,   // 2026-09-16: the layup vocabulary
+  buildScoopLayup, buildSpinLayup, buildHangLayup,   // 2026-09-18: the acrobatic layups
   buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble, buildDoubleCross, buildSnatchBack,
   buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip,   // 2026-09-16: the handle, and the ankles
 } from './basketball';
@@ -324,6 +325,37 @@ describe('basketball packages on the forge rig', () => {
     expect(pos('Hips').y - down).toBeLessThan(0.2);                              // a flick, not a leap
     at(g, 0.34);
     expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);                   // the hand STAYS up — you are going again
+  });
+
+  // ACROBATIC LAYUPS (owner, 2026-09-18) — each one's tell, measured on the rig
+  it('the SCOOP comes from the HIP: the ball hand starts low and forward, and releases above the head with the elbow BELOW the hand', () => {
+    rest(); const g = buildScoopLayup(scene, sk)!;
+    at(g, 0.16);
+    expect(pos('RightHand').y).toBeLessThan(1.15);                               // the scoop starts low
+    expect(pos('RightHand').z).toBeGreaterThan(0.3);                             // and out in front
+    at(g, 0.32);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);                   // the release, above the head
+    expect(pos('RightForeArm').y).toBeLessThan(pos('RightHand').y - 0.15);       // the arm from BELOW: elbow under the hand
+    expect(pos('LeftLeg').y).toBeGreaterThan(pos('RightLeg').y + 0.15);          // the off knee drives
+  });
+  it('the SPIN LAYUP turns the body a full circle and comes out of it facing the way it went in, ball hand up', () => {
+    rest(); const g = buildSpinLayup(scene, sk)!;
+    const fwd = () => { const h = boneNode(sk, 'Hips')!; h.computeWorldMatrix(true); return Vector3.TransformNormal(Vector3.Forward(), h.getWorldMatrix()).normalize(); };
+    at(g, 0); const f0 = fwd();
+    at(g, 0.12); expect(Vector3.Dot(fwd(), f0)).toBeLessThan(0.1);               // a third of the way round: well off the entry facing
+    at(g, 0.24); expect(Vector3.Dot(fwd(), f0)).toBeLessThan(0.1);
+    at(g, 0.34); expect(Vector3.Dot(fwd(), f0)).toBeGreaterThan(0.9);            // out of the turn: facing the iron again
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);                   // …with the ball hand up
+    at(g, 0.12);
+    expect(Vector3.Distance(pos('RightHand'), pos('LeftHand'))).toBeLessThan(0.36);   // tucked in two hands through the turn
+  });
+  it('the HANG goes up, CLUTCHES down to the chest, and releases late above the head', () => {
+    rest(); const g = buildHangLayup(scene, sk)!;
+    at(g, 0.18); const up = pos('RightHand').y; expect(up).toBeGreaterThan(pos('Head').y - 0.05);   // up, as if to finish
+    at(g, 0.32); const clutch = pos('RightHand').y;
+    expect(clutch).toBeLessThan(up - 0.45);                                      // pulled DOWN
+    expect(Vector3.Distance(pos('RightHand'), pos('LeftHand'))).toBeLessThan(0.36);   // both hands on it
+    at(g, 0.5); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);       // back up, late
   });
 
   it('the UP AND UNDER sells the shot first: ball and chin UP with the feet still under you', () => {

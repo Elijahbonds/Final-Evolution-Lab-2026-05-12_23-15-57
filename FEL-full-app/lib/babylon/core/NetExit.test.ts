@@ -12,7 +12,7 @@ describe('NetExit', () => {
     expect(-netExitVelocity('poster').y).toBeGreaterThan(-netExitVelocity('showtime').y);
   });
   it('the finishes at the rim drop; the shots swish', () => {
-    for (const s of ['layup', 'reverse', 'mikan', 'upAndUnder', 'fingerRoll'] as const) expect(netExitKindOf(s)).toBe('layup');
+    for (const s of ['layup', 'reverse', 'mikan', 'upAndUnder', 'fingerRoll', 'scoop', 'spinLayup', 'hangLayup'] as const) expect(netExitKindOf(s)).toBe('layup');
     for (const s of ['jumper', 'fadeaway', 'hook', 'floater'] as const) expect(netExitKindOf(s)).toBe('jumper');
   });
   it('drifts toward the court along the given direction', () => {

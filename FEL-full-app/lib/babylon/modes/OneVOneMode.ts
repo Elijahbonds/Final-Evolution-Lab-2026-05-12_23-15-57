@@ -117,6 +117,8 @@ import {
 } from '../core/ContactDunk';   // dunked ON, not dunked beside
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
 import { attachBallToHand, releaseBall, clankOffRim } from '../anim/ballRig';
+import { mountRimReach, rimReachWeight, type RimReachHandle } from '../anim/rimReach';   // HAND AND RIM (owner, 2026-09-18): the ball hand meets the iron on a game dunk
+import { isFinishStyle } from '../core/HoopsMoves';
 import { startFlush, stepFlush, type FlushState } from '../core/RimFlush';   // DUNK-FANATIC (2026-09-17): the contest's flush — over the lip, down the axis, out of the net — on the game's dunks
 import { RIM_RADIUS } from '../core/RimPhysics';
 import { NET_EXIT_MPS, NET_DROP_NUDGE } from '../core/NetExit';
@@ -278,6 +280,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let meAnimTree: BasketballAnimTree, foeAnimTree: BasketballAnimTree;
   let meFootPlant: FootPlant;
   let meCarry: BallCarry | null = null, foeCarry: BallCarry | null = null;   // live dribble (ball off the palm)
+  let meReach: RimReachHandle | null = null, foeReach: RimReachHandle | null = null;   // HAND AND RIM: the dunk's hand onto the ring
   let wasPlanting = false;
   let shotMeter: ShotMeter;
   let turbo: TurboMeter;
@@ -655,6 +658,9 @@ export const OneVOneMode: ModeDefinition = (() => {
       meCarry?.dispose(); foeCarry?.dispose();
       meCarry = mountBallCarry({ scene: ctx.scene, ball, root: me.root, skeleton: me.skeleton });
       foeCarry = mountBallCarry({ scene: ctx.scene, ball, root: foe.root, skeleton: foe.skeleton });
+      meReach?.dispose(); foeReach?.dispose();
+      meReach = mountRimReach({ scene: ctx.scene, skeleton: me.skeleton, root: me.root, ball, rim: RIM, ringR: RIM_RADIUS });
+      foeReach = mountRimReach({ scene: ctx.scene, skeleton: foe.skeleton, root: foe.root, ball, rim: RIM, ringR: RIM_RADIUS });
       shotMeter = new ShotMeter();
       turbo = new TurboMeter();
       arc = new ShotArc();
@@ -1245,8 +1251,13 @@ export const OneVOneMode: ModeDefinition = (() => {
             console.info(`[1V1-SHOT] gather ${currentShot.style} rim ${distXZ(me.root.position, RIM_FLOOR).toFixed(2)} speed ${Math.hypot(meDribble.vel.x, meDribble.vel.z).toFixed(1)} contest ${contest.toFixed(2)}`);
             // HOOPS-MOVE-KIT-A: a layup / floater is a FINISH (M3); a jumper GATHERS first (M1) — a set body rises at once.
             // HOOPS-MOVE-KIT-B: the hook (M5) and the fadeaway (M4) are finishes too — their own clip, their own hop.
-            if (currentShot.style === 'layup' || currentShot.style === 'floater' || currentShot.style === 'hook' || currentShot.style === 'fadeaway' || currentShot.style === 'reverse') startFinish(ctx, currentShot.style, stickShot?.shimmy ? contest * 0.55 : contest, defenderPos, stickShot?.side); if (stickShot) { stickShot.started = true; console.info(`[1V1-STICK] post hook ${stickShot.side}${stickShot.shimmy ? ' (shimmy)' : ''}`); }
+            // THE DANGLING ELSE (found 2026-09-18 by the lab's eye): `if (finish) startFinish(); if (stickShot) {…} else startRise()` —
+            // the else belonged to the STICK check, so every finish without a stick shot ALSO started the pull-up rise on the
+            // same frame: the gather clip and the jumpshot hold played over every layup, and the "layup" the eye saw was a
+            // pull-up (measured: `finish fingerRoll` and `gather pullup` logged 0 ms apart)
+            if (isFinishStyle(currentShot.style)) startFinish(ctx, currentShot.style, stickShot?.shimmy ? contest * 0.55 : contest, defenderPos, stickShot?.side);
             else startRise(ctx, contest, mx, my);
+            if (stickShot) { stickShot.started = true; console.info(`[1V1-STICK] post hook ${stickShot.side}${stickShot.shimmy ? ' (shimmy)' : ''}`); }
             aiContestLoad(ctx);   // D1/D3: the AI puts a hand up on the load, or times a block jump to the green
           }
         }
@@ -1617,6 +1628,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       meFootPlant?.dispose();
       mePosture?.dispose(); foePosture?.dispose(); mePosture = null; foePosture = null;   // BIOMECH-HOOPS-WAVE1
       meCarry?.dispose(); foeCarry?.dispose(); meCarry = null; foeCarry = null;
+      meReach?.dispose(); foeReach?.dispose(); meReach = null; foeReach = null;
       contact?.dispose(); contact = null;
       shotTrail?.dispose(); shotTrail = null;
       ring?.dispose(); ring = null;
@@ -1858,6 +1870,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       face(me.root, slewYaw(me.root.rotation.y, yawTo(me.root.position, RIM) + (picked.reverse ? Math.PI : 0), FACE_RIM_RATE * (picked.reverse ? 2 : 1), fdt));   // a REVERSE turns its back to the iron
       dunkFlight = { k, made: resolved ? made : null };
       meter3d?.set(showtime ? showtimeMeterT(k) : k, me.root.position.add(new Vector3(0, 1.72, 0)));
+      meReach?.set(rimReachWeight(k, DRIVE_DUNK.resolveK, swatted));   // HAND AND RIM: the ball hand onto the iron through the flush and the hang
       if (!showtime) ctx.setHud({ shotMeterT: k, shotMeterGreen: hudGreen });
       // THE TRICK STICK (owner, 2026-09-16). Once the feet leave, the right stick stops being the camera orbit and
       // becomes the trick stick: a flick asks for a trick and WHEN you threw it decides whether you get it. The
@@ -1968,7 +1981,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       }
       if (k < 1) return;
       ctx.scene.onBeforeRenderObservable.remove(obs);
-      dunking = false; dunkFlight = null; meLandSec = LAND_SEC; driveContest = null;
+      dunking = false; dunkFlight = null; meLandSec = LAND_SEC; driveContest = null; meReach?.set(0);
       if (showtimeCam) { showtimeCam = false; ctx.camDirector.toggle(); ctx.camDirector.snapTo(me.root.position, RIM); }   // POLISH: a cut back, not a lerp from the side camera   // SHOWTIME: the follow camera comes back at feet-down
       ctx.setHud({ shotMeterT: 0 }); meter3d?.end('brick');   // a swat ends the flight with no verdict of its own
       contact?.setAirborne('me', false);
@@ -2152,6 +2165,9 @@ export const OneVOneMode: ModeDefinition = (() => {
     meCarry?.update(0, 0, false);
     if (!ball.parent) attachBallToHand(ball, me.skeleton, 'RightHand');
     currentShot = plan.then === 'rise' ? classifyShot(me.root.position, meDribble.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : 1.18, drift: 'none' };
+    // ACROBATIC LAYUPS (2026-09-18): a hop that was going to RISE but classifies as a finish (the running layup band, the
+    // scoop, the hang) ends IN that finish — it used to rise as a jumper under a "HANG & FINISH" label (measured)
+    if (plan.then === 'rise' && isFinishStyle(currentShot.style)) plan.then = currentShot.style;
     meterStart(contest, currentShot.style, plan.sec);
     gather = { plan, t: 0 };
     meShotWin = 'footwork'; meShotSec = 0;
@@ -2846,6 +2862,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       foe.root.position.y = driveDunkY(k);
       face(foe.root, slewYaw(foe.root.rotation.y, yawTo(foe.root.position, RIM), FACE_RIM_RATE, fdt));
       foeDunkFlight = { k, made: resolved ? made && !swatted : null };
+      foeReach?.set(rimReachWeight(k, DRIVE_DUNK.resolveK, swatted));   // HAND AND RIM: his too
       // the SWAT: my fresh jump inside range while he is between the takeoff and the resolve
       if (!swatted && !resolved && jumpSwats(k, myJumpAge, Math.min(distXZ(me.root.position, foe.root.position), distXZ(me.root.position, ball.getAbsolutePosition())))) {
         swatted = true; made = false;
@@ -2879,7 +2896,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       }
       if (k < 1) return;
       ctx.scene.onBeforeRenderObservable.remove(obs);
-      foeDunkFlight = null; contact?.setAirborne('foe', false);
+      foeDunkFlight = null; contact?.setAirborne('foe', false); foeReach?.set(0);
       foeAnimTree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });
       if (made) {
         foeScore += 2;

@@ -43,7 +43,7 @@ export const AI_BLOCK_RANGE = 1.9;   // a JUMPING defender's reach (measured: th
 // The MIKAN is the most blockable shot on the list — you are under the ring with no separation at all, which is the
 // trade for how quickly it goes up. The UP AND UNDER is the least: the block chance is read at the release, and by
 // then the man who would have blocked it is on his way down, which is the entire point of the move.
-export const AI_BLOCK_BASE: Record<'jumper' | 'layup' | 'floater' | 'fadeaway' | 'hook' | 'reverse' | 'mikan' | 'upAndUnder' | 'fingerRoll' | 'dunk', number> = { jumper: 0.12, layup: 0.3, floater: 0.22, fadeaway: 0.08, hook: 0.05, reverse: 0.11, mikan: 0.34, upAndUnder: 0.04, fingerRoll: 0.26, dunk: 0.35 };
+export const AI_BLOCK_BASE: Record<'jumper' | 'layup' | 'floater' | 'fadeaway' | 'hook' | 'reverse' | 'mikan' | 'upAndUnder' | 'fingerRoll' | 'scoop' | 'spinLayup' | 'hangLayup' | 'dunk', number> = { jumper: 0.12, layup: 0.3, floater: 0.22, fadeaway: 0.08, hook: 0.05, reverse: 0.11, mikan: 0.34, upAndUnder: 0.04, fingerRoll: 0.26, scoop: 0.18, spinLayup: 0.14, hangLayup: 0.06, dunk: 0.35 };
 /** A dunker in the air can be swatted between the takeoff and the resolve (flight clock 0..1). */
 export const SWAT_K_FROM = 0.12, SWAT_K_TO = 0.75;   // to just before feet-down: the bump's slow-mo stretches the flight past 600 ms
 /** A full contest takes this much off the shooter's make chance. */

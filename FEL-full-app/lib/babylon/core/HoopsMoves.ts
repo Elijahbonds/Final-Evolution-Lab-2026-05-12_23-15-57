@@ -120,19 +120,23 @@ export function stickBack01(wishX: number, wishZ: number, toRim: Vector3): numbe
 export type FinishSide = 'left' | 'right';
 /** HOOPS-MOVE-KIT-B: the hook (M5) and the fadeaway (M4) join the finish family — every one of them is a metered shot
  *  released from its OWN clip at the top of its own hop, not a label on the jumpshot. */
-export type FinishStyle = Extract<ShotStyle, 'layup' | 'floater' | 'hook' | 'fadeaway' | 'reverse' | 'mikan' | 'upAndUnder' | 'fingerRoll'>;
+export type FinishStyle = Extract<ShotStyle, 'layup' | 'floater' | 'hook' | 'fadeaway' | 'reverse' | 'mikan' | 'upAndUnder' | 'fingerRoll' | 'scoop' | 'spinLayup' | 'hangLayup'>;
+/** Every style that is a FINISH (its own clip, its own hop) rather than a rise. The modes used to list five of these by name
+ *  at the squeeze, so the Mikan, the finger roll and the up-and-under — classified, labelled — rose as jumpers (2026-09-18). */
+export const FINISH_STYLES: ReadonlySet<ShotStyle> = new Set<ShotStyle>(['layup', 'floater', 'hook', 'fadeaway', 'reverse', 'mikan', 'upAndUnder', 'fingerRoll', 'scoop', 'spinLayup', 'hangLayup']);
+export const isFinishStyle = (s: ShotStyle): s is FinishStyle => FINISH_STYLES.has(s);
 /** Lateral offset (body frame, metres) from the rim's line past which the drive is on a side. */
 export const LAYUP_SIDE_MIN = 0.35;
 /** A defender inside this on the strong side sends the finish to the off hand. */
 export const LAYUP_PROTECT_RANGE = 1.5;
 /** The hop apex (metres) of each finish: a layup's two-foot hop, a floater's runner. */
 // the Mikan barely leaves the floor (that is the shot) and the up-and-under's hop comes AFTER the fake, off one foot
-export const FINISH_HOP_APEX: Record<FinishStyle, number> = { layup: 0.28, floater: 0.22, hook: 0.3, fadeaway: 0.34, reverse: 0.3, mikan: 0.16, upAndUnder: 0.26, fingerRoll: 0.34 };   // the roll gets the most air of the finishes: it is a reach
+export const FINISH_HOP_APEX: Record<FinishStyle, number> = { layup: 0.28, floater: 0.22, hook: 0.3, fadeaway: 0.34, reverse: 0.3, mikan: 0.16, upAndUnder: 0.26, fingerRoll: 0.34, scoop: 0.3, spinLayup: 0.36, hangLayup: 0.42 };   // the hang buys the most air   // the roll gets the most air of the finishes: it is a reach
 /** The stride the finish carries toward the rim (the rival's LAYUP_STRIDE_SPEED) while further than the stop range. A hook
  *  takes ONE step into the middle; a fadeaway goes the other way entirely (fadeDrift). */
-export const FINISH_STRIDE_SPEED: Record<FinishStyle, number> = { layup: LAYUP_STRIDE_SPEED, floater: 1.6, hook: 1.1, fadeaway: 0, reverse: 1.5, mikan: 0, upAndUnder: 0.9, fingerRoll: LAYUP_STRIDE_SPEED };
+export const FINISH_STRIDE_SPEED: Record<FinishStyle, number> = { layup: LAYUP_STRIDE_SPEED, floater: 1.6, hook: 1.1, fadeaway: 0, reverse: 1.5, mikan: 0, upAndUnder: 0.9, fingerRoll: LAYUP_STRIDE_SPEED, scoop: LAYUP_STRIDE_SPEED, spinLayup: 1.3, hangLayup: 1.2 };
 // the Mikan does not travel at all — you are already under it; the up-and-under steps THROUGH him and finishes past the rim
-export const FINISH_STRIDE_STOP: Record<FinishStyle, number> = { layup: 0.9, floater: 2.0, hook: 1.5, fadeaway: 0, reverse: 0.55, mikan: 0, upAndUnder: 0.5, fingerRoll: 1.15 };   // it lets go EARLIER than a layup — that is the reach   // M11: the reverse carries THROUGH the rim to the far side
+export const FINISH_STRIDE_STOP: Record<FinishStyle, number> = { layup: 0.9, floater: 2.0, hook: 1.5, fadeaway: 0, reverse: 0.55, mikan: 0, upAndUnder: 0.5, fingerRoll: 1.15, scoop: 0.9, spinLayup: 0.85, hangLayup: 0.95 };   // it lets go EARLIER than a layup — that is the reach   // M11: the reverse carries THROUGH the rim to the far side
 /** The authored finish clips and where in them the ball leaves the hand (the top of the hop) and the feet come down. */
 export const FINISH_CLIP: Record<FinishStyle, Record<FinishSide, string>> = {
   layup: { right: 'bball_layup_gather', left: 'bball_layup_gather_left' },
@@ -143,10 +147,13 @@ export const FINISH_CLIP: Record<FinishStyle, Record<FinishSide, string>> = {
   mikan: { right: 'bball_mikan', left: 'bball_mikan_left' },                    // under the ring: knee up, ball up the middle, land and go again
   upAndUnder: { right: 'bball_up_and_under', left: 'bball_up_and_under_left' },  // the fake, then through UNDER the arm that bit
   fingerRoll: { right: 'bball_finger_roll', left: 'bball_finger_roll_left' },    // arm straight, ball out front, rolled off the fingers
+  scoop: { right: 'bball_layup_scoop', left: 'bball_layup_scoop_left' },         // 2026-09-18: underhand past the hand — the contact layup
+  spinLayup: { right: 'bball_layup_spin', left: 'bball_layup_spin_left' },       // a full turn in the air, out of it facing the iron
+  hangLayup: { right: 'bball_layup_hang', left: 'bball_layup_hang_left' },       // up, clutch, back up late
 };
 // the Mikan is the quickest release in the game and the up-and-under the slowest — 0.30 s of it is the LIE
-export const FINISH_RELEASE_KEY_SEC: Record<FinishStyle, number> = { layup: 0.3, floater: 0.35, hook: 0.34, fadeaway: 0.38, reverse: 0.34, mikan: 0.22, upAndUnder: 0.46, fingerRoll: 0.38 };
-export const FINISH_LAND_KEY_SEC: Record<FinishStyle, number> = { layup: 0.7, floater: 0.7, hook: 0.72, fadeaway: 0.8, reverse: 0.74, mikan: 0.5, upAndUnder: 0.85, fingerRoll: 0.78 };
+export const FINISH_RELEASE_KEY_SEC: Record<FinishStyle, number> = { layup: 0.3, floater: 0.35, hook: 0.34, fadeaway: 0.38, reverse: 0.34, mikan: 0.22, upAndUnder: 0.46, fingerRoll: 0.38, scoop: 0.32, spinLayup: 0.34, hangLayup: 0.5 };
+export const FINISH_LAND_KEY_SEC: Record<FinishStyle, number> = { layup: 0.7, floater: 0.7, hook: 0.72, fadeaway: 0.8, reverse: 0.74, mikan: 0.5, upAndUnder: 0.85, fingerRoll: 0.78, scoop: 0.72, spinLayup: 0.76, hangLayup: 0.9 };
 
 /** Body-right for a yaw (measured, MODE-STICK-FACE): (cos yaw, 0, −sin yaw). */
 export function bodyRight(yaw: number): Vector3 { return new Vector3(Math.cos(yaw), 0, -Math.sin(yaw)); }
@@ -216,6 +223,9 @@ export const FINISH_LABEL: Record<FinishStyle, Record<FinishSide, string>> = {
   mikan: { right: 'MIKAN', left: 'MIKAN' },                      // under the ring; the side is the hand, not a different shot
   upAndUnder: { right: 'UP AND UNDER', left: 'UP AND UNDER' },
   fingerRoll: { right: 'FINGER ROLL — RIGHT', left: 'FINGER ROLL — LEFT' },
+  scoop: { right: 'SCOOP — RIGHT', left: 'SCOOP — LEFT' },
+  spinLayup: { right: 'SPIN LAYUP', left: 'SPIN LAYUP' },
+  hangLayup: { right: 'HANG & FINISH', left: 'HANG & FINISH' },
 };
 
 // ── M2: the drive contest ───────────────────────────────────────────────────
