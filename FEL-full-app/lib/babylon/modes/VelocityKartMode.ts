@@ -695,6 +695,7 @@ return {
       if (!offRoadSaid) { offRoadSaid = true; ctx.juice.callout('OFF THE ROAD', '#fca5a5', 600); }
     } else { offRoadTick = 0; offRoadSaid = false; }
     const bev = boost.update(dt, S.boostHeld, true);
+    ctx.stamina?.(boost.meter);   // PLAYER RING: the ring's arc is the boost tank
     S.input.boostK = boost.k;
     stepKart(state, S.input, dt, on, kartSpec);
 

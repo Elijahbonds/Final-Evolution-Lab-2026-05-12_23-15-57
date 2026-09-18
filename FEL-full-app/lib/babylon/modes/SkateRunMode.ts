@@ -772,6 +772,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       if (drive < 0 && performance.now() < brakeMuteUntil) drive = 0;   // the manual link's own back-tap must not drag the line to a stop
       const steer = grounded && !bailing ? stickX : 0;
       const bev = boost.update(dt, boostHeld, grounded && !bailing);
+      ctx.stamina?.(boost.meter);   // PLAYER RING: the ring's arc is the boost tank
       move.boostK = boost.k;
       if (rig.rider.grinding) boost.earnOver('grindPerSec', dt);
       boostPads?.update(dt, rig.char.root.position, boost);

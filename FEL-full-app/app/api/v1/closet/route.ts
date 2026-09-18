@@ -18,7 +18,7 @@ export async function GET() {
     look = await prisma.avatarLook.create({ data: { userId, face: defaultFace() as any, equipped: defaultEquipped() as any } });
   }
   const owned = await prisma.ownedWearable.findMany({ where: { userId } });
-  const cards = await prisma.creatorCard.findMany({ where: { ownerId: userId }, select: { id: true, displayName: true, accent: true, rarity: true } });
+  const cards = await prisma.creatorCard.findMany({ where: { ownerId: userId }, select: { id: true, displayName: true, accent: true, rarity: true, mode: true } });   // PLAYER RING (2026-09-17): `mode` = the card's signature mode → the indicator's glyph
   return NextResponse.json({ look, owned: owned.map((o) => o.itemId), skins: cards });
 }
 

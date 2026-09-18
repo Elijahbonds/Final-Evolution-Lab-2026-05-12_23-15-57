@@ -371,6 +371,7 @@ export function makeAeroAcesMode(): ModeDefinition {
 
       // ── boost: the shared kit (RB), plus a blue balloon's zip holding it at full ──
       const bev = boost.update(dt, S.boostHeld, flight.spinT <= 0);
+      ctx.stamina?.(boost.meter);   // PLAYER RING: the ring's arc is the boost tank
       S.zipT = Math.max(0, S.zipT - dt);
       S.shieldT = Math.max(0, S.shieldT - dt);
       S.input.boostK = Math.max(boost.k, S.zipT > 0 ? 1 : 0);

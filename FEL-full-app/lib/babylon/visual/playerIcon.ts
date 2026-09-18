@@ -4,6 +4,7 @@
 // The CHOICE first (`?icon=` on the URL, then the saved preference), then the creator record's most-played discipline,
 // then the controller — a gamer with no card yet is still somebody. Pure apart from the reads; safe on the server.
 import { readRecord } from '../../creator/CreatorRecord';
+import { cachedIdentity, type EquippedCard } from '../core/playerIdentity';
 import type { RingIcon } from './PlayerRing';
 
 export const PLAYER_ICON_KEY = 'fel-player-icon';
@@ -16,7 +17,8 @@ export function iconForDiscipline(id: string): RingIcon {
   if (/music|studio|beat|song|dj/.test(d)) return 'music';
   if (/dance/.test(d)) return 'dance';
   if (/scene|act|camera|film|photo|video/.test(d)) return 'camera';
-  if (/art|paint|draw/.test(d)) return 'art';
+  if (/kart|racing|aero|pilot|drive/.test(d)) return 'controller';   // the vehicles are the gamer's (and "kart" contains "art")
+  if (/\bart\b|art_|paint|draw|canvas/.test(d)) return 'art';
   if (/writ|story/.test(d)) return 'pen';
   if (/cook|kitchen|fuel/.test(d)) return 'chef';
   if (/fashion|closet|wear/.test(d)) return 'fashion';
@@ -33,9 +35,11 @@ export function readPlayerIconChoice(): RingIcon | null {
   } catch { return null; }
 }
 export function writePlayerIconChoice(icon: RingIcon): void { try { window.localStorage.setItem(PLAYER_ICON_KEY, icon); } catch { /* private mode */ } }
-/** The icon for this player: the choice, else the record's most-played discipline, else the controller. */
-export function readPlayerIcon(): RingIcon {
+/** The icon for this player: the choice, else the EQUIPPED CREATOR CARD's signature mode (owner, 2026-09-17: "the icon
+ *  correlates to the user's creator card"), else the record's most-played discipline, else the controller. */
+export function readPlayerIcon(card: EquippedCard | null | undefined = cachedIdentity()?.card): RingIcon {
   const chosen = readPlayerIconChoice(); if (chosen) return chosen;
+  if (card?.mode) return iconForDiscipline(card.mode);
   const rec = readRecord();
   if (rec) {
     let best: string | null = null, bestSec = -1;

@@ -13,11 +13,15 @@ export const RING_GLYPH: Record<RingIcon, string> = { basketball: '🏀', music:
 
 export interface PlayerRingHandle { set(stamina01: number): void; setIcon(icon: RingIcon): void; dispose(): void }
 
-export function mountPlayerRing(scene: Scene, root: TransformNode, opts: { color?: string; icon?: RingIcon; radius?: number; stamina?: boolean } = {}): PlayerRingHandle {
+/** True when a MODE mounted its own ring in this scene (1v1, 3v3, 3PT, dunk, the three fight modes) — the harness stays out. */
+export function modeOwnsPlayerRing(scene: Scene): boolean { return !!(scene.metadata as { felPlayerRingMode?: boolean } | null)?.felPlayerRingMode; }
+
+export function mountPlayerRing(scene: Scene, root: TransformNode, opts: { color?: string; icon?: RingIcon; radius?: number; stamina?: boolean; harness?: boolean; y?: number } = {}): PlayerRingHandle {
+  if (!opts.harness) ((scene.metadata ??= {}) as { felPlayerRingMode?: boolean }).felPlayerRingMode = true;   // PLAYER RING (all modes, 2026-09-17): a mode's own ring wins
   const color = Color3.FromHexString(opts.color ?? '#22d3ee'); const R = opts.radius ?? 0.62;
   // the ring: a disc at the feet with a dynamic texture (an arc for the stamina over a faint full ring)
   const ring = MeshBuilder.CreateDisc('player_ring', { radius: R, tessellation: 48 }, scene);
-  ring.rotation.x = Math.PI / 2; ring.position.y = 0.025; ring.parent = root; ring.isPickable = false; ring.renderingGroupId = 0;
+  ring.rotation.x = Math.PI / 2; ring.position.y = (opts.y ?? 0) + 0.025; ring.parent = root;   // `y`: the hero's ground in root space (a kart's root sits at axle height) ring.isPickable = false; ring.renderingGroupId = 0;
   const tex = new DynamicTexture('player_ring_tex', { width: 256, height: 256 }, scene, false); tex.hasAlpha = true;
   const mat = new StandardMaterial('player_ring_mat', scene); mat.diffuseTexture = tex; mat.emissiveTexture = tex; mat.opacityTexture = tex; mat.disableLighting = true; mat.backFaceCulling = false; mat.useAlphaFromDiffuseTexture = true;
   ring.material = mat;
@@ -38,7 +42,7 @@ export function mountPlayerRing(scene: Scene, root: TransformNode, opts: { color
   const follow = scene.onBeforeRenderObservable.add(() => {
     const cam = scene.activeCamera; if (cam) { cam.getDirectionToRef(Vector3.Right(), right); right.y = 0; if (right.lengthSquared() < 1e-4) right.set(1, 0, 0); right.normalize(); }
     const at = root.getAbsolutePosition();
-    tag.position.set(at.x + right.x * (R + 0.24), at.y + 0.2, at.z + right.z * (R + 0.24));
+    tag.position.set(at.x + right.x * (R + 0.24), at.y + (opts.y ?? 0) + 0.2, at.z + right.z * (R + 0.24));
   });
   const tagTex = new DynamicTexture('player_tag_tex', { width: 256, height: 256 }, scene, false); tagTex.hasAlpha = true;
   const tagMat = new StandardMaterial('player_tag_mat', scene); tagMat.diffuseTexture = tagTex; tagMat.emissiveTexture = tagTex; tagMat.opacityTexture = tagTex; tagMat.disableLighting = true; tagMat.backFaceCulling = false; tagMat.useAlphaFromDiffuseTexture = true;

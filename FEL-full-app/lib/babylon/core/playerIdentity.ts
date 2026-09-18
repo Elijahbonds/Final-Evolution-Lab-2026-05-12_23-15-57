@@ -52,7 +52,11 @@ export interface PlayerIdentity {
   /** EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14): which body this player wears — the server's decision
    *  (/api/v1/hero-body). 'kit-male' for a guest or when the server could not be asked. */
   body: HeroBodyKind;
+  /** PLAYER RING (owner, 2026-09-17: "the icon correlates to the user's creator card"): the EQUIPPED creator card —
+   *  the start screen's card slot / the Closet skin (AvatarLook.skinCardId) — with its accent and signature mode. null = BASE. */
+  card?: EquippedCard | null;   // optional: the preview / dev literals do not carry one
 }
+export interface EquippedCard { id: string; name: string; accent: string; mode: string }
 
 const FALLBACK_PALETTE = { jersey: '#00E5FF', shorts: '#0b1220', shoes: '#A855F7', accent: '#FFD700' };
 
@@ -71,9 +75,9 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
 
   const face: FaceConfig = { ...defaultFace(), ...(closet?.look?.face ?? {}) };
   const equipped: Partial<Record<WearableSlot, string | null>> = closet?.look?.equipped ?? {};
-  const cardAccent: string | undefined = closet?.skins?.find(
-    (s: { id: string; accent?: string }) => s.id === closet?.look?.skinCardId,
-  )?.accent;
+  const cardRow = closet?.skins?.find((s: { id: string }) => s.id === closet?.look?.skinCardId) as { id: string; displayName?: string; accent?: string; mode?: string } | undefined;
+  const cardAccent: string | undefined = cardRow?.accent;
+  const card: EquippedCard | null = cardRow ? { id: cardRow.id, name: cardRow.displayName ?? '', accent: cardRow.accent || FALLBACK_PALETTE.accent, mode: cardRow.mode || 'dunk' } : null;
 
   const accentOf = (slot: WearableSlot, fallback: string): string => {
     const id = equipped[slot];
@@ -100,9 +104,11 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
 
   const wardrobe: Wardrobe = { tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null };
   const body: HeroBodyKind = heroBody?.body === 'scan' || heroBody?.body === 'kit-female' ? heroBody.body : 'kit-male';
-  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) || Boolean(frame), body };
+  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) || Boolean(frame), body, card };
   return cached;
 }
+/** The identity resolved so far this session (null before the first spawn asked) — a synchronous read for the ring / icon. */
+export function cachedIdentity(): PlayerIdentity | null { return cached; }
 
 /**
  * DEV ONLY — the body matrix (EVERYONE-BODY-MOCAP-OPPONENTS, 2026-09-14). `/dev/mode/<key>?body=female&height=90&build=112&reach=100`

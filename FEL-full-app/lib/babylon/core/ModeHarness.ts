@@ -2,10 +2,13 @@
 // InputBus, READY gate + 3-2-1, pause, update loop, SessionResult emit.
 
 import type { HudCue } from './danceTracks';
-import { Scene, TargetCamera, Vector3, SceneInstrumentation } from '@babylonjs/core';
+import { Scene, TargetCamera, Vector3, SceneInstrumentation, Ray } from '@babylonjs/core';
 import { FloatingOriginCurrentScene } from '@babylonjs/core/Materials/floatingOriginMatrixOverrides';
 import { createEngine } from './createEngine';
 import type { TransformNode } from '@babylonjs/core';
+import { mountPlayerRing, modeOwnsPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (all modes, 2026-09-17)
+import { readPlayerIcon } from '../visual/playerIcon';
+import { cachedIdentity } from './playerIdentity';
 import { mountLightRig, liftBlackMaterials, type LightRigHandle } from '../scene/LightRig';
 import { mountIblShadows, type IblShadowsHandle } from '../scene/IblShadows';
 import { detectQualityTier, mountSsao, tierRigSettings, type SsaoHandle } from '../scene/QualityTier';
@@ -118,6 +121,9 @@ export interface ModeContext {
    *  inside the mode rather than a cold reboot of the whole stage. */
   card(outcome: string, score: number, stats: Record<string, number>, detail?: unknown): void;
   setHud(update: Record<string, HudValue>): void;   // bezel HUD bridge
+  /** PLAYER RING (all modes, 2026-09-17): the ring's arc — a mode with a tank (boost / turbo) reports it 0..1; without a
+   *  report the ring stays full. Optional so a mode (or a test's fake context) need not know about the ring. */
+  stamina?(v01: number): void;
 }
 
 export interface ModeDefinition {
@@ -326,6 +332,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   });
 
   const heroRef: MutableRef<TransformNode> = { current: null };
+  let ring: PlayerRingHandle | null = null;   // PLAYER RING (harness-mounted; a mode's own ring keeps this null)
   const objectiveRef: MutableRef<Vector3> = { current: null };
 
   const agentHooks: ModeContext['agent'] = {};   // M69: filled by a mode's load() if it opts in
@@ -354,6 +361,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       void opts.cardSink?.(result);
     },
     setHud(update) { if (qa) { qa.hud(update); Object.assign(qaRawHud, update); } opts.onHud?.(update); },
+    stamina(v01) { ring?.set(v01); },
   };
 
   // M37: hero-framing watchdog — recenters the camera if the hero leaves frame.
@@ -539,8 +547,41 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     }
     if (best && best !== qaTop) { qaTop = best; qa.anim(best); }
   }
+  // PLAYER RING (owner, 2026-09-17: "a player indicator with their icon in all modes like we did for 1v1"). The seven
+  // modes that mount their own ring (mountPlayerRing without `harness`) keep it; everywhere else the harness rides the
+  // hero reference every mode already sets for the frame guard. A reference that is not a body — a ball in flight, a
+  // scene anchor in a quiz — keeps the ring where it was, so the indicator never points at the wrong thing.
+  const RING_SKIP = new Set(['brainbrawl', 'who_scene_it']);
+  let ringRoot: TransformNode | null = null;
+  const bodyLike = (n: TransformNode | null): n is TransformNode => !!n && !n.isDisposed() && n.getChildMeshes(false).some((m) => m.getTotalVertices() > 0);
+  const ringFollow = () => {
+    if (RING_SKIP.has(def.modeId) || modeOwnsPlayerRing(scene)) return;
+    const root = heroRef.current;
+    if (root === ringRoot || !bodyLike(root)) return;
+    ring?.dispose(); ringRoot = root;
+    const card = cachedIdentity()?.card;
+    // (a trail / effect plane wider than 4 m is not the footprint and is skipped)
+    // (the footprint is the UNSKINNED part: a chassis, a deck — never the person, nor the driver sitting in the kart)
+    // the ring fits the hero's FOOTPRINT: a body takes the default 0.62 m, a kart (1.3 x 2 m, root at axle height) a
+    // 1.1 m ring at its wheels — measured in root space so the ring rides whatever the root does
+    root.computeWorldMatrix(true);
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, minY = Infinity;
+    const inv = root.getWorldMatrix().clone().invert();
+    for (const m of root.getChildMeshes(false)) { if (m.getTotalVertices() === 0 || !m.isVisible || !m.isEnabled() || m.skeleton) continue; const bi = m.getBoundingInfo(); if (bi.boundingSphere.radiusWorld > 4) continue; const bb = bi.boundingBox; for (const v of bb.vectorsWorld) { const p = Vector3.TransformCoordinates(v, inv); minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); minY = Math.min(minY, p.y); } }
+    const span = Math.max(maxX - minX, maxZ - minZ);
+    const radius = isFinite(span) && span > 1.3 ? Math.min(1.3, span * 0.5) : 0.62;   // a person (or a rider on a deck) keeps the default; a vehicle gets its own
+    // the ring sits on the SURFACE under the root, not at the root: a kart's root is its axle (0.44 m up), and its
+    // lowest child box (measured −0.8) is not its wheels either. A ray down from the root finds the ground it rides;
+    // a root already on its surface (a body, a board rider) keeps 0.
+    void minY;
+    const at = root.getAbsolutePosition();
+    const hit = scene.pickWithRay(new Ray(new Vector3(at.x, at.y + 0.3, at.z), Vector3.Down(), 6), (m) => m.isEnabled() && m.isVisible && m.getTotalVertices() > 0 && !m.isDescendantOf(root) && !/^player_/.test(m.name));   // NOT isPickable: the kart's road is unpickable and sits above the pickable venue ground
+    const y = hit?.hit && hit.distance > 0.4 ? -(hit.distance - 0.3) : at.y > 0.15 && at.y < 0.9 ? -at.y : 0;
+    ring = mountPlayerRing(scene, root, { color: card?.accent ?? '#22d3ee', icon: readPlayerIcon(), harness: true, radius, y });
+  };
   engine.runRenderLoop(() => {
     const dt = engine.getDeltaTime() / 1000;
+    ringFollow();
     // M37 hit-stop: dt scales to 0 during an impact freeze, then eases back.
     if (phase === 'playing') {
       if (qa) qaSampleAnim();
@@ -579,6 +620,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     qaRestore?.();
     shaker.dispose();
     groundLock.dispose();
+    ring?.dispose(); ring = null; ringRoot = null;   // PLAYER RING
     def.dispose?.();
     perf.dispose();       // M67
     clearReady();         // M67
