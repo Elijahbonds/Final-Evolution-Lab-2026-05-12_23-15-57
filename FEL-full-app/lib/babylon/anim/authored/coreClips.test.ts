@@ -379,7 +379,7 @@ describe('karate lean dodge', () => {
     at(g, 0.13);
     expect(pos('Head').z).toBeLessThan(head0.z - 0.25);                     // the head goes well behind its stance line — the lean
     expect(pos('Head').y).toBeLessThan(head0.y - 0.12);                     // and down with it
-    expect(hipsY()).toBeLessThan(h0 - 0.12);                                // knees bent under the lean
+    expect(hipsY()).toBeLessThan(h0 - 0.06);                                // knees bent under the lean (RIG-FLOOR sweep: −0.22 sank the ankles; the 46/40 knees pay for −0.08)
     expect(pos('LeftHand').z).toBeLessThan(pos('Hips').z);                  // arms trailing behind the hips
     expect(pos('RightHand').z).toBeLessThan(pos('Hips').z);
     at(g, 0.42); expect(Math.abs(hipsY() - h0)).toBeLessThan(0.03); expect(Vector3.Distance(pos('LeftHand'), l0)).toBeLessThan(0.04); expect(Vector3.Distance(pos('RightHand'), r0)).toBeLessThan(0.04);

@@ -9,6 +9,7 @@ import { CardSlot } from './card-slot';
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
+import { readyMusicStages, readMusicStage, writeMusicStage, type MusicStageId } from '@/lib/babylon/music/musicStage';
 import { skinsFor, readBoardSkin, writeBoardSkin } from '@/lib/babylon/nexus/boardSkins';
 import { readyCourses, readCourse, writeCourse } from '@/lib/babylon/core/RaceCourse';
 import { readyVehicles, readVehicle, writeVehicle, type RaceKind } from '@/lib/babylon/racing/garage';
@@ -135,6 +136,14 @@ export function BootSplash(props: {
     if (!disc || id === deck) return;
     writeBoardSkin(disc, id); setDeck(id);   // the deck is dressed when the rig builds; remembering it is enough
   };
+
+  // MUSIC picks its STAGE here — the Academy is both a tool and a scored mode, so which
+  // one you are walking into is chosen on the same screen as everyone else's venue. No
+  // reload: the stage is the tab StudioMode opens on, and it reads the pick at mount.
+  const isMusic = props.modeId === 'music';
+  const [stage, setStage] = useState<MusicStageId>('studio');
+  useEffect(() => { if (isMusic) setStage(readMusicStage()); }, [isMusic]);
+  const pickStage = (id: MusicStageId) => { if (id === stage) return; writeMusicStage(id); setStage(id); };
 
   // THE RACING MODES pick a MAP and a VEHICLE on this same screen (2026-09-13, owner: "Different maps,
   // different vehicles, like the start up screen from the dunk mode"). Same ritual, same place, same rules as
@@ -305,6 +314,25 @@ export function BootSplash(props: {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {isMusic && (props.phase === 'ready' || props.phase === 'loading') && readyMusicStages().length > 1 && (
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">STAGE</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {readyMusicStages().map((m) => (
+                <button key={m.id} type="button" onClick={() => pickStage(m.id)} title={m.sub}
+                  aria-label={`${m.label} — ${m.sub}`} aria-pressed={m.id === stage}
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${m.id === stage ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={m.id === stage ? { background: m.tint, borderColor: m.tint } : { borderColor: `${m.tint}88` }}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
+              {readyMusicStages().find((m) => m.id === stage)?.sub ?? ''}
+            </p>
           </div>
         )}
 

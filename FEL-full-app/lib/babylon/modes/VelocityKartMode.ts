@@ -638,7 +638,7 @@ return {
         const at = a.add(b.subtract(a).scale(0.4)); at.y = 0;
         spots.push({ pos: at, yaw: Math.atan2(b.x - a.x, b.z - a.z), kind: 'pad' as const, radius: 3 });
       }
-      boostPads = new BoostPads(ctx.scene, spots, '#ff8a1f');
+      boostPads = new BoostPads(ctx.scene, spots);   // SHARD-PICKUP: one colour for the mechanic
     }
 
     ctx.heroRef.current = kart;

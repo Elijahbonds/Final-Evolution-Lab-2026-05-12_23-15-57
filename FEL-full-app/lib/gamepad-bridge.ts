@@ -12,7 +12,6 @@ import {
   resolveShoulders,
   resolveLook,
   SHOULDER_PAD_INDEX,
-  AXIS_INDEX,
   stickToDirs,
   type ShoulderSlot,
 } from './input/controller-map';
@@ -97,9 +96,10 @@ export class PhysicalGamepadPoller {
     if (!pad) { this.releaseAll(); return; }
 
     // Input & Presence Phase A (2026-09-13): read through the PROFILE rather than straight into
-    // buttons[0..15]. This file was half-converted — it imported AXIS_INDEX for the right stick and then
-    // indexed the left one by hand — which is the state that hides a mapping bug best. A Switch Pro's face
-    // buttons are in a different physical order, and nothing here could previously notice.
+    // buttons[0..15]. This file used to be half-converted — it imported AXIS_INDEX for the right stick and
+    // then indexed the left one by hand — which is the state that hides a mapping bug best. A Switch Pro's
+    // face buttons are in a different physical order, and nothing here could previously notice. Every axis and
+    // button now comes from readPad's canonical profile; raw indices live in controller-map alone.
     const c = readPad(pad as unknown as PadLike);
     const CANON: Record<string, PadButton> = { a: 'A', b: 'B', x: 'X', y: 'Y' };
 

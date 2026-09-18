@@ -30,13 +30,48 @@ ok('pushes build speed, cooldown paces them, drag bleeds', () => {
   for (let i = 0; i < 40; i++) m.update(DT, 0, 0);
   assert.ok(m.push(), 'cooled down');
   for (let i = 0; i < 90; i++) m.update(DT, 0, 0);
-  assert.ok(m.speed > 4 && m.speed < SKATE_TUNING.cruiseSpeed, `cruising at ${m.speed.toFixed(1)}`);
+  // RELATIVE TO CRUISE, not a literal. This bar was written as `> 4` when cruise was
+  // 7.5 (f77c644) — i.e. 53% of cruise, and it passed at 0.609. The weight pass
+  // (252d8ed) deliberately dropped cruise to 5.6, which turned the same literal into a
+  // 71% bar overnight; the economy itself barely moved (0.609 -> 0.576 of cruise). The
+  // test was reporting a retune as a regression, and the red was then waved through as
+  // "pre-existing" — so express the invariant the way it was always meant: two pushes
+  // leave you cruising, not crawling, and never at max.
+  const ratio = m.speed / SKATE_TUNING.cruiseSpeed;
+  assert.ok(
+    ratio > 0.5 && m.speed < SKATE_TUNING.cruiseSpeed,
+    `two pushes should leave you above half cruise and below it — got ${m.speed.toFixed(2)} m/s (${(ratio * 100).toFixed(0)}% of ${SKATE_TUNING.cruiseSpeed})`,
+  );
 });
 ok('flat-ground pump approaches cruise but never max', () => {
   const m = new BoardMovement();
   for (let i = 0; i < 60 * 10; i++) m.update(DT, 0, 1);   // 10s of pumping, flat
   assert.ok(m.speed <= SKATE_TUNING.cruiseSpeed + 0.05, `capped at cruise (${m.speed.toFixed(1)})`);
   assert.ok(m.speed > SKATE_TUNING.cruiseSpeed * 0.5, `pumping beats pushing on flat (${m.speed.toFixed(1)})`);
+});
+
+ok('a board coasts like a board — it rolls, and it still comes to rest', () => {
+  // SKATE-COAST. The weight pass bundled friction in with weight and nothing noticed,
+  // because no test described what a coast should feel like. This one does, as a
+  // physical property rather than a magic number: ride to cruise on the shipping input
+  // (hold forward), let go, and measure the whole roll-out.
+  const m = new BoardMovement();
+  for (let i = 0; i < 60 * 10; i++) m.update(DT, 0, 0, undefined, undefined, undefined, 1);
+  const from = m.speed;
+  assert.ok(from > SKATE_TUNING.cruiseSpeed * 0.95, `holds cruise before the coast (${from.toFixed(2)})`);
+
+  let stop = -1;
+  for (let i = 0; i < 60 * 60; i++) {
+    m.update(DT, 0, 0);
+    if (m.speed <= 0.1) { stop = (i + 1) / 60; break; }
+  }
+  assert.ok(stop > 0, 'a coasting board must come to rest, not roll forever');
+  const decel = from / stop;
+  // A real board on flat concrete sheds roughly 0.1-0.3 m/s^2. This is a game, and the
+  // owner's weight pass is deliberate, so the window is wider than life — but it has
+  // both ends: above 0.85 the board dies under you (it was 0.98), below 0.45 it never
+  // settles and the push cadence stops meaning anything.
+  assert.ok(decel > 0.45 && decel < 0.85, `coast decel ${decel.toFixed(2)} m/s^2 (rolls to rest in ${stop.toFixed(1)}s)`);
 });
 
 console.log('\nB. carve');

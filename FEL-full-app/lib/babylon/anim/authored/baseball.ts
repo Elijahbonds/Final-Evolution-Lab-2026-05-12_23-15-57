@@ -25,6 +25,25 @@ const BAT_LOAD: V3 = [0.28, 1.32, 0.18];
 const LOADED_LEGS: Record<string, Deg3> = { LeftUpLeg: [-24, 0, 12], RightUpLeg: [-24, 0, -12], LeftLeg: [36, 0, 0], RightLeg: [36, 0, 0] };
 const BACK_POLES = { Right: [0.8, -0.2, -0.6] as V3, Left: [0.2, -0.6, -0.8] as V3 };
 
+/**
+ * ONE GRIP, ONE ELBOW SIDE (grip sweep, 2026-09-16). Two fists on one handle cannot solve to
+ * mirrored elbow poles: the hands share a point, so the arms share a plane, and the elbows
+ * trail that plane together as the body turns. This clip used to alternate — BACK_POLES at
+ * the load, NO poles at t=0.15 (so the solver's mirrored default), MIRRORED poles at contact
+ * ([-0.7,…] left against [+0.7,…] right), then same-side again at the wrap. buildPoseClip
+ * solves IK per key and interpolates the resulting BONE ROTATIONS between them, so two arms
+ * that keep swapping configuration send their wrists on different paths in between: measured,
+ * the fists opened from 0.03 m to 0.57 m at t=0.75 — as far apart as a fighting guard, with
+ * the bat held by nobody through the follow-through.
+ *
+ * `swingPoles` keeps both elbows on the same side and rolls that side through the turn, so
+ * the pair reads as one grip for the whole swing.
+ */
+const swingPoles = (x: number, y: number, z: number) => ({
+  Right: [x, y, z] as V3,
+  Left: [x - 0.3, y - 0.15, z - 0.1] as V3,   // the trailing fist, just inside the lead elbow
+});
+
 /** Right-handed batter: hands together up by the back (right) shoulder. */
 export function buildBatStance(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const D = 1.2;
@@ -36,11 +55,14 @@ export function buildBatStance(scene: Scene, sk: Skeleton): AnimationGroup | nul
 export function buildBatSwing(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'baseball_swing', 0.55, [
     { t: 0,    bones: { Hips: [0, -18, 0], Spine: [16, -14, 0], ...LOADED_LEGS }, hands: { Left: BAT_LOAD, Right: BAT_LOAD }, poles: BACK_POLES, hipsY: -0.05 },
-    { t: 0.15, bones: { Hips: [0, 10, 0],  Spine: [12, 20, 0],  LeftUpLeg: [-18, 0, 10], RightUpLeg: [-26, 0, -9], LeftLeg: [24, 0, 0], RightLeg: [30, 0, 0] }, hands: { Left: [0.25, 1.20, 0.15], Right: [0.30, 1.22, 0.05] }, hipsY: -0.07 },
+    { t: 0.15, bones: { Hips: [0, 10, 0],  Spine: [12, 20, 0],  LeftUpLeg: [-18, 0, 10], RightUpLeg: [-26, 0, -9], LeftLeg: [24, 0, 0], RightLeg: [30, 0, 0] }, hands: { Left: [0.25, 1.20, 0.15], Right: [0.30, 1.22, 0.05] }, poles: swingPoles(0.70, -0.35, -0.60), hipsY: -0.07 },
     // contact: extended through the zone in front
-    { t: 0.3,  bones: { Hips: [0, 55, 0],  Spine: [8, 50, 0],   LeftUpLeg: [-10, 0, 8],  RightUpLeg: [-30, 0, -6], LeftLeg: [20, 0, 0], RightLeg: [26, 0, 0] }, hands: { Left: [0.10, 1.15, 0.55], Right: [0.14, 1.15, 0.52] }, poles: { Left: [-0.7, -0.5, -0.2], Right: [0.7, -0.5, -0.2] }, hipsY: -0.06 },
+    { t: 0.3,  bones: { Hips: [0, 55, 0],  Spine: [8, 50, 0],   LeftUpLeg: [-10, 0, 8],  RightUpLeg: [-30, 0, -6], LeftLeg: [20, 0, 0], RightLeg: [26, 0, 0] }, hands: { Left: [0.10, 1.15, 0.55], Right: [0.14, 1.15, 0.52] }, poles: swingPoles(0.25, -0.60, -0.65), hipsY: -0.06 },
+    // mid follow-through: the fists are still together, and without this key the 0.3 -> 0.55
+    // rotation interpolation was free to walk them apart across the fastest part of the swing.
+    { t: 0.42, bones: { Hips: [0, 57, 0], Spine: [7, 52, 0], LeftUpLeg: [-11, 0, 8], RightUpLeg: [-30, 0, -6], LeftLeg: [20, 0, 0], RightLeg: [26, 0, 0] }, hands: { Left: [-0.13, 1.35, 0.33], Right: [-0.08, 1.35, 0.33] }, poles: swingPoles(-0.10, -0.55, -0.63), hipsY: -0.04 },
     // wrapped high on the left
-    { t: 0.55, bones: { Hips: [0, 60, 0],  Spine: [6, 55, 0],   LeftUpLeg: [-12, 0, 8],  RightUpLeg: [-30, 0, -6], LeftLeg: [20, 0, 0], RightLeg: [26, 0, 0] }, hands: { Left: [-0.35, 1.55, 0.10], Right: [-0.30, 1.55, 0.14] }, poles: { Left: [-0.8, -0.3, -0.5], Right: [-0.4, -0.6, -0.6] }, hipsY: -0.02 },
+    { t: 0.55, bones: { Hips: [0, 60, 0],  Spine: [6, 55, 0],   LeftUpLeg: [-12, 0, 8],  RightUpLeg: [-30, 0, -6], LeftLeg: [20, 0, 0], RightLeg: [26, 0, 0] }, hands: { Left: [-0.35, 1.55, 0.10], Right: [-0.30, 1.55, 0.14] }, poles: swingPoles(-0.45, -0.50, -0.60), hipsY: -0.02 },
   ]);
 }
 
@@ -100,7 +122,15 @@ const PITCH_LEGS = {
   land: { LeftUpLeg: [-30, 0, 10] as Deg3, LeftLeg: [20, 0, 0] as Deg3, RightUpLeg: [-6, 0, -6] as Deg3, RightLeg: [8, 0, 0] as Deg3 },
   done: { LeftUpLeg: [-20, 0, 10] as Deg3, LeftLeg: [20, 0, 0] as Deg3, RightUpLeg: [-4, 0, -6] as Deg3, RightLeg: [6, 0, 0] as Deg3 },
 };
-const GLOVE = { set: [-0.20, 1.05, 0.15] as V3, lift: [-0.15, 1.35, 0.12] as V3, land: [-0.25, 1.10, 0.30] as V3, done: [-0.20, 1.00, 0.20] as V3 };
+/**
+ * The glove hand, OUT IN FRONT OF THE CHEST (joint sweep, 2026-09-16). These targets used to sit
+ * 0.12-0.15 m in front of the body at shoulder height — which is on top of the shoulder itself,
+ * about 0.16 m from the joint, far inside the arm. `hands` is absolute-from-the-root, so the
+ * solver can only reach it by folding the elbow shut: measured, the left elbow closed to 11 deg
+ * on the side-arm and 16 deg over the top, which is the forearm passing through the bicep. A
+ * pitcher's glove rides out in front, not tucked into the armpit.
+ */
+const GLOVE = { set: [-0.22, 1.08, 0.32] as V3, lift: [-0.24, 1.30, 0.34] as V3, land: [-0.30, 1.12, 0.40] as V3, done: [-0.26, 1.02, 0.30] as V3 };
 const OVER_POLE: V3 = [0.9, 0.1, -0.3];
 
 /** Over-the-top delivery: the arm goes high behind, then whips over and forward. */

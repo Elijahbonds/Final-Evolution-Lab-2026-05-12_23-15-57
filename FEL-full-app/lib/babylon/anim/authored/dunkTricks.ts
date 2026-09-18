@@ -181,7 +181,7 @@ export const BACKFLIP_SEC = 0.9;
 export function buildBackflip(scene: Scene, sk: Skeleton): AnimationGroup | null {
   /** Arms pulled in through the tuck: at the chest, a little forward, riding the rotation. */
   const hand = (side: -1 | 1, deg: number): V3 => {
-    const r = (deg * Math.PI) / 180, x = side * 0.20, y = 0.42, z = 0.26;
+    const r = (deg * Math.PI) / 180, x = side * 0.28, y = 0.38, z = 0.46;   // RIG-JOINT merge (2026-09-17): z 0.26 put the fists on the shoulders through the tuck (15° elbows); a forearm further out
     return [x, 0.96 + y * Math.cos(r) - z * Math.sin(r), -(y * Math.sin(r) + z * Math.cos(r)) + z];
   };
   const key = (t: number, pitch: number, hipsY: number, tuck: number) => ({

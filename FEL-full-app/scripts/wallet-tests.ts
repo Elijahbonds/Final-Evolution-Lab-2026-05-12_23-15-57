@@ -284,8 +284,13 @@ async function dbTests() {
       const after = await readWallet(prisma, playerId); assert.equal(after.lc, before.lc + 250, 'wallet lc moved');
       const row = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey: `lc_grant_${stamp}` } });
       assert.ok(row && String(row.currency) === 'lc' && Number(row.delta) === 250, 'lc ledger row');
+      // Pass 5 phase 1 (a49ac13) stopped mirroring into PlayerProfile.labCredits and made
+      // every reader take the wallet. This assertion used to require the mirror and had been
+      // red ever since — 76 minutes younger than the change that retired it. The invariant
+      // worth holding is that the wallet is authoritative and the dead column is NOT written.
       const prof = await prisma.playerProfile.findUnique({ where: { userId: playerId }, select: { labCredits: true } });
-      assert.equal(prof?.labCredits, after.lc, 'profile column mirrors the wallet');
+      assert.equal(Number(prof?.labCredits ?? 0), 0, 'the retired profile column stays unwritten');
+      assert.equal((await readWallet(prisma, playerId)).lc, after.lc, 'the wallet is the balance');
       const audit = await prisma.creditLedger.findFirst({ where: { userId: playerId, dedupeKey: `lc_grant_${stamp}` } });
       assert.ok(audit && audit.amount === 250, 'house book (CreditLedger) has the movement');
     });

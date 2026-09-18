@@ -22,8 +22,8 @@ export function buildHitReact(scene: Scene, sk: Skeleton): AnimationGroup | null
 export function buildKnockdown(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'karate_knockdown', 0.7, [
     { t: 0,   bones: { Hips: [0, 0, 0], Spine: [0, 0, 0],     Neck: [0, 0, 0],   LeftUpLeg: [-12, 0, 4],  RightUpLeg: [-12, 0, -4] },  hands: GUARD, hipsY: 0 },
-    { t: 0.3, bones: { Hips: [0, 0, 0], Spine: [-40, 10, 8],  Neck: [-18, 0, 0], LeftUpLeg: [-20, 0, 8],  RightUpLeg: [-16, 0, -6] },  hands: { Left: [-0.40, 1.30, -0.10], Right: [0.42, 1.28, -0.12] }, hipsY: -0.30 },   // arms fly out and back
-    { t: 0.7, bones: { Hips: [0, 0, 0], Spine: [-85, 12, 10], Neck: [-10, 0, 0], LeftUpLeg: [-35, 0, 12], RightUpLeg: [-25, 0, -10] }, hands: { Left: [-0.55, 0.30, -0.35], Right: [0.55, 0.30, -0.40] }, poles: { Left: [-0.3, 0.8, -0.4], Right: [0.3, 0.8, -0.4] }, hipsY: -0.9 },   // on the floor, arms out
+    { t: 0.3, ...FALL_MID },   // arms fly out and back, pelvis already going over
+    { t: 0.7, ...FLOOR_KEY },   // on the floor, arms out — the same key the hold and the get-up use
   ]);
 }
 
@@ -126,13 +126,17 @@ export function buildCombatRoll(scene: Scene, sk: Skeleton): AnimationGroup | nu
  * NOT key hipsY upward or the two would sum and the fighter would leave the arena. It keys the tuck and
  * the landing absorb only — the shape of a jump, with none of its travel.
  */
+/** FISTS IN FRONT, NOT ON THE SHOULDER (joint sweep, 2026-09-16). Every key here held the hands
+ *  ~0.20 m out at chest height, which is where the shoulder joint already is — so the solver shut
+ *  the elbow to 6 deg (right) and 10 deg (left) to reach them, folding each forearm back through
+ *  its own bicep for the whole jump. The read wanted is fists carried in front of the chest. */
 export function buildCombatJump(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'karate_jump', 0.62, [
-    { t: 0,    bones: { Hips: [8, 0, 0], Spine: [12, 0, 0], LeftUpLeg: [-26, 0, 6], LeftLeg: [44, 0, 0], RightUpLeg: [-26, 0, -6], RightLeg: [44, 0, 0] }, hands: { Left: [-0.20, 1.24, 0.18], Right: [0.20, 1.22, 0.16] }, hipsY: -0.08 },   // the crouch that launches it
-    { t: 0.16, bones: { Hips: [-4, 0, 0], Spine: [-8, 0, 0], Neck: [-8, 0, 0], LeftUpLeg: [-48, 0, 6], LeftLeg: [76, 0, 0], RightUpLeg: [-44, 0, -6], RightLeg: [72, 0, 0] }, hands: { Left: [-0.26, 1.50, 0.16], Right: [0.26, 1.48, 0.14] } },   // knees up — the tuck that clears the sweep
-    { t: 0.34, bones: { Hips: [-2, 0, 0], Spine: [-6, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-40, 0, 6], LeftLeg: [64, 0, 0], RightUpLeg: [-36, 0, -6], RightLeg: [58, 0, 0] }, hands: { Left: [-0.24, 1.46, 0.18], Right: [0.24, 1.44, 0.16] } },   // the hang
-    { t: 0.48, bones: { Hips: [6, 0, 0], Spine: [10, 0, 0], LeftUpLeg: [-20, 0, 6], LeftLeg: [34, 0, 0], RightUpLeg: [-18, 0, -6], RightLeg: [30, 0, 0] }, hands: { Left: [-0.20, 1.30, 0.20], Right: [0.20, 1.28, 0.18] } },   // legs down for the floor
-    { t: 0.62, bones: { Hips: [14, 0, 0], Spine: [18, 0, 0], Neck: [6, 0, 0], LeftUpLeg: [-30, 0, 6], LeftLeg: [50, 0, 0], RightUpLeg: [-28, 0, -6], RightLeg: [48, 0, 0] }, hands: { Left: [-0.16, 1.34, 0.22], Right: [0.16, 1.30, 0.20] }, hipsY: -0.12 },   // the absorb
+    { t: 0,    bones: { Hips: [8, 0, 0], Spine: [12, 0, 0], LeftUpLeg: [-26, 0, 6], LeftLeg: [44, 0, 0], RightUpLeg: [-26, 0, -6], RightLeg: [44, 0, 0] }, hands: { Left: [-0.24, 1.20, 0.34], Right: [0.24, 1.18, 0.32] }, hipsY: -0.08 },   // the crouch that launches it
+    { t: 0.16, bones: { Hips: [-4, 0, 0], Spine: [-8, 0, 0], Neck: [-8, 0, 0], LeftUpLeg: [-48, 0, 6], LeftLeg: [76, 0, 0], RightUpLeg: [-44, 0, -6], RightLeg: [72, 0, 0] }, hands: { Left: [-0.30, 1.46, 0.32], Right: [0.30, 1.44, 0.30] } },   // knees up — the tuck that clears the sweep
+    { t: 0.34, bones: { Hips: [-2, 0, 0], Spine: [-6, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-40, 0, 6], LeftLeg: [64, 0, 0], RightUpLeg: [-36, 0, -6], RightLeg: [58, 0, 0] }, hands: { Left: [-0.28, 1.42, 0.34], Right: [0.28, 1.40, 0.32] } },   // the hang
+    { t: 0.48, bones: { Hips: [6, 0, 0], Spine: [10, 0, 0], LeftUpLeg: [-20, 0, 6], LeftLeg: [34, 0, 0], RightUpLeg: [-18, 0, -6], RightLeg: [30, 0, 0] }, hands: { Left: [-0.24, 1.26, 0.36], Right: [0.24, 1.24, 0.34] } },   // legs down for the floor
+    { t: 0.62, bones: { Hips: [14, 0, 0], Spine: [18, 0, 0], Neck: [6, 0, 0], LeftUpLeg: [-30, 0, 6], LeftLeg: [50, 0, 0], RightUpLeg: [-28, 0, -6], RightLeg: [48, 0, 0] }, hands: { Left: [-0.22, 1.30, 0.38], Right: [0.22, 1.26, 0.36] }, hipsY: -0.12 },   // the absorb
   ]);
 }
 
@@ -160,7 +164,10 @@ export function buildBlockHold(scene: Scene, sk: Skeleton): AnimationGroup | nul
 export function buildGuardImpact(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'karate_guard_impact', 0.24, [
     { t: 0,    bones: BLOCK_BONES, hands: HIGH_GUARD, hipsY: -0.03 },
-    { t: 0.07, bones: { ...BLOCK_BONES, Hips: [0, 0, 0], Spine: [16, 0, 0], Neck: [14, 0, 0] }, hands: { Left: [-0.10, 1.42, 0.10], Right: [0.10, 1.40, 0.08] }, hipsY: -0.07 },
+    // MERGE (2026-09-17): the shove goes BACK toward the chin (the read: a guard driven into the face), 8 cm behind the rest
+    // guard — but LOWER and WIDER than the old [-0.10, 1.42, 0.10] key, which the joint sweep measured folding the elbow to
+    // 6–10°; the peers' elbow-safe key put the fists OUT in front (z 0.34), which is a guard pushed away, not one taken on the chin
+    { t: 0.07, bones: { ...BLOCK_BONES, Hips: [0, 0, 0], Spine: [16, 0, 0], Neck: [14, 0, 0] }, hands: { Left: [-0.22, 1.20, 0.14], Right: [0.22, 1.18, 0.12] }, hipsY: -0.07 },
     { t: 0.24, bones: BLOCK_BONES, hands: HIGH_GUARD, hipsY: -0.03 },
   ]);
 }
@@ -179,12 +186,47 @@ export function buildParry(scene: Scene, sk: Skeleton): AnimationGroup | null {
   ]);
 }
 
-/** The knockdown's floor key — the HELD loop a downed fighter stays in (a breath in the chest), and the get-up's start. */
+/**
+ * The knockdown's floor key — the HELD loop a downed fighter stays in (a breath in the chest),
+ * and the get-up's start.
+ *
+ * LIE THE PELVIS, NOT THE SPINE (SKATE-LEGS sweep, 2026-09-16). This used to read
+ * `Hips: [0,0,0]` with `Spine: [-85,…]`, which is not a body on the floor — it is a BACKBEND.
+ * The pelvis stayed vertical, so the legs went on hanging from an upright hip socket, and
+ * `hipsY: -0.9` then drove them straight down through the mat: measured on a fresh rig, the
+ * lowest ankle sat at -0.775 with the hips at 0.071. Nothing clamped it, because karate does
+ * not foot-plant (only the basketball and board trees call plantLeg), so a KO — the money
+ * shot of the mode — put a shin through the floor for the whole held loop and the get-up.
+ *
+ * Rotating the HIPS lays the whole chain down, which is what "on your back" actually is; the
+ * spine then only needs the small curl a fighter keeps, and the knees fall where a downed
+ * body's knees fall. Measured after: lowest ankle above the mat, hips still on it.
+ */
+/**
+ * The halfway pose of the fall — and of the get-up, which is the same pose travelled the
+ * other way, so they share it rather than drifting apart. The pelvis is already going over
+ * here (the old keys held it bolt upright at hipsY -0.30, which is what left a foot under
+ * the floor mid-fall even after the floor key itself was fixed).
+ */
+const FALL_MID = {
+  bones: {
+    Hips: [-34, 2, 2] as V3, Spine: [-18, 8, 6] as V3, Neck: [-4, 0, 0] as V3,
+    LeftUpLeg: [-26, 0, 9] as V3, RightUpLeg: [-20, 0, -7] as V3,
+    LeftLeg: [46, 0, 0] as V3, RightLeg: [42, 0, 0] as V3,
+  },
+  hands: { Left: [-0.40, 1.30, -0.10] as V3, Right: [0.42, 1.28, -0.12] as V3 },
+  hipsY: -0.23,
+};
+
 const FLOOR_KEY = {
-  bones: { Hips: [0, 0, 0] as V3, Spine: [-85, 12, 10] as V3, Neck: [-10, 0, 0] as V3, LeftUpLeg: [-35, 0, 12] as V3, RightUpLeg: [-25, 0, -10] as V3 },
+  bones: {
+    Hips: [-82, 6, 4] as V3, Spine: [-8, 8, 6] as V3, Neck: [16, 0, 0] as V3,
+    LeftUpLeg: [-16, 0, 10] as V3, RightUpLeg: [-10, 0, -8] as V3,
+    LeftLeg: [34, 0, 0] as V3, RightLeg: [28, 0, 0] as V3,
+  },
   hands: { Left: [-0.55, 0.30, -0.35] as V3, Right: [0.55, 0.30, -0.40] as V3 },
   poles: { Left: [-0.3, 0.8, -0.4] as V3, Right: [0.3, 0.8, -0.4] as V3 },
-  hipsY: -0.9,
+  hipsY: -0.78,
 };
 export function buildFloorHold(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 1.4;
@@ -199,7 +241,7 @@ export function buildFloorHold(scene: Scene, sk: Skeleton): AnimationGroup | nul
 export function buildGetUp(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'karate_get_up', 0.45, [
     { t: 0, ...FLOOR_KEY },
-    { t: 0.22, bones: { Hips: [0, 0, 0], Spine: [-40, 10, 8], Neck: [-18, 0, 0], LeftUpLeg: [-20, 0, 8], RightUpLeg: [-16, 0, -6] }, hands: { Left: [-0.40, 1.30, -0.10], Right: [0.42, 1.28, -0.12] }, hipsY: -0.30 },
+    { t: 0.22, ...FALL_MID },   // the fall's halfway pose, travelled the other way
     { t: 0.45, bones: { Hips: [0, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0], LeftUpLeg: [-12, 0, 4], RightUpLeg: [-12, 0, -4] }, hands: GUARD, hipsY: 0 },
   ]);
 }
@@ -229,7 +271,7 @@ export function buildEvade(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const SLIP = { Hips: [0, 18, 0] as V3, Spine: [-24, 12, -10] as V3, Neck: [-8, 0, 0] as V3, LeftUpLeg: [-34, 0, 12] as V3, RightUpLeg: [-28, 0, -12] as V3, LeftLeg: [50, 0, 0] as V3, RightLeg: [46, 0, 0] as V3 };
   return buildPoseClip(scene, sk, 'karate_evade', 0.36, [
     { t: 0,    bones: STAND, hands: GUARD, hipsY: 0 },
-    { t: 0.14, bones: SLIP,  hands: { Left: [-0.24, 1.30, 0.16], Right: [0.22, 1.26, 0.06] }, hipsY: -0.26 },   // low, back, guard still up (hand targets ride the hips offset: 1.30 − 0.26 ≈ 1.04 m)
+    { t: 0.14, bones: SLIP,  hands: { Left: [-0.24, 1.30, 0.16], Right: [0.22, 1.26, 0.06] }, hipsY: -0.17 },   // low, back, guard still up (hand targets ride the hips offset). -0.26 dropped further than the 50/46 knee fold paid for and put both ankles under the mat.
     { t: 0.36, bones: STAND, hands: GUARD, hipsY: 0 },
   ]);
 }
@@ -248,7 +290,7 @@ export function buildLeanDodge(scene: Scene, sk: Skeleton): AnimationGroup | nul
   const OUT_POLES = { Left: [-0.9, 0.4, -0.6] as V3, Right: [0.9, 0.4, -0.6] as V3 };
   return buildPoseClip(scene, sk, 'karate_lean_dodge', T, [
     { t: 0,    bones: STAND, hands: GUARD, hipsY: 0 },
-    { t: 0.13, bones: LEAN, hands: OUT, poles: OUT_POLES, hipsY: -0.22 },   // the fold: fast in
+    { t: 0.13, bones: LEAN, hands: OUT, poles: OUT_POLES, hipsY: -0.08 },   // the fold: fast in (-0.22 sank the ankles; the 46/40 knees only pay for this much)
     { t: 0.24, bones: { ...LEAN, Spine: [-54, 0, 6] }, hands: { Left: [-0.60, 1.05, -0.32], Right: [0.58, 1.03, -0.38] }, poles: OUT_POLES, hipsY: -0.21 },   // held a beat at the bottom
     { t: T,    bones: STAND, hands: GUARD, hipsY: 0 },
   ]);
@@ -260,8 +302,8 @@ export function buildLeanDodge(scene: Scene, sk: Skeleton): AnimationGroup | nul
 export function buildElbow(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'karate_elbow', 0.42, [
     { t: 0,    bones: { Hips: [4, 8, 0], Spine: [10, 6, 0], LeftUpLeg: [-24, 0, 8], LeftLeg: [40, 0, 0], RightUpLeg: [-24, 0, -8], RightLeg: [40, 0, 0] }, hands: { Left: GUARD.Left, Right: GUARD.Right }, hipsY: -0.06 },
-    { t: 0.16, bones: { Hips: [6, -26, 0], Spine: [12, -18, 4], Neck: [-4, 10, 0], LeftUpLeg: [-28, 0, 8], LeftLeg: [44, 0, 0], RightUpLeg: [-20, 0, -8], RightLeg: [34, 0, 0] }, hands: { Left: [-0.22, 1.30, 0.26], Right: [-0.08, 1.46, 0.34] }, poles: { Right: [0.55, 1.4, 0.55] as V3 }, hipsY: -0.04 },   // the elbow across: the right fist by the left ear, the elbow leading
-    { t: 0.28, bones: { Hips: [6, -30, 0], Spine: [10, -20, 4], Neck: [-4, 12, 0], LeftUpLeg: [-28, 0, 8], LeftLeg: [44, 0, 0], RightUpLeg: [-20, 0, -8], RightLeg: [34, 0, 0] }, hands: { Left: [-0.22, 1.30, 0.26], Right: [-0.16, 1.44, 0.30] }, poles: { Right: [0.5, 1.4, 0.6] as V3 }, hipsY: -0.04 },
+    { t: 0.16, bones: { Hips: [6, -26, 0], Spine: [12, -18, 4], Neck: [-4, 10, 0], LeftUpLeg: [-28, 0, 8], LeftLeg: [44, 0, 0], RightUpLeg: [-20, 0, -8], RightLeg: [34, 0, 0] }, hands: { Left: [-0.22, 1.30, 0.26], Right: [-0.18, 1.44, 0.46] }, poles: { Right: [0.55, 1.4, 0.55] as V3 }, hipsY: -0.04 },   // the elbow across: the right fist by the left ear, the elbow leading
+    { t: 0.28, bones: { Hips: [6, -30, 0], Spine: [10, -20, 4], Neck: [-4, 12, 0], LeftUpLeg: [-28, 0, 8], LeftLeg: [44, 0, 0], RightUpLeg: [-20, 0, -8], RightLeg: [34, 0, 0] }, hands: { Left: [-0.22, 1.30, 0.26], Right: [-0.26, 1.42, 0.42] }, poles: { Right: [0.5, 1.4, 0.6] as V3 }, hipsY: -0.04 },
     { t: 0.42, bones: { Hips: [4, 4, 0], Spine: [10, 4, 0], LeftUpLeg: [-24, 0, 8], LeftLeg: [40, 0, 0], RightUpLeg: [-24, 0, -8], RightLeg: [40, 0, 0] }, hands: { Left: GUARD.Left, Right: GUARD.Right }, hipsY: -0.06 },
   ]);
 }
@@ -271,10 +313,10 @@ export function buildElbow(scene: Scene, sk: Skeleton): AnimationGroup | null {
 export function buildSpinElbow(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'karate_spin_elbow', 0.6, [
     { t: 0,    bones: { Hips: [4, 0, 0], Spine: [10, 0, 0], LeftUpLeg: [-24, 0, 8], LeftLeg: [40, 0, 0], RightUpLeg: [-24, 0, -8], RightLeg: [40, 0, 0] }, hands: { Left: GUARD.Left, Right: GUARD.Right }, hipsY: -0.06 },
-    { t: 0.14, bones: { Hips: [6, -110, 0], Spine: [8, -20, 0], Neck: [-4, -30, 0], LeftUpLeg: [-30, 0, 8], LeftLeg: [46, 0, 0], RightUpLeg: [-14, 0, -8], RightLeg: [26, 0, 0] }, hands: { Left: [-0.24, 1.28, 0.20], Right: [0.34, 1.34, -0.30] }, hipsY: -0.05 },   // the wind: the back turns, the elbow loads behind
-    { t: 0.26, bones: { Hips: [6, -230, 0], Spine: [6, -14, 0], Neck: [-4, -20, 0], LeftUpLeg: [-30, 0, 8], LeftLeg: [46, 0, 0], RightUpLeg: [-16, 0, -8], RightLeg: [28, 0, 0] }, hands: { Left: [-0.24, 1.28, 0.20], Right: [0.48, 1.44, 0.10] }, hipsY: -0.05 },
-    { t: 0.34, bones: { Hips: [8, -350, 0], Spine: [4, 6, 6], Neck: [-4, 8, 0], LeftUpLeg: [-32, 0, 8], LeftLeg: [48, 0, 0], RightUpLeg: [-18, 0, -8], RightLeg: [30, 0, 0] }, hands: { Left: [-0.20, 1.30, 0.24], Right: [-0.02, 1.52, 0.40] }, poles: { Right: [0.6, 1.5, 0.6] as V3 }, hipsY: -0.04 },   // the hit: round and through, the elbow at head height
-    { t: 0.46, bones: { Hips: [6, -360, 0], Spine: [8, 2, 2], LeftUpLeg: [-28, 0, 8], LeftLeg: [44, 0, 0], RightUpLeg: [-22, 0, -8], RightLeg: [38, 0, 0] }, hands: { Left: [-0.22, 1.30, 0.24], Right: [0.10, 1.40, 0.34] }, hipsY: -0.05 },
+    { t: 0.14, bones: { Hips: [6, -110, 0], Spine: [8, -20, 0], Neck: [-4, -30, 0], LeftUpLeg: [-30, 0, 8], LeftLeg: [46, 0, 0], RightUpLeg: [-14, 0, -8], RightLeg: [26, 0, 0] }, hands: { Left: [-0.11, 1.28, -0.29], Right: [0.46, 1.30, -0.42] }, hipsY: -0.05 },   // the wind (the guard hand rides the −110° turn: the rest offset rotated with the hips): the back turns, the elbow loads behind
+    { t: 0.26, bones: { Hips: [6, -230, 0], Spine: [6, -14, 0], Neck: [-4, -20, 0], LeftUpLeg: [-30, 0, 8], LeftLeg: [46, 0, 0], RightUpLeg: [-16, 0, -8], RightLeg: [28, 0, 0] }, hands: { Left: [0.31, 1.28, 0.06], Right: [0.56, 1.42, 0.18] }, hipsY: -0.05 },   // −230°
+    { t: 0.34, bones: { Hips: [8, -350, 0], Spine: [4, 6, 6], Neck: [-4, 8, 0], LeftUpLeg: [-32, 0, 8], LeftLeg: [48, 0, 0], RightUpLeg: [-18, 0, -8], RightLeg: [30, 0, 0] }, hands: { Left: [-0.20, 1.30, 0.24], Right: [-0.14, 1.50, 0.52] }, poles: { Right: [0.6, 1.5, 0.6] as V3 }, hipsY: -0.04 },   // the hit: round and through, the elbow at head height
+    { t: 0.46, bones: { Hips: [6, -360, 0], Spine: [8, 2, 2], LeftUpLeg: [-28, 0, 8], LeftLeg: [44, 0, 0], RightUpLeg: [-22, 0, -8], RightLeg: [38, 0, 0] }, hands: { Left: [-0.22, 1.30, 0.24], Right: [0.06, 1.40, 0.42] }, hipsY: -0.05 },
     { t: 0.6,  bones: { Hips: [4, -360, 0], Spine: [10, 0, 0], LeftUpLeg: [-24, 0, 8], LeftLeg: [40, 0, 0], RightUpLeg: [-24, 0, -8], RightLeg: [40, 0, 0] }, hands: { Left: GUARD.Left, Right: GUARD.Right }, hipsY: -0.06 },
   ]);
 }

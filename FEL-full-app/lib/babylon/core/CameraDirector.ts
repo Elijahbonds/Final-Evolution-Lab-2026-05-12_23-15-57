@@ -374,6 +374,32 @@ export class CameraDirector {
     this.cfg = FOLLOW_PRESETS[preset] ?? FOLLOW_PRESETS.court;
   }
 
+  /**
+   * BROADCAST CUT (HIT-CAM). 0 = the mode's own preset, 1 = a broadcast framing: higher,
+   * further back, looking further downfield so the player reads the gap before contact.
+   *
+   * The decision of WHEN to cut is not this class's business — lib/feel/football-cam.ts
+   * owns that (converge count -> fire -> hold -> cooldown) and is unit-tested on its own.
+   * This is only the framing half, so any mode with a "something big is about to happen"
+   * signal can drive it without re-deriving a camera.
+   */
+  public broadcast = 0;
+
+  /** The active preset, blended toward the broadcast framing by `broadcast`. */
+  private effCfg(): FollowConfig {
+    const b = Math.max(0, Math.min(1, this.broadcast));
+    if (b <= 0) return this.cfg;
+    const c = this.cfg;
+    return {
+      ...c,
+      distance: c.distance + 4.0 * b,
+      height: c.height + 6.0 * b,
+      minHeight: c.minHeight + 4.0 * b,
+      lookAhead: c.lookAhead + 6.0 * b,
+      pitchCapDeg: c.pitchCapDeg + 10 * b,
+    };
+  }
+
   setPreset(preset: keyof typeof FOLLOW_PRESETS): void {
     this.cfg = FOLLOW_PRESETS[preset] ?? this.cfg;
     this.mode = 'follow';
@@ -460,7 +486,7 @@ export class CameraDirector {
   }
 
   snapTo(subject: Vector3, objective: Vector3 | null): void {
-    const cfg = this.cfg;
+    const cfg = this.effCfg();
     const back = objective
       ? subject.subtract(objective).normalize()
       : new Vector3(0, 0, 1);
@@ -501,7 +527,7 @@ export class CameraDirector {
       return;
     }
 
-    const cfg = this.cfg;
+    const cfg = this.effCfg();
     let back: Vector3;
     if (cfg.fitTwo && objective) {
       back = subject.subtract(objective);
@@ -683,7 +709,7 @@ export class CameraDirector {
   private lastBoxedInLogAt = -Infinity;
 
   private aim(subject: Vector3, objective: Vector3 | null, velocity?: Vector3): void {
-    const cfg = this.cfg;
+    const cfg = this.effCfg();
     const chest = subject.add(new Vector3(0, cfg.targetHeight, 0));
 
     // Lead the subject along the GROUND direction of travel. This used the raw
@@ -755,7 +781,7 @@ export class CameraDirector {
    * Opt-in per preset: a config without `fovGain` behaves exactly as before.
    */
   private applyDynamicFov(velocity: Vector3 | undefined): void {
-    const cfg = this.cfg;
+    const cfg = this.effCfg();
     if (this.baseFov === null) this.baseFov = this.camera.fov;
     if (!cfg.fovGain) {
       // a preset that does not opt in must not be left holding a widened lens from a

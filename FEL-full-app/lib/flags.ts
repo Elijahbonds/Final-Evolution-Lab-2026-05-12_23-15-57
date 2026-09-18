@@ -43,3 +43,17 @@ export const FEATURE_DISABLED = { error: 'feature_disabled', message: 'This feat
 export function isSeasonPassPurchaseEnabled(): boolean {
   return envOn('SEASON_PASS_PURCHASE');
 }
+
+/**
+ * PRO-lane price in USD cents, read from SEASON_PASS_PRO_PRICE_USD_CENTS.
+ *
+ * Pricing is the OWNER's, never the code's: there is deliberately no default
+ * and no fallback. Unset (or non-positive) returns null and the checkout route
+ * answers 503 `not_configured`, so the lane can never be sold at a price the
+ * repo invented. Elijah sets the env var; changing the price needs no deploy.
+ */
+export function seasonPassProPriceUsdCents(): number | null {
+  const raw = Number((process.env.SEASON_PASS_PRO_PRICE_USD_CENTS ?? '').trim());
+  if (!Number.isFinite(raw) || raw <= 0) return null;
+  return Math.round(raw);
+}

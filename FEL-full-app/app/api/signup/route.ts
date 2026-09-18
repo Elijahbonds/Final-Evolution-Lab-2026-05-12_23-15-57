@@ -9,6 +9,7 @@ import { recordServerEvent } from '@/lib/analytics-server';
 import { GUEST_COOKIE } from '@/lib/guest';
 import { convertReferralOnSignup } from '@/lib/marketing/referral';
 import { sendWelcomeEmail } from '@/lib/marketing/email';
+import { isUnreachable } from '@/lib/db/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,6 +125,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error('signup error', e);
+    // Separate "the server is misconfigured" from "something went wrong", so a
+    // dead DATABASE_URL is visible instead of reading as a transient glitch
+    // the athlete should retry. 503 + Retry-After, never the raw Prisma text:
+    // it names the database host and port.
+    if (isUnreachable(e)) {
+      return NextResponse.json(
+        { error: "Account service is temporarily unavailable — the server can't reach its database. Please try again shortly." },
+        { status: 503, headers: { 'Retry-After': '60' } }
+      );
+    }
     return NextResponse.json({ error: 'Signup failed. Please try again.' }, { status: 500 });
   }
 }

@@ -96,7 +96,16 @@ span('rh', CARRY.from, CARRY.to);
 span('lh', RISE.from, RISE.to);
 const keys = raw.map(({ t, hipYaw, pitch, spineYaw, lh, rh, lf, rf, hY }) => {
   const P = (v: V): string => `[${R(v[0] * SCALE)}, ${R(REF_HIPS + hY + v[1] * SCALE)}, ${R(v[2] * SCALE)}]`;
-  return `    { t: ${t}, bones: { Hips: [0, ${hipYaw}, 0], Spine: [${Math.max(-25, Math.min(45, pitch))}, ${spineYaw}, 0] }, hands: { Left: ${P(lh)}, Right: ${P(rh)} }, feet: { Left: ${P(lf)}, Right: ${P(rf)} }, hipsY: ${R(hY)} },`;
+  // THE CROUCH IS CARRIED ONCE, NOT TWICE (dunk pass, 2026-09-16). poseClip solves the foot
+  // targets into LOCAL LEG ROTATIONS on an untranslated body and then emits `hipsY` as its own
+  // Hips translation track — and the legs hang off Hips, so that translation already lowers the
+  // ankles. Baking hY into the target as well charged the crouch to the feet a second time:
+  // at t=0 the target says 0.08 (an ankle 8 cm off the floor, correct) and the foot rendered at
+  // 0.08 - 0.25 = -0.170, a boot through the court on the OPENING FRAME of every dunk. The
+  // note above this describes the opposite symptom, feet floating 0.25 m up, which is what the
+  // same bake fixed before poseClip carried hipsY on its own track.
+  const PF = (v: V): string => `[${R(v[0] * SCALE)}, ${R(REF_HIPS + v[1] * SCALE)}, ${R(v[2] * SCALE)}]`;
+  return `    { t: ${t}, bones: { Hips: [0, ${hipYaw}, 0], Spine: [${Math.max(-25, Math.min(45, pitch))}, ${spineYaw}, 0] }, hands: { Left: ${P(lh)}, Right: ${P(rh)} }, feet: { Left: ${PF(lf)}, Right: ${PF(rf)} }, hipsY: ${R(hY)} },`;
 });
 
 const src = `// mocapDunk — the owner's REAL dunk capture (public/mocap/dunk.json, DeepMotion,

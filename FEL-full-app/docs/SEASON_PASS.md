@@ -1,0 +1,206 @@
+# Season Pass — operator guide (M13/M14)
+
+Everything the season pass needs to run, and the exact switches that take the
+PRO lane live. Nothing here decides a price: **pricing is the owner's**, set in
+env, changeable without a deploy.
+
+## What ships on by default
+
+The FREE lane is fully live the moment a season row is active. No flag needed.
+
+- Season XP flows from **every mode** through `/api/sessions` → `addSeasonXp()`.
+- 50 tiers, 8-week season. Curve: `TIER_XP(tier) = 450 + tier * 68`
+  (`lib/season/season-pass-core.ts`). It is the single source of truth — never
+  re-derive the curve anywhere else.
+- Clearing a tier **books** its rewards immediately, server-side, keyed by a
+  unique `PassGrant.dedupeKey`, so a reward can never be paid twice.
+- An `lc` reward is really credited: `PlayerProfile.labCredits` and the
+  `CreditLedger` double-entry move in the **same transaction** as the grant row.
+- Season 1 "Golden Hour" content is data (`lib/season/golden-hour.ts`), not code.
+  Future seasons ship by adding a table to the registry — no deploy of logic.
+
+Seed an active season with the existing seeder (`prisma/seed` →
+`scripts/seed.ts`), which upserts S1 as active for 8 weeks.
+
+## Pacing (TUNE(elijah))
+
+The whole track costs **105,800 XP** across 56 days. Measured against three
+play profiles, which the pacing checks in `scripts/season-pass-core-tests.ts`
+hold in place:
+
+| Profile | Per day | Outcome |
+|---|---|---|
+| casual — 2 sessions, 2 modes, 50% wins | ~980 XP | ~tier 34 at season end |
+| committed — 4 sessions, 3 modes, 60% wins | ~1,930 XP | finishes ~day 55 |
+| dedicated — 6 sessions, 4 modes, 70% wins | ~2,880 XP | finishes ~day 37 |
+
+Casual deliberately does **not** finish — the track is meant to be an
+achievement. The first shipped curve (`800 + 120t`, 187,000 XP) required about
+seven capped wins a day for eight straight weeks, so nobody reached tier 50 and
+the legendary the PRO lane is sold on was unreachable.
+
+**Re-tuning mid-season is safe but not silent.** Stored `xp` and `tier` are
+untouched, so nobody loses a tier; a lowered curve just means banked XP clears
+more tiers on the athlete's next session, paying out every reward it crosses.
+Observed on a live row: an athlete sitting at tier 7 with 1,600 banked XP rolled
+to tier 9 on one session, with both tier-ups booked and delivered. Until that
+next session the HUD bar reads full (it clamps at 100%).
+
+If the quest track ships, `questsDone` (200 XP each) adds a lever on top of this
+and the curve should be re-measured against the same three profiles.
+
+## Turning the PRO lane on
+
+Three env vars, all required. Miss any one and the lane stays visibly dark
+rather than selling at a price the repo invented.
+
+| Variable | Meaning |
+|---|---|
+| `SEASON_PASS_PURCHASE` | `1` exposes the buy button. Unset/`0` → HUB shows "COMING SOON". |
+| `SEASON_PASS_PRO_PRICE_USD_CENTS` | Price in **cents** (e.g. `999` = $9.99). No default — unset means `/api/season/checkout` answers `503 not_configured`. |
+| `STRIPE_SECRET_KEY` | Already required by the coin store. Absent → `503`. |
+
+The webhook (`/api/v1/wallet/stripe-webhook`) must receive
+`checkout.session.completed` and `charge.refunded`, and needs
+`STRIPE_WEBHOOK_SECRET` — same endpoint and secret the coin store already uses.
+
+### What happens on purchase
+
+1. `POST /api/season/checkout` creates a Stripe Checkout session. The price is
+   server-owned; a client-supplied price is ignored. `seasonId` is pinned into
+   metadata so a payment landing after a season rollover still unlocks the
+   season it was bought for.
+2. Nothing is unlocked there. The lane opens **only** in the signature-verified
+   webhook, on `product: 'SEASON_PASS_PRO'`.
+3. `unlockProLane()` sets `hasPro` and **back-fills** every PRO reward for tiers
+   already climbed — buy at tier 20, collect tiers 1-20 immediately. Back-fill
+   runs through the same dedupeKeys, so a redelivered webhook grants nothing new.
+4. `charge.refunded` closes the lane (`revokeProLane`) **and withdraws the PRO
+   cosmetics it delivered** — see Delivery below for why. FREE-lane items are
+   untouched. The grant rows stay as the audit trail, and re-purchasing re-opens
+   the lane and hands the items back.
+
+**The PRO lane is cosmetic-only. It must never grant a stat, PRQ point, or any
+gameplay edge** (Blueprint Pillar 7). LC is the one non-cosmetic reward and it
+sits on the FREE lane too.
+
+## Delivery: how a cosmetic becomes wearable
+
+A reward is not delivered by being logged. The closet equips out of
+`OwnedWearable`, so a cosmetic that exists only as a `PassGrant` row is a
+receipt for nothing — the pass shipped that way, with all 50 tiers of cosmetics
+unwearable, until this was bridged.
+
+- Season cosmetics are authored **with their slot** in `lib/season/golden-hour.ts`
+  and registered as the reward table is built, so the rewards and the wearables
+  cannot drift apart. One authoring pass, two views of the same data.
+- `getWearable()` resolves them so they can be equipped and rendered.
+  `wearablesForSlot()` (the store listing) does **not** include them, and
+  `/api/v1/closet/buy` refuses them with `403 not_for_sale`. They are earned,
+  never sold, at any coin price.
+- Booking a cosmetic grant writes its `OwnedWearable` row in the same
+  transaction.
+
+**Entitlement is not the ledger.** `PassGrant` is append-only and single-write —
+its dedupeKey is what stops LC being paid twice. Ownership is *state*: a refund
+withdraws it, a re-purchase restores it. That is why unlocking and collecting
+re-assert ownership on their own path instead of going through the grant log,
+which would hit the existing row and silently deliver nothing.
+
+**Databases that ran the pass before this fix owe their players items.** Those
+cosmetics have grant rows and no ownership, and nothing re-delivers them on its
+own once the tier is collected. Run the one-shot reconciliation, which only ever
+adds a missing row and is safe to re-run:
+
+```
+yarn tsx --require dotenv/config scripts/season-backfill-wearables.ts          # dry run
+yarn tsx --require dotenv/config scripts/season-backfill-wearables.ts --apply
+```
+
+It skips PRO grants whose purchase was refunded (those are withdrawn on
+purpose), ids that do not resolve, and grants left behind by deleted accounts.
+
+**Refunds take the PRO cosmetics back.** Unlocking back-fills every earned tier
+at once, so otherwise a player could buy at tier 40, collect four legendaries,
+refund, and keep the product. FREE-lane items are never withdrawn — those were
+earned by playing. The grant rows stay either way, as the audit trail.
+
+## Collecting
+
+`POST /api/season/claim` with `{}` collects everything earned, or
+`{ tier, lane }` collects one. Claiming marks collection for the HUB badge and
+COLLECT beat; it also re-books through the same dedupeKey path, which self-heals
+the case where a tier-up's grant write failed on a transient error. It mints
+nothing new and is safe to call repeatedly.
+
+## Deliberately absent
+
+`SessionXpInput.questsDone` (worth 200 XP each) is part of the verified
+reference core but **nothing feeds it** — FEL has no quest system yet. When a
+daily-quest track lands, pass the count into `SeasonPassCore.sessionXp()` and
+season XP picks it up with no other change. Do not repurpose it for the daily
+streak: the streak bonus pays LC, not pass XP.
+
+## Verifying
+
+`scripts/season-pass-core-tests.ts` (registered in `scripts/standing-suite.ts`)
+covers the curve, tier-up events, reward shape, the tier cap, rehydration,
+collection idempotency, the PRO back-fill, and the delivery invariants (every
+granted cosmetic resolves to a real wearable in a real slot; season items are
+never purchasable; ids are unique and disjoint from the store):
+
+```
+yarn tsx scripts/season-pass-core-tests.ts
+```
+
+## Running it locally
+
+These are the exact steps used to exercise the pass against a real Postgres.
+If `scripts/dev-setup.sh` is present on your branch it automates steps 1-3.
+
+```bash
+# 1. a database (any local Postgres; Docker works too)
+createdb fel
+
+# 2. .env — the PRO lane needs the last two lines; the FREE lane does not
+cat > .env <<'ENV'
+DATABASE_URL="postgresql://USER:PASS@127.0.0.1:5432/fel?schema=public"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="local-dev-only"
+SEASON_PASS_PURCHASE=1
+SEASON_PASS_PRO_PRICE_USD_CENTS=999
+ENV
+
+# 3. deps, schema, seed (the seeder upserts Season 1 "Golden Hour" as active)
+yarn install
+yarn prisma generate && yarn prisma db push
+yarn tsx --require dotenv/config scripts/seed.ts
+
+# 4. run it
+yarn dev
+```
+
+Sign in as `john@doe.com` / `johndoe123`. The pass track sits on the HUB
+(`app/page.tsx`). A fresh account starts at tier 0 with nothing to collect —
+play any mode a few times to climb, since season XP comes off the shared
+`/api/sessions` pipeline.
+
+What to look for:
+
+- **Tier bar** fills toward `TIER_XP(tier)`, and `T{n}` climbs.
+- **COLLECT n REWARDS** appears once you cross a tier that carries one
+  (FREE lane: every 3rd and every 5th). Clicking it clears the badge.
+- **LC actually moves** on every 5th tier — check the credit balance before and
+  after tier 5. That is the fix; it used to log the reward and pay nothing.
+- **The cosmetic is wearable.** Cross tier 3, then open The Closet: "Sunset
+  Chalk Dust" is owned and can be equipped. That is the delivery fix — before
+  it, the reward existed only as a log row and no item ever appeared.
+- **PRO LANE** shows `UNLOCK PRO LANE` with `SEASON_PASS_PURCHASE=1`, or
+  `COMING SOON` without it. Without `STRIPE_SECRET_KEY` the button's request
+  answers `503 not_configured` and the lane stays shut — by design, it will not
+  sell at a price nobody set.
+
+To test a real purchase you need Stripe test keys (`STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`) and `stripe listen --forward-to
+localhost:3000/api/v1/wallet/stripe-webhook`, since the lane only opens in the
+signature-verified webhook — never in the browser.

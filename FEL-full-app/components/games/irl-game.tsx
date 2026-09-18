@@ -9,6 +9,7 @@
 // integrated acceleration, and thrown-phone traces are rejected as cheating.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { GameProps } from '@/components/games/game-shell';
 import Link from 'next/link';
 import { ArrowLeft, Smartphone, Activity, RotateCcw, Square } from 'lucide-react';
 import {
@@ -29,7 +30,8 @@ type Phase = 'gate' | 'unsupported' | 'needs-permission' | 'live' | 'results';
 
 type DME = typeof DeviceMotionEvent & { requestPermission?: () => Promise<'granted' | 'denied'> };
 
-export default function IrlGame() {
+// See acting-game: this mounted bare too, so a logged jump session reported nothing.
+export default function IrlGame({ onEnd }: GameProps) {
   const [phase, setPhase] = useState<Phase>('gate');
   const [jumpCount, setJumpCount] = useState(0);
   const [bestCm, setBestCm] = useState(0);
@@ -105,9 +107,18 @@ export default function IrlGame() {
   const finish = useCallback(() => {
     stopListening();
     const jumps = detectJumps(samplesRef.current);
-    setSession(summarise(jumps));
+    const summary = summarise(jumps);
+    setSession(summary);
     setPhase('results');
-  }, [stopListening]);
+    onEnd({
+      score: Math.round(summary.best),
+      won: summary.total > 0,
+      duration: t0Ref.current ? Math.round((Date.now() - t0Ref.current) / 1000) : 0,
+      headline: `${summary.total} jumps · best ${Math.round(summary.best)} cm`,
+      stats: { jumps: summary.total, bestCm: Math.round(summary.best), averageCm: Math.round(summary.average) },
+      outcome: summary.total > 0 ? 'logged' : 'no jumps detected',
+    });
+  }, [stopListening, onEnd]);
 
   const reset = useCallback(() => {
     stopListening();

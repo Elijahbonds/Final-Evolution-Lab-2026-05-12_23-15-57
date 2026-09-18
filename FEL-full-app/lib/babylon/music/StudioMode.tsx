@@ -32,6 +32,9 @@ import SongPanel from './SongPanel';   // lane 2 M2–M4 — sections, chain, ta
 import { padFromAction } from './Flip';
 import { HostLobby } from '@/components/controller-link/host-lobby';   // M1b — the phone is the pad controller
 import { MODE_CONTROLLERS } from '@/lib/controller-link/schemas/registry';
+import { BootSplash } from '@/components/games/boot-splash';
+import { readMusicStage } from './musicStage';
+import type { GameProps } from '@/components/games/game-shell';
 
 const STEPS = 16;
 const EXPIRE_S = 0.25;
@@ -79,11 +82,16 @@ function cellFoundation(seed = Date.now()): Record<string, boolean[]> {
 type View = 'studio' | 'flip' | 'library' | 'creator' | 'listen';
 type Mode = 'build' | 'perform';
 
+// MUSIC IS BOTH (owner, 2026-09-16). The Academy mounts through GameShell like every
+// other mode, and the STAGE pick on the boot splash decides which half you get: STUDIO
+// is the tool (no clock, no score, nothing reported) and PERFORM is the scored mode
+// that ends on a card. `onEnd` comes from the shell; the rest are the tool's own seams.
 export default function StudioMode({
+  onEnd,
   onPublish,
   profile = { id: 'me', name: 'You' },
   spendShards,
-}: {
+}: GameProps & {
   onPublish?: (payload: unknown) => void;
   profile?: { id: string; name: string };
   /** SHARDS SEAM — wire to the real economy; absent = allowed + logged. */
@@ -97,7 +105,11 @@ export default function StudioMode({
   const [view, setView] = useState<View>('studio');
   const [creatorId, setCreatorId] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [mode, setMode] = useState<Mode>('build');
+  // The boot splash's STAGE pick decides where the Academy opens. 'perform' is the
+  // scored half, so it maps to the PERFORM tab; 'studio' is the tool's BUILD floor.
+  const [mode, setMode] = useState<Mode>(() => (readMusicStage() === 'perform' ? 'perform' : 'build'));
+  const [started, setStarted] = useState(false);
+  const setStartedAt = useRef(0);
   const [playhead, setPlayhead] = useState(-1);
   const [bpm, setBpm] = useState(92);
   const [swing, setSwing] = useState(0.15);
@@ -292,11 +304,66 @@ export default function StudioMode({
     toast: { position: 'sticky', bottom: 8, marginTop: 12, padding: '8px 12px', borderRadius: 8, background: '#7a5c9e', color: '#fff', width: 'fit-content' },
   };
 
+  // ONE WAY INTO PERFORM. The set clock starts here and nowhere else — when this was
+  // only stamped on the splash's READY tap, a player who built for ten minutes and then
+  // tapped PERFORM reported the whole ten minutes as their set. That is the "both" path,
+  // and it is the normal one: the stage pick chooses where you land, not where you stay.
+  const enterPerform = useCallback(() => {
+    setMode('perform');
+    setScore(0);
+    setCombo(0);
+    setStartedAt.current = Date.now();
+  }, []);
+
+  // The scored half's finish line. Reports the set to the shell, which posts the
+  // session and shows the card — the same path every other mode ends on. Back to the
+  // BUILD floor afterwards so the room is still there to keep working in.
+  const endSet = useCallback(() => {
+    const seconds = setStartedAt.current ? Math.round((Date.now() - setStartedAt.current) / 1000) : 0;
+    onEnd?.({
+      score,
+      won: score > 0,
+      duration: seconds,
+      headline: combo > 0 ? `${score} · best combo x${combo}` : `${score}`,
+      stats: { score, combo, kit: String(kit) },
+      outcome: score > 0 ? 'set played' : 'no notes landed',
+    });
+    setMode('build');
+    setScore(0);
+    setCombo(0);
+  }, [onEnd, score, combo, kit]);
+
   const allTracks = StudioLibrary.list();
   const creators = [...new Map(allTracks.map((t) => [t.authorId, t.authorName])).entries()];
   void libraryRev;                                        // read to re-render on library writes
 
-  if (!ready) return <div style={S.root}>Tuning the Academy's instruments…</div>;
+  // The same start ritual as every other mode: the splash carries the STAGE pick, and
+  // the READY tap is what enters the room. It used to be a bare line of text, which is
+  // why music had no screen on which to choose what it was going to be.
+  if (!ready || !started) {
+    return (
+      <div style={S.root}>
+        <BootSplash
+          modeId="music"
+          title="FEL GROOVE ACADEMY"
+          phase={ready ? 'ready' : 'loading'}
+          onStart={() => {
+            // Re-read the pick at the tap, not at mount: the player may have just
+            // changed it on this very screen.
+            const picked = readMusicStage();
+            if (picked === 'perform') {
+              enterPerform();
+            } else {
+              setMode('build');
+              setStartedAt.current = 0;   // no set is running on the studio floor
+            }
+            setStarted(true);
+          }}
+          onRetry={() => setStarted(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div style={S.root}>
@@ -394,11 +461,14 @@ export default function StudioMode({
 
           <div style={S.row}>
             <button style={{ ...S.tab, ...(mode === 'build' ? S.tabOn : {}) }} onClick={() => setMode('build')}>BUILD</button>
-            <button style={{ ...S.tab, ...(mode === 'perform' ? S.tabOn : {}) }} onClick={() => { setMode('perform'); setScore(0); setCombo(0); }}>PERFORM</button>
+            <button style={{ ...S.tab, ...(mode === 'perform' ? S.tabOn : {}) }} onClick={enterPerform}>PERFORM</button>
             {mode === 'perform' && (
               <>
                 <button style={S.btn} onClick={performTap}>TAP</button>
                 <span style={{ fontSize: 13 }}>score {score} · combo x{combo} · {judgement}</span>
+                {/* A scored half needs a finish line, or it can never reach a card. STUDIO
+                    has no END SET because a tool does not end — that is the whole split. */}
+                <button style={S.btn} onClick={endSet}>END SET</button>
               </>
             )}
           </div>

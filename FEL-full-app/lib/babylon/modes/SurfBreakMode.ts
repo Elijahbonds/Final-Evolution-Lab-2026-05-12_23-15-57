@@ -294,7 +294,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'venice');
       boostKit = new BoostKit(0.2); boostHeld = false;
       boostFx?.dispose(); boostFx = new BoostFx(ctx.scene, ctx.camera, { trailFrom: rig.char.root, trailWidth: 0.5, color: '#bff4ff' });
-      boostPads?.dispose(); boostPads = new BoostPads(ctx.scene, PAD_XS.map((x) => ({ pos: new Vector3(x, 0, 0), radius: 2.8 })), '#bff4ff');
+      boostPads?.dispose(); boostPads = new BoostPads(ctx.scene, PAD_XS.map((x) => ({ pos: new Vector3(x, 0, 0), radius: 2.8 })));   // SHARD-PICKUP: one colour for the mechanic
       ctx.setHud({ score: 0, flow: 0, ...boostKit.hud(), time: RUN_SEC, hint: 'Ride the pocket under the lip · pull BACK to climb, push to drop in · R2 drives · hold RB / Shift to BOOST · miss the buoys' });
     },
 

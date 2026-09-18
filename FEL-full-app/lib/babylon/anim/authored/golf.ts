@@ -25,12 +25,31 @@ export function buildGolfAddress(scene: Scene, sk: Skeleton): AnimationGroup | n
   return buildPoseClip(scene, sk, 'golf_address_idle', D, [key(0, 32), key(D / 2, 33), key(D, 32)]);
 }
 
+/** See baseball.ts swingPoles: two fists on one shaft share an arm plane, so the elbows trail
+ *  it together. The address and impact keys used to specify NO poles at all, which drops the
+ *  solver onto its mirrored default and flips one elbow between every pair of keys — measured,
+ *  the hands opened to 0.59 m through the backswing with the club held by one of them. */
+const swingPoles = (x: number, y: number, z: number) => ({
+  Right: [x, y, z] as [number, number, number],
+  Left: [x - 0.3, y - 0.15, z - 0.1] as [number, number, number],
+});
+
 export function buildGolfSwing(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'golf_swing_full', 0.9, [
-    { t: 0,    bones: { Hips: [0, 0, 0],   Spine: [32, 0, 0],   ...LEGS_SOFT }, hands: { Left: GRIP, Right: GRIP }, hipsY: -0.04 },
-    { t: 0.35, bones: { Hips: [0, -40, 0],  Spine: [25, -35, 0],  ...LEGS_SOFT }, hands: { Right: [0.35, 1.75, -0.15], Left: [0.30, 1.70, -0.10] }, poles: { Right: [0.8, -0.3, -0.6], Left: [0.6, -0.6, -0.6] }, hipsY: -0.04 },
-    { t: 0.55, bones: { Hips: [0, 20, 0], Spine: [30, 10, 0], ...LEGS_SOFT }, hands: { Left: [0.0, 0.85, 0.30], Right: [0.0, 0.85, 0.30] }, hipsY: -0.06 },
-    { t: 0.9,  bones: { Hips: [0, 80, 0], Spine: [5, 70, 0],  LeftUpLeg: [-10, 0, 6], RightUpLeg: [-22, 0, -4], LeftLeg: [20, 0, 0], RightLeg: [20, 0, 0] }, hands: { Right: [-0.30, 1.70, 0.05], Left: [-0.35, 1.70, 0.05] }, poles: { Right: [-0.6, -0.6, -0.6], Left: [-0.8, -0.3, -0.6] }, hipsY: 0.0 },
+    { t: 0,    bones: { Hips: [0, 0, 0],   Spine: [32, 0, 0],   ...LEGS_SOFT }, hands: { Left: GRIP, Right: GRIP }, poles: swingPoles(0.55, -0.55, -0.60), hipsY: -0.04 },
+    // mid backswing — the club is travelling fastest here and the 0 -> 0.35 gap was where the
+    // hands came off the shaft (measured 0.59 m at t=0.20 before this key existed).
+    { t: 0.18, bones: { Hips: [0, -22, 0], Spine: [29, -19, 0], ...LEGS_SOFT }, hands: { Right: [0.38, 1.40, -0.05], Left: [0.34, 1.38, -0.02] }, poles: swingPoles(0.68, -0.42, -0.60), hipsY: -0.04 },
+    { t: 0.35, bones: { Hips: [0, -40, 0],  Spine: [25, -35, 0],  ...LEGS_SOFT }, hands: { Right: [0.35, 1.75, -0.15], Left: [0.30, 1.70, -0.10] }, poles: swingPoles(0.80, -0.30, -0.60), hipsY: -0.04 },
+    // mid DOWNSWING — the fastest arc in the motion: the hands fall from over the shoulder to
+    // the ball in 0.2s. Without a key here the rotation interpolation opened them to 0.39 m
+    // right before impact, so the club was in one hand at the only moment that scores.
+    { t: 0.46, bones: { Hips: [0, -10, 0], Spine: [28, -12, 0], ...LEGS_SOFT }, hands: { Right: [0.38, 1.12, 0.18], Left: [0.34, 1.10, 0.21] }, poles: swingPoles(0.58, -0.48, -0.60), hipsY: -0.05 },
+    { t: 0.55, bones: { Hips: [0, 20, 0], Spine: [30, 10, 0], ...LEGS_SOFT }, hands: { Left: [0.0, 0.85, 0.30], Right: [0.0, 0.85, 0.30] }, poles: swingPoles(0.30, -0.65, -0.60), hipsY: -0.06 },
+    // mid follow-through, same reason on the way out
+    { t: 0.65, bones: { Hips: [0, 38, 0], Spine: [24, 30, 0], LeftUpLeg: [-12, 0, 7], RightUpLeg: [-18, 0, -6], LeftLeg: [20, 0, 0], RightLeg: [20, 0, 0] }, hands: { Right: [-0.14, 1.22, 0.26], Left: [-0.18, 1.20, 0.26] }, poles: swingPoles(-0.02, -0.60, -0.60), hipsY: -0.04 },
+    { t: 0.76, bones: { Hips: [0, 56, 0], Spine: [16, 44, 0], LeftUpLeg: [-12, 0, 7], RightUpLeg: [-18, 0, -6], LeftLeg: [20, 0, 0], RightLeg: [20, 0, 0] }, hands: { Right: [-0.30, 1.46, 0.14], Left: [-0.34, 1.44, 0.14] }, poles: swingPoles(-0.22, -0.52, -0.60), hipsY: -0.03 },
+    { t: 0.9,  bones: { Hips: [0, 80, 0], Spine: [5, 70, 0],  LeftUpLeg: [-10, 0, 6], RightUpLeg: [-22, 0, -4], LeftLeg: [20, 0, 0], RightLeg: [20, 0, 0] }, hands: { Right: [-0.30, 1.70, 0.05], Left: [-0.35, 1.70, 0.05] }, poles: swingPoles(-0.55, -0.45, -0.60), hipsY: 0.0 },
   ]);
 }
 

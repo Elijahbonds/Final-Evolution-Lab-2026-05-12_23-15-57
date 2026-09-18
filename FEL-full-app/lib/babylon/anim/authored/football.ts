@@ -37,8 +37,14 @@ export function buildTackledFall(scene: Scene, sk: Skeleton): AnimationGroup | n
     // the hit: hands BRACE forward and low. SHARED-ANIM-BUS (2026-09-14): this key threw both wrists out to shoulder height
     // ([±0.40–0.45, 1.25–1.30, behind the root]) — a T for a frame at the moment of contact, and on the one-mesh scan body
     // the jacket stretched across the chest into the "purple melt" the eye caught mid-play.
-    { t: 0.25, bones: { Hips: [0, 0, 0], Spine: [-30, 0, 12],  Neck: [-16, 0, 0], LeftUpLeg: [-24, 0, 8],  RightUpLeg: [-20, 0, -6] }, hands: { Right: [0.30, 1.02, 0.30], Left: [-0.34, 1.00, 0.30] }, hipsY: -0.35 },
-    { t: 0.6,  bones: { Hips: [0, 0, 0], Spine: [-70, 0, 18],  Neck: [-20, 0, 0], LeftUpLeg: [-40, 0, 10], RightUpLeg: [-30, 0, -8] }, hands: { Right: [0.55, 0.35, -0.40], Left: [-0.55, 0.35, -0.35] }, poles: { Left: [-0.3, 0.8, -0.4], Right: [0.3, 0.8, -0.4] }, hipsY: -0.85 },
+    // LIE THE PELVIS, NOT THE SPINE (rig sweep, 2026-09-16). Both the hit and the landing held
+    // `Hips: [0,0,0]` and bent only the SPINE, which is a backbend rather than a body going
+    // down — so the legs kept hanging from an upright hip socket while hipsY drove them into
+    // the turf. Measured on a fresh rig: the lowest ankle reached -0.691 with the hips at
+    // 0.123, and nothing clamps it because football does not foot-plant. Same fault, same
+    // shape, as the karate floor key.
+    { t: 0.25, bones: { Hips: [-26, 0, 4], Spine: [-12, 0, 10],  Neck: [-6, 0, 0], LeftUpLeg: [-26, 0, 8],  RightUpLeg: [-22, 0, -6], LeftLeg: [44, 0, 0], RightLeg: [48, 0, 0] }, hands: { Right: [0.30, 1.02, 0.30], Left: [-0.34, 1.00, 0.30] }, hipsY: -0.10 },
+    { t: 0.6,  bones: { Hips: [-74, 0, 8], Spine: [-8, 0, 14],  Neck: [14, 0, 0], LeftUpLeg: [-18, 0, 10], RightUpLeg: [-12, 0, -8], LeftLeg: [38, 0, 0], RightLeg: [32, 0, 0] }, hands: { Right: [0.55, 0.35, -0.40], Left: [-0.55, 0.35, -0.35] }, poles: { Left: [-0.3, 0.8, -0.4], Right: [0.3, 0.8, -0.4] }, hipsY: -0.74 },
   ]);
 }
 
