@@ -14,6 +14,8 @@ import { buildPoseClip, type Deg3, type PoseKey } from '../poseClip';
 export const BASKETBALL_CLIPS = [
   'bball_dribble_idle', 'bball_crossover_left', 'bball_crossover_right', 'bball_hesi',
   'bball_layup_gather', 'bball_defend_slide_left', 'bball_defend_slide_right',
+  'bball_defend_backpedal', 'bball_closeout', 'bball_contact_react',
+  'bball_defend_slide_hard_left', 'bball_defend_slide_hard_right',
   'bball_block_reach', 'bball_steal_reach',
   'bball_follow_through',   // BIOMECH-HOOPS-WAVE1 (2026-09-08): the shot's follow-through, held until the arc resolves (G5)
   // HOOPS-MOVE-KIT-A (2026-09-08): the player's pull-up gather (M1), the left-hand layup + the floater (M3)

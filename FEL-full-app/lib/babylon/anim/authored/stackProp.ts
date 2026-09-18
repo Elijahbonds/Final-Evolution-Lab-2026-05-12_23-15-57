@@ -150,9 +150,9 @@ export function buildBikeRider(scene: Scene, sk: Skeleton): AnimationGroup | nul
     poles: { Left: [-0.6, -0.7, -0.2] as V3, Right: [0.6, -0.7, -0.2] as V3 }, hipsY,
   });
   return buildPoseClip(scene, sk, 'prop_bike_rider', STACK_SEC, [
-    key(0, true, 26, -0.30),
-    key(STACK_SEC / 2, false, 30, -0.32),          // the pedals go round
-    key(STACK_SEC, true, 26, -0.30),
+    key(0, true, 26, -0.24),
+    key(STACK_SEC / 2, false, 30, -0.26),          // the pedals go round
+    key(STACK_SEC, true, 26, -0.24),
   ]);
 }
 

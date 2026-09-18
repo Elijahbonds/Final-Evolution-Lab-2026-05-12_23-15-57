@@ -36,6 +36,7 @@ model User {
   cellProjects   CellProject[]
   cellApiKeys    CellApiKey[]
   cellSettings   CellSettings?
+  athleteBuild   AthleteBuild?
 
   // M2 relations
   stripeCustomer   StripeCustomer?
@@ -1190,6 +1191,31 @@ model WorkoutPlan {
 // ===========================================================================
 // M20 — The Closet (avatar identity: face + wearables + creator-card skins)
 // ===========================================================================
+/// The athlete BUILD — everything the creator decides that the look tables do not already own.
+/// Deliberately NOT a second copy of AvatarLook: the face, the equipped garments and the jersey plate
+/// stay in AvatarLook, which the Closet writes and every mode spawns from ("one canonical record. No mode
+/// may persist its own parallel profile"). What lands here is attributes, tendencies, traits, hot zones,
+/// mechanics slots, the three frame scales, the archetype/stance, and the palette overrides — none of
+/// which has a home anywhere else.
+///
+/// One per account. A roster of saved builds is a real feature and a different schema; shipping a `slot`
+/// column before there is a screen that uses it would be inventing a shape from a guess.
+model AthleteBuild {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// BuildPayload from lib/creator/schema/saveBuild.ts.
+  build         Json
+  /// The schema the build was written against, so a future migration knows what it is reading.
+  schemaVersion String   @default("1.0.0")
+  /// The measured axes the ceilings were resolved against when it was saved, or null for no scan.
+  prq           Json?
+  /// Set when Finalize accepted it. A build can be stored while still invalid; this says it passed.
+  finalizedAt   DateTime?
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+}
+
 model AvatarLook {
   id          String   @id @default(cuid())
   userId      String   @unique

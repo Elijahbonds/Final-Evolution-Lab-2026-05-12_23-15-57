@@ -190,6 +190,9 @@ export class BasketballAnimTree {
   private sameGroup(a: BasketballAnimState | null, b: BasketballAnimState): boolean {
     return !!a && BasketballAnimTree.DWELL_GROUPS.some((g) => g.has(a) && g.has(b));
   }
+  private bypassDwell(from: BasketballAnimState | null, to: BasketballAnimState, input: AnimTreeInput): boolean {
+    return from === 'idle_dribble' && input.speed01 > 0.7 && ['speed_dribble', 'sprint_dribble', 'drive'].includes(to);
+  }
   update(input: AnimTreeInput): BasketballAnimState {
     this.last = input;
     const raw = chooseBasketballClip(input);
@@ -201,7 +204,7 @@ export class BasketballAnimTree {
       if (!yields) return this.override.state ?? this.current ?? c.state;
     }
     const now = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
-    if (c.state !== this.current && c.loop && this.sameGroup(this.current, c.state) && now - this.stateSince < BasketballAnimTree.DWELL_SEC) return this.current!;   // the dwell
+    if (c.state !== this.current && c.loop && this.sameGroup(this.current, c.state) && !this.bypassDwell(this.current, c.state, input) && now - this.stateSince < BasketballAnimTree.DWELL_SEC) return this.current!;   // the dwell
     if (c.state !== this.current) {
       this.current = c.state; this.stateSince = now;
       if (c.loop) {

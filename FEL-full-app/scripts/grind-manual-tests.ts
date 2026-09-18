@@ -25,7 +25,7 @@ ok('countering the drift sustains the grind and ticks points', () => {
   g.start(0.2);                                  // slow, controlled grind
   let pts = 0;
   for (let i = 0; i < 120 && g.active; i++) {
-    const r = g.update(DT, -g.needle * 0.9, 0.2);  // proportional counter
+    const r = g.update(DT, g.needle * 0.9, 0.2);  // proportional counter
     pts += r.pts;
   }
   assert.ok(g.active, 'still grinding after 2s at low speed');
@@ -51,7 +51,7 @@ ok('manuals tick at their own rate and end on stop()', () => {
   const m = new BalanceChannel('manual', b);
   m.start(0.3);
   let pts = 0;
-  for (let i = 0; i < 60 && m.active; i++) pts += m.update(DT, -m.needle * 0.9, 0.3).pts;
+  for (let i = 0; i < 60 && m.active; i++) pts += m.update(DT, m.needle * 0.9, 0.3).pts;
   assert.ok(Math.abs(pts - MANUAL_PTS_PER_SEC) < MANUAL_PTS_PER_SEC * 0.4);
   m.stop();
   assert.ok(!m.active);
@@ -72,7 +72,7 @@ ok('faster grinds drift harder', () => {
   // same skill, both speeds: faster must slip sooner
   const run = (g: InstanceType<typeof BalanceChannel>, spd: number) => {
     let frames = 0;
-    while (g.active && frames < 1200) { g.update(DT, -g.needle * 0.9, spd); frames++; }
+    while (g.active && frames < 1200) { g.update(DT, g.needle * 0.9, spd); frames++; }
     return frames;
   };
   const slowFrames = run(slow, 0.2);

@@ -26,6 +26,9 @@ ok('score / combo / gap / collect all complete through their own paths', () => {
   assert.ok(t.goals.find((g) => g.id === 'gap_moving')!.done);
   for (let i = 0; i < 10; i++) t.report({ type: 'collect', collectibleId: `c${i}` });
   assert.ok(t.goals.find((g) => g.id === 'coins10')!.done);
+  t.report({ type: 'gap', gapId: 'plaza_hubba' });
+  t.report({ type: 'gap', gapId: 'plaza_gap' });
+  t.report({ type: 'gap', gapId: 'plaza_wallride' });
   assert.ok(t.allDone);
 });
 

@@ -92,8 +92,9 @@ export class BalanceChannel {
     // intent line's 157). Pushing the WRONG way now costs more than pushing the right way saves, so noise falls off the
     // board and a player who reads the needle still holds it.
     const counters = Math.sign(stickX) === Math.sign(this.needle) || this.needle === 0;
-    this.needle += (drift - stickX * (counters ? 4.2 : 6.6)) * dt;
-    const damping = Math.sign(stickX) === -Math.sign(this.needle) ? 4.2 : 0;
+    const speedTax = Math.max(0.1, 1 - speed01 * 0.9);
+    this.needle += (drift - stickX * (counters ? 4.2 * speedTax : 6.6)) * dt;
+    const damping = Math.sign(stickX) === Math.sign(this.needle) ? 4.2 * speedTax : 0;
     this.needle -= this.needle * damping * dt;
     const centering = 0.9;                            // weak — no free ride
     this.needle -= this.needle * Math.min(1, Math.abs(this.needle) * 2.4) * dt * centering;
@@ -101,7 +102,8 @@ export class BalanceChannel {
     // for a beat (feels like saving it on the heel edge, not instant death).
     // HANDS OFF is different: no stick input = the edge grace doesn't apply.
     const handsOff = Math.abs(stickX) < 0.05;
-    if (Math.abs(this.needle) >= BALANCE_EDGE) {
+    const edge = BALANCE_EDGE * Math.max(0.68, 1 - speed01 * 0.3);
+    if (Math.abs(this.needle) >= edge) {
       this.overEdgeSec = (this.overEdgeSec ?? 0) + dt * (handsOff ? 3 : 1);
     } else this.overEdgeSec = 0;
     if ((this.overEdgeSec ?? 0) > 0.18) {
