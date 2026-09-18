@@ -1,0 +1,253 @@
+'use client';
+
+// TouchOverlay — THE single touch control component. Mounted ONCE by the
+// harness route; every legacy in-canvas button set must be deleted.
+// Portrait: DS-style bottom deck. Landscape: translucent side overlay.
+// Emits FelInput through the SAME bus keyboard/gamepad use; buttons emit
+// press AND release; hold buttons stream analog trigger 0→1; sticks stream
+// a normalized vector and recenter on lift.
+//
+// UNIFORM CONTROLLER LAYOUT — every mode renders the exact same rig: left
+// stick + d-pad on the left, right stick + A/B/X/Y diamond on the right.
+// Modes differ only in what each control DOES (modeVerbs.ts), never in
+// which controls are on screen — the console-emulator feel the whole point
+// of this file is to guarantee. A slot a given mode has no use for keeps its
+// place in the diamond but renders HOLLOW: a thin dashed ring, no letter, no
+// label, not pressable — an empty socket, never a control (owner decision
+// 2026-09-05, "hide now, build later").
+
+import React, { useEffect, useRef, useState } from 'react';
+import type { InputBus } from '../core/InputBus';
+import { MODE_VERBS, type VerbButton } from './modeVerbs';
+
+// setPointerCapture throws NotFoundError if the browser has already dropped
+// the pointer session by the time the handler runs (seen on some mobile
+// WebViews on a fast tap-and-release) — capture is a nice-to-have (keeps the
+// drag tracking a finger that slides off the control), never a precondition
+// for the input itself, so a failure here must never block the emit below it.
+function safeCapture(el: Element, pointerId: number): void {
+  try { el.setPointerCapture(pointerId); } catch { /* session already gone — fine */ }
+}
+
+// CONTROLLER-UNIVERSAL-MULTI: phone-screen mirroring (iPhone Safari → Control Center → Screen Mirroring) is played in
+// landscape, where the notch and the home indicator own the edges. The verbs sit at least the safe-area inset in from
+// them; env() is 0 wherever there is no inset, so desktop and portrait keep their 12 px.
+const SAFE_LEFT: React.CSSProperties = { left: 'max(0.75rem, env(safe-area-inset-left))', bottom: 'max(0.75rem, env(safe-area-inset-bottom))' };
+const SAFE_RIGHT: React.CSSProperties = { right: 'max(0.75rem, env(safe-area-inset-right))', bottom: 'max(0.75rem, env(safe-area-inset-bottom))' };
+
+export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: boolean }) {
+  const cfg = MODE_VERBS[props.modeId] ?? MODE_VERBS.default;
+  const [landscape, setLandscape] = useState(window.innerWidth > window.innerHeight);
+
+  useEffect(() => {
+    const onR = () => setLandscape(window.innerWidth > window.innerHeight);
+    window.addEventListener('resize', onR);
+    return () => window.removeEventListener('resize', onR);
+  }, []);
+
+  if (!props.visible || props.bus.gamepadActive) return null;
+
+  return (
+    <div className={landscape
+      ? 'pointer-events-none absolute inset-0 z-30'
+      : 'pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[44vh] bg-gradient-to-t from-black/85 to-transparent'}>
+      <div className="pointer-events-auto absolute bottom-3 left-3 flex flex-col items-center gap-2" style={SAFE_LEFT}>
+        <DPad bus={props.bus} />
+        <AnalogStick bus={props.bus} side="L" label="MOVE" />
+      </div>
+      <div className="pointer-events-auto absolute bottom-3 right-3 flex flex-col items-center gap-2" style={SAFE_RIGHT}>
+        {cfg.boost && <BoostPill bus={props.bus} />}
+        <ButtonDiamond bus={props.bus} buttons={cfg.buttons} />
+        {cfg.rStick === null ? <HollowStick /> : <AnalogStick bus={props.bus} side="R" label={cfg.rStick} />}
+      </div>
+    </div>
+  );
+}
+
+function AnalogStick({ bus, side, label }: { bus: InputBus; side: 'L' | 'R'; label: string }) {
+  const zone = useRef<HTMLDivElement>(null);
+  const knob = useRef<HTMLDivElement>(null);
+  const active = useRef<number | null>(null);
+
+  const setVec = (x: number, y: number) => {
+    bus.emit({ t: 'stick', side, x, y });
+    if (knob.current) knob.current.style.transform = `translate(${x * 28}px, ${y * 28}px)`;
+  };
+
+  const onMove = (e: React.PointerEvent) => {
+    if (active.current !== e.pointerId || !zone.current) return;
+    const r = zone.current.getBoundingClientRect();
+    const dx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2);
+    const dy = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
+    const len = Math.hypot(dx, dy);
+    const k = len > 1 ? 1 / len : 1;
+    setVec(dx * k, dy * k);
+  };
+
+  return (
+    <div ref={zone}
+      onPointerDown={(e) => { active.current = e.pointerId; safeCapture(e.target as Element, e.pointerId); onMove(e); }}
+      onPointerMove={onMove}
+      onPointerUp={() => { active.current = null; setVec(0, 0); }}
+      onPointerCancel={() => { active.current = null; setVec(0, 0); }}
+      className="relative h-24 w-24 touch-none rounded-full border border-white/15 bg-white/5 backdrop-blur-sm">
+      <div ref={knob}
+        className="absolute left-1/2 top-1/2 -ml-6 -mt-6 h-12 w-12 rounded-full bg-white/20 shadow-lg transition-transform duration-75" />
+      <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black tracking-widest text-white/30">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+/** The R stick's socket on a mode that reads nothing from it (MODE-STICK-FACE, 2026-09-07): the same 96 px footprint
+ *  so the diamond above it never moves, a dashed ring at 30 % like an inert verb — an empty socket, not a control. */
+function HollowStick() {
+  return <div aria-hidden="true" className="pointer-events-none h-24 w-24 rounded-full border border-dashed border-white opacity-30" />;
+}
+
+function DPad({ bus }: { bus: InputBus }) {
+  const press = (dir: 'up' | 'down' | 'left' | 'right') => () => bus.emit({ t: 'dpad', dir, pressed: true });
+  const release = (dir: 'up' | 'down' | 'left' | 'right') => () => bus.emit({ t: 'dpad', dir, pressed: false });
+  const seg = 'absolute flex touch-none select-none items-center justify-center border border-white/15 bg-white/8 text-[10px] text-white/50 active:bg-white/25 active:text-white';
+  return (
+    <div className="relative h-[72px] w-[72px]">
+      <button
+        className={`${seg} left-1/2 top-0 h-6 w-6 -translate-x-1/2 rounded-t-md`}
+        onPointerDown={press('up')} onPointerUp={release('up')} onPointerCancel={release('up')} onPointerLeave={release('up')}
+      >▲</button>
+      <button
+        className={`${seg} bottom-0 left-1/2 h-6 w-6 -translate-x-1/2 rounded-b-md`}
+        onPointerDown={press('down')} onPointerUp={release('down')} onPointerCancel={release('down')} onPointerLeave={release('down')}
+      >▼</button>
+      <button
+        className={`${seg} left-0 top-1/2 h-6 w-6 -translate-y-1/2 rounded-l-md`}
+        onPointerDown={press('left')} onPointerUp={release('left')} onPointerCancel={release('left')} onPointerLeave={release('left')}
+      >◀</button>
+      <button
+        className={`${seg} right-0 top-1/2 h-6 w-6 -translate-y-1/2 rounded-r-md`}
+        onPointerDown={press('right')} onPointerUp={release('right')} onPointerCancel={release('right')} onPointerLeave={release('right')}
+      >▶</button>
+      <div className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-sm bg-white/5" />
+    </div>
+  );
+}
+
+// BOOST (FINISH-RELEASE, 2026-09-14): one held control in every speed mode. Emits R1 down on press and R1 up on release,
+// exactly what RB on a pad and Shift on a keyboard send, so the mode reads one input for all three.
+function BoostPill({ bus }: { bus: InputBus }) {
+  const [held, setHeld] = useState(false);
+  const down = (e: React.PointerEvent) => { safeCapture(e.target as Element, e.pointerId); navigator.vibrate?.(12); setHeld(true); bus.emit({ t: 'button', btn: 'R1', pressed: true }); };
+  const up = () => { if (!held) return; setHeld(false); bus.emit({ t: 'button', btn: 'R1', pressed: false }); };
+  return (
+    <button onPointerDown={down} onPointerUp={up} onPointerCancel={up} onPointerLeave={up}
+      className="h-[46px] w-[148px] touch-none select-none rounded-full border-2 text-[12px] font-black tracking-[0.25em] text-white transition-transform duration-75 active:scale-95"
+      style={{ borderColor: '#22d3ee', background: held ? '#22d3eecc' : '#22d3ee26', boxShadow: held ? '0 0 26px #22d3ee' : '0 0 14px #22d3ee55' }}>
+      BOOST
+    </button>
+  );
+}
+
+// Fixed Xbox-style diamond: Y top, X left, B right, A bottom. Position and
+// per-slot color are ALWAYS the same across every mode — only the label and
+// what pressing it does change. A slot a mode leaves unassigned keeps its
+// position (so bound slots never move) and renders as a hollow socket.
+const SLOT_POS: Record<'A' | 'B' | 'X' | 'Y', string> = {
+  Y: 'left-1/2 top-0 -translate-x-1/2',
+  X: 'left-0 top-1/2 -translate-y-1/2',
+  B: 'right-0 top-1/2 -translate-y-1/2',
+  A: 'left-1/2 bottom-0 -translate-x-1/2',
+};
+const SLOT_ORDER: Array<'A' | 'B' | 'X' | 'Y'> = ['Y', 'X', 'B', 'A'];
+
+function ButtonDiamond({ bus, buttons }: { bus: InputBus; buttons: [VerbButton, VerbButton, VerbButton, VerbButton] }) {
+  const bySlot: Record<'A' | 'B' | 'X' | 'Y', VerbButton> = { A: buttons[0], B: buttons[1], X: buttons[2], Y: buttons[3] };
+  return (
+    <div className="relative h-[148px] w-[148px]">
+      {SLOT_ORDER.map((slot) => (
+        <div key={slot} className={`absolute ${SLOT_POS[slot]}`}>
+          <Verb bus={bus} def={bySlot[slot]} slot={slot} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Verb({ bus, def, slot }: { bus: InputBus; def: VerbButton; slot: 'A' | 'B' | 'X' | 'Y' }) {
+  const holdRaf = useRef(0);
+  const downAt = useRef(0);
+  const inert = def.emit === null;
+  const [holdV, setHoldV] = useState(0);   // pad acceptance #1: the HOLD cue — the ring fills while the hold is down
+
+  // HOLLOW SOCKET. An inert slot is not a button: no letter (a bare "X" reads
+  // as a control), no label, no glow, nothing to press. A thin dashed ring at
+  // 30% keeps the diamond's shape so the bound slots stay where the thumb
+  // expects them. Same 64 px footprint as a live verb.
+  if (inert) {
+    return (
+      <div className="relative">
+        <div aria-hidden="true"
+          className="pointer-events-none h-[64px] w-[64px] rounded-full border border-dashed border-white opacity-30" />
+      </div>
+    );
+  }
+
+  const press = (e: React.PointerEvent) => {
+    if (inert) return;
+    safeCapture(e.target as Element, e.pointerId);
+    navigator.vibrate?.(10);
+    // PHONE CONTROLS (FINISH-RELEASE, 2026-09-15): a HOLD verb used to stream the RIGHT trigger whatever it was bound to — so
+    // the kart's BRAKE (LT) and DRIFT (the X button, held) both drove the throttle on a phone, and aero's rudder did too.
+    // A held TRIGGER verb streams ITS trigger; a held BUTTON verb is simply pressed down and released.
+    if (def.hold && def.emit!.t === 'button') {
+      bus.emit(def.emit!);
+      setHoldV(1);
+    } else if (def.hold) {
+      const side = def.emit!.t === 'trigger' ? def.emit!.side : 'R';
+      downAt.current = performance.now();
+      const stream = () => {
+        const v = Math.min(1, (performance.now() - downAt.current) / 1100);
+        bus.emit({ t: 'trigger', side, value: Math.max(0.01, v) });
+        setHoldV(v);
+        holdRaf.current = requestAnimationFrame(stream);
+      };
+      stream();
+    } else {
+      bus.emit(def.emit!);
+    }
+  };
+
+  const release = () => {
+    if (inert) return;
+    if (def.hold && def.emit!.t === 'button') {
+      setHoldV(0);
+      bus.emit({ ...def.emit!, pressed: false });
+    } else if (def.hold) {
+      cancelAnimationFrame(holdRaf.current);
+      setHoldV(0);
+      bus.emit({ t: 'trigger', side: def.emit!.t === 'trigger' ? def.emit!.side : 'R', value: 0 });   // release = launch
+    } else if (def.emit!.t === 'button' || def.emit!.t === 'dpad') {
+      bus.emit({ ...def.emit!, pressed: false });
+    }
+  };
+
+  const color = def.color;
+  return (
+    <div className="relative">
+      {def.hold && (
+        <span className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 text-[7px] font-black tracking-[0.2em] text-white/60">HOLD</span>
+      )}
+    <button
+      onPointerDown={press} onPointerUp={release} onPointerCancel={release}
+      className="h-[64px] w-[64px] touch-none select-none rounded-full border-2 text-[10px] font-black tracking-wide text-white transition-transform duration-75 active:scale-90 active:brightness-150"
+      style={{ borderColor: color, background: def.hold && holdV > 0 ? `conic-gradient(${color}cc ${Math.round(holdV * 360)}deg, ${color}22 0)` : `${color}22`, boxShadow: `0 0 18px ${color}44` }}>
+      {def.label || slot}
+    </button>
+    </div>
+  );
+}
+
+// MOUNT (harness route component):
+//   <TouchOverlay bus={inputBus} modeId={modeId} visible={phase === 'playing'} />
+// DELETE every other on-screen control (grep: PUNCH/HEAVY circle set, PWR/FLSH/
+// SIG/CHARGE/SLAM in-canvas set, the old gamepad FAB deck). One overlay. Ever.

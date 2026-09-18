@@ -1,0 +1,11 @@
+import { chromium } from 'playwright-core';
+const BASE = process.env.BASE ?? 'http://localhost:3000', HERO = process.env.HERO ?? '';
+const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'] });
+const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+const rc = ctx.request; const csrf = (await (await rc.get(`${BASE}/api/auth/csrf`)).json()).csrfToken as string;
+await rc.post(`${BASE}/api/auth/callback/credentials`, { form: { csrfToken: csrf, email: 'playtest@fel.local', password: 'playtest-local-only', json: 'true' } });
+const p = await ctx.newPage();
+await p.goto(`${BASE}/closet${HERO ? `?hero=${HERO}` : ''}`, { waitUntil: 'networkidle', timeout: 120000 });
+await p.waitForSelector('canvas', { timeout: 60000 }); await p.waitForTimeout(4000);
+console.log(await p.evaluate(`(() => { const s = window.__FEL_PREVIEW__?.spawned; return JSON.stringify(s.meshes.map((m) => { const w = m.getVerticesData('matricesWeights'); const idx = m.getVerticesData('matricesIndices'); let sumW = 0, n = 0, maxIdx = -1; if (w) { for (let i = 0; i < Math.min(w.length, 4000); i++) sumW += w[i]; n = Math.min(w.length, 4000) / 4; } if (idx) for (let i = 0; i < Math.min(idx.length, 4000); i++) maxIdx = Math.max(maxIdx, idx[i]); return { mesh: m.name, useBones: m.useBones, hasIdx: !!idx, hasW: !!w, meanWeightPerVert: n ? +(sumW / n).toFixed(2) : null, maxIdx, applySkeletonBaked: !!m._sourcePositions, isEnabled: m.isEnabled(), visibility: m.visibility, vertsData: m.getTotalVertices() }; })); })()`));
+await b.close();

@@ -1,0 +1,8 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "body": "mpfb-kit-male",
+  "source": "scripts/avatar/mpfb/dress-kit.py \u2192 scripts/avatar/import-mpfb.mts",
+  "note": "ship pass 3 hero: clips are built on the live skeleton at spawn (lib/babylon/anim/authored); the forge hero and its manifest live under public/models/_forge/"
+}
