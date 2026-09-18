@@ -4,49 +4,21 @@ import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { AppHeader } from '@/components/app-header';
 import { BottomNav } from '@/components/bottom-nav';
-import { MODE_INFO } from '@/lib/game-data';
-import { CARNIVAL_EXTERNAL_POOL } from '@/lib/carnival-run';
-import {
-  Swords, CircleDot, Trophy, Brain, ChevronRight, Zap, Users, Target, Crosshair,
-  Snowflake, Waves, Flag, Goal, CircleDollarSign, Sparkles, Dumbbell, Mountain,
-  Timer, Footprints, Eye, Shield, BookOpen,
-} from 'lucide-react';
+import { modeMenuMetaFor, visibleModeEntries } from '@/lib/mode-menu';
+import { ChevronRight, Swords, Timer } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
-
-const META: Record<string, { icon: any; color: string; desc: string }> = {
-  karateEndless: { icon: Swords, color: '#FF3366', desc: 'Wave-survival fighter. Chain jabs, kicks and specials — survive escalating waves.' },
-  dunkContest: { icon: Trophy, color: '#00E5FF', desc: 'Charge your jump, hit the apex QTE, pick your style. First to 21 style points.' },
-  tennis: { icon: CircleDot, color: '#00FF9D', desc: 'Rally-based match play vs adaptive AI. First to 5 points takes the match.' },
-  brainBrawl: { icon: Brain, color: '#A855F7', desc: 'Spin the category wheel and answer under pressure. 120 seconds on the clock.' },
-  skateboarding: { icon: Zap, color: '#00E5FF', desc: 'Shred the Venice park. Time your ollies, chain grabs and grinds for a high score run.' },
-  soccer: { icon: Goal, color: '#00FF9D', desc: 'Twelve yards under stadium lights. Pick your corner, beat the keeper, five rounds.' },
-  baseball: { icon: CircleDollarSign, color: '#FFD700', desc: 'Moonshot Derby at Catalina Ballpark. Read the pitch, time the swing, clear the wall.' },
-  snowboarding: { icon: Snowflake, color: '#00E5FF', desc: 'Gate-crashing descent down the mountain. Carve every gate at speed without wiping out.' },
-  surfing: { icon: Waves, color: '#00FF9D', desc: 'Ride the break. Balance the line, pump for speed, and stick tricks on the lip.' },
-  golf: { icon: Flag, color: '#00FF9D', desc: 'Coastal links loop. Dial in power and accuracy across three signature holes.' },
-  freerun: { icon: Sparkles, color: '#A855F7', desc: 'Free-running tricking. Momentum unlocks vaults, wall runs and cat leaps; flip off anything and land it clean to bank the line.' },
-  training: { icon: Dumbbell, color: '#FF3366', desc: 'Iron Paradise circuit at Muscle Beach. Rep timing drills that push every attribute.' },
-  hoops1v1: { icon: Target, color: '#FF3366', desc: 'Ones at Venice. Break down your defender on offense, lock up on D. First to 11.' },
-  hoops3v3: { icon: Users, color: '#00E5FF', desc: 'Streetball with your squad. Swing it to the open lane and knock down shots. First to 21.' },
-  threePoint: { icon: Crosshair, color: '#FFD700', desc: 'Five racks, five balls, sixty seconds. Money balls count double — drain 18+ to win.' },
-  karateVersus: { icon: Shield, color: '#FF3366', desc: 'Best of 3 vs the Rival Sensei. Strike, block the telegraph, unleash your chi special.' },
-  whoSceneIt: { icon: Eye, color: '#A855F7', desc: 'Rapid-fire recall. 15 questions, 8 seconds each — speed and streaks multiply your score.' },
-  bigAir: { icon: Mountain, color: '#00E5FF', desc: 'Five kickers, huge amplitude. Charge the jump, spin the trick prompts, stomp the landing.' },
-  tiebreak: { icon: Timer, color: '#00FF9D', desc: 'Sudden-death tennis. Read the serve side and swing in the green window. First to 7.' },
-  sprint: { icon: Footprints, color: '#FFD700', desc: '100m beach dash. Alternate steps in rhythm — stumble once and the rival pulls ahead.' },
-  storyMode: { icon: BookOpen, color: '#A855F7', desc: 'The Nexus Initiative. Train in the Sanctum, grind the rails, face the Glitch Boss.' },
-};
 
 // Quick, single-mechanic mini-games live only inside Court Carnival's
 // rotating party lineup now, not as their own top-level tiles — same games,
 // same rewards, just reached from the carnival hub instead of this grid.
-const HIDDEN_FROM_MENU = new Set<string>(CARNIVAL_EXTERNAL_POOL);
+// Non-session support surfaces stay reachable from their own product nav,
+// but do not belong in the game-mode count.
 
 export default async function ModesPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect('/login');
-  const visibleModes = Object.entries(MODE_INFO).filter(([key]) => !HIDDEN_FROM_MENU.has(key));
+  const visibleModes = visibleModeEntries();
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
       <AppHeader />
@@ -75,8 +47,8 @@ export default async function ModesPage() {
         </div>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {visibleModes.map(([key, info]) => {
-            const meta = META?.[key];
-            const Icon = meta?.icon ?? Trophy;
+            const meta = modeMenuMetaFor(key);
+            const Icon = meta.icon;
             return (
               <Link
                 key={key}
@@ -85,14 +57,14 @@ export default async function ModesPage() {
               >
                 <div
                   className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl"
-                  style={{ background: `${meta?.color}18`, border: `1px solid ${meta?.color}55` }}
+                  style={{ background: `${meta.color}18`, border: `1px solid ${meta.color}55` }}
                 >
-                  <Icon className="h-7 w-7" style={{ color: meta?.color }} />
+                  <Icon className="h-7 w-7" style={{ color: meta.color }} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <h2 className="fel-heading text-xl font-bold text-white">{info?.name}</h2>
                   <p className="text-xs text-white/45">{info?.venue}</p>
-                  <p className="mt-1 line-clamp-2 text-xs text-white/55">{meta?.desc}</p>
+                  <p className="mt-1 line-clamp-2 text-xs text-white/55">{meta.desc}</p>
                 </div>
                 <ChevronRight className="h-5 w-5 shrink-0 text-white/30 transition-transform group-hover:translate-x-1 group-hover:text-[#00E5FF]" />
               </Link>
