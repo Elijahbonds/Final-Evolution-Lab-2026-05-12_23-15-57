@@ -9,12 +9,13 @@
 // ~60s final + final board. Unattended, ~3 minutes.
 
 import { chromium } from 'playwright-core';
+import { chromiumExe } from './probes/_chromium.mts';
 
 // NB: not named URL — that would shadow the global URL constructor.
 const MODE_URL = process.env.URL ?? 'http://localhost:3000/dev/mode/threepoint';
 
 const b = await chromium.launch({
-  executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
+  executablePath: chromiumExe(),
   args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'],
 });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });

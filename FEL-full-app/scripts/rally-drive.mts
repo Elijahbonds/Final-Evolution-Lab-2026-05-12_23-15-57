@@ -12,6 +12,7 @@
 //   URL=http://localhost:3000/dev/mode/volleyball npx tsx scripts/rally-drive.mts
 
 import { chromium } from 'playwright-core';
+import { chromiumExe } from './probes/_chromium.mts';
 
 const MODE_URL = process.env.URL ?? 'http://localhost:3000/dev/mode/volleyball';
 // `shotMeterT` is NOT a 0..1 progress ramp in this mode -- NetSportMode sets it
@@ -27,7 +28,7 @@ const SWING_AT = Number(process.env.SWING_AT ?? 0.9);
 const SECONDS = Number(process.env.SECONDS ?? 75);
 
 const b = await chromium.launch({
-  executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
+  executablePath: chromiumExe(),
   args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'],
 });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });

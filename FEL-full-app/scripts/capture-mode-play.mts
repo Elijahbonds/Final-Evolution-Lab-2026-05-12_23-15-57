@@ -7,6 +7,7 @@
 
 import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
+import { chromiumExe } from './probes/_chromium.mts';
 
 // NB: not named URL — that would shadow the global URL constructor.
 const MODE_URL = process.env.URL ?? 'http://localhost:3000/dev/mode/onevone';
@@ -34,7 +35,7 @@ const NAME = process.env.NAME ?? 'play';
 mkdirSync(OUT, { recursive: true });
 
 const b = await chromium.launch({
-  executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
+  executablePath: chromiumExe(),
   args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'],
 });
 // TIER=mobile: a phone-shaped, touch-capable context so detectQualityTier picks

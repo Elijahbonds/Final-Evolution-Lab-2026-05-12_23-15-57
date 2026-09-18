@@ -12,6 +12,7 @@
 
 import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
+import { chromiumExe } from './probes/_chromium.mts';
 
 const OUT = process.env.OUT_DIR ?? 'docs/shots/mobile';
 const URL = process.env.URL ?? 'http://localhost:3000/try';
@@ -23,7 +24,7 @@ const TAP_VERB = process.env.TAP_VERB ?? 'SLAM';
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({
-  executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
+  executablePath: chromiumExe(),
   args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'],
 });
 const page = await browser.newPage({
