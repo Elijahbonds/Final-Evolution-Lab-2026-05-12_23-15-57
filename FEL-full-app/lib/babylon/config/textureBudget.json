@@ -1,0 +1,636 @@
+{
+  "measuredAt": "2026-09-04",
+  "probe": "scripts/probes/_vram-diag.mts",
+  "budgetRule": "mobile: no mode above 2x tierMedian",
+  "basis": "engine._internalTexturesCache, each GPU texture once, width*height*4*1.33 (mip) *6 (cube); render targets/shadow/depth maps excluded",
+  "tiers": {
+    "desktop": {
+      "median": 132.4,
+      "modes": {
+        "dunk": {
+          "totalMB": 197.6,
+          "textures": 82,
+          "top": [
+            "21.3MB skin (Base Color) 2048x2048",
+            "21.3MB light-male.jpg 2048x2048",
+            "21.3MB detail-normal.jpg 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB hair.afro (Base Color) 1024x1024",
+            "5.3MB hair.braids (Base Color) 1024x1024",
+            "5.3MB hair.bun (Base Color) 1024x1024",
+            "5.3MB hair.buzz (Base Color) 1024x1024"
+          ]
+        },
+        "threepoint": {
+          "totalMB": 152.2,
+          "textures": 58,
+          "top": [
+            "21.3MB court_ocean_tex 2048x2048",
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024"
+          ]
+        },
+        "threevthree": {
+          "totalMB": 177.4,
+          "textures": 117,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "onevone": {
+          "totalMB": 154.8,
+          "textures": 79,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "dunkduel": {
+          "totalMB": 175,
+          "textures": 80,
+          "top": [
+            "21.3MB court_ocean_tex 2048x2048",
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024"
+          ]
+        },
+        "karate_vs": {
+          "totalMB": 143.9,
+          "textures": 76,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "karate": {
+          "totalMB": 189.2,
+          "textures": 148,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "mixedcombat": {
+          "totalMB": 117.7,
+          "textures": 67,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "skateboard": {
+          "totalMB": 105.8,
+          "textures": 51,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "surf": {
+          "totalMB": 104.5,
+          "textures": 50,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "snowboard_slalom": {
+          "totalMB": 104.4,
+          "textures": 50,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "bigair": {
+          "totalMB": 108.4,
+          "textures": 53,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "gymnastics": {
+          "totalMB": 109.8,
+          "textures": 54,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "volleyball": {
+          "totalMB": 133,
+          "textures": 73,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "tennis": {
+          "totalMB": 138.9,
+          "textures": 76,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "golf": {
+          "totalMB": 113.4,
+          "textures": 56,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "derby": {
+          "totalMB": 111.6,
+          "textures": 70,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB baseball-park (Base Color) 1024x1024",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024"
+          ]
+        },
+        "penalty": {
+          "totalMB": 111.2,
+          "textures": 68,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB soccer-stadium (Base Color) 1024x1024",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024"
+          ]
+        },
+        "football": {
+          "totalMB": 154.9,
+          "textures": 105,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "carnival": {
+          "totalMB": 132.4,
+          "textures": 88,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        },
+        "dance": {
+          "totalMB": 110.9,
+          "textures": 54,
+          "top": [
+            "21.3MB fel-hero.glb#image7 2048x2048",
+            "5.3MB fel-hero.glb#image0 1024x1024",
+            "5.3MB fel-hero.glb#image1 1024x1024",
+            "5.3MB fel-hero.glb#image2 1024x1024",
+            "5.3MB fel-hero.glb#image3 1024x1024",
+            "5.3MB fel-hero.glb#image4 1024x1024",
+            "5.3MB fel-hero.glb#image5 1024x1024",
+            "5.3MB fel-hero.glb#image6 1024x1024"
+          ]
+        }
+      }
+    },
+    "mobile": {
+      "median": 60.9,
+      "modes": {
+        "dunk": {
+          "totalMB": 93.6,
+          "textures": 80,
+          "top": [
+            "5.3MB skin (Base Color) 1024x1024",
+            "5.3MB light-male-1024.jpg 1024x1024",
+            "5.3MB detail-normal-1024.jpg 1024x1024",
+            "5.3MB Material_0 (Normal) 1024x1024",
+            "5.3MB Material_0 (Emissive) 1024x1024",
+            "5.3MB Material_0 (Base Color) 1024x1024",
+            "5.3MB Material_0 (Metallic Roughness) 1024x1024",
+            "5.3MB sage.glb#image1 1024x1024"
+          ]
+        },
+        "threepoint": {
+          "totalMB": 80,
+          "textures": 56,
+          "top": [
+            "21.3MB court_ocean_tex 2048x2048",
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "5.3MB Material_0 (Normal) 1024x1024",
+            "5.3MB Material_0 (Emissive) 1024x1024",
+            "5.3MB Material_0 (Base Color) 1024x1024",
+            "5.3MB Material_0 (Metallic Roughness) 1024x1024",
+            "4.0MB groundTex 1024x1024",
+            "2.7MB beach.jpg 1024x512"
+          ]
+        },
+        "threevthree": {
+          "totalMB": 105.3,
+          "textures": 115,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "5.3MB Material_0 (Normal) 1024x1024",
+            "5.3MB Material_0 (Emissive) 1024x1024",
+            "5.3MB Material_0 (Base Color) 1024x1024",
+            "5.3MB Material_0 (Metallic Roughness) 1024x1024",
+            "5.3MB nova.glb#image1 1024x1024",
+            "5.3MB nova.glb#image2 1024x1024",
+            "5.3MB nova.glb#image4 1024x1024"
+          ]
+        },
+        "onevone": {
+          "totalMB": 82.7,
+          "textures": 77,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "5.3MB Material_0 (Normal) 1024x1024",
+            "5.3MB Material_0 (Emissive) 1024x1024",
+            "5.3MB Material_0 (Base Color) 1024x1024",
+            "5.3MB Material_0 (Metallic Roughness) 1024x1024",
+            "5.3MB sage.glb#image1 1024x1024",
+            "5.3MB sage.glb#image2 1024x1024",
+            "5.3MB sage.glb#image4 1024x1024"
+          ]
+        },
+        "dunkduel": {
+          "totalMB": 102.9,
+          "textures": 78,
+          "top": [
+            "21.3MB court_ocean_tex 2048x2048",
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "5.3MB Material_0 (Normal) 1024x1024",
+            "5.3MB Material_0 (Emissive) 1024x1024",
+            "5.3MB Material_0 (Base Color) 1024x1024",
+            "5.3MB Material_0 (Metallic Roughness) 1024x1024",
+            "5.3MB nova.glb#image1 1024x1024",
+            "5.3MB nova.glb#image2 1024x1024"
+          ]
+        },
+        "karate_vs": {
+          "totalMB": 71.8,
+          "textures": 74,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "5.3MB Material.001 (Normal) 1024x1024",
+            "5.3MB Material.001 (Emissive) 1024x1024",
+            "5.3MB Material.001 (Base Color) 1024x1024",
+            "5.3MB titan.glb#image1 1024x1024",
+            "5.3MB titan.glb#image2 1024x1024",
+            "4.0MB studioTex 1024x1024",
+            "2.7MB dojo.jpg 1024x512"
+          ]
+        },
+        "karate": {
+          "totalMB": 117,
+          "textures": 146,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "5.3MB Material.001 (Normal) 1024x1024",
+            "5.3MB Material.001 (Emissive) 1024x1024",
+            "5.3MB Material.001 (Base Color) 1024x1024",
+            "5.3MB nova.glb#image1 1024x1024",
+            "5.3MB nova.glb#image2 1024x1024",
+            "5.3MB nova.glb#image4 1024x1024",
+            "5.3MB frost.glb#image2 1024x1024"
+          ]
+        },
+        "mixedcombat": {
+          "totalMB": 45.6,
+          "textures": 65,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "5.3MB vex.glb#image1 1024x1024",
+            "5.3MB vex.glb#image2 1024x1024",
+            "2.0MB bk_sky 1024x512",
+            "2.0MB bk_ring 2048x256",
+            "1.3MB fel-hero.mobile.glb#image0 512x512",
+            "1.3MB fel-hero.mobile.glb#image1 512x512",
+            "1.3MB fel-hero.mobile.glb#image2 512x512"
+          ]
+        },
+        "skateboard": {
+          "totalMB": 33.7,
+          "textures": 49,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "4.0MB groundTex 1024x1024",
+            "2.0MB bk_sky 1024x512",
+            "2.0MB bk_ring 2048x256",
+            "1.3MB colormap (Base Color) 512x512",
+            "1.3MB fel-hero.mobile.glb#image0 512x512",
+            "1.3MB fel-hero.mobile.glb#image1 512x512",
+            "1.3MB fel-hero.mobile.glb#image2 512x512"
+          ]
+        },
+        "surf": {
+          "totalMB": 32.4,
+          "textures": 48,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "4.0MB groundTex 1024x1024",
+            "2.0MB bk_sky 1024x512",
+            "2.0MB bk_ring 2048x256",
+            "1.3MB fel-hero.mobile.glb#image0 512x512",
+            "1.3MB fel-hero.mobile.glb#image1 512x512",
+            "1.3MB fel-hero.mobile.glb#image2 512x512",
+            "1.3MB fel-hero.mobile.glb#image3 512x512"
+          ]
+        },
+        "snowboard_slalom": {
+          "totalMB": 32.3,
+          "textures": 48,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "4.0MB groundTex 1024x1024",
+            "2.0MB bk_sky 1024x512",
+            "2.0MB bk_ring 2048x256",
+            "1.3MB fel-hero.mobile.glb#image0 512x512",
+            "1.3MB fel-hero.mobile.glb#image1 512x512",
+            "1.3MB fel-hero.mobile.glb#image2 512x512",
+            "1.3MB fel-hero.mobile.glb#image3 512x512"
+          ]
+        },
+        "bigair": {
+          "totalMB": 36.3,
+          "textures": 51,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "4.0MB venue_ground_tex 1024x1024",
+            "2.0MB bk_sky 1024x512",
+            "2.0MB bk_ring 2048x256",
+            "1.3MB fel-hero.mobile.glb#image0 512x512",
+            "1.3MB fel-hero.mobile.glb#image1 512x512",
+            "1.3MB fel-hero.mobile.glb#image2 512x512",
+            "1.3MB fel-hero.mobile.glb#image3 512x512"
+          ]
+        },
+        "gymnastics": {
+          "totalMB": 37.6,
+          "textures": 52,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "4.0MB venue_ground_tex 1024x1024",
+            "2.0MB bk_sky 1024x512",
+            "2.0MB bk_ring 2048x256",
+            "1.3MB colormap (Base Color) 512x512",
+            "1.3MB fel-hero.mobile.glb#image0 512x512",
+            "1.3MB fel-hero.mobile.glb#image1 512x512",
+            "1.3MB fel-hero.mobile.glb#image2 512x512"
+          ]
+        },
+        "volleyball": {
+          "totalMB": 60.9,
+          "textures": 71,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "5.3MB sage.glb#image1 1024x1024",
+            "5.3MB sage.glb#image2 1024x1024",
+            "5.3MB sage.glb#image4 1024x1024",
+            "4.0MB groundTex 1024x1024",
+            "2.7MB beach.jpg 1024x512",
+            "2.0MB bk_sky 1024x512",
+            "2.0MB bk_ring 2048x256"
+          ]
+        },
+        "tennis": {
+          "totalMB": 66.7,
+          "textures": 74,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "5.3MB tennis-court (Base Color) 1024x1024",
+            "5.3MB sage.glb#image1 1024x1024",
+            "5.3MB sage.glb#image2 1024x1024",
+            "5.3MB sage.glb#image4 1024x1024",
+            "4.0MB groundTex 1024x1024",
+            "2.7MB stadium.jpg 1024x512",
+            "2.0MB bk_sky 1024x512"
+          ]
+        },
+        "golf": {
+          "totalMB": 41.2,
+          "textures": 54,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "4.0MB venue_ground_tex 1024x1024",
+            "2.7MB links.jpg 1024x512",
+            "2.0MB bk_sky 1024x512",
+            "2.0MB bk_ring 2048x256",
+            "2.0MB skyTex 1024x512",
+            "1.3MB fel-hero.mobile.glb#image0 512x512",
+            "1.3MB fel-hero.mobile.glb#image1 512x512"
+          ]
+        },
+        "derby": {
+          "totalMB": 39.5,
+          "textures": 68,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "5.3MB baseball-park (Base Color) 1024x1024",
+            "2.7MB stadium.jpg 1024x512",
+            "2.0MB bk_sky 1024x512",
+            "2.0MB bk_ring 2048x256",
+            "2.0MB skyTex 1024x512",
+            "1.3MB fel-hero.mobile.glb#image0 512x512",
+            "1.3MB fel-hero.mobile.glb#image1 512x512"
+          ]
+        },
+        "penalty": {
+          "totalMB": 39.1,
+          "textures": 66,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "5.3MB soccer-stadium (Base Color) 1024x1024",
+            "2.7MB stadium.jpg 1024x512",
+            "2.0MB bk_sky 1024x512",
+            "2.0MB bk_ring 2048x256",
+            "2.0MB skyTex 1024x512",
+            "1.3MB fel-hero.mobile.glb#image0 512x512",
+            "1.3MB fel-hero.mobile.glb#image1 512x512"
+          ]
+        },
+        "football": {
+          "totalMB": 82.8,
+          "textures": 103,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "5.3MB sage.glb#image1 1024x1024",
+            "5.3MB sage.glb#image2 1024x1024",
+            "5.3MB sage.glb#image4 1024x1024",
+            "5.3MB titan.glb#image1 1024x1024",
+            "5.3MB titan.glb#image2 1024x1024",
+            "4.0MB venue_ground_tex 1024x1024",
+            "2.7MB stadium.jpg 1024x512"
+          ]
+        },
+        "carnival": {
+          "totalMB": 78.9,
+          "textures": 106,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "5.3MB sage.glb#image1 1024x1024",
+            "5.3MB sage.glb#image2 1024x1024",
+            "5.3MB sage.glb#image4 1024x1024",
+            "5.3MB frost.glb#image2 1024x1024",
+            "5.3MB frost.glb#image4 1024x1024",
+            "4.0MB venue_ground_tex 1024x1024",
+            "2.0MB bk_sky 1024x512"
+          ]
+        },
+        "dance": {
+          "totalMB": 38.8,
+          "textures": 52,
+          "top": [
+            "5.3MB fel-hero.mobile.glb#image7 1024x1024",
+            "4.0MB studioTex 1024x1024",
+            "2.7MB neon.jpg 1024x512",
+            "2.0MB bk_sky 1024x512",
+            "2.0MB bk_ring 2048x256",
+            "2.0MB skyTex 1024x512",
+            "1.3MB colormap (Base Color) 512x512",
+            "1.3MB fel-hero.mobile.glb#image0 512x512"
+          ]
+        }
+      }
+    }
+  },
+  "throttle4": {
+    "dunk": {
+      "fps": 60,
+      "frameMs": 16.6
+    },
+    "karate": {
+      "fps": 60,
+      "frameMs": 16.7
+    },
+    "skateboard": {
+      "fps": 60,
+      "frameMs": 16.7
+    },
+    "volleyball": {
+      "fps": 60,
+      "frameMs": 16.7
+    },
+    "golf": {
+      "fps": 60,
+      "frameMs": 16.6
+    },
+    "football": {
+      "fps": 60,
+      "frameMs": 16.7
+    },
+    "dance": {
+      "fps": 60,
+      "frameMs": 16.7
+    }
+  }
+}

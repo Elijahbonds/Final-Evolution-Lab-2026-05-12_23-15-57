@@ -1,0 +1,21 @@
+import { chromium } from 'playwright-core';
+const BASE = process.env.BASE ?? 'http://localhost:3000', HERO = process.env.HERO ?? '';
+const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'] });
+const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+const rc = ctx.request; const csrf = (await (await rc.get(`${BASE}/api/auth/csrf`)).json()).csrfToken as string;
+await rc.post(`${BASE}/api/auth/callback/credentials`, { form: { csrfToken: csrf, email: 'playtest@fel.local', password: 'playtest-local-only', json: 'true' } });
+const p = await ctx.newPage();
+await p.goto(`${BASE}/closet${HERO ? `?hero=${HERO}` : ''}`, { waitUntil: 'networkidle', timeout: 120000 });
+await p.waitForSelector('canvas', { timeout: 60000 }); await p.waitForTimeout(4000);
+console.log(await p.evaluate(`(() => {
+  const s = window.__FEL_PREVIEW__?.spawned; const sk = s.skeleton; const mesh = s.meshes.find((m) => /Body/.test(m.name)) || s.meshes[1];
+  const bi = sk.bones.findIndex((b) => /RightArm/.test(b.name)); const bone = sk.bones[bi]; const node = bone.getTransformNode();
+  sk.prepare(true);
+  const tm = sk.getTransformMatrices(mesh); const skin = Array.from(tm.slice(bi * 16, bi * 16 + 16)).map((v) => +v.toFixed(2));
+  const abs = bone.getAbsoluteTransform().asArray().map((v) => +v.toFixed(2));
+  const local = bone.getLocalMatrix().asArray().map((v) => +v.toFixed(2)); const nodeLocal = node._localMatrix.asArray().map((v) => +v.toFixed(2));
+  const same = local.every((v, i) => Math.abs(v - nodeLocal[i]) < 0.01);
+  const nodeQ = node.rotationQuaternion ? node.rotationQuaternion.asArray().map((v) => +v.toFixed(3)) : null; const boneQ = bone.rotationQuaternion.asArray().map((v) => +v.toFixed(3));
+  return JSON.stringify({ bone: bone.name, linked: sk._numBonesWithLinkedTransformNode, localEqualsNode: same, nodeQ, boneQ, skinRow3: skin.slice(12, 15), absRow3: abs.slice(12, 15), skinDiag: [skin[0], skin[5], skin[10]], needInitial: sk.needInitialSkinMatrix, animatorPlaying: s.animator && s.animator.isPlaying });
+})()`));
+await b.close();

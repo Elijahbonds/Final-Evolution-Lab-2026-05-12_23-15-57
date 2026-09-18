@@ -1,0 +1,133 @@
+// dunkFinishes — M111 performance/timing-driven dunk finishes: the finish
+// reflects HOW WELL you timed the slam and HOW BIG the judges scored it.
+//   dunk_finish_windmill — perfect-timing aerial: a full one-arm windmill.
+//   dunk_finish_tomahawk — good-timing aerial: two-hand cock-back tomahawk.
+//   dunk_finish_blown    — mistimed/whiffed aerial: arms flail off-balance, then a brace (not a held T).
+//   dunk_celebrate_big   — landing after a huge score: crouch into a flex.
+//
+// RE-AUTHORED as pose targets (ship pass 3, rung 1): hands as world-axis metres
+// from the root, fitted by the two-bone solver; torso and legs in degrees about
+// the parent's bind axes. The old Euler arm keys rotated about X — the arm's own
+// axis on this rig — so the tomahawk's hands never rose above the head
+// (coreClips.test.ts, 2026-09-03). The mode owns the jump; these are aerial shapes.
+import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
+import { buildPoseClip, type Deg3 } from '../poseClip';
+type V3 = [number, number, number];
+
+const UP = { Left: [-0.9, 0.1, -0.3] as V3, Right: [0.9, 0.1, -0.3] as V3 };
+const SETTLE_LEGS: Record<string, Deg3> = { LeftUpLeg: [-12, 0, 4], LeftLeg: [16, 0, 0], RightUpLeg: [-12, 0, -4], RightLeg: [16, 0, 0] };
+
+/**
+ * THE LEGS OF THE TWO BIG FINISHES (dynamics pass, 2026-09-16).
+ *
+ * The windmill and the tomahawk both flew with `AIR_LEGS` — one symmetric tuck, both thighs −30°, both knees 45° — held
+ * from the cock-back to the slam. Which is to say the two most photographed dunks in the sport were performed with the
+ * legs of someone sitting on a chair. A tomahawk's whole silhouette is the SPREAD: arms back over the head, legs thrown
+ * open, the body a giant X. A windmill's is the counterweight: the trail leg kicks back and out as the arm comes over
+ * the top, because that is what a body does to keep the shoulder line under a swinging arm.
+ */
+const TAKEOFF_LEGS: Record<string, Deg3> = { LeftUpLeg: [-72, 0, 8], LeftLeg: [44, 0, 0], RightUpLeg: [14, 0, -6], RightLeg: [60, 0, 0] };
+const SPREAD_LEGS: Record<string, Deg3> = { LeftUpLeg: [-34, 0, 26], LeftLeg: [30, 0, 0], RightUpLeg: [-34, 0, -26], RightLeg: [30, 0, 0] };
+const KICKBACK_LEGS: Record<string, Deg3> = { LeftUpLeg: [-52, 0, 14], LeftLeg: [40, 0, 0], RightUpLeg: [28, 0, -12], RightLeg: [84, 0, 0] };
+/** The flush: long under the arm, and still not mirror-symmetric — nobody lands a dunk in a diagram. */
+const LONG_LEGS: Record<string, Deg3> = { LeftUpLeg: [-16, 0, 5], LeftLeg: [14, 0, 0], RightUpLeg: [-6, 0, -5], RightLeg: [22, 0, 0] };
+
+// PERFECT timing → the crowd-popper. Right arm sweeps a full circle: cocked
+// back-and-down, out and up over the top, then down to slam. Left arm rides high.
+export function buildFinishWindmill(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.85;
+  return buildPoseClip(scene, sk, 'dunk_finish_windmill', T, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, -8, 0],  ...TAKEOFF_LEGS }, hands: { Right: [0.30, 0.80, -0.30], Left: [-0.20, 1.85, 0.15] }, poles: { Right: [0.8, 0.2, -0.5], Left: UP.Left } },   // off one foot, lead knee still driving
+    { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0],  ...KICKBACK_LEGS }, hands: { Right: [0.62, 1.40, -0.15], Left: [-0.20, 1.90, 0.15] }, poles: { Right: [0.4, -0.3, -0.9], Left: UP.Left } },   // out to the side — the trail leg kicks back to counterweight the arm
+    { t: 0.55, bones: { Hips: [0, 0, 0], Spine: [-12, 6, 0],  ...SPREAD_LEGS }, hands: { Right: [0.15, 2.02, 0.05], Left: [-0.22, 1.85, 0.18] }, poles: { Right: UP.Right, Left: UP.Left } },   // over the top, legs open under it
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],    ...LONG_LEGS }, hands: { Right: [0.12, 1.90, 0.35], Left: [-0.22, 1.60, 0.25] }, poles: { Right: UP.Right } },   // slam, forward and down, body long
+  ]);
+}
+
+// GOOD timing → both arms cock straight overhead, then crunch down together.
+export function buildFinishTomahawk(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  // ONE HAND (DUNK-CLIPS, 2026-09-17). It was a two-handed cock-back, which is a different dunk; a tomahawk is the ball
+  // in ONE hand cocked behind the head, the off arm thrown out for balance, the legs spread — the X — then the hammer.
+  const T = 0.75;
+  return buildPoseClip(scene, sk, 'dunk_finish_tomahawk', T, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], Neck: [-6, 0, 0], ...TAKEOFF_LEGS }, hands: { Right: [0.24, 1.78, 0.22], Left: [-0.30, 1.50, 0.26] }, poles: { Right: [0.8, -0.2, 0.1], Left: [-0.8, -0.4, 0.2] } },   // off one foot, the ball leaving the guide hand
+    { t: 0.36, bones: { Hips: [0, 0, 0], Spine: [-24, 0, 0], Neck: [-12, 0, 0], ...SPREAD_LEGS }, hands: { Right: [0.28, 2.00, -0.38], Left: [-0.58, 1.58, 0.02] }, poles: { Right: [0.9, 0.3, -0.5], Left: [-0.7, -0.6, -0.3] } },   // cocked BEHIND the head, off arm out — the X
+    { t: 0.56, bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0],  Neck: [-4, 0, 0], ...KICKBACK_LEGS }, hands: { Right: [0.22, 2.06, 0.12], Left: [-0.50, 1.50, 0.12] }, poles: { Right: UP.Right, Left: [-0.7, -0.6, -0.3] } },   // over the top
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0],  Neck: [6, 0, 0],  ...LONG_LEGS }, hands: { Right: [0.18, 1.78, 0.44], Left: [-0.40, 1.36, 0.22] }, poles: { Right: UP.Right, Left: [-0.8, -0.5, 0.1] } },   // hammered down and through, body long
+  ]);
+}
+
+/** The knees up under the chest — the hang of a one-foot power dunk (lead knee higher, trail knee following). */
+const TUCK_LEGS: Record<string, Deg3> = { LeftUpLeg: [-62, 0, 8], LeftLeg: [92, 0, 0], RightUpLeg: [-48, 0, -8], RightLeg: [78, 0, 0] };
+/** Both knees up together — a TWO-FOOT jump's tuck. */
+const TUCK2_LEGS: Record<string, Deg3> = { LeftUpLeg: [-56, 0, 8], LeftLeg: [84, 0, 0], RightUpLeg: [-56, 0, -8], RightLeg: [84, 0, 0] };
+
+// POWER SLAM (DUNK-CLIPS, 2026-09-17) — the game's default drive dunk. It played `dunk_launch`, a 0.35 s two-hand LAUNCH
+// (arms thrown overhead, knees soft) stretched over a 550 ms flight: no hang, no hammer. This is the flight: off one
+// foot, the ball in the strong hand, the knees come up under the chest at the top, and the arm comes down THROUGH the
+// iron with the body long.
+export function buildFinishPower(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.6;
+  return buildPoseClip(scene, sk, 'dunk_finish_power', T, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0],  Neck: [-4, 0, 0], ...TAKEOFF_LEGS }, hands: { Right: [0.22, 1.56, 0.30], Left: [-0.22, 1.46, 0.30] }, poles: { Right: [0.8, -0.3, 0.2], Left: [-0.8, -0.3, 0.2] } },   // the ball rising in front, the guide hand still on it
+    { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [-18, 0, 0], Neck: [-10, 0, 0], ...TUCK_LEGS }, hands: { Right: [0.20, 2.08, 0.06], Left: [-0.46, 1.60, 0.02] }, poles: { Right: [0.9, 0.3, -0.4], Left: [-0.8, -0.5, -0.2] } },   // the hang: one hand cocked high, the knees up, the chest open
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0],  Neck: [6, 0, 0],  ...LONG_LEGS }, hands: { Right: [0.16, 1.80, 0.46], Left: [-0.40, 1.40, 0.20] }, poles: { Right: UP.Right, Left: [-0.8, -0.5, 0.1] } },   // hammered down and through
+  ]);
+}
+
+// TWO-HAND FLUSH — the standing dunk (checkDriveDunk 'standing'): a two-foot jump, both knees tucked, the ball carried up
+// in both hands past the face, over and behind the head at the top, and flushed down with both.
+export function buildFinishTwoHand(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.55;
+  return buildPoseClip(scene, sk, 'dunk_finish_two_hand', T, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [2, 0, 0],   Neck: [-6, 0, 0], ...TUCK2_LEGS }, hands: { Right: [0.22, 1.62, 0.34], Left: [-0.22, 1.62, 0.34] }, poles: { Right: [0.8, -0.4, 0.2], Left: [-0.8, -0.4, 0.2] } },   // both hands carrying it up past the face
+    { t: 0.28, bones: { Hips: [0, 0, 0], Spine: [-16, 0, 0], Neck: [-10, 0, 0], ...TUCK2_LEGS }, hands: { Right: [0.20, 2.04, 0.00], Left: [-0.20, 2.04, 0.00] }, poles: UP },   // over the head, knees up
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [10, 0, 0],  Neck: [6, 0, 0],  ...LONG_LEGS }, hands: { Right: [0.18, 1.78, 0.42], Left: [-0.18, 1.78, 0.42] }, poles: UP },   // flushed with both, body long
+  ]);
+}
+
+// MISTIMED / whiffed → off the iron off balance, then the body BRACES: arms in front of the face, knees up, chin down.
+// DUNK-BIOMECH (2026-09-08): the clip used to flail wide (both hands out at shoulder height) and the aerial owner holds
+// the last frame through the fall — a T-pose was what the floor got. A blown dunk ends in a readable bail, not a T; the
+// land crouch takes it from feet-down.
+export function buildFinishBlown(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  // a miss resolves ~0.4 m off the floor and falls at the arc's own 2.6 m/s: ~0.2 s to feet-down, inside the crossfade.
+  // So the brace IS the clip — hands come off the iron and straight in front of the face, knees up, chin down — with the
+  // flail folded into the first tenth (measured: a flail key at 0.14 s was the pose the floor got, arms wide = a T)
+  const T = 0.35;
+  return buildPoseClip(scene, sk, 'dunk_finish_blown', T, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-4, 8, 8],  Neck: [0, 0, 0],  LeftUpLeg: [-36, 0, 10], LeftLeg: [40, 0, 0], RightUpLeg: [-20, 0, -10], RightLeg: [52, 0, 0] }, hands: { Left: [-0.34, 1.62, 0.18], Right: [0.36, 1.66, 0.22] }, poles: { Left: [-0.6, -0.4, -0.6], Right: [0.6, -0.4, -0.6] } },   // off the iron, off balance
+    { t: 0.12, bones: { Hips: [6, 0, 0], Spine: [22, 4, 6], Neck: [12, 0, 0], LeftUpLeg: [-48, 0, 8], LeftLeg: [70, 0, 0], RightUpLeg: [-40, 0, -8], RightLeg: [62, 0, 0] }, hands: { Left: [-0.18, 1.40, 0.34], Right: [0.22, 1.34, 0.36] }, poles: { Left: [-0.7, -0.5, -0.4], Right: [0.7, -0.5, -0.4] } },   // the brace: arms in front of the face, knees up, chin down
+    { t: T,    bones: { Hips: [8, 0, 0], Spine: [26, 2, 4], Neck: [14, 0, 0], LeftUpLeg: [-50, 0, 8], LeftLeg: [72, 0, 0], RightUpLeg: [-44, 0, -8], RightLeg: [66, 0, 0] }, hands: { Left: [-0.17, 1.36, 0.36], Right: [0.21, 1.30, 0.38] }, poles: { Left: [-0.7, -0.5, -0.4], Right: [0.7, -0.5, -0.4] } },   // held to feet-down
+  ]);
+}
+
+// BIG score landing → absorb into a deep crouch, then rise into a proud
+// two-arm bicep flex (chest out, spine leaned back). The hips dip and recover.
+export function buildCelebrateBig(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.9, M = 0.3;
+  const FLEX = { Left: [-0.34, 1.52, 0.12] as V3, Right: [0.34, 1.52, 0.12] as V3 };   // fists up beside the head, elbows out at shoulder height
+  const FLEX_POLES = { Left: [-0.9, -0.2, -0.3] as V3, Right: [0.9, -0.2, -0.3] as V3 };
+  // DUNK-POSTURE (2026-09-08): the same authored descent as the land crouch — feet-down crossfades in from a finish with the
+  // hands overhead, and a low first key left the arms' way down to the blend (measured: the tomahawk → celebrate blend swept
+  // the hands to a 1.1 m T at shoulder height). Overhead first (the finishes' UP poles), then down the front into the crouch.
+  return buildPoseClip(scene, sk, 'dunk_celebrate_big', T, [
+    { t: 0,   bones: { Hips: [0, 0, 0], Spine: [4, 0, 0],  LeftUpLeg: [-14, 0, 6], LeftLeg: [18, 0, 0], RightUpLeg: [-14, 0, -6], RightLeg: [18, 0, 0] }, hands: { Left: [-0.20, 1.92, 0.08], Right: [0.20, 1.92, 0.08] }, poles: { Left: [-0.9, 0.1, -0.3], Right: [0.9, 0.1, -0.3] }, hipsY: 0.04 },
+    { t: 0.1, bones: { Hips: [0, 0, 0], Spine: [20, 0, 0], LeftUpLeg: [-55, 0, 8], LeftLeg: [80, 0, 0], RightUpLeg: [-55, 0, -8], RightLeg: [80, 0, 0] }, hands: { Left: [-0.30, 0.85, 0.30], Right: [0.30, 0.85, 0.30] }, poles: { Left: [-0.9, 0.0, -0.3], Right: [0.9, 0.0, -0.3] }, hipsY: -0.06 },   // down the front, into the crouch — the elbows stay OUT (a pole flip between keys is a lateral sweep of the arm)
+    { t: M,   bones: { Hips: [0, 0, 0], Spine: [26, 0, 0], LeftUpLeg: [-60, 0, 8], LeftLeg: [85, 0, 0], RightUpLeg: [-60, 0, -8], RightLeg: [85, 0, 0] }, hands: { Left: [-0.34, 0.80, 0.34], Right: [0.34, 0.80, 0.34] }, hipsY: -0.26 },
+    { t: 0.6, bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], LeftUpLeg: [-10, 0, 4], LeftLeg: [14, 0, 0], RightUpLeg: [-10, 0, -4], RightLeg: [14, 0, 0] }, hands: FLEX, poles: FLEX_POLES, hipsY: -0.02 },
+    { t: T,   bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], LeftUpLeg: [-10, 0, 4], LeftLeg: [14, 0, 0], RightUpLeg: [-10, 0, -4], RightLeg: [14, 0, 0] }, hands: FLEX, poles: FLEX_POLES, hipsY: 0 },
+  ]);
+}
+
+// REVERSE (DEFENSE-LOOK, 2026-09-17) — the baseline dunk. The flight turns the back to the iron (HoopsDunk.reverse), so
+// the ball goes up in front of the chest, over the head, and is flushed BEHIND it: the arch is the shape (Spine −30),
+// both hands, the legs long. Body-local +z is forward, so 'behind the head' is −z.
+export function buildFinishReverse(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.7;
+  return buildPoseClip(scene, sk, 'dunk_finish_reverse', T, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0],  ...TAKEOFF_LEGS }, hands: { Left: [-0.22, 1.80, 0.12], Right: [0.22, 1.80, 0.12] }, poles: UP },   // ball up in front, off one foot
+    { t: 0.4,  bones: { Hips: [0, 0, 0], Spine: [-30, 0, 0], ...SPREAD_LEGS }, hands: { Left: [-0.20, 2.04, -0.28], Right: [0.20, 2.04, -0.28] }, poles: UP },  // the arch: ball over and behind the head
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [-18, 0, 0], ...LONG_LEGS },   hands: { Left: [-0.18, 1.86, -0.44], Right: [0.18, 1.86, -0.44] }, poles: UP },  // flushed behind, body long
+  ]);
+}

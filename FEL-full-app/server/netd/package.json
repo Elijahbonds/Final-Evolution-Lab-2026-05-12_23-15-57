@@ -1,0 +1,14 @@
+{
+  "name": "fel-netd",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": { "node": "22" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": { "ws": "^8.18.0" },
+  "devDependencies": { "@types/ws": "^8.5.12", "typescript": "5.9.3", "tsx": "^4.19.0" }
+}
