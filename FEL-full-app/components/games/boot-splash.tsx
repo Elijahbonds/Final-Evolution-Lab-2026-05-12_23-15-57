@@ -16,6 +16,7 @@ import { readyCourses, readCourse, writeCourse } from '@/lib/babylon/core/RaceCo
 import { readyVehicles, readVehicle, writeVehicle, type RaceKind } from '@/lib/babylon/racing/garage';
 import { readyWeapons, readWeapon, writeWeapon } from '@/lib/babylon/combat/arsenal';
 import { arenasFor, readCombatArena, writeCombatArena, COMBAT_MODE_IDS, type CombatModeId } from '@/lib/babylon/combat/arenas';
+import { looksFor, readPlaceLook, writePlaceLook } from '@/lib/babylon/nexus/placeLooks';
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
 import {
   readySchools, readBlend, writeBlend, blendName, schoolById, blendTraits, STYLE_TRAIT_KEYS,
@@ -208,6 +209,16 @@ export function BootSplash(props: {
     const u = new URL(window.location.href); u.searchParams.set('arena', id); window.location.assign(u.toString());
   };
 
+  // THE PLACE (2026-09-18): three looks for every mode that had one room (nexus/placeLooks.ts). Reloads like a venue.
+  const placeList = looksFor(props.modeId);
+  const [placeId, setPlaceId] = useState<string>('home');
+  useEffect(() => { if (placeList.length) setPlaceId(readPlaceLook(props.modeId)?.id ?? 'home'); }, [placeList.length, props.modeId]);
+  const pickPlace = (id: string) => {
+    if (id === placeId) return;
+    writePlaceLook(props.modeId, id);
+    const u = new URL(window.location.href); u.searchParams.set('place', id); window.location.assign(u.toString());
+  };
+
   // DIFFICULTY (2026-09-13). Phase 0 measured four modes with no tiering at all and four more each inventing
   // their own; this is the one picker, reading the one shared ladder.
   const hasTiers = TIER_MODES.has(props.modeId);
@@ -357,6 +368,23 @@ export function BootSplash(props: {
             <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
               {arenasFor(arenaMode).find((a) => a.id === arenaId)?.sub ?? ''}
             </p>
+          </div>
+        )}
+
+        {placeList.length > 1 && (props.phase === 'ready' || props.phase === 'loading') && (
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">PLACE</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {placeList.map((l) => (
+                <button key={l.id} type="button" onClick={() => pickPlace(l.id)} title={l.sub}
+                  aria-label={`${l.name} — ${l.sub}`} aria-pressed={l.id === placeId}
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${l.id === placeId ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={l.id === placeId ? { background: l.tint, borderColor: l.tint } : { borderColor: `${l.tint}88` }}>
+                  {l.name.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">{placeList.find((l) => l.id === placeId)?.sub ?? ''}</p>
           </div>
         )}
 

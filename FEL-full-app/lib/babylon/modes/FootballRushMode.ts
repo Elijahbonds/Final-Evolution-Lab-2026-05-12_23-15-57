@@ -50,6 +50,7 @@ import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
+import { readPlaceLook } from '../nexus/placeLooks';
 import { Onlookers } from '../visual/Onlookers';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -361,7 +362,7 @@ export const FootballRushMode: ModeDefinition = (() => {
     async load(ctx: ModeContext) {
       tier = readProfile();
       driveLog = []; driveYards = 0;
-      rushVenue = mountVenue(ctx, 'football_rush', { keepGameplayCamera: true });
+      rushVenue = mountVenue(ctx, 'football_rush', { keepGameplayCamera: true, look: readPlaceLook('football') });   // PLACE: the splash's pick
       // WEATHER: the start screen's pick — rain softens the cut (grip), snow slows the run (drag), fog / night dress it
       weather = WeatherKit.fromPick(readWeather('football'), 'gridiron', Math.floor(Date.now() / 1000) % 100000);
       weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier });

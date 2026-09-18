@@ -32,6 +32,7 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
+import { readPlaceLook } from '../nexus/placeLooks';
 import { FighterState, KARATE_ATTACKS, CHI_MAX } from '../core/FightCore';
 import { StrikeController, karateMoveset, MIN_STARTUP_SEC, type CombatMove } from '../core/StrikeSystem';
 import { readBlend, blendTraits } from '../combat/schools';
@@ -319,7 +320,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       // exactly one onTierChange subscriber in the game. Same reports, same weights, now heard.
       mbus = ctx.momentum;
       // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
-      modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true });
+      modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true, look: readPlaceLook('showdown') });   // PLACE: the splash's pick
       if (!modeVenue) VenueKit.buildDojo(ctx.scene);
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 4), startClip: 'karate_idle_stance', modeId: 'showdown-me',

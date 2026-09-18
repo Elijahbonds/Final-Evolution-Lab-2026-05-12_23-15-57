@@ -31,6 +31,7 @@ import { refuse } from '../core/Refusal';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
+import { readPlaceLook } from '../nexus/placeLooks';
 import { allCarnivalEvents, type CarnivalEvent } from './carnivalEvents';
 import {
   pickNight, rollRival, rivalProgress, freshTally, bankEvent, nightChampion, nightBoard, type NightTally,
@@ -135,7 +136,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
    *  Who Scene It mounts and disposes a venue per question the same way. */
   function showHub(ctx: ModeContext, S: St, on: boolean): void {
     if (on) {
-      if (!S.hub) { S.hub = mountVenue(ctx, HUB_VENUE, { keepGameplayCamera: true }); S.hub?.hidePlaceholders(); }
+      if (!S.hub) { S.hub = mountVenue(ctx, HUB_VENUE, { keepGameplayCamera: true, look: readPlaceLook('carnival') }); S.hub?.hidePlaceholders(); }   // PLACE: the splash's pick
       // A FOLLOW camera around a still anchor, not a fixed shot: fixed mode places the camera but the frame guard
       // measured it aimed away ("hero BEHIND camera") and the frame sat on the sky. Follow aims every frame. The anchor
       // is the court's centre; the objective is the midpoint of the two actor spots, so the two-shot looks past the

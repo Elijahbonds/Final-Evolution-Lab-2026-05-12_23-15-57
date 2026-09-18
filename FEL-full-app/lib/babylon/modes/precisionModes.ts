@@ -44,6 +44,7 @@ import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
+import { readPlaceLook } from '../nexus/placeLooks';
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
 import { mountPostureLayer } from '../anim/PostureLayer';
@@ -512,7 +513,7 @@ export const GolfMode: ModeDefinition = (() => {
     modeId: 'golf', mood: 'alpine', camPreset: 'links',
 
     async load(ctx: ModeContext) {
-      golfVenue = mountVenue(ctx, 'golf_loop', { keepGameplayCamera: true });
+      golfVenue = mountVenue(ctx, 'golf_loop', { keepGameplayCamera: true, look: readPlaceLook('golf') });   // PLACE: the splash's pick
       VenueKit.buildField(ctx.scene, 'golf');   // the kit green and pines stay under the spec's sky and props; the spec's pale ground hides
       // Same stacking as football, same rename, same reason: two coplanar meshes under one name made the
       // physics floor the hidden one (see FootballRushMode).
@@ -896,7 +897,7 @@ export const DerbyMode: ModeDefinition = (() => {
     modeId: 'baseball', mood: 'goldenHour', camPreset: 'court',
 
     async load(ctx: ModeContext) {
-      derbyVenue = mountVenue(ctx, 'derby', { keepGameplayCamera: true });
+      derbyVenue = mountVenue(ctx, 'derby', { keepGameplayCamera: true, look: readPlaceLook('derby') });   // PLACE
       if (!derbyVenue) VenueKit.buildField(ctx.scene, 'ballpark');   // spec first, kit fallback
       EffectsKit.ambient(ctx.scene, 'park');
       furniture = buildPlateAndMound(ctx.scene);
@@ -1337,7 +1338,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     modeId: 'soccer', mood: 'nightGame', camPreset: 'court',
 
     async load(ctx: ModeContext) {
-      penaltyVenue = mountVenue(ctx, 'penalty', { keepGameplayCamera: true });
+      penaltyVenue = mountVenue(ctx, 'penalty', { keepGameplayCamera: true, look: readPlaceLook('penalty') });   // PLACE
       if (!penaltyVenue) VenueKit.buildField(ctx.scene, 'pitch');   // spec first, kit fallback
       EffectsKit.ambient(ctx.scene, 'park');
       furniture = buildGoal(ctx.scene);

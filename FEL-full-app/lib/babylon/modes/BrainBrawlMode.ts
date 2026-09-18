@@ -13,6 +13,7 @@ import type { FelInput } from '../core/InputBus';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { Onlookers } from '../visual/Onlookers';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
+import { readPlaceLook } from '../nexus/placeLooks';
 import { SoundKit } from '../audio/SoundKit';
 import { Contestants, podiums } from '../party/Contestants';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -204,7 +205,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
         challenge: null, clock: 0, exposeT: 0, answers: [null], answerTimes: [0], resultT: 0, best: loadBest(),
       };
       states.set(ctx.scene, S); live.add(S);
-      S.venue = mountVenue(ctx, 'brain_brawl', { keepGameplayCamera: true }); S.venue?.hidePlaceholders();
+      S.venue = mountVenue(ctx, 'brain_brawl', { keepGameplayCamera: true, look: readPlaceLook('brainbrawl') }); S.venue?.hidePlaceholders();
       S.crowd = new Onlookers(ctx.scene, Array.from({ length: 12 }, (_, i) => {
         const a = -0.9 + (i / 11) * 1.8;   // an arc across the front of the stage, facing the wheel
         return new Vector3(Math.sin(a) * 7.5, 0, 4.2 + Math.cos(a) * 2.2);

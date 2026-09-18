@@ -35,6 +35,7 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { BeatOwner } from '../anim/beatOwner';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
+import { readPlaceLook } from '../nexus/placeLooks';
 import { registerDanceClips, resolveDanceClip, danceRootTracks } from '../anim/danceClips';
 import { MoveRootLayer } from '../anim/MoveRootLayer';
 import { registerMirroredClips } from '../anim/mirrored-clips';
@@ -293,7 +294,7 @@ export const DanceMode: ModeDefinition = (() => {
     camPreset: 'overShoulder',
 
     async load(ctx: ModeContext) {
-      venue = mountVenue(ctx, 'dance', { keepGameplayCamera: true });   // M104 gap: keep the over-shoulder follow camera, not the venue orbit
+      venue = mountVenue(ctx, 'dance', { keepGameplayCamera: true, look: readPlaceLook('dance') });   // M104 gap: keep the over-shoulder follow camera, not the venue orbit
       // SCORECARD VISUALS (2026-09-15): a cypher IS the circle of people around the dancer, and the frame review found a
       // lone body on a lit disc in a dark room. The ring watches the floor (the same Onlookers the dojo and the courts use).
       crowd?.dispose(); crowd = null;

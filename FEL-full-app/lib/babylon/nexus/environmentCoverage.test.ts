@@ -1,0 +1,47 @@
+// THREE PLACES PER MODE (owner, 2026-09-18: "3 map/arena/environment per mode minimum").
+//
+// Every enabled mode has to offer at least three places to play, through one of the game's pick systems: the hoops
+// court locations, the board venues, the race courses, the combat arenas, the place looks, or (Who Scene It) a venue
+// that changes every round. This test is the ledger: a mode that loses its picks, or a new mode that ships with one
+// room, fails here. The two named exceptions are the modes whose worlds are built by hand rather than from a venue
+// spec — they are the open work, not a pass.
+import { describe, it, expect } from 'vitest';
+import { ENABLED_BABYLON_MODES } from '../modes/registry';
+import { BASKETBALL_MODE_IDS, readyCourtLocations } from './courtLocations';
+import { readyVenues, type BoardDiscipline } from './boardVenues';
+import { readyCourses } from '../core/RaceCourse';
+import { arenasFor, COMBAT_MODE_IDS, type CombatModeId } from '../combat/arenas';
+import { looksFor } from './placeLooks';
+
+/** Registry key → the splash / pick id, where they differ. */
+const SPLASH_ID: Record<string, string> = { snowboard_slalom: 'snow', skateboard: 'skate', surf: 'surf', bigair: 'snow', aeroaces: 'aero', velocitykart: 'kart', brainbrawl: 'brainbrawl' };
+const BOARD = new Set(['skate', 'snow', 'surf']);
+const RACE = new Set(['aero', 'kart']);
+/** Worlds built by hand (no venue spec): the open work. */
+const HAND_BUILT = new Set(['sprint', 'freerun']);
+/** The quiz mounts a different venue every round — every venue in the game is its place. */
+const ROTATING = new Set(['who_scene_it']);
+
+function placesFor(key: string): number {
+  const id = SPLASH_ID[key] ?? key;
+  if (BASKETBALL_MODE_IDS.has(key) || key === 'threepoint') return readyCourtLocations().length;
+  if (BOARD.has(id)) return readyVenues(id as BoardDiscipline).length;
+  if (RACE.has(id)) return readyCourses(id as 'aero' | 'kart').length;
+  if ((COMBAT_MODE_IDS as readonly string[]).includes(id)) return arenasFor(id as CombatModeId).length;
+  if (ROTATING.has(key)) return 3;
+  return looksFor(id).length;
+}
+
+describe('three places per mode', () => {
+  for (const key of ENABLED_BABYLON_MODES) {
+    if (HAND_BUILT.has(key)) continue;
+    it(`${key} offers at least three`, () => { expect(placesFor(key), key).toBeGreaterThanOrEqual(3); });
+  }
+  it('names the open work exactly', () => { expect([...HAND_BUILT].sort()).toEqual(['freerun', 'sprint']); });
+  it('every place look list starts at home and has unique ids', () => {
+    for (const [mode, list] of Object.entries({ football: looksFor('football'), tennis: looksFor('tennis'), dance: looksFor('dance') })) {
+      expect(list[0].id, mode).toBe('home');
+      expect(new Set(list.map((l) => l.id)).size).toBe(list.length);
+    }
+  });
+});
