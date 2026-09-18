@@ -1,0 +1,11 @@
+import { chromium } from 'playwright-core';
+const URL_ = process.env.URL ?? 'http://localhost:3000/dev/mode/karate_vs', OUT = process.env.OUT_DIR ?? 'docs/shots';
+const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'] });
+const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+await p.goto(URL_, { waitUntil: 'domcontentloaded' }); await p.waitForSelector('canvas', { timeout: 60000 }); await p.waitForTimeout(8000);
+await p.getByText(/^START$/).first().click({ force: true }).catch(() => {}); await p.waitForTimeout(1500);
+console.log(await p.evaluate(`(() => { const s = window.__FEL_DEV__.scene; s.render(); const active = new Set(s.getActiveMeshes().data.slice(0, s.getActiveMeshes().length).map((m) => m.name)); return s.meshes.filter((m) => /^(Kit|Body)/.test(m.name) && m.isVisible).map((m) => { const bb = m.getBoundingInfo().boundingBox; const w = bb.centerWorld; return m.name.replace(/_c\\d+$/, '') + (active.has(m.name) ? ' ACTIVE' : ' culled') + ' bbW(' + w.x.toFixed(1) + ',' + w.y.toFixed(1) + ',' + w.z.toFixed(1) + ') ext' + bb.extendSizeWorld.length().toFixed(2) + ' rootPos(' + (m.parent ? m.parent.getAbsolutePosition().x.toFixed(1) + ',' + m.parent.getAbsolutePosition().z.toFixed(1) : '-') + ')' + (m.alwaysSelectAsActiveMesh ? ' always' : ''); }).join('\\n'); })()`));
+await p.screenshot({ path: `${OUT}/cull-before.png` });
+await p.evaluate(`(() => { const s = window.__FEL_DEV__.scene; for (const m of s.meshes) if (/^Kit_/.test(m.name)) m.alwaysSelectAsActiveMesh = true; })()`);
+await p.waitForTimeout(400); await p.screenshot({ path: `${OUT}/cull-after.png` });
+await b.close();

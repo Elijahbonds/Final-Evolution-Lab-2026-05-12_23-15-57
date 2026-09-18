@@ -1,0 +1,10 @@
+import { chromium } from 'playwright-core';
+const URL_ = process.env.URL ?? 'http://localhost:3000/dev/mode/karate_vs', OUT = process.env.OUT_DIR ?? 'docs/shots';
+const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'] });
+const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+await p.goto(URL_, { waitUntil: 'domcontentloaded' }); await p.waitForSelector('canvas', { timeout: 60000 }); await p.waitForTimeout(8000);
+await p.getByText(/^START$/).first().click({ force: true }).catch(() => {}); await p.waitForTimeout(1500);
+console.log(await p.evaluate(`(() => { const s = window.__FEL_DEV__.scene; const names = s.meshes.map((m) => m.name).filter((n) => /ink|outline|hull|shell|edge/i.test(n)); return JSON.stringify({ inkMeshes: names.slice(0, 8), count: names.length, postProcesses: s.postProcesses.map((pp) => pp.name).slice(0, 6), renderingGroups: [...new Set(s.meshes.map((m) => m.renderingGroupId))], edgeRenderers: s.meshes.filter((m) => m.edgesRenderer).length, bodyMatSide: (s.meshes.find((m) => /^Body/.test(m.name)) || {}).material && s.meshes.find((m) => /^Body/.test(m.name)).material.sideOrientation }); })()`));
+await p.evaluate(`(() => { const s = window.__FEL_DEV__.scene; for (const m of s.meshes) if (/ink|outline|hull|shell/i.test(m.name)) m.isVisible = false; for (const pp of [...s.postProcesses]) pp.dispose(); })()`);
+await p.waitForTimeout(400); await p.screenshot({ path: `${OUT}/ink-off.png` });
+await b.close();

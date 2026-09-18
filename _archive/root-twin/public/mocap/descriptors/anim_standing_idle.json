@@ -1,0 +1,58 @@
+{
+  "id": "anim_standing_idle",
+  "name": "Standing Idle Breathing Loop",
+  "category": "animations",
+  "type": "loop_motion",
+  "file": "anim_standing_idle.fbx",
+  "urls": [
+    "https://static.seeles.ai/data/asset/export/1bb25513-dee2-41f4-a3f9-165864e0ccb6/468449/unityModel_7fead869-7d0f-423e-abaf-bc1c603aad3d.fbx"
+  ],
+  "description": "Universal looping standing idle with subtle breathing and weight shift used as the base idle state across all 13 ABPs",
+  "tags": [
+    "idle",
+    "standing",
+    "breathing",
+    "loop",
+    "shared",
+    "blend space"
+  ],
+  "keywords": [
+    "idle animation",
+    "breathing idle",
+    "neutral stand",
+    "locomotion base"
+  ],
+  "compat": [
+    "unity",
+    "unreal"
+  ],
+  "status": "ready",
+  "created_at": "2026-05-23T16:00:00Z",
+  "source_date": "2026-05-23",
+  "source_turn": 22,
+  "version": "1.0",
+  "property_id": "search_78c3aff0a872_0",
+  "motion_asset_id": 468449,
+  "fel_abp": "ABP_Shared",
+  "fel_blend_space": "BS_Shared_Locomotion",
+  "fel_modes": [
+    "basketball_h2h",
+    "basketball_dunk",
+    "basketball_3v3",
+    "karate_h2h",
+    "karate_endless",
+    "baseball",
+    "football",
+    "soccer",
+    "golf",
+    "tennis",
+    "volleyball",
+    "surfing",
+    "gymnastics",
+    "brain_brawl"
+  ],
+  "local_bundle_file": "anim_standing_idle.nexusanim.json",
+  "local_bundle_path": "FinalEvolutionLab/Resources/Animations/anim_standing_idle.nexusanim.json",
+  "runtime_loader": "NexusAnimationLoader",
+  "runtime_format": "nexusanim_json"
+}

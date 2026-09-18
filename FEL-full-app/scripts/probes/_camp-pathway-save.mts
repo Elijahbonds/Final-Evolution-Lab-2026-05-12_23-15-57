@@ -1,0 +1,23 @@
+// One-off: fill a Pathway Map field, save it to the plan, reload, confirm it persisted.
+import { chromium } from 'playwright-core';
+const BASE = process.env.BASE ?? 'http://localhost:3000', OUT = process.env.OUT_DIR ?? 'docs/shots/camp';
+const browser = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing' });
+const ctx = await browser.newContext({ viewport: { width: 900, height: 1200 } });
+const rc = ctx.request;
+const csrf = (await (await rc.get(`${BASE}/api/auth/csrf`)).json()).csrfToken as string;
+await rc.post(`${BASE}/api/auth/callback/credentials`, { form: { csrfToken: csrf, email: 'playtest@fel.local', password: 'playtest-local-only', json: 'true' } });
+const p = await ctx.newPage(); const errors: string[] = [];
+p.on('pageerror', (e) => errors.push(e.message)); p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 160)); });
+await p.goto(`${BASE}/camp`, { waitUntil: 'networkidle', timeout: 120000 });
+await p.getByRole('button', { name: 'Curriculum' }).click(); await p.waitForTimeout(500);
+const stamp = `Probe ${new Date().toISOString().slice(11, 19)}: email the local marine lab, take the intro bio class, build one specimen log`;
+await p.getByLabel('First real step').fill(stamp);
+await p.getByRole('button', { name: 'Save to the plan' }).click();
+await p.waitForTimeout(1200);
+await p.screenshot({ path: `${OUT}/pathway-saved.png`, fullPage: false });
+await p.reload({ waitUntil: 'networkidle' });
+await p.getByRole('button', { name: 'Curriculum' }).click(); await p.waitForTimeout(800);
+const after = await p.getByLabel('First real step').inputValue();
+const saved = await p.locator('main').innerText();
+console.log('persisted:', after === stamp, '| saved stamp shown:', /Saved \d/.test(saved), '| errors:', errors.length, errors.slice(0, 2));
+await browser.close();

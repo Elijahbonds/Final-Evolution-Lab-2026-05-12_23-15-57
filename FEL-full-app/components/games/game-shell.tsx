@@ -1,0 +1,685 @@
+'use client';
+
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { proofLineFor, type ProofVerdict } from '@/lib/proofLine';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, RotateCcw, Home, Loader2, Trophy, Sparkles, Gem, Coins, TrendingUp, TrendingDown, Crown, Award, Share2, Check, PartyPopper, ArrowRight } from 'lucide-react';
+import type { PrqGrade } from '@/lib/prq';
+import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
+import { getScheme } from '@/lib/input-schemes';
+import { isBabylon } from '@/components/three/flags';
+import { VirtualController } from './virtual-controller';
+import type { SessionTallies } from '@/lib/game-systems';
+import { reportEarn } from '@/lib/wallet/client';
+import {
+  type CarnivalStop, type CarnivalRunState,
+  recordCarnivalResult, carnivalStopLabel, carnivalStopHref, carnivalRunTotalScore, clearCarnivalRun,
+} from '@/lib/carnival-run';
+
+export interface GameResult {
+  score: number;
+  opponentScore?: number;
+  won: boolean;
+  duration: number;
+  headline?: string;
+  /** Standardized fun-loop tallies (hits/misses/dodges/combos) for the PRQ pipeline. */
+  tallies?: SessionTallies;
+  /** Longest combo chain reached during the session. */
+  maxCombo?: number;
+  /** Pass 5 phase 3: the mode's own end-of-session stats and outcome, for the proof line (lib/proofLine.ts). */
+  stats?: Record<string, number | string | boolean>;
+  outcome?: string;
+}
+
+export interface GameProps {
+  grade: PrqGrade;
+  prq: number;
+  onEnd: (result: GameResult) => void;
+  /** Gamepad state polled every frame by GameShell — games can read it. */
+  gamepad?: import('@/lib/canvas-juice').GamepadState;
+}
+
+interface SeasonRecap {
+  name: string;
+  gained: number;
+  tier: number;
+  into: number;
+  need: number;
+  hasPro: boolean;
+  tierUps: { tier: number }[];
+}
+interface MasteryRecap {
+  mode: string;
+  tier: string;
+  tierIndex: number;
+  ups: { tier: string }[];
+}
+interface RecapData {
+  /** FEATURES-UX-SHOP: the server recorded no session — the run ended with no evidence of play. */
+  noPlay?: boolean;
+  xp: number;
+  shards: number;
+  credits: number;
+  prqDelta: number;
+  prqAfter: number;
+  grade?: { label: string; color: string };
+  season?: SeasonRecap | null;
+  mastery?: MasteryRecap | null;
+}
+
+export function GameShell(props: {
+  mode: string;
+  title: string;
+  venue: string;
+  Game: React.ComponentType<GameProps>;
+  /** True when Game already mounts its own <TouchOverlay> (Babylon modes) —
+   *  suppresses the legacy VirtualController so only one control deck shows. */
+  ownControls?: boolean;
+}) {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#050505]"><Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" /></div>}>
+      <GameShellInner {...props} />
+    </Suspense>
+  );
+}
+
+function GameShellInner({
+  mode,
+  title,
+  venue,
+  Game,
+  ownControls,
+}: {
+  mode: string;
+  title: string;
+  venue: string;
+  Game: React.ComponentType<GameProps>;
+  ownControls?: boolean;
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const storyNodeId = searchParams?.get('story') ?? null;
+  const signatureFlag = searchParams?.get('signature') ?? null;
+  const arenaMatchId = searchParams?.get('arena') ?? null;
+  const mpCode = searchParams?.get('mp') ?? null;   // pass 5 phase 5: an async challenge code — accept it with this run's session
+  const carnivalFlag = searchParams?.get('carnival') ?? null;
+  const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade } | null>(null);
+  // Ship pass 2, Phase 4: the profile request failing (offline, server down)
+  // used to leave the shell empty and silent — no game, no message. Measured
+  // with a blocked /api/** on /play/onevone: "HUB ONES Venice Beach Court" and
+  // nothing else. Say so, and offer a retry.
+  const [unreachable, setUnreachable] = useState(false);
+  const [profileTry, setProfileTry] = useState(0);
+  const [result, setResult] = useState<GameResult | null>(null);
+  const [recap, setRecap] = useState<RecapData | null>(null);
+  const [carnivalRun, setCarnivalRun] = useState<CarnivalRunState | null>(null);
+  const [storyReward, setStoryReward] = useState<{ rewardLC: number; badge?: { name: string } | null } | null>(null);
+  const [mpResult, setMpResult] = useState<{ status: string; hostScore: number; guestScore: number; hostName?: string; iWon: boolean; tie: boolean } | null>(null);
+  const [arenaResult, setArenaResult] = useState<
+    | { settled: boolean; status: string; result?: string; iWon?: boolean; payout?: number; feeLc?: number; myScore?: number; oppScore?: number }
+    | null
+  >(null);
+  const [gameKey, setGameKey] = useState(0);
+  // FEATURES-UX-SHOP (2026-09-08): browsing is not playing. A mode left idle ends on its own clock and used to post a
+  // score-0 session that paid XP, a profile shard, streak credits and the 40-coin "Session completed" floor. The shell
+  // now counts the presses it saw while the run was live (keys — the pad bridge and the touch deck both emit them —
+  // pointers, touches; the results card's buttons come after the run and do not count) and sends `played` with the
+  // session; the server pays only on evidence of play (lib/session-evidence.ts). Three presses, so a lone tap on a
+  // "ready" overlay followed by nothing still reads as no play.
+  const inputCount = useRef(0);
+  const runLive = useRef(true);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
+  const scheme = getScheme(mode);
+
+  // ONE INPUT OWNER PER GAME (ported from elijahbonds-fel-upgrade-pass, 2026-09-12; measured here 2026-09-15).
+  //
+  // A Babylon host owns its own input: InputBus polls the pads directly and TouchOverlay draws the touch deck. Running
+  // the shell's poller on top delivered every pad press TWICE — once as the real pad, once as a synthetic key — and on a
+  // HELD trigger the two disagreed frame by frame: football's 2 s truck hold arrived as 35 separate presses, 60 of which
+  // the cause-and-effect probe then scored silent. The shell bridge stays the only input path for the legacy DOM games.
+  const babylonOwnsInput = isBabylon(mode) || !!ownControls;
+
+  // A single physical-gamepad poller translates controller input into the same
+  // synthetic keyboard events the on-screen VirtualController emits, so physical
+  // and virtual pads drive every mode identically.
+  useEffect(() => {
+    if (!scheme || babylonOwnsInput) return;
+    const poller = new PhysicalGamepadPoller();
+    poller.setScheme(scheme);
+    let active = true;
+    let raf = 0;
+    const tick = () => { if (!active) return; poller.poll(); raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    return () => { active = false; cancelAnimationFrame(raf); poller.setScheme(null); };
+  }, [scheme, gameKey, babylonOwnsInput]);
+
+  useEffect(() => { runLive.current = result === null; }, [result]);
+  useEffect(() => {
+    inputCount.current = 0;
+    const mark = () => { if (runLive.current) inputCount.current += 1; };
+    window.addEventListener('keydown', mark);
+    window.addEventListener('pointerdown', mark);
+    window.addEventListener('touchstart', mark, { passive: true });
+    return () => {
+      window.removeEventListener('keydown', mark);
+      window.removeEventListener('pointerdown', mark);
+      window.removeEventListener('touchstart', mark);
+    };
+  }, [gameKey]);
+
+  useEffect(() => {
+    let live = true;
+    setUnreachable(false);
+    fetch('/api/profile')
+      .then((r) => (r?.ok ? r.json() : null))
+      .then((j) => {
+        if (!live) return;
+        if (j?.grade) {
+          setProfile({ prq: j?.prq ?? 50, grade: j.grade });
+        } else {
+          router.replace('/login');
+        }
+      })
+      .catch(() => { if (live) setUnreachable(true); });
+    return () => {
+      live = false;
+    };
+  }, [router, gameKey, profileTry]);
+
+  const handleEnd = useCallback(
+    (res: GameResult) => {
+      setResult(res);
+      fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode,
+          score: res?.score ?? 0,
+          opponentScore: res?.opponentScore ?? 0,
+          won: Boolean(res?.won),
+          duration: res?.duration ?? 0,
+          tallies: res?.tallies,
+          maxCombo: res?.maxCombo,
+          played: inputCount.current >= 3,
+        }),
+      })
+        .then((r) => (r?.ok ? r.json() : null))
+        .then(async (j) => {
+          if (j?.ok) {
+            setRecap({
+              noPlay: Boolean(j?.noPlay),
+              xp: j?.xp ?? 0,
+              shards: j?.shards ?? 0,
+              credits: j?.credits ?? 0,
+              prqDelta: j?.prqDelta ?? 0,
+              prqAfter: j?.prqAfter ?? 0,
+              grade: j?.grade,
+              season: j?.season ?? null,
+              mastery: j?.mastery ?? null,
+            });
+            // FEL wallet (Phase 2): grant coins/shards for EVERY mode through
+            // this shared choke point. Dunk is skipped here because the dunk
+            // component self-reports richer per-attempt events. Keyed on the
+            // server sessionId so a retry is idempotent. Best-effort only.
+            if (j?.sessionId && mode !== 'dunk') {
+              void reportEarn({
+                idempotency_key: `sess:${j.sessionId}:complete`,
+                event_type: 'mode_session_completed',
+                payload: { mode, run_id: j.sessionId, score: res?.score ?? 0 },
+              });
+              if (res?.won) {
+                void reportEarn({
+                  idempotency_key: `sess:${j.sessionId}:won`,
+                  event_type: 'mode_session_won',
+                  payload: { mode, run_id: j.sessionId },
+                });
+              }
+            }
+
+            // If this is a story run, complete the node
+            if (storyNodeId && j?.sessionId) {
+              try {
+                const sr = await fetch('/api/story/complete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ nodeId: storyNodeId, sessionId: j.sessionId }),
+                }).then((r2) => r2.ok ? r2.json() : null);
+                if (sr?.ok && !sr?.alreadyCompleted) {
+                  setStoryReward({ rewardLC: sr.rewardLC ?? 0, badge: sr.badge ?? null });
+                }
+              } catch {}
+            }
+
+            // M13.3 signature challenge: submit the score to the weekly ladder
+            // when this run was launched from the Signature page (1/day capped
+            // server-side). Fire-and-forget; never blocks the recap.
+            if (signatureFlag) {
+              fetch('/api/signature', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode, score: res?.score ?? 0 }),
+              }).catch(() => {});
+            }
+
+            // M14 Triumph Arena: when this run was launched from a duel
+            // (?arena=<matchId>), submit the score. If both players are in,
+            // the server auto-settles and returns the result for the recap.
+            if (arenaMatchId) {
+              try {
+                // Arena scores must be whole numbers (submit-score validates
+                // integers); some modes accrue fractional points internally
+                // (e.g. the carnival gauntlet at 0.4/unit).
+                const arenaScore = Math.max(0, Math.round(res?.score ?? 0));
+                const ar = await fetch('/api/arena/submit-score', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  // the dunk card rides along when the mode produced one, so the other player can see what
+                  // was actually thrown rather than only the number it added up to
+                  body: JSON.stringify({
+                    matchId: arenaMatchId, score: arenaScore,
+                    ...((res as { detail?: { card?: unknown } })?.detail?.card ? { card: (res as { detail?: { card?: unknown } }).detail!.card } : {}),
+                  }),
+                }).then((r2) => (r2.ok ? r2.json() : null));
+                if (ar?.ok) {
+                  // ARENA-10PHASE P1/P2: keep both settled scores — the card reads the duel from them, not from the mode's own rival.
+                  const p1 = typeof ar.p1Score === 'number' ? ar.p1Score : undefined, p2 = typeof ar.p2Score === 'number' ? ar.p2Score : undefined;
+                  setArenaResult({
+                    settled: Boolean(ar.settled),
+                    status: ar.status,
+                    result: ar.result,
+                    iWon: ar.iWon,
+                    payout: ar.payout,
+                    feeLc: ar.feeLc,
+                    myScore: arenaScore,
+                    oppScore: p1 === undefined || p2 === undefined ? undefined : p1 === arenaScore ? p2 : p1,
+                  });
+                }
+              } catch {}
+            }
+
+            // Pass 5 phase 5: accepting a friend's async challenge from the results card. The session above is what
+            // bestScoreFor reads; the join settles best score vs best score and says who won.
+            if (mpCode) {
+              try {
+                const mj = await fetch('/api/v1/mp/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: mpCode }) }).then((r2) => (r2.ok ? r2.json() : null));
+                const m = mj?.match ?? mj;
+                if (m && m.status) setMpResult({ status: m.status, hostScore: Number(m.hostScore ?? 0), guestScore: Number(m.guestScore ?? 0), hostName: m.hostName, iWon: !!m.winnerId && m.winnerId === m.guestId, tie: m.status === 'settled' && !m.winnerId });
+              } catch {}
+            }
+
+            // Court Carnival relay: this stop's reward already posted above
+            // through the normal pipeline — this only advances the run so
+            // the recap can offer "next stop" instead of Replay/Hub.
+            if (carnivalFlag) {
+              const updated = recordCarnivalResult(mode as CarnivalStop, {
+                score: res?.score ?? 0,
+                won: Boolean(res?.won),
+              });
+              setCarnivalRun(updated);
+            }
+
+            // Report to NEXUS sequencer (fire-and-forget; no-ops when disabled)
+            if (j?.sessionId) {
+              fetch('/api/nexus/session-result', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sessionId: j.sessionId,
+                  mode,
+                  score: res?.score ?? 0,
+                  won: Boolean(res?.won),
+                  duration: res?.duration ?? 0,
+                  prqAfter: j?.prqAfter ?? 0,
+                }),
+              }).catch(() => {}); // best-effort, never block the recap
+            }
+          } else {
+            setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 });
+          }
+        })
+        .catch(() => setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 }));
+    },
+    [mode, storyNodeId, signatureFlag, arenaMatchId, carnivalFlag, mpCode]
+  );
+
+  const replay = () => {
+    setResult(null);
+    setRecap(null);
+    setArenaResult(null);
+    setMpResult(null);
+    setShareUrl(null);
+    setShareState('idle');
+    setGameKey((k) => k + 1);
+  };
+
+  // Mint a shareable challenge link from this finished run (M13.4 K-factor loop).
+  // PACK THE FIVE #3: `display` may be overridden — the dunk proof card mints the same link with the make/miss line.
+  const shareChallenge = useCallback(async (displayOverride?: string) => {
+    if (!result) return;
+    setShareState('minting');
+    try {
+      const j = await fetch('/api/challenge/mint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modeKey: mode,
+          score: result.score ?? 0,
+          display: displayOverride ?? result.headline ?? `${title} run`,
+        }),
+      }).then((r) => (r.ok ? r.json() : null));
+      if (j?.path) {
+        const url = `${window.location.origin}${j.path}`;
+        setShareUrl(url);
+        try {
+          if (navigator.share) await navigator.share({ title: 'Beat my FEL run', url });
+          else await navigator.clipboard.writeText(url);
+        } catch {
+          try { await navigator.clipboard.writeText(url); } catch {}
+        }
+        setShareState('copied');
+      } else {
+        setShareState('idle');
+      }
+    } catch {
+      setShareState('idle');
+    }
+  }, [result, mode, title]);
+
+  // Pass 5 phase 3 (was PACK THE FIVE #3, dunk only): one proof line per mode from its own stats — lib/proofLine.ts.
+  // ARENA-10PHASE P1/P2 (2026-09-07): ONE source of truth for an Arena run's W/L. The mode's rival (dunk's in-game rival, the 3PT
+  // field) and the Triumph Arena house rival are different opponents, so the card read "You won the duel — +45 LC" over a
+  // proof line that said "YOU LOST" (playtest d3d4a93, dunk 128–156 in-game vs a lower house draw; 3PT "Tie — refunded" vs
+  // "LOST"). When the run was staked, the settlement is the verdict: headline, score line, proof line and the arena card all
+  // read from it. A run whose submission never came back keeps the mode's own result (no arena card, no arena claim).
+  const arenaVerdict: ProofVerdict | null = arenaMatchId && arenaResult
+    ? (!arenaResult.settled ? 'PENDING' : arenaResult.result === 'tie' ? 'TIE' : arenaResult.iWon ? 'WON' : 'LOST')
+    : null;
+  const arenaOpp = arenaVerdict && arenaVerdict !== 'PENDING' ? arenaResult?.oppScore : undefined;
+  const proofLine = result ? proofLineFor(mode, {
+    score: result.score,
+    opponentScore: arenaOpp ?? result.opponentScore,
+    won: arenaVerdict ? arenaVerdict === 'WON' : result.won,
+    outcome: result.outcome, stats: result.stats,
+    verdict: arenaVerdict ?? undefined,
+  }) : null;
+  const cardWon = arenaVerdict ? arenaVerdict === 'WON' : Boolean(result?.won);
+  const cardHeadline = !result ? '' : arenaVerdict === 'WON' ? 'DUEL WON' : arenaVerdict === 'LOST' ? 'DUEL LOST' : arenaVerdict === 'TIE' ? 'DUEL TIED' : arenaVerdict === 'PENDING' ? 'SCORE LOCKED IN' : (result.headline ?? (result.won ? 'VICTORY' : 'SESSION COMPLETE'));
+  const shareProof = useCallback(() => { if (proofLine) void shareChallenge(`PROOF · ${proofLine}`); }, [proofLine, shareChallenge]);
+
+  return (
+    <div className="flex min-h-screen flex-col bg-[#050505]">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md">
+        <div className="mx-auto flex max-w-[1200px] items-center gap-3 px-4 py-2.5">
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-xs font-medium text-white/60 transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Home
+          </Link>
+          <div>
+            <h1 className="fel-heading text-xl font-bold leading-none text-white">{title}</h1>
+            <p className="font-mono text-[10px] text-white/40">{venue}</p>
+          </div>
+          {profile && (
+            <span
+              className="ml-auto rounded-md border px-2.5 py-1 font-mono text-xs"
+              style={{ borderColor: `${profile.grade?.color}55`, color: profile.grade?.color }}
+            >
+              PRQ {Math.round(profile.prq)} · {profile.grade?.label}
+            </span>
+          )}
+        </div>
+      </header>
+
+      <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4">
+        {!profile && unreachable && (
+          <div className="flex h-[60vh] flex-col items-center justify-center gap-3 text-center">
+            <p className="font-mono text-sm text-white/80">Can&apos;t reach the server. Check your connection, then try again.</p>
+            <button type="button" onClick={() => setProfileTry((n) => n + 1)} className="rounded-md border border-[#00E5FF]/60 px-4 py-2 font-mono text-sm text-[#00E5FF]">RETRY</button>
+          </div>
+        )}
+        {profile ? (
+          <Game key={gameKey} grade={profile.grade} prq={profile.prq} onEnd={handleEnd} />
+        ) : (
+          <div className="flex h-[60vh] items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />
+          </div>
+        )}
+
+        <AnimatePresence>
+          {result && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ y: 60, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ type: 'spring', damping: 22 }}
+                className="fel-panel w-full max-w-md rounded-2xl p-7 text-center"
+              >
+                <Trophy className={`mx-auto h-12 w-12 ${cardWon ? 'text-[#FFD700]' : 'text-white/30'}`} />
+                <h2 className="fel-heading mt-3 text-4xl font-bold text-white">
+                  {cardHeadline}
+                </h2>
+                <p className="mt-1 font-mono text-sm text-white/50">
+                  {arenaVerdict && arenaVerdict !== 'PENDING' && typeof arenaOpp === 'number'
+                    ? `Score ${arenaResult?.myScore ?? result.score} — ${arenaOpp} house rival`
+                    : <>Score {result.score}{typeof result.opponentScore === 'number' && result.opponentScore > 0 ? ` — ${result.opponentScore}` : ''}</>}
+                </p>
+
+                {carnivalFlag && carnivalRun && (
+                  <div className="mt-3 rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/10 p-3 text-center">
+                    <p className="flex items-center justify-center gap-1.5 text-xs font-bold text-[#FFD700]">
+                      <PartyPopper className="h-3.5 w-3.5" /> CARNIVAL NIGHT — STOP {carnivalRun.index} OF {carnivalRun.lineup.length}
+                    </p>
+                    <p className="mt-1 font-mono text-sm text-white/70">
+                      Running total: {carnivalRunTotalScore(carnivalRun)}
+                    </p>
+                  </div>
+                )}
+
+                {recap ? (
+                  <>
+                  {recap.noPlay ? (
+                    <div className="fel-card mt-6 rounded-lg p-4 text-center">
+                      <div className="font-mono text-sm font-bold text-white/70">NO PLAY RECORDED</div>
+                      <div className="mt-1 text-xs text-white/40">The run ended before you got going — nothing earned, nothing counted. Play again to score.</div>
+                    </div>
+                  ) : (
+                  <div className="mt-6 grid grid-cols-2 gap-3">
+                    <div className="fel-card rounded-lg p-3">
+                      <Sparkles className="mx-auto h-4 w-4 text-[#00FF9D]" />
+                      <div className="mt-1 font-mono text-xl font-bold text-[#00FF9D]">+{recap.xp}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-white/40">XP</div>
+                    </div>
+                    <div className="fel-card rounded-lg p-3">
+                      <Gem className="mx-auto h-4 w-4 text-[#A855F7]" />
+                      <div className="mt-1 font-mono text-xl font-bold text-[#A855F7]">+{recap.shards}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-white/40">Shards</div>
+                    </div>
+                    <div className="fel-card rounded-lg p-3">
+                      <Coins className="mx-auto h-4 w-4 text-[#FFD700]" />
+                      <div className="mt-1 font-mono text-xl font-bold text-[#FFD700]">+{recap.credits}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-white/40">Credits</div>
+                    </div>
+                    <div className="fel-card rounded-lg p-3">
+                      {recap.prqDelta >= 0 ? (
+                        <TrendingUp className="mx-auto h-4 w-4 text-[#00E5FF]" />
+                      ) : (
+                        <TrendingDown className="mx-auto h-4 w-4 text-[#FF3366]" />
+                      )}
+                      <div className={`mt-1 font-mono text-xl font-bold ${recap.prqDelta >= 0 ? 'text-[#00E5FF]' : 'text-[#FF3366]'}`}>
+                        {recap.prqDelta >= 0 ? '+' : ''}
+                        {recap.prqDelta}
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wider text-white/40">PRQ Δ</div>
+                    </div>
+                  </div>
+                  )}
+                  {storyReward && (
+                    <div className="mt-3 rounded-lg border border-[#A855F7]/30 bg-[#A855F7]/10 p-3 text-center">
+                      <p className="text-xs font-bold text-[#A855F7]">STORY NODE COMPLETE</p>
+                      <p className="mt-1 font-mono text-sm text-[#FFD700]">+{storyReward.rewardLC} LC</p>
+                      {storyReward.badge && (
+                        <p className="mt-1 text-xs text-amber-400">{'🏆'} {storyReward.badge.name}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* M14 Triumph Arena — duel result */}
+                  {mpResult && (
+                    <div className={`mt-3 rounded-lg border p-3 text-center ${mpResult.tie ? 'border-white/25 bg-white/[0.05]' : mpResult.iWon ? 'border-[#00FF9D]/40 bg-[#00FF9D]/10' : 'border-[#FF3366]/40 bg-[#FF3366]/10'}`}>
+                      <p className="text-xs font-bold tracking-wide text-white/80">FRIEND CHALLENGE</p>
+                      <p className="mt-1 text-sm text-white/80">{mpResult.tie ? 'Dead heat' : mpResult.iWon ? 'You took it' : `${mpResult.hostName ?? 'They'} held it`} — your best {mpResult.guestScore.toLocaleString('en-US')} vs their {mpResult.hostScore.toLocaleString('en-US')}</p>
+                    </div>
+                  )}
+                  {arenaResult && (
+                    <div
+                      className={`mt-3 rounded-lg border p-3 text-center ${
+                        !arenaResult.settled
+                          ? 'border-white/20 bg-white/[0.04]'
+                          : arenaResult.result === 'tie'
+                          ? 'border-white/25 bg-white/[0.05]'
+                          : arenaResult.iWon
+                          ? 'border-[#00FF9D]/40 bg-[#00FF9D]/10'
+                          : 'border-[#FF3366]/40 bg-[#FF3366]/10'
+                      }`}
+                    >
+                      <p className="text-xs font-bold tracking-wide text-white/80">TRIUMPH ARENA</p>
+                      {!arenaResult.settled ? (
+                        <p className="mt-1 text-sm text-white/70">Score locked in — waiting for your opponent to finish.</p>
+                      ) : arenaResult.result === 'tie' ? (
+                        <p className="mt-1 text-sm text-white/80">Tie — both entries refunded ({arenaResult.feeLc} LC each).</p>
+                      ) : arenaResult.iWon ? (
+                        <p className="mt-1 font-mono text-sm font-bold text-[#00FF9D]">You won the duel — +{arenaResult.payout} LC</p>
+                      ) : (
+                        <p className="mt-1 text-sm text-[#FF3366]">You lost this duel. Better luck next time.</p>
+                      )}
+                      {arenaResult.settled && typeof arenaResult.myScore === 'number' && typeof arenaResult.oppScore === 'number' && (
+                        <p className="mt-1 font-mono text-[11px] text-white/60">Your {arenaResult.myScore.toLocaleString('en-US')} vs the house rival&apos;s {arenaResult.oppScore.toLocaleString('en-US')}</p>
+                      )}
+                      <a href="/arena" className="mt-2 inline-block text-[11px] text-[#00E5FF] underline">
+                        Back to the Arena
+                      </a>
+                    </div>
+                  )}
+
+                  {/* M13.2 season pass progress + tier-up feedback */}
+                  {recap.season && (
+                    <div className="mt-3 rounded-lg border border-[#FFD700]/25 bg-[#FFD700]/[0.06] p-3 text-left">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-xs font-bold text-[#FFD700]">
+                          <Crown className="h-3.5 w-3.5" /> {recap.season.name}
+                        </span>
+                        <span className="font-mono text-[11px] text-white/60">+{recap.season.gained} season XP</span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="font-mono text-[11px] text-white/50">T{recap.season.tier}</span>
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-[#FFD700]"
+                            style={{ width: `${Math.min(100, Math.round((recap.season.into / Math.max(1, recap.season.need)) * 100))}%` }}
+                          />
+                        </div>
+                        <span className="font-mono text-[11px] text-white/50">T{recap.season.tier + 1}</span>
+                      </div>
+                      {recap.season.tierUps.length > 0 && (
+                        <p className="mt-2 text-center text-xs font-bold text-[#FFD700]">
+                          {'🎖'} TIER UP! Reached Tier {recap.season.tierUps[recap.season.tierUps.length - 1].tier}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* M13.3 mastery-up feedback */}
+                  {recap.mastery && recap.mastery.ups.length > 0 && (
+                    <div className="mt-3 rounded-lg border border-[#00E5FF]/30 bg-[#00E5FF]/10 p-3 text-center">
+                      <p className="flex items-center justify-center gap-1.5 text-xs font-bold text-[#00E5FF]">
+                        <Award className="h-3.5 w-3.5" /> MASTERY UP — {recap.mastery.ups[recap.mastery.ups.length - 1].tier}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* M13.4 share challenge (K-factor loop) */}
+                  <button
+                    onClick={() => void shareChallenge()}
+                    disabled={shareState === 'minting'}
+                    className="fel-heading mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-[#A855F7]/50 bg-[#A855F7]/10 py-2.5 text-sm font-bold text-[#A855F7] transition-colors hover:bg-[#A855F7]/20 disabled:opacity-60"
+                  >
+                    {shareState === 'copied' ? (
+                      <><Check className="h-4 w-4" /> CHALLENGE LINK COPIED</>
+                    ) : shareState === 'minting' ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" /> MINTING…</>
+                    ) : (
+                      <><Share2 className="h-4 w-4" /> CHALLENGE A FRIEND</>
+                    )}
+                  </button>
+                  {proofLine && (
+                    <button
+                      onClick={shareProof}
+                      disabled={shareState === 'minting'}
+                      className="fel-heading mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-[#00E5FF]/50 bg-[#00E5FF]/10 py-2.5 text-sm font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20 disabled:opacity-60"
+                    >
+                      <Share2 className="h-4 w-4" /> Share proof · {proofLine}
+                    </button>
+                  )}
+                  {shareUrl && (
+                    <p className="mt-1 break-all font-mono text-[10px] text-white/40">{shareUrl}</p>
+                  )}
+                  </>
+                ) : (
+                  <div className="mt-6 flex justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-[#00E5FF]" />
+                  </div>
+                )}
+
+                {carnivalFlag && carnivalRun ? (
+                  <div className="mt-6">
+                    {carnivalRun.index < carnivalRun.lineup.length ? (
+                      <button
+                        onClick={() => router.push(carnivalStopHref(carnivalRun.lineup[carnivalRun.index]))}
+                        className="fel-heading flex w-full items-center justify-center gap-2 rounded-md bg-[#FFD700] py-3 text-base font-bold text-black transition-all hover:bg-[#FFD700]/85"
+                      >
+                        <ArrowRight className="h-4 w-4" /> NEXT: {carnivalStopLabel(carnivalRun.lineup[carnivalRun.index]).toUpperCase()}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => router.push('/play/carnival/recap')}
+                        className="fel-heading flex w-full items-center justify-center gap-2 rounded-md bg-[#FFD700] py-3 text-base font-bold text-black transition-all hover:bg-[#FFD700]/85"
+                      >
+                        <PartyPopper className="h-4 w-4" /> SEE CARNIVAL RESULTS
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      onClick={replay}
+                      className="fel-heading flex flex-1 items-center justify-center gap-2 rounded-md bg-[#00E5FF] py-3 text-base font-bold text-black transition-all hover:bg-[#00E5FF]/85"
+                    >
+                      <RotateCcw className="h-4 w-4" /> REPLAY
+                    </button>
+                    <Link
+                      href={storyNodeId ? '/story' : '/'}
+                      className="fel-heading flex flex-1 items-center justify-center gap-2 rounded-md border border-white/15 py-3 text-base font-bold text-white/80 transition-colors hover:border-[#00E5FF]/60 hover:text-[#00E5FF]"
+                    >
+                      <Home className="h-4 w-4" /> {storyNodeId ? 'Map' : 'Home'}
+                    </Link>
+                  </div>
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {profile && scheme && !result && !ownControls && <VirtualController scheme={scheme} />}
+    </div>
+  );
+}

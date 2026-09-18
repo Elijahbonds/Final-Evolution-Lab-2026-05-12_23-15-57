@@ -1,0 +1,44 @@
+{
+  "id": "anim_golf_swing",
+  "name": "Golf Swing Animation",
+  "category": "animations",
+  "type": "non_loop_motion",
+  "file": "anim_golf_swing.fbx",
+  "urls": [
+    "https://static.seeles.ai/data/asset/export/3503eb8a-c310-436e-bdc6-30cba892f8d9/410707/import.fbx"
+  ],
+  "description": "One-shot golf swing animation with full body rotation and follow-through for ABP_Golf montage.",
+  "tags": [
+    "golf",
+    "swing",
+    "animation",
+    "non-loop",
+    "unreal",
+    "fel"
+  ],
+  "keywords": [
+    "golf swing",
+    "full rotation",
+    "follow through",
+    "ABP_Golf"
+  ],
+  "compat": [
+    "unreal"
+  ],
+  "status": "ready",
+  "created_at": "2026-05-23T18:00:00Z",
+  "source_date": "2026-05-23",
+  "source_turn": 23,
+  "version": "1.0",
+  "property_id": "search_e47eee5da361_0",
+  "motion_asset_id": 410707,
+  "abp": "ABP_Golf",
+  "abp_slot": "AM_Golf_Swing",
+  "fel_modes": [
+    "golf"
+  ],
+  "local_bundle_file": "anim_golf_swing.nexusanim.json",
+  "local_bundle_path": "FinalEvolutionLab/Resources/Animations/anim_golf_swing.nexusanim.json",
+  "runtime_loader": "NexusAnimationLoader",
+  "runtime_format": "nexusanim_json"
+}
