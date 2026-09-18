@@ -34,5 +34,5 @@ execSync('npx prisma generate --schema=prisma/schema.prisma', { stdio: 'inherit'
 console.log('\n[2/3] pushing 78 models through the DIRECT connection…');
 execSync('npx prisma db push --schema=prisma/schema.prisma --skip-generate', { stdio: 'inherit' });
 console.log('\n[3/3] verifying the POOLED connection the app will actually use…');
-execSync(`node -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.\\$queryRaw\\`select 1\\`.then(()=>{console.log('pooled connection OK');process.exit(0)}).catch(e=>{console.error('pooled connection FAILED:',e.message);process.exit(1)})"`, { stdio: 'inherit' });
+execSync('node -e "const{PrismaClient}=require(\'@prisma/client\');const p=new PrismaClient();p.\\$queryRawUnsafe(\'select 1\').then(()=>{console.log(\'pooled connection OK\');process.exit(0)}).catch(e=>{console.error(\'pooled connection FAILED:\',e.message);process.exit(1)})"', { stdio: 'inherit' });
 console.log('\n✔ Supabase is ready. Redeploy to push it live.');

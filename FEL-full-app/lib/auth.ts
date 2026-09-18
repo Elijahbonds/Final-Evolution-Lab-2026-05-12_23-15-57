@@ -1,11 +1,21 @@
 import { type NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
+import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 
+const generatedAuthSecret = process.env.NEXTAUTH_SECRET ?? randomBytes(32).toString('hex');
+
+if (!process.env.NEXTAUTH_SECRET && process.env.NODE_ENV === 'production') {
+  console.warn(
+    'NEXTAUTH_SECRET is not set; using an ephemeral per-process secret. Set NEXTAUTH_SECRET for stable sessions.',
+  );
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
+  secret: generatedAuthSecret,
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60,   // 30-day absolute session lifetime

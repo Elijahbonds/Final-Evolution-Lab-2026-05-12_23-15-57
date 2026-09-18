@@ -63,11 +63,11 @@ export function walledReason(modeKey: string): string | null {
 }
 
 /**
- * Route slugs behind the wall.
+ * Route slug to mode-key map for entries that may be put behind the wall.
  *
  * `/play/<slug>` and the registry key differ for some modes, so the mapping is explicit rather than derived
  * — a silently wrong guess here would either wall the wrong mode or leave a walled one reachable, and both
- * fail quietly.
+ * fail quietly. A route is only actually walled when its mapped mode key is present in WALLED.
  */
 export const WALLED_ROUTES: Readonly<Record<string, string>> = {
   'velocity-kart': 'velocitykart',
@@ -75,5 +75,6 @@ export const WALLED_ROUTES: Readonly<Record<string, string>> = {
 };
 
 export function isWalledRoute(slug: string): boolean {
-  return slug in WALLED_ROUTES;
+  const modeKey = WALLED_ROUTES[slug];
+  return modeKey ? WALLED_KEYS.has(modeKey) : false;
 }

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { MODE_INFO } from './game-data';
 import { MP_MODES, sessionModeFor } from './mp/match-core';
 import {
@@ -43,6 +45,18 @@ describe('mode menu contract', () => {
     const visible = new Set(visibleModeEntries().map(([key]) => key));
     expect(visible.has('aeroAces')).toBe(true);
     expect(visible.has('velocityKart')).toBe(true);
+  });
+
+  it('links every visible mode tile to a real app route', () => {
+    for (const [key, info] of visibleModeEntries()) {
+      expect(info.href, `${key} href should be absolute`).toMatch(/^\//);
+
+      const routePath = info.href === '/'
+        ? join(process.cwd(), 'app', 'page.tsx')
+        : join(process.cwd(), 'app', info.href.replace(/^\/+/, ''), 'page.tsx');
+
+      expect(existsSync(routePath), `${key} links to a missing route: ${info.href}`).toBe(true);
+    }
   });
 
   it('only hides keys that exist in MODE_INFO', () => {

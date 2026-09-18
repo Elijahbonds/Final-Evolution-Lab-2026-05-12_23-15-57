@@ -10,9 +10,8 @@ export const dynamic = 'force-dynamic';
 export default async function AeroAcesPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect('/login');
-  // THE WALL (2026-09-13). AERO ACES has not been through an A+ pass — it and Aero Aces are the only two
-  // registered modes that have not — so it is visible and labelled rather than playable. The loader import
-  // stays: coming off the wall is deleting the WALLED entry in modes/shipStatus.ts, nothing more.
+  // Navigation walls are data-driven by modes/shipStatus.ts. Keep the shipped
+  // loader here so moving the mode on or off the wall is a registry-only change.
   if (isWalled('aeroaces')) {
     return <InDevelopment title="AERO ACES" reason={walledReason('aeroaces') ?? ''} />;
   }
