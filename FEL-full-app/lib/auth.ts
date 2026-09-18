@@ -14,6 +14,18 @@ export const authOptions: NextAuthOptions = {
     updateAge: 24 * 60 * 60,     // rolling refresh: token re-issued at most daily
   },
   jwt: { maxAge: 30 * 24 * 60 * 60 },
+  // FIREBASE HOSTING FORWARDS ONE COOKIE (2026-09-18, owner: "i couldnt log in or sign up"). Hosting strips every request
+  // cookie except `__session` before the SSR backend sees it (measured live: the credentials POST set
+  // `__Secure-next-auth.session-token`, then every page and GET /api/auth/session read an EMPTY session — and the same
+  // cookie sent straight to the Cloud Run URL returned the user). So the session token rides `__session`. The CSRF
+  // cookie still reaches the sign-in POST (measured: a POST without it is refused with ?csrf=true, with it succeeds).
+  // Secure only over https so the local http servers (next dev / next start) still get the cookie.
+  cookies: {
+    sessionToken: {
+      name: '__session',
+      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: (process.env.NEXTAUTH_URL ?? '').startsWith('https') },
+    },
+  },
   pages: { signIn: '/login' },
   providers: [
     CredentialsProvider({
