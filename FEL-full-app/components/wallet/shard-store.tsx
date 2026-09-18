@@ -41,7 +41,7 @@ export function ShardStore() {
 
   // Handle the post-checkout redirect once.
   useEffect(() => {
-    if (params.get('paid') === '1') {
+    if (params?.get('paid') === '1') {
       toast.success('Shards added!', { description: 'Your purchase is confirmed. Balance updates in a moment.' });
       // Poll a few times — the webhook credits shards asynchronously.
       let n = 0;
@@ -49,7 +49,7 @@ export function ShardStore() {
       window.history.replaceState({}, '', '/shop/shards');
       return () => clearInterval(iv);
     }
-    if (params.get('canceled') === '1') {
+    if (params?.get('canceled') === '1') {
       toast('Checkout canceled', { description: 'No charge was made.' });
       window.history.replaceState({}, '', '/shop/shards');
     }

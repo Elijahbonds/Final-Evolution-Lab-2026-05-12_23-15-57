@@ -29,7 +29,10 @@ function CarnivalHubInner() {
   // ARENA-10PHASE P7 (2026-09-07): an Arena Quick Match (/play/carnival?arena=<id>), a friend challenge (?mp=) or a story node
   // (?story=) is a single scored round of the Babylon hub, not a party night — the lobby swallowed the query (START THE
   // NIGHT navigated to a stop href without it), so an Arena carnival duel could never post a score. Those land in the game.
-  const inRun = searchParams.get('carnival') === '1' || !!searchParams.get('arena') || !!searchParams.get('mp') || !!searchParams.get('story');
+  const inRun = searchParams?.get('carnival') === '1'
+    || !!searchParams?.get('arena')
+    || !!searchParams?.get('mp')
+    || !!searchParams?.get('story');
   // drawCarnivalLineup() shuffles with Math.random() — computing it inside
   // useState's initializer ran it once during SSR and again independently
   // on the client during hydration, so the server-rendered lineup order

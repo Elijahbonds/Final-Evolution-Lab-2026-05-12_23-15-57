@@ -137,9 +137,15 @@ check('every active Babylon mode mounts a world (venue or terrain) and ambient',
 // ── 4. Global crash boundary + telemetry + play layout ──────────────────
 check('global error boundary, crash telemetry route, and play layout are present', () => {
   assert.ok(existsSync(join(ROOT, 'components/reliability/global-error-boundary.tsx')));
+  assert.ok(existsSync(join(ROOT, 'app/global-error.tsx')), 'app/global-error.tsx missing');
+  assert.ok(existsSync(join(ROOT, 'pages/500.tsx')), 'pages/500.tsx missing');
   assert.ok(existsSync(join(ROOT, 'app/api/telemetry/crash/route.ts')));
   const layout = read('app/play/layout.tsx');
   assert.ok(layout.includes('GlobalErrorBoundary'), 'play layout does not wrap children in the boundary');
+  const healthz = read('app/healthz/route.ts');
+  assert.ok(healthz.includes("export const runtime = 'nodejs'"), 'healthz runtime must be statically analyzable');
+  const auth = read('lib/auth.ts');
+  assert.ok(auth.includes('resolveAuthSecret'), 'auth config must tolerate missing NEXTAUTH_SECRET during runtime smokes');
 });
 
 // ── 5. Every /play/* route ships a page.tsx ─────────────────────────

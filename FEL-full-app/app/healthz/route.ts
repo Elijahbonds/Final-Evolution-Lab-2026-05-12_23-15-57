@@ -7,5 +7,9 @@
 //
 // It DELEGATES rather than duplicating: two handlers that could disagree about whether the service is up is
 // worse than one, and the failure mode would be the confusing kind — a monitor saying healthy while the real
-// check says otherwise.
-export { GET, dynamic, runtime } from '../api/health/route';
+// check says otherwise. Route segment config must stay literal in this file; Next cannot statically analyze a
+// re-exported runtime value and falls back with a production-build warning.
+export { GET } from '../api/health/route';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';

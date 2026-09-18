@@ -2,11 +2,22 @@ import { type NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import { prisma } from '@/lib/db';
 import { isUnreachable } from '@/lib/db/errors';
 import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
 
+function resolveAuthSecret() {
+  if (process.env.NEXTAUTH_SECRET) return process.env.NEXTAUTH_SECRET;
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[auth] NEXTAUTH_SECRET is missing; using an ephemeral process secret. Sessions will reset on restart.');
+    return randomBytes(32).toString('hex');
+  }
+  return 'fel-local-dev-secret';
+}
+
 export const authOptions: NextAuthOptions = {
+  secret: resolveAuthSecret(),
   adapter: PrismaAdapter(prisma) as any,
   session: {
     strategy: 'jwt',

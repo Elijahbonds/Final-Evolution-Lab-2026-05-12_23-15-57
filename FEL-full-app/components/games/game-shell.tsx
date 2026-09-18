@@ -100,11 +100,11 @@ function GameShellInner({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const storyNodeId = searchParams.get('story');
-  const signatureFlag = searchParams.get('signature');
-  const arenaMatchId = searchParams.get('arena');
-  const mpCode = searchParams.get('mp');   // pass 5 phase 5: an async challenge code — accept it with this run's session
-  const carnivalFlag = searchParams.get('carnival');
+  const storyNodeId = searchParams?.get('story') ?? null;
+  const signatureFlag = searchParams?.get('signature') ?? null;
+  const arenaMatchId = searchParams?.get('arena') ?? null;
+  const mpCode = searchParams?.get('mp') ?? null;   // pass 5 phase 5: an async challenge code — accept it with this run's session
+  const carnivalFlag = searchParams?.get('carnival') ?? null;
   const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade } | null>(null);
   // Ship pass 2, Phase 4: the profile request failing (offline, server down)
   // used to leave the shell empty and silent — no game, no message. Measured
