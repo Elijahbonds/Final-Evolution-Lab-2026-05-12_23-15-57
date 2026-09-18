@@ -1,0 +1,18 @@
+import { chromium } from 'playwright-core';
+const BASE = 'http://localhost:3001';
+const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', args: ['--use-gl=angle','--use-angle=metal','--enable-webgl','--ignore-gpu-blocklist'] });
+const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+await p.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+await p.locator('input[type="email"]').fill('playtest@fel.local');
+await p.locator('input[type="password"]').fill('playtest-local-only');
+await p.locator('input[type="password"]').press('Enter');
+await p.waitForURL((u) => !u.toString().includes('/login'), { timeout: 30_000 });
+await p.waitForLoadState('networkidle').catch(() => {});
+await p.goto(`${BASE}/play/dunk`, { waitUntil: 'domcontentloaded' });
+await p.waitForSelector('canvas', { timeout: 30_000 });
+await p.waitForTimeout(5000);
+await p.getByText(/TAP TO START/i).first().click({ force: true }).catch(() => {});
+await p.waitForTimeout(3500);
+await p.screenshot({ path: 'docs/shots/menus/venue-juiced.png' });
+console.log('shot saved');
+await b.close();

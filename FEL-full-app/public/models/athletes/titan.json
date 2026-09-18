@@ -1,0 +1,9 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "titan",
+  "sex": "male",
+  "note": "big, amber kit",
+  "source": "public/models/candidates/fel-kit-male.glb"
+}
