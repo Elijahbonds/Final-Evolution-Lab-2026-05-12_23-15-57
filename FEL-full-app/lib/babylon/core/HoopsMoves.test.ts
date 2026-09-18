@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { planShimmyFade, planDropStep, stickAtRim01, SHIMMY_SEC, DROP_STEP_SEC, DROP_STEP_SPEED } from './HoopsMoves';   // THE POST GAME (2026-09-18)
 import { Vector3 } from '@babylonjs/core';
 import {
   planGather, gatherWish, gatherTravel, gatherLabel, stickBack01, PULLUP_TRAVEL_MAX, GATHER_PULLUP_MAX_SEC, GATHER_PULLUP_MIN_SEC,
@@ -740,5 +741,33 @@ describe('the pass fake', () => {
 
   it('the fake commits him for LESS time than a pump — he stepped, he did not land', () => {
     expect(PASS_FAKE_STUN).toBeLessThan(PUMP_BITE_STUN);
+  });
+});
+
+describe('THE POST GAME (2026-09-18): the shimmy fade and the drop step', () => {
+  const rim = new Vector3(0, 0, 0);
+  it('the shimmy has no legs, no travel, and ends in the fadeaway', () => {
+    const p = planShimmyFade(new Vector3(1.2, 0, 3.0), rim);
+    expect(p.kind).toBe('shimmy'); expect(p.then).toBe('fadeaway'); expect(p.sec).toBe(SHIMMY_SEC);
+    expect(gatherTravel(p)).toBe(0);
+  });
+  it('the drop step goes at the rim and around the side he is NOT on, and ends in a layup — a reverse from under the ring', () => {
+    const me = new Vector3(0, 0, 3.0);
+    const yaw = Math.atan2(me.x - rim.x, me.z - rim.z);   // the seal: back to the basket
+    const right = bodyRight(yaw);
+    const him = me.add(right.scale(0.8));                 // on my right shoulder
+    const p = planDropStep(me, rim, yaw, him);
+    expect(p.kind).toBe('dropstep'); expect(p.side).toBe('left'); expect(p.then).toBe('layup');
+    const step = p.legs![0].dir;
+    expect(Vector3.Dot(step, p.toRim)).toBeGreaterThan(0.5);    // at the rim
+    expect(Vector3.Dot(step, right)).toBeLessThan(-0.3);       // and away from him
+    expect(gatherTravel(p)).toBeCloseTo(DROP_STEP_SEC * DROP_STEP_SPEED, 5);
+    expect(planDropStep(new Vector3(0, 0, 1.4), rim, yaw, null).then).toBe('reverse');   // carried under the ring
+  });
+  it('stickAtRim01 is the mirror of stickBack01', () => {
+    const toRim = new Vector3(0, 0, -1);
+    expect(stickAtRim01(0, -1, toRim)).toBeCloseTo(1, 5);
+    expect(stickAtRim01(0, 1, toRim)).toBe(0);
+    expect(stickAtRim01(0.1, 0.05, toRim)).toBe(0);            // inside the dead zone
   });
 });

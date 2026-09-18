@@ -35,6 +35,8 @@ export const BASKETBALL_CLIPS = [
   'bball_hop_step', 'bball_euro_step',
   // ACROBATIC LAYUPS (2026-09-18): the scoop (contact), the spin, the hang / double clutch
   'bball_layup_scoop', 'bball_layup_scoop_left', 'bball_layup_spin', 'bball_layup_spin_left', 'bball_layup_hang', 'bball_layup_hang_left',
+  // THE POST GAME (2026-09-18): the shimmy before a fade, the drop step around the man
+  'bball_shimmy', 'bball_drop_step', 'bball_drop_step_left',
 ] as const;
 type V3 = [number, number, number];
 
@@ -670,4 +672,29 @@ const HANG_LAYUP_KEYS: PoseKey[] = [
 export function buildHangLayup(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_layup_hang', 0.9, HANG_LAYUP_KEYS);
   return buildPoseClip(scene, sk, 'bball_layup_hang_left', 0.9, HANG_LAYUP_KEYS.map(mirrorKey));
+}
+
+// ── THE POST GAME (owner, 2026-09-18) ────────────────────────────────────────────────────────────────────────────────
+/** The SHIMMY: out of the seal, the ball pulled tight to the chest in both hands, the shoulders sell a turn one way,
+ *  then the other, then back — the hips and the spine's roll swing with them, the knees stay loaded, the feet never
+ *  move (no travel: the mode's plan has no legs). It ends set for the fade (the fade's first key is the chest hold). */
+export function buildShimmy(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const base: Record<string, Deg3> = { LeftUpLeg: [-28, 0, 18], RightUpLeg: [-28, 0, -18], LeftLeg: [42, 0, 0], RightLeg: [42, 0, 0] };
+  const key = (t: number, yaw: number, roll: number, hipsY: number): PoseKey => ({
+    t, bones: { Hips: [0, yaw, 0], Spine: [10, -yaw * 0.6, roll], Neck: [-6, yaw * 0.4, 0], ...base },
+    hands: { Right: [0.16 + yaw * 0.002, 1.16, 0.22], Left: [-0.12 + yaw * 0.002, 1.14, 0.24] }, hipsY,
+  });
+  return buildPoseClip(scene, sk, 'bball_shimmy', 0.38, [key(0, 0, 0, -0.10), key(0.1, 14, 7, -0.11), key(0.2, -14, -7, -0.11), key(0.3, 9, 4, -0.10), key(0.38, 0, 0, -0.10)]);
+}
+/** The DROP STEP, right-side: from the seal (back to the basket, the ball low on the right) the right foot swings AROUND
+ *  toward the iron and the hips turn 130° after it, the ball swept low across the body into both hands at the chest —
+ *  set for the layup that follows (the mode walks the step; this is the turn that rides it). 0.34 s (DROP_STEP_SEC). */
+const DROP_STEP_KEYS: PoseKey[] = [
+  { t: 0,    bones: { Hips: [0, 0, 0],    Spine: [10, 0, 0],   Neck: [-6, 0, 0],  LeftUpLeg: [-26, 0, 20], RightUpLeg: [-26, 0, -20], LeftLeg: [40, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.44, 0.92, 0.04], Left: [-0.32, 1.24, -0.24] }, poles: { Left: [-0.9, 0.0, -0.3] }, hipsY: -0.10 },
+  { t: 0.17, bones: { Hips: [0, -70, 0],  Spine: [12, -10, 0], Neck: [-6, -8, 0], LeftUpLeg: [-18, 0, 12], RightUpLeg: [-56, 0, -14], LeftLeg: [30, 0, 0], RightLeg: [46, 0, 0] }, hands: { Right: [0.20, 0.98, 0.30], Left: [-0.06, 1.02, 0.32] }, hipsY: -0.08 },   // the step swings round, the ball low across
+  { t: 0.34, bones: { Hips: [0, -130, 0], Spine: [12, -6, 0],  Neck: [-6, 0, 0],  LeftUpLeg: [-30, 0, 8],  RightUpLeg: [-30, 0, -8],  LeftLeg: [44, 0, 0], RightLeg: [44, 0, 0] }, hands: { Right: [0.16, 1.18, 0.24], Left: [-0.12, 1.16, 0.26] }, hipsY: -0.10 },   // facing the iron, loaded, the ball at the chest
+];
+export function buildDropStep(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
+  if (side === 'right') return buildPoseClip(scene, sk, 'bball_drop_step', 0.34, DROP_STEP_KEYS);
+  return buildPoseClip(scene, sk, 'bball_drop_step_left', 0.34, DROP_STEP_KEYS.map(mirrorKey));
 }

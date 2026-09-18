@@ -118,7 +118,7 @@ import {
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
 import { attachBallToHand, releaseBall, clankOffRim } from '../anim/ballRig';
 import { mountRimReach, rimReachWeight, type RimReachHandle } from '../anim/rimReach';   // HAND AND RIM (owner, 2026-09-18): the ball hand meets the iron on a game dunk
-import { isFinishStyle } from '../core/HoopsMoves';
+import { isFinishStyle, planDropStep, planShimmyFade, stickAtRim01, POST_DROP_STICK_MIN, SHIMMY_CONTEST_CUT } from '../core/HoopsMoves';
 import { startFlush, stepFlush, type FlushState } from '../core/RimFlush';   // DUNK-FANATIC (2026-09-17): the contest's flush — over the lip, down the axis, out of the net — on the game's dunks
 import { RIM_RADIUS } from '../core/RimPhysics';
 import { NET_EXIT_MPS, NET_DROP_NUDGE } from '../core/NetExit';
@@ -262,7 +262,7 @@ const FACE_RATE = 10, FACE_RIM_RATE = 6;
 const DEFEND_FACE_RANGE = 6;
 // "SPRINT in to DUNK, ease off to LAY IT IN" is the one line this hint was missing, and the fix that made the layup
 // reachable (see the checkDriveDunk call) is worth nothing if nobody is told the choice exists.
-const HINT_OFFENCE = 'HOLD R2 (SHIFT) + a direction to SPRINT · R2 + SQUARE (SHIFT + L) at the rim = DUNK, SQUARE (L) alone = LAY IT IN · SQUARE (L): hold, release in the green · L2 (F): POST UP · snap the stick for ankles · pull BACK for a HESI · hold L1 (Q)/LT near the block to POST UP (back to the rim: shoot for a HOOK, pull off the rim for a FADEAWAY, swing the stick across to SPIN) · drive into a body to SPIN off him';
+const HINT_OFFENCE = 'HOLD R2 (SHIFT) + a direction to SPRINT · R2 + SQUARE (SHIFT + L) at the rim = DUNK, SQUARE (L) alone = LAY IT IN · SQUARE (L): hold, release in the green · L2 (F): POST UP · snap the stick for ankles · pull BACK for a HESI · hold L2 (F) or L1 (Q) near the block to POST UP (back to the rim: SQUARE = HOOK · stick OFF the rim + SQUARE = FADE, with R2 = SHIMMY FADE · stick AT the rim + SQUARE = DROP STEP · swing the stick across = SPIN · let go early = PUMP FAKE, then SQUARE again = UP AND UNDER) · drive into a body to SPIN off him';
 const HINT_DEFENCE = 'STAY IN FRONT — they sidestep, you slide · HOLD L2 (F): SIT DOWN and slide faster · SQUARE (L): STEAL as the ball crosses over (hold it for a HAND UP) · TRIANGLE (I): jump on the gather to BLOCK · HOLD CIRCLE (K): plant and TAKE THE CHARGE · L1: BOX OUT';
 
 type Possession = 'mine' | 'defense';
@@ -1236,7 +1236,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (kind !== 'none') { startDunk(ctx, kind); }
           // the FOOTWORK reads the body even when he is frozen: a defender who has just BITTEN a pump is exactly the man you
           // step through, and passing null there killed every step-through the fake had earned (measured: 0 of 1).
-          else if (!posting && startFootwork(ctx, mx, my, foeFloored ? null : foe.root.position)) { /* M8 / M13 / M14 */ }
+          else if (startFootwork(ctx, mx, my, foeFloored ? null : foe.root.position)) { /* M8 / M13 / M14 — and the post's own footwork (2026-09-18) */ }
           else {
             shooting = true;
             banked = null;   // M12: each release calls its own glass
@@ -1266,7 +1266,14 @@ export const OneVOneMode: ModeDefinition = (() => {
           ctx.setHud({ shotMeterT: t, shotMeterGreen: hudGreen });
           meter3d?.set(t, me.root.position.add(new Vector3(0, 1.72, 0)));
           // HOOPS-MOVE-KIT-B M8: let go this early and it is a PUMP FAKE, not a 0.35-pct brick — and he can bite it
-          if (meSlot.intent.action && isPumpFake(t * shotMeter.durationSec) && !finish) { pumpFake(ctx, defPos); }
+          // THE POST PUMP (2026-09-18): the post's shots are FINISHES (a hook, a fade), and the pump only read on a rise — so
+          // a quick release out of the seal was an EARLY hook, never a fake. Let go inside the pump window before the hop
+          // has really left and the hook / fade is cancelled into the pump; the step-through / up-and-under follows.
+          const postPump = !!finish && (finish.plan.style === 'hook' || finish.plan.style === 'fadeaway') && finish.t < PUMP_MAX_SEC;
+          if (meSlot.intent.action && isPumpFake(t * shotMeter.durationSec) && (!finish || postPump)) {
+            if (finish) { finish = null; me.root.position.y = 0; contact?.setAirborne('me', false); meAnimTree.release(); }
+            pumpFake(ctx, defPos);
+          }
           else if (meSlot.intent.action || t >= 1 || (stickShot?.started && Math.hypot(postStick.x, postStick.y) < 0.35)) { stickShot = null; releaseJumper(ctx, meterRelease()); }   // POST HOOK: the stick let go = the release
         }
         pumpWindow = Math.max(0, pumpWindow - dt);
@@ -2138,7 +2145,19 @@ export const OneVOneMode: ModeDefinition = (() => {
     const yaw = me.root.rotation.y;
     const dist = distXZ(me.root.position, RIM_FLOOR);
     let plan: GatherPlan | null = null;
-    if (pumpWindow > 0 && defenderPos && dist < 5.4) plan = planStepThrough(me.root.position, RIM_FLOOR, yaw, defenderPos);   // M8
+    // THE POST GAME (owner, 2026-09-18). Out of the seal the squeeze reads the stick: pushed AT the rim it is the DROP STEP
+    // (the baseline foot around him into a layup), pulled OFF the rim with R2 it is the SHIMMY FADE (the shoulders sell
+    // both ways, then the fade); a pump-fake window still opens the step-through / up-and-under from the seal (the
+    // footwork was gated off in the post entirely — the post had no up-and-under). The euro and the hop stay perimeter moves.
+    if (posting) {
+      const toRimP = RIM_FLOOR.subtract(me.root.position); toRimP.y = 0; toRimP.normalize();
+      if (stickAtRim01(mx, -my, toRimP) >= POST_DROP_STICK_MIN) plan = planDropStep(me.root.position, RIM_FLOOR, yaw, defenderPos);
+      else if (meSlot.intent.sprint && stickBack01(mx, -my, toRimP) >= POST_FADE_STICK_MIN) plan = planShimmyFade(me.root.position, RIM_FLOOR);
+      else if (pumpWindow > 0 && defenderPos && dist < 5.4) plan = planStepThrough(me.root.position, RIM_FLOOR, yaw, defenderPos);
+      if (!plan) return false;
+      posting = false;   // the seal ends in the move; the beat below replaces the held seal clip
+    }
+    else if (pumpWindow > 0 && defenderPos && dist < 5.4) plan = planStepThrough(me.root.position, RIM_FLOOR, yaw, defenderPos);   // M8
     else if (euroAvailable(meDribble.vel, me.root.position, RIM_FLOOR, defenderPos)) {                                        // M14
       const sell = euroSell(mx, -my, yaw);
       if (sell) plan = planEuro(me.root.position, RIM_FLOOR, yaw, sell, rimProtected(me.root.position, RIM_FLOOR, defenderPos) ? 'floater' : 'layup');
@@ -2160,11 +2179,11 @@ export const OneVOneMode: ModeDefinition = (() => {
     }
     if (!plan) return false;
     shooting = true;
-    shotContest = contest;
+    shotContest = plan.kind === 'shimmy' ? contest * SHIMMY_CONTEST_CUT : contest;   // the shimmy sells: the contest that reaches the fade is cut
     pumpWindow = 0;
     meCarry?.update(0, 0, false);
     if (!ball.parent) attachBallToHand(ball, me.skeleton, 'RightHand');
-    currentShot = plan.then === 'rise' ? classifyShot(me.root.position, meDribble.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : 1.18, drift: 'none' };
+    currentShot = plan.then === 'rise' ? classifyShot(me.root.position, meDribble.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : plan.then === 'fadeaway' ? 0.86 : 1.18, drift: 'none' };
     // ACROBATIC LAYUPS (2026-09-18): a hop that was going to RISE but classifies as a finish (the running layup band, the
     // scoop, the hang) ends IN that finish — it used to rise as a jumper under a "HANG & FINISH" label (measured)
     if (plan.then === 'rise' && isFinishStyle(currentShot.style)) plan.then = currentShot.style;
@@ -2176,6 +2195,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     // CROSSING hand, so the sell is its opposite.
     const clip = plan.kind === 'stepthrough' ? 'bball_step_through'
       : plan.kind === 'hop' ? 'bball_hop_step'
+      : plan.kind === 'shimmy' ? 'bball_shimmy'
+      : plan.kind === 'dropstep' ? (plan.side === 'left' ? 'bball_drop_step_left' : 'bball_drop_step')
       : plan.side === 'left' ? 'bball_euro_step' : 'bball_euro_step_left';
     const clipSec = me.animator.durationOf(clip) ?? plan.sec;
     meAnimTree.beat(clip, { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });

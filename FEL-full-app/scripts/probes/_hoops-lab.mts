@@ -398,6 +398,26 @@ for (let n = 0; n < POSSESSIONS; n++) {
       await agent(`a.do('postup', { ms: 1600 })`);
       await page.waitForTimeout(600);
     }
+    else if (play === 'postfade' || play === 'dropstep' || play === 'postpump') {
+      // THE POST GAME (2026-09-18): drive to the block, seal (L2 via the bridge's brace), then the read — the stick pulled OFF the
+      // rim with R2 + the shot = the SHIMMY FADE; the stick AT the rim + the shot = the DROP STEP; a tap let go inside the pump
+      // window, then the shot again = PUMP → STEP-THROUGH / UP AND UNDER.
+      await driveToRim(3.2);
+      await agent(`a.act({ moveX: 0, moveY: 0.3, brace: true }, 900)`);
+      if (play === 'postfade') {
+        await agent(`a.act({ moveX: 0, moveY: -1, sprint: true, brace: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE) + 380})`);
+        await agent(`a.act({ moveX: 0, moveY: -1, sprint: true, brace: true, actionHeld: 0, action: true }, 80)`);
+      } else if (play === 'dropstep') {
+        await agent(`a.act({ moveX: 0, moveY: 1, brace: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE) + 340})`);
+        await agent(`a.act({ moveX: 0, moveY: 1, brace: true, actionHeld: 0, action: true }, 80)`);
+      } else {
+        await agent(`a.act({ moveX: 0, moveY: 0, brace: true, actionHeld: 0.3 }, 120)`);   // the pump: let go inside PUMP_MAX_SEC
+        await agent(`a.act({ moveX: 0, moveY: 0, brace: true, actionHeld: 0, action: true }, 60)`);
+        await page.waitForTimeout(150);
+        await agent(`a.act({ moveX: 0, moveY: 0.6, brace: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE) + 300})`);
+        await agent(`a.act({ moveX: 0, moveY: 0.6, brace: true, actionHeld: 0, action: true }, 80)`);
+      }
+    }
     else if (play === 'pausin') {
       // PAUSIN' (2K21): the drive with the turbo, the sweep thrown in-page at ~5 m — the drop step, then the spin into the dunk
       await driveToRim(6.0);

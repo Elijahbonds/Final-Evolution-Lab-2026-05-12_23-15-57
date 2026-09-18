@@ -14,6 +14,7 @@ import {
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // wave 2: the footwork (M8–M14)
   buildMikan, buildUpAndUnder, buildFingerRoll,   // 2026-09-16: the layup vocabulary
   buildScoopLayup, buildSpinLayup, buildHangLayup,   // 2026-09-18: the acrobatic layups
+  buildShimmy, buildDropStep,                        // 2026-09-18: the post game
   buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble, buildDoubleCross, buildSnatchBack,
   buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip,   // 2026-09-16: the handle, and the ankles
 } from './basketball';
@@ -356,6 +357,28 @@ describe('basketball packages on the forge rig', () => {
     expect(clutch).toBeLessThan(up - 0.45);                                      // pulled DOWN
     expect(Vector3.Distance(pos('RightHand'), pos('LeftHand'))).toBeLessThan(0.36);   // both hands on it
     at(g, 0.5); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);       // back up, late
+  });
+
+  // THE POST GAME (2026-09-18)
+  it('the SHIMMY sells both ways with the ball tight at the chest and the feet planted', () => {
+    rest(); const g = buildShimmy(scene, sk)!;
+    const fwd = () => { const h = boneNode(sk, 'Hips')!; h.computeWorldMatrix(true); return Vector3.TransformNormal(Vector3.Forward(), h.getWorldMatrix()).normalize(); };
+    at(g, 0); const f0 = fwd(); const lf0 = pos('LeftFoot'), rf0 = pos('RightFoot');
+    at(g, 0.1); const a = Vector3.Cross(f0, fwd()).y;
+    at(g, 0.2); const b = Vector3.Cross(f0, fwd()).y;
+    expect(Math.sign(a)).not.toBe(Math.sign(b)); expect(Math.abs(a)).toBeGreaterThan(0.1); expect(Math.abs(b)).toBeGreaterThan(0.1);   // one way, then the other
+    expect(Vector3.Distance(pos('RightHand'), pos('LeftHand'))).toBeLessThan(0.36);   // both hands on the ball
+    expect(Vector3.Distance(pos('LeftFoot'), lf0)).toBeLessThan(0.12); expect(Vector3.Distance(pos('RightFoot'), rf0)).toBeLessThan(0.12);   // the feet never move
+  });
+  it('the DROP STEP turns the hips well past 90° from the seal and ends with the ball at the chest, loaded', () => {
+    rest(); const g = buildDropStep(scene, sk)!;
+    const fwd = () => { const h = boneNode(sk, 'Hips')!; h.computeWorldMatrix(true); return Vector3.TransformNormal(Vector3.Forward(), h.getWorldMatrix()).normalize(); };
+    at(g, 0); const f0 = fwd(); const ballLow = pos('RightHand').y;
+    expect(ballLow).toBeLessThan(1.1);                                             // the seal: the ball low on the ball side
+    at(g, 0.34);
+    expect(Vector3.Dot(fwd(), f0)).toBeLessThan(-0.1);                             // turned past 90°
+    expect(Vector3.Distance(pos('RightHand'), pos('LeftHand'))).toBeLessThan(0.36);   // both hands on it, at the chest
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Hips').y + 0.05);
   });
 
   it('the UP AND UNDER sells the shot first: ball and chin UP with the feet still under you', () => {

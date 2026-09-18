@@ -77,7 +77,7 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
 import { attachBallToHand, releaseBall } from '../anim/ballRig';
 import { mountRimReach, rimReachWeight, type RimReachHandle } from '../anim/rimReach';   // HAND AND RIM (owner, 2026-09-18)
-import { isFinishStyle } from '../core/HoopsMoves';
+import { isFinishStyle, planDropStep, planShimmyFade, stickAtRim01, POST_DROP_STICK_MIN, SHIMMY_CONTEST_CUT, PUMP_MAX_SEC } from '../core/HoopsMoves';
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
 import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-in: ?net=<room> seats a human in the first AI slot
@@ -610,7 +610,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           jobs: () => everyBody().map((b, i) => { const mb = mateBrain(b), db = foeBrain(b); const obj = b === me ? (carrierId === 'me' ? RIM : (driver?.char.root.position ?? ballWorld())) : objectiveFor(b); const p = bodyPos(b); const yaw = b.char.root.rotation.y; const v = b === me ? me.drib.vel : b.vel; return { id: b === me ? 'me' : isFoe(b) ? `foe${foes.indexOf(b)}` : `mate${mates.indexOf(b)}`, i, job: jobOf(b), phase: mb?.screen.phase ?? (db ? (db.fightingOver === null ? '' : db.fightingOver ? 'over' : 'under') : ''), x: p.x, z: p.z, y: p.y, speed: Math.hypot(v.x, v.z), facing: facingCos(yaw, p, obj), objX: obj.x, objZ: obj.z, boxing: !!(mb?.boxing || db?.boxing), root: b.char.root }; }), get foeRoot() { return driver ? driver.char.root : (foes[0]?.char.root ?? null); }, /* the man to guard is whoever is DRIVING */ nearestFoeRoot: () => foes.reduce<Body | null>((b, f) => !b || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(b.char.root.position, me.char.root.position) ? f : b, null)?.char.root ?? null }; if (dev) dev.hoopsPosture = seam; (ctx.scene.metadata ??= {}).threevthree = seam; }   // BIOMECH-HOOPS-WAVE1 probes
       ctx.setHud({
         score: myScore, foeScore, target: TARGET_SCORE, time: timeLeft, ast: assists,
-        hint: 'HOLD R2 (SHIFT) + a direction to SPRINT · R2 + SQUARE (SHIFT + L) at the rim = DUNK, SQUARE (L) alone = LAY IT IN · SQUARE (L): hold, release in the green · BOTTOM BUTTON (J): PASS (hold to FAKE) · CIRCLE (K): call a SCREEN · L2 (F): POST UP (shoot = HOOK, pull off the rim = FADEAWAY, stick across = SPIN) · snap the stick to break ankles',
+        hint: 'HOLD R2 (SHIFT) + a direction to SPRINT · R2 + SQUARE (SHIFT + L) at the rim = DUNK, SQUARE (L) alone = LAY IT IN · SQUARE (L): hold, release in the green · BOTTOM BUTTON (J): PASS (hold to FAKE) · CIRCLE (K): call a SCREEN · L2 (F): POST UP (L2/L1 · shoot = HOOK · stick off the rim = FADE, with R2 = SHIMMY FADE · stick at the rim = DROP STEP · stick across = SPIN · let go early = PUMP, then shoot = UP AND UNDER) · snap the stick to break ankles',
       });
     },
 
@@ -1433,7 +1433,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (kind !== 'none') {
           startDunk(ctx, kind, nearestFoePos);
         // the FOOTWORK reads a frozen body too: a defender who has just BITTEN a pump is the man you step through
-        } else if (!posting && startFootwork(ctx, wish.x, -wish.z, nearestFoeAny() ?? nearestFoePos)) {
+        } else if (startFootwork(ctx, wish.x, -wish.z, nearestFoeAny() ?? nearestFoePos)) {   // …and the post's own footwork (2026-09-18)
           // M8 / M13 / M14: the footwork owns this squeeze
         } else {
           shooting = true;
@@ -1456,7 +1456,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         ctx.setHud({ shotMeterT: t, shotMeterGreen: hudGreen });
         meter3d?.set(t, me.char.root.position.add(new Vector3(0, 1.72, 0)));
         // HOOPS-MOVE-KIT-B M8: let go this early and it is a PUMP FAKE, not a 0.35-pct brick — and he can bite it
-        if (meIntent.action && isPumpFake(t * shotMeter.durationSec) && !finish) pumpFake(ctx, nearestLiveFoe());
+        // THE POST PUMP (2026-09-18, the 1v1's): a quick release out of the seal cancels the hook / fade into the pump
+        const postPump = !!finish && (finish.plan.style === 'hook' || finish.plan.style === 'fadeaway') && finish.t < PUMP_MAX_SEC;
+        if (meIntent.action && isPumpFake(t * shotMeter.durationSec) && (!finish || postPump)) {
+          if (finish) { finish = null; me.char.root.position.y = 0; me.tree.release(); }
+          pumpFake(ctx, nearestLiveFoe());
+        }
         else if (meIntent.action || t >= 1 || (stickShot?.started && Math.hypot(postStick.x, postStick.y) < 0.35)) {   // POST HOOK: the stick let go = the release
           stickShot = null;
           const quality = meterRelease();
@@ -1940,7 +1945,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const yaw = me.char.root.rotation.y;
     const dist = distXZ(me.char.root.position, RIM_FLOOR);
     let plan: GatherPlan | null = null;
-    if (pumpWindow > 0 && defenderPos && dist < 5.4) plan = planStepThrough(me.char.root.position, RIM_FLOOR, yaw, defenderPos);
+    // THE POST GAME (2026-09-18, the 1v1's): out of the seal — the drop step, the shimmy fade, or the pump's step-through
+    if (posting) {
+      const toRimP = RIM_FLOOR.subtract(me.char.root.position); toRimP.y = 0; toRimP.normalize();
+      if (stickAtRim01(mx, -my, toRimP) >= POST_DROP_STICK_MIN) plan = planDropStep(me.char.root.position, RIM_FLOOR, yaw, defenderPos);
+      else if (me.slot.intent.sprint && stickBack01(mx, -my, toRimP) >= POST_FADE_STICK_MIN) plan = planShimmyFade(me.char.root.position, RIM_FLOOR);
+      else if (pumpWindow > 0 && defenderPos && dist < 5.4) plan = planStepThrough(me.char.root.position, RIM_FLOOR, yaw, defenderPos);
+      if (!plan) return false;
+      posting = false;
+    }
+    else if (pumpWindow > 0 && defenderPos && dist < 5.4) plan = planStepThrough(me.char.root.position, RIM_FLOOR, yaw, defenderPos);
     else if (euroAvailable(me.drib.vel, me.char.root.position, RIM_FLOOR, defenderPos)) {
       const sell = euroSell(mx, -my, yaw);
       if (sell) plan = planEuro(me.char.root.position, RIM_FLOOR, yaw, sell, rimProtected(me.char.root.position, RIM_FLOOR, defenderPos) ? 'floater' : 'layup');
@@ -1962,7 +1976,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     }
     if (!plan) return false;
     shooting = true;
-    shotContest = contest;
+    shotContest = plan.kind === 'shimmy' ? contest * SHIMMY_CONTEST_CUT : contest;
     pumpWindow = 0;
     carries.get(me)?.update(0, 0, false);
     if (!ball.parent) attachBallToHand(ball, me.char.skeleton, 'RightHand');
@@ -1976,6 +1990,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // CROSSING hand, so the sell is its opposite.
     const clip = plan.kind === 'stepthrough' ? 'bball_step_through'
       : plan.kind === 'hop' ? 'bball_hop_step'
+      : plan.kind === 'shimmy' ? 'bball_shimmy'
+      : plan.kind === 'dropstep' ? (plan.side === 'left' ? 'bball_drop_step_left' : 'bball_drop_step')
       : plan.side === 'left' ? 'bball_euro_step' : 'bball_euro_step_left';
     const clipSec = me.char.animator.durationOf(clip) ?? plan.sec;
     me.tree.beat(clip, { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });

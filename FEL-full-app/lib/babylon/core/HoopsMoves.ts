@@ -31,7 +31,9 @@ import { DUNK_PCT, STEPBACK_SEC, STEPBACK_SPEED, LAYUP_STRIDE_SPEED, type ShotSt
 export type GatherKind = 'set' | 'pullup' | 'stepback'
   // HOOPS-MOVE-KIT-B wave 2 (M8 / M13 / M14): three more gathers, and the first ones that end in a FINISH rather than a
   // rise — the footwork IS the move, and the meter runs through it exactly as it runs through the pull-up's plant.
-  | 'stepthrough' | 'hop' | 'euro';
+  | 'stepthrough' | 'hop' | 'euro'
+  // THE POST GAME (2026-09-18): the shimmy before a fade, the drop step around the man into a finish
+  | 'shimmy' | 'dropstep';
 /** Planar speed under which the feet count as set (a standstill / the last shuffle): no gather, the rise starts now. */
 export const GATHER_SET_SPEED = 1.0;
 /** The pull-up gather: a walking pull-up plants in 0.2 s, a full-speed one (the 1-dribble off the check) in 0.34 s. */
@@ -105,7 +107,8 @@ export function gatherTravel(plan: GatherPlan): number {
 /** The HUD label for the shot under its gather. */
 export function gatherLabel(kind: GatherKind, base: string): string {
   return kind === 'pullup' ? 'PULL-UP' : kind === 'stepback' ? 'STEP-BACK'
-    : kind === 'stepthrough' ? 'STEP-THROUGH' : kind === 'hop' ? 'HOP STEP' : kind === 'euro' ? 'EURO STEP' : base;
+    : kind === 'stepthrough' ? 'STEP-THROUGH' : kind === 'hop' ? 'HOP STEP' : kind === 'euro' ? 'EURO STEP'
+    : kind === 'shimmy' ? 'SHIMMY FADE' : kind === 'dropstep' ? 'DROP STEP' : base;
 }
 
 /** How far the stick is pulled AWAY from the rim, 0..1, from a world-planar wish direction (mx, −my in the dribble's
@@ -884,4 +887,43 @@ export function passFakeShiftTo(defender: Vector3, bite: PassFakeBite): Vector3 
   return new Vector3(
     defender.x + bite.shift.x * PASS_FAKE_SHIFT, defender.y, defender.z + bite.shift.z * PASS_FAKE_SHIFT,
   );
+}
+
+// ── THE POST GAME (owner, 2026-09-18: "post ups with L2, post spins, post fades, post shimmy fades, drop steps, up and
+// unders, pump fakes"). The seal (L2 / L1), the hook, the fade, the spin, the pivot, the pump and the step-through /
+// up-and-under already existed; two post reads did not, and the footwork was gated OFF in the post. Both are footwork
+// GatherPlans so the meter runs through them and they end IN a finish (the modes' gather-end path).
+/** The SHIMMY: R2 held with the stick pulled off the rim at the post squeeze — the shoulders sell a turn both ways
+ *  before the fade goes up. No travel; the contest that reaches the fade is cut like the shimmy hook's. */
+export const SHIMMY_SEC = 0.38;
+export const SHIMMY_CONTEST_CUT = 0.55;
+export function planShimmyFade(shooter: Vector3, rimFloor: Vector3): GatherPlan {
+  const toRim = new Vector3(rimFloor.x - shooter.x, 0, rimFloor.z - shooter.z);
+  const d = toRim.length(); if (d > 1e-4) toRim.scaleInPlace(1 / d); else toRim.set(0, 0, -1);
+  return { kind: 'shimmy', sec: SHIMMY_SEC, v0: new Vector3(0, 0, 0), toRim, then: 'fadeaway', legs: [] };
+}
+/** The DROP STEP: the stick pushed AT the rim (≥ POST_DROP_STICK_MIN of it) with the shot at the post squeeze — the
+ *  baseline foot steps around the man toward the iron and the seal turns into a layup (a reverse when the step carries
+ *  under the ring). The step goes on the side AWAY from the defender. */
+export const POST_DROP_STICK_MIN = 0.6;
+export const DROP_STEP_SEC = 0.34, DROP_STEP_SPEED = 3.2;
+export function planDropStep(shooter: Vector3, rimFloor: Vector3, yaw: number, defender: Vector3 | null): GatherPlan {
+  const toRim = new Vector3(rimFloor.x - shooter.x, 0, rimFloor.z - shooter.z);
+  const d = toRim.length(); if (d > 1e-4) toRim.scaleInPlace(1 / d); else toRim.set(0, 0, -1);
+  const right = bodyRight(yaw);
+  let lateral = 0;
+  if (defender) lateral = (defender.x - shooter.x) * right.x + (defender.z - shooter.z) * right.z;
+  const side: FinishSide = lateral > 0 ? 'left' : 'right';        // the step goes past the side he is NOT on
+  const sign = side === 'right' ? 1 : -1;
+  const dir = new Vector3(toRim.x * 0.8 + right.x * 0.6 * sign, 0, toRim.z * 0.8 + right.z * 0.6 * sign);
+  const n = dir.length() || 1;
+  const travel = DROP_STEP_SEC * DROP_STEP_SPEED;
+  const then: FinishStyle = d - travel * 0.8 < 0.7 ? 'reverse' : 'layup';   // carried under the ring: lay it back on the far side
+  return { kind: 'dropstep', sec: DROP_STEP_SEC, v0: new Vector3(0, 0, 0), toRim, then, side,
+    legs: [{ dir: dir.scale(1 / n), sec: DROP_STEP_SEC, speed: DROP_STEP_SPEED }] };
+}
+/** How far the stick is pushed AT the rim, 0..1 (the opposite of stickBack01). */
+export function stickAtRim01(wishX: number, wishZ: number, toRim: Vector3): number {
+  const m = Math.hypot(wishX, wishZ); if (m < 0.2) return 0;
+  return Math.max(0, (wishX * toRim.x + wishZ * toRim.z) / m) * Math.min(1, m);
 }
