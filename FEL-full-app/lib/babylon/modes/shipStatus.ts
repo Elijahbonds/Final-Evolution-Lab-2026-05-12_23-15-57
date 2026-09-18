@@ -75,5 +75,6 @@ export const WALLED_ROUTES: Readonly<Record<string, string>> = {
 };
 
 export function isWalledRoute(slug: string): boolean {
-  return slug in WALLED_ROUTES;
+  const modeKey = WALLED_ROUTES[slug];
+  return modeKey ? isWalled(modeKey) : false;
 }
