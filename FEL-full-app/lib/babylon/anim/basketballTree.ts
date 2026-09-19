@@ -28,6 +28,7 @@ export type BasketballAnimState =
   | 'defend_backpedal' | 'closeout' | 'defend_slide_hard' | 'defend_slide_hard_right'   // DEFENSE-LOOK (2026-09-17): the retreat, the closeout, the sat-down slide
   | 'watch'
   | 'floor'
+  | 'carry_slide' | 'carry_slide_right' | 'carry_back'   // THE CRAB WALK FIX (2026-09-19): travelling off the facing
   | 'celebrate' | 'dejected';
 
 export interface AnimTreeInput {
@@ -56,6 +57,16 @@ export interface AnimTreeInput {
   staggered: boolean;        // contact/ankle-break stun active
   /** ONEVONE-DEFENSE-LOGIC: which way the defender is sliding (body frame) — picks the slide clip. Default left. */
   slideDir?: 'left' | 'right';
+  /**
+   * THE CRAB WALK (owner, 2026-09-19: "the movement in the 1v1 mode… looked choppy and crab walky on both sides").
+   *
+   * Where the body is TRAVELLING relative to where it is FACING, in radians, 0 = straight ahead. A ball-handler
+   * sizing up slides sideways while squared to the rim — correct basketball — but every dribble loop in this tree is
+   * a FORWARD clip, so the feet ran forward while the body went sideways. Measured on the live 1v1 with a pre-boot
+   * pad: a forward push holds facing-vs-travel at 1.00, a lateral push sits at −0.13 with 71% of frames sideways.
+   * Optional: a mode that does not pass it behaves exactly as before.
+   */
+  travelOffRad?: number;
   /** DEFENSE-LOOK (2026-09-17): moving AWAY from the man while facing him (beaten, dropping back) — the backpedal. */
   retreat?: boolean;
   /** Closing the last two metres on a catch — chop steps under a high hand. */
@@ -98,6 +109,11 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   // catch chops his feet under a high hand instead of running at the shooter with his arms down; and INTENSE D (L2, or
   // an AI sitting on the ball) slides sat down — the hard slide capture — not the ordinary stance loop.
   defend_backpedal: { clip: 'bball_defend_backpedal', loop: true, fadeSec: 0.14 },
+  // …and the same three reads for a body that still has the ball. These are the shared lateral loops; the carry rig
+  // owns the ball hand independently, so the ball stays in the palm through them.
+  carry_slide:       { clip: 'strafe_left', loop: true, fadeSec: 0.14 },
+  carry_slide_right: { clip: 'strafe_right', loop: true, fadeSec: 0.14 },
+  carry_back:        { clip: 'bball_defend_backpedal', loop: true, fadeSec: 0.16 },
   closeout:        { clip: 'bball_closeout', loop: true, fadeSec: 0.12 },
   defend_slide_hard: { clip: 'bball_defend_slide_hard_left', loop: true, fadeSec: 0.14 },
   defend_slide_hard_right: { clip: 'bball_defend_slide_hard_right', loop: true, fadeSec: 0.14 },
@@ -128,11 +144,27 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
           : (i.slideDir === 'right' ? 'defend_slide_right' : 'defend_slide'))
         : 'defend_idle';
   } else if (i.crossover) state = i.crossoverDir === 'right' ? 'crossover_right' : 'crossover';
+  // TRAVELLING OFF THE FACING: slide, do not run. Only above a real walking pace and never inside a drive, so a
+  // size-up reads as a size-up and a drive still reads as a drive.
+  else if (lateralState(i)) state = lateralState(i)!;
   else if (i.driving && i.hasBall) state = 'drive';
   else if (i.speed01 > 0.15) state = i.hasBall ? (i.speed01 < 0.42 ? 'walk_dribble' : i.speed01 > 0.74 ? 'sprint_dribble' : 'speed_dribble') : 'run';   // DRIBBLE GEARS: the loop follows the gear (walk 1.6 / jog 4.2 / sprint 6.4 m/s of 6.4)
   else if (i.nearestDefender < 1.4 && i.hasBall) state = 'protect';
   else state = i.hasBall ? 'idle_dribble' : 'watch';
   return { state, ...CLIP_FOR[state] };
+}
+
+/** LATERAL / BACKWARD travel, or null when the body is going where it is pointed. The window is deliberately wide
+ *  (past 50° off the nose) so the facing slew's own catch-up does not flicker the loop on every turn. */
+function lateralState(i: AnimTreeInput): BasketballAnimState | null {
+  const off = i.travelOffRad;
+  if (off === undefined || i.speed01 <= 0.2) return null;
+  if (i.driving && i.hasBall) return null;              // a drive is a drive: the body turns and goes
+  const wrapped = ((off + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  const a = Math.abs(wrapped);
+  if (a > (3 * Math.PI) / 4) return 'carry_back';       // backpedalling out of pressure
+  if (a < (5 * Math.PI) / 18) return null;              // inside 50°: the forward loop still reads
+  return wrapped > 0 ? 'carry_slide_right' : 'carry_slide';
 }
 
 /** A one-shot state that ran out must not re-fire while the input still names it: the input with that trigger cleared. */

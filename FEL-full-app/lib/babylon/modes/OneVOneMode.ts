@@ -504,6 +504,14 @@ export const OneVOneMode: ModeDefinition = (() => {
     root.rotation.y = yaw;
     if (root.rotationQuaternion) Quaternion.RotationYawPitchRollToRef(yaw, 0, 0, root.rotationQuaternion);
   }
+  /** Where a body is TRAVELLING relative to where it is FACING (radians, 0 = straight ahead), or undefined when it is
+   *  barely moving. The anim tree turns this into a slide / backpedal loop instead of running the feet forward through
+   *  a sideways push — the crab walk (owner, 2026-09-19). */
+  function travelOff(yaw: number, vel: Vector3): number | undefined {
+    if (vel.x * vel.x + vel.z * vel.z < 0.36) return undefined;   // under 0.6 m/s the loop is idle anyway
+    const d = Math.atan2(vel.x, vel.z) - yaw;
+    return ((d + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  }
   /** Body-right for a yaw (measured, MODE-STICK-FACE): which way a slide goes in the body frame. */
   function slideDirFor(yaw: number, vel: Vector3): 'left' | 'right' {
     return vel.x * Math.cos(yaw) - vel.z * Math.sin(yaw) > 0.3 ? 'right' : 'left';
@@ -1123,6 +1131,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             driving: sprintOk && drib.speed01 > 0.6
               && Vector3.Dot(meDribble.vel, RIM.subtract(me.root.position)) > 0,
             defending: false, bracing: false, staggered: false,
+            travelOffRad: travelOff(me.root.rotation.y, meDribble.vel),
           });
           // plant-and-cut contact lock: pin the plant foot with IK
           if (drib.planting && !wasPlanting) {
@@ -1602,6 +1611,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             speed01: Math.min(1, sp / RIVAL_DRIVE_SPEED), crossover: false, nearestDefender: dist,
             hasBall: true, shooting: false, dunking: false, driving: dec.phase === 'blowby',
             defending: false, bracing: false, staggered: false,
+            travelOffRad: travelOff(foe.root.rotation.y, dec.wish),
           });
           if (dec.phase === 'stepback' && !stepbackShown) { stepbackShown = true; foeAnimTree.beat('bball_hesi', { fadeSec: 0.1 }); }   // the step-back reads as a check: the body loads
           if (dec.crossover) {
@@ -1681,6 +1691,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             speed01: Math.min(1, wish.length() / 3.6), crossover: false, nearestDefender: Infinity,
             hasBall: false, shooting: false, dunking: false, driving: false,
             defending: false, bracing: false, staggered: false,
+            travelOffRad: travelOff(foe.root.rotation.y, wish),
           });
         }
 
