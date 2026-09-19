@@ -135,7 +135,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
           <span className="fel-panel px-3 py-1 text-[var(--fel-cyan)]">{hnode(hud.round, '—')}</span>
           {/* BREAKAWAY (owner brief 2026-09-18): the shot clock and the FLOW gauge (wall runs, rebounds, slides, a fast dribble) that sets the shot's power */}
           {typeof hud.clock === 'number' && Number(hud.clock) > 0 && <span className={`fel-panel px-3 py-1 font-bold ${Number(hud.clock) <= 3 ? 'text-[#ff2d78]' : 'text-white'}`}>⏱ {hud.clock}s</span>}
-          {typeof hud.flow === 'number' && Number(hud.clock) > 0 && (
+          {typeof hud.flow === 'number' && Number(hud.flow) >= 0 && (
             <span className="fel-panel flex items-center gap-2 px-3 py-1">
               <span className="text-[10px] tracking-wider text-white/60">FLOW</span>
               <span className="h-2 w-20 overflow-hidden rounded-full bg-black/50"><span className={`block h-full rounded-full transition-[width] duration-150 ${Number(hud.flow) >= 70 ? 'bg-[#fbbf24]' : 'bg-[var(--fel-cyan)]/80'}`} style={{ width: `${Math.max(0, Math.min(100, Number(hud.flow)))}%` }} /></span>
@@ -277,6 +277,9 @@ export function makeTimingHost(opts: TimingHostOpts) {
               {Number(hud.longest) > 0 && <span className="ml-2 rounded bg-black/40 px-2 py-0.5 text-[11px] text-[var(--fel-gold)]">LONGEST {hnode(hud.longest, 0)} FT</span>}
               <span className="ml-2 text-[11px] tracking-wider text-[#facc15]">RIVAL <span className="fel-stat text-lg">{hnode(hud.rivalHomers, 0)}</span></span>
               {typeof hud.pitch === 'string' && hud.pitch && <span className="ml-2 rounded bg-black/40 px-2 py-0.5 text-[11px] text-white/80">{hud.pitch}</span>}
+              {/* PARKOUR DERBY (owner brief 2026-09-18): the wall targets taken, and a multiplier waiting on the next hit */}
+              {typeof hud.targets === 'string' && hud.targets && <span className="ml-2 rounded bg-[#ff2d78]/20 px-2 py-0.5 text-[11px] text-[#ff9ac2]">TARGETS {hud.targets}</span>}
+              {typeof hud.mult === 'string' && hud.mult && <span className="ml-2 rounded bg-[var(--fel-gold)]/25 px-2 py-0.5 text-[11px] font-bold text-[var(--fel-gold)]">{hud.mult}</span>}
             </div>
             {typeof hud.distance === 'string' && hud.distance && (
               <span className="fel-heading fel-panel px-4 py-1 text-2xl font-black text-[var(--fel-gold)]">{hud.distance}</span>
