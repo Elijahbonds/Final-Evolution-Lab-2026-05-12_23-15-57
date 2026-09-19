@@ -618,7 +618,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       rushVenue = mountVenue(ctx, 'football_rush', { keepGameplayCamera: true, look: readPlaceLook('football') });   // PLACE: the splash's pick
       // WEATHER: the start screen's pick — rain softens the cut (grip), snow slows the run (drag), fog / night dress it
       weather = WeatherKit.fromPick(readWeather('football'), 'gridiron', Math.floor(Date.now() / 1000) % 100000);
-      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier });
+      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier, keepSky: !!readPlaceLook('football')?.sky });   // a place with its own sky keeps it
       // the kit gridiron stands at y 0.05: the reads sit just over it
       lineArrow?.dispose(); lineArrow = mountAimArrow(ctx.scene, '#22d3ee', 0.09); lineArrow.show(false);
       pursuit?.dispose(); pursuit = mountRing(ctx.scene, '#ff2d78', 1.5, 0.09); pursuit.show(false);

@@ -140,7 +140,8 @@ import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers th
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the 2K bar beside the shooter's head
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
 import { PARRY, parryVaultRead, vaultAt, DRIFT, driftRead, ankleBreak, DRIVE_BY, driveByRead, SLIPSTREAM, slipstreamRead, SLING, slingRead, SYNERGY, SynergyGauge, shockVictims } from '../core/HoopsKinetic';
-import { CHOKE, CHOKE_RAILS, readChoke, resolveRails, inChokeLane, railRunRead } from '../core/Chokepoint';   // CHOKEPOINT COURT (owner brief, 2026-09-18 — the deferred layout)   // HOOPS KINETIC 3v3 (owner, 2026-09-18): slipstream / sling / synergy + the 1v1's duel reads
+import { CHOKE, CHOKE_RAILS, readChoke, resolveRails, inChokeLane, railRunRead } from '../core/Chokepoint';
+import { readCourtLayout } from '../nexus/courtLayout';   // CHOKEPOINT COURT (owner brief, 2026-09-18 — the deferred layout)   // HOOPS KINETIC 3v3 (owner, 2026-09-18): slipstream / sling / synergy + the 1v1's duel reads
 import { driveIntent, driveLateral, bodiesMet } from '../core/DriveLine';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -529,7 +530,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       mbus = ctx.momentum;
       ctx0 = ctx;
       threeVenue = mountVenue(ctx, 'basketball_3v3', { keepGameplayCamera: true, location: ctx.location });
-      choke = typeof window !== 'undefined' && readChoke(window.location.search);   // CHOKEPOINT COURT
+      choke = typeof window !== 'undefined' && (readChoke(window.location.search) || readCourtLayout('threevthree') === 'chokepoint');   // CHOKEPOINT COURT: the url, or the splash's remembered pick
       if (choke) { buildChoke(ctx); ctx.setHud({ court: 'CHOKEPOINT' }); console.info('[3V3-CHOKE] the chokepoint court: 4 rails'); }
       if (!threeVenue) { VenueKit.buildCourt(ctx.scene, 'venice'); applyOceanCourt(ctx.scene, 'venice'); }
       const spawnBody = async (

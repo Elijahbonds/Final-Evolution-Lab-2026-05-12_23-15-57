@@ -878,7 +878,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ctx.heroRef.current = me.root;
       // WEATHER (the start screen's chip; tennis only — the beach court has no chip yet) and the landing ring
       weather = WeatherKit.fromPick(o.cfg.touchesPerSide === 1 ? readWeather(o.modeId) : 'natural', 'court', Math.floor(Date.now() / 1000) % 100000);
-      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier });
+      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier, keepSky: !!readPlaceLook(o.venueId)?.sky });   // a place with its own sky keeps it
       landing?.dispose(); landing = o.cfg.touchesPerSide === 1 ? mountRing(ctx.scene, '#22d3ee', 1.4) : null; landing?.show(false);
       // THE BODY. Neither net sport mounted a posture layer, so between shots the chest, the neck and the head
       // sat wherever the last swing clip left them — no ready position, no split step, and the eyes never on

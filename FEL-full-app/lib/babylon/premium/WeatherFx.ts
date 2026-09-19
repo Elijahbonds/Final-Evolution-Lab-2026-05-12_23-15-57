@@ -25,7 +25,7 @@ function streakTexture(scene: Scene, snow: boolean): DynamicTexture {
   tex.update(); tex.hasAlpha = true; return tex;
 }
 
-export function mountWeatherFx(scene: Scene, lights: LightRigHandle | null, kit: WeatherKit, opts: { tier?: QualityTier } = {}): WeatherFxHandle {
+export function mountWeatherFx(scene: Scene, lights: LightRigHandle | null, kit: WeatherKit, opts: { tier?: QualityTier; /** a PLACE LOOK brought its own sky: the time of day retunes the lights but leaves the painted sky and the clear colour alone (the Dome's neon rafters went dusk-orange under a 'natural' pick, measured) */ keepSky?: boolean } = {}): WeatherFxHandle {
   const tier = opts.tier ?? 'desktop';
   const disposers: (() => void)[] = [];
   const s = kit.state;
@@ -45,7 +45,7 @@ export function mountWeatherFx(scene: Scene, lights: LightRigHandle | null, kit:
     // emissiveColor beside the emissive texture), so the texture's own `level` is what a night turns down
     const skySaved: { t: { level: number }; level: number }[] = [];
     const skyMats: { m: { diffuseColor?: Color3; emissiveColor?: Color3 }; d?: Color3; e?: Color3 }[] = [];
-    for (const mesh of scene.meshes) {
+    for (const mesh of opts.keepSky ? [] : scene.meshes) {
       if (!/sky|dome|bk_dome/i.test(mesh.name)) continue;
       const m = mesh.material as unknown as { diffuseColor?: Color3; emissiveColor?: Color3; diffuseTexture?: { level: number } | null; emissiveTexture?: { level: number } | null; albedoTexture?: { level: number } | null } | null;
       if (!m) continue;
@@ -56,7 +56,7 @@ export function mountWeatherFx(scene: Scene, lights: LightRigHandle | null, kit:
     // and PBR takes most of its light from the image-based environment, not the two lamps
     const env0 = scene.environmentIntensity; scene.environmentIntensity = env0 * (T.k * 0.8 + 0.2);
     const ip = lights?.pipeline.imageProcessing; const exp0 = ip?.exposure ?? 1; if (ip) ip.exposure = exp0 * T.exp;
-    const clear0 = scene.clearColor.clone(); scene.clearColor = new Color4(clear0.r * T.sky, clear0.g * T.sky, clear0.b * T.sky, 1);
+    const clear0 = scene.clearColor.clone(); if (!opts.keepSky) scene.clearColor = new Color4(clear0.r * T.sky, clear0.g * T.sky, clear0.b * T.sky, 1);
     disposers.push(() => {
       for (const x of lightsSaved) { try { x.l.intensity = x.i; x.l.diffuse = x.c; } catch { /* gone */ } }
       for (const x of skySaved) { try { x.t.level = x.level; } catch { /* gone */ } }

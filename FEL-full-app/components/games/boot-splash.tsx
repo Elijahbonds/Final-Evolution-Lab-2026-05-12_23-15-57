@@ -16,6 +16,7 @@ import { readyCourses, readCourse, writeCourse } from '@/lib/babylon/core/RaceCo
 import { readyVehicles, readVehicle, writeVehicle, type RaceKind } from '@/lib/babylon/racing/garage';
 import { readyWeapons, readWeapon, writeWeapon } from '@/lib/babylon/combat/arsenal';
 import { arenasFor, readCombatArena, writeCombatArena, COMBAT_MODE_IDS, type CombatModeId } from '@/lib/babylon/combat/arenas';
+import { COURT_LAYOUTS, COURT_LAYOUT_MODES, readCourtLayout, writeCourtLayout, type CourtLayoutId } from '@/lib/babylon/nexus/courtLayout';   // COURT LAYOUT (2026-09-18): the 3v3's chokepoint
 import { looksFor, readPlaceLook, writePlaceLook } from '@/lib/babylon/nexus/placeLooks';
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
 import {
@@ -219,6 +220,16 @@ export function BootSplash(props: {
     const u = new URL(window.location.href); u.searchParams.set('place', id); window.location.assign(u.toString());
   };
 
+  // THE COURT LAYOUT (2026-09-18): the 3v3's open court or the chokepoint (rails). Reloads like a place.
+  const hasCourt = COURT_LAYOUT_MODES.includes(props.modeId);
+  const [courtId, setCourtId] = useState<CourtLayoutId>('open');
+  useEffect(() => { if (hasCourt) setCourtId(readCourtLayout(props.modeId)); }, [hasCourt, props.modeId]);
+  const pickCourt = (id: CourtLayoutId) => {
+    if (id === courtId) return;
+    writeCourtLayout(props.modeId, id);
+    const u = new URL(window.location.href); u.searchParams.set('court', id); u.searchParams.delete('choke'); window.location.assign(u.toString());
+  };
+
   // DIFFICULTY (2026-09-13). Phase 0 measured four modes with no tiering at all and four more each inventing
   // their own; this is the one picker, reading the one shared ladder.
   const hasTiers = TIER_MODES.has(props.modeId);
@@ -388,6 +399,22 @@ export function BootSplash(props: {
           </div>
         )}
 
+        {hasCourt && (props.phase === 'ready' || props.phase === 'loading') && (
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">COURT</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {COURT_LAYOUTS.map((l) => (
+                <button key={l.id} type="button" onClick={() => pickCourt(l.id)} title={l.sub}
+                  aria-label={`${l.name} — ${l.sub}`} aria-pressed={l.id === courtId}
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${l.id === courtId ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={l.id === courtId ? { background: l.tint, borderColor: l.tint } : { borderColor: `${l.tint}88` }}>
+                  {l.name.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">{COURT_LAYOUTS.find((l) => l.id === courtId)?.sub ?? ''}</p>
+          </div>
+        )}
         {disc && (props.phase === 'ready' || props.phase === 'loading') && skinsFor(disc).length > 1 && (
           <div className="mt-2 flex flex-col items-center gap-1.5">
             <p className="text-[9px] font-black tracking-[0.3em] text-white/45">DECK</p>

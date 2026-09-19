@@ -566,7 +566,7 @@ export const GolfMode: ModeDefinition = (() => {
       sim = new GolfBallSim(ball);
       // WEATHER: the start screen's pick (natural / random / a condition / a time of day) — read here, after the page exists
       weather = WeatherKit.fromPick(readWeather('golf'), 'links', Math.floor(Date.now() / 1000) % 100000);
-      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier });
+      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier, keepSky: !!readPlaceLook('golf')?.sky });   // a place with its own sky keeps it
       arrow?.dispose(); arrow = mountAimArrow(ctx.scene);
       meter = new PowerMeter();
       ctx.objectiveRef.current = holePos;
@@ -1736,7 +1736,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       pball = new SoccerBall(ball, GRASS);
       // WEATHER: the start screen's pick — wind bends the flight, rain and fog dress the night
       weather = WeatherKit.fromPick(readWeather('soccer'), 'course', Math.floor(Date.now() / 1000) % 100000);
-      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier });
+      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier, keepSky: !!readPlaceLook('penalty')?.sky });   // a place with its own sky keeps it
       reticle = new Reticle(ctx.scene, new Vector3(0, 1.2, 11), { x: 3.3, y: 1.05 });
       meter = new PowerMeter();
       ctx.objectiveRef.current = new Vector3(0, 1.2, 11);
