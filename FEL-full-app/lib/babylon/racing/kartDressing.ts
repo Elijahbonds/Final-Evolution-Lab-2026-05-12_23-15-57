@@ -285,6 +285,36 @@ export function kartSceneryFor(circuit: KartCircuit): PropPlacement[] {
     const at = pointAlong(circuit.line, d);
     put(night ? 'lightPostModern' : 'lightPostLarge', at, d % 2 ? 1 : -1, 7, 2.6);
   }
+  // A REAL CIRCUIT, NOT A TEST TRACK (owner, 2026-09-19: "expand out and add detail to both the karting and aero ace
+  // mode"). Everything below is Kenney racing-kit geometry — textured models, no new primitives — placed off the road
+  // by construction, since `put` measures from the track's half-width outwards.
+  // 1. A CONTINUOUS FENCE down both verges. `fenceStraight` was the one model in the kit nothing used.
+  for (let d = 0; d < L; d += 8.4) {
+    const at = pointAlong(circuit.line, d);
+    for (const s of [-1, 1]) put('fenceStraight', at, s, 2.6, 2.2, Math.PI / 2);
+  }
+  // 2. TYRE WALLS on the quick corners too — the tight ones already get a barrier wall above.
+  for (const kerb of circuit.kerbs) {
+    if (kerb.radius < 45) continue;
+    for (let d = kerb.from - 4; d <= kerb.to + 4; d += 5.0) put('barrierWhite', pointAlong(circuit.line, d), -kerb.side, 4.0, 2.2, Math.PI / 2);
+  }
+  // 3. THE CROWD GOES WHERE THE OVERTAKES ARE: a round stand on the outside of the tightest corner.
+  {
+    const tight = [...circuit.kerbs].sort((a, c) => a.radius - c.radius)[0];
+    if (tight) {
+      const mid = pointAlong(circuit.line, (tight.from + tight.to) / 2);
+      put('grandStandRound', mid, -tight.side, 19, 3.0);
+      put('grandStandCoveredRound', pointAlong(circuit.line, (tight.from + tight.to) / 2 + 26), -tight.side, 21, 3.0);
+    }
+  }
+  // 4. THE PADDOCK behind the start: a row of awnings where the karts come from.
+  for (let i = -2; i <= 2; i++) {
+    put('tentRoof', pointAlong(circuit.line, circuit.line.loop ? L - 52 + i * 9 : 46 + i * 9), -1, 30, 2.4, Math.PI / 2);
+  }
+  // 5. Flags down the long straights, so the fast parts are not empty either.
+  for (let d = 24; d < L - 24; d += 58) {
+    put(d % 116 < 58 ? 'flagGreen' : 'flagCheckers', pointAlong(circuit.line, d), d % 2 ? -1 : 1, 3.2, 2.0);
+  }
   // the overhead lights across the line on a night course
   if (night) { const p = start.pos; out.push({ kit: 'racing', model: 'overheadLights', at: [p.x, 0, p.z], yaw: Math.atan2(start.tangent.x, start.tangent.z), scale: 2.8 }); }
   return out;

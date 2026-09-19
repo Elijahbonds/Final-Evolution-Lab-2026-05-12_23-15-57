@@ -132,9 +132,16 @@ describe('the detail pass', () => {
     for (const c of allKartCircuits()) {
       const scenery = kartSceneryFor(c);
       const models = scenery.map((p) => p.model);
-      expect(models.filter((m) => m.startsWith('grandStand')).length, c.course.id).toBe(2);
+      // The counts were pinned at exactly two stands and one flag per corner when that WAS the whole dressing. The
+      // circuit is fuller now (owner, 2026-09-19: "expand out and add detail"), so what is guarded is the intent: a
+      // pair of stands at the line plus whatever the corners earn, the two banner towers that mark the line itself,
+      // a flag for at least every corner, and a fence down both verges. The invariant that matters — NOTHING ON THE
+      // TARMAC — is checked in full below, on every prop.
+      expect(models.filter((m) => m.startsWith('grandStand')).length, c.course.id).toBeGreaterThanOrEqual(2);
       expect(models.filter((m) => m.startsWith('bannerTower')).length, c.course.id).toBe(2);
-      expect(models.filter((m) => m.startsWith('flag')).length, c.course.id).toBe(c.kerbs.length);
+      expect(models.filter((m) => m.startsWith('flag')).length, c.course.id).toBeGreaterThanOrEqual(c.kerbs.length);
+      expect(models.filter((m) => m === 'fenceStraight').length, c.course.id).toBeGreaterThan(10);
+      expect(models.filter((m) => m === 'barrierWhite').length, c.course.id).toBeGreaterThan(0);
       for (const p of scenery) {
         const at = locateOnLine(c.line, p.at[0], p.at[2]);
         if (p.model === 'overheadLights') continue;   // the one thing that spans the road, on purpose

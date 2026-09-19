@@ -292,7 +292,7 @@ function buildTowers(scene: Scene, c: AeroCircuit, root: TransformNode): void {
 function sceneryFor(c: AeroCircuit): PropPlacement[] {
   const out: PropPlacement[] = [];
   const pick = (d: number, list: string[]) => list[Math.abs(Math.floor(d * 0.37)) % list.length];
-  const step = c.theme === 'island' ? 34 : 26;
+  const step = c.theme === 'island' ? 26 : 18;   // denser near band (34/26 → 26/18)
   for (let d = 0; d < c.line.length; d += step) {
     const { pos, tangent } = pointAlong(c.line, d);
     const right = new Vector3(tangent.z, 0, -tangent.x);
@@ -316,6 +316,40 @@ function sceneryFor(c: AeroCircuit): PropPlacement[] {
       } else {
         out.push({ kit: 'nature', model: pick(d + side, ['tree_pineTallA', 'tree_pineTallB', 'rock_largeB', 'tree_pineRoundA']), at: [at.x, 0, at.z], yaw, scale: 5 + ((d * 2.9) % 4), tint: '#dfeee6' });
       }
+    }
+  }
+  // A WORLD THAT READS FROM ALTITUDE (owner, 2026-09-19: "expand out and add detail to both the karting and aero ace
+  // mode"). The band above hugs the corridor, which is all a pilot sees at gate height; from any climb the ground went
+  // empty. A FAR BAND carries the same kit out to 60–260 m either side at a coarser step, so the map has depth.
+  for (let d = 0; d < c.line.length; d += 62) {
+    const { pos, tangent } = pointAlong(c.line, d);
+    const right = new Vector3(tangent.z, 0, -tangent.x);
+    for (const side of [-1, 1]) {
+      for (const ring of [0, 1, 2]) {
+        const off = c.corridor + 60 + ring * 70 + ((d * 5.1 + side * 23 + ring * 17) % 34);
+        const at = pos.add(right.scale(side * off));
+        if (Math.abs(locate(c.line, at.x, at.z).lateral) < c.corridor) continue;
+        const h = c.floorAt(at.x, at.z);
+        if ((c.theme === 'island' && h < 1.5) || (c.theme === 'volcano' && h < 0) || (c.theme === 'city' && h < 0)) continue;
+        const yaw = (d * 0.21 + side * ring) % (Math.PI * 2);
+        const scale = 6 + ((d * 3.1 + ring * 13) % 5);
+        if (c.theme === 'canyon') out.push({ kit: 'nature', model: pick(d + ring + side, ['rock_largeB', 'rock_tallB', 'rock_largeD', 'rock_largeA']), at: [at.x, 0, at.z], yaw, scale });
+        else if (c.theme === 'island') out.push({ kit: 'nature', model: pick(d + ring + side, ['tree_palmTall', 'tree_palmBend', 'tree_palmShort']), at: [at.x, 0, at.z], yaw, scale: scale * 0.8 });
+        else if (c.theme === 'volcano') out.push({ kit: 'nature', model: pick(d + ring + side, ['rock_tallA', 'rock_largeC', 'rock_largeD']), at: [at.x, 0, at.z], yaw, scale });
+        else if (c.theme === 'city') out.push({ kit: 'racing', model: ring ? 'lightPostLarge' : 'lightPostModern', at: [at.x, 0, at.z], yaw, scale: 7 });
+        else out.push({ kit: 'nature', model: pick(d + ring + side, ['tree_pineTallA', 'tree_pineTallB', 'tree_pineRoundB', 'rock_largeB']), at: [at.x, 0, at.z], yaw, scale });
+      }
+    }
+  }
+  // THE PYLONS. Air racing is read off the gates, and the gates here were invisible lap logic. A banner tower either
+  // side of every checkpoint, just outside the corridor, gives the course its shape from the air — red on the left,
+  // green on the right, the way a racecourse is marked.
+  for (const g of c.course.gates) {
+    const right = new Vector3(g.through.z, 0, -g.through.x);
+    for (const side of [-1, 1]) {
+      const at = g.at.add(right.scale(side * (c.corridor + 8)));
+      if (c.floorAt(at.x, at.z) < 0 && c.theme !== 'canyon') continue;   // no pylon standing in water or lava
+      out.push({ kit: 'racing', model: side < 0 ? 'bannerTowerRed' : 'bannerTowerGreen', at: [at.x, 0, at.z], yaw: Math.atan2(g.through.x, g.through.z), scale: 7 });
     }
   }
   if (c.theme === 'island') {
