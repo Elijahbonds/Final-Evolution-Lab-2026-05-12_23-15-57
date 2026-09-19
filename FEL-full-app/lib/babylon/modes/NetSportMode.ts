@@ -17,6 +17,8 @@ import { answerFor, tellFor, rallyPace, SHOT_FACE } from '../core/tennisHud';
 // the weather drifts the flight (shown before you commit).
 import { aimFor, landingFor, windDrift, meterBandsFor } from '../core/TennisAim';
 import { mountRing, type RingHandle } from '../visual/AimArrow';
+import { CAGE, glassX, backZ, cageCross, mirrorShot, liveOffGlass, WALLRUN, wallRunRead, SMASH, aerialRead, type AerialKind, multStep, paceFor, stylePts } from '../core/ParkourTennis';   // PARKOUR TENNIS (owner brief, 2026-09-18)
+import { VenueKit } from '../visual/VenueKit';
 import { WeatherKit } from '../core/WeatherKit';
 import { readWeather } from '../nexus/weather';
 import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
@@ -84,6 +86,8 @@ export interface NetSportOptions {
   beach?: boolean;
   /** Aces' energy gauge, Zone Shot and racket break. Tennis only. */
   energy?: boolean;
+  /** PARKOUR TENNIS: the glass cage — wide / long balls live off the glass, wall-run returns, the aerials, the rally multiplier. Tennis only. */
+  cage?: boolean;
   swingClip: string;
   /** 0–1. How reliably the AI returns; higher misses less. */
   aiSkill: number;
@@ -216,6 +220,27 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let gameLatch = false;
 
   const HERO_SIDE = 1;             // hero defends +Z, opponent defends −Z
+  // ── PARKOUR TENNIS (owner brief, 2026-09-18: "the glass-cage rally"): the cage keeps wide / long balls live (the flight
+  // mirrored off the pane), a return taken at the glass is a WALL RUN, R1 is the aerial (up the back glass on a deep lob,
+  // the net vault METEOR on a short ball), and the rally's multiplier speeds the ball and pays style. Pure reads in
+  // core/ParkourTennis; tennis only (o.cage).
+  let bouncedSide = false, bouncedBack = false, mult = 1, style = 0, aerialNow: AerialKind = null, incomingMeteor = false, lastLive = false, incomingKind: TennisShot | undefined;
+  const cageStats = { bounces: 0, wallRuns: 0, smashes: 0, meteors: 0, rallies: 0, liveSaves: 0 };
+  let glassMeshes: AbstractMesh[] = [];
+  function buildCage(ctx: ModeContext): void {
+    const mat = VenueKit.paint(ctx.scene, 'cage_glass_mat', '#9ad7ff', 0.12, 0.2); mat.alpha = 0.26;
+    const gx = glassX(o.cfg), bz = backZ(o.cfg);
+    for (const sx of [1, -1] as const) { const g = MeshBuilder.CreateBox(`cage_side_${sx}`, { width: 0.12, height: CAGE.height, depth: bz * 2 }, ctx.scene); g.position.set(sx * (gx + 0.06), CAGE.height / 2, 0); g.material = mat; g.isPickable = false; glassMeshes.push(g); }
+    for (const sz of [1, -1] as const) { const g = MeshBuilder.CreateBox(`cage_back_${sz}`, { width: gx * 2 + 0.24, height: CAGE.height, depth: 0.12 }, ctx.scene); g.position.set(0, CAGE.height / 2, sz * (bz + 0.06)); g.material = mat; g.isPickable = false; glassMeshes.push(g); }
+  }
+  /** R1: the aerial on the incoming ball — the back-wall smash or the net-vault meteor. */
+  function humanAerial(ctx: ModeContext): void {
+    if (!shot || !awaitingHuman) { refuse(ctx, 'NO BALL TO GO UP FOR'); return; }
+    const kind = aerialRead(shot.to.z, o.cfg, incomingKind, energy[0], !!o.energy);
+    if (!kind) { refuse(ctx, Math.abs(shot.to.z) <= SMASH.shortM ? `METEOR NEEDS ${SMASH.meteorEnergy} ENERGY` : 'NOT A BALL TO GO UP FOR — a deep lob, or a short one'); return; }
+    pendingShot = 'drive';
+    humanSwing(ctx, kind);
+  }
 
   // ── FOOTWORK (2026-09-13) ────────────────────────────────────────────────
   // This file used to say, in its own words, that Zone Speed and the trick-shot dash were out of scope because
@@ -282,6 +307,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   /** Award a point to `side` (0 = hero) and set up the next serve. */
   function awardPoint(ctx: ModeContext, side: 0 | 1, why: string): void {
     rally.end();
+    if (o.cage) { if (side === 0) style += stylePts(mult); cageStats.rallies++; if (mult > 1 && side === 0) why = `${why} · x${mult}`; mult = 1; aerialNow = null; incomingMeteor = false; ctx.setHud({ mult: 1, style }); }   // PARKOUR TENNIS
     shot = null;
     contactArmed = false;
     ctx.setHud({ incomingShot: '', incomingTell: '', answer: '' });
@@ -323,7 +349,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ctx.end(
         side === 0 ? 'WIN' : 'LOSS',
         tennisScore ? tennisScore.games[0] : volleyScore!.points[0],
-        { streak: heroStreak },
+        { streak: heroStreak, style },
       );
       return;
     }
@@ -366,7 +392,19 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // the tell describes THEIR ball; once ours is away it is stale
     if (toSide < 0 && o.cfg.touchesPerSide === 1) _ctx.setHud({ incomingShot: '', incomingTell: '', answer: '' });
 
-    const fault: RallyFault | null = judgeShot(o.cfg, planned);
+    // PARKOUR TENNIS: a hard sideways aim on a good swing is a BANK — the ball is sent INTO the side glass on purpose and
+    // comes off it inside the line (the planner never lands a good ball wide on its own, measured: 0 glass in 23 swings)
+    if (o.cage && Math.abs(aim) >= 0.85 && (q === 'perfect' || q === 'good') && !touch) planned.to.x = Math.sign(aim) * (glassX(o.cfg) + 1.6);
+    let fault: RallyFault | null = judgeShot(o.cfg, planned);
+    // PARKOUR TENNIS: a wide or long ball is LIVE off the glass (the flight is mirrored when it reaches the pane); the rally's
+    // multiplier speeds every flight
+    lastLive = false;
+    if (o.cage) {
+      if (liveOffGlass(fault)) { fault = null; lastLive = true; cageStats.liveSaves++; }
+      if (mult > 1) planned.duration *= paceFor(mult);
+      bouncedSide = false; bouncedBack = false;
+    }
+    incomingKind = tennisShot;   // PARKOUR TENNIS: what KIND of ball is coming (the Shot itself carries no kind)
     shot = planned;
     flightT = 0;
     contactArmed = false;
@@ -488,6 +526,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       if (q === 'miss') { awardPoint(ctx, 0, 'KILL — THEY COULD NOT DIG IT'); return; }
     }
 
+    // PARKOUR TENNIS: a ball off the glass is harder to read — the answer slips a step a third of the time
+    if (o.cage && (bouncedSide || bouncedBack) && Math.random() < 0.35) q = q === 'perfect' ? 'good' : q === 'good' ? 'late' : q === 'late' ? 'miss' : q;
+    if (o.cage && incomingMeteor) { incomingMeteor = false; if (Math.random() < SMASH.aiMissAdd || q === 'late') { awardPoint(ctx, 0, 'METEOR — UNPLAYABLE'); return; } }   // PARKOUR TENNIS
     if (q === 'miss') { awardPoint(ctx, 0, 'THEY MISSED'); return; }
 
     // The opponent plays the same sequence the player does. Leaving them on a
@@ -534,7 +575,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // off the chalk -- an opponent who paints the line every ball is not playing tennis, at any scoreline.
     const commit = Math.min(1, (q === 'perfect' ? 1 : q === 'good' ? 0.75 : 0.45) * shift.aggression);
     const aiIntent = aiCrosses
-      ? aiTargetX(foot.x, o.cfg.halfWidth, commit) / o.cfg.halfWidth
+      ? (o.cage && (q === 'perfect' || q === 'good') && Math.random() < 0.25 ? (Math.random() < 0.5 ? 1 : -1) : aiTargetX(foot.x, o.cfg.halfWidth, commit) / o.cfg.halfWidth)   // PARKOUR TENNIS: the opponent banks off the glass too
       : (Math.random() - 0.5) * 1.6;                 // a self-pass is not aimed at the opponent
     launch(ctx, ball.getAbsolutePosition(), aiCrosses ? 1 : -1, aiIntent, q, aiIsVolley ? aiTouch : undefined, aiShot, aiZone);
   }
@@ -637,7 +678,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   }
 
   /** The human's swing. Called on the action edge. */
-  function humanSwing(ctx: ModeContext): void {
+  function humanSwing(ctx: ModeContext, aerial: AerialKind = null): void {
     // MECHANICS PASS (2026-09-15): tennis X was silent 5 of 7 and volleyball 29 % of hits — a swing with no ball coming, or
     // one too early / out of reach, returned without a word. The rally game's whole read is timing, so timing is SAID.
     if (!shot || !awaitingHuman) { refuse(ctx, 'WAIT FOR THE BALL'); return; }
@@ -741,9 +782,27 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     }
 
     // WII READ: in tennis WHEN you swing is WHERE it goes — early pulls it across your body, late pushes it the other way
-    launch(ctx, swingPos, crosses ? -1 : 1, isVolley ? aimX : aimFor(aimX, dt), q,
+    const wallRun = o.cage && !isVolley && wallRunRead(foot.x, o.cfg.halfWidth);
+    const away = launch(ctx, swingPos, crosses ? -1 : 1, isVolley ? aimX : aimFor(aimX, dt), q,
       isVolley ? touchKind : undefined,
       isVolley ? undefined : pendingShot, zone);
+    // PARKOUR TENNIS: the wall run and the aerials are faster balls and a higher multiplier
+    if (o.cage && away && shot) {
+      if (aerial) {
+        shot.duration /= aerial === 'meteor' ? SMASH.meteorMult : SMASH.paceMult; mult = multStep(mult, SMASH.multAdd);
+        if (aerial === 'meteor') { cageStats.meteors++; incomingMeteor = true; if (o.energy) { energy[0] = Math.max(0, energy[0] - SMASH.meteorEnergy); ctx.setHud({ energy: Math.round(energy[0]) }); } }
+        else cageStats.smashes++;
+        me.root.position.y = 0;
+        flash(ctx, aerial === 'meteor' ? `NET VAULT — METEOR SMASH! x${mult}` : `UP THE GLASS — OVERHEAD SMASH! x${mult}`, 900);
+        SoundKit.play('impact', { pitch: 1.4, volume: 0.6 }); ctx.juice.shake(0.16, 140); ctx.feel.impact(0.5); EffectsKit.burst(ctx.scene, swingPos, 'sparks');
+        console.info(`[CAGE] ${aerial} smash → x${mult}`);
+      } else if (wallRun) {
+        shot.duration /= WALLRUN.paceMult; mult = multStep(mult, WALLRUN.multAdd); cageStats.wallRuns++;
+        flash(ctx, `WALL RUN — off the glass! x${mult}`, 700); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 });
+        console.info(`[CAGE] wall-run return → x${mult}`);
+      }
+      ctx.setHud({ mult });
+    }
   }
 
   return {
@@ -755,6 +814,15 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       venue = mountVenue(ctx, o.venueId, { keepGameplayCamera: true, look: readPlaceLook(o.venueId) });   // PLACE: the splash's pick (tennis / volleyball)   // M104 gap: tennis and volleyball rendered through the venue orbit camera — the hero sat at 44 px, cut off at the frame's bottom
       if (o.beach) beach = buildBeach(ctx.scene);   // P5: sand to the horizon, the sea past the far baseline
       if (o.cfg.touchesPerSide > 1) readableNet = buildReadableNet(ctx.scene, o.cfg);   // volleyball: a net you can see
+      if (o.cage) {   // PARKOUR TENNIS: the glass, and the dev seam
+        for (const g of glassMeshes) g.dispose(); glassMeshes = []; buildCage(ctx);
+        mult = 1; style = 0; aerialNow = null; incomingMeteor = false; Object.assign(cageStats, { bounces: 0, wallRuns: 0, smashes: 0, meteors: 0, rallies: 0, liveSaves: 0 });
+        if (process.env.NODE_ENV === 'development') {
+          (ctx.scene.metadata ??= {}).tennis = {
+            state: () => ({ awaitingHuman, flightT, contactArmed, shot: shot ? { toX: shot.to.x, toZ: shot.to.z, duration: shot.duration, kind: incomingKind ?? '' } : null, ballX: ball ? ball.position.x : 0, ballZ: ball ? ball.position.z : 0, footX: foot.x, aerial: aerialNow, mult, style, energy: energy[0], lastLive, ...cageStats, ended, resting: restSec > 0, steerSign: Math.sign(ctx.camDirector.rightFlat().x || 1), games: tennisScore ? [tennisScore.games[0], tennisScore.games[1]] : null }),
+          };
+        }
+      }
 
       me = await CharacterLibrary.spawn(ctx.scene, o.heroUrl, {
         position: new Vector3(0, 0, o.cfg.halfLength * 0.85), yawRad: Math.PI, startClip: clips.ready });
@@ -863,6 +931,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       // screen-LEFT from behind the baseline (measured Δscreen −4.7 m on stick-right).
       if (e.t === 'stick' && e.side === 'L') aimX = e.x;
       if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5) humanSwing(_ctx);
+      if (e.t === 'button' && e.btn === 'R1' && e.pressed && o.cage) humanAerial(_ctx);   // PARKOUR TENNIS: the aerial
       // THE SPLIT STEP (L1). The highest-skill, lowest-visibility mechanic in tennis: hop just before the
       // opponent strikes so you land as they hit and can push either way. Timed against their contact — early
       // is forgiven, late is not — and it buys ONE faster first step, never a sprint button.
@@ -963,6 +1032,20 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       flightT += dt / shot.duration;
       const p = shotAt(shot, flightT);
       ball.position.set(p.x, p.y, p.z);
+      // PARKOUR TENNIS: the ball reaching a pane is mirrored off it (live); the aerial read on the incoming ball
+      if (o.cage) {
+        const hit = cageCross(ball.position, o.cfg, bouncedSide, bouncedBack);
+        if (hit) {
+          if (hit === 'side') { mirrorShot(shot, 'x', Math.sign(ball.position.x) * glassX(o.cfg)); bouncedSide = true; }
+          else { mirrorShot(shot, 'z', Math.sign(ball.position.z) * backZ(o.cfg)); bouncedBack = true; }
+          cageStats.bounces++; mult = multStep(mult, 1);
+          SoundKit.play('clang', { pitch: 1.5, volume: 0.5 }); EffectsKit.burst(ctx.scene, ball.position.clone(), 'sparks');
+          flash(ctx, `LIVE OFF THE GLASS — x${mult}`, 700); ctx.setHud({ mult });
+          console.info(`[CAGE] ${hit} glass → x${mult}`);
+        }
+        const kind = awaitingHuman ? aerialRead(shot.to.z, o.cfg, incomingKind, energy[0], !!o.energy) : null;
+        if (kind !== aerialNow) { aerialNow = kind; ctx.setHud({ aerial: kind === 'backwall' ? 'R1 — UP THE GLASS' : kind === 'meteor' ? 'R1 — METEOR' : '' }); }
+      }
 
       // Arm the swing window once the ball is on its way in.
       if (!contactArmed && flightT > 0.55) contactArmed = true;
@@ -1008,6 +1091,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     },
 
     dispose() {
+      for (const g of glassMeshes) g.dispose(); glassMeshes = [];   // PARKOUR TENNIS
       crowd?.dispose(); crowd = null;
       crowdEnds?.dispose(); crowdEnds = null; beach?.dispose(); beach = null; readableNet?.dispose(); readableNet = null;   // P5
       venue?.dispose(); venue = null;

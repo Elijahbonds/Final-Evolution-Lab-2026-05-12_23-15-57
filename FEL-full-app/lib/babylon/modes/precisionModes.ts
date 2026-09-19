@@ -69,6 +69,7 @@ import { launchKick, frameHit, judgeKick, kickZone, METER_ZONES, GOAL as PEN_GOA
 import { WIND_GAIN } from '../core/GolfBall';
 import { BREAK, FLOW, flowAdd, shotProfile, glassRead, bankTarget, rainbowRead, slideCancelRead, rainbowArc, KEEPER, keeperTargetZ, keeperSlideRead, reachFor, crossesKeeper, type ShotKind } from '../core/Breakaway';   // BREAKAWAY (owner brief, 2026-09-18: "Soccer Shootout")
 import { stepRun } from '../core/RushRun';
+import { PAD, padMult, type PadKind, FLICK, flickRead, flickVel, type Ring, RINGS, ringsFor, ringPass, turbineFor, gustAt, BANK, bankReflect } from '../core/ParkourGolf';   // PARKOUR GOLF (owner brief, 2026-09-18)
 import { PARK, TARGETS, predictWallCross, targetHit, robRead, verdictFor, flowTrick, kineticSwing, FLOW as PARK_FLOW, TOKEN, multiplierScramble, type Rob, type Verdict, type WallTarget, type WallCross } from '../core/ParkourDerby';   // PARKOUR DERBY (owner brief, 2026-09-18)
 
 // ship pass 4: the mounted venue specs (golf_loop / derby / penalty), disposed with their modes
@@ -313,6 +314,37 @@ export const GolfMode: ModeDefinition = (() => {
   const ACCURACY_HALF = GH_ACC_HALF;
   /** A+ mission #5: the card, hole by hole, for the scoreboard between holes. */
   let holeResults: HoleResult[] = [];
+  // ── PARKOUR GOLF (owner brief, 2026-09-18: "Parkour Golf — target drop + trick-putt arena"): a springboard behind the ball
+  // that augments the strike, two mid-air FLICKS that bend the ball, score RINGS on the line, a TURBINE that gusts it, and
+  // the banked half-pipe around the green a putt rides back into the cup (harder on a SLIDE PUTT). Pure reads in
+  // core/ParkourGolf; the hole itself (Wii swing, strokes, the card) is untouched.
+  const golfPark = { pads: 0, flicks: 0, ringsTotal: 0, gusts: 0, bankRides: 0, slidePutts: 0 };
+  let pad: PadKind | null = null, hopT = -1, flicksLeft = 0, prevFlickX = 0, rings: Ring[] = [], ringChain = 0, gusting = false, slidePutt = false, bankRode = false, bankCool = 0;
+  const ringsTaken = new Set<string>(); const ringMeshes = new Map<string, AbstractMesh>();
+  let fan: { x: number; z: number } | null = null, fanBlades: AbstractMesh | null = null;
+  const teePos = new Vector3(), prevBallPos = new Vector3(); let lastCarryM = 0, apexY = 0;
+  /** The hole's park: the springboard at the tee, the rings and the fan on the line, the bank around the green (all in `furniture`, rebuilt per hole). */
+  function buildHolePark(ctx: ModeContext): void {
+    teePos.copyFrom(ball.position); ringsTaken.clear(); ringMeshes.clear(); ringChain = 0; pad = null; slidePutt = false; bankRode = false; gusting = false;
+    const tee = { x: teePos.x, z: teePos.z }, hole = { x: holePos.x, z: holePos.z };
+    const padMat = VenueKit.paint(ctx.scene, 'gp_pad_mat', '#22d3ee', 0.3, 0.5), ringMat = VenueKit.paint(ctx.scene, 'gp_ring_mat', '#9ad7ff', 0.45, 0.4), fanMat = VenueKit.paint(ctx.scene, 'gp_fan_mat', '#d9d2c2', 0.08, 0.6), bankMat = VenueKit.paint(ctx.scene, 'gp_bank_mat', '#2f7a42', 0.06, 0.9);
+    const yaw = Math.atan2(hole.x - tee.x, hole.z - tee.z);
+    const board = MeshBuilder.CreateBox('gp_springboard', { width: 1.2, height: 0.12, depth: 0.9 }, ctx.scene);
+    board.position.set(tee.x - Math.sin(yaw) * 1.1, 0.06, tee.z - Math.cos(yaw) * 1.1); board.rotation.y = yaw; board.material = padMat; board.isPickable = false; furniture.push(board);
+    rings = ringsFor(tee, hole);
+    for (const rg of rings) {
+      const t = MeshBuilder.CreateTorus(`gp_${rg.id}`, { diameter: rg.r * 2, thickness: 0.18, tessellation: 28 }, ctx.scene);
+      t.position.set(rg.x, rg.y, rg.z); t.rotation.x = Math.PI / 2; t.rotation.y = yaw; t.rotation.x = Math.PI / 2; t.material = ringMat; t.isPickable = false;
+      // a torus lies flat (XZ); stood up across the line: rotate about the line's perpendicular
+      t.rotation.set(0, yaw, 0); t.addRotation(Math.PI / 2, 0, 0);
+      furniture.push(t); ringMeshes.set(rg.id, t);
+    }
+    fan = turbineFor(tee, hole);
+    const post = MeshBuilder.CreateCylinder('gp_fan_post', { diameter: 0.3, height: 2.2 }, ctx.scene); post.position.set(fan.x, 1.1, fan.z); post.material = fanMat; post.isPickable = false; furniture.push(post);
+    fanBlades = MeshBuilder.CreateBox('gp_fan_blades', { width: 2.6, height: 2.6, depth: 0.08 }, ctx.scene); fanBlades.position.set(fan.x, 2.6, fan.z); fanBlades.rotation.y = yaw + Math.PI / 2; fanBlades.material = fanMat; fanBlades.isPickable = false; furniture.push(fanBlades);
+    const bank = MeshBuilder.CreateTorus('gp_bank', { diameter: (BANK.innerR + BANK.outerR), thickness: BANK.outerR - BANK.innerR, tessellation: 40 }, ctx.scene);
+    bank.position.set(hole.x, -0.25, hole.z); bank.scaling.y = 0.75; bank.material = bankMat; bank.isPickable = false; furniture.push(bank);
+  }
 
   function nextShot(ctx: ModeContext): void {
     round++;
@@ -369,6 +401,7 @@ export const GolfMode: ModeDefinition = (() => {
       round: `${round}/${TOTAL}`, power: 0, accuracy: '',
       hint: clutch ? 'FINAL SHOT — study the green' : `HOLE ${round} — ${Math.round(Vector3.Distance(ball.position, holePos))}m out`,
     });
+    buildHolePark(ctx);   // PARKOUR GOLF
   }
 
   /** The golf frame: strokes against par, which is how the sport is scored. */
@@ -396,7 +429,7 @@ export const GolfMode: ModeDefinition = (() => {
     const c = onGreen() ? PUTTER : GOLF_CLUBS[club];
     const from = { x: ball.position.x, y: ball.position.y, z: ball.position.z };
     const pred = simulateShot(c, 1, aimYaw, from, air(), surfaceAt);
-    arrow?.set(ball.position, aimYaw, pred.carryM, pred.carry, pred.rest);
+    arrow?.set(ball.position, aimYaw, pred.carryM, pred.carry, pred.rest); lastCarryM = pred.carryM;
     me.root.rotation.y = aimYaw;   // the golfer faces the arrow
     const aimDeg = Math.round(((aimYaw - pinYaw() + Math.PI * 3) % (Math.PI * 2) - Math.PI) * 180 / Math.PI);   // the arrow's offset from the pin line, for the HUD
     if (withTicks) { ticks = meterTicks(c, aimYaw, from, air(), surfaceAt); ctx.setHud({ meterTicks: ticks.join(','), aimCarry: Math.round(pred.carryM), aimDeg }); }
@@ -440,13 +473,18 @@ export const GolfMode: ModeDefinition = (() => {
     // divided by the club's forgiveness. Not a random lateral kick.
     const sideSign: -1 | 1 = sideErr >= 0 ? 1 : -1; const errMag = Math.min(1, Math.abs(sideErr));
     const { vel, spin } = launchVelocity(c, pwr, aimYaw, errMag, sideSign);
+    // PARKOUR GOLF: the launch pad augments the strike; a SLIDE PUTT is a little hotter and rides the bank harder; two flicks in the air
+    if (pad) { vel.scaleInPlace(padMult(pad)); golfPark.pads++; console.info(`[GOLF-PARK] ${PAD[pad].label} ×${padMult(pad)}`); }
+    if (c === PUTTER && slidePutt) { vel.scaleInPlace(1.12); golfPark.slidePutts++; console.info('[GOLF-PARK] slide putt'); }
+    flicksLeft = c === PUTTER ? 0 : FLICK.perShot; ringChain = 0; bankRode = false; gusting = false; prevFlickX = 0;
+    ctx.setHud({ flicks: flicksLeft, pad: pad ? PAD[pad].label : '' }); pad = null;
     pendingVel = vel;   // the follow camera sets up behind the line of the coming shot while the club comes down
     arrow?.show(false);
     pendingStrike = () => {
       SoundKit.play('whoosh', { pitch: 0.9 });
       ctx.feel?.impact?.(0.25 + pwr * 0.35);   // the contact feel, ON the contact (A+ P0 weight unchanged)
       sim.wind.copyFrom(wind); sim.wet01 = weather.wet01(); sim.airDensity = weather.airDensityMult();
-      sim.launch(ball.position.clone(), vel, spin); flightSec = 0;
+      prevBallPos.copyFrom(ball.position); apexY = 0; sim.launch(ball.position.clone(), vel, spin); flightSec = 0;
     };
     if (strikeIn <= 0) { pendingStrike(); pendingStrike = null; }
     ctx.setHud({
@@ -507,7 +545,7 @@ export const GolfMode: ModeDefinition = (() => {
       windDeg, windWord: windWord(windDeg, wind.length()), hole: round, holes: TOTAL, par: GOLF_PAR[Math.min(round, GOLF_PAR.length) - 1] ?? 3,
       meterT: null, swingPhase: null, powerLock: null, board: null, boardTitle: '',
       pin: `${toPin.toFixed(0)}m`, weather: weather.describe(),
-      strokes, card: card(),
+      strokes, card: card(), pad: '', flicks: onGreen() ? 0 : FLICK.perShot, rings: ringsTaken.size,
       hint: 'L-STICK turns the ARROW (the ring is a full swing) · A starts the swing · A at the top for POWER · A in the band · B cycles CLUB · or pull the stick back and drive through',
     });
   }
@@ -549,6 +587,11 @@ export const GolfMode: ModeDefinition = (() => {
         -1 + (i % 5) * 1.5,
       )), '#3d4a3a');
       ctx.setHud({ score: 0, weather: weather.describe() });
+      if (process.env.NODE_ENV === 'development') {
+        (ctx.scene.metadata ??= {}).golf = {   // PARKOUR GOLF probes
+          state: () => ({ phase, hole: round, strokes, ended, onGreen: onGreen(), ballX: ball.position.x, ballY: ball.position.y, ballZ: ball.position.z, holeX: holePos.x, holeZ: holePos.z, pad, flicksLeft, rings: ringsTaken.size, ringChain, slidePutt, pts, ...golfPark, flying: sim.ball.active, rolling: sim.ball.rolling, carryM: lastCarryM, apexY, distToPin: Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos) }),
+        };
+      }
       nextShot(ctx);
     },
 
@@ -556,6 +599,16 @@ export const GolfMode: ModeDefinition = (() => {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') {
         stickX = e.x; stickY = e.y;
+        // PARKOUR GOLF: a FLICK in the air bends the ball (an edge on the stick, two a shot)
+        if (phase === 'flight' && strikeIn <= 0 && sim.ball.active && !sim.ball.rolling) {
+          const f = flickRead(prevFlickX, e.x, flicksLeft);
+          if (f !== 0) {
+            const d = flickVel({ x: sim.ball.vel.x, z: sim.ball.vel.z }, f); sim.ball.vel.x += d.x; sim.ball.vel.z += d.z;
+            flicksLeft--; golfPark.flicks++; SoundKit.play('whoosh', { pitch: 1.5, volume: 0.35 }); ctx.feel?.impact?.(0.12);
+            ctx.setHud({ flicks: flicksLeft, banner: `FLICK ${f > 0 ? '▶' : '◀'}` }); setTimeout(() => ctx.setHud({ banner: '' }), 400); console.info(`[GOLF-PARK] flick ${f > 0 ? 'right' : 'left'} (${flicksLeft} left)`);
+          }
+        }
+        prevFlickX = e.x;
         // THE ANALOG STICK SWING — PGA Tour 2K's signature, added ALONGSIDE the
         // 3-click rather than replacing it. Pull back to load, drive through to
         // strike: how far you pulled is the power, and where the stick sits
@@ -586,6 +639,13 @@ export const GolfMode: ModeDefinition = (() => {
           strike(ctx, power, clean ? 0 : Math.sign(raw - ACCURACY_CENTER) * Math.min(1, (err - ACCURACY_HALF) * 3));   // early hooks, late slices
         }
       }
+      // PARKOUR GOLF: Y before the swing is the SPRINGBOARD hop (power off the launch position); LT on the green is the SLIDE PUTT
+      if (e.t === 'button' && e.btn === 'Y' && e.pressed) {
+        if (phase === 'aim' && !onGreen() && !pad) { pad = 'springboard'; hopT = 0; SoundKit.play('whoosh', { pitch: 1.2, volume: 0.4 }); ctx.setHud({ pad: PAD.springboard.label, banner: `SPRINGBOARD — +${Math.round((PAD.springboard.mult - 1) * 100)}% off the pad` }); setTimeout(() => ctx.setHud({ banner: '' }), 600); console.info('[GOLF-PARK] springboard'); }
+        else refuse(ctx, onGreen() ? 'NO PAD ON THE GREEN' : pad ? 'ON THE PAD ALREADY' : 'HOP BEFORE THE SWING');
+        return;
+      }
+      if (e.t === 'trigger' && e.side === 'L' && phase === 'aim' && onGreen()) { const on = e.value > 0.5; if (on !== slidePutt) { slidePutt = on; ctx.setHud({ pad: on ? 'SLIDE PUTT' : '' }); } }
       // CLUB SELECTION — the first pillar the lock names, and it did not exist.
       if (e.t === 'button' && e.btn === 'B' && e.pressed && phase === 'aim' && !onGreen()) {
         club = (club + 1) % GOLF_CLUBS.length;
@@ -610,6 +670,9 @@ export const GolfMode: ModeDefinition = (() => {
         return;                                   // camera holds the green view
       }
       if (phase === 'power' || phase === 'accuracy') ctx.setHud({ power: Math.round(meter.value * 100), meterT: Number(meter.value.toFixed(3)), swingPhase: phase, powerLock: phase === 'accuracy' ? Math.round(power * 100) : null, meterCarry: ticks.length ? Math.round(carryAt(ticks, phase === 'accuracy' ? power : meter.value)) : null });
+      // PARKOUR GOLF: the springboard hop, the fan turning
+      if (hopT >= 0) { hopT += dt; const u = Math.min(1, hopT / 0.45); me.root.position.y = Math.sin(u * Math.PI) * 0.6; if (u >= 1) { hopT = -1; me.root.position.y = 0; } }
+      if (fanBlades) fanBlades.rotation.z += dt * 6;
       if (phase === 'aim' && !pulling) { const y0 = aimYaw; aimYaw = turnAim(aimYaw, pinYaw(), stickX, dt); if (aimYaw !== y0) refreshAim(ctx, false); }
       // Phase 3 wants update() EVERY frame; this mode drove its camera only
       // during flight, so between shots the camera never converged on its fixed
@@ -637,6 +700,25 @@ export const GolfMode: ModeDefinition = (() => {
         flightSec += dt;
         sim.wind.copyFrom(wind);
         sim.step(dt, surfaceAt);
+        // PARKOUR GOLF: the rings on the line, the turbine's gust, the bank around the green
+        if (sim.ball.active) {
+          const line = { x: holePos.x - teePos.x, z: holePos.z - teePos.z };
+          for (const rg of rings) if (!ringsTaken.has(rg.id) && ringPass(prevBallPos, ball.position, rg, line)) {
+            ringsTaken.add(rg.id); ringChain++; golfPark.ringsTotal++; const gained = RINGS.pts * (ringChain >= 2 ? RINGS.chainMult : 1); pts += gained;
+            ringMeshes.get(rg.id)?.setEnabled(false); SoundKit.play('score', { pitch: 1.4 }); EffectsKit.burst(ctx.scene, ball.position.clone(), 'sparks');
+            ctx.setHud({ score: pts, rings: ringsTaken.size, banner: ringChain >= 2 ? `RING CHAIN! +${gained}` : `RING! +${gained}` }); setTimeout(() => ctx.setHud({ banner: '' }), 700); console.info(`[GOLF-PARK] ring ${rg.id} +${gained}`);
+          }
+          if (fan && !sim.ball.rolling) {
+            const g = gustAt(ball.position, fan);
+            if (g) { sim.ball.vel.x += g.x * dt; sim.ball.vel.z += g.z * dt; if (!gusting) { gusting = true; golfPark.gusts++; ctx.setHud({ banner: 'TURBINE — flick against it' }); setTimeout(() => ctx.setHud({ banner: '' }), 500); console.info('[GOLF-PARK] gust'); } }
+            else gusting = false;
+          }
+          if (sim.ball.rolling && onGreen()) {
+            bankCool = Math.max(0, bankCool - dt);
+            if (bankCool === 0) { const r = bankReflect(ball.position, sim.ball.vel, holePos, slidePutt); if (r) { sim.ball.vel.x = r.x; sim.ball.vel.z = r.z; bankCool = 0.4; if (!bankRode) { bankRode = true; golfPark.bankRides++; ctx.setHud({ banner: slidePutt ? 'SLIDE PUTT — riding the bank' : 'OFF THE BANK' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); } SoundKit.play('clang', { pitch: 1.6, volume: 0.35 }); console.info('[GOLF-PARK] bank ride'); } }
+          }
+        }
+        prevBallPos.copyFrom(ball.position); apexY = Math.max(apexY, ball.position.y);
         sim.tryHole(holePos.x, holePos.z);
         if (sim.ball.active && flightSec > 25) sim.ball.stop();   // a ball that never settles is settled (a guard, not a rule)
         const flying = sim.ball.active;
@@ -707,6 +789,7 @@ export const GolfMode: ModeDefinition = (() => {
           holeResults.push({ hole: round, par, strokes });
           const gained = Math.round(Math.max(20, 120 - rel * 40) * (clutch ? CLUTCH_MULT : 1));
           pts += gained;
+          if (bankRode) { pts += BANK.pts; console.info('[GOLF-PARK] banked in'); }   // PARKOUR GOLF: a putt that rode the bank into the cup
           SoundKit.play('score', { pitch: rel < 0 ? 1.35 : 1 });
           gallery?.cheer(rel <= 0 ? 1 : 0.4);      // louder for a birdie than a bogey
           // A+ P0 juice (PM brief NET-PRECISION-A-PLUS-P0): the hole drops — under par gets hit-stop + shake + a short gold
@@ -719,7 +802,7 @@ export const GolfMode: ModeDefinition = (() => {
           }
           ctx.setHud({
             score: pts, strokes, card: card(), meterT: null, swingPhase: null, powerLock: null,
-            banner: `${name} — ${strokes} on a par ${par}${clutch ? ' · CLUTCH' : ''}`,
+            banner: `${bankRode ? 'BANKED IN! ' : ''}${name} — ${strokes} on a par ${par}${clutch ? ' · CLUTCH' : ''}`,
             board: holeBoard(holeResults, TOTAL), boardTitle: round >= TOTAL ? 'CARD IN' : `NEXT — HOLE ${round + 1} · PAR ${GOLF_PAR[Math.min(round + 1, GOLF_PAR.length) - 1] ?? 3}`,
           });
           settling = true;

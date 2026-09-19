@@ -19,6 +19,7 @@ export const TennisMode = createNetSportMode({
   ambient: 'stadium',
   crowd: true,          // L4 — Center Court has crowd tiers; give them people
   energy: true,         // Aces' gauge, Zone Shot and racket break
+  cage: true,           // PARKOUR TENNIS (owner brief 2026-09-18): the glass cage, wall-run returns, the aerials, the rally multiplier
   // Phase 3 (2026-09-03): the authored forehand (lib/babylon/anim/authored/tennis.ts),
   // proven on the forge rig. It replaced the jumpshot stand-in.
   swingClip: 'tennis_swing',
