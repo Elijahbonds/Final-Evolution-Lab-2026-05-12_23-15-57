@@ -27,7 +27,7 @@ import { StudioLibrary } from '../music/StudioLibrary';
 import { Color3, Color4, MeshBuilder, Vector3, type Mesh } from '@babylonjs/core';
 import { TransformNode } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
-import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, Scene } from '@babylonjs/core';
+import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, PBRMaterial, Scene } from '@babylonjs/core';
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -74,6 +74,7 @@ import { OBSTACLE_SPECS, OBSTACLE_KINDS, PROP_CAM, clipsObstacle, heightAt, next
 // DUNK PARKOUR (owner brief 2026-09-18): the glass rebound on the runway (a vector-transfer launch), the two launches, the
 // backboard double-launch, the overdrive dunk. Pure in core/DunkParkour.
 import { GLASS, launchProfile, doubleLaunchAllowed, DOUBLE_LAUNCH, overdriveDunk, cornerPanes, paneRebound, billboardFor, type GlassPane } from '../core/DunkParkour';
+import { SKY, skyTierFor, skyTapAllowed, skyTapRefusal, type SkyTier } from '../core/SkyTier';   // THE SKY TIER (owner, 2026-09-18): a blimp / a rocket / … over the lane, per court
 import { spawnMeshyProp } from '../visual/meshyProps';
 import { SceneLoader, DynamicTexture } from '@babylonjs/core';
 import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, signatureFor, landingDustScale, netSplashScale, NET_SPLASH_DROP, type SlamReadout } from '../core/DunkSystem';
@@ -318,6 +319,41 @@ export const DunkMode: ModeDefinition = (() => {
   // THE CORNER PROPS (owner: no glass on the sidelines — the hoopbus parked across one front corner, an event tent with the
   // scene's sign across the other; their faces are the rebound / wall-run surfaces the pure panes describe)
   let vectorAt = -1e9, vectorWallRun = false, doubleLaunched = false, doubleLaunchLift = 0, sideProps: TransformNode[] = [], panes: GlassPane[] = [];
+  // THE SKY TIER: what hangs over the lane in this court, and whether the dunker has tapped off it this flight
+  let skyTier: SkyTier = skyTierFor(undefined), skyRoot: TransformNode | null = null, skyTapped = false, skyBob = 0, skyKick = 0;
+  /** The court's own thing in the sky, from primitives, hung with its underside at SKY.underY over the lane. */
+  function buildSkyTier(scene: Scene, tier: SkyTier, z: number): TransformNode {
+    const root = new TransformNode('dunk_sky', scene); root.position.set(0, SKY.underY, z);
+    const body = VenueKit.paint(scene, 'sky_body_m', tier.color, 0.12, 0.6), acc = VenueKit.paint(scene, 'sky_acc_m', tier.accent, 0.35, 0.5), dark = VenueKit.paint(scene, 'sky_dark_m', '#33383f', 0.05, 0.8);
+    const add = (m: Mesh, mat: PBRMaterial, x: number, y: number, zz: number): Mesh => { m.parent = root; m.position.set(x, y, zz); m.material = mat; m.isPickable = false; return m; };
+    if (tier.kind === 'blimp') {
+      const hull = add(MeshBuilder.CreateSphere('sky_hull', { diameter: 1, segments: 16 }, scene), body, 0, 1.7, 0); hull.scaling.set(2.2, 1.35, 5.2);
+      add(MeshBuilder.CreateBox('sky_gondola', { width: 1.2, height: 0.5, depth: 1.6 }, scene), dark, 0, 0.25, 0.2);
+      for (const sx of [-1, 1]) add(MeshBuilder.CreateBox('sky_fin', { width: 0.9, height: 0.08, depth: 1.1 }, scene), acc, sx * 1.2, 1.7, -2.3);
+      add(MeshBuilder.CreateBox('sky_finv', { width: 0.08, height: 0.9, depth: 1.1 }, scene), acc, 0, 2.5, -2.3);
+    } else if (tier.kind === 'rocket') {
+      add(MeshBuilder.CreateCylinder('sky_stage', { diameter: 1.3, height: 3.6, tessellation: 20 }, scene), body, 0, 2.2, 0);
+      add(MeshBuilder.CreateCylinder('sky_nose', { diameterTop: 0, diameterBottom: 1.3, height: 1.3, tessellation: 20 }, scene), acc, 0, 4.65, 0);
+      for (let i = 0; i < 3; i++) { const a = (i * Math.PI * 2) / 3; const fin = add(MeshBuilder.CreateBox('sky_rfin', { width: 0.08, height: 1.2, depth: 0.9 }, scene), acc, Math.sin(a) * 0.85, 0.75, Math.cos(a) * 0.85); fin.rotation.y = a; }
+      add(MeshBuilder.CreateCylinder('sky_nozzle', { diameterTop: 0.7, diameterBottom: 1.0, height: 0.4, tessellation: 16 }, scene), dark, 0, 0.2, 0);
+    } else if (tier.kind === 'balloon') {
+      const env = add(MeshBuilder.CreateSphere('sky_env', { diameter: 3.4, segments: 16 }, scene), body, 0, 3.4, 0); env.scaling.y = 1.15;
+      add(MeshBuilder.CreateBox('sky_basket', { width: 1.1, height: 0.7, depth: 1.1 }, scene), dark, 0, 0.35, 0);
+      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const r = add(MeshBuilder.CreateCylinder('sky_rope', { diameter: 0.04, height: 1.6 }, scene), acc, sx * 0.5, 1.5, sz * 0.5); r.rotation.x = sz * 0.25; r.rotation.z = -sx * 0.25; }
+    } else if (tier.kind === 'treehouse') {
+      add(MeshBuilder.CreateBox('sky_deck', { width: 3.4, height: 0.3, depth: 2.4 }, scene), body, 0, 0.15, 0);
+      add(MeshBuilder.CreateBox('sky_hut', { width: 2.2, height: 1.6, depth: 1.6 }, scene), dark, 0, 1.1, -0.3);
+      const roof = add(MeshBuilder.CreateCylinder('sky_roof', { diameterTop: 0, diameterBottom: 3.0, height: 1.0, tessellation: 4 }, scene), acc, 0, 2.4, -0.3); roof.rotation.y = Math.PI / 4;
+      for (const sx of [-1, 1]) add(MeshBuilder.CreateBox('sky_rail', { width: 0.06, height: 0.7, depth: 2.4 }, scene), acc, sx * 1.65, 0.65, 0);
+    } else {
+      add(MeshBuilder.CreateCylinder('sky_tank', { diameter: 2.6, height: 1.9, tessellation: 20 }, scene), body, 0, 1.25, 0);
+      add(MeshBuilder.CreateCylinder('sky_cap', { diameterTop: 0.2, diameterBottom: 2.8, height: 0.8, tessellation: 20 }, scene), acc, 0, 2.6, 0);
+      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const leg = add(MeshBuilder.CreateCylinder('sky_leg', { diameter: 0.14, height: 5.6 }, scene), dark, sx * 1.6, -2.5, sz * 1.6); leg.rotation.x = sz * 0.12; leg.rotation.z = -sx * 0.12; }
+      add(MeshBuilder.CreateBox('sky_walk', { width: 3.6, height: 0.08, depth: 3.6 }, scene), acc, 0, 0.05, 0);
+    }
+    return root;
+  }
+
   // THE RIM SWING (owner: "be able to swing off the rim and off the backboard"): with the SLAM held through the contact the body
   // hangs; the stick swings it under the rim (a pendulum about the iron), and letting go at the swing's reach is a flourish.
   // The BACKBOARD SWING is L1 in the hang beat (after the rise's kick): a pivot off the glass for a little more lift.
@@ -672,6 +708,9 @@ export const DunkMode: ModeDefinition = (() => {
       // the left; their faces are what the run rebounds off / wall-runs along (the pure panes in core/DunkParkour)
       for (const p of sideProps) p.dispose(); sideProps = [];
       panes = cornerPanes(GLASS.halfX, gatherLine());
+      // THE SKY TIER: the court's own thing over the lane (a blimp at Venice, a rocket in Orbit, …), its underside a surface for R1
+      skyRoot?.dispose(); skyTier = skyTierFor(ctx.location); skyRoot = buildSkyTier(ctx.scene, skyTier, gatherLine() - SKY.zAhead); skyTapped = false;
+      console.info(`[DUNK-SKY] ${skyTier.tag} over the lane (underside ${SKY.underY} m)`);
       {
         const scene = ctx.scene; const loc = ctx.location;
         void spawnMeshyProp(scene, 'hoopbus', null, 'dunk_hoopbus').then((bus) => { if (!bus || scene.isDisposed) return; parkOnPane(bus, panes[0], 6.4); sideProps.push(bus); console.info('[DUNK-PARKOUR] hoopbus parked on the right corner'); });
@@ -760,7 +799,7 @@ export const DunkMode: ModeDefinition = (() => {
       style = 'power'; prop = 'none'; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
-      vectorAt = -1e9; vectorWallRun = false; doubleLaunched = false; doubleLaunchLift = 0; boardSwung = false; hangBase = null; swingAng = 0;
+      vectorAt = -1e9; vectorWallRun = false; doubleLaunched = false; doubleLaunchLift = 0; boardSwung = false; hangBase = null; swingAng = 0; skyTapped = false;
         foe = rivalForNight(night);
     stakes = freshStakes();
       resetLob(); resetRunway(); win = 'run';
@@ -909,6 +948,16 @@ export const DunkMode: ModeDefinition = (() => {
       if (phase === 'cinematic' && e.t === 'dpad') flight.recognizer.feed(e);
       // DUNK-BIOMECH: every trick has a cue window — early = ARMED (fires on its beat), late = refused with a banner
       if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') && !qteWindowOpen) airButton(ctx, e);   // X reads in the air
+      // THE SKY TIER (owner, 2026-09-18): R1 in the air is the tap off whatever hangs over the lane — a second lift and the drop into
+      // the slam; honest only inside the window with the hand up to its underside (a full run, a rebound or a backboard kick gets there)
+      if (phase === 'cinematic' && e.t === 'button' && e.pressed && e.btn === 'R1' && !qteWindowOpen) {
+        if (skyTapAllowed(clipTime, skyTapped, player.root.position.y)) {
+          skyTapped = true; doubleLaunchLift += SKY.apexAdd; runwayDifficulty += SKY.difficulty; runwayLabels.push(`OFF THE ${skyTier.tag}`); hype = Math.min(100, hype + SKY.hype); skyKick = 1;
+          SoundKit.play('impact', { pitch: 1.2, volume: 0.5 }); ctx.feel?.impact?.(0.35); ctx.camDirector.pulse(0.6, 0.45);
+          EffectsKit.burst(ctx.scene, new Vector3(player.root.position.x, SKY.underY - 0.1, player.root.position.z), 'sparks');
+          flash(ctx, `${skyTier.call} — DROP SLAM`, 800); console.info(`[DUNK-SKY] tap off the ${skyTier.tag} @${clipTime.toFixed(2)} root y ${player.root.position.y.toFixed(2)}`);
+        } else refuse(ctx, skyTapRefusal(clipTime, skyTapped, player.root.position.y, skyTier.tag));
+      }
       if (phase === 'cinematic' && e.t === 'button' && e.pressed && e.btn === 'L1' && !qteWindowOpen) {   // DUNK PARKOUR: the backboard double-launch in the rise
         if (doubleLaunchAllowed(clipTime, doubleLaunched)) {
           doubleLaunched = true; doubleLaunchLift = DOUBLE_LAUNCH.apexAdd; hype = Math.min(100, hype + 8);
@@ -1406,6 +1455,8 @@ export const DunkMode: ModeDefinition = (() => {
       handIkT = reachWant ? Math.min(1, handIkT + ikStep) : Math.max(0, handIkT - ikStep);
       if (prevIk === 0 && handIkT > 0) { console.info('[HANDS] reach on'); lagLive = false; } else if (prevIk > 0 && handIkT === 0) { console.info('[HANDS] reach off'); lagLive = false; }
 
+      // THE SKY TIER sways, and rocks when it is tapped
+      if (skyRoot) { skyBob += dt; skyKick = Math.max(0, skyKick - dt * 1.4); skyRoot.position.y = SKY.underY + Math.sin(skyBob * 0.9) * 0.08 + skyKick * 0.25; skyRoot.rotation.z = Math.sin(skyBob * 0.6) * 0.03 + Math.sin(skyKick * Math.PI) * 0.12; skyRoot.rotation.y = Math.sin(skyBob * 0.35) * 0.05; }
       // the building breathes with the contest every frame
       crowd.update(dt, Math.min(1, hype / 100), chain, momentum.tier === 'on_fire');
       SoundKit.setAmbientLevel(crowd.level);
@@ -1540,6 +1591,7 @@ export const DunkMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      skyRoot?.dispose(); skyRoot = null;   // THE SKY TIER
       hoopJuice?.dispose(); hoopJuice = null;
       meter3d?.dispose(); meter3d = null;
       dribble?.dispose(); dribble = null;
@@ -2710,7 +2762,7 @@ export const DunkMode: ModeDefinition = (() => {
     // JUDGE TRANSPARENCY (owner's pillars brief, 2026-09-18 §4): the panel's four reads, in words — the APPROACH (the run, the
     // takeoff, the runway beats, the caught toss), the AIR (the tricks, the taps, the hang), the PRECISION (the slam's timing)
     // and the room (HYPE, and whether the panel has seen this one) — so a card is a lesson, not a number
-    const approachBits = [launchSpeed01 >= 0.8 ? 'FULL RUN' : launchSpeed01 >= 0.45 ? 'JOG' : 'WALK-UP', launchTag, ...runwayLabels, lob.caught ? lob.label : '', doubleLaunched ? 'DOUBLE-LAUNCH' : ''].filter(Boolean);
+    const approachBits = [launchSpeed01 >= 0.8 ? 'FULL RUN' : launchSpeed01 >= 0.45 ? 'JOG' : 'WALK-UP', launchTag, ...runwayLabels, lob.caught ? lob.label : '', doubleLaunched ? 'DOUBLE-LAUNCH' : ''].filter(Boolean);   // the sky tap is already a runway label
     const airBits = [...flight.attempt.tricks.map((t) => t.id.toUpperCase()), styleTaps > 0 ? `${styleTaps} STYLE TAP${styleTaps > 1 ? 'S' : ''}` : '', hangBonus > 0 ? 'HANG' : ''].filter(Boolean);
     const judgeWhy = `APPROACH ${approachBits.join(' · ')} │ AIR ${airBits.join(' · ') || 'straight up'} │ PRECISION ${Math.round(qteAccuracy * 100)}% │ HYPE ${Math.round(momentum.score01 * 100)}%${isRepeat ? ' · SEEN IT' : ''}`;
     ctx.setHud({

@@ -33,6 +33,8 @@ const GLASS = process.env.GLASS === '1';
  *  from the launch itself (the rise window is 0.12–0.62 s of flight), which is the reliable knob. */
 const L1_AT_MS = process.env.L1_AT_MS ? Number(process.env.L1_AT_MS) : 0;
 const L1_AFTER_LAUNCH_MS = process.env.L1_AFTER_LAUNCH_MS ? Number(process.env.L1_AFTER_LAUNCH_MS) : 0;
+/** R1_AFTER_LAUNCH_MS=<ms> — THE SKY TIER: press R1 in the air to tap off the blimp / rocket / … over the lane (needs height: GLASS=1 and/or L1). */
+const R1_AFTER_LAUNCH_MS = process.env.R1_AFTER_LAUNCH_MS ? Number(process.env.R1_AFTER_LAUNCH_MS) : 0;
 /** SLAM_HOLD_MS=<ms> — hold the slam through the contact (a hang); SWING=1 pushes the stick during the hold (the RIM SWING). */
 const SLAM_HOLD_MS = Number(process.env.SLAM_HOLD_MS ?? 60);
 const SWING = process.env.SWING === '1';
@@ -93,7 +95,7 @@ await ctx.addInitScript({ content: "try { window.sessionStorage.setItem('NEXUS_A
 const page = await ctx.newPage();
 await page.addInitScript({ content: 'window.__name = window.__name || function (f) { return f; };' });
 const log: string[] = [];
-page.on('console', (m) => { const t = m.text(); if (/\[DUNK|\[LOB|\[RIM|\[JUDGE|\[HANDS\] (rim hang|hang release|contact:)/.test(t)) log.push(`${Date.now()} ${t.slice(0, 180)}`); });
+page.on('console', (m) => { const t = m.text(); if (/\[DUNK-SKY\]|\[DUNK|\[LOB|\[RIM|\[JUDGE|\[HANDS\] (rim hang|hang release|contact:)/.test(t)) log.push(`${Date.now()} ${t.slice(0, 180)}`); });
 // the dev overlay's '1 error' badge, named: every console error and page error the run produced (printed at the end)
 const errors: string[] = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 240)); });
@@ -283,6 +285,7 @@ for (let n = 0; n < ATTEMPTS; n++) {
   if (!launched) { await trigger(0); await page.waitForTimeout(400); }   // release: jump from here
   const airT0 = Date.now();
   if (L1_AFTER_LAUNCH_MS) { void (async () => { await page.waitForTimeout(L1_AFTER_LAUNCH_MS); await press(4, 60); })(); }   // DUNK PARKOUR: the double-launch, timed from the launch
+  if (R1_AFTER_LAUNCH_MS) { void (async () => { await page.waitForTimeout(R1_AFTER_LAUNCH_MS); await press(5, 60); })(); }   // THE SKY TIER: the tap, timed from the launch
   // the burst continues into the air (offsets are still from RUN)
   const burstRest = SHOTS_MS.map((ms, si) => ({ ms, si })).filter(({ si }) => !shotsDone.has(si));
   const burstTimer = burstRest.length ? (async () => { for (const { ms, si } of burstRest) { const wait = runT0 + ms - Date.now(); if (wait > 0) await page.waitForTimeout(wait); shotsDone.add(si); await page.screenshot({ path: `${OUT}/${TAG}-a${a.n}-${ms}ms.png` }).catch(() => {}); } })() : null;
