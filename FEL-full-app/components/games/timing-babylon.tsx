@@ -133,6 +133,15 @@ export function makeTimingHost(opts: TimingHostOpts) {
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-4 py-3 font-mono text-xs">
           {/* M42 E20: render the mode's own round label as-is (RD/SHOT/KICK/PITCH) — no dup prefix */}
           <span className="fel-panel px-3 py-1 text-[var(--fel-cyan)]">{hnode(hud.round, '—')}</span>
+          {/* BREAKAWAY (owner brief 2026-09-18): the shot clock and the FLOW gauge (wall runs, rebounds, slides, a fast dribble) that sets the shot's power */}
+          {typeof hud.clock === 'number' && Number(hud.clock) > 0 && <span className={`fel-panel px-3 py-1 font-bold ${Number(hud.clock) <= 3 ? 'text-[#ff2d78]' : 'text-white'}`}>⏱ {hud.clock}s</span>}
+          {typeof hud.flow === 'number' && Number(hud.flow) >= 0 && (
+            <span className="fel-panel flex items-center gap-2 px-3 py-1">
+              <span className="text-[10px] tracking-wider text-white/60">FLOW</span>
+              <span className="h-2 w-20 overflow-hidden rounded-full bg-black/50"><span className={`block h-full rounded-full transition-[width] duration-150 ${Number(hud.flow) >= 70 ? 'bg-[#fbbf24]' : 'bg-[var(--fel-cyan)]/80'}`} style={{ width: `${Math.max(0, Math.min(100, Number(hud.flow)))}%` }} /></span>
+              {typeof hud.kinetic === 'string' && hud.kinetic ? <span className="text-[10px] font-bold text-[#fbbf24]">{hud.kinetic}</span> : null}
+            </span>
+          )}
           {/* M42 E20: numeric score gets " PTS"; string scores (e.g. "2 GOALS") render as-is */}
           <span className="rounded-md bg-black/50 px-3 py-1 text-white">{typeof hud.score === 'number' ? `${hud.score} PTS` : hnode(hud.score, '0 PTS')}</span>
           {/* combo — the rhythm family's core readout (The Cypher publishes it
@@ -268,6 +277,9 @@ export function makeTimingHost(opts: TimingHostOpts) {
               {Number(hud.longest) > 0 && <span className="ml-2 rounded bg-black/40 px-2 py-0.5 text-[11px] text-[var(--fel-gold)]">LONGEST {hnode(hud.longest, 0)} FT</span>}
               <span className="ml-2 text-[11px] tracking-wider text-[#facc15]">RIVAL <span className="fel-stat text-lg">{hnode(hud.rivalHomers, 0)}</span></span>
               {typeof hud.pitch === 'string' && hud.pitch && <span className="ml-2 rounded bg-black/40 px-2 py-0.5 text-[11px] text-white/80">{hud.pitch}</span>}
+              {/* PARKOUR DERBY (owner brief 2026-09-18): the wall targets taken, and a multiplier waiting on the next hit */}
+              {typeof hud.targets === 'string' && hud.targets && <span className="ml-2 rounded bg-[#ff2d78]/20 px-2 py-0.5 text-[11px] text-[#ff9ac2]">TARGETS {hud.targets}</span>}
+              {typeof hud.mult === 'string' && hud.mult && <span className="ml-2 rounded bg-[var(--fel-gold)]/25 px-2 py-0.5 text-[11px] font-bold text-[var(--fel-gold)]">{hud.mult}</span>}
             </div>
             {typeof hud.distance === 'string' && hud.distance && (
               <span className="fel-heading fel-panel px-4 py-1 text-2xl font-black text-[var(--fel-gold)]">{hud.distance}</span>
