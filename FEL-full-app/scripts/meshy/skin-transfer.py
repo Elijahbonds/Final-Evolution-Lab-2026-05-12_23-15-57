@@ -193,8 +193,16 @@ def accessor(arr, comp, kind, target=None, minmax=False):
 a_pos = accessor(t_pos.astype(np.float32), 5126, 'VEC3', 34962, minmax=True)
 a_nrm = accessor(t_nrm, 5126, 'VEC3', 34962) if t_nrm is not None else None
 a_uv = accessor(t_uv, 5126, 'VEC2', 34962) if t_uv is not None else None
+# THE SHIPPED-AVATAR SPEC (scripts/avatar-pipeline-tests.ts) takes skins in one of two forms. Without
+# KHR_mesh_quantization it demands float32 joints — which the glTF spec itself forbids, and which exists here only
+# because byte skins once failed to render. The quantized form is the one the hero already ships in and Babylon reads
+# natively: integer joints and NORMALISED integer weights. That is what this writes.
 a_j = accessor(out_j, 5123, 'VEC4', 34962)
-a_w = accessor(out_w, 5126, 'VEC4', 34962)
+w_q = np.clip(np.rint(out_w * 65535.0), 0, 65535).astype(np.uint16)
+row = w_q.sum(axis=1, dtype=np.int64)                      # the spec also checks each vertex sums to 1
+w_q[np.arange(len(w_q)), w_q.argmax(axis=1)] += (65535 - row).astype(np.uint16)
+a_w = accessor(w_q, 5123, 'VEC4', 34962)
+accs[a_w]['normalized'] = True
 a_i = accessor(t_idx.astype(np.uint32).reshape(-1, 1), 5125, 'SCALAR', 34963) if t_idx is not None else None
 ibm = read_accessor(dg, dbin, skin['inverseBindMatrices']).astype(np.float32)
 a_ibm = accessor(ibm, 5126, 'MAT4')
@@ -221,6 +229,8 @@ if a_i is not None:
 
 out = {
     'asset': {'version': '2.0', 'generator': 'FEL skin-transfer'},
+    'extensionsUsed': ['KHR_mesh_quantization'],
+    'extensionsRequired': ['KHR_mesh_quantization'],
     'scene': 0,
     'scenes': [{'nodes': scene_nodes}],
     'nodes': nodes,

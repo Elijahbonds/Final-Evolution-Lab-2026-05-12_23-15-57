@@ -92,7 +92,9 @@ ok('pursue → wind-up → strike (lands once on the contact beat) → recover �
 ok('the telegraph never drops below the floor; an interrupt cancels the attack; the attacker cap grows and stays sane', () => {
   assert.ok(windupSecFor(1) > windupSecFor(9)); assert.equal(windupSecFor(99), ENEMY_ATTACK.windupMinSec);
   const b = new EnemyBrain(3); b.engage(); b.step(0.1); b.interrupt(); assert.equal(b.phase, 'pursue'); assert.equal(b.engage(), 'windup');
-  assert.equal(maxAttackers(1), 2); assert.ok(maxAttackers(7) > maxAttackers(1)); assert.ok(maxAttackers(50) <= 5);
+  // The ceiling went 5 → 7 when the owner asked for a harder horde (2026-09-19); the point of the check is that it
+  // is CAPPED at all, because being swarmed with no answer is not difficulty. NeoCombatCore.test.ts owns the curve.
+  assert.equal(maxAttackers(1), 2); assert.ok(maxAttackers(7) > maxAttackers(1)); assert.ok(maxAttackers(50) <= 7);
 });
 
 ok('the kick variant (wave 3+): longer clip, later contact beat, harder hit; the jab is the default', () => {

@@ -15,14 +15,18 @@ import { VENUE_PROP_SETS, surroundSize, surroundCovers, surroundColor, SURROUND_
 // The board play areas are in the set's AUTHORED frame. Snow venues now bring their own corridor width
 // (20 / 24 / 34 m) and mountVenueProps shifts the set outward by the difference (lateralShift), so the
 // authored 17 m is the width these positions have to clear — not the widest venue's.
-const PLAY: Record<string, { hx: number; z: [number, number] }> = {
+const PLAY: Record<string, { hx: number; z: [number, number]; fan?: boolean }> = {
   'venice-court': { hx: 8, z: [-14, 14] },       // 16×28 court
   'venice-court-meshy': { hx: 8, z: [-14, 14] }, // the same court with the owner's Meshy hoopbus and sedan behind the hoop
   'canopy-court': { hx: 8, z: [-14, 14] },       // court locations (docs/SPEC-COURT-LOCATIONS.md): the same court
   'night-rooftop': { hx: 8, z: [-14, 14] },
   'dojo':         { hx: 7, z: [-7, 7] },         // 14×14 mat
   'links':        { hx: 12, z: [-42, 42] },      // fairway strip inside the 60×90 green
-  'ballpark':     { hx: 28, z: [-40, 40] },      // diamond + outfield
+  // A DIAMOND IS A FAN, NOT A BOX. The rectangle counted everything behind home plate as field of play, which is
+  // exactly where a ballpark puts its backstop, its dugouts and its bleachers (owner, 2026-09-19: "add more detail to
+  // the baseball field"). The plate is the origin and the field opens toward +z between the foul lines, so `fan`
+  // narrows the check to the real playing surface: inside the foul lines and inside the outfield wall.
+  'ballpark':     { hx: 28, z: [-40, 40], fan: true },   // diamond + outfield
   'stadium':      { hx: 22, z: [-30, 12] },      // penalty box side of the pitch, goal line z 10.4
   'gridiron':     { hx: 22, z: [-2, 42] },       // x ±20 over z 0..40
   'skatepark':    { hx: 34, z: [-34, 34] },
@@ -52,7 +56,10 @@ describe('venuePropSets', () => {
       const area = PLAY[venue]; expect(area, `play area for ${venue}`).toBeTruthy();
       for (const p of set) {
         const [x, , z] = p.at;
-        if (Math.abs(x) < area.hx && z > area.z[0] && z < area.z[1]) inside.push(`${venue}: ${p.model} at ${x},${z}`);
+        const inBox = Math.abs(x) < area.hx && z > area.z[0] && z < area.z[1];
+        // a fan venue is only "in play" between its foul lines, i.e. forward of the plate and inside |x| <= z
+        const inPlay = area.fan ? inBox && z > 0 && Math.abs(x) <= z : inBox;
+        if (inPlay) inside.push(`${venue}: ${p.model} at ${x},${z}`);
       }
     }
     expect(inside).toEqual([]);
