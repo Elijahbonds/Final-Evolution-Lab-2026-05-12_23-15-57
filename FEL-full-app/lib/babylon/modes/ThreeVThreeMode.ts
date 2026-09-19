@@ -139,7 +139,8 @@ import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot 
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the 2K bar beside the shooter's head
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
-import { PARRY, parryVaultRead, vaultAt, DRIFT, driftRead, ankleBreak, DRIVE_BY, driveByRead, SLIPSTREAM, slipstreamRead, SLING, slingRead, SYNERGY, SynergyGauge, shockVictims } from '../core/HoopsKinetic';   // HOOPS KINETIC 3v3 (owner, 2026-09-18): slipstream / sling / synergy + the 1v1's duel reads
+import { PARRY, parryVaultRead, vaultAt, DRIFT, driftRead, ankleBreak, DRIVE_BY, driveByRead, SLIPSTREAM, slipstreamRead, SLING, slingRead, SYNERGY, SynergyGauge, shockVictims } from '../core/HoopsKinetic';
+import { CHOKE, CHOKE_RAILS, readChoke, resolveRails, inChokeLane, railRunRead } from '../core/Chokepoint';   // CHOKEPOINT COURT (owner brief, 2026-09-18 — the deferred layout)   // HOOPS KINETIC 3v3 (owner, 2026-09-18): slipstream / sling / synergy + the 1v1's duel reads
 import { driveIntent, driveLateral, bodiesMet } from '../core/DriveLine';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -218,6 +219,22 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let ltHeld = false, driftCool = 0, slipping = false, slingPass = false, meBurstLeft = 0, synHud = -1, odHud = -1, slipCalloutAt = -1e9;
   let vault: { from: Vector3; dir: Vector3; t: number } | null = null;
   const mateBurst = [0, 0];
+  // CHOKEPOINT COURT (?choke=1): rails flank the lane and wings close the corners; bodies resolve out of them after the
+  // court's own clamp; a run along a rail is a RAIL RUN (faster); drafting inside the lane fills the synergy twice as fast
+  let choke = false, chokeMeshes: AbstractMesh[] = [], railNow: string | null = null, railCallAt = -1e9, railRuns = 0;
+  const BODY_R = 0.42;
+  const chokeClamp = (p: Vector3): void => { if (choke) resolveRails(p, BODY_R, CHOKE_RAILS); };
+  const me2 = () => ({ x: me.char.root.position.x, z: me.char.root.position.z });
+  function buildChoke(ctx: ModeContext): void {
+    for (const m of chokeMeshes) m.dispose(); chokeMeshes = [];
+    const mat = VenueKit.paint(ctx.scene, 'choke_rail_mat', '#d9d2c2', 0.1, 0.5), cap = VenueKit.paint(ctx.scene, 'choke_cap_mat', '#22d3ee', 0.35, 0.5);
+    for (const r of CHOKE_RAILS) {
+      const box = MeshBuilder.CreateBox(`choke_${r.id}`, { width: r.halfX * 2, height: r.h, depth: r.halfZ * 2 }, ctx.scene);
+      box.position.set(r.x, r.h / 2, r.z); box.material = mat; box.isPickable = false; chokeMeshes.push(box);
+      const top = MeshBuilder.CreateBox(`choke_${r.id}_cap`, { width: r.halfX * 2 + 0.06, height: 0.05, depth: r.halfZ * 2 + 0.06 }, ctx.scene);
+      top.position.set(r.x, r.h + 0.025, r.z); top.material = cap; top.isPickable = false; chokeMeshes.push(top);
+    }
+  }
   // the rival's drive is a CLOCKED path (his `vel` is zeroed every frame — see the foe loop), so his closing speed on me is
   // read off his position, the way the charge reads it
   const driverPrev = new Vector3(), driverVelEst = new Vector3(); let driverPrevFor: Body | null = null;
@@ -512,6 +529,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       mbus = ctx.momentum;
       ctx0 = ctx;
       threeVenue = mountVenue(ctx, 'basketball_3v3', { keepGameplayCamera: true, location: ctx.location });
+      choke = typeof window !== 'undefined' && readChoke(window.location.search);   // CHOKEPOINT COURT
+      if (choke) { buildChoke(ctx); ctx.setHud({ court: 'CHOKEPOINT' }); console.info('[3V3-CHOKE] the chokepoint court: 4 rails'); }
       if (!threeVenue) { VenueKit.buildCourt(ctx.scene, 'venice'); applyOceanCourt(ctx.scene, 'venice'); }
       const spawnBody = async (
         pos: Vector3, tint: string | undefined, ai: boolean,
@@ -619,7 +638,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       threeVenue?.hidePlaceholders();  // M74: drop stand-ins now that real chars are in
       assertSpawned(ctx.scene, { hero: me.char.root, minWorldMeshes: 6, modeId: 'threevthree' });
       resetPossession(true);
-      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; const seam = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, defend: () => { if (!ended) { resetPossession(false); void opponentPossession(ctx); } }, /* resetPossession(false) only RESETS: its toMe branch is the only thing that hands the ball out, so on its own it leaves the rock wherever it was and no drive ever starts. opponentPossession() is what a defensive possession actually IS here — the 1v1 seam's defend() calls startDefense() for the same reason. */ attackPhase: () => (driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check'), driveK: () => driveK, driveSpeed: () => (driver ? driver.vel.length() : 0), takingCharge: () => takingCharge, flightK: () => (dunkFlight ? dunkFlight.k : foeDunkFlight ? foeDunkFlight.k : -1)   /* MY flight's clock first (the showtime press is timed off it), then the rival's */, luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: !!foeHandUp }), post: () => { const n = nearestLiveFoe(); return { posting, spinning: !!spin, brace: !!me.slot.intent.brace, can: canPostUp(me.char.root.position, RIM_FLOOR, n ? n.char.root.position : null), carrying: carrierId === 'me', shooting, finish: !!finish, gather: !!gather, foeStun: n ? n.stunSec : -1, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: me.tree.held ?? '' }; }, driverRoot: () => driver?.char.root ?? null, block: () => (ctx0 ? contestJump(ctx0) : false), /* the block with no bridge latency: the lab's jump was landing at driveK 1.00 behind its own steer queue */ ended: () => ended, kinetic: () => { const d = driver; const dv = d ? d.char.root.position.subtract(me.char.root.position) : null; const dist = dv ? Math.hypot(dv.x, dv.z) : -1; return { ...kin, synergy: synergy.value, overdrive: synergy.overdriveLeft, ltHeld, slipping, meSpeed: Math.hypot(me.drib.vel.x, me.drib.vel.z), dist, closing: d && dv && dist > 1e-3 ? -(driverVelEst.x * dv.x + driverVelEst.z * dv.z) / dist : 0, driveK, turbo: turbo.t01, carrier: carrierId, mateBurst: [...mateBurst], intent: { moveX: me.slot.intent.moveX, moveY: me.slot.intent.moveY, sprint: me.slot.intent.sprint }, gates: { paused: me.drib.paused, stun: meStunSec, floored: meFloored, land: me.landSec, celebrate: me.celebrateSec, shooting, dunking, vault: !!vault } }; }, synergyAdd: (n: number) => { if (synergy.add(n) && ctx0) igniteOverdrive(ctx0); }, boxing: () => boxingOut,
+      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; const seam = { me: () => me.posture?.layer.get() ?? null, foe: () => foes[0]?.posture?.layer.get() ?? null, bio: () => ({ me: { ...me.bio }, foe: { ...(foes[0]?.bio ?? {}) } }), carrier: () => carrierId, offense: () => { if (!ended) resetPossession(true); }, defend: () => { if (!ended) { resetPossession(false); void opponentPossession(ctx); } }, /* resetPossession(false) only RESETS: its toMe branch is the only thing that hands the ball out, so on its own it leaves the rock wherever it was and no drive ever starts. opponentPossession() is what a defensive possession actually IS here — the 1v1 seam's defend() calls startDefense() for the same reason. */ attackPhase: () => (driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check'), driveK: () => driveK, driveSpeed: () => (driver ? driver.vel.length() : 0), takingCharge: () => takingCharge, flightK: () => (dunkFlight ? dunkFlight.k : foeDunkFlight ? foeDunkFlight.k : -1)   /* MY flight's clock first (the showtime press is timed off it), then the rival's */, luck: (v: number | null) => { defenseLuck = v; }, bumpAge: () => bumpAge, handUp: () => ({ me: meHandUp, foe: !!foeHandUp }), post: () => { const n = nearestLiveFoe(); return { posting, spinning: !!spin, brace: !!me.slot.intent.brace, can: canPostUp(me.char.root.position, RIM_FLOOR, n ? n.char.root.position : null), carrying: carrierId === 'me', shooting, finish: !!finish, gather: !!gather, foeStun: n ? n.stunSec : -1, armed: spinArmed, pump: pumpWindow, glass: !!banked, held: me.tree.held ?? '' }; }, driverRoot: () => driver?.char.root ?? null, block: () => (ctx0 ? contestJump(ctx0) : false), /* the block with no bridge latency: the lab's jump was landing at driveK 1.00 behind its own steer queue */ ended: () => ended, kinetic: () => { const d = driver; const dv = d ? d.char.root.position.subtract(me.char.root.position) : null; const dist = dv ? Math.hypot(dv.x, dv.z) : -1; return { ...kin, synergy: synergy.value, overdrive: synergy.overdriveLeft, ltHeld, slipping, meSpeed: Math.hypot(me.drib.vel.x, me.drib.vel.z), dist, closing: d && dv && dist > 1e-3 ? -(driverVelEst.x * dv.x + driverVelEst.z * dv.z) / dist : 0, driveK, turbo: turbo.t01, carrier: carrierId, mateBurst: [...mateBurst], intent: { moveX: me.slot.intent.moveX, moveY: me.slot.intent.moveY, sprint: me.slot.intent.sprint }, choke, railRuns, railNow, inLane: inChokeLane(me2()), gates: { paused: me.drib.paused, stun: meStunSec, floored: meFloored, land: me.landSec, celebrate: me.celebrateSec, shooting, dunking, vault: !!vault } }; }, synergyAdd: (n: number) => { if (synergy.add(n) && ctx0) igniteOverdrive(ctx0); }, boxing: () => boxingOut,
           // O3: every body's job, its objective and how squarely it faces it (the probes' awareness read)
           jobs: () => everyBody().map((b, i) => { const mb = mateBrain(b), db = foeBrain(b); const obj = b === me ? (carrierId === 'me' ? RIM : (driver?.char.root.position ?? ballWorld())) : objectiveFor(b); const p = bodyPos(b); const yaw = b.char.root.rotation.y; const v = b === me ? me.drib.vel : b.vel; return { id: b === me ? 'me' : isFoe(b) ? `foe${foes.indexOf(b)}` : `mate${mates.indexOf(b)}`, i, job: jobOf(b), phase: mb?.screen.phase ?? (db ? (db.fightingOver === null ? '' : db.fightingOver ? 'over' : 'under') : ''), x: p.x, z: p.z, y: p.y, speed: Math.hypot(v.x, v.z), facing: facingCos(yaw, p, obj), objX: obj.x, objZ: obj.z, boxing: !!(mb?.boxing || db?.boxing), root: b.char.root }; }), get foeRoot() { return driver ? driver.char.root : (foes[0]?.char.root ?? null); }, /* the man to guard is whoever is DRIVING */ nearestFoeRoot: () => foes.reduce<Body | null>((b, f) => !b || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(b.char.root.position, me.char.root.position) ? f : b, null)?.char.root ?? null }; if (dev) dev.hoopsPosture = seam; (ctx.scene.metadata ??= {}).threevthree = seam; }   // BIOMECH-HOOPS-WAVE1 probes
       ctx.setHud({
@@ -985,8 +1004,13 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const mc = carrierId === 'mate0' ? mates[0] : carrierId === 'mate1' ? mates[1] : null;
         const slipNow = !!mc && !passFlight.active && slipstreamRead(me.char.root.position, mc.char.root.position, mc.vel);
         if (slipNow !== slipping) { slipping = slipNow; if (slipNow && performance.now() - slipCalloutAt > 1500) { slipCalloutAt = performance.now(); ctx.juice.callout('SLIPSTREAM', '#22d3ee', 380); console.info('[3V3-KIN] slipstream on'); } }   // the mate brain stutters (runs, stops, runs): one callout per 1.5 s, not one per restart (11 in 6 s, measured)
-        if (slipNow) { kin.slipSec += dt; if (synergy.add(SLIPSTREAM.gaugePerSec * dt)) igniteOverdrive(ctx); }
-        me.drib.speedScale = (slipNow ? SLIPSTREAM.speedMult : 1) * (meBurstLeft > 0 ? SLING.burstMult : 1) * synergy.meMult;
+        if (slipNow) { kin.slipSec += dt; if (synergy.add(SLIPSTREAM.gaugePerSec * dt * (choke && inChokeLane(me2()) ? CHOKE.draftGain : 1))) igniteOverdrive(ctx); }   // CHOKEPOINT: the lane doubles the draft
+        // CHOKEPOINT: a run along a rail at speed is a RAIL RUN
+        const rail = choke && !passFlight.active ? railRunRead(me2(), { x: me.drib.vel.x, z: me.drib.vel.z }, CHOKE_RAILS) : null;
+        const railId = rail ? rail.id : null;
+        if (railId && railId !== railNow) { railRuns++; if (performance.now() - railCallAt > CHOKE.railCallSec * 1000) { railCallAt = performance.now(); ctx.juice.callout('RAIL RUN', '#22d3ee', 380); } console.info(`[3V3-CHOKE] rail run along ${railId}`); }
+        railNow = railId;
+        me.drib.speedScale = (slipNow ? SLIPSTREAM.speedMult : 1) * (meBurstLeft > 0 ? SLING.burstMult : 1) * synergy.meMult * (rail ? CHOKE.railMult : 1);
       }
       // HOOPS KINETIC: the MOMENTUM DRIFT (LT + the turbo + a hard cut) keeps the speed through the turn; a defender in front of
       // the old line inside reach is left on the wrong foot. `wish` is already the world wish here; the cut takes world z.
@@ -1162,6 +1186,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (!shooting && !dunking && !spin) {
         if (!finish && !posting) me.char.root.position.addInPlace(me.drib.vel.scale(dt));
         if (!threeVenue?.constrain(me.char.root.position)) clampToHalfCourt(me.char.root.position, 8, 15);   // phase 3: navmesh first
+        chokeClamp(me.char.root.position);
         // OUT OF BOUNDS OFF THE CARRIER — the same rule 1v1 was missing. The clamp above holds every body inside
         // the lines, so carrying into the sideline was an invisible wall you slid along for free: the only way to
         // lose it by leaving the floor was a LOOSE ball. The clamp stays (a body half off the court looks broken);
@@ -1259,6 +1284,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         mateVel[i]?.copyFrom(vel); body.vel.copyFrom(vel);
         body.char.root.position.addInPlace(vel.scale(dt));
         if (!threeVenue?.constrain(body.char.root.position)) clampToHalfCourt(body.char.root.position, 8, 15);
+        chokeClamp(body.char.root.position);
         const mateId = i === 0 ? 'mate0' : 'mate1';
         // BIOMECH-HOOPS-WAVE1 G1/G2: a cutter faces his travel (slewed); on defense his chest stays on the driver; the tree owns the rig
         // HOOPS-MOVE-KIT-A O1/O3: a SCREENER faces the man he screens and PLANTS (the screen clip held); a boxer faces his man
@@ -1312,6 +1338,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           if (!foeDunkFlight) f.tree.update({ speedMps: Math.hypot(f.vel.x, f.vel.z), speed01: f.speed01, crossover: false, nearestDefender: Infinity, hasBall: !!ball.parent, shooting: false, dunking: false, driving: driveK < 1, defending: false, bracing: false, staggered: false });   // the dunk's launch / land are mode-owned beats
           bioTick(f, dt, 'offense', !!ball.parent, Infinity, false);
           if (foeDunkFlight) f.bio.flight = foeDunkFlight;
+          chokeClamp(f.char.root.position);   // CHOKEPOINT: the scripted drive skips the clamp line below — 2 of 546 samples inside a rail, measured
           continue;
         }
         const intent = f.slot.intent;
@@ -1325,6 +1352,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         }
         f.char.root.position.addInPlace(vel.scale(dt));
         if (!threeVenue?.constrain(f.char.root.position)) clampToHalfCourt(f.char.root.position, 8, 15);
+        chokeClamp(f.char.root.position);
         // BIOMECH-HOOPS-WAVE1 G1: a defender's chest stays ON the carrier inside range (he faced his travel — a sideways-shuffling
         // run through every slide); beyond it he runs to his spot facing the travel; the tree owns the rig (slides / stance)
         // O2/O3: a boxer faces his MAN (the seal), the on-ball man the handler, a helper / denier the ball (the job's objective)

@@ -111,6 +111,8 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
         <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-cyan)]">
           AST {hnode(hud.ast, 0)}
         </span>
+        {/* CHOKEPOINT COURT (?choke=1): the rails are on */}
+        {typeof hud.court === 'string' && hud.court && <span className="fel-panel px-3 py-1 font-mono text-[10px] tracking-wider text-[#fbbf24]">{hud.court}</span>}
         {/* SYNERGY (owner brief 2026-09-18): the team's shared gauge — assists, steals, drifts, blocks, dunks and the slipstream fill it; full, it OVERDRIVES for 15 s */}
         {typeof hud.synergy === 'number' && (() => {
           const syn = Math.max(0, Math.min(100, Number(hud.synergy))); const od = Number(hud.overdrive ?? 0);
