@@ -107,6 +107,90 @@ t_uv = read_accessor(tg, tbin, tp['attributes']['TEXCOORD_0']).astype(np.float32
 t_idx = read_accessor(tg, tbin, tp['indices']).astype(np.uint32).reshape(-1) if 'indices' in tp else None
 print(f'TARGET {os.path.basename(src)}: {len(t_pos)} verts, {0 if t_idx is None else len(t_idx)} indices')
 
+# ── ONE BALL ON THE COURT ─────────────────────────────────────────────────────
+# Owner, 2026-09-19: "make sure only one character has the ball". Meshy sculpts its athletes holding one — ember's
+# floats beside her hip mid-dribble, titan palms his — and the export welds it into the SAME single mesh as the body,
+# so every copy of that athlete walked on court with a second ball the game knew nothing about. The game owns exactly
+# one ball (anim/ballRig), so the sculpted one comes off here, before the skin transfer.
+#
+# IT IS FOUND BY ITS NORMALS, NOT BY ITS EDGES. A first pass looked for a loose island and was wrong twice over: it
+# missed titan's, whose surface is welded to his fingers, and it matched a crumpled shell inside his shirt, which is
+# nothing and is invisible. Every vertex of a sphere, wherever its edges run, points at one centre: step back along
+# the normal by the radius and a ball's thousands of vertices land on the same spot, while a head, a shoulder or a
+# balled-up shirt scatter. So: vote for a centre, demand the winner be a true shell (every vertex at one radius, and
+# covering the whole sphere, not a cap), then delete the vertices on it.
+if t_idx is not None and t_nrm is not None:
+    _span = t_pos[:, 1].max() - t_pos[:, 1].min()
+    _unit = _span / (height if height > 0 else 1.8)          # source units per metre, so the sizes below are real
+    _n = t_nrm[:, :3].astype(np.float64)
+    _n /= np.maximum(1e-9, np.linalg.norm(_n, axis=1))[:, None]
+    _best = None                                             # (tightness, shell mask, centre, radius)
+    for _rm in (0.11, 0.12, 0.13, 0.14, 0.15, 0.16):         # a basketball is 0.12 m in radius; sculpts run large
+        _R = _rm * _unit
+        for _sgn in (-1.0, 1.0):                             # whichever way this export points its normals
+            for _cm in (0.02, 0.03):
+                _c = t_pos + _sgn * _n * _R
+                _cell = _cm * _unit
+                _uk, _inv2, _cnt = np.unique(np.floor(_c / _cell).astype(np.int64), axis=0,
+                                             return_inverse=True, return_counts=True)
+                _w = int(np.argmax(_cnt))
+                if _cnt[_w] < 150: continue
+                _ctr = _c[_inv2 == _w].mean(axis=0); _rad = _R
+                for _ in range(2):                           # settle the centre and radius on what they caught
+                    _d = np.linalg.norm(t_pos - _ctr, axis=1)
+                    _on = np.abs(_d - _rad) < 0.08 * _rad
+                    if _on.sum() < 200: break
+                    _P = t_pos[_on]
+                    _A = np.c_[_P, np.ones(len(_P))]
+                    _sol = np.linalg.lstsq(_A, (_P ** 2).sum(axis=1), rcond=None)[0]
+                    _ctr = _sol[:3] / 2.0
+                    _rad = float(np.sqrt(max(1e-9, _sol[3] + _ctr.dot(_ctr))))
+                _d = np.linalg.norm(t_pos - _ctr, axis=1)
+                _on = np.abs(_d - _rad) < 0.08 * _rad
+                if _on.sum() < 600: continue
+                if not (0.10 * _unit < _rad < 0.17 * _unit): continue
+                if _ctr[1] > t_pos[:, 1].min() + 0.82 * _span: continue   # up there it is a head, not a ball
+                _rr = _d[_on]
+                _tight = float(_rr.std() / _rr.mean())
+                if _tight > 0.035: continue                  # ONE radius — a shoulder or a bun is looser than this
+                _dir = (t_pos[_on] - _ctr) / np.maximum(1e-9, _rr)[:, None]
+                if float(_dir.mean(axis=0).dot(_dir.mean(axis=0))) > 0.12: continue   # all the way round, not a cap
+                if _best is None or _tight < _best[0]: _best = (_tight, _on, _ctr, _rad)
+    if _best is not None:
+        _tight, _on, _ctr, _rad = _best
+        print(f'BALL OFF: {int(_on.sum())} verts on a {_rad / _unit * 2:.2f} m ball at '
+              f'{np.round(_ctr / _unit, 3)} m (radius holds to {_tight * 100:.1f}%)')
+        # AND THE CRUMBS. The shell test takes the sphere; a sculpted ball also has flattened bits — the squashed
+        # contact patch, an inner lining — that sit off the radius and would be left hanging in the air where the
+        # ball was (ember kept a 128-vertex disc). Anything small that lies wholly inside the ball's own volume is
+        # part of it, so it goes too. The body is far too big to be caught by this.
+        _kill = _on.copy()
+        _, _iv = np.unique(np.round(t_pos, 5), axis=0, return_inverse=True)
+        _par = np.arange(_iv.max() + 1)
+        def _find(x):
+            while _par[x] != x:
+                _par[x] = _par[_par[x]]; x = _par[x]
+            return x
+        for _a, _b, _c2 in _iv[t_idx].reshape(-1, 3):
+            _ra, _rb, _rc = _find(_a), _find(_b), _find(_c2)
+            if _ra != _rb: _par[_rb] = _ra
+            if _ra != _rc: _par[_rc] = _ra
+        _isl = np.array([_find(i) for i in range(len(_par))])[_iv]
+        _near = np.linalg.norm(t_pos - _ctr, axis=1) < 1.35 * _rad
+        for _u in np.unique(_isl[_on]):
+            _m = _isl == _u
+            if _m.sum() < 4000 and _near[_m].all(): _kill |= _m
+        if _kill.sum() > _on.sum():
+            print(f'  + {int(_kill.sum() - _on.sum())} crumbs inside the ball')
+        _on = _kill
+        _keep = ~_on
+        _remap = np.full(len(t_pos), -1, dtype=np.int64); _remap[_keep] = np.arange(int(_keep.sum()))
+        _tri = t_idx.reshape(-1, 3); _tri = _tri[_keep[_tri].all(axis=1)]
+        t_idx = _remap[_tri].reshape(-1).astype(np.uint32)
+        t_pos = t_pos[_keep]; t_nrm = t_nrm[_keep]
+        if t_uv is not None: t_uv = t_uv[_keep]
+        print(f'TARGET now {len(t_pos)} verts, {len(t_idx)} indices')
+
 # ── stand the target where the donor stands ───────────────────────────────────
 d_lo, d_hi = d_pos.min(axis=0), d_pos.max(axis=0)
 t_lo, t_hi = t_pos.min(axis=0), t_pos.max(axis=0)
