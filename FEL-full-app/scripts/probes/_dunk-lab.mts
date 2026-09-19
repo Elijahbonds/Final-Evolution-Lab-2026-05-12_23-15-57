@@ -165,7 +165,7 @@ await page.evaluate(`(() => {
       const q = window.__FEL_QA__; const s = q && q.scene && q.scene(); if (!s) return;
       // THE contest ball: the sphere carrying the palm-mirror metadata (a venue rack has meshes named 'ball' too — the first one
       // measured 'invisible' on every sample). It is an invisible physics sphere; the Meshy leather rides it as a child.
-      const b = s.meshes.find((m) => m.name === 'ball' && m.metadata && m.metadata.felPalmMirrorLeft); if (!b) { window.__BALL.push({ t: Date.now(), missing: true }); return; }
+      const b = s.meshes.find((m) => m.name === 'ball' && m.metadata && m.metadata.felPalmMirrorLeft); if (!b) { const cands = ['meshes=' + s.meshes.length, 'scenes=' + (window.BABYLON && window.BABYLON.Engine && window.BABYLON.Engine.LastCreatedEngine ? window.BABYLON.Engine.LastCreatedEngine.scenes.length : '?')].concat(s.meshes.filter((m) => /ball|meshy/i.test(m.name)).map((m) => m.name).slice(0, 5)); window.__BALL.push({ t: Date.now(), missing: true, cands: cands.slice(0, 6) }); return; }
       const skin = b.getChildMeshes().filter((c) => c.isEnabled() && c.isVisible && c.visibility > 0.5);
       const p = b.getAbsolutePosition();
       const h = q.hero && q.hero(); let hp = null; if (h) { let r = h; while (r.parent) r = r.parent; hp = r.getAbsolutePosition(); }
@@ -364,7 +364,9 @@ a.judgeWhy = mine.map((r) => r.judgeWhy).filter(Boolean).pop() ?? '';
   // BALL WATCH: the anomalies in this attempt's window, with the first one's moment (ms after the mark) and what it was
   {
     const rows = (await page.evaluate('window.__BALL') as { t: number; missing?: boolean; x?: number; y?: number; z?: number; vis?: boolean; parent?: string | null; far?: number | null; fr?: boolean | null; nan?: boolean; sc?: number }[]).filter((r) => r.t >= mark);
-    const w: BallWatch = { samples: rows.length, missing: 0, nan: 0, invisible: 0, under: 0, far: 0, offCam: 0, byPhase: {} };
+    const firstMiss = rows.find((r) => r.missing && (r as { cands?: string[] }).cands);
+  if (firstMiss) console.log('  [ball] no marked ball; meshes named ball:', JSON.stringify((firstMiss as { cands?: string[] }).cands));
+  const w: BallWatch = { samples: rows.length, missing: 0, nan: 0, invisible: 0, under: 0, far: 0, offCam: 0, byPhase: {} };
     // the contest's phase at each sample ([DUNK-PHASE] lines carry a ms stamp): a loose ball off camera in RESOLVE is the net exit
     // flying off (expected); in APPROACH / CHARGE / CINEMATIC it is the glitch
     const phases = log.map((l) => { const m = /^(\d+) \[DUNK-PHASE\] (\w+)/.exec(l); return m ? { t: +m[1], p: m[2] } : null; }).filter((x): x is { t: number; p: string } => !!x);

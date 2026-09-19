@@ -696,6 +696,14 @@ export const DunkMode: ModeDefinition = (() => {
 
   function clearProps(): void {
     obstacle?.dispose(); obstacle = null; obstacleToken++;
+    // THE DISAPPEARING BALL (owner, 2026-09-19: "the ball needs to not glitch and disappear").
+    // The oop passer holds the contest ball in his hand — the ball mesh is PARENTED to his hand bone — and disposing a
+    // node in Babylon disposes its descendants. So every prop change that cleared the passer disposed the ball with
+    // him, and the re-attach on the next line ran against a dead mesh. Measured with the dunk lab: on oopglass,
+    // oopbounce, oopcorner and oopalien the scene held NO mesh named 'ball' for the whole attempt (343 of 343
+    // samples), while plain and obstacle props — which have no passer — were clean.
+    // Detach first: setParent(null) keeps the ball's world transform, and setupProp hands it back to the player.
+    if (teammate && ball) releaseBall(ball);
     teammate?.dispose(); teammate = null;
   }
 
@@ -728,7 +736,7 @@ export const DunkMode: ModeDefinition = (() => {
         // from the rim side there is no bank (the solve refuses a throw from behind the face)
         position: prop === 'oopcorner' ? new Vector3(4.0, 0, gatherLine() + 5.0) : new Vector3(-3.4, 0, CFG.rimZ + 1.6), tint: '#22d3ee', startClip: SPORT_CLIP.teammateIdle,   // the billboard oop: down the left side, so the mirror line meets the sign near its centre (from x −1.2 it crossed 3 m off it, measured)
       });
-      if (token !== obstacleToken || ctx.scene.isDisposed) { npc.dispose(); return; }   // the prop changed under the load
+      if (token !== obstacleToken || ctx.scene.isDisposed) { if (ball) releaseBall(ball); npc.dispose(); return; }   // the prop changed under the load — never let the passer take the ball with him
       teammate = npc;
       neverBindPose(teammate.animator, SPORT_CLIP.teammateIdle);
       installSafePlay(teammate.animator, 'dunk-teammate');
