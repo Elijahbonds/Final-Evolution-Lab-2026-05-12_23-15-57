@@ -216,7 +216,7 @@ const trigger = async (v: number) => page.evaluate(`(() => { const b = window.__
 const hud = async () => page.evaluate('window.__hudNow()') as Promise<Record<string, unknown>>;
 
 interface BallWatch { samples: number; missing: number; nan: number; invisible: number; under: number; far: number; offCam: number; byPhase: Record<string, number>; firstAt?: string; worst?: string }
-interface Attempt { n: number; trick: string; launch?: string; cue: string[]; slamTiming?: string; breakdown?: string; cards?: unknown; total?: number; banners: string[]; clips?: string[]; ball?: BallWatch; note?: string }
+interface Attempt { n: number; trick: string; launch?: string; cue: string[]; slamTiming?: string; breakdown?: string; judgeWhy?: string; cards?: unknown; total?: number; banners: string[]; clips?: string[]; ball?: BallWatch; note?: string }
 const attempts: Attempt[] = [];
 let logMark = 0;
 
@@ -326,6 +326,7 @@ for (let n = 0; n < ATTEMPTS; n++) {
   a.banners = [...new Set(mine.map((r) => r.banner).filter((b): b is string => !!b))];
   a.slamTiming = mine.map((r) => r.slamTiming).filter(Boolean).pop() ?? '';
   a.breakdown = mine.map((r) => r.breakdown).filter(Boolean).pop() ?? '';
+a.judgeWhy = mine.map((r) => r.judgeWhy).filter(Boolean).pop() ?? '';
   const cards = mine.map((r) => r.cards).filter((c) => Array.isArray(c) && (c as unknown[]).length) as unknown[][];
   a.cards = cards.pop() ?? null;
   a.total = mine.map((r) => r.score).filter((s): s is number => typeof s === 'number').pop();

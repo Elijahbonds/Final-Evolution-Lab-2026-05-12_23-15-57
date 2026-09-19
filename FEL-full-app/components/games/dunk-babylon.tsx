@@ -268,6 +268,10 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
               {typeof hud.breakdown === 'string' && hud.breakdown ? (
                 <span className="fel-panel px-2.5 py-0.5 font-mono text-[10px] text-white/60">{hud.breakdown}</span>
               ) : null}
+              {/* JUDGE TRANSPARENCY (owner's pillars brief): the four reads behind the card, in words */}
+              {typeof hud.judgeWhy === 'string' && hud.judgeWhy ? (
+                <span className="fel-panel max-w-[92%] px-2.5 py-0.5 text-center font-mono text-[9px] leading-snug text-white/55">{hud.judgeWhy}</span>
+              ) : null}
             </div>
           )}
         </div>

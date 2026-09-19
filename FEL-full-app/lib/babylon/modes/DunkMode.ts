@@ -381,6 +381,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
   let stickReboundX = 0, stickReboundUntil = 0;
   let launchSpeed01 = 0;                      // run-up speed as a 0..1 budget input
+  let launchTag = '';                          // JUDGE TRANSPARENCY: the takeoff the panel saw (SPEED LAUNCH / POWER LAUNCH / BILLBOARD REBOUND → … / CORNER WALL RUN → …)
   let obstacleClipped = false;                // caught the prop mid-flight — the dunk is dead
   let toppling = false;                       // the prop goes over with you
   const usedCombos = new Set<string>();       // variety memory: "style_prop" combos thrown
@@ -1809,6 +1810,7 @@ export const DunkMode: ModeDefinition = (() => {
     );
     const prof = launchProfile(approach.takeoff, vectorLive(), vectorWallRun);   // DUNK PARKOUR: the foot's launch, and the corner prop if it was just used
     console.info(`[DUNK-PARKOUR] ${prof.label} apex x${prof.apexMult.toFixed(2)} +${prof.difficulty.toFixed(1)} diff`);
+    launchTag = prof.label;
     flight.launch(Math.min(1, charge * 0.5 + launchSpeed01 * 0.5), STYLE_TIER[style], approach.difficulty + prof.difficulty);
     armedAir = null; spin.reset(); liveTricks = []; liveSpin = { turns: 0, from: 0, until: 0 };
     if (heldDpad) flight.recognizer.feed({ t: 'dpad', dir: heldDpad, pressed: true });   // a direction held through the takeoff is still held
@@ -2705,10 +2707,18 @@ export const DunkMode: ModeDefinition = (() => {
     // whether they lost it on difficulty, execution or style -- so they could not know what to change. The
     // panel already weights these three; showing them costs nothing and is the difference between a score
     // and a lesson.
+    // JUDGE TRANSPARENCY (owner's pillars brief, 2026-09-18 §4): the panel's four reads, in words — the APPROACH (the run, the
+    // takeoff, the runway beats, the caught toss), the AIR (the tricks, the taps, the hang), the PRECISION (the slam's timing)
+    // and the room (HYPE, and whether the panel has seen this one) — so a card is a lesson, not a number
+    const approachBits = [launchSpeed01 >= 0.8 ? 'FULL RUN' : launchSpeed01 >= 0.45 ? 'JOG' : 'WALK-UP', launchTag, ...runwayLabels, lob.caught ? lob.label : '', doubleLaunched ? 'DOUBLE-LAUNCH' : ''].filter(Boolean);
+    const airBits = [...flight.attempt.tricks.map((t) => t.id.toUpperCase()), styleTaps > 0 ? `${styleTaps} STYLE TAP${styleTaps > 1 ? 'S' : ''}` : '', hangBonus > 0 ? 'HANG' : ''].filter(Boolean);
+    const judgeWhy = `APPROACH ${approachBits.join(' · ')} │ AIR ${airBits.join(' · ') || 'straight up'} │ PRECISION ${Math.round(qteAccuracy * 100)}% │ HYPE ${Math.round(momentum.score01 * 100)}%${isRepeat ? ' · SEEN IT' : ''}`;
     ctx.setHud({
       slamTiming: slamTiming?.label ?? '',
       breakdown: `DIFF ${difficulty.toFixed(1)} · EXEC ${execution.toFixed(1)} · STYLE ${styleScore.toFixed(1)}`,
+      judgeWhy,
     });
+    console.info(`[JUDGE-WHY] ${judgeWhy}`);
     const scores = judgeDunk(difficulty, execution, styleScore, momentum.score01);
     lastScores = scores;
     // THE STAKES SCALE THE PANEL, they do not replace it: the judges still judge the dunk, and then what
@@ -2867,7 +2877,7 @@ export const DunkMode: ModeDefinition = (() => {
       attempt: stakesLabel(stakes, calledLabel()),
       // the LAST attempt's verdict must not hang over this one: measured on the probe, the readout from
       // attempt 1 was still on screen through attempt 2 because only a resolve ever wrote the field.
-      slamTiming: '', breakdown: '',
+      slamTiming: '', breakdown: '', judgeWhy: '',
       need: need > 0 ? need : 0,
       hint: need > 0
         ? `FINAL ROUND — you need big numbers (${deficit > 0 ? `down ${deficit}` : `up ${-deficit}`})`
