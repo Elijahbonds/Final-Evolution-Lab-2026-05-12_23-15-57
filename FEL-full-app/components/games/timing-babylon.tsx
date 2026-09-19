@@ -133,6 +133,15 @@ export function makeTimingHost(opts: TimingHostOpts) {
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-4 py-3 font-mono text-xs">
           {/* M42 E20: render the mode's own round label as-is (RD/SHOT/KICK/PITCH) — no dup prefix */}
           <span className="fel-panel px-3 py-1 text-[var(--fel-cyan)]">{hnode(hud.round, '—')}</span>
+          {/* BREAKAWAY (owner brief 2026-09-18): the shot clock and the FLOW gauge (wall runs, rebounds, slides, a fast dribble) that sets the shot's power */}
+          {typeof hud.clock === 'number' && Number(hud.clock) > 0 && <span className={`fel-panel px-3 py-1 font-bold ${Number(hud.clock) <= 3 ? 'text-[#ff2d78]' : 'text-white'}`}>⏱ {hud.clock}s</span>}
+          {typeof hud.flow === 'number' && Number(hud.clock) > 0 && (
+            <span className="fel-panel flex items-center gap-2 px-3 py-1">
+              <span className="text-[10px] tracking-wider text-white/60">FLOW</span>
+              <span className="h-2 w-20 overflow-hidden rounded-full bg-black/50"><span className={`block h-full rounded-full transition-[width] duration-150 ${Number(hud.flow) >= 70 ? 'bg-[#fbbf24]' : 'bg-[var(--fel-cyan)]/80'}`} style={{ width: `${Math.max(0, Math.min(100, Number(hud.flow)))}%` }} /></span>
+              {typeof hud.kinetic === 'string' && hud.kinetic ? <span className="text-[10px] font-bold text-[#fbbf24]">{hud.kinetic}</span> : null}
+            </span>
+          )}
           {/* M42 E20: numeric score gets " PTS"; string scores (e.g. "2 GOALS") render as-is */}
           <span className="rounded-md bg-black/50 px-3 py-1 text-white">{typeof hud.score === 'number' ? `${hud.score} PTS` : hnode(hud.score, '0 PTS')}</span>
           {/* combo — the rhythm family's core readout (The Cypher publishes it

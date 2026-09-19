@@ -67,6 +67,8 @@ import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
 import { SoccerBall, GRASS } from '../core/SoccerBall';
 import { launchKick, frameHit, judgeKick, kickZone, METER_ZONES, GOAL as PEN_GOAL } from '../core/PenaltyKick';
 import { WIND_GAIN } from '../core/GolfBall';
+import { BREAK, FLOW, flowAdd, shotProfile, glassRead, bankTarget, rainbowRead, slideCancelRead, rainbowArc, KEEPER, keeperTargetZ, keeperSlideRead, reachFor, crossesKeeper, type ShotKind } from '../core/Breakaway';   // BREAKAWAY (owner brief, 2026-09-18: "Soccer Shootout")
+import { stepRun } from '../core/RushRun';
 
 // ship pass 4: the mounted venue specs (golf_loop / derby / penalty), disposed with their modes
 let golfVenue: VenueHandle | null = null, derbyVenue: VenueHandle | null = null, penaltyVenue: VenueHandle | null = null;
@@ -1189,6 +1191,14 @@ export const PenaltyMode: ModeDefinition = (() => {
   const prevBall = new Vector3();
   let weather: WeatherKit = new WeatherKit(); let weatherFx: WeatherFxHandle | null = null;
   const KEEPER_REACH = 0.9;
+  // ── BREAKAWAY (owner brief, 2026-09-18): your kick is a RUN at the keeper from midfield on a shot clock — kinetic shot
+  // stacking off a flow gauge, the bank off the glass, the rainbow flick, the slide-cancel curler; the keeper comes off
+  // his line, slide-tackles, vaults for the top corners and parry-kicks a save back at you (an overdrive if you hit it
+  // again). Pure reads in core/Breakaway; the shootout format around it (their kick, sudden death) is untouched.
+  const brk = { on: false, clock: 0, flow: 0, kineticAt: -1e9, run: { vx: 0, vz: 0 }, wall: 0 as 1 | -1 | 0, wallSec: 0, slideSec: -1, slideCool: 0, vaultT: -1, vault: null as { from: Vector3; dir: Vector3 } | null, counterLive: false, struck: false, shotKind: 'strike' as ShotKind, lastHigh: false, lastAimSign: 1, stylePts: 0, keeperSlide: null as { t: number; dir: Vector3 } | null, keeperCool: 0, hudClock: -1, hudFlow: -1, hudKin: '' };
+  const brkStats = { shots: 0, wallRuns: 0, banks: 0, rainbows: 0, curlers: 0, overdrives: 0, kinetic: 0, slides: 0, tackled: 0, clocks: 0, parries: 0, rebounds: 0 };
+  const me2 = () => ({ x: me.root.position.x, z: me.root.position.z });
+  const vel2 = () => ({ x: brk.run.vx, z: brk.run.vz });
   /** The physics step every kick shares: wind through the air (the golf gain), the frame, the mesh. */
   function stepBall(dt: number): void {
     if (!pball.active) return;
@@ -1198,6 +1208,10 @@ export const PenaltyMode: ModeDefinition = (() => {
       prevBall.copyFrom(pball.pos);
       if (!pball.rolling && wv.lengthSquared() > 0) pball.vel.addInPlace(wv.scale(WIND_GAIN * GRASS.dragK * pball.vel.subtract(wv).length() * h));
       pball.step(h);
+      if (brk.on && Math.abs(pball.pos.x) >= BREAK.glassX - 0.05) {   // BREAKAWAY: the side glass keeps the ball live (the bank rides this)
+        const sx = Math.sign(pball.pos.x) || 1; pball.deflect(new Vector3(-sx, 0, 0), 0.85); pball.pos.x = sx * (BREAK.glassX - 0.08); ball.position.x = pball.pos.x;
+        brk.flow = flowAdd(brk.flow, FLOW.bank); SoundKit.play('clang', { pitch: 1.4, volume: 0.45 });
+      }
       const hit = frameHit(prevBall, pball.pos);
       if (hit && !frameKind) { frameKind = hit.kind; pball.deflect(hit.normal, 0.62); SoundKit.play('clang', { pitch: hit.kind === 'bar' ? 0.9 : 1.1, volume: 0.8 }); }
     }
@@ -1205,7 +1219,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     if (flightSec > 5) pball.stop();
   }
   let goalLatch = false;               // A+ P0 juice: the goal's ONE punch per kick
-  let phase: 'aim' | 'power' | 'flight' | 'keep' = 'aim';
+  let phase: 'aim' | 'power' | 'flight' | 'keep' | 'break' = 'aim';
   let keeperTargetX = 0, ended = false;
   // THE KEEPER ROUND (owner decision 2026-09-03): on their kick you are the
   // keeper. The rival's body runs up with a tell, you dive, KeeperCore judges.
@@ -1240,6 +1254,148 @@ export const PenaltyMode: ModeDefinition = (() => {
   /** Kicks you've taken === round. Regulation is REGULATION_KICKS each, then
    *  sudden death until a round splits. */
 
+  // ── BREAKAWAY helpers ────────────────────────────────────────────────────────────────────────────────────────────
+  function startBreakaway(ctx: ModeContext): void {
+    phase = 'break'; Object.assign(brk, { on: true, clock: BREAK.clockSec, flow: 0, kineticAt: -1e9, run: { vx: 0, vz: 0 }, wall: 0, wallSec: 0, slideSec: -1, slideCool: 0, vaultT: -1, vault: null, counterLive: false, struck: false, shotKind: 'strike', lastHigh: false, lastAimSign: 1, stylePts: 0, keeperSlide: null, keeperCool: 1.0, hudClock: -1, hudFlow: -1, hudKin: '' });
+    me.root.position.set(0, 0, BREAK.startZ); me.root.rotation.set(0, 0, 0);
+    keeper.root.position.set(0, 0, BREAK.keeperZ); keeper.root.rotation.set(0, Math.PI, 0);
+    keeperAnim.loop(SPORT_CLIP.keeperIdle, { fadeSec: 0.25 }); meAnim.loop(SPORT_CLIP.moveLoop, { fadeSec: 0.2 });
+    pball.stop(); ball.position.set(0, 0.11, BREAK.startZ + BREAK.dribbleAhead); frameKind = null; flightSec = 0;
+    ctx.camDirector.setPreset('court'); ctx.camDirector.snapTo(me.root.position, new Vector3(0, 1, PEN_GOAL.z));
+    ctx.setHud({ hint: 'BREAKAWAY — 9 s · run at him · A shoots (stick = the corner, up = the chip) · LT slide · R1 banks it off the glass', clock: BREAK.clockSec, flow: 0, kinetic: '', kickPower: null });
+  }
+  /** The shot, any of its kinds: the ball leaves on the boot's contact key; the keeper reads the side and commits. */
+  function strikeNow(ctx: ModeContext, kind: ShotKind): void {
+    if (phase !== 'break' || brk.struck) return;
+    const kinetic = performance.now() - brk.kineticAt <= FLOW.kineticSec * 1000;
+    const prof = shotProfile(brk.flow / FLOW.full, kinetic, kind);
+    const high = stickY < -0.5 || kind === 'rainbow';
+    let curl = 0; let target = { x: Math.max(-1, Math.min(1, stickX)) * 3.0, y: high ? 1.9 : 0.85 };
+    if (kind === 'curler') { const sgn = stickX >= 0 ? 1 : -1; curl = 1.6 * sgn; target = { x: sgn * 2.6, y: 0.9 }; }
+    if (kind === 'rainbow') target = { x: Math.max(-1, Math.min(1, stickX)) * 2.2, y: 2.05 };
+    if (kind === 'bank') target = bankTarget(brk.wall === 0 ? 1 : brk.wall, target);
+    const from = { x: ball.position.x, y: ball.position.y, z: ball.position.z };
+    const { vel, spin } = launchKick(from, target, prof.power01, { curl, chip: kind === 'rainbow' || (high && kind !== 'bank'), wobble: 0, rand: Math.random() });
+    vel.scaleInPlace(prof.speedMult);
+    brk.struck = true; brk.shotKind = kind; brk.lastHigh = high; brk.lastAimSign = Math.sign(target.x || 0.01); brk.counterLive = false; brk.slideSec = -1;
+    if (brk.wall !== 0) { brk.wall = 0; me.root.position.y = 0; }
+    brk.stylePts += kind === 'strike' ? 0 : kind === 'rainbow' ? 15 : kind === 'overdrive' ? 15 : 10; if (kinetic) brk.stylePts += 5;
+    brkStats.shots++; if (kind === 'bank') brkStats.banks++; if (kind === 'rainbow') brkStats.rainbows++; if (kind === 'curler') brkStats.curlers++; if (kind === 'overdrive') brkStats.overdrives++; if (kinetic) brkStats.kinetic++;
+    goalLatch = false; frameKind = null; flightSec = 0;
+    meAnim.beat(SPORT_CLIP.penaltyStrike, { fadeSec: 0.08 });
+    if (kind === 'rainbow') { const dir = keeper.root.position.subtract(me.root.position); dir.y = 0; dir.normalize(); brk.vault = { from: me.root.position.clone(), dir }; brk.vaultT = 0; }
+    const aimSign = brk.lastAimSign; const correct = Math.random() < keeperReadProb(aimSign, shotHistory, 0);
+    keeperTargetX = keeper.root.position.x + (correct ? aimSign : -aimSign) * 2.0;
+    kickIn = kind === 'rainbow' ? 0.2 : KICK_CONTACT_SEC * 0.6;
+    pendingKick = () => {
+      SoundKit.play('whoosh'); ctx.feel?.impact?.(0.3 + prof.power01 * 0.3);
+      keeperDiveSign = keeperTargetX > keeper.root.position.x ? 1 : -1; if (kind !== 'rainbow') { dive(keeperAnim, keeperDiveSign); keeperDove = true; }
+      pball.launch(new Vector3(from.x, from.y, from.z), vel, spin);
+    };
+    phase = 'flight';
+    ctx.setHud({ kickShape: prof.label, kinetic: kinetic ? 'KINETIC' : '', banner: prof.label, hint: '' }); setTimeout(() => ctx.setHud({ banner: '' }), 700);
+    console.info(`[BREAK] ${kind} power ${prof.power01.toFixed(2)} x${prof.speedMult.toFixed(2)} flow ${brk.flow.toFixed(0)} kinetic ${kinetic} clock ${brk.clock.toFixed(1)}`);
+  }
+  /** The run: the clock, the body with momentum, the glass, the slide, the rainbow's arc, the ball at the feet, the keeper. */
+  function tickBreak(ctx: ModeContext, dt: number): void {
+    brk.clock -= dt; brk.slideCool = Math.max(0, brk.slideCool - dt); brk.keeperCool = Math.max(0, brk.keeperCool - dt);
+    if (brk.clock <= 0) { pball.stop(); brkStats.clocks++; console.info('[BREAK] clock'); resolveKick(ctx, 'wide', 'CLOCK — NO SHOT'); return; }
+    const held = brk.vaultT >= 0;
+    if (brk.slideSec >= 0) { brk.slideSec += dt; if (brk.slideSec >= BREAK.slideSec) { brk.slideSec = -1; brk.slideCool = BREAK.slideCool; meAnim.loop(SPORT_CLIP.moveLoop, { fadeSec: 0.2 }); } }
+    const boost = (brk.wall !== 0 ? BREAK.wallRunMult : 1) * (brk.slideSec >= 0 ? BREAK.slideMult : 1);
+    brk.run = stepRun(brk.run, { x: stickX, y: stickY }, dt, { boost, trucking: false, held, grip: 1, drag: 1 });
+    const vel = new Vector3(brk.run.vx, 0, brk.run.vz);
+    const p = me.root.position;
+    if (!held) p.addInPlace(vel.scale(dt));
+    if (brk.wall === 0 && !held) {
+      const g = glassRead(p.x, vel.x, vel.z);
+      if (g !== 0) { brk.wall = g; brk.wallSec = 0; brk.flow = flowAdd(brk.flow, FLOW.wallRun); brk.kineticAt = performance.now(); brk.stylePts += 5; brkStats.wallRuns++; SoundKit.play('whoosh', { pitch: 0.9 }); ctx.setHud({ banner: 'WALL RUN — R1 banks it off the glass' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); console.info('[BREAK] wall run'); }
+    }
+    if (brk.wall !== 0) {
+      brk.wallSec += dt; p.x = brk.wall * (BREAK.glassX - 0.35); p.y = BREAK.wallRunY;
+      const off = Math.sign(stickX) === -brk.wall && Math.abs(stickX) > 0.5;
+      if (brk.wallSec >= BREAK.wallRunSec || off) { const w = brk.wall; brk.wall = 0; p.y = 0; brk.run.vx = -w * 2; }
+    }
+    p.x = Math.max(-(BREAK.glassX - 0.3), Math.min(BREAK.glassX - 0.3, p.x)); p.z = Math.min(p.z, GOAL_LINE.z - 1.2);
+    if (brk.vaultT >= 0 && brk.vault) { brk.vaultT += dt; const u = Math.min(1, brk.vaultT / BREAK.rainbowSec); const q = rainbowArc(brk.vault.from, brk.vault.dir, u); p.set(q.x, q.y, q.z); if (u >= 1) { brk.vaultT = -1; p.y = 0; } }
+    const sp = Math.hypot(vel.x, vel.z);
+    if (sp > 0.5 && !held) { const want = Math.atan2(vel.x, vel.z); let d = want - me.root.rotation.y; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; me.root.rotation.y += Math.max(-10 * dt, Math.min(10 * dt, d)); }
+    if (sp >= 6) brk.flow = flowAdd(brk.flow, FLOW.dribblePerSec * dt);
+    if (!brk.counterLive) ball.position.set(p.x + Math.sin(me.root.rotation.y) * BREAK.dribbleAhead, 0.11, p.z + Math.cos(me.root.rotation.y) * BREAK.dribbleAhead);
+    else { stepBall(dt); if (!pball.active && Vector3.Distance(ball.position, p) > BREAK.strikeReach + 2.5) { resolveKick(ctx, 'saved', 'PARRIED CLEAR — SAVED'); return; } }
+    // the keeper: off his line, tracking the ball, the slide-tackle on a striker who dawdles inside his range
+    const kp = keeper.root.position;
+    if (brk.keeperSlide) {
+      brk.keeperSlide.t += dt; kp.addInPlace(brk.keeperSlide.dir.scale(KEEPER.slideSpeed * dt));
+      if (!brk.counterLive && brk.vaultT < 0 && Math.hypot(ball.position.x - kp.x, ball.position.z - kp.z) <= KEEPER.slideHitM) {
+        brk.keeperSlide = null; brkStats.tackled++; pball.stop(); SoundKit.play('impact', { pitch: 0.7, volume: 0.5 }); ctx.feel?.impact?.(0.4); console.info('[BREAK] slide-tackled');
+        resolveKick(ctx, 'saved', 'SLIDE-TACKLED — NO SHOT'); return;
+      }
+      if (brk.keeperSlide.t >= KEEPER.slideSec) { brk.keeperSlide = null; brk.keeperCool = KEEPER.slideCool; const sgn = keeperDiveSign; setTimeout(() => { if (!ended && phase === 'break') rise(keeperAnim, sgn, SPORT_CLIP.keeperIdle); }, 300); }
+    } else {
+      const tz = keeperTargetZ(p.z); kp.z += Math.max(-KEEPER.closeRate * dt, Math.min(KEEPER.closeRate * dt, tz - kp.z));
+      kp.x += (ball.position.x * KEEPER.trackX - kp.x) * Math.min(1, 3 * dt);
+      if (!brk.counterLive && keeperSlideRead({ x: kp.x, z: kp.z }, { x: ball.position.x, z: ball.position.z }, brk.keeperCool, brk.struck)) {
+        const dir = ball.position.subtract(kp); dir.y = 0; dir.normalize(); brk.keeperSlide = { t: 0, dir }; keeperDiveSign = dir.x > 0 ? 1 : -1;
+        keeperAnim.beat(sided(SPORT_CLIP.keeperDive, keeperDiveSign), { fadeSec: 0.08 });
+        ctx.setHud({ banner: "HE'S COMING OUT — flick it over him (A) or beat him" }); setTimeout(() => ctx.setHud({ banner: '' }), 500); console.info('[BREAK] keeper slide');
+      }
+    }
+    const c = Math.ceil(brk.clock), f = Math.round(brk.flow), kin = performance.now() - brk.kineticAt <= FLOW.kineticSec * 1000 ? 'KINETIC' : '';
+    if (c !== brk.hudClock || f !== brk.hudFlow || kin !== brk.hudKin) { brk.hudClock = c; brk.hudFlow = f; brk.hudKin = kin; ctx.setHud({ clock: c, flow: f, kinetic: kin }); }
+    gallery?.update(dt);
+    ctx.camDirector.update(p, vel, ball.position);
+  }
+  /** The curved glass down each side of the breakaway. */
+  function buildGlass(ctx: ModeContext): void {
+    const mat = VenueKit.paint(ctx.scene, 'brk_glass_mat', '#9ad7ff', 0.12, 0.2); mat.alpha = 0.28;
+    for (const side of [1, -1] as const) {
+      const g = MeshBuilder.CreateBox(`brk_glass_${side}`, { width: 0.16, height: 2.4, depth: 22 }, ctx.scene);
+      g.position.set(side * (BREAK.glassX + 0.2), 1.2, 0.5); g.material = mat; g.isPickable = false; furniture.push(g);
+    }
+  }
+
+  /** The kick decided (was inline in the flight branch): the score, the pips, the juice, the banner, their kick next. */
+  function resolveKick(ctx: ModeContext, outcome: ReturnType<typeof judgeKick>, bannerOverride?: string): void {
+    const saved = outcome === 'saved';
+    if (saved) lastSaveBy = 'them';
+    const scored = outcome === 'goal';
+    shotHistory.push(brk.on ? brk.lastAimSign : Math.sign(reticle.pos.x || 0.01));   // the keeper remembers
+    if (keeperDove) { keeperDove = false; setTimeout(() => { if (!ended) rise(keeperAnim, keeperDiveSign, SPORT_CLIP.keeperIdle); }, RISE_DELAY_MS); }   // decided: off the ground, a beat later
+    myKicks.push(scored ? 'goal' : 'miss');
+    if (scored) {
+      goals++;
+      stylePts += feints * FEINT_STYLE_PTS + (brk.on ? brk.stylePts : 0);
+      // A+ P0 juice: TD-class goal punch — hit-stop + shake + gold flash + ONE thud, latched per kick (replaces the bare feel.impact)
+      if (!goalLatch) {
+        goalLatch = true;
+        ctx.juice.hitStop(60); ctx.juice.shake(0.14, 160); ctx.juice.flash('#FFD700', 130);
+        SoundKit.play('impact', { pitch: 0.7, volume: 0.8 });
+        console.info('[PEN-JUICE] goal punch');
+      }
+      SoundKit.play('score');
+      SoundKit.play('crowdCheer');
+      gallery?.cheer(1);
+    } else {
+      SoundKit.play(saved ? 'crowdGroan' : 'miss');
+      if (!saved) SoundKit.play('crowdGroan', { volume: 0.3 });   // A+ P0: the miss groans too, quieter
+      ctx.feel?.impact?.(0.45);           // A+ P0: heavier feel on a save / miss — never the goal punch
+      console.info(`[PEN-JUICE] ${saved ? 'saved' : 'miss'} (heavy feel + groan)`);
+      gallery?.cheer(0.25);               // a save is THEIR moment
+    }
+    ctx.setHud({
+      score: `${goals}–${themGoals}`, ...kicksHud(),
+      banner: bannerOverride ?? (scored
+        ? `${frameKind ? `OFF THE ${frameKind.toUpperCase()} — IN! ` : ''}GOOOAL!${feints > 0 ? ` +${feints * FEINT_STYLE_PTS} style` : ''}`
+      : frameKind ? `OFF THE ${frameKind.toUpperCase()}!` : outcome === 'short' ? 'SCUFFED IT — SHORT' : saved ? 'SAVED' : outcome === 'over' ? 'OVER THE BAR' : 'WIDE'),
+    });
+    // YOUR kick, then THEIR answer — the shootout breathes in
+    // alternating beats, and a tied fifth round goes to SUDDEN DEATH.
+    // YOUR kick, then THEIR kick — and their kick is yours to keep.
+    setTimeout(() => { if (!ended) startKeeperRound(ctx); }, 1200);
+    phase = 'aim'; brk.on = false; brk.counterLive = false; ctx.setHud({ clock: 0, kinetic: '' }); me.root.position.y = 0;
+  }
+
   function kickLabel(): string {
     return round <= REGULATION_KICKS ? `KICK ${round}/${REGULATION_KICKS}` : 'SUDDEN DEATH';
   }
@@ -1261,12 +1417,13 @@ export const PenaltyMode: ModeDefinition = (() => {
       ? 'SCORE OR YOU ARE OUT — feint, aim, bury it'
       : s.phase === 'suddenDeath'
         ? 'SUDDEN DEATH — score and the keeper must answer'
-        : 'Snap the stick side-to-side to FEINT (max 2) · aim · KICK twice';
+        : 'BREAKAWAY — run at him, A shoots; LT slide, R1 off the glass';
     ctx.setHud({
       round: kickLabel(), feints: 0, ...kicksHud(), dive: '', weather: weather.describe(), kickShape: '',
       score: `${goals}–${themGoals}`,
       hint,
     });
+    startBreakaway(ctx);   // BREAKAWAY: your kick is the run
   }
 
   /** Street-style feint: a hard left↔right stick snap during aim. */
@@ -1315,8 +1472,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     }
     me.root.position.set(-0.4, 0, -1.6); me.root.rotation.set(0, 0, 0);
     meAnim.loop(SPORT_CLIP.penaltyIdle, { fadeSec: 0.25 });
-    nextKick(ctx);
-    ctx.camDirector.setFixedBehind(me.root.position, 0, 'flight', true);
+    nextKick(ctx);   // BREAKAWAY: startBreakaway sets the follow camera
   }
 
   function detectFeint(ctx: ModeContext, x: number): void {
@@ -1342,6 +1498,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       if (!penaltyVenue) VenueKit.buildField(ctx.scene, 'pitch');   // spec first, kit fallback
       EffectsKit.ambient(ctx.scene, 'park');
       furniture = buildGoal(ctx.scene);
+      buildGlass(ctx);   // BREAKAWAY: the side glass
       // Phase 6: the penalty spot is a real mark under the ball, and the
       // shootout is played in front of a bank of crowd behind the goal —
       // in frame the whole time, because the camera sits behind the kicker.
@@ -1408,6 +1565,12 @@ export const PenaltyMode: ModeDefinition = (() => {
       themGoals = 0; themKicks = 0; shotHistory = []; hintFlags.read = false; myKicks = []; theirKicks = [];
       SoundKit.startAmbient('stadium');
       ctx.setHud({ score: '0–0' });
+      if (process.env.NODE_ENV === 'development') {
+        (ctx.scene.metadata ??= {}).soccer = {   // BREAKAWAY probes
+          state: () => ({ phase, clock: brk.clock, flow: brk.flow, wall: brk.wall, counterLive: brk.counterLive, struck: brk.struck, x: me.root.position.x, y: me.root.position.y, z: me.root.position.z, vx: brk.run.vx, vz: brk.run.vz, keeperX: keeper.root.position.x, keeperZ: keeper.root.position.z, keeperSliding: !!brk.keeperSlide, rainbowReady: phase === 'break' && brk.vaultT < 0 && rainbowRead(me2(), vel2(), { x: keeper.root.position.x, z: keeper.root.position.z }), slideSec: brk.slideSec, ...brkStats, goals, themGoals, round, ended, ballActive: pball.active, ballZ: ball.position.z }),
+          diveNow: (side: -1 | 1) => { if (phase === 'keep' && keepDiveAt == null) { keepDive = side; keepDiveAt = performance.now(); dive(meAnim, side); meDove = true; meDiveSign = side; } },
+        };
+      }
       nextKick(ctx);
     },
 
@@ -1422,6 +1585,24 @@ export const PenaltyMode: ModeDefinition = (() => {
           keepDive = side; keepDiveAt = performance.now();
           dive(meAnim, side); meDove = true; meDiveSign = side;
           ctx.setHud({ hint: '' });
+        }
+        return;
+      }
+      if (phase === 'break') {   // BREAKAWAY
+        if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+        if (e.t === 'trigger' && e.side === 'L' && e.value > 0.5 && brk.slideSec < 0 && brk.slideCool === 0 && brk.vaultT < 0 && brk.wall === 0 && !brk.struck) {
+          brk.slideSec = 0; brk.flow = flowAdd(brk.flow, FLOW.slide); brk.kineticAt = performance.now(); brkStats.slides++;
+          meAnim.beat(sided(SPORT_CLIP.keeperDive, stickX >= 0 ? 1 : -1), { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 0.8, volume: 0.4 }); console.info('[BREAK] slide');   // the dive's stretch, in the soccer clip scope (a football clip here trips clipScope.test)
+        }
+        if (e.t === 'button' && e.pressed && e.btn === 'R1') { if (brk.wall !== 0) strikeNow(ctx, 'bank'); else refuse(ctx, 'BANK IT OFF THE GLASS — wall run first'); }
+        if (e.t === 'button' && e.pressed && e.btn === 'A') {
+          const near = Vector3.Distance(ball.position, me.root.position) <= BREAK.strikeReach;
+          if (!near) refuse(ctx, 'GET TO THE BALL');
+          else if (brk.vaultT >= 0) refuse(ctx, 'IN THE AIR');
+          else if (rainbowRead(me2(), vel2(), { x: keeper.root.position.x, z: keeper.root.position.z })) strikeNow(ctx, 'rainbow');
+          else if (slideCancelRead(brk.slideSec)) strikeNow(ctx, 'curler');
+          else if (brk.counterLive) strikeNow(ctx, 'overdrive');
+          else strikeNow(ctx, 'strike');
         }
         return;
       }
@@ -1486,7 +1667,9 @@ export const PenaltyMode: ModeDefinition = (() => {
         }
       }
       gallery?.update(dt);
+      if (phase === 'break') { tickBreak(ctx, dt); return; }   // BREAKAWAY
       if (phase === 'flight') {
+        if (brk.on) ctx.camDirector.update(me.root.position, Vector3.Zero(), ball.position);   // BREAKAWAY: the follow camera rides the shot
         if (kickIn > 0) {
           // the run-up / wind-up: the ball waits for the boot
           kickIn -= dt;
@@ -1495,6 +1678,28 @@ export const PenaltyMode: ModeDefinition = (() => {
         }
         keeper.root.position.x += (keeperTargetX - keeper.root.position.x) * 5 * dt;
         stepBall(dt);
+        if (brk.on && pball.active) {   // BREAKAWAY: the keeper OFF his line, and the ball that comes back
+          const kz = keeper.root.position.z;
+          if (kz < GOAL_LINE.z - 0.3 && crossesKeeper(prevBall.z, ball.position.z, kz)) {
+            const nearPost = Math.abs(Math.abs(keeper.root.position.x) - PEN_GOAL.halfW) <= KEEPER.vaultNearPost;
+            const reach = reachFor(KEEPER_REACH + 0.35, { high: brk.lastHigh, kind: brk.shotKind }, nearPost);
+            if (Math.abs(ball.position.x - keeper.root.position.x) <= reach && ball.position.y <= (brk.lastHigh && nearPost ? 2.6 : 2.0)) {
+              if (Math.random() < KEEPER.parryChance && brk.clock > 1.5 && brk.shotKind !== 'overdrive') {
+                const to = me.root.position.subtract(ball.position); to.y = 0; to.normalize();
+                pball.launch(ball.position.clone(), to.scale(KEEPER.counterSpeed).add(new Vector3(0, 2.2, 0)));
+                brkStats.parries++; brk.counterLive = true; brk.struck = false; phase = 'break';
+                keeperAnim.beat(SPORT_CLIP.penaltyStrike, { fadeSec: 0.08 }); if (keeperDove) { keeperDove = false; rise(keeperAnim, keeperDiveSign, SPORT_CLIP.keeperIdle); }
+                SoundKit.play('impact', { pitch: 1.2, volume: 0.5 }); ctx.setHud({ banner: 'PARRIED — BACK AT YOU! hit it again', hint: 'OVERDRIVE — A on the loose ball' });
+                console.info('[BREAK] parry-kick'); return;
+              }
+              pball.stop(); resolveKick(ctx, 'saved', 'SAVED — off his line'); return;
+            }
+          }
+          if (frameKind && brk.clock > 0.8 && Vector3.Distance(ball.position, me.root.position) <= BREAK.strikeReach + 0.6 && pball.vel.z < 2) {
+            brk.counterLive = true; brk.struck = false; brk.flow = flowAdd(brk.flow, FLOW.rebound); brk.kineticAt = performance.now(); brkStats.rebounds++; phase = 'break';
+            ctx.setHud({ banner: 'OFF THE FRAME — OVERDRIVE!', hint: 'A — hit it again' }); console.info('[BREAK] rebound live'); return;
+          }
+        }
         // A scuffed pen can DIE SHORT of the line (weak meter + gravity) —
         // and before the shootout pass that never resolved: the only exit
         // from 'flight' was crossing z 10.9, so an under-hit kick soft-locked
@@ -1505,43 +1710,7 @@ export const PenaltyMode: ModeDefinition = (() => {
         if (ball.position.z >= PEN_GOAL.z - 0.1 || diedShort) {
           pball.stop();
           const outcome = judgeKick(ball.position, keeper.root.position.x, KEEPER_REACH, diedShort && !frameKind);
-          const saved = outcome === 'saved';
-          if (saved) lastSaveBy = 'them';
-          const scored = outcome === 'goal';
-          shotHistory.push(Math.sign(reticle.pos.x || 0.01));   // the keeper remembers
-          if (keeperDove) { keeperDove = false; setTimeout(() => { if (!ended) rise(keeperAnim, keeperDiveSign, SPORT_CLIP.keeperIdle); }, RISE_DELAY_MS); }   // decided: off the ground, a beat later
-          myKicks.push(scored ? 'goal' : 'miss');
-          if (scored) {
-            goals++;
-            stylePts += feints * FEINT_STYLE_PTS;
-            // A+ P0 juice: TD-class goal punch — hit-stop + shake + gold flash + ONE thud, latched per kick (replaces the bare feel.impact)
-            if (!goalLatch) {
-              goalLatch = true;
-              ctx.juice.hitStop(60); ctx.juice.shake(0.14, 160); ctx.juice.flash('#FFD700', 130);
-              SoundKit.play('impact', { pitch: 0.7, volume: 0.8 });
-              console.info('[PEN-JUICE] goal punch');
-            }
-            SoundKit.play('score');
-            SoundKit.play('crowdCheer');
-            gallery?.cheer(1);
-          } else {
-            SoundKit.play(saved ? 'crowdGroan' : 'miss');
-            if (!saved) SoundKit.play('crowdGroan', { volume: 0.3 });   // A+ P0: the miss groans too, quieter
-            ctx.feel?.impact?.(0.45);           // A+ P0: heavier feel on a save / miss — never the goal punch
-            console.info(`[PEN-JUICE] ${saved ? 'saved' : 'miss'} (heavy feel + groan)`);
-            gallery?.cheer(0.25);               // a save is THEIR moment
-          }
-          ctx.setHud({
-            score: `${goals}–${themGoals}`, ...kicksHud(),
-            banner: scored
-              ? `${frameKind ? `OFF THE ${frameKind.toUpperCase()} — IN! ` : ''}GOOOAL!${feints > 0 ? ` +${feints * FEINT_STYLE_PTS} style` : ''}`
-            : frameKind ? `OFF THE ${frameKind.toUpperCase()}!` : outcome === 'short' ? 'SCUFFED IT — SHORT' : saved ? 'SAVED' : outcome === 'over' ? 'OVER THE BAR' : 'WIDE',
-          });
-          // YOUR kick, then THEIR answer — the shootout breathes in
-          // alternating beats, and a tied fifth round goes to SUDDEN DEATH.
-          // YOUR kick, then THEIR kick — and their kick is yours to keep.
-          setTimeout(() => { if (!ended) startKeeperRound(ctx); }, 1200);
-          phase = 'aim';
+          resolveKick(ctx, outcome);
         }
         return;
       }
