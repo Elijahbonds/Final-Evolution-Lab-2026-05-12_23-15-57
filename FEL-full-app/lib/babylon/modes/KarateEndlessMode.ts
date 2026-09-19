@@ -187,7 +187,7 @@ const PERFECT_WINDOW_SEC = HORDE_WINDOW_SEC;
 
 // ── KARATE-NEO-COOP: the player's toughness (VITALS in NeoCombatCore) + what only the renderer knows ──
 const HP_REGEN_DELAY_SEC = 3.5, HP_REGEN_PER_SEC = 4;   // out of contact the pool refills — a beating survived, not attrition
-const ORBIT_SEC = 0.5;             // a capped-out agent circles this long before it presses again
+const ORBIT_SEC = 0.34;            // a capped-out agent circles this long before it presses again (0.5 → 0.34, 2026-09-19)
 const AGENT_STRIKE_ARC_DEG = ENEMY_ATTACK.arcDeg + 20;  // the renderer's arc is a hair wider than the core's (the hit-check happens on a body that may have stepped)
 const AGENT_TURN_RATE = 9;         // rad/s — a wound-up agent tracks you
 /** The middle of each band, for re-deriving the grade's own speedMult from a band name. */
@@ -206,7 +206,7 @@ const CHI_BURST_KNOCKBACK = 3.4;
 
 // ── pickups (DropDirector decides WHAT drops; this is how they look and how close you walk) and the shop ──
 const PICKUP_BOB_HZ = 1.6;
-const SHOP_SEC = 6;                            // the between-wave window; B fights early (8 s was a third of a horde run standing still, measured)
+const SHOP_SEC = 5;                            // the between-wave window; B fights early (8 s was a third of a horde run standing still, measured)
 const PICKUP_STYLE: Record<DropKind, { hex: string }> = { shard: { hex: '#FFC53D' }, chi: { hex: '#22d3ee' }, health: { hex: '#7CFFB2' } };
 
 interface Enemy {
@@ -1696,7 +1696,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // ran screen-LEFT once the camera had swung). Up = the camera's flat forward, right = screen right; no axis flipped.
       // The basis LATCHES while the stick is held (the over-shoulder camera swings behind every turn — a live basis
       // spun the fighter on the spot on a held stick-right: 0.26 m/s net, measured); a push runs straight.
-      const vel = ctx.camDirector.stickWorldLatched(stickX, stickY).scaleInPlace(MOVE_SPEED * perks.speedMult * prqSpeed * (carry ? 0.7 : 1));
+      const vel = ctx.camDirector.stickWorldLatched(stickX, stickY, 0.15, Math.hypot(lookX, lookY) > 0.15).scaleInPlace(MOVE_SPEED * perks.speedMult * prqSpeed * (carry ? 0.7 : 1));
       // THE-HUNDRED: a held stick cuts a swing's recovery (past its cancel point + a hair, so the strike still reads) —
       // no more standing in the last third of a jab while the horde walks round you
       if (striking && strikeMove && !carry?.swinging && !queue.pending && vel.lengthSquared() > 0.05 && swingCancelable()

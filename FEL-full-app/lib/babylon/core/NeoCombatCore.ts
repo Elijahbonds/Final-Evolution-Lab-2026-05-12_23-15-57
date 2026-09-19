@@ -101,20 +101,23 @@ export class SlowMoLatch {
 
 // ── Enemy attack brain ──────────────────────────────────────────────────────
 export const ENEMY_ATTACK = {
-  windupSec: 0.42, windupMinSec: 0.28, windupPerWave: 0.015,   // the telegraph shortens a hair per wave
+  windupSec: 0.40, windupMinSec: 0.22, windupPerWave: 0.022,   // the telegraph shortens per wave — raised 2026-09-19, the floor is still a readable 0.22 s
   strikeSec: 0.5, landAt: 0.2,                                  // the jab clip; the hit lands on its contact beat
-  kick: { strikeSec: 0.7, landAt: 0.28, dmgMult: 1.4, fromWave: 3 },   // the high kick (wave 3+, every third square-up): longer, lands later, hits harder
-  recoverSec: 0.55,
+  kick: { strikeSec: 0.7, landAt: 0.28, dmgMult: 1.5, fromWave: 2 },   // the high kick (wave 3+, every third square-up): longer, lands later, hits harder
+  recoverSec: 0.44,                                             // less rest between an enemy's swings
   engageRange: 1.25, hitRange: 1.5, arcDeg: 90,
-  orbitSpeed: 1.3,                                              // a capped-out attacker circles at this speed
+  orbitSpeed: 1.55,                                             // a capped-out attacker circles at this speed
 } as const;
 
 export function windupSecFor(wave: number): number {
   return Math.max(ENEMY_ATTACK.windupMinSec, ENEMY_ATTACK.windupSec - Math.max(0, wave - 1) * ENEMY_ATTACK.windupPerWave);
 }
-/** How many bodies may be inside a strike at once — the horde pressures, it does not instant-mob. */
+/** How many bodies may be inside a strike at once — the horde pressures, it does not instant-mob.
+ *  RAISED 2026-09-19 (owner: the mode was too easy): the ceiling is 7 instead of 5 and it is reached at wave 9 instead
+ *  of wave 9 at 5 — a body every 1.5 waves. The mob is still capped, because being swarmed with no answer is not
+ *  difficulty; the answer here is that the crowd control verbs (the wall run, the carry, the finisher) have to be used. */
 export function maxAttackers(wave: number): number {
-  return Math.min(5, 2 + Math.floor(Math.max(0, wave - 1) / 2));
+  return Math.min(7, 2 + Math.floor(Math.max(0, wave - 1) / 1.5));
 }
 
 export type EnemyPhase = 'pursue' | 'windup' | 'strike' | 'recover';

@@ -89,9 +89,9 @@ export interface WaveSpec { wave: number; count: number; hp: number; speedMult: 
 export function waveSpec(wave: number, maxCount = 14): WaveSpec {
   return {
     wave,
-    count: Math.min(6 + Math.floor(wave * 1.2), maxCount),    // a horde from wave one (H1)
+    count: Math.min(7 + Math.floor(wave * 1.6), maxCount),    // a horde from wave one (H1); raised 2026-09-19 — the cap arrives by wave 8, not 12
     hp: 22 + wave * 4,
-    speedMult: Math.min(1.6, 1 + wave * 0.04),
+    speedMult: Math.min(1.75, 1 + wave * 0.055),
   };
 }
 

@@ -353,11 +353,19 @@ export class CameraDirector {
   // push runs STRAIGHT in the direction that was screen-right at the push while the camera swings in behind. Cameras
   // anchored on an objective (the fight and hoops presets: fitTwo on the rival / rim) should keep the live basis —
   // there "right" orbiting the rival IS the wanted feel.
+  // …BUT A LATCH THE PLAYER CANNOT REFRESH READS AS INVERTED CONTROLS (owner, 2026-09-19: "the movement controls on
+  // karate endless are inverted"). Hold forward and orbit with the R stick: the basis stays frozen at the push while the
+  // camera swings past it, so within about a second the hero is running AT the viewer on a forward push. Measured on the
+  // live mode — travel-vs-camera went 0.94 → −0.41 while UP was held and the R stick turned the camera.
+  // The fix keeps both properties: the latch still resists the camera swinging itself in behind a turn (that is what
+  // stops a held stick-right becoming a pirouette), and `steering` re-takes the basis on the frames the PLAYER is
+  // turning the camera, so what is on screen is always what the stick means.
   private latchF: Vector3 | null = null; private latchR: Vector3 | null = null;
-  /** The L stick (x right, y down as the bus emits it) as a unit-scaled WORLD wish on the ground plane. */
-  stickWorldLatched(x: number, y: number, deadzone = 0.15): Vector3 {
+  /** The L stick (x right, y down as the bus emits it) as a unit-scaled WORLD wish on the ground plane.
+   *  `steering` = the player is moving the camera this frame (R stick out of its deadzone): re-take the basis. */
+  stickWorldLatched(x: number, y: number, deadzone = 0.15, steering = false): Vector3 {
     if (Math.hypot(x, y) < deadzone) { this.latchF = null; this.latchR = null; return Vector3.Zero(); }
-    if (!this.latchF || !this.latchR) { this.latchF = this.forwardFlat(); this.latchR = this.rightFlat(); }
+    if (steering || !this.latchF || !this.latchR) { this.latchF = this.forwardFlat(); this.latchR = this.rightFlat(); }
     return this.latchF.scale(-y).addInPlace(this.latchR.scale(x));
   }
   /** The camera's forward on the ground plane (unit; falls back to −Z when the camera looks straight down). */
