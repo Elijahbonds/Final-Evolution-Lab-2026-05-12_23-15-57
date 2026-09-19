@@ -118,9 +118,12 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   // a player could swing, and could never earn the swing that scores.
   derby: verbs({ A: { label: 'SWING', emit: A('A') }, B: { label: 'BAT FLIP', emit: A('B') } }),
   penalty: verbs({ A: { label: 'STRIKE', emit: A('A') } }),
+  // PARKOUR GOLF (2026-09-18): Y sets the SPRINGBOARD before the swing — a percentage multiplier off the pad, and the
+  // only way to get one. Same shape as the derby's bat-flip vault: a new verb on a button with no touch slot.
   golf: verbs({
     A: { label: 'SWING', emit: A('A') },
     B: { label: 'CLUB', emit: A('B') },
+    Y: { label: 'PAD', emit: A('Y') },
   }),
 
   // 1v1 Hoops: shooting is HOLD-then-release on the trigger stream (shot

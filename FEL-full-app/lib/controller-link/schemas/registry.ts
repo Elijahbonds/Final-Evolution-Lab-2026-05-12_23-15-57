@@ -213,9 +213,11 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     askName: true,
     schemas: [
       { kind: 'dpad', dpad: { action: 'move' } },
+      // PARKOUR GOLF (2026-09-18): the springboard is on Y and is the only source of a pad multiplier.
       { kind: 'button', buttons: [
         { action: 'A', label: 'SWING' },
         { action: 'B', label: 'CLUB' },
+        { action: 'Y', label: 'PAD' },
       ] },
     ],
   },
