@@ -16,6 +16,8 @@ export const dynamic = 'force-dynamic';
 
 const META: Record<string, { icon: any; color: string; desc: string }> = {
   karateEndless: { icon: Swords, color: '#FF3366', desc: 'Wave-survival fighter. Chain jabs, kicks and specials — survive escalating waves.' },
+  velocitykart: { icon: Timer, color: '#FFD700', desc: 'Kart racing on the Sovereign Circuit. Drift the corners, bank the boost, hold the line.' },
+  aeroaces: { icon: Mountain, color: '#00E5FF', desc: 'Low-altitude air racing. Thread the pylons, roll through the gates, chase the leader.' },
   dunkContest: { icon: Trophy, color: '#00E5FF', desc: 'Charge your jump, hit the apex QTE, pick your style. First to 21 style points.' },
   tennis: { icon: CircleDot, color: '#00FF9D', desc: 'Rally-based match play vs adaptive AI. First to 5 points takes the match.' },
   brainBrawl: { icon: Brain, color: '#A855F7', desc: 'Spin the category wheel and answer under pressure. 120 seconds on the clock.' },

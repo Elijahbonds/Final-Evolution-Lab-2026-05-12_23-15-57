@@ -153,6 +153,11 @@ export const TRACKS: Track[] = [
 
 export const MODE_INFO: Record<string, { name: string; venue: string; href: string }> = {
   karateEndless: { name: 'The Hundred', venue: 'Shimogamo Dojo', href: '/play/karate' },
+  // BOTH OF THESE SHIPPED UNREACHABLE (owner, 2026-09-19: "its also missing from the registry on the link"). They are
+  // in ENABLED_BABYLON_MODES and they have routes, but with no MODE_INFO row nothing on /modes ever linked to them —
+  // the only way in was to type the URL.
+  velocitykart: { name: 'Velocity Kart', venue: 'Sovereign Circuit', href: '/play/velocity-kart' },
+  aeroaces: { name: 'Aero Aces', venue: 'The Flyway', href: '/play/aero-aces' },
   dunkContest: { name: 'Flight Night', venue: 'Venice Beach Court', href: '/play/dunk' },
   tennis: { name: 'Match Point', venue: 'Venice Tennis Court', href: '/play/tennis' },
   brainBrawl: { name: 'Brain Brawl', venue: 'NeuroArena', href: '/play/brain-brawl' },
