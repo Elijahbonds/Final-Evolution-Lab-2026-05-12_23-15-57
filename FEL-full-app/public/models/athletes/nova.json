@@ -4,6 +4,7 @@
   "builtAtSpawn": true,
   "athlete": "nova",
   "sex": "female",
-  "note": "violet kit",
-  "source": "public/models/candidates/fel-kit-female.glb"
+  "note": "lean and quick",
+  "source": "Meshy \u2014 Female Skinny Basketball Player",
+  "rig": "skin-transfer.py from public/models/elijah-meshy.glb (22 joints, T-pose donor)"
 }

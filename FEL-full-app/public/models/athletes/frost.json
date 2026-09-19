@@ -4,6 +4,7 @@
   "builtAtSpawn": true,
   "athlete": "frost",
   "sex": "female",
-  "note": "pale skin, royal blue kit",
-  "source": "public/models/candidates/fel-kit-female.glb"
+  "note": "tall, long strides",
+  "source": "Meshy \u2014 Female Tall Athletic Basketball Player",
+  "rig": "skin-transfer.py from public/models/elijah-meshy.glb (22 joints, T-pose donor)"
 }

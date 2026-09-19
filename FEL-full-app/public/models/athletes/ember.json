@@ -4,6 +4,7 @@
   "builtAtSpawn": true,
   "athlete": "ember",
   "sex": "female",
-  "note": "deep skin, orange kit",
-  "source": "public/models/candidates/fel-kit-female.glb"
+  "note": "strong through the shoulders",
+  "source": "Meshy \u2014 Female Strong Athletic Basketball Player",
+  "rig": "skin-transfer.py from public/models/elijah-meshy.glb (22 joints, T-pose donor)"
 }

@@ -4,6 +4,7 @@
   "builtAtSpawn": true,
   "athlete": "sage",
   "sex": "female",
-  "note": "green kit (hijab pending an asset)",
-  "source": "public/models/candidates/fel-kit-female.glb"
+  "note": "heavy, low centre",
+  "source": "Meshy \u2014 Female Obese Basketball Player",
+  "rig": "skin-transfer.py from public/models/elijah-meshy.glb (22 joints, T-pose donor)"
 }

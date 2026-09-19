@@ -4,6 +4,7 @@
   "builtAtSpawn": true,
   "athlete": "titan",
   "sex": "male",
-  "note": "big, amber kit",
-  "source": "public/models/candidates/fel-kit-male.glb"
+  "note": "big through the chest and shoulders",
+  "source": "Meshy \u2014 Strong Athletic Basketball Player",
+  "rig": "skin-transfer.py from public/models/elijah-meshy.glb (22 joints, T-pose donor)"
 }
