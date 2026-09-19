@@ -212,6 +212,14 @@ export function makeTimingHost(opts: TimingHostOpts) {
               >↑</span>
               <span className="text-[11px] text-white/85">WIND {hnode(hud.wind, '—')}{typeof hud.windWord === 'string' && hud.windWord ? ` · ${hud.windWord}` : ''}</span>
             </div>
+            {/* PARKOUR GOLF (owner brief 2026-09-18): the launch pad, the flicks left in the air, the rings taken this hole */}
+            {(typeof hud.flicks === 'number' || (typeof hud.pad === 'string' && hud.pad) || typeof hud.rings === 'number') && (
+              <div className="fel-panel flex items-center gap-2 px-3 py-1 text-[11px]">
+                {typeof hud.pad === 'string' && hud.pad ? <span className="rounded bg-[var(--fel-gold)]/25 px-1.5 py-0.5 font-bold text-[var(--fel-gold)]">{hud.pad}</span> : null}
+                {typeof hud.flicks === 'number' ? <span className="text-white/85">FLICKS {'◆'.repeat(Math.max(0, Number(hud.flicks)))}{'◇'.repeat(Math.max(0, 2 - Number(hud.flicks)))}</span> : null}
+                {typeof hud.rings === 'number' ? <span className="text-[#9ad7ff]">RINGS {hud.rings}/2</span> : null}
+              </div>
+            )}
           </div>
         )}
         {typeof hud.hole === 'number' && (
