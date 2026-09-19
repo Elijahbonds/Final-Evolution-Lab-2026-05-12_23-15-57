@@ -42,7 +42,7 @@ export type GroundKind =
 
 export type PropKind =
   | 'hoop' | 'backboardPole' | 'goal' | 'net' | 'wall' | 'crowdTier'
-  | 'palm' | 'lamp' | 'banner' | 'ramp' | 'beam' | 'podium' | 'tee' | 'flag' | 'stadium';
+  | 'palm' | 'lamp' | 'banner' | 'ramp' | 'beam' | 'podium' | 'tee' | 'flag' | 'stage';
 
 export interface Grade {
   /** Camera exposure. >1 lifts the whole image; the anime grade sits ~1.15. */
@@ -113,8 +113,11 @@ export interface PropSpec {
   kind: PropKind;
   position: [number, number, number];
   rotationY?: number;
+  /** For most props a multiplier; for `stage` it is the model's FOOTPRINT IN METRES on its long axis. */
   scale?: number;
   color?: string;
+  /** For `stage`: which baked venue model stands here (a meshy key). Defaults to the stadium. */
+  model?: string;
 }
 
 export interface ActorSpec {
@@ -683,13 +686,14 @@ function buildProp(scene: Scene, p: PropSpec, root: TransformNode, shadows: Shad
       add(crown);
       break;
     }
-    case 'stadium': {
+    case 'stage': {
       // THE STAGE IS A REAL STADIUM (owner, 2026-09-18: "2 soccer stadiums… swap with the one underneath that we can see in
       // the forefront"). A baked Meshy bowl stands around the play area; `scale` is its footprint in metres on its long
       // axis, and it is sunk 0.2 m so the mode's own pitch — which carries the markings and the ball's plane — reads on top
       // of the model's grass instead of z-fighting it.
-      const span = (p.scale ?? 1) > 4 ? (p.scale ?? 132) : 132;   // a stadium's `scale` is metres, not a multiplier
-      void spawnMeshyProp(scene, 'stadium', null, 'venue_stadium').then((st) => {
+      const span = (p.scale ?? 1) > 4 ? (p.scale ?? 132) : 132;   // a stage's `scale` is its footprint in METRES, not a multiplier
+      const model = (p.model ?? 'stadium') as 'stadium' | 'ballpark';
+      void spawnMeshyProp(scene, model, null, `venue_${model}`).then((st) => {
         if (!st || scene.isDisposed) return;
         st.parent = node;
         const { min, max } = st.getHierarchyBoundingVectors(true);
@@ -708,7 +712,7 @@ function buildProp(scene: Scene, p: PropSpec, root: TransformNode, shadows: Shad
         const hit = scene.pickWithRay(new Ray(from, new Vector3(0, -1, 0), 800), (m) => set.has(m as never));
         if (hit?.hit && hit.pickedPoint) st.position.y -= hit.pickedPoint.y + 0.06;
         for (const m of st.getChildMeshes()) m.isPickable = false;
-        console.info(`[VENUE] stadium stage ${span.toFixed(0)} m, field ${hit?.pickedPoint ? hit.pickedPoint.y.toFixed(2) : '?'} m → sunk to ${st.position.y.toFixed(2)}`);
+        console.info(`[VENUE] ${model} stage ${span.toFixed(0)} m, floor ${hit?.pickedPoint ? hit.pickedPoint.y.toFixed(2) : '?'} m → sunk to ${st.position.y.toFixed(2)}`);
       });
       break;
     }

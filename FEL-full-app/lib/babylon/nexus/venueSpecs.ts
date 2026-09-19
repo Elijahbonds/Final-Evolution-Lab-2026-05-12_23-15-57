@@ -457,6 +457,8 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     environment: dusk('#8ED0F0', '#123A1E', '#1E5230', '#FFF0B8', 0.85),
     ground: { kind: 'diamond', size: [70, 90], color: '#2F7A42', lineColor: '#E8D5A8', markings: 'diamond' },
     props: [
+      // THE STAGE (owner, 2026-09-18): his Catalina Beach ballpark stands around the diamond.
+      { kind: 'stage', model: 'ballpark', position: [0, 0, 6], scale: 150 },
       { kind: 'crowdTier', position: [0, 0, 44], rotationY: Math.PI }, { kind: 'crowdTier', position: [-30, 0, 30], rotationY: Math.PI * 0.75 }, { kind: 'crowdTier', position: [30, 0, 30], rotationY: -Math.PI * 0.75 },
       { kind: 'lamp', position: [-28, 0, -20] }, { kind: 'lamp', position: [28, 0, -20] },
       { kind: 'banner', position: [0, 0, -42], color: '#E8D5A8' },
@@ -472,7 +474,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     ground: { kind: 'pitch', size: [44, 58], color: '#2E7D46', lineColor: '#FFFFFF', markings: 'penalty' },
     props: [
       // THE STAGE (owner, 2026-09-18): a real stadium bowl stands around the penalty pitch instead of three block tiers.
-      { kind: 'stadium', position: [0, 0, 2], scale: 66 },
+      { kind: 'stage', model: 'stadium', position: [0, 0, 2], scale: 66 },
       { kind: 'lamp', position: [-22, 0, 16] }, { kind: 'lamp', position: [22, 0, 16] },
     ],
     actors: [],
