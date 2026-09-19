@@ -68,6 +68,19 @@ export const REAL_CLIPS = new Set<string>([
   'board_ride_idle', 'board_carve_left', 'board_carve_right', 'board_tuck',
   'board_grab', 'board_air', 'board_grind', 'board_land', 'board_push',
   'skate_kickflip', 'skate_bail', 'board_manual', 'skate_ollie',
+  // REGISTRY DRIFT, CLOSED (2026-09-18). 42 authored clips had no entry here — the whole HOOPS handle kit
+  // (shammgod, yoyo, snatch-back, the ankle breakers), the layup/finish kit, the hard defensive slides, the
+  // elbow strikes and three dunk finishes. They still PLAYED, because installSafePlay's second clause accepts
+  // any name the animator has registered — but `isResolvable()` said no, which is what every static check and
+  // every blend tree proof asks. Read off anim/authored/index.ts; `clip-registry-tests.ts` now keeps it honest.
+  'dunk_finish_reverse', 'dunk_finish_power', 'dunk_finish_two_hand', 'karate_elbow', 'karate_spin_elbow', 'bball_in_and_out_left',
+  'bball_in_and_out_right', 'bball_between_legs_left', 'bball_between_legs_right', 'bball_behind_back_left', 'bball_behind_back_right',
+  'bball_double_cross_left', 'bball_double_cross_right', 'bball_snatch_back', 'bball_shammgod_left', 'bball_shammgod_right', 'bball_yoyo',
+  'bball_ankle_stumble', 'bball_ankle_slip', 'bball_stepback_gather', 'bball_mikan', 'bball_mikan_left', 'bball_up_and_under',
+  'bball_up_and_under_left', 'bball_finger_roll', 'bball_finger_roll_left', 'bball_layup_scoop', 'bball_layup_scoop_left', 'bball_layup_spin',
+  'bball_layup_spin_left', 'bball_layup_hang', 'bball_layup_hang_left', 'bball_shimmy', 'bball_drop_step', 'bball_drop_step_left', 'bball_floater_left',
+  'bball_euro_step_left', 'bball_defend_backpedal', 'bball_closeout', 'bball_contact_react', 'bball_defend_slide_hard_left',
+  'bball_defend_slide_hard_right',
 ]);
 
 // NOTE ON THIS LIST. isResolvable() — and therefore installSafePlay's gate —

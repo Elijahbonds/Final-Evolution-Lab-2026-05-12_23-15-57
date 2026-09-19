@@ -8,7 +8,7 @@ import type { Scene } from '@babylonjs/core';
 import { CharacterAnimator } from '../anim/CharacterAnimator';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
-import { registerMirroredClips, DANCE_MIRROR_BASES } from '../anim/mirrored-clips';
+import { registerMirroredClips, SPAWN_MIRROR_BASES } from '../anim/mirrored-clips';
 import { buildRig } from './proceduralRig';
 import { buildBody } from './proceduralMesh';
 import { buildSkinnedBody } from './proceduralSkin';
@@ -70,7 +70,9 @@ export function spawnProceduralAthlete(scene: Scene, opts: SpawnOpts = {}): Spaw
   // every mirrored dance step silently fell back to the bind-pose-safe
   // default ('guard') instead of actually mirroring, and since
   // PROCEDURAL_CHARACTERS is the default spawn path, that was every player.
-  registerMirroredClips(animator, scene, rig.skeleton, DANCE_MIRROR_BASES);
+  // Keeper dives ride along for the same reason (see KEEPER_MIRROR_BASES): `keeper_dive_left` is a GLOBAL alias onto
+  // 'keeper_dive.M', played by the soccer and baseball trees, and only Penalty mode was registering that mirror.
+  registerMirroredClips(animator, scene, rig.skeleton, SPAWN_MIRROR_BASES);
 
   const baseLoop = opts.startClip ?? 'idle_stand';
   neverBindPose(animator, baseLoop);

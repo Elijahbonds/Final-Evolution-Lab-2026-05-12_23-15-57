@@ -39,6 +39,22 @@ const FLOOR_TOLERANCE = -0.10;
  */
 const RUNTIME_PLANTED: Record<string, string> = {};
 
+/**
+ * Clips whose rig is spawned with its ROOT off the floor, because the character is sitting on something.
+ *
+ * This is not an exemption — the clip still has to clear the ground. It is a correction to WHERE the ground is:
+ * `footY` reads world y and the sweep rig spawns at y=0, so a pose authored for a saddle reads its own mount height
+ * as a hole in the pitch. Each entry is the literal the runtime spawns that rider at, and it is a MEASUREMENT (the
+ * file and line below), not a claim — the same bar the empty list above is held to. A rider whose ankle is still
+ * under the floor after its mount height is added is a real offender and fails like anything else.
+ */
+const MOUNTED: Record<string, { lift: number; where: string }> = {
+  // modes/dunkObstacleProps.ts: `const y = spec.rider === 'bike' ? 0.26 : 0.08;` — the saddle sits at 0.92, the
+  // seated hips land ~0.96 above the root, so the whole cyclist rides 0.26 up and the pedals are below his root.
+  prop_bike_rider: { lift: 0.26, where: "dunkObstacleProps.ts spawnNpc position.y" },
+  prop_skate_rider: { lift: 0.08, where: "dunkObstacleProps.ts spawnNpc position.y" },
+};
+
 const scene = new Scene(new NullEngine());
 new FreeCamera('cam', new Vector3(0, 0, -5), scene);
 const rig = buildRig(scene, 'default');
@@ -77,8 +93,11 @@ for (const g of scene.animationGroups) {
   g.stop();
   if (!Number.isFinite(lowest)) continue;
   measured++;
-  if (lowest < FLOOR_TOLERANCE && !RUNTIME_PLANTED[g.name]) {
-    offenders.push(`${g.name} (lowest ankle ${lowest.toFixed(3)})`);
+  const mount = MOUNTED[g.name];
+  const ground = lowest + (mount?.lift ?? 0);
+  if (ground < FLOOR_TOLERANCE && !RUNTIME_PLANTED[g.name]) {
+    const seat = mount ? ` — mounted +${mount.lift} (${mount.where})` : '';
+    offenders.push(`${g.name} (lowest ankle ${ground.toFixed(3)}${seat})`);
   }
 }
 resetPose();
@@ -88,6 +107,7 @@ assert.ok(measured > 100, `the whole library should be swept (got ${measured})`)
 assert.deepEqual(offenders, [], `clips with a foot through the floor:\n   ${offenders.join('\n   ')}`);
 console.log(`  ✓ no clip puts a foot more than ${Math.abs(FLOOR_TOLERANCE) * 100}cm under the floor`);
 console.log(`  ✓ ${Object.keys(RUNTIME_PLANTED).length} clip(s) exempt — the list is empty, every clip stands on its own`);
+console.log(`  ✓ ${Object.keys(MOUNTED).length} clip(s) measured from their mount rather than from y=0`);
 
 scene.dispose();
 console.log(`\n✅ rig-floor-tests: the library stands on the ground`);

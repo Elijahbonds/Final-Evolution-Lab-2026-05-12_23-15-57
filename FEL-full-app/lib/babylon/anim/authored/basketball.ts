@@ -263,15 +263,29 @@ export function buildAnkleStumble(scene: Scene, sk: Skeleton): AnimationGroup | 
   ]);
 }
 
-/** THE SLIP: he did not catch it. The feet go out from under him sideways and he lands on a hip and a hand — this
+/** LIE THE PELVIS, AND LET THE ARMS FOLLOW IT (rig sweep, 2026-09-18).
+ *
+ *  The going-down keys carried only YAW on Hips while hipsY dropped 0.74, so the pelvis stayed bolt upright and the
+ *  legs hung from a vertical socket straight through the floor — measured -0.516, half a metre of shin under the court
+ *  on the one clip the crowd stands up for. Rotating Hips lays the chain down; the knees fold so the feet come up with
+ *  the hips rather than being dragged under the floor by them.
+ *
+ *  Rotating the pelvis 62° then broke the ARMS, and the same way the spin layup's did (see buildSpinLayup): `hands`
+ *  targets are ABSOLUTE FROM THE ROOT, so a pelvis that pitches back swings both shoulders down and behind while the
+ *  targets stay where an UPRIGHT body would have put them. Measured: 0.67 m and 0.86 m of requested reach against a
+ *  0.54 m arm, so the solver straightened both arms and stopped short — 178° at every frame from t=0.36 to the end,
+ *  a scarecrow lying on the court. The down keys are `handsRel` now: measured from the POSED shoulder, so |rel| IS the
+ *  elbow (0.44-0.46 ≈ 110-120°) and it stays that whatever the pelvis does. The two standing keys keep `hands`.
+ *
+ *  THE SLIP: he did not catch it. The feet go out from under him sideways and he lands on a hip and a hand — this
  *  is the one the crowd stands up for, and it has to be a FALL, not a knockdown: nothing hit him. */
 export function buildAnkleSlip(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'bball_ankle_slip', 0.78, [
     { t: 0,    bones: { Hips: [0, 0, 0],   Spine: [10, 0, 0],  Neck: [-4, 0, 0],  LeftUpLeg: [-26, 0, 14], RightUpLeg: [-26, 0, -14], LeftLeg: [38, 0, 0], RightLeg: [38, 0, 0] }, hands: { Right: [0.34, 1.02, 0.18] as V3, Left: [-0.34, 1.02, 0.18] as V3 }, hipsY: -0.08 },
     { t: 0.14, bones: { Hips: [0, -18, 0], Spine: [20, 12, 0], Neck: [2, -8, 0],  LeftUpLeg: [-64, 0, -22], RightUpLeg: [-8, 0, -20], LeftLeg: [22, 0, 0], RightLeg: [14, 0, 0] }, hands: { Right: [0.58, 1.20, 0.04] as V3, Left: [-0.54, 1.26, -0.08] as V3 }, hipsY: -0.16 },   // the foot slides out from under him
-    { t: 0.34, bones: { Hips: [0, -26, 0], Spine: [40, 18, 0], Neck: [10, -12, 0], LeftUpLeg: [-86, 0, -30], RightUpLeg: [-30, 0, -22], LeftLeg: [18, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.66, 0.52, -0.20] as V3, Left: [-0.50, 0.92, 0.26] as V3 }, hipsY: -0.52 },   // going down: the hand reaches for the floor behind him
-    { t: 0.5,  bones: { Hips: [0, -30, 0], Spine: [46, 20, 0], Neck: [14, -12, 0], LeftUpLeg: [-96, 0, -34], RightUpLeg: [-46, 0, -24], LeftLeg: [26, 0, 0], RightLeg: [58, 0, 0] }, hands: { Right: [0.70, 0.14, -0.30] as V3, Left: [-0.44, 0.70, 0.30] as V3 }, hipsY: -0.74 },   // DOWN — on the hip and the hand
-    { t: 0.78, bones: { Hips: [0, -28, 0], Spine: [42, 18, 0], Neck: [10, -10, 0], LeftUpLeg: [-92, 0, -32], RightUpLeg: [-44, 0, -22], LeftLeg: [30, 0, 0], RightLeg: [56, 0, 0] }, hands: { Right: [0.68, 0.16, -0.28] as V3, Left: [-0.46, 0.66, 0.28] as V3 }, hipsY: -0.72 },   // sat there watching you go
+    { t: 0.34, bones: { Hips: [-40, -26, 0], Spine: [16, 18, 0], Neck: [10, -12, 0], LeftUpLeg: [-58, 0, -30], RightUpLeg: [-34, 0, -22], LeftLeg: [66, 0, 0], RightLeg: [76, 0, 0] }, handsRel: { Right: [0.10, -0.40, -0.16] as V3, Left: [-0.34, -0.14, 0.22] as V3 }, hipsY: -0.44 },   // going down: the hand reaches for the floor behind him
+    { t: 0.5,  bones: { Hips: [-62, -30, 0], Spine: [12, 20, 0], Neck: [14, -12, 0], LeftUpLeg: [-74, 0, -34], RightUpLeg: [-52, 0, -24], LeftLeg: [96, 0, 0], RightLeg: [104, 0, 0] }, handsRel: { Right: [0.06, -0.44, -0.12] as V3, Left: [-0.30, -0.24, 0.20] as V3 }, hipsY: -0.66 },   // DOWN — on the hip and the hand, knees up
+    { t: 0.78, bones: { Hips: [-60, -28, 0], Spine: [12, 18, 0], Neck: [10, -10, 0], LeftUpLeg: [-72, 0, -32], RightUpLeg: [-50, 0, -22], LeftLeg: [94, 0, 0], RightLeg: [102, 0, 0] }, handsRel: { Right: [0.06, -0.43, -0.12] as V3, Left: [-0.30, -0.23, 0.20] as V3 }, hipsY: -0.64 },   // sat there watching you go
   ]);
 }
 
@@ -646,12 +660,26 @@ export function buildScoopLayup(scene: Scene, sk: Skeleton, side: 'left' | 'righ
 /** The spin: a full turn of the HIPS (the root bone — the whole body turns with it) through the hop, the ball tucked in two
  *  hands at the chest, out of the turn facing the iron with the ball hand up. Yaw is keyed in 120° steps so the quaternion
  *  interpolation takes the short way round each time. */
+/**
+ * HANDS THAT RIDE A SPIN ARE SHOULDER-RELATIVE (rig sweep, 2026-09-18).
+ *
+ * These keys turn the Hips a full 360, but `hands` targets are ABSOLUTE FROM THE ROOT — they
+ * do not turn with the body. So the shoulder swings around a target that stays put, and partway
+ * through the turn it arrives on top of it: measured, the left shoulder-to-hand distance fell to
+ * 0.08 m at t=0.37 and the elbow shut to 14 degrees, the forearm folded inside the bicep on both
+ * the right and mirrored left clips.
+ *
+ * `handsRel` is measured FROM THE POSED SHOULDER, so it travels with the turn, and its LENGTH is
+ * the elbow angle (0.54 = straight, 0.46 ~117, 0.42 ~102). The tuck and the off hand use it; the
+ * RIGHT hand at the release keeps an absolute target, because reaching for the rim is a reach at
+ * a fixed thing in the world and is supposed to stay where the rim is.
+ */
 const SPIN_LAYUP_KEYS: PoseKey[] = [
   { t: 0,    bones: { Hips: [0, 0, 0],   Spine: [12, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-22, 0, 6], RightUpLeg: [-22, 0, -6], LeftLeg: [34, 0, 0], RightLeg: [34, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06 },
-  { t: 0.12, bones: { Hips: [0, 120, 0], Spine: [6, 0, 0],  Neck: [-6, 0, 0],  LeftUpLeg: [-52, 0, 8], RightUpLeg: [-48, 0, -8], LeftLeg: [68, 0, 0], RightLeg: [64, 0, 0] }, hands: { Right: [0.12, 1.32, 0.22], Left: [-0.12, 1.32, 0.22] }, hipsY: 0.02 },   // tucked, both hands on the ball
-  { t: 0.24, bones: { Hips: [0, 240, 0], Spine: [2, 0, 0],  Neck: [-6, 0, 0],  LeftUpLeg: [-56, 0, 8], RightUpLeg: [-44, 0, -8], LeftLeg: [70, 0, 0], RightLeg: [60, 0, 0] }, hands: { Right: [0.14, 1.52, 0.18], Left: [-0.14, 1.52, 0.18] }, hipsY: 0.04 },
-  { t: 0.34, bones: { Hips: [0, 360, 0], Spine: [-8, 0, 0], Neck: [-10, 0, 0], LeftUpLeg: [-76, 0, 8], RightUpLeg: [-8, 0, -6],  LeftLeg: [70, 0, 0], RightLeg: [12, 0, 0] }, hands: { Right: [0.20, 2.02, 0.18], Left: [-0.26, 1.40, 0.20] }, poles: { Right: UP_R }, hipsY: 0.05 },   // out of the turn: the release
-  { t: 0.54, bones: { Hips: [0, 360, 0], Spine: [-2, 0, 0], Neck: [-6, 0, 0],  LeftUpLeg: [-48, 0, 8], RightUpLeg: [-12, 0, -6], LeftLeg: [50, 0, 0], RightLeg: [16, 0, 0] }, hands: { Right: [0.22, 1.90, 0.14], Left: [-0.26, 1.34, 0.22] }, poles: { Right: UP_R }, hipsY: 0.02 },
+  { t: 0.12, bones: { Hips: [0, 120, 0], Spine: [6, 0, 0],  Neck: [-6, 0, 0],  LeftUpLeg: [-52, 0, 8], RightUpLeg: [-48, 0, -8], LeftLeg: [68, 0, 0], RightLeg: [64, 0, 0] }, handsRel: { Right: [0.09, -0.08, 0.41], Left: [-0.09, -0.08, 0.41] }, hipsY: 0.02 },   // tucked, both hands on the ball — rel, so the tuck rides the turn; x pulls each wrist toward the MIDLINE (it pushed them apart, and a tuck is two hands on one ball)
+  { t: 0.24, bones: { Hips: [0, 240, 0], Spine: [2, 0, 0],  Neck: [-6, 0, 0],  LeftUpLeg: [-56, 0, 8], RightUpLeg: [-44, 0, -8], LeftLeg: [70, 0, 0], RightLeg: [60, 0, 0] }, handsRel: { Right: [0.09, 0.02, 0.41], Left: [-0.09, 0.02, 0.41] }, hipsY: 0.04 },
+  { t: 0.34, bones: { Hips: [0, 360, 0], Spine: [-8, 0, 0], Neck: [-10, 0, 0], LeftUpLeg: [-76, 0, 8], RightUpLeg: [-8, 0, -6],  LeftLeg: [70, 0, 0], RightLeg: [12, 0, 0] }, hands: { Right: [0.20, 2.02, 0.18] }, handsRel: { Left: [0.14, -0.06, 0.40] }, poles: { Right: UP_R }, hipsY: 0.05 },   // out of the turn: the release — the rim hand is a world reach, the off hand rides the body
+  { t: 0.54, bones: { Hips: [0, 360, 0], Spine: [-2, 0, 0], Neck: [-6, 0, 0],  LeftUpLeg: [-48, 0, 8], RightUpLeg: [-12, 0, -6], LeftLeg: [50, 0, 0], RightLeg: [16, 0, 0] }, hands: { Right: [0.22, 1.90, 0.14] }, handsRel: { Left: [0.14, -0.10, 0.40] }, poles: { Right: UP_R }, hipsY: 0.02 },
   { t: 0.76, bones: { Hips: [0, 360, 0], Spine: [10, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-18, 0, 6], RightUpLeg: [-18, 0, -6], LeftLeg: [28, 0, 0], RightLeg: [28, 0, 0] }, hands: { Right: [0.26, 1.14, 0.30], Left: [-0.24, 1.08, 0.26] }, hipsY: -0.05 },
 ];
 export function buildSpinLayup(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {

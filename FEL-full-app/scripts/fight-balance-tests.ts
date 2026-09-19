@@ -13,6 +13,8 @@
 
 import { Vector3 } from '@babylonjs/core';
 import { RivalFightBrain, FighterState, KARATE_ATTACKS } from '../lib/babylon/core/FightCore';
+import { COMBAT_ARENAS, type CombatArena, type CombatModeId } from '../lib/babylon/combat/arenas';
+import { FOLLOW_PRESETS } from '../lib/babylon/core/CameraDirector';
 
 let checks = 0;
 const fail: string[] = [];
@@ -112,29 +114,40 @@ import { readFileSync } from 'node:fs';
 // Both karate modes hit this, and so did both half-court basketball venues: a
 // play area exactly as big as its room leaves the camera nowhere to stand, and
 // the hero drops out of frame at the boundary. One check, both modes.
-const arenas: { file: string; roomHalf: number; pullback: number; label: string }[] = [
-  // KarateVS fights in VenueKit.buildDojo's 18x18 floor with the 'fight' preset.
-  { file: 'lib/babylon/modes/KarateVSMode.ts', roomHalf: 9, pullback: 4.2, label: 'Karate VS / dojo' },
-  // KarateEndless fights on the karate_endless mat with the 'overShoulder' preset.
-  { file: 'lib/babylon/modes/KarateEndlessMode.ts', roomHalf: 12, pullback: 3.1, label: 'Karate Endless / mat' },
-];
-for (const a of arenas) {
-  const src = readFileSync(a.file, 'utf8');
-  // Accept either spelling. Karate Endless's square clamp became a RADIAL one
-  // (ARENA_HALF -> ARENA_RADIUS) because a square has corners, and a corner is
-  // the one place a facing-derived camera cannot swing behind its subject. The
-  // clearance arithmetic is the same either way -- it is the worst-case
-  // distance from the origin to where a fighter can stand -- but the fallback
-  // of '99' meant a rename silently turned this check into a guaranteed
-  // failure rather than a skipped one, which is at least loud. Reading both
-  // names keeps it honest through the next rename too.
-  const decl = /const ARENA_(?:HALF|RADIUS) = ([0-9.]+)/.exec(src);
-  ok(decl !== null, `D-${a.label}: found an arena extent to check in ${a.file}`);
-  const half = Number(decl?.[1] ?? '99');
-  ok(half + a.pullback <= a.roomHalf + 0.5,
-    `D-${a.label}: a fighter at the arena edge (${half}) leaves room for the camera's ` +
-    `${a.pullback}m pullback inside a room of half-extent ${a.roomHalf} — it did not, ` +
-    'and the hero fell out of frame at the boundary');
+// THE ARENA IS DATA NOW (2026-09-18). This check used to GREP each mode file for `const ARENA_HALF = …` and compare it
+// against a room half-extent written down here, with a `?? '99'` fallback so a rename failed loudly instead of
+// silently. The rename came: COMBAT ARENAS replaced four hardcoded room constants (karate's 7.5 disc, Karate VS's 4.5
+// box, Mixed's 6.2 octagon, Duel's 6.5 disc) with a table of seven arenas, each carrying its own shape and the
+// half-extent of the floor its venue paints. So the grep found nothing, took the 99, and reported the dojo as
+// catastrophically oversized — a true failure of a check that no longer knew where to look.
+//
+// Asked properly, it is a better question than it was: every arena, against every mode that serves it, with both
+// numbers read from the modules that own them. The worst case for a fighter is the point of the arena FURTHEST from
+// the origin — for a box that is the corner, not the wall, which is exactly the case the old square-vs-radial note
+// worried about.
+const MODE_CAM: Record<CombatModeId, string> = {
+  karate: 'overShoulder',       // KarateEndlessMode camPreset
+  karate_vs: 'fight',           // KarateVSMode camPreset
+  mixedcombat: 'fight',         // MixedCombatMode camPreset
+  duel: 'duel',                 // DuelMode camPreset
+};
+/** How far from the origin a fighter can get: a disc's rim, or a box's CORNER. */
+const worstReach = (a: CombatArena): number =>
+  (a.shape.kind === 'disc' ? a.shape.radius : Math.hypot(a.shape.halfX, a.shape.halfZ));
+
+for (const arena of COMBAT_ARENAS) {
+  for (const mode of arena.modes) {
+    const preset = FOLLOW_PRESETS[MODE_CAM[mode]];
+    ok(!!preset, `D-${arena.id}/${mode}: camera preset "${MODE_CAM[mode]}" exists in FOLLOW_PRESETS`);
+    if (!preset) continue;
+    // The camera stands `distance` behind its subject and swings `shoulderOffset` off the axis; the worst case is
+    // both at once, which is the diagonal.
+    const pullback = Math.hypot(preset.distance, preset.shoulderOffset ?? 0);
+    ok(worstReach(arena) + pullback <= arena.look.floorHalf + 0.5,
+      `D-${arena.id}/${mode}: a fighter at the arena's furthest point (${worstReach(arena).toFixed(1)}m) leaves room ` +
+      `for the ${MODE_CAM[mode]} camera's ${pullback.toFixed(1)}m pullback inside a floor of half-extent ` +
+      `${arena.look.floorHalf} — it did not, and the hero falls out of frame at the boundary`);
+  }
 }
 
 if (fail.length) {

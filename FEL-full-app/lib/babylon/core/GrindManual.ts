@@ -72,8 +72,15 @@ export class BalanceChannel {
     this.balance.kick(0.15 * speed01);         // locking on at speed is a jolt
   }
 
-  /** Frame step. stickX counters the drift. Returns pts accrued this frame
-   *  (0 when slipped). 'slipped' ends the channel. */
+  /**
+   * Frame step. Returns pts accrued this frame (0 when slipped); 'slipped' ends the channel.
+   *
+   * SIGN CONVENTION — `stickX` COUNTERS WHEN IT MATCHES `needle`'s SIGN. The needle moves by `-stickX * authority`,
+   * so a needle at +0.4 is pulled back to centre by a stick at +x, not −x. Read the other way round it is a soft
+   * edge that amplifies: pushing against the needle's sign is the WRONG-WAY branch (6.6 vs 4.2, see ANTI-MASH
+   * below), so a "counter" of −needle is a 6.6-authority shove toward the edge and the rider is off the rail in
+   * under a second. grind-manual-tests.ts asserted exactly that for a while and read the slip as a physics bug.
+   */
   update(dt: number, stickX: number, speed01: number): { pts: number; slipped: boolean } {
     if (!this.active) return { pts: 0, slipped: false };
     this.heldSec += dt;

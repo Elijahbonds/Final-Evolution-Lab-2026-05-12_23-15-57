@@ -25,7 +25,10 @@ ok('countering the drift sustains the grind and ticks points', () => {
   g.start(0.2);                                  // slow, controlled grind
   let pts = 0;
   for (let i = 0; i < 120 && g.active; i++) {
-    const r = g.update(DT, -g.needle * 0.9, 0.2);  // proportional counter
+    // SIGN: the stick counters when it MATCHES the needle's sign (the needle moves by -stickX * authority, see
+    // GrindManual.update). This read -needle for a long time — which is the WRONG-WAY branch at 6.6 authority, so
+    // the "proportional counter" was a shove and the grind slipped at 0.8 s. The physics were never the problem.
+    const r = g.update(DT, g.needle * 0.9, 0.2);  // proportional counter
     pts += r.pts;
   }
   assert.ok(g.active, 'still grinding after 2s at low speed');
@@ -51,7 +54,7 @@ ok('manuals tick at their own rate and end on stop()', () => {
   const m = new BalanceChannel('manual', b);
   m.start(0.3);
   let pts = 0;
-  for (let i = 0; i < 60 && m.active; i++) pts += m.update(DT, -m.needle * 0.9, 0.3).pts;
+  for (let i = 0; i < 60 && m.active; i++) pts += m.update(DT, m.needle * 0.9, 0.3).pts;
   assert.ok(Math.abs(pts - MANUAL_PTS_PER_SEC) < MANUAL_PTS_PER_SEC * 0.4);
   m.stop();
   assert.ok(!m.active);
@@ -66,18 +69,31 @@ ok('snap + transition = manual; otherwise nothing', () => {
 });
 
 console.log('\nD. speed scales the skill check');
+// HOW THIS IS MEASURED. The claim is about DRIFT — `drift = (BALANCE_DRIFT_RATE + speed01 * 0.45) * …` — so the probe
+// is hands-off, where drift is the only term that moves the needle. With a stick on it the check could not see its own
+// subject: a 0.9-proportional counter holds BOTH speeds past the 20 s cap, so slow and fast tied at 20.0 s and the
+// assertion failed on a model that was behaving exactly as designed.
+//
+// And it is SEEDED. `BalanceChannel`'s `rnd` is injectable for this reason (see its constructor): the drift's seed and
+// its initial direction were Math.random, so a single run's slip time is not a number anything can assert on. One
+// seeded generator, many runs, compare the means.
 ok('faster grinds drift harder', () => {
-  const b1 = new BalanceModel(); const slow = new BalanceChannel('grind', b1); slow.start(0.1);
-  const b2 = new BalanceModel(); const fast = new BalanceChannel('grind', b2); fast.start(0.95);
-  // same skill, both speeds: faster must slip sooner
-  const run = (g: InstanceType<typeof BalanceChannel>, spd: number) => {
-    let frames = 0;
-    while (g.active && frames < 1200) { g.update(DT, -g.needle * 0.9, spd); frames++; }
-    return frames;
+  const lcg = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000);
+  const meanSlipSec = (speed01: number) => {
+    let total = 0;
+    const RUNS = 60;
+    for (let r = 0; r < RUNS; r++) {
+      const g = new BalanceChannel('grind', new BalanceModel(), lcg(r + 1));
+      g.start(speed01);
+      let frames = 0;
+      while (g.active && frames < 1200) { g.update(DT, 0, speed01); frames++; }   // hands off: drift alone
+      total += frames * DT;
+    }
+    return total / RUNS;
   };
-  const slowFrames = run(slow, 0.2);
-  const fastFrames = run(fast, 0.95);
-  assert.ok(fastFrames < slowFrames, `fast slips sooner (${(fastFrames * DT).toFixed(1)}s vs ${(slowFrames * DT).toFixed(1)}s)`);
+  const slow = meanSlipSec(0.1);
+  const fast = meanSlipSec(0.95);
+  assert.ok(fast < slow, `fast must slip sooner (fast ${fast.toFixed(2)}s vs slow ${slow.toFixed(2)}s over 60 seeded runs)`);
 });
 
 console.log(`\n${pass} checks green`);

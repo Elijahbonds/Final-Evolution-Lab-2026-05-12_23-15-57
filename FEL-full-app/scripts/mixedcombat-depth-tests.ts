@@ -81,7 +81,15 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
   }
   // the edge readout has both directions and both are computed from the ring
   ok(mode.includes("'EDGE BEHIND YOU'") && mode.includes("'RIVAL ON THE EDGE'"), 'edge warning names both dangers');
-  ok(mode.includes('RING_RADIUS - 1.6'), 'the danger zone is measured off the real ring radius');
+  // WAS `mode.includes('RING_RADIUS - 1.6')`. COMBAT ARENAS (2026-09-18) deleted that constant: the ring is one of
+  // seven shapes now, so a danger band measured as "radius minus 1.6" cannot describe a box at all. The mode uses
+  // `insideBy(pos, arena.shape)` — signed distance INSIDE the edge, positive inwards — which is the same 1.6 m band
+  // stated in a way a rectangle can answer, and it is gated on `edge === 'drop'` because a walled arena has no
+  // ring-out to warn about. The grep was checking for the old spelling of a thing that got better.
+  ok(/insideBy\(player\.root\.position, arena\.shape\)/.test(mode) && /insideBy\(rival\.root\.position, arena\.shape\)/.test(mode),
+    'the danger zone is measured off the arena\'s own shape, both fighters');
+  ok(/myIn < 1\.6/.test(mode) && /foeIn < 1\.6/.test(mode), 'the danger band is 1.6m inside the edge');
+  ok(/arena\.edge !== 'drop' \? null/.test(mode), 'the ring-out warning only fires on an arena you can be knocked off');
   // the fight hint teaches the grammar
   ok(mode.includes('side-step verticals'), 'the fight hint teaches step-vs-sweep');
 }

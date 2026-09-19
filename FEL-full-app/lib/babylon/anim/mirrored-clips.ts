@@ -96,3 +96,18 @@ export const DANCE_ALIASES: Record<string, [string, number]> = {
 /** Base asset clips that dance steps mirror. Mirror THESE at character load so
  * every '<base>.M' group exists before any mirrored dance alias resolves. */
 export const DANCE_MIRROR_BASES = ['walk', 'run', 'guard', 'roundhouse'];
+
+/**
+ * Keeper clips that a MODE OTHER THAN PENALTY reaches for mirrored.
+ *
+ * `clipAliases` maps `keeper_dive_left -> 'keeper_dive.M'` globally, and two animation trees play that alias:
+ * `soccerTree.gk_dive_left` and `baseballTree.field_dive`. But the only `registerMirroredClips` call that covered the
+ * keeper set lived inside Penalty mode's setup (precisionModes `MIRRORED`), so in Soccer and Baseball the target did
+ * not exist and the alias fell through installSafePlay to the safe pose — the GK's left dive and the fielder's dive
+ * were a fallback, silently, exactly the way the dance mirrors were before DANCE_MIRROR_BASES got this treatment.
+ * Mirrored at character load, the alias is true wherever it is played.
+ */
+export const KEEPER_MIRROR_BASES = ['keeper_dive', 'keeper_dive_hold', 'keeper_rise'];
+
+/** Every base clip mirrored on a spawned character, whatever mode it is about to walk into. */
+export const SPAWN_MIRROR_BASES = [...DANCE_MIRROR_BASES, ...KEEPER_MIRROR_BASES];

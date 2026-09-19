@@ -84,13 +84,31 @@ ok('no hard cuts (every fadeSec > 0); one-shots never loop', () => {
   assert.equal(chooseBasketballClip({ ...BASE, staggered: true }).loop, false);
   assert.equal(chooseBasketballClip({ ...BASE, speed01: 0.8 }).loop, true);
 });
+// THE DWELL (tree POLISH, 2026-09-17) IS PART OF THIS CONTRACT NOW. A sibling LOOP inside the same dwell group has to
+// be asked for DWELL_SEC before it replaces the running one — the fix for a defender flickering closeout ↔ slide on a
+// threshold. This check used to flip idle_dribble → sprint_dribble in the same millisecond and count a second play;
+// both are handle loops, so the dwell (correctly) swallowed it and the assertion read as a dedupe bug. The tree takes
+// its clock from performance.now() and not from the caller, so the way to prove a cut here is to cut with something
+// the dwell does not gate: a one-shot (`c.loop` false) skips the dwell clause entirely, which is the stated design.
 ok('tree dedupes same-state plays (no per-frame restart)', () => {
   let plays = 0;
-  const fake = { play: () => { plays++; } } as never;
+  const fake = { play: () => { plays++; }, setPlaybackScale: () => {} } as never;
   const tree = new BasketballAnimTree(fake);
   tree.update(BASE); tree.update(BASE); tree.update(BASE);
-  assert.equal(plays, 1);
-  tree.update({ ...BASE, speed01: 0.9 });
+  assert.equal(plays, 1, 'three identical frames must play once');
+  tree.update({ ...BASE, shooting: true });
+  assert.equal(plays, 2, 'a one-shot cuts in immediately — the dwell gates loops only');
+});
+ok('the dwell holds a sibling loop, and does not hold a one-shot', () => {
+  let plays = 0;
+  const fake = { play: () => { plays++; }, setPlaybackScale: () => {} } as never;
+  const tree = new BasketballAnimTree(fake);
+  assert.equal(tree.update(BASE), 'idle_dribble');
+  // same dwell group (both handle loops), same instant: the tree stays put rather than restarting a crossfade
+  assert.equal(tree.update({ ...BASE, speed01: 0.9 }), 'idle_dribble');
+  assert.equal(plays, 1, 'a sibling loop inside DWELL_SEC must not restart the group');
+  // a stagger is a priority one-shot: it cuts on the frame it is asked for, dwell or no dwell
+  assert.equal(tree.update({ ...BASE, staggered: true }), 'contact_stagger');
   assert.equal(plays, 2);
 });
 

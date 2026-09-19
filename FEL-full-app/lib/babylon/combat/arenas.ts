@@ -197,7 +197,7 @@ const DOJO: CombatArena = {
   shape: { kind: 'box', halfX: 5, halfZ: 5 }, edge: 'wall',
   walls: perimeterWalls({ kind: 'box', halfX: 5, halfZ: 5 }, 2.4, 'courtyard wall'),
   pillars: [], hazards: [],
-  look: { ...shrineSky, backdrop: 'dojo', ground: { kind: 'mat', color: '#C6BFB2', line: '#6B5B4A', markings: 'none' }, floorHalf: 8,
+  look: { ...shrineSky, backdrop: 'dojo', ground: { kind: 'mat', color: '#C6BFB2', line: '#6B5B4A', markings: 'none' }, floorHalf: 12,   // CAM CLEARANCE: was 8 — the 'fight' camera stands 11.3 m out from the 5x5 box's corner, so the mat ran out under the frame (gauntlet, the other dojo, has always painted 12)
     wallColor: '#A89B88', accent: '#FF2D55', mood: 'dojoWarm', propSet: 'dojo',
     props: [{ kind: 'banner', position: [0, 0, -11.6], color: '#FF2D55' }, lamp(6, -6), lamp(-6, -6)] },
 };
@@ -208,7 +208,7 @@ const CAGE: CombatArena = {
   shape: { kind: 'disc', radius: 6.4 }, edge: 'ropes',
   walls: perimeterWalls({ kind: 'disc', radius: 6.4 }, 3, 'cage', 8, Math.PI / 8, Math.PI * 2 + Math.PI / 8),
   pillars: [], hazards: [],
-  look: { ...nightSky, backdrop: 'neon', ground: { kind: 'street', color: '#1a1d2b', line: '#22d3ee', markings: 'none' }, floorHalf: 11,
+  look: { ...nightSky, backdrop: 'neon', ground: { kind: 'street', color: '#1a1d2b', line: '#22d3ee', markings: 'none' }, floorHalf: 12,   // CAM CLEARANCE: was 11 — the 'fight' camera swings 3 m off-axis as well as 4.2 m back, which is 11.6 m out from the 6.4 m rim
     wallColor: '#22d3ee', accent: '#22d3ee', mood: 'nightGame', propSet: null,
     props: [lamp(8, 8, '#22d3ee'), lamp(-8, 8, '#f472b6'), lamp(8, -8, '#f472b6'), lamp(-8, -8, '#22d3ee'), { kind: 'banner', position: [0, 0, -10.5], color: '#22d3ee' }] },
 };
@@ -223,7 +223,7 @@ const FOUNDRY: CombatArena = {
     { x: 3.4, z: -2.6, r: 0.5, h: 3.2, label: 'pillar SE' }, { x: -3.4, z: -2.6, r: 0.5, h: 3.2, label: 'pillar SW' },
   ],
   hazards: [{ x: 0, z: 4.4, r: 1.1, kind: 'fire', dps: 14, label: 'north pit' }, { x: 0, z: -4.4, r: 1.1, kind: 'fire', dps: 14, label: 'south pit' }],
-  look: { ...emberSky, backdrop: 'city', ground: { kind: 'street', color: '#2a2622', line: '#ff7b3d', markings: 'none' }, floorHalf: 10,
+  look: { ...emberSky, backdrop: 'city', ground: { kind: 'street', color: '#2a2622', line: '#ff7b3d', markings: 'none' }, floorHalf: 14,   // CAM CLEARANCE: was 10 — the 7x6 box's corner plus the 'fight' pullback puts the camera 13.4 m out
     wallColor: '#3a3b40', accent: '#ff7b3d', mood: 'goldenHour', propSet: null,
     props: [lamp(8.5, 7.5, '#ff7b3d'), lamp(-8.5, 7.5, '#ff7b3d'), lamp(8.5, -7.5, '#ff7b3d'), lamp(-8.5, -7.5, '#ff7b3d')] },
 };

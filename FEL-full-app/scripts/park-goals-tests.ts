@@ -15,18 +15,42 @@ let pass = 0;
 const ok = (n: string, fn: () => void) => { fn(); pass++; console.log(`  ✓ ${n}`); };
 
 console.log('\nA. goal kinds');
-ok('score / combo / gap / collect all complete through their own paths', () => {
+// DRIVEN OFF SKATE_GOALS, NOT OFF A COPY OF IT (2026-09-18). This used to complete four goals by hand and then assert
+// `allDone`. BOARD-10PHASE P8 added the plaza's three signature gaps — the hubba, the bar over the gap, the wallride
+// lip — and the check went red claiming the tracker was broken, when what it actually caught was its own hardcoded
+// list falling four short of the table. A goal the proof does not know how to drive is a goal nobody proved, so the
+// driver is per-KIND and the table supplies the rest: add a goal, and it is covered the day it lands.
+const driveTo = (t: GoalTracker, g: (typeof SKATE_GOALS)[number], idPrefix: string): void => {
+  switch (g.kind) {
+    case 'score': t.report({ type: 'bank', value: g.target + 200 }); break;
+    case 'combo': t.report({ type: 'comboLanded', value: g.target + 100 }); break;
+    case 'gap': t.report({ type: 'gap', gapId: g.gapId }); break;
+    case 'collect': for (let i = 0; i < g.target; i++) t.report({ type: 'collect', collectibleId: `${idPrefix}${i}` }); break;
+  }
+};
+
+ok('every goal in the table completes through its own event path', () => {
+  const kinds = new Set(SKATE_GOALS.map((g) => g.kind));
+  assert.ok(kinds.size >= 4, `the table should exercise every goal kind (saw ${[...kinds].join(', ')})`);
+  for (const g of SKATE_GOALS) {
+    const t = new GoalTracker(SKATE_GOALS);
+    assert.equal(t.doneCount, 0);
+    driveTo(t, g, `${g.id}_`);
+    const got = t.goals.find((x) => x.id === g.id)!;
+    assert.ok(got.done, `goal "${g.id}" (${g.kind}) did not complete on its own event`);
+  }
+});
+
+ok('every gap goal names a DISTINCT feature — no two goals on one rail', () => {
+  const gapIds = SKATE_GOALS.filter((g) => g.kind === 'gap').map((g) => g.gapId);
+  assert.ok(gapIds.every((id) => !!id), 'a gap goal with no gapId can never be completed');
+  assert.equal(new Set(gapIds).size, gapIds.length, `duplicate gapIds: ${gapIds.join(', ')}`);
+});
+
+ok('the whole card can be cleared in one run', () => {
   const t = new GoalTracker(SKATE_GOALS);
-  assert.equal(t.doneCount, 0);
-  t.report({ type: 'bank', value: 5200 });
-  assert.ok(t.goals.find((g) => g.id === 'score5k')!.done);
-  t.report({ type: 'comboLanded', value: 900 });
-  assert.ok(t.goals.find((g) => g.id === 'combo800')!.done);
-  t.report({ type: 'gap', gapId: 'moving_rail' });
-  assert.ok(t.goals.find((g) => g.id === 'gap_moving')!.done);
-  for (let i = 0; i < 10; i++) t.report({ type: 'collect', collectibleId: `c${i}` });
-  assert.ok(t.goals.find((g) => g.id === 'coins10')!.done);
-  assert.ok(t.allDone);
+  SKATE_GOALS.forEach((g, i) => driveTo(t, g, `c${i}_`));
+  assert.ok(t.allDone, `cleared ${t.doneCount} of ${SKATE_GOALS.length}`);
 });
 
 console.log('\nB. no double-complete');

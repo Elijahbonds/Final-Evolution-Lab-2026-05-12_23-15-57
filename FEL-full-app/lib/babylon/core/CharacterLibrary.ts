@@ -12,7 +12,7 @@ import { CharacterAnimator } from '../anim/CharacterAnimator';
 import { sanitizeImportedGroups, neverBindPose } from '../anim/importSanitizer';
 import { registerAuthoredClips } from '../anim/authored';
 import { CLIP_ALIASES } from '../anim/clipAliases';
-import { registerMirroredClips, DANCE_ALIASES, DANCE_MIRROR_BASES } from '../anim/mirrored-clips';
+import { registerMirroredClips, DANCE_ALIASES, SPAWN_MIRROR_BASES } from '../anim/mirrored-clips';
 import { installSafePlay } from '../anim/clipRegistry';
 import { resolveIdentity, applyIdentity } from './playerIdentity';
 import { SkinningGuard } from '../anim/SkinningGuard';
@@ -288,8 +288,9 @@ export const CharacterLibrary = {
     const animator = new CharacterAnimator(scene, inst.animationGroups);
     registerAuthoredClips(animator, scene, skeleton);
     // M28 dance: build '<base>.M' mirrored groups so mirrored dance steps have a
-    // real reflected clip (never a T-pose) — see mirrored-clips.ts.
-    registerMirroredClips(animator, scene, skeleton, DANCE_MIRROR_BASES);
+    // real reflected clip (never a T-pose) — see mirrored-clips.ts. The keeper set rides along so the global
+    // `keeper_dive_left` alias resolves outside Penalty mode too (KEEPER_MIRROR_BASES).
+    registerMirroredClips(animator, scene, skeleton, SPAWN_MIRROR_BASES);
     // ── M35 FIX (T-pose returns): a finished non-loop group drops to bind pose.
     // Every non-loop play now falls through to this character's base loop.
     const baseLoop = opts.startClip ?? 'idle_stand';

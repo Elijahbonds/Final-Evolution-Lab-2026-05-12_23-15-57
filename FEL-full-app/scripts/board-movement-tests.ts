@@ -67,11 +67,21 @@ ok('a board coasts like a board — it rolls, and it still comes to rest', () =>
   }
   assert.ok(stop > 0, 'a coasting board must come to rest, not roll forever');
   const decel = from / stop;
-  // A real board on flat concrete sheds roughly 0.1-0.3 m/s^2. This is a game, and the
-  // owner's weight pass is deliberate, so the window is wider than life — but it has
-  // both ends: above 0.85 the board dies under you (it was 0.98), below 0.45 it never
-  // settles and the push cadence stops meaning anything.
-  assert.ok(decel > 0.45 && decel < 0.85, `coast decel ${decel.toFixed(2)} m/s^2 (rolls to rest in ${stop.toFixed(1)}s)`);
+  // WHAT THIS ASSERTS, AND WHY IT IS NOT `decel` ANY MORE (2026-09-18).
+  //
+  // SKATE-COAST set the window on the absolute average `from / stop` — 0.45 to 0.85 m/s^2, measured at the cruise of
+  // the day (5.51 m/s, rolling to rest in 7.3 s at 0.75). Then WALLS + SPEED raised BOARD_PACE to 1.35 on the owner's
+  // "make the normal movement speed faster" and cruise became 7.56. The roll-out got LONGER — 8.3 s, the board holding
+  // on for a second more, which is the direction this check exists to protect — and the assertion went red anyway,
+  // because an average decel over a run rises with the speed the run starts at (the `drag` term is proportional to
+  // speed; only `rollResist` is constant). The feel never regressed. The number was measuring the wrong thing.
+  //
+  // So the coast is stated the way the tuning note argues it: HOW LONG THE BOARD ROLLS. That is speed-independent in
+  // the sense that matters — it is the player's experience of letting off — and it survives the next pace pass.
+  // Below ~6 s the board dies under you (it was 5.6 s before SKATE-COAST, and that is what the owner's eye caught);
+  // above ~11 s it never settles and the push cadence stops meaning anything.
+  assert.ok(stop > 6 && stop < 11,
+    `a coasting board rolls to rest in 6-11s (got ${stop.toFixed(1)}s from ${from.toFixed(2)} m/s, avg ${decel.toFixed(2)} m/s^2)`);
 });
 
 console.log('\nB. carve');

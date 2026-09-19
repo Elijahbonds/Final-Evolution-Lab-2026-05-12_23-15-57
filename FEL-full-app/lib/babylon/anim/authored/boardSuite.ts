@@ -377,6 +377,9 @@ export function buildSkateKickflip(scene: Scene, sk: Skeleton): AnimationGroup |
   ]);
 }
 
+/** Where a slammed rider's ankles end up: splayed, on the ground, the back leg thrown wider than the front. */
+const SLAM_FEET = { Left: [-0.26, 0.07, 0.16] as [number, number, number], Right: [0.30, 0.07, -0.18] as [number, number, number] };
+
 /** Bail — the board is gone and so is the rider. The stance BREAKS: the hips unwind and the arms flail out straight,
  *  which is the one place in this suite where a locked elbow is the truth. */
 export function buildSkateBail(scene: Scene, sk: Skeleton): AnimationGroup | null {
@@ -386,7 +389,14 @@ export function buildSkateBail(scene: Scene, sk: Skeleton): AnimationGroup | nul
       [-0.40, -0.10, 0.18], [0.40, -0.12, 0.12], -0.16, 1),
     key(T * 0.4, { LeftUpLeg: [-76, 0, 34], LeftLeg: [30, 0, 0], RightUpLeg: [-18, 0, -30], RightLeg: [88, 0, 0], Spine: [58, 0, 26], Spine1: [14, 0, 10], Neck: [10, 0, 0] },
       [-0.28, 0.36, -0.16], [0.31, 0.33, -0.20], -0.10, 0.5),
-    key(T, { LeftUpLeg: [-40, 0, 44], LeftLeg: [96, 0, 0], RightUpLeg: [-66, 0, -38], RightLeg: [40, 0, 0], Spine: [74, 0, 34], Spine1: [24, 0, 18], Neck: [26, 0, 0] },
-      [-0.40, 0.10, -0.26], [0.42, 0.06, -0.29], -0.62, 0),
+    // RIG-FLOOR (2026-09-18): the landing half of the bail was keyed in thigh/shin degrees only, and the hips fell 0.53 m
+    // over the last 0.4 s while those degrees held — so both ankles were carried 0.14 m THROUGH the ground on the way
+    // down, which is the one thing a crash must not do (it reads as the rider sinking into the pitch, not hitting it).
+    // The rest of this suite already solves its stance by PLANTING the feet and letting the hips' drop become knee bend;
+    // the bail gets the same treatment, with the feet splayed where a rider's actually end up after a slam.
+    key(T * 0.78, { LeftUpLeg: [-48, 0, 44], LeftLeg: [104, 0, 0], RightUpLeg: [-70, 0, -38], RightLeg: [74, 0, 0], Spine: [66, 0, 32], Spine1: [20, 0, 16], Neck: [22, 0, 0] },
+      [-0.40, 0.22, -0.24], [0.42, 0.18, -0.27], -0.40, 0, SLAM_FEET),
+    key(T, { LeftUpLeg: [-52, 0, 44], LeftLeg: [126, 0, 0], RightUpLeg: [-74, 0, -38], RightLeg: [104, 0, 0], Spine: [74, 0, 34], Spine1: [24, 0, 18], Neck: [26, 0, 0] },
+      [-0.40, 0.10, -0.26], [0.42, 0.06, -0.29], -0.62, 0, SLAM_FEET),
   ]);
 }

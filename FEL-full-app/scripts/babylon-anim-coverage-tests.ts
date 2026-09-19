@@ -48,8 +48,25 @@ const AUTHORED = new Set<string>(
 );
 assert.ok(AUTHORED.size > 50, `expected the authored registry to be read (got ${AUTHORED.size})`);
 
-// What a spawned character actually exposes: baked GLB groups + authored clips.
-const AVAILABLE = new Set<string>([...BAKED, ...AUTHORED]);
+// Mirrored groups ('<base>.M'), built at spawn by registerMirroredClips(SPAWN_MIRROR_BASES) on BOTH spawn paths
+// (ProceduralAthlete and CharacterLibrary). READ FROM SOURCE for the same reason AUTHORED is: a hardcoded copy goes
+// stale, and this list is exactly what made `keeper_dive_left -> keeper_dive.M` look unavailable while Penalty mode
+// was quietly registering it on the side — which was true everywhere EXCEPT Penalty, and the alias is global.
+const MIRROR_SRC = fs.readFileSync(
+  path.join(__dirname, '..', 'lib', 'babylon', 'anim', 'mirrored-clips.ts'),
+  'utf8',
+);
+const MIRROR_BASES = new Set<string>(
+  [...MIRROR_SRC.matchAll(/^export const (?:DANCE|KEEPER)_MIRROR_BASES = \[([^\]]*)\]/gm)]
+    .flatMap((m) => [...m[1].matchAll(/'([a-z0-9_]+)'/g)].map((x) => x[1])),
+);
+assert.ok(MIRROR_BASES.size > 4, `expected the spawn mirror bases to be read (got ${MIRROR_BASES.size})`);
+
+// What a spawned character actually exposes: baked GLB groups + authored clips + the mirrors built over them.
+const AVAILABLE = new Set<string>([
+  ...BAKED, ...AUTHORED,
+  ...[...MIRROR_BASES].map((b) => `${b}.M`),
+]);
 
 // Every clip the shipped Babylon modes request (grepped from lib/babylon/modes/*).
 const REQUESTED: string[] = [

@@ -57,7 +57,7 @@ export function buildKeeperDive(scene: Scene, sk: Skeleton): AnimationGroup | nu
 
 /** The dive's END pose — down on the side, flat, arms still reaching — shared by the hold and the rise. */
 const STRETCH = {
-  bones: { Hips: [0, 0, 86] as Deg3, Spine: [6, 0, 10] as Deg3, LeftUpLeg: [-14, 0, 6] as Deg3, RightUpLeg: [-26, 0, -4] as Deg3, LeftLeg: [18, 0, 0] as Deg3, RightLeg: [36, 0, 0] as Deg3 },
+  bones: { Hips: [0, 0, 86] as Deg3, Spine: [6, 0, 10] as Deg3, LeftUpLeg: [-14, 0, 6] as Deg3, RightUpLeg: [-26, 0, 10] as Deg3, LeftLeg: [18, 0, 0] as Deg3, RightLeg: [36, 0, 0] as Deg3 },
   hands: { Right: [1.20, 0.18, 0.24] as V3, Left: [1.14, 0.32, 0.34] as V3 },
   poles: { Right: [0.3, -0.9, -0.3] as V3, Left: [0.3, 0.9, -0.4] as V3 },
   hipsY: -0.84,
@@ -79,7 +79,12 @@ export function buildKeeperDiveHold(scene: Scene, sk: Skeleton): AnimationGroup 
 export function buildKeeperRise(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'keeper_rise', 0.5, [
     { t: 0, ...STRETCH },
-    { t: 0.28, bones: { Hips: [0, 0, 35], Spine: [24, 0, 16], LeftUpLeg: [-70, 0, 10], RightUpLeg: [-20, 0, -10], LeftLeg: [80, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.46, 0.70, 0.30], Left: [0.10, 0.96, 0.30] }, poles: { Left: [0.2, 0.6, -0.6] }, hipsY: -0.36 },   // pushed up off the ground onto a knee
+    // RIG-FLOOR (2026-09-18): the rise went straight from the side-lying stretch to the knee, and the under (right)
+    // leg stayed long the whole way — so as the hips climbed +0.48 the right ankle swung down 0.24 THROUGH the pitch.
+    // A keeper gets up by folding that leg under first: the shin comes flat, the knee takes the weight, THEN the hips rise.
+    { t: 0.06, bones: { Hips: [0, 0, 76], Spine: [8, 0, 12], LeftUpLeg: [-28, 0, 6], RightUpLeg: [-2, 0, -6], LeftLeg: [40, 0, 0], RightLeg: [92, 0, 0] }, hands: { Right: [1.02, 0.26, 0.26], Left: [0.88, 0.46, 0.32] }, poles: { Left: [0.2, 0.6, -0.6] }, hipsY: -0.76 },
+    { t: 0.13, bones: { Hips: [0, 0, 62], Spine: [14, 0, 14], LeftUpLeg: [-44, 0, 8], RightUpLeg: [14, 0, -8], LeftLeg: [62, 0, 0], RightLeg: [104, 0, 0] }, hands: { Right: [0.78, 0.44, 0.28], Left: [0.56, 0.68, 0.32] }, poles: { Left: [0.2, 0.6, -0.6] }, hipsY: -0.62 },
+    { t: 0.28, bones: { Hips: [0, 0, 35], Spine: [24, 0, 16], LeftUpLeg: [-70, 0, 10], RightUpLeg: [8, 0, -10], LeftLeg: [80, 0, 0], RightLeg: [104, 0, 0] }, hands: { Right: [0.46, 0.70, 0.30], Left: [0.10, 0.96, 0.30] }, poles: { Left: [0.2, 0.6, -0.6] }, hipsY: -0.36 },   // up onto the knee, shin still flat
     { t: 0.5, bones: { Hips: [0, 0, 0], Spine: [30, 0, 0], ...SET_LEGS(-36, 50) }, hands: SET_HANDS, hipsY: -0.14 },
   ]);
 }
