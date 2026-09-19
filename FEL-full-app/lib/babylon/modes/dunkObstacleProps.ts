@@ -4,7 +4,7 @@
 // meshyProps (a baked Meshy asset, untouched); the barrier and the block come from the Kenney kits under
 // public/models/props (CC0, the same files VenueProps dresses venues with). No CreateBox stand-in survives a load.
 import { Color3, MeshBuilder, PBRMaterial, Ray, SceneLoader, TransformNode, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Mesh, Scene } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { spawnMeshyProp } from '../visual/meshyProps';
 import { CharacterPipeline } from '../core/characterPipeline';
@@ -100,6 +100,21 @@ function buildBike(scene: Scene, name: string): TransformNode {
   bars.parent = root; bars.material = frame; bars.isPickable = false; bars.position.set(0, 1.02, 0.30);
   const saddle = MeshBuilder.CreateBox(`${name}_saddle`, { width: 0.12, height: 0.05, depth: 0.26 }, scene);
   saddle.parent = root; saddle.material = rubber; saddle.isPickable = false; saddle.position.set(0, 0.92, -0.46);
+  return root;
+}
+
+/** A kangaroo, upright: the body, the head and ears, the tail out behind, two big feet. It faces −z (down the lane, at the rim). */
+function buildKangaroo(scene: Scene, name: string): TransformNode {
+  const root = new TransformNode(name, scene);
+  const fur = matteMaterial(scene, `${name}_fur`, '#b08a5a'), belly = matteMaterial(scene, `${name}_belly`, '#e5d3b3'), dark = matteMaterial(scene, `${name}_dark`, '#4a3524');
+  const part = (m: Mesh, mat: PBRMaterial, x: number, y: number, z: number): Mesh => { m.parent = root; m.material = mat; m.isPickable = false; m.position.set(x, y, z); return m; };
+  const body = part(MeshBuilder.CreateSphere(`${name}_body`, { diameter: 1, segments: 12 }, scene), fur, 0, 0.8, 0); body.scaling.set(0.55, 0.95, 0.6); body.rotation.x = 0.25;
+  const chest = part(MeshBuilder.CreateSphere(`${name}_chest`, { diameter: 0.5, segments: 10 }, scene), belly, 0, 0.75, -0.16); chest.scaling.set(0.8, 1.3, 0.5);
+  const head = part(MeshBuilder.CreateBox(`${name}_head`, { width: 0.26, height: 0.28, depth: 0.42 }, scene), fur, 0, 1.32, -0.25); head.rotation.x = 0.15;
+  for (const dx of [-0.09, 0.09]) part(MeshBuilder.CreateBox(`${name}_ear`, { width: 0.07, height: 0.3, depth: 0.04 }, scene), fur, dx, 1.55, -0.15).rotation.z = dx * 3;
+  const tail = part(MeshBuilder.CreateCylinder(`${name}_tail`, { diameterTop: 0.08, diameterBottom: 0.2, height: 1.1, tessellation: 10 }, scene), fur, 0, 0.35, 0.6); tail.rotation.x = -1.15;
+  for (const dx of [-0.16, 0.16]) { part(MeshBuilder.CreateBox(`${name}_foot`, { width: 0.14, height: 0.1, depth: 0.62 }, scene), dark, dx, 0.05, -0.05); part(MeshBuilder.CreateCylinder(`${name}_shin`, { diameter: 0.14, height: 0.5, tessellation: 8 }, scene), fur, dx, 0.32, 0.12).rotation.x = 0.35; }
+  for (const dx of [-0.2, 0.2]) part(MeshBuilder.CreateCylinder(`${name}_arm`, { diameter: 0.07, height: 0.32, tessellation: 8 }, scene), fur, dx, 0.95, -0.28).rotation.x = -0.6;
   return root;
 }
 
@@ -206,7 +221,7 @@ export async function spawnDunkObstacle(scene: Scene, kind: ObstacleKind, rim: {
     rider.animator.play('prop_stack_rider', { loop: true });
     bodies.push(base, rider);
   } else if ('meshy' in spec.source) model = await spawnMeshyProp(scene, spec.source.meshy, holder, `${name}_${spec.source.meshy}`);
-  else if ('built' in spec.source) model = spec.source.built === 'ladder' ? buildLadder(scene, `${name}_ladder`) : buildBike(scene, `${name}_bike`);
+  else if ('built' in spec.source) model = spec.source.built === 'ladder' ? buildLadder(scene, `${name}_ladder`) : spec.source.built === 'bike' ? buildBike(scene, `${name}_bike`) : buildKangaroo(scene, `${name}_kangaroo`);
   else model = await loadKit(scene, spec.source.kit, spec.source.model, `${name}_${spec.source.model}`);
   if (scene.isDisposed) { holder.dispose(); throw new Error('scene disposed'); }
 
@@ -229,12 +244,12 @@ export async function spawnDunkObstacle(scene: Scene, kind: ObstacleKind, rim: {
   let rock = 0, toppleT = -1;
   // A moving prop WAITS at its mark — off the near end of its run — until the run-up commits, then it comes. Parked at
   // the middle it would just be an obstacle that happens to wiggle; starting it on the press is what makes it a read.
-  let rollDir = 1, rolling = false;
-  let rollX = -(spec.travel ?? 3.4);
+  let rollDir = spec.towardRim ? -1 : 1, rolling = false, hopT = 0;
+  let rollX = spec.towardRim ? (spec.travel ?? 3.4) : -(spec.travel ?? 3.4);   // toward the rim: it starts at the runner's end
   let profile: HeightProfile;
   if (spec.speed) {
     const t = spec.travel ?? 3.4;
-    if (spec.axis === 'z') holder.position.z = centerZ - t; else holder.position.x = rim.x - t;
+    if (spec.axis === 'z') holder.position.z = centerZ + rollX; else holder.position.x = rim.x - t;
   }
   if (model) {
     model.parent = holder;
@@ -279,7 +294,7 @@ export async function spawnDunkObstacle(scene: Scene, kind: ObstacleKind, rim: {
     profile = boxProfile(centerZ, kind === 'car' ? 1.04 : 0.5, spec.nominalHeight, kind === 'car' ? 2.4 : 0.6);
   }
   // a waiting prop's HITBOX waits with it, off the near end of its run
-  if (spec.speed) { const t = spec.travel ?? 3.4; if (spec.axis === 'z') profile.zShift = -t; else profile.centerX = -t; }
+  if (spec.speed) { const t = spec.travel ?? 3.4; if (spec.axis === 'z') profile.zShift = rollX; else profile.centerX = -t; }
   const peak = Math.max(0, ...profile.h);
   const shift0 = profile.zShift ?? 0;
   const nearZ = Math.max(profile.z[0], profile.z[profile.z.length - 1]) + shift0, farZ = Math.min(profile.z[0], profile.z[profile.z.length - 1]) + shift0;
@@ -295,6 +310,12 @@ export async function spawnDunkObstacle(scene: Scene, kind: ObstacleKind, rim: {
         rollX += rollDir * spec.speed * dt;
         if (rollX > travel) { rollX = travel; rollDir = -1; }
         if (rollX < -travel) { rollX = -travel; rollDir = 1; }
+        // THE HOP: the body and the hitbox ride each hop; the animal faces the way it is going
+        if (spec.hop) {
+          hopT += dt; const u = (hopT % spec.hop.period) / spec.hop.period; const lift = Math.sin(u * Math.PI) * spec.hop.height;
+          holder.position.y = lift; profile.lift = lift;
+          if (model) model.rotation.y = spec.yaw + (rollDir < 0 ? 0 : Math.PI);
+        }
         if (spec.axis === 'z') {
           // COMING AT YOU (owner, 2026-09-16: "the bike can come towards you"). It runs up and down the runway on the
           // line you are running, so it is not a question of whether it is in your way — it is, the whole time — but of

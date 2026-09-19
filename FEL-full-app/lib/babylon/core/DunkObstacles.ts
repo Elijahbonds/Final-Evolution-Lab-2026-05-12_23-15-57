@@ -8,15 +8,15 @@
 // The car parks sideways under the rim's shadow, so the runway crosses its width; the takeoff line moves back for it
 // (a real over-the-car dunk is a long jump) and the flight's forward carry lands the dunker past the far door.
 
-export type ObstacleKind = 'car' | 'barrier' | 'crate' | 'tetris' | 'ladder' | 'bike' | 'bikeroll' | 'skate' | 'skateroll' | 'row3' | 'row5' | 'wall';
-export const OBSTACLE_KINDS: ObstacleKind[] = ['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall'];
+export type ObstacleKind = 'car' | 'barrier' | 'crate' | 'tetris' | 'ladder' | 'bike' | 'bikeroll' | 'skate' | 'skateroll' | 'row3' | 'row5' | 'wall' | 'kangaroo';
+export const OBSTACLE_KINDS: ObstacleKind[] = ['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall', 'kangaroo'];
 
 export interface ObstacleSpec {
   kind: ObstacleKind;
   label: string;
   /** Where the model comes from: the owner's Meshy bakes, a Kenney kit (public/models/props/<kit>/<model>.glb), or
    *  BODIES — two of the game's own characters, stacked (the TETRIS). */
-  source: { meshy: 'sedan' | 'skateboard' } | { kit: string; model: string } | { bodies: 'stack' | 'row' | 'wall' } | { built: 'ladder' | 'bike' };
+  source: { meshy: 'sedan' | 'skateboard' } | { kit: string; model: string } | { bodies: 'stack' | 'row' | 'wall' } | { built: 'ladder' | 'bike' | 'kangaroo' };
   /** For a BODIES row or wall: how many of them. */
   bodyCount?: number;
   /** Somebody is ON it — a cyclist on the bike, a skater on the board. They ride the prop and duck as you come. */
@@ -28,6 +28,11 @@ export interface ObstacleSpec {
   travel?: number;
   /** Which way it travels: ACROSS the runway ('x', the default) or ALONG it — 'z' is a prop coming straight at you. */
   axis?: 'x' | 'z';
+  /** THE HOP (owner, 2026-09-18: "a kangaroo jumping in motion towards the basket"): a moving prop that hops as it goes — its
+   *  body (and the hitbox) rises `height` metres on each hop of `period` seconds. */
+  hop?: { height: number; period: number };
+  /** A moving prop that starts at the RUNNER's end and goes toward the rim first (the default starts near the rim and comes at you). */
+  towardRim?: boolean;
   /**
    * Extra apex, metres, for an obstacle that needs a bigger jump than the flat runway does.
    *
@@ -94,6 +99,11 @@ export const OBSTACLE_SPECS: Record<ObstacleKind, ObstacleSpec> = {
   skate: { kind: 'skate', label: 'SKATER', source: { meshy: 'skateboard' }, rider: 'skate', scale: 1, yaw: Math.PI / 2, zFromRim: 1.85, takeoffFromRim: 3.6, bonus: 3, topples: true, nominalHeight: 1.45, clearance: 0.05 },
   skateroll: { kind: 'skateroll', label: 'ROLLING SKATER', source: { meshy: 'skateboard' }, rider: 'skate', speed: 2.8, travel: 3.2, axis: 'x', scale: 1, yaw: Math.PI / 2, zFromRim: 1.85, takeoffFromRim: 3.6, bonus: 4.5, topples: true, nominalHeight: 1.45, clearance: 0.05 },
 
+  // THE ANIMAL (owner, 2026-09-18: "dunking over a kangaroo jumping in motion towards the basket and eastbaying over it hopping";
+  // the giraffe was cut the same night — "take the giraffe out"). Built from its own shapes like the ladder and the bike: the
+  // kangaroo hops down the lane toward the rim and its hitbox rises with every hop — the read is the beat between hops.
+  kangaroo: { kind: 'kangaroo', label: 'HOPPING KANGAROO', source: { built: 'kangaroo' }, speed: 2.6, travel: 2.4, axis: 'z', towardRim: true, hop: { height: 0.5, period: 0.6 }, scale: 1, yaw: 0, zFromRim: 2.1, takeoffFromRim: 4.0, bonus: 6, topples: true, nominalHeight: 1.3, clearance: 0.05, apexLift: 0.3 },
+
   // OVER A ROW OF PEOPLE — LONGITUDINAL (owner, 2026-09-16: "it's supposed to be 5 in a row longitudinal, straight").
   //
   // The line runs AWAY from you down the runway, so what you clear is its LENGTH, and they STAND UP (owner, 2026-09-16:
@@ -132,6 +142,8 @@ export interface HeightProfile {
   centerX?: number;
   /** And how far it has slid ALONG the runway, for a prop coming at you rather than across you. Default 0. */
   zShift?: number;
+  /** A hopping prop's height off the floor right now — the whole profile rides it. Default 0. */
+  lift?: number;
 }
 
 /** The obstacle's height under a point on the runway (linear between samples; 0 outside its footprint). */
@@ -145,7 +157,8 @@ export function heightAt(profile: HeightProfile, x: number, z: number): number {
     const a = zs[i], b = zs[i + 1];
     if ((z <= a && z >= b) || (z >= a && z <= b)) {
       const k = a === b ? 0 : (z - a) / (b - a);
-      return profile.h[i] + (profile.h[i + 1] - profile.h[i]) * k;
+      const hh = profile.h[i] + (profile.h[i + 1] - profile.h[i]) * k;
+      return hh > 0 ? hh + (profile.lift ?? 0) : hh;   // a hop lifts the whole body
     }
   }
   return 0;

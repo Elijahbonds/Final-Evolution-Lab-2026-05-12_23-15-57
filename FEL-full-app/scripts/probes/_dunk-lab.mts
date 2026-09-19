@@ -29,12 +29,16 @@ const SLAM_OFFSET_MS = Number(process.env.SLAM_OFFSET_MS ?? 0);
 const RUN_MS = Number(process.env.RUN_MS ?? 1500);          // how long RUN is held before the gather line
 /** GLASS=1 — DUNK PARKOUR: steer hard into the right-hand glass for the first part of the run (a rebound is expected), then back. */
 const GLASS = process.env.GLASS === '1';
+/** BUS=1 — THE BUS WALL RUN: out to the right on the approach, then a shallow line into the hoopbus's face (the run up its side and the jump off its front end are expected). */
+const BUS = process.env.BUS === '1';
 /** L1_AT_MS=<ms after RUN> — DUNK PARKOUR: press L1 in the air for the backboard double-launch. L1_AFTER_LAUNCH_MS=<ms> times it
  *  from the launch itself (the rise window is 0.12–0.62 s of flight), which is the reliable knob. */
 const L1_AT_MS = process.env.L1_AT_MS ? Number(process.env.L1_AT_MS) : 0;
 const L1_AFTER_LAUNCH_MS = process.env.L1_AFTER_LAUNCH_MS ? Number(process.env.L1_AFTER_LAUNCH_MS) : 0;
 /** R1_AFTER_LAUNCH_MS=<ms> — THE SKY TIER: press R1 in the air to tap off the blimp / rocket / … over the lane (needs height: GLASS=1 and/or L1). */
 const R1_AFTER_LAUNCH_MS = process.env.R1_AFTER_LAUNCH_MS ? Number(process.env.R1_AFTER_LAUNCH_MS) : 0;
+/** L1_UP=1 — hold the d-pad UP through the L1 press: the flip OFF THE TOP OF THE BACKBOARD. L1_HOLD_MS=<ms> — keep L1 down that long: the BACKBOARD RUN. */
+const L1_UP = process.env.L1_UP === '1'; const L1_HOLD_MS = Number(process.env.L1_HOLD_MS ?? 0);
 /** SLAM_HOLD_MS=<ms> — hold the slam through the contact (a hang); SWING=1 pushes the stick during the hold (the RIM SWING). */
 const SLAM_HOLD_MS = Number(process.env.SLAM_HOLD_MS ?? 60);
 const SWING = process.env.SWING === '1';
@@ -72,7 +76,7 @@ if (RUNWAY_TRICK && !(RUNWAY_TRICK in RUNWAY)) throw new Error(`no such runway t
 /** How long into the hold-run the runway trick is thrown (the double-up wants the last stretch before the line). */
 const RUNWAY_AT_MS = Number(process.env.RUNWAY_AT_MS ?? 700);
 /** The PROP ring: d-pad DOWN in the approach cycles the obstacle (car → barrier → crate → THE TETRIS). OBSTACLE=tetris. */
-const OBSTACLE_RING = ['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall'];
+const OBSTACLE_RING = ['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall', 'kangaroo'];
 const OBSTACLE = process.env.OBSTACLE ?? '';
 /** OOP=oopcorner — the prop ring is stepped with X (alley-oop → off the glass → bounce → OFF THE BILLBOARD). */
 const OOP_RING = ['alleyoop', 'oopglass', 'oopbounce', 'oopcorner']; const OOP = process.env.OOP ?? '';
@@ -110,13 +114,13 @@ page.on('pageerror', (e) => errors.push(`pageerror: ${String(e.message ?? e).sli
   if (/\/login/.test(lp.url())) {
     await lp.fill('input[type="email"]', process.env.PLAYTEST_EMAIL ?? 'playtest@fel.local');
     await lp.fill('input[type="password"]', process.env.PLAYTEST_PASSWORD ?? 'playtest-local-only');
-    await lp.click('button[type="submit"]');
+    await lp.click('button[type="submit"]', { force: true, timeout: 15000 }).catch(() => lp.press('input[type="password"]', 'Enter'));   // a venue image overlaps the button since 2026-09-18 (the click was intercepted)
     const t = Date.now(); while (Date.now() - t < 30000 && /\/login/.test(lp.url())) await lp.waitForTimeout(300);
   }
   await lp.close();
 }
 
-await page.goto(`${BASE}/play/dunk?agent=1`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+await page.goto(`${BASE}/play/dunk?agent=1&pass=${process.env.PASS ?? '1'}${process.env.LOCATION ? `&location=${process.env.LOCATION}` : ''}`, { waitUntil: 'domcontentloaded', timeout: 180000 });   // SEASON SPECIALS: the dev url opens the PRO lane for the lab (PASS=0 measures the locks)
 { const t = Date.now(); while (Date.now() - t < 180000) { const s = await page.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => ''); if (s === 'loaded' || s === 'playing') break; await page.waitForTimeout(400); } }
 
 // the pad, plus a HUD tap that records every distinct readout the contest publishes
@@ -237,18 +241,40 @@ for (let n = 0; n < ATTEMPTS; n++) {
   // X steps the whole prop ring on the PRESS (none → alley-oop → off the glass → bounce → OFF THE BILLBOARD → …); the pad d-pad's
   // release pick never landed from the fake pad (measured: NO PROP after four rights in the approach)
   // X steps the WHOLE prop ring every attempt: press until the HUD reads the label (four presses a run walked on to the car)
-  const OOP_LABEL: Record<string, string> = { alleyoop: 'ALLEY-OOP', oopglass: 'OOP OFF THE GLASS', oopbounce: 'BOUNCE OOP', oopcorner: 'OOP OFF THE BILLBOARD' };
+  const OOP_LABEL: Record<string, string> = { alleyoop: 'ALLEY-OOP', oopglass: 'OOP OFF THE GLASS', oopbounce: 'BOUNCE OOP', oopcorner: 'OOP OFF THE BUS', oopalien: 'LOB FROM THE ALIENS' };
   for (let i = 0; OOP && i < 24; i++) { const h0 = await hud(); if (String(h0.prop) === OOP_LABEL[OOP]) break; await press(2, 60); await page.waitForTimeout(160); }
   if (OOP) { await page.waitForTimeout(2600); const h0 = await hud(); console.log(`  oop ring → prop ${String(h0.prop ?? '?')} (the passer needs ~2 s to spawn before the run)`); }
 
   // RUN: the hold drives the runway; the launch fires at the gather line
   // DUNK PARKOUR: the glass is hit on the APPROACH (the stick alone, before RUN is held): a hold-run's carve toward the rim
   // wins against a full stick, so the carve into the glass has to come first, then the run
+  const runT00 = Date.now();
   if (GLASS) {
     await page.evaluate('(() => { window.__PAD.axes[0] = 0.85; window.__PAD.axes[1] = -1; })()');   // at the right front corner: the hoopbus
     await page.waitForTimeout(1400);
     await page.evaluate('(() => { window.__PAD.axes[0] = -0.35; window.__PAD.axes[1] = -1; })()');
     await page.waitForTimeout(150);
+  }
+  const heroXZ = async (): Promise<string> => page.evaluate(`(() => { try { const q = window.__FEL_QA__; const h = q && q.hero && q.hero(); if (!h) return 'no hero'; let r = h; while (r.parent) r = r.parent; const p = r.getAbsolutePosition(); return p.x.toFixed(2) + ',' + p.y.toFixed(2) + ',' + p.z.toFixed(2); } catch (e) { return 'err ' + e; } })()`) as Promise<string>;
+  if (BUS) {   // out to the right first, then the shallow line along the bus's face (≥ 14° and < 34° off it)
+    for (let i = 0; i < 40; i++) { const z = Number((await heroXZ()).split(',')[2]); if (z > -2.5) break; await page.waitForTimeout(100); }   // attempt 2+: the walk-out is still bringing him back from the rim (traced: the steer ran on a hero parked at z −10)
+    const busTrace = (async () => { for (let i = 0; i < 14; i++) { console.log(`  [bus trace] ${((Date.now() - runT00) / 1000).toFixed(1)} s hero (${await heroXZ()})`); await page.waitForTimeout(200); } })();
+    // the stick's right is the camera's right = world −x (traced 2026-09-18: +1 ran to x −4.4, the tent's side); the bus is at +x
+    await page.evaluate('(() => { window.__PAD.axes[0] = -1; window.__PAD.axes[1] = -0.35; })()');
+    await page.waitForTimeout(Number(process.env.BUS_OUT_MS ?? 900));
+    // 30° off the bus's face (the tangent turned toward the wall): a shallower line closes at 1.7 m/s and meets the z clamp first (measured: no contact at −0.5)
+    // the stick is CAMERA-relative and the follow camera looks at the rim from wherever he is: from (4.4, −4.1) forward is (−0.58, −0.81),
+    // so the 30°-off-the-face line (world (−0.26, −0.95)) is stick (−0.35, −0.93) there (a (0.27, −1) ran a 45° line into it: a rebound, not a run)
+    // …and the camera sits differently per court (Orbit: the same stick ran straight down −z, a head-on rebound), so the in-leg
+    // re-aims every 80 ms from the LIVE camera: stick = (w·right, −w·forward) for the world line w = (−0.26, −0.95)
+    const inT0 = Date.now(), inMs = Number(process.env.BUS_IN_MS ?? 1500);
+    while (Date.now() - inT0 < inMs) {
+      await page.evaluate(`(() => { const c = window.__FEL_DEV__ && window.__FEL_DEV__.scene && window.__FEL_DEV__.scene.activeCamera; if (!c) { window.__PAD.axes[0] = -0.35; window.__PAD.axes[1] = -0.93; return; }
+        const d = c.getForwardRay(1).direction; const n = Math.hypot(d.x, d.z) || 1; const f = [d.x / n, d.z / n]; const r = [f[1], -f[0]]; const w = [-0.26, -0.95];
+        window.__PAD.axes[0] = w[0] * r[0] + w[1] * r[1]; window.__PAD.axes[1] = -(w[0] * f[0] + w[1] * f[1]); })()`);
+      await page.waitForTimeout(80);
+    }
+    await busTrace;
   }
   await trigger(1);
   const runT0 = Date.now();
@@ -284,7 +310,7 @@ for (let n = 0; n < ATTEMPTS; n++) {
   }
   if (!launched) { await trigger(0); await page.waitForTimeout(400); }   // release: jump from here
   const airT0 = Date.now();
-  if (L1_AFTER_LAUNCH_MS) { void (async () => { await page.waitForTimeout(L1_AFTER_LAUNCH_MS); await press(4, 60); })(); }   // DUNK PARKOUR: the double-launch, timed from the launch
+  if (L1_AFTER_LAUNCH_MS) { void (async () => { await page.waitForTimeout(L1_AFTER_LAUNCH_MS); if (L1_UP) { await hold(DPAD.up, true); await page.waitForTimeout(30); } await hold(4, true); await page.waitForTimeout(L1_HOLD_MS || 60); await hold(4, false); if (L1_UP) await hold(DPAD.up, false); })(); }   // DUNK PARKOUR: the double-launch, timed from the launch
   if (R1_AFTER_LAUNCH_MS) { void (async () => { await page.waitForTimeout(R1_AFTER_LAUNCH_MS); await press(5, 60); })(); }   // THE SKY TIER: the tap, timed from the launch
   // the burst continues into the air (offsets are still from RUN)
   const burstRest = SHOTS_MS.map((ms, si) => ({ ms, si })).filter(({ si }) => !shotsDone.has(si));

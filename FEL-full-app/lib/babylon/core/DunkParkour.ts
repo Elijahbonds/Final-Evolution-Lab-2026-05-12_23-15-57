@@ -40,14 +40,14 @@ export const WALL_RUN_APEX_MULT = 1.5;
 export type LaunchFoot = 'one' | 'two';
 export interface LaunchProfile { apexMult: number; carryMult: number; difficulty: number; label: string }
 
-/** What a launch off this foot does, and what a corner rebound (or a wall run along the billboard) just before it adds. Capped at ×2. */
+/** What a launch off this foot does, and what a corner rebound (or the wall run along the hoopbus) just before it adds. Capped at ×2. */
 export function launchProfile(foot: LaunchFoot, vector: boolean, wallRun = false): LaunchProfile {
   const base: LaunchProfile = foot === 'one'
     ? { apexMult: 1.0, carryMult: 1.15, difficulty: 0, label: 'SPEED LAUNCH' }
     : { apexMult: 1.18, carryMult: 0.9, difficulty: 0.2, label: 'POWER LAUNCH' };
   if (!vector) return base;
   const mult = wallRun ? WALL_RUN_APEX_MULT : GLASS.apexMult;
-  return { apexMult: Math.min(2, base.apexMult * mult), carryMult: base.carryMult, difficulty: base.difficulty + GLASS.difficulty + (wallRun ? 0.4 : 0), label: `${wallRun ? 'CORNER WALL RUN' : 'BILLBOARD REBOUND'} → ${base.label}` };
+  return { apexMult: Math.min(2, base.apexMult * mult), carryMult: base.carryMult, difficulty: base.difficulty + GLASS.difficulty + (wallRun ? 0.4 : 0), label: `${wallRun ? 'WALL RUN' : 'CORNER REBOUND'} → ${base.label}` };
 }
 
 export const DOUBLE_LAUNCH = {
@@ -102,7 +102,41 @@ export function paneRebound(x: number, z: number, vx: number, vz: number, panes:
   return null;
 }
 
-// ── THE BILLBOARDS (owner: "make it a billboard and sign, change it for each scene") ──────────────────────────────────
+// ── THE CORNER RIDE (owner, 2026-09-18: "keep the bus"; "make the bus a space shuttle in the space one") ─────────────
+// What is parked across the right front corner: the hoopbus everywhere, a space shuttle in Orbit. Its face is the wall-run
+// surface and the corner oop's bank; its name is what the banners and the judge line call it.
+export interface CornerRide { kind: 'hoopbus' | 'shuttle'; name: string; short: string }
+export const CORNER_RIDES: Record<string, CornerRide> = {
+  hoopbus: { kind: 'hoopbus', name: 'THE HOOPBUS', short: 'BUS' },
+  shuttle: { kind: 'shuttle', name: 'THE SHUTTLE', short: 'SHUTTLE' },
+};
+export function cornerRideFor(location: string | undefined): CornerRide { return location === 'orbit' ? CORNER_RIDES.shuttle : CORNER_RIDES.hoopbus; }
+
+// ── THE BUS WALL RUN (owner, 2026-09-18: "keep the bus, try a wall run dunk off the bus") ────────────────────────────
+// A shallow run into the hoopbus's face is not a rebound: the runner goes UP the side of the bus and runs ALONG it toward the
+// rim (the bus is parked across the corner, so its length points at the basket), banked into the panels, and leaves it at the
+// front end — a launch from 1.15 m up and 2 m off the centre line, the flight a diagonal to the iron.
+export const BUS_RUN = {
+  /** How far off the face the body runs, how high up the side it gets and how fast it gets there. */
+  offM: 0.42, height: 1.15, riseSec: 0.28,
+  /** The run's floor speed along the bus; where along it (metres from the pane's centre, toward the rim) the run leaves. */
+  speedMin: 5.6, exitS: 2.6, maxSec: 1.1,
+  /** The bank into the panels (root roll, radians); what the run buys the launch on top of the wall-run apex. */
+  bank: 0.42, difficulty: 1.1, apexAdd: 0.2, hype: 8,
+} as const;
+/** The runner on the bus's face `s` metres along it (toward the rim), `t` seconds into the run: position, height, facing. */
+export function busRunPose(pane: GlassPane, s: number, t: number): { x: number; z: number; y: number; fx: number; fz: number } {
+  const tx = -pane.nz, tz = pane.nx;   // along the pane, toward the rim
+  const rise = Math.min(1, Math.max(0, t) / BUS_RUN.riseSec);
+  return { x: pane.cx + pane.nx * BUS_RUN.offM + tx * s, z: pane.cz + pane.nz * BUS_RUN.offM + tz * s, y: Math.sin((rise * Math.PI) / 2) * BUS_RUN.height, fx: tx, fz: tz };
+}
+/** Where along the pane a point is (metres from its centre, toward the rim). */
+export function alongPane(pane: GlassPane, x: number, z: number): number { return (x - pane.cx) * -pane.nz + (z - pane.cz) * pane.nx; }
+/** The run along the bus is over — past its front end, or out of time — and the jump off it is now. */
+export function busRunDone(s: number, t: number): boolean { return s >= BUS_RUN.exitS || t >= BUS_RUN.maxSec; }
+
+// ── THE BILLBOARDS (owner: "make it a billboard and sign, change it for each scene"; the sign MESH came out of the dunk court
+// 2026-09-18 — "remove the sign, keep the bus" — the scene names stay for the splash / the card) ──────────────────────────────────
 export interface BillboardSign { text: string; sub: string; bg: string; fg: string; accent: string }
 export const BILLBOARD_SIGNS: Record<string, BillboardSign> = {
   venice: { text: 'VENICE BEACH', sub: 'DOGTOWN · SINCE \'79', bg: '#0e7490', fg: '#fff7ed', accent: '#fb923c' },

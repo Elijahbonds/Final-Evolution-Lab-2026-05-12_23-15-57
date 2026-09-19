@@ -1,21 +1,22 @@
 // THE SKY TIER — the dunk arena's upper tier, per setting (owner, 2026-09-18: "add that but make it level specific, like a
 // blimp, or a rocket, according to the setting"; the pillars brief's catwalk tier).
 //
-// Something hangs over the lane in every court: Venice's blimp, Orbit's rocket, Blossom's balloon, Canopy's treehouse,
-// the Rooftop's water tower. Its underside is a surface: a dunker who gets up there — a full run, a corner rebound, a
+// Something hangs over the lane in the courts that have a setting for it: Orbit's alien saucer, Blossom's balloon, Canopy's
+// treehouse, the Rooftop's water tower. Venice hangs NOTHING (owner, 2026-09-18: "take the blimp out" — it sat on top of the
+// hoop from the runway, an eyesore over the beach); a court with no tier has no R1 tap. Its underside is a surface: a dunker who gets up there — a full run, a corner rebound, a
 // backboard kick — taps off it (R1) for a second lift and the drop into the slam. Pure: what hangs where, and when a
 // tap is honest.
 
-export type SkyKind = 'blimp' | 'rocket' | 'balloon' | 'treehouse' | 'watertower';
+export type SkyKind = 'saucer' | 'balloon' | 'treehouse' | 'watertower';
 export interface SkyTier { kind: SkyKind; tag: string; call: string; color: string; accent: string }
 export const SKY_TIERS: Record<string, SkyTier> = {
-  venice: { kind: 'blimp', tag: 'BLIMP', call: 'OFF THE BLIMP!', color: '#f4f1de', accent: '#fb923c' },
-  orbit: { kind: 'rocket', tag: 'ROCKET', call: 'OFF THE ROCKET!', color: '#e0f2fe', accent: '#22d3ee' },
+  orbit: { kind: 'saucer', tag: 'SAUCER', call: 'OFF THE SAUCER!', color: '#b9c6cf', accent: '#7cf7a0' },   // owner, 2026-09-18: "replace the rocket above with an alien space shuttle"
   blossom: { kind: 'balloon', tag: 'BALLOON', call: 'OFF THE BALLOON!', color: '#fbcfe8', accent: '#9d174d' },
   canopy: { kind: 'treehouse', tag: 'TREEHOUSE', call: 'OFF THE TREEHOUSE!', color: '#a16207', accent: '#86efac' },
   rooftop: { kind: 'watertower', tag: 'WATER TOWER', call: 'OFF THE WATER TOWER!', color: '#9ca3af', accent: '#9ad7ff' },
 };
-export function skyTierFor(location: string | undefined): SkyTier { return SKY_TIERS[location ?? ''] ?? SKY_TIERS.venice; }
+/** What hangs over this court's lane — null for a court that hangs nothing (Venice, an unknown court). */
+export function skyTierFor(location: string | undefined): SkyTier | null { return SKY_TIERS[location ?? ''] ?? null; }
 
 export const SKY = {
   /** The underside's height over the lane, and where it hangs (behind the takeoff line, toward the rim). */

@@ -3,7 +3,7 @@ import { OBSTACLE_KINDS, OBSTACLE_SPECS, PROP_CAM, ROW_SPACING_M, ROW_ALONG_SPAC
 
 describe('DunkObstacles — cars and other objects', () => {
   it('every kind is readable, sourced, and ordered by what it costs to clear', () => {
-    expect(OBSTACLE_KINDS).toEqual(['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall']);
+    expect(OBSTACLE_KINDS).toEqual(['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall', 'kangaroo']);   // the kangaroo is the one animal left (the giraffe came out 2026-09-18)
     expect(OBSTACLE_SPECS.car.source).toEqual({ meshy: 'sedan' });
     expect(OBSTACLE_SPECS.tetris.source).toEqual({ bodies: 'stack' });   // two of the game's own bodies, not a prop file
     expect(OBSTACLE_SPECS.car.bonus).toBeGreaterThan(OBSTACLE_SPECS.crate.bonus);

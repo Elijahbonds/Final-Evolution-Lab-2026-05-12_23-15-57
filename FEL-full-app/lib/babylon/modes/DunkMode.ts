@@ -73,10 +73,11 @@ import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLi
 import { OBSTACLE_SPECS, OBSTACLE_KINDS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, type ObstacleKind } from '../core/DunkObstacles';
 // DUNK PARKOUR (owner brief 2026-09-18): the glass rebound on the runway (a vector-transfer launch), the two launches, the
 // backboard double-launch, the overdrive dunk. Pure in core/DunkParkour.
-import { GLASS, launchProfile, doubleLaunchAllowed, DOUBLE_LAUNCH, overdriveDunk, cornerPanes, paneRebound, billboardFor, type GlassPane } from '../core/DunkParkour';
-import { SKY, skyTierFor, skyTapAllowed, skyTapRefusal, type SkyTier } from '../core/SkyTier';   // THE SKY TIER (owner, 2026-09-18): a blimp / a rocket / … over the lane, per court
+import { GLASS, launchProfile, doubleLaunchAllowed, DOUBLE_LAUNCH, overdriveDunk, cornerPanes, paneRebound, BUS_RUN, busRunPose, alongPane, busRunDone, cornerRideFor, type CornerRide, type GlassPane } from '../core/DunkParkour';
+import { SKY, skyTierFor, skyTapAllowed, skyTapRefusal, type SkyTier } from '../core/SkyTier';
+import { readSeasonLane, specialOpen, specialLockLine, SPECIAL_PROPS, type SeasonLane } from '../core/SeasonSpecials';   // SEASON SPECIALS (owner, 2026-09-18): the PRO lane's   // THE SKY TIER (owner, 2026-09-18): a blimp / a rocket / … over the lane, per court
 import { spawnMeshyProp } from '../visual/meshyProps';
-import { SceneLoader, DynamicTexture } from '@babylonjs/core';
+import { SceneLoader } from '@babylonjs/core';
 import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, signatureFor, landingDustScale, netSplashScale, NET_SPLASH_DROP, type SlamReadout } from '../core/DunkSystem';
 import { dunkCard, slamIsClean } from '../core/DunkCard';
 import { missBeat } from '../core/MissFlavour';
@@ -126,14 +127,14 @@ type Style = (typeof STYLES)[number];
 // DUNK-GLASS-BOUNCE (2026-09-08): two more self-lobs on the ring — OFF THE GLASS (the toss goes at the backboard and comes
 // back off it to the hand: WDA "Off The Backboard") and the BOUNCE LOB (thrown down into the floor, up to the hand: WDA
 // "Bounce Ball"; from standing it is the bounce-BOUNCE with a RUN cue). d-pad left cycles the lob family.
-const PROPS = ['none', 'alleyoop', 'oopglass', 'oopbounce', 'oopcorner', 'selflob', 'offglass', 'bounce', 'car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall'] as const;
+const PROPS = ['none', 'alleyoop', 'oopglass', 'oopbounce', 'oopcorner', 'oopalien', 'selflob', 'offglass', 'bounce', 'car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall', 'kangaroo'] as const;
 type Prop = (typeof PROPS)[number];
 const OBSTACLE_PROPS = new Set<string>(OBSTACLE_KINDS);
 const obstacleKindOf = (p: Prop): ObstacleKind | null => (OBSTACLE_PROPS.has(p) ? (p as ObstacleKind) : null);
 // FLASHY ALLEY-OOPS (owner, 2026-09-16: "add flashy alley oops"). The oop was one thing — a teammate throws it straight
 // up and you catch it. The passer can do everything the SELF-lob can: off the glass, or down off the floor. Three oops
 // on the d-pad's right now, and they are worth what they cost to catch.
-const OOP_PROPS = ['alleyoop', 'oopglass', 'oopbounce', 'oopcorner'] as const;   // DUNK PARKOUR: the oop off the corner billboard
+const OOP_PROPS = ['alleyoop', 'oopglass', 'oopbounce', 'oopcorner', 'oopalien'] as const;   // DUNK PARKOUR: the oop off the corner ride; ORBIT: the lob out of the saucer
 type OopProp = (typeof OOP_PROPS)[number];
 const isOop = (p: Prop): p is OopProp => (OOP_PROPS as readonly string[]).includes(p);
 const nextOop = (p: Prop): OopProp => (isOop(p) ? OOP_PROPS[(OOP_PROPS.indexOf(p) + 1) % OOP_PROPS.length] : 'alleyoop');
@@ -153,10 +154,12 @@ const STYLE_CLIP: Record<Style, string> = {
 };
 const STYLE_LABEL: Record<Style, string> = { power: 'POWER', flashy: 'FLASHY', sig: 'SIGNATURE' };
 // the obstacle labels and bonuses come from the SPEC TABLE, so a new prop is one entry there and not four (2026-09-16)
-const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', alleyoop: 'ALLEY-OOP', oopglass: 'OOP OFF THE GLASS', oopbounce: 'BOUNCE OOP', oopcorner: 'OOP OFF THE BILLBOARD', selflob: 'SELF-LOB', offglass: 'OFF THE GLASS', bounce: 'BOUNCE LOB',
+const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', alleyoop: 'ALLEY-OOP', oopglass: 'OOP OFF THE GLASS', oopbounce: 'BOUNCE OOP', oopcorner: 'OOP OFF THE BUS', oopalien: 'LOB FROM THE ALIENS', selflob: 'SELF-LOB', offglass: 'OFF THE GLASS', bounce: 'BOUNCE LOB',
   ...Object.fromEntries(OBSTACLE_KINDS.map((k) => [k, OBSTACLE_SPECS[k].label])) } as Record<Prop, string>;
 const STYLE_TIER: Record<Style, number> = { power: 3, flashy: 5.5, sig: 8 };
-const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, oopglass: 3.2, oopbounce: 3.6, oopcorner: 3.8, selflob: 1.5, offglass: 2.5, bounce: 2.5,
+// EVERY PROP NEEDS A BONUS HERE: the trailing `as Record<Prop, number>` cast silences the missing-key error, and a missing one
+// is `undefined` → the card's DIFF reads NaN (measured 2026-09-18, the alien lob's first run).
+const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, oopglass: 3.2, oopbounce: 3.6, oopcorner: 3.8, oopalien: 4.2, selflob: 1.5, offglass: 2.5, bounce: 2.5,
   ...Object.fromEntries(OBSTACLE_KINDS.map((k) => [k, OBSTACLE_SPECS[k].bonus])) } as Record<Prop, number>;
 /** Where the ball hand is at the lob's catch beat (LOB_CATCH_CLIP_T), relative to the root, per launch clip — measured on the
  *  live rig with the reach off through the rise (DUNK-SOFTS-NAMED probe, hand − root at clip 0.62): the mocap POWER gather
@@ -320,20 +323,66 @@ export const DunkMode: ModeDefinition = (() => {
   // scene's sign across the other; their faces are the rebound / wall-run surfaces the pure panes describe)
   let vectorAt = -1e9, vectorWallRun = false, doubleLaunched = false, doubleLaunchLift = 0, sideProps: TransformNode[] = [], panes: GlassPane[] = [];
   // THE SKY TIER: what hangs over the lane in this court, and whether the dunker has tapped off it this flight
-  let skyTier: SkyTier = skyTierFor(undefined), skyRoot: TransformNode | null = null, skyTapped = false, skyBob = 0, skyKick = 0;
+  let skyTier: SkyTier | null = null, skyRoot: TransformNode | null = null, skyTapped = false, skyBob = 0, skyKick = 0;
+  // THE BACKBOARD (owner, 2026-09-18): L1 with the d-pad UP is the flip OFF THE TOP OF THE BOARD; L1 HELD after the kick is a RUN
+  // across the glass. A sky tap's drop is a backflip into a rim hang. The flips are a pitch layer on the root, like the swing's roll.
+  let boardTopFlip = false, boardRan = false, l1DownAt = -1;
+  // THE BUS WALL RUN (owner, 2026-09-18: "try a wall run dunk off the bus"): a shallow run into the hoopbus goes up its side and
+  // along it to the front end, and the jump off it is the takeoff (core/DunkParkour BUS_RUN)
+  let busRun: { t: number; s: number; pane: GlassPane; speed: number } | null = null, busLaunch: { x0: number; y0: number } | null = null, busRan = false;
+  let ride: CornerRide = cornerRideFor(undefined);   // what is parked across the right corner (the hoopbus; a shuttle in Orbit)
+  const propLabel = (p: Prop): string => PROP_LABEL[p].replace('THE BUS', `THE ${ride.short}`);
+  // SEASON SPECIALS: the animals, the sky tap, the board-top flip and the backboard run are the PRO lane's — read once at
+  // load (the dev url can override); until it answers the specials are locked, never silently open
+  let seasonLane: SeasonLane = 'guest';
+  const specialsOpen = () => specialOpen(seasonLane);
+  function pitchFlip(ctx: ModeContext, fromT: number, sec: number): void {
+    const obs = ctx.scene.onBeforeRenderObservable.add(() => {
+      const u = Math.min(1, Math.max(0, (clipTime - fromT) / sec));
+      player.root.rotation.x = -Math.sin(u * Math.PI) * Math.PI * (u < 0.5 ? 1 : 1);   // over the top and back: a full turn read as a flip
+      player.root.rotation.x = -u * Math.PI * 2;
+      if (u >= 1 || phase !== 'cinematic') { player.root.rotation.x = 0; ctx.scene.onBeforeRenderObservable.remove(obs); }
+    });
+  }
+  /** ORBIT's left corner (owner, 2026-09-18: "replace the red tent with a space station"): a station module — the pressurised
+   *  can along the pane, a docking ring at the rim end, radiator wings on a truss ABOVE it. The can is the longest axis on
+   *  purpose: parkOnPane scales a prop's longest side to the pane, so wings wider than the module would shrink the whole
+   *  station (measured: an 8.2 m wing span scaled it to 61%). */
+  function buildSpaceStation(scene: Scene): TransformNode {
+    const root = new TransformNode('dunk_station', scene);
+    const shell = VenueKit.paint(scene, 'station_shell_m', '#e8edf3', 0.25, 0.45), trim = VenueKit.paint(scene, 'station_trim_m', '#8d9aa8', 0.55, 0.4), panel = VenueKit.paint(scene, 'station_panel_m', '#1b2f6b', 0.25, 0.3), gold = VenueKit.paint(scene, 'station_gold_m', '#e0ad4c', 0.7, 0.35), dark = VenueKit.paint(scene, 'station_dark_m', '#2b3038', 0.3, 0.6);
+    const add = (m: Mesh, mat: PBRMaterial, x: number, y: number, z: number): Mesh => { m.parent = root; m.position.set(x, y, z); m.material = mat; m.isPickable = false; m.receiveShadows = true; return m; };
+    const can = add(MeshBuilder.CreateCylinder('station_can', { diameter: 1.9, height: 4.4, tessellation: 22 }, scene), shell, 0, 1.45, 0); can.rotation.x = Math.PI / 2;
+    for (const z of [-2.2, 2.2]) add(MeshBuilder.CreateCylinder('station_cap', { diameter: 1.95, height: 0.22, tessellation: 22 }, scene), trim, 0, 1.45, z).rotation.x = Math.PI / 2;
+    for (const z of [-1.1, 0.4]) add(MeshBuilder.CreateTorus('station_band', { diameter: 2.0, thickness: 0.1, tessellation: 22 }, scene), trim, 0, 1.45, z).rotation.x = Math.PI / 2;
+    const dock = add(MeshBuilder.CreateCylinder('station_dock', { diameterTop: 1.0, diameterBottom: 1.4, height: 0.55, tessellation: 20 }, scene), trim, 0, 1.45, 2.6); dock.rotation.x = Math.PI / 2;
+    add(MeshBuilder.CreateTorus('station_ring', { diameter: 1.15, thickness: 0.13, tessellation: 20 }, scene), gold, 0, 1.45, 2.9).rotation.x = Math.PI / 2;
+    for (const z of [-0.6, 0.9]) add(MeshBuilder.CreateBox('station_port', { width: 0.34, height: 0.34, depth: 0.06 }, scene), dark, 0.92, 1.75, z).rotation.y = Math.PI / 2;
+    add(MeshBuilder.CreateBox('station_truss', { width: 0.14, height: 0.14, depth: 4.2 }, scene), trim, 0, 2.75, -0.2);
+    for (const z of [-1.6, 1.1]) {   // the radiator wings, both inside the module's own length
+      for (const sx of [-1, 1]) {
+        add(MeshBuilder.CreateBox('station_wing', { width: 1.7, height: 0.07, depth: 1.15 }, scene), panel, sx * 1.05, 2.75, z);
+        add(MeshBuilder.CreateBox('station_wingedge', { width: 1.74, height: 0.11, depth: 0.09 }, scene), gold, sx * 1.05, 2.75, z - 0.58);
+        add(MeshBuilder.CreateCylinder('station_wingarm', { diameter: 0.09, height: 0.35, tessellation: 8 }, scene), trim, sx * 0.2, 2.75, z).rotation.z = Math.PI / 2;
+      }
+    }
+    for (const [x, z] of [[-0.7, 1.5], [0.7, 1.5], [-0.7, -1.5], [0.7, -1.5]] as const) add(MeshBuilder.CreateCylinder('station_leg', { diameter: 0.15, height: 1.0, tessellation: 10 }, scene), trim, x, 0.5, z);
+    void [can, dock];
+    return root;
+  }
   /** The court's own thing in the sky, from primitives, hung with its underside at SKY.underY over the lane. */
   function buildSkyTier(scene: Scene, tier: SkyTier, z: number): TransformNode {
     const root = new TransformNode('dunk_sky', scene); root.position.set(0, SKY.underY, z);
     const body = VenueKit.paint(scene, 'sky_body_m', tier.color, 0.12, 0.6), acc = VenueKit.paint(scene, 'sky_acc_m', tier.accent, 0.35, 0.5), dark = VenueKit.paint(scene, 'sky_dark_m', '#33383f', 0.05, 0.8);
     const add = (m: Mesh, mat: PBRMaterial, x: number, y: number, zz: number): Mesh => { m.parent = root; m.position.set(x, y, zz); m.material = mat; m.isPickable = false; return m; };
-    if (tier.kind === 'blimp') {
-      const hull = add(MeshBuilder.CreateSphere('sky_hull', { diameter: 1, segments: 16 }, scene), body, 0, 1.7, 0); hull.scaling.set(2.2, 1.35, 5.2);
-      add(MeshBuilder.CreateBox('sky_gondola', { width: 1.2, height: 0.5, depth: 1.6 }, scene), dark, 0, 0.25, 0.2);
-      for (const sx of [-1, 1]) add(MeshBuilder.CreateBox('sky_fin', { width: 0.9, height: 0.08, depth: 1.1 }, scene), acc, sx * 1.2, 1.7, -2.3);
-      add(MeshBuilder.CreateBox('sky_finv', { width: 0.08, height: 0.9, depth: 1.1 }, scene), acc, 0, 2.5, -2.3);
-    } else if (tier.kind === 'rocket') {
-      add(MeshBuilder.CreateCylinder('sky_stage', { diameter: 1.3, height: 3.6, tessellation: 20 }, scene), body, 0, 2.2, 0);
-      add(MeshBuilder.CreateCylinder('sky_nose', { diameterTop: 0, diameterBottom: 1.3, height: 1.3, tessellation: 20 }, scene), acc, 0, 4.65, 0);
+    if (tier.kind === 'saucer') {
+      // ORBIT's ALIEN CRAFT (owner, 2026-09-18): a lobed saucer — the lens hull, a glass dome, the lobes around the rim and the
+      // belly ring the lob drops out of. Its LOWEST point is the hull's underside at y 0 (the root hangs at SKY.underY).
+      const hull = add(MeshBuilder.CreateSphere('sky_hull', { diameter: 1, segments: 20 }, scene), body, 0, 0.45, 0); hull.scaling.set(5.2, 0.9, 4.2);
+      const dome = add(MeshBuilder.CreateSphere('sky_dome', { diameter: 2.1, segments: 16 }, scene), acc, 0, 0.7, 0); dome.scaling.y = 0.85;
+      for (let i = 0; i < 8; i++) { const a = (i * Math.PI * 2) / 8; const lobe = add(MeshBuilder.CreateSphere('sky_lobe', { diameter: 0.62, segments: 10 }, scene), acc, Math.sin(a) * 2.35, 0.42, Math.cos(a) * 1.9); lobe.scaling.y = 0.6; }
+      add(MeshBuilder.CreateTorus('sky_ring', { diameter: 2.4, thickness: 0.16, tessellation: 24 }, scene), acc, 0, 0.12, 0);
+      add(MeshBuilder.CreateCylinder('sky_port', { diameterTop: 1.5, diameterBottom: 0.9, height: 0.22, tessellation: 20 }, scene), dark, 0, 0.1, 0);
       for (let i = 0; i < 3; i++) { const a = (i * Math.PI * 2) / 3; const fin = add(MeshBuilder.CreateBox('sky_rfin', { width: 0.08, height: 1.2, depth: 0.9 }, scene), acc, Math.sin(a) * 0.85, 0.75, Math.cos(a) * 0.85); fin.rotation.y = a; }
       add(MeshBuilder.CreateCylinder('sky_nozzle', { diameterTop: 0.7, diameterBottom: 1.0, height: 0.4, tessellation: 16 }, scene), dark, 0, 0.2, 0);
     } else if (tier.kind === 'balloon') {
@@ -365,16 +414,39 @@ export const DunkMode: ModeDefinition = (() => {
     if (performance.now() - vectorAt < 600) return;   // one rebound per contact
     const r = paneRebound(player.root.position.x, player.root.position.z, vx, vz, panes);
     if (!r) return;
-    vectorAt = performance.now(); vectorWallRun = r.wallRun;
+    if (r.pane.side > 0 && r.wallRun) { startBusRun(ctx, r.pane, Math.hypot(vx, vz)); return; }   // THE BUS WALL RUN
+    vectorAt = performance.now(); vectorWallRun = false;   // the tent's shallow hit is a rebound (the wall run is the bus's)
     player.root.position.x += r.pane.nx * GLASS.pushM; player.root.position.z += r.pane.nz * GLASS.pushM;
     stickReboundX = Math.sign(r.v.x);   // the next strides carry the reflected x until the stick says otherwise
     stickReboundUntil = performance.now() + 380;
     runUpPeak = Math.max(runUpPeak, Math.hypot(vx, vz));
     SoundKit.play('impact', { pitch: r.wallRun ? 1.2 : 1.5, volume: 0.45 }); ctx.feel?.impact?.(0.25); ctx.juice.flash('#a5f3fc', 50); ctx.camDirector.pulse(0.35, 0.3);
     EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(-r.pane.nx * 0.5, 1.2, -r.pane.nz * 0.5)), 'sparks');
-    const what = r.pane.side > 0 ? 'THE HOOPBUS' : 'THE TENT';
-    flash(ctx, r.wallRun ? `WALL RUN ON ${what} — the jump carries it` : `KICKED OFF ${what} — the jump carries it`, 700);
-    console.info(`[DUNK-PARKOUR] ${r.wallRun ? 'wall run' : 'rebound'} off ${what.toLowerCase()} at (${player.root.position.x.toFixed(2)}, ${player.root.position.z.toFixed(2)}) v (${vx.toFixed(1)}, ${vz.toFixed(1)})`);
+    const what = r.pane.side > 0 ? ride.name : ride.kind === 'shuttle' ? 'THE STATION' : 'THE TENT';
+    flash(ctx, `KICKED OFF ${what} — the jump carries it`, 700);
+    console.info(`[DUNK-PARKOUR] rebound off ${what.toLowerCase()} at (${player.root.position.x.toFixed(2)}, ${player.root.position.z.toFixed(2)}) v (${vx.toFixed(1)}, ${vz.toFixed(1)})`);
+  }
+  /** Up the side of the hoopbus and along it: the run owns the body until the front end, where launchDunk takes it. */
+  function startBusRun(ctx: ModeContext, pane: GlassPane, speed: number): void {
+    if (busRun || busRan) return;
+    busRun = { t: 0, s: alongPane(pane, player.root.position.x, player.root.position.z), pane, speed: Math.max(BUS_RUN.speedMin, speed) };
+    runUpPeak = Math.max(runUpPeak, busRun.speed);
+    endRunwayBeat(true); runwayBeat = null;
+    playClip(SPORT_CLIP.moveLoop, { loop: true }); player.animator.setPlaybackScale(SPORT_CLIP.moveLoop, strideRate(busRun.speed)); setWin('run');
+    SoundKit.play('impact', { pitch: 1.2, volume: 0.45 }); ctx.feel?.impact?.(0.25); ctx.juice.flash('#a5f3fc', 50); ctx.camDirector.pulse(0.35, 0.3);
+    EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(-pane.nx * 0.5, 1.0, -pane.nz * 0.5)), 'sparks');
+    flash(ctx, `WALL RUN ON ${ride.name} — off the front of it`, 800); ctx.setHud({ hint: `RUNNING THE ${ride.short} — the jump is at its front end` });
+    console.info(`[DUNK-PARKOUR] bus wall run from s ${busRun.s.toFixed(2)} at (${player.root.position.x.toFixed(2)}, ${player.root.position.z.toFixed(2)}) ${busRun.speed.toFixed(1)} m/s`);
+  }
+  function busRunTick(ctx: ModeContext, dt: number): void {
+    if (!busRun) return;
+    busRun.t += dt; busRun.s += busRun.speed * dt;
+    const p = busRunPose(busRun.pane, busRun.s, busRun.t);
+    player.root.position.set(p.x, p.y, p.z);
+    faceVel(new Vector3(p.fx, 0, p.fz).scale(busRun.speed), dt);
+    player.root.rotation.z = BUS_RUN.bank * Math.min(1, busRun.t / BUS_RUN.riseSec);   // banked into the panels (the bus is on his left)
+    runwayVel.x = p.fx * busRun.speed; runwayVel.z = p.fz * busRun.speed;
+    if (busRunDone(busRun.s, busRun.t)) launchDunk(ctx);
   }
   /** Park a prop across a corner pane: its long side on the pane's line, its body behind it. */
   function parkOnPane(root: TransformNode, pane: GlassPane, longM: number): void {
@@ -388,33 +460,7 @@ export const DunkMode: ModeDefinition = (() => {
     root.rotation.y = Math.atan2(tx, tz) + (longIs === 'x' ? Math.PI / 2 : 0);
     root.position.set(pane.cx - pane.nx * (wide / 2 + 0.05), -min.y * k, pane.cz - pane.nz * (wide / 2 + 0.05));
   }
-  /** The scene's sign on a banner over the tent (owner: "a billboard and sign, change it for each scene"). */
-  function signBanner(scene: Scene, pane: GlassPane, location: string | undefined): Mesh {
-    const sign = billboardFor(location);
-    const tex = new DynamicTexture('dunk_sign_tex', { width: 1024, height: 320 }, scene, false);
-    const c = tex.getContext() as CanvasRenderingContext2D;
-    c.fillStyle = sign.bg; c.fillRect(0, 0, 1024, 320);
-    c.fillStyle = sign.accent; c.fillRect(0, 0, 1024, 26); c.fillRect(0, 294, 1024, 26);
-    c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillStyle = sign.fg; c.font = 'bold 118px Impact, Arial Black, sans-serif'; c.fillText(sign.text, 512, 140);
-    c.fillStyle = sign.accent; c.font = 'bold 44px Arial, sans-serif'; c.fillText(sign.sub, 512, 240);
-    tex.update();
-    const m = MeshBuilder.CreateBox('dunk_sign', { width: 3.4, height: 1.05, depth: 0.08 }, scene);
-    const mat = VenueKit.paint(scene, 'dunk_sign_m', '#ffffff', 0.35, 0.6); mat.albedoTexture = tex; mat.emissiveTexture = tex; mat.emissiveColor = Color3.White().scale(0.35);
-    m.material = mat; m.isPickable = false;
-    m.rotation.y = Math.atan2(pane.nx, pane.nz) + Math.PI;   // a box's +z face turned to face along the pane's normal
-    m.position.set(pane.cx + pane.nx * 0.12, 2.75, pane.cz + pane.nz * 0.12);
-    // THE BILLBOARD behind the sign (owner: "make it a billboard and sign"): a 3.8 × 2.8 m board from 1.6 to 4.4 m, the scene's
-    // colours, standing on the pane — the face the corner OOP plays off (a toss for a 3.2 m catch meets the sign near 3.8 m, measured)
-    const board = MeshBuilder.CreateBox('dunk_billboard', { width: 3.8, height: 2.8, depth: 0.1 }, scene);
-    board.material = VenueKit.paint(scene, 'dunk_billboard_m', sign.bg, 0.18, 0.7); board.isPickable = false;
-    board.rotation.y = m.rotation.y; board.position.set(pane.cx - pane.nx * 0.02, 3.0, pane.cz - pane.nz * 0.02);
-    const frame = MeshBuilder.CreateBox('dunk_billboard_frame', { width: 4.0, height: 3.0, depth: 0.06 }, scene);
-    frame.material = VenueKit.paint(scene, 'dunk_billboard_frame_m', sign.accent, 0.3, 0.6); frame.isPickable = false;
-    frame.rotation.y = m.rotation.y; frame.position.set(pane.cx - pane.nx * 0.1, 3.0, pane.cz - pane.nz * 0.1);
-    board.parent = null; m.addChild(board); m.addChild(frame);   // disposed with the sign
-    return m;
-  }
+  // THE SIGN + BILLBOARD over the tent came out 2026-09-18 (owner: "remove the sign, keep the bus"); the corner oop plays off the bus.
   let stickReboundX = 0, stickReboundUntil = 0;
   let launchSpeed01 = 0;                      // run-up speed as a 0..1 budget input
   let launchTag = '';                          // JUDGE TRANSPARENCY: the takeoff the panel saw (SPEED LAUNCH / POWER LAUNCH / BILLBOARD REBOUND → … / CORNER WALL RUN → …)
@@ -667,12 +713,20 @@ export const DunkMode: ModeDefinition = (() => {
       } catch { /* scene gone */ }
       return;
     }
+    if (prop === 'oopalien') {   // THE ALIENS THROW IT (owner, 2026-09-18: "lob from the aliens") — no passer stands on the floor;
+      // the ball waits in the saucer's belly port until the rise
+      releaseBall(ball); ballSim.stop();
+      ball.position.set(skyRoot ? skyRoot.position.x : 0, SKY.underY - 0.18, skyRoot ? skyRoot.position.z : gatherLine() - SKY.zAhead);
+      ball.setEnabled(true);
+      console.info('[HANDS] ball → the saucer');
+      return;
+    }
     if (isOop(prop)) {   // every oop variant needs the passer standing there
       const token = ++obstacleToken;
       const npc = await CharacterPipeline.spawnNpc(ctx.scene, CFG.heroUrl, {
         // the billboard oop's passer stands on the RUNWAY side of the line near the centre: the corner signs face up the runway, and
         // from the rim side there is no bank (the solve refuses a throw from behind the face)
-        position: prop === 'oopcorner' ? new Vector3(-4.0, 0, gatherLine() + 5.0) : new Vector3(-3.4, 0, CFG.rimZ + 1.6), tint: '#22d3ee', startClip: SPORT_CLIP.teammateIdle,   // the billboard oop: down the left side, so the mirror line meets the sign near its centre (from x −1.2 it crossed 3 m off it, measured)
+        position: prop === 'oopcorner' ? new Vector3(4.0, 0, gatherLine() + 5.0) : new Vector3(-3.4, 0, CFG.rimZ + 1.6), tint: '#22d3ee', startClip: SPORT_CLIP.teammateIdle,   // the billboard oop: down the left side, so the mirror line meets the sign near its centre (from x −1.2 it crossed 3 m off it, measured)
       });
       if (token !== obstacleToken || ctx.scene.isDisposed) { npc.dispose(); return; }   // the prop changed under the load
       teammate = npc;
@@ -708,20 +762,28 @@ export const DunkMode: ModeDefinition = (() => {
       // the left; their faces are what the run rebounds off / wall-runs along (the pure panes in core/DunkParkour)
       for (const p of sideProps) p.dispose(); sideProps = [];
       panes = cornerPanes(GLASS.halfX, gatherLine());
-      // THE SKY TIER: the court's own thing over the lane (a blimp at Venice, a rocket in Orbit, …), its underside a surface for R1
-      skyRoot?.dispose(); skyTier = skyTierFor(ctx.location); skyRoot = buildSkyTier(ctx.scene, skyTier, gatherLine() - SKY.zAhead); skyTapped = false;
-      console.info(`[DUNK-SKY] ${skyTier.tag} over the lane (underside ${SKY.underY} m)`);
+      // THE SKY TIER: the court's own thing over the lane (a rocket in Orbit, a balloon at Blossom, …), its underside a surface for R1;
+      // Venice hangs nothing (the blimp is out — owner: "the grey thing on top of the hoop, its an eye sore")
+      skyRoot?.dispose(); skyTier = skyTierFor(ctx.location); skyRoot = skyTier ? buildSkyTier(ctx.scene, skyTier, gatherLine() - SKY.zAhead) : null; skyTapped = false;
+      void readSeasonLane().then((lane) => { seasonLane = lane; console.info(`[DUNK-SEASON] lane ${lane} — specials ${specialOpen(lane) ? 'OPEN' : 'LOCKED'}`); ctx.setHud({ specials: specialOpen(lane) ? 'PRO' : 'LOCKED' }); });
+      console.info(skyTier ? `[DUNK-SKY] ${skyTier.tag} over the lane (underside ${SKY.underY} m)` : '[DUNK-SKY] nothing over this lane');
       {
         const scene = ctx.scene; const loc = ctx.location;
-        void spawnMeshyProp(scene, 'hoopbus', null, 'dunk_hoopbus').then((bus) => { if (!bus || scene.isDisposed) return; parkOnPane(bus, panes[0], 6.4); sideProps.push(bus); console.info('[DUNK-PARKOUR] hoopbus parked on the right corner'); });
-        void SceneLoader.ImportMeshAsync('', '/models/props/racing/', 'tent.glb', scene).then((r) => {
+        ride = cornerRideFor(loc);
+        // ORBIT parks a SPACE SHUTTLE where every other court parks the hoopbus (owner, 2026-09-18: "make the bus a space shuttle
+        // in the space one", then his own Meshy export: "swap that shuttle in for the other one" — baked to 6.4 m by scripts/meshy/bake-prop.py)
+        const rideKey = ride.kind === 'shuttle' ? 'shuttle' : 'hoopbus';
+        void spawnMeshyProp(scene, rideKey, null, `dunk_${rideKey}`).then((r) => { if (!r || scene.isDisposed) return; parkOnPane(r, panes[0], 6.4); sideProps.push(r); const { max } = r.getHierarchyBoundingVectors(true); console.info(`[DUNK-PARKOUR] ${rideKey} parked on the right corner (roof ${max.y.toFixed(2)} m)`); });
+        if (ride.kind === 'shuttle') {   // ORBIT's other corner (owner, 2026-09-18: "replace the red tent with a space station")
+          const st = buildSpaceStation(scene); parkOnPane(st, panes[1], 5.0); sideProps.push(st);
+          console.info('[DUNK-PARKOUR] space station on the left corner');
+        } else void SceneLoader.ImportMeshAsync('', '/models/props/racing/', 'tent.glb', scene).then((r) => {
           if (scene.isDisposed) { for (const m of r.meshes) m.dispose(); return; }
           const root = new TransformNode('dunk_tent', scene);
           for (const m of r.meshes) if (!m.parent) m.parent = root;
           for (const m of root.getChildMeshes()) { m.isPickable = false; m.receiveShadows = true; }
           parkOnPane(root, panes[1], 4.2); sideProps.push(root);
-          const banner = signBanner(scene, panes[1], loc); sideProps.push(banner);
-          console.info(`[DUNK-PARKOUR] tent + sign "${billboardFor(loc).text}" on the left corner`);
+          console.info('[DUNK-PARKOUR] tent on the left corner (no sign)');
         }).catch((e) => console.warn('[DUNK-PARKOUR] tent did not load', e));
       }
       // spawnPlayer, not CharacterLibrary.spawn — this is the route that applies
@@ -799,7 +861,7 @@ export const DunkMode: ModeDefinition = (() => {
       style = 'power'; prop = 'none'; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
-      vectorAt = -1e9; vectorWallRun = false; doubleLaunched = false; doubleLaunchLift = 0; boardSwung = false; hangBase = null; swingAng = 0; skyTapped = false;
+      vectorAt = -1e9; vectorWallRun = false; doubleLaunched = false; doubleLaunchLift = 0; boardSwung = false; hangBase = null; swingAng = 0; skyTapped = false; boardTopFlip = false; boardRan = false; l1DownAt = -1; busRun = null; busLaunch = null; busRan = false;
         foe = rivalForNight(night);
     stakes = freshStakes();
       resetLob(); resetRunway(); win = 'run';
@@ -807,7 +869,7 @@ export const DunkMode: ModeDefinition = (() => {
       startWalkOut();
       ctx.setHud({
         round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`, nightCard: null, nightNum: night,
-        score: playerTotal, rivalScore: rivalTotal, style: STYLE_LABEL[style], prop: PROP_LABEL[prop], hype: 0, chain: 0,
+        score: playerTotal, rivalScore: rivalTotal, style: STYLE_LABEL[style], prop: propLabel(prop), hype: 0, chain: 0,
         // F4 (review): this was a 130-character run-on naming six controls. The first run needs two.
         hint: 'HOLD to run · tap JUMP at the line — then SLAM on NOW!',
         // one line, phrased by the module: a mode must not invent its own wording for somebody's track
@@ -885,7 +947,9 @@ export const DunkMode: ModeDefinition = (() => {
       // Pad: X cycles the prop the way the d-pad picks it — one button, no dead bind on the diamond.
       if (e.t === 'button' && e.btn === 'X' && e.pressed && phase === 'approach') {
         prop = PROPS[(PROPS.indexOf(prop) + 1) % PROPS.length];
-        ctx.setHud({ prop: PROP_LABEL[prop] });
+        while (prop === 'oopalien' && skyTier?.kind !== 'saucer') { refuse(ctx, 'NO ALIENS OVER THIS COURT'); prop = PROPS[(PROPS.indexOf(prop) + 1) % PROPS.length]; }
+        while (SPECIAL_PROPS.has(prop) && !specialsOpen()) { refuse(ctx, specialLockLine(prop as 'kangaroo')); prop = PROPS[(PROPS.indexOf(prop) + 1) % PROPS.length]; }   // SEASON SPECIALS
+        ctx.setHud({ prop: propLabel(prop) });
         SoundKit.play('uiTick', { pitch: 1.3 });
         void setupProp(ctx);
       }
@@ -899,7 +963,9 @@ export const DunkMode: ModeDefinition = (() => {
         const pick = dpadPick; dpadPick = null;
         if (!pick.fired && phase === 'approach') {
           prop = e.dir === 'up' ? 'none' : e.dir === 'right' ? nextOop(prop) : e.dir === 'left' ? nextLobProp(prop) : nextObstacle(obstacleKindOf(prop));   // left cycles SELF-LOB → OFF THE GLASS → BOUNCE LOB
-          ctx.setHud({ prop: PROP_LABEL[prop] });
+          while (prop === 'oopalien' && skyTier?.kind !== 'saucer') { refuse(ctx, 'NO ALIENS OVER THIS COURT'); prop = nextOop(prop); }   // the alien lob is the saucer's (Orbit)
+          while (SPECIAL_PROPS.has(prop) && !specialsOpen()) { refuse(ctx, specialLockLine(prop as 'kangaroo')); prop = nextObstacle(obstacleKindOf(prop)); }   // SEASON SPECIALS: the animals skip past a free lane, named
+          ctx.setHud({ prop: propLabel(prop) });
           SoundKit.play('uiTick', { pitch: 1.3 });
           void setupProp(ctx);
         }
@@ -951,15 +1017,42 @@ export const DunkMode: ModeDefinition = (() => {
       // THE SKY TIER (owner, 2026-09-18): R1 in the air is the tap off whatever hangs over the lane — a second lift and the drop into
       // the slam; honest only inside the window with the hand up to its underside (a full run, a rebound or a backboard kick gets there)
       if (phase === 'cinematic' && e.t === 'button' && e.pressed && e.btn === 'R1' && !qteWindowOpen) {
-        if (skyTapAllowed(clipTime, skyTapped, player.root.position.y)) {
+        if (!skyTier) refuse(ctx, 'NOTHING OVER THIS LANE');   // Venice: no tier, no tap
+        else if (!specialsOpen()) refuse(ctx, specialLockLine('skyTap'));   // SEASON SPECIALS
+        else if (skyTapAllowed(clipTime, skyTapped, player.root.position.y)) {
           skyTapped = true; doubleLaunchLift += SKY.apexAdd; runwayDifficulty += SKY.difficulty; runwayLabels.push(`OFF THE ${skyTier.tag}`); hype = Math.min(100, hype + SKY.hype); skyKick = 1;
           SoundKit.play('impact', { pitch: 1.2, volume: 0.5 }); ctx.feel?.impact?.(0.35); ctx.camDirector.pulse(0.6, 0.45);
           EffectsKit.burst(ctx.scene, new Vector3(player.root.position.x, SKY.underY - 0.1, player.root.position.z), 'sparks');
-          flash(ctx, `${skyTier.call} — DROP SLAM`, 800); console.info(`[DUNK-SKY] tap off the ${skyTier.tag} @${clipTime.toFixed(2)} root y ${player.root.position.y.toFixed(2)}`);
+          pitchFlip(ctx, clipTime + 0.05, 0.55);   // the drop is a BACKFLIP, and the rim takes a hang (the contact below)
+          flash(ctx, `${skyTier.call} — DROP FLIP · HANG`, 800); console.info(`[DUNK-SKY] tap off the ${skyTier.tag} @${clipTime.toFixed(2)} root y ${player.root.position.y.toFixed(2)} → drop flip`);
         } else refuse(ctx, skyTapRefusal(clipTime, skyTapped, player.root.position.y, skyTier.tag));
       }
+      // THE BACKBOARD RUN: L1 held after the kick (≥ 0.22 s) runs the dunker ACROSS the glass — the root slides to the other side of
+      // the board with a little more lift, once a flight
+      if (phase === 'cinematic' && e.t === 'button' && !e.pressed && e.btn === 'L1' && l1DownAt >= 0) {
+        const held = (performance.now() - l1DownAt) / 1000; l1DownAt = -1;   // REAL seconds: the hang's slow-mo stalls the clip clock (a 400 ms hold read 0.2 clip s, measured)
+        if (held >= 0.22 && doubleLaunched && !boardRan && clipTime < 0.95 && !specialsOpen()) refuse(ctx, specialLockLine('boardRun'));   // SEASON SPECIALS
+        else if (held >= 0.22 && doubleLaunched && !boardRan && clipTime < 0.95) {
+          boardRan = true; doubleLaunchLift += 0.25; runwayDifficulty += 0.8; runwayLabels.push('RAN THE BACKBOARD'); hype = Math.min(100, hype + 8);
+          const x0 = player.root.position.x, x1 = Math.max(-0.8, Math.min(0.8, -x0 || 0.8)), t0 = clipTime;
+          const obs = ctx.scene.onBeforeRenderObservable.add(() => { const u = Math.min(1, (clipTime - t0) / 0.4); player.root.position.x = x0 + (x1 - x0) * (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2); player.root.rotation.z = Math.sin(u * Math.PI) * 0.25 * Math.sign(x1 - x0 || 1); if (u >= 1 || phase !== 'cinematic') { player.root.rotation.z = 0; ctx.scene.onBeforeRenderObservable.remove(obs); } });
+          SoundKit.play('whoosh', { pitch: 1.1, volume: 0.45 }); ctx.feel?.impact?.(0.2); ctx.camDirector.pulse(0.4, 0.4);
+          flash(ctx, 'RAN THE BACKBOARD', 700); console.info(`[DUNK-PARKOUR] backboard run @${clipTime.toFixed(2)} x ${x0.toFixed(2)} → ${x1.toFixed(2)}`);
+        }
+      }
       if (phase === 'cinematic' && e.t === 'button' && e.pressed && e.btn === 'L1' && !qteWindowOpen) {   // DUNK PARKOUR: the backboard double-launch in the rise
-        if (doubleLaunchAllowed(clipTime, doubleLaunched)) {
+        l1DownAt = performance.now();
+        // OFF THE TOP OF THE BACKBOARD (owner, 2026-09-18): the d-pad UP with L1 in the rise vaults the dunker to the board's top and
+        // BACKFLIPS off it — a big second lift, the flip as a pitch layer; whatever trick is armed still fires on its beat (the variants)
+        const upHeld = heldDpad === 'up' && !heldDpadKey;
+        if (upHeld && !specialsOpen() && doubleLaunchAllowed(clipTime, doubleLaunched)) refuse(ctx, `${specialLockLine('boardTopFlip')} — the kick is yours (L1 alone)`);   // SEASON SPECIALS
+        else if (upHeld && doubleLaunchAllowed(clipTime, doubleLaunched)) {
+          doubleLaunched = true; boardTopFlip = true; doubleLaunchLift = DOUBLE_LAUNCH.apexAdd + 0.85; runwayDifficulty += 1.2; runwayLabels.push('OFF THE TOP OF THE BOARD'); hype = Math.min(100, hype + 12);
+          pitchFlip(ctx, clipTime + 0.12, 0.6);
+          SoundKit.play('impact', { pitch: 1.4, volume: 0.55 }); ctx.feel?.impact?.(0.4); ctx.camDirector.pulse(0.7, 0.5);
+          EffectsKit.burst(ctx.scene, new Vector3(player.root.position.x, glass.yMax, glass.z), 'sparks');
+          flash(ctx, 'OFF THE TOP OF THE BACKBOARD — BACKFLIP', 800); console.info(`[DUNK-PARKOUR] board-top backflip @${clipTime.toFixed(2)}`);
+        } else if (doubleLaunchAllowed(clipTime, doubleLaunched)) {
           doubleLaunched = true; doubleLaunchLift = DOUBLE_LAUNCH.apexAdd; hype = Math.min(100, hype + 8);
           SoundKit.play('impact', { pitch: 1.3, volume: 0.5 }); ctx.feel?.impact?.(0.3); ctx.camDirector.pulse(0.5, 0.4);
           EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.6, 0)), 'sparks');
@@ -1029,7 +1122,8 @@ export const DunkMode: ModeDefinition = (() => {
       // camera-relative (up = the camera's forward = the rim, right = screen right), its magnitude is the speed,
       // and the facing follows the velocity every approach / charge frame (the OneVOne / KarateEndless pattern).
       const vel = stickVel(ctx);
-      if (phase === 'approach') {
+      if (busRun && (phase === 'approach' || phase === 'charge')) busRunTick(ctx, dt);   // THE BUS WALL RUN owns the body
+      if (phase === 'approach' && !busRun) {
         player.root.position.addInPlace(vel.scale(dt));
         player.root.position.z = Math.max(gatherLine(), Math.min(RETREAT_Z, player.root.position.z));   // the runway: takeoff line … a step behind the start
         player.root.position.x = Math.max(-6, Math.min(6, player.root.position.x));
@@ -1051,7 +1145,7 @@ export const DunkMode: ModeDefinition = (() => {
         }
       }
 
-      if (phase === 'charge') {
+      if (phase === 'charge' && !busRun) {
         // HOLD = RUN (pad acceptance #2): ramp to the max run, curve toward the rim's x, let the stick steer,
         // and launch the moment the gather line is reached. runUpPeak keeps feeding the air budget.
         {   // THE GATHER STRIDE: ramp until the last stride, then ease to the carry the flight will actually fly at
@@ -1178,6 +1272,10 @@ export const DunkMode: ModeDefinition = (() => {
         const plantFrom = launchZ + carryDir * PLANT_DRIFT_M * Math.min(1, clipTime / PLANT_SEC);
         player.root.position.z = plantFrom + (rim.z + FLUSH_Z_AHEAD - plantFrom) * u;
         player.root.position.x += (rim.x - player.root.position.x) * 1.6 * dt;
+        if (busLaunch) {   // off the bus: 2 m off the centre line and a metre up — the x is driven to the iron on the carry, the height fades by the extension
+          player.root.position.x = busLaunch.x0 + (rim.x - busLaunch.x0) * Math.min(1, u * 1.15);
+          player.root.position.y += busLaunch.y0 * Math.max(0, 1 - clipTime / EASTBAY_TIMING.extend);
+        }
         // Pad acceptance #2: the stick is alive in the hang — a body lean and a small drift before contact;
         // the pull to rim.x above (1.6/s) still wins by the flush, so the contact math is untouched.
         airLean += (stickX - airLean) * Math.min(1, dt * 8);
@@ -1254,6 +1352,7 @@ export const DunkMode: ModeDefinition = (() => {
         // cannot desync, cannot stall.
         // DUNK-CONTROL-JUICE: the alley-oop is a real pass now — the teammate's toss arcs to the catch point in clip time and
         // the dunker's hand has to meet it (it used to LERP head-high and parent itself to the palm on a timer)
+        if (prop === 'oopalien' && !lob.thrown && clipTime >= 0.02) throwAlienLob(ctx, Math.max(0.45, LOB_CATCH_CLIP_T - clipTime));
         if (isOop(prop) && teammate && !lob.thrown) {
           if (clipTime >= 0.02) teammate.animator.play(SPORT_CLIP.teammateToss, {});   // the passer winds up as the dunker leaves the floor
           if (prop === 'oopcorner' && clipTime >= 0.02) {   // DUNK PARKOUR: the billboard oop leaves at once — the bank needs the whole rise
@@ -1363,7 +1462,7 @@ export const DunkMode: ModeDefinition = (() => {
               // slam held from the beat arrived at the ring with hangSec already at the 1 s cap and the hang never engaged (measured:
               // 'slam up 0.95 s after the press' on an ON TIME slam). Held on the contact = a hang; the tick caps it from here.
               console.info(`[HANDS] contact: slam ${aHeld ? 'held' : 'up'} ${hangSec.toFixed(2)} s after the press`);
-              if (aHeld) { hangOn = true; hangHeldSec = 0; hoopJuice?.hold(true); console.info('[HANDS] rim hang'); }   // SLAM still held on the contact = a hang (a tap that overlaps it is a 20 ms pull, released with the tap)
+              if (aHeld || skyTapped) { hangOn = true; hangHeldSec = 0; hoopJuice?.hold(true); console.info(`[HANDS] rim hang${skyTapped && !aHeld ? ' (the drop hangs)' : ''}`); }   // THE SKY TIER: the drop-in flip hangs on its own   // SLAM still held on the contact = a hang (a tap that overlaps it is a 20 ms pull, released with the tap)
             } else { jamPrevBall.copyFrom(bp); jamPrevLive = true; }
           }
           if (jamContact) {
@@ -1383,7 +1482,7 @@ export const DunkMode: ModeDefinition = (() => {
               swingPeak = Math.max(swingPeak, Math.abs(swingAng));
               player.root.rotation.z = -swingAng * 0.8;
               player.root.position.x = hangBase.x + Math.sin(swingAng) * 0.55; player.root.position.y = hangBase.y - (1 - Math.cos(swingAng)) * 0.55;
-              if (!hangHold(aHeld, hangHeldSec, HANG_MAX_SEC)) {
+              if (!hangHold(aHeld || (skyTapped && hangHeldSec < HANG_MAX_SEC), hangHeldSec, HANG_MAX_SEC + (skyTapped ? 0.8 : 0))) {   // a high-tier drop hangs longer
                 hangOn = false; hoopJuice?.hold(false); console.info(`[HANDS] hang release after ${hangHeldSec.toFixed(2)} s`);
                 console.info(`[DUNK-PARKOUR] rim swing peak ${swingPeak.toFixed(2)} rad`);
                 if (swingPeak > 0.25) { styleTaps = Math.min(2, styleTaps + 1); hype = Math.min(100, hype + 8); flash(ctx, `RIM SWING${swingPeak > 0.5 ? ' · BIG' : ''}`, 700); SoundKit.play('crowdCheer', { volume: 0.4 }); }
@@ -1806,6 +1905,11 @@ export const DunkMode: ModeDefinition = (() => {
     if (phase === 'cinematic') return;
     if (runwayBeat && runwayBeat.id !== 'doubleup') endRunwayBeat(true);   // a toss / kick / cartwheel still running gives the body to the takeoff (no run loop in between — the launch clip crossfades out of the beat)
     runwayBeat = null; launchQueued = false;
+    if (busRun) {   // THE BUS WALL RUN: the jump off the front of the bus — from up its side, the flight a diagonal to the iron
+      busLaunch = { x0: player.root.position.x, y0: player.root.position.y }; busRan = true; busRun = null; player.root.rotation.z = 0;
+      vectorAt = performance.now(); vectorWallRun = true; doubleLaunchLift += BUS_RUN.apexAdd; runwayDifficulty += BUS_RUN.difficulty; runwayLabels.push(`RAN THE ${ride.short}`); hype = Math.min(100, hype + BUS_RUN.hype);
+      console.info(`[DUNK-PARKOUR] off the bus at (${busLaunch.x0.toFixed(2)}, ${busLaunch.y0.toFixed(2)}, ${player.root.position.z.toFixed(2)})`);
+    }
     // THE RUNWAY'S TEACHING LINE ENDS AT THE RUNWAY (caught in the hang frame, 2026-09-16): "DOUBLE-UP — tap A" was
     // still sitting under the dunker in mid-air, offering a move that is no longer available and standing where the
     // flight's own read is about to appear. The runway teaches; the air reads.
@@ -1867,9 +1971,10 @@ export const DunkMode: ModeDefinition = (() => {
     armedAir = null; spin.reset(); liveTricks = []; liveSpin = { turns: 0, from: 0, until: 0 };
     if (heldDpad) flight.recognizer.feed({ t: 'dpad', dir: heldDpad, pressed: true });   // a direction held through the takeoff is still held
     if (launchSpeed01 < 0.3 && charge > 0.4) flash(ctx, 'WALK-UP — short air', 900);
-    else if (approach.difficulty > 0 || vectorLive()) flash(ctx, `${vectorLive() ? (vectorWallRun ? 'OFF THE WALL RUN · ' : 'OFF THE REBOUND · ') : ''}${approach.label}${approach.angleDeg >= 10 ? ` · ${approach.angleDeg}°` : ''}`, 900);
+    else if (approach.difficulty > 0 || vectorLive()) flash(ctx, `${vectorLive() ? (vectorWallRun ? `OFF THE ${ride.short} RUN · ` : 'OFF THE REBOUND · ') : ''}${approach.label}${approach.angleDeg >= 10 ? ` · ${approach.angleDeg}°` : ''}`, 900);
     dribble?.update(0, 0, false); gatherLatched = false; gatherStride = false; finishRelease = -1;   // DUNK-POSTURE-LEGS: the dribble is parked (the ball back in the palm) before the takeoff takes it
-    if (isOop(prop)) { if (teammate) attachBallToHand(ball, teammate.skeleton, 'RightHand'); else releaseBall(ball); }   // the ball rides the passer's palm until the toss (it used to wait at his idle hand and teleport 0.87 m up on the throw)
+    if (prop === 'oopalien') { /* the ball waits in the saucer (setupProp put it there) */ }
+    else if (isOop(prop)) { if (teammate) attachBallToHand(ball, teammate.skeleton, 'RightHand'); else releaseBall(ball); }   // the ball rides the passer's palm until the toss (it used to wait at his idle hand and teleport 0.87 m up on the throw)
     else if (!lob.live) attachBallToHand(ball, player.skeleton, 'RightHand');   // a lob already in the air stays there — the catch is the hand's job
     // the track plays you OUT; it does not play under the dunk. The crowd owns the flight.
     stopWalkOut();
@@ -2348,6 +2453,15 @@ export const DunkMode: ModeDefinition = (() => {
     setTrail('soft');
     console.info(`[LOB] ${label} from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${tf.toFixed(2)} s`);
   }
+  /** ORBIT (owner, 2026-09-18: "lob from the aliens"): the saucer drops the oop out of its belly port onto the catch beat. */
+  function throwAlienLob(ctx: ModeContext, tf: number): void {
+    const from = new Vector3(skyRoot ? skyRoot.position.x : 0, SKY.underY - 0.18, skyRoot ? skyRoot.position.z : gatherLine() - SKY.zAhead);
+    throwLob(ctx, from, 'ALIEN OOP', tf);
+    skyKick = 1; runwayDifficulty += 0.5;
+    SoundKit.play('whoosh', { pitch: 1.5, volume: 0.5 }); ctx.juice.flash('#7cf7a0', 60); ctx.camDirector.pulse(0.4, 0.35);
+    EffectsKit.burst(ctx.scene, from, 'sparks');
+    flash(ctx, 'THE ALIENS DROP IT — GO GET IT', 800);
+  }
   /** DUNK-GLASS-BOUNCE: the flight's catch point for a lob thrown now (throwLob's aim, shared by the glass and bounce throws). */
   function catchPointNow(catchT = LOB_CATCH_CLIP_T): Vector3 {
     const line = phase === 'cinematic' ? launchZ : gatherLine();
@@ -2426,12 +2540,12 @@ export const DunkMode: ModeDefinition = (() => {
     const g = pane ? paneLobVelocity(v3(from), v3(to), pane, tf) : null;
     const along = pane && g ? Math.abs((g.hitWorld.x - pane.cx) * -pane.nz + (g.hitWorld.z - pane.cz) * pane.nx) : Infinity;
     if (!pane || !g || along > pane.half + 0.3 || g.hitWorld.y < 0.3 || g.hitWorld.y > 4.3) {
-      console.warn(`[LOB] billboard oop impossible from here (${!g ? 'no solve' : `off the sign: along ${along.toFixed(2)} y ${g.hitWorld.y.toFixed(2)}`}) — a plain oop instead`);
+      console.warn(`[LOB] bus oop impossible from here (${!g ? 'no solve' : `off the sign: along ${along.toFixed(2)} y ${g.hitWorld.y.toFixed(2)}`}) — a plain oop instead`);
       throwLob(ctx, from, 'ALLEY-OOP', Math.max(0.35, tf)); return;
     }
     if (ball.parent) { releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ball.position.copyFrom(releasePos); }
     ballSim.launch(from, new Vector3(g.v.x, g.v.y, g.v.z));
-    lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = 'BILLBOARD OOP'; lob.kind = 'corner'; lob.t = 0; catchBlend = 1; catchPending = false;
+    lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = `${ride.short} OOP`; lob.kind = 'corner'; lob.t = 0; catchBlend = 1; catchPending = false;
     setTrail('soft');
     console.info(`[LOB] BILLBOARD OOP from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) off the ${pane.side > 0 ? 'right' : 'left'} sign at (${g.hitWorld.x.toFixed(2)},${g.hitWorld.y.toFixed(2)},${g.hitWorld.z.toFixed(2)}) @${g.t1.toFixed(2)} s then to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${tf.toFixed(2)} s`);
   }
@@ -2491,7 +2605,7 @@ export const DunkMode: ModeDefinition = (() => {
     // the corner billboards (DUNK PARKOUR): the toss off a sign comes back off it
     if (lob.kind === 'corner' && !lob.glass) for (const pn of panes) {
       const hit = ballSim.sweptPaneHit(pn.cx, pn.cz, pn.nx, pn.nz, pn.half + 0.3, 0.2, 4.3, GLASS_E_N, GLASS_E_T);
-      if (hit) { lob.glass = true; runwayDifficulty += 0.6; console.info(`[LOB] OFF THE BILLBOARD at (${hit.x.toFixed(2)},${hit.y.toFixed(2)},${hit.z.toFixed(2)}) @${lob.t.toFixed(2)} s`); flash(ctx, 'OFF THE BILLBOARD!', 600); SoundKit.play('impact', { pitch: 1.6, volume: 0.45 }); EffectsKit.burst(ctx.scene, hit, 'sparks'); break; }
+      if (hit) { lob.glass = true; runwayDifficulty += 0.6; console.info(`[LOB] OFF THE BUS at (${hit.x.toFixed(2)},${hit.y.toFixed(2)},${hit.z.toFixed(2)}) @${lob.t.toFixed(2)} s`); flash(ctx, `OFF THE ${ride.short}!`, 600); SoundKit.play('impact', { pitch: 1.6, volume: 0.45 }); EffectsKit.burst(ctx.scene, hit, 'sparks'); break; }
     }
     // the iron: a toss through the rim's ring clanks off it
     if (!lob.clanked) for (const c of RIM_RING) { const h = ballSim.sweptHit(c, RIM_IRON_R); if (h) { const n = ballSim.pos.subtract(c); if (n.lengthSquared() < 1e-6) n.set(0, 1, 0); ballSim.deflect(n, 0.55); ballSim.pos.copyFrom(h); ballSim.mesh.position.copyFrom(h); lob.clanked = true; console.info(`[LOB] CLANK off the iron @${lob.t.toFixed(2)} s (${h.x.toFixed(2)},${h.y.toFixed(2)},${h.z.toFixed(2)})`); flash(ctx, 'OFF THE IRON', 600); SoundKit.play('impact', { pitch: 1.2, volume: 0.5 }); break; } }
@@ -2689,7 +2803,7 @@ export const DunkMode: ModeDefinition = (() => {
         * stakesScale(stakes, flight.attempt.tricks.map((t) => t.id), false));
       playerTotal += missTotal; misses++; playerCards.push(missTotal);   // a miss is part of the standard too
       card = addAttempt(card, {
-        round, style: STYLE_LABEL[style], prop: PROP_LABEL[prop],
+        round, style: STYLE_LABEL[style], prop: propLabel(prop),
         finish: SPORT_CLIP.dunkFinishBlown, label: 'BLOWN',
         judges: missScores.map((j) => j.score), total: missTotal, made: false,
         diff: missDiff, exec: 0, look: missStyle,   // P9: a miss is part of the night's numbers too
@@ -2762,7 +2876,7 @@ export const DunkMode: ModeDefinition = (() => {
     // JUDGE TRANSPARENCY (owner's pillars brief, 2026-09-18 §4): the panel's four reads, in words — the APPROACH (the run, the
     // takeoff, the runway beats, the caught toss), the AIR (the tricks, the taps, the hang), the PRECISION (the slam's timing)
     // and the room (HYPE, and whether the panel has seen this one) — so a card is a lesson, not a number
-    const approachBits = [launchSpeed01 >= 0.8 ? 'FULL RUN' : launchSpeed01 >= 0.45 ? 'JOG' : 'WALK-UP', launchTag, ...runwayLabels, lob.caught ? lob.label : '', doubleLaunched ? 'DOUBLE-LAUNCH' : ''].filter(Boolean);   // the sky tap is already a runway label
+    const approachBits = [launchSpeed01 >= 0.8 ? 'FULL RUN' : launchSpeed01 >= 0.45 ? 'JOG' : 'WALK-UP', launchTag, ...runwayLabels, lob.caught ? lob.label : '', doubleLaunched && !boardTopFlip ? 'DOUBLE-LAUNCH' : ''].filter(Boolean);   // the sky tap, the board top and the board run are runway labels
     const airBits = [...flight.attempt.tricks.map((t) => t.id.toUpperCase()), styleTaps > 0 ? `${styleTaps} STYLE TAP${styleTaps > 1 ? 'S' : ''}` : '', hangBonus > 0 ? 'HANG' : ''].filter(Boolean);
     const judgeWhy = `APPROACH ${approachBits.join(' · ')} │ AIR ${airBits.join(' · ') || 'straight up'} │ PRECISION ${Math.round(qteAccuracy * 100)}% │ HYPE ${Math.round(momentum.score01 * 100)}%${isRepeat ? ' · SEEN IT' : ''}`;
     ctx.setHud({
@@ -2814,7 +2928,7 @@ export const DunkMode: ModeDefinition = (() => {
     // the FINISH CLIP goes in, not only a label: the body's finish is picked deterministically from these
     // same values, so the card is enough to re-perform the attempt if a replay is ever built
     card = addAttempt(card, {
-      round, style: STYLE_LABEL[style], prop: PROP_LABEL[prop],
+      round, style: STYLE_LABEL[style], prop: propLabel(prop),
       finish: aerialClip, label: finishBanner(true, qteAccuracy, ebState.inLeftHand, calledAirTrick()).replace('!', '') || STYLE_LABEL[style],
       judges: scores.map((j) => j.score), total: dunkTotal, made: true,
       diff: difficulty, exec: execution, look: styleScore,   // P9: the night's report reads these back
@@ -2908,6 +3022,9 @@ export const DunkMode: ModeDefinition = (() => {
     jamSec = -1; jamContact = false; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
     styleTaps = 0; hangSec = 0; revealed = []; slamTiming = null;
     runUpPeak = 0; obstacleClipped = false; toppling = false; runwayIds = [];
+    // THE FLIGHT'S ONCE-A-FLIGHT FLAGS ARE PER ATTEMPT (2026-09-18, measured: the bus wall run refused attempt 2 of a night — busRan, like
+    // doubleLaunched / skyTapped / boardRan, was reset at the mode's start only, so every second flight of a night found its board / sky / bus 'spent')
+    vectorAt = -1e9; vectorWallRun = false; doubleLaunched = false; doubleLaunchLift = 0; boardSwung = false; hangBase = null; swingAng = 0; skyTapped = false; boardTopFlip = false; boardRan = false; l1DownAt = -1; busRun = null; busLaunch = null; busRan = false;
     resetLob(); resetRunway(); ballSim.stop(); looseBall = false; flush = null; jamPrevLive = false; punchPending = false; dribble?.update(0, 0, false); gatherLatched = false; gatherStride = false; gatherK = 0; finishRelease = -1; attachBallToHand(ball, player.skeleton, 'RightHand'); ebState.inLeftHand = false; setWin('run');
     settleLatch = false; settleArmed = false; fovRelease(); setTrail('soft');   // juice soft: back to the runway
     void setupProp(ctx);

@@ -197,6 +197,10 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           {hud.prop != null && (
             <span className="fel-panel px-2 py-1 text-[var(--fel-purple)]">{hnode(hud.prop)}</span>
           )}
+          {/* SEASON SPECIALS: the kangaroo, the sky tap, the board-top flip and the backboard run are the PRO lane's — named and locked, never missing */}
+          {hud.specials === 'LOCKED' && (
+            <span className="fel-panel px-2 py-1 font-mono text-[9px] tracking-wider text-amber-300/80">SPECIALS · SEASON PASS</span>
+          )}
           {hud.style != null && (
             <span className="fel-panel px-2 py-1 text-[var(--fel-gold)]">{hnode(hud.style)}</span>
           )}

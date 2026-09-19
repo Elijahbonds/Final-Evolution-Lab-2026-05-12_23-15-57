@@ -1,6 +1,6 @@
 // Does the glass send the run back, do the two launches differ, is the double-launch a window, does a perfect break the board?
 import { describe, it, expect } from 'vitest';
-import { GLASS, glassRebound, launchProfile, doubleLaunchAllowed, DOUBLE_LAUNCH, overdriveDunk, cornerPanes, paneRebound, billboardFor } from './DunkParkour';
+import { BUS_RUN, busRunPose, alongPane, busRunDone, cornerRideFor, GLASS, glassRebound, launchProfile, doubleLaunchAllowed, DOUBLE_LAUNCH, overdriveDunk, cornerPanes, paneRebound, billboardFor } from './DunkParkour';
 
 describe('the glass rebound', () => {
   it('reflects a fast oblique run into the wall and keeps the speed', () => {
@@ -43,6 +43,18 @@ describe('the corner glass', () => {
   it('two panes at the front corners, facing the runway centre, nothing on the sidelines', () => {
     expect(panes).toHaveLength(2);
     for (const p of panes) { expect(Math.hypot(p.nx, p.nz)).toBeCloseTo(1, 6); expect(p.nz).toBeGreaterThan(0); expect(Math.sign(p.nx)).toBe(-p.side); expect(Math.abs(p.cx)).toBeLessThan(5.6); }
+  });
+  it('the bus wall run goes up the side and along it toward the rim, and leaves at the front end', () => {
+    const bus = panes[0];
+    const s0 = alongPane(bus, bus.cx + bus.nx * 0.3, bus.cz + bus.nz * 0.3);
+    expect(s0).toBeCloseTo(0, 6);
+    const a = busRunPose(bus, 0, 0), b = busRunPose(bus, 2, BUS_RUN.riseSec + 1);
+    expect(a.y).toBe(0); expect(b.y).toBeCloseTo(BUS_RUN.height, 6);
+    expect(b.z).toBeLessThan(a.z); expect(Math.abs(b.x)).toBeLessThan(Math.abs(a.x));   // toward the rim and the centre line
+    expect(Math.hypot(b.fx, b.fz)).toBeCloseTo(1, 6); expect(b.fz).toBeLessThan(0);
+    expect(busRunDone(BUS_RUN.exitS - 0.1, 0.5)).toBe(false); expect(busRunDone(BUS_RUN.exitS, 0.5)).toBe(true); expect(busRunDone(0, BUS_RUN.maxSec)).toBe(true);
+    expect(launchProfile('one', true, true).label).toMatch(/^WALL RUN/); expect(launchProfile('one', true, false).label).toMatch(/^CORNER REBOUND/);
+    expect(cornerRideFor('orbit').kind).toBe('shuttle'); expect(cornerRideFor('venice').kind).toBe('hoopbus'); expect(cornerRideFor(undefined).short).toBe('BUS');
   });
   it('a run down the side is kicked toward the middle; a shallow one is a wall run; away from it nothing', () => {
     const right = panes[0];
