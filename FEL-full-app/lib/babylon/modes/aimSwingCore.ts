@@ -12,6 +12,7 @@ import { VenueKit } from '../visual/VenueKit';
 import { Color3, DynamicTexture, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, PBRMaterial, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { spawnMeshyProp } from '../visual/meshyProps';
 import { CharacterPipeline } from '../core/characterPipeline';
 import { neverBindPose } from '../anim/importSanitizer';
 import type { ModeContext } from '../core/ModeHarness';
@@ -222,19 +223,37 @@ export function buildBallparkOutfield(scene: Scene): AbstractMesh[] {
   return parts;
 }
 
+/** The goal's regulation frame — the shot maths uses these numbers, so the MESH is fitted to them, never the other way. */
+const GOAL_FIT = { width: 7.42, height: 2.44, depth: 2.0, z: 11 } as const;
+
 export function buildGoal(scene: Scene): AbstractMesh[] {
   const parts: AbstractMesh[] = [];
   const white = mat(scene, '#f4f6f8');
+  const bars: AbstractMesh[] = [];
   for (const [x, y, w, h] of [[-3.66, 1.22, 0.1, 2.44], [3.66, 1.22, 0.1, 2.44], [0, 2.44, 7.42, 0.1]] as const) {
     const bar = MeshBuilder.CreateBox('goalbar', { width: w === 0.1 ? 0.1 : w, height: h === 0.1 ? 0.1 : h, depth: 0.1 }, scene);
-    bar.position.set(x, y, 11);
+    bar.position.set(x, y, GOAL_FIT.z);
     bar.material = white;
-    parts.push(bar);
+    parts.push(bar); bars.push(bar);
   }
   const netB = MeshBuilder.CreateBox('goalnet', { width: 7.3, height: 2.4, depth: 0.04 }, scene);
   netB.position.set(0, 1.2, 11.8);
   netB.material = mat(scene, '#dfe5ea', 0.25);
-  parts.push(netB);
+  parts.push(netB); bars.push(netB);
+  // ASSET UPGRADE (owner, 2026-09-18: "do asset upgrade, asset swaps with the models"): a real goal with real netting rides
+  // the frame above — the boxes stay as the instant look and are hidden the moment the mesh lands (a failed load keeps them).
+  // The model's own proportions are not regulation, so it is fitted per axis to GOAL_FIT; a net does not show the stretch.
+  void spawnMeshyProp(scene, 'goal', null, 'goal_meshy').then((root) => {
+    if (!root || scene.isDisposed) return;
+    const { min, max } = root.getHierarchyBoundingVectors(true);
+    const ex = Math.max(0.01, max.x - min.x), ey = Math.max(0.01, max.y - min.y), ez = Math.max(0.01, max.z - min.z);
+    root.scaling.set(GOAL_FIT.width / ex, GOAL_FIT.height / ey, GOAL_FIT.depth / ez);
+    const b2 = root.getHierarchyBoundingVectors(true);
+    root.position.set(root.position.x - (b2.min.x + b2.max.x) / 2, root.position.y - b2.min.y, root.position.z - (b2.min.z + b2.max.z) / 2 + GOAL_FIT.z + GOAL_FIT.depth / 2);
+    for (const m of bars) m.setEnabled(false);
+    for (const m of root.getChildMeshes()) parts.push(m);
+    console.info(`[GOAL] meshy goal fitted to ${GOAL_FIT.width} x ${GOAL_FIT.height} m at z ${GOAL_FIT.z}`);
+  });
   return parts;
 }
 
