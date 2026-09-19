@@ -62,11 +62,34 @@ export const SNOW_SLOPE: SnowFeature[] = [
   F('kicker', 188, -0.58, 9, 8, 2.8),
   F('rail', 208, 0.6, 18, 0.5, 1.0, 200),
   F('roller', 228, -0.5, 10, 10, 1.4),
+  // THE LOWER MOUNTAIN (owner, 2026-09-19: "much bigger and longer"). The run now carries 30 gates to 598 m, so the
+  // features carry on down it at the same rhythm — 10 m after each gate, alternating sides, which is what keeps a 9 m
+  // roller and a 4 m gate off each other on the narrow venues. The bottom third runs bigger and faster: the kickers
+  // grow, the rails run longer, and the last stretch is a wall-ride into a road gap before the finish.
+  F('kicker', 248, 0.58, 10, 8, 3.0),
+  F('rail', 268, -0.6, 22, 0.5, 1.1, 240),
+  F('box', 288, 0.54, 16, 3.2, 1.0, 170),
+  F('roller', 308, -0.52, 11, 11, 1.5),
+  F('wallride', 328, 0.72, 16, 0.6, 3.4, 285),
+  F('kicker', 348, -0.6, 11, 9, 3.2),
+  F('rail', 368, 0.62, 24, 0.5, 1.2, 260),
+  F('roller', 388, -0.54, 12, 11, 1.6),
+  F('box', 408, 0.56, 18, 3.4, 1.0, 180),
+  F('kicker', 428, -0.62, 12, 9, 3.4),
+  F('rail', 448, 0.64, 26, 0.5, 1.2, 280),
+  F('wallride', 468, -0.74, 18, 0.6, 3.6, 295),
+  F('roller', 488, 0.56, 12, 12, 1.7),
+  F('kicker', 508, -0.64, 13, 10, 3.6),
+  F('rail', 528, 0.66, 28, 0.5, 1.3, 290),
+  F('box', 548, -0.58, 20, 3.6, 1.1, 200),
+  F('roller', 568, 0.58, 13, 12, 1.8),
+  F('kicker', 588, -0.66, 14, 10, 3.8),
 ];
 
 /** The gates, recomputed here so a test can check the features against the real thing. */
 export const gateDist = (i: number, start: number, spacing: number): number => start + i * spacing;
-export const gateX = (i: number): number => (i === 0 ? 0 : (i % 2 === 0 ? -1 : 1) * (3.1 + (i / 11) * 1.0));
+export const gateX = (i: number, gates = 30): number =>
+  i === 0 ? 0 : (i % 2 === 0 ? -1 : 1) * (3.1 + (gates > 1 ? i / (gates - 1) : 0) * 1.0);
 
 /** Features that carry a grindable edge. */
 export const snowRails = (): SnowFeature[] => SNOW_SLOPE.filter((f) => f.bonus > 0);

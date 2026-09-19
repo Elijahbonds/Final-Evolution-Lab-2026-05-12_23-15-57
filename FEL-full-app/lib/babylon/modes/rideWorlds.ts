@@ -721,10 +721,18 @@ export const SURF_HALF_WIDTH = 45;
 // MIRROR the formula to steer at the gates -- its own header warns that the two
 // would drift. One definition instead: the world builds from it, the driver
 // aims with it, and the tests check it.
-/** Half-width of the piste. The rider clamps here and the snow ends here. */
-export const PISTE_HALF_WIDTH = 17;
-export const SLALOM_GATES = 12;
-/** Metres down the fall line between gates. */
+/** Half-width of the piste. The rider clamps here and the snow ends here.
+ *  A BIGGER MOUNTAIN (owner, 2026-09-19: "expand out the snowboarding map to be much bigger and longer"): 17 → 24 m a
+ *  side, so the groom is 48 m wide. The 'slope' prop set's treeline is authored for a 17 m piste and is pushed out by
+ *  `bound - 17` at mount, so widening here does not leave pines standing in the snow. */
+export const PISTE_HALF_WIDTH = 24;
+/** 12 → 30 gates: the run goes from 318 m to 678 m, a 149 m vertical drop instead of 70. The gate spread below
+ *  normalises over the COUNT, so a longer course does not open past what a rider can carve. */
+export const SLALOM_GATES = 30;
+/** Metres down the fall line between gates.
+ *  DO NOT RETUNE THIS CASUALLY: the slope features in snowSlope.ts are hand-placed 10 m after each gate — exactly
+ *  midway — which is the only reason a 9 m wide roller and a gate can share a narrow venue at all. Moving the spacing
+ *  to 24 slid the gates into five features on the alpine and night venues (measured). Length comes from GATES. */
 export const SLALOM_SPACING = 20;
 /** Distance to the first gate. */
 export const SLALOM_START = 18;
@@ -758,7 +766,12 @@ export function slalomGateDistAt(i: number, venue: BoardVenue): number {
 }
 
 export function slalomGateX(i: number): number {
-  return i === 0 ? 0 : (i % 2 === 0 ? -1 : 1) * (3.1 + (i / 11) * 1.0);
+  // The spread opens with the course, normalised over the GATE COUNT — it used to divide by a hardcoded 11, so adding
+  // gates pushed the tail past what a rider can cross (the unreachable-tail defect snowboard-run-tests C1 exists to
+  // catch). The wider legs (24 m) buy about 11 m of lateral per gate, so 3.4 → 4.9 a side keeps the hardest gate at
+  // roughly 90% of what is available, which is where this course has always been tuned.
+  const t = SLALOM_GATES > 1 ? i / (SLALOM_GATES - 1) : 0;
+  return i === 0 ? 0 : (i % 2 === 0 ? -1 : 1) * (3.1 + t * 1.0);
 }
 /** Distance down the fall line to gate `i`. */
 export function slalomGateDist(i: number): number {
