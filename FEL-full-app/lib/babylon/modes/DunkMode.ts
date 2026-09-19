@@ -389,16 +389,13 @@ export const DunkMode: ModeDefinition = (() => {
       const env = add(MeshBuilder.CreateSphere('sky_env', { diameter: 3.4, segments: 16 }, scene), body, 0, 3.4, 0); env.scaling.y = 1.15;
       add(MeshBuilder.CreateBox('sky_basket', { width: 1.1, height: 0.7, depth: 1.1 }, scene), dark, 0, 0.35, 0);
       for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const r = add(MeshBuilder.CreateCylinder('sky_rope', { diameter: 0.04, height: 1.6 }, scene), acc, sx * 0.5, 1.5, sz * 0.5); r.rotation.x = sz * 0.25; r.rotation.z = -sx * 0.25; }
-    } else if (tier.kind === 'treehouse') {
+    } else {
+      // the treehouse — and the last kind, so it is the fallback. (The Rooftop's water tower stood here until
+      // 2026-09-19: owner, "take out the water tower". The Rooftop hangs nothing now, like Venice.)
       add(MeshBuilder.CreateBox('sky_deck', { width: 3.4, height: 0.3, depth: 2.4 }, scene), body, 0, 0.15, 0);
       add(MeshBuilder.CreateBox('sky_hut', { width: 2.2, height: 1.6, depth: 1.6 }, scene), dark, 0, 1.1, -0.3);
       const roof = add(MeshBuilder.CreateCylinder('sky_roof', { diameterTop: 0, diameterBottom: 3.0, height: 1.0, tessellation: 4 }, scene), acc, 0, 2.4, -0.3); roof.rotation.y = Math.PI / 4;
       for (const sx of [-1, 1]) add(MeshBuilder.CreateBox('sky_rail', { width: 0.06, height: 0.7, depth: 2.4 }, scene), acc, sx * 1.65, 0.65, 0);
-    } else {
-      add(MeshBuilder.CreateCylinder('sky_tank', { diameter: 2.6, height: 1.9, tessellation: 20 }, scene), body, 0, 1.25, 0);
-      add(MeshBuilder.CreateCylinder('sky_cap', { diameterTop: 0.2, diameterBottom: 2.8, height: 0.8, tessellation: 20 }, scene), acc, 0, 2.6, 0);
-      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const leg = add(MeshBuilder.CreateCylinder('sky_leg', { diameter: 0.14, height: 5.6 }, scene), dark, sx * 1.6, -2.5, sz * 1.6); leg.rotation.x = sz * 0.12; leg.rotation.z = -sx * 0.12; }
-      add(MeshBuilder.CreateBox('sky_walk', { width: 3.6, height: 0.08, depth: 3.6 }, scene), acc, 0, 0.05, 0);
     }
     return root;
   }
@@ -505,6 +502,7 @@ export const DunkMode: ModeDefinition = (() => {
   let slamBufferAt = -1;                     // clip second of a SLAM press waiting for the window (−1 = none)
   let slamSeen = false;                      // an A press reached the flight at all (the miss banner names WHAT missed)
   let slamCueOn = false;                     // the SLAM read is up: the buffer's edge through the window's close
+  let beatCalled = false;                    // the NOW! call fires once a flight, ON the beat the card scores against
   // ── A+ P8 athlete hands ──
   const arms: { Left: ArmChain | null; Right: ArmChain | null } = { Left: null, Right: null };   // H1: built once at spawn
   let handIkT = 0;                            // H1: 0..1 ease of the wrist reach
@@ -1395,9 +1393,21 @@ export const DunkMode: ModeDefinition = (() => {
         // signal can never learn where the perfect beat is: they press on the read, take their 25-40 %, and have no way
         // to find the other 60. The window's own opening now has a tell of its own — a word and a tick — so the beat
         // can be learned by ear the way a rhythm game teaches one.
+        // …BUT THE LOUD WORD HAS TO LAND ON THE BEAT, NOT BEFORE IT (owner, 2026-09-19).
+        // "NOW!" fired on the window's OPENING frame while the card scores the press against the window's CENTRE, so a
+        // player who does exactly what the prompt says is half a window early — every time. Measured with the lab
+        // pressing the frame the word appeared: 107 ms, 108 ms, 110 ms, 122 ms EARLY across every run tonight, and
+        // "0 slams on time" in every single report.
+        // The rhythm lesson the opening tell was added for is kept: the window still announces itself with its own
+        // word and tick. The instruction moved to the beat, where obeying it scores.
         if (qteWindowOpen && !wasOpen && !lob.live) {
+          ctx.setHud({ hint: 'WINDOW OPEN' });
+          SoundKit.play('uiTick', { pitch: 1.55, volume: 0.4 });
+        }
+        if (!lob.live && !beatCalled && clipTime >= EASTBAY_TIMING.extend && clipTime <= closeAt) {
+          beatCalled = true;
           ctx.setHud({ hint: 'NOW!' });
-          SoundKit.play('uiTick', { pitch: 1.8, volume: 0.5 });
+          SoundKit.play('uiTick', { pitch: 1.9, volume: 0.55 });
         }
         if (!slamCueOn && !qteWindowOpen && (wasCue || wasOpen)) ctx.setHud({ slamPulse: false });
         // a press the buffer was holding fires on the frame the window opens — its execution is scored from where the finger was
@@ -1931,7 +1941,7 @@ export const DunkMode: ModeDefinition = (() => {
     // the broadcast cut is per-attempt: hand the follow camera back or the next runway is shot from the rim
     ctx.camDirector.mode = 'follow';
     rimCamCut = false; verdictCamSet = false; rivalCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
-    slamBufferAt = -1; slamSeen = false; slamCueOn = false;   // DUNK-BODY-MID: the slam buffer is per attempt
+    slamBufferAt = -1; slamSeen = false; slamCueOn = false; beatCalled = false;   // DUNK-BODY-MID: the slam buffer is per attempt
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
     airHeld = false; dropToFloor = false; replaying = false; replayAir = false; launchRealMs = performance.now();   // A+ P8
     jamSec = -1; jamContact = false; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM

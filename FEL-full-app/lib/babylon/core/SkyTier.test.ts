@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { SKY, SKY_TIERS, skyTierFor, skyTapAllowed, skyTapRefusal } from './SkyTier';
 describe('the sky tier', () => {
-  it('every court with a tier hangs something different; Venice and an unknown court hang nothing (the blimp is out)', () => {
-    expect(new Set(Object.values(SKY_TIERS).map((t) => t.kind)).size).toBe(4);
-    expect(skyTierFor('orbit')?.kind).toBe('saucer'); expect(skyTierFor('venice')).toBeNull(); expect(skyTierFor(undefined)).toBeNull();
-    expect(Object.values(SKY_TIERS).some((t) => /blimp/i.test(t.tag))).toBe(false);
+  it('every court with a tier hangs something different; Venice and an unknown court hang nothing (the blimp and the water tower are out)', () => {
+    expect(new Set(Object.values(SKY_TIERS).map((t) => t.kind)).size).toBe(3);
+    expect(skyTierFor('orbit')?.kind).toBe('saucer'); expect(skyTierFor('venice')).toBeNull(); expect(skyTierFor('rooftop')).toBeNull(); expect(skyTierFor(undefined)).toBeNull();
+    expect(Object.values(SKY_TIERS).some((t) => /blimp|water tower/i.test(t.tag))).toBe(false);
   });
   it('a tap is once a flight, inside the window, with the hand up to the surface', () => {
     const reach = SKY.underY - SKY.slackM - SKY.reachM;
