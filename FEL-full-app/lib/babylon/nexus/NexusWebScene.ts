@@ -27,10 +27,12 @@ import {
   ArcRotateCamera, Color3, Color4, DirectionalLight, DynamicTexture, Engine,
   HemisphericLight, Mesh, MeshBuilder, PBRMaterial, Scene, ShadowGenerator,
   StandardMaterial, Texture, TransformNode, Vector3,
+  Ray,
 } from '@babylonjs/core';
 import { PREMIUM_DRESSING } from './dressingFlags';   // M108 broadcast dressing (rollback flag)
 import { mountVenueMap } from '../visual/VenueMaps';
 import { buildCrowdStand, fieldMaterial } from '../visual/PlacePack';
+import { spawnMeshyProp } from '../visual/meshyProps';
 
 // ── spec ──────────────────────────────────────────────────────────────────
 
@@ -40,7 +42,7 @@ export type GroundKind =
 
 export type PropKind =
   | 'hoop' | 'backboardPole' | 'goal' | 'net' | 'wall' | 'crowdTier'
-  | 'palm' | 'lamp' | 'banner' | 'ramp' | 'beam' | 'podium' | 'tee' | 'flag';
+  | 'palm' | 'lamp' | 'banner' | 'ramp' | 'beam' | 'podium' | 'tee' | 'flag' | 'stadium';
 
 export interface Grade {
   /** Camera exposure. >1 lifts the whole image; the anime grade sits ~1.15. */
@@ -679,6 +681,35 @@ function buildProp(scene: Scene, p: PropSpec, root: TransformNode, shadows: Shad
       crown.position.y = 4.6 * s;
       crown.material = surface(scene, 'crownMat', '#2FBF5B', 0.85);
       add(crown);
+      break;
+    }
+    case 'stadium': {
+      // THE STAGE IS A REAL STADIUM (owner, 2026-09-18: "2 soccer stadiums… swap with the one underneath that we can see in
+      // the forefront"). A baked Meshy bowl stands around the play area; `scale` is its footprint in metres on its long
+      // axis, and it is sunk 0.2 m so the mode's own pitch — which carries the markings and the ball's plane — reads on top
+      // of the model's grass instead of z-fighting it.
+      const span = (p.scale ?? 1) > 4 ? (p.scale ?? 132) : 132;   // a stadium's `scale` is metres, not a multiplier
+      void spawnMeshyProp(scene, 'stadium', null, 'venue_stadium').then((st) => {
+        if (!st || scene.isDisposed) return;
+        st.parent = node;
+        const { min, max } = st.getHierarchyBoundingVectors(true);
+        const ex = Math.max(1, Math.max(max.x - min.x, max.z - min.z));
+        const k = span / ex;
+        st.scaling.setAll(k);
+        st.position.set(-((min.x + max.x) / 2) * k, -min.y * k, -((min.z + max.z) / 2) * k);
+        // SINK IT BY ITS OWN FIELD, NOT BY ITS LOWEST VERTEX. A stadium diorama sits on a plinth, so its pitch plane can be
+        // 10 m above the bottom of the mesh: aligning `min.y` to the floor buried the real pitch and its markings under the
+        // model's grass (measured 2026-09-18 — no penalty markings visible at all). A ray straight down the middle finds
+        // the model's own field, and the whole bowl drops until that field sits just under the mode's ground plane.
+        for (const m of st.getChildMeshes()) { m.isPickable = true; m.receiveShadows = true; }
+        st.computeWorldMatrix(true);
+        const from = new Vector3(node.position.x, 400, node.position.z);
+        const set = new Set(st.getChildMeshes());
+        const hit = scene.pickWithRay(new Ray(from, new Vector3(0, -1, 0), 800), (m) => set.has(m as never));
+        if (hit?.hit && hit.pickedPoint) st.position.y -= hit.pickedPoint.y + 0.06;
+        for (const m of st.getChildMeshes()) m.isPickable = false;
+        console.info(`[VENUE] stadium stage ${span.toFixed(0)} m, field ${hit?.pickedPoint ? hit.pickedPoint.y.toFixed(2) : '?'} m → sunk to ${st.position.y.toFixed(2)}`);
+      });
       break;
     }
     case 'lamp': {

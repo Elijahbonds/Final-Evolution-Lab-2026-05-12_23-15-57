@@ -468,9 +468,11 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
     modeId: 'penalty', name: 'Penalty', venue: 'Global Pitch',
     environment: dusk('#5BC0EB', '#0B3D2E', '#12513C', '#FFF6C8', 0.8),
     // the spot is the origin and the goal line sits at z 10.4 (the mode builds the goal)
-    ground: { kind: 'pitch', size: [50, 70], color: '#2E7D46', lineColor: '#FFFFFF', markings: 'penalty' },
+    // the ground is sized to sit INSIDE the stadium bowl's own field (the bowl is the stage now, not a ring on the horizon)
+    ground: { kind: 'pitch', size: [44, 58], color: '#2E7D46', lineColor: '#FFFFFF', markings: 'penalty' },
     props: [
-      { kind: 'crowdTier', position: [0, 0, 24], rotationY: Math.PI }, { kind: 'crowdTier', position: [-26, 0, 6], rotationY: Math.PI / 2 }, { kind: 'crowdTier', position: [26, 0, 6], rotationY: -Math.PI / 2 },
+      // THE STAGE (owner, 2026-09-18): a real stadium bowl stands around the penalty pitch instead of three block tiers.
+      { kind: 'stadium', position: [0, 0, 2], scale: 66 },
       { kind: 'lamp', position: [-22, 0, 16] }, { kind: 'lamp', position: [22, 0, 16] },
     ],
     actors: [],

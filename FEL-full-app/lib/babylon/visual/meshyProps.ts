@@ -11,7 +11,7 @@ import { AssetContainer, SceneLoader, TransformNode } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 
-export type MeshyPropKey = 'hoop' | 'ball-basketball' | 'ball-soccer' | 'ball-tennis' | 'skateboard' | 'snowboard' | 'surfboard' | 'hoopbus' | 'shuttle' | 'goal' | 'sedan' | 'dojo' | 'store' | 'helmet' | 'helmet2' | 'bat' | 'glove';
+export type MeshyPropKey = 'hoop' | 'ball-basketball' | 'ball-soccer' | 'ball-tennis' | 'skateboard' | 'snowboard' | 'surfboard' | 'hoopbus' | 'shuttle' | 'goal' | 'stadium' | 'sedan' | 'dojo' | 'store' | 'helmet' | 'helmet2' | 'bat' | 'glove';
 export type BallKind = 'basketball' | 'soccer' | 'tennis' | 'volleyball';
 export type BoardKind = 'skateboard' | 'snowboard' | 'surfboard';
 
