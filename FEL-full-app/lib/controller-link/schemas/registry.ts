@@ -162,7 +162,10 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     askName: true,
     schemas: [
       { kind: 'dpad', dpad: { action: 'move' } },
-      { kind: 'button', buttons: [{ action: 'A', label: 'SWING' }] },
+      // PARKOUR DERBY (2026-09-18): the bat-flip vault is a whole mechanic — it is the only way to fill flow for a
+      // KINETIC swing — and it lives on B, which this overlay did not offer. A phone player could swing but never
+      // reach the trick that makes the swing worth anything.
+      { kind: 'button', buttons: [{ action: 'A', label: 'SWING' }, { action: 'B', label: 'BAT FLIP' }] },
     ],
   },
 

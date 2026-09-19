@@ -836,7 +836,10 @@ export const DerbyMode: ModeDefinition = (() => {
   let flow = 0, flowAtSwing = 0, trickDone = false, hopT = -1, multiplier = 1;
   const targetsHit = new Set<string>(); const targetMeshes = new Map<string, AbstractMesh>();
   let hit: { q: number; launch: number; cover: number; clutch: boolean; distPts: number; cross: WallCross | null; rob: Rob; settled: boolean } | null = null;
-  let fielders: { char: SpawnedCharacter; bearing: number; home: Vector3; run: { bearing: number; t: number; total: number; mode: Rob; boost: number; h: number } | null; y: number; moving: boolean }[] = [];
+  // A fielder gets a BeatOwner like every other body in this file: the derby's first cut drove their run/idle loops
+  // with two raw `animator.play` calls, which is the exact discipline net-anim-tests guards (one owner per body, so a
+  // beat can never be cut by a locomotion frame). `loop()` is per-frame safe and dedupes, so it is a drop-in.
+  let fielders: { char: SpawnedCharacter; own: BeatOwner; bearing: number; home: Vector3; run: { bearing: number; t: number; total: number; mode: Rob; boost: number; h: number } | null; y: number; moving: boolean }[] = [];
   let token: { mesh: AbstractMesh; t: number; bearing: number; who: 'yours' | 'theirs' } | null = null;
   const park = { batFlips: 0, targetsHit: 0, robbed: 0, tokensYours: 0, tokensTheirs: 0 };
   let lastVerdict: Verdict | '' = '', lastDetail = '', settledRound = 0;
@@ -874,8 +877,8 @@ export const DerbyMode: ModeDefinition = (() => {
         if (f.run.t > f.run.total + 1.3) f.run = null;
       } else f.y += (0 - f.y) * Math.min(1, dt * 4);
       const d = target.subtract(root.position); d.y = 0; const dist = d.length();
-      if (dist > 0.3) { const step = Math.min(dist, speed * dt); root.position.addInPlace(d.scale(step / dist)); root.rotation.y = Math.atan2(d.x, d.z); if (!f.moving) { f.moving = true; f.char.animator.play(SPORT_CLIP.moveLoop, { loop: true, fadeSec: 0.15 }); } }
-      else if (f.moving) { f.moving = false; f.char.animator.play(SPORT_CLIP.idle, { loop: true, fadeSec: 0.2 }); root.rotation.y = Math.PI + (f.bearing * Math.PI) / 180; }
+      if (dist > 0.3) { const step = Math.min(dist, speed * dt); root.position.addInPlace(d.scale(step / dist)); root.rotation.y = Math.atan2(d.x, d.z); if (!f.moving) { f.moving = true; f.own.loop(SPORT_CLIP.moveLoop, { fadeSec: 0.15 }); } }
+      else if (f.moving) { f.moving = false; f.own.loop(SPORT_CLIP.idle, { fadeSec: 0.2 }); root.rotation.y = Math.PI + (f.bearing * Math.PI) / 180; }
       root.position.y = f.y;
     }
   }
@@ -1101,7 +1104,7 @@ export const DerbyMode: ModeDefinition = (() => {
       for (const bearing of PARK.fielderBearings) {
         const home = onWall(bearing, PARK.fielderR);
         const char = await spawnFoe(ctx, CFG.heroUrl, home.clone(), Math.PI + (bearing * Math.PI) / 180, SPORT_CLIP.idle);
-        fielders.push({ char, bearing, home, run: null, y: 0, moving: false });
+        fielders.push({ char, own: new BeatOwner(char.animator), bearing, home, run: null, y: 0, moving: false });
       }
       if (process.env.NODE_ENV === 'development') {
         (ctx.scene.metadata ??= {}).baseball = {
