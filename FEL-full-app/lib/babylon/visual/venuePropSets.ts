@@ -9,6 +9,15 @@ const ring = (kit: string, model: string, r: number, n: number, y = 0, scale = 1
 const line = (kit: string, model: string, from: [number, number], to: [number, number], n: number, yaw = 0, scale = 1, tint?: string): PropPlacement[] =>
   Array.from({ length: n }, (_, i) => { const t = n === 1 ? 0 : i / (n - 1); return { kit, model, at: [from[0] + (to[0] - from[0]) * t, 0, from[1] + (to[1] - from[1]) * t], yaw, scale, ...(tint ? { tint } : {}) }; });
 
+/** `n` copies around an arc centred on [cx, cz], each turned to face the centre — backstops, terraces, anything that
+ *  curves. Angles in radians, 0 = +z, sweeping toward +x. */
+const arc = (kit: string, model: string, centre: [number, number], radius: number, from: number, to: number, n: number, scale = 1, faceOut = false): PropPlacement[] =>
+  Array.from({ length: n }, (_, i) => {
+    const a = from + (to - from) * (n === 1 ? 0.5 : i / (n - 1));
+    return { kit, model, at: [centre[0] + Math.sin(a) * radius, 0, centre[1] + Math.cos(a) * radius] as [number, number, number],
+             yaw: a + (faceOut ? 0 : Math.PI), scale };
+  });
+
 /** owner call 2026-09-05: the nature kit's canopy is teal by palette; the slope's trees take a green multiply. */
 const GREEN = '#63D452';
 
@@ -102,6 +111,23 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     ...line('nature', 'tree_tall', [-44, -54], [44, -54], 9, 0, 6.2), ...line('nature', 'tree_detailed', [-46, -20], [-46, 40], 5, 0, 5.0),
     // Pass 7 phase 3 (dressing density): bats and a glove by the dugout — Meshy props from the baseball pack, real size
     { kit: 'meshy', model: 'bat', at: [-29.5, 0.05, 26], yaw: 0.3 }, { kit: 'meshy', model: 'bat', at: [-29.2, 0.05, 26.6], yaw: 0.8 }, { kit: 'meshy', model: 'glove', at: [-30.4, 0, 27.4], yaw: 1.4 }, { kit: 'meshy', model: 'glove', at: [29.6, 0, 26.2], yaw: -1.1 },
+    // MORE BALLPARK (owner, 2026-09-19: "add more detail to the baseball field in the derby mode"). Kit geometry only,
+    // all of it behind the plate or outside the foul lines, so nothing stands in a batted ball's way.
+    // the BACKSTOP: a fence arc behind the plate, the thing every ballpark has and this one did not
+    ...arc('racing', 'fenceStraight', [0, 0], 13, Math.PI - 0.95, Math.PI + 0.95, 11, 2.4),
+    ...arc('racing', 'fenceStraight', [0, 0], 16.4, Math.PI - 0.8, Math.PI + 0.8, 9, 2.4),
+    // the DUGOUTS: a low awning down each foul line, with a bench row behind
+    ...line('racing', 'tentRoof', [-19, -4], [-25, 10], 3, Math.PI * 0.75, 2.2),
+    ...line('racing', 'tentRoof', [19, -4], [25, 10], 3, -Math.PI * 0.75, 2.2),
+    // the BLEACHERS out past third and first, turned in toward the plate
+    ...arc('racing', 'grandStand', [0, 6], 40, Math.PI * 0.62, Math.PI * 0.86, 3, 2.8),
+    ...arc('racing', 'grandStand', [0, 6], 40, -Math.PI * 0.86, -Math.PI * 0.62, 3, 2.8),
+    // FOUL POLES at the ends of both lines — the tallest thing on the field, as they should be
+    { kit: 'racing', model: 'bannerTowerRed', at: [-34.5, 0, 34.5], yaw: Math.PI * 0.25, scale: 3.4 },
+    { kit: 'racing', model: 'bannerTowerGreen', at: [34.5, 0, 34.5], yaw: -Math.PI * 0.25, scale: 3.4 },
+    // a light mast behind each bleacher block, and bushes filling the gap out to the tree line
+    { kit: 'racing', model: 'lightPostLarge', at: [-42, 0, 18], scale: 3 }, { kit: 'racing', model: 'lightPostLarge', at: [42, 0, 18], scale: 3 },
+    ...line('nature', 'plant_bushLarge', [-40, -30], [-40, -6], 5, 0, 2.8), ...line('nature', 'plant_bushLarge', [40, -30], [40, -6], 5, 0, 2.8),
   ],
   'stadium': [
     { kit: 'racing', model: 'grandStandCoveredRound', at: [0, 0, 26], scale: 3 }, { kit: 'racing', model: 'grandStandRound', at: [-28, 0, 6], yaw: Math.PI / 2, scale: 3 }, { kit: 'racing', model: 'grandStandRound', at: [28, 0, 6], yaw: -Math.PI / 2, scale: 3 },

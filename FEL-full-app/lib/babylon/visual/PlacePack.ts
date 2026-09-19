@@ -360,6 +360,14 @@ export function paintField(ctx: Ctx, W: number, H: number, o: FieldPaint): void 
     for (const [bx, bz] of [b1, b2, b3]) ctx.fillRect(X(bx) - 0.4 * pxm, Y(bz) - 0.4 * pxm, 0.8 * pxm, 0.8 * pxm);
     ctx.beginPath(); ctx.moveTo(X(-0.25), Y(0.2)); ctx.lineTo(X(0.25), Y(0.2)); ctx.lineTo(X(0.25), Y(-0.1)); ctx.lineTo(X(0), Y(-0.35)); ctx.lineTo(X(-0.25), Y(-0.1)); ctx.closePath(); ctx.fill();
     ctx.fillRect(X(-0.3), Y(MOUND) - 0.08 * pxm, 0.6 * pxm, 0.16 * pxm);   // the rubber
+    // ON-DECK CIRCLES and the coaches' boxes — the marks that make a diamond read as a BALLPARK rather than a field
+    // (owner, 2026-09-19: "add more detail to the baseball field in the derby mode").
+    ctx.fillStyle = dirt;
+    for (const s2 of [1, -1]) { ctx.beginPath(); ctx.arc(X(s2 * 6.5), Y(-4.5), 1.5 * pxm, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = chalk; ctx.lineWidth = Math.max(2, 0.1 * pxm);
+    for (const s2 of [1, -1]) ctx.strokeRect(X(s2 > 0 ? 14 : -17), Y(20), 3 * pxm, 6 * pxm);   // first- and third-base coach
+    // the running lane down the first-base line, and the cut of the grass beyond the bases
+    ctx.beginPath(); ctx.moveTo(X(10.5), Y(10.5)); ctx.lineTo(X(19.4), Y(19.4)); ctx.stroke();
   } else if (o.marks === 'penalty') {
     const GOAL = 10.4;
     ctx.strokeStyle = chalk; ctx.lineWidth = Math.max(3, 0.12 * pxm);
