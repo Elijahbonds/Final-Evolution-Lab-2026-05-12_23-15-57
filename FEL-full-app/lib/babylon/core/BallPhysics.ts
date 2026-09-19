@@ -90,6 +90,27 @@ export class BallSim {
     return this.prev.add(d.scale(t));
   }
 
+  /**
+   * Swept-sphere vs a VERTICAL PANE through (cx, cz) with the unit normal (nx, nz) — the dunk runway's corner billboards
+   * (DUNK PARKOUR, 2026-09-18). The ball comes from the normal's side; contact is where the centre's signed distance
+   * crosses the radius. Normal speed ×eN, tangential ×eT. Returns the hit point on the pane, or null.
+   */
+  sweptPaneHit(cx: number, cz: number, nx: number, nz: number, half: number, yMin: number, yMax: number, eN = 1, eT = 1): Vector3 | null {
+    const dPrev = (this.prev.x - cx) * nx + (this.prev.z - cz) * nz, dPos = (this.pos.x - cx) * nx + (this.pos.z - cz) * nz;
+    if (!(dPrev >= this.radius && dPos < this.radius)) return null;
+    const t = (this.radius - dPrev) / (dPos - dPrev);
+    const d = this.pos.subtract(this.prev);
+    const hit = this.prev.add(d.scale(t));
+    const along = (hit.x - cx) * -nz + (hit.z - cz) * nx;
+    if (Math.abs(along) > half || hit.y < yMin || hit.y > yMax) return null;
+    const vn = this.vel.x * nx + this.vel.z * nz;
+    const tx = this.vel.x - vn * nx, tz = this.vel.z - vn * nz;
+    this.vel.x = tx * eT - vn * nx * eN; this.vel.z = tz * eT - vn * nz * eN; this.vel.y *= eT;
+    this.pos.copyFrom(hit); this.pos.x += nx * 1e-4; this.pos.z += nz * 1e-4;
+    this.mesh.position.copyFrom(this.pos);
+    return new Vector3(hit.x - nx * this.radius, hit.y, hit.z - nz * this.radius);
+  }
+
   /** Reflect off a normal with speed multiplier (racket rebound, rim clank). */
   deflect(normal: Vector3, speedMul = 1): void {
     const n = normal.normalizeToNew();

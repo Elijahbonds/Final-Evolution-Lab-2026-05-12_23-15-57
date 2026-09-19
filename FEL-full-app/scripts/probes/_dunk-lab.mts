@@ -72,6 +72,8 @@ const RUNWAY_AT_MS = Number(process.env.RUNWAY_AT_MS ?? 700);
 /** The PROP ring: d-pad DOWN in the approach cycles the obstacle (car → barrier → crate → THE TETRIS). OBSTACLE=tetris. */
 const OBSTACLE_RING = ['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall'];
 const OBSTACLE = process.env.OBSTACLE ?? '';
+/** OOP=oopcorner — the prop ring is stepped with X (alley-oop → off the glass → bounce → OFF THE BILLBOARD). */
+const OOP_RING = ['alleyoop', 'oopglass', 'oopbounce', 'oopcorner']; const OOP = process.env.OOP ?? '';
 /** STYLE=flashy|sig — B in the approach cycles POWER -> FLASHY -> SIGNATURE, and the style called buys air (a triple needs it). */
 const STYLE_RING = ['power', 'flashy', 'sig'];
 const STYLE = process.env.STYLE ?? '';
@@ -229,6 +231,13 @@ for (let n = 0; n < ATTEMPTS; n++) {
   for (let i = 0; OBSTACLE && i <= OBSTACLE_RING.indexOf(OBSTACLE); i++) {
     await hold(DPAD.down, true); await page.waitForTimeout(70); await hold(DPAD.down, false); await page.waitForTimeout(140);
   }
+  if (OOP) { const h1 = await hud(); console.log(`  before the oop ring: ${JSON.stringify({ phase: h1.phase, hint: String(h1.hint ?? '').slice(0, 60), prop: h1.prop, attempt: h1.attempt })}`); }
+  // X steps the whole prop ring on the PRESS (none → alley-oop → off the glass → bounce → OFF THE BILLBOARD → …); the pad d-pad's
+  // release pick never landed from the fake pad (measured: NO PROP after four rights in the approach)
+  // X steps the WHOLE prop ring every attempt: press until the HUD reads the label (four presses a run walked on to the car)
+  const OOP_LABEL: Record<string, string> = { alleyoop: 'ALLEY-OOP', oopglass: 'OOP OFF THE GLASS', oopbounce: 'BOUNCE OOP', oopcorner: 'OOP OFF THE BILLBOARD' };
+  for (let i = 0; OOP && i < 24; i++) { const h0 = await hud(); if (String(h0.prop) === OOP_LABEL[OOP]) break; await press(2, 60); await page.waitForTimeout(160); }
+  if (OOP) { await page.waitForTimeout(2600); const h0 = await hud(); console.log(`  oop ring → prop ${String(h0.prop ?? '?')} (the passer needs ~2 s to spawn before the run)`); }
 
   // RUN: the hold drives the runway; the launch fires at the gather line
   // DUNK PARKOUR: the glass is hit on the APPROACH (the stick alone, before RUN is held): a hold-run's carve toward the rim

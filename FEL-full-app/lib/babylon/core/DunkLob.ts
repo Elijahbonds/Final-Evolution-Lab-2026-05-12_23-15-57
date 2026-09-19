@@ -227,3 +227,21 @@ export function rimRing(center: V3, ringRadius: number, n = 12): V3[] {
   for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; out.push({ x: center.x + Math.cos(a) * ringRadius, y: center.y, z: center.z + Math.sin(a) * ringRadius }); }
   return out;
 }
+
+// ── THE CORNER BILLBOARD (DUNK PARKOUR, 2026-09-18: "throw alley oops off that and dunk it") ─────────────────────────
+// The backboard solver works in a frame where the glass is the plane z = boardZ and the ball comes from +z. A corner pane
+// has a diagonal normal, so the throw is solved in the PANE's frame — z' along its normal (the runway side is +z'), x'
+// along its face — and the velocity rotated back. The ball then flies in the world and BallPhysics.sweptPaneHit reflects
+// it off the pane with the same eN / eT the solve assumed.
+export interface Pane2 { cx: number; cz: number; nx: number; nz: number }
+export function paneLobVelocity(from: V3, to: V3, pane: Pane2, tf: number, eN = GLASS_E_N, eT = GLASS_E_T, radius = 0.12): (GlassLob & { hitWorld: V3 }) | null {
+  const n = Math.hypot(pane.nx, pane.nz) || 1, nx = pane.nx / n, nz = pane.nz / n, tx = -nz, tz = nx;
+  const local = (p: V3): V3 => ({ x: (p.x - pane.cx) * tx + (p.z - pane.cz) * tz, y: p.y, z: (p.x - pane.cx) * nx + (p.z - pane.cz) * nz });
+  const world = (p: V3): V3 => ({ x: pane.cx + p.x * tx + p.z * nx, y: p.y, z: pane.cz + p.x * tz + p.z * nz });
+  const f = local(from), t = local(to);
+  if (f.z <= 0 || t.z <= 0) return null;   // both ends must be in front of the pane
+  const g = glassLobVelocity(f, t, 0, tf, eN, eT, radius);
+  if (!g) return null;
+  const v = { x: g.v.x * tx + g.v.z * nx, y: g.v.y, z: g.v.x * tz + g.v.z * nz };
+  return { v, hit: g.hit, t1: g.t1, hitWorld: world({ x: g.hit.x, y: g.hit.y, z: 0 }) };
+}

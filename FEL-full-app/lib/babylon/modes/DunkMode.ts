@@ -69,7 +69,7 @@ import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
 import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, doubleUpFits, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
-import { lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
+import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, OBSTACLE_KINDS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, type ObstacleKind } from '../core/DunkObstacles';
 // DUNK PARKOUR (owner brief 2026-09-18): the glass rebound on the runway (a vector-transfer launch), the two launches, the
 // backboard double-launch, the overdrive dunk. Pure in core/DunkParkour.
@@ -125,14 +125,14 @@ type Style = (typeof STYLES)[number];
 // DUNK-GLASS-BOUNCE (2026-09-08): two more self-lobs on the ring — OFF THE GLASS (the toss goes at the backboard and comes
 // back off it to the hand: WDA "Off The Backboard") and the BOUNCE LOB (thrown down into the floor, up to the hand: WDA
 // "Bounce Ball"; from standing it is the bounce-BOUNCE with a RUN cue). d-pad left cycles the lob family.
-const PROPS = ['none', 'alleyoop', 'oopglass', 'oopbounce', 'selflob', 'offglass', 'bounce', 'car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall'] as const;
+const PROPS = ['none', 'alleyoop', 'oopglass', 'oopbounce', 'oopcorner', 'selflob', 'offglass', 'bounce', 'car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall'] as const;
 type Prop = (typeof PROPS)[number];
 const OBSTACLE_PROPS = new Set<string>(OBSTACLE_KINDS);
 const obstacleKindOf = (p: Prop): ObstacleKind | null => (OBSTACLE_PROPS.has(p) ? (p as ObstacleKind) : null);
 // FLASHY ALLEY-OOPS (owner, 2026-09-16: "add flashy alley oops"). The oop was one thing — a teammate throws it straight
 // up and you catch it. The passer can do everything the SELF-lob can: off the glass, or down off the floor. Three oops
 // on the d-pad's right now, and they are worth what they cost to catch.
-const OOP_PROPS = ['alleyoop', 'oopglass', 'oopbounce'] as const;
+const OOP_PROPS = ['alleyoop', 'oopglass', 'oopbounce', 'oopcorner'] as const;   // DUNK PARKOUR: the oop off the corner billboard
 type OopProp = (typeof OOP_PROPS)[number];
 const isOop = (p: Prop): p is OopProp => (OOP_PROPS as readonly string[]).includes(p);
 const nextOop = (p: Prop): OopProp => (isOop(p) ? OOP_PROPS[(OOP_PROPS.indexOf(p) + 1) % OOP_PROPS.length] : 'alleyoop');
@@ -152,10 +152,10 @@ const STYLE_CLIP: Record<Style, string> = {
 };
 const STYLE_LABEL: Record<Style, string> = { power: 'POWER', flashy: 'FLASHY', sig: 'SIGNATURE' };
 // the obstacle labels and bonuses come from the SPEC TABLE, so a new prop is one entry there and not four (2026-09-16)
-const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', alleyoop: 'ALLEY-OOP', oopglass: 'OOP OFF THE GLASS', oopbounce: 'BOUNCE OOP', selflob: 'SELF-LOB', offglass: 'OFF THE GLASS', bounce: 'BOUNCE LOB',
+const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', alleyoop: 'ALLEY-OOP', oopglass: 'OOP OFF THE GLASS', oopbounce: 'BOUNCE OOP', oopcorner: 'OOP OFF THE BILLBOARD', selflob: 'SELF-LOB', offglass: 'OFF THE GLASS', bounce: 'BOUNCE LOB',
   ...Object.fromEntries(OBSTACLE_KINDS.map((k) => [k, OBSTACLE_SPECS[k].label])) } as Record<Prop, string>;
 const STYLE_TIER: Record<Style, number> = { power: 3, flashy: 5.5, sig: 8 };
-const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, oopglass: 3.2, oopbounce: 3.6, selflob: 1.5, offglass: 2.5, bounce: 2.5,
+const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, oopglass: 3.2, oopbounce: 3.6, oopcorner: 3.8, selflob: 1.5, offglass: 2.5, bounce: 2.5,
   ...Object.fromEntries(OBSTACLE_KINDS.map((k) => [k, OBSTACLE_SPECS[k].bonus])) } as Record<Prop, number>;
 /** Where the ball hand is at the lob's catch beat (LOB_CATCH_CLIP_T), relative to the root, per launch clip — measured on the
  *  live rig with the reach off through the rise (DUNK-SOFTS-NAMED probe, hand − root at clip 0.62): the mocap POWER gather
@@ -180,6 +180,10 @@ const AUTO_GLASS_AHEAD_M = 3.8;
  *  or under it (a CLANK on two of three runs); at the hang beat the same release meets the board 3.5–3.8 m up with
  *  0.3–0.5 m over the iron, and a throw 2 m+ out sails over the board's top (OVER THE GLASS, honest). */
 const GLASS_CATCH_CLIP_T = 0.8;
+/** The corner-billboard oop's catch beat: the plain oop's (the rise runs at the real rate; a catch deep in the hang met a hand
+ *  that the slow-mo had not brought there yet — LOST at 1.38 three of three, measured). The throw leaves on the cinematic's
+ *  first frame instead, so the mirror path off the sign has the whole rise to fly. */
+const CORNER_CATCH_CLIP_T = LOB_CATCH_CLIP_T;
 /** The highest a toss onto a prop's top may go (the last hop's apex); beyond it the throw reads as a rocket, not a lob. */
 const ENV_TOSS_APEX_CAP = 6.5;
 /** The judges see the ball come off something that is not the floor (a car roof, a crate). */
@@ -259,7 +263,7 @@ export const DunkMode: ModeDefinition = (() => {
   let feet: { L: TransformNode | null; R: TransformNode | null } = { L: null, R: null };   // the clear test reads the FEET
   let win: Win = 'run';                       // the anim window in charge of the body
   // ── the lob (self-lob / kick-up / cartwheel toss / the alley-oop pass): one real arc, one fair catch ──
-  const lob = { live: false, thrown: false, caught: false, lost: false, label: '', kind: 'plain' as 'plain' | 'glass' | 'bounce', glass: false, over: false, bounces: 0, wantBounces: 0, env: '' as string, clanked: false, t: 0, runCueAt: -1, runCued: false };
+  const lob = { live: false, thrown: false, caught: false, lost: false, label: '', kind: 'plain' as 'plain' | 'glass' | 'bounce' | 'corner', glass: false, over: false, bounces: 0, wantBounces: 0, env: '' as string, clanked: false, t: 0, runCueAt: -1, runCued: false };
   // DUNK-GLASS-BOUNCE: the backboard's front face (read off the venue's board mesh at load; the regulation fallback) and the
   // iron as twelve small colliders — the lob is swept against both every step
   const glass = { z: CFG.rimZ - 0.39, xMin: -0.9, xMax: 0.9, yMin: CFG.rimHeight - 0.075, yMax: CFG.rimHeight + 0.975, found: false };
@@ -364,6 +368,15 @@ export const DunkMode: ModeDefinition = (() => {
     m.material = mat; m.isPickable = false;
     m.rotation.y = Math.atan2(pane.nx, pane.nz) + Math.PI;   // a box's +z face turned to face along the pane's normal
     m.position.set(pane.cx + pane.nx * 0.12, 2.75, pane.cz + pane.nz * 0.12);
+    // THE BILLBOARD behind the sign (owner: "make it a billboard and sign"): a 3.8 × 2.8 m board from 1.6 to 4.4 m, the scene's
+    // colours, standing on the pane — the face the corner OOP plays off (a toss for a 3.2 m catch meets the sign near 3.8 m, measured)
+    const board = MeshBuilder.CreateBox('dunk_billboard', { width: 3.8, height: 2.8, depth: 0.1 }, scene);
+    board.material = VenueKit.paint(scene, 'dunk_billboard_m', sign.bg, 0.18, 0.7); board.isPickable = false;
+    board.rotation.y = m.rotation.y; board.position.set(pane.cx - pane.nx * 0.02, 3.0, pane.cz - pane.nz * 0.02);
+    const frame = MeshBuilder.CreateBox('dunk_billboard_frame', { width: 4.0, height: 3.0, depth: 0.06 }, scene);
+    frame.material = VenueKit.paint(scene, 'dunk_billboard_frame_m', sign.accent, 0.3, 0.6); frame.isPickable = false;
+    frame.rotation.y = m.rotation.y; frame.position.set(pane.cx - pane.nx * 0.1, 3.0, pane.cz - pane.nz * 0.1);
+    board.parent = null; m.addChild(board); m.addChild(frame);   // disposed with the sign
     return m;
   }
   let stickReboundX = 0, stickReboundUntil = 0;
@@ -620,7 +633,9 @@ export const DunkMode: ModeDefinition = (() => {
     if (isOop(prop)) {   // every oop variant needs the passer standing there
       const token = ++obstacleToken;
       const npc = await CharacterPipeline.spawnNpc(ctx.scene, CFG.heroUrl, {
-        position: new Vector3(-3.4, 0, CFG.rimZ + 1.6), tint: '#22d3ee', startClip: SPORT_CLIP.teammateIdle,
+        // the billboard oop's passer stands on the RUNWAY side of the line near the centre: the corner signs face up the runway, and
+        // from the rim side there is no bank (the solve refuses a throw from behind the face)
+        position: prop === 'oopcorner' ? new Vector3(-4.0, 0, gatherLine() + 5.0) : new Vector3(-3.4, 0, CFG.rimZ + 1.6), tint: '#22d3ee', startClip: SPORT_CLIP.teammateIdle,   // the billboard oop: down the left side, so the mirror line meets the sign near its centre (from x −1.2 it crossed 3 m off it, measured)
       });
       if (token !== obstacleToken || ctx.scene.isDisposed) { npc.dispose(); return; }   // the prop changed under the load
       teammate = npc;
@@ -1191,7 +1206,9 @@ export const DunkMode: ModeDefinition = (() => {
         // the dunker's hand has to meet it (it used to LERP head-high and parent itself to the palm on a timer)
         if (isOop(prop) && teammate && !lob.thrown) {
           if (clipTime >= 0.02) teammate.animator.play(SPORT_CLIP.teammateToss, {});   // the passer winds up as the dunker leaves the floor
-          if (clipTime >= EASTBAY_TIMING.rise * 0.9) {
+          if (prop === 'oopcorner' && clipTime >= 0.02) {   // DUNK PARKOUR: the billboard oop leaves at once — the bank needs the whole rise
+            throwCornerLob(ctx, ball.getAbsolutePosition().clone(), Math.max(0.45, CORNER_CATCH_CLIP_T - clipTime));
+          } else if (clipTime >= EASTBAY_TIMING.rise * 0.9) {
             // the passer can throw everything the self-lob can, and the SAME solvers run it — a lob off the glass is a
             // lob off the glass whoever let go of it
             const from = ball.getAbsolutePosition().clone();
@@ -2347,6 +2364,23 @@ export const DunkMode: ModeDefinition = (() => {
     console.info(`[LOB] OFF-GLASS LOB from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) at the glass (${g.hit.x.toFixed(2)},${g.hit.y.toFixed(2)}) @${g.t1.toFixed(2)} s${onBoard ? '' : ' — OFF THE BOARD'} then to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${t.toFixed(2)} s${standing ? ' (standing)' : ''}`);
     if (standing) armRunCue(t, dist, GLASS_CATCH_CLIP_T);
   }
+  /** DUNK PARKOUR (owner, 2026-09-18: "throw alley oops off that and dunk it"): the passer's toss off a CORNER BILLBOARD — solved
+   *  in the sign's own frame (core/DunkLob.paneLobVelocity), flown in the world, reflected by the sign (BallPhysics.sweptPaneHit). */
+  function throwCornerLob(ctx: ModeContext, from: Vector3, tf: number): void {
+    const to = catchPointNow(CORNER_CATCH_CLIP_T);
+    const pane = panes.reduce<GlassPane | null>((b, p) => !b || Math.hypot(p.cx - from.x, p.cz - from.z) < Math.hypot(b.cx - from.x, b.cz - from.z) ? p : b, null);
+    const g = pane ? paneLobVelocity(v3(from), v3(to), pane, tf) : null;
+    const along = pane && g ? Math.abs((g.hitWorld.x - pane.cx) * -pane.nz + (g.hitWorld.z - pane.cz) * pane.nx) : Infinity;
+    if (!pane || !g || along > pane.half + 0.3 || g.hitWorld.y < 0.3 || g.hitWorld.y > 4.3) {
+      console.warn(`[LOB] billboard oop impossible from here (${!g ? 'no solve' : `off the sign: along ${along.toFixed(2)} y ${g.hitWorld.y.toFixed(2)}`}) — a plain oop instead`);
+      throwLob(ctx, from, 'ALLEY-OOP', Math.max(0.35, tf)); return;
+    }
+    if (ball.parent) { releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ball.position.copyFrom(releasePos); }
+    ballSim.launch(from, new Vector3(g.v.x, g.v.y, g.v.z));
+    lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = 'BILLBOARD OOP'; lob.kind = 'corner'; lob.t = 0; catchBlend = 1; catchPending = false;
+    setTrail('soft');
+    console.info(`[LOB] BILLBOARD OOP from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) off the ${pane.side > 0 ? 'right' : 'left'} sign at (${g.hitWorld.x.toFixed(2)},${g.hitWorld.y.toFixed(2)},${g.hitWorld.z.toFixed(2)}) @${g.t1.toFixed(2)} s then to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${tf.toFixed(2)} s`);
+  }
   /** The BOUNCE LOB: thrown DOWN into the floor and up to the catch point. On the run one bounce on the run's clock (the beat
    *  is refused when it cannot fit); standing, the bounce-BOUNCE on the ball's own clock with a RUN cue — and when a prop's
    *  top lies under the bounce it is the floor: OFF THE CAR. */
@@ -2399,6 +2433,11 @@ export const DunkMode: ModeDefinition = (() => {
       const hit = ballSim.sweptPanelHit(glass.z, glass.xMin, glass.xMax, glass.yMin, glass.yMax, GLASS_E_N, GLASS_E_T);
       if (hit) { lob.glass = true; console.info(`[LOB] OFF THE GLASS at (${hit.x.toFixed(2)},${hit.y.toFixed(2)}) @${lob.t.toFixed(2)} s`); flash(ctx, 'OFF THE GLASS!', 600); SoundKit.play('impact', { pitch: 1.6, volume: 0.45 }); EffectsKit.burst(ctx.scene, hit, 'sparks'); ctx.camDirector.pulse(0.3, 0.3); hoopJuice?.punch(); }
       else if (ballSim.prevPos.z >= glass.z + ballSim.radius && ballSim.pos.z < glass.z + ballSim.radius && lob.kind === 'glass') { lob.over = true; const y = ballSim.pos.y; console.info(`[LOB] ${y > glass.yMax ? 'OVER' : 'WIDE OF'} THE GLASS (${ballSim.pos.x.toFixed(2)},${y.toFixed(2)}) @${lob.t.toFixed(2)} s`); flash(ctx, y > glass.yMax ? 'OVER THE GLASS' : 'WIDE OF THE GLASS', 700); SoundKit.play('crowdGroan', { volume: 0.4 }); }
+    }
+    // the corner billboards (DUNK PARKOUR): the toss off a sign comes back off it
+    if (lob.kind === 'corner' && !lob.glass) for (const pn of panes) {
+      const hit = ballSim.sweptPaneHit(pn.cx, pn.cz, pn.nx, pn.nz, pn.half + 0.3, 0.2, 4.3, GLASS_E_N, GLASS_E_T);
+      if (hit) { lob.glass = true; runwayDifficulty += 0.6; console.info(`[LOB] OFF THE BILLBOARD at (${hit.x.toFixed(2)},${hit.y.toFixed(2)},${hit.z.toFixed(2)}) @${lob.t.toFixed(2)} s`); flash(ctx, 'OFF THE BILLBOARD!', 600); SoundKit.play('impact', { pitch: 1.6, volume: 0.45 }); EffectsKit.burst(ctx.scene, hit, 'sparks'); break; }
     }
     // the iron: a toss through the rim's ring clanks off it
     if (!lob.clanked) for (const c of RIM_RING) { const h = ballSim.sweptHit(c, RIM_IRON_R); if (h) { const n = ballSim.pos.subtract(c); if (n.lengthSquared() < 1e-6) n.set(0, 1, 0); ballSim.deflect(n, 0.55); ballSim.pos.copyFrom(h); ballSim.mesh.position.copyFrom(h); lob.clanked = true; console.info(`[LOB] CLANK off the iron @${lob.t.toFixed(2)} s (${h.x.toFixed(2)},${h.y.toFixed(2)},${h.z.toFixed(2)})`); flash(ctx, 'OFF THE IRON', 600); SoundKit.play('impact', { pitch: 1.2, volume: 0.5 }); break; } }
