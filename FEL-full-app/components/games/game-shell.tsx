@@ -5,11 +5,12 @@ import { proofLineFor, type ProofVerdict } from '@/lib/proofLine';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, RotateCcw, Home, Loader2, Trophy, Sparkles, Gem, Coins, TrendingUp, TrendingDown, Crown, Award, Share2, Check, PartyPopper, ArrowRight } from 'lucide-react';
+import { Maximize2, Minimize2, ArrowLeft, RotateCcw, Home, Loader2, Trophy, Sparkles, Gem, Coins, TrendingUp, TrendingDown, Crown, Award, Share2, Check, PartyPopper, ArrowRight } from 'lucide-react';
 import type { PrqGrade } from '@/lib/prq';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
 import { getScheme } from '@/lib/input-schemes';
 import { isBabylon } from '@/components/three/flags';
+import { canFullscreen, isFullscreen, isLandscapePhone, toggleFullscreen } from '@/lib/ui/fullscreen';
 import { VirtualController } from './virtual-controller';
 import type { SessionTallies } from '@/lib/game-systems';
 import { reportEarn } from '@/lib/wallet/client';
@@ -409,9 +410,55 @@ function GameShellInner({
   const cardHeadline = !result ? '' : arenaVerdict === 'WON' ? 'DUEL WON' : arenaVerdict === 'LOST' ? 'DUEL LOST' : arenaVerdict === 'TIE' ? 'DUEL TIED' : arenaVerdict === 'PENDING' ? 'SCORE LOCKED IN' : (result.headline ?? (result.won ? 'VICTORY' : 'SESSION COMPLETE'));
   const shareProof = useCallback(() => { if (proofLine) void shareChallenge(`PROOF · ${proofLine}`); }, [proofLine, shareChallenge]);
 
+  // A PHONE HELD SIDEWAYS GETS THE WHOLE SCREEN.
+  //
+  // Measured at 844x390 before this: the stage is h-[calc(100dvh-3.25rem)], which assumes the header is all
+  // that sits above it — but the container also has py-3. 56 (header) + 12 (pad) + 338 (stage) + 12 = 418 on a
+  // 390px-tall screen, so the bottom of the game was 16px off the bottom of the phone AND the page scrolled,
+  // which on a game means you can flick the thing you are playing off the screen.
+  //
+  // Landscape is detected by HEIGHT, not by a width breakpoint: a landscape phone is 844 across, wider than
+  // plenty of laptops, so a width test gets it exactly backwards.
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [immersive, setImmersive] = useState(false);
+  const [fsAvailable, setFsAvailable] = useState(false);
+  const [fsOn, setFsOn] = useState(false);
+
+  useEffect(() => {
+    const measure = () => setImmersive(isLandscapePhone(window.innerWidth, window.innerHeight));
+    measure();
+    setFsAvailable(canFullscreen(stageRef.current));
+    const onFs = () => setFsOn(isFullscreen());
+    window.addEventListener('resize', measure);
+    window.addEventListener('orientationchange', measure);
+    document.addEventListener('fullscreenchange', onFs);
+    document.addEventListener('webkitfullscreenchange', onFs);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
+      document.removeEventListener('fullscreenchange', onFs);
+      document.removeEventListener('webkitfullscreenchange', onFs);
+    };
+  }, []);
+
+  // While the game owns the screen, the document must not scroll — a stray drag should move the player, not
+  // the page. Restored on the way out, including if the component unmounts mid-game.
+  useEffect(() => {
+    if (!immersive && !fsOn) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [immersive, fsOn]);
+
+  const onFullscreen = useCallback(() => { void toggleFullscreen(stageRef.current); }, []);
+
+  const fullBleed = immersive || fsOn;
+
   return (
-    <div className="flex min-h-screen flex-col bg-[#050505]">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md">
+    <div className={fullBleed ? 'flex h-[100dvh] flex-col overflow-hidden bg-[#050505]' : 'flex min-h-screen flex-col bg-[#050505]'}>
+      {/* Sideways on a phone, the header is a fifth of the screen spent on a back link. It goes; the way out
+          lives on the stage instead, where a thumb already is. */}
+      <header className={`sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md ${fullBleed ? 'hidden' : ''}`}>
         <div className="mx-auto flex max-w-[1200px] items-center gap-3 px-4 py-2.5">
           <Link
             href="/"
@@ -431,10 +478,51 @@ function GameShellInner({
               PRQ {Math.round(profile.prq)} · {profile.grade?.label}
             </span>
           )}
+          {fsAvailable && (
+            <button
+              type="button"
+              onClick={onFullscreen}
+              aria-label={fsOn ? 'Leave full screen' : 'Full screen'}
+              className={`grid h-8 w-8 place-items-center rounded-md border border-white/10 text-white/50
+                          transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF] ${profile ? '' : 'ml-auto'}`}
+            >
+              {fsOn ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </button>
+          )}
         </div>
       </header>
 
-      <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4">
+      <div
+        ref={stageRef}
+        className={fullBleed
+          ? 'relative w-full flex-1 overflow-hidden'
+          : 'relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4'}
+      >
+        {/* The two controls the header was carrying, as thumb-sized glass over the corner of the stage. Only
+            while full-bleed — with the header up they would be a second copy of it. */}
+        {fullBleed && (
+          <div className="pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5">
+            <Link
+              href="/play"
+              aria-label="Leave the game"
+              className="pointer-events-auto grid h-9 w-9 place-items-center rounded-lg border border-white/15
+                         bg-black/50 text-white/70 backdrop-blur-md transition-colors hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+            {fsAvailable && (
+              <button
+                type="button"
+                onClick={onFullscreen}
+                aria-label={fsOn ? 'Leave full screen' : 'Full screen'}
+                className="pointer-events-auto grid h-9 w-9 place-items-center rounded-lg border border-white/15
+                           bg-black/50 text-white/70 backdrop-blur-md transition-colors hover:text-white"
+              >
+                {fsOn ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </button>
+            )}
+          </div>
+        )}
         {!profile && unreachable && (
           <div className="flex h-[60vh] flex-col items-center justify-center gap-3 text-center">
             <p className="font-mono text-sm text-white/80">Can&apos;t reach the server. Check your connection, then try again.</p>

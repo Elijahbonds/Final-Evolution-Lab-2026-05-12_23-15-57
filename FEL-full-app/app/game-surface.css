@@ -55,3 +55,51 @@
 /* Landscape phones and tablets keep 16:10 deliberately: the letterbox is
  * correct there, and the whole failure above came from applying one shape to
  * every screen. */
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * A PHONE HELD SIDEWAYS (2026-09-20).
+ *
+ * The portrait fix above was only ever half the problem, and the comment that
+ * landscape "keeps 16:10 deliberately" was wrong about what actually happens.
+ * Measured at 844×390 on /play/dunk before this:
+ *
+ *   header   56px
+ *   padding  12px  (the container's py-3)
+ *   stage   338px  (h-[calc(100dvh-3.25rem)] — 390 minus 52)
+ *   padding  12px
+ *   ─────────────
+ *   total   418px  into a 390px screen
+ *
+ * So the bottom of the game sat 16px below the bottom of the phone and the
+ * PAGE SCROLLED — on a game, meaning a stray drag flicks the thing you are
+ * playing off the screen. The stage's own calc was right about the header and
+ * knew nothing about the padding around it.
+ *
+ * GameShell now drops its header and padding at this size, so the stage only
+ * needs to stop subtracting a header that is no longer there.
+ *
+ * Keyed on HEIGHT. A landscape phone is 844px across — wider than plenty of
+ * laptops — so a width breakpoint gets this exactly backwards.
+ * ────────────────────────────────────────────────────────────────────────── */
+@media (orientation: landscape) and (max-height: 520px) {
+  [class*="100dvh-3.25rem"] {
+    height: 100% !important;
+    max-height: 100% !important;
+  }
+
+  /* The same 16:10 letterbox the portrait rules undo: at 844×390 it wants
+   * 527px of height in a 390px screen. */
+  [class*="aspect-[16/10]"] {
+    aspect-ratio: auto !important;
+    height: 100% !important;
+  }
+}
+
+/* In actual fullscreen the element IS the screen, so anything still reserving
+ * room for browser chrome is reserving room for nothing. */
+:fullscreen [class*="100dvh-3.25rem"],
+:fullscreen [class*="aspect-[16/10]"] {
+  height: 100% !important;
+  max-height: 100% !important;
+  aspect-ratio: auto !important;
+}
