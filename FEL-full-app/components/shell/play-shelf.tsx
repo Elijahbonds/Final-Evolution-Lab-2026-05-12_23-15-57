@@ -32,7 +32,7 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
   const [open, setOpen] = useState<string | null>(initialFamily ?? FAMILIES[0].id);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {FAMILIES.map((f, i) => {
         const isOpen = open === f.id;
         const modes = modesOf(f);
@@ -45,7 +45,7 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
             <button
               onClick={() => setOpen(isOpen ? null : f.id)}
               aria-expanded={isOpen}
-              className="group flex w-full items-center gap-4 rounded-2xl border px-5 py-4 text-left transition-all duration-300"
+              className="group flex w-full items-center gap-3.5 rounded-2xl border px-4 py-3 text-left transition-all duration-300"
               style={{
                 borderColor: isOpen ? `${f.accent}55` : 'rgba(255,255,255,0.08)',
                 background: isOpen
@@ -54,26 +54,39 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
                 boxShadow: isOpen ? `0 0 42px -18px ${f.accent}` : 'none',
               }}
             >
-              {/* the bubble: the family's colour as an object, not a border */}
+              {/* The bubble: the family's colour as an object, not a border. The mode count used to live inside it,
+                  which made a coloured disc with a number in it — the shape of an unread badge, reading as "seven
+                  things need you" rather than "seven games are in here". The count is now a quiet figure on the
+                  right, where a count belongs. */}
               <span
                 aria-hidden
-                className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full transition-transform duration-300 group-hover:scale-105"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition-transform duration-300 group-hover:scale-110"
                 style={{
                   background: `radial-gradient(circle at 30% 28%, ${f.accent}, ${f.accent}22 70%)`,
-                  boxShadow: `0 0 24px -6px ${f.accent}`,
+                  boxShadow: `0 0 20px -6px ${f.accent}`,
                 }}
+              />
+
+              <span className="flex min-w-0 flex-1 items-baseline gap-3">
+                <span className="fel-heading shrink-0 text-[16px] font-bold leading-none text-white">{f.label}</span>
+                {/* CLOSED, THE ROW SAYS WHAT IS INSIDE IT. Seven collapsed families with a mood line each filled
+                    530px of the page and told you nothing you could act on, directly above a venue grid that shows
+                    fourteen places with artwork. Listing the modes makes the shelf worth reading at rest; the
+                    family's own line takes over once it is open and the modes are on screen underneath anyway. */}
+                <span className="min-w-0 truncate text-[12px] leading-none text-white/35">
+                  {isOpen ? f.blurb : modes.map((m) => m.name).join('  ·  ')}
+                </span>
+              </span>
+
+              <span
+                className="shrink-0 font-mono text-[11px] font-bold tabular-nums transition-colors"
+                style={{ color: isOpen ? f.accent : 'rgba(255,255,255,0.3)' }}
               >
-                <span className="font-mono text-[13px] font-black text-[#050505]">{modes.length}</span>
+                {modes.length}
               </span>
-
-              <span className="min-w-0 flex-1">
-                <span className="fel-heading block text-[17px] font-bold leading-tight text-white">{f.label}</span>
-                <span className="mt-0.5 block truncate text-[12.5px] leading-snug text-white/45">{f.blurb}</span>
-              </span>
-
               <ChevronRight
                 className="h-4 w-4 shrink-0 transition-transform duration-300"
-                style={{ color: isOpen ? f.accent : 'rgba(255,255,255,0.3)', transform: isOpen ? 'rotate(90deg)' : 'none' }}
+                style={{ color: isOpen ? f.accent : 'rgba(255,255,255,0.25)', transform: isOpen ? 'rotate(90deg)' : 'none' }}
               />
             </button>
 

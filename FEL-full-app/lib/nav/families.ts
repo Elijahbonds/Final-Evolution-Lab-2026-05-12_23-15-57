@@ -11,6 +11,8 @@
 //
 // Pure data and pure lookups. The tab shell renders it; nothing here knows what a component is.
 
+import { PALETTE } from '@/lib/design/palette';
+
 export type FamilyId = 'hoops' | 'combat' | 'board' | 'racing' | 'field' | 'party' | 'craft';
 
 export interface Family {
@@ -31,31 +33,31 @@ export interface Family {
  */
 export const FAMILIES: Family[] = [
   {
-    id: 'hoops', label: 'Hoops', blurb: 'Dunk contests, ones, threes, the arc.', accent: '#FF7A2F',
+    id: 'hoops', label: 'Hoops', blurb: 'Dunk contests, ones, threes, the arc.', accent: PALETTE.ember,
     modes: ['dunkContest', 'hoops1v1', 'hoops3v3', 'threePoint', 'dunkduel'],
   },
   {
-    id: 'combat', label: 'Combat', blurb: 'Waves, duels and the tournament.', accent: '#FF3366',
+    id: 'combat', label: 'Combat', blurb: 'Waves, duels and the tournament.', accent: PALETTE.crimson,
     modes: ['karateEndless', 'karateVersus', 'mixedcombat', 'duel', 'showdown'],
   },
   {
-    id: 'board', label: 'Board', blurb: 'Concrete, powder and open water.', accent: '#00E5FF',
+    id: 'board', label: 'Board', blurb: 'Concrete, powder and open water.', accent: PALETTE.cyan,
     modes: ['skateboarding', 'snowboarding', 'surfing', 'bigAir'],
   },
   {
-    id: 'racing', label: 'Racing', blurb: 'Karts on the boardwalk, planes through canyons.', accent: '#A855F7',
+    id: 'racing', label: 'Racing', blurb: 'Karts on the boardwalk, planes through canyons.', accent: PALETTE.violet,
     modes: ['velocitykart', 'aeroaces', 'freerun', 'sprint'],
   },
   {
-    id: 'field', label: 'Field & Court', blurb: 'The other sports, one skill each.', accent: '#00FF9D',
+    id: 'field', label: 'Field & Court', blurb: 'The other sports, one skill each.', accent: PALETTE.emerald,
     modes: ['football', 'soccer', 'baseball', 'tennis', 'volleyball', 'golf', 'tiebreak'],
   },
   {
-    id: 'party', label: 'Party', blurb: 'What you put on when people are round.', accent: '#FFD700',
+    id: 'party', label: 'Party', blurb: 'What you put on when people are round.', accent: PALETTE.gold,
     modes: ['carnival', 'brainBrawl', 'whoSceneIt', 'irl'],
   },
   {
-    id: 'craft', label: 'Craft', blurb: 'Rhythm, performance and the story.', accent: '#7B61FF',
+    id: 'craft', label: 'Craft', blurb: 'Rhythm, performance and the story.', accent: PALETTE.indigo,
     modes: ['dance', 'musicAcademy', 'acting', 'storyMode'],
   },
 ];

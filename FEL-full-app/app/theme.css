@@ -7,21 +7,35 @@
   --fel-font-display: 'Chakra Petch', 'JetBrains Mono', ui-monospace, monospace;
   --fel-font-body: 'Inter', system-ui, sans-serif;
 
-  /* Core palette */
-  --fel-bg: #05060a;
-  --fel-surface: #0d1117;
+  /* Core palette.
+     THE TOKENS NOW HOLD THE COLOURS THE APP ACTUALLY USES (2026-09-20). This block described a palette the
+     product had already left behind: --fel-emerald was #34e89e with FOUR uses in the whole tree while #00FF9D had
+     364, and --fel-crimson was #ff3d5e with three against #FF3366's 350. Two systems a shade apart, and the
+     minority one was the one written down -- which is worse than having no tokens, because it makes the written
+     rule the wrong answer. The values below are the measured convention. lib/design/palette.ts mirrors them for
+     the TypeScript side and a test fails if the two ever disagree. */
+  --fel-bg: #050505;
+  --fel-surface: #0c0c11;   /* matches .fel-card in globals.css -- one card material, one value */
   --fel-surface-2: #161d27;
   --fel-line: #232c38;
   --fel-text: #f2f5f9;
   --fel-text-dim: #8b97a5;
 
   /* Brand accents */
-  --fel-cyan: #22d3ee;      /* primary actions, focus */
-  --fel-gold: #ffd75e;      /* scores, currency, celebration */
-  --fel-ember: #ff6b3d;     /* heat/momentum */
-  --fel-crimson: #ff3d5e;   /* danger, KO, live */
-  --fel-emerald: #34e89e;   /* success, PRQ up */
-  --fel-violet: #a78bfa;    /* nexus, rare */
+  --fel-cyan: #00E5FF;      /* primary actions, focus */
+  --fel-gold: #FFD700;      /* scores, currency, celebration */
+  --fel-ember: #FF7A2F;     /* heat/momentum */
+  --fel-crimson: #FF3366;   /* danger, KO, live */
+  --fel-emerald: #00FF9D;   /* success, PRQ up */
+  --fel-violet: #A855F7;    /* nexus, rare */
+  --fel-indigo: #7B61FF;    /* craft: dance, music, acting, story */
+
+  /* THESE TWO WERE BEING USED AND HAD NEVER BEEN DEFINED. Fourteen call sites referenced var(--fel-red) and
+     var(--fel-purple); an undefined custom property is an invalid value, so each one silently rendered as no
+     colour at all. In app/creator/athlete that included the VIOLATION text -- the line telling an author a stat
+     is illegal had no colour cue. Defined here as the names those call sites use for the colours beside them. */
+  --fel-red: #FF3366;
+  --fel-purple: #A855F7;
 
   /* Rarity ladder (cards, wearables) */
   --fel-rarity-common: #9aa7b4;
@@ -33,8 +47,8 @@
   --fel-glass: rgba(13, 17, 23, 0.72);
   --fel-glass-border: rgba(255, 255, 255, 0.08);
   --fel-shadow-pop: 0 12px 40px rgba(0, 0, 0, 0.55);
-  --fel-glow-cyan: 0 0 24px rgba(34, 211, 238, 0.35);
-  --fel-glow-gold: 0 0 24px rgba(255, 215, 94, 0.35);
+  --fel-glow-cyan: 0 0 24px rgba(0, 229, 255, 0.35);
+  --fel-glow-gold: 0 0 24px rgba(255, 215, 0, 0.35);
 
   /* Motion — every animated property uses one of these */
   --fel-ease-pop: cubic-bezier(0.2, 1.4, 0.4, 1);
