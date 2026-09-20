@@ -5,7 +5,7 @@
     "node": "22"
   },
   "scripts": {
-    "postinstall": "prisma generate --schema=prisma/schema.prisma",
+    "postinstall": "prisma generate",
     "dev": "next dev",
     "build": "next build && node scripts/copy-prisma-schema.mjs",
     "build:check": "NEXT_DIST_DIR=.next-verify next build && NEXT_DIST_DIR=.next-verify node scripts/copy-prisma-schema.mjs",
