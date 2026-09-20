@@ -11,6 +11,16 @@
 //
 // Pure: one pose frame in, a verdict out. No DOM, no camera handles.
 
+/**
+ * WHICH WAY THE ATHLETE FACES, and it is a property of the MOVEMENT, not a preference.
+ *
+ * Knee tracking and left/right symmetry are frontal-plane measurements: from the side the knees are behind each other
+ * and there is nothing to read. A hip hinge is the opposite — its whole question is how far the hips travel back and
+ * whether the back stays flat, and from the front you cannot see either. So a pattern declares the view it needs and
+ * the framing check enforces THAT, instead of always demanding square-on and quietly failing every side-on movement.
+ */
+export type FramingView = 'front' | 'side';
+
 export type FramingIssue =
   | 'noBody'        // nothing to work with
   | 'cutOffTop'     // head out of shot
@@ -18,7 +28,7 @@ export type FramingIssue =
   | 'tooClose'      // filling the frame; a squat will leave it
   | 'tooFar'        // a small body is a noisy body
   | 'offCentre'     // drifting out of one side
-  | 'turned'        // side-on, so the frontal checks (knee tracking, symmetry) cannot be read
+  | 'turned'        // facing the wrong way for this movement's own measurements
   | 'dim';          // the model is guessing — bad light, busy background
 
 export interface FramingCheck {
@@ -50,6 +60,8 @@ export const CENTRE_TOLERANCE = 0.18;
 export const VIS_MIN = 0.55;
 /** Square to the camera the shoulders read wider than the hips; under this ratio the athlete has turned. */
 export const SQUARE_MIN = 0.85;
+/** And the other way: a SIDE-on movement wants the shoulders stacked, so anything wider than this is still facing you. */
+export const SIDE_MAX = 0.6;
 
 const ORDER: FramingIssue[] = ['noBody', 'cutOffBottom', 'cutOffTop', 'turned', 'tooClose', 'tooFar', 'offCentre', 'dim'];
 
@@ -64,7 +76,7 @@ const SAY: Record<FramingIssue, string> = {
   dim: 'More light, or a plainer background — I am losing track of you.',
 };
 
-export function checkFraming(frame: FramingFrame): FramingCheck {
+export function checkFraming(frame: FramingFrame, view: FramingView = 'front'): FramingCheck {
   const L = frame.landmarks ?? [];
   const get = (i: number) => L[i];
   const seen = (p: FramingPoint | undefined) => !!p && (p.visibility ?? 1) >= 0.3;
@@ -91,15 +103,20 @@ export function checkFraming(frame: FramingFrame): FramingCheck {
   if (bodyFill > FILL_MAX) issues.push('tooClose');
   if (bodyFill < FILL_MIN) issues.push('tooFar');
   if (Math.abs(hipMidX - 0.5) > CENTRE_TOLERANCE) issues.push('offCentre');
-  if (hipSpan > 1e-3 && shoulderSpan / hipSpan < SQUARE_MIN) issues.push('turned');
+  // square-on: the shoulders read wider than the hips. Side-on: they collapse toward each other.
+  const squareness = hipSpan > 1e-3 ? shoulderSpan / hipSpan : 1;
+  if (view === 'front' ? squareness < SQUARE_MIN : squareness > SIDE_MAX) issues.push('turned');
   if (visibility < VIS_MIN) issues.push('dim');
 
   const worst = ORDER.find((i) => issues.includes(i)) ?? null;
+  const say = worst === 'turned' && view === 'side'
+    ? 'Turn side-on to the camera — I read a hinge from the side.'
+    : worst ? SAY[worst] : 'Good shot — start when you are ready.';
   return {
     ok: issues.length === 0,
     issues,
     worst,
-    instruction: worst ? SAY[worst] : 'Good shot — start when you are ready.',
+    instruction: say,
     bodyFill,
     visibility,
   };

@@ -69,4 +69,17 @@ describe('the shot before the rep', () => {
     gate.ready(checkFraming(shot({ ankleY: 0.99 })), 1900);   // a bad frame resets it
     expect(gate.ready(good, 2000)).toBe(false);
   });
+
+  it('a SIDE-on movement wants you side-on, and says so in its own words', () => {
+    const squareOn = shot();                                   // shoulders wider than hips
+    const sideOn = shot({ shoulderSpan: 0.05 });               // shoulders stacked
+    // a hinge filmed from the front is the fault now, not the other way round
+    expect(checkFraming(squareOn, 'side').issues).toContain('turned');
+    expect(checkFraming(squareOn, 'side').instruction).toMatch(/side-on/i);
+    expect(checkFraming(sideOn, 'side').ok).toBe(true);
+    // and the squat is unchanged: square-on passes, side-on is the fault
+    expect(checkFraming(squareOn, 'front').ok).toBe(true);
+    expect(checkFraming(sideOn, 'front').issues).toContain('turned');
+    expect(checkFraming(sideOn, 'front').instruction).toMatch(/square-on/i);
+  });
 });
