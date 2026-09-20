@@ -12,7 +12,7 @@ export function TabPage({
   eyebrow: string; title: string; lede?: string; accent: string; children: ReactNode; aside?: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#050505] pb-28 md:pb-16 md:pt-20">
+    <div className="relative min-h-screen bg-[#050505] pb-28 md:pb-12">
       {/* a single wash of the tab's colour at the top — the only chrome the page gets */}
       <div
         aria-hidden

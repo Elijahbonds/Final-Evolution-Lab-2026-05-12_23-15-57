@@ -54,48 +54,76 @@ export function tabForPath(pathname: string): TabDef | null {
   return best;
 }
 
-export function TabBar() {
+/**
+ * Where the shell hides itself. A running mode owns the whole screen, and the dev views are for looking at one
+ * component without the app around it. Exported so the rail and the bar cannot disagree about it -- two copies of
+ * this rule is how you end up with a header over a game.
+ */
+export function chromeHiddenFor(pathname: string): boolean {
+  return pathname.startsWith('/play/') || pathname.startsWith('/dev/');
+}
+
+/**
+ * `bar` is the fixed bottom bar a thumb reaches on a phone. `inline` is the same three tabs sitting inside the
+ * StatusRail on a desktop, so the app has one piece of furniture at the top instead of a bar and a floating pill.
+ */
+export function TabBar({ variant = 'bar' }: { variant?: 'bar' | 'inline' } = {}) {
   const pathname = usePathname() || '/';
   const active = tabForPath(pathname);
-  // The bar is for getting around the app, not for sitting on top of a game. A mode running full-screen keeps it.
-  if (pathname.startsWith('/play/') || pathname.startsWith('/dev/')) return null;
+  if (chromeHiddenFor(pathname)) return null;
+
+  const items = TABS.map((t) => {
+    const on = active?.id === t.id;
+    const Icon = t.icon;
+    return (
+      <li key={t.id} className={variant === 'bar' ? 'flex-1' : ''}>
+        <Link
+          href={t.href}
+          aria-current={on ? 'page' : undefined}
+          className={
+            variant === 'bar'
+              ? `group relative flex flex-col items-center gap-1 px-4 py-2.5
+                 pb-[max(0.625rem,env(safe-area-inset-bottom))] transition-colors`
+              : 'group relative flex items-center gap-2 rounded-xl px-3.5 py-1.5 transition-colors'
+          }
+          style={{ color: on ? t.accent : 'rgba(255,255,255,0.45)' }}
+        >
+          {/* the lit tab carries its own colour as a soft wash rather than a hard pill */}
+          {on && (
+            <span
+              aria-hidden
+              className={
+                variant === 'bar'
+                  ? 'pointer-events-none absolute inset-x-3 inset-y-1 rounded-xl'
+                  : 'pointer-events-none absolute inset-0 rounded-xl'
+              }
+              style={{ background: `${t.accent}14`, boxShadow: `inset 0 0 0 1px ${t.accent}33` }}
+            />
+          )}
+          <Icon className="relative h-[18px] w-[18px]" strokeWidth={on ? 2.4 : 2} />
+          <span className="relative font-mono text-[10px] font-bold uppercase tracking-[0.14em] md:text-[11px]">
+            {t.label}
+          </span>
+        </Link>
+      </li>
+    );
+  });
+
+  if (variant === 'inline') {
+    return (
+      <nav aria-label="Main">
+        <ul className="flex items-center gap-1">{items}</ul>
+      </nav>
+    );
+  }
 
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#050505]/90 backdrop-blur-xl
-                 md:inset-x-auto md:bottom-auto md:left-1/2 md:top-3 md:-translate-x-1/2 md:rounded-2xl md:border"
+      // Bottom bar on a phone only: on a desktop the same tabs are inside the rail at the top.
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#050505]/90 backdrop-blur-xl md:hidden"
     >
-      <ul className="mx-auto flex max-w-md items-stretch justify-around md:max-w-none md:gap-1 md:px-1.5 md:py-1.5">
-        {TABS.map((t) => {
-          const on = active?.id === t.id;
-          const Icon = t.icon;
-          return (
-            <li key={t.id} className="flex-1 md:flex-none">
-              <Link
-                href={t.href}
-                aria-current={on ? 'page' : undefined}
-                className="group relative flex flex-col items-center gap-1 px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))]
-                           transition-colors md:flex-row md:gap-2 md:rounded-xl md:px-4 md:py-2 md:pb-2"
-                style={{ color: on ? t.accent : 'rgba(255,255,255,0.45)' }}
-              >
-                {/* the lit tab carries its own colour as a soft wash rather than a hard pill */}
-                {on && (
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-3 inset-y-1 rounded-xl md:inset-x-0"
-                    style={{ background: `${t.accent}14`, boxShadow: `inset 0 0 0 1px ${t.accent}33` }}
-                  />
-                )}
-                <Icon className="relative h-[18px] w-[18px]" strokeWidth={on ? 2.4 : 2} />
-                <span className="relative font-mono text-[10px] font-bold uppercase tracking-[0.14em] md:text-[11px]">
-                  {t.label}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      <ul className="mx-auto flex max-w-md items-stretch justify-around">{items}</ul>
     </nav>
   );
 }

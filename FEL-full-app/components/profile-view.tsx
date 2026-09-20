@@ -85,7 +85,9 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
             {[
               { icon: Coins, label: 'Credits', value: data?.wallet?.lc ?? p?.labCredits, color: '#FFD700' },
               { icon: Sparkles, label: 'XP', value: p?.xp, color: '#00FF9D' },
-              { icon: Gem, label: 'Shards', value: p?.shards, color: '#A855F7' },
+              // Wallet first, like Credits above it. PlayerProfile.shards is a second field with the same name that
+              // spend() never touches, so it reads 0 while the rail and the card shelf show the real balance.
+              { icon: Gem, label: 'Shards', value: data?.wallet?.shards ?? p?.shards, color: '#A855F7' },
               { icon: Flame, label: 'Streak', value: p?.streakDays, color: '#FF3366' },
             ].map((s) => {
               const Icon = s.icon;

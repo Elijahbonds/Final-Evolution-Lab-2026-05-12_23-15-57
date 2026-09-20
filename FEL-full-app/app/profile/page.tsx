@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Gem, Shirt, Store, CalendarDays } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { readWallet } from '@/lib/wallet/wallet-service';
 import { prqScore, prqGrade } from '@/lib/prq';
 import { gameVitals, ownedFromEntitlements } from '@/lib/cards/boosts';
 import { TabPage } from '@/components/shell/tab-page';
@@ -25,9 +26,12 @@ export default async function ProfilePage() {
   const me = (session?.user as { id?: string } | undefined)?.id;
   if (!session) redirect('/login?next=%2Fprofile');
 
-  const [profile, entitlements] = await Promise.all([
+  const [profile, entitlements, wallet] = await Promise.all([
     me ? prisma.playerProfile.findUnique({ where: { userId: me } }).catch(() => null) : null,
     me ? prisma.playerEntitlement.findMany({ where: { playerId: me }, select: { skuId: true } }).catch(() => []) : [],
+    // The SHARDS THAT BUY are the wallet's, not PlayerProfile.shards. Two fields carry that name and only this one
+    // is what spend() decrements -- showing the other would price the shelf against a balance nobody can spend.
+    me ? readWallet(prisma, me).catch(() => null) : null,
   ]);
 
   const base = prqScore(profile as unknown as Record<string, number> | null);
@@ -35,7 +39,7 @@ export default async function ProfilePage() {
   const vitals = gameVitals(base, owned);
   // The grade an athlete IS graded at is the measured one. The lift is shown beside it, labelled, never folded in.
   const grade = prqGrade(vitals.base);
-  const shards = profile?.shards ?? 0;
+  const shards = wallet?.shards ?? 0;
 
   const shortcuts = [
     { href: '/closet', icon: Shirt, accent: '#00E5FF', label: 'Closet' },
@@ -55,7 +59,7 @@ export default async function ProfilePage() {
           <div className="text-right">
             <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/35">PRQ</p>
             <p className="fel-heading text-[34px] font-black leading-none" style={{ color: grade.color }}>
-              {vitals.base}
+              {Math.round(vitals.base)}
             </p>
             <p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: grade.color }}>
               {grade.label}
@@ -64,7 +68,7 @@ export default async function ProfilePage() {
           {vitals.lift > 0 && (
             <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-right">
               <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">In game</p>
-              <p className="fel-heading text-[20px] font-black leading-none text-white">{vitals.boosted}</p>
+              <p className="fel-heading text-[20px] font-black leading-none text-white">{Math.round(vitals.boosted)}</p>
               <p className="mt-0.5 font-mono text-[9px] text-[#A855F7]">+{vitals.lift} from cards</p>
             </div>
           )}

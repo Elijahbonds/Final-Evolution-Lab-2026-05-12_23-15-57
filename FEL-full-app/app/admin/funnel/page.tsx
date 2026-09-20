@@ -2,8 +2,6 @@ import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { AppHeader } from '@/components/app-header';
-import { BottomNav } from '@/components/bottom-nav';
 import { computeFunnelCounts, STAGE_META, FUNNEL_ORDER } from '@/lib/marketing/funnel';
 import { ReengageButton } from '@/components/marketing/reengage-button';
 
@@ -30,7 +28,6 @@ export default async function AdminFunnelPage() {
 
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
-      <AppHeader />
       <main className="mx-auto max-w-[1100px] px-4 py-8">
         <h1 className="fel-heading text-3xl font-bold text-white">
           MARKETING <span className="text-[#00FF9D]">FUNNEL</span>
@@ -119,7 +116,6 @@ export default async function AdminFunnelPage() {
           </table>
         </div>
       </main>
-      <BottomNav />
     </div>
   );
 }

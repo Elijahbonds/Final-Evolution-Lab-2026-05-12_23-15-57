@@ -14,8 +14,6 @@ import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import CreativeHub from '@/components/creator/creative-hub';
 import MyCreations from '@/components/creator/my-creations';
-import { AppHeader } from '@/components/app-header';
-import { BottomNav } from '@/components/bottom-nav';
 import {
   defaultStats, defaultRarity,
   type Discipline, type SportDesignation, type ArtPayload,
@@ -151,10 +149,8 @@ export default function CreatePage() {
   if (stage === 'hub' || !sel) return (
     // Standard chrome on the hub stage (the authoring modes stay immersive).
     <div className="min-h-screen bg-neutral-950 pb-20">
-      <AppHeader />
       <CreativeHub onEnter={enter} />
       <MyCreations refreshKey={galleryKey} />
-      <BottomNav />
     </div>
   );
 

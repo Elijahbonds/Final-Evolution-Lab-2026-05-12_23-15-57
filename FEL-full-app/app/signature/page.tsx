@@ -1,8 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
-import { AppHeader } from '@/components/app-header';
-import { BottomNav } from '@/components/bottom-nav';
 import { SignatureView } from '@/components/signature-view';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +14,6 @@ export default async function SignaturePage() {
   if (!session) redirect('/login');
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
-      <AppHeader />
       <main className="mx-auto max-w-[900px] px-4 py-8">
         <h1 className="fel-heading text-3xl font-bold text-white">
           SIGNATURE <span className="text-[#FFD700]">CHALLENGE</span>
@@ -26,7 +23,6 @@ export default async function SignaturePage() {
         </p>
         <SignatureView />
       </main>
-      <BottomNav />
     </div>
   );
 }

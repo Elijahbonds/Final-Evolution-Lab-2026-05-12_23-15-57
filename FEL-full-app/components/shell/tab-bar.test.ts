@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TABS, tabForPath } from './tab-bar';
+import { TABS, chromeHiddenFor, tabForPath } from './tab-bar';
 
 /**
  * The tab bar's only piece of logic worth a test: which tab is lit. Getting it wrong is not a crash, it is the
@@ -46,5 +46,27 @@ describe('which tab owns a path', () => {
 
   it('there are exactly three, because that was the point', () => {
     expect(TABS.map((t) => t.id)).toEqual(['play', 'train', 'profile']);
+  });
+});
+
+describe('where the shell hides itself', () => {
+  it('gets out of the way of a running mode', () => {
+    expect(chromeHiddenFor('/play/dunkContest')).toBe(true);
+    expect(chromeHiddenFor('/play/hoops1v1')).toBe(true);
+  });
+
+  it('gets out of the way of the dev views', () => {
+    expect(chromeHiddenFor('/dev/mode/karate')).toBe(true);
+    expect(chromeHiddenFor('/dev/shelf/cards')).toBe(true);
+  });
+
+  it('stays on the shelf itself, which is a page and not a game', () => {
+    expect(chromeHiddenFor('/play')).toBe(false);
+  });
+
+  it('stays everywhere else', () => {
+    for (const p of ['/', '/train', '/profile', '/coach', '/kitchens', '/store', '/playlist']) {
+      expect(chromeHiddenFor(p), p).toBe(false);
+    }
   });
 });

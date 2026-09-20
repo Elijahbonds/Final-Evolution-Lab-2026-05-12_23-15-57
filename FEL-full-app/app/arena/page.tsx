@@ -1,8 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
-import { AppHeader } from '@/components/app-header';
-import { BottomNav } from '@/components/bottom-nav';
 import { ArenaView } from '@/components/arena-view';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +16,6 @@ export default async function ArenaPage() {
   if (!session) redirect('/login');
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
-      <AppHeader />
       <main className="mx-auto max-w-[960px] px-4 py-8">
         <div className="flex items-center gap-3">
           <h1 className="fel-heading text-3xl font-bold text-white">
@@ -32,7 +29,6 @@ export default async function ArenaPage() {
         </p>
         <ArenaView />
       </main>
-      <BottomNav />
     </div>
   );
 }

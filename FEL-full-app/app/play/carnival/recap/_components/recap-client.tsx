@@ -3,8 +3,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PartyPopper, Trophy, RotateCcw, Home } from 'lucide-react';
-import { AppHeader } from '@/components/app-header';
-import { BottomNav } from '@/components/bottom-nav';
 import {
   type CarnivalRunState, peekCarnivalRun, clearCarnivalRun, carnivalStopLabel, carnivalRunTotalScore,
 } from '@/lib/carnival-run';
@@ -27,7 +25,6 @@ export function CarnivalRecapClient() {
 
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
-      <AppHeader />
       <main className="mx-auto max-w-[560px] px-4 py-8 text-center">
         {!run || cleared ? (
           <div className="fel-card rounded-2xl p-8">
@@ -84,7 +81,6 @@ export function CarnivalRecapClient() {
           </div>
         )}
       </main>
-      <BottomNav />
     </div>
   );
 }

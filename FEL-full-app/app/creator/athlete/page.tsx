@@ -1,8 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
-import { AppHeader } from '@/components/app-header';
-import { BottomNav } from '@/components/bottom-nav';
 import AthleteCreator from './_components/athlete-creator';
 
 export const dynamic = 'force-dynamic';
@@ -14,9 +12,7 @@ export default async function AthleteCreatorPage() {
   // body scan gets no ceilings at all, which is the rule the whole attribute layer is built on.
   return (
     <div className="min-h-screen bg-[#050505] pb-20 text-white">
-      <AppHeader />
       <AthleteCreator axes={null} profileId={String((session.user as { id?: string } | undefined)?.id ?? 'local')} />
-      <BottomNav />
     </div>
   );
 }

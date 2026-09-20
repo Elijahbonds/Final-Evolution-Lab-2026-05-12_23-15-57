@@ -1,8 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
-import { AppHeader } from '@/components/app-header';
-import { BottomNav } from '@/components/bottom-nav';
 import { MetricsDashboard } from '@/components/metrics-dashboard';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +18,6 @@ export default async function AdminMetricsPage() {
 
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
-      <AppHeader />
       <main className="mx-auto max-w-[1100px] px-4 py-8">
         <h1 className="fel-heading text-3xl font-bold text-white">
           GROWTH <span className="text-[#00E5FF] fel-glow-cyan">METRICS</span>
@@ -30,7 +27,6 @@ export default async function AdminMetricsPage() {
         </p>
         <MetricsDashboard />
       </main>
-      <BottomNav />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { Barlow_Condensed, IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google'
 import { TabBar } from '@/components/shell/tab-bar'
+import { StatusRail } from '@/components/shell/status-rail'
 import './globals.css'
 import './theme.css'
 // M95 (Pass 2): mobile canvas fix — on portrait phones the shared 16:10 game
@@ -52,10 +53,14 @@ export default function RootLayout({
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${barlow.variable} ${plexSans.variable} ${jetbrainsMono.variable} font-sans min-h-screen bg-[#050505]`}>
         <Providers>
+          {/* THE ONE BAR (2026-09-20). Above the page, not inside it: thirty-three routes each mounted their own
+              AppHeader and BottomNav, which meant nine chips at the top and, once the tabs arrived, two navigation
+              bars stacked at the bottom. The rail carries PRQ, the wallet and the way out; on a desktop it carries
+              the tabs too. */}
+          <StatusRail />
           {children}
-          {/* THE THREE TABS (2026-09-20). Mounted once, here, rather than imported by each page — thirty-three
-              top-level routes had no shared navigation at all, which is why the coach product and the athlete's
-              training screen were reachable only by typing their URLs. It hides itself inside a running mode. */}
+          {/* The same three tabs, at the bottom of a phone where a thumb is. On a desktop this renders nothing and
+              the rail above carries them instead. */}
           <TabBar />
           <Toaster theme="dark" position="top-center" />
           {/* IMPORTANT: Do not remove — handles chunk loading race conditions in the dev server */}

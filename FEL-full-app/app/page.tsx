@@ -1,7 +1,5 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { AppHeader } from '@/components/app-header';
-import { BottomNav } from '@/components/bottom-nav';
 import { HubWorld } from '@/components/hub-world';
 import { PublicTopBar, PublicLegalFooter } from '@/components/public-chrome';
 import { GuestLandingHero } from '@/components/guest-landing-hero';
@@ -23,9 +21,7 @@ export default async function HomePage() {
   }
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
-      <AppHeader />
       <HubWorld userName={session?.user?.name ?? 'Athlete'} />
-      <BottomNav />
     </div>
   );
 }

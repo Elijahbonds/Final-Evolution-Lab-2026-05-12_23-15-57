@@ -1,7 +1,5 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { AppHeader } from '@/components/app-header';
-import { BottomNav } from '@/components/bottom-nav';
 import { PublicTopBar, PublicLegalFooter } from '@/components/public-chrome';
 import { PRIVACY_CONTENT, CURRENT_POLICY_VERSION } from '@/lib/policies';
 
@@ -12,7 +10,7 @@ export default async function PrivacyPage() {
   const session = await getServerSession(authOptions);
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
-      {session ? <AppHeader /> : <PublicTopBar />}
+      {session ? null : <PublicTopBar />}
       <main className="mx-auto max-w-[700px] px-4 py-8">
         <div className="fel-panel rounded-xl p-6">
           <div className="prose prose-invert prose-sm max-w-none
@@ -27,7 +25,7 @@ export default async function PrivacyPage() {
           </div>
         </div>
       </main>
-      {session ? <BottomNav /> : <PublicLegalFooter />}
+      {session ? null : <PublicLegalFooter />}
     </div>
   );
 }

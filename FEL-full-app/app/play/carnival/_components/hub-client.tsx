@@ -3,8 +3,6 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, PartyPopper, ArrowRight } from 'lucide-react';
-import { AppHeader } from '@/components/app-header';
-import { BottomNav } from '@/components/bottom-nav';
 import { CarnivalLoader } from './loader';
 import {
   drawCarnivalLineup, startCarnivalRun, carnivalStopHref, carnivalStopLabel,
@@ -58,7 +56,6 @@ function CarnivalHubInner() {
 
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
-      <AppHeader />
       <main className="mx-auto max-w-[560px] px-4 py-8 text-center">
         <div className="fel-panel rounded-2xl p-8">
           <PartyPopper className="mx-auto h-12 w-12 text-[#FFD700]" />
@@ -86,7 +83,6 @@ function CarnivalHubInner() {
           <p className="mt-3 text-[11px] text-white/35">Every stop still earns its own XP, shards, and credits.</p>
         </div>
       </main>
-      <BottomNav />
     </div>
   );
 }

@@ -1,7 +1,5 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { AppHeader } from '@/components/app-header';
-import { BottomNav } from '@/components/bottom-nav';
 import { PublicTopBar, PublicLegalFooter } from '@/components/public-chrome';
 import Link from 'next/link';
 import { Mail, FileText, Shield } from 'lucide-react';
@@ -13,7 +11,7 @@ export default async function SupportPage() {
   const session = await getServerSession(authOptions);
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
-      {session ? <AppHeader /> : <PublicTopBar />}
+      {session ? null : <PublicTopBar />}
       <main className="mx-auto max-w-[700px] px-4 py-8">
         <h1 className="fel-heading text-3xl font-bold text-white">SUPPORT</h1>
         <p className="mt-2 text-sm text-white/50">
@@ -64,7 +62,7 @@ export default async function SupportPage() {
           </Link>
         </div>
       </main>
-      {session ? <BottomNav /> : <PublicLegalFooter />}
+      {session ? null : <PublicLegalFooter />}
     </div>
   );
 }

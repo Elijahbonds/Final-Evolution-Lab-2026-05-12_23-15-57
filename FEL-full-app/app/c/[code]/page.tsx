@@ -1,7 +1,5 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { AppHeader } from '@/components/app-header';
-import { BottomNav } from '@/components/bottom-nav';
 import { PublicTopBar, PublicLegalFooter } from '@/components/public-chrome';
 import { getChallenge } from '@/lib/social/challenge-service';
 import { ChallengeLanding } from '@/components/challenge-landing';
@@ -19,7 +17,7 @@ export default async function ChallengePage({ params }: { params: { code: string
 
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
-      {session ? <AppHeader /> : <PublicTopBar />}
+      {session ? null : <PublicTopBar />}
       <main className="mx-auto max-w-[640px] px-4 py-10">
         {!link ? (
           <div className="fel-panel rounded-xl p-8 text-center">
@@ -45,7 +43,7 @@ export default async function ChallengePage({ params }: { params: { code: string
           />
         )}
       </main>
-      {session ? <BottomNav /> : <PublicLegalFooter />}
+      {session ? null : <PublicLegalFooter />}
     </div>
   );
 }
