@@ -66,7 +66,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     // 60-90 m field without a 4k map. Stabilized so the edge does not swim
     // as the follow camera moves; PCF for the soft edge the blur gave us.
     const csm = new CascadedShadowGenerator(T.shadowMapSize, sun);
-    csm.numCascades = 3;
+    csm.numCascades = 4;   // four bands over the same 90 m: the near cascade tightens around the players (2026-09-19)
     csm.lambda = 0.85;
     csm.shadowMaxZ = 90;
     csm.stabilizeCascades = true;

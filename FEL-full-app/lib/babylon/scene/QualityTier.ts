@@ -85,7 +85,12 @@ export function tierRigSettings(tier: QualityTier, mood: VenueMood): TierRigSett
   if (tier === 'mobile') {
     return { shadowMapSize: 512, cascaded: false, sharpen: false, bloomScaleMul: 0.7, ssao: false };
   }
-  return { shadowMapSize: 2048, cascaded: OUTDOOR_MOODS.has(mood), sharpen: true, bloomScaleMul: 1, ssao: true };
+  // DESKTOP SHADOWS AT 4096 (owner, 2026-09-19: the graphics pass, "whatever it takes"). 2048 over a 90 m cascade
+  // range is ~2 cm of shadow per texel at the far edge, which is why the sunset's long shadows came back soft and
+  // stepped while everything else in the frame is sharp. Measured on the dunk arena before and after: the frame is
+  // vsync-locked at 16.7 ms either way, zero frames over 33 ms. The map is the one thing in this rig that was
+  // visibly under-resolved and the budget had room for it.
+  return { shadowMapSize: 4096, cascaded: OUTDOOR_MOODS.has(mood), sharpen: true, bloomScaleMul: 1, ssao: true };
 }
 
 export interface SsaoHandle { dispose(): void }
