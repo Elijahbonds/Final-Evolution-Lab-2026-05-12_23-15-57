@@ -99,7 +99,7 @@ await ctx.addInitScript({ content: "try { window.sessionStorage.setItem('NEXUS_A
 const page = await ctx.newPage();
 await page.addInitScript({ content: 'window.__name = window.__name || function (f) { return f; };' });
 const log: string[] = [];
-page.on('console', (m) => { const t = m.text(); if (/\[DUNK-SKY\]|\[DUNK|\[LOB|\[RIM|\[JUDGE|\[HANDS\] (rim hang|hang release|contact:)/.test(t)) log.push(`${Date.now()} ${t.slice(0, 180)}`); });
+page.on('console', (m) => { const t = m.text(); if (/\[DUNK-SKY\]|\[DUNK|\[LOB|\[RIM|\[JUDGE|\[HANDS\] (rim hang|hang release|contact:|iron contact)/.test(t)) log.push(`${Date.now()} ${t.slice(0, 180)}`); });
 // the dev overlay's '1 error' badge, named: every console error and page error the run produced (printed at the end)
 const errors: string[] = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 240)); });
