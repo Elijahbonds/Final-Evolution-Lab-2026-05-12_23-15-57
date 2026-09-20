@@ -12,7 +12,7 @@ import {
   DEFAULT_FIRST_GAME, destinationFor, resolveFirstGame, type OnboardingPath,
 } from '@/lib/onboarding/firstRun';
 import { motion } from 'framer-motion';
-import { Zap, Loader2, Check } from 'lucide-react';
+import { Loader2, Check } from 'lucide-react';
 import { CURRENT_POLICY_VERSION } from '@/lib/policies';
 import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
 import { toast } from 'sonner';
@@ -142,9 +142,17 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         className={`fel-panel relative w-full rounded-2xl p-5 sm:p-8 ${mode === 'signup' ? 'max-w-2xl' : 'max-w-md'}`}
       >
         <div className="mb-5 text-center">
-          <div className="mb-2.5 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#00E5FF]/40 bg-[#00E5FF]/10 sm:h-14 sm:w-14">
-            <Zap className="h-6 w-6 text-[#00E5FF] sm:h-7 sm:w-7" />
-          </div>
+          {/* The owner's own crest, not a stock lightning bolt in a rounded square. The supplied file is black
+              line art on opaque white, so it ships prepared as a white-on-transparent mark — see
+              public/brand/README.md. */}
+          <Image
+            src="/brand/crest-light.png"
+            alt=""
+            width={132}
+            height={140}
+            priority
+            className="mx-auto mb-2 h-[72px] w-auto opacity-90 sm:h-[92px]"
+          />
           <h1 className="fel-heading text-[26px] font-bold leading-none sm:text-4xl">
             <span className="text-[#00E5FF] fel-glow-cyan">FINAL EVOLUTION</span> LAB
           </h1>
