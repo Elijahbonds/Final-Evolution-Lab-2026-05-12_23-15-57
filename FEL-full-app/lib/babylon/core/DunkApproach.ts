@@ -15,8 +15,23 @@ export function approachAngle(playerX: number, playerZ: number, rimX: number, ri
   return Math.atan2(playerX - rimX, rimZ - playerZ);
 }
 
-export function takeoffFor(runUpPeak: number): Takeoff {
+// THE FOOT IS THE PLAYER'S CALL NOW (owner, 2026-09-19: "have 1 foot and 2 foot jumps", chosen "with a button").
+// Speed alone used to decide it, which meant the difference between Jordan's glide and Shaq's two-footed lift was
+// something the game did TO you, never something you asked for. Holding GATHER (L2) through the run plants both feet:
+// you trade the one-foot's carry for the two-foot's apex, at any speed, deliberately.
+//
+// What the button CANNOT do is fake a one-foot takeoff out of a walk. A one-foot launch is a run converted upward —
+// with no run there is nothing to convert, so below the threshold it gathers whatever the player holds, and the label
+// says which jump he actually got. The choice is real in one direction because the physics is real in the other.
+export function takeoffFor(runUpPeak: number, gatherHeld = false): Takeoff {
+  if (gatherHeld) return 'two';
   return runUpPeak >= ONE_FOOT_MIN_SPEED ? 'one' : 'two';
+}
+
+/** Why the takeoff came out the way it did — the HUD tell during the run, so the foot is never a surprise. */
+export function takeoffTell(runUpPeak: number, gatherHeld: boolean): string {
+  if (gatherHeld) return 'GATHER — TWO-FOOT';
+  return runUpPeak >= ONE_FOOT_MIN_SPEED ? 'ONE-FOOT OFF THE RUN' : 'TOO SLOW TO ONE-FOOT — GATHERING';
 }
 
 // ── HOW FAR OUT HE LEFT THE FLOOR (2026-09-14) ──────────────────────────────

@@ -42,9 +42,15 @@ export interface LaunchProfile { apexMult: number; carryMult: number; difficulty
 
 /** What a launch off this foot does, and what a corner rebound (or the wall run along the hoopbus) just before it adds. Capped at ×2. */
 export function launchProfile(foot: LaunchFoot, vector: boolean, wallRun = false): LaunchProfile {
+  // THE TWO JUMPS ARE DIFFERENT BODIES, NOT TWO LABELS. `carryMult` was computed here from the day the profile
+  // existed and read by nothing but a unit test, so the only thing a one-foot takeoff actually changed was the apex
+  // number — the glide that IS the one-foot dunk, the run converted into distance, never reached the flight. The mode
+  // applies it to the plant now (DunkMode: PLANT_DRIFT_M × carry). Spread wider than before, because at 1.15 vs 0.9
+  // the difference was under 4 cm of travel and invisible: a one-foot keeps most of its run through the plant, a
+  // two-foot stops dead and spends it going up.
   const base: LaunchProfile = foot === 'one'
-    ? { apexMult: 1.0, carryMult: 1.15, difficulty: 0, label: 'SPEED LAUNCH' }
-    : { apexMult: 1.18, carryMult: 0.9, difficulty: 0.2, label: 'POWER LAUNCH' };
+    ? { apexMult: 0.96, carryMult: 1.6, difficulty: 0, label: 'SPEED LAUNCH' }
+    : { apexMult: 1.22, carryMult: 0.45, difficulty: 0.2, label: 'POWER LAUNCH' };
   if (!vector) return base;
   const mult = wallRun ? WALL_RUN_APEX_MULT : GLASS.apexMult;
   return { apexMult: Math.min(2, base.apexMult * mult), carryMult: base.carryMult, difficulty: base.difficulty + GLASS.difficulty + (wallRun ? 0.4 : 0), label: `${wallRun ? 'WALL RUN' : 'CORNER REBOUND'} → ${base.label}` };

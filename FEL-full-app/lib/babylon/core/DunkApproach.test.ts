@@ -1,10 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import {
-  BASELINE_ANGLE, approachAngle, approachBonus, takeoffFor,
-  rangeBonus, rangeLabel, STANDING_M, FREE_THROW_M, MAX_RANGE_BONUS, BEYOND_CAP,
-} from './DunkApproach';
+import { BASELINE_ANGLE, approachAngle, approachBonus, takeoffFor, rangeBonus, rangeLabel, STANDING_M, FREE_THROW_M, MAX_RANGE_BONUS, BEYOND_CAP, takeoffTell, ONE_FOOT_MIN_SPEED } from './DunkApproach';
 
 describe('free-approach dunk', () => {
+  it('GATHER takes the two-foot at any speed; without it the run decides, and a walk can never one-foot', () => {
+    // the owner's button: held, it is always two feet — that is a choice a body can always make
+    expect(takeoffFor(7, true)).toBe('two');
+    expect(takeoffFor(ONE_FOOT_MIN_SPEED, true)).toBe('two');
+    expect(takeoffFor(0, true)).toBe('two');
+    // let go and the run decides, exactly as before the button existed
+    expect(takeoffFor(7)).toBe('one');
+    expect(takeoffFor(ONE_FOOT_MIN_SPEED)).toBe('one');
+    expect(takeoffFor(ONE_FOOT_MIN_SPEED - 0.01)).toBe('two');
+    expect(takeoffFor(0, false)).toBe('two');
+  });
+
+  it('the tell says which jump is coming, and why, before he leaves the floor', () => {
+    expect(takeoffTell(7, true)).toBe('GATHER — TWO-FOOT');
+    expect(takeoffTell(7, false)).toBe('ONE-FOOT OFF THE RUN');
+    expect(takeoffTell(1, false)).toMatch(/TOO SLOW/);        // the refusal is named, not silent
+    expect(takeoffTell(1, true)).toBe('GATHER — TWO-FOOT');   // a gather is honest at any speed
+  });
+
   it('head-on two-foot adds nothing; the baseline one-foot adds the most', () => {
     expect(approachBonus(0, 'two')).toMatchObject({ difficulty: 0, label: 'HEAD-ON · TWO-FOOT' });
     const best = approachBonus(BASELINE_ANGLE, 'one');

@@ -84,7 +84,7 @@ import { missBeat } from '../core/MissFlavour';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
-import { approachAngle, approachBonus, takeoffFor } from '../core/DunkApproach';
+import { approachAngle, approachBonus, takeoffFor, takeoffTell } from '../core/DunkApproach';
 import { emptyCard, addAttempt, forWire, nightReport } from '@/lib/mp/dunkCard';
 import {
   judgeDunk, ScoreReveal, CrowdEnergy, REVEAL_DURATION_SEC, BAND_TOTAL, JUDGE_COUNT,
@@ -317,6 +317,10 @@ export const DunkMode: ModeDefinition = (() => {
   let styleTaps = 0;                          // mid-air showboat taps (max 2)
   let aHeld = false, hangSec = 0;             // rim-hang tracking
   let runUpPeak = 0;                          // fastest approach speed (m/s) this attempt
+  let gatherHeld = false;                     // GATHER (L2) through the run: both feet, by choice (2026-09-19)
+  let launchCarry = 1;                        // the foot's carry through the plant (DunkParkour.launchProfile)
+  let launchFoot: 'one' | 'two' = 'two';      // which foot left the floor, for the flight and the card
+  let gatherTold = '';                        // the last tell shown, so the HUD is not rewritten every frame
   // DUNK PARKOUR: when the run last rebounded off the glass (a launch inside GLASS.carrySec of it is a vector launch), the
   // backboard double-launch (once a flight) and the apex it adds, the glass panels along the runway
   // THE CORNER PROPS (owner: no glass on the sidelines — the hoopbus parked across one front corner, an event tent with the
@@ -405,7 +409,7 @@ export const DunkMode: ModeDefinition = (() => {
   // The BACKBOARD SWING is L1 in the hang beat (after the rise's kick): a pivot off the glass for a little more lift.
   let swingAng = 0, swingVel = 0, swingPeak = 0, hangBase: Vector3 | null = null, boardSwung = false;
   const vectorLive = () => performance.now() - vectorAt < GLASS.carrySec * 1000;
-  const launchMult = () => launchProfile(takeoffFor(runUpPeak), vectorLive(), vectorWallRun).apexMult;
+  const launchMult = () => launchProfile(takeoffFor(runUpPeak, gatherHeld), vectorLive(), vectorWallRun).apexMult;
   /** The glass: the run reflects off it with the speed kept — the launch that follows is a vector launch. */
   function tryGlass(ctx: ModeContext, vx: number, vz: number): void {
     if (performance.now() - vectorAt < 600) return;   // one rebound per contact
@@ -866,7 +870,7 @@ export const DunkMode: ModeDefinition = (() => {
       hype = 0; chain = 0; finishing = false; ended = false; rivalClipToken = 0; card = emptyCard();
       style = 'power'; prop = 'none'; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
-      runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false;
+      runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false; gatherHeld = false; gatherTold = '';
       vectorAt = -1e9; vectorWallRun = false; doubleLaunched = false; doubleLaunchLift = 0; boardSwung = false; hangBase = null; swingAng = 0; skyTapped = false; boardTopFlip = false; boardRan = false; l1DownAt = -1; busRun = null; busLaunch = null; busRan = false;
         foe = rivalForNight(night);
     stakes = freshStakes();
@@ -1072,6 +1076,20 @@ export const DunkMode: ModeDefinition = (() => {
         } else refuse(ctx, doubleLaunched && boardSwung ? 'THE BOARD IS SPENT' : doubleLaunched ? 'BACKBOARD SWING IN THE HANG' : 'BACKBOARD KICK IN THE RISE');
       }   // (X reads in the air now: it carries the chain pieces, 2026-09-16)
 
+      // GATHER (L2) — the player's call on the foot. Held through the run it plants both; let go and a run fast
+      // enough leaves off one. It is read live so the tell can change under the thumb, and it is answered outside the
+      // runway like every other press rather than swallowed.
+      if (e.t === 'trigger' && e.side === 'L') {
+        const now = e.value > 0.5;
+        if (now !== gatherHeld) {
+          gatherHeld = now;
+          if (phase === 'charge' || phase === 'approach') {
+            const tell = takeoffTell(runUpPeak, gatherHeld);
+            if (tell !== gatherTold) { gatherTold = tell; ctx.setHud({ hint: tell }); }
+          } else if (now) refuse(ctx, phase === 'cinematic' ? 'THE FEET HAVE LEFT THE FLOOR' : 'GATHER ON THE RUN');
+        }
+      }
+
       if (e.t === 'trigger' && e.side === 'R') {
         // MECHANICS PASS (2026-09-15): RUN (RT) was silent 6 of 6 when held outside the runway — through the judges, the
         // replay, the rival's turn. The first press of a hold is answered with what the contest is doing.
@@ -1086,7 +1104,7 @@ export const DunkMode: ModeDefinition = (() => {
           obstacle?.start();   // a rolling prop comes when you commit to the run (owner, 2026-09-16)
           holdRunSpeed = Math.max(2, runUpPeak);
           playClip(SPORT_CLIP.moveLoop, { loop: true });
-          ctx.setHud({ hint: 'HOLD — running to the rim · steer with the stick · LOOK orbits the camera · release early to jump from here' });
+          ctx.setHud({ hint: 'HOLD — running to the rim · GATHER (L2) to go up off two feet · steer with the stick · release early to jump from here' });
         }
         if (phase === 'charge') {
           charge = Math.max(charge, e.value);
@@ -1275,7 +1293,9 @@ export const DunkMode: ModeDefinition = (() => {
         // on consecutive frames — the wall at the takeoff). The gather step keeps rolling through the plant (PLANT_DRIFT_M over the
         // plant), and the carry runs from where the plant ended to the same rim point on the same beat.
         const carryDir = Math.sign(rim.z + FLUSH_Z_AHEAD - launchZ) || -1;
-        const plantFrom = launchZ + carryDir * PLANT_DRIFT_M * Math.min(1, clipTime / PLANT_SEC);
+        // THE FOOT DECIDES HOW MUCH RUN SURVIVES THE PLANT: a one-foot takeoff barely breaks stride (carry 1.6),
+        // a two-foot gather plants and spends the run going up instead (0.45). Same line, two different bodies.
+        const plantFrom = launchZ + carryDir * PLANT_DRIFT_M * launchCarry * Math.min(1, clipTime / PLANT_SEC);
         player.root.position.z = plantFrom + (rim.z + FLUSH_Z_AHEAD - plantFrom) * u;
         player.root.position.x += (rim.x - player.root.position.x) * 1.6 * dt;
         if (busLaunch) {   // off the bus: 2 m off the centre line and a metre up — the x is driven to the iron on the carry, the height fades by the extension
@@ -1979,12 +1999,12 @@ export const DunkMode: ModeDefinition = (() => {
     const takeoffRange = Math.hypot(player.root.position.x - rim.x, player.root.position.z - rim.z);
     const approach = approachBonus(
       approachAngle(player.root.position.x, player.root.position.z, rim.x, rim.z),
-      takeoffFor(runUpPeak),
+      takeoffFor(runUpPeak, gatherHeld),
       takeoffRange,
     );
     const prof = launchProfile(approach.takeoff, vectorLive(), vectorWallRun);   // DUNK PARKOUR: the foot's launch, and the corner prop if it was just used
     console.info(`[DUNK-PARKOUR] ${prof.label} apex x${prof.apexMult.toFixed(2)} +${prof.difficulty.toFixed(1)} diff`);
-    launchTag = prof.label;
+    launchTag = prof.label; launchCarry = prof.carryMult; launchFoot = approach.takeoff;
     flight.launch(Math.min(1, charge * 0.5 + launchSpeed01 * 0.5), STYLE_TIER[style], approach.difficulty + prof.difficulty);
     armedAir = null; spin.reset(); liveTricks = []; liveSpin = { turns: 0, from: 0, until: 0 };
     if (heldDpad) flight.recognizer.feed({ t: 'dpad', dir: heldDpad, pressed: true });   // a direction held through the takeoff is still held

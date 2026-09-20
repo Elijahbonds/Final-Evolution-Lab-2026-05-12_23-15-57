@@ -17,6 +17,16 @@ describe('the glass rebound', () => {
 });
 
 describe('the launches', () => {
+  it('the two feet are far enough apart to SEE — the carry spread is worth centimetres of travel, not millimetres', () => {
+    const one = launchProfile('one', false), two = launchProfile('two', false);
+    // the mode multiplies PLANT_DRIFT_M (0.14 m) by the carry: this is the travel each foot keeps through the plant
+    const PLANT_DRIFT_M = 0.14;
+    const glide = PLANT_DRIFT_M * one.carryMult, lift = PLANT_DRIFT_M * two.carryMult;
+    expect(glide - lift).toBeGreaterThan(0.12);        // ≥ 12 cm apart: the old 1.15/0.9 pair was under 4 cm
+    expect(one.carryMult / two.carryMult).toBeGreaterThan(2.5);
+    expect(two.apexMult / one.apexMult).toBeGreaterThan(1.2);   // and the lift buys real height for it
+  });
+
   it('one foot keeps the carry, two feet buy height; the glass multiplies the apex and adds difficulty, capped at ×2', () => {
     const one = launchProfile('one', false), two = launchProfile('two', false);
     expect(one.carryMult).toBeGreaterThan(two.carryMult); expect(two.apexMult).toBeGreaterThan(one.apexMult);
