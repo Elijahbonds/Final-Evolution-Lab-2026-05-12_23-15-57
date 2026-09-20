@@ -1,4 +1,5 @@
 import { Barlow_Condensed, IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google'
+import { TabBar } from '@/components/shell/tab-bar'
 import './globals.css'
 import './theme.css'
 // M95 (Pass 2): mobile canvas fix — on portrait phones the shared 16:10 game
@@ -52,6 +53,10 @@ export default function RootLayout({
       <body className={`${barlow.variable} ${plexSans.variable} ${jetbrainsMono.variable} font-sans min-h-screen bg-[#050505]`}>
         <Providers>
           {children}
+          {/* THE THREE TABS (2026-09-20). Mounted once, here, rather than imported by each page — thirty-three
+              top-level routes had no shared navigation at all, which is why the coach product and the athlete's
+              training screen were reachable only by typing their URLs. It hides itself inside a running mode. */}
+          <TabBar />
           <Toaster theme="dark" position="top-center" />
           {/* IMPORTANT: Do not remove — handles chunk loading race conditions in the dev server */}
           <ChunkLoadErrorHandler />
