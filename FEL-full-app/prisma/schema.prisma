@@ -47,6 +47,9 @@ model User {
   creatorListings  MarketplaceListing[] @relation("CreatorListings")
   buyerPurchases   MarketplacePurchase[] @relation("BuyerPurchases")
   coachShares      ShareLink[]          @relation("CoachShares")
+  coachInvites     CoachInvite[]        @relation("CoachInvites")
+  clientsCoached   CoachClient[]        @relation("CoachOf")
+  coaches          CoachClient[]        @relation("ClientOf")
   ladderEntries    LadderEntry[] @relation("LadderEntries")
 
   // M3 relations (Track C — Studio Creator)
@@ -1814,4 +1817,48 @@ model ShareLink {
 
   @@index([coachId, createdAt])
   @@index([revokedAt])
+}
+
+
+/// A coach's invite link. Until this existed there was NO way to add a client: the roster
+/// was derived from existing programs, so a client did not exist until the coach had already
+/// built them one. An invite is a capability URL and follows ShareLink's rules — unguessable,
+/// revocable, expiring, and carrying nothing about anybody except the coach who made it.
+model CoachInvite {
+  id        String   @id @default(cuid())
+  /// base64url, 32 chars. Unguessable, never derived from the coach or the client.
+  token     String   @unique
+  coachId   String
+  coach     User     @relation("CoachInvites", fields: [coachId], references: [id], onDelete: Cascade)
+  /// once | many — a texted link dies when it is used, a flyer link keeps working.
+  use       String   @default("once")
+  /// Set when a one-shot has been spent or the coach revoked it. A closed invite stops resolving.
+  closedAt  DateTime?
+  expiresAt DateTime
+  /// How many clients joined through it — a flyer's own analytics.
+  joined    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([coachId, createdAt])
+}
+
+/// The coach-client relationship itself, which the tree never had: the roster was inferred from
+/// CoachingProgram rows. A client belongs to a coach from the moment they accept an invite,
+/// before any programming exists — which is the right way round, because you write the program
+/// for somebody who is already there.
+model CoachClient {
+  id        String   @id @default(cuid())
+  coachId   String
+  coach     User     @relation("CoachOf", fields: [coachId], references: [id], onDelete: Cascade)
+  clientId  String
+  client    User     @relation("ClientOf", fields: [clientId], references: [id], onDelete: Cascade)
+  /// How they got here, for the coach's own history: invite | manual.
+  via       String   @default("invite")
+  /// Set when the relationship ends; the row survives so neither side loses the history.
+  endedAt   DateTime?
+  createdAt DateTime @default(now())
+
+  @@unique([coachId, clientId])
+  @@index([clientId])
 }

@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Plus, Trash2, Video, MessageSquare, IdCard } from 'lucide-react';
+import { InvitePanel } from '@/components/coach/invite-panel';
 
 interface Ex { id: string; name: string; sets: number; reps: string; load: string; tempo: string; restSeconds: number; coachNote: string | null }
 interface Tree { id: string; name: string; blocks: { id: string; label: string; sessions: { id: string; label: string; exercises: Ex[] }[] }[] }
@@ -55,10 +56,13 @@ export function ClientsView() {
   const prog = programs.find((p) => p.tree.id === selected) ?? null;
   return (
     <div className="space-y-4">
+      {/* ADD AN ATHLETE comes first, because until 2026-09-19 there was no way to do it at all and a coach with an
+          empty roster has nothing else on this screen to do. */}
+      <InvitePanel />
       {/* roster — lane 5 S3: every client with their card, PRQ and deltas since the program began */}
       <div className="fel-card rounded-xl p-4 space-y-2">
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><IdCard className="h-3.5 w-3.5" /> Roster</div>
-        {roster.length === 0 && <div className="text-sm text-white/50">No clients yet.</div>}
+        {roster.length === 0 && <div className="text-sm text-white/50">No clients yet — send an invite above.</div>}
         {roster.map((r) => (
           <div key={r.clientId} className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] border border-white/6 px-3 py-2 text-xs">
             <div className="min-w-0">
