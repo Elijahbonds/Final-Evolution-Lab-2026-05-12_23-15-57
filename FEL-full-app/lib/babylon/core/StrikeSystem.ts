@@ -33,6 +33,11 @@ export interface CombatMove {
 
 export const MIN_STARTUP_SEC = 0.1;      // the readability floor
 
+/** How long a press waits for the game to be able to take it. The horde measured its way to 0.4 s (HordeDynamics
+ *  QUEUE_SEC) and this is the same number for the same reason: it has to outlive a whole swing, not a fraction of
+ *  one, or the queue only serves presses that were nearly late enough to work anyway. */
+export const QUEUE_MS = 400;
+
 /** Design-table lint: no unreadable strikes, no cancel-into-self loops
  *  that never end, cancel targets must exist. */
 export function validateMoveset(moves: Record<string, CombatMove>): string[] {
@@ -97,8 +102,19 @@ export class StrikeController {
 
   constructor(private moveset: Record<string, CombatMove>) {}
 
-  /** Request a strike. If mid-recovery inside a cancel window, chains.
-   *  Otherwise buffers briefly (140ms) so slightly-early presses land. */
+  /**
+   * Request a strike. If mid-recovery inside a cancel window, chains. Otherwise the press is QUEUED.
+   *
+   * THE PRESS USED TO DIE BEFORE THE SWING ENDED (measured 2026-09-19). The buffer expired 140 ms after the PRESS,
+   * and it was only ever consumed once the current strike reached `done`. A fists jab runs 0.42 s, so a press at the
+   * start of a swing was discarded 280 ms before anything could accept it, while a press in the last 140 ms landed.
+   * Driven through this controller with the real arsenal timings, 21 of 46 press offsets across a swing came out —
+   * and every one that did not was in the FIRST part of the swing. Mashing as you commit to a punch, the most natural
+   * input in a fight, was the one case guaranteed to be eaten. That is what "laggy" was.
+   *
+   * The queue now lives as long as the horde's (QUEUE_MS, the number that mode already measured its way to) and is
+   * taken at the CANCEL POINT as well as at the end of the swing — see `update`.
+   */
   request(moveId: string, nowMs: number): boolean {
     if (!this.moveset[moveId]) return false;
     if (!this.current || this.current.phase === 'done') {
@@ -110,13 +126,25 @@ export class StrikeController {
       return true;
     }
     this.buffered = moveId;
-    this.bufferUntil = nowMs + 140;
+    this.bufferUntil = nowMs + QUEUE_MS;
     return false;
   }
 
   update(dt: number, nowMs: number): { startedActive: boolean } {
+    // A PRESS THAT MISSED ITS WINDOW IS FORGOTTEN. It used to sit in the field indefinitely: the clean-up path
+    // nulled `current` and never touched `buffered`, so a press could outlive the swing it was meant for by minutes.
+    // Nothing fired it — every consumer re-checks the deadline — but a dead command left lying in a state machine is
+    // a bug waiting for its second reader.
+    if (this.buffered && nowMs > this.bufferUntil) this.buffered = null;
     if (!this.current) return { startedActive: false };
     const opened = this.current.update(dt);
+    // TAKE THE QUEUED PRESS AT THE CANCEL POINT, not only at the end of the swing. A press made before the window
+    // opens is the player asking to chain; holding it until the chain is legal is the whole point of a queue.
+    if (this.buffered && nowMs <= this.bufferUntil && this.current.canCancelInto(this.buffered)) {
+      const next = this.buffered; this.buffered = null;
+      this.current = new StrikeInstance(this.moveset[next]);
+      return { startedActive: opened };
+    }
     if (this.current.phase === 'done' && this.buffered && nowMs <= this.bufferUntil) {
       const next = this.buffered; this.buffered = null;
       this.current = new StrikeInstance(this.moveset[next]);
