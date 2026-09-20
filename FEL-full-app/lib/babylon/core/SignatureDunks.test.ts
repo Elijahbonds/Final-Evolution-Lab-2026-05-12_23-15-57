@@ -140,4 +140,22 @@ describe('credit means credit', () => {
     expect(signatureFor(['selflob'], ['tap'])?.name).toBe('THE TAP DUNK');
     expect(signatureFor(['kickup'], ['tap'])?.name).toBe('THE KICK-UP TAP');
   });
+
+  it('THE 360 EASTBAY is in the book, and it is not the same dunk as the scorpion that contains it', () => {
+    const two = signatureFor([], ['spin360', 'eastbay']);
+    expect(two?.name).toBe('360 EASTBAY');
+    const three = signatureFor([], ['spin360', 'eastbay', 'scorpion']);
+    expect(three?.name).toBe('360 EASTBAY SCORPION');
+    expect(three!.nod).toBeGreaterThan(two!.nod);          // the longer chain is still worth more
+    // a sequence, not a set: the eastbay before the turn is not this dunk
+    expect(signatureFor([], ['eastbay', 'spin360'])).toBeNull();
+  });
+
+  it('both pieces of the 360 eastbay fit one flight with air left to finish with', () => {
+    const spin = DUNK_TRICKS.find((t) => t.id === 'spin360')!;
+    const east = DUNK_TRICKS.find((t) => t.id === 'eastbay')!;
+    const left = (1 - spin.windowCost) * (1 - east.windowCost);
+    expect(left).toBeGreaterThan(0.35);                     // a good flight carries it
+    expect(left).toBeLessThan(0.45);                        // and a lazy one does not
+  });
 });

@@ -406,6 +406,12 @@ export const SIGNATURE_DUNKS: readonly SignatureDunk[] = [
   // THE WHIRLWIND is a 360 TAP (owner, 2026-09-16) — a full turn and then no grip at all, which is why it is a chain
   // and not a body: the turn is the 360's, the tap is the tap's, and doing both in one flight is the whole dunk.
   { id: 'whirlwind', air: ['spin360', 'tap'], name: 'THE WHIRLWIND', by: 'FLIGHT NIGHT', nod: 1.7 },
+  // THE 360 EASTBAY (owner, 2026-09-19: "360 eastbays"). The three-piece 360 EASTBAY SCORPION was in this table from
+  // the start, which means the game recognised the hard version of a dunk whose plain version it had never heard of:
+  // turn a full revolution and pass the ball under the leg, the Jordan-in-Barcelona of this vocabulary. Both pieces
+  // fire at the rise and are done by the hang, and they cost 0.34 + 0.40 of the air, so it fits a good flight and not
+  // a lazy one — which is the gate the owner asked for ("free to all"), enforced by the air budget rather than a lock.
+  { id: '360_eastbay', air: ['spin360', 'eastbay'], name: '360 EASTBAY', by: 'Team Flight Brothers', nod: 2.0 },
   { id: 'windmill360_scorpion', air: ['windmill360', 'scorpion'], name: '360 WINDMILL SCORPION', by: 'FLIGHT NIGHT', nod: 1.9 },
   { id: 'windmill360_btl', air: ['windmill360', 'betweenlegs'], name: '360 WINDMILL BETWEEN THE LEGS', by: 'FLIGHT NIGHT', nod: 1.9 },
   { id: 'lob_tap', runway: 'selflob', air: ['tap'], name: 'THE TAP DUNK', by: 'FLIGHT NIGHT', nod: 1.3 },

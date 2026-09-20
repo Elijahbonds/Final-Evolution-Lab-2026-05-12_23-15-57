@@ -492,6 +492,7 @@ export const DunkMode: ModeDefinition = (() => {
   let rimCamCut = false;                     // broadcast cut latch (per attempt)
   let verdictCamSet = false;                 // the portrait for the confer, placed once per attempt
   let rivalCamCut = false;
+  let runHeld = 0;                           // the RUN trigger's LIVE value: a hold that began before the runway opened still counts
   let runPressWas = false;                   // MECHANICS PASS: the RUN hold's press edge (a held trigger streams values)                   // the rival's own broadcast cut, once per his turn
   let hangSlowMoLatch = false;               // JuiceKit.slowMo once per attempt (hang only)
   let contactLatch = false;                  // contactPunch once per attempt (the make's flush frame)
@@ -1101,15 +1102,8 @@ export const DunkMode: ModeDefinition = (() => {
           refuse(ctx, phase === 'rivalTurn' ? "RIVAL'S TURN" : phase === 'judging' || phase === 'resolve' ? 'THE JUDGES ARE SCORING' : 'WAIT');
         }
         runPressWas = e.value > 0.5;
-        if (phase === 'approach' && e.value > 0.02) {
-          // Venice DualShock pad: HOLD = RUN. The hold drives the runway toward the rim (stick steers), the jump
-          // loads while you run, and the launch fires at the gather line — or on release, from wherever you are.
-          setPhase('charge');
-          obstacle?.start();   // a rolling prop comes when you commit to the run (owner, 2026-09-16)
-          holdRunSpeed = Math.max(2, runUpPeak);
-          playClip(SPORT_CLIP.moveLoop, { loop: true });
-          ctx.setHud({ hint: 'HOLD — running to the rim · GATHER (L2) to go up off two feet · steer with the stick · release early to jump from here' });
-        }
+        runHeld = e.value;
+        if (phase === 'approach' && e.value > 0.02) beginRun(ctx);
         if (phase === 'charge') {
           charge = Math.max(charge, e.value);
           ctx.setHud({ charge: Math.round(charge * 100) });
@@ -1126,6 +1120,12 @@ export const DunkMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
+      // A RUN HELD THROUGH THE WAIT STILL COUNTS (2026-09-19). The run started on a trigger EVENT inside the approach,
+      // so a finger already down when the runway opened — held through the judges' card and the rival's turn, which is
+      // exactly what a player does between attempts — produced no event and no run: the attempt launched off a walk
+      // with no gather and blew. Measured in the lab: attempt 3 of every set, every set, `run → dunk_launch →
+      // dunk_finish_blown` with the gather clip missing. The runway now looks at the trigger it can already see.
+      if (phase === 'approach' && runHeld > 0.02) beginRun(ctx);
       meter3d?.update(dt);
       ctx0 = ctx;
       fovTick(dt); settleTick(ctx);
@@ -2266,6 +2266,18 @@ export const DunkMode: ModeDefinition = (() => {
     // the feet flatten on the way DOWN (a miss's fall, a make's drop after the replay), not on the feet-down frame
     llPose = easeLegPose(llPose, legPose(dropToFloor && !rep && window !== 'land' && window !== 'celebrate' ? 'brace' : window, trickId), lowPassK(dt, POSTURE_TAU));
   }
+  /** Commit to the runway: the hold drives it toward the rim (the stick steers), the jump loads while you run, and the
+   *  launch fires at the gather line — or on release, from wherever you are. Called by the press AND by a hold that was
+   *  already down when the runway opened. */
+  function beginRun(ctx: ModeContext): void {
+    if (phase !== 'approach') return;
+    setPhase('charge');
+    obstacle?.start();   // a rolling prop comes when you commit to the run (owner, 2026-09-16)
+    holdRunSpeed = Math.max(2, runUpPeak);
+    playClip(SPORT_CLIP.moveLoop, { loop: true });
+    ctx.setHud({ hint: 'HOLD — running to the rim · GATHER (L2) to go up off two feet · steer with the stick · release early to jump from here' });
+  }
+
   function applyPostureLayer(): void {
     if (!ppFrame || !hipsBf || !hipsNode) return;
     const dt = clamp((ikScene?.getEngine().getDeltaTime() ?? 16) / 1000, 0, 0.05);
