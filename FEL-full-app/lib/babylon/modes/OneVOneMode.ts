@@ -85,6 +85,7 @@
 // timer; make-it-take-it both ways; the board is a race on both ends; the loose ball always steps.
 
 import { nerve, standingOf } from '../core/Nerve';
+import { InputBuffer } from '../core/gameFeel';
 import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
 import { MeshBuilder, Quaternion, TransformNode as BABYLON_TransformNode, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
@@ -273,6 +274,17 @@ type Possession = 'mine' | 'defense';
 type DefensePhase = 'check' | 'drive' | 'shot' | 'over';
 
 export const OneVOneMode: ModeDefinition = (() => {
+  // THE SQUEEZE THAT ARRIVED MID-ANIMATION (2026-09-20). The shot gate reads `actionHeld`, which exists only while
+  // the button is down: press SQUARE during a spin, a dunk or a running jumper and the gate refuses on that frame,
+  // and by the time the body is free the press has been released and forgotten. Holding works; TAPPING does not, and
+  // tapping is what people do. Same fault the combat pass measured in StrikeController — a press with nowhere to
+  // wait — and the fix is one this codebase already owns: gameFeel's InputBuffer.
+  //
+  // 400 ms rather than the class default of 140, for the reason the strike queue is 400: the wait has to outlive the
+  // thing it waits for. A spin or a dunk approach runs several hundred milliseconds, and a window that expires first
+  // only ever serves presses that were nearly free anyway.
+  const SHOT_BUFFER_MS = 400;
+  const shotBuffer = new InputBuffer(SHOT_BUFFER_MS);
   let me: SpawnedCharacter, foe: SpawnedCharacter, ball: AbstractMesh, ballSim: BallSim;
   let onevoneVenue: VenueHandle | null = null;  // M74
   let meSlot: PlayerSlot, foeSlot: PlayerSlot, localSource: LocalInputSource;
@@ -590,6 +602,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
+    shotBuffer.clear();   // a squeeze from the last possession is not a shot on this one
     gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; meDribble.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
     clearDefense();
     place('me', me.root, MY_SPAWN, Math.PI);
@@ -1324,7 +1337,9 @@ export const OneVOneMode: ModeDefinition = (() => {
           shimmyLeft = Math.max(0, shimmyLeft - dt);
           if (Math.hypot(postStick.x, postStick.y) < 0.35 && shimmyLeft <= 0) stickShot = null;
         }
-        if (!shooting && !dunking && !spin && carrying && (meSlot.intent.actionHeld > 0.02 || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0))) {   // POST HOOK (2K20): the stick starts it too
+        // a squeeze made while the body is committed WAITS instead of vanishing
+        if (carrying && meSlot.intent.actionHeld > 0.02 && (shooting || dunking || spin)) shotBuffer.press('shot');
+        if (!shooting && !dunking && !spin && carrying && (meSlot.intent.actionHeld > 0.02 || shotBuffer.consume('shot') || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0))) {   // POST HOOK (2K20): the stick starts it too
           const defenderPos = foeStunSec > 0 ? null : foe.root.position;
           // A+ P0: the gate measures a 3-D distance and the rim sits 3.05 m up — against RIM itself a floor-bound body can
           // NEVER be inside DUNK_RANGE (2.8 m), so the drive dunk had never fired in play (measured: every squeeze at speed
