@@ -78,8 +78,18 @@ export type ConnState = 'unconnected' | 'awaiting-credentials';
 const KEY_CONN = 'fel_streaming_conn_v1';
 
 function readConn(): Record<Provider, ConnState> {
-  try { return { spotify: 'unconnected', apple: 'unconnected', ...JSON.parse(localStorage.getItem(KEY_CONN) ?? '{}') }; }
-  catch { return { spotify: 'unconnected', apple: 'unconnected' }; }
+  const base: Record<Provider, ConnState> = { spotify: 'unconnected', apple: 'unconnected' };
+  try {
+    const raw = JSON.parse(localStorage.getItem(KEY_CONN) ?? '{}') as Partial<Record<Provider, unknown>>;
+    // Only the two states this type has. A hand-edited store must not invent a third one that the UI then
+    // switches on and falls through.
+    const clean = (v: unknown): ConnState => (v === 'awaiting-credentials' ? 'awaiting-credentials' : 'unconnected');
+    return { spotify: clean(raw.spotify), apple: clean(raw.apple) };
+  } catch { return base; }
+}
+
+function writeConn(conn: Record<Provider, ConnState>): void {
+  try { localStorage.setItem(KEY_CONN, JSON.stringify(conn)); } catch { /* see writeShelf */ }
 }
 
 export const StreamingConnect = {
@@ -95,7 +105,7 @@ export const StreamingConnect = {
   requestConnect(p: Provider): { ok: false; needs: string } {
     const conn = readConn();
     conn[p] = 'awaiting-credentials';
-    localStorage.setItem(KEY_CONN, JSON.stringify(conn));
+    writeConn(conn);
     console.info(`[FEL-STREAM] connect(${p}) — CREDENTIAL SEAM not provisioned. Needs: ${PROVIDER_META[p].connectNeeds}`);
     return { ok: false, needs: PROVIDER_META[p].connectNeeds };
   },
@@ -103,24 +113,38 @@ export const StreamingConnect = {
   reset(p: Provider): void {
     const conn = readConn();
     conn[p] = 'unconnected';
-    localStorage.setItem(KEY_CONN, JSON.stringify(conn));
+    writeConn(conn);
   },
 };
 
 // ── Saved streaming picks (the listening shelf) ───────────────────────────
 const KEY_SHELF = 'fel_streaming_shelf_v1';
 
+function readShelf(): StreamingLink[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(KEY_SHELF) ?? '[]');
+    return Array.isArray(parsed) ? (parsed as StreamingLink[]) : [];
+  } catch { return []; }
+}
+
+/** Writing was the asymmetry: reading already survived a store that refuses, and writing took the room down. */
+function writeShelf(links: StreamingLink[]): void {
+  try { localStorage.setItem(KEY_SHELF, JSON.stringify(links)); }
+  catch { /* private mode, a full quota, or no storage at all — the shelf is a convenience, not the product */ }
+}
+
 export const StreamingShelf = {
-  list(): StreamingLink[] {
-    try { return JSON.parse(localStorage.getItem(KEY_SHELF) ?? '[]') as StreamingLink[]; }
-    catch { return []; }
-  },
-  add(link: StreamingLink): void {
-    const all = this.list().filter((l) => l.url !== link.url);
-    localStorage.setItem(KEY_SHELF, JSON.stringify([link, ...all].slice(0, 30)));
+  // ARROW FUNCTIONS, NOT METHODS, and a module-scope reader rather than `this`. `add` used to call this.list(),
+  // so the obvious way to use it — handing it straight to a click handler — threw on `this` being undefined.
+  list: (): StreamingLink[] => readShelf(),
+
+  add: (link: StreamingLink): void => {
+    const all = readShelf().filter((l) => l.url !== link.url);
+    writeShelf([link, ...all].slice(0, 30));
     // SYNC SEAM: POST /api/streaming/shelf — per-user, cross-device.
   },
-  remove(url: string): void {
-    localStorage.setItem(KEY_SHELF, JSON.stringify(this.list().filter((l) => l.url !== url)));
+
+  remove: (url: string): void => {
+    writeShelf(readShelf().filter((l) => l.url !== url));
   },
 };

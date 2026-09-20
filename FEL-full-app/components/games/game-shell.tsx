@@ -78,6 +78,8 @@ export function GameShell(props: {
   /** True when Game already mounts its own <TouchOverlay> (Babylon modes) —
    *  suppresses the legacy VirtualController so only one control deck shows. */
   ownControls?: boolean;
+  /** Extra props for the mode itself — a seam a mode needs wired that the shell has no opinion about. */
+  gameProps?: Record<string, unknown>;
 }) {
   return (
     <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#050505]"><Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" /></div>}>
@@ -92,12 +94,14 @@ function GameShellInner({
   venue,
   Game,
   ownControls,
+  gameProps,
 }: {
   mode: string;
   title: string;
   venue: string;
   Game: React.ComponentType<GameProps>;
   ownControls?: boolean;
+  gameProps?: Record<string, unknown>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -530,7 +534,7 @@ function GameShellInner({
           </div>
         )}
         {profile ? (
-          <Game key={gameKey} grade={profile.grade} prq={profile.prq} onEnd={handleEnd} />
+          <Game key={gameKey} grade={profile.grade} prq={profile.prq} onEnd={handleEnd} {...(gameProps ?? {})} />
         ) : (
           <div className="flex h-[60vh] items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />

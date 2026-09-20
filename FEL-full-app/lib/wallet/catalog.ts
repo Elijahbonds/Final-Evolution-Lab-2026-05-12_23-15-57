@@ -9,6 +9,7 @@
 import type { WalletCurrency } from './reward-rules';
 import { WEARABLES } from '../closet/wearable-catalog';
 import { BOOST_CARDS, boostSkuId } from '../cards/boosts';
+import { MUSIC_PURCHASES } from '../babylon/music/purchases';
 
 export interface CatalogSku {
   skuId: string;
@@ -37,6 +38,16 @@ export const CATALOG: Record<string, CatalogSku> = {
   session_group_workout: { skuId: 'session_group_workout', currency: 'shards', unitPrice: 150, consumable: true },
   seminar_seat:          { skuId: 'seminar_seat',          currency: 'shards', unitPrice: 250, consumable: true },
   private_1on1:          { skuId: 'private_1on1',          currency: 'shards', unitPrice: 900, consumable: true },
+
+  // ── The Music Room (SHARD sinks) — generated from lib/babylon/music/purchases ──
+  // Kits and the Cell assist. Registered here so the room charges through the same server-priced, atomic,
+  // idempotent spend as everything else, instead of the `spendShards` seam that was never wired and quietly
+  // handed both out for free.
+  ...Object.fromEntries(
+    MUSIC_PURCHASES.map((p) => [p.id, {
+      skuId: p.id, currency: 'shards' as WalletCurrency, unitPrice: p.shards, consumable: p.id.endsWith('cell_assist'),
+    }]),
+  ),
 
   // ── Creator boost cards (SHARD sinks) — generated from lib/cards/boosts ──
   // Registered here rather than given their own purchase path, so a boost card buys through the same
