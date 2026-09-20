@@ -82,9 +82,10 @@ export const MODES: Record<string, ModeDefinition> = {
   // that host would have thrown the moment anything mounted it. Nothing does today (the player route still
   // serves the 2D deck), so the mode was simply unreachable work rather than a live crash.
   //
-  // In MODES, deliberately NOT in ENABLED_BABYLON_MODES: registering makes it reachable from /dev/mode and
-  // makes its own host valid, while whether players get the Babylon version instead of the deck stays an
-  // owner call rather than something a registry edit decides by accident.
+  // This once read "deliberately NOT in ENABLED_BABYLON_MODES" — registering made it reachable from /dev/mode
+  // while whether players got the Babylon version stayed an owner call. That call was made: brainbrawl is in the
+  // enabled set now (see the note beside it there), and the comment outlived the decision by long enough to say
+  // the opposite of the code. Every registered mode is enabled today.
   brainbrawl: BrainBrawlMode,
 };
 
