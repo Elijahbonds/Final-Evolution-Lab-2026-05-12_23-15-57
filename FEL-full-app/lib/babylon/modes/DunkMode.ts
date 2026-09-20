@@ -1044,6 +1044,13 @@ export const DunkMode: ModeDefinition = (() => {
         // not the slam button, thrown after the jam's beat opened: say so rather than swallowing it
         refuse(ctx, 'TOO LATE FOR A TRICK — THE JAM IS ON YOU');
       }
+      // …and the same courtesy for the two shoulder moves. The parkour ride and the backboard both gate on
+      // `!qteWindowOpen`, so a press during the jam did nothing and said nothing — the one thing this pass has been
+      // removing everywhere else. They are genuinely too late at that point; being too late is not the same as
+      // being ignored.
+      if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'R1' || e.btn === 'L1') && qteWindowOpen && !qteHit) {
+        refuse(ctx, e.btn === 'L1' ? 'NO GLASS FROM HERE — FINISH IT' : 'NO RIDE LEFT — FINISH IT');
+      }
       if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') && !qteWindowOpen) airButton(ctx, e);   // X reads in the air
       // THE SKY TIER (owner, 2026-09-18): R1 in the air is the tap off whatever hangs over the lane — a second lift and the drop into
       // the slam; honest only inside the window with the hand up to its underside (a full run, a rebound or a backboard kick gets there)

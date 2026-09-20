@@ -35,6 +35,7 @@
 import { Color3, Color4, MeshBuilder, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, Scene, TransformNode } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { EarlyPress, judgePress } from '../core/timingPress';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { BallSim } from '../core/BallPhysics';
@@ -116,6 +117,11 @@ export const DunkDuelMode: ModeDefinition = (() => {
   let totals = [0, 0];
   let style: Style = 'power';
   let charge = 0, clipTime = 0, qteHit = false, qteWindowOpen = false, qteAccuracy = 0;
+  // A SLAM PRESSED A BEAT EARLY USED TO VANISH. The gate was `if (A && pressed && qteWindowOpen)`, so a player who
+  // read the rise correctly and pressed slightly before the window got nothing at all — no slam, no miss, no word.
+  // The press waits now and is scored from WHEN IT WAS PRESSED (core/timingPress), so early lands and lands badly,
+  // which is what happens to somebody who jumps a beat. Late is still never buffered: after the moment, no moment.
+  const earlySlam = new EarlyPress();
   let sinceRelease = 0, releasePos = new Vector3();
   let finishing = false, rimCamCut = false, ended = false;
   let hangSlowMoLatch = false;
@@ -236,7 +242,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   function launchDunk(ctx: ModeContext): void {
     if (phase === 'cinematic') return;
     setPhase('cinematic');
-    clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
+    clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; earlySlam.clear(); ebState.inLeftHand = false; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
     airHeld = false; dropToFloor = false;   // A+ P8
     launchZ = active().root.position.z; obstacleOver = false; obstacleCleared = false; activeHandOff = null; ikSideK = 0;
@@ -582,9 +588,10 @@ export const DunkDuelMode: ModeDefinition = (() => {
           if (e.value === 0) launchDunk(ctx);
         }
       }
-      if (e.t === 'button' && e.btn === 'A' && e.pressed && qteWindowOpen) {
-        qteHit = true;
-        qteAccuracy = Math.max(0, 1 - Math.abs(clipTime - EASTBAY_TIMING.extend) / (CFG.qteWindowSec / 2));
+      if (e.t === 'button' && e.btn === 'A' && e.pressed && phase === 'cinematic' && !qteHit) {
+        const v = judgePress(clipTime, { centre: EASTBAY_TIMING.extend, width: CFG.qteWindowSec });
+        if (v.hit) { qteHit = true; qteAccuracy = v.accuracy; }
+        else if (!qteWindowOpen && clipTime < EASTBAY_TIMING.extend) earlySlam.press(clipTime);   // too early to judge yet — hold it
       }
     },
 
@@ -683,7 +690,15 @@ export const DunkDuelMode: ModeDefinition = (() => {
         const wasOpen = qteWindowOpen;
         qteWindowOpen = clipTime >= EASTBAY_TIMING.extend - CFG.qteWindowSec / 2
           && clipTime <= EASTBAY_TIMING.extend + CFG.qteWindowSec / 2;
-        if (qteWindowOpen && !wasOpen) ctx.setHud({ hint: 'SLAM!', slamPulse: true });
+        if (qteWindowOpen && !wasOpen) {
+          ctx.setHud({ hint: 'SLAM!', slamPulse: true });
+          // the press that beat the window: honoured here, scored from when it actually landed
+          const early = earlySlam.take();
+          if (early !== null && !qteHit) {
+            const v = judgePress(early, { centre: EASTBAY_TIMING.extend, width: CFG.qteWindowSec });
+            if (v.hit) { qteHit = true; qteAccuracy = v.accuracy; }
+          }
+        }
         if (!qteWindowOpen && wasOpen) ctx.setHud({ slamPulse: false });
         if (clipTime >= EASTBAY_TIMING.extend + CFG.qteWindowSec / 2) resolveDunk(ctx);
       }
