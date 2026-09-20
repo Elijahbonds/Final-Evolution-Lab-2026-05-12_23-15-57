@@ -150,3 +150,28 @@ canvas {
 .hljs-attribute, .hljs-variable, .hljs-property { color: #FF7AA8; }
 .hljs-type, .hljs-built_in, .hljs-builtin-name { color: #38bdf8; }
 .hljs-deletion { color: #FF3366; }
+
+/* The Mirror's breath pacer. Inhale 4s, hold 2s, exhale 6s — the cadence the Playbook specifies, expressed as the
+   ring the athlete watches rather than as a countdown they have to read. Twelve seconds a cycle. */
+.fel-breath {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 2px solid #00E5FF;
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.4), transparent 70%);
+  box-shadow: 0 0 60px -10px #00E5FF;
+  animation: fel-breathe 12s ease-in-out infinite;
+}
+
+@keyframes fel-breathe {
+  0%   { transform: scale(0.6); opacity: 0.5; }
+  33%  { transform: scale(1);   opacity: 1; }
+  50%  { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(0.6); opacity: 0.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The pacer IS the instruction, so it keeps breathing — but gently, without the scale that causes trouble. */
+  .fel-breath { animation: fel-breathe-calm 12s ease-in-out infinite; }
+  @keyframes fel-breathe-calm { 0%, 100% { opacity: 0.4; } 40%, 55% { opacity: 1; } }
+}

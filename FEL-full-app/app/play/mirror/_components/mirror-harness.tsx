@@ -12,6 +12,8 @@
 // are the ones the engine actually computes for this session.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { ArrowLeft, Loader2, ScanLine, Volume2, VolumeX } from 'lucide-react';
 // CODE-SPLIT (2026-09-12). `NeuroMirror` reaches @babylonjs through render/overlay-compositor and
 // rig/zone-binding, so importing it here as a VALUE pulled the whole engine into this route's
 // first-load bundle: /play/mirror shipped 2.03 MB against ~160 kB for every other /play route,
@@ -321,300 +323,437 @@ export function MirrorHarness() {
 
   const secs = (ms: number) => (ms / 1000).toFixed(1);
 
+  const PATTERN_TITLE: Record<Pattern, string> = {
+    pressRow: 'Split-Stance Press / Row',
+    squat: 'Corrective Squat',
+    jump: 'Vertical Jump',
+  };
+  const live = status === 'live';
+  // ms/frame is an engineering number. It belongs to whoever is tuning the pipeline, not to an athlete standing
+  // in their front room trying to squat, so it shows in development and stays out of the way in a shipped build.
+  const showFrameBudget = process.env.NODE_ENV !== 'production';
+
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
-      <div className="mx-auto max-w-5xl px-4 py-6">
-        <header className="mb-4">
-          <h1 className="text-2xl font-bold text-[#00E5FF]">Neuro-Mechanic Mirror</h1>
-          <p className="text-sm text-white/70">
-            On-device movement coaching — your skeleton, your reps, your jump.
-          </p>
-          {/* pattern picker — locked while a session runs */}
-          <div className="mt-3 flex gap-2">
-            {([
-              ['pressRow', 'Split-Stance Press / Row'],
-              ['squat', 'Corrective Squat — guided'],
-              ['jump', 'Vertical Jump'],
-            ] as [Pattern, string][]).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setPattern(key)}
-                disabled={status === 'live'}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
-                  pattern === key
-                    ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]'
-                    : 'border-white/10 text-white/50 hover:border-white/30'
-                } ${status === 'live' ? 'cursor-not-allowed opacity-40' : ''}`}
-              >
-                {label}
-              </button>
-            ))}
+    <div className="relative min-h-screen bg-[#050505] text-white">
+      {/* One wash of colour behind the stage, so the page has a light source instead of being a flat black sheet. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[420px]"
+        style={{ background: 'radial-gradient(120% 90% at 50% 0%, rgba(0,229,255,0.10) 0%, transparent 70%)' }}
+      />
+
+      <div className="relative mx-auto max-w-[1180px] px-4 pb-16 pt-4">
+        {/* THE WAY OUT. This route sits under /play/, where the app shell hides itself so a running mode owns the
+            screen — correct for a game, wrong for a tool, and it left the Mirror with no way back at all. A camera
+            surface should not carry a navigation bar anyway; it should carry one explicit exit. */}
+        <header className="mb-5 flex items-center gap-3">
+          <Link
+            href="/train"
+            aria-label="Back to Train"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03]
+                       text-white/55 transition-colors hover:border-white/25 hover:text-white"
+          >
+            <ArrowLeft className="h-[18px] w-[18px]" />
+          </Link>
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#00E5FF]">The Mirror</p>
+            <h1 className="fel-heading truncate text-[22px] font-black leading-none tracking-tight text-white md:text-[26px]">
+              {PATTERN_TITLE[pattern]}
+            </h1>
           </div>
+          <span
+            className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 font-mono
+                       text-[10px] font-bold uppercase tracking-[0.14em]"
+            style={{
+              borderColor: live ? 'rgba(0,255,157,0.35)' : 'rgba(255,255,255,0.12)',
+              color: live ? '#00FF9D' : 'rgba(255,255,255,0.4)',
+              background: live ? 'rgba(0,255,157,0.07)' : 'transparent',
+            }}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: live ? '#00FF9D' : 'rgba(255,255,255,0.3)' }}
+            />
+            {live ? 'Live' : status === 'requesting' ? 'Camera' : status === 'loading-model' ? 'Loading' : 'Ready'}
+          </span>
         </header>
 
-        {/* Accuracy disclaimer — estimated language, no clinical claims (brief §2.4) */}
-        <div className="mb-4 rounded-xl border border-[#00E5FF]/25 bg-[#00E5FF]/5 px-4 py-3 text-xs leading-relaxed text-white/70">
-          This overlay shows <strong className="text-white">estimated / inferred engagement</strong> from your
-          movement, derived from joint kinematics only. It does <strong className="text-white">not</strong> measure
-          actual muscle activation (no EMG). Everything runs in your browser — your camera feed is never uploaded.
+        {/* One segmented control instead of three loose pills, so the three patterns read as one choice. */}
+        <div
+          role="tablist"
+          aria-label="Movement pattern"
+          className="mb-4 inline-flex rounded-2xl border border-white/10 bg-white/[0.03] p-1"
+        >
+          {(Object.keys(PATTERN_TITLE) as Pattern[]).map((key) => {
+            const on = pattern === key;
+            return (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={on}
+                onClick={() => setPattern(key)}
+                disabled={live}
+                className={`rounded-xl px-3.5 py-2 text-[12.5px] font-bold transition-all duration-200
+                            disabled:cursor-not-allowed disabled:opacity-40
+                            ${on ? 'bg-white/[0.07] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]'
+                                 : 'text-white/45 hover:text-white/75'}`}
+              >
+                {key === 'pressRow' ? 'Press / Row' : key === 'squat' ? 'Squat' : 'Jump'}
+              </button>
+            );
+          })}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-[1fr_260px]">
-          {/* Video + transparent overlay */}
-          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
-            <video ref={videoRef} playsInline muted className="absolute inset-0 h-full w-full object-cover" />
-            <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
-            {/* the proof-of-tracking skeleton — drawn from the pose stream */}
-            <canvas ref={skeletonRef} className="pointer-events-none absolute inset-0 h-full w-full" />
-            {status !== 'live' && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-center text-sm text-white/60">
-                {status === 'requesting' ? 'Requesting camera…'
-                  : status === 'loading-model' ? 'Loading pose model…'
-                  : status === 'error' ? '—'
-                  : 'Start a session to begin coaching.'}
+        {/* THE STAGE. The camera is the product here, so it gets the whole width and everything else floats over
+            it. Before, it was a 4:3 box in a two-column grid beside a 260px column of bullet lists — the shape of
+            a settings page, not of a thing you stand in front of. */}
+        <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-white/10 bg-black
+                        shadow-[0_40px_120px_-60px_rgba(0,229,255,0.5)] sm:aspect-[16/10]">
+          <video ref={videoRef} playsInline muted className="absolute inset-0 h-full w-full object-cover" />
+          <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+          {/* the proof-of-tracking skeleton — drawn from the pose stream */}
+          <canvas ref={skeletonRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+
+          {/* IDLE: the invitation, and the disclaimer where it is actually read — before you start, not shouting
+              above the fold forever. The wording is unchanged (brief §2.4): estimated / inferred engagement, no
+              clinical claim, nothing uploaded. */}
+          {!live && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-black/70 px-6 text-center backdrop-blur-[2px]">
+              {status === 'requesting' || status === 'loading-model' ? (
+                <>
+                  <Loader2 className="h-7 w-7 animate-spin text-[#00E5FF]" />
+                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-white/55">
+                    {status === 'requesting' ? 'Asking for the camera' : 'Loading the pose model'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <ScanLine className="h-8 w-8 text-[#00E5FF]" strokeWidth={1.6} />
+                  <div>
+                    <p className="fel-heading text-[20px] font-black leading-tight text-white">Stand where it can see you</p>
+                    <p className="mx-auto mt-2 max-w-sm text-[13px] leading-relaxed text-white/50">
+                      Prop the phone up, step back until your whole body is in frame, and start when you are ready.
+                    </p>
+                  </div>
+                  <p className="mx-auto max-w-md text-[11.5px] leading-relaxed text-white/35">
+                    This shows <span className="text-white/60">estimated engagement</span> inferred from joint
+                    movement. It does not measure muscle activation, and it is not a medical assessment. Everything
+                    runs in your browser — the camera feed is never uploaded.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* LIVE HUD. The readout used to be one comma-separated line in a black box: "Phase: hold · REPS 0 ·
+              12.4 ms/frame". That is a debug print. What somebody mid-rep can actually use is the count, big, and
+              the phase word — so those are the two things, and they are legible from across a room. */}
+          {live && (
+            <>
+              <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2">
+                <span className="rounded-lg bg-black/55 px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase
+                                 tracking-[0.16em] text-white/75 backdrop-blur-sm">
+                  {pattern === 'pressRow' ? phase
+                    : pattern === 'jump' ? (jumpState === 'ready' ? 'Jump when ready' : jumpState === 'airborne' ? 'Airborne' : jumpState === 'calibrating' ? 'Stand still' : jumpState)
+                    : squatStage}
+                </span>
+                {showFrameBudget && (
+                  <span
+                    className="rounded-lg bg-black/55 px-2 py-1.5 font-mono text-[10px] backdrop-blur-sm"
+                    style={{ color: frameMs > 50 ? '#FFC24B' : 'rgba(255,255,255,0.4)' }}
+                  >
+                    {frameMs.toFixed(1)}ms
+                  </span>
+                )}
               </div>
-            )}
-            {status === 'live' && (
-              <div className="absolute left-2 top-2 rounded-lg bg-black/60 px-2 py-1 text-[11px] text-white/80">
-                {pattern === 'pressRow' ? (
-                  <>
-                    Phase: <span className="text-[#00E5FF]">{phase}</span>
-                    {' · '}REPS <span className="font-bold text-[#FFD700]">{reps?.reps ?? 0}</span>
-                    {reps?.last && (
-                      <span className="text-white/50"> · {reps.last.pullSec}s↓ {reps.last.pressSec}s↑</span>
-                    )}
-                  </>
+
+              <div className="pointer-events-none absolute right-4 top-4 text-right">
+                {pattern === 'jump' ? (
+                  jumps.length > 0 && (
+                    <>
+                      <p className="fel-heading text-[40px] font-black leading-none text-[#FFD700]">
+                        {Math.max(...jumps.map((j) => j.verticalCm))}
+                        <span className="ml-1 text-[16px]">cm</span>
+                      </p>
+                      <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">Best jump</p>
+                    </>
+                  )
                 ) : (
                   <>
-                    Jump: <span className="text-[#00E5FF]">{jumpState === 'ready' ? 'TRACKING — jump when ready' : jumpState === 'airborne' ? 'AIRBORNE' : jumpState === 'calibrating' ? 'stand still…' : jumpState}</span>
-                    {jumps.length > 0 && (
-                      <span> · BEST <span className="font-bold text-[#FFD700]">{Math.max(...jumps.map((j) => j.verticalCm))}cm</span></span>
-                    )}
+                    <p className="fel-heading text-[40px] font-black leading-none text-white">
+                      {pattern === 'squat' ? squatReps : reps?.reps ?? 0}
+                    </p>
+                    <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">Reps</p>
                   </>
                 )}
-                {' · '}{frameMs.toFixed(1)} ms/frame
-                {frameMs > 50 && <span className="text-[#FFC24B]"> (over 50ms budget)</span>}
               </div>
+
+              {/* the breath pacer, centred on the stage where the eye already is */}
+              {pattern === 'squat' && squatStage === 'breathe' && (
+                <div className="pointer-events-none absolute inset-0 grid place-items-center">
+                  <div className="fel-breath" />
+                </div>
+              )}
+
+              {/* THE COACH'S VOICE, one cue at a time, over the picture rather than in a panel below it — you are
+                  looking at yourself when the correction lands, not at a sidebar. */}
+              {cue && pattern === 'squat' && squatStage === 'work' && (
+                <div className="pointer-events-none absolute inset-x-4 bottom-24 flex justify-center">
+                  <p
+                    className="max-w-lg rounded-2xl border px-5 py-3 text-center text-[15px] font-bold backdrop-blur-md"
+                    style={{
+                      borderColor: cue.level === 'regress' ? '#FF336688' : cue.level === 'escalate' ? '#FFD70088' : cue.level === 'confirm' ? '#00FF9D88' : '#00E5FF55',
+                      color: cue.level === 'regress' ? '#FF3366' : cue.level === 'escalate' ? '#FFD700' : cue.level === 'confirm' ? '#00FF9D' : '#00E5FF',
+                      background: 'rgba(0,0,0,0.55)',
+                    }}
+                  >
+                    {cue.level === 'regress' ? 'Regress: ' : cue.level === 'escalate' ? 'Stronger: ' : ''}{cue.text}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* The action is docked to the stage, the way a camera's shutter is part of the camera. */}
+          <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-3 bg-gradient-to-t
+                          from-black/80 to-transparent px-4 pb-5 pt-12">
+            {!live ? (
+              <button
+                onClick={start}
+                disabled={status === 'requesting' || status === 'loading-model'}
+                className="rounded-2xl bg-[#00E5FF] px-7 py-3 text-[14px] font-black text-black shadow-[0_10px_40px_-12px_#00E5FF]
+                           transition-transform hover:scale-[1.02] active:scale-[0.99] disabled:opacity-50"
+              >
+                Start session
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={endSession}
+                  className="rounded-2xl border border-white/20 bg-black/50 px-6 py-3 text-[14px] font-bold text-white
+                             backdrop-blur-md transition-colors hover:border-[#FF3366]/60 hover:text-[#FF3366]"
+                >
+                  End session
+                </button>
+                {pattern === 'squat' && (
+                  <button
+                    onClick={() => setVoiceOn((v) => !v)}
+                    aria-pressed={voiceOn}
+                    aria-label={voiceOn ? 'Turn coaching voice off' : 'Turn coaching voice on'}
+                    className="grid h-12 w-12 place-items-center rounded-2xl border border-white/20 bg-black/50 backdrop-blur-md transition-colors"
+                    style={{ color: voiceOn ? '#00E5FF' : 'rgba(255,255,255,0.35)' }}
+                  >
+                    {voiceOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+                  </button>
+                )}
+              </>
             )}
           </div>
+        </div>
 
-          {/* Zone legend + live states (press/row) OR the jump book OR the
-              squat's four-check audit */}
-          <aside className="space-y-3">
-            {pattern === 'squat' ? (
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                <h2 className="mb-2 text-sm font-semibold text-white">The four checks (estimated)</h2>
-                <ul className="space-y-2">
-                  {([
-                    ['kneeValgus', 'Knees track over toes'],
-                    ['heelRise', 'Heels stay down'],
-                    ['armFall', 'Chest stays tall'],
-                    ['lateralShift', 'Weight stays centered'],
-                  ] as [SquatFault, string][]).map(([id, label]) => {
-                    const faulting = squatFaults.includes(id);
-                    return (
-                      <li key={id} className="flex items-center justify-between gap-2 text-xs">
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="inline-block h-3 w-3 rounded-full"
-                            style={{ backgroundColor: faulting ? '#FF3366' : '#00FF9D' }}
-                          />
-                          <span className="text-white/80">{label}</span>
-                        </span>
-                        <span className="text-white/50">{faulting ? 'estimated fault' : 'estimated stable'}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ) : pattern === 'jump' ? (
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                <h2 className="mb-2 text-sm font-semibold text-white">Jumps (measured from flight time)</h2>
-                {jumps.length === 0 ? (
-                  <p className="text-xs text-white/50">Stand tall, let the floor calibrate, then jump. Landing settles the rep.</p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {jumps.map((j, i) => (
-                      <li key={i} className="flex items-center justify-between text-xs text-white/80">
-                        <span>Jump {i + 1}</span>
-                        <span>
-                          <b className="text-[#FFD700]">{j.verticalCm}cm</b>
-                          <span className="text-white/40"> · {j.flightTimeMs}ms · {j.takeoff}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ) : (
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-              <h2 className="mb-2 text-sm font-semibold text-white">Estimated engagement zones</h2>
-              <ul className="space-y-2">
-                {PATTERN_ZONES.map((id) => {
-                  const st = zoneStates[id];
+        {/* The stage direction for the guided squat, under the picture where a caption belongs. */}
+        {pattern === 'squat' && live && (
+          <p className="mt-4 text-[13px] leading-relaxed text-white/55">
+            {squatStage === 'breathe' && (
+              <><span className="font-bold text-white">Breathe first.</span> In through the nose 4s · hold 2s · out slow 6s, {BREATH_CYCLES} cycles. The breath is the bedrock — everything else builds on it.</>
+            )}
+            {squatStage === 'check' && (
+              <><span className="font-bold text-white">The movement check.</span> {SQUAT_CHECK_REPS} slow squats — knees, heels, chest and shift. Squat {Math.min(squatReps + 1, SQUAT_CHECK_REPS)} of {SQUAT_CHECK_REPS}.</>
+            )}
+            {squatStage === 'work' && (
+              <><span className="font-bold text-white">The work set.</span> {SQUAT_WORK_REPS} squats — cued from what the camera measures. Squat {Math.min(squatReps + 1, SQUAT_WORK_REPS)} of {SQUAT_WORK_REPS}.</>
+            )}
+            {squatStage === 'review' && (
+              <><span className="font-bold text-white">Review.</span> What faulted, what was cued, and whether the correction held.</>
+            )}
+          </p>
+        )}
+
+        {error && (
+          <p className="mt-4 rounded-xl border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-3 text-[13px] text-[#ff8da8]">
+            {error}
+          </p>
+        )}
+
+        {/* THE READOUT, under the stage and across the full width. It was a 260px column of 11px bullet lists
+            squeezed beside the camera; there is no reason for the picture to be narrow so a legend can sit next
+            to it. */}
+        <section className="mt-6">
+          {pattern === 'squat' ? (
+            <>
+              <h2 className="fel-heading mb-3 text-[15px] font-bold text-white/80">The four checks</h2>
+              <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {([
+                  ['kneeValgus', 'Knees track over toes'],
+                  ['heelRise', 'Heels stay down'],
+                  ['armFall', 'Chest stays tall'],
+                  ['lateralShift', 'Weight stays centered'],
+                ] as [SquatFault, string][]).map(([id, label]) => {
+                  const faulting = squatFaults.includes(id);
                   return (
-                    <li key={id} className="flex items-center justify-between gap-2 text-xs">
-                      <span className="flex items-center gap-2">
-                        <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: ZONE_STATE_COLOR[st] }} />
-                        <span className="text-white/80">{ZONE_LABEL[id]}</span>
+                    <li
+                      key={id}
+                      className="flex items-center gap-3 rounded-2xl border px-4 py-3 transition-colors duration-300"
+                      style={{
+                        borderColor: faulting ? 'rgba(255,51,102,0.35)' : 'rgba(255,255,255,0.08)',
+                        background: faulting ? 'rgba(255,51,102,0.06)' : 'rgba(255,255,255,0.02)',
+                      }}
+                    >
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: faulting ? '#FF3366' : '#00FF9D' }}
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13px] font-semibold text-white/85">{label}</span>
+                        <span className="mt-0.5 block font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/35">
+                          {faulting ? 'Estimated fault' : 'Estimated stable'}
+                        </span>
                       </span>
-                      <span className="text-white/50">{ZONE_STATE_LABEL[st]}</span>
                     </li>
                   );
                 })}
               </ul>
-            </div>
-            )}
+            </>
+          ) : pattern === 'jump' ? (
+            <>
+              <h2 className="fel-heading mb-3 text-[15px] font-bold text-white/80">Jumps · measured from flight time</h2>
+              {jumps.length === 0 ? (
+                <p className="text-[13px] text-white/45">
+                  Stand tall, let the floor calibrate, then jump. The landing settles the rep.
+                </p>
+              ) : (
+                <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {jumps.map((j, i) => (
+                    <li key={i} className="flex items-baseline justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3">
+                      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">Jump {i + 1}</span>
+                      <span className="text-right">
+                        <span className="fel-heading text-[20px] font-black text-[#FFD700]">{j.verticalCm}<span className="text-[12px]">cm</span></span>
+                        <span className="mt-0.5 block font-mono text-[9.5px] text-white/30">{j.flightTimeMs}ms · {j.takeoff}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : (
+            <>
+              <h2 className="fel-heading mb-3 text-[15px] font-bold text-white/80">Estimated engagement</h2>
+              <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {PATTERN_ZONES.map((id) => {
+                  const st = zoneStates[id];
+                  return (
+                    <li
+                      key={id}
+                      className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3"
+                    >
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: ZONE_STATE_COLOR[st] }} />
+                      {/* Stacked, not side by side: these zone names are long ("Lumbo-pelvic control") and the
+                          state is longer still ("not computable from view"), so on one line every label truncated
+                          to "Lumbo-pelvi…" and the row said nothing. The name is the thing being read. */}
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-semibold leading-tight text-white/85">{ZONE_LABEL[id]}</span>
+                        <span className="mt-0.5 block font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/35">
+                          {ZONE_STATE_LABEL[st]}
+                        </span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </section>
 
-            {pattern === 'pressRow' && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/60">
-              <div className="mb-1 font-semibold text-white/80">Legend</div>
-              {(['stable', 'warning', 'fault', 'unavailable'] as ZoneState[]).map((s) => (
-                <div key={s} className="flex items-center gap-2">
-                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: ZONE_STATE_COLOR[s] }} />
-                  <span>{ZONE_STATE_LABEL[s]}</span>
-                </div>
-              ))}
-            </div>
-            )}
-          </aside>
-        </div>
-
-        {/* the corrective coach: stage card + the cue, while a squat session runs */}
-        {pattern === 'squat' && status === 'live' && (
-          <div className="mt-4 space-y-3">
-            <div className="flex items-center justify-between rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/5 px-4 py-3">
-              <div className="text-xs text-white/70">
-                {squatStage === 'breathe' && (
-                  <span><b className="text-white">BREATHE FIRST.</b> In through the nose 4s · hold 2s · out slow 6s. {BREATH_CYCLES} cycles, then we move. The breath is the bedrock — everything else builds on it.</span>
-                )}
-                {squatStage === 'check' && (
-                  <span><b className="text-white">THE MOVEMENT CHECK.</b> {SQUAT_CHECK_REPS} slow squats — I watch the knees, heels, chest and shift. Squat {Math.min(squatReps + 1, SQUAT_CHECK_REPS)}/{SQUAT_CHECK_REPS}.</span>
-                )}
-                {squatStage === 'work' && (
-                  <span><b className="text-white">THE WORK SET.</b> {SQUAT_WORK_REPS} squats — I cue what the camera measures. Squat {Math.min(squatReps + 1, SQUAT_WORK_REPS)}/{SQUAT_WORK_REPS}.</span>
-                )}
-                {squatStage === 'review' && (
-                  <span><b className="text-white">REVIEW.</b> What faulted, what I cued, and whether the correction held.</span>
-                )}
-              </div>
-              <button
-                onClick={() => setVoiceOn((v) => !v)}
-                className={`ml-3 shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-bold ${voiceOn ? 'border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/15 text-white/40'}`}
-              >
-                VOICE {voiceOn ? 'ON' : 'OFF'}
-              </button>
-            </div>
-
-            {/* the breath pacer */}
-            {squatStage === 'breathe' && (
-              <div className="flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.02] py-6">
-                <div className="breath-pacer" />
-                <style>{`.breath-pacer{width:64px;height:64px;border-radius:50%;background:radial-gradient(circle,#00E5FF66,transparent 70%);border:2px solid #00E5FF;animation:felbreathe 12s ease-in-out infinite}@keyframes felbreathe{0%{transform:scale(.6);opacity:.5}33%{transform:scale(1);opacity:1}50%{transform:scale(1)}100%{transform:scale(.6);opacity:.5}}`}</style>
-              </div>
-            )}
-
-            {/* the cue card — the coach's voice, one cue at a time */}
-            {cue && squatStage === 'work' && (
-              <div
-                className="rounded-xl border px-4 py-3 text-sm font-bold"
-                style={{
-                  borderColor: cue.level === 'regress' ? '#FF336688' : cue.level === 'escalate' ? '#FFD70088' : cue.level === 'confirm' ? '#00FF9D88' : '#00E5FF55',
-                  color: cue.level === 'regress' ? '#FF3366' : cue.level === 'escalate' ? '#FFD700' : cue.level === 'confirm' ? '#00FF9D' : '#00E5FF',
-                }}
-              >
-                {cue.level === 'regress' ? 'REGRESS: ' : cue.level === 'escalate' ? 'STRONGER: ' : ''}{cue.text}
-              </div>
-            )}
-
-            {/* the review */}
-            {squatStage === 'review' && (
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-xs text-white/70">
-                <div className="mb-2 font-semibold text-white">What the camera measured (estimated)</div>
+        {/* The review of a guided squat — what faulted, what was said, and whether it held. */}
+        {pattern === 'squat' && squatStage === 'review' && (
+          <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+            <h2 className="fel-heading text-[15px] font-bold text-white/80">What the camera measured</h2>
+            <div className="mt-3 grid gap-5 sm:grid-cols-2">
+              <div>
+                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">Findings</p>
                 {squatFindings.length === 0 ? (
-                  <p>No faults measured in the check. Clean structure — load it.</p>
+                  <p className="mt-2 text-[13px] text-white/60">No faults measured in the check. Clean structure — load it.</p>
                 ) : (
-                  <ul className="mb-2 list-inside list-disc">
+                  <ul className="mt-2 space-y-1.5">
                     {squatFindings.map((f) => (
-                      <li key={f}>{({ kneeValgus: 'Knee valgus on the descent', heelRise: 'Heels lifting (dorsiflexion limit)', armFall: 'Arms falling forward (thoracic leak)', lateralShift: 'Lateral weight shift', shallow: 'Shallow depth' } as Record<string, string>)[f]}</li>
+                      <li key={f} className="flex gap-2 text-[13px] text-white/70">
+                        <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-[#FF3366]" />
+                        {({ kneeValgus: 'Knee valgus on the descent', heelRise: 'Heels lifting (dorsiflexion limit)', armFall: 'Arms falling forward (thoracic leak)', lateralShift: 'Lateral weight shift', shallow: 'Shallow depth' } as Record<string, string>)[f]}
+                      </li>
                     ))}
                   </ul>
                 )}
-                <div className="mb-1 font-semibold text-white/80">What I cued</div>
+              </div>
+              <div>
+                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">What was cued</p>
                 {cueLog.length === 0 ? (
-                  <p>No corrections needed during the work set — every rep clean.</p>
+                  <p className="mt-2 text-[13px] text-white/60">No corrections needed during the work set — every rep clean.</p>
                 ) : (
-                  <ul className="list-inside list-disc">
-                    {cueLog.map((c, i) => <li key={i}><span className="text-white/45">{c.level}:</span> {c.text}</li>)}
+                  <ul className="mt-2 space-y-1.5">
+                    {cueLog.map((c, i) => (
+                      <li key={i} className="text-[13px] text-white/70">
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{c.level}</span>{' '}{c.text}
+                      </li>
+                    ))}
                   </ul>
                 )}
-                <p className="mt-2 border-t border-white/5 pt-2 text-white/50">
-                  {cueLog.some((c) => c.level === 'regress')
-                    ? 'A fault survived the cues — regress the drill (see above) and rebuild. That is the correction working, not failing.'
-                    : cueLog.length
-                      ? 'The correction held by the end of the set — that reflex is the goal. Next session it should need fewer cues.'
-                      : 'Clean set. Add load or speed next time.'}
-                </p>
               </div>
-            )}
-          </div>
+            </div>
+            <p className="mt-4 border-t border-white/[0.06] pt-4 text-[13px] leading-relaxed text-white/50">
+              {cueLog.some((c) => c.level === 'regress')
+                ? 'A fault survived the cues — regress the drill and rebuild. That is the correction working, not failing.'
+                : cueLog.length
+                  ? 'The correction held by the end of the set — that reflex is the goal. Next session it should need fewer cues.'
+                  : 'Clean set. Add load or speed next time.'}
+            </p>
+          </section>
         )}
 
-        {error && <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>}
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {status === 'idle' || status === 'error' ? (
-            <button onClick={start}
-              className="rounded-xl bg-[#00E5FF] px-5 py-2.5 text-sm font-bold text-black transition hover:bg-[#33ecff]">
-              Start session
-            </button>
-          ) : (
-            <button onClick={endSession}
-              className="rounded-xl bg-[#FF3366] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#ff4d7a]">
-              End session
-            </button>
-          )}
-        </div>
-
-        {/* Session summary — real accumulated stats only (brief §4) */}
+        {/* SESSION SUMMARY. Real accumulated stats only (brief §4) — but read as figures, not as a bare <table>. */}
         {summary && (
-          <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-            <h2 className="mb-2 text-sm font-semibold text-white">Session summary (estimated)</h2>
-            <p className="mb-3 text-xs text-white/50">
-              Duration {secs(summary.durationMs)}s · avg {summary.avgFrameMs.toFixed(1)} ms/frame
-              {summary.reps > 0 && (
-                <span> · <span className="text-white/80">{summary.reps} reps</span> (counted from movement)
-                  {summary.avgTempo && (
-                    <span> · avg tempo {summary.avgTempo.pullSec}s down / {summary.avgTempo.pressSec}s up</span>
-                  )}
-                </span>
+          <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+            <h2 className="fel-heading text-[15px] font-bold text-white/80">Session summary · estimated</h2>
+
+            <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <Figure label="Duration" value={`${secs(summary.durationMs)}s`} />
+              {summary.reps > 0 && <Figure label="Reps" value={String(summary.reps)} />}
+              {summary.avgTempo && (
+                <Figure label="Avg tempo" value={`${summary.avgTempo.pullSec}s / ${summary.avgTempo.pressSec}s`} />
               )}
-            </p>
-            {jumps.length > 0 && (
-              <p className="mb-3 text-xs text-white/50">
-                <span className="text-white/80">{jumps.length} jumps</span> measured from flight time · best{' '}
-                <span className="text-[#FFD700]">{Math.max(...jumps.map((j) => j.verticalCm))}cm</span>
-              </p>
-            )}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="text-white/50">
-                  <tr><th className="py-1 pr-4">Zone</th><th className="py-1 pr-4">Time estimated-stable</th><th className="py-1">Estimated faults</th></tr>
-                </thead>
-                <tbody className="text-white/80">
-                  {PATTERN_ZONES.map((id) => (
-                    <tr key={id} className="border-t border-white/5">
-                      <td className="py-1 pr-4">{ZONE_LABEL[id]}</td>
-                      <td className="py-1 pr-4">{secs(summary.timeInStableMs[id])}s</td>
-                      <td className="py-1">{summary.faultCounts[id]}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {jumps.length > 0 && (
+                <Figure label="Best jump" value={`${Math.max(...jumps.map((j) => j.verticalCm))}cm`} accent="#FFD700" />
+              )}
             </div>
-          </div>
+
+            <ul className="mt-5 space-y-1.5 border-t border-white/[0.06] pt-4">
+              {PATTERN_ZONES.map((id) => (
+                <li key={id} className="flex items-baseline gap-3 text-[13px]">
+                  <span className="min-w-0 flex-1 truncate text-white/70">{ZONE_LABEL[id]}</span>
+                  <span className="shrink-0 font-mono text-[12px] text-white/45">
+                    {secs(summary.timeInStableMs[id])}s stable
+                  </span>
+                  <span
+                    className="w-16 shrink-0 text-right font-mono text-[12px]"
+                    style={{ color: summary.faultCounts[id] > 0 ? '#FF3366' : 'rgba(255,255,255,0.25)' }}
+                  >
+                    {summary.faultCounts[id]} {summary.faultCounts[id] === 1 ? 'fault' : 'faults'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
       </div>
+    </div>
+  );
+}
+
+/** A number worth reading from a distance, with the quiet label under it. */
+function Figure({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  return (
+    <div>
+      <p className="fel-heading text-[24px] font-black leading-none" style={{ color: accent ?? '#FFFFFF' }}>{value}</p>
+      <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">{label}</p>
     </div>
   );
 }
