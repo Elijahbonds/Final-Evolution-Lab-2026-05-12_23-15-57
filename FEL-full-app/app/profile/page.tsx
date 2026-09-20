@@ -8,6 +8,7 @@ import { readWallet } from '@/lib/wallet/wallet-service';
 import { prqScore, prqGrade } from '@/lib/prq';
 import { gameVitals, ownedFromEntitlements } from '@/lib/cards/boosts';
 import { TabPage } from '@/components/shell/tab-page';
+import { DoorsRow } from '@/components/shell/doors-row';
 import { ProfileView } from '@/components/profile-view';
 import { BoostShelf } from '@/components/cards/boost-shelf';
 import { ReferralCard } from '@/components/marketing/referral-card';
@@ -110,6 +111,7 @@ export default async function ProfilePage() {
       </section>
 
       <div className="mt-8"><ReferralCard /></div>
+      <DoorsRow tab="profile" />
     </TabPage>
   );
 }

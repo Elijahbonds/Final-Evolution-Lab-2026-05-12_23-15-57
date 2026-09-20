@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Swords } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { TabPage } from '@/components/shell/tab-page';
+import { DoorsRow } from '@/components/shell/doors-row';
 import { PlayShelf } from '@/components/shell/play-shelf';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,7 @@ export default async function PlayPage() {
       }
     >
       <PlayShelf />
+      <DoorsRow tab="play" />
     </TabPage>
   );
 }

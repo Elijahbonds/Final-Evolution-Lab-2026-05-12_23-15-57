@@ -5,6 +5,7 @@ import { Activity, ClipboardList, Dumbbell, UtensilsCrossed, Users, ScanLine } f
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { TabPage } from '@/components/shell/tab-page';
+import { DoorsRow } from '@/components/shell/doors-row';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,6 +101,7 @@ export default async function TrainPage() {
           );
         })}
       </ul>
+      <DoorsRow tab="train" />
     </TabPage>
   );
 }
