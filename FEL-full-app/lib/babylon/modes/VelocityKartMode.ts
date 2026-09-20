@@ -13,6 +13,7 @@
 // and the no-placeholder rule here is about BODIES, not vehicles.
 
 import { stepSpeedFov } from '../core/SpeedFov';
+import { GhostRecorder, deltaLabel, deltaMs, loadGhost, saveIfFaster, type Ghost } from '../racing/ghost';
 import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the shared boost (drift fills it, RB/Shift burns it)
 import { BoostFx } from '../premium/BoostFx';
 import { BoostPads } from '../visual/BoostPads';
@@ -34,7 +35,7 @@ import {
   type KartInput, type KartState, type KartSpec,
 } from '../core/KartModel';
 import {
-  KART_COURSES, readCourse, startRace, stepRace, toNextGate, medalFor, onTrack, TRACK_HALF_WIDTH,
+  KART_COURSES, readCourse, startRace, stepRace, toNextGate, medalFor, onTrack, TRACK_HALF_WIDTH, courseLength,
   type Course, type RaceProgress,
 } from '../core/RaceCourse';
 import { buildCourseVenue, buildWorldGround, worldHeightFn } from '../racing/venueForCourse';
@@ -114,6 +115,14 @@ const PLAYER_ID = 0;
 const KART_PICKUP_SCALE = 0.42;
 /** The player's own distance along the racing line — what the standings are computed against. */
 let playerDist = 0;
+
+// THE GHOST (2026-09-19 depth pass). The mode had a clock and medals and no memory: once the gold was gone there was
+// nothing left on the course to chase. The recorder runs every frame, the best lap per course is kept on the device,
+// and the HUD carries the delta AT THE CURRENT DISTANCE — the only comparison that means anything (racing/ghost).
+let ghostRec: GhostRecorder | null = null;
+let bestGhost: Ghost | null = null;
+let ghostDelta: number | null = null;
+let kartId = '';
 let tier = profileFor(DEFAULT_TIER);
 /** The picked kart's handling. Defaults to the starter, so a mode with no pick is byte-identical to before. */
 let kartSpec: KartSpec = KART_STARTER;
@@ -683,6 +692,9 @@ function pushHud(ctx: ModeContext): void {
     item: S.held ? `${S.held.kind === 'missile' ? 'SHELL' : ITEM_LABEL[S.held.kind]}${S.held.level > 1 ? ` L${S.held.level}` : ''}` : '',
     itemKind: S.held?.kind ?? '',
     banner: S.banner,
+    // only shown once there is a lap to measure against — a delta with no reference is a number pretending to mean something
+    delta: bestGhost ? deltaLabel(ghostDelta) : '',
+    chasing: bestGhost ? `PB ${(bestGhost.timeMs / 1000).toFixed(1)}s` : '',
     hint: 'RT throttle · X drift to fill BOOST · hold RB / Shift to burn it · A fires your item',
   } satisfies Record<string, HudValue>);
 }
@@ -692,11 +704,21 @@ function finish(ctx: ModeContext): void {
   S.done = true;
   const medal = medalFor(course, race.time, race.finished);
   const place = rivals.length ? playerPosition(playerDist, rivals) : 1;
+  // KEEP THE LAP IF IT WAS FASTER. Only a finished race counts: a DNF is not a lap, and a half-recorded ghost would
+  // strand a future chase halfway round the course with nothing to compare against.
+  const hadGhost = bestGhost;
+  if (race.finished && ghostRec) {
+    const run = ghostRec.finish(course.id, race.time * 1000, kartId);
+    bestGhost = saveIfFaster(run) ?? bestGhost;
+  }
+  const beatIt = race.finished && hadGhost != null && bestGhost != null && bestGhost.timeMs < hadGhost.timeMs;
   SoundKit.play(medal === 'none' ? 'miss' : 'score');
   ctx.juice.hitStop(90);
   // the result says WHERE you placed as well as the clock's medal, and a race you did not finish says so
   const placeTag = rivals.length ? `${ordinal(place)} · ` : '';
-  say(!race.finished ? `OUT OF TIME — ${placeTag}DNF` : medal === 'none' ? `${placeTag}FINISHED ${race.time.toFixed(1)}s` : `${placeTag}${medal.toUpperCase()} — ${race.time.toFixed(1)}s`, 2.4);
+  // A NEW PERSONAL BEST OUTRANKS THE MEDAL on a course you have already golded — the medal stopped being news
+  // three laps ago and the record is the reason you went round again.
+  say(beatIt ? `NEW BEST — ${race.time.toFixed(1)}s` : !race.finished ? `OUT OF TIME — ${placeTag}DNF` : medal === 'none' ? `${placeTag}FINISHED ${race.time.toFixed(1)}s` : `${placeTag}${medal.toUpperCase()} — ${race.time.toFixed(1)}s`, 2.4);
   pushHud(ctx);
   ctx.end(race.finished ? `COMPLETE_${medal.toUpperCase()}` : 'OUT',
     Math.round(Math.max(0, course.gold * 2 - race.time) * 10), {
@@ -726,7 +748,9 @@ return {
     // the course and the handling comes from the vehicle, and neither can be swapped under a running scene.
     course = readCourse('kart');
     circuit = kartCircuitById(course.id);
-    kartSpec = readKart().spec;
+    const chosenKart = readKart();
+    kartSpec = chosenKart.spec;
+    kartId = chosenKart.id;
     race = startRace();
 
     venueRoot = buildCourseVenue(ctx.scene, course);
@@ -810,6 +834,10 @@ return {
     rivals = makeField(shape.count, kartSpec.vMax, tier.edge);
     rivalKarts = rivals.map((r) => buildRivalKart(ctx, r.name, r.tint));
     playerDist = 0;
+    // a fresh recorder per race, and whatever the device remembers for THIS course as the thing to chase
+    ghostRec = new GhostRecorder();
+    bestGhost = loadGhost(course.id);
+    ghostDelta = null;
     rivalHome = rivals.map((r) => r.lane); rivalStun = rivals.map(() => 0); rivalCool = rivals.map(() => 0); rivalAlongside = rivals.map(() => false);
     rivalKits = rivals.map(() => ({ item: null, itemAt: 0, shieldT: 0, zipT: 0, nextRow: 0, lap: 0 }));
     // ITEM ROWS: three balloons across the road on every leg, 62% of the way along it (the boost pads sit at 40% of every
@@ -1022,6 +1050,14 @@ return {
     // a player who cuts a corner does not get credited for the metres they skipped — the standings read the
     // same racing line the rivals run.
     playerDist += state.speed * dt;
+    // THE GHOST RIDES THE SAME DISTANCE AXIS as the standings: progress is travelled distance over the whole race,
+    // so the delta and the placing can never disagree about where the player is.
+    if (ghostRec && state) {
+      const full = Math.max(1, courseLength(course) * course.laps);
+      const progress = Math.min(1, playerDist / full);
+      ghostRec.sample({ progress, t: race.time * 1000, x: state.pos.x, y: state.pos.y, z: state.pos.z });
+      ghostDelta = deltaMs(bestGhost, progress, race.time * 1000);
+    }
     // AN OVERTAKE IS THE HIGHLIGHT OF A RACE, and neither racing mode could see one happen -- both reported
     // nothing into the Game-Breaker layer, so the crowd was as loud in last as in first. `playerPosition`
     // already exists and the HUD already prints it; this only remembers last frame's. Improving a place

@@ -192,3 +192,37 @@ export function theoreticalBestMs(laps: readonly SectorTimes[]): number | null {
   const b = bestSectors(laps);
   return b ? b.splits.reduce((a, s) => a + s, 0) : null;
 }
+
+// ── KEEPING ONE ─────────────────────────────────────────────────────────────
+//
+// Per viewer, per course, in localStorage — the same pattern the Fuel floor's metrics use. A ghost is a few hundred
+// small samples; one per course is nothing next to a texture, and it is the thing that makes the second visit to a
+// track mean something. Storage is guarded because a private window throws rather than returning null.
+
+export const GHOST_STORAGE_PREFIX = 'fel-ghost-v1:';
+
+interface StorageLike { getItem(k: string): string | null; setItem(k: string, v: string): void }
+
+function storage(): StorageLike | null {
+  try { return typeof localStorage === 'undefined' ? null : localStorage; } catch { return null; }
+}
+
+export function loadGhost(courseId: string, store: StorageLike | null = storage()): Ghost | null {
+  if (!store) return null;
+  try {
+    const raw = store.getItem(GHOST_STORAGE_PREFIX + courseId);
+    if (!raw) return null;
+    const g = JSON.parse(raw) as Ghost;
+    return Array.isArray(g?.samples) && g.samples.length >= 2 && typeof g.timeMs === 'number' ? g : null;
+  } catch { return null; }
+}
+
+/** Write only if it beats what is there. Returns the ghost that now holds the course. */
+export function saveIfFaster(ghost: Ghost | null, store: StorageLike | null = storage()): Ghost | null {
+  if (!ghost) return null;
+  const best = fasterGhost(loadGhost(ghost.courseId, store), ghost);
+  if (best === ghost && store) {
+    try { store.setItem(GHOST_STORAGE_PREFIX + ghost.courseId, JSON.stringify(ghost)); } catch { /* full or blocked */ }
+  }
+  return best;
+}

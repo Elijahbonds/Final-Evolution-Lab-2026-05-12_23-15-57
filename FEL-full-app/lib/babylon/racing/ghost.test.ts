@@ -109,3 +109,30 @@ describe('sectors', () => {
     expect(theoreticalBestMs([])).toBeNull();
   });
 });
+
+describe('keeping a ghost', () => {
+  const mem = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); } };
+  };
+
+  it('keeps a lap, and only replaces it with a faster one', async () => {
+    const { loadGhost, saveIfFaster } = await import('./ghost');
+    const store = mem();
+    const slow = lap(60_000), fast = lap(58_000), slower = lap(61_000);
+    expect(saveIfFaster(slow, store)?.timeMs).toBe(60_000);
+    expect(loadGhost('boardwalk-loop', store)?.timeMs).toBe(60_000);
+    expect(saveIfFaster(fast, store)?.timeMs).toBe(58_000);
+    expect(saveIfFaster(slower, store)?.timeMs).toBe(58_000);   // the slower lap does not overwrite
+    expect(loadGhost('boardwalk-loop', store)?.timeMs).toBe(58_000);
+  });
+
+  it('survives a blocked or empty store rather than throwing', async () => {
+    const { loadGhost, saveIfFaster } = await import('./ghost');
+    expect(loadGhost('anything', null)).toBeNull();
+    expect(saveIfFaster(lap(1000), null)?.timeMs).toBe(1000);    // still returns the best it knows
+    const broken = { getItem: () => 'not json', setItem: () => { throw new Error('blocked'); } };
+    expect(loadGhost('x', broken)).toBeNull();
+    expect(() => saveIfFaster(lap(1000), broken)).not.toThrow();
+  });
+});
