@@ -1,0 +1,10 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "amir",
+  "sex": "male",
+  "note": "lean build",
+  "source": "Meshy \u2014 Amir Smith",
+  "rig": "skin-transfer.py from public/models/elijah-meshy.glb (22 joints, T-pose donor)"
+}

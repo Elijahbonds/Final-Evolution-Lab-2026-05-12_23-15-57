@@ -1,0 +1,10 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "scout",
+  "sex": "male",
+  "note": "everyday build, off the bench",
+  "source": "Meshy \u2014 Spectator Male NPC 1",
+  "rig": "skin-transfer.py from public/models/elijah-meshy.glb (22 joints, T-pose donor)"
+}

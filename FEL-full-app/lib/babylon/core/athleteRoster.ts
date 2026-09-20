@@ -24,6 +24,24 @@ export const ATHLETE_ROSTER: RosterAthlete[] = [
   { key: 'frost', url: '/models/athletes/frost.glb' },
   { key: 'sage', url: '/models/athletes/sage.glb' },
   { key: 'vex', url: '/models/athletes/vex.glb' },
+  // Phase 6 (owner, 2026-09-19: "rig the other models … same normal static posture as the ones that animate", then
+  // "separate those models"). The Meshy people who were not basketball players carried no rig, so nothing could spawn
+  // them — and they do not come one to a file: "Athletic Male NPC 1" is FIVE men standing shoulder to shoulder inside
+  // a single mesh. Fed whole to the skin transfer all five were skinned to one skeleton and the idle tore the sheet
+  // apart, which is exactly what it did the first time. They are cut into people first (scripts/meshy/split-row.py,
+  // at the valleys in the vertex histogram — the one thing that separates figures standing in a line), then each one
+  // goes through the same transfer onto the same 22-bone skeleton as the eight. One rig, one clip set, one idle.
+  { key: 'ranger', url: '/models/athletes/ranger.glb' },
+  { key: 'flint', url: '/models/athletes/flint.glb' },
+  { key: 'onyx', url: '/models/athletes/onyx.glb' },
+  { key: 'dune', url: '/models/athletes/dune.glb' },
+  { key: 'cobalt', url: '/models/athletes/cobalt.glb' },
+  { key: 'vega', url: '/models/athletes/vega.glb' },
+  { key: 'juno', url: '/models/athletes/juno.glb' },
+  { key: 'lyra', url: '/models/athletes/lyra.glb' },
+  { key: 'iris', url: '/models/athletes/iris.glb' },
+  { key: 'wren', url: '/models/athletes/wren.glb' },
+  { key: 'amir', url: '/models/athletes/amir.glb' },
 ];
 
 /** THE hero — the one body every mode spawns unless it asks for a specific file. Owner decision 2026-09-05 (Ship Pass 6):

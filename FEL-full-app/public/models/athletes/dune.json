@@ -1,0 +1,10 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "dune",
+  "sex": "male",
+  "note": "athletic build, tall",
+  "source": "Meshy \u2014 Athletic Male NPC 1 (figure 4 of 5)",
+  "rig": "skin-transfer.py from public/models/elijah-meshy.glb (22 joints, T-pose donor)"
+}
