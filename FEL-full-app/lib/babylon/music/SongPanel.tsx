@@ -12,9 +12,12 @@ declare global { interface Window { __FEL_SONG__?: { sections: number; chain: So
 export interface SongPanelProps {
   engine: AudioEngine | null; tracks: TrackState[]; setTracks: (t: TrackState[]) => void; playing: boolean; bpm: number; steps: number; say: (m: string) => void;
   S: Record<string, React.CSSProperties>;
+  /** Told when a section is saved and when one is put in the chain — the two gates on the studio tier. */
+  onSectionSaved?: () => void;
+  onChained?: () => void;
 }
 
-export default function SongPanel({ engine, tracks, setTracks, playing, bpm, steps, say, S }: SongPanelProps) {
+export default function SongPanel({ engine, tracks, setTracks, playing, bpm, steps, say, S, onSectionSaved, onChained }: SongPanelProps) {
   const [sections, setSections] = useState<Section[]>([]);
   /** Has this song been sent to the dance floor? Resets when the arrangement changes under it. */
   const [danced, setDanced] = useState(false);
@@ -60,6 +63,8 @@ export default function SongPanel({ engine, tracks, setTracks, playing, bpm, ste
   const saveSection = () => {
     const s: Section = { id: newSectionId(name), name, tracks: snapshotTracks(tracks) };
     setSections((a) => [...a, s]); setChain((c) => normalizeChain([...c, { sectionId: s.id, bars: 2 }], [...sections, s]));
+    // Saving a section also drops it into the chain, so this one action is both events.
+    onSectionSaved?.(); onChained?.();
     say(`Saved "${name}" — added to the song`);
   };
   const beginTake = useCallback(async (atBar: number) => {
@@ -118,7 +123,7 @@ export default function SongPanel({ engine, tracks, setTracks, playing, bpm, ste
               </span>
             );
           })}
-          {sections.map((s) => <button key={s.id} style={{ ...S.btnAlt, fontSize: 11 }} onClick={() => setChain((c) => normalizeChain([...c, { sectionId: s.id, bars: 2 }], sections))}>+ {s.name}</button>)}
+          {sections.map((s) => <button key={s.id} style={{ ...S.btnAlt, fontSize: 11 }} onClick={() => { setChain((c) => normalizeChain([...c, { sectionId: s.id, bars: 2 }], sections)); onChained?.(); }}>+ {s.name}</button>)}
         </div>
       )}
       <div style={S.row}>

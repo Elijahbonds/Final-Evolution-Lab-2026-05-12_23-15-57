@@ -34,6 +34,10 @@ import { HostLobby } from '@/components/controller-link/host-lobby';   // M1b �
 import { MODE_CONTROLLERS } from '@/lib/controller-link/schemas/registry';
 import { BootSplash } from '@/components/games/boot-splash';
 import { readMusicStage } from './musicStage';
+import {
+  advance as advanceProgress, isRealPattern, nextUnlock, readProgress, tierDef, tierFor, writeProgress,
+  type MusicProgress,
+} from './MusicTiers';
 import type { GameProps } from '@/components/games/game-shell';
 
 const STEPS = 16;
@@ -114,6 +118,40 @@ export default function StudioMode({
   const [bpm, setBpm] = useState(92);
   const [swing, setSwing] = useState(0.15);
   const [tracks, setTracks] = useState<TrackState[]>(emptyTracks());
+
+  // THE LADDER, FINALLY READ. MusicTiers has existed since 2026-09-13 with a header explaining that the room
+  // "shipped M1-M4 all at once ... a player who opens it meets ALL of it — a full DAW on the first visit. That
+  // is the actual problem this closes." Nothing imported it, so the problem was never closed: a first-time
+  // player still met eight tracks, sections, a chain, takes, stems and a render on the opening screen.
+  const [progress, setProgress] = useState<MusicProgress>(() => readProgress());
+  const tier = tierFor(progress);
+  const caps = tierDef(progress);
+  const opensNext = nextUnlock(progress);
+
+  /**
+   * THE GRID'S GATE. Watching the state rather than a click handler, for two reasons found the hard way:
+   * tying it to the PLAY press read a `tracks` the closure had already gone stale on, so the chain never
+   * opened at all — and doing it inside the setTracks updater made the updater impure, which React's
+   * StrictMode duly double-invoked and counted one click as two patterns.
+   *
+   * An effect on `tracks` is the honest place: it runs after the state is real, exactly once per change.
+   */
+  useEffect(() => {
+    if (progress.patternsMade > 0) return;   // the gate only has to open once
+    if (isRealPattern(tracks)) noteProgress('pattern');
+  }, [tracks, progress.patternsMade]);
+
+  /** Fold an event in, remember it, and say what it opened. Monotonic — a tier reached is a tier kept. */
+  const noteProgress = useCallback((e: 'pattern' | 'section' | 'chain') => {
+    setProgress((prev) => {
+      const before = tierFor(prev);
+      const next = advanceProgress(prev, e);
+      writeProgress(next);
+      const after = tierFor(next);
+      if (after !== before) say(`${tierDef(next).name} unlocked — ${tierDef(next).blurb}`);
+      return next;
+    });
+  }, []);
   const [kit, setKit] = useState<KitId>('street');
   const [unlockedKits, setUnlockedKits] = useState<KitId[]>(() => {
     try { return JSON.parse(localStorage.getItem('fel_studio_kits_v1') ?? '["street"]') as KitId[]; }
@@ -211,7 +249,9 @@ export default function StudioMode({
     const eng = engineRef.current;
     if (!eng) return;
     if (playing) { eng.stop(); setPlaying(false); setPlayhead(-1); }
-    else { eng.start(); setPlaying(true); }
+    else {
+      eng.start(); setPlaying(true);
+    }
   };
 
   const performTap = (): void => {
@@ -419,7 +459,7 @@ export default function StudioMode({
             </div>
           )}
           <div style={S.grid}>
-            {tracks.map((t, ti) => (
+            {tracks.slice(0, caps.tracks).map((t, ti) => (
               <React.Fragment key={t.sampleId}>
                 <div style={S.label}>{KIT_SLOTS.find((k) => k.id === t.sampleId)?.name ?? (t.sampleId.startsWith('flip_') ? `FLIP ${Number(t.sampleId.slice(5)) + 1}` : t.sampleId)}</div>
                 {t.pattern.map((on, si) => (
@@ -483,7 +523,22 @@ export default function StudioMode({
             </button>
           </div>
 
-          <SongPanel engine={engineRef.current} tracks={tracks} setTracks={setTracks} playing={playing} bpm={bpm} steps={STEPS} say={say} S={S} />
+          {caps.arrangement ? (
+            <SongPanel
+              engine={engineRef.current} tracks={tracks} setTracks={setTracks} playing={playing}
+              bpm={bpm} steps={STEPS} say={say} S={S}
+              onSectionSaved={() => noteProgress('section')}
+              onChained={() => noteProgress('chain')}
+            />
+          ) : null}
+
+          {/* The room SAYS what opens next rather than leaving a locked control on screen for somebody to
+              prod at. nextUnlock returns null at the top, which is the honest answer. */}
+          {opensNext && (
+            <div style={{ ...S.mentor, color: '#ffd75e' }}>
+              Next: {opensNext.needs} — and the {opensNext.tier} opens.
+            </div>
+          )}
 
           <div style={S.mentor}>{tip}</div>
         </>
