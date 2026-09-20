@@ -50,6 +50,7 @@ export const REASON = {
   // Phase 5 — referral loop (viral). Referrer earns shards when a lead they
   // referred converts to a registered athlete. Server-granted, never client.
   REFERRAL_BONUS: 'REFERRAL_BONUS', // shards
+  MOVEMENT_SCREEN_COMPLETED: 'MOVEMENT_SCREEN_COMPLETED', // shards — one graded screen
   // Phase 6 — async multiplayer settlement. Both players earn coins for
   // playing a resolved match; the winner earns shards. Server-granted only.
   MP_MATCH_PLAYED: 'MP_MATCH_PLAYED', // coins
@@ -152,6 +153,16 @@ export const DEFAULT_REWARD_RULES: Record<string, RewardRuleConfig> = {
     reasonCode: REASON.REFERRAL_BONUS, currency: 'shards', formula: 'flat',
     baseAmount: 10, scaleNum: 0, minGrant: 1, maxGrant: 50, // TUNE(elijah)
     perMinuteCap: 0, perDayCurrencyCap: 0, active: true,
+  },
+  // THE MOVEMENT SCREEN (owner, 2026-09-19: shards for a completed scan, body scan first). Server-granted and
+  // idempotent per screen, capped hard per day: the point is that an athlete screens themselves regularly, not that
+  // they discover squatting at a phone is a shard faucet. A screen the camera could not grade pays nothing, because
+  // the reward is for the measurement, not for standing near a camera — that gate lives at the call site, where the
+  // confidence is known.
+  [REASON.MOVEMENT_SCREEN_COMPLETED]: {
+    reasonCode: REASON.MOVEMENT_SCREEN_COMPLETED, currency: 'shards', formula: 'flat',
+    baseAmount: 5, scaleNum: 0, minGrant: 1, maxGrant: 10, // TUNE(elijah)
+    perMinuteCap: 0, perDayCurrencyCap: 10, active: true,
   },
   // Phase 6 — async multiplayer settlement. Coins for playing a resolved
   // match, shards for winning. Idempotent per match (keyed by match id).

@@ -32,6 +32,7 @@ export const REASON_LABELS: Record<string, ReasonLabel> = {
   MP_MATCH_WON: { label: 'Multiplayer match won', kind: 'earn' },
   MP_MATCH_PLAYED: { label: 'Multiplayer match played', kind: 'earn' },
   REFERRAL_BONUS: { label: 'Referral bonus', kind: 'earn' },
+  MOVEMENT_SCREEN_COMPLETED: { label: 'Movement screen', kind: 'earn' },
   CREATIVE_CARD_PUBLISH: { label: 'Creative card published', kind: 'earn' },
   CREATIVE_CARD_REMIX_ROYALTY: { label: 'Remix royalty', kind: 'earn' },
   PURCHASE_COIN_PACK: { label: 'Coin pack purchase', kind: 'purchase' },
