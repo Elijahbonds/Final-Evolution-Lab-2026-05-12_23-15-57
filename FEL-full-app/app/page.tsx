@@ -1,27 +1,28 @@
 import { getServerSession } from 'next-auth';
+import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
-import { HubWorld } from '@/components/hub-world';
-import { PublicTopBar, PublicLegalFooter } from '@/components/public-chrome';
 import { GuestLandingHero } from '@/components/guest-landing-hero';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * The front door has one job each way.
+ *
+ * SIGNED OUT it is the pitch — sixty seconds to a dunk, no account, no download. That is what a shared link
+ * should open on and it is the only page whose job is to convert a stranger.
+ *
+ * SIGNED IN it used to be HubWorld: seven tiles and three banners pointing at the scan, multiplayer, the creator
+ * card, the workout, live classes, sessions and the closet. Every one of those is now a tab or a door inside one,
+ * so the hub was a fourth front door arguing with the three, which is the clutter the owner asked to be rid of.
+ * Its venue grid was the best-looking thing in the product and it moved to the Play tab, where "which court" is
+ * the question being asked. So a signed-in visitor goes where the games are.
+ */
 export default async function HomePage() {
   const session = await getServerSession(authOptions);
-  // M13 Step 1 — logged-out visitors get the guest landing ("60 seconds to a
-  // dunk") instead of a hard login wall.
-  if (!session) {
-    return (
-      <div className="min-h-screen bg-[#050505]">
-        <PublicTopBar />
-        <GuestLandingHero />
-        <PublicLegalFooter />
-      </div>
-    );
-  }
+  if (session) redirect('/play');
   return (
-    <div className="min-h-screen bg-[#050505] pb-20">
-      <HubWorld userName={session?.user?.name ?? 'Athlete'} />
+    <div className="min-h-screen bg-[#050505]">
+      <GuestLandingHero />
     </div>
   );
 }

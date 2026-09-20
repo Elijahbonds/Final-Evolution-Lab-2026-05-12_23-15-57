@@ -6,6 +6,9 @@ import { authOptions } from '@/lib/auth';
 import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
 import { PlayShelf } from '@/components/shell/play-shelf';
+import { VenueShelf } from '@/components/shell/venue-shelf';
+// The season pass came off the retired hub with the venues. It is what playing earns, so it belongs on Play.
+import { SeasonPassTrack } from '@/components/season-pass-track';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +33,8 @@ export default async function PlayPage() {
       }
     >
       <PlayShelf />
+      <VenueShelf />
+      <div className="mt-12"><SeasonPassTrack /></div>
       <DoorsRow tab="play" />
     </TabPage>
   );
