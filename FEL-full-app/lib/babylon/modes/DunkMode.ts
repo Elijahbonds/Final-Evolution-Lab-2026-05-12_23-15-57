@@ -1040,6 +1040,10 @@ export const DunkMode: ModeDefinition = (() => {
       // for the rise and fires there — the trick the player asked for, at the beat it belongs to.
       if (phase === 'cinematic' && e.t === 'dpad') flight.recognizer.feed(e);
       // DUNK-BIOMECH: every trick has a cue window — early = ARMED (fires on its beat), late = refused with a banner
+      if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') && qteWindowOpen && !qteHit) {
+        // not the slam button, thrown after the jam's beat opened: say so rather than swallowing it
+        refuse(ctx, 'TOO LATE FOR A TRICK — THE JAM IS ON YOU');
+      }
       if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') && !qteWindowOpen) airButton(ctx, e);   // X reads in the air
       // THE SKY TIER (owner, 2026-09-18): R1 in the air is the tap off whatever hangs over the lane — a second lift and the drop into
       // the slam; honest only inside the window with the hand up to its underside (a full run, a rebound or a backboard kick gets there)
@@ -1268,7 +1272,15 @@ export const DunkMode: ModeDefinition = (() => {
           setTrail('hang');   // A+ P6: the trail brightens at the hang rise, not at takeoff
         }
         if (clipTime >= EASTBAY_TIMING.rise) setWin('hang');
-        if (armedAir && clipTime >= cueFireAt(armedAir) && !qteWindowOpen) { const a = armedAir; armedAir = null; fireTrick(ctx, a, 'armed'); }
+        // THE WINDOW USED TO CANCEL THE DUNK YOU CALLED (2026-09-19). An armed trick could only fire while the slam
+        // window was shut, so on a short flight — the window opens early — the called dunk simply never happened and
+        // nothing said why: measured in the lab, 2 of 6 called tricks had no [DUNK-CUE] line at all. The window is
+        // the JAM's beat, not a cancel: an armed trick still fires inside it while the jam is unthrown and the
+        // trick's own last beat is still ahead. Once the jam is away the flight belongs to the finish.
+        if (armedAir && clipTime >= cueFireAt(armedAir)
+            && (!qteWindowOpen || (!qteHit && clipTime <= cueLastAt(armedAir)))) {
+          const a = armedAir; armedAir = null; fireTrick(ctx, a, 'armed');
+        }
         spin.update(clipTime);   // the momentum-led turn rides the flight's own clock (the hang slow-mo stretches both)
         // ── the lob: the ball flies in CLIP time through the hang (the slow-mo stretches both), the catch is the hand ──
         if (lob.live) {
