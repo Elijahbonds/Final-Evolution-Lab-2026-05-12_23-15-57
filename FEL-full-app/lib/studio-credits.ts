@@ -17,7 +17,7 @@
  * do NOT recognize USD here.
  */
 
-import type { Prisma } from '@/lib/generated/prisma';
+import type { Prisma } from '@/public/_prisma/client';
 import { postTransaction, getBalance, type DbClient, type LedgerCurrency } from '@/lib/ledger';
 
 const SC: LedgerCurrency = 'STUDIO_CREDIT';

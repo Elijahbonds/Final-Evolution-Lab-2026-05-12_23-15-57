@@ -1,4 +1,4 @@
-import { PrismaClient } from '@/lib/generated/prisma';
+import { PrismaClient } from '@/public/_prisma/client';
 const db = new PrismaClient();
 const rules = await db.rewardRule.count(); const active = await db.rewardRule.count({ where: { active: true } });
 const since = new Date(); since.setHours(0, 0, 0, 0);

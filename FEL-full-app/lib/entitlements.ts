@@ -11,7 +11,7 @@
  * Nothing here trusts a client-supplied ownership claim.
  */
 
-import { Prisma, type PrismaClient } from '@/lib/generated/prisma';
+import { Prisma, type PrismaClient } from '@/public/_prisma/client';
 import { CARD_CATALOG, getCardById, type Card, type CardUnlock } from '@/lib/card-catalog';
 
 export type DbClient = PrismaClient | Prisma.TransactionClient;

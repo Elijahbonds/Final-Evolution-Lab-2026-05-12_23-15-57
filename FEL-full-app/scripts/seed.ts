@@ -1,4 +1,4 @@
-import { PrismaClient } from '@/lib/generated/prisma';
+import { PrismaClient } from '@/public/_prisma/client';
 import { migrateLcToWallet } from './migrate-lc-to-wallet';
 import bcrypt from 'bcryptjs';
 import { postLc } from '../lib/ledger';

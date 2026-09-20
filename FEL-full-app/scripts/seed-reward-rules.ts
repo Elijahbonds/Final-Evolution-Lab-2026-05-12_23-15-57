@@ -7,7 +7,7 @@
  * Run: `yarn tsx scripts/seed-reward-rules.ts`
  */
 import 'dotenv/config';
-import { PrismaClient } from '@/lib/generated/prisma';
+import { PrismaClient } from '@/public/_prisma/client';
 import { DEFAULT_REWARD_RULES } from '../lib/wallet/reward-rules';
 
 const prisma = new PrismaClient();

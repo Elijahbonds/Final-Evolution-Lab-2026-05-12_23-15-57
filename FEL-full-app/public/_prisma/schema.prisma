@@ -9,10 +9,16 @@ generator client {
     // build that is being ignored — only the Next.js default build script is respected", so generate cannot be hung
     // off the build either. A client under node_modules is replaced by the cloud install and never rebuilt.
     //
-    // In the source tree it is an ordinary module: traced by next build like any other import, uploaded with the
-    // bundle, immune to a reinstall. It is also what Prisma now asks for — generating without an output path is
-    // deprecated. The cost is ~44 MB of generated client in the repo, which is the price of a deterministic deploy.
-    output   = "../../lib/generated/prisma"
+    // AND IT HAS TO LIVE UNDER public/. Generating into lib/ was the obvious move and it half-worked: the client JS
+    // was traced into .next so the model resolved, and then Prisma threw "engine not found", listing the paths it
+    // had searched — /workspace/lib/generated/prisma among them, empty. The packager copies exactly .env*,
+    // next.config.js, package.json, package-lock.json, server.js, public/ and .next/ into the function. lib/ is not
+    // on that list, so a 19 MB .node binary sitting there never boards the plane. public/ is, which is the whole
+    // reason public/_prisma/schema.prisma exists — the same constraint, solved the same way.
+    //
+    // The cost: ~44 MB of generated client in the repo, and it is served publicly like anything else under public/.
+    // No credentials live in it; the schema beside it was already public for the same reason.
+    output   = "./client"
     // The deploy target is a 2nd-gen Cloud Function, i.e. Cloud Run: linux x64 on Debian/glibc.
     // This said linux-musl-arm64 (Alpine on ARM) — an engine that can never load there.
     binaryTargets = ["native", "debian-openssl-3.0.x"]

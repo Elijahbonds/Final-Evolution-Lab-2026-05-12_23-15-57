@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createShare, readShare, revokeShare, listShares, ShareRefused, MAX_LIVE_SHARES_PER_COACH } from './service';
 import { shareDrill, ShareLeak, type Share, type SharedBy } from './shareable';
 import { PLATFORM_PROTOCOLS } from '../profile/protocol';
-import { Prisma } from '@/lib/generated/prisma';
+import { Prisma } from '@/public/_prisma/client';
 
 const BY: SharedBy = { coachId: 'coach_me', displayName: 'Coach Mike', credentialed: true };
 const drill = (o = {}) => shareDrill('depth_drop', PLATFORM_PROTOCOLS, BY, o).share!;

@@ -20,11 +20,11 @@ const src = join('prisma', 'schema.prisma');
 if (!existsSync(src)) { console.error(`[prisma-schema] ${src} missing`); process.exit(1); }
 const destDir = join('public', '_prisma');
 mkdirSync(destDir, { recursive: true });
-// THE OUTPUT PATH IS RELATIVE TO THE SCHEMA FILE, and this copy sits one directory deeper than prisma/schema.prisma.
-// Copied verbatim, `output = "../lib/generated/prisma"` resolves to public/lib/generated/prisma whenever generate
-// reads this copy — which is exactly where it silently went the first time. One extra hop on the way out.
+// THE OUTPUT PATH IS RELATIVE TO THE SCHEMA FILE. This copy already lives in public/_prisma, so the client it names
+// is simply ./client — whereas the source schema, two directories up, has to walk down into public/. Both name the
+// same directory; copied verbatim they would not.
 writeFileSync(
   join(destDir, 'schema.prisma'),
-  readFileSync(src, 'utf8').replace('output   = "../lib/generated/prisma"', 'output   = "../../lib/generated/prisma"'),
+  readFileSync(src, 'utf8').replace('output   = "../public/_prisma/client"', 'output   = "./client"'),
 );
 console.log(`[prisma-schema] copied ${src} -> ${join(destDir, 'schema.prisma')}`);

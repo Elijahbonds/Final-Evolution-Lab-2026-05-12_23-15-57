@@ -1,5 +1,5 @@
 // _mp-mode-keys — do GameSession.mode values match the multiplayer challenge keys (lib/mp/match-core MP_MODES)?
-import { PrismaClient } from '@/lib/generated/prisma';
+import { PrismaClient } from '@/public/_prisma/client';
 import mc from '../../lib/mp/match-core';
 const { MP_MODES } = mc as unknown as typeof import('../../lib/mp/match-core');
 const db = new PrismaClient();

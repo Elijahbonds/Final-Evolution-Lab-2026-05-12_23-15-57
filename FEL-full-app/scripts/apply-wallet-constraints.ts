@@ -4,7 +4,7 @@
  */
 import 'dotenv/config';
 import { readFileSync } from 'node:fs';
-import { PrismaClient } from '@/lib/generated/prisma';
+import { PrismaClient } from '@/public/_prisma/client';
 const db = new PrismaClient();
 
 async function main(): Promise<void> {

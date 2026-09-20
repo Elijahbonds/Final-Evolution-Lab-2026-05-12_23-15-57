@@ -16,7 +16,7 @@
 // failure it causes is a missing panel with a known fix.
 
 import 'server-only';
-import type { PrismaClient } from '@/lib/generated/prisma';
+import type { PrismaClient } from '@/public/_prisma/client';
 import { loadSharedProfile } from '../profile/profileServer';
 import { PLATFORM_PROTOCOLS } from '../profile/protocol';
 import { CURRICULUM_VERSION } from '../curriculum/blueprint';

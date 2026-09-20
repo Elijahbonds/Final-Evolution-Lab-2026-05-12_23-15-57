@@ -15,7 +15,7 @@
  *   - amount bounds enforced server-side (ECONOMY_CONFIG.earn.storyNodeRewardMax)
  */
 
-import type { Prisma } from '@/lib/generated/prisma';
+import type { Prisma } from '@/public/_prisma/client';
 import { awardCredits, type AwardResult } from '@/lib/economy';
 
 export interface StoryAward {

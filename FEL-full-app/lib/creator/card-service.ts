@@ -8,7 +8,7 @@
  */
 
 import 'server-only';
-import { PrismaClient } from '@/lib/generated/prisma';
+import { PrismaClient } from '@/public/_prisma/client';
 import { computeTraceablePrq } from '@/lib/prq-entries';
 import {
   deriveRarity, slugCandidate, safeAccent, clampCardText, isValidSlug,

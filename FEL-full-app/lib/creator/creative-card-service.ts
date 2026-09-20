@@ -5,7 +5,7 @@
 // infrastructure: Prisma (CreativeCard/CardSlot models) + the wallet-service
 // (grantServerReward / spend). The pure gate/validation logic is unchanged.
 
-import type { PrismaClient } from '@/lib/generated/prisma';
+import type { PrismaClient } from '@/public/_prisma/client';
 import { grantServerReward, spend } from '@/lib/wallet/wallet-service';
 import { REASON } from '@/lib/wallet/reward-rules';
 import {

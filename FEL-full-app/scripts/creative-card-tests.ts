@@ -14,7 +14,7 @@
 
 import 'dotenv/config';
 import assert from 'node:assert';
-import { PrismaClient } from '@/lib/generated/prisma';
+import { PrismaClient } from '@/public/_prisma/client';
 import {
   createCard, reviewCard, CardError, type CreateCardInput,
 } from '../lib/creator/creative-card-service';

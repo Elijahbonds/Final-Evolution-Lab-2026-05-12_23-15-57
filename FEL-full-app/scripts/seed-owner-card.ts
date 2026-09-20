@@ -12,7 +12,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import bcrypt from 'bcryptjs';
-import { PrismaClient } from '@/lib/generated/prisma';
+import { PrismaClient } from '@/public/_prisma/client';
 
 for (const f of ['.env.local', '.env']) {
   if (!existsSync(f)) continue;

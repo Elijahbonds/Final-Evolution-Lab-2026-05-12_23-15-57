@@ -13,7 +13,7 @@
  * and a shard-credit ledger row; balances can never go negative.
  */
 
-import { PrismaClient, Prisma } from '@/lib/generated/prisma';
+import { PrismaClient, Prisma } from '@/public/_prisma/client';
 import { getOrCreateWallet, readWallet, WalletError } from './wallet-service';
 
 // TUNE(elijah) — exchange rate: coins per 1 shard.

@@ -9,7 +9,7 @@
 //   coach@fel.local  / coach-local-only      client@fel.local / client-local-only
 import { readFileSync, existsSync } from 'node:fs';
 import bcrypt from 'bcryptjs';
-import { PrismaClient } from '@/lib/generated/prisma';
+import { PrismaClient } from '@/public/_prisma/client';
 import { requiredModules, CURRICULUM_VERSION } from '../../lib/curriculum/blueprint';
 
 for (const f of ['.env.local', '.env']) {

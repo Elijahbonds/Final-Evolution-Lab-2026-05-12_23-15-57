@@ -11,7 +11,7 @@
 // capability URLs nobody asked for, and it would make "revoke my public invite" impossible to reason about. One
 // public link, the coach can revoke it, and every share they have ever sent starts pointing at a new one.
 
-import type { PrismaClient } from '@/lib/generated/prisma';
+import type { PrismaClient } from '@/public/_prisma/client';
 import { INVITE_TTL_MS } from './invite';
 
 /** How long a public invite lives before it is quietly rolled over. A year: it is on flyers and old messages. */

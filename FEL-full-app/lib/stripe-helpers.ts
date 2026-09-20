@@ -5,7 +5,7 @@
  * talks to Stripe directly — it only builds the correct postings.
  */
 
-import type { Prisma } from '@/lib/generated/prisma';
+import type { Prisma } from '@/public/_prisma/client';
 import { postTransaction, type DbClient, type LedgerCurrency } from '@/lib/ledger';
 
 const CUR: LedgerCurrency = 'USD_CENTS';

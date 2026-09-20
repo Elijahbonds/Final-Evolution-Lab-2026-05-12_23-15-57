@@ -17,7 +17,7 @@
 
 import 'dotenv/config';
 import assert from 'node:assert';
-import { PrismaClient } from '@/lib/generated/prisma';
+import { PrismaClient } from '@/public/_prisma/client';
 import { postTransaction, postLc, getBalance, LedgerError, type DbClient } from '../lib/ledger';
 
 const prisma = new PrismaClient();

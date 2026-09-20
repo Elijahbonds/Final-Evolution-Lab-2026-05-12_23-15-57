@@ -25,8 +25,8 @@ describe('the prisma schema that ships', () => {
     // Everything else being byte-identical is the property that matters: a model added to one must reach the other.
     expect(differing).toHaveLength(1);
     expect(a[differing[0]]).toContain('output');
-    expect(a[differing[0]]).toContain('../lib/generated/prisma');
-    expect(b[differing[0]]).toContain('../../lib/generated/prisma');
+    expect(a[differing[0]]).toContain('../public/_prisma/client');
+    expect(b[differing[0]]).toContain('./client');
   });
 
   it('every model in the source schema reaches the shipped one', () => {
@@ -37,7 +37,7 @@ describe('the prisma schema that ships', () => {
   it('the generated client is built from the same schema, so a new model is actually callable', () => {
     // The whole point of generating into the source tree: this file ships with the build. If it drifts from the
     // schema, production gets a client that has never heard of the newest table — which is the bug this exists for.
-    const generated = readFileSync('lib/generated/prisma/schema.prisma', 'utf8');
+    const generated = readFileSync('public/_prisma/client/schema.prisma', 'utf8');
     const models = (s: string) => [...s.matchAll(/^model\s+(\w+)/gm)].map((m) => m[1]).sort();
     expect(models(generated)).toEqual(models(source()));
   });
