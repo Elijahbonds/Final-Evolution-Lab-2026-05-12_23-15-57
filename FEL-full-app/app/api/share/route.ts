@@ -12,6 +12,8 @@ import {
 } from '@/lib/share/shareable';
 import { toPlainText } from '@/lib/share/plaintext';
 import { createShare, listShares, ShareRefused } from '@/lib/share/service';
+import { ensurePublicInvite } from '@/lib/coach/publicInvite';
+import { randomBytes } from 'node:crypto';
 import { ShareLeak } from '@/lib/share/shareable';
 
 /**
@@ -59,6 +61,9 @@ export async function POST(req: NextRequest) {
     const created = await createShare(prisma, session.user.id, built.share, {
       expiresAt: expiresAt ? new Date(expiresAt) : null,
     });
+    // TIE: a shared program is the front door to this coach's roster. The public invite is made HERE — on a write the
+    // coach initiated — so the public page can read it without an anonymous viewer ever causing a write.
+    await ensurePublicInvite(prisma, session.user.id, () => randomBytes(24).toString('base64url')).catch(() => null);
     const origin = req.headers.get('origin') || process.env.NEXTAUTH_URL || '';
     const url = shareUrl(origin, created.token);
     return NextResponse.json({

@@ -15,7 +15,8 @@ import { prisma } from '@/lib/db';
 import { readShare } from '@/lib/share/service';
 import { toSummaryLine } from '@/lib/share/plaintext';
 import type { Share, SharedItem } from '@/lib/share/shareable';
-import { BadgeCheck, Clock, Lock } from 'lucide-react';
+import { BadgeCheck, Clock, Lock, UserPlus } from 'lucide-react';
+import { invitePath } from '@/lib/coach/invite';
 
 export const dynamic = 'force-dynamic';
 
@@ -94,9 +95,20 @@ function Body({ share }: { share: Share }) {
 }
 
 export default async function SharePage({ params }: { params: { token: string } }) {
-  const share = await readShare(prisma, String(params?.token ?? ''));
+  const token = String(params?.token ?? '');
+  const share = await readShare(prisma, token);
   // missing, revoked and expired are one answer
   if (!share) notFound();
+
+  // TIE: whoever is reading this can become this coach's client. The invite is READ only — it was created when the
+  // coach made the share — so a stranger opening a link never causes a write.
+  const row = await prisma.shareLink.findUnique({ where: { token }, select: { coachId: true } });
+  const publicInvite = row
+    ? await prisma.coachInvite.findFirst({
+        where: { coachId: row.coachId, use: 'many', closedAt: null, expiresAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' }, select: { token: true },
+      })
+    : null;
 
   return (
     <main className="mx-auto max-w-2xl px-5 py-10">
@@ -129,6 +141,24 @@ export default async function SharePage({ params }: { params: { token: string } 
           Start tracking
         </Link>
       </div>
+
+      {publicInvite && (
+        <div className="mt-4 rounded-xl border border-[#00E5FF]/25 bg-[#00E5FF]/[0.06] p-4">
+          <p className="flex items-center gap-2 text-sm font-medium text-white">
+            <UserPlus className="h-4 w-4 text-[#00E5FF]" />
+            Want {share.by.displayName} to program for you?
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-white/55">
+            Join their roster and they can build your training, watch your movement screens and send you work.
+          </p>
+          <Link
+            href={invitePath(publicInvite.token)}
+            className="mt-3 inline-block rounded-lg bg-[#00E5FF] px-4 py-2 text-sm font-bold text-[#050505]"
+          >
+            Train with {share.by.displayName}
+          </Link>
+        </div>
+      )}
 
       <p className="mt-6 text-[11px] leading-relaxed text-white/30">
         Training guidance from an independent coach. Final Evolution Lab is a performance and movement
