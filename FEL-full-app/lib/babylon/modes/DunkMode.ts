@@ -85,6 +85,7 @@ import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
 import { approachAngle, approachBonus, takeoffFor, takeoffTell } from '../core/DunkApproach';
+import { spinBody, spinProgress } from '../core/DunkSpinBody';
 import { emptyCard, addAttempt, forWire, nightReport } from '@/lib/mp/dunkCard';
 import {
   judgeDunk, ScoreReveal, CrowdEnergy, REVEAL_DURATION_SEC, BAND_TOTAL, JUDGE_COUNT,
@@ -106,6 +107,9 @@ const HOLD_RUN_MAX = 7, HOLD_RUN_RAMP = 6, AIR_LEAN_RAD = 0.32, AIR_DRIFT = 0.8;
 const GATHER_STRIDE_SEC = 0.3, GATHER_MIN_M = 1.1, GATHER_EASE_SEC = 0.16;
 /** How far the plant step keeps rolling toward the rim over PLANT_SEC (≈ the carry speed × the plant: no dead stop at the line). */
 const PLANT_DRIFT_M = 0.14;
+/** The tucked off arm of a 360 (clip degrees: X pitch, Y yaw, Z roll) and how far the tuck may pull the clip's own arm. */
+const SPIN_TUCK_DEG: [number, number, number] = [-18, 26, 34];
+const SPIN_TUCK_WEIGHT = 0.55;
 /** The runway loop's rate follows the run (the loop ran at one rate from a 2 m/s drift to a 7 m/s sprint: foot slide). */
 const strideRate = (mps: number): number => Math.max(0.7, Math.min(1.6, mps / HOOPS_STRIDE.run));
 // Dunk play tip (2026-09-07): a full stick runs at APPROACH_SPEED (the hold-run ramps past it to HOLD_RUN_MAX); the
@@ -567,7 +571,7 @@ export const DunkMode: ModeDefinition = (() => {
   // squares the chest to the rim (the spin subtracted), puts the eyes on the iron and strips the clip's own hip yaw.
   interface PpNode { n: TransformNode; raw: Quaternion; out: Quaternion; layered: boolean; bindChain: Quaternion }
   let ppFrame: TransformNode | null = null;
-  const ppNodes: { spine: PpNode | null; spine1: PpNode | null; spine2: PpNode | null; neck: PpNode | null; head: PpNode | null; Left: PpNode | null; Right: PpNode | null } = { spine: null, spine1: null, spine2: null, neck: null, head: null, Left: null, Right: null };
+  const ppNodes: { spine: PpNode | null; spine1: PpNode | null; spine2: PpNode | null; neck: PpNode | null; head: PpNode | null; Left: PpNode | null; Right: PpNode | null; offArm: PpNode | null } = { offArm: null, spine: null, spine1: null, spine2: null, neck: null, head: null, Left: null, Right: null };
   const llNodes: { LeftFoot: PpNode | null; RightFoot: PpNode | null; LeftToeBase: PpNode | null; RightToeBase: PpNode | null } = { LeftFoot: null, RightFoot: null, LeftToeBase: null, RightToeBase: null };
   const llPitch = { Left: 0, Right: 0 };   // the eased ankle correction per side (rad)
   let ppSign: 1 | -1 = 1;                     // world yaw per frame-space yaw (−1 under a mirrored import root)
@@ -2226,6 +2230,7 @@ export const DunkMode: ModeDefinition = (() => {
     ppFrame = hipsNode ? frameAbove(hipsNode) : null;
     ppNodes.spine = ppNodeFor('Spine'); ppNodes.spine1 = ppNodeFor('Spine1'); ppNodes.spine2 = ppNodeFor('Spine2'); ppNodes.neck = ppNodeFor('Neck'); ppNodes.head = ppNodeFor('Head');
     ppNodes.Left = ppNodeFor('LeftShoulder'); ppNodes.Right = ppNodeFor('RightShoulder');
+    ppNodes.offArm = ppNodeFor('LeftArm');   // THE 360's TUCK rides the off arm only — the right carries the ball
     for (const k of ['LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'] as const) llNodes[k] = ppNodeFor(k);   // DUNK-POSTURE-LEGS: the feet and the toes
     llPose = cloneLegPose(LEGS.stance);
     ppPose = clonePose(POSTURE.stance); ppWindow = 'stance'; ppTrick = null; ppAim = 0; ppHeadYaw = 0; ppHeadPitch = 0;
@@ -2279,6 +2284,22 @@ export const DunkMode: ModeDefinition = (() => {
     stance(ppNodes.spine1, P.spine1); stance(ppNodes.spine2, P.spine2);
     for (const side of ['Left', 'Right'] as const) stance(ppNodes[side], [0, CLAVICLE_SIGN[side].forward * P.forward, CLAVICLE_SIGN[side].shrug * P.shrug]);
     stance(ppNodes.neck, P.neck); stance(ppNodes.head, P.head);
+    // 1b) THE BODY AROUND THE 360 (DunkSpinBody): the off arm tucks to drive the turn and opens at the catch to stop it,
+    //     the axis leans into the rotation, and the head lets the rim go and finds it again. Only while a turn is live.
+    const spinRec = replaying ? null : spin.record;
+    const sb = spinRec ? spinBody(spinProgress(spinRec, clipTime), spinRec.turns) : { tuck: 0, tilt: 0, spot: 1 };
+    if (sb.tuck > 0.02 && ppNodes.offArm) {
+      // the clip's own arm is still under it: this pulls TOWARD a tucked elbow by the tuck's weight, never replaces it
+      stanceW(ppNodes.offArm, SPIN_TUCK_DEG, clamp(sb.tuck * SPIN_TUCK_WEIGHT * w, 0, 1));
+    }
+    if (Math.abs(sb.tilt) > 0.05) {
+      for (const [pnode, k] of [[ppNodes.spine1, 0.45], [ppNodes.spine2, 0.55]] as [PpNode | null, number][]) {
+        if (!pnode) continue;
+        chainRotation(pnode.n, ppFrame).multiplyToRef(Quaternion.Inverse(pnode.bindChain), _ppD);
+        const axis = Vector3.Forward().rotateByQuaternionToRef(_ppD, new Vector3()).normalize();
+        Quaternion.RotationAxisToRef(axis, sb.tilt * k * w * Math.PI / 180, _ppRho); rotateInFrame(pnode.n, _ppRho); ppCommit(pnode);
+      }
+    }
     // 2) the rim-locked chest aim: the chest's frame-space yaw vs where the rim is (the turn subtracted), split over the two
     //    thoracic bones, capped at a hip–shoulder separation, eased so the aim never jitters against the clip
     const rootYaw = player.root.rotationQuaternion ? player.root.rotationQuaternion.toEulerAngles().y : player.root.rotation.y;
@@ -2302,8 +2323,10 @@ export const DunkMode: ModeDefinition = (() => {
       const headYaw = Math.atan2(_ppV.x, _ppV.z), headEl = Math.asin(clamp(_ppV.y, -1, 1));
       hp.n.computeWorldMatrix(true); const hw = hp.n.getAbsolutePosition();
       const el = Math.atan2(rim.y - hw.y, Math.max(0.3, Math.hypot(rim.x - hw.x, rim.z - hw.z)));
-      const wantYaw = clamp(wrapRad(spinYaw + ppSign * rootErr - headYaw), -HEAD_YAW_CAP, HEAD_YAW_CAP) * P.eyes * w;
-      const wantPitch = clamp(el - headEl, -HEAD_PITCH_CAP, HEAD_PITCH_CAP) * P.eyes * w;
+      // the spot: through a turn the head holds the rim, loses it as the shoulders pass, and snaps back on
+      const eyeW = P.eyes * w * sb.spot;
+      const wantYaw = clamp(wrapRad(spinYaw + ppSign * rootErr - headYaw), -HEAD_YAW_CAP, HEAD_YAW_CAP) * eyeW;
+      const wantPitch = clamp(el - headEl, -HEAD_PITCH_CAP, HEAD_PITCH_CAP) * eyeW;
       ppHeadYaw += (wantYaw - ppHeadYaw) * kAim; ppHeadPitch += (wantPitch - ppHeadPitch) * kAim;
       const parts: [PpNode | null, number][] = [[ppNodes.neck, EYES_SPLIT[0]], [hp, EYES_SPLIT[1]]];
       for (const [p, k] of parts) {
