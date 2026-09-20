@@ -5,6 +5,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
+import { Dumbbell, Gamepad2 } from 'lucide-react';
+import { ModeCarousel } from '@/components/onboarding/mode-carousel';
+import { MODE_INFO } from '@/lib/game-data';
+import {
+  DEFAULT_FIRST_GAME, destinationFor, resolveFirstGame, type OnboardingPath,
+} from '@/lib/onboarding/firstRun';
 import { motion } from 'framer-motion';
 import { Zap, Loader2, Check } from 'lucide-react';
 import { CURRENT_POLICY_VERSION } from '@/lib/policies';
@@ -13,14 +19,7 @@ import { toast } from 'sonner';
 
 // M8.6 — landing hook: marquee sports so the pre-auth page actually shows what
 // FEL is. Imagery lives in /public/venues. // TUNE(elijah)
-const SPORT_PICKS: { label: string; sub: string; img: string; href: string }[] = [
-  { label: 'Streetball', sub: 'Dunk · 1v1 · 3v3', img: '/venues/venicebeach.jpg', href: '/play/dunk' },
-  { label: 'Karate', sub: 'Endless · Versus', img: '/venues/dojo-card.jpg', href: '/play/karate' },
-  { label: 'Skate', sub: 'Venice Skatepark', img: '/venues/skatepark.jpg', href: '/play/skateboard' },
-  { label: 'Surf', sub: 'Surf Break', img: '/venues/surfbreak.jpg', href: '/play/surf' },
-  { label: 'Snowboard', sub: 'Gate Crasher · Stomp', img: '/venues/mountainslope.jpg', href: '/play/snowboard' },
-  { label: 'Tennis', sub: 'Match · Tiebreak', img: '/venues/tenniscourt.jpg', href: '/play/tennis' },
-];
+
 
 export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const router = useRouter();
@@ -31,17 +30,23 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const [policyAccepted, setPolicyAccepted] = useState(false);
   // M8.6 — sport chosen before credential commitment (signup). Persisted so it can
   // greet the athlete after they land inside the lab. Cosmetic onboarding only.
-  const [selectedSport, setSelectedSport] = useState<string | null>(null);
 
   // Phase 5 — referral attribution. A ?ref=CODE from a shared link is captured
   // here (and persisted by EmailCapture) so it survives the hop to /signup.
   const [refCode, setRefCode] = useState<string | null>(null);
+  // WHAT THEY CAME FOR, asked before they commit to anything. Some people arrive to play and some arrive to be
+  // assessed; sending both to the same shelf loses one of them.
+  const [path, setPath] = useState<OnboardingPath>('play');
+  const [firstGame, setFirstGame] = useState<string>(DEFAULT_FIRST_GAME);
+  // The creator whose card or QR brought them, resolved from ?ref by /api/onboarding/host.
+  const [host, setHost] = useState<{ name: string; mode: string | null; accent: string | null } | null>(null);
 
   useEffect(() => {
+    // The last game they picked, so somebody coming back is offered what they chose before rather than the default.
     try {
-      const saved = localStorage.getItem('fel:preferredSport');
-      if (saved) setSelectedSport(saved);
-    } catch { /* ignore */ }
+      const saved = localStorage.getItem('fel:firstGame');
+      if (saved && MODE_INFO[saved]?.href) setFirstGame(saved);
+    } catch { /* a blocked or empty store is not an error here */ }
     try {
       const url = new URL(window.location.href);
       const fromUrl = url.searchParams.get('ref');
@@ -54,9 +59,29 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     } catch { /* ignore */ }
   }, []);
 
-  const pickSport = (label: string) => {
-    setSelectedSport(label);
-    try { localStorage.setItem('fel:preferredSport', label); } catch { /* ignore */ }
+  // WHOSE LINK THIS IS DECIDES THE FIRST GAME. A card scanned at a court already pays its owner shards
+  // (lib/creator/share-link.ts); until now it had no say in what the person it recruited actually landed on.
+  // Their signature mode is that say. Resolved server-side, because a referral code should not expose a lookup
+  // of anybody's account from the client.
+  useEffect(() => {
+    if (!refCode) return;
+    let live = true;
+    fetch(`/api/onboarding/host?ref=${encodeURIComponent(refCode)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!live || !j?.host) return;
+        setHost(j.host);
+        if (j.host.mode) setFirstGame(j.host.mode);
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [refCode]);
+
+
+
+  const rememberGame = (key: string) => {
+    setFirstGame(key);
+    try { localStorage.setItem('fel:firstGame', key); } catch { /* per-viewer convenience only */ }
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -96,7 +121,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         setLoading(false);
         return;
       }
-      router.replace('/');
+      // Land them in the thing they said they came for, not on a menu about it.
+      router.replace(destinationFor(path, resolveFirstGame({ creatorMode: host?.mode, chosen: firstGame })));
     } catch {
       toast.error('Something went wrong');
       setLoading(false);
@@ -104,7 +130,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#050505] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-[#050505] px-3 py-6 sm:px-4">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-[#00E5FF]/10 blur-[120px]" />
         <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-[#A855F7]/10 blur-[120px]" />
@@ -113,69 +139,109 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className={`fel-panel relative w-full rounded-xl p-8 ${mode === 'signup' ? 'max-w-2xl' : 'max-w-md'}`}
+        className={`fel-panel relative w-full rounded-2xl p-5 sm:p-8 ${mode === 'signup' ? 'max-w-2xl' : 'max-w-md'}`}
       >
-        <div className="mb-6 text-center">
-          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-xl border border-[#00E5FF]/40 bg-[#00E5FF]/10">
-            <Zap className="h-7 w-7 text-[#00E5FF]" />
+        <div className="mb-5 text-center">
+          <div className="mb-2.5 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#00E5FF]/40 bg-[#00E5FF]/10 sm:h-14 sm:w-14">
+            <Zap className="h-6 w-6 text-[#00E5FF] sm:h-7 sm:w-7" />
           </div>
-          <h1 className="fel-heading text-4xl font-bold">
+          <h1 className="fel-heading text-[26px] font-bold leading-none sm:text-4xl">
             <span className="text-[#00E5FF] fel-glow-cyan">FINAL EVOLUTION</span> LAB
           </h1>
-          <p className="mt-2 text-sm text-white/60">
+          <p className="mx-auto mt-2 max-w-xs text-[13px] text-white/55 sm:max-w-none sm:text-sm">
             {mode === 'login'
               ? 'Real sports, real training — your on-court reps become real stats.'
               : 'Pick your arena, then create your athlete profile.'}
           </p>
         </div>
 
-        {/* M8.6 — LOGIN: venue preview strip so the landing page shows the game // TUNE(elijah) */}
-        {mode === 'login' && (
-          <div className="mb-7">
-            <div className="grid grid-cols-4 gap-2">
-              {SPORT_PICKS.slice(0, 4).map((s) => (
-                <div key={s.label} className="relative aspect-[3/4] overflow-hidden rounded-lg border border-white/10 bg-[#16161A]">
-                  <Image src={s.img} alt={`${s.label} arena in Final Evolution Lab`} fill sizes="120px" className="object-cover opacity-90" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
-                  <span className="fel-heading absolute bottom-1.5 left-0 right-0 text-center text-[11px] font-bold uppercase tracking-wide text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>{s.label}</span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-2 text-center text-[11px] text-white/45">Streetball · Karate · Skate · Surf · Snowboard · Tennis — and more inside.</p>
+        {/* WHO SENT THEM. A scanned card already pays its owner; now it also greets the person it recruited and
+            decides what they open on. Their colour carries through the whole arrival. */}
+        {host && (
+          <div
+            className="mb-5 flex items-center gap-3 rounded-2xl border px-4 py-3"
+            style={{
+              borderColor: `${host.accent ?? '#00E5FF'}40`,
+              background: `${host.accent ?? '#00E5FF'}0D`,
+            }}
+          >
+            <span
+              aria-hidden
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full font-mono text-[13px] font-black text-black"
+              style={{ background: host.accent ?? '#00E5FF' }}
+            >
+              {host.name.slice(0, 1).toUpperCase()}
+            </span>
+            <p className="min-w-0 text-[13px] leading-snug text-white/70">
+              <span className="font-bold text-white">{host.name}</span> sent you
+              {host.mode && MODE_INFO[host.mode] && (
+                <> — you are starting in <span className="font-bold text-white">{MODE_INFO[host.mode].name}</span>.</>
+              )}
+            </p>
           </div>
         )}
 
-        {/* M8.6 — SIGNUP: sport/mode picker BEFORE credential commitment // TUNE(elijah) */}
+        {/* THE TWO WAYS IN. This used to be six hardcoded sports that saved your answer to localStorage and then
+            sent you to the home page regardless. Asking is only worth doing if the answer changes where you land,
+            and now it does. */}
         {mode === 'signup' && (
-          <div className="mb-7">
-            <p className="mb-2 fel-heading text-xs font-bold uppercase tracking-widest text-white/50">Choose your arena</p>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-              {SPORT_PICKS.map((s) => {
-                const active = selectedSport === s.label;
+          <div className="mb-5">
+            <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
+              What did you come for?
+            </p>
+            <div className="grid grid-cols-2 gap-2.5">
+              {([
+                { id: 'play' as const, icon: Gamepad2, title: 'Play first', line: 'Drop into a game now.', accent: '#00E5FF' },
+                { id: 'body' as const, icon: Dumbbell, title: 'Body first', line: 'Screen your movement, then train.', accent: '#00FF9D' },
+              ]).map((o) => {
+                const on = path === o.id;
+                const Icon = o.icon;
                 return (
                   <button
+                    key={o.id}
                     type="button"
-                    key={s.label}
-                    onClick={() => pickSport(s.label)}
-                    className={`relative aspect-[4/3] overflow-hidden rounded-lg border text-left transition-all ${active ? 'border-[#00E5FF] shadow-[0_0_18px_rgba(0,229,255,0.4)]' : 'border-white/10 hover:border-white/30'}`}
+                    onClick={() => setPath(o.id)}
+                    aria-pressed={on}
+                    className="rounded-2xl border p-3.5 text-left transition-all duration-200"
+                    style={{
+                      borderColor: on ? `${o.accent}66` : 'rgba(255,255,255,0.10)',
+                      background: on ? `${o.accent}10` : 'rgba(255,255,255,0.02)',
+                    }}
                   >
-                    <Image src={s.img} alt={`${s.label} arena`} fill sizes="180px" className={`object-cover transition-opacity ${active ? 'opacity-100' : 'opacity-70'}`} />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-                    {active && (
-                      <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#00E5FF]">
-                        <Check className="h-3 w-3 text-black" />
-                      </span>
-                    )}
-                    <div className="absolute bottom-1.5 left-2 right-2">
-                      <div className="fel-heading text-sm font-bold uppercase leading-none text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>{s.label}</div>
-                      <div className="mt-0.5 text-[10px] text-white/70" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>{s.sub}</div>
-                    </div>
+                    <Icon className="h-[18px] w-[18px]" style={{ color: on ? o.accent : 'rgba(255,255,255,0.35)' }} strokeWidth={2.2} />
+                    <span className="fel-heading mt-2 block text-[14px] font-bold leading-none text-white">{o.title}</span>
+                    <span className="mt-1.5 block text-[11.5px] leading-snug text-white/45">{o.line}</span>
                   </button>
                 );
               })}
             </div>
           </div>
         )}
+
+        {/* The games, as a rail you swipe. The focused card preloads its mode so entry is instant. */}
+        {mode === 'signup' && path === 'play' && (
+          <div className="mb-6">
+            <ModeCarousel lead={host?.mode ?? null} value={firstGame} onChange={rememberGame} accent={host?.accent} />
+          </div>
+        )}
+
+        {mode === 'signup' && path === 'body' && (
+          <div className="mb-6 rounded-2xl border border-[#00FF9D]/25 bg-[#00FF9D]/[0.04] p-4">
+            <p className="fel-heading text-[14px] font-bold text-white">You will start in the Mirror</p>
+            <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/50">
+              A movement screen from your phone camera — prop it up, step back, and it scores what it sees. The
+              games are still there when you want them.
+            </p>
+          </div>
+        )}
+
+        {/* SIGNING IN: the games, so the page shows the product rather than a lonely pair of fields. */}
+        {mode === 'login' && (
+          <div className="mb-6">
+            <ModeCarousel value={firstGame} onChange={rememberGame} />
+          </div>
+        )}
+
         <form onSubmit={submit} className="mx-auto max-w-md space-y-4">
           {mode === 'signup' && (
             <input

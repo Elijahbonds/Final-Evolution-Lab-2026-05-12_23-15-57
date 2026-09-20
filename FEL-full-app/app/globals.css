@@ -175,3 +175,12 @@ canvas {
   .fel-breath { animation: fel-breathe-calm 12s ease-in-out infinite; }
   @keyframes fel-breathe-calm { 0%, 100% { opacity: 0.4; } 40%, 55% { opacity: 1; } }
 }
+
+/* A horizontal rail you swipe. The scrollbar is chrome on a surface whose whole point is the pictures, and on a
+   phone there is no scrollbar to show anyway — so it is hidden on every platform rather than on some of them. */
+.fel-rail {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior-x: contain;
+}
+.fel-rail::-webkit-scrollbar { display: none; }

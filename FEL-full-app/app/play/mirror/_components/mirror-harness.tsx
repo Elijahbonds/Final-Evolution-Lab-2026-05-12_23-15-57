@@ -391,6 +391,9 @@ export function MirrorHarness() {
                 key={key}
                 role="tab"
                 aria-selected={on}
+                // The visible label is short because a segmented control should be; the accessible name is the
+                // full one, so what a screen reader announces is the pattern's actual name.
+                aria-label={PATTERN_TITLE[key]}
                 onClick={() => setPattern(key)}
                 disabled={live}
                 className={`rounded-xl px-3.5 py-2 text-[12.5px] font-bold transition-all duration-200

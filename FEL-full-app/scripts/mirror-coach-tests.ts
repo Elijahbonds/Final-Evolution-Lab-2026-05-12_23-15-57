@@ -109,15 +109,17 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
 // ── C. wiring ───────────────────────────────────────────────────────────────
 {
   const h = readFileSync(new URL('../app/play/mirror/_components/mirror-harness.tsx', import.meta.url), 'utf8');
-  ok(h.includes("['squat', 'Corrective Squat — guided']"), 'the picker offers the guided corrective squat');
+  // Matched on the pattern title map rather than one literal tuple, and case-insensitively on the stage copy:
+  // the guided flow is the contract, the exact shouting is not.
+  ok(/squat:\s*'Corrective Squat'/.test(h), 'the picker offers the guided corrective squat');
   ok(h.includes("patternRef.current === 'squat'"), 'the squat pattern runs its own analysis');
   ok(h.includes("analysis: patternRef.current === 'squat' ? 'squat' : 'zones'"), 'the compositor is routed by pattern');
   ok(h.includes('cueEngineRef.current.decide('), 'measured faults feed the cue engine');
   ok(h.includes('speak(evt.text)'), 'cues are voiced (on-device speechSynthesis)');
-  ok(h.includes('BREATHE FIRST'), 'the session breathes before it moves (the Blueprint)');
-  ok(h.includes('breath-pacer'), 'the pacer animates the breath cadence');
+  ok(/breathe first/i.test(h), 'the session breathes before it moves (the Blueprint)');
+  ok(h.includes('fel-breath'), 'the pacer animates the breath cadence');
   ok(h.includes('MY BAND PULLS IN — YOU PUSH OUT'), 'the RNT perturbation is visible when valgus faults');
-  ok(h.includes('REVIEW'), 'the session ends in a review, not a stopwatch');
+  ok(/>Review\.?</i.test(h) || /squatStage === 'review'/.test(h), 'the session ends in a review, not a stopwatch');
   const comp = readFileSync(new URL('../lib/babylon/nexus/neuro-mirror/render/overlay-compositor.ts', import.meta.url), 'utf8');
   ok(comp.includes("opts.analysis === 'squat'"), 'the compositor runs SquatAudit when asked');
   ok(comp.includes('pose: frame, squat'), 'squat results ride the frame payload');

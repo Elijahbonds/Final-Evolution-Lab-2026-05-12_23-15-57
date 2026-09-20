@@ -79,12 +79,15 @@ function runReps(n: number, pullMs: number, pressMs: number, holdMs: number): Re
 // ── C. harness wiring ───────────────────────────────────────────────────────
 {
   const h = readFileSync(new URL('../app/play/mirror/_components/mirror-harness.tsx', import.meta.url), 'utf8');
-  ok(h.includes("['jump', 'Vertical Jump']"), 'the pattern picker offers Vertical Jump');
+  // Asserted against the title map rather than one literal tuple: the picker's visible labels are short now
+  // ("Jump") and the full name is the accessible one, which is the name that actually has to be right.
+  ok(/jump:\s*'Vertical Jump'/.test(h), 'the pattern picker offers Vertical Jump');
+  ok(h.includes('aria-label={PATTERN_TITLE[key]}'), 'each pattern button is announced by its full name');
   ok(h.includes('jumpTrackerRef.current.feed(pose)'), 'the jump pattern runs the Prove It tracker on the same stream');
   ok(h.includes('jumpTrackerRef.current.reset()'), 'each jump resets for the next');
   ok(h.includes('paintSkeleton(pose, p)'), 'the skeleton is painted from the pose stream');
   ok(h.includes('skeletonRef'), 'the skeleton canvas is layered over the video');
-  ok(h.includes('REPS'), 'the live HUD shows the rep count');
+  ok(/>\s*Reps\s*</i.test(h), 'the live HUD shows the rep count');
   ok(h.includes('measured from flight time'), 'the jump panel says where the number comes from');
   ok(!/verticalCm.*random|Math\.random/.test(h), 'no fabricated jump numbers in the harness');
 }

@@ -15,6 +15,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Dumbbell, Gamepad2, UserRound } from 'lucide-react';
 
 export interface TabDef {
@@ -69,8 +70,11 @@ export function chromeHiddenFor(pathname: string): boolean {
  */
 export function TabBar({ variant = 'bar' }: { variant?: 'bar' | 'inline' } = {}) {
   const pathname = usePathname() || '/';
+  const { status } = useSession();
   const active = tabForPath(pathname);
-  if (chromeHiddenFor(pathname)) return null;
+  // Three tabs into an app you have not joined is an offer of doors that all lead to the login page. The rail
+  // already checks this; the bar did not, so a signed-out visitor on /signup got a navigation bar over the form.
+  if (chromeHiddenFor(pathname) || status !== 'authenticated') return null;
 
   const items = TABS.map((t) => {
     const on = active?.id === t.id;

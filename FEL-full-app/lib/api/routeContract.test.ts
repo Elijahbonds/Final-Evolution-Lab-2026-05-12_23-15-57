@@ -54,6 +54,7 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   'controller-link/signal/route.ts': 'pairing signal relay, rate limited',
   'v1/card/[slug]/route.ts': 'a published creator card is public by design (the card page is too)',
   'v1/creative-card/[id]/route.ts': 'a published creative card is public in the same way a creator card is',
+  'onboarding/host/route.ts': 'a visitor who scanned a card has no session yet; returns only a published card\'s display name, signature mode and accent',
 };
 
 // Two shapes count: a declared handler, and a re-export — NextAuth ships `export { handler as GET, handler as POST }`,
