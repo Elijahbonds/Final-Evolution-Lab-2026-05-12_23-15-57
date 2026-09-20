@@ -127,7 +127,12 @@ await page.goto(`${BASE}/play/dunk?agent=1&pass=${process.env.PASS ?? '1'}${proc
 await page.evaluate(`(() => {
   const pad = { index: 0, id: 'fake', connected: true, mapping: 'standard', axes: [0, 0, 0, 0], timestamp: 0, buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })) };
   window.__PAD = pad; navigator.getGamepads = () => [pad];
-  window.dispatchEvent(new Event('gamepadconnected'));
+  // A GamepadEvent, not a bare Event (2026-09-19). Babylon reads event.gamepad.id in its own connect handler, so
+  // a bare Event threw "Cannot read properties of undefined" on every single lab run: five console errors a
+  // session, in the very log this probe uses to judge whether a run was clean.
+  // (a real GamepadEvent cannot be constructed from a plain object — the constructor refuses to convert it — so the
+  //  property is attached to a plain Event, which is what the handler actually reads)
+  window.dispatchEvent(Object.assign(new Event('gamepadconnected'), { gamepad: pad }));
   // P4: the BODY through the flight — the top clip on the rig at 20 Hz, so "does a TOMAHAWK look like a TOMAHAWK" is a
   // measurement and not an opinion. Production publishes __FEL_DEV__.anim (SHARED-ANIM-BUS).
   window.__CLIPS = [];
