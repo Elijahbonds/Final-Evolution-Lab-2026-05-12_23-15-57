@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  StringBook, StrikeQueue, QUEUE_SEC, STRIKE_TIMING, canCancel, resolveMove, MOVES, STRING_WINDOW_SEC,
+  StringBook, StrikeQueue, QUEUE_SEC, STRIKE_TIMING, resolveMove, MOVES, STRING_WINDOW_SEC,
   pickTarget, stickDirTo, lungeFor, crowdStun, pathHits, pickGrab, THROW,
 } from './HordeDynamics';
 import { CombatAnimTree, type CombatAnimInput } from '../anim/combatTree';
@@ -12,13 +12,11 @@ describe('HordeDynamics — cancel + queue', () => {
   });
   it('a press before the cancel point waits; a stale one expires', () => {
     const q = new StrikeQueue();
-    expect(canCancel('light', 0, 0.1)).toBe(false);
     q.push('A', 'n', 0.1);
     expect(q.take(0.3)).toEqual({ btn: 'A', dir: 'n' });
     expect(q.take(0.3)).toBeNull();
     q.push('B', 'n', 0);
     expect(q.take(QUEUE_SEC + 0.01)).toBeNull();
-    expect(canCancel('light', 0, STRIKE_TIMING.light.cancelAt)).toBe(true);
   });
 });
 

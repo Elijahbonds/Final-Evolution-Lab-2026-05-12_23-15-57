@@ -79,9 +79,13 @@ export class StrikeQueue {
   clear(): void { this.btn = null; }
 }
 
-/** May a new command cut the swing that started at `startedAt`? */
-export const canCancel = (weight: StrikeWeightKey, startedAt: number, now: number): boolean =>
-  now - startedAt >= STRIKE_TIMING[weight].cancelAt;
+// `canCancel(weight, startedAt, now)` used to live here and was called by NOBODY — not even by this file's own mode.
+// It was removed rather than wired (2026-09-19), because wiring it would have been a downgrade: the rule karate
+// endless actually runs is `!striking || (hit beat landed && gameSec - startedAt >= cancelAt * style.startupMult)`,
+// and the helper knew about neither the hit beat nor the fighter's style scale. A dead export that encodes a WEAKER
+// version of a live rule is worse than no export: it reads as the authority and the next person to need a cancel
+// check finds it, uses it, and quietly loses two conditions. The cancel point itself stays in STRIKE_TIMING, which
+// is the shared thing worth sharing; how a mode reads it is the mode's own business.
 
 // ── the string book ─────────────────────────────────────────────────────────
 const M = (m: Omit<HordeMove, 'ender'> & { ender?: boolean }): HordeMove => ({ ender: false, ...m });
