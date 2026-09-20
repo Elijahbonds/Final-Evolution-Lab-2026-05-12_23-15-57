@@ -11,7 +11,7 @@
  * but the code-generation math is pure and unit-tested.
  */
 import 'server-only';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { grantServerReward } from '@/lib/wallet/wallet-service';
 import { REASON } from '@/lib/wallet/reward-rules';
 import { sendReferralRewardEmail } from '@/lib/marketing/email';

@@ -1,9 +1,21 @@
 generator client {
     provider = "prisma-client-js"
+    // GENERATED INTO THE SOURCE TREE, not node_modules/.prisma (2026-09-20, owner-approved).
+    //
+    // Two tables shipped correctly — schema pushed, copy deployed, code green — and 500'd in production for six
+    // deploys, because the deployed client had been generated from a schema that predated them. It could not fix
+    // itself, and the deploy's own output says why twice over: the cloud install prints "npm warn install-scripts
+    // @prisma/client", so nothing regenerates up there, and Firebase prints "Your package.json contains a custom
+    // build that is being ignored — only the Next.js default build script is respected", so generate cannot be hung
+    // off the build either. A client under node_modules is replaced by the cloud install and never rebuilt.
+    //
+    // In the source tree it is an ordinary module: traced by next build like any other import, uploaded with the
+    // bundle, immune to a reinstall. It is also what Prisma now asks for — generating without an output path is
+    // deprecated. The cost is ~44 MB of generated client in the repo, which is the price of a deterministic deploy.
+    output   = "../lib/generated/prisma"
     // The deploy target is a 2nd-gen Cloud Function, i.e. Cloud Run: linux x64 on Debian/glibc.
     // This said linux-musl-arm64 (Alpine on ARM) — an engine that can never load there.
     binaryTargets = ["native", "debian-openssl-3.0.x"]
-    // output path removed: use the default (node_modules/.prisma/client) so the project is portable across machines
 }
 
 datasource db {

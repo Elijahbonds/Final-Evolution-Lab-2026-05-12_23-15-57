@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 const db = new PrismaClient();
 const since = new Date(); since.setHours(0, 0, 0, 0);
 const s = await db.gameSession.groupBy({ by: ['mode'], where: { createdAt: { gte: since } }, _count: { _all: true } });

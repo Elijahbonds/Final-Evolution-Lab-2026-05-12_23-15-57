@@ -21,7 +21,7 @@
 
 import 'server-only';
 import { randomBytes } from 'crypto';
-import { Prisma, type PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@/lib/generated/prisma';
 import { assertNoAthleteData, isShareToken, shareIsPublishable, type Share } from './shareable';
 
 /**

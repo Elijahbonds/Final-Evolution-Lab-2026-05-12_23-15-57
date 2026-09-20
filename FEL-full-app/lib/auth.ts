@@ -7,7 +7,11 @@ import { isUnreachable } from '@/lib/db/errors';
 import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as any,
+  // @next-auth/prisma-adapter is typed against a client generated into node_modules/.prisma. Ours is generated into
+  // the source tree so it survives the deploy (see prisma/schema.prisma), which makes the two clients NOMINALLY
+  // different types for the same runtime object. The cast is at this one seam rather than pushing the old location
+  // back through the app.
+  adapter: PrismaAdapter(prisma as unknown as Parameters<typeof PrismaAdapter>[0]) as never,
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60,   // 30-day absolute session lifetime

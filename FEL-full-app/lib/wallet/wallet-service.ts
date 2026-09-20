@@ -20,7 +20,7 @@
  * the original entry.
  */
 
-import { Prisma, type PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@/lib/generated/prisma';
 import {
   DEFAULT_REWARD_RULES,
   EVENT_REASON,

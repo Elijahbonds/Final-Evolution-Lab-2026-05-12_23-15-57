@@ -1,5 +1,5 @@
 // Ship pass 2, Phase 5 proof: promote the LOCAL playtest account to admin, then read /api/admin/diag.
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 import { request } from 'playwright-core';
 const prisma = new PrismaClient();
 await prisma.user.update({ where: { email: 'playtest@fel.local' }, data: { role: 'admin' } });

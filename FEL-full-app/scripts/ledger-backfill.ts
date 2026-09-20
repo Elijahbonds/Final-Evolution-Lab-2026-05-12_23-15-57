@@ -14,7 +14,7 @@
  */
 
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 import { postTransaction } from '../lib/ledger';
 
 const prisma = new PrismaClient();

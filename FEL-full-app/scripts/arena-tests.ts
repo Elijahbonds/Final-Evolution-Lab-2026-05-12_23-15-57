@@ -24,7 +24,7 @@
 import 'dotenv/config';
 import { applyLc, readWallet } from '../lib/wallet/wallet-service';
 import assert from 'node:assert';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 
 import {
   ARENA_RAKE_PERCENT,

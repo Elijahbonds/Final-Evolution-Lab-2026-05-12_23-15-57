@@ -22,7 +22,7 @@
 
 import 'dotenv/config';
 import assert from 'assert';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 import { getBalance, postTransaction, type DbClient, LedgerError } from '../lib/ledger';
 import {
   ledgerEscrowLock,

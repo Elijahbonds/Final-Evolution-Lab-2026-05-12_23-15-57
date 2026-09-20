@@ -14,7 +14,7 @@
  */
 import 'server-only';
 import { sessionModeFor } from './match-core';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { grantServerReward } from '@/lib/wallet/wallet-service';
 import { REASON } from '@/lib/wallet/reward-rules';
 import { generateMatchCode, resolveOutcome, winnerIdFor } from '@/lib/mp/match-core';

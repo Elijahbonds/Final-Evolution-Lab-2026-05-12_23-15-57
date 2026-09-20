@@ -18,7 +18,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import bcrypt from 'bcryptjs';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 import { seedRewardRules } from './seed-reward-rules';
 import { migrateLcToWallet } from './migrate-lc-to-wallet';   // LC lives in the wallet (2026-09-04)   // PACK #5: the playtest path seeds the reward rules so earn never no-ops
 

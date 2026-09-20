@@ -20,7 +20,7 @@
 
 import 'dotenv/config';
 import assert from 'assert';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 import { getBalance, type DbClient } from '../lib/ledger';
 import {
   studioCreditBalance,

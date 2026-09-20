@@ -16,7 +16,7 @@
  */
 import 'dotenv/config';
 import assert from 'node:assert';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 
 import {
   REASON, EVENT_REASON, SHARD_REASONS, DEFAULT_REWARD_RULES, computeGrant,

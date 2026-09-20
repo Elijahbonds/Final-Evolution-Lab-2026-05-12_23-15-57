@@ -9,7 +9,7 @@
 //
 // .next IS copied, so the schema goes there and package.json's `prisma.schema`
 // points at it. The cloud install then generates a real client, engine included.
-import { copyFileSync, mkdirSync, existsSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // public/ is the only directory that reaches the deployed function intact. .next is
@@ -20,5 +20,11 @@ const src = join('prisma', 'schema.prisma');
 if (!existsSync(src)) { console.error(`[prisma-schema] ${src} missing`); process.exit(1); }
 const destDir = join('public', '_prisma');
 mkdirSync(destDir, { recursive: true });
-copyFileSync(src, join(destDir, 'schema.prisma'));
+// THE OUTPUT PATH IS RELATIVE TO THE SCHEMA FILE, and this copy sits one directory deeper than prisma/schema.prisma.
+// Copied verbatim, `output = "../lib/generated/prisma"` resolves to public/lib/generated/prisma whenever generate
+// reads this copy — which is exactly where it silently went the first time. One extra hop on the way out.
+writeFileSync(
+  join(destDir, 'schema.prisma'),
+  readFileSync(src, 'utf8').replace('output   = "../lib/generated/prisma"', 'output   = "../../lib/generated/prisma"'),
+);
 console.log(`[prisma-schema] copied ${src} -> ${join(destDir, 'schema.prisma')}`);

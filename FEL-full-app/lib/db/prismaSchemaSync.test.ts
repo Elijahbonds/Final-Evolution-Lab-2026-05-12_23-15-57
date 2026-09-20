@@ -13,21 +13,32 @@ import { readFileSync } from 'node:fs';
  * that predated both models. A test is cheaper than finding that twice.
  */
 describe('the prisma schema that ships', () => {
-  it('public/_prisma/schema.prisma is identical to prisma/schema.prisma', () => {
-    const source = readFileSync('prisma/schema.prisma', 'utf8');
-    const shipped = readFileSync('public/_prisma/schema.prisma', 'utf8');
-    if (source !== shipped) {
-      throw new Error(
-        'public/_prisma/schema.prisma is stale — run `node scripts/copy-prisma-schema.mjs` and commit it, '
-        + 'or production will build its Prisma client from the old schema.',
-      );
-    }
-    expect(shipped).toBe(source);
+  const source = () => readFileSync('prisma/schema.prisma', 'utf8');
+  const shipped = () => readFileSync('public/_prisma/schema.prisma', 'utf8');
+
+  it('the shipped copy differs from the source in EXACTLY one line: the generator output path', () => {
+    const a = source().split('\n');
+    const b = shipped().split('\n');
+    expect(b.length).toBe(a.length);
+    const differing = a.map((line, i) => (line === b[i] ? null : i)).filter((i): i is number => i !== null);
+    // The copy sits one directory deeper, so its relative `output` needs one more hop — see copy-prisma-schema.mjs.
+    // Everything else being byte-identical is the property that matters: a model added to one must reach the other.
+    expect(differing).toHaveLength(1);
+    expect(a[differing[0]]).toContain('output');
+    expect(a[differing[0]]).toContain('../lib/generated/prisma');
+    expect(b[differing[0]]).toContain('../../lib/generated/prisma');
   });
 
   it('every model in the source schema reaches the shipped one', () => {
     const models = (s: string) => [...s.matchAll(/^model\s+(\w+)/gm)].map((m) => m[1]).sort();
-    expect(models(readFileSync('public/_prisma/schema.prisma', 'utf8')))
-      .toEqual(models(readFileSync('prisma/schema.prisma', 'utf8')));
+    expect(models(shipped())).toEqual(models(source()));
+  });
+
+  it('the generated client is built from the same schema, so a new model is actually callable', () => {
+    // The whole point of generating into the source tree: this file ships with the build. If it drifts from the
+    // schema, production gets a client that has never heard of the newest table — which is the bug this exists for.
+    const generated = readFileSync('lib/generated/prisma/schema.prisma', 'utf8');
+    const models = (s: string) => [...s.matchAll(/^model\s+(\w+)/gm)].map((m) => m[1]).sort();
+    expect(models(generated)).toEqual(models(source()));
   });
 });

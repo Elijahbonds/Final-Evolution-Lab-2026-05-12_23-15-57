@@ -13,7 +13,7 @@
  * unique constraint since NULL != NULL in PostgreSQL).
  */
 
-import { Prisma, type PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@/lib/generated/prisma';
 import { postLc } from '@/lib/ledger';
 
 // ---------------------------------------------------------------------------

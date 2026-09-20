@@ -7,7 +7,7 @@
  * they must match. Run: `npx tsx scripts/migrate-lc-to-wallet.ts` (add `--dry` to report only).
  */
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 const db = new PrismaClient();
 
 /** Carry every profile's labCredits into its wallet. Idempotent. Returns the totals; callers may pass their own client. */
