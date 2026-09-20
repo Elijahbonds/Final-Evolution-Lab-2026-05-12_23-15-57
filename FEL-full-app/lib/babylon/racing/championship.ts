@@ -173,3 +173,45 @@ export const ALL_CUPS: Cup[] = [...KART_CUPS, ...AERO_CUPS];
 export function cupById(id: string): Cup | null {
   return ALL_CUPS.find((c) => c.id === id) ?? null;
 }
+
+// ── KEEPING A CUP ───────────────────────────────────────────────────────────
+//
+// Per viewer, in localStorage, the same pattern the ghost uses. A cup is a handful of small rows; what it buys is
+// the only thing that makes round three matter — the standings you carry into it.
+
+export const CUP_STORAGE_KEY = 'fel-cup-v1';
+
+interface StorageLike { getItem(k: string): string | null; setItem(k: string, v: string): void }
+
+function storage(): StorageLike | null {
+  try { return typeof localStorage === 'undefined' ? null : localStorage; } catch { return null; }
+}
+
+/** Every result this device has recorded, across every cup. */
+export function loadResults(store: StorageLike | null = storage()): RaceResult[] {
+  if (!store) return [];
+  try {
+    const raw = store.getItem(CUP_STORAGE_KEY);
+    const rows = raw ? (JSON.parse(raw) as RaceResult[]) : [];
+    return Array.isArray(rows) ? rows.filter((r) => r && typeof r.courseId === 'string') : [];
+  } catch { return []; }
+}
+
+/**
+ * Record a finished race. A course raced twice in the same cup REPLACES its earlier result rather than adding a
+ * second one — a cup has one round per track, and letting a re-run stack would let a driver farm points by
+ * repeating the round they are best at.
+ */
+export function recordResult(result: RaceResult, store: StorageLike | null = storage()): RaceResult[] {
+  const rows = loadResults(store).filter((r) => !(r.courseId === result.courseId && r.racerId === result.racerId));
+  rows.push(result);
+  if (store) {
+    try { store.setItem(CUP_STORAGE_KEY, JSON.stringify(rows.slice(-200))); } catch { /* full or blocked */ }
+  }
+  return rows;
+}
+
+/** The cup a course belongs to, or null when it is being raced on its own. */
+export function cupForCourse(courseId: string): Cup | null {
+  return ALL_CUPS.find((c) => c.courses.some((x) => x.id === courseId)) ?? null;
+}

@@ -14,6 +14,7 @@
 
 import { stepSpeedFov } from '../core/SpeedFov';
 import { GhostRecorder, deltaLabel, deltaMs, loadGhost, saveIfFaster, type Ghost } from '../racing/ghost';
+import { cupForCourse, cupProgress, loadResults, recordResult } from '../racing/championship';
 import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the shared boost (drift fills it, RB/Shift burns it)
 import { BoostFx } from '../premium/BoostFx';
 import { BoostPads } from '../visual/BoostPads';
@@ -123,6 +124,10 @@ let ghostRec: GhostRecorder | null = null;
 let bestGhost: Ghost | null = null;
 let ghostDelta: number | null = null;
 let kartId = '';
+// THE CUP (2026-09-20). Seven courses that had never heard of each other: every race was an island with a medal on
+// it. The season was built and tested and nothing rendered it, which is the same gap this pass has been closing
+// everywhere else — so the kart records its round at the flag and carries the standings into the next one.
+let cupLine = '';
 let tier = profileFor(DEFAULT_TIER);
 /** The picked kart's handling. Defaults to the starter, so a mode with no pick is byte-identical to before. */
 let kartSpec: KartSpec = KART_STARTER;
@@ -695,6 +700,7 @@ function pushHud(ctx: ModeContext): void {
     // only shown once there is a lap to measure against — a delta with no reference is a number pretending to mean something
     delta: bestGhost ? deltaLabel(ghostDelta) : '',
     chasing: bestGhost ? `PB ${(bestGhost.timeMs / 1000).toFixed(1)}s` : '',
+    cup: cupLine,
     hint: 'RT throttle · X drift to fill BOOST · hold RB / Shift to burn it · A fires your item',
   } satisfies Record<string, HudValue>);
 }
@@ -704,6 +710,19 @@ function finish(ctx: ModeContext): void {
   S.done = true;
   const medal = medalFor(course, race.time, race.finished);
   const place = rivals.length ? playerPosition(playerDist, rivals) : 1;
+  // RECORD THE ROUND. Only a finished race counts toward a cup — a DNF is not a result, and letting one score zero
+  // would be indistinguishable from never having raced it.
+  const cup = cupForCourse(course.id);
+  if (cup && race.finished) {
+    const rows = recordResult({
+      courseId: course.id, racerId: 'me', place, finished: true, timeMs: Math.round(race.time * 1000),
+    });
+    const prog = cupProgress(cup, rows, 'me');
+    cupLine = prog.headline;
+  } else if (cup) {
+    cupLine = cupProgress(cup, loadResults(), 'me').headline;
+  }
+
   // KEEP THE LAP IF IT WAS FASTER. Only a finished race counts: a DNF is not a lap, and a half-recorded ghost would
   // strand a future chase halfway round the course with nothing to compare against.
   const hadGhost = bestGhost;
@@ -838,6 +857,9 @@ return {
     ghostRec = new GhostRecorder();
     bestGhost = loadGhost(course.id);
     ghostDelta = null;
+    // the standings you are carrying INTO this round — the reason a third race matters
+    const cupAtStart = cupForCourse(course.id);
+    cupLine = cupAtStart ? cupProgress(cupAtStart, loadResults(), 'me').headline : '';
     rivalHome = rivals.map((r) => r.lane); rivalStun = rivals.map(() => 0); rivalCool = rivals.map(() => 0); rivalAlongside = rivals.map(() => false);
     rivalKits = rivals.map(() => ({ item: null, itemAt: 0, shieldT: 0, zipT: 0, nextRow: 0, lap: 0 }));
     // ITEM ROWS: three balloons across the road on every leg, 62% of the way along it (the boost pads sit at 40% of every

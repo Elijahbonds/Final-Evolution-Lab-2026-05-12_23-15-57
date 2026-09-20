@@ -79,3 +79,53 @@ describe('the cup', () => {
     expect(ALL_CUPS.length).toBe(KART_CUPS.length + AERO_CUPS.length);
   });
 });
+
+describe('keeping a cup', () => {
+  const mem = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); } };
+  };
+
+  it('records a result and reads it back', async () => {
+    const { loadResults, recordResult } = await import('./championship');
+    const store = mem();
+    recordResult(r('boardwalk-loop', 'me', 2), store);
+    expect(loadResults(store).map((x) => x.courseId)).toEqual(['boardwalk-loop']);
+  });
+
+  it('a re-run REPLACES its round — a cup has one result per track, not a farm', async () => {
+    const { loadResults, recordResult, cupProgress } = await import('./championship');
+    const { KART_CUPS } = await import('./championship');
+    const store = mem();
+    recordResult(r('boardwalk-loop', 'me', 8), store);
+    recordResult(r('boardwalk-loop', 'me', 1), store);      // went back and won it
+    const rows = loadResults(store);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].place).toBe(1);
+    expect(cupProgress(KART_CUPS[0], rows, 'me').done).toEqual(['boardwalk-loop']);
+  });
+
+  it('keeps one racer\'s rounds separate from another\'s', async () => {
+    const { loadResults, recordResult } = await import('./championship');
+    const store = mem();
+    recordResult(r('boardwalk-loop', 'me', 1), store);
+    recordResult(r('boardwalk-loop', 'rival', 2), store);
+    expect(loadResults(store)).toHaveLength(2);
+  });
+
+  it('finds the cup a course belongs to, and says null for one raced alone', async () => {
+    const { cupForCourse } = await import('./championship');
+    expect(cupForCourse('boardwalk-loop')?.id).toBe('boardwalk-cup');
+    expect(cupForCourse('neon-skyline')?.id).toBe('skyline-cup');
+    expect(cupForCourse('not-a-course')).toBeNull();
+  });
+
+  it('survives a blocked store rather than throwing mid-race', async () => {
+    const { loadResults, recordResult } = await import('./championship');
+    expect(loadResults(null)).toEqual([]);
+    expect(() => recordResult(r('boardwalk-loop', 'me', 1), null)).not.toThrow();
+    const broken = { getItem: () => '{{{', setItem: () => { throw new Error('blocked'); } };
+    expect(loadResults(broken)).toEqual([]);
+    expect(() => recordResult(r('boardwalk-loop', 'me', 1), broken)).not.toThrow();
+  });
+});
