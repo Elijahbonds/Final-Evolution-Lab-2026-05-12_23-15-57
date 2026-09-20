@@ -19,7 +19,7 @@
  * whether the back stays flat, and from the front you cannot see either. So a pattern declares the view it needs and
  * the framing check enforces THAT, instead of always demanding square-on and quietly failing every side-on movement.
  */
-export type FramingView = 'front' | 'side';
+export type FramingView = 'front' | 'side' | 'back';
 
 export type FramingIssue =
   | 'noBody'        // nothing to work with
@@ -48,7 +48,7 @@ export interface FramingPoint { x: number; y: number; visibility?: number }
 export interface FramingFrame { landmarks: FramingPoint[]; present?: boolean }
 
 const IDX = {
-  nose: 0, leftShoulder: 11, rightShoulder: 12, leftHip: 23, rightHip: 24,
+  nose: 0, leftEye: 2, rightEye: 5, leftShoulder: 11, rightShoulder: 12, leftHip: 23, rightHip: 24,
   leftKnee: 25, rightKnee: 26, leftAnkle: 27, rightAnkle: 28,
 } as const;
 
@@ -60,6 +60,8 @@ export const CENTRE_TOLERANCE = 0.18;
 export const VIS_MIN = 0.55;
 /** Square to the camera the shoulders read wider than the hips; under this ratio the athlete has turned. */
 export const SQUARE_MIN = 0.85;
+/** Facing away, the model loses the face. Above this the athlete is still looking at the camera. */
+export const FACE_AWAY_MAX = 0.45;
 /** And the other way: a SIDE-on movement wants the shoulders stacked, so anything wider than this is still facing you. */
 export const SIDE_MAX = 0.6;
 
@@ -105,12 +107,21 @@ export function checkFraming(frame: FramingFrame, view: FramingView = 'front'): 
   if (Math.abs(hipMidX - 0.5) > CENTRE_TOLERANCE) issues.push('offCentre');
   // square-on: the shoulders read wider than the hips. Side-on: they collapse toward each other.
   const squareness = hipSpan > 1e-3 ? shoulderSpan / hipSpan : 1;
-  if (view === 'front' ? squareness < SQUARE_MIN : squareness > SIDE_MAX) issues.push('turned');
+  const faceVis = Math.max(
+    get(IDX.nose)?.visibility ?? 1, get(IDX.leftEye)?.visibility ?? 0, get(IDX.rightEye)?.visibility ?? 0,
+  );
+  const wrongWay =
+    view === 'front' ? squareness < SQUARE_MIN || faceVis < FACE_AWAY_MAX
+    : view === 'side' ? squareness > SIDE_MAX
+    : squareness < SQUARE_MIN || faceVis >= FACE_AWAY_MAX;   // back: square body, face turned away
+  if (wrongWay) issues.push('turned');
   if (visibility < VIS_MIN) issues.push('dim');
 
   const worst = ORDER.find((i) => issues.includes(i)) ?? null;
-  const say = worst === 'turned' && view === 'side'
-    ? 'Turn side-on to the camera — I read a hinge from the side.'
+  const say = worst === 'turned'
+    ? view === 'side' ? 'Turn side-on to the camera — I read a hinge from the side.'
+      : view === 'back' ? 'Turn all the way around — I read the heel line from behind.'
+      : SAY.turned
     : worst ? SAY[worst] : 'Good shot — start when you are ready.';
   return {
     ok: issues.length === 0,
