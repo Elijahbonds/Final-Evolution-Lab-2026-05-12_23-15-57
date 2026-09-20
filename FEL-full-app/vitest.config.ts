@@ -9,7 +9,14 @@ import path from 'node:path';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['lib/**/*.test.ts', 'scripts/**/*.suite.test.ts', 'tests/**/*.test.ts'],
+    // components/ was added 2026-09-20. It held 239 files and 46,000 lines with no tests, and the reason turned out
+    // not to be discipline: the runner was never pointed at it, so a test written there would have been collected by
+    // nobody and passed silently forever. app/ is deliberately still out — its routes are covered by the static
+    // contract in lib/api/routeContract.test.ts, which needs no DOM.
+    include: [
+      'lib/**/*.test.ts', 'scripts/**/*.suite.test.ts', 'tests/**/*.test.ts',
+      'components/**/*.test.ts', 'components/**/*.test.tsx',
+    ],
     // Babylon's NullEngine work and the 3000-sample statistical checks are not
     // fast; the default 5s timeout fails them for no good reason.
     testTimeout: 180_000,   // the headless check suites spawn a script with its own 120 s limit; under a sweep load a 60 s test timeout fired first (three false alarms 2026-09-05 and 06)
