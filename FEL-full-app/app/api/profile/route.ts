@@ -19,7 +19,20 @@ export async function GET() {
     const score = prqScore(profile as any);
     const role = (session?.user as any)?.role ?? 'user';
     const wallet = await readWallet(prisma, userId);   // pass 5 phase 1: the wallet is the balance readers use
-    return NextResponse.json({ profile, wallet: { coins: wallet.coins, shards: wallet.shards, lc: wallet.lc }, prq: score, grade: prqGrade(score), role });
+    // WHAT THE HEADER NEEDS TO SHOW THE RIGHT DOORS (2026-09-19). The coach product and the athlete's training
+    // screen were reachable only by typing the URL, because nothing in the app knew whether you were a coach or
+    // whether anybody was coaching you. Two booleans, read where the session already is.
+    const [facilitator, coachedBy, coachesAnyone] = await Promise.all([
+      prisma.facilitatorProfile.findUnique({ where: { userId }, select: { certificationStatus: true } }).catch(() => null),
+      prisma.coachClient.findFirst({ where: { clientId: userId, endedAt: null }, select: { id: true } }).catch(() => null),
+      prisma.coachClient.findFirst({ where: { coachId: userId, endedAt: null }, select: { id: true } }).catch(() => null),
+    ]);
+    const isCoach = facilitator?.certificationStatus === 'certified' || !!coachesAnyone;
+    const hasCoach = !!coachedBy;
+    return NextResponse.json({
+      profile, wallet: { coins: wallet.coins, shards: wallet.shards, lc: wallet.lc },
+      prq: score, grade: prqGrade(score), role, isCoach, hasCoach,
+    });
   } catch (e) {
     console.error('profile error', e);
     return NextResponse.json({ error: 'Failed to load profile' }, { status: 500 });

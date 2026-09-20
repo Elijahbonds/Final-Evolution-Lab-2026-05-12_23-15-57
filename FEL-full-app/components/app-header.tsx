@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { signOut } from 'next-auth/react';
-import { Coins, LogOut, Zap, BarChart3 } from 'lucide-react';
+import { Coins, LogOut, Zap, BarChart3, Users, Dumbbell, UtensilsCrossed } from 'lucide-react';
 import { WALLET_REFRESH_EVENT } from '@/components/wallet-chip';
 import { DualWalletChip } from '@/components/dual-wallet-chip';
 
@@ -13,6 +13,10 @@ interface HeaderData {
   gradeColor: string;
   credits: number;
   isAdmin: boolean;
+  /** A certified facilitator, or anyone already coaching somebody. */
+  isCoach: boolean;
+  /** Somebody is coaching them, so they have programming to open. */
+  hasCoach: boolean;
 }
 
 export function AppHeader() {
@@ -29,6 +33,8 @@ export function AppHeader() {
           gradeColor: j?.grade?.color ?? '#00FF9D',
           credits: j?.wallet?.lc ?? j?.profile?.labCredits ?? 0,   // wallet first (pass 5 phase 1)
           isAdmin: j?.role === 'admin',
+          isCoach: !!j?.isCoach,
+          hasCoach: !!j?.hasCoach,
         });
       })
       .catch(() => {});
@@ -62,6 +68,33 @@ export function AppHeader() {
                 <Zap className="h-3.5 w-3.5" />
                 PRQ {Math.round(data.prq)} · {data.gradeLabel}
               </span>
+              {/* THE DOORS (2026-09-19). Until today this header linked three places — metrics, cards, store — and the
+                  coach product, the athlete's training screen and the Fuel floor were reachable only by typing the
+                  URL. Everything here already worked; nothing pointed at it. Each door is shown only to somebody it
+                  is for: COACH to a certified facilitator or anyone already coaching, TRAIN to an athlete who has a
+                  coach, FUEL to everyone, because eating is not a role. */}
+              {data.isCoach && (
+                <Link
+                  href="/coach"
+                  className="hidden md:inline-flex items-center gap-1.5 rounded-md border border-[#00E5FF]/40 px-2.5 py-1 font-mono text-xs text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/10"
+                >
+                  <Users className="h-3.5 w-3.5" /> COACH
+                </Link>
+              )}
+              {data.hasCoach && (
+                <Link
+                  href="/training"
+                  className="hidden md:inline-flex items-center gap-1.5 rounded-md border border-[#00FF9D]/40 px-2.5 py-1 font-mono text-xs text-[#00FF9D] transition-colors hover:bg-[#00FF9D]/10"
+                >
+                  <Dumbbell className="h-3.5 w-3.5" /> TRAIN
+                </Link>
+              )}
+              <Link
+                href="/kitchens"
+                className="hidden lg:inline-flex items-center gap-1.5 rounded-md border border-white/20 px-2.5 py-1 font-mono text-xs text-white/70 transition-colors hover:bg-white/5"
+              >
+                <UtensilsCrossed className="h-3.5 w-3.5" /> FUEL
+              </Link>
               <Link href="/store" aria-label="Open coin store" className="transition-transform active:scale-95">
                 <DualWalletChip />
               </Link>
