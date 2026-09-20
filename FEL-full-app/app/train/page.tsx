@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, ClipboardList, Dumbbell, UtensilsCrossed, Users, ScanLine } from 'lucide-react';
+import { Activity, BookOpen, ClipboardList, Dumbbell, UtensilsCrossed, Users, ScanLine } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { TabPage } from '@/components/shell/tab-page';
@@ -42,6 +42,11 @@ export default async function TrainPage() {
       href: '/play/training', icon: Dumbbell, accent: '#FFD700', title: 'Iron Paradise',
       line: 'The gym floor. Lift, jump, and put a number on it.',
       tag: 'Train',
+    },
+    {
+      href: '/education/playbook', icon: BookOpen, accent: '#A855F7', title: 'The Playbook',
+      line: 'Ten chapters on how the body actually moves, from the book. Every drill is one you can run tonight.',
+      tag: 'Learn',
     },
     {
       href: '/kitchens', icon: UtensilsCrossed, accent: '#FF7A2F', title: 'Fuel',

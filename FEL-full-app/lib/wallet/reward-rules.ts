@@ -50,6 +50,9 @@ export const REASON = {
   // Phase 5 — referral loop (viral). Referrer earns shards when a lead they
   // referred converts to a registered athlete. Server-granted, never client.
   REFERRAL_BONUS: 'REFERRAL_BONUS', // shards
+  // The movement course (lib/education/course.ts). Finishing a chapter of the Playbook is a milestone, which is
+  // what shards are for -- earned, never purchasable.
+  EDU_CHAPTER_COMPLETE: 'EDU_CHAPTER_COMPLETE', // shards
   MOVEMENT_SCREEN_COMPLETED: 'MOVEMENT_SCREEN_COMPLETED', // shards — one graded screen
   // Phase 6 — async multiplayer settlement. Both players earn coins for
   // playing a resolved match; the winner earns shards. Server-granted only.
@@ -92,6 +95,7 @@ export const SHARD_REASONS: ReadonlySet<string> = new Set([
   REASON.SCENEIT_FREEUSE_IDENTIFIED,
   REASON.REFERRAL_BONUS,
   REASON.MP_MATCH_WON,
+  REASON.EDU_CHAPTER_COMPLETE,
 ]);
 
 // ---------------------------------------------------------------------------
@@ -152,6 +156,13 @@ export const DEFAULT_REWARD_RULES: Record<string, RewardRuleConfig> = {
   [REASON.REFERRAL_BONUS]: {
     reasonCode: REASON.REFERRAL_BONUS, currency: 'shards', formula: 'flat',
     baseAmount: 10, scaleNum: 0, minGrant: 1, maxGrant: 50, // TUNE(elijah)
+    perMinuteCap: 0, perDayCurrencyCap: 0, active: true,
+  },
+  [REASON.EDU_CHAPTER_COMPLETE]: {
+    reasonCode: REASON.EDU_CHAPTER_COMPLETE, currency: 'shards', formula: 'flat',
+    // Matches CHAPTER_SHARDS in lib/education/course.ts, which a test keeps in step. The AMOUNT LIVES HERE, not
+    // in the request -- a client saying it finished a chapter is a claim, and the server prices it.
+    baseAmount: 15, scaleNum: 0, minGrant: 15, maxGrant: 15, // TUNE(elijah)
     perMinuteCap: 0, perDayCurrencyCap: 0, active: true,
   },
   // THE MOVEMENT SCREEN (owner, 2026-09-19: shards for a completed scan, body scan first). Server-granted and
