@@ -8,6 +8,7 @@
 
 import type { WalletCurrency } from './reward-rules';
 import { WEARABLES } from '../closet/wearable-catalog';
+import { BOOST_CARDS, boostSkuId } from '../cards/boosts';
 
 export interface CatalogSku {
   skuId: string;
@@ -36,6 +37,16 @@ export const CATALOG: Record<string, CatalogSku> = {
   session_group_workout: { skuId: 'session_group_workout', currency: 'shards', unitPrice: 150, consumable: true },
   seminar_seat:          { skuId: 'seminar_seat',          currency: 'shards', unitPrice: 250, consumable: true },
   private_1on1:          { skuId: 'private_1on1',          currency: 'shards', unitPrice: 900, consumable: true },
+
+  // ── Creator boost cards (SHARD sinks) — generated from lib/cards/boosts ──
+  // Registered here rather than given their own purchase path, so a boost card buys through the same
+  // server-priced, atomic, idempotent spend as everything else and lands in the same PlayerEntitlement table.
+  // Not consumable: you own the card, you do not use it up.
+  ...Object.fromEntries(
+    BOOST_CARDS.map((c) => [boostSkuId(c.id), {
+      skuId: boostSkuId(c.id), currency: 'shards' as WalletCurrency, unitPrice: c.costShards, consumable: false,
+    }]),
+  ),
 
   // ── M20 closet wearables (COINS) — generated from the cosmetic catalog ──
   ...Object.fromEntries(
