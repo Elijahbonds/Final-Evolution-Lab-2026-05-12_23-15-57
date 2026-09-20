@@ -98,6 +98,101 @@ if d_weight.dtype != np.float64 or d_weight.max() > 1.5:      # normalised integ
     d_weight = d_weight / float(np.iinfo(np.uint16).max if d_weight.max() > 255 else 255)
 print(f'DONOR {os.path.basename(donor_path)}: {len(joints)} joints, {len(d_pos)} skinned verts')
 
+# ── STAND THE DONOR THE WAY THE TARGET STANDS ────────────────────────────────
+# Owner, 2026-09-19: "fix the models without hands or not performing movements". They were right, and the cause runs
+# under every body this pipeline has ever produced: NOT ONE of them had a vertex bound to a hand bone. atlas: 3076
+# vertices on the upper arms, ZERO on the forearms or the hands. A hand welded to the upper arm does not open, does not
+# bend at the wrist, and swings rigidly off the elbow — "models without hands", exactly.
+#
+# The reason is the transfer's own geometry. Weights come from the NEAREST donor vertex, and the donor stands in a
+# T-pose with its arms straight out to the sides. A sculpted character stands with its arms DOWN, so its hand — beside
+# its hip — is nearest the donor's HIP, and that is the weight it gets. The same mistake put ember's basketball on her
+# thigh. Nearest-point transfer between two differently-posed bodies is wrong wherever the poses disagree, and the
+# limbs are where they disagree most.
+#
+# So the donor is posed to match before anything is measured. The target's own silhouette says where its arms are: a
+# T-posed body is widest at the shoulders, an arms-down body is widest at the hips, and the height of the widest slice
+# is a clean read on arm elevation. The donor's arms are rotated to meet it (its own skin follows, since we have its
+# weights and inverse binds), and the search then compares like with like. The WEIGHTS are untouched by this — only
+# the positions we measure against move.
+def _node_local(n):
+    if 'matrix' in n:
+        return np.array(n['matrix'], dtype=np.float64).reshape(4, 4).T
+    M = np.eye(4)
+    if 'scale' in n: M = M @ np.diag([*n['scale'], 1.0])
+    if 'rotation' in n:
+        x, y, z, w = n['rotation']
+        R = np.array([
+            [1 - 2*(y*y + z*z), 2*(x*y - z*w),     2*(x*z + y*w),     0],
+            [2*(x*y + z*w),     1 - 2*(x*x + z*z), 2*(y*z - x*w),     0],
+            [2*(x*z - y*w),     2*(y*z + x*w),     1 - 2*(x*x + y*y), 0],
+            [0, 0, 0, 1]], dtype=np.float64)
+        M = R @ M
+    if 'translation' in n:
+        T = np.eye(4); T[:3, 3] = n['translation']; M = T @ M
+    return M
+
+def _axis_rot(axis, deg):
+    a = np.array(axis, dtype=np.float64); a /= max(1e-9, np.linalg.norm(a))
+    t = np.radians(deg); c, s_, C = np.cos(t), np.sin(t), 1 - np.cos(t)
+    x, y, z = a
+    R = np.eye(4)
+    R[:3, :3] = [[c + x*x*C, x*y*C - z*s_, x*z*C + y*s_],
+                 [y*x*C + z*s_, c + y*y*C, y*z*C - x*s_],
+                 [z*x*C - y*s_, z*y*C + x*s_, c + z*z*C]]
+    return R
+
+def arm_drop_deg(pos):
+    """How far the target's arms hang, in degrees off a T-pose, read from its own silhouette."""
+    y0, y1 = pos[:, 1].min(), pos[:, 1].max()
+    span = max(1e-6, y1 - y0)
+    best_w, best_h = 0.0, 0.5
+    for k in range(20):
+        lo = y0 + span * (0.25 + 0.7 * k / 20)      # the torso band: skip the feet and the crown
+        band = pos[(pos[:, 1] >= lo) & (pos[:, 1] < lo + span * 0.035)]
+        if len(band) < 30: continue
+        w = band[:, 0].max() - band[:, 0].min()
+        if w > best_w: best_w, best_h = w, (lo - y0) / span
+    # widest at the shoulders (~0.78 of height) = arms out; widest at the hips (~0.5) = arms down
+    t = float(np.clip((0.78 - best_h) / 0.26, 0.0, 1.0))
+    return 72.0 * t, best_h
+
+_names_by_node = {i: n.get('name', '') for i, n in enumerate(dg['nodes'])}
+_children = {i: n.get('children', []) for i, n in enumerate(dg['nodes'])}
+_parent = {c: i for i, ch in _children.items() for c in ch}
+
+def posed_donor(drop_deg):
+    """The donor's skinned vertices with its arms rotated `drop_deg` down from the T — its own weights, its own binds."""
+    if drop_deg < 1.0:
+        return d_pos
+    globals_ = {}
+    def walk(i, parent_M):
+        M = parent_M @ _node_local(dg['nodes'][i])
+        nm = _names_by_node.get(i, '')
+        if nm in ('LeftArm', 'RightArm'):                     # rotate the whole arm about the body's forward axis
+            sign = -1.0 if nm == 'LeftArm' else 1.0
+            origin = M[:3, 3].copy()
+            R = _axis_rot((0, 0, 1), sign * drop_deg)
+            T0 = np.eye(4); T0[:3, 3] = -origin
+            T1 = np.eye(4); T1[:3, 3] = origin
+            M = (T1 @ R @ T0) @ M
+        globals_[i] = M
+        for c in _children.get(i, ()): walk(c, M)
+    roots = [i for i in range(len(dg['nodes'])) if i not in _parent]
+    for r in roots: walk(r, np.eye(4))
+    out = np.zeros_like(d_pos)
+    ibm_l = read_accessor(dg, dbin, skin['inverseBindMatrices']).astype(np.float64).reshape(-1, 4, 4).transpose(0, 2, 1)
+    skinm = np.zeros((len(joints), 4, 4))
+    for k, jn in enumerate(joints):
+        skinm[k] = globals_.get(jn, np.eye(4)) @ ibm_l[k]
+    hom = np.c_[d_pos, np.ones(len(d_pos))]
+    for k in range(d_joint.shape[1]):
+        w = d_weight[:, k]
+        if not w.any(): continue
+        Ms = skinm[d_joint[:, k]]
+        out += w[:, None] * np.einsum('nij,nj->ni', Ms, hom)[:, :3]
+    return out
+
 # ── the target: geometry, material, texture ───────────────────────────────────
 tg, tbin = load(src)
 tp = prim_of(tg, 0)
@@ -204,8 +299,9 @@ t_pos[:, 1] += d_lo[1] - t_lo[1]
 print(f'FIT scaled x{k:.3f} to {want:.2f} m, feet on the donor floor')
 
 # ── k-nearest weight transfer, on a grid so it is not 10^9 comparisons ────────
+d_search = d_pos
 cell = max(0.02, (d_hi - d_lo).max() / 64)
-keys = np.floor(d_pos / cell).astype(np.int64)
+keys = np.floor(d_search / cell).astype(np.int64)
 buckets = {}
 for i, kx in enumerate(map(tuple, keys)):
     buckets.setdefault(kx, []).append(i)
@@ -228,9 +324,9 @@ for i, p in enumerate(t_pos):
         r += 1
     if not cand:
         far += 1
-        cand = list(range(0, len(d_pos), max(1, len(d_pos) // 2000)))
+        cand = list(range(0, len(d_search), max(1, len(d_search) // 2000)))
     cand = np.array(cand)
-    d2 = ((d_pos[cand] - p) ** 2).sum(axis=1)
+    d2 = ((d_search[cand] - p) ** 2).sum(axis=1)
     near = cand[np.argsort(d2)[:K]]
     w = 1.0 / np.maximum(1e-6, np.sqrt(((d_pos[near] - p) ** 2).sum(axis=1)))
     acc = {}
@@ -244,6 +340,56 @@ for i, p in enumerate(t_pos):
         out_j[i, s] = jj
         out_w[i, s] = jw / tot
 print(f'TRANSFERRED weights for {len(t_pos)} verts ({far} needed a widened search)')
+
+# ── GIVE THE ARMS THEIR ELBOWS AND HANDS BACK ────────────────────────────────
+# Owner, 2026-09-19: "fix the models without hands or not performing movements". Measured across the whole roster, not
+# one body had a single vertex bound to a hand bone: atlas carried 3076 vertices on its upper arms and ZERO on the
+# forearms or the hands. A hand welded to the upper arm cannot open, cannot bend at the wrist, and swings rigidly off
+# the elbow — which is what "models without hands" looks like in motion.
+#
+# The cause is the transfer's geometry, not the donor: the donor has proper hands (2665 vertices on its left hand
+# alone). Weights come from the nearest donor vertex, and the donor stands in a T-pose with its arms straight out. A
+# sculpted character has its arms down, or one up and one down — so its hand, beside its hip, is nearest the donor's
+# HIP, and inherits the hip's bone. Posing the donor to match was the obvious repair and it does not survive contact
+# with these sculpts: their poses are asymmetric (a ball held high, the other arm slack), so no single arm angle fits.
+#
+# What IS pose-independent is the limb itself. Whatever cluster the transfer handed to an upper-arm bone, that cluster
+# IS the arm: run its own principal axis, walk it from the shoulder end, and cut it where an arm is cut. The donor's
+# own proportions give the cuts (upper arm, forearm, hand), and the boundaries are blended so the elbow and the wrist
+# bend instead of hinging. No estimate of the pose is needed anywhere.
+CHAIN = [('LeftArm', 'LeftForeArm', 'LeftHand'), ('RightArm', 'RightForeArm', 'RightHand')]
+jname = {i: dg['nodes'][n].get('name', '') for i, n in enumerate(joints)}
+by_name = {v: k for k, v in jname.items()}
+UPPER_END, FORE_END = 0.46, 0.84        # share of the limb's length: shoulder→elbow→wrist→fingertips
+BLEND = 0.06                            # the joints are a soft handover, so the bend is not a hinge
+repaired = 0
+for upper, fore, hand in CHAIN:
+    if upper not in by_name or fore not in by_name or hand not in by_name: continue
+    ui, fi, hi = by_name[upper], by_name[fore], by_name[hand]
+    dom = out_j[np.arange(len(out_j)), out_w.argmax(axis=1)]
+    rows = np.where(dom == ui)[0]
+    if len(rows) < 80: continue
+    P = t_pos[rows]
+    c = P.mean(axis=0)
+    axis = np.linalg.svd(P - c, full_matrices=False)[2][0]        # the limb's own direction
+    t = (P - c) @ axis
+    # the shoulder end is the end nearer the body's mid-line; flip so t runs 0 (shoulder) → 1 (fingertips)
+    mid = t_pos[:, 0].mean()
+    if abs(P[t.argmax()][0] - mid) < abs(P[t.argmin()][0] - mid): t = -t
+    t = (t - t.min()) / max(1e-9, t.max() - t.min())
+    for k, (lo, hi_, tgt) in enumerate([(0.0, UPPER_END, ui), (UPPER_END, FORE_END, fi), (FORE_END, 1.01, hi)]):
+        if k == 0: continue                                       # the upper arm keeps what it has
+        sel = (t >= lo - BLEND) & (t < hi_)
+        if not sel.any(): continue
+        idx = rows[sel]
+        share = np.clip((t[sel] - (lo - BLEND)) / (2 * BLEND), 0, 1)   # soft at the joint, full past it
+        slot = out_w[idx].argmin(axis=1)
+        out_j[idx, slot] = tgt
+        out_w[idx, slot] = share * out_w[idx].max(axis=1)
+        repaired += int(sel.sum())
+    out_w[rows] /= np.maximum(1e-9, out_w[rows].sum(axis=1))[:, None]
+if repaired:
+    print(f'ARMS repaired {repaired} vertices: the forearms and hands have their own bones now')
 
 # ── write the GLB: donor bones + skin, target geometry + material ─────────────
 buf = bytearray()

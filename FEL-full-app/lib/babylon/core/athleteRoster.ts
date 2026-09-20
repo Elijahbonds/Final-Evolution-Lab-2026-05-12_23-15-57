@@ -40,7 +40,9 @@ export const ATHLETE_ROSTER: RosterAthlete[] = [
   { key: 'juno', url: '/models/athletes/juno.glb' },
   { key: 'lyra', url: '/models/athletes/lyra.glb' },
   { key: 'iris', url: '/models/athletes/iris.glb' },
-  { key: 'wren', url: '/models/athletes/wren.glb' },
+  // wren and the crowd's bramble are BUILT but OUT: on those two the transfer bound the arms to the chest — not a
+  // vertex reached an arm bone — so the anatomical repair below has no arm cluster to split and their arms would
+  // swing from the sternum. The files stay on disk; they are not spawned until the transfer can find their arms.
   { key: 'amir', url: '/models/athletes/amir.glb' },
 ];
 
