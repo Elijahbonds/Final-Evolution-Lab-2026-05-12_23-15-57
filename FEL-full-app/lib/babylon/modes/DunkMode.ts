@@ -73,7 +73,7 @@ import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLi
 import { OBSTACLE_SPECS, OBSTACLE_KINDS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, type ObstacleKind } from '../core/DunkObstacles';
 // DUNK PARKOUR (owner brief 2026-09-18): the glass rebound on the runway (a vector-transfer launch), the two launches, the
 // backboard double-launch, the overdrive dunk. Pure in core/DunkParkour.
-import { GLASS, launchProfile, doubleLaunchAllowed, DOUBLE_LAUNCH, overdriveDunk, cornerPanes, paneRebound, BUS_RUN, busRunPose, alongPane, busRunDone, cornerRideFor, type CornerRide, type GlassPane } from '../core/DunkParkour';
+import { GLASS, wallRunMiss, launchProfile, doubleLaunchAllowed, DOUBLE_LAUNCH, overdriveDunk, cornerPanes, paneRebound, BUS_RUN, busRunPose, alongPane, busRunDone, cornerRideFor, type CornerRide, type GlassPane } from '../core/DunkParkour';
 import { SKY, skyTierFor, skyTapAllowed, skyTapRefusal, type SkyTier } from '../core/SkyTier';
 import { readSeasonLane, specialOpen, specialLockLine, SPECIAL_PROPS, type SeasonLane } from '../core/SeasonSpecials';   // SEASON SPECIALS (owner, 2026-09-18): the PRO lane's   // THE SKY TIER (owner, 2026-09-18): a blimp / a rocket / … over the lane, per court
 import { spawnMeshyProp } from '../visual/meshyProps';
@@ -338,6 +338,7 @@ export const DunkMode: ModeDefinition = (() => {
   // THE BUS WALL RUN (owner, 2026-09-18: "try a wall run dunk off the bus"): a shallow run into the hoopbus goes up its side and
   // along it to the front end, and the jump off it is the takeoff (core/DunkParkour BUS_RUN)
   let busRun: { t: number; s: number; pane: GlassPane; speed: number } | null = null, busLaunch: { x0: number; y0: number } | null = null, busRan = false;
+  let rideMissAt = -1e9;                      // the near-miss tell is throttled: one word per approach, not per frame
   let ride: CornerRide = cornerRideFor(undefined);   // what is parked across the right corner (the hoopbus; a shuttle in Orbit)
   const propLabel = (p: Prop): string => PROP_LABEL[p].replace('THE BUS', `THE ${ride.short}`);
   // SEASON SPECIALS: the animals, the sky tap, the board-top flip and the backboard run are the PRO lane's — read once at
@@ -418,7 +419,18 @@ export const DunkMode: ModeDefinition = (() => {
   function tryGlass(ctx: ModeContext, vx: number, vz: number): void {
     if (performance.now() - vectorAt < 600) return;   // one rebound per contact
     const r = paneRebound(player.root.position.x, player.root.position.z, vx, vz, panes);
-    if (!r) return;
+    if (!r) {
+      // A NEAR MISS IS TOLD NOW. Running past the ride's face at speed used to be silence, so there was nothing to
+      // correct — the same line caught it one attempt and missed the next with no word either way.
+      const miss = wallRunMiss(player.root.position.x, player.root.position.z, vx, vz, panes);
+      if (miss && performance.now() - rideMissAt > 1200) {
+        rideMissAt = performance.now();
+        flash(ctx, miss === 'slow' ? `TOO SLOW FOR THE ${ride.short} — hold the run into it`
+          : miss === 'flat' ? `TOO FLAT FOR THE ${ride.short} — angle into its side`
+          : `TOO SQUARE FOR THE ${ride.short} — cut across its face, do not hit it head-on`, 900);
+      }
+      return;
+    }
     if (r.pane.side > 0 && r.wallRun) { startBusRun(ctx, r.pane, Math.hypot(vx, vz)); return; }   // THE BUS WALL RUN
     vectorAt = performance.now(); vectorWallRun = false;   // the tent's shallow hit is a rebound (the wall run is the bus's)
     player.root.position.x += r.pane.nx * GLASS.pushM; player.root.position.z += r.pane.nz * GLASS.pushM;

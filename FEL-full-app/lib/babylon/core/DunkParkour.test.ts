@@ -1,6 +1,7 @@
 // Does the glass send the run back, do the two launches differ, is the double-launch a window, does a perfect break the board?
 import { describe, it, expect } from 'vitest';
-import { BUS_RUN, busRunPose, alongPane, busRunDone, cornerRideFor, GLASS, glassRebound, launchProfile, doubleLaunchAllowed, DOUBLE_LAUNCH, overdriveDunk, cornerPanes, paneRebound, billboardFor } from './DunkParkour';
+import { BUS_RUN, busRunPose, alongPane, busRunDone, cornerRideFor, GLASS, glassRebound, launchProfile, doubleLaunchAllowed, DOUBLE_LAUNCH, overdriveDunk, cornerPanes, paneRebound, billboardFor, wallRunMiss } from './DunkParkour';
+import type { GlassPane } from './DunkParkour';
 
 describe('the glass rebound', () => {
   it('reflects a fast oblique run into the wall and keeps the speed', () => {
@@ -87,5 +88,29 @@ describe('the billboards', () => {
   it('a wall run along the billboard launches higher than a rebound off it', () => {
     expect(launchProfile('one', true, true).apexMult).toBeGreaterThan(launchProfile('one', true).apexMult);
     expect(launchProfile('one', true, true).label).toMatch(/WALL RUN/);
+  });
+
+  it('THE RIDE IS CATCHABLE: a flatter line runs its side, and the tent still needs a real angle', () => {
+    const [bus, tent] = cornerPanes(GLASS.halfX, -7.5);   // side +1 is the ride parked across the right corner
+    const at = (q: GlassPane, out = 0.2): [number, number] => [q.cx + q.nx * out, q.cz + q.nz * out];
+    // 10.5° off the face — under the old 14° floor, so this line used to run straight past the bus
+    expect(paneRebound(...at(bus), -3.5, -5.1, [bus])?.wallRun).toBe(true);
+    // 35.5° — over the old 34° edge, so it bounced off instead of running the side. It runs it now.
+    expect(paneRebound(...at(bus), -1, -6, [bus])?.wallRun).toBe(true);
+    // 43.4° is still too square to run: that is a rebound, the honest answer to hitting it head-on
+    expect(paneRebound(...at(bus), -0.2, -7, [bus])?.wallRun).toBe(false);
+    // 3.0° is flatter than even the ride's floor: a brush past the side, not a run up it
+    expect(paneRebound(...at(bus), -4.6, -5.1, [bus])).toBeNull();
+    // and the TENT is untouched — a rebound still needs GLASS.minDeg, so the same 10.5° line is nothing there
+    expect(paneRebound(...at(tent), 3.5, -5.1, [tent])).toBeNull();
+  });
+
+  it('a near miss has a NAME — slow, flat or too square — and running nowhere near it is not a miss', () => {
+    const [bus] = cornerPanes(GLASS.halfX, -7.5);
+    const at = (q: GlassPane, out = 0.2): [number, number] => [q.cx + q.nx * out, q.cz + q.nz * out];
+    expect(wallRunMiss(...at(bus), -0.5, -1.5, [bus])).toBe('slow');    // 1.6 m/s, under GLASS.minSpeed
+    expect(wallRunMiss(...at(bus), -0.2, -7, [bus])).toBe('steep');     // 43° — straight into the face
+    expect(wallRunMiss(...at(bus), -1, -6, [bus])).toBeNull();          // 35° — inside the band now, so caught
+    expect(wallRunMiss(-9, 9, -5, -5, [bus])).toBeNull();               // nowhere near it
   });
 });

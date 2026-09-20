@@ -34,7 +34,20 @@ export function glassRebound(x: number, vx: number, vz: number): { x: number; z:
   return { x: -vx, z: vz };
 }
 
-export const WALL_RUN_DEG = 34;
+// THE RIDE HAS TO BE CATCHABLE (owner, 2026-09-19: "fix the ball run dunk too — off the bus, off the shuttle").
+// The wall run lived in a 20° band: steeper than 14° off the face to register at all, shallower than 34° to run the
+// side instead of bouncing off it. Measured in the lab, the same scripted line caught the bus on the first attempt
+// (difficulty 10.0, the maximum) and missed it on the next two, which is the worst kind of mechanic — it works often
+// enough to look intended and fails often enough to feel broken. The band is wider now at both edges, and the bus
+// takes a flatter line than the tent does because you are RUNNING it, not rebounding off it.
+export const WALL_RUN_DEG = 42;
+/** The bus's own floor: a line this flat still catches its side (the tent keeps GLASS.minDeg — a rebound needs an angle). */
+export const WALL_RUN_MIN_DEG = 9;
+/** And its own DEPTH. The tent is a pane you glance off, so 0.55 m in front of it is the whole rebound. The ride is a
+ *  vehicle you run UP, and a runner aiming at a bus does not thread a half-metre slot — measured in the lab, a scripted
+ *  line that caught it on one attempt passed outside this window on the next two and the game said nothing, because
+ *  there was nothing to say: he was never near enough to refuse. The ride's face reads from twice as far out. */
+export const RIDE_WINDOW_M = 1.3;
 export const WALL_RUN_APEX_MULT = 1.5;
 
 export type LaunchFoot = 'one' | 'two';
@@ -94,14 +107,14 @@ export function paneRebound(x: number, z: number, vx: number, vz: number, panes:
   if (speed < GLASS.minSpeed) return null;
   for (const p of panes) {
     const d = (x - p.cx) * p.nx + (z - p.cz) * p.nz;   // signed distance in front of the face
-    if (d < -0.2 || d > GLASS.windowM) continue;
+    if (d < -0.2 || d > (p.side > 0 ? RIDE_WINDOW_M : GLASS.windowM)) continue;   // the ride reads from further out
     const tx = -p.nz, tz = p.nx;   // along the pane
     const s = (x - p.cx) * tx + (z - p.cz) * tz;
-    if (Math.abs(s) > p.half + 0.3) continue;
+    if (Math.abs(s) > p.half + (p.side > 0 ? 1.1 : 0.3)) continue;                // and along a longer face
     const into = -(vx * p.nx + vz * p.nz) / speed;   // 1 = head-on into the face
     if (into <= 0) continue;
     const deg = (Math.asin(Math.min(1, into)) * 180) / Math.PI;   // angle off the face
-    if (deg < GLASS.minDeg) continue;
+    if (deg < (p.side > 0 ? WALL_RUN_MIN_DEG : GLASS.minDeg)) continue;   // the ride's face takes a flatter line than the tent
     const dot = vx * p.nx + vz * p.nz;
     return { v: { x: vx - 2 * dot * p.nx, z: vz - 2 * dot * p.nz }, pane: p, wallRun: deg < WALL_RUN_DEG };
   }
@@ -152,3 +165,26 @@ export const BILLBOARD_SIGNS: Record<string, BillboardSign> = {
   rooftop: { text: 'ROOFTOP', sub: 'AFTER HOURS', bg: '#0b0f1e', fg: '#e0e7ff', accent: '#9ad7ff' },
 };
 export function billboardFor(location: string | undefined): BillboardSign { return BILLBOARD_SIGNS[location ?? ''] ?? BILLBOARD_SIGNS.venice; }
+
+
+/** WHY THE RIDE WAS NOT CAUGHT — for the tell. A near miss used to be silence: you ran past the bus at speed and the
+ *  game said nothing, so there was nothing to correct. Null means it was not a near miss at all (nowhere near the face). */
+export type WallRunMiss = 'slow' | 'flat' | 'steep';
+export function wallRunMiss(x: number, z: number, vx: number, vz: number, panes: readonly GlassPane[]): WallRunMiss | null {
+  const speed = Math.hypot(vx, vz);
+  for (const p of panes) {
+    if (p.side <= 0) continue;                                   // the ride is the right-hand pane
+    const d = (x - p.cx) * p.nx + (z - p.cz) * p.nz;
+    if (d < -0.2 || d > RIDE_WINDOW_M) continue;
+    const tx = -p.nz, tz = p.nx;
+    if (Math.abs((x - p.cx) * tx + (z - p.cz) * tz) > p.half + 1.1) continue;
+    if (speed < GLASS.minSpeed) return 'slow';
+    const into = -(vx * p.nx + vz * p.nz) / Math.max(1e-6, speed);
+    if (into <= 0) continue;                                     // running away from it is not a miss
+    const deg = (Math.asin(Math.min(1, into)) * 180) / Math.PI;
+    if (deg < WALL_RUN_MIN_DEG) return 'flat';
+    if (deg >= WALL_RUN_DEG) return 'steep';
+    return null;                                                 // inside the band: this one was caught
+  }
+  return null;
+}
