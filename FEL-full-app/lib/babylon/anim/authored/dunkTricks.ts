@@ -225,12 +225,26 @@ export function buildDoubleUp(scene: Scene, sk: Skeleton): AnimationGroup | null
  *
  * So: chin down through the arch (the no-look), the ball swung BEHIND the head, and the flush reaching back over the
  * top rather than punched forward.
+ *
+ * AND THEN THE ARCH ITSELF WAS MEASURED (owner, 2026-09-19: "fix the scorpion dunk to be more accurate, look at the
+ * pose"). Reading the keys tells you nothing — the leg bones take +X as a BACKWARD swing here while the spine takes it
+ * as forward flexion, so the only honest way to see the shape is to drive the clip on the rig and measure where the
+ * body ends up. Done that way, at the peak: the heels sat 0.27 m above the hips and 0.38 m behind them while the head
+ * reached 0.42 m out IN FRONT — 0.81 m of daylight between heel and head. That is not a scorpion. A scorpion CURLS:
+ * the tail comes over the back toward the head, and the two ends approach each other.
+ *
+ * The dive is cut back so the head stops reaching out in front (0.42 m → 0.28 m) and the legs swing further up behind:
+ * heels 0.27 m → 0.30 m above the hips, and the heel-to-head gap 0.81 m → 0.58 m. A tighter curl, and the feet are
+ * still a clear quarter-metre behind the hips — which is the rule coreClips.test.ts holds this clip to, and the reason
+ * a deeper fold was rejected: closing the gap to 0.38 m pulled the heels in UNDER the body, so the tail stopped
+ * trailing behind him and the dunk lost the thing it is named for. The hold at 0.5 keeps the shape instead of
+ * relaxing out of it a fifth of a second after reaching it, which made the old one read as a stretch, not a pose.
  */
 export function buildScorpion(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'dunk_scorpion', SCORPION_SEC, [
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], Neck: [0, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.20, 1.90, 0.15], Left: [-0.22, 1.82, 0.15] }, poles: UP },   // off one foot — the arch that follows is symmetric, the take-off never is
-    { t: 0.35, bones: { Hips: [18, 0, 0], Spine: [32, 0, 0], Neck: [26, 0, 0], LeftUpLeg: [58, 0, 8], LeftLeg: [112, 0, 0], RightUpLeg: [58, 0, -8], RightLeg: [112, 0, 0] }, hands: { Right: [0.22, 1.88, -0.34], Left: [-0.46, 1.26, -0.16] }, poles: { Right: [0.8, 0.3, -0.6], Left: [-0.9, -0.2, -0.5] }, hipsY: 0.1 },   // THE SCORPION: the tail goes up, the chin goes DOWN (he is looking at the floor), the ball swings BEHIND the head
-    { t: 0.5,  bones: { Hips: [16, 0, 0], Spine: [28, 0, 0], Neck: [22, 0, 0], LeftUpLeg: [52, 0, 8], LeftLeg: [108, 0, 0], RightUpLeg: [52, 0, -8], RightLeg: [108, 0, 0] }, hands: { Right: [0.18, 1.94, -0.28], Left: [-0.44, 1.28, -0.14] }, poles: { Right: [0.8, 0.3, -0.6], Left: [-0.9, -0.2, -0.5] }, hipsY: 0.08 },   // still no-look, the ball behind him
+    { t: 0.35, bones: { Hips: [12, 0, 0], Spine: [18, 0, 0], Neck: [15, 0, 0], LeftUpLeg: [72, 0, 5], LeftLeg: [118, 0, 0], RightUpLeg: [72, 0, -5], RightLeg: [118, 0, 0] }, hands: { Right: [0.22, 1.88, -0.34], Left: [-0.46, 1.26, -0.16] }, poles: { Right: [0.8, 0.3, -0.6], Left: [-0.9, -0.2, -0.5] }, hipsY: 0.1 },   // THE SCORPION: the tail goes up, the chin goes DOWN (he is looking at the floor), the ball swings BEHIND the head
+    { t: 0.5,  bones: { Hips: [11, 0, 0], Spine: [16, 0, 0], Neck: [14, 0, 0], LeftUpLeg: [70, 0, 5], LeftLeg: [116, 0, 0], RightUpLeg: [70, 0, -5], RightLeg: [116, 0, 0] }, hands: { Right: [0.18, 1.94, -0.28], Left: [-0.44, 1.28, -0.14] }, poles: { Right: [0.8, 0.3, -0.6], Left: [-0.9, -0.2, -0.5] }, hipsY: 0.08 },   // still no-look, the ball behind him
     { t: SCORPION_SEC, bones: { Hips: [4, 0, 0], Spine: [6, 0, 0], Neck: [8, 0, 0], LeftUpLeg: [10, 0, 4], LeftLeg: [40, 0, 0], RightUpLeg: [10, 0, -4], RightLeg: [40, 0, 0] }, hands: { Right: [0.15, 2.00, 0.10], Left: [-0.30, 1.50, 0.10] }, poles: UP },   // the flush, reached back over the top — chin still down, because he never looks
   ]);
 }
