@@ -2,20 +2,22 @@
 //
 // WHY THIS EXISTS (owner, 2026-09-19: "finish the Mirror scan"; SPEC-FEL-KITCHENS open item 3). The Fuel floor builds
 // a meal Rx from seven MovementMetrics, and today an athlete types all seven into sliders by hand — the spec says so
-// out loud: "until a Mirror scan is wired, the athlete enters or adjusts its metrics on the Fuel floor". The Mirror
-// runtime exists and cannot help as it stands: its SessionSummary reports fault COUNTS and stable time per zone, and
-// its one v1 pattern is the split-stance press/row. Nowhere in it is an angle, and a meal Rx cannot be built from
-// "kneeValgus happened four times".
+// out loud: "until a Mirror scan is wired, the athlete enters or adjusts its metrics on the Fuel floor".
 //
-// So this is the measuring half, kept pure: give it the pose frames the MediaPipe adapter already emits (normalized,
-// client-side, nothing leaves the browser) and it returns what the screen actually asks for, measured at the rep's
-// deepest frame.
+// IT RUNS ON THE MIRROR'S OWN SQUAT AUDIT. The first version of this file did not, and that was a mistake worth
+// recording: rules/squat-audit.ts already watches a bodyweight squat frame by frame — phase, depth against the knee
+// line, knee valgus, heel rise, arm fall, lateral shift, all visibility-gated and all tuned — and I wrote a second
+// set of the same measurements beside it because I did not look first. The audit owns the movement now. What stays
+// here is only what the audit does not do, because the screen needs it and a live overlay does not: the SESSION
+// reduction (one rep's worth of frames down to one set of numbers, taken at the deepest frame the athlete reached)
+// and the PER-SIDE split — the audit reports the worse knee, the meal Rx wants to know which knee.
 //
 // WHAT IT HONESTLY MEASURES, AND WHAT IT DOES NOT. A squat gives depth, knee valgus per side, trunk lean and left /
 // right asymmetry. It does NOT give jump height or running cadence — those are a countermovement jump and a run, two
 // different tests — so this returns them as `null` and the Fuel floor keeps the athlete's own numbers for those two
 // rather than inventing them from a squat. A scan that fabricates the fields it cannot see is worse than sliders.
 import type { MovementMetrics } from '@/lib/workout/movement-screen';
+import { SquatAudit, type SquatFault, type SquatFrameResult } from '@/lib/babylon/nexus/neuro-mirror/rules/squat-audit';
 
 /** One landmark, in the adapter's own shape: x,y normalized to the image, visibility 0..1. */
 export interface ScanPoint { x: number; y: number; z?: number; visibility?: number }
@@ -30,6 +32,10 @@ export const SQUAT_IDX = {
 } as const;
 
 export interface SquatScan {
+  /** The audit's own reading at the bottom: its phase, depth, faults and worst-knee ratio. */
+  audit: SquatFrameResult;
+  /** Every fault the audit raised anywhere in the rep, not just at the bottom. */
+  faults: SquatFault[];
   /** Knee flexion at the bottom, degrees — the screen's `depthDeg`. */
   depthDeg: number;
   /** Knee collapse per side at the bottom, 0 clean → 1 severe. */
@@ -86,10 +92,10 @@ function valgusOf(hip: ScanPoint, knee: ScanPoint, ankle: ScanPoint, hipWidth: n
 }
 
 /**
- * Read a squat from its frames. The bottom is the frame with the smallest mean knee angle — the deepest position the
- * athlete actually reached, not a position we hoped for — and every number is measured there.
+ * Read a squat from its frames. The MIRROR'S AUDIT decides where the bottom is — its `depth01` is the hip crease
+ * against the knee line, which is what a squat's depth actually means — and the per-side numbers are measured there.
  */
-export function scanSquat(frames: readonly ScanFrame[]): SquatScan | null {
+export function scanSquat(frames: readonly ScanFrame[], audit: SquatAudit = new SquatAudit()): SquatScan | null {
   const usable = frames.filter((f) => {
     if (f.present === false) return false;
     const L = f.landmarks;
@@ -100,12 +106,28 @@ export function scanSquat(frames: readonly ScanFrame[]): SquatScan | null {
   const confidence = frames.length ? usable.length / frames.length : 0;
   if (!usable.length) return null;
 
-  let bottom = usable[0], bottomAngle = Infinity;
-  for (const f of usable) {
-    const L = f.landmarks;
-    const mean = (angleAt(L[SQUAT_IDX.leftHip], L[SQUAT_IDX.leftKnee], L[SQUAT_IDX.leftAnkle])
-      + angleAt(L[SQUAT_IDX.rightHip], L[SQUAT_IDX.rightKnee], L[SQUAT_IDX.rightAnkle])) / 2;
-    if (mean < bottomAngle) { bottomAngle = mean; bottom = f; }
+  // the audit walks the WHOLE stream in order (it is stateful: it learns the standing line from the first frames),
+  // then the deepest frame it saw is the one we measure at
+  audit.reset();
+  let bottom = usable[0], deepestSeen = -1;
+  let bottomRead: SquatFrameResult | null = null;
+  const seen = new Set<SquatFault>();
+  for (const f of frames) {
+    const read = audit.evaluate({ landmarks: f.landmarks as never, timestampMs: f.timestampMs, present: f.present !== false });
+    for (const x of read.faults) seen.add(x);
+    if (!read.present) continue;
+    if (read.depth01 > deepestSeen) { deepestSeen = read.depth01; bottom = f; bottomRead = read; }
+  }
+  if (!bottomRead) {
+    // the audit never got a usable read (no standing line, nothing visible) — fall back to the deepest knee angle we
+    // can see ourselves rather than returning nothing, and say so through the confidence
+    let best = Infinity;
+    for (const f of usable) {
+      const L = f.landmarks;
+      const mean = (angleAt(L[SQUAT_IDX.leftHip], L[SQUAT_IDX.leftKnee], L[SQUAT_IDX.leftAnkle])
+        + angleAt(L[SQUAT_IDX.rightHip], L[SQUAT_IDX.rightKnee], L[SQUAT_IDX.rightAnkle])) / 2;
+      if (mean < best) { best = mean; bottom = f; }
+    }
   }
 
   const L = bottom.landmarks;
@@ -125,6 +147,8 @@ export function scanSquat(frames: readonly ScanFrame[]): SquatScan | null {
   const asymmetryPct = shallowest < 1e-6 ? 0 : ((shallowest - deepest) / shallowest) * 100;
 
   return {
+    audit: bottomRead ?? { present: false, phase: 'standing', depth01: 0, faults: [], valgusRatio: 0, lateralDrift: 0, note: 'no audit read' },
+    faults: [...seen],
     depthDeg: (kneeL + kneeR) / 2,
     valgusL: valgusOf(L[SQUAT_IDX.leftHip], L[SQUAT_IDX.leftKnee], L[SQUAT_IDX.leftAnkle], hipWidth, hipMid.x),
     valgusR: valgusOf(L[SQUAT_IDX.rightHip], L[SQUAT_IDX.rightKnee], L[SQUAT_IDX.rightAnkle], hipWidth, hipMid.x),

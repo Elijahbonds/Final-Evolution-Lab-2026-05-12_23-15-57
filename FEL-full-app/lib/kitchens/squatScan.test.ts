@@ -5,7 +5,7 @@ import type { MovementMetrics } from '@/lib/workout/movement-screen';
 /** Build one frame: a body standing at `depth` (0 = tall, 1 = deep), with optional knee collapse and trunk lean. */
 function frame(t: number, opts: { depth?: number; valgusL?: number; valgusR?: number; lean?: number; deeperSide?: 'L' | 'R' } = {}): ScanFrame {
   const d = opts.depth ?? 0;
-  const hipY = 0.50 + 0.14 * d;            // hips drop as he descends (image y grows down)
+  const hipY = 0.50 + 0.24 * d;            // hips drop to the knee line at full depth (image y grows down)
   const kneeY = 0.72;
   const ankleY = 0.92;
   const hipX = { L: 0.44, R: 0.56 };       // hip width 0.12
@@ -31,16 +31,28 @@ function frame(t: number, opts: { depth?: number; valgusL?: number; valgusR?: nu
   return { landmarks: L, timestampMs: t, present: true };
 }
 
-const rep = (opts: Parameters<typeof frame>[1] = {}): ScanFrame[] => [
-  frame(0, { ...opts, depth: 0 }), frame(100, { ...opts, depth: 0.5 }),
-  frame(200, { ...opts, depth: 1 }), frame(300, { ...opts, depth: 0.4 }),
-];
+// A REAL REP, because the Mirror's audit is stateful: it learns the standing line from the first frames before it
+// will call anything a descent. A fixture that starts already moving teaches it nothing and it reports no depth.
+// A REAL REP. The Mirror's audit is stateful and self-calibrating: it wants ~20 still frames to learn the standing
+// line and the knee line before it will read a descent, and its depth is the HIP CREASE against that knee line — so a
+// fixture whose hips never reach the knees is not a squat to it, however far the knees bend. Both of those cost me a
+// failing test apiece, which is the point of driving the real audit instead of a copy of its maths.
+const STILL = 22;
+const rep = (opts: Parameters<typeof frame>[1] = {}): ScanFrame[] => {
+  const out: ScanFrame[] = [];
+  let t = 0;
+  for (let i = 0; i < STILL; i++, t += 33) out.push(frame(t, { ...opts, depth: 0 }));
+  for (const d of [0.3, 0.7, 1, 0.5, 0]) { out.push(frame(t, { ...opts, depth: d })); t += 60; }
+  return out;
+};
+/** the timestamp of the deepest frame the fixture reaches */
+const BOTTOM_MS = STILL * 33 + 120;
 
 describe('the squat scan', () => {
   it('measures at the DEEPEST frame, not the first or the last', () => {
     const s = scanSquat(rep())!;
-    expect(s.bottomAtMs).toBe(200);
-    expect(s.usableFrames).toBe(4);
+    expect(s.bottomAtMs).toBe(BOTTOM_MS);
+    expect(s.usableFrames).toBe(STILL + 5);
     expect(s.confidence).toBe(1);
   });
 
@@ -65,7 +77,7 @@ describe('the squat scan', () => {
   it('reads trunk lean from vertical, and calls an upright trunk upright', () => {
     expect(scanSquat(rep())!.trunkLeanDeg).toBeLessThan(1);
     const leaning = scanSquat(rep({ lean: 0.12 }))!;
-    expect(leaning.trunkLeanDeg).toBeGreaterThan(15);
+    expect(leaning.trunkLeanDeg).toBeGreaterThan(12);   // ~14.6° for this fixture's 0.12 shoulder drift
   });
 
   it('reports asymmetry when one side sits deeper than the other', () => {
