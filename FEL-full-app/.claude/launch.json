@@ -100,6 +100,20 @@
         "3061"
       ],
       "port": 3061
+    },
+    {
+      "name": "fel-dev-n26",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PATH=/opt/homebrew/Cellar/node/26.8.2/bin:/usr/bin:/bin",
+        "NEXT_DIST_DIR=.next-n26",
+        "npx",
+        "next",
+        "dev",
+        "-p",
+        "3011"
+      ],
+      "port": 3011
     }
   ]
 }
