@@ -18,7 +18,7 @@ one is built and deliberately switched off, and one is a real, total gap.
 | C1 | no roll, no jump, dodge in one mode of four | `EvadeMoves` (roll with i-frames that **end before the roll does**, jump), `DodgeRead` (a binary perfect-dodge reward). Wired into karate_vs, mixedcombat and endless. New `karate_roll` / `karate_jump` clips; block and parry rebuilt. |
 | C2 | enemies dropped on one touch | `MookHealth` — **3 hits at wave 1** (owner), a shallow capped curve so one swing still clears a crowd, and a bar built on first damage. |
 | C3 | PRQ tied to nothing | `PrqVitals` — max HP and speed from the band, spread capped at a fifth of a pool, guest = READY. `/api/profile` → host → harness → mode. |
-| **C4** | **"better speed, smoother" — unmeasured** | **next.** |
+| C4 | "better speed, smoother" — unmeasured | **measured and closed, 2026-09-20 — see below** |
 
 Two things worth carrying forward from the build:
 
@@ -113,3 +113,45 @@ shipping it rather than guessing how many hits a mook should take.
 
 Only one thing, and only when I reach C2: **how many hits should a standard enemy take at wave 1?** Three
 is One Piece; one is what it does now. Everything else in this plan I can take.
+
+
+---
+
+## C4 — measured, 2026-09-20
+
+The brief's last line was the one that could not be acted on from source alone, and this plan's own instruction was
+to measure three things on a live loop before tuning anything. All three now have numbers.
+
+**1 · The gap between a press and the first animated frame — this was the bug.**
+
+Driven through the real `StrikeController` with the real arsenal timings, across 46 press offsets through a swing:
+
+| | presses that came out |
+|---|---|
+| before | **25 / 46 (54%)** — and every one that failed was in the FIRST part of the swing |
+| after | **45 / 46 (98%)**, mean wait 95 ms |
+
+The buffer expired 140 ms after the PRESS while only being consumed when the swing reached `done`, 420 ms later. So
+committing to a punch and pressing again — the most natural input in a fight — was the one case guaranteed to be
+eaten, while a press in the last 140 ms landed. Lengthening the window alone changed nothing (250 ms and 400 ms both
+measured 25/46); the fault was WHEN the queue was read, not how long it lived. The queue now outlives a swing and is
+taken at the cancel point. The one press still dropped is on the swing's own first frame, which is the same input
+counted twice.
+
+**2 · Frame time under a full wave — not a problem, and worth saying so.**
+
+Karate endless, 23 skinned bodies on screen, 478 sampled frames:
+
+```
+mean 16.7 ms · p95 17.3 · p99 17.7 · max 17.8 · frames over 33 ms: 0 · over 50 ms: 0
+```
+
+Locked 60 with the wave up. "Smoother" was never a frame-rate problem — it was the input one above. No tuning was
+done here, because there is nothing in the numbers to tune.
+
+**3 · How long a strike locks the body** — this is the same measurement as (1) from the body's side, and the same
+fix answers it: the lock is unchanged, but it no longer swallows what you pressed during it.
+
+One thing found along the way and removed: `HordeDynamics.canCancel` had zero callers and encoded a weaker rule than
+the one karate endless actually runs (it knew about neither the hit beat nor the fighter's style scale). Deleted
+rather than wired — a dead export that looks authoritative is how a weaker rule spreads.
