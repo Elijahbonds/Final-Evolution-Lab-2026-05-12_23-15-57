@@ -57,7 +57,7 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
   const currentAvatar = ROSTER.find((r) => r.key === p?.avatarKey) ?? null;
 
   return (
-    <main className="mx-auto max-w-[900px] px-4 py-6">
+    <main className="py-2">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="fel-panel rounded-xl p-6">
         <div className="flex flex-wrap items-center gap-5">
           <div
@@ -67,11 +67,16 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
             {currentAvatar ? <AvatarFigure avatar={currentAvatar} size={54} cosmeticAssetId={p?.cosmeticAssetId} /> : (userName?.[0] ?? 'A').toUpperCase()}
           </div>
           <div>
-            <h1 className="fel-heading text-3xl font-bold text-white">{userName}</h1>
-            <p className="font-mono text-xs text-white/70">{email}</p>
-            {currentAvatar && (
-              <p className="fel-heading text-sm font-bold" style={{ color: currentAvatar.accent }}>{currentAvatar.name.toUpperCase()}</p>
+            {/* The name is the page's own <h1> (TabPage) -- printing it again here made one screen carry the same
+                headline twice. This block identifies the ATHLETE: archetype first, then the account it belongs to. */}
+            {currentAvatar ? (
+              <p className="fel-heading text-[22px] font-bold leading-none" style={{ color: currentAvatar.accent }}>
+                {currentAvatar.name}
+              </p>
+            ) : (
+              <p className="fel-heading text-[22px] font-bold leading-none text-white">{userName}</p>
             )}
+            <p className="mt-1.5 font-mono text-[11px] text-white/45">{email}</p>
             {grade && (
               <span
                 className="fel-heading mt-2 inline-block rounded px-2.5 py-0.5 text-sm font-bold"
@@ -107,7 +112,7 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
 
       <div className="mt-8 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="fel-heading text-2xl font-bold text-white">SELECT YOUR ATHLETE</h2>
+          <h2 className="fel-heading text-[19px] font-bold text-white">SELECT YOUR ATHLETE</h2>
           <p className="text-xs text-white/45">Pick the body type you're building toward. Your athlete shows up across the Lab.</p>
         </div>
         <a
@@ -175,7 +180,7 @@ function MasteryPanel() {
   const entries = Object.entries(map).filter(([, v]) => v.tierIndex > 0);
   return (
     <>
-      <h2 className="fel-heading mt-8 text-2xl font-bold text-white">MODE MASTERY</h2>
+      <h2 className="fel-heading mt-8 text-[19px] font-bold text-white">MODE MASTERY</h2>
       <p className="text-xs text-white/45">Earned on a rolling window of your best sessions per mode. Tiers never decay.</p>
       {entries.length === 0 ? (
         <p className="mt-4 rounded-lg border border-white/10 bg-white/[0.02] p-4 text-sm text-white/40">
@@ -342,7 +347,7 @@ function PrqFoundation() {
     <>
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="fel-heading text-2xl font-bold text-white">PRQ ATTRIBUTES</h2>
+          <h2 className="fel-heading text-[19px] font-bold text-white">PRQ ATTRIBUTES</h2>
           <p className="text-xs text-white/45">
             Performance Readiness Quotient — every value is traceable to its source.
             {prq && ` ${prq.measured}/${prq.total} measured.`}

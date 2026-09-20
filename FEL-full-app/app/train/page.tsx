@@ -68,15 +68,15 @@ export default async function TrainPage() {
       accent="#00FF9D"
     >
       <ul className="grid gap-3 sm:grid-cols-2">
-        {cards.map((c) => {
+        {cards.map((c, i) => {
           const Icon = c.icon;
           return (
-            <li key={c.href}>
+            <li key={c.href} className="fel-rise" style={{ ['--fel-rise-delay' as string]: `${i * 45}ms` }}>
               <Link
                 href={c.href}
                 className="group flex h-full gap-4 rounded-2xl border border-white/8 bg-white/[0.02] p-5
-                           transition-all duration-300 hover:bg-white/[0.045]"
-                style={{ boxShadow: 'none' }}
+                           transition-all duration-300 hover:-translate-y-0.5 hover:border-white/15
+                           hover:bg-white/[0.045] hover:shadow-[0_18px_40px_-24px_rgba(0,0,0,0.9)]"
                 // the colour arrives on approach rather than sitting there shouting
               >
                 <span
@@ -89,10 +89,11 @@ export default async function TrainPage() {
                 <span className="min-w-0 flex-1">
                   <span className="fel-heading block text-[16px] font-bold leading-tight text-white">{c.title}</span>
                   <span className="mt-1.5 block text-[13px] leading-relaxed text-white/45">{c.line}</span>
-                  <span
-                    className="mt-3 inline-block font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
-                    style={{ color: c.accent }}
-                  >
+                  {/* One colour moment per card. The icon tile carries the accent because it is the destination's
+                      identity; the call to action repeating it gave five cards ten coloured marks on a page whose
+                      own colour is green, and the eye had nowhere to land. */}
+                  <span className="mt-3 inline-block font-mono text-[10px] font-bold uppercase tracking-[0.16em]
+                                   text-white/40 transition-colors group-hover:text-white/75">
                     {c.tag} →
                   </span>
                 </span>

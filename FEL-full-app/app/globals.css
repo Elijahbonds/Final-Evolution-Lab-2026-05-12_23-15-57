@@ -64,10 +64,34 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+/* ONE CARD MATERIAL (2026-09-20).
+   This was #1a1a20 -- an opaque warm grey noticeably lighter than the near-black the app actually sits on. It is
+   used by nineteen files, and on the Profile tab it landed directly above the creator cards, so one page showed
+   two different materials a shade apart. That gap is what reads as unfinished; a premium surface is not a richer
+   surface, it is the SAME surface everywhere. Kept opaque rather than a white overlay, because some of these sit
+   over artwork and a translucent card there would show the image through it. */
 .fel-card {
-  background: #1a1a20;
+  background: #0c0c11;
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #e5e5e5;
+}
+
+/* ENTRANCE (2026-09-20).
+   The shelves appeared fully formed, all at once, which is the one thing that reads cheap on an otherwise still
+   page. A short rise, staggered by a variable the caller sets, is enough -- 320ms and 14px, not a performance.
+   Anybody who has asked their system not to animate gets the final state immediately and no transform at all. */
+@keyframes fel-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.fel-rise {
+  animation: fel-rise 320ms cubic-bezier(0.16, 0.8, 0.3, 1) both;
+  animation-delay: var(--fel-rise-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fel-rise { animation: none; opacity: 1; transform: none; }
 }
 
 .fel-input {

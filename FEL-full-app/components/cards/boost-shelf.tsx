@@ -70,15 +70,16 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
       </div>
 
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {BOOST_CARDS.map((c) => {
+        {BOOST_CARDS.map((c, i) => {
           const mine = have.includes(c.id);
           const check = purchaseCheck(c, purse, have);
           const working = busy === c.id;
           return (
             <li
               key={c.id}
-              className="relative flex flex-col overflow-hidden rounded-2xl border p-4 transition-colors duration-300"
+              className="fel-rise relative flex flex-col overflow-hidden rounded-2xl border p-4 transition-colors duration-300"
               style={{
+                ['--fel-rise-delay' as string]: `${i * 45}ms`,
                 borderColor: mine ? `${c.accent}40` : 'rgba(255,255,255,0.08)',
                 background: mine
                   ? `linear-gradient(160deg, ${c.accent}14 0%, rgba(255,255,255,0.02) 55%)`

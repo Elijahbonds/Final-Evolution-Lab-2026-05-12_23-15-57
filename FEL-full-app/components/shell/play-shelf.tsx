@@ -33,7 +33,7 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
 
   return (
     <div className="space-y-3">
-      {FAMILIES.map((f) => {
+      {FAMILIES.map((f, i) => {
         const isOpen = open === f.id;
         const modes = modesOf(f);
         // A VENUE THAT EVERY MODE SHARES IS NOT INFORMATION. All five hoops modes read "VENICE BEACH COURT"; printing
@@ -41,7 +41,7 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
         const venues = new Set(modes.map((m) => m.venue).filter(Boolean));
         const venueDistinguishes = venues.size > 1;
         return (
-          <section key={f.id}>
+          <section key={f.id} className="fel-rise" style={{ ['--fel-rise-delay' as string]: `${i * 40}ms` }}>
             <button
               onClick={() => setOpen(isOpen ? null : f.id)}
               aria-expanded={isOpen}

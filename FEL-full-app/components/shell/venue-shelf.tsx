@@ -11,6 +11,7 @@
 // answers "where". A mastery badge on a venue is the only earned mark on the page, so it is the only badge.
 
 import { useEffect, useState } from 'react';
+import type React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Lock, Play } from 'lucide-react';
@@ -54,7 +55,7 @@ export function VenueShelf() {
       </div>
 
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {VENUES.map((venue) => {
+        {VENUES.map((venue, i) => {
           const key = venueModeKey(venue.href);
           const tier = key ? mastery[key]?.tierIndex ?? 0 : 0;
           const card = (
@@ -107,7 +108,7 @@ export function VenueShelf() {
             </div>
           );
           return (
-            <li key={venue.key}>
+            <li key={venue.key} className="fel-rise" style={{ '--fel-rise-delay': `${Math.min(i, 8) * 45}ms` } as React.CSSProperties}>
               {venue.playable && venue.href ? <Link href={venue.href}>{card}</Link> : card}
             </li>
           );
