@@ -89,3 +89,10 @@ export function familyById(id: string): Family | null {
 export function shelvedModes(): string[] {
   return FAMILIES.flatMap((f) => f.modes);
 }
+
+/** How many modes the shelf actually carries. A hand-typed count in the page copy said twenty-eight while this
+ *  was thirty-three; a number on screen that describes the data should be read from the data. */
+export const SHELF_MODE_COUNT: number = FAMILIES.reduce((n, f) => n + f.modes.length, 0);
+
+/** The shelf's own one-liner, so the page and the dev view cannot drift apart or go stale again. */
+export const SHELF_LEDE = `${FAMILIES.length} families, ${SHELF_MODE_COUNT} modes. Open one to see what is inside.`;

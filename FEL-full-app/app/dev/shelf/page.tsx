@@ -1,4 +1,5 @@
 import { PlayShelf } from '@/components/shell/play-shelf';
+import { SHELF_LEDE } from '@/lib/nav/families';
 import { TabPage } from '@/components/shell/tab-page';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +14,7 @@ export default function DevShelfPage() {
     <TabPage
       eyebrow="Play"
       title="Pick your lane"
-      lede="Seven families, twenty-eight modes. Open one to see what is inside."
+      lede={SHELF_LEDE}
       accent="#00E5FF"
     >
       <PlayShelf />

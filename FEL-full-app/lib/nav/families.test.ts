@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FAMILIES, OFF_SHELF, familyById, familyOf, shelvedModes } from './families';
+import { SHELF_LEDE, SHELF_MODE_COUNT, FAMILIES, OFF_SHELF, familyById, familyOf, shelvedModes } from './families';
 import { MODE_INFO } from '@/lib/game-data';
 
 const KNOWN = new Set(Object.keys(MODE_INFO as Record<string, unknown>));
@@ -54,5 +54,23 @@ describe('the mode shelf', () => {
     expect(familyOf('mirror')).toBeNull();          // off the shelf on purpose
     expect(familyById('board')?.label).toBe('Board');
     expect(familyById('nope')).toBeNull();
+  });
+});
+
+describe('the shelf describes itself', () => {
+  it('counts what is actually on it', () => {
+    // This is here because the page said "twenty-eight modes" while the shelf carried thirty-three. A number on
+    // screen that describes the data has to be read from the data, or it is a lie with a shelf life.
+    expect(SHELF_MODE_COUNT).toBe(FAMILIES.reduce((n, f) => n + f.modes.length, 0));
+    expect(SHELF_MODE_COUNT).toBeGreaterThan(25);
+  });
+
+  it('puts both real numbers in the line the page prints', () => {
+    expect(SHELF_LEDE).toContain(String(SHELF_MODE_COUNT));
+    expect(SHELF_LEDE).toContain(String(FAMILIES.length));
+  });
+
+  it('hard-codes no count anywhere in the copy', () => {
+    expect(SHELF_LEDE).not.toMatch(/twenty|thirty|seven families/i);
   });
 });

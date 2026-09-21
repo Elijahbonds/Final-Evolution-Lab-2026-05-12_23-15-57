@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
 import { PlayShelf } from '@/components/shell/play-shelf';
+import { SHELF_LEDE } from '@/lib/nav/families';
 import { VenueStrip } from '@/components/shell/venue-strip';
 // The season pass came off the retired hub with the venues. It is what playing earns, so it belongs on Play.
 import { SeasonPassTrack } from '@/components/season-pass-track';
@@ -20,7 +21,7 @@ export default async function PlayPage() {
     <TabPage
       eyebrow="Play"
       title="Pick your lane"
-      lede="Seven families, twenty-eight modes. Open one to see what is inside."
+      lede={SHELF_LEDE}
       accent="#00E5FF"
       aside={
         <Link
