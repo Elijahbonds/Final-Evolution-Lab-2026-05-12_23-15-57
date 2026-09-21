@@ -8,7 +8,8 @@ const SECS = Number(process.env.SECS ?? 70);
 const EXE = process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
 
 const b = await chromium.launch({ executablePath: EXE, args: ['--use-gl=angle','--use-angle=metal','--enable-webgl','--ignore-gpu-blocklist'] });
-const p = await (await b.newContext({ viewport: { width: 1280, height: 780 } })).newPage();
+const MOBILE = process.env.MOBILE === '1';
+const p = await (await b.newContext(MOBILE ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 } : { viewport: { width: 1280, height: 780 } })).newPage();
 const errs: string[] = [], warns: string[] = [], logs: string[] = [];
 p.on('console', (m) => { const t = m.text().slice(0, 160); if (m.type() === 'error') errs.push(t); else if (m.type() === 'warning') warns.push(t); else if (/\[RACE\]|\[KART\]|\[AERO\]/.test(t)) logs.push(t); });
 p.on('pageerror', (e) => errs.push('PAGEERROR ' + String(e).slice(0, 160)));
@@ -22,6 +23,8 @@ await p.waitForTimeout(2500);
 await p.evaluate(`(() => { const pad={index:0,id:'fake (STANDARD GAMEPAD)',connected:true,mapping:'standard',axes:[0,0,0,0],timestamp:0,buttons:Array.from({length:17},()=>({pressed:false,touched:false,value:0}))}; window.__PAD=pad; navigator.getGamepads=()=>[pad];
   window.__S = (s) => { const m = window.__FEL_DEV__?.scene?.metadata?.[s]; return m ? m.state() : null; };
   window.__FPS = () => { const e = window.__FEL_DEV__?.scene?.getEngine?.(); return e ? Math.round(e.getFps()) : 0; };
+  window.__DRAWS = () => { const s = window.__FEL_DEV__?.scene; if (!s) return null; const e = s.getEngine();
+    return { draws: e._drawCalls ? e._drawCalls.current : (s.getEngine().drawCalls ?? -1), active: s.getActiveMeshes ? s.getActiveMeshes().length : -1, meshes: s.meshes.length, mats: s.materials.length, lights: s.lights.length, shadowGens: s.lights.reduce((a,l)=>a+(l.getShadowGenerator()?1:0),0) }; };
 })()`);
 const set = async (js: string) => { await p.evaluate(`(() => { const p=window.__PAD; ${js}; p.timestamp=performance.now(); })()`).catch(()=>{}); };
 const st = async (): Promise<any> => p.evaluate(`window.__S(${JSON.stringify(SEAM)})`).catch(() => null);
@@ -45,7 +48,8 @@ for (let i = 0; i < SECS * 5; i++) {
     const lat = s.lateral ?? 0;
     steer = Math.max(-1, Math.min(1, d * 1.8 - lat * 0.25));
     rows.push({ t: +(i / 5).toFixed(1), speed: s.speed, along: s.along, lat: +(lat).toFixed(2), lap: s.lap ?? null,
-      place: s.place, onRoad: s.onRoad ?? null, y: s.pos ? +s.pos.y.toFixed(1) : null, fps: await p.evaluate('window.__FPS()') });
+      place: s.place, onRoad: s.onRoad ?? null, y: s.pos ? +s.pos.y.toFixed(1) : null, lineY: s.lineY ?? null,
+      overLine: s.pos && s.lineY != null ? +(s.pos.y - s.lineY).toFixed(1) : null, fps: await p.evaluate('window.__FPS()') });
   }
   await set(`p.axes[0]=${steer.toFixed(3)};p.buttons[7].pressed=true;p.buttons[7].value=1`);
   await p.waitForTimeout(200);
@@ -56,13 +60,20 @@ const num = (k: string) => rows.map((r) => r[k]).filter((v) => typeof v === 'num
 const stat = (k: string) => { const v = num(k); if (!v.length) return 'n/a'; const s = [...v].sort((a, b) => a - b); return `min ${s[0]} p50 ${s[Math.floor(s.length / 2)]} max ${s[s.length - 1]}`; };
 console.log(`\n=== ${MODE.toUpperCase()} — ${rows.length} samples over ${(rows.length / 5).toFixed(0)}s`);
 console.log(`  speed    ${stat('speed')}`);
-console.log(`  fps      ${stat('fps')}`);
+console.log(`  fps      ${stat('fps')}${MOBILE ? '   (phone viewport 390x844, dpr 3)' : ''}`);
+console.log(`  scene    ${JSON.stringify(await p.evaluate('window.__DRAWS()'))}`);
 console.log(`  lateral  ${stat('lat')}   (corridor half-width is the budget)`);
 console.log(`  along    first ${rows[0]?.along} last ${rows[rows.length - 1]?.along}`);
 const stuck = rows.filter((r, i) => i > 4 && Math.abs(r.along - rows[i - 1].along) < 0.5);
 console.log(`  stalled samples (no progress): ${stuck.length} / ${rows.length}`);
 const off = rows.filter((r) => r.onRoad === false).length;
 if (rows.some((r) => r.onRoad !== null)) console.log(`  off-road samples: ${off} / ${rows.length}`);
+if (rows.some((r) => r.overLine != null)) {
+  console.log(`  altitude ${stat('y')}   line ${stat('lineY')}`);
+  console.log(`  height above the racing line: ${stat('overLine')}`);
+  const below = rows.filter((r) => (r.overLine ?? 0) < -3).length;
+  console.log(`  samples more than 3 m BELOW the line: ${below} / ${rows.length}`);
+}
 console.log(`  laps seen: ${[...new Set(rows.map((r) => r.lap).filter((v) => v != null))].join(', ') || 'n/a'}`);
 console.log(`  place: ${[...new Set(rows.map((r) => r.place))].join(' → ')}`);
 console.log(`\n  errors ${errs.length}: ${[...new Set(errs)].slice(0, 6).join(' | ') || 'none'}`);

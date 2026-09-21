@@ -12,7 +12,7 @@
 import { Matrix, Quaternion, Space, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { attachBallToHand } from './ballRig';
-import { DEFAULT_DRIBBLE, advancePhase, dribbleAt, type DribbleParams } from './Dribble';
+import { DEFAULT_DRIBBLE, advancePhase, dribbleAt, fitDribbleToReach, type DribbleParams } from './Dribble';
 import { armChain, reachArm, shapeReach, type ArmChain } from './HandIK';
 
 export interface BallCarryOpts {
@@ -95,11 +95,25 @@ function reachShaped(arm: ArmChain, target: Vector3, pole: Vector3, weight: numb
   armMemo.set(arm.shoulder, { side, stamp });
 }
 
+/**
+ * The lowest this body's hand can get above the root, in metres: the shoulder's height less the arm's length.
+ * Measured off the live rig rather than assumed — the roster's arms are not the hero's.
+ */
+function lowestHandY(chain: ArmChain | null, root: TransformNode): number {
+  if (!chain) return Number.NaN;
+  for (const n of [chain.shoulder, chain.elbow, chain.hand, root]) n.computeWorldMatrix(true);
+  const sh = chain.shoulder.getAbsolutePosition(), el = chain.elbow.getAbsolutePosition(), ha = chain.hand.getAbsolutePosition();
+  const armLen = Vector3.Distance(sh, el) + Vector3.Distance(el, ha);
+  return sh.y - root.getAbsolutePosition().y - armLen;
+}
+
 export function mountBallCarry(opts: BallCarryOpts): BallCarry {
-  const p = opts.params ?? DEFAULT_DRIBBLE;
   const armW = opts.armIntensity ?? 1;
   let side: 'Left' | 'Right' = opts.side ?? 'Right';
   let arm: ArmChain | null = armChain(opts.skeleton, side);
+  // THE STROKE HAS TO FIT THE BODY. The dribble's bottom sat below where this body's hand can reach, so the solver
+  // clamped it and the dribbling hand barely out-travelled the off hand riding the torso. See fitDribbleToReach.
+  const p = fitDribbleToReach(opts.params ?? DEFAULT_DRIBBLE, lowestHandY(arm, opts.root));
   // ONEVONE-DEFENSE-LOGIC (2026-09-07): on a hand switch the OLD arm let go in one frame — it snapped from the ball
   // back to the clip's pose, a 0.3–0.5 m hand pop on every crossover (measured on both 1v1 bodies). It now lets go
   // over SWITCH_FADE_SEC while the new arm takes the reach.

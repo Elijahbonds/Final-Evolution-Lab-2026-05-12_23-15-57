@@ -66,3 +66,22 @@ export function dribbleAt(phase: number, p: DribbleParams = DEFAULT_DRIBBLE): Dr
     handWeight,
   };
 }
+
+/**
+ * Lift a dribble so the WHOLE stroke is inside the arm's reach.
+ *
+ * WHY (2026-09-20, owner: "fix the dribbling and running to look more like a basketball player"). The defaults put
+ * the palm at 0.98 m and followed the ball 0.12 m down — a stroke bottoming at 0.86 m. The forged hero's hand cannot
+ * get below about 0.92 m (shoulder 1.43 m, arm 0.486 m), so the solver clamped the bottom half away and the hand
+ * moved about 6 cm of the 12 cm asked for. Measured on the runway: the ball travelled 0.853 m while the dribbling
+ * hand travelled 0.177 m — and the OFF hand, which is doing nothing but riding the torso, travelled 0.16 m. The hand
+ * was not dribbling the ball, it was hanging beside it.
+ *
+ * The author's `followDepth` is the intent and is kept exactly; only the palm moves, and only upward, and only as far
+ * as it must. A body with a long enough arm is left alone.
+ */
+export function fitDribbleToReach(p: DribbleParams, lowestHandY: number): DribbleParams {
+  if (!Number.isFinite(lowestHandY) || !Number.isFinite(p.palmY) || !Number.isFinite(p.followDepth)) return p;
+  const needed = lowestHandY + p.followDepth;
+  return needed > p.palmY ? { ...p, palmY: needed } : p;
+}
