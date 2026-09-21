@@ -34,6 +34,9 @@ let mirrorModPromise: Promise<MirrorModule> | null = null;
 const loadMirror = (): Promise<MirrorModule> =>
   (mirrorModPromise ??= import('@/lib/babylon/nexus/neuro-mirror'));
 import { DunkTracker, type DunkMetrics } from '@/lib/irl/dunkTracker';
+// THE REASON TO COME BACK. DunkTracker has always measured a jump beautifully and then thrown it away when the
+// session ended. This keeps the numbers — and only the numbers; the clip never leaves the phone.
+import { attemptFrom, progressLine, readProgress, type DunkProgress } from '@/lib/irl/dunkProgress';
 import type { PoseFrame } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import type { RepState } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
 import type { SquatFrameResult, SquatFault } from '@/lib/babylon/nexus/neuro-mirror/rules/squat-audit';
@@ -83,6 +86,8 @@ export function MirrorHarness() {
   patternRef.current = pattern;
   const [reps, setReps] = useState<RepState | null>(null);
   const [jumps, setJumps] = useState<DunkMetrics[]>([]);
+  const [dunkProgress, setDunkProgress] = useState<DunkProgress | null>(null);
+  const [dunkSaid, setDunkSaid] = useState<string>('');
   const [jumpState, setJumpState] = useState('idle');
   const skeletonRef = useRef<HTMLCanvasElement | null>(null);
   const jumpTrackerRef = useRef(new DunkTracker());
@@ -269,6 +274,7 @@ export function MirrorHarness() {
             setJumpState(jumpTrackerRef.current.state);
             if (got) {
               setJumps((prev) => [...prev, got]);
+              void recordDunk(got);
               jumpTrackerRef.current.reset();
             }
           }
@@ -358,6 +364,47 @@ export function MirrorHarness() {
   }, [stop]);
 
   const secs = (ms: number) => (ms / 1000).toFixed(1);
+
+  /**
+   * Keep a measured jump. Numbers only — the clip is never uploaded, which is the promise the schema has carried
+   * since M17 and the one the owner chose to keep.
+   *
+   * A refusal is not an error worth interrupting a session for: an implausible measurement (the tracker losing
+   * the feet and reporting a three-metre vertical) is REFUSED by the route rather than stored, and the athlete
+   * simply does not see a new number for that one.
+   */
+  const recordDunk = useCallback(async (m: DunkMetrics) => {
+    const attempt = attemptFrom(m);
+    try {
+      const res = await fetch('/api/mirror/dunks', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(attempt),
+      });
+      if (!res.ok) return;
+      const j = await res.json().catch(() => null);
+      if (!j?.progress) return;
+      setDunkProgress(j.progress);
+      const line = progressLine(j.progress, attempt);
+      setDunkSaid(line);
+      speak(line);
+    } catch {
+      // Offline in a gym is the normal case, not a failure state. The jump still showed on screen.
+      const local = readProgress([attempt]);
+      setDunkSaid(progressLine(local, attempt));
+    }
+  }, [speak]);
+
+  // The history, so the screen opens on what there is to beat rather than on nothing.
+  useEffect(() => {
+    if (pattern !== 'jump') return;
+    let live = true;
+    fetch('/api/mirror/dunks')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (live && j?.progress) setDunkProgress(j.progress); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [pattern]);
 
   /**
    * A finished screen goes to the server, which recomputes the score and decides the payout. A screen the
@@ -785,6 +832,108 @@ export function MirrorHarness() {
             </>
           ) : pattern === 'jump' ? (
             <>
+              {/* WHAT YOU CAME BACK FOR. The best to beat, the rhythm you are keeping, the line over weeks, and
+                  the next dunk named — the four the owner asked for, in the order they matter when you are
+                  standing in a gym with your phone propped against a bag. */}
+              {dunkProgress && dunkProgress.attempts > 0 && (
+                <section className="mb-5 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/35">
+                        Your best
+                      </p>
+                      <p className="fel-heading text-[40px] font-black leading-none text-[#FFD700]">
+                        {Math.round(dunkProgress.best?.verticalCm ?? 0)}
+                        <span className="ml-1 text-[16px]">cm</span>
+                      </p>
+                      {dunkProgress.trendCmPerWeek !== null && (
+                        <p
+                          className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.14em]"
+                          style={{ color: dunkProgress.trendCmPerWeek >= 0 ? '#00FF9D' : '#FF7A2F' }}
+                        >
+                          {dunkProgress.trendCmPerWeek >= 0 ? '+' : ''}{dunkProgress.trendCmPerWeek} cm / week
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex gap-5 text-right">
+                      <div>
+                        <p className="fel-heading text-[22px] font-black leading-none text-white">
+                          {dunkProgress.streakDays}
+                        </p>
+                        <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">
+                          Day streak
+                        </p>
+                      </div>
+                      <div>
+                        <p className="fel-heading text-[22px] font-black leading-none text-white">
+                          {dunkProgress.thisWeek}
+                        </p>
+                        <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">
+                          This week
+                        </p>
+                      </div>
+                      <div>
+                        <p className="fel-heading text-[22px] font-black leading-none text-white">
+                          {dunkProgress.attempts}
+                        </p>
+                        <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">
+                          Jumps
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* The trend, drawn as the session bests. Eight weeks of stall and breakthrough is the proof
+                      the Playbook's whole thesis asks for. */}
+                  {dunkProgress.trend.length > 1 && (() => {
+                    const pts = dunkProgress.trend.slice(-14);
+                    const lo = Math.min(...pts.map((t) => t.bestCm));
+                    const hi = Math.max(...pts.map((t) => t.bestCm));
+                    const span = Math.max(1, hi - lo);
+                    return (
+                      <div className="mt-5 flex h-16 items-end gap-1.5" role="img"
+                           aria-label={`Session bests from ${Math.round(lo)} to ${Math.round(hi)} centimetres`}>
+                        {pts.map((t) => (
+                          <span
+                            key={t.day}
+                            title={`${t.day} · ${Math.round(t.bestCm)} cm`}
+                            className="flex-1 rounded-t"
+                            style={{
+                              height: `${18 + ((t.bestCm - lo) / span) * 82}%`,
+                              background: t.bestCm >= hi ? '#FFD700' : 'rgba(255,255,255,0.16)',
+                            }}
+                          />
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  {dunkProgress.next && (
+                    <div className="mt-5 border-t border-white/[0.06] pt-4">
+                      <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-[#00E5FF]">
+                        Next dunk · {dunkProgress.next.family}
+                      </p>
+                      <p className="mt-1.5 text-[13.5px] leading-relaxed text-white/70">{dunkProgress.next.ask}</p>
+                    </div>
+                  )}
+
+                  {dunkProgress.landed.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {dunkProgress.landed.map((f) => (
+                        <span key={f} className="rounded-md bg-[#00FF9D]/12 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-[#00FF9D]">
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {dunkSaid && (
+                <p className="mb-4 text-[15px] font-bold text-[#FFD700]">{dunkSaid}</p>
+              )}
+
               <h2 className="fel-heading mb-3 text-[15px] font-bold text-white/80">Jumps · measured from flight time</h2>
               {jumps.length === 0 ? (
                 <p className="text-[13px] text-white/45">
