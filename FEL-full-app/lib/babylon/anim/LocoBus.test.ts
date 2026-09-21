@@ -117,3 +117,54 @@ describe('the authored clips keep their arms inside the bus limits (forge rig)',
     expect(judge(run, [0, 0.1, 0.2, 0.3, 0.4, 0.5], 'loco')).toEqual([]);
   });
 });
+
+describe('a hand folded across the body', () => {
+  // MEASURED ON THE LIVE RIG, 2026-09-20 (scripts/probes/_dunk-arms-replay-probe.mts). The dunk rival stood with
+  // its left shoulder at r+0.178 and its left HAND at r-0.083 — 0.26 m inboard, past the body's centre line — and
+  // the hero's left arm did the same thing through a run. The owner's words were "fix the opponents arms".
+  //
+  // armsVerdict had three checks (behind, high, T) and this was none of them, so it read ok:true the whole time.
+  const at = (fwd: number, up: number, out: number) => ({ fwd, up, out });
+
+  it('passes arms hanging naturally outboard, which is what the hero does', () => {
+    // hero, measured: hand 0.06 m OUTBOARD of the shoulder
+    const v = armsVerdict('loco', at(0.02, -0.49, 0.06), at(0.02, -0.49, 0.06));
+    expect(v.crossed).toBe(false);
+    expect(v.ok).toBe(true);
+  });
+
+  it('CATCHES THE RIVAL, with the numbers the probe measured', () => {
+    const v = armsVerdict('loco', at(0.04, -0.41, -0.26), at(0.04, -0.41, -0.26));
+    expect(v.crossed).toBe(true);
+    expect(v.ok).toBe(false);
+    expect(v.reasons.join(' ')).toMatch(/across the body/);
+  });
+
+  it('allows the small cross a real arm swing makes', () => {
+    // A sprinter's hand reaches the opposite pec on the forward swing. That is running, not folding.
+    expect(armsVerdict('loco', at(0.25, -0.35, -0.12), at(-0.2, -0.45, 0.1)).crossed).toBe(false);
+  });
+
+  it('is looser for a stance, where two hands legitimately meet at the midline', () => {
+    const hands = at(0.3, -0.2, -0.2);
+    expect(armsVerdict('stance', hands, hands).crossed).toBe(false);
+    expect(armsVerdict('ride', hands, hands).crossed).toBe(true);
+  });
+
+  it('ADMITS A BATTING GRIP AND STILL CATCHES THE DERBY DRAG', () => {
+    // The authored clips set this limit, not me: baseball_stance holds its lead hand 0.29 m across to grip the
+    // bat. That is a batting stance. The 0.47 m drag in this module's own header is the fault, and it still is.
+    expect(armsVerdict('stance', at(0.3, -0.2, -0.29), at(0.3, -0.2, 0.1)).crossed).toBe(false);
+    expect(armsVerdict('stance', at(0.3, -0.2, -0.47), at(0.3, -0.2, 0.1)).crossed).toBe(true);
+  });
+
+  it('never complains in the free window', () => {
+    expect(armsVerdict('free', at(0, 0, -5), at(0, 0, -5)).ok).toBe(true);
+  });
+
+  it('names which hand, so a fix has somewhere to start', () => {
+    const v = armsVerdict('loco', at(0, -0.4, -0.3), at(0, -0.4, 0.06));
+    expect(v.reasons.join(' ')).toMatch(/left hand .* across/);
+    expect(v.reasons.join(' ')).not.toMatch(/right hand .* across/);
+  });
+});

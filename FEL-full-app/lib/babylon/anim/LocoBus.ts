@@ -99,23 +99,38 @@ export interface ArmLimit {
   maxUp: number;
   /** A hand out wider than this AND higher than `teeUp` is a T. */
   teeOut: number; teeUp: number;
+  /**
+   * How far a hand may cross INBOARD of its own shoulder, past the body's midline.
+   *
+   * Added 2026-09-20 after measuring the dunk rival: its left hand sat 0.26 m inboard of its left shoulder — the
+   * arms folded across the chest — and the hero's running left arm did the same. `out` has been signed since this
+   * function was written (negative IS crossing), so the data was here all along and nothing looked at it. Three
+   * checks for behind, high and T, and the fourth failure mode walked straight through.
+   */
+  maxCross: number;
 }
 
 export const ARM_LIMITS: Record<ArmWindow, ArmLimit> = {
-  // a runner's arm swings back past the hip, never up behind the shoulder
-  loco: { maxBehind: 0.34, maxUp: -0.05, teeOut: 0.3, teeUp: -0.12 },
-  // a batter / golfer / keeper set: hands in front of or at the chest plane, never pulled back behind the body
-  stance: { maxBehind: 0.12, maxUp: 0.25, teeOut: 0.35, teeUp: -0.05 },
+  // a runner's arm swings back past the hip, never up behind the shoulder; it crosses the chest a little on the
+  // forward swing, which is why maxCross is not zero — a sprinter's hand reaches the opposite pec, not past it
+  loco: { maxBehind: 0.34, maxUp: -0.05, teeOut: 0.3, teeUp: -0.12, maxCross: 0.16 },
+  // a batter / golfer / keeper set: hands in front of or at the chest plane, never pulled back behind the body.
+  // A two-handed stance legitimately brings both hands to the midline, so this is the loosest of the strict ones.
+  // 0.32 was set BY THE AUTHORED CLIPS: baseball_stance holds its lead hand 0.29 m across to grip the bat, which
+  // is a batting stance and not a fault. It stays well under the 0.47 m drag this module's own header records as
+  // the derby bug, so the real defect is still caught.
+  stance: { maxBehind: 0.12, maxUp: 0.25, teeOut: 0.35, teeUp: -0.05, maxCross: 0.32 },
   // cruising on a board: counterweight arms low and a little out, not held at shoulder height
-  ride: { maxBehind: 0.3, maxUp: -0.15, teeOut: 0.28, teeUp: -0.2 },
-  // carrying the ball / bracing into contact
-  carry: { maxBehind: 0.34, maxUp: -0.05, teeOut: 0.3, teeUp: -0.12 },
+  ride: { maxBehind: 0.3, maxUp: -0.15, teeOut: 0.28, teeUp: -0.2, maxCross: 0.14 },
+  // carrying the ball / bracing into contact — a ball tucked on one side crosses that arm in, and
+  // football_carry_run measures 0.27 m doing exactly that.
+  carry: { maxBehind: 0.34, maxUp: -0.05, teeOut: 0.3, teeUp: -0.12, maxCross: 0.30 },
   // a celebration may go up, but never locked out wide at shoulder height
-  celebrate: { maxBehind: 0.2, maxUp: 0.5, teeOut: 0.32, teeUp: -0.12 },
-  free: { maxBehind: Infinity, maxUp: Infinity, teeOut: Infinity, teeUp: Infinity },
+  celebrate: { maxBehind: 0.2, maxUp: 0.5, teeOut: 0.32, teeUp: -0.12, maxCross: 0.3 },
+  free: { maxBehind: Infinity, maxUp: Infinity, teeOut: Infinity, teeUp: Infinity, maxCross: Infinity },
 };
 
-export interface ArmsVerdict { ok: boolean; behind: boolean; high: boolean; tee: boolean; reasons: string[] }
+export interface ArmsVerdict { ok: boolean; behind: boolean; high: boolean; tee: boolean; crossed: boolean; reasons: string[] }
 
 export function armsVerdict(window: ArmWindow, left: HandInChest, right: HandInChest): ArmsVerdict {
   const lim = ARM_LIMITS[window];
@@ -123,6 +138,8 @@ export function armsVerdict(window: ArmWindow, left: HandInChest, right: HandInC
   const side = (n: string, h: HandInChest) => {
     if (-h.fwd > lim.maxBehind) reasons.push(`${n} hand ${(-h.fwd).toFixed(2)} m behind the chest (max ${lim.maxBehind})`);
     if (h.up > lim.maxUp) reasons.push(`${n} hand ${h.up.toFixed(2)} m above the shoulder (max ${lim.maxUp})`);
+    // `out` is signed away from the midline, so a negative one is a hand folded across the body.
+    if (-h.out > lim.maxCross) reasons.push(`${n} hand ${(-h.out).toFixed(2)} m across the body (max ${lim.maxCross})`);
   };
   side('left', left); side('right', right);
   const teeOne = (h: HandInChest) => h.out > lim.teeOut && h.up > lim.teeUp;
@@ -130,7 +147,8 @@ export function armsVerdict(window: ArmWindow, left: HandInChest, right: HandInC
   if (tee) reasons.push(`both hands out wide at shoulder height (T): out ${left.out.toFixed(2)}/${right.out.toFixed(2)}`);
   const behind = reasons.some((r) => r.includes('behind'));
   const high = reasons.some((r) => r.includes('above'));
-  return { ok: reasons.length === 0, behind, high, tee, reasons };
+  const crossed = reasons.some((r) => r.includes('across'));
+  return { ok: reasons.length === 0, behind, high, tee, crossed, reasons };
 }
 
 type P3 = { x: number; y: number; z: number };
