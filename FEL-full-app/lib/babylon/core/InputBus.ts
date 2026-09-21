@@ -91,6 +91,29 @@ const KEYMAP: Record<string, FelInput> = {
 const WASD = new Set(['w', 'a', 's', 'd']);
 const ARROWS: Record<string, 'up' | 'down' | 'left' | 'right'> = { arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right' };
 
+/**
+ * THE LIVE BUSES.
+ *
+ * Every mode constructs its own InputBus, so there is no singleton for an external input source to talk to.
+ * Body control (lib/input/poseSource) needs one: it owns a camera at the shell level and has to reach whichever
+ * mode is actually running.
+ *
+ * Membership is keyed on start() and stop(), which the bus already has and already calls, so a bus is registered
+ * exactly while it is polling. Emitting into a torn-down mode is the bug this shape prevents — and it is the same
+ * reason stop() clears held state: an input owner that outlives its game leaves buttons down forever.
+ */
+const LIVE = new Set<InputBus>();
+
+/** The buses currently running. Newest last, because the most recently started one is the mode on screen. */
+export function liveInputBuses(): InputBus[] {
+  return [...LIVE];
+}
+
+/** Send an event to every running bus. Used by input sources that live outside a mode. */
+export function emitToLive(e: FelInput): void {
+  LIVE.forEach((b) => b.emit(e));
+}
+
 export class InputBus {
   private listeners = new Set<Listener>();
   private slotListeners = new Set<SlotListener>();
@@ -110,6 +133,7 @@ export class InputBus {
     // A fresh start never inherits held state: a key or button held across a stop / start would otherwise stay logically
     // down forever (ported from elijahbonds-fel-upgrade-pass "one input owner per game", 2026-09-12).
     this.held.clear();
+    LIVE.add(this);
     this.spaceDownAt = 0;
     window.addEventListener('keydown', this.onKey);
     window.addEventListener('keyup', this.onKey);
@@ -120,6 +144,7 @@ export class InputBus {
     this.pollPads();
   }
   stop(): void {
+    LIVE.delete(this);
     window.removeEventListener('keydown', this.onKey);
     window.removeEventListener('keyup', this.onKey);
     window.removeEventListener('blur', this.onBlur);

@@ -12,6 +12,7 @@ import { getScheme } from '@/lib/input-schemes';
 import { isBabylon } from '@/components/three/flags';
 import { canFullscreen, isFullscreen, isLandscapePhone, toggleFullscreen } from '@/lib/ui/fullscreen';
 import { VirtualController } from './virtual-controller';
+import { BodyControl } from './body-control';
 import type { SessionTallies } from '@/lib/game-systems';
 import { reportEarn } from '@/lib/wallet/client';
 import {
@@ -482,6 +483,10 @@ function GameShellInner({
               PRQ {Math.round(profile.prq)} · {profile.grade?.label}
             </span>
           )}
+          {/* BODY CONTROL, for every mode at once. It is an input device, not a mode feature — poseControl maps
+              a body to the same FelInput a gamepad produces and emitToLive posts it to whichever bus is running,
+              so no mode file knows this exists. */}
+          <BodyControl />
           {fsAvailable && (
             <button
               type="button"
@@ -514,6 +519,7 @@ function GameShellInner({
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
+            <span className="pointer-events-auto"><BodyControl compact /></span>
             {fsAvailable && (
               <button
                 type="button"
