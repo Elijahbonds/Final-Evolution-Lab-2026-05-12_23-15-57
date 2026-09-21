@@ -17,6 +17,24 @@ const HANG_DEFAULT = { Left: [-0.24, 0.84, 0.06] as V3, Right: [0.24, 0.84, 0.06
 const HANG_POLES = { Left: [-0.2, -0.3, -0.9] as V3, Right: [0.2, -0.3, -0.9] as V3 };   // elbows slightly back
 
 /**
+ * Where one hand hangs, given its shoulder in the rig's BIND axes and the arm's length.
+ *
+ * THE SIDE IS THE CALLER'S, NOT THE RIG'S (2026-09-20, owner: "fix the opponents arms in the dunk mode"). poseClip
+ * reads hand targets in BODY-frame metres — +x is the body's right — and HANG_DEFAULT is written that way. The bind
+ * axes are not: on this rig the bone NAMED LeftArm sits at bind x +0.145, so `sh[0] + dir * 0.05` returned +0.095 for
+ * the left hand and sent it across the body's centre line. Measured on the dunk's opponent: left shoulder at body-frame
+ * -0.175 with its hand target at +0.095, both hands 0.17 m apart across the chest instead of 0.47 m at the sides.
+ *
+ * Only the hero looked right, and by accident: its rest arm measures 0.147 m, which fails the length guard below, so it
+ * fell back to the constant — which is already in body-frame axes. Every NPC passed the guard and crossed its arms.
+ */
+export function hangTarget(sh: V3, armLen: number, side: 'Left' | 'Right'): V3 {
+  const dir = side === 'Left' ? -1 : 1;
+  // |sh[0]| drops the bind axes' own handedness; `dir` puts the hand on the side the caller asked for.
+  return [dir * (Math.abs(sh[0]) + 0.05), sh[1] - armLen * 0.965, sh[2] + 0.06];   // hands 3.5 % short of straight: a soft elbow
+}
+
+/**
  * Ship Pass 6 (owner: "fix the arms of the NPCs"): the hang was fixed metres from the root, so a body with shorter arms
  * than the hero (the roster) had to BEND its elbows to reach the same point — arms held out, hands splayed. Now the hang
  * is derived from THIS skeleton: shoulder position from the bind pose, hand a hair under a straight arm's reach.
@@ -35,8 +53,7 @@ export function hangFor(sk: Skeleton): { Left: V3; Right: V3 } {
     if (!sh || !el || !ha) continue;
     const len = Math.hypot(el[0] - sh[0], el[1] - sh[1], el[2] - sh[2]) + Math.hypot(ha[0] - el[0], ha[1] - el[1], ha[2] - el[2]);
     if (!(len > 0.3 && len < 1.2)) continue;
-    const dir = side === 'Left' ? -1 : 1;
-    out[side] = [sh[0] + dir * 0.05, sh[1] - len * 0.965, sh[2] + 0.06] as V3;   // hands 3.5 % short of straight: a soft elbow
+    out[side] = hangTarget(sh, len, side);
   }
   return out;
 }

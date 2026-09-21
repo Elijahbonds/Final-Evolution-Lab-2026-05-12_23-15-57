@@ -881,7 +881,9 @@ export const DunkMode: ModeDefinition = (() => {
       trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
       meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
-      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown; dunkPosture?: unknown } }).__FEL_DEV__; if (dev) { dev.hoopJuiceUsed = hoopJuice.used; dev.dunkPosture = postureDevHandle; } }   // OOM-HYGIENE: the handle is gone once the harness is disposed (a load that resolves after an unmount)
+      // `dunkRival` because a probe cannot find the opponent by looking: the nearest body to the hero at floor height is
+      // as often a courtside spectator, and one has been measured by mistake before. The mode knows which body it is.
+      if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown; dunkPosture?: unknown; dunkRival?: unknown } }).__FEL_DEV__; if (dev) { dev.hoopJuiceUsed = hoopJuice.used; dev.dunkPosture = postureDevHandle; dev.dunkRival = () => rival?.root ?? null; } }   // OOM-HYGIENE: the handle is gone once the harness is disposed (a load that resolves after an unmount)
       // Venice LOOK: KEEP/HIDE, palm tip ~10m, golden-haze (no GLB edits).
       // Court locations (docs/SPEC-COURT-LOCATIONS.md): the Venice look (golden sky, surround palms) is Venice's own —
       // under any other location the location's environment stands, so the pass steps aside.

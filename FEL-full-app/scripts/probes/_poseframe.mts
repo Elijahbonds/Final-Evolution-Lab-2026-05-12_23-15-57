@@ -1,0 +1,17 @@
+import { chromium } from 'playwright-core';
+const PORT = process.env.PORT ?? '3011';
+const EXE = process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
+const b = await chromium.launch({ executablePath: EXE, args: ['--use-gl=angle','--use-angle=metal','--enable-webgl','--ignore-gpu-blocklist'] });
+const p = await (await b.newContext({ viewport: { width: 1000, height: 700 } })).newPage();
+const lines: string[] = [];
+p.on('console', (m) => { const t = m.text(); if (/\[POSECLIP\]|\[POSESTALE\]|\[POSEHAND\]/.test(t)) lines.push(t); });
+await p.goto(`http://localhost:${PORT}/dev/mode/dunk`, { waitUntil: 'domcontentloaded' });
+await p.waitForSelector('canvas', { timeout: 90000 });
+await p.waitForFunction(() => !!(window as any).__FEL_DEV__?.hero?.(), null, { timeout: 180000 });
+await p.waitForTimeout(5000);
+const idle = lines.filter((l) => /idle_stand|POSEHAND/.test(l));
+console.log('STALE lines:', lines.filter((l) => l.includes('STALE=true')).length, 'of', lines.filter((l) => l.includes('POSESTALE')).length);
+console.log(`idle_stand builds: ${idle.length}`);
+idle.forEach((l, i) => console.log(`  #${i + 1} ${l.replace(/^.*\[POSECLIP\]\s*/, '')}`));
+console.log(`\nall builds: ${lines.length}`);
+await b.close();
