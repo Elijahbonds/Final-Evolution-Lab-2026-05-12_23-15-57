@@ -136,6 +136,33 @@ pose('board_tuck', 0); const tuckSpan = wristSpan();
 pose('board_air', 0); const airSpan = wristSpan();
 ok(airSpan > tuckSpan + 0.2, `the plain air is OPEN, not the speed tuck (wrist span ${airSpan.toFixed(3)} vs ${tuckSpan.toFixed(3)})`);
 
+// ARMS ALIVE (ANIM-READABILITY, 2026-09-21). "Dead arms" is a clip whose hands never move: the rider rides a loop with
+// the arms bolted on. Every clip a rider LIVES in — the two idles, the carves, the push, the grind — has to move its
+// wrists across the loop by something the eye reads as alive, measured root-relative so the ride's own travel cannot
+// stand in for it. A bolted-on arm scores 0.000 here.
+function wristTravel(clip: string): number {
+  const at = [0, 0.2, 0.4, 0.6, 0.8, 1];
+  const root = () => rootNode?.getAbsolutePosition?.() ?? Vector3.Zero();
+  const tracks: Record<'LeftHand' | 'RightHand', Vector3[]> = { LeftHand: [], RightHand: [] };
+  for (const t of at) {
+    if (!pose(clip, t)) return NaN;
+    const o = root();
+    for (const b of ['LeftHand', 'RightHand'] as const) tracks[b].push(worldPos(b).subtract(o));
+  }
+  let most = 0;
+  for (const b of ['LeftHand', 'RightHand'] as const) {
+    for (let i = 0; i < tracks[b].length; i++) for (let j = i + 1; j < tracks[b].length; j++) {
+      most = Math.max(most, Vector3.Distance(tracks[b][i], tracks[b][j]));
+    }
+  }
+  return most;
+}
+for (const clip of ['board_ride_idle', 'board_stand_idle', 'board_carve_left', 'board_carve_right', 'board_push', 'board_grind']) {
+  const travel = wristTravel(clip);
+  console.log(`  ${clip.padEnd(18)} wrist travel ${Number.isNaN(travel) ? 'CLIP MISSING' : travel.toFixed(3)}`);
+  ok(travel > 0.03, `${clip}: the arms are alive, not bolted on (wrist travel ${travel.toFixed(3)} m, want > 0.03)`);
+}
+
 // The bail must BREAK the stance -- holding a textbook ride pose through a
 // crash is what makes a fall read as choreography.
 pose('skate_bail', 1);
