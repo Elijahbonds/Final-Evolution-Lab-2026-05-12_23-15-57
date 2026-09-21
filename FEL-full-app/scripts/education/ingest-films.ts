@@ -7,6 +7,13 @@
  *
  *   npx tsx scripts/education/ingest-films.ts "/path/to/Bonds Bounce Blueprint"          # dry run: what matches
  *   npx tsx scripts/education/ingest-films.ts "/path/to/folder" --write                  # write the manifest
+ *   npx tsx scripts/education/ingest-films.ts --names films.txt                          # match a LIST of names
+ *   ls "Bonds Bounce Blueprint" | npx tsx scripts/education/ingest-films.ts --names -     # ...or from a pipe
+ *
+ * THE NAMES MODE EXISTS BECAUSE THE FOLDER IS IN GOOGLE DRIVE (2026-09-21). Deciding how to move thirty videos
+ * onto this machine is much easier once you know whether their names match the book at all — and that question
+ * only needs the names. Paste the file list out of Drive and the same report comes out, without moving a byte.
+ * It refuses --write, because a manifest of drill -> source path is a lie when there are no paths.
  *
  * IT DOES NOT COPY THE VIDEO FILES INTO THE REPO, on purpose. public/ is copied wholesale into the deployed
  * function bundle (that is how the Prisma client ships — see docs/DEPLOY-NOTES-PRISMA.md), so dropping thirty
@@ -16,36 +23,13 @@
  * Matching is by name, scored, and it PRINTS WHAT IT IS UNSURE ABOUT rather than guessing quietly: a film
  * attached to the wrong drill teaches somebody the wrong movement.
  */
-import { readdirSync, statSync, writeFileSync, existsSync } from 'node:fs';
+import { readdirSync, statSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join, extname, basename } from 'node:path';
 import { DRILLS } from '../../lib/education/course';
+import { matchFilms } from '../../lib/education/filmMatch';
 
 const VIDEO = new Set(['.mp4', '.mov', '.m4v', '.webm', '.avi']);
 const MANIFEST = join(process.cwd(), 'lib', 'education', 'films.json');
-
-/** Confident enough to attach without a human looking at it. */
-const STRONG = 0.62;
-/** Worth showing as a maybe. Below this it is not offered at all. */
-const WEAK = 0.4;
-
-function words(s: string): string[] {
-  return s.toLowerCase()
-    .replace(/\.[a-z0-9]+$/, '')
-    .replace(/\b(final|v\d+|copy|edit|export|render|clip|video|hd|4k|1080p?|720p?)\b/g, ' ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length > 2 && !['the', 'and', 'for', 'with', 'your'].includes(w));
-}
-
-/** Jaccard over meaningful words — robust to "Drill 2 - Pogo Progression FINAL.mov" vs "The Oscillatory Pogo…". */
-function score(file: string, drillTitle: string): number {
-  const a = new Set(words(file));
-  const b = new Set(words(drillTitle));
-  if (!a.size || !b.size) return 0;
-  let hit = 0;
-  for (const w of a) if (b.has(w)) hit++;
-  return hit / new Set([...a, ...b]).size;
-}
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const e of readdirSync(dir)) {
@@ -57,37 +41,40 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-function main() {
+/** The names to match: a real folder, or a list the owner pasted out of Drive. */
+function collect(): { files: string[]; realPaths: boolean } | null {
+  const namesAt = process.argv.indexOf('--names');
+  if (namesAt !== -1) {
+    const src = process.argv[namesAt + 1];
+    if (!src) { console.error('--names wants a file of names, one per line, or - for stdin'); return null; }
+    const raw = src === '-' ? readFileSync(0, 'utf8') : existsSync(src) ? readFileSync(src, 'utf8') : '';
+    if (!raw.trim()) { console.error(`nothing to read in ${src}`); return null; }
+    // A pasted Drive listing may carry paths, sizes or no extension at all. Take the name and move on.
+    const files = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => basename(l));
+    return { files, realPaths: false };
+  }
   const dir = process.argv[2];
+  if (!dir || dir.startsWith('--') || !existsSync(dir)) {
+    console.error('Point me at the folder of films, or at a list of their names:\n'
+      + '  npx tsx scripts/education/ingest-films.ts "/path/to/Bonds Bounce Blueprint"\n'
+      + '  npx tsx scripts/education/ingest-films.ts --names films.txt');
+    return null;
+  }
+  return { files: walk(dir), realPaths: true };
+}
+
+function main() {
+  const got = collect();
+  if (!got) { process.exit(1); return; }
+  const { files, realPaths } = got;
   const write = process.argv.includes('--write');
-  if (!dir || !existsSync(dir)) {
-    console.error('Point me at the folder of films:\n  npx tsx scripts/education/ingest-films.ts "/path/to/Bonds Bounce Blueprint"');
-    process.exit(1);
-  }
 
-  const files = walk(dir);
-  console.log(`${files.length} video files · ${DRILLS.length} drills in the book\n`);
+  const nonVideo = realPaths ? 0 : files.filter((f) => !VIDEO.has(extname(f).toLowerCase())).length;
+  console.log(`${files.length} ${realPaths ? 'video files' : 'names'} · ${DRILLS.length} drills in the book`);
+  if (nonVideo) console.log(`(${nonVideo} of the names have no video extension — matched anyway, on the name)`);
+  console.log('');
 
-  const taken = new Set<string>();
-  const matched: { key: string; title: string; file: string; score: number }[] = [];
-  const unsure: { file: string; best: string; score: number }[] = [];
-  const unmatched: string[] = [];
-
-  // Best-first across every pair, so one strong film is not stolen by an earlier weak match.
-  const pairs = files.flatMap((f) => DRILLS.map((d) => ({ f, d, s: score(basename(f), d.title) })));
-  pairs.sort((a, b) => b.s - a.s);
-  const usedFiles = new Set<string>();
-
-  for (const { f, d, s } of pairs) {
-    if (s < WEAK || taken.has(d.key) || usedFiles.has(f)) continue;
-    if (s >= STRONG) {
-      matched.push({ key: d.key, title: d.title, file: f, score: s });
-      taken.add(d.key); usedFiles.add(f);
-    } else {
-      unsure.push({ file: f, best: d.title, score: s });
-    }
-  }
-  for (const f of files) if (!usedFiles.has(f) && !unsure.some((u) => u.file === f)) unmatched.push(f);
+  const { matched, unsure, unmatched, missing } = matchFilms(files, DRILLS);
 
   console.log(`MATCHED (${matched.length})`);
   for (const m of matched) console.log(`  ${m.score.toFixed(2)}  ${m.title}\n          ${basename(m.file)}`);
@@ -100,19 +87,21 @@ function main() {
     console.log(`\nNO MATCH (${unmatched.length})`);
     for (const f of unmatched) console.log(`  ${basename(f)}`);
   }
-
-  const missing = DRILLS.filter((d) => !taken.has(d.key));
   if (missing.length) {
     console.log(`\nDRILLS STILL WITHOUT FILM (${missing.length})`);
     for (const d of missing) console.log(`  ch${d.chapter}  ${d.title}`);
   }
 
+  if (write && !realPaths) {
+    console.log('\n--write needs the real folder: a manifest of drill → source path is a lie without the paths.');
+    process.exit(1);
+  }
   if (write) {
     const films = Object.fromEntries(matched.map((m) => [m.key, { source: m.file, url: '' }]));
     writeFileSync(MANIFEST, JSON.stringify({ updatedAt: new Date().toISOString().slice(0, 10), films }, null, 2));
     console.log(`\nwrote ${MANIFEST} — fill each 'url' once the file is hosted, or leave it and the drill shows its steps only.`);
   } else {
-    console.log('\n(dry run — pass --write to record the matches)');
+    console.log(realPaths ? '\n(dry run — pass --write to record the matches)' : '\n(names only — point me at the folder to record the matches)');
   }
 }
 
