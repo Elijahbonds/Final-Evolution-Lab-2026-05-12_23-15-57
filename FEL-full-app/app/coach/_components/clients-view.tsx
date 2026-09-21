@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Plus, Trash2, Video, MessageSquare, IdCard } from 'lucide-react';
 import { InvitePanel } from '@/components/coach/invite-panel';
+import { AttentionPanel } from '@/components/coach/attention-panel';
 
 interface Ex { id: string; name: string; sets: number; reps: string; load: string; tempo: string; restSeconds: number; coachNote: string | null }
 interface Tree { id: string; name: string; blocks: { id: string; label: string; sessions: { id: string; label: string; exercises: Ex[] }[] }[] }
@@ -59,6 +60,10 @@ export function ClientsView() {
       {/* ADD AN ATHLETE comes first, because until 2026-09-19 there was no way to do it at all and a coach with an
           empty roster has nothing else on this screen to do. */}
       <InvitePanel />
+      {/* NEEDS YOU TODAY, above the roster: fifty rows is not an answer to "who needs me", and the reading the
+          coach would otherwise do by eye is already written in lib/coach/{triage,compliance}.ts. It sits BELOW
+          the invite panel for that panel's own reason — a coach with nobody on the roster has nothing to triage. */}
+      <AttentionPanel />
       {/* roster — lane 5 S3: every client with their card, PRQ and deltas since the program began */}
       <div className="fel-card rounded-xl p-4 space-y-2">
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><IdCard className="h-3.5 w-3.5" /> Roster</div>

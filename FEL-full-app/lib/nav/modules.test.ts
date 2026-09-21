@@ -53,9 +53,7 @@ const KNOWN_ORPHANS: readonly string[] = [
   'lib/mirror/lungeAudit.ts',
   'lib/kitchens/fromScreen.ts',
   // The coach layer — written, tested, unreachable.
-  'lib/coach/compliance.ts',
   'lib/coach/mirrorToProgram.ts',
-  'lib/coach/triage.ts',
   'lib/coach-interfaces.ts',
   'lib/coach-service.ts',
   // Engine and platform pieces. bvh.ts and recognisable.ts came off on 2026-09-21: they were never orphaned,
