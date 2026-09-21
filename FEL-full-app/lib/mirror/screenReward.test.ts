@@ -7,7 +7,7 @@ describe('what a screen pays', () => {
   it('a graded screen pays, once, keyed by the screen itself', () => {
     const d = decideScreenReward(base);
     expect(d.pay).toBe(true);
-    expect(d.idempotencyKey).toBe('screen:s1');
+    expect(d.idempotencyKey).toBe('screen:a1:s1');
     expect(decideScreenReward(base).idempotencyKey).toBe(d.idempotencyKey);   // a retry cannot pay twice
   });
 
@@ -25,5 +25,21 @@ describe('what a screen pays', () => {
 
   it('different screens have different keys, so tomorrow pays again', () => {
     expect(decideScreenReward({ ...base, screenId: 's2' }).idempotencyKey).not.toBe(decideScreenReward(base).idempotencyKey);
+  });
+});
+
+describe('the key cannot collide between two athletes', () => {
+  // Ledger keys are unique across the whole table. A key built from the screen id alone would hand the second
+  // athlete to generate that id the FIRST one's ledger entry, instead of paying them.
+  it('puts the athlete in the key', () => {
+    const a = decideScreenReward({ screenId: 'same', athleteId: 'alice', provisional: false, checksTaken: 6 });
+    const b = decideScreenReward({ screenId: 'same', athleteId: 'bob', provisional: false, checksTaken: 6 });
+    expect(a.idempotencyKey).not.toBe(b.idempotencyKey);
+    expect(a.idempotencyKey).toContain('alice');
+  });
+
+  it('still pays one athlete only once for one screen', () => {
+    const once = { screenId: 's9', athleteId: 'alice', provisional: false, checksTaken: 6 };
+    expect(decideScreenReward(once).idempotencyKey).toBe(decideScreenReward(once).idempotencyKey);
   });
 });

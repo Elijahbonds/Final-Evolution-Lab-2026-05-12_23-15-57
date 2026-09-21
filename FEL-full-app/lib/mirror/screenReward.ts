@@ -8,9 +8,9 @@
 // for standing near a phone. Paying for a provisional screen would teach an athlete that the fastest shards come
 // from a bad shot, which is the exact opposite of what a screening tool wants from them.
 //
-// Idempotency is per SCREEN, not per day: the key is the screen's own id, so a retry, a double-tap or a reconnect
-// pays once, while a genuinely new screen tomorrow pays again — up to the wallet's daily cap, which exists so that
-// squatting at a camera is never a faucet.
+// Idempotency is per ATHLETE per SCREEN, not per day: the key is the athlete's id and the screen's own id, so a
+// retry, a double-tap or a reconnect pays once, while a genuinely new screen tomorrow pays again — up to the
+// wallet's daily cap, which exists so that squatting at a camera is never a faucet.
 import { REASON } from '@/lib/wallet/reward-rules';
 
 export interface ScreenRewardDecision {
@@ -36,7 +36,11 @@ export interface ScreenRewardInput {
 export const MIN_CHECKS_FOR_REWARD = 3;
 
 export function decideScreenReward(input: ScreenRewardInput): ScreenRewardDecision {
-  const key = `screen:${input.screenId}`;
+  // THE KEY CARRIES THE ATHLETE. Ledger idempotency keys are unique across the WHOLE table, so a key built from
+  // the screen id alone would collide between two people the moment a client generated the same id twice — and
+  // the second athlete would be handed the first one's ledger entry instead of a payout. `athleteId` was already
+  // on this input and went unused, which is what that field was always for.
+  const key = `screen:${input.athleteId}:${input.screenId}`;
   if (input.provisional) {
     return {
       pay: false, reasonCode: REASON.MOVEMENT_SCREEN_COMPLETED, idempotencyKey: key,

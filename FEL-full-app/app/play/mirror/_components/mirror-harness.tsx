@@ -38,9 +38,13 @@ import type { PoseFrame } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-
 import type { RepState } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
 import type { SquatFrameResult, SquatFault } from '@/lib/babylon/nexus/neuro-mirror/rules/squat-audit';
 import { CueEngine, type CueEvent } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
+// THE GUIDED MOVEMENT SCREEN. Every one of these was written for this and then never mounted — the runner, the
+// reward and the scoring sat in lib/mirror with no importer at all. lib/nav/modules.test.ts is what found them.
+import { ScreenRunner, type RunnerState } from '@/lib/mirror/screenRunner';
+import { scoreScreen, type ScreenId, type CheckResult, type ScreenResultSummary } from '@/lib/mirror/screen';
 
 type Status = 'idle' | 'requesting' | 'loading-model' | 'live' | 'error';
-type Pattern = 'pressRow' | 'jump' | 'squat';
+type Pattern = 'pressRow' | 'jump' | 'squat' | 'screen';
 /** The guided corrective session: breathe → check → work → review. The
  *  Blueprint is emphatic that the breath comes FIRST — the pacer is not a
  *  warm-up nicety, it is the foundation the book insists on. */
@@ -90,6 +94,14 @@ export function MirrorHarness() {
   const [cue, setCue] = useState<CueEvent | null>(null);
   const [cueLog, setCueLog] = useState<CueEvent[]>([]);
   const [voiceOn, setVoiceOn] = useState(true);
+  // The screen runs as a state machine over the same pose stream; nothing here decides anything itself.
+  const runnerRef = useRef<ScreenRunner | null>(null);
+  const [screenId, setScreenId] = useState<ScreenId>('modified');
+  const [runner, setRunner] = useState<RunnerState | null>(null);
+  const [screenSummary, setScreenSummary] = useState<ScreenResultSummary | null>(null);
+  const [screenMessage, setScreenMessage] = useState<string>('');
+  const lastSaidRef = useRef('');
+  const screenSentRef = useRef(false);
   const squatPrevPhase = useRef<string>('standing');
   const breatheStart = useRef(0);
   const voiceRef = useRef(true);
@@ -186,6 +198,13 @@ export function MirrorHarness() {
   }, [squatReps, squatStage]);
 
   const start = useCallback(async () => {
+    // A fresh runner per session, so a second screen is a second screen rather than a resumed one.
+    if (patternRef.current === 'screen') {
+      runnerRef.current = new ScreenRunner(screenId);
+      screenSentRef.current = false;
+      lastSaidRef.current = '';
+      setRunner(null); setScreenSummary(null); setScreenMessage('');
+    }
     setError('');
     setJumps([]);
     setReps(null);
@@ -226,6 +245,23 @@ export function MirrorHarness() {
           setFrameMs(fm);
           setZoneStates(zones);
           setReps(r);
+          // THE GUIDED SCREEN. The runner owns the protocol: it says the turn, holds the clock only while the
+          // shot is good, and pauses rather than fails when somebody steps out to move a chair.
+          if (patternRef.current === 'screen' && runnerRef.current) {
+            const st = runnerRef.current.tick(
+              { landmarks: pose.landmarks, present: pose.present },
+              pose.timestampMs,
+            );
+            setRunner(st);
+            paintSkeleton(pose, p);
+            // Said once per change, because the athlete is across the room and cannot read the phone — and
+            // because repeating a cue every frame would be unusable.
+            if (st.say && st.say !== lastSaidRef.current) {
+              lastSaidRef.current = st.say;
+              speak(st.say);
+            }
+          }
+
           // the vertical-jump pattern runs the Prove It tracker on the same
           // stream — floor calibration, flight time, landing
           if (patternRef.current === 'jump') {
@@ -323,10 +359,59 @@ export function MirrorHarness() {
 
   const secs = (ms: number) => (ms / 1000).toFixed(1);
 
+  /**
+   * A finished screen goes to the server, which recomputes the score and decides the payout. A screen the
+   * camera could not grade pays nothing — the reward is for the measurement, not for standing near a phone.
+   */
+  const submitScreen = useCallback(async (results: CheckResult[], provisional: boolean) => {
+    if (screenSentRef.current) return;
+    screenSentRef.current = true;
+    setScreenSummary(scoreScreen(screenId, results));   // shown immediately; the server's is authoritative
+    try {
+      const res = await fetch('/api/mirror/screen', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          // A uuid, because this file is forbidden randomness on purpose — scripts/mirror-v2-tests.ts asserts
+          // "no fabricated jump numbers in the harness", which is what stops an invented figure ever being
+          // shown to an athlete as a measurement. An id is not a measurement, and crypto.randomUUID says so
+          // without tripping a guard that is worth more than the convenience of the shorter call.
+          screenId: crypto.randomUUID(),
+          screen: screenId,
+          results,
+          provisional,
+        }),
+      });
+      const j = await res.json().catch(() => null);
+      if (j?.summary) setScreenSummary(j.summary);
+      if (j?.message) setScreenMessage(j.message);
+      if (j?.message) speak(j.message);
+    } catch {
+      setScreenMessage('Screen finished — it could not be saved, so nothing was paid for it.');
+    }
+  }, [screenId, speak]);
+
+  // The screen ends itself. Nothing else in the Mirror does, which is the point of a protocol.
+  useEffect(() => {
+    if (pattern !== 'screen' || runner?.phase !== 'complete') return;
+    const provisional = runner.results.length === 0;
+    void submitScreen(runner.results, provisional);
+  }, [pattern, runner, submitScreen]);
+
+  /** The short label on the control, beside the full one it is announced by. A ternary here silently labelled
+   *  the new pattern "Jump" — a map cannot, because TypeScript makes it name every case. */
+  const PATTERN_SHORT: Record<Pattern, string> = {
+    pressRow: 'Press / Row',
+    squat: 'Squat',
+    jump: 'Jump',
+    screen: 'Screen',
+  };
+
   const PATTERN_TITLE: Record<Pattern, string> = {
     pressRow: 'Split-Stance Press / Row',
     squat: 'Corrective Squat',
     jump: 'Vertical Jump',
+    screen: 'Movement Screen',
   };
   const live = status === 'live';
   // ms/frame is an engineering number. It belongs to whoever is tuning the pipeline, not to an athlete standing
@@ -401,7 +486,7 @@ export function MirrorHarness() {
                             ${on ? 'bg-white/[0.07] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]'
                                  : 'text-white/45 hover:text-white/75'}`}
               >
-                {key === 'pressRow' ? 'Press / Row' : key === 'squat' ? 'Squat' : 'Jump'}
+                {PATTERN_SHORT[key]}
               </button>
             );
           })}
@@ -470,8 +555,47 @@ export function MirrorHarness() {
                 )}
               </div>
 
+              {/* THE SCREEN'S OWN HUD. The athlete is across the room with the phone propped up, so the cue is the
+                  biggest thing on the stage and the countdown is a ring rather than a number to squint at. */}
+              {pattern === 'screen' && runner && runner.phase !== 'complete' && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 top-16 flex flex-col items-center justify-between px-6 pb-28">
+                  <p
+                    className="max-w-2xl text-center text-[22px] font-bold leading-snug text-white sm:text-[28px]"
+                    style={{ textShadow: '0 2px 18px rgba(0,0,0,0.95)' }}
+                  >
+                    {runner.say}
+                  </p>
+
+                  {runner.station && (
+                    <div className="flex flex-col items-center gap-2">
+                      <span
+                        className="fel-heading text-[52px] font-black leading-none tabular-nums"
+                        style={{
+                          color: runner.phase === 'holding' ? '#00FF9D' : 'rgba(255,255,255,0.45)',
+                          textShadow: '0 2px 20px rgba(0,0,0,0.9)',
+                        }}
+                      >
+                        {Math.ceil(runner.remainingSec)}
+                      </span>
+                      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/50">
+                        {runner.phase === 'holding' ? 'Hold' : 'Get set'} · station {runner.stationIndex + 1}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="pointer-events-none absolute right-4 top-4 text-right">
-                {pattern === 'jump' ? (
+                {pattern === 'screen' ? (
+                  runner && (
+                    <>
+                      <p className="fel-heading text-[40px] font-black leading-none text-white">
+                        {runner.results.length}
+                      </p>
+                      <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">Checks</p>
+                    </>
+                  )
+                ) : pattern === 'jump' ? (
                   jumps.length > 0 && (
                     <>
                       <p className="fel-heading text-[40px] font-black leading-none text-[#FFD700]">
@@ -578,10 +702,52 @@ export function MirrorHarness() {
           </p>
         )}
 
+        {/* Which screen, chosen before it starts. The full one adds the stations a coach has to answer for,
+            because a phone cannot palpate a pelvis — the protocol says so and the picker should too. */}
+        {pattern === 'screen' && !live && (
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            {([['modified', 'Modified', 'Six stations, about two minutes.'],
+               ['full', 'Full', 'Adds the stations a coach answers.']] as [ScreenId, string, string][])
+              .map(([id, label, blurb]) => {
+                const on = screenId === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setScreenId(id)}
+                    aria-pressed={on}
+                    className="rounded-xl border px-4 py-2.5 text-left transition-colors"
+                    style={{
+                      borderColor: on ? 'rgba(0,255,157,0.45)' : 'rgba(255,255,255,0.10)',
+                      background: on ? 'rgba(0,255,157,0.07)' : 'rgba(255,255,255,0.02)',
+                    }}
+                  >
+                    <span className="block text-[13.5px] font-bold text-white">{label} screen</span>
+                    <span className="mt-0.5 block text-[11.5px] text-white/45">{blurb}</span>
+                  </button>
+                );
+              })}
+          </div>
+        )}
+
+        {/* What the screen found. The book counts red flags and ranks the one-sided ones above the rest. */}
+        {pattern === 'screen' && screenSummary && (
+          <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+            <h2 className="fel-heading text-[15px] font-bold text-white/80">What the screen found</h2>
+            <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <Figure label="Score" value={String(screenSummary.score)} accent="#00FF9D" />
+              <Figure label="Red flags" value={String(screenSummary.redFlags)} accent={screenSummary.redFlags > 0 ? '#FF3366' : undefined} />
+              <Figure label="One-sided" value={String(screenSummary.asymmetries)} accent={screenSummary.asymmetries > 0 ? '#FFD700' : undefined} />
+              <Figure label="Checks" value={String(runner?.results.length ?? 0)} />
+            </div>
+            {screenMessage && <p className="mt-4 text-[13px] leading-relaxed text-white/60">{screenMessage}</p>}
+          </section>
+        )}
+
         {/* THE READOUT, under the stage and across the full width. It was a 260px column of 11px bullet lists
             squeezed beside the camera; there is no reason for the picture to be narrow so a legend can sit next
             to it. */}
-        <section className="mt-6">
+        <section className={pattern === 'screen' ? 'hidden' : 'mt-6'}>
           {pattern === 'squat' ? (
             <>
               <h2 className="fel-heading mb-3 text-[15px] font-bold text-white/80">The four checks</h2>

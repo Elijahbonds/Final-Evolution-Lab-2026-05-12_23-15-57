@@ -44,9 +44,8 @@ const DYNAMIC_TREES = [
  * orphan is either work waiting to be finished or work that should not be in the tree.
  */
 const KNOWN_ORPHANS: readonly string[] = [
-  // The movement screen's own machinery — built for the Mirror and never mounted.
-  'lib/mirror/screenRunner.ts',
-  'lib/mirror/screenReward.ts',
+  // The movement screen's own machinery. screenRunner and screenReward were wired into the Mirror on
+  // 2026-09-20 and came off this list, which is the ratchet doing its job. These two are still waiting.
   'lib/mirror/lungeAudit.ts',
   'lib/kitchens/fromScreen.ts',
   // The coach layer — written, tested, unreachable.
