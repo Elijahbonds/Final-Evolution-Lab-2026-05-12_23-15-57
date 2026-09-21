@@ -13,8 +13,11 @@ export default defineConfig({
     // not to be discipline: the runner was never pointed at it, so a test written there would have been collected by
     // nobody and passed silently forever. app/ is deliberately still out — its routes are covered by the static
     // contract in lib/api/routeContract.test.ts, which needs no DOM.
+    // `lib/**/*.test.tsx` was added 2026-09-21 for the same reason components/ was: a .tsx test written beside a
+    // .tsx module under lib/ (CaptionRegion lives there) matched no pattern, so it would have been collected by
+    // nobody and passed silently forever — which is the failure this include list exists to prevent.
     include: [
-      'lib/**/*.test.ts', 'scripts/**/*.suite.test.ts', 'tests/**/*.test.ts',
+      'lib/**/*.test.ts', 'lib/**/*.test.tsx', 'scripts/**/*.suite.test.ts', 'tests/**/*.test.ts',
       'components/**/*.test.ts', 'components/**/*.test.tsx',
     ],
     // Babylon's NullEngine work and the 3000-sample statistical checks are not
@@ -22,6 +25,11 @@ export default defineConfig({
     testTimeout: 180_000,   // the headless check suites spawn a script with its own 120 s limit; under a sweep load a 60 s test timeout fired first (three false alarms 2026-09-05 and 06)
     hookTimeout: 120_000,
   },
+  // React components compile against the AUTOMATIC JSX runtime everywhere else in this app (Next sets it), so a
+  // component that imports only the hooks it uses — as CaptionRegion does — throws "React is not defined" under
+  // the classic runtime esbuild defaults to. Without this, no React component in this repo can be rendered by a
+  // test at all.
+  esbuild: { jsx: 'automatic' },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
