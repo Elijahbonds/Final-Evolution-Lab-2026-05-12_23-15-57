@@ -27,7 +27,9 @@ import {
   type ImpactFrameState, type Grade,
 } from './ImpactFrame';
 import { SoundKit } from '../audio/SoundKit';
-import { QaTrace } from './QaTrace';   // MECHANICS PASS: press → perceivable answer, agent-only   // M43: unlock audio on first user gesture
+import { QaTrace } from './QaTrace';
+import { captions } from './captions';
+import { captionsFromHud, rememberHud } from './hudCaptions';   // MECHANICS PASS: press → perceivable answer, agent-only   // M43: unlock audio on first user gesture
 import { autoInk } from '../visual/AnimeInk';    // M59: anime ink outlines
 import { mountBackdrop, MOOD_TO_FAMILY } from '../visual/Backdrops'; // M61: painted backdrops
 import type { BackdropFamily } from '../visual/Backdrops';
@@ -256,6 +258,8 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   // one timeline, published as `window.__FEL_QA__` for the mechanics probe. See QaTrace.ts. Off in play: `qa` is null.
   const qa = agentEnabled() ? new QaTrace() : null;
   const qaRawHud: Record<string, unknown> = {};
+  /** What each captioned HUD key last said, so one banner is announced once and not once a frame. */
+  const saidHud: Record<string, string> = {};
   const qaTrigAt: Record<'L' | 'R', number> = { L: -1e9, R: -1e9 };
   let qaResult: { outcome: string; score: number; card?: boolean } | null = null;
   let qaRestore: (() => void) | null = null;
@@ -360,7 +364,14 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       const result: SessionResult = buildResult(def.modeId, outcome, score, stats, startedAt, detail);
       void opts.cardSink?.(result);
     },
-    setHud(update) { if (qa) { qa.hud(update); Object.assign(qaRawHud, update); } opts.onHud?.(update); },
+    setHud(update) {
+      if (qa) { qa.hud(update); Object.assign(qaRawHud, update); }
+      // THE HUD'S NEWS IS ANNOUNCED. 31 modes push their headline through setHud({ banner }) and none call
+      // juice.banner(), so this — not the juice channel — is where a caption has to come from. See hudCaptions.
+      for (const c of captionsFromHud(update, saidHud)) captions.cue(c.text, 'feedback');
+      rememberHud(update, saidHud);
+      opts.onHud?.(update);
+    },
     stamina(v01) { ring?.set(v01); },
   };
 
