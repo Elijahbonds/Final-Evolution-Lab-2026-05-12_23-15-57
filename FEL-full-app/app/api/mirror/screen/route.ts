@@ -6,7 +6,8 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { grantServerReward } from '@/lib/wallet/wallet-service';
 import { decideScreenReward } from '@/lib/mirror/screenReward';
-import { scoreScreen, type CheckResult, type ScreenId } from '@/lib/mirror/screen';
+import { MIRROR_SCREEN_KIND, scoreScreen, type CheckResult, type ScreenId } from '@/lib/mirror/screen';
+import { storedScreen, storedScreenId } from '@/lib/mirror/screenStore';
 
 /**
  * A completed movement screen.
@@ -18,7 +19,18 @@ import { scoreScreen, type CheckResult, type ScreenId } from '@/lib/mirror/scree
  *
  * The score is recomputed here from the checks rather than accepted from the client, and the athlete id in the
  * idempotency key is the SESSION's, never the body's.
+ *
+ * THE SCREEN IS KEPT NOW (2026-09-21). Until today this route scored a screen, paid for it in shards, returned
+ * the summary and threw it away — nothing was written anywhere. So an athlete's screen existed for one render
+ * and was gone: no history, no way to see whether the thing they were told to correct got better, and nothing a
+ * coach could ever read. lib/coach/mirrorToProgram.ts ("the screen writes the corrective work") could not be
+ * connected to anything for exactly this reason, and that module's own header calls this tie the one thing the
+ * competition cannot answer quickly.
+ *
+ * It is stored the same way the dunk log is — WorkoutScan with its own `kind`, numbers only, no video, no
+ * keypoints — and a failed write never costs the athlete their reward.
  */
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const athleteId = (session?.user as { id?: string } | undefined)?.id;
@@ -52,6 +64,19 @@ export async function POST(req: NextRequest) {
       metadata: { screen, screenId, redFlags: summary.redFlags, asymmetries: summary.asymmetries },
     }).catch(() => null);
     awarded = granted?.granted.shards ?? 0;
+  }
+
+  // Kept AFTER the reward, and never allowed to break it: a screen the athlete earned is not undone by a write.
+  // Deduped on screenId so a retried post is one screen in their history rather than two.
+  const already = await prisma.workoutScan.findFirst({
+    where: { userId: athleteId, kind: MIRROR_SCREEN_KIND },
+    orderBy: { createdAt: 'desc' }, take: 1, select: { metrics: true },
+  }).catch(() => null);
+  const seen = storedScreenId(already?.metrics ?? null);
+  if (seen !== screenId) {
+    await prisma.workoutScan.create({
+      data: { userId: athleteId, kind: MIRROR_SCREEN_KIND, metrics: storedScreen(screenId, screen, results, summary) as unknown as object },
+    }).catch(() => null);
   }
 
   return NextResponse.json({

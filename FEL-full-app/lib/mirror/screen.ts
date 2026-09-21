@@ -120,6 +120,14 @@ export function screenFor(id: ScreenId): ScreenStation[] {
 
 // ── SCORING ─────────────────────────────────────────────────────────────────
 
+/**
+ * The WorkoutScan `kind` a completed Mirror screen is stored under.
+ *
+ * Its own kind, not the older `movement_screen`: that one holds the v1 workout scan's derived metrics, which is a
+ * different measurement with a different shape, and mixing them would make both histories lie.
+ */
+export const MIRROR_SCREEN_KIND = 'mirror_screen';
+
 export interface CheckResult {
   checkId: string;
   grade: Grade;

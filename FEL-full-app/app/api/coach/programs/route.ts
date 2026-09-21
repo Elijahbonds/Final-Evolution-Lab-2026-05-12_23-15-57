@@ -20,7 +20,7 @@ export async function GET() {
   const programs = rows.map((r) => {
     const tree = toTree(r);
     const done = r.clientSessions.map((c) => c.sessionId);
-    return { tree, role: accessRole(r, userId), coachName: nameOf(r.coachId), clientName: nameOf(r.clientId), isActive: r.isActive, startDate: r.startDate, completedSessionIds: done, next: nextSession(tree, done), plan: planByProgram.get(r.id) ?? null };
+    return { tree, role: accessRole(r, userId), coachName: nameOf(r.coachId), clientName: nameOf(r.clientId), clientId: r.clientId, isActive: r.isActive, startDate: r.startDate, completedSessionIds: done, next: nextSession(tree, done), plan: planByProgram.get(r.id) ?? null };
   });
   return NextResponse.json({ programs, coachCertified: await isCertifiedCoach(userId) });
 }

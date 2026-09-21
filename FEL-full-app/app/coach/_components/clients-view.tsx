@@ -6,10 +6,11 @@ import { toast } from 'sonner';
 import { Loader2, Plus, Trash2, Video, MessageSquare, IdCard } from 'lucide-react';
 import { InvitePanel } from '@/components/coach/invite-panel';
 import { AttentionPanel } from '@/components/coach/attention-panel';
+import { ScreenPrescriptions } from '@/components/coach/screen-prescriptions';
 
 interface Ex { id: string; name: string; sets: number; reps: string; load: string; tempo: string; restSeconds: number; coachNote: string | null }
 interface Tree { id: string; name: string; blocks: { id: string; label: string; sessions: { id: string; label: string; exercises: Ex[] }[] }[] }
-interface Program { tree: Tree; role: 'coach' | 'client' | null; clientName: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
+interface Program { tree: Tree; role: 'coach' | 'client' | null; clientName: string; clientId?: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
 interface Catalogue { id: string; name: string; category: string }
 interface InboxLog { id: string; exercise: string; prescribed: string; actualSets: number | null; actualReps: string | null; actualLoad: string | null; rpe: number | null; clientNote: string | null; videoUrl: string | null; coachComment: string | null }
 interface InboxItem { id: string; completedAt: string; program: { id: string; name: string }; session: string; clientName: string; logs: InboxLog[] }
@@ -101,6 +102,15 @@ export function ClientsView() {
         <div className="text-[11px] uppercase tracking-wider text-white/40">Programs I coach</div>
         {programs.length === 0 && <div className="text-sm text-white/50">Draft a Plan for a mentee in Camp — its milestones become the program you build here.</div>}
         <div className="flex gap-2 flex-wrap">{programs.map((p) => <button key={p.tree.id} onClick={() => setSelected(p.tree.id)} className={`rounded-lg px-3 py-1.5 text-xs border ${selected === p.tree.id ? 'border-[#00E5FF]/50 text-[#00E5FF] bg-[#00E5FF]/10' : 'border-white/10 text-white/70'}`}>{p.clientName} · {p.tree.name}</button>)}</div>
+        {/* The screen's correctives, offered before the blank builder below them: the coach came here to write
+            work for this athlete, and the athlete's own screen already says what the work should be. */}
+        {prog?.clientId && (
+          <ScreenPrescriptions
+            clientId={prog.clientId}
+            sessions={prog.tree.blocks.flatMap((b) => b.sessions.map((s) => ({ id: s.id, label: `${b.label} · ${s.label}` })))}
+            onAdd={(_sessionId, body) => builder(prog.tree.id, body)}
+          />
+        )}
         {prog && prog.tree.blocks.map((b) => (
           <div key={b.id} className="space-y-2">
             <div className="text-sm text-white/70 font-medium">{b.label}</div>
