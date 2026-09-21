@@ -4,6 +4,7 @@
 
 import { Matrix, Quaternion, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, TargetCamera, TransformNode, Observer } from '@babylonjs/core';
+import { replayWindow } from './replayWindow';
 
 const WINDOW_S = 4, RATE_HZ = 30, SPEED = 0.5;
 
@@ -82,14 +83,13 @@ export class DunkReplayRecorder {
    * nobody re-watches the walk to the baseline. The buffer stays 4 s because the mode cannot know at record
    * time how long the run-up will be; the TRIM happens at playback, when it does.
    */
-  play(rimCenter: Vector3, lastSeconds = WINDOW_S): Promise<void> {
+  play(rimCenter: Vector3, lastSeconds = WINDOW_S, endAt?: number): Promise<void> {
     if (this.buf.length < RATE_HZ) return Promise.resolve();
     const all = [...this.buf];
-    const endT = all[all.length - 1].t;
-    // keep at least half a second whatever is asked for: a trim that leaves two frames is not a replay
-    const cut = endT - Math.max(0.5, lastSeconds);
-    const trimmed = all.filter((f) => f.t >= cut);
-    const frames = trimmed.length >= 2 ? trimmed : all;
+    // `endAt` is the last moment worth showing — the mode passes the ball through the net. Everything after it is the
+    // mode holding the body parked at rim height for the verdict beat: dead air that played back as a statue. See replayWindow.
+    const w = replayWindow(all.map((f) => f.t), { lastSeconds, endAt });
+    const frames = all.slice(w.from, w.to + 1);
     const t0 = frames[0].t, dur = frames[frames.length - 1].t - t0;
 
     return new Promise<void>((resolve) => {

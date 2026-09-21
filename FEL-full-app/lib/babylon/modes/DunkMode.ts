@@ -562,6 +562,10 @@ export const DunkMode: ModeDefinition = (() => {
   let replayClipNow = 0;                      // DUNK-BALL-ARMS-RIM: the replayed flight's clip second (the reach gate)
   let replaying = false, replayAir = false, replayAerial = false, replayAirSec = 0, replayAerialAt = 0, replayPrevY = 0;   // H5: replay re-drive
   let launchRealMs = 0, resolveRealMs = 0, clipTimeAtResolve = 0;   // the live flight's real timing, for the replay's clip rate
+  /** The contact and the ball through the net, on the recorder's clock (seconds). The replay ends on the net —
+   *  everything after it is the body parked at rim height for the verdict beat, which played back as a motionless
+   *  hero (measured: 0.9 s of it, arms inside a centimetre). 0 = it did not happen this attempt. */
+  let flushRealSec = 0, netRealSec = 0;
   const rim = new Vector3(0, CFG.rimHeight, CFG.rimZ);
   const ebState = { inLeftHand: false };
   let stickX = 0, stickY = 0;
@@ -1526,7 +1530,7 @@ export const DunkMode: ModeDefinition = (() => {
               // …and out of the metal when it was already in it a frame ago (a low catch under the front rim: no clear frame to rewind to)
               const touch = clearOfIron(jamPrevLive ? sweptTouch(jamPrevBall, bp, rim, RIM_RADIUS, ballSim.radius) : bp, rim, RIM_RADIUS, ballSim.radius);
               releaseBall(ball); ball.position.set(touch.x, touch.y, touch.z);
-              jamContact = true; releasePos.copyFrom(ball.position); sinceRelease = 0; flush = startFlush(ball.position, rim, RIM_RADIUS, ballSim.radius, NET_THROW_MIN + (NET_THROW_MAX - NET_THROW_MIN) * Math.max(0, Math.min(1, qteAccuracy)));   // NET EXIT: a clean slam spits it out
+              jamContact = true; flushRealSec = performance.now() / 1000; releasePos.copyFrom(ball.position); sinceRelease = 0; flush = startFlush(ball.position, rim, RIM_RADIUS, ballSim.radius, NET_THROW_MIN + (NET_THROW_MAX - NET_THROW_MIN) * Math.max(0, Math.min(1, qteAccuracy)));   // NET EXIT: a clean slam spits it out
               console.info(`[HANDS] iron contact ${(jamSec * 1000).toFixed(0)} ms into the jam: ball ${Vector3.Distance(bp, rim).toFixed(2)} m from the rim centre (${bp.y.toFixed(2)} m) · iron ${ringDistance(bp, rim, RIM_RADIUS).toFixed(3)} m (last frame ${jamPrevLive ? ringDistance(jamPrevBall, rim, RIM_RADIUS).toFixed(3) : '—'}) → let go at ${ringDistance(touch, rim, RIM_RADIUS).toFixed(3)}`);
               // DUNK-BALL-ARMS-RIM: the CONTACT is the ball ON the iron — a jam that timed out with the ball short of it (a late slam:
               // 9 cm of daylight measured) punches on the flush frame the ball meets the ring, not on the release
@@ -1543,7 +1547,7 @@ export const DunkMode: ModeDefinition = (() => {
               const st = stepFlush(flush, rim, RIM_RADIUS, ballSim.radius, dt);
               ball.position.set(st.pos.x, st.pos.y, st.pos.z);
               if (punchPending && (ringDistance(st.pos, rim, RIM_RADIUS) <= ringClearance(ballSim.radius) + 0.02 || st.phase !== 'lip')) { punchPending = false; setWin('contact'); contactPunch(ctx); console.info(`[HANDS] contact on the iron ${(sinceRelease * 1000).toFixed(0)} ms after the let-go`); }
-              if (st.phase === 'free') { ballSim.launch(ball.position.clone(), new Vector3(st.vel.x, st.vel.y, st.vel.z)); looseBall = true; console.info(`[HANDS] through the net ${(sinceRelease * 1000).toFixed(0)} ms after the contact`); }
+              if (st.phase === 'free') { ballSim.launch(ball.position.clone(), new Vector3(st.vel.x, st.vel.y, st.vel.z)); looseBall = true; netRealSec = performance.now() / 1000; console.info(`[HANDS] through the net ${(sinceRelease * 1000).toFixed(0)} ms after the contact`); }
             }
             const through = sinceRelease > FLUSH_BEAT_SEC;
             if (hangOn) {
@@ -1999,7 +2003,7 @@ export const DunkMode: ModeDefinition = (() => {
     slamBufferAt = -1; slamSeen = false; slamCueOn = false; beatCalled = false;   // DUNK-BODY-MID: the slam buffer is per attempt
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
     airHeld = false; dropToFloor = false; replaying = false; replayAir = false; launchRealMs = performance.now();   // A+ P8
-    jamSec = -1; jamContact = false; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
+    jamSec = -1; jamContact = false; flushRealSec = 0; netRealSec = 0; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
     console.info('[JUICE-SOFT] launch');
     ctx.camDirector.resetLook();   // the takeoff → rimCamCut framing never inherits a look orbit
     ctx.setHud({ bannerHigh: true });   // DUNK-CAR-CLIP R2: the flight's banners ride at the top of the frame, clear of the rim (finishAttempt puts them back)
@@ -3065,7 +3069,7 @@ export const DunkMode: ModeDefinition = (() => {
     // `launchRealMs` to now -- so it trims to that plus a beat of run-up for context, which is the shape a
     // broadcast actually cuts.
     const flightSec = Math.max(0, (performance.now() - launchRealMs) / 1000);
-    const replayDone = replay.play(rim, Math.min(4, flightSec + REPLAY_LEAD_IN_SEC)).then(() => { replaying = false; replayAir = false; player.root.rotationQuaternion = null; dropToFloor = true; console.info('[HANDS] replay end'); });
+    const replayDone = replay.play(rim, Math.min(4, flightSec + REPLAY_LEAD_IN_SEC), (netRealSec || (flushRealSec && flushRealSec + 0.2)) || undefined).then(() => { replaying = false; replayAir = false; player.root.rotationQuaternion = null; dropToFloor = true; console.info('[HANDS] replay end'); });
     ctx.camDirector.suspended = true;
     await Promise.race([replayDone, new Promise((r) => setTimeout(r, 3500))]);
     ctx.camDirector.suspended = false;
@@ -3123,7 +3127,7 @@ export const DunkMode: ModeDefinition = (() => {
     armedAir = null; spin.reset(); replaySpinYaw = 0;
     playClip(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
-    jamSec = -1; jamContact = false; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
+    jamSec = -1; jamContact = false; flushRealSec = 0; netRealSec = 0; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
     styleTaps = 0; hangSec = 0; revealed = []; slamTiming = null;
     runUpPeak = 0; obstacleClipped = false; toppling = false; runwayIds = [];
     // THE FLIGHT'S ONCE-A-FLIGHT FLAGS ARE PER ATTEMPT (2026-09-18, measured: the bus wall run refused attempt 2 of a night — busRan, like
