@@ -7,6 +7,9 @@ import type { Scene, TargetCamera } from '@babylonjs/core';
 import { vibrate } from './Haptics';
 import { captions } from '../core/captions';
 
+/** How long the same callout stays "already said" for the caption bus. On screen it may repeat as often as it likes. */
+const CALLOUT_REPEAT_MS = 4000;
+
 /** Alpha at the frame's edge, where light spills in. */
 export const FLASH_EDGE = 0.46;
 /** Alpha through the middle of the frame, where the thing being celebrated is. */
@@ -172,10 +175,21 @@ export class JuiceKit {
   /** A small, quick line under the action — the answer to a press that cannot act ("WAIT FOR THE QUESTION", "NO BALL").
    *  Deliberately quieter than banner(): a refusal informs, it does not celebrate. One at a time. */
   private calloutEl: HTMLDivElement | null = null;
+  private lastCalloutText = '';
+  private lastCalloutAt = -1e9;
   callout(text: string, color = '#cbd5e1', ms = 700): void {
     // A callout is the answer to a press that could not act ("NO BALL", "WAIT FOR THE QUESTION"). A player who
     // cannot see it has to guess why nothing happened, so it is announced like the banner is.
-    captions.cue(text, 'feedback');
+    //
+    // ONCE, THOUGH. Heard in production while driving off a kart course: "BACK TO THE TRACK. BACK TO THE TRACK.
+    // BACK TO THE TRACK." A callout that repeats on a cooldown is fine on screen — it is one element that
+    // replaces itself — and unbearable in a screen reader, which reads the whole region again each time. The
+    // same rule as a race bump: the first one is the event, the repeats are a buzz.
+    const now = performance.now();
+    if (this.lastCalloutText !== text || now - this.lastCalloutAt > CALLOUT_REPEAT_MS) {
+      captions.cue(text, 'feedback');
+      this.lastCalloutText = text; this.lastCalloutAt = now;
+    }
     this.calloutEl?.remove();
     const el = document.createElement('div');
     el.textContent = text;
